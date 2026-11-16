@@ -38,20 +38,21 @@ struct CollisionHash {
 };
 
 template <std::size_t Alignment> struct alignas(Alignment) FlatMoveOnly {
-  static int live_count;
+  static int& live_count() {
+    static int count = 0;
+    return count;
+  }
   int id;
   std::unique_ptr<int> ownership;
 
-  explicit FlatMoveOnly(int value) : id(value), ownership(std::make_unique<int>(value)) { ++live_count; }
-  FlatMoveOnly(FlatMoveOnly&& other) noexcept : id(other.id), ownership(std::move(other.ownership)) { ++live_count; }
+  explicit FlatMoveOnly(int value) : id(value), ownership(std::make_unique<int>(value)) { ++live_count(); }
+  FlatMoveOnly(FlatMoveOnly&& other) noexcept : id(other.id), ownership(std::move(other.ownership)) { ++live_count(); }
   FlatMoveOnly(FlatMoveOnly const&) = delete;
   FlatMoveOnly& operator=(FlatMoveOnly const&) = delete;
   FlatMoveOnly& operator=(FlatMoveOnly&&) = delete;
-  ~FlatMoveOnly() { --live_count; }
+  ~FlatMoveOnly() { --live_count(); }
 };
 
-template <> int FlatMoveOnly<64>::live_count = 0;
-template <> int FlatMoveOnly<128>::live_count = 0;
 
 using FlatMoveKey = FlatMoveOnly<64>;
 using FlatMoveValue = FlatMoveOnly<128>;
@@ -202,8 +203,8 @@ TEST(FlatHashMap, NonassignableAlignedOwnershipSurvivesDisplacementRehashAndEras
   using MapType = FlatHashMap<FlatMoveKey, FlatMoveValue, FlatWrapHash, FlatMoveEqual>;
   static_assert(std::forward_iterator<MapType::iterator>);
   static_assert(std::forward_iterator<MapType::const_iterator>);
-  EXPECT_EQ(FlatMoveKey::live_count, 0);
-  EXPECT_EQ(FlatMoveValue::live_count, 0);
+  EXPECT_EQ(FlatMoveKey::live_count(), 0);
+  EXPECT_EQ(FlatMoveValue::live_count(), 0);
   {
     MapType values;
     for (int key : {1, 0, 2, 3})
@@ -238,15 +239,15 @@ TEST(FlatHashMap, NonassignableAlignedOwnershipSurvivesDisplacementRehashAndEras
     EXPECT_EQ(values.begin(), values.end());
     EXPECT_EQ(moved.size(), 20u);
     moved.clear();
-    EXPECT_EQ(FlatMoveKey::live_count, 1);
-    EXPECT_EQ(FlatMoveValue::live_count, 1);
+    EXPECT_EQ(FlatMoveKey::live_count(), 1);
+    EXPECT_EQ(FlatMoveValue::live_count(), 1);
   }
-  EXPECT_EQ(FlatMoveKey::live_count, 0);
-  EXPECT_EQ(FlatMoveValue::live_count, 0);
+  EXPECT_EQ(FlatMoveKey::live_count(), 0);
+  EXPECT_EQ(FlatMoveValue::live_count(), 0);
 }
 
 TEST(FlatHashSet, NonassignableAlignedKeysSurviveCollisionRelocation) {
-  EXPECT_EQ(FlatMoveKey::live_count, 0);
+  EXPECT_EQ(FlatMoveKey::live_count(), 0);
   {
     FlatHashSet<FlatMoveKey, FlatWrapHash, FlatMoveEqual> values;
     static_assert(std::same_as<decltype(*values.begin()), FlatMoveKey const&>);
@@ -263,7 +264,7 @@ TEST(FlatHashSet, NonassignableAlignedKeysSurviveCollisionRelocation) {
     }
     values.clear();
   }
-  EXPECT_EQ(FlatMoveKey::live_count, 0);
+  EXPECT_EQ(FlatMoveKey::live_count(), 0);
 }
 
 TEST(FlatHashMap, ReboundAllocatorsAndFunctorStateSurviveCopiesAndMoves) {

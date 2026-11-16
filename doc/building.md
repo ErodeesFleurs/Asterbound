@@ -146,6 +146,8 @@ Sanitized mimalloc uses an optimized, assertion-enabled `RelWithAsserts` profile
 with ASan tracking and its existing allocator checks retained. Unused upstream
 cpptrace demonstration executables are excluded from the default build; its
 integration and unit tests remain enabled.
+Known unsupported Nix-hook CMake variables are omitted before configuration;
+unsetting them with `-U` still leaves CMake's unused-command-line warning.
 
 Build variants into different result links when retaining more than one:
 

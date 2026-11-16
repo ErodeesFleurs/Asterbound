@@ -16,17 +16,21 @@ let
       env = (old.env or { }) // {
         XCLANG_ROOT = cc.bundledRuntime;
       };
-      cmakeFlags = (old.cmakeFlags or [ ]) ++ [
-        # The Nix hook still injects this pre-CMP0090 export option; none of
-        # these dependencies exports packages to the user's registry.
-        "-UCMAKE_EXPORT_NO_PACKAGE_REGISTRY"
+      # A fresh Nix build has no stale cache. Omit variables marked for removal
+      # before CMake sees them, including the hook's obsolete registry option.
+      cmakeFlags = lib.filter (flag: !(lib.hasPrefix "-U" flag)) (old.cmakeFlags or [ ]) ++ [
         (lib.cmakeBool "CMAKE_SKIP_BUILD_RPATH" false)
         (lib.cmakeFeature "CMAKE_BUILD_RPATH" (
           lib.makeLibraryPath ((old.buildInputs or [ ]) ++ (old.propagatedBuildInputs or [ ]))
         ))
       ];
       preConfigure =
-        lib.optionalString sanitizers ''
+        (import ./filter-cmake-variables.nix) (
+          [ "CMAKE_EXPORT_NO_PACKAGE_REGISTRY" ]
+          ++ map (lib.removePrefix "-U")
+            (lib.filter (lib.hasPrefix "-U") (old.cmakeFlags or [ ]))
+        )
+        + lib.optionalString sanitizers ''
           export CFLAGS="''${CFLAGS-} -fsanitize=address,undefined"
           export CXXFLAGS="''${CXXFLAGS-} -fsanitize=address,undefined"
           export LDFLAGS="''${LDFLAGS-} -fsanitize=address,undefined"
@@ -166,6 +170,10 @@ let
             --replace-fail 'mu_->ReaderUnlock()' 'mu_->unlock_shared()' \
             --replace-fail 'mu_->WriterLock()' 'mu_->lock()' \
             --replace-fail 'mu_->WriterUnlock()' 'mu_->unlock()'
+          substituteInPlace re2/regexp.cc \
+            --replace-fail 'absl::MutexLock l(ref_mutex());' 'absl::MutexLock l(*ref_mutex());'
+          substituteInPlace re2/testing/regexp_benchmark.cc \
+            --replace-fail 'absl::MutexLock lock(&mutex);' 'absl::MutexLock lock(mutex);'
         '';
       })
   );

@@ -64,13 +64,14 @@ struct AlgebraicScalar {
 
 struct ExplicitScalar {
   explicit constexpr ExplicitScalar(int) noexcept {}
-  friend int operator*(ExplicitScalar const&, ExplicitScalar const&) noexcept;
 };
+// These operators participate only in unevaluated constraint checks.
+[[maybe_unused]] int operator*(ExplicitScalar const&, ExplicitScalar const&) noexcept;
 
 struct ExplicitInterpolationValue {
   explicit ExplicitInterpolationValue(double) {}
-  friend double operator*(ExplicitInterpolationValue const&, double);
 };
+[[maybe_unused]] double operator*(ExplicitInterpolationValue const&, double);
 
 struct CopyOnlyEndpoint {
   int value;

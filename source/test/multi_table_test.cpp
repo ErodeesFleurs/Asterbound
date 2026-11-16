@@ -441,7 +441,7 @@ TEST(MultiArrayTest, LinearSetSizeRetainsPrefixAndZeroShapesRetainCapacity) {
     array[i] = static_cast<int>(i + 1);
   ASSERT_TRUE(array.set_size({3, 2, 4}, -1));
   for (std::size_t i = 0; i < array.size(); ++i)
-    EXPECT_EQ(array[i], i + 1);
+    EXPECT_EQ(array[i], static_cast<int>(i + 1));
   ASSERT_TRUE(array.set_size({3, 3, 4}, -1));
   for (std::size_t i = 0; i < array.size(); ++i)
     EXPECT_EQ(array[i], i < 24 ? static_cast<int>(i + 1) : -1);

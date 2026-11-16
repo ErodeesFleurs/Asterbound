@@ -28,7 +28,7 @@ struct NonDefaultMatrixScalar {
   explicit NonDefaultMatrixScalar(std::uint16_t v) : value(v) {}
 };
 
-[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException>
+[[maybe_unused, nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException>
 operator>>(DataStream& stream, NonDefaultMatrixScalar& value);
 
 static_assert(stream_readable<Matrix3<NonDefaultMatrixScalar>>);

@@ -104,14 +104,11 @@ let
   # by selecting the dummy audio driver.
   patchedSdl3 = sdl3.overrideAttrs (old: {
     patches = (old.patches or [ ]) ++ [ ./patches/sdl3-alsa-cleanup.patch ];
-    cmakeFlags =
-      lib.filter (flag: !(lib.hasPrefix "-DSDL_UNIX_CONSOLE_BUILD=" flag)) (old.cmakeFlags or [ ])
-      ++ [
-        # SDL is C-only; the Nix hook injects both language compilers and an
-        # obsolete export-registry option, irrespective of project support.
-        "-UCMAKE_CXX_COMPILER"
-        "-UCMAKE_EXPORT_NO_PACKAGE_REGISTRY"
-      ];
+    preConfigure = (import ./filter-cmake-variables.nix) [
+      "CMAKE_CXX_COMPILER"
+      "CMAKE_EXPORT_NO_PACKAGE_REGISTRY"
+      "SDL_UNIX_CONSOLE_BUILD"
+    ] + (old.preConfigure or "");
   });
   imgui = dependencies.instrument (
     callPackage ./imgui.nix {
