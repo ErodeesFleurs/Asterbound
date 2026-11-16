@@ -639,9 +639,10 @@ if (!result914) return std::unexpected(std::move(result914.error()));
   }
 
   auto result915 = world();
-if (!result915) return std::unexpected(std::move(result915.error()));
-if (result915->get().isClient())
-  this->root().spatialLogger().log_poly("world", m_movementController->collisionBody(), Color::Red.to_rgba());
+  if (!result915) return std::unexpected(std::move(result915.error()));
+  if (result915->get().isClient()) {
+    this->root().spatialLogger().log_poly("world", m_movementController->collisionBody(), Color::Red.to_rgba());
+  }
   return {};
 }
 

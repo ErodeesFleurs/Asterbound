@@ -21,7 +21,6 @@
         "VCPKG_OVERLAY_TRIPLETS": "${sourceParentDir}/triplets",
         "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceParentDir}/triplets/toolchain.cmake",
         "VCPKG_MANIFEST_FEATURES": "qt-tools",
-        "CMAKE_VERBOSE_MAKEFILE": true,
         "CMAKE_EXPORT_COMPILE_COMMANDS": true,
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "STAR_BUILD_QT_TOOLS": true,

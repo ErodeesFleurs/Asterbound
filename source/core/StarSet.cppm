@@ -290,7 +290,7 @@ public:
     return std::optional<value_type>(std::in_place, extract_at(last_position()));
   }
   bool has_intersection(BasicSet const& other) const {
-    return std::ranges::any_of(other, [this](auto const& value) { return contains(value); });
+    return std::ranges::any_of(other, [this](auto const& value) { return this->contains(value); });
   }
   BasicSet intersection(BasicSet const& other) const
     requires set_copyable_value<value_type>

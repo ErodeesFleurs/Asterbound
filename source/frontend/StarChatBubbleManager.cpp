@@ -611,7 +611,8 @@ std::expected<void, StarException> ChatBubbleManager::addChatActions(List<ChatAc
                        .age = 0,
                        .backgroundImages = std::move(backgroundImages),
                        .bubbleText = std::move(bubbleTexts),
-                       .onscreen = false};
+                       .onscreen = false,
+                       .instance = {}};
       List<BubbleState<Bubble>> oldBubbles = m_bubbles.filtered([&sayAction](BubbleState<Bubble> const&, Bubble const& bubble) {
           return bubble.entity == sayAction.entity;
         });
@@ -651,7 +652,8 @@ std::expected<void, StarException> ChatBubbleManager::addChatActions(List<ChatAc
                                     .age = 0,
                                     .backgroundImages = std::move(backgroundImages),
                                     .bubbleText = std::move(bubbleTexts),
-                                    .onscreen = false});
+                                    .onscreen = false,
+                                    .instance = {}});
     }
 
     if (!silent) {

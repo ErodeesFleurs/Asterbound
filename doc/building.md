@@ -27,6 +27,12 @@ Run commands from the repository root unless a step changes directories.
 
 GCC, Apple Clang and MSVC builds are unsupported. Windows uses MinGW. Dependencies must use the same C++ runtime; all configurations use static mimalloc with `MI_OVERRIDE=OFF` and must not mix allocator heaps.
 
+Optimized profiles retain fast scalar arithmetic through explicit Clang options
+rather than a conflicting `-ffast-math` umbrella. macOS providers share full
+complex arithmetic mode. Color's HSV interpolation and hue divisions retain
+local precise, noncontracting rounding so instrumentation cannot change their
+half-byte regression results; other arithmetic remains optimized.
+
 Lua is fetched from the official [`lua/lua`](https://github.com/lua/lua) GitHub repository at the Lua 5.5.1 commit pinned by the [source URL and archive hash](../cmake/dependencies/lua.json), then receives the [project patch](../cmake/patches/lua-openstarbound.patch). Git is required unless using Nix or supplying prepatched Lua sources. Both CMake and Nix use the same lock and patch; prepatched source overrides must expose `lua.h` and the C sources directly at their root.
 
 ## Linux without Nix
@@ -133,6 +139,13 @@ ASTERBOUND_ASSETS=/path/to/Starbound/assets ./result/bin/asterbound
 | `.#benchmarks` / `.#benchmarks-gui` | Opt-in benchmark targets |
 
 Discord is disabled in all default variants. ARM64's default package is SDK-free. See the [testing guide](testing.md) for asset-backed runners and benchmark usage.
+
+The Nix dependency overlay updates Abseil's captured-`this` annotations and RE2's
+mutex calls for the pinned compiler/API without disabling their diagnostics.
+Sanitized mimalloc uses an optimized, assertion-enabled `RelWithAsserts` profile
+with ASan tracking and its existing allocator checks retained. Unused upstream
+cpptrace demonstration executables are excluded from the default build; its
+integration and unit tests remain enabled.
 
 Build variants into different result links when retaining more than one:
 

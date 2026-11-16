@@ -2,7 +2,7 @@
   lib,
   stdenv,
   stdenvNoCC,
-  fetchurl,
+  fetchFromGitHub,
   callPackage,
   cmake,
   ninja,
@@ -68,6 +68,9 @@ let
   sdkExtension = stdenv.hostPlatform.extensions.sharedLibrary;
   opusCmake = callPackage ./opus-cmake-config.nix { };
   luaMetadata = builtins.fromJSON (builtins.readFile ../cmake/dependencies/lua.json);
+  luaRevision = builtins.elemAt (
+    builtins.match "https://github.com/lua/lua/archive/([0-9a-f]{40})\\.tar\\.gz" luaMetadata.url
+  ) 0;
   # Isolate the patch's store identity from unrelated edits to the flake source.
   luaPatch = builtins.path {
     path = ../cmake/patches/lua-openstarbound.patch;
@@ -78,8 +81,11 @@ let
   luaSource = stdenvNoCC.mkDerivation {
     pname = "openstarbound-lua-source";
     version = luaMetadata.version;
-    src = fetchurl {
-      inherit (luaMetadata) url sha256;
+    src = fetchFromGitHub {
+      owner = "lua";
+      repo = "lua";
+      rev = luaRevision;
+      hash = "sha256-Sml/XrEMBC6uxLmq7EW84YSIcK52qLIngCNQNvzax5E=";
     };
     patches = [ luaPatch ];
     strictDeps = true;
@@ -98,6 +104,14 @@ let
   # by selecting the dummy audio driver.
   patchedSdl3 = sdl3.overrideAttrs (old: {
     patches = (old.patches or [ ]) ++ [ ./patches/sdl3-alsa-cleanup.patch ];
+    cmakeFlags =
+      lib.filter (flag: !(lib.hasPrefix "-DSDL_UNIX_CONSOLE_BUILD=" flag)) (old.cmakeFlags or [ ])
+      ++ [
+        # SDL is C-only; the Nix hook injects both language compilers and an
+        # obsolete export-registry option, irrespective of project support.
+        "-UCMAKE_CXX_COMPILER"
+        "-UCMAKE_EXPORT_NO_PACKAGE_REGISTRY"
+      ];
   });
   imgui = dependencies.instrument (
     callPackage ./imgui.nix {

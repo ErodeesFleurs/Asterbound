@@ -38,7 +38,7 @@ struct CollisionHash {
 };
 
 template <std::size_t Alignment> struct alignas(Alignment) FlatMoveOnly {
-  inline static int live_count = 0;
+  static int live_count;
   int id;
   std::unique_ptr<int> ownership;
 
@@ -49,6 +49,9 @@ template <std::size_t Alignment> struct alignas(Alignment) FlatMoveOnly {
   FlatMoveOnly& operator=(FlatMoveOnly&&) = delete;
   ~FlatMoveOnly() { --live_count; }
 };
+
+template <> int FlatMoveOnly<64>::live_count = 0;
+template <> int FlatMoveOnly<128>::live_count = 0;
 
 using FlatMoveKey = FlatMoveOnly<64>;
 using FlatMoveValue = FlatMoveOnly<128>;
@@ -278,7 +281,9 @@ TEST(FlatHashMap, ReboundAllocatorsAndFunctorStateSurviveCopiesAndMoves) {
     EXPECT_EQ(copy.hash_function().salt, 17);
     EXPECT_EQ(copy.key_eq().modulus, 1000);
     EXPECT_EQ(copy.find(1003)->second, 30);
-    copy = copy;
+    auto const& self = copy;
+    EXPECT_EQ(std::addressof(copy = self), std::addressof(copy));
+    EXPECT_EQ(copy, original);
     EXPECT_EQ(copy.size(), 40u);
     MapType moved(std::move(copy), Allocator(first_state));
     EXPECT_EQ(moved.get_allocator().state, &first_state);

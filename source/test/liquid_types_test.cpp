@@ -389,7 +389,7 @@ const GameTestRegistration
       engine.visitLocation({i * 2, 0});
       ASSERT_TRUE(engine.update());
     }
-    ASSERT_EQ(engine.activeCells(), BudgetLiquidBasin::Count);
+    ASSERT_EQ(engine.activeCells(), basin->cells.size());
     engine.setProcessingLimit(2);
     // Engine membership uses Rect::contains (inclusive max), not belongs.
     // End at odd x=29 so x=28 is unlimited but x=30 remains ordinary.
@@ -397,7 +397,7 @@ const GameTestRegistration
     basin->failNextRead = true;
     auto failed = engine.update();
     ASSERT_FALSE(failed);
-    ASSERT_EQ(engine.activeCells(), BudgetLiquidBasin::Count);
+    ASSERT_EQ(engine.activeCells(), basin->cells.size());
     ASSERT_TRUE(engine.update());
     for (int i = 0; i < BudgetLiquidBasin::Count; ++i) {
       bool unlimited = i >= 10 && i <= 14;

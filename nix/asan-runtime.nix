@@ -95,7 +95,6 @@ stdenv.mkDerivation {
     (lib.cmakeBool "LIBCXX_INSTALL_MODULES" true)
     (lib.cmakeBool "LIBCXX_ENABLE_ABI_LINKER_SCRIPT" false)
     (lib.cmakeBool "LIBCXX_INCLUDE_TESTS" false)
-    (lib.cmakeBool "LIBCXX_INCLUDE_BENCHMARKS" false)
     (lib.cmakeBool "LIBCXX_ENABLE_RTTI" true)
     (lib.cmakeBool "LIBCXX_ENABLE_EXCEPTIONS" true)
   ];

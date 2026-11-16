@@ -113,17 +113,24 @@ if(NOT STAR_SYSTEM_WINDOWS AND NOT STAR_SYSTEM_MACOS)
   target_link_options(star_build_config INTERFACE -pthread)
 endif()
 
+# Spell out the fast-math components so source-local contraction and complex
+# arithmetic policies do not contradict an umbrella flag. Clang derives the same
+# fast scalar options; macOS module providers also need full complex arithmetic.
+set(star_fast_math_options
+  -fno-honor-infinities -fno-honor-nans -fno-math-errno -fapprox-func
+  -fno-signed-zeros -fassociative-math -freciprocal-math
+  -fno-trapping-math -fno-rounding-math -ffp-contract=fast)
+if(STAR_SYSTEM_MACOS)
+  list(APPEND star_fast_math_options -fcomplex-arithmetic=full)
+else()
+  list(APPEND star_fast_math_options -fcomplex-arithmetic=basic)
+endif()
+
 foreach(config RelWithAsserts RelWithDebInfo Release)
   star_default_compile_options(${config} optimization -O3)
-  star_default_compile_options(${config} math -ffast-math)
+  star_default_compile_options(${config} math ${star_fast_math_options})
 endforeach()
 
-# Clang serializes complex arithmetic mode in every BMI. Keep it stable when
-# macOS color conversion opts out of scalar fast-math for saturation accuracy.
-if(STAR_SYSTEM_MACOS)
-  target_compile_options(star_build_config INTERFACE
-    "$<$<COMPILE_LANGUAGE:CXX>:-fno-cx-limited-range>")
-endif()
 
 foreach(config Debug RelWithAsserts RelWithDebInfo)
   if(STAR_DEBUG_SYMBOL_LEVEL STREQUAL "minimal" OR

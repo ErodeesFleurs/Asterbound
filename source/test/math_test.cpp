@@ -54,9 +54,6 @@ struct AlgebraicScalar {
   friend constexpr AlgebraicScalar operator-(AlgebraicScalar const& a, AlgebraicScalar const& b) noexcept {
     return AlgebraicScalar(a.value - b.value);
   }
-  friend constexpr AlgebraicScalar operator-(AlgebraicScalar const& a) noexcept {
-    return AlgebraicScalar(-a.value);
-  }
   friend constexpr ContextualBool operator<(AlgebraicScalar const& a, AlgebraicScalar const& b) noexcept {
     return {a.value < b.value};
   }
@@ -67,12 +64,12 @@ struct AlgebraicScalar {
 
 struct ExplicitScalar {
   explicit constexpr ExplicitScalar(int) noexcept {}
-  friend constexpr int operator*(ExplicitScalar const&, ExplicitScalar const&) noexcept { return 4; }
+  friend int operator*(ExplicitScalar const&, ExplicitScalar const&) noexcept;
 };
 
 struct ExplicitInterpolationValue {
   explicit ExplicitInterpolationValue(double) {}
-  friend double operator*(ExplicitInterpolationValue const&, double) { return 1; }
+  friend double operator*(ExplicitInterpolationValue const&, double);
 };
 
 struct CopyOnlyEndpoint {
@@ -407,22 +404,22 @@ TEST(Interpolation, BoundsAreSafeForShortSignedAndSizeExtents) {
           auto linear = get_bound2(x, extent, mode);
           auto cubic = get_bound4(x, extent, mode);
           if (extent <= 1) {
-            EXPECT_EQ(linear.i0, 0);
-            EXPECT_EQ(linear.i1, 0);
-            EXPECT_EQ(cubic.i0, 0);
-            EXPECT_EQ(cubic.i1, 0);
-            EXPECT_EQ(cubic.i2, 0);
-            EXPECT_EQ(cubic.i3, 0);
+            EXPECT_EQ(linear.i0, Index{0});
+            EXPECT_EQ(linear.i1, Index{0});
+            EXPECT_EQ(cubic.i0, Index{0});
+            EXPECT_EQ(cubic.i1, Index{0});
+            EXPECT_EQ(cubic.i2, Index{0});
+            EXPECT_EQ(cubic.i3, Index{0});
             EXPECT_EQ(cubic.offset, 0);
           } else {
             EXPECT_LT(cubic.i0, extent);
             EXPECT_LT(cubic.i1, extent);
             EXPECT_LT(cubic.i2, extent);
             EXPECT_LT(cubic.i3, extent);
-            EXPECT_GE(cubic.i0, 0);
-            EXPECT_GE(cubic.i1, 0);
-            EXPECT_GE(cubic.i2, 0);
-            EXPECT_GE(cubic.i3, 0);
+            EXPECT_GE(cubic.i0, Index{0});
+            EXPECT_GE(cubic.i1, Index{0});
+            EXPECT_GE(cubic.i2, Index{0});
+            EXPECT_GE(cubic.i3, Index{0});
             EXPECT_EQ(cubic.i1, linear.i0);
             EXPECT_EQ(cubic.i2, linear.i1);
             if (mode != BoundMode::Wrap) {
@@ -435,12 +432,12 @@ TEST(Interpolation, BoundsAreSafeForShortSignedAndSizeExtents) {
       }
     }
     auto wrapped = get_bound2(-0.25, Index{3}, BoundMode::Wrap);
-    EXPECT_EQ(wrapped.i0, 2);
-    EXPECT_EQ(wrapped.i1, 0);
+    EXPECT_EQ(wrapped.i0, Index{2});
+    EXPECT_EQ(wrapped.i1, Index{0});
     EXPECT_EQ(wrapped.offset, 0.75);
     auto outside = get_bound2(-2, Index{3}, BoundMode::Extrapolate);
-    EXPECT_EQ(outside.i0, 0);
-    EXPECT_EQ(outside.i1, 1);
+    EXPECT_EQ(outside.i0, Index{0});
+    EXPECT_EQ(outside.i1, Index{1});
     EXPECT_EQ(outside.offset, -2);
   };
   check.operator()<int>();
@@ -452,10 +449,10 @@ TEST(Interpolation, BoundsAreSafeForShortSignedAndSizeExtents) {
   EXPECT_EQ(pair_start.i3, 0);
   EXPECT_EQ(pair_start.offset, 0.25);
   auto pair_end = get_bound4(1.25, std::size_t{2}, BoundMode::Wrap);
-  EXPECT_EQ(pair_end.i0, 0);
-  EXPECT_EQ(pair_end.i1, 1);
-  EXPECT_EQ(pair_end.i2, 0);
-  EXPECT_EQ(pair_end.i3, 1);
+  EXPECT_EQ(pair_end.i0, 0u);
+  EXPECT_EQ(pair_end.i1, 1u);
+  EXPECT_EQ(pair_end.i2, 0u);
+  EXPECT_EQ(pair_end.i3, 1u);
   auto triple_start = get_bound4(0.25, 3, BoundMode::Wrap);
   EXPECT_EQ(triple_start.i0, 2);
   EXPECT_EQ(triple_start.i1, 0);
@@ -466,16 +463,16 @@ TEST(Interpolation, BoundsAreSafeForShortSignedAndSizeExtents) {
 
 TEST(Interpolation, CubicBoundsRetainFullWindowAndExtrapolationOffsets) {
   auto start = get_bound4(-0.5, std::size_t{5}, BoundMode::Clamp);
-  EXPECT_EQ(start.i0, 0);
-  EXPECT_EQ(start.i1, 1);
-  EXPECT_EQ(start.i2, 2);
-  EXPECT_EQ(start.i3, 3);
+  EXPECT_EQ(start.i0, 0u);
+  EXPECT_EQ(start.i1, 1u);
+  EXPECT_EQ(start.i2, 2u);
+  EXPECT_EQ(start.i3, 3u);
   EXPECT_EQ(start.offset, -1);
   auto end = get_bound4(8.0, std::size_t{5}, BoundMode::Clamp);
-  EXPECT_EQ(end.i0, 1);
-  EXPECT_EQ(end.i1, 2);
-  EXPECT_EQ(end.i2, 3);
-  EXPECT_EQ(end.i3, 4);
+  EXPECT_EQ(end.i0, 1u);
+  EXPECT_EQ(end.i1, 2u);
+  EXPECT_EQ(end.i2, 3u);
+  EXPECT_EQ(end.i3, 4u);
   EXPECT_EQ(end.offset, 2);
   EXPECT_EQ(get_bound4(-0.5, 5, BoundMode::Extrapolate).offset, -1.5);
   EXPECT_EQ(get_bound4(4.5, 5, BoundMode::Extrapolate).offset, 2.5);

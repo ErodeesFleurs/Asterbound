@@ -149,10 +149,12 @@ TEST(MapEquality, HeterogeneousIterationOrderAndExplicitBooleanValues) {
 
 TEST(ListPredicates, MembershipConvertsToElementType) {
   auto expectMembership = [](auto const& values) {
+    double present = 1.5;
+    double absent = 2.5;
     EXPECT_TRUE(values.contains(1));
-    EXPECT_TRUE(values.contains(1.5));
+    EXPECT_TRUE(values.contains(present));
     EXPECT_FALSE(values.contains(2));
-    EXPECT_FALSE(values.contains(2.5));
+    EXPECT_FALSE(values.contains(absent));
   };
 
   expectMembership(List<int>{1});

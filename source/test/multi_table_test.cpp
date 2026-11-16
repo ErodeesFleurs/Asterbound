@@ -387,7 +387,7 @@ TEST(MultiArrayTest, InvalidShapesAndGrowthPreserveEveryCoordinate) {
     EXPECT_EQ(array.size(), 6u);
     for (std::size_t x = 0; x < 2; ++x)
       for (std::size_t y = 0; y < 3; ++y)
-        EXPECT_EQ(array(x, y), 10 * x + y);
+        EXPECT_EQ(array(x, y), static_cast<int>(10 * x + y));
   };
   auto invalid = array.resize({array.max_size(), 2});
   ASSERT_FALSE(invalid);
@@ -411,7 +411,7 @@ TEST(MultiArrayTest, InvalidShapesAndGrowthPreserveEveryCoordinate) {
   EXPECT_EQ(array.size(), 20u);
   for (std::size_t x = 0; x < 4; ++x)
     for (std::size_t y = 0; y < 5; ++y)
-      EXPECT_EQ(array(x, y), x == 3 && y == 4 ? 99 : x < 2 && y < 3 ? 10 * x + y : 0);
+      EXPECT_EQ(array(x, y), x == 3 && y == 4 ? 99 : x < 2 && y < 3 ? static_cast<int>(10 * x + y) : 0);
 }
 
 TEST(MultiArrayTest, ResizePreservesCoordinateIntersectionAndFillsOnlyNewCells) {

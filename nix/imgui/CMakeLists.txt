@@ -23,7 +23,6 @@ add_library(imgui STATIC
 )
 add_library(imgui::imgui ALIAS imgui)
 target_compile_features(imgui PUBLIC cxx_std_11)
-target_compile_definitions(imgui PUBLIC IMGUI_ENABLE_FREETYPE)
 target_include_directories(imgui PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>

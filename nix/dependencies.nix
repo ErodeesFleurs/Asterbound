@@ -17,8 +17,9 @@ let
         XCLANG_ROOT = cc.bundledRuntime;
       };
       cmakeFlags = (old.cmakeFlags or [ ]) ++ [
-        (lib.cmakeFeature "CMAKE_C_COMPILER" "${cc}/bin/clang")
-        (lib.cmakeFeature "CMAKE_CXX_COMPILER" "${cc}/bin/clang++")
+        # The Nix hook still injects this pre-CMP0090 export option; none of
+        # these dependencies exports packages to the user's registry.
+        "-UCMAKE_EXPORT_NO_PACKAGE_REGISTRY"
         (lib.cmakeBool "CMAKE_SKIP_BUILD_RPATH" false)
         (lib.cmakeFeature "CMAKE_BUILD_RPATH" (
           lib.makeLibraryPath ((old.buildInputs or [ ]) ++ (old.propagatedBuildInputs or [ ]))
@@ -39,9 +40,16 @@ let
   mimalloc = instrument (
     (pkgs.mimalloc.override { inherit stdenv; }).overrideAttrs (old: {
       dontDisableStatic = true;
+      # Keep optimization and all ASan pointer/padding checks, but do not mix
+      # MI_DEBUG with Release's contradictory NDEBUG definition.
+      cmakeBuildType = if sanitizers then "RelWithAsserts" else "Release";
       cmakeFlags =
         (old.cmakeFlags or [ ])
         ++ [
+          # This is a C-only build with no package lookup.
+          "-UCMAKE_CXX_COMPILER"
+          "-UCMAKE_FIND_USE_PACKAGE_REGISTRY"
+          "-UCMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY"
           (lib.cmakeBool "MI_BUILD_STATIC" true)
           (lib.cmakeBool "MI_BUILD_SHARED" false)
           (lib.cmakeBool "MI_BUILD_OBJECT" false)
@@ -51,7 +59,10 @@ let
         ]
         # Tracking enables padding; validate pointers before reading that metadata.
         # Without MI_DEBUG, upstream's invalid-realloc API test corrupts free lists.
-        ++ lib.optional sanitizers (lib.cmakeBool "MI_DEBUG" true);
+        ++ lib.optionals sanitizers [
+          (lib.cmakeBool "MI_DEBUG" true)
+          (lib.cmakeFeature "CMAKE_C_FLAGS_RELWITHASSERTS" "-O3")
+        ];
       # Upstream otherwise silently drops tracking if ASan headers are absent.
       # Poison/unpoison annotations cover access errors, not LSan registration
       # of individual allocations in mimalloc's private heaps.
@@ -69,14 +80,27 @@ let
   # Test helpers have C++ interfaces too; using nixpkgs' shared gtest here
   # would introduce a second, incompatible C++ runtime into dependency tests.
   gtest = instrument (
-    pkgs.gtest.override {
+    (pkgs.gtest.override {
       inherit stdenv;
       static = true;
-    }
+    }).overrideAttrs (old: {
+      # GoogleTest uses gtest_build_tests, not CTest's BUILD_TESTING.
+      cmakeFlags = (old.cmakeFlags or [ ]) ++ [ "-UBUILD_TESTING" ];
+    })
   );
   gbenchmark = instrument (
     (pkgs.gbenchmark.override { inherit stdenv gtest; }).overrideAttrs (old: {
+      # The structured environment is sourced before LOCALE_ARCHIVE is set.
+      # Enter the build in C locale and select the test locale after setup.
+      env = (old.env or { }) // {
+        LANG = "C";
+        LC_ALL = "C";
+      };
+      preCheck = (old.preCheck or "") + lib.optionalString stdenv.hostPlatform.isGnu ''
+        export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+      '';
       cmakeFlags = (old.cmakeFlags or [ ]) ++ [
+        "-UCMAKE_C_COMPILER"
         (lib.cmakeBool "BUILD_SHARED_LIBS" false)
         # Remove compiler-instruction snapshots; retain all behavioral tests.
         (lib.cmakeBool "BENCHMARK_ENABLE_ASSEMBLY_TESTS" false)
@@ -84,11 +108,14 @@ let
     })
   );
   abseil-cpp = instrument (
-    pkgs.abseil-cpp_202601.override {
+    (pkgs.abseil-cpp_202601.override {
       inherit stdenv gtest;
       static = true;
       cxxStandard = "20";
-    }
+    }).overrideAttrs (old: {
+      patches = (old.patches or [ ]) ++ [ ./patches/abseil-lifetime-capture-this.patch ];
+      cmakeFlags = (old.cmakeFlags or [ ]) ++ [ "-UCMAKE_C_COMPILER" ];
+    })
   );
 
   # ICU exposes C++ APIs used by RE2. Keep both its libraries and its data
@@ -102,6 +129,7 @@ let
         "--enable-static"
         "--disable-shared"
       ];
+      postInstall = lib.replaceStrings [ "--replace '" ] [ "--replace-fail '" ] old.postInstall;
     })
   );
   re2 = instrument (
@@ -115,7 +143,10 @@ let
         ;
     }).overrideAttrs
       (old: {
-        cmakeFlags = (old.cmakeFlags or [ ]) ++ [ (lib.cmakeBool "BUILD_SHARED_LIBS" false) ];
+        cmakeFlags = (old.cmakeFlags or [ ]) ++ [
+          (lib.cmakeBool "BUILD_SHARED_LIBS" false)
+          "-UCMAKE_C_COMPILER"
+        ];
         # FindICU's uc target does not carry the static data archive. Export the
         # data component as well, so downstream CMake consumers link it too.
         postPatch = (old.postPatch or "") + ''
@@ -125,14 +156,30 @@ let
             --replace-fail "if(NOT TARGET ICU::uc)" "if(NOT TARGET ICU::uc OR NOT TARGET ICU::data)" \
             --replace-fail "target_link_libraries(re2 PUBLIC ICU::uc)" \
               "target_link_libraries(re2 PUBLIC ICU::uc ICU::data)"
+          # Abseil's lowercase locking APIs and reference-taking guards have
+          # identical synchronization semantics to the retired pointer APIs.
+          substituteInPlace re2/dfa.cc \
+            --replace-fail 'absl::MutexLock l(&mutex_);' 'absl::MutexLock l(mutex_);' \
+            --replace-fail 'absl::MutexLock l(&dfa_->mutex_);' 'absl::MutexLock l(dfa_->mutex_);' \
+            --replace-fail 'absl::MutexLock lock(&mutex_);' 'absl::MutexLock lock(mutex_);' \
+            --replace-fail 'mu_->ReaderLock()' 'mu_->lock_shared()' \
+            --replace-fail 'mu_->ReaderUnlock()' 'mu_->unlock_shared()' \
+            --replace-fail 'mu_->WriterLock()' 'mu_->lock()' \
+            --replace-fail 'mu_->WriterUnlock()' 'mu_->unlock()'
         '';
       })
   );
   libcpr = instrument (
-    pkgs.libcpr.override {
+    (pkgs.libcpr.override {
       inherit stdenv;
       staticOnly = true;
-    }
+    }).overrideAttrs (old: {
+      # CPR has its own CPR_BUILD_TESTS option and only enables C++.
+      cmakeFlags = (old.cmakeFlags or [ ]) ++ [
+        "-UBUILD_TESTING"
+        "-UCMAKE_C_COMPILER"
+      ];
+    })
   );
   cpptrace = instrument (
     (pkgs.cpptrace.override {
@@ -146,6 +193,15 @@ let
           pkgs.zstd
           pkgs.libdwarf
         ];
+        # Keep the upstream semantic test suite, but do not build unconsumed
+        # demos (notably signal_demo's deliberately unchecked signal I/O).
+        postPatch = (old.postPatch or "") + ''
+          substituteInPlace test/CMakeLists.txt \
+            --replace-fail 'add_executable(demo demo.cpp)' 'add_executable(demo EXCLUDE_FROM_ALL demo.cpp)' \
+            --replace-fail 'add_executable(c_demo ctrace_demo.c)' 'add_executable(c_demo EXCLUDE_FROM_ALL ctrace_demo.c)' \
+            --replace-fail 'add_executable(signal_demo signal_demo.cpp)' 'add_executable(signal_demo EXCLUDE_FROM_ALL signal_demo.cpp)' \
+            --replace-fail 'add_executable(signal_tracer signal_tracer.cpp)' 'add_executable(signal_tracer EXCLUDE_FROM_ALL signal_tracer.cpp)'
+        '';
         cmakeFlags = (old.cmakeFlags or [ ]) ++ [
           (lib.cmakeBool "CPPTRACE_UNWIND_WITH_LIBUNWIND" false)
           (lib.cmakeBool "CPPTRACE_UNWIND_WITH_UNWIND" true)

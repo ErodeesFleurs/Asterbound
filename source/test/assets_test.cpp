@@ -467,7 +467,7 @@ const GameTestRegistration packedMetadataLengths(
     std::array<std::reference_wrapper<String const>, 2> duplicate_requests{std::cref(duplicate_paths[0]),
                                                                            std::cref(duplicate_paths[1])};
     auto before_truncation = (*packed)->file_sizes(duplicate_requests);
-    ASSERT_EQ(before_truncation.size(), 2);
+    ASSERT_EQ(before_truncation.size(), duplicate_requests.size());
     ASSERT_TRUE(before_truncation[0]);
     ASSERT_TRUE(before_truncation[1]);
     auto payload = (*packed)->read("/binary");
@@ -492,7 +492,7 @@ const GameTestRegistration packedMetadataLengths(
     EXPECT_TRUE(truncated.error().is<AssetSourceException>());
     expect_batch_matches_scalar(**packed, requests);
     auto during_truncation = (*packed)->file_sizes(duplicate_requests);
-    ASSERT_EQ(during_truncation.size(), 2);
+    ASSERT_EQ(during_truncation.size(), duplicate_requests.size());
     EXPECT_FALSE(during_truncation[0]);
     EXPECT_FALSE(during_truncation[1]);
     // A snapshot is the captured extent of one call, not a cross-call cache
@@ -510,7 +510,7 @@ const GameTestRegistration packedMetadataLengths(
     EXPECT_TRUE((*packed)->read("/binary"));
     expect_batch_matches_scalar(**packed, requests);
     auto after_recovery = (*packed)->file_sizes(duplicate_requests);
-    ASSERT_EQ(after_recovery.size(), 2);
+    ASSERT_EQ(after_recovery.size(), duplicate_requests.size());
     ASSERT_TRUE(after_recovery[0]);
     ASSERT_TRUE(after_recovery[1]);
     EXPECT_EQ(*after_recovery[0], 7);

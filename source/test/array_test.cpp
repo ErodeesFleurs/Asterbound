@@ -116,6 +116,7 @@ struct ordered_assignment {
 
   ordered_assignment() : slot(next_slot++) { events.emplace_back('D', slot); }
   ordered_assignment(argument const& source) : value(source.value) { events.emplace_back('C', value); }
+  ordered_assignment(ordered_assignment const&) = default;
   ordered_assignment& operator=(ordered_assignment const& source) {
     value = source.value;
     events.emplace_back('E', slot * 100 + value);
@@ -184,7 +185,8 @@ TEST(ArrayConstruction, IteratorCopyClampsCountAndValueInitializesTail) {
 }
 
 TEST(ArrayConstruction, RetainsAssignmentCompatibleNarrowing) {
-  Array<int, 3> integers(3.75, -2.75, 9.125);
+  std::array<double, 3> fractional{3.75, -2.75, 9.125};
+  Array<int, 3> integers(fractional[0], fractional[1], fractional[2]);
   EXPECT_EQ(integers[0], 3);
   EXPECT_EQ(integers[1], -2);
   EXPECT_EQ(integers[2], 9);

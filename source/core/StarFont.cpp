@@ -70,7 +70,7 @@ std::expected<std::shared_ptr<Font>, StarException> Font::loadFont(FontLibrary c
     // to decompress the same WOFF2 font for every text painter.
     FT_ULong size = 0;
     if (FT_Load_Sfnt_Table(font->m_fontImpl->face, 0, 0, nullptr, &size)
-        || size == 0 || size > ByteArray::max_size()
+        || size == 0 || std::cmp_greater(size, ByteArray::max_size())
         || size > static_cast<FT_ULong>(std::numeric_limits<FT_Long>::max()))
       return std::unexpected(FontException("Could not read decoded font size"));
     auto decoded = std::make_shared<ByteArray>();

@@ -23,6 +23,9 @@ stdenv.mkDerivation {
   cmakeFlags = [
     (lib.cmakeBool "BUILD_SHARED_LIBS" false)
     (lib.cmakeBool "IMGUI_BUILD_GUI_BACKENDS" guiSupport)
+    # This C++-only library has no test targets; undo generic hook defaults.
+    "-UCMAKE_C_COMPILER"
+    "-UBUILD_TESTING"
   ];
 
   postPatch = ''

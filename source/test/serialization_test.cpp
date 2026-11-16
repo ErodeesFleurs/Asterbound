@@ -29,9 +29,7 @@ struct NonDefaultMatrixScalar {
 };
 
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException>
-operator>>(DataStream& stream, NonDefaultMatrixScalar& value) {
-  return stream >> value.value;
-}
+operator>>(DataStream& stream, NonDefaultMatrixScalar& value);
 
 static_assert(stream_readable<Matrix3<NonDefaultMatrixScalar>>);
 static_assert(!stream_read_factory<Matrix3<NonDefaultMatrixScalar>>);

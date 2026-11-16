@@ -368,16 +368,22 @@ Vec4F Color::to_hsva() const {
   } else { // Chromatic data
     s = del_max / var_max;
 
-    float del_r = (((var_max - var_r) / 6.0f) + (del_max / 2.0f)) / del_max;
-    float del_g = (((var_max - var_g) / 6.0f) + (del_max / 2.0f)) / del_max;
-    float del_b = (((var_max - var_b) / 6.0f) + (del_max / 2.0f)) / del_max;
+    {
+#pragma float_control(precise, on)
+#pragma clang fp contract(off)
+      // Sanitizer instrumentation changes fast reciprocal/reassociation choices.
+      // Keep hue's division and addition rounding stable at half-byte boundaries.
+      float del_r = (((var_max - var_r) / 6.0f) + (del_max / 2.0f)) / del_max;
+      float del_g = (((var_max - var_g) / 6.0f) + (del_max / 2.0f)) / del_max;
+      float del_b = (((var_max - var_b) / 6.0f) + (del_max / 2.0f)) / del_max;
 
-    if (var_r == var_max)
-      h = del_b - del_g;
-    else if (var_g == var_max)
-      h = (1.0f / 3.0f) + del_r - del_b;
-    else
-      /*if (var_b == var_max)*/ h = (2.0f / 3.0f) + del_g - del_r;
+      if (var_r == var_max)
+        h = del_b - del_g;
+      else if (var_g == var_max)
+        h = (1.0f / 3.0f) + del_r - del_b;
+      else
+        /*if (var_b == var_max)*/ h = (2.0f / 3.0f) + del_g - del_r;
+    }
 
     if (h < 0.0f)
       h += 1.0f;
