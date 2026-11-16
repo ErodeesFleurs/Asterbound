@@ -17,33 +17,66 @@ namespace Star {
 
 Lightmap::Lightmap() : m_width(0), m_height(0) {}
 
-Lightmap::Lightmap(unsigned width, unsigned height) : m_width(width), m_height(height) {
-  m_data = std::make_unique<float[]>(len());
+Lightmap::Lightmap(unsigned width, unsigned height) : Lightmap() {
+  auto resized = resizeForOverwrite(width, height);
+  if (!resized) {
+    Star::fatal_error(resized.error().what(), false);
+    std::terminate();
+  }
+  std::ranges::fill(data(), 0.0f);
 }
 
-Lightmap::Lightmap(Lightmap const& lightMap) {
+Lightmap::Lightmap(Lightmap const& lightMap) : Lightmap() {
   operator=(lightMap);
 }
 
-Lightmap::Lightmap(Lightmap&& lightMap) noexcept {
+Lightmap::Lightmap(Lightmap&& lightMap) noexcept : Lightmap() {
   operator=(std::move(lightMap));
 }
 
 Lightmap& Lightmap::operator=(Lightmap const& lightMap) {
+  if (this == &lightMap)
+    return *this;
+  auto length = lightMap.len();
+  if (length > m_capacity) {
+    m_data = std::make_unique_for_overwrite<float[]>(length);
+    m_capacity = length;
+  }
+  std::ranges::copy(lightMap.data(), std::span(m_data.get(), length).begin());
   m_width = lightMap.m_width;
   m_height = lightMap.m_height;
-  if (lightMap.m_data) {
-    m_data = std::make_unique<float[]>(len());
-    std::memcpy(m_data.get(), lightMap.m_data.get(), len());
-  }
   return *this;
 }
 
 Lightmap& Lightmap::operator=(Lightmap&& lightMap) noexcept {
+  if (this == &lightMap)
+    return *this;
   m_width = std::exchange(lightMap.m_width, 0);
   m_height = std::exchange(lightMap.m_height, 0);
   m_data = std::move(lightMap.m_data);
+  m_capacity = std::exchange(lightMap.m_capacity, 0);
   return *this;
+}
+
+void Lightmap::swap(Lightmap& other) noexcept {
+  m_data.swap(other.m_data);
+  std::swap(m_capacity, other.m_capacity);
+  std::swap(m_width, other.m_width);
+  std::swap(m_height, other.m_height);
+}
+
+std::expected<void, StarException> Lightmap::resizeForOverwrite(unsigned width, unsigned height) {
+  auto bytes = Image::size_bytes({width, height}, PixelFormat::RGB_F);
+  if (!bytes)
+    return std::unexpected(LightmapException(bytes.error().what()));
+  auto length = *bytes / sizeof(float);
+  if (length > m_capacity) {
+    m_data = std::make_unique_for_overwrite<float[]>(length);
+    m_capacity = length;
+  }
+  m_width = width;
+  m_height = height;
+  return {};
 }
 
 Lightmap::operator ImageView() {
@@ -181,10 +214,11 @@ std::expected<void, StarException> CellularLightingCalculator::calculate(Lightma
   else
     m_lightArray.leftRef().calculate(arrayMin[0], arrayMin[1], arrayMax[0], arrayMax[1]);
 
-  output = Lightmap(arrayMax[0] - arrayMin[0], arrayMax[1] - arrayMin[1]);
-
   auto brightnessLimit = m_config.getFloat("brightnessLimit");
   if (!brightnessLimit) return std::unexpected(std::move(brightnessLimit.error()));
+  auto resized = output.resizeForOverwrite(arrayMax[0] - arrayMin[0], arrayMax[1] - arrayMin[1]);
+  if (!resized)
+    return std::unexpected(std::move(resized.error()));
 
   if (m_monochrome) {
     for (std::size_t x = arrayMin[0]; x < arrayMax[0]; ++x) {

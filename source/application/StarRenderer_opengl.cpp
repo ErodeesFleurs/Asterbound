@@ -677,7 +677,7 @@ std::expected<void, StarException> OpenGlRenderer::setEffectTexture(String const
     parameter.textureValue = std::move(*texture);
   } else {
     glBindTexture(GL_TEXTURE_2D, parameter.textureValue->textureId);
-    auto uploaded = uploadTextureImage(image.format, image.size, image.data.data());
+    auto uploaded = uploadTextureImage(image.format, image.size, image.data);
     if (!uploaded) return std::unexpected(std::move(uploaded.error()));
     parameter.textureValue->textureSize = image.size;
   }
@@ -1138,7 +1138,7 @@ std::expected<GLuint, StarException> OpenGlRenderer::GlTextureAtlasSet::createAt
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   }
 
-  auto uploaded = uploadTextureImage(pixelFormat, size, nullptr);
+  auto uploaded = uploadTextureImage(pixelFormat, size, {});
   if (!uploaded) {
     glDeleteTextures(1, &glTextureId);
     return std::unexpected(std::move(uploaded.error()));
@@ -1358,11 +1358,12 @@ std::expected<void, StarException> OpenGlRenderer::GlRenderBuffer::appendPrimiti
     appendVertex(1, 0, 2);
     appendVertex(2, 1, 0);
   } else if (kind == 1) {
+    auto first = offset;
     appendVertex(0, 3, 1);
     appendVertex(1, 0, 2);
     appendVertex(2, 1, 3);
-    appendVertex(0, 3, 1);
-    appendVertex(2, 1, 3);
+    accumulationBuffer[offset++] = accumulationBuffer[first];
+    accumulationBuffer[offset++] = accumulationBuffer[first + 2];
     appendVertex(3, 2, 0);
   } else {
     for (std::size_t i = 1; i < count - 1; ++i) {
@@ -1533,33 +1534,31 @@ std::expected<void, StarException> OpenGlRenderer::checkGlError(std::string_view
   return std::unexpected(RendererException::format("OpenGL error {} during {}", first, operation));
 }
 
-std::expected<void, StarException> OpenGlRenderer::uploadTextureImage(PixelFormat pixelFormat, Vec2U size, std::uint8_t const* data) {
+std::expected<void, StarException> OpenGlRenderer::uploadTextureImage(PixelFormat pixelFormat, Vec2U size, std::span<std::uint8_t const> data) {
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-  std::optional<GLenum> internalFormat;
+  GLenum internalFormat;
   GLenum format;
   GLenum type = GL_UNSIGNED_BYTE;
-  if (pixelFormat == PixelFormat::RGB24)
+  if (pixelFormat == PixelFormat::RGB24 || pixelFormat == PixelFormat::BGR24) {
+    internalFormat = GL_RGB;
+    format = pixelFormat == PixelFormat::RGB24 ? GL_RGB : GL_BGR;
+  } else if (pixelFormat == PixelFormat::RGBA32 || pixelFormat == PixelFormat::BGRA32) {
+    internalFormat = GL_RGBA;
+    format = pixelFormat == PixelFormat::RGBA32 ? GL_RGBA : GL_BGRA;
+  } else if (pixelFormat == PixelFormat::RGB_F) {
+    internalFormat = GL_RGB32F;
     format = GL_RGB;
-  else if (pixelFormat == PixelFormat::RGBA32)
-    format = GL_RGBA;
-  else if (pixelFormat == PixelFormat::BGR24)
-    format = GL_BGR;
-  else if (pixelFormat == PixelFormat::BGRA32)
-    format = GL_BGRA;
-  else {
     type = GL_FLOAT;
-    if (pixelFormat == PixelFormat::RGB_F) {
-      internalFormat = GL_RGB32F;
-      format = GL_RGB;
-    } else if (pixelFormat == PixelFormat::RGBA_F) {
-      internalFormat = GL_RGBA32F;
-      format = GL_RGBA;
-    } else
-      return std::unexpected(RendererException("Unsupported texture format in OpenGlRenderer::uploadTextureImage"));
+  } else if (pixelFormat == PixelFormat::RGBA_F) {
+    internalFormat = GL_RGBA32F;
+    format = GL_RGBA;
+    type = GL_FLOAT;
+  } else {
+    return std::unexpected(RendererException("Unsupported texture format in OpenGlRenderer::uploadTextureImage"));
   }
 
-  glTexImage2D(GL_TEXTURE_2D, 0, internalFormat.value_or(format), size[0], size[1], 0, format, type, data);
+  glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, size[0], size[1], 0, format, type, data.data());
   return checkGlError("texture image upload");
 }
 
@@ -1614,7 +1613,7 @@ auto OpenGlRenderer::createGlTexture(ImageView const& image, TextureAddressing a
 
 
   if (!image.empty()) {
-    auto uploaded = uploadTextureImage(image.format, image.size, image.data.data());
+    auto uploaded = uploadTextureImage(image.format, image.size, image.data);
     if (!uploaded) return std::unexpected(std::move(uploaded.error()));
   }
   auto status = checkGlError("texture creation");

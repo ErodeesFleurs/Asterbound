@@ -1104,6 +1104,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
     if (m_asyncLighting) {
       m_lightingCond.notify_one();
     } else {
+      std::lock_guard lightingLocker(m_lightingMutex);
       auto result48 = lightingCalc();
       if (!result48)
         return std::unexpected(std::move(result48.error()));
@@ -2798,21 +2799,19 @@ std::expected<void, StarException> WorldClient::collectLiquid(List<Vec2I> const&
 std::expected<bool, StarException> WorldClient::waitForLighting(std::optional<std::reference_wrapper<WorldRenderData>> renderData) {
   std::lock_guard prepLocker(m_lightMapPrepMutex);
   std::lock_guard lightMapLocker(m_lightMapMutex);
-  if (renderData && !m_lightMap.empty()) {
+  if (renderData && m_lightMap.ready) {
     for (auto& previewTile : m_previewTiles) {
       if (previewTile.updateLight) {
-        Vec2I lightArrayPos(m_geometry.pdiff(previewTile.position[0], m_lightMinPosition[0]), previewTile.position[1] - m_lightMinPosition[1]);
-        if (lightArrayPos[0] >= 0 && lightArrayPos[0] < static_cast<int>(m_lightMap.width()) && lightArrayPos[1] >= 0
-            && lightArrayPos[1] < static_cast<int>(m_lightMap.height())) {
-          auto result202 = m_lightMap.set(lightArrayPos[0], lightArrayPos[1], Color::rgb_bytes_to_float(previewTile.light));
+        Vec2I lightArrayPos(m_geometry.pdiff(previewTile.position[0], m_lightMap.minPosition[0]), previewTile.position[1] - m_lightMap.minPosition[1]);
+        if (lightArrayPos[0] >= 0 && lightArrayPos[0] < static_cast<int>(m_lightMap.lightMap.width()) && lightArrayPos[1] >= 0
+            && lightArrayPos[1] < static_cast<int>(m_lightMap.lightMap.height())) {
+          auto result202 = m_lightMap.lightMap.set(lightArrayPos[0], lightArrayPos[1], Color::rgb_bytes_to_float(previewTile.light));
           if (!result202)
             return std::unexpected(std::move(result202.error()));
         }
       }
     }
-    renderData->get().lightMap = std::move(m_lightMap);
-    renderData->get().lightMinPosition = m_lightMinPosition;
-    return true;
+    return m_lightMap.take(renderData->get().lightMap, renderData->get().lightMinPosition);
   }
   return false;
 }
@@ -3326,8 +3325,7 @@ std::expected<void, StarException> WorldClient::lightingCalc() {
   {
     std::lock_guard mapLocker(m_lightMapMutex);
     publicationStart = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
-    m_lightMinPosition = lightRange.min();
-    m_lightMap = std::move(m_pendingLightMap);
+    m_lightMap.publish(m_pendingLightMap, lightRange.min());
   }
   auto publicationEnd = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
   root.logMap().set("client_render_world_async_light_prep_wait", Star::format("{:05d}\u00b5s", (prepStart - prepWaitStart).count()));
@@ -3588,6 +3586,17 @@ std::expected<void, StarException> WorldClient::initWorld(WorldStartPacket const
 }
 
 std::expected<void, StarException> WorldClient::clearWorld() {
+  {
+    // Drain propagation too: it runs after releasing the prep mutex and must
+    // not publish an old world's map after this reset.
+    std::lock_guard lightingLocker(m_lightingMutex);
+    std::lock_guard prepLocker(m_lightMapPrepMutex);
+    std::lock_guard mapLocker(m_lightMapMutex);
+    m_pendingLightReady = false;
+    m_pendingLights.clear();
+    m_pendingParticleLights.clear();
+    m_lightMap.reset();
+  }
   resetPresentation();
   m_hiddenEntityAudio.clear();
   std::optional<StarException> error;
@@ -3615,7 +3624,6 @@ std::expected<void, StarException> WorldClient::clearWorld() {
   for (auto&& p : m_scriptContexts)
     remember(recoverLuaScriptError(p.second->uninit()));
   m_scriptContexts.clear();
-  remember(waitForLighting(std::nullopt));
 
   m_currentStep = 0;
   m_currentTime = 0;

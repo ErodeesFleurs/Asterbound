@@ -114,7 +114,32 @@ Only one sealed command frame is in flight. Command storage owns copied pixels a
 
 Main packs detached geometry directly into owned, typed GPU vertices; legacy primitives use the same packing kernel. Immediate segments remain batched until a real renderer flush, even across ordered queries and transport-slot reuse. Texture pins protect atlas coordinates while batches are pending, and reusable GPU buffers retain their allocated capacity. Command headers are separate from names, shader/configuration payloads and images: creation uploads are released after consumption, while recurring effect-image storage is reused and cleared at configuration reload.
 
+Quad staging packs the four original vertices once, then copies the two repeated
+packed vertices into the existing six-vertex triangle order. Rounding flags still
+use each original outside neighbor; polygons retain their triangle-fan rules.
+This changes neither upload layout nor draw ordering.
+
+Effect-image streaming retains `glTexImage2D`: replacing it unconditionally with
+subimage updates can add overwrite waits instead of improving throughput.
+BGR/BGRA describe source channel order; their storage uses RGB/RGBA internal
+formats. Float images retain RGB32F/RGBA32F storage.
+
 Detached views borrow spans and a required typed reference to main's texture table, not an opaque context or lookup callback; the backend consumes them synchronously without retaining those references. Command builders return checked references. Synchronous main-thread requests remain stack-owned, linked through optional references and executed through a typed interface without queue heap allocations. GPU staging exposes data pointers only at the OpenGL upload boundary.
+
+### Visual lighting buffers
+
+Client lighting collection and propagation remain CPU-owned. Pending, completed
+and displayed float maps exchange owned storage rather than allocating and zeroing
+a new output every calculation. Capacity is retained for reuse; the calculator
+overwrites every channel before publishing. A separate ready bit distinguishes a
+fresh result from recycled storage, and a completed result is consumed only once.
+World reset drains propagation and clears readiness before releasing world state.
+Synchronous calculations serialize with the asynchronous worker.
+
+Render-side borrowing ends before the displayed map is exchanged; the threaded
+renderer owns its image copy before returning. Buffer reuse does not change the
+spread/point algorithms, liquid correction, or independent CPU `world.lightLevel`
+queries used by gameplay and headless servers.
 
 ### Shutdown order
 

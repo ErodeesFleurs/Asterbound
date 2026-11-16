@@ -291,7 +291,7 @@ private:
 
   static bool logGlErrorSummary(String prefix);
   [[nodiscard]] static std::expected<void, StarException> checkGlError(std::string_view operation);
-  [[nodiscard]] static std::expected<void, StarException> uploadTextureImage(PixelFormat pixelFormat, Vec2U size, std::uint8_t const* data);
+  [[nodiscard]] static std::expected<void, StarException> uploadTextureImage(PixelFormat pixelFormat, Vec2U size, std::span<std::uint8_t const> data);
 
   
   [[nodiscard]] static std::expected<RefPtr<GlLoneTexture>, StarException> createGlTexture(ImageView const& image, TextureAddressing addressing, TextureFiltering filtering);

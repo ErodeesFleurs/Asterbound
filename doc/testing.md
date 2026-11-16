@@ -441,6 +441,19 @@ Keep synthetic waits out of performance runs. Delayed frame-setup handshakes and
 slow swaps are separate checks; compare presentation alpha with the scheduler's
 post-handshake sample.
 
+Record texture redefinitions versus subimage updates, uploaded bytes and buffer
+API CPU time before choosing a streaming scheme. Fewer storage-definition calls
+do not prove less driver work: in-use texture or VBO overwrites can wait.
+Validate packed upload bytes and native pixels for both legacy and detached
+geometry, including atlas offsets, mixed primitives and multi-texture boundaries.
+
+Keep GPU-query diagnostics separate from throughput runs. Timestamp pairs around
+individual draw/upload calls measure those command spans, not utilization or the
+whole frame; report skipped and unresolved queries rather than extrapolating.
+They can materially perturb small draws. Offscreen EGL vendor selection must be
+explicit and checked against the actual renderer; `DRI_PRIME` alone need not
+override GLVND's selected vendor.
+
 Rendered-session evidence needs bounded readiness, not a fixed frame delay, and
 real native scene layers rather than HUD imitations. Preserve same-tick display
 sampling and lifecycle/reset checks without advancing simulation or repeating

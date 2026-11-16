@@ -173,6 +173,33 @@ struct ParallaxWindTime {
   std::optional<double> lastEpoch;
 };
 
+// Pending, completed and displayed maps rotate ownership without copying. A
+// recycled completed map is not fresh until publish succeeds again.
+// WorldClient protects every operation with its map mutex; display borrowing
+// must have ended before take exchanges the previous displayed storage.
+struct ClientLightingResult {
+  void publish(Lightmap& pending, Vec2I position) {
+    lightMap.swap(pending);
+    minPosition = position;
+    ready = true;
+  }
+
+  bool take(Lightmap& output, Vec2I& position) {
+    if (!ready)
+      return false;
+    lightMap.swap(output);
+    position = minPosition;
+    ready = false;
+    return true;
+  }
+
+  void reset() { ready = false; }
+
+  Lightmap lightMap;
+  Vec2I minPosition;
+  bool ready = false;
+};
+
 class WorldClient : public World {
 public:
   void const* query_type(TypeKey key) const noexcept override { return query_type_of<WorldClient, World>(this, key); }
@@ -483,12 +510,11 @@ private:
   std::mutex m_lightMapMutex;
 
   Lightmap m_pendingLightMap;
-  Lightmap m_lightMap;
+  ClientLightingResult m_lightMap;
   List<LightSource> m_pendingLights;
   List<std::pair<Vec2F, Vec3F>> m_pendingParticleLights;
   RectI m_pendingLightRange;
   std::atomic<bool> m_pendingLightReady;
-  Vec2I m_lightMinPosition;
   List<PreviewTile> m_previewTiles;
 
   std::shared_ptr<Sky> m_sky;
@@ -609,6 +635,7 @@ export namespace Star {
   using ::Star::CelestialLog;
   using ::Star::ClientContext;
   using ::Star::DamageManager;
+  using ::Star::ClientLightingResult;
   using ::Star::EntityMap;
   using ::Star::gatherClientLightingTiles;
   using ::Star::Item;

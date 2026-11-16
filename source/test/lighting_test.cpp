@@ -252,6 +252,155 @@ TEST(CellularLightArray, PointRaysMatchGeometricAttenuationInEveryOrientation) {
 }
 
 
+TEST(Lightmap, CopyMovePreservesEveryRgbComponent) {
+  Lightmap original(7, 5);
+  ASSERT_TRUE(std::ranges::all_of(original.data(), [](float value) { return value == 0.0f; }));
+  for (unsigned y = 0; y < original.height(); ++y)
+    for (unsigned x = 0; x < original.width(); ++x) {
+      float value = 1.0f + y * original.width() + x;
+      ASSERT_TRUE(original.set(x, y, Vec3F(value, value + 0.25f, value + 0.5f)));
+    }
+  std::vector<float> snapshot(original.data().begin(), original.data().end());
+  Lightmap copy(original);
+  EXPECT_TRUE(std::ranges::equal(copy.data(), snapshot));
+  auto const& alias = original;
+  original = alias;
+  EXPECT_TRUE(std::ranges::equal(original.data(), snapshot));
+  Lightmap assigned(1, 2);
+  assigned = original;
+  EXPECT_EQ(assigned.size(), original.size());
+  EXPECT_TRUE(std::ranges::equal(assigned.data(), snapshot));
+  ASSERT_TRUE(original.set(6, 4, Vec3F::filled(-1.0f)));
+  EXPECT_EQ(*copy.get(6, 4), Vec3F(35.0f, 35.25f, 35.5f));
+
+  Lightmap moved(std::move(copy));
+  EXPECT_TRUE(copy.empty());
+  EXPECT_EQ(copy.size(), Vec2U());
+  EXPECT_TRUE(copy.data().empty());
+  EXPECT_TRUE(std::ranges::equal(moved.data(), snapshot));
+  auto& moveAlias = moved;
+  moved = std::move(moveAlias);
+  EXPECT_TRUE(std::ranges::equal(moved.data(), snapshot));
+  assigned = std::move(moved);
+  EXPECT_TRUE(moved.empty());
+  EXPECT_TRUE(moved.data().empty());
+  EXPECT_TRUE(std::ranges::equal(assigned.data(), snapshot));
+
+  Lightmap small(2, 1);
+  ASSERT_TRUE(small.set(0, 0, Vec3F(0.1f, 0.2f, 0.3f)));
+  ASSERT_TRUE(small.set(1, 0, Vec3F(0.4f, 0.5f, 0.6f)));
+  assigned = small;
+  EXPECT_EQ(assigned.size(), small.size());
+  EXPECT_TRUE(std::ranges::equal(assigned.data(), small.data()));
+  assigned = Lightmap(0, 9);
+  EXPECT_EQ(assigned.size(), Vec2U(0, 9));
+  EXPECT_TRUE(assigned.empty());
+  EXPECT_TRUE(assigned.data().empty());
+  assigned = small;
+  Lightmap empty;
+  assigned = empty;
+  EXPECT_EQ(assigned.size(), Vec2U());
+  EXPECT_TRUE(assigned.data().empty());
+  EXPECT_FALSE(assigned.get(0, 0));
+  EXPECT_FALSE(assigned.set(0, 0, 1.0f));
+  EXPECT_FALSE(assigned.add(0, 0, Vec3F::filled(1.0f)));
+  EXPECT_FALSE(small.get(2, 0));
+  EXPECT_FALSE(small.set(0, 1, Vec3F::filled(1.0f)));
+  EXPECT_FALSE(small.add(2, 0, Vec3F::filled(1.0f)));
+}
+
+TEST(ClientLightingResult, RotatesOwnedMapsAndConsumesOnlyFreshResults) {
+  ClientLightingResult completed;
+  Lightmap pending(3, 2);
+  std::ranges::fill(pending.data(), 1.25f);
+  Lightmap displayed(2, 2);
+  std::ranges::fill(displayed.data(), -3.0f);
+  Vec2I position(-10, -20);
+  EXPECT_FALSE(completed.take(displayed, position));
+  EXPECT_EQ(position, Vec2I(-10, -20));
+  EXPECT_TRUE(std::ranges::all_of(displayed.data(), [](float value) { return value == -3.0f; }));
+
+  completed.publish(pending, {10, 20});
+  EXPECT_TRUE(pending.empty());
+  EXPECT_TRUE(std::ranges::all_of(displayed.data(), [](float value) { return value == -3.0f; }));
+  ASSERT_TRUE(completed.take(displayed, position));
+  EXPECT_EQ(position, Vec2I(10, 20));
+  EXPECT_EQ(displayed.size(), Vec2U(3, 2));
+  EXPECT_TRUE(std::ranges::all_of(displayed.data(), [](float value) { return value == 1.25f; }));
+  EXPECT_FALSE(completed.take(displayed, position));
+  EXPECT_EQ(position, Vec2I(10, 20));
+  EXPECT_TRUE(std::ranges::all_of(displayed.data(), [](float value) { return value == 1.25f; }));
+
+  pending = Lightmap(4, 3);
+  std::ranges::fill(pending.data(), 2.5f);
+  completed.publish(pending, {30, 40});
+  EXPECT_EQ(pending.size(), Vec2U(2, 2));
+  EXPECT_TRUE(std::ranges::all_of(pending.data(), [](float value) { return value == -3.0f; }));
+  // Reuse the returned storage while the consumer still owns the first result.
+  std::ranges::fill(pending.data(), 7.5f);
+  EXPECT_TRUE(std::ranges::all_of(displayed.data(), [](float value) { return value == 1.25f; }));
+  completed.publish(pending, {50, 60});
+  ASSERT_TRUE(completed.take(displayed, position));
+  EXPECT_EQ(position, Vec2I(50, 60));
+  EXPECT_EQ(displayed.size(), Vec2U(2, 2));
+  EXPECT_TRUE(std::ranges::all_of(displayed.data(), [](float value) { return value == 7.5f; }));
+  EXPECT_EQ(pending.size(), Vec2U(4, 3));
+  EXPECT_TRUE(std::ranges::all_of(pending.data(), [](float value) { return value == 2.5f; }));
+
+  completed.publish(pending, {70, 80});
+  completed.reset();
+  EXPECT_FALSE(completed.take(displayed, position));
+  EXPECT_EQ(position, Vec2I(50, 60));
+  EXPECT_TRUE(std::ranges::all_of(displayed.data(), [](float value) { return value == 7.5f; }));
+  Lightmap empty;
+  completed.publish(empty, {90, 100});
+  ASSERT_TRUE(completed.take(displayed, position));
+  EXPECT_EQ(position, Vec2I(90, 100));
+  EXPECT_TRUE(displayed.empty());
+  EXPECT_TRUE(displayed.data().empty());
+  EXPECT_FALSE(completed.take(displayed, position));
+}
+
+const GameTestRegistration
+  clientLightingReusedOutput("ClientLighting", "ReusedOutputMatchesFreshCalculations", [](GameTest& fixture) {
+    auto assets = fixture.root().assets();
+    ASSERT_TRUE(assets);
+    auto parameters = (*assets)->json("/lighting.config:lighting");
+    ASSERT_TRUE(parameters);
+    CellularLightingCalculator reused;
+    Lightmap output;
+    unsigned iteration = 0;
+    for (bool monochrome : {false, true, false}) {
+      ASSERT_TRUE(reused.setMonochrome(monochrome));
+      ASSERT_TRUE(reused.setParameters(*parameters));
+      for (auto size : {Vec2I(17, 13), Vec2I(31, 19), Vec2I(4, 3), Vec2I(0, 0), Vec2I(17, 13)}) {
+        RectI query(Vec2I(10, 20), Vec2I(10, 20) + size);
+        CellularLightingCalculator fresh(monochrome);
+        ASSERT_TRUE(fresh.setParameters(*parameters));
+        auto populate = [&](CellularLightingCalculator& calculator) {
+          calculator.begin(query);
+          auto region = calculator.calculationRegion();
+          for (int x = region.xMin(); x < region.xMax(); ++x)
+            for (int y = region.yMin(); y < region.yMax(); ++y) {
+              float value = ((x * 7 + y * 11 + iteration) % 17) * 0.125f;
+              calculator.setCellIndex(calculator.baseIndexFor({x, y}),
+                  Vec3F(value, value * 0.6f, value * 0.2f), (x + y) % 3 == 0);
+            }
+          addBoundaryLights(calculator, query);
+        };
+        populate(fresh);
+        populate(reused);
+        Lightmap expected;
+        ASSERT_TRUE(fresh.calculate(expected));
+        std::ranges::fill(output.data(), -100.0f);
+        ASSERT_TRUE(reused.calculate(output));
+        EXPECT_EQ(output.size(), Vec2U(size));
+        EXPECT_TRUE(std::ranges::equal(output.data(), expected.data()));
+        ++iteration;
+      }
+    }
+  });
+
 const GameTestRegistration
   clientLightingGatherMatchesTileSnapshot("ClientLighting", "GatherMatchesTileSnapshot", [](GameTest& fixture) {
     auto materials = fixture.root().materialDatabase();
