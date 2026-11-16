@@ -12,11 +12,11 @@ let
 in
 stdenv.mkDerivation {
   pname = "xclang-asan-libcxx";
-  version = "23.1.3.6";
+  version = "23.1.5.2";
 
   src = fetchurl {
-    url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.3/llvm-project-23.1.3.src.tar.xz";
-    sha256 = "c44186a7762ed28954be72e5ff6df9808e0779d4f1bf014ecc4e7e211d31ee34";
+    url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.5/llvm-project-23.1.5.src.tar.xz";
+    sha256 = "fb50b1eac93ddeb3aa8dab4cfe324dff74f4a9c2bdee6160c9e36188f8d06a6e";
   };
 
   nativeBuildInputs = [ cmake ninja python3 ];

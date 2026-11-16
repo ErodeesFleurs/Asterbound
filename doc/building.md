@@ -20,7 +20,7 @@ Run commands from the repository root unless a step changes directories.
 | Component | Requirement |
 |---|---|
 | Language | C++23 with named modules and `import std` |
-| Compiler | [xclang 23.1.3.6](https://github.com/clice-io/xclang/releases/tag/23.1.3.6), LLVM 23.1.3, bundled libc++ |
+| Compiler | [xclang 23.1.5.2](https://github.com/clice-io/xclang/releases/tag/23.1.5.2), LLVM 23.1.5, bundled libc++ |
 | Build tools | CMake 3.28+, Ninja 1.11+ |
 | Dependencies | Nix, or vcpkg with this repository's overlay ports/triplets |
 | Game assets | `packed.pak` from an owned Starbound installation; never redistributed |
@@ -262,7 +262,7 @@ Linux validation is not proof of Windows/macOS native packaging or SDK interoper
 
 The native [Build workflow](../.github/workflows/build.yml) retains Windows x64, Linux x86_64/ARM64 and macOS ARM64 coverage and all development/client/server/installer artifacts. Asset-free tests run before distribution compression. Fast source checks have a 10-minute deadline; native and sanitizer jobs have 120-minute deadlines. New push/PR runs cancel superseded runs for the same event and branch; manual dispatches remain independent. Branch names containing `/` are supported.
 
-The shared [native build action](../.github/actions/native-build/action.yml) pins CMake 3.29.2, Ninja 1.13.2, xclang 23.1.3.6 and immutable third-party Action revisions. Lua download/hash/patch preflight runs before expensive dependency configuration and exports the same prepatched source tree to the engine.
+The shared [native build action](../.github/actions/native-build/action.yml) pins CMake 3.29.2, Ninja 1.13.2, xclang 23.1.5.2 and immutable third-party Action revisions. Lua download/hash/patch preflight runs before expensive dependency configuration and exports the same prepatched source tree to the engine.
 
 The GitHub Lua source tree does not ship the release-only `lua.hpp` wrapper. C++ implementation, module-global-fragment and test consumers include the official `lua.h`, `lualib.h` and `lauxlib.h` under `extern "C"` directly. Download/patch preflight is not a substitute for compiling the actual `star.lua` consumers and running `core_tests`.
 

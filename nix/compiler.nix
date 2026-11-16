@@ -9,15 +9,15 @@
   sanitizerRuntime ? null,
 }:
 let
-  version = "23.1.3.6";
+  version = "23.1.5.2";
   hosts = {
     x86_64-linux = {
       triple = "x86_64-unknown-linux-gnu";
-      hash = "sha256-zcsJdb/HZ2+dBDwPzuZ7oA5wDm7ti/LZ9hU972LBMW0=";
+      hash = "sha256-brX0k8HCFx/tLs49otI00kIIlT6DPLBC3iPyacaHBXk=";
     };
     aarch64-linux = {
       triple = "aarch64-unknown-linux-gnu";
-      hash = "sha256-/h8WhJvr2VY0ci88KW8AF/VvwfFIeGiXY0JMxUpmEYw=";
+      hash = "sha256-V3WUajwgpu9KMjBXFWgVJT0p6gI2j4rmlBHH1SoZKso=";
     };
   };
   host = hosts.${stdenvNoCC.hostPlatform.system};
