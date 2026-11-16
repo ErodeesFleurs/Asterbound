@@ -1,0 +1,13 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -4000,6 +4000,10 @@
+       "$<BUILD_INTERFACE:${SDL3_SOURCE_DIR}/src>"
+   )
+   target_link_libraries(SDL3-shared PUBLIC $<TARGET_NAME:SDL3::Headers>)
++  if(MINGW)
++    # Keep the COFF import archive visible to vcpkg's Windows package validator.
++    set_target_properties(SDL3-shared PROPERTIES IMPORT_PREFIX "" IMPORT_SUFFIX ".lib")
++  endif()
+   if(MINGW OR CYGWIN)
+     target_link_options(SDL3-shared PRIVATE -static-libgcc)
+   endif()

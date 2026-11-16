@@ -1,0 +1,21 @@
+--- a/ports/liblzma/portfile.cmake
++++ b/ports/liblzma/portfile.cmake
+@@ -14,9 +14,7 @@
+ )
+ 
+ if("tools" IN_LIST FEATURES)
+-    set(XZ_SANDBOX "auto")
+-else()
+-    set(XZ_SANDBOX "no")
++    list(APPEND FEATURE_OPTIONS -DXZ_SANDBOX:STRING=auto)
+ endif()
+ 
+ if(VCPKG_TARGET_ARCHITECTURE STREQUAL "wasm32")
+@@ -34,7 +32,6 @@
+         -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=   # using flags from (vcpkg) toolchain
+         -DENABLE_NLS=OFF # nls is not supported by this port, yet
+         -DXZ_NLS=OFF
+-        -DXZ_SANDBOX:STRING=${XZ_SANDBOX}
+     MAYBE_UNUSED_VARIABLES
+         CMAKE_MSVC_DEBUG_INFORMATION_FORMAT
+         CREATE_XZ_SYMLINKS

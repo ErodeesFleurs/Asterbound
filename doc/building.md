@@ -151,6 +151,10 @@ unsetting them with `-U` still leaves CMake's unused-command-line warning.
 The fixed-registry vcpkg overlays likewise omit obsolete CPR sanitizer-probe and
 SDL console variables, plus PCRE2's unused MSVC runtime option for our GNU ABI.
 They retain the registry's versions, source hashes and other build/install steps.
+liblzma's sandbox option is passed only when building its CLI tools. MinGW SDL
+keeps its GNU ABI and DLL name, but installs its COFF import archive as `.lib`
+so Windows package validation can inspect it. Native Windows CI uses a short
+temporary vcpkg root to avoid Qt's build-path limit.
 
 Build variants into different result links when retaining more than one:
 

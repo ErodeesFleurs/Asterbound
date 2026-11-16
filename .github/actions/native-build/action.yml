@@ -24,6 +24,7 @@ runs:
     - name: Bootstrap vcpkg
       uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2
       with:
+        vcpkgDirectory: ${{ runner.os == 'Windows' && format('{0}/v', runner.temp) || format('{0}/vcpkg', github.workspace) }}
         vcpkgJsonGlob: '**/source/vcpkg.json'
         vcpkgConfigurationJsonGlob: '**/source/vcpkg-configuration.json'
 
@@ -256,7 +257,7 @@ runs:
           build/ci/
           build/${{ inputs.preset }}/CMakeFiles/CMakeConfigureLog.yaml
           build/${{ inputs.preset }}/vcpkg-manifest-install.log
-          vcpkg/buildtrees/*/*.log
+          ${{ env.VCPKG_ROOT }}/buildtrees/*/*.log
           build/lua-preflight/_deps/*-subbuild/*-populate-prefix/src/*-stamp/*.log
         if-no-files-found: ignore
         retention-days: 7

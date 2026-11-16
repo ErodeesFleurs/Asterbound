@@ -1,6 +1,12 @@
 --- a/ports/sdl3/portfile.cmake
 +++ b/ports/sdl3/portfile.cmake
-@@ -49,8 +49,6 @@
+@@ -6,4 +6,5 @@
+     HEAD_REF main
+     PATCHES
+         fix-freebsd.patch
++        "${ASTERBOUND_SDL_IMPLIB_PATCH}"
+ )
+@@ -49,8 +50,6 @@
      endif()
  endif()
  
