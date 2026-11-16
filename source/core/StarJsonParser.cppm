@@ -609,7 +609,9 @@ private:
 };
 
 // Write JSON through JsonStream interface.
-template <typename OutputIterator, bool Utf8 = false>
+// Escaped object keys are an explicit opt-in; ordinary JSON output retains its
+// historical raw-key spelling and first-NUL truncation.
+template <typename OutputIterator, bool Utf8 = false, bool EscapeObjectKeys = false>
 class JsonWriter : public JsonStream {
 public:
   JsonWriter(OutputIterator out, unsigned pretty = 0) : m_out(out), m_pretty(pretty) {}
@@ -623,6 +625,11 @@ public:
     if (state() != ObjectElement) m_state.push_back(ObjectElement);
     auto r = indent();
     if (!r) return std::unexpected(std::move(r.error()));
+    if constexpr (EscapeObjectKeys) {
+      r = quoted(s);
+      if (!r) return std::unexpected(std::move(r.error()));
+      return m_pretty ? write(' ') : std::expected<void, StarException>{};
+    }
     r = write('"');
     if (!r) return std::unexpected(std::move(r.error()));
     for (std::size_t i = 0; i < s.size() && s[i]; ++i) {
@@ -639,6 +646,11 @@ public:
     if (state() != ObjectElement) m_state.push_back(ObjectElement);
     auto r = indent();
     if (!r) return std::unexpected(std::move(r.error()));
+    if constexpr (EscapeObjectKeys) {
+      r = putStringUtf8(bytes);
+      if (!r) return std::unexpected(std::move(r.error()));
+      return m_pretty ? write(' ') : std::expected<void, StarException>{};
+    }
     r = write('"');
     if (!r) return std::unexpected(std::move(r.error()));
     // Object keys historically bypass value escaping and stop at the first

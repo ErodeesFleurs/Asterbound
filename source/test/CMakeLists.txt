@@ -203,6 +203,7 @@ set (star_game_tests_SOURCES
       lua_component_test.cpp
       material_types_test.cpp
       movement_controller_test.cpp
+      mod_storage_test.cpp
       particle_presentation_test.cpp
       parallax_wind_presentation_test.cpp
       physics_object_test.cpp

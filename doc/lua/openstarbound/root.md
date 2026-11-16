@@ -132,6 +132,40 @@ Sets a configuration value in `/storage/starbound.config` by path.
 
 ---
 
+### Mod storage
+
+Persistent JSON key/value storage, available with `safeScripts` enabled. This is **not a sandbox between mods**.
+
+- **Source:** without `mod`, access uses the asset provider of the directly calling script, including shared helpers and overridden scripts. Code created by `loadstring` has no default namespace. An explicit `mod` selects the first loaded source whose `_metadata.name` matches; unknown names error. Both forms resolve the same source identity.
+- **Identity:** the namespace uses metadata `name`, or the source basename as fallback. If loaded sources resolve to the same natural namespace (for example duplicate unnamed basenames), the first keeps it and others receive a disambiguated identity, cached for this Root's lifetime. This does not bypass asset loading's duplicate-mod-name filtering.
+- **Scope:** all scripts, characters, worlds and threads in one Root share the store, including its built-in server. Independent installations/processes must use separate `storageDirectory` paths; sharing a directory is not supported. For character/world data, prefix keys with an appropriate stable ID, for example `player.uniqueId() .. ".settings"`.
+- **Values:** normal Lua-to-JSON conversion applies; functions and other unsupported values error. `nil` deletes a key. Tables are copied into/out of storage; mutating a returned table does not save it. Use `jarray()` for an empty array. Non-finite numbers are rejected; file integers must fit signed 64-bit range. Stored values may nest at most 255 containers (256 including the namespace object).
+- **Limit:** each mod's complete serialized UTF-8 JSON object, including escaped keys, punctuation and nested values, may occupy at most **4 MiB (4,194,304 bytes)**. A rejected set leaves the stored data unchanged.
+- **Persistence:** changes are batched about two seconds after the first pending change and flushed at orderly shutdown. A crash can lose pending changes. Explicit flush waits for all mods' pending writes, including in-flight writes; failure raises an error and retains pending changes for retry. Background write failures are logged.
+- **Files:** `<storageDirectory>/modstorage/mod-<lowercase SHA256 of namespace UTF-8>.json`, plain JSON. Read/edit only while the application is closed. Unreadable, oversized or malformed files error rather than becoming empty stores; they are not automatically overwritten. Old OpenStarbound mod-storage files are **not imported automatically**.
+
+#### `Json` root.getModStorage(`String` key, [`String` mod])
+
+Returns a copy of the stored value, or `nil` if absent.
+
+#### `void` root.setModStorage(`String` key, `Json` value, [`String` mod])
+
+Stores a value, or removes the key for `nil`. An unchanged value does not schedule another write.
+
+#### `JsonArray` root.modStorageKeys([`String` mod])
+
+Returns the stored keys in no particular order.
+
+#### `void` root.clearModStorage([`String` mod])
+
+Removes all keys in the selected mod's store.
+
+#### `void` root.flushModStorage()
+
+A global write barrier for **all mods**, not just the caller; takes no mod argument. Returns only after pending writes complete, or errors on failure. Source resolution, initialization, file access and JSON errors are propagated by the storage APIs.
+
+---
+
 #### `JsonArray` root.allRecipes(`Maybe<StringSet>` filter)
 
 Returns all recipes.

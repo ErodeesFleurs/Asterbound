@@ -52,6 +52,7 @@ target_sources (star_game_module_interfaces PUBLIC FILE_SET CXX_MODULES FILES
     StarTileSectorArray.cppm
     StarDungeonGenerator.cppm
     StarRoot.cppm
+    StarModStorage.cppm
     StarRootLoader.cppm
     scripting/StarEntityLuaBindings.cppm
     scripting/StarMovementControllerLuaBindings.cppm
@@ -308,6 +309,7 @@ add_library (star_game_modules STATIC
     StarStagehand.cpp
     StarRootLoader.cpp
     StarRoot.cpp
+    StarModStorage.cpp
     StarProjectile.cpp
     StarPlayer.cpp
     StarPlant.cpp

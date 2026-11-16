@@ -6,6 +6,7 @@ Many StarExtensions mods remain compatible; StarExtensions itself is deprecated.
 
 - [Compatibility identity and limits](#asterbound-compatibility-identity)
 - [Lua 5.5.1 migration](#lua-551-migration)
+- [Persistent mod storage](#persistent-mod-storage)
 - [Bundled compatibility repairs](#bundled-mod-compatibility)
 - [Required third-party dependencies](#required-third-party-dependencies)
 - [Error diagnostics](#mod-error-diagnostics)
@@ -47,6 +48,14 @@ Compound assignment, safe navigation, `math.round` and `math.copysign` remain av
 Asterbound repairs vanilla `/scripts/actions/flying.lua`, `/stagehands/coordinator/npccombat.lua` and the fossil game's tile helpers in memory, using writable local loop variables. The flying/combat repairs preserve fractional sample bounds. Mod scripts still need migration; the vanilla repairs do not migrate arbitrary scripts.
 
 Use the [Lua API index](lua/README.md) to find the script host and related tables, and the [stub setup guide](lua/stubs/README.md) for LuaLS. Editor completion is not proof that an API exists in a particular runtime context.
+
+## Persistent mod storage
+
+Use [`root.getModStorage`, `setModStorage`, `modStorageKeys`, `clearModStorage` and `flushModStorage`](lua/openstarbound/root.md#mod-storage) with `safeScripts` enabled. Default access follows the directly calling asset script's provider, not its Lua context; shared helpers and overrides therefore matter. Dynamically generated `loadstring` code has no default namespace. An optional mod name selects the first loaded `_metadata.name` match and errors if unknown. This is not a mod-to-mod sandbox.
+
+Data is shared per Root and `storageDirectory`, across characters, worlds, threads and the built-in server. Use character/world ID key prefixes for narrower scope, and separate storage directories for independent installations/processes. Values are JSON copies; `nil` deletes. Each mod's complete serialized UTF-8 JSON object is limited to exactly 4 MiB (4,194,304 bytes), including escaped keys, nested values and punctuation, with oversized sets rejected unchanged. Values may nest at most 255 containers (256 including the namespace object); non-finite numbers and file integers outside signed 64-bit range are rejected.
+
+Pending writes are batched about two seconds after the first change and at orderly shutdown. `flushModStorage()` waits globally for all mods' pending/in-flight writes; failures error and retain pending changes for retry, while background failures are logged. Crashes may lose unflushed data. Files are plain JSON at `<storageDirectory>/modstorage/mod-<lowercase SHA256 of namespace UTF-8>.json`; edit only while closed. Bad files error rather than being silently emptied or overwritten. OpenStarbound's old mod-storage files are not automatically imported.
 
 ## Bundled mod compatibility
 

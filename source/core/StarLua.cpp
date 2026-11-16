@@ -850,6 +850,13 @@ lua_Debug const& LuaEngine::debugInfo(int level, String const& what) {
   return debug;
 }
 
+std::optional<String> LuaEngine::scriptSource(int level) {
+  lua_Debug info{};
+  if (!lua_getstack(m_state, level, &info) || !lua_getinfo(m_state, "S", &info) || !info.source)
+    return {};
+  return String(std::string_view(info.source));
+}
+
 std::expected<LuaString, StarException> LuaEngine::createString(std::string_view str) {
   LuaStackRestore stack(m_state);
   if (!lua_checkstack(m_state, 3))

@@ -23,6 +23,8 @@ import star.file;
 import star.string;
 import star.byte_array;
 import star.encode;
+import star.sha256;
+import star.mod_storage;
 import std;
 import star.format;
 import star.output_proxy;
@@ -326,6 +328,8 @@ Root::~Root() {
   if (auto written = writeConfig(); !written)
     EmergencyLog::error("Root: Could not write configuration during shutdown: {}", Star::output_exception(written.error(), true));
 
+  m_modStorage.reset();
+
 }
 
 std::expected<void, StarException> Root::reload() {
@@ -583,6 +587,65 @@ std::expected<std::shared_ptr<Assets const>, StarException> Root::assets() {
         return std::unexpected(std::move(logged.error()));
       return loaded;
     });
+}
+
+std::expected<std::reference_wrapper<ModStorage>, StarException> Root::modStorage() {
+  std::lock_guard locker(m_modStorageMutex);
+  if (!m_modStorage) {
+    auto storage = ModStorage::create(m_logger, toStoragePath("modstorage"));
+    if (!storage)
+      return std::unexpected(std::move(storage.error()));
+    m_modStorage = std::move(*storage);
+  }
+  return std::ref(*m_modStorage);
+}
+
+std::expected<String, StarException> Root::modStorageId(Assets const& assets, String const& sourcePath) {
+  std::lock_guard locker(m_modStorageMutex);
+  if (auto id = m_modStorageIds.find(sourcePath.utf8()); id != m_modStorageIds.end())
+    return id->second;
+
+  // Reserve natural names before assigning generated names, so a duplicate's
+  // suffix cannot take another loaded source's real metadata name.
+  std::vector<std::pair<String, String>> sources;
+  std::unordered_set<std::string> naturalNames;
+  for (auto const& path : assets.assetSources()) {
+    auto metadata = assets.assetSourceMetadata(path);
+    if (!metadata)
+      return std::unexpected(std::move(metadata.error()));
+    String name = File::base_name(path);
+    if (auto value = metadata->find_ref("name"); value && value->get().isType(Json::Type::String)) {
+      auto named = value->get().toString();
+      if (!named)
+        return std::unexpected(std::move(named.error()));
+      if (!named->empty())
+        name = std::move(*named);
+    }
+    naturalNames.insert(name.utf8());
+    sources.emplace_back(path, std::move(name));
+  }
+  if (std::ranges::none_of(sources, [&](auto const& source) { return source.first == sourcePath; }))
+    return std::unexpected(StarException("Mod storage source is not loaded"));
+
+  for (auto const& [path, name] : sources) {
+    if (m_modStorageIds.contains(path.utf8()))
+      continue;
+    String id = name;
+    if (m_modStorageUsedIds.contains(id.utf8())) {
+      auto base = Star::format("{} ({})", name, File::base_name(path));
+      id = base;
+      if (m_modStorageUsedIds.contains(id.utf8()) || naturalNames.contains(id.utf8())) {
+        auto digest = hex_encode(sha256(path));
+        id = Star::format("{} [{}]", base, digest);
+        for (std::size_t suffix = 1;
+             m_modStorageUsedIds.contains(id.utf8()) || naturalNames.contains(id.utf8()); ++suffix)
+          id = Star::format("{} [{}:{}]", base, digest, suffix);
+      }
+    }
+    m_modStorageUsedIds.insert(id.utf8());
+    m_modStorageIds.emplace(path.utf8(), std::move(id));
+  }
+  return m_modStorageIds.at(sourcePath.utf8());
 }
 
 std::expected<std::shared_ptr<Configuration>, StarException> Root::configuration() {

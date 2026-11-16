@@ -77,6 +77,40 @@ function root.setConfiguration(key, value) end
 ---@return Json
 function root.setConfigurationPath(path, value) end
 
+--- Persistent JSON storage shared by all scripts in one Root/storageDirectory, including its built-in server.
+--- Works with safeScripts enabled; not a sandbox between mods. Use separate storage directories for independent processes/installations.
+--- Defaults to the directly calling asset script's provider (including helpers/overrides); loadstring has no default namespace.
+--- Optional mod selects the first loaded source with matching _metadata.name; unknown names error.
+--- Returns a copy, or nil when absent; prefix keys with character/world IDs when that scope is needed.
+---@param key string
+---@param mod? string
+---@return Json
+function root.getModStorage(key, mod) end
+
+--- Stores a JSON value copy; nil deletes. Unsupported Lua values error; use jarray() for an empty array.
+--- The full serialized UTF-8 JSON object (escaped keys and punctuation included) is limited to 4,194,304 bytes per mod.
+--- Values allow at most 255 nested containers (256 including the namespace object); non-finite numbers error and file integers must fit int64.
+--- Rejected sets leave data unchanged. Writes batch about two seconds after the first pending change and at orderly shutdown.
+--- Files are modstorage/mod-<lowercase SHA256 of namespace UTF-8>.json under storageDirectory; old OpenStarbound files are not imported.
+--- Unreadable, oversized or malformed files error instead of being silently emptied or overwritten.
+---@param key string
+---@param value Json
+---@param mod? string
+function root.setModStorage(key, value, mod) end
+
+--- Returns all keys in the selected mod's store in no particular order. Uses the same source/name selection as getModStorage.
+---@param mod? string
+---@return string[]
+function root.modStorageKeys(mod) end
+
+--- Removes all keys in the selected mod's store. Uses the same source/name selection as getModStorage.
+---@param mod? string
+function root.clearModStorage(mod) end
+
+--- Global barrier: waits for all mods' pending/in-flight writes, not only the caller's. Takes no mod argument.
+--- Failures error and retain pending changes for retry; background failures are logged. A crash may lose unflushed changes.
+function root.flushModStorage() end
+
 --- Returns all recipes. ---
 ---@return JsonArray
 function root.allRecipes() end

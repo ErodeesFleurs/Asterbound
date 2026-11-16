@@ -69,6 +69,7 @@ class DanceDatabase;
 class SpawnTypeDatabase;
 class RadioMessageDatabase;
 class CollectionDatabase;
+class ModStorage;
 
 // Instance-owned configuration, assets, factories, and databases.
 // Root and its resources are thread safe. Initialization must finish before
@@ -157,6 +158,10 @@ public:
   [[nodiscard]] std::expected<std::shared_ptr<Assets const>, StarException> assets() override;
   [[nodiscard]] std::expected<std::shared_ptr<Configuration>, StarException> configuration() override;
 
+  // Persistent services survive resource reloads and are borrowed until Root shutdown.
+  [[nodiscard]] std::expected<std::reference_wrapper<ModStorage>, StarException> modStorage();
+  [[nodiscard]] std::expected<String, StarException> modStorageId(Assets const& assets, String const& sourcePath);
+
   [[nodiscard]] std::expected<std::shared_ptr<ObjectDatabase const>, StarException> objectDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<PlantDatabase const>, StarException> plantDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<ProjectileDatabase const>, StarException> projectileDatabase();
@@ -242,6 +247,11 @@ private:
 
   std::mutex m_modsMutex;
   StringList m_modDirectories;
+
+  std::mutex m_modStorageMutex;
+  std::unique_ptr<ModStorage> m_modStorage;
+  std::unordered_map<std::string, String> m_modStorageIds;
+  std::unordered_set<std::string> m_modStorageUsedIds;
 
   ListenerGroup m_reloadListeners;
 
@@ -417,5 +427,6 @@ export namespace Star {
   using ::Star::SpawnTypeDatabase;
   using ::Star::RadioMessageDatabase;
   using ::Star::CollectionDatabase;
+  using ::Star::ModStorage;
   using ::Star::Root;
 }

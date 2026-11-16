@@ -653,6 +653,8 @@ public:
 
   // Returns the debug info of the state.
   lua_Debug const& debugInfo(int level = 1, String const& what = "nSlu");
+  // Owned source of an existing Lua frame; no Lua C API types escape.
+  std::optional<String> scriptSource(int level = 1);
 
   // Generic from/to lua conversion, calls template specialization of
   // LuaConverter for actual conversion.
