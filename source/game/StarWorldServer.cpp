@@ -1243,7 +1243,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
         auto assets = world.root().assets();
         if (!assets)
           return std::unexpected(std::move(assets.error()));
-        String checkPath = AssetPath::split(path).basePath;
+        String checkPath = AssetPath::split(path).m_base_path;
         if (checkPath.empty())
           return false;
         return (*assets)->assetExists(checkPath);

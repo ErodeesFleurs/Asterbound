@@ -379,6 +379,19 @@ These are algorithm/compatibility guarantees, not measured runtime speedups.
   renamed APIs, compile flags, fixture/result labels and runtime dependencies.
   Retain alternating before/after samples, old/old drift and every regression.
 
+### Asset locators
+
+- `core_tests --gtest_filter='AssetPathTest.*:PathEmbedTest.*:ImageDirectivePipelineTest.*'`
+  covers base-only filename/extension ranges, UTF-8/NUL and bounded input views,
+  delimiter normalization, literal replacement sub-paths, relative concatenation,
+  embedded identity, moves/source reuse, canonical text/wire and truncated reads.
+- Run `AssetsTest.All:EmbeddedAssetsTest.*` with explicit owned `packed.pak` and
+  repository `assets/asterbound` sources in a private boot configuration/storage.
+  These exercise real Assets/Lua image frames/directives, WAV/font decoding and
+  script/raw permissions. Keep the bundled-version guard active: regenerate
+  CMake build metadata after `version.json` changes rather than changing asset
+  markers or bypassing checks to make stale binaries pass.
+
 ### Images, gameplay and frontend lifecycles
 
 - Image kernels retain full format/scaler coverage, byte-exact independent
@@ -442,6 +455,7 @@ catalog; implementation and detailed labels live in [benchmark sources](../sourc
 |---|---|---|
 | Lua | `./result/bin/core_benchmarks --benchmark_filter='Lua/'` | Calls, callbacks, contexts and coroutines; asset workers share one VM. |
 | JSON | `./result/bin/json_benchmarks` | Parsing, preserved formatting, path updates and patches. |
+| Asset locators | `./result/bin/core_benchmarks --benchmark_filter='^Core/AssetPath/'` | Byte parsing, canonical output, filename/extension, sub-path/directive edits and relative concatenation. |
 | Algorithms | `./result/bin/algorithm_benchmarks --benchmark_filter='Algorithm/'` | Ordinary/checked cached-key and stable sorting; held-key filtering. |
 | Optional values | `./result/bin/optional_benchmarks --benchmark_filter='Optional/'` | Owning extraction, borrowing, traced empty errors and nested diagnostics. |
 | Byte order | `./result/bin/bytes_benchmarks --benchmark_filter='Bytes/'` | Scalar and misaligned raw reversal/conversion. |
@@ -486,6 +500,12 @@ not production frame pacing or FPS evidence.
   narrowed double-angle results also make `AfterOnly` cases incomparable. Exclude
   them from baseline speedup claims rather than relaxing validation.
 - **Scalar-math baseline:** preserve the original implementation and complete pre/post timed-output oracles. Ordinary-domain angle comparisons use the same independent numerical tolerance; their output bits can differ. Fixed endpoint/extended-precision behavior and fractions outside the old integer-conversion domain are correctness cases, not baseline speedups. Labels report fixture/output fingerprints and results per item; normalize by both batch size and result count.
+- **Asset-locator baseline:** use 64-result batches with 32/1024-byte UTF-8
+  directories. Setup and independent full-result/fingerprint checks are untimed;
+  result destruction is timed, and join/text use prebuilt locators. Compare
+  filename/extension on base-only inputs: suffix-bearing cases fix an old range
+  bug and are correctness regressions, not valid old/new speedups. Historical
+  benchmark labels retain their spelling independently of the snake_case API.
 
 ### Comparable measurements
 

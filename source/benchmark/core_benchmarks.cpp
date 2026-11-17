@@ -15,8 +15,209 @@ import star.lua;
 import star.lua_converters;
 import star.vector;
 import star.format;
+import star.asset_path;
+import star.text_formatter;
 
 namespace {
+
+namespace AssetPathBenchmarks {
+
+using Star::String;
+
+constexpr std::size_t batch_size = 64;
+
+enum class Operation {
+  Split,
+  Construct,
+  Join,
+  Filename,
+  Extension,
+  Directory,
+  SetSubPath,
+  RemoveSubPath,
+  AddDirectives,
+  RelativeTo,
+  WriteText
+};
+
+struct Fixture {
+  String m_input;
+  String m_base;
+  String m_replacement;
+  String m_added_directives;
+  String m_relative;
+  Star::AssetPath m_locator;
+  std::string m_original;
+  std::string m_canonical;
+  std::string m_original_subpath;
+  std::array<std::string, 11> m_expected;
+};
+
+std::vector<Fixture> make_fixtures(std::size_t directory_bytes) {
+  std::vector<Fixture> fixtures;
+  fixtures.reserve(batch_size);
+  for (std::size_t index = 0; index < batch_size; ++index) {
+    std::string directory = "/";
+    while (directory.size() + std::string_view("星/").size() <= directory_bytes)
+      directory += "星/";
+    while (directory.size() < directory_bytes)
+      directory += '/';
+    auto filename = std::format("image{:02}.png", index);
+    auto base = directory + filename;
+    auto subpath = std::format("frame:{}:星", index);
+    std::string directives = "?flipx?multiply=ffffff";
+    auto original = base + ":" + subpath + "??flipx???multiply=ffffff?";
+    auto canonical = base + ":" + subpath + directives;
+    auto replacement = std::format("other:{}:月", index);
+    std::string added = "?flipy";
+    auto relative = std::format("next{:02}.png:idle??flipx", index);
+    Fixture fixture{String(original),
+                    String(base),
+                    String(replacement),
+                    String(added),
+                    String(relative),
+                    Star::AssetPath::split(String(original)),
+                    original,
+                    canonical,
+                    subpath,
+                    {canonical, canonical, canonical, filename, "png", directory, base + ":" + replacement + directives,
+                     base + directives, original + "flipy", directory + relative, canonical}};
+    fixtures.push_back(std::move(fixture));
+  }
+  return fixtures;
+}
+
+template <Operation operation>
+concept asset_path_operation = operation >= Operation::Split && operation <= Operation::WriteText;
+
+template <Operation operation>
+  requires asset_path_operation<operation>
+auto execute(Fixture const& fixture) {
+  using Star::AssetPath;
+  if constexpr (operation == Operation::Split)
+    return AssetPath::split(fixture.m_input);
+  else if constexpr (operation == Operation::Construct)
+    return AssetPath(std::string_view(fixture.m_input.utf8()));
+  else if constexpr (operation == Operation::Join)
+    return AssetPath::join(fixture.m_locator);
+  else if constexpr (operation == Operation::Filename)
+    return AssetPath::filename(fixture.m_base);
+  else if constexpr (operation == Operation::Extension)
+    return AssetPath::extension(fixture.m_base);
+  else if constexpr (operation == Operation::Directory)
+    return AssetPath::directory(fixture.m_input);
+  else if constexpr (operation == Operation::SetSubPath)
+    return AssetPath::set_sub_path(fixture.m_input, fixture.m_replacement);
+  else if constexpr (operation == Operation::RemoveSubPath)
+    return AssetPath::remove_sub_path(fixture.m_input);
+  else if constexpr (operation == Operation::AddDirectives)
+    return AssetPath::add_directives(fixture.m_input, fixture.m_added_directives);
+  else if constexpr (operation == Operation::RelativeTo)
+    return AssetPath::relative_to(fixture.m_input, fixture.m_relative);
+  else {
+    Star::TextBuffer output;
+    Star::write_text(output, fixture.m_locator);
+    return output;
+  }
+}
+
+// Stable byte fingerprints, not std::hash: labels remain comparable across builds.
+void fingerprint(std::uint64_t& value, std::string_view text) {
+  for (unsigned char byte : text) {
+    value ^= byte;
+    value *= 1099511628211ULL;
+  }
+  value ^= 255;
+  value *= 1099511628211ULL;
+}
+
+template <Operation operation>
+  requires asset_path_operation<operation>
+bool validate(benchmark::State& state, std::vector<Fixture> const& fixtures, std::uint64_t& fixture_fingerprint,
+              std::uint64_t& result_fingerprint) {
+  for (auto const& fixture : fixtures) {
+    auto result = execute<operation>(fixture);
+    auto text = [&]() -> std::string {
+      if constexpr (operation == Operation::Split || operation == Operation::Construct) {
+        if (result.m_base_path != fixture.m_base || !result.m_sub_path
+            || result.m_sub_path->utf8() != fixture.m_original_subpath)
+          return {};
+        return Star::AssetPath::join(result).utf8();
+      } else if constexpr (operation == Operation::WriteText)
+        return std::string(result.view());
+      else
+        return result.utf8();
+    }();
+    if (text != fixture.m_expected[static_cast<std::size_t>(operation)] || fixture.m_input.utf8() != fixture.m_original
+        || Star::AssetPath::join(fixture.m_locator).utf8() != fixture.m_canonical) {
+      state.SkipWithError("AssetPath output or original fixture differs from independent oracle");
+      return false;
+    }
+    fingerprint(fixture_fingerprint, fixture.m_original);
+    fingerprint(fixture_fingerprint, fixture.m_base.utf8());
+    fingerprint(fixture_fingerprint, fixture.m_replacement.utf8());
+    fingerprint(fixture_fingerprint, fixture.m_added_directives.utf8());
+    fingerprint(fixture_fingerprint, fixture.m_relative.utf8());
+    fingerprint(fixture_fingerprint, fixture.m_canonical);
+    fingerprint(result_fingerprint, text);
+  }
+  return true;
+}
+
+template <Operation operation>
+  requires asset_path_operation<operation>
+void benchmark_asset_path(benchmark::State& state) {
+  auto fixtures = make_fixtures(static_cast<std::size_t>(state.range(0)));
+  std::uint64_t fixture_fingerprint = 14695981039346656037ULL;
+  std::uint64_t result_fingerprint = 14695981039346656037ULL;
+  if (!validate<operation>(state, fixtures, fixture_fingerprint, result_fingerprint))
+    return;
+  state.SetLabel(std::format("batch=64; directory_bytes={}; fixture={:016x}; result={:016x}", state.range(0),
+                             fixture_fingerprint, result_fingerprint));
+  // Fixtures, independent oracles and full validation are untimed. Each result
+  // is destroyed inside the timed batch; join/write_text use prebuilt locators.
+  for (auto _ : state) {
+    (void)_;
+    for (auto const& fixture : fixtures) {
+      benchmark::DoNotOptimize(fixture);
+      auto result = execute<operation>(fixture);
+      benchmark::DoNotOptimize(result);
+    }
+  }
+  fixture_fingerprint = 14695981039346656037ULL;
+  result_fingerprint = 14695981039346656037ULL;
+  validate<operation>(state, fixtures, fixture_fingerprint, result_fingerprint);
+  state.SetItemsProcessed(state.iterations() * static_cast<std::int64_t>(batch_size));
+}
+
+BENCHMARK_TEMPLATE(benchmark_asset_path, Operation::Split)->Name("Core/AssetPath/split")->Arg(32)->Arg(1024);
+BENCHMARK_TEMPLATE(benchmark_asset_path, Operation::Construct)
+  ->Name("Core/AssetPath/constructor_string_view")
+  ->Arg(32)
+  ->Arg(1024);
+BENCHMARK_TEMPLATE(benchmark_asset_path, Operation::Join)->Name("Core/AssetPath/join")->Arg(32)->Arg(1024);
+BENCHMARK_TEMPLATE(benchmark_asset_path, Operation::Filename)
+  ->Name("Core/AssetPath/filename_base_only")
+  ->Arg(32)
+  ->Arg(1024);
+BENCHMARK_TEMPLATE(benchmark_asset_path, Operation::Extension)
+  ->Name("Core/AssetPath/extension_base_only")
+  ->Arg(32)
+  ->Arg(1024);
+BENCHMARK_TEMPLATE(benchmark_asset_path, Operation::Directory)->Name("Core/AssetPath/directory")->Arg(32)->Arg(1024);
+BENCHMARK_TEMPLATE(benchmark_asset_path, Operation::SetSubPath)->Name("Core/AssetPath/setSubPath")->Arg(32)->Arg(1024);
+BENCHMARK_TEMPLATE(benchmark_asset_path, Operation::RemoveSubPath)
+  ->Name("Core/AssetPath/removeSubPath")
+  ->Arg(32)
+  ->Arg(1024);
+BENCHMARK_TEMPLATE(benchmark_asset_path, Operation::AddDirectives)
+  ->Name("Core/AssetPath/addDirectives")
+  ->Arg(32)
+  ->Arg(1024);
+BENCHMARK_TEMPLATE(benchmark_asset_path, Operation::RelativeTo)->Name("Core/AssetPath/relative_to")->Arg(32)->Arg(1024);
+BENCHMARK_TEMPLATE(benchmark_asset_path, Operation::WriteText)->Name("Core/AssetPath/write_text")->Arg(32)->Arg(1024);
+
+}// namespace AssetPathBenchmarks
 
 using Star::EnumMap;
 using Star::Json;

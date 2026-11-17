@@ -1077,10 +1077,10 @@ std::expected<List<Drawable>, StarException> PaintingBeamTool::drawables() const
         auto directives = color.substr(*directivesStart);
         if (!directives)
           return std::unexpected(std::move(directives.error()));
-        image.subPath = image.subPath.value_or("0") + *index;
-        image.directives += *directives;
+        image.m_sub_path = image.m_sub_path.value_or("0") + *index;
+        image.m_directives += *directives;
       } else {
-        image.subPath = image.subPath.value_or("0") + color;
+        image.m_sub_path = image.m_sub_path.value_or("0") + color;
       }
     }
   }

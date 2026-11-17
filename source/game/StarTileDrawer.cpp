@@ -203,7 +203,7 @@ std::expected<bool, StarException> TileDrawer::produceTerrainDrawables(Drawables
 
     AssetPath image(path);
     if (directives)
-      image.directives += directives->get();
+      image.m_directives += directives->get();
 
     return image;
   };

@@ -184,8 +184,8 @@ const GameTestRegistration embeddedEncoders("EmbeddedAssetsTest", "LuaEncodersPr
     ASSERT_TRUE(lua.setPath("compression", compression));
     auto path = lua.eval<String>("return sb.embedData(binary, compression)");
     ASSERT_TRUE(path) << path.error().what();
-    EXPECT_TRUE(AssetPath::isEmbedded(*path));
-    EXPECT_TRUE(AssetPath::isRemote(*path));
+    EXPECT_TRUE(AssetPath::is_embedded(*path));
+    EXPECT_TRUE(AssetPath::is_remote(*path));
     EXPECT_FALSE(setup.assets->bytes(*path));
     auto bytes = setup.assets->bytes(*path, true);
     ASSERT_TRUE(bytes) << bytes.error().what();
@@ -226,7 +226,7 @@ const GameTestRegistration embeddedEncoders("EmbeddedAssetsTest", "LuaEncodersPr
   auto recoveredBytes = setup.assets->bytes(*recovered, true);
   ASSERT_TRUE(recoveredBytes);
   EXPECT_EQ(**recoveredBytes, ByteArray::from_string(arbitrary));
-  EXPECT_FALSE(AssetPath::isEmbedded("/OPENSB_DATA;text;x"));
+  EXPECT_FALSE(AssetPath::is_embedded("/OPENSB_DATA;text;x"));
 });
 
 const GameTestRegistration embeddedImages("EmbeddedAssetsTest", "ImageEmbeddingFramesAliasesOffsetsAndDirectives", [](GameTest& fixture) {
@@ -543,8 +543,8 @@ const GameTestRegistration embeddedEscapedFrameNames(
       )LUA");
       ASSERT_TRUE(path) << path.error().what();
       AssetPath components;
-      components.basePath = *path;
-      components.subPath = name;
+      components.m_base_path = *path;
+      components.m_sub_path = name;
       auto loaded = (*assets)->image(components);
       ASSERT_TRUE(loaded) << loaded.error().what();
       expectPixels(**loaded, *expected);

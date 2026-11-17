@@ -2382,7 +2382,7 @@ std::expected<List<Drawable>, StarException> Object::orientationDrawables(std::s
     for (auto const& layer : orientation->imageLayers) {
       Drawable drawable = layer;
       auto& imagePart = drawable.imagePart();
-      imagePart.image.directives.clear();
+      imagePart.image.m_directives.clear();
       String imagePath = AssetPath::join(imagePart.image);
       if ((m_colorDirectives || !m_colorSuffix.empty()) && m_imageKeys.contains("color")) {
         String& color = m_imageKeys.find("color")->second;
@@ -2403,7 +2403,7 @@ std::expected<List<Drawable>, StarException> Object::orientationDrawables(std::s
         else
           imagePart.image = imagePath.replace_tags(m_imageKeys, true, "default");
         color = std::move(backup);
-        imagePart.image.directives = layer.imagePart().image.directives;
+        imagePart.image.m_directives = layer.imagePart().image.m_directives;
         if (m_colorDirectives) {
           auto operation1 = imagePart.addDirectives(*metadata, m_colorDirectives);
           if (!operation1)
@@ -2416,7 +2416,7 @@ std::expected<List<Drawable>, StarException> Object::orientationDrawables(std::s
         }
       } else {
         imagePart.image = imagePath.replace_tags(m_imageKeys, true, "default");
-        imagePart.image.directives = layer.imagePart().image.directives;
+        imagePart.image.m_directives = layer.imagePart().image.m_directives;
       }
       auto operation3 = imagePart.addDirectives(*metadata, m_directives);
       if (!operation3)

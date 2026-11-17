@@ -97,7 +97,7 @@ std::expected<LuaMethods<Image>, StarException> LuaUserDataMethods<Image>::make(
         if (!frames)
           return output;
         if (auto path = std::get_if<String>(&*frames)) {
-          if (AssetPath::isEmbedded(*path)) {
+          if (AssetPath::is_embedded(*path)) {
             // A self-contained frames asset is represented inline, rather than
             // inserting its semicolons into the single framespath field.
             if (path->utf8().find_first_of(":?") != std::string::npos)

@@ -44,7 +44,7 @@ std::expected<std::reference_wrapper<Drawable::ImagePart>, StarException> Drawab
       return std::unexpected(std::move(size.error()));
     oldSize = Vec2F(*size);
   }
-  image.directives += directives;
+  image.m_directives += directives;
   if (oldSize) {
     auto size = imageMetadata.imageSize(image);
     if (!size)
@@ -65,7 +65,7 @@ std::expected<std::reference_wrapper<Drawable::ImagePart>, StarException> Drawab
     oldSize = Vec2F(*size);
   }
   for (Directives const& directives : directivesGroup.list())
-    image.directives += directives;
+    image.m_directives += directives;
   if (oldSize) {
     auto size = imageMetadata.imageSize(image);
     if (!size)
@@ -83,7 +83,7 @@ std::expected<std::reference_wrapper<Drawable::ImagePart>, StarException> Drawab
       return std::unexpected(std::move(size.error()));
     oldSize = Vec2F(*size);
   }
-  image.directives.clear();
+  image.m_directives.clear();
   if (oldSize) {
     auto size = imageMetadata.imageSize(image);
     if (!size)

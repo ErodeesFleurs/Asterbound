@@ -99,6 +99,27 @@ values in named locals and preserve first-error, ownership and transaction order
   decoded indexes through the bounded cache; keep disk I/O outside its spinlock.
   Keep transaction staging, root publication barriers and explicit failure recovery.
 
+### Asset locators
+
+- `AssetPath` owns `m_base_path`, `m_sub_path` and `m_directives`. Parsing helpers
+  borrow byte views only during the call. The first `:` before `?` introduces a
+  sub-path; later colons are ordinary bytes. Only `/` separates directories.
+  Do not apply filesystem normalization or fold `..`.
+- `filename` and `extension` inspect the base path only, excluding sub-paths and
+  directives. `relative_to` concatenates the source directory and a relative
+  locator without interpreting its suffix.
+- Use `set_sub_path`, `remove_sub_path`, `get_directives`, `add_directives` and
+  `remove_directives`. Sub-path edits normalize existing empty `?` entries but
+  preserve replacement bytes literally. Raw directive edits retain their
+  existing boundary rules; `DirectivesGroup::append_to` is not canonical joining.
+- `join` and `write_text` share canonical entry emission. An explicitly engaged
+  empty sub-path emits `:`, although parsing a trailing colon discards it.
+  Moves consume and reset source optional/directive state; self-move is stable.
+  Wire reads replace the destination only after the complete String is decoded.
+- Equality/hash remain byte-sensitive, including embedded payloads.
+  `is_embedded` recognizes only lowercase `/opensb_data;`; `is_remote` currently
+  has the same recognition rule and does not imply network fetching.
+
 ### Images and pixel processing
 
 - Check layout arithmetic in `size_t`, bounded by `PTRDIFF_MAX`; `Image::size_bytes` validates without allocation. `for_overwrite` requires writing every byte. Construction/changed-layout reset zero storage; unchanged-layout reset preserves pixels.

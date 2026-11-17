@@ -106,7 +106,7 @@ struct AssetWorkerTestAccess {
         return std::unexpected(std::move(bytes.error()));
       digest.push(*bytes);
       for (auto const& patch : descriptor->get().patchSources) {
-        auto patch_device = patch.second->open(AssetPath::removeSubPath(patch.first));
+        auto patch_device = patch.second->open(AssetPath::remove_sub_path(patch.first));
         if (!patch_device)
           return std::unexpected(std::move(patch_device.error()));
         auto patch_size = (*patch_device)->size();
@@ -227,7 +227,7 @@ namespace {
 }
 
 const GameTestRegistration assetsAll("AssetsTest", "All", [](GameTest&) {
-  EXPECT_EQ(AssetPath::removeDirectives("/foo/bar/baz??::?:??:asdfasdf??D?"), "/foo/bar/baz");
+  EXPECT_EQ(AssetPath::remove_directives("/foo/bar/baz??::?:??:asdfasdf??D?"), "/foo/bar/baz");
   EXPECT_EQ(AssetPath::directory("/foo/bar/baz"), "/foo/bar/");
   EXPECT_EQ(AssetPath::directory("foo/bar/baz"), "foo/bar/");
   EXPECT_EQ(AssetPath::directory("foo"), "");

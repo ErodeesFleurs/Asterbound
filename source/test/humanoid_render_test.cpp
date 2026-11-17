@@ -149,7 +149,7 @@ const GameTestRegistration
       ASSERT_TRUE(chest);
       ASSERT_EQ(chest->get().fullbright(), fullbright);
       ASSERT_TRUE((*humanoid)->setWearableFromChest(0, chest->get(), identity.gender));
-      auto sleeve = AssetPath::split(chest->get().backSleeveFrameset(identity.gender)).basePath;
+      auto sleeve = AssetPath::split(chest->get().backSleeveFrameset(identity.gender)).m_base_path;
       for (auto direction : {Direction::Left, Direction::Right}) {
         (*humanoid)->setFacingDirection(direction);
         for (bool holding : {false, true}) {
@@ -159,7 +159,7 @@ const GameTestRegistration
           ASSERT_TRUE(drawables) << drawables.error().what();
           unsigned sleeves = 0;
           for (auto const& drawable : *drawables) {
-            if (drawable.isImage() && drawable.imagePart().image.basePath == sleeve) {
+            if (drawable.isImage() && drawable.imagePart().image.m_base_path == sleeve) {
               ++sleeves;
               EXPECT_EQ(drawable.fullbright, fullbright)
                 << "holding=" << holding << ", armor fullbright=" << fullbright;
@@ -431,7 +431,7 @@ const GameTestRegistration refreshedMovementCycles(
               ASSERT_TRUE(drawables) << drawables.error().what();
               String renderedFrames;
               for (auto const& drawable : *drawables) {
-                if (drawable.isImage() && drawable.imagePart().image.subPath)
+                if (drawable.isImage() && drawable.imagePart().image.m_sub_path)
                   renderedFrames += AssetPath::join(drawable.imagePart().image);
               }
               frames.insert(std::move(renderedFrames));

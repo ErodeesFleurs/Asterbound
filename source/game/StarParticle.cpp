@@ -495,7 +495,7 @@ void Particle::destructionUpdate() {
 
 std::expected<void, StarException> Particle::initializeAnimation(Root& root) {
   if (!animation) {
-    auto created = Animation::create(root, AssetPath::removeDirectives(string));
+    auto created = Animation::create(root, AssetPath::remove_directives(string));
     if (!created)
       return std::unexpected(std::move(created.error()));
     animation = std::move(*created);

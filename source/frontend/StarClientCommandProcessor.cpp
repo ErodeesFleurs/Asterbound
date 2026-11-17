@@ -811,8 +811,8 @@ std::expected<String, StarException> ClientCommandProcessor::render(String const
     outputSheet = true;
     outputName = first;
     if (first == "hat") {
-      assetPath.basePath = humanoid->headArmorFrameset();
-      assetPath.directives += humanoid->headArmorDirectives();
+      assetPath.m_base_path = humanoid->headArmorFrameset();
+      assetPath.m_directives += humanoid->headArmorDirectives();
     } else if (first == "chest") {
       if (args.size() <= 1) {
         return "Chest armors have multiple spritesheets. Do: "
@@ -824,14 +824,14 @@ std::expected<String, StarException> ClientCommandProcessor::render(String const
       String sheet = std::move(*loweredSheet);
       outputName += " " + sheet;
       if (sheet == "torso") {
-        assetPath.basePath = humanoid->chestArmorFrameset();
-        assetPath.directives += humanoid->chestArmorDirectives();
+        assetPath.m_base_path = humanoid->chestArmorFrameset();
+        assetPath.m_directives += humanoid->chestArmorDirectives();
       } else if (sheet == "front") {
-        assetPath.basePath = humanoid->frontSleeveFrameset();
-        assetPath.directives += humanoid->chestArmorDirectives();
+        assetPath.m_base_path = humanoid->frontSleeveFrameset();
+        assetPath.m_directives += humanoid->chestArmorDirectives();
       } else if (sheet == "back") {
-        assetPath.basePath = humanoid->backSleeveFrameset();
-        assetPath.directives += humanoid->chestArmorDirectives();
+        assetPath.m_base_path = humanoid->backSleeveFrameset();
+        assetPath.m_directives += humanoid->chestArmorDirectives();
       } else {
         return Star::format("^red;Invalid chest sheet type '{}'^reset;", sheet);
       }
@@ -840,53 +840,53 @@ std::expected<String, StarException> ClientCommandProcessor::render(String const
         auto old = args[2].to_lower();
         if (!old) return std::unexpected(std::move(old.error()));
         if (*old == "old") {
-          auto prefix = assetPath.basePath.starts_with("/items/armors/avian/avian-tier6separator/");
+          auto prefix = assetPath.m_base_path.starts_with("/items/armors/avian/avian-tier6separator/");
           if (!prefix) return std::unexpected(std::move(prefix.error()));
           if (*prefix) {
-            auto suffix = assetPath.basePath.substr(41);
+            auto suffix = assetPath.m_base_path.substr(41);
             if (!suffix) return std::unexpected(std::move(suffix.error()));
-            assetPath.basePath = "/items/armors/avian/avian-tier6separator/old/" + *suffix;
+            assetPath.m_base_path = "/items/armors/avian/avian-tier6separator/old/" + *suffix;
           }
         }
       }
     } else if (first == "legs") {
-      assetPath.basePath = humanoid->legsArmorFrameset();
-      assetPath.directives += humanoid->legsArmorDirectives();
+      assetPath.m_base_path = humanoid->legsArmorFrameset();
+      assetPath.m_directives += humanoid->legsArmorDirectives();
     } else if (first == "back") {
-      assetPath.basePath = humanoid->backArmorFrameset();
-      assetPath.directives += humanoid->backArmorDirectives();
+      assetPath.m_base_path = humanoid->backArmorFrameset();
+      assetPath.m_directives += humanoid->backArmorDirectives();
     } else if (first == "body") {
-      assetPath.basePath = humanoid->getBodyFromIdentity();
-      assetPath.directives += identity.bodyDirectives;
+      assetPath.m_base_path = humanoid->getBodyFromIdentity();
+      assetPath.m_directives += identity.bodyDirectives;
     } else if (first == "head") {
       outputSheet = false;
-      assetPath.basePath = humanoid->getHeadFromIdentity();
-      assetPath.subPath = String("normal");
-      assetPath.directives += identity.bodyDirectives;
+      assetPath.m_base_path = humanoid->getHeadFromIdentity();
+      assetPath.m_sub_path = String("normal");
+      assetPath.m_directives += identity.bodyDirectives;
     } else if (first == "hair") {
       outputSheet = false;
-      assetPath.basePath = humanoid->getHairFromIdentity();
-      assetPath.subPath = String("normal");
-      assetPath.directives += identity.hairDirectives;
+      assetPath.m_base_path = humanoid->getHairFromIdentity();
+      assetPath.m_sub_path = String("normal");
+      assetPath.m_directives += identity.hairDirectives;
     } else if (first == "facialhair") {
       outputSheet = false;
-      assetPath.basePath = humanoid->getFacialHairFromIdentity();
-      assetPath.subPath = String("normal");
-      assetPath.directives += identity.facialHairDirectives;
+      assetPath.m_base_path = humanoid->getFacialHairFromIdentity();
+      assetPath.m_sub_path = String("normal");
+      assetPath.m_directives += identity.facialHairDirectives;
     } else if (first == "facialmask") {
       outputSheet = false;
-      assetPath.basePath = humanoid->getFacialMaskFromIdentity();
-      assetPath.subPath = String("normal");
-      assetPath.directives += identity.facialMaskDirectives;
+      assetPath.m_base_path = humanoid->getFacialMaskFromIdentity();
+      assetPath.m_sub_path = String("normal");
+      assetPath.m_directives += identity.facialMaskDirectives;
     } else if (first == "frontarm") {
-      assetPath.basePath = humanoid->getFrontArmFromIdentity();
-      assetPath.directives += identity.bodyDirectives;
+      assetPath.m_base_path = humanoid->getFrontArmFromIdentity();
+      assetPath.m_directives += identity.bodyDirectives;
     } else if (first == "backarm") {
-      assetPath.basePath = humanoid->getBackArmFromIdentity();
-      assetPath.directives += identity.bodyDirectives;
+      assetPath.m_base_path = humanoid->getBackArmFromIdentity();
+      assetPath.m_directives += identity.bodyDirectives;
     } else if (first == "emote") {
-      assetPath.basePath = humanoid->getFacialEmotesFromIdentity();
-      assetPath.directives += identity.emoteDirectives;
+      assetPath.m_base_path = humanoid->getFacialEmotesFromIdentity();
+      assetPath.m_directives += identity.emoteDirectives;
     } else {
       outputSheet = false;
       outputName = "render";
@@ -894,23 +894,23 @@ std::expected<String, StarException> ClientCommandProcessor::render(String const
   }
   if (assetPath == AssetPath()) {
     assetPath = AssetPath::split(path);
-    auto absolute = assetPath.basePath.starts_with("/");
+    auto absolute = assetPath.m_base_path.starts_with("/");
     if (!absolute) return std::unexpected(std::move(absolute.error()));
     if (!*absolute)
-      assetPath.basePath = "/assetmissing.png" + assetPath.basePath;
+      assetPath.m_base_path = "/assetmissing.png" + assetPath.m_base_path;
   }
   auto assets = m_context.root().assets();
   if (!assets) return std::unexpected(std::move(assets.error()));
   std::shared_ptr<Image const> image;
   if (outputSheet) {
-    auto original = (*assets)->image(assetPath.basePath);
+    auto original = (*assets)->image(assetPath.m_base_path);
     if (!original) return std::unexpected(std::move(original.error()));
     auto sheet = std::make_shared<Image>(**original);
     sheet->convert(PixelFormat::RGBA32);
     AssetPath framePath = assetPath;
 
     StringMap<std::pair<RectU, std::shared_ptr<Image const>>> frames;
-    auto imageFrames = (*assets)->imageFrames(assetPath.basePath);
+    auto imageFrames = (*assets)->imageFrames(assetPath.m_base_path);
     if (!imageFrames) return std::unexpected(std::move(imageFrames.error()));
     if (*imageFrames)
       for (auto const& pair : (*imageFrames)->frames)
@@ -920,7 +920,7 @@ std::expected<String, StarException> ClientCommandProcessor::render(String const
       return "^red;Failed to save image^reset;";
 
     for (auto&& entry : frames) {
-      framePath.subPath = entry.first;
+      framePath.m_sub_path = entry.first;
       auto frame = (*assets)->image(framePath);
       if (!frame) return std::unexpected(std::move(frame.error()));
       entry.second.second = std::move(*frame);

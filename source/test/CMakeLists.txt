@@ -11,6 +11,7 @@ set (star_core_tests_SOURCES
 
       algorithm_test.cpp
       array_test.cpp
+      asset_path_test.cpp
       block_allocator_test.cpp
       blocks_along_line_test.cpp
       btree_database_test.cpp

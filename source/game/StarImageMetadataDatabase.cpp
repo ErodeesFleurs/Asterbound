@@ -243,10 +243,10 @@ void ImageMetadataDatabase::cleanup() const {
 }
 
 AssetPath ImageMetadataDatabase::filterProcessing(AssetPath const& path) {
-  AssetPath newPath = { path.basePath, path.subPath, {} };
+  AssetPath newPath = {path.m_base_path, path.m_sub_path, {}};
 
   String filtered;
-  for (auto const& directives : path.directives.list()) {
+  for (auto const& directives : path.m_directives.list()) {
     auto parsed = directives.operations();
     for (auto const& entry : directives.entries()) {
       ImageOperation const& operation = parsed[entry.index];
@@ -262,7 +262,7 @@ AssetPath ImageMetadataDatabase::filterProcessing(AssetPath const& path) {
     }
   }
 
-  newPath.directives = std::move(filtered);
+  newPath.m_directives = std::move(filtered);
   return newPath;
 }
 
@@ -276,19 +276,19 @@ std::expected<Vec2U, StarException> ImageMetadataDatabase::calculateImageSize(As
       return std::unexpected(std::move(image.error()));
     return (*image)->size();
   };
-  auto exists = (*assets)->assetExists(path.basePath);
+  auto exists = (*assets)->assetExists(path.m_base_path);
   if (!exists)
     return std::unexpected(std::move(exists.error()));
   if (!*exists)
     return fallback();
   Vec2U imageSize;
-  if (path.subPath) {
-    auto frames = (*assets)->imageFrames(path.basePath);
+  if (path.m_sub_path) {
+    auto frames = (*assets)->imageFrames(path.m_base_path);
     if (!frames)
       return std::unexpected(std::move(frames.error()));
     if (!*frames)
       return fallback();
-    auto rect = (*frames)->getRect(*path.subPath);
+    auto rect = (*frames)->getRect(*path.m_sub_path);
     if (!rect)
       return std::unexpected(std::move(rect.error()));
     if (*rect)
@@ -297,14 +297,14 @@ std::expected<Vec2U, StarException> ImageMetadataDatabase::calculateImageSize(As
       return fallback();
   } else {
     std::unique_lock locker(m_mutex);
-    auto size = m_sizeCache.find_ref(path.basePath);
+    auto size = m_sizeCache.find_ref(path.m_base_path);
     if (!size)
       return std::unexpected(std::move(size.error()));
     if (*size) {
       imageSize = (*size)->get();
     } else {
       locker.unlock();
-      auto file = (*assets)->openFile(path.basePath);
+      auto file = (*assets)->openFile(path.m_base_path);
       if (!file)
         return std::unexpected(std::move(file.error()));
       auto png = Image::is_png(*file);
@@ -322,7 +322,7 @@ std::expected<Vec2U, StarException> ImageMetadataDatabase::calculateImageSize(As
         imageSize = *size;
       }
       locker.lock();
-      auto stored = m_sizeCache.insert_or_assign(path.basePath, imageSize);
+      auto stored = m_sizeCache.insert_or_assign(path.m_base_path, imageSize);
       if (!stored)
         return std::unexpected(std::move(stored.error()));
     }
@@ -389,7 +389,7 @@ std::expected<Vec2U, StarException> ImageMetadataDatabase::calculateImageSize(As
   OperationSizeAdjust osa(imageSize);
 
   bool complete = true;
-  for (auto const& directives : path.directives.list()) {
+  for (auto const& directives : path.m_directives.list()) {
     for (auto const& operation : directives.operations()) {
       std::visit(osa, operation);
       if (osa.hasError) {
