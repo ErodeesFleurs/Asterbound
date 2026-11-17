@@ -168,6 +168,8 @@ unsetting them with `-U` still leaves CMake's unused-command-line warning.
 The fixed-registry vcpkg overlays likewise omit obsolete CPR sanitizer-probe and
 SDL console variables, plus PCRE2's unused MSVC runtime option for our GNU ABI.
 They retain the registry's versions, source hashes and other build/install steps.
+Vulkan Loader's X11/Wayland/DirectFB WSI options are omitted on Windows and Apple
+targets, whose platform backends do not consume those CMake options.
 liblzma's sandbox option is passed only when building its CLI tools. MinGW SDL
 keeps its GNU ABI and DLL name, but installs its COFF import archive as `.lib`
 so Windows package validation can inspect it. Native Windows CI uses a short

@@ -1,0 +1,24 @@
+--- a/ports/vulkan-loader/portfile.cmake
++++ b/ports/vulkan-loader/portfile.cmake
+@@ -16,12 +16,14 @@
+ set(ENV{PKG_CONFIG} "${PKGCONFIG}")
+ 
+-vcpkg_check_features(OUT_FEATURE_OPTIONS FEATURE_OPTIONS
+-    FEATURES
+-        xcb       BUILD_WSI_XCB_SUPPORT
+-        xlib      BUILD_WSI_XLIB_SUPPORT
+-        wayland   BUILD_WSI_WAYLAND_SUPPORT
+-        directfb  BUILD_WSI_DIRECTFB_SUPPORT
+-)
++if(NOT VCPKG_TARGET_IS_WINDOWS AND NOT VCPKG_TARGET_IS_OSX AND NOT VCPKG_TARGET_IS_IOS)
++    vcpkg_check_features(OUT_FEATURE_OPTIONS FEATURE_OPTIONS
++        FEATURES
++            xcb       BUILD_WSI_XCB_SUPPORT
++            xlib      BUILD_WSI_XLIB_SUPPORT
++            wayland   BUILD_WSI_WAYLAND_SUPPORT
++            directfb  BUILD_WSI_DIRECTFB_SUPPORT
++    )
++endif()
+ 
+ vcpkg_cmake_configure(
+   SOURCE_PATH "${SOURCE_PATH}"
