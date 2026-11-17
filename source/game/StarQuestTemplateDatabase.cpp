@@ -48,7 +48,7 @@ std::expected<std::shared_ptr<QuestTemplate>, StarException> QuestTemplate::crea
   auto rewards = config.find("rewards");
   if (!rewards) return std::unexpected(std::move(rewards.error()));
   if (*rewards && !(**rewards).get().isNull()) {
-    auto options = (**rewards).get().iterateArray();
+    auto options = (**rewards).get().iterate_array();
     if (!options)
       return std::unexpected(std::move(options.error()));
     for (auto const& option : *options) {

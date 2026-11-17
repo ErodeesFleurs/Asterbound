@@ -829,7 +829,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::tryCreateItem(
   std::optional<float> fallbackLevel = level;
   std::optional<std::uint64_t> fallbackSeed = seed;
   if (descriptor.name() != "perfectlygenericitem") {
-    auto stored = descriptor.toJson().eraseKey("count");
+    auto stored = descriptor.toJson().erase("count");
     if (!stored)
       return std::unexpected(std::move(stored.error()));
     fallbackParameters = JsonObject{

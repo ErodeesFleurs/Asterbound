@@ -56,42 +56,45 @@ class StorageWriter : public JsonWriter<StorageOutput, true, true> {
   using Base = JsonWriter<StorageOutput, true, true>;
 public:
   explicit StorageWriter(StorageOutput output) : Base(output) {}
-  std::expected<void, StarException> beginObject() override {
+  std::expected<void, StarException> begin_object() override {
     if (m_depth == MaxStorageDepth)
       return depthError();
     ++m_depth;
-    return Base::beginObject();
+    return Base::begin_object();
   }
-  std::expected<void, StarException> endObject() override {
+  std::expected<void, StarException> end_object() override {
     --m_depth;
-    return Base::endObject();
+    return Base::end_object();
   }
-  std::expected<void, StarException> beginArray() override {
+  std::expected<void, StarException> begin_array() override {
     if (m_depth == MaxStorageDepth)
       return depthError();
     ++m_depth;
-    return Base::beginArray();
+    return Base::begin_array();
   }
-  std::expected<void, StarException> endArray() override {
+  std::expected<void, StarException> end_array() override {
     --m_depth;
-    return Base::endArray();
+    return Base::end_array();
   }
-  std::expected<void, StarException> putDouble(std::string_view token) override {
+  std::expected<void, StarException> put_double(std::string_view token) override {
     auto valid = checkDouble(token);
     if (!valid)
       return std::unexpected(std::move(valid.error()));
-    auto written = Base::putDouble(token);
+    auto written = Base::put_double(token);
     if (!written)
       return std::unexpected(std::move(written.error()));
     // The engine parser treats decimal-free tokens as int64. A finite float
     // such as 1e19 must not be reloaded through its permissive integer parser.
     if (token.find_first_of(".eE") == std::string_view::npos)
-      return Base::putDouble(".0");
+      return Base::put_double(".0");
     return {};
   }
-  std::expected<void, StarException> putInteger(std::string_view token) override { return Base::putDouble(token); }
-  std::expected<void, StarException> putBoolean(bool value) override { return Base::putDouble(value ? "true" : "false"); }
-  std::expected<void, StarException> putNull() override { return Base::putDouble("null"); }
+  std::expected<void, StarException> put_integer(std::string_view token) override { return Base::put_double(token); }
+  std::expected<void, StarException> put_boolean(bool value) override {
+    return Base::put_double(value ? "true" : "false");
+  }
+  std::expected<void, StarException> put_null() override { return Base::put_double("null"); }
+
 private:
   static std::expected<void, StarException> depthError() {
     return std::unexpected(StarException("Mod storage JSON exceeds 256 container levels"));
@@ -103,39 +106,40 @@ private:
 // conversion. Storage opts into strict conversion without changing that API.
 class StorageBuilder : public JsonBuilderStream {
 public:
-  std::expected<void, StarException> beginObject() override {
+  std::expected<void, StarException> begin_object() override {
     auto valid = descend();
     if (!valid)
       return std::unexpected(std::move(valid.error()));
-    return JsonBuilderStream::beginObject();
+    return JsonBuilderStream::begin_object();
   }
-  std::expected<void, StarException> endObject() override {
+  std::expected<void, StarException> end_object() override {
     --m_depth;
-    return JsonBuilderStream::endObject();
+    return JsonBuilderStream::end_object();
   }
-  std::expected<void, StarException> beginArray() override {
+  std::expected<void, StarException> begin_array() override {
     auto valid = descend();
     if (!valid)
       return std::unexpected(std::move(valid.error()));
-    return JsonBuilderStream::beginArray();
+    return JsonBuilderStream::begin_array();
   }
-  std::expected<void, StarException> endArray() override {
+  std::expected<void, StarException> end_array() override {
     --m_depth;
-    return JsonBuilderStream::endArray();
+    return JsonBuilderStream::end_array();
   }
-  std::expected<void, StarException> putDouble(std::string_view token) override {
+  std::expected<void, StarException> put_double(std::string_view token) override {
     auto valid = checkDouble(token);
     if (!valid)
       return std::unexpected(std::move(valid.error()));
-    return JsonBuilderStream::putDouble(token);
+    return JsonBuilderStream::put_double(token);
   }
-  std::expected<void, StarException> putInteger(std::string_view token) override {
+  std::expected<void, StarException> put_integer(std::string_view token) override {
     std::int64_t value;
     auto result = std::from_chars(token.data(), token.data() + token.size(), value);
     if (result.ec != std::errc{} || result.ptr != token.data() + token.size())
       return std::unexpected(StarException("Mod storage JSON integer is outside int64 range"));
-    return JsonBuilderStream::putInteger(token);
+    return JsonBuilderStream::put_integer(token);
   }
+
 private:
   std::expected<void, StarException> descend() {
     if (m_depth == MaxStorageDepth)
@@ -149,7 +153,7 @@ private:
 std::expected<std::string, StarException> serializeValue(Json const& value, std::size_t limit) {
   std::string text;
   StorageWriter writer{StorageOutput(text, limit)};
-  auto written = JsonStreamer<Json>::toJsonStream(value, writer, false);
+  auto written = JsonStreamer<Json>::to_json_stream(value, writer, false);
   if (!written)
     return std::unexpected(std::move(written.error()));
   return text;
@@ -158,7 +162,7 @@ std::expected<std::string, StarException> serializeValue(Json const& value, std:
 std::expected<std::string, StarException> serializeKey(String const& key, std::size_t limit) {
   std::string text;
   StorageWriter writer{StorageOutput(text, limit)};
-  auto written = writer.putStringUtf8(key.utf8());
+  auto written = writer.put_string_utf8(key.utf8());
   if (!written)
     return std::unexpected(std::move(written.error()));
   return text;
@@ -265,11 +269,11 @@ std::expected<std::reference_wrapper<ModStorage::ModData>, StarException> ModSto
     }
     if (!contents)
       return std::unexpected(std::move(contents.error()));
-    auto parsed = inputUtf8Json<std::string::const_iterator, StorageBuilder>(
-        contents->cbegin(), contents->cend(), JsonParseType::Top);
+    auto parsed = input_utf8_json<std::string::const_iterator, StorageBuilder>(contents->cbegin(), contents->cend(),
+                                                                               JsonParseType::Top);
     if (!parsed)
       return std::unexpected(parsed.error().with_context(Star::format("Loading mod storage '{}'", data.filename)));
-    auto object = parsed->objectPtr();
+    auto object = parsed->object_ptr();
     if (!object)
       return std::unexpected(std::move(object.error()));
     for (auto const& [key, value] : **object) {

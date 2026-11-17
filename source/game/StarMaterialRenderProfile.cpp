@@ -39,7 +39,7 @@ namespace Star {
 [[nodiscard]]
 std::expected<MaterialRenderMatchList, StarException> parseMaterialRenderMatchList(Json const& matchSpec, RuleMap const& ruleMap, PieceMap const& pieceMap, MatchMap const& matchMap) {
   MaterialRenderMatchList result;
-  auto configs = matchSpec.toArray();
+  auto configs = matchSpec.iterate_array();
   if (!configs) return std::unexpected(std::move(configs.error()));
   for (auto const& config : *configs) {
     auto match = std::make_shared<MaterialRenderMatch>();
@@ -57,11 +57,12 @@ std::expected<MaterialRenderMatchList, StarException> parseMaterialRenderMatchLi
         match->matchJoin = MaterialJoinType::Any;
       }
     }
-    auto pointConfigs = points.iterateArray();
-    if (!pointConfigs) return std::unexpected(std::move(pointConfigs.error()));
-    for (auto const& pointConfig : *pointConfigs) {
+    auto point_configs = points.iterate_array();
+    if (!point_configs)
+      return std::unexpected(std::move(point_configs.error()));
+    for (auto const& point_config : *point_configs) {
       MaterialMatchPoint point;
-      auto position = pointConfig.get(0);
+      auto position = point_config.get(0);
       if (!position) return std::unexpected(std::move(position.error()));
       {
         auto value = jsonToVec2I(*position);
@@ -70,25 +71,34 @@ std::expected<MaterialRenderMatchList, StarException> parseMaterialRenderMatchLi
       }
       if (std::abs(point.position[0]) > MaterialRenderProfileMaxNeighborDistance || std::abs(point.position[1]) > MaterialRenderProfileMaxNeighborDistance)
         return std::unexpected(MaterialRenderProfileException(Star::format("Match position {} outside of maximum rule distance {}", point.position, MaterialRenderProfileMaxNeighborDistance)));
-      auto name = pointConfig.getString(1);
+      auto name = point_config.getString(1);
       if (!name) return std::unexpected(std::move(name.error()));
       auto rule = ruleMap.get(*name);
       if (!rule) return std::unexpected(std::move(rule.error()));
       point.rule = rule->get();
       match->matchPoints.push_back(std::move(point));
     }
-    auto pieces = config.getArray("pieces", {});
+    auto pieces = config.find("pieces");
     if (!pieces) return std::unexpected(std::move(pieces.error()));
-    for (auto const& piece : *pieces) {
-      auto name = piece.getString(0);
-      if (!name) return std::unexpected(std::move(name.error()));
-      auto renderPiece = pieceMap.get(*name);
-      if (!renderPiece) return std::unexpected(std::move(renderPiece.error()));
-      auto positionConfig = piece.get(1);
-      if (!positionConfig) return std::unexpected(std::move(positionConfig.error()));
-      auto position = jsonToVec2F(*positionConfig);
-      if (!position) return std::unexpected(std::move(position.error()));
-      match->resultingPieces.push_back({renderPiece->get(), *position});
+    if (*pieces && !(*pieces)->get().isNull()) {
+      auto piece_configs = (*pieces)->get().iterate_array();
+      if (!piece_configs)
+        return std::unexpected(std::move(piece_configs.error()));
+      for (auto const& piece : *piece_configs) {
+        auto name = piece.getString(0);
+        if (!name)
+          return std::unexpected(std::move(name.error()));
+        auto render_piece = pieceMap.get(*name);
+        if (!render_piece)
+          return std::unexpected(std::move(render_piece.error()));
+        auto position_config = piece.get(1);
+        if (!position_config)
+          return std::unexpected(std::move(position_config.error()));
+        auto position = jsonToVec2F(*position_config);
+        if (!position)
+          return std::unexpected(std::move(position.error()));
+        match->resultingPieces.push_back({render_piece->get(), *position});
+      }
     }
     auto subMatches = config.get("subMatches", {});
     if (!subMatches) return std::unexpected(std::move(subMatches.error()));
@@ -203,7 +213,7 @@ std::expected<MaterialRenderProfile, StarException> parseMaterialRenderProfile(I
   }
   auto rulesConfig = spec.get("rules");
   if (!rulesConfig) return std::unexpected(std::move(rulesConfig.error()));
-  auto rules = rulesConfig->iterateObject();
+  auto rules = rulesConfig->iterate_object();
   if (!rules) return std::unexpected(std::move(rules.error()));
   for (auto const& pair : *rules) {
     auto rule = std::make_shared<MaterialRule>();
@@ -254,7 +264,7 @@ std::expected<MaterialRenderProfile, StarException> parseMaterialRenderProfile(I
   }
   auto piecesConfig = spec.get("pieces");
   if (!piecesConfig) return std::unexpected(std::move(piecesConfig.error()));
-  auto pieces = piecesConfig->iterateObject();
+  auto pieces = piecesConfig->iterate_object();
   if (!pieces) return std::unexpected(std::move(pieces.error()));
   for (auto const& pair : *pieces) {
     auto piece = std::make_shared<MaterialRenderPiece>();
@@ -301,7 +311,7 @@ std::expected<MaterialRenderProfile, StarException> parseMaterialRenderProfile(I
   }
   auto matchesConfig = spec.get("matches");
   if (!matchesConfig) return std::unexpected(std::move(matchesConfig.error()));
-  auto matches = matchesConfig->iterateArray();
+  auto matches = matchesConfig->iterate_array();
   if (!matches) return std::unexpected(std::move(matches.error()));
   for (auto const& entry : *matches) {
     auto name = entry.getString(0);

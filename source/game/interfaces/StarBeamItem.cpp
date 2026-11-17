@@ -86,7 +86,7 @@ std::expected<void, StarException> BeamItem::initializeBeam(Json config) {
   auto overrides = config.toObject();
   if (!overrides)
     return std::unexpected(std::move(overrides.error()));
-  auto merged = defaults->setAll(*overrides);
+  auto merged = defaults->set_all(*overrides);
   if (!merged)
     return std::unexpected(std::move(merged.error()));
   config = std::move(*merged);

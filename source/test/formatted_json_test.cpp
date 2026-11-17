@@ -137,7 +137,7 @@ List<String> keyOrder(FormattedJson const& json) {
   List<String> keys;
   for (JsonElement const& elem : json.elements()) {
     if (std::holds_alternative<ObjectKeyElement>(elem))
-      keys.push_back(std::get<ObjectKeyElement>(elem).key);
+      keys.push_back(std::get<ObjectKeyElement>(elem).m_key);
   }
   return keys;
 }
@@ -174,7 +174,7 @@ TEST(FormattedJsonTest, ObjectInsertion) {
 
   auto result204 = FormattedJson::create(Json{"alal"});
   ASSERT_TRUE(result204);
-  auto result26 = json.insertBefore("lala", (*result204), "foo");
+  auto result26 = json.insert_before("lala", (*result204), "foo");
   ASSERT_TRUE(result26);
   json = (*result26);
   expectedKeys.insert_at(1, "lala");
@@ -182,7 +182,7 @@ TEST(FormattedJsonTest, ObjectInsertion) {
 
   auto result205 = FormattedJson::create(Json{"ipsum"});
   ASSERT_TRUE(result205);
-  auto result27 = json.insertAfter("lorem", (*result205), "foo");
+  auto result27 = json.insert_after("lorem", (*result205), "foo");
   ASSERT_TRUE(result27);
   json = (*result27);
   expectedKeys.insert_at(3, "lorem");
@@ -207,7 +207,7 @@ TEST(FormattedJsonTest, ObjectInsertion) {
   ASSERT_TRUE(result30);
   auto result209 = FormattedJson::create(Json{123});
   ASSERT_TRUE(result209);
-  auto result31 = (*result30).insertAfter("dolor", (*result209), "baz");
+  auto result31 = (*result30).insert_after("dolor", (*result209), "baz");
   ASSERT_TRUE(result31);
   json = (*result31);
   EXPECT_EQ(keyOrder(json), expectedKeys);
@@ -248,12 +248,12 @@ TEST(FormattedJsonTest, ObjectInsertion) {
   FormattedJson emptyObject = FormattedJson::ofType(Json::Type::Object);
   auto result210 = FormattedJson::create(Json{});
   ASSERT_TRUE(result210);
-  auto error32 = emptyObject.insertBefore("foo", (*result210), "bar");
+  auto error32 = emptyObject.insert_before("foo", (*result210), "bar");
   ASSERT_FALSE(error32);
   EXPECT_TRUE(error32.error().is<JsonException>());
   auto result211 = FormattedJson::create(Json{});
   ASSERT_TRUE(result211);
-  auto error33 = emptyObject.insertAfter("foo", (*result211), "bar");
+  auto error33 = emptyObject.insert_after("foo", (*result211), "bar");
   ASSERT_FALSE(error33);
   EXPECT_TRUE(error33.error().is<JsonException>());
   auto result212 = FormattedJson::create(Json{});
@@ -349,7 +349,7 @@ TEST(FormattedJsonTest, ObjectErase) {
   })JSON");
   ASSERT_TRUE(result49);
   FormattedJson json = (*result49);
-  auto result50 = json.eraseKey("mmm");
+  auto result50 = json.erase("mmm");
   ASSERT_TRUE(result50);
   json = (*result50);
   std::string_view expected = R"JSON({
@@ -360,7 +360,7 @@ TEST(FormattedJsonTest, ObjectErase) {
   ASSERT_TRUE(result51);
   EXPECT_EQ((*result51), expected);
 
-  auto result52 = json.eraseKey("zzz");
+  auto result52 = json.erase("zzz");
   ASSERT_TRUE(result52);
   FormattedJson jsonNoZ = (*result52);
   expected = R"JSON({
@@ -370,7 +370,7 @@ TEST(FormattedJsonTest, ObjectErase) {
   ASSERT_TRUE(result53);
   EXPECT_EQ((*result53), expected);
 
-  auto result54 = json.eraseKey("aaa");
+  auto result54 = json.erase("aaa");
   ASSERT_TRUE(result54);
   FormattedJson jsonNoA = (*result54);
   expected = R"JSON({
@@ -380,10 +380,10 @@ TEST(FormattedJsonTest, ObjectErase) {
   ASSERT_TRUE(result55);
   EXPECT_EQ((*result55), expected);
 
-  auto result56 = json.eraseKey("bbb");
+  auto result56 = json.erase("bbb");
   ASSERT_TRUE(result56);
   ASSERT_EQ((*result56), json);
-  auto error57 = FormattedJson::ofType(Json::Type::Array).eraseKey("foo");
+  auto error57 = FormattedJson::ofType(Json::Type::Array).erase("foo");
   ASSERT_FALSE(error57);
   EXPECT_TRUE(error57.error().is<JsonException>());
 }
@@ -392,39 +392,39 @@ TEST(FormattedJsonTest, ArrayErase) {
   auto result58 = FormattedJson::parse("[123, 456, 789]");
   ASSERT_TRUE(result58);
   FormattedJson json = (*result58);
-  auto result59 = json.eraseIndex(0);
+  auto result59 = json.erase(0);
   ASSERT_TRUE(result59);
   auto result60 = (*result59).repr();
   ASSERT_TRUE(result60);
   EXPECT_EQ((*result60), "[456, 789]");
-  auto result61 = json.eraseIndex(1);
+  auto result61 = json.erase(1);
   ASSERT_TRUE(result61);
   auto result62 = (*result61).repr();
   ASSERT_TRUE(result62);
   EXPECT_EQ((*result62), "[123, 789]");
-  auto result63 = json.eraseIndex(2);
+  auto result63 = json.erase(2);
   ASSERT_TRUE(result63);
   auto result64 = (*result63).repr();
   ASSERT_TRUE(result64);
   EXPECT_EQ((*result64), "[123, 456]");
-  auto result65 = json.eraseIndex(0);
+  auto result65 = json.erase(0);
   ASSERT_TRUE(result65);
-  auto result66 = (*result65).eraseIndex(0);
+  auto result66 = (*result65).erase(0);
   ASSERT_TRUE(result66);
   auto result67 = (*result66).repr();
   ASSERT_TRUE(result67);
   EXPECT_EQ((*result67), "[789]");
-  auto result68 = json.eraseIndex(0);
+  auto result68 = json.erase(0);
   ASSERT_TRUE(result68);
-  auto result69 = (*result68).eraseIndex(0);
+  auto result69 = (*result68).erase(0);
   ASSERT_TRUE(result69);
-  auto result70 = (*result69).eraseIndex(0);
+  auto result70 = (*result69).erase(0);
   ASSERT_TRUE(result70);
   auto result71 = (*result70).repr();
   ASSERT_TRUE(result71);
   EXPECT_EQ((*result71), "[]");
 
-  auto error72 = FormattedJson::ofType(Json::Type::Object).eraseIndex(0);
+  auto error72 = FormattedJson::ofType(Json::Type::Object).erase(0);
   ASSERT_FALSE(error72);
   EXPECT_TRUE(error72.error().is<JsonException>());
 }
@@ -439,10 +439,10 @@ TEST(FormattedJsonTest, CommentPreservation) {
   FormattedJson json = (*result73);
   auto result222 = FormattedJson::create(Json{1});
   ASSERT_TRUE(result222);
-  auto result74 = json.insertBefore("goodbye", (*result222), "world");
+  auto result74 = json.insert_before("goodbye", (*result222), "world");
   ASSERT_TRUE(result74);
   json = (*result74);
-  auto result75 = json.eraseKey("hello");
+  auto result75 = json.erase("hello");
   ASSERT_TRUE(result75);
   json = (*result75);
   std::string_view expected = R"JSON({
@@ -841,7 +841,7 @@ TEST(FormattedJsonTest, DuplicateTokensKeepLastSemanticValueAndRebuildIndex) {
   auto updatedText = updated->repr();
   ASSERT_TRUE(updatedText);
   EXPECT_EQ(*updatedText, R"({"dup":1.00,"dup":7.50,"tail":[1e+2,2]})");
-  auto erased = updated->eraseKey("dup");
+  auto erased = updated->erase("dup");
   ASSERT_TRUE(erased);
   auto erasedText = erased->repr();
   ASSERT_TRUE(erasedText);
@@ -1043,4 +1043,113 @@ TEST(FormattedJsonTest, BatchArrayUnicodeFailureDoesNotWritePartialOutput) {
   ASSERT_FALSE(written);
   EXPECT_TRUE(written.error().is<UnicodeException>());
   EXPECT_EQ(output.view(), "unchanged");
+}
+
+TEST(FormattedJsonTest, ErasingAroundCommentRunsPreservesHistoricalTriviaOwnership) {
+  struct Case {
+    std::string_view m_input;
+    std::size_t m_index;
+    std::string_view m_expected;
+  };
+  for (auto const& entry : std::array<Case, 8>{
+         {{"[ /*lead*/ 1 /*one*/, /*between*/ 2 /*two*/, /*last*/ 3 /*tail*/ ]", 0,
+           "[ /*lead*/ 2 /*two*/, /*last*/ 3 /*tail*/ ]"},
+          {"[ /*lead*/ 1 /*one*/, /*between*/ 2 /*two*/, /*last*/ 3 /*tail*/ ]", 1,
+           "[ /*lead*/ 1 /*one*/, /*between*/ 3 /*tail*/ ]"},
+          {"[ /*lead*/ 1 /*one*/, /*between*/ 2 /*two*/, /*last*/ 3 /*tail*/ ]", 2,
+           "[ /*lead*/ 1 /*one*/, /*between*/ 2 /*two*/ /*tail*/ ]"},
+          {"[ /*lead*/ 1 /*tail*/ ]", 0, "[ /*tail*/ ]"},
+          {R"({ /*lead*/ "a" /*key*/ : /*value*/ 1 /*one*/, /*between*/ "b":2 /*two*/, /*last*/ "c":3 /*tail*/ })", 0,
+           R"({ /*lead*/ "b":2 /*two*/, /*last*/ "c":3 /*tail*/ })"},
+          {R"({ /*lead*/ "a":1 /*one*/, /*between*/ "b" /*key*/ : /*value*/ 2 /*two*/, /*last*/ "c":3 /*tail*/ })", 1,
+           R"({ /*lead*/ "a":1 /*one*/, /*between*/ "c":3 /*tail*/ })"},
+          {R"({ /*lead*/ "a":1 /*one*/, /*between*/ "b":2 /*two*/, /*last*/ "c" /*key*/ : /*value*/ 3 /*tail*/ })", 2,
+           R"({ /*lead*/ "a":1 /*one*/, /*between*/ "b":2 /*two*/ /*tail*/ })"},
+          {R"({ /*lead*/ "a" /*key*/ : /*value*/ 1 /*tail*/ })", 0, "{ /*tail*/ }"}}}) {
+    SCOPED_TRACE(entry.m_input);
+    auto parsed = FormattedJson::parse(String(entry.m_input));
+    ASSERT_TRUE(parsed);
+    auto snapshot = *parsed;
+    auto erased = parsed->type() == Json::Type::Array ? parsed->erase(entry.m_index)
+                                                      : parsed->erase(List<String>{"a", "b", "c"}[entry.m_index]);
+    ASSERT_TRUE(erased);
+    auto output = erased->repr();
+    ASSERT_TRUE(output);
+    EXPECT_EQ(*output, entry.m_expected);
+    auto expected = FormattedJson::parse(String(entry.m_expected));
+    ASSERT_TRUE(expected);
+    EXPECT_EQ(erased->toJson(), expected->toJson());
+    auto original_output = snapshot.repr();
+    ASSERT_TRUE(original_output);
+    EXPECT_EQ(*original_output, entry.m_input);
+  }
+}
+
+TEST(FormattedJsonTest, InsertingAroundCommentRunsPreservesLearnedStyle) {
+  struct Case {
+    std::string_view m_input;
+    std::size_t m_index;
+    std::string_view m_expected;
+  };
+  for (auto const& entry : std::array<Case, 8>{
+         {{"[ /*lead*/ 1, /*between*/ 2 /*tail*/ ]", 0, "[ /*lead*/ 9, /*lead*/ 1, /*between*/ 2 /*tail*/ ]"},
+          {"[ /*lead*/ 1, /*between*/ 2 /*tail*/ ]", 1, "[ /*lead*/ 1, /*lead*/ 9, /*between*/ 2 /*tail*/ ]"},
+          {"[ /*lead*/ 1, /*between*/ 2 /*tail*/ ]", 2, "[ /*lead*/ 1, /*between*/ 2, /*between*/ 9 /*tail*/ ]"},
+          {"[ /*empty*/ ]", 0, "[ /*empty*/ 9 /*empty*/ ]"},
+          {R"({ /*lead*/ "a":1, /*between*/ "b":2 /*tail*/ })", 0,
+           R"({ /*lead*/ "new":9, /*lead*/ "a":1, /*between*/ "b":2 /*tail*/ })"},
+          {R"({ /*lead*/ "a":1, /*between*/ "b":2 /*tail*/ })", 1,
+           R"({ /*lead*/ "a":1, /*lead*/ "new":9, /*between*/ "b":2 /*tail*/ })"},
+          {R"({ /*lead*/ "a":1, /*between*/ "b":2 /*tail*/ })", 2,
+           R"({ /*lead*/ "a":1, /*between*/ "b":2, /*between*/ "new":9 /*tail*/ })"},
+          {"{ /*empty*/ }", 0, R"({ /*empty*/ "new":9 /*empty*/ })"}}}) {
+    SCOPED_TRACE(entry.m_input);
+    auto parsed = FormattedJson::parse(String(entry.m_input));
+    auto value = FormattedJson::parse("9");
+    ASSERT_TRUE(parsed);
+    ASSERT_TRUE(value);
+    auto snapshot = *parsed;
+    auto inserted = parsed->type() == Json::Type::Array ? parsed->insert(entry.m_index, *value)
+      : entry.m_index == 0                              ? parsed->prepend("new", *value)
+      : entry.m_index == 1                              ? parsed->insert_before("new", *value, "b")
+                                                        : parsed->append("new", *value);
+    ASSERT_TRUE(inserted);
+    auto output = inserted->repr();
+    ASSERT_TRUE(output);
+    EXPECT_EQ(*output, entry.m_expected);
+    auto expected = FormattedJson::parse(String(entry.m_expected));
+    ASSERT_TRUE(expected);
+    EXPECT_EQ(inserted->toJson(), expected->toJson());
+    auto original_output = snapshot.repr();
+    ASSERT_TRUE(original_output);
+    EXPECT_EQ(*original_output, entry.m_input);
+  }
+}
+
+TEST(FormattedJsonTest, RepeatedInsertEraseRebuildsRetainEveryRawNumberSpelling) {
+  for (std::string_view original : {"[-0,-0.0,1.00,6.25e2,9223372036854775807]",
+                                    R"({"a":-0,"b":-0.0,"c":1.00,"d":6.25e2,"e":9223372036854775807})"}) {
+    auto parsed = FormattedJson::parse(String(original));
+    auto temporary = FormattedJson::parse("7.50");
+    ASSERT_TRUE(parsed);
+    ASSERT_TRUE(temporary);
+    auto snapshot = *parsed;
+    auto current = *parsed;
+    for (std::size_t iteration = 0; iteration < 4; ++iteration) {
+      auto inserted = current.type() == Json::Type::Array ? current.insert(std::size_t{0}, *temporary)
+                                                          : current.prepend("temporary", *temporary);
+      ASSERT_TRUE(inserted);
+      auto erased =
+        current.type() == Json::Type::Array ? inserted->erase(std::size_t{0}) : inserted->erase("temporary");
+      ASSERT_TRUE(erased);
+      current = std::move(*erased);
+      auto output = current.repr();
+      ASSERT_TRUE(output);
+      EXPECT_EQ(*output, original);
+      EXPECT_EQ(current.toJson(), snapshot.toJson());
+    }
+    auto original_output = snapshot.repr();
+    ASSERT_TRUE(original_output);
+    EXPECT_EQ(*original_output, original);
+  }
 }

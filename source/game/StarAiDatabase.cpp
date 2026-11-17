@@ -76,7 +76,7 @@ std::expected<std::shared_ptr<AiDatabase>, StarException> AiDatabase::create(Roo
     result->m_missions[mission->missionName] = std::move(*mission);
   }
   auto configured = [&]() -> std::expected<void, StarException> {
-    auto species = config->get("species").and_then([](Json const& value) { return value.iterateObject(); });
+    auto species = config->get("species").and_then([](Json const& value) { return value.iterate_object(); });
     if (!species)
       return std::unexpected(std::move(species.error()));
     for (auto const& pair : *species) {
@@ -85,7 +85,7 @@ std::expected<std::shared_ptr<AiDatabase>, StarException> AiDatabase::create(Roo
         return std::unexpected(std::move(parameters.error()));
       result->m_speciesParameters[pair.first] = std::move(*parameters);
     }
-    auto statuses = config->get("shipStatus").and_then([](Json const& value) { return value.iterateObject(); });
+    auto statuses = config->get("shipStatus").and_then([](Json const& value) { return value.iterate_object(); });
     if (!statuses)
       return std::unexpected(std::move(statuses.error()));
     for (auto const& pair : *statuses) {
@@ -135,7 +135,7 @@ std::expected<std::shared_ptr<AiDatabase>, StarException> AiDatabase::create(Roo
     if (!scanlineOpacity)
       return std::unexpected(std::move(scanlineOpacity.error()));
     result->m_animationConfig.scanlineOpacity = *scanlineOpacity;
-    auto animations = config->get("aiAnimations").and_then([](Json const& value) { return value.iterateObject(); });
+    auto animations = config->get("aiAnimations").and_then([](Json const& value) { return value.iterate_object(); });
     if (!animations)
       return std::unexpected(std::move(animations.error()));
     for (auto const& pair : *animations) {
@@ -292,7 +292,7 @@ std::expected<AiMission, StarException> AiDatabase::parseMission(Json const& vm)
   mission.warpAnimation = std::move(*warpAnimation);
   mission.warpDeploy = *warpDeploy;
   mission.icon = AssetPath::relative_to("/ai/", *icon);
-  auto texts = vm.get("speciesText").and_then([](Json const& value) { return value.iterateObject(); });
+  auto texts = vm.get("speciesText").and_then([](Json const& value) { return value.iterate_object(); });
   if (!texts)
     return std::unexpected(std::move(texts.error()));
   for (auto const& pair : *texts) {

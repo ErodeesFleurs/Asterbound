@@ -164,7 +164,7 @@ std::expected<List<String>, StarException> EffectSource::particles() {
       auto config = std::invoke(loadConfig);
       if (!config)
         return std::unexpected(std::move(config.error()));
-      auto options = config->arrayPtr();
+      auto options = config->array_ptr();
       if (!options)
         return std::unexpected(std::move(options.error()));
       auto initialized = std::make_unique<ParticleChoices>();
@@ -276,7 +276,7 @@ String EffectSource::suggestedSpawnLocation() const {
 std::expected<List<Particle>, StarException> particlesFromDefinition(Root& root, Json const& config, Vec2F const& position) {
   Json particles = config;
   if (config.type() == Json::Type::Array) {
-    auto options = config.arrayPtr();
+    auto options = config.array_ptr();
     if (!options)
       return std::unexpected(std::move(options.error()));
     auto selected = root.random().sample_value(**options, Json());
@@ -289,7 +289,7 @@ std::expected<List<Particle>, StarException> particlesFromDefinition(Root& root,
     return result;
   if (particles.type() != Json::Type::Array)
     particles = JsonArray{particles};
-  auto entries = particles.iterateArray();
+  auto entries = particles.iterate_array();
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   for (auto const& entry : *entries) {
@@ -325,7 +325,7 @@ std::expected<List<Particle>, StarException> particlesFromDefinition(Root& root,
 std::expected<List<std::shared_ptr<AudioInstance>>, StarException> soundsFromDefinition(Root& root, Json const& config, Vec2F const& position) {
   Json sound = config;
   if (config.type() == Json::Type::Array) {
-    auto options = config.arrayPtr();
+    auto options = config.array_ptr();
     if (!options)
       return std::unexpected(std::move(options.error()));
     auto selected = root.random().sample_value(**options, Json());
@@ -341,7 +341,7 @@ std::expected<List<std::shared_ptr<AudioInstance>>, StarException> soundsFromDef
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto entries = sound.iterateArray();
+  auto entries = sound.iterate_array();
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   for (auto entry : *entries) {

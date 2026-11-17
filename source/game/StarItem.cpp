@@ -87,7 +87,7 @@ std::expected<void, StarException> Item::initialize(Json config, String director
   auto loadIcon = [&](Json const& icon) -> std::expected<List<Drawable>, StarException> {
     List<Drawable> drawables;
     if (icon.type() == Json::Type::Array) {
-      auto array = icon.iterateArray();
+      auto array = icon.iterate_array();
       if (!array)
         return std::unexpected(std::move(array.error()));
       for (auto imageConfig : *array) {
@@ -196,7 +196,9 @@ std::expected<void, StarException> Item::initialize(Json config, String director
       return std::unexpected(std::move(descriptor.error()));
     m_learnBlueprintsOnPickup.push_back(std::move(*descriptor));
   }
-  auto collectables = instanceValue("collectablesOnPickup", JsonObject{}).and_then([](Json const& value) { return value.iterateObject(); });
+  auto collectables = instanceValue("collectablesOnPickup", JsonObject{}).and_then([](Json const& value) {
+    return value.iterate_object();
+  });
   if (!collectables)
     return std::unexpected(std::move(collectables.error()));
   for (auto const& pair : *collectables) {
@@ -437,7 +439,9 @@ void Item::setTimeToLive(float timeToLive) {
 }
 
 std::expected<List<QuestArcDescriptor>, StarException> Item::pickupQuestTemplates() const {
-  auto templates = instanceValue("pickupQuestTemplates", JsonArray{}).and_then([](Json const& value) { return value.iterateArray(); });
+  auto templates = instanceValue("pickupQuestTemplates", JsonArray{}).and_then([](Json const& value) {
+    return value.iterate_array();
+  });
   if (!templates)
     return std::unexpected(std::move(templates.error()));
   List<QuestArcDescriptor> result;
@@ -478,7 +482,7 @@ std::expected<Json, StarException> Item::instanceValues() const {
   auto parameters = m_parameters.toObject();
   if (!parameters)
     return std::unexpected(std::move(parameters.error()));
-  return m_config.setAll(std::move(*parameters));
+  return m_config.set_all(std::move(*parameters));
 }
 
 Json Item::config() const {
@@ -494,7 +498,7 @@ std::expected<void, StarException> Item::setInstanceValue(String const& name, Js
   if (!current)
     return std::unexpected(std::move(current.error()));
   if (*current != value) {
-    auto parameters = m_parameters.setAll(JsonObject{{name, value}});
+    auto parameters = m_parameters.set_all(JsonObject{{name, value}});
     if (!parameters)
       return std::unexpected(std::move(parameters.error()));
     m_parameters = std::move(*parameters);

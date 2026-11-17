@@ -575,7 +575,10 @@ std::expected<Json, StarException> FarmableObject::writeStoredData() const {
   if (!storedResult)
     return std::unexpected(std::move(storedResult.error()));
   auto stored = std::move(*storedResult);
-  return stored.setAll({{"stage", m_stage}, {"stageAlt", m_stageAlt}, {"stageEnterTime", m_stageEnterTime}, {"nextStageTime", m_nextStageTime}});
+  return stored.set_all({{"stage", m_stage},
+                         {"stageAlt", m_stageAlt},
+                         {"stageEnterTime", m_stageEnterTime},
+                         {"nextStageTime", m_nextStageTime}});
 }
 
 }

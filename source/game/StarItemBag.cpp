@@ -52,7 +52,7 @@ std::expected<ItemBag, StarException> ItemBag::fromJson(Root& root, Json const& 
   auto itemDatabase = root.itemDatabase();
   if (!itemDatabase)
     return std::unexpected(std::move(itemDatabase.error()));
-  auto entries = store.iterateArray();
+  auto entries = store.iterate_array();
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   ItemBag res(root, 0);
@@ -69,7 +69,7 @@ std::expected<ItemBag, StarException> ItemBag::loadStore(Root& root, Json const&
   auto itemDatabase = root.itemDatabase();
   if (!itemDatabase)
     return std::unexpected(std::move(itemDatabase.error()));
-  auto entries = store.iterateArray();
+  auto entries = store.iterate_array();
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   ItemBag res(root, 0);

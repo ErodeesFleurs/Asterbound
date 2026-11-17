@@ -363,9 +363,10 @@ if (!result240) return std::unexpected(std::move(result240.error()));
 treeVariant.foliageDropConfig = std::move(*result240);
 
   JsonObject descriptions;
-  auto result241 = stemConfig.settings.iterateObject();
-if (!result241) return std::unexpected(std::move(result241.error()));
-for (auto const& entry : std::move(*result241)) {
+  auto result241 = stemConfig.settings.iterate_object();
+  if (!result241)
+    return std::unexpected(std::move(result241.error()));
+  for (auto const& entry : std::move(*result241)) {
     auto result242 = entry.first.ends_with("Description");
 if (!result242) return std::unexpected(std::move(result242.error()));
 if (std::move(*result242))
@@ -420,9 +421,10 @@ treeVariant.stemDropConfig = std::move(*result227);
   treeVariant.foliageDropConfig = JsonObject();
 
   JsonObject descriptions;
-  auto result228 = stemConfig.settings.iterateObject();
-if (!result228) return std::unexpected(std::move(result228.error()));
-for (auto const& entry : std::move(*result228)) {
+  auto result228 = stemConfig.settings.iterate_object();
+  if (!result228)
+    return std::unexpected(std::move(result228.error()));
+  for (auto const& entry : std::move(*result228)) {
     auto result229 = entry.first.ends_with("Description");
 if (!result229) return std::unexpected(std::move(result229.error()));
 if (std::move(*result229))
@@ -485,9 +487,10 @@ if (!result215) return std::unexpected(std::move(result215.error()));
 grassVariant.ceiling = std::move(*result215);
 
   JsonObject descriptions;
-  auto result216 = config.settings.iterateObject();
-if (!result216) return std::unexpected(std::move(result216.error()));
-for (auto const& entry : std::move(*result216)) {
+  auto result216 = config.settings.iterate_object();
+  if (!result216)
+    return std::unexpected(std::move(result216.error()));
+  for (auto const& entry : std::move(*result216)) {
     auto result217 = entry.first.ends_with("Description");
 if (!result217) return std::unexpected(std::move(result217.error()));
 if (std::move(*result217))
@@ -550,11 +553,11 @@ auto const& config = result193->get();
   bushVariant.directory = config.directory;
   auto result194 = config.settings.get("shapes");
 if (!result194) return std::unexpected(std::move(result194.error()));
-auto shapes = result194->iterateArray();
+auto shapes = result194->iterate_array();
 if (!shapes)
   return std::unexpected(std::move(shapes.error()));
 for (auto const& shapeVar : *shapes) {
-  auto shapeMap = shapeVar.objectPtr();
+  auto shapeMap = shapeVar.object_ptr();
   if (!shapeMap)
     return std::unexpected(std::move(shapeMap.error()));
   auto result197 = (*shapeMap)->get("base");
@@ -586,9 +589,10 @@ if (!result202) return std::unexpected(std::move(result202.error()));
 bushVariant.ceiling = std::move(*result202);
 
   JsonObject descriptions;
-  auto result203 = config.settings.iterateObject();
-if (!result203) return std::unexpected(std::move(result203.error()));
-for (auto const& entry : std::move(*result203)) {
+  auto result203 = config.settings.iterate_object();
+  if (!result203)
+    return std::unexpected(std::move(result203.error()));
+  for (auto const& entry : std::move(*result203)) {
     auto result204 = entry.first.ends_with("Description");
 if (!result204) return std::unexpected(std::move(result204.error()));
 if (std::move(*result204))

@@ -1217,7 +1217,7 @@ std::expected<void, StarException> ClientApplication::renderReload() {
   }
   m_postProcessLayers.clear();
   m_labelledPostProcessLayers.clear();
-  auto layers = assets->json("/client.config:postProcessLayers").and_then([](Json j) { return j.iterateArray(); });
+  auto layers = assets->json("/client.config:postProcessLayers").and_then([](Json j) { return j.iterate_array(); });
   if (!layers)
     return std::unexpected(std::move(layers.error()));
   for (auto const& layer : *layers) {
@@ -2099,7 +2099,7 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
       if (!activityDetails)
         return std::unexpected(std::move(activityDetails.error()));
       if (activityDetails->isType(Json::Type::Array)) {
-        auto details = activityDetails->iterateArray();
+        auto details = activityDetails->iterate_array();
         if (!details)
           return std::unexpected(std::move(details.error()));
         StringList detailsList;

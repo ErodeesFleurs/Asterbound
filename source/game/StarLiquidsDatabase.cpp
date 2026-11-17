@@ -105,7 +105,7 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::
       entry->path = file;
       entry->config = *config;
       JsonObject descriptions;
-      auto members = config->iterateObject();
+      auto members = config->iterate_object();
       if (!members)
         return std::unexpected(std::move(members.error()));
       for (auto const& pair : *members) {

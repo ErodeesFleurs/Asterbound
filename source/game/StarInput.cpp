@@ -99,7 +99,7 @@ Json keyModsToJson(KeyMod mod) {
   }
 
   std::uint8_t modPriority = 0;
-  auto array = json.iterateArray();
+  auto array = json.iterate_array();
   if (!array) return std::unexpected(std::move(array.error()));
   for (Json const& jMod : *array) {
     auto text = jMod.toString();

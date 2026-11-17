@@ -33,7 +33,7 @@ std::expected<StringList, StarException> color_directives_from_config(JsonArray 
 
 std::expected<String, StarException> palette_swap_directives_from_config(Json const& swaps) {
   ColorReplaceImageOperation paletteSwaps;
-  auto object = swaps.iterateObject();
+  auto object = swaps.iterate_object();
   if (!object)
     return std::unexpected(std::move(object.error()));
   for (auto const& swap : *object) {

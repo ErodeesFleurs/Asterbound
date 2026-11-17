@@ -372,7 +372,7 @@ struct ProfileShape {
 };
 
 std::expected<void, StarException> inspectProfile(Json const& entries, std::size_t depth, ProfileShape& shape) {
-  auto array = entries.iterateArray();
+  auto array = entries.iterate_array();
   if (!array)
     return std::unexpected(std::move(array.error()));
   for (auto const& entry : *array) {

@@ -66,64 +66,84 @@ Mat3F sampleAffine(float alpha, Mat3F const& previous, Mat3F const& current) {
   return Mat3F(xs * std::cos(xa), xs * std::sin(xa), lerp(alpha, previous[0][2], current[0][2]),
       ys * std::sin(ya), ys * std::cos(ya), lerp(alpha, previous[1][2], current[1][2]), 0, 0, 1);
 }
-    auto processTransforms = [](Mat3F mat, Json const& transforms, JsonObject const& properties) -> std::expected<Mat3F, StarException> {
-      auto entries = transforms.iterateArray();
-      if (!entries) return std::unexpected(std::move(entries.error()));
-      for (auto const& v : *entries) {
-        auto action = v.getString(0);
-        if (!action) return std::unexpected(std::move(action.error()));
-        if (*action == "reset") {
-          mat = Mat3F::identity();
-        } else if (*action == "translate") {
-          auto offsetJson = v.getArray(1);
-          if (!offsetJson) return std::unexpected(std::move(offsetJson.error()));
-          auto offset = jsonToVec2F(*offsetJson);
-          if (!offset) return std::unexpected(std::move(offset.error()));
-          mat.translate(*offset);
-        } else if (*action == "rotate" || *action == "rotateDegrees") {
-          auto angle = v.getFloat(1);
-          if (!angle) return std::unexpected(std::move(angle.error()));
-          auto configuredCenter = properties.maybe("rotationCenter");
-          auto defaultCenter = configuredCenter ? configuredCenter->toArray()
-            : std::expected<JsonArray, StarException>(JsonArray{0, 0});
-          if (!defaultCenter) return std::unexpected(std::move(defaultCenter.error()));
-          auto centerJson = v.getArray(2, *defaultCenter);
-          if (!centerJson) return std::unexpected(std::move(centerJson.error()));
-          auto center = jsonToVec2F(*centerJson);
-          if (!center) return std::unexpected(std::move(center.error()));
-          mat.rotate(*action == "rotate" ? *angle : *angle * std::numbers::pi / 180, *center);
-        } else if (*action == "scale") {
-          auto scaleJson = v.getArray(1);
-          if (!scaleJson) return std::unexpected(std::move(scaleJson.error()));
-          auto scale = jsonToVec2F(*scaleJson);
-          if (!scale) return std::unexpected(std::move(scale.error()));
-          auto configuredCenter = properties.maybe("scalingCenter");
-          auto defaultCenter = configuredCenter ? configuredCenter->toArray()
-            : std::expected<JsonArray, StarException>(JsonArray{0, 0});
-          if (!defaultCenter) return std::unexpected(std::move(defaultCenter.error()));
-          auto centerJson = v.getArray(2, *defaultCenter);
-          if (!centerJson) return std::unexpected(std::move(centerJson.error()));
-          auto center = jsonToVec2F(*centerJson);
-          if (!center) return std::unexpected(std::move(center.error()));
-          mat.scale(*scale, *center);
-        } else if (*action == "transform") {
-          auto v1 = v.getFloat(1);
-          if (!v1) return std::unexpected(std::move(v1.error()));
-          auto v2 = v.getFloat(2);
-          if (!v2) return std::unexpected(std::move(v2.error()));
-          auto v3 = v.getFloat(3);
-          if (!v3) return std::unexpected(std::move(v3.error()));
-          auto v4 = v.getFloat(4);
-          if (!v4) return std::unexpected(std::move(v4.error()));
-          auto v5 = v.getFloat(5);
-          if (!v5) return std::unexpected(std::move(v5.error()));
-          auto v6 = v.getFloat(6);
-          if (!v6) return std::unexpected(std::move(v6.error()));
-          mat = Mat3F(*v1, *v2, *v3, *v4, *v5, *v6, 0, 0, 1) * mat;
-        }
-      }
-      return mat;
-    };
+auto processTransforms = [](Mat3F mat, Json const& transforms,
+                            JsonObject const& properties) -> std::expected<Mat3F, StarException> {
+  auto entries = transforms.iterate_array();
+  if (!entries)
+    return std::unexpected(std::move(entries.error()));
+  for (auto const& v : *entries) {
+    auto action = v.getString(0);
+    if (!action)
+      return std::unexpected(std::move(action.error()));
+    if (*action == "reset") {
+      mat = Mat3F::identity();
+    } else if (*action == "translate") {
+      auto offsetJson = v.getArray(1);
+      if (!offsetJson)
+        return std::unexpected(std::move(offsetJson.error()));
+      auto offset = jsonToVec2F(*offsetJson);
+      if (!offset)
+        return std::unexpected(std::move(offset.error()));
+      mat.translate(*offset);
+    } else if (*action == "rotate" || *action == "rotateDegrees") {
+      auto angle = v.getFloat(1);
+      if (!angle)
+        return std::unexpected(std::move(angle.error()));
+      auto configuredCenter = properties.maybe("rotationCenter");
+      auto defaultCenter =
+        configuredCenter ? configuredCenter->toArray() : std::expected<JsonArray, StarException>(JsonArray{0, 0});
+      if (!defaultCenter)
+        return std::unexpected(std::move(defaultCenter.error()));
+      auto centerJson = v.getArray(2, *defaultCenter);
+      if (!centerJson)
+        return std::unexpected(std::move(centerJson.error()));
+      auto center = jsonToVec2F(*centerJson);
+      if (!center)
+        return std::unexpected(std::move(center.error()));
+      mat.rotate(*action == "rotate" ? *angle : *angle * std::numbers::pi / 180, *center);
+    } else if (*action == "scale") {
+      auto scaleJson = v.getArray(1);
+      if (!scaleJson)
+        return std::unexpected(std::move(scaleJson.error()));
+      auto scale = jsonToVec2F(*scaleJson);
+      if (!scale)
+        return std::unexpected(std::move(scale.error()));
+      auto configuredCenter = properties.maybe("scalingCenter");
+      auto defaultCenter =
+        configuredCenter ? configuredCenter->toArray() : std::expected<JsonArray, StarException>(JsonArray{0, 0});
+      if (!defaultCenter)
+        return std::unexpected(std::move(defaultCenter.error()));
+      auto centerJson = v.getArray(2, *defaultCenter);
+      if (!centerJson)
+        return std::unexpected(std::move(centerJson.error()));
+      auto center = jsonToVec2F(*centerJson);
+      if (!center)
+        return std::unexpected(std::move(center.error()));
+      mat.scale(*scale, *center);
+    } else if (*action == "transform") {
+      auto v1 = v.getFloat(1);
+      if (!v1)
+        return std::unexpected(std::move(v1.error()));
+      auto v2 = v.getFloat(2);
+      if (!v2)
+        return std::unexpected(std::move(v2.error()));
+      auto v3 = v.getFloat(3);
+      if (!v3)
+        return std::unexpected(std::move(v3.error()));
+      auto v4 = v.getFloat(4);
+      if (!v4)
+        return std::unexpected(std::move(v4.error()));
+      auto v5 = v.getFloat(5);
+      if (!v5)
+        return std::unexpected(std::move(v5.error()));
+      auto v6 = v.getFloat(6);
+      if (!v6)
+        return std::unexpected(std::move(v6.error()));
+      mat = Mat3F(*v1, *v2, *v3, *v4, *v5, *v6, 0, 0, 1) * mat;
+    }
+  }
+  return mat;
+};
 }
 
 NetworkedAnimator::Sample::Sample(NetworkedAnimator const& animator, float interpolation)
@@ -523,7 +543,7 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
   m_relativePath = AssetPath::directory(relativePath);
   auto globalTagDefaultsConfig = config.get("globalTagDefaults", JsonObject());
   if (!globalTagDefaultsConfig) return std::unexpected(std::move(globalTagDefaultsConfig.error()));
-  auto globalTagDefaultsEntries = globalTagDefaultsConfig->iterateObject();
+  auto globalTagDefaultsEntries = globalTagDefaultsConfig->iterate_object();
   if (!globalTagDefaultsEntries) return std::unexpected(std::move(globalTagDefaultsEntries.error()));
   for (auto const& pair : *globalTagDefaultsEntries) {
     auto value = pair.second.toString();
@@ -532,10 +552,10 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
   }
   auto partTagDefaultsConfig = config.get("partTagDefaults", JsonObject());
   if (!partTagDefaultsConfig) return std::unexpected(std::move(partTagDefaultsConfig.error()));
-  auto partTagDefaultsEntries = partTagDefaultsConfig->iterateObject();
+  auto partTagDefaultsEntries = partTagDefaultsConfig->iterate_object();
   if (!partTagDefaultsEntries) return std::unexpected(std::move(partTagDefaultsEntries.error()));
   for (auto const& pair : *partTagDefaultsEntries) {
-    auto tags = pair.second.iterateObject();
+    auto tags = pair.second.iterate_object();
     if (!tags) return std::unexpected(std::move(tags.error()));
     for (auto const& tag : *tags) {
       auto value = tag.second.toString();
@@ -545,7 +565,7 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
   }
   auto transformationGroupsConfig = config.get("transformationGroups", JsonObject());
   if (!transformationGroupsConfig) return std::unexpected(std::move(transformationGroupsConfig.error()));
-  auto transformationGroupsEntries = transformationGroupsConfig->iterateObject();
+  auto transformationGroupsEntries = transformationGroupsConfig->iterate_object();
   if (!transformationGroupsEntries) return std::unexpected(std::move(transformationGroupsEntries.error()));
   for (auto const& pair : *transformationGroupsEntries) {
     auto& tg = m_transformationGroups[pair.first];
@@ -558,7 +578,7 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
   }
   auto rotationGroupsConfig = config.get("rotationGroups", JsonObject());
   if (!rotationGroupsConfig) return std::unexpected(std::move(rotationGroupsConfig.error()));
-  auto rotationGroupsEntries = rotationGroupsConfig->iterateObject();
+  auto rotationGroupsEntries = rotationGroupsConfig->iterate_object();
   if (!rotationGroupsEntries) return std::unexpected(std::move(rotationGroupsEntries.error()));
   for (auto const& pair : *rotationGroupsEntries) {
     auto& rotationGroup = m_rotationGroups[pair.first];
@@ -573,7 +593,7 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
   }
   auto particleEmittersConfig = config.get("particleEmitters", JsonObject());
   if (!particleEmittersConfig) return std::unexpected(std::move(particleEmittersConfig.error()));
-  auto particleEmittersEntries = particleEmittersConfig->iterateObject();
+  auto particleEmittersEntries = particleEmittersConfig->iterate_object();
   if (!particleEmittersEntries) return std::unexpected(std::move(particleEmittersEntries.error()));
   for (auto const& pair : *particleEmittersEntries) {
     auto& emitter = m_particleEmitters[pair.first];
@@ -613,7 +633,7 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
     }
     auto particlesJson = particleEmitterConfig.get("particles");
     if (!particlesJson) return std::unexpected(std::move(particlesJson.error()));
-    auto particles = particlesJson->iterateArray();
+    auto particles = particlesJson->iterate_array();
     if (!particles) return std::unexpected(std::move(particles.error()));
     for (auto const& particleConfig : *particles) {
       auto database = root.particleDatabase();
@@ -644,7 +664,7 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
   }
   auto lightsConfig = config.get("lights", JsonObject());
   if (!lightsConfig) return std::unexpected(std::move(lightsConfig.error()));
-  auto lightsEntries = lightsConfig->iterateObject();
+  auto lightsEntries = lightsConfig->iterate_object();
   if (!lightsEntries) return std::unexpected(std::move(lightsEntries.error()));
   for (auto const& pair : *lightsEntries) {
     auto& light = m_lights[pair.first];
@@ -719,7 +739,7 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
   }
   auto soundsConfig = config.get("sounds", JsonObject());
   if (!soundsConfig) return std::unexpected(std::move(soundsConfig.error()));
-  auto soundsEntries = soundsConfig->iterateObject();
+  auto soundsEntries = soundsConfig->iterate_object();
   if (!soundsEntries) return std::unexpected(std::move(soundsEntries.error()));
   for (auto const& pair : *soundsEntries) {
     auto& sound = m_sounds[pair.first];
@@ -770,7 +790,7 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
   }
   auto effectsConfig = config.get("effects", JsonObject());
   if (!effectsConfig) return std::unexpected(std::move(effectsConfig.error()));
-  auto effectsEntries = effectsConfig->iterateObject();
+  auto effectsEntries = effectsConfig->iterate_object();
   if (!effectsEntries) return std::unexpected(std::move(effectsEntries.error()));
   for (auto const& pair : *effectsEntries) {
     auto& effect = m_effects[pair.first];
@@ -1172,7 +1192,7 @@ std::expected<String, StarException> NetworkedAnimator::queryApplyPartTags(Strin
       animationTags.set(stateTypeName + "_state", activeState.stateName);
 
       if (auto p = activeState.properties.find_ref("animationTags")) {
-        auto tags = p->get().iterateObject();
+        auto tags = p->get().iterate_object();
         if (!tags) return std::unexpected(std::move(tags.error()));
         for (auto const& tag : *tags) {
           if (!animationTags.contains(tag.first)) {
@@ -1593,7 +1613,7 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
       animationTags.set(stateTypeName + "_state", activeState.stateName);
 
       if (auto p = activeState.properties.find_ref("animationTags")) {
-        auto tags = p->get().iterateObject();
+        auto tags = p->get().iterate_object();
         if (!tags) return std::unexpected(std::move(tags.error()));
         for (auto const& tag : *tags) {
           if (!animationTags.contains(tag.first)) {
@@ -1647,7 +1667,7 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
 
     std::shared_ptr<String const> imageString;
     if (jImage.isType(Json::Type::String)) {
-      auto checkedImage = jImage.stringPtr();
+      auto checkedImage = jImage.string_ptr();
       if (!checkedImage)
         return std::unexpected(std::move(checkedImage.error()));
       imageString = std::move(*checkedImage);
@@ -1858,9 +1878,12 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
           if (!file) return std::unexpected(std::move(file.error()));
           persistentSoundFile = *file;
         } else if (persistentSound.isType(Json::Type::Array)) {
-          auto pool = persistentSound.toArray();
-          if (!pool) return std::unexpected(std::move(pool.error()));
-          auto file = m_root.get().random().sample_value(*pool, "").and_then([](Json const& value) { return value.toString(); });
+          auto sound_pool = persistentSound.array_ptr();
+          if (!sound_pool)
+            return std::unexpected(std::move(sound_pool.error()));
+          auto file = m_root.get().random().sample_value(**sound_pool, "").and_then([](Json const& value) {
+            return value.toString();
+          });
           if (!file) return std::unexpected(std::move(file.error()));
           persistentSoundFile = *file;
         }
@@ -1906,9 +1929,12 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
           if (!file) return std::unexpected(std::move(file.error()));
           immediateSoundFile = *file;
         } else if (immediateSound.isType(Json::Type::Array)) {
-          auto pool = immediateSound.toArray();
-          if (!pool) return std::unexpected(std::move(pool.error()));
-          auto file = m_root.get().random().sample_value(*pool, "").and_then([](Json const& value) { return value.toString(); });
+          auto sound_pool = immediateSound.array_ptr();
+          if (!sound_pool)
+            return std::unexpected(std::move(sound_pool.error()));
+          auto file = m_root.get().random().sample_value(**sound_pool, "").and_then([](Json const& value) {
+            return value.toString();
+          });
           if (!file) return std::unexpected(std::move(file.error()));
           immediateSoundFile = *file;
         }
@@ -1939,7 +1965,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
       }
 
       if (auto lightsOn = activeState.properties.find_ref("lightsOn")) {
-        auto entries = lightsOn->get().iterateArray();
+        auto entries = lightsOn->get().iterate_array();
         if (!entries) return std::unexpected(std::move(entries.error()));
         for (auto const& nameJson : *entries) {
           auto name = nameJson.toString();
@@ -1950,7 +1976,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
         }
       }
       if (auto lightsOff = activeState.properties.find_ref("lightsOff")) {
-        auto entries = lightsOff->get().iterateArray();
+        auto entries = lightsOff->get().iterate_array();
         if (!entries) return std::unexpected(std::move(entries.error()));
         for (auto const& nameJson : *entries) {
           auto name = nameJson.toString();
@@ -1962,7 +1988,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
       }
 
       if (auto particleEmittersOn = activeState.properties.find_ref("particleEmittersOn")) {
-        auto entries = particleEmittersOn->get().iterateArray();
+        auto entries = particleEmittersOn->get().iterate_array();
         if (!entries) return std::unexpected(std::move(entries.error()));
         for (auto const& nameJson : *entries) {
           auto name = nameJson.toString();
@@ -1973,7 +1999,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
         }
       }
       if (auto particleEmittersOff = activeState.properties.find_ref("particleEmittersOff")) {
-        auto entries = particleEmittersOff->get().iterateArray();
+        auto entries = particleEmittersOff->get().iterate_array();
         if (!entries) return std::unexpected(std::move(entries.error()));
         for (auto const& nameJson : *entries) {
           auto name = nameJson.toString();
@@ -2346,7 +2372,7 @@ std::uint8_t NetworkedAnimator::version() const {
 
 std::expected<Json, StarException> NetworkedAnimator::mergeIncludes(Root& root, Json config, Json includes, String relativePath) {
   Json includedConfigs;
-  auto paths = includes.iterateArray();
+  auto paths = includes.iterate_array();
   if (!paths) return std::unexpected(std::move(paths.error()));
   for (auto const& path : *paths) {
     auto name = path.toString();

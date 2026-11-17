@@ -158,7 +158,7 @@ std::expected<void, StarException> UniverseSettings::loadFlagActions() {
   auto config = (*assets)->json("/universeflags.config");
   if (!config)
     return std::unexpected(std::move(config.error()));
-  auto entries = config->iterateObject();
+  auto entries = config->iterate_object();
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   StringMap<List<UniverseFlagAction>> actionsByFlag;
@@ -166,7 +166,7 @@ std::expected<void, StarException> UniverseSettings::loadFlagActions() {
     auto actionsData = entry.second.get("actions");
     if (!actionsData)
       return std::unexpected(std::move(actionsData.error()));
-    auto actionArray = actionsData->iterateArray();
+    auto actionArray = actionsData->iterate_array();
     if (!actionArray)
       return std::unexpected(std::move(actionArray.error()));
     List<UniverseFlagAction> actions;

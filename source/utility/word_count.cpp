@@ -43,7 +43,7 @@ std::expected<int, StarException> countFields(Json const& json, std::initializer
 std::expected<int, StarException> countOnlyStrings(Json const& json) {
   int count = 0;
   if (json.isType(Json::Type::Object)) {
-    auto entries = json.iterateObject();
+    auto entries = json.iterate_object();
     if (!entries)
       return std::unexpected(std::move(entries.error()));
     for (auto const& entry : *entries) {
@@ -53,7 +53,7 @@ std::expected<int, StarException> countOnlyStrings(Json const& json) {
       count += *words;
     }
   } else if (json.isType(Json::Type::Array)) {
-    auto entries = json.iterateArray();
+    auto entries = json.iterate_array();
     if (!entries)
       return std::unexpected(std::move(entries.error()));
     for (auto const& entry : *entries) {
@@ -165,7 +165,7 @@ int main(int argc, char** argv) {
     if (!counted)
       return std::unexpected(std::move(counted.error()));
     counted = countWordsInType("radiomessages", [](Json const& json) -> std::expected<int, StarException> {
-      auto messages = json.iterateObject();
+      auto messages = json.iterate_object();
       if (!messages)
         return std::unexpected(std::move(messages.error()));
       int count = 0;
@@ -220,7 +220,7 @@ int main(int argc, char** argv) {
       auto collectables = json.get("collectables", Json());
       if (!collectables)
         return std::unexpected(std::move(collectables.error()));
-      auto entries = collectables->iterateObject();
+      auto entries = collectables->iterate_object();
       if (!entries)
         return std::unexpected(std::move(entries.error()));
       int count = 0;
@@ -238,7 +238,7 @@ int main(int argc, char** argv) {
       auto panels = json.get("panels", Json());
       if (!panels)
         return std::unexpected(std::move(panels.error()));
-      auto entries = panels->iterateArray();
+      auto entries = panels->iterate_array();
       if (!entries)
         return std::unexpected(std::move(entries.error()));
       int count = 0;
@@ -267,7 +267,7 @@ int main(int argc, char** argv) {
       auto species = json.get("speciesText", Json());
       if (!species)
         return std::unexpected(std::move(species.error()));
-      auto entries = species->iterateObject();
+      auto entries = species->iterate_object();
       if (!entries)
         return std::unexpected(std::move(entries.error()));
       int count = 0;

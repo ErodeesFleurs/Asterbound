@@ -35,7 +35,7 @@ std::expected<std::shared_ptr<DamageDatabase>, StarException> DamageDatabase::cr
     auto elementalConfig = assets->json("/damage/elementaltypes.config");
     if (!elementalConfig)
       return std::unexpected(std::move(elementalConfig.error()));
-    auto elementalEntries = elementalConfig->iterateObject();
+    auto elementalEntries = elementalConfig->iterate_object();
     if (!elementalEntries)
       return std::unexpected(std::move(elementalEntries.error()));
     for (auto const& p : *elementalEntries) {
@@ -45,7 +45,7 @@ std::expected<std::shared_ptr<DamageDatabase>, StarException> DamageDatabase::cr
         return std::unexpected(std::move(resistance.error()));
       type.resistanceStat = std::move(*resistance);
       auto particles =
-        p.second.get("damageNumberParticles").and_then([](Json const& value) { return value.iterateObject(); });
+        p.second.get("damageNumberParticles").and_then([](Json const& value) { return value.iterate_object(); });
       if (!particles)
         return std::unexpected(std::move(particles.error()));
       for (auto const& particle : *particles) {
@@ -92,12 +92,12 @@ std::expected<std::shared_ptr<DamageDatabase>, StarException> DamageDatabase::cr
       if (!effects)
         return std::unexpected(std::move(effects.error()));
       if (*effects) {
-        auto effectEntries = (**effects).iterateObject();
+        auto effectEntries = (**effects).iterate_object();
         if (!effectEntries)
           return std::unexpected(std::move(effectEntries.error()));
         for (auto const& effect : *effectEntries) {
           HashMap<HitType, DamageEffect> materialEffects;
-          auto hits = effect.second.iterateObject();
+          auto hits = effect.second.iterate_object();
           if (!hits)
             return std::unexpected(std::move(hits.error()));
           for (auto const& hit : *hits) {

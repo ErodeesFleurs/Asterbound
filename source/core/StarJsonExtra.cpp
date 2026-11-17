@@ -199,7 +199,7 @@ Json jsonFromColor(Color const& color) {
 }
 
 std::expected<PolyD, StarException> jsonToPolyD(Json const& v) {
-  auto vertices = v.iterateArray();
+  auto vertices = v.iterate_array();
   if (!vertices)
     return std::unexpected(std::move(vertices.error()));
   PolyD poly;
@@ -212,7 +212,7 @@ std::expected<PolyD, StarException> jsonToPolyD(Json const& v) {
   return fixInsideOutPoly(std::move(poly));
 }
 std::expected<PolyF, StarException> jsonToPolyF(Json const& v) {
-  auto vertices = v.iterateArray();
+  auto vertices = v.iterate_array();
   if (!vertices)
     return std::unexpected(std::move(vertices.error()));
   PolyF poly;
@@ -225,7 +225,7 @@ std::expected<PolyF, StarException> jsonToPolyF(Json const& v) {
   return fixInsideOutPoly(std::move(poly));
 }
 std::expected<PolyI, StarException> jsonToPolyI(Json const& v) {
-  auto vertices = v.iterateArray();
+  auto vertices = v.iterate_array();
   if (!vertices)
     return std::unexpected(std::move(vertices.error()));
   PolyI poly;
@@ -317,7 +317,7 @@ std::expected<Json, StarException> weightedChoiceFromJson(RandomService& random,
     return default_;
   if (source.type() != Json::Type::Array)
     return std::unexpected(StarException("Json of array type expected."));
-  auto array = source.arrayPtr();
+  auto array = source.array_ptr();
   if (!array)
     return std::unexpected(std::move(array.error()));
   List<std::pair<float, Json>> options;
@@ -349,7 +349,7 @@ std::expected<Json, StarException> weightedChoiceFromJson(RandomService& random,
 }
 
 std::expected<Json, StarException> binnedChoiceFromJson(Json const& bins, float target, Json const& def) {
-  auto entries = bins.iterateArray();
+  auto entries = bins.iterate_array();
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   // Extract checked keys before sorting: a comparator cannot propagate errors.

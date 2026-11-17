@@ -3,8 +3,11 @@ import star.format;
 import star.hash;
 import star.xx_hash;
 import star.json;
+import star.json_builder;
 import star.string;
 import star.data_stream_devices;
+import star.text_formatter;
+import star.unicode;
 
 #include "gtest/gtest.h"
 
@@ -293,4 +296,175 @@ TEST(JsonContractTest, BinaryStringPreservesLongEmbeddedNullAndCommitsOnlyComple
   auto failed = DataStreamBuffer::deserialize(retained, encoded->span());
   ASSERT_FALSE(failed);
   EXPECT_EQ(retained, Json(JsonObject{{"keep", 17}}));
+}
+
+TEST(JsonContractTest, ArrayMutationBoundsPreserveOriginalValues) {
+  for (Json const& original : {Json(JsonArray{}), Json(JsonArray{1, Json(), 3})}) {
+    auto snapshot = original;
+    auto values = original.toArray();
+    ASSERT_TRUE(values);
+    auto count = values->size();
+    for (std::size_t index : {count, count + 1, std::numeric_limits<std::size_t>::max()}) {
+      auto replaced = original.set(index, 9);
+      auto erased = original.erase(index);
+      ASSERT_FALSE(replaced);
+      ASSERT_FALSE(erased);
+      EXPECT_TRUE(replaced.error().is<JsonException>());
+      EXPECT_TRUE(erased.error().is<JsonException>());
+      if (index != count) {
+        auto inserted = original.insert(index, 9);
+        ASSERT_FALSE(inserted);
+        EXPECT_TRUE(inserted.error().is<JsonException>());
+      }
+    }
+    auto inserted = original.insert(count, 9);
+    auto appended = original.append(9);
+    ASSERT_TRUE(inserted);
+    ASSERT_TRUE(appended);
+    values->push_back(9);
+    EXPECT_EQ(*inserted, Json(*values));
+    EXPECT_EQ(*appended, Json(*values));
+    EXPECT_EQ(original, snapshot);
+  }
+
+  Json scalar = 1;
+  auto replaced = scalar.set(std::size_t{0}, 9);
+  auto inserted = scalar.insert(std::size_t{0}, 9);
+  auto appended = scalar.append(9);
+  auto erased = scalar.erase(std::size_t{0});
+  ASSERT_FALSE(replaced);
+  ASSERT_FALSE(inserted);
+  ASSERT_FALSE(appended);
+  ASSERT_FALSE(erased);
+  EXPECT_TRUE(replaced.error().is<JsonException>());
+  EXPECT_TRUE(inserted.error().is<JsonException>());
+  EXPECT_TRUE(appended.error().is<JsonException>());
+  EXPECT_TRUE(erased.error().is<JsonException>());
+}
+
+TEST(JsonContractTest, ArrayMutationsAcceptSelfAndBorrowedChildrenWithoutChangingSnapshots) {
+  Json original = JsonArray{JsonObject{{"value", 7}}, Json(), 3};
+  auto snapshot = original;
+  auto child = original.find(std::size_t{0});
+  ASSERT_TRUE(child);
+  ASSERT_TRUE(*child);
+  Json child_snapshot = (*child)->get();
+
+  for (std::size_t index : {std::size_t{0}, std::size_t{1}, std::size_t{2}}) {
+    auto replaced = original.set(index, original);
+    auto inserted = original.insert(index, original);
+    auto erased = original.erase(index);
+    ASSERT_TRUE(replaced);
+    ASSERT_TRUE(inserted);
+    ASSERT_TRUE(erased);
+    JsonArray expected{child_snapshot, Json(), 3};
+    expected[index] = snapshot;
+    EXPECT_EQ(*replaced, Json(expected));
+    expected = JsonArray{child_snapshot, Json(), 3};
+    expected.insert(expected.begin() + index, snapshot);
+    EXPECT_EQ(*inserted, Json(expected));
+    expected = JsonArray{child_snapshot, Json(), 3};
+    expected.erase(expected.begin() + index);
+    EXPECT_EQ(*erased, Json(expected));
+  }
+  auto appended = original.append(original);
+  auto borrowed = original.insert(std::size_t{1}, (*child)->get());
+  ASSERT_TRUE(appended);
+  ASSERT_TRUE(borrowed);
+  EXPECT_EQ(*appended, (Json(JsonArray{child_snapshot, Json(), 3, snapshot})));
+  EXPECT_EQ(*borrowed, (Json(JsonArray{child_snapshot, child_snapshot, Json(), 3})));
+  original = *appended;
+  EXPECT_EQ(snapshot, (Json(JsonArray{child_snapshot, Json(), 3})));
+  EXPECT_EQ(child_snapshot, (Json(JsonObject{{"value", 7}})));
+  EXPECT_EQ(*borrowed, (Json(JsonArray{child_snapshot, child_snapshot, Json(), 3})));
+}
+
+TEST(JsonContractTest, DirectObjectTextPreservesTraversalNestedValuesAndKeyQuirks) {
+  JsonObject object{{"z", JsonArray{String(std::string_view("a\0b\n", 4)), "水😀", true, Json()}},
+                    {"a", JsonObject{{"number", std::numeric_limits<std::int64_t>::min()}}},
+                    {"empty", JsonObject{}}};
+  auto expected = Json(object).repr(0, false);
+  ASSERT_TRUE(expected);
+  TextBuffer output;
+  output.append("prefix:");
+  ASSERT_TRUE(write_text(output, object));
+  EXPECT_EQ(output.view(), std::string("prefix:") + expected->utf8());
+  auto parsed = Json::parseJson(*expected);
+  ASSERT_TRUE(parsed);
+  EXPECT_EQ(*parsed, Json(object));
+
+  TextBuffer empty_output;
+  ASSERT_TRUE(write_text(empty_output, JsonObject{}));
+  EXPECT_EQ(empty_output.view(), "{}");
+
+  String key(std::string_view("é\"key\0suffix", 13));
+  TextBuffer key_output;
+  ASSERT_TRUE(write_text(key_output, JsonObject{{key, String(std::string_view("a\0b\n", 4))}}));
+  // Raw keys stop at NUL without escaping quotes; values remain JSON-escaped.
+  EXPECT_EQ(key_output.view(), R"({"é"key":"a\u0000b\n"})");
+}
+
+TEST(JsonContractTest, DirectObjectTextValidatesEachKeyAndValueBeforeItsOwnOutput) {
+  struct Case {
+    JsonObject m_value;
+    std::string m_prefix;
+  };
+  String invalid(std::string_view("bad\xff", 4));
+  String invalid_key(std::string_view("key\0\xff", 5));
+  for (auto const& entry :
+       std::array<Case, 4>{{{JsonObject{{invalid_key, invalid}}, "prefix:{"},
+                            {JsonObject{{"key", invalid}}, "prefix:{\"key\":"},
+                            {JsonObject{{"key", JsonArray{1, invalid, 2}}}, "prefix:{\"key\":[1,"},
+                            {JsonObject{{"key", JsonObject{{invalid_key, 1}}}}, "prefix:{\"key\":{"}}}) {
+    TextBuffer output;
+    output.append("prefix:");
+    auto written = write_text(output, entry.m_value);
+    ASSERT_FALSE(written);
+    EXPECT_TRUE(written.error().is<UnicodeException>());
+    EXPECT_EQ(output.view(), entry.m_prefix);
+  }
+}
+
+TEST(JsonContractTest, BuilderCopyAndMoveKeepIndependentActiveNestedContainers) {
+  JsonBuilderStream original;
+  ASSERT_TRUE(original.begin_array());
+  ASSERT_TRUE(original.put_integer("1"));
+  ASSERT_TRUE(original.begin_object());
+  ASSERT_TRUE(original.object_key_utf8("items"));
+  ASSERT_TRUE(original.begin_array());
+  ASSERT_TRUE(original.put_integer("2"));
+
+  JsonBuilderStream copied(original);
+  JsonBuilderStream moved(std::move(original));
+  JsonBuilderStream assigned;
+  ASSERT_TRUE(assigned.begin_object());
+  assigned = std::move(moved);
+
+  for (auto builder : std::array{std::ref(copied), std::ref(assigned)}) {
+    ASSERT_TRUE(builder.get().put_integer("3"));
+    ASSERT_TRUE(builder.get().end_array());
+    ASSERT_TRUE(builder.get().end_object());
+    ASSERT_TRUE(builder.get().end_array());
+    auto result = builder.get().take_top();
+    ASSERT_TRUE(result);
+    EXPECT_EQ(*result, (Json(JsonArray{1, JsonObject{{"items", JsonArray{2, 3}}}})));
+  }
+
+  for (auto builder : std::array{std::ref(original), std::ref(moved)}) {
+    ASSERT_TRUE(builder.get().begin_array());
+    ASSERT_TRUE(builder.get().put_null());
+    ASSERT_TRUE(builder.get().end_array());
+    auto result = builder.get().take_top();
+    ASSERT_TRUE(result);
+    EXPECT_EQ(*result, Json(JsonArray{Json()}));
+    auto incomplete = builder.get().end_array();
+    ASSERT_FALSE(incomplete);
+    EXPECT_TRUE(incomplete.error().is<JsonParsingException>());
+    ASSERT_TRUE(builder.get().begin_array());
+    ASSERT_TRUE(builder.get().put_integer("7"));
+    ASSERT_TRUE(builder.get().end_array());
+    auto recovered = builder.get().take_top();
+    ASSERT_TRUE(recovered);
+    EXPECT_EQ(*recovered, Json(JsonArray{7}));
+  }
 }

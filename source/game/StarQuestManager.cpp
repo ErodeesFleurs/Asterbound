@@ -35,7 +35,7 @@ std::expected<std::shared_ptr<QuestManager>, StarException> QuestManager::create
   if (!versions) return std::unexpected(std::move(versions.error()));
   auto templates = root.questTemplateDatabase();
   if (!templates) return std::unexpected(std::move(templates.error()));
-  auto entries = json.iterateObject();
+  auto entries = json.iterate_object();
   if (!entries) return std::unexpected(std::move(entries.error()));
   StringMap<std::shared_ptr<Quest>> result;
   for (auto const& entry : *entries) {

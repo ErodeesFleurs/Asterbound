@@ -431,10 +431,10 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
     return std::unexpected(std::move(instanceValueResult820.error()));
   auto tooltipFields = std::move(*instanceValueResult820);
   {
-    auto iterateObjectResult821 = tooltipFields.iterateObject();
-    if (!iterateObjectResult821)
-      return std::unexpected(std::move(iterateObjectResult821.error()));
-    for (auto const& pair : std::move(*iterateObjectResult821)) {
+    auto object_entries = tooltipFields.iterate_object();
+    if (!object_entries)
+      return std::unexpected(std::move(object_entries.error()));
+    for (auto const& pair : std::move(*object_entries)) {
       {
         auto equalsIgnoreCaseResult822 = pair.first.equals_ignore_case("subtitle");
         if (!equalsIgnoreCaseResult822)

@@ -315,7 +315,7 @@ std::expected<std::reference_wrapper<Tiled::Tile const>, StarException> TMXTileL
 
 std::expected<std::shared_ptr<TMXTilesets>, StarException> TMXTilesets::create(Root& root, Json const& tmx) {
   auto result = std::shared_ptr<TMXTilesets>(new TMXTilesets);
-  auto definitions = tmx.iterateArray();
+  auto definitions = tmx.iterate_array();
   if (!definitions) return std::unexpected(std::move(definitions.error()));
   for (Json const& definition : *definitions) {
     auto hasSource = definition.contains("source");

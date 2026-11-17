@@ -516,7 +516,7 @@ std::expected<Json, StarException> embeddedDataToJson(EmbeddedData const& data) 
     return invalid("image payload is not JSON");
   auto checked = checkTextDepth(data.bytes.span());
   if (!checked) return std::unexpected(std::move(checked.error()));
-  return inputUtf8Json(data.bytes.begin(), data.bytes.end(), JsonParseType::Value);
+  return input_utf8_json(data.bytes.begin(), data.bytes.end(), JsonParseType::Value);
 }
 
 }

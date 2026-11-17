@@ -688,7 +688,7 @@ std::expected<void, StarException> TitleScreen::initCharCreationMenu() {
 std::expected<void, StarException> TitleScreen::populateServerList(ListWidget& list) {
   if (!m_serverList.isNull()) {
     if (auto r = list.clear(); !r) return std::unexpected(std::move(r.error()));
-    auto servers = m_serverList.iterateArray();
+    auto servers = m_serverList.iterate_array();
     if (!servers) return std::unexpected(std::move(servers.error()));
     for (auto const& server : *servers) {
       auto item = list.addItem();
@@ -752,7 +752,7 @@ std::expected<void, StarException> TitleScreen::initMultiPlayerMenu() {
   if (!serverList) return std::unexpected(std::move(serverList.error()));
   (*serverList)->registerMemberCallback("delete", [this, list = *serverList](Widget&) -> std::expected<void, StarException> {
     if (auto pos = list->selectedItem(); pos != NPos) {
-      auto updated = m_serverList.eraseIndex(pos);
+      auto updated = m_serverList.erase(pos);
       if (!updated) return std::unexpected(std::move(updated.error()));
       m_serverList = std::move(*updated);
     }

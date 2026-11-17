@@ -174,7 +174,7 @@ std::expected<std::shared_ptr<FunctionDatabase>, StarException> FunctionDatabase
     auto config = assets->json(file);
     if (!config)
       return std::unexpected(std::move(config.error()));
-    auto entries = config->iterateObject();
+    auto entries = config->iterate_object();
     if (!entries)
       return std::unexpected(std::move(entries.error()));
     for (auto const& entry : *entries) {
@@ -194,7 +194,7 @@ std::expected<std::shared_ptr<FunctionDatabase>, StarException> FunctionDatabase
     auto config = assets->json(file);
     if (!config)
       return std::unexpected(std::move(config.error()));
-    auto entries = config->iterateObject();
+    auto entries = config->iterate_object();
     if (!entries)
       return std::unexpected(std::move(entries.error()));
     for (auto const& entry : *entries) {
@@ -211,7 +211,7 @@ std::expected<std::shared_ptr<FunctionDatabase>, StarException> FunctionDatabase
     auto config = assets->json(file);
     if (!config)
       return std::unexpected(std::move(config.error()));
-    auto entries = config->iterateObject();
+    auto entries = config->iterate_object();
     if (!entries)
       return std::unexpected(std::move(entries.error()));
     for (auto const& entry : *entries) {
@@ -341,7 +341,7 @@ std::expected<ParametricFunction<double, double>, StarException> FunctionDatabas
       return std::unexpected(std::move(size.error()));
     List<std::pair<double, double>> points;
     for (std::size_t i = 2; i < *size; ++i) {
-      auto pair = descriptor.get(i).and_then([](Json const& value) { return value.arrayPtr(); });
+      auto pair = descriptor.get(i).and_then([](Json const& value) { return value.array_ptr(); });
       if (!pair)
         return std::unexpected(std::move(pair.error()));
       if ((*pair)->size() != 2)
@@ -369,12 +369,12 @@ std::expected<ParametricFunction<double, double>, StarException> FunctionDatabas
 
 std::expected<ParametricTable<int, Json>, StarException> FunctionDatabase::parametricTableFromConfig(Json descriptor) {
   auto parsed = [&]() -> std::expected<ParametricTable<int, Json>, StarException> {
-    auto entries = descriptor.iterateArray();
+    auto entries = descriptor.iterate_array();
     if (!entries)
       return std::unexpected(std::move(entries.error()));
     List<std::pair<int, Json>> points;
     for (auto const& entry : *entries) {
-      auto pair = entry.arrayPtr();
+      auto pair = entry.array_ptr();
       if (!pair)
         return std::unexpected(std::move(pair.error()));
       if ((*pair)->size() != 2)
@@ -399,7 +399,7 @@ std::expected<MultiTable2D, StarException> FunctionDatabase::multiTable2DFromCon
     auto boundName = descriptor.getString(1);
     if (!boundName)
       return std::unexpected(std::move(boundName.error()));
-    auto grid = descriptor.get(2).and_then([](Json const& value) { return value.arrayPtr(); });
+    auto grid = descriptor.get(2).and_then([](Json const& value) { return value.array_ptr(); });
     if (!grid)
       return std::unexpected(std::move(grid.error()));
     if ((*grid)->empty())
@@ -408,7 +408,7 @@ std::expected<MultiTable2D, StarException> FunctionDatabase::multiTable2DFromCon
     List<double> yaxis;
     MultiArray2D points;
     for (std::size_t y = 0; y < (*grid)->size(); ++y) {
-      auto row = (**grid)[y].arrayPtr();
+      auto row = (**grid)[y].array_ptr();
       if (!row)
         return std::unexpected(std::move(row.error()));
       if (y == 0) {
@@ -430,7 +430,7 @@ std::expected<MultiTable2D, StarException> FunctionDatabase::multiTable2DFromCon
         if (!axis)
           return std::unexpected(std::move(axis.error()));
         yaxis.push_back(*axis);
-        auto cells = (**row)[1].arrayPtr();
+        auto cells = (**row)[1].array_ptr();
         if (!cells)
           return std::unexpected(std::move(cells.error()));
         if ((*cells)->size() != xaxis.size())

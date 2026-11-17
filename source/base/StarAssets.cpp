@@ -144,7 +144,7 @@ std::string Assets::sourceDiagnostic(AssetSource const& source,
   for (String const& key : {String("friendlyName"), String("name")}) {
     if (auto value = metadata.find_ref(key)) {
       // Invalid optional metadata must not hide the error being diagnosed.
-      auto text = value->get().stringPtr();
+      auto text = value->get().string_ptr();
       if (text && !(**text).empty())
         result += Star::format(", {} '{}'", key, **text);
     }
@@ -538,7 +538,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
           auto file = newFiles->read(path);
           if (!file)
             return std::unexpected(std::move(file.error()));
-          auto json = inputUtf8Json(file->begin(), file->end(), JsonParseType::Top);
+          auto json = input_utf8_json(file->begin(), file->end(), JsonParseType::Top);
           if (!json)
             return std::unexpected(std::move(json.error()));
           auto patched = applyJsonPatches(*json, path, {std::make_pair(patchPath, patchSource)});
@@ -761,10 +761,10 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
               auto stream = source->read(filename);
               if (!stream)
                 return std::unexpected(std::move(stream.error()));
-              auto patchList = inputUtf8Json(stream->begin(), stream->end(), JsonParseType::Top);
+              auto patchList = input_utf8_json(stream->begin(), stream->end(), JsonParseType::Top);
               if (!patchList)
                 return std::unexpected(std::move(patchList.error()));
-              auto patchPairs = patchList->iterateArray();
+              auto patchPairs = patchList->iterate_array();
               if (!patchPairs)
                 return std::unexpected(std::move(patchPairs.error()));
               std::size_t patchIndex = 0;
@@ -1060,7 +1060,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
   auto logged = m_logger.info("Preloading assets");
   if (!logged)
     return std::unexpected(std::move(logged.error()));
-  auto preloadScripts = preload->iterateArray();
+  auto preloadScripts = preload->iterate_array();
   if (!preloadScripts)
     return std::unexpected(std::move(preloadScripts.error()));
   constexpr std::array<std::pair<std::string_view, AssetType>, 5> assetTypes{{
@@ -1512,7 +1512,7 @@ std::expected<FramesSpecification, StarException> Assets::parseFramesSpecificati
   if (!frameList)
     return std::unexpected(std::move(frameList.error()));
   if (*frameList) {
-    auto list = (*frameList)->get().iterateObject();
+    auto list = (*frameList)->get().iterate_object();
     if (!list)
       return std::unexpected(std::move(list.error()));
     for (auto const& pair : *list) {
@@ -1529,7 +1529,7 @@ std::expected<FramesSpecification, StarException> Assets::parseFramesSpecificati
   if (!frameGrid)
     return std::unexpected(std::move(frameGrid.error()));
   if (*frameGrid) {
-    auto gridResult = (*frameGrid)->get().objectPtr();
+    auto gridResult = (*frameGrid)->get().object_ptr();
     if (!gridResult)
       return std::unexpected(std::move(gridResult.error()));
     auto const& grid = **gridResult;
@@ -1557,7 +1557,7 @@ std::expected<FramesSpecification, StarException> Assets::parseFramesSpecificati
     if (dimensions[0] == 0 || dimensions[1] == 0)
       return std::unexpected(AssetException(Star::format("Image {} \"dimensions\" in frameGrid cannot be zero", spec.framesFile)));
     if (auto namesConfig = grid.find_ref("names")) {
-      auto names = namesConfig->get().arrayPtr();
+      auto names = namesConfig->get().array_ptr();
       if (!names)
         return std::unexpected(std::move(names.error()));
       for (std::size_t y = 0; y < (*names)->size(); ++y) {
@@ -1566,7 +1566,7 @@ std::expected<FramesSpecification, StarException> Assets::parseFramesSpecificati
         auto const& rowConfig = (**names)[y];
         if (rowConfig.isNull())
           continue;
-        auto row = rowConfig.arrayPtr();
+        auto row = rowConfig.array_ptr();
         if (!row)
           return std::unexpected(std::move(row.error()));
         for (std::size_t x = 0; x < (*row)->size(); ++x) {
@@ -1979,7 +1979,7 @@ std::expected<Json, StarException> Assets::checkPatchArray(String const& path,
   for (auto const& patch : patchData) {
     switch (patch.type()) {
       case Json::Type::Array: { // Nested groups commit only if the whole group succeeds.
-        auto patchData = patch.arrayPtr();
+        auto patchData = patch.array_ptr();
         if (!patchData)
           return std::unexpected(std::move(patchData.error()));
         auto patched = checkPatchArray(path, source, newResult, **patchData, externalRef);
@@ -1996,7 +1996,7 @@ std::expected<Json, StarException> Assets::checkPatchArray(String const& path,
         break;
       }
       case Json::Type::Object: {
-        auto patched = JsonPatching::applyOperation(newResult, patch, externalRef);
+        auto patched = JsonPatching::applyOperation(newResult, patch);
         if (!patched)
           return std::unexpected(std::move(patched.error()));
         newResult = std::move(*patched);
@@ -2029,7 +2029,7 @@ std::expected<Json, StarException> Assets::readJson(String const& path) const {
   auto streamData = read(path);
   if (!streamData)
     return std::unexpected(std::move(streamData.error()));
-  auto parsed = inputUtf8Json(streamData->begin(), streamData->end(), JsonParseType::Top);
+  auto parsed = input_utf8_json(streamData->begin(), streamData->end(), JsonParseType::Top);
   if (!parsed)
     return std::unexpected(JsonParsingException(Star::format("Cannot parse json file: {}", path), parsed.error()));
   auto key = CaseInsensitiveStringView::create(path);
@@ -2083,7 +2083,7 @@ std::expected<Json, StarException> Assets::applyJsonPatches(Json const& input, S
     } else {
       auto applyPatch = [&]() -> std::expected<void, StarException> {
         auto& bytes = **patchStream;
-        auto patchJson = inputUtf8Json(bytes.begin(), bytes.end(), JsonParseType::Top);
+        auto patchJson = input_utf8_json(bytes.begin(), bytes.end(), JsonParseType::Top);
         if (!patchJson)
           return std::unexpected(std::move(patchJson.error()));
         if (patchAssetPath.subPath) {
@@ -2093,7 +2093,7 @@ std::expected<Json, StarException> Assets::applyJsonPatches(Json const& input, S
           *patchJson = std::move(*selected);
         }
         if (patchJson->isType(Json::Type::Array)) {
-          auto patchData = patchJson->arrayPtr();
+          auto patchData = patchJson->array_ptr();
           if (!patchData)
             return std::unexpected(std::move(patchData.error()));
           auto patched = checkPatchArray(pair.first, patchSource, result, **patchData, {});

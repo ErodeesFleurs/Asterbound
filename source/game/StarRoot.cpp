@@ -699,7 +699,7 @@ std::expected<std::shared_ptr<Configuration>, StarException> Root::configuration
             auto config = parsed->toObject();
             if (!config)
               return std::unexpected(std::move(config.error()));
-            auto defaults = m_settings.defaultConfiguration.objectPtr();
+            auto defaults = m_settings.defaultConfiguration.object_ptr();
             if (!defaults)
               return std::unexpected(std::move(defaults.error()));
             for (auto const& entry : **defaults) {

@@ -297,7 +297,7 @@ std::expected<void, StarException> Cinematic::loadDefinition(Json const& definit
     if (!loopTime)
       return std::unexpected(std::move(loopTime.error()));
     panel->loopTime = *loopTime;
-    auto keyframes = panelDefinition.get("keyframes").and_then([](Json value) { return value.iterateArray(); });
+    auto keyframes = panelDefinition.get("keyframes").and_then([](Json value) { return value.iterate_array(); });
     if (!keyframes)
       return std::unexpected(std::move(keyframes.error()));
     for (auto const& keyframeDefinition : *keyframes) {

@@ -113,9 +113,11 @@ values in named locals and preserve first-error, ownership and transaction order
 
 ## JSON values and formatting
 
-- `Json` is immutable. Prefer `find`, `arrayPtr`/`objectPtr` and synchronous `iterateArray`/`iterateObject`; `toArray`/`toObject` copy mutable containers. Retain owners for borrowed children. Borrowing generation data must preserve random draws/object traversal order; not every snapshot can become a view.
-- Use `jsonToList` for ordered conversion. Preserve missing versus null, source order and first-error behavior in field/default tables. UTF-8 parsing borrows unescaped tokens only during synchronous contiguous-input callbacks; escaped/generic input retains decoding, Unicode checks and error order.
-- `FormattedJson::create` reuses semantic values; `createArray(span)` batches output while retaining comments/numeric spellings. Token indexing must not alter hashes/wire order. Path updates rebuild ancestors; patch groups commit on success. Searches keep the first match and defer value validation until it exists.
+- `Json` is immutable. Prefer `find`, `array_ptr`/`object_ptr` and synchronous `iterate_array`/`iterate_object`; `toArray`/`toObject` copy mutable containers. Retain owners for borrowed children. Borrowing generation data must preserve random draws/object traversal order; not every snapshot can become a view.
+- Array `append`, `insert` and `erase` build the final container directly; validate indices before copying and preserve self-aliasing/snapshots. Direct `JsonObject` text output must not construct a temporary owning `Json` or change traversal, UTF-8 checks or partial-output boundaries.
+- Use `jsonToList` for ordered conversion. Preserve missing versus null, source order and first-error behavior in field/default tables. UTF-8 parsing borrows unescaped tokens only during synchronous contiguous-input callbacks; `utf8_remaining()` is a view, not stored pointer state. Escaped/generic input retains decoding, Unicode checks and error order.
+- `JsonBuilderStream` caches the active sentry in existing stack entries. Copies, moves and failed closes must preserve valid nested-container state; moved-from builders remain reusable. Constrain input adapters, UTF-8 iterators, output sinks and serializer/builder protocols independently. Helper concepts use snake_case; state fields use semantic names such as `m_character`, not type prefixes.
+- `FormattedJson::create` reuses semantic values; `createArray(span)` batches output while retaining comments/numeric spellings. Insertion fills one reserved token buffer; deletion erases one original interval. Preserve asymmetric trivia ownership, repeated numeric spellings and duplicate-key reveal. Token indexing must not alter hashes/wire order. Path updates rebuild ancestors; patch groups commit on success. Searches keep the first match and defer value validation until it exists.
 
 ## UI and rendering preparation
 

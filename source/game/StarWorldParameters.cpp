@@ -500,21 +500,21 @@ std::expected<Json, StarException> TerrestrialWorldParameters::store() const {
 
   auto base = VisitableWorldParameters::store();
   if (!base) return std::unexpected(std::move(base.error()));
-  return base->setAll(JsonObject{{"primaryBiome", primaryBiome},
-      {"sizeName", sizeName},
-      {"hueShift", hueShift},
-      {"surfaceLiquid", primarySurfaceLiquid},
-      {"skyColoring", skyColoring.toJson()},
-      {"dayLength", dayLength},
-      {"blockNoise", blockNoiseConfig},
-      {"blendNoise", blendNoiseConfig},
-      {"blendSize", blendSize},
-      {"spaceLayer", storeTerrestrialLayer(spaceLayer)},
-      {"atmosphereLayer", storeTerrestrialLayer(atmosphereLayer)},
-      {"surfaceLayer", storeTerrestrialLayer(surfaceLayer)},
-      {"subsurfaceLayer", storeTerrestrialLayer(subsurfaceLayer)},
-      {"undergroundLayers", undergroundLayers.transformed(storeTerrestrialLayer)},
-      {"coreLayer", storeTerrestrialLayer(coreLayer)}});
+  return base->set_all(JsonObject{{"primaryBiome", primaryBiome},
+                                  {"sizeName", sizeName},
+                                  {"hueShift", hueShift},
+                                  {"surfaceLiquid", primarySurfaceLiquid},
+                                  {"skyColoring", skyColoring.toJson()},
+                                  {"dayLength", dayLength},
+                                  {"blockNoise", blockNoiseConfig},
+                                  {"blendNoise", blendNoiseConfig},
+                                  {"blendSize", blendSize},
+                                  {"spaceLayer", storeTerrestrialLayer(spaceLayer)},
+                                  {"atmosphereLayer", storeTerrestrialLayer(atmosphereLayer)},
+                                  {"surfaceLayer", storeTerrestrialLayer(surfaceLayer)},
+                                  {"subsurfaceLayer", storeTerrestrialLayer(subsurfaceLayer)},
+                                  {"undergroundLayers", undergroundLayers.transformed(storeTerrestrialLayer)},
+                                  {"coreLayer", storeTerrestrialLayer(coreLayer)}});
 }
 
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, TerrestrialWorldParameters::TerrestrialRegion& region) {
@@ -900,11 +900,11 @@ WorldParametersType AsteroidsWorldParameters::type() const {
 std::expected<Json, StarException> AsteroidsWorldParameters::store() const {
   auto base = VisitableWorldParameters::store();
   if (!base) return std::unexpected(std::move(base.error()));
-  return base->setAll(JsonObject{{"asteroidTopLevel", asteroidTopLevel},
-      {"asteroidBottomLevel", asteroidBottomLevel},
-      {"blendSize", blendSize},
-      {"asteroidBiome", asteroidBiome},
-      {"ambientLightLevel", jsonFromColor(ambientLightLevel)}});
+  return base->set_all(JsonObject{{"asteroidTopLevel", asteroidTopLevel},
+                                  {"asteroidBottomLevel", asteroidBottomLevel},
+                                  {"blendSize", blendSize},
+                                  {"asteroidBiome", asteroidBiome},
+                                  {"ambientLightLevel", jsonFromColor(ambientLightLevel)}});
 }
 
 std::expected<void, StarException> AsteroidsWorldParameters::read(DataStream& ds) {
@@ -1015,16 +1015,16 @@ WorldParametersType FloatingDungeonWorldParameters::type() const {
 std::expected<Json, StarException> FloatingDungeonWorldParameters::store() const {
   auto base = VisitableWorldParameters::store();
   if (!base) return std::unexpected(std::move(base.error()));
-  return base->setAll(JsonObject{{"dungeonBaseHeight", dungeonBaseHeight},
-      {"dungeonSurfaceHeight", dungeonSurfaceHeight},
-      {"dungeonUndergroundLevel", dungeonUndergroundLevel},
-      {"primaryDungeon", primaryDungeon},
-      {"biome", json_from_optional(biome)},
-      {"ambientLightLevel", jsonFromColor(ambientLightLevel)},
-      {"dayMusicTrack", json_from_optional(dayMusicTrack)},
-      {"nightMusicTrack", json_from_optional(nightMusicTrack)},
-      {"dayAmbientNoises", json_from_optional(dayAmbientNoises)},
-      {"nightAmbientNoises", json_from_optional(nightAmbientNoises)}});
+  return base->set_all(JsonObject{{"dungeonBaseHeight", dungeonBaseHeight},
+                                  {"dungeonSurfaceHeight", dungeonSurfaceHeight},
+                                  {"dungeonUndergroundLevel", dungeonUndergroundLevel},
+                                  {"primaryDungeon", primaryDungeon},
+                                  {"biome", json_from_optional(biome)},
+                                  {"ambientLightLevel", jsonFromColor(ambientLightLevel)},
+                                  {"dayMusicTrack", json_from_optional(dayMusicTrack)},
+                                  {"nightMusicTrack", json_from_optional(nightMusicTrack)},
+                                  {"dayAmbientNoises", json_from_optional(dayAmbientNoises)},
+                                  {"nightAmbientNoises", json_from_optional(nightAmbientNoises)}});
 }
 
 std::expected<void, StarException> FloatingDungeonWorldParameters::read(DataStream& ds) {
@@ -1138,7 +1138,7 @@ std::expected<Json, StarException> diskStoreVisitableWorldParameters(std::shared
   if (!WorldParametersTypeNames) return std::unexpected(WorldParametersTypeNames.error());
   auto type = WorldParametersTypeNames->get_right(parameters->type());
   if (!type) return std::unexpected(std::move(type.error()));
-  return stored->setAll({{"type", type->get()}});
+  return stored->set_all({{"type", type->get()}});
 }
 
 std::expected<std::shared_ptr<VisitableWorldParameters>, StarException> diskLoadVisitableWorldParameters(Json const& store) {

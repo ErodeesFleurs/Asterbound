@@ -344,9 +344,10 @@ auto paletteName = std::move(*result44);
   for (auto const& swapSet : std::move(*result45)) {
           ColorReplaceMap colorSwaps;
           {
-    auto result46 = swapSet.iterateObject();
-    if (!result46) return std::unexpected(std::move(result46.error()));
-    for (auto const& swap : std::move(*result46)) {
+            auto result46 = swapSet.iterate_object();
+            if (!result46)
+              return std::unexpected(std::move(result46.error()));
+            for (auto const& swap : std::move(*result46)) {
               auto result47 = Color::from_hex(swap.first);
     if (!result47) return std::unexpected(std::move(result47.error()));
     auto result48 = swap.second.toString();
@@ -579,22 +580,24 @@ std::expected<Json, StarException> MonsterDatabase::mergePartParameters(Json con
 
   // First assign all the defaults.
   {
-  auto result81 = partParameterDescription.iterateObject();
-  if (!result81) return std::unexpected(std::move(result81.error()));
-  for (auto const& pair : std::move(*result81))
-      {
-    auto result82 = pair.second.get(1);
-    if (!result82) return std::unexpected(std::move(result82.error()));
-    mergedParameters[pair.first] = std::move(*result82);
-  }
+    auto result81 = partParameterDescription.iterate_object();
+    if (!result81)
+      return std::unexpected(std::move(result81.error()));
+    for (auto const& pair : std::move(*result81)) {
+      auto result82 = pair.second.get(1);
+      if (!result82)
+        return std::unexpected(std::move(result82.error()));
+      mergedParameters[pair.first] = std::move(*result82);
+    }
 }
 
   // Then go through parameter list and merge based on the merge rules.
   for (auto const& applyParams : parameters) {
     {
-  auto result83 = applyParams.iterateObject();
-  if (!result83) return std::unexpected(std::move(result83.error()));
-  for (auto const& pair : std::move(*result83)) {
+      auto result83 = applyParams.iterate_object();
+      if (!result83)
+        return std::unexpected(std::move(result83.error()));
+      for (auto const& pair : std::move(*result83)) {
         auto result84 = partParameterDescription.get(pair.first);
   if (!result84) return std::unexpected(std::move(result84.error()));
   auto result85 = std::move(*result84).getString(0);
@@ -676,9 +679,10 @@ std::expected<Json, StarException> MonsterDatabase::mergeFinalParameters(JsonArr
 
   for (auto const& applyParams : parameters) {
     {
-  auto result99 = applyParams.iterateObject();
-  if (!result99) return std::unexpected(std::move(result99.error()));
-  for (auto const& pair : std::move(*result99)) {
+      auto result99 = applyParams.iterate_object();
+      if (!result99)
+        return std::unexpected(std::move(result99.error()));
+      for (auto const& pair : std::move(*result99)) {
         Json value = mergedParameters.value(pair.first);
 
         // Hard-coded merge for scripts and skills parameters, otherwise merge.
@@ -964,7 +968,7 @@ if (!result163) return std::unexpected(std::move(result163.error()));
   monsterVariant.animatorZoom = monsterVariant.scale;
   if (monsterVariant.dropPoolConfig.isType(Json::Type::Array))
     {
-    auto result164 = monsterVariant.dropPoolConfig.arrayPtr();
+    auto result164 = monsterVariant.dropPoolConfig.array_ptr();
     if (!result164)
       return std::unexpected(std::move(result164.error()));
     auto dropPool = rand.sample_value(**result164);

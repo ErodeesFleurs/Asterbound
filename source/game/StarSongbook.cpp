@@ -430,7 +430,7 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
           return std::unexpected(std::move(key.error()));
         continue;
       }
-      auto entries = signature->iterateArray();
+      auto entries = signature->iterate_array();
       if (!entries)
         return std::unexpected(std::move(entries.error()));
       List<int> mapping;

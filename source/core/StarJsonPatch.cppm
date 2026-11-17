@@ -21,14 +21,14 @@ using JsonPatchTestFail = StarError<JsonPatchTestFailTag, StarException>;
 // Applies RFC6902 operations, preserving patch diagnostics and test-failure categories.
 std::expected<Json, StarException> jsonPatch(Json const& base, JsonArray const& patch);
 namespace JsonPatching {
-  std::expected<Json, StarException> applyOperation(Json const& base, Json const& op, std::optional<Json> const& external = {});
-  std::expected<Json, StarException> applyTestOperation(Json const& base, Json const& op);
-  std::expected<Json, StarException> applyRemoveOperation(Json const& base, Json const& op);
-  std::expected<Json, StarException> applyAddOperation(Json const& base, Json const& op);
-  std::expected<Json, StarException> applyReplaceOperation(Json const& base, Json const& op);
-  std::expected<Json, StarException> applyMoveOperation(Json const& base, Json const& op);
-  std::expected<Json, StarException> applyCopyOperation(Json const& base, Json const& op);
-  std::expected<Json, StarException> applyMergeOperation(Json const& base, Json const& op);
+std::expected<Json, StarException> applyOperation(Json const& base, Json const& op);
+std::expected<Json, StarException> applyTestOperation(Json const& base, Json const& op);
+std::expected<Json, StarException> applyRemoveOperation(Json const& base, Json const& op);
+std::expected<Json, StarException> applyAddOperation(Json const& base, Json const& op);
+std::expected<Json, StarException> applyReplaceOperation(Json const& base, Json const& op);
+std::expected<Json, StarException> applyMoveOperation(Json const& base, Json const& op);
+std::expected<Json, StarException> applyCopyOperation(Json const& base, Json const& op);
+std::expected<Json, StarException> applyMergeOperation(Json const& base, Json const& op);
 }
 }
 
@@ -56,7 +56,7 @@ std::expected<Json, StarException> jsonPatch(Json const& base, JsonArray const& 
 std::expected<std::size_t, StarException> findJsonMatch(Json const& searchable, Json const& value, JsonPath::Pointer const& pointer) {
   if (!searchable.isType(Json::Type::Array))
     return std::unexpected(JsonPatchException(Star::format("Search operation failure, value at '{}' is not an array.", pointer.path()), false));
-  auto array = searchable.arrayPtr();
+  auto array = searchable.array_ptr();
   if (!array)
     return std::unexpected(std::move(array.error()));
   for (std::size_t i = 0; i < (*array)->size(); ++i)
@@ -75,7 +75,7 @@ namespace JsonPatching {
       {"merge", std::ref(applyMergeOperation)},
   }};
 
-  std::expected<Json, StarException> applyOperation(Json const& base, Json const& op, std::optional<Json> const&) {
+  std::expected<Json, StarException> applyOperation(Json const& base, Json const& op) {
     auto operation = op.getString("op");
     if (!operation)
       return std::unexpected(patchFailure(std::move(operation.error()), "Could not apply operation to base."));
@@ -168,7 +168,7 @@ namespace JsonPatching {
       return std::unexpected(std::move(index.error()));
     if (!*index)
       return base;
-    auto changed = searchable->get().eraseIndex(*index - 1);
+    auto changed = searchable->get().erase(*index - 1);
     if (!changed)
       return std::unexpected(std::move(changed.error()));
     return pointer.set(base, *changed);
@@ -278,7 +278,7 @@ namespace JsonPatching {
       auto added = toPointer.add(base, (**value).get());
       if (!added)
         return std::unexpected(std::move(added.error()));
-      auto changed = searchable->get().eraseIndex(*index - 1);
+      auto changed = searchable->get().erase(*index - 1);
       if (!changed)
         return std::unexpected(std::move(changed.error()));
       return fromPointer.add(*added, *changed);

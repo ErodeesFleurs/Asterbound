@@ -12,7 +12,7 @@ namespace Star {
 
 class FormattedJson;
 
-template <typename Jsonlike> class JsonStreamer;
+template <typename JsonLike> class JsonStreamer;
 
 struct ObjectElement;
 struct ObjectKeyElement;
@@ -25,19 +25,19 @@ struct CommaElement;
 struct ValueElement {
   ValueElement(FormattedJson json);
 
-  std::shared_ptr<FormattedJson> value;
+  std::shared_ptr<FormattedJson> m_value;
 
   bool operator==(ValueElement const& v) const;
 };
 
 struct ObjectKeyElement {
-  String key;
+  String m_key;
 
   bool operator==(ObjectKeyElement const& v) const;
 };
 
 struct WhitespaceElement {
-  String whitespace;
+  String m_whitespace;
 
   bool operator==(WhitespaceElement const& v) const;
 };
@@ -83,16 +83,18 @@ public:
   // Prepend, insert and append update the value in-place if the key already
   // exists.
   std::expected<FormattedJson, StarException> prepend(String const& key, FormattedJson const& value) const;
-  std::expected<FormattedJson, StarException> insertBefore(String const& key, FormattedJson const& value, String const& beforeKey) const;
-  std::expected<FormattedJson, StarException> insertAfter(String const& key, FormattedJson const& value, String const& afterKey) const;
+  std::expected<FormattedJson, StarException> insert_before(String const& key, FormattedJson const& value,
+                                                            String const& before_key) const;
+  std::expected<FormattedJson, StarException> insert_after(String const& key, FormattedJson const& value,
+                                                           String const& after_key) const;
   std::expected<FormattedJson, StarException> append(String const& key, FormattedJson const& value) const;
   std::expected<FormattedJson, StarException> set(String const& key, FormattedJson const& value) const;
-  std::expected<FormattedJson, StarException> eraseKey(String const& key) const;
+  std::expected<FormattedJson, StarException> erase(String const& key) const;
 
   std::expected<FormattedJson, StarException> insert(std::size_t index, FormattedJson const& value) const;
   std::expected<FormattedJson, StarException> append(FormattedJson const& value) const;
   std::expected<FormattedJson, StarException> set(std::size_t index, FormattedJson const& value) const;
-  std::expected<FormattedJson, StarException> eraseIndex(std::size_t index) const;
+  std::expected<FormattedJson, StarException> erase(std::size_t index) const;
 
   // Returns the number of elements in a Json array, or entries in an object.
   std::expected<std::size_t, StarException> size() const;
@@ -122,13 +124,16 @@ private:
 
   class Builder;
   static std::expected<FormattedJson, StarException> object(ElementList elements);
-  static std::expected<FormattedJson, StarException> array(ElementList elements);
+  static std::expected<FormattedJson, StarException> array(ElementList elements,
+                                                           std::optional<std::size_t> value_count = {});
 
-  std::expected<FormattedJson, StarException> objectInsert(String const& key, FormattedJson const& value, ElementLocation loc) const;
+  std::expected<FormattedJson, StarException> insert_object(String const& key, FormattedJson const& value,
+                                                            ElementLocation loc) const;
 
-  std::expected<std::reference_wrapper<FormattedJson const>, StarException> getFormattedJson(ElementLocation loc) const;
+  std::expected<std::reference_wrapper<FormattedJson const>, StarException>
+  get_formatted_json(ElementLocation loc) const;
 
-  Json m_jsonValue;
+  Json m_value;
   ElementList m_elements;
   // Used to preserve the formatting of numbers, i.e. -0 vs 0, 1.0 vs 1:
   std::optional<String> m_formatting;
@@ -138,8 +143,8 @@ private:
   struct ObjectKeyHash {
     std::size_t operator()(String const& key) const { return std::hash<std::string_view>{}(key.utf8()); }
   };
-  StringMap<std::pair<ElementLocation, ElementLocation>, ObjectKeyHash> m_objectEntryLocations;
-  List<ElementLocation> m_arrayElementLocations;
+  StringMap<std::pair<ElementLocation, ElementLocation>, ObjectKeyHash> m_object_entry_locations;
+  List<ElementLocation> m_array_element_locations;
 };
 
 [[nodiscard]] std::expected<void, StarException> write_text(TextBuffer& output, FormattedJson const& json);

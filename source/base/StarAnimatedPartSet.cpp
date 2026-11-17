@@ -41,7 +41,7 @@ std::expected<AnimatedPartSet, StarException> AnimatedPartSet::create(Json confi
   result.m_animatorVersion = animatorVersion;
   auto stateTypes = config.get("stateTypes", JsonObject());
   if (!stateTypes) return std::unexpected(std::move(stateTypes.error()));
-  auto stateTypeEntries = stateTypes->iterateObject();
+  auto stateTypeEntries = stateTypes->iterate_object();
   if (!stateTypeEntries) return std::unexpected(std::move(stateTypeEntries.error()));
   for (auto const& [stateTypeName, stateTypeConfig] : *stateTypeEntries) {
     if (animatorVersion > 0 && !stateTypeConfig.isType(Json::Type::Object))
@@ -61,7 +61,7 @@ std::expected<AnimatedPartSet, StarException> AnimatedPartSet::create(Json confi
     newStateType.stateTypeProperties = std::move(*properties);
     auto states = stateTypeConfig.get("states", JsonObject());
     if (!states) return std::unexpected(std::move(states.error()));
-    auto stateEntries = states->iterateObject();
+    auto stateEntries = states->iterate_object();
     if (!stateEntries) return std::unexpected(std::move(stateEntries.error()));
     for (auto const& [stateName, stateConfig] : *stateEntries) {
       if (animatorVersion > 0 && !stateConfig.isType(Json::Type::Object))
@@ -102,7 +102,7 @@ std::expected<AnimatedPartSet, StarException> AnimatedPartSet::create(Json confi
   });
   auto parts = config.get("parts", JsonObject());
   if (!parts) return std::unexpected(std::move(parts.error()));
-  auto partEntries = parts->iterateObject();
+  auto partEntries = parts->iterate_object();
   if (!partEntries) return std::unexpected(std::move(partEntries.error()));
   for (auto const& [partName, partConfig] : *partEntries) {
     if (animatorVersion > 0 && !partConfig.isType(Json::Type::Object))
@@ -113,7 +113,7 @@ std::expected<AnimatedPartSet, StarException> AnimatedPartSet::create(Json confi
     newPart.partProperties = std::move(*properties);
     auto partStates = partConfig.get("partStates", JsonObject());
     if (!partStates) return std::unexpected(std::move(partStates.error()));
-    auto partStateTypes = partStates->iterateObject();
+    auto partStateTypes = partStates->iterate_object();
     if (!partStateTypes) return std::unexpected(std::move(partStateTypes.error()));
     for (auto const& [stateTypeName, stateTypeConfig] : *partStateTypes) {
       auto states = stateTypeConfig.toObject();
@@ -146,7 +146,7 @@ std::expected<AnimatedPartSet, StarException> AnimatedPartSet::create(Json confi
     auto active = result.setActiveState(pair.first, pair.second.defaultState, true, false);
     if (!active) return std::unexpected(std::move(active.error()));
   }
-  auto source = config.objectPtr();
+  auto source = config.object_ptr();
   if (!source) return std::unexpected(std::move(source.error()));
   result.m_sampleConfiguration = std::move(*source);
   return result;
@@ -590,24 +590,28 @@ std::expected<void, StarException> AnimatedPartSet::freshenActivePart(Part const
       activePart.activeState->reverse = sampledState->reverse;
     }
     if (version() > 0) {
-      auto processTransforms = [](Mat3F mat, Json const& transforms, JsonObject const& properties) -> std::expected<Mat3F, StarException> {
-        auto entries = transforms.iterateArray();
-        if (!entries) return std::unexpected(std::move(entries.error()));
+      auto processTransforms = [](Mat3F mat, Json const& transforms,
+                                  JsonObject const& properties) -> std::expected<Mat3F, StarException> {
+        auto entries = transforms.iterate_array();
+        if (!entries)
+          return std::unexpected(std::move(entries.error()));
         for (auto const& v : *entries) {
           auto action = v.getString(0);
-          if (!action) return std::unexpected(std::move(action.error()));
+          if (!action)
+            return std::unexpected(std::move(action.error()));
           if (*action == "reset") {
             mat = Mat3F::identity();
           } else if (*action == "translate") {
             auto translation = v.get(1).and_then(jsonToVec2F);
-            if (!translation) return std::unexpected(std::move(translation.error()));
+            if (!translation)
+              return std::unexpected(std::move(translation.error()));
             mat.translate(*translation);
           } else if (*action == "rotate" || *action == "rotateDegrees" || *action == "scale") {
             auto centerProperty = properties.find_ref(*action == "scale" ? std::string_view("scalingCenter")
                                                                          : std::string_view("rotationCenter"));
             // Preserve validation of a supplied default even when an explicit center wins.
             if (centerProperty) {
-              auto defaultCenter = centerProperty->get().arrayPtr();
+              auto defaultCenter = centerProperty->get().array_ptr();
               if (!defaultCenter)
                 return std::unexpected(std::move(defaultCenter.error()));
             }
@@ -619,21 +623,25 @@ std::expected<void, StarException> AnimatedPartSet::freshenActivePart(Part const
               center = jsonToVec2F((*centerValue)->get());
             else if (centerProperty)
               center = jsonToVec2F(centerProperty->get());
-            if (!center) return std::unexpected(std::move(center.error()));
+            if (!center)
+              return std::unexpected(std::move(center.error()));
             if (*action == "scale") {
               auto scale = v.get(1).and_then(jsonToVec2F);
-              if (!scale) return std::unexpected(std::move(scale.error()));
+              if (!scale)
+                return std::unexpected(std::move(scale.error()));
               mat.scale(*scale, *center);
             } else {
               auto angle = v.getFloat(1);
-              if (!angle) return std::unexpected(std::move(angle.error()));
+              if (!angle)
+                return std::unexpected(std::move(angle.error()));
               mat.rotate(*action == "rotateDegrees" ? *angle * std::numbers::pi / 180 : *angle, *center);
             }
           } else if (*action == "transform") {
             std::array<float, 6> values;
             for (std::size_t i = 0; i < values.size(); ++i) {
               auto value = v.getFloat(i + 1);
-              if (!value) return std::unexpected(std::move(value.error()));
+              if (!value)
+                return std::unexpected(std::move(value.error()));
               values[i] = *value;
             }
             mat = Mat3F(values[0], values[1], values[2], values[3], values[4], values[5], 0, 0, 1) * mat;

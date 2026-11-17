@@ -146,7 +146,7 @@ ItemDescriptor ItemDescriptor::multiply(std::uint64_t count) const {
 }
 
 std::expected<ItemDescriptor, StarException> ItemDescriptor::applyParameters(JsonObject const& parameters) const {
-  auto merged = this->parameters().setAll(parameters);
+  auto merged = this->parameters().set_all(parameters);
   if (!merged)
     return std::unexpected(std::move(merged.error()));
   return create(name(), count(), std::move(*merged));

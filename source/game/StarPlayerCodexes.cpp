@@ -42,7 +42,7 @@ std::expected<std::shared_ptr<PlayerCodexes>, StarException> PlayerCodexes::crea
   auto database = root.codexDatabase();
   if (!database)
     return std::unexpected(std::move(database.error()));
-  auto entries = json.iterateObject();
+  auto entries = json.iterate_object();
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   for (auto const& entry : *entries) {

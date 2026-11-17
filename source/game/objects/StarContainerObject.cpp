@@ -195,7 +195,7 @@ std::expected<void, StarException> ContainerObject::init(World& world, EntityId 
         if (!itemsConfigResult)
           return std::unexpected(std::move(itemsConfigResult.error()));
         auto itemsConfig = std::move(*itemsConfigResult);
-        auto itemsResult = itemsConfig.iterateArray();
+        auto itemsResult = itemsConfig.iterate_array();
         if (!itemsResult)
           return std::unexpected(std::move(itemsResult.error()));
         auto items = std::move(*itemsResult);
@@ -1248,7 +1248,13 @@ std::expected<Json, StarException> ContainerObject::writeStoredData() const {
   if (!itemsResult)
     return std::unexpected(std::move(itemsResult.error()));
   auto items = std::move(*itemsResult);
-  return stored.setAll({{"opened", m_opened.get()}, {"currentState", m_currentState}, {"crafting", m_crafting.get()}, {"craftingProgress", m_craftingProgress.get()}, {"initialized", m_initialized}, {"items", std::move(items)}, {"ageItemsTimer", m_ageItemsTimer.toJson()}});
+  return stored.set_all({{"opened", m_opened.get()},
+                         {"currentState", m_currentState},
+                         {"crafting", m_crafting.get()},
+                         {"craftingProgress", m_craftingProgress.get()},
+                         {"initialized", m_initialized},
+                         {"items", std::move(items)},
+                         {"ageItemsTimer", m_ageItemsTimer.toJson()}});
 }
 
 std::expected<ItemRecipe, StarException> ContainerObject::recipeForMaterials(List<std::shared_ptr<Item>> const& inputItems) {

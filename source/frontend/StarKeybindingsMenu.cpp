@@ -215,7 +215,7 @@ std::expected<void, StarException> KeybindingsMenu::buildListsFromConfig() {
     auto bindings = (*config)->get("bindings");
     if (!bindings)
       return std::unexpected(std::move(bindings.error()));
-    auto entries = keybinds.iterateArray();
+    auto entries = keybinds.iterate_array();
     if (!entries)
       return std::unexpected(std::move(entries.error()));
     for (auto const& keybind : *entries) {
@@ -235,7 +235,7 @@ std::expected<void, StarException> KeybindingsMenu::buildListsFromConfig() {
         auto actionBindings = bindings->get(*actionString);
         if (!actionBindings)
           return std::unexpected(std::move(actionBindings.error()));
-        auto bindingEntries = actionBindings->iterateArray();
+        auto bindingEntries = actionBindings->iterate_array();
         if (!bindingEntries)
           return std::unexpected(std::move(bindingEntries.error()));
         for (auto const& bindingEntry : *bindingEntries) {
@@ -352,7 +352,7 @@ std::expected<void, StarException> KeybindingsMenu::setKeybinding(KeyChord desc)
   auto actionBindings = updated->get(key->get());
   if (!actionBindings)
     return std::unexpected(std::move(actionBindings.error()));
-  auto entries = actionBindings->iterateArray();
+  auto entries = actionBindings->iterate_array();
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   StringList buttonText;

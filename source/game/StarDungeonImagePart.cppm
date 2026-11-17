@@ -191,7 +191,7 @@ namespace Dungeon {
 
   [[nodiscard]] std::expected<std::shared_ptr<ImageTileset>, StarException> ImageTileset::create(Root& root, Json const& tileset) {
     auto result = std::shared_ptr<ImageTileset>(new ImageTileset);
-    auto definitions = tileset.iterateArray();
+    auto definitions = tileset.iterate_array();
     if (!definitions) return std::unexpected(std::move(definitions.error()));
     for (Json const& definition : *definitions) {
       auto value = definition.get("value");

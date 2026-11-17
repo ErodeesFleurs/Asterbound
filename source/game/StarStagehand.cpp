@@ -90,10 +90,8 @@ std::expected<std::shared_ptr<Stagehand>, StarException> Stagehand::create(Root&
 }
 
 std::expected<Json, StarException> Stagehand::diskStore() const {
-  auto saveData = m_config.setAll({
-      {"position", jsonFromVec2F({m_xPosition.get(), m_yPosition.get()})},
-      {"uniqueId", json_from_optional(uniqueId())}
-    });
+  auto saveData = m_config.set_all({{"position", jsonFromVec2F({m_xPosition.get(), m_yPosition.get()})},
+                                    {"uniqueId", json_from_optional(uniqueId())}});
   if (!saveData)
     return std::unexpected(std::move(saveData.error()));
   if (!m_scripted)

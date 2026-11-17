@@ -135,14 +135,14 @@ std::expected<std::shared_ptr<TreasureDatabase>, StarException> TreasureDatabase
   };
   for (auto const& assetFile : treasurePools->get()) {
     auto const& file = assetFile.string();
-    auto definitions = (*assets)->json(file).and_then([](Json const& value) { return value.iterateObject(); });
+    auto definitions = (*assets)->json(file).and_then([](Json const& value) { return value.iterate_object(); });
     if (!definitions)
       return std::unexpected(std::move(definitions.error()));
     for (auto const& pair : *definitions) {
       if (database->m_treasurePools.contains(pair.first))
         return std::unexpected(TreasureException::format("Duplicate TreasurePool config '{}' from file '{}'", pair.first, file));
       auto& treasurePool = database->m_treasurePools[pair.first];
-      auto entries = pair.second.iterateArray();
+      auto entries = pair.second.iterate_array();
       if (!entries)
         return std::unexpected(std::move(entries.error()));
       for (auto const& entry : *entries) {
@@ -201,7 +201,7 @@ std::expected<std::shared_ptr<TreasureDatabase>, StarException> TreasureDatabase
           if (!inserted)
             return std::unexpected(std::move(inserted.error()));
         } else {
-          auto rounds = poolRounds->iterateArray();
+          auto rounds = poolRounds->iterate_array();
           if (!rounds)
             return std::unexpected(std::move(rounds.error()));
           for (auto const& round : *rounds) {
@@ -230,14 +230,14 @@ std::expected<std::shared_ptr<TreasureDatabase>, StarException> TreasureDatabase
   }
   for (auto const& assetFile : treasureChests->get()) {
     auto const& file = assetFile.string();
-    auto definitions = (*assets)->json(file).and_then([](Json const& value) { return value.iterateObject(); });
+    auto definitions = (*assets)->json(file).and_then([](Json const& value) { return value.iterate_object(); });
     if (!definitions)
       return std::unexpected(std::move(definitions.error()));
     for (auto const& pair : *definitions) {
       if (database->m_treasureChestSets.contains(pair.first))
         return std::unexpected(TreasureException::format("Duplicate TreasureChestSet config '{}' from file '{}'", pair.first, file));
       auto& chestSet = database->m_treasureChestSets[pair.first];
-      auto entries = pair.second.iterateArray();
+      auto entries = pair.second.iterate_array();
       if (!entries)
         return std::unexpected(std::move(entries.error()));
       for (auto const& entry : *entries) {

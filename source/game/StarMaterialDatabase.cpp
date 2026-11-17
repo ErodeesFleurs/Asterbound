@@ -67,7 +67,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
   auto loadMetaMaterials = [&]() -> std::expected<void, StarException> {
     auto metaConfig = assets->json("/metamaterials.config");
     if (!metaConfig) return std::unexpected(std::move(metaConfig.error()));
-    auto metas = metaConfig->iterateArray();
+    auto metas = metaConfig->iterate_array();
     if (!metas) return std::unexpected(std::move(metas.error()));
     for (auto const& meta : *metas) {
       auto name = meta.getString("name");
@@ -137,7 +137,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
         material.itemDrop = std::move(*value);
       }
       JsonObject descriptions;
-      auto members = config->iterateObject();
+      auto members = config->iterate_object();
       if (!members)
         return std::unexpected(std::move(members.error()));
       for (auto const& entry : *members) {
@@ -354,7 +354,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
         mod.itemDrop = std::move(*value);
       }
       JsonObject descriptions;
-      auto members = config->iterateObject();
+      auto members = config->iterate_object();
       if (!members)
         return std::unexpected(std::move(members.error()));
       for (auto const& entry : *members) {

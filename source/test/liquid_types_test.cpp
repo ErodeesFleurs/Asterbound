@@ -119,7 +119,7 @@ const GameTestRegistration
       SCOPED_TRACE(name);
       for (bool missing : {true, false}) {
         SCOPED_TRACE(missing);
-        auto changed = missing ? engine.eraseKey(name) : engine.set(name, "not a float");
+        auto changed = missing ? engine.erase(name) : engine.set(name, "not a float");
         ASSERT_TRUE(changed);
         auto loaded = liquidsFixture(fixture, File::relative_to(*directory, Star::format("case{}", index++)),
                                      JsonObject{{"liquidEngineParameters", *changed}, {"backgroundDrain", 12}});

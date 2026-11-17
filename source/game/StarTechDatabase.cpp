@@ -91,7 +91,7 @@ std::expected<TechConfig, StarException> TechDatabase::parseTech(Json const& con
     if (!*type)
       return std::unexpected(TechDatabaseException::format("Unknown tech type '{}'", *typeName));
     tech.type = (*type)->get();
-    auto scripts = config.get("scripts").and_then([](Json const& value) { return value.iterateArray(); });
+    auto scripts = config.get("scripts").and_then([](Json const& value) { return value.iterate_array(); });
     if (!scripts)
       return std::unexpected(std::move(scripts.error()));
     for (auto const& script : *scripts) {

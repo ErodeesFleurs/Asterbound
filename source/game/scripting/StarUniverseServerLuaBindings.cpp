@@ -323,7 +323,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseServerCallba
     auto users = (*config)->get("serverUsers");
     if (!users)
       return std::unexpected(std::move(users.error()));
-    auto serverUsers = users->iterateObject();
+    auto serverUsers = users->iterate_object();
     if (!serverUsers)
       return std::unexpected(std::move(serverUsers.error()));
     JsonObject result;

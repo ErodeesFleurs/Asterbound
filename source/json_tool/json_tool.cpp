@@ -136,9 +136,9 @@ std::expected<FormattedJson, StarException> Star::addOrSet(bool add,
     if (std::holds_alternative<AtEnd>(insertLocation))
       return object.append(key, value);
     if (std::holds_alternative<BeforeKey>(insertLocation))
-      return object.insertBefore(key, value, std::get<BeforeKey>(insertLocation).key);
+      return object.insert_before(key, value, std::get<BeforeKey>(insertLocation).key);
     if (std::holds_alternative<AfterKey>(insertLocation))
-      return object.insertAfter(key, value, std::get<AfterKey>(insertLocation).key);
+      return object.insert_after(key, value, std::get<AfterKey>(insertLocation).key);
     return object.set(key, value);
   };
   JsonPath::ArrayOp<FormattedJson> arrayOp = [&value, add](FormattedJson const& array, std::optional<std::size_t> i)

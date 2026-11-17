@@ -112,7 +112,7 @@ const GameTestRegistration
     auto config = (*assets)->json("/humanoid.config");
     ASSERT_TRUE(config);
     // Exercise the legacy humanoid path still used by species without an animator.
-    auto legacy = config->eraseKey("animation");
+    auto legacy = config->erase("animation");
     ASSERT_TRUE(legacy);
     auto humanoid = Humanoid::create(fixture.root(), *legacy);
     ASSERT_TRUE(humanoid) << humanoid.error().what();
@@ -411,7 +411,7 @@ const GameTestRegistration refreshedMovementCycles(
     ASSERT_TRUE(assets);
     auto config = (*assets)->json("/humanoid.config");
     ASSERT_TRUE(config);
-    auto legacy = config->eraseKey("animation");
+    auto legacy = config->erase("animation");
     ASSERT_TRUE(legacy);
     for (auto const& mode : {*legacy, *config}) {
       auto made = Humanoid::create(fixture.root(), mode);
@@ -769,7 +769,7 @@ const GameTestRegistration humanoidSemanticSampling(
     ASSERT_TRUE(assets);
     auto config = (*assets)->json("/humanoid.config");
     ASSERT_TRUE(config);
-    auto legacy = config->eraseKey("animation");
+    auto legacy = config->erase("animation");
     ASSERT_TRUE(legacy);
     for (auto const& mode : {*legacy, *config}) {
       auto made = Humanoid::create(fixture.root(), mode);

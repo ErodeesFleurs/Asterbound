@@ -339,7 +339,7 @@ std::expected<void, StarException> ArmorItem::refreshStatusEffects() {
     auto level = instanceValue("level", 1).and_then([](Json const& value) { return value.toFloat(); });
     if (!level)
       return std::unexpected(std::move(level.error()));
-    auto values = leveled->iterateArray();
+    auto values = leveled->iterate_array();
     if (!values)
       return std::unexpected(std::move(values.error()));
     for (auto const& effectConfig : *values) {

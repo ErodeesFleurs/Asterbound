@@ -412,7 +412,7 @@ std::expected<Json, StarException> Object::diskStore() const {
   if (!storedResult)
     return std::unexpected(std::move(storedResult.error()));
   auto stored = std::move(*storedResult);
-  return stored.setAll({{"name", m_config->name}, {"parameters", m_parameters.baseMap()}});
+  return stored.set_all({{"name", m_config->name}, {"parameters", m_parameters.baseMap()}});
 }
 
 std::expected<ByteArray, StarException> Object::netStore(NetCompatibilityRules rules) {

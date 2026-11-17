@@ -50,7 +50,7 @@ std::expected<std::shared_ptr<RadioMessageDatabase>, StarException> RadioMessage
       auto messages = (*assets)->json(file);
       if (!messages)
         return std::unexpected(std::move(messages.error()));
-      auto entries = messages->iterateObject();
+      auto entries = messages->iterate_object();
       if (!entries)
         return std::unexpected(std::move(entries.error()));
       for (auto const& pair : *entries) {
@@ -150,14 +150,15 @@ std::expected<RadioMessage, StarException> RadioMessageDatabase::createRadioMess
   if (!chatterSound)
     return std::unexpected(std::move(chatterSound.error()));
   message.chatterSound = std::move(*chatterSound);
-  auto withoutAi = config.eraseKey("speciesAiMessage");
+  auto withoutAi = config.erase("speciesAiMessage");
   if (!withoutAi)
     return std::unexpected(std::move(withoutAi.error()));
-  auto merger = withoutAi->eraseKey("speciesMessage");
+  auto merger = withoutAi->erase("speciesMessage");
   if (!merger)
     return std::unexpected(std::move(merger.error()));
   for (auto const& key : std::initializer_list<String>{"speciesAiMessage", "speciesMessage"}) {
-    auto variants = mergedConfig.get(key, JsonObject()).and_then([](Json const& value) { return value.iterateObject(); });
+    auto variants =
+      mergedConfig.get(key, JsonObject()).and_then([](Json const& value) { return value.iterate_object(); });
     if (!variants)
       return std::unexpected(std::move(variants.error()));
     for (auto const& pair : *variants) {

@@ -11,77 +11,100 @@ namespace Star {
 
 class JsonBuilderStream : public JsonStream {
 public:
-  std::expected<void, StarException> beginObject() override;
-  std::expected<void, StarException> objectKey(std::span<char32_t const> s) override;
-  std::expected<void, StarException> objectKeyUtf8(std::string_view s) override;
-  std::expected<void, StarException> endObject() override;
-  std::expected<void, StarException> beginArray() override;
-  std::expected<void, StarException> endArray() override;
-  std::expected<void, StarException> putString(std::span<char32_t const> s) override;
-  std::expected<void, StarException> putStringUtf8(std::string_view s) override;
-  std::expected<void, StarException> putDouble(std::string_view s) override;
-  std::expected<void, StarException> putInteger(std::string_view s) override;
-  std::expected<void, StarException> putBoolean(bool b) override;
-  std::expected<void, StarException> putNull() override;
-  std::expected<void, StarException> putWhitespace(std::span<char32_t const> s) override;
-  std::expected<void, StarException> putColon() override;
-  std::expected<void, StarException> putComma() override;
-  std::size_t stackSize();
-  std::expected<Json, StarException> takeTop();
+  JsonBuilderStream() = default;
+  JsonBuilderStream(JsonBuilderStream const&) = default;
+  JsonBuilderStream& operator=(JsonBuilderStream const&) = default;
+  JsonBuilderStream(JsonBuilderStream&& other) noexcept;
+  JsonBuilderStream& operator=(JsonBuilderStream&& other) noexcept;
+  std::expected<void, StarException> begin_object() override;
+  std::expected<void, StarException> object_key(std::span<char32_t const> s) override;
+  std::expected<void, StarException> object_key_utf8(std::string_view s) override;
+  std::expected<void, StarException> end_object() override;
+  std::expected<void, StarException> begin_array() override;
+  std::expected<void, StarException> end_array() override;
+  std::expected<void, StarException> put_string(std::span<char32_t const> s) override;
+  std::expected<void, StarException> put_string_utf8(std::string_view s) override;
+  std::expected<void, StarException> put_double(std::string_view s) override;
+  std::expected<void, StarException> put_integer(std::string_view s) override;
+  std::expected<void, StarException> put_boolean(bool b) override;
+  std::expected<void, StarException> put_null() override;
+  std::expected<void, StarException> put_whitespace(std::span<char32_t const> s) override;
+  std::expected<void, StarException> put_colon() override;
+  std::expected<void, StarException> put_comma() override;
+  std::size_t stack_size();
+  std::expected<Json, StarException> take_top();
+
 private:
   void push(Json v);
   std::expected<Json, StarException> pop();
   std::expected<void, StarException> set(Json v);
-  void pushSentry();
-  bool isSentry();
-  List<std::optional<Json>> m_stack;
+  void push_sentry();
+  bool is_sentry();
+  static constexpr std::size_t m_no_sentry = std::numeric_limits<std::size_t>::max();
+  // Sentries link to their enclosing active index without a separate frame stack.
+  List<std::variant<Json, std::size_t>> m_stack;
+  std::size_t m_active_sentry = m_no_sentry;
 };
 
-template <typename Jsonlike>
-class JsonStreamer {
+template <typename JsonLike> class JsonStreamer {
 public:
-  static std::expected<void, StarException> toJsonStream(Jsonlike const& val, JsonStream& stream, bool sort);
+  static std::expected<void, StarException> to_json_stream(JsonLike const&, JsonStream&, bool) = delete;
 };
 
 template <>
 class JsonStreamer<Json> {
 public:
-  static std::expected<void, StarException> toJsonStream(Json const& val, JsonStream& stream, bool sort);
+  static std::expected<void, StarException> to_json_stream(Json const& val, JsonStream& stream, bool sort);
+  static std::expected<void, StarException> stream_object(JsonObject const& object, JsonStream& stream, bool sort);
+};
+
+template <typename Stream, typename JsonLike>
+concept json_builder_stream =
+  std::default_initializable<Stream> && std::convertible_to<Stream&, JsonStream&> && requires(Stream& stream) {
+    { stream.take_top() } -> std::same_as<std::expected<JsonLike, StarException>>;
+  };
+
+template <typename JsonLike>
+concept json_streamable = requires(JsonLike const& value, JsonStream& stream) {
+  { JsonStreamer<JsonLike>::to_json_stream(value, stream, false) } -> std::same_as<std::expected<void, StarException>>;
 };
 
 // Unlike back_insert_iterator<String>, this sink propagates Unicode errors.
 class JsonStringOutputIterator {
 public:
-  explicit JsonStringOutputIterator(String& string) : m_string(string) {}
-  std::expected<void, StarException> push(char32_t c) { return m_string.push_back(c); }
+  explicit JsonStringOutputIterator(String& string) : m_output(string) {}
+  std::expected<void, StarException> push(char32_t c) { return m_output.push_back(c); }
+
 private:
-  String& m_string;
+  String& m_output;
 };
 
 // UTF-8 output can append validated runs without an iterator assignment per byte.
 class JsonUtf8StringOutputIterator {
 public:
-  explicit JsonUtf8StringOutputIterator(std::string& string) : m_string(string) {}
+  explicit JsonUtf8StringOutputIterator(std::string& string) : m_output(string) {}
   std::expected<void, StarException> push(char c) {
-    m_string.push_back(c);
+    m_output.push_back(c);
     return {};
   }
   std::expected<void, StarException> append(std::string_view bytes) {
-    m_string.append(bytes);
+    m_output.append(bytes);
     return {};
   }
 
 private:
-  std::string& m_string;
+  std::string& m_output;
 };
 
-template <typename InputIterator, typename Stream = JsonBuilderStream, typename Jsonlike = Json>
-std::expected<Jsonlike, StarException> inputUtf32Json(InputIterator begin, InputIterator end, JsonParseType parseType) {
+template <json_input_iterator InputIterator, typename Stream = JsonBuilderStream, typename JsonLike = Json>
+  requires json_builder_stream<Stream, JsonLike>
+std::expected<JsonLike, StarException> input_utf32_json(InputIterator begin, InputIterator end,
+                                                        JsonParseType parse_type) {
   Stream stream;
   // Only the ordinary DOM discards trivia. Custom streams keep the parser's
   // historical whitespace callbacks, including subclasses of the DOM builder.
   JsonParser<InputIterator, !std::is_same_v<Stream, JsonBuilderStream>> parser(stream);
-  auto parsed = parser.parse(begin, end, parseType);
+  auto parsed = parser.parse(begin, end, parse_type);
   if (!parsed) {
     if (parsed.error().template is<JsonParserException>())
       return std::unexpected(JsonParsingException("Error parsing json", ExceptionDiagnostic(parsed.error())));
@@ -89,7 +112,7 @@ std::expected<Jsonlike, StarException> inputUtf32Json(InputIterator begin, Input
   }
   if (*parsed != end)
     return std::unexpected(JsonParsingException(Star::format("Error extra data at end of input at {}:{}", parser.line(), parser.column())));
-  return stream.takeTop();
+  return stream.take_top();
 }
 
 // Decode only the current codepoint. Unlike a validated Unicode range, this
@@ -109,7 +132,7 @@ public:
       return m_point;
     if constexpr (std::contiguous_iterator<InputIterator> && std::same_as<std::iter_value_t<InputIterator>, char>) {
       auto decoded = utf8_decode_char(
-          std::string_view(std::to_address(m_current), static_cast<std::size_t>(m_end - m_current)), m_point);
+        std::string_view(std::to_address(m_current), static_cast<std::size_t>(m_end - m_current)), m_point);
       if (!decoded)
         return std::unexpected(std::move(decoded.error()));
       m_width = *decoded;
@@ -145,15 +168,15 @@ public:
     return {};
   }
 
-  char const* utf8Position() const
+  std::string_view utf8_remaining() const
     requires(std::contiguous_iterator<InputIterator> && std::same_as<std::iter_value_t<InputIterator>, char>)
   {
-    return std::to_address(m_current);
+    if (m_current == m_end)
+      return {};
+    return std::string_view(std::to_address(m_current), static_cast<std::size_t>(m_end - m_current));
   }
 
-  bool operator==(JsonUtf8InputIterator const& other) const {
-    return m_current == other.m_current;
-  }
+  bool operator==(JsonUtf8InputIterator const& other) const { return m_current == other.m_current; }
 
 private:
   InputIterator m_current{};
@@ -162,34 +185,38 @@ private:
   mutable std::size_t m_width = 0;
 };
 
-template <std::forward_iterator InputIterator, typename Stream = JsonBuilderStream, typename Jsonlike = Json>
-  requires std::convertible_to<std::iter_reference_t<InputIterator>, char>
-std::expected<Jsonlike, StarException> inputUtf8Json(InputIterator begin, InputIterator end, JsonParseType parseType) {
+template <std::forward_iterator InputIterator, typename Stream = JsonBuilderStream, typename JsonLike = Json>
+  requires std::convertible_to<std::iter_reference_t<InputIterator>, char> && json_builder_stream<Stream, JsonLike>
+std::expected<JsonLike, StarException> input_utf8_json(InputIterator begin, InputIterator end,
+                                                       JsonParseType parse_type) {
   using Utf32Input = JsonUtf8InputIterator<InputIterator>;
-  return inputUtf32Json<Utf32Input, Stream, Jsonlike>(Utf32Input(begin, end), Utf32Input(end, end), parseType);
+  return input_utf32_json<Utf32Input, Stream, JsonLike>(Utf32Input(begin, end), Utf32Input(end, end), parse_type);
 }
 
 template <typename OutputIterator>
-std::expected<void, StarException> outputUtf8Json(Json const& val, OutputIterator out, int pretty, bool sort) {
+  requires json_output_iterator<OutputIterator, char>
+std::expected<void, StarException> output_utf8_json(Json const& val, OutputIterator out, int pretty, bool sort) {
   JsonWriter<OutputIterator, true> writer(out, pretty);
-  return JsonStreamer<Json>::toJsonStream(val, writer, sort);
+  return JsonStreamer<Json>::to_json_stream(val, writer, sort);
 }
 
-template <typename OutputIterator, typename Jsonlike = Json>
-std::expected<void, StarException> outputUtf32Json(Jsonlike const& val, OutputIterator out, int pretty, bool sort) {
+template <typename OutputIterator, json_streamable JsonLike = Json>
+  requires json_output_iterator<OutputIterator, char32_t>
+std::expected<void, StarException> output_utf32_json(JsonLike const& val, OutputIterator out, int pretty, bool sort) {
   JsonWriter<OutputIterator> writer(out, pretty);
-  return JsonStreamer<Jsonlike>::toJsonStream(val, writer, sort);
+  return JsonStreamer<JsonLike>::to_json_stream(val, writer, sort);
 }
-
 }
 export module star.json_builder;
 export namespace Star {
-using ::Star::inputUtf32Json;
-using ::Star::inputUtf8Json;
+using ::Star::input_utf32_json;
+using ::Star::input_utf8_json;
+using ::Star::json_builder_stream;
+using ::Star::json_streamable;
 using ::Star::JsonBuilderStream;
 using ::Star::JsonStreamer;
 using ::Star::JsonStringOutputIterator;
 using ::Star::JsonUtf8StringOutputIterator;
-using ::Star::outputUtf32Json;
-using ::Star::outputUtf8Json;
+using ::Star::output_utf32_json;
+using ::Star::output_utf8_json;
 }

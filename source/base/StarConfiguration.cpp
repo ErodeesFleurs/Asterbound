@@ -48,7 +48,7 @@ std::expected<void, StarException> Configuration::set(String const& key, Json co
   if (key == "configurationVersion")
     return std::unexpected(ConfigurationException("cannot set configurationVersion"));
 
-  auto updated = value ? m_currentConfig.set(key, value) : m_currentConfig.eraseKey(key);
+  auto updated = value ? m_currentConfig.set(key, value) : m_currentConfig.erase(key);
   if (!updated)
     return std::unexpected(std::move(updated.error()));
   m_currentConfig = std::move(*updated);
@@ -63,7 +63,7 @@ std::expected<void, StarException> Configuration::setPath(String const& path, Js
   if (!components->empty() && (*components)[0] == "configurationVersion")
     return std::unexpected(ConfigurationException("cannot set configurationVersion"));
 
-  auto updated = value ? m_currentConfig.setPath(path, value) : m_currentConfig.erasePath(path);
+  auto updated = value ? m_currentConfig.set_path(path, value) : m_currentConfig.erase_path(path);
   if (!updated)
     return std::unexpected(std::move(updated.error()));
   m_currentConfig = std::move(*updated);

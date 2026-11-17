@@ -385,7 +385,7 @@ namespace Tiled {
     if (*count < 0) return std::unexpected(StarException("Negative tile count in tileset"));
     result->m_tilesBack.resize(*count);
     result->m_tilesFront.resize(*count);
-    auto entries = tileProperties->value_or(JsonObject{}).iterateObject();
+    auto entries = tileProperties->value_or(JsonObject{}).iterate_object();
     if (!entries) return std::unexpected(std::move(entries.error()));
     for (auto const& entry : *entries) {
       auto index = lexical_cast<std::size_t>(entry.first);

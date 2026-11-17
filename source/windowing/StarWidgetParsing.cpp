@@ -245,7 +245,7 @@ std::expected<List<WidgetConstructResult>, StarException> WidgetParser::construc
     return {};
   };
   if (config.isType(Json::Type::Object)) {
-    auto members = config.iterateObject();
+    auto members = config.iterate_object();
     if (!members)
       return std::unexpected(std::move(members.error()));
     for (auto const& member : *members) {
@@ -257,7 +257,7 @@ std::expected<List<WidgetConstructResult>, StarException> WidgetParser::construc
         return std::unexpected(std::move(added.error()));
     }
   } else if (config.isType(Json::Type::Array)) {
-    auto members = config.iterateArray();
+    auto members = config.iterate_array();
     if (!members)
       return std::unexpected(std::move(members.error()));
     for (auto const& member : *members) {

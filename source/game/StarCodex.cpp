@@ -39,7 +39,7 @@ std::expected<std::shared_ptr<Codex>, StarException> Codex::create(Json const& c
   if (!icon)
     return std::unexpected(std::move(icon.error()));
   result->m_icon = std::move(*icon);
-  auto pages = config.get("contentPages").and_then([](Json const& value) { return value.iterateArray(); });
+  auto pages = config.get("contentPages").and_then([](Json const& value) { return value.iterate_array(); });
   if (!pages)
     return std::unexpected(std::move(pages.error()));
   for (auto const& page : *pages) {

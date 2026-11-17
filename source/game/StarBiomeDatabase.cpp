@@ -312,7 +312,7 @@ std::expected<StringList, StarException> BiomeDatabase::biomeOres(String const& 
     if (!function) return std::unexpected(std::move(function.error()));
     auto ores = (*function)->get(threatLevel);
     if (!ores) return std::unexpected(std::move(ores.error()));
-    auto entries = ores->iterateArray();
+    auto entries = ores->iterate_array();
     if (!entries) return std::unexpected(std::move(entries.error()));
     for (auto const& entry : *entries) {
       auto density = entry.getFloat(1);
@@ -525,7 +525,7 @@ std::expected<List<std::pair<ModId, float>>, StarException> BiomeDatabase::readO
     if (!function) return std::unexpected(std::move(function.error()));
     auto ores = (*function)->get(threatLevel);
     if (!ores) return std::unexpected(std::move(ores.error()));
-    auto entries = ores->iterateArray();
+    auto entries = ores->iterate_array();
     if (!entries) return std::unexpected(std::move(entries.error()));
     for (auto const& entry : *entries) {
       auto density = entry.getFloat(1);

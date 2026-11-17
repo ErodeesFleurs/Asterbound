@@ -27,12 +27,18 @@ using JsonArray = List<Json>;
 
 using JsonObject = StringMap<Json>;
 
+// Keep constraints independent of container internals while Json is recursive.
+template <typename Container>
+concept json_container = std::same_as<Container, JsonArray> || std::same_as<Container, JsonObject>;
+
+template <typename Value>
+concept json_boolean = std::same_as<std::remove_cvref_t<Value>, bool>;
+
 // Class for holding representation of JSON data.  Immutable and implicitly
 // shared.
 class Json {
 public:
-  template <typename Container>
-  struct IteratorWrapper {
+  template <json_container Container> struct IteratorWrapper {
     // Keep the immutable container alive when iterating a temporary Json.
     using const_iterator = typename Container::const_iterator;
     using iterator = const_iterator;
@@ -40,7 +46,7 @@ public:
     const_iterator begin() const;
     const_iterator end() const;
 
-    std::shared_ptr<Container const> ptr;
+    std::shared_ptr<Container const> m_container;
   };
 
   enum class Type : std::uint8_t {
@@ -73,8 +79,7 @@ public:
 
   Json(double);
   // Pointer-to-bool conversions must not steal UTF-8 view construction.
-  template <typename Bool> requires std::same_as<std::remove_cvref_t<Bool>, bool>
-  Json(Bool b) : m_data(b) {}
+  template <json_boolean Bool> Json(Bool b) : m_data(b) {}
   Json(int);
   Json(long);
   Json(long long);
@@ -82,12 +87,14 @@ public:
   Json(unsigned long);
   Json(unsigned long long);
   Json(std::string_view);
-  template <std::size_t Size>
-  Json(char const (&text)[Size]) : Json(std::string_view(text, Size - 1)) {}
+  template <std::size_t size>
+    requires(size > 0)
+  Json(char const (&text)[size]) : Json(std::string_view(text, size - 1)) {}
   static std::expected<Json, StarException> create(std::span<String::Char const>);
-  template <std::size_t Size>
-  static std::expected<Json, StarException> create(String::Char const (&text)[Size]) {
-    return create(std::span<String::Char const>(text, Size - 1));
+  template <std::size_t size>
+    requires(size > 0)
+  static std::expected<Json, StarException> create(String::Char const (&text)[size]) {
+    return create(std::span<String::Char const>(text, size - 1));
   }
   Json(String);
   Json(std::string);
@@ -115,14 +122,14 @@ public:
   // Internally, String, JsonArray, and JsonObject are shared via shared_ptr
   // since this class is immutable.  Use these methods to get at this pointer
   // without causing a copy.
-  std::expected<std::shared_ptr<String const>, StarException> stringPtr() const;
-  std::expected<std::shared_ptr<JsonArray const>, StarException> arrayPtr() const;
-  std::expected<std::shared_ptr<JsonObject const>, StarException> objectPtr() const;
+  std::expected<std::shared_ptr<String const>, StarException> string_ptr() const;
+  std::expected<std::shared_ptr<JsonArray const>, StarException> array_ptr() const;
+  std::expected<std::shared_ptr<JsonObject const>, StarException> object_ptr() const;
 
   // As a convenience, make it easy to safely and quickly iterate over a
   // JsonArray or JsonObject contents by holding the container pointer.
-  std::expected<IteratorWrapper<JsonArray>, StarException> iterateArray() const;
-  std::expected<IteratorWrapper<JsonObject>, StarException> iterateObject() const;
+  std::expected<IteratorWrapper<JsonArray>, StarException> iterate_array() const;
+  std::expected<IteratorWrapper<JsonObject>, StarException> iterate_object() const;
 
   // opt* methods work like this, if the json is null, it returns none.  If the
   // json is convertible, it returns the converted type, otherwise an error.
@@ -249,17 +256,17 @@ public:
   // Returns a *new* object with the given values set/erased.  Errors if not an
   // object.
   std::expected<Json, StarException> set(String key, Json value) const;
-  std::expected<Json, StarException> setPath(String path, Json value) const;
-  std::expected<Json, StarException> setAll(JsonObject values) const;
-  std::expected<Json, StarException> eraseKey(String key) const;
-  std::expected<Json, StarException> erasePath(String path) const;
+  std::expected<Json, StarException> set_path(String path, Json value) const;
+  std::expected<Json, StarException> set_all(JsonObject values) const;
+  std::expected<Json, StarException> erase(String key) const;
+  std::expected<Json, StarException> erase_path(String path) const;
 
   // Returns a *new* array with the given values set/inserted/appended/erased.
   // Errors if not an array.
   std::expected<Json, StarException> set(std::size_t index, Json value) const;
   std::expected<Json, StarException> insert(std::size_t index, Json value) const;
   std::expected<Json, StarException> append(Json value) const;
-  std::expected<Json, StarException> eraseIndex(std::size_t index) const;
+  std::expected<Json, StarException> erase(std::size_t index) const;
 
   Type type() const;
   String typeName() const;
@@ -300,9 +307,15 @@ private:
   friend Json jsonMergeNulling(Json const& base, Json const& merger);
   friend bool jsonPartialMatch(Json const& base, Json const& compare);
 
+  std::expected<std::reference_wrapper<JsonArray const>, StarException> array_ref() const&;
 
-  std::variant<std::monostate, double, bool, std::int64_t, std::shared_ptr<String const>, std::shared_ptr<JsonArray const>, std::shared_ptr<JsonObject const>> m_data;
+  std::variant<std::monostate, double, bool, std::int64_t, std::shared_ptr<String const>,
+               std::shared_ptr<JsonArray const>, std::shared_ptr<JsonObject const>>
+    m_data;
 };
+
+template <typename Value>
+concept json_source = std::convertible_to<Value const&, Json>;
 
 [[nodiscard]] std::expected<void, StarException> write_text(TextBuffer& output, Json const& value);
 
@@ -330,17 +343,16 @@ Json jsonMerge(Json const& base, Json const& merger);
 // Same as above, but applies null mergers.
 Json jsonMergeNulling(Json const& base, Json const& merger);
 
-template <typename... T>
-Json jsonMerge(Json const& base, Json const& merger, T const&... rest);
+template <json_source... T> Json jsonMerge(Json const& base, Json const& merger, T const&... rest);
 
 // Similar to jsonMerge, but query only for a single key.  Gets a value equal
 // to jsonMerge(jsons...).query(key, Json()), but much faster than doing an
 // entire merge operation.
-template <typename... T>
+template <json_source... T>
 std::expected<Json, StarException> jsonMergeQuery(String const& key, Json const& first, T const&... rest);
 
 // jsonMergeQuery with a default.
-template <typename... T>
+template <json_source... T>
 std::expected<Json, StarException> jsonMergeQueryDef(String const& key, Json def, Json const& first, T const&... rest);
 
 template <>
@@ -348,52 +360,46 @@ struct hash<Json> {
   std::size_t operator()(Json const& v) const;
 };
 
-template <typename Container>
-auto Json::IteratorWrapper<Container>::begin() const -> const_iterator {
-  return ptr->begin();
+template <json_container Container> auto Json::IteratorWrapper<Container>::begin() const -> const_iterator {
+  return m_container->begin();
 }
 
-template <typename Container>
-auto Json::IteratorWrapper<Container>::end() const -> const_iterator {
-  return ptr->end();
+template <json_container Container> auto Json::IteratorWrapper<Container>::end() const -> const_iterator {
+  return m_container->end();
 }
 
-template <typename... T>
-Json jsonMerge(Json const& base, Json const& merger, T const&... rest) {
+template <json_source... T> Json jsonMerge(Json const& base, Json const& merger, T const&... rest) {
   return jsonMerge(jsonMerge(base, merger), rest...);
 }
 
-template <typename... T>
-std::expected<Json, StarException> jsonMergeQuery(String const&, Json def) {
-  return def;
-}
+template <json_source... T> std::expected<Json, StarException> jsonMergeQuery(String const&, Json def) { return def; }
 
-template <typename... T>
-std::expected<Json, StarException> jsonMergeQueryImpl(String const& key, Json const& json) {
+inline std::expected<Json, StarException> json_merge_query_impl(String const& key, Json const& json) {
   return json.query(key, {});
 }
 
-template <typename... T>
-std::expected<Json, StarException> jsonMergeQueryImpl(String const& key, Json const& base, Json const& first, T const&... rest) {
-  auto value = jsonMergeQueryImpl(key, first, rest...);
+template <json_source... T>
+std::expected<Json, StarException> json_merge_query_impl(String const& key, Json const& base, Json const& first,
+                                                         T const&... rest) {
+  auto value = json_merge_query_impl(key, first, rest...);
   if (!value)
     return std::unexpected(std::move(value.error()));
   if (*value && !value->isType(Json::Type::Object))
     return std::move(*value);
-  auto baseValue = base.query(key, {});
-  if (!baseValue)
-    return std::unexpected(std::move(baseValue.error()));
-  return jsonMerge(*baseValue, *value);
+  auto base_value = base.query(key, {});
+  if (!base_value)
+    return std::unexpected(std::move(base_value.error()));
+  return jsonMerge(*base_value, *value);
 }
 
-template <typename... T>
+template <json_source... T>
 std::expected<Json, StarException> jsonMergeQuery(String const& key, Json const& first, T const&... rest) {
-  return jsonMergeQueryImpl(key, first, rest...);
+  return json_merge_query_impl(key, first, rest...);
 }
 
-template <typename... T>
+template <json_source... T>
 std::expected<Json, StarException> jsonMergeQueryDef(String const& key, Json def, Json const& first, T const&... rest) {
-  auto value = jsonMergeQueryImpl(key, first, rest...);
+  auto value = json_merge_query_impl(key, first, rest...);
   if (!value)
     return std::unexpected(std::move(value.error()));
   if (*value)
@@ -420,22 +426,24 @@ export namespace Star {
 
 
 export namespace Star {
-  using ::Star::JsonExceptionTag;
-  using ::Star::JsonException;
-  using ::Star::JsonParsingExceptionTag;
-  using ::Star::JsonParsingException;
-  using ::Star::Json;
-  using ::Star::JsonArray;
-  using ::Star::JsonObject;
-  using ::Star::jsonMerge;
-  using ::Star::jsonMergeNulling;
-  using ::Star::jsonMergeQuery;
-  using ::Star::jsonMergeQueryImpl;
-  using ::Star::jsonMergeQueryDef;
-  using ::Star::jsonPartialMatch;
-  using ::Star::hash;
-  using ::Star::write_text;
-  using ::Star::operator<<;
-  using ::Star::operator>>;
+using ::Star::hash;
+using ::Star::Json;
+using ::Star::json_boolean;
+using ::Star::json_container;
+using ::Star::json_source;
+using ::Star::JsonArray;
+using ::Star::JsonException;
+using ::Star::JsonExceptionTag;
+using ::Star::jsonMerge;
+using ::Star::jsonMergeNulling;
+using ::Star::jsonMergeQuery;
+using ::Star::jsonMergeQueryDef;
+using ::Star::JsonObject;
+using ::Star::JsonParsingException;
+using ::Star::JsonParsingExceptionTag;
+using ::Star::jsonPartialMatch;
+using ::Star::write_text;
+using ::Star::operator<<;
+using ::Star::operator>>;
 }
 

@@ -176,7 +176,7 @@ std::expected<void, StarException> PlayerCompanions::diskLoad(Json const& diskSt
     return std::unexpected(std::move(categories.error()));
   StringMap<List<std::shared_ptr<Companion>>> loaded;
   for (auto const& category : *categories) {
-    auto entries = category.second.iterateArray();
+    auto entries = category.second.iterate_array();
     if (!entries)
       return std::unexpected(std::move(entries.error()));
     for (auto const& entry : *entries) {

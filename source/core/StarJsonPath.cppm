@@ -386,11 +386,11 @@ namespace JsonPath {
         return std::unexpected(std::move(contains.error()));
       if (!*contains)
         return std::unexpected(TraversalException::format("Could not find \"{}\" to remove", key));
-      return object.eraseKey(key);
+      return object.erase(key);
     };
     ArrayOp<Jsonlike> arrayOp = [](Jsonlike const& array, std::optional<std::size_t> i) -> std::expected<Jsonlike, StarException> {
       if (i)
-        return array.eraseIndex(*i);
+        return array.erase(*i);
       return std::unexpected(TraversalException("Could not remove element after end of array"));
     };
     return pathApply(base, parser, path, genericObjectArrayOp(path, emptyPathOp, objectOp, arrayOp));

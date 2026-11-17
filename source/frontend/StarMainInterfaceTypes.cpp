@@ -160,7 +160,7 @@ std::expected<std::unique_ptr<MainInterfaceConfig>, StarException> MainInterface
   for (auto const& path : macros->get()) {
     auto json = (*assets)->json(path.string());
     if (!json) return std::unexpected(std::move(json.error()));
-    auto entries = json->iterateObject();
+    auto entries = json->iterate_object();
     if (!entries) return std::unexpected(std::move(entries.error()));
     for (auto const& pair : *entries) {
       auto commands = jsonToStringList(pair.second);

@@ -859,7 +859,7 @@ std::expected<String, StarException> CommandProcessor::spawnMonster(ConnectionId
       if (!parsed) return std::unexpected(std::move(parsed.error()));
       auto object = parsed->toObject();
       if (!object) return std::unexpected(std::move(object.error()));
-      auto merged = parameters.setAll(*object);
+      auto merged = parameters.set_all(*object);
       if (!merged) return std::unexpected(std::move(merged.error()));
       parameters = std::move(*merged);
     }
@@ -1745,7 +1745,7 @@ std::expected<ServerCommandResult, StarException> CommandProcessor::handleComman
       auto& promise = std::get<RpcPromise<Json>>(result);
       auto wrapped = promise.wrap([](Json res) -> std::expected<String, StarException> {
         if (res.isType(Json::Type::String)) {
-          auto text = res.stringPtr();
+          auto text = res.string_ptr();
           if (!text) return std::unexpected(std::move(text.error()));
           return **text;
         }

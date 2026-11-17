@@ -1155,7 +1155,7 @@ if (!checked205) return std::unexpected(std::move(checked205.error()));
 for (auto const& pair : std::move(*checked205)) {
   HashMap<String, AnimationStateArgs> animations;
   {
-    auto checked206 = pair.second.iterateObject();
+    auto checked206 = pair.second.iterate_object();
     if (!checked206)
       return std::unexpected(std::move(checked206.error()));
     for (auto const& anim : std::move(*checked206)) {
@@ -1198,7 +1198,7 @@ if (!checked215) return std::unexpected(std::move(checked215.error()));
 for (auto const& pair : std::move(*checked215)) {
   HashMap<String, AnimationStateArgs> animations;
   {
-    auto checked216 = pair.second.iterateObject();
+    auto checked216 = pair.second.iterate_object();
     if (!checked216)
       return std::unexpected(std::move(checked216.error()));
     for (auto const& anim : std::move(*checked216)) {
@@ -1241,7 +1241,7 @@ if (!checked225) return std::unexpected(std::move(checked225.error()));
 for (auto const& pair : std::move(*checked225)) {
   HashMap<String, AnimationStateArgs> animations;
   {
-    auto checked226 = pair.second.iterateObject();
+    auto checked226 = pair.second.iterate_object();
     if (!checked226)
       return std::unexpected(std::move(checked226.error()));
     for (auto const& anim : std::move(*checked226)) {
@@ -1284,7 +1284,7 @@ if (!checked235) return std::unexpected(std::move(checked235.error()));
 for (auto const& pair : std::move(*checked235)) {
   HashMap<String, AnimationStateArgs> animations;
   {
-    auto checked236 = pair.second.iterateObject();
+    auto checked236 = pair.second.iterate_object();
     if (!checked236)
       return std::unexpected(std::move(checked236.error()));
     for (auto const& anim : std::move(*checked236)) {
@@ -1385,7 +1385,7 @@ Wearable& current = checked246->get();
   {
 auto checked247 = head.instanceValue("humanoidAnimationTags", JsonObject());
 if (!checked247) return std::unexpected(std::move(checked247.error()));
-auto checked248 = std::move(*checked247).iterateObject();
+auto checked248 = std::move(*checked247).iterate_object();
 if (!checked248) return std::unexpected(std::move(checked248.error()));
 for (auto const& tag : std::move(*checked248)) {
   auto checked249 = tag.first.replace("<slot>", Star::to_string(slot + 1));
@@ -1430,7 +1430,7 @@ Wearable& current = checked253->get();
   {
 auto checked254 = chest.instanceValue("humanoidAnimationTags", JsonObject());
 if (!checked254) return std::unexpected(std::move(checked254.error()));
-auto checked255 = std::move(*checked254).iterateObject();
+auto checked255 = std::move(*checked254).iterate_object();
 if (!checked255) return std::unexpected(std::move(checked255.error()));
 for (auto const& tag : std::move(*checked255)) {
   auto checked256 = tag.first.replace("<slot>", Star::to_string(slot + 1));
@@ -1471,7 +1471,7 @@ Wearable& current = checked260->get();
   {
 auto checked261 = legs.instanceValue("humanoidAnimationTags", JsonObject());
 if (!checked261) return std::unexpected(std::move(checked261.error()));
-auto checked262 = std::move(*checked261).iterateObject();
+auto checked262 = std::move(*checked261).iterate_object();
 if (!checked262) return std::unexpected(std::move(checked262.error()));
 for (auto const& tag : std::move(*checked262)) {
   auto checked263 = tag.first.replace("<slot>", Star::to_string(slot + 1));
@@ -1517,7 +1517,7 @@ wornBack.rotateWithHead = std::move(*checked269).value_or(false);
   {
 auto checked270 = back.instanceValue("humanoidAnimationTags", JsonObject());
 if (!checked270) return std::unexpected(std::move(checked270.error()));
-auto checked271 = std::move(*checked270).iterateObject();
+auto checked271 = std::move(*checked270).iterate_object();
 if (!checked271) return std::unexpected(std::move(checked271.error()));
 for (auto const& tag : std::move(*checked271)) {
   auto checked272 = tag.first.replace("<slot>", Star::to_string(slot + 1));

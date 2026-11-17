@@ -145,7 +145,7 @@ std::expected<KeyChord, StarException> inputDescriptorFromJson(Json const& json)
   auto modsJson = json.get("mods");
   if (!modsJson)
     return std::unexpected(std::move(modsJson.error()));
-  auto entries = modsJson->iterateArray();
+  auto entries = modsJson->iterate_array();
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   KeyMod mods = KeyMod::NoMod;
@@ -191,14 +191,14 @@ std::expected<KeyBindings, StarException> KeyBindings::create(Root& root, Json c
   if (!InterfaceActionNames)
     return std::unexpected(InterfaceActionNames.error().with_context("Could not set keybindings from configuration"));
   KeyBindings bindings;
-  auto entries = json.iterateObject();
+  auto entries = json.iterate_object();
   if (!entries)
     return std::unexpected(entries.error().with_context("Could not set keybindings from configuration"));
   for (auto const& entry : *entries) {
     auto action = InterfaceActionNames->get_left(entry.first);
     if (!action)
       return std::unexpected(action.error().with_context("Could not set keybindings from configuration"));
-    auto inputs = entry.second.iterateArray();
+    auto inputs = entry.second.iterate_array();
     if (!inputs)
       return std::unexpected(inputs.error().with_context("Could not set keybindings from configuration"));
     for (auto const& input : *inputs) {

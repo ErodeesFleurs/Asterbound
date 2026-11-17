@@ -140,7 +140,7 @@ std::expected<Root::Settings, StarException> embeddedRootSettings(GameTest& fixt
   settings.assetsSettings.missingAudio = {};
   settings.assetsSettings.assetTimeToLive = std::numeric_limits<float>::max();
   settings.assetSources.push_back(directory);
-  auto config = settings.defaultConfiguration.setPath("safe.allowRemoteAssets", allowRemote);
+  auto config = settings.defaultConfiguration.set_path("safe.allowRemoteAssets", allowRemote);
   if (!config)
     return std::unexpected(std::move(config.error()));
   settings.defaultConfiguration = std::move(*config);

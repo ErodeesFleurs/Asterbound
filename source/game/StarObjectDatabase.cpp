@@ -1111,36 +1111,32 @@ std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::read
     auto breakDropPool = std::move(*breakDropPoolResult);
     objectConfig->breakDropPool = std::move(breakDropPool);
     }
-    if (auto containsResult = config.contains("breakDropOptions"); !containsResult)
-      return std::unexpected(std::move(containsResult.error()));
-    else if (*containsResult) {
-    auto field6Result = config.getArray("breakDropOptions");
-    if (!field6Result)
-      return std::unexpected(std::move(field6Result.error()));
-    auto field6 = std::move(*field6Result);
-      for (auto const& choices : field6) {
-    auto choicesArrayResult = choices.toArray();
-    if (!choicesArrayResult)
-      return std::unexpected(std::move(choicesArrayResult.error()));
-    auto choicesArray = std::move(*choicesArrayResult);
+    auto break_options = config.find("breakDropOptions");
+    if (!break_options)
+      return std::unexpected(std::move(break_options.error()));
+    if (*break_options) {
+      auto option_groups = (*break_options)->get().iterate_array();
+      if (!option_groups)
+        return std::unexpected(std::move(option_groups.error()));
+      for (auto const& choices : *option_groups) {
+        auto choices_array = choices.iterate_array();
+        if (!choices_array)
+          return std::unexpected(std::move(choices_array.error()));
         List<ItemDescriptor> group;
-        for (auto const& choice : choicesArray) {
-    auto field7Result = choice.getString(0);
-    if (!field7Result)
-      return std::unexpected(std::move(field7Result.error()));
-    auto field7 = std::move(*field7Result);
-    auto field8Result = choice.getUInt(1);
-    if (!field8Result)
-      return std::unexpected(std::move(field8Result.error()));
-    auto field8 = std::move(*field8Result);
-    auto field9Result = choice.getObject(2);
-    if (!field9Result)
-      return std::unexpected(std::move(field9Result.error()));
-    auto field9 = std::move(*field9Result);
-    auto descriptor = ItemDescriptor::create(field7, static_cast<std::size_t>(field8), field9);
-    if (!descriptor)
-      return std::unexpected(std::move(descriptor.error()));
-    group.push_back(std::move(*descriptor));
+        for (auto const& choice : *choices_array) {
+          auto item_name = choice.getString(0);
+          if (!item_name)
+            return std::unexpected(std::move(item_name.error()));
+          auto item_count = choice.getUInt(1);
+          if (!item_count)
+            return std::unexpected(std::move(item_count.error()));
+          auto item_parameters = choice.getObject(2);
+          if (!item_parameters)
+            return std::unexpected(std::move(item_parameters.error()));
+          auto descriptor = ItemDescriptor::create(*item_name, static_cast<std::size_t>(*item_count), *item_parameters);
+          if (!descriptor)
+            return std::unexpected(std::move(descriptor.error()));
+          group.push_back(std::move(*descriptor));
         }
         objectConfig->breakDropOptions.push_back(std::move(group));
       }
@@ -1157,25 +1153,23 @@ std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::read
     auto smashDropPool = std::move(*smashDropPoolResult);
     objectConfig->smashDropPool = std::move(smashDropPool);
     }
-    if (auto containsResult = config.contains("smashDropOptions"); !containsResult)
-      return std::unexpected(std::move(containsResult.error()));
-    else if (*containsResult) {
-    auto field10Result = config.getArray("smashDropOptions");
-    if (!field10Result)
-      return std::unexpected(std::move(field10Result.error()));
-    auto field10 = std::move(*field10Result);
-      for (auto const& choices : field10) {
-    auto choicesArrayResult = choices.toArray();
-    if (!choicesArrayResult)
-      return std::unexpected(std::move(choicesArrayResult.error()));
-    auto choicesArray = std::move(*choicesArrayResult);
+    auto smash_options = config.find("smashDropOptions");
+    if (!smash_options)
+      return std::unexpected(std::move(smash_options.error()));
+    if (*smash_options) {
+      auto option_groups = (*smash_options)->get().iterate_array();
+      if (!option_groups)
+        return std::unexpected(std::move(option_groups.error()));
+      for (auto const& choices : *option_groups) {
+        auto choices_array = choices.iterate_array();
+        if (!choices_array)
+          return std::unexpected(std::move(choices_array.error()));
         List<ItemDescriptor> group;
-        for (auto const& choice : choicesArray) {
-    auto field11Result = ItemDescriptor::create(choice);
-    if (!field11Result)
-      return std::unexpected(std::move(field11Result.error()));
-    auto field11 = std::move(*field11Result);
-    group.push_back(std::move(field11));
+        for (auto const& choice : *choices_array) {
+          auto descriptor = ItemDescriptor::create(choice);
+          if (!descriptor)
+            return std::unexpected(std::move(descriptor.error()));
+          group.push_back(std::move(*descriptor));
         }
         objectConfig->smashDropOptions.push_back(std::move(group));
       }

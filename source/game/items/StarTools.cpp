@@ -570,7 +570,7 @@ std::expected<std::shared_ptr<WireTool>, StarException> WireTool::create(Root& r
   auto overrides = parameters.toObject();
   if (!overrides)
     return std::unexpected(std::move(overrides.error()));
-  auto merged = config.setAll(*overrides);
+  auto merged = config.set_all(*overrides);
   if (!merged)
     return std::unexpected(std::move(merged.error()));
   auto beam = item->initializeBeam(std::move(*merged));
@@ -708,7 +708,7 @@ std::expected<std::shared_ptr<BeamMiningTool>, StarException> BeamMiningTool::cr
   auto overrides = directoryParameters.toObject();
   if (!overrides)
     return std::unexpected(std::move(overrides.error()));
-  auto merged = config.setAll(*overrides);
+  auto merged = config.set_all(*overrides);
   if (!merged)
     return std::unexpected(std::move(merged.error()));
   auto beam = item->initializeBeam(std::move(*merged));

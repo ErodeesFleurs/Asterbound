@@ -229,7 +229,7 @@ if (!result1039) return std::unexpected(std::move(result1039.error()));
 
   auto result1040 = configValue("loungePositions", JsonObject());
 if (!result1040) return std::unexpected(std::move(result1040.error()));
-auto result1041 = std::move(*result1040).iterateObject();
+auto result1041 = std::move(*result1040).iterate_object();
 if (!result1041) return std::unexpected(std::move(result1041.error()));
 for (auto const& pair : std::move(*result1041)) {
     auto& loungePosition = m_loungePositions[pair.first];
@@ -286,7 +286,7 @@ loungePosition.suppressTools = std::move(*result1057);
 
   auto result1058 = configValue("physicsCollisions", JsonObject());
 if (!result1058) return std::unexpected(std::move(result1058.error()));
-auto result1059 = std::move(*result1058).iterateObject();
+auto result1059 = std::move(*result1058).iterate_object();
 if (!result1059) return std::unexpected(std::move(result1059.error()));
 for (auto const& pair : std::move(*result1059)) {
     auto& collisionConfig = m_movingCollisions[pair.first];
@@ -303,7 +303,7 @@ collisionConfig.enabled.set(std::move(*result1062));
 
   auto result1063 = configValue("physicsForces", JsonObject());
 if (!result1063) return std::unexpected(std::move(result1063.error()));
-auto result1064 = std::move(*result1063).iterateObject();
+auto result1064 = std::move(*result1063).iterate_object();
 if (!result1064) return std::unexpected(std::move(result1064.error()));
 for (auto const& pair : std::move(*result1064)) {
     auto& forceRegionConfig = m_forceRegions[pair.first];
@@ -320,7 +320,7 @@ forceRegionConfig.enabled.set(std::move(*result1067));
 
   auto result1068 = configValue("damageSources", JsonObject());
 if (!result1068) return std::unexpected(std::move(result1068.error()));
-auto result1069 = std::move(*result1068).iterateObject();
+auto result1069 = std::move(*result1068).iterate_object();
 if (!result1069) return std::unexpected(std::move(result1069.error()));
 for (auto const& pair : std::move(*result1069)) {
     auto& damageSourceConfig = m_damageSources[pair.first];
@@ -354,7 +354,7 @@ m_networkedAnimator = std::move(*result1078);
 
   auto result1079 = configValue("animationGlobalTags", JsonObject());
 if (!result1079) return std::unexpected(std::move(result1079.error()));
-auto result1080 = std::move(*result1079).iterateObject();
+auto result1080 = std::move(*result1079).iterate_object();
 if (!result1080) return std::unexpected(std::move(result1080.error()));
 for (auto const& p : std::move(*result1080))
     {
@@ -364,17 +364,18 @@ m_networkedAnimator->setGlobalTag(p.first, std::move(*result1081));
 }
   auto result1082 = configValue("animationPartTags", JsonObject());
 if (!result1082) return std::unexpected(std::move(result1082.error()));
-auto result1083 = std::move(*result1082).iterateObject();
+auto result1083 = std::move(*result1082).iterate_object();
 if (!result1083) return std::unexpected(std::move(result1083.error()));
 for (auto const& partPair : std::move(*result1083)) {
-    auto result1084 = partPair.second.iterateObject();
-if (!result1084) return std::unexpected(std::move(result1084.error()));
-for (auto const& tagPair : std::move(*result1084))
-      {
-auto result1085 = tagPair.second.toString();
-if (!result1085) return std::unexpected(std::move(result1085.error()));
-m_networkedAnimator->setPartTag(partPair.first, tagPair.first, std::move(*result1085));
-}
+  auto result1084 = partPair.second.iterate_object();
+  if (!result1084)
+    return std::unexpected(std::move(result1084.error()));
+  for (auto const& tagPair : std::move(*result1084)) {
+    auto result1085 = tagPair.second.toString();
+    if (!result1085)
+      return std::unexpected(std::move(result1085.error()));
+    m_networkedAnimator->setPartTag(partPair.first, tagPair.first, std::move(*result1085));
+  }
   }
 
   auto result1086 = configValue("movementSettings");
@@ -917,7 +918,7 @@ auto& loungePosition = result1162->get();
     Set<LoungeControl> allControlsHeld;
     auto result1163 = args.at(1);
 if (!result1163) return std::unexpected(std::move(result1163.error()));
-auto result1164 = result1163->get().iterateArray();
+auto result1164 = result1163->get().iterate_array();
 if (!result1164) return std::unexpected(std::move(result1164.error()));
 for (auto const& s : std::move(*result1164))
       {

@@ -344,7 +344,7 @@ std::expected<StringList, StarException> ClientCommandProcessor::executeCommand(
       if (std::holds_alternative<Json>(**response)) {
         auto const& value = std::get<Json>(**response);
         if (value.isType(Json::Type::String)) {
-          auto text = value.stringPtr();
+          auto text = value.string_ptr();
           if (!text) return std::unexpected(std::move(text.error()));
           result.push_back(**text);
         } else if (!value.isNull()) {
@@ -379,7 +379,7 @@ std::expected<StringList, StarException> ClientCommandProcessor::updatePromises(
         return std::unexpected(StarException("Successful client command promise has no result"));
       auto& value = **response;
       if (value.isType(Json::Type::String)) {
-        auto text = value.stringPtr();
+        auto text = value.string_ptr();
         if (!text) return std::unexpected(std::move(text.error()));
         result.push_back(**text);
       } else if (!value.isNull()) {

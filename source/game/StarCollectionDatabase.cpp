@@ -87,7 +87,7 @@ std::expected<std::shared_ptr<CollectionDatabase>, StarException> CollectionData
       if (!*type)
         return std::unexpected(CollectionDatabaseException(Star::format("Unknown collection type '{}'", *typeName)));
       Collection collection(*name, **type, *title);
-      auto configs = config->get("collectables").and_then([](Json const& value) { return value.iterateObject(); });
+      auto configs = config->get("collectables").and_then([](Json const& value) { return value.iterate_object(); });
       if (!configs)
         return std::unexpected(std::move(configs.error()));
       result->m_collectables[collection.name] = {};

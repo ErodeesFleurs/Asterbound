@@ -355,6 +355,21 @@ request. Historical generated-seed results for unique selections, including
 dungeon choices, intentionally change.
 These are algorithm/compatibility guarantees, not measured runtime speedups.
 
+### JSON values and preserved formatting
+
+- Keep array bounds, self-aliasing and borrowed-child/snapshot coverage alongside
+  direct-object writer traversal, embedded-NUL and invalid-UTF-8 partial-output
+  checks. Builder copy/move coverage must finish active nested containers and
+  reuse moved-from builders after malformed closes.
+- Formatted insert/erase checks retain adjacent comments, duplicate-key reveal
+  and exact numeric spellings, not just semantic equality. Preserve first-error
+  order and missing/null/empty distinctions in real consumer checks.
+- Reuse `json_benchmarks` plus the `Core/Json/` and `Hash/Json/` filters; do not
+  create a parallel benchmark implementation. Direct-object output and immutable
+  array edits include result destruction. Formatted token-only and
+  serialize/destroy rows are separate; validate complete tokens/text and fixture
+  fingerprints outside timing.
+
 ### Images, gameplay and frontend lifecycles
 
 - Image kernels retain full format/scaler coverage, byte-exact independent

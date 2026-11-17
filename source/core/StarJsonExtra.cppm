@@ -195,11 +195,11 @@ std::expected<Array<String, Size>, StarException> jsonToStringArray(Json const& 
 
 template <typename Value, typename Converter>
 std::expected<List<Value>, StarException> jsonToList(Json const& v, Converter&& converter) {
-  auto entries = v.iterateArray();
+  auto entries = v.iterate_array();
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   List<Value> result;
-  result.reserve(entries->ptr->size());
+  result.reserve(entries->m_container->size());
   for (auto const& entry : *entries) {
     auto converted = JsonExtraDetail::convert<Value>(converter, entry);
     if (!converted)
@@ -232,7 +232,7 @@ std::expected<Json, StarException> jsonFromList(List<Value> const& list) {
 
 template <typename SetType, typename Converter>
 std::expected<SetType, StarException> jsonToSet(Json const& v, Converter&& converter) {
-  auto entries = v.iterateArray();
+  auto entries = v.iterate_array();
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   SetType result;
@@ -267,7 +267,7 @@ std::expected<Json, StarException> jsonFromSet(SetType const& set) {
 
 template <typename MapType, typename KeyConverter, typename ValueConverter>
 std::expected<MapType, StarException> jsonToMapKV(Json const& v, KeyConverter&& keyConvert, ValueConverter&& valueConvert) {
-  auto entries = v.iterateObject();
+  auto entries = v.iterate_object();
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   MapType result;
@@ -360,7 +360,7 @@ std::expected<WeightedPool<T>, StarException> json_to_weighted_pool(Json const& 
   WeightedPool<T> result;
   if (source.isNull())
     return result;
-  auto entries = source.iterateArray();
+  auto entries = source.iterate_array();
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   for (auto const& entry : *entries) {

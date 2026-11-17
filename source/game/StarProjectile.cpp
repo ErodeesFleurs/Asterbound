@@ -1127,52 +1127,68 @@ if (!result778) return std::unexpected(std::move(result778.error()));
     if (isSlave())
       return {};
 
-    auto result779 = parameters.getString("type");
-if (!result779) return std::unexpected(std::move(result779.error()));
-String type = std::move(*result779);
-    auto result780 = parameters.get("config", JsonObject());
-if (!result780) return std::unexpected(std::move(result780.error()));
-auto projectileParameters = std::move(*result780);
-    auto result781 = projectileParameters.contains("damageTeam");
-if (!result781) return std::unexpected(std::move(result781.error()));
-if (!std::move(*result781)) {
-      if (m_damageTeam)
-        {
-auto result782 = projectileParameters.set("damageTeam", m_damageTeam);
-if (!result782) return std::unexpected(std::move(result782.error()));
-projectileParameters = std::move(*result782);
-}
+    auto type_result = parameters.getString("type");
+    if (!type_result)
+      return std::unexpected(std::move(type_result.error()));
+    String projectile_type = std::move(*type_result);
+    auto config_result = parameters.get("config", JsonObject());
+    if (!config_result)
+      return std::unexpected(std::move(config_result.error()));
+    auto projectile_parameters = std::move(*config_result);
+    std::optional<JsonObject> parameter_updates;
+    auto set_parameter = [&](String key, Json value) -> std::expected<void, StarException> {
+      if (!parameter_updates) {
+        auto object = projectile_parameters.toObject();
+        if (!object)
+          return std::unexpected(std::move(object.error()));
+        parameter_updates.emplace(std::move(*object));
+      }
+      (*parameter_updates)[std::move(key)] = std::move(value);
+      return {};
+    };
+    auto has_damage_team = projectile_parameters.contains("damageTeam");
+    if (!has_damage_team)
+      return std::unexpected(std::move(has_damage_team.error()));
+    if (!*has_damage_team && m_damageTeam) {
+      auto updated = set_parameter("damageTeam", m_damageTeam);
+      if (!updated)
+        return std::unexpected(std::move(updated.error()));
     }
-    auto result783 = parameters.contains("inheritDamageFactor");
-if (!result783) return std::unexpected(std::move(result783.error()));
-bool condition785 = static_cast<bool>(std::move(*result783));
-if (condition785) {
-auto result784 = projectileParameters.contains("power");
-if (!result784) return std::unexpected(std::move(result784.error()));
-condition785 = static_cast<bool>(!std::move(*result784));
-}
-if (condition785)
-      {
-auto result786 = parameters.getFloat("inheritDamageFactor");
-if (!result786) return std::unexpected(std::move(result786.error()));
-auto result787 = projectileParameters.set("power", m_power * std::move(*result786));
-if (!result787) return std::unexpected(std::move(result787.error()));
-projectileParameters = std::move(*result787);
-}
-    auto result788 = parameters.contains("inheritSpeedFactor");
-if (!result788) return std::unexpected(std::move(result788.error()));
-if (std::move(*result788))
-      {
-auto result789 = parameters.getFloat("inheritSpeedFactor");
-if (!result789) return std::unexpected(std::move(result789.error()));
-auto result790 = projectileParameters.set("speed", (m_movementController->velocity() - m_referenceVelocity.value_or(Vec2F{})).magnitude() * std::move(*result789));
-if (!result790) return std::unexpected(std::move(result790.error()));
-projectileParameters = std::move(*result790);
-}
+    auto inherits_damage = parameters.contains("inheritDamageFactor");
+    if (!inherits_damage)
+      return std::unexpected(std::move(inherits_damage.error()));
+    if (*inherits_damage) {
+      auto has_power = projectile_parameters.contains("power");
+      if (!has_power)
+        return std::unexpected(std::move(has_power.error()));
+      if (!*has_power) {
+        auto damage_factor = parameters.getFloat("inheritDamageFactor");
+        if (!damage_factor)
+          return std::unexpected(std::move(damage_factor.error()));
+        auto updated = set_parameter("power", m_power * *damage_factor);
+        if (!updated)
+          return std::unexpected(std::move(updated.error()));
+      }
+    }
+    auto inherits_speed = parameters.contains("inheritSpeedFactor");
+    if (!inherits_speed)
+      return std::unexpected(std::move(inherits_speed.error()));
+    if (*inherits_speed) {
+      auto speed_factor = parameters.getFloat("inheritSpeedFactor");
+      if (!speed_factor)
+        return std::unexpected(std::move(speed_factor.error()));
+      auto updated = set_parameter(
+        "speed",
+        (m_movementController->velocity() - m_referenceVelocity.value_or(Vec2F{})).magnitude() * *speed_factor);
+      if (!updated)
+        return std::unexpected(std::move(updated.error()));
+    }
+    if (parameter_updates)
+      projectile_parameters = Json(std::move(*parameter_updates));
 
     auto result791 = this->root().projectileDatabase();
 if (!result791) return std::unexpected(std::move(result791.error()));
-auto result792 = std::move(*result791)->createProjectile(type, projectileParameters);
+auto result792 = std::move(*result791)->createProjectile(projectile_type, projectile_parameters);
 if (!result792) return std::unexpected(std::move(result792.error()));
 auto projectile = std::move(*result792);
     Vec2F offset;
@@ -1728,9 +1744,10 @@ if (!result707) return std::unexpected(std::move(result707.error()));
 m_animationCycle = std::move(*result707);
   m_collision = false;
 
-  auto result708 = m_config->physicsForces.iterateObject();
-if (!result708) return std::unexpected(std::move(result708.error()));
-for (auto const& p : std::move(*result708)) {
+  auto result708 = m_config->physicsForces.iterate_object();
+  if (!result708)
+    return std::unexpected(std::move(result708.error()));
+  for (auto const& p : std::move(*result708)) {
     auto& forceConfig = m_physicsForces[p.first];
 
     auto result709 = jsonToPhysicsForceRegion(p.second);
@@ -1741,9 +1758,10 @@ if (!result710) return std::unexpected(std::move(result710.error()));
 forceConfig.enabled.set(std::move(*result710));
   }
 
-  auto result711 = m_config->physicsCollisions.iterateObject();
-if (!result711) return std::unexpected(std::move(result711.error()));
-for (auto const& p : std::move(*result711)) {
+  auto result711 = m_config->physicsCollisions.iterate_object();
+  if (!result711)
+    return std::unexpected(std::move(result711.error()));
+  for (auto const& p : std::move(*result711)) {
     auto& forceConfig = m_physicsCollisions[p.first];
 
     auto result712 = PhysicsMovingCollision::fromJson(p.second);

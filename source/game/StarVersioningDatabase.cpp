@@ -177,7 +177,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
         if (!value) return std::unexpected(std::move(value.error()));
         versionedJson.subVersions[pair.first] = *value;
       }
-      auto stripped = versionedJson.content.eraseKey("subVersions");
+      auto stripped = versionedJson.content.erase("subVersions");
       if (!stripped) return std::unexpected(std::move(stripped.error()));
       versionedJson.content = std::move(*stripped);
     }
@@ -209,7 +209,7 @@ std::expected<void, StarException> VersioningDatabase::init() {
   auto configured = [&]() -> std::expected<void, StarException> {
     auto versions = (*assets)->json("/versioning.config");
     if (!versions) return std::unexpected(std::move(versions.error()));
-    auto entries = versions->iterateObject();
+    auto entries = versions->iterate_object();
     if (!entries) return std::unexpected(std::move(entries.error()));
     for (auto const& pair : *entries) {
       auto version = pair.second.toUInt();
@@ -223,10 +223,10 @@ std::expected<void, StarException> VersioningDatabase::init() {
   auto subConfigured = [&]() -> std::expected<void, StarException> {
     auto subVersions = (*assets)->json("/versioning/subVersioning.config");
     if (!subVersions) return std::unexpected(std::move(subVersions.error()));
-    auto subEntries = subVersions->iterateObject();
+    auto subEntries = subVersions->iterate_object();
     if (!subEntries) return std::unexpected(std::move(subEntries.error()));
     for (auto const& pair : *subEntries) {
-      auto identifiers = pair.second.iterateObject();
+      auto identifiers = pair.second.iterate_object();
       if (!identifiers) return std::unexpected(std::move(identifiers.error()));
       for (auto const& entry : *identifiers) {
         auto version = entry.second.toUInt();

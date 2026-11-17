@@ -179,7 +179,7 @@ const GameTestRegistration itemFallbackDiagnostics(
       auto descriptor = ItemDescriptor::create("missing-item-diagnostics-probe", 37,
           JsonObject{{"scriptStorage", JsonObject{{"savedState", "private-saved-state-marker"}}}});
       ASSERT_TRUE(descriptor);
-      auto storedDescriptor = descriptor->toJson().eraseKey("count");
+      auto storedDescriptor = descriptor->toJson().erase("count");
       ASSERT_TRUE(storedDescriptor);
       for (auto level : {LogLevel::Error, LogLevel::Debug}) {
         sink->set_level(level);
@@ -1682,7 +1682,7 @@ const GameTestRegistration
     for (std::string_view key : {"damageTeam", "lightColor", "lightColors", "lightType", "pointLight", "pointBeam",
                                  "beamAmbience", "flickerPeriod", "flickerMinIntensity", "flickerMaxIntensity",
                                  "flickerPeriodVariance", "flickerIntensityVariance"}) {
-      auto erased = base.eraseKey(key);
+      auto erased = base.erase(key);
       ASSERT_TRUE(erased);
       base = std::move(*erased);
     }
@@ -1739,7 +1739,7 @@ const GameTestRegistration
        ""}};
     for (auto const& test : cases) {
       auto config =
-        base.setAll(test.fields).and_then([&](Json const& value) { return value.set("objectName", test.name); });
+        base.set_all(test.fields).and_then([&](Json const& value) { return value.set("objectName", test.name); });
       ASSERT_TRUE(config);
       auto contents = config->repr();
       ASSERT_TRUE(contents);

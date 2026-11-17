@@ -122,7 +122,8 @@ std::expected<std::shared_ptr<Tenant>, StarException> TenantDatabase::readTenant
     auto priority = config->getFloat("priority");
     if (!priority)
       return std::unexpected(std::move(priority.error()));
-    auto criteriaConfig = config->get("colonyTagCriteria").and_then([](Json const& value) { return value.iterateObject(); });
+    auto criteriaConfig =
+      config->get("colonyTagCriteria").and_then([](Json const& value) { return value.iterate_object(); });
     if (!criteriaConfig)
       return std::unexpected(std::move(criteriaConfig.error()));
     StringMap<unsigned> criteria;
@@ -132,7 +133,7 @@ std::expected<std::shared_ptr<Tenant>, StarException> TenantDatabase::readTenant
         return std::unexpected(std::move(count.error()));
       criteria[entry.first] = *count;
     }
-    auto tenantsConfig = config->get("tenants").and_then([](Json const& value) { return value.iterateArray(); });
+    auto tenantsConfig = config->get("tenants").and_then([](Json const& value) { return value.iterate_array(); });
     if (!tenantsConfig)
       return std::unexpected(std::move(tenantsConfig.error()));
     List<TenantSpawnable> tenants;
@@ -159,7 +160,7 @@ std::expected<std::shared_ptr<Tenant>, StarException> TenantDatabase::readTenant
           return std::unexpected(std::move(speciesConfig.error()));
         List<String> species;
         if (speciesConfig->isType(Json::Type::Array)) {
-          auto speciesArray = speciesConfig->iterateArray();
+          auto speciesArray = speciesConfig->iterate_array();
           if (!speciesArray)
             return std::unexpected(std::move(speciesArray.error()));
           for (auto const& entry : *speciesArray) {

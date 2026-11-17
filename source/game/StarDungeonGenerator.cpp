@@ -132,7 +132,7 @@ namespace Dungeon {
 
   std::expected<List<std::shared_ptr<Rule const>>, StarException> Rule::readRules(Root& root, Json const& rules) {
     List<std::shared_ptr<Rule const>> result;
-    auto entries = rules.iterateArray();
+    auto entries = rules.iterate_array();
     if (!entries) return std::unexpected(std::move(entries.error()));
     for (auto const& entry : *entries) {
       auto rule = Rule::parse(root, entry);
@@ -144,7 +144,7 @@ namespace Dungeon {
 
   std::expected<List<std::shared_ptr<Brush const>>, StarException> Brush::readBrushes(Root& root, Json const& brushes) {
     List<std::shared_ptr<Brush const>> result;
-    auto entries = brushes.iterateArray();
+    auto entries = brushes.iterate_array();
     if (!entries) return std::unexpected(std::move(entries.error()));
     for (auto const& entry : *entries) {
       auto brush = Brush::parse(root, entry);
@@ -788,7 +788,7 @@ namespace Dungeon {
       auto loaded = reader->readAsset(AssetPath::relative_to(dungeon.directory(), *asset));
       if (!loaded) return std::unexpected(std::move(loaded.error()));
     } else {
-      auto assets = assetDefinitions->iterateArray();
+      auto assets = assetDefinitions->iterate_array();
       if (!assets) return std::unexpected(std::move(assets.error()));
       for (auto const& definition : *assets) {
         auto asset = definition.toString();
@@ -1607,7 +1607,7 @@ std::expected<std::shared_ptr<DungeonDefinition>, StarException> DungeonDefiniti
   }
   auto partsValue = definition.get("parts");
   if (!partsValue) return std::unexpected(std::move(partsValue.error()));
-  auto parts = partsValue->get().iterateArray();
+  auto parts = partsValue->get().iterate_array();
   if (!parts) return std::unexpected(std::move(parts.error()));
   for (auto const& partJson : *parts) {
     auto part = parsePart(root, *result, partJson, tileset);

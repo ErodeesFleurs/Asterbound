@@ -212,7 +212,7 @@ std::expected<std::shared_ptr<SpawnTypeDatabase>, StarException> SpawnTypeDataba
       auto config = assets->json(file);
       if (!config)
         return std::unexpected(std::move(config.error()));
-      auto entries = config->iterateArray();
+      auto entries = config->iterate_array();
       if (!entries)
         return std::unexpected(std::move(entries.error()));
       for (auto const& entry : *entries) {

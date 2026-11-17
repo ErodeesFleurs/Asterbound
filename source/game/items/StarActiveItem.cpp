@@ -137,7 +137,9 @@ std::expected<std::shared_ptr<ActiveItem>, StarException> ActiveItem::create(Roo
   if (!animator)
     return std::unexpected(std::move(animator.error()));
   item->m_itemAnimator = std::move(*animator);
-  auto parts = item->instanceValue("animationParts", JsonObject()).and_then([](Json const& value) { return value.iterateObject(); });
+  auto parts = item->instanceValue("animationParts", JsonObject()).and_then([](Json const& value) {
+    return value.iterate_object();
+  });
   if (!parts)
     return std::unexpected(std::move(parts.error()));
   for (auto const& pair : *parts) {

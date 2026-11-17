@@ -286,7 +286,7 @@ std::expected<void, StarException> PlayerStorage::initialize(String const& stora
     if (!order)
       return std::unexpected(std::move(order.error()));
     if (!order->isNull()) {
-      auto entries = order->iterateArray();
+      auto entries = order->iterate_array();
       if (!entries)
         return std::unexpected(std::move(entries.error()));
       for (auto const& jUuid : *entries) {

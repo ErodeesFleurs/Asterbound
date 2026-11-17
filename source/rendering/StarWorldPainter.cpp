@@ -125,7 +125,7 @@ std::expected<void, StarException> WorldPainter::initialize() {
   m_highlightConfig = std::move(*highlightConfig);
   auto directives = m_highlightConfig.get("highlightDirectives");
   if (!directives) return std::unexpected(std::move(directives.error()));
-  auto entries = directives->iterateObject();
+  auto entries = directives->iterate_object();
   if (!entries) return std::unexpected(std::move(entries.error()));
   for (auto const& p : *entries) {
     auto type = enumValue<EntityHighlightEffectTypeNames>(p.first);

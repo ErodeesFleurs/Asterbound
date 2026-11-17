@@ -748,7 +748,7 @@ std::expected<bool, StarException> WorldServer::addClient(ConnectionId clientId,
     condition57 = static_cast<bool>(std::move(*result56).value_or(false));
   }
   if (condition57) {
-    auto result58 = worldStartPacket->templateData.setPath("worldParameters.primaryDungeon", "testarena");
+    auto result58 = worldStartPacket->templateData.set_path("worldParameters.primaryDungeon", "testarena");
     if (!result58)
       return std::unexpected(std::move(result58.error()));
     worldStartPacket->templateData = std::move(*result58);
@@ -1556,7 +1556,7 @@ std::expected<void, StarException> WorldServer::setFidelity(WorldServerFidelity 
     return std::unexpected(std::move(result152.error()));
   std::optional<std::reference_wrapper<JsonObject const>> identity;
   if (result152->type() == Json::Type::Object) {
-    auto object = result152->objectPtr();
+    auto object = result152->object_ptr();
     if (!object)
       return std::unexpected(std::move(object.error()));
     identity = std::cref(**object);

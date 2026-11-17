@@ -388,7 +388,7 @@ auto speciesItemsConfig = std::move(*result59);
     if (!speciesItemsConfig.isNull()) {
       Json highestLevelItemsConfig;
       {
-        auto result62 = speciesItemsConfig.iterateArray();
+        auto result62 = speciesItemsConfig.iterate_array();
         if (!result62)
           return std::unexpected(std::move(result62.error()));
         for (auto const& levelItemsConfig : *result62) {
@@ -411,7 +411,7 @@ if (!result65) return std::unexpected(std::move(result65.error()));
 bool matchColorIndices = std::move(*result65);
 
         {
-          auto result66 = highestLevelItemsConfig.arrayPtr();
+          auto result66 = highestLevelItemsConfig.array_ptr();
           if (!result66)
             return std::unexpected(std::move(result66.error()));
           auto result67 = randSource.sample_ref(**result66);
@@ -421,7 +421,7 @@ bool matchColorIndices = std::move(*result65);
           if (!result68)
             return std::unexpected(std::move(result68.error()));
           for (auto const& itemSlotConfig : std::move(*result68)) {
-            auto result69 = itemSlotConfig.second.arrayPtr();
+            auto result69 = itemSlotConfig.second.array_ptr();
             if (!result69)
               return std::unexpected(std::move(result69.error()));
             auto result70 = randSource.sample_ref(**result69);
@@ -443,7 +443,7 @@ bool matchColorIndices = std::move(*result65);
                 if (colorIndex.isType(Json::Type::Array)) {
                   if (!matchColorIndices || randomColorIndex == -1)
                     {
-                    auto result74 = colorIndex.arrayPtr();
+                    auto result74 = colorIndex.array_ptr();
                     if (!result74)
                       return std::unexpected(std::move(result74.error()));
                     auto result75 = randSource.sample_ref(**result74);
@@ -1047,9 +1047,10 @@ std::expected<Json, StarException> NpcDatabase::mergeConfigValues(Json const& ba
 if (!result216) return std::unexpected(std::move(result216.error()));
 auto map = std::move(*result216);
     {
-  auto result217 = merger.iterateObject();
-  if (!result217) return std::unexpected(std::move(result217.error()));
-  for (auto const& entry : std::move(*result217)) {
+      auto result217 = merger.iterate_object();
+      if (!result217)
+        return std::unexpected(std::move(result217.error()));
+      for (auto const& entry : std::move(*result217)) {
         if (!map.insert(entry.first, entry.second).second) {
           auto result218 = mergeConfigValues(map[entry.first], entry.second);
   if (!result218) return std::unexpected(std::move(result218.error()));

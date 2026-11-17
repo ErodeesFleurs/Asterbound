@@ -79,7 +79,7 @@ std::expected<std::shared_ptr<PatternedNameGenerator>, StarException> PatternedN
   auto profanityConfig = (*assets)->json("/names/profanityfilter.config");
   if (!profanityConfig)
     return std::unexpected(std::move(profanityConfig.error()));
-  auto profanity = profanityConfig->iterateArray();
+  auto profanity = profanityConfig->iterate_array();
   if (!profanity)
     return std::unexpected(std::move(profanity.error()));
   for (auto const& entry : *profanity) {
@@ -111,7 +111,7 @@ std::expected<String, StarException> PatternedNameGenerator::generateName(String
   auto config = (*assets)->json(rulesAsset);
   if (!config)
     return std::unexpected(std::move(config.error()));
-  auto rules = config->arrayPtr();
+  auto rules = config->array_ptr();
   if (!rules)
     return std::unexpected(std::move(rules.error()));
   String result;
@@ -154,7 +154,7 @@ std::expected<String, StarException> PatternedNameGenerator::processRule(JsonArr
   auto evaluate = [&](Json const& entry) -> std::expected<String, StarException> {
     if (!entry.isType(Json::Type::Array))
       return entry.toString();
-    auto nested = entry.arrayPtr();
+    auto nested = entry.array_ptr();
     if (!nested)
       return std::unexpected(std::move(nested.error()));
     return processRule(**nested, random);
@@ -183,7 +183,7 @@ std::expected<String, StarException> PatternedNameGenerator::processRule(JsonArr
     auto source = m_markovSources.find_ref(*sourceName);
     if (!source)
       return std::unexpected(NameGeneratorException::format("Unknown name source '{}'", *sourceName));
-    auto range = meta.get("targetLength").and_then([](Json const& value) { return value.arrayPtr(); });
+    auto range = meta.get("targetLength").and_then([](Json const& value) { return value.array_ptr(); });
     if (!range)
       return std::unexpected(std::move(range.error()));
     if ((*range)->size() < 2)

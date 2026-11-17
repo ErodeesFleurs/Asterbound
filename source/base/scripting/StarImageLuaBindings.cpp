@@ -114,7 +114,7 @@ std::expected<LuaMethods<Image>, StarException> LuaUserDataMethods<Image>::make(
               [](char a, char b) { return (a >= 'A' && a <= 'Z' ? a + ('a' - 'A') : a) == b; })) {
             std::string text;
             JsonWriter<JsonUtf8StringOutputIterator, true, true> writer{JsonUtf8StringOutputIterator(text)};
-            auto written = JsonStreamer<Json>::toJsonStream(json, writer, false);
+            auto written = JsonStreamer<Json>::to_json_stream(json, writer, false);
             if (!written) return std::unexpected(std::move(written.error()));
             auto escaped = embedEscapeText(String(std::move(text)));
             if (!escaped) return std::unexpected(std::move(escaped.error()));
