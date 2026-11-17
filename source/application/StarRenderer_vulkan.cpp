@@ -154,7 +154,8 @@ Result<std::shared_ptr<GpuImage>> makeImage(std::shared_ptr<Device> const& devic
   view.image = image->handle; view.viewType = VK_IMAGE_VIEW_TYPE_2D; view.format = format;
   view.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
   VK_REQUIRE(vkCreateImageView(device->logical, &view, nullptr, &image->view));
-  VkSamplerCreateInfo sampler{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+  VkSamplerCreateInfo sampler{};
+  sampler.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
   sampler.magFilter = sampler.minFilter = filtering == TextureFiltering::Linear ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
   sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
   sampler.addressModeU = sampler.addressModeV = sampler.addressModeW = addressing == TextureAddressing::Wrap ? VK_SAMPLER_ADDRESS_MODE_REPEAT : VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
