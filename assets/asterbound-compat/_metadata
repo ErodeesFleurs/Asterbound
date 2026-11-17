@@ -2,7 +2,7 @@
   "author" : "OpenStarbound contributors",
   "name" : "asterbound_compat",
   "friendlyName" : "Asterbound Mod Compatibility",
-  "version" : "0.1.0.1",
+  "version" : "0.1.0.2",
   "requires" : ["base", "asterbound_base"],
   "includes" : [
     "SChinese", "Arcana", "advanced_teleporter_interface",
@@ -46,7 +46,8 @@
     "projectknightfalleSchinese", "FFSDungeonsAndEncountersCN", "oSBztarboundsailsupportpatch",
     "randgenblshields", "spacePolice", "[GIC]恶化扩展——汉化", "sylveonoid",
     "Custom Crafter Template", "vanta-race", "moremmupgrades", "CustomCollectionsUI", "gicexp_311patch",
-    "GBHGKrArcanaAddon"
+    "GBHGKrArcanaAddon", "RPG_Growth_AI", "Minimap - Alpha",
+    "[oSB] Minimap Enhancements + Portrait Studio"
   ],
   "scripts" : {
     "onLoad" : [
