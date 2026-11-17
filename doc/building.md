@@ -29,12 +29,19 @@ Run commands from the repository root unless a step changes directories.
 GCC, Apple Clang and MSVC builds are unsupported. Windows uses MinGW. Dependencies must use the same C++ runtime; all configurations use static mimalloc with `MI_OVERRIDE=OFF` and must not mix allocator heaps.
 
 Desktop GUI builds include both OpenGL and Vulkan. Vulkan needs headers/loader
-version 1.3 or later, shaderc's C compiler API, and ImGui 1.92.8's Vulkan backend.
-Nix and the native vcpkg presets provide these dependencies; no separate Vulkan
-build switch is needed. `-DSTAR_BUILD_GUI=OFF` keeps Vulkan/shaderc out of a
+version 1.3 or later, shaderc's C compiler API, SDL's Vulkan window support, and
+ImGui 1.92.8's Vulkan backend. Nix and the native vcpkg presets provide these
+dependencies; the GUI manifest feature explicitly enables `sdl3[vulkan]`.
+Installing the Vulkan loader alone does not enable Vulkan in an SDL build.
+When updating an existing Windows installation, replace the rebuilt `SDL3.dll`
+alongside the executable. `-DSTAR_BUILD_GUI=OFF` keeps Vulkan/shaderc out of a
 headless build's dependency selection. Nix also rebuilds shaderc, glslang and
 SPIRV-Tools with the same private xclang/libc++ closure as the engine; do not
 substitute a distro shaderc or C++ archive linked against libstdc++.
+
+Vulkan API structures are value-initialized before assigning `sType` and the
+required fields, preserving zeroed optional fields without disabling
+missing-field initializer diagnostics.
 
 Optimized profiles retain fast scalar arithmetic through explicit Clang options
 rather than a conflicting `-ffast-math` umbrella. macOS providers share full

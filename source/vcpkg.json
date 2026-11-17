@@ -22,6 +22,7 @@
       "dependencies": [
         "vulkan",
         "shaderc",
+        { "name": "sdl3", "features": ["vulkan"] },
         { "name": "imgui", "features": ["vulkan-binding"] },
         { "name": "vulkan-loader", "features": ["wayland", "xcb", "xlib"], "platform": "linux" }
       ]
