@@ -284,7 +284,7 @@ template <bool Hit> void BM_PatchSearchMergeSerializeDestroy(benchmark::State& s
                              {"value", JsonObject{{"config", JsonObject{{"enabled", true}, {"level", 9}}}}}}};
   auto oldOutput = base.repr(0, true);
   auto expectedOutput = expected.repr(0, true);
-  auto validation = Star::jsonPatch(base, patch);
+  auto validation = Star::json_patch(base, patch);
   if (!checked(state, oldOutput) || !checked(state, expectedOutput) || !checked(state, validation)
       || !require(state, *validation == expected, "patch search/merge differs from independent expected rows"))
     return;
@@ -299,7 +299,7 @@ template <bool Hit> void BM_PatchSearchMergeSerializeDestroy(benchmark::State& s
   for (auto _ : state) {
     (void)_;
     for (std::size_t i = 0; i < 8; ++i) {
-      auto result = Star::jsonPatch(base, patch);
+      auto result = Star::json_patch(base, patch);
       if (!checked(state, result))
         return;
       auto text = result->repr(0, true);
@@ -320,7 +320,7 @@ void BM_PatchSequenceSerializeDestroy(benchmark::State& state) {
                   JsonObject{{"op", "remove"}, {"path", "/rows/2"}},
                   JsonObject{{"op", "copy"}, {"from", "/rows/0"}, {"path", "/rows/-"}},
                   JsonObject{{"op", "replace"}, {"path", "/meta/name"}, {"value", "new"}}};
-  auto validation = Star::jsonPatch(base, patch);
+  auto validation = Star::json_patch(base, patch);
   if (!checked(state, validation)
       || !require(state, *validation == expected && base == oldSnapshot,
                   "patch sequence output or old snapshot differs"))
@@ -338,7 +338,7 @@ void BM_PatchSequenceSerializeDestroy(benchmark::State& state) {
   for (auto _ : state) {
     (void)_;
     for (std::size_t i = 0; i < 64; ++i) {
-      auto result = Star::jsonPatch(base, patch);
+      auto result = Star::json_patch(base, patch);
       if (!checked(state, result))
         return;
       auto text = result->repr(0, true);

@@ -1996,7 +1996,7 @@ std::expected<Json, StarException> Assets::checkPatchArray(String const& path,
         break;
       }
       case Json::Type::Object: {
-        auto patched = JsonPatching::applyOperation(newResult, patch);
+        auto patched = JsonPatching::apply_operation(newResult, patch);
         if (!patched)
           return std::unexpected(std::move(patched.error()));
         newResult = std::move(*patched);

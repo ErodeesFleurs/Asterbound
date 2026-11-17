@@ -1,7 +1,6 @@
 module;
 import std;
 import star.string;
-import star.map;
 import star.format;
 import star.json;
 import star.json_path;
@@ -19,374 +18,363 @@ struct JsonPatchTestFailTag {
 using JsonPatchTestFail = StarError<JsonPatchTestFailTag, StarException>;
 
 // Applies RFC6902 operations, preserving patch diagnostics and test-failure categories.
-std::expected<Json, StarException> jsonPatch(Json const& base, JsonArray const& patch);
+std::expected<Json, StarException> json_patch(Json const& base, JsonArray const& patch);
 namespace JsonPatching {
-std::expected<Json, StarException> applyOperation(Json const& base, Json const& op);
-std::expected<Json, StarException> applyTestOperation(Json const& base, Json const& op);
-std::expected<Json, StarException> applyRemoveOperation(Json const& base, Json const& op);
-std::expected<Json, StarException> applyAddOperation(Json const& base, Json const& op);
-std::expected<Json, StarException> applyReplaceOperation(Json const& base, Json const& op);
-std::expected<Json, StarException> applyMoveOperation(Json const& base, Json const& op);
-std::expected<Json, StarException> applyCopyOperation(Json const& base, Json const& op);
-std::expected<Json, StarException> applyMergeOperation(Json const& base, Json const& op);
+std::expected<Json, StarException> apply_operation(Json const& base, Json const& op);
+// Raw merge preserves traversal/parsing errors without the dispatch failure wrapper.
+std::expected<Json, StarException> apply_merge(Json const& base, Json const& op);
 }
 }
 
 namespace Star {
 namespace {
-StarException patchFailure(StarException error, std::string_view context) {
+StarException patch_failure(StarException error, std::string_view context) {
   if (error.is<JsonException>())
     return JsonPatchException(Star::format("{} {}", context, error.what()), false);
   return error;
 }
 }// namespace
 
-std::expected<Json, StarException> jsonPatch(Json const& base, JsonArray const& patch) {
+std::expected<Json, StarException> json_patch(Json const& base, JsonArray const& patch) {
   Json result = base;
   for (auto const& operation : patch) {
-    auto applied = JsonPatching::applyOperation(result, operation);
+    auto applied = JsonPatching::apply_operation(result, operation);
     if (!applied)
-      return std::unexpected(patchFailure(std::move(applied.error()), "Could not apply patch to base."));
+      return std::unexpected(patch_failure(std::move(applied.error()), "Could not apply patch to base."));
     result = std::move(*applied);
   }
   return result;
 }
 
-// Zero means absent; otherwise the result is the matching index plus one.
-std::expected<std::size_t, StarException> findJsonMatch(Json const& searchable, Json const& value, JsonPath::Pointer const& pointer) {
+namespace JsonPatching {
+namespace {
+std::expected<std::reference_wrapper<Json const>, StarException> require_field(Json const& op, String const& key) {
+  auto value = op.find(key);
+  if (!value)
+    return std::unexpected(std::move(value.error()));
+  if (!*value)
+    return std::unexpected(JsonException::format("No such key in Json::get(\"{}\")", key));
+  return **value;
+}
+
+std::expected<std::shared_ptr<String const>, StarException> string_field(Json const& op, String const& key) {
+  auto value = require_field(op, key);
+  if (!value)
+    return std::unexpected(std::move(value.error()));
+  return value->get().string_ptr();
+}
+
+std::expected<std::optional<std::size_t>, StarException> find_match(Json const& searchable, Json const& value,
+                                                                    String const& path) {
   if (!searchable.isType(Json::Type::Array))
-    return std::unexpected(JsonPatchException(Star::format("Search operation failure, value at '{}' is not an array.", pointer.path()), false));
+    return std::unexpected(
+      JsonPatchException(Star::format("Search operation failure, value at '{}' is not an array.", path), false));
   auto array = searchable.array_ptr();
   if (!array)
     return std::unexpected(std::move(array.error()));
-  for (std::size_t i = 0; i < (*array)->size(); ++i)
-    if (jsonPartialMatch((**array)[i], value))
-      return i + 1;
-  return 0;
+  for (std::size_t index = 0; index < (*array)->size(); ++index)
+    if (jsonPartialMatch((**array)[index], value))
+      return index;
+  return std::nullopt;
 }
 
-namespace JsonPatching {
-  using Operation = std::reference_wrapper<std::expected<Json, StarException>(Json const&, Json const&)>;
-  using OperationEntry = std::pair<std::string_view, Operation>;
-  static constexpr std::array<OperationEntry, 7> functionMap{{
-      {"test", std::ref(applyTestOperation)}, {"remove", std::ref(applyRemoveOperation)},
-      {"add", std::ref(applyAddOperation)}, {"replace", std::ref(applyReplaceOperation)},
-      {"move", std::ref(applyMoveOperation)}, {"copy", std::ref(applyCopyOperation)},
-      {"merge", std::ref(applyMergeOperation)},
-  }};
+template <typename Mutation>
+concept search_mutation = requires(Mutation& mutation, Json const& searchable, std::size_t index) {
+  { std::invoke(mutation, searchable, index) } -> std::same_as<std::expected<Json, StarException>>;
+};
 
-  std::expected<Json, StarException> applyOperation(Json const& base, Json const& op) {
-    auto operation = op.getString("op");
-    if (!operation)
-      return std::unexpected(patchFailure(std::move(operation.error()), "Could not apply operation to base."));
-    auto function = std::ranges::find(functionMap, operation->utf8(), &OperationEntry::first);
-    if (function == functionMap.end())
-      return std::unexpected(JsonPatchException(Star::format("Invalid operation: {}", *operation), false));
-    return function->second(base, op).transform_error(
-      [](StarException error) { return patchFailure(std::move(error), "Could not apply operation to base."); });
-  }
+template <search_mutation Mutation>
+std::expected<Json, StarException> update_search(Json const& base, String const& path, Json const& search,
+                                                 Mutation&& mutation) {
+  auto updated =
+    JsonPath::path_update(base, JsonPath::parse_pointer, path,
+                          [&](Json const& searchable) -> std::expected<std::optional<Json>, StarException> {
+                            auto index = find_match(searchable, search, path);
+                            if (!index)
+                              return std::unexpected(std::move(index.error()));
+                            if (!*index)
+                              return std::nullopt;
+                            auto changed = std::invoke(mutation, searchable, **index);
+                            if (!changed)
+                              return std::unexpected(std::move(changed.error()));
+                            return std::optional<Json>(std::move(*changed));
+                          });
+  if (!updated)
+    return std::unexpected(std::move(updated.error()));
+  if (!*updated)
+    return base;
+  return std::move(**updated);
+}
 
-  std::expected<Json, StarException> applyTestOperation(Json const& base, Json const& op) {
-    auto path = op.getString("path");
-    if (!path)
-      return std::unexpected(std::move(path.error()));
-    auto inverse = op.getBool("inverse", false);
-    if (!inverse)
-      return std::unexpected(std::move(inverse.error()));
-    JsonPath::Pointer pointer(*path);
-    auto tested = [&]() -> std::expected<Json, StarException> {
-      auto search = op.contains("search");
-      if (!search)
-        return std::unexpected(std::move(search.error()));
-      if (*search) {
-        auto searchable = JsonPath::pathGetRef(base, JsonPath::parsePointer, *path);
-        if (!searchable)
-          return std::unexpected(std::move(searchable.error()));
-        auto value = op.get("search");
-        if (!value)
-          return std::unexpected(std::move(value.error()));
-        auto found = findJsonMatch(searchable->get(), *value, pointer);
-        if (!found)
-          return std::unexpected(std::move(found.error()));
-        if ((*found != 0) == *inverse) {
-          auto text = value->repr();
-          if (!text)
-            return std::unexpected(std::move(text.error()));
-          if (*inverse)
-            return std::unexpected(JsonPatchTestFail(Star::format("Test operation failure, expected {} to be missing.", *text), false));
-          return std::unexpected(JsonPatchTestFail(Star::format("Test operation failure, could not find {}.", *text), false));
-        }
-        return base;
-      }
-      auto value = op.opt("value");
-      if (!value)
-        return std::unexpected(std::move(value.error()));
-      auto actual = JsonPath::pathGetRef(base, JsonPath::parsePointer, *path);
-      if (!actual)
-        return std::unexpected(std::move(actual.error()));
-      if (!*value) {
+std::expected<Json, StarException> apply_test(Json const& base, Json const& op) {
+  auto path = string_field(op, "path");
+  if (!path)
+    return std::unexpected(std::move(path.error()));
+  auto inverse = op.getBool("inverse", false);
+  if (!inverse)
+    return std::unexpected(std::move(inverse.error()));
+  auto tested = [&]() -> std::expected<Json, StarException> {
+    auto search = op.find("search");
+    if (!search)
+      return std::unexpected(std::move(search.error()));
+    if (*search) {
+      auto searchable = JsonPath::path_get_ref(base, JsonPath::parse_pointer, **path);
+      if (!searchable)
+        return std::unexpected(std::move(searchable.error()));
+      auto const& value = (**search).get();
+      auto found = find_match(searchable->get(), value, **path);
+      if (!found)
+        return std::unexpected(std::move(found.error()));
+      if (found->has_value() == *inverse) {
+        auto text = value.repr();
+        if (!text)
+          return std::unexpected(std::move(text.error()));
         if (*inverse)
-          return std::unexpected(JsonPatchTestFail(Star::format("Test operation failure, expected {} to be missing.", *path), false));
-        return base;
+          return std::unexpected(
+            JsonPatchTestFail(Star::format("Test operation failure, expected {} to be missing.", *text), false));
+        return std::unexpected(
+          JsonPatchTestFail(Star::format("Test operation failure, could not find {}.", *text), false));
       }
-      if ((**value == actual->get()) != *inverse)
-        return base;
-      auto expectedText = (**value).repr();
-      if (!expectedText)
-        return std::unexpected(std::move(expectedText.error()));
-      auto actualText = actual->get().repr();
-      if (!actualText)
-        return std::unexpected(std::move(actualText.error()));
-      return std::unexpected(JsonPatchTestFail(Star::format("Test operation failure, expected Just ({}) found {}.", *expectedText, *actualText), false));
-    }();
-    if (!tested && tested.error().is<JsonPath::TraversalException>()) {
+      return base;
+    }
+    auto value = op.find("value");
+    if (!value)
+      return std::unexpected(std::move(value.error()));
+    auto actual = JsonPath::path_get_ref(base, JsonPath::parse_pointer, **path);
+    if (!actual)
+      return std::unexpected(std::move(actual.error()));
+    if (!*value || (**value).get().isNull()) {
       if (*inverse)
-        return base;
-      return std::unexpected(JsonPatchTestFail(Star::format("Test operation failure: {}", tested.error().what()), false));
-    }
-    return tested;
-  }
-
-  std::expected<Json, StarException> applyRemoveOperation(Json const& base, Json const& op) {
-    auto path = op.getString("path");
-    if (!path)
-      return std::unexpected(std::move(path.error()));
-    JsonPath::Pointer pointer(*path);
-    auto search = op.contains("search");
-    if (!search)
-      return std::unexpected(std::move(search.error()));
-    if (!*search)
-      return pointer.remove(base);
-    auto searchable = JsonPath::pathGetRef(base, JsonPath::parsePointer, *path);
-    if (!searchable)
-      return std::unexpected(std::move(searchable.error()));
-    auto value = op.get("search");
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    auto index = findJsonMatch(searchable->get(), *value, pointer);
-    if (!index)
-      return std::unexpected(std::move(index.error()));
-    if (!*index)
+        return std::unexpected(
+          JsonPatchTestFail(Star::format("Test operation failure, expected {} to be missing.", **path), false));
       return base;
-    auto changed = searchable->get().erase(*index - 1);
-    if (!changed)
-      return std::unexpected(std::move(changed.error()));
-    return pointer.set(base, *changed);
-  }
-
-  std::expected<Json, StarException> applyAddOperation(Json const& base, Json const& op) {
-    auto path = op.getString("path");
-    if (!path)
-      return std::unexpected(std::move(path.error()));
-    auto value = op.get("value");
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    JsonPath::Pointer pointer(*path);
-    auto search = op.contains("search");
-    if (!search)
-      return std::unexpected(std::move(search.error()));
-    if (!*search)
-      return pointer.add(base, *value);
-    auto searchable = JsonPath::pathGetRef(base, JsonPath::parsePointer, *path);
-    if (!searchable)
-      return std::unexpected(std::move(searchable.error()));
-    auto searchValue = op.get("search");
-    if (!searchValue)
-      return std::unexpected(std::move(searchValue.error()));
-    auto index = findJsonMatch(searchable->get(), *searchValue, pointer);
-    if (!index)
-      return std::unexpected(std::move(index.error()));
-    if (!*index)
+    }
+    if (((**value).get() == actual->get()) != *inverse)
       return base;
-    auto changed = searchable->get().insert(*index - 1, *value);
-    if (!changed)
-      return std::unexpected(std::move(changed.error()));
-    return pointer.set(base, *changed);
+    auto expected_text = (**value).get().repr();
+    if (!expected_text)
+      return std::unexpected(std::move(expected_text.error()));
+    auto actual_text = actual->get().repr();
+    if (!actual_text)
+      return std::unexpected(std::move(actual_text.error()));
+    return std::unexpected(JsonPatchTestFail(
+      Star::format("Test operation failure, expected Just ({}) found {}.", *expected_text, *actual_text), false));
+  }();
+  if (!tested && tested.error().is<JsonPath::TraversalException>()) {
+    if (*inverse)
+      return base;
+    return std::unexpected(JsonPatchTestFail(Star::format("Test operation failure: {}", tested.error().what()), false));
   }
-
-  std::expected<Json, StarException> applyReplaceOperation(Json const& base, Json const& op) {
-    auto path = op.getString("path");
-    if (!path)
-      return std::unexpected(std::move(path.error()));
-    auto value = op.get("value");
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    JsonPath::Pointer pointer(*path);
-    auto search = op.contains("search");
-    if (!search)
-      return std::unexpected(std::move(search.error()));
-    if (*search) {
-      auto searchable = JsonPath::pathGetRef(base, JsonPath::parsePointer, *path);
-      if (!searchable)
-        return std::unexpected(std::move(searchable.error()));
-      auto searchValue = op.get("search");
-      if (!searchValue)
-        return std::unexpected(std::move(searchValue.error()));
-      auto index = findJsonMatch(searchable->get(), *searchValue, pointer);
-      if (!index)
-        return std::unexpected(std::move(index.error()));
-      if (!*index)
-        return base;
-      auto changed = searchable->get().set(*index - 1, *value);
-      if (!changed)
-        return std::unexpected(std::move(changed.error()));
-      return pointer.set(base, *changed);
-    }
-    return pointer.apply<Json>(
-      base, [&](Json const&) -> std::expected<Json, StarException> { return *value; },
-      [&](Json const& object, String const& key) -> std::expected<Json, StarException> {
-        auto present = object.find(key);
-        if (!present)
-          return std::unexpected(std::move(present.error()));
-        if (!*present)
-          return std::unexpected(JsonPath::TraversalException::format("Could not find \"{}\" to remove", key));
-        return object.set(key, *value);
-      },
-      [&](Json const& array, std::optional<std::size_t> index) -> std::expected<Json, StarException> {
-        if (!index)
-          return std::unexpected(JsonPath::TraversalException("Could not remove element after end of array"));
-        return array.set(*index, *value);
-      });
-  }
-
-  std::expected<Json, StarException> applyMoveOperation(Json const& base, Json const& op) {
-    auto path = op.getString("path");
-    if (!path)
-      return std::unexpected(std::move(path.error()));
-    auto from = op.getString("from");
-    if (!from)
-      return std::unexpected(std::move(from.error()));
-    JsonPath::Pointer toPointer(*path), fromPointer(*from);
-    auto search = op.contains("search");
-    if (!search)
-      return std::unexpected(std::move(search.error()));
-    if (*search) {
-      auto searchable = JsonPath::pathGetRef(base, JsonPath::parsePointer, *from);
-      if (!searchable)
-        return std::unexpected(std::move(searchable.error()));
-      auto searchValue = op.get("search");
-      if (!searchValue)
-        return std::unexpected(std::move(searchValue.error()));
-      auto index = findJsonMatch(searchable->get(), *searchValue, fromPointer);
-      if (!index)
-        return std::unexpected(std::move(index.error()));
-      if (!*index)
-        return base;
-      auto value = searchable->get().find(*index - 1);
-      if (!value)
-        return std::unexpected(std::move(value.error()));
-      auto added = toPointer.add(base, (**value).get());
-      if (!added)
-        return std::unexpected(std::move(added.error()));
-      auto changed = searchable->get().erase(*index - 1);
-      if (!changed)
-        return std::unexpected(std::move(changed.error()));
-      return fromPointer.add(*added, *changed);
-    }
-    auto value = JsonPath::pathGetRef(base, JsonPath::parsePointer, *from);
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    auto removed = fromPointer.remove(base);
-    if (!removed)
-      return std::unexpected(std::move(removed.error()));
-    return toPointer.add(*removed, value->get());
-  }
-
-  std::expected<Json, StarException> applyCopyOperation(Json const& base, Json const& op) {
-    auto path = op.getString("path");
-    if (!path)
-      return std::unexpected(std::move(path.error()));
-    auto from = op.getString("from");
-    if (!from)
-      return std::unexpected(std::move(from.error()));
-    JsonPath::Pointer toPointer(*path), fromPointer(*from);
-    auto search = op.contains("search");
-    if (!search)
-      return std::unexpected(std::move(search.error()));
-    if (*search) {
-      auto searchable = JsonPath::pathGetRef(base, JsonPath::parsePointer, *from);
-      if (!searchable)
-        return std::unexpected(std::move(searchable.error()));
-      auto searchValue = op.get("search");
-      if (!searchValue)
-        return std::unexpected(std::move(searchValue.error()));
-      auto index = findJsonMatch(searchable->get(), *searchValue, fromPointer);
-      if (!index)
-        return std::unexpected(std::move(index.error()));
-      if (!*index)
-        return base;
-      auto value = searchable->get().find(*index - 1);
-      if (!value)
-        return std::unexpected(std::move(value.error()));
-      return toPointer.add(base, (**value).get());
-    }
-    auto value = JsonPath::pathGetRef(base, JsonPath::parsePointer, *from);
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    return toPointer.add(base, value->get());
-  }
-
-  std::expected<Json, StarException> applyMergeOperation(Json const& base, Json const& op) {
-    auto path = op.getString("path");
-    if (!path)
-      return std::unexpected(std::move(path.error()));
-    JsonPath::Pointer pointer(*path);
-    auto search = op.contains("search");
-    if (!search)
-      return std::unexpected(std::move(search.error()));
-    if (*search) {
-      auto searchable = JsonPath::pathGetRef(base, JsonPath::parsePointer, *path);
-      if (!searchable)
-        return std::unexpected(std::move(searchable.error()));
-      auto searchValue = op.get("search");
-      if (!searchValue)
-        return std::unexpected(std::move(searchValue.error()));
-      auto index = findJsonMatch(searchable->get(), *searchValue, pointer);
-      if (!index)
-        return std::unexpected(std::move(index.error()));
-      if (!*index)
-        return base;
-      auto oldValue = searchable->get().find(*index - 1);
-      if (!oldValue)
-        return std::unexpected(std::move(oldValue.error()));
-      auto value = op.get("value");
-      if (!value)
-        return std::unexpected(std::move(value.error()));
-      auto changed = searchable->get().set(*index - 1, jsonMerge((**oldValue).get(), *value));
-      if (!changed)
-        return std::unexpected(std::move(changed.error()));
-      return pointer.set(base, *changed);
-    }
-    auto merge = [&](Json const& target) -> std::expected<Json, StarException> {
-      auto value = op.get("value");
-      if (!value)
-        return std::unexpected(std::move(value.error()));
-      return jsonMerge(target, *value);
-    };
-    return pointer.apply<Json>(
-      base, merge,
-      [&](Json const& object, String const& key) -> std::expected<Json, StarException> {
-        auto target = object.find(key);
-        if (!target)
-          return std::unexpected(std::move(target.error()));
-        if (!*target)
-          return std::unexpected(JsonPath::TraversalException::format("No such key '{}' in merge", key));
-        auto changed = merge((**target).get());
-        if (!changed)
-          return std::unexpected(std::move(changed.error()));
-        return object.set(key, std::move(*changed));
-      },
-      [&](Json const& array, std::optional<std::size_t> index) -> std::expected<Json, StarException> {
-        if (!index)
-          return std::unexpected(JsonPath::TraversalException("Index out of range in merge"));
-        auto target = array.find(*index);
-        if (!target)
-          return std::unexpected(std::move(target.error()));
-        auto changed = merge((**target).get());
-        if (!changed)
-          return std::unexpected(std::move(changed.error()));
-        return array.set(*index, std::move(*changed));
-      });
-  }
+  return tested;
 }
+
+std::expected<Json, StarException> apply_remove(Json const& base, Json const& op) {
+  auto path = string_field(op, "path");
+  if (!path)
+    return std::unexpected(std::move(path.error()));
+  auto search = op.find("search");
+  if (!search)
+    return std::unexpected(std::move(search.error()));
+  if (!*search)
+    return JsonPath::path_remove(base, JsonPath::parse_pointer, **path);
+  return update_search(base, **path, (**search).get(),
+                       [](Json const& searchable, std::size_t index) { return searchable.erase(index); });
+}
+
+std::expected<Json, StarException> apply_add(Json const& base, Json const& op) {
+  auto path = string_field(op, "path");
+  if (!path)
+    return std::unexpected(std::move(path.error()));
+  auto value = require_field(op, "value");
+  if (!value)
+    return std::unexpected(std::move(value.error()));
+  auto search = op.find("search");
+  if (!search)
+    return std::unexpected(std::move(search.error()));
+  if (!*search)
+    return JsonPath::path_add(base, JsonPath::parse_pointer, **path, value->get());
+  return update_search(base, **path, (**search).get(), [&](Json const& searchable, std::size_t index) {
+    return searchable.insert(index, value->get());
+  });
+}
+
+std::expected<Json, StarException> apply_replace(Json const& base, Json const& op) {
+  auto path = string_field(op, "path");
+  if (!path)
+    return std::unexpected(std::move(path.error()));
+  auto value = require_field(op, "value");
+  if (!value)
+    return std::unexpected(std::move(value.error()));
+  auto search = op.find("search");
+  if (!search)
+    return std::unexpected(std::move(search.error()));
+  if (*search)
+    return update_search(base, **path, (**search).get(), [&](Json const& searchable, std::size_t index) {
+      return searchable.set(index, value->get());
+    });
+  return JsonPath::path_apply<Json>(
+    base, JsonPath::parse_pointer, **path,
+    [&](Json const&) -> std::expected<Json, StarException> { return value->get(); },
+    [&](Json const& object, String const& key) -> std::expected<Json, StarException> {
+      auto present = object.find(key);
+      if (!present)
+        return std::unexpected(std::move(present.error()));
+      if (!*present)
+        return std::unexpected(JsonPath::TraversalException::format("Could not find \"{}\" to remove", key));
+      return object.set(key, value->get());
+    },
+    [&](Json const& array, std::optional<std::size_t> index) -> std::expected<Json, StarException> {
+      if (!index)
+        return std::unexpected(JsonPath::TraversalException("Could not remove element after end of array"));
+      return array.set(*index, value->get());
+    });
+}
+
+std::expected<Json, StarException> apply_move(Json const& base, Json const& op) {
+  auto path = string_field(op, "path");
+  if (!path)
+    return std::unexpected(std::move(path.error()));
+  auto from = string_field(op, "from");
+  if (!from)
+    return std::unexpected(std::move(from.error()));
+  auto search = op.find("search");
+  if (!search)
+    return std::unexpected(std::move(search.error()));
+  if (*search) {
+    auto searchable = JsonPath::path_get_ref(base, JsonPath::parse_pointer, **from);
+    if (!searchable)
+      return std::unexpected(std::move(searchable.error()));
+    auto index = find_match(searchable->get(), (**search).get(), **from);
+    if (!index)
+      return std::unexpected(std::move(index.error()));
+    if (!*index)
+      return base;
+    auto value = searchable->get().find(**index);
+    if (!value)
+      return std::unexpected(std::move(value.error()));
+    // Search moves add first, then add the rewritten original source array.
+    // Overlapping paths deliberately retain these non-RFC insertion semantics.
+    auto added = JsonPath::path_add(base, JsonPath::parse_pointer, **path, (**value).get());
+    if (!added)
+      return std::unexpected(std::move(added.error()));
+    auto changed = searchable->get().erase(**index);
+    if (!changed)
+      return std::unexpected(std::move(changed.error()));
+    return JsonPath::path_add(*added, JsonPath::parse_pointer, **from, *changed);
+  }
+  auto value = JsonPath::path_get_ref(base, JsonPath::parse_pointer, **from);
+  if (!value)
+    return std::unexpected(std::move(value.error()));
+  auto removed = JsonPath::path_remove(base, JsonPath::parse_pointer, **from);
+  if (!removed)
+    return std::unexpected(std::move(removed.error()));
+  return JsonPath::path_add(*removed, JsonPath::parse_pointer, **path, value->get());
+}
+
+std::expected<Json, StarException> apply_copy(Json const& base, Json const& op) {
+  auto path = string_field(op, "path");
+  if (!path)
+    return std::unexpected(std::move(path.error()));
+  auto from = string_field(op, "from");
+  if (!from)
+    return std::unexpected(std::move(from.error()));
+  auto search = op.find("search");
+  if (!search)
+    return std::unexpected(std::move(search.error()));
+  if (*search) {
+    auto searchable = JsonPath::path_get_ref(base, JsonPath::parse_pointer, **from);
+    if (!searchable)
+      return std::unexpected(std::move(searchable.error()));
+    auto index = find_match(searchable->get(), (**search).get(), **from);
+    if (!index)
+      return std::unexpected(std::move(index.error()));
+    if (!*index)
+      return base;
+    auto value = searchable->get().find(**index);
+    if (!value)
+      return std::unexpected(std::move(value.error()));
+    return JsonPath::path_add(base, JsonPath::parse_pointer, **path, (**value).get());
+  }
+  auto value = JsonPath::path_get_ref(base, JsonPath::parse_pointer, **from);
+  if (!value)
+    return std::unexpected(std::move(value.error()));
+  return JsonPath::path_add(base, JsonPath::parse_pointer, **path, value->get());
+}
+}// namespace
+
+std::expected<Json, StarException> apply_merge(Json const& base, Json const& op) {
+  auto path = string_field(op, "path");
+  if (!path)
+    return std::unexpected(std::move(path.error()));
+  auto search = op.find("search");
+  if (!search)
+    return std::unexpected(std::move(search.error()));
+  if (*search)
+    return update_search(base, **path, (**search).get(),
+                         [&](Json const& searchable, std::size_t index) -> std::expected<Json, StarException> {
+                           auto old_value = searchable.find(index);
+                           if (!old_value)
+                             return std::unexpected(std::move(old_value.error()));
+                           auto value = require_field(op, "value");
+                           if (!value)
+                             return std::unexpected(std::move(value.error()));
+                           return searchable.set(index, jsonMerge((**old_value).get(), value->get()));
+                         });
+  auto merge = [&](Json const& target) -> std::expected<Json, StarException> {
+    auto value = require_field(op, "value");
+    if (!value)
+      return std::unexpected(std::move(value.error()));
+    return jsonMerge(target, value->get());
+  };
+  return JsonPath::path_apply<Json>(
+    base, JsonPath::parse_pointer, **path, merge,
+    [&](Json const& object, String const& key) -> std::expected<Json, StarException> {
+      auto target = object.find(key);
+      if (!target)
+        return std::unexpected(std::move(target.error()));
+      if (!*target)
+        return std::unexpected(JsonPath::TraversalException::format("No such key '{}' in merge", key));
+      auto changed = merge((**target).get());
+      if (!changed)
+        return std::unexpected(std::move(changed.error()));
+      return object.set(key, std::move(*changed));
+    },
+    [&](Json const& array, std::optional<std::size_t> index) -> std::expected<Json, StarException> {
+      if (!index)
+        return std::unexpected(JsonPath::TraversalException("Index out of range in merge"));
+      auto target = array.find(*index);
+      if (!target)
+        return std::unexpected(std::move(target.error()));
+      auto changed = merge((**target).get());
+      if (!changed)
+        return std::unexpected(std::move(changed.error()));
+      return array.set(*index, std::move(*changed));
+    });
+}
+
+namespace {
+using Operation = std::reference_wrapper<std::expected<Json, StarException>(Json const&, Json const&)>;
+using OperationEntry = std::pair<std::string_view, Operation>;
+static constexpr std::array<OperationEntry, 7> operations{{
+  {"test", std::ref(apply_test)},
+  {"remove", std::ref(apply_remove)},
+  {"add", std::ref(apply_add)},
+  {"replace", std::ref(apply_replace)},
+  {"move", std::ref(apply_move)},
+  {"copy", std::ref(apply_copy)},
+  {"merge", std::ref(apply_merge)},
+}};
+}// namespace
+
+std::expected<Json, StarException> apply_operation(Json const& base, Json const& op) {
+  auto operation = string_field(op, "op");
+  if (!operation)
+    return std::unexpected(patch_failure(std::move(operation.error()), "Could not apply operation to base."));
+  auto function = std::ranges::find(operations, (*operation)->utf8(), &OperationEntry::first);
+  if (function == operations.end())
+    return std::unexpected(JsonPatchException(Star::format("Invalid operation: {}", **operation), false));
+  return function->second(base, op).transform_error(
+    [](StarException error) { return patch_failure(std::move(error), "Could not apply operation to base."); });
+}
+}// namespace JsonPatching
 }

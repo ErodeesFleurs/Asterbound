@@ -364,11 +364,20 @@ These are algorithm/compatibility guarantees, not measured runtime speedups.
 - Formatted insert/erase checks retain adjacent comments, duplicate-key reveal
   and exact numeric spellings, not just semantic equality. Preserve first-error
   order and missing/null/empty distinctions in real consumer checks.
+- Patch regressions retain search-miss owner sharing, overlapping search-move
+  insertion behavior, lazy merge values and unreachable suffix/error precedence.
+  Native path protocol probes exercise read-only values, move-only mutable
+  callbacks, custom parsers and empty callables. Actual Assets group-commit and
+  real `json_tool` pointer/query get/set/add/remove checks complement unit tests.
 - Reuse `json_benchmarks` plus the `Core/Json/` and `Hash/Json/` filters; do not
   create a parallel benchmark implementation. Direct-object output and immutable
   array edits include result destruction. Formatted token-only and
   serialize/destroy rows are separate; validate complete tokens/text and fixture
   fingerprints outside timing.
+- Patch/path rows include serialization and destruction; do not attribute the
+  complete timing to mutation alone. Keep identical consumer tokens apart from
+  renamed APIs, compile flags, fixture/result labels and runtime dependencies.
+  Retain alternating before/after samples, old/old drift and every regression.
 
 ### Images, gameplay and frontend lifecycles
 

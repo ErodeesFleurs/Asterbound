@@ -593,34 +593,34 @@ std::expected<std::optional<JsonObject>, StarException> Json::optObject(String c
 }
 
 std::expected<Json, StarException> Json::query(String const& path) const {
-  return JsonPath::pathGet(*this, JsonPath::parseQueryPath, path);
+  return JsonPath::path_get(*this, JsonPath::parse_query_path, path);
 }
 std::expected<double, StarException> Json::queryDouble(String const& path) const {
-  return convert_json(JsonPath::pathGetRef(*this, JsonPath::parseQueryPath, path), &Json::toDouble);
+  return convert_json(JsonPath::path_get_ref(*this, JsonPath::parse_query_path, path), &Json::toDouble);
 }
 std::expected<float, StarException> Json::queryFloat(String const& path) const {
-  return convert_json(JsonPath::pathGetRef(*this, JsonPath::parseQueryPath, path), &Json::toFloat);
+  return convert_json(JsonPath::path_get_ref(*this, JsonPath::parse_query_path, path), &Json::toFloat);
 }
 std::expected<bool, StarException> Json::queryBool(String const& path) const {
-  return convert_json(JsonPath::pathGetRef(*this, JsonPath::parseQueryPath, path), &Json::toBool);
+  return convert_json(JsonPath::path_get_ref(*this, JsonPath::parse_query_path, path), &Json::toBool);
 }
 std::expected<std::int64_t, StarException> Json::queryInt(String const& path) const {
-  return convert_json(JsonPath::pathGetRef(*this, JsonPath::parseQueryPath, path), &Json::toInt);
+  return convert_json(JsonPath::path_get_ref(*this, JsonPath::parse_query_path, path), &Json::toInt);
 }
 std::expected<std::uint64_t, StarException> Json::queryUInt(String const& path) const {
-  return convert_json(JsonPath::pathGetRef(*this, JsonPath::parseQueryPath, path), &Json::toUInt);
+  return convert_json(JsonPath::path_get_ref(*this, JsonPath::parse_query_path, path), &Json::toUInt);
 }
 std::expected<String, StarException> Json::queryString(String const& path) const {
-  return convert_json(JsonPath::pathGetRef(*this, JsonPath::parseQueryPath, path), &Json::toString);
+  return convert_json(JsonPath::path_get_ref(*this, JsonPath::parse_query_path, path), &Json::toString);
 }
 std::expected<JsonArray, StarException> Json::queryArray(String const& path) const {
-  return convert_json(JsonPath::pathGetRef(*this, JsonPath::parseQueryPath, path), &Json::toArray);
+  return convert_json(JsonPath::path_get_ref(*this, JsonPath::parse_query_path, path), &Json::toArray);
 }
 std::expected<JsonObject, StarException> Json::queryObject(String const& path) const {
-  return convert_json(JsonPath::pathGetRef(*this, JsonPath::parseQueryPath, path), &Json::toObject);
+  return convert_json(JsonPath::path_get_ref(*this, JsonPath::parse_query_path, path), &Json::toObject);
 }
 std::expected<Json, StarException> Json::query(String const& path, Json def) const {
-  auto value = JsonPath::pathFindRef(*this, JsonPath::parseQueryPath, path);
+  auto value = JsonPath::path_find_ref(*this, JsonPath::parse_query_path, path);
   if (!value)
     return std::unexpected(std::move(value.error()));
   if (*value)
@@ -628,33 +628,33 @@ std::expected<Json, StarException> Json::query(String const& path, Json def) con
   return def;
 }
 std::expected<double, StarException> Json::queryDouble(String const& path, double def) const {
-  return convert_json_or(JsonPath::pathFindRef(*this, JsonPath::parseQueryPath, path), &Json::toDouble, def, true);
+  return convert_json_or(JsonPath::path_find_ref(*this, JsonPath::parse_query_path, path), &Json::toDouble, def, true);
 }
 std::expected<float, StarException> Json::queryFloat(String const& path, float def) const {
-  return convert_json_or(JsonPath::pathFindRef(*this, JsonPath::parseQueryPath, path), &Json::toFloat, def, true);
+  return convert_json_or(JsonPath::path_find_ref(*this, JsonPath::parse_query_path, path), &Json::toFloat, def, true);
 }
 std::expected<bool, StarException> Json::queryBool(String const& path, bool def) const {
-  return convert_json_or(JsonPath::pathFindRef(*this, JsonPath::parseQueryPath, path), &Json::toBool, def, true);
+  return convert_json_or(JsonPath::path_find_ref(*this, JsonPath::parse_query_path, path), &Json::toBool, def, true);
 }
 std::expected<std::int64_t, StarException> Json::queryInt(String const& path, std::int64_t def) const {
-  return convert_json_or(JsonPath::pathFindRef(*this, JsonPath::parseQueryPath, path), &Json::toInt, def, true);
+  return convert_json_or(JsonPath::path_find_ref(*this, JsonPath::parse_query_path, path), &Json::toInt, def, true);
 }
 std::expected<std::uint64_t, StarException> Json::queryUInt(String const& path, std::uint64_t def) const {
-  return convert_json_or(JsonPath::pathFindRef(*this, JsonPath::parseQueryPath, path), &Json::toUInt, def, true);
+  return convert_json_or(JsonPath::path_find_ref(*this, JsonPath::parse_query_path, path), &Json::toUInt, def, true);
 }
 std::expected<String, StarException> Json::queryString(String const& path, String const& def) const {
-  return convert_json_or(JsonPath::pathFindRef(*this, JsonPath::parseQueryPath, path), &Json::toString, def, true);
+  return convert_json_or(JsonPath::path_find_ref(*this, JsonPath::parse_query_path, path), &Json::toString, def, true);
 }
 std::expected<JsonArray, StarException> Json::queryArray(String const& path, JsonArray def) const {
-  return convert_json_or(JsonPath::pathFindRef(*this, JsonPath::parseQueryPath, path), &Json::toArray, std::move(def),
-                         true);
+  return convert_json_or(JsonPath::path_find_ref(*this, JsonPath::parse_query_path, path), &Json::toArray,
+                         std::move(def), true);
 }
 std::expected<JsonObject, StarException> Json::queryObject(String const& path, JsonObject def) const {
-  return convert_json_or(JsonPath::pathFindRef(*this, JsonPath::parseQueryPath, path), &Json::toObject, std::move(def),
-                         true);
+  return convert_json_or(JsonPath::path_find_ref(*this, JsonPath::parse_query_path, path), &Json::toObject,
+                         std::move(def), true);
 }
 std::expected<std::optional<Json>, StarException> Json::optQuery(String const& path) const {
-  auto value = JsonPath::pathFindRef(*this, JsonPath::parseQueryPath, path);
+  auto value = JsonPath::path_find_ref(*this, JsonPath::parse_query_path, path);
   if (!value)
     return std::unexpected(std::move(value.error()));
   if (*value && !(*value)->get().isNull())
@@ -662,28 +662,28 @@ std::expected<std::optional<Json>, StarException> Json::optQuery(String const& p
   return std::optional<Json>{};
 }
 std::expected<std::optional<double>, StarException> Json::optQueryDouble(String const& path) const {
-  return convert_optional_json(JsonPath::pathFindRef(*this, JsonPath::parseQueryPath, path), &Json::toDouble);
+  return convert_optional_json(JsonPath::path_find_ref(*this, JsonPath::parse_query_path, path), &Json::toDouble);
 }
 std::expected<std::optional<float>, StarException> Json::optQueryFloat(String const& path) const {
-  return convert_optional_json(JsonPath::pathFindRef(*this, JsonPath::parseQueryPath, path), &Json::toFloat);
+  return convert_optional_json(JsonPath::path_find_ref(*this, JsonPath::parse_query_path, path), &Json::toFloat);
 }
 std::expected<std::optional<bool>, StarException> Json::optQueryBool(String const& path) const {
-  return convert_optional_json(JsonPath::pathFindRef(*this, JsonPath::parseQueryPath, path), &Json::toBool);
+  return convert_optional_json(JsonPath::path_find_ref(*this, JsonPath::parse_query_path, path), &Json::toBool);
 }
 std::expected<std::optional<std::int64_t>, StarException> Json::optQueryInt(String const& path) const {
-  return convert_optional_json(JsonPath::pathFindRef(*this, JsonPath::parseQueryPath, path), &Json::toInt);
+  return convert_optional_json(JsonPath::path_find_ref(*this, JsonPath::parse_query_path, path), &Json::toInt);
 }
 std::expected<std::optional<std::uint64_t>, StarException> Json::optQueryUInt(String const& path) const {
-  return convert_optional_json(JsonPath::pathFindRef(*this, JsonPath::parseQueryPath, path), &Json::toUInt);
+  return convert_optional_json(JsonPath::path_find_ref(*this, JsonPath::parse_query_path, path), &Json::toUInt);
 }
 std::expected<std::optional<String>, StarException> Json::optQueryString(String const& path) const {
-  return convert_optional_json(JsonPath::pathFindRef(*this, JsonPath::parseQueryPath, path), &Json::toString);
+  return convert_optional_json(JsonPath::path_find_ref(*this, JsonPath::parse_query_path, path), &Json::toString);
 }
 std::expected<std::optional<JsonArray>, StarException> Json::optQueryArray(String const& path) const {
-  return convert_optional_json(JsonPath::pathFindRef(*this, JsonPath::parseQueryPath, path), &Json::toArray);
+  return convert_optional_json(JsonPath::path_find_ref(*this, JsonPath::parse_query_path, path), &Json::toArray);
 }
 std::expected<std::optional<JsonObject>, StarException> Json::optQueryObject(String const& path) const {
-  return convert_optional_json(JsonPath::pathFindRef(*this, JsonPath::parseQueryPath, path), &Json::toObject);
+  return convert_optional_json(JsonPath::path_find_ref(*this, JsonPath::parse_query_path, path), &Json::toObject);
 }
 
 std::expected<Json, StarException> Json::set(String key, Json value) const {
@@ -695,11 +695,11 @@ std::expected<Json, StarException> Json::set(String key, Json value) const {
 }
 
 std::expected<Json, StarException> Json::set_path(String path, Json value) const {
-  return JsonPath::pathSet(*this, JsonPath::parseQueryPath, path, value);
+  return JsonPath::path_set(*this, JsonPath::parse_query_path, path, value);
 }
 
 std::expected<Json, StarException> Json::erase_path(String path) const {
-  return JsonPath::pathRemove(*this, JsonPath::parseQueryPath, path);
+  return JsonPath::path_remove(*this, JsonPath::parse_query_path, path);
 }
 
 std::expected<Json, StarException> Json::set_all(JsonObject values) const {

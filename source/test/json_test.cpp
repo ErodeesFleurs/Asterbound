@@ -996,22 +996,22 @@ TEST(JsonTest, PatchingAdd) {
 
   auto result62 = patch.toArray();
   ASSERT_TRUE(result62);
-  auto result63 = jsonPatch(before, (*result62));
+  auto result63 = json_patch(before, (*result62));
   ASSERT_TRUE(result63);
   EXPECT_EQ((*result63), after);
   auto result64 = badPatch1.toArray();
   ASSERT_TRUE(result64);
-  auto error65 = jsonPatch(before, (*result64));
+  auto error65 = json_patch(before, (*result64));
   ASSERT_FALSE(error65);
   EXPECT_TRUE(error65.error().is<JsonPatchException>());
   auto result66 = badPatch2.toArray();
   ASSERT_TRUE(result66);
-  auto error67 = jsonPatch(before, (*result66));
+  auto error67 = json_patch(before, (*result66));
   ASSERT_FALSE(error67);
   EXPECT_TRUE(error67.error().is<JsonPatchException>());
   auto result68 = badPatch3.toArray();
   ASSERT_TRUE(result68);
-  auto error69 = jsonPatch(before, (*result68));
+  auto error69 = json_patch(before, (*result68));
   ASSERT_FALSE(error69);
   EXPECT_TRUE(error69.error().is<JsonPatchException>());
 }
@@ -1085,22 +1085,22 @@ TEST(JsonTest, PatchingRemove) {
 
   auto result76 = patch.toArray();
   ASSERT_TRUE(result76);
-  auto result77 = jsonPatch(before, (*result76));
+  auto result77 = json_patch(before, (*result76));
   ASSERT_TRUE(result77);
   EXPECT_EQ((*result77), after);
   auto result78 = badPatch1.toArray();
   ASSERT_TRUE(result78);
-  auto error79 = jsonPatch(before, (*result78));
+  auto error79 = json_patch(before, (*result78));
   ASSERT_FALSE(error79);
   EXPECT_TRUE(error79.error().is<JsonPatchException>());
   auto result80 = badPatch2.toArray();
   ASSERT_TRUE(result80);
-  auto error81 = jsonPatch(before, (*result80));
+  auto error81 = json_patch(before, (*result80));
   ASSERT_FALSE(error81);
   EXPECT_TRUE(error81.error().is<JsonPatchException>());
   auto result82 = badPatch3.toArray();
   ASSERT_TRUE(result82);
-  auto error83 = jsonPatch(before, (*result82));
+  auto error83 = json_patch(before, (*result82));
   ASSERT_FALSE(error83);
   EXPECT_TRUE(error83.error().is<JsonPatchException>());
 }
@@ -1182,22 +1182,22 @@ TEST(JsonTest, PatchingReplace) {
 
   auto result90 = patch.toArray();
   ASSERT_TRUE(result90);
-  auto result91 = jsonPatch(before, (*result90));
+  auto result91 = json_patch(before, (*result90));
   ASSERT_TRUE(result91);
   EXPECT_EQ((*result91), after);
   auto result92 = badPatch1.toArray();
   ASSERT_TRUE(result92);
-  auto error93 = jsonPatch(before, (*result92));
+  auto error93 = json_patch(before, (*result92));
   ASSERT_FALSE(error93);
   EXPECT_TRUE(error93.error().is<JsonPatchException>());
   auto result94 = badPatch2.toArray();
   ASSERT_TRUE(result94);
-  auto error95 = jsonPatch(before, (*result94));
+  auto error95 = json_patch(before, (*result94));
   ASSERT_FALSE(error95);
   EXPECT_TRUE(error95.error().is<JsonPatchException>());
   auto result96 = badPatch3.toArray();
   ASSERT_TRUE(result96);
-  auto error97 = jsonPatch(before, (*result96));
+  auto error97 = json_patch(before, (*result96));
   ASSERT_FALSE(error97);
   EXPECT_TRUE(error97.error().is<JsonPatchException>());
 }
@@ -1294,32 +1294,32 @@ TEST(JsonTest, PatchingMove) {
 
   auto result106 = patch.toArray();
   ASSERT_TRUE(result106);
-  auto result107 = jsonPatch(before, (*result106));
+  auto result107 = json_patch(before, (*result106));
   ASSERT_TRUE(result107);
   EXPECT_EQ((*result107), after);
   auto result108 = badPatch1.toArray();
   ASSERT_TRUE(result108);
-  auto error109 = jsonPatch(before, (*result108));
+  auto error109 = json_patch(before, (*result108));
   ASSERT_FALSE(error109);
   EXPECT_TRUE(error109.error().is<JsonPatchException>());
   auto result110 = badPatch2.toArray();
   ASSERT_TRUE(result110);
-  auto error111 = jsonPatch(before, (*result110));
+  auto error111 = json_patch(before, (*result110));
   ASSERT_FALSE(error111);
   EXPECT_TRUE(error111.error().is<JsonPatchException>());
   auto result112 = badPatch3.toArray();
   ASSERT_TRUE(result112);
-  auto error113 = jsonPatch(before, (*result112));
+  auto error113 = json_patch(before, (*result112));
   ASSERT_FALSE(error113);
   EXPECT_TRUE(error113.error().is<JsonPatchException>());
   auto result114 = badPatch4.toArray();
   ASSERT_TRUE(result114);
-  auto error115 = jsonPatch(before, (*result114));
+  auto error115 = json_patch(before, (*result114));
   ASSERT_FALSE(error115);
   EXPECT_TRUE(error115.error().is<JsonPatchException>());
   auto result116 = badPatch5.toArray();
   ASSERT_TRUE(result116);
-  auto error117 = jsonPatch(before, (*result116));
+  auto error117 = json_patch(before, (*result116));
   ASSERT_FALSE(error117);
   EXPECT_TRUE(error117.error().is<JsonPatchException>());
 }
@@ -1420,32 +1420,32 @@ TEST(JsonTest, PatchingCopy) {
 
   auto result126 = patch.toArray();
   ASSERT_TRUE(result126);
-  auto result127 = jsonPatch(before, (*result126));
+  auto result127 = json_patch(before, (*result126));
   ASSERT_TRUE(result127);
   EXPECT_EQ((*result127), after);
   auto result128 = badPatch1.toArray();
   ASSERT_TRUE(result128);
-  auto error129 = jsonPatch(before, (*result128));
+  auto error129 = json_patch(before, (*result128));
   ASSERT_FALSE(error129);
   EXPECT_TRUE(error129.error().is<JsonPatchException>());
   auto result130 = badPatch2.toArray();
   ASSERT_TRUE(result130);
-  auto error131 = jsonPatch(before, (*result130));
+  auto error131 = json_patch(before, (*result130));
   ASSERT_FALSE(error131);
   EXPECT_TRUE(error131.error().is<JsonPatchException>());
   auto result132 = badPatch3.toArray();
   ASSERT_TRUE(result132);
-  auto error133 = jsonPatch(before, (*result132));
+  auto error133 = json_patch(before, (*result132));
   ASSERT_FALSE(error133);
   EXPECT_TRUE(error133.error().is<JsonPatchException>());
   auto result134 = badPatch4.toArray();
   ASSERT_TRUE(result134);
-  auto error135 = jsonPatch(before, (*result134));
+  auto error135 = json_patch(before, (*result134));
   ASSERT_FALSE(error135);
   EXPECT_TRUE(error135.error().is<JsonPatchException>());
   auto result136 = badPatch5.toArray();
   ASSERT_TRUE(result136);
-  auto error137 = jsonPatch(before, (*result136));
+  auto error137 = json_patch(before, (*result136));
   ASSERT_FALSE(error137);
   EXPECT_TRUE(error137.error().is<JsonPatchException>());
 }
@@ -1545,42 +1545,42 @@ TEST(JsonTest, PatchingTest) {
 
   auto result147 = goodTest.toArray();
   ASSERT_TRUE(result147);
-  auto result148 = jsonPatch(base, (*result147));
+  auto result148 = json_patch(base, (*result147));
   ASSERT_TRUE(result148);
 
   auto result149 = failTest1.toArray();
   ASSERT_TRUE(result149);
-  auto error150 = jsonPatch(base, (*result149));
+  auto error150 = json_patch(base, (*result149));
   ASSERT_FALSE(error150);
   EXPECT_TRUE(error150.error().is<JsonPatchTestFail>());
   auto result151 = failTest2.toArray();
   ASSERT_TRUE(result151);
-  auto error152 = jsonPatch(base, (*result151));
+  auto error152 = json_patch(base, (*result151));
   ASSERT_FALSE(error152);
   EXPECT_TRUE(error152.error().is<JsonPatchTestFail>());
   auto result153 = failTest3.toArray();
   ASSERT_TRUE(result153);
-  auto error154 = jsonPatch(base, (*result153));
+  auto error154 = json_patch(base, (*result153));
   ASSERT_FALSE(error154);
   EXPECT_TRUE(error154.error().is<JsonPatchTestFail>());
   auto result155 = failTest4.toArray();
   ASSERT_TRUE(result155);
-  auto error156 = jsonPatch(base, (*result155));
+  auto error156 = json_patch(base, (*result155));
   ASSERT_FALSE(error156);
   EXPECT_TRUE(error156.error().is<JsonPatchTestFail>());
   auto result157 = failTest5.toArray();
   ASSERT_TRUE(result157);
-  auto error158 = jsonPatch(base, (*result157));
+  auto error158 = json_patch(base, (*result157));
   ASSERT_FALSE(error158);
   EXPECT_TRUE(error158.error().is<JsonPatchTestFail>());
   auto result159 = failTest6.toArray();
   ASSERT_TRUE(result159);
-  auto error160 = jsonPatch(base, (*result159));
+  auto error160 = json_patch(base, (*result159));
   ASSERT_FALSE(error160);
   EXPECT_TRUE(error160.error().is<JsonPatchTestFail>());
   auto result161 = failTest7.toArray();
   ASSERT_TRUE(result161);
-  auto error162 = jsonPatch(base, (*result161));
+  auto error162 = json_patch(base, (*result161));
   ASSERT_FALSE(error162);
   EXPECT_TRUE(error162.error().is<JsonPatchTestFail>());
 }
@@ -1612,7 +1612,7 @@ TEST(JsonTest, PatchingEscaping) {
 
   auto result165 = test1.toArray();
   ASSERT_TRUE(result165);
-  auto result166 = jsonPatch(base1, (*result165));
+  auto result166 = json_patch(base1, (*result165));
   ASSERT_TRUE(result166);
 }
 

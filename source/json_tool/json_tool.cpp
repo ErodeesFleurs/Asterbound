@@ -118,39 +118,36 @@ std::expected<void, StarException> ArrayOutput::flush() {
   return {};
 }
 
-std::expected<FormattedJson, StarException> Star::addOrSet(bool add,
-    std::shared_ptr<::Star::JsonPath::Path> path,
-    FormattedJson const& input,
-    InsertLocation insertLocation,
-    FormattedJson const& value) {
-  JsonPath::EmptyPathOp<FormattedJson> emptyPathOp = [&value, add](FormattedJson const& document)
-      -> std::expected<FormattedJson, StarException> {
+std::expected<FormattedJson, StarException> Star::addOrSet(bool add, std::shared_ptr<::Star::JsonPath::Path> path,
+                                                           FormattedJson const& input, InsertLocation insert_location,
+                                                           FormattedJson const& value) {
+  auto empty_path_op = [&value, add](FormattedJson const& document) -> std::expected<FormattedJson, StarException> {
     if (!add || document.type() == Json::Type::Null)
       return value;
     return std::unexpected(JsonException("Cannot add a value to the entire document, it is not empty."));
   };
-  JsonPath::ObjectOp<FormattedJson> objectOp = [&value, &insertLocation](
-      FormattedJson const& object, String const& key) -> std::expected<FormattedJson, StarException> {
-    if (std::holds_alternative<AtBeginning>(insertLocation))
+  auto object_op = [&value, &insert_location](FormattedJson const& object,
+                                              String const& key) -> std::expected<FormattedJson, StarException> {
+    if (std::holds_alternative<AtBeginning>(insert_location))
       return object.prepend(key, value);
-    if (std::holds_alternative<AtEnd>(insertLocation))
+    if (std::holds_alternative<AtEnd>(insert_location))
       return object.append(key, value);
-    if (std::holds_alternative<BeforeKey>(insertLocation))
-      return object.insert_before(key, value, std::get<BeforeKey>(insertLocation).key);
-    if (std::holds_alternative<AfterKey>(insertLocation))
-      return object.insert_after(key, value, std::get<AfterKey>(insertLocation).key);
+    if (std::holds_alternative<BeforeKey>(insert_location))
+      return object.insert_before(key, value, std::get<BeforeKey>(insert_location).key);
+    if (std::holds_alternative<AfterKey>(insert_location))
+      return object.insert_after(key, value, std::get<AfterKey>(insert_location).key);
     return object.set(key, value);
   };
-  JsonPath::ArrayOp<FormattedJson> arrayOp = [&value, add](FormattedJson const& array, std::optional<std::size_t> i)
-      -> std::expected<FormattedJson, StarException> {
-    if (i) {
+  auto array_op = [&value, add](FormattedJson const& array,
+                                std::optional<std::size_t> index) -> std::expected<FormattedJson, StarException> {
+    if (index) {
       if (add)
-        return array.insert(*i, value);
-      return array.set(*i, value);
+        return array.insert(*index, value);
+      return array.set(*index, value);
     }
     return array.append(value);
   };
-  return path->apply(input, emptyPathOp, objectOp, arrayOp);
+  return path->apply(input, empty_path_op, object_op, array_op);
 }
 
 [[nodiscard]]
