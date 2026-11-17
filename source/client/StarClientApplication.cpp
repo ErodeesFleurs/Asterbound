@@ -300,6 +300,10 @@ constexpr char AdditionalDefaultConfiguration[] = R"JSON(
       "maximized" : true,
       "antiAliasing" : false,
       "hdr": true,
+      "renderOutput" : "legacy",
+      "renderExposure" : 0,
+      "hdrPaperWhite" : 203,
+      "hdrPeakLuminance" : 1000,
       "zoomLevel" : 3.0,
       "cameraSpeedFactor" : 1.0,
       "interfaceScale" : 0,
@@ -638,6 +642,9 @@ std::expected<void, StarException> ClientApplication::renderInit(std::shared_ptr
   if (!configResult)
     return std::unexpected(std::move(configResult.error()));
   auto config = *configResult;
+  m_appliedOutputSettings.reset();
+  if (auto applied = applyRenderSettings(*config); !applied)
+    return std::unexpected(std::move(applied.error()));
   auto limit = config->get("limitTextureAtlasSize").and_then([](Json j) { return j.optBool(); });
   if (!limit)
     return std::unexpected(std::move(limit.error()));
@@ -897,6 +904,14 @@ std::expected<void, StarException> ClientApplication::update() {
 }
 
 std::expected<void, StarException> ClientApplication::applyRenderSettings(Configuration const& configuration) {
+  auto output = renderOutputSettingsFromJson(configuration.currentConfiguration());
+  if (!output)
+    return std::unexpected(std::move(output.error()));
+  if (auto renderer = Application::renderer(); renderer && m_appliedOutputSettings != *output) {
+    if (auto applied = renderer->setOutputSettings(*output); !applied)
+      return std::unexpected(std::move(applied.error()));
+    m_appliedOutputSettings = *output;
+  }
   auto limit = configuration.get("renderFpsLimit").and_then([](Json value) { return value.toDouble(); });
   if (!limit)
     return std::unexpected(std::move(limit.error()));

@@ -45,6 +45,8 @@ struct Device {
   VkPhysicalDeviceMemoryProperties memory{};
   bool sampleShading = false;
   bool portability = false;
+  bool swapchainColorspace = false;
+  bool hdrMetadata = false;
   ~Device() {
     if (logical) { vkDeviceWaitIdle(logical); vkDestroyDevice(logical, nullptr); }
     if (surface) vkDestroySurfaceKHR(instance, surface, nullptr);
@@ -98,6 +100,7 @@ struct GpuImage {
   VkDeviceMemory memory = VK_NULL_HANDLE;
   VkImageView view = VK_NULL_HANDLE;
   VkImageView sampledView = VK_NULL_HANDLE;
+  VkImageView srgbView = VK_NULL_HANDLE;
   bool opaque = false;
   VkSampler sampler = VK_NULL_HANDLE;
   Vec2U size;
@@ -110,6 +113,7 @@ struct GpuImage {
   ~GpuImage() {
     if (sampler) vkDestroySampler(device->logical, sampler, nullptr);
     if (sampledView) vkDestroyImageView(device->logical, sampledView, nullptr);
+    if (srgbView) vkDestroyImageView(device->logical, srgbView, nullptr);
     if (view) vkDestroyImageView(device->logical, view, nullptr);
     if (handle) vkDestroyImage(device->logical, handle, nullptr);
     if (memory) vkFreeMemory(device->logical, memory, nullptr);
@@ -119,9 +123,10 @@ Result<std::shared_ptr<GpuImage>> makeImage(std::shared_ptr<Device> const& devic
     VkSampleCountFlagBits samples, TextureAddressing addressing, TextureFiltering filtering) {
   if (!size[0] || !size[1] || size[0] > device->properties.limits.maxImageDimension2D || size[1] > device->properties.limits.maxImageDimension2D)
     return std::unexpected(RendererException("Vulkan image dimensions are zero or exceed device limits"));
+  auto flags = format == VK_FORMAT_R8G8B8A8_UNORM ? VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT : VkImageCreateFlags(0);
   VkImageFormatProperties supported{};
   auto support = vkGetPhysicalDeviceImageFormatProperties(device->physical, format, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
-      VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, 0, &supported);
+      VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, flags, &supported);
   if (support != VK_SUCCESS || !(supported.sampleCounts & samples))
     return std::unexpected(RendererException::format("Vulkan format {} does not support {} samples", static_cast<int>(format), static_cast<unsigned>(samples)));
   VkFormatProperties features;
@@ -132,6 +137,7 @@ Result<std::shared_ptr<GpuImage>> makeImage(std::shared_ptr<Device> const& devic
   image->device = device; image->size = size; image->format = format; image->samples = samples;
   image->addressing = addressing; image->filtering = filtering;
   VkImageCreateInfo info{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
+  info.flags = flags;
   info.imageType = VK_IMAGE_TYPE_2D; info.format = format; info.extent = {size[0], size[1], 1};
   info.mipLevels = 1; info.arrayLayers = 1; info.samples = samples; info.tiling = VK_IMAGE_TILING_OPTIMAL;
   info.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
@@ -432,6 +438,7 @@ struct Effect {
   std::vector<std::pair<String, String>> inputs;
   std::uint32_t uniformSize = 128;
   bool includeTextures = true, pingPong = false;
+  std::uint32_t outputOffset = 0;
   ~Effect() {
     for (auto const& [key, pipeline] : pipelines) vkDestroyPipeline(device->logical, pipeline, nullptr);
     if (layout) vkDestroyPipelineLayout(device->logical, layout, nullptr);
@@ -532,7 +539,7 @@ void main() {
  int i=vertexData&3;
  vec2 s=i==3?textureSize3:i==2?textureSize2:i==1?textureSize1:textureSize0;
  fragmentTextureCoordinate=vertexTextureCoordinate/s;
- fragmentTextureIndex=i; fragmentColor=vertexColor;
+ fragmentTextureIndex=i; fragmentColor=starVertexColor(vertexColor);
 }
 )GLSL";
 constexpr std::string_view BasicFragment = R"GLSL(#version 450
@@ -551,6 +558,63 @@ layout(location=0) in vec2 fragmentTextureCoordinate;
 layout(location=0) out vec4 outColor;
 void main() { outColor=texture(texture0,fragmentTextureCoordinate); }
 )GLSL";
+// A single output transform, never a material/light-map operation. Scene
+// luminance is unchanged through the knee and approaches the display ceiling
+// monotonically. Scaling RGB together preserves neutral axes and scene hue;
+// out-of-gamut highlights are desaturated toward their mapped luminance.
+constexpr std::string_view OutputFragment = R"GLSL(#version 450
+layout(location=0) in vec2 fragmentTextureCoordinate;
+layout(location=0) out vec4 outColor;
+void main() {
+ vec4 c=texture(texture0,fragmentTextureCoordinate);
+ vec3 rgb=max(c.rgb,vec3(0));
+ if(starOutput.w==1.0) {
+   rgb*=exp2(starOutput.x);
+   float ceiling=starOutput.z;
+   float knee=min(1.0,ceiling*0.75);
+   float y=dot(rgb,vec3(0.2126,0.7152,0.0722));
+   float mapped=y<=knee?y:knee+(ceiling-knee)*(y-knee)/(ceiling-knee+y-knee);
+   rgb*=y>0.0?mapped/y:0.0;
+   float largest=max(rgb.r,max(rgb.g,rgb.b));
+   if(largest>ceiling) rgb=mix(vec3(mapped),rgb,(ceiling-mapped)/(largest-mapped));
+   if(starOutput.y==1.0) rgb=starLinearToSrgb(rgb);
+ } else if(starOutput.w==2.0) {
+   // Linear BT.709 relative to paper white -> absolute BT.2020 -> ST2084.
+   rgb=mat3(0.6274039,0.0690973,0.0163914,
+            0.3292830,0.9195404,0.0880133,
+            0.0433131,0.0113623,0.8955953)*rgb*starOutput.y;
+   vec3 p=pow(clamp(rgb/10000.0,vec3(0),vec3(1)),vec3(2610.0/16384.0));
+   rgb=pow((vec3(3424.0/4096.0)+(2413.0/128.0)*p)/(vec3(1)+(2392.0/128.0)*p),vec3(2523.0/32.0));
+ }
+ outColor=vec4(rgb,c.a);
+}
+)GLSL";
+constexpr std::string_view GuiHdrVertex = R"GLSL(#version 450
+layout(location=0) in vec2 aPos;
+layout(location=1) in vec2 aUV;
+layout(location=2) in vec4 aColor;
+layout(push_constant) uniform uPushConstant { vec2 uScale; vec2 uTranslate; } pc;
+out gl_PerVertex { vec4 gl_Position; };
+layout(location=0) out struct { vec4 Color; vec2 UV; } Out;
+vec3 decode(vec3 c) { return mix(c/12.92,pow((c+0.055)/1.055,vec3(2.4)),greaterThan(c,vec3(0.04045))); }
+void main() {
+ Out.Color=vec4(decode(aColor.rgb),aColor.a); Out.UV=aUV;
+ gl_Position=vec4(aPos*pc.uScale+pc.uTranslate,0,1);
+}
+)GLSL";
+constexpr std::string_view GuiHdrFragment = R"GLSL(#version 450
+layout(location=0) out vec4 fColor;
+layout(set=0,binding=0) uniform texture2D _Texture;
+layout(set=1,binding=0) uniform sampler _Sampler;
+layout(location=0) in struct { vec4 Color; vec2 UV; } In;
+vec3 decode(vec3 c) { return mix(c/12.92,pow((c+0.055)/1.055,vec3(2.4)),greaterThan(c,vec3(0.04045))); }
+void main() {
+ vec4 t=texture(sampler2D(_Texture,_Sampler),In.UV.st);
+ fColor=vec4(In.Color.rgb*decode(t.rgb),In.Color.a*t.a);
+}
+)GLSL";
+Result<VkShaderModule> compileShader(std::shared_ptr<Device> const&, String const&, String const&,
+    std::string_view, shaderc_shader_kind, std::optional<std::reference_wrapper<std::vector<std::uint32_t>>> = {});
 thread_local VkResult guiResult = VK_SUCCESS;
 void checkGuiResult(VkResult result) {
   if (result < 0 && guiResult == VK_SUCCESS) guiResult = result;
@@ -575,6 +639,13 @@ struct VulkanRenderer::State {
   bool rendering = false, vsync = true, dirtySwapchain = true, gui = false, frameOpen = false;
   bool sizeLimit = false, multi = true, hdr = true;
   unsigned samples = 0;
+  RenderOutputSettings outputSettings;
+  VkFormat guiFormat = VK_FORMAT_UNDEFINED;
+  std::vector<std::uint32_t> guiHdrShader;
+  std::vector<std::uint32_t> guiHdrVertexShader;
+  Target guiComposition, encodedOutput;
+  Vec4F outputTransform{0, 0, 0, 0};
+  bool transforming = false;
   Vec2U size{0, 0};
   Json config = JsonObject();
   std::map<String, std::shared_ptr<Effect>> effects;
@@ -596,9 +667,12 @@ struct VulkanRenderer::State {
   ~State();
   Result<void> initialize();
   Result<void> recreateSwapchain();
+  void updateHdrMetadata();
+  Result<std::map<String, Framebuffer>> createTargets(Json const&);
+  void installTargets(Json const&, std::map<String, Framebuffer>);
   Result<void> rebuildTargets(Json const&);
   Result<Target> makeTarget(Vec2U, VkFormat, VkSampleCountFlagBits, TextureAddressing, TextureFiltering, bool alpha = true);
-  Result<void> initializeGui();
+  Result<void> initializeGui(VkFormat = VK_FORMAT_UNDEFINED, bool hdrOutput = false);
   Result<void> loadEffect(String const&, Json const&, StringMap<String> const&);
   Result<void> upload(std::shared_ptr<GpuImage> const&);
   Result<void> replacePixels(std::shared_ptr<GpuImage> const&, ImageView const&);
@@ -606,7 +680,8 @@ struct VulkanRenderer::State {
   void endRendering();
   Result<void> beginRendering(Target const&, bool alpha);
   Result<void> clear(Target const&, bool alpha);
-  Result<void> blit(Target const&, Target const&);
+  Result<void> blit(Target const&, Target const&, bool flip = false);
+  Result<void> transform(Target const&, Target const&, Vec4F const&, bool flip = false);
   Result<void> draw(std::shared_ptr<Geometry> const&, Mat3F const&, bool retained);
   Result<VkPipeline> pipeline(Effect&, PipelineKey);
   Result<std::reference_wrapper<Target>> target();
@@ -640,6 +715,10 @@ Result<void> VulkanRenderer::State::initialize() {
     return std::string_view(extension.extensionName) == VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME;
   });
   if (enumeratePortability) instanceExtensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+  device->swapchainColorspace = std::ranges::any_of(availableExtensions, [](auto const& extension) {
+    return std::string_view(extension.extensionName) == VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME;
+  });
+  if (device->swapchainColorspace) instanceExtensions.push_back(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME);
   VkApplicationInfo application{VK_STRUCTURE_TYPE_APPLICATION_INFO};
   application.pApplicationName = "Asterbound"; application.apiVersion = VK_API_VERSION_1_3;
   VkInstanceCreateInfo instance{VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
@@ -684,6 +763,7 @@ Result<void> VulkanRenderer::State::initialize() {
         bestScore = score; device->physical = physical; device->family = family;
         device->properties = properties; device->sampleShading = features.features.sampleRateShading;
         device->portability = has("VK_KHR_portability_subset");
+        device->hdrMetadata = has(VK_EXT_HDR_METADATA_EXTENSION_NAME);
       }
     }
   }
@@ -698,6 +778,7 @@ Result<void> VulkanRenderer::State::initialize() {
   enabled.sampleRateShading = device->sampleShading;
   std::vector<char const*> deviceExtensions{VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME};
   if (device->portability) deviceExtensions.push_back("VK_KHR_portability_subset");
+  if (device->hdrMetadata) deviceExtensions.push_back(VK_EXT_HDR_METADATA_EXTENSION_NAME);
   VkDeviceCreateInfo logical{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
   logical.pNext = &enabled13; logical.queueCreateInfoCount = 1; logical.pQueueCreateInfos = &queue;
   logical.enabledExtensionCount = deviceExtensions.size(); logical.ppEnabledExtensionNames = deviceExtensions.data(); logical.pEnabledFeatures = &enabled;
@@ -727,6 +808,7 @@ Result<void> VulkanRenderer::State::initialize() {
   immediate.device = device; immediate.white = white;
   RENDER_REQUIRE(loadEffect("internal", JsonObject(), {{"vertex", String(BasicVertex)}, {"fragment", String(BasicFragment)}}));
   RENDER_REQUIRE(loadEffect("internalCopy", JsonObject(), {{"vertex", String(BasicVertex)}, {"fragment", String(CopyFragment)}}));
+  RENDER_REQUIRE(loadEffect("internalOutput", JsonObject(), {{"vertex", String(BasicVertex)}, {"fragment", String(OutputFragment)}}));
   currentEffect = "internal";
   int width = 0, height = 0;
   if (!SDL_GetWindowSizeInPixels(&window, &width, &height))
@@ -774,7 +856,8 @@ Result<void> VulkanRenderer::State::recreateSwapchain() {
     newExtent.width = std::clamp(size[0], capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
     newExtent.height = std::clamp(size[1], capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
   }
-  if (!newExtent.width || !newExtent.height) return {};
+  if (!newExtent.width || !newExtent.height)
+    return std::unexpected(RendererException("Vulkan surface has no drawable extent; restore the window before changing output settings"));
   if ((capabilities.supportedUsageFlags & (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)) != (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT))
     return std::unexpected(RendererException("Vulkan surface does not support color attachment presentation image transfers"));
   std::uint32_t count = 0;
@@ -782,10 +865,19 @@ Result<void> VulkanRenderer::State::recreateSwapchain() {
   std::vector<VkSurfaceFormatKHR> formats(count);
   VK_REQUIRE(vkGetPhysicalDeviceSurfaceFormatsKHR(device->physical, device->surface, &count, formats.data()));
   if (formats.size() == 1 && formats[0].format == VK_FORMAT_UNDEFINED) formats[0].format = VK_FORMAT_B8G8R8A8_UNORM;
-  auto chosen = std::find_if(formats.begin(), formats.end(), [](auto const& format) {
+  bool hdrOutput = outputSettings.mode == RenderOutputMode::Hdr10;
+  if (hdrOutput && !device->swapchainColorspace)
+    return std::unexpected(RendererException("HDR10 requires VK_EXT_swapchain_colorspace; use SDR or a Vulkan driver/window system exposing HDR output"));
+  auto chosen = std::find_if(formats.begin(), formats.end(), [hdrOutput](auto const& format) {
+    if (hdrOutput)
+      return (format.format == VK_FORMAT_A2B10G10R10_UNORM_PACK32 || format.format == VK_FORMAT_A2R10G10B10_UNORM_PACK32)
+          && format.colorSpace == VK_COLOR_SPACE_HDR10_ST2084_EXT;
     return (format.format == VK_FORMAT_B8G8R8A8_UNORM || format.format == VK_FORMAT_R8G8B8A8_UNORM) && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
   });
-  if (chosen == formats.end()) return std::unexpected(RendererException("Vulkan surface has no non-sRGB RGBA8/BGRA8 presentation format"));
+  if (chosen == formats.end())
+    return std::unexpected(RendererException(hdrOutput
+        ? "HDR10 unavailable: this Vulkan surface does not advertise HDR10 ST2084 with a 10-bit UNORM format; enable HDR in a capable display/compositor or select SDR"
+        : "Vulkan surface has no non-sRGB RGBA8/BGRA8 presentation format"));
   VkFormatProperties formatSupport;
   vkGetPhysicalDeviceFormatProperties(device->physical, chosen->format, &formatSupport);
   if (!(formatSupport.optimalTilingFeatures & VK_FORMAT_FEATURE_BLIT_DST_BIT))
@@ -836,10 +928,42 @@ Result<void> VulkanRenderer::State::recreateSwapchain() {
     VkSemaphore ready;
     VK_REQUIRE(vkCreateSemaphore(device->logical, &semaphore, nullptr, &ready)); guard.semaphores.push_back(ready);
   }
-  auto screenTarget = makeTarget(Vec2U(newExtent.width, newExtent.height), VK_FORMAT_R8G8B8A8_UNORM, VK_SAMPLE_COUNT_1_BIT, TextureAddressing::Clamp, TextureFiltering::Nearest);
+  auto dimensions = Vec2U(newExtent.width, newExtent.height);
+  auto screenTarget = makeTarget(dimensions, hdrOutput ? VK_FORMAT_R16G16B16A16_SFLOAT : VK_FORMAT_R8G8B8A8_UNORM,
+      VK_SAMPLE_COUNT_1_BIT, TextureAddressing::Clamp, TextureFiltering::Nearest);
   if (!screenTarget) return std::unexpected(std::move(screenTarget.error()));
-  bool hadGui = gui;
-  if (hadGui) { ImGui_ImplVulkan_Shutdown(); gui = false; }
+  Target compositionTarget, encodedTarget;
+  if (hdrOutput) {
+    auto composition = makeTarget(dimensions, VK_FORMAT_R16G16B16A16_SFLOAT, VK_SAMPLE_COUNT_1_BIT, TextureAddressing::Clamp, TextureFiltering::Nearest);
+    if (!composition) return std::unexpected(std::move(composition.error()));
+    compositionTarget = std::move(*composition);
+    auto encoded = makeTarget(dimensions, chosen->format, VK_SAMPLE_COUNT_1_BIT, TextureAddressing::Clamp, TextureFiltering::Nearest);
+    if (!encoded) return std::unexpected(std::move(encoded.error()));
+    encodedTarget = std::move(*encoded);
+  }
+  auto targets = createTargets(config);
+  if (!targets) return std::unexpected(std::move(targets.error()));
+  if (outputSettings.mode != RenderOutputMode::Legacy) {
+    auto mapped = pipeline(*effects.at("internalOutput"), {screenTarget->color->format, VK_SAMPLE_COUNT_1_BIT, true, false});
+    if (!mapped) return std::unexpected(std::move(mapped.error()));
+    if (hdrOutput) {
+      auto encoded = pipeline(*effects.at("internalOutput"), {chosen->format, VK_SAMPLE_COUNT_1_BIT, true, false});
+      if (!encoded) return std::unexpected(std::move(encoded.error()));
+    }
+  }
+  auto newGuiFormat = hdrOutput ? VK_FORMAT_R16G16B16A16_SFLOAT : chosen->format;
+  if (gui && newGuiFormat != guiFormat) {
+    auto oldFormat = guiFormat;
+    ImGui_ImplVulkan_Shutdown(); gui = false;
+    auto initialized = initializeGui(newGuiFormat, hdrOutput);
+    if (!initialized) {
+      if (gui) { ImGui_ImplVulkan_Shutdown(); gui = false; }
+      auto restored = initializeGui(oldFormat, oldFormat == VK_FORMAT_R16G16B16A16_SFLOAT);
+      if (!restored)
+        return std::unexpected(RendererException::format("Vulkan output change failed: {}; restoring ImGui also failed: {}", initialized.error().what(), restored.error().what()));
+      return std::unexpected(std::move(initialized.error()));
+    }
+  }
   for (auto view : swapViews) vkDestroyImageView(device->logical, view, nullptr);
   for (auto semaphore : presentSemaphores) vkDestroySemaphore(device->logical, semaphore, nullptr);
   if (swapchain) vkDestroySwapchainKHR(device->logical, swapchain, nullptr);
@@ -847,15 +971,46 @@ Result<void> VulkanRenderer::State::recreateSwapchain() {
   swapViews = std::move(guard.views); presentSemaphores = std::move(guard.semaphores);
   swapImages = std::move(images); swapLayouts.assign(swapImages.size(), VK_IMAGE_LAYOUT_UNDEFINED);
   swapFormat = chosen->format; extent = newExtent; screen = std::move(*screenTarget);
-  RENDER_REQUIRE(rebuildTargets(config));
+  guiComposition = std::move(compositionTarget); encodedOutput = std::move(encodedTarget);
+  installTargets(config, std::move(*targets));
   dirtySwapchain = false;
-  if (hadGui) return initializeGui();
+  updateHdrMetadata();
   return {};
 }
 
-Result<void> VulkanRenderer::State::initializeGui() {
+void VulkanRenderer::State::updateHdrMetadata() {
+  if (outputSettings.mode == RenderOutputMode::Hdr10 && device->hdrMetadata) {
+    auto setMetadata = reinterpret_cast<PFN_vkSetHdrMetadataEXT>(vkGetDeviceProcAddr(device->logical, "vkSetHdrMetadataEXT"));
+    if (setMetadata) {
+      VkHdrMetadataEXT metadata{VK_STRUCTURE_TYPE_HDR_METADATA_EXT};
+      metadata.displayPrimaryRed = {0.708f, 0.292f}; metadata.displayPrimaryGreen = {0.170f, 0.797f};
+      metadata.displayPrimaryBlue = {0.131f, 0.046f}; metadata.whitePoint = {0.3127f, 0.3290f};
+      metadata.maxLuminance = outputSettings.peakNits; metadata.minLuminance = 0;
+      metadata.maxContentLightLevel = outputSettings.peakNits;
+      // No measured MaxFALL is available. Zero leaves it unspecified rather
+      // than claiming that paper-white or peak is a measured frame average.
+      metadata.maxFrameAverageLightLevel = 0;
+      setMetadata(device->logical, 1, &swapchain, &metadata);
+    }
+  }
+}
+
+Result<void> VulkanRenderer::State::initializeGui(VkFormat format, bool hdrOutput) {
   if (gui) return {};
-  if (swapFormat == VK_FORMAT_UNDEFINED) swapFormat = VK_FORMAT_B8G8R8A8_UNORM;
+  if (format == VK_FORMAT_UNDEFINED) {
+    hdrOutput = outputSettings.mode == RenderOutputMode::Hdr10;
+    format = hdrOutput ? VK_FORMAT_R16G16B16A16_SFLOAT : swapFormat;
+  }
+  if (format == VK_FORMAT_UNDEFINED) format = VK_FORMAT_B8G8R8A8_UNORM;
+  if (hdrOutput && guiHdrShader.empty()) {
+    auto shader = compileShader(device, "internalImGuiHdr", String(GuiHdrFragment), {}, shaderc_fragment_shader, std::ref(guiHdrShader));
+    if (!shader) return std::unexpected(std::move(shader.error()));
+    vkDestroyShaderModule(device->logical, *shader, nullptr);
+    auto vertex = compileShader(device, "internalImGuiHdrVertex", String(GuiHdrVertex), {}, shaderc_vertex_shader, std::ref(guiHdrVertexShader));
+    if (!vertex) { guiHdrShader.clear(); return std::unexpected(std::move(vertex.error())); }
+    vkDestroyShaderModule(device->logical, *vertex, nullptr);
+  }
+  guiFormat = format;
   ImGui_ImplVulkan_InitInfo info{};
   info.ApiVersion = VK_API_VERSION_1_3; info.Instance = device->instance; info.PhysicalDevice = device->physical;
   info.Device = device->logical; info.QueueFamily = device->family; info.Queue = device->queue;
@@ -864,7 +1019,15 @@ Result<void> VulkanRenderer::State::initializeGui() {
   info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
   auto& renderingInfo = info.PipelineInfoMain.PipelineRenderingCreateInfo;
   renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-  renderingInfo.colorAttachmentCount = 1; renderingInfo.pColorAttachmentFormats = &swapFormat;
+  renderingInfo.colorAttachmentCount = 1; renderingInfo.pColorAttachmentFormats = &guiFormat;
+  if (hdrOutput) {
+    info.CustomShaderFragCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    info.CustomShaderFragCreateInfo.codeSize = guiHdrShader.size() * sizeof(std::uint32_t);
+    info.CustomShaderFragCreateInfo.pCode = guiHdrShader.data();
+    info.CustomShaderVertCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    info.CustomShaderVertCreateInfo.codeSize = guiHdrVertexShader.size() * sizeof(std::uint32_t);
+    info.CustomShaderVertCreateInfo.pCode = guiHdrVertexShader.data();
+  }
   info.MinAllocationSize = 1024 * 1024;
   guiResult = VK_SUCCESS; info.CheckVkResultFn = checkGuiResult;
   if (!ImGui_ImplVulkan_Init(&info))
@@ -905,7 +1068,7 @@ Result<RenderEffectParameter> parseParameter(String const& type, Json const& val
   return std::unexpected(RendererException::format("Unknown Vulkan effect parameter type '{}'", type));
 }
 Result<VkShaderModule> compileShader(std::shared_ptr<Device> const& device, String const& name, String const& source,
-    std::string_view declarations, shaderc_shader_kind kind) {
+    std::string_view declarations, shaderc_shader_kind kind, std::optional<std::reference_wrapper<std::vector<std::uint32_t>>> retainedWords) {
   std::string_view text = source.utf8();
   auto lineEnd = text.find('\n');
   if (!text.starts_with("#version 450") || lineEnd == std::string_view::npos)
@@ -968,6 +1131,7 @@ Result<VkShaderModule> compileShader(std::shared_ptr<Device> const& device, Stri
   info.codeSize = bytes; info.pCode = words.data();
   VkShaderModule module;
   VK_REQUIRE(vkCreateShaderModule(device->logical, &info, nullptr, &module));
+  if (retainedWords) retainedWords->get() = std::move(words);
   return module;
 }
 }
@@ -996,7 +1160,7 @@ Result<void> VulkanRenderer::State::loadEffect(String const& name, Json const& d
     "layout(offset=0) vec2 screenSize;\nlayout(offset=16) mat3 vertexTransform;\n"
     "layout(offset=64) vec2 textureSize0;\nlayout(offset=80) vec2 textureSize1;\n"
     "layout(offset=96) vec2 textureSize2;\nlayout(offset=112) vec2 textureSize3;\n";
-  std::set<String> uniformNames{"screenSize", "vertexTransform", "textureSize0", "textureSize1", "textureSize2", "textureSize3", "texture0", "texture1", "texture2", "texture3"};
+  std::set<String> uniformNames{"screenSize", "vertexTransform", "textureSize0", "textureSize1", "textureSize2", "textureSize3", "texture0", "texture1", "texture2", "texture3", "starColorState", "starOutput"};
   JSON_REQUIRE(parameters, definition.getObject("effectParameters", {}));
   // Sort public names so the descriptor/uniform ABI does not depend on hash-map
   // insertion order or JSON object serialization order.
@@ -1049,7 +1213,15 @@ Result<void> VulkanRenderer::State::loadEffect(String const& name, Json const& d
       effect->uniformSize += 16;
     }
   }
-  declarations += "};\n";
+  effect->outputOffset = effect->uniformSize;
+  declarations += std::format("layout(offset={}) vec4 starColorState;\nlayout(offset={}) vec4 starOutput;\n}};\n",
+      effect->uniformSize, effect->uniformSize + 16);
+  effect->uniformSize += 32;
+  declarations += R"GLSL(
+vec3 starSrgbToLinear(vec3 c) { return mix(c/12.92,pow((c+0.055)/1.055,vec3(2.4)),greaterThan(c,vec3(0.04045))); }
+vec3 starLinearToSrgb(vec3 c) { return mix(c*12.92,1.055*pow(max(c,vec3(0)),vec3(1.0/2.4))-0.055,greaterThan(c,vec3(0.0031308))); }
+vec4 starVertexColor(vec4 c) { return vec4(starColorState.x!=0.0?starSrgbToLinear(c.rgb):c.rgb,c.a); }
+)GLSL";
   for (unsigned i = 0; i < 4; ++i)
     declarations += std::format("layout(set=0,binding={}) uniform sampler2D texture{};\n", i + 1, i);
   for (auto const& [textureName, texture] : effect->textures)
@@ -1082,7 +1254,7 @@ Result<void> VulkanRenderer::State::loadEffect(String const& name, Json const& d
   return {};
 }
 
-Result<void> VulkanRenderer::State::rebuildTargets(Json const& definition) {
+Result<std::map<String, Framebuffer>> VulkanRenderer::State::createTargets(Json const& definition) {
   JSON_REQUIRE(definitions, definition.getObject("frameBuffers", {}));
   std::map<String, Framebuffer> replacements;
   for (auto const& [name, value] : *definitions) {
@@ -1108,6 +1280,9 @@ Result<void> VulkanRenderer::State::rebuildTargets(Json const& definition) {
     if (*hdrMode == "enabled") floating = true;
     else if (*hdrMode == "fromsetting") floating = hdr;
     else if (*hdrMode != "disabled") return std::unexpected(RendererException::format("Unknown Vulkan framebuffer HDR mode '{}'", *hdrName));
+    // Every scene/postprocessing target must preserve super-white values,
+    // including targets whose legacy configuration explicitly disabled floats.
+    floating |= outputSettings.mode != RenderOutputMode::Legacy;
     JSON_REQUIRE(sampleCount, value.getUInt("multisample", samples));
     if (*sampleCount > 64 || (*sampleCount && (*sampleCount & (*sampleCount - 1))))
       return std::unexpected(RendererException("Vulkan framebuffer multisample must be 0 or a power of two up to 64"));
@@ -1125,6 +1300,10 @@ Result<void> VulkanRenderer::State::rebuildTargets(Json const& definition) {
     }
     replacements.emplace(name, std::move(framebuffer));
   }
+  return replacements;
+}
+
+void VulkanRenderer::State::installTargets(Json const& definition, std::map<String, Framebuffer> replacements) {
   endRendering();
   framebuffers = std::move(replacements);
   // Inputs hold concrete image generations; refresh them on the next effect
@@ -1133,6 +1312,12 @@ Result<void> VulkanRenderer::State::rebuildTargets(Json const& definition) {
     for (auto const& [texture, framebuffer] : effect->inputs) effect->textures.at(texture).image.reset();
   config = definition;
   currentEffect = "internal"; output.reset();
+}
+
+Result<void> VulkanRenderer::State::rebuildTargets(Json const& definition) {
+  auto replacements = createTargets(definition);
+  if (!replacements) return std::unexpected(std::move(replacements.error()));
+  installTargets(definition, std::move(*replacements));
   return {};
 }
 
@@ -1307,7 +1492,7 @@ Result<VkPipeline> VulkanRenderer::State::pipeline(Effect& effect, PipelineKey k
 
 Result<void> VulkanRenderer::State::draw(std::shared_ptr<Geometry> const& geometry, Mat3F const& transform, bool retained) {
   if (geometry->vertices.empty() || !active) return {};
-  auto effect = effects.at(copying ? String("internalCopy") : currentEffect);
+  auto effect = effects.at(transforming ? String("internalOutput") : copying ? String("internalCopy") : currentEffect);
   auto destination = target();
   if (!destination) return std::unexpected(std::move(destination.error()));
   auto& target = destination->get();
@@ -1358,6 +1543,10 @@ Result<void> VulkanRenderer::State::draw(std::shared_ptr<Geometry> const& geomet
     for (unsigned column = 0; column < 3; ++column)
       for (unsigned row = 0; row < 3; ++row) put(16 + column * 16 + row * 4, transform[row][column]);
     for (unsigned i = 0; i < 4; ++i) put(64 + i * 16, Vec2F(images[i]->size));
+    bool linearInputs = !copying && outputSettings.mode != RenderOutputMode::Legacy
+        && (output.has_value() || outputSettings.mode == RenderOutputMode::Hdr10);
+    put(effect->outputOffset, Vec4F(linearInputs ? 1.0f : 0.0f, 0, 0, 0));
+    put(effect->outputOffset + 16, outputTransform);
     for (auto const& [name, parameter] : effect->parameters) {
       if (!parameter.value) continue;
       std::visit([&](auto const& value) {
@@ -1375,9 +1564,21 @@ Result<void> VulkanRenderer::State::draw(std::shared_ptr<Geometry> const& geomet
     if (!descriptor) return std::unexpected(std::move(descriptor.error()));
     VkDescriptorBufferInfo uniformInfo{uniformSlice->buffer->handle, uniformSlice->offset, effect->uniformSize};
     imageInfos.clear(); imageInfos.reserve(images.size());
-    for (auto const& image : images)
-      imageInfos.push_back({copying ? whiteImage->sampler : image->sampler,
-          image->sampledView ? image->sampledView : image->view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
+    for (std::size_t i = 0; i < images.size(); ++i) {
+      auto const& image = images[i];
+      auto view = image->sampledView ? image->sampledView : image->view;
+      if (linearInputs && i < 4 && image->format == VK_FORMAT_R8G8B8A8_UNORM) {
+        if (!image->srgbView) {
+          VkImageViewCreateInfo info{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+          info.image = image->handle; info.viewType = VK_IMAGE_VIEW_TYPE_2D; info.format = VK_FORMAT_R8G8B8A8_SRGB;
+          info.components.a = image->opaque ? VK_COMPONENT_SWIZZLE_ONE : VK_COMPONENT_SWIZZLE_IDENTITY;
+          info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+          VK_REQUIRE(vkCreateImageView(device->logical, &info, nullptr, &image->srgbView));
+        }
+        view = image->srgbView;
+      }
+      imageInfos.push_back({copying ? whiteImage->sampler : image->sampler, view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
+    }
     auto& writes = descriptorWrites;
     writes.clear(); writes.reserve(images.size() + 1);
     VkWriteDescriptorSet uniformWrite{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
@@ -1420,7 +1621,7 @@ Result<void> VulkanRenderer::State::flush(Mat3F const& transform) {
   return result;
 }
 
-Result<void> VulkanRenderer::State::blit(Target const& source, Target const& destination) {
+Result<void> VulkanRenderer::State::blit(Target const& source, Target const& destination, bool flip) {
   if (!active || source.resolve == destination.resolve) return {};
   // Render a copy, rather than transfer into an MSAA image (which Vulkan
   // forbids). This also handles HDR conversion, scaling and MSAA resolves.
@@ -1430,6 +1631,7 @@ Result<void> VulkanRenderer::State::blit(Target const& source, Target const& des
   Vec4B color(255, 255, 255, 255);
   Vertex a{{0, 0}, {0, 0}, color, 0}, b{{size[0], 0}, {uv[0], 0}, color, 0};
   Vertex c{size, uv, color, 0}, d{{0, size[1]}, {0, uv[1]}, color, 0};
+  if (flip) { a.uv[1] = b.uv[1] = uv[1]; c.uv[1] = d.uv[1] = 0; }
   geometry->vertices = {a, b, c, a, c, d};
   Batch batch; batch.images[0] = source.resolve; batch.textureCount = 1; batch.count = 6;
   geometry->batches.push_back(std::move(batch));
@@ -1439,6 +1641,19 @@ Result<void> VulkanRenderer::State::blit(Target const& source, Target const& des
   } restore{*this};
   copyTarget = destination; copying = true;
   return draw(geometry, Mat3F::identity(), false);
+}
+
+Result<void> VulkanRenderer::State::transform(Target const& source, Target const& destination, Vec4F const& parameters, bool flip) {
+  struct Restore {
+    State& state;
+    std::optional<RectI> scissor;
+    ~Restore() {
+      state.transforming = false; state.outputTransform = Vec4F(0, 0, 0, 0);
+      state.scissor = std::move(scissor);
+    }
+  } restore{*this, std::exchange(scissor, {})};
+  transforming = true; outputTransform = parameters;
+  return blit(source, destination, flip);
 }
 
 Result<void> VulkanRenderer::State::chooseEffect(String const& name) {
@@ -1480,7 +1695,13 @@ Result<void> VulkanRenderer::State::chooseEffect(String const& name) {
     auto inputIndex = effect->pingPong && effect->output && *effect->blit == *effect->output ? 1 - framebuffer.current : framebuffer.current;
     auto destinationTarget = target();
     if (!destinationTarget) return std::unexpected(std::move(destinationTarget.error()));
-    RENDER_REQUIRE(blit(framebuffer.targets[inputIndex], destinationTarget->get()));
+    if (outputSettings.mode != RenderOutputMode::Legacy && name == "interface" && *effect->blit == "main" && !effect->output) {
+      bool sdr = outputSettings.mode == RenderOutputMode::Sdr;
+      RENDER_REQUIRE(transform(framebuffer.targets[inputIndex], destinationTarget->get(),
+          Vec4F(outputSettings.exposure, sdr ? 1.0f : 0.0f, sdr ? 1.0f : outputSettings.peakNits / outputSettings.paperWhiteNits, 1)));
+    } else {
+      RENDER_REQUIRE(blit(framebuffer.targets[inputIndex], destinationTarget->get()));
+    }
   }
   return {};
 }
@@ -1633,6 +1854,23 @@ Result<void> VulkanRenderer::setMainHDR(bool enabled) {
   if (!result) m_state->hdr = previous;
   return result;
 }
+Result<void> VulkanRenderer::setOutputSettings(RenderOutputSettings const& settings) {
+  RENDER_REQUIRE(validateRenderOutputSettings(settings));
+  auto& state = *m_state;
+  if (settings == state.outputSettings) return {};
+  if (state.active || state.frameOpen)
+    return std::unexpected(RendererException("Change Vulkan output settings between frames"));
+  if (!state.size[0] || !state.size[1])
+    return std::unexpected(RendererException("Restore the Vulkan window before changing display output settings"));
+  auto previous = std::exchange(state.outputSettings, settings);
+  if (previous.mode == settings.mode) {
+    if (previous.peakNits != settings.peakNits) state.updateHdrMetadata();
+    return {};
+  }
+  auto result = state.recreateSwapchain();
+  if (!result) state.outputSettings = previous;
+  return result;
+}
 Result<std::shared_ptr<TextureGroup>> VulkanRenderer::createTextureGroup(TextureGroupSize size, TextureFiltering filtering) {
   auto maximum = m_state->device->properties.limits.maxImageDimension2D;
   if (size == TextureGroupSize::Large && (m_state->sizeLimit || maximum < 4096)) size = TextureGroupSize::Medium;
@@ -1715,7 +1953,22 @@ Result<bool> VulkanRenderer::present(ImDrawData& drawData) {
   if (!state.active) return false;
   auto& frame = state.active->get();
   state.endRendering();
-  state.barrier(*state.screen.resolve, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  bool hdrOutput = state.outputSettings.mode == RenderOutputMode::Hdr10;
+  if (hdrOutput) {
+    // Flip the game's bottom-left image exactly once before top-left ImGui.
+    // Both game UI and ImGui are linear relative to the same paper white.
+    RENDER_REQUIRE(state.transform(state.screen, state.guiComposition, Vec4F(0, 0, 0, 0), true));
+    if (state.gui) {
+      RENDER_REQUIRE(state.beginRendering(state.guiComposition, true));
+      ImGui_ImplVulkan_RenderDrawData(&drawData, frame.command);
+      state.endRendering();
+    }
+    // PQ is deliberately last: alpha blending into PQ would be incorrect.
+    RENDER_REQUIRE(state.transform(state.guiComposition, state.encodedOutput,
+        Vec4F(0, state.outputSettings.paperWhiteNits, 0, 2)));
+  }
+  auto const& presentationImage = hdrOutput ? state.encodedOutput.resolve : state.screen.resolve;
+  state.barrier(*presentationImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   auto swapBarrier = [&](VkImageLayout layout, VkAccessFlags access) {
     VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
     barrier.srcAccessMask = state.swapLayouts[state.imageIndex] == VK_IMAGE_LAYOUT_UNDEFINED ? 0 : VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
@@ -1730,12 +1983,12 @@ Result<bool> VulkanRenderer::present(ImDrawData& drawData) {
   copy.srcSubresource = copy.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
   // Internal image row zero is the game's bottom row, exactly like uploaded
   // pixels and OpenGL framebuffer texture coordinates. Flip once for display.
-  copy.srcOffsets[0] = {0, static_cast<int>(state.screen.resolve->size[1]), 0};
-  copy.srcOffsets[1] = {static_cast<int>(state.screen.resolve->size[0]), 0, 1};
+  copy.srcOffsets[0] = {0, hdrOutput ? 0 : static_cast<int>(presentationImage->size[1]), 0};
+  copy.srcOffsets[1] = {static_cast<int>(presentationImage->size[0]), hdrOutput ? static_cast<int>(presentationImage->size[1]) : 0, 1};
   copy.dstOffsets[1] = {static_cast<int>(state.extent.width), static_cast<int>(state.extent.height), 1};
-  vkCmdBlitImage(frame.command, state.screen.resolve->handle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+  vkCmdBlitImage(frame.command, presentationImage->handle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
       state.swapImages[state.imageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy, VK_FILTER_NEAREST);
-  if (state.gui) {
+  if (state.gui && !hdrOutput) {
     swapBarrier(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
     VkRenderingAttachmentInfo color{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
     color.imageView = state.swapViews[state.imageIndex]; color.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;

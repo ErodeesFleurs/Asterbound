@@ -42,6 +42,7 @@ public:
   void setMultiTexturingEnabled(bool) override;
   std::expected<void, StarException> setMultiSampling(unsigned) override;
   std::expected<void, StarException> setMainHDR(bool) override;
+  std::expected<void, StarException> setOutputSettings(RenderOutputSettings const&) override;
   std::expected<std::shared_ptr<TextureGroup>, StarException> createTextureGroup(TextureGroupSize, TextureFiltering) override;
   std::expected<std::shared_ptr<RenderBuffer>, StarException> createRenderBuffer() override;
   List<RenderPrimitive>& immediatePrimitives() override;

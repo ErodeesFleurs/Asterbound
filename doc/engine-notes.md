@@ -152,7 +152,25 @@ Vulkan requires the 1.3 dynamic-rendering API, while runtime shaders target the
 Vulkan 1.2 / SPIR-V 1.5 baseline so ordinary `discard` does not require optional
 1.3 shader-demote features. MSAA sample counts and sample-rate shading, float
 image filtering and attachment formats are checked against device capabilities.
-The HDR setting controls floating-point intermediate targets, not monitor HDR.
+The legacy `hdr` setting controls floating-point intermediate targets, not monitor
+HDR. `renderOutput` separately selects legacy-compatible output, linear-scene SDR
+tone mapping, or Vulkan HDR10; see [output settings](building.md#output-color-and-hdr10).
+
+Linear output keeps scene and postprocess buffers floating-point. Byte sprite
+textures use sRGB sampling views so decoding precedes hardware filtering; vertex
+colors are decoded before interpolation, while float lighting textures remain
+linear. Lighting values above one reach the final scene-to-interface boundary
+without the legacy light-map shoulder. Scene exposure and a luminance-preserving
+highlight shoulder are applied once there, with highlight desaturation only when
+needed to fit the output gamut.
+
+SDR encodes that scene to sRGB before the existing SDR UI. HDR10 instead composes
+ordinary UI and ImGui in linear paper-white-relative space, then converts BT.709
+to BT.2020 and encodes ST2084 PQ into an advertised 10-bit HDR10 swapchain. HDR
+metadata is submitted when the driver supports it; MaxFALL remains unspecified,
+not an invented measurement. Mode changes replace resources transactionally
+between frames; rejected requests preserve the old output and configuration.
+Exposure and luminance-only changes do not recreate the swapchain.
 
 
 ### Visual lighting buffers

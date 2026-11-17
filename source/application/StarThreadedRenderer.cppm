@@ -22,8 +22,8 @@ struct ThreadedRendererState;
 // the ordered stream. Their first backend failure is retained as an owned
 // StarException and returned by consumeFrame, retire, and subsequent fallible
 // frontend calls; no commands except retirement execute after that failure.
-// Config/shader loading, scriptable setters, MSAA and HDR are synchronous
-// barriers: their own recoverable backend errors return directly to the caller.
+// Config/shader loading, scriptable setters, MSAA, float buffers and output
+// settings are synchronous barriers: recoverable errors return to the caller.
 // Shader getters perform an ordered barrier and return the actual backend
 // result, retaining any preceding asynchronous error for the fallible channel.
 class ThreadedRenderer final : public Renderer {
@@ -68,6 +68,7 @@ public:
   void setMultiTexturingEnabled(bool enabled) override;
   [[nodiscard]] std::expected<void, StarException> setMultiSampling(unsigned samples) override;
   [[nodiscard]] std::expected<void, StarException> setMainHDR(bool enabled) override;
+  [[nodiscard]] std::expected<void, StarException> setOutputSettings(RenderOutputSettings const& settings) override;
   [[nodiscard]] std::expected<std::shared_ptr<TextureGroup>, StarException> createTextureGroup(TextureGroupSize size = TextureGroupSize::Medium, TextureFiltering filtering = TextureFiltering::Nearest) override;
   [[nodiscard]] std::expected<std::shared_ptr<RenderBuffer>, StarException> createRenderBuffer() override;
   List<RenderPrimitive>& immediatePrimitives() override;

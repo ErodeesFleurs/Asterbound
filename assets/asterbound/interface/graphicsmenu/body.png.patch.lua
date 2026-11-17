@@ -10,7 +10,7 @@ function patch(original)
   image:copyInto({119, 37}, checkbox) -- Anti-Aliasing
   image:copyInto({19, 26}, checkbox)  -- New Lighting
   image:copyInto({119, 26}, checkbox) -- Hardware Cursor
-  image:copyInto({19, 15}, checkbox) -- HDR
+  image:copyInto({19, 15}, checkbox) -- Float scene buffer
   image:copyInto({119, 15}, checkbox) -- VSync
 
   image:copyInto({119, 79}, image:process("?crop=19;79;117;98")) -- Camera Pan Speed
@@ -22,5 +22,12 @@ function patch(original)
   expanded:copyInto({0, 98}, image:process("?crop=0;70;236;98"))
   -- The FPS slider spans both columns, with its value on the right.
   expanded:copyInto({19, 107}, original:process("?crop=55;108;181;126"))
-  return expanded
+  -- Extend the backdrop without stretching pixels or retaining a center border.
+  local wide = expanded:process("?crop=0;0;1;1?scalenearest=472;205")
+  wide:copyInto({0, 0}, expanded)
+  local edge = original:size()[1] - 24
+  local panel = expanded:process(string.format("?crop=100;50;101;51?scalenearest=%d;205", 448 - edge))
+  wide:copyInto({edge, 0}, panel)
+  wide:copyInto({448, 0}, expanded:process(string.format("?crop=%d;0;%d;205", edge, edge + 24)))
+  return wide
 end

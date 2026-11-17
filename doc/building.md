@@ -195,6 +195,34 @@ alone does not supply a GPU driver. On macOS this also requires an appropriate
 Vulkan implementation such as MoltenVK; native macOS runtime support must be
 checked on the target system.
 
+### Output color and HDR10
+
+Graphics settings stage output mode, scene exposure, HDR paper white and peak
+luminance until **Apply**. **Back** discards those pending changes. A rejected
+output change leaves the previous output usable and shows the backend error in
+the menu; an explicit unsupported HDR10 request never silently selects SDR.
+
+| Configuration key | Default | Meaning / accepted range |
+|---|---|---|
+| `renderOutput` | `"legacy"` | `"legacy"` preserves existing colors; `"sdr"` enables linear-scene tone mapping to SDR; `"hdr10"` requests real HDR10 output |
+| `renderExposure` | `0` | Scene exposure in EV, finite `-10` to `10`; ordinary UI is unaffected |
+| `hdrPaperWhite` | `203` | Diffuse reference white and UI brightness, finite `80` to `500` nits |
+| `hdrPeakLuminance` | `1000` | Output peak, finite and at least paper white, at most `10000` nits |
+
+SDR linear-scene and HDR10 output require Vulkan; OpenGL accepts only legacy
+output. HDR10 additionally requires the window surface to advertise an HDR10
+ST2084 10-bit format and colorspace. Enable HDR in the operating system/display
+configuration where supported; the game does not change desktop color modes.
+Software-GPU validation does not establish physical monitor HDR support.
+
+The existing `hdr` boolean, now labelled **Float scene buffer**, only controls
+legacy floating-point scene storage. It is not a display HDR switch, and its
+existing behavior and default remain unchanged. New SDR/HDR10 output modes
+require floating-point scene storage regardless of that legacy checkbox.
+
+
+### Effect shader variants
+
 Vulkan uses explicit shader variants, not automatic translation of arbitrary
 OpenGL GLSL. Effect configurations retain `effectShaders` for OpenGL and supply
 `effectShadersVulkan` for Vulkan, using Vulkan GLSL and its explicit descriptor

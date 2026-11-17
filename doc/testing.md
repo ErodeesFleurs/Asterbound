@@ -89,6 +89,30 @@ VSync/VRR, monitor HDR, Windows/macOS or all-Mod compatibility evidence. Keep
 actual driver strings and screenshots with comparisons; average FPS or successful
 device creation alone is not rendered-session proof.
 
+The HDR follow-up probe first confirmed that `(2, 4, 8)` survives a float scene
+buffer but clips to white at legacy presentation; dividing before presentation
+recovered the channels. The linear-SDR path then matched independent CPU
+tone-map/alpha references within one byte across 26 sampled results, including
+EV -2/0/+2. White and byte-gray UI stayed at 255/128. A linearly filtered
+black/white byte texture produced midpoint 188, not gamma-filtered 128.
+The same Vulkan probe exercised float-buffer overrides, MSAA, resize, VSync,
+framebuffer reload, mode reselection and unsupported HDR10 rollback, then exited
+normally without core/synchronization validation errors. The three
+`RenderOutputSettings` boundary/nonfinite/JSON-narrowing cases passed.
+The real 800×600 client also exercised the expanded graphics menu: applying SDR,
+displaying an unsupported-HDR10 error without exiting, discarding staged changes
+with Back, and restoring the saved SDR/EV settings on restart. The final header,
+body and footer were inspected in the running client. A separate native OpenGL
+probe rejected linear SDR, accepted legacy again and exited normally. The full
+client's unsupported-output startup logged the intended error but its unattended
+fatal-error path timed out; this is not clean-exit evidence.
+
+This machine's internal eDP panel has a 128-byte EDID with no extension blocks
+or CTA HDR metadata; the isolated software surface advertises no HDR10 format.
+HDR10 rejection is verified, but successful HDR swapchain presentation, physical
+peak/paper-white calibration and HDR UI appearance still require an HDR-capable
+display/compositor. Do not infer those results from SDR screenshots.
+
 
 ## Nix asset-backed tests
 

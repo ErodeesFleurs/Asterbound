@@ -79,6 +79,7 @@ private:
                                                                      List<float> const& values, SettingUpdate update);
   [[nodiscard]] std::expected<void, StarException> applyLiveSetting(String const& key, Json const& value);
   [[nodiscard]] std::expected<void, StarException> syncGui();
+  [[nodiscard]] std::expected<void, StarException> updateOutputSlider(String const& name, String const& key, List<double> const& values);
 
   [[nodiscard]] std::expected<void, StarException> apply();
   [[nodiscard]] std::expected<void, StarException> applyWindowSettings();
@@ -91,6 +92,9 @@ private:
   List<float> m_cameraSpeedList;
   List<double> m_renderFpsPresets;
   List<double> m_renderFpsList;
+  List<double> m_renderExposureList;
+  List<double> m_hdrPaperWhiteList;
+  List<double> m_hdrPeakList;
 
   JsonObject m_localChanges;
   

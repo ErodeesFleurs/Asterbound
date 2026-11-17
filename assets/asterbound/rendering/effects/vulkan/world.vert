@@ -21,6 +21,6 @@ void main() {
   vec2 size = index == 3 ? textureSize3 : index == 2 ? textureSize2 : index == 1 ? textureSize1 : textureSize0;
   fragmentTextureCoordinate = vertexTextureCoordinate / size;
   fragmentTextureIndex = index;
-  fragmentColor = vertexColor;
+  fragmentColor = starVertexColor(vertexColor);
   gl_Position = vec4(screenPosition / screenSize * 2.0 - 1.0, 0.0, 1.0);
 }

@@ -79,6 +79,7 @@ import star.image;
 import star.image_processing;
 import star.text;
 import star.text_painter;
+import star.renderer;
 
 #include "gtest/gtest.h"
 #include "gtest/gtest-spi.h"
@@ -86,6 +87,44 @@ import star.text_painter;
 using namespace Star;
 
 namespace {
+
+TEST(RenderOutputSettings, InclusiveLimitsAndAdjacentFloats) {
+  EXPECT_TRUE(validateRenderOutputSettings({RenderOutputMode::Hdr10, -10, 80, 80}));
+  EXPECT_TRUE(validateRenderOutputSettings({RenderOutputMode::Hdr10, 10, 500, 10000}));
+  EXPECT_TRUE(validateRenderOutputSettings({RenderOutputMode::Sdr, std::numeric_limits<float>::denorm_min(), 203, 203}));
+  EXPECT_FALSE(validateRenderOutputSettings({RenderOutputMode::Hdr10, std::nextafter(-10.0f, -11.0f), 203, 1000}));
+  EXPECT_FALSE(validateRenderOutputSettings({RenderOutputMode::Hdr10, std::nextafter(10.0f, 11.0f), 203, 1000}));
+  EXPECT_FALSE(validateRenderOutputSettings({RenderOutputMode::Hdr10, 0, std::nextafter(80.0f, 0.0f), 1000}));
+  EXPECT_FALSE(validateRenderOutputSettings({RenderOutputMode::Hdr10, 0, std::nextafter(500.0f, 501.0f), 1000}));
+  EXPECT_FALSE(validateRenderOutputSettings({RenderOutputMode::Hdr10, 0, 203, std::nextafter(203.0f, 0.0f)}));
+  EXPECT_FALSE(validateRenderOutputSettings({RenderOutputMode::Hdr10, 0, 203, std::nextafter(10000.0f, 10001.0f)}));
+}
+
+TEST(RenderOutputSettings, RejectsNonfiniteComponents) {
+  for (auto member : {&RenderOutputSettings::exposure, &RenderOutputSettings::paperWhiteNits, &RenderOutputSettings::peakNits}) {
+    for (auto bits : {0x7fc00001u, 0x7f800000u, 0xff800000u}) {
+      RenderOutputSettings settings;
+      settings.*member = std::bit_cast<float>(bits);
+      EXPECT_FALSE(validateRenderOutputSettings(settings));
+    }
+  }
+}
+
+TEST(RenderOutputSettings, ConfigurationChecksBeforeFloatNarrowing) {
+  auto parse = [](double exposure, double paperWhite, double peak) {
+    return renderOutputSettingsFromJson(JsonObject{
+      {"renderOutput", "hdr10"}, {"renderExposure", exposure},
+      {"hdrPaperWhite", paperWhite}, {"hdrPeakLuminance", peak}});
+  };
+  EXPECT_TRUE(parse(-10, 80, 80));
+  EXPECT_TRUE(parse(10, 500, 10000));
+  EXPECT_FALSE(parse(std::nextafter(-10.0, -11.0), 203, 1000));
+  EXPECT_FALSE(parse(std::nextafter(10.0, 11.0), 203, 1000));
+  EXPECT_FALSE(parse(0, std::nextafter(80.0, 0.0), 1000));
+  EXPECT_FALSE(parse(0, std::nextafter(500.0, 501.0), 1000));
+  EXPECT_FALSE(parse(0, 203, std::nextafter(203.0, 0.0)));
+  EXPECT_FALSE(parse(0, 203, std::nextafter(10000.0, 10001.0)));
+}
 
 TEST(MainThreadDispatcher, ConsumerOwnsExecutionAndMoveOnlyResults) {
   MainThreadDispatcher dispatcher;

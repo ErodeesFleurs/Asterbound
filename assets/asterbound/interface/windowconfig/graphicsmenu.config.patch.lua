@@ -72,8 +72,8 @@ function patch(config)
   -- Create hardware cursor toggle
   shift(clone(layout, "multiTextureLabel", "hardwareCursorLabel"), 98, -11).value = "HARDWARE CURSOR"
   shift(clone(layout, "multiTextureCheckbox", "hardwareCursorCheckbox"), 99, -11)
-  -- Create HDR toggle
-  shift(clone(layout, "multiTextureLabel", "hdrLabel"), 0, -22).value = "HDR"
+  -- Legacy float scene storage is independent of display output encoding.
+  shift(clone(layout, "multiTextureLabel", "hdrLabel"), 0, -22).value = "FLOAT SCENE BUFFER"
   shift(clone(layout, "multiTextureCheckbox", "hdrCheckbox"), 0, -22)
   -- VSync is staged alongside the render limit; existing live toggles stay live.
   shift(clone(layout, "hdrLabel", "vsyncLabel"), 98).value = "VSYNC"
@@ -82,8 +82,25 @@ function patch(config)
   -- Create shader menu button
   shift(moveto(clone(layout, "accept", "showShadersMenu"), layout.interfaceScaleSlider), 112, -2).caption = "Shaders"
 
+  -- A second column keeps every output control visible at the existing height.
+  for _, row in ipairs({
+    {"renderOutput", "OUTPUT MODE", 56},
+    {"renderExposure", "SCENE EXPOSURE", 28},
+    {"hdrPaperWhite", "HDR PAPER WHITE", 0},
+    {"hdrPeak", "HDR PEAK LUMINANCE", -28}
+  }) do
+    shift(clone(layout, "renderFpsLabel", row[1] .. "Label"), 236, row[3]).value = row[2]
+    shift(clone(layout, "renderFpsSlider", row[1] .. "Slider"), 236, row[3])
+    shift(clone(layout, "renderFpsValueLabel", row[1] .. "ValueLabel"), 236, row[3])
+  end
+  layout.renderOutputStatusLabel = {
+    type = "label", position = {354, 58}, hAnchor = "mid", vAnchor = "top",
+    wrapWidth = 212, fontSize = 7, mouseTransparent = true, value = ""
+  }
+
 
   shift(layout.title, 0, 52+upshift)
+  layout.title.position[1] = 236
   shift(layout.resLabel, 0, 56+upshift)
   shift(layout.resSlider, 0, 56+upshift)
   shift(layout.resValueLabel, 0, 56+upshift)

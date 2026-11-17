@@ -17,6 +17,7 @@ import star.listener;
 import star.logging;
 import star.format;
 import star.world_camera;
+import star.renderer;
 
 namespace Star {
 
@@ -193,6 +194,7 @@ private:
   std::optional<PresentedCamera> m_inputCamera;
   float m_appliedRenderFpsLimit = -1.0f;
   bool m_appliedVSync = true;
+  std::optional<RenderOutputSettings> m_appliedOutputSettings;
 
   unsigned m_framesSkipped = 0;
   float m_minInterfaceScale = 2;

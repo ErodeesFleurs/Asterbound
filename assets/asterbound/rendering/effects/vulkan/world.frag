@@ -36,6 +36,7 @@ vec4 bicubicSample(sampler2D tex, vec2 texcoord, vec2 texscale) {
 vec3 sampleLight(vec2 coord, vec2 scale) {
   const float threshold = 1.0;
   vec3 rgb = bicubicSample(lightMap, coord, scale).rgb;
+  if (starColorState.x != 0.0) return rgb;
   vec3 lower = min(rgb, threshold);
   vec3 upper = max(rgb, threshold) - threshold;
   return lower + upper / (vec3(1.0) + upper);

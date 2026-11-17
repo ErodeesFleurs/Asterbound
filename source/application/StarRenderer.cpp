@@ -7,10 +7,55 @@ import star.poly;
 import star.bi_map;
 import star.ref_ptr;
 import star.renderer;
+import star.math_common;
 
 import star.vector;
 import star.rect;
 namespace Star {
+
+namespace {
+template <std::floating_point T>
+std::expected<void, StarException> validateOutputLevels(T exposure, T paperWhite, T peak) {
+  if (!is_finite(exposure) || exposure < -10 || exposure > 10)
+    return std::unexpected(RendererException("renderExposure must be finite and between -10 and 10 EV"));
+  if (!is_finite(paperWhite) || paperWhite < 80 || paperWhite > 500)
+    return std::unexpected(RendererException("hdrPaperWhite must be finite and between 80 and 500 nits"));
+  if (!is_finite(peak) || peak < paperWhite || peak > 10000)
+    return std::unexpected(RendererException("hdrPeakLuminance must be finite, at least hdrPaperWhite and at most 10000 nits"));
+  return {};
+}
+}
+
+std::expected<void, StarException> validateRenderOutputSettings(RenderOutputSettings const& settings) {
+  switch (settings.mode) {
+    case RenderOutputMode::Legacy:
+    case RenderOutputMode::Sdr:
+    case RenderOutputMode::Hdr10:
+      return validateOutputLevels(settings.exposure, settings.paperWhiteNits, settings.peakNits);
+  }
+  return std::unexpected(RendererException("renderOutput must be legacy, sdr or hdr10"));
+}
+
+std::expected<RenderOutputSettings, StarException> renderOutputSettingsFromJson(Json const& config) {
+  auto name = config.getString("renderOutput");
+  if (!name)
+    return std::unexpected(std::move(name.error()));
+  auto mode = enumValue<RenderOutputModeNames>(*name);
+  if (!mode)
+    return std::unexpected(RendererException("renderOutput must be legacy, sdr or hdr10"));
+  auto exposure = config.getDouble("renderExposure");
+  if (!exposure)
+    return std::unexpected(std::move(exposure.error()));
+  auto paperWhite = config.getDouble("hdrPaperWhite");
+  if (!paperWhite)
+    return std::unexpected(std::move(paperWhite.error()));
+  auto peak = config.getDouble("hdrPeakLuminance");
+  if (!peak)
+    return std::unexpected(std::move(peak.error()));
+  if (auto result = validateOutputLevels(*exposure, *paperWhite, *peak); !result)
+    return std::unexpected(std::move(result.error()));
+  return RenderOutputSettings{*mode, static_cast<float>(*exposure), static_cast<float>(*paperWhite), static_cast<float>(*peak)};
+}
 
 
 RenderQuad::RenderQuad(Vec2F posA, Vec2F posB, Vec2F posC, Vec2F posD, Vec4B color, float param1) : texture() {

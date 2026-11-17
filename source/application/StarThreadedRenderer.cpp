@@ -20,7 +20,7 @@ using ResourceId = std::uint64_t;
 enum class Operation {
   Begin, End, Resize, Config, EffectConfig, Parameter, Scriptable, EffectTexture,
   Switch, Scissor, Texture, GroupTexture, Group, Buffer, BufferSet, Immediate,
-  DrawBuffer, Flush, SizeLimit, MultiTexture, MultiSampling, HDR,
+  DrawBuffer, Flush, SizeLimit, MultiTexture, MultiSampling, HDR, OutputSettings,
   DeleteTexture, DeleteGroup, DeleteBuffer
 };
 enum class SlotStatus { Available, Sealed, Consuming, Consumed };
@@ -81,6 +81,7 @@ struct CommandSlot {
   std::size_t namedCount = 0;
   std::vector<Json> configs;
   std::vector<ShaderConfig> shaderConfigs;
+  std::vector<RenderOutputSettings> outputSettings;
   // Creation uploads are released after consumption. Only recurring effect
   // uploads retain pixel storage, independently of the command high-water mark.
   std::vector<OwnedImage> creationImages;
@@ -117,6 +118,7 @@ struct CommandSlot {
     effectImageCount = 0;
     configs.clear();
     shaderConfigs.clear();
+    outputSettings.clear();
     creationImages.clear();
   }
 };
@@ -443,6 +445,7 @@ std::expected<void, StarException> ThreadedRendererState::execute(CommandSlot& s
       case Operation::MultiTexture: backend->setMultiTexturingEnabled(command.flag); return {};
       case Operation::MultiSampling: return backend->setMultiSampling(command.number);
       case Operation::HDR: return backend->setMainHDR(command.flag);
+      case Operation::OutputSettings: return backend->setOutputSettings(slot.outputSettings[command.payload]);
       case Operation::DeleteTexture: textures.erase(command.id); return {};
       case Operation::DeleteGroup: groups.erase(command.id); return {};
       case Operation::DeleteBuffer: buffers.erase(command.id); return {};
@@ -656,6 +659,15 @@ std::expected<void, StarException> ThreadedRenderer::setMainHDR(bool enabled) {
   auto command = m_state->append(Operation::HDR);
   if (!command) return std::unexpected(std::move(command.error()));
   command->get().flag = enabled;
+  command->get().synchronous = true;
+  return m_state->barrier();
+}
+std::expected<void, StarException> ThreadedRenderer::setOutputSettings(RenderOutputSettings const& settings) {
+  auto command = m_state->append(Operation::OutputSettings);
+  if (!command) return std::unexpected(std::move(command.error()));
+  auto& values = m_state->writing().outputSettings;
+  command->get().payload = values.size();
+  values.push_back(settings);
   command->get().synchronous = true;
   return m_state->barrier();
 }

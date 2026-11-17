@@ -910,6 +910,15 @@ std::expected<void, StarException> OpenGlRenderer::setMainHDR(bool enabled) {
   return {};
 }
 
+std::expected<void, StarException> OpenGlRenderer::setOutputSettings(RenderOutputSettings const& settings) {
+  auto valid = validateRenderOutputSettings(settings);
+  if (!valid)
+    return std::unexpected(std::move(valid.error()));
+  if (settings.mode != RenderOutputMode::Legacy)
+    return std::unexpected(RendererException("Linear tone-mapped and HDR10 output require the Vulkan renderer; select -renderer vulkan or renderOutput=legacy"));
+  return {};
+}
+
 std::expected<std::shared_ptr<TextureGroup>, StarException> OpenGlRenderer::createTextureGroup(TextureGroupSize textureSize, TextureFiltering filtering) {
   int maxTextureSize;
   glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);

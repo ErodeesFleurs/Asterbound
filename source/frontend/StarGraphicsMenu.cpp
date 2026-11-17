@@ -231,6 +231,17 @@ std::expected<void, StarException> GraphicsMenu::applyLiveSetting(String const& 
   return syncGui();
 }
 
+std::expected<void, StarException> GraphicsMenu::updateOutputSlider(String const& name, String const& key, List<double> const& values) {
+  auto slider = requireChild<SliderBarWidget>(name);
+  if (!slider)
+    return std::unexpected(std::move(slider.error()));
+  auto value = values.at((*slider)->val());
+  if (!value)
+    return std::unexpected(std::move(value.error()));
+  m_localChanges.set(key, value->get());
+  return syncGui();
+}
+
 std::expected<void, StarException> GraphicsMenu::init(std::shared_ptr<UniverseClient> client) {
   GuiReader reader(context());
   reader.registerCallback("cancel", [this](Widget&) -> std::expected<void, StarException> {
@@ -238,7 +249,12 @@ std::expected<void, StarException> GraphicsMenu::init(std::shared_ptr<UniverseCl
     return {};
   });
   reader.registerCallback("accept", [this](Widget&) -> std::expected<void, StarException> {
+    auto status = requireChild<LabelWidget>("renderOutputStatusLabel");
+    if (!status)
+      return std::unexpected(std::move(status.error()));
     if (auto result = apply(); !result)
+      return (*status)->setText(Star::format("^red;{}^reset;", result.error().what()));
+    if (auto result = (*status)->setText("Output settings applied."); !result)
       return std::unexpected(std::move(result.error()));
     return applyWindowSettings();
   });
@@ -265,6 +281,23 @@ std::expected<void, StarException> GraphicsMenu::init(std::shared_ptr<UniverseCl
       return std::unexpected(std::move(rate.error()));
     m_localChanges.set("renderFpsLimit", rate->get());
     return syncGui();
+  });
+  reader.registerCallback("renderOutputSlider", [this](Widget&) -> std::expected<void, StarException> {
+    auto slider = requireChild<SliderBarWidget>("renderOutputSlider");
+    if (!slider)
+      return std::unexpected(std::move(slider.error()));
+    constexpr std::array<std::string_view, 3> modes{"legacy", "sdr", "hdr10"};
+    m_localChanges.set("renderOutput", String(modes.at((*slider)->val())));
+    return syncGui();
+  });
+  reader.registerCallback("renderExposureSlider", [this](Widget&) {
+    return updateOutputSlider("renderExposureSlider", "renderExposure", m_renderExposureList);
+  });
+  reader.registerCallback("hdrPaperWhiteSlider", [this](Widget&) {
+    return updateOutputSlider("hdrPaperWhiteSlider", "hdrPaperWhite", m_hdrPaperWhiteList);
+  });
+  reader.registerCallback("hdrPeakSlider", [this](Widget&) {
+    return updateOutputSlider("hdrPeakSlider", "hdrPeakLuminance", m_hdrPeakList);
   });
   // Zoom and camera speed also update the running configuration immediately.
   reader.registerCallback("zoomSlider", [this](Widget&) -> std::expected<void, StarException> {
@@ -472,7 +505,11 @@ StringList const GraphicsMenu::ConfigKeys = {
   "hardwareCursor",
   "monochromeLighting",
   "newLighting",
-  "hdr"
+  "hdr",
+  "renderOutput",
+  "renderExposure",
+  "hdrPaperWhite",
+  "hdrPeakLuminance"
 };
 
 std::expected<void, StarException> GraphicsMenu::initConfig() {
@@ -501,6 +538,43 @@ std::expected<void, StarException> GraphicsMenu::initConfig() {
     return std::unexpected(std::move(slider.error()));
   if (auto result = (*slider)->setRange(0, m_renderFpsList.size() - 1, 1); !result)
     return std::unexpected(std::move(result.error()));
+  Json localConfig(m_localChanges);
+  if (auto output = renderOutputSettingsFromJson(localConfig); !output)
+    return std::unexpected(std::move(output.error()));
+  m_renderExposureList.clear();
+  for (int step = -20; step <= 20; ++step)
+    m_renderExposureList.push_back(step / 2.0);
+  m_hdrPaperWhiteList.clear();
+  for (int nits = 80; nits <= 500; nits += 10)
+    m_hdrPaperWhiteList.push_back(nits);
+  m_hdrPeakList = {80, 100, 203, 300, 400, 500, 600, 800, 1000, 1500, 2000, 4000, 10000};
+  for (auto const& [name, key, values] : {
+      std::tuple{std::string_view("renderExposureSlider"), std::string_view("renderExposure"), std::ref(m_renderExposureList)},
+      std::tuple{std::string_view("hdrPaperWhiteSlider"), std::string_view("hdrPaperWhite"), std::ref(m_hdrPaperWhiteList)},
+      std::tuple{std::string_view("hdrPeakSlider"), std::string_view("hdrPeakLuminance"), std::ref(m_hdrPeakList)}}) {
+    auto value = localConfig.getDouble(key);
+    if (!value)
+      return std::unexpected(std::move(value.error()));
+    auto& list = values.get();
+    auto position = std::lower_bound(list.begin(), list.end(), *value);
+    if (position == list.end() || *position != *value)
+      list.insert(position, *value);
+    auto control = requireChild<SliderBarWidget>(name);
+    if (!control)
+      return std::unexpected(std::move(control.error()));
+    if (auto result = (*control)->setRange(0, list.size() - 1, 1); !result)
+      return std::unexpected(std::move(result.error()));
+  }
+  auto modeSlider = requireChild<SliderBarWidget>("renderOutputSlider");
+  if (!modeSlider)
+    return std::unexpected(std::move(modeSlider.error()));
+  if (auto result = (*modeSlider)->setRange(0, 2, 1); !result)
+    return std::unexpected(std::move(result.error()));
+  auto status = requireChild<LabelWidget>("renderOutputStatusLabel");
+  if (!status)
+    return std::unexpected(std::move(status.error()));
+  if (auto result = (*status)->setText("Legacy keeps original colors. SDR/HDR10 require Vulkan. HDR10 needs an HDR-enabled display."); !result)
+    return std::unexpected(std::move(result.error()));
   return {};
 }
 
@@ -511,6 +585,7 @@ std::expected<void, StarException> GraphicsMenu::syncGui() {
       return std::unexpected(std::move(label.error()));
     return (*label)->setText(text);
   };
+  Json localConfig(m_localChanges);
   auto resolutionSetting = m_localChanges.get("fullscreenResolution");
   if (!resolutionSetting)
     return std::unexpected(std::move(resolutionSetting.error()));
@@ -587,6 +662,37 @@ std::expected<void, StarException> GraphicsMenu::syncGui() {
     return std::unexpected(std::move(result.error()));
   if (auto result = setRequiredLabel("renderFpsValueLabel", *fps == 0 ? "UNLIMITED" : Star::to_string(*fps)); !result)
     return std::unexpected(std::move(result.error()));
+  auto modeName = localConfig.getString("renderOutput");
+  if (!modeName)
+    return std::unexpected(std::move(modeName.error()));
+  auto mode = enumValue<RenderOutputModeNames>(*modeName);
+  if (!mode)
+    return std::unexpected(std::move(mode.error()));
+  auto modeSlider = requireChild<SliderBarWidget>("renderOutputSlider");
+  if (!modeSlider)
+    return std::unexpected(std::move(modeSlider.error()));
+  if (auto result = (*modeSlider)->setVal(static_cast<unsigned>(*mode), false); !result)
+    return std::unexpected(std::move(result.error()));
+  constexpr std::array<std::string_view, 3> modeLabels{"LEGACY", "SDR (LINEAR)", "HDR10"};
+  if (auto result = setRequiredLabel("renderOutputValueLabel", String(modeLabels.at(static_cast<unsigned>(*mode)))); !result)
+    return std::unexpected(std::move(result.error()));
+  for (auto const& [name, key, values, unit] : {
+      std::tuple{std::string_view("renderExposure"), std::string_view("renderExposure"), std::cref(m_renderExposureList), std::string_view(" EV")},
+      std::tuple{std::string_view("hdrPaperWhite"), std::string_view("hdrPaperWhite"), std::cref(m_hdrPaperWhiteList), std::string_view(" nits")},
+      std::tuple{std::string_view("hdrPeak"), std::string_view("hdrPeakLuminance"), std::cref(m_hdrPeakList), std::string_view(" nits")}}) {
+    auto value = localConfig.getDouble(key);
+    if (!value)
+      return std::unexpected(std::move(value.error()));
+    auto const& list = values.get();
+    auto control = requireChild<SliderBarWidget>(String(name) + "Slider");
+    if (!control)
+      return std::unexpected(std::move(control.error()));
+    auto position = std::lower_bound(list.begin(), list.end(), *value);
+    if (auto result = (*control)->setVal(position - list.begin(), false); !result)
+      return std::unexpected(std::move(result.error()));
+    if (auto result = setRequiredLabel(String(name) + "ValueLabel", Star::format("{}{}", *value, unit)); !result)
+      return std::unexpected(std::move(result.error()));
+  }
   for (auto const& [name, key] : {
       std::pair{std::string_view("speechBubbleCheckbox"), std::string_view("speechBubbles")},
       std::pair{std::string_view("interactiveHighlightCheckbox"), std::string_view("interactiveHighlight")},
@@ -642,6 +748,16 @@ std::expected<void, StarException> GraphicsMenu::apply() {
   auto vsync = vsyncSetting->get().toBool();
   if (!vsync)
     return std::unexpected(std::move(vsync.error()));
+  auto output = renderOutputSettingsFromJson(Json(m_localChanges));
+  if (!output)
+    return std::unexpected(std::move(output.error()));
+  auto renderer = context().renderer();
+  if (!renderer)
+    return std::unexpected(std::move(renderer.error()));
+  // Probe the real backend before persisting: unsupported HDR10 must leave the
+  // previous working mode and configuration available for another selection.
+  if (auto result = renderer->get().setOutputSettings(*output); !result)
+    return std::unexpected(std::move(result.error()));
   for (auto const& [key, value] : m_localChanges) {
     if (auto result = (*configuration)->set(key, value); !result)
       return std::unexpected(std::move(result.error()));

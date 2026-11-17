@@ -155,6 +155,30 @@ public:
 
 using RenderEffectParameter = std::variant<float, int, Vec4F, Vec3F, Vec2F, bool>;
 
+enum class RenderOutputMode {
+  Legacy,
+  Sdr,
+  Hdr10
+};
+inline constexpr auto RenderOutputModeNames = sortedEnumNames(std::to_array<std::pair<RenderOutputMode, std::string_view>>({
+  {RenderOutputMode::Legacy, "legacy"},
+  {RenderOutputMode::Sdr, "sdr"},
+  {RenderOutputMode::Hdr10, "hdr10"}
+}));
+
+struct RenderOutputSettings {
+  RenderOutputMode mode = RenderOutputMode::Legacy;
+  float exposure = 0;
+  float paperWhiteNits = 203;
+  float peakNits = 1000;
+  bool operator==(RenderOutputSettings const&) const = default;
+};
+
+[[nodiscard]] std::expected<void, StarException> validateRenderOutputSettings(RenderOutputSettings const& settings);
+// Reads the persistent renderOutput/renderExposure/hdrPaperWhite/hdrPeakLuminance
+// keys, validating their original numeric values before narrowing to floats.
+[[nodiscard]] std::expected<RenderOutputSettings, StarException> renderOutputSettingsFromJson(Json const& config);
+
 class Renderer {
 public:
   virtual ~Renderer() = default;
@@ -191,6 +215,8 @@ public:
   virtual void setMultiTexturingEnabled(bool enabled) = 0;
   [[nodiscard]] virtual std::expected<void, StarException> setMultiSampling(unsigned multiSampling) = 0;
   [[nodiscard]] virtual std::expected<void, StarException> setMainHDR(bool enabled) = 0;
+  // Recoverable, transactional change: rejection leaves the previous output usable.
+  [[nodiscard]] virtual std::expected<void, StarException> setOutputSettings(RenderOutputSettings const& settings) = 0;
   [[nodiscard]] virtual std::expected<std::shared_ptr<TextureGroup>, StarException> createTextureGroup(TextureGroupSize size = TextureGroupSize::Medium, TextureFiltering filtering = TextureFiltering::Nearest) = 0;
   [[nodiscard]] virtual std::expected<std::shared_ptr<RenderBuffer>, StarException> createRenderBuffer() = 0;
 
@@ -241,4 +267,9 @@ export namespace Star {
   using ::Star::DetachedRenderPrimitive;
   using ::Star::DetachedRenderGeometry;
   using ::Star::RenderEffectParameter;
+  using ::Star::RenderOutputMode;
+  using ::Star::RenderOutputModeNames;
+  using ::Star::RenderOutputSettings;
+  using ::Star::validateRenderOutputSettings;
+  using ::Star::renderOutputSettingsFromJson;
 }

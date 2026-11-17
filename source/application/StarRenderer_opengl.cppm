@@ -66,6 +66,7 @@ public:
   void setMultiTexturingEnabled(bool enabled) override;
   [[nodiscard]] std::expected<void, StarException> setMultiSampling(unsigned multiSampling) override;
   [[nodiscard]] std::expected<void, StarException> setMainHDR(bool enabled) override;
+  [[nodiscard]] std::expected<void, StarException> setOutputSettings(RenderOutputSettings const& settings) override;
   [[nodiscard]] std::expected<std::shared_ptr<TextureGroup>, StarException> createTextureGroup(TextureGroupSize size, TextureFiltering filtering) override;
   [[nodiscard]] std::expected<std::shared_ptr<RenderBuffer>, StarException> createRenderBuffer() override;
 
