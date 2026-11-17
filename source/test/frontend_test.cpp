@@ -790,6 +790,7 @@ const GameTestRegistration textEditorLegacy("TextEditor", "UnselectedEditingFocu
 
 class ScriptTestPane : public BaseScriptPane {
 public:
+  using BaseScriptPane::construct;
   static std::expected<std::shared_ptr<ScriptTestPane>, StarException> create(GuiContext& context, bool interactive = true) {
     return create(context, JsonObject{{"gui", JsonObject{}}, {"interactive", interactive}});
   }
@@ -1667,6 +1668,21 @@ const GameTestRegistration scriptPaneBounds("ScriptPane", "WidgetOnlyPaneHasAuto
   auto explicitSize = BaseScriptPane::create(**context, config, true);
   ASSERT_TRUE(explicitSize) << explicitSize.error().what();
   EXPECT_EQ((*explicitSize)->size(), (Vec2I{100, 40}));
+});
+
+const GameTestRegistration scriptPaneEstablishedBounds("ScriptPane", "EstablishedRootBoundsIgnoreOffscreenControls", [](GameTest& fixture) {
+  auto context = textEditorContext(fixture);
+  ASSERT_TRUE(context) << context.error().what();
+  auto pane = ScriptTestPane::create(**context);
+  ASSERT_TRUE(pane) << pane.error().what();
+  // Background construction establishes root bounds before child layout is
+  // considered. Exercise that state without requiring a graphics context.
+  (*pane)->setSize({128, 90});
+  auto constructed = (*pane)->construct(JsonObject{
+      {"canvas", JsonObject{{"type", "canvas"}, {"position", JsonArray{7, 9}}, {"size", JsonArray{23, 11}}}},
+      {"parked", JsonObject{{"type", "canvas"}, {"position", JsonArray{99999999, 0}}, {"size", JsonArray{128, 90}}}}});
+  ASSERT_TRUE(constructed) << constructed.error().what();
+  EXPECT_EQ((*pane)->size(), (Vec2I{128, 90}));
 });
 
 class InputOrderPane : public Pane {

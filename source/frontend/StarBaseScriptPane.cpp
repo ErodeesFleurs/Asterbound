@@ -397,12 +397,10 @@ std::expected<void, StarException> BaseScriptPane::construct(Json config) {
     if (!configuredSize)
       return std::unexpected(std::move(configuredSize.error()));
     setSize(*configuredSize);
-  } else {
-    // A widget-only script pane has no native background to establish bounds.
-    // Preserve background dimensions while including its declarative children.
-    auto backgroundSize = size();
+  } else if (size() == Vec2I{}) {
+    // Backgrounds establish legacy pane bounds; parked helper widgets must not
+    // enlarge them. Only widget-only panes need bounds inferred from children.
     determineSizeFromChildren();
-    setSize(size().piecewise_max(backgroundSize));
   }
   auto clicks = m_config.getObject("canvasClickCallbacks", {});
   if (!clicks)

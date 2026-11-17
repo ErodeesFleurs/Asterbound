@@ -178,10 +178,12 @@ dormant until reopened. Put cancellation/commit of a presentation request in
 `dismissed()`, not in the general `uninit()` hook.
 
 A pane configuration can specify top-level `size: [width, height]` in interface
-pixels. Otherwise initial root bounds include declarative children and any
-native background. When a script changes Canvas or layout dimensions, update
-the root with `pane.setSize(size)` to keep drawing bounds and input geometry in
-sync.
+pixels. Otherwise a nonzero native background size remains authoritative;
+declarative children determine initial root bounds only when no size has been
+established. Offscreen helper widgets therefore do not enlarge background-based
+windows or shift their anchors. When a script changes Canvas or layout dimensions,
+update the root with `pane.setSize(size)` to keep drawing bounds and input geometry
+in sync.
 Anchored composite HUDs may deliberately keep an explicit zero-sized root and
 negative child positions. Disable root scissoring for their out-of-bounds
 drawing and hit-test the actual child geometry rather than inventing root bounds.
