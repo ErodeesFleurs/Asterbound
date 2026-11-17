@@ -17,6 +17,15 @@
     { "name": "cpr", "version>=": "1.10.5", "features": ["ssl"] }
   ],
   "features": {
+    "vulkan": {
+      "description": "Vulkan client renderer and runtime GLSL compiler",
+      "dependencies": [
+        "vulkan",
+        "shaderc",
+        { "name": "imgui", "features": ["vulkan-binding"] },
+        { "name": "vulkan-loader", "features": ["wayland", "xcb", "xlib"], "platform": "linux" }
+      ]
+    },
     "benchmarks": {
       "description": "Standalone Google Benchmark performance executables",
       "dependencies": [{ "name": "benchmark", "version>=": "1.9.5" }]

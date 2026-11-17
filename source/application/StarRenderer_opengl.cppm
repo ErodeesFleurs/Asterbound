@@ -40,7 +40,7 @@ bool settingModeValue(BoolSettingMode const& mode, bool const& setting);
 
 // OpenGL 2.0 implementation of Renderer.  OpenGL context must be created and
 // active during construction, destruction, and all method calls.
-class OpenGlRenderer : public Renderer {
+class OpenGlRenderer : public NativeRenderer {
 public:
   [[nodiscard]] static std::expected<std::shared_ptr<OpenGlRenderer>, StarException> create(Logger& logger);
   ~OpenGlRenderer() override;
@@ -72,16 +72,16 @@ public:
   List<RenderPrimitive>& immediatePrimitives() override;
   void render(RenderPrimitive primitive) override;
   // Detached views are consumed synchronously into main-owned GPU-format bytes.
-  [[nodiscard]] std::expected<void, StarException> appendImmediate(DetachedRenderGeometry const& geometry);
-  [[nodiscard]] std::expected<void, StarException> setRenderBuffer(std::shared_ptr<RenderBuffer> const& renderBuffer, DetachedRenderGeometry const& geometry);
+  [[nodiscard]] std::expected<void, StarException> appendImmediate(DetachedRenderGeometry const& geometry) override;
+  [[nodiscard]] std::expected<void, StarException> setRenderBuffer(std::shared_ptr<RenderBuffer> const& renderBuffer, DetachedRenderGeometry const& geometry) override;
   [[nodiscard]] std::expected<void, StarException> renderBuffer(std::shared_ptr<RenderBuffer> const& renderBuffer, Mat3F const& transformation) override;
 
   [[nodiscard]] std::expected<void, StarException> flush(Mat3F const& transformation) override;
 
-  [[nodiscard]] std::expected<void, StarException> setScreenSize(Vec2U screenSize);
+  [[nodiscard]] std::expected<void, StarException> setScreenSize(Vec2U screenSize) override;
 
-  [[nodiscard]] std::expected<void, StarException> startFrame();
-  [[nodiscard]] std::expected<void, StarException> finishFrame();
+  [[nodiscard]] std::expected<void, StarException> startFrame() override;
+  [[nodiscard]] std::expected<void, StarException> finishFrame() override;
 
 private:
   explicit OpenGlRenderer(Logger& logger);

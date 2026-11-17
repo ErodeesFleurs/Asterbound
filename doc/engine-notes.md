@@ -66,7 +66,7 @@ Team updates share one configuration snapshot within each update, without cachin
 
 ### Thread ownership
 
-SDL event polling, window operations and OpenGL stay on the main thread. `ClientLogic` exclusively owns client-world updates, client Lua, UI and CPU draw preparation. Main consumes an owned command frame while the worker can run subsequent fixed ticks; the next draw preparation waits for presentation acknowledgment so ImGui is never mutated concurrently. This is backend/logic parallelism, not concurrent access to the live world or parallel Lua execution. Command capture and handoff add CPU and memory costs; higher uncapped FPS is not guaranteed.
+SDL event polling, window operations and both native graphics backends stay on the main thread. `ClientLogic` exclusively owns client-world updates, client Lua, UI and CPU draw preparation. Main consumes an owned command frame while the worker can run subsequent fixed ticks; the next draw preparation waits for presentation acknowledgment so ImGui is never mutated concurrently. This is backend/logic parallelism, not concurrent access to the live world or parallel Lua execution. Command capture and handoff add CPU and memory costs; higher uncapped FPS is not guaranteed.
 
 For CPU accounting, A/A controls and limits on performance claims, see
 [runtime performance evidence](testing.md#runtime-performance-evidence).
@@ -119,12 +119,41 @@ packed vertices into the existing six-vertex triangle order. Rounding flags stil
 use each original outside neighbor; polygons retain their triangle-fan rules.
 This changes neither upload layout nor draw ordering.
 
-Effect-image streaming retains `glTexImage2D`: replacing it unconditionally with
+OpenGL effect-image streaming retains `glTexImage2D`: replacing it unconditionally with
 subimage updates can add overwrite waits instead of improving throughput.
 BGR/BGRA describe source channel order; their storage uses RGB/RGBA internal
 formats. Float images retain RGB32F/RGBA32F storage.
 
-Detached views borrow spans and a required typed reference to main's texture table, not an opaque context or lookup callback; the backend consumes them synchronously without retaining those references. Command builders return checked references. Synchronous main-thread requests remain stack-owned, linked through optional references and executed through a typed interface without queue heap allocations. GPU staging exposes data pointers only at the OpenGL upload boundary.
+Detached views borrow spans and a required typed reference to main's texture table, not an opaque context or lookup callback; the backend consumes them synchronously without retaining those references. Command builders return checked references. Synchronous main-thread requests remain stack-owned, linked through optional references and executed through a typed interface without queue heap allocations. GPU staging exposes data pointers only at native graphics C ABI boundaries.
+
+### Native backend lifetimes
+
+GUI clients include both OpenGL and Vulkan; there is no separate Vulkan build
+switch. Vulkan is the startup default. `NativeRenderer` supplies the main-owned
+frame, resize and detached-geometry interface consumed by `ThreadedRenderer`.
+The runtime selection and explicit shader-variant contract are documented in
+[renderer selection](building.md#renderer-selection).
+
+The single sealed CPU command frame is independent of Vulkan's two fenced GPU
+frames. Resetting a transport slot or acknowledging presentation never permits
+overwriting GPU storage still in use. GPU frames retain texture/atlas allocations,
+image and effect generations, descriptors, upload slices and retained-buffer
+generations until their fences complete. Reusable buffer generations keep their
+capacity without changing bytes referenced by earlier draws.
+
+Vulkan keeps game coordinates and framebuffer sampling in the existing
+bottom-left convention, then flips once when copying to the presentation image.
+ImGui renders afterward in native window coordinates. Normal out-of-date or
+zero-sized presentations retire CPU commands without acknowledging a displayed
+camera or changing input capture. Hidden/minimized Vulkan windows suspend draw
+preparation, not simulation; restoration wakes the owner.
+
+Vulkan requires the 1.3 dynamic-rendering API, while runtime shaders target the
+Vulkan 1.2 / SPIR-V 1.5 baseline so ordinary `discard` does not require optional
+1.3 shader-demote features. MSAA sample counts and sample-rate shading, float
+image filtering and attachment formats are checked against device capabilities.
+The HDR setting controls floating-point intermediate targets, not monitor HDR.
+
 
 ### Visual lighting buffers
 

@@ -20,6 +20,8 @@
   sdl3,
   glew,
   libGL,
+  vulkan-headers,
+  vulkan-loader,
   # This repository's source tree; the CMake layout expects the repository root
   # (source/CMakeLists.txt is configured through `cmakeDir`).
   src,
@@ -234,6 +236,7 @@ let
         libGL
         libopus
       ]
+      ++ lib.optional guiSupport vulkan-loader
       ++ lib.optional (steamSupport || discordSupport) sdks
       ++ lib.optional discordSupport sdkRuntime
       ++ lib.optional qtSupport qt5.qtbase
@@ -288,6 +291,14 @@ stdenv.mkDerivation {
     libGL
     libopus
     opusCmake
+  ]
+  ++ lib.optionals guiSupport [
+    vulkan-headers
+    vulkan-loader
+    (lib.getDev dependencies.shaderc)
+    (lib.getOutput "static" dependencies.shaderc)
+    dependencies.glslang
+    dependencies.spirv-tools
   ]
   ++ lib.optional (steamSupport || discordSupport) sdks
   ++ lib.optional qtSupport qt5.qtbase

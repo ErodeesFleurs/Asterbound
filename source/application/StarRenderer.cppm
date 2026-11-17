@@ -201,6 +201,17 @@ public:
   [[nodiscard]] virtual std::expected<void, StarException> flush(Mat3F const& transformation = Mat3F::identity()) = 0;
 };
 
+// Main-owned command consumer. CPU transport retirement does not imply GPU
+// completion; each backend owns the lifetime of submitted storage and resources.
+class NativeRenderer : public Renderer {
+public:
+  [[nodiscard]] virtual std::expected<void, StarException> appendImmediate(DetachedRenderGeometry const& geometry) = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> setRenderBuffer(std::shared_ptr<RenderBuffer> const& buffer, DetachedRenderGeometry const& geometry) = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> setScreenSize(Vec2U size) = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> startFrame() = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> finishFrame() = 0;
+};
+
 }
 
 export module star.renderer;
@@ -213,6 +224,7 @@ export namespace Star {
   using ::Star::TextureGroup;
   using ::Star::RenderBuffer;
   using ::Star::Renderer;
+  using ::Star::NativeRenderer;
   using ::Star::TextureAddressing;
   using ::Star::TextureAddressingNames;
   using ::Star::TextureFiltering;

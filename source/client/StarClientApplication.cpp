@@ -1095,36 +1095,66 @@ std::expected<void, StarException> ClientApplication::renderReload() {
     if (!exists)
       return std::unexpected(std::move(exists.error()));
     if (!*exists) {
+      if (renderer->rendererId() == "Vulkan")
+        return std::unexpected(RendererException::format("Missing Vulkan effect configuration '{}'; use -renderer opengl or provide an explicit Vulkan effect", path));
       return m_root->logger().warn("No rendering config found for renderer with id '{}'", renderer->rendererId());
     }
     auto config = assets->json(path);
     if (!config)
       return std::unexpected(std::move(config.error()));
-    auto shaderConfig = config->getObject("effectShaders");
-    if (!shaderConfig)
-      return std::unexpected(std::move(shaderConfig.error()));
-    StringMap<String> shaders;
-    for (auto&& entry : *shaderConfig) {
-      if (!entry.second.isType(Json::Type::String))
-        continue;
-      auto shader = entry.second.toString();
-      if (!shader)
-        return std::unexpected(std::move(shader.error()));
+    auto sourceFor = [&](Json const& value) -> std::expected<String, StarException> {
+      auto shader = value.toString();
+      if (!shader) return std::unexpected(std::move(shader.error()));
       auto multiline = shader->has_char('\n');
-      if (!multiline)
-        return std::unexpected(std::move(multiline.error()));
+      if (!multiline) return std::unexpected(std::move(multiline.error()));
       if (!*multiline) {
-        auto relative = AssetPath::relative_to(path, *shader);
-        auto bytes = assets->bytes(relative);
-        if (!bytes)
-          return std::unexpected(std::move(bytes.error()));
+        auto bytes = assets->bytes(AssetPath::relative_to(path, *shader));
+        if (!bytes) return std::unexpected(std::move(bytes.error()));
         *shader = std::string((*bytes)->begin(), (*bytes)->end());
       }
-      shaders[entry.first] = std::move(*shader);
+      return std::move(*shader);
+    };
+    bool vulkan = renderer->rendererId() == "Vulkan";
+    if (vulkan) {
+      auto guards = config->getObject("vulkanLegacySourceGuard", {});
+      if (!guards) return std::unexpected(std::move(guards.error()));
+      if (!guards->empty()) {
+        auto legacy = config->getObject("effectShaders");
+        if (!legacy) return std::unexpected(std::move(legacy.error()));
+        for (auto const& [stage, expectedValue] : *guards) {
+          auto expected = expectedValue.toString();
+          if (!expected) return std::unexpected(std::move(expected.error()));
+          auto entry = legacy->find_ref(stage);
+          if (!entry)
+            return std::unexpected(RendererException::format("Vulkan effect '{}' missing guarded legacy stage '{}'; use -renderer opengl or provide effectShadersVulkan and update/remove vulkanLegacySourceGuard", name, stage));
+          auto source = sourceFor(entry->get());
+          if (!source) return std::unexpected(std::move(source.error()));
+          std::uint64_t fingerprint = 14695981039346656037ull;
+          for (unsigned char byte : source->utf8()) {
+            fingerprint ^= byte;
+            fingerprint *= 1099511628211ull;
+          }
+          if (*expected != Star::format("{:016x}", fingerprint))
+            return std::unexpected(RendererException::format("Vulkan effect '{}' legacy stage '{}' was modified without a matching Vulkan variant; use -renderer opengl or provide effectShadersVulkan and update/remove vulkanLegacySourceGuard", name, stage));
+        }
+      }
+    }
+    auto shaderConfig = vulkan ? config->getObject("effectShadersVulkan") : config->getObject("effectShaders");
+    if (!shaderConfig) {
+      if (vulkan)
+        return std::unexpected(RendererException::format("Effect '{}' has no effectShadersVulkan; use -renderer opengl or provide explicit Vulkan vertex/fragment shaders", name));
+      return std::unexpected(std::move(shaderConfig.error()));
+    }
+    StringMap<String> shaders;
+    for (auto const& [stage, value] : *shaderConfig) {
+      if (!value.isType(Json::Type::String)) continue;
+      auto shader = sourceFor(value);
+      if (!shader) return std::unexpected(std::move(shader.error()));
+      shaders[stage] = std::move(*shader);
     }
     return renderer->loadEffectConfig(name, *config, shaders);
   };
-  auto glConfig = assets->json("/rendering/opengl.config");
+  auto glConfig = assets->json(renderer->rendererId() == "Vulkan" ? "/rendering/vulkan.config" : "/rendering/opengl.config");
   if (!glConfig)
     return std::unexpected(std::move(glConfig.error()));
   auto loaded = renderer->loadConfig(*glConfig);

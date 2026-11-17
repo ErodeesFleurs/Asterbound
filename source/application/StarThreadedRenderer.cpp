@@ -5,7 +5,6 @@ import star.string;
 import star.list;
 import star.image;
 import star.renderer;
-import star.renderer_opengl;
 import star.main_thread_dispatcher;
 import star.threaded_renderer;
 import star.casting;
@@ -128,7 +127,7 @@ struct ProxyBuffer;
 }
 
 struct ThreadedRendererState : std::enable_shared_from_this<ThreadedRendererState> {
-  explicit ThreadedRendererState(std::shared_ptr<OpenGlRenderer> renderer, MainThreadDispatcher& main)
+  explicit ThreadedRendererState(std::shared_ptr<NativeRenderer> renderer, MainThreadDispatcher& main)
     : dispatcher(main), backend(std::move(renderer)), id(backend->rendererId()), screen(backend->screenSize()), scissor(backend->scissorRect()) {
     knownEffects["internal"] = true;
   }
@@ -136,7 +135,7 @@ struct ThreadedRendererState : std::enable_shared_from_this<ThreadedRendererStat
   MainThreadDispatcher& dispatcher;
   // Accessed only by main, including destruction. releaseResources clears it
   // before the last worker-owned proxy can release its shared state.
-  std::shared_ptr<OpenGlRenderer> backend;
+  std::shared_ptr<NativeRenderer> backend;
   std::unordered_map<ResourceId, TexturePtr> textures;
   std::unordered_map<ResourceId, std::shared_ptr<TextureGroup>> groups;
   std::unordered_map<ResourceId, std::shared_ptr<RenderBuffer>> buffers;
@@ -174,7 +173,7 @@ struct ThreadedRendererState : std::enable_shared_from_this<ThreadedRendererStat
   }
   CommandSlot& writing() { return slots[producer]; }
   void destroy(Operation operation, ResourceId resource) {
-    // Proxy destruction is a worker operation; nothing here touches a GL owner.
+    // Proxy destruction is a worker operation; native owners remain on main.
     // After the explicit main-thread release no deletion command is needed.
     if (active.load(std::memory_order_acquire))
       writing().append(operation).id = resource;
@@ -284,8 +283,8 @@ struct ProxyBuffer final : RenderBuffer {
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ProxyBuffer>(); }
   std::expected<void, StarException> set(List<RenderPrimitive>& primitives) override {
-    // OpenGlRenderer::GlRenderBuffer::set borrows, but does not consume, this
-    // list. A detached version is recorded on every mutation, in call order.
+    // The public buffer setter borrows this list. Record an owned detached
+    // version on every mutation, in call order.
     return state->setBuffer(resource, primitives);
   }
   std::shared_ptr<ThreadedRendererState> state;
@@ -369,7 +368,7 @@ std::expected<void, StarException> ThreadedRendererState::execute(CommandSlot& s
   for (std::size_t index = 0; index != slot.commandCount; ++index) {
     auto const& command = slot.commands[index];
     // Deletions remain executable after a failed device operation. All other
-    // commands stop: a failed creation must never turn into a bogus GL draw.
+    // commands stop: a failed creation must never turn into a bogus draw.
     bool deletion = command.operation == Operation::DeleteTexture || command.operation == Operation::DeleteGroup || command.operation == Operation::DeleteBuffer;
     if (!deletion && (synchronousError || failed.load(std::memory_order_acquire))) continue;
     auto result = [&]() -> std::expected<void, StarException> {
@@ -461,7 +460,7 @@ std::expected<void, StarException> ThreadedRendererState::execute(CommandSlot& s
   return status();
 }
 
-ThreadedRenderer::ThreadedRenderer(std::shared_ptr<OpenGlRenderer> backend, MainThreadDispatcher& dispatcher)
+ThreadedRenderer::ThreadedRenderer(std::shared_ptr<NativeRenderer> backend, MainThreadDispatcher& dispatcher)
   : m_state(std::make_shared<ThreadedRendererState>(std::move(backend), dispatcher)) {}
 ThreadedRenderer::~ThreadedRenderer() = default;
 String ThreadedRenderer::rendererId() const { return m_state->id; }
@@ -524,7 +523,7 @@ std::expected<void, StarException> ThreadedRenderer::retire(FrameTicket ticket) 
 }
 std::expected<void, StarException> ThreadedRenderer::drain() {
   if (!m_state->active.load(std::memory_order_acquire)) {
-    // Main has already destroyed every GL owner. Destruction of the remaining
+    // Main has already destroyed every native owner. Remaining
     // Application/frontend handles can only retire CPU-side storage.
     m_state->immediate.clear();
     m_state->writing().reset();
@@ -606,7 +605,7 @@ std::expected<void, StarException> ThreadedRenderer::setEffectScriptableParamete
   return m_state->barrier();
 }
 std::optional<RenderEffectParameter> ThreadedRenderer::getEffectScriptableParameter(String const& effect, String const& name) {
-  return m_state->query([effect = String(effect), name = String(name)](OpenGlRenderer& backend) {
+  return m_state->query([effect = String(effect), name = String(name)](NativeRenderer& backend) {
     return backend.getEffectScriptableParameter(effect, name);
   });
 }

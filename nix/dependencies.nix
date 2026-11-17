@@ -220,6 +220,54 @@ let
       })
   );
 
+  # Runtime shader compilation crosses shaderc's C API, but its implementation
+  # and every transitive C++ archive still use our private libc++/ASan ABI.
+  spirv-tools = instrument (
+    (pkgs.spirv-tools.override { inherit stdenv; }).overrideAttrs (old: {
+      cmakeFlags = (old.cmakeFlags or [ ]) ++ [
+        (lib.cmakeBool "BUILD_SHARED_LIBS" false)
+        (lib.cmakeBool "SPIRV_TOOLS_BUILD_STATIC" true)
+        (lib.cmakeBool "SPIRV_SKIP_TESTS" true)
+        (lib.cmakeBool "SPIRV_SKIP_EXECUTABLES" true)
+        "-UBUILD_TESTING"
+      ];
+    })
+  );
+  glslang = instrument (
+    (pkgs.glslang.override { inherit stdenv spirv-tools gtest; }).overrideAttrs (old: {
+      cmakeFlags = (old.cmakeFlags or [ ]) ++ [
+        (lib.cmakeBool "BUILD_SHARED_LIBS" false)
+        "-UBUILD_TESTING"
+      ];
+    })
+  );
+  shaderc = instrument (
+    (pkgs.shaderc.override { inherit stdenv glslang spirv-tools; }).overrideAttrs (old: {
+      propagatedBuildInputs = (old.propagatedBuildInputs or [ ]) ++ [ spirv-tools ];
+      cmakeFlags = (old.cmakeFlags or [ ]) ++ [
+        (lib.cmakeBool "BUILD_SHARED_LIBS" false)
+        "-UBUILD_TESTING"
+      ];
+      # The unvendored Nix build must use the installed namespaced glslang
+      # targets and explicitly select SPIRV-Tools' static target.
+      postPatch = (old.postPatch or "") + ''
+        substituteInPlace libshaderc/CMakeLists.txt \
+          --replace-fail '  glslang ''${CMAKE_THREAD_LIBS_INIT}' \
+            '  glslang::glslang ''${CMAKE_THREAD_LIBS_INIT}' \
+          --replace-fail '  SPIRV # from glslang' '  glslang::SPIRV # from glslang' \
+          --replace-fail $'  SPIRV-Tools\n' $'  SPIRV-Tools-static\n'
+        substituteInPlace libshaderc_util/CMakeLists.txt \
+          --replace-fail '  glslang SPIRV' '  glslang::glslang glslang::SPIRV'
+        # Imported static targets have no TARGET_OBJECTS; keep those archives
+        # external and let the application link the exported dependency graph.
+        substituteInPlace cmake/utils.cmake \
+          --replace-fail 'if ("''${libtype}" STREQUAL "STATIC_LIBRARY")' \
+            'get_target_property(is_imported ''${target} IMPORTED)
+    if ("''${libtype}" STREQUAL "STATIC_LIBRARY" AND NOT is_imported)'
+      '';
+    })
+  );
+
   # Qt's public APIs and plugin interfaces are C++, so Qt libraries AND its
   # platform/image/style plugins must be linked statically into each tool.
   # Qtbase contains moc/uic/rcc. Only Linguist's lupdate/lrelease family from
@@ -326,6 +374,9 @@ in
     re2
     libcpr
     cpptrace
+    spirv-tools
+    glslang
+    shaderc
     qt5
     sdkRuntime
     ;

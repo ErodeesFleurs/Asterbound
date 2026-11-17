@@ -60,6 +60,36 @@ python3 scripts/ci/smoke-client-startup.py dist/asterbound
 On Windows use `python` and `dist/asterbound.exe`. This is not asset-loading,
 rendered-session or cross-platform gameplay evidence.
 
+### Vulkan/OpenGL rendered-session checks
+
+Both backends are built into GUI clients. Use a private HOME/XDG/D-Bus and
+storage fixture, then select `-renderer opengl` or `-renderer vulkan`; do not
+share writable saves between instances. Vulkan needs an actual WSI surface:
+SDL's OpenGL offscreen path is not a Vulkan window test. Enable the Khronos
+validation layer and synchronization validation when available.
+
+The November 2026 Linux X11/Xvfb check used Mesa 26.3 llvmpipe for both APIs.
+An actual `Application`/`ThreadedRenderer` probe produced byte-identical baseline
+RGB images, including ImGui. It exercised ordered getter/transport-slot reuse,
+texture deletion before native flush, retained-buffer updates after an earlier
+draw, two ping-pong postprocess passes, rejected scriptable parameter types,
+MSAA/HDR toggles, resize, VSync changes, reload and normal teardown. Hidden-window
+checks observed no presentation acknowledgment until restoration and no busy
+render loop. No Vulkan core or synchronization validation errors were observed.
+
+The real Vulkan client also created a private character, entered its ship,
+moved, opened inventory, reloaded assets and exited through Save & Quit.
+A legacy-only shader override was rejected with the affected effect/stage and
+OpenGL/variant migration instructions. The scheduler suite and 58 frontend cases
+passed; frontend execution used a newer compatible glibc loader because a host
+audio dependency required a newer symbol version than the pinned build runtime.
+
+These checks are software-renderer evidence, not hardware performance, physical
+VSync/VRR, monitor HDR, Windows/macOS or all-Mod compatibility evidence. Keep
+actual driver strings and screenshots with comparisons; average FPS or successful
+device creation alone is not rendered-session proof.
+
+
 ## Nix asset-backed tests
 
 These apps package `game_tests`, not `frontend_tests`:

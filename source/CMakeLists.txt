@@ -1,4 +1,12 @@
 cmake_minimum_required(VERSION 3.28)
+option(STAR_BUILD_GUI "Build GUI utilities and Client" ON)
+# vcpkg resolves the manifest during project(), before dependency discovery.
+# Keep Vulkan out of headless dependency installations.
+if(STAR_BUILD_GUI)
+  list(APPEND VCPKG_MANIFEST_FEATURES vulkan)
+  list(REMOVE_DUPLICATES VCPKG_MANIFEST_FEATURES)
+endif()
+
 # Remember command-line configuration flags before project() gives cache entries
 # their normal types. These values take precedence over project defaults.
 foreach(language C CXX)
@@ -127,8 +135,6 @@ endif()
 set(STAR_COMPILER "clang")
 
 # Enable OPTIONs based on the discovered system / environment...
-
-option(STAR_BUILD_GUI "Build GUI utilities and Client" ON)
 
 if(STAR_BUILD_GUI)
   option(STAR_BUILD_QT_TOOLS "Build GUI utilities that require Qt" OFF)
@@ -259,6 +265,7 @@ if(STAR_ENABLE_DISCORD_INTEGRATION)
 endif()
 
 
+
 # Compiler/configuration defaults belong only to in-tree compiled targets.
 include(StarBuildOptions)
 if(STAR_SYSTEM_LINUX)
@@ -346,6 +353,26 @@ if(STAR_BUILD_GUI)
   if(NOT STAR_SYSTEM_HAIKU)
     find_package(Opus CONFIG REQUIRED)
   endif()
+
+  find_package(Vulkan 1.3 REQUIRED)
+  add_library(star_shaderc_dependencies INTERFACE)
+  find_package(unofficial-shaderc CONFIG QUIET)
+  if(TARGET unofficial::shaderc::shaderc)
+    target_link_libraries(star_shaderc_dependencies INTERFACE unofficial::shaderc::shaderc)
+  else()
+    # Nix's unvendored shaderc archive does not contain its external static
+    # glslang/SPIRV-Tools closure. Use their exported targets, not -lstdc++ or
+    # a shared distro shaderc built against a different C++ ABI.
+    find_path(STAR_SHADERC_INCLUDE_DIR shaderc/shaderc.h REQUIRED)
+    find_library(STAR_SHADERC_COMBINED_LIBRARY NAMES shaderc_combined REQUIRED)
+    target_include_directories(star_shaderc_dependencies SYSTEM INTERFACE ${STAR_SHADERC_INCLUDE_DIR})
+    find_package(glslang CONFIG REQUIRED)
+    find_package(SPIRV-Tools-opt CONFIG REQUIRED)
+    target_link_libraries(star_shaderc_dependencies INTERFACE
+      "${STAR_SHADERC_COMBINED_LIBRARY}" glslang::SPIRV SPIRV-Tools-opt)
+  endif()
+  target_link_libraries(star_application_dependencies INTERFACE
+    Vulkan::Vulkan star_shaderc_dependencies)
 
   target_link_libraries(star_application_dependencies INTERFACE
     ${STAR_SDL_TARGET}

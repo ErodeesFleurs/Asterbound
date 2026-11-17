@@ -44,6 +44,7 @@ import star.casting;
 import star.texture_atlas;
 
 import star.renderer_opengl;
+import star.renderer_vulkan;
 import star.ordered_map;
 import star.lru_cache;
 import star.random;
@@ -515,7 +516,18 @@ public:
     cmdLineArgs.erase(cmdLineArgs.begin());
 
     StringList platformArguments;
+    String selectedRenderer = "vulkan";
+    if (auto configured = std::getenv("ASTERBOUND_RENDERER"))
+      selectedRenderer = String(std::string_view(configured));
     for (auto it = cmdLineArgs.begin(); it != cmdLineArgs.end();) {
+      if (*it == "-renderer") {
+        it = cmdLineArgs.erase(it);
+        if (it == cmdLineArgs.end())
+          return std::unexpected(ApplicationException("The -renderer option requires opengl or vulkan"));
+        selectedRenderer = std::move(*it);
+        it = cmdLineArgs.erase(it);
+        continue;
+      }
       auto platformArgument = it->starts_with("+platform");
       if (!platformArgument)
         return std::unexpected(std::move(platformArgument.error()));
@@ -526,6 +538,9 @@ public:
         ++it;
       }
     }
+    if (selectedRenderer != "opengl" && selectedRenderer != "vulkan")
+      return std::unexpected(ApplicationException::format("Unknown renderer '{}'; expected opengl or vulkan", selectedRenderer));
+    m_useVulkan = selectedRenderer == "vulkan";
     if (auto result = m_cursorRandom.seed(); !result)
       return std::unexpected(std::move(result.error()));
 
@@ -617,11 +632,11 @@ public:
 
     if (auto result = m_logger->get().info("Application: Creating SDL window"); !result)
       return std::unexpected(std::move(result.error()));
-#ifdef STAR_SYSTEM_MACOS
-    m_sdlWindow.reset(SDL_CreateWindow(m_windowTitle.utf8_data(), m_windowSize[0], m_windowSize[1], SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE));
-#else
-    m_sdlWindow.reset(SDL_CreateWindow(m_windowTitle.utf8_data(), m_windowSize[0], m_windowSize[1], SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY));
+    SDL_WindowFlags windowFlags = SDL_WINDOW_RESIZABLE | (m_useVulkan ? SDL_WINDOW_VULKAN : SDL_WINDOW_OPENGL);
+#ifndef STAR_SYSTEM_MACOS
+    windowFlags |= SDL_WINDOW_HIGH_PIXEL_DENSITY;
 #endif
+    m_sdlWindow.reset(SDL_CreateWindow(m_windowTitle.utf8_data(), m_windowSize[0], m_windowSize[1], windowFlags));
     if (!m_sdlWindow)
       return std::unexpected(ApplicationException::format("Application: Could not create SDL Window: {}", SDL_GetError()));
     
@@ -716,19 +731,21 @@ public:
     SDL_SetHint(SDL_HINT_AUDIO_DEVICE_APP_ICON_NAME, "asterbound");
 #endif
 
-    if (auto result = m_logger->get().info("Application: Creating SDL OpenGL context"); !result)
-      return std::unexpected(std::move(result.error()));
-    static const std::pair<int,int> versions[] = {{4,6},{4,5},{4,4},{4,3},{4,2},{4,1},{4,0},{3,3},{3,2},{3,1}};
-    for (auto& [majorVersion, minorVersion] : versions) {
-      SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
-      SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-      SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, majorVersion);
-      SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minorVersion);
-      m_sdlGlContext.reset(SDL_GL_CreateContext(m_sdlWindow.get()));
-      if (m_sdlGlContext) break;
+    if (!m_useVulkan) {
+      if (auto result = m_logger->get().info("Application: Creating SDL OpenGL context"); !result)
+        return std::unexpected(std::move(result.error()));
+      static const std::pair<int,int> versions[] = {{4,6},{4,5},{4,4},{4,3},{4,2},{4,1},{4,0},{3,3},{3,2},{3,1}};
+      for (auto& [majorVersion, minorVersion] : versions) {
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, majorVersion);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minorVersion);
+        m_sdlGlContext.reset(SDL_GL_CreateContext(m_sdlWindow.get()));
+        if (m_sdlGlContext) break;
+      }
+      if (!m_sdlGlContext)
+        return std::unexpected(ApplicationException::format("Application: Could not create OpenGL context: {}", SDL_GetError()));
     }
-    if (!m_sdlGlContext)
-      return std::unexpected(ApplicationException::format("Application: Could not create OpenGL context: {}", SDL_GetError()));
 
     SDL_ShowWindow(m_sdlWindow.get());
     SDL_RaiseWindow(m_sdlWindow.get());
@@ -738,9 +755,11 @@ public:
     SDL_GetWindowSize(m_sdlWindow.get(), &width, &height);
     m_windowSize = Vec2U(width, height);
 
-    SDL_GL_SwapWindow(m_sdlWindow.get());
-    if (auto result = setVSyncEnabled(m_windowVSync); !result)
-      return std::unexpected(std::move(result.error()));
+    if (!m_useVulkan) {
+      SDL_GL_SwapWindow(m_sdlWindow.get());
+      if (auto result = setVSyncEnabled(m_windowVSync); !result)
+        return std::unexpected(std::move(result.error()));
+    }
 
     SDL_StopTextInput(m_sdlWindow.get());
 
@@ -770,13 +789,21 @@ public:
       SDL_ResumeAudioDevice(SDL_GetAudioStreamDevice(m_sdlAudioOutputStream.get()));
     }
 
-    auto renderer = OpenGlRenderer::create(m_logger->get());
-    if (!renderer)
-      return std::unexpected(std::move(renderer.error()));
-    m_glRenderer = std::move(*renderer);
-    if (auto result = m_glRenderer->setScreenSize(m_windowSize); !result)
+    if (m_useVulkan) {
+      auto renderer = VulkanRenderer::create(m_logger->get(), *m_sdlWindow, m_windowVSync);
+      if (!renderer)
+        return std::unexpected(std::move(renderer.error()));
+      m_vulkanRenderer = std::move(*renderer);
+      m_nativeRenderer = m_vulkanRenderer;
+    } else {
+      auto renderer = OpenGlRenderer::create(m_logger->get());
+      if (!renderer)
+        return std::unexpected(std::move(renderer.error()));
+      m_nativeRenderer = std::move(*renderer);
+    }
+    if (auto result = m_nativeRenderer->setScreenSize(m_windowSize); !result)
       return std::unexpected(std::move(result.error()));
-    m_renderer = std::make_shared<ThreadedRenderer>(m_glRenderer, m_dispatcher);
+    m_renderer = std::make_shared<ThreadedRenderer>(m_nativeRenderer, m_dispatcher);
 
     m_cursorCache.set_time_to_live(std::chrono::milliseconds(30000));
 
@@ -793,13 +820,20 @@ public:
     float main_scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
     style.ScaleAllSizes(main_scale);
 
-    m_imguiSdlInitialized = ImGui_ImplSDL3_InitForOpenGL(m_sdlWindow.get(), m_sdlGlContext.get());
+    m_imguiSdlInitialized = m_useVulkan
+      ? ImGui_ImplSDL3_InitForVulkan(m_sdlWindow.get())
+      : ImGui_ImplSDL3_InitForOpenGL(m_sdlWindow.get(), m_sdlGlContext.get());
     if (!m_imguiSdlInitialized)
       return std::unexpected(ApplicationException::format("Application: Could not initialize ImGui SDL backend: {}", SDL_GetError()));
     installImguiPlatformCallbacks();
-    m_imguiOpenGlInitialized = ImGui_ImplOpenGL3_Init(nullptr);
-    if (!m_imguiOpenGlInitialized)
-      return std::unexpected(ApplicationException("Application: Could not initialize ImGui OpenGL backend"));
+    if (m_vulkanRenderer) {
+      if (auto initialized = m_vulkanRenderer->initializeGui(); !initialized)
+        return std::unexpected(std::move(initialized.error()));
+    } else {
+      m_imguiOpenGlInitialized = ImGui_ImplOpenGL3_Init(nullptr);
+      if (!m_imguiOpenGlInitialized)
+        return std::unexpected(ApplicationException("Application: Could not initialize ImGui OpenGL backend"));
+    }
 
     m_renderTicker.reset();
     m_focused.store((SDL_GetWindowFlags(m_sdlWindow.get()) & SDL_WINDOW_INPUT_FOCUS) != 0, std::memory_order_relaxed);
@@ -900,13 +934,13 @@ public:
         if (auto drained = m_renderer->drain(); !drained && result)
           result = std::unexpected(std::move(drained.error()));
       }
-      // SDK callbacks and GL diagnostics borrow the Root logger. Join/release
+      // SDK callbacks and native diagnostics borrow the Root logger. Join/release
       // their native owners while the worker is paused and Root is still alive.
       auto nativeReleased = m_dispatcher.invoke([&]() -> std::expected<void, StarException> {
         m_mainThreadServices.reset();
         m_platformServices.reset();
         auto released = m_renderer ? m_renderer->releaseResources() : std::expected<void, StarException>{};
-        m_glRenderer.reset();
+        releaseNativeRenderer();
         return released;
       });
       if (!nativeReleased && result)
@@ -1080,13 +1114,26 @@ private:
     auto finishStart = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
     auto result = m_renderer->consumeFrame(frame->ticket);
     auto guiStart = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
-    if (result)
+    if (result && !m_useVulkan)
       ImGui_ImplOpenGL3_RenderDrawData(frame->drawData);
     auto presentStart = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
-    if (result && !SDL_GL_SwapWindow(m_sdlWindow.get()))
-      result = std::unexpected(ApplicationException::format("Application: Could not present OpenGL frame: {}", SDL_GetError()));
-    auto presentEnd = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
+    bool presented = false;
     if (result) {
+      if (m_vulkanRenderer) {
+        auto nativePresent = m_vulkanRenderer->present(*frame->drawData);
+        if (!nativePresent)
+          result = std::unexpected(std::move(nativePresent.error()));
+        else
+          presented = *nativePresent;
+      } else {
+        if (!SDL_GL_SwapWindow(m_sdlWindow.get()))
+          result = std::unexpected(ApplicationException::format("Application: Could not present OpenGL frame: {}", SDL_GetError()));
+        else
+          presented = true;
+      }
+    }
+    auto presentEnd = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
+    if (presented) {
       m_captureKeyboard = frame->captureKeyboard;
       m_captureText = frame->captureText;
       m_captureMouse = frame->captureMouse;
@@ -1095,7 +1142,7 @@ private:
     frame->timings.gui += (presentStart - guiStart).count();
     frame->timings.present = (presentEnd - presentStart).count();
     frame->timings.total = (presentEnd - frame->started).count();
-    float rate = result ? m_renderTicker.tick() : 0.0f;
+    float rate = presented ? m_renderTicker.tick() : m_completedRenderRate;
     {
       std::lock_guard lock(m_pipelineMutex);
       m_completedTimings = frame->timings;
@@ -1103,6 +1150,7 @@ private:
       if (!result)
         m_pipelineError.emplace(std::move(result.error()));
       m_frameCompleted = true;
+      m_framePresented = presented;
     }
     m_dispatcher.wake();
   }
@@ -1111,6 +1159,7 @@ private:
     while (m_ownerFrame) {
       auto observed = m_dispatcher.generation();
       bool completed;
+      bool presented = false;
       std::optional<StarException> error;
       {
         std::lock_guard lock(m_pipelineMutex);
@@ -1118,6 +1167,7 @@ private:
         if (completed) {
           m_frameCompleted = false;
           m_renderRate = m_completedRenderRate;
+          presented = m_framePresented;
           m_application->recordFrameTimings(m_completedTimings);
           error = std::move(m_pipelineError);
           m_pipelineError.reset();
@@ -1136,8 +1186,10 @@ private:
         return std::unexpected(std::move(*error));
       if (!retired)
         return std::unexpected(std::move(retired.error()));
-      if (auto presented = m_application->framePresented(); !presented)
-        return std::unexpected(std::move(presented.error()));
+      if (presented) {
+        if (auto acknowledged = m_application->framePresented(); !acknowledged)
+          return std::unexpected(std::move(acknowledged.error()));
+      }
     }
     return {};
   }
@@ -1176,12 +1228,16 @@ private:
         // Void native state is coalesced by the main event pump.
         auto renderStart = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
         bool prepared = false;
-        if (!m_ownerFrame && !m_quitRequested && m_scheduler.beginRender(renderStart)) {
-          // Only backend setup touches SDL/GL. Main owns IO until this call
+        bool renderSuspended = m_renderSuspended.load(std::memory_order_relaxed);
+        if (!renderSuspended && !m_ownerFrame && !m_quitRequested && m_scheduler.beginRender(renderStart)) {
+          // Only backend setup touches SDL/GPU. Main owns IO until this call
           // returns; afterward it does not touch ImGui until consuming us.
           m_dispatcher.invoke([&] {
             processImguiEvents();
-            ImGui_ImplOpenGL3_NewFrame();
+            if (m_vulkanRenderer)
+              m_vulkanRenderer->newGuiFrame();
+            else
+              ImGui_ImplOpenGL3_NewFrame();
             ImGui_ImplSDL3_NewFrame();
           });
           ImGui::NewFrame();
@@ -1222,7 +1278,7 @@ private:
           m_quitRequested = true;
         auto throttleStart = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
         if (!m_quitRequested) {
-          auto sleep = m_ownerFrame ? m_scheduler.updateSleepTime(throttleStart) : m_scheduler.sleepTime(throttleStart);
+          auto sleep = m_ownerFrame || renderSuspended ? m_scheduler.updateSleepTime(throttleStart) : m_scheduler.sleepTime(throttleStart);
           if (sleep > std::chrono::duration<double>::zero())
             m_dispatcher.wait(observed, sleep);
         }
@@ -1269,6 +1325,13 @@ private:
     }
   }
 
+  void releaseNativeRenderer() {
+    if (m_vulkanRenderer)
+      m_vulkanRenderer->shutdownGui();
+    m_vulkanRenderer.reset();
+    m_nativeRenderer.reset();
+  }
+
   [[nodiscard]] std::expected<void, StarException> releaseResources() {
     if (!m_sdlInitialized) {
       m_application.reset();
@@ -1282,7 +1345,7 @@ private:
     m_mainThreadServices.reset();
     m_platformServices.reset();
     m_renderer.reset();
-    m_glRenderer.reset();
+    releaseNativeRenderer();
     if (std::exchange(m_imguiOpenGlInitialized, false))
       ImGui_ImplOpenGL3_Shutdown();
     if (std::exchange(m_imguiSdlInitialized, false)) {
@@ -1797,6 +1860,13 @@ private:
         m_ownerEvents.emplace_back(OwnerEvent{.input = std::move(starEvent)});
       }
     }
+    if (m_useVulkan) {
+      auto flags = SDL_GetWindowFlags(m_sdlWindow.get());
+      bool suspended = (flags & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN))
+        || m_windowSize[0] == 0 || m_windowSize[1] == 0;
+      if (m_renderSuspended.exchange(suspended, std::memory_order_relaxed) != suspended)
+        m_dispatcher.wake();
+    }
 
     if (m_cursorVisible || (m_platformServices && m_platformServices->overlayActive()))
       SDL_ShowCursor();
@@ -1945,6 +2015,8 @@ private:
   }
 
   [[nodiscard]] std::expected<void, StarException> setVSyncEnabled(bool vsyncEnabled) {
+    if (m_vulkanRenderer)
+      return m_vulkanRenderer->setVSyncEnabled(vsyncEnabled);
     if (vsyncEnabled) {
       // If VSync is requested, try for late swap tearing first, then fall back
       // to regular VSync
@@ -2139,6 +2211,7 @@ private:
 
   String m_windowTitle = "Asterbound";
   bool m_windowVSync = true;
+  bool m_useVulkan = false;
   unsigned m_maxFrameSkip = 5;
   bool m_cursorVisible = true;
   bool m_cursorHardware = true;
@@ -2150,7 +2223,8 @@ private:
   std::atomic<float> m_displayScale = 1.0f;
 
   std::shared_ptr<ThreadedRenderer> m_renderer;
-  std::shared_ptr<OpenGlRenderer> m_glRenderer;
+  std::shared_ptr<NativeRenderer> m_nativeRenderer;
+  std::shared_ptr<VulkanRenderer> m_vulkanRenderer;
   std::optional<NativeUiContextScope> m_nativeContextScope;
   std::optional<std::reference_wrapper<Logger>> m_logger;
   MainThreadDispatcher m_dispatcher;
@@ -2158,6 +2232,7 @@ private:
   bool m_pollingEnabled = false;
   bool m_steamIsFlatpak = false;
   std::atomic<bool> m_focused = false;
+  std::atomic<bool> m_renderSuspended = false;
   // Main-owned capture policy of the last successfully presented ImGui frame.
   bool m_captureKeyboard = false;
   bool m_captureText = false;
@@ -2168,6 +2243,7 @@ private:
   Application::FrameTimings m_completedTimings;
   float m_completedRenderRate = 0.0f;
   bool m_frameCompleted = false;
+  bool m_framePresented = false;
   std::optional<StarException> m_pipelineError;
   std::mutex m_eventMutex;
   std::vector<OwnerEvent> m_ownerEvents;

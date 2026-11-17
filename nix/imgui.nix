@@ -1,4 +1,4 @@
-{ lib, stdenv, fetchFromGitHub, cmake, ninja, sdl3, freetype, libGL, guiSupport ? true }:
+{ lib, stdenv, fetchFromGitHub, cmake, ninja, sdl3, freetype, libGL, vulkan-headers, vulkan-loader, guiSupport ? true }:
 
 stdenv.mkDerivation {
   pname = "openstarbound-imgui";
@@ -18,7 +18,8 @@ stdenv.mkDerivation {
   nativeBuildInputs = [ cmake ninja ];
   propagatedBuildInputs = [ freetype ]
     ++ lib.optional guiSupport sdl3
-    ++ lib.optional (guiSupport && stdenv.hostPlatform.isLinux) libGL;
+    ++ lib.optional (guiSupport && stdenv.hostPlatform.isLinux) libGL
+    ++ lib.optionals guiSupport [ vulkan-headers vulkan-loader ];
   # Its C++ API shares the program's private bundled libc++ runtime.
   cmakeFlags = [
     (lib.cmakeBool "BUILD_SHARED_LIBS" false)
@@ -37,7 +38,7 @@ stdenv.mkDerivation {
   '';
 
   meta = {
-    description = "ImGui 1.92.8 with FreeType and optional SDL3/OpenGL3 backends";
+    description = "ImGui 1.92.8 with FreeType and optional SDL3/OpenGL3/Vulkan backends";
     homepage = "https://github.com/ocornut/imgui";
     license = lib.licenses.mit;
     platforms = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];

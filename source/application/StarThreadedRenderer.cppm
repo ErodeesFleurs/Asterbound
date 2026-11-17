@@ -6,7 +6,6 @@ import star.string;
 import star.list;
 import star.image;
 import star.renderer;
-import star.renderer_opengl;
 import star.main_thread_dispatcher;
 import star.vector;
 import star.matrix3;
@@ -16,7 +15,7 @@ namespace Star {
 struct ThreadedRendererState;
 
 // Worker-owned Renderer frontend. Only consumeFrame/releaseResources run on the
-// context-owning main thread. The caller acknowledges swap before retire and
+// native-backend main thread. The caller acknowledges presentation before retire and
 // must not start another preparation before that acknowledgment.
 //
 // Resource creation, native draw parameters and drawing report acceptance into
@@ -35,7 +34,7 @@ public:
     bool operator==(FrameTicket const&) const = default;
   };
 
-  ThreadedRenderer(std::shared_ptr<OpenGlRenderer> backend, MainThreadDispatcher& dispatcher);
+  ThreadedRenderer(std::shared_ptr<NativeRenderer> backend, MainThreadDispatcher& dispatcher);
   ~ThreadedRenderer() override;
   ThreadedRenderer(ThreadedRenderer const&) = delete;
   ThreadedRenderer& operator=(ThreadedRenderer const&) = delete;
@@ -49,7 +48,7 @@ public:
   // Also called by the worker on every exit path, before joining.
   [[nodiscard]] std::expected<void, StarException> drain();
   // Main only, worker paused after final drain, before Application/Root dies.
-  // Clears every GL owner/backend reference even after a device error.
+  // Clears every native owner/backend reference even after a device error.
   [[nodiscard]] std::expected<void, StarException> releaseResources();
   [[nodiscard]] std::expected<void, StarException> setScreenSize(Vec2U size);
 

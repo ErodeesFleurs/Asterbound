@@ -3,11 +3,12 @@ project(imgui VERSION 1.92.8 LANGUAGES CXX)
 
 # Match the ImGui ABI in the OpenStarbound vcpkg baseline. Headless builds keep
 # the Lua bindings and FreeType renderer, but do not need windowing backends.
-option(IMGUI_BUILD_GUI_BACKENDS "Build SDL3 and OpenGL3 backends" ON)
+option(IMGUI_BUILD_GUI_BACKENDS "Build SDL3, OpenGL3 and Vulkan backends" ON)
 find_package(Freetype REQUIRED)
 if(IMGUI_BUILD_GUI_BACKENDS)
     find_package(SDL3 CONFIG REQUIRED)
     find_package(OpenGL REQUIRED)
+    find_package(Vulkan 1.3 REQUIRED)
 endif()
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
@@ -32,9 +33,10 @@ if(IMGUI_BUILD_GUI_BACKENDS)
     add_library(imgui_backends STATIC
         backends/imgui_impl_sdl3.cpp
         backends/imgui_impl_opengl3.cpp
+        backends/imgui_impl_vulkan.cpp
     )
     add_library(imgui::imgui_backends ALIAS imgui_backends)
-    target_link_libraries(imgui_backends PUBLIC imgui SDL3::SDL3 OpenGL::GL ${CMAKE_DL_LIBS})
+    target_link_libraries(imgui_backends PUBLIC imgui SDL3::SDL3 OpenGL::GL Vulkan::Vulkan ${CMAKE_DL_LIBS})
     install(TARGETS imgui_backends EXPORT imgui-targets ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 endif()
 
@@ -44,6 +46,7 @@ install(FILES
     imstb_textedit.h imstb_rectpack.h imstb_truetype.h
     misc/cpp/imgui_stdlib.h misc/freetype/imgui_freetype.h
     backends/imgui_impl_sdl3.h backends/imgui_impl_opengl3.h
+    backends/imgui_impl_vulkan.h
     backends/imgui_impl_opengl3_loader.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )

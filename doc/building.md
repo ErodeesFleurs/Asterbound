@@ -7,6 +7,7 @@ Run commands from the repository root unless a step changes directories.
 - [Requirements](#requirements)
 - [Linux without Nix](#linux-without-nix)
 - [Nix on Linux](#nix-on-linux)
+- [Renderer selection](#renderer-selection)
 - [Runtime paths and data import](#runtime-paths-and-data-import)
 - [Native CMake presets](#native-cmake-presets)
 - [Packaging and version metadata](#packaging-and-version-metadata)
@@ -26,6 +27,14 @@ Run commands from the repository root unless a step changes directories.
 | Game assets | `packed.pak` from an owned Starbound installation; never redistributed |
 
 GCC, Apple Clang and MSVC builds are unsupported. Windows uses MinGW. Dependencies must use the same C++ runtime; all configurations use static mimalloc with `MI_OVERRIDE=OFF` and must not mix allocator heaps.
+
+Desktop GUI builds include both OpenGL and Vulkan. Vulkan needs headers/loader
+version 1.3 or later, shaderc's C compiler API, and ImGui 1.92.8's Vulkan backend.
+Nix and the native vcpkg presets provide these dependencies; no separate Vulkan
+build switch is needed. `-DSTAR_BUILD_GUI=OFF` keeps Vulkan/shaderc out of a
+headless build's dependency selection. Nix also rebuilds shaderc, glslang and
+SPIRV-Tools with the same private xclang/libc++ closure as the engine; do not
+substitute a distro shaderc or C++ archive linked against libstdc++.
 
 Optimized profiles retain fast scalar arithmetic through explicit Clang options
 rather than a conflicting `-ffast-math` umbrella. macOS providers share full
@@ -165,6 +174,49 @@ ASTERBOUND_ASSETS=/path/to/Starbound/assets ./result-server/bin/asterbound_serve
 ```
 
 Use `nix develop` for the default development environment or `nix develop .#full` for Qt tools. Limit `--cores` and `--max-jobs` to suit the machine; ThinLTO can use additional memory during linking.
+
+## Renderer selection
+
+Vulkan is the default. Override the renderer at startup:
+
+```sh
+./dist/asterbound
+./dist/asterbound -renderer opengl
+# Nix launcher example; CLI selection takes precedence over the environment.
+ASTERBOUND_RENDERER=opengl ./result/bin/asterbound
+```
+
+If `-renderer` is absent, `ASTERBOUND_RENDERER` selects `opengl` or `vulkan`;
+when neither is provided, the renderer is `vulkan`. An unknown renderer or a
+Vulkan initialization failure produces an error rather than silently switching
+APIs. Selecting OpenGL does not require a working Vulkan device/driver. Vulkan
+requires a Vulkan 1.3-capable driver with dynamic rendering; installing the loader
+alone does not supply a GPU driver. On macOS this also requires an appropriate
+Vulkan implementation such as MoltenVK; native macOS runtime support must be
+checked on the target system.
+
+Vulkan uses explicit shader variants, not automatic translation of arbitrary
+OpenGL GLSL. Effect configurations retain `effectShaders` for OpenGL and supply
+`effectShadersVulkan` for Vulkan, using Vulkan GLSL and its explicit descriptor
+bindings. The selected asset sources are compiled to SPIR-V at runtime through
+shaderc, including reloads. A shader-changing Mod must provide a matching Vulkan
+variant; legacy OpenGL-only shaders are not a Vulkan compatibility guarantee and
+missing variants should be diagnosed rather than replaced with unrelated effects.
+Use `-renderer opengl` for Mods that have not supplied Vulkan variants.
+
+Bundled variants can carry a `vulkanLegacySourceGuard` object mapping each shader
+stage to the 16-digit lowercase hexadecimal FNV-1a-64 hash of its final OpenGL
+`effectShaders` source. This detects Mods that replace an OpenGL stage while
+leaving an unrelated bundled Vulkan variant selected. When changing a guarded
+shader, supply the corresponding Vulkan variant and update the guard to match
+the final legacy source; do not bypass it to accept a stale variant.
+
+Vulkan variant sources use GLSL 450. The engine supplies uniform and sampler
+declarations from the effect configuration; variant sources must not redeclare
+them. The shared interface includes typed effect parameters, effect textures and
+`lightMap`. Vertex inputs
+are location 0 position, location 1 UV, location 2 normalized RGBA8 color and
+location 3 integer flags. Preserve these interfaces when authoring variants.
 
 ## Runtime paths and data import
 

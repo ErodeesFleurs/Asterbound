@@ -15,6 +15,9 @@ target_sources (star_application_module_interfaces PUBLIC FILE_SET CXX_MODULES F
     StarPlatformServices_pc.cppm
   )
 
+target_sources(star_application_module_interfaces PUBLIC FILE_SET CXX_MODULES FILES
+  StarRenderer_vulkan.cppm)
+
 add_library (star_application_modules STATIC
     StarApplication.cpp
     StarRenderer.cpp
@@ -24,6 +27,8 @@ add_library (star_application_modules STATIC
     StarPlatformServices_pc.cpp
     StarRenderer_opengl.cpp
   )
+
+target_sources(star_application_modules PRIVATE StarRenderer_vulkan.cpp)
 
 if (STAR_ENABLE_STEAM_INTEGRATION)
   add_library (star_steam_dispatch_modules STATIC)

@@ -21,6 +21,7 @@ Development artifacts are not stable releases. Keep backups before importing sav
 - Positional Opus voice chat, character swapping, multiple fonts and instrument volume control.
 - Inventory recovery, mod compatibility fixes and client-side tile prediction. Custom tile collision requires Asterbound or a compatible OpenStarbound server.
 - Independent simulation and rendering, configurable FPS limits and interpolated world presentation.
+- Built-in OpenGL and Vulkan renderers, selected at startup; see [renderer selection](doc/building.md#renderer-selection) for driver requirements and shader-Mod compatibility.
 
 Use `/help` in game or read the [command reference](assets/asterbound/help.config.patch).
 
