@@ -1,6 +1,18 @@
 --- a/ports/vulkan-loader/portfile.cmake
 +++ b/ports/vulkan-loader/portfile.cmake
-@@ -16,12 +16,14 @@
+@@ -8,4 +8,5 @@
+     HEAD_REF main
+     PATCHES
+         link-directfb.patch
++        "${ASTERBOUND_VULKAN_IMPLIB_PATCH}"
+ )
+@@ -13,3 +14,5 @@
+ vcpkg_find_acquire_program(PYTHON3)
++get_filename_component(PYTHON3_DIR "${PYTHON3}" DIRECTORY)
++vcpkg_add_to_path(PREPEND "${PYTHON3_DIR}")
+ # Needed to make port install vulkan.pc
+ vcpkg_find_acquire_program(PKGCONFIG)
+@@ -16,11 +19,13 @@
  set(ENV{PKG_CONFIG} "${PKGCONFIG}")
  
 -vcpkg_check_features(OUT_FEATURE_OPTIONS FEATURE_OPTIONS
@@ -21,4 +33,11 @@
 +endif()
  
  vcpkg_cmake_configure(
+@@ -27,7 +32,6 @@
    SOURCE_PATH "${SOURCE_PATH}"
+   OPTIONS
+     -DBUILD_TESTS:BOOL=OFF
+-    -DPython3_EXECUTABLE=${PYTHON3}
+     ${FEATURE_OPTIONS}
+ )
+ vcpkg_cmake_install()

@@ -170,6 +170,10 @@ SDL console variables, plus PCRE2's unused MSVC runtime option for our GNU ABI.
 They retain the registry's versions, source hashes and other build/install steps.
 Vulkan Loader's X11/Wayland/DirectFB WSI options are omitted on Windows and Apple
 targets, whose platform backends do not consume those CMake options.
+Its acquired host Python is added to `PATH` for code-generation branches instead
+of passing an unused `Python3_EXECUTABLE` option. Its MinGW COFF import archive
+uses `vulkan-1.lib`, with matching CMake/pkg-config metadata and unchanged GNU
+ABI and `vulkan-1.dll` runtime name; Windows package checks remain enabled.
 liblzma's sandbox option is passed only when building its CLI tools. MinGW SDL
 keeps its GNU ABI and DLL name, but installs its COFF import archive as `.lib`
 so Windows package validation can inspect it. Native Windows CI uses a short

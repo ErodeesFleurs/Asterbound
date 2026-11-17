@@ -1,0 +1,37 @@
+--- a/loader/CMakeLists.txt
++++ b/loader/CMakeLists.txt
+@@ -385,8 +385,8 @@
+     target_link_libraries(vulkan PRIVATE loader_specific_options)
+ 
+     # when adding the suffix the import and runtime library names must be consistent
+-    # mingw: libvulkan-1.dll.a / vulkan-1.dll
++    # mingw: vulkan-1.lib / vulkan-1.dll
+     # msvc: vulkan-1.lib / vulkan-1.dll
+     set_target_properties(vulkan
+                           PROPERTIES
+                           OUTPUT_NAME ${API_TYPE}-1)
+@@ -394,7 +394,9 @@
+         # generate the same DLL with mingw
+         set_target_properties(vulkan
+                               PROPERTIES
+-                              PREFIX "")
++                              PREFIX ""
++                              IMPORT_PREFIX ""
++                              IMPORT_SUFFIX ".lib")
+         # let the linker just fix up the stdcall mangling, like on msvc
+         if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+             target_link_options(vulkan PRIVATE "-Wl,--enable-stdcall-fixup")
+@@ -552,12 +554,8 @@
+ # Generate PkgConfig File (IE: vulkan.pc)
+ # NOTE: Hopefully in the future CMake can generate .pc files natively.
+ # https://gitlab.kitware.com/cmake/cmake/-/issues/22621
+ find_package(PkgConfig)
+ if (PKG_CONFIG_FOUND)
+     if(WIN32)
+-        if(MINGW)
+-            set(VULKAN_LIB_SUFFIX "-1.dll")
+-        else()
+-            set(VULKAN_LIB_SUFFIX "-1")
+-        endif()
++        set(VULKAN_LIB_SUFFIX "-1")
+     endif()
