@@ -625,6 +625,51 @@ coverage includes `AssetsTest.OggCloneIndependentCursorsAndLifetime` at nonzero/
 decompression positions and `MainMixerTest.*` for initially muted/live settings.
 The latter permits one LSB after perceptual conversion and int16 quantization.
 
+### Compression contracts and comparison
+
+`star.compression` exposes span-based `compress`, `decompress` and
+`decompress_gzip`; ByteArray is accepted as a contiguous range. Zlib keeps its
+legacy empty-buffer representation and unlimited default decode size for saves.
+Outputs clear before initialization; failed decode publishes only earlier
+accepted codec calls. Overlapping input is staged before output mutation.
+Owning results compact against actual size; reusable zlib outputs keep capacity.
+The unused `CompressedFile` wrapper has been removed.
+
+`ZstdContext` owns exclusive reusable native contexts and alternating scratch
+buffers. Independent-frame errors preserve the caller's output; scratch can
+retain its previous capacity until context destruction. `ZstdCompression` is the
+one-shot convenience API. New empty results are valid Zstd frames; decoding also
+accepts the old empty-buffer sentinel. Unknown-size frames still require streaming.
+
+Move-only stream factories return values, not heap-allocated wrappers.
+Compression flushes continuations rather than ending each frame. The bounded
+decompression span overload reports consumed/produced counts for backpressure;
+its input and output must not overlap. The ByteArray overload stages aliases,
+appends within a per-call budget, and preserves the original logical output on
+failure. Codec, progress and budget failures require `reset()` before reuse;
+reset starts a new stream, not a retry of the discarded continuation.
+
+TCP retains compressed input and native pending output while its plaintext buffer
+is full, then resumes after packet parsing. This bounds buffering without imposing
+a cumulative connection or multi-packet batch limit. P2P decoding applies the
+same 64MiB packet-body bound as TCP. Embedded decoders independently retain their
+strict 64MiB cap, bounded window, complete-frame consumption and rejection of
+trailing/concatenated streams.
+
+Run `CompressionTest.*:PathEmbedTest.*` in `core_tests`, and
+`UniverseConnections.*:EmbeddedAssetsTest.*` in a private asset-backed `game_tests`
+fixture. The transport regression includes two valid packets whose combined
+plaintext exceeds one packet budget.
+
+Reuse `byte_array_benchmarks --benchmark_filter='^ByteArray/(Zlib|Zstd)/'`.
+Its eight owning one-shot rows use 17/4096-byte independent fixtures, full native
+decode validation and four operations per batch, including destruction. Preserve
+fixture/result labels across API-only consumer adaptation, balanced A/B samples,
+identical-binary A/A controls, compiler flags and dependency identities. These
+rows do not measure reusable-context throughput, network streams, embedded assets,
+large high-ratio retained memory or whole-game performance.
+
+
 ### Comparable measurements
 
 Freeze the original production implementation and benchmark consumer before

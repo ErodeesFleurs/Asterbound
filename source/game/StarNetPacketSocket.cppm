@@ -17,10 +17,6 @@ import star.byte_array;
 import star.map;
 import star.data_stream_devices;
 
-using ZSTD_CCtx = struct ZSTD_CCtx_s;
-using ZSTD_DCtx = struct ZSTD_DCtx_s;
-using ZSTD_DStream = ZSTD_DCtx;
-using ZSTD_CStream = ZSTD_CCtx;
 import star.zstd_compression;
 import star.net_compatibility;
 
@@ -123,8 +119,8 @@ private:
   bool m_useCompressionStream = false;
 protected:
   [[nodiscard]] std::expected<void, StarException> initializeCompression();
-  std::unique_ptr<CompressionStream> m_compressionStream;
-  std::unique_ptr<DecompressionStream> m_decompressionStream;
+  std::optional<CompressionStream> m_compression_stream;
+  std::optional<DecompressionStream> m_decompression_stream;
 };
 
 // PacketSocket for local communication.
@@ -203,6 +199,8 @@ private:
   ByteArray m_outputBuffer;
   ByteArray m_inputBuffer;
   ByteArray m_compressedOutputBuffer;
+  ByteArray m_compressed_input;
+  bool m_decompression_pending = false;
 };
 
 // Wraps a P2PSocket into a PacketSocket

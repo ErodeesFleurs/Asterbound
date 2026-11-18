@@ -880,7 +880,7 @@ std::expected<void, StarException> CelestialMasterDatabase::storeVersionedChunk(
   auto key = DataStreamBuffer::serialize(chunkIndex);
   if (!key)
     return std::unexpected(std::move(key.error()));
-  auto compressed = compressData(stream.data());
+  auto compressed = compress(stream.data());
   if (!compressed)
     return std::unexpected(std::move(compressed.error()));
   auto inserted = m_database.insert(*key, *compressed);
@@ -903,7 +903,7 @@ std::expected<std::reference_wrapper<CelestialChunk const>, StarException> Celes
       if (!data)
         return std::unexpected(std::move(data.error()));
       if (*data) {
-        auto decompressed = uncompressData(**data);
+        auto decompressed = decompress(**data);
         if (!decompressed)
           return std::unexpected(std::move(decompressed.error()));
         auto versioned = DataStreamBuffer::deserialize<VersionedJson>(decompressed->span());

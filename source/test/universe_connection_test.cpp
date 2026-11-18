@@ -44,10 +44,6 @@ import star.ordered_set;
 import star.rpc_promise;
 import star.byte_array;
 
-typedef struct ZSTD_CCtx_s ZSTD_CCtx;
-typedef struct ZSTD_DCtx_s ZSTD_DCtx;
-typedef ZSTD_DCtx ZSTD_DStream;
-typedef ZSTD_CCtx ZSTD_CStream;
 import star.zstd_compression;
 import star.net_compatibility;
 
@@ -635,7 +631,7 @@ const GameTestRegistration universeConnectionsTcpCompressedTailPrecedesNewPlainF
   ByteArray original(SocketTestAccess::pendingPlain(**transport));
   auto compressor = CompressionStream::create();
   ASSERT_TRUE(compressor) << compressor.error().what();
-  auto encoded = (*compressor)->compress(original);
+  auto encoded = compressor->compress(original);
   ASSERT_TRUE(encoded) << encoded.error().what();
   ByteArray expected = std::move(*encoded);
   auto compressedSize = expected.size();
@@ -668,7 +664,7 @@ const GameTestRegistration universeConnectionsTcpCompressedTailPrecedesNewPlainF
   EXPECT_FALSE((*transport)->sentPacketsPending());
   auto decompressor = DecompressionStream::create();
   ASSERT_TRUE(decompressor) << decompressor.error().what();
-  auto decoded = (*decompressor)->decompress(wire.span().first(compressedSize));
+  auto decoded = decompressor->decompress(wire.span().first(compressedSize));
   ASSERT_TRUE(decoded) << decoded.error().what();
   EXPECT_EQ(*decoded, original);
   EXPECT_TRUE(std::ranges::equal(wire.span().subspan(compressedSize), plain->span()));
@@ -699,7 +695,7 @@ const GameTestRegistration universeConnectionsTcpEnablingCompressionUsesOnlyUnse
   ByteArray compressionInput(SocketTestAccess::pendingPlain(**transport));
   auto compressor = CompressionStream::create();
   ASSERT_TRUE(compressor) << compressor.error().what();
-  auto encoded = (*compressor)->compress(compressionInput);
+  auto encoded = compressor->compress(compressionInput);
   ASSERT_TRUE(encoded) << encoded.error().what();
   expected.append(*encoded);
   ByteArray wire;
@@ -718,7 +714,7 @@ const GameTestRegistration universeConnectionsTcpEnablingCompressionUsesOnlyUnse
   EXPECT_FALSE((*transport)->sentPacketsPending());
   auto decompressor = DecompressionStream::create();
   ASSERT_TRUE(decompressor) << decompressor.error().what();
-  auto decoded = (*decompressor)->decompress(wire.span().subspan(consumed));
+  auto decoded = decompressor->decompress(wire.span().subspan(consumed));
   ASSERT_TRUE(decoded) << decoded.error().what();
   EXPECT_EQ(*decoded, compressionInput);
 });
@@ -754,7 +750,7 @@ const GameTestRegistration universeConnectionsTcpDrainCommitsPrefixBeforeNativeR
     if (compressed) {
       auto compressor = CompressionStream::create();
       ASSERT_TRUE(compressor) << compressor.error().what();
-      auto encoded = (*compressor)->compress(expected);
+      auto encoded = compressor->compress(expected);
       ASSERT_TRUE(encoded) << encoded.error().what();
       expected = std::move(*encoded);
     }
@@ -782,6 +778,44 @@ const GameTestRegistration universeConnectionsTcpDrainCommitsPrefixBeforeNativeR
     EXPECT_TRUE(std::ranges::equal(pending, expected.span().last(pending.size())));
     EXPECT_TRUE((*transport)->sentPacketsPending());
   }
+});
+
+const GameTestRegistration universe_connections_tcp_compressed_batch_backpressure(
+    "UniverseConnections", "TcpCompressedBatchLargerThanOnePacketBudget", [](GameTest& fixture) {
+  auto pair = connectionTestTcpPair(fixture.root().logger());
+  ASSERT_TRUE(pair) << pair.error().what();
+  auto sender = TcpPacketSocket::open(fixture.root().logger(), pair->first);
+  auto receiver = TcpPacketSocket::open(fixture.root().logger(), pair->second);
+  ASSERT_TRUE(sender);
+  ASSERT_TRUE(receiver);
+  (*sender)->setCompressionStreamEnabled(true);
+  (*receiver)->setCompressionStreamEnabled(true);
+  constexpr std::size_t payload_size = 34 * 1024 * 1024;
+  ASSERT_TRUE((*sender)->sendPackets({
+      std::make_shared<WorldParametersUpdatePacket>(ByteArray(payload_size, 'a')),
+      std::make_shared<WorldParametersUpdatePacket>(ByteArray(payload_size, 'b'))}));
+  std::size_t received_count = 0;
+  auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+  while (received_count != 2 && std::chrono::steady_clock::now() < deadline) {
+    ASSERT_TRUE((*sender)->writeData());
+    auto read = (*receiver)->readData();
+    ASSERT_TRUE(read) << read.error().what();
+    auto packets = (*receiver)->receivePackets();
+    ASSERT_TRUE(packets) << packets.error().what();
+    for (auto const& packet : *packets) {
+      auto parameters = convert<WorldParametersUpdatePacket>(packet);
+      ASSERT_TRUE(parameters);
+      ASSERT_LT(received_count, 2u);
+      ASSERT_EQ((*parameters)->parametersData.size(), payload_size);
+      auto expected_byte = received_count ? 'b' : 'a';
+      EXPECT_TRUE(std::ranges::all_of((*parameters)->parametersData, [=](char byte) { return byte == expected_byte; }));
+      ++received_count;
+    }
+    if (!*read && received_count != 2)
+      ASSERT_TRUE(pair->second->waitForData(false, deadline));
+  }
+  EXPECT_EQ(received_count, 2u);
+  EXPECT_TRUE((*receiver)->isOpen());
 });
 
 }

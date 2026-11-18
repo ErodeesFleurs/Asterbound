@@ -29,12 +29,14 @@ std::expected<Json, StarException> decodeJson(std::span<char const> bytes) {
 
 // Produce a large logical stream from a small reusable input. Only the codec
 // under test allocates its bounded decompressed output.
-std::expected<ByteArray, StarException> compressedZeros(std::size_t size) {
+std::expected<ByteArray, StarException> compressed_zeros(std::size_t size, bool gzip = false) {
   zng_stream stream{};
-  if (zng_deflateInit(&stream, 1) != Z_OK)
+  if (zng_deflateInit2(&stream, 1, Z_DEFLATED, gzip ? 31 : 15, 8, Z_DEFAULT_STRATEGY) != Z_OK)
     return std::unexpected(StarException("Cannot initialize test deflate"));
-  auto cleanup = [](zng_stream* stream) noexcept { (void)zng_deflateEnd(stream); };
-  std::unique_ptr<zng_stream, decltype(cleanup)> owner(&stream, cleanup);
+  struct StreamCleanup {
+    zng_stream& stream;
+    ~StreamCleanup() { (void)zng_deflateEnd(&stream); }
+  } cleanup{stream};
   std::array<std::uint8_t, 16384> input{};
   std::array<char, 32768> output;
   ByteArray compressed;
@@ -55,7 +57,7 @@ std::expected<ByteArray, StarException> compressedZeros(std::size_t size) {
   }
 }
 
-std::expected<ByteArray, StarException> compressedZstdZeros(std::size_t size) {
+std::expected<ByteArray, StarException> compressed_zstd_zeros(std::size_t size) {
   auto cleanup = [](ZSTD_CCtx* context) noexcept { (void)ZSTD_freeCCtx(context); };
   std::unique_ptr<ZSTD_CCtx, decltype(cleanup)> context(ZSTD_createCCtx(), cleanup);
   if (!context || ZSTD_isError(ZSTD_CCtx_setParameter(context.get(), ZSTD_c_contentSizeFlag, 0)))
@@ -268,6 +270,23 @@ TEST(PathEmbedTest, CompressedStreamsRejectCorruptionTruncationAndConcatenation)
   }
 }
 
+TEST(PathEmbedTest, GzipStreamsRejectTrailingBytesAndConcatenation) {
+  auto compressed = compressed_zeros(17, true);
+  ASSERT_TRUE(compressed);
+  for (bool concatenate : {false, true}) {
+    auto bytes = *compressed;
+    if (concatenate)
+      bytes.append(*compressed);
+    else
+      bytes.push_back('\0');
+    auto encoded = embedAndCompressData(bytes.span(), EmbeddedCompressionMethod::None);
+    ASSERT_TRUE(encoded);
+    auto decoded = decodeEmbeddedData(String("/opensb_data;bin;gzip;" + encoded->utf8()));
+    ASSERT_FALSE(decoded);
+    EXPECT_NE(std::string(decoded.error().what()).find("trailing compressed bytes"), std::string::npos);
+  }
+}
+
 TEST(PathEmbedTest, ZstandardUnknownSizeStreamsDecodeAndHugeDeclaredSizesFailEarly) {
   auto cleanup = [](ZSTD_CCtx* context) noexcept { (void)ZSTD_freeCCtx(context); };
   std::unique_ptr<ZSTD_CCtx, decltype(cleanup)> context(ZSTD_createCCtx(), cleanup);
@@ -291,15 +310,27 @@ TEST(PathEmbedTest, ZstandardUnknownSizeStreamsDecodeAndHugeDeclaredSizesFailEar
   EXPECT_FALSE(decodeEmbeddedData(String("/opensb_data;bin;zstd;" + huge->utf8())));
 }
 
-TEST(PathEmbedTest, StreamingDecompressionRejectsExpansionAbove64MiB) {
-  for (bool zstd : {false, true}) {
-    auto compressed = zstd ? compressedZstdZeros(MaxEmbeddedDataSize + 1) : compressedZeros(MaxEmbeddedDataSize + 1);
-    ASSERT_TRUE(compressed);
-    auto encoded = embedAndCompressData(compressed->span(), EmbeddedCompressionMethod::None);
-    ASSERT_TRUE(encoded);
-    auto result = decodeEmbeddedData(String(std::string("/opensb_data;bin;") + (zstd ? "zstd;" : "zlib;") + encoded->utf8()));
-    EXPECT_FALSE(result);
-    if (!result)
-      EXPECT_NE(std::string(result.error().what()).find("size limit"), std::string::npos);
+TEST(PathEmbedTest, StreamingDecompressionAcceptsExact64MiBAndRejectsOneByteMore) {
+  for (auto method : {EmbeddedCompressionMethod::Zlib, EmbeddedCompressionMethod::Gzip, EmbeddedCompressionMethod::Zstd}) {
+    for (auto size : {MaxEmbeddedDataSize, MaxEmbeddedDataSize + 1}) {
+      auto compressed = method == EmbeddedCompressionMethod::Zstd
+          ? compressed_zstd_zeros(size)
+          : compressed_zeros(size, method == EmbeddedCompressionMethod::Gzip);
+      ASSERT_TRUE(compressed);
+      auto encoded = embedAndCompressData(compressed->span(), EmbeddedCompressionMethod::None);
+      ASSERT_TRUE(encoded);
+      std::string_view token = method == EmbeddedCompressionMethod::Zstd ? "zstd;"
+          : method == EmbeddedCompressionMethod::Gzip ? "gzip;" : "zlib;";
+      auto result = decodeEmbeddedData(String("/opensb_data;bin;" + std::string(token) + encoded->utf8()));
+      if (size == MaxEmbeddedDataSize) {
+        ASSERT_TRUE(result) << result.error().what();
+        EXPECT_EQ(result->bytes.size(), size);
+        EXPECT_LE(result->bytes.capacity(), MaxEmbeddedDataSize);
+        EXPECT_TRUE(std::ranges::all_of(result->bytes, [](char byte) { return byte == '\0'; }));
+      } else {
+        ASSERT_FALSE(result);
+        EXPECT_NE(std::string(result.error().what()).find("size limit"), std::string::npos);
+      }
+    }
   }
 }

@@ -106,40 +106,56 @@ std::expected<ByteArray, StarException> decodeBase64(std::string_view text) {
   return bytes;
 }
 
-std::expected<ByteArray, StarException> inflateBytes(std::span<char const> bytes, bool gzip) {
+// Grow only in powers of two up to the decoded limit. At the limit a single
+// probe byte lets the codec consume trailers without allocating past the cap.
+std::span<char> prepare_output_tail(ByteArray& output, std::span<char, 1> probe) {
+  auto previous_size = output.size();
+  if (previous_size == MaxEmbeddedDataSize)
+    return probe;
+  if (previous_size == output.capacity())
+    output.reserve(output.capacity() ? std::min(MaxEmbeddedDataSize, output.capacity() * 2) : 4096);
+  output.resize(output.capacity());
+  return output.span().subspan(previous_size);
+}
+
+std::expected<ByteArray, StarException> inflate_bytes(std::span<char const> bytes, bool gzip) {
   zng_stream stream{};
   auto status = zng_inflateInit2(&stream, gzip ? 31 : 15);
   if (status != Z_OK)
     return std::unexpected(StarException(Star::format("Embedded inflate initialization error ({})", status)));
-  auto cleanup = [](zng_stream* stream) noexcept { (void)zng_inflateEnd(stream); };
-  std::unique_ptr<zng_stream, decltype(cleanup)> owner(&stream, cleanup);
+  struct StreamCleanup {
+    zng_stream& stream;
+    ~StreamCleanup() { (void)zng_inflateEnd(&stream); }
+  } cleanup{stream};
   stream.next_in = reinterpret_cast<std::uint8_t const*>(bytes.data());
   stream.avail_in = bytes.size();
   ByteArray output;
-  std::array<char, 32768> chunk;
+  std::array<char, 1> probe;
   for (;;) {
-    stream.next_out = reinterpret_cast<std::uint8_t*>(chunk.data());
-    stream.avail_out = chunk.size();
-    auto previousInput = stream.avail_in;
+    auto previous_size = output.size();
+    auto tail = prepare_output_tail(output, probe);
+    stream.next_out = reinterpret_cast<std::uint8_t*>(tail.data());
+    stream.avail_out = tail.size();
+    auto previous_input = stream.avail_in;
     status = zng_inflate(&stream, Z_NO_FLUSH);
     if (status != Z_OK && status != Z_STREAM_END)
       return std::unexpected(StarException(Star::format("Embedded inflate error ({}): {}", status,
           stream.msg ? stream.msg : "corrupt or truncated compressed payload")));
-    auto produced = chunk.size() - stream.avail_out;
-    if (produced > MaxEmbeddedDataSize - output.size())
+    auto produced = tail.size() - stream.avail_out;
+    if (produced > MaxEmbeddedDataSize - previous_size)
       return invalid("decompressed payload exceeds size limit");
-    output.append(std::span<char const>(chunk.data(), produced));
+    output.resize(previous_size + produced);
     if (status == Z_STREAM_END) {
       if (stream.avail_in)
         return invalid("trailing compressed bytes or concatenated streams");
       return output;
     }
-    if (!produced && previousInput == stream.avail_in)
+    if (!produced && previous_input == stream.avail_in)
       return invalid("truncated compressed payload");
   }
 }
 
-std::expected<ByteArray, StarException> inflateZstd(std::span<char const> bytes) {
+std::expected<ByteArray, StarException> inflate_zstd(std::span<char const> bytes) {
   auto declared = ZSTD_getFrameContentSize(bytes.data(), bytes.size());
   if (declared == ZSTD_CONTENTSIZE_ERROR)
     return invalid("invalid Zstandard header");
@@ -154,22 +170,24 @@ std::expected<ByteArray, StarException> inflateZstd(std::span<char const> bytes)
     return invalid("cannot bound Zstandard decompression window");
   ZSTD_inBuffer input{bytes.data(), bytes.size(), 0};
   ByteArray output;
-  std::array<char, 32768> chunk;
+  std::array<char, 1> probe;
   for (;;) {
-    ZSTD_outBuffer out{chunk.data(), chunk.size(), 0};
-    auto previousInput = input.pos;
+    auto previous_size = output.size();
+    auto tail = prepare_output_tail(output, probe);
+    ZSTD_outBuffer out{tail.data(), tail.size(), 0};
+    auto previous_input = input.pos;
     status = ZSTD_decompressStream(context.get(), &out, &input);
     if (ZSTD_isError(status))
       return std::unexpected(StarException(Star::format("Embedded Zstandard decompression: {}", ZSTD_getErrorName(status))));
-    if (out.pos > MaxEmbeddedDataSize - output.size())
+    if (out.pos > MaxEmbeddedDataSize - previous_size)
       return invalid("decompressed payload exceeds size limit");
-    output.append(std::span<char const>(chunk.data(), out.pos));
+    output.resize(previous_size + out.pos);
     if (!status) {
       if (input.pos != input.size)
         return invalid("trailing compressed bytes or concatenated streams");
       return output;
     }
-    if (!out.pos && previousInput == input.pos)
+    if (!out.pos && previous_input == input.pos)
       return invalid("truncated Zstandard payload");
   }
 }
@@ -273,8 +291,8 @@ std::expected<EmbeddedData, StarException> decodeBody(std::string_view body, boo
       bytes = std::move(*decoded);
     } else {
       auto inflated = method == EmbeddedCompressionMethod::Zstd
-          ? inflateZstd(decoded->span())
-          : inflateBytes(decoded->span(), method == EmbeddedCompressionMethod::Gzip);
+          ? inflate_zstd(decoded->span())
+          : inflate_bytes(decoded->span(), method == EmbeddedCompressionMethod::Gzip);
       if (!inflated) return std::unexpected(std::move(inflated.error()));
       bytes = std::move(*inflated);
     }

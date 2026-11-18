@@ -38,10 +38,6 @@ import star.ordered_set;
 import star.rpc_promise;
 import star.byte_array;
 
-using ZSTD_CCtx = struct ZSTD_CCtx_s;
-using ZSTD_DCtx = struct ZSTD_DCtx_s;
-using ZSTD_DStream = ZSTD_DCtx;
-using ZSTD_CStream = ZSTD_CCtx;
 import star.zstd_compression;
 import star.net_compatibility;
 import star.logging;
@@ -101,6 +97,12 @@ import star.compression;
 
 import star.algorithm;
 namespace Star {
+
+namespace {
+constexpr std::size_t packet_size_limit = 64 * 1024 * 1024;
+// One packet type byte and at most ten VLQ length bytes.
+constexpr std::size_t input_buffer_limit = packet_size_limit + 11;
+}
 
 PacketStatCollector::PacketStatCollector() : PacketStatCollector(1.0f) {}
 
@@ -174,8 +176,8 @@ std::expected<void, StarException> CompressedPacketSocket::initializeCompression
   auto decompression = DecompressionStream::create();
   if (!decompression)
     return std::unexpected(std::move(decompression.error()));
-  m_compressionStream = std::move(*compression);
-  m_decompressionStream = std::move(*decompression);
+  m_compression_stream.emplace(std::move(*compression));
+  m_decompression_stream.emplace(std::move(*decompression));
   return {};
 }
 
@@ -378,7 +380,7 @@ std::expected<void, StarException> TcpPacketSocket::sendPackets(List<std::shared
       bool mustCompress = currentCompressionMode == PacketCompressionMode::Enabled;
       bool perhapsCompress = currentCompressionMode == PacketCompressionMode::Automatic && packetBuffer.size() > 64;
       if (mustCompress || perhapsCompress) {
-        auto compressed = compressData(packetBuffer.data());
+        auto compressed = compress(packetBuffer.data());
         if (!compressed)
           return std::unexpected(std::move(compressed.error()));
         compressedPackets = std::move(*compressed);
@@ -416,8 +418,7 @@ std::expected<void, StarException> TcpPacketSocket::sendPackets(List<std::shared
 }
 
 std::expected<List<std::shared_ptr<Packet>>, StarException> TcpPacketSocket::receivePackets() {
-  std::uint64_t const PacketSizeLimit = 64 << 20;
-  std::uint64_t const PacketBatchLimit = 131072;
+  constexpr std::size_t packet_batch_limit = 131072;
   List<std::shared_ptr<Packet>> packets;
   auto parse = [&]() -> std::expected<void, StarException> {
     DataStreamReader ds{std::span<char const>(m_inputBuffer)};
@@ -452,7 +453,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> TcpPacketSocket::rec
           return std::unexpected(std::move(name.error()));
         return name->get();
       };
-      if (packetSize > PacketSizeLimit) {
+      if (packetSize > packet_size_limit) {
         auto name = packetName();
         if (!name)
           return std::unexpected(std::move(name.error()));
@@ -471,7 +472,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> TcpPacketSocket::rec
       packetStream.set_stream_compatibility_version(netRules());
       ByteArray uncompressed;
       if (packetCompressed) {
-        auto decoded = uncompressData(packetStream.span(), PacketSizeLimit);
+        auto decoded = decompress(packetStream.span(), packet_size_limit);
         if (!decoded)
           return std::unexpected(std::move(decoded.error()));
         uncompressed = std::move(*decoded);
@@ -486,11 +487,11 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> TcpPacketSocket::rec
       trimPos = *position;
       std::size_t count = 0;
       do {
-        if (++count > PacketBatchLimit) {
+        if (++count > packet_batch_limit) {
           auto name = packetName();
           if (!name)
             return std::unexpected(std::move(name.error()));
-          return std::unexpected(IOException::format("Packet batch limit {} reached while reading {}s!", PacketBatchLimit, *name));
+          return std::unexpected(IOException::format("Packet batch limit {} reached while reading {}s!", packet_batch_limit, *name));
         }
         auto created = createPacket(*type);
         if (!created)
@@ -538,7 +539,7 @@ std::expected<bool, StarException> TcpPacketSocket::writeData() {
   std::size_t plainConsumed = 0;
   auto write = [&]() -> std::expected<void, StarException> {
     if (compressionStreamEnabled() && !m_outputBuffer.empty()) {
-      auto compressed = m_compressionStream->compress(m_outputBuffer, m_compressedOutputBuffer);
+      auto compressed = m_compression_stream->compress(m_outputBuffer, m_compressedOutputBuffer);
       if (!compressed)
         return std::unexpected(std::move(compressed.error()));
       m_outputBuffer.clear();
@@ -591,27 +592,44 @@ std::expected<bool, StarException> TcpPacketSocket::writeData() {
 }
 
 std::expected<bool, StarException> TcpPacketSocket::readData() {
-  // A local close is terminal for native reads, not a socket error. Buffered
-  // frames remain available to receivePackets(), including after close.
+  // Drain codec-owned output and saved compressed input even after peer EOF.
+  // A local close is terminal for reads, not for already buffered packets.
   if (!m_socket->isOpen())
     return false;
-  bool dataReceived = false;
+  bool data_received = false;
   auto read = [&]() -> std::expected<void, StarException> {
-    char readBuffer[1024];
-    while (true) {
-      auto readAmount = m_socket->receive(readBuffer);
-      if (!readAmount)
-        return std::unexpected(std::move(readAmount.error()));
-      if (*readAmount == 0)
+    std::array<char, 1024> read_buffer;
+    for (;;) {
+      if (m_inputBuffer.size() == input_buffer_limit)
+        break; // receivePackets() must drain complete frames before more input.
+      if (m_decompression_pending || !m_compressed_input.empty()) {
+        auto committed = m_inputBuffer.size();
+        auto chunk_size = std::min(std::size_t(32768), input_buffer_limit - committed);
+        m_inputBuffer.reserve(committed + chunk_size);
+        auto decoded = m_decompression_stream->decompress(m_compressed_input.span(),
+            std::span<char>(m_inputBuffer.data() + committed, chunk_size));
+        if (!decoded)
+          return std::unexpected(std::move(decoded.error()));
+        m_inputBuffer.resize(committed + decoded->produced);
+        m_compressed_input.remove_prefix(decoded->consumed);
+        m_decompression_pending = decoded->produced == chunk_size;
+        data_received |= decoded->produced != 0;
+        if (!decoded->consumed && !decoded->produced && !m_compressed_input.empty())
+          return std::unexpected(IOException("ZSTD network decompression made no progress"));
+        continue;
+      }
+      auto amount = m_socket->receive(std::span(read_buffer).first(
+          std::min(read_buffer.size(), input_buffer_limit - m_inputBuffer.size())));
+      if (!amount)
+        return std::unexpected(std::move(amount.error()));
+      if (!*amount)
         break;
-      dataReceived = true;
+      data_received = true;
       if (compressionStreamEnabled()) {
-        m_incomingStats.mix(*readAmount);
-        auto decompressed = m_decompressionStream->decompress(std::span<char const>(readBuffer).first(*readAmount), m_inputBuffer);
-        if (!decompressed)
-          return std::unexpected(std::move(decompressed.error()));
+        m_incomingStats.mix(*amount);
+        m_compressed_input.append(std::span<char const>(read_buffer).first(*amount));
       } else {
-        m_inputBuffer.append(std::span<char const>(readBuffer).first(*readAmount));
+        m_inputBuffer.append(std::span<char const>(read_buffer).first(*amount));
       }
     }
     return {};
@@ -632,7 +650,7 @@ std::expected<bool, StarException> TcpPacketSocket::readData() {
       return std::unexpected(std::move(received.error()));
     }
   }
-  return dataReceived;
+  return data_received;
 }
 
 std::expected<void, StarException> TcpPacketSocket::waitForData(bool writable, std::chrono::steady_clock::time_point deadline) {
@@ -695,7 +713,7 @@ std::expected<void, StarException> P2PPacketSocket::sendPackets(List<std::shared
       if (!bodyWritten)
         return std::unexpected(std::move(bodyWritten.error()));
       m_outgoingStats.mix(currentType, packetBuffer.size(), false);
-      auto compressed = m_compressionStream->compress(outBuffer.take_data());
+      auto compressed = m_compression_stream->compress(outBuffer.take_data());
       if (!compressed)
         return std::unexpected(std::move(compressed.error()));
       m_outputMessages.push_back(std::move(*compressed));
@@ -726,7 +744,7 @@ std::expected<void, StarException> P2PPacketSocket::sendPackets(List<std::shared
       bool mustCompress = currentCompressionMode == PacketCompressionMode::Enabled;
       bool perhapsCompress = currentCompressionMode == PacketCompressionMode::Automatic && packetBuffer.size() > 64;
       if (mustCompress || perhapsCompress) {
-        auto compressed = compressData(packetBuffer.data());
+        auto compressed = compress(packetBuffer.data());
         if (!compressed)
           return std::unexpected(std::move(compressed.error()));
         compressedPackets = std::move(*compressed);
@@ -775,12 +793,12 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> P2PPacketSocket::rec
       if (!position)
         return std::unexpected(std::move(position.error()));
       std::size_t packetSize = ds.size() - *position;
-      if (packetSize > std::size_t(std::numeric_limits<std::ptrdiff_t>::max()))
-        return std::unexpected(DataStreamException("Byte stream request exceeds addressable size"));
+      if (packetSize > packet_size_limit)
+        return std::unexpected(IOException("P2P packet exceeds size limit"));
       auto packetBytes = ds.span().subspan(*position);
       ByteArray uncompressed;
       if (*compressed) {
-        auto decoded = uncompressData(packetBytes);
+        auto decoded = decompress(packetBytes, packet_size_limit);
         if (!decoded)
           return std::unexpected(std::move(decoded.error()));
         uncompressed = std::move(*decoded);
@@ -862,7 +880,7 @@ std::expected<bool, StarException> P2PPacketSocket::readData() {
         break;
       m_incomingStats.mix((**message).size());
       if (compressionStreamEnabled()) {
-        auto decompressed = m_decompressionStream->decompress(**message);
+        auto decompressed = m_decompression_stream->decompress(**message, packet_size_limit + 2);
         if (!decompressed)
           return std::unexpected(std::move(decompressed.error()));
         m_inputMessages.push_back(std::move(*decompressed));

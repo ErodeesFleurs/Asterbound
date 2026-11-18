@@ -183,14 +183,14 @@ void measure_codec(benchmark::State& state, bool zstd, bool decompress) {
   } else {
     auto size = compressed.size();
     auto status = zng_compress2(reinterpret_cast<unsigned char*>(compressed.data()), &size,
-        reinterpret_cast<unsigned char const*>(golden.data()), golden.size(), Star::MediumCompression);
+        reinterpret_cast<unsigned char const*>(golden.data()), golden.size(), Star::medium_compression);
     if (!require(state, status == Z_OK, "independent zlib fixture compression failed")) return;
     compressed.resize(size);
   }
   auto input = ByteArray::from_string(decompress ? std::string_view(compressed) : std::string_view(golden));
   auto evaluate = [&]() -> std::expected<ByteArray, StarException> {
     if (zstd) return decompress ? Star::ZstdCompression::decompress(input) : Star::ZstdCompression::compress(input, 3);
-    return decompress ? Star::uncompressData(input) : Star::compressData(input);
+    return decompress ? Star::decompress(input) : Star::compress(input);
   };
   auto validation = evaluate();
   if (!checked(state, validation)) return;
