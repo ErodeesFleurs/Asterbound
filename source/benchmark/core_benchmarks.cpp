@@ -17,6 +17,274 @@ import star.vector;
 import star.format;
 import star.asset_path;
 import star.text_formatter;
+import star.a_star;
+
+namespace AStarBenchmarks {
+
+struct Edge {
+  double cost;
+  unsigned source;
+  unsigned target;
+
+  friend bool operator==(Edge const&, Edge const&) = default;
+};
+
+using Search = Star::AStar::Search<Edge, unsigned>;
+
+enum class Shape { Chain, Tree, UnreachableBest };
+
+struct Fixture {
+  std::vector<std::vector<Edge>> adjacency;
+  std::vector<Edge> expected;
+  unsigned goal;
+  bool success;
+  bool return_best;
+};
+
+void fingerprint(std::uint64_t& value, std::uint64_t word) {
+  for (unsigned shift = 0; shift != 64; shift += 8) {
+    value ^= (word >> shift) & 255;
+    value *= 1099511628211ULL;
+  }
+}
+
+void fingerprint_edge(std::uint64_t& value, Edge const& edge) {
+  fingerprint(value, std::bit_cast<std::uint64_t>(edge.cost));
+  fingerprint(value, edge.source);
+  fingerprint(value, edge.target);
+}
+
+Fixture make_fixture(Shape shape, unsigned node_count) {
+  Fixture fixture{std::vector<std::vector<Edge>>(node_count),
+                  {},
+                  shape == Shape::UnreachableBest ? node_count + 17 : node_count - 1,
+                  shape != Shape::UnreachableBest,
+                  shape == Shape::UnreachableBest};
+  for (unsigned node = 0; node < node_count; ++node) {
+    if (shape == Shape::Chain) {
+      if (node + 1 < node_count)
+        fixture.adjacency[node].push_back({1.0, node, node + 1});
+    } else {
+      for (unsigned child : {2 * node + 1, 2 * node + 2}) {
+        if (child < node_count)
+          fixture.adjacency[node].push_back({1.0, node, child});
+      }
+    }
+  }
+  // A chain has exactly one path. A heap-indexed directed tree has exactly
+  // one parent per child: the oracle is arithmetic, not a second graph search.
+  // UnreachableBest's |goal-node| heuristic uniquely selects the largest leaf.
+  for (unsigned node = node_count - 1; node != 0;) {
+    unsigned parent = shape == Shape::Chain ? node - 1 : (node - 1) / 2;
+    fixture.expected.push_back({1.0, parent, node});
+    node = parent;
+  }
+  std::ranges::reverse(fixture.expected);
+  return fixture;
+}
+
+Search make_search(Fixture const& fixture) {
+  return Search(
+    [fixture = std::cref(fixture)](unsigned node, unsigned goal) -> std::expected<double, Star::StarException> {
+      return fixture.get().return_best ? static_cast<double>(goal - node) : 0.0;
+    },
+    [fixture = std::cref(fixture)](unsigned node,
+                                   Star::List<Edge>& neighbors) -> std::expected<void, Star::StarException> {
+      for (auto const& edge : fixture.get().adjacency[node])
+        neighbors.push_back(edge);
+      return {};
+    },
+    [goal = fixture.goal](unsigned node) -> std::expected<bool, Star::StarException> { return node == goal; },
+    fixture.return_best);
+}
+
+std::expected<bool, Star::StarException> run_search(Search& search, Fixture const& fixture, unsigned budget) {
+  auto started = search.start(0, fixture.goal);
+  if (!started)
+    return std::unexpected(std::move(started.error()));
+  // Unique-parent graphs enqueue at most node_count candidates. This bound
+  // catches a stalled incremental search without timing an unbounded loop.
+  for (std::size_t call = 0; call < fixture.adjacency.size() + 2; ++call) {
+    auto status = search.explore(budget ? std::optional<unsigned>(budget) : std::nullopt);
+    if (!status)
+      return std::unexpected(std::move(status.error()));
+    if (status->has_value())
+      return **status;
+  }
+  return std::unexpected(Star::StarException("AStar benchmark exceeded its bounded exploration calls"));
+}
+
+void record_diagnostics() {
+  auto enabled = std::getenv("ASTERBOUND_ASTAR_DIAGNOSTICS");
+  if (!enabled || std::string_view(enabled) != "1")
+    return;
+  // Opt-in, once per process, before State timing. These deliberately broken
+  // old domains are observations, never equivalent performance/oracle rows.
+  static bool const recorded = [] {
+    auto print_outcome = [](char const* name, std::expected<std::optional<bool>, Star::StarException> const& status,
+                            Search const& search) {
+      if (!status) {
+        std::fprintf(stderr, "AStar diagnostic %s: error=%s\n", name, status.error().what());
+        return;
+      }
+      std::fprintf(stderr, "AStar diagnostic %s: status=%s; path=", name,
+                   !status->has_value() ? "pending"
+                     : **status         ? "true"
+                                        : "false");
+      auto const& path = search.result();
+      if (!path) {
+        std::fprintf(stderr, "none\n");
+        return;
+      }
+      double cost = 0.0;
+      for (auto const& edge : *path) {
+        std::fprintf(stderr, "[%u>%u:%.17g]", edge.source, edge.target, edge.cost);
+        cost += edge.cost;
+      }
+      std::fprintf(stderr, "; edges=%zu; cost=%.17g\n", path->size(), cost);
+    };
+    Fixture rediscovery{{{{100.0, 0, 1}, {1.0, 0, 2}}, {{1.0, 1, 3}}, {{1.0, 2, 1}}, {}}, {}, 3, true, false};
+    for (bool pruned : {false, true}) {
+      // Construct explicitly to change only maxFScore, not the graph/callbacks.
+      Search search([](unsigned, unsigned) -> std::expected<double, Star::StarException> { return 0.0; },
+                    [fixture = std::cref(rediscovery)](
+                      unsigned node, Star::List<Edge>& neighbors) -> std::expected<void, Star::StarException> {
+                      for (auto const& edge : fixture.get().adjacency[node])
+                        neighbors.push_back(edge);
+                      return {};
+                    },
+                    [](unsigned node) -> std::expected<bool, Star::StarException> { return node == 3; }, false, {},
+                    pruned ? std::optional<double>(3.0) : std::nullopt);
+      auto started = search.start(0, 3);
+      if (!started)
+        std::fprintf(stderr, "AStar diagnostic start: error=%s\n", started.error().what());
+      else
+        print_outcome(pruned ? "pruned_rediscovery" : "cheaper_rediscovery", search.explore(), search);
+    }
+    auto partial_fixture = make_fixture(Shape::UnreachableBest, 3);
+    auto partial = make_search(partial_fixture);
+    auto started = partial.start(0, partial_fixture.goal);
+    if (!started)
+      std::fprintf(stderr, "AStar diagnostic start: error=%s\n", started.error().what());
+    else {
+      print_outcome("partial_first", partial.explore(), partial);
+      print_outcome("partial_repeat", partial.explore(), partial);
+    }
+    return true;
+  }();
+  (void)recorded;
+}
+
+bool validate(benchmark::State& state, Fixture const& fixture, unsigned budget, unsigned restarts,
+              std::uint64_t& input_fingerprint, std::uint64_t& output_fingerprint) {
+  fingerprint(input_fingerprint, fixture.adjacency.size());
+  fingerprint(input_fingerprint, fixture.goal);
+  fingerprint(input_fingerprint, fixture.success);
+  fingerprint(input_fingerprint, fixture.return_best);
+  fingerprint(input_fingerprint, budget);
+  fingerprint(input_fingerprint, restarts);
+  for (auto const& neighbors : fixture.adjacency) {
+    fingerprint(input_fingerprint, neighbors.size());
+    for (auto const& edge : neighbors)
+      fingerprint_edge(input_fingerprint, edge);
+  }
+  auto search = make_search(fixture);
+  for (unsigned restart = 0; restart < restarts; ++restart) {
+    auto status = run_search(search, fixture, budget);
+    if (!status) {
+      state.SkipWithError(status.error().what());
+      return false;
+    }
+    auto const& path = search.result();
+    if (*status != fixture.success || !path || path->size() != fixture.expected.size()) {
+      state.SkipWithError("AStar status/path size differs from independent unique-parent oracle");
+      return false;
+    }
+    fingerprint(output_fingerprint, *status);
+    fingerprint(output_fingerprint, path.has_value());
+    fingerprint(output_fingerprint, path->size());
+    for (std::size_t index = 0; index < path->size(); ++index) {
+      if ((*path)[index] != fixture.expected[index]) {
+        state.SkipWithError("AStar complete path differs from independent unique-parent oracle");
+        return false;
+      }
+      fingerprint_edge(output_fingerprint, (*path)[index]);
+    }
+    // Deliberately stop at the first terminal answer: the old returnBest
+    // terminal-repeat bug is a regression-test domain, not comparable timing.
+  }
+  return true;
+}
+
+void benchmark_astar(benchmark::State& state, Shape shape, unsigned node_count, unsigned budget, unsigned restarts) {
+  record_diagnostics();
+  auto fixture = make_fixture(shape, node_count);
+  std::uint64_t input_fingerprint = 14695981039346656037ULL;
+  std::uint64_t output_fingerprint = 14695981039346656037ULL;
+  if (!validate(state, fixture, budget, restarts, input_fingerprint, output_fingerprint))
+    return;
+  state.SetLabel(std::format("nodes={}; searches/batch={}; budget={} (0=unlimited); input={:016x}; output={:016x}",
+                             node_count, restarts, budget, input_fingerprint, output_fingerprint));
+  // Fixture/oracle construction and complete checks are untimed. One timed
+  // batch owns one Search, restarts it 1 or 4 times, and destroys it (including
+  // its final result). Earlier results are destroyed by the next start().
+  // Thus restart rows amortize callback construction but do not leak the last
+  // result's destruction outside timing. No result copies/extraction are used.
+  for (auto _ : state) {
+    (void)_;
+    auto search = make_search(fixture);
+    for (unsigned restart = 0; restart < restarts; ++restart) {
+      auto status = run_search(search, fixture, budget);
+      if (!status) {
+        state.SkipWithError(status.error().what());
+        return;
+      }
+      benchmark::DoNotOptimize(*status);
+      benchmark::DoNotOptimize(search.result());
+    }
+  }
+  std::uint64_t checked_input = 14695981039346656037ULL;
+  std::uint64_t checked_output = 14695981039346656037ULL;
+  if (validate(state, fixture, budget, restarts, checked_input, checked_output)
+      && (checked_input != input_fingerprint || checked_output != output_fingerprint))
+    state.SkipWithError("AStar fixture or complete output fingerprint changed after timing");
+  state.SetItemsProcessed(state.iterations() * restarts);
+}
+
+BENCHMARK_CAPTURE(benchmark_astar, Chain128, Shape::Chain, 128, 0, 1)
+  ->Name("Core/AStar/chain128")
+  ->UseRealTime()
+  ->Unit(benchmark::kMicrosecond);
+BENCHMARK_CAPTURE(benchmark_astar, Chain1024, Shape::Chain, 1024, 0, 1)
+  ->Name("Core/AStar/chain1024")
+  ->UseRealTime()
+  ->Unit(benchmark::kMicrosecond);
+BENCHMARK_CAPTURE(benchmark_astar, Tree255, Shape::Tree, 255, 0, 1)
+  ->Name("Core/AStar/branch255")
+  ->UseRealTime()
+  ->Unit(benchmark::kMicrosecond);
+BENCHMARK_CAPTURE(benchmark_astar, Best255, Shape::UnreachableBest, 255, 0, 1)
+  ->Name("Core/AStar/unreachable_best255")
+  ->UseRealTime()
+  ->Unit(benchmark::kMicrosecond);
+BENCHMARK_CAPTURE(benchmark_astar, Chain128Restart, Shape::Chain, 128, 1, 4)
+  ->Name("Core/AStar/chain128_restart4_budget1")
+  ->UseRealTime()
+  ->Unit(benchmark::kMicrosecond);
+BENCHMARK_CAPTURE(benchmark_astar, Chain1024Restart, Shape::Chain, 1024, 8, 4)
+  ->Name("Core/AStar/chain1024_restart4_budget8")
+  ->UseRealTime()
+  ->Unit(benchmark::kMicrosecond);
+BENCHMARK_CAPTURE(benchmark_astar, Tree255Restart, Shape::Tree, 255, 8, 4)
+  ->Name("Core/AStar/branch255_restart4_budget8")
+  ->UseRealTime()
+  ->Unit(benchmark::kMicrosecond);
+BENCHMARK_CAPTURE(benchmark_astar, Best255Restart, Shape::UnreachableBest, 255, 8, 4)
+  ->Name("Core/AStar/unreachable_best255_restart4_budget8")
+  ->UseRealTime()
+  ->Unit(benchmark::kMicrosecond);
+
+}// namespace AStarBenchmarks
 
 namespace {
 

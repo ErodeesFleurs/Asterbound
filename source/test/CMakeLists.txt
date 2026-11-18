@@ -9,6 +9,7 @@ set_target_properties(star_test_gtest PROPERTIES CXX_SCAN_FOR_MODULES OFF)
 set (star_core_tests_SOURCES
       core_tests_main.cpp
 
+      a_star_test.cpp
       algorithm_test.cpp
       array_test.cpp
       asset_path_test.cpp
@@ -237,6 +238,7 @@ set (star_game_tests_SOURCES
       particle_presentation_test.cpp
       parallax_wind_presentation_test.cpp
       physics_object_test.cpp
+      platformer_astar_test.cpp
       player_storage_test.cpp
       root_test.cpp
       server_test.cpp

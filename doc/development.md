@@ -77,6 +77,33 @@ values in named locals and preserve first-error, ownership and transaction order
 - `BlockAllocator` uses allocator traits and shared rebind families with external synchronization. Copies deallocate interchangeably before first allocation; moves transfer ownership, clear source cache borrows and permit lazy reuse. Typed pools are lazy; `allocate(n != 1)` stays on the standard path. Slots are uninitialized storage, not zeroed/live objects; retain LIFO free slots, stable nodes and at most one empty block. Keep registry/block creation off per-node paths and reuse typed-cache borrows.
 - `SmallVector` owns capacity-aware storage with explicit live size and per-operation constraints. Check overflow before allocation and reserve known lengths once. Publish replacement storage before retiring elements; preserve live-size changes during assignment callbacks and reusable moved-from state. Bulk uninitialized construction must not hide observable element construction.
 
+### Path search
+
+- `AStar::Search` constrains `search_node`/`search_edge_for` by the operations it
+  uses: copyable values, node `<`, numeric cost and compatible source/target.
+  Nodes need neither default construction nor all relational operators.
+  Search data structs use unprefixed snake_case fields.
+- Metadata owns one ordered node table. Strictly cheaper open/pruned discoveries
+  replace predecessors; candidate revisions discard stale heap/early entries.
+  Closed nodes remain closed. Closest fallback retains node-order ties and
+  terminal validator order, not a cached world-dependent best candidate.
+- Callbacks own their callable and receive const references synchronously; they
+  must not reenter the search. Errors repeat until `start`, which resets outcome,
+  paths and active state while retaining scratch capacity. Pending, success and
+  failure are independent of whether a partial path exists.
+- `result()` borrows until mutation; `extract_result()` transfers the path and
+  disengages it without changing the terminal outcome. Lua `result()` remains
+  repeatable. Native snake_case names do not rename Lua methods/parameter keys.
+- Per-call budgets count candidates, including stale entries. The legacy total
+  cutoff remains `closed_count > max_nodes_to_search`; closest-path finalization
+  is outside the candidate budget. Neither limit is a wall-time guarantee.
+- Platform searches preserve wrapping `WorldGeometry`, two-times-Manhattan
+  weighting, neighbor order, zero-cost Land edges and source-based distance
+  filtering. Cache only immutable standing-polygon bounds; never retain world
+  collision/liquid/gravity results across ticks. Preserve separate full/stand/drop
+  overrides and lazy missing-polygon errors. Path splicing compares both old/new
+  edge targets before retaining traversal progress.
+
 ### Numeric and geometry contracts
 
 - `std::clamp` requires ordered bounds; legacy `Star::clamp` returns the upper bound for reversed ranges. Preserve interpolation, rounding, wrapping and fast-math-safe finite classification. Byte-order helpers accept padding-free integrals and 32/64-bit floats, not aggregates/pointers; decode with `from_byte_order`. Raw reversal permits unaligned/null zero-length ranges, but ranges must be disjoint or identical.

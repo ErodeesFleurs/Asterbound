@@ -956,17 +956,19 @@ std::expected<std::optional<std::pair<Vec2F, bool>>, StarException> ActorMovemen
   }
 
   // set new parameters if they have changed
-  if (!m_pathController->targetPosition().has_value() || (parameters && m_pathController->parameters() != *parameters)) {
+  if (!m_pathController->target_position().has_value()
+      || (parameters && m_pathController->parameters() != *parameters)) {
     if (parameters)
-      m_pathController->setParameters(*parameters);
-    auto pathResult = m_pathController->findPath(*this, position);
+      m_pathController->set_parameters(*parameters);
+    auto pathResult = m_pathController->find_path(*this, position);
     if (!pathResult) return std::unexpected(std::move(pathResult.error()));
     m_pathMoveResult = pathResult->transform([position](bool result) { return std::pair<Vec2F, bool>(position, result); });
   }
 
   // update target position if it has changed
   if (m_pathController) {
-    if (auto result = m_pathController->findPath(*this, position); !result) return std::unexpected(std::move(result.error()));
+    if (auto result = m_pathController->find_path(*this, position); !result)
+      return std::unexpected(std::move(result.error()));
   }
 
   if (m_pathMoveResult.has_value()) {
@@ -1076,7 +1078,7 @@ std::expected<void, StarException> ActorMovementController::tickMaster(float dt)
         if (!pathResult) return std::unexpected(std::move(pathResult.error()));
         m_pathMoveResult = pathResult->transform([&pathMove = m_controlPathMove](bool result) { return std::pair<Vec2F, bool>(pathMove->first, result); });
 
-        auto action = m_pathController->curAction();
+        auto action = m_pathController->current_action();
         bool onGround = false;
         if (auto a = action) {
           using namespace PlatformerAStar;
@@ -1116,7 +1118,7 @@ std::expected<void, StarException> ActorMovementController::tickMaster(float dt)
         clearControls();
         return {};
       } else {
-        auto pathResult = m_pathController->findPath(*this, m_controlPathMove->first);
+        auto pathResult = m_pathController->find_path(*this, m_controlPathMove->first);
         if (!pathResult) return std::unexpected(std::move(pathResult.error()));
         m_pathMoveResult = pathResult->transform([&pathMove = m_controlPathMove](bool result) {
             return std::pair<Vec2F, bool>(pathMove->first, result);
@@ -1460,93 +1462,90 @@ std::expected<void, StarException> ActorMovementController::doSetAnchorState(std
   return {};
 }
 
+PathController::PathController(World& world) : m_world(world), m_edge_index(0), m_edge_timer(0.0) {}
 
-PathController::PathController(World& world)
-  : m_world(world), m_edgeIndex(0), m_edgeTimer(0.0) { }
+PlatformerAStar::Parameters const& PathController::parameters() const { return m_parameters; }
 
-PlatformerAStar::Parameters const& PathController::parameters() {
-  return m_parameters;
-}
-
-void PathController::setParameters(PlatformerAStar::Parameters const& parameters) {
-  m_parameters = parameters;
-}
+void PathController::set_parameters(PlatformerAStar::Parameters const& parameters) { m_parameters = parameters; }
 
 void PathController::reset() {
-  m_startPosition = {};
-  m_targetPosition = {};
-  m_controlFace = {};
-  m_pathFinder = {};
+  m_start_position = {};
+  m_target_position = {};
+  m_control_face = {};
+  m_path_finder = {};
   m_path = {};
-  m_edgeIndex = 0;
-  m_edgeTimer = 0.0;
+  m_edge_index = 0;
+  m_edge_timer = 0.0;
 }
 
 bool PathController::pathfinding() const {
   return !m_path.has_value();
 }
 
-std::optional<Vec2F> PathController::targetPosition() const {
-  return m_targetPosition;
-}
+std::optional<Vec2F> PathController::target_position() const { return m_target_position; }
 
-std::optional<Direction> PathController::facing() const {
-  return m_controlFace;
-}
+std::optional<Direction> PathController::facing() const { return m_control_face; }
 
-std::optional<PlatformerAStar::Action> PathController::curAction() const {
-  if (m_path && m_edgeIndex < m_path->size()) {
-    return (*m_path)[m_edgeIndex].action;
+std::optional<PlatformerAStar::Action> PathController::current_action() const {
+  if (m_path && m_edge_index < m_path->size()) {
+    return (*m_path)[m_edge_index].action;
   }
   return {};
 }
 
-std::expected<std::optional<bool>, StarException> PathController::findPath(ActorMovementController& movementController, Vec2F const& targetPosition) {
+std::expected<std::optional<bool>, StarException>
+PathController::find_path(ActorMovementController& movement_controller, Vec2F const& target_position) {
   using namespace PlatformerAStar;
 
   // reached the end of the last path and we have a new target position to move toward
-  if (m_path && m_edgeIndex == m_path->size() && m_world.get().geometry().diff(*m_targetPosition, targetPosition).magnitude() > 0.001) {
+  if (m_path && m_edge_index == m_path->size()
+      && m_world.get().geometry().diff(*m_target_position, target_position).magnitude() > 0.001) {
     reset();
-    m_targetPosition = targetPosition;
+    m_target_position = target_position;
   }
 
   // starting a new path, or the target position moved by more than 2 blocks
-  if (!m_targetPosition || (!m_path && !m_pathFinder) || m_world.get().geometry().diff(*m_targetPosition, targetPosition).magnitude() > 2.0) {
-    auto grounded = movementController.onGround();
+  if (!m_target_position || (!m_path && !m_path_finder)
+      || m_world.get().geometry().diff(*m_target_position, target_position).magnitude() > 2.0) {
+    auto grounded = movement_controller.onGround();
     if (m_path) {
       // if already moving on a path, collision will be disabled and we can't use MovementController::onGround() to check for ground collision
-      auto const groundCollision = CollisionSet{ CollisionKind::Null, CollisionKind::Block, CollisionKind::Slippery, CollisionKind::Platform };
-      auto groundedResult = onGround(movementController, movementController.position(), groundCollision);
-      if (!groundedResult) return std::unexpected(std::move(groundedResult.error()));
-      grounded = *groundedResult;
+      auto const ground_collision =
+        CollisionSet{CollisionKind::Null, CollisionKind::Block, CollisionKind::Slippery, CollisionKind::Platform};
+      auto grounded_result = on_ground(movement_controller, movement_controller.position(), ground_collision);
+      if (!grounded_result)
+        return std::unexpected(std::move(grounded_result.error()));
+      grounded = *grounded_result;
     }
-    if (*movementController.parameters().gravityEnabled && !grounded && !movementController.liquidMovement()) {
+    if (*movement_controller.parameters().gravityEnabled && !grounded && !movement_controller.liquidMovement()) {
       return {};
     }
-    m_startPosition = movementController.position();
-    m_targetPosition = targetPosition;
-    auto finder = PathFinder::create(m_world.get(), movementController.position(), *m_targetPosition, movementController.baseParameters(), m_parameters);
+    m_start_position = movement_controller.position();
+    m_target_position = target_position;
+    auto finder = PathFinder::create(m_world.get(), movement_controller.position(), *m_target_position,
+                                     movement_controller.baseParameters(), m_parameters);
     if (!finder) return std::unexpected(std::move(finder.error()));
-    m_pathFinder = std::move(*finder);
+    m_path_finder = std::move(*finder);
   }
 
-  if (!m_pathFinder && m_path && m_edgeIndex == m_path->size())
+  if (!m_path_finder && m_path && m_edge_index == m_path->size())
     return true; // Reached goal
 
-  if (m_pathFinder) {
-    auto exploration = m_pathFinder->explore(movementController.baseParameters().pathExploreRate.value_or(100.0));
+  if (m_path_finder) {
+    auto exploration = m_path_finder->explore(movement_controller.baseParameters().pathExploreRate.value_or(100.0));
     if (!exploration) return std::unexpected(std::move(exploration.error()));
     auto explored = *exploration;
     if (explored) {
-      auto pathfinder = m_pathFinder;
-      m_pathFinder = {};
+      auto pathfinder = std::move(m_path_finder);
 
       if (*explored) {
-        if (!pathfinder->result()) return std::unexpected(ActorMovementControllerException("Successful path search has no path"));
-        auto path = *pathfinder->result();
+        auto path_result = pathfinder->extract_result();
+        if (!path_result)
+          return std::unexpected(ActorMovementControllerException("Successful path search has no path"));
+        auto path = std::move(*path_result);
 
-        float newEdgeTimer = 0.0;
-        float newEdgeIndex = 0.0;
+        float new_edge_timer = 0.0;
+        std::size_t new_edge_index = 0;
 
         // if we have a path already, see if our paths can be merged either by splicing or fast forwarding
         bool merged = false;
@@ -1554,15 +1553,17 @@ std::expected<std::optional<bool>, StarException> PathController::findPath(Actor
           // try to fast forward on the new path
           std::size_t i = 0;
           // fast forward from current edge, or the last edge of the path
-          auto curEdgeIndex = std::min(m_edgeIndex, m_path->size() - 1);
-          auto curEdgeResult = m_path->at(curEdgeIndex);
-          if (!curEdgeResult) return std::unexpected(std::move(curEdgeResult.error()));
-          auto& curEdge = curEdgeResult->get();
+          auto current_edge_index = std::min(m_edge_index, m_path->size() - 1);
+          auto current_edge_result = m_path->at(current_edge_index);
+          if (!current_edge_result)
+            return std::unexpected(std::move(current_edge_result.error()));
+          auto& current_edge = current_edge_result->get();
           for (auto& edge : path) {
-            if (curEdge.action == edge.action && curEdge.source.position == edge.source.position && edge.target.position == edge.target.position) {
+            if (current_edge.action == edge.action && current_edge.source.position == edge.source.position
+                && current_edge.target.position == edge.target.position) {
               // fast forward on the new path
-              newEdgeTimer = m_edgeTimer;
-              newEdgeIndex = i;
+              new_edge_timer = m_edge_timer;
+              new_edge_index = i;
 
               merged = true;
               break;
@@ -1572,17 +1573,17 @@ std::expected<std::optional<bool>, StarException> PathController::findPath(Actor
 
           if (!merged) {
             // try to splice the new path onto the current path
-            auto& newPathStart = path[0];
-            for (std::size_t i = m_edgeIndex; i < m_path->size(); i += 2) {
+            auto& new_path_start = path[0];
+            for (std::size_t i = m_edge_index; i < m_path->size(); i += 2) {
               auto& edge = (*m_path)[i];
-              if (edge.target.position == newPathStart.source.position) {
+              if (edge.target.position == new_path_start.source.position) {
                 // splice the new path onto our current path up to this index
-                auto newPath = m_path->slice(0, i + 1);
-                newPath.append_range(path);
-                path = std::move(newPath);
+                auto new_path = m_path->slice(0, i + 1);
+                new_path.append_range(path);
+                path = std::move(new_path);
 
-                newEdgeTimer = m_edgeTimer;
-                newEdgeIndex = m_edgeIndex;
+                new_edge_timer = m_edge_timer;
+                new_edge_index = m_edge_index;
 
                 merged = true;
                 break;
@@ -1591,22 +1592,28 @@ std::expected<std::optional<bool>, StarException> PathController::findPath(Actor
           }
         }
 
-        if (!merged && movementController.position() != *m_startPosition) {
+        if (!merged && movement_controller.position() != *m_start_position) {
           // merging the paths failed, and the entity has moved from the path start position
           // try to bridge the gap from the current position to the new path
-          auto bridgeResult = PathFinder::create(m_world.get(), movementController.position(), *m_startPosition, movementController.baseParameters(), m_parameters);
-          if (!bridgeResult) return std::unexpected(std::move(bridgeResult.error()));
-          auto bridgePathFinder = std::move(*bridgeResult);
-          auto bridgeExploration = bridgePathFinder->explore(movementController.baseParameters().pathExploreRate.value_or(100.0));
-          if (!bridgeExploration) return std::unexpected(std::move(bridgeExploration.error()));
-          auto explored = *bridgeExploration;
+          auto bridge_result = PathFinder::create(m_world.get(), movement_controller.position(), *m_start_position,
+                                                  movement_controller.baseParameters(), m_parameters);
+          if (!bridge_result)
+            return std::unexpected(std::move(bridge_result.error()));
+          auto bridge_path_finder = std::move(*bridge_result);
+          auto bridge_exploration =
+            bridge_path_finder->explore(movement_controller.baseParameters().pathExploreRate.value_or(100.0));
+          if (!bridge_exploration)
+            return std::unexpected(std::move(bridge_exploration.error()));
+          auto explored = *bridge_exploration;
 
           if (explored && *explored) {
             // concatenate the bridge path with the new path
-            if (!bridgePathFinder->result()) return std::unexpected(ActorMovementControllerException("Successful bridge search has no path"));
-            auto newPath = *bridgePathFinder->result();
-            newPath.append_range(path);
-            path = newPath;
+            auto bridge_path = bridge_path_finder->extract_result();
+            if (!bridge_path)
+              return std::unexpected(ActorMovementControllerException("Successful bridge search has no path"));
+            auto new_path = std::move(*bridge_path);
+            new_path.append_range(path);
+            path = std::move(new_path);
           } else {
             // if the gap isn't bridged in a single tick, reset and start over
             reset();
@@ -1616,9 +1623,10 @@ std::expected<std::optional<bool>, StarException> PathController::findPath(Actor
 
         bool valid = true;
         if (!path.empty()) {
-          auto edgeValid = validateEdge(movementController, path[0]);
-          if (!edgeValid) return std::unexpected(std::move(edgeValid.error()));
-          valid = *edgeValid;
+          auto edge_valid = validate_edge(movement_controller, path[0]);
+          if (!edge_valid)
+            return std::unexpected(std::move(edge_valid.error()));
+          valid = *edge_valid;
         }
         if (!valid) {
           // reset if the first edge is invalid
@@ -1626,9 +1634,9 @@ std::expected<std::optional<bool>, StarException> PathController::findPath(Actor
           return false;
         }
 
-        m_edgeTimer = newEdgeTimer;
-        m_edgeIndex = newEdgeIndex;
-        m_path = path;
+        m_edge_timer = new_edge_timer;
+        m_edge_index = new_edge_index;
+        m_path = std::move(path);
         if (m_path->empty())
           return true;
       } else {
@@ -1640,25 +1648,29 @@ std::expected<std::optional<bool>, StarException> PathController::findPath(Actor
   return {};
 }
 
-std::expected<std::optional<bool>, StarException> PathController::move(ActorMovementController& movementController, ActorMovementParameters const& parameters, ActorMovementModifiers const& modifiers, bool run, float dt) {
+std::expected<std::optional<bool>, StarException> PathController::move(ActorMovementController& movement_controller,
+                                                                       ActorMovementParameters const& parameters,
+                                                                       ActorMovementModifiers const& modifiers,
+                                                                       bool run, float dt) {
   using namespace PlatformerAStar;
 
   // pathfind to a new target position in the background while moving on the current path
-  if (m_pathFinder && m_targetPosition) {
-    if (auto result = findPath(movementController, *m_targetPosition); !result) return std::unexpected(std::move(result.error()));
+  if (m_path_finder && m_target_position) {
+    if (auto result = find_path(movement_controller, *m_target_position); !result)
+      return std::unexpected(std::move(result.error()));
   }
 
   if (!m_path)
     return {};
 
-  m_controlFace = {};
+  m_control_face = {};
 
-  while (m_edgeIndex < m_path->size()) {
-    auto& edge = (*m_path)[m_edgeIndex];
+  while (m_edge_index < m_path->size()) {
+    auto& edge = (*m_path)[m_edge_index];
     Vec2F delta = m_world.get().geometry().diff(edge.target.position, edge.source.position);
 
-    Vec2F sourceVelocity;
-    Vec2F targetVelocity;
+    Vec2F source_velocity;
+    Vec2F target_velocity;
     switch (edge.action) {
       case Action::Jump:
         if (modifiers.jumpingSuppressed) {
@@ -1667,43 +1679,44 @@ std::expected<std::optional<bool>, StarException> PathController::move(ActorMove
         }
         break;
       case Action::Arc:
-        sourceVelocity = edge.source.velocity.value_or(Vec2F());
-        targetVelocity = edge.target.velocity.value_or(Vec2F());
+        source_velocity = edge.source.velocity.value_or(Vec2F());
+        target_velocity = edge.target.velocity.value_or(Vec2F());
         break;
-      case Action::Drop:
-        targetVelocity = edge.target.velocity.value_or(Vec2F());
-        break;
+      case Action::Drop: target_velocity = edge.target.velocity.value_or(Vec2F()); break;
       case Action::Fly:
         {
           // accelerate along path using airForce
-          float angleFactor = movementController.velocity().normalized() * delta.normalized();
-          float speedAlongAngle = angleFactor * movementController.velocity().magnitude();
-          auto acc = parameters.airForce.value_or(0.0) / movementController.mass();
-          sourceVelocity = delta.normalized() * std::fmin(parameters.flySpeed.value_or(0.0), speedAlongAngle + acc * dt);
-          targetVelocity = sourceVelocity;
+          float angle_factor = movement_controller.velocity().normalized() * delta.normalized();
+          float speed_along_angle = angle_factor * movement_controller.velocity().magnitude();
+          auto acc = parameters.airForce.value_or(0.0) / movement_controller.mass();
+          source_velocity =
+            delta.normalized() * std::fmin(parameters.flySpeed.value_or(0.0), speed_along_angle + acc * dt);
+          target_velocity = source_velocity;
         }
         break;
       case Action::Swim:
-        sourceVelocity = targetVelocity = delta.normalized() * parameters.flySpeed.value_or(0.0f) * (1.0f - parameters.liquidImpedance.value_or(0.0f));
+        source_velocity = target_velocity =
+          delta.normalized() * parameters.flySpeed.value_or(0.0f) * (1.0f - parameters.liquidImpedance.value_or(0.0f));
         break;
       case Action::Walk:
-        sourceVelocity = delta.normalized() * (run ? parameters.runSpeed.value_or(0.0f) : parameters.walkSpeed.value_or(0.0f));
-        sourceVelocity *= modifiers.speedModifier;
-        targetVelocity = sourceVelocity;
+        source_velocity =
+          delta.normalized() * (run ? parameters.runSpeed.value_or(0.0f) : parameters.walkSpeed.value_or(0.0f));
+        source_velocity *= modifiers.speedModifier;
+        target_velocity = source_velocity;
         break;
       default: {}
     }
 
-    Vec2F avgVelocity = (sourceVelocity + targetVelocity) / 2.0;
-    float avgSpeed = avgVelocity.magnitude();
-    auto edgeTime = avgSpeed > 0.0f ? delta.magnitude() / avgSpeed : 0.2;
+    Vec2F average_velocity = (source_velocity + target_velocity) / 2.0;
+    float average_speed = average_velocity.magnitude();
+    auto edge_time = average_speed > 0.0f ? delta.magnitude() / average_speed : 0.2;
 
-    auto edgeProgress = m_edgeTimer / edgeTime;
-    if (edgeProgress > 1.0f) {
-      m_edgeTimer -= edgeTime;
-      m_edgeIndex++;
-      if (m_edgeIndex < m_path->size()) {
-        auto valid = validateEdge(movementController, (*m_path)[m_edgeIndex]);
+    auto edge_progress = m_edge_timer / edge_time;
+    if (edge_progress > 1.0f) {
+      m_edge_timer -= edge_time;
+      m_edge_index++;
+      if (m_edge_index < m_path->size()) {
+        auto valid = validate_edge(movement_controller, (*m_path)[m_edge_index]);
         if (!valid) return std::unexpected(std::move(valid.error()));
         if (!*valid) {
           reset();
@@ -1713,95 +1726,108 @@ std::expected<std::optional<bool>, StarException> PathController::move(ActorMove
       continue;
     }
 
-    auto curVelocity = sourceVelocity + ((targetVelocity - sourceVelocity) * edgeProgress);
-    movementController.setVelocity(curVelocity);
-    auto movement = (curVelocity + sourceVelocity) / 2.0 * m_edgeTimer;
-    movementController.setPosition(edge.source.position + movement);
+    auto current_velocity = source_velocity + ((target_velocity - source_velocity) * edge_progress);
+    movement_controller.setVelocity(current_velocity);
+    auto movement = (current_velocity + source_velocity) / 2.0 * m_edge_timer;
+    movement_controller.setPosition(edge.source.position + movement);
 
     if (auto direction = directionOf(delta[0]))
-      m_controlFace = direction;
+      m_control_face = direction;
 
-    m_edgeTimer += dt;
+    m_edge_timer += dt;
     return {};
   }
 
-  if (auto lastEdge = m_path->back_value()) {
-    movementController.setPosition(lastEdge->target.position);
-    movementController.setVelocity(Vec2F());
+  if (auto last_edge = m_path->back_value()) {
+    movement_controller.setPosition(last_edge->target.position);
+    movement_controller.setVelocity(Vec2F());
   }
 
   // reached the end of the path, success unless we're also currently pathfinding to a new position
-  if (m_pathFinder)
+  if (m_path_finder)
     return {};
   else
     return true;
 }
 
-std::expected<bool, StarException> PathController::validateEdge(ActorMovementController& movementController, PlatformerAStar::Edge const& edge) {
+std::expected<bool, StarException> PathController::validate_edge(ActorMovementController& movement_controller,
+                                                                 PlatformerAStar::Edge const& edge) {
   using namespace PlatformerAStar;
-  auto const groundCollision = CollisionSet{CollisionKind::Null, CollisionKind::Block, CollisionKind::Slippery, CollisionKind::Platform};
-  auto const solidCollision = CollisionSet{CollisionKind::Null, CollisionKind::Block, CollisionKind::Slippery};
-  auto openDoors = [&world = m_world.get()](RectF const& bounds) -> std::expected<bool, StarException> {
+  auto const ground_collision =
+    CollisionSet{CollisionKind::Null, CollisionKind::Block, CollisionKind::Slippery, CollisionKind::Platform};
+  auto const solid_collision = CollisionSet{CollisionKind::Null, CollisionKind::Block, CollisionKind::Slippery};
+  auto open_doors = [&world = m_world.get()](RectF const& bounds) -> std::expected<bool, StarException> {
     auto objects = world.entityQuery(bounds, entityTypeFilter<Object>());
-    if (!objects) return std::unexpected(std::move(objects.error()));
+    if (!objects)
+      return std::unexpected(std::move(objects.error()));
     bool opened = false;
     for (auto const& entity : *objects) {
       if (auto object = as<Object>(entity); object && object->isMaster()) {
         auto arg = world.luaRoot()->luaEngine().createString("closedDoor");
-        if (!arg) return std::unexpected(std::move(arg.error()));
+        if (!arg)
+          return std::unexpected(std::move(arg.error()));
         auto response = object->callScript("hasCapability", LuaVariadic<LuaValue>{*arg});
-        if (!response) return std::unexpected(std::move(response.error()));
+        if (!response)
+          return std::unexpected(std::move(response.error()));
         if (*response && std::holds_alternative<LuaBoolean>(**response) && std::get<LuaBoolean>(**response)) {
           auto sent = world.sendEntityMessage(entity->entityId(), "openDoor");
-          if (!sent) return std::unexpected(std::move(sent.error()));
+          if (!sent)
+            return std::unexpected(std::move(sent.error()));
           opened = true;
         }
       }
     }
     return opened;
   };
-  auto poly = movementController.collisionPoly();
+  auto poly = movement_controller.collisionPoly();
   poly.translate(edge.target.position);
-  auto worldCollision = m_world.get().polyCollision(poly);
-  if (!worldCollision) return std::unexpected(std::move(worldCollision.error()));
-  bool collided = *worldCollision;
+  auto world_collision = m_world.get().polyCollision(poly);
+  if (!world_collision)
+    return std::unexpected(std::move(world_collision.error()));
+  bool collided = *world_collision;
   if (!collided) {
-    auto moving = movingCollision(movementController, poly);
+    auto moving = moving_collision(movement_controller, poly);
     if (!moving) return std::unexpected(std::move(moving.error()));
     collided = *moving;
   }
   if (collided) {
     auto bounds = RectI::integral(poly.boundBox());
-    auto tileCollision = m_world.get().rectTileCollision(bounds);
-    if (!tileCollision) return std::unexpected(std::move(tileCollision.error()));
-    if (!*tileCollision) return false;
-    auto solid = m_world.get().rectTileCollision(bounds, solidCollision);
+    auto tile_collision = m_world.get().rectTileCollision(bounds);
+    if (!tile_collision)
+      return std::unexpected(std::move(tile_collision.error()));
+    if (!*tile_collision)
+      return false;
+    auto solid = m_world.get().rectTileCollision(bounds, solid_collision);
     if (!solid) return std::unexpected(std::move(solid.error()));
     if (*solid) return false;
-    auto opened = openDoors(poly.boundBox());
+    auto opened = open_doors(poly.boundBox());
     if (!opened) return std::unexpected(std::move(opened.error()));
     if (!*opened) return false;
   }
-  auto inLiquid = [&movementController, &world = m_world.get()](Vec2F const& position) -> std::expected<bool, StarException> {
-    auto bounds = movementController.localBoundBox().translated(position);
+  auto in_liquid = [&movement_controller,
+                    &world = m_world.get()](Vec2F const& position) -> std::expected<bool, StarException> {
+    auto bounds = movement_controller.localBoundBox().translated(position);
     auto liquid = world.liquidLevel(bounds);
-    if (!liquid) return std::unexpected(std::move(liquid.error()));
-    return liquid->level >= movementController.baseParameters().minimumLiquidPercentage.value_or(1.0);
+    if (!liquid)
+      return std::unexpected(std::move(liquid.error()));
+    return liquid->level >= movement_controller.baseParameters().minimumLiquidPercentage.value_or(1.0);
   };
   switch (edge.action) {
-    case Action::Walk: return onGround(movementController, edge.source.position, groundCollision);
-    case Action::Swim: return inLiquid(edge.target.position);
-    case Action::Land: {
-      auto grounded = onGround(movementController, edge.target.position, groundCollision);
-      if (!grounded) return std::unexpected(std::move(grounded.error()));
-      if (*grounded) return true;
-      return inLiquid(edge.target.position);
-    }
+  case Action::Walk: return on_ground(movement_controller, edge.source.position, ground_collision);
+  case Action::Swim: return in_liquid(edge.target.position);
+  case Action::Land: {
+    auto grounded = on_ground(movement_controller, edge.target.position, ground_collision);
+    if (!grounded)
+      return std::unexpected(std::move(grounded.error()));
+    if (*grounded)
+      return true;
+    return in_liquid(edge.target.position);
+  }
     case Action::Drop: {
-      auto grounded = onGround(movementController, edge.source.position, groundCollision);
+      auto grounded = on_ground(movement_controller, edge.source.position, ground_collision);
       if (!grounded) return std::unexpected(std::move(grounded.error()));
       if (!*grounded) return false;
-      auto solid = onGround(movementController, edge.source.position, solidCollision);
+      auto solid = on_ground(movement_controller, edge.source.position, solid_collision);
       if (!solid) return std::unexpected(std::move(solid.error()));
       return !*solid;
     }
@@ -1809,10 +1835,13 @@ std::expected<bool, StarException> PathController::validateEdge(ActorMovementCon
   }
 }
 
-std::expected<bool, StarException> PathController::movingCollision(ActorMovementController& movementController, PolyF const& collisionPoly) {
+std::expected<bool, StarException> PathController::moving_collision(ActorMovementController& movement_controller,
+                                                                    PolyF const& collision_poly) {
   bool collided = false;
-  auto scanned = movementController.forEachMovingCollision(collisionPoly.boundBox(), [&](MovingCollisionId, PhysicsMovingCollision, PolyF poly, RectF) -> std::expected<bool, StarException> {
-      if (poly.intersects(collisionPoly)) {
+  auto scanned = movement_controller.forEachMovingCollision(
+    collision_poly.boundBox(),
+    [&](MovingCollisionId, PhysicsMovingCollision, PolyF poly, RectF) -> std::expected<bool, StarException> {
+      if (poly.intersects(collision_poly)) {
         // set collided and stop iterating
         collided = true;
         return false;
@@ -1823,11 +1852,12 @@ std::expected<bool, StarException> PathController::movingCollision(ActorMovement
   return collided;
 }
 
-std::expected<bool, StarException> PathController::onGround(ActorMovementController const& movementController, Vec2F const& position, CollisionSet const& collisionSet) const {
-    auto bounds = RectI::integral(movementController.localBoundBox().translated(position));
-    Vec2I min = Vec2I(bounds.xMin(), bounds.yMin() - 1);
-    Vec2I max = Vec2I(bounds.xMax(), bounds.yMin());
-    return m_world.get().rectTileCollision(RectI(min, max), collisionSet);
+std::expected<bool, StarException> PathController::on_ground(ActorMovementController const& movement_controller,
+                                                             Vec2F const& position,
+                                                             CollisionSet const& collision_set) const {
+  auto bounds = RectI::integral(movement_controller.localBoundBox().translated(position));
+  Vec2I min = Vec2I(bounds.xMin(), bounds.yMin() - 1);
+  Vec2I max = Vec2I(bounds.xMax(), bounds.yMin());
+  return m_world.get().rectTileCollision(RectI(min, max), collision_set);
 }
-
 }

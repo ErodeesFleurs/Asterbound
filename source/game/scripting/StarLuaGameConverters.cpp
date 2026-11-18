@@ -212,7 +212,7 @@ std::expected<std::optional<CollisionSet>, StarException> LuaConverter<Collision
 
 std::expected<void, StarException> LuaConverter<PlatformerAStar::Path>::from(LuaStack stack,
                                                                              PlatformerAStar::Path const& path) {
-  auto convertNode = [&stack](PlatformerAStar::Node const& node) {
+  auto convert_node = [&stack](PlatformerAStar::Node const& node) {
     return makeTable(stack, "position", node.position, "velocity", node.velocity);
   };
   if (path.size() > static_cast<std::size_t>(std::numeric_limits<int>::max()))
@@ -220,25 +220,25 @@ std::expected<void, StarException> LuaConverter<PlatformerAStar::Path>::from(Lua
   auto created = stack.createTable(static_cast<int>(path.size()), 0);
   if (!created)
     return std::unexpected(std::move(created.error()));
-  auto pathTable = std::move(*created);
+  auto path_table = std::move(*created);
   int index = 1;
   for (auto const& edge : path) {
-    auto action = PlatformerAStar::actionName(edge.action);
+    auto action = PlatformerAStar::action_name(edge.action);
     if (!action)
       return std::unexpected(std::move(action.error()));
-    auto source = convertNode(edge.source);
+    auto source = convert_node(edge.source);
     if (!source)
       return std::unexpected(std::move(source.error()));
-    auto sourceTable = stack.value(-1);
-    auto target = convertNode(edge.target);
+    auto source_table = stack.value(-1);
+    auto target = convert_node(edge.target);
     if (!target)
       return std::unexpected(std::move(target.error()));
-    auto targetTable = stack.value(-1);
-    auto converted = makeTable(stack, "cost", edge.cost, "action", action->get(), "jumpVelocity", edge.jumpVelocity,
-                               "source", sourceTable, "target", targetTable);
+    auto target_table = stack.value(-1);
+    auto converted = makeTable(stack, "cost", edge.cost, "action", action->get(), "jumpVelocity", edge.jump_velocity,
+                               "source", source_table, "target", target_table);
     if (!converted)
       return std::unexpected(std::move(converted.error()));
-    auto inserted = pathTable.set(index++, stack.value(-1));
+    auto inserted = path_table.set(index++, stack.value(-1));
     if (!inserted)
       return std::unexpected(std::move(inserted.error()));
     stack.pop(3);
@@ -293,31 +293,31 @@ LuaConverter<std::shared_ptr<PlatformerAStar::PathFinder>>::to(LuaStackValue val
 std::expected<std::optional<PlatformerAStar::Parameters>, StarException>
 LuaConverter<PlatformerAStar::Parameters>::to(LuaStackValue v) {
   PlatformerAStar::Parameters p;
-  p.returnBest = false;
-  p.mustEndOnGround = false;
-  p.enableWalkSpeedJumps = false;
-  p.enableVerticalJumpAirControl = false;
+  p.return_best = false;
+  p.must_end_on_ground = false;
+  p.enable_walk_speed_jumps = false;
+  p.enable_vertical_jump_air_control = false;
   if (v.is<LuaNilType>())
     return p;
   if (!v.is<LuaTable>())
     return std::nullopt;
   auto const& table = v;
-  std::optional<bool> returnBest, mustEndOnGround, enableWalkSpeedJumps, enableVerticalJumpAirControl;
-  auto read = readFields(table, "maxDistance", p.maxDistance, "returnBest", returnBest, "mustEndOnGround",
-                         mustEndOnGround, "enableWalkSpeedJumps", enableWalkSpeedJumps, "enableVerticalJumpAirControl",
-                         enableVerticalJumpAirControl, "swimCost", p.swimCost, "jumpCost", p.jumpCost, "liquidJumpCost",
-                         p.liquidJumpCost, "dropCost", p.dropCost, "boundBox", p.boundBox, "standingBoundBox",
-                         p.standingBoundBox, "droppingBoundBox", p.droppingBoundBox, "smallJumpMultiplier",
-                         p.smallJumpMultiplier, "jumpDropXMultiplier", p.jumpDropXMultiplier, "maxFScore", p.maxFScore,
-                         "maxNodesToSearch", p.maxNodesToSearch, "maxLandingVelocity", p.maxLandingVelocity);
+  std::optional<bool> return_best, must_end_on_ground, enable_walk_speed_jumps, enable_vertical_jump_air_control;
+  auto read = readFields(
+    table, "maxDistance", p.max_distance, "returnBest", return_best, "mustEndOnGround", must_end_on_ground,
+    "enableWalkSpeedJumps", enable_walk_speed_jumps, "enableVerticalJumpAirControl", enable_vertical_jump_air_control,
+    "swimCost", p.swim_cost, "jumpCost", p.jump_cost, "liquidJumpCost", p.liquid_jump_cost, "dropCost", p.drop_cost,
+    "boundBox", p.bound_box, "standingBoundBox", p.standing_bound_box, "droppingBoundBox", p.dropping_bound_box,
+    "smallJumpMultiplier", p.small_jump_multiplier, "jumpDropXMultiplier", p.jump_drop_x_multiplier, "maxFScore",
+    p.max_f_score, "maxNodesToSearch", p.max_nodes_to_search, "maxLandingVelocity", p.max_landing_velocity);
   if (!read)
     return std::unexpected(std::move(read.error()));
   if (!*read)
     return std::nullopt;
-  p.returnBest = returnBest.value_or(false);
-  p.mustEndOnGround = mustEndOnGround.value_or(false);
-  p.enableWalkSpeedJumps = enableWalkSpeedJumps.value_or(false);
-  p.enableVerticalJumpAirControl = enableVerticalJumpAirControl.value_or(false);
+  p.return_best = return_best.value_or(false);
+  p.must_end_on_ground = must_end_on_ground.value_or(false);
+  p.enable_walk_speed_jumps = enable_walk_speed_jumps.value_or(false);
+  p.enable_vertical_jump_air_control = enable_vertical_jump_air_control.value_or(false);
   return p;
 }
 

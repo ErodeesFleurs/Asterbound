@@ -424,6 +424,19 @@ These are algorithm/compatibility guarantees, not measured runtime speedups.
   renamed APIs, compile flags, fixture/result labels and runtime dependencies.
   Retain alternating before/after samples, old/old drift and every regression.
 
+### Path search
+
+- `core_tests --gtest_filter='AStar.*'` covers cheaper open/pruned rediscovery,
+  stale heap/early candidates, incremental/zero budgets, ordered validated
+  fallback, stable partial failure, restart/extraction, active copies/moves and
+  sticky typed callback errors. Compile-time consumers include non-default nodes
+  with only the required ordering operations and reject malformed edges.
+- `game_tests --gtest_filter='PlatformerAStar.*:PathController.*:MovementController.*'`
+  uses private ephemeral real WorldServer terrain: floor walking, wall-detour
+  flying, falling/platform drops and zero-cost landing, ledge/bounds overrides,
+  missing-polygon error timing, opposite-target replan progress and actual Lua
+  parameter/edge keys with repeatable incremental results.
+
 ### Asset locators
 
 - `core_tests --gtest_filter='AssetPathTest.*:PathEmbedTest.*:ImageDirectivePipelineTest.*'`
@@ -501,6 +514,7 @@ catalog; implementation and detailed labels live in [benchmark sources](../sourc
 | Lua | `./result/bin/core_benchmarks --benchmark_filter='Lua/'` | Calls, callbacks, contexts and coroutines; asset workers share one VM. |
 | JSON | `./result/bin/json_benchmarks` | Parsing, preserved formatting, path updates and patches. |
 | Asset locators | `./result/bin/core_benchmarks --benchmark_filter='^Core/AssetPath/'` | Byte parsing, canonical output, filename/extension, sub-path/directive edits and relative concatenation. |
+| Path search | `core_benchmarks --benchmark_filter='^Core/AStar/'`; `game_benchmarks --benchmark_filter='^Game/AStar/'` | Graph chains/branches, partial fallback and budgeted restart; real WorldServer walk/flight. |
 | Algorithms | `./result/bin/algorithm_benchmarks --benchmark_filter='Algorithm/'` | Ordinary/checked cached-key and stable sorting; held-key filtering. |
 | Optional values | `./result/bin/optional_benchmarks --benchmark_filter='Optional/'` | Owning extraction, borrowing, traced empty errors and nested diagnostics. |
 | Byte order | `./result/bin/bytes_benchmarks --benchmark_filter='Bytes/'` | Scalar and misaligned raw reversal/conversion. |
@@ -551,6 +565,23 @@ not production frame pacing or FPS evidence.
   filename/extension on base-only inputs: suffix-bearing cases fix an old range
   bug and are correctness regressions, not valid old/new speedups. Historical
   benchmark labels retain their spelling independently of the snake_case API.
+
+### Path-search comparison boundaries
+
+Eight `Core/AStar` rows validate complete independent graph paths and input/output
+fingerprints. `searches/batch` is one for fresh searches and four for budgeted
+restart rows; divide batch time by that count, not by visited nodes. Four
+`Game/AStar` rows use real ephemeral WorldServer terrain; setup, terrain/oracles
+and teardown are untimed. Search construction, exploration and result destruction
+are timed. Registrations calibrate real time; report CPU and wall metrics
+explicitly rather than confusing them.
+
+Cheaper-rediscovery/pruned-node and repeated-partial-terminal defects are
+correctness cases, excluded from equivalent speedups. Optional
+`ASTERBOUND_ASTAR_DIAGNOSTICS=1` prints their untimed native outcomes. Keep original
+production-linked binaries, consumer token/API-name parity, compiler/dependency
+parity, alternating A/B results, A/A drift and every regression. These search-only
+measurements do not establish whole-NPC update or rendered-frame gains.
 
 ### Comparable measurements
 

@@ -2853,26 +2853,26 @@ namespace LuaBindings {
     return world.isTileProtected(Vec2I::floor(position));
   }
 
-  std::expected<std::optional<PlatformerAStar::Path>, StarException> WorldCallbacks::findPlatformerPath(World& world,
-      Vec2F const& start,
-      Vec2F const& end,
-      ActorMovementParameters actorMovementParameters,
-      PlatformerAStar::Parameters searchParameters) {
-    auto pathFinderResult = PlatformerAStar::PathFinder::create(world, start, end, std::move(actorMovementParameters), std::move(searchParameters));
-    if (!pathFinderResult)
-      return std::unexpected(std::move(pathFinderResult.error()));
-    auto pathFinder = std::move(*pathFinderResult);
-    if (auto operation = pathFinder->explore({}); !operation)
+  std::expected<std::optional<PlatformerAStar::Path>, StarException>
+  WorldCallbacks::findPlatformerPath(World& world, Vec2F const& start, Vec2F const& end,
+                                     ActorMovementParameters actor_movement_parameters,
+                                     PlatformerAStar::Parameters search_parameters) {
+    auto path_finder_result = PlatformerAStar::PathFinder::create(
+      world, start, end, std::move(actor_movement_parameters), std::move(search_parameters));
+    if (!path_finder_result)
+      return std::unexpected(std::move(path_finder_result.error()));
+    auto path_finder = std::move(*path_finder_result);
+    if (auto operation = path_finder->explore({}); !operation)
       return std::unexpected(std::move(operation.error()));
-    return pathFinder->result();
+    return path_finder->extract_result();
   }
 
-  std::expected<std::shared_ptr<PlatformerAStar::PathFinder>, StarException> WorldCallbacks::platformerPathStart(World& world,
-      Vec2F const& start,
-      Vec2F const& end,
-      ActorMovementParameters actorMovementParameters,
-      PlatformerAStar::Parameters searchParameters) {
-    return PlatformerAStar::PathFinder::create(world, start, end, std::move(actorMovementParameters), std::move(searchParameters));
+  std::expected<std::shared_ptr<PlatformerAStar::PathFinder>, StarException>
+  WorldCallbacks::platformerPathStart(World& world, Vec2F const& start, Vec2F const& end,
+                                      ActorMovementParameters actor_movement_parameters,
+                                      PlatformerAStar::Parameters search_parameters) {
+    return PlatformerAStar::PathFinder::create(world, start, end, std::move(actor_movement_parameters),
+                                               std::move(search_parameters));
   }
 
   std::expected<void, StarException> ClientWorldCallbacks::resendEntity(WorldClient& world, EntityId arg1) {

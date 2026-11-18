@@ -374,35 +374,44 @@ class PathController {
 public:
   PathController(World& world);
 
-  PlatformerAStar::Parameters const& parameters();
-  void setParameters(PlatformerAStar::Parameters const& parameters);
+  PlatformerAStar::Parameters const& parameters() const;
+  void set_parameters(PlatformerAStar::Parameters const& parameters);
   void reset();
   bool pathfinding() const;
-  std::optional<Vec2F> targetPosition() const;
+  std::optional<Vec2F> target_position() const;
   std::optional<Direction> facing() const;
-  std::optional<PlatformerAStar::Action> curAction() const;
+  std::optional<PlatformerAStar::Action> current_action() const;
 
   // return true for reaching goal, false for failing to find path, nothing for running
-  [[nodiscard]] std::expected<std::optional<bool>, StarException> findPath(ActorMovementController& movementController, Vec2F const& targetPosition);
-  [[nodiscard]] std::expected<std::optional<bool>, StarException> move(ActorMovementController& movementController, ActorMovementParameters const& parameters, ActorMovementModifiers const& modifiers, bool run, float dt);
-private:
-  [[nodiscard]] std::expected<bool, StarException> validateEdge(ActorMovementController& movementController, PlatformerAStar::Edge const& edge);
-  [[nodiscard]] std::expected<bool, StarException> movingCollision(ActorMovementController& movementController, PolyF const& collisionPoly);
+  [[nodiscard]] std::expected<std::optional<bool>, StarException>
+  find_path(ActorMovementController& movement_controller, Vec2F const& target_position);
+  [[nodiscard]] std::expected<std::optional<bool>, StarException> move(ActorMovementController& movement_controller,
+                                                                       ActorMovementParameters const& parameters,
+                                                                       ActorMovementModifiers const& modifiers,
+                                                                       bool run, float dt);
 
 private:
-  [[nodiscard]] std::expected<bool, StarException> onGround(ActorMovementController const& movementController, Vec2F const& position, CollisionSet const& collisionSet) const;
+  [[nodiscard]] std::expected<bool, StarException> validate_edge(ActorMovementController& movement_controller,
+                                                                 PlatformerAStar::Edge const& edge);
+  [[nodiscard]] std::expected<bool, StarException> moving_collision(ActorMovementController& movement_controller,
+                                                                    PolyF const& collision_poly);
+
+private:
+  [[nodiscard]] std::expected<bool, StarException> on_ground(ActorMovementController const& movement_controller,
+                                                             Vec2F const& position,
+                                                             CollisionSet const& collision_set) const;
 
   std::reference_wrapper<World> m_world;
   PlatformerAStar::Parameters m_parameters;
 
-  std::optional<Vec2F> m_startPosition;
-  std::optional<Vec2F> m_targetPosition;
-  std::shared_ptr<PlatformerAStar::PathFinder> m_pathFinder;
+  std::optional<Vec2F> m_start_position;
+  std::optional<Vec2F> m_target_position;
+  std::shared_ptr<PlatformerAStar::PathFinder> m_path_finder;
 
-  std::optional<Direction> m_controlFace;
+  std::optional<Direction> m_control_face;
 
-  std::size_t m_edgeIndex;
-  float m_edgeTimer;
+  std::size_t m_edge_index;
+  float m_edge_timer;
   std::optional<PlatformerAStar::Path> m_path;
 };
 

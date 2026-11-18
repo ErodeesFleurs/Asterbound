@@ -21,6 +21,19 @@ import star.root_loader;
 import star.string;
 import star.world_layout;
 import star.world_parameters;
+import star.algorithm;
+import star.actor_movement_controller;
+import star.collision_block;
+import star.game_types;
+import star.material_database;
+import star.material_types;
+import star.platformer_astar;
+import star.platformer_astar_types;
+import star.rect;
+import star.tile_modification;
+import star.vector;
+import star.world_server;
+import star.world_tiles;
 
 using namespace Star;
 
@@ -41,6 +54,250 @@ struct BenchmarkSession {
     fail(state, error.what());
   }
 };
+
+namespace PlatformerBenchmarks {
+
+struct Fixture {
+  std::shared_ptr<WorldServer> world;
+  ActorMovementParameters movement;
+  PlatformerAStar::Parameters parameters;
+  Vec2F start;
+  unsigned steps;
+  unsigned budget;
+  bool flying;
+  MaterialId floor_material;
+};
+
+void fingerprint(std::uint64_t& value, std::uint64_t word) {
+  for (unsigned shift = 0; shift != 64; shift += 8) {
+    value ^= (word >> shift) & 255;
+    value *= 1099511628211ULL;
+  }
+}
+
+void fingerprint_float(std::uint64_t& value, float number) { fingerprint(value, std::bit_cast<std::uint32_t>(number)); }
+
+void fingerprint_vector(std::uint64_t& value, Vec2F const& vector) {
+  fingerprint_float(value, vector[0]);
+  fingerprint_float(value, vector[1]);
+}
+
+void fingerprint_node(std::uint64_t& value, PlatformerAStar::Node const& node) {
+  fingerprint_vector(value, node.position);
+  fingerprint(value, node.velocity.has_value());
+  if (node.velocity)
+    fingerprint_vector(value, *node.velocity);
+}
+
+std::expected<Fixture, StarException> prepare_fixture(Root& root, std::shared_ptr<WorldServer> world, bool flying,
+                                                      unsigned steps, unsigned budget) {
+  world->setSpawningEnabled(false);
+  world->setTileProtectionEnabled(false);
+  auto generated = world->generateRegion(RectI::withSize(Vec2I(1016, 1016), Vec2I(56, 24)));
+  if (!generated)
+    return std::unexpected(std::move(generated.error()));
+  for (auto dungeon : {NoDungeonId, ConstructionDungeonId}) {
+    auto gravity = world->setDungeonGravity(dungeon, flying ? 0.0f : 60.0f);
+    if (!gravity)
+      return std::unexpected(std::move(gravity.error()));
+  }
+  MaterialId floor_material = EmptyMaterialId;
+  if (!flying) {
+    auto materials = root.materialDatabase();
+    if (!materials)
+      return std::unexpected(std::move(materials.error()));
+    auto dirt = (*materials)->materialId("dirt");
+    if (!dirt)
+      return std::unexpected(std::move(dirt.error()));
+    floor_material = *dirt;
+    for (int x = 1018; x < 1066; ++x) {
+      Vec2I position(x, 1024);
+      auto tile = world->modifyServerTile(position, true);
+      if (!tile)
+        return std::unexpected(std::move(tile.error()));
+      if (!*tile)
+        return std::unexpected(StarException("Platformer benchmark floor tile is unavailable"));
+      (*tile)->get().background = StructureMaterialId;
+      auto placed = world->forceModifyTile(
+        position, PlaceMaterial{TileLayer::Foreground, floor_material, MaterialHue(0), TileCollisionOverride::Block},
+        true);
+      if (!placed)
+        return std::unexpected(std::move(placed.error()));
+      if (!*placed)
+        return std::unexpected(StarException("Platformer benchmark floor placement was rejected"));
+    }
+  }
+  ActorMovementParameters movement;
+  movement.mass = 1.0f;
+  movement.gravityEnabled = true;
+  movement.gravityMultiplier = 1.0f;
+  movement.airBuoyancy = 0.0f;
+  movement.minimumLiquidPercentage = 0.5f;
+  movement.walkSpeed = 4.0f;
+  movement.runSpeed = 8.0f;
+  movement.airJumpProfile.jumpSpeed.reset();
+  PlatformerAStar::Parameters parameters;
+  parameters.bound_box = RectF(-0.25f, -0.25f, 0.25f, 0.25f);
+  parameters.standing_bound_box = parameters.bound_box;
+  parameters.dropping_bound_box = parameters.bound_box;
+  parameters.must_end_on_ground = !flying;
+  parameters.max_distance = 48.0f;
+  parameters.max_nodes_to_search = 512;
+  return Fixture{std::move(world), std::move(movement), std::move(parameters), Vec2F(1024.0f, 1025.25f), steps, budget,
+                 flying,           floor_material};
+}
+
+std::expected<void, StarException> validate_world(Fixture const& fixture) {
+  // Independent terrain checks, not PathFinder's own collision predicates.
+  CollisionSet collisions{CollisionKind::Null, CollisionKind::Block, CollisionKind::Slippery, CollisionKind::Platform,
+                          CollisionKind::Dynamic};
+  auto blocked = fixture.world->rectTileCollision(RectI(1018, 1025, 1066, 1032), collisions);
+  if (!blocked)
+    return std::unexpected(std::move(blocked.error()));
+  if (*blocked)
+    return std::unexpected(StarException("Platformer benchmark requires a completely clear air corridor"));
+  auto liquid = fixture.world->liquidLevel(RectF(1018.0f, 1025.0f, 1066.0f, 1032.0f));
+  if (!liquid)
+    return std::unexpected(std::move(liquid.error()));
+  if (liquid->level != 0.0f)
+    return std::unexpected(StarException("Platformer benchmark requires a dry air corridor"));
+  for (int x = 1018; x < 1066; ++x) {
+    auto floor = fixture.world->rectTileCollision(RectI(x, 1024, x + 1, 1025), collisions);
+    if (!floor)
+      return std::unexpected(std::move(floor.error()));
+    if (*floor == fixture.flying)
+      return std::unexpected(StarException("Platformer benchmark floor presence differs from its oracle"));
+    auto gravity = fixture.world->gravity(Vec2F(static_cast<float>(x), fixture.start[1]));
+    if (!gravity)
+      return std::unexpected(std::move(gravity.error()));
+    if (*gravity != (fixture.flying ? 0.0f : 60.0f))
+      return std::unexpected(StarException("Platformer benchmark world gravity differs from its oracle"));
+  }
+  return {};
+}
+
+std::uint64_t input_fingerprint(Fixture const& fixture) {
+  std::uint64_t value = 14695981039346656037ULL;
+  // Fixed setup/config is part of the input fingerprint, not the ephemeral
+  // filename or WorldServer RNG. Terrain is checked independently pre/post.
+  for (unsigned char byte :
+       std::string_view("platformer-v1;world=2048x2048;region=1016,1016,56,24;floor=1018:1066,1024;"
+                        "air=1018,1025,1066,1032;mass=1;gravityEnabled=1;gravityMultiplier=1;airBuoyancy=0;"
+                        "minimumLiquidPercentage=.5;walkSpeed=4;runSpeed=8;jumpSpeed=none;"
+                        "allBoxes=-.25,-.25,.25,.25;maxDistance=48;maxNodesToSearch=512;otherSearchOptions=default"))
+    fingerprint(value, byte);
+  fingerprint_vector(value, fixture.start);
+  fingerprint(value, fixture.steps);
+  fingerprint(value, fixture.budget);
+  fingerprint(value, fixture.flying);
+  fingerprint(value, fixture.floor_material);
+  fingerprint_float(value, fixture.flying ? 0.0f : 60.0f);
+  return value;
+}
+
+std::expected<void, StarException> run_search(Fixture const& fixture, bool check_output, std::uint64_t& output) {
+  auto target = fixture.start + Vec2F(static_cast<float>(fixture.steps), 0.0f);
+  auto finder =
+    PlatformerAStar::PathFinder::create(*fixture.world, fixture.start, target, fixture.movement, fixture.parameters);
+  if (!finder)
+    return std::unexpected(std::move(finder.error()));
+  for (unsigned call = 0; call < 514; ++call) {
+    auto status = (*finder)->explore(fixture.budget ? std::optional<unsigned>(fixture.budget) : std::nullopt);
+    if (!status)
+      return std::unexpected(std::move(status.error()));
+    if (!status->has_value())
+      continue;
+    if (!**status)
+      return std::unexpected(StarException("Platformer benchmark failed to find its unobstructed route"));
+    auto const& path = (*finder)->result();
+    benchmark::DoNotOptimize(path);
+    if (!check_output)
+      return {};
+    if (!path || path->size() != fixture.steps)
+      return std::unexpected(StarException("Platformer path size differs from independent straight-line oracle"));
+    fingerprint(output, **status);
+    fingerprint(output, path.has_value());
+    fingerprint(output, path->size());
+    PlatformerAStar::Node previous{fixture.start, {}};
+    for (unsigned index = 0; index < fixture.steps; ++index) {
+      auto const& edge = (*path)[index];
+      PlatformerAStar::Node expected_target{fixture.start + Vec2F(static_cast<float>(index + 1), 0.0f), {}};
+      auto expected_action = fixture.flying ? PlatformerAStar::Action::Fly : PlatformerAStar::Action::Walk;
+      if (edge.source != previous || edge.target != expected_target || edge.action != expected_action
+          || edge.cost != 1.0f || edge.jump_velocity != Vec2F(0.0f, 0.0f))
+        return std::unexpected(StarException("Platformer complete edge differs from independent straight-line oracle"));
+      fingerprint_float(output, edge.cost);
+      fingerprint(output, static_cast<std::uint64_t>(edge.action));
+      fingerprint_vector(output, edge.jump_velocity);
+      fingerprint_node(output, edge.source);
+      fingerprint_node(output, edge.target);
+      previous = edge.target;
+    }
+    if (previous.position != target || previous.velocity)
+      return std::unexpected(StarException("Platformer endpoint differs from independent straight-line oracle"));
+    return {};
+  }
+  return std::unexpected(StarException("Platformer benchmark exceeded its bounded exploration calls"));
+}
+
+void benchmark_platformer(benchmark::State& state, BenchmarkSession& session, bool flying, unsigned steps,
+                          unsigned budget) {
+  auto storage = File::ephemeral_file(session.root.random());
+  if (!storage) {
+    session.fail(state, storage.error());
+    return;
+  }
+  auto world = WorldServer::create(session.root, Vec2U(2048, 2048), *storage);
+  if (!world) {
+    session.fail(state, world.error());
+    return;
+  }
+  auto close_world = make_scope_exit([&] {
+    if (auto closed = (*world)->close(); !closed)
+      session.fail(state, closed.error());
+  });
+  auto fixture = prepare_fixture(session.root, *world, flying, steps, budget);
+  if (!fixture) {
+    session.fail(state, fixture.error());
+    return;
+  }
+  auto terrain = validate_world(*fixture);
+  if (!terrain) {
+    session.fail(state, terrain.error());
+    return;
+  }
+  auto input = input_fingerprint(*fixture);
+  std::uint64_t output = 14695981039346656037ULL;
+  if (auto checked = run_search(*fixture, true, output); !checked) {
+    session.fail(state, checked.error());
+    return;
+  }
+  state.SetLabel(std::format("real WorldServer; steps={}; budget={} (0=unlimited); input={:016x}; output={:016x}",
+                             steps, budget, input, output));
+  // World/file/terrain/parameters and complete pre/post checks are untimed.
+  // Each timed iteration creates one real PathFinder, explores to the first
+  // terminal answer and destroys the finder and its owned complete result.
+  // Axis-aligned dry routes have an independent exact unit-edge oracle; no
+  // platformer neighbor/arc solver is duplicated in this benchmark.
+  for (auto _ : state) {
+    (void)_;
+    std::uint64_t unused_output = 0;
+    if (auto result = run_search(*fixture, false, unused_output); !result) {
+      session.fail(state, result.error());
+      return;
+    }
+  }
+  std::uint64_t checked_output = 14695981039346656037ULL;
+  if (auto checked = run_search(*fixture, true, checked_output); !checked)
+    session.fail(state, checked.error());
+  else if (checked_output != output || input_fingerprint(*fixture) != input)
+    session.fail(state, "Platformer fixture or complete output fingerprint changed after timing");
+  if (auto checked = validate_world(*fixture); !checked)
+    session.fail(state, checked.error());
+  state.SetItemsProcessed(state.iterations());
+}
+
+}// namespace PlatformerBenchmarks
 
 std::expected<void, StarException> requirePrivateStorage(String const& storage) {
   // A benchmark bootconfig must point at private storage, never a save tree.
@@ -544,7 +801,7 @@ int main(int argc, char** argv) {
     return 1;
   }
   // Never persist configuration or rotate logs, even if extra RootLoader flags
-  // requested them. The only benchmark writes are owned transient Lua profiles.
+  // requested them. Writes are owned transient Lua profiles/ephemeral worlds.
   settings.runtimeConfigFile.reset();
   settings.logFile.reset();
   auto root = Root::create(std::move(settings));
@@ -569,6 +826,30 @@ int main(int argc, char** argv) {
   benchmark::RegisterBenchmark("LuaRoot/NestedProfileShutdownAndExport", [&](benchmark::State& state) {
     luaNestedProfileExport(state, session);
   })->Iterations(8)->UseRealTime()->Unit(benchmark::kMicrosecond);
+  benchmark::RegisterBenchmark(
+    "Game/AStar/flat_walk8",
+    [&](benchmark::State& state) { PlatformerBenchmarks::benchmark_platformer(state, session, false, 8, 0); })
+    ->MinTime(0.1)
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
+  benchmark::RegisterBenchmark(
+    "Game/AStar/flat_walk32_budget4",
+    [&](benchmark::State& state) { PlatformerBenchmarks::benchmark_platformer(state, session, false, 32, 4); })
+    ->MinTime(0.1)
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
+  benchmark::RegisterBenchmark(
+    "Game/AStar/fly8",
+    [&](benchmark::State& state) { PlatformerBenchmarks::benchmark_platformer(state, session, true, 8, 0); })
+    ->MinTime(0.1)
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
+  benchmark::RegisterBenchmark(
+    "Game/AStar/fly32_budget4",
+    [&](benchmark::State& state) { PlatformerBenchmarks::benchmark_platformer(state, session, true, 32, 4); })
+    ->MinTime(0.1)
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
   register_player_storage_benchmarks(**root, session.failed);
   auto result = Star::run_registered_benchmarks(true, false);
   // Remove callbacks borrowing session/Root before those owners leave scope.
