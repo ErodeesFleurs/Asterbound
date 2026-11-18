@@ -13,6 +13,18 @@ import star.vector;
 import star.rect;
 namespace Star {
 
+std::uint64_t legacyShaderSourceFingerprint(std::string_view source) noexcept {
+  std::uint64_t fingerprint = 14695981039346656037ull;
+  for (std::size_t i = 0; i < source.size(); ++i) {
+    auto byte = static_cast<unsigned char>(source[i]);
+    if (byte == '\r' && i + 1 < source.size() && source[i + 1] == '\n')
+      continue;
+    fingerprint ^= byte;
+    fingerprint *= 1099511628211ull;
+  }
+  return fingerprint;
+}
+
 namespace {
 template <std::floating_point T>
 std::expected<void, StarException> validateOutputLevels(T exposure, T paperWhite, T peak) {

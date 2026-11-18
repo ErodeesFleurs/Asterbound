@@ -21,6 +21,9 @@ struct RendererExceptionTag {
 };
 using RendererException = StarError<RendererExceptionTag, StarException>;
 
+// FNV-1a-64 of legacy GLSL bytes, treating CRLF as LF without changing other bytes.
+std::uint64_t legacyShaderSourceFingerprint(std::string_view source) noexcept;
+
 class Texture;
 using TexturePtr = RefPtr<Texture>;
 
@@ -245,6 +248,7 @@ export module star.renderer;
 export namespace Star {
   using ::Star::RendererExceptionTag;
   using ::Star::RendererException;
+  using ::Star::legacyShaderSourceFingerprint;
   using ::Star::Texture;
   using ::Star::TexturePtr;
   using ::Star::TextureGroup;

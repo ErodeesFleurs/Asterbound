@@ -247,7 +247,10 @@ Use `-renderer opengl` for Mods that have not supplied Vulkan variants.
 
 Bundled variants can carry a `vulkanLegacySourceGuard` object mapping each shader
 stage to the 16-digit lowercase hexadecimal FNV-1a-64 hash of its final OpenGL
-`effectShaders` source. This detects Mods that replace an OpenGL stage while
+`effectShaders` source, with CRLF line endings treated as LF. All other bytes
+remain significant. Shader files are checked out with LF on all platforms to
+keep Windows asset packs stable; the runtime also accepts CRLF in external or
+generated sources. This detects Mods that replace an OpenGL stage while
 leaving an unrelated bundled Vulkan variant selected. When changing a guarded
 shader, supply the corresponding Vulkan variant and update the guard to match
 the final legacy source; do not bypass it to accept a stale variant.

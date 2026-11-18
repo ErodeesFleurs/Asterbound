@@ -88,6 +88,28 @@ using namespace Star;
 
 namespace {
 
+TEST(RendererShaderGuard, AcceptsWindowsAndMixedLineEndings) {
+  constexpr std::string_view lf = "#version 140\nvoid main() {\n  gl_Position = vec4(0.0);\n}\n";
+  constexpr std::string_view crlf = "#version 140\r\nvoid main() {\r\n  gl_Position = vec4(0.0);\r\n}\r\n";
+  constexpr std::string_view mixed = "#version 140\r\nvoid main() {\n  gl_Position = vec4(0.0);\r\n}\n";
+  EXPECT_EQ(legacyShaderSourceFingerprint(lf), legacyShaderSourceFingerprint(crlf));
+  EXPECT_EQ(legacyShaderSourceFingerprint(lf), legacyShaderSourceFingerprint(mixed));
+  // Existing LF guards retain the standard FNV-1a-64 encoding.
+  EXPECT_EQ(legacyShaderSourceFingerprint("hello"), 0xa430d84680aabd0bull);
+}
+
+TEST(RendererShaderGuard, StillDetectsSourceChanges) {
+  constexpr std::string_view original = "void main() { gl_Position = vec4(0.0); }\n";
+  EXPECT_NE(legacyShaderSourceFingerprint(original),
+      legacyShaderSourceFingerprint("void main() { gl_Position = vec4(1.0); }\r\n"));
+  EXPECT_NE(legacyShaderSourceFingerprint("a\nb"), legacyShaderSourceFingerprint("ab"));
+  EXPECT_NE(legacyShaderSourceFingerprint("a\rb"), legacyShaderSourceFingerprint("ab"));
+  EXPECT_NE(legacyShaderSourceFingerprint("a\r"), legacyShaderSourceFingerprint("a"));
+  EXPECT_NE(legacyShaderSourceFingerprint("a b"), legacyShaderSourceFingerprint("ab"));
+  EXPECT_NE(legacyShaderSourceFingerprint(std::string_view("a\0b", 3)),
+      legacyShaderSourceFingerprint("a"));
+}
+
 TEST(RenderOutputSettings, InclusiveLimitsAndAdjacentFloats) {
   EXPECT_TRUE(validateRenderOutputSettings({RenderOutputMode::Hdr10, -10, 80, 80}));
   EXPECT_TRUE(validateRenderOutputSettings({RenderOutputMode::Hdr10, 10, 500, 10000}));

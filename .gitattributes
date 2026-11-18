@@ -1,3 +1,6 @@
 source/extern/** linguist-vendored=true
 lib/** linguist-vendored=true
 *.patch text eol=lf
+# Shader guards must also remain stable when packed from Windows checkouts.
+*.vert text eol=lf
+*.frag text eol=lf

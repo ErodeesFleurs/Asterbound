@@ -1144,11 +1144,7 @@ std::expected<void, StarException> ClientApplication::renderReload() {
             return std::unexpected(RendererException::format("Vulkan effect '{}' missing guarded legacy stage '{}'; use -renderer opengl or provide effectShadersVulkan and update/remove vulkanLegacySourceGuard", name, stage));
           auto source = sourceFor(entry->get());
           if (!source) return std::unexpected(std::move(source.error()));
-          std::uint64_t fingerprint = 14695981039346656037ull;
-          for (unsigned char byte : source->utf8()) {
-            fingerprint ^= byte;
-            fingerprint *= 1099511628211ull;
-          }
+          auto fingerprint = legacyShaderSourceFingerprint(source->utf8());
           if (*expected != Star::format("{:016x}", fingerprint))
             return std::unexpected(RendererException::format("Vulkan effect '{}' legacy stage '{}' was modified without a matching Vulkan variant; use -renderer opengl or provide effectShadersVulkan and update/remove vulkanLegacySourceGuard", name, stage));
         }
