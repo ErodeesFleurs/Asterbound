@@ -35,6 +35,7 @@ import star.ordered_map;
 import star.net_compatibility;
 import std;
 import star.worker_pool;
+import star.curve25519;
 
 import star.sector_array_2d;
 import star.perlin;
@@ -375,6 +376,8 @@ private:
   [[nodiscard]] std::expected<void, StarException> initialize(std::shared_ptr<Player> mainPlayer, std::shared_ptr<LuaRoot> luaRoot, UniverseClient& universe);
   [[nodiscard]] std::expected<void, StarException> initialize(ClientSubWorldId subWorldId, UniverseClient& universe);
   PresentationContext presentationFor(Entity const& entity, PresentationContext presentation) const;
+  bool verify_broadcast_signature(std::shared_ptr<Player> const& player, bool legacy,
+      std::span<char const> public_key, std::span<char const> signature, std::span<char const> message);
 
   static const float DropDist;
 
@@ -613,6 +616,16 @@ private:
   List<PhysicsForceRegion> m_forceRegions;
 
   BroadcastCallback m_broadcastCallback;
+  struct BroadcastVerifiers {
+    std::weak_ptr<Player> player;
+    std::optional<Curve25519::Verifier> modern;
+    Curve25519::PublicKey modern_key{};
+    std::optional<Curve25519::Verifier> legacy;
+    Curve25519::PublicKey legacy_key{};
+  };
+  // Entries exist only for current player entities and are erased on removal.
+  std::unordered_map<EntityId, BroadcastVerifiers> m_broadcast_verifiers;
+  String const m_broadcast_public_key;
 
   // used to keep track of already-printed stack traces caused by remote entities, so they don't clog the log
   HashSet<std::uint64_t> m_entityExceptionsLogged;

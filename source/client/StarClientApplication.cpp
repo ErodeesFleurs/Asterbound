@@ -2314,7 +2314,7 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
           auto signature = m_root->identity().sign(voiceData.span());
           std::string broadcast("data\0voice\0", sizeof("data\0voice\0") - 1);
           broadcast.reserve((sizeof("data\0voice\0") - 1) + signature.size() + voiceData.size());
-          broadcast.append(reinterpret_cast<char const*>(signature.data()), signature.size());
+          broadcast.append(signature.begin(), signature.end());
           auto voiceBytes = voiceData.span();
           broadcast.append(voiceBytes.begin(), voiceBytes.end());
           worldClient->sendSecretBroadcast(broadcast, true, false); // Packet queueing is nonfallible.

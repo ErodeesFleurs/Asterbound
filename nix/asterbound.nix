@@ -17,6 +17,7 @@
   libvorbis,
   zstd,
   libopus,
+  libsodium,
   sdl3,
   glew,
   libGL,
@@ -227,6 +228,7 @@ let
         libogg
         libvorbis
         zstd
+        libsodium
         re2
         cpptrace
       ]
@@ -281,6 +283,7 @@ stdenv.mkDerivation {
     libogg
     libvorbis
     zstd
+    libsodium
     imgui
     re2
     cpptrace

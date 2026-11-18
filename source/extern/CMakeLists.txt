@@ -1,21 +1,10 @@
 set (star_extern_HEADERS
-    curve25519/include/curve25519_dh.h
-    curve25519/include/ed25519_signature.h
-    curve25519/include/external_calls.h
     imgui_iterator.inl
     imgui_lua_bindings.hpp
     xxhash.h
   )
 
 set (star_extern_SOURCES
-    curve25519/source/sha512.c
-    curve25519/source/curve25519_dh.c
-    curve25519/source/curve25519_mehdi.c
-    curve25519/source/curve25519_order.c
-    curve25519/source/curve25519_utils.c
-    curve25519/source/custom_blind.c
-    curve25519/source/ed25519_sign.c
-    curve25519/source/ed25519_verify.c
     xxhash.c
     imgui_lua_bindings.cpp
   )

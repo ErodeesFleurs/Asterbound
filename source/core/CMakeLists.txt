@@ -89,6 +89,7 @@ target_sources (star_modules PRIVATE
     StarString.cpp StarStringView.cpp StarThread.cpp
     StarIODevice.cpp StarFile.cpp StarDataStream.cpp
     StarCompression.cpp
+    StarCurve25519.cpp
     StarJson.cpp StarLogging.cpp StarLua.cpp
     StarNativeRuntime.cpp
     StarWorkerPool.cpp StarOptionParser.cpp StarShellParser.cpp StarJsonPath.cpp

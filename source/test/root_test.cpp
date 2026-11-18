@@ -69,6 +69,15 @@ import star.lua_http_bindings;
 import star.tcp;
 import star.socket;
 import star.host_address;
+import star.curve25519;
+import star.casting;
+import star.entity;
+import star.net_packets;
+import star.test_universe;
+import star.world_client;
+import star.warping;
+import star.data_stream_devices;
+import star.byte_array;
 
 #include "gtest/gtest.h"
 
@@ -236,6 +245,151 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
   if (!json) return std::unexpected(std::move(json.error()));
   return json->getString("rootIsolationOwner");
 }
+
+const GameTestRegistration secure_identity("RootTest", "SecureIdentityStability", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory) << directory.error().what();
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto settings = isolationSettings(fixture.rootSettings(), *directory, "identity");
+  ASSERT_TRUE(settings) << settings.error().what();
+  auto created = Root::create(std::move(*settings));
+  ASSERT_TRUE(created) << created.error().what();
+  auto& root = **created;
+
+  auto const public_key = root.identity().public_key();
+  std::string_view message("identity\0regression", sizeof("identity\0regression") - 1);
+  auto signature = root.identity().sign(std::span<char const>(message));
+  EXPECT_TRUE(Curve25519::verify(signature, public_key, std::span<char const>(message)));
+  ASSERT_TRUE(root.reload());
+  EXPECT_EQ(root.identity().public_key(), public_key);
+  EXPECT_EQ(root.identity().sign(std::span<char const>(message)), signature);
+});
+
+const GameTestRegistration signed_broadcast_lifecycle("RootTest", "SignedBroadcastPublicationAndKeyReplacement", [](GameTest& fixture) {
+  auto& root = fixture.root();
+  auto universe = TestUniverse::create(root, Vec2U(100, 100));
+  ASSERT_TRUE(universe) << universe.error().what();
+  auto close = make_scope_exit([&] { EXPECT_TRUE((*universe)->close()); });
+  ASSERT_TRUE((*universe)->warpPlayer(InstanceWorldId("outpost")));
+  auto ready = (*universe)->waitForWorldReady();
+  ASSERT_TRUE(ready) << ready.error().what();
+  auto world = (*universe)->worldClient();
+  ASSERT_TRUE(world);
+  std::shared_ptr<Player> player;
+  ASSERT_TRUE(world->forAllEntities([&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
+    if (auto candidate = as<Player>(entity); candidate && candidate->isMaster())
+      player = std::move(candidate);
+    return {};
+  }));
+  ASSERT_TRUE(player);
+  String const property = "SecretBroadcastPublicKey";
+  String const legacy_tag(std::string("\0SE_VOICE_SIGNING_KEY", sizeof("\0SE_VOICE_SIGNING_KEY") - 1));
+  auto const& key = root.identity().public_key();
+  String const expected_key(std::string(key.begin(), key.end()));
+  DataStreamBuffer encoded_key;
+  ASSERT_TRUE(encoded_key.write(Json(expected_key)));
+  String const expected_property(std::string(encoded_key.data().span().begin(), encoded_key.data().span().end()));
+  auto expect_published = [&] {
+    auto published = player->getSecretPropertyRef(property);
+    ASSERT_TRUE(published);
+    EXPECT_EQ(published->get(), expected_property);
+    auto legacy = player->effectsAnimator()->globalTag(legacy_tag);
+    ASSERT_TRUE(legacy);
+    EXPECT_EQ(legacy->get(), expected_key);
+  };
+  ASSERT_NO_FATAL_FAILURE(expect_published());
+  ASSERT_TRUE(player->setSecretProperty(property, Json()));
+  player->effectsAnimator()->removeGlobalTag(legacy_tag);
+  ASSERT_TRUE(world->update(1.0f / 60.0f));
+  ASSERT_NO_FATAL_FAILURE(expect_published());
+  ASSERT_TRUE(player->setSecretProperty(property, 17));
+  player->effectsAnimator()->setGlobalTag(legacy_tag, "replaced");
+  ASSERT_TRUE(world->update(1.0f / 60.0f));
+  ASSERT_NO_FATAL_FAILURE(expect_published());
+
+  std::vector<std::string> received;
+  world->broadcastCallback() = [&](std::shared_ptr<Player> source, StringView message) -> std::expected<bool, StarException> {
+    EXPECT_EQ(source, player);
+    received.emplace_back(message.utf8());
+    return true;
+  };
+  auto clear_callback = make_scope_exit([&] { world->broadcastCallback() = {}; });
+  std::string_view outbound("outbound\0payload", sizeof("outbound\0payload") - 1);
+  ASSERT_TRUE(world->sendSecretBroadcast(StringView(outbound), false, false));
+  std::size_t outbound_count = 0;
+  for (auto const& packet : world->getOutgoingPackets()) {
+    auto damage = as<DamageNotificationPacket>(packet);
+    if (!damage)
+      continue;
+    auto wire = damage->remoteDamageNotification.damageNotification.targetMaterialKind.utf8();
+    constexpr std::string_view prefix("\0Broadcast\0", sizeof("\0Broadcast\0") - 1);
+    if (!wire.starts_with(prefix))
+      continue;
+    ASSERT_EQ(wire.size(), prefix.size() + Curve25519::signature_size + outbound.size());
+    EXPECT_EQ(wire.substr(prefix.size() + Curve25519::signature_size), outbound);
+    auto verifier = Curve25519::Verifier::create(key);
+    ASSERT_TRUE(verifier);
+    EXPECT_TRUE(verifier->verify(
+        std::span<char const>(wire.substr(prefix.size(), Curve25519::signature_size)),
+        std::span<char const>(outbound)));
+    ++outbound_count;
+  }
+  EXPECT_EQ(outbound_count, 1u);
+  Curve25519::SecretKey replacement_seed{};
+  replacement_seed[0] = 71;
+  auto replacement = Curve25519::KeySet::from_seed(replacement_seed);
+  ASSERT_TRUE(replacement) << replacement.error().what();
+  auto make_packet = [&](Curve25519::KeySet const& signer, bool legacy) {
+    std::string_view payload("signed\0payload", sizeof("signed\0payload") - 1);
+    auto signature = signer.sign(std::span<char const>(payload));
+    std::string wire = legacy ? std::string("data\0voice\0", sizeof("data\0voice\0") - 1)
+                              : std::string("\0Broadcast\0", sizeof("\0Broadcast\0") - 1);
+    wire.append(signature.begin(), signature.end());
+    wire.append(payload);
+    auto packet = std::make_shared<DamageNotificationPacket>();
+    packet->remoteDamageNotification.sourceEntityId = player->entityId();
+    packet->remoteDamageNotification.damageNotification.targetMaterialKind = String(std::move(wire));
+    return packet;
+  };
+  for (bool legacy : {false, true}) {
+    SCOPED_TRACE(legacy ? "StarExtensions" : "secret broadcast");
+    auto publish = [&](String const& public_key) -> std::expected<void, StarException> {
+      if (legacy) {
+        player->effectsAnimator()->setGlobalTag(legacy_tag, public_key);
+        return {};
+      }
+      return player->setSecretProperty(property, public_key);
+    };
+    ASSERT_TRUE(publish(expected_key));
+    auto original_packet = make_packet(root.identity(), legacy);
+    auto before = received.size();
+    ASSERT_TRUE(world->handleIncomingPackets({original_packet}));
+    ASSERT_EQ(received.size(), before + 1);
+    EXPECT_EQ(received.back(), legacy ? std::string("Voice\0signed\0payload", sizeof("Voice\0signed\0payload") - 1)
+                                     : std::string("signed\0payload", sizeof("signed\0payload") - 1));
+    for (std::size_t length : {0u, 1u, 31u, 33u, 32u}) {
+      ASSERT_TRUE(publish(String(std::string(length, '\0'))));
+      ASSERT_TRUE(world->handleIncomingPackets({original_packet}));
+      EXPECT_EQ(received.size(), before + 1);
+    }
+    if (legacy) {
+      player->effectsAnimator()->removeGlobalTag(legacy_tag);
+    } else {
+      ASSERT_TRUE(player->setSecretProperty(property, Json()));
+    }
+    ASSERT_TRUE(world->handleIncomingPackets({original_packet}));
+    EXPECT_EQ(received.size(), before + 1);
+    auto const& replacement_key = replacement->public_key();
+    ASSERT_TRUE(publish(String(std::string(replacement_key.begin(), replacement_key.end()))));
+    ASSERT_TRUE(world->handleIncomingPackets({original_packet}));
+    EXPECT_EQ(received.size(), before + 1);
+    ASSERT_TRUE(world->handleIncomingPackets({make_packet(*replacement, legacy)}));
+    EXPECT_EQ(received.size(), before + 2);
+  }
+  ASSERT_TRUE(world->update(1.0f / 60.0f));
+  ASSERT_NO_FATAL_FAILURE(expect_published());
+});
+
 
 const GameTestRegistration strictLuaTags("RootTest", "StrictLuaTagFormatting", [](GameTest& fixture) {
   auto lua = isolationLua(fixture.root(), true);

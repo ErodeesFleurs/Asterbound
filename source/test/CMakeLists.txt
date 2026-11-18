@@ -22,6 +22,7 @@ set (star_core_tests_SOURCES
       clock_test.cpp
       color_test.cpp
       container_test.cpp
+      curve25519_test.cpp
       encode_test.cpp
       exception_test.cpp
       file_test.cpp
@@ -82,8 +83,8 @@ add_executable (core_tests
   $<TARGET_OBJECTS:star_extern> $<TARGET_OBJECTS:star_core>
   ${star_core_tests_SOURCES})
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-  target_compile_definitions (core_tests PRIVATE STAR_TEST_WRAP_WRITE=1)
-  target_link_options (core_tests PRIVATE "LINKER:--wrap=write")
+  target_compile_definitions (core_tests PRIVATE STAR_TEST_WRAP_WRITE=1 STAR_TEST_WRAP_READ=1)
+  target_link_options (core_tests PRIVATE "LINKER:--wrap=write" "LINKER:--wrap=read")
 endif ()
 if (STAR_ENABLE_STEAM_INTEGRATION)
   target_sources (core_tests PRIVATE steam_dispatch_test.cpp)

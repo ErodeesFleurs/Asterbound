@@ -1,96 +1,62 @@
 module;
-#include <stddef.h>
-#include "curve25519/include/curve25519_dh.h"
-#include "curve25519/include/ed25519_signature.h"
 import std;
-import star.random;
-
-
-// The native C declarations are parsed in the global module fragment.
-import star.string;
-import star.byte_array;
-import star.encode;
-import star.array;
+import star.format;
 
 export module star.curve25519;
 
-export namespace Star {
-namespace Curve25519 {
+export namespace Star::Curve25519 {
 
-constexpr std::size_t PublicKeySize = 32;
-constexpr std::size_t SecretKeySize = 32;
-constexpr std::size_t PrivateKeySize = 64;
-constexpr std::size_t SignatureSize = 64;
+inline constexpr std::size_t public_key_size = 32;
+inline constexpr std::size_t secret_key_size = 32;
+inline constexpr std::size_t signature_size = 64;
 
-using PublicKey = Array<std::uint8_t, PublicKeySize>;
-using SecretKey = Array<std::uint8_t, SecretKeySize>;
-using PrivateKey = Array<std::uint8_t, PrivateKeySize>;
-using Signature = Array<std::uint8_t, SignatureSize>;
+using PublicKey = std::array<std::uint8_t, public_key_size>;
+using SecretKey = std::array<std::uint8_t, secret_key_size>;
+using Signature = std::array<std::uint8_t, signature_size>;
 
-// The process/application owner chooses the identity lifetime explicitly.
-// Generation remains lazy, so owning an identity does not consume its injected
-// random stream until the first publication or signature. The source outlives
-// this object.
+// An initialized application identity, with exclusive ownership of its secret.
 class KeySet {
 public:
-  explicit KeySet(RandomService& random);
-  explicit KeySet(RandomSource& random);
+  [[nodiscard]] static std::expected<KeySet, StarException> create();
+  [[nodiscard]] static std::expected<KeySet, StarException> from_seed(
+      std::span<std::uint8_t const, secret_key_size> seed);
 
-  PublicKey const& publicKey() const;
-  Signature sign(std::span<char const> data) const;
+  KeySet(KeySet const&) = delete;
+  KeySet& operator=(KeySet const&) = delete;
+  KeySet(KeySet&& other) noexcept;
+  KeySet& operator=(KeySet&& other) noexcept;
+  ~KeySet();
+
+  PublicKey const& public_key() const& noexcept;
+  PublicKey const& public_key() const&& = delete;
+  Signature sign(std::span<char const> message) const;
 
 private:
-  void generate() const;
+  KeySet() = default;
 
-  std::variant<std::reference_wrapper<RandomService>, std::reference_wrapper<RandomSource>> m_random;
-  mutable std::once_flag m_generated;
-  mutable PrivateKey m_privateKey;
-  mutable PublicKey m_publicKey;
+  PublicKey m_public_key_bytes{};
+  // libsodium's signing key is the seed followed by its public key.
+  std::array<std::uint8_t, secret_key_size + public_key_size> m_private_key_bytes{};
+  bool m_initialized = false;
 };
 
-bool verify(std::span<std::uint8_t const, SignatureSize> signature, std::span<std::uint8_t const, PublicKeySize> publicKey, std::span<char const> data);
+// Reuses validated public-key bytes, not an undocumented native point cache.
+class Verifier {
+public:
+  [[nodiscard]] static std::expected<Verifier, StarException> create(
+      std::span<std::uint8_t const> public_key);
+  [[nodiscard]] bool verify(std::span<std::uint8_t const> signature,
+      std::span<char const> message) const;
+  [[nodiscard]] bool verify(std::span<char const> signature,
+      std::span<char const> message) const;
 
+private:
+  explicit Verifier(std::span<std::uint8_t const, public_key_size> public_key) noexcept;
 
-}
-}
+  PublicKey m_public_key_bytes;
+};
 
-// Keep the native crypto definitions in the implementation portion.
-namespace Star {
-namespace Curve25519 {
-KeySet::KeySet(RandomService& random) : m_random(std::ref(random)) {}
+[[nodiscard]] bool verify(std::span<std::uint8_t const> signature,
+    std::span<std::uint8_t const> public_key, std::span<char const> message);
 
-KeySet::KeySet(RandomSource& random) : m_random(std::ref(random)) {}
-
-void KeySet::generate() const {
-  std::call_once(m_generated, [this] {
-    SecretKey secret;
-    std::visit([&secret](auto random) {
-      random.get().fill_bytes({reinterpret_cast<char*>(secret.data()), secret.size()});
-    }, m_random);
-    secret[0]  &= 248;
-    secret[31] &= 127;
-    secret[31] |= 64;
-
-    ed25519_CreateKeyPair(m_publicKey.data(), m_privateKey.data(), nullptr, secret.data());
-  });
-}
-
-PublicKey const& KeySet::publicKey() const {
-  generate();
-  return m_publicKey;
-}
-
-Signature KeySet::sign(std::span<char const> data) const {
-  generate();
-  Signature signature;
-  ed25519_SignMessage(signature.data(), m_privateKey.data(), nullptr, reinterpret_cast<unsigned char const*>(data.data()), data.size());
-  return signature;
-}
-
-bool verify(std::span<std::uint8_t const, SignatureSize> signature, std::span<std::uint8_t const, PublicKeySize> publicKey, std::span<char const> data) {
-  return ed25519_VerifySignature(signature.data(), publicKey.data(), reinterpret_cast<unsigned char const*>(data.data()), data.size());
-}
-
-
-}
 }

@@ -208,11 +208,20 @@ import star.line;
 import star.algorithm;
 namespace Star {
 
-const std::string SECRET_BROADCAST_PUBLIC_KEY = "SecretBroadcastPublicKey";
-const std::string SECRET_BROADCAST_PREFIX = std::string("\0Broadcast\0", sizeof("\0Broadcast\0") - 1);
+namespace {
+const String secret_broadcast_public_key = "SecretBroadcastPublicKey";
+constexpr std::string_view secret_broadcast_prefix("\0Broadcast\0", sizeof("\0Broadcast\0") - 1);
+const String legacy_voice_public_key(std::string("\0SE_VOICE_SIGNING_KEY", sizeof("\0SE_VOICE_SIGNING_KEY") - 1));
+constexpr std::string_view legacy_voice_prefix("data\0voice\0", sizeof("data\0voice\0") - 1);
+}
 
 const float WorldClient::DropDist = 6.0f;
-WorldClient::WorldClient(Root& root, UniverseClient& universe) : World(root), m_currentStep(0), m_currentTime(0), m_pendingLightReady(false), m_subWorldId(MainClientWorldId), m_worldDimLevel(0), m_latency(0), m_ambientSounds(root), m_musicTrack(root), m_altMusicTrack(root), m_universe(universe) {}
+WorldClient::WorldClient(Root& root, UniverseClient& universe)
+  : World(root), m_currentStep(0), m_currentTime(0), m_pendingLightReady(false),
+    m_subWorldId(MainClientWorldId), m_worldDimLevel(0), m_latency(0),
+    m_ambientSounds(root), m_musicTrack(root), m_altMusicTrack(root),
+    m_broadcast_public_key(std::string(root.identity().public_key().begin(), root.identity().public_key().end())),
+    m_universe(universe) {}
 
 std::expected<std::shared_ptr<WorldClient>, StarException> WorldClient::create(Root& root, std::shared_ptr<Player> mainPlayer, std::shared_ptr<LuaRoot> luaRoot, UniverseClient& universe) {
   auto client = std::shared_ptr<WorldClient>(new WorldClient(root, universe));
@@ -610,6 +619,7 @@ std::expected<void, StarException> WorldClient::resendEntity(EntityId entityId) 
 }
 
 std::expected<void, StarException> WorldClient::removeEntity(EntityId entityId, bool andDie) {
+  m_broadcast_verifiers.erase(entityId);
   auto entity = m_entityMap->entity(entityId);
   if (!entity)
     return {};
@@ -1859,44 +1869,36 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
         return std::unexpected(std::move(result129.error()));
     } else if (auto damage = as<DamageNotificationPacket>(packet)) {
       std::string_view view = damage->remoteDamageNotification.damageNotification.targetMaterialKind.utf8();
-      static const std::size_t FULL_SIZE = SECRET_BROADCAST_PREFIX.size() + Curve25519::SignatureSize;
-      static const std::string LEGACY_VOICE_PREFIX = std::string("data\0voice\0", sizeof("data\0voice\0") - 1);
-      
-      if (view.size() >= FULL_SIZE && view.rfind(SECRET_BROADCAST_PREFIX, 0) != NPos) {
-        // this is actually a secret broadcast!!
+      constexpr auto full_size = secret_broadcast_prefix.size() + Curve25519::signature_size;
+      constexpr auto legacy_full_size = legacy_voice_prefix.size() + Curve25519::signature_size;
+
+      if (view.size() >= full_size && view.starts_with(secret_broadcast_prefix)) {
         if (auto player = m_entityMap->get<Player>(damage->remoteDamageNotification.sourceEntityId)) {
-          if (auto publicKey = player->getSecretPropertyView(SECRET_BROADCAST_PUBLIC_KEY)) {
-            if (publicKey->utf8_size() == Curve25519::PublicKeySize) {
-              auto signature = view.substr(SECRET_BROADCAST_PREFIX.size(), Curve25519::SignatureSize);
-              
-              auto rawBroadcast = view.substr(FULL_SIZE);
-              if (Curve25519::verify(
-                      std::span<std::uint8_t const, Curve25519::SignatureSize>(reinterpret_cast<std::uint8_t const*>(signature.data()), Curve25519::SignatureSize),
-                      std::span<std::uint8_t const, Curve25519::PublicKeySize>(reinterpret_cast<std::uint8_t const*>(publicKey->utf8_data()), Curve25519::PublicKeySize),
-                      std::span<char const>(rawBroadcast.data(), rawBroadcast.size()))) {
-                auto result130 = handleSecretBroadcast(player, rawBroadcast);
-                if (!result130)
-                  return std::unexpected(std::move(result130.error()));
-              }
-            }
+          auto public_key = player->getSecretPropertyView(secret_broadcast_public_key);
+          auto signature = view.substr(secret_broadcast_prefix.size(), Curve25519::signature_size);
+          auto raw_broadcast = view.substr(full_size);
+          if (verify_broadcast_signature(player, false,
+                  public_key ? std::span<char const>(public_key->utf8()) : std::span<char const>{},
+                  std::span<char const>(signature), std::span<char const>(raw_broadcast))) {
+            auto handled = handleSecretBroadcast(player, raw_broadcast);
+            if (!handled)
+              return std::unexpected(std::move(handled.error()));
           }
         }
-      } else if (view.size() > 75 && view.rfind(LEGACY_VOICE_PREFIX, 0) != NPos) {
-        // this is a StarExtensions voice packet
-        // (remove this and stop transmitting like this once most SE features are ported over)
+      } else if (view.size() > legacy_full_size && view.starts_with(legacy_voice_prefix)) {
+        // Preserve StarExtensions' signed voice framing on vanilla servers.
         if (auto player = m_entityMap->get<Player>(damage->remoteDamageNotification.sourceEntityId)) {
-          if (auto publicKey = player->effectsAnimator()->globalTag(std::string("\0SE_VOICE_SIGNING_KEY", sizeof("\0SE_VOICE_SIGNING_KEY") - 1))) {
-            auto raw = view.substr(75);
-            if (m_broadcastCallback && Curve25519::verify(
-                    std::span<std::uint8_t const, Curve25519::SignatureSize>(reinterpret_cast<std::uint8_t const*>(view.data() + LEGACY_VOICE_PREFIX.size()), Curve25519::SignatureSize),
-                    std::span<std::uint8_t const, Curve25519::PublicKeySize>(reinterpret_cast<std::uint8_t const*>(publicKey->get().utf8().data()), Curve25519::PublicKeySize),
-                    std::span<char const>(raw.data(), raw.size()))) {
-              auto broadcastData = std::string("Voice\0", sizeof("Voice\0") - 1);
-              broadcastData.append(raw.data(), raw.size());
-              auto result131 = m_broadcastCallback(player, broadcastData);
-              if (!result131)
-                return std::unexpected(std::move(result131.error()));
-            }
+          auto public_key = player->effectsAnimator()->globalTag(legacy_voice_public_key);
+          auto signature = view.substr(legacy_voice_prefix.size(), Curve25519::signature_size);
+          auto raw = view.substr(legacy_full_size);
+          if (verify_broadcast_signature(player, true,
+                  public_key ? std::span<char const>(public_key->get().utf8()) : std::span<char const>{},
+                  std::span<char const>(signature), std::span<char const>(raw)) && m_broadcastCallback) {
+            auto broadcast_data = std::string("Voice\0", sizeof("Voice\0") - 1);
+            broadcast_data.append(raw);
+            auto handled = m_broadcastCallback(player, broadcast_data);
+            if (!handled)
+              return std::unexpected(std::move(handled.error()));
           }
         }
       } else {
@@ -2147,15 +2149,17 @@ std::expected<void, StarException> WorldClient::update(float dt) {
   });
 
   if (!m_headless) {
-    // Secret broadcasts are transmitted through DamageNotifications for vanilla server compatibility.
-    // Because DamageNotification packets are spoofable, we have to sign the data so other clients can validate that it is legitimate.
-    auto& publicKey = this->root().identity().publicKey();
-    String publicKeyString(std::string_view(reinterpret_cast<char const*>(publicKey.data()), publicKey.size()));
-    auto result154 = m_mainPlayer->setSecretProperty(SECRET_BROADCAST_PUBLIC_KEY, publicKeyString);
-    if (!result154)
-      return std::unexpected(std::move(result154.error()));
-    // Temporary: Backwards compatibility with StarExtensions
-    m_mainPlayer->effectsAnimator()->setGlobalTag(std::string("\0SE_VOICE_SIGNING_KEY", sizeof("\0SE_VOICE_SIGNING_KEY") - 1), publicKeyString);
+    // Compare actual tags, not a published-once flag: scripts may replace or
+    // remove either tag, and the main player may be rebound on world entry.
+    auto public_key = m_mainPlayer->getSecretPropertyView(secret_broadcast_public_key);
+    if (!public_key || public_key->utf8() != m_broadcast_public_key.utf8()) {
+      auto published = m_mainPlayer->setSecretProperty(secret_broadcast_public_key, m_broadcast_public_key);
+      if (!published)
+        return std::unexpected(std::move(published.error()));
+    }
+    auto legacy_key = m_mainPlayer->effectsAnimator()->globalTag(legacy_voice_public_key);
+    if (!legacy_key || legacy_key->get() != m_broadcast_public_key)
+      m_mainPlayer->effectsAnimator()->setGlobalTag(legacy_voice_public_key, m_broadcast_public_key);
   }
   
   ++m_currentStep;
@@ -3599,6 +3603,7 @@ std::expected<void, StarException> WorldClient::clearWorld() {
   }
   resetPresentation();
   m_hiddenEntityAudio.clear();
+  m_broadcast_verifiers.clear();
   std::optional<StarException> error;
   auto remember = [&](auto result) {
     if (!result) {
@@ -4137,10 +4142,8 @@ void WorldClient::connectWire(WireConnection const& output, WireConnection const
 }
 
 bool WorldClient::sendSecretBroadcast(StringView broadcast, bool raw, bool compress) {
-  if (!inWorld() || !m_mainPlayer || !m_mainPlayer->getSecretPropertyView(SECRET_BROADCAST_PUBLIC_KEY))
+  if (!inWorld() || !m_mainPlayer || !m_mainPlayer->getSecretPropertyView(secret_broadcast_public_key))
     return false;
-
-  auto signature = this->root().identity().sign(std::span<char const>(broadcast.utf8()));
 
   auto damageNotification = std::make_shared<DamageNotificationPacket>();
   auto& remDmg = damageNotification->remoteDamageNotification;
@@ -4150,8 +4153,17 @@ bool WorldClient::sendSecretBroadcast(StringView broadcast, bool raw, bool compr
   dmg.damageDealt = dmg.healthLost = 0.0f;
   dmg.hitType = HitType::Hit;
   dmg.damageSourceKind = "nodamage";
-  dmg.targetMaterialKind = raw ? String(broadcast) : String(Star::format("{}{}{}", SECRET_BROADCAST_PREFIX,
-      StringView(std::string_view(reinterpret_cast<char const*>(signature.data()), signature.size())), broadcast));
+  if (raw) {
+    dmg.targetMaterialKind = String(broadcast);
+  } else {
+    auto message = broadcast.utf8();
+    auto signature = this->root().identity().sign(std::span<char const>(message));
+    std::string wire(secret_broadcast_prefix);
+    wire.reserve(secret_broadcast_prefix.size() + signature.size() + message.size());
+    wire.append(signature.begin(), signature.end());
+    wire.append(message);
+    dmg.targetMaterialKind = String(std::move(wire));
+  }
   dmg.position = m_mainPlayer->position();
 
   if (!compress)
@@ -4159,6 +4171,35 @@ bool WorldClient::sendSecretBroadcast(StringView broadcast, bool raw, bool compr
 
   m_outgoingPackets.emplace_back(std::move(damageNotification));
   return true;
+}
+
+bool WorldClient::verify_broadcast_signature(std::shared_ptr<Player> const& player, bool legacy,
+    std::span<char const> public_key, std::span<char const> signature, std::span<char const> message) {
+  auto& state = m_broadcast_verifiers[player->entityId()];
+  if (state.player.lock() != player) {
+    state = {};
+    state.player = player;
+  }
+  auto& verifier = legacy ? state.legacy : state.modern;
+  auto& cached_key = legacy ? state.legacy_key : state.modern_key;
+  if (public_key.size() != Curve25519::public_key_size) {
+    verifier.reset();
+    return false;
+  }
+
+  if (!verifier || !std::ranges::equal(public_key, cached_key, {},
+          [](char byte) { return static_cast<std::uint8_t>(byte); })) {
+    // Invalidate first, including when a replacement is malformed.
+    verifier.reset();
+    Curve25519::PublicKey key;
+    std::ranges::copy(public_key, key.begin());
+    auto replacement = Curve25519::Verifier::create(key);
+    if (!replacement)
+      return false;
+    cached_key = key;
+    verifier.emplace(std::move(*replacement));
+  }
+  return verifier->verify(signature, message);
 }
 
 std::expected<bool, StarException> WorldClient::handleSecretBroadcast(std::shared_ptr<Player> player, StringView broadcast) {

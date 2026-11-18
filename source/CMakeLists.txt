@@ -317,6 +317,24 @@ if(NOT STAR_SYSTEM_HAIKU)
   find_package(re2 CONFIG REQUIRED)
 endif()
 
+# libsodium owns Ed25519 arithmetic; its C ABI may remain a shared dependency.
+find_package(unofficial-sodium CONFIG QUIET)
+if(TARGET unofficial-sodium::sodium)
+  set(STAR_SODIUM_TARGET unofficial-sodium::sodium)
+else()
+  find_path(STAR_SODIUM_INCLUDE_DIR NAMES sodium.h REQUIRED)
+  find_library(STAR_SODIUM_LIBRARY NAMES sodium libsodium REQUIRED)
+  add_library(star_sodium UNKNOWN IMPORTED GLOBAL)
+  set_target_properties(star_sodium PROPERTIES
+    IMPORTED_LOCATION "${STAR_SODIUM_LIBRARY}"
+    INTERFACE_INCLUDE_DIRECTORIES "${STAR_SODIUM_INCLUDE_DIR}")
+  set(STAR_SODIUM_TARGET star_sodium)
+endif()
+# Object closures link the core group explicitly, while the implementation
+# companion needs the module group's include paths and native link dependency.
+target_link_libraries(star_core_dependencies INTERFACE ${STAR_SODIUM_TARGET})
+target_link_libraries(star_module_dependencies INTERFACE ${STAR_SODIUM_TARGET})
+
 target_include_directories(star_vorbis_dependencies SYSTEM INTERFACE
   ${VORBIS_INCLUDE_DIR} ${OGG_INCLUDE_DIR})
 target_link_libraries(star_vorbis_dependencies INTERFACE

@@ -18,6 +18,132 @@ import star.format;
 import star.asset_path;
 import star.text_formatter;
 import star.a_star;
+import star.encode;
+import star.byte_array;
+import star.curve25519;
+
+namespace Ed25519Benchmarks {
+
+struct Vector {
+  std::string_view seed;
+  std::string_view public_key;
+  std::string_view message;
+  std::string_view signature;
+};
+
+// RFC 8032 section 7.1: independent complete key/signature oracles.
+constexpr std::array vectors{
+    Vector{"9d61b19deffd5a60ba844af492ec2cc4" "4449c5697b326919703bac031cae7f60",
+           "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a", "",
+           "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e06522490155"
+           "5fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b"},
+    Vector{"4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb",
+           "3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c", "72",
+           "92a009a9f0d4cab8720e820b5f642540a2b27b5416503f8fb3762223ebdb69da"
+           "085ac1e43e15996e458f3613d0f11d8c387b2eaeb4302aeeb00d291612bb0c00"},
+    Vector{"833fe62409237b9d62ec77587520911e9a759cec1d19755b7da901b96dca3d42",
+           "ec172b93ad5e563bf4932c70e1245034c35467ef2efd4d64ebf819683467e2bf",
+           "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a"
+           "2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f",
+           "dc2a4459e7369633a52b1bf277839a00201009a3efbf3ecb69bea2186c26b589"
+           "09351fc9ac90b3ecfdfbc7c66431e0303dca179c138ac17ad9bef1177331a704"}};
+
+template <std::size_t extent>
+std::array<std::uint8_t, extent> decode_fixed(std::string_view text) {
+  if (text.size() != extent * 2)
+    Star::fatal_error("Invalid Ed25519 benchmark hex length", false);
+  auto bytes = Star::hex_decode(text);
+  if (bytes.size() != extent)
+    Star::fatal_error("Invalid Ed25519 benchmark vector", false);
+  std::array<std::uint8_t, extent> result;
+  std::ranges::copy(bytes, result.begin());
+  return result;
+}
+
+// Only these adapters differ from the frozen original native implementation;
+// fixtures, full-result validation and measured operations stay identical.
+class Identity {
+public:
+  explicit Identity(std::span<std::uint8_t const, 32> seed) : m_key(make_key(seed)) {}
+  auto const& public_key() const { return m_key.public_key(); }
+  auto sign(std::span<char const> message) const { return m_key.sign(message); }
+private:
+  static Star::Curve25519::KeySet make_key(std::span<std::uint8_t const, 32> seed) {
+    auto key = Star::Curve25519::KeySet::from_seed(seed);
+    if (!key)
+      Star::fatal_error(key.error().what(), false);
+    return std::move(*key);
+  }
+  Star::Curve25519::KeySet m_key;
+};
+
+class Verifier {
+public:
+  explicit Verifier(std::span<std::uint8_t const, 32> public_key) : m_key(make_key(public_key)) {}
+  bool verify(std::span<std::uint8_t const, 64> signature, std::span<char const> message) const {
+    return m_key.verify(signature, message);
+  }
+private:
+  static Star::Curve25519::Verifier make_key(std::span<std::uint8_t const, 32> public_key) {
+    auto key = Star::Curve25519::Verifier::create(public_key);
+    if (!key)
+      Star::fatal_error(key.error().what(), false);
+    return std::move(*key);
+  }
+  Star::Curve25519::Verifier m_key;
+};
+
+bool verify(std::span<std::uint8_t const, 64> signature, std::span<std::uint8_t const, 32> public_key,
+            std::span<char const> message) {
+  return Star::Curve25519::verify(signature, public_key, message);
+}
+
+enum class Operation { Keygen, Sign, Verify, ReusedVerifier };
+
+void measure(benchmark::State& state, Operation operation) {
+  auto const& vector = vectors[state.range(0)];
+  auto seed = decode_fixed<32>(vector.seed);
+  auto public_key = decode_fixed<32>(vector.public_key);
+  auto signature = decode_fixed<64>(vector.signature);
+  auto message = Star::hex_decode(vector.message);
+  Identity identity(seed);
+  Verifier verifier(public_key);
+  if (identity.public_key() != public_key || identity.sign(message.span()) != signature
+      || !verify(signature, public_key, message.span()) || !verifier.verify(signature, message.span())) {
+    state.SkipWithError("Ed25519 differs from independent RFC 8032 vector");
+    return;
+  }
+  auto corrupt = signature;
+  corrupt[0] ^= 1;
+  if (verify(corrupt, public_key, message.span()) || verifier.verify(corrupt, message.span())) {
+    state.SkipWithError("Ed25519 accepts a corrupted RFC signature");
+    return;
+  }
+  state.SetLabel(std::format("RFC8032/7.1; seed={}; pk={}; signature={}; message={}; operations/batch=1; deterministic seed, not OS RNG",
+      vector.seed, vector.public_key, vector.signature, vector.message));
+  for (auto _ : state) {
+    (void)_;
+    if (operation == Operation::Keygen) {
+      Identity generated(seed);
+      benchmark::DoNotOptimize(generated.public_key());
+    } else if (operation == Operation::Sign) {
+      auto result = identity.sign(message.span());
+      benchmark::DoNotOptimize(result);
+    } else {
+      auto result = operation == Operation::Verify ? verify(signature, public_key, message.span())
+                                                 : verifier.verify(signature, message.span());
+      benchmark::DoNotOptimize(result);
+    }
+    benchmark::ClobberMemory();
+  }
+  state.SetItemsProcessed(state.iterations());
+}
+
+BENCHMARK_CAPTURE(measure, Keygen, Operation::Keygen)->Name("Core/Ed25519/Keygen")->Arg(0)->Arg(1)->Arg(2);
+BENCHMARK_CAPTURE(measure, Sign, Operation::Sign)->Name("Core/Ed25519/Sign")->Arg(0)->Arg(1)->Arg(2);
+BENCHMARK_CAPTURE(measure, Verify, Operation::Verify)->Name("Core/Ed25519/Verify")->Arg(0)->Arg(1)->Arg(2);
+BENCHMARK_CAPTURE(measure, ReusedVerifier, Operation::ReusedVerifier)->Name("Core/Ed25519/ReusedVerifier")->Arg(0)->Arg(1)->Arg(2);
+}
 
 namespace AStarBenchmarks {
 

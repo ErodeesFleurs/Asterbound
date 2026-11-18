@@ -210,7 +210,8 @@ public:
   // Resource-cache jitter and presentation never consume gameplay randomness.
   RandomService& presentationRandom() { return m_presentationRandom; }
   GameTiming& timing() { return m_timing; }
-  Curve25519::KeySet const& identity() const { return m_identity; }
+  Curve25519::KeySet const& identity() const& { return *m_identity; }
+  Curve25519::KeySet const& identity() const&& = delete;
   SongbookSynchronization& songbookSynchronization() { return m_songbookSynchronization; }
   [[nodiscard]] std::expected<std::reference_wrapper<WorkerPool>, StarException> workers();
   [[nodiscard]] std::expected<std::reference_wrapper<bool>, StarException> humanoidHeadRotation();
@@ -234,7 +235,8 @@ private:
   RandomService m_random;
   RandomService m_presentationRandom{0};
   GameTiming m_timing;
-  Curve25519::KeySet m_identity;
+  // Engaged before initialization starts any dependent work.
+  std::optional<Curve25519::KeySet> m_identity;
   SongbookSynchronization m_songbookSynchronization;
   WorkerPool m_workers;
   std::mutex m_workersStartMutex;

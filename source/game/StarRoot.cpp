@@ -5,6 +5,7 @@ import star.ordered_map;
 import star.lru_cache;
 import star.thread;
 import star.random;
+import star.curve25519;
 import star.ttl_cache;
 import star.casting;
 import star.game_types;
@@ -178,7 +179,7 @@ namespace {
 }
 
 Root::Root(Settings settings)
-  : m_random(0), m_identity(m_random), m_workers("Root CPU"), m_settings(std::move(settings)) {}
+  : m_random(0), m_workers("Root CPU"), m_settings(std::move(settings)) {}
 
 std::expected<std::unique_ptr<Root>, StarException> Root::create(Settings settings) {
   auto root = std::unique_ptr<Root>(new Root(std::move(settings)));
@@ -189,6 +190,10 @@ std::expected<std::unique_ptr<Root>, StarException> Root::create(Settings settin
 }
 
 std::expected<void, StarException> Root::initialize() {
+  auto identity = Curve25519::KeySet::create();
+  if (!identity)
+    return std::unexpected(std::move(identity.error()));
+  m_identity.emplace(std::move(*identity));
   auto random = m_random.seed();
   if (!random)
     return std::unexpected(std::move(random.error()));

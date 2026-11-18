@@ -670,6 +670,60 @@ rows do not measure reusable-context throughput, network streams, embedded asset
 large high-ratio retained memory or whole-game performance.
 
 
+### Ed25519 identities and broadcasts
+
+`star.curve25519` now uses libsodium, not the removed bundled curve arithmetic.
+Headers and runtime require libsodium 1.0.21 or newer (ABI 26.3): earlier
+`crypto_core_ed25519_is_valid_point` versions have incomplete subgroup checks.
+See [point validation](https://doc.libsodium.org/advanced/point-arithmetic).
+Nix and vcpkg carry the dependency; this is an intentional backend change.
+
+Root creates one move-only identity from 32 OS-CSPRNG bytes before publishing
+services. Entropy failures propagate without a PRNG fallback. `from_seed` takes
+standard Ed25519 seed bytes without the historical pre-clamp; supplying an old
+effective, already-clamped seed still produces the same standard key/signature.
+Owned private bytes and temporary generated seeds are wiped with `sodium_memzero`;
+borrowed caller-owned seeds remain the caller's responsibility.
+
+Length checks precede native reads. Verification requires canonical main-subgroup
+public keys and R points, and native scalar/signature checks; malformed, small-order
+and noncanonical inputs intentionally lose legacy acceptance. A reusable Verifier
+retains validated public-key bytes, not an undocumented point table. Native
+signing still hashes its seed; no expanded-secret format or custom scalar math is
+introduced. Input message/signature spans are borrowed only for each call.
+
+Broadcast verifiers belong to current player entities and invalidate on key
+replacement/removal, entity reuse and world reset. Modern and StarExtensions
+tags/prefixes retain their wire bytes. Publication compares actual tags, avoiding
+per-update serialization while repairing script changes and main-player reentry.
+Raw broadcasts do not perform a redundant second signature.
+
+Run `core_tests --gtest_filter='Curve25519Test.*:SecureRandomTest.*'` for
+[RFC 8032](https://www.rfc-editor.org/rfc/rfc8032#section-7.1) complete key/signature
+vectors, binary messages, move ownership, exact input boundaries, scalar
+malleability and identity-key rejection. Linux's scoped native read fault checks
+entropy failure and recovery. In a private asset-backed fixture run
+`RootTest.SecureIdentityStability:RootTest.SignedBroadcastPublicationAndKeyReplacement`
+for actual WorldClient signing/receive paths, modern/legacy key replacement,
+missing/wrong tags and repair after an update.
+
+Reuse `core_benchmarks --benchmark_filter='^Core/Ed25519/'`, with no new executable.
+Twelve rows cover seeded key generation/destruction, hot signing, one-shot verify
+and reused verifier at three RFC fixtures (0/1/64 message bytes). Complete public
+keys/signatures, accepted valid and rejected corrupt signatures are checked outside
+timing. Freeze the original production native binary before dependency removal;
+adapt only the small API adapters and public-key accessor spelling, not the
+fixtures, full-result checks or measured operations. Native process initialization
+and verifier construction are untimed; seeded identity construction/destruction
+is timed only in key-generation rows.
+
+This compares the original C implementation with the strict libsodium-backed
+API, including its validation and secret-lifetime costs. Dependencies intentionally
+differ; do not claim a wrapper-only or identical-backend speedup. OS randomness,
+Root/world construction, publication serialization, end-to-end voice/network
+latency and FPS are not measured. Keep balanced A/B pairs, A/A controls, raw JSON,
+source/binary identities and every regression.
+
 ### Comparable measurements
 
 Freeze the original production implementation and benchmark consumer before
