@@ -256,6 +256,12 @@ struct Atlas final : TextureAtlasSet<std::shared_ptr<GpuImage>> {
 };
 VkTexture::~VkTexture() {
   if (allocation) {
+    // Allocations have a one-pixel border and are locked against compaction.
+    // Cancel an unsubmitted upload before freeing its cells for another texture;
+    // otherwise reused cells can receive overlapping, unordered transfer writes.
+    // Draw/frame texture pins keep submitted allocations alive until completion.
+    auto uploadOffset = offset - Vec2U(1, 1);
+    std::erase_if(image->pending, [&](Upload const& upload) { return upload.offset == uploadOffset; });
     auto freed = atlas->freeTexture(allocation);
     if (!freed) EmergencyLog::error("Vulkan atlas release: {}", freed.error().what());
   }
@@ -1863,8 +1869,10 @@ Result<void> VulkanRenderer::setEffectTexture(String const& name, ImageView cons
 }
 Result<bool> VulkanRenderer::switchEffectConfig(String const& name) {
   RENDER_REQUIRE(m_state->flush());
-  if (!m_state->effects.contains(name)) return false;
-  if (m_state->currentEffect != name) RENDER_REQUIRE(m_state->chooseEffect(name));
+  auto effect = m_state->effects.find(name);
+  if (effect == m_state->effects.end()) return false;
+  if (m_state->currentEffect != name || effect->second->pingPong)
+    RENDER_REQUIRE(m_state->chooseEffect(name));
   return true;
 }
 Result<void> VulkanRenderer::setScissorRect(std::optional<RectI> const& rect) {

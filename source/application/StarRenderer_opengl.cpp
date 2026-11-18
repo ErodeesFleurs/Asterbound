@@ -378,6 +378,9 @@ std::expected<void, StarException> OpenGlRenderer::loadConfig(Json const& config
   }
   m_currentFrameBuffer.reset();
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glViewport(0, 0, m_screenSize[0], m_screenSize[1]);
+  glUniform2f(m_screenSizeUniform, m_screenSize[0], m_screenSize[1]);
+  m_effectTargetsDirty = true;
   for (auto&& effect : m_effects)
     for (auto&& texture : effect.second.textures)
       texture.second.textureValue.reset();
@@ -602,6 +605,7 @@ std::expected<void, StarException> OpenGlRenderer::loadEffectConfig(String const
   m_effects[name] = std::move(effect);
   m_currentEffect = std::ref(m_effects[name]);
   m_program = program;
+  m_effectTargetsDirty = true;
   programGuard.program = 0;
   return {};
 }
@@ -695,7 +699,7 @@ std::expected<bool, StarException> OpenGlRenderer::switchEffectConfig(String con
   if (find == m_effects.end())
     return false;
   Effect& effect = find->second;
-  if (m_currentEffect && std::addressof(m_currentEffect->get()) == std::addressof(effect))
+  if (!m_effectTargetsDirty && !effect.doubleBuffered && m_currentEffect && std::addressof(m_currentEffect->get()) == std::addressof(effect))
     return true;
   auto output = effect.config.optString("frameBuffer");
   if (!output) return std::unexpected(std::move(output.error()));
@@ -705,7 +709,12 @@ std::expected<bool, StarException> OpenGlRenderer::switchEffectConfig(String con
   if (!blit) return std::unexpected(std::move(blit.error()));
   RefPtr<GlFrameBuffer> outputBuffer;
   RefPtr<GlFrameBuffer> blitBuffer;
-  List<std::pair<std::reference_wrapper<EffectTexture>, RefPtr<GlFrameBuffer>>> inputBuffers;
+  struct InputBuffer {
+    std::reference_wrapper<EffectTexture> parameter;
+    RefPtr<GlFrameBuffer> buffer;
+    RefPtr<GlLoneTexture> previousTexture;
+  };
+  List<InputBuffer> inputBuffers;
   if (*output) {
     auto buffer = getGlFrameBuffer(**output);
     if (!buffer) return std::unexpected(std::move(buffer.error()));
@@ -727,7 +736,7 @@ std::expected<bool, StarException> OpenGlRenderer::switchEffectConfig(String con
       if (auto texture = effect.textures.find_ref(*textureName)) {
         auto buffer = getGlFrameBuffer(**framebuffer);
         if (!buffer) return std::unexpected(std::move(buffer.error()));
-        inputBuffers.emplace_back(*texture, *buffer);
+        inputBuffers.push_back({*texture, *buffer, texture->get().textureValue});
       }
     }
   }
@@ -742,6 +751,9 @@ std::expected<bool, StarException> OpenGlRenderer::switchEffectConfig(String con
     GLuint program;
     RefPtr<GlFrameBuffer> framebuffer;
     RefPtr<GlFrameBuffer> swapped;
+    List<InputBuffer>& inputs;
+    GLint viewport[4]{};
+    bool justSwapped = false;
     GLint draw = 0;
     GLint read = 0;
     bool committed = false;
@@ -750,28 +762,33 @@ std::expected<bool, StarException> OpenGlRenderer::switchEffectConfig(String con
       if (swapped) {
         std::swap(swapped->id, swapped->altId);
         std::swap(swapped->texture, swapped->altTexture);
-        swapped->justSwapped = false;
+        swapped->justSwapped = justSwapped;
       }
       glBindFramebuffer(GL_DRAW_FRAMEBUFFER, draw);
       glBindFramebuffer(GL_READ_FRAMEBUFFER, read);
+      glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+      for (auto const& input : inputs)
+        input.parameter.get().textureValue = input.previousTexture;
       renderer.m_currentFrameBuffer = framebuffer;
       renderer.m_currentEffect = effect;
       renderer.m_program = program;
       glUseProgram(program);
       if (effect) {
         auto size = framebuffer
-            ? (framebuffer->overrideSize ? *framebuffer->overrideSize : renderer.m_screenSize / framebuffer->sizeDiv)
+            ? framebuffer->texture->textureSize
             : renderer.m_screenSize;
         renderer.setupGlUniforms(effect->get(), size);
       }
     }
-  } guard{*this, m_currentEffect, m_program, m_currentFrameBuffer, {}};
+  } guard{*this, m_currentEffect, m_program, m_currentFrameBuffer, {}, inputBuffers};
   glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &guard.draw);
   glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &guard.read);
+  glGetIntegerv(GL_VIEWPORT, guard.viewport);
   auto effectSize = m_screenSize;
   if (outputBuffer) {
-    effectSize = outputBuffer->overrideSize ? *outputBuffer->overrideSize : m_screenSize / outputBuffer->sizeDiv;
+    effectSize = outputBuffer->texture->textureSize;
     if (effect.doubleBuffered) {
+      guard.justSwapped = outputBuffer->justSwapped;
       auto swapped = outputBuffer->swap();
       if (!swapped) return std::unexpected(std::move(swapped.error()));
       guard.swapped = outputBuffer;
@@ -781,23 +798,19 @@ std::expected<bool, StarException> OpenGlRenderer::switchEffectConfig(String con
   } else {
     m_currentFrameBuffer.reset();
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    glViewport(0, 0, effectSize[0], effectSize[1]);
   }
   glUseProgram(m_program = effect.program);
   setupGlUniforms(effect, effectSize);
   m_currentEffect = std::ref(effect);
   auto rounding = setEffectParameter("vertexRounding", m_multiSampling > 0);
   if (!rounding) return std::unexpected(std::move(rounding.error()));
-  for (auto const& [parameterRef, buffer] : inputBuffers) {
-    auto& parameter = parameterRef.get();
-    bool undefined = !parameter.textureValue || parameter.textureValue->textureId == 0;
-    if (undefined || buffer->hasAlt) {
-      parameter.textureValue = effect.doubleBuffered && buffer == outputBuffer ? buffer->altTexture : buffer->texture;
-      if (parameter.textureSizeUniform != -1 && undefined) {
-        auto size = parameter.textureValue->glTextureSize();
-        glUniform2f(parameter.textureSizeUniform, size[0], size[1]);
-      }
-    }
+  for (auto const& input : inputBuffers) {
+    auto& parameter = input.parameter.get();
+    auto const& buffer = input.buffer;
+    parameter.textureValue = effect.doubleBuffered && buffer == outputBuffer ? buffer->altTexture : buffer->texture;
   }
+  updateGlTextureSizeUniforms(effect);
   if (blitBuffer) {
     auto blitted = blitGlFrameBuffer(blitBuffer, effect.doubleBuffered);
     if (!blitted) return std::unexpected(std::move(blitted.error()));
@@ -805,6 +818,7 @@ std::expected<bool, StarException> OpenGlRenderer::switchEffectConfig(String con
   auto status = checkGlError("effect switch");
   if (!status) return std::unexpected(std::move(status.error()));
   guard.committed = true;
+  m_effectTargetsDirty = false;
   return true;
 }
 
@@ -998,75 +1012,87 @@ std::expected<void, StarException> OpenGlRenderer::flush(Mat3F const& transforma
 }
 
 std::expected<void, StarException> OpenGlRenderer::setScreenSize(Vec2U screenSize) {
+  auto flushed = flushImmediatePrimitives();
+  if (!flushed) return std::unexpected(std::move(flushed.error()));
+  struct Replacement {
+    RefPtr<GlFrameBuffer> original;
+    RefPtr<GlFrameBuffer> replacement;
+  };
   struct ResizeGuard {
     OpenGlRenderer& renderer;
     Vec2U previous;
+    List<Replacement> replacements{};
+    GlTextureBindingGuard textureBinding{};
     GLint viewport[4]{};
+    GLint read = 0;
+    GLint draw = 0;
+    bool installed = false;
     bool committed = false;
-    ~ResizeGuard() {
-      if (committed) return;
-      renderer.m_screenSize = previous;
-      glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
-      auto framebuffer = renderer.m_currentFrameBuffer;
-      auto size = framebuffer
-          ? (framebuffer->overrideSize ? *framebuffer->overrideSize : previous / framebuffer->sizeDiv)
-          : previous;
-      glUniform2f(renderer.m_screenSizeUniform, size[0], size[1]);
-    }
-  } guard{*this, m_screenSize};
-  glGetIntegerv(GL_VIEWPORT, guard.viewport);
-  m_screenSize = screenSize;
-  glViewport(0, 0, m_screenSize[0], m_screenSize[1]);
-  glUniform2f(m_screenSizeUniform, m_screenSize[0], m_screenSize[1]);
-  GlTextureBindingGuard textureBinding;
-  GlFramebufferBindingGuard framebufferBinding;
 
-  for (auto&& frameBuffer : m_frameBuffers) {
-    if (frameBuffer.second->overrideSize) {
-      continue; // don't resize this one
-    }
-    unsigned sizeDiv = frameBuffer.second->sizeDiv;
-    bool hdr = settingModeValue(frameBuffer.second->hdrMode,m_hdrSetting);
-    if (unsigned multisample = frameBuffer.second->multisample) {
-      auto internalFormat =  hdr ? GL_RGBA16F : GL_RGBA8;
-      
-      glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, frameBuffer.second->texture->glTextureId());
-      glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, multisample, internalFormat, m_screenSize[0] / sizeDiv, m_screenSize[1] / sizeDiv, GL_TRUE);
-      if (frameBuffer.second->hasAlt) {
-        glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, frameBuffer.second->altTexture->glTextureId());
-        glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, multisample, internalFormat, m_screenSize[0] / sizeDiv, m_screenSize[1] / sizeDiv, GL_TRUE);
-      }
-    } else {
-      auto format = frameBuffer.second->alpha ? GL_RGBA : GL_RGB;
-      auto internalFormat =  hdr ? 
-          (frameBuffer.second->alpha ? GL_RGBA16F : GL_RGB16F) :
-          (frameBuffer.second->alpha ? GL_RGBA8 : GL_RGB8);
-      auto type = hdr ? GL_FLOAT : GL_UNSIGNED_BYTE;
-      
-      glBindTexture(GL_TEXTURE_2D, frameBuffer.second->texture->glTextureId());
-      glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, m_screenSize[0] / sizeDiv, m_screenSize[1] / sizeDiv, 0, format, type, NULL);
-      if (frameBuffer.second->hasAlt) {
-        glBindTexture(GL_TEXTURE_2D, frameBuffer.second->altTexture->glTextureId());
-        glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, m_screenSize[0] / sizeDiv, m_screenSize[1] / sizeDiv, 0, format, type, NULL);
+    // Keep effect texture references stable; only exchange validated GL storage.
+    void exchange() {
+      for (auto& entry : replacements) {
+        auto exchangeTarget = [&](GLuint& id, GLuint& replacementId, GlLoneTexture& texture, GlLoneTexture& replacementTexture) {
+          if (read == static_cast<GLint>(id)) read = replacementId;
+          if (draw == static_cast<GLint>(id)) draw = replacementId;
+          if (textureBinding.texture == static_cast<GLint>(texture.textureId))
+            textureBinding.texture = replacementTexture.textureId;
+          if (textureBinding.multisampleTexture == static_cast<GLint>(texture.textureId))
+            textureBinding.multisampleTexture = replacementTexture.textureId;
+          std::swap(id, replacementId);
+          std::swap(texture.textureId, replacementTexture.textureId);
+          std::swap(texture.textureSize, replacementTexture.textureSize);
+        };
+        auto& original = *entry.original;
+        auto& replacement = *entry.replacement;
+        exchangeTarget(original.id, replacement.id, *original.texture, *replacement.texture);
+        if (original.hasAlt)
+          exchangeTarget(original.altId, replacement.altId, *original.altTexture, *replacement.altTexture);
       }
     }
-    auto resized = checkGlError("framebuffer resize");
-    if (!resized) return std::unexpected(std::move(resized.error()));
-    glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer.second->id);
-    auto status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-    if (status != GL_FRAMEBUFFER_COMPLETE)
-      return std::unexpected(RendererException::format("OpenGL framebuffer is not complete after resize: {}", status));
-    if (frameBuffer.second->hasAlt) {
-      glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer.second->altId);
-      status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-      if (status != GL_FRAMEBUFFER_COMPLETE)
-        return std::unexpected(RendererException::format("OpenGL alternate framebuffer is not complete after resize: {}", status));
+
+    ~ResizeGuard() {
+      if (!committed) {
+        if (installed) exchange();
+        renderer.m_screenSize = previous;
+        glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+        auto size = renderer.m_currentFrameBuffer ? renderer.m_currentFrameBuffer->texture->textureSize : previous;
+        glUniform2f(renderer.m_screenSizeUniform, size[0], size[1]);
+        if (renderer.m_currentEffect)
+          renderer.updateGlTextureSizeUniforms(renderer.m_currentEffect->get());
+      }
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, read);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, draw);
     }
-    Vec2U textureSize = m_screenSize / sizeDiv;
-    frameBuffer.second->texture->textureSize = textureSize;
-    if (frameBuffer.second->hasAlt)
-      frameBuffer.second->altTexture->textureSize = textureSize;
+  } guard{.renderer = *this, .previous = m_screenSize};
+  glGetIntegerv(GL_VIEWPORT, guard.viewport);
+  glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &guard.read);
+  glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &guard.draw);
+  for (auto const& [name, framebuffer] : m_frameBuffers) {
+    if (framebuffer->overrideSize)
+      continue;
+    auto size = screenSize / framebuffer->sizeDiv;
+    if (size == framebuffer->texture->textureSize)
+      continue;
+    // Allocate every changed target before publishing any resize.
+    auto config = framebuffer->config.set("size", JsonArray{size[0], size[1]});
+    if (!config) return std::unexpected(std::move(config.error()));
+    auto replacement = GlFrameBuffer::create(*config);
+    if (!replacement) return std::unexpected(std::move(replacement.error()));
+    if (framebuffer->hasAlt) {
+      auto alternate = (*replacement)->makeAlt(screenSize);
+      if (!alternate) return std::unexpected(std::move(alternate.error()));
+    }
+    guard.replacements.push_back({framebuffer, std::move(*replacement)});
   }
+  guard.exchange();
+  guard.installed = true;
+  m_screenSize = screenSize;
+  auto size = m_currentFrameBuffer ? m_currentFrameBuffer->texture->textureSize : screenSize;
+  glViewport(0, 0, size[0], size[1]);
+  glUniform2f(m_screenSizeUniform, size[0], size[1]);
+  if (m_currentEffect)
+    updateGlTextureSizeUniforms(m_currentEffect->get());
   auto status = checkGlError("screen resize");
   if (!status) return std::unexpected(std::move(status.error()));
   guard.committed = true;
@@ -1092,6 +1118,12 @@ std::expected<void, StarException> OpenGlRenderer::startFrame() {
   }
 
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  if (m_currentFrameBuffer) {
+    m_currentFrameBuffer.reset();
+    m_effectTargetsDirty = true;
+  }
+  glViewport(0, 0, m_screenSize[0], m_screenSize[1]);
+  glUniform2f(m_screenSizeUniform, m_screenSize[0], m_screenSize[1]);
 
   glClear(GL_COLOR_BUFFER_BIT);
 
@@ -1116,6 +1148,12 @@ std::expected<void, StarException> OpenGlRenderer::finishFrame() {
     return group.use_count() != 1 || group->textureAtlasSet.totalTextures() > 0;
   });
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  if (m_currentFrameBuffer) {
+    m_currentFrameBuffer.reset();
+    m_effectTargetsDirty = true;
+  }
+  glViewport(0, 0, m_screenSize[0], m_screenSize[1]);
+  glUniform2f(m_screenSizeUniform, m_screenSize[0], m_screenSize[1]);
   return checkGlError("frame finish");
 }
 
@@ -1744,6 +1782,7 @@ void OpenGlRenderer::setupGlUniforms(Effect& effect, Vec2U screenSize) {
   }
   for (auto const& texture : effect.textures)
     glUniform1i(texture.second.textureUniform, texture.second.textureUnit);
+  updateGlTextureSizeUniforms(effect);
 
   glUniform2f(m_screenSizeUniform, screenSize[0], screenSize[1]);
   
@@ -1759,6 +1798,15 @@ void OpenGlRenderer::setupGlUniforms(Effect& effect, Vec2U screenSize) {
   uploadParameters(effect.scriptables);
 }
 
+void OpenGlRenderer::updateGlTextureSizeUniforms(Effect const& effect) {
+  for (auto const& [name, texture] : effect.textures) {
+    if (texture.textureSizeUniform != -1 && texture.textureValue) {
+      auto size = texture.textureValue->textureSize;
+      glUniform2f(texture.textureSizeUniform, size[0], size[1]);
+    }
+  }
+}
+
 std::expected<RefPtr<OpenGlRenderer::GlFrameBuffer>, StarException> OpenGlRenderer::getGlFrameBuffer(String const& id) {
   if (auto framebuffer = m_frameBuffers.find_ref(id))
     return framebuffer->get();
@@ -1768,24 +1816,78 @@ std::expected<RefPtr<OpenGlRenderer::GlFrameBuffer>, StarException> OpenGlRender
 
 std::expected<void, StarException> OpenGlRenderer::blitGlFrameBuffer(RefPtr<GlFrameBuffer> const& frameBuffer, bool const& useAlt) {
   GlFramebufferBindingGuard binding;
-  auto& size = m_screenSize;
-  glBindFramebuffer(GL_READ_FRAMEBUFFER, (useAlt && frameBuffer->hasAlt) ? frameBuffer->altId : frameBuffer->id);
-  glBlitFramebuffer(
-    0, 0, size[0], size[1],
-    0, 0, size[0], size[1],
-    GL_COLOR_BUFFER_BIT, GL_NEAREST
-  );
-  return checkGlError("framebuffer blit");
+  GlTextureBindingGuard textureBinding;
+  bool alternate = useAlt && frameBuffer->hasAlt;
+  GLuint source = alternate ? frameBuffer->altId : frameBuffer->id;
+  auto sourceSize = (alternate ? frameBuffer->altTexture : frameBuffer->texture)->textureSize;
+  auto destinationSize = m_currentFrameBuffer ? m_currentFrameBuffer->texture->textureSize : m_screenSize;
+  GLint destinationSamples = 0;
+  glGetIntegerv(GL_SAMPLES, &destinationSamples);
+  auto blit = [&](GLuint read, GLuint draw, Vec2U readSize, Vec2U drawSize) -> std::expected<void, StarException> {
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, read);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, draw);
+    glBlitFramebuffer(0, 0, readSize[0], readSize[1], 0, 0, drawSize[0], drawSize[1], GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    return checkGlError("framebuffer blit");
+  };
+  auto scratch = [&](RefPtr<GlFrameBuffer>& buffer, Vec2U size, bool hdr, bool alpha) -> std::expected<void, StarException> {
+    if (buffer && buffer->texture->textureSize == size
+        && settingModeValue(buffer->hdrMode, m_hdrSetting) == hdr && buffer->alpha == alpha)
+      return {};
+    auto created = GlFrameBuffer::create(JsonObject{
+      {"size", Json(JsonArray{Json(size[0]), Json(size[1])})},
+      {"hdr", Json(hdr ? String("Enabled") : String("Disabled"))},
+      {"alpha", Json(alpha)}
+    });
+    if (!created) return std::unexpected(std::move(created.error()));
+    buffer = std::move(*created);
+    return {};
+  };
+  bool differentSize = sourceSize != destinationSize;
+  bool differentSamples = frameBuffer->multisample && destinationSamples
+      && frameBuffer->multisample != static_cast<unsigned>(destinationSamples);
+  if ((differentSize && (frameBuffer->multisample || destinationSamples)) || differentSamples) {
+    struct ScissorGuard {
+      bool enabled = glIsEnabled(GL_SCISSOR_TEST);
+      ScissorGuard() { glDisable(GL_SCISSOR_TEST); }
+      ~ScissorGuard() {
+        if (enabled) glEnable(GL_SCISSOR_TEST);
+      }
+    } scissor;
+    // Multisampled blits cannot scale. Resolve at source size, scale only
+    // between single-sample images, then replicate at destination size.
+    if (frameBuffer->multisample) {
+      auto prepared = scratch(m_blitResolveBuffer, sourceSize, settingModeValue(frameBuffer->hdrMode, m_hdrSetting), frameBuffer->alpha);
+      if (!prepared) return std::unexpected(std::move(prepared.error()));
+      auto resolved = blit(source, m_blitResolveBuffer->id, sourceSize, sourceSize);
+      if (!resolved) return std::unexpected(std::move(resolved.error()));
+      source = m_blitResolveBuffer->id;
+    }
+    if (differentSize && destinationSamples) {
+      bool hdr = m_currentFrameBuffer && settingModeValue(m_currentFrameBuffer->hdrMode, m_hdrSetting);
+      bool alpha = !m_currentFrameBuffer || m_currentFrameBuffer->alpha;
+      auto prepared = scratch(m_blitScaleBuffer, destinationSize, hdr, alpha);
+      if (!prepared) return std::unexpected(std::move(prepared.error()));
+      auto scaled = blit(source, m_blitScaleBuffer->id, sourceSize, destinationSize);
+      if (!scaled) return std::unexpected(std::move(scaled.error()));
+      source = m_blitScaleBuffer->id;
+      sourceSize = destinationSize;
+    }
+  }
+  return blit(source, binding.draw, sourceSize, destinationSize);
 }
 
 std::expected<void, StarException> OpenGlRenderer::switchGlFrameBuffer(RefPtr<GlFrameBuffer> const& frameBuffer) {
   if (m_currentFrameBuffer == frameBuffer && !frameBuffer->justSwapped)
     return {};
   
-  frameBuffer->justSwapped = false;
+  auto size = frameBuffer->texture->textureSize;
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, frameBuffer->id);
+  glViewport(0, 0, size[0], size[1]);
+  auto status = checkGlError("framebuffer switch");
+  if (!status) return std::unexpected(std::move(status.error()));
+  frameBuffer->justSwapped = false;
   m_currentFrameBuffer = frameBuffer;
-  return checkGlError("framebuffer switch");
+  return {};
 }
 
 GLuint OpenGlRenderer::Effect::getAttribute(String const& name) {

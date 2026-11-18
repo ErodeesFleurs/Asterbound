@@ -60,6 +60,34 @@ python3 scripts/ci/smoke-client-startup.py dist/asterbound
 On Windows use `python` and `dist/asterbound.exe`. This is not asset-loading,
 rendered-session or cross-platform gameplay evidence.
 
+### Native renderer regression suite
+
+Linux GUI builds include `renderer_regression_tests`, which uses real SDL
+windows and backend rendering without Root or game assets. Run it only inside
+an owned Xvfb with private HOME/XDG/D-Bus directories:
+
+```sh
+ASTERBOUND_RENDER_TEST_DISPLAY="$DISPLAY" ./dist/renderer_regression_tests
+```
+
+Without that explicit display opt-in, all cases skip before SDL initialization.
+Vulkan cases require the Khronos validation layer and enable synchronization
+validation. Readback copies the engine's presentation-source image, not the
+swapchain image; the latter is not allocated with transfer-source usage.
+
+The six cases cover canceled atlas uploads before differently sized cell reuse,
+two/three consecutive ping-pong passes in both backends, OpenGL fixed/divided
+target viewports and active-target resize, bidirectional framebuffer scaling
+with single-sample/4x MSAA and byte/float targets, and framebuffer sampler-size
+uniforms after resize with same-effect reselection. Pixel tolerances use integer
+byte differences, avoiding floating-point assertion behavior under fast-math.
+The old backend failed all five non-atlas pixel cases; its separate atlas
+reproducer reported `SYNC-HAZARD-WRITE-AFTER-WRITE`. The repaired suite passed all
+six cases on Mesa 26.3 llvmpipe/lvp with no Vulkan validation errors, including
+teardown. Both production backends also reached the title, resized to 960x720
+without clipping, and exited normally through Quit in private client fixtures.
+This is software Linux evidence, not Windows or hardware-driver proof.
+
 ### Vulkan/OpenGL rendered-session checks
 
 Both backends are built into GUI clients. Use a private HOME/XDG/D-Bus and

@@ -125,6 +125,33 @@ add_test(NAME fixed_scheduler_tests
   COMMAND fixed_scheduler_tests)
 set_tests_properties(fixed_scheduler_tests PROPERTIES LABELS "NoAssets")
 
+# Native pixels and Vulkan synchronization validation, without Root or assets.
+# Windows are forbidden unless DISPLAY is explicitly opted in by the runner.
+if(STAR_BUILD_GUI AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  add_executable(renderer_regression_tests
+    $<TARGET_OBJECTS:star_extern> $<TARGET_OBJECTS:star_core>
+    core_tests_main.cpp renderer_regression_test.cpp)
+  target_include_directories(renderer_regression_tests PRIVATE
+    ${STAR_EXTERN_INCLUDES} ${STAR_CORE_INCLUDES} ${STAR_BASE_INCLUDES}
+    ${STAR_PLATFORM_INCLUDES} ${STAR_APPLICATION_INCLUDES}
+    ${CMAKE_CURRENT_SOURCE_DIR})
+  target_link_libraries(renderer_regression_tests PRIVATE
+    star_test_gtest star_base_modules star_application_modules star_build_config
+    star_vorbis_dependencies star_lua
+    $<LINK_ONLY:star_core_dependencies> $<LINK_ONLY:star_extern_dependencies>
+    star_application_dependencies)
+  target_link_options(renderer_regression_tests PRIVATE
+    "LINKER:--wrap=vkCreateInstance" "LINKER:--wrap=vkDestroyInstance"
+    "LINKER:--wrap=vkCreateDevice" "LINKER:--wrap=vkDestroyDevice"
+    "LINKER:--wrap=vkCmdBlitImage")
+  set_target_properties(renderer_regression_tests PROPERTIES CXX_SCAN_FOR_MODULES ON)
+  add_test(NAME renderer_regression_tests
+    WORKING_DIRECTORY $<TARGET_FILE_DIR:renderer_regression_tests>
+    COMMAND renderer_regression_tests)
+  set_tests_properties(renderer_regression_tests PROPERTIES
+    LABELS "NoAssets;Renderer;IsolatedDisplay" RUN_SERIAL TRUE)
+endif()
+
 if (STAR_BUILD_GUI AND STAR_ENABLE_DISCORD_INTEGRATION)
   # Compile the real PC services in isolation: no Steam initialization, GUI,
   # assets, or native Discord library. The SDK wrappers call our DiscordCreate

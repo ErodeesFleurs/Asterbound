@@ -304,6 +304,7 @@ private:
   [[nodiscard]] std::expected<void, StarException> renderGlBuffer(GlRenderBuffer const& renderBuffer, Mat3F const& transformation);
 
   void setupGlUniforms(Effect& effect, Vec2U screenSize);
+  void updateGlTextureSizeUniforms(Effect const& effect);
 
   [[nodiscard]] std::expected<RefPtr<OpenGlRenderer::GlFrameBuffer>, StarException> getGlFrameBuffer(String const& id);
   [[nodiscard]] std::expected<void, StarException> blitGlFrameBuffer(RefPtr<OpenGlRenderer::GlFrameBuffer> const& frameBuffer, bool const& useAlt = false);
@@ -330,6 +331,9 @@ private:
 
   StringMap<RefPtr<GlFrameBuffer>> m_frameBuffers;
   RefPtr<GlFrameBuffer> m_currentFrameBuffer;
+  RefPtr<GlFrameBuffer> m_blitResolveBuffer;
+  RefPtr<GlFrameBuffer> m_blitScaleBuffer;
+  bool m_effectTargetsDirty = true;
 
   RefPtr<GlTexture> m_whiteTexture;
 
