@@ -917,40 +917,6 @@ Result<void> VulkanRenderer::State::recreateSwapchain() {
   VkCompositeAlphaFlagBitsKHR composite = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
   for (auto candidate : {VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR, VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR, VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR, VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR})
     if (capabilities.supportedCompositeAlpha & candidate) { composite = candidate; break; }
-  VkSwapchainCreateInfoKHR info{};
-  info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-  info.surface = device->surface; info.minImageCount = imageCount; info.imageFormat = chosen->format; info.imageColorSpace = chosen->colorSpace;
-  info.imageExtent = newExtent; info.imageArrayLayers = 1; info.imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-  info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE; info.preTransform = capabilities.currentTransform;
-  info.compositeAlpha = composite; info.presentMode = mode; info.clipped = VK_TRUE;
-  // Keep the old swapchain usable if allocation of the replacement fails.
-  VkSwapchainKHR replacement = VK_NULL_HANDLE;
-  VK_REQUIRE(vkCreateSwapchainKHR(device->logical, &info, nullptr, &replacement));
-  struct ReplacementGuard {
-    VkDevice device; VkSwapchainKHR swapchain;
-    std::vector<VkImageView> views;
-    std::vector<VkSemaphore> semaphores;
-    ~ReplacementGuard() {
-      for (auto view : views) vkDestroyImageView(device, view, nullptr);
-      for (auto semaphore : semaphores) vkDestroySemaphore(device, semaphore, nullptr);
-      if (swapchain) vkDestroySwapchainKHR(device, swapchain, nullptr);
-    }
-  } guard{device->logical, replacement, {}, {}};
-  VK_REQUIRE(vkGetSwapchainImagesKHR(device->logical, replacement, &count, nullptr));
-  std::vector<VkImage> images(count);
-  VK_REQUIRE(vkGetSwapchainImagesKHR(device->logical, replacement, &count, images.data()));
-  for (auto image : images) {
-    VkImageViewCreateInfo view{};
-    view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    view.image = image; view.viewType = VK_IMAGE_VIEW_TYPE_2D; view.format = chosen->format;
-    view.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    VkImageView handle;
-    VK_REQUIRE(vkCreateImageView(device->logical, &view, nullptr, &handle)); guard.views.push_back(handle);
-    VkSemaphoreCreateInfo semaphore{};
-    semaphore.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-    VkSemaphore ready;
-    VK_REQUIRE(vkCreateSemaphore(device->logical, &semaphore, nullptr, &ready)); guard.semaphores.push_back(ready);
-  }
   auto dimensions = Vec2U(newExtent.width, newExtent.height);
   auto screenTarget = makeTarget(dimensions, hdrOutput ? VK_FORMAT_R16G16B16A16_SFLOAT : VK_FORMAT_R8G8B8A8_UNORM,
       VK_SAMPLE_COUNT_1_BIT, TextureAddressing::Clamp, TextureFiltering::Nearest);
@@ -974,6 +940,46 @@ Result<void> VulkanRenderer::State::recreateSwapchain() {
       if (!encoded) return std::unexpected(std::move(encoded.error()));
     }
   }
+  VkSwapchainCreateInfoKHR info{};
+  info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+  info.surface = device->surface; info.minImageCount = imageCount; info.imageFormat = chosen->format; info.imageColorSpace = chosen->colorSpace;
+  info.imageExtent = newExtent; info.imageArrayLayers = 1; info.imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+  info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE; info.preTransform = capabilities.currentTransform;
+  info.compositeAlpha = composite; info.presentMode = mode; info.clipped = VK_TRUE;
+  info.oldSwapchain = swapchain;
+  // Passing oldSwapchain retires it even if creation fails. Prepare independent
+  // resources first, then remove the old generation from acquire/present state.
+  struct SwapchainGuard {
+    VkDevice device; VkSwapchainKHR swapchain;
+    std::vector<VkImageView> views;
+    std::vector<VkSemaphore> semaphores;
+    ~SwapchainGuard() {
+      for (auto view : views) vkDestroyImageView(device, view, nullptr);
+      for (auto semaphore : semaphores) vkDestroySemaphore(device, semaphore, nullptr);
+      if (swapchain) vkDestroySwapchainKHR(device, swapchain, nullptr);
+    }
+  };
+  SwapchainGuard retired{device->logical, std::exchange(swapchain, VK_NULL_HANDLE),
+      std::move(swapViews), std::move(presentSemaphores)};
+  swapImages.clear(); swapLayouts.clear();
+  dirtySwapchain = true;
+  SwapchainGuard guard{device->logical, VK_NULL_HANDLE, {}, {}};
+  VK_REQUIRE(vkCreateSwapchainKHR(device->logical, &info, nullptr, &guard.swapchain));
+  VK_REQUIRE(vkGetSwapchainImagesKHR(device->logical, guard.swapchain, &count, nullptr));
+  std::vector<VkImage> images(count);
+  VK_REQUIRE(vkGetSwapchainImagesKHR(device->logical, guard.swapchain, &count, images.data()));
+  for (auto image : images) {
+    VkImageViewCreateInfo view{};
+    view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    view.image = image; view.viewType = VK_IMAGE_VIEW_TYPE_2D; view.format = chosen->format;
+    view.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    VkImageView handle;
+    VK_REQUIRE(vkCreateImageView(device->logical, &view, nullptr, &handle)); guard.views.push_back(handle);
+    VkSemaphoreCreateInfo semaphore{};
+    semaphore.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    VkSemaphore ready;
+    VK_REQUIRE(vkCreateSemaphore(device->logical, &semaphore, nullptr, &ready)); guard.semaphores.push_back(ready);
+  }
   auto newGuiFormat = hdrOutput ? VK_FORMAT_R16G16B16A16_SFLOAT : chosen->format;
   if (gui && newGuiFormat != guiFormat) {
     auto oldFormat = guiFormat;
@@ -987,9 +993,6 @@ Result<void> VulkanRenderer::State::recreateSwapchain() {
       return std::unexpected(std::move(initialized.error()));
     }
   }
-  for (auto view : swapViews) vkDestroyImageView(device->logical, view, nullptr);
-  for (auto semaphore : presentSemaphores) vkDestroySemaphore(device->logical, semaphore, nullptr);
-  if (swapchain) vkDestroySwapchainKHR(device->logical, swapchain, nullptr);
   swapchain = std::exchange(guard.swapchain, VK_NULL_HANDLE);
   swapViews = std::move(guard.views); presentSemaphores = std::move(guard.semaphores);
   swapImages = std::move(images); swapLayouts.assign(swapImages.size(), VK_IMAGE_LAYOUT_UNDEFINED);
@@ -1911,8 +1914,21 @@ Result<void> VulkanRenderer::setOutputSettings(RenderOutputSettings const& setti
     if (previous.peakNits != settings.peakNits) state.updateHdrMetadata();
     return {};
   }
+  bool hadSwapchain = state.swapchain != VK_NULL_HANDLE;
+  bool hadGui = state.gui;
   auto result = state.recreateSwapchain();
-  if (!result) state.outputSettings = previous;
+  if (!result) {
+    state.outputSettings = previous;
+    // A failure before retirement leaves the old output intact. Afterwards,
+    // rollback needs a fresh swapchain, never another acquire of the retired one.
+    if (hadSwapchain && !state.swapchain) {
+      auto restored = state.recreateSwapchain();
+      if (restored && hadGui && !state.gui)
+        restored = state.initializeGui();
+      if (!restored)
+        return std::unexpected(RendererException::format("Vulkan output change failed: {}; restoring the previous output also failed: {}", result.error().what(), restored.error().what()));
+    }
+  }
   return result;
 }
 Result<std::shared_ptr<TextureGroup>> VulkanRenderer::createTextureGroup(TextureGroupSize size, TextureFiltering filtering) {

@@ -68,6 +68,23 @@ share writable saves between instances. Vulkan needs an actual WSI surface:
 SDL's OpenGL offscreen path is not a Vulkan window test. Enable the Khronos
 validation layer and synchronization validation when available.
 
+Swapchain replacement must pass the current non-retired handle in
+`oldSwapchain`. That call retires the old chain even when creation fails, so
+rollback cannot acquire from it again. Independent render targets and pipelines
+are prepared before retirement; failed replacements release both swapchain
+generations, and output-setting rollback creates a fresh chain for the previous
+mode. Exercise resize, VSync and legacy/SDR changes, plus failures before
+retirement, during creation and while creating replacement image views. Each
+recoverable output failure must still allow presentation and later reselection.
+
+The retirement regression probe on Linux X11/llvmpipe performed 32 real
+swapchain creations and 29 image acquisitions, with three injected allocation
+failures covering those boundaries. It rejected missing/retired `oldSwapchain`
+handles and acquisitions from retired chains, recovered presentation after each
+failure, and exited with no live swapchains or core/synchronization validation
+errors. The real client also resized its window, applied SDR through Graphics,
+and quit normally. This does not establish Windows or hardware-driver coverage.
+
 The November 2026 Linux X11/Xvfb check used Mesa 26.3 llvmpipe for both APIs.
 An actual `Application`/`ThreadedRenderer` probe produced byte-identical baseline
 RGB images, including ImGui. It exercised ordered getter/transport-slot reuse,
