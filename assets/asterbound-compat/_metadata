@@ -47,7 +47,11 @@
     "randgenblshields", "spacePolice", "[GIC]恶化扩展——汉化", "sylveonoid",
     "Custom Crafter Template", "vanta-race", "moremmupgrades", "CustomCollectionsUI", "gicexp_311patch",
     "GBHGKrArcanaAddon", "RPG_Growth_AI", "Minimap - Alpha",
-    "[oSB] Minimap Enhancements + Portrait Studio", "Futara's Dragon Engine"
+    "[oSB] Minimap Enhancements + Portrait Studio", "Futara's Dragon Engine",
+    "XRC_BETA_STARBOUND", "My Enternia", "StardustLib",
+    "Tougher Mobs with Better Loot!", "Meteora-Train-System", "rl_belterdungeons",
+    "[oSB]StarTechUltimateUpgrade", "StarTech", "antr_armorImplants",
+    "Weapon Fusion Station", "DSBots"
   ],
   "scripts" : {
     "onLoad" : [
