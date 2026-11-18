@@ -158,19 +158,6 @@ jobs:
           ren client.zip Asterbound-Windows-Client.zip
           ren server.zip Asterbound-Windows-Server.zip
 
-      - name: Prepare Artifacts
-        shell: cmd
-        run: |
-          cmake -E tar cf dist.zip --format=zip dist
-          ren dist.zip Asterbound-Windows-All-DevOnly.zip
-
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: Asterbound-Windows-All-DevOnly
-          path: Asterbound-Windows-All-DevOnly.zip
-          archive: false
-
       - name: Upload Client
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
