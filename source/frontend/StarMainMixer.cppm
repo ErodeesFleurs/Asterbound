@@ -2,15 +2,6 @@ module;
 
 import std;
 import star.format;
-import star.audio;
-import star.thread;
-import star.list;
-import star.map;
-import star.set;
-import star.bi_map;
-import star.game_types;
-
-
 import star.mixer;
 
 namespace Star {
@@ -22,30 +13,37 @@ class Voice;
 
 class MainMixer {
 public:
-  MainMixer(Root& root, unsigned sampleRate, unsigned channels);
+  MainMixer(Root& root, unsigned sample_rate, unsigned channels);
 
-  void setUniverseClient(std::shared_ptr<UniverseClient> universeClient);
+  void set_universe_client(std::shared_ptr<UniverseClient> universe_client);
   // ClientApplication clears this borrow before releasing its painter.
-  void setWorldPainter(std::optional<std::reference_wrapper<WorldPainter>> worldPainter);
+  void set_world_painter(std::optional<std::reference_wrapper<WorldPainter>> world_painter);
   // Borrows the client voice service; bind after construction and clear before it is destroyed.
-  void setVoice(std::optional<std::reference_wrapper<Voice>> voice);
+  void set_voice(std::optional<std::reference_wrapper<Voice>> voice);
 
-  [[nodiscard]] std::expected<void, StarException> update(float dt, bool muteSfx = false, bool muteMusic = false);
+  [[nodiscard]] std::expected<void, StarException> update(float dt, bool mute_sfx = false, bool mute_music = false);
 
   std::shared_ptr<Mixer> mixer() const;
 
-  void setSpeed(float speed);
-  void setVolume(float volume, float rampTime = 0.0f);
-  [[nodiscard]] std::expected<void, StarException> read(std::span<std::int16_t> sampleData, std::size_t frameCount, Mixer::ExtraMixFunction = {});
+  void set_speed(float speed);
+  void set_volume(float volume, float ramp_time = 0.0f);
+  [[nodiscard]] std::expected<void, StarException> read(std::span<std::int16_t> sample_data, std::size_t frame_count,
+                                                        Mixer::ExtraMixFunction = {});
 
 private:
+  struct VolumeSetting {
+    std::optional<float> raw;
+    float amplitude = 0.0f;
+  };
+
   std::reference_wrapper<Root> m_root;
   std::optional<std::reference_wrapper<Voice>> m_voice;
-  std::shared_ptr<UniverseClient> m_universeClient;
-  std::optional<std::reference_wrapper<WorldPainter>> m_worldPainter;
+  std::shared_ptr<UniverseClient> m_universe_client;
+  std::optional<std::reference_wrapper<WorldPainter>> m_world_painter;
   std::shared_ptr<Mixer> m_mixer;
-  Set<MixerGroup> m_mutedGroups;
-  Map<MixerGroup, float> m_groupVolumes;
+  std::array<bool, 4> m_muted_groups{};
+  std::array<std::optional<float>, 4> m_group_volumes{};
+  std::array<VolumeSetting, 3> m_volume_settings{};
 };
 
 }

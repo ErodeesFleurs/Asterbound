@@ -1360,11 +1360,11 @@ if (!result618) return std::unexpected(std::move(result618.error()));
 auto result1277 = AudioInstance::create(*std::move(*result618));
 if (!result1277) return std::unexpected(std::move(result1277.error()));
 auto audioInstance = std::move(*result1277);
-        audioInstance->setPosition(pos);
-        auto result619 = sound.getFloat("volume", 1.0f);
+audioInstance->set_position(pos);
+auto result619 = sound.getFloat("volume", 1.0f);
 if (!result619) return std::unexpected(std::move(result619.error()));
-audioInstance->setVolume(std::move(*result619));
-        auto result620 = renderCallback.addAudio(std::move(audioInstance));
+audioInstance->set_volume(std::move(*result619));
+auto result620 = renderCallback.addAudio(std::move(audioInstance));
 if (!result620) return std::unexpected(std::move(result620.error()));
       }
     }

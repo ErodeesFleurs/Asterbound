@@ -9,6 +9,7 @@ import star.byte_array;
 import star.array;
 import star.bi_map;
 import star.format;
+import star.mixer;
 import star.vector;
 import star.game_types;
 import star.thread;
@@ -135,8 +136,8 @@ public:
   // Called to mix voice audio with the game.
   void mix(std::span<std::int16_t> buffer, std::size_t frames, unsigned channels);
 
-  using PositionalAttenuationFunction = std::function<std::expected<float, StarException>(unsigned, Vec2F, float)>;
-  [[nodiscard]] std::expected<void, StarException> update(float dt, PositionalAttenuationFunction positionalAttenuationFunction = {});
+  [[nodiscard]] std::expected<void, StarException>
+  update(float dt, Mixer::PositionalAttenuationFunction positional_attenuation = {});
 
   [[nodiscard]] std::expected<void, StarException> setDeviceName(std::optional<String> device);
   StringList availableDevices();

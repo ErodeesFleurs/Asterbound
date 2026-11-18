@@ -458,9 +458,9 @@ std::expected<void, StarException> ClientApplication::shutdown() {
   if (m_guiContext)
     m_guiContext->setTileDrawer(std::nullopt);
   if (m_mainMixer) {
-    m_mainMixer->setVoice(std::nullopt);
-    m_mainMixer->setUniverseClient({});
-    m_mainMixer->setWorldPainter(std::nullopt);
+    m_mainMixer->set_voice(std::nullopt);
+    m_mainMixer->set_universe_client({});
+    m_mainMixer->set_world_painter(std::nullopt);
   }
   m_worldPainter.reset();
   m_voice.reset();
@@ -556,7 +556,7 @@ std::expected<void, StarException> ClientApplication::applicationInit(std::share
     return std::unexpected(std::move(mods.error()));
   AudioFormat audioFormat = appController->enableAudio();
   m_mainMixer = std::make_unique<MainMixer>(*m_root, audioFormat.sampleRate, audioFormat.channels);
-  m_mainMixer->setVolume(0.5);
+  m_mainMixer->set_volume(0.5);
   auto painter = WorldPainter::create(*m_root);
   if (!painter)
     return std::unexpected(std::move(painter.error()));
@@ -575,7 +575,7 @@ std::expected<void, StarException> ClientApplication::applicationInit(std::share
   m_voice = std::move(*voice);
   m_guiContext->bindInput(*m_input);
   m_guiContext->bindVoice(*m_voice);
-  m_mainMixer->setVoice(optional_ref(m_voice));
+  m_mainMixer->set_voice(optional_ref(m_voice));
   auto assetsResult = m_root->assets();
   if (!assetsResult)
     return std::unexpected(std::move(assetsResult.error()));
@@ -1365,7 +1365,7 @@ std::expected<void, StarException> ClientApplication::teardownTransition(MainApp
   }
   if (oldState > MainAppState::Title && newState == MainAppState::Title) {
     remember(m_titleScreen->resetState());
-    m_mainMixer->setUniverseClient({});
+    m_mainMixer->set_universe_client({});
   }
   if (oldState >= MainAppState::Title && newState < MainAppState::Title) {
     m_playerStorage.reset();
@@ -1377,7 +1377,7 @@ std::expected<void, StarException> ClientApplication::teardownTransition(MainApp
       remember(m_httpSession->stop());
     m_universeClient.reset();
     m_httpSession.reset();
-    m_mainMixer->setUniverseClient({});
+    m_mainMixer->set_universe_client({});
     if (m_titleScreen)
       remember(m_titleScreen->close());
     m_titleScreen.reset();
@@ -1457,7 +1457,7 @@ std::expected<void, StarException> ClientApplication::prepareTitleServices() {
       !installed)
     return installed;
   installPlayerReloadCallbacks();
-  m_mainMixer->setUniverseClient(m_universeClient);
+  m_mainMixer->set_universe_client(m_universeClient);
   auto title = TitleScreen::create(*m_guiContext, m_playerStorage, m_mainMixer->mixer(), m_universeClient);
   if (!title)
     return std::unexpected(std::move(title.error()));
@@ -1586,7 +1586,7 @@ std::expected<bool, StarException> ClientApplication::activateSessionPlayer() {
       return setError("Error loading player!").transform([] { return false; });
   }
   m_player->setInput(optional_ref(m_input));
-  m_mainMixer->setUniverseClient(m_universeClient);
+  m_mainMixer->set_universe_client(m_universeClient);
   if (auto activated = m_universeClient->setMainPlayer(m_player); !activated)
     return std::unexpected(std::move(activated.error()));
   m_cinematicOverlay->setPlayer(m_player);
@@ -1720,7 +1720,7 @@ std::expected<void, StarException> ClientApplication::prepareSessionInterface() 
     });
   if (auto started = m_universeClient->startLuaScripts(); !started)
     return started;
-  m_mainMixer->setWorldPainter(optional_ref(m_worldPainter));
+  m_mainMixer->set_world_painter(optional_ref(m_worldPainter));
   if (auto renderer = Application::renderer()) {
     if (auto initialized = m_worldPainter->renderInit(renderer); !initialized)
       return initialized;
@@ -1915,7 +1915,7 @@ std::expected<void, StarException> ClientApplication::updateTitle(float dt) {
     return std::unexpected(std::move(updated.error()));
   if (auto mixed = m_mainMixer->update(dt); !mixed)
     return std::unexpected(std::move(mixed.error()));
-  m_mainMixer->setSpeed(m_root->timing().timescale);
+  m_mainMixer->set_speed(m_root->timing().timescale);
 
   auto& app = appController();
   auto active = m_titleScreen->textInputActive();
@@ -2340,7 +2340,7 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
       return std::unexpected(std::move(updated.error()));
     if (auto mixed = m_mainMixer->update(dt, m_cinematicOverlay->muteSfx(), m_cinematicOverlay->muteMusic()); !mixed)
       return std::unexpected(std::move(mixed.error()));
-    m_mainMixer->setSpeed(m_root->timing().timescale);
+    m_mainMixer->set_speed(m_root->timing().timescale);
 
     auto active = m_mainInterface->textInputActive();
     if (!active)

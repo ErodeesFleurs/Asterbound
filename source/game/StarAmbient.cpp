@@ -169,10 +169,10 @@ std::expected<std::shared_ptr<AudioInstance>, StarException> AmbientManager::upd
         if (!instance)
           return std::unexpected(std::move(instance.error()));
         m_currentTrack = std::move(*instance);
-        m_currentTrack->setLoops(current ? current->trackLoops : -1);
+        m_currentTrack->set_loops(current ? current->trackLoops : -1);
         // Slowly fade the music track in
-        m_currentTrack->setVolume(0.0f);
-        m_currentTrack->setVolume(m_volume, m_trackFadeInTime);
+        m_currentTrack->set_volume(0.0f);
+        m_currentTrack->set_volume(m_volume, m_trackFadeInTime);
         m_delay = 0;
         m_duration = 0;
         m_volumeChanged = false;
@@ -186,7 +186,7 @@ std::expected<std::shared_ptr<AudioInstance>, StarException> AmbientManager::upd
     else {
       m_volumeChanged = false;
       if (m_currentTrack) {
-        m_currentTrack->setVolume(m_volume, m_duration);
+        m_currentTrack->set_volume(m_volume, m_duration);
       }
     }
   }
@@ -232,9 +232,9 @@ std::expected<std::shared_ptr<AudioInstance>, StarException> AmbientManager::upd
         if (!instance)
           return std::unexpected(std::move(instance.error()));
         m_weatherTrack = std::move(*instance);
-        m_weatherTrack->setLoops(-1);
-        m_weatherTrack->setVolume(0.0f);
-        m_weatherTrack->setVolume(1, m_trackFadeInTime);
+        m_weatherTrack->set_loops(-1);
+        m_weatherTrack->set_volume(0.0f);
+        m_weatherTrack->set_volume(1, m_trackFadeInTime);
         return m_weatherTrack;
       }
     }

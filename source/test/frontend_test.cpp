@@ -81,6 +81,11 @@ import star.text;
 import star.text_painter;
 import star.renderer;
 
+import star.audio;
+import star.buffer;
+import star.byte_array;
+import star.main_mixer;
+import star.mixer;
 #include "gtest/gtest.h"
 #include "gtest/gtest-spi.h"
 
@@ -5000,4 +5005,67 @@ const GameTestRegistration mainbarGeometry("LuaMainBar", "PhysicalPolygonTransfo
   }
 });
 
+const GameTestRegistration
+  main_mixer_volume("MainMixerTest", "InitiallyMutedVolumeRestoresAndTracksLiveConfiguration", [](GameTest& fixture) {
+    auto configuration = fixture.root().configuration();
+    ASSERT_TRUE(configuration);
+    std::array<String, 3> keys{"sfxVol", "musicVol", "instrumentVol"};
+    std::array<Json, 3> previous_values;
+    for (std::size_t i = 0; i != keys.size(); ++i) {
+      auto value = (*configuration)->get(keys[i]);
+      ASSERT_TRUE(value);
+      previous_values[i] = std::move(*value);
+    }
+    auto restore = make_scope_exit([&] {
+      for (std::size_t i = 0; i != keys.size(); ++i)
+        EXPECT_TRUE((*configuration)->set(keys[i], previous_values[i]));
+    });
+    for (auto const& key : keys)
+      ASSERT_TRUE((*configuration)->set(key, Json(100)));
+
+    std::array<unsigned char, 48> encoded{
+      'R', 'I', 'F', 'F', 40, 0, 0, 0, 'W', 'A', 'V', 'E', 'f', 'm', 't', ' ', 16, 0, 0, 0, 1,    0,    1,    0,
+      8,   0,   0,   0,   16, 0, 0, 0, 2,   0,   16,  0,   'd', 'a', 't', 'a', 4,  0, 0, 0, 0xe0, 0x2e, 0xe0, 0x2e};
+    auto wav_bytes = std::bit_cast<std::array<char, 48>>(encoded);
+    auto audio = Audio::create(std::make_shared<Buffer>(ByteArray(std::span(wav_bytes))), "main-mixer-volume.wav");
+    ASSERT_TRUE(audio);
+    auto instance = AudioInstance::create(*audio);
+    ASSERT_TRUE(instance);
+    (*instance)->set_loops(-1);
+    MainMixer main_mixer(fixture.root(), 8, 1);
+    ASSERT_TRUE(main_mixer.update(0, true));
+    ASSERT_TRUE(main_mixer.mixer()->play(*instance));
+    std::array<std::int16_t, 8> output{};
+    ASSERT_TRUE(main_mixer.read(output, output.size()));
+    ASSERT_TRUE(main_mixer.update(0));
+    ASSERT_TRUE(main_mixer.read(output, output.size()));
+    EXPECT_EQ(output.front(), 0);
+    // Perceptual conversion precedes int16 quantization under optimized float math.
+    EXPECT_LE(std::abs(static_cast<int>(output.back()) - 10500), 1);
+    ASSERT_TRUE(main_mixer.read(output, output.size()));
+    EXPECT_TRUE(std::ranges::all_of(output, [](std::int16_t sample) {
+      return std::abs(static_cast<int>(sample) - 12000) <= 1;
+    }));
+
+    ASSERT_TRUE((*configuration)->set("sfxVol", Json(0)));
+    ASSERT_TRUE(main_mixer.update(0));
+    ASSERT_TRUE(main_mixer.read(output, output.size()));
+    EXPECT_EQ(output, (std::array<std::int16_t, 8>{}));
+    ASSERT_TRUE((*configuration)->set("sfxVol", Json(100)));
+    ASSERT_TRUE(main_mixer.update(0));
+    ASSERT_TRUE(main_mixer.read(output, output.size()));
+    EXPECT_TRUE(std::ranges::all_of(output, [](std::int16_t sample) {
+      return std::abs(static_cast<int>(sample) - 12000) <= 1;
+    }));
+
+    ASSERT_TRUE(main_mixer.update(0, true));
+    ASSERT_TRUE(main_mixer.read(output, output.size()));
+    ASSERT_TRUE((*configuration)->set("sfxVol", Json(0)));
+    ASSERT_TRUE(main_mixer.update(0, true));
+    ASSERT_TRUE(main_mixer.read(output, output.size()));
+    ASSERT_TRUE(main_mixer.update(0));
+    ASSERT_TRUE(main_mixer.read(output, output.size()));
+    EXPECT_EQ(output, (std::array<std::int16_t, 8>{}));
+    EXPECT_FALSE((*instance)->finished());
+  });
 }

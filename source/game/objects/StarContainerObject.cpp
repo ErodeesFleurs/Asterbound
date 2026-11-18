@@ -385,8 +385,8 @@ std::expected<void, StarException> ContainerObject::collectRenderEvents(RenderCa
           if (!instanceResult)
             return std::unexpected(std::move(instanceResult.error()));
           auto instance = std::move(*instanceResult);
-          instance->setPosition(position());
-          instance->setRangeMultiplier(config()->soundEffectRangeMultiplier);
+          instance->set_position(position());
+          instance->set_range_multiplier(config()->soundEffectRangeMultiplier);
           auto operation1 = renderCallback.addAudio(std::move(instance));
           if (!operation1)
             return std::unexpected(std::move(operation1.error()));
@@ -430,8 +430,8 @@ std::expected<void, StarException> ContainerObject::collectRenderEvents(RenderCa
           if (!instanceResult)
             return std::unexpected(std::move(instanceResult.error()));
           auto instance = std::move(*instanceResult);
-          instance->setPosition(position());
-          instance->setRangeMultiplier(config()->soundEffectRangeMultiplier);
+          instance->set_position(position());
+          instance->set_range_multiplier(config()->soundEffectRangeMultiplier);
           auto operation2 = renderCallback.addAudio(std::move(instance));
           if (!operation2)
             return std::unexpected(std::move(operation2.error()));

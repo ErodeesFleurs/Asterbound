@@ -1199,7 +1199,7 @@ const GameTestRegistration assetsWavSignaturesAndPcmSamples("AssetsTest", "WavSi
   ASSERT_TRUE(audio);
   EXPECT_FALSE(audio->compressed());
   EXPECT_EQ(audio->channels(), 1u);
-  EXPECT_EQ(audio->sampleRate(), 8000u);
+  EXPECT_EQ(audio->sample_rate(), 8000u);
   std::array<std::int16_t, 2> samples{};
   auto read = audio->read(samples);
   ASSERT_TRUE(read);
@@ -1207,18 +1207,18 @@ const GameTestRegistration assetsWavSignaturesAndPcmSamples("AssetsTest", "WavSi
   EXPECT_EQ(samples[0], 0x1234);
   EXPECT_EQ(samples[1], -2);
 
-  ASSERT_TRUE(audio->seekSample(1));
+  ASSERT_TRUE(audio->seek_sample(1));
   auto cloned = audio->clone();
   ASSERT_TRUE(cloned);
-  ASSERT_TRUE(audio->seekSample(0));
-  EXPECT_EQ(cloned->currentSample(), 1u);
+  ASSERT_TRUE(audio->seek_sample(0));
+  EXPECT_EQ(cloned->current_sample(), 1u);
   Audio moved(std::move(*audio));
   *audio = std::move(*cloned);
   // Replacing the original decoder must not invalidate a clone's shared PCM storage.
-  ASSERT_TRUE(audio->seekSample(0));
+  ASSERT_TRUE(audio->seek_sample(0));
   moved = std::move(*audio);
-  EXPECT_FALSE(moved.seekSample(3));
-  EXPECT_EQ(moved.currentSample(), 0u);
+  EXPECT_FALSE(moved.seek_sample(3));
+  EXPECT_EQ(moved.current_sample(), 0u);
   read = moved.read(samples);
   ASSERT_TRUE(read);
   EXPECT_EQ(*read, samples.size());
@@ -1273,19 +1273,19 @@ const GameTestRegistration audioMixerGroupBindings("AssetsTest", "AudioMixerGrou
                                  {"Instruments", "Instruments", MixerGroup::Instruments}})) {
     auto selected = context->invokePath<String>("selectGroup", String(inputName));
     ASSERT_TRUE(selected);
-    EXPECT_EQ((*instance)->mixerGroup(), group);
+    EXPECT_EQ((*instance)->mixer_group(), group);
     EXPECT_EQ(selected->utf8(), canonical);
   }
   for (auto const& invalid : {String("unknown"), String("Músic"), String(std::string("Music\0Effects", 13)),
                               String(std::string(1, static_cast<char>(0xff)))}) {
     auto selected = context->invokePath<String>("selectGroup", invalid);
     EXPECT_FALSE(selected);
-    EXPECT_EQ((*instance)->mixerGroup(), MixerGroup::Instruments);
+    EXPECT_EQ((*instance)->mixer_group(), MixerGroup::Instruments);
   }
   auto recovered = context->invokePath<String>("selectGroup", String("effects"));
   ASSERT_TRUE(recovered);
   EXPECT_EQ(*recovered, "Effects");
-  EXPECT_EQ((*instance)->mixerGroup(), MixerGroup::Effects);
+  EXPECT_EQ((*instance)->mixer_group(), MixerGroup::Effects);
 });
 
 const GameTestRegistration assetsOggCloneLifetimes("AssetsTest", "OggCloneIndependentCursorsAndLifetime", [](GameTest& fixture) {
@@ -1297,35 +1297,57 @@ const GameTestRegistration assetsOggCloneLifetimes("AssetsTest", "OggCloneIndepe
   ASSERT_TRUE(created);
   std::optional<Audio> owner(std::move(*created));
   ASSERT_TRUE(owner->compressed());
-  auto total = owner->totalSamples();
+  auto total = owner->total_samples();
   ASSERT_TRUE(total);
   ASSERT_GT(*total, 0u);
-  ASSERT_TRUE(owner->seekSample(*total / 2));
+  ASSERT_TRUE(owner->seek_sample(*total / 2));
   auto cloned = owner->clone();
   ASSERT_TRUE(cloned);
-  EXPECT_EQ(cloned->currentSample(), *total / 2);
-  ASSERT_TRUE(owner->seekSample(0));
-  EXPECT_EQ(cloned->currentSample(), *total / 2);
+  EXPECT_EQ(cloned->current_sample(), *total / 2);
+  ASSERT_TRUE(owner->seek_sample(0));
+  EXPECT_EQ(cloned->current_sample(), *total / 2);
 
   // A rejected seek leaves the original decoder usable at its existing cursor.
-  EXPECT_FALSE(owner->seekSample(*total + 1));
-  EXPECT_EQ(owner->currentSample(), 0u);
+  EXPECT_FALSE(owner->seek_sample(*total + 1));
+  EXPECT_EQ(owner->current_sample(), 0u);
   std::array<std::int16_t, 64> original{};
   auto read = owner->read(original);
   ASSERT_TRUE(read);
   ASSERT_GT(*read, 0u);
   owner.reset();
-  ASSERT_TRUE(cloned->seekSample(0));
+  ASSERT_TRUE(cloned->seek_sample(0));
   std::array<std::int16_t, 64> replay{};
   auto replayed = cloned->read(replay);
   ASSERT_TRUE(replayed);
   EXPECT_EQ(*replayed, *read);
   EXPECT_EQ(replay, original);
 
-  ASSERT_TRUE(cloned->seekSample(0));
+  auto pivot = *total / 2;
+  ASSERT_TRUE(cloned->seek_sample(pivot));
+  auto compressed_reference = cloned->clone();
+  ASSERT_TRUE(compressed_reference);
+  std::array<std::int16_t, 64> suffix{};
+  auto suffix_count = compressed_reference->read(suffix);
+  ASSERT_TRUE(suffix_count);
+  ASSERT_TRUE(cloned->uncompress());
+  EXPECT_EQ(cloned->total_samples(), *total);
+  EXPECT_EQ(cloned->current_sample(), pivot);
+  replay.fill(0);
+  replayed = cloned->read(replay);
+  ASSERT_TRUE(replayed);
+  EXPECT_EQ(*replayed, *suffix_count);
+  EXPECT_EQ(replay, suffix);
+
+  ASSERT_TRUE(compressed_reference->seek_sample(*total));
+  ASSERT_TRUE(compressed_reference->uncompress());
+  EXPECT_EQ(compressed_reference->total_samples(), *total);
+  EXPECT_EQ(compressed_reference->current_sample(), *total);
+  EXPECT_EQ(compressed_reference->read(replay), 0u);
+
+  ASSERT_TRUE(cloned->seek_sample(0));
   ASSERT_TRUE(cloned->uncompress());
   EXPECT_FALSE(cloned->compressed());
-  ASSERT_TRUE(cloned->seekSample(0));
+  ASSERT_TRUE(cloned->seek_sample(0));
   auto pcmClone = cloned->clone();
   ASSERT_TRUE(pcmClone);
   Audio moved(std::move(*pcmClone));

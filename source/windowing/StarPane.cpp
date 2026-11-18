@@ -597,8 +597,8 @@ std::expected<LuaCallbacks, StarException> Pane::makePaneCallbacks() {
       auto instance = AudioInstance::create(**sound);
       if (!instance)
         return std::unexpected(std::move(instance.error()));
-      (*instance)->setVolume(volume.value_or(1.0));
-      (*instance)->setLoops(loops.value_or(0));
+      (*instance)->set_volume(volume.value_or(1.0));
+      (*instance)->set_loops(loops.value_or(0));
       auto played = pane.context().playAudio(*instance);
       if (!played)
         return std::unexpected(std::move(played.error()));

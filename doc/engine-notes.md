@@ -11,6 +11,7 @@ commands and measurement limits, see [tests and benchmarks](testing.md).
   - [Asset and texture caches](#asset-and-texture-caches)
   - [Gameplay catalogs and physics](#gameplay-catalogs-and-physics)
   - [Text layout](#text-layout)
+- [Audio playback](#audio-playback)
 - [Network and frame preparation](#network-and-frame-preparation)
 - [Independent simulation and rendering](#independent-simulation-and-rendering)
   - [Thread ownership](#thread-ownership)
@@ -51,6 +52,25 @@ commits identify upstream sources; they are not cross-platform validation report
 
 - [Chat bubbles](https://github.com/OpenStarbound/OpenStarbound/commit/9f412531) measure text with the final per-message style and the same scaled wrap positioning used for drawing, keeping custom font sizes inside their backgrounds.
 - Native [right-aligned TextBox overflow](https://github.com/OpenStarbound/OpenStarbound/commit/be262918) scrolls toward the cursor correctly. The existing cursor-offset calculation and Lua-managed chat input are unchanged.
+
+## Audio playback
+
+Instance volume is a linear amplitude applied once, alongside global/group and
+positional gains. This corrects the former squared instance gain: values between
+zero and one can therefore sound louder than before. Pitch ramps now advance
+across callback buffers rather than restarting from the same value.
+
+Global speed zero pauses Effects/Instruments cursors without finishing them;
+Music/Cinematic remain speed-independent. Volume/pitch ramps and wall-clock
+start/stop scheduling continue during this pause. Empty infinitely-looping clips
+finish instead of blocking the audio callback.
+
+Uncompressing a Vorbis clip preserves its complete duration and current frame,
+including an EOF cursor. Failure retains the original decoder and position.
+The moving-average low-pass now uses exact integer sums; its quantization can
+differ from the former float-normalized filter by one int16 LSB. Echo retains
+its processed-output feedback. Mixer voice order and per-voice clipping remain
+unchanged.
 
 ## Network and frame preparation
 

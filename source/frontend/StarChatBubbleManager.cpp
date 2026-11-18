@@ -668,13 +668,13 @@ std::expected<void, StarException> ChatBubbleManager::addChatActions(List<ChatAc
         auto instance = AudioInstance::create(**audio);
         if (!instance) return std::unexpected(std::move(instance.error()));
         auto audioInstance = std::move(*instance);
-        audioInstance->setPosition(position);
+        audioInstance->set_position(position);
         auto volume = config.getFloat("volume", 1.0f);
         if (!volume) return std::unexpected(std::move(volume.error()));
         auto pitch = config.getFloat("pitch", 1.0f);
         if (!pitch) return std::unexpected(std::move(pitch.error()));
-        audioInstance->setVolume(*volume);
-        audioInstance->setPitchMultiplier(*pitch);
+        audioInstance->set_volume(*volume);
+        audioInstance->set_pitch_multiplier(*pitch);
         auto played = m_guiContext.get().playAudio(audioInstance);
         if (!played) return std::unexpected(std::move(played.error()));
       }

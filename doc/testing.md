@@ -523,6 +523,7 @@ catalog; implementation and detailed labels live in [benchmark sources](../sourc
 | Scalar math | `./result/bin/math_common_benchmarks --benchmark_filter='MathCommon/'` | Fractions, modular wrapping, angles, comparison policy and byte quantization; scalar and batched inputs. |
 | I/O | `./result/bin/io_benchmarks --benchmark_filter='IO/'` | Borrowed deserialization, VLQ, UUID, file writes and full asset payload reads. |
 | Logging | `./result/bin/logging_benchmarks --benchmark_filter='Logging/'` | Raw/formatted messages, sinks, concurrent callers, files and spatial logs. |
+| Audio | `ownership_benchmarks -bootconfig <private-config> --benchmark_filter='^Ownership/Audio/'` | Shared-byte clone/seek/read, PCM resampling, looping mixer callbacks and cold filter lifecycles. |
 | Flat hash storage | `./result/bin/flat_hash_benchmarks --benchmark_filter='FlatHash/'` | Insertion/duplicates, collision rehash, lookup, churn, reuse and sparse iteration. |
 | Images | `./result/bin/image_benchmarks --benchmark_filter='^(Image/\|Vector/ImageBlend/)'` | Ownership, pixel operations, scaling, masks/blends, directives and libpng; historical `Vector/ImageBlend/*` rows now live here, not in `vector_benchmarks`. |
 | LRU/TTL caches | `./result/bin/lru_benchmarks --benchmark_filter='^(Lru\|Ttl)/'` | Hits/misses, updates, trim/shrink, TTL refresh and cleanup. |
@@ -582,6 +583,28 @@ correctness cases, excluded from equivalent speedups. Optional
 production-linked binaries, consumer token/API-name parity, compiler/dependency
 parity, alternating A/B results, A/A drift and every regression. These search-only
 measurements do not establish whole-NPC update or rendered-frame gains.
+
+### Audio comparison boundaries
+
+Reuse `ownership_benchmarks`; audio does not need a separate executable.
+Clone rows include decoder/cursor reclamation. Resampling rows include seek-to-zero
+and 512 output frames; mixer rows include eight 512-frame callbacks with 1/16/64
+looping voices. Filter rows include buffer reset, factory, 64 stereo blocks and
+reclamation, not just a steady-state kernel.
+
+Validate complete PCM, read counts and frame cursors outside timing. Fixtures and
+result labels carry fingerprints. Resampling, ordinary mixing and echo require
+exact PCM; low-pass compares against independent zero-padded convolution within
+one int16 LSB, so its original/current result hashes may intentionally differ.
+Keep amplitude/pitch/pause/empty-loop fixes out of equivalent-throughput claims.
+Clone measurements alone do not establish resampling or callback performance.
+
+`AudioTest.*` and `MixerTest.*` cover scalar cursor ownership, finite inputs, short
+resampling, empty loops, gain/ramp/pause behavior, batched positional gain, split
+filter histories and effect error/reentry boundaries without assets. Asset-backed
+coverage includes `AssetsTest.OggCloneIndependentCursorsAndLifetime` at nonzero/EOF
+decompression positions and `MainMixerTest.*` for initially muted/live settings.
+The latter permits one LSB after perceptual conversion and int16 quantization.
 
 ### Comparable measurements
 

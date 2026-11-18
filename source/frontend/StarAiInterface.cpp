@@ -394,7 +394,7 @@ std::expected<void, StarException> AiInterface::update(float dt) {
         auto chatter = AudioInstance::create(**sound);
         if (!chatter) return std::unexpected(std::move(chatter.error()));
         m_chatterSound = std::move(*chatter);
-        m_chatterSound->setLoops(-1);
+        m_chatterSound->set_loops(-1);
         auto played = context().playAudio(m_chatterSound);
         if (!played)
           return std::unexpected(std::move(played.error()));

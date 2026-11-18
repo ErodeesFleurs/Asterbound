@@ -126,6 +126,29 @@ values in named locals and preserve first-error, ownership and transaction order
   decoded indexes through the bounded cache; keep disk I/O outside its spinlock.
   Keep transaction staging, root publication barriers and explicit failure recovery.
 
+### Audio decoding and mixing
+
+- `Audio` clones share immutable encoded/PCM bytes but retain independent decoder
+  or scalar-sample cursors. `total_samples`, `seek_sample` and `current_sample`
+  count frames; `read_partial`, `read` and `resample` count interleaved samples.
+  Partial PCM frames and their clone cursors remain valid.
+- Complete decoding stages a fresh decoder at frame zero, uses a bounded metadata
+  allocation hint, restores the original frame position and commits only success.
+  Reuse typed, uninitialized resampling capacity; do not add buffer-wide clearing.
+  Keep native codec pointers confined to C-API boundaries.
+- Resampling retains per-call source-frame ceilings and integer eight-tap
+  arithmetic. Share tap indices across channels and broadcast converted channels;
+  a stateful fractional-phase converter is a separate audio-contract change.
+- Mixer registry locks protect owning snapshots, not decoder work or external
+  effects. Instance state and positional gains share the instance mutex.
+  `read` remains single-reader/non-reentrant; attenuation runs synchronously in
+  `update`, may inspect/change instances, but must not reenter `update`.
+- Keep fixed group state in arrays and preserve per-voice traversal/saturation.
+  Effects publish scratch only on success. Low-pass uses integer ring sums;
+  echo stores the quantized processed output in its feedback ring.
+- Native audio APIs use snake_case; Lua method strings and configuration keys
+  retain their existing spellings.
+
 ### Asset locators
 
 - `AssetPath` owns `m_base_path`, `m_sub_path` and `m_directives`. Parsing helpers

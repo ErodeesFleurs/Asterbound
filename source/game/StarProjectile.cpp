@@ -301,9 +301,9 @@ if (!result974) return std::unexpected(std::move(result974.error()));
 auto result1276 = AudioInstance::create(*std::move(*result974));
 if (!result1276) return std::unexpected(std::move(result1276.error()));
 m_persistentAudio = std::move(*result1276);
-    m_persistentAudio->setLoops(-1);
-    m_persistentAudio->setPosition(position());
-    m_pendingRenderables.push_back(m_persistentAudio);
+m_persistentAudio->set_loops(-1);
+m_persistentAudio->set_position(position());
+m_pendingRenderables.push_back(m_persistentAudio);
   }
   return {};
 }
@@ -655,7 +655,7 @@ std::expected<void, StarException> Projectile::collectRenderEvents(RenderCallbac
 if (!result900) return std::unexpected(std::move(result900.error()));
 
   if (m_persistentAudio)
-    m_persistentAudio->setPosition(position());
+    m_persistentAudio->set_position(position());
 
   auto result901 = m_effectEmitter->collectRenderEvents(renderCallback);
 if (!result901) return std::unexpected(std::move(result901.error()));
@@ -1502,13 +1502,13 @@ if (!result866) return std::unexpected(std::move(result866.error()));
 auto result1275 = AudioInstance::create(*std::move(*result866));
 if (!result1275) return std::unexpected(std::move(result1275.error()));
 std::shared_ptr<AudioInstance> sound = std::move(*result1275);
-    sound->setPosition(position());
-    auto result867 = parameters.getFloat("volume", 1.0f);
+sound->set_position(position());
+auto result867 = parameters.getFloat("volume", 1.0f);
 if (!result867) return std::unexpected(std::move(result867.error()));
-sound->setVolume(std::move(*result867));
-    auto result868 = parameters.getFloat("pitch", 1.0f);
+sound->set_volume(std::move(*result867));
+auto result868 = parameters.getFloat("pitch", 1.0f);
 if (!result868) return std::unexpected(std::move(result868.error()));
-sound->setPitchMultiplier(std::move(*result868));
+sound->set_pitch_multiplier(std::move(*result868));
 m_pendingRenderables.push_back(std::move(sound));
 
   } else if (command == "light") {

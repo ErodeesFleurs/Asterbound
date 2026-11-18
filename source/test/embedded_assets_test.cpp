@@ -318,9 +318,9 @@ const GameTestRegistration embeddedAudioFont("EmbeddedAssetsTest", "EmbeddedWavA
   auto audio = setup.assets->audio(*audioPath);
   ASSERT_TRUE(audio) << audio.error().what();
   EXPECT_EQ((*audio)->channels(), 1u);
-  EXPECT_EQ((*audio)->sampleRate(), 8000u);
-  EXPECT_EQ((*audio)->totalSamples(), 2u);
-  EXPECT_EQ((*audio)->totalTime(), 2.0 / 8000.0);
+  EXPECT_EQ((*audio)->sample_rate(), 8000u);
+  EXPECT_EQ((*audio)->total_samples(), 2u);
+  EXPECT_EQ((*audio)->total_time(), 2.0 / 8000.0);
   auto decoder = (*audio)->clone();
   ASSERT_TRUE(decoder) << decoder.error().what();
   std::array<std::int16_t, 2> samples{};

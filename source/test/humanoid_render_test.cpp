@@ -924,7 +924,7 @@ const GameTestRegistration hiddenLoopingPresentationAudio(
     auto loop = AudioInstance::create(**sample);
     ASSERT_TRUE(oneShot);
     ASSERT_TRUE(loop);
-    (*loop)->setLoops(-1);
+    (*loop)->set_loops(-1);
     List<std::shared_ptr<AudioInstance>> retained;
     NullRenderCallback hidden(&retained);
     ASSERT_TRUE(hidden.addAudio(*oneShot));
@@ -934,7 +934,7 @@ const GameTestRegistration hiddenLoopingPresentationAudio(
     EXPECT_EQ(retained[0], *loop);
     // The original instance survives so animator position/volume/stop updates
     // while hidden still affect the instance eventually submitted on reveal.
-    (*loop)->setPosition(Vec2F(7, 9));
+    (*loop)->set_position(Vec2F(7, 9));
     EXPECT_EQ(*retained[0]->position(), Vec2F(7, 9));
     (*loop)->stop();
   });

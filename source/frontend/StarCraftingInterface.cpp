@@ -1318,7 +1318,7 @@ std::expected<void, StarException> CraftingPane::toggleCraft() {
             if (!createResult512)
               return std::unexpected(std::move(createResult512.error()));
             m_craftingSound = std::move(*createResult512);
-            m_craftingSound->setLoops(-1);
+            m_craftingSound->set_loops(-1);
             auto playAudioResult513 = context().playAudio(m_craftingSound);
             if (!playAudioResult513)
               return std::unexpected(std::move(playAudioResult513.error()));

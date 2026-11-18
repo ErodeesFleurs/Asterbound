@@ -11,6 +11,7 @@ import star.thread;
 import star.data_stream_devices;
 import star.logging;
 import star.audio;
+import star.mixer;
 import star.ordered_map;
 import star.map;
 import star.string;
@@ -286,8 +287,8 @@ std::expected<void, StarException> Voice::loadJson(Json const& config, bool skip
   if (*hasDeviceName && change(m_deviceName, std::move(*deviceName), changed))
     shouldResetDevice = true;
   m_threshold = *threshold;
-  m_inputAmplitude = perceptualToAmplitude(m_inputVolume = *inputVolume);
-  m_outputAmplitude = perceptualToAmplitude(m_outputVolume = *outputVolume);
+  m_inputAmplitude = perceptual_to_amplitude(m_inputVolume = *inputVolume);
+  m_outputAmplitude = perceptual_to_amplitude(m_outputVolume = *outputVolume);
   if (change(m_loopback, *loopback, changed))
     m_clientSpeaker->playing = false;
   if (change(m_inputMode, inputMode, changed))
@@ -494,29 +495,28 @@ void Voice::mix(std::span<std::int16_t> buffer, std::size_t frameCount, unsigned
   }
 }
 
-std::expected<void, StarException> Voice::update(float, PositionalAttenuationFunction positionalAttenuationFunction) {
+std::expected<void, StarException> Voice::update(float, Mixer::PositionalAttenuationFunction positional_attenuation) {
   for (auto&& entry : m_speakers) {
     if (std::shared_ptr<Speaker>& speaker = entry.second) {
-      Vec2F newChannelVolumes{1.0f, 1.0f};
-      if (positionalAttenuationFunction) {
-        auto left = positionalAttenuationFunction(0, speaker->position, 1.0f);
-        if (!left) return std::unexpected(std::move(left.error()));
-        auto right = positionalAttenuationFunction(1, speaker->position, 1.0f);
-        if (!right) return std::unexpected(std::move(right.error()));
-        newChannelVolumes = Vec2F{1.0f - *left, 1.0f - *right};
+      Vec2F channel_volumes{1.0f, 1.0f};
+      if (positional_attenuation) {
+        std::array<float, 2> attenuation{};
+        if (auto result = positional_attenuation(speaker->position, 1.0f, attenuation); !result)
+          return std::unexpected(std::move(result.error()));
+        channel_volumes = Vec2F{1.0f - attenuation[0], 1.0f - attenuation[1]};
       }
       {
         std::lock_guard locker(speaker->mutex);
-        speaker->channelVolumes = newChannelVolumes;
+        speaker->channelVolumes = channel_volumes;
       }
-      auto& dbHistory = speaker->dbHistory;
-      std::memmove(&dbHistory[1], &dbHistory[0], (dbHistory.size() - 1) * sizeof(float));
-      dbHistory[0] = speaker->decibelLevel;
-      float smoothDb = 0.0f;
-      for (float dB : dbHistory)
-        smoothDb += dB;
+      auto& db_history = speaker->dbHistory;
+      std::move_backward(db_history.begin(), std::prev(db_history.end()), db_history.end());
+      db_history[0] = speaker->decibelLevel;
+      float smooth_db = 0.0f;
+      for (float decibels : db_history)
+        smooth_db += decibels;
 
-      speaker->smoothDb = smoothDb / dbHistory.size();
+      speaker->smoothDb = smooth_db / db_history.size();
     }
   }
 
@@ -527,7 +527,6 @@ std::expected<void, StarException> Voice::update(float, PositionalAttenuationFun
   }
   return {};
 }
-
 
 std::expected<void, StarException> Voice::setDeviceName(std::optional<String> deviceName) {
   if (m_deviceName == deviceName)

@@ -920,108 +920,111 @@ std::expected<LuaMethods<std::weak_ptr<Blackboard>>, StarException> LuaUserDataM
   return methods;
 }
 
-std::expected<LuaMethods<std::shared_ptr<AudioInstance>>, StarException> LuaUserDataMethods<std::shared_ptr<AudioInstance>>::make() {
+std::expected<LuaMethods<std::shared_ptr<AudioInstance>>, StarException>
+LuaUserDataMethods<std::shared_ptr<AudioInstance>>::make() {
   LuaMethods<std::shared_ptr<AudioInstance>> methods;
-  auto position = methods.registerMethod("position", [](std::shared_ptr<AudioInstance> const& audio) {
-    return audio->position();
-  });
+  auto position =
+    methods.registerMethod("position", [](std::shared_ptr<AudioInstance> const& audio) { return audio->position(); });
   if (!position)
     return std::unexpected(std::move(position.error()));
-  auto setPosition = methods.registerMethod("setPosition", [](std::shared_ptr<AudioInstance> const& audio, std::optional<Vec2F> const& pos) {
-    return audio->setPosition(pos);
-  });
-  if (!setPosition)
-    return std::unexpected(std::move(setPosition.error()));
-  auto translate = methods.registerMethod("translate", [](std::shared_ptr<AudioInstance> const& audio, Vec2F const& distance) {
-    return audio->translate(distance);
-  });
+  auto set_position = methods.registerMethod("setPosition",
+                                             [](std::shared_ptr<AudioInstance> const& audio,
+                                                std::optional<Vec2F> const& pos) { return audio->set_position(pos); });
+  if (!set_position)
+    return std::unexpected(std::move(set_position.error()));
+  auto translate =
+    methods.registerMethod("translate", [](std::shared_ptr<AudioInstance> const& audio, Vec2F const& distance) {
+      return audio->translate(distance);
+    });
   if (!translate)
     return std::unexpected(std::move(translate.error()));
-  auto rangeMultiplier = methods.registerMethod("rangeMultiplier", [](std::shared_ptr<AudioInstance> const& audio) {
-    return audio->rangeMultiplier();
-  });
-  if (!rangeMultiplier)
-    return std::unexpected(std::move(rangeMultiplier.error()));
-  auto setRangeMultiplier = methods.registerMethod("setRangeMultiplier", [](std::shared_ptr<AudioInstance> const& audio, float const& value) {
-    return audio->setRangeMultiplier(value);
-  });
-  if (!setRangeMultiplier)
-    return std::unexpected(std::move(setRangeMultiplier.error()));
-  auto setVolume = methods.registerMethod("setVolume", [](std::shared_ptr<AudioInstance> const& audio, float const& value, std::optional<float> const& rampTime) {
-    return audio->setVolume(value, rampTime.value_or(0.0f));
-  });
-  if (!setVolume)
-    return std::unexpected(std::move(setVolume.error()));
-  auto setPitch = methods.registerMethod("setPitchMultiplier", [](std::shared_ptr<AudioInstance> const& audio, float const& value, std::optional<float> const& rampTime) {
-    return audio->setPitchMultiplier(value, rampTime.value_or(0.0f));
-  });
-  if (!setPitch)
-    return std::unexpected(std::move(setPitch.error()));
-  auto loops = methods.registerMethod("loops", [](std::shared_ptr<AudioInstance> const& audio) {
-    return audio->loops();
-  });
+  auto range_multiplier = methods.registerMethod(
+    "rangeMultiplier", [](std::shared_ptr<AudioInstance> const& audio) { return audio->range_multiplier(); });
+  if (!range_multiplier)
+    return std::unexpected(std::move(range_multiplier.error()));
+  auto set_range_multiplier =
+    methods.registerMethod("setRangeMultiplier", [](std::shared_ptr<AudioInstance> const& audio, float const& value) {
+      return audio->set_range_multiplier(value);
+    });
+  if (!set_range_multiplier)
+    return std::unexpected(std::move(set_range_multiplier.error()));
+  auto set_volume = methods.registerMethod(
+    "setVolume",
+    [](std::shared_ptr<AudioInstance> const& audio, float const& value, std::optional<float> const& ramp_time) {
+      return audio->set_volume(value, ramp_time.value_or(0.0f));
+    });
+  if (!set_volume)
+    return std::unexpected(std::move(set_volume.error()));
+  auto set_pitch = methods.registerMethod(
+    "setPitchMultiplier",
+    [](std::shared_ptr<AudioInstance> const& audio, float const& value, std::optional<float> const& ramp_time) {
+      return audio->set_pitch_multiplier(value, ramp_time.value_or(0.0f));
+    });
+  if (!set_pitch)
+    return std::unexpected(std::move(set_pitch.error()));
+  auto loops =
+    methods.registerMethod("loops", [](std::shared_ptr<AudioInstance> const& audio) { return audio->loops(); });
   if (!loops)
     return std::unexpected(std::move(loops.error()));
-  auto setLoops = methods.registerMethod("setLoops", [](std::shared_ptr<AudioInstance> const& audio, int const& value) {
-    return audio->setLoops(value);
-  });
-  if (!setLoops)
-    return std::unexpected(std::move(setLoops.error()));
-  auto currentTime = methods.registerMethod("currentTime", [](std::shared_ptr<AudioInstance> const& audio) {
-    return audio->currentTime();
-  });
-  if (!currentTime)
-    return std::unexpected(std::move(currentTime.error()));
-  auto totalTime = methods.registerMethod("totalTime", [](std::shared_ptr<AudioInstance> const& audio) {
-    return audio->totalTime();
-  });
-  if (!totalTime)
-    return std::unexpected(std::move(totalTime.error()));
-  auto seekTime = methods.registerMethod("seekTime", [](std::shared_ptr<AudioInstance> const& audio, double const& time) {
-    return audio->seekTime(time);
-  });
-  if (!seekTime)
-    return std::unexpected(std::move(seekTime.error()));
-  auto mixerGroup = methods.registerMethod(
+  auto set_loops = methods.registerMethod(
+    "setLoops", [](std::shared_ptr<AudioInstance> const& audio, int const& value) { return audio->set_loops(value); });
+  if (!set_loops)
+    return std::unexpected(std::move(set_loops.error()));
+  auto current_time = methods.registerMethod(
+    "currentTime", [](std::shared_ptr<AudioInstance> const& audio) { return audio->current_time(); });
+  if (!current_time)
+    return std::unexpected(std::move(current_time.error()));
+  auto total_time = methods.registerMethod(
+    "totalTime", [](std::shared_ptr<AudioInstance> const& audio) { return audio->total_time(); });
+  if (!total_time)
+    return std::unexpected(std::move(total_time.error()));
+  auto seek_time = methods.registerMethod(
+    "seekTime", [](std::shared_ptr<AudioInstance> const& audio, double const& time) { return audio->seek_time(time); });
+  if (!seek_time)
+    return std::unexpected(std::move(seek_time.error()));
+  auto mixer_group = methods.registerMethod(
     "mixerGroup", [](std::shared_ptr<AudioInstance> const& audio) -> std::expected<String, StarException> {
-      return enumName<MixerGroupNames>(audio->mixerGroup()).transform([](std::string_view name) {
+      return enumName<mixer_group_names>(audio->mixer_group()).transform([](std::string_view name) {
         return String(name);
       });
     });
-  if (!mixerGroup)
-    return std::unexpected(std::move(mixerGroup.error()));
-  auto setMixerGroup = methods.registerMethod(
+  if (!mixer_group)
+    return std::unexpected(std::move(mixer_group.error()));
+  auto set_mixer_group = methods.registerMethod(
     "setMixerGroup",
     [](std::shared_ptr<AudioInstance> const& audio, String const& group) -> std::expected<void, StarException> {
-      auto converted = enumValue<MixerGroupNames>(group);
+      auto converted = enumValue<mixer_group_names>(group);
       if (!converted)
         return std::unexpected(std::move(converted.error()));
-      audio->setMixerGroup(*converted);
+      audio->set_mixer_group(*converted);
       return {};
     });
-  if (!setMixerGroup)
-    return std::unexpected(std::move(setMixerGroup.error()));
-  auto setClockStart = methods.registerMethod("setClockStart", [](std::shared_ptr<AudioInstance> const& audio, std::optional<std::int64_t> const& time) {
-    return audio->setClockStart(time);
-  });
-  if (!setClockStart)
-    return std::unexpected(std::move(setClockStart.error()));
-  auto setClockStop = methods.registerMethod("setClockStop", [](std::shared_ptr<AudioInstance> const& audio, std::optional<std::int64_t> const& time, std::optional<std::int64_t> const& fadeOutTime) {
-    return audio->setClockStop(time, fadeOutTime.value_or(0));
-  });
-  if (!setClockStop)
-    return std::unexpected(std::move(setClockStop.error()));
-  auto stop = methods.registerMethod("stop", [](std::shared_ptr<AudioInstance> const& audio, std::optional<float> const& rampTime) {
-    return audio->stop(rampTime.value_or(0.0f));
-  });
+  if (!set_mixer_group)
+    return std::unexpected(std::move(set_mixer_group.error()));
+  auto set_clock_start = methods.registerMethod(
+    "setClockStart", [](std::shared_ptr<AudioInstance> const& audio, std::optional<std::int64_t> const& time) {
+      return audio->set_clock_start(time);
+    });
+  if (!set_clock_start)
+    return std::unexpected(std::move(set_clock_start.error()));
+  auto set_clock_stop =
+    methods.registerMethod("setClockStop",
+                           [](std::shared_ptr<AudioInstance> const& audio, std::optional<std::int64_t> const& time,
+                              std::optional<std::int64_t> const& fade_out_time) {
+                             return audio->set_clock_stop(time, fade_out_time.value_or(0));
+                           });
+  if (!set_clock_stop)
+    return std::unexpected(std::move(set_clock_stop.error()));
+  auto stop = methods.registerMethod(
+    "stop", [](std::shared_ptr<AudioInstance> const& audio, std::optional<float> const& ramp_time) {
+      return audio->stop(ramp_time.value_or(0.0f));
+    });
   if (!stop)
     return std::unexpected(std::move(stop.error()));
-  auto finished = methods.registerMethod("finished", [](std::shared_ptr<AudioInstance> const& audio) {
-    return audio->finished();
-  });
+  auto finished =
+    methods.registerMethod("finished", [](std::shared_ptr<AudioInstance> const& audio) { return audio->finished(); });
   if (!finished)
     return std::unexpected(std::move(finished.error()));
   return methods;
 }
-
 }

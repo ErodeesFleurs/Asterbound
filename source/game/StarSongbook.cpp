@@ -241,7 +241,7 @@ std::expected<void, StarException> Songbook::playback() {
   auto now = (Time::millisecondsSinceEpoch() - m_timeSourceInstance->epoch) / 1000.0;
   if (!m_heldNotes.empty()) {
     for (auto& note : m_heldNotes)
-      note.audio->setPosition(m_position);
+      note.audio->set_position(m_position);
     m_heldNotes.filter([](HeldNote const& note) { return !note.audio->finished(); });
   }
 
@@ -277,15 +277,15 @@ std::expected<void, StarException> Songbook::playback() {
     if (!created)
       return std::unexpected(std::move(created.error()));
     auto audioInstance = std::move(*created);
-    audioInstance->setMixerGroup(MixerGroup::Instruments);
-    audioInstance->setPitchMultiplier(note.velocity);
+    audioInstance->set_mixer_group(MixerGroup::Instruments);
+    audioInstance->set_pitch_multiplier(note.velocity);
 
     auto start = m_timeSourceInstance->epoch + static_cast<std::int64_t>(note.timecode * 1000.0);
-    audioInstance->setClockStart(start);
-    audioInstance->setClockStop(start + static_cast<std::int64_t>(note.duration * 1000.0),
-                                static_cast<std::int64_t>(note.fadeout * 1000.0));
+    audioInstance->set_clock_start(start);
+    audioInstance->set_clock_stop(start + static_cast<std::int64_t>(note.duration * 1000.0),
+                                  static_cast<std::int64_t>(note.fadeout * 1000.0));
 
-    audioInstance->setPosition(m_position);
+    audioInstance->set_position(m_position);
 
     m_pendingAudio.push_back(audioInstance);
     m_heldNotes.push_back(HeldNote{audioInstance, note.timecode, note.duration + note.timecode});

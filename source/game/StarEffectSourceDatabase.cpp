@@ -363,11 +363,11 @@ std::expected<List<std::shared_ptr<AudioInstance>>, StarException> soundsFromDef
     auto loops = entry.getInt("loops", 0);
     if (!loops)
       return std::unexpected(std::move(loops.error()));
-    (*sample)->setLoops(*loops);
+    (*sample)->set_loops(*loops);
     auto volume = entry.getFloat("volume", 1.0f);
     if (!volume)
       return std::unexpected(std::move(volume.error()));
-    (*sample)->setVolume(*volume);
+    (*sample)->set_volume(*volume);
     auto pitch = entry.getFloat("pitch", 1.0f);
     if (!pitch)
       return std::unexpected(std::move(pitch.error()));
@@ -375,12 +375,12 @@ std::expected<List<std::shared_ptr<AudioInstance>>, StarException> soundsFromDef
     auto variability = entry.getFloat("pitchVariability", 0.0f);
     if (!variability)
       return std::unexpected(std::move(variability.error()));
-    (*sample)->setPitchMultiplier(*pitch + randomPitch * *variability);
+    (*sample)->set_pitch_multiplier(*pitch + randomPitch * *variability);
     auto range = entry.getFloat("audioRangeMultiplier", 1.0f);
     if (!range)
       return std::unexpected(std::move(range.error()));
-    (*sample)->setRangeMultiplier(*range);
-    (*sample)->setPosition(position);
+    (*sample)->set_range_multiplier(*range);
+    (*sample)->set_position(position);
     result.push_back(std::move(*sample));
   }
   return result;

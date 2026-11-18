@@ -2539,8 +2539,8 @@ std::expected<void, StarException> Player::collectRenderEvents(RenderCallback& c
       if (!offsetResult)
         return std::unexpected(std::move(offsetResult.error()));
       auto offset = std::move(*offsetResult);
-      noise->setPosition(position() + offset);
-      noise->setVolume(m_landingVolume);
+      noise->set_position(position() + offset);
+      noise->set_volume(m_landingVolume);
       if (auto result = renderCallback.addAudio(std::move(noise)); !result)
         return std::unexpected(std::move(result.error()));
     }
@@ -2553,12 +2553,12 @@ std::expected<void, StarException> Player::collectRenderEvents(RenderCallback& c
       if (!offsetResult)
         return std::unexpected(std::move(offsetResult.error()));
       auto offset = std::move(*offsetResult);
-      noise->setPosition(position() + offset);
+      noise->set_position(position() + offset);
       auto varianceResult = root().random().uniform_float(0, m_footstepVolumeVariance);
       if (!varianceResult)
         return std::unexpected(std::move(varianceResult.error()));
       auto variance = std::move(*varianceResult);
-      noise->setVolume(1 - variance);
+      noise->set_volume(1 - variance);
       if (auto result = renderCallback.addAudio(std::move(noise)); !result)
         return std::unexpected(std::move(result.error()));
     }
@@ -2591,9 +2591,9 @@ std::expected<void, StarException> Player::collectRenderEvents(RenderCallback& c
     if (!audioInstance)
       return std::unexpected(std::move(audioInstance.error()));
     auto audio = std::move(*audioInstance);
-    audio->setVolume(std::get<1>(pending));
-    audio->setPitchMultiplier(std::get<2>(pending));
-    audio->setPosition(position());
+    audio->set_volume(std::get<1>(pending));
+    audio->set_pitch_multiplier(std::get<2>(pending));
+    audio->set_position(position());
     if (auto result = renderCallback.addAudio(std::move(audio)); !result)
       return std::unexpected(std::move(result.error()));
   }

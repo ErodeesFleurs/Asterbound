@@ -1,6 +1,5 @@
 module;
 import std;
-import star.byte_array;
 import star.string;
 import star.format;
 import star.io_device;
@@ -8,14 +7,14 @@ import star.io_device;
 
 namespace Star {
 
-extern float const DefaultPerceptualRangeDb;
-extern float const DefaultPerceptualBoostRangeDb;
+extern float const default_perceptual_range_db;
+extern float const default_perceptual_boost_range_db;
 
-float perceptualToAmplitude(float perceptual, float normalizedMax = 1.f,
-  float range = DefaultPerceptualRangeDb, float boostRange = DefaultPerceptualBoostRangeDb);
+float perceptual_to_amplitude(float perceptual, float normalized_max = 1.f, float range = default_perceptual_range_db,
+                              float boost_range = default_perceptual_boost_range_db);
 
-float amplitudeToPerceptual(float amp, float normalizedMax = 1.f,
-  float range = DefaultPerceptualRangeDb, float boostRange = DefaultPerceptualBoostRangeDb);
+float amplitude_to_perceptual(float amp, float normalized_max = 1.f, float range = default_perceptual_range_db,
+                              float boost_range = default_perceptual_boost_range_db);
 
 class CompressedAudioImpl;
 class UncompressedAudioImpl;
@@ -46,43 +45,43 @@ public:
 
   // This function returns the sample rate that this file has.  Sample rates
   // are static throughout file.
-  unsigned sampleRate() const;
+  unsigned sample_rate() const;
 
   // This function returns the playtime duration of the file.
-  [[nodiscard]] std::expected<double, StarException> totalTime() const;
+  [[nodiscard]] std::expected<double, StarException> total_time() const;
 
-  // This function returns total number of samples in this file.
-  [[nodiscard]] std::expected<std::uint64_t, StarException> totalSamples() const;
+  // Returns the total number of frames (one scalar sample per channel).
+  [[nodiscard]] std::expected<std::uint64_t, StarException> total_samples() const;
 
   // This function returns true when the datastream or file being read from is
   // a vorbis compressed file.  False otherwise.
   bool compressed() const;
 
   // If compressed, permanently uncompresses audio for faster reading.
+  // Decodes the complete clip while preserving the current frame position.
   // On failure the original decoder and its cursor are retained. Decoded bytes
   // are shared with all further clones.
   [[nodiscard]] std::expected<void, StarException> uncompress();
 
   // This function seeks the data stream to the given time in seconds.
-  [[nodiscard]] std::expected<void, StarException> seekTime(double time);
+  [[nodiscard]] std::expected<void, StarException> seek_time(double time);
 
-  // This function seeks the data stream to the given sample number
-  [[nodiscard]] std::expected<void, StarException> seekSample(std::uint64_t sample);
+  // Seeks to the given frame number.
+  [[nodiscard]] std::expected<void, StarException> seek_sample(std::uint64_t sample);
 
   // This function converts the current offset of the file to the time value of
   // that offset in seconds.
-  [[nodiscard]] std::expected<double, StarException> currentTime() const;
+  [[nodiscard]] std::expected<double, StarException> current_time() const;
 
-  // This function converts the current offset of the file to the current
-  // sample number.
-  [[nodiscard]] std::expected<std::uint64_t, StarException> currentSample() const;
+  // Returns the current frame number, rounding down partial interleaved frames.
+  [[nodiscard]] std::expected<std::uint64_t, StarException> current_sample() const;
 
   // Reads into 16 bit signed buffer with channels interleaved.  Returns total
   // number of samples read (counting each channel individually).  0 indicates
   // end of stream.
-  [[nodiscard]] std::expected<std::size_t, StarException> readPartial(std::span<std::int16_t> buffer);
+  [[nodiscard]] std::expected<std::size_t, StarException> read_partial(std::span<std::int16_t> buffer);
 
-  // Same as readPartial, but repeats read attempting to fill buffer as much as
+  // Same as read_partial, but repeats read attempting to fill buffer as much as
   // possible
   [[nodiscard]] std::expected<std::size_t, StarException> read(std::span<std::int16_t> buffer);
 
@@ -91,14 +90,15 @@ public:
   // channels in the file is higher, only populates lower channels, if it is
   // lower, the last channel is copied to the remaining channels.  Attempts to
   // fill the buffer as much as possible up to end of stream.  May fail to fill
-  // an entire buffer depending on the destinationSampleRate / velocity /
+  // an entire buffer depending on the destination_sample_rate / velocity /
   // available samples.
-  [[nodiscard]] std::expected<std::size_t, StarException> resample(unsigned destinationChannels, unsigned destinationSampleRate,
-      std::span<std::int16_t> destinationBuffer,
-      double velocity = 1.0);
+  [[nodiscard]] std::expected<std::size_t, StarException> resample(unsigned destination_channels,
+                                                                   unsigned destination_sample_rate,
+                                                                   std::span<std::int16_t> destination_buffer,
+                                                                   double velocity = 1.0);
 
   String const& name() const;
-  void setName(String name);
+  void set_name(String name);
 
 private:
   Audio();
@@ -106,7 +106,8 @@ private:
   std::unique_ptr<CompressedAudioImpl> m_compressed;
   std::unique_ptr<UncompressedAudioImpl> m_uncompressed;
 
-  ByteArray m_workingBuffer;
+  std::unique_ptr<std::int16_t[]> m_working_buffer;
+  std::size_t m_working_capacity = 0;
   String m_name;
 };
 
@@ -115,13 +116,11 @@ private:
 export module star.audio;
 
 export namespace Star {
-  using ::Star::DefaultPerceptualRangeDb;
-  using ::Star::DefaultPerceptualBoostRangeDb;
-  using ::Star::perceptualToAmplitude;
-  using ::Star::amplitudeToPerceptual;
-  using ::Star::AudioExceptionTag;
-  using ::Star::AudioException;
-  using ::Star::CompressedAudioImpl;
-  using ::Star::UncompressedAudioImpl;
-  using ::Star::Audio;
+using ::Star::amplitude_to_perceptual;
+using ::Star::Audio;
+using ::Star::AudioException;
+using ::Star::AudioExceptionTag;
+using ::Star::default_perceptual_boost_range_db;
+using ::Star::default_perceptual_range_db;
+using ::Star::perceptual_to_amplitude;
 }

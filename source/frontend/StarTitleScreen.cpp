@@ -422,8 +422,8 @@ std::expected<void, StarException> TitleScreen::update(float dt) {
       return std::unexpected(std::move(audioSample.error()));
     if (*audioSample) {
       m_currentMusicTrack = *audioSample;
-      (*audioSample)->setMixerGroup(MixerGroup::Music);
-      (*audioSample)->setLoops(0);
+      (*audioSample)->set_mixer_group(MixerGroup::Music);
+      (*audioSample)->set_loops(0);
       if (auto r = m_mixer->play(*audioSample); !r) return std::unexpected(std::move(r.error()));
     }
   }
@@ -456,7 +456,7 @@ bool TitleScreen::finishedState() const {
 std::expected<void, StarException> TitleScreen::resetState() {
   if (auto r = switchState(TitleState::Main); !r) return std::unexpected(std::move(r.error()));
   if (m_currentMusicTrack)
-    m_currentMusicTrack->setVolume(1.0f, 4.0f);
+    m_currentMusicTrack->set_volume(1.0f, 4.0f);
   return {};
 }
 

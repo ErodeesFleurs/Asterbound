@@ -4,7 +4,6 @@ import star.string;
 import star.format;
 import star.list;
 import star.map;
-import star.set;
 import star.vector;
 import star.bi_map;
 import star.mixer;
@@ -17,48 +16,37 @@ import star.algorithm;
 namespace Star {
 
 namespace {
-  float rateOfChangeFromRampTime(float rampTime) {
-    static const float MaxRate = 10000.0f;
+float rate_of_change_from_ramp_time(float ramp_time) {
+  static constexpr float max_rate = 10000.0f;
+  return ramp_time < 1.0f / max_rate ? max_rate : 1.0f / ramp_time;
+}
 
-    if (rampTime < 1.0f / MaxRate)
-      return MaxRate;
-    else
-      return 1.0f / rampTime;
-  }
+bool valid_mixer_group(MixerGroup group) { return std::to_underlying(group) < 4; }
+
+bool valid_buffer_shape(std::span<std::int16_t> buffer, std::size_t frames, unsigned channels) {
+  return channels != 0 && frames <= buffer.size() / channels;
+}
 }
 
 std::expected<std::shared_ptr<AudioInstance>, StarException> AudioInstance::create(Audio const& audio) {
   auto copy = audio.clone();
   if (!copy)
     return std::unexpected(std::move(copy.error()));
-  return std::shared_ptr<AudioInstance>(new AudioInstance(std::move(*copy)));
+  return std::make_shared<AudioInstance>(ConstructionKey{}, std::move(*copy));
 }
 
-AudioInstance::AudioInstance(Audio audio)
-  : m_audio(std::move(audio)) {
-  m_mixerGroup = MixerGroup::Effects;
-
-  m_volume = {.value = 1.0f, .target = 1.0f, .velocity = 0};
-
-  m_pitchMultiplier = 1.0f;
-  m_pitchMultiplierTarget = 1.0f;
-  m_pitchMultiplierVelocity = 0;
-
-  m_loops = 0;
-  m_stopping = false;
-  m_finished = false;
-
-  m_rangeMultiplier = 1.0f;
-
-  m_clockStopFadeOut = 0.0f;
-}
+AudioInstance::AudioInstance(ConstructionKey, Audio audio)
+    : m_audio(std::move(audio)), m_mixer_group(MixerGroup::Effects),
+      m_volume{.value = 1.0f, .target = 1.0f, .velocity = 0.0f},
+      m_pitch_multiplier{.value = 1.0f, .target = 1.0f, .velocity = 0.0f}, m_loops(0), m_stopping(false),
+      m_finished(false), m_range_multiplier(1.0f), m_clock_stop_fade_out(0) {}
 
 std::optional<Vec2F> AudioInstance::position() const {
   std::lock_guard locker(m_mutex);
   return m_position;
 }
 
-void AudioInstance::setPosition(std::optional<Vec2F> position) {
+void AudioInstance::set_position(std::optional<Vec2F> position) {
   std::lock_guard locker(m_mutex);
   m_position = position;
 }
@@ -71,51 +59,41 @@ void AudioInstance::translate(Vec2F const& distance) {
     m_position = distance;
 }
 
-float AudioInstance::rangeMultiplier() const {
+float AudioInstance::range_multiplier() const {
   std::lock_guard locker(m_mutex);
-  return m_rangeMultiplier;
+  return m_range_multiplier;
 }
 
-void AudioInstance::setRangeMultiplier(float rangeMultiplier) {
+void AudioInstance::set_range_multiplier(float range_multiplier) {
   std::lock_guard locker(m_mutex);
-  m_rangeMultiplier = rangeMultiplier;
+  m_range_multiplier = range_multiplier;
 }
 
-void AudioInstance::setVolume(float targetValue, float rampTime) {
-  if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((targetValue >= 0));
-  }
+void AudioInstance::set_volume(float target_value, float ramp_time) {
+  if constexpr (Star::DebugEnabled)
+    Star::star_assert_failed((target_value >= 0));
   std::lock_guard locker(m_mutex);
-
   if (m_stopping)
     return;
-
-  if (rampTime <= 0.0f) {
-    m_volume.value = targetValue;
-    m_volume.target = targetValue;
-    m_volume.velocity = 0.0f;
-  } else {
-    m_volume.target = targetValue;
-    m_volume.velocity = rateOfChangeFromRampTime(rampTime);
+  if (ramp_time <= 0.0f)
+    m_volume = {.value = target_value, .target = target_value, .velocity = 0.0f};
+  else {
+    m_volume.target = target_value;
+    m_volume.velocity = rate_of_change_from_ramp_time(ramp_time);
   }
 }
 
-void AudioInstance::setPitchMultiplier(float targetValue, float rampTime) {
-  if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((targetValue >= 0));
-  }
+void AudioInstance::set_pitch_multiplier(float target_value, float ramp_time) {
+  if constexpr (Star::DebugEnabled)
+    Star::star_assert_failed((target_value >= 0));
   std::lock_guard locker(m_mutex);
-
   if (m_stopping)
     return;
-
-  if (rampTime <= 0.0f) {
-    m_pitchMultiplier = targetValue;
-    m_pitchMultiplierTarget = targetValue;
-    m_pitchMultiplierVelocity = 0.0f;
-  } else {
-    m_pitchMultiplierTarget = targetValue;
-    m_pitchMultiplierVelocity = rateOfChangeFromRampTime(rampTime);
+  if (ramp_time <= 0.0f)
+    m_pitch_multiplier = {.value = target_value, .target = target_value, .velocity = 0.0f};
+  else {
+    m_pitch_multiplier.target = target_value;
+    m_pitch_multiplier.velocity = rate_of_change_from_ramp_time(ramp_time);
   }
 }
 
@@ -124,456 +102,493 @@ int AudioInstance::loops() const {
   return m_loops;
 }
 
-void AudioInstance::setLoops(int loops) {
+void AudioInstance::set_loops(int loops) {
   std::lock_guard locker(m_mutex);
   m_loops = loops;
 }
 
-std::expected<double, StarException> AudioInstance::currentTime() const {
+std::expected<double, StarException> AudioInstance::current_time() const {
   std::lock_guard locker(m_mutex);
-  return m_audio.currentTime();
+  return m_audio.current_time();
 }
 
-std::expected<double, StarException> AudioInstance::totalTime() const {
+std::expected<double, StarException> AudioInstance::total_time() const {
   std::lock_guard locker(m_mutex);
-  return m_audio.totalTime();
+  return m_audio.total_time();
 }
 
-std::expected<void, StarException> AudioInstance::seekTime(double time) {
+std::expected<void, StarException> AudioInstance::seek_time(double time) {
   std::lock_guard locker(m_mutex);
-  return m_audio.seekTime(time);
+  return m_audio.seek_time(time);
 }
 
-MixerGroup AudioInstance::mixerGroup() const {
+MixerGroup AudioInstance::mixer_group() const {
   std::lock_guard locker(m_mutex);
-  return m_mixerGroup;
+  return m_mixer_group;
 }
 
-void AudioInstance::setMixerGroup(MixerGroup mixerGroup) {
+void AudioInstance::set_mixer_group(MixerGroup mixer_group) {
+  if (!valid_mixer_group(mixer_group))
+    return;
   std::lock_guard locker(m_mutex);
-  m_mixerGroup = mixerGroup;
+  m_mixer_group = mixer_group;
 }
 
-void AudioInstance::setClockStart(std::optional<std::int64_t> clockStartTime) {
+void AudioInstance::set_clock_start(std::optional<std::int64_t> clock_start_time) {
   std::lock_guard locker(m_mutex);
-  m_clockStart = clockStartTime;
+  m_clock_start = clock_start_time;
 }
 
-void AudioInstance::setClockStop(std::optional<std::int64_t> clockStopTime, std::int64_t fadeOutTime) {
+void AudioInstance::set_clock_stop(std::optional<std::int64_t> clock_stop_time, std::int64_t fade_out_time) {
   std::lock_guard locker(m_mutex);
-  m_clockStop = clockStopTime;
-  m_clockStopFadeOut = fadeOutTime;
+  m_clock_stop = clock_stop_time;
+  m_clock_stop_fade_out = fade_out_time;
 }
 
-void AudioInstance::stop(float rampTime) {
+void AudioInstance::stop(float ramp_time) {
   std::lock_guard locker(m_mutex);
-
-  if (rampTime <= 0.0f) {
-    m_volume.value = 0.0f;
-    m_volume.target = 0.0f;
-    m_volume.velocity = 0.0f;
-
-    m_pitchMultiplierTarget = 0.0f;
-    m_pitchMultiplierVelocity = 0.0f;
+  if (ramp_time <= 0.0f) {
+    m_volume = {.value = 0.0f, .target = 0.0f, .velocity = 0.0f};
+    m_pitch_multiplier.target = 0.0f;
+    m_pitch_multiplier.velocity = 0.0f;
   } else {
     m_volume.target = 0.0f;
-    m_volume.velocity = rateOfChangeFromRampTime(rampTime);
+    m_volume.velocity = rate_of_change_from_ramp_time(ramp_time);
   }
-
   m_stopping = true;
 }
 
 bool AudioInstance::finished() const {
+  std::lock_guard locker(m_mutex);
   return m_finished;
 }
 
-Mixer::Mixer(Logger& logger, unsigned sampleRate, unsigned channels) : m_logger(logger) {
-  m_sampleRate = sampleRate;
-  m_channels = channels;
-
-  m_volume = {.value = 1.0f, .target = 1.0f, .velocity = 0};
-
-  m_groupVolumes[MixerGroup::Effects] = {.value = 1.0f, .target = 1.0f, .velocity = 0};
-  m_groupVolumes[MixerGroup::Music] = {.value = 1.0f, .target = 1.0f, .velocity = 0};
-  m_groupVolumes[MixerGroup::Cinematic] = {.value = 1.0f, .target = 1.0f, .velocity = 0};
-  m_groupVolumes[MixerGroup::Instruments] = {.value = 1.0f, .target = 1.0f, .velocity = 0};
-
-  m_speed = 1.0f;
+Mixer::Mixer(Logger& logger, unsigned sample_rate, unsigned channels)
+    : m_logger(logger), m_sample_rate(sample_rate), m_channels(channels),
+      m_volume{.value = 1.0f, .target = 1.0f, .velocity = 0.0f}, m_speed(1.0f) {
+  m_group_volumes.fill({.value = 1.0f, .target = 1.0f, .velocity = 0.0f});
 }
 
-unsigned Mixer::sampleRate() const {
-  return m_sampleRate;
-}
+unsigned Mixer::sample_rate() const { return m_sample_rate; }
 
 unsigned Mixer::channels() const {
   return m_channels;
 }
 
-std::expected<void, StarException> Mixer::addEffect(String const& effectName, EffectFunction effectFunction, float rampTime) {
-  if (!effectFunction)
+std::expected<void, StarException> Mixer::add_effect(String const& effect_name, EffectFunction effect_function,
+                                                     float ramp_time) {
+  if (!effect_function)
     return std::unexpected(AudioException("Cannot add an empty audio effect"));
-  std::lock_guard locker(m_effectsMutex);
-  m_effects[effectName] = std::make_shared<EffectInfo>(EffectInfo{.effectFunction = std::move(effectFunction),
-                                                                  .amount = 0.0f,
-                                                                  .velocity = rateOfChangeFromRampTime(rampTime),
-                                                                  .finished = false});
+  auto effect_info = std::make_shared<EffectInfo>(EffectInfo{.effect_function = std::move(effect_function),
+                                                             .amount = 0.0f,
+                                                             .velocity = rate_of_change_from_ramp_time(ramp_time),
+                                                             .finished = false});
+  std::lock_guard locker(m_effects_mutex);
+  m_effects[effect_name] = std::move(effect_info);
   return {};
 }
 
-void Mixer::removeEffect(String const& effectName, float rampTime) {
-  std::lock_guard locker(m_effectsMutex);
-  if (m_effects.contains(effectName))
-    m_effects[effectName]->velocity = -rateOfChangeFromRampTime(rampTime);
+void Mixer::remove_effect(String const& effect_name, float ramp_time) {
+  std::lock_guard locker(m_effects_mutex);
+  if (auto effect = m_effects.find(effect_name); effect != m_effects.end())
+    effect->second->velocity = -rate_of_change_from_ramp_time(ramp_time);
 }
 
-StringList Mixer::currentEffects() {
-  std::lock_guard locker(m_effectsMutex);
+StringList Mixer::current_effects() {
+  std::lock_guard locker(m_effects_mutex);
   return m_effects.keys();
 }
 
-bool Mixer::hasEffect(String const& effectName) {
-  std::lock_guard locker(m_effectsMutex);
-  return m_effects.contains(effectName);
+bool Mixer::has_effect(String const& effect_name) {
+  std::lock_guard locker(m_effects_mutex);
+  return m_effects.contains(effect_name);
 }
 
-void Mixer::setSpeed(float speed) {
-  m_speed = speed;
-}
+void Mixer::set_speed(float speed) { m_speed = speed; }
 
-void Mixer::setVolume(float volume, float rampTime) {
+void Mixer::set_volume(float volume, float ramp_time) {
   std::lock_guard locker(m_mutex);
   m_volume.target = volume;
-  m_volume.velocity = rateOfChangeFromRampTime(rampTime);
+  m_volume.velocity = rate_of_change_from_ramp_time(ramp_time);
 }
 
 std::expected<void, StarException> Mixer::play(std::shared_ptr<AudioInstance> sample) {
-  std::lock_guard locker(m_queueMutex);
-  auto added = m_audios.add(std::move(sample), AudioState{List<float>(m_channels, 1.0f)});
+  if (!sample)
+    return std::unexpected(AudioException("Cannot play an empty audio instance"));
+  auto state = std::make_shared<AudioState>(AudioState{sample, std::vector<float>(m_channels, 1.0f)});
+  std::lock_guard locker(m_queue_mutex);
+  auto added = m_audios.add(std::move(sample), std::move(state));
   if (!added)
     return std::unexpected(std::move(added.error()));
   return {};
 }
 
-void Mixer::stopAll(float rampTime) {
-  std::lock_guard locker(m_queueMutex);
-  float vel = rateOfChangeFromRampTime(rampTime);
-  for (auto const& p : m_audios)
-    p.first->stop(vel);
-}
+std::expected<void, StarException> Mixer::read(std::span<std::int16_t> out_buffer, std::size_t frame_count,
+                                               ExtraMixFunction extra_mix_function) {
+  if (m_sample_rate == 0 || !valid_buffer_shape(out_buffer, frame_count, m_channels))
+    return std::unexpected(AudioException("Invalid mixer output buffer shape or sample rate"));
+  auto clear_snapshots = make_scope_exit([&] {
+    m_read_audios.clear();
+    m_read_effects.clear();
+  });
 
-std::expected<void, StarException> Mixer::read(std::span<std::int16_t> outBuffer, std::size_t frameCount, ExtraMixFunction extraMixFunction) {
-  // Make this method as least locky as possible by copying all the needed
-  // member data before the expensive audio / effect stuff.
-  float speed;
-  unsigned sampleRate;
-  unsigned channels;
-  float volume;
-  float volumeVelocity;
-  float targetVolume;
-  Map<MixerGroup, RampedValue> groupVolumes;
-
+  auto const buffer_size = frame_count * m_channels;
+  out_buffer = out_buffer.first(buffer_size);
+  m_mix_buffer.resize(buffer_size);
+  float const time = static_cast<float>(frame_count) / m_sample_rate;
+  float const speed = m_speed;
+  float begin_volume;
+  float end_volume;
+  std::array<RampedValue, 4> group_volumes;
+  std::array<float, 4> group_end_volumes;
   {
     std::lock_guard locker(m_mutex);
-    speed = m_speed;
-    sampleRate = m_sampleRate;
-    channels = m_channels;
-    volume = m_volume.value;
-    volumeVelocity = m_volume.velocity;
-    targetVolume = m_volume.target;
-    groupVolumes = m_groupVolumes;
-  }
-
-  std::size_t bufferSize = frameCount * m_channels;
-  m_mixBuffer.resize(bufferSize, 0);
-
-  float time = static_cast<float>(frameCount) / sampleRate;
-  float beginVolume = volume;
-  float endVolume = approach(targetVolume, volume, volumeVelocity * time);
-
-  Map<MixerGroup, float> groupEndVolumes;
-  for (auto p : groupVolumes)
-    groupEndVolumes[p.first] = approach(p.second.target, p.second.value, p.second.velocity * time);
-
-  auto sampleStartTime = Time::millisecondsSinceEpoch();
-  unsigned millisecondsInBuffer = (bufferSize * 1000) / (channels * sampleRate);
-  auto sampleEndTime = sampleStartTime + millisecondsInBuffer;
-
-  for (std::size_t i = 0; i < bufferSize; ++i)
-    outBuffer[i] = 0;
-
-  {
-    std::lock_guard locker(m_queueMutex);
-    // Mix all active sounds
-    for (auto&& p : m_audios) {
-      auto& audioInstance = p.first;
-      auto& audioState = p.second;
-
-      std::lock_guard audioLocker(audioInstance->m_mutex);
-
-      if (audioInstance->m_finished)
-        continue;
-
-      if (audioInstance->m_clockStart && *audioInstance->m_clockStart > sampleEndTime)
-        continue;
-
-      float groupVolume = groupVolumes[audioInstance->m_mixerGroup].value;
-      float groupEndVolume = groupEndVolumes[audioInstance->m_mixerGroup];
-
-      bool finished = false;
-
-      float audioStopVolBegin = audioInstance->m_volume.value;
-      float audioStopVolEnd = (audioInstance->m_volume.velocity > 0)
-          ? approach(audioInstance->m_volume.target, audioStopVolBegin, audioInstance->m_volume.velocity * time)
-          : audioInstance->m_volume.value;
-
-      float pitchMultiplier = (audioInstance->m_pitchMultiplierVelocity > 0)
-          ? approach(audioInstance->m_pitchMultiplierTarget, audioInstance->m_pitchMultiplier, audioInstance->m_pitchMultiplierVelocity * time)
-          : audioInstance->m_pitchMultiplier;
-
-      if (audioInstance->m_mixerGroup == MixerGroup::Effects || audioInstance->m_mixerGroup == MixerGroup::Instruments)
-        pitchMultiplier *= speed;
-
-      if (audioStopVolEnd == 0.0f && audioInstance->m_stopping)
-        finished = true;
-
-      std::size_t ramt = 0;
-      if (audioInstance->m_clockStart && *audioInstance->m_clockStart > sampleStartTime) {
-        int silentSamples = (*audioInstance->m_clockStart - sampleStartTime) * sampleRate / 1000;
-        for (unsigned i = 0; i < silentSamples * channels; ++i)
-          m_mixBuffer[i] = 0;
-        ramt += silentSamples * channels;
-      }
-      auto mixed = [&]() -> std::expected<void, StarException> {
-        auto resampled = audioInstance->m_audio.resample(channels, sampleRate, std::span(m_mixBuffer).subspan(ramt, bufferSize - ramt), pitchMultiplier);
-        if (!resampled)
-          return std::unexpected(std::move(resampled.error()));
-        ramt += *resampled;
-        while (ramt != bufferSize && !finished) {
-          // Only seek back to the beginning and read more data if loops is < 0
-          // (loop forever), or we have more loops to go, otherwise, the sample is
-          // finished.
-          if (audioInstance->m_loops != 0) {
-            auto sought = audioInstance->m_audio.seekSample(0);
-            if (!sought)
-              return std::unexpected(std::move(sought.error()));
-            auto loopSamples = audioInstance->m_audio.resample(channels, sampleRate, std::span(m_mixBuffer).subspan(ramt, bufferSize - ramt), pitchMultiplier);
-            if (!loopSamples)
-              return std::unexpected(std::move(loopSamples.error()));
-            ramt += *loopSamples;
-            if (audioInstance->m_loops > 0)
-              --audioInstance->m_loops;
-          } else {
-            finished = true;
-          }
-        }
-        if (audioInstance->m_clockStop && *audioInstance->m_clockStop < sampleEndTime) {
-          for (std::size_t s = 0; s < ramt / channels; ++s) {
-            unsigned millisecondsInBuffer = (s * 1000) / sampleRate;
-            auto sampleTime = sampleStartTime + millisecondsInBuffer;
-            if (sampleTime > *audioInstance->m_clockStop) {
-              float volume = 0.0f;
-              if (audioInstance->m_clockStopFadeOut > 0)
-                volume = 1.0f
-                  - static_cast<float>((sampleTime - *audioInstance->m_clockStop))
-                    / static_cast<float>(audioInstance->m_clockStopFadeOut);
-
-              if (volume <= 0) {
-                for (std::size_t c = 0; c < channels; ++c)
-                  m_mixBuffer[s * channels + c] = 0;
-              } else {
-                for (std::size_t c = 0; c < channels; ++c)
-                  m_mixBuffer[s * channels + c] *= volume;
-              }
-            }
-          }
-          if (sampleEndTime > *audioInstance->m_clockStop + audioInstance->m_clockStopFadeOut)
-            finished = true;
-        }
-
-        for (std::size_t s = 0; s < ramt / channels; ++s) {
-          float vol = std::lerp(beginVolume * groupVolume * audioStopVolBegin,
-                                endVolume * groupEndVolume * audioStopVolEnd, static_cast<float>(s) / frameCount);
-          for (std::size_t c = 0; c < channels; ++c) {
-            float sample = m_mixBuffer[s * channels + c] * vol * audioState.positionalChannelVolumes[c] * audioInstance->m_volume.value;
-            std::int16_t& outSample = outBuffer[s * channels + c];
-            outSample = std::clamp(sample + outSample, -32767.0f, 32767.0f);
-          }
-        }
-        return {};
-      }();
-      if (!mixed) {
-        if (!mixed.error().is<AudioException>())
-          return std::unexpected(std::move(mixed.error()));
-        auto logged = m_logger.error("Error reading audio '{}': {}", audioInstance->m_audio.name(), mixed.error().what());
-        finished = true;
-        if (!logged) {
-          audioInstance->m_volume.value = audioStopVolEnd;
-          audioInstance->m_finished = true;
-          return std::unexpected(std::move(logged.error()));
-        }
-      }
-
-      audioInstance->m_volume.value = audioStopVolEnd;
-      audioInstance->m_finished = finished;
+    begin_volume = m_volume.value;
+    end_volume = approach(m_volume.target, begin_volume, m_volume.velocity * time);
+    m_volume.value = end_volume;
+    group_volumes = m_group_volumes;
+    for (std::size_t group = 0; group < group_volumes.size(); ++group) {
+      auto const& volume = group_volumes[group];
+      group_end_volumes[group] = approach(volume.target, volume.value, volume.velocity * time);
+      m_group_volumes[group].value = group_end_volumes[group];
     }
   }
 
-  if (extraMixFunction) {
-    auto mixed = extraMixFunction(outBuffer, frameCount, channels);
+  auto const sample_start_time = Time::millisecondsSinceEpoch();
+  // Wall-clock scheduling and all ramps continue while global speed is zero.
+  long double const sample_end_time =
+    sample_start_time + std::floor(static_cast<long double>(frame_count) * 1000 / m_sample_rate);
+  std::ranges::fill(out_buffer, 0);
+  m_read_audios.clear();
+  {
+    std::lock_guard locker(m_queue_mutex);
+    m_read_audios.reserve(m_audios.size());
+    for (auto const& entry : m_audios)
+      m_read_audios.push_back(entry.second);
+  }
+
+  // Preserve the map's voice order and saturate after every voice, not once at the end.
+  for (auto const& audio_state : m_read_audios) {
+    auto const& audio_instance = audio_state->audio;
+    std::lock_guard audio_locker(audio_instance->m_mutex);
+    if (audio_instance->m_finished)
+      continue;
+    if (audio_instance->m_clock_start && *audio_instance->m_clock_start > sample_end_time)
+      continue;
+
+    auto const group = std::to_underlying(audio_instance->m_mixer_group);
+    float const group_volume = group_volumes[group].value;
+    float const group_end_volume = group_end_volumes[group];
+    float const audio_volume_begin = audio_instance->m_volume.value;
+    float const audio_volume_end =
+      approach(audio_instance->m_volume.target, audio_volume_begin, audio_instance->m_volume.velocity * time);
+    audio_instance->m_volume.value = audio_volume_end;
+
+    // Persist the instance's unscaled pitch before applying the independent global speed.
+    auto& pitch = audio_instance->m_pitch_multiplier;
+    pitch.value = approach(pitch.target, pitch.value, pitch.velocity * time);
+    float pitch_multiplier = pitch.value;
+    if (audio_instance->m_mixer_group == MixerGroup::Effects
+        || audio_instance->m_mixer_group == MixerGroup::Instruments)
+      pitch_multiplier *= speed;
+
+    bool finished = audio_volume_end == 0.0f && audio_instance->m_stopping;
+    bool const clock_finished = audio_instance->m_clock_stop && *audio_instance->m_clock_stop < sample_end_time
+      && sample_end_time
+        > static_cast<long double>(*audio_instance->m_clock_stop) + audio_instance->m_clock_stop_fade_out;
+
+    // A zero rate is a pause, not EOF or an Audio::resample error. Fades and scheduled
+    // stops still retire a paused voice; otherwise its decoder and loops are untouched.
+    if (pitch_multiplier == 0.0f) {
+      audio_instance->m_finished = finished || clock_finished;
+      continue;
+    }
+
+    std::size_t read_amount = 0;
+    if (audio_instance->m_clock_start && *audio_instance->m_clock_start > sample_start_time) {
+      auto const silent_frames = static_cast<std::size_t>(std::min(
+        static_cast<long double>(frame_count),
+        (static_cast<long double>(*audio_instance->m_clock_start) - sample_start_time) * m_sample_rate / 1000));
+      read_amount = silent_frames * m_channels;
+      std::fill_n(m_mix_buffer.begin(), read_amount, 0);
+    }
+    auto mixed = [&]() -> std::expected<void, StarException> {
+      if (read_amount < buffer_size) {
+        auto resampled = audio_instance->m_audio.resample(
+          m_channels, m_sample_rate, std::span(m_mix_buffer).subspan(read_amount), pitch_multiplier);
+        if (!resampled)
+          return std::unexpected(std::move(resampled.error()));
+        read_amount += *resampled;
+        while (read_amount < buffer_size && !finished) {
+          if (audio_instance->m_loops == 0) {
+            finished = true;
+            break;
+          }
+          auto sought = audio_instance->m_audio.seek_sample(0);
+          if (!sought)
+            return std::unexpected(std::move(sought.error()));
+          auto loop_samples = audio_instance->m_audio.resample(
+            m_channels, m_sample_rate, std::span(m_mix_buffer).subspan(read_amount), pitch_multiplier);
+          if (!loop_samples)
+            return std::unexpected(std::move(loop_samples.error()));
+          if (audio_instance->m_loops > 0)
+            --audio_instance->m_loops;
+          if (*loop_samples == 0) {
+            // An empty clip cannot make progress, even when looping forever.
+            finished = true;
+            break;
+          }
+          read_amount += *loop_samples;
+        }
+      }
+
+      if (audio_instance->m_clock_stop && *audio_instance->m_clock_stop < sample_end_time) {
+        for (std::size_t frame = 0; frame < read_amount / m_channels; ++frame) {
+          long double const sample_time =
+            sample_start_time + std::floor(static_cast<long double>(frame) * 1000 / m_sample_rate);
+          if (sample_time > *audio_instance->m_clock_stop) {
+            float volume = 0.0f;
+            if (audio_instance->m_clock_stop_fade_out > 0)
+              volume = 1.0f
+                - static_cast<float>(sample_time - *audio_instance->m_clock_stop)
+                  / static_cast<float>(audio_instance->m_clock_stop_fade_out);
+            for (std::size_t channel = 0; channel < m_channels; ++channel) {
+              auto& sample = m_mix_buffer[frame * m_channels + channel];
+              sample = volume <= 0.0f ? 0 : sample * volume;
+            }
+          }
+        }
+      }
+
+      for (std::size_t frame = 0; frame < read_amount / m_channels; ++frame) {
+        float const volume =
+          std::lerp(begin_volume * group_volume * audio_volume_begin, end_volume * group_end_volume * audio_volume_end,
+                    static_cast<float>(frame) / frame_count);
+        for (std::size_t channel = 0; channel < m_channels; ++channel) {
+          float const sample =
+            m_mix_buffer[frame * m_channels + channel] * volume * audio_state->positional_channel_volumes[channel];
+          auto& out_sample = out_buffer[frame * m_channels + channel];
+          out_sample = std::clamp(sample + out_sample, -32767.0f, 32767.0f);
+        }
+      }
+      return {};
+    }();
+    if (!mixed) {
+      if (!mixed.error().is<AudioException>())
+        return std::unexpected(std::move(mixed.error()));
+      finished = true;
+      audio_instance->m_finished = true;
+      auto logged =
+        m_logger.error("Error reading audio '{}': {}", audio_instance->m_audio.name(), mixed.error().what());
+      if (!logged)
+        return std::unexpected(std::move(logged.error()));
+    }
+    audio_instance->m_finished = finished || clock_finished;
+  }
+  m_read_audios.clear();
+
+  if (extra_mix_function) {
+    auto mixed = extra_mix_function(out_buffer, frame_count, m_channels);
     if (!mixed)
       return std::unexpected(std::move(mixed.error()));
   }
 
+  m_read_effects.clear();
   {
-    std::lock_guard locker(m_effectsMutex);
-    // Apply all active effects
-    for (auto const& pair : m_effects) {
-      auto const& effectInfo = pair.second;
-      if (effectInfo->finished)
-        continue;
-
-      float effectBegin = effectInfo->amount;
-      float effectEnd;
-      if (effectInfo->velocity < 0)
-        effectEnd = approach(0.0f, effectBegin, -effectInfo->velocity * time);
-      else
-        effectEnd = approach(1.0f, effectBegin, effectInfo->velocity * time);
-
-      std::copy_n(outBuffer.begin(), bufferSize, m_mixBuffer.begin());
-      auto effected = effectInfo->effectFunction(std::span(m_mixBuffer), frameCount, channels);
-      if (!effected)
-        return std::unexpected(std::move(effected.error()));
-
-      for (std::size_t s = 0; s < frameCount; ++s) {
-        float amt = std::lerp(effectBegin, effectEnd, static_cast<float>(s) / frameCount);
-        for (std::size_t c = 0; c < channels; ++c) {
-          std::int16_t prev = outBuffer[s * channels + c];
-          outBuffer[s * channels + c] = lerp(amt, prev, m_mixBuffer[s * channels + c]);
-        }
-      }
-
-      effectInfo->amount = effectEnd;
-      effectInfo->finished = effectInfo->amount <= 0.0f;
-    }
+    std::lock_guard locker(m_effects_mutex);
+    m_read_effects.reserve(m_effects.size());
+    for (auto const& entry : m_effects)
+      m_read_effects.push_back(entry.second);
   }
+  for (auto const& effect_info : m_read_effects) {
+    float effect_begin;
+    float effect_end;
+    {
+      std::lock_guard locker(m_effects_mutex);
+      if (effect_info->finished)
+        continue;
+      effect_begin = effect_info->amount;
+      effect_end = effect_info->velocity < 0 ? approach(0.0f, effect_begin, -effect_info->velocity * time)
+                                             : approach(1.0f, effect_begin, effect_info->velocity * time);
+    }
 
-  {
-    std::lock_guard locker(m_mutex);
-
-    m_volume.value = endVolume;
-
-    for (auto p : groupEndVolumes)
-      m_groupVolumes[p.first].value = p.second;
+    // User effects run without registry locks and only publish scratch on success.
+    std::ranges::copy(out_buffer, m_mix_buffer.begin());
+    auto effected = effect_info->effect_function(std::span(m_mix_buffer), frame_count, m_channels);
+    if (!effected)
+      return std::unexpected(std::move(effected.error()));
+    for (std::size_t frame = 0; frame < frame_count; ++frame) {
+      float const amount = std::lerp(effect_begin, effect_end, static_cast<float>(frame) / frame_count);
+      for (std::size_t channel = 0; channel < m_channels; ++channel) {
+        auto& sample = out_buffer[frame * m_channels + channel];
+        sample = lerp(amount, sample, m_mix_buffer[frame * m_channels + channel]);
+      }
+    }
+    {
+      std::lock_guard locker(m_effects_mutex);
+      effect_info->amount = effect_end;
+      effect_info->finished = effect_end <= 0.0f;
+    }
   }
   return {};
 }
 
-Mixer::EffectFunction Mixer::lowpass(std::size_t avgSize) const {
+Mixer::EffectFunction Mixer::low_pass(std::size_t average_size) const {
+  struct FilterChannel {
+    std::vector<std::int16_t> ring;
+    std::size_t cursor = 0;
+    std::int64_t sum = 0;
+  };
   struct LowPass {
-    LowPass(std::size_t avgSize) : avgSize(avgSize) {}
-
-    std::size_t avgSize;
-    List<Deque<float>> filter;
+    std::size_t average_size;
+    std::vector<FilterChannel> filter;
 
     [[nodiscard]] std::expected<void, StarException> operator()(std::span<std::int16_t> buffer, std::size_t frames, unsigned channels) {
+      if (!valid_buffer_shape(buffer, frames, channels) || average_size == 0
+          || average_size > std::numeric_limits<std::int64_t>::max() / 32768
+          || average_size > std::vector<std::int16_t>().max_size() || channels > filter.max_size())
+        return std::unexpected(AudioException("Invalid low-pass window or buffer shape"));
+      if (frames == 0)
+        return {};
       filter.resize(channels);
-      for (std::size_t f = 0; f < frames; ++f) {
-        for (std::size_t c = 0; c < channels; ++c) {
-          auto& filterChannel = filter[c];
-          filterChannel.push_back(buffer[f * channels + c] / 32767.0f);
-          while (filterChannel.size() > avgSize) {
-            auto removed = filterChannel.take_front();
-            if (!removed)
-              return std::unexpected(std::move(removed.error()));
-          }
-          buffer[f * channels + c] = std::ranges::fold_left_first(filterChannel, std::plus<float>()).value_or(0.0f)
-            / static_cast<float>(avgSize) * 32767.0f;
+      for (auto& channel : filter) {
+        if (channel.ring.empty())
+          channel.ring.resize(average_size, 0);
+      }
+      for (std::size_t frame = 0; frame < frames; ++frame) {
+        for (std::size_t channel = 0; channel < channels; ++channel) {
+          auto& history = filter[channel];
+          auto& sample = buffer[frame * channels + channel];
+          history.sum -= history.ring[history.cursor];
+          history.sum += sample;
+          history.ring[history.cursor] = sample;
+          if (++history.cursor == average_size)
+            history.cursor = 0;
+          // Mathematical box average, with truncation toward zero. Integer state
+          // cannot drift; the old normalized-float fold may differ by one int16 LSB.
+          sample = history.sum / static_cast<std::int64_t>(average_size);
         }
       }
       return {};
     }
   };
-
-  return LowPass(avgSize);
+  return LowPass{.average_size = average_size, .filter = {}};
 }
 
 Mixer::EffectFunction Mixer::echo(float time, float dry, float wet) const {
+  struct FilterChannel {
+    std::vector<std::int16_t> ring;
+    std::size_t cursor = 0;
+  };
   struct Echo {
-    unsigned echoLength;
+    unsigned echo_length;
     float dry;
     float wet;
-    List<Deque<float>> filter;
+    bool valid_parameters;
+    std::vector<FilterChannel> filter;
 
-    [[nodiscard]] std::expected<void, StarException> operator()(std::span<std::int16_t> buffer, std::size_t frames, unsigned channels) {
-      if (echoLength == 0)
+    [[nodiscard]] std::expected<void, StarException> operator()(std::span<std::int16_t> buffer, std::size_t frames,
+                                                                unsigned channels) {
+      if (!valid_parameters || !valid_buffer_shape(buffer, frames, channels)
+          || echo_length > std::vector<std::int16_t>().max_size() || channels > filter.max_size())
+        return std::unexpected(AudioException("Invalid echo parameters or buffer shape"));
+      if (echo_length == 0 || frames == 0)
         return {};
-
       filter.resize(channels);
-      for (std::size_t c = 0; c < channels; ++c) {
-        auto& filterChannel = filter[c];
-        if (filterChannel.empty())
-          filterChannel.resize(echoLength, 0);
+      for (auto& channel : filter) {
+        if (channel.ring.empty())
+          channel.ring.resize(echo_length, 0);
       }
-
-      for (std::size_t f = 0; f < frames; ++f) {
-        for (std::size_t c = 0; c < channels; ++c) {
-          auto& filterChannel = filter[c];
-          buffer[f * channels + c] = buffer[f * channels + c] * dry + filter[c][0] * wet;
-          filterChannel.push_back(buffer[f * channels + c]);
-          while (filterChannel.size() > echoLength) {
-            auto removed = filterChannel.take_front();
-            if (!removed)
-              return std::unexpected(std::move(removed.error()));
-          }
+      for (std::size_t frame = 0; frame < frames; ++frame) {
+        for (std::size_t channel = 0; channel < channels; ++channel) {
+          auto& history = filter[channel];
+          auto& sample = buffer[frame * channels + channel];
+          sample = sample * dry + history.ring[history.cursor] * wet;
+          // Feedback is the quantized processed output, not the dry input.
+          history.ring[history.cursor] = sample;
+          if (++history.cursor == echo_length)
+            history.cursor = 0;
         }
       }
       return {};
     }
   };
 
-  return Echo{.echoLength = static_cast<unsigned>((time * m_sampleRate)), .dry = dry, .wet = wet, .filter = {}};
+  // Preserve float multiplication and truncation of the original unsigned delay.
+  float const delay_frames = time * m_sample_rate;
+  bool const valid_parameters = is_finite(time) && is_finite(dry) && is_finite(wet) && is_finite(delay_frames)
+    && time >= 0.0f
+    && static_cast<double>(delay_frames) < static_cast<double>(std::numeric_limits<unsigned>::max()) + 1.0;
+  return Echo{.echo_length = valid_parameters ? static_cast<unsigned>(delay_frames) : 0,
+              .dry = dry,
+              .wet = wet,
+              .valid_parameters = valid_parameters,
+              .filter = {}};
 }
 
-void Mixer::setGroupVolume(MixerGroup group, float targetValue, float rampTime) {
+void Mixer::set_group_volume(MixerGroup group, float target_value, float ramp_time) {
+  if (!valid_mixer_group(group))
+    return;
   std::lock_guard locker(m_mutex);
-  if (rampTime <= 0.0f) {
-    m_groupVolumes[group].value = targetValue;
-    m_groupVolumes[group].target = targetValue;
-    m_groupVolumes[group].velocity = 0.0f;
-  } else {
-    m_groupVolumes[group].target = targetValue;
-    m_groupVolumes[group].velocity = rateOfChangeFromRampTime(rampTime);
+  auto& volume = m_group_volumes[std::to_underlying(group)];
+  if (ramp_time <= 0.0f)
+    volume = {.value = target_value, .target = target_value, .velocity = 0.0f};
+  else {
+    volume.target = target_value;
+    volume.velocity = rate_of_change_from_ramp_time(ramp_time);
   }
 }
 
-std::expected<void, StarException> Mixer::update(float, PositionalAttenuationFunction positionalAttenuationFunction) {
+std::expected<void, StarException> Mixer::update(float, PositionalAttenuationFunction positional_attenuation_function) {
+  std::lock_guard update_locker(m_update_mutex);
+  auto clear_snapshot = make_scope_exit([&] { m_update_audios.clear(); });
+  m_update_audios.clear();
   {
-    std::lock_guard locker(m_queueMutex);
-    Star::erase_if(m_audios, [](auto const& p) {
-      return p.first->m_finished;
-    });
-    for (auto&& p : m_audios) {
-      if (positionalAttenuationFunction && p.first->m_position) {
-        for (unsigned c = 0; c < m_channels; ++c) {
-          auto attenuation = positionalAttenuationFunction(c, *p.first->m_position, p.first->m_rangeMultiplier);
-          if (!attenuation)
-            return std::unexpected(std::move(attenuation.error()));
-          p.second.positionalChannelVolumes[c] = 1.0f - *attenuation;
-        }
-      } else {
-        for (unsigned c = 0; c < m_channels; ++c)
-          p.second.positionalChannelVolumes[c] = 1.0f;
-      }
+    std::lock_guard locker(m_queue_mutex);
+    // Queue -> instance is the only nested lock order.
+    for (auto entry = m_audios.begin(); entry != m_audios.end();) {
+      if (entry->first->finished())
+        entry = m_audios.erase(entry);
+      else
+        ++entry;
+    }
+    m_update_audios.reserve(m_audios.size());
+    for (auto const& entry : m_audios)
+      m_update_audios.push_back(entry.second);
+  }
+  m_attenuation_buffer.resize(m_channels);
+  for (auto const& audio_state : m_update_audios) {
+    auto const& audio_instance = audio_state->audio;
+    std::optional<Vec2F> position;
+    float range_multiplier;
+    {
+      std::lock_guard locker(audio_instance->m_mutex);
+      position = audio_instance->m_position;
+      range_multiplier = audio_instance->m_range_multiplier;
+    }
+    std::ranges::fill(m_attenuation_buffer, 0.0f);
+    if (positional_attenuation_function && position) {
+      // One synchronous batch per source; external geometry code holds no instance
+      // or queue lock and may safely inspect or change the audio instance.
+      auto attenuated = positional_attenuation_function(*position, range_multiplier, m_attenuation_buffer);
+      if (!attenuated)
+        return std::unexpected(std::move(attenuated.error()));
+    }
+    {
+      std::lock_guard locker(audio_instance->m_mutex);
+      for (std::size_t channel = 0; channel < m_channels; ++channel)
+        audio_state->positional_channel_volumes[channel] = 1.0f - m_attenuation_buffer[channel];
     }
   }
-
   {
-    std::lock_guard locker(m_effectsMutex);
-    Star::erase_if(m_effects, [](auto const& p) {
-        return p.second->finished;
-      });
+    std::lock_guard locker(m_effects_mutex);
+    for (auto effect = m_effects.begin(); effect != m_effects.end();) {
+      if (effect->second->finished)
+        effect = m_effects.erase(effect);
+      else
+        ++effect;
+    }
   }
   return {};
 }
-
 }

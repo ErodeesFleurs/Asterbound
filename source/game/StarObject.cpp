@@ -2499,18 +2499,18 @@ std::expected<void, StarException> Object::collectSounds(RenderCallback& renderC
       if (!soundResult)
         return std::unexpected(std::move(soundResult.error()));
       auto sound = std::move(*soundResult);
-      sound->setLoops(-1);
-      auto durationResult = sound->totalTime();
+      sound->set_loops(-1);
+      auto durationResult = sound->total_time();
       if (!durationResult)
         return std::unexpected(std::move(durationResult.error()));
       auto duration = std::move(*durationResult);
-      auto operation1 = sound->seekTime(root().random().uniform_float() * duration);
+      auto operation1 = sound->seek_time(root().random().uniform_float() * duration);
       if (!operation1)
         return std::unexpected(std::move(operation1.error()));
-      sound->setRangeMultiplier(m_config->soundEffectRangeMultiplier);
-      sound->setPosition(metaBoundBox().center() + position());
-      sound->setVolume(0);
-      sound->setVolume(1, 1.0);
+      sound->set_range_multiplier(m_config->soundEffectRangeMultiplier);
+      sound->set_position(metaBoundBox().center() + position());
+      sound->set_volume(0);
+      sound->set_volume(1, 1.0);
       auto operation2 = renderCallback.addAudio(sound);
       if (!operation2)
         return std::unexpected(std::move(operation2.error()));

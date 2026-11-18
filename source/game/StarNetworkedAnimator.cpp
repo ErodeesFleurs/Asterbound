@@ -444,7 +444,7 @@ List<std::shared_ptr<AudioInstance>> NetworkedAnimator::DynamicTarget::pullNewAu
   pendingAudios.exec([this](std::shared_ptr<AudioInstance> const& ptr) {
     Vec2F audioBasePosition = ptr->position().value_or(Vec2F{});
     currentAudioBasePositions[ptr] = audioBasePosition;
-    ptr->setPosition(position + audioBasePosition);
+    ptr->set_position(position + audioBasePosition);
   });
   return std::exchange(pendingAudios, {});
 }
@@ -468,7 +468,7 @@ void NetworkedAnimator::DynamicTarget::updatePosition(Vec2F const& p) {
   clearFinishedAudio();
   position = p;
   for (auto&& audioPair : currentAudioBasePositions)
-    audioPair.first->setPosition(audioPair.second + p);
+    audioPair.first->set_position(audioPair.second + p);
 }
 
 void NetworkedAnimator::DynamicTarget::clearFinishedAudio() {
@@ -1909,9 +1909,9 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
             activePersistentSound.audio = std::move(*instance);
             auto range = activeState.properties.value("persistentSoundRangeMultiplier", 1.0f).toFloat();
             if (!range) return std::unexpected(std::move(range.error()));
-            activePersistentSound.audio->setRangeMultiplier(*range);
-            activePersistentSound.audio->setLoops(-1);
-            activePersistentSound.audio->setPosition(globalTransformation().transform_point(Vec2F()));
+            activePersistentSound.audio->set_range_multiplier(*range);
+            activePersistentSound.audio->set_loops(-1);
+            activePersistentSound.audio->set_position(globalTransformation().transform_point(Vec2F()));
             auto stopTime = activeState.properties.value("persistentSoundStopTime", 0.0f).toFloat();
             if (!stopTime) return std::unexpected(std::move(stopTime.error()));
             activePersistentSound.stopRampTime = *stopTime;
@@ -1957,8 +1957,8 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
             activeImmediateSound.audio = std::move(*instance);
             auto range = activeState.properties.value("immediateSoundRangeMultiplier", 1.0f).toFloat();
             if (!range) return std::unexpected(std::move(range.error()));
-            activeImmediateSound.audio->setRangeMultiplier(*range);
-            activeImmediateSound.audio->setPosition(globalTransformation().transform_point(Vec2F()));
+            activeImmediateSound.audio->set_range_multiplier(*range);
+            activeImmediateSound.audio->set_position(globalTransformation().transform_point(Vec2F()));
             dynamicTarget->get().pendingAudios.push_back(activeImmediateSound.audio);
           }
         }
@@ -2142,11 +2142,13 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
             auto instance = AudioInstance::create(**audio);
             if (!instance) return std::unexpected(std::move(instance.error()));
             auto sound = std::move(*instance);
-            sound->setRangeMultiplier(soundEntry.rangeMultiplier);
-            sound->setLoops(soundEntry.loops.get());
-            sound->setPosition(globalTransformation().transform_point(Vec2F(soundEntry.xPosition.get(), soundEntry.yPosition.get())));
-            sound->setVolume(soundEntry.volumeTarget.get(), soundEntry.volumeRampTime.get());
-            sound->setPitchMultiplier(soundEntry.pitchMultiplierTarget.get(), soundEntry.pitchMultiplierRampTime.get());
+            sound->set_range_multiplier(soundEntry.rangeMultiplier);
+            sound->set_loops(soundEntry.loops.get());
+            sound->set_position(
+              globalTransformation().transform_point(Vec2F(soundEntry.xPosition.get(), soundEntry.yPosition.get())));
+            sound->set_volume(soundEntry.volumeTarget.get(), soundEntry.volumeRampTime.get());
+            sound->set_pitch_multiplier(soundEntry.pitchMultiplierTarget.get(),
+                                        soundEntry.pitchMultiplierRampTime.get());
             dynamicTarget->get().independentSounds[soundName].push_back(sound);
             dynamicTarget->get().pendingAudios.push_back(std::move(sound));
           }
@@ -2157,8 +2159,9 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
       for (auto const& activeIndependentSound : dynamicTarget->get().independentSounds.value(soundName)) {
         if (auto basePosition = dynamicTarget->get().currentAudioBasePositions.find_ref(activeIndependentSound))
           basePosition->get() = globalTransformation().transform_point(Vec2F(soundEntry.xPosition.get(), soundEntry.yPosition.get()));
-        activeIndependentSound->setVolume(soundEntry.volumeTarget.get(), soundEntry.volumeRampTime.get());
-        activeIndependentSound->setPitchMultiplier(soundEntry.pitchMultiplierTarget.get(), soundEntry.pitchMultiplierRampTime.get());
+        activeIndependentSound->set_volume(soundEntry.volumeTarget.get(), soundEntry.volumeRampTime.get());
+        activeIndependentSound->set_pitch_multiplier(soundEntry.pitchMultiplierTarget.get(),
+                                                     soundEntry.pitchMultiplierRampTime.get());
       }
     }
   }

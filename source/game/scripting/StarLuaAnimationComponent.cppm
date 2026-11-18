@@ -67,8 +67,8 @@ private:
     auto audio = AudioInstance::create(**source);
     if (!audio)
       return std::unexpected(std::move(audio.error()));
-    (*audio)->setLoops(loops.value_or(0));
-    (*audio)->setVolume(volume.value_or(1.0f));
+    (*audio)->set_loops(loops.value_or(0));
+    (*audio)->set_volume(volume.value_or(1.0f));
     self.m_pendingAudios.push_back(*audio);
     self.m_activeAudio.push_back(*audio);
     return audio;
@@ -168,7 +168,7 @@ inline List<std::shared_ptr<AudioInstance>> LuaScriptAnimation::pullNewAudios() 
 
 inline void LuaScriptAnimation::contextShutdown() {
   for (auto const& audio : m_activeAudio)
-    audio->setLoops(0);
+    audio->set_loops(0);
   m_activeAudio.clear();
 }
 

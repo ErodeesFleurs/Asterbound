@@ -2472,7 +2472,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::postPro
     auto audioData = as_ref<AudioData>(*original);
     if (!audioData)
       return std::shared_ptr<AssetData>{};
-    auto duration = audioData->get().audio->totalTime();
+    auto duration = audioData->get().audio->total_time();
     if (!duration)
       return std::unexpected(std::move(duration.error()));
     if (*duration >= m_settings.audioDecompressLimit)

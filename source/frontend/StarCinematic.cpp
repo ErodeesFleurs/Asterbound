@@ -625,8 +625,8 @@ std::expected<void, StarException> Cinematic::render() {
       auto audioInstance = AudioInstance::create(**audio);
       if (!audioInstance)
         return std::unexpected(std::move(audioInstance.error()));
-      (*audioInstance)->setLoops(m_audioCues[i].loops);
-      (*audioInstance)->setMixerGroup(MixerGroup::Cinematic);
+      (*audioInstance)->set_loops(m_audioCues[i].loops);
+      (*audioInstance)->set_mixer_group(MixerGroup::Cinematic);
       auto played = mixer->play(*audioInstance);
       if (!played)
         return std::unexpected(std::move(played.error()));

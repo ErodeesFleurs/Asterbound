@@ -384,7 +384,7 @@ std::expected<void, StarException> ActiveItem::update(float dt, FireMode fireMod
     auto position = handPosition(it->second);
     if (!position)
       return std::unexpected(std::move(position.error()));
-    it->first->setPosition(itemOwner->get().position() + *position);
+    it->first->set_position(itemOwner->get().position() + *position);
     if (it->first->finished())
       it = m_activeAudio.erase(it);
     else
@@ -594,7 +594,7 @@ std::expected<List<std::shared_ptr<AudioInstance>>, StarException> ActiveItem::p
     auto position = handPosition(*audio->position());
     if (!position)
       return std::unexpected(std::move(position.error()));
-    audio->setPosition(itemOwner->get().position() + *position);
+    audio->set_position(itemOwner->get().position() + *position);
     result.push_back(std::move(audio));
   }
   result.append_range(m_scriptedAnimator.pullNewAudios());

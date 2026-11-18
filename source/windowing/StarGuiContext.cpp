@@ -626,9 +626,9 @@ std::expected<std::shared_ptr<AudioInstance>, StarException> GuiContext::playAud
   auto audioInstance = AudioInstance::create(**audio);
   if (!audioInstance)
     return std::unexpected(std::move(audioInstance.error()));
-  (*audioInstance)->setVolume(volume);
-  (*audioInstance)->setPitchMultiplier(pitch);
-  (*audioInstance)->setLoops(loops);
+  (*audioInstance)->set_volume(volume);
+  (*audioInstance)->set_pitch_multiplier(pitch);
+  (*audioInstance)->set_loops(loops);
   auto played = m_mixer->play(*audioInstance);
   if (!played)
     return std::unexpected(std::move(played.error()));
