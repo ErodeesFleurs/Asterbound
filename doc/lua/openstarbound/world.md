@@ -55,6 +55,55 @@ geometry does not cross Lua or recompute cropped bounds. Tokens belong to this
 world callback group: reset a cached known token on script init/service rebind.
 The service does not choose fitting, translation, clipping or health-bar state.
 
+#### `Maybe<Json>` world.entitySnapshot(`EntityId` id)
+
+Synchronously serializes an entity currently present in this world. Returns
+`nil` when absent; serialization failures raise errors. Available on client
+and server worlds, including for other players. It does not request data
+from another process, save a file, remove the entity or restore a snapshot.
+
+The envelope contains `schema = "asterbound.entitySnapshot"`,
+`schemaVersion = 1`, native `type`, `entityId`, `position`, `authority`
+(`"master"` or `"replica"`), `complete`, `format` and `data`.
+`entityId` is a transient observation identifier, not an import identity.
+
+Persistent types use the engine's existing entity-factory disk serialization.
+For `format = "disk"`, `data` is the existing `VersionedJson` object:
+`{id, version, content, subVersions}`.
+
+For `format = "net"`, `data` contains `encoding = "base64"`,
+`compatibilityVersion`, `netStore`, `netState` and `netStateVersion`.
+The two byte strings use base64; `netState` is a full state record suitable
+for the existing native `readNetState` path. Snapshotting does not advance
+the source entity's replication version or consume pending updates.
+
+`complete` describes an authoritative single-entity persistence snapshot,
+not a self-contained world backup: assets, linked entities, wiring and other
+external state are not bundled. Other players are not rejected, but a
+replica's serialized inventory, quests or script storage may be unsynchronized
+or initialized defaults; it is explicitly **not their complete remote save**.
+Only the owning instance can supply that data.
+
+Projectiles and falling plant pieces use a network snapshot rather than a
+persistent save and report `complete = false`. Network snapshots are tied to
+the engine/network version, not a portable disk-save format. Never execute
+exported script text or treat arbitrary snapshot JSON as trusted input.
+Snapshots can be retained through the existing mod-storage API:
+
+```lua
+local snapshot = world.entitySnapshot(targetId)
+if snapshot then
+  root.setModStorage("entitySnapshot", snapshot)
+end
+```
+
+The entire mod namespace shares a 4 MiB limit, so large snapshots can be
+rejected without replacing the previous value. Writes follow mod storage's
+normal batching and shutdown policy; `root.flushModStorage()` is an explicit
+global write barrier, not something to call every update.
+
+
+
 ---
 
 

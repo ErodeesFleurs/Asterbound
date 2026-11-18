@@ -46,6 +46,25 @@ GoogleTest case. Windows CI runs verbose CTest, writes
 `build/windows-release/test-results.xml`, and uploads it with `Testing/Temporary/`
 as `Windows-Test-Failure-Logs` on failure.
 
+### Entity snapshot export
+
+`EntitySnapshot.*` exercises the production `world.entitySnapshot` binding:
+missing entities, versioned persistent-entity round trips, a player replica
+received through the real entity-create packet path, and projectile/plant-drop
+full-state restoration without consuming replication updates.
+
+Run it with owned assets through the isolated runner:
+
+```sh
+GTEST_FILTER='EntitySnapshot.*' ASTERBOUND_ASSETS=/absolute/path/to/Starbound/assets \
+  ctest --test-dir build/linux-release -R '^game_tests$' --output-on-failure
+```
+
+Snapshots are saved with existing mod storage; there is no separate JSON-file
+export API. Replica player snapshots may contain initialized defaults instead
+of unsynchronized inventory, quests or script storage. Do not report them as
+complete remote saves merely because serialization succeeded.
+
 ### Graphical client startup smoke
 
 Windows, Linux and macOS CI exercise the actual graphical client's no-assets

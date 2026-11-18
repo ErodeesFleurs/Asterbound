@@ -51,6 +51,10 @@ import star.output_proxy;
 import star.version;
 import star.image;
 import star.worker_pool;
+import star.encode;
+import star.byte_array;
+import star.entity_factory;
+import star.plant_drop;
 
 import std;
 import star.sector_array_2d;
@@ -296,6 +300,7 @@ namespace LuaBindings {
     [[nodiscard]] std::expected<LuaTable, StarException> objectLineQuery(World& world, LuaEngine& engine, Vec2F const& pos1, Vec2F const& pos2, std::optional<LuaTable> options);
     [[nodiscard]] std::expected<LuaTable, StarException> npcLineQuery(World& world, LuaEngine& engine, Vec2F const& pos1, Vec2F const& pos2, std::optional<LuaTable> options);
     [[nodiscard]] std::expected<bool, StarException> entityExists(World& world, EntityId entityId);
+    [[nodiscard]] std::expected<std::optional<Json>, StarException> entitySnapshot(World& world, EntityId entityId);
     [[nodiscard]] std::expected<bool, StarException> entityCanDamage(World& world, EntityId sourceId, EntityId targetId);
     [[nodiscard]] std::expected<Json, StarException> entityDamageTeam(World& world, EntityId entityId);
     [[nodiscard]] std::expected<bool, StarException> entityAggressive(World& world, EntityId entityId);
@@ -1543,6 +1548,11 @@ namespace LuaBindings {
 
     if (auto result = callbacks.registerCallbackWithSignature<bool, int>(
           "entityExists", [&world](int entity) { return WorldEntityCallbacks::entityExists(world, entity); });
+        !result)
+      return std::unexpected(std::move(result.error()));
+    if (auto result = callbacks.registerCallbackWithSignature<std::optional<Json>, EntityId>(
+          "entitySnapshot",
+          [&world](EntityId entity) { return WorldEntityCallbacks::entitySnapshot(world, entity); });
         !result)
       return std::unexpected(std::move(result.error()));
     if (auto result = callbacks.registerCallbackWithSignature<bool, int, int>(
@@ -3158,6 +3168,68 @@ namespace LuaBindings {
 
   std::expected<bool, StarException> WorldEntityCallbacks::entityExists(World& world, EntityId entityId) {
     return static_cast<bool>(world.entity(entityId));
+  }
+
+  std::expected<std::optional<Json>, StarException> WorldEntityCallbacks::entitySnapshot(World& world, EntityId entityId) {
+    auto entity = world.entity(entityId);
+    if (!entity)
+      return {};
+    if (!EntityTypeNames)
+      return std::unexpected(EntityTypeNames.error());
+    auto type = EntityTypeNames->get_right(entity->entityType());
+    if (!type)
+      return std::unexpected(std::move(type.error()));
+    auto factory = world.root().entityFactory();
+    if (!factory)
+      return std::unexpected(std::move(factory.error()));
+
+    bool master = entity->isMaster();
+    bool transient = entity->entityType() == EntityType::Projectile || entity->entityType() == EntityType::PlantDrop;
+    JsonObject snapshot{
+      {"schema", "asterbound.entitySnapshot"}, {"schemaVersion", 1},
+      {"type", type->get()}, {"entityId", entityId}, {"position", jsonFromVec2F(entity->position())},
+      {"authority", std::string_view(master ? "master" : "replica")}, {"complete", master && !transient},
+      {"format", std::string_view(transient ? "net" : "disk")}
+    };
+    JsonArray warnings;
+    if (transient) {
+      NetCompatibilityRules rules;
+      auto store = (*factory)->netStoreEntity(entity, rules);
+      if (!store)
+        return std::unexpected(std::move(store.error()));
+      // These types keep their live state directly in NetElements. Unlike
+      // writeNetState(0), this read does not advance their replication version.
+      auto state = [&]() -> std::expected<std::pair<ByteArray, std::uint64_t>, StarException> {
+        if (auto projectile = as<Projectile>(entity))
+          return projectile->snapshot_net_state(rules);
+        if (auto plantDrop = as<PlantDrop>(entity))
+          return plantDrop->snapshot_net_state(rules);
+        return std::unexpected(EntityException("Transient entity type does not match its native class"));
+      }();
+      if (!state)
+        return std::unexpected(std::move(state.error()));
+      snapshot["data"] = JsonObject{
+        {"encoding", "base64"}, {"compatibilityVersion", rules.version()},
+        {"netStore", base64_encode(*store)}, {"netState", base64_encode(state->first)},
+        {"netStateVersion", state->second}
+      };
+      warnings.push_back("Network reconstruction record, not a persistent save. netState is a full readNetState record; netStateVersion is observational, not a continuation token.");
+    } else {
+      // The existing dispatcher includes Player::diskStore on replicas too.
+      // Keep its errors (including live Lua storage conversion errors) intact.
+      auto store = (*factory)->storeVersionedEntity(entity);
+      if (!store)
+        return std::unexpected(std::move(store.error()));
+      snapshot["data"] = store->toJson();
+      warnings.push_back("Single-entity engine persistence state only; external assets and world relationships are not included.");
+    }
+    if (!master) {
+      warnings.push_back("Local replica only: fields not synchronized to this world may be absent, stale, or local defaults; this is not the remote authoritative save.");
+      if (entity->entityType() == EntityType::Player)
+        warnings.push_back("Player disk serialization includes locally held inventory, quests, and script storage, but cannot recover inventory, quests, script storage, or other private fields the remote player has not transmitted.");
+    }
+    snapshot["warnings"] = std::move(warnings);
+    return std::optional<Json>(Json(std::move(snapshot)));
   }
 
   std::expected<bool, StarException> WorldEntityCallbacks::entityCanDamage(World& world, EntityId sourceId, EntityId targetId) {

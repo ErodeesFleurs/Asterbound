@@ -48,6 +48,25 @@ function world.entityDamageBar(id) end
 ---@return EntityPortraitView?
 function world.entityPortraitView(id, mode, knownRevision) end
 
+---@class EntitySnapshot
+---@field schema "asterbound.entitySnapshot"
+---@field schemaVersion integer
+---@field type string Native entity type.
+---@field entityId EntityId Transient observation ID, not an import identity.
+---@field position Vec2F
+---@field authority "master"|"replica"
+---@field complete boolean Authoritative single-entity persistence only; never promises a full remote player save.
+---@field format "disk"|"net"
+---@field data Json
+---@field warnings? string[]
+
+--- Synchronous local-world snapshot; absent entity returns nil, serialization failures error.
+--- Other players are allowed, but replicas may lack inventory/quests/scripts and report incomplete.
+--- Projectiles/plant drops use engine-version-specific network data, not a portable disk save.
+---@param id EntityId
+---@return EntitySnapshot?
+function world.entitySnapshot(id) end
+
 --- Attempts a wire connection between the two objects positioned at `outputPosition` and `inputPosition`. The `outputIndex` and `inputIndex` parameters specify which output and input nodes to connect. --- The following additional world bindings are available only for scripts running on the client. ---
 ---@param outputPosition Vec2I
 ---@param outputIndex number

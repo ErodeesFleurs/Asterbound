@@ -722,6 +722,10 @@ if (!result283) return std::unexpected(std::move(result283.error()));
 return std::move(*result283);
 }
 
+std::expected<std::pair<ByteArray, std::uint64_t>, StarException> PlantDrop::snapshot_net_state(NetCompatibilityRules rules) const {
+  return m_netGroup.snapshot_net_state(rules);
+}
+
 std::expected<void, StarException> PlantDrop::readNetState(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
   auto result282 = m_netGroup.readNetState(data, interpolationTime, rules);
 if (!result282) return std::unexpected(std::move(result282.error()));

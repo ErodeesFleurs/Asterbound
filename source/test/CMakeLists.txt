@@ -224,6 +224,7 @@ set (star_game_tests_SOURCES
       assets_patch_read_test.cpp
       assets_reference_cache_test.cpp
       embedded_assets_test.cpp
+      entity_snapshot_test.cpp
       biome_placement_test.cpp
       camera_presentation_test.cpp
       damage_database_test.cpp

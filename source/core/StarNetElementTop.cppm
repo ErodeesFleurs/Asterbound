@@ -39,6 +39,10 @@ public:
   // 'fromVersion' is 0, then this is a full write for an initial read of a
   // slave NetElementTop.
   [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> writeNetState(std::uint64_t fromVersion = 0, NetCompatibilityRules rules = {});
+
+  // Uses the same full-state wire record as writeNetState(0), without advancing
+  // the publisher's version or consuming a delta. The version is observational.
+  [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> snapshot_net_state(NetCompatibilityRules rules = {}) const;
   // Reads a state produced by a call to writeState, optionally with the
   // interpolation delay time for the data contained in this state update.  If
   // the state is a full update rather than a delta, the interoplation delay
@@ -87,6 +91,17 @@ template <typename BaseNetElement>
   if (!written) return std::unexpected(std::move(written.error()));
   if (!*written) return std::pair<ByteArray, std::uint64_t>{ByteArray(), m_netVersion.current()};
   return std::pair<ByteArray, std::uint64_t>{ds.take_data(), m_netVersion.increment()};
+}
+
+template <typename BaseNetElement>
+[[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> NetElementTop<BaseNetElement>::snapshot_net_state(NetCompatibilityRules rules) const {
+  DataStreamBuffer ds;
+  ds.set_stream_compatibility_version(rules);
+  if (auto result = ds.write<bool>(true); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = BaseNetElement::netStore(ds, rules); !result)
+    return std::unexpected(std::move(result.error()));
+  return std::pair<ByteArray, std::uint64_t>{ds.take_data(), m_netVersion.current()};
 }
 
 template <typename BaseNetElement>

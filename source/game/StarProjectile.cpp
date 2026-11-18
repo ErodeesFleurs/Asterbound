@@ -366,6 +366,10 @@ if (!result939) return std::unexpected(std::move(result939.error()));
 return std::move(*result939);
 }
 
+std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Projectile::snapshot_net_state(NetCompatibilityRules rules) const {
+  return m_netGroup.snapshot_net_state(rules);
+}
+
 std::expected<void, StarException> Projectile::readNetState(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
   auto result938 = m_netGroup.readNetState(data, interpolationTime, rules);
 if (!result938) return std::unexpected(std::move(result938.error()));
