@@ -1386,8 +1386,14 @@ std::expected<void, StarException> UniverseServer::updateTeams() {
       if (channel != *worldName && (!team || channel != team->hex()))
         m_chatProcessor->leaveChannel(p.first, channel);
     }
-    if (team && !channels.contains(team->hex()))
-      m_chatProcessor->joinChannel(p.first, team->hex());
+    if (team) {
+      auto teamChannel = team->hex();
+      auto subscribed = channels.contains(teamChannel);
+      if (!subscribed)
+        return std::unexpected(std::move(subscribed.error()));
+      if (!*subscribed)
+        m_chatProcessor->joinChannel(p.first, teamChannel);
+    }
   }
 
   m_teamManager->setConnectedPlayers(connectedPlayers);
