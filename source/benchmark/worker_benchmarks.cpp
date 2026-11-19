@@ -6,6 +6,7 @@ import star.benchmark_runner;
 import star.worker_pool;
 import star.string;
 import star.format;
+import star.unique_function;
 
 namespace {
 
@@ -125,6 +126,74 @@ BENCHMARK_TEMPLATE(BM_WorkerSubmission, 1, false, true)->Arg(256)->UseRealTime()
 BENCHMARK_TEMPLATE(BM_WorkerSubmission, 128, false, true)->Arg(256)->UseRealTime();
 BENCHMARK_TEMPLATE(BM_WorkerSubmission, 1, true, true)->Arg(256)->UseRealTime();
 BENCHMARK_TEMPLATE(BM_WorkerSubmission, 128, true, true)->Arg(256)->UseRealTime();
+
+using TimedFunction = Star::UniqueFunction<std::uint64_t(std::uint64_t)>;
+
+struct InlineAdder {
+  std::uint64_t increment;
+  std::uint64_t operator()(std::uint64_t value) const noexcept { return value + increment; }
+};
+
+struct alignas(64) HeapAdder : InlineAdder {};
+
+template <typename Target>
+  requires std::constructible_from<TimedFunction, Target>
+bool check_transfer(benchmark::State& state, Target target) {
+  TimedFunction source(std::move(target));
+  TimedFunction destination(std::move(source));
+  auto result = destination(41);
+  if (source || !result || *result != 42) {
+    state.SkipWithError("Callable move did not transfer its target");
+    return false;
+  }
+  return true;
+}
+
+void inline_construct_move(benchmark::State& state) {
+  if (!check_transfer(state, InlineAdder{1}))
+    return;
+  for (auto _ : state) {
+    TimedFunction source(InlineAdder{1});
+    benchmark::DoNotOptimize(source);
+    TimedFunction destination(std::move(source));
+    benchmark::DoNotOptimize(destination);
+  }
+}
+
+void heap_transfer(benchmark::State& state) {
+  if (!check_transfer(state, HeapAdder{{1}}))
+    return;
+  TimedFunction source(HeapAdder{{1}});
+  // Allocate once: each iteration measures two transfers, not allocation.
+  for (auto _ : state) {
+    benchmark::DoNotOptimize(source);
+    TimedFunction destination(std::move(source));
+    benchmark::DoNotOptimize(destination);
+    source = std::move(destination);
+  }
+  auto result = source(41);
+  if (!result || *result != 42)
+    state.SkipWithError("Heap target lost during round trip");
+  state.SetItemsProcessed(2 * state.iterations());
+}
+
+void hot_invocation(benchmark::State& state) {
+  TimedFunction callable(InlineAdder{1});
+  auto check = callable(41);
+  if (!check || *check != 42) {
+    state.SkipWithError("Incorrect callable result");
+    return;
+  }
+  benchmark::DoNotOptimize(callable);
+  for (auto _ : state) {
+    auto result = callable(41);
+    benchmark::DoNotOptimize(result);
+  }
+}
+
+BENCHMARK(inline_construct_move);
+BENCHMARK(heap_transfer);
+BENCHMARK(hot_invocation);
 
 }
 

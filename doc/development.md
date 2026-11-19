@@ -43,6 +43,8 @@ and the title screen at its configured image scale after changes.
 - Thread creation/joining use the native `std::expected` backend: `std::thread`/`std::jthread` throw on creation failure. Use standard mutexes, condition variables and atomic waits. `ReadersWriterMutex` retains repeated shared acquisitions by one thread and queued-writer priority, unlike `std::shared_mutex`.
 - Keep stop tokens stable for a run; renew the domain only after previous workers join. Terminal owners retain one lifetime domain. Request stop, notify waiters or shut down native I/O, then join before destroying borrowed state, including in derived owners. `Socket::close()` shuts down under shared ownership before waiting for exclusive descriptor release.
 - Worker pools retain checked startup rollback, cancellation-versus-draining semantics, stored-lvalue task invocation and checked result publication.
+- `UniqueFunction` calls its stored target as an lvalue. Empty invocation reports a `StarException`; an `expected<T, StarException>` result is not wrapped a second time. Reference results borrow their referent. A void task may discard an ordinary result, but not a `std::expected` error.
+- A target's move constructor or destructor may observe the withdrawn source wrapper as empty and clear it again. Do not install a new target into storage whose previous target is still being destroyed.
 
 ## C++ implementation boundaries
 

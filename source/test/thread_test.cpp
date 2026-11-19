@@ -63,7 +63,7 @@ TEST(Thread, UniqueCallableOwnershipAlignmentAndEmptyState) {
   };
   int deaths = 0;
   {
-    UniqueFunction<int()> small([owner = std::unique_ptr<Witness>(new Witness{std::ref(deaths)})] { return 42; });
+    UniqueFunction<int()> small([owner = std::make_unique<Witness>(std::ref(deaths))] { return 42; });
     UniqueFunction<int()> moved(std::move(small));
     EXPECT_FALSE(small);
     auto initial = moved();
@@ -77,7 +77,7 @@ TEST(Thread, UniqueCallableOwnershipAlignmentAndEmptyState) {
         return reinterpret_cast<std::uintptr_t>(this) % alignof(Aligned) == 0 ? 7 : -1;
       }
     };
-    UniqueFunction<int()> large(Aligned{std::unique_ptr<Witness>(new Witness{std::ref(deaths)})});
+    UniqueFunction<int()> large(Aligned{std::make_unique<Witness>(std::ref(deaths))});
     auto aligned = large();
     ASSERT_TRUE(aligned);
     EXPECT_EQ(*aligned, 7);
@@ -111,6 +111,70 @@ TEST(Thread, UniqueCallableOwnershipAlignmentAndEmptyState) {
     static_assert(!std::is_constructible_v<UniqueFunction<void()>, ErrorTask>);
   }
   EXPECT_EQ(deaths, 2);
+}
+
+TEST(Thread, UniqueCallableWithdrawsSourceBeforeTargetMoveAndDestruction) {
+  struct Observation {
+    UniqueFunction<void()>& owner;
+    bool armed = false;
+    unsigned moves = 0;
+    unsigned destructions = 0;
+    void observe() {
+      EXPECT_FALSE(owner);
+      if (!owner)
+        owner = nullptr;
+    }
+  };
+  struct Target {
+    Observation& state;
+    explicit Target(Observation& state) : state(state) {}
+    Target(Target&& other) noexcept : state(other.state) {
+      if (state.armed) {
+        ++state.moves;
+        state.observe();
+      }
+    }
+    ~Target() {
+      if (state.armed) {
+        ++state.destructions;
+        state.observe();
+      }
+    }
+    void operator()() {}
+  };
+  UniqueFunction<void()> source;
+  Observation observation{source};
+  source = Target(observation);
+  observation.armed = true;
+  UniqueFunction<void()> moved(std::move(source));
+  EXPECT_EQ(observation.moves, 1u);
+  EXPECT_EQ(observation.destructions, 1u);
+  observation.armed = false;
+  source = std::move(moved);
+  observation.armed = true;
+  source = nullptr;
+  EXPECT_EQ(observation.destructions, 2u);
+}
+
+TEST(Thread, UniqueCallableDiscardsOrdinaryValuesButNotExpectedErrors) {
+  struct BusinessValue { using error_type = int; };
+  int calls = 0;
+  UniqueFunction<void()> work([&] {
+    ++calls;
+    return BusinessValue{};
+  });
+  EXPECT_TRUE(work());
+  EXPECT_EQ(calls, 1);
+  using Failure = std::expected<int, StarException>;
+  Failure failure(std::unexpected(IOException("unique task", false)));
+  auto borrow = [&]() -> Failure& { return failure; };
+  static_assert(!std::constructible_from<UniqueFunction<void()>, decltype(borrow)>);
+  UniqueFunction<Failure&()> reference(borrow);
+  auto result = reference();
+  ASSERT_TRUE(result);
+  EXPECT_TRUE(result->get().error().is<IOException>());
+  result->get() = 7;
+  EXPECT_EQ(failure.value_or(0), 7);
 }
 
 TEST(Thread, ReadersWriterMutex) {

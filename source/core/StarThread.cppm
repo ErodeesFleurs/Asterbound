@@ -14,6 +14,11 @@ struct ThreadFunctionImpl;
 template <typename Return>
 class ThreadFunction;
 
+template <typename Function, typename... Args>
+concept thread_invocable = std::constructible_from<std::decay_t<Function>, Function>
+    && (std::constructible_from<std::decay_t<Args>, Args> && ...)
+    && requires { typename std::invoke_result_t<std::decay_t<Function>&, std::decay_t<Args>&...>::value_type; };
+
 class Thread {
 public:
   virtual void const* query_type(TypeKey key) const noexcept { return query_type_of<Thread>(this, key); }
@@ -23,6 +28,7 @@ public:
   static void sleepPrecise(unsigned millis);
 
   template <typename Function, typename... Args>
+    requires thread_invocable<Function, Args...>
   [[nodiscard]] static auto invoke(String const& name, Function&& f, Args&&... args)
       -> std::expected<ThreadFunction<typename std::invoke_result_t<std::decay_t<Function>&, std::decay_t<Args>&...>::value_type>, StarException>;
 
@@ -57,6 +63,7 @@ protected:
   [[nodiscard]] virtual std::expected<void, StarException> run() = 0;
 
 private:
+  friend struct ThreadImpl;
   std::unique_ptr<ThreadImpl> m_impl;
 };
 
@@ -91,13 +98,18 @@ private:
   std::unique_ptr<ThreadFunctionImpl> m_impl;
 };
 
+template <typename Callable, typename Return>
+concept thread_function_target = std::constructible_from<UniqueFunction<std::expected<Return, StarException>()>, Callable>;
+
 template <typename Return>
 class ThreadFunction {
 public:
   ThreadFunction();
   ThreadFunction(ThreadFunction&&);
+  template <typename Callable = UniqueFunction<std::expected<Return, StarException>()>>
+    requires thread_function_target<Callable, Return>
   [[nodiscard]] static std::expected<ThreadFunction, StarException> create(
-      UniqueFunction<std::expected<Return, StarException>()> function, String const& name);
+      Callable&& function, String const& name);
 
   ~ThreadFunction();
 
@@ -114,8 +126,11 @@ public:
   String name();
 
 private:
+  struct ResultState {
+    std::optional<Return> value;
+  };
   ThreadFunction<void> m_function;
-  std::shared_ptr<std::optional<Return>> m_return;
+  std::shared_ptr<ResultState> m_return;
 };
 
 // Acquire an unlocked standard guard, retaining the native long-wait stack
@@ -161,15 +176,23 @@ private:
 };
 
 template <typename Function, typename... Args>
+  requires thread_invocable<Function, Args...>
 [[nodiscard]] auto Thread::invoke(String const& name, Function&& f, Args&&... args)
     -> std::expected<ThreadFunction<typename std::invoke_result_t<std::decay_t<Function>&, std::decay_t<Args>&...>::value_type>, StarException> {
   using Return = typename std::invoke_result_t<std::decay_t<Function>&, std::decay_t<Args>&...>::value_type;
-  return ThreadFunction<Return>::create(
-      [function = std::forward<Function>(f), arguments = std::make_tuple(std::forward<Args>(args)...)]() mutable {
-        return std::apply([&function](auto&... saved) {
-          return std::invoke(function, saved...);
-        }, arguments);
-      }, name);
+  if constexpr (sizeof...(Args) == 0) {
+    return ThreadFunction<Return>::create(std::forward<Function>(f), name);
+  } else {
+    using Target = std::decay_t<Function>;
+    if constexpr (std::is_pointer_v<Target> || std::is_member_pointer_v<Target>) {
+      if (!f)
+        return ThreadFunction<Return>::create(nullptr, name);
+    }
+    return ThreadFunction<Return>::create(
+        [function = std::forward<Function>(f), arguments = std::make_tuple(std::forward<Args>(args)...)]() mutable {
+          return std::apply(function, arguments);
+        }, name);
+  }
 }
 
 template <typename Return>
@@ -179,22 +202,42 @@ template <typename Return>
 ThreadFunction<Return>::ThreadFunction(ThreadFunction&&) = default;
 
 template <typename Return>
+template <typename Callable>
+  requires thread_function_target<Callable, Return>
 [[nodiscard]] std::expected<ThreadFunction<Return>, StarException> ThreadFunction<Return>::create(
-    UniqueFunction<std::expected<Return, StarException>()> function, String const& name) {
-  ThreadFunction result;
-  result.m_return = std::make_shared<std::optional<Return>>();
-  auto thread = ThreadFunction<void>::create(
-      [function = std::move(function), retValue = result.m_return]() mutable -> std::expected<void, StarException> {
-        auto value = function();
-        if (!value)
-          return std::unexpected(std::move(value.error()));
-        retValue->emplace(std::move(*value));
-        return {};
-      }, name);
-  if (!thread)
-    return std::unexpected(std::move(thread.error()));
-  result.m_function = std::move(*thread);
-  return result;
+    Callable&& function, String const& name) {
+  using Result = std::expected<Return, StarException>;
+  using Target = std::decay_t<Callable>;
+  if constexpr (!std::is_invocable_r_v<Result, Target&> || !std::constructible_from<Target, Callable>) {
+    // Preserve nullptr (and implicit conversions) as a checked callable.
+    return create(UniqueFunction<Result()>(std::forward<Callable>(function)), name);
+  } else {
+    if constexpr (std::is_pointer_v<Target>) {
+      if (!function)
+        return create(UniqueFunction<Result()>{}, name);
+    }
+
+    // Co-locate the concrete callable and its result. Only the small handle to
+    // this state crosses the erased native boundary, regardless of target size.
+    struct Task : ResultState {
+      explicit Task(Callable&& target) : function(std::forward<Callable>(target)) {}
+      Target function;
+    };
+    auto task = std::make_shared<Task>(std::forward<Callable>(function));
+    ThreadFunction result;
+    result.m_return = task;
+    auto thread = ThreadFunction<void>::create([task = std::move(task)] -> std::expected<void, StarException> {
+      auto value = std::invoke_r<Result>(task->function);
+      if (!value)
+        return std::unexpected(std::move(value.error()));
+      task->value.emplace(std::move(*value));
+      return {};
+    }, name);
+    if (!thread)
+      return std::unexpected(std::move(thread.error()));
+    result.m_function = std::move(*thread);
+    return result;
+  }
 }
 
 template <typename Return>
@@ -208,10 +251,10 @@ template <typename Return>
   auto finished = m_function.finish();
   if (!finished)
     return std::unexpected(std::move(finished.error()));
-  if (!m_return || !*m_return)
+  if (!m_return || !m_return->value)
     return std::unexpected(StarException("Thread function has no unconsumed result"));
-  Return result = std::move(**m_return);
-  m_return->reset();
+  Return result = std::move(*m_return->value);
+  m_return->value.reset();
   return result;
 }
 

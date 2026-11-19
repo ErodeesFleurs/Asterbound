@@ -22,40 +22,38 @@ import star.output_proxy;
 import star.logging;
 
 #ifdef MAXCOMLEN
-static constexpr std::size_t MaxThreadNameLength = MAXCOMLEN;
+static constexpr std::size_t max_thread_name_length = MAXCOMLEN;
 #else
-static constexpr std::size_t MaxThreadNameLength = 16;
+static constexpr std::size_t max_thread_name_length = 16;
 #endif
 
 import star.algorithm;
 namespace Star {
 
-struct ThreadImpl {
-  static void* runThread(void* data) {
-    auto& state = *static_cast<ThreadImpl*>(data);
+template <typename State>
+concept native_thread_state = std::same_as<State, ThreadImpl> || std::same_as<State, ThreadFunctionImpl>;
+
+template <native_thread_state State>
+struct NativeThread {
+  static void* run_thread(void* data) {
+    auto& state = *static_cast<State*>(data);
 #ifdef STAR_SYSTEM_MACOS
-    char tname[MaxThreadNameLength];
+    char tname[max_thread_name_length];
     std::snprintf(tname, sizeof(tname), "%s", state.name.utf8_data());
     pthread_setname_np(tname);
 #endif
-    auto result = state.function();
-    if (!result)
-      EmergencyLog::error("Thread {} failed: {}", state.name, Star::output_exception(ExceptionDiagnostic(result.error()), true));
+    state.execute();
     state.stopped = true;
     return nullptr;
   }
 
-  ThreadImpl(UniqueFunction<std::expected<void, StarException>()> function, String name)
-    : function(std::move(function)), name(std::move(name)), stopped(true), joined(true) {}
+  explicit NativeThread(String name) : name(std::move(name)) {}
 
-  [[nodiscard]] std::expected<bool, StarException> start() {
-    std::lock_guard mutexLocker(mutex);
-    if (!joined)
-      return false;
-
+  // Only launch unpublished or joined state; a restart holds mutex.
+  [[nodiscard]] std::expected<bool, StarException> launch() {
     stopped = false;
     joined = false;
-    int ret = pthread_create(&pthread, NULL, &runThread, (void*)this);
+    int ret = pthread_create(&pthread, nullptr, run_thread, static_cast<State*>(this));
     if (ret != 0) {
       stopped = true;
       joined = true;
@@ -63,7 +61,7 @@ struct ThreadImpl {
     }
 
     // ensure the name is under the max allowed
-    char tname[MaxThreadNameLength];
+    char tname[max_thread_name_length];
     std::snprintf(tname, sizeof(tname), "%s", name.utf8_data());
 
 #ifdef STAR_SYSTEM_FREEBSD
@@ -77,38 +75,46 @@ struct ThreadImpl {
   }
 
   [[nodiscard]] std::expected<bool, StarException> join() {
-    std::lock_guard mutexLocker(mutex);
+    std::lock_guard lock(mutex);
     if (joined)
       return false;
-    int ret = pthread_join(pthread, NULL);
+    int ret = pthread_join(pthread, nullptr);
     if (ret != 0)
       return std::unexpected(StarException(Star::format("Failed to join thread, error {}", ret)));
     joined = true;
     return true;
   }
 
-  UniqueFunction<std::expected<void, StarException>()> function;
   String name;
   pthread_t pthread;
-  std::atomic<bool> stopped;
-  bool joined;
+  std::atomic<bool> stopped{true};
+  bool joined = true;
   std::mutex mutex;
 };
 
-struct ThreadFunctionImpl : ThreadImpl {
-  ThreadFunctionImpl(UniqueFunction<std::expected<void, StarException>()> function, String name)
-    : ThreadImpl(wrapFunction(std::move(function)), std::move(name)) {}
+struct ThreadImpl final : NativeThread<ThreadImpl> {
+  ThreadImpl(Thread& owner, String name) : NativeThread(std::move(name)), owner(owner) {}
 
-  UniqueFunction<std::expected<void, StarException>()> wrapFunction(
-      UniqueFunction<std::expected<void, StarException>()> function) {
-    return [function = std::move(function), this]() mutable -> std::expected<void, StarException> {
-      auto result = function();
-      if (!result)
-        error = std::move(result.error());
-      return {};
-    };
+  void execute() {
+    auto result = owner.get().run();
+    if (!result)
+      EmergencyLog::error("Thread {} failed: {}", name, Star::output_exception(ExceptionDiagnostic(result.error()), true));
   }
 
+  std::reference_wrapper<Thread> owner;
+};
+
+struct ThreadFunctionImpl final : NativeThread<ThreadFunctionImpl> {
+  ThreadFunctionImpl(UniqueFunction<std::expected<void, StarException>()>&& function, String name)
+    : NativeThread(std::move(name)), function(std::move(function)) {}
+
+  void execute() {
+    auto result = function();
+    if (!result)
+      error.emplace(std::move(result.error()));
+  }
+
+  UniqueFunction<std::expected<void, StarException>()> function;
   std::optional<StarException> error;
 };
 
@@ -142,11 +148,8 @@ void Thread::sleepPrecise(unsigned msecs) {
   }
 }
 
-Thread::Thread(String const& name) {
-  m_impl.reset(new ThreadImpl([this]() {
-      return run();
-    }, name));
-}
+Thread::Thread(String const& name)
+  : m_impl(std::make_unique<ThreadImpl>(*this, name)) {}
 
 Thread::Thread(Thread&&) = default;
 
@@ -169,7 +172,11 @@ Thread& Thread::operator=(Thread&& other) {
 }
 
 std::expected<bool, StarException> Thread::start() {
-  return m_impl->start();
+  std::lock_guard lock(m_impl->mutex);
+  if (!m_impl->joined)
+    return false;
+  m_impl->owner = *this;
+  return m_impl->launch();
 }
 
 std::expected<bool, StarException> Thread::join() {
@@ -196,7 +203,7 @@ std::expected<ThreadFunction<void>, StarException> ThreadFunction<void>::create(
     UniqueFunction<std::expected<void, StarException>()> function, String const& name) {
   ThreadFunction result;
   result.m_impl = std::make_unique<ThreadFunctionImpl>(std::move(function), name);
-  auto started = result.m_impl->start();
+  auto started = result.m_impl->launch();
   if (!started)
     return std::unexpected(std::move(started.error()));
   return result;
