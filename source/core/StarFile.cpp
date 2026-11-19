@@ -40,9 +40,10 @@ std::expected<std::size_t, StarException> read_file_tail(File& file, std::string
                                                          char first) {
   auto offset = text.size();
   std::expected<std::size_t, StarException> count = 0;
-  text.resize_and_overwrite(offset + amount, [&](char* storage, std::size_t) {
-    storage[offset] = first;
-    count = file.read(std::span<char>(storage + offset + 1, amount - 1));
+  text.resize_and_overwrite(offset + amount, [&](std::string::pointer storage, std::size_t count_available) {
+    auto tail = std::span(storage, count_available).subspan(offset, amount);
+    tail.front() = first;
+    count = file.read(tail.subspan(1));
     return offset + 1 + (count ? *count : 0);
   });
   if (!count)
@@ -140,19 +141,19 @@ std::expected<String, StarException> File::current_directory() {
 #endif
 }
 
-std::expected<void, StarException> File::change_directory(String const& dirName) {
-  auto path = filesystem_path(dirName);
+std::expected<void, StarException> File::change_directory(String const& dir_name) {
+  auto path = filesystem_path(dir_name);
   if (!path)
     return std::unexpected(std::move(path.error()));
   std::error_code error;
   std::filesystem::current_path(*path, error);
   if (error)
-    return std::unexpected(IOException::format("could not change directory to '{}': {}", dirName, error.message()));
+    return std::unexpected(IOException::format("could not change directory to '{}': {}", dir_name, error.message()));
   return {};
 }
 
-std::expected<void, StarException> File::create_directory(String const& dirName) {
-  auto path = filesystem_path(dirName);
+std::expected<void, StarException> File::create_directory(String const& dir_name) {
+  auto path = filesystem_path(dir_name);
   if (!path)
     return std::unexpected(std::move(path.error()));
   std::error_code error;
@@ -160,29 +161,29 @@ std::expected<void, StarException> File::create_directory(String const& dirName)
     // Unlike create_directory, a single mkdir must reject an existing directory.
     if (!error)
       error = std::make_error_code(std::errc::file_exists);
-    return std::unexpected(IOException::format("could not create directory '{}': {}", dirName, error.message()));
+    return std::unexpected(IOException::format("could not create directory '{}': {}", dir_name, error.message()));
   }
   return {};
 }
 
-std::expected<void, StarException> File::create_directories(String const& fileName) {
-  auto path = filesystem_path(fileName);
+std::expected<void, StarException> File::create_directories(String const& dir_name) {
+  auto path = filesystem_path(dir_name);
   if (!path)
     return std::unexpected(std::move(path.error()));
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
   // The native helper rejects bare, drive-relative roots after trimming separators.
   if (path->has_root_directory() && !path->has_root_name() && !path->has_relative_path())
-    return std::unexpected(IOException::format("Cannot create directory ancestor '{}'", fileName));
+    return std::unexpected(IOException::format("Cannot create directory ancestor '{}'", dir_name));
 #endif
   std::error_code error;
   std::filesystem::create_directories(*path, error);
   if (error)
-    return std::unexpected(IOException::format("could not create directory '{}': {}", fileName, error.message()));
+    return std::unexpected(IOException::format("could not create directory '{}': {}", dir_name, error.message()));
   return {};
 }
 
-std::expected<void, StarException> File::remove(String const& fileName) {
-  auto path = filesystem_path(fileName);
+std::expected<void, StarException> File::remove(String const& filename) {
+  auto path = filesystem_path(filename);
   if (!path)
     return std::unexpected(std::move(path.error()));
   std::error_code error;
@@ -190,19 +191,19 @@ std::expected<void, StarException> File::remove(String const& fileName) {
     // Missing paths are an error in the File interface, not a successful no-op.
     if (!error)
       error = std::make_error_code(std::errc::no_such_file_or_directory);
-    return std::unexpected(IOException::format("remove error on '{}': {}", fileName, error.message()));
+    return std::unexpected(IOException::format("remove error on '{}': {}", filename, error.message()));
   }
   return {};
 }
 
-std::expected<void, StarException> File::remove_all(String const& fileName) {
-  auto path = filesystem_path(fileName);
+std::expected<void, StarException> File::remove_all(String const& filename) {
+  auto path = filesystem_path(filename);
   if (!path)
     return std::unexpected(std::move(path.error()));
   std::error_code error;
   auto status = std::filesystem::symlink_status(*path, error);
   if (error)
-    return std::unexpected(IOException::format("could not remove directory '{}': {}", fileName, error.message()));
+    return std::unexpected(IOException::format("could not remove directory '{}': {}", filename, error.message()));
   // A trailing separator must still require a directory, but must not turn a
   // directory symlink into a traversal of its target.
   if (path->has_relative_path() && path->filename().empty()) {
@@ -210,27 +211,27 @@ std::expected<void, StarException> File::remove_all(String const& fileName) {
       *path = path->parent_path();
     status = std::filesystem::symlink_status(*path, error);
     if (error)
-      return std::unexpected(IOException::format("could not remove directory '{}': {}", fileName, error.message()));
+      return std::unexpected(IOException::format("could not remove directory '{}': {}", filename, error.message()));
   }
   // remove_all also accepts regular files and missing paths; this API does not.
   if (!std::filesystem::is_directory(status) && !std::filesystem::is_symlink(status))
-    return std::unexpected(IOException::format("cannot recursively remove non-directory '{}'", fileName));
+    return std::unexpected(IOException::format("cannot recursively remove non-directory '{}'", filename));
   if (std::filesystem::remove_all(*path, error) == 0 && !error)
     error = std::make_error_code(std::errc::no_such_file_or_directory);
   if (error)
-    return std::unexpected(IOException::format("could not remove directory '{}': {}", fileName, error.message()));
+    return std::unexpected(IOException::format("could not remove directory '{}': {}", filename, error.message()));
   return {};
 }
 
 std::expected<void, StarException> File::copy(String const& source, String const& target) {
-  auto sourcePath = filesystem_path(source);
-  if (!sourcePath)
-    return std::unexpected(std::move(sourcePath.error()));
-  auto targetPath = filesystem_path(target);
-  if (!targetPath)
-    return std::unexpected(std::move(targetPath.error()));
+  auto source_path = filesystem_path(source);
+  if (!source_path)
+    return std::unexpected(std::move(source_path.error()));
+  auto target_path = filesystem_path(target);
+  if (!target_path)
+    return std::unexpected(std::move(target_path.error()));
   std::error_code error;
-  std::filesystem::copy_file(*sourcePath, *targetPath, std::filesystem::copy_options::overwrite_existing, error);
+  std::filesystem::copy_file(*source_path, *target_path, std::filesystem::copy_options::overwrite_existing, error);
   if (error)
     return std::unexpected(IOException::format("could not copy '{}' to '{}': {}", source, target, error.message()));
   return {};
@@ -276,12 +277,12 @@ std::expected<void, StarException> File::write_file(String const& data, String c
 
 std::expected<void, StarException> File::overwrite_file_with_rename(std::span<char const> data, String const& filename,
                                                                     String const& new_suffix) {
-  auto new_file = filename + new_suffix;
-  auto acquired = fopen(new_file.utf8_data(), IOMode::Write, true, true);
+  File staging(filename + new_suffix);
+  auto const& new_file = staging.m_filename;
+  auto acquired = NativeFileHandle::open(new_file, IOMode::Write, true, true);
   if (!acquired)
     return std::unexpected(std::move(acquired.error()));
-  File staging(new_file);
-  staging.m_file = *acquired;
+  staging.m_file.reset(acquired->release());
   staging.set_mode(IOMode::Write);
   bool owns_stage = true;
   auto cleanup = make_scope_exit([&] {
@@ -320,47 +321,53 @@ std::expected<void, StarException> File::overwrite_file_with_rename(std::span<ch
 }
 
 std::expected<void, StarException> File::overwrite_file_with_rename(ByteArray const& data, String const& filename,
-                                                                    String const& newSuffix) {
-  return overwrite_file_with_rename(data.span(), filename, newSuffix);
+                                                                    String const& new_suffix) {
+  return overwrite_file_with_rename(data.span(), filename, new_suffix);
 }
 
 std::expected<void, StarException> File::overwrite_file_with_rename(String const& data, String const& filename,
-                                                                    String const& newSuffix) {
-  return overwrite_file_with_rename(std::span<char const>(data.utf8()), filename, newSuffix);
+                                                                    String const& new_suffix) {
+  return overwrite_file_with_rename(std::span<char const>(data.utf8()), filename, new_suffix);
 }
 
-std::expected<void, StarException> File::backup_file_in_sequence(String const& initialFile, String const& targetFile,
-                                                                 unsigned maximumBackups,
-                                                                 String const& backupExtensionPrefix) {
-  for (unsigned i = maximumBackups; i > 0; --i) {
-    bool initial = i == 1;
-    String const& sourceFile = initial ? initialFile : targetFile;
-    String curExtension = initial ? "" : Star::format("{}{}", backupExtensionPrefix, i - 1);
-    String nextExtension = Star::format("{}{}", backupExtensionPrefix, i);
-    auto sourceExists = File::is_regular_file(sourceFile + curExtension);
-    if (!sourceExists)
-      return std::unexpected(std::move(sourceExists.error()));
-    if (*sourceExists) {
-      auto copied = File::copy(sourceFile + curExtension, targetFile + nextExtension);
-      if (!copied)
-        return std::unexpected(std::move(copied.error()));
-    }
+std::expected<void, StarException> File::backup_file_in_sequence(String const& initial_file, String const& target_file,
+                                                                 unsigned maximum_backups,
+                                                                 String const& backup_extension_prefix) {
+  auto backup_path = [&](unsigned index) -> String {
+    return Star::format("{}{}{}", target_file, backup_extension_prefix, index);
+  };
+  auto copy_existing = [&](String const& source, unsigned index) -> std::expected<void, StarException> {
+    auto exists = is_regular_file(source);
+    if (!exists)
+      return std::unexpected(std::move(exists.error()));
+    if (*exists)
+      return copy(source, backup_path(index));
+    return {};
+  };
+  for (unsigned index = maximum_backups; index > 1; --index) {
+    auto copied = copy_existing(backup_path(index - 1), index);
+    if (!copied)
+      return copied;
   }
+  if (maximum_backups)
+    return copy_existing(initial_file, 1);
   return {};
 }
 
-std::expected<void, StarException> File::backup_file_in_sequence(String const& targetFile, unsigned maximumBackups,
-                                                                 String const& backupExtensionPrefix) {
-  return backup_file_in_sequence(targetFile, targetFile, maximumBackups, backupExtensionPrefix);
+std::expected<void, StarException> File::backup_file_in_sequence(String const& target_file, unsigned maximum_backups,
+                                                                 String const& backup_extension_prefix) {
+  return backup_file_in_sequence(target_file, target_file, maximum_backups, backup_extension_prefix);
 }
 
-File::File() : IODevice(IOMode::Closed), m_file(nullptr) {}
+File::File() : IODevice(IOMode::Closed) {}
 
 File::File(String filename)
-  : IODevice(IOMode::Closed), m_filename(std::move(filename)), m_file(nullptr) {}
+  : IODevice(IOMode::Closed), m_filename(std::move(filename)) {}
 
 File::~File() noexcept {
-  auto result = close();
+  if (!m_file)
+    return;
+  auto result = m_file.close();
   if (!result) {
     if (auto written = Star::print(stderr, "Error closing file '{}' during destruction: {}\n", m_filename.utf8_data(), result.error().what()); !written)
       std::_Exit(1);
@@ -373,16 +380,16 @@ std::expected<StreamOffset, StarException> File::pos() {
 #endif
   if (!m_file)
     return std::unexpected(IOException("pos called on closed File"));
-  return ftell(m_file);
+  return m_file.pos();
 }
 
-std::expected<void, StarException> File::seek(StreamOffset offset, IOSeek seekMode) {
+std::expected<void, StarException> File::seek(StreamOffset offset, IOSeek origin) {
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
   std::lock_guard lock(m_cursor_mutex);
 #endif
   if (!m_file)
     return std::unexpected(IOException("seek called on closed File"));
-  return fseek(m_file, offset, seekMode);
+  return m_file.seek(offset, origin);
 }
 
 std::expected<StreamOffset, StarException> File::size() {
@@ -391,20 +398,24 @@ std::expected<StreamOffset, StarException> File::size() {
 #endif
   if (!m_file)
     return std::unexpected(IOException("size called on closed File"));
-  return fsize(m_file);
+  return m_file.size();
 }
 
 std::expected<bool, StarException> File::at_end() {
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
   std::lock_guard lock(m_cursor_mutex);
-#endif
-  auto position = pos();
+  if (!m_file)
+    return std::unexpected(IOException("pos called on closed File"));
+  auto position = m_file.pos();
   if (!position)
     return std::unexpected(std::move(position.error()));
-  auto length = size();
+  auto length = m_file.size();
   if (!length)
     return std::unexpected(std::move(length.error()));
   return *position >= *length;
+#else
+  return IODevice::at_end();
+#endif
 }
 
 std::expected<std::size_t, StarException> File::read(std::span<char> data) {
@@ -415,7 +426,7 @@ std::expected<std::size_t, StarException> File::read(std::span<char> data) {
     return std::unexpected(IOException("read called on closed File"));
   if (!is_readable())
     return std::unexpected(IOException("read called on non-readable File"));
-  return fread(m_file, data.data(), data.size());
+  return m_file.read(data);
 }
 
 std::expected<std::size_t, StarException> File::write(std::span<char const> data) {
@@ -426,7 +437,7 @@ std::expected<std::size_t, StarException> File::write(std::span<char const> data
     return std::unexpected(IOException("write called on closed File"));
   if (!is_writable())
     return std::unexpected(IOException("write called on non-writable File"));
-  return fwrite(m_file, data.data(), data.size());
+  return m_file.write(data);
 }
 
 std::expected<std::size_t, StarException> File::read_absolute(StreamOffset position, std::span<char> data) {
@@ -435,7 +446,7 @@ std::expected<std::size_t, StarException> File::read_absolute(StreamOffset posit
 #endif
   if (!m_file || !is_readable())
     return std::unexpected(IOException("read_absolute called on closed or non-readable File"));
-  return pread(m_file, data.data(), data.size(), position);
+  return m_file.read_at(position, data);
 }
 
 std::expected<std::size_t, StarException> File::write_absolute(StreamOffset position, std::span<char const> data) {
@@ -444,7 +455,7 @@ std::expected<std::size_t, StarException> File::write_absolute(StreamOffset posi
 #endif
   if (!m_file || !is_writable())
     return std::unexpected(IOException("write_absolute called on closed or non-writable File"));
-  return pwrite(m_file, data.data(), data.size(), position);
+  return m_file.write_at(position, data);
 }
 
 String File::file_name() const { return m_filename; }
@@ -473,7 +484,7 @@ std::expected<void, StarException> File::resize(StreamOffset length) {
     return std::unexpected(IOException("resize called on closed File"));
   if (!is_writable())
     return std::unexpected(IOException("resize called on non-writable File"));
-  return File::resize(m_file, length);
+  return m_file.resize(length);
 }
 
 std::expected<void, StarException> File::sync() {
@@ -482,22 +493,19 @@ std::expected<void, StarException> File::sync() {
 #endif
   if (!m_file)
     return std::unexpected(IOException("sync called on closed File"));
-  return fsync(m_file);
+  return m_file.sync();
 }
 
 std::expected<void, StarException> File::open(IOMode mode) {
-#ifdef STAR_SYSTEM_FAMILY_WINDOWS
-  std::lock_guard lock(m_cursor_mutex);
-#endif
   auto closed = close();
   if (!closed)
     return std::unexpected(std::move(closed.error()));
   if (m_filename.empty())
     return std::unexpected(IOException("Cannot open file, no filename set"));
-  auto opened = fopen(m_filename.utf8_data(), mode);
+  auto opened = NativeFileHandle::open(m_filename, mode);
   if (!opened)
     return std::unexpected(std::move(opened.error()));
-  m_file = *opened;
+  m_file.reset(opened->release());
   set_mode(mode);
   return {};
 }
@@ -506,11 +514,9 @@ std::expected<void, StarException> File::close() {
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
   std::lock_guard lock(m_cursor_mutex);
 #endif
-  // Consume first: a failed close must never later close a reused descriptor.
-  auto file = std::exchange(m_file, nullptr);
   set_mode(IOMode::Closed);
-  if (file)
-    return fclose(file);
+  if (m_file)
+    return m_file.close();
   return {};
 }
 
@@ -528,15 +534,21 @@ std::expected<std::shared_ptr<IODevice>, StarException> File::clone() {
   if (is_open()) {
     auto clone_mode = static_cast<IOMode>(static_cast<std::uint8_t>(mode())
                                           & ~static_cast<std::uint8_t>(IOMode::Truncate | IOMode::Append));
-    auto opened = fopen(m_filename.utf8_data(), clone_mode, false);
+    auto opened = NativeFileHandle::open(m_filename, clone_mode, false);
     if (!opened)
       return std::unexpected(std::move(opened.error()));
-    cloned->m_file = *opened;
+    cloned->m_file.reset(opened->release());
     cloned->set_mode(clone_mode);
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+    if (!m_file)
+      return std::unexpected(IOException("pos called on closed File"));
+    auto position = m_file.pos();
+#else
     auto position = pos();
+#endif
     if (!position)
       return std::unexpected(std::move(position.error()));
-    auto moved = cloned->seek(*position, IOSeek::Absolute);
+    auto moved = cloned->m_file.seek(*position, IOSeek::Absolute);
     if (!moved)
       return std::unexpected(std::move(moved.error()));
   }

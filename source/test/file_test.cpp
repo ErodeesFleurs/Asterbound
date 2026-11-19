@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "vorbis/vorbisfile.h"
-#ifdef STAR_SYSTEM_LINUX
+#ifndef STAR_SYSTEM_FAMILY_WINDOWS
+#include <errno.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -874,6 +875,33 @@ TEST(FileTest, OggDeviceCallbacksReadAndSeek) {
   EXPECT_EQ(callbacks.read_func(output, 2, 2, &adapter), 0u);
   EXPECT_FALSE(adapter.takeError());
 }
+
+#if GTEST_HAS_DEATH_TEST && !defined(STAR_SYSTEM_FAMILY_WINDOWS)
+TEST(FileHandleDeathTest, DescriptorZeroSupportsIoAndCheckedClose) {
+  // Re-exec before releasing stdin; never touch the test runner's descriptors.
+  testing::GTEST_FLAG(death_test_style) = "threadsafe";
+  ASSERT_EXIT(
+    {
+      File file("/dev/null");
+      if (::close(STDIN_FILENO) < 0 && errno != EBADF)
+        std::_Exit(1);
+      if (!file.open(IOMode::Read) || ::fcntl(STDIN_FILENO, F_GETFD) < 0)
+        std::_Exit(2);
+      char byte[1];
+      if (file.read(byte) != 0 || !file.close() || file.is_open())
+        std::_Exit(3);
+      if (::fcntl(STDIN_FILENO, F_GETFD) != -1 || errno != EBADF)
+        std::_Exit(4);
+      if (!file.open(IOMode::Read) || ::close(STDIN_FILENO) < 0)
+        std::_Exit(5);
+      auto closed = file.close();
+      if (closed || !closed.error().is<IOException>() || file.is_open() || !file.close())
+        std::_Exit(6);
+      std::_Exit(0);
+    },
+    ::testing::ExitedWithCode(0), "");
+}
+#endif
 
 #ifdef STAR_SYSTEM_LINUX
 TEST(FileTest, WholeReadsStopAtActualEofWhenMetadataOverstatesContents) {

@@ -1,4 +1,5 @@
 module;
+#include <cassert>
 import std;
 import star.format;
 
@@ -29,24 +30,24 @@ public:
   // get the current working directory
   [[nodiscard]] static std::expected<String, StarException> current_directory();
   // set the current working directory.
-  [[nodiscard]] static std::expected<void, StarException> change_directory(String const& dirName);
-  [[nodiscard]] static std::expected<void, StarException> create_directory(String const& dirName);
-  [[nodiscard]] static std::expected<void, StarException> create_directories(String const& dirName);
+  [[nodiscard]] static std::expected<void, StarException> change_directory(String const& dir_name);
+  [[nodiscard]] static std::expected<void, StarException> create_directory(String const& dir_name);
+  [[nodiscard]] static std::expected<void, StarException> create_directories(String const& dir_name);
 
-  // List all files or directories under given directory.  skipDots skips the
+  // List all files or directories under given directory. skip_dots skips the
   // special '.' and '..' entries.  Bool value is true for directories.
   [[nodiscard]] static std::expected<List<std::pair<String, bool>>, StarException>
-  directory_entries(String const& dirName, bool skipDots = true);
+  directory_entries(String const& dir_name, bool skip_dots = true);
 
   // Returns the final component of the given path with no directory separators
-  static String base_name(String const& fileName);
+  static String base_name(String const& filename);
   // All components of the given path minus the final component, separated by
   // the directory separator
-  static String dir_name(String const& fileName);
+  static String dir_name(String const& filename);
 
   // Resolve a path relative to another path.  If the given path is absolute,
   // then the given path is returned unmodified.
-  static String relative_to(String const& relativeTo, String const& path);
+  static String relative_to(String const& base, String const& path);
 
   // Resolve the given possibly relative path into an absolute path.
   [[nodiscard]] static std::expected<String, StarException> full_path(String const& path);
@@ -61,7 +62,7 @@ public:
   // has no filename and will be removed on close.
   [[nodiscard]] static std::expected<std::shared_ptr<File>, StarException> ephemeral_file(RandomService& random);
 
-  // Creates a new temporary directory and reutrns the path.  Will not be
+  // Creates a new temporary directory and returns the path. Will not be
   // removed automatically.
   [[nodiscard]] static std::expected<String, StarException> temporary_directory(RandomService& random);
 
@@ -100,7 +101,7 @@ public:
   [[nodiscard]] static std::expected<void, StarException> write_file(ByteArray const& data, String const& filename);
   [[nodiscard]] static std::expected<void, StarException> write_file(String const& data, String const& filename);
 
-  // Exclusively create filename + newSuffix in the target directory, write and
+  // Exclusively create filename + new_suffix in the target directory, write and
   // flush it, then replace the target. An existing staging path is never
   // clobbered. Failures before replacement preserve the old target; there is
   // no fallback that truncates it. On Unix, file sync precedes rename and
@@ -108,17 +109,17 @@ public:
   // after the replacement is already visible. Windows uses a flushed staging
   // file and write-through replacement, not an equivalent parent-directory sync.
   [[nodiscard]] static std::expected<void, StarException>
-  overwrite_file_with_rename(std::span<char const> data, String const& filename, String const& newSuffix = ".new");
+  overwrite_file_with_rename(std::span<char const> data, String const& filename, String const& new_suffix = ".new");
   [[nodiscard]] static std::expected<void, StarException>
-  overwrite_file_with_rename(ByteArray const& data, String const& filename, String const& newSuffix = ".new");
+  overwrite_file_with_rename(ByteArray const& data, String const& filename, String const& new_suffix = ".new");
   [[nodiscard]] static std::expected<void, StarException>
-  overwrite_file_with_rename(String const& data, String const& filename, String const& newSuffix = ".new");
+  overwrite_file_with_rename(String const& data, String const& filename, String const& new_suffix = ".new");
 
   [[nodiscard]] static std::expected<void, StarException>
-  backup_file_in_sequence(String const& initialFile, String const& targetFile, unsigned maximumBackups,
-                          String const& backupExtensionPrefix = ".");
+  backup_file_in_sequence(String const& initial_file, String const& target_file, unsigned maximum_backups,
+                          String const& backup_extension_prefix = ".");
   [[nodiscard]] static std::expected<void, StarException>
-  backup_file_in_sequence(String const& targetFile, unsigned maximumBackups, String const& backupExtensionPrefix = ".");
+  backup_file_in_sequence(String const& target_file, unsigned maximum_backups, String const& backup_extension_prefix = ".");
 
   [[nodiscard]] static std::expected<std::shared_ptr<File>, StarException> open(String const& filename, IOMode mode);
 
@@ -146,10 +147,10 @@ public:
 
   // Read / write an absolute location without modifying the shared cursor.
   // Safe alongside other IO, but not lifecycle changes; see the class contract.
-  [[nodiscard]] std::expected<std::size_t, StarException> read_absolute(StreamOffset readPosition,
-                                                                        std::span<char> data) override;
-  [[nodiscard]] std::expected<std::size_t, StarException> write_absolute(StreamOffset writePosition,
-                                                                         std::span<char const> data) override;
+  [[nodiscard]] std::expected<std::size_t, StarException> read_absolute(StreamOffset position,
+                                                                       std::span<char> data) override;
+  [[nodiscard]] std::expected<std::size_t, StarException> write_absolute(StreamOffset position,
+                                                                        std::span<char const> data) override;
 
   [[nodiscard]] std::expected<void, StarException> open(IOMode mode) override;
   // Consumes the handle even on error.  Call explicitly after writing so that
@@ -165,26 +166,56 @@ public:
   [[nodiscard]] std::expected<std::shared_ptr<IODevice>, StarException> clone() override;
 
 private:
-  static std::expected<void*, StarException> fopen(char const* filename, IOMode mode, bool create = true,
-                                                   bool exclusive = false);
+  class NativeFileHandle {
+  public:
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+    using Storage = std::uintptr_t;
+#else
+    using Storage = int;
+#endif
+    NativeFileHandle() noexcept = default;
+    explicit NativeFileHandle(Storage value) noexcept : m_value(value) {}
+    NativeFileHandle(NativeFileHandle&& other) noexcept : m_value(other.release()) {}
+    NativeFileHandle(NativeFileHandle const&) = delete;
+    NativeFileHandle& operator=(NativeFileHandle const&) = delete;
+    NativeFileHandle& operator=(NativeFileHandle&&) = delete;
+    ~NativeFileHandle() noexcept;
+
+    explicit operator bool() const noexcept { return m_value != invalid; }
+    Storage get() const noexcept { return m_value; }
+    Storage release() noexcept { return std::exchange(m_value, invalid); }
+    // Adoption must never silently discard a pending close or its error.
+    void reset(Storage value) noexcept {
+      assert(!*this);
+      m_value = value;
+    }
+
+    [[nodiscard]] static std::expected<NativeFileHandle, StarException>
+    open(String const& filename, IOMode mode, bool create = true, bool exclusive = false);
+    [[nodiscard]] std::expected<void, StarException> close();
+    [[nodiscard]] std::expected<void, StarException> seek(StreamOffset offset, IOSeek origin);
+    [[nodiscard]] std::expected<StreamOffset, StarException> pos();
+    [[nodiscard]] std::expected<StreamOffset, StarException> size();
+    [[nodiscard]] std::expected<void, StarException> resize(StreamOffset length);
+    [[nodiscard]] std::expected<void, StarException> sync();
+    [[nodiscard]] std::expected<std::size_t, StarException> read(std::span<char> data);
+    [[nodiscard]] std::expected<std::size_t, StarException> write(std::span<char const> data);
+    [[nodiscard]] std::expected<std::size_t, StarException> read_at(StreamOffset position, std::span<char> data);
+    [[nodiscard]] std::expected<std::size_t, StarException> write_at(StreamOffset position, std::span<char const> data);
+
+  private:
+    static constexpr Storage invalid = static_cast<Storage>(-1);
+    Storage m_value = invalid;
+  };
+
 #ifndef STAR_SYSTEM_FAMILY_WINDOWS
   static std::expected<void, StarException> sync_directory(String const& directory);
 #endif
-  static std::expected<void, StarException> fseek(void* file, StreamOffset offset, IOSeek seek);
-  static std::expected<StreamOffset, StarException> ftell(void* file);
-  static std::expected<std::size_t, StarException> fread(void* file, char* data, std::size_t len);
-  static std::expected<std::size_t, StarException> fwrite(void* file, char const* data, std::size_t len);
-  static std::expected<void, StarException> fsync(void* file);
-  static std::expected<void, StarException> fclose(void* file);
-  static std::expected<StreamOffset, StarException> fsize(void* file);
-  static std::expected<std::size_t, StarException> pread(void* file, char* data, std::size_t len, StreamOffset absPosition);
-  static std::expected<std::size_t, StarException> pwrite(void* file, char const* data, std::size_t len, StreamOffset absPosition);
-  static std::expected<void, StarException> resize(void* file, StreamOffset size);
 
   String m_filename;
-  void* m_file;
+  NativeFileHandle m_file;
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
-  std::recursive_mutex m_cursor_mutex;
+  std::mutex m_cursor_mutex;
 #endif
 };
 

@@ -19,25 +19,25 @@ namespace {
 using Star::File;
 using Star::String;
 
-bool require(benchmark::State& state, bool condition, char const* message) {
+bool require(benchmark::State& state, bool condition, std::string_view message) {
   if (!condition)
-    state.SkipWithError(message);
+    state.SkipWithError(std::string(message));
   return condition;
 }
 
 // Each invocation owns its directory, including replacement staging files.
 // This object's lifetime encloses the State range: setup and checked cleanup
 // are untimed, while returned read buffers are destroyed inside that range.
-struct file_fixture {
+struct FileFixture {
   benchmark::State& state;
   String directory;
   String path;
   std::vector<char> bytes;
   std::shared_ptr<File> handle;
 
-  explicit file_fixture(benchmark::State& benchmark_state) : state(benchmark_state) {}
+  explicit FileFixture(benchmark::State& benchmark_state) : state(benchmark_state) {}
 
-  ~file_fixture() {
+  ~FileFixture() {
     if (handle) {
       auto closed = handle->close();
       if (!closed)
@@ -127,7 +127,7 @@ struct file_fixture {
 };
 
 void file_size(benchmark::State& state) {
-  file_fixture fixture(state);
+  FileFixture fixture(state);
   if (!fixture.prepare(1024 * 1024) || !fixture.open_at_cursor())
     return;
   state.SetLabel("warm page-cache fixture; open handle; cursor preserved");
@@ -146,8 +146,80 @@ void file_size(benchmark::State& state) {
   state.SetItemsProcessed(state.iterations());
 }
 
+void file_at_end(benchmark::State& state) {
+  FileFixture fixture(state);
+  auto length = static_cast<std::size_t>(state.range(0));
+  if (!fixture.prepare(length) || !fixture.open_at_cursor())
+    return;
+  state.SetLabel("open handle; fixed cursor at 137");
+  for (auto _ : state) {
+    (void)_;
+    auto ended = fixture.handle->at_end();
+    if (!ended) {
+      state.SkipWithError(ended.error().what());
+      break;
+    }
+    if (!require(state, *ended == (length == 137), "Unexpected EOF result"))
+      break;
+    benchmark::DoNotOptimize(*ended);
+  }
+  fixture.validate_cursor();
+  state.SetItemsProcessed(state.iterations());
+}
+
+void file_backup_rotation(benchmark::State& state) {
+  FileFixture fixture(state);
+  if (!fixture.prepare(1))
+    return;
+  bool sparse = state.range(0) == 0;
+  std::array<String, 4> paths{fixture.path, fixture.path + ".1", fixture.path + ".2", fixture.path + ".3"};
+  std::array<char, 4> markers{0, 1, 2, 3};
+  state.SetLabel(sparse ? "missing first backup; fixture reset and checks untimed"
+                        : "populated backups; fixture reset and checks untimed");
+  for (auto _ : state) {
+    (void)_;
+    state.PauseTiming();
+    for (std::size_t i = sparse ? 2 : 1; i < paths.size(); ++i) {
+      auto written = File::write_file(std::span<char const>(markers).subspan(i, 1), paths[i]);
+      if (!written) {
+        state.SkipWithError(written.error().what());
+        return;
+      }
+    }
+    state.ResumeTiming();
+    auto rotated = File::backup_file_in_sequence(fixture.path, 3);
+    if (!rotated) {
+      state.SkipWithError(rotated.error().what());
+      return;
+    }
+    state.PauseTiming();
+    for (std::size_t i = 0; i < paths.size(); ++i) {
+      auto read = File::read_file(paths[i]);
+      if (!read) {
+        state.SkipWithError(read.error().what());
+        return;
+      }
+      auto expected = i == 0 || (i == 2 && sparse) ? i : i - 1;
+      if (!require(state, read->size() == 1 && read->span().front() == markers[expected], "Incorrect backup contents"))
+        return;
+    }
+    if (sparse) {
+      auto removed = File::remove(paths[1]);
+      if (!removed) {
+        state.SkipWithError(removed.error().what());
+        return;
+      }
+    }
+    state.ResumeTiming();
+  }
+  state.SetItemsProcessed(state.iterations());
+}
+
+BENCHMARK(file_at_end)->Name("File/AtEnd")->Arg(137)->Arg(138)->UseRealTime();
+BENCHMARK(file_backup_rotation)->Name("File/BackupRotation")->Arg(0)->Arg(1)->UseRealTime();
+
 void file_read_bytes(benchmark::State& state) {
-  file_fixture fixture(state);
+  FileFixture fixture(state);
   auto length = static_cast<std::size_t>(state.range(0));
   if (!fixture.prepare(length))
     return;
@@ -172,7 +244,7 @@ void file_read_bytes(benchmark::State& state) {
 
 #ifdef __linux__
 void file_read_bytes_evict_advised(benchmark::State& state) {
-  file_fixture fixture(state);
+  FileFixture fixture(state);
   auto length = static_cast<std::size_t>(state.range(0));
   if (!fixture.prepare(length))
     return;
@@ -223,7 +295,7 @@ BENCHMARK(file_read_bytes_evict_advised)
 #endif
 
 void file_read_string(benchmark::State& state) {
-  file_fixture fixture(state);
+  FileFixture fixture(state);
   auto length = static_cast<std::size_t>(state.range(0));
   if (!fixture.prepare(length) || !fixture.validate_string())
     return;
@@ -247,7 +319,7 @@ void file_read_string(benchmark::State& state) {
 }
 
 void file_positioned_read(benchmark::State& state) {
-  file_fixture fixture(state);
+  FileFixture fixture(state);
   if (!fixture.prepare(1024 * 1024) || !fixture.open_at_cursor())
     return;
   std::array<char, 4096> buffer;
@@ -287,7 +359,7 @@ void file_positioned_read(benchmark::State& state) {
 }
 
 void file_overwrite_rename(benchmark::State& state) {
-  file_fixture fixture(state);
+  FileFixture fixture(state);
   auto length = static_cast<std::size_t>(state.range(0));
   if (!fixture.prepare(length))
     return;

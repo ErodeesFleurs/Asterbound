@@ -119,6 +119,9 @@ values in named locals and preserve first-error, ownership and transaction order
 
 ### Binary data and I/O
 
+- `File` exclusively owns its native handle; Unix descriptor zero is valid. Explicit `close()` reports failures and consumes ownership even on error. Never retry it against a possibly reused descriptor. A clone reopens the existing path with an independent cursor and does not replay truncate or append.
+- Exclude lifecycle changes from concurrent file I/O. Unix positioned operations use `pread`/`pwrite`; Windows serializes the cursor save, operation and restore. A sequence of separate public `seek()` and `read()` calls is not atomic.
+- On Windows, `File::at_end()` and `File::clone()` observe the native cursor directly under the cursor lock. A subclass that presents a logical position or size different from the native file must also implement the corresponding end/clone behavior.
 - VLQ adapters accept integral/enum values. Synchronous `deserialize*` borrows unchanged, retained `span<const char>` input; decoded fields own storage and serializers transfer output with `take_data()`.
 - Prefer final `DataStreamReader` for contiguous decoding without read-ahead. Extensible buffers retain virtual `read_data` transformations/failures. Preserve container prefixes and complete-value commits on truncation; memory-device seeks, clone cursors and closed empty reads retain their own contracts, not file semantics.
 - B-tree comparisons and synchronous visitors borrow from retained node handles;
