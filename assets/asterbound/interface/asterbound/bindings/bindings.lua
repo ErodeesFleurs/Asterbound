@@ -243,10 +243,10 @@ function selectCategory()
   -- The scroll area preserves its distance from the top when its content resizes.
   widget.setScrollOffset("binds", widget.getMaxScrollPosition("binds"))
   widget.removeAllChildren(ROWS)
-  widget.setSize(ROWS, {240, math.max(0, #entry.rows * 14 - 1)})
+  widget.setSize(ROWS, {241, math.max(0, #entry.rows * 16 - 1)})
   for i, row in ipairs(entry.rows) do
     local template = row.id and rowTemplate or groupTemplate
-    template.position = {0, (#entry.rows - i) * 14}
+    template.position = {0, (#entry.rows - i) * 16}
     template.children.label.value = row.name
     if row.id then
       template.children.apply.caption = describe(getBinds(row.id))
