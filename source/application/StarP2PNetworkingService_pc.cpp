@@ -163,7 +163,7 @@ std::expected<void, StarException> PcP2PNetworkingService::setJoinLocal(std::uin
 }
 
 std::expected<void, StarException> PcP2PNetworkingService::setJoinRemote(HostAddressWithPort location) {
-  return setJoinLocation(JoinRemote(location));
+  return setJoinLocation(std::move(location));
 }
 
 std::expected<void, StarException> Star::PcP2PNetworkingService::setActivityData(
@@ -210,8 +210,8 @@ std::expected<void, StarException> Star::PcP2PNetworkingService::setActivityData
             return std::unexpected(std::move(logged.error()));
           activity.GetSecrets().SetJoin(joinSecret.utf8_data());
         }
-      } else if (std::holds_alternative<JoinRemote>(m_joinLocation)) {
-        String address = Star::to_string((HostAddressWithPort)std::get<JoinRemote>(m_joinLocation));
+      } else if (std::holds_alternative<HostAddressWithPort>(m_joinLocation)) {
+        String address = Star::to_string(std::get<HostAddressWithPort>(m_joinLocation));
         String joinSecret = Star::format("connect:address_{}", address);
         if (auto logged = m_state->logger.info("Setting Discord join secret as {}", joinSecret); !logged)
           return std::unexpected(std::move(logged.error()));
@@ -388,7 +388,7 @@ std::expected<void, StarException> PcP2PNetworkingService::addPendingJoin(String
   if (!targetType)
     return std::unexpected(std::move(targetType.error()));
   if (*targetType == "address") {
-    auto address = HostAddressWithPort::create(connectionString);
+    auto address = HostAddressWithPort::lookup(connectionString);
     if (!address)
       return std::unexpected(std::move(address.error()));
     m_pendingJoin = std::move(*address);
@@ -795,8 +795,8 @@ std::expected<void, StarException> PcP2PNetworkingService::setJoinLocation(JoinL
           Star::format("+platform:connect:steamid_{}", steamId).c_str()))
         return std::unexpected(ApplicationException("Steam rejected local rich presence"));
 
-    } else if (std::holds_alternative<JoinRemote>(location)) {
-      auto address = (HostAddressWithPort)std::get<JoinRemote>(location);
+    } else if (std::holds_alternative<HostAddressWithPort>(location)) {
+      auto const& address = std::get<HostAddressWithPort>(location);
       if (auto logged = m_state->logger.info("Setting Steam rich presence connection as address_{}", address); !logged)
         return std::unexpected(std::move(logged.error()));
       if (!SteamAPI_ISteamFriends_SetRichPresence(SteamAPI_SteamFriends(), "connect",

@@ -1,4 +1,5 @@
 module;
+#include <stddef.h>
 
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
 #include <winsock2.h>
@@ -79,51 +80,82 @@ inline bool netErrorInterrupt() {
 #endif
 }
 
-[[nodiscard]] inline std::expected<void, StarException> setAddressFromNative(HostAddressWithPort& addressWithPort, NetworkMode mode, struct sockaddr_storage* sockAddr) {
+inline int native_address_family(NetworkMode mode) {
   switch (mode) {
-    case NetworkMode::IPv4: {
-      struct sockaddr_in* addr4 = (struct sockaddr_in*)sockAddr;
-      addressWithPort = HostAddressWithPort(mode, {(std::uint8_t*)&(addr4->sin_addr.s_addr), sizeof(addr4->sin_addr.s_addr)}, ntohs(addr4->sin_port));
-      break;
-    }
-    case NetworkMode::IPv6: {
-      struct sockaddr_in6* addr6 = (struct sockaddr_in6*)sockAddr;
-      addressWithPort = HostAddressWithPort(mode, {(std::uint8_t*)&addr6->sin6_addr.s6_addr, sizeof(addr6->sin6_addr.s6_addr)}, ntohs(addr6->sin6_port));
-      break;
-    }
-    default:
-      return std::unexpected(NetworkException("Invalid network mode for setAddressFromNative"));
+    case NetworkMode::IPv4: return AF_INET;
+    case NetworkMode::IPv6: return AF_INET6;
+    default: return AF_UNSPEC;
   }
-  return {};
 }
 
-[[nodiscard]] inline std::expected<void, StarException> setNativeFromAddress(HostAddressWithPort const& addressWithPort, struct sockaddr_storage* sockAddr, socklen_t* sockAddrLen) {
-  switch (addressWithPort.address().mode()) {
-    case NetworkMode::IPv4: {
-      struct sockaddr_in* addr4 = (struct sockaddr_in*)sockAddr;
-      *sockAddrLen = sizeof(*addr4);
-
-      std::memset(addr4, 0, *sockAddrLen);
-      addr4->sin_family = AF_INET;
-      addr4->sin_port = htons(addressWithPort.port());
-      std::memcpy(((char*)&addr4->sin_addr.s_addr), addressWithPort.address().bytes().data(), addressWithPort.address().size());
-
-      break;
-    }
-    case NetworkMode::IPv6: {
-      struct sockaddr_in6* addr6 = (struct sockaddr_in6*)sockAddr;
-      *sockAddrLen = sizeof(*addr6);
-
-      std::memset(addr6, 0, *sockAddrLen);
-      addr6->sin6_family = AF_INET6;
-      addr6->sin6_port = htons(addressWithPort.port());
-      std::memcpy(((char*)&addr6->sin6_addr.s6_addr), addressWithPort.address().bytes().data(), addressWithPort.address().size());
-      break;
-    }
+[[nodiscard]] inline std::expected<HostAddressWithPort, StarException> address_from_native(
+    std::span<std::byte const> bytes, int expected_family) {
+  // sockaddr's family is not necessarily the first field (Darwin/FreeBSD).
+  // Resolver records and byte views need not have sockaddr_in/in6 alignment.
+  decltype(sockaddr::sa_family) family;
+  constexpr auto family_offset = offsetof(sockaddr, sa_family);
+  if (bytes.size() < family_offset + sizeof(family))
+    return std::unexpected(NetworkException("Missing native address family"));
+  std::memcpy(&family, bytes.data() + family_offset, sizeof(family));
+  if (family != expected_family)
+    return std::unexpected(NetworkException("Native address family mismatch"));
+#if defined STAR_SYSTEM_MACOS || defined STAR_SYSTEM_FREEBSD
+  if (std::to_integer<unsigned>(bytes[offsetof(sockaddr, sa_len)]) != bytes.size())
+    return std::unexpected(NetworkException("Inconsistent native address length"));
+#endif
+  auto octets = std::span{reinterpret_cast<std::uint8_t const*>(bytes.data()), bytes.size()};
+  auto port_at = [&](std::size_t offset) {
+    std::uint16_t port;
+    std::memcpy(&port, bytes.data() + offset, sizeof(port));
+    return ntohs(port);
+  };
+  switch (family) {
+    case AF_INET:
+      if (bytes.size() != sizeof(sockaddr_in))
+        return std::unexpected(NetworkException("Invalid IPv4 socket address length"));
+      return HostAddressWithPort(HostAddress(octets.subspan<offsetof(sockaddr_in, sin_addr), sizeof(in_addr)>()),
+          port_at(offsetof(sockaddr_in, sin_port)));
+    case AF_INET6:
+      if (bytes.size() != sizeof(sockaddr_in6))
+        return std::unexpected(NetworkException("Invalid IPv6 socket address length"));
+      return HostAddressWithPort(HostAddress(octets.subspan<offsetof(sockaddr_in6, sin6_addr), sizeof(in6_addr)>()),
+          port_at(offsetof(sockaddr_in6, sin6_port)));
     default:
-      return std::unexpected(NetworkException("Invalid network mode for setNativeFromAddress"));
+      return std::unexpected(NetworkException("Unsupported native address family"));
   }
-  return {};
+}
+
+[[nodiscard]] inline std::expected<HostAddressWithPort, StarException> address_from_native(
+    sockaddr_storage const& storage, socklen_t length, int expected_family) {
+  auto size = static_cast<std::size_t>(length);
+  if (size > sizeof(storage))
+    return std::unexpected(NetworkException("Native address exceeds socket buffer"));
+  return address_from_native(std::as_bytes(std::span{&storage, 1}).first(size), expected_family);
+}
+
+[[nodiscard]] inline socklen_t native_from_address(HostAddressWithPort const& endpoint, sockaddr_storage& storage) {
+  auto const& host = endpoint.address();
+  auto bytes = host.bytes();
+  if (host.mode() == NetworkMode::IPv4) {
+    sockaddr_in address{};
+#if defined STAR_SYSTEM_MACOS || defined STAR_SYSTEM_FREEBSD
+    address.sin_len = sizeof(address);
+#endif
+    address.sin_family = AF_INET;
+    address.sin_port = htons(endpoint.port());
+    std::memcpy(&address.sin_addr, bytes.data(), sizeof(address.sin_addr));
+    std::memcpy(&storage, &address, sizeof(address));
+    return sizeof(address);
+  }
+  sockaddr_in6 address{};
+#if defined STAR_SYSTEM_MACOS || defined STAR_SYSTEM_FREEBSD
+  address.sin6_len = sizeof(address);
+#endif
+  address.sin6_family = AF_INET6;
+  address.sin6_port = htons(endpoint.port());
+  std::memcpy(&address.sin6_addr, bytes.data(), sizeof(address.sin6_addr));
+  std::memcpy(&storage, &address, sizeof(address));
+  return sizeof(address);
 }
 
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
@@ -226,8 +258,9 @@ export namespace Star {
   using ::Star::netErrorString;
   using ::Star::netErrorConnectionReset;
   using ::Star::netErrorInterrupt;
-  using ::Star::setAddressFromNative;
-  using ::Star::setNativeFromAddress;
+  using ::Star::native_address_family;
+  using ::Star::address_from_native;
+  using ::Star::native_from_address;
   using ::Star::invalidSocketDescriptor;
   using ::Star::SocketImpl;
 }

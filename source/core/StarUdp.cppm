@@ -82,12 +82,10 @@ UdpSocket::UdpSocket(NetworkMode networkMode) : Socket(networkMode) {}
   if (auto status = checkOpen("UdpSocket::receive"); !status)
     return std::unexpected(std::move(status.error()));
 
-  int flags = 0;
-  int len;
-  struct sockaddr_storage sockAddr;
-  socklen_t sockAddrLen = sizeof(sockAddr);
-
-  len = ::recvfrom(m_impl->socketDesc, data.data(), data.size(), flags, (struct sockaddr*)&sockAddr, &sockAddrLen);
+  sockaddr_storage storage;
+  socklen_t length = sizeof(storage);
+  auto len = ::recvfrom(m_impl->socketDesc, data.data(), data.size(), 0,
+      address ? reinterpret_cast<sockaddr*>(&storage) : nullptr, address ? &length : nullptr);
 
   if (len < 0) {
     if (!isActive())
@@ -99,8 +97,10 @@ UdpSocket::UdpSocket(NetworkMode networkMode) : Socket(networkMode) {}
   }
 
   if (address) {
-    if (auto status = setAddressFromNative(address->get(), m_localAddress.address().mode(), &sockAddr); !status)
-      return std::unexpected(std::move(status.error()));
+    auto peer = address_from_native(storage, length, native_address_family(m_networkMode));
+    if (!peer)
+      return std::unexpected(std::move(peer.error()));
+    address->get() = std::move(*peer);
   }
 
   return len;
@@ -111,12 +111,10 @@ UdpSocket::UdpSocket(NetworkMode networkMode) : Socket(networkMode) {}
   if (auto status = checkOpen("UdpSocket::send"); !status)
     return std::unexpected(std::move(status.error()));
 
-  struct sockaddr_storage sockAddr;
-  socklen_t sockAddrLen;
-  if (auto status = setNativeFromAddress(address, &sockAddr, &sockAddrLen); !status)
-    return std::unexpected(std::move(status.error()));
-
-  int len = ::sendto(m_impl->socketDesc, data.data(), data.size(), 0, (struct sockaddr*)&sockAddr, sockAddrLen);
+  sockaddr_storage storage;
+  auto length = native_from_address(address, storage);
+  auto len = ::sendto(m_impl->socketDesc, data.data(), data.size(), 0,
+      reinterpret_cast<sockaddr const*>(&storage), length);
   if (len < 0) {
     if (!isActive())
       return std::unexpected(SocketClosedException("Connection closed"));

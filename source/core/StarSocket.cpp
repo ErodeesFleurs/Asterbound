@@ -195,9 +195,6 @@ std::expected<void, StarException> Socket::bind(Logger& logger, HostAddressWithP
   if (auto status = checkOpen("Socket::bind"); !status)
     return std::unexpected(std::move(status.error()));
 
-  struct sockaddr_storage sockAddr;
-  socklen_t sockAddrLen;
-
   if (addressWithPort.address().mode() != m_networkMode)
     return std::unexpected(NetworkException("Bind address does not match socket mode"));
 
@@ -206,17 +203,20 @@ std::expected<void, StarException> Socket::bind(Logger& logger, HostAddressWithP
   if (auto status = m_impl->setSockOpt(SOL_SOCKET, SO_REUSEADDR, (void*)&set, sizeof(int)); !status)
     return std::unexpected(std::move(status.error()));
 
-  m_localAddress = addressWithPort;
-  if (auto status = setNativeFromAddress(m_localAddress, &sockAddr, &sockAddrLen); !status)
-    return std::unexpected(std::move(status.error()));
-  if (::bind(m_impl->socketDesc, (struct sockaddr*)&sockAddr, sockAddrLen) < 0)
-    return std::unexpected(NetworkException(Star::format("Cannot bind socket to {}: {}", m_localAddress, netErrorString())));
+  sockaddr_storage storage;
+  auto length = native_from_address(addressWithPort, storage);
+  if (::bind(m_impl->socketDesc, reinterpret_cast<sockaddr const*>(&storage), length) < 0)
+    return std::unexpected(NetworkException(Star::format("Cannot bind socket to {}: {}", addressWithPort, netErrorString())));
   if (addressWithPort.port() == 0) {
-    sockAddrLen = sizeof(sockAddr);
-    if (::getsockname(m_impl->socketDesc, (struct sockaddr*)&sockAddr, &sockAddrLen) != 0)
+    length = sizeof(storage);
+    if (::getsockname(m_impl->socketDesc, reinterpret_cast<sockaddr*>(&storage), &length) != 0)
       return std::unexpected(NetworkException::format("Cannot query bound socket address: {}", netErrorString()));
-    if (auto status = setAddressFromNative(m_localAddress, m_networkMode, &sockAddr); !status)
-      return std::unexpected(std::move(status.error()));
+    auto local = address_from_native(storage, length, native_address_family(m_networkMode));
+    if (!local)
+      return std::unexpected(std::move(local.error()));
+    m_localAddress = std::move(*local);
+  } else {
+    m_localAddress = addressWithPort;
   }
 
   m_socketMode = SocketMode::Bound;
@@ -315,9 +315,10 @@ Socket::Socket(NetworkMode networkMode)
 
 std::expected<void, StarException> Socket::initialize(SocketType type) {
   m_impl = std::make_shared<SocketImpl>();
-  if (m_networkMode != NetworkMode::IPv4 && m_networkMode != NetworkMode::IPv6)
+  int family = native_address_family(m_networkMode);
+  if (family == AF_UNSPEC)
     return std::unexpected(NetworkException("Invalid socket network mode"));
-  m_impl->socketDesc = ::socket(m_networkMode == NetworkMode::IPv4 ? AF_INET : AF_INET6,
+  m_impl->socketDesc = ::socket(family,
       type == SocketType::Tcp ? SOCK_STREAM : SOCK_DGRAM, 0);
   if (invalidSocketDescriptor(m_impl->socketDesc))
     return std::unexpected(NetworkException::format("cannot create socket: {}", netErrorString()));

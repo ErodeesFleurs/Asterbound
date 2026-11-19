@@ -7,7 +7,6 @@ import star.native_runtime;
 import star.json;
 import star.file;
 import star.random;
-import star.lexical_cast;
 import star.logging;
 import star.id_map;
 import star.format;
@@ -228,20 +227,22 @@ static std::expected<void, StarException> runServer(int argc, char** argv, bool&
     std::unique_ptr<ServerQueryThread> queryServer;
     std::unique_ptr<ServerRconThread> rconServer;
     auto session = [&]() -> std::expected<void, StarException> {
-    auto bindAddress = [&configuration](String const& bindKey, String const& portKey) -> std::expected<HostAddressWithPort, StarException> {
-      auto bind = (*configuration)->get(bindKey);
+    auto bind_address = [&configuration](String const& bind_key, String const& port_key) -> std::expected<HostAddressWithPort, StarException> {
+      auto bind = (*configuration)->get(bind_key);
       if (!bind)
         return std::unexpected(std::move(bind.error()));
       auto host = bind->toString();
       if (!host)
         return std::unexpected(std::move(host.error()));
-      auto port = (*configuration)->get(portKey);
+      auto port = (*configuration)->get(port_key);
       if (!port)
         return std::unexpected(std::move(port.error()));
       auto number = port->toInt();
       if (!number)
         return std::unexpected(std::move(number.error()));
-      return HostAddressWithPort::create(*host, *number);
+      if (!std::in_range<std::uint16_t>(*number))
+        return std::unexpected(NetworkException::format("{} must be a port between 0 and 65535", port_key));
+      return HostAddressWithPort::lookup(*host, static_cast<std::uint16_t>(*number));
     };
 
     auto querySetting = (*configuration)->get("runQueryServer");
@@ -251,7 +252,7 @@ static std::expected<void, StarException> runServer(int argc, char** argv, bool&
     if (!queryEnabled)
       return std::unexpected(std::move(queryEnabled.error()));
     if (*queryEnabled) {
-      auto address = bindAddress("queryServerBind", "queryServerPort");
+      auto address = bind_address("queryServerBind", "queryServerPort");
       if (!address)
         return std::unexpected(std::move(address.error()));
       auto query = ServerQueryThread::create(*server, *address);
@@ -270,7 +271,7 @@ static std::expected<void, StarException> runServer(int argc, char** argv, bool&
     if (!rconEnabled)
       return std::unexpected(std::move(rconEnabled.error()));
     if (*rconEnabled) {
-      auto address = bindAddress("rconServerBind", "rconServerPort");
+      auto address = bind_address("rconServerBind", "rconServerPort");
       if (!address)
         return std::unexpected(std::move(address.error()));
       auto rcon = ServerRconThread::create(*server, *address);

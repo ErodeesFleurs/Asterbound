@@ -59,38 +59,39 @@ std::expected<std::shared_ptr<TcpSocket>, StarException> TcpSocket::accept(Logge
   if (m_socketMode != SocketMode::Bound)
     return std::unexpected(SocketClosedException("TcpSocket not bound in TcpSocket::accept"));
 
-  struct sockaddr_storage sockAddr;
-  socklen_t sockAddrLen = sizeof(sockAddr);
+  sockaddr_storage storage;
+  socklen_t length = sizeof(storage);
+  auto socket_desc = ::accept(m_impl->socketDesc, reinterpret_cast<sockaddr*>(&storage), &length);
 
-  auto socketDesc = ::accept(m_impl->socketDesc, (struct sockaddr*)&sockAddr, &sockAddrLen);
-
-  if (invalidSocketDescriptor(socketDesc)) {
+  if (invalidSocketDescriptor(socket_desc)) {
     if (netErrorInterrupt())
       return std::shared_ptr<TcpSocket>{};
     return std::unexpected(NetworkException(Star::format("Cannot accept connection: {}", netErrorString())));
   }
 
-  auto socketImpl = std::make_shared<SocketImpl>();
-  socketImpl->socketDesc = socketDesc;
+  auto socket_impl = std::make_shared<SocketImpl>();
+  socket_impl->socketDesc = socket_desc;
+  auto remote = address_from_native(storage, length, native_address_family(m_networkMode));
+  if (!remote)
+    return std::unexpected(std::move(remote.error()));
 
 #if defined STAR_SYSTEM_MACOS || defined STAR_SYSTEM_FREEBSD
   // Don't generate sigpipe
   int set = 1;
-  if (auto status = socketImpl->setSockOpt(SOL_SOCKET, SO_NOSIGPIPE, (void*)&set, sizeof(int)); !status)
+  if (auto status = socket_impl->setSockOpt(SOL_SOCKET, SO_NOSIGPIPE, &set, sizeof(set)); !status)
     return std::unexpected(std::move(status.error()));
 #endif
 
-  std::shared_ptr<TcpSocket> sockPtr(new TcpSocket(m_localAddress.address().mode(), socketImpl));
-  if (auto status = sockPtr->configure(); !status)
+  std::shared_ptr<TcpSocket> socket(new TcpSocket(m_networkMode, std::move(socket_impl)));
+  if (auto status = socket->configure(); !status)
     return std::unexpected(std::move(status.error()));
 
-  sockPtr->m_localAddress = m_localAddress;
-  if (auto status = setAddressFromNative(sockPtr->m_remoteAddress, m_localAddress.address().mode(), &sockAddr); !status)
-    return std::unexpected(std::move(status.error()));
-  if (auto status = logger.debug("accept from {} ({})", sockPtr->m_remoteAddress, sockPtr->m_impl->socketDesc); !status)
+  socket->m_localAddress = m_localAddress;
+  socket->m_remoteAddress = std::move(*remote);
+  if (auto status = logger.debug("accept from {} ({})", socket->m_remoteAddress, socket->m_impl->socketDesc); !status)
     return std::unexpected(std::move(status.error()));
 
-  return sockPtr;
+  return socket;
 }
 
 std::expected<void, StarException> TcpSocket::setNoDelay(bool noDelay) {
@@ -183,11 +184,9 @@ std::expected<void, StarException> TcpSocket::connect(HostAddressWithPort const&
   if (m_networkMode != addressWithPort.address().mode())
     return std::unexpected(NetworkException("Socket address type mismatch between address and socket."));
 
-  struct sockaddr_storage sockAddr;
-  socklen_t sockAddrLen;
-  if (auto status = setNativeFromAddress(addressWithPort, &sockAddr, &sockAddrLen); !status)
-    return std::unexpected(std::move(status.error()));
-  if (::connect(m_impl->socketDesc, (struct sockaddr*)&sockAddr, sockAddrLen) < 0)
+  sockaddr_storage storage;
+  auto length = native_from_address(addressWithPort, storage);
+  if (::connect(m_impl->socketDesc, reinterpret_cast<sockaddr const*>(&storage), length) < 0)
     return std::unexpected(NetworkException(Star::format("cannot connect to {}: {}", addressWithPort, netErrorString())));
 
 #if defined STAR_SYSTEM_MACOS || defined STAR_SYSTEM_FREEBSD

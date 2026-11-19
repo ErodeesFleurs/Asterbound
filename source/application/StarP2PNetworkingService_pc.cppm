@@ -93,43 +93,7 @@ private:
     bool operator==(JoinLocal const& rhs) const { return capacity == rhs.capacity; };
     std::uint32_t capacity;
   };
-  template <typename BaseType>
-  struct JoinRemoteWrapper : BaseType {
-    using BaseType::BaseType;
-
-    JoinRemoteWrapper() : BaseType() {}
-
-    JoinRemoteWrapper(JoinRemoteWrapper const& nt) : BaseType(nt) {}
-
-    JoinRemoteWrapper(JoinRemoteWrapper&& nt) : BaseType(std::move(nt)) {}
-
-    explicit JoinRemoteWrapper(BaseType const& bt) : BaseType(bt) {}
-
-    explicit JoinRemoteWrapper(BaseType&& bt) : BaseType(std::move(bt)) {}
-
-    JoinRemoteWrapper& operator=(JoinRemoteWrapper const& rhs) {
-      BaseType::operator=(rhs);
-      return *this;
-    }
-
-    JoinRemoteWrapper& operator=(JoinRemoteWrapper&& rhs) {
-      BaseType::operator=(std::move(rhs));
-      return *this;
-    }
-
-    template <class Arg>
-    JoinRemoteWrapper& operator=(Arg&& other) {
-      static_assert(std::is_base_of_v<BaseType, std::decay_t<Arg>> == false
-                      || std::is_same_v<JoinRemoteWrapper, std::decay_t<Arg>>,
-                    "JoinRemote can not implicitly be assigned from HostAddressWithPort-derived classes or strong "
-                    "HostAddressWithPort typedefs");
-
-      BaseType::operator=(std::forward<Arg>(other));
-      return *this;
-    }
-  };
-  using JoinRemote = JoinRemoteWrapper<HostAddressWithPort>;
-  using JoinLocation = std::variant<JoinUnavailable, JoinLocal, JoinRemote>;
+  using JoinLocation = std::variant<JoinUnavailable, JoinLocal, HostAddressWithPort>;
 
 #ifdef STAR_ENABLE_STEAM_INTEGRATION
 

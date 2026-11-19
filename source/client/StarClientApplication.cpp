@@ -204,7 +204,6 @@ import star.weather;
 import star.world_client;
 import star.root_loader;
 import star.input;
-import star.lexical_cast;
 import star.bytes;
 struct OpusDecoder;
 struct OpusEncoder;
@@ -1973,25 +1972,25 @@ std::expected<void, StarException> ClientApplication::updateTitle(float dt) {
 
   } else if (m_titleScreen->currentState() == TitleState::StartMultiPlayer) {
     if (!m_pendingMultiPlayerConnection || std::holds_alternative<HostAddressWithPort>(m_pendingMultiPlayerConnection->server)) {
-      auto addressString = m_titleScreen->multiPlayerAddress().trim();
-      if (!addressString)
-        return std::unexpected(std::move(addressString.error()));
-      auto portString = m_titleScreen->multiPlayerPort().trim();
-      if (!portString)
-        return std::unexpected(std::move(portString.error()));
+      auto host_text = m_titleScreen->multiPlayerAddress().trim();
+      if (!host_text)
+        return std::unexpected(std::move(host_text.error()));
+      auto port_text = m_titleScreen->multiPlayerPort().trim();
+      if (!port_text)
+        return std::unexpected(std::move(port_text.error()));
       auto config = m_root->configuration();
       if (!config)
         return std::unexpected(std::move(config.error()));
-      if (portString->empty()) {
-        auto defaultPort = (*config)->get("gameServerPort").and_then([](Json j) { return j.toUInt(); });
-        if (!defaultPort)
-          return std::unexpected(std::move(defaultPort.error()));
-        *portString = Star::to_string(*defaultPort);
+      if (port_text->empty()) {
+        auto default_port = (*config)->get("gameServerPort").and_then([](Json j) { return j.toUInt(); });
+        if (!default_port)
+          return std::unexpected(std::move(default_port.error()));
+        *port_text = Star::to_string(*default_port);
       }
-      auto port = maybe_lexical_cast<std::uint16_t>(*portString);
+      auto port = HostAddressWithPort::parse_port(port_text->utf8());
       if (!port)
-        return setError(Star::format("invalid port: {}", *portString));
-      auto address = HostAddressWithPort::lookup(*addressString, *port);
+        return setError(Star::format("invalid port: {}", *port_text));
+      auto address = HostAddressWithPort::lookup(*host_text, *port);
       if (!address)
         return setError("Error resolving server address", ExceptionDiagnostic(address.error()));
       m_pendingMultiPlayerConnection =

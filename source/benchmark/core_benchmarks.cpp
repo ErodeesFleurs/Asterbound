@@ -1,3 +1,9 @@
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
+#include <sys/socket.h>
+#endif
 #include <cstdio>
 #include <benchmark/benchmark.h>
 
@@ -25,6 +31,89 @@ import star.dynamic_lib;
 import star.rpc_promise;
 import star.json_rpc;
 import star.logging;
+import star.host_address;
+import star.net_impl;
+
+namespace HostBenchmarks {
+using namespace Star;
+
+constexpr std::array<std::uint8_t, 4> ipv4{192, 0, 2, 255};
+constexpr std::array<std::uint8_t, 16> ipv6{0xfd, 0, 0x80, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0xaa, 0xbb, 0xcc, 0xff};
+
+HostAddress fixture(bool v6) {
+  return v6 ? HostAddress(std::span{ipv6}) : HostAddress(std::span{ipv4});
+}
+
+void parse_endpoint(benchmark::State& state, bool v6) {
+  String text(std::string_view(v6 ? "[::]:65535" : "*:65535"));
+  auto parse = [&] { return HostAddressWithPort::lookup(text); };
+  auto check = parse();
+  if (!check || check->port() != 65535 || check->address().mode() != (v6 ? NetworkMode::IPv6 : NetworkMode::IPv4)
+      || !check->address().is_zero()) {
+    state.SkipWithError("Wildcard endpoint differs from fixture");
+    return;
+  }
+  for (auto _ : state) {
+    auto result = parse();
+    benchmark::DoNotOptimize(result);
+  }
+}
+
+void format_address(benchmark::State& state, bool v6) {
+  auto address = fixture(v6);
+  if (std::format("{}", address) != (v6 ? "fd00:8001:0203:0405:0607:0809:aabb:ccff" : "192.0.2.255")) {
+    state.SkipWithError("Address text differs from fixture");
+    return;
+  }
+  for (auto _ : state) {
+    auto text = std::format("{}", address);
+    benchmark::DoNotOptimize(text);
+  }
+}
+
+void hash_address(benchmark::State& state) {
+  auto address = fixture(true);
+  std::size_t expected = 0;
+  for (auto byte : ipv6)
+    expected = expected * 101 + byte;
+  if (hash<HostAddress>{}(address) != expected) {
+    state.SkipWithError("Address hash differs from unsigned fixture");
+    return;
+  }
+  for (auto _ : state) {
+    benchmark::DoNotOptimize(address);
+    auto result = hash<HostAddress>{}(address);
+    benchmark::DoNotOptimize(result);
+  }
+}
+
+void native_round_trip(benchmark::State& state, bool v6) {
+  HostAddressWithPort endpoint(fixture(v6), 0xbeef);
+  sockaddr_storage native{};
+  auto convert = [&]() -> std::expected<HostAddressWithPort, StarException> {
+    auto length = native_from_address(endpoint, native);
+    benchmark::DoNotOptimize(native);
+    return address_from_native(native, length, v6 ? AF_INET6 : AF_INET);
+  };
+  auto check = convert();
+  if (!check || *check != endpoint) {
+    state.SkipWithError("Native endpoint round trip differs from fixture");
+    return;
+  }
+  for (auto _ : state) {
+    auto result = convert();
+    benchmark::DoNotOptimize(result);
+  }
+}
+
+BENCHMARK_CAPTURE(parse_endpoint, V4, false)->Name("Core/HostAddress/ParseWildcard4");
+BENCHMARK_CAPTURE(parse_endpoint, V6, true)->Name("Core/HostAddress/ParseWildcard6");
+BENCHMARK_CAPTURE(format_address, V4, false)->Name("Core/HostAddress/Format4");
+BENCHMARK_CAPTURE(format_address, V6, true)->Name("Core/HostAddress/Format6");
+BENCHMARK(hash_address)->Name("Core/HostAddress/HashHighBit6");
+BENCHMARK_CAPTURE(native_round_trip, V4, false)->Name("Core/HostAddress/NativeRoundTrip4");
+BENCHMARK_CAPTURE(native_round_trip, V6, true)->Name("Core/HostAddress/NativeRoundTrip6");
+} // namespace HostBenchmarks
 
 namespace RpcBenchmarks {
 

@@ -931,19 +931,21 @@ std::expected<void, StarException> UniverseServer::runLoop(std::stop_token stopT
         auto configuration = m_root.configuration();
         if (!configuration)
           return std::unexpected(std::move(configuration.error()));
-        auto bindJson = (*configuration)->get("gameServerBind");
-        if (!bindJson)
-          return std::unexpected(std::move(bindJson.error()));
-        auto bind = bindJson->toString();
+        auto bind_json = (*configuration)->get("gameServerBind");
+        if (!bind_json)
+          return std::unexpected(std::move(bind_json.error()));
+        auto bind = bind_json->toString();
         if (!bind)
           return std::unexpected(std::move(bind.error()));
-        auto portJson = (*configuration)->get("gameServerPort");
-        if (!portJson)
-          return std::unexpected(std::move(portJson.error()));
-        auto port = portJson->toUInt();
+        auto port_json = (*configuration)->get("gameServerPort");
+        if (!port_json)
+          return std::unexpected(std::move(port_json.error()));
+        auto port = port_json->toUInt();
         if (!port)
           return std::unexpected(std::move(port.error()));
-        auto address = HostAddressWithPort::create(*bind, *port);
+        if (!std::in_range<std::uint16_t>(*port))
+          return std::unexpected(NetworkException("gameServerPort must be a port between 0 and 65535"));
+        auto address = HostAddressWithPort::lookup(*bind, static_cast<std::uint16_t>(*port));
         if (!address)
           return std::unexpected(std::move(address.error()));
         auto pendingJson = assets->json("/universe_server.config:maxPendingConnections");
@@ -2936,7 +2938,7 @@ std::expected<std::optional<String>, StarException> UniverseServer::isBannedUser
       auto text = ban.getString("ip");
       if (!text)
         return std::unexpected(std::move(text.error()));
-      auto address = HostAddress::create(*text);
+      auto address = HostAddress::lookup(*text);
       if (!address)
         return std::unexpected(std::move(address.error()));
       if (*address == *hostAddress) {
