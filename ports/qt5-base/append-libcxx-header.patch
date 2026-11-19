@@ -1,7 +1,0 @@
---- a/ports/qt5-base/portfile.cmake
-+++ b/ports/qt5-base/portfile.cmake
-@@ -47,3 +47,4 @@
- set(PATCHES
-+    "${OSB_QT_LIBCXX_PATCH}"
-     # CVE fixes from https://download.qt.io/archive/qt/5.15/
-     patches/CVE-2025-4211-qtbase-5.15.diff

@@ -19,7 +19,7 @@ target_include_directories (mod_uploader PRIVATE
 target_link_libraries (mod_uploader PRIVATE star_base_modules star_steam_dispatch_modules
   star_build_config star_steam_dependencies
   $<LINK_ONLY:star_core_dependencies> $<LINK_ONLY:star_extern_dependencies>
-  Qt5::Core Qt5::Gui Qt5::Widgets)
+  Qt6::Core Qt6::Gui Qt6::Widgets)
 star_import_qt_plugins(mod_uploader)
 star_module_moc(mod_uploader StarSPlainTextEdit.cppm moc_StarSPlainTextEdit.cpp)
 set_target_properties (mod_uploader PROPERTIES AUTOMOC OFF CXX_SCAN_FOR_MODULES ON)

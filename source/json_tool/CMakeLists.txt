@@ -11,7 +11,7 @@ target_include_directories (json_tool PRIVATE
   )
 target_link_libraries (json_tool PRIVATE star_modules star_build_config
   $<LINK_ONLY:star_core_dependencies> $<LINK_ONLY:star_extern_dependencies>
-  Qt5::Core Qt5::Gui Qt5::Widgets)
+  Qt6::Core Qt6::Gui Qt6::Widgets)
 star_import_qt_plugins(json_tool)
 
 set_target_properties (json_tool PROPERTIES AUTOMOC OFF CXX_SCAN_FOR_MODULES ON)

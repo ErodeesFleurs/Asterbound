@@ -270,88 +270,67 @@ let
 
   # Qt's public APIs and plugin interfaces are C++, so Qt libraries AND its
   # platform/image/style plugins must be linked statically into each tool.
-  # Qtbase contains moc/uic/rcc. Only Linguist's lupdate/lrelease family from
-  # qttools is needed; QDoc would add nixpkgs' incompatible shared LLVM C++ API.
-  qt5 = (pkgs.qt5.override { inherit stdenv; }).overrideScope (
-    final: prev: {
+  # qtbase supplies moc/uic/rcc; neither tool uses Linguist or Qt translations.
+  doubleConversion = instrument (
+    (pkgs.double-conversion.override { inherit stdenv; }).overrideAttrs (old: {
+      cmakeFlags = (old.cmakeFlags or [ ]) ++ [
+        (lib.cmakeBool "BUILD_SHARED_LIBS" false)
+      ];
+    })
+  );
+  qt6 = (pkgs.qt6.override { inherit stdenv; }).overrideScope (
+    _final: prev: {
       qtbase = instrument (
         (prev.qtbase.override {
-          inherit icu;
-          # Avoid the translations -> qttools -> qtbase bootstrap cycle; the
-          # Asterbound widgets do not install or load Qt translation catalogs.
+          inherit stdenv icu;
+          double-conversion = doubleConversion;
           qttranslations = null;
-        }).overrideAttrs
-          (old: {
-            propagatedBuildInputs = (old.propagatedBuildInputs or [ ]) ++ [ pkgs.zstd ];
-            patches = (old.patches or [ ]) ++ [ ../cmake/patches/qtbase-libcxx.patch ];
-            # Qt's shared-library RPATH feature is invalid for a static Qt build.
-            configureFlags =
-              lib.filter (flag: flag != "-shared" && flag != "-rpath") (old.configureFlags or [ ])
-              ++ [
-                "-static"
-                "-no-rpath"
-                "-platform"
-                "linux-clang"
-              ];
-            # Host tools still load C-ABI dependencies through the bundled lld.
-            preConfigure = (old.preConfigure or "") + ''
-              export NIX_LDFLAGS="''${NIX_LDFLAGS-} -rpath ${
-                lib.makeLibraryPath (
-                  (old.buildInputs or [ ]) ++ (old.propagatedBuildInputs or [ ]) ++ [ pkgs.zstd ]
-                )
-              }"
-            '';
-            # Static plugin metadata is already installed in dev/mkspecs/modules.
-            # Merge its files before the upstream one-level mkspecs directory move.
-            postInstall = ''
-              moveToOutput "mkspecs/modules/*" "$dev"
-            ''
-            + (old.postInstall or "");
-            # qtbase does not load its own setup hook. Supply its plugin prefix to
-            # the inherited fixup so static consumers find the binary-output archives.
-            postFixup = ''
-              qtPluginPrefix=${lib.escapeShellArg prev.qtbase.qtPluginPrefix}
-            ''
-            + (old.postFixup or "");
-          })
-      );
-      qttools = instrument (
-        final.qtModule {
-          pname = "qttools";
-          propagatedBuildInputs = [ final.qtbase ];
-          outputs = [
-            "out"
-            "dev"
+          withGtk3 = false;
+          withWayland = false;
+          systemdSupport = false;
+          cups = null;
+          libpq = null;
+        }).overrideAttrs (old: {
+          dontDisableStatic = true;
+          # Static Qt still installs dynamically linked C-ABI host tools.
+          # Qt clears their install RPATH; resolve it in the package, not via
+          # LD_LIBRARY_PATH in each downstream moc invocation.
+          nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.autoPatchelfHook ];
+          buildInputs = lib.subtractLists [ pkgs.libmysqlclient ] (old.buildInputs or [ ]);
+          # Only the Widgets/XCB dependency closure is needed. In particular,
+          # do not propagate unused SQL drivers, QtNetwork's proxy or Vulkan.
+          propagatedBuildInputs = with pkgs; [
+            zlib libGL harfbuzz libjpeg libpng pcre2 zstd libb2 md4c
+            dbus glib fontconfig freetype
+            libx11 libxext libxi libxrender libxcb libxkbcommon
+            libxcb-util libxcb-image libxcb-keysyms libxcb-render-util
+            libxcb-wm libxdmcp libxtst libxcb-cursor
+          ] ++ [ icu doubleConversion ];
+          cmakeFlags = lib.filter (
+            flag: !(lib.any (prefix: lib.hasPrefix prefix flag) [
+              "-DQT_FEATURE_libproxy=" "-DQT_FEATURE_system_sqlite="
+              "-DQT_FEATURE_openssl_linked=" "-DQT_FEATURE_vulkan="
+              "-DQT_FEATURE_sctp=" "-DQT_FEATURE_journald="
+            ])
+          ) (old.cmakeFlags or [ ]) ++ [
+            (lib.cmakeBool "BUILD_SHARED_LIBS" false)
+            (lib.cmakeBool "QT_BUILD_EXAMPLES" false)
+            (lib.cmakeBool "QT_BUILD_TESTS" false)
+            "-DQT_FEATURE_network=OFF"
+            "-DQT_FEATURE_sql=OFF"
+            "-DQT_FEATURE_printsupport=OFF"
+            "-DQT_FEATURE_testlib=OFF"
+            "-DQT_FEATURE_xml=OFF"
+            "-DQT_FEATURE_vulkan=OFF"
           ];
-          patches = [
-            (pkgs.replaceVars
-              "${pkgs.path}/pkgs/development/libraries/qt-5/modules/qttools-QT_HOST_DATA-refs.patch"
-              {
-                qtbaseDev = lib.getDev final.qtbase;
-              }
-            )
-          ];
-          postPatch = ''
-            # No QDoc/LLVM, Designer plugins or QML module is used by these builds.
-            printf '%s\n' \
-              'TEMPLATE = subdirs' \
-              'SUBDIRS = uiplugin uitools linguist' \
-              'uiplugin.subdir = designer/src/uiplugin' \
-              'uitools.subdir = designer/src/uitools' \
-              'uitools.depends = uiplugin' \
-              'linguist.depends = uitools' > src/src.pro
-          '';
-          devTools = [
-            "bin/linguist"
-            "bin/lconvert"
-            "bin/lrelease"
-            "bin/lrelease-pro"
-            "bin/lupdate"
-            "bin/lupdate-pro"
-            "bin/lprodump"
-          ];
-          setupHook = "${pkgs.path}/pkgs/development/libraries/qt-5/hooks/qttools-setup-hook.sh";
-        }
+          # Preserve split-output metadata fixups, not upstream's patchelf
+          # operations on shared QtGui and the unused MySQL plugin.
+          postFixup = lib.concatStringsSep "\n" (
+            lib.filter (line:
+              !(lib.hasInfix "libqsqlmysql.so" line || lib.hasInfix "$out/lib/libQt6Gui.so" line)
+            ) (lib.splitString "\n" old.postFixup)
+          );
+        })
       );
     }
   );
@@ -377,7 +356,7 @@ in
     spirv-tools
     glslang
     shaderc
-    qt5
+    qt6
     sdkRuntime
     ;
 }

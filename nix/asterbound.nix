@@ -54,7 +54,7 @@ let
     libcpr
     re2
     cpptrace
-    qt5
+    qt6
     sdkRuntime
     ;
   version = (builtins.fromJSON (builtins.readFile ../version.json)).version;
@@ -241,7 +241,7 @@ let
       ++ lib.optional guiSupport vulkan-loader
       ++ lib.optional (steamSupport || discordSupport) sdks
       ++ lib.optional discordSupport sdkRuntime
-      ++ lib.optional qtSupport qt5.qtbase
+      ++ lib.optional qtSupport qt6.qtbase
     )
   );
 in
@@ -272,8 +272,7 @@ stdenv.mkDerivation {
     cmake
     ninja
     pkg-config
-  ]
-  ++ lib.optional qtSupport qt5.qttools;
+  ];
   buildInputs = [
     mimalloc
     zlib-ng
@@ -304,7 +303,7 @@ stdenv.mkDerivation {
     dependencies.spirv-tools
   ]
   ++ lib.optional (steamSupport || discordSupport) sdks
-  ++ lib.optional qtSupport qt5.qtbase
+  ++ lib.optional qtSupport qt6.qtbase
   ++ lib.optional withBenchmarks dependencies.gbenchmark;
 
   # Append rather than replace the caller's compiler/linker flags. These are

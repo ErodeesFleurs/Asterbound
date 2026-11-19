@@ -4,17 +4,13 @@ set(VCPKG_CRT_LINKAGE dynamic)
 set(VCPKG_LIBRARY_LINKAGE static)
 set(VCPKG_BUILD_TYPE release)
 set(VCPKG_LOAD_VCVARS_ENV OFF)
-set(VCPKG_ENV_PASSTHROUGH_UNTRACKED XCLANG_ROOT MSYS2_ROOT MAKEFLAGS)
+set(VCPKG_ENV_PASSTHROUGH_UNTRACKED XCLANG_ROOT MAKEFLAGS)
 set(VCPKG_ENV_PASSTHROUGH OSB_NATIVE_COMPILER_ROOT)
 set(VCPKG_HASH_ADDITIONAL_FILES
     "${CMAKE_CURRENT_LIST_FILE}"
     "${CMAKE_CURRENT_LIST_DIR}/toolchain.cmake"
     "${CMAKE_CURRENT_LIST_DIR}/../scripts/ci/install-xclang.cmake"
     "${CMAKE_CURRENT_LIST_DIR}/../scripts/ci/configure-native-linux-sdk.cmake")
-if(PORT STREQUAL "qt5-base")
-    list(APPEND VCPKG_HASH_ADDITIONAL_FILES
-        "${CMAKE_CURRENT_LIST_DIR}/../cmake/patches/qtbase-libcxx.patch")
-endif()
 if(NOT EXISTS "$ENV{XCLANG_ROOT}/lib/cmake/xclang/toolchain.cmake")
     message(FATAL_ERROR "Set XCLANG_ROOT to the unpacked xclang 23.1.5.2 toolchain")
 endif()
@@ -51,54 +47,23 @@ list(APPEND VCPKG_CMAKE_CONFIGURE_OPTIONS
 string(APPEND VCPKG_C_FLAGS " --target=${XCLANG_TARGET}")
 string(APPEND VCPKG_CXX_FLAGS " --target=${XCLANG_TARGET}")
 # The official chainloaded toolchain does not consume vcpkg's flag variables.
-# Forward them explicitly for CMake ports as well as autotools/qmake probes.
+# Forward them explicitly for CMake ports as well as autotools probes.
 list(APPEND VCPKG_CMAKE_CONFIGURE_OPTIONS
     "-DCMAKE_C_FLAGS=${VCPKG_C_FLAGS}"
     "-DCMAKE_CXX_FLAGS=${VCPKG_CXX_FLAGS}")
 
-# Qt5's qmake bootstrap must not auto-detect MSVC or select a GNU mkspec.
 if(VCPKG_CMAKE_SYSTEM_NAME STREQUAL "MinGW")
     # MinGW is vcpkg's platform name; CMake's platform is Windows. The official
     # xclang file replaces vcpkg's mingw.cmake, which normally translates this.
     list(APPEND VCPKG_CMAKE_CONFIGURE_OPTIONS "-DCMAKE_SYSTEM_NAME=Windows")
-    set(VCPKG_QT_TARGET_MKSPEC win32-clang-g++)
-    # Compiler executable names and PATH follow the host, not the target.
+    # PATH separators follow the host, not the target.
     if(CMAKE_HOST_WIN32)
-        if(DEFINED ENV{MSYS2_ROOT})
-            set(ENV{PATH} "$ENV{XCLANG_ROOT}/bin;$ENV{MSYS2_ROOT}/ucrt64/bin;$ENV{PATH}")
-        else()
-            set(ENV{PATH} "$ENV{XCLANG_ROOT}/bin;$ENV{PATH}")
-        endif()
-        set(host_exe ".exe")
+        set(ENV{PATH} "$ENV{XCLANG_ROOT}/bin;$ENV{PATH}")
     else()
         set(ENV{PATH} "$ENV{XCLANG_ROOT}/bin:$ENV{PATH}")
-        set(host_exe "")
-    endif()
-    if(PORT STREQUAL "qt5-base")
-        set(ENV{CC} "$ENV{XCLANG_ROOT}/bin/clang${host_exe}")
-        set(ENV{CXX} "$ENV{XCLANG_ROOT}/bin/clang++${host_exe}")
-        # The MinGW mkspec otherwise hardcodes GNU ar for static libraries.
-        set(ENV{QMAKEFLAGS} "-late \"QMAKE_LIB=llvm-ar -rc\" \"QMAKE_AR=llvm-ar -rc\" \"QMAKE_OBJCOPY=llvm-objcopy\"")
-    endif()
-elseif(VCPKG_CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    set(VCPKG_QT_TARGET_MKSPEC linux-clang)
-    set(VCPKG_QT_HOST_MKSPEC linux-clang)
-    if(PORT STREQUAL "qt5-base")
-        set(ENV{CC} "${OSB_COMPILER_ROOT}/bin/clang")
-        set(ENV{CXX} "${OSB_COMPILER_ROOT}/bin/clang++")
-        set(ENV{PATH} "${OSB_COMPILER_ROOT}/bin:$ENV{PATH}")
     endif()
 elseif(VCPKG_CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    set(VCPKG_QT_TARGET_MKSPEC macx-clang)
-    set(VCPKG_QT_HOST_MKSPEC macx-clang)
     set(VCPKG_OSX_DEPLOYMENT_TARGET 14.0)
-endif()
-if(CMAKE_HOST_WIN32)
-    set(VCPKG_QT_HOST_MKSPEC win32-clang-g++)
-elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
-    set(VCPKG_QT_HOST_MKSPEC linux-clang)
-elseif(CMAKE_HOST_APPLE)
-    set(VCPKG_QT_HOST_MKSPEC macx-clang)
 endif()
 if(PORT MATCHES "^discord-")
     set(VCPKG_LIBRARY_LINKAGE dynamic)

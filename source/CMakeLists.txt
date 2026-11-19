@@ -536,24 +536,24 @@ if(STAR_BUILD_GUI)
 
   # Qt GUI tools
   if(STAR_BUILD_QT_TOOLS)
-    find_package(Qt5 REQUIRED COMPONENTS Core Gui Widgets)
-    get_target_property(qt_core_type Qt5::Core TYPE)
+    find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets)
+    get_target_property(qt_core_type Qt6::Core TYPE)
     if(NOT qt_core_type STREQUAL "STATIC_LIBRARY")
       message(FATAL_ERROR "Qt tools require static Qt built with xclang's bundled libc++.")
     endif()
     if(STAR_SYSTEM_WINDOWS)
-      set(STAR_QT_PLATFORM_PLUGIN Qt5::QWindowsIntegrationPlugin)
+      set(STAR_QT_PLATFORM_PLUGIN Qt6::QWindowsIntegrationPlugin)
     elseif(STAR_SYSTEM_MACOS)
-      set(STAR_QT_PLATFORM_PLUGIN Qt5::QCocoaIntegrationPlugin)
+      set(STAR_QT_PLATFORM_PLUGIN Qt6::QCocoaIntegrationPlugin)
     else()
-      set(STAR_QT_PLATFORM_PLUGIN Qt5::QXcbIntegrationPlugin)
+      set(STAR_QT_PLATFORM_PLUGIN Qt6::QXcbIntegrationPlugin)
     endif()
     function(star_import_qt_plugins target)
-      qt5_import_plugins(${target} INCLUDE ${STAR_QT_PLATFORM_PLUGIN})
+      qt6_import_plugins(${target} INCLUDE ${STAR_QT_PLATFORM_PLUGIN})
     endfunction()
     function(star_module_moc target interface output)
       set(moc_includes)
-      foreach(qt_target Qt5::Core Qt5::Gui Qt5::Widgets)
+      foreach(qt_target Qt6::Core Qt6::Gui Qt6::Widgets)
         get_target_property(qt_includes ${qt_target} INTERFACE_INCLUDE_DIRECTORIES)
         foreach(directory IN LISTS qt_includes)
           list(APPEND moc_includes "-I${directory}")
@@ -562,10 +562,10 @@ if(STAR_BUILD_GUI)
       set(moc_source "${CMAKE_CURRENT_SOURCE_DIR}/${interface}")
       set(moc_output "${CMAKE_CURRENT_BINARY_DIR}/${output}")
       add_custom_command(OUTPUT "${moc_output}"
-        COMMAND Qt5::moc -i ${moc_includes}
+        COMMAND Qt6::moc -i ${moc_includes}
           -DQT_CORE_LIB -DQT_GUI_LIB -DQT_WIDGETS_LIB
           "${moc_source}" -o "${moc_output}"
-        DEPENDS "${moc_source}" Qt5::moc
+        DEPENDS "${moc_source}" Qt6::moc
         VERBATIM)
       set_source_files_properties("${moc_output}" PROPERTIES HEADER_FILE_ONLY TRUE)
       target_sources(${target} PRIVATE "${moc_output}")

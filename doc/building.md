@@ -188,6 +188,44 @@ ASTERBOUND_ASSETS=/path/to/Starbound/assets ./result-server/bin/asterbound_serve
 
 Use `nix develop` for the default development environment or `nix develop .#full` for Qt tools. Limit `--cores` and `--max-jobs` to suit the machine; ThinLTO can use additional memory during linking.
 
+## Qt maintenance tools
+
+`json_tool` and, with Steam enabled, `mod_uploader` use static Qt 6 Core,
+Gui and Widgets. The client and server do not use Qt. The existing pins provide
+Qt 6.11.0 through vcpkg's `qt-tools` feature and Qt 6.11.2 through Nix's
+`.#full` variant; this migration does not update either dependency lock.
+
+Qt and its static platform/image plugins must use the same xclang/libc++ as the
+project. Do not substitute a system Qt or installer-built GCC/MSVC package.
+vcpkg disables Qt's default features and selects Widgets, fonts and PNG/JPEG,
+plus XCB/fontconfig on Linux. Linux tools retain the XCB backend (XWayland on a
+Wayland desktop), not native Wayland. No QML, Core5Compat or Linguist is needed.
+Nix also builds double-conversion with the project's static C++ runtime and
+fixes the installed Qt host tools' C-library RPATHs, so `moc` does not need
+`LD_LIBRARY_PATH`.
+
+Use a fresh directory when switching from Qt 5 to Qt 6:
+
+```sh
+nix develop .#full -c cmake -S source -B build/qt6 -G Ninja \
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo -DSTAR_BUILD_QT_TOOLS=ON \
+  -DSTAR_ENABLE_STEAM_INTEGRATION=ON -DSTAR_ENABLE_DISCORD_INTEGRATION=OFF
+nix develop .#full -c cmake --build build/qt6 --target json_tool mod_uploader --parallel 4
+```
+
+These commands still write executables to `dist/`; do not run competing build
+trees against that directory. Keep `AUTOMOC` disabled: the uploader's
+`StarSPlainTextEdit.cppm` is processed with `Qt6::moc -i`, and the generated file
+is included by its module-aware implementation rather than compiled separately.
+
+For migration validation, exercise `json_tool` without a display as well as
+actual edit/save/error windows, PNG/JPEG previews and 100/150/200% scaling.
+The uploader also needs a real Steam initialization check; a missing-Steam
+error dialog is not proof of successful login or Workshop publication.
+Inspect platform binaries for accidental dynamic Qt or another C++ runtime.
+Windows/macOS need native validation in addition to Linux smoke checks.
+Static Qt distribution obligations are described in [OPENSOURCE.md](OPENSOURCE.md).
+
 ## Renderer selection
 
 Vulkan is the default. Override the renderer at startup:

@@ -33,8 +33,20 @@
       "dependencies": [{ "name": "benchmark", "version>=": "1.9.5" }]
     },
     "qt-tools": {
-      "description": "Static Qt5 widgets for json_tool and mod_uploader",
-      "dependencies": ["qt5-base"]
+      "description": "Static Qt6 widgets for json_tool and mod_uploader",
+      "dependencies": [
+        {
+          "name": "qtbase",
+          "default-features": false,
+          "features": ["widgets", "thread", "png", "jpeg", "freetype", "harfbuzz"]
+        },
+        {
+          "name": "qtbase",
+          "default-features": false,
+          "features": ["xcb", "fontconfig"],
+          "platform": "linux"
+        }
+      ]
     }
   }
 }
