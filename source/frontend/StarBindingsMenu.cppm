@@ -55,13 +55,8 @@ public:
 
   [[nodiscard]] static std::expected<std::shared_ptr<BindingsMenu>, StarException> create(GuiContext& guiContext, Json const& config);
 
-  [[nodiscard]] std::expected<void, StarException> show() override;
-  [[nodiscard]] std::expected<void, StarException> displayed() override;
-  [[nodiscard]] std::expected<void, StarException> dismissed() override;
-
 private:
   explicit BindingsMenu(GuiContext& guiContext);
-
 };
 
 }

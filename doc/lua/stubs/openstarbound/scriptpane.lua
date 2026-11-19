@@ -95,6 +95,9 @@ function pane.removeWidget(widgetName) end
 ---@field screenPosition? Vec2I Screen interface pixels for pointer events.
 ---@field physicalPosition? Vec2F Actual raw physical pixels for move/buttonDown/buttonUp only.
 ---@field button? integer Zero-based mouse button.
+---@field buttonName? string Canonical mouse button name on buttonDown.
+---@field controllerButton? string Canonical controller button name on press.
+---@field controller? integer Controller ID on button press.
 ---@field direction? integer Wheel: 1 up, -1 down.
 ---@field key? string
 ---@field mods? integer

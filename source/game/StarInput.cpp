@@ -58,33 +58,19 @@ inline bool compareKeyMod(KeyMod input, KeyMod test) {
 	return (input | (KeyModOptional & ~test)) == (test | KeyModOptional);
 }
 
+// Keep mod binding wire names separate from the game's LMeta/RMeta spellings.
+constexpr auto ModBindModifierNames = sortedEnumNames(std::to_array<std::pair<KeyMod, std::string_view>>({
+  {KeyMod::LShift, "LShift"}, {KeyMod::RShift, "RShift"}, {KeyMod::LCtrl, "LCtrl"}, {KeyMod::RCtrl, "RCtrl"},
+  {KeyMod::LAlt, "LAlt"}, {KeyMod::RAlt, "RAlt"}, {KeyMod::LGui, "LGui"}, {KeyMod::RGui, "RGui"},
+  {KeyMod::Num, "Num"}, {KeyMod::Caps, "Caps"}, {KeyMod::AltGr, "AltGr"}, {KeyMod::Scroll, "Scroll"}
+}));
+
 Json keyModsToJson(KeyMod mod) {
   JsonArray array;
 
-  if (static_cast<bool>(mod & KeyMod::LShift))
-    array.emplace_back("LShift");
-  if (static_cast<bool>(mod & KeyMod::RShift))
-    array.emplace_back("RShift");
-  if (static_cast<bool>(mod & KeyMod::LCtrl))
-    array.emplace_back("LCtrl");
-  if (static_cast<bool>(mod & KeyMod::RCtrl))
-    array.emplace_back("RCtrl");
-  if (static_cast<bool>(mod & KeyMod::LAlt))
-    array.emplace_back("LAlt");
-  if (static_cast<bool>(mod & KeyMod::RAlt))
-    array.emplace_back("RAlt");
-  if (static_cast<bool>(mod & KeyMod::LGui))
-    array.emplace_back("LGui");
-  if (static_cast<bool>(mod & KeyMod::RGui))
-    array.emplace_back("RGui");
-  if (static_cast<bool>(mod & KeyMod::Num))
-    array.emplace_back("Num");
-  if (static_cast<bool>(mod & KeyMod::Caps))
-    array.emplace_back("Caps");
-  if (static_cast<bool>(mod & KeyMod::AltGr))
-    array.emplace_back("AltGr");
-  if (static_cast<bool>(mod & KeyMod::Scroll))
-    array.emplace_back("Scroll");
+  for (auto const& [bit, name] : ModBindModifierNames)
+    if (static_cast<bool>(mod & bit))
+      array.emplace_back(name);
 
   return array.empty() ? Json() : std::move(array);
 }
@@ -104,9 +90,17 @@ Json keyModsToJson(KeyMod mod) {
   for (Json const& jMod : *array) {
     auto text = jMod.toString();
     if (!text) return std::unexpected(std::move(text.error()));
-    auto named = enumValue<KeyModNames>(*text);
+    auto named = maybeEnumValue<ModBindModifierNames>(*text);
     if (!named) return std::unexpected(std::move(named.error()));
-    KeyMod changedMod = mod | *named;
+    KeyMod bit;
+    if (*named) {
+      bit = **named;
+    } else {
+      auto legacy = enumValue<KeyModNames>(*text);
+      if (!legacy) return std::unexpected(std::move(legacy.error()));
+      bit = *legacy;
+    }
+    KeyMod changedMod = mod | bit;
     if (mod != changedMod) {
       mod = changedMod;
       ++modPriority;
@@ -405,16 +399,22 @@ std::expected<void, StarException> Input::BindCategory::mergeJson(String const& 
     if (!built) return std::unexpected(std::move(built.error()));
     auto& entry = entries.try_emplace(bindId, std::move(*built)).first->second;
     if (userBindings->isType(Json::Type::Object)) {
-      auto bindings = userBindings->queryArray(Star::format("{}.{}", id, bindId), {});
-      if (!bindings) return std::unexpected(std::move(bindings.error()));
-      for (auto const& jBind : *bindings) {
-        auto bind = bindFromJson(jBind);
-        if (!bind) {
-          if (!bind.error().is<JsonException>()) return std::unexpected(std::move(bind.error()));
-          auto logged = owner.m_root.logger().error_exception(
-            Star::format("Binds: Error loading user bind in {}.{}", id, bindId), ExceptionDiagnostic(bind.error()));
-          if (!logged) return std::unexpected(std::move(logged.error()));
-        } else entry.customBinds.emplace_back(std::move(*bind));
+      auto override = userBindings->query(Star::format("{}.{}", id, bindId), Json());
+      if (!override) return std::unexpected(std::move(override.error()));
+      if (override->isType(Json::Type::Array)) {
+        auto bindings = override->iterate_array();
+        if (!bindings) return std::unexpected(std::move(bindings.error()));
+        // An empty saved array is an intentional unbind, not a missing override.
+        if (bindings->begin() == bindings->end()) continue;
+        for (auto const& jBind : *bindings) {
+          auto bind = bindFromJson(jBind);
+          if (!bind) {
+            if (!bind.error().is<JsonException>()) return std::unexpected(std::move(bind.error()));
+            auto logged = owner.m_root.logger().error_exception(
+              Star::format("Binds: Error loading user bind in {}.{}", id, bindId), ExceptionDiagnostic(bind.error()));
+            if (!logged) return std::unexpected(std::move(logged.error()));
+          } else entry.customBinds.emplace_back(std::move(*bind));
+        }
       }
     }
     if (entry.customBinds.empty()) entry.customBinds = entry.defaultBinds;

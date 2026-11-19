@@ -80,7 +80,7 @@ Resets this bind to its default keys.
 
 #### `void` input.setBinds(`String` categoryId, `String` bindId, `Json` binds)
 
-Sets this bind to the specified keys.
+Sets the inputs for this `.binds` action. An empty array clears the action, including after restart. Use `input.resetBinds` to restore its defaults. These functions do not modify game actions in `bindings`.
 
 ---
 

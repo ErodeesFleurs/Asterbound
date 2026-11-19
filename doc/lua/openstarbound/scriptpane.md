@@ -240,8 +240,10 @@ press's action names in Lua. Input events contain:
   event's floating-point physical window-pixel coordinates. It is not rebuilt
   from the rounded/scaled interface coordinates. Wheel/nonpointer events do
   not have this field; existing `position`/`screenPosition` semantics are unchanged.
-* Zero-based `button` for mouse-button events or `direction` (`1` up, `-1` down)
-  for wheel events.
+* Mouse-button events carry a zero-based `button`; `buttonDown` also carries its
+  canonical `buttonName` (e.g. `MouseLeft`). Wheel events have `direction` (`1` up, `-1` down).
+* A controller button press has `type = "controller"`, a canonical `controllerButton`
+  name (e.g. `DPadUp`) and the numeric `controller` ID. Axis events and releases do not carry these fields.
 
 ```lua
 function init()

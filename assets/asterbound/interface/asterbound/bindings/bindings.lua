@@ -1,374 +1,312 @@
---constants
-local PATH = "/interface/asterbound/bindings/"
-local CATEGORY_LIST_WIDGET = "categories.list"
-local BINDS_WIDGET       = "binds"
+local LIST = "categories.list"
+local ROWS = "binds.rows"
+local gameCategories = {"player", "toolbar", "game"}
 
-local fmt = string.format
+-- KeyDown supplies the native KeyMod bitset. Lock states are not chord
+-- modifiers. The game and .binds encoders spell the GUI modifiers differently.
+local modifiers = {
+  {"LShift", 0x0001}, {"RShift", 0x0002},
+  {"LCtrl",  0x0040}, {"RCtrl",  0x0080},
+  {"LAlt",   0x0100}, {"RAlt",   0x0200},
+  {"LGui",   0x0400, "LMeta"}, {"RGui", 0x0800, "RMeta"},
+  {"AltGr",  0x4000}
+}
+local modBits = {}
+for _, mod in ipairs(modifiers) do modBits[mod[1]] = mod[2] end
 
---SNARE
+local categories, category = {}, nil
+local rowTemplate, groupTemplate
+local openingGame, currentGame, defaultGame, maxBindings
+local gameChanged = false
+local capture
 
-local snared = false
-local snareFinished
-
-function snare(_key) end
-
-local mods = {}
-for i, mod in ipairs{"LShift", "RShift", "LCtrl", "RCtrl", "LAlt", "RAlt", "LGui", "RGui", "AltGr", "Scroll"} do
-  local data = {name = mod, active = false}
-  mods[i], mods[mod] = data, data
+local function rowPath(index)
+  return ROWS .. ".row" .. index
 end
 
-
-local function getMods(key)
-  local bindMods = jarray()
-  for _, mod in ipairs(mods) do
-    if mod.active and mod.name ~= key then
-      bindMods[#bindMods + 1] = mod.name
-    end
-  end
-  if bindMods[1] then return bindMods end
+local function getBinds(id)
+  if category.modId then return input.getBinds(category.modId, id) end
+  return currentGame[id] or jarray()
 end
 
-local function finishBind(a, b)
-  widget.blur("snare")
-  snared = false
-  if (type(a) == "table") then
-    snareFinished(a)
-  else
-    snareFinished{ type = a, value = b, mods = getMods(b) }
-    for _, mod in ipairs(mods) do
-      mod.active = false
-    end
-  end
-end
-
-local function scanInputEvents()
-  local events = input.events()
-  for _, event in pairs(events) do
-    local type, data = event.type, event.data
-    if type == "KeyDown" then
-      local key = data.key
-      local mod = mods[key]
-      if mod then mod.active = true end
-    elseif type == "KeyUp" then
-      return finishBind("key", data.key)
-    elseif type == "MouseButtonDown" then
-      return finishBind("mouse", data.mouseButton)
-    elseif type == "ControllerButtonDown" then
-      return finishBind{ type = "controller", value = data.controllerButton, controller = data.controller }
-    end
-  end
-end
-
-function update()
-  if snared then
-    scanInputEvents()
-    if snared and not widget.hasFocus("snare") then
-      snared = false
-      snareFinished()
-      for _, mod in ipairs(mods) do
-        mod.active = false
-      end
-    end
-  end
-end
-
-local function beginSnare()
-  snared = true
-  widget.focus("snare")
-end
-
--- BINDING
-
-
-local function alphabeticalNameSortLesser(a, b)  return a.name < b.name end
-local sortedCategories = {}
-local categories = {}
-
-local widgetsToCategories = {}
-local allBinds = {}
-
-local function addCategoryToList(data)
-  local name = widget.addListItem(CATEGORY_LIST_WIDGET)
-  widget.setText(fmt("%s.%s.button", CATEGORY_LIST_WIDGET, name), data.name)
-  return name
-end
-
-local function parseBinds()
-  for _, path in pairs(root.assetsByExtension("binds")) do
-    local assetBinds = root.assetJson(path)
-    ---@cast assetBinds JsonObject
-    for categoryId, data in pairs(assetBinds) do
-      if not data.name then data.name = categoryId end
-      data.categoryId = categoryId
-      local existing = categories[categoryId]
-      categories[categoryId] = existing and sb.jsonMerge(existing, data) or data
-    end
-  end
-
-  for _, data in pairs(categories) do
-    sortedCategories[#sortedCategories + 1] = data
-  end
-  table.sort(sortedCategories, alphabeticalNameSortLesser)
-  for i = 1, #sortedCategories do
-    local data = sortedCategories[i]
-    data.index = i
-    local name = addCategoryToList(data)
-    data.widget = name
-    widgetsToCategories[name] = data
-  end
-  if sortedCategories[1] then
-    local first = sortedCategories[1].widget
-    widget.setListSelected(CATEGORY_LIST_WIDGET, first)
-    selectCategory()
-  end
-end
-
-local function bindsToString(binds)
-  local t = {}
-  for i, bind in pairs(binds) do
-    local str = ""
-    if bind.mods then
-      for _, v in pairs(bind.mods) do
-        str = str .. v .. " + "
-      end
-    end
+local function describe(binds)
+  local descriptions = {}
+  for _, bind in ipairs(binds) do
+    local value = tostring(bind.value)
     if bind.type == "controller" then
-      str = str .. "🎮 " .. bind.value
-    else
-      str = str .. bind.value
+      value = string.format("Pad %d: %s", bind.controller or 0, value)
     end
-    local _i = (i - 1) * 2
-    if _i ~= 0 then
-      t[_i] = ", "
+    if bind.mods and #bind.mods > 0 then
+      value = table.concat(bind.mods, " + ") .. " + " .. value
     end
-    t[_i + 1] = str
+    descriptions[#descriptions + 1] = value
   end
-  return table.concat(t)
+  return table.concat(descriptions, ", ")
 end
 
-local function setButtonsEnabled(state)
-  for _, bind in pairs(allBinds) do
-    widget.setButtonEnabled(fmt("%s.apply_%s", BINDS_WIDGET, bind.bindId), state)
-    widget.setButtonEnabled(fmt("%s.erase_%s", BINDS_WIDGET, bind.bindId), state)
-    widget.setButtonEnabled(fmt("%s.reset_%s", BINDS_WIDGET, bind.bindId), state)
-  end
-  for widgetId in pairs(widgetsToCategories) do
-    widget.setButtonEnabled(fmt("%s.%s.button", CATEGORY_LIST_WIDGET, widgetId), state)
-  end
-  widget.setButtonEnabled(CATEGORY_LIST_WIDGET, state)
-end
-
-local activeBind
-local activeCategory
-
-snareFinished = function(newBind)
-  setButtonsEnabled(true)
-  if not newBind or not activeBind or not activeCategory then return end
-  local currentBinds = input.getBinds(activeCategory, activeBind)
-  local replace = false
-  for _, v in pairs(currentBinds) do
-    if sb.printJson(v) == sb.printJson(newBind) then
-      --equal, replace all binds
-      currentBinds = {newBind}
-      replace = true
-      break
+local function refresh(id)
+  for i, row in ipairs(category.rows) do
+    if row.id and (not id or row.id == id) then
+      widget.setText(rowPath(i) .. ".apply", describe(getBinds(row.id)))
     end
   end
-  if replace then
-    currentBinds = {newBind}
+end
+
+local function setBinds(id, binds)
+  if category.modId then
+    input.setBinds(category.modId, id, binds)
   else
-    currentBinds[#currentBinds + 1] = newBind
+    currentGame[id] = binds
+    gameBinds.set(currentGame)
+    gameChanged = true
   end
-  input.setBinds(activeCategory, activeBind, currentBinds)
-  widget.setText(fmt("%s.apply_%s", BINDS_WIDGET, activeBind), bindsToString(currentBinds))
+  refresh(id)
 end
 
-function eraseBind(bind)
-  bind = bind:sub(7)
-  local binds = jarray()
-  binds[1] = nil
-  input.setBinds(activeCategory, bind, binds)
-  widget.setText(fmt("%s.apply_%s", BINDS_WIDGET, bind), "")
-end
-
-function resetBind(bind)
-  bind = bind:sub(7)
-  local defaultBinds = input.getDefaultBinds(activeCategory, bind)
-  if #defaultBinds == 0 then
-    defaultBinds = jarray()
-    defaultBinds[1] = nil
+local function endCapture()
+  if capture then
+    local index = capture.index
+    capture = nil
+    widget.setVisible("capture", false)
+    widget.setText(rowPath(index) .. ".apply", describe(getBinds(category.rows[index].id)))
   end
-  input.setBinds(activeCategory, bind, defaultBinds)
-  widget.setText(fmt("%s.apply_%s", BINDS_WIDGET, bind), bindsToString(defaultBinds))
 end
 
-function applyBind(bind)
-  bind = bind:sub(7)
-  setButtonsEnabled(false)
-  activeBind = bind
-  beginSnare()
+function applyBind(_, index)
+  endCapture()
+  local held = 0
+  for _, mod in ipairs(modifiers) do
+    if input.keyHeld(mod[1]) then held = held | mod[2] end
+  end
+  capture = {index = index, mods = held}
+  widget.setText(rowPath(index) .. ".apply", category.modId and "Press input..." or "Press key...")
+  widget.setVisible("capture", true)
 end
 
-local function addBindGroup(data, i, added)
-  local y = (i - 1) * -14
-  local bg = {
-    type = "image",
-    file = PATH .. "groupname.png",
-    position = {-12, y}
-  }
-  local name = "group_" .. i
-  widget.addChild(BINDS_WIDGET, bg, name)
-  added[#added + 1] = name
-  local label = {
-    type = "label",
-    value = data.name,
-    wrapWidth = 120,
-    fontSize = 8,
-    hAnchor = "mid",
-    vAnchor = "mid",
-    position = {120, 6}
-  }
-  widget.addChild(fmt("%s.%s", BINDS_WIDGET, name), label, "text")
+function eraseBind(_, index)
+  endCapture()
+  setBinds(category.rows[index].id, jarray())
 end
 
-local function addBindSet(data, i, added)
-  local y = (i - 1) * -14
-  local bg = {
-    type = "image",
-    file = PATH .. "bindname.png",
-    position = {-12, y}
-  }
-  local name = "label_" .. i
-  widget.addChild(BINDS_WIDGET, bg, name)
-  added[#added + 1] = name
-  local label = {
-    type = "label",
-    value = data.name,
-    wrapWidth = 120,
-    fontSize = 8,
-    hAnchor = "mid",
-    vAnchor = "mid",
-    position = {62, 6}
-  }
-  widget.addChild(fmt("%s.%s", BINDS_WIDGET, name), label, "text")
-  local button = {
-    type = "button",
-    callback = "applyBind",
-    position = {112, y + 2},
-    pressedOffset = {0, 0},
-    base = PATH .. "bind.png",
-    hover = PATH .. "bind.png?fade=fff;0.025",
-    pressed = PATH .. "bind.png?fade=fff;0.05?multiply=0f0",
-    caption = bindsToString(input.getBinds(data.categoryId, data.bindId))
-  }
-  name = "apply_" .. data.bindId
-  added[#added + 1] = name
-  widget.addChild(BINDS_WIDGET, button, name)
-  local erase = {
-    type = "button",
-    callback = "eraseBind",
-    position = {209, y + 2},
-    pressedOffset = {0, -1},
-    base = PATH .. "garbage.png",
-    hover = PATH .. "garbage.png?multiply=faa",
-    pressed = PATH .. "garbage.png?multiply=f00",
-  }
-  name = "erase_" .. data.bindId
-  added[#added + 1] = name
-  widget.addChild(BINDS_WIDGET, erase, name)
-  local reset = {
-    type = "button",
-    callback = "resetBind",
-    position = {218, y + 2},
-    pressedOffset = {0, -1},
-    base = PATH .. "reset.png",
-    hover = PATH .. "reset.png?multiply=faa",
-    pressed = PATH .. "reset.png?multiply=f00",
-  }
-  name = "reset_" .. data.bindId
-  added[#added + 1] = name
-  widget.addChild(BINDS_WIDGET, reset, name)
+function resetBind(_, index)
+  endCapture()
+  local id = category.rows[index].id
+  if category.modId then
+    input.resetBinds(category.modId, id)
+    refresh(id)
+  else
+    setBinds(id, defaultGame[id] or jarray())
+  end
+end
+
+function cancelGame()
+  if gameChanged then gameBinds.set(openingGame) end
+  pane.dismiss()
+end
+
+function resetGame()
+  endCapture()
+  currentGame = gameBinds.defaults()
+  gameBinds.set(currentGame)
+  gameChanged = true
+  if not category.modId then refresh() end
+end
+
+local function finishBind(kind, value, controller)
+  local id = category.rows[capture.index].id
+  local newBind = {type = kind, value = value, controller = controller}
+  if kind ~= "controller" then
+    local names = jarray()
+    for _, mod in ipairs(modifiers) do
+      if (capture.mods & mod[2]) ~= 0 then
+        names[#names + 1] = not category.modId and mod[3] or mod[1]
+      end
+    end
+    if not category.modId or #names > 0 then newBind.mods = names end
+  end
+  endCapture()
+
+  -- Never mutate a descriptor array from the opening snapshot or defaults.
+  local previous = getBinds(id)
+  local nextBinds = jarray()
+  local duplicate = false
+  for _, old in ipairs(previous) do
+    if sb.jsonEqual(old, newBind) then duplicate = true; break end
+  end
+  if not duplicate then
+    local first = category.modId and 1 or math.max(1, #previous - maxBindings + 2)
+    for i = first, #previous do nextBinds[#nextBinds + 1] = previous[i] end
+  end
+  if category.modId or maxBindings > 0 then nextBinds[#nextBinds + 1] = newBind end
+  setBinds(id, nextBinds)
+end
+
+function onInput(event)
+  if not capture then return false end
+  if event.type == "keyDown" then
+    local cancel = false
+    for _, action in ipairs(event.actions) do
+      if not category.modId and action == "KeybindingClear" then
+        eraseBind(nil, capture.index)
+        return true
+      end
+      if action == "KeybindingCancel" then cancel = true end
+    end
+    if cancel then
+      endCapture()
+    else
+      local bit = modBits[event.key]
+      capture.mods = event.mods | (bit or 0)
+      if not bit then finishBind("key", event.key) end
+    end
+    return true
+  elseif event.type == "keyUp" then
+    local bit = modBits[event.key]
+    if bit and (capture.mods & bit) ~= 0 then
+      capture.mods = capture.mods & ~bit
+      finishBind("key", event.key)
+    end
+    return true
+  elseif event.type == "buttonDown" and category.modId then
+    local path = rowPath(capture.index)
+    if event.button == 0 and (widget.inMember("categories", event.screenPosition)
+        or widget.inMember("cancelGame", event.screenPosition) or widget.inMember("resetGame", event.screenPosition)
+        or widget.inMember("close", event.screenPosition) or widget.inMember(path .. ".erase", event.screenPosition)
+        or widget.inMember(path .. ".reset", event.screenPosition)) then
+      endCapture()
+      return false
+    end
+    finishBind("mouse", event.buttonName)
+    return true
+  elseif event.type == "controller" and category.modId and event.controllerButton then
+    finishBind("controller", event.controllerButton, event.controller)
+    return true
+  end
+  return event.type == "textInput"
+end
+
+local function addCategory(entry)
+  local member = widget.addListItem(LIST)
+  categories[member] = entry
+  widget.setText(LIST .. "." .. member .. ".label", entry.name)
+  return member
+end
+
+local function byName(a, b)
+  return a.name < b.name or (a.name == b.name and a.id < b.id)
+end
+
+local function modRows(data)
+  local groups, sorted = {}, {}
+  for id, group in pairs(data.groups or {}) do
+    groups[id] = {id = id, name = group.name or id, rows = {}}
+  end
+  groups.unsorted = groups.unsorted or {id = "unsorted", name = "Unsorted", rows = {}}
+  for id, bind in pairs(data.binds or {}) do
+    if type(bind) == "table" then
+      local rows = (groups[bind.group] or groups.unsorted).rows
+      rows[#rows + 1] = {id = id, name = bind.name or id}
+    end
+  end
+  for _, group in pairs(groups) do sorted[#sorted + 1] = group end
+  table.sort(sorted, byName)
+  local rows = {}
+  for _, group in ipairs(sorted) do
+    if #group.rows > 0 then
+      if #sorted > 1 then rows[#rows + 1] = {name = group.name} end
+      table.sort(group.rows, byName)
+      for _, row in ipairs(group.rows) do rows[#rows + 1] = row end
+    end
+  end
+  return rows
+end
+
+local function addModCategories()
+  local definitions, sorted = {}, {}
+  for _, path in ipairs(root.assetsByExtension("binds")) do
+    for id, data in pairs(root.assetJson(path)) do
+      definitions[id] = definitions[id] and sb.jsonMerge(definitions[id], data) or data
+    end
+  end
+  for id, data in pairs(definitions) do
+    sorted[#sorted + 1] = {id = id, modId = id, name = data.name or id, banner = data.bannerName, rows = modRows(data)}
+  end
+  table.sort(sorted, byName)
+  for _, entry in ipairs(sorted) do addCategory(entry) end
 end
 
 function selectCategory()
-  local selected = widget.getListSelected(CATEGORY_LIST_WIDGET)
-  local category = widgetsToCategories[selected]
-  local dataFromPrev = widget.getData(BINDS_WIDGET)
-  ---@cast dataFromPrev string[]?
-  if dataFromPrev then
-    for _, v in pairs(dataFromPrev) do
-      widget.removeChild(BINDS_WIDGET, v)
+  local entry = categories[widget.getListSelected(LIST)]
+  if not entry then return end
+  endCapture()
+  category = entry
+  -- The scroll area preserves its distance from the top when its content resizes.
+  widget.setScrollOffset("binds", widget.getMaxScrollPosition("binds"))
+  widget.removeAllChildren(ROWS)
+  widget.setSize(ROWS, {240, math.max(0, #entry.rows * 14 - 1)})
+  for i, row in ipairs(entry.rows) do
+    local template = row.id and rowTemplate or groupTemplate
+    template.position = {0, (#entry.rows - i) * 14}
+    template.children.label.value = row.name
+    if row.id then
+      template.children.apply.caption = describe(getBinds(row.id))
+      template.children.apply.data = i
+      template.children.erase.data = i
+      template.children.reset.data = i
     end
+    widget.addChild(ROWS, template, "row" .. i)
   end
-
-  local groups = category.groups or {}
-  if not groups.unsorted then
-    groups.unsorted = {name = "Unsorted"}
-  end
-
-  local sortedGroups = {}
-  for groupId, data in pairs(groups) do
-    data.name = tostring(data.name or groupId)
-    data.sortedBinds = {}
-    sortedGroups[#sortedGroups + 1] = data
-  end
-
-  allBinds = {}
-  for bindId, data in pairs(category.binds) do
-    if not data.name then data.name = bindId end
-    data.bindId = bindId
-    data.categoryId = category.categoryId
-    local group = groups[data.group or "unsorted"] or groups.unsorted
-    group.sortedBinds[#group.sortedBinds + 1] = data
-    allBinds[#allBinds + 1] = data
-  end
-
-  activeCategory = category.categoryId
-  table.sort(sortedGroups, alphabeticalNameSortLesser)
-
-  for _, data in pairs(groups) do
-    table.sort(data.sortedBinds, alphabeticalNameSortLesser)
-  end
-
-  local bannerBinds = widget.bindCanvas("banner")
-  bannerBinds:clear()
-
-  local bannerName = tostring(category.bannerName or category.name or category.categoryId)
-  bannerBinds:drawText(bannerName, {position = {127, 13}, horizontalAnchor = "mid", verticalAnchor = "mid"}, 16)
-
-  local onlyUnsorted = not sortedGroups[2] and sortedGroups[1] == groups.unsorted
-
-  local added = {}
-  local index = 0
-  for iA = 1, #sortedGroups do
-    local group = sortedGroups[iA]
-    local bindsCount = #group.sortedBinds
-    if bindsCount > 0 then
-      if not onlyUnsorted then
-        index = index + 1
-        addBindGroup(group, index, added)
-      end
-      for iB = 1, bindsCount do
-        index = index + 1
-        addBindSet(group.sortedBinds[iB], index, added)
-      end
-    end
-  end
-
-  widget.setData(BINDS_WIDGET, added)
+  widget.setText("banner", entry.banner or entry.name)
+  widget.setText("source", entry.modId and "Mod controls" or "Game controls")
 end
 
-
-local function initCallbacks()
-  widget.registerMemberCallback(CATEGORY_LIST_WIDGET, "selectCategory", selectCategory)
+function createTooltip(position)
+  local target = widget.getChildAt(position)
+  local index, button
+  if target then index, button = target:match("binds%.rows%.row(%d+)%.(%a+)$") end
+  local row = index and category.rows[tonumber(index)]
+  if row and row.id then
+    if button == "erase" then return "Clear " .. row.name end
+    if button == "reset" then return "Restore default: " .. row.name end
+    if button == "apply" then
+      local keys = describe(getBinds(row.id))
+      return row.name .. ": " .. (keys ~= "" and keys or "Unbound")
+    end
+  end
 end
 
 function init()
+  widget.setVisible("capture", false)
+  rowTemplate = config.getParameter("actionRow")
+  groupTemplate = config.getParameter("groupRow")
+  openingGame = gameBinds.get()
+  defaultGame = gameBinds.defaults()
+  currentGame = jobject()
+  for id, binds in pairs(openingGame) do currentGame[id] = binds end
 
-  widget.clearListItems(CATEGORY_LIST_WIDGET)
-  initCallbacks()
-  parseBinds()
+  local menu = root.assetJson("/interface/windowconfig/keybindingsmenu.config")
+  maxBindings = menu.maxBindings
+  local names = {player = "Player", toolbar = "Toolbar", game = "Game"}
+  local tabs = menu.paneLayout and menu.paneLayout.categories
+  for _, tab in ipairs(tabs and tabs.tabs or {}) do
+    if tab.tabName and tab.tabTitle then names[tab.tabName] = tab.tabTitle end
+  end
 
-  script.setUpdateDelta(1)
+  widget.clearListItems(LIST)
+  local first
+  for _, id in ipairs(gameCategories) do
+    local rows = {}
+    for _, action in ipairs(menu.keyActions[id]) do
+      rows[#rows + 1] = {id = action.action, name = action.label}
+    end
+    local member = addCategory({name = names[id], rows = rows})
+    first = first or member
+  end
+  addModCategories()
+  widget.setListSelected(LIST, first)
+end
+
+function uninit()
+  widget.setVisible("capture", false)
+  capture = nil
 end

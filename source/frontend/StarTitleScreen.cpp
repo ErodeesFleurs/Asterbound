@@ -394,6 +394,8 @@ std::expected<bool, StarException> TitleScreen::handleInputEvent(InputEvent cons
   if (std::holds_alternative<MouseMoveEvent>(event))
     m_cursorScreenPos = Vec2I(std::get<MouseMoveEvent>(event).mousePosition);
   if (std::holds_alternative<KeyDownEvent>(event) && m_guiContext.actions(event).contains(InterfaceAction::TitleBack)) {
+    if (m_paneManager->topPane({PaneLayer::ModalWindow}))
+      return m_paneManager->sendInputEvent(event);
     if (auto r = back(); !r) return std::unexpected(std::move(r.error()));
     return true;
   }

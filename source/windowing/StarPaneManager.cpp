@@ -388,6 +388,19 @@ std::expected<bool, StarException> PaneManager::sendInputEvent(InputEvent const&
       for (auto const& panePair : layerPair.second) {
         if (!panePair.first->interactive())
           continue;
+        auto capturer = panePair.first->keyboardCapturer();
+        if (!capturer)
+          return std::unexpected(std::move(capturer.error()));
+        if (*capturer) {
+          auto mode = (*capturer)->keyboardCaptureMode();
+          if (!mode)
+            return std::unexpected(std::move(mode.error()));
+          if (*mode == KeyboardCaptureMode::KeyEvents) {
+            auto handled = panePair.first->sendEvent(event);
+            if (!handled || *handled)
+              return handled;
+          }
+        }
         auto dismissed = dismiss(panePair.first);
         if (!dismissed)
           return std::unexpected(std::move(dismissed.error()));

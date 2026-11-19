@@ -59,7 +59,6 @@ class SliderBarWidget;
 class ButtonWidget;
 class LabelWidget;
 class VoiceSettingsMenu;
-class KeybindingsMenu;
 class GraphicsMenu;
 class BindingsMenu;
 
@@ -91,7 +90,6 @@ private:
 
   [[nodiscard]] std::expected<void, StarException> displayControls();
   [[nodiscard]] std::expected<void, StarException> displayVoiceSettings();
-  [[nodiscard]] std::expected<void, StarException> displayModBindings();
   [[nodiscard]] std::expected<void, StarException> displayGraphics();
 
   std::shared_ptr<SliderBarWidget> m_instrumentSlider;
@@ -117,8 +115,7 @@ private:
   JsonObject m_localChanges;
 
   std::shared_ptr<VoiceSettingsMenu> m_voiceSettingsMenu;
-  std::shared_ptr<BindingsMenu> m_modBindingsMenu;
-  std::shared_ptr<KeybindingsMenu> m_keybindingsMenu;
+  std::shared_ptr<BindingsMenu> m_bindingsMenu;
   std::shared_ptr<GraphicsMenu> m_graphicsMenu;
   std::optional<std::reference_wrapper<PaneManager>> m_paneManager;
 };
@@ -132,7 +129,6 @@ export namespace Star {
   using ::Star::ButtonWidget;
   using ::Star::LabelWidget;
   using ::Star::VoiceSettingsMenu;
-  using ::Star::KeybindingsMenu;
   using ::Star::GraphicsMenu;
   using ::Star::BindingsMenu;
   using ::Star::OptionsMenu;

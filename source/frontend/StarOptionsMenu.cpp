@@ -167,13 +167,6 @@ import star.image_widget;
 import star.slider_bar;
 import star.label_widget;
 
-
-
-import star.keybindings_menu;
-
-
-
-
 import star.base_script_pane;
 
 
@@ -266,7 +259,6 @@ std::expected<void, StarException> OptionsMenu::init(std::shared_ptr<UniverseCli
   reader.registerCallback("showKeybindings", [this](Widget&) { return displayControls(); });
   reader.registerCallback("showVoiceSettings", [this](Widget&) { return displayVoiceSettings(); });
   reader.registerCallback("showVoicePlayers", [](Widget&) -> std::expected<void, StarException> { return {}; });
-  reader.registerCallback("showModBindings", [this](Widget&) { return displayModBindings(); });
   reader.registerCallback("showGraphics", [this](Widget&) { return displayGraphics(); });
   auto config = (*assets)->json("/interface/optionsmenu/optionsmenu.config");
   if (!config)
@@ -343,11 +335,7 @@ std::expected<void, StarException> OptionsMenu::init(std::shared_ptr<UniverseCli
   auto bindingsMenu = BindingsMenu::create(context(), *bindingsConfig);
   if (!bindingsMenu)
     return std::unexpected(std::move(bindingsMenu.error()));
-  m_modBindingsMenu = std::move(*bindingsMenu);
-  auto keybindingsMenu = KeybindingsMenu::create(context());
-  if (!keybindingsMenu)
-    return std::unexpected(std::move(keybindingsMenu.error()));
-  m_keybindingsMenu = std::move(*keybindingsMenu);
+  m_bindingsMenu = std::move(*bindingsMenu);
   auto graphicsMenu = GraphicsMenu::create(context(), m_paneManager->get(), std::move(client));
   if (!graphicsMenu)
     return std::unexpected(std::move(graphicsMenu.error()));
@@ -473,19 +461,13 @@ std::expected<void, StarException> OptionsMenu::syncGuiToConf() {
 std::expected<void, StarException> OptionsMenu::displayControls() {
   if (!m_paneManager)
     return std::unexpected(GuiException("Options menu is detached from its pane manager"));
-  return m_paneManager->get().displayPane(PaneLayer::ModalWindow, m_keybindingsMenu);
+  return m_paneManager->get().displayPane(PaneLayer::ModalWindow, m_bindingsMenu);
 }
 
 std::expected<void, StarException> OptionsMenu::displayVoiceSettings() {
   if (!m_paneManager)
     return std::unexpected(GuiException("Options menu is detached from its pane manager"));
   return m_paneManager->get().displayPane(PaneLayer::ModalWindow, m_voiceSettingsMenu);
-}
-
-std::expected<void, StarException> OptionsMenu::displayModBindings() {
-  if (!m_paneManager)
-    return std::unexpected(GuiException("Options menu is detached from its pane manager"));
-  return m_paneManager->get().displayPane(PaneLayer::ModalWindow, m_modBindingsMenu);
 }
 
 std::expected<void, StarException> OptionsMenu::displayGraphics() {

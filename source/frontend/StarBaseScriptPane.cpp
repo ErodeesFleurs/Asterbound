@@ -536,6 +536,10 @@ std::expected<Json, StarException> BaseScriptPane::inputJson(InputEvent const& e
   } else if (auto down = std::get_if<MouseButtonDownEvent>(&event)) {
     result.set("type", "buttonDown");
     result.set("button", static_cast<int>(down->mouseButton));
+    auto name = enumName<MouseButtonNames>(down->mouseButton);
+    if (!name)
+      return std::unexpected(std::move(name.error()));
+    result.set("buttonName", String(*name));
   } else if (auto up = std::get_if<MouseButtonUpEvent>(&event)) {
     result.set("type", "buttonUp");
     result.set("button", static_cast<int>(up->mouseButton));
@@ -544,6 +548,13 @@ std::expected<Json, StarException> BaseScriptPane::inputJson(InputEvent const& e
     result.set("direction", wheel->mouseWheel == MouseWheel::Up ? 1 : -1);
   } else {
     result.set("type", "controller");
+    if (auto down = std::get_if<ControllerButtonDownEvent>(&event)) {
+      auto name = enumName<ControllerButtonNames>(down->controllerButton);
+      if (!name)
+        return std::unexpected(std::move(name.error()));
+      result.set("controllerButton", String(*name));
+      result.set("controller", down->controller);
+    }
   }
   return Json(std::move(result));
 }

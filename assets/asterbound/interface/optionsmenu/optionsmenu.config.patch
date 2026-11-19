@@ -26,24 +26,17 @@
     },
     "showKeybindings" : {
       "type" : "button",
-      "position" : [153, 95],
-      "caption" : "Game Binds",
-      "base" : "/interface/optionsmenu/tricontrolsbutton.png",
-      "hover" : "/interface/optionsmenu/tricontrolsbuttonhover.png"
-    },
-    "showModBindings" : {
-      "type" : "button",
-      "position" : [87, 95],
-      "caption" : "Mod Binds",
-      "base" : "/interface/optionsmenu/tricontrolsbutton.png",
-      "hover" : "/interface/optionsmenu/tricontrolsbuttonhover.png"
+      "position" : [133, 95],
+      "caption" : "Keybindings",
+      "base" : "/interface/optionsmenu/duocontrolsbutton.png",
+      "hover" : "/interface/optionsmenu/duocontrolsbuttonhover.png"
     },
     "showGraphics" : {
       "type" : "button",
-      "position" : [21, 95],
+      "position" : [30, 95],
       "caption" : "Graphics",
-      "base" : "/interface/optionsmenu/tricontrolsbutton.png",
-      "hover" : "/interface/optionsmenu/tricontrolsbuttonhover.png"
+      "base" : "/interface/optionsmenu/duocontrolsbutton.png",
+      "hover" : "/interface/optionsmenu/duocontrolsbuttonhover.png"
     },
 
     "volumeLabel" : { "position" : [119, 173] },

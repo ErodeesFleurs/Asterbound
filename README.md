@@ -17,7 +17,7 @@ Development artifacts are not stable releases. Keep backups before importing sav
 ## Features
 
 - Multithreaded lighting, extended colors and additive point lights.
-- Lua-managed interfaces, asset/image patches, custom keybindings and status HUDs.
+- Lua-managed interfaces, asset/image patches and status HUDs. **Options → Keybindings** edits both game actions and installed mods' `.binds` actions without migrating existing settings.
 - Lua entity snapshots with explicit authority/completeness metadata, suitable for persistence through existing mod storage.
 - Positional Opus voice chat, character swapping, multiple fonts and instrument volume control.
 - Inventory recovery, mod compatibility fixes and client-side tile prediction. Custom tile collision requires Asterbound or a compatible OpenStarbound server.

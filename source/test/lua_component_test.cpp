@@ -7,6 +7,7 @@ import star.algorithm;
 import star.actor_movement_controller;
 import star.behavior_database;
 import star.chat_types;
+import star.configuration;
 import star.collection_database;
 import star.casting;
 import star.collision_block;
@@ -969,6 +970,27 @@ const GameTestRegistration
                         EXPECT_EQ(**active, (Json(JsonArray{false, true})));
                       });
 
+const GameTestRegistration clearedModBind("InputBindings", "ExplicitUnbindSurvivesReopeningInput", [](GameTest& fixture) {
+  auto config = fixture.root().configuration();
+  ASSERT_TRUE(config);
+  auto original = (*config)->get("modBindings");
+  ASSERT_TRUE(original);
+  auto restore = make_scope_exit([&] { EXPECT_TRUE((*config)->set("modBindings", *original)); });
+  ASSERT_TRUE((*config)->set("modBindings", JsonObject{}));
+  auto input = Input::create(fixture.root());
+  ASSERT_TRUE(input) << input.error().what();
+  auto defaults = (*input)->getDefaultBinds("opensb", "zoomIn");
+  ASSERT_TRUE(defaults);
+  ASSERT_NE(*defaults, Json(JsonArray{}));
+  EXPECT_EQ((*input)->getBinds("opensb", "zoomIn").value(), *defaults);
+  ASSERT_TRUE((*input)->setBinds("opensb", "zoomIn", JsonArray{}));
+  auto reopened = Input::create(fixture.root());
+  ASSERT_TRUE(reopened) << reopened.error().what();
+  EXPECT_EQ((*reopened)->getBinds("opensb", "zoomIn").value(), Json(JsonArray{}));
+  ASSERT_TRUE((*reopened)->resetBinds("opensb", "zoomIn"));
+  EXPECT_EQ((*reopened)->getBinds("opensb", "zoomIn").value(), *defaults);
+});
+
 const GameTestRegistration inputEventNames("InputNameSerialization", "EventJsonPreservesCanonicalNamesAndUnknownEnumErrors", [](GameTest&) {
   auto key = Input::inputEventToJson(KeyDownEvent{Key::F16, KeyMod::LGui | KeyMod::AltGr});
   ASSERT_TRUE(key) << key.error().what();
@@ -996,17 +1018,17 @@ const GameTestRegistration inputEventNames("InputNameSerialization", "EventJsonP
 
 const GameTestRegistration inputBindNames("InputNameSerialization", "BindJsonPreservesCaseFirstErrorsAndUnknownNames", [](GameTest&) {
   auto key = Input::bindFromJson(JsonObject{{"type", "key"}, {"value", "eSc"},
-      {"mods", JsonArray{"rShIfT", "lCtRl", "RSHIFT"}}});
+      {"mods", JsonArray{"rShIfT", "lCtRl", "RSHIFT", "LMeta", "RGui", "Scroll"}}});
   ASSERT_TRUE(key) << key.error().what();
   ASSERT_TRUE(std::holds_alternative<Input::KeyBind>(*key));
   auto const& keyBind = std::get<Input::KeyBind>(*key);
   EXPECT_EQ(keyBind.key, Key::Escape);
-  EXPECT_EQ(keyBind.mods, KeyMod::RShift | KeyMod::LCtrl);
-  EXPECT_EQ(keyBind.priority, 2);
+  EXPECT_EQ(keyBind.mods, KeyMod::RShift | KeyMod::LCtrl | KeyMod::LGui | KeyMod::RGui | KeyMod::Scroll);
+  EXPECT_EQ(keyBind.priority, 5);
   auto serializedKey = Input::bindToJson(*key);
   ASSERT_TRUE(serializedKey) << serializedKey.error().what();
   EXPECT_EQ(*serializedKey, Json(JsonObject{{"type", "key"}, {"value", "Esc"},
-      {"mods", JsonArray{"RShift", "LCtrl"}}}));
+      {"mods", JsonArray{"RShift", "LCtrl", "LGui", "RGui", "Scroll"}}}));
   auto reparsedKey = Input::bindFromJson(*serializedKey);
   ASSERT_TRUE(reparsedKey) << reparsedKey.error().what();
   ASSERT_TRUE(std::holds_alternative<Input::KeyBind>(*reparsedKey));

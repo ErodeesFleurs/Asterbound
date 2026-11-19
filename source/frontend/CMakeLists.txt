@@ -11,7 +11,6 @@ target_sources (star_frontend_module_interfaces PUBLIC FILE_SET CXX_MODULES FILE
     StarErrorScreen.cppm
     StarGraphicsMenu.cppm
     StarJoinRequestDialog.cppm
-    StarKeybindingsMenu.cppm
     StarModsMenu.cppm
     StarOptionsMenu.cppm
     StarShadersMenu.cppm
@@ -64,7 +63,6 @@ add_library (star_frontend_modules STATIC
     StarErrorScreen.cpp
     StarGraphicsMenu.cpp
     StarJoinRequestDialog.cpp
-    StarKeybindingsMenu.cpp
     StarModsMenu.cpp
     StarOptionsMenu.cpp
     StarShadersMenu.cpp
