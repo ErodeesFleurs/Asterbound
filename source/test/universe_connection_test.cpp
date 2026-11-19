@@ -1291,6 +1291,33 @@ const GameTestRegistration universeConnectionsShardCallbacksReenterAndRemovalRet
 });
 
 #ifdef STAR_TEST_WRAP_PTHREAD_CREATE
+const GameTestRegistration pool_start_rollback("WorkerPoolNativeDeathTest", "PartialStartupJoinsAndCanRestart",
+    [](GameTest&) {
+  auto old_style = testing::GTEST_FLAG(death_test_style);
+  testing::GTEST_FLAG(death_test_style) = "threadsafe";
+  EXPECT_EXIT(([] {
+    alarm(8);
+    WorkerPool pool("partial startup");
+    std::atomic<unsigned> completed = 0;
+    completedInjectedThreads = std::ref(completed);
+    threadStartsBeforeFailure = 2;
+    auto started = pool.start(4);
+    completedInjectedThreads.reset();
+    threadStartsBeforeFailure = -1;
+    if (started || completed.load() != 2 || pool.worker_count() != 0)
+      std::_Exit(1);
+    auto rejected = pool.add_work([]() -> std::expected<void, StarException> { return {}; });
+    if (rejected.finish() || !pool.start(1))
+      std::_Exit(2);
+    auto fresh = pool.add_producer<int>([]() -> std::expected<int, StarException> { return 17; });
+    auto value = fresh.get();
+    if (!value || value->get() != 17 || !pool.finish())
+      std::_Exit(3);
+    std::_Exit(0);
+  }()), testing::ExitedWithCode(0), "");
+  testing::GTEST_FLAG(death_test_style) = old_style;
+});
+
 const GameTestRegistration universeConnectionsStartupFailureJoinsEveryPreviouslyStartedWorker(
     "UniverseConnectionsDeathTest", "StartupFailureJoinsEveryPreviouslyStartedWorker", [](GameTest& fixture) {
   auto& logger = fixture.root().logger();

@@ -1066,7 +1066,7 @@ std::expected<void, StarException> UniverseServer::runLoop(std::stop_token stopT
 }
 
 bool UniverseServer::shutdownThreadsJoined() const {
-  if (!isJoined() || m_workerPool.getWorkerCount() != 0
+  if (!isJoined() || m_workerPool.worker_count() != 0
       || (m_tcpServer && !m_tcpServer->isClosed())
       || (m_connectionServer && !m_connectionServer->isClosed()))
     return false;
@@ -1142,7 +1142,7 @@ std::expected<void, StarException> UniverseServer::shutdown() {
   if (m_initialized)
     record(m_root.logger().info("UniverseServer: Stopping UniverseServer"));
   record(m_workerPool.stop());
-  bool producersJoined = m_workerPool.getWorkerCount() == 0;
+  bool producersJoined = m_workerPool.worker_count() == 0;
   bool tcpJoined = true;
   if (m_tcpServer) {
     record(m_root.logger().info("UniverseServer: Stopping TCP Server"));
@@ -2709,7 +2709,7 @@ std::expected<std::optional<CelestialCoordinate>, StarException> UniverseServer:
     return std::optional<CelestialCoordinate>(std::move(coordinate));
   }
   if (!m_nextRandomizedStarterWorld) {
-    m_nextRandomizedStarterWorld = m_workerPool.addProducer<CelestialCoordinate>([&root = m_root, assets = *assets, database = m_celestialDatabase]() -> std::expected<CelestialCoordinate, StarException> {
+    m_nextRandomizedStarterWorld = m_workerPool.add_producer<CelestialCoordinate>([&root = m_root, assets = *assets, database = m_celestialDatabase]() -> std::expected<CelestialCoordinate, StarException> {
       if (auto logged = root.logger().info("Searching for new randomized starter world"); !logged)
         return std::unexpected(std::move(logged.error()));
       auto filterWorld = [database](CelestialCoordinate const& coordinate, Json const& filter) -> std::expected<bool, StarException> {
@@ -3057,7 +3057,7 @@ std::expected<void, StarException> UniverseServer::addCelestialRequests(Connecti
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
   for (auto const& request : requests) {
-    m_pendingCelestialRequests[clientId].push_back(m_workerPool.addProducer<CelestialResponse>(
+    m_pendingCelestialRequests[clientId].push_back(m_workerPool.add_producer<CelestialResponse>(
       [&database = *m_celestialDatabase, request]() { return database.respondToRequest(request); }));
   }
   return {};
@@ -4206,7 +4206,7 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
   if (!context)
     return std::unexpected(std::move(context.error()));
   auto client = context->get();
-  return WorldServerPromise(m_workerPool.addProducer<std::shared_ptr<WorldServerThread>>([&universe = *this, &m_root = m_root, &m_universeSettings = m_universeSettings, &m_pause = m_pause, id, client, speciesShips = m_speciesShips]() -> std::expected<std::shared_ptr<WorldServerThread>, StarException> {
+  return WorldServerPromise(m_workerPool.add_producer<std::shared_ptr<WorldServerThread>>([&universe = *this, &m_root = m_root, &m_universeSettings = m_universeSettings, &m_pause = m_pause, id, client, speciesShips = m_speciesShips]() -> std::expected<std::shared_ptr<WorldServerThread>, StarException> {
     std::shared_ptr<WorldServer> ship;
     auto chunks = client->shipChunks();
     if (!chunks.empty()) {
@@ -4327,7 +4327,7 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
 std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> UniverseServer::celestialWorldPromise(CelestialWorldId const& id) {
   if (!id)
     return std::nullopt;
-  return WorldServerPromise(m_workerPool.addProducer<std::shared_ptr<WorldServerThread>>([&universe = *this, &m_root = m_root, &m_universeSettings = m_universeSettings, &m_pause = m_pause, id, directory = m_storageDirectory, database = m_celestialDatabase, clock = m_universeClock]() -> std::expected<std::shared_ptr<WorldServerThread>, StarException> {
+  return WorldServerPromise(m_workerPool.add_producer<std::shared_ptr<WorldServerThread>>([&universe = *this, &m_root = m_root, &m_universeSettings = m_universeSettings, &m_pause = m_pause, id, directory = m_storageDirectory, database = m_celestialDatabase, clock = m_universeClock]() -> std::expected<std::shared_ptr<WorldServerThread>, StarException> {
     std::shared_ptr<WorldServer> world;
     auto path = File::relative_to(directory, Star::format("{}.world", id.filename()));
     auto exists = File::is_regular_file(path);
@@ -4383,7 +4383,7 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
 }
 
 std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> UniverseServer::instanceWorldPromise(InstanceWorldId const& id) {
-  return WorldServerPromise(m_workerPool.addProducer<std::shared_ptr<WorldServerThread>>([&universe = *this, &m_root = m_root, &m_universeSettings = m_universeSettings, &m_pause = m_pause, &m_tempWorldIndex = m_tempWorldIndex, &m_universeClock = m_universeClock, id, directory = m_storageDirectory, clock = m_universeClock]() -> std::expected<std::shared_ptr<WorldServerThread>, StarException> {
+  return WorldServerPromise(m_workerPool.add_producer<std::shared_ptr<WorldServerThread>>([&universe = *this, &m_root = m_root, &m_universeSettings = m_universeSettings, &m_pause = m_pause, &m_tempWorldIndex = m_tempWorldIndex, &m_universeClock = m_universeClock, id, directory = m_storageDirectory, clock = m_universeClock]() -> std::expected<std::shared_ptr<WorldServerThread>, StarException> {
     auto assets = m_root.assets();
     if (!assets)
       return std::unexpected(std::move(assets.error()));
@@ -4617,7 +4617,7 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
 }
 
 std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> UniverseServer::customWorldPromise(CustomWorldId const& id, std::optional<std::shared_ptr<WorldTemplate>> worldTemplate) {
-  return WorldServerPromise(m_workerPool.addProducer<std::shared_ptr<WorldServerThread>>([&universe = *this, &m_root = m_root, &m_universeSettings = m_universeSettings, &m_pause = m_pause, id, worldTemplate, directory = m_storageDirectory, clock = m_universeClock]() -> std::expected<std::shared_ptr<WorldServerThread>, StarException> {
+  return WorldServerPromise(m_workerPool.add_producer<std::shared_ptr<WorldServerThread>>([&universe = *this, &m_root = m_root, &m_universeSettings = m_universeSettings, &m_pause = m_pause, id, worldTemplate, directory = m_storageDirectory, clock = m_universeClock]() -> std::expected<std::shared_ptr<WorldServerThread>, StarException> {
     auto forward = id.contains("../");
     if (!forward)
       return std::unexpected(std::move(forward.error()));
@@ -4695,7 +4695,7 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
     return std::nullopt;
   }
   auto producer = [&universe = *this, id, worldTemplate, client](WorldChunks chunks) -> WorkerPoolPromise<std::shared_ptr<WorldServerThread>> {
-    return universe.m_workerPool.addProducer<std::shared_ptr<WorldServerThread>>([&universe, &m_root = universe.m_root, &m_universeSettings = universe.m_universeSettings, &m_pause = universe.m_pause, id, worldTemplate, client, chunks = std::move(chunks)]() -> std::expected<std::shared_ptr<WorldServerThread>, StarException> {
+    return universe.m_workerPool.add_producer<std::shared_ptr<WorldServerThread>>([&universe, &m_root = universe.m_root, &m_universeSettings = universe.m_universeSettings, &m_pause = universe.m_pause, id, worldTemplate, client, chunks = std::move(chunks)]() -> std::expected<std::shared_ptr<WorldServerThread>, StarException> {
       std::shared_ptr<WorldServer> world;
       if (!chunks.empty()) {
         if (auto logged = m_root.logger().info("UniverseServer: Loading client custom world '{}' for '{}'", id.name, id.uuid.hex()); !logged)

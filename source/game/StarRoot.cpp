@@ -487,7 +487,7 @@ std::expected<void, StarException> Root::fullyLoad() {
   loaders.reserve(40);
 
   auto add = [&](auto method) {
-    loaders.push_back(workerPool.addWork([this, method]() -> std::expected<void, StarException> {
+    loaders.push_back(workerPool.add_work([this, method]() -> std::expected<void, StarException> {
       auto loaded = (this->*method)();
       if (!loaded)
         return std::unexpected(std::move(loaded.error()));

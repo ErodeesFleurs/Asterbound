@@ -146,7 +146,7 @@ HttpClient::~HttpClient() = default;
 }
 
 WorkerPoolPromise<HttpResponse> HttpClient::requestAsync(HttpRequest const& request) {
-  return m_workerPool->addProducer<HttpResponse>([request]() -> std::expected<HttpResponse, StarException> {
+  return m_workerPool->add_producer<HttpResponse>([request]() -> std::expected<HttpResponse, StarException> {
     return performRequest(request);
   });
 }

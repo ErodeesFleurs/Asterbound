@@ -432,7 +432,7 @@ std::expected<bool, StarException> SectorArray2D<ElementT, SectorSize>::evalColu
     WorkerPool& workers, std::size_t minX, std::size_t minY, std::size_t width, std::size_t height, Function&& function, bool evalEmpty) {
   if (width == 0 || height == 0)
     return true;
-  if (workers.isWorkerThread() || workers.getWorkerCount() == 0)
+  if (!workers.can_parallelize())
     return evalColumnsPriv(minX, minY, width, height, std::forward<Function>(function), evalEmpty);
 
   std::size_t maxX = minX + width;
@@ -459,7 +459,7 @@ std::expected<bool, StarException> SectorArray2D<ElementT, SectorSize>::evalColu
 
     std::size_t x_ = xSector * SectorSize;
 
-    futures.push_back(workers.addProducer<bool>([=, &function, this]() -> std::expected<bool, StarException> {
+    futures.push_back(workers.add_producer<bool>([=, &function, this]() -> std::expected<bool, StarException> {
       for (std::size_t ySector = minYSector; ySector <= maxYSector; ++ySector) {
         auto& array = m_sectors(xSector, ySector);
 

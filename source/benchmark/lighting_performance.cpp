@@ -230,7 +230,7 @@ void lightingBenchmark(benchmark::State& state, PerformanceBenchmarkSession& ses
   }
   std::vector<float> reference(output.data().begin(), output.data().end());
   state.SetLabel(std::format("snapshot={:016x}; loaded={}; workers={}", lightDigest(reference),
-                             fixture.tiles.loadedSectorCount(), workers.getWorkerCount()));
+                             fixture.tiles.loadedSectorCount(), workers.worker_count()));
   auto gather = [&]() {
     return gatherClientLightingTiles(calculator, fixture.tiles, workers, *fixture.materials, *fixture.liquids,
                                      fixture.environment, fixture.underground);
