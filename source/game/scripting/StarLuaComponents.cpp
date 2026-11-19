@@ -515,10 +515,10 @@ std::expected<LuaCallbacks, StarException> LuaBaseComponent::makeThreadsCallback
                         LuaVariadic<Json> args) -> std::expected<RpcPromise<Json>, StarException> {
           auto thread = self.m_threads.find_ref(name);
           if (!thread)
-            return RpcPromise<Json>::createFailed("Thread does not exist");
+            return RpcPromise<Json>::make_failed("Thread does not exist");
           if (thread->get()->shouldExpire())
-            return RpcPromise<Json>::createFailed("Thread is stopped");
-          auto pair = RpcPromise<Json>::createPair();
+            return RpcPromise<Json>::make_failed("Thread is stopped");
+          auto pair = RpcPromise<Json>::make_pair();
           if (auto passed = thread->get()->passMessage(
                 {.message = message, .args = JsonArray::from(std::move(args)), .promise = pair.second});
               !passed)
@@ -531,7 +531,7 @@ std::expected<LuaCallbacks, StarException> LuaBaseComponent::makeThreadsCallback
 }
 
 RpcPromise<Json> LuaBaseComponent::threadPassMessage(String const&, String const&, JsonArray const&) {
-  return RpcPromise<Json>::createFailed("Lua component cannot handle messages");
+  return RpcPromise<Json>::make_failed("Lua component cannot handle messages");
 }
 
 
@@ -613,7 +613,7 @@ void LuaScriptUpdate::setUpdateDelta(unsigned delta) { m_updatePeriodic.setStepC
 bool LuaScriptUpdate::updateReady() const { return m_updatePeriodic.ready(); }
 
 RpcPromise<Json> LuaScriptUpdate::threadPassMessage(String const& thread, String const& message, JsonArray const& args) {
-  auto pair = RpcPromise<Json>::createPair();
+  auto pair = RpcPromise<Json>::make_pair();
   std::unique_lock locker(m_threadMessageMutex, std::defer_lock);
   lockWithDiagnostics(locker);
   m_threadMessages.push_back({.originThread = thread, .message = message, .args = args, .promise = pair.second});

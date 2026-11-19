@@ -24,7 +24,7 @@ using JsonRpcHandlers = StringMap<JsonRpcRemoteFunction>;
 class JsonRpcInterface {
 public:
   virtual ~JsonRpcInterface();
-  [[nodiscard]] virtual std::expected<RpcPromise<Json>, StarException> invokeRemote(String const& handler, Json const& arguments) = 0;
+  [[nodiscard]] virtual std::expected<RpcPromise<Json>, StarException> invoke_remote(String const& handler, Json const& arguments) = 0;
 };
 
 // Simple class to handle remote methods based on Json types.  Does not
@@ -34,25 +34,34 @@ class JsonRpc : public JsonRpcInterface {
 public:
   explicit JsonRpc(Logger& logger);
 
-  [[nodiscard]] std::expected<void, StarException> registerHandler(String const& handler, JsonRpcRemoteFunction func);
-  [[nodiscard]] std::expected<void, StarException> registerHandlers(JsonRpcHandlers const& handlers);
+  [[nodiscard]] std::expected<void, StarException> register_handler(String const& handler, JsonRpcRemoteFunction func);
+  [[nodiscard]] std::expected<void, StarException> register_handlers(JsonRpcHandlers const& handlers);
 
-  [[nodiscard]] std::expected<void, StarException> removeHandler(String const& handler);
-  void clearHandlers();
+  [[nodiscard]] std::expected<void, StarException> remove_handler(String const& handler);
+  void clear_handlers();
 
-  [[nodiscard]] std::expected<RpcPromise<Json>, StarException> invokeRemote(String const& handler, Json const& arguments) override;
+  [[nodiscard]] std::expected<RpcPromise<Json>, StarException> invoke_remote(String const& handler, Json const& arguments) override;
 
-  bool sendPending() const;
+  bool has_pending() const;
   [[nodiscard]] std::expected<ByteArray, StarException> send();
   [[nodiscard]] std::expected<void, StarException> receive(ByteArray const& inbuffer);
 
 private:
+  struct RegisteredHandler {
+    explicit RegisteredHandler(JsonRpcRemoteFunction&& function)
+      : target(std::make_shared<JsonRpcRemoteFunction const>(std::move(function))) {}
+    // Endpoint copies own independent closures; a dispatch only pins its target.
+    RegisteredHandler(RegisteredHandler const& other)
+      : target(std::make_shared<JsonRpcRemoteFunction const>(*other.target)) {}
+    RegisteredHandler(RegisteredHandler&&) = default;
+    std::shared_ptr<JsonRpcRemoteFunction const> target;
+  };
+
   Logger& m_logger;
-  // Handlers may register more methods while their own callable is borrowed.
-  StableStringMap<JsonRpcRemoteFunction> m_handlers;
-  Map<std::uint64_t, RpcPromiseKeeper<Json>> m_pendingResponse;
+  StableStringMap<RegisteredHandler> m_handlers;
+  Map<std::uint64_t, RpcPromiseKeeper<Json>> m_pending_response;
   List<Json> m_pending;
-  std::uint64_t m_requestId;
+  std::uint64_t m_request_id = 0;
 };
 
 }

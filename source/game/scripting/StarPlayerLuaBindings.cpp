@@ -869,7 +869,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.registerCallback("setUniverseFlag", [&player](String const& flagName) -> std::expected<void, StarException> {
-    auto invoked = player.clientContext()->rpcInterface()->invokeRemote("universe.setFlag", flagName);
+    auto invoked = player.clientContext()->rpcInterface()->invoke_remote("universe.setFlag", flagName);
     if (!invoked) return std::unexpected(std::move(invoked.error()));
     return {};
   }); !registered)
@@ -1630,7 +1630,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.registerCallback("confirm", [&player](Json dialogConfig) -> std::expected<RpcPromise<Json>, StarException> {
-    auto pair = RpcPromise<Json>::createPair();
+    auto pair = RpcPromise<Json>::make_pair();
       player.queueConfirmation(dialogConfig, pair.second);
       return pair.first;
   }); !registered)

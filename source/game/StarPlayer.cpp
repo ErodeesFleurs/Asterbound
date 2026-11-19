@@ -4250,7 +4250,7 @@ std::expected<void, StarException> Player::applyShipUpgrades(Json const& upgrade
     return std::unexpected(std::move(playerUuidResult.error()));
   auto playerUuid = std::move(*playerUuidResult);
   if (m_clientContext->playerUuid() == playerUuid) {
-    if (auto result = m_clientContext->rpcInterface()->invokeRemote("ship.applyShipUpgrades", upgrades); !result)
+    if (auto result = m_clientContext->rpcInterface()->invoke_remote("ship.applyShipUpgrades", upgrades); !result)
       return std::unexpected(std::move(result.error()));
   } else {
     if (auto result = m_shipUpgrades.apply(upgrades); !result)
@@ -4551,7 +4551,7 @@ std::expected<void, StarException> Player::interact(InteractAction const& action
   if constexpr (Star::DebugEnabled) {
     Star::star_assert_failed((!isSlave()));
   }
-  m_pendingInteractActions.push_back(RpcPromise<InteractAction>::createFulfilled(action));
+  m_pendingInteractActions.push_back(RpcPromise<InteractAction>::make_fulfilled(action));
   return {};
 }
 

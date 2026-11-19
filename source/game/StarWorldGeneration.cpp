@@ -1468,7 +1468,7 @@ std::expected<bool, StarException> WorldGenerator::entityPersistent(WorldStorage
 }
 
 std::expected<RpcPromise<Vec2I>, StarException> WorldGenerator::enqueuePlacement(List<BiomeItemDistribution> distributions, std::optional<DungeonId> id) {
-  auto promise = RpcPromise<Vec2I>::createPair();
+  auto promise = RpcPromise<Vec2I>::make_pair();
   m_queuedPlacements.push_back(QueuedPlacement{
     .distributions = std::move(distributions),
     .dungeonId = id,

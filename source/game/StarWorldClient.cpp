@@ -3122,7 +3122,7 @@ std::expected<bool, StarException> WorldClient::canReachEntity(Vec2F const& posi
 
 std::expected<RpcPromise<InteractAction>, StarException> WorldClient::interact(InteractRequest const& request) {
   if (!inWorld()) {
-    return RpcPromise<InteractAction>::createFailed("not initialized in world");
+    return RpcPromise<InteractAction>::make_failed("not initialized in world");
   }
   
   if (auto targetEntity = m_entityMap->entity(request.targetId)) {
@@ -3133,14 +3133,14 @@ std::expected<RpcPromise<InteractAction>, StarException> WorldClient::interact(I
         if (!action) {
           return std::unexpected(std::move(action.error()));
         }
-        return RpcPromise<InteractAction>::createFulfilled(std::move(*action));
+        return RpcPromise<InteractAction>::make_fulfilled(std::move(*action));
       } else {
-        return RpcPromise<InteractAction>::createFulfilled(InteractAction());
+        return RpcPromise<InteractAction>::make_fulfilled(InteractAction());
       }
     }
   }
   
-  auto pair = RpcPromise<InteractAction>::createPair();
+  auto pair = RpcPromise<InteractAction>::make_pair();
   Uuid requestId(this->root().random());
   m_entityInteractionResponses[requestId] = pair.second;
   m_outgoingPackets.push_back(std::make_shared<EntityInteractPacket>(request, requestId));
@@ -4297,14 +4297,14 @@ void WorldClient::requestDestroy() {
 
 std::expected<RpcPromise<Vec2F>, StarException> WorldClient::findUniqueEntity(String const& uniqueId) {
   if (!inWorld()) {
-    return RpcPromise<Vec2F>::createFailed("Not currently in a world");
+    return RpcPromise<Vec2F>::make_failed("Not currently in a world");
   }
   
   if (auto entity = m_entityMap->uniqueEntity(uniqueId)) {
-    return RpcPromise<Vec2F>::createFulfilled(entity->position());
+    return RpcPromise<Vec2F>::make_fulfilled(entity->position());
   }
   
-  auto pair = RpcPromise<Vec2F>::createPair();
+  auto pair = RpcPromise<Vec2F>::make_pair();
   auto& rpcPromises = m_findUniqueEntityResponses[uniqueId];
   if (rpcPromises.empty()) {
     m_outgoingPackets.push_back(std::make_shared<FindUniqueEntityPacket>(uniqueId));
@@ -4316,7 +4316,7 @@ std::expected<RpcPromise<Vec2F>, StarException> WorldClient::findUniqueEntity(St
 
 std::expected<RpcPromise<Json>, StarException> WorldClient::sendEntityMessage(std::variant<EntityId, String> const& entityId, String const& message, JsonArray const& args) {
   if (!inWorld()) {
-    return RpcPromise<Json>::createFailed("Not currently in a world");
+    return RpcPromise<Json>::make_failed("Not currently in a world");
   }
   
   std::shared_ptr<Entity> entity;
@@ -4329,25 +4329,25 @@ std::expected<RpcPromise<Json>, StarException> WorldClient::sendEntityMessage(st
   // Only fail with "unknown entity" if we know this entity should exist on the
   // client, because it's entity id indicates it is master here.
   if (std::holds_alternative<EntityId>(entityId) && !entity && m_clientId == connectionForEntity(std::get<EntityId>(entityId))) {
-    return RpcPromise<Json>::createFailed("Unknown entity");
+    return RpcPromise<Json>::make_failed("Unknown entity");
   } else if (entity && entity->isMaster()) {
     auto responseResult = entity->receiveMessage(*m_clientId, message, args);
     if (!responseResult)
       return std::unexpected(std::move(responseResult.error()));
     auto response = std::move(*responseResult);
     if (!response)
-      return RpcPromise<Json>::createFailed("Message not handled by entity");
+      return RpcPromise<Json>::make_failed("Message not handled by entity");
 
     struct ResponseToPromise {
       std::expected<RpcPromise<Json>, StarException> operator()(Json& result) const {
-        return RpcPromise<Json>::createFulfilled(result);
+        return RpcPromise<Json>::make_fulfilled(result);
       }
 
       std::expected<RpcPromise<Json>, StarException> operator()(RpcPromise<Json>& promise) const { return promise; }
     };
     return std::visit(ResponseToPromise{}, *response);
   } else {
-    auto pair = RpcPromise<Json>::createPair();
+    auto pair = RpcPromise<Json>::make_pair();
     Uuid uuid(this->root().random());
     m_entityMessageResponses[uuid] = pair.second;
     m_outgoingPackets.push_back(std::make_shared<EntityMessagePacket>(entityId, message, args, uuid));

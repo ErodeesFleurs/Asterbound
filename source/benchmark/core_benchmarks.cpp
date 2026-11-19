@@ -22,6 +22,184 @@ import star.encode;
 import star.byte_array;
 import star.curve25519;
 import star.dynamic_lib;
+import star.rpc_promise;
+import star.json_rpc;
+import star.logging;
+
+namespace RpcBenchmarks {
+
+using namespace Star;
+
+constexpr int chain_depth = 256;
+constexpr int payload = 41;
+
+template <typename Outcome>
+concept diagnostic_outcome = requires(Outcome const& value) {
+  typename Outcome::value_type;
+  requires std::same_as<Outcome, std::expected<typename Outcome::value_type, StarException>>;
+};
+
+template <diagnostic_outcome Outcome>
+bool checked(benchmark::State& state, Outcome const& outcome) {
+  if (!outcome)
+    state.SkipWithError(outcome.error().what());
+  return outcome.has_value();
+}
+
+template <std::equality_comparable T> requires std::copy_constructible<T>
+bool validate(benchmark::State& state, RpcPromise<T> const& promise, T const& expected) {
+  auto status = promise.status();
+  auto value = promise.result();
+  if (!checked(state, status) || !checked(state, value))
+    return false;
+  if (*status != RpcPromiseStatus::Succeeded || !*value || **value != expected) {
+    state.SkipWithError("RPC status or payload differs from the fixture");
+    return false;
+  }
+  return true;
+}
+
+// Link forward into pending nodes. This measures ordinary incremental delegation,
+// not repeatedly attaching a new root to an already-complete deep chain.
+std::expected<RpcPromise<int>, StarException> make_chain(int depth) {
+  auto [root, tail] = RpcPromise<int>::make_pair();
+  for (int i = 0; i < depth; ++i) {
+    auto [next, keeper] = RpcPromise<int>::make_pair();
+    if (auto linked = tail.chain(std::move(next)); !linked)
+      return std::unexpected(std::move(linked.error()));
+    tail = std::move(keeper);
+  }
+  if (auto terminal = tail.fulfill(payload); !terminal)
+    return std::unexpected(std::move(terminal.error()));
+  return root;
+}
+
+// Only query the status inside the timed loop; never copy the payload there.
+void measure_status(benchmark::State& state, RpcPromise<int> const& promise, int expected) {
+  if (!validate(state, promise, expected))
+    return;
+  auto status = promise.status();
+  for (auto _ : state) {
+    status = promise.status();
+    benchmark::DoNotOptimize(status);
+  }
+  if (checked(state, status) && *status != RpcPromiseStatus::Succeeded)
+    state.SkipWithError("Timed status query returned the wrong outcome");
+  state.SetItemsProcessed(state.iterations());
+}
+
+void chain_status(benchmark::State& state, int depth) {
+  auto promise = make_chain(depth);
+  if (checked(state, promise))
+    measure_status(state, *promise, payload);
+}
+
+void cached_wrapper_status(benchmark::State& state) {
+  int calls = 0;
+  auto source = RpcPromise<int>::make_fulfilled(payload);
+  auto wrapped = source.wrap([&](int value) -> std::expected<int, StarException> {
+    ++calls;
+    return value + 1;
+  });
+  if (!checked(state, wrapped))
+    return;
+  // measure_status validates (and therefore primes the cache) before timing.
+  measure_status(state, *wrapped, payload + 1);
+  if (calls != 1)
+    state.SkipWithError("Hot RPC wrapper did not reuse its published value");
+}
+
+void fresh_wrapper_result(benchmark::State& state) {
+  auto source = make_chain(chain_depth);
+  if (!checked(state, source) || !validate(state, *source, payload))
+    return;
+  constexpr int batch_size = 16;
+  std::array<RpcPromise<int>, batch_size> wrappers;
+  std::array<std::expected<std::optional<int>, StarException>, batch_size> results;
+  while (state.KeepRunningBatch(batch_size)) {
+    state.PauseTiming();
+    for (auto& wrapper : wrappers) {
+      auto fresh = source->wrap([](int value) -> std::expected<int, StarException> { return value + 1; });
+      if (!checked(state, fresh))
+        return;
+      wrapper = std::move(*fresh);
+    }
+    state.ResumeTiming();
+    for (int i = 0; i < batch_size; ++i) {
+      results[i] = wrappers[i].result();
+      benchmark::DoNotOptimize(results[i]);
+    }
+  }
+  for (int i = 0; i < batch_size; ++i) {
+    if (!checked(state, results[i]))
+      return;
+    if (results[i]->value_or(0) != payload + 1) {
+      state.SkipWithError("Fresh wrapper returned the wrong payload");
+      return;
+    }
+    if (!validate(state, wrappers[i], payload + 1))
+      return;
+  }
+  state.SetItemsProcessed(state.iterations());
+}
+
+// Keep the last produced promise for untimed validation; replacing it includes
+// the ordinary release cost in the measured construction/transport workload.
+template <class Operation, std::equality_comparable T>
+  requires std::copy_constructible<T> && std::invocable<Operation&>
+      && std::same_as<std::invoke_result_t<Operation&>, std::expected<RpcPromise<T>, StarException>>
+void measure_production(benchmark::State& state, Operation operation, T const& expected) {
+  auto promise = operation();
+  if (!checked(state, promise) || !validate(state, *promise, expected))
+    return;
+  for (auto _ : state) {
+    promise = operation();
+    if (!checked(state, promise))
+      return;
+    benchmark::DoNotOptimize(promise);
+  }
+  if (validate(state, *promise, expected))
+    state.SetItemsProcessed(state.iterations());
+}
+
+void chain_construction(benchmark::State& state) {
+  measure_production(state, [] { return make_chain(chain_depth); }, payload);
+}
+
+void json_round_trip(benchmark::State& state) {
+  Logger logger;
+  JsonRpc client(logger), server(logger);
+  String const method = "echo";
+  Json const arguments = JsonObject{{"message", "round trip"}, {"values", JsonArray{1, false, Json()}}};
+  auto registered = server.register_handler(method, [](Json const& value) -> std::expected<Json, StarException> { return value; });
+  if (!checked(state, registered))
+    return;
+  measure_production(state, [&]() -> std::expected<RpcPromise<Json>, StarException> {
+    auto promise = client.invoke_remote(method, arguments);
+    if (!promise)
+      return promise;
+    auto request = client.send();
+    if (!request)
+      return std::unexpected(std::move(request.error()));
+    if (auto delivered = server.receive(*request); !delivered)
+      return std::unexpected(std::move(delivered.error()));
+    auto response = server.send();
+    if (!response)
+      return std::unexpected(std::move(response.error()));
+    if (auto delivered = client.receive(*response); !delivered)
+      return std::unexpected(std::move(delivered.error()));
+    return promise;
+  }, arguments);
+}
+
+BENCHMARK_CAPTURE(chain_status, direct, 0)->Name("Core/Rpc/DirectStatus");
+BENCHMARK_CAPTURE(chain_status, deep, chain_depth)->Name("Core/Rpc/ChainStatus256");
+BENCHMARK(chain_construction)->Name("Core/Rpc/ChainBuildRelease256");
+BENCHMARK(cached_wrapper_status)->Name("Core/Rpc/CachedWrapperStatus");
+BENCHMARK(fresh_wrapper_result)->Name("Core/Rpc/FreshWrapperResultOnChain256");
+BENCHMARK(json_round_trip)->Name("Core/Rpc/JsonRequestReply");
+
+} // namespace RpcBenchmarks
 
 namespace DynamicLibBenchmarks {
 

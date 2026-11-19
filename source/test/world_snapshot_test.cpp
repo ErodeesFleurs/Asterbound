@@ -177,7 +177,7 @@ const GameTestRegistration worldMessageBatchDrainsAfterFailure(
     List<WorldServerThread::Message> messages;
     List<RpcPromise<Json>> promises;
     for (unsigned i = 0; i != 5; ++i) {
-      auto [promise, keeper] = RpcPromise<Json>::createPair();
+      auto [promise, keeper] = RpcPromise<Json>::make_pair();
       promises.push_back(std::move(promise));
       messages.push_back({"batchRegression", {}, std::move(keeper)});
     }

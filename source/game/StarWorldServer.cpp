@@ -4387,8 +4387,8 @@ std::expected<RpcPromise<Vec2F>, StarException> WorldServer::findUniqueEntity(St
   if (!result462)
     return std::unexpected(std::move(result462.error()));
   if (auto pos = std::move(*result462))
-    return RpcPromise<Vec2F>::createFulfilled(*pos); else {
-    return RpcPromise<Vec2F>::createFailed("Unknown entity");
+    return RpcPromise<Vec2F>::make_fulfilled(*pos); else {
+    return RpcPromise<Vec2F>::make_failed("Unknown entity");
   }
 }
 
@@ -4403,21 +4403,21 @@ std::expected<RpcPromise<Json>, StarException> WorldServer::sendEntityMessage(st
   }
 
   if (!entity) {
-    return RpcPromise<Json>::createFailed("Unknown entity");
+    return RpcPromise<Json>::make_failed("Unknown entity");
   } else if (entity->isMaster()) {
     auto result464 = entity->receiveMessage(ServerConnectionId, message, args);
     if (!result464)
       return std::unexpected(std::move(result464.error()));
     if (auto resp = std::move(*result464)) {
       if (std::holds_alternative<Json>(*resp))
-        return RpcPromise<Json>::createFulfilled(std::get<Json>(*resp)); else {
+        return RpcPromise<Json>::make_fulfilled(std::get<Json>(*resp)); else {
         return std::get<RpcPromise<Json>>(*resp);
       }
     } else {
-      return RpcPromise<Json>::createFailed("Message not handled by entity");
+      return RpcPromise<Json>::make_failed("Message not handled by entity");
     }
   } else {
-    auto pair = RpcPromise<Json>::createPair();
+    auto pair = RpcPromise<Json>::make_pair();
     auto destination = m_clientInfo.get(connectionForEntity(entity->entityId()));
     if (!destination)
       return std::unexpected(std::move(destination.error()));
@@ -4773,9 +4773,9 @@ std::expected<RpcPromise<InteractAction>, StarException> WorldServer::interact(I
     auto action = entity->interact(request);
     if (!action)
       return std::unexpected(std::move(action.error()));
-    return RpcPromise<InteractAction>::createFulfilled(std::move(*action));
+    return RpcPromise<InteractAction>::make_fulfilled(std::move(*action));
   }
-  return RpcPromise<InteractAction>::createFulfilled(InteractAction());
+  return RpcPromise<InteractAction>::make_fulfilled(InteractAction());
 }
 
 std::expected<void, StarException> WorldServer::setupForceRegions() {

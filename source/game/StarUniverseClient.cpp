@@ -1584,7 +1584,7 @@ std::expected<RpcPromise<Json>, StarException> UniverseClient::sendSubWorldOnWor
     return std::unexpected(std::move(versionResult.error()));
   auto version = std::move(*versionResult);
   if (version < 16)
-    return RpcPromise<Json>::createFailed("Server too old");
+    return RpcPromise<Json>::make_failed("Server too old");
   auto idResult = getSubWorldOnWorld(worldId);
   if (!idResult)
     return std::unexpected(std::move(idResult.error()));
@@ -1593,7 +1593,7 @@ std::expected<RpcPromise<Json>, StarException> UniverseClient::sendSubWorldOnWor
   if (!threadResult)
     return std::unexpected(std::move(threadResult.error()));
   auto thread = std::move(*threadResult);
-  auto pair = RpcPromise<Json>::createPair();
+  auto pair = RpcPromise<Json>::make_pair();
   thread.get()->passMessage({message, args, pair.second});
   return pair.first;
 }
@@ -1601,20 +1601,20 @@ std::expected<RpcPromise<Json>, StarException> UniverseClient::sendSubWorldOnWor
 // though it resolves instantly, still use a promise for consistency
 std::expected<RpcPromise<Json>, StarException> UniverseClient::sendMainWorldMessage(String const& message, JsonArray const& args) {
   if (!isConnected())
-    return RpcPromise<Json>::createFailed("Not connected");
+    return RpcPromise<Json>::make_failed("Not connected");
   auto responseResult = m_worldClient->receiveMessage(ServerConnectionId, message, args);
   if (!responseResult)
     return std::unexpected(std::move(responseResult.error()));
   auto response = std::move(*responseResult);
   if (!response)
-    return RpcPromise<Json>::createFailed("Message not handled by world");
+    return RpcPromise<Json>::make_failed("Message not handled by world");
   struct ResponseToPromise {
     std::expected<RpcPromise<Json>, StarException> operator()(RpcPromise<Json>& promise) const {
       return std::move(promise);
     }
 
     std::expected<RpcPromise<Json>, StarException> operator()(Json& result) const {
-      return RpcPromise<Json>::createFulfilled(result);
+      return RpcPromise<Json>::make_fulfilled(result);
     }
   };
   return std::visit(ResponseToPromise{}, *response);
@@ -2044,7 +2044,7 @@ std::expected<RpcPromise<Json>, StarException> UniverseClient::sendUniverseMessa
   if (!m_clientContext)
     return std::unexpected(StarException("Universe client is not connected"));
   if (connectionId == m_clientContext->connectionId()) {
-    auto pair = RpcPromise<Json>::createPair();
+    auto pair = RpcPromise<Json>::make_pair();
     auto operation37 = passMessage({message, args, pair.second});
     if (!operation37)
       return std::unexpected(std::move(operation37.error()));
@@ -2055,8 +2055,8 @@ std::expected<RpcPromise<Json>, StarException> UniverseClient::sendUniverseMessa
     return std::unexpected(std::move(versionResult.error()));
   auto version = std::move(*versionResult);
   if (version < 18)
-    return RpcPromise<Json>::createFailed("Server is not new enough");
-  auto pair = RpcPromise<Json>::createPair();
+    return RpcPromise<Json>::make_failed("Server is not new enough");
+  auto pair = RpcPromise<Json>::make_pair();
   Uuid uuid(m_root.random());
   std::unique_lock locker(m_messageMutex, std::defer_lock);
   lockWithDiagnostics(locker);

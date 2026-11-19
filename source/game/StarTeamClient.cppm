@@ -80,7 +80,7 @@ private:
   using RpcResponseHandler =
     std::pair<RpcPromise<Json>, std::function<std::expected<void, StarException>(Json const&)>>;
 
-  [[nodiscard]] std::expected<void, StarException> invokeRemote(String const& method, Json const& args,
+  [[nodiscard]] std::expected<void, StarException> invoke_remote(String const& method, Json const& args,
       std::function<std::expected<void, StarException>(Json const&)> responseFunction = {});
   [[nodiscard]] std::expected<void, StarException> handleRpcResponses();
 

@@ -467,6 +467,23 @@ These are algorithm/compatibility guarantees, not measured runtime speedups.
   missing-polygon error timing, opposite-target replan progress and actual Lua
   parameter/edge keys with repeatable incremental results.
 
+### RPC promises and JSON transport
+
+Native callers use `RpcPromise<T>::make_pair()` and `with_cancellation()`;
+the Lua factory remains `sb.makePromise`. Native method names are not RPC
+wire identifiers: do not rename registered remote method strings with them.
+
+Use `core_tests --gtest_filter='RpcPromiseTest.*:JsonRpcTest.*:LuaTest.*Promise*'`
+and the asset-backed `game_tests --gtest_filter='TeamClientTest.*'`. A remote
+`fail` completes successfully with JSON null; malformed replies must not retire
+the keeper for a subsequent valid response. A truncated binary batch must not
+dispatch even its complete prefix. Local cancellation and transform diagnostics
+are separate from these wire outcomes.
+
+When comparing performance, measure direct observation, delegated observation,
+cached transforms and a complete serialized round trip separately. Time the
+query, not construction of a long chain, when measuring observation cost.
+
 ### Bidirectional maps
 
 Run `core_tests --gtest_filter='BiMapTest.*'` for duplicate handling, cross-index

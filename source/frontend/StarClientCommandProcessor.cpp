@@ -752,7 +752,7 @@ std::expected<String, StarException> ClientCommandProcessor::upgradeShip(String 
   if (arguments->empty()) return "Not enough arguments to /upgradeship";
   auto upgrades = Json::parseJson((*arguments)[0]);
   if (!upgrades) return std::unexpected(std::move(upgrades.error()));
-  auto invoked = m_universeClient->rpcInterface()->invokeRemote("ship.applyShipUpgrades", *upgrades);
+  auto invoked = m_universeClient->rpcInterface()->invoke_remote("ship.applyShipUpgrades", *upgrades);
   if (!invoked) return std::unexpected(std::move(invoked.error()));
   return "Upgraded ship";
 }

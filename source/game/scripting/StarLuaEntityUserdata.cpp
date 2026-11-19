@@ -293,7 +293,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
               return std::unexpected(std::move(world.error()));
             return world->get().sendEntityMessage(entity->entityId(), message, JsonArray::from(std::move(args)));
         }
-        return RpcPromise<Json>::createFailed("Entity not in world");
+        return RpcPromise<Json>::make_failed("Entity not in world");
   }); !registration)
       return std::unexpected(std::move(registration.error()));
 

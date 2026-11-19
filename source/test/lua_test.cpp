@@ -2206,7 +2206,7 @@ TEST(LuaTest, PromiseUserdataObservesSharedOutcome) {
   auto contextResult = engine->createContext();
   ASSERT_TRUE(contextResult);
   auto context = std::move(*contextResult);
-  auto [promise, keeper] = RpcPromise<Json>::createPair();
+  auto [promise, keeper] = RpcPromise<Json>::make_pair();
   ASSERT_TRUE((context.setPath("promise", promise)));
   ASSERT_TRUE((context.setPath("keeper", std::make_shared<AutoFailRpcPromiseKeeper<Json>>(keeper))));
   EXPECT_EQ(context.eval<bool>("promise:finished()"), false);
@@ -2238,7 +2238,7 @@ TEST(LuaTest, PromiseKeeperGarbageCollectionFailsOnlyLastOwner) {
   auto contextResult = engine->createContext();
   ASSERT_TRUE(contextResult);
   auto context = std::move(*contextResult);
-  auto [promise, keeper] = RpcPromise<Json>::createPair();
+  auto [promise, keeper] = RpcPromise<Json>::make_pair();
   auto automatic = std::make_shared<AutoFailRpcPromiseKeeper<Json>>(keeper);
   ASSERT_TRUE((context.setPath("keeper", automatic)));
   ASSERT_TRUE((context.setPath("promise", promise)));
@@ -2266,8 +2266,8 @@ TEST(LuaTest, PromiseKeeperCollectionPreservesChainAndFailure) {
   auto contextResult = engine->createContext();
   ASSERT_TRUE(contextResult);
   auto context = std::move(*contextResult);
-  auto [source, sourceKeeper] = RpcPromise<Json>::createPair();
-  auto [promise, keeper] = RpcPromise<Json>::createPair();
+  auto [source, sourceKeeper] = RpcPromise<Json>::make_pair();
+  auto [promise, keeper] = RpcPromise<Json>::make_pair();
   ASSERT_TRUE((context.setPath("source", source)));
   ASSERT_TRUE((context.setPath("promise", promise)));
   ASSERT_TRUE((context.setPath("keeper", std::make_shared<AutoFailRpcPromiseKeeper<Json>>(keeper))));
@@ -2277,7 +2277,7 @@ TEST(LuaTest, PromiseKeeperCollectionPreservesChainAndFailure) {
   ASSERT_TRUE((sourceKeeper.fulfill(JsonArray{1, 2, 3})));
   EXPECT_EQ(context.eval<Json>("promise:result()"), JsonArray({1, 2, 3}));
 
-  auto [failed, failedKeeper] = RpcPromise<Json>::createPair();
+  auto [failed, failedKeeper] = RpcPromise<Json>::make_pair();
   ASSERT_TRUE((context.setPath("failedKeeper", std::make_shared<AutoFailRpcPromiseKeeper<Json>>(failedKeeper))));
   ASSERT_TRUE((context.load("failedKeeper:fail('from Lua') failedKeeper = nil")));
   ASSERT_TRUE(engine->collectGarbage());
@@ -2633,13 +2633,13 @@ TEST(LuaTest, PromiseStatusDistinguishesNullFailureAndCancellation) {
   ASSERT_TRUE(engine);
   auto context = (*engine)->createContext();
   ASSERT_TRUE(context);
-  auto [source, keeper] = RpcPromise<Json>::createPair();
+  auto [source, keeper] = RpcPromise<Json>::make_pair();
   std::stop_source lifetime;
   auto previous = (*engine)->setPromiseLifetime(lifetime.get_token());
   ASSERT_TRUE(context->set("pending", source));
   (*engine)->setPromiseLifetime(std::move(previous));
-  ASSERT_TRUE(context->set("success", RpcPromise<Json>::createFulfilled(Json())));
-  ASSERT_TRUE(context->set("failure", RpcPromise<Json>::createFailed("remote failure")));
+  ASSERT_TRUE(context->set("success", RpcPromise<Json>::make_fulfilled(Json())));
+  ASSERT_TRUE(context->set("failure", RpcPromise<Json>::make_failed("remote failure")));
   EXPECT_EQ(context->eval<bool>(R"LUA(
     pending:status() == "pending" and not pending:finished() and
     success:status() == "succeeded" and success:succeeded() and success:result() == nil and
@@ -2661,7 +2661,7 @@ TEST(LuaTest, PromiseStatusDistinguishesNullFailureAndCancellation) {
     not pending:cancel() and pending:status() == "cancelled" and pending:result() == nil
   )LUA"),
             true);
-  auto [producer, producerKeeper] = RpcPromise<Json>::createPair();
+  auto [producer, producerKeeper] = RpcPromise<Json>::make_pair();
   ASSERT_TRUE(context->set("producer", producer));
   ASSERT_TRUE(context->set("keeper", std::make_shared<AutoFailRpcPromiseKeeper<Json>>(producerKeeper)));
   EXPECT_EQ(context->eval<bool>("keeper:cancel() and producer:status() == 'cancelled'"), true);
@@ -2676,7 +2676,7 @@ TEST(LuaTest, PromiseScopeSeparatesObserversAndKeepsPublishedNull) {
   ASSERT_TRUE(second);
   std::stop_source firstLifetime;
   std::stop_source secondLifetime;
-  auto [source, keeper] = RpcPromise<Json>::createPair();
+  auto [source, keeper] = RpcPromise<Json>::make_pair();
   auto previous = (*engine)->setPromiseLifetime(firstLifetime.get_token());
   ASSERT_TRUE(first->set("promise", source));
   (*engine)->setPromiseLifetime(secondLifetime.get_token());
@@ -2699,7 +2699,7 @@ TEST(LuaTest, ClosingPromiseScopeDoesNotEvaluateLazyConversion) {
   auto context = (*engine)->createContext();
   ASSERT_TRUE(context);
   int evaluations = 0;
-  auto source = RpcPromise<Json>::createFulfilled(Json(27));
+  auto source = RpcPromise<Json>::make_fulfilled(Json(27));
   auto wrapped = source.wrap([&](Json value) -> std::expected<Json, StarException> {
     ++evaluations;
     return value;

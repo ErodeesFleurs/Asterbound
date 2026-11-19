@@ -322,8 +322,8 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUtilityCallbacks(Ran
 
   if (auto result = callbacks.registerCallback("makePromise",
       []() -> std::pair<RpcPromise<Json>, std::shared_ptr<AutoFailRpcPromiseKeeper<Json>>> {
-        auto pair = RpcPromise<Json>::createPair();
-        return std::make_pair(pair.first, std::make_shared<AutoFailRpcPromiseKeeper<Json>>(pair.second));
+        auto [promise, keeper] = RpcPromise<Json>::make_pair();
+        return {std::move(promise), std::make_shared<AutoFailRpcPromiseKeeper<Json>>(std::move(keeper))};
       }); !result)
     return std::unexpected(std::move(result.error()));
 

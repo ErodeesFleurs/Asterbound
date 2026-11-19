@@ -596,7 +596,7 @@ std::expected<void, StarException> UniverseServer::setPvp(ConnectionId clientId,
 }
 
 std::expected<RpcPromise<Json>, StarException> UniverseServer::sendWorldMessage(WorldId const& worldId, String const& message, JsonArray const& args) {
-  auto pair = RpcPromise<Json>::createPair();
+  auto pair = RpcPromise<Json>::make_pair();
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lockWithDiagnostics(locker);
   m_pendingWorldMessages[worldId].push_back({message, args, pair.second});
@@ -4751,7 +4751,7 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
     return WorldServerPromise(producer(std::move(*chunks)));
   if (auto logged = m_root.logger().info("UniverseServer: Requesting client custom world '{}' for '{}'", id.name, id.uuid.hex()); !logged)
     return std::unexpected(std::move(logged.error()));
-  auto pair = RpcPromise<WorldChunks>::createPair();
+  auto pair = RpcPromise<WorldChunks>::make_pair();
   if (auto requested = client->customWorldRequested(id.name, pair.second); !requested)
     return std::unexpected(std::move(requested.error()));
   if (auto sent = m_connectionServer->sendPackets(*clientId, {std::make_shared<ClientCustomWorldRequest>(id.name)}); !sent) {
@@ -4993,7 +4993,7 @@ std::expected<void, StarException> UniverseServer::passMessage(Universe::Message
 
 std::expected<RpcPromise<Json>, StarException> UniverseServer::sendUniverseMessage(ConnectionId const& connectionId, String const& message, JsonArray const& args) {
   if (connectionId == ServerConnectionId) {
-    auto pair = RpcPromise<Json>::createPair();
+    auto pair = RpcPromise<Json>::make_pair();
     if (auto passed = passMessage({message, args, pair.second}); !passed)
       return std::unexpected(std::move(passed.error()));
     return pair.first;
@@ -5002,9 +5002,9 @@ std::expected<RpcPromise<Json>, StarException> UniverseServer::sendUniverseMessa
     if (auto client = m_clients.value(connectionId); client && !m_disconnectingClients.contains(connectionId)) {
       clientsLocker.unlock();
       if (client->netRules().version() < 18) {
-        return RpcPromise<Json>::createFailed("Client is not new enough");
+        return RpcPromise<Json>::make_failed("Client is not new enough");
       }
-      auto pair = RpcPromise<Json>::createPair();
+      auto pair = RpcPromise<Json>::make_pair();
       Uuid uuid(m_root.random());
       std::unique_lock messageLocker(m_messageLock, std::defer_lock);
       lockWithDiagnostics(messageLocker);
@@ -5016,7 +5016,7 @@ std::expected<RpcPromise<Json>, StarException> UniverseServer::sendUniverseMessa
       }
       return pair.first;
     }
-    return RpcPromise<Json>::createFailed("Client does not exist");
+    return RpcPromise<Json>::make_failed("Client does not exist");
   }
 }
 

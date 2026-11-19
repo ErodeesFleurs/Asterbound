@@ -228,7 +228,7 @@ struct LuaConverter<LuaCallbacks> {
 
 template <typename T> struct LuaConverter<RpcPromise<T>> {
   [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, RpcPromise<T> const& promise) {
-    auto scoped = promise.withCancellation(stack.engine().promiseLifetime(), "Lua session stopped");
+    auto scoped = promise.with_cancellation(stack.engine().promiseLifetime(), "Lua session stopped");
     if (!scoped)
       return std::unexpected(std::move(scoped.error()));
     return LuaUserDataConverter<RpcPromise<T>>::from(stack, std::move(*scoped));
@@ -237,7 +237,7 @@ template <typename T> struct LuaConverter<RpcPromise<T>> {
     auto promise = LuaUserDataConverter<RpcPromise<T>>::to(value);
     if (!promise || !*promise)
       return promise;
-    auto scoped = (**promise).withCancellation(value.stack().engine().promiseLifetime(), "Lua session stopped");
+    auto scoped = (**promise).with_cancellation(value.stack().engine().promiseLifetime(), "Lua session stopped");
     if (!scoped)
       return std::unexpected(std::move(scoped.error()));
     return std::optional<RpcPromise<T>>(std::move(*scoped));

@@ -154,7 +154,7 @@ std::expected<std::shared_ptr<ServerClientContext>, StarException> ServerClientC
 }
 
 std::expected<void, StarException> ServerClientContext::initialize() {
-  auto upgradeHandler = m_rpc.registerHandler("ship.applyShipUpgrades", [&self = *this](Json const& args) -> std::expected<Json, StarException> {
+  auto upgradeHandler = m_rpc.register_handler("ship.applyShipUpgrades", [&self = *this](Json const& args) -> std::expected<Json, StarException> {
     std::unique_lock locker(self.m_mutex, std::defer_lock);
     lockWithDiagnostics(locker);
     auto upgrades = self.shipUpgrades();
@@ -167,7 +167,7 @@ std::expected<void, StarException> ServerClientContext::initialize() {
   if (!upgradeHandler)
     return std::unexpected(std::move(upgradeHandler.error()));
 
-  auto speciesHandler = m_rpc.registerHandler("ship.setShipSpecies", [&self = *this](Json const& species) -> std::expected<Json, StarException> {
+  auto speciesHandler = m_rpc.register_handler("ship.setShipSpecies", [&self = *this](Json const& species) -> std::expected<Json, StarException> {
     std::unique_lock locker(self.m_mutex, std::defer_lock);
     lockWithDiagnostics(locker);
     auto newSpecies = species.toString();
@@ -185,7 +185,7 @@ std::expected<void, StarException> ServerClientContext::initialize() {
   if (!speciesHandler)
     return std::unexpected(std::move(speciesHandler.error()));
 
-  auto containerHandler = m_rpc.registerHandler("world.containerPutItems", [&self = *this](Json const& args) -> std::expected<Json, StarException> {
+  auto containerHandler = m_rpc.register_handler("world.containerPutItems", [&self = *this](Json const& args) -> std::expected<Json, StarException> {
     auto items = args.getArray("items");
     if (!items)
       return std::unexpected(std::move(items.error()));
@@ -236,7 +236,7 @@ std::expected<void, StarException> ServerClientContext::initialize() {
   if (!containerHandler)
     return std::unexpected(std::move(containerHandler.error()));
 
-  auto flagHandler = m_rpc.registerHandler("universe.setFlag", [&self = *this](Json const& args) -> std::expected<Json, StarException> {
+  auto flagHandler = m_rpc.register_handler("universe.setFlag", [&self = *this](Json const& args) -> std::expected<Json, StarException> {
     auto flagName = args.toString();
     if (!flagName)
       return std::unexpected(std::move(flagName.error()));
@@ -305,7 +305,7 @@ String ServerClientContext::descriptiveName() const {
 }
 
 std::expected<void, StarException> ServerClientContext::registerRpcHandlers(JsonRpcHandlers const& rpcHandlers) {
-  return m_rpc.registerHandlers(rpcHandlers);
+  return m_rpc.register_handlers(rpcHandlers);
 }
 
 CelestialCoordinate ServerClientContext::shipCoordinate() const {

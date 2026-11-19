@@ -664,7 +664,7 @@ const GameTestRegistration
                        [](GameTest& fixture) {
                          auto luaRoot = LuaRoot::create(fixture.root());
                          ASSERT_TRUE(luaRoot);
-                         auto remote = RpcPromise<Json>::createPair();
+                         auto remote = RpcPromise<Json>::make_pair();
                          LuaMessageScript component(fixture.root());
                          auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
                          ASSERT_TRUE(component.setLuaRoot(*luaRoot));
@@ -689,7 +689,7 @@ const GameTestRegistration
                          auto failedResult = response.result();
                          ASSERT_TRUE(failedResult);
                          EXPECT_FALSE(*failedResult);
-                         remote = RpcPromise<Json>::createPair();
+                         remote = RpcPromise<Json>::make_pair();
                          auto success = component.threadPassMessage("worker", "async", {});
                          ASSERT_TRUE(component.update<LuaValue>());
                          expectPending(success);
@@ -707,7 +707,7 @@ const GameTestRegistration workerStartupFailure(
     ASSERT_TRUE(created) << created.error().what();
     auto worker = std::move(*created);
     auto cleanup = make_scope_exit([&] { EXPECT_TRUE(worker->stop()); });
-    auto accepted = RpcPromise<Json>::createPair();
+    auto accepted = RpcPromise<Json>::make_pair();
     ASSERT_TRUE(worker->passMessage({"queued-before-start", {}, accepted.second}));
     expectPending(accepted.first);
     testing::TestPartResultArray errors;
@@ -728,7 +728,7 @@ const GameTestRegistration workerStartupFailure(
     EXPECT_TRUE(worker->isJoined());
     expectPromiseFailure(accepted.first);
     expectPromiseStatus(accepted.first, RpcPromiseStatus::Failed);
-    auto late = RpcPromise<Json>::createPair();
+    auto late = RpcPromise<Json>::make_pair();
     ASSERT_TRUE(worker->passMessage({"after-failure", {}, late.second}));
     expectPromiseFailure(late.first);
     expectPromiseStatus(late.first, RpcPromiseStatus::Failed);
@@ -1132,7 +1132,7 @@ const GameTestRegistration
                        [](GameTest& fixture) {
                          auto luaRoot = LuaRoot::create(fixture.root());
                          ASSERT_TRUE(luaRoot);
-                         auto remote = RpcPromise<Json>::createPair();
+                         auto remote = RpcPromise<Json>::make_pair();
                          LuaMessageScript component(fixture.root());
                          auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
                          ASSERT_TRUE(component.setLuaRoot(*luaRoot));
@@ -1172,7 +1172,7 @@ const GameTestRegistration
                               auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
                               ASSERT_TRUE(component.setLuaRoot(*luaRoot));
                               ASSERT_TRUE(component.init());
-                              auto producer = RpcPromise<Json>::createPair();
+                              auto producer = RpcPromise<Json>::make_pair();
                               ASSERT_TRUE(component.context()->set("injected", producer.first));
                               ASSERT_TRUE(component.eval<LuaValue>(R"LUA(
         message.setHandler("async", function() return injected end)
@@ -1219,7 +1219,7 @@ const GameTestRegistration publishedNullReply("LuaComponentLifecycle",
                                                 for (bool completedBeforeDispatch : {true, false}) {
                                                   SCOPED_TRACE(completedBeforeDispatch ? "completed before dispatch"
                                                                                        : "completed after dispatch");
-                                                  auto producer = RpcPromise<Json>::createPair();
+                                                  auto producer = RpcPromise<Json>::make_pair();
                                                   if (completedBeforeDispatch)
                                                     ASSERT_TRUE(producer.second.fulfill(Json()));
                                                   ASSERT_TRUE(component.context()->set("injected", producer.first));
@@ -1250,7 +1250,7 @@ const GameTestRegistration
                             [](GameTest& fixture) {
                               auto luaRoot = LuaRoot::create(fixture.root());
                               ASSERT_TRUE(luaRoot);
-                              auto producer = RpcPromise<Json>::createPair();
+                              auto producer = RpcPromise<Json>::make_pair();
                               LuaMessageScript first(fixture.root());
                               LuaMessageScript second(fixture.root());
                               auto cleanup = make_scope_exit([&] {
@@ -1290,7 +1290,7 @@ const GameTestRegistration
                           auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
                           ASSERT_TRUE(component.setLuaRoot(*luaRoot));
                           ASSERT_TRUE(component.init());
-                          auto producer = RpcPromise<Json>::createPair();
+                          auto producer = RpcPromise<Json>::make_pair();
                           auto userdata = component.context()->createUserData(SessionPromiseFactory{producer.first});
                           ASSERT_TRUE(userdata);
                           ASSERT_TRUE(component.context()->set("factory", *userdata));
@@ -1320,7 +1320,7 @@ const GameTestRegistration deferredReplyCancellation(
       LuaMessageScript component(fixture.root());
       auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
       ASSERT_TRUE(component.setLuaRoot(*luaRoot));
-      auto producer = RpcPromise<Json>::createPair();
+      auto producer = RpcPromise<Json>::make_pair();
       if (completed)
         ASSERT_TRUE(producer.second.fulfill(Json()));
       LuaCallbacks host;
@@ -1360,7 +1360,7 @@ const GameTestRegistration closedWorkerMessages(
     ASSERT_TRUE(created);
     auto worker = *created;
     auto cleanup = make_scope_exit([&] { EXPECT_TRUE(worker->stop()); });
-    auto beforeStart = RpcPromise<Json>::createPair();
+    auto beforeStart = RpcPromise<Json>::make_pair();
     ASSERT_TRUE(worker->passMessage({"queued", {}, beforeStart.second}));
     ASSERT_TRUE(worker->stop());
     expectPromiseStatus(beforeStart.first, RpcPromiseStatus::Cancelled);
@@ -1372,7 +1372,7 @@ const GameTestRegistration closedWorkerMessages(
       auto alreadyStarted = worker->start();
       ASSERT_TRUE(alreadyStarted);
       EXPECT_FALSE(*alreadyStarted);
-      auto running = RpcPromise<Json>::createPair();
+      auto running = RpcPromise<Json>::make_pair();
       ASSERT_TRUE(worker->passMessage({"no-handler", {}, running.second}));
       auto status = running.first.status();
       auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
@@ -1390,7 +1390,7 @@ const GameTestRegistration closedWorkerMessages(
       EXPECT_TRUE(worker->shouldExpire());
       EXPECT_FALSE(worker->errorOccurred());
     }
-    auto late = RpcPromise<Json>::createPair();
+    auto late = RpcPromise<Json>::make_pair();
     ASSERT_TRUE(worker->passMessage({"after-close", {}, late.second}));
     expectPromiseStatus(late.first, RpcPromiseStatus::Cancelled);
   });
@@ -1425,7 +1425,7 @@ const GameTestRegistration workerChainedReplyClosure(
                                             parent);
     ASSERT_TRUE(created);
     auto worker = *created;
-    auto producer = RpcPromise<Json>::createPair();
+    auto producer = RpcPromise<Json>::make_pair();
     std::promise<void> entered;
     auto handlerEntered = entered.get_future();
     LuaCallbacks host;
@@ -1434,7 +1434,7 @@ const GameTestRegistration workerChainedReplyClosure(
       return producer.first;
     }));
     ASSERT_TRUE(worker->addCallbacks("host", host));
-    auto response = RpcPromise<Json>::createPair();
+    auto response = RpcPromise<Json>::make_pair();
     auto cleanup = make_scope_exit([&] { EXPECT_TRUE(worker->stop()); });
     ASSERT_TRUE(worker->passMessage({"pending", {}, response.second}));
     auto started = worker->start();

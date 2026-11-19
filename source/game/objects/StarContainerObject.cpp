@@ -830,7 +830,7 @@ std::expected<RpcPromise<std::shared_ptr<Item>>, StarException> ContainerObject:
   if (!resultResult)
     return std::unexpected(std::move(resultResult.error()));
   auto result = std::move(*resultResult);
-  return RpcPromise<std::shared_ptr<Item>>::createFulfilled(std::move(result));
+  return RpcPromise<std::shared_ptr<Item>>::make_fulfilled(std::move(result));
 }
 
 std::expected<RpcPromise<std::shared_ptr<Item>>, StarException> ContainerObject::putItems(std::size_t pos, std::shared_ptr<Item> const& items) {
@@ -859,7 +859,7 @@ std::expected<RpcPromise<std::shared_ptr<Item>>, StarException> ContainerObject:
   if (!resultResult)
     return std::unexpected(std::move(resultResult.error()));
   auto result = std::move(*resultResult);
-  return RpcPromise<std::shared_ptr<Item>>::createFulfilled(std::move(result));
+  return RpcPromise<std::shared_ptr<Item>>::make_fulfilled(std::move(result));
 }
 
 std::expected<RpcPromise<std::shared_ptr<Item>>, StarException> ContainerObject::takeItems(std::size_t slot, std::size_t count) {
@@ -888,7 +888,7 @@ std::expected<RpcPromise<std::shared_ptr<Item>>, StarException> ContainerObject:
   if (!resultResult)
     return std::unexpected(std::move(resultResult.error()));
   auto result = std::move(*resultResult);
-  return RpcPromise<std::shared_ptr<Item>>::createFulfilled(std::move(result));
+  return RpcPromise<std::shared_ptr<Item>>::make_fulfilled(std::move(result));
 }
 
 std::expected<RpcPromise<std::shared_ptr<Item>>, StarException> ContainerObject::swapItems(std::size_t slot, std::shared_ptr<Item> const& items, bool tryCombine) {
@@ -917,7 +917,7 @@ std::expected<RpcPromise<std::shared_ptr<Item>>, StarException> ContainerObject:
   if (!resultResult)
     return std::unexpected(std::move(resultResult.error()));
   auto result = std::move(*resultResult);
-  return RpcPromise<std::shared_ptr<Item>>::createFulfilled(std::move(result));
+  return RpcPromise<std::shared_ptr<Item>>::make_fulfilled(std::move(result));
 }
 
 std::expected<RpcPromise<std::shared_ptr<Item>>, StarException> ContainerObject::applyAugment(std::size_t slot, std::shared_ptr<Item> const& augment) {
@@ -946,7 +946,7 @@ std::expected<RpcPromise<std::shared_ptr<Item>>, StarException> ContainerObject:
   if (!resultResult)
     return std::unexpected(std::move(resultResult.error()));
   auto result = std::move(*resultResult);
-  return RpcPromise<std::shared_ptr<Item>>::createFulfilled(std::move(result));
+  return RpcPromise<std::shared_ptr<Item>>::make_fulfilled(std::move(result));
 }
 
 std::expected<RpcPromise<bool>, StarException> ContainerObject::consumeItems(ItemDescriptor const& descriptor) {
@@ -965,7 +965,7 @@ std::expected<RpcPromise<bool>, StarException> ContainerObject::consumeItems(Ite
   if (!resultResult)
     return std::unexpected(std::move(resultResult.error()));
   auto result = std::move(*resultResult);
-  return RpcPromise<bool>::createFulfilled(result);
+  return RpcPromise<bool>::make_fulfilled(result);
 }
 
 std::expected<RpcPromise<bool>, StarException> ContainerObject::consumeItems(std::size_t pos, std::size_t count) {
@@ -984,7 +984,7 @@ std::expected<RpcPromise<bool>, StarException> ContainerObject::consumeItems(std
   if (!resultResult)
     return std::unexpected(std::move(resultResult.error()));
   auto result = std::move(*resultResult);
-  return RpcPromise<bool>::createFulfilled(result);
+  return RpcPromise<bool>::make_fulfilled(result);
 }
 
 std::expected<RpcPromise<List<std::shared_ptr<Item>>>, StarException> ContainerObject::clearContainer() {
@@ -1025,7 +1025,7 @@ std::expected<RpcPromise<List<std::shared_ptr<Item>>>, StarException> ContainerO
   if (!resultResult)
     return std::unexpected(std::move(resultResult.error()));
   auto result = std::move(*resultResult);
-  return RpcPromise<List<std::shared_ptr<Item>>>::createFulfilled(std::move(result));
+  return RpcPromise<List<std::shared_ptr<Item>>>::make_fulfilled(std::move(result));
 }
 
 bool ContainerObject::isCrafting() const {

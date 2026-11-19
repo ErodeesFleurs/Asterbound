@@ -21,7 +21,7 @@ struct NonDefaultValue {
 }
 
 TEST(RpcPromiseTest, SharedObservationAndSingleResolution) {
-  auto [promise, keeper] = RpcPromise<int>::createPair();
+  auto [promise, keeper] = RpcPromise<int>::make_pair();
   auto observer = promise;
   auto otherKeeper = keeper;
   EXPECT_EQ(observer.finished(), false);
@@ -50,14 +50,14 @@ TEST(RpcPromiseTest, SharedObservationAndSingleResolution) {
   auto failedAfterFulfill = otherKeeper.fail("late failure");
   ASSERT_FALSE(failedAfterFulfill);
   EXPECT_TRUE(failedAfterFulfill.error().is<RpcPromiseException>());
-  auto chainedAfterFulfill = otherKeeper.chain(RpcPromise<int>::createFulfilled(1));
+  auto chainedAfterFulfill = otherKeeper.chain(RpcPromise<int>::make_fulfilled(1));
   ASSERT_FALSE(chainedAfterFulfill);
   EXPECT_TRUE(chainedAfterFulfill.error().is<RpcPromiseException>());
   auto resolvedResult = promise.result();
   ASSERT_TRUE(resolvedResult);
   EXPECT_EQ(*resolvedResult, std::optional<int>{42});
 
-  auto [failure, failureKeeper] = RpcPromise<int>::createPair();
+  auto [failure, failureKeeper] = RpcPromise<int>::make_pair();
   ASSERT_TRUE(failureKeeper.fail("failed"));
   EXPECT_EQ(failure.finished(), true);
   EXPECT_EQ(failure.succeeded(), false);
@@ -77,9 +77,9 @@ TEST(RpcPromiseTest, SharedObservationAndSingleResolution) {
 }
 
 TEST(RpcPromiseTest, DelegationIsResolutionEvenBeforeTargetFinishes) {
-  auto [outer, outerKeeper] = RpcPromise<int>::createPair();
-  auto [middle, middleKeeper] = RpcPromise<int>::createPair();
-  auto [inner, innerKeeper] = RpcPromise<int>::createPair();
+  auto [outer, outerKeeper] = RpcPromise<int>::make_pair();
+  auto [middle, middleKeeper] = RpcPromise<int>::make_pair();
+  auto [inner, innerKeeper] = RpcPromise<int>::make_pair();
   ASSERT_TRUE(outerKeeper.chain(middle));
   ASSERT_TRUE(middleKeeper.chain(inner));
   EXPECT_EQ(outer.finished(), false);
@@ -107,8 +107,8 @@ TEST(RpcPromiseTest, DelegationIsResolutionEvenBeforeTargetFinishes) {
   ASSERT_TRUE(completedResult);
   EXPECT_EQ(*completedResult, std::optional<int>{73});
 
-  auto [failedOuter, failedKeeper] = RpcPromise<int>::createPair();
-  ASSERT_TRUE(failedKeeper.chain(RpcPromise<int>::createFailed("delegated error")));
+  auto [failedOuter, failedKeeper] = RpcPromise<int>::make_pair();
+  ASSERT_TRUE(failedKeeper.chain(RpcPromise<int>::make_failed("delegated error")));
   EXPECT_EQ(failedOuter.finished(), true);
   EXPECT_EQ(failedOuter.failed(), true);
   auto failedResult = failedOuter.result();
@@ -120,7 +120,7 @@ TEST(RpcPromiseTest, DelegationIsResolutionEvenBeforeTargetFinishes) {
 }
 
 TEST(RpcPromiseTest, LazyWrapperCachesAcrossAllObservers) {
-  auto [source, keeper] = RpcPromise<int>::createPair();
+  auto [source, keeper] = RpcPromise<int>::make_pair();
   int calls = 0;
   auto wrapping = source.wrap([&calls](int value) -> std::expected<String, StarException> {
     ++calls;
@@ -156,7 +156,7 @@ TEST(RpcPromiseTest, LazyWrapperCachesAcrossAllObservers) {
 }
 
 TEST(RpcPromiseTest, FailingWrapperRemainsQueryable) {
-  auto source = RpcPromise<int>::createFulfilled(8);
+  auto source = RpcPromise<int>::make_fulfilled(8);
   int calls = 0;
   auto wrapping = source.wrap([&calls](int value) -> std::expected<int, StarException> {
     if (++calls < 3)
@@ -185,13 +185,13 @@ TEST(RpcPromiseTest, FailingWrapperRemainsQueryable) {
 
 TEST(RpcPromiseTest, WrappedFailureAndWrappedDelegation) {
   int calls = 0;
-  auto [source, keeper] = RpcPromise<int, int>::createPair();
+  auto [source, keeper] = RpcPromise<int, int>::make_pair();
   auto wrapped = source.wrap([&calls](int value) -> std::expected<int, StarException> {
     ++calls;
     return value + 1;
   });
   ASSERT_TRUE(wrapped);
-  auto [outer, outerKeeper] = RpcPromise<int, int>::createPair();
+  auto [outer, outerKeeper] = RpcPromise<int, int>::make_pair();
   ASSERT_TRUE(outerKeeper.chain(*wrapped));
   EXPECT_EQ(outer.finished(), false);
   ASSERT_TRUE(keeper.fail(19));
@@ -205,13 +205,13 @@ TEST(RpcPromiseTest, WrappedFailureAndWrappedDelegation) {
   EXPECT_EQ(*failedError, std::optional<int>{19});
   EXPECT_EQ(calls, 0);
 
-  auto [success, successKeeper] = RpcPromise<int, int>::createPair();
+  auto [success, successKeeper] = RpcPromise<int, int>::make_pair();
   auto transformed = success.wrap([&calls](int value) -> std::expected<int, StarException> {
     ++calls;
     return value + 1;
   });
   ASSERT_TRUE(transformed);
-  auto [delegated, delegatedKeeper] = RpcPromise<int, int>::createPair();
+  auto [delegated, delegatedKeeper] = RpcPromise<int, int>::make_pair();
   ASSERT_TRUE(delegatedKeeper.chain(*transformed));
   ASSERT_TRUE(successKeeper.fulfill(10));
   EXPECT_EQ(calls, 0);
@@ -223,7 +223,7 @@ TEST(RpcPromiseTest, WrappedFailureAndWrappedDelegation) {
 }
 
 TEST(RpcPromiseTest, ArbitraryPayloadTypesDoNotNeedDefaultConstruction) {
-  auto [promise, keeper] = RpcPromise<NonDefaultValue, NonDefaultValue>::createPair();
+  auto [promise, keeper] = RpcPromise<NonDefaultValue, NonDefaultValue>::make_pair();
   ASSERT_TRUE(keeper.fulfill(NonDefaultValue(7)));
   auto result = promise.result();
   ASSERT_TRUE(result);
@@ -232,22 +232,22 @@ TEST(RpcPromiseTest, ArbitraryPayloadTypesDoNotNeedDefaultConstruction) {
   auto noError = promise.error();
   ASSERT_TRUE(noError);
   EXPECT_FALSE(*noError);
-  auto failed = RpcPromise<NonDefaultValue, NonDefaultValue>::createFailed(NonDefaultValue(12));
+  auto failed = RpcPromise<NonDefaultValue, NonDefaultValue>::make_failed(NonDefaultValue(12));
   EXPECT_EQ(failed.failed(), true);
   auto error = failed.error();
   ASSERT_TRUE(error);
   ASSERT_TRUE(*error);
   EXPECT_EQ((*error)->value, 12);
 
-  auto [moveOnly, moveOnlyKeeper] = RpcPromise<std::unique_ptr<int>, std::unique_ptr<int>>::createPair();
+  auto [moveOnly, moveOnlyKeeper] = RpcPromise<std::unique_ptr<int>, std::unique_ptr<int>>::make_pair();
   ASSERT_TRUE(moveOnlyKeeper.fulfill(std::make_unique<int>(3)));
   EXPECT_EQ(moveOnly.succeeded(), true);
-  auto moveOnlyFailure = RpcPromise<std::unique_ptr<int>, std::unique_ptr<int>>::createFailed(std::make_unique<int>(4));
+  auto moveOnlyFailure = RpcPromise<std::unique_ptr<int>, std::unique_ptr<int>>::make_failed(std::make_unique<int>(4));
   EXPECT_EQ(moveOnlyFailure.failed(), true);
 }
 
 TEST(RpcPromiseTest, ConcurrentKeepersChooseExactlyOneOutcome) {
-  auto [promise, keeper] = RpcPromise<int, int>::createPair();
+  auto [promise, keeper] = RpcPromise<int, int>::make_pair();
   std::barrier start(3);
   std::atomic<int> rejected = 0;
   auto fulfillKeeper = keeper;
@@ -290,7 +290,7 @@ TEST(RpcPromiseTest, ConcurrentKeepersChooseExactlyOneOutcome) {
 }
 
 TEST(RpcPromiseTest, AutoFailOwnershipAndExplicitDecisions) {
-  auto [abandoned, keeper] = RpcPromise<int>::createPair();
+  auto [abandoned, keeper] = RpcPromise<int>::make_pair();
   auto automatic = std::make_shared<AutoFailRpcPromiseKeeper<int>>(keeper);
   auto alias = automatic;
   automatic.reset();
@@ -301,7 +301,7 @@ TEST(RpcPromiseTest, AutoFailOwnershipAndExplicitDecisions) {
   ASSERT_TRUE(abandonedError);
   EXPECT_EQ(*abandonedError, std::optional<String>{"Keeper destroyed"});
 
-  auto [fulfilled, fulfilledKeeper] = RpcPromise<int>::createPair();
+  auto [fulfilled, fulfilledKeeper] = RpcPromise<int>::make_pair();
   {
     AutoFailRpcPromiseKeeper<int> automaticKeeper(fulfilledKeeper);
     ASSERT_TRUE(automaticKeeper.fulfill(10));
@@ -313,7 +313,7 @@ TEST(RpcPromiseTest, AutoFailOwnershipAndExplicitDecisions) {
   ASSERT_TRUE(fulfilledResult);
   EXPECT_EQ(*fulfilledResult, std::optional<int>{10});
 
-  auto [failed, failedKeeper] = RpcPromise<int>::createPair();
+  auto [failed, failedKeeper] = RpcPromise<int>::make_pair();
   {
     AutoFailRpcPromiseKeeper<int> automaticKeeper(failedKeeper);
     ASSERT_TRUE(automaticKeeper.fail("explicit failure"));
@@ -322,8 +322,8 @@ TEST(RpcPromiseTest, AutoFailOwnershipAndExplicitDecisions) {
   ASSERT_TRUE(failedError);
   EXPECT_EQ(*failedError, std::optional<String>{"explicit failure"});
 
-  auto [delegated, delegatedKeeper] = RpcPromise<int>::createPair();
-  auto [target, targetKeeper] = RpcPromise<int>::createPair();
+  auto [delegated, delegatedKeeper] = RpcPromise<int>::make_pair();
+  auto [target, targetKeeper] = RpcPromise<int>::make_pair();
   {
     AutoFailRpcPromiseKeeper<int> automaticKeeper(delegatedKeeper);
     ASSERT_TRUE(automaticKeeper.chain(target));
@@ -340,7 +340,7 @@ TEST(RpcPromiseTest, WrapperRetainsCaptureUntilLastObserverDies) {
   {
     auto resource = std::make_shared<int>(9);
     capture = resource;
-    auto wrapping = RpcPromise<int>::createFulfilled(2).wrap([resource](int value) -> std::expected<int, StarException> { return value + *resource; });
+    auto wrapping = RpcPromise<int>::make_fulfilled(2).wrap([resource](int value) -> std::expected<int, StarException> { return value + *resource; });
     ASSERT_TRUE(wrapping);
     auto wrapped = std::move(*wrapping);
     resource.reset();
@@ -375,7 +375,7 @@ TEST(RpcPromiseTest, EmptyHandlesReportDomainErrors) {
 TEST(JsonRpcTest, RemoteFailureStillFulfillsNull) {
   Logger logger;
   JsonRpc sender(logger);
-  auto response = sender.invokeRemote("remote", JsonArray{1, 2});
+  auto response = sender.invoke_remote("remote", JsonArray{1, 2});
   ASSERT_TRUE(response);
   EXPECT_EQ(response->finished(), false);
   auto request = sender.send();
@@ -406,9 +406,9 @@ TEST(JsonRpcTest, SuccessfulTransportPreservesStructuredResult) {
   Logger logger;
   JsonRpc sender(logger);
   JsonRpc receiver(logger);
-  ASSERT_TRUE(receiver.registerHandler("echo", [](Json const& arguments) -> std::expected<Json, StarException> { return arguments; }));
+  ASSERT_TRUE(receiver.register_handler("echo", [](Json const& arguments) -> std::expected<Json, StarException> { return arguments; }));
   Json arguments = JsonObject{{"message", "round trip"}, {"values", JsonArray{1, false, Json()}}};
-  auto response = sender.invokeRemote("echo", arguments);
+  auto response = sender.invoke_remote("echo", arguments);
   ASSERT_TRUE(response);
   auto request = sender.send();
   ASSERT_TRUE(request);
@@ -431,15 +431,15 @@ TEST(JsonRpcTest, TruncatedContainerDoesNotDispatchItsCompleteFirstRequest) {
   JsonRpc sender(logger);
   JsonRpc receiver(logger);
   int calls = 0;
-  ASSERT_TRUE(receiver.registerHandler("echo", [&calls](Json const& arguments) -> std::expected<Json, StarException> {
+  ASSERT_TRUE(receiver.register_handler("echo", [&calls](Json const& arguments) -> std::expected<Json, StarException> {
     ++calls;
     return arguments;
   }));
   Json firstArguments = JsonObject{{"message", "first"}, {"values", JsonArray{1, false, Json()}}};
   Json secondArguments = JsonObject{{"message", "second"}};
-  auto firstResponse = sender.invokeRemote("echo", firstArguments);
+  auto firstResponse = sender.invoke_remote("echo", firstArguments);
   ASSERT_TRUE(firstResponse);
-  auto secondResponse = sender.invokeRemote("echo", secondArguments);
+  auto secondResponse = sender.invoke_remote("echo", secondArguments);
   ASSERT_TRUE(secondResponse);
   auto request = sender.send();
   ASSERT_TRUE(request);
@@ -449,7 +449,7 @@ TEST(JsonRpcTest, TruncatedContainerDoesNotDispatchItsCompleteFirstRequest) {
 
   EXPECT_FALSE(receiver.receive(truncated));
   EXPECT_EQ(calls, 0);
-  EXPECT_FALSE(receiver.sendPending());
+  EXPECT_FALSE(receiver.has_pending());
   EXPECT_EQ(firstResponse->finished(), false);
   EXPECT_EQ(secondResponse->finished(), false);
 
@@ -470,11 +470,11 @@ TEST(JsonRpcTest, HandlerRegistrationPreservesActiveCallableState) {
   Logger logger;
   JsonRpc sender(logger);
   JsonRpc receiver(logger);
-  ASSERT_TRUE(receiver.registerHandler(
+  ASSERT_TRUE(receiver.register_handler(
     "grow", [&receiver, visits = 0](Json const&) mutable -> std::expected<Json, StarException> {
       if (++visits == 1) {
         for (int i = 0; i < 256; ++i) {
-          auto added = receiver.registerHandler(
+          auto added = receiver.register_handler(
             Star::format("generated-{}", i), [i](Json const&) -> std::expected<Json, StarException> { return Json(i); });
           if (!added)
             return std::unexpected(std::move(added.error()));
@@ -484,7 +484,7 @@ TEST(JsonRpcTest, HandlerRegistrationPreservesActiveCallableState) {
     }));
 
   for (int expected : {2, 4}) {
-    auto response = sender.invokeRemote("grow", Json());
+    auto response = sender.invoke_remote("grow", Json());
     ASSERT_TRUE(response);
     auto request = sender.send();
     ASSERT_TRUE(request);
@@ -497,7 +497,7 @@ TEST(JsonRpcTest, HandlerRegistrationPreservesActiveCallableState) {
     EXPECT_EQ(*result, std::optional<Json>{Json(expected)});
   }
 
-  auto response = sender.invokeRemote("generated-255", Json());
+  auto response = sender.invoke_remote("generated-255", Json());
   ASSERT_TRUE(response);
   auto request = sender.send();
   ASSERT_TRUE(request);
@@ -510,9 +510,89 @@ TEST(JsonRpcTest, HandlerRegistrationPreservesActiveCallableState) {
   EXPECT_EQ(*result, std::optional<Json>{Json(255)});
 }
 
+TEST(JsonRpcTest, MalformedResponseLeavesKeeperForValidReply) {
+  Logger logger;
+  JsonRpc sender(logger);
+  auto response = sender.invoke_remote("remote", Json{});
+  ASSERT_TRUE(response);
+  auto wire = sender.send();
+  ASSERT_TRUE(wire);
+  DataStreamBuffer outgoing(std::move(*wire));
+  List<Json> requests;
+  ASSERT_TRUE(outgoing.read_container(requests));
+  ASSERT_EQ(requests.size(), 1u);
+  auto id = requests[0].get("id");
+  ASSERT_TRUE(id);
+
+  DataStreamBuffer malformed;
+  ASSERT_TRUE(malformed.write_container(List<Json>{JsonObject{{"command", "response"}, {"id", *id}}}));
+  ASSERT_TRUE(sender.receive(malformed.take_data()));
+  EXPECT_EQ(response->finished(), false);
+
+  DataStreamBuffer valid;
+  ASSERT_TRUE(valid.write_container(List<Json>{JsonObject{{"command", "response"}, {"id", *id}, {"result", 42}}}));
+  ASSERT_TRUE(sender.receive(valid.take_data()));
+  auto result = response->result();
+  ASSERT_TRUE(result);
+  EXPECT_EQ(*result, std::optional<Json>{Json(42)});
+}
+
+TEST(JsonRpcTest, ErasingAnActiveHandlerKeepsItsClosureAliveUntilReturn) {
+  for (bool clear_all : {false, true}) {
+    SCOPED_TRACE(clear_all ? "clear" : "remove");
+    Logger logger;
+    JsonRpc sender(logger);
+    JsonRpc receiver(logger);
+    auto token = std::make_shared<int>(0);
+    std::weak_ptr<int> lifetime = token;
+    ASSERT_TRUE(receiver.register_handler("erase", [token = std::move(token), &receiver, clear_all](Json const&)
+        -> std::expected<Json, StarException> {
+      std::weak_ptr<int> witness = token;
+      if (clear_all)
+        receiver.clear_handlers();
+      else if (auto removed = receiver.remove_handler("erase"); !removed)
+        return std::unexpected(std::move(removed.error()));
+      return Json(!witness.expired());
+    }));
+
+    auto response = sender.invoke_remote("erase", Json{});
+    ASSERT_TRUE(response);
+    auto request = sender.send();
+    ASSERT_TRUE(request);
+    ASSERT_TRUE(receiver.receive(*request));
+    EXPECT_TRUE(lifetime.expired());
+    EXPECT_FALSE(receiver.remove_handler("erase"));
+    auto reply = receiver.send();
+    ASSERT_TRUE(reply);
+    ASSERT_TRUE(sender.receive(*reply));
+    auto result = response->result();
+    ASSERT_TRUE(result);
+    EXPECT_EQ(*result, std::optional<Json>{Json(true)});
+  }
+}
+
+TEST(JsonRpcTest, EndpointCopiesKeepIndependentCallableState) {
+  Logger logger;
+  JsonRpc sender(logger);
+  JsonRpc receiver(logger);
+  std::vector<int> visits;
+  ASSERT_TRUE(receiver.register_handler("count", [&visits, count = 0](Json const&) mutable -> std::expected<Json, StarException> {
+    visits.push_back(++count);
+    return Json(count);
+  }));
+  ASSERT_TRUE(sender.invoke_remote("count", Json{}));
+  auto request = sender.send();
+  ASSERT_TRUE(request);
+  ASSERT_TRUE(receiver.receive(*request));
+  JsonRpc copy = receiver;
+  ASSERT_TRUE(copy.receive(*request));
+  ASSERT_TRUE(receiver.receive(*request));
+  EXPECT_EQ(visits, (std::vector<int>{1, 2, 2}));
+}
+
 TEST(RpcPromiseTest, ConcurrentObserversShareOneLazyEvaluation) {
   std::atomic<int> calls = 0;
-  auto wrapped = RpcPromise<int>::createFulfilled(7).wrap([&calls](int value) -> std::expected<int, StarException> {
+  auto wrapped = RpcPromise<int>::make_fulfilled(7).wrap([&calls](int value) -> std::expected<int, StarException> {
     ++calls;
     return value * 3;
   });
@@ -540,7 +620,7 @@ TEST(RpcPromiseTest, ConcurrentObserversShareOneLazyEvaluation) {
 
 TEST(RpcPromiseTest, WrapperCachesOwnedValue) {
   int value = 13;
-  auto wrapped = RpcPromise<int>::createFulfilled(1).wrap([&value](int) -> std::expected<int, StarException> {
+  auto wrapped = RpcPromise<int>::make_fulfilled(1).wrap([&value](int) -> std::expected<int, StarException> {
     return value;
   });
   ASSERT_TRUE(wrapped);
@@ -554,7 +634,7 @@ TEST(RpcPromiseTest, WrapperCachesOwnedValue) {
 }
 
 TEST(RpcPromiseTest, CancellationIsTerminalAndDiscardsLateProducerDecisions) {
-  auto [promise, keeper] = RpcPromise<int, int>::createPair();
+  auto [promise, keeper] = RpcPromise<int, int>::make_pair();
   EXPECT_EQ(promise.status(), RpcPromiseStatus::Pending);
   EXPECT_EQ(keeper.cancel(17), true);
   EXPECT_EQ(promise.status(), RpcPromiseStatus::Cancelled);
@@ -577,10 +657,10 @@ TEST(RpcPromiseTest, CancellationIsTerminalAndDiscardsLateProducerDecisions) {
   ASSERT_TRUE(error);
   EXPECT_EQ(*error, (std::optional<int>{17}));
 
-  EXPECT_EQ((RpcPromise<int, int>::createFulfilled(3).cancel(9)), false);
-  EXPECT_EQ((RpcPromise<int, int>::createFailed(4).cancel(9)), false);
-  auto [delegated, delegatedKeeper] = RpcPromise<int, int>::createPair();
-  auto [target, targetKeeper] = RpcPromise<int, int>::createPair();
+  EXPECT_EQ((RpcPromise<int, int>::make_fulfilled(3).cancel(9)), false);
+  EXPECT_EQ((RpcPromise<int, int>::make_failed(4).cancel(9)), false);
+  auto [delegated, delegatedKeeper] = RpcPromise<int, int>::make_pair();
+  auto [target, targetKeeper] = RpcPromise<int, int>::make_pair();
   ASSERT_TRUE(delegatedKeeper.chain(target));
   EXPECT_EQ(delegated.cancel(8), false);
   EXPECT_EQ(targetKeeper.cancel(7), true);
@@ -591,8 +671,8 @@ TEST(RpcPromiseTest, CancellationIsTerminalAndDiscardsLateProducerDecisions) {
   EXPECT_FALSE(empty.status());
   EXPECT_FALSE(empty.cancel("closed"));
   EXPECT_FALSE(emptyKeeper.cancel("closed"));
-  EXPECT_FALSE(empty.withCancellation(std::stop_token{}, "closed"));
-  auto [automaticPromise, automaticKeeper] = RpcPromise<int>::createPair();
+  EXPECT_FALSE(empty.with_cancellation(std::stop_token{}, "closed"));
+  auto [automaticPromise, automaticKeeper] = RpcPromise<int>::make_pair();
   {
     AutoFailRpcPromiseKeeper<int> automatic(automaticKeeper);
     EXPECT_EQ(automatic.cancel("closed"), true);
@@ -604,29 +684,29 @@ TEST(RpcPromiseTest, CancellationIsTerminalAndDiscardsLateProducerDecisions) {
 }
 
 TEST(RpcPromiseTest, CancellationBeforeCompletionKeepsNativeDecision) {
-  auto [promise, keeper] = RpcPromise<int, int>::createPair();
+  auto [promise, keeper] = RpcPromise<int, int>::make_pair();
   EXPECT_EQ(promise.cancel(9), true);
   EXPECT_TRUE(keeper.fulfill(42));
   EXPECT_EQ(promise.status(), RpcPromiseStatus::Cancelled);
 }
 
 TEST(RpcPromiseTest, CompletionBeforeCancellationKeepsNativeDecision) {
-  auto [promise, keeper] = RpcPromise<int, int>::createPair();
+  auto [promise, keeper] = RpcPromise<int, int>::make_pair();
   EXPECT_TRUE(keeper.fulfill(42));
   EXPECT_EQ(promise.cancel(9), false);
   EXPECT_EQ(promise.status(), RpcPromiseStatus::Succeeded);
 }
 
 TEST(RpcPromiseTest, ScopedChainedViewCancelsWithoutChangingSourceObservers) {
-  auto [source, sourceKeeper] = RpcPromise<int>::createPair();
-  auto [chained, chainedKeeper] = RpcPromise<int>::createPair();
+  auto [source, sourceKeeper] = RpcPromise<int>::make_pair();
+  auto [chained, chainedKeeper] = RpcPromise<int>::make_pair();
   ASSERT_TRUE(chainedKeeper.chain(source));
   std::stop_source lifetime;
-  auto scoped = chained.withCancellation(lifetime.get_token(), "closed");
+  auto scoped = chained.with_cancellation(lifetime.get_token(), "closed");
   ASSERT_TRUE(scoped);
-  auto reused = scoped->withCancellation(lifetime.get_token(), "different reason");
+  auto reused = scoped->with_cancellation(lifetime.get_token(), "different reason");
   ASSERT_TRUE(reused);
-  auto independent = chained.withCancellation(lifetime.get_token(), "independent");
+  auto independent = chained.with_cancellation(lifetime.get_token(), "independent");
   ASSERT_TRUE(independent);
   EXPECT_EQ(scoped->cancel("manual"), true);
   auto error = reused->error();
@@ -663,11 +743,11 @@ TEST(RpcPromiseTest, ScopedCancellationWinsBeforePublicationButNotAfter) {
       return {};
     }
   };
-  auto [source, keeper] = RpcPromise<int>::createPair();
+  auto [source, keeper] = RpcPromise<int>::make_pair();
   std::stop_source lifetime;
   std::latch entered(1), resume(1);
   std::atomic<int> cancelled = 0;
-  auto view = source.withCancellation(lifetime.get_token(), "closed", Progress{entered, resume, cancelled});
+  auto view = source.with_cancellation(lifetime.get_token(), "closed", Progress{entered, resume, cancelled});
   ASSERT_TRUE(view);
   ASSERT_TRUE(keeper.fulfill(22));
   std::thread observer([&] { EXPECT_EQ(view->status(), RpcPromiseStatus::Cancelled); });
@@ -681,9 +761,9 @@ TEST(RpcPromiseTest, ScopedCancellationWinsBeforePublicationButNotAfter) {
   ASSERT_TRUE(result);
   EXPECT_EQ(*result, (std::optional<int>{22}));
 
-  auto [completedSource, completedKeeper] = RpcPromise<int>::createPair();
+  auto [completedSource, completedKeeper] = RpcPromise<int>::make_pair();
   std::stop_source completedLifetime;
-  auto completedView = completedSource.withCancellation(completedLifetime.get_token(), "closed");
+  auto completedView = completedSource.with_cancellation(completedLifetime.get_token(), "closed");
   ASSERT_TRUE(completedView);
   ASSERT_TRUE(completedKeeper.fulfill(23));
   EXPECT_EQ(completedView->status(), RpcPromiseStatus::Succeeded);
@@ -711,14 +791,14 @@ TEST(RpcPromiseTest, ScopedProgressMayReenterCancellationAndQueries) {
     }
   };
   int conversions = 0;
-  auto source = RpcPromise<int>::createFulfilled(5).wrap([&](int value) -> std::expected<int, StarException> {
+  auto source = RpcPromise<int>::make_fulfilled(5).wrap([&](int value) -> std::expected<int, StarException> {
     ++conversions;
     return value;
   });
   ASSERT_TRUE(source);
   RpcPromise<int> view;
   int cancellations = 0;
-  auto scoped = source->withCancellation(std::stop_token{}, "closed", Progress{view, cancellations});
+  auto scoped = source->with_cancellation(std::stop_token{}, "closed", Progress{view, cancellations});
   ASSERT_TRUE(scoped);
   view = *scoped;
   EXPECT_EQ(view.status(), RpcPromiseStatus::Cancelled);
@@ -743,7 +823,7 @@ TEST(RpcPromiseTest, StopCallbackPinsStateWhileHookDropsLastObservation) {
       return {};
     }
   };
-  auto [source, keeper] = RpcPromise<int>::createPair();
+  auto [source, keeper] = RpcPromise<int>::make_pair();
   std::stop_source lifetime;
   RpcPromise<int> observation;
   std::weak_ptr<int> capture;
@@ -751,7 +831,7 @@ TEST(RpcPromiseTest, StopCallbackPinsStateWhileHookDropsLastObservation) {
   {
     auto owned = std::make_shared<int>(7);
     capture = owned;
-    auto scoped = source.withCancellation(lifetime.get_token(), "closed",
+    auto scoped = source.with_cancellation(lifetime.get_token(), "closed",
                                           Progress{observation, capture, std::move(owned), cancellations});
     ASSERT_TRUE(scoped);
     observation = std::move(*scoped);
@@ -773,11 +853,11 @@ TEST(RpcPromiseTest, DroppingScopedObservationUnregistersWithoutCancellingOperat
       return {};
     }
   };
-  auto [source, keeper] = RpcPromise<int>::createPair();
+  auto [source, keeper] = RpcPromise<int>::make_pair();
   std::stop_source lifetime;
   int cancellations = 0;
   {
-    auto view = source.withCancellation(lifetime.get_token(), "closed", Progress{cancellations});
+    auto view = source.with_cancellation(lifetime.get_token(), "closed", Progress{cancellations});
     ASSERT_TRUE(view);
   }
   lifetime.request_stop();
@@ -789,7 +869,7 @@ TEST(RpcPromiseTest, DroppingScopedObservationUnregistersWithoutCancellingOperat
 TEST(RpcPromiseTest, ScopedNullAndNonDefaultPayloadsRemainCachedWithoutStatusCopies) {
   std::stop_source stopped;
   stopped.request_stop();
-  auto terminal = RpcPromise<Json>::createFulfilled(Json()).withCancellation(stopped.get_token(), "closed");
+  auto terminal = RpcPromise<Json>::make_fulfilled(Json()).with_cancellation(stopped.get_token(), "closed");
   ASSERT_TRUE(terminal);
   EXPECT_EQ(terminal->status(), RpcPromiseStatus::Succeeded);
   auto null = terminal->result();
@@ -797,9 +877,9 @@ TEST(RpcPromiseTest, ScopedNullAndNonDefaultPayloadsRemainCachedWithoutStatusCop
   ASSERT_TRUE(*null);
   EXPECT_TRUE((*null)->isNull());
 
-  auto [source, keeper] = RpcPromise<Json>::createPair();
+  auto [source, keeper] = RpcPromise<Json>::make_pair();
   std::stop_source lifetime;
-  auto view = source.withCancellation(lifetime.get_token(), "closed");
+  auto view = source.with_cancellation(lifetime.get_token(), "closed");
   ASSERT_TRUE(view);
   ASSERT_TRUE(keeper.fulfill(Json()));
   auto result = view->result();
@@ -809,9 +889,9 @@ TEST(RpcPromiseTest, ScopedNullAndNonDefaultPayloadsRemainCachedWithoutStatusCop
   lifetime.request_stop();
   EXPECT_EQ(view->status(), RpcPromiseStatus::Succeeded);
 
-  auto [nonDefault, nonDefaultKeeper] = RpcPromise<NonDefaultValue, NonDefaultValue>::createPair();
+  auto [nonDefault, nonDefaultKeeper] = RpcPromise<NonDefaultValue, NonDefaultValue>::make_pair();
   std::stop_source nonDefaultLifetime;
-  auto nonDefaultView = nonDefault.withCancellation(nonDefaultLifetime.get_token(), NonDefaultValue(12));
+  auto nonDefaultView = nonDefault.with_cancellation(nonDefaultLifetime.get_token(), NonDefaultValue(12));
   ASSERT_TRUE(nonDefaultView);
   nonDefaultLifetime.request_stop();
   EXPECT_EQ(nonDefaultView->status(), RpcPromiseStatus::Cancelled);
@@ -821,7 +901,7 @@ TEST(RpcPromiseTest, ScopedNullAndNonDefaultPayloadsRemainCachedWithoutStatusCop
   EXPECT_EQ((**reason).value, 12);
   ASSERT_TRUE(nonDefaultKeeper.fulfill(NonDefaultValue(13)));
   EXPECT_EQ(nonDefault.status(), RpcPromiseStatus::Succeeded);
-  auto completedNonDefault = nonDefault.withCancellation(stopped.get_token(), NonDefaultValue(20));
+  auto completedNonDefault = nonDefault.with_cancellation(stopped.get_token(), NonDefaultValue(20));
   ASSERT_TRUE(completedNonDefault);
   EXPECT_EQ(completedNonDefault->status(), RpcPromiseStatus::Succeeded);
   auto cachedNonDefault = completedNonDefault->result();
@@ -829,9 +909,9 @@ TEST(RpcPromiseTest, ScopedNullAndNonDefaultPayloadsRemainCachedWithoutStatusCop
   ASSERT_TRUE(*cachedNonDefault);
   EXPECT_EQ((**cachedNonDefault).value, 13);
 
-  auto [moveOnly, moveOnlyKeeper] = RpcPromise<std::unique_ptr<int>, std::unique_ptr<int>>::createPair();
+  auto [moveOnly, moveOnlyKeeper] = RpcPromise<std::unique_ptr<int>, std::unique_ptr<int>>::make_pair();
   std::stop_source moveOnlyLifetime;
-  auto moveOnlyView = moveOnly.withCancellation(moveOnlyLifetime.get_token(), std::make_unique<int>(9));
+  auto moveOnlyView = moveOnly.with_cancellation(moveOnlyLifetime.get_token(), std::make_unique<int>(9));
   ASSERT_TRUE(moveOnlyView);
   ASSERT_TRUE(moveOnlyKeeper.fulfill(std::make_unique<int>(2)));
   EXPECT_EQ(moveOnlyView->status(), RpcPromiseStatus::Succeeded);
@@ -842,7 +922,7 @@ TEST(RpcPromiseTest, ScopedNullAndNonDefaultPayloadsRemainCachedWithoutStatusCop
 TEST(RpcPromiseTest, WrapperSupportsReentrantCancellationAndPropagatesCancelledSources) {
   RpcPromise<int> observation;
   int calls = 0;
-  auto wrapper = RpcPromise<int>::createFulfilled(1).wrap([&](int) -> std::expected<int, StarException> {
+  auto wrapper = RpcPromise<int>::make_fulfilled(1).wrap([&](int) -> std::expected<int, StarException> {
     ++calls;
     EXPECT_EQ(observation.cancel("inside transform"), true);
     return std::unexpected(StarException("discarded diagnostic"));
@@ -855,7 +935,7 @@ TEST(RpcPromiseTest, WrapperSupportsReentrantCancellationAndPropagatesCancelledS
   EXPECT_EQ(*error, (std::optional<String>{"inside transform"}));
   EXPECT_EQ(calls, 1);
 
-  auto [source, keeper] = RpcPromise<int, int>::createPair();
+  auto [source, keeper] = RpcPromise<int, int>::make_pair();
   auto propagated = source.wrap([](int value) -> std::expected<int, StarException> { return value; });
   ASSERT_TRUE(propagated);
   EXPECT_EQ(keeper.cancel(4), true);
@@ -868,7 +948,7 @@ TEST(RpcPromiseTest, WrapperSupportsReentrantCancellationAndPropagatesCancelledS
 TEST(RpcPromiseTest, SingleFlightCancellationWakesObserversAndDiscardsLateTransform) {
   std::latch entered(1), resume(1), observerStarted(1), observerFinished(1);
   std::atomic<int> calls = 0;
-  auto wrapped = RpcPromise<int>::createFulfilled(7).wrap([&](int value) -> std::expected<int, StarException> {
+  auto wrapped = RpcPromise<int>::make_fulfilled(7).wrap([&](int value) -> std::expected<int, StarException> {
     ++calls;
     entered.count_down();
     resume.wait();
@@ -913,17 +993,251 @@ TEST(RpcPromiseTest, AlreadyStoppedLifetimeEagerlyCancelsOnlyPendingViews) {
   std::stop_source lifetime;
   lifetime.request_stop();
   int polls = 0, cancellations = 0;
-  auto [source, keeper] = RpcPromise<int>::createPair();
-  auto view = source.withCancellation(lifetime.get_token(), "closed", Progress{polls, cancellations});
+  auto [source, keeper] = RpcPromise<int>::make_pair();
+  auto view = source.with_cancellation(lifetime.get_token(), "closed", Progress{polls, cancellations});
   ASSERT_TRUE(view);
   EXPECT_EQ(cancellations, 1);
   EXPECT_EQ(polls, 0);
   EXPECT_EQ(view->status(), RpcPromiseStatus::Cancelled);
   EXPECT_EQ(source.status(), RpcPromiseStatus::Pending);
   ASSERT_TRUE(keeper.fulfill(8));
-  auto terminal = source.withCancellation(lifetime.get_token(), "closed", Progress{polls, cancellations});
+  auto terminal = source.with_cancellation(lifetime.get_token(), "closed", Progress{polls, cancellations});
   ASSERT_TRUE(terminal);
   EXPECT_EQ(terminal->status(), RpcPromiseStatus::Succeeded);
   EXPECT_EQ(cancellations, 1);
   EXPECT_EQ(polls, 0);
+}
+
+namespace {
+template <class Promise, class Function>
+concept can_wrap = requires(Promise promise, Function function) { promise.wrap(std::move(function)); };
+
+template <class Progress>
+concept can_observe_with = requires(RpcPromise<int> promise, Progress progress) {
+  promise.with_cancellation(std::stop_token{}, "closed", std::move(progress));
+};
+
+template <class Promise>
+concept can_read_result = requires(Promise const& promise) { promise.result(); };
+
+template <class Promise>
+concept can_read_error = requires(Promise const& promise) { promise.error(); };
+
+struct MutableTransform {
+  std::expected<int, StarException> operator()(int);
+};
+using IntTransform = decltype([](int value) -> std::expected<int, StarException> { return value; });
+using MoveOnlyValue = std::unique_ptr<int>;
+static_assert(can_wrap<RpcPromise<int>, IntTransform>);
+static_assert(!can_wrap<RpcPromise<int>, decltype([](int) { return std::optional<int>{}; })>);
+static_assert(!can_wrap<RpcPromise<int>, decltype([](int) -> std::expected<int, int> { return 1; })>);
+static_assert(!can_wrap<RpcPromise<int>, decltype([](int) -> std::expected<void, StarException> { return {}; })>);
+static_assert(!can_wrap<RpcPromise<int>, MutableTransform>);
+static_assert(!can_wrap<RpcPromise<int, MoveOnlyValue>, IntTransform>);
+static_assert(can_read_result<RpcPromise<int, MoveOnlyValue>> && !can_read_error<RpcPromise<int, MoveOnlyValue>>);
+static_assert(!can_read_result<RpcPromise<MoveOnlyValue, int>> && can_read_error<RpcPromise<MoveOnlyValue, int>>);
+
+struct PollOnly {
+  std::expected<void, StarException> poll();
+};
+struct WrongProgressResult {
+  std::expected<int, StarException> poll();
+  std::expected<void, StarException> cancel();
+};
+static_assert(can_observe_with<std::monostate>);
+static_assert(!can_observe_with<PollOnly> && !can_observe_with<WrongProgressResult>);
+static_assert(std::copyable<RpcPromiseKeeper<int>>);
+using AutoKeeper = AutoFailRpcPromiseKeeper<int>;
+static_assert(!std::is_copy_constructible_v<AutoKeeper> && !std::is_copy_assignable_v<AutoKeeper>);
+static_assert(!std::is_move_constructible_v<AutoKeeper> && !std::is_move_assignable_v<AutoKeeper>);
+static_assert(!std::constructible_from<AutoFailRpcPromiseKeeper<int, NonDefaultValue>,
+                                       RpcPromiseKeeper<int, NonDefaultValue>>);
+
+struct AbandonmentProbe {
+  static inline thread_local std::function<void()> on_construction;
+  explicit AbandonmentProbe(std::string_view) {
+    if (auto hook = std::exchange(on_construction, {}))
+      hook();
+  }
+};
+}
+
+TEST(RpcPromiseTest, AbandonmentHonorsIndependentDecisionDuringReasonConstruction) {
+  auto [promise, keeper] = RpcPromise<int, AbandonmentProbe>::make_pair();
+  {
+    AutoFailRpcPromiseKeeper<int, AbandonmentProbe> automatic(keeper);
+    EXPECT_FALSE(automatic.chain({})); // A rejected decision leaves the destructor responsible.
+    AbandonmentProbe::on_construction = [&] { EXPECT_TRUE(keeper.fulfill(31)); };
+  }
+  AbandonmentProbe::on_construction = {};
+  EXPECT_EQ(promise.result().value_or(std::nullopt), 31);
+}
+
+TEST(RpcPromiseTest, SharedAutoKeeperForwardsEveryExplicitDecision) {
+  auto [promise, keeper] = RpcPromise<int>::make_pair();
+  auto shared = std::make_shared<AutoKeeper>(std::move(keeper));
+  std::barrier start(2);
+  std::expected<void, StarException> fulfilled, failed;
+  std::thread producer([alias = shared, &start, &fulfilled] {
+    start.arrive_and_wait();
+    fulfilled = alias->fulfill(22);
+  });
+  start.arrive_and_wait();
+  failed = shared->fail("failed");
+  producer.join();
+  ASSERT_NE(fulfilled.has_value(), failed.has_value());
+  EXPECT_TRUE((fulfilled ? failed : fulfilled).error().is<RpcPromiseException>());
+  EXPECT_EQ(shared->cancel("late"), false);
+  shared.reset();
+  if (fulfilled)
+    EXPECT_EQ(promise.result().value_or(std::nullopt), 22);
+  else
+    EXPECT_EQ(promise.error().value_or(std::nullopt), std::optional<String>{"failed"});
+
+  // Even after cancellation multiple explicit requests succeed as discards.
+  auto [cancelled, cancelled_keeper] = RpcPromise<int>::make_pair();
+  shared = std::make_shared<AutoKeeper>(std::move(cancelled_keeper));
+  ASSERT_EQ(shared->cancel("first"), true);
+  std::thread late([alias = shared, &start] {
+    start.arrive_and_wait();
+    EXPECT_TRUE(alias->chain({}));
+  });
+  start.arrive_and_wait();
+  EXPECT_TRUE(shared->fail("late failure"));
+  late.join();
+  shared.reset();
+  EXPECT_EQ(cancelled.error().value_or(std::nullopt), std::optional<String>{"first"});
+}
+
+TEST(RpcPromiseTest, SelfAndIndirectCycleRejectionLeaveKeeperPending) {
+  auto [first, first_keeper] = RpcPromise<int>::make_pair();
+  auto [second, second_keeper] = RpcPromise<int>::make_pair();
+  auto [third, third_keeper] = RpcPromise<int>::make_pair();
+  auto self = first_keeper.chain(first);
+  ASSERT_FALSE(self);
+  EXPECT_TRUE(self.error().is<RpcPromiseException>());
+  ASSERT_TRUE(first_keeper.chain(second));
+  ASSERT_TRUE(second_keeper.chain(third));
+  auto indirect = third_keeper.chain(first);
+  ASSERT_FALSE(indirect);
+  EXPECT_TRUE(indirect.error().is<RpcPromiseException>());
+  EXPECT_EQ(third.status(), RpcPromiseStatus::Pending);
+  ASSERT_TRUE(third_keeper.fail("recovered"));
+  EXPECT_EQ(first.error().value_or(std::nullopt), std::optional<String>{"recovered"});
+}
+
+TEST(RpcPromiseTest, ConcurrentOppositeDelegationsCommitExactlyOneEdge) {
+  auto [left, left_keeper] = RpcPromise<int>::make_pair();
+  auto [right, right_keeper] = RpcPromise<int>::make_pair();
+  std::barrier start(2);
+  std::expected<void, StarException> forward;
+  std::thread producer([&] {
+    start.arrive_and_wait();
+    forward = left_keeper.chain(right);
+  });
+  start.arrive_and_wait();
+  auto reverse = right_keeper.chain(left);
+  producer.join();
+  ASSERT_NE(forward.has_value(), reverse.has_value());
+  EXPECT_TRUE((forward ? reverse : forward).error().is<RpcPromiseException>());
+  ASSERT_TRUE((forward ? right_keeper : left_keeper).fulfill(17));
+  EXPECT_EQ(left.result().value_or(std::nullopt), 17);
+  EXPECT_EQ(right.result().value_or(std::nullopt), 17);
+}
+
+TEST(RpcPromiseTest, DependencyCyclesThroughScopedAndMixedTypeViewsDoNotPollOrRetain) {
+  std::weak_ptr<int> witness;
+  {
+    auto [source, keeper] = RpcPromise<int>::make_pair();
+    std::stop_source lifetime;
+    auto scoped = source.with_cancellation(lifetime.get_token(), "closed");
+    ASSERT_TRUE(scoped);
+    auto scoped_cycle = keeper.chain(*scoped);
+    ASSERT_FALSE(scoped_cycle);
+    EXPECT_TRUE(scoped_cycle.error().is<RpcPromiseException>());
+    auto counter = std::make_shared<int>(0);
+    witness = counter;
+    auto wide = scoped->wrap([counter](int value) -> std::expected<long, StarException> {
+      ++*counter;
+      return value;
+    });
+    ASSERT_TRUE(wide);
+    auto narrow = wide->wrap([](long value) -> std::expected<int, StarException> { return static_cast<int>(value); });
+    ASSERT_TRUE(narrow);
+    auto mixed_cycle = keeper.chain(*narrow);
+    ASSERT_FALSE(mixed_cycle);
+    EXPECT_TRUE(mixed_cycle.error().is<RpcPromiseException>());
+    EXPECT_EQ(*counter, 0);
+    ASSERT_TRUE(keeper.fulfill(12));
+    EXPECT_EQ(narrow->result().value_or(std::nullopt), 12);
+    EXPECT_EQ(*counter, 1);
+  }
+  EXPECT_TRUE(witness.expired());
+}
+
+TEST(RpcPromiseTest, DeepDelegationObservesOnlyRequestedPayload) {
+  struct Payload {
+    int& copies;
+    explicit Payload(int& copies) : copies(copies) {}
+    Payload(Payload const& other) : copies(other.copies) { ++copies; }
+    Payload(Payload&&) = default;
+  };
+  using Promise = RpcPromise<Payload, Payload>;
+  for (auto terminal : {RpcPromiseStatus::Succeeded, RpcPromiseStatus::Failed, RpcPromiseStatus::Cancelled}) {
+    int copies = 0;
+    auto [head, tail] = Promise::make_pair();
+    std::vector<Promise> nodes;
+    nodes.reserve(16384);
+    nodes.emplace_back(std::move(head));
+    while (nodes.size() < 16384) {
+      auto [next, next_keeper] = Promise::make_pair();
+      ASSERT_TRUE(tail.chain(next));
+      nodes.emplace_back(std::move(next));
+      tail = std::move(next_keeper);
+    }
+    auto const& root = nodes.front();
+    EXPECT_EQ(root.status(), RpcPromiseStatus::Pending);
+    if (terminal == RpcPromiseStatus::Succeeded)
+      ASSERT_TRUE(tail.fulfill(Payload(copies)));
+    else if (terminal == RpcPromiseStatus::Failed)
+      ASSERT_TRUE(tail.fail(Payload(copies)));
+    else
+      ASSERT_EQ(tail.cancel(Payload(copies)), true);
+    EXPECT_EQ(root.status(), terminal);
+    EXPECT_EQ(copies, 0);
+    auto result = root.result();
+    ASSERT_TRUE(result);
+    EXPECT_EQ(result->has_value(), terminal == RpcPromiseStatus::Succeeded);
+    EXPECT_EQ(copies, terminal == RpcPromiseStatus::Succeeded ? 1 : 0);
+    auto error = root.error();
+    ASSERT_TRUE(error);
+    EXPECT_EQ(error->has_value(), terminal != RpcPromiseStatus::Succeeded);
+    EXPECT_EQ(copies, 1);
+    // Test traversal depth independently of recursive shared_ptr teardown.
+    for (auto& node : nodes)
+      node = {};
+  }
+}
+
+TEST(RpcPromiseTest, DelegatedQueryPinsLazyTargetDuringLastHandleRelease) {
+  RpcPromise<int> root;
+  int attempts = 0;
+  auto [head, keeper] = RpcPromise<int>::make_pair();
+  auto capture = std::make_shared<int>(9);
+  std::weak_ptr<int> witness = capture;
+  auto target = RpcPromise<int>::make_fulfilled(6).wrap(
+    [&root, &attempts, capture = std::move(capture)](int value) -> std::expected<int, StarException> {
+      if (++attempts == 1)
+        return std::unexpected(StarException("retry"));
+      root = {};
+      return value + *capture;
+    });
+  ASSERT_TRUE(target);
+  ASSERT_TRUE(keeper.chain(std::move(*target)));
+  root = std::move(head);
+  keeper = {};
+  EXPECT_FALSE(root.status());
+  EXPECT_EQ(root.result().value_or(std::nullopt), 15);
+  EXPECT_EQ(attempts, 2);
+  EXPECT_TRUE(witness.expired());
 }

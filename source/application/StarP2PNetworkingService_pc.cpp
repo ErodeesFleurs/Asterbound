@@ -257,7 +257,7 @@ std::optional<std::pair<String, RpcPromiseKeeper<P2PJoinRequestReply>>> Star::Pc
 
 #ifdef STAR_ENABLE_DISCORD_INTEGRATION
   if (auto request = m_discordJoinRequests.try_take_back()) {
-    auto promisePair = RpcPromise<P2PJoinRequestReply>::createPair();
+    auto promisePair = RpcPromise<P2PJoinRequestReply>::make_pair();
     m_pendingDiscordJoinRequests.push_back(std::make_pair(request->first, promisePair.first));
     return std::make_pair(request->second, promisePair.second);
   }

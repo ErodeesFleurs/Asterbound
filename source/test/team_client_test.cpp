@@ -97,7 +97,7 @@ const GameTestRegistration teamStatusSynchronization(
     Logger logger;
     logger.remove_stdout_sink();
     JsonRpc server(logger);
-    ASSERT_TRUE(server.registerHandlers(ownHandlers));
+    ASSERT_TRUE(server.register_handlers(ownHandlers));
     TeamClient team(**root, *player, *context);
     auto exchange = [&](ByteArray const& packet) -> std::expected<void, StarException> {
       if (auto received = server.receive(packet); !received)

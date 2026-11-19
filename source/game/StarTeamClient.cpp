@@ -186,7 +186,7 @@ std::expected<void, StarException> TeamClient::invitePlayer(String const& player
   auto name = m_mainPlayer->name();
   if (!name) return std::unexpected(std::move(name.error()));
   request["inviterName"] = *name;
-  return invokeRemote("team.invite", request, [playerName, &self = *this](Json response) -> std::expected<void, StarException> {
+  return invoke_remote("team.invite", request, [playerName, &self = *this](Json response) -> std::expected<void, StarException> {
     if (!response)
       self.m_pendingInviteResults.push_back(std::make_pair(playerName, true));
     else if (response == "inviteeNotFound")
@@ -215,7 +215,7 @@ std::expected<void, StarException> TeamClient::acceptInvitation(Uuid const& invi
   JsonObject request;
   request["inviterUuid"] = inviterUuid.hex();
   request["inviteeUuid"] = m_clientContext->playerUuid().hex();
-  return invokeRemote("team.acceptInvitation", request, [&self = *this](Json) -> std::expected<void, StarException> { self.forceUpdate(); return {}; });
+  return invoke_remote("team.acceptInvitation", request, [&self = *this](Json) -> std::expected<void, StarException> { self.forceUpdate(); return {}; });
 }
 
 std::optional<Uuid> TeamClient::currentTeam() const {
@@ -230,7 +230,7 @@ std::expected<void, StarException> TeamClient::makeLeader(Uuid const& playerUuid
   JsonObject request;
   request["teamUuid"] = m_teamUuid->hex();
   request["playerUuid"] = playerUuid.hex();
-  return invokeRemote("team.makeLeader", request, [&self = *this](Json) -> std::expected<void, StarException> { self.forceUpdate(); return {}; });
+  return invoke_remote("team.makeLeader", request, [&self = *this](Json) -> std::expected<void, StarException> { self.forceUpdate(); return {}; });
 }
 
 std::expected<void, StarException> TeamClient::removeFromTeam(Uuid const& playerUuid) {
@@ -241,7 +241,7 @@ std::expected<void, StarException> TeamClient::removeFromTeam(Uuid const& player
   JsonObject request;
   request["teamUuid"] = m_teamUuid->hex();
   request["playerUuid"] = playerUuid.hex();
-  return invokeRemote("team.removeFromTeam", request, [&self = *this](Json) -> std::expected<void, StarException> { self.forceUpdate(); return {}; });
+  return invoke_remote("team.removeFromTeam", request, [&self = *this](Json) -> std::expected<void, StarException> { self.forceUpdate(); return {}; });
 }
 
 bool TeamClient::hasInvitationPending() {
@@ -289,7 +289,7 @@ std::expected<void, StarException> TeamClient::update() {
       m_pollInvitationsTimer = std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now());
       JsonObject request;
       request["playerUuid"] = m_clientContext->playerUuid().hex();
-      auto invoked = invokeRemote("team.pollInvitation", request, [&self = *this](Json response) -> std::expected<void, StarException> {
+      auto invoked = invoke_remote("team.pollInvitation", request, [&self = *this](Json response) -> std::expected<void, StarException> {
         if (response.isNull() || self.m_hasPendingInvitation) return {};
         auto uuidText = response.getString("inviterUuid");
         if (!uuidText) return std::unexpected(std::move(uuidText.error()));
@@ -330,7 +330,7 @@ std::expected<void, StarException> TeamClient::pullFullUpdate() {
   m_fullUpdateRunning = true;
   JsonObject request;
   request["playerUuid"] = m_clientContext->playerUuid().hex();
-  return invokeRemote("team.fetchTeamStatus", request, [&self = *this](Json response) -> std::expected<void, StarException> {
+  return invoke_remote("team.fetchTeamStatus", request, [&self = *this](Json response) -> std::expected<void, StarException> {
     self.m_fullUpdateRunning = false;
     auto version = response.optInt("version");
     if (!version) return std::unexpected(std::move(version.error()));
@@ -425,7 +425,7 @@ std::expected<void, StarException> TeamClient::statusUpdate() {
   auto written = writePlayerData(request, m_mainPlayer, fullWrite);
   if (!written)
     return std::unexpected(std::move(written.error()));
-  auto invoked = invokeRemote("team.updateStatus", request,
+  auto invoked = invoke_remote("team.updateStatus", request,
       [&self = *this](Json const&) -> std::expected<void, StarException> {
         self.m_statusUpdateRunning = false;
         return {};
@@ -490,9 +490,9 @@ void TeamClient::forceUpdate() {
   m_fullStatusRequired = true;
 }
 
-std::expected<void, StarException> TeamClient::invokeRemote(String const& method, Json const& args,
+std::expected<void, StarException> TeamClient::invoke_remote(String const& method, Json const& args,
     std::function<std::expected<void, StarException>(Json const&)> responseFunction) {
-  auto promise = m_clientContext->rpcInterface()->invokeRemote(method, args);
+  auto promise = m_clientContext->rpcInterface()->invoke_remote(method, args);
   if (!promise) return std::unexpected(std::move(promise.error()));
   m_pendingResponses.push_back({std::move(*promise), std::move(responseFunction)});
   return {};

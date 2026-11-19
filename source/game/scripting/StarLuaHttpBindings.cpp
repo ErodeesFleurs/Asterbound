@@ -132,7 +132,7 @@ struct LuaHttpSession::Impl {
 
   [[nodiscard]] std::expected<RpcPromise<LuaHttpResponse>, StarException>
   request(HttpRequest request, std::stop_token lifetime, std::weak_ptr<LuaHttpSession> owner) {
-    auto [promise, keeper] = RpcPromise<LuaHttpResponse>::createPair();
+    auto [promise, keeper] = RpcPromise<LuaHttpResponse>::make_pair();
     auto domain = extractDomain(request.url);
     if (!domain)
       return std::unexpected(std::move(domain.error()));
@@ -158,7 +158,7 @@ struct LuaHttpSession::Impl {
                                  .lifetime = lifetime});
     }
     LuaHttpProgress progress{.session = std::move(owner), .id = id};
-    auto scoped = promise.withCancellation(lifetime, "Lua session stopped", progress);
+    auto scoped = promise.with_cancellation(lifetime, "Lua session stopped", progress);
     if (!scoped) {
       if (auto cancelled = progress.cancel(); !cancelled)
         return std::unexpected(cancelled.error().with_related(scoped.error(), "Original HTTP scope failure"));
@@ -449,12 +449,12 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeHttpCallbacks(std::s
                            enabled](LuaEngine& engine, String const& method, String const& url,
                                     std::optional<LuaTable> const& options) -> RpcPromise<LuaHttpResponse> {
     if (!enabled)
-      return RpcPromise<LuaHttpResponse>::createFailed("luaHttp disabled by configuration");
+      return RpcPromise<LuaHttpResponse>::make_failed("luaHttp disabled by configuration");
     auto owner = weakSession.lock();
     if (!owner) {
-      auto [promise, keeper] = RpcPromise<LuaHttpResponse>::createPair();
+      auto [promise, keeper] = RpcPromise<LuaHttpResponse>::make_pair();
       if (auto cancelled = keeper.cancel("HTTP session stopped"); !cancelled)
-        return RpcPromise<LuaHttpResponse>::createFailed(Star::format("HTTP request failed: {}", cancelled.error().what()));
+        return RpcPromise<LuaHttpResponse>::make_failed(Star::format("HTTP request failed: {}", cancelled.error().what()));
       return promise;
     }
     auto prepared = [&]() -> std::expected<HttpRequest, StarException> {
@@ -506,10 +506,10 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeHttpCallbacks(std::s
       return request;
     }();
     if (!prepared)
-      return RpcPromise<LuaHttpResponse>::createFailed(Star::format("HTTP request failed: {}", prepared.error().what()));
+      return RpcPromise<LuaHttpResponse>::make_failed(Star::format("HTTP request failed: {}", prepared.error().what()));
     auto promise = owner->m_impl->request(std::move(*prepared), engine.promiseLifetime(), weakSession);
     if (!promise)
-      return RpcPromise<LuaHttpResponse>::createFailed(Star::format("HTTP request failed: {}", promise.error().what()));
+      return RpcPromise<LuaHttpResponse>::make_failed(Star::format("HTTP request failed: {}", promise.error().what()));
     return std::move(*promise);
   };
   if (auto result = callbacks.registerCallback("createRequest", [requestForMethod](LuaEngine& engine, String const& method, String const& url, std::optional<LuaTable> const& options) {

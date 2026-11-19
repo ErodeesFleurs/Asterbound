@@ -139,7 +139,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseClientThread
   LuaCallbacks callbacks;
   
   if (auto registration = callbacks.registerCallback("sendOwnUniverseMessage", [&universe](String const& message, LuaVariadic<Json> args) -> std::expected<RpcPromise<Json>, StarException> {
-    auto pair = RpcPromise<Json>::createPair();
+    auto pair = RpcPromise<Json>::make_pair();
     auto passed =
       universe.passMessage({.message = message, .args = JsonArray::from(std::move(args)), .keeper = pair.second});
     if (!passed)
