@@ -193,6 +193,12 @@ void register_diagnostics() {
   register_no_trace("Error/Origin/NoTrace", []() -> Star::StarException {
     return Star::OutOfRangeException("origin", false);
   }, "(OutOfRangeException) origin", summary, "OutOfRangeException: origin");
+  std::string message(4096, 'x');
+  register_no_trace("Error/Origin/NoTrace/Message4096", [message]() -> Star::StarException {
+    // Charge the caller's copy into the by-value API, not fixture generation.
+    return Star::OutOfRangeException(message, false);
+  }, "(OutOfRangeException) " + message, native_summary("OutOfRangeException", message),
+      "OutOfRangeException: " + message);
   for (unsigned depth : {1u, 8u, 64u}) {
     std::string text = "(OutOfRangeException) origin";
     for (unsigned i = 0; i != depth; ++i)
@@ -216,6 +222,66 @@ void register_diagnostics() {
     return primary.with_related(secondary, "cleanup");
   }, "(OutOfRangeException) origin\ncleanup\nRelated error: (IOException) secondary",
       summary, "OutOfRangeException: origin");
+}
+
+bool verify_captured_origin(benchmark::State& state, Star::StarException const& error, std::string_view scope) {
+  constexpr std::string_view short_text = "(OutOfRangeException) origin";
+  constexpr std::string_view brief_text = "OutOfRangeException: origin";
+  std::string complete;
+  if (!verify_error<Star::OutOfRangeException>(state, error, native_summary("OutOfRangeException", "origin"),
+          short_text, brief_text, false, complete))
+    return false;
+  auto full = Star::print_exception(error, true);
+  if (!full.starts_with("(OutOfRangeException) origin\n") || full.find("[0] ") == std::string::npos
+      || Star::print_exception(error, true) != full
+      || Star::exception_report(error) != std::format("{}\nDetails:\n{}", brief_text, full)) {
+    state.SkipWithError("captured frame, cached full diagnostic or report differs from fixture");
+    return false;
+  }
+  // Addresses, modules, and resolved symbols are meaningful only for this capture.
+  set_fingerprint(state, complete, scope);
+  return true;
+}
+
+void register_captured_diagnostics() {
+  benchmark::RegisterBenchmark("Error/Trace/CaptureNoRender", [](benchmark::State& state) {
+    for (auto _ : state) {
+      Star::OutOfRangeException origin("origin", true);
+      benchmark::DoNotOptimize(origin);
+    }
+    verify_captured_origin(state, Star::OutOfRangeException("origin", true),
+        "fresh capture+destruction; no rendering timed; trace bytes excluded from hash");
+  });
+  benchmark::RegisterBenchmark("Error/Trace/FirstFullIncludingCapture", [](benchmark::State& state) {
+    for (auto _ : state) {
+      Star::OutOfRangeException origin("origin", true);
+      auto full = Star::print_exception(origin, true);
+      benchmark::DoNotOptimize(full);
+    }
+    verify_captured_origin(state, Star::OutOfRangeException("origin", true),
+        "fresh capture+first full string+destruction; process symbol caches may be warm; trace bytes excluded from hash");
+  });
+  for (bool report : {false, true}) {
+    benchmark::RegisterBenchmark(report ? "Error/Trace/ExceptionReportHotFull" : "Error/Trace/HotFull",
+        [report](benchmark::State& state) {
+      Star::OutOfRangeException origin("origin", true);
+      if (!verify_captured_origin(state, origin, report
+              ? "hot full cache; summary+details report assembly+string destruction; trace bytes excluded from hash"
+              : "hot full cache; returned string copy+destruction; trace bytes excluded from hash"))
+        return;
+      if (report) {
+        for (auto _ : state) {
+          auto text = Star::exception_report(origin);
+          benchmark::DoNotOptimize(text);
+        }
+      } else {
+        for (auto _ : state) {
+          auto full = Star::print_exception(origin, true);
+          benchmark::DoNotOptimize(full);
+        }
+      }
+    });
+  }
 }
 
 template <class Category, class Operation>
@@ -301,6 +367,7 @@ int main(int argc, char** argv) {
   return Star::run_benchmarks(argc, argv, [](int) {
     register_expected_micro();
     register_diagnostics();
+    register_captured_diagnostics();
     register_checked_paths();
     return 0;
   }, {.report_runtime_error = false});

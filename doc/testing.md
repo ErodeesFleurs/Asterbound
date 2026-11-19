@@ -223,6 +223,17 @@ single-pass inputs, recovery paths or lifecycle transitions.
 
 ### Native output and fatal errors
 
+`ExceptionTest.*` covers typed error propagation, temporary summary ownership,
+related-error aliasing and concurrent first rendering. `what()` is the short
+original diagnostic, not the replaceable structured summary. Full rendering
+resolves the captured origin, not the current caller's stack.
+
+Compare `error_benchmarks --benchmark_filter='^Error/'` using matching binaries.
+Separate capture without rendering, capture plus first full rendering, copying
+an already rendered string, and assembling a report from cached details. The
+first full render is per error; process-wide symbol caches may already be warm.
+Compare the checked fixture labels, not raw addresses across processes.
+
 Preserve noninteractive fatal termination, oversized growth/write-offset and
 impossible-allocation checks. `NativeRuntimeStdioDeathTest.*` isolates stream
 changes in children: absent outputs, preserved file/pipe bytes and file logging,

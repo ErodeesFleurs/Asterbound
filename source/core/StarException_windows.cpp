@@ -4,11 +4,9 @@
 
 import std;
 import star.format;
-import star.output_proxy;
 import star.text_formatter;
-import star.logging;
-import star.version;
 import star.native_runtime;
+import star.native_stack;
 
 
 namespace Star {
@@ -76,50 +74,30 @@ NativeRuntime::~NativeRuntime() {
     WSACleanup();
 }
 
-static constexpr std::size_t StackLimit = 256;
-
-struct CapturedModule {
-  HMODULE base;
-  DWORD imageSize;
-  DWORD timestamp;
-  std::wstring path;
-};
 
 // A temporary, balanced reference protects only the module containing this
 // address while its identity is read. Diagnostics never pin a DLL for their
 // lifetime and never release a borrowed module handle.
-class ModuleReference {
-public:
-  explicit ModuleReference(void const* address) {
-    GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
-        reinterpret_cast<LPCWSTR>(address), &m_module);
-  }
-  ~ModuleReference() {
-    if (m_module)
-      FreeLibrary(m_module);
-  }
-  ModuleReference(ModuleReference const&) = delete;
-  ModuleReference& operator=(ModuleReference const&) = delete;
-  ModuleReference(ModuleReference&& other) noexcept : m_module(std::exchange(other.m_module, nullptr)) {}
-  HMODULE get() const { return m_module; }
-
-private:
-  HMODULE m_module = nullptr;
+struct FreeModule {
+  void operator()(HMODULE module) const noexcept { FreeLibrary(module); }
 };
+using ModuleReference = std::unique_ptr<std::remove_pointer_t<HMODULE>, FreeModule>;
 
-static CapturedModule describe_module(HMODULE module) {
-  auto const* dos = reinterpret_cast<IMAGE_DOS_HEADER const*>(module);
-  auto const* headers = reinterpret_cast<IMAGE_NT_HEADERS const*>(
-      reinterpret_cast<std::byte const*>(module) + dos->e_lfanew);
-  std::array<wchar_t, 32768> path;
-  auto length = GetModuleFileNameW(module, path.data(), static_cast<DWORD>(path.size()));
-  return {module, headers->OptionalHeader.SizeOfImage, headers->FileHeader.TimeDateStamp,
-      length && length < path.size() ? std::wstring(path.data(), length) : std::wstring()};
+static ModuleReference reference_module(std::uintptr_t address) {
+  HMODULE module = nullptr;
+  if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+          reinterpret_cast<LPCWSTR>(address), &module))
+    return {};
+  return ModuleReference(module);
 }
 
-static bool same_module(CapturedModule const& left, CapturedModule const& right) {
-  return !left.path.empty() && left.base == right.base && left.imageSize == right.imageSize
-      && left.timestamp == right.timestamp && left.path == right.path;
+NativeStack::Module NativeStack::describe_module(std::uintptr_t base) {
+  auto const* dos = reinterpret_cast<IMAGE_DOS_HEADER const*>(base);
+  auto const* headers = reinterpret_cast<IMAGE_NT_HEADERS const*>(base + dos->e_lfanew);
+  std::array<wchar_t, 32768> path;
+  auto length = GetModuleFileNameW(reinterpret_cast<HMODULE>(base), path.data(), static_cast<DWORD>(path.size()));
+  return {base, headers->OptionalHeader.SizeOfImage, headers->FileHeader.TimeDateStamp,
+      length && length < path.size() ? std::wstring(path.data(), length) : std::wstring()};
 }
 
 static std::string module_path_utf8(std::wstring const& path) {
@@ -141,127 +119,91 @@ static std::string module_path_utf8(std::wstring const& path) {
   return result;
 }
 
-static std::function<void(TextBuffer&, bool)> capture_stack() {
-  struct Frame {
-    void* address;
-    std::size_t module;
-  };
-  std::array<void*, StackLimit> addresses;
+NativeStack NativeStack::capture() {
+  std::array<void*, stack_limit> addresses;
   auto count = CaptureStackBackTrace(1, static_cast<DWORD>(addresses.size()), addresses.data(), nullptr);
-  std::vector<Frame> frames;
-  std::vector<CapturedModule> modules;
-  frames.reserve(count);
+  NativeStack stack;
+  stack.m_frames.reserve(count);
   for (USHORT i = 0; i < count; ++i) {
-    auto moduleIndex = std::numeric_limits<std::size_t>::max();
-    ModuleReference module(addresses[i]);
-    if (module.get()) {
-      auto found = std::find_if(modules.begin(), modules.end(),
-          [&](auto const& captured) { return captured.base == module.get(); });
-      if (found == modules.end()) {
-        moduleIndex = modules.size();
-        modules.push_back(describe_module(module.get()));
+    auto address = reinterpret_cast<std::uintptr_t>(addresses[i]);
+    auto index = std::numeric_limits<std::size_t>::max();
+    if (auto reference = reference_module(address)) {
+      auto base = reinterpret_cast<std::uintptr_t>(reference.get());
+      auto found = std::ranges::find(stack.m_modules, base, &Module::base);
+      if (found == stack.m_modules.end()) {
+        index = stack.m_modules.size();
+        stack.m_modules.push_back(describe_module(base));
       } else {
-        moduleIndex = static_cast<std::size_t>(found - modules.begin());
+        index = static_cast<std::size_t>(found - stack.m_modules.begin());
       }
     }
-    frames.push_back({addresses[i], moduleIndex});
+    stack.m_frames.push_back({address, index});
   }
-  return [frames = std::move(frames), modules = std::move(modules)](TextBuffer& output, bool) {
-    struct CurrentModule {
-      ModuleReference reference;
-      std::string path;
-      bool matches;
-    };
-    std::vector<CurrentModule> current;
-    current.reserve(modules.size());
-    for (auto const& captured : modules) {
-      auto& module = current.emplace_back(ModuleReference(captured.base), module_path_utf8(captured.path), false);
-      module.matches = module.reference.get() && same_module(captured, describe_module(module.reference.get()));
-    }
-    HANDLE process = GetCurrentProcess();
-    // Release the symbol lock before dropping module references: a last
-    // reference can run DLL teardown code, which must not inherit this lock.
-    std::lock_guard lock(g_dbgHelpLock);
-    for (std::size_t i = 0; i < modules.size(); ++i) {
-      if (!current[i].matches || g_diagnosticsOwners == 0) {
-        current[i].matches = false;
-        continue;
-      }
-      auto const& captured = modules[i];
-      IMAGEHLP_MODULE64 symbolModule{};
-      symbolModule.SizeOfStruct = sizeof(symbolModule);
-      current[i].matches = SymGetModuleInfo64(process, reinterpret_cast<DWORD64>(captured.base), &symbolModule)
-          && symbolModule.BaseOfImage == reinterpret_cast<DWORD64>(captured.base)
-          && symbolModule.ImageSize == captured.imageSize && symbolModule.TimeDateStamp == captured.timestamp;
-    }
-    for (std::size_t i = 0; i < frames.size(); ++i) {
-      auto const& frame = frames[i];
-      if (i)
-        output.push_back('\n');
-      std::format_to(std::back_inserter(output), "[{}] {}", i, frame.address);
-      if (frame.module == std::numeric_limits<std::size_t>::max())
-        continue;
-      auto const& captured = modules[frame.module];
-      std::format_to(std::back_inserter(output), " {} +0x{:x} (image size 0x{:x}, timestamp 0x{:x})", current[frame.module].path,
-          reinterpret_cast<std::uintptr_t>(frame.address) - reinterpret_cast<std::uintptr_t>(captured.base),
-          captured.imageSize, captured.timestamp);
-      if (!current[frame.module].matches)
-        continue;
-      auto address = reinterpret_cast<DWORD64>(frame.address);
-      IMAGEHLP_LINE64 line{};
-      line.SizeOfStruct = sizeof(line);
-      DWORD displacement = 0;
-      if (SymGetLineFromAddr64(process, address, &displacement, &line) && line.FileName && *line.FileName) {
-        std::string_view file(line.FileName);
-        auto slash = file.find_last_of("\\/");
-        if (slash != std::string_view::npos)
-          file.remove_prefix(slash + 1);
-        std::format_to(std::back_inserter(output), " ({}:{})", file, line.LineNumber);
-      }
-      alignas(SYMBOL_INFO) std::array<std::byte, sizeof(SYMBOL_INFO) + MAX_SYM_NAME> buffer{};
-      auto* symbol = reinterpret_cast<SYMBOL_INFO*>(buffer.data());
-      symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
-      symbol->MaxNameLen = MAX_SYM_NAME;
-      if (SymFromAddr(process, address, nullptr, symbol))
-        std::format_to(std::back_inserter(output), " {}", std::string_view(symbol->Name, symbol->NameLen));
-    }
-    if (frames.size() == StackLimit)
-      output.append("\n[Stack Output Limit Reached]");
+  return stack;
+}
+
+void NativeStack::append_to(TextBuffer& output) const {
+  struct CurrentModule {
+    ModuleReference reference;
+    std::string path;
+    bool matches;
   };
+  std::vector<CurrentModule> current;
+  current.reserve(m_modules.size());
+  for (auto const& captured : m_modules) {
+    auto reference = reference_module(captured.base);
+    auto matches = reference && !captured.path.empty()
+        && reinterpret_cast<std::uintptr_t>(reference.get()) == captured.base
+        && captured == describe_module(captured.base);
+    current.emplace_back(std::move(reference), module_path_utf8(captured.path), matches);
+  }
+  HANDLE process = GetCurrentProcess();
+  // A last module reference can run DLL teardown. Declare the DbgHelp guard
+  // after current so the guard is gone when those references are released.
+  std::lock_guard lock(g_dbgHelpLock);
+  for (std::size_t i = 0; i < m_modules.size(); ++i) {
+    if (!current[i].matches || g_diagnosticsOwners == 0) {
+      current[i].matches = false;
+      continue;
+    }
+    auto const& captured = m_modules[i];
+    IMAGEHLP_MODULE64 symbol_module{};
+    symbol_module.SizeOfStruct = sizeof(symbol_module);
+    current[i].matches = SymGetModuleInfo64(process, captured.base, &symbol_module)
+        && symbol_module.BaseOfImage == captured.base
+        && symbol_module.ImageSize == captured.image_size && symbol_module.TimeDateStamp == captured.timestamp;
+  }
+  for (std::size_t i = 0; i < m_frames.size(); ++i) {
+    auto const& frame = m_frames[i];
+    if (i)
+      output.push_back('\n');
+    std::format_to(std::back_inserter(output), "[{}] {:#x}", i, frame.address);
+    if (frame.module == std::numeric_limits<std::size_t>::max())
+      continue;
+    auto const& captured = m_modules[frame.module];
+    std::format_to(std::back_inserter(output), " {} +0x{:x} (image size 0x{:x}, timestamp 0x{:x})",
+        current[frame.module].path, frame.address - captured.base, captured.image_size, captured.timestamp);
+    if (!current[frame.module].matches)
+      continue;
+    IMAGEHLP_LINE64 line{};
+    line.SizeOfStruct = sizeof(line);
+    DWORD displacement = 0;
+    if (SymGetLineFromAddr64(process, frame.address, &displacement, &line) && line.FileName && *line.FileName) {
+      std::string_view file(line.FileName);
+      auto slash = file.find_last_of("\\/");
+      if (slash != std::string_view::npos)
+        file.remove_prefix(slash + 1);
+      std::format_to(std::back_inserter(output), " ({}:{})", file, line.LineNumber);
+    }
+    alignas(SYMBOL_INFO) std::array<std::byte, sizeof(SYMBOL_INFO) + MAX_SYM_NAME> buffer{};
+    auto* symbol = reinterpret_cast<SYMBOL_INFO*>(buffer.data());
+    symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+    symbol->MaxNameLen = MAX_SYM_NAME;
+    if (SymFromAddr(process, frame.address, nullptr, symbol))
+      std::format_to(std::back_inserter(output), " {}", std::string_view(symbol->Name, symbol->NameLen));
+  }
+  if (m_frames.size() == stack_limit)
+    output.append("\n[Stack Output Limit Reached]");
 }
-
-static std::string capture_backtrace() {
-  TextBuffer buffer;
-  capture_stack()(buffer, true);
-  return std::move(buffer).str();
-}
-
-std::function<void(TextBuffer&, bool)> StarException::capture_origin_stack() {
-  return capture_stack();
-}
-
-OutputProxy output_exception(ExceptionDiagnostic const& e, bool fullStacktrace) {
-  return OutputProxy([payload = e.m_payload, fullStacktrace](TextBuffer& buffer) {
-    buffer.append(payload->rendered(fullStacktrace));
-  });
-}
-
-void print_stack(std::string_view message) {
-  EmergencyLog::info("Stack Trace ({})...\n{}", message, capture_backtrace());
-}
-
-void fatal_error(std::string_view message, bool showStackTrace) {
-  TextBuffer buffer;
-  std::format_to(std::back_inserter(buffer), "v{} ({})\nFatal Error: {}\n",
-      ProductVersionString, StarSourceIdentifierString, message);
-  if (showStackTrace)
-    buffer.append(capture_backtrace());
-
-  auto diagnostic = std::move(buffer).str();
-  EmergencyLog::log(LogLevel::Error, diagnostic);
-  // Fatal paths must terminate without waiting for interactive acknowledgement.
-  std::abort();
-}
-
 
 }

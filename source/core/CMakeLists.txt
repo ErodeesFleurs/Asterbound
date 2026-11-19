@@ -84,6 +84,9 @@ target_sources (star_modules PUBLIC FILE_SET CXX_MODULES
           StarImage.cppm
           StarInputEvent.cppm
           StarSectorArray2D.cppm)
+# Concrete platform frames (including cpptrace on Unix) stay private to the
+# implementation; importing star.format never needs a native unwinder.
+target_sources (star_modules PRIVATE FILE_SET native_stack TYPE CXX_MODULES FILES StarNativeStack.cppm)
 target_sources (star_modules PRIVATE
     StarUuid.cpp StarHostAddress.cpp StarSocket.cpp StarTcp.cpp
     StarString.cpp StarStringView.cpp StarThread.cpp
@@ -92,7 +95,7 @@ target_sources (star_modules PRIVATE
     StarCurve25519.cpp
     StarDynamicLib.cpp
     StarJson.cpp StarLogging.cpp StarLua.cpp
-    StarNativeRuntime.cpp
+    StarNativeRuntime.cpp StarException.cpp
     StarWorkerPool.cpp StarOptionParser.cpp StarShellParser.cpp StarJsonPath.cpp
     StarJsonBuilder.cpp StarFormattedJson.cpp StarJsonRpc.cpp
     StarNetElement.cpp StarNetElementBasicFields.cpp

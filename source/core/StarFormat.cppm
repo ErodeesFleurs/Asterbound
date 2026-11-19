@@ -39,54 +39,57 @@ concept error_category = std::derived_from<std::remove_cvref_t<Error>, StarExcep
       { std::remove_cvref_t<Error>::matches_error_type(key) } noexcept -> std::same_as<bool>;
     };
 
+using ExceptionMatcher = bool(TypeKey) noexcept;
+
 // A diagnostic is an immutable graph. Only its lazily rendered views mutate;
 // child emission deliberately bypasses whole-chain caches so rendering a deep
 // chain does not materialize and retain every suffix of that chain.
 class ExceptionPayload {
 public:
-  explicit ExceptionPayload(bool (*matcher)(TypeKey) noexcept,
+  explicit ExceptionPayload(ExceptionMatcher& matcher,
       std::shared_ptr<ExceptionSummary const> summary)
     : matcher(matcher), summary(std::move(summary)) {}
   virtual ~ExceptionPayload() noexcept = default;
 
-  virtual void emit(TextBuffer& buffer, bool fullStacktrace) const = 0;
+  virtual void emit(TextBuffer& buffer, bool full_stacktrace) const = 0;
 
-  std::string const& rendered(bool fullStacktrace) const {
-    auto index = fullStacktrace ? 1u : 0u;
-    std::call_once(m_renderOnce[index], [this, index, fullStacktrace] {
+  std::string const& rendered(bool full_stacktrace) const {
+    auto index = full_stacktrace ? 1u : 0u;
+    std::call_once(m_render_once[index], [this, index, full_stacktrace] {
       TextBuffer buffer;
-      emit(buffer, fullStacktrace);
+      emit(buffer, full_stacktrace);
       m_rendered[index] = std::move(buffer).str();
     });
     return m_rendered[index];
   }
 
-  bool (*const matcher)(TypeKey) noexcept;
+  ExceptionMatcher& matcher;
   std::shared_ptr<ExceptionSummary const> const summary;
 
 private:
-  mutable std::array<std::once_flag, 2> m_renderOnce;
+  mutable std::array<std::once_flag, 2> m_render_once;
   mutable std::array<std::string, 2> m_rendered;
 };
 
 template <typename Printer>
-concept exception_printer = requires(Printer const& printer, TextBuffer& buffer, bool fullStacktrace) {
-  { std::invoke(printer, buffer, fullStacktrace) } -> std::same_as<void>;
+concept exception_printer = requires(Printer const& printer, TextBuffer& buffer, bool full_stacktrace,
+    ExceptionSummary const& summary) {
+  { printer(buffer, full_stacktrace, summary) } -> std::same_as<void>;
 };
 
 // Keep the concrete closure in the same allocation as its immutable metadata
-// and caches. Only native stack providers still use their existing std::function.
+// and caches. A root printer reads its original text from the node's own summary.
 template <exception_printer Printer>
 class PrintedExceptionPayload final : public ExceptionPayload {
 public:
   template <typename Source>
     requires std::constructible_from<Printer, Source>
-  PrintedExceptionPayload(Source&& printer, bool (*matcher)(TypeKey) noexcept,
+  PrintedExceptionPayload(Source&& printer, ExceptionMatcher& matcher,
       std::shared_ptr<ExceptionSummary const> summary)
     : ExceptionPayload(matcher, std::move(summary)), m_printer(std::forward<Source>(printer)) {}
 
-  void emit(TextBuffer& buffer, bool fullStacktrace) const override {
-    std::invoke(m_printer, buffer, fullStacktrace);
+  void emit(TextBuffer& buffer, bool full_stacktrace) const override {
+    m_printer(buffer, full_stacktrace, *summary);
   }
 
 private:
@@ -97,8 +100,7 @@ template <typename Printer>
   requires exception_printer<std::remove_cvref_t<Printer>>
       && std::constructible_from<std::remove_cvref_t<Printer>, Printer>
 std::shared_ptr<ExceptionPayload const> make_exception_payload(Printer&& printer,
-    bool (*matcher)(TypeKey) noexcept = nullptr,
-    std::shared_ptr<ExceptionSummary const> summary = {}) {
+    ExceptionMatcher& matcher, std::shared_ptr<ExceptionSummary const> summary) {
   return std::make_shared<PrintedExceptionPayload<std::remove_cvref_t<Printer>> const>(
       std::forward<Printer>(printer), matcher, std::move(summary));
 }
@@ -126,7 +128,8 @@ struct ExceptionSummary {
 class ExceptionDiagnostic {
 public:
   ExceptionDiagnostic(StarException const& exception);
-  std::shared_ptr<ExceptionSummary const> const& diagnostic_summary() const noexcept { return m_payload->summary; }
+  std::shared_ptr<ExceptionSummary const> const& diagnostic_summary() const& noexcept { return m_payload->summary; }
+  std::shared_ptr<ExceptionSummary const> diagnostic_summary() const&& noexcept { return m_payload->summary; }
 
   friend void print_exception(TextBuffer& buffer, ExceptionDiagnostic const& e, bool fullStacktrace);
   friend std::string print_exception(ExceptionDiagnostic const& e, bool fullStacktrace);
@@ -150,8 +153,8 @@ public:
   StarException(StarException&&) noexcept = default;
   StarException& operator=(StarException&&) noexcept = default;
 
-  explicit StarException(std::string message, bool genStackTrace = true) noexcept
-    : StarException("StarException", std::move(message), genStackTrace) {}
+  explicit StarException(std::string message, bool gen_stack_trace = true) noexcept
+    : StarException("StarException", std::move(message), gen_stack_trace) {}
   explicit StarException(ExceptionDiagnostic cause) noexcept
     : StarException("StarException", std::string(), std::move(cause)) {}
   StarException(std::string message, ExceptionDiagnostic cause) noexcept
@@ -163,128 +166,134 @@ public:
 
   static bool matches_error_type(TypeKey key) noexcept { return key == type_key<StarException>(); }
 
-  std::shared_ptr<ExceptionSummary const> const& diagnostic_summary() const noexcept { return m_payload->summary; }
+  std::shared_ptr<ExceptionSummary const> const& diagnostic_summary() const& noexcept { return m_payload->summary; }
+  std::shared_ptr<ExceptionSummary const> diagnostic_summary() const&& noexcept { return m_payload->summary; }
 
   StarException with_summary(ExceptionSummary summary) const& {
-    return StarException(
-        [source = m_payload](TextBuffer& buffer, bool fullStacktrace) {
-          source->emit(buffer, fullStacktrace);
-        },
-        m_payload->matcher, std::make_shared<ExceptionSummary const>(std::move(summary)));
+    return make_summary(m_payload, std::move(summary));
   }
 
   StarException with_summary(ExceptionSummary summary) && {
-    auto matcher = m_payload->matcher;
-    return StarException(
-        [source = std::move(m_payload)](TextBuffer& buffer, bool fullStacktrace) {
-          source->emit(buffer, fullStacktrace);
-        },
-        matcher, std::make_shared<ExceptionSummary const>(std::move(summary)));
+    return make_summary(std::move(m_payload), std::move(summary));
   }
 
   StarException with_context(std::string context) const& {
-    return StarException(
-        [context = std::move(context), cause = m_payload](TextBuffer& buffer, bool fullStacktrace) {
-          buffer.append(context);
-          buffer.append("\nCaused by: ");
-          cause->emit(buffer, fullStacktrace);
-        },
-        m_payload->matcher, m_payload->summary);
+    return make_context(m_payload, std::move(context));
   }
 
   StarException with_context(std::string context) && {
-    auto matcher = m_payload->matcher;
-    auto summary = m_payload->summary;
-    return StarException(
-        [context = std::move(context), cause = std::move(m_payload)](TextBuffer& buffer, bool fullStacktrace) {
-          buffer.append(context);
-          buffer.append("\nCaused by: ");
-          cause->emit(buffer, fullStacktrace);
-        },
-        matcher, std::move(summary));
+    return make_context(std::move(m_payload), std::move(context));
   }
 
   StarException with_related(StarException const& secondary, std::string context) const& {
-    return StarException(
-        [primary = m_payload, secondary = secondary.m_payload, context = std::move(context)](
-            TextBuffer& buffer, bool fullStacktrace) {
-          primary->emit(buffer, fullStacktrace);
-          buffer.push_back('\n');
-          buffer.append(context);
-          buffer.append("\nRelated error: ");
-          secondary->emit(buffer, fullStacktrace);
-        },
-        m_payload->matcher, m_payload->summary);
+    return make_related(m_payload, secondary.m_payload, std::move(context));
   }
 
   StarException with_related(StarException const& secondary, std::string context) && {
-    // Copy all metadata and the secondary first: secondary may alias this value.
-    auto matcher = m_payload->matcher;
-    auto summary = m_payload->summary;
+    // Retain the secondary before moving the primary: they may be the same object.
     auto related = secondary.m_payload;
-    return StarException(
-        [primary = std::move(m_payload), secondary = std::move(related), context = std::move(context)](
-            TextBuffer& buffer, bool fullStacktrace) {
-          primary->emit(buffer, fullStacktrace);
-          buffer.push_back('\n');
-          buffer.append(context);
-          buffer.append("\nRelated error: ");
-          secondary->emit(buffer, fullStacktrace);
-        },
-        matcher, std::move(summary));
+    return make_related(std::move(m_payload), std::move(related), std::move(context));
   }
 
   friend class ExceptionDiagnostic;
 
 protected:
-  StarException(std::string_view type, std::string message, bool genStackTrace = true,
-      bool (*matcher)(TypeKey) noexcept = &StarException::matches_error_type) noexcept
-    : StarException(type, std::move(message), genStackTrace, matcher, {}) {}
+  StarException(std::string_view type, std::string message, bool gen_stack_trace = true,
+      ExceptionMatcher& matcher = StarException::matches_error_type) noexcept
+    : StarException(type, std::move(message), gen_stack_trace, matcher, {}) {}
   StarException(std::string_view type, std::string message, ExceptionDiagnostic cause,
-      bool (*matcher)(TypeKey) noexcept = &StarException::matches_error_type) noexcept
+      ExceptionMatcher& matcher = StarException::matches_error_type) noexcept
     : StarException(type, std::move(message), true, matcher, std::move(cause.m_payload)) {}
 
 private:
-  StarException(std::string_view type, std::string message, bool genStackTrace,
-      bool (*matcher)(TypeKey) noexcept, std::shared_ptr<ExceptionPayload const> cause) noexcept {
-    auto summary = cause ? cause->summary : nullptr;
-    if (!summary) {
-      ExceptionSummary origin;
-      origin.category = type;
-      origin.reason = message;
-      summary = std::make_shared<ExceptionSummary const>(std::move(origin));
+  using PayloadHandle = std::shared_ptr<ExceptionPayload const>;
+  struct CapturedOriginStack;
+
+  static void append_native_error(TextBuffer& buffer, std::string_view type, std::string_view message,
+      bool full_stacktrace, std::shared_ptr<CapturedOriginStack const> const& stack) {
+    buffer.push_back('(');
+    buffer.append(type);
+    buffer.push_back(')');
+    if (!message.empty()) {
+      buffer.push_back(' ');
+      buffer.append(message);
     }
-    auto stack = genStackTrace ? make_exception_payload(capture_origin_stack()) : nullptr;
+    if (full_stacktrace && stack) {
+      buffer.push_back('\n');
+      buffer.append(rendered_origin_stack(*stack));
+    }
+  }
+
+  StarException(std::string_view type, std::string&& message, bool gen_stack_trace,
+      ExceptionMatcher& matcher, PayloadHandle cause) noexcept {
+    auto stack = gen_stack_trace ? capture_origin_stack() : nullptr;
+    if (!cause) {
+      auto summary = std::make_shared<ExceptionSummary const>(
+          ExceptionSummaryKind::Native, std::string(type), std::move(message));
+      m_payload = make_exception_payload(
+          [stack = std::move(stack)](TextBuffer& buffer, bool full_stacktrace, ExceptionSummary const& origin) {
+            append_native_error(buffer, origin.category, origin.reason, full_stacktrace, stack);
+          },
+          matcher, std::move(summary));
+      return;
+    }
+    auto summary = cause->summary;
     m_payload = make_exception_payload(
         [type = std::string(type), message = std::move(message), stack = std::move(stack), cause = std::move(cause)](
-            TextBuffer& buffer, bool fullStacktrace) {
-          buffer.push_back('(');
-          buffer.append(type);
-          buffer.push_back(')');
-          if (!message.empty()) {
-            buffer.push_back(' ');
-            buffer.append(message);
-          }
-          if (fullStacktrace && stack) {
-            buffer.push_back('\n');
-            buffer.append(stack->rendered(true));
-          }
-          if (cause) {
-            buffer.append("\nCaused by: ");
-            cause->emit(buffer, fullStacktrace);
-          }
+            TextBuffer& buffer, bool full_stacktrace, ExceptionSummary const&) {
+          append_native_error(buffer, type, message, full_stacktrace, stack);
+          buffer.append("\nCaused by: ");
+          cause->emit(buffer, full_stacktrace);
         },
         matcher, std::move(summary));
   }
 
-  static std::function<void(TextBuffer&, bool)> capture_origin_stack();
+  static StarException make_summary(PayloadHandle source, ExceptionSummary&& summary) {
+    auto& matcher = source->matcher;
+    return StarException(
+        [source = std::move(source)](TextBuffer& buffer, bool full_stacktrace, ExceptionSummary const&) {
+          source->emit(buffer, full_stacktrace);
+        },
+        matcher, std::make_shared<ExceptionSummary const>(std::move(summary)));
+  }
+
+  static StarException make_context(PayloadHandle cause, std::string&& context) {
+    auto& matcher = cause->matcher;
+    auto summary = cause->summary;
+    return StarException(
+        [context = std::move(context), cause = std::move(cause)](
+            TextBuffer& buffer, bool full_stacktrace, ExceptionSummary const&) {
+          buffer.append(context);
+          buffer.append("\nCaused by: ");
+          cause->emit(buffer, full_stacktrace);
+        },
+        matcher, std::move(summary));
+  }
+
+  static StarException make_related(PayloadHandle primary, PayloadHandle secondary, std::string&& context) {
+    auto& matcher = primary->matcher;
+    auto summary = primary->summary;
+    return StarException(
+        [primary = std::move(primary), secondary = std::move(secondary), context = std::move(context)](
+            TextBuffer& buffer, bool full_stacktrace, ExceptionSummary const&) {
+          primary->emit(buffer, full_stacktrace);
+          buffer.push_back('\n');
+          buffer.append(context);
+          buffer.append("\nRelated error: ");
+          secondary->emit(buffer, full_stacktrace);
+        },
+        matcher, std::move(summary));
+  }
+
+  static std::shared_ptr<CapturedOriginStack const> capture_origin_stack();
+  static std::string const& rendered_origin_stack(CapturedOriginStack const& stack);
   template <typename Printer>
     requires exception_printer<std::remove_cvref_t<Printer>>
         && std::constructible_from<std::remove_cvref_t<Printer>, Printer>
   StarException(Printer&& printer,
-      bool (*matcher)(TypeKey) noexcept, std::shared_ptr<ExceptionSummary const> summary) noexcept
+      ExceptionMatcher& matcher, std::shared_ptr<ExceptionSummary const> summary) noexcept
     : m_payload(make_exception_payload(std::forward<Printer>(printer), matcher, std::move(summary))) {}
-  std::shared_ptr<ExceptionPayload const> m_payload;
+  PayloadHandle m_payload;
 };
 
 inline ExceptionDiagnostic::ExceptionDiagnostic(StarException const& exception)
@@ -299,9 +308,11 @@ inline std::string print_exception(ExceptionDiagnostic const& e, bool fullStackt
 }
 OutputProxy output_exception(ExceptionDiagnostic const& e, bool fullStacktrace);
 
-inline std::string exception_summary(std::shared_ptr<ExceptionSummary const> const& summary) {
-  if (!summary)
-    return "Error";
+inline void append_exception_summary(TextBuffer& buffer, std::shared_ptr<ExceptionSummary const> const& summary) {
+  if (!summary) {
+    buffer.append("Error");
+    return;
+  }
   std::string_view category = summary->category;
   switch (summary->kind) {
     case ExceptionSummaryKind::Native: break;
@@ -311,7 +322,6 @@ inline std::string exception_summary(std::shared_ptr<ExceptionSummary const> con
     case ExceptionSummaryKind::PatchSyntax: category = "Lua patch syntax error"; break;
     case ExceptionSummaryKind::Resource: category = "Resource error"; break;
   }
-  TextBuffer buffer;
   buffer.append(category);
   auto reason = std::string_view(summary->reason);
   reason = reason.substr(0, reason.find_first_of("\r\n"));
@@ -344,6 +354,11 @@ inline std::string exception_summary(std::shared_ptr<ExceptionSummary const> con
       buffer.append(location.provider);
     }
   }
+}
+
+inline std::string exception_summary(std::shared_ptr<ExceptionSummary const> const& summary) {
+  TextBuffer buffer;
+  append_exception_summary(buffer, summary);
   return std::move(buffer).str();
 }
 
@@ -356,7 +371,7 @@ inline std::string exception_summary(ExceptionDiagnostic const& error) {
 }
 inline std::string exception_report(ExceptionDiagnostic const& error) {
   TextBuffer buffer;
-  buffer.append(exception_summary(error));
+  append_exception_summary(buffer, error.diagnostic_summary());
   buffer.append("\nDetails:\n");
   print_exception(buffer, error, true);
   return std::move(buffer).str();
@@ -365,9 +380,8 @@ inline std::string exception_report(ExceptionDiagnostic const& error) {
 
 void print_stack(std::string_view message);
 
-// Log error and stack-trace and possibly show a dialog box if available, then
-// abort.
-void fatal_error(std::string_view message, bool showStackTrace);
+// Write an emergency diagnostic and abort without waiting for interaction.
+void fatal_error(std::string_view message, bool show_stack_trace);
 
 // The file and line of an assertion are a language construct now
 // (std::source_location) instead of __FILE__/__LINE__ stringification.
@@ -421,8 +435,8 @@ public:
   }
 
   StarError() : StarError(Tag::name(), std::string(), true) {}
-  explicit StarError(std::string message, bool genStackTrace = true)
-    : StarError(Tag::name(), std::move(message), genStackTrace) {}
+  explicit StarError(std::string message, bool gen_stack_trace = true)
+    : StarError(Tag::name(), std::move(message), gen_stack_trace) {}
   explicit StarError(ExceptionDiagnostic cause)
     : StarError(Tag::name(), std::string(), std::move(cause)) {}
   StarError(std::string message, ExceptionDiagnostic cause)
@@ -431,11 +445,11 @@ public:
 protected:
   // Each base forwards the final matcher unchanged. No published node is
   // subsequently rewritten while a more-derived category is constructed.
-  StarError(std::string_view type, std::string message, bool genStackTrace = true,
-      bool (*matcher)(TypeKey) noexcept = &StarError::matches_error_type)
-    : Base(type, std::move(message), genStackTrace, matcher) {}
+  StarError(std::string_view type, std::string message, bool gen_stack_trace = true,
+      ExceptionMatcher& matcher = StarError::matches_error_type)
+    : Base(type, std::move(message), gen_stack_trace, matcher) {}
   StarError(std::string_view type, std::string message, ExceptionDiagnostic cause,
-      bool (*matcher)(TypeKey) noexcept = &StarError::matches_error_type)
+      ExceptionMatcher& matcher = StarError::matches_error_type)
     : Base(type, std::move(message), std::move(cause), matcher) {}
 };
 

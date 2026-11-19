@@ -740,6 +740,20 @@ TEST(ExceptionTest, CopiesAndMovesRetainTypedContextsAfterSourcesAreReplaced) {
   EXPECT_EQ(text.find("replacement-after-copy"), std::string::npos);
 }
 
+TEST(ExceptionTest, TemporaryDiagnosticsReturnOwningSummaries) {
+  using Summary = std::shared_ptr<Star::ExceptionSummary const>;
+  static_assert(std::same_as<decltype(std::declval<StarException const&>().diagnostic_summary()), Summary const&>);
+  static_assert(std::same_as<decltype(std::declval<ExceptionDiagnostic const&>().diagnostic_summary()), Summary const&>);
+  static_assert(std::same_as<decltype(std::declval<StarException const&&>().diagnostic_summary()), Summary>);
+  static_assert(std::same_as<decltype(std::declval<ExceptionDiagnostic const&&>().diagnostic_summary()), Summary>);
+  auto const& origin = OutOfRangeException("temporary error", false).diagnostic_summary();
+  auto const& diagnostic = ExceptionDiagnostic(IOException("temporary diagnostic", false)).diagnostic_summary();
+  EXPECT_EQ(origin->category, "OutOfRangeException");
+  EXPECT_EQ(origin->reason, "temporary error");
+  EXPECT_EQ(diagnostic->category, "IOException");
+  EXPECT_EQ(diagnostic->reason, "temporary diagnostic");
+}
+
 TEST(ExceptionTest, OriginOwnsItsTypeNameAndMessage) {
   struct NamedError : StarException {
     NamedError(std::string_view type, std::string message)
