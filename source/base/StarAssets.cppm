@@ -29,7 +29,6 @@ class Logger;
 class RandomService;
 class LogMap;
 
-class Font;
 class Audio;
 class Image;
 

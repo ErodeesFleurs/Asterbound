@@ -80,7 +80,7 @@ target_sources (star_modules PUBLIC FILE_SET CXX_MODULES
           StarRect.cppm StarPoly.cppm StarInterpolation.cppm
           StarAudio.cppm
           StarColor.cppm
-          StarFont.cppm
+          StarFont.cppm StarFontBitmap.cppm
           StarImage.cppm
           StarInputEvent.cppm
           StarSectorArray2D.cppm)

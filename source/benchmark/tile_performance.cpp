@@ -8,6 +8,7 @@ import star.collision_block;
 import star.tile_damage;
 import star.file;
 import star.format;
+import star.font_benchmarks;
 import star.liquid_types;
 import star.liquids_database;
 import star.logging;
@@ -510,6 +511,7 @@ std::expected<int, StarException> run_native_benchmarks(Root& root) {
   auto registered = registerTilePerformanceBenchmarks(session, *renderer);
   if (!registered)
     return std::unexpected(std::move(registered.error()));
+  register_font_benchmarks(session, *renderer);
   auto result = Star::run_registered_benchmarks();
   auto finished = (*renderer)->finishFrame();
   if (!finished)

@@ -137,6 +137,7 @@ if(STAR_BUILD_GUI)
 
   add_executable(tile_performance_benchmarks tile_performance.cpp
     $<TARGET_OBJECTS:star_extern> $<TARGET_OBJECTS:star_core> $<TARGET_OBJECTS:star_game>)
+  target_sources(tile_performance_benchmarks PRIVATE FILE_SET CXX_MODULES FILES StarFontBenchmarks.cppm)
   if(STAR_ENABLE_DISCORD_INTEGRATION)
     target_sources(tile_performance_benchmarks PRIVATE $<TARGET_OBJECTS:star_application>)
   endif()

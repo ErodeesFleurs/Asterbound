@@ -101,20 +101,25 @@ public:
   [[nodiscard]] std::expected<void, StarException> setFont(String const& font);
   [[nodiscard]] std::expected<std::reference_wrapper<TextStyle>, StarException> setTextStyle(TextStyle const& textStyle);
   [[nodiscard]] std::expected<void, StarException> clearTextStyle();
-  [[nodiscard]] std::expected<void, StarException> addFont(std::shared_ptr<Font> const& font, String const& name);
   [[nodiscard]] std::expected<void, StarException> reloadFonts();
 
   void cleanup(std::int64_t textureTimeout);
   [[nodiscard]] std::expected<void, StarException> applyCommands(StringView unsplitCommands);
 private:
+  struct MeasurementFonts {
+    std::shared_ptr<Font> current;
+    std::shared_ptr<Font> saved;
+  };
+  using MeasureOnly = std::optional<std::reference_wrapper<MeasurementFonts>>;
+  [[nodiscard]] std::expected<void, StarException> refresh_fonts();
+  [[nodiscard]] std::expected<void, StarException> apply_measurement_commands(MeasurementFonts& fonts, std::string_view commands) const;
+  [[nodiscard]] std::expected<int, StarException> string_width(StringView text, unsigned char_limit, MeasurementFonts fonts) const;
   TextPainter(Root& root, std::shared_ptr<Renderer> renderer, std::shared_ptr<TextureGroup> textureGroup);
   [[nodiscard]] std::expected<RectF, StarException> doRenderText(StringView s, TextPositioning const& position, bool reallyRender, std::optional<std::reference_wrapper<unsigned>> charLimit);
-  [[nodiscard]] std::expected<RectF, StarException> doRenderLine(StringView s, TextPositioning const& position, bool reallyRender, std::optional<std::reference_wrapper<unsigned>> charLimit);
-  [[nodiscard]] std::expected<RectF, StarException> doRenderGlyph(String::Char c, TextPositioning const& position, bool reallyRender);
+  [[nodiscard]] std::expected<RectF, StarException> doRenderLine(StringView s, TextPositioning const& position, MeasureOnly measure, std::optional<std::reference_wrapper<unsigned>> charLimit);
+  [[nodiscard]] std::expected<RectF, StarException> doRenderGlyph(String::Char c, TextPositioning const& position, bool really_render, std::shared_ptr<Font> const& active);
 
   void renderPrimitives();
-  [[nodiscard]] std::expected<void, StarException> renderGlyph(String::Char c, Vec2F const& screenPos, List<RenderPrimitive>& out, unsigned fontSize, float scale, Vec4B color, std::optional<std::reference_wrapper<Directives const>> processingDirectives = std::nullopt);
-  [[nodiscard]] std::expected<std::shared_ptr<Font>, StarException> loadFont(String const& fontPath, std::optional<String> fontName = {});
 
   Root& m_root;
   std::shared_ptr<Renderer> m_renderer;
@@ -127,7 +132,6 @@ private:
   TextStyle m_renderSettings;
   TextStyle m_savedRenderSettings;
 
-  String m_nonRenderedCharacters;
   std::shared_ptr<TrackerListener> m_reloadTracker;
   ListenerSubscription m_reloadSubscription;
 };

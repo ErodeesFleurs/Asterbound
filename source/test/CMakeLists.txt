@@ -27,6 +27,7 @@ set (star_core_tests_SOURCES
       encode_test.cpp
       exception_test.cpp
       file_test.cpp
+      font_bitmap_test.cpp
       hash_test.cpp
       hash_append_test.cpp
       host_address_test.cpp
@@ -85,6 +86,9 @@ add_executable (core_tests
   ${star_core_tests_SOURCES})
 add_dependencies(core_tests star_dynamic_lib_fixture)
 target_compile_definitions(core_tests PRIVATE STAR_DYNAMIC_LIB_FIXTURE="$<TARGET_FILE:star_dynamic_lib_fixture>")
+set_property(SOURCE font_bitmap_test.cpp APPEND PROPERTY COMPILE_DEFINITIONS
+  "STAR_BUNDLED_FONTS=\"${PROJECT_SOURCE_DIR}/../assets/asterbound\"")
+target_include_directories(core_tests SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
   target_compile_definitions (core_tests PRIVATE STAR_TEST_WRAP_WRITE=1 STAR_TEST_WRAP_READ=1)
   target_link_options (core_tests PRIVATE "LINKER:--wrap=write" "LINKER:--wrap=read")

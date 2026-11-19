@@ -670,6 +670,20 @@ rows do not measure reusable-context throughput, network streams, embedded asset
 large high-ratio retained memory or whole-game performance.
 
 
+### Font rasterization and glyph caching
+
+Use the real grayscale and color fonts when checking the rasterizer. Compare
+the full padded image (including transparent RGB), bearing and color flag,
+not just nonzero alpha. Both formats place source row `y` at destination
+`height - y`, leaving one border pixel on all four sides. Only active pixel
+bytes belong to a row; source pitch can include padding or be negative.
+
+Use `tile_performance_benchmarks --benchmark_filter='^Font/'` with a private
+`-bootconfig` and a real OpenGL context. Separate CPU rasterization, cached
+texture lookup, alternating-size width lookup and layered drawing. Compare
+identical fonts, output fingerprints and renderer settings; synthetic pitch
+tests cover row layouts that the installed fonts need not exercise.
+
 ### Either and its consumers
 
 `Either` has two successful alternatives, not a success/error pair. Its wire

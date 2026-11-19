@@ -1,24 +1,12 @@
 module;
 import std;
 import star.format;
-import star.json;
+import star.directives;
 import star.string;
 import star.map;
-
-import star.color;
 import star.font;
-import star.image;
-import star.bi_map;
-import star.ref_ptr;
 import star.renderer;
-import star.list;
-import star.image_processing;
 import star.hash;
-import star.data_stream;
-import star.string_view;
-import star.thread;
-import star.directives;
-
 import star.vector;
 namespace Star {
 class Root;
@@ -28,22 +16,17 @@ enum class GlyphDirectivePolicy : std::uint8_t {
   Text
 };
 
-
+class TextPainter;
 class FontTextureGroup {
 public:
-  using GlyphDescriptor = std::tuple<String::Char, unsigned, Directives, GlyphDirectivePolicy, std::reference_wrapper<Font>>;
-  struct GlyphDescriptorHash {
-    std::size_t operator()(GlyphDescriptor const& descriptor) const {
-      return hash_of(std::get<0>(descriptor), std::get<1>(descriptor), std::get<2>(descriptor).hash(),
-                     std::get<3>(descriptor), std::addressof(std::get<4>(descriptor).get()));
-    }
-  };
-  struct GlyphDescriptorEqual {
-    bool operator()(GlyphDescriptor const& lhs, GlyphDescriptor const& rhs) const {
-      return std::get<0>(lhs) == std::get<0>(rhs) && std::get<1>(lhs) == std::get<1>(rhs)
-          && std::get<2>(lhs).equals(std::get<2>(rhs)) && std::get<3>(lhs) == std::get<3>(rhs)
-          && std::addressof(std::get<4>(lhs).get()) == std::addressof(std::get<4>(rhs).get());
-    }
+  // Build the complete case-insensitive registry before replacing the live set.
+  class FontSet {
+  public:
+    [[nodiscard]] std::expected<void, StarException> insert_or_assign(String name, std::shared_ptr<Font> font);
+  private:
+    friend class FontTextureGroup;
+    [[nodiscard]] std::expected<std::shared_ptr<Font>, StarException> find(std::string_view name) const;
+    CaseInsensitiveStringMap<std::shared_ptr<Font>> m_fonts;
   };
 
   struct GlyphTexture {
@@ -53,37 +36,66 @@ public:
     Vec2F offset;
   };
 
-  FontTextureGroup(Root& root, std::shared_ptr<TextureGroup> textureGroup);
-
-  [[nodiscard]] std::expected<std::reference_wrapper<GlyphTexture const>, StarException> glyphTexture(String::Char, unsigned fontSize, std::optional<std::reference_wrapper<Directives const>> processingDirectives = std::nullopt, GlyphDirectivePolicy policy = GlyphDirectivePolicy::Default);
-
-  [[nodiscard]] std::expected<TexturePtr, StarException> glyphTexturePtr(String::Char, unsigned fontSize);
-  [[nodiscard]] std::expected<TexturePtr, StarException> glyphTexturePtr(String::Char, unsigned fontSize, std::optional<std::reference_wrapper<Directives const>> processingDirectives, GlyphDirectivePolicy policy = GlyphDirectivePolicy::Default);
-
-  [[nodiscard]] std::expected<unsigned, StarException> glyphWidth(String::Char c, unsigned fontSize);
+  FontTextureGroup(Root& root, std::shared_ptr<TextureGroup> texture_group);
+  [[nodiscard]] std::expected<void, StarException> replace_fonts(FontSet&& fonts, String const& default_name,
+      String const& fallback_name, String const& emoji_name);
+  [[nodiscard]] std::expected<void, StarException> select_font(String const& name);
+  [[nodiscard]] std::expected<unsigned, StarException> glyph_width(String::Char c, unsigned size) const;
+  [[nodiscard]] std::expected<std::reference_wrapper<GlyphTexture const>, StarException> glyph_texture(String::Char c,
+      unsigned size, std::optional<std::reference_wrapper<Directives const>> directives = {},
+      GlyphDirectivePolicy policy = GlyphDirectivePolicy::Default) &;
 
   // Removes glyphs that haven't been used in more than the given timeout in
   // milliseconds (configuration units).
   void cleanup(std::int64_t timeout);
-  // Switches the current font
-  [[nodiscard]] std::expected<void, StarException> switchFont(String const& font);
-  String const& activeFont();
-  [[nodiscard]] std::expected<void, StarException> addFont(std::shared_ptr<Font> const& font, String const& name);
-  void clearFonts();
-  [[nodiscard]] std::expected<void, StarException> setFixedFonts(String const& defaultFontName, String const& fallbackFontName, String const& emojiFontName);
 private:
-  [[nodiscard]] std::expected<std::reference_wrapper<Font>, StarException> getFontForCharacter(String::Char);
+  friend class TextPainter;
+  struct GlyphLookup {
+    String::Char c;
+    unsigned size;
+    Directives const& directives;
+    GlyphDirectivePolicy policy;
+    std::shared_ptr<Font> const& font;
+  };
+  struct GlyphKey {
+    String::Char c;
+    unsigned size;
+    Directives directives;
+    GlyphDirectivePolicy policy;
+    std::shared_ptr<Font> font;
+    operator GlyphLookup() const { return {c, size, directives, policy, font}; }
+  };
+  struct GlyphHash {
+    using is_transparent = void;
+    std::size_t operator()(GlyphLookup key) const {
+      return hash_of(key.c, key.size, key.directives.hash(), key.policy, std::hash<std::shared_ptr<Font>>{}(key.font));
+    }
+  };
+  struct GlyphEqual {
+    using is_transparent = void;
+    bool operator()(GlyphLookup lhs, GlyphLookup rhs) const {
+      return lhs.c == rhs.c && lhs.size == rhs.size && lhs.policy == rhs.policy && lhs.font == rhs.font
+          && lhs.directives.equals(rhs.directives);
+    }
+  };
+  [[nodiscard]] std::expected<std::shared_ptr<Font>, StarException> named_font(std::string_view name) const;
+  [[nodiscard]] std::expected<std::reference_wrapper<std::shared_ptr<Font> const>, StarException>
+      resolve_font(std::shared_ptr<Font> const& active, String::Char c) const;
+  [[nodiscard]] std::expected<unsigned, StarException> glyph_width(std::shared_ptr<Font> const& active,
+      String::Char c, unsigned size) const;
+  [[nodiscard]] std::expected<std::reference_wrapper<GlyphTexture const>, StarException> glyph_texture(
+      std::shared_ptr<Font> const& font, String::Char c, unsigned size,
+      std::optional<std::reference_wrapper<Directives const>> directives, GlyphDirectivePolicy policy);
 
   Root& m_root;
-  CaseInsensitiveStringMap<std::shared_ptr<Font>> m_fonts;
-  String m_fontName;
-  std::shared_ptr<Font> m_activeFont;
-  std::shared_ptr<Font> m_defaultFont;
-  std::shared_ptr<Font> m_fallbackFont;
-  std::shared_ptr<Font> m_emojiFont;
-
-  std::shared_ptr<TextureGroup> m_textureGroup;
-  HashMap<GlyphDescriptor, GlyphTexture, GlyphDescriptorHash, GlyphDescriptorEqual> m_glyphs;
+  FontSet m_fonts;
+  String m_font_name;
+  std::shared_ptr<Font> m_active_font;
+  std::shared_ptr<Font> m_default_font;
+  std::shared_ptr<Font> m_fallback_font;
+  std::shared_ptr<Font> m_emoji_font;
+  std::shared_ptr<TextureGroup> m_texture_group;
+  HashMap<GlyphKey, GlyphTexture, GlyphHash, GlyphEqual> m_glyphs;
 };
 
 }

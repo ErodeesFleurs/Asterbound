@@ -1,19 +1,11 @@
 import std;
 import star.format;
-import star.json;
 import star.string;
-import star.color;
 import star.font;
 import star.image;
-import star.bi_map;
 import star.ref_ptr;
 import star.renderer;
-import star.list;
 import star.image_processing;
-import star.hash;
-import star.data_stream;
-import star.string_view;
-import star.thread;
 import star.directives;
 import star.font_texture_group;
 import star.logging;
@@ -22,101 +14,123 @@ import star.root;
 import star.vector;
 import star.algorithm;
 namespace Star {
-
-FontTextureGroup::FontTextureGroup(Root& root, std::shared_ptr<TextureGroup> textureGroup)
-  : m_root(root), m_textureGroup(std::move(textureGroup)) {}
-
-void FontTextureGroup::cleanup(std::int64_t timeout) {
-  auto currentTime = std::chrono::time_point_cast<std::chrono::milliseconds>(
+namespace {
+auto glyph_time() {
+  return std::chrono::time_point_cast<std::chrono::milliseconds>(
       std::chrono::steady_clock::now() + std::chrono::microseconds(500));
-  auto timeToLive = std::chrono::milliseconds(timeout);
-  Star::erase_if(m_glyphs, [&](auto const& p) { return currentTime - p.second.time > timeToLive; });
+}
 }
 
-std::expected<void, StarException> FontTextureGroup::switchFont(String const& font) {
-  if (font.empty()) {
-    m_activeFont = m_defaultFont;
-    m_fontName.clear();
-  } else if (m_fontName != font) {
-    auto key = CaseInsensitiveStringView::create(font);
-    if (!key)
-      return std::unexpected(std::move(key.error()));
-    auto find = m_fonts.find(*key);
-    m_activeFont = find != m_fonts.end() ? find->second : m_defaultFont;
-    m_fontName = font;
+FontTextureGroup::FontTextureGroup(Root& root, std::shared_ptr<TextureGroup> texture_group)
+  : m_root(root), m_texture_group(std::move(texture_group)) {}
+
+void FontTextureGroup::cleanup(std::int64_t timeout) {
+  auto now = glyph_time();
+  auto age = std::chrono::milliseconds(timeout);
+  Star::erase_if(m_glyphs, [&](decltype(m_glyphs)::value_type const& entry) { return now - entry.second.time > age; });
+}
+
+std::expected<void, StarException> FontTextureGroup::FontSet::insert_or_assign(String name, std::shared_ptr<Font> font) {
+  if (!font)
+    return std::unexpected(FontException("Cannot register an empty font"));
+  auto key = CaseInsensitiveString::create(std::move(name));
+  if (!key)
+    return std::unexpected(std::move(key.error()));
+  m_fonts.insert_or_assign(std::move(*key), std::move(font));
+  return {};
+}
+
+std::expected<std::shared_ptr<Font>, StarException> FontTextureGroup::FontSet::find(std::string_view name) const {
+  auto key = CaseInsensitiveStringView::create(name);
+  if (!key)
+    return std::unexpected(std::move(key.error()));
+  return m_fonts.value(*key);
+}
+
+std::expected<std::shared_ptr<Font>, StarException> FontTextureGroup::named_font(std::string_view name) const {
+  if (name.empty())
+    return m_default_font;
+  auto found = m_fonts.find(name);
+  if (!found)
+    return std::unexpected(std::move(found.error()));
+  return *found ? std::move(*found) : m_default_font;
+}
+
+std::expected<void, StarException> FontTextureGroup::select_font(String const& name) {
+  if (name != m_font_name) {
+    auto selected = named_font(name.utf8());
+    if (!selected)
+      return std::unexpected(std::move(selected.error()));
+    m_active_font = std::move(*selected);
+    m_font_name = name;
   }
   return {};
 }
 
-String const& FontTextureGroup::activeFont() {
-  return m_fontName;
-}
+std::expected<void, StarException> FontTextureGroup::replace_fonts(FontSet&& fonts, String const& default_name,
+    String const& fallback_name, String const& emoji_name) {
+  auto default_font = fonts.find(default_name.utf8());
+  if (!default_font)
+    return std::unexpected(std::move(default_font.error()));
+  if (!*default_font)
+    return std::unexpected(FontException::format("Default font '{}' not found", default_name));
+  auto fallback_font = fonts.find(fallback_name.utf8());
+  if (!fallback_font)
+    return std::unexpected(std::move(fallback_font.error()));
+  auto emoji_font = fonts.find(emoji_name.utf8());
+  if (!emoji_font)
+    return std::unexpected(std::move(emoji_font.error()));
+  auto selected = m_font_name.empty() ? default_font : fonts.find(m_font_name.utf8());
+  if (!selected)
+    return std::unexpected(std::move(selected.error()));
 
-std::expected<void, StarException> FontTextureGroup::addFont(std::shared_ptr<Font> const& font, String const& name) {
-  auto key = CaseInsensitiveString::create(name);
-  if (!key)
-    return std::unexpected(std::move(key.error()));
-  if (m_fonts.contains(*key))
-    m_glyphs.clear();
-  m_fonts[std::move(*key)] = font;
-  return {};
-}
-
-void FontTextureGroup::clearFonts() {
+  // Missing named selections use this generation's default. Missing fallback
+  // and emoji fonts are never inherited from the previous registry.
   m_glyphs.clear();
-  m_fonts.clear();
-  m_activeFont = m_defaultFont;
-}
-
-std::expected<void, StarException> FontTextureGroup::setFixedFonts(String const& defaultFontName, String const& fallbackFontName, String const& emojiFontName) {
-  auto defaultKey = CaseInsensitiveStringView::create(defaultFontName);
-  if (!defaultKey)
-    return std::unexpected(std::move(defaultKey.error()));
-  auto fallbackKey = CaseInsensitiveStringView::create(fallbackFontName);
-  if (!fallbackKey)
-    return std::unexpected(std::move(fallbackKey.error()));
-  auto emojiKey = CaseInsensitiveStringView::create(emojiFontName);
-  if (!emojiKey)
-    return std::unexpected(std::move(emojiKey.error()));
-  if (auto defaultFont = m_fonts.find_ref(*defaultKey))
-    m_defaultFont = m_activeFont = defaultFont->get();
-  if (auto fallbackFont = m_fonts.find_ref(*fallbackKey))
-    m_fallbackFont = fallbackFont->get();
-  if (auto emojiFont = m_fonts.find_ref(*emojiKey))
-    m_emojiFont = emojiFont->get();
+  m_fonts = std::move(fonts);
+  m_active_font = *selected ? std::move(*selected) : *default_font;
+  m_default_font = std::move(*default_font);
+  m_fallback_font = std::move(*fallback_font);
+  m_emoji_font = std::move(*emoji_font);
   return {};
 }
 
-std::expected<std::reference_wrapper<FontTextureGroup::GlyphTexture const>, StarException> FontTextureGroup::glyphTexture(String::Char c, unsigned size, std::optional<std::reference_wrapper<Directives const>> processingDirectives, GlyphDirectivePolicy policy) {
-  auto fontResult = getFontForCharacter(c);
-  if (!fontResult)
-    return std::unexpected(std::move(fontResult.error()));
-  Font& font = fontResult->get();
-  if ((m_emojiFont && std::addressof(font) == std::addressof(*m_emojiFont))
-      || (processingDirectives && processingDirectives->get().empty()))
-    processingDirectives.reset();
-  if (!processingDirectives)
+std::expected<std::reference_wrapper<FontTextureGroup::GlyphTexture const>, StarException>
+FontTextureGroup::glyph_texture(String::Char c, unsigned size,
+    std::optional<std::reference_wrapper<Directives const>> directives, GlyphDirectivePolicy policy) & {
+  auto font = resolve_font(m_active_font, c);
+  if (!font)
+    return std::unexpected(std::move(font.error()));
+  return glyph_texture(font->get(), c, size, directives, policy);
+}
+
+std::expected<std::reference_wrapper<FontTextureGroup::GlyphTexture const>, StarException>
+FontTextureGroup::glyph_texture(std::shared_ptr<Font> const& font, String::Char c, unsigned size,
+    std::optional<std::reference_wrapper<Directives const>> processing_directives, GlyphDirectivePolicy policy) {
+  static Directives const empty;
+  auto const& source = font != m_emoji_font && processing_directives ? processing_directives->get() : empty;
+  bool apply_directives = !source.empty();
+  if (!apply_directives)
     policy = GlyphDirectivePolicy::Default;
-  GlyphDescriptor descriptor{c, size, processingDirectives ? processingDirectives->get() : Directives{}, policy, std::ref(font)};
-  if (auto cached = m_glyphs.find_ref(descriptor)) {
-    cached->get().time = std::chrono::time_point_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() + std::chrono::microseconds(500));
+  GlyphLookup lookup{c, size, source, policy, font};
+  if (auto cached = m_glyphs.find_ref(lookup)) {
+    cached->get().time = glyph_time();
     return std::cref(cached->get());
   }
 
-  auto pixelSize = font.setPixelSize(size);
-  if (!pixelSize)
-    return std::unexpected(std::move(pixelSize.error()));
-  auto rendered = font.render(c);
+  auto pixel_size = font->set_pixel_size(size);
+  if (!pixel_size)
+    return std::unexpected(std::move(pixel_size.error()));
+  auto rendered = font->render(c);
   if (!rendered)
     return std::unexpected(std::move(rendered.error()));
-  auto& renderResult = *rendered;
-  Image& image = std::get<0>(renderResult);
-  GlyphTexture glyphTexture;
-  if (processingDirectives) {
-    Vec2F preSize = Vec2F(image.size());
+  auto& image = rendered->image;
+  GlyphTexture glyph_texture;
+  GlyphKey key{c, size, source, policy, font};
+  if (apply_directives) {
+    auto const& directives = key.directives;
+    Vec2F pre_size(image.size());
     bool broken = false;
-    auto const& directives = std::get<2>(descriptor);
     for (auto const& entry : directives.entries()) {
       auto const& operation = directives.entry_operation(entry);
       if (std::holds_alternative<ErrorImageOperation>(operation)) {
@@ -148,50 +162,39 @@ std::expected<std::reference_wrapper<FontTextureGroup::GlyphTexture const>, Star
       }
     }
     if (broken) {
-      glyphTexture.colored = true;
+      glyph_texture.colored = true;
       image.for_each_pixel([](unsigned x, unsigned y, Vec4B& pixel) {
         pixel = ((x + y) % 2 == 0) ? Vec4B(255, 0, 255, pixel[3]) : Vec4B(0, 0, 0, pixel[3]);
       });
     }
-    glyphTexture.offset = (preSize - Vec2F(image.size())) / 2;
+    glyph_texture.offset = (pre_size - Vec2F(image.size())) / 2;
   }
-  glyphTexture.colored |= std::get<2>(renderResult);
-  glyphTexture.offset += Vec2F(std::get<1>(renderResult));
-  auto texture = m_textureGroup->create(image);
+  glyph_texture.colored |= rendered->colored;
+  glyph_texture.offset += Vec2F(rendered->offset);
+  auto texture = m_texture_group->create(image);
   if (!texture)
     return std::unexpected(std::move(texture.error()));
-  glyphTexture.texture = std::move(*texture);
-  glyphTexture.time = std::chrono::time_point_cast<std::chrono::milliseconds>(
-      std::chrono::steady_clock::now() + std::chrono::microseconds(500));
-  auto inserted = m_glyphs.add(descriptor, std::move(glyphTexture));
-  if (!inserted)
-    return std::unexpected(std::move(inserted.error()));
-  return std::cref(inserted->get());
+  glyph_texture.texture = std::move(*texture);
+  glyph_texture.time = glyph_time();
+  auto entry = m_glyphs.try_emplace(std::move(key), std::move(glyph_texture)).first;
+  return std::cref(entry->second);
 }
 
-std::expected<TexturePtr, StarException> FontTextureGroup::glyphTexturePtr(String::Char c, unsigned size) {
-  return glyphTexturePtr(c, size, std::nullopt);
+std::expected<unsigned, StarException> FontTextureGroup::glyph_width(String::Char c, unsigned size) const {
+  return glyph_width(m_active_font, c, size);
 }
 
-std::expected<TexturePtr, StarException> FontTextureGroup::glyphTexturePtr(String::Char c, unsigned size, std::optional<std::reference_wrapper<Directives const>> processingDirectives, GlyphDirectivePolicy policy) {
-  auto glyph = glyphTexture(c, size, processingDirectives, policy);
-  if (!glyph)
-    return std::unexpected(std::move(glyph.error()));
-  return glyph->get().texture;
-}
-
-std::expected<unsigned, StarException> FontTextureGroup::glyphWidth(String::Char c, unsigned fontSize) {
-  auto font = getFontForCharacter(c);
+std::expected<unsigned, StarException> FontTextureGroup::glyph_width(
+    std::shared_ptr<Font> const& active, String::Char c, unsigned size) const {
+  auto font = resolve_font(active, c);
   if (!font)
     return std::unexpected(std::move(font.error()));
-  auto pixelSize = font->get().setPixelSize(fontSize);
-  if (!pixelSize)
-    return std::unexpected(std::move(pixelSize.error()));
-  return font->get().width(c);
+  return font->get()->width(c, size);
 }
 
-std::expected<std::reference_wrapper<Font>, StarException> FontTextureGroup::getFontForCharacter(String::Char c) {
-  if (!m_activeFont)
+std::expected<std::reference_wrapper<std::shared_ptr<Font> const>, StarException>
+FontTextureGroup::resolve_font(std::shared_ptr<Font> const& active, String::Char c) const {
+  if (!active)
     return std::unexpected(FontException("No default font is configured"));
   if (((c >= 0x1F600 && c <= 0x1F64F) || // Emoticons
        (c >= 0x1F300 && c <= 0x1F5FF) || // Misc Symbols and Pictographs
@@ -202,23 +205,18 @@ std::expected<std::reference_wrapper<Font>, StarException> FontTextureGroup::get
        (c >= 0xFE00  && c <= 0xFE0F ) || // Variation Selectors
        (c >= 0x1F900 && c <= 0x1F9FF) || // Supplemental Symbols and Pictographs
        (c >= 0x1F018 && c <= 0x1F270) || // Various asian characters
-       (c >= 65024   && c <= 65039  ) || // Variation selector
        (c >= 9100    && c <= 9300   ) || // Misc items
        (c >= 8400    && c <= 8447   ))) { // Combining Diacritical Marks for Symbols
-    if (!m_emojiFont)
+    if (!m_emoji_font)
       return std::unexpected(FontException("No emoji font is configured"));
-    auto exists = m_emojiFont->exists(c);
-    if (!exists)
-      return std::unexpected(std::move(exists.error()));
-    if (*exists)
-      return std::ref(*m_emojiFont);
+    if (m_emoji_font->exists(c))
+      return std::cref(m_emoji_font);
+    if (active == m_emoji_font)
+      return std::cref(m_fallback_font ? m_fallback_font : active);
   }
-  auto exists = m_activeFont->exists(c);
-  if (!exists)
-    return std::unexpected(std::move(exists.error()));
-  if (*exists || !m_fallbackFont)
-    return std::ref(*m_activeFont);
-  return std::ref(*m_fallbackFont);
+  if (!m_fallback_font || active == m_fallback_font || active->exists(c))
+    return std::cref(active);
+  return std::cref(m_fallback_font);
 }
 
 }

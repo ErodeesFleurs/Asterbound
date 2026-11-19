@@ -79,6 +79,9 @@ import star.directives;
 import star.image;
 import star.image_processing;
 import star.text;
+import star.font;
+import star.font_texture_group;
+import star.string_view;
 import star.text_painter;
 import star.renderer;
 
@@ -564,6 +567,148 @@ std::expected<std::shared_ptr<GuiContext>, StarException> textEditorContext(Game
     return std::unexpected(std::move(configured.error()));
   return GuiContext::create(fixture.root(), {}, {});
 }
+
+std::expected<std::shared_ptr<Font>, StarException> clone_test_font(Assets const& assets, String const& path) {
+  auto source = assets.font(path);
+  if (!source)
+    return std::unexpected(std::move(source.error()));
+  return (*source)->clone();
+}
+
+const GameTestRegistration replace_named_font("FontTextureGroup", "NamedSelectionSurvivesReplacementAndRejectedCandidate",
+  [](GameTest& fixture) {
+    auto assets = fixture.root().assets();
+    ASSERT_TRUE(assets) << assets.error().what();
+    auto hobo = clone_test_font(**assets, "/hobo.ttf");
+    auto mono = clone_test_font(**assets, "/font/unifont.woff2");
+    ASSERT_TRUE(hobo) << hobo.error().what();
+    ASSERT_TRUE(mono) << mono.error().what();
+    auto narrow = (*hobo)->width(U'i', 32);
+    auto wide = (*mono)->width(U'i', 32);
+    ASSERT_TRUE(narrow);
+    ASSERT_TRUE(wide);
+    ASSERT_NE(*narrow, *wide);
+
+    FontTextureGroup group(fixture.root(), {});
+    FontTextureGroup::FontSet first;
+    ASSERT_TRUE(first.insert_or_assign("base", *hobo));
+    ASSERT_TRUE(first.insert_or_assign("chosen", *hobo));
+    ASSERT_TRUE(group.replace_fonts(std::move(first), "base", "", ""));
+    ASSERT_TRUE(group.select_font("cHoSeN"));
+    EXPECT_EQ(group.glyph_width(U'i', 32).value_or(0), *narrow);
+
+    FontTextureGroup::FontSet second;
+    ASSERT_TRUE(second.insert_or_assign("base", *hobo));
+    ASSERT_TRUE(second.insert_or_assign("CHOSEN", *hobo));
+    ASSERT_TRUE(second.insert_or_assign("chosen", *mono));
+    ASSERT_TRUE(group.replace_fonts(std::move(second), "BASE", "", ""));
+    EXPECT_EQ(group.glyph_width(U'i', 32).value_or(0), *wide);
+    ASSERT_TRUE(group.select_font("cHoSeN")); // Must not skip a required rebinding.
+    EXPECT_EQ(group.glyph_width(U'i', 32).value_or(0), *wide);
+
+    FontTextureGroup::FontSet rejected;
+    ASSERT_TRUE(rejected.insert_or_assign("chosen", *hobo));
+    EXPECT_FALSE(group.replace_fonts(std::move(rejected), "no-default", "", ""));
+    EXPECT_EQ(group.glyph_width(U'i', 32).value_or(0), *wide);
+    ASSERT_TRUE(group.select_font(""));
+    EXPECT_EQ(group.glyph_width(U'i', 32).value_or(0), *narrow);
+    ASSERT_TRUE(group.select_font("chosen"));
+    EXPECT_EQ(group.glyph_width(U'i', 32).value_or(0), *wide);
+
+    FontTextureGroup::FontSet removed;
+    ASSERT_TRUE(removed.insert_or_assign("base", *hobo));
+    ASSERT_TRUE(group.replace_fonts(std::move(removed), "base", "", ""));
+    EXPECT_EQ(group.glyph_width(U'i', 32).value_or(0), *narrow);
+    FontTextureGroup::FontSet restored;
+    ASSERT_TRUE(restored.insert_or_assign("base", *hobo));
+    ASSERT_TRUE(restored.insert_or_assign("chosen", *mono));
+    ASSERT_TRUE(group.replace_fonts(std::move(restored), "base", "", ""));
+    EXPECT_EQ(group.glyph_width(U'i', 32).value_or(0), *wide);
+  });
+
+const GameTestRegistration replace_fixed_fonts("FontTextureGroup", "AbsentFixedRolesNeverUsePreviousFaces",
+  [](GameTest& fixture) {
+    auto assets = fixture.root().assets();
+    ASSERT_TRUE(assets);
+    auto base = clone_test_font(**assets, "/hobo.ttf");
+    ASSERT_TRUE(base) << base.error().what();
+    ASSERT_FALSE((*base)->exists(U'中'));
+    FontTextureGroup group(fixture.root(), {});
+    std::weak_ptr<Font> fallback_lifetime, emoji_lifetime;
+    {
+      auto fallback = clone_test_font(**assets, "/font/unifont.woff2");
+      auto emoji = clone_test_font(**assets, "/font/twemoji.woff2");
+      ASSERT_TRUE(fallback) << fallback.error().what();
+      ASSERT_TRUE(emoji) << emoji.error().what();
+      ASSERT_TRUE((*fallback)->exists(U'中'));
+      ASSERT_TRUE((*emoji)->exists(U'☀'));
+      fallback_lifetime = *fallback;
+      emoji_lifetime = *emoji;
+      FontTextureGroup::FontSet first;
+      ASSERT_TRUE(first.insert_or_assign("base", *base));
+      ASSERT_TRUE(first.insert_or_assign("fallback", *fallback));
+      ASSERT_TRUE(first.insert_or_assign("emoji", *emoji));
+      ASSERT_TRUE(group.replace_fonts(std::move(first), "base", "fallback", "emoji"));
+      auto fallback_width = (*fallback)->width(U'中', 32);
+      auto emoji_width = (*emoji)->width(U'☀', 32);
+      ASSERT_TRUE(fallback_width);
+      ASSERT_TRUE(emoji_width);
+      EXPECT_EQ(group.glyph_width(U'中', 32).value_or(0), *fallback_width);
+      EXPECT_EQ(group.glyph_width(U'☀', 32).value_or(0), *emoji_width);
+      FontTextureGroup::FontSet invalid;
+      ASSERT_TRUE(invalid.insert_or_assign("base", *base));
+      EXPECT_FALSE(group.replace_fonts(std::move(invalid), "base", "fallback", String(std::string_view("\xff", 1))));
+      EXPECT_EQ(group.glyph_width(U'中', 32).value_or(0), *fallback_width);
+      EXPECT_EQ(group.glyph_width(U'☀', 32).value_or(0), *emoji_width);
+    }
+    ASSERT_FALSE(fallback_lifetime.expired());
+    ASSERT_FALSE(emoji_lifetime.expired());
+    FontTextureGroup::FontSet second;
+    ASSERT_TRUE(second.insert_or_assign("base", *base));
+    ASSERT_TRUE(group.replace_fonts(std::move(second), "base", "fallback", "emoji"));
+    EXPECT_TRUE(fallback_lifetime.expired());
+    EXPECT_TRUE(emoji_lifetime.expired());
+    auto missing = (*base)->width(U'中', 32);
+    ASSERT_TRUE(missing);
+    EXPECT_EQ(group.glyph_width(U'中', 32).value_or(~0u), *missing);
+    EXPECT_FALSE(group.glyph_width(U'☀', 32)); // Cold-start missing-emoji behavior.
+  });
+
+const GameTestRegistration measurement_fonts("TextPainter", "MeasurementCommandsDoNotMutateTheActiveOrSavedStyle",
+  [](GameTest& fixture) {
+    // No renderer or texture group: even layered directives may only measure.
+    auto painter = TextPainter::create(fixture.root(), {}, {});
+    ASSERT_TRUE(painter) << painter.error().what();
+    TextStyle style;
+    style.font = "hobo";
+    style.fontSize = 32;
+    style.backDirectives = String("?border=1;ff0000");
+    auto active = (*painter)->setTextStyle(style);
+    ASSERT_TRUE(active);
+    ASSERT_TRUE((*painter)->applyCommands("set"));
+    auto primary = (*painter)->glyphWidth(U'i');
+    ASSERT_TRUE(primary);
+    auto other = (*painter)->stringWidth("^font=unifont;i");
+    ASSERT_TRUE(other);
+    ASSERT_NE(*primary, *other);
+    StringView text("^font=unifont,set;i^font=hobo;i^reset;i");
+    auto line = (*painter)->determineLineSize(text, TextPositioning{});
+    ASSERT_TRUE(line) << line.error().what();
+    EXPECT_EQ(line->width(), 2 * *other + *primary);
+    auto block = (*painter)->determineTextSize(text, TextPositioning{});
+    ASSERT_TRUE(block) << block.error().what();
+    EXPECT_EQ(block->width(), line->width());
+    EXPECT_EQ(active->get().font, "hobo");
+    ASSERT_TRUE((*painter)->setFont("unifont"));
+    ASSERT_TRUE((*painter)->reloadFonts());
+    EXPECT_EQ((*painter)->glyphWidth(U'i').value_or(-1), *other);
+    ASSERT_TRUE((*painter)->setFont("unifont"));
+    EXPECT_EQ((*painter)->glyphWidth(U'i').value_or(-1), *other);
+    ASSERT_TRUE((*painter)->applyCommands("reset"));
+    EXPECT_EQ(active->get().font, "hobo");
+    EXPECT_EQ((*painter)->glyphWidth(U'i').value_or(-1), *primary);
+  });
+
 const GameTestRegistration text_directive_aliases(
   "TextDirectives", "ApplyingStylesDoesNotMutateSharedBorderSyntax", [](GameTest& fixture) {
     auto context = textEditorContext(fixture);

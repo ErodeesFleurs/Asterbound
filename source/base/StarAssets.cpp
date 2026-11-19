@@ -1498,7 +1498,7 @@ bool Assets::AudioData::shouldPersist() const {
 }
 
 bool Assets::FontData::shouldPersist() const {
-  return forcePersist || font.use_count() != 1 || font->sharesBackingBuffer();
+  return forcePersist || font.use_count() != 1 || font->shares_backing_buffer();
 }
 
 bool Assets::BytesData::shouldPersist() const {
@@ -2447,7 +2447,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadFon
     }();
     if (!bytes)
       return std::unexpected(std::move(bytes.error()));
-    auto font = Font::loadFont(*m_fontLibrary, std::make_shared<ByteArray>(std::move(*bytes)));
+    auto font = Font::load(*m_fontLibrary, std::make_shared<ByteArray>(std::move(*bytes)));
     if (!font)
       return std::unexpected(std::move(font.error()));
     auto data = std::make_shared<FontData>();

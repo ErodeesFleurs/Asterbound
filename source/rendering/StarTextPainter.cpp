@@ -42,30 +42,27 @@ import star.math_common;
 import star.pythonic;
 namespace Star {
 
-namespace {
-
-std::expected<void, StarException> applyMeasurementFontCommands(FontTextureGroup& fontTextureGroup, String& font,
-                                                                String& setFont, std::string_view remaining) {
+std::expected<void, StarException> TextPainter::apply_measurement_commands(MeasurementFonts& fonts,
+    std::string_view remaining) const {
   while (!remaining.empty()) {
     auto comma = remaining.find(',');
     auto command = remaining.substr(0, comma);
-    std::expected<void, StarException> changed;
-    if (command == "reset")
-      changed = fontTextureGroup.switchFont(font = setFont);
-    else if (command == "set")
-      setFont = font;
-    else if (command.starts_with("font="))
-      changed = fontTextureGroup.switchFont(font = String(command.substr(5)));
-    if (!changed)
-      return std::unexpected(std::move(changed.error()));
+    if (command == "reset") {
+      fonts.current = fonts.saved;
+    } else if (command == "set") {
+      fonts.saved = fonts.current;
+    } else if (command.starts_with("font=")) {
+      auto selected = m_fontTextureGroup.named_font(command.substr(5));
+      if (!selected)
+        return std::unexpected(std::move(selected.error()));
+      fonts.current = std::move(*selected);
+    }
     if (comma == std::string_view::npos)
       break;
     remaining.remove_prefix(comma + 1);
   }
   return {};
 }
-
-}// namespace
 
 TextPositioning::TextPositioning() {
   pos = Vec2F();
@@ -165,7 +162,10 @@ std::expected<RectF, StarException> TextPainter::renderText(StringView s, TextPo
 
 std::expected<RectF, StarException> TextPainter::renderLine(StringView s, TextPositioning const& position) {
   auto charLimit = position.charLimit;
-  auto rect = doRenderLine(s, position, true, optional_ref(charLimit));
+  auto ready = refresh_fonts();
+  if (!ready)
+    return std::unexpected(std::move(ready.error()));
+  auto rect = doRenderLine(s, position, {}, optional_ref(charLimit));
   if (!rect)
     return std::unexpected(std::move(rect.error()));
   renderPrimitives();
@@ -173,7 +173,10 @@ std::expected<RectF, StarException> TextPainter::renderLine(StringView s, TextPo
 }
 
 std::expected<RectF, StarException> TextPainter::renderGlyph(String::Char c, TextPositioning const& position) {
-  auto rect = doRenderGlyph(c, position, true);
+  auto ready = refresh_fonts();
+  if (!ready)
+    return std::unexpected(std::move(ready.error()));
+  auto rect = doRenderGlyph(c, position, true, m_fontTextureGroup.m_active_font);
   if (!rect)
     return std::unexpected(std::move(rect.error()));
   renderPrimitives();
@@ -187,29 +190,46 @@ std::expected<RectF, StarException> TextPainter::determineTextSize(StringView s,
 
 std::expected<RectF, StarException> TextPainter::determineLineSize(StringView s, TextPositioning const& position) {
   auto charLimit = position.charLimit;
-  return doRenderLine(s, position, false, optional_ref(charLimit));
+  auto ready = refresh_fonts();
+  if (!ready)
+    return std::unexpected(std::move(ready.error()));
+  auto saved = m_fontTextureGroup.named_font(m_savedRenderSettings.font.utf8());
+  if (!saved)
+    return std::unexpected(std::move(saved.error()));
+  MeasurementFonts fonts{m_fontTextureGroup.m_active_font, std::move(*saved)};
+  return doRenderLine(s, position, std::ref(fonts), optional_ref(charLimit));
 }
 
 std::expected<RectF, StarException> TextPainter::determineGlyphSize(String::Char c, TextPositioning const& position) {
-  return doRenderGlyph(c, position, false);
+  auto ready = refresh_fonts();
+  if (!ready)
+    return std::unexpected(std::move(ready.error()));
+  return doRenderGlyph(c, position, false, m_fontTextureGroup.m_active_font);
 }
 
 std::expected<int, StarException> TextPainter::glyphWidth(String::Char c) {
-  auto width = m_fontTextureGroup.glyphWidth(c, m_renderSettings.fontSize);
+  auto ready = refresh_fonts();
+  if (!ready)
+    return std::unexpected(std::move(ready.error()));
+  auto width = m_fontTextureGroup.glyph_width(c, m_renderSettings.fontSize);
   if (!width)
     return std::unexpected(std::move(width.error()));
   return static_cast<int>(*width);
 }
 
 std::expected<int, StarException> TextPainter::stringWidth(StringView s, unsigned charLimit) {
+  auto ready = refresh_fonts();
+  if (!ready)
+    return std::unexpected(std::move(ready.error()));
+  auto const& active = m_fontTextureGroup.m_active_font;
+  return string_width(s, charLimit, {active, active});
+}
+
+std::expected<int, StarException> TextPainter::string_width(StringView s, unsigned char_limit, MeasurementFonts fonts) const {
   if (s.empty())
     return 0;
-  String font = m_renderSettings.font, setFont = font;
-  auto switched = m_fontTextureGroup.switchFont(font);
-  if (!switched)
-    return std::unexpected(std::move(switched.error()));
   Text::CommandsCallback commandsCallback = [&](StringView commands) -> std::expected<bool, StarException> {
-    if (auto changed = applyMeasurementFontCommands(m_fontTextureGroup, font, setFont, commands.utf8()); !changed)
+    if (auto changed = apply_measurement_commands(fonts, commands.utf8()); !changed)
       return std::unexpected(std::move(changed.error()));
     return true;
   };
@@ -220,11 +240,11 @@ std::expected<int, StarException> TextPainter::stringWidth(StringView s, unsigne
       auto character = cursor.read();
       if (!character)
         return std::unexpected(std::move(character.error()));
-      auto characterWidth = glyphWidth(*character);
-      if (!characterWidth)
-        return std::unexpected(std::move(characterWidth.error()));
-      width += *characterWidth;
-      if (charLimit && --charLimit == 0)
+      auto character_width = m_fontTextureGroup.glyph_width(fonts.current, *character, m_renderSettings.fontSize);
+      if (!character_width)
+        return std::unexpected(std::move(character_width.error()));
+      width += *character_width;
+      if (char_limit && --char_limit == 0)
         return false;
       auto advanced = cursor.advance();
       if (!advanced)
@@ -241,10 +261,11 @@ std::expected<int, StarException> TextPainter::stringWidth(StringView s, unsigne
 std::expected<bool, StarException> TextPainter::processWrapText(StringView text, std::optional<std::reference_wrapper<unsigned>> wrapWidth, WrapTextCallback textFunc) {
   if (!textFunc)
     return std::unexpected(StarException("Cannot wrap text with an empty callback"));
-  String font = m_renderSettings.font, setFont = font;
-  auto switched = m_fontTextureGroup.switchFont(font);
-  if (!switched)
-    return std::unexpected(std::move(switched.error()));
+  auto ready = refresh_fonts();
+  if (!ready)
+    return std::unexpected(std::move(ready.error()));
+  auto const& active = m_fontTextureGroup.m_active_font;
+  MeasurementFonts fonts{active, active};
   Utf8Cursor cursor(text.utf8());
   std::size_t cursorBase = 0;
   std::size_t iterator = 0, end = text.utf8_size();
@@ -280,8 +301,8 @@ std::expected<bool, StarException> TextPainter::processWrapText(StringView text,
         }
       }
       if (commandStart == index && commandEnd != NPos) {
-        if (auto changed = applyMeasurementFontCommands(
-              m_fontTextureGroup, font, setFont, text.utf8().substr(commandStart + 1, commandEnd - commandStart - 1));
+        if (auto changed = apply_measurement_commands(
+              fonts, text.utf8().substr(commandStart + 1, commandEnd - commandStart - 1));
             !changed)
           return std::unexpected(std::move(changed.error()));
         iterator = cursorBase = commandEnd + 1;
@@ -306,7 +327,7 @@ std::expected<bool, StarException> TextPainter::processWrapText(StringView text,
       splitIterator = end;
       finished = true;
     } else {
-      auto measured = glyphWidth(character);
+      auto measured = m_fontTextureGroup.glyph_width(fonts.current, character, m_renderSettings.fontSize);
       if (!measured)
         return std::unexpected(std::move(measured.error()));
       int characterWidth = *measured;
@@ -430,7 +451,7 @@ std::expected<void, StarException> TextPainter::setProcessingDirectives(StringVi
 }
 
 std::expected<void, StarException> TextPainter::setFont(String const& font) {
-  auto switched = m_fontTextureGroup.switchFont(font);
+  auto switched = m_fontTextureGroup.select_font(font);
   if (!switched)
     return std::unexpected(std::move(switched.error()));
   m_renderSettings.font = font;
@@ -438,70 +459,76 @@ std::expected<void, StarException> TextPainter::setFont(String const& font) {
 }
 
 std::expected<std::reference_wrapper<TextStyle>, StarException> TextPainter::setTextStyle(TextStyle const& textStyle) {
-  TextStyle& style = m_renderSettings = textStyle;
-  auto switched = m_fontTextureGroup.switchFont(style.font);
+  auto switched = m_fontTextureGroup.select_font(textStyle.font);
   if (!switched)
     return std::unexpected(std::move(switched.error()));
-  return std::ref(style);
+  m_renderSettings = textStyle;
+  return std::ref(m_renderSettings);
 }
 
 std::expected<void, StarException> TextPainter::clearTextStyle() {
-  m_renderSettings = m_defaultRenderSettings;
-  return m_fontTextureGroup.switchFont(m_renderSettings.font);
+  return setTextStyle(m_defaultRenderSettings).transform([](std::reference_wrapper<TextStyle>) {});
 }
 
-std::expected<void, StarException> TextPainter::addFont(std::shared_ptr<Font> const& font, String const& name) {
-  return m_fontTextureGroup.addFont(font, name);
+std::expected<void, StarException> TextPainter::refresh_fonts() {
+  if (m_reloadTracker->pullTriggered()) {
+    auto reloaded = reloadFonts();
+    if (!reloaded)
+      return std::unexpected(std::move(reloaded.error()));
+  }
+  // setTextStyle exposes mutable settings; honor subsequent direct font edits.
+  return m_fontTextureGroup.select_font(m_renderSettings.font);
 }
 
 std::expected<void, StarException> TextPainter::reloadFonts() {
-  auto assetsResult = m_root.assets();
-  if (!assetsResult)
-    return std::unexpected(std::move(assetsResult.error()));
-  auto assets = *assetsResult;
-  List<std::pair<std::shared_ptr<Font>, String>> fonts;
-  auto loadFontsByExtension = [&](String const& ext) -> std::expected<void, StarException> {
-    auto paths = assets->scanExtension(ext);
+  auto assets_result = m_root.assets();
+  if (!assets_result)
+    return std::unexpected(std::move(assets_result.error()));
+  auto& assets = **assets_result;
+  FontTextureGroup::FontSet fonts;
+  auto config = assets.json("/interface.config:font");
+  if (!config)
+    return std::unexpected(std::move(config.error()));
+  auto default_name = config->getString("defaultFont");
+  if (!default_name)
+    return std::unexpected(std::move(default_name.error()));
+  auto fallback_name = config->getString("fallbackFont");
+  if (!fallback_name)
+    return std::unexpected(std::move(fallback_name.error()));
+  auto emoji_name = config->getString("emojiFont");
+  if (!emoji_name)
+    return std::unexpected(std::move(emoji_name.error()));
+  for (auto extension : std::array<std::string_view, 2>{"ttf", "woff2"}) {
+    auto paths = assets.scanExtension(extension);
     if (!paths)
       return std::unexpected(std::move(paths.error()));
-    for (auto const& assetKey : paths->get()) {
-      auto const& fontPath = assetKey.string();
-      auto filename = AssetPath::filename(fontPath);
-      auto const& bytes = filename.utf8();
-      String name(bytes.substr(0, bytes.find_last_of('.')));
-      auto loaded = loadFont(fontPath, name);
-      if (!loaded)
-        return std::unexpected(std::move(loaded.error()));
-      fonts.emplace_back(std::move(*loaded), std::move(name));
+    for (auto const& key : paths->get()) {
+      auto const& path = key.string();
+      auto bytes = AssetPath::filename(path).utf8();
+      if (auto dot = bytes.find_last_of('.'); dot != std::string::npos)
+        bytes.resize(dot);
+      String name(std::move(bytes));
+      auto source = assets.font(path);
+      if (!source)
+        return std::unexpected(std::move(source.error()));
+      auto font = (*source)->clone();
+      if (!font)
+        return std::unexpected(std::move(font.error()));
+      auto options = config->opt(name);
+      if (!options)
+        return std::unexpected(std::move(options.error()));
+      if (*options) {
+        auto threshold = (**options).getUInt("alphaThreshold", 0);
+        if (!threshold)
+          return std::unexpected(std::move(threshold.error()));
+        (*font)->set_alpha_threshold(*threshold);
+      }
+      auto inserted = fonts.insert_or_assign(std::move(name), std::move(*font));
+      if (!inserted)
+        return std::unexpected(std::move(inserted.error()));
     }
-    return {};
-  };
-  auto ttf = loadFontsByExtension("ttf");
-  if (!ttf)
-    return std::unexpected(std::move(ttf.error()));
-  auto woff = loadFontsByExtension("woff2");
-  if (!woff)
-    return std::unexpected(std::move(woff.error()));
-  auto fontConfig = assets->json("/interface.config:font");
-  if (!fontConfig)
-    return std::unexpected(std::move(fontConfig.error()));
-  auto defaultFont = fontConfig->getString("defaultFont");
-  if (!defaultFont)
-    return std::unexpected(std::move(defaultFont.error()));
-  auto fallbackFont = fontConfig->getString("fallbackFont");
-  if (!fallbackFont)
-    return std::unexpected(std::move(fallbackFont.error()));
-  auto emojiFont = fontConfig->getString("emojiFont");
-  if (!emojiFont)
-    return std::unexpected(std::move(emojiFont.error()));
-  m_fontTextureGroup.clearFonts();
-  m_fontTextureGroup.cleanup(0);
-  for (auto const& [font, name] : fonts) {
-    auto added = addFont(font, name);
-    if (!added)
-      return std::unexpected(std::move(added.error()));
   }
-  return m_fontTextureGroup.setFixedFonts(*defaultFont, *fallbackFont, *emojiFont);
+  return m_fontTextureGroup.replace_fonts(std::move(fonts), *default_name, *fallback_name, *emoji_name);
 }
 
 void TextPainter::cleanup(std::int64_t timeout) {
@@ -515,8 +542,7 @@ std::expected<void, StarException> TextPainter::applyCommands(StringView unsplit
     auto command = remaining.substr(0, comma);
     auto apply = [&]() -> std::expected<void, StarException> {
       if (command == "reset") {
-        m_renderSettings = m_savedRenderSettings;
-        return m_fontTextureGroup.switchFont(m_renderSettings.font);
+        return setTextStyle(m_savedRenderSettings).transform([](std::reference_wrapper<TextStyle>) {});
       } else if (command == "set") {
         m_savedRenderSettings = m_renderSettings;
       } else if (command.starts_with("shadow")) {
@@ -566,44 +592,40 @@ std::expected<RectF, StarException> TextPainter::doRenderText(StringView s, Text
     return std::unexpected(std::move(wrapped.error()));
   auto& lines = *wrapped;
 
-  TextStyle backup = m_savedRenderSettings = m_renderSettings;
-  int height = (lines.size() - 1) * backup.lineSpacing * backup.fontSize + backup.fontSize;
+  int height = (lines.size() - 1) * m_renderSettings.lineSpacing * m_renderSettings.fontSize + m_renderSettings.fontSize;
   if (position.vAnchor == VerticalAnchor::BottomAnchor)
-    pos[1] += (height - backup.fontSize);
+    pos[1] += (height - m_renderSettings.fontSize);
   else if (position.vAnchor == VerticalAnchor::VMidAnchor)
-    pos[1] += (height - backup.fontSize) / 2;
+    pos[1] += (height - m_renderSettings.fontSize) / 2;
 
-  RectF bounds = RectF::withSize(pos, Vec2F());
-  for (auto& i : lines) {
-    auto line = doRenderLine(i, { pos, position.hAnchor, position.vAnchor, {}, {} }, reallyRender, charLimit);
-    if (!line) {
-      m_renderSettings = std::move(backup);
-      auto restored = m_fontTextureGroup.switchFont(m_renderSettings.font);
-      if (!restored)
-        return std::unexpected(restored.error().with_context(line.error().what()));
-      return std::unexpected(std::move(line.error()));
+  auto layout = [&](MeasureOnly measure) -> std::expected<RectF, StarException> {
+    RectF bounds = RectF::withSize(pos, Vec2F());
+    for (auto line : lines) {
+      auto result = doRenderLine(line, {pos, position.hAnchor, position.vAnchor, {}, {}}, measure, charLimit);
+      if (!result)
+        return std::unexpected(std::move(result.error()));
+      bounds.combine(*result);
+      pos[1] -= m_renderSettings.fontSize * m_renderSettings.lineSpacing;
+      if (charLimit && charLimit->get() == 0)
+        break;
     }
-    bounds.combine(*line);
-    pos[1] -= m_renderSettings.fontSize * m_renderSettings.lineSpacing;
-
-    if (charLimit && charLimit->get() == 0)
-      break;
+    return bounds;
+  };
+  if (!reallyRender) {
+    auto const& active = m_fontTextureGroup.m_active_font;
+    MeasurementFonts fonts{active, active};
+    return layout(std::ref(fonts));
   }
-
+  TextStyle backup = m_savedRenderSettings = m_renderSettings;
+  auto result = layout({});
   m_renderSettings = std::move(backup);
-  auto restored = m_fontTextureGroup.switchFont(m_renderSettings.font);
+  auto restored = m_fontTextureGroup.select_font(m_renderSettings.font);
   if (!restored)
-    return std::unexpected(std::move(restored.error()));
-
-  return bounds;
+    return std::unexpected(result ? std::move(restored.error()) : restored.error().with_context(result.error().what()));
+  return result;
 }
 
-std::expected<RectF, StarException> TextPainter::doRenderLine(StringView text, TextPositioning const& position, bool reallyRender, std::optional<std::reference_wrapper<unsigned>> charLimit) {
-  if (m_reloadTracker->pullTriggered()) {
-    auto reloaded = reloadFonts();
-    if (!reloaded)
-      return std::unexpected(std::move(reloaded.error()));
-  }
+std::expected<RectF, StarException> TextPainter::doRenderLine(StringView text, TextPositioning const& position, MeasureOnly measure, std::optional<std::reference_wrapper<unsigned>> charLimit) {
   TextPositioning pos = position;
   if (pos.hAnchor == HorizontalAnchor::RightAnchor || pos.hAnchor == HorizontalAnchor::HMidAnchor) {
     StringView trimmedString = text;
@@ -613,7 +635,8 @@ std::expected<RectF, StarException> TextPainter::doRenderLine(StringView text, T
         return std::unexpected(std::move(trimmed.error()));
       trimmedString = *trimmed;
     }
-    auto measured = stringWidth(trimmedString, 0);
+    auto const& active = m_fontTextureGroup.m_active_font;
+    auto measured = string_width(trimmedString, 0, measure ? measure->get() : MeasurementFonts{active, active});
     if (!measured)
       return std::unexpected(std::move(measured.error()));
     pos.pos[0] -= pos.hAnchor == HorizontalAnchor::RightAnchor ? static_cast<float>(*measured)
@@ -621,7 +644,6 @@ std::expected<RectF, StarException> TextPainter::doRenderLine(StringView text, T
     pos.hAnchor = HorizontalAnchor::LeftAnchor;
   }
 
-  String escapeCode;
   RectF bounds = RectF::withSize(pos.pos, Vec2F());
   Text::TextCallback textCallback = [&](StringView text) -> std::expected<bool, StarException> {
     Utf8Cursor cursor(text.utf8());
@@ -636,7 +658,8 @@ std::expected<RectF, StarException> TextPainter::doRenderLine(StringView text, T
         else
           --charLimit->get();
       }
-      auto glyphBounds = doRenderGlyph(c, pos, reallyRender);
+      auto const& active = measure ? measure->get().current : m_fontTextureGroup.m_active_font;
+      auto glyphBounds = doRenderGlyph(c, pos, !measure, active);
       if (!glyphBounds)
         return std::unexpected(std::move(glyphBounds.error()));
       bounds.combine(*glyphBounds);
@@ -649,15 +672,12 @@ std::expected<RectF, StarException> TextPainter::doRenderLine(StringView text, T
   };
 
   Text::CommandsCallback commandsCallback = [&](StringView commands) -> std::expected<bool, StarException> {
-    auto applied = applyCommands(commands);
+    auto applied = measure ? apply_measurement_commands(measure->get(), commands.utf8()) : applyCommands(commands);
     if (!applied)
       return std::unexpected(std::move(applied.error()));
     return true;
   };
 
-  auto switched = m_fontTextureGroup.switchFont(m_renderSettings.font);
-  if (!switched)
-    return std::unexpected(std::move(switched.error()));
   auto processed = Text::processText(text, textCallback, commandsCallback);
   if (!processed)
     return std::unexpected(std::move(processed.error()));
@@ -665,11 +685,16 @@ std::expected<RectF, StarException> TextPainter::doRenderLine(StringView text, T
   return bounds;
 }
 
-std::expected<RectF, StarException> TextPainter::doRenderGlyph(String::Char c, TextPositioning const& position, bool reallyRender) {
+std::expected<RectF, StarException> TextPainter::doRenderGlyph(String::Char c, TextPositioning const& position,
+    bool really_render, std::shared_ptr<Font> const& active) {
   if (c == '\n' || c == '\v' || c == '\r')
     return RectF();
 
-  auto measured = glyphWidth(c);
+  auto resolved = m_fontTextureGroup.resolve_font(active, c);
+  if (!resolved)
+    return std::unexpected(std::move(resolved.error()));
+  auto const& font = resolved->get();
+  auto measured = font->width(c, m_renderSettings.fontSize);
   if (!measured)
     return std::unexpected(std::move(measured.error()));
   int width = *measured;
@@ -686,40 +711,40 @@ std::expected<RectF, StarException> TextPainter::doRenderGlyph(String::Char c, T
   else if (position.vAnchor == VerticalAnchor::TopAnchor)
     vOffset = -static_cast<float>(m_renderSettings.fontSize);
 
-  std::optional<std::reference_wrapper<Directives const>> directives;
-  if (m_renderSettings.directives)
-    directives = std::cref(m_renderSettings.directives);
-
   Vec2F pos = position.pos + Vec2F(hOffset, vOffset);
-  if (reallyRender) {
-    bool hasShadow = m_renderSettings.shadow[3] > 0;
-    bool hasBackDirectives = m_renderSettings.backDirectives;
-    if (hasShadow) {
-      //Kae: unlike vanilla we draw only one shadow glyph instead of two, so i'm tweaking the alpha here
+  if (really_render && m_renderSettings.fontSize) {
+    auto lookup = [&](Directives const& directives) {
+      return m_fontTextureGroup.glyph_texture(font, c, m_renderSettings.fontSize, std::cref(directives), GlyphDirectivePolicy::Text);
+    };
+    auto append = [](List<RenderPrimitive>& out, FontTextureGroup::GlyphTexture const& glyph, Vec2F point, Vec4B color) {
+      if (glyph.colored)
+        color[0] = color[1] = color[2] = 255;
+      out.emplace_back(std::in_place_type_t<RenderQuad>(), glyph.texture, Vec2F::round(point + glyph.offset), 1.0f, color, 0.0f);
+    };
+    bool has_shadow = m_renderSettings.shadow[3] > 0;
+    bool has_back = m_renderSettings.backDirectives;
+    auto glyph = lookup(has_back ? m_renderSettings.backDirectives : m_renderSettings.directives);
+    if (!glyph)
+      return std::unexpected(std::move(glyph.error()));
+    if (has_shadow) {
       Vec4B shadow = m_renderSettings.shadow;
-      std::uint8_t alphaU = m_renderSettings.color[3] * byte_to_float(shadow[3]);
-      if (alphaU != 255) {
-        float alpha = byte_to_float(alphaU);
-        shadow[3] = float_to_byte(alpha * (1.5f - 0.5f * alpha));
+      std::uint8_t alpha_byte = m_renderSettings.color[3] * byte_to_float(shadow[3]);
+      float alpha = byte_to_float(alpha_byte);
+      shadow[3] = alpha_byte == 255 ? alpha_byte : float_to_byte(alpha * (1.5f - 0.5f * alpha));
+      append(m_shadowPrimitives, glyph->get(), pos + Vec2F(0, -2), shadow);
+    }
+    if (has_back) {
+      append(m_backPrimitives, glyph->get(), pos, m_renderSettings.color);
+      // Finish using the borrowed back entry before a distinct front lookup:
+      // an insertion can relocate the cache.
+      if (font != m_fontTextureGroup.m_emoji_font && !m_renderSettings.directives.equals(m_renderSettings.backDirectives)) {
+        glyph = lookup(m_renderSettings.directives);
+        if (!glyph)
+          return std::unexpected(std::move(glyph.error()));
       }
-      else
-        shadow[3] = alphaU;
-
-      auto shadowDirectives = hasBackDirectives ? std::optional{std::cref(m_renderSettings.backDirectives)} : directives;
-      auto rendered = renderGlyph(c, pos + Vec2F(0, -2), m_shadowPrimitives, m_renderSettings.fontSize, 1, shadow, shadowDirectives);
-      if (!rendered)
-        return std::unexpected(std::move(rendered.error()));
     }
-    if (hasBackDirectives) {
-      auto rendered = renderGlyph(c, pos, m_backPrimitives, m_renderSettings.fontSize, 1, m_renderSettings.color, std::cref(m_renderSettings.backDirectives));
-      if (!rendered)
-        return std::unexpected(std::move(rendered.error()));
-    }
-
-    auto& output = (hasShadow || hasBackDirectives) ? m_frontPrimitives : m_renderer->immediatePrimitives(); 
-    auto rendered = renderGlyph(c, pos, output, m_renderSettings.fontSize, 1, m_renderSettings.color, directives);
-    if (!rendered)
-      return std::unexpected(std::move(rendered.error()));
+    auto& output = has_shadow || has_back ? m_frontPrimitives : m_renderer->immediatePrimitives();
+    append(output, glyph->get(), pos, m_renderSettings.color);
   }
 
   return RectF::withSize(pos, {static_cast<float>(width), static_cast<int>(m_renderSettings.fontSize)});
@@ -733,50 +758,6 @@ void TextPainter::renderPrimitives() {
   m_backPrimitives.clear();
   std::move(std::begin(m_frontPrimitives), std::end(m_frontPrimitives), std::back_inserter(destination));
   m_frontPrimitives.clear();
-}
-
-std::expected<void, StarException> TextPainter::renderGlyph(String::Char c, Vec2F const& screenPos, List<RenderPrimitive>& out, unsigned fontSize,
-    float scale, Vec4B color, std::optional<std::reference_wrapper<Directives const>> processingDirectives) {
-  if (!fontSize)
-    return {};
-  auto glyph = m_fontTextureGroup.glyphTexture(c, fontSize, processingDirectives, GlyphDirectivePolicy::Text);
-  if (!glyph)
-    return std::unexpected(std::move(glyph.error()));
-  auto const& glyphTexture = glyph->get();
-  if (glyphTexture.colored)
-    color[0] = color[1] = color[2] = 255;
-  out.emplace_back(std::in_place_type_t<RenderQuad>(),
-    glyphTexture.texture, Vec2F::round(screenPos + glyphTexture.offset * scale), scale, color, 0.0f);
-  return {};
-}
-
-std::expected<std::shared_ptr<Font>, StarException> TextPainter::loadFont(String const& fontPath, std::optional<String> fontName) {
-  if (!fontName) {
-    auto name = AssetPath::filename(fontPath);
-    fontName.emplace(name.utf8().substr(0, name.utf8().find_last_of('.')));
-  }
-  auto assets = m_root.assets();
-  if (!assets)
-    return std::unexpected(std::move(assets.error()));
-  auto source = (*assets)->font(fontPath);
-  if (!source)
-    return std::unexpected(std::move(source.error()));
-  auto font = (*source)->clone();
-  if (!font)
-    return std::unexpected(std::move(font.error()));
-  auto config = (*assets)->json("/interface.config:font");
-  if (!config)
-    return std::unexpected(std::move(config.error()));
-  auto fontConfig = config->opt(*fontName);
-  if (!fontConfig)
-    return std::unexpected(std::move(fontConfig.error()));
-  if (*fontConfig) {
-    auto threshold = (**fontConfig).getUInt("alphaThreshold", 0);
-    if (!threshold)
-      return std::unexpected(std::move(threshold.error()));
-    (*font)->setAlphaThreshold(*threshold);
-  }
-  return std::move(*font);
 }
 
 }

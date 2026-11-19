@@ -291,7 +291,7 @@ const GameTestRegistration fontClonesRetainIndependentFaces(
     {
       auto library = FontLibrary::create();
       ASSERT_TRUE(library) << library.error().what();
-      auto source = Font::loadFont(*library, *bytes);
+      auto source = Font::load(*library, *bytes);
       ASSERT_TRUE(source) << source.error().what();
       auto a = (*source)->clone();
       auto b = (*source)->clone();
@@ -300,29 +300,65 @@ const GameTestRegistration fontClonesRetainIndependentFaces(
       first = std::move(*a);
       second = std::move(*b);
     }
-    ASSERT_TRUE(first->setPixelSize(24));
+    ASSERT_TRUE(first->set_pixel_size(24));
     auto before = first->render(U'\U0001F600');
     ASSERT_TRUE(before) << before.error().what();
-    ASSERT_TRUE(second->setPixelSize(48));
+    ASSERT_TRUE(second->set_pixel_size(48));
     auto large = second->render(U'\U0001F600');
     ASSERT_TRUE(large) << large.error().what();
-    EXPECT_NE(std::get<0>(*before).size(), std::get<0>(*large).size());
+    EXPECT_NE(before->image.size(), large->image.size());
     second.reset();
     auto after = first->render(U'\U0001F600');
     ASSERT_TRUE(after) << after.error().what();
-    auto const& expected = std::get<0>(*before);
-    auto const& actual = std::get<0>(*after);
-    ASSERT_EQ(expected.size(), actual.size());
-    for (unsigned y = 0; y < expected.height(); ++y) {
-      for (unsigned x = 0; x < expected.width(); ++x) {
-        auto a = expected.get(x, y);
-        auto b = actual.get(x, y);
-        ASSERT_TRUE(a) << a.error().what();
-        ASSERT_TRUE(b) << b.error().what();
-        EXPECT_EQ(*a, *b);
+    ASSERT_EQ(before->image.size(), after->image.size());
+    EXPECT_TRUE(std::ranges::equal(before->image.data(), after->image.data()));
+    EXPECT_EQ(before->offset, after->offset);
+    EXPECT_EQ(before->colored, after->colored);
+    EXPECT_EQ(first->height(), 24u);
+  });
+
+const GameTestRegistration font_clone_threshold_and_cached_size(
+  "FontTest", "ClonedThresholdIsIndependentAndCachedWidthsPreserveRenderSize", [](GameTest& fixture) {
+    auto assets = fixture.root().assets();
+    ASSERT_TRUE(assets);
+    auto source = (*assets)->font("/font/spacemono/spacemono.woff2");
+    ASSERT_TRUE(source) << source.error().what();
+    auto face = (*source)->clone();
+    ASSERT_TRUE(face) << face.error().what();
+
+    // Size zero and size one name the same advance cache entry. A hit must
+    // not disturb the active raster size, even when querying another size.
+    auto small = (*face)->width(U'A', 0);
+    ASSERT_TRUE(small) << small.error().what();
+    EXPECT_EQ((*face)->height(), 1u);
+    auto large = (*face)->width(U'A', 23);
+    ASSERT_TRUE(large) << large.error().what();
+    ASSERT_GT(*large, *small);
+    auto cached = (*face)->width(U'A', 1);
+    ASSERT_TRUE(cached) << cached.error().what();
+    EXPECT_EQ(*cached, *small);
+    EXPECT_EQ((*face)->height(), 23u);
+
+    (*face)->set_alpha_threshold(128);
+    auto clone = (*face)->clone();
+    ASSERT_TRUE(clone) << clone.error().what();
+    EXPECT_EQ((*clone)->height(), 23u);
+    (*face)->set_alpha_threshold(0);
+    auto smooth = (*face)->render(U'A');
+    auto binary = (*clone)->render(U'A');
+    ASSERT_TRUE(smooth) << smooth.error().what();
+    ASSERT_TRUE(binary) << binary.error().what();
+    ASSERT_FALSE(smooth->colored);
+    ASSERT_EQ(smooth->image.size(), binary->image.size());
+    EXPECT_EQ(smooth->offset, binary->offset);
+    bool found_antialiasing = false;
+    for (unsigned y = 0; y < smooth->image.height(); ++y) {
+      for (unsigned x = 0; x < smooth->image.width(); ++x) {
+        auto pixel = smooth->image.get32(x, y);
+        found_antialiasing |= pixel[3] != 0 && pixel[3] != 255;
+        pixel[3] = pixel[3] >= 128 ? 255 : 0;
+        EXPECT_EQ(binary->image.get32(x, y), pixel);
       }
     }
-    EXPECT_EQ(std::get<1>(*before), std::get<1>(*after));
-    EXPECT_EQ(std::get<2>(*before), std::get<2>(*after));
-    EXPECT_EQ(first->height(), 24u);
+    EXPECT_TRUE(found_antialiasing);
   });

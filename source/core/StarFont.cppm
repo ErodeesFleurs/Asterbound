@@ -7,15 +7,18 @@ import star.image;
 import star.byte_array;
 import star.map;
 
-namespace Star {
+struct FT_FaceRec_;
+
+export module star.font;
+
+export namespace Star {
+
+class Font;
 
 struct FontExceptionTag {
   static constexpr std::string_view name() { return "FontException"; }
 };
 using FontException = StarError<FontExceptionTag, StarException>;
-
-struct FontImpl;
-struct FTContext;
 
 // Explicit FreeType library owner. Loaded fonts retain the library, including
 // when the originating asset catalog has been replaced.
@@ -32,57 +35,61 @@ public:
 private:
   FontLibrary() = default;
   friend class Font;
-  std::shared_ptr<FTContext> m_context;
+  struct Context;
+  std::shared_ptr<Context> m_context;
+};
+
+struct RenderedGlyph {
+  Image image;
+  Vec2I offset{};
+  bool colored = false;
 };
 
 class Font {
-public:
-  [[nodiscard]] static std::expected<std::shared_ptr<Font>, StarException> loadFont(FontLibrary const& library, String const& fileName, unsigned pixelSize = 12);
-  [[nodiscard]] static std::expected<std::shared_ptr<Font>, StarException> loadFont(FontLibrary const& library, std::shared_ptr<ByteArray const> const& bytes, unsigned pixelSize = 12);
+  struct ConstructionKey { explicit ConstructionKey() = default; };
+  struct FaceDeleter {
+    // FreeType borrows the bytes; the deleter retains both dependencies until
+    // after FT_Done_Face, then drops the bytes before the library context.
+    std::shared_ptr<FontLibrary::Context> context;
+    std::shared_ptr<ByteArray const> bytes;
+    void operator()(FT_FaceRec_* face) const noexcept;
+  };
+  using Face = std::unique_ptr<FT_FaceRec_, FaceDeleter>;
 
-  explicit Font(FontLibrary const& library);
+public:
+  [[nodiscard]] static std::expected<std::shared_ptr<Font>, StarException> load(FontLibrary const& library, String const& filename, unsigned pixel_size = 12);
+  [[nodiscard]] static std::expected<std::shared_ptr<Font>, StarException> load(FontLibrary const& library, std::shared_ptr<ByteArray const> bytes, unsigned pixel_size = 12);
+
+  Font(ConstructionKey, Face face, unsigned pixel_size, std::uint8_t alpha_threshold);
   ~Font();
 
   Font(Font const&) = delete;
   Font const& operator=(Font const&) = delete;
 
-  // Create a new font from the same data
+  // Share decoded data, but retain independent face, size and threshold state.
   [[nodiscard]] std::expected<std::shared_ptr<Font>, StarException> clone() const;
   // Asset caches must retain decoded data while independent faces still use it.
-  bool sharesBackingBuffer() const { return m_fontBuffer.use_count() > 1; }
+  bool shares_backing_buffer() const noexcept { return m_face.get_deleter().bytes.use_count() > 1; }
 
-  [[nodiscard]] std::expected<void, StarException> setPixelSize(unsigned pixelSize);
-  void setAlphaThreshold(std::uint8_t alphaThreshold = 0);
+  [[nodiscard]] std::expected<void, StarException> set_pixel_size(unsigned pixel_size);
+  void set_alpha_threshold(std::uint8_t alpha_threshold = 0) noexcept { m_alpha_threshold = alpha_threshold; }
 
-  unsigned height() const;
-  [[nodiscard]] std::expected<unsigned, StarException> width(String::Char c);
+  unsigned height() const noexcept { return m_pixel_size; }
+  // Cached advances do not change the active face size.
+  [[nodiscard]] std::expected<unsigned, StarException> width(String::Char c, unsigned pixel_size);
 
   // Empty glyph bitmaps are valid; FreeType failures are diagnostic values.
-  [[nodiscard]] std::expected<std::tuple<Image, Vec2I, bool>, StarException> render(String::Char c);
-  [[nodiscard]] std::expected<bool, StarException> exists(String::Char c);
+  [[nodiscard]] std::expected<RenderedGlyph, StarException> render(String::Char c);
+  bool exists(String::Char c) const noexcept;
 
 private:
-  explicit Font(std::shared_ptr<FTContext> context);
+  static std::expected<Face, StarException> open_face(std::shared_ptr<FontLibrary::Context> context, std::shared_ptr<ByteArray const> bytes);
+  static std::expected<std::shared_ptr<Font>, StarException> create(std::shared_ptr<FontLibrary::Context> context, std::shared_ptr<ByteArray const> bytes, unsigned pixel_size, std::uint8_t alpha_threshold);
 
-  std::shared_ptr<FTContext> m_context;
-  std::shared_ptr<ByteArray const> m_fontBuffer;
-  std::shared_ptr<FontImpl> m_fontImpl;
-  unsigned m_pixelSize;
-  std::uint8_t m_alphaThreshold;
-
-  [[nodiscard]] std::expected<void, StarException> loadFontImpl();
-  HashMap<std::pair<String::Char, unsigned>, unsigned> m_widthCache;
+  Face m_face;
+  unsigned m_pixel_size;
+  std::uint8_t m_alpha_threshold;
+  HashMap<std::pair<String::Char, unsigned>, unsigned> m_width_cache;
 };
 
-}
-
-export module star.font;
-
-export namespace Star {
-  using ::Star::FontExceptionTag;
-  using ::Star::FontException;
-  using ::Star::FontImpl;
-  using ::Star::FTContext;
-  using ::Star::FontLibrary;
-  using ::Star::Font;
 }
