@@ -444,16 +444,8 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> TcpPacketSocket::rec
       // Avoid negating INT64_MIN while rejecting oversized frames normally.
       std::uint64_t packetSize =
         packetCompressed ? static_cast<std::uint64_t>(-(*length + 1)) + 1 : static_cast<std::uint64_t>(*length);
-      auto packetName = [&]() -> std::expected<String, StarException> {
-        if (!PacketTypeNames)
-          return std::unexpected(PacketTypeNames.error());
-        auto name = PacketTypeNames->get_right(*type);
-        if (!name)
-          return std::unexpected(std::move(name.error()));
-        return name->get();
-      };
       if (packetSize > packet_size_limit) {
-        auto name = packetName();
+        auto name = packet_type_name(*type);
         if (!name)
           return std::unexpected(std::move(name.error()));
         return std::unexpected(IOException::format("{} bytes large {} exceeds max size!", packetSize, *name));
@@ -487,7 +479,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> TcpPacketSocket::rec
       std::size_t count = 0;
       do {
         if (++count > packet_batch_limit) {
-          auto name = packetName();
+          auto name = packet_type_name(*type);
           if (!name)
             return std::unexpected(std::move(name.error()));
           return std::unexpected(IOException::format("Packet batch limit {} reached while reading {}s!", packet_batch_limit, *name));

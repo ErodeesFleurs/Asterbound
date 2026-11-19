@@ -579,12 +579,10 @@ std::expected<RpcPromise<Json>, StarException> LuaBindings::UniverseServerCallba
 }
 
 std::expected<bool, StarException> LuaBindings::UniverseServerCallbacks::sendPacket(UniverseServer& universe, ConnectionId clientId, String const& packetTypeName, Json const& args) {
-  if (!PacketTypeNames)
-    return std::unexpected(PacketTypeNames.error());
-  auto packetType = PacketTypeNames->get_left(packetTypeName);
-  if (!packetType)
-    return std::unexpected(std::move(packetType.error()));
-  auto packet = createPacket(universe.root().random(), packetType->get(), args);
+  auto packet_type = packet_type_from_name(packetTypeName);
+  if (!packet_type)
+    return std::unexpected(std::move(packet_type.error()));
+  auto packet = createPacket(universe.root().random(), *packet_type, args);
   if (!packet)
     return std::unexpected(std::move(packet.error()));
   return universe.sendPacket(clientId, std::move(*packet));

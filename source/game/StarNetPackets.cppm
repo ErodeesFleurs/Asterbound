@@ -202,7 +202,8 @@ enum class PacketType : std::uint8_t {
   UniverseMessage,
   UniverseMessageResponse
 };
-extern std::expected<EnumMap<PacketType>, StarException> const PacketTypeNames;
+[[nodiscard]] std::expected<std::string_view, StarException> packet_type_name(PacketType type);
+[[nodiscard]] std::expected<PacketType, StarException> packet_type_from_name(StringView name);
 
 enum class NetCompressionMode : std::uint8_t {
   None,
@@ -1622,7 +1623,8 @@ export namespace Star {
   using ::Star::StarPacketException;
   using ::Star::StarProtocolVersion;
   using ::Star::PacketType;
-  using ::Star::PacketTypeNames;
+  using ::Star::packet_type_name;
+  using ::Star::packet_type_from_name;
   using ::Star::NetCompressionMode;
   using ::Star::NetCompressionModeNames;
   using ::Star::PacketCompressionMode;

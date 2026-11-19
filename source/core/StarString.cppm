@@ -442,6 +442,10 @@ public:
   [[nodiscard]] static std::expected<CaseInsensitiveString, StarException> create(String string);
   String const& string() const & { return m_string; }
   String const& string() const && = delete;
+  [[nodiscard]] String take_string() && {
+    m_hash = PLHasher().hash();
+    return std::exchange(m_string, String{});
+  }
   std::size_t hash() const { return m_hash; }
   CaseInsensitiveStringView view() const & { return CaseInsensitiveStringView(m_string.utf8(), m_hash); }
   CaseInsensitiveStringView view() const && = delete;

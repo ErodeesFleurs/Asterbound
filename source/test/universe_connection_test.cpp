@@ -16,6 +16,7 @@ import star.unique_function;
 import star.id_map;
 import star.data_stream;
 import star.list;
+import star.map;
 import star.bi_map;
 import star.game_types;
 import star.format;
@@ -27,6 +28,7 @@ import star.weighted_pool;
 import star.image_processing;
 import star.hash;
 import star.string_view;
+import star.unicode;
 import star.directives;
 import star.asset_path;
 import star.casting;
@@ -514,6 +516,40 @@ std::expected<void, StarException> wait_for_wire_progress(
     return std::unexpected(std::move(ready.error()));
   return {};
 }
+
+const GameTestRegistration packet_names_preserve_wire_and_lua_spelling(
+    "UniverseConnections", "PacketNamesPreserveWireAndLuaSpelling", [](GameTest&) {
+  for (unsigned wire = 0; wire <= std::to_underlying(PacketType::UniverseMessageResponse); ++wire) {
+    auto type = static_cast<PacketType>(wire);
+    auto name = packet_type_name(type);
+    ASSERT_TRUE(name) << name.error().what();
+    EXPECT_EQ(packet_type_from_name(*name), type);
+  }
+
+  // The public spelling is intentionally not the C++ enumerator name.
+  auto alias = packet_type_from_name("eNTiTyUPdAtE");
+  ASSERT_TRUE(alias) << alias.error().what();
+  EXPECT_EQ(std::to_underlying(*alias), 51u);
+  auto packet = createPacket(*alias);
+  ASSERT_TRUE(packet) << packet.error().what();
+  EXPECT_TRUE(is<EntityUpdateSetPacket>(*packet));
+  auto name = packet_type_name((*packet)->type());
+  ASSERT_TRUE(name) << name.error().what();
+  EXPECT_EQ(Star::format("on{}Packet", *name), "onEntityUpdatePacket");
+
+  for (std::string_view miss : {"EntityUpdateSet", "日本語"}) {
+    auto result = packet_type_from_name(miss);
+    ASSERT_FALSE(result);
+    EXPECT_TRUE(result.error().is<MapException>());
+    EXPECT_TRUE(std::string_view(result.error().what()).contains(miss));
+  }
+  auto invalid = packet_type_from_name(std::string_view("Ping\xff", 5));
+  ASSERT_FALSE(invalid);
+  EXPECT_TRUE(invalid.error().is<UnicodeException>());
+  auto unnamed = packet_type_name(static_cast<PacketType>(255));
+  ASSERT_FALSE(unnamed);
+  EXPECT_TRUE(unnamed.error().is<MapException>());
+});
 
 const GameTestRegistration universeConnectionsWorldUpdatePacketsTransferRvaluesAndCopyLvalues(
     "UniverseConnections", "WorldUpdatePacketsTransferRvaluesAndCopyLvalues", [](GameTest&) {

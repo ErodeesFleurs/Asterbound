@@ -490,6 +490,38 @@ TEST(IdMapTest, MalformedDecodeRetainsExistingEntriesRangeAndCursor) {
   EXPECT_EQ(*next, 5);
 }
 
+namespace {
+
+// Check each borrow independently: blocking one overload must not mask an
+// unqualified overload on another lookup, on the iterator pair, or on insert.
+template <typename MapType>
+concept safe_temporary_bimap = requires(MapType owner, typename MapType::Left left, typename MapType::Right right,
+                                        typename MapType::value_type pair) {
+  requires (!requires { std::move(owner).get_left(right); });
+  requires (!requires { std::move(owner).get_right(left); });
+  requires (!requires { std::move(owner).find_left_ref(right); });
+  requires (!requires { std::move(owner).find_right_ref(left); });
+  requires (!requires { std::move(owner).begin(); });
+  requires (!requires { std::move(owner).end(); });
+  requires (!requires { std::move(owner).insert(pair); });
+  requires (!requires { std::move(owner).insert(std::move(pair)); });
+  std::move(owner).maybe_left(right);
+  std::move(owner).maybe_right(left);
+  std::move(owner).value_left(right);
+  std::move(owner).value_right(left);
+};
+
+static_assert(safe_temporary_bimap<BiMap<int, int>> && safe_temporary_bimap<BiMap<int, int> const>);
+static_assert(safe_temporary_bimap<EnumMap<int>> && safe_temporary_bimap<EnumMap<int> const>);
+
+template <typename Object>
+  requires std::is_object_v<Object>
+std::uintptr_t object_address(Object const& object) {
+  return reinterpret_cast<std::uintptr_t>(std::addressof(object));
+}
+
+} // namespace
+
 TEST(BiMapTest, DuplicateEitherSideLeavesBothIndexesConsistent) {
   auto check = []<typename MapType>() {
     MapType map;
@@ -499,6 +531,13 @@ TEST(BiMapTest, DuplicateEitherSideLeavesBothIndexesConsistent) {
     EXPECT_FALSE(duplicate_right.second);
     EXPECT_EQ((*duplicate_right.first).first, 2);
     EXPECT_EQ((*duplicate_right.first).second, 22);
+    auto both = map.insert(typename MapType::value_type{1, 22});
+    ASSERT_FALSE(both.second);
+    EXPECT_EQ((*both.first).first, 1);
+    EXPECT_EQ((*both.first).second, 11);
+    auto rejected = map.add(1, 22);
+    ASSERT_FALSE(rejected);
+    EXPECT_NE(std::string_view(rejected.error().what()).find("left side value '1'"), std::string_view::npos);
     EXPECT_FALSE(map.insert(1, 33));
     EXPECT_FALSE(map.add(4, 22));
     EXPECT_EQ(map.size(), 2u);
@@ -509,6 +548,10 @@ TEST(BiMapTest, DuplicateEitherSideLeavesBothIndexesConsistent) {
     EXPECT_EQ(map.maybe_right(2), 22);
     EXPECT_EQ(map.maybe_left(11), 1);
     EXPECT_EQ(map.maybe_left(22), 2);
+    std::array<typename MapType::value_type, 4> entries{{{1, 11}, {1, 33}, {3, 11}, {2, 22}}};
+    EXPECT_EQ(MapType::from(entries), map);
+    EXPECT_FALSE(MapType::create({{1, 11}, {1, 33}}));
+    EXPECT_FALSE(MapType::create({{1, 11}, {3, 11}}));
   };
   check.template operator()<BiMap<int, int>>();
   check.template operator()<BiHashMap<int, int>>();
@@ -528,29 +571,29 @@ TEST(BiMapTest, CopiesOwnTheirCrossIndexesAndSelfAssignmentRetainsBorrows) {
       original.clear();
       ASSERT_TRUE(original.add(3, 33));
     }
-    for (auto* map : {&assigned, &*copied}) {
-      EXPECT_EQ(map->maybe_right(1), 11);
-      EXPECT_EQ(map->maybe_left(22), 2);
-      EXPECT_FALSE(map->contains_left(9));
-      auto left = map->find_left_ref(11);
-      auto right = map->find_right_ref(1);
+    for (MapType& map : {std::ref(assigned), std::ref(*copied)}) {
+      EXPECT_EQ(map.maybe_right(1), 11);
+      EXPECT_EQ(map.maybe_left(22), 2);
+      EXPECT_FALSE(map.contains_left(9));
+      auto left = map.find_left_ref(11);
+      auto right = map.find_right_ref(1);
       ASSERT_TRUE(left);
       ASSERT_TRUE(right);
-      auto left_address = &left->get();
-      auto right_address = &right->get();
-      *map = std::as_const(*map);
-      EXPECT_EQ(&map->find_left_ref(11)->get(), left_address);
-      EXPECT_EQ(&map->find_right_ref(1)->get(), right_address);
+      auto left_address = object_address(left->get());
+      auto right_address = object_address(right->get());
+      map = std::as_const(map);
+      EXPECT_EQ(object_address(map.find_left_ref(11)->get()), left_address);
+      EXPECT_EQ(object_address(map.find_right_ref(1)->get()), right_address);
       for (int value = 4; value != 256; ++value)
-        ASSERT_TRUE(map->add(value, value + 1000));
-      EXPECT_EQ(&map->find_left_ref(11)->get(), left_address);
-      EXPECT_EQ(&map->find_right_ref(1)->get(), right_address);
-      EXPECT_TRUE(map->erase_right(22));
-      EXPECT_FALSE(map->contains_left(2));
-      auto taken = map->extract_right(1);
+        ASSERT_TRUE(map.add(value, value + 1000));
+      EXPECT_EQ(object_address(map.find_left_ref(11)->get()), left_address);
+      EXPECT_EQ(object_address(map.find_right_ref(1)->get()), right_address);
+      EXPECT_TRUE(map.erase_right(22));
+      EXPECT_FALSE(map.contains_left(2));
+      auto taken = map.extract_right(1);
       ASSERT_TRUE(taken);
       EXPECT_EQ(*taken, 11);
-      EXPECT_FALSE(map->contains_right(11));
+      EXPECT_FALSE(map.contains_right(11));
     }
   };
   check.template operator()<BiMap<int, int>>();
@@ -567,27 +610,27 @@ TEST(BiMapTest, AliasedOverwriteAndErasePreserveSurvivingNodeAddresses) {
     auto right = map.find_right_ref(2);
     ASSERT_TRUE(left);
     ASSERT_TRUE(right);
-    auto left_address = &left->get();
-    auto right_address = &right->get();
+    auto left_address = object_address(left->get());
+    auto right_address = object_address(right->get());
     map.overwrite(left->get(), right->get());
     EXPECT_EQ(map.size(), 2u);
     EXPECT_EQ(map.maybe_right(1), 22);
     EXPECT_EQ(map.maybe_left(22), 1);
     EXPECT_FALSE(map.contains_left(2));
     EXPECT_FALSE(map.contains_right(11));
-    EXPECT_EQ(&map.find_left_ref(22)->get(), left_address);
-    EXPECT_EQ(&map.find_right_ref(1)->get(), right_address);
-    map.overwrite(*left_address, *right_address);
-    EXPECT_EQ(&map.find_left_ref(22)->get(), left_address);
-    EXPECT_EQ(&map.find_right_ref(1)->get(), right_address);
-    map.overwrite(*left_address, 44);
-    EXPECT_EQ(&map.find_left_ref(44)->get(), left_address);
+    ASSERT_EQ(object_address(map.find_left_ref(22)->get()), left_address);
+    ASSERT_EQ(object_address(map.find_right_ref(1)->get()), right_address);
+    map.overwrite(left->get(), right->get());
+    ASSERT_EQ(object_address(map.find_left_ref(22)->get()), left_address);
+    ASSERT_EQ(object_address(map.find_right_ref(1)->get()), right_address);
+    map.overwrite(left->get(), 44);
+    EXPECT_EQ(object_address(map.find_left_ref(44)->get()), left_address);
     EXPECT_FALSE(map.contains_right(22));
     auto surviving_right = map.find_right_ref(1);
     ASSERT_TRUE(surviving_right);
-    auto surviving_address = &surviving_right->get();
+    auto surviving_address = object_address(surviving_right->get());
     map.overwrite(5, surviving_right->get());
-    EXPECT_EQ(&map.find_right_ref(5)->get(), surviving_address);
+    EXPECT_EQ(object_address(map.find_right_ref(5)->get()), surviving_address);
     EXPECT_FALSE(map.contains_left(1));
     // Arguments may borrow the opposite index, which is erased first.
     ASSERT_TRUE(map.add(6, 6));
@@ -619,10 +662,114 @@ struct BiMapStatefulOrder {
   bool operator()(int left, int right) const { return reverse ? left > right : left < right; }
 };
 
+struct BiMapKey {
+  int value;
+  static inline int copies = 0;
+  static inline int moves = 0;
+
+  explicit BiMapKey(int value) : value(value) {}
+  BiMapKey(BiMapKey const& other) : value(other.value) { ++copies; }
+  BiMapKey(BiMapKey&& other) noexcept : value(other.value) { ++moves; }
+  BiMapKey& operator=(BiMapKey const& other) {
+    value = other.value;
+    ++copies;
+    return *this;
+  }
+  BiMapKey& operator=(BiMapKey&& other) noexcept {
+    value = other.value;
+    ++moves;
+    return *this;
+  }
+  auto operator<=>(BiMapKey const&) const = default;
+};
+
+struct BiMapKeyHash {
+  std::size_t operator()(BiMapKey const& key) const noexcept { return std::hash<int>{}(key.value); }
+};
+
+// Independent indices get unequal, non-propagating allocators. A plain map
+// move assignment cannot steal nodes here; move construction still can.
+template <typename T>
+struct BiMapAllocator : std::allocator<T> {
+  using propagate_on_container_move_assignment = std::false_type;
+  using is_always_equal = std::false_type;
+  static inline std::size_t next_identity = 0;
+  std::size_t identity;
+
+  BiMapAllocator() : identity(++next_identity) {}
+  template <typename U>
+  BiMapAllocator(BiMapAllocator<U> const& other) noexcept : identity(other.identity) {}
+  template <typename U>
+  bool operator==(BiMapAllocator<U> const& other) const noexcept { return identity == other.identity; }
+};
+
+template <typename MapType>
+concept counted_key_bimap = std::same_as<typename MapType::value_type, std::pair<BiMapKey, BiMapKey>>;
+
+void check_bimap_move(counted_key_bimap auto& source) {
+  using MapType = std::remove_reference_t<decltype(source)>;
+  BiMapKey const left(1), right(11), other_left(2), other_right(22);
+  BiMapKey::copies = BiMapKey::moves = 0;
+  ASSERT_TRUE(source.insert(left, right));
+  EXPECT_EQ(BiMapKey::copies, 2);
+  EXPECT_EQ(BiMapKey::moves, 0);
+  auto left_node = source.find_left_ref(right);
+  auto right_node = source.find_right_ref(left);
+  ASSERT_TRUE(left_node);
+  ASSERT_TRUE(right_node);
+  auto left_address = object_address(left_node->get());
+  auto right_address = object_address(right_node->get());
+  auto check_transfer = [&](MapType const& destination) {
+    auto found_left = destination.find_left_ref(right);
+    auto found_right = destination.find_right_ref(left);
+    ASSERT_TRUE(found_left);
+    ASSERT_TRUE(found_right);
+    EXPECT_EQ(object_address(found_left->get()), left_address);
+    EXPECT_EQ(object_address(found_right->get()), right_address);
+    EXPECT_EQ(BiMapKey::copies, 0);
+    EXPECT_EQ(BiMapKey::moves, 0);
+  };
+  BiMapKey::copies = BiMapKey::moves = 0;
+  MapType moved(std::move(source));
+  ASSERT_NO_FATAL_FAILURE(check_transfer(moved));
+  ASSERT_TRUE(source.insert(other_left, other_right));
+  ASSERT_TRUE(source.find_right_ref(other_left));
+  MapType assigned;
+  ASSERT_TRUE(assigned.insert(other_left, other_right));
+  BiMapKey::copies = BiMapKey::moves = 0;
+  assigned = std::move(moved);
+  ASSERT_NO_FATAL_FAILURE(check_transfer(assigned));
+  EXPECT_FALSE(assigned.contains_left(other_left));
+  ASSERT_TRUE(moved.insert(BiMapKey(3), BiMapKey(33)));
+  EXPECT_TRUE(moved.contains_right(BiMapKey(33)));
+
+  // The counterpart key may only be moved after its node leaves the index.
+  BiMapKey::copies = 0;
+  auto taken = assigned.try_extract_right(left);
+  ASSERT_TRUE(taken);
+  EXPECT_EQ(*taken, right);
+  EXPECT_TRUE(assigned.empty());
+  auto reverse = source.try_extract_left(other_right);
+  ASSERT_TRUE(reverse);
+  EXPECT_EQ(*reverse, other_left);
+  EXPECT_EQ(BiMapKey::copies, 0);
+}
+
 }// namespace
 
+TEST(BiMapTest, MovesTransferNodesEvenWithUnequalNonPropagatingAllocators) {
+  using Link = BiMapLink<BiMapKey>;
+  using Index = Map<BiMapKey, Link, std::less<>, BiMapAllocator<std::pair<BiMapKey const, Link>>>;
+  BiMap<BiMapKey, BiMapKey> ordered;
+  BiHashMap<BiMapKey, BiMapKey, BiMapKeyHash, BiMapKeyHash> hashed;
+  BiMap<BiMapKey, BiMapKey, Index, Index> unequal;
+  ASSERT_NO_FATAL_FAILURE(check_bimap_move(ordered));
+  ASSERT_NO_FATAL_FAILURE(check_bimap_move(hashed));
+  ASSERT_NO_FATAL_FAILURE(check_bimap_move(unequal));
+}
+
 TEST(BiMapTest, CopyPreservesSourceIndexComparisonPolicies) {
-  using Index = Map<int, int const*, BiMapStatefulOrder>;
+  using Index = Map<int, BiMapLink<int>, BiMapStatefulOrder>;
   using MapType = BiMap<int, int, Index, Index>;
   MapType original;
   ASSERT_TRUE(original.add(1, 11));

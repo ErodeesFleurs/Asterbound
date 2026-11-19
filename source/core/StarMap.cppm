@@ -282,6 +282,11 @@ public:
   auto insert_or_assign(key_type const& key, Mapped&& value) { return m_storage.insert_or_assign(key, std::forward<Mapped>(value)); }
   template <typename Mapped>
   auto insert_or_assign(key_type&& key, Mapped&& value) { return m_storage.insert_or_assign(std::move(key), std::forward<Mapped>(value)); }
+  auto extract(const_iterator position)
+    requires requires(Storage& storage) { storage.extract(position); }
+  {
+    return m_storage.extract(position);
+  }
   iterator erase(const_iterator position) { return m_storage.erase(position); }
   iterator erase(const_iterator first, const_iterator last) { return m_storage.erase(first, last); }
   size_type erase(key_type const& key) { return m_storage.erase(key); }

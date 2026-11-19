@@ -890,6 +890,38 @@ void BM_PerlinDynamicConstructDestroy(benchmark::State& state) {
   state.SetItemsProcessed(state.iterations());
 }
 
+void measure_bimap_move(benchmark::State& state) {
+  Star::BiMap<int, int> table;
+  for (int i = 0; i < 128; ++i)
+    table.insert(i, i + 1);
+  for (auto _ : state) {
+    Star::BiMap<int, int> moved(std::move(table));
+    benchmark::DoNotOptimize(moved);
+    table = std::move(moved);
+    benchmark::DoNotOptimize(table);
+  }
+  if (table.size() != 128 || table.maybe_left(128) != 127)
+    state.SkipWithError("Move lost a mapping");
+}
+
+void measure_bimap_conflict(benchmark::State& state, bool left_conflict) {
+  Star::BiMap<int, int> table;
+  for (int i = 0; i < 128; ++i)
+    table.insert(i, i + 1);
+  for (auto _ : state) {
+    auto result = left_conflict ? table.insert({64, 200}) : table.insert({200, 65});
+    if (result.second || (*result.first).first != 64) {
+      state.SkipWithError("Duplicate returned the wrong mapping");
+      break;
+    }
+    benchmark::DoNotOptimize(result);
+  }
+}
+
+BENCHMARK(measure_bimap_move)->Name("Core/BiMap/MoveRoundTrip128");
+BENCHMARK_CAPTURE(measure_bimap_conflict, Left, true)->Name("Core/BiMap/LeftConflict128");
+BENCHMARK_CAPTURE(measure_bimap_conflict, Right, false)->Name("Core/BiMap/RightConflict128");
+
 Json numericArray(std::size_t count) {
   JsonArray values;
   values.reserve(count);

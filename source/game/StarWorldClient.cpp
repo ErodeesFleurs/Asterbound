@@ -1599,12 +1599,10 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
   
   for (auto const& packet : packets) {
     if (!inWorld() && !is<WorldStartPacket>(packet)) {
-      if (!PacketTypeNames)
-        return std::unexpected(PacketTypeNames.error());
-      auto result93 = PacketTypeNames->get_right(packet->type());
-      if (!result93)
-        return std::unexpected(std::move(result93.error()));
-      auto result94 = this->root().logger().error("WorldClient received packet type {} while not in world", result93->get());
+      auto type_name = packet_type_name(packet->type());
+      if (!type_name)
+        return std::unexpected(std::move(type_name.error()));
+      auto result94 = this->root().logger().error("WorldClient received packet type {} while not in world", *type_name);
       if (!result94)
         return std::unexpected(std::move(result94.error()));
     }

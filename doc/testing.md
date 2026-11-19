@@ -456,6 +456,19 @@ These are algorithm/compatibility guarantees, not measured runtime speedups.
   missing-polygon error timing, opposite-target replan progress and actual Lua
   parameter/edge keys with repeatable incremental results.
 
+### Bidirectional maps
+
+Run `core_tests --gtest_filter='BiMapTest.*'` for duplicate handling, cross-index
+ownership and the lifetime of borrowed keys. An overwrite may be passed keys
+borrowed from the map itself. Node addresses, not hash-table iterators, must
+survive unrelated insertion. A reference obtained through a temporary
+`expected` does not extend the lifetime of the map it contains.
+
+Use the existing `core_benchmarks` filter `^Core/(BiMap|Perlin)/` for comparisons.
+The 128-entry move round trip includes both move construction and move assignment;
+the right-conflict case also checks the returned left iterator. The Perlin rows
+measure a four-entry enum table and are not a proxy for moving a large map.
+
 ### Asset locators
 
 - `core_tests --gtest_filter='AssetPathTest.*:PathEmbedTest.*:ImageDirectivePipelineTest.*'`

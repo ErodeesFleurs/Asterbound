@@ -230,9 +230,9 @@ Returns a `String` representation of the world's id.
 
 #### `bool` world.sendPacket(`ConnectionId` clientId, `String` packetType, `Json` packetData)
 
-Sends a raw network packet to the specified client that is currently connected to this world. The `packetType` must be the name
-of a known packet in `Star::PacketTypeNames` (for example `"EntityInteractResult"`) and `packetData` must contain the JSON
-representation expected by `Star::createPacket` for that packet. Returns `true` when the packet is queued successfully.
+Sends a raw network packet to a client connected to this world. `packetType` is a case-insensitive packet name
+(for example `"EntityInteractResult"` or `"EntityUpdate"`). `packetData` must contain the JSON representation
+expected by `Star::createPacket` for that packet. Returns `true` when the packet is queued successfully.
 
 ---
 

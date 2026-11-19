@@ -302,14 +302,11 @@ std::expected<std::optional<String>, StarException> UniverseClient::connect(Univ
     auto protocolResponse = as<ProtocolResponsePacket>(nextPacket);
     if (!nextPacket)
       return String("Join failed! Expected ProtocolResponse, but none received");
-    if (!PacketTypeNames)
-      return std::unexpected(PacketTypeNames.error());
     if (!protocolResponse) {
-      auto typeResult = PacketTypeNames->get_right(nextPacket->type());
-      if (!typeResult)
-        return std::unexpected(std::move(typeResult.error()));
-      auto type = std::move(*typeResult);
-      return String(Star::format("Join failed! Expected ProtocolResponse, got {}", type.get()));
+      auto type_name = packet_type_name(nextPacket->type());
+      if (!type_name)
+        return std::unexpected(std::move(type_name.error()));
+      return String(Star::format("Join failed! Expected ProtocolResponse, got {}", *type_name));
     }
     if (!protocolResponse->allowed)
       return String(Star::format("Join failed! Server does not support connections with protocol version {}", StarProtocolVersion));
@@ -452,11 +449,10 @@ std::expected<std::optional<String>, StarException> UniverseClient::connect(Univ
       return failure->reason;
     }
     if (packet) {
-      auto typeResult = PacketTypeNames->get_right(packet->type());
-      if (!typeResult)
-        return std::unexpected(std::move(typeResult.error()));
-      auto type = std::move(*typeResult);
-      return String(Star::format("Join failed! Expected ConnectSuccess/Failure, got {}", type.get()));
+      auto type_name = packet_type_name(packet->type());
+      if (!type_name)
+        return std::unexpected(std::move(type_name.error()));
+      return String(Star::format("Join failed! Expected ConnectSuccess/Failure, got {}", *type_name));
     }
     return String("Join failed! Expected ConnectSuccess/Failure, but none received");
   }();
@@ -926,23 +922,19 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
     m_respawnTimer.reset();
   }
   m_celestialDatabase->cleanup();
-  if (!PacketTypeNames)
-    return std::unexpected(PacketTypeNames.error());
   if (auto stats = m_connection->incomingStats()) {
     m_root.logMap().set("net_total_incoming", Star::format("{:4.3f} kB/s", stats->bytesPerSecond / 1000.f));
-    auto typeResult = PacketTypeNames->get_right(stats->worstPacketType);
-    if (!typeResult)
-      return std::unexpected(std::move(typeResult.error()));
-    auto type = std::move(*typeResult);
-    m_root.logMap().set("net_worst_incoming", Star::format("^cyan;{}^reset; ({:4.3f} kB/s)", type.get(), float(stats->worstPacketSize) / 1000.f));
+    auto type_name = packet_type_name(stats->worstPacketType);
+    if (!type_name)
+      return std::unexpected(std::move(type_name.error()));
+    m_root.logMap().set("net_worst_incoming", Star::format("^cyan;{}^reset; ({:4.3f} kB/s)", *type_name, float(stats->worstPacketSize) / 1000.f));
   }
   if (auto stats = m_connection->outgoingStats()) {
     m_root.logMap().set("net_total_outgoing", Star::format("{:4.3f} kB/s", stats->bytesPerSecond / 1000.f));
-    auto typeResult = PacketTypeNames->get_right(stats->worstPacketType);
-    if (!typeResult)
-      return std::unexpected(std::move(typeResult.error()));
-    auto type = std::move(*typeResult);
-    m_root.logMap().set("net_worst_outgoing", Star::format("^cyan;{}^reset; ({:4.3f} kB/s)", type.get(), float(stats->worstPacketSize) / 1000.f));
+    auto type_name = packet_type_name(stats->worstPacketType);
+    if (!type_name)
+      return std::unexpected(std::move(type_name.error()));
+    m_root.logMap().set("net_worst_outgoing", Star::format("^cyan;{}^reset; ({:4.3f} kB/s)", *type_name, float(stats->worstPacketSize) / 1000.f));
   }
   return {};
 }
@@ -1642,16 +1634,13 @@ void UniverseClient::setPause(bool pause) {
 }
 
 std::expected<void, StarException> UniverseClient::handlePackets(List<std::shared_ptr<Packet>> const& packets) {
-  if (!PacketTypeNames)
-    return std::unexpected(PacketTypeNames.error());
   for (auto const& packet : packets) {
-    auto typeResult = PacketTypeNames->get_right(packet->type());
-    if (!typeResult)
-      return std::unexpected(std::move(typeResult.error()));
-    auto type = std::move(*typeResult);
+    auto type_name = packet_type_name(packet->type());
+    if (!type_name)
+      return std::unexpected(std::move(type_name.error()));
     auto handled = [&]() -> std::expected<bool, StarException> {
       std::optional<Json> packetJson;
-      auto functionName = Star::format("on{}Packet", type.get());
+      auto functionName = Star::format("on{}Packet", *type_name);
       for (auto&& context : m_scriptContexts) {
         auto& optionalContext = context.second->context();
         if (!optionalContext)
@@ -1958,7 +1947,7 @@ std::expected<void, StarException> UniverseClient::handlePackets(List<std::share
       return false;
     }();
     if (!handled) {
-      return std::unexpected(handled.error().with_context(Star::format("Exception while handling {} packet", type.get())));
+      return std::unexpected(handled.error().with_context(Star::format("Exception while handling {} packet", *type_name)));
     }
     if (*handled)
       break;

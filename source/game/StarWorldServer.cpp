@@ -1486,13 +1486,10 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
         return std::unexpected(std::move(result145.error()));
       clientInfo = result145->get();
     } else {
-      if (!PacketTypeNames)
-        return std::unexpected(PacketTypeNames.error());
-      auto result146 = (*PacketTypeNames).get_right(packet->type());
-      if (!result146)
-        return std::unexpected(std::move(result146.error()));
-      auto result147 = this->root().logger().warn("UniverseServer: Dropping unexpected {} packet from client",
-                result146->get());
+      auto type_name = packet_type_name(packet->type());
+      if (!type_name)
+        return std::unexpected(std::move(type_name.error()));
+      auto result147 = this->root().logger().warn("UniverseServer: Dropping unexpected {} packet from client", *type_name);
       if (!result147)
         return std::unexpected(std::move(result147.error()));
     }

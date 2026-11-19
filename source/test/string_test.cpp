@@ -482,6 +482,19 @@ TEST(StringTest, CaseInsensitive) {
   EXPECT_TRUE(CaseInsensitiveStringCompare()(*upperView, *foo));
   EXPECT_TRUE(CaseInsensitiveStringCompare()(foo->view(), *upperView));
 
+  // The extracted spelling takes the allocation. The emptied key must still
+  // compare and hash like a freshly constructed empty key.
+  String spelling(std::string(128, 'A') + "中");
+  auto key = CaseInsensitiveString::create(spelling);
+  ASSERT_TRUE(key);
+  auto allocation = reinterpret_cast<std::uintptr_t>(key->string().utf8().data());
+  auto extracted = std::move(*key).take_string();
+  EXPECT_EQ(extracted, spelling);
+  EXPECT_EQ(reinterpret_cast<std::uintptr_t>(extracted.utf8().data()), allocation);
+  CaseInsensitiveString empty;
+  EXPECT_TRUE(CaseInsensitiveStringCompare()(*key, empty));
+  EXPECT_EQ(CaseInsensitiveStringHash()(*key), CaseInsensitiveStringHash()(empty));
+
   auto one = CaseInsensitiveString::create("One");
   auto three = CaseInsensitiveString::create("Three");
   auto mixedOne = CaseInsensitiveString::create("OnE");
@@ -512,6 +525,52 @@ TEST(StringTest, CaseInsensitive) {
 
   StringSet keyCmp = {"One", "Three"};
   EXPECT_EQ(keys, keyCmp);
+}
+
+TEST(StringTest, DynamicEnumMapKeepsCanonicalSpellingAndValidatedReverseMutations) {
+  using Names = EnumMap<Key>;
+  std::array<Names::value_type, 4> entries{{
+      {Key::Escape, "Esc中"}, {Key::Delete, "esC中"}, {Key::Delete, "Del"}, {Key::KeypadEnter, "Enter"}}};
+  auto parsed = Names::from(entries);
+  ASSERT_TRUE(parsed);
+  EXPECT_FALSE(Names::create({{Key::Escape, "Esc中"}, {Key::Delete, "esC中"}}));
+  auto spelling = parsed->find_right_ref(Key::Escape);
+  ASSERT_TRUE(spelling);
+  EXPECT_EQ(spelling->get(), "Esc中");
+  auto address = reinterpret_cast<std::uintptr_t>(std::addressof(spelling->get()));
+  Names names(std::move(*parsed));
+  auto moved_spelling = names.get_right(Key::Escape);
+  ASSERT_TRUE(moved_spelling);
+  EXPECT_EQ(reinterpret_cast<std::uintptr_t>(std::addressof(moved_spelling->get())), address);
+
+  String malformed(std::string_view("esc中\xff"));
+  auto expect_unicode_error = [](auto const& result) {
+    ASSERT_FALSE(result);
+    EXPECT_TRUE(result.error().template is<UnicodeException>());
+  };
+  expect_unicode_error(names.find_left_ref(StringView(malformed)));
+  expect_unicode_error(names.try_extract_left(malformed));
+  expect_unicode_error(names.extract_left(malformed));
+  expect_unicode_error(names.erase_right(malformed));
+  auto absent = names.try_extract_left("esc文");
+  ASSERT_TRUE(absent);
+  EXPECT_FALSE(*absent);
+  EXPECT_EQ(names.erase_right("esc文"), false);
+  auto required = names.extract_left("esc文");
+  ASSERT_FALSE(required);
+  EXPECT_TRUE(required.error().is<MapException>());
+  EXPECT_EQ(names.size(), 3u);
+
+  EXPECT_EQ(names.extract_left(std::string_view("ESC中")), Key::Escape);
+  auto validated = CaseInsensitiveStringView::create(std::string_view("dEl"));
+  ASSERT_TRUE(validated);
+  auto taken = names.try_extract_left(*validated);
+  ASSERT_TRUE(taken);
+  EXPECT_EQ(*taken, Key::Delete);
+  auto aliased = names.find_right_ref(Key::KeypadEnter);
+  ASSERT_TRUE(aliased);
+  EXPECT_EQ(names.erase_right(aliased->get()), true);
+  EXPECT_TRUE(names.empty());
 }
 
 TEST(StringTest, FixedEnumNamesPreserveCaseInsensitiveLookupAndCanonicalNames) {

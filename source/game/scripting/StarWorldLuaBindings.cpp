@@ -3016,14 +3016,10 @@ namespace LuaBindings {
   }
 
   std::expected<bool, StarException> ServerWorldCallbacks::sendPacket(WorldServer& world, ConnectionId clientId, String const& packetType, Json const& packetData) {
-    if (!PacketTypeNames)
-      return std::unexpected(PacketTypeNames.error());
-    auto typePointerResult = PacketTypeNames->get_left(packetType);
-    if (!typePointerResult)
-      return std::unexpected(std::move(typePointerResult.error()));
-    auto typePointer = std::move(*typePointerResult);
-    auto type = typePointer.get();
-    auto packetResult = createPacket(world.root().random(), type, packetData);
+    auto type = packet_type_from_name(packetType);
+    if (!type)
+      return std::unexpected(std::move(type.error()));
+    auto packetResult = createPacket(world.root().random(), *type, packetData);
     if (!packetResult)
       return std::unexpected(std::move(packetResult.error()));
     auto packet = std::move(*packetResult);

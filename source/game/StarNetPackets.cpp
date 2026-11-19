@@ -89,7 +89,8 @@ namespace Star {
 
 extern VersionNumber const StarProtocolVersion = 747;
 
-extern std::expected<EnumMap<PacketType>, StarException> const PacketTypeNames = EnumMap<PacketType>::create({
+namespace {
+constexpr auto packet_type_names = std::to_array<std::pair<PacketType, std::string_view>>({
   {PacketType::ProtocolRequest, "ProtocolRequest"},
   {PacketType::ProtocolResponse, "ProtocolResponse"},
   {PacketType::ServerDisconnect, "ServerDisconnect"},
@@ -173,6 +174,15 @@ extern std::expected<EnumMap<PacketType>, StarException> const PacketTypeNames =
   {PacketType::UniverseMessage, "UniverseMessage"},
   {PacketType::UniverseMessageResponse, "UniverseMessageResponse"}
 });
+}
+
+std::expected<std::string_view, StarException> packet_type_name(PacketType type) {
+  return enumName<packet_type_names>(type);
+}
+
+std::expected<PacketType, StarException> packet_type_from_name(StringView name) {
+  return enumValue<packet_type_names>(name);
+}
 
 extern std::expected<EnumMap<NetCompressionMode>, StarException> const NetCompressionModeNames = EnumMap<NetCompressionMode>::create({
   {NetCompressionMode::None, "None"},
