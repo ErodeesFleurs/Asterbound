@@ -22,7 +22,6 @@ import star.audio;
 import star.map;
 import star.color;
 import star.string;
-import star.either;
 import star.random;
 import star.periodic_function;
 import star.ordered_map;

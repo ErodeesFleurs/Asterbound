@@ -37,7 +37,6 @@ import star.asset_path;
 import star.game_types;
 import star.a_star;
 import star.ordered_set;
-import star.either;
 
 import star.damage_types;
 import star.world_geometry;

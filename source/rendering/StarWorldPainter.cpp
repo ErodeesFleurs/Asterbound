@@ -11,7 +11,6 @@ import star.list;
 import star.map;
 import star.math_common;
 import star.vector;
-import star.either;
 import star.rect;
 import star.image_processing;
 import star.hash;

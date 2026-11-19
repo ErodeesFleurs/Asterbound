@@ -43,7 +43,6 @@ import std;
 import star.format;
 import star.version;
 import star.observer_stream;
-import star.either;
 
 import star.monster;
 import star.data_stream_extra;

@@ -15,7 +15,6 @@ import star.strong_typedef;
 import star.id_map;
 import star.status_types;
 
-import star.either;
 import star.line;
 namespace Star {
 

@@ -49,7 +49,6 @@ import star.gui_context;
 import star.widget;
 import star.button_group;
 
-import star.either;
 namespace Star {
 
 class ButtonWidget : public Widget {

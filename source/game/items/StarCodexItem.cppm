@@ -33,7 +33,6 @@ import star.version;
 import star.ordered_set;
 import star.audio;
 import star.map;
-import star.either;
 import star.random;
 import star.periodic_function;
 

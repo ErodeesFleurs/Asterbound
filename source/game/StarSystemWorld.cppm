@@ -21,7 +21,6 @@ import star.thread;
 import star.directives;
 import star.asset_path;
 import star.strong_typedef;
-import star.either;
 
 import star.celestial_coordinate;
 import star.sky_types;

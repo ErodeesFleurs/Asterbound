@@ -11,7 +11,6 @@ import star.format;
 import star.version;
 import star.color;
 import star.bi_map;
-import star.either;
 import star.game_types;
 import star.random;
 import star.weighted_pool;

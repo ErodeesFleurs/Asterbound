@@ -9,7 +9,6 @@ import star.strong_typedef;
 import star.data_stream;
 import star.vector;
 import star.string;
-import star.either;
 import star.color;
 import star.bi_map;
 import star.random;

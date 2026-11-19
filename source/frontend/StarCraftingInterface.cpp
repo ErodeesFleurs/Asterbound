@@ -9,7 +9,6 @@ import star.bi_map;
 import star.game_types;
 import star.image;
 import star.math_common;
-import star.either;
 import star.random;
 import star.weighted_pool;
 import star.strong_typedef;

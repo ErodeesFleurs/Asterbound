@@ -51,7 +51,7 @@ import star.root;
 import star.static_random;
 namespace Star {
 
-SkyParameters::SkyParameters() : seed(), skyColoring(makeRight(Color::Black)), settings(JsonObject()) {}
+SkyParameters::SkyParameters() : seed(), skyColoring(make_right(Color::Black)), settings(JsonObject()) {}
 
 std::expected<SkyParameters, StarException> SkyParameters::create(Root& root, CelestialCoordinate const& coordinate, std::shared_ptr<CelestialDatabase> const& celestialDatabase) {
   SkyParameters sky;
@@ -201,16 +201,14 @@ std::expected<SkyParameters, StarException> SkyParameters::create(Json const& co
   if (*colors) {
     auto coloring = SkyColoring::create(**colors);
     if (!coloring) return std::unexpected(std::move(coloring.error()));
-    sky.skyColoring.setLeft(std::move(*coloring));
+    sky.skyColoring.set_left(std::move(*coloring));
   } else {
     auto light = config.opt("ambientLightLevel");
     if (!light) return std::unexpected(std::move(light.error()));
     if (*light) {
       auto color = jsonToColor(**light);
       if (!color) return std::unexpected(std::move(color.error()));
-      sky.skyColoring.setRight(*color);
-    } else {
-      sky.skyColoring.setRight(Color::Black);
+      sky.skyColoring.set_right(*color);
     }
   }
   auto space = config.optFloat("spaceLevel");
@@ -247,9 +245,11 @@ std::expected<Json, StarException> SkyParameters::toJson() const {
   for (auto const& horizon : horizonImages)
     horizons.push_back(JsonObject{{"left", horizon.first}, {"right", horizon.second}});
   Json coloring;
-  if (auto value = skyColoring.maybeLeftRef()) coloring = value->get().toJson();
   Json light;
-  if (auto value = skyColoring.maybeRightRef()) light = jsonFromColor(value->get());
+  if (auto value = skyColoring.maybe_left_ref())
+    coloring = value->get().toJson();
+  else
+    light = jsonFromColor(skyColoring.right_ref());
   return JsonObject{
       {"seed", seed}, {"dayLength", json_from_optional<float>(dayLength)},
       {"planet", std::move(planet)}, {"satellites", std::move(satellites)},
@@ -294,7 +294,7 @@ void SkyParameters::readVisitableParameters(std::shared_ptr<VisitableWorldParame
       skyType = SkyType::Atmospheric;
       horizonClouds = true;
     }
-    skyColoring.setLeft(terrestrialParameters->skyColoring);
+    skyColoring.set_left(terrestrialParameters->skyColoring);
     spaceLevel = terrestrialParameters->spaceLayer.layerMinHeight;
     surfaceLevel = terrestrialParameters->atmosphereLayer.layerMinHeight;
   } else {
@@ -302,11 +302,11 @@ void SkyParameters::readVisitableParameters(std::shared_ptr<VisitableWorldParame
     horizonClouds = false;
 
     if (auto asteroidsParameters = as<AsteroidsWorldParameters>(visitableParameters)) {
-      skyColoring.setRight(asteroidsParameters->ambientLightLevel);
+      skyColoring.set_right(asteroidsParameters->ambientLightLevel);
     } else if (auto floatingDungeonParameters = as<FloatingDungeonWorldParameters>(visitableParameters)) {
-      skyColoring.setRight(floatingDungeonParameters->ambientLightLevel);
+      skyColoring.set_right(floatingDungeonParameters->ambientLightLevel);
     } else {
-      skyColoring.setRight(Color::Black);
+      skyColoring.set_right(Color::Black);
     }
   }
 }

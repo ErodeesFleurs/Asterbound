@@ -35,7 +35,6 @@ import star.version;
 import star.id_map;
 import star.image;
 import star.math_common;
-import star.either;
 import star.random;
 import star.weighted_pool;
 import star.casting;

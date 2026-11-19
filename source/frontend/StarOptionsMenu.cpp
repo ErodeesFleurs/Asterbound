@@ -28,7 +28,6 @@ import star.map;
 import star.format;
 import star.version;
 import star.ordered_map;
-import star.either;
 import star.random;
 import star.weighted_pool;
 import star.strong_typedef;

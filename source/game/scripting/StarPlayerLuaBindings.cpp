@@ -35,7 +35,6 @@ import star.a_star;
 import star.ordered_set;
 import star.audio;
 import star.map;
-import star.either;
 import star.periodic_function;
 import star.strong_typedef;
 import star.vector;
@@ -529,7 +528,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.registerCallback("hungerEnabled", [&player]() {
-    return player.modeConfig().hunger;
+    return player.mode_config().hunger;
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.registerCallback("lastDamagedTarget", [&player]() -> std::optional<EntityId> {

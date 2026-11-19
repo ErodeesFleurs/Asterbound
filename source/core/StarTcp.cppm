@@ -3,7 +3,6 @@ import std;
 import star.format;
 import star.io_device;
 import star.string;
-import star.either;
 import star.host_address;
 import star.thread;
 import star.socket;

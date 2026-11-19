@@ -36,7 +36,6 @@ import star.math_common;
 import std;
 import star.format;
 import star.version;
-import star.either;
 import star.weighted_pool;
 import star.io_device;
 import star.ref_ptr;

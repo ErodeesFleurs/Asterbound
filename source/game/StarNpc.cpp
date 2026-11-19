@@ -47,7 +47,6 @@ import std;
 import star.format;
 import star.version;
 import star.observer_stream;
-import star.either;
 
 import star.npc;
 import star.lua_root;

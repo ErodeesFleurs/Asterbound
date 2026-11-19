@@ -26,7 +26,6 @@ import star.game_types;
 import star.set;
 import star.audio;
 import star.map;
-import star.either;
 
 import star.application;
 import star.statistics_service;
@@ -65,7 +64,6 @@ std::expected<void, StarException> StackWidget::showPage(std::size_t page) {
       return std::unexpected(std::move(hidden.error()));
   }
   m_shownPage = m_members[page];
-  m_page = makeLeft(page);
   if (m_shownPage)
     return m_shownPage->show();
   return {};
@@ -81,14 +79,9 @@ std::expected<void, StarException> StackWidget::showPage(String const& name) {
       return std::unexpected(std::move(hidden.error()));
   }
   m_shownPage = page->get();
-  m_page = makeRight(name);
   if (m_shownPage)
     return m_shownPage->show();
   return {};
-}
-
-Either<std::size_t, String> StackWidget::currentPage() const {
-  return m_page;
 }
 
 std::expected<void, StarException> StackWidget::addChild(String const& name, std::shared_ptr<Widget> member) {

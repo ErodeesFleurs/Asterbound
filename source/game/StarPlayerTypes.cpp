@@ -24,7 +24,7 @@ extern std::expected<EnumMap<PlayerBusyState>, StarException> const PlayerBusySt
 
 PlayerModeConfig::PlayerModeConfig()
   : hunger(true), allowBeamUpUnderground(false), reviveCostPercentile(0.0f),
-    deathDropItemTypes(makeLeft(String("none"))), permadeath(false) {}
+    deathDropItemTypes(make_left(String("none"))), permadeath(false) {}
 
 std::expected<PlayerModeConfig, StarException> PlayerModeConfig::create(Json config) {
   if (config.isNull())
@@ -49,12 +49,12 @@ std::expected<PlayerModeConfig, StarException> PlayerModeConfig::create(Json con
     auto types = jsonToStringList(*dropTypes);
     if (!types)
       return std::unexpected(std::move(types.error()));
-    result.deathDropItemTypes.setRight(std::move(*types));
+    result.deathDropItemTypes.set_right(std::move(*types));
   } else {
     auto type = dropTypes->toString();
     if (!type)
       return std::unexpected(std::move(type.error()));
-    result.deathDropItemTypes.setLeft(std::move(*type));
+    result.deathDropItemTypes.set_left(std::move(*type));
   }
   auto permadeath = config.getBool("permadeath", false);
   if (!permadeath)

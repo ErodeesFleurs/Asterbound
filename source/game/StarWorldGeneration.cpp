@@ -350,43 +350,24 @@ std::expected<void, StarException> LiquidWorld::setFlow(Vec2I const& location, C
 }
 
 std::expected<void, StarException> LiquidWorld::liquidInteraction(Vec2I const& a, LiquidId aLiquid, Vec2I const& b, LiquidId bLiquid) {
-  auto handleInteraction = [&worldServer = m_worldServer](Vec2I const& target, std::optional<LiquidInteractionResult> interaction) -> std::expected<void, StarException> {
-    if (interaction) {
-      if (interaction->isLeft()) {
-        {
-          auto replacementMaterial = interaction->left();
-          if (!replacementMaterial)
-            return std::unexpected(std::move(replacementMaterial.error()));
-          auto materialPlaced = worldServer.modifyTile(target,
-                                                       PlaceMaterial{.layer = TileLayer::Foreground,
-                                                                     .material = replacementMaterial->get(),
-                                                                     .materialHueShift = 0},
-                                                       false);
-          if (!materialPlaced)
-            return std::unexpected(std::move(materialPlaced.error()));
-        }
-      } else {
-        auto liquidLevel = worldServer.liquidLevel(target);
-        {
-          auto operationResult1 = interaction->right();
-          if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-          auto operationResult2 = worldServer.setLiquid(target, operationResult1->get(), liquidLevel.level, liquidLevel.level);
-          if (!operationResult2) return std::unexpected(std::move(operationResult2.error()));
-        }
-      }
+  auto handle_interaction = [this](Vec2I const& target, LiquidId current, LiquidId other) -> std::expected<void, StarException> {
+    auto interaction = m_liquidsDatabase->interact(current, other);
+    if (!interaction)
+      return {};
+    if (auto material = interaction->maybe_left_ref()) {
+      auto placed = m_worldServer.modifyTile(target, PlaceMaterial{.layer = TileLayer::Foreground,
+                                                                   .material = material->get(),
+                                                                   .materialHueShift = 0}, false);
+      if (!placed)
+        return std::unexpected(std::move(placed.error()));
+      return {};
     }
-    return {};
+    auto level = m_worldServer.liquidLevel(target).level;
+    return m_worldServer.setLiquid(target, interaction->right_ref(), level, level);
   };
-  {
-    auto operationResult1 = handleInteraction(a, m_liquidsDatabase->interact(aLiquid, bLiquid));
-    if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-  }
-  {
-    auto operationResult1 = handleInteraction(b, m_liquidsDatabase->interact(bLiquid, aLiquid));
-    if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-  }
-
-  return {};
+  if (auto result = handle_interaction(a, aLiquid, bLiquid); !result)
+    return std::unexpected(std::move(result.error()));
+  return handle_interaction(b, bLiquid, aLiquid);
 }
 
 std::expected<void, StarException> LiquidWorld::liquidCollision(Vec2I const& liquidPos, LiquidId liquidId, Vec2I const& blockPos) {

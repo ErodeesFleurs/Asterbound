@@ -3,9 +3,10 @@ import star.json_extra;
 import star.json;
 import star.xx_hash;
 import star.data_stream_extra;
+import star.compression;
+import star.either;
 import star.ordered_map;
 import star.rect;
-import star.either;
 import star.vector;
 import star.game_types;
 import star.material_types;
@@ -305,6 +306,95 @@ const GameTestRegistration worldTimersPreserveOrderAndDeferReentrantActions(
     EXPECT_EQ(fired, (std::vector<int>{1, 2, 3, 4}));
     ASSERT_TRUE(world->update(0.125f));
     EXPECT_EQ(fired, (std::vector<int>{1, 2, 3, 4}));
+  });
+
+const GameTestRegistration celestial_chunk_response(
+  "CelestialDatabase", "ChunkResponsePreservesWireBytesAndCachedSystems", [](GameTest& fixture) {
+    auto& root = fixture.root();
+    auto directory = File::temporary_directory(root.random());
+    ASSERT_TRUE(directory) << directory.error().what();
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto path = File::relative_to(*directory, "universe.chunks");
+
+    CelestialChunk seed;
+    seed.chunkIndex = {0, -1};
+    seed.constellations = {{{{0, -1}, {1, -1}}, {{1, -1}, {2, -1}}}};
+    auto parameters = [&](CelestialCoordinate coordinate) {
+      return CelestialParameters::create(root, coordinate, 42, coordinate.id(), JsonObject{});
+    };
+    Vec3I const location{0, -1, 71};
+    for (int x = 0; x < 12; ++x) {
+      Vec3I system{x, -1, location[2] + x};
+      auto star = parameters(CelestialCoordinate(system));
+      ASSERT_TRUE(star) << star.error().what();
+      seed.systemParameters[system] = std::move(*star);
+      seed.systemObjects[system] = {};
+    }
+    auto planet = parameters(CelestialCoordinate(location, 3));
+    auto moon = parameters(CelestialCoordinate(location, 3, 1));
+    ASSERT_TRUE(planet) << planet.error().what();
+    ASSERT_TRUE(moon) << moon.error().what();
+    auto& body = seed.systemObjects[location][3];
+    body.planetParameters = std::move(*planet);
+    body.satelliteParameters[1] = std::move(*moon);
+
+    auto stored = seed.toJson();
+    ASSERT_TRUE(stored) << stored.error().what();
+    {
+      auto versions = root.versioningDatabase();
+      ASSERT_TRUE(versions) << versions.error().what();
+      auto versioned = (*versions)->makeCurrentVersionedJson("CelestialChunk", *stored);
+      ASSERT_TRUE(versioned) << versioned.error().what();
+      DataStreamBuffer stream;
+      ASSERT_TRUE(stream.write(*versioned));
+      ASSERT_TRUE(VersionedJson::writeSubVersioning(stream, *versioned));
+      auto compressed = compress(stream.data());
+      ASSERT_TRUE(compressed) << compressed.error().what();
+      auto key = DataStreamBuffer::serialize(seed.chunkIndex);
+      ASSERT_TRUE(key) << key.error().what();
+      BTreeSha256Database storage(root.logger());
+      ASSERT_TRUE(storage.set_content_identifier("Celestial2"));
+      auto file = File::open(path, IOMode::ReadWrite);
+      ASSERT_TRUE(file) << file.error().what();
+      ASSERT_TRUE(storage.set_io_device(std::move(*file)));
+      ASSERT_TRUE(storage.open());
+      ASSERT_TRUE(storage.insert(*key, *compressed));
+      ASSERT_TRUE(storage.close(true));
+    }
+
+    // Derive both legacy payloads from the same on-disk insertion order that
+    // the master loads, not from the original map or the response under test.
+    auto loaded = CelestialChunk::create(*stored);
+    ASSERT_TRUE(loaded) << loaded.error().what();
+    auto planets = loaded->systemObjects.get(location);
+    ASSERT_TRUE(planets) << planets.error().what();
+    DataStreamBuffer system_wire;
+    ASSERT_TRUE(system_wire.write(std::uint8_t{2}));
+    ASSERT_TRUE(system_wire.write(CelestialSystemObjects{location, planets->get()}));
+    auto legacy_chunk = *loaded;
+    legacy_chunk.systemObjects.clear();
+    DataStreamBuffer chunk_wire;
+    ASSERT_TRUE(chunk_wire.write(std::uint8_t{1}));
+    ASSERT_TRUE(chunk_wire.write(legacy_chunk));
+
+    auto database = CelestialMasterDatabase::create(root, path);
+    ASSERT_TRUE(database) << database.error().what();
+    auto close_database = make_scope_exit([&] { EXPECT_TRUE((*database)->close()); });
+    for (int pass = 0; pass < 2; ++pass) {
+      auto chunk = (*database)->respondToRequest(make_left(seed.chunkIndex));
+      ASSERT_TRUE(chunk) << chunk.error().what();
+      ASSERT_TRUE(chunk->is_left());
+      EXPECT_TRUE(chunk->left_ref().persistent); // Not serialized.
+      auto summary = DataStreamBuffer::serialize(*chunk);
+      ASSERT_TRUE(summary) << summary.error().what();
+      EXPECT_EQ(*summary, chunk_wire.data());
+
+      auto system = (*database)->respondToRequest(make_right(location));
+      ASSERT_TRUE(system) << system.error().what();
+      auto objects = DataStreamBuffer::serialize(*system);
+      ASSERT_TRUE(objects) << objects.error().what();
+      EXPECT_EQ(*objects, system_wire.data());
+    }
   });
 
 // This configured asset/math-profile baseline catches unintended world changes.

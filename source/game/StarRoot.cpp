@@ -47,7 +47,6 @@ import star.map;
 import star.periodic_function;
 import star.periodic;
 import star.ordered_set;
-import star.either;
 import star.image;
 
 import star.lua_root;

@@ -41,7 +41,6 @@ import star.a_star;
 import star.audio;
 import star.map;
 import star.string;
-import star.either;
 import star.periodic_function;
 import star.io_device;
 import star.ref_ptr;

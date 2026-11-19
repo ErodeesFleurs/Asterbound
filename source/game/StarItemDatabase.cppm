@@ -32,7 +32,6 @@ import star.celestial_coordinate;
 import star.quest_descriptor;
 import star.item;
 
-import star.either;
 namespace Star {
 
 class Root;

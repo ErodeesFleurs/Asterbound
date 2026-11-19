@@ -4,7 +4,6 @@ import star.json_extra;
 import star.data_stream_extra;
 import star.interpolation;
 import star.ordered_map;
-import star.either;
 import star.vector;
 import star.game_types;
 import star.color;

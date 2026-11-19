@@ -28,7 +28,6 @@ import star.id_map;
 import star.set;
 import star.casting;
 import star.strong_typedef;
-import star.either;
 
 import star.animation;
 import star.particle;

@@ -5,7 +5,6 @@ import star.string;
 import star.buffer;
 import star.data_stream;
 
-import star.either;
 import star.byte_array;
 import star.type_identity;
 import star.format;

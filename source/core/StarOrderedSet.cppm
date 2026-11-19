@@ -10,7 +10,6 @@ import star.optional;
 import star.hash;
 import star.format;
 
-import star.either;
 namespace Star {
 
 template <typename Range, typename Value>

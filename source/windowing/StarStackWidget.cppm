@@ -33,7 +33,6 @@ import star.game_types;
 import star.set;
 import star.audio;
 import star.map;
-import star.either;
 import star.font_texture_group;
 import star.anchor_types;
 import star.text_painter;
@@ -58,14 +57,11 @@ public:
   [[nodiscard]] std::expected<void, StarException> showPage(std::size_t page);
   [[nodiscard]] std::expected<void, StarException> showPage(String const& name);
 
-  Either<std::size_t, String> currentPage() const;
-
   [[nodiscard]] std::expected<void, StarException> addChild(String const& name,
                                                             std::shared_ptr<Widget> member) override;
 
 private:
   std::shared_ptr<Widget> m_shownPage;
-  Either<std::size_t, String> m_page;
 };
 
 }

@@ -38,7 +38,6 @@ import star.a_star;
 import star.periodic_function;
 import star.periodic;
 import star.ordered_set;
-import star.either;
 import star.weighted_pool;
 import star.byte_array;
 import star.data_stream_devices;

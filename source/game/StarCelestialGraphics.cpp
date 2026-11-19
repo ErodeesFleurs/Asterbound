@@ -1,7 +1,6 @@
 import star.json_extra;
 import star.json;
 import star.ordered_map;
-import star.either;
 import star.game_types;
 import star.liquid_types;
 import star.color;

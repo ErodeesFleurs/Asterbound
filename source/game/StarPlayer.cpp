@@ -1453,19 +1453,15 @@ std::expected<void, StarException> Player::destroy(std::optional<std::reference_
       return std::unexpected(std::move(disabledResult.error()));
     auto disabled = std::move(*disabledResult);
     if (!disabled) {
-      auto config = modeConfig();
-      if (auto dropString = config.deathDropItemTypes.maybeLeft()) {
-        if (*dropString == "all") {
+      auto const& drop_types = m_modeConfig.deathDropItemTypes;
+      if (auto drop_string = drop_types.maybe_left_ref()) {
+        if (drop_string->get() == "all") {
           if (auto result = dropEverything(); !result)
             return std::unexpected(std::move(result.error()));
         }
       } else {
-        auto namesResult = config.deathDropItemTypes.right();
-        if (!namesResult)
-          return std::unexpected(std::move(namesResult.error()));
-        auto const& names = namesResult->get();
         Set<ItemType> types;
-        for (auto const& name : names) {
+        for (auto const& name : drop_types.right_ref()) {
           auto typeResult = enumValue<ItemTypeNames>(name);
           if (!typeResult)
             return std::unexpected(std::move(typeResult.error()));
@@ -1636,7 +1632,7 @@ std::expected<void, StarException> Player::revive(Vec2F const& footPosition) {
   m_movementController->setVelocity(Vec2F());
   if (auto result = m_techController->reloadTech(); !result)
     return std::unexpected(std::move(result.error()));
-  float moneyCost = m_inventory->currency("money") * modeConfig().reviveCostPercentile;
+  float moneyCost = m_inventory->currency("money") * m_modeConfig.reviveCostPercentile;
   m_inventory->consumeCurrency(
     "money", std::min(static_cast<std::uint64_t>(std::round(moneyCost)), m_inventory->currency("money")));
   return {};
@@ -2127,7 +2123,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
             return std::unexpected(std::move(result.error()));
         }
 
-      if (!modeConfig().hunger)
+      if (!m_modeConfig.hunger)
         {
           if (auto result = m_statusController->resetResource("food"); !result)
             return std::unexpected(std::move(result.error()));
@@ -4236,7 +4232,7 @@ std::expected<void, StarException> Player::setModeType(PlayerMode mode) {
   return {};
 }
 
-PlayerModeConfig Player::modeConfig() const {
+PlayerModeConfig const& Player::mode_config() const & {
   return m_modeConfig;
 }
 
@@ -4828,7 +4824,7 @@ std::expected<void, StarException> Player::dropEverything() {
 bool Player::isPermaDead() const {
   if (!isDead())
     return false;
-  return modeConfig().permadeath;
+  return m_modeConfig.permadeath;
 }
 
 bool Player::interruptRadioMessage() {

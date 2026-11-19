@@ -34,7 +34,6 @@ import star.parametric_function;
 import star.multi_array_interpolator;
 import star.multi_table;
 import star.ordered_set;
-import star.either;
 
 import star.armors;
 import star.lua_root;

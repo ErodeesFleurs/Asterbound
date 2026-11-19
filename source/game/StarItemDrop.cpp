@@ -37,7 +37,6 @@ import std;
 import star.format;
 import star.version;
 import star.ordered_set;
-import star.either;
 import star.periodic_function;
 import star.optional;
 

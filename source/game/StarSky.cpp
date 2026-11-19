@@ -504,43 +504,43 @@ Color Sky::environmentLight() const {
   if (m_skyType == SkyType::Orbital || m_skyType == SkyType::Warp)
     return Color::Black;
 
-  if (m_skyParameters.skyColoring.isLeft()) {
-    auto const& skyColoring = m_skyParameters.skyColoring.leftRef();
+  if (auto value = m_skyParameters.skyColoring.maybe_left_ref()) {
+    auto const& sky_coloring = value->get();
 
     Array<Vec4F, 4> colors;
-    colors[0] = skyColoring.morningLightColor.to_rgba_f();
-    colors[1] = skyColoring.dayLightColor.to_rgba_f();
-    colors[2] = skyColoring.eveningLightColor.to_rgba_f();
-    colors[3] = skyColoring.nightLightColor.to_rgba_f();
+    colors[0] = sky_coloring.morningLightColor.to_rgba_f();
+    colors[1] = sky_coloring.dayLightColor.to_rgba_f();
+    colors[2] = sky_coloring.eveningLightColor.to_rgba_f();
+    colors[3] = sky_coloring.nightLightColor.to_rgba_f();
 
     return Color::rgba_f(list_interpolate2(colors, dayCycle(), SinWeightOperator<float>(), BoundMode::Wrap));
   } else {
-    return m_skyParameters.skyColoring.rightRef();
+    return m_skyParameters.skyColoring.right_ref();
   }
 }
 
 Color Sky::mainSkyColor() const {
-  if (m_skyParameters.skyColoring.isLeft())
-    return m_skyParameters.skyColoring.leftRef().mainColor;
+  if (auto coloring = m_skyParameters.skyColoring.maybe_left_ref())
+    return coloring->get().mainColor;
 
   return Color::Black;
 }
 
 std::pair<Color, Color> Sky::skyRectColors() const {
-  if (m_skyParameters.skyColoring.isLeft()) {
-    auto const& skyColoring = m_skyParameters.skyColoring.leftRef();
+  if (auto value = m_skyParameters.skyColoring.maybe_left_ref()) {
+    auto const& sky_coloring = value->get();
 
     Array<Vec4F, 4> topColorList;
-    topColorList[0] = skyColoring.morningColors.first.to_rgba_f();
-    topColorList[1] = skyColoring.dayColors.first.to_rgba_f();
-    topColorList[2] = skyColoring.eveningColors.first.to_rgba_f();
-    topColorList[3] = skyColoring.nightColors.first.to_rgba_f();
+    topColorList[0] = sky_coloring.morningColors.first.to_rgba_f();
+    topColorList[1] = sky_coloring.dayColors.first.to_rgba_f();
+    topColorList[2] = sky_coloring.eveningColors.first.to_rgba_f();
+    topColorList[3] = sky_coloring.nightColors.first.to_rgba_f();
 
     Array<Vec4F, 4> bottomColorList;
-    bottomColorList[0] = skyColoring.morningColors.second.to_rgba_f();
-    bottomColorList[1] = skyColoring.dayColors.second.to_rgba_f();
-    bottomColorList[2] = skyColoring.eveningColors.second.to_rgba_f();
-    bottomColorList[3] = skyColoring.nightColors.second.to_rgba_f();
+    bottomColorList[0] = sky_coloring.morningColors.second.to_rgba_f();
+    bottomColorList[1] = sky_coloring.dayColors.second.to_rgba_f();
+    bottomColorList[2] = sky_coloring.eveningColors.second.to_rgba_f();
+    bottomColorList[3] = sky_coloring.nightColors.second.to_rgba_f();
 
     float cycle = dayCycle();
     auto topColor = Color::rgba_f(list_interpolate2(topColorList, cycle, SinWeightOperator<float>(), BoundMode::Wrap));

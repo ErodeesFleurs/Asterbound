@@ -670,6 +670,23 @@ rows do not measure reusable-context throughput, network streams, embedded asset
 large high-ratio retained memory or whole-game performance.
 
 
+### Either and its consumers
+
+`Either` has two successful alternatives, not a success/error pair. Its wire
+tags are **1 = left, 2 = right**, even when the payload types are identical.
+Other tags consume only the tag and leave the destination unchanged. A
+truncated payload reports an error without committing a partial replacement.
+Do not substitute the zero-based `std::variant` stream codec.
+
+When comparing lighting dispatch, use the existing `performance_benchmarks`
+with a private `-bootconfig` and filter
+`^Lighting/Propagate/(Colored|Monochrome)/Interior/Mixed/`. Compare the same
+fixture, build profile and output oracle. These rows do not measure celestial
+response assembly, wire throughput or whole-frame rendering.
+Check the color and monochrome output fingerprints separately. In particular,
+fast-math reassociation of the scalar RGB average can change the float bytes
+even when both implementations pass their own serial-reference checks.
+
 ### Dynamic libraries
 
 `DynamicLib::open`, `open_base` and `open_current` return a move-only library.

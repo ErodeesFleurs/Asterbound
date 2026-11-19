@@ -25,7 +25,6 @@ import star.game_types;
 import star.random;
 import star.a_star;
 import star.ordered_set;
-import star.either;
 import star.periodic_function;
 import star.ordered_map;
 import star.io_device;

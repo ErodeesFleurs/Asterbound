@@ -55,7 +55,6 @@ import star.id_map;
 import star.rpc_promise;
 import star.strong_typedef;
 import star.a_star;
-import star.either;
 import star.random;
 import star.periodic_function;
 import star.lru_cache;

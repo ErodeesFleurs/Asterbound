@@ -29,7 +29,6 @@ import star.game_types;
 import star.set;
 import star.audio;
 import star.map;
-import star.either;
 import star.lexical_cast;
 
 import star.application;

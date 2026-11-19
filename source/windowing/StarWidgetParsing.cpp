@@ -35,7 +35,6 @@ import star.a_star;
 import star.ordered_set;
 import star.random;
 import star.periodic_function;
-import star.either;
 
 import star.application;
 import star.statistics_service;

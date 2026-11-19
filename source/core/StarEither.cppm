@@ -1,6 +1,5 @@
 module;
 import std;
-import star.optional;
 import star.format;
 
 namespace Star {
@@ -10,15 +9,38 @@ struct EitherExceptionTag {
 };
 using EitherException = StarError<EitherExceptionTag, StarException>;
 
-template <typename Value>
-struct EitherLeftValue {
-  Value value;
+template <typename T>
+concept either_payload = std::is_object_v<T> && !std::is_array_v<T> && std::destructible<T>;
+
+// A tag owns the argument until it is consumed. Only the index is stored by
+// Either's variant, even when both sides have the same payload type.
+template <std::size_t Index, either_payload T>
+  requires (Index < 2)
+struct EitherTag {
+  T value;
 };
 
-template <typename Value>
-struct EitherRightValue {
-  Value value;
+// Test the aggregate member initialization used by the tags, not just
+// constructible_from: an explicit or narrowing conversion is not implicit.
+template <typename To, typename From>
+concept either_payload_from = either_payload<To> && std::constructible_from<To, From> && requires(From&& from) {
+  EitherTag<0, To>{std::forward<From>(from)};
 };
+
+template <typename To, typename From>
+using EitherTagPayload = std::conditional_t<std::is_void_v<To>, std::decay_t<From>, To>;
+
+template <typename To = void, typename From>
+  requires either_payload_from<EitherTagPayload<To, From>, From>
+[[nodiscard]] constexpr auto make_left(From&& value) {
+  return EitherTag<0, EitherTagPayload<To, From>>{std::forward<From>(value)};
+}
+
+template <typename To = void, typename From>
+  requires either_payload_from<EitherTagPayload<To, From>, From>
+[[nodiscard]] constexpr auto make_right(From&& value) {
+  return EitherTag<1, EitherTagPayload<To, From>>{std::forward<From>(value)};
+}
 
 // Moving a nullable payload consumes its value, not the active variant side.
 // This policy depends on reset itself, never on optional_ref overloads.
@@ -29,259 +51,138 @@ concept either_resettable_payload = std::is_class_v<T> && requires(T& value) {
   { value.reset() } -> std::same_as<void>;
 };
 
-template <typename Value>
-EitherLeftValue<Value> makeLeft(Value value);
-
-template <typename Value>
-EitherRightValue<Value> makeRight(Value value);
-
-// Container that contains exactly one of either Left or Right.
-template <typename Left, typename Right>
-class Either {
-public:
-  // Constructs Either that contains a default constructed Left value
-  Either();
-
-  Either(EitherLeftValue<Left> left);
-  Either(EitherRightValue<Right> right);
-
-  template <typename T>
-  Either(EitherLeftValue<T> left);
-
-  template <typename T>
-  Either(EitherRightValue<T> right);
-
-  Either(Either const& rhs);
-  Either(Either&& rhs);
-
-  Either& operator=(Either const& rhs);
-  Either& operator=(Either&& rhs);
-
-  template <typename T>
-  Either& operator=(EitherLeftValue<T> left);
-
-  template <typename T>
-  Either& operator=(EitherRightValue<T> right);
-
-  bool isLeft() const;
-  bool isRight() const;
-
-  void setLeft(Left left);
-  void setRight(Right left);
-
-  // Checked side access returns a diagnostic on the inactive alternative.
-
-  [[nodiscard]]
-  std::expected<std::reference_wrapper<Left const>, StarException> left() const;
-  [[nodiscard]]
-  std::expected<std::reference_wrapper<Right const>, StarException> right() const;
-
-  [[nodiscard]]
-  std::expected<std::reference_wrapper<Left>, StarException> left();
-  [[nodiscard]]
-  std::expected<std::reference_wrapper<Right>, StarException> right();
-
-  std::optional<Left> maybeLeft() const;
-  std::optional<Right> maybeRight() const;
-
-  Left const& leftRef() const;
-  Right const& rightRef() const;
-  Left& leftRef();
-  Right& rightRef();
-
-  std::optional<std::reference_wrapper<Left const>> maybeLeftRef() const;
-  std::optional<std::reference_wrapper<Right const>> maybeRightRef() const;
-  std::optional<std::reference_wrapper<Left>> maybeLeftRef();
-  std::optional<std::reference_wrapper<Right>> maybeRightRef();
-
-private:
-  using LeftType = EitherLeftValue<Left>;
-  using RightType = EitherRightValue<Right>;
-
-  std::variant<LeftType, RightType> m_value;
+template <typename T>
+concept either_nothrow_reset = !either_resettable_payload<T> || requires(T& value) {
+  { value.reset() } noexcept;
 };
 
-template <typename Value>
-EitherLeftValue<Value> makeLeft(Value value) {
-  return {std::move(value)};
-}
+template <typename Self>
+concept either_lvalue = std::is_lvalue_reference_v<Self>;
 
-template <typename Value>
-EitherRightValue<Value> makeRight(Value value) {
-  return {std::move(value)};
-}
+template <either_payload Left, either_payload Right>
+class Either {
+  using Storage = std::variant<Left, Right>;
+  template <std::size_t Index>
+  using Side = std::variant_alternative_t<Index, Storage>;
+  static constexpr bool resets_source = either_resettable_payload<Left> || either_resettable_payload<Right>;
+  static constexpr bool nothrow_reset = either_nothrow_reset<Left> && either_nothrow_reset<Right>;
+  static constexpr bool trivial_move_assignment = !resets_source && std::is_trivially_move_assignable_v<Storage>;
 
-template <typename Left, typename Right> Either<Left, Right>::Either() = default;
+public:
+  Either() = default;
+  Either(Either const&) = default;
+  Either& operator=(Either const&) = default;
 
-template <typename Left, typename Right>
-Either<Left, Right>::Either(EitherLeftValue<Left> left)
-  : m_value(std::move(left)) {}
+  Either(Either&&) requires (!resets_source) = default;
+  Either(Either&& source) noexcept(std::is_nothrow_move_constructible_v<Storage> && nothrow_reset)
+    requires (resets_source && std::is_move_constructible_v<Storage>)
+    : m_value(std::move(source.m_value)) {
+    source.reset_payload();
+  }
 
-template <typename Left, typename Right>
-Either<Left, Right>::Either(EitherRightValue<Right> right)
-  : m_value(std::move(right)) {}
-
-template <typename Left, typename Right>
-template <typename T>
-Either<Left, Right>::Either(EitherLeftValue<T> left)
-  : Either(LeftType{std::move(left.value)}) {}
-
-template <typename Left, typename Right>
-template <typename T>
-Either<Left, Right>::Either(EitherRightValue<T> right)
-  : Either(RightType{std::move(right.value)}) {}
-
-template <typename Left, typename Right>
-Either<Left, Right>::Either(Either const& rhs)
-  : m_value(rhs.m_value) {}
-
-template <typename Left, typename Right>
-Either<Left, Right>::Either(Either&& rhs)
-  : m_value(std::move(rhs.m_value)) {
-  std::visit([](auto& side) {
-    if constexpr (either_resettable_payload<std::remove_cvref_t<decltype(side.value)>>)
-      side.value.reset();
-  }, rhs.m_value);
-}
-
-template <typename Left, typename Right>
-Either<Left, Right>& Either<Left, Right>::operator=(Either const& rhs) = default;
-
-template <typename Left, typename Right>
-Either<Left, Right>& Either<Left, Right>::operator=(Either&& rhs) {
-  if (this == &rhs)
+  Either& operator=(Either&&) requires trivial_move_assignment = default;
+  Either& operator=(Either&& source) noexcept(std::is_nothrow_move_assignable_v<Storage> && nothrow_reset)
+    requires (!trivial_move_assignment && std::is_move_assignable_v<Storage>) {
+    if (this != std::addressof(source)) {
+      m_value = std::move(source.m_value);
+      if constexpr (resets_source)
+        source.reset_payload();
+    }
     return *this;
-  m_value = std::move(rhs.m_value);
-  std::visit([](auto& side) {
-    if constexpr (either_resettable_payload<std::remove_cvref_t<decltype(side.value)>>)
-      side.value.reset();
-  }, rhs.m_value);
-  return *this;
-}
+  }
 
-template <typename Left, typename Right>
-template <typename T>
-Either<Left, Right>& Either<Left, Right>::operator=(EitherLeftValue<T> left) {
-  m_value = LeftType{std::move(left.value)};
-  return *this;
-}
+  template <std::size_t Index, typename T>
+    requires either_payload_from<Side<Index>, T const&>
+  constexpr Either(EitherTag<Index, T> const& tag)
+    : m_value(std::in_place_index<Index>, tag.value) {}
 
-template <typename Left, typename Right>
-template <typename T>
-Either<Left, Right>& Either<Left, Right>::operator=(EitherRightValue<T> right) {
-  m_value = RightType{std::move(right.value)};
-  return *this;
-}
+  template <std::size_t Index, typename T>
+    requires either_payload_from<Side<Index>, T>
+  constexpr Either(EitherTag<Index, T>&& tag)
+    : m_value(std::in_place_index<Index>, std::move(tag.value)) {}
 
-template <typename Left, typename Right>
-bool Either<Left, Right>::isLeft() const {
-  return std::holds_alternative<LeftType>(m_value);
-}
+  // Capture the tag first: it may itself be a member of the active payload.
+  template <std::size_t Index, typename T>
+    requires either_payload_from<Side<Index>, T>
+  constexpr Either& operator=(EitherTag<Index, T> tag) {
+    m_value.template emplace<Index>(std::move(tag.value));
+    return *this;
+  }
 
-template <typename Left, typename Right>
-bool Either<Left, Right>::isRight() const {
-  return std::holds_alternative<RightType>(m_value);
-}
+  [[nodiscard]] constexpr bool is_left() const noexcept { return m_value.index() == 0; }
+  [[nodiscard]] constexpr bool is_right() const noexcept { return m_value.index() == 1; }
 
-template <typename Left, typename Right>
-void Either<Left, Right>::setLeft(Left left) {
-  m_value = LeftType{std::move(left)};
-}
+  // Own the replacement before destroying a side: value may alias its payload.
+  template <typename T>
+    requires (either_payload_from<Left, T> && either_payload_from<Left, Left>)
+  constexpr void set_left(T&& value) { *this = make_left<Left>(std::forward<T>(value)); }
+  template <typename T>
+    requires (either_payload_from<Right, T> && either_payload_from<Right, Right>)
+  constexpr void set_right(T&& value) { *this = make_right<Right>(std::forward<T>(value)); }
 
-template <typename Left, typename Right>
-void Either<Left, Right>::setRight(Right right) {
-  m_value = RightType{std::move(right)};
-}
+  [[nodiscard]] constexpr Left& left_ref() & { return std::get<0>(m_value); }
+  [[nodiscard]] constexpr Left const& left_ref() const& { return std::get<0>(m_value); }
+  void left_ref() const&& = delete;
+  [[nodiscard]] constexpr Right& right_ref() & { return std::get<1>(m_value); }
+  [[nodiscard]] constexpr Right const& right_ref() const& { return std::get<1>(m_value); }
+  void right_ref() const&& = delete;
 
-template <typename Left, typename Right>
-std::expected<std::reference_wrapper<Left const>, StarException> Either<Left, Right>::left() const {
-  if (auto l = maybeLeftRef())
-    return *l;
-  return std::unexpected(EitherException("Improper access of left side of Either"));
-}
+  [[nodiscard]] constexpr auto maybe_left_ref() & { return borrow<0>(*this); }
+  [[nodiscard]] constexpr auto maybe_left_ref() const& { return borrow<0>(*this); }
+  void maybe_left_ref() const&& = delete;
+  [[nodiscard]] constexpr auto maybe_right_ref() & { return borrow<1>(*this); }
+  [[nodiscard]] constexpr auto maybe_right_ref() const& { return borrow<1>(*this); }
+  void maybe_right_ref() const&& = delete;
 
-template <typename Left, typename Right>
-std::expected<std::reference_wrapper<Right const>, StarException> Either<Left, Right>::right() const {
-  if (auto r = maybeRightRef())
-    return *r;
-  return std::unexpected(EitherException("Improper access of right side of Either"));
-}
+  [[nodiscard]] auto left() & { return checked<0>(*this); }
+  [[nodiscard]] auto left() const& { return checked<0>(*this); }
+  void left() const&& = delete;
+  [[nodiscard]] auto right() & { return checked<1>(*this); }
+  [[nodiscard]] auto right() const& { return checked<1>(*this); }
+  void right() const&& = delete;
 
-template <typename Left, typename Right>
-std::expected<std::reference_wrapper<Left>, StarException> Either<Left, Right>::left() {
-  if (auto l = maybeLeftRef())
-    return *l;
-  return std::unexpected(EitherException("Improper access of left side of Either"));
-}
+  [[nodiscard]] constexpr std::optional<Left> maybe_left() const requires std::is_copy_constructible_v<Left> {
+    if (is_left())
+      return std::optional<Left>(std::in_place, left_ref());
+    return {};
+  }
+  [[nodiscard]] constexpr std::optional<Right> maybe_right() const requires std::is_copy_constructible_v<Right> {
+    if (is_right())
+      return std::optional<Right>(std::in_place, right_ref());
+    return {};
+  }
 
-template <typename Left, typename Right>
-std::expected<std::reference_wrapper<Right>, StarException> Either<Left, Right>::right() {
-  if (auto r = maybeRightRef())
-    return *r;
-  return std::unexpected(EitherException("Improper access of right side of Either"));
-}
+private:
+  void reset_payload() noexcept(nothrow_reset) requires resets_source {
+    if constexpr (either_resettable_payload<Left>)
+      if (is_left())
+        left_ref().reset();
+    if constexpr (either_resettable_payload<Right>)
+      if (is_right())
+        right_ref().reset();
+  }
 
-template <typename Left, typename Right>
-std::optional<Left> Either<Left, Right>::maybeLeft() const {
-  if (auto l = maybeLeftRef())
-    return std::optional<Left>(std::in_place, l->get());
-  return {};
-}
+  template <std::size_t Index, either_lvalue Self>
+    requires (Index < 2)
+  static constexpr auto borrow(Self&& self) {
+    using Result = std::optional<decltype(std::ref(std::get<Index>(self.m_value)))>;
+    if (self.m_value.index() == Index)
+      return Result(std::ref(std::get<Index>(self.m_value)));
+    return Result{};
+  }
 
-template <typename Left, typename Right>
-std::optional<Right> Either<Left, Right>::maybeRight() const {
-  if (auto r = maybeRightRef())
-    return std::optional<Right>(std::in_place, r->get());
-  return {};
-}
+  template <std::size_t Index, either_lvalue Self>
+    requires (Index < 2)
+  static auto checked(Self&& self) {
+    using Result = std::expected<decltype(std::ref(std::get<Index>(self.m_value))), StarException>;
+    if (auto ref = borrow<Index>(self))
+      return Result(*ref);
+    return Result(std::unexpect, EitherException(Index == 0
+        ? "Improper access of left side of Either" : "Improper access of right side of Either"));
+  }
 
-template <typename Left, typename Right>
-Left const& Either<Left, Right>::leftRef() const {
-  return std::get<LeftType>(m_value).value;
-}
-
-template <typename Left, typename Right>
-Right const& Either<Left, Right>::rightRef() const {
-  return std::get<RightType>(m_value).value;
-}
-
-template <typename Left, typename Right>
-Left& Either<Left, Right>::leftRef() {
-  return std::get<LeftType>(m_value).value;
-}
-
-template <typename Left, typename Right>
-Right& Either<Left, Right>::rightRef() {
-  return std::get<RightType>(m_value).value;
-}
-
-template <typename Left, typename Right>
-std::optional<std::reference_wrapper<Left const>> Either<Left, Right>::maybeLeftRef() const {
-  if (isLeft())
-    return std::reference_wrapper<Left const>(leftRef());
-  return std::nullopt;
-}
-
-template <typename Left, typename Right>
-std::optional<std::reference_wrapper<Right const>> Either<Left, Right>::maybeRightRef() const {
-  if (isRight())
-    return std::reference_wrapper<Right const>(rightRef());
-  return std::nullopt;
-}
-
-template <typename Left, typename Right>
-std::optional<std::reference_wrapper<Left>> Either<Left, Right>::maybeLeftRef() {
-  if (isLeft())
-    return std::reference_wrapper<Left>(leftRef());
-  return std::nullopt;
-}
-
-template <typename Left, typename Right>
-std::optional<std::reference_wrapper<Right>> Either<Left, Right>::maybeRightRef() {
-  if (isRight())
-    return std::reference_wrapper<Right>(rightRef());
-  return std::nullopt;
-}
+  Storage m_value;
+};
 
 }
 
@@ -290,9 +191,8 @@ export module star.either;
 export namespace Star {
   using ::Star::EitherExceptionTag;
   using ::Star::EitherException;
-  using ::Star::EitherLeftValue;
-  using ::Star::EitherRightValue;
-  using ::Star::makeLeft;
-  using ::Star::makeRight;
+  using ::Star::EitherTag;
+  using ::Star::make_left;
+  using ::Star::make_right;
   using ::Star::Either;
 }

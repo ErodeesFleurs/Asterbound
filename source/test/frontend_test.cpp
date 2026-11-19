@@ -14,6 +14,7 @@ import star.root;
 import star.configuration;
 import star.gui_context;
 import star.widget;
+import star.stack_widget;
 import star.button_widget;
 import star.button_group;
 import star.text_box_widget;
@@ -474,6 +475,29 @@ const GameTestRegistration keybindingSpecificity("KeyBindings", "MostSpecificMod
   ASSERT_TRUE(tied) << tied.error().what();
   EXPECT_EQ(tied->actions(KeyChord{Key::A, both}),
       (Set<InterfaceAction>{InterfaceAction::PlayerRight, InterfaceAction::PlayerUp}));
+});
+
+const GameTestRegistration stack_page_visibility("StackWidget", "PageSelectionPreservesVisibleChild", [](GameTest& fixture) {
+  auto configuration = fixture.root().configuration();
+  ASSERT_TRUE(configuration);
+  ASSERT_TRUE((*configuration)->set("bindings", JsonObject{}));
+  auto context = GuiContext::create(fixture.root(), {}, {});
+  ASSERT_TRUE(context) << context.error().what();
+  auto stack = std::make_shared<StackWidget>(**context);
+  auto first = std::make_shared<Widget>(**context);
+  auto second = std::make_shared<Widget>(**context);
+  ASSERT_TRUE(stack->addChild("one", first));
+  ASSERT_TRUE(stack->addChild("two", second));
+  EXPECT_TRUE(first->active());
+  EXPECT_FALSE(second->active());
+  ASSERT_TRUE(stack->showPage("two"));
+  EXPECT_FALSE(stack->showPage("missing"));
+  EXPECT_FALSE(stack->showPage(3));
+  EXPECT_FALSE(first->active());
+  EXPECT_TRUE(second->active());
+  ASSERT_TRUE(stack->showPage(std::size_t{0}));
+  EXPECT_TRUE(first->active());
+  EXPECT_FALSE(second->active());
 });
 
 const GameTestRegistration widgetParentLifetime("WidgetBorrow", "ReparentAndDestructionDetachEscapedChild", [](GameTest& fixture) {

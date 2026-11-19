@@ -32,7 +32,6 @@ import star.hash;
 import star.string_view;
 import star.directives;
 import star.asset_path;
-import star.either;
 import star.weighted_pool;
 import star.set;
 import star.worker_pool;

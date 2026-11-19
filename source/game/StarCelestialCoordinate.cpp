@@ -7,7 +7,6 @@ import star.json;
 import star.vector;
 import star.celestial_coordinate;
 import star.ordered_map;
-import star.either;
 import star.celestial_coordinate;
 import star.game_types;
 import star.color;

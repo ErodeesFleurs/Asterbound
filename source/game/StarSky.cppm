@@ -6,7 +6,6 @@ import star.json;
 import star.net_compatibility;
 import star.byte_array;
 
-import star.either;
 import star.vector;
 import star.celestial_coordinate;
 import star.game_types;

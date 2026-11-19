@@ -35,7 +35,6 @@ import star.version;
 import star.a_star;
 import star.spline;
 import star.observer_stream;
-import star.either;
 
 import star.lua_root;
 import star.lua_components;

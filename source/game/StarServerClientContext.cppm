@@ -10,7 +10,6 @@ import star.json_rpc;
 import star.rpc_promise;
 import star.game_types;
 import star.string;
-import star.either;
 import star.strong_typedef;
 import star.bi_map;
 import star.id_map;

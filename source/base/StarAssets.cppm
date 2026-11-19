@@ -4,7 +4,6 @@ import star.string;
 import star.map;
 import star.format;
 import star.json;
-import star.either;
 import star.byte_array;
 import star.ordered_map;
 import star.rect;

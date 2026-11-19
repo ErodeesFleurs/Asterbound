@@ -9,7 +9,6 @@ import star.json;
 import star.color;
 import star.bi_map;
 import star.sky_types;
-import star.either;
 import star.vector;
 import star.celestial_coordinate;
 import star.sky_parameters;

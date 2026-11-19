@@ -27,7 +27,6 @@ import star.game_types;
 import star.set;
 import star.audio;
 import star.map;
-import star.either;
 import star.random;
 import star.weighted_pool;
 import star.strong_typedef;

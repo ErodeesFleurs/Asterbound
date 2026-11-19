@@ -15,7 +15,6 @@ import star.game_types;
 import star.json_rpc;
 import star.rpc_promise;
 import star.string;
-import star.either;
 import star.strong_typedef;
 import star.data_stream_extra;
 import star.logging;

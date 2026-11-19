@@ -109,25 +109,164 @@ TEST(OptionalOperations, NestedDiagnosticsStopAtFirstPayloadFailure) {
   EXPECT_EQ(visited, (std::vector<int>{1, 2}));
 }
 
-TEST(OptionalOperations, EitherMovesConsumeNullablePayloadWithoutChangingSide) {
-  using Value = Either<std::optional<std::unique_ptr<int>>, int>;
-  Value source(makeLeft(std::optional<std::unique_ptr<int>>(std::in_place, std::make_unique<int>(42))));
+namespace {
+using MoveOnlyEither = Either<std::optional<std::unique_ptr<int>>, int>;
+using DuplicateEither = Either<int, int>;
+
+struct ThrowingReset : std::optional<int> {
+  void reset() noexcept(false) { std::optional<int>::reset(); }
+};
+
+struct ThrowingMove {
+  explicit ThrowingMove(int value) : value(value) {}
+  ThrowingMove(ThrowingMove&& source) noexcept(false) : value(source.value) {}
+  ThrowingMove& operator=(ThrowingMove&&) = delete;
+  int value;
+};
+
+template <typename T>
+concept has_either_borrow =
+    requires(T&& value) { std::forward<T>(value).left(); }
+    || requires(T&& value) { std::forward<T>(value).right(); }
+    || requires(T&& value) { std::forward<T>(value).left_ref(); }
+    || requires(T&& value) { std::forward<T>(value).right_ref(); }
+    || requires(T&& value) { std::forward<T>(value).maybe_left_ref(); }
+    || requires(T&& value) { std::forward<T>(value).maybe_right_ref(); };
+
+template <typename T>
+concept copies_left = requires(T const& value) { value.maybe_left(); };
+
+template <typename T>
+concept makes_byte_tag = requires(T value) { make_left<std::uint8_t>(value); };
+
+using ShortEither = Either<std::uint16_t, std::uint16_t>;
+static_assert(std::is_trivially_copyable_v<DuplicateEither>);
+static_assert(std::is_trivially_move_constructible_v<DuplicateEither>);
+static_assert(std::is_trivially_move_assignable_v<DuplicateEither>);
+static_assert(!std::is_copy_constructible_v<MoveOnlyEither> && !std::is_copy_assignable_v<MoveOnlyEither>);
+static_assert(std::is_nothrow_move_constructible_v<MoveOnlyEither> && std::is_nothrow_move_assignable_v<MoveOnlyEither>);
+static_assert(!std::is_nothrow_move_constructible_v<Either<int, ThrowingReset>>);
+static_assert(!std::is_nothrow_move_assignable_v<Either<int, ThrowingReset>>);
+using ConstructOnlyEither = Either<ThrowingMove, int>;
+static_assert(!std::default_initializable<ConstructOnlyEither>);
+static_assert(std::is_move_constructible_v<ConstructOnlyEither> && !std::is_nothrow_move_constructible_v<ConstructOnlyEither>);
+static_assert(!std::is_move_assignable_v<ConstructOnlyEither> && !std::is_copy_constructible_v<ConstructOnlyEither>);
+static_assert(!std::constructible_from<ConstructOnlyEither, decltype(make_left(123))>);
+static_assert(!copies_left<MoveOnlyEither> && copies_left<DuplicateEither>);
+static_assert(!has_either_borrow<DuplicateEither> && !has_either_borrow<DuplicateEither const>);
+static_assert(std::same_as<decltype(std::declval<DuplicateEither const&>().left_ref()), int const&>);
+static_assert(std::same_as<decltype(std::declval<DuplicateEither&>().right_ref()), int&>);
+static_assert(makes_byte_tag<std::uint8_t> && !makes_byte_tag<int>);
+static_assert(std::constructible_from<ShortEither, decltype(make_left(std::uint8_t{}))>);
+static_assert(!std::constructible_from<ShortEither, decltype(make_left(std::uint32_t{}))>);
+static_assert(!std::is_assignable_v<ShortEither&, decltype(make_right(1.5))>);
+}
+
+TEST(EitherOperations, MovesConsumeNullablePayloadWithoutChangingSide) {
+  using Value = MoveOnlyEither;
+  Value source(make_left(std::optional<std::unique_ptr<int>>(std::in_place, std::make_unique<int>(42))));
   Value moved(std::move(source));
-  EXPECT_TRUE(source.isLeft());
-  EXPECT_FALSE(source.leftRef());
-  ASSERT_TRUE(moved.leftRef());
-  EXPECT_EQ(**moved.leftRef(), 42);
-  Value destination(makeRight(7));
+  EXPECT_TRUE(source.is_left());
+  EXPECT_FALSE(source.left_ref());
+  ASSERT_TRUE(moved.left_ref());
+  EXPECT_EQ(**moved.left_ref(), 42);
+  Value destination(make_right(7));
   destination = std::move(moved);
-  EXPECT_TRUE(moved.isLeft());
-  EXPECT_FALSE(moved.leftRef());
-  ASSERT_TRUE(destination.isLeft());
-  ASSERT_TRUE(destination.leftRef());
-  EXPECT_EQ(**destination.leftRef(), 42);
+  EXPECT_TRUE(moved.is_left());
+  EXPECT_FALSE(moved.left_ref());
+  ASSERT_TRUE(destination.is_left());
+  ASSERT_TRUE(destination.left_ref());
+  EXPECT_EQ(**destination.left_ref(), 42);
   auto& alias = destination;
   destination = std::move(alias);
-  ASSERT_TRUE(destination.leftRef());
-  EXPECT_EQ(**destination.leftRef(), 42);
+  ASSERT_TRUE(destination.left_ref());
+  EXPECT_EQ(**destination.left_ref(), 42);
+
+  using RightNullable = Either<int, std::optional<int>>;
+  RightNullable right(make_right(std::optional{12}));
+  RightNullable transferred(std::move(right));
+  ASSERT_TRUE(right.is_right());
+  EXPECT_FALSE(right.right_ref());
+  EXPECT_EQ(transferred.right_ref(), std::optional{12});
+}
+
+TEST(EitherOperations, DuplicateSidesDistinguishBorrowsAndCopies) {
+  DuplicateEither value;
+  ASSERT_TRUE(value.is_left());
+  EXPECT_EQ(value.left_ref(), 0);
+  ASSERT_TRUE(value.left());
+  value.left()->get() = 12;
+  auto copy = value.maybe_left();
+  ASSERT_TRUE(value.maybe_left_ref());
+  value.maybe_left_ref()->get() = 34;
+  EXPECT_EQ(copy, std::optional{12});
+  EXPECT_FALSE(value.maybe_right());
+  EXPECT_FALSE(value.maybe_right_ref());
+  auto wrong_right = value.right();
+  ASSERT_FALSE(wrong_right);
+  EXPECT_TRUE(wrong_right.error().is<EitherException>());
+
+  value.set_right(value.left_ref());
+  ASSERT_TRUE(value.is_right());
+  auto const& readonly = value;
+  ASSERT_TRUE(readonly.right());
+  EXPECT_EQ(readonly.right()->get(), 34);
+  EXPECT_EQ(readonly.maybe_right_ref()->get(), 34);
+  EXPECT_FALSE(readonly.maybe_left_ref());
+  auto wrong_left = readonly.left();
+  ASSERT_FALSE(wrong_left);
+  EXPECT_TRUE(wrong_left.error().is<EitherException>());
+}
+
+TEST(EitherSerialization, DuplicatePayloadsUseHistoricalSideBytes) {
+  for (char tag : {1, 2}) {
+    ShortEither value = make_left(std::uint16_t{0x1234});
+    if (tag == 2)
+      value = make_right(std::uint16_t{0x1234});
+    DataStreamBuffer output;
+    ASSERT_TRUE(output << value);
+    std::array<char, 3> bytes{tag, 0x12, 0x34};
+    EXPECT_TRUE(std::ranges::equal(output.span(), bytes));
+
+    std::array<char, 4> frame{tag, 0x12, 0x34, 0x5a};
+    DataStreamExternalBuffer input(frame);
+    ShortEither restored = make_right(std::uint16_t{0xffff});
+    ASSERT_TRUE(input >> restored);
+    ASSERT_EQ(restored.is_left(), tag == 1);
+    EXPECT_EQ(tag == 1 ? restored.left_ref() : restored.right_ref(), 0x1234);
+    auto sentinel = input.read<std::uint8_t>();
+    ASSERT_TRUE(sentinel);
+    EXPECT_EQ(*sentinel, 0x5a);
+  }
+}
+
+TEST(EitherSerialization, UnrecognizedTagsConsumeOnlyTheDiscriminant) {
+  for (char tag : {char{0}, char{3}, static_cast<char>(0xff)}) {
+    std::array<char, 2> frame{tag, 0x5a};
+    DataStreamExternalBuffer input(frame);
+    ShortEither value = make_right(std::uint16_t{0x1234});
+    ASSERT_TRUE(input >> value);
+    ASSERT_TRUE(value.is_right());
+    EXPECT_EQ(value.right_ref(), 0x1234);
+    auto sentinel = input.read<std::uint8_t>();
+    ASSERT_TRUE(sentinel);
+    EXPECT_EQ(*sentinel, 0x5a);
+  }
+}
+
+TEST(EitherSerialization, TruncatedReadsDoNotPublishPartialPayloads) {
+  using Pair = std::pair<std::uint8_t, std::uint16_t>;
+  Pair const original{0xab, 0xcdef};
+  for (char tag : {1, 2}) {
+    std::array<char, 4> frame{tag, 0x12, 0x34, 0x56};
+    for (std::size_t length = 0; length < frame.size(); ++length) {
+      DataStreamExternalBuffer input(std::span<char const>(frame).first(length));
+      Either<Pair, Pair> value = make_left(original);
+      ASSERT_FALSE(input >> value);
+      ASSERT_TRUE(value.is_left());
+      EXPECT_EQ(value.left_ref(), original);
+    }
+  }
 }
 
 TEST(VariantSerialization, DiscriminantAndPayloadBytes) {

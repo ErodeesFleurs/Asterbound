@@ -26,7 +26,6 @@ import star.hash;
 import star.string_view;
 import star.directives;
 import star.asset_path;
-import star.either;
 import star.random;
 import star.periodic_function;
 import star.ordered_map;

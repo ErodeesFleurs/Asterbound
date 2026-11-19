@@ -32,7 +32,6 @@ import star.audio;
 import star.map;
 import star.id_map;
 import star.image;
-import star.either;
 import star.random;
 import star.weighted_pool;
 import star.strong_typedef;

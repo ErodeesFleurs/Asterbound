@@ -2124,7 +2124,10 @@ std::expected<void, StarException> UniverseServer::respondToCelestialRequests() 
         auto response = it->get();
         if (!response)
           return std::unexpected(std::move(response.error()));
-        responses.push_back(response->get());
+        // addCelestialRequests puts the only consumer handle directly in this queue.
+        if (responses.empty())
+          responses.reserve(entry.second.size());
+        responses.push_back(std::move(response->get()));
         it = entry.second.erase(it);
       } else {
         ++it;
@@ -3679,7 +3682,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
           return std::unexpected(std::move(system.error()));
         if (auto added = (*system)->addClient(clientId, client->playerUuid(), client->shipUpgrades().shipSpeed, client->shipLocation()); !added)
           return std::unexpected(std::move(added.error()));
-        if (auto requested = addCelestialRequests(clientId, {makeLeft(location.vec2()), makeRight(location)}); !requested) {
+        if (auto requested = addCelestialRequests(clientId, {make_left(location.vec2()), make_right(location)}); !requested) {
           auto removed = (*system)->removeClient(clientId);
           if (!removed)
             return std::unexpected(requested.error().with_related(removed.error(), "Removing failed system client failed"));

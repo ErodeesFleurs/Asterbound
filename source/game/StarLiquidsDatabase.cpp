@@ -168,7 +168,7 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::
         auto liquid = interaction.getUInt("liquid");
         if (!liquid)
           return std::unexpected(std::move(liquid.error()));
-        LiquidInteractionResult interactionResult;
+        auto other_id = static_cast<LiquidId>(*liquid);
         auto materialResult = interaction.optString("materialResult");
         if (!materialResult)
           return std::unexpected(std::move(materialResult.error()));
@@ -176,16 +176,15 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::
           auto material = materialDatabase->materialId(**materialResult);
           if (!material)
             return std::unexpected(std::move(material.error()));
-          interactionResult = makeLeft<MaterialId>(*material);
+          entry->interactions[other_id].emplace(make_left(*material));
         } else {
           auto liquidResult = interaction.optUInt("liquidResult");
           if (!liquidResult)
             return std::unexpected(std::move(liquidResult.error()));
           if (!*liquidResult)
             return std::unexpected(LiquidException::format("Neither resultMaterial or resultLiquid specified in liquid interaction of liquid {}", entry->id));
-          interactionResult = makeRight<LiquidId>(**liquidResult);
+          entry->interactions[other_id].emplace(make_right(static_cast<LiquidId>(**liquidResult)));
         }
-        entry->interactions[static_cast<LiquidId>(*liquid)] = std::move(interactionResult);
       }
       auto stored = result->m_settings.set(entry->id, entry);
       if (!stored)

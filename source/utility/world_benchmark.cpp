@@ -26,7 +26,6 @@ import star.ref_ptr;
 import star.listener;
 import star.id_map;
 import star.casting;
-import star.either;
 import star.image;
 import star.color;
 import star.vector;

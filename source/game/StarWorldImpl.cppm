@@ -20,7 +20,6 @@ import star.random;
 import star.perlin;
 import star.weighted_pool;
 import star.strong_typedef;
-import star.either;
 import star.image;
 import star.color;
 import star.thread;

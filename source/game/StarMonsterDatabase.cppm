@@ -58,7 +58,6 @@ import star.damage_types;
 import star.drawable;
 import star.entity_rendering_types;
 
-import star.either;
 import star.net_compatibility;
 import star.byte_array;
 namespace Star {

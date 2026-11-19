@@ -38,7 +38,6 @@ import star.logging;
 import star.listener;
 import star.version;
 import star.ordered_set;
-import star.either;
 
 
 import star.lua_root;

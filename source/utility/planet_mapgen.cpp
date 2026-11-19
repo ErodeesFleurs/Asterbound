@@ -3,7 +3,6 @@ import star.json;
 import star.output_proxy;
 import star.native_runtime;
 import star.ordered_map;
-import star.either;
 import star.vector;
 import star.game_types;
 import star.material_types;

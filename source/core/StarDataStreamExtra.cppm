@@ -463,30 +463,25 @@ template <typename T>
   return std::ref(ds);
 }
 
-// Writes / reads an Either type, an Either can either have a left or right
-// value, or in edge cases, nothing.
+// Historical Either wire tags are 1/2, unlike std::variant's 0/1.
+// Zero and unknown tags consume one byte and leave the destination unchanged.
 
 template <typename Left, typename Right>
   requires(stream_writable<Left> && stream_writable<Right>)
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException>
 operator<<(DataStream& ds, Either<Left, Right> const& either) {
-  if (either.isLeft()) {
-    auto tagWritten = ds.write<std::uint8_t>(1);
-    if (!tagWritten)
-      return std::unexpected(std::move(tagWritten.error()));
-    return ds << either.leftRef();
-  } else if (either.isRight()) {
-    auto tagWritten = ds.write<std::uint8_t>(2);
-    if (!tagWritten)
-      return std::unexpected(std::move(tagWritten.error()));
-    return ds << either.rightRef();
-  } else {
-    return ds.write<std::uint8_t>(0).transform([&ds] { return std::ref(ds); });
-  }
+  if (either.is_left())
+    return ds << std::uint8_t{1} << either.left_ref();
+  if (either.is_right())
+    return ds << std::uint8_t{2} << either.right_ref();
+  return ds << std::uint8_t{0};
 }
 
 template <typename Left, typename Right>
-  requires(stream_readable<Left> && stream_readable<Right>)
+  requires(stream_read_factory<Left> && stream_read_factory<Right> && requires(Either<Left, Right>& destination, Left& left, Right& right) {
+    destination.set_left(std::move(left));
+    destination.set_right(std::move(right));
+  })
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds,
                                                                                           Either<Left, Right>& either) {
   auto tag = ds.read<std::uint8_t>();
@@ -494,11 +489,11 @@ template <typename Left, typename Right>
   if (*tag == 1) {
     auto payload = ds.read<Left>();
     if (!payload) return std::unexpected(std::move(payload.error()));
-    either = makeLeft(std::move(*payload));
+    either.set_left(std::move(*payload));
   } else if (*tag == 2) {
     auto payload = ds.read<Right>();
     if (!payload) return std::unexpected(std::move(payload.error()));
-    either = makeRight(std::move(*payload));
+    either.set_right(std::move(*payload));
   }
   return std::ref(ds);
 }

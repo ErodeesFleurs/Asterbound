@@ -16,7 +16,6 @@ import star.thread;
 import star.directives;
 import star.asset_path;
 import star.ordered_map;
-import star.either;
 import star.vector;
 import star.poly;
 import star.game_types;

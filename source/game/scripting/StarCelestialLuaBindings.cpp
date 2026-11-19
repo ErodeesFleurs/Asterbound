@@ -5,7 +5,6 @@ import star.json_extra;
 import star.lua;
 import star.format;
 import star.string;
-import star.either;
 import star.data_stream;
 import star.strong_typedef;
 import star.ordered_set;

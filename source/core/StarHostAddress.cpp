@@ -27,7 +27,6 @@ import std;
 import star.text_formatter;
 import star.format;
 import star.string;
-import star.either;
 import star.host_address;
 import star.lexical_cast;
 import star.net_impl;

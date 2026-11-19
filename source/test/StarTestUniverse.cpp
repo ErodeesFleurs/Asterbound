@@ -30,7 +30,6 @@ import star.map;
 import star.set;
 import star.color;
 import star.string;
-import star.either;
 import star.random;
 import star.periodic_function;
 import star.image;

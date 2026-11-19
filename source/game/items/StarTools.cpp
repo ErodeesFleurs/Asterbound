@@ -35,7 +35,6 @@ import star.listener;
 import star.version;
 import star.image;
 import star.math_common;
-import star.either;
 import star.random;
 import star.weighted_pool;
 import star.net_compatibility;

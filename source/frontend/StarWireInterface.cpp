@@ -29,7 +29,6 @@ import star.strong_typedef;
 import star.image;
 import star.math_common;
 import star.version;
-import star.either;
 import star.random;
 import star.weighted_pool;
 import star.ordered_map;

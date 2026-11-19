@@ -19,7 +19,6 @@ import star.poly;
 import star.id_map;
 import star.set;
 import star.casting;
-import star.either;
 import star.interpolation;
 import star.bi_map;
 import star.random;

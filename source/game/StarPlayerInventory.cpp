@@ -37,7 +37,6 @@ import star.array;
 import star.ordered_set;
 import star.audio;
 import star.map;
-import star.either;
 import star.periodic_function;
 
 import star.lua_root;

@@ -40,7 +40,6 @@ import star.lua;
 import star.periodic_function;
 import star.audio;
 import star.map;
-import star.either;
 import star.image;
 import star.math_common;
 import star.worker_pool;

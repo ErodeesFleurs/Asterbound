@@ -483,24 +483,29 @@ CelestialBaseInformation CelestialMasterDatabase::baseInformation() const {
 std::expected<CelestialResponse, StarException> CelestialMasterDatabase::respondToRequest(CelestialRequest const& request) {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lockWithDiagnostics(locker);
-  if (auto location = request.maybeLeft()) {
-    auto loaded = getChunk(*location);
+  if (auto location = request.maybe_left_ref()) {
+    auto loaded = getChunk(location->get());
     if (!loaded)
       return std::unexpected(std::move(loaded.error()));
-    auto chunk = loaded->get();
-    // System objects are sent by separate system requests.
-    chunk.systemObjects.clear();
-    return makeLeft(std::move(chunk));
-  } else if (auto location = request.maybeRight()) {
-    auto chunk = getChunk(chunkIndexFor(*location));
-    if (!chunk)
-      return std::unexpected(std::move(chunk.error()));
-    auto planets = chunk->get().systemObjects.get(*location);
-    if (!planets)
-      return std::unexpected(std::move(planets.error()));
-    return makeRight(CelestialSystemObjects{*location, planets->get()});
+    auto const& cached = loaded->get();
+    // System objects stay in the cache for separate system requests. Copy the
+    // parameter map itself, not its entries, to retain bucket (wire) order.
+    std::expected<CelestialResponse, StarException> response(std::in_place);
+    auto& chunk = response->left_ref();
+    chunk.chunkIndex = cached.chunkIndex;
+    chunk.constellations = cached.constellations;
+    chunk.systemParameters = cached.systemParameters;
+    chunk.persistent = cached.persistent;
+    return response;
   }
-  return CelestialResponse();
+  auto const& location = request.right_ref();
+  auto chunk = getChunk(chunkIndexFor(location));
+  if (!chunk)
+    return std::unexpected(std::move(chunk.error()));
+  auto planets = chunk->get().systemObjects.get(location);
+  if (!planets)
+    return std::unexpected(std::move(planets.error()));
+  return make_right(CelestialSystemObjects{location, planets->get()});
 }
 
 std::expected<void, StarException> CelestialMasterDatabase::cleanupAndCommit() {
@@ -1236,7 +1241,7 @@ List<CelestialRequest> CelestialSlaveDatabase::pullRequests() {
   for (auto chunkIt = m_pendingChunkRequests.begin(); chunkIt != m_pendingChunkRequests.end();) {
     auto&& pair = *chunkIt;
     if (!pair.second.running()) {
-      requests.push_back(makeLeft(pair.first));
+      requests.push_back(make_left(pair.first));
       pair.second.restart(m_requestTimeout);
       ++chunkIt;
     } else if (pair.second.timeUp()) {
@@ -1249,7 +1254,7 @@ List<CelestialRequest> CelestialSlaveDatabase::pullRequests() {
   for (auto systemIt = m_pendingSystemRequests.begin(); systemIt != m_pendingSystemRequests.end();) {
     auto&& pair = *systemIt;
     if (!pair.second.running()) {
-      requests.push_back(makeRight(pair.first));
+      requests.push_back(make_right(pair.first));
       pair.second.restart(m_requestTimeout);
       ++systemIt;
     } else if (pair.second.timeUp()) {
@@ -1266,12 +1271,12 @@ std::expected<void, StarException> CelestialSlaveDatabase::pushResponses(List<Ce
   std::unique_lock locker(m_mutex, std::defer_lock);
   lockWithDiagnostics(locker);
   for (auto& response : responses) {
-    if (auto chunk = response.maybeLeftRef()) {
+    if (auto chunk = response.maybe_left_ref()) {
       m_pendingChunkRequests.remove(chunk->get().chunkIndex);
       auto stored = m_chunkCache.insert_or_assign(chunk->get().chunkIndex, std::move(chunk->get()));
       if (!stored)
         return std::unexpected(std::move(stored.error()));
-    } else if (auto objects = response.maybeRightRef()) {
+    } else if (auto objects = response.maybe_right_ref()) {
       m_pendingSystemRequests.remove(objects->get().systemLocation);
       auto chunk = m_chunkCache.find_ref(chunkIndexFor(objects->get().systemLocation));
       if (!chunk)

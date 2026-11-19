@@ -25,7 +25,6 @@ import star.weighted_pool;
 import star.id_map;
 import star.set;
 import star.casting;
-import star.either;
 import star.rpc_promise;
 import star.a_star;
 import star.ordered_set;

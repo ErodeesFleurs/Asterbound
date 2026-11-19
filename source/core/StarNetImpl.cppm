@@ -27,7 +27,6 @@ import star.string_windows;
 #endif
 import star.string;
 import star.format;
-import star.either;
 import star.host_address;
 
 #ifndef AI_ADDRCONFIG

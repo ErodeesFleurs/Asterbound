@@ -29,7 +29,6 @@ import star.hash;
 import star.string_view;
 import star.directives;
 import star.asset_path;
-import star.either;
 import star.random;
 import star.periodic_function;
 import star.ordered_map;
@@ -396,7 +395,8 @@ public:
 
   PlayerMode modeType() const;
   [[nodiscard]] std::expected<void, StarException> setModeType(PlayerMode mode);
-  PlayerModeConfig modeConfig() const;
+  PlayerModeConfig const& mode_config() const &;
+  PlayerModeConfig const& mode_config() const && = delete;
 
   ShipUpgrades shipUpgrades();
   void setShipUpgrades(ShipUpgrades shipUpgrades);

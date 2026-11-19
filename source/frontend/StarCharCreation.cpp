@@ -41,7 +41,6 @@ import star.version;
 import star.periodic_function;
 import star.image;
 import star.math_common;
-import star.either;
 import star.weighted_pool;
 import star.net_compatibility;
 import star.worker_pool;

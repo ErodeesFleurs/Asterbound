@@ -11,7 +11,6 @@ import star.format;
 import star.string;
 import star.lock_file;
 import star.thread;
-import star.either;
 import star.data_stream;
 import star.io_device;
 import star.byte_array;

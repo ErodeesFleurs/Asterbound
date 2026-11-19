@@ -4,7 +4,6 @@ import star.format;
 import star.text_formatter;
 
 import star.string;
-import star.either;
 
 namespace Star {
 

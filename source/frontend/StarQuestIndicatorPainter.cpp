@@ -6,7 +6,6 @@ import star.game_types;
 import star.id_map;
 import star.image;
 import star.version;
-import star.either;
 import star.random;
 import star.weighted_pool;
 import star.casting;

@@ -29,7 +29,6 @@ import star.audio;
 import star.map;
 import star.set;
 import star.observer_stream;
-import star.either;
 import star.a_star;
 import star.ordered_set;
 import star.io_device;

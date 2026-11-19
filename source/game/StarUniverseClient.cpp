@@ -877,7 +877,7 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
       }
     }
   }
-  if (!m_worldClient->mainPlayerDead() || m_mainPlayer->modeConfig().permadeath) {
+  if (!m_worldClient->mainPlayerDead() || m_mainPlayer->mode_config().permadeath) {
     m_respawnWarped = m_respawning = false;
   } else if (m_respawning) {
     if (m_respawnTimer.tick(dt)) {
@@ -967,7 +967,7 @@ std::expected<bool, StarException> UniverseClient::canBeamUp() const {
   if (rule == BeamUpRule::Anywhere || rule == BeamUpRule::AnywhereWithWarning)
     return true;
   if (rule == BeamUpRule::Surface) {
-    if (m_mainPlayer->modeConfig().allowBeamUpUnderground)
+    if (m_mainPlayer->mode_config().allowBeamUpUnderground)
       return true;
     return m_mainPlayer->isOutside();
   }

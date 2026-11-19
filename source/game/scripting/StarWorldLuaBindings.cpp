@@ -40,7 +40,6 @@ import star.periodic_function;
 import star.audio;
 import star.map;
 import star.ordered_set;
-import star.either;
 import star.io_device;
 import star.ref_ptr;
 import star.listener;

@@ -14,7 +14,6 @@ import star.format;
 import star.string;
 import star.lock_file;
 import star.game_types;
-import star.either;
 import star.data_stream;
 import star.rpc_promise;
 import star.io_device;

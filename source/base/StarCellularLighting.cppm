@@ -3,7 +3,6 @@ import std;
 import star.format;
 import star.json;
 
-import star.either;
 import star.rect;
 import star.image;
 import star.color;
@@ -161,8 +160,8 @@ public:
   void setupImage(Image& image, PixelFormat format = PixelFormat::RGB24) const;
 private:
   Json m_config;
-  bool m_monochrome;
-  Either<ColoredCellularLightArray, ScalarCellularLightArray> m_lightArray;
+  using LightArray = std::variant<ColoredCellularLightArray, ScalarCellularLightArray>;
+  LightArray m_light_array;
   RectI m_queryRegion;
   RectI m_calculationRegion;
 };
@@ -200,12 +199,18 @@ inline std::size_t CellularLightingCalculator::baseIndexFor(Vec2I const& positio
 }
 
 inline void CellularLightingCalculator::setCellIndex(std::size_t cellIndex, Vec3F const& light, bool obstacle) {
-  if (m_monochrome)
-    m_lightArray.rightRef().cellAtIndex(cellIndex) =
-      ScalarCellularLightArray::Cell{.light = light.sum() / 3, .obstacle = obstacle};
-  else
-    m_lightArray.leftRef().cellAtIndex(cellIndex) =
+  if (std::holds_alternative<ScalarCellularLightArray>(m_light_array)) {
+#if defined(__clang__)
+#pragma clang fp reassociate(off)
+#endif
+    // Preserve the channel grouping and reciprocal used by the native monochrome gather.
+    float intensity = ((light[0] + light[2]) + light[1]) * (1.0f / 3.0f);
+    std::get<ScalarCellularLightArray>(m_light_array).cellAtIndex(cellIndex) =
+      ScalarCellularLightArray::Cell{.light = intensity, .obstacle = obstacle};
+  } else {
+    std::get<ColoredCellularLightArray>(m_light_array).cellAtIndex(cellIndex) =
       ColoredCellularLightArray::Cell{.light = light, .obstacle = obstacle};
+  }
 }
 
 }

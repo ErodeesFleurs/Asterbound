@@ -14,7 +14,6 @@ import star.bi_map;
 import star.list;
 import star.rpc_promise;
 import star.observer_stream;
-import star.either;
 import star.interpolation;
 import star.random;
 import star.periodic_function;

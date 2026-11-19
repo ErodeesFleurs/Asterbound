@@ -39,7 +39,6 @@ import star.logging;
 import star.format;
 import star.version;
 import star.image;
-import star.either;
 import star.weighted_pool;
 import star.net_compatibility;
 import star.worker_pool;

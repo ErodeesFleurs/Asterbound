@@ -5,7 +5,6 @@ import star.json;
 import star.format;
 import star.game_types;
 import star.string;
-import star.either;
 import star.vector;
 import star.color;
 import star.bi_map;

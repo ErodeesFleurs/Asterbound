@@ -6,7 +6,6 @@ import star.id_map;
 import star.list;
 import star.bi_map;
 import star.casting;
-import star.either;
 import star.image;
 import star.color;
 import star.vector;

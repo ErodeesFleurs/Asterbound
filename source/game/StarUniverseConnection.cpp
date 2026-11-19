@@ -2,7 +2,6 @@ import star.json;
 import star.xx_hash;
 import star.io_device;
 import star.string;
-import star.either;
 import star.thread;
 import std;
 import star.id_map;

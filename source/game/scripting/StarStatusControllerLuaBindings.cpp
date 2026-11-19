@@ -9,7 +9,6 @@ import star.observer_stream;
 import star.strong_typedef;
 import star.data_stream;
 import star.id_map;
-import star.either;
 import star.game_types;
 import star.random;
 import star.periodic_function;

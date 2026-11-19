@@ -32,7 +32,6 @@ import star.rpc_promise;
 import star.strong_typedef;
 import star.a_star;
 import star.ordered_set;
-import star.either;
 import star.random;
 import star.periodic_function;
 

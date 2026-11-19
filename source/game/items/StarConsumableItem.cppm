@@ -32,7 +32,6 @@ import star.listener;
 import std;
 import star.version;
 import star.observer_stream;
-import star.either;
 import star.periodic_function;
 import star.audio;
 import star.map;

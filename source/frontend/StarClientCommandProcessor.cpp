@@ -43,7 +43,6 @@ import star.ref_ptr;
 import star.logging;
 import star.output_proxy;
 import star.version;
-import star.either;
 import star.weighted_pool;
 import star.data_stream_devices;
 
