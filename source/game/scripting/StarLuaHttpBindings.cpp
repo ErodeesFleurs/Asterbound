@@ -137,7 +137,7 @@ struct LuaHttpSession::Impl {
     if (!domain)
       return std::unexpected(std::move(domain.error()));
     std::unique_lock callbackLock(callbackMutex, std::defer_lock);
-    lockWithDiagnostics(callbackLock);
+    lock_with_diagnostics(callbackLock);
     std::uint64_t id;
     {
       std::lock_guard lock(mutex);
@@ -261,7 +261,7 @@ LuaHttpSession::~LuaHttpSession() {
 
 void LuaHttpSession::setHttpTrustRequestCallback(LuaBindings::HttpTrustRequestCallback callback) {
   std::unique_lock callbackLock(m_impl->callbackMutex, std::defer_lock);
-  lockWithDiagnostics(callbackLock);
+  lock_with_diagnostics(callbackLock);
   std::lock_guard lock(m_impl->mutex);
   if (!m_impl->stopped)
     m_impl->trustRequestCallback = std::move(callback);
@@ -269,7 +269,7 @@ void LuaHttpSession::setHttpTrustRequestCallback(LuaBindings::HttpTrustRequestCa
 
 void LuaHttpSession::clearHttpTrustRequestCallback() {
   std::unique_lock callbackLock(m_impl->callbackMutex, std::defer_lock);
-  lockWithDiagnostics(callbackLock);
+  lock_with_diagnostics(callbackLock);
   m_impl->trustRequestCallback = {};
 }
 
@@ -371,7 +371,7 @@ std::expected<void, StarException> LuaHttpSession::cancel(std::uint64_t id) {
 
 std::expected<void, StarException> LuaHttpSession::stop() {
   std::unique_lock callbackLock(m_impl->callbackMutex, std::defer_lock);
-  lockWithDiagnostics(callbackLock);
+  lock_with_diagnostics(callbackLock);
   std::optional<StarException> error;
   auto remember = [&](auto result) {
     if (!result) {

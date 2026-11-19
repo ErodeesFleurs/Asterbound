@@ -65,13 +65,13 @@ ServerQueryThread::~ServerQueryThread() {
   stop();
   if (auto joined = join(); !joined)
     EmergencyLog::error("Query server shutdown failed: {}", joined.error().what());
-  if (!isJoined())
+  if (!is_joined())
     Star::fatal_error("Cannot destroy a query server with an unjoined native worker", false);
 }
 
 std::expected<void, StarException> ServerQueryThread::start() {
   // A completed but unjoined run still owns its cancellation state.
-  if (!isJoined())
+  if (!is_joined())
     return {};
   m_stopSource = std::stop_source{};
   m_lastActiveTime = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));

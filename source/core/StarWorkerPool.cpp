@@ -179,7 +179,7 @@ std::expected<void, StarException> WorkerPool::join_workers(std::optional<StarEx
     }
     std::lock_guard work_lock(m_work_mutex);
     if (failure)
-      std::erase_if(m_worker_threads, [](std::unique_ptr<WorkerThread> const& worker) { return worker->isJoined(); });
+      std::erase_if(m_worker_threads, [](std::unique_ptr<WorkerThread> const& worker) { return worker->is_joined(); });
     else
       m_worker_threads.clear();
   }

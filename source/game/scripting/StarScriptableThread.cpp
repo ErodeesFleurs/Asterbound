@@ -139,7 +139,7 @@ std::expected<void, StarException> ScriptableThread::removeCallbacks(String cons
 }
 
 std::expected<bool, StarException> ScriptableThread::start() {
-  if (!isJoined())
+  if (!is_joined())
     return false;
   {
     std::scoped_lock locks(m_messageMutex, m_sleepMutex);
@@ -173,7 +173,7 @@ std::expected<void, StarException> ScriptableThread::stop() {
   List<Message> messages;
   {
     std::unique_lock locker(m_messageMutex, std::defer_lock);
-    lockWithDiagnostics(locker);
+    lock_with_diagnostics(locker);
     messages = std::move(m_messages);
   }
   std::optional<StarException> error;
@@ -200,7 +200,7 @@ bool ScriptableThread::shouldExpire() { return m_shouldExpire.load(std::memory_o
 
 std::expected<void, StarException> ScriptableThread::passMessage(Message&& message) {
   std::unique_lock locker(m_messageMutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   if (m_errorOccurred)
     return message.promise.fail("Thread failed");
   if (m_stopSource.stop_requested() || m_shouldExpire)
@@ -275,7 +275,7 @@ std::expected<void, StarException> ScriptableThread::run() {
   List<Message> messages;
   {
     std::unique_lock locker(m_messageMutex, std::defer_lock);
-    lockWithDiagnostics(locker);
+    lock_with_diagnostics(locker);
     requestStop();
     messages = std::move(m_messages);
   }
@@ -336,7 +336,7 @@ std::expected<void, StarException> ScriptableThread::update() {
   List<Message> messages;
   {
     std::unique_lock locker(m_messageMutex, std::defer_lock);
-    lockWithDiagnostics(locker);
+    lock_with_diagnostics(locker);
     messages = std::move(m_messages);
   }
   for (auto& message : messages) {

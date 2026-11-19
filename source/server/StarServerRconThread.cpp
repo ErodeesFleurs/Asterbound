@@ -45,7 +45,7 @@ ServerRconClient::~ServerRconClient() {
   stop();
   if (auto joined = join(); !joined)
     EmergencyLog::error("RCON client shutdown failed: {}", joined.error().what());
-  if (!isJoined())
+  if (!is_joined())
     Star::fatal_error("Cannot destroy an RCON client with an unjoined native worker", false);
 }
 
@@ -134,7 +134,7 @@ std::expected<void, StarException> ServerRconClient::sendCmdResponse(std::uint32
 
 std::expected<void, StarException> ServerRconClient::start() {
   // Do not replace a source until the previous native run has been joined.
-  if (!isJoined())
+  if (!is_joined())
     return {};
   m_stopSource = std::stop_source{};
   auto started = Thread::start();
@@ -307,7 +307,7 @@ ServerRconThread::~ServerRconThread() {
     EmergencyLog::error("RCON server stop failed: {}", stopped.error().what());
   if (auto joined = join(); !joined)
     EmergencyLog::error("RCON server shutdown failed: {}", joined.error().what());
-  if (!isJoined())
+  if (!is_joined())
     Star::fatal_error("Cannot destroy an RCON server with an unjoined native worker", false);
 }
 
@@ -318,7 +318,7 @@ void ServerRconThread::clearClients(bool all) {
     auto client = pair.second;
     if (all)
       client->stop();
-    else if (!client->isRunning()) {
+    else if (!client->is_running()) {
       it = m_clients.erase(it);
       continue;
     }
@@ -328,7 +328,7 @@ void ServerRconThread::clearClients(bool all) {
 
 std::expected<void, StarException> ServerRconThread::start() {
   // Do not replace a source until the previous native run has been joined.
-  if (!isJoined())
+  if (!is_joined())
     return {};
   m_stopSource = std::stop_source{};
   auto started = Thread::start();

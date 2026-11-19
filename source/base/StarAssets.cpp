@@ -1719,7 +1719,7 @@ std::expected<void, StarException> Assets::workerMain(std::stop_token stopToken)
         std::expected<void, StarException> collected;
         {
           std::unique_lock luaLocker(m_luaMutex, std::defer_lock);
-          lockWithDiagnostics(luaLocker);
+          lock_with_diagnostics(luaLocker);
           collected = as_ref<LuaEngine>(*m_luaEngine)->get().collectGarbage();
         }
         assetsLocker.lock();
@@ -1891,7 +1891,7 @@ std::expected<std::shared_ptr<Image const>, StarException> Assets::readImage(Str
 
 std::expected<std::shared_ptr<Image const>, StarException> Assets::applyImagePatches(std::shared_ptr<Image const> image, String const& path, List<std::pair<String, std::shared_ptr<AssetSource>>> patches) const {
   std::unique_lock luaLocker(m_luaMutex, std::defer_lock);
-  lockWithDiagnostics(luaLocker);
+  lock_with_diagnostics(luaLocker);
   auto& luaEngine = as_ref<LuaEngine>(*m_luaEngine)->get();
   auto imageUserData = luaEngine.createUserData(*image);
   if (!imageUserData)
@@ -1911,7 +1911,7 @@ std::expected<std::shared_ptr<Image const>, StarException> Assets::applyImagePat
       return std::unexpected(std::move(isLua.error()));
     if (*isLua) {
       PatchContextKey contextKey{.source = std::ref(*patchSource), .path = patchPath};
-      lockWithDiagnostics(luaLocker);
+      lock_with_diagnostics(luaLocker);
       std::shared_ptr<LuaContext>& context = m_patchContexts[contextKey];
       if (!context) {
         auto createdContext = luaEngine.createContext();
@@ -2061,7 +2061,7 @@ std::expected<Json, StarException> Assets::applyJsonPatches(Json const& input, S
     if (*isLua) {
       PatchContextKey contextKey{.source = std::ref(*patchSource), .path = patchBasePath};
       std::unique_lock luaLocker(m_luaMutex, std::defer_lock);
-      lockWithDiagnostics(luaLocker);
+      lock_with_diagnostics(luaLocker);
       std::shared_ptr<LuaContext>& context = m_patchContexts[contextKey];
       if (!context) {
         auto createdContext = as_ref<LuaEngine>(*m_luaEngine)->get().createContext();

@@ -283,7 +283,7 @@ static std::expected<void, StarException> runServer(int argc, char** argv, bool&
         return std::unexpected(std::move(rconStarted.error()));
     }
 
-    while (server->isRunning()) {
+    while (server->is_running()) {
       if (signalHandler.interruptCaught()) {
         auto interruptLogged = root->logger().info("Interrupt caught!");
         if (!interruptLogged)

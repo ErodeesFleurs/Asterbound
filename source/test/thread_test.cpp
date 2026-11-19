@@ -1,4 +1,5 @@
 import std;
+import star.algorithm;
 import star.unique_function;
 import star.thread;
 import star.string;
@@ -8,6 +9,313 @@ import star.format;
 #include "gtest/gtest.h"
 
 using namespace Star;
+
+namespace {
+using IntResult = std::expected<int, StarException>;
+
+template <typename Function, typename... Args>
+concept can_invoke_thread = requires(String const& name, Function&& function, Args&&... args) {
+  Thread::invoke(name, std::forward<Function>(function), std::forward<Args>(args)...);
+};
+
+template <typename Return, typename Function>
+concept can_create_thread = requires(String const& name, Function&& function) {
+  ThreadFunction<Return>::create(std::forward<Function>(function), name);
+};
+
+struct ConvertibleResult {
+  using value_type = int;
+  operator IntResult() const;
+};
+
+struct Immobile {
+  Immobile(Immobile&&) = delete;
+};
+
+struct UnstorableTask {
+  std::expected<Immobile, StarException> operator()() const;
+};
+
+using WrongError = decltype([] { return std::expected<int, int>(42); });
+struct BorrowedResult {
+  IntResult& operator()() const;
+};
+struct RvalueTask {
+  IntResult operator()() &&;
+};
+using ConvertibleTask = decltype([] { return ConvertibleResult{}; });
+using OwnedArgument = decltype([](std::unique_ptr<int>& value) -> IntResult { return *value; });
+
+static_assert(!can_invoke_thread<WrongError> && !can_create_thread<int, WrongError>);
+static_assert(!can_invoke_thread<ConvertibleTask> && !can_create_thread<int, ConvertibleTask>);
+static_assert(!can_invoke_thread<decltype([] { return 42; })>);
+static_assert(!can_invoke_thread<BorrowedResult> && !can_create_thread<int, BorrowedResult>);
+static_assert(!can_invoke_thread<RvalueTask> && !can_create_thread<int, RvalueTask>);
+static_assert(!can_create_thread<void, decltype([] { return std::expected<void, int>{}; })>);
+static_assert(!can_invoke_thread<UnstorableTask> && !can_create_thread<Immobile, UnstorableTask>);
+static_assert(can_invoke_thread<OwnedArgument, std::unique_ptr<int>>);
+static_assert(!can_invoke_thread<OwnedArgument, std::unique_ptr<int>&>);
+
+struct ProbeThread final : Thread {
+  using Thread::Thread;
+  std::function<void()> probe;
+  std::expected<void, StarException> run() override {
+    probe();
+    return {};
+  }
+};
+
+// Unlike a type containing a latch, the concrete probe would be movable if
+// Thread accidentally allowed moving the owner of a borrowed virtual run().
+static_assert(!std::is_move_constructible_v<ProbeThread> && !std::is_move_assignable_v<ProbeThread>);
+static_assert(!std::is_copy_constructible_v<ProbeThread> && !std::is_copy_assignable_v<ProbeThread>);
+static_assert(std::movable<ThreadFunction<int>> && std::movable<ThreadFunction<void>>);
+
+#if GTEST_HAS_DEATH_TEST
+[[noreturn]] void run_bounded(std::invocable auto&& scenario) {
+  std::thread([] {
+    std::this_thread::sleep_for(std::chrono::seconds(10));
+    std::_Exit(124);
+  }).detach();
+  scenario();
+  std::_Exit(testing::Test::HasFailure() ? 1 : 0);
+}
+
+void exercise_restart() {
+  std::binary_semaphore entered(0), resume(0);
+  unsigned runs = 0;
+  ProbeThread thread("restart");
+  thread.probe = [&] {
+    ++runs;
+    entered.release();
+    resume.acquire();
+  };
+  EXPECT_EQ(std::as_const(thread).name(), "restart");
+  for (unsigned i = 1; i <= 3; ++i) {
+    EXPECT_TRUE(thread.is_joined());
+    EXPECT_FALSE(thread.is_running());
+    ASSERT_TRUE(thread.start().value_or(false));
+    entered.acquire();
+    EXPECT_TRUE(thread.is_running());
+    EXPECT_FALSE(thread.is_joined());
+    EXPECT_FALSE(thread.start().value_or(true));
+    resume.release();
+    while (thread.is_running())
+      std::this_thread::yield();
+    EXPECT_FALSE(thread.is_joined());
+    EXPECT_FALSE(thread.start().value_or(true));
+    EXPECT_TRUE(thread.join().value_or(false));
+    EXPECT_FALSE(thread.join().value_or(true));
+    EXPECT_EQ(runs, i);
+  }
+}
+
+void exercise_concurrent_join() {
+  ProbeThread thread("self-join");
+  std::latch entered(1), joining(1), check(1);
+  thread.probe = [&] {
+    entered.count_down();
+    check.wait();
+    EXPECT_TRUE(thread.is_running());
+    EXPECT_FALSE(thread.is_joined());
+    EXPECT_FALSE(thread.join().has_value());
+    EXPECT_FALSE(thread.is_joined());
+  };
+  ASSERT_TRUE(thread.start().value_or(false));
+  entered.wait();
+  auto joined = std::async(std::launch::async, [&] {
+    joining.count_down();
+    return thread.join();
+  });
+  joining.wait();
+  EXPECT_EQ(joined.wait_for(std::chrono::milliseconds(25)), std::future_status::timeout);
+  EXPECT_FALSE(thread.is_joined());
+  check.count_down();
+  EXPECT_TRUE(joined.get().value_or(false));
+  EXPECT_TRUE(thread.is_joined());
+  EXPECT_FALSE(thread.is_running());
+}
+
+void exercise_self_finish() {
+  ThreadFunction<int> task;
+  std::latch published(1), rejected(1);
+  auto started = Thread::invoke("self-finish", [&]() -> IntResult {
+    published.wait();
+    EXPECT_FALSE(task.finish());
+    EXPECT_FALSE(task.is_finished());
+    rejected.count_down();
+    return 17;
+  });
+  ASSERT_TRUE(started);
+  task = std::move(*started);
+  published.count_down();
+  rejected.wait();
+  EXPECT_EQ(task.finish().value_or(0), 17);
+  EXPECT_FALSE(task.finish());
+}
+
+template <typename Return>
+  requires (std::same_as<Return, int> || std::same_as<Return, void>)
+void exercise_capture_release(bool fail) {
+  auto const caller = std::this_thread::get_id();
+  unsigned releases = 0;
+  bool finishing = false;
+  ThreadFunction<Return> task;
+  auto cleanup = make_scope_exit([&] {
+    EXPECT_EQ(std::this_thread::get_id(), caller);
+    if (std::this_thread::get_id() != caller)
+      return;
+    ++releases;
+    EXPECT_TRUE(finishing);
+    if (!finishing)
+      return;
+    EXPECT_TRUE(task.is_finished());
+    EXPECT_FALSE(task.is_running());
+    auto nested = task.finish();
+    if constexpr (std::is_void_v<Return>) {
+      EXPECT_TRUE(nested);
+    } else {
+      ASSERT_FALSE(nested);
+      EXPECT_FALSE(nested.error().template is<IOException>());
+    }
+  });
+  auto started = Thread::invoke("capture-release",
+      [cleanup = std::move(cleanup), fail]() -> std::expected<Return, StarException> {
+        if (fail)
+          return std::unexpected(IOException("capture-release", false));
+        if constexpr (std::is_void_v<Return>)
+          return {};
+        else
+          return 42;
+      });
+  ASSERT_TRUE(started);
+  task = std::move(*started);
+  while (task.is_running())
+    std::this_thread::yield();
+  EXPECT_FALSE(task.is_finished());
+  EXPECT_EQ(releases, 0u);
+  finishing = true;
+  auto result = task.finish();
+  finishing = false;
+  EXPECT_EQ(releases, 1u);
+  if (fail) {
+    ASSERT_FALSE(result);
+    EXPECT_TRUE(result.error().template is<IOException>());
+  } else {
+    ASSERT_TRUE(result);
+    if constexpr (!std::is_void_v<Return>) {
+      EXPECT_EQ(*result, 42);
+    }
+  }
+  EXPECT_EQ(task.finish().has_value(), std::is_void_v<Return>);
+}
+
+void exercise_result_move() {
+  struct Value {
+    explicit Value(std::function<void()>& observe) : observe(observe) {}
+    Value(Value&& other) noexcept : observe(other.observe), payload(std::exchange(other.payload, 0)) {
+      observe();
+    }
+    std::function<void()>& observe;
+    int payload = 42;
+  };
+  std::function<void()> observe;
+  ThreadFunction<Value> task;
+  auto const caller = std::this_thread::get_id();
+  bool armed = false;
+  observe = [&] {
+    if (std::this_thread::get_id() == caller && std::exchange(armed, false)) {
+      EXPECT_FALSE(task.finish());
+    }
+  };
+  auto started = Thread::invoke("result-move", [&]() -> std::expected<Value, StarException> {
+    return Value(observe);
+  });
+  ASSERT_TRUE(started);
+  task = std::move(*started);
+  armed = true;
+  auto result = task.finish();
+  ASSERT_TRUE(result);
+  EXPECT_EQ(result->payload, 42);
+  EXPECT_FALSE(armed);
+  EXPECT_FALSE(task.finish());
+}
+
+void exercise_handle_retirement(bool replace) {
+  auto const caller = std::this_thread::get_id();
+  bool retiring = false;
+  unsigned releases = 0;
+  {
+    ThreadFunction<int> task;
+    auto outgoing = Thread::invoke("outgoing", [cleanup = make_scope_exit([&] {
+      EXPECT_EQ(std::this_thread::get_id(), caller);
+      if (std::this_thread::get_id() != caller || !retiring)
+        return;
+      ++releases;
+      auto nested = task.finish();
+      if (replace) {
+        EXPECT_EQ(nested.value_or(-1), 22);
+      } else {
+        EXPECT_FALSE(nested);
+      }
+    })]() -> IntResult { return 11; });
+    ASSERT_TRUE(outgoing);
+    task = std::move(*outgoing);
+    if (replace) {
+      auto incoming = Thread::invoke("incoming", []() -> IntResult { return 22; });
+      ASSERT_TRUE(incoming);
+      retiring = true;
+      task = std::move(*incoming);
+      EXPECT_EQ(releases, 1u);
+      EXPECT_FALSE(task.finish());
+    } else {
+      retiring = true;
+    }
+  }
+  EXPECT_EQ(releases, 1u);
+}
+#endif
+}
+
+#if GTEST_HAS_DEATH_TEST
+TEST(Thread, JoinedRunningAndStoppedBeforeRestart) {
+  testing::GTEST_FLAG(death_test_style) = "threadsafe";
+  EXPECT_EXIT(run_bounded(exercise_restart), testing::ExitedWithCode(0), "");
+}
+
+TEST(Thread, ExternalJoinDoesNotBlockWorkerQueryOrSelfJoin) {
+  testing::GTEST_FLAG(death_test_style) = "threadsafe";
+  EXPECT_EXIT(run_bounded(exercise_concurrent_join), testing::ExitedWithCode(0), "");
+}
+
+TEST(Thread, FailedSelfFinishPreservesTypedResult) {
+  testing::GTEST_FLAG(death_test_style) = "threadsafe";
+  EXPECT_EXIT(run_bounded(exercise_self_finish), testing::ExitedWithCode(0), "");
+}
+
+TEST(Thread, FinishReleasesCapturesOutsideJoinBeforeReturning) {
+  testing::GTEST_FLAG(death_test_style) = "threadsafe";
+  EXPECT_EXIT(run_bounded([] {
+    for (bool fail : {false, true}) {
+      exercise_capture_release<int>(fail);
+      exercise_capture_release<void>(fail);
+    }
+  }), testing::ExitedWithCode(0), "");
+}
+
+TEST(Thread, MovingResultCannotReenterAndConsumeItTwice) {
+  testing::GTEST_FLAG(death_test_style) = "threadsafe";
+  EXPECT_EXIT(run_bounded(exercise_result_move), testing::ExitedWithCode(0), "");
+}
+
+TEST(Thread, RetiringCaptureSeesReplacementOrWithdrawnResult) {
+  testing::GTEST_FLAG(death_test_style) = "threadsafe";
+  EXPECT_EXIT(run_bounded([] {
+    exercise_handle_retirement(false);
+    exercise_handle_retirement(true);
+  }), testing::ExitedWithCode(0), "");
+}
+#endif
 
 TEST(Thread, InvokeErrors) {
   auto function = Thread::invoke("test", []() -> std::expected<void, StarException> {
@@ -21,14 +329,14 @@ TEST(Thread, InvokeErrors) {
 }
 
 TEST(Thread, InvokeReturn) {
-  auto functionRet = Thread::invoke("test", []() -> std::expected<String, StarException> {
+  auto task = Thread::invoke("test", []() -> std::expected<String, StarException> {
     return String("TestValue");
   });
-  ASSERT_TRUE(functionRet);
-  auto value = functionRet->finish();
+  ASSERT_TRUE(task);
+  auto value = task->finish();
   ASSERT_TRUE(value);
   EXPECT_EQ(*value, String("TestValue"));
-  auto consumed = functionRet->finish();
+  auto consumed = task->finish();
   ASSERT_FALSE(consumed);
 }
 
@@ -52,8 +360,39 @@ TEST(Thread, MoveOnlyCallableAndMemberInvocation) {
   EXPECT_EQ(target.value, 12);
   auto empty = ThreadFunction<void>::create(UniqueFunction<std::expected<void, StarException>()>{}, "empty");
   ASSERT_TRUE(empty);
-  auto emptyFinish = empty->finish();
-  ASSERT_FALSE(emptyFinish);
+  EXPECT_FALSE(empty->finish());
+}
+
+TEST(Thread, InvokeUsesStoredLvaluesAndUnwrapsReferenceArguments) {
+  struct Overloaded {
+    IntResult operator()(int& n, std::unique_ptr<int>& amount) & { return n += *amount; }
+    ConvertibleResult operator()(std::reference_wrapper<int>&, std::unique_ptr<int>&) & = delete;
+    IntResult operator()(int&, std::unique_ptr<int>&) && = delete;
+  };
+  int n = 5;
+  auto task = Thread::invoke("stored-args", Overloaded{}, std::ref(n), std::make_unique<int>(7));
+  ASSERT_TRUE(task);
+  EXPECT_EQ(task->finish().value_or(0), 12);
+  EXPECT_EQ(n, 12);
+}
+
+TEST(Thread, NullTargetsLaunchWithCheckedTaskFailures) {
+  struct Target {
+    IntResult member(int);
+  } target;
+  auto member = Thread::invoke("null-member", decltype(&Target::member){}, std::ref(target), 1);
+  ASSERT_TRUE(member);
+  EXPECT_FALSE(member->finish());
+  using Function = IntResult (*)(int);
+  auto function = Thread::invoke("null-function", Function{}, 1);
+  ASSERT_TRUE(function);
+  EXPECT_FALSE(function->finish());
+  auto typed = ThreadFunction<int>::create(nullptr, "null-typed");
+  ASSERT_TRUE(typed);
+  EXPECT_FALSE(typed->finish());
+  auto empty = ThreadFunction<void>::create(nullptr, "null-void");
+  ASSERT_TRUE(empty);
+  EXPECT_FALSE(empty->finish());
 }
 
 TEST(Thread, UniqueCallableOwnershipAlignmentAndEmptyState) {

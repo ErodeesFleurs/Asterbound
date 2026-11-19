@@ -482,7 +482,7 @@ CelestialBaseInformation CelestialMasterDatabase::baseInformation() const {
 
 std::expected<CelestialResponse, StarException> CelestialMasterDatabase::respondToRequest(CelestialRequest const& request) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   if (auto location = request.maybe_left_ref()) {
     auto loaded = getChunk(location->get());
     if (!loaded)
@@ -510,7 +510,7 @@ std::expected<CelestialResponse, StarException> CelestialMasterDatabase::respond
 
 std::expected<void, StarException> CelestialMasterDatabase::cleanupAndCommit() {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   m_chunkCache.cleanup();
   if (m_database.is_open() && m_commitTimer.timeUp()) {
     auto committed = m_database.commit();
@@ -523,7 +523,7 @@ std::expected<void, StarException> CelestialMasterDatabase::cleanupAndCommit() {
 
 std::expected<void, StarException> CelestialMasterDatabase::close() {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   if (std::exchange(m_closeAttempted, true))
     return {};
   return m_database.close(true);
@@ -531,7 +531,7 @@ std::expected<void, StarException> CelestialMasterDatabase::close() {
 
 std::expected<bool, StarException> CelestialMasterDatabase::coordinateValid(CelestialCoordinate const& coordinate) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   if (!coordinate)
     return false;
   auto chunk = getChunk(chunkIndexFor(coordinate));
@@ -617,7 +617,7 @@ std::expected<std::optional<CelestialCoordinate>, StarException> CelestialMaster
 
 std::expected<std::optional<CelestialParameters>, StarException> CelestialMasterDatabase::parameters(CelestialCoordinate const& coordinate) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   auto valid = coordinateValid(coordinate);
   if (!valid)
     return std::unexpected(std::move(valid.error()));
@@ -666,7 +666,7 @@ std::expected<std::optional<String>, StarException> CelestialMasterDatabase::nam
 
 std::expected<std::optional<bool>, StarException> CelestialMasterDatabase::hasChildren(CelestialCoordinate const& coordinate) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   auto valid = coordinateValid(coordinate);
   if (!valid)
     return std::unexpected(std::move(valid.error()));
@@ -708,7 +708,7 @@ std::expected<List<CelestialCoordinate>, StarException> CelestialMasterDatabase:
 
 std::expected<List<int>, StarException> CelestialMasterDatabase::childOrbits(CelestialCoordinate const& coordinate) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   auto valid = coordinateValid(coordinate);
   if (!valid)
     return std::unexpected(std::move(valid.error()));
@@ -737,13 +737,13 @@ std::expected<List<int>, StarException> CelestialMasterDatabase::childOrbits(Cel
 std::expected<List<CelestialCoordinate>, StarException> CelestialMasterDatabase::scanSystems(
     RectI const& region, std::optional<StringSet> const& includedTypes) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   List<CelestialCoordinate> systems;
   for (auto const& location : chunkIndexesFor(region)) {
     auto chunk = getChunk(location, [&](std::function<std::expected<void, StarException>()>&& produce) -> std::expected<void, StarException> {
       locker.unlock();
       auto result = produce();
-      lockWithDiagnostics(locker);
+      lock_with_diagnostics(locker);
       return result;
     });
     if (!chunk)
@@ -766,7 +766,7 @@ std::expected<List<CelestialCoordinate>, StarException> CelestialMasterDatabase:
 
 std::expected<List<std::pair<Vec2I, Vec2I>>, StarException> CelestialMasterDatabase::scanConstellationLines(RectI const& region) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   List<std::pair<Vec2I, Vec2I>> lines;
   for (auto const& location : chunkIndexesFor(region)) {
     auto chunk = getChunk(location);
@@ -787,7 +787,7 @@ std::expected<bool, StarException> CelestialMasterDatabase::scanRegionFullyLoade
 std::expected<void, StarException> CelestialMasterDatabase::updateParameters(
     CelestialCoordinate const& coordinate, CelestialParameters const& parameters) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   auto valid = coordinateValid(coordinate);
   if (!valid)
     return std::unexpected(std::move(valid.error()));
@@ -850,7 +850,7 @@ std::optional<CelestialOrbitRegion> CelestialMasterDatabase::orbitRegion(
 
 std::expected<void, StarException> CelestialMasterDatabase::markPersistent(CelestialCoordinate const& coordinate) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   auto index = chunkIndexFor(coordinate);
   auto loaded = getChunk(index);
   if (!loaded)
@@ -1207,7 +1207,7 @@ std::expected<std::shared_ptr<CelestialSlaveDatabase>, StarException> CelestialS
 
 std::expected<void, StarException> CelestialSlaveDatabase::signalRegion(RectI const& region) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   for (auto const& location : chunkIndexesFor(region)) {
     auto chunk = m_chunkCache.find_ref(location);
     if (!chunk)
@@ -1220,7 +1220,7 @@ std::expected<void, StarException> CelestialSlaveDatabase::signalRegion(RectI co
 
 std::expected<void, StarException> CelestialSlaveDatabase::signalSystem(CelestialCoordinate const& system) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   auto chunk = m_chunkCache.find_ref(chunkIndexFor(system));
   if (!chunk)
     return std::unexpected(std::move(chunk.error()));
@@ -1234,7 +1234,7 @@ std::expected<void, StarException> CelestialSlaveDatabase::signalSystem(Celestia
 
 List<CelestialRequest> CelestialSlaveDatabase::pullRequests() {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
 
   List<CelestialRequest> requests;
 
@@ -1269,7 +1269,7 @@ List<CelestialRequest> CelestialSlaveDatabase::pullRequests() {
 
 std::expected<void, StarException> CelestialSlaveDatabase::pushResponses(List<CelestialResponse> responses) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   for (auto& response : responses) {
     if (auto chunk = response.maybe_left_ref()) {
       m_pendingChunkRequests.remove(chunk->get().chunkIndex);
@@ -1290,7 +1290,7 @@ std::expected<void, StarException> CelestialSlaveDatabase::pushResponses(List<Ce
 
 void CelestialSlaveDatabase::cleanup() {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   m_chunkCache.cleanup();
 }
 
@@ -1298,7 +1298,7 @@ std::expected<std::optional<CelestialParameters>, StarException> CelestialSlaveD
   if (!coordinate)
     return std::unexpected(CelestialException("CelestialSlaveDatabase::parameters called on null coordinate"));
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   auto signaled = coordinate.isSystem()
       ? signalRegion(RectI::withSize(coordinate.location().vec2(), {1, 1})) : signalSystem(coordinate);
   if (!signaled)
@@ -1346,7 +1346,7 @@ std::expected<std::optional<bool>, StarException> CelestialSlaveDatabase::hasChi
   if (!coordinate)
     return std::unexpected(CelestialException("CelestialSlaveDatabase::hasChildren called on null coordinate"));
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   auto signaled = signalSystem(coordinate);
   if (!signaled)
     return std::unexpected(std::move(signaled.error()));
@@ -1391,7 +1391,7 @@ std::expected<List<int>, StarException> CelestialSlaveDatabase::childOrbits(Cele
   if (coordinate.isSatelliteBody())
     return std::unexpected(CelestialException("CelestialSlaveDatabase::childOrbits called on improper type!"));
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   auto signaled = signalSystem(coordinate);
   if (!signaled)
     return std::unexpected(std::move(signaled.error()));
@@ -1419,7 +1419,7 @@ std::expected<List<int>, StarException> CelestialSlaveDatabase::childOrbits(Cele
 std::expected<List<CelestialCoordinate>, StarException> CelestialSlaveDatabase::scanSystems(
     RectI const& region, std::optional<StringSet> const& includedTypes) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   auto signaled = signalRegion(region);
   if (!signaled)
     return std::unexpected(std::move(signaled.error()));
@@ -1448,7 +1448,7 @@ std::expected<List<CelestialCoordinate>, StarException> CelestialSlaveDatabase::
 
 std::expected<List<std::pair<Vec2I, Vec2I>>, StarException> CelestialSlaveDatabase::scanConstellationLines(RectI const& region) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   auto signaled = signalRegion(region);
   if (!signaled)
     return std::unexpected(std::move(signaled.error()));
@@ -1468,7 +1468,7 @@ std::expected<List<std::pair<Vec2I, Vec2I>>, StarException> CelestialSlaveDataba
 
 std::expected<bool, StarException> CelestialSlaveDatabase::scanRegionFullyLoaded(RectI const& region) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   auto signaled = signalRegion(region);
   if (!signaled)
     return std::unexpected(std::move(signaled.error()));
@@ -1484,7 +1484,7 @@ std::expected<bool, StarException> CelestialSlaveDatabase::scanRegionFullyLoaded
 
 void CelestialSlaveDatabase::invalidateCacheFor(CelestialCoordinate const& coordinate) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
 
   m_chunkCache.erase(chunkIndexFor(coordinate));
 }

@@ -23,7 +23,7 @@ std::string_view const ChatProcessor::ServerNick = "server";
 
 std::expected<String, StarException> ChatProcessor::connectClient(ConnectionId clientId, String nick) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
 
   if (nick.empty())
     nick = Star::format("Player_{}", clientId);
@@ -43,7 +43,7 @@ std::expected<String, StarException> ChatProcessor::connectClient(ConnectionId c
 
 std::expected<List<ChatReceivedMessage>, StarException> ChatProcessor::disconnectClient(ConnectionId clientId) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
 
   for (auto const& channel : clientChannels(clientId))
     leaveChannel(clientId, channel);
@@ -64,19 +64,19 @@ std::expected<List<ChatReceivedMessage>, StarException> ChatProcessor::disconnec
 
 List<ConnectionId> ChatProcessor::clients() const {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   return m_clients.keys();
 }
 
 bool ChatProcessor::hasClient(ConnectionId clientId) const {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   return m_clients.contains(clientId);
 }
 
 std::optional<ConnectionId> ChatProcessor::findNick(String const& nick) const {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   if (auto m = m_nicks.maybe(nick))
     return m;
   if (nick == ServerNick)
@@ -86,7 +86,7 @@ std::optional<ConnectionId> ChatProcessor::findNick(String const& nick) const {
 
 std::expected<String, StarException> ChatProcessor::connectionNick(ConnectionId clientId) const {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   if (clientId == ServerConnectionId)
     return ServerNick;
   auto client = m_clients.get(clientId);
@@ -96,7 +96,7 @@ std::expected<String, StarException> ChatProcessor::connectionNick(ConnectionId 
 
 std::expected<String, StarException> ChatProcessor::renick(ConnectionId clientId, String const& nick) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
 
   auto clientInfoResult = m_clients.get(clientId);
   if (!clientInfoResult) return std::unexpected(std::move(clientInfoResult.error()));
@@ -111,7 +111,7 @@ std::expected<String, StarException> ChatProcessor::renick(ConnectionId clientId
 
 bool ChatProcessor::joinChannel(ConnectionId clientId, String const& channelName) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
 
   // Right now channels are simply created on join if they don't exist.
   return m_channels[channelName].add(clientId);
@@ -119,13 +119,13 @@ bool ChatProcessor::joinChannel(ConnectionId clientId, String const& channelName
 
 bool ChatProcessor::leaveChannel(ConnectionId clientId, String const& channelName) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   return m_channels[channelName].remove(clientId);
 }
 
 StringList ChatProcessor::clientChannels(ConnectionId clientId) const {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
 
   StringList channels;
   for (auto const& pair : m_channels) {
@@ -137,7 +137,7 @@ StringList ChatProcessor::clientChannels(ConnectionId clientId) const {
 
 StringList ChatProcessor::activeChannels() const {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
 
   StringList channels;
   for (auto const& pair : m_channels) {
@@ -149,7 +149,7 @@ StringList ChatProcessor::activeChannels() const {
 
 std::expected<void, StarException> ChatProcessor::broadcast(ConnectionId sourceConnectionId, String const& text, JsonObject data) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
 
   auto nick = connectionNick(sourceConnectionId);
   if (!nick) return std::unexpected(std::move(nick.error()));
@@ -173,7 +173,7 @@ std::expected<void, StarException> ChatProcessor::broadcast(ConnectionId sourceC
 
 std::expected<void, StarException> ChatProcessor::message(ConnectionId sourceConnectionId, MessageContext::Mode mode, String const& channelName, String const& text, JsonObject data) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
 
   auto nick = connectionNick(sourceConnectionId);
   if (!nick) return std::unexpected(std::move(nick.error()));
@@ -201,7 +201,7 @@ std::expected<void, StarException> ChatProcessor::message(ConnectionId sourceCon
 
 std::expected<void, StarException> ChatProcessor::whisper(ConnectionId sourceConnectionId, ConnectionId targetClientId, String const& text, JsonObject data) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
 
   auto nick = connectionNick(sourceConnectionId);
   if (!nick) return std::unexpected(std::move(nick.error()));
@@ -231,25 +231,25 @@ std::expected<void, StarException> ChatProcessor::whisper(ConnectionId sourceCon
 
 std::expected<void, StarException> ChatProcessor::adminBroadcast(String const& text) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   return broadcast(ServerConnectionId, text, {});
 }
 
 std::expected<void, StarException> ChatProcessor::adminMessage(MessageContext::Mode context, String const& channelName, String const& text) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   return ChatProcessor::message(ServerConnectionId, context, channelName, text, {});
 }
 
 std::expected<void, StarException> ChatProcessor::adminWhisper(ConnectionId targetClientId, String const& text) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   return whisper(ServerConnectionId, targetClientId, text, {});
 }
 
 std::expected<List<ChatReceivedMessage>, StarException> ChatProcessor::pullPendingMessages(ConnectionId clientId) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   if (auto client = m_clients.find_ref(clientId))
     return std::exchange(client->get().pendingMessages, {});
   return List<ChatReceivedMessage>{};
@@ -257,13 +257,13 @@ std::expected<List<ChatReceivedMessage>, StarException> ChatProcessor::pullPendi
 
 void ChatProcessor::setCommandHandler(CommandHandler commandHandler) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   m_commandHandler = std::move(commandHandler);
 }
 
 void ChatProcessor::clearCommandHandler() {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   m_commandHandler = {};
 }
 
@@ -332,7 +332,7 @@ std::expected<bool, StarException> ChatProcessor::handleCommand(ChatReceivedMess
 
 std::expected<void, StarException> ChatProcessor::updatePromises() {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   for (auto const& uuid : m_commandPromises.keys()) {
     auto& entry = m_commandPromises[uuid];
     auto finished = entry.second.finished();

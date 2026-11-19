@@ -262,7 +262,52 @@ struct BTreeFixture {
   }
 };
 
-void btree_transactions(benchmark::State& state, bool commit) {
+enum class BTreeOperation { commit, rollback, concurrent_lookup };
+
+void concurrent_lookup(benchmark::State& state, BTreeFixture& fixture) {
+  constexpr unsigned sweeps = 8;
+  auto lookup = [&](std::size_t offset) {
+    for (unsigned pass = 0; pass < sweeps; ++pass) {
+      for (std::size_t i = 0; i < btree_key_count; ++i) {
+        auto index = (i + offset) % btree_key_count;
+        auto found = fixture.database->contains(fixture.keys[index]);
+        if (!found || *found != (index < btree_seed_count))
+          return false;
+      }
+    }
+    return true;
+  };
+  if (!lookup(0)) {
+    state.SkipWithError("Incorrect B-tree lookup during cache warmup");
+    return;
+  }
+  std::barrier rendezvous(2);
+  bool stop = false;
+  bool worker_ok = true;
+  std::jthread reader([&] {
+    for (;;) {
+      rendezvous.arrive_and_wait();
+      if (stop)
+        return;
+      worker_ok = lookup(btree_seed_count);
+      rendezvous.arrive_and_wait();
+    }
+  });
+  for (auto _ : state) {
+    rendezvous.arrive_and_wait();
+    auto caller_ok = lookup(0);
+    rendezvous.arrive_and_wait();
+    if (!caller_ok || !worker_ok) {
+      state.SkipWithError("Concurrent B-tree lookup returned wrong membership");
+      break;
+    }
+  }
+  stop = true;
+  rendezvous.arrive_and_wait();
+  state.SetItemsProcessed(state.iterations() * 2 * sweeps * btree_key_count);
+}
+
+void btree_transactions(benchmark::State& state, BTreeOperation operation) {
   auto random = Star::RandomService::create();
   if (!random) {
     state.SkipWithError(random.error().what());
@@ -285,6 +330,13 @@ void btree_transactions(benchmark::State& state, bool commit) {
     state.SkipWithError(initialized.error().what());
     return;
   }
+  if (operation == BTreeOperation::concurrent_lookup) {
+    concurrent_lookup(state, fixture);
+    if (auto closed = fixture.close_database(); !closed)
+      state.SkipWithError(closed.error().what());
+    return;
+  }
+  bool commit = operation == BTreeOperation::commit;
   if (auto result = fixture.preflight(); !result) {
     state.SkipWithError(result.error().what());
     return;
@@ -338,13 +390,15 @@ void btree_transactions(benchmark::State& state, bool commit) {
 void asset_lengths_directory(benchmark::State& state) { asset_lengths(state, AssetKind::directory); }
 void asset_lengths_packed(benchmark::State& state) { asset_lengths(state, AssetKind::packed); }
 void asset_lengths_memory(benchmark::State& state) { asset_lengths(state, AssetKind::memory); }
-void btree_stage_rollback(benchmark::State& state) { btree_transactions(state, false); }
-void btree_commit(benchmark::State& state) { btree_transactions(state, true); }
+void btree_stage_rollback(benchmark::State& state) { btree_transactions(state, BTreeOperation::rollback); }
+void btree_commit(benchmark::State& state) { btree_transactions(state, BTreeOperation::commit); }
+void btree_cache_readers(benchmark::State& state) { btree_transactions(state, BTreeOperation::concurrent_lookup); }
 
 BENCHMARK(asset_lengths_directory)->Name("File/AssetLengths/Directory")->Arg(256)->Arg(4096)->UseRealTime();
 BENCHMARK(asset_lengths_packed)->Name("File/AssetLengths/Packed")->Arg(256)->Arg(4096)->UseRealTime();
 BENCHMARK(asset_lengths_memory)->Name("File/AssetLengths/Memory")->Arg(256)->Arg(4096)->UseRealTime();
 BENCHMARK(btree_stage_rollback)->Name("File/BTree/StageRollback")->Arg(64)->Arg(12288)->UseRealTime();
 BENCHMARK(btree_commit)->Name("File/BTree/Commit")->Arg(64)->Arg(12288)->UseRealTime();
+BENCHMARK(btree_cache_readers)->Name("File/BTree/ConcurrentLookup")->Arg(64)->UseRealTime();
 
 }// namespace

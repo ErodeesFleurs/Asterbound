@@ -167,7 +167,7 @@ WorldClientThread::WorldClientThread(ClientSubWorldId subWorldId, std::shared_pt
 WorldClientThread::~WorldClientThread() {
   if (auto stopped = stop(); !stopped)
     EmergencyLog::error("Error stopping client world thread during destruction: {}", stopped.error().what());
-  if (!isJoined())
+  if (!is_joined())
     Star::fatal_error("Cannot destroy WorldClientThread while its native thread still borrows world state", false);
   if (auto closed = m_worldClient->close(); !closed)
     EmergencyLog::error("Error closing client world during destruction: {}", closed.error().what());
@@ -178,7 +178,7 @@ ClientSubWorldId WorldClientThread::subWorldId() const {
 }
 
 std::expected<void, StarException> WorldClientThread::start() {
-  if (!isJoined())
+  if (!is_joined())
     return {};
   m_stopSource = std::stop_source();
   m_errorOccurred = false;
@@ -214,19 +214,19 @@ bool WorldClientThread::shouldExpire() {
 
 void WorldClientThread::pushIncomingPackets(List<std::shared_ptr<Packet>> packets) {
   std::unique_lock queueLocker(m_queueMutex, std::defer_lock);
-  lockWithDiagnostics(queueLocker);
+  lock_with_diagnostics(queueLocker);
   m_incomingPacketQueue.append_range(std::move(packets));
 }
 
 List<std::shared_ptr<Packet>> WorldClientThread::pullOutgoingPackets() {
   std::unique_lock queueLocker(m_queueMutex, std::defer_lock);
-  lockWithDiagnostics(queueLocker);
+  lock_with_diagnostics(queueLocker);
   return std::exchange(m_outgoingPacketQueue, {});
 }
 
 std::expected<void, StarException> WorldClientThread::executeAction(WorldClientAction action) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   if (!action)
     return std::unexpected(StarException("Cannot execute an empty client world action"));
   return action(*this, *m_worldClient);
@@ -234,13 +234,13 @@ std::expected<void, StarException> WorldClientThread::executeAction(WorldClientA
 
 void WorldClientThread::setUpdateAction(WorldClientAction updateAction) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   m_updateAction = std::move(updateAction);
 }
 
 void WorldClientThread::passMessage(Message&& message) {
   std::unique_lock locker(m_messageMutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   m_messages.push_back(std::move(message));
 }
 
@@ -248,7 +248,7 @@ std::expected<void, StarException> WorldClientThread::clearMessages() {
   List<Message> messages;
   {
     std::unique_lock locker(m_messageMutex, std::defer_lock);
-    lockWithDiagnostics(locker);
+    lock_with_diagnostics(locker);
     messages = std::move(m_messages);
   }
   std::optional<StarException> error;
@@ -304,25 +304,25 @@ std::expected<void, StarException> WorldClientThread::runLoop(std::stop_token st
       return std::unexpected(std::move(updated.error()));
     tickApproacher.setTargetTickRate(1.0f / root.timing().timestep);
     tickApproacher.tick();
-    std::int64_t spareMilliseconds = std::floor(tickApproacher.spareTime() * 1000);
-    if (spareMilliseconds > 0)
-      Thread::sleepPrecise(spareMilliseconds);
+    std::int64_t spare_milliseconds = std::floor(tickApproacher.spareTime() * 1000);
+    if (spare_milliseconds > 0)
+      Thread::sleep_precise(spare_milliseconds);
   }
   return {};
 }
 
 std::expected<void, StarException> WorldClientThread::update() {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   std::unique_lock queueLocker(m_queueMutex, std::defer_lock);
-  lockWithDiagnostics(queueLocker);
+  lock_with_diagnostics(queueLocker);
   auto incomingPackets = std::exchange(m_incomingPacketQueue, {});
   queueLocker.unlock();
   auto incoming = m_worldClient->handleIncomingPackets(std::move(incomingPackets));
   if (!incoming) {
     auto logged = m_worldClient->root().logger().error_exception("WorldClientThread error handling incoming packets",
                                                                  ExceptionDiagnostic(incoming.error()));
-    lockWithDiagnostics(queueLocker);
+    lock_with_diagnostics(queueLocker);
     m_outgoingPacketQueue.push_back(std::make_shared<ClientSubWorldRequest>(m_subWorldId, WorldId()));
     queueLocker.unlock();
     m_errorOccurred = true;
@@ -341,7 +341,7 @@ std::expected<void, StarException> WorldClientThread::update() {
     List<Message> messages;
     {
       std::unique_lock messageLocker(m_messageMutex, std::defer_lock);
-      lockWithDiagnostics(messageLocker);
+      lock_with_diagnostics(messageLocker);
       messages = std::move(m_messages);
     }
     auto settled = settleWorldMessageBatch(messages, [&](String const& message, JsonArray const& args) {
@@ -353,7 +353,7 @@ std::expected<void, StarException> WorldClientThread::update() {
 
   auto outgoingPackets = m_worldClient->getOutgoingPackets();
   auto shouldDestroy = m_worldClient->pullRequestedDestroy();
-  lockWithDiagnostics(queueLocker);
+  lock_with_diagnostics(queueLocker);
   m_outgoingPacketQueue.push_back(std::make_shared<ClientSubWorldPackets>(m_subWorldId, std::move(outgoingPackets)));
   if (shouldDestroy) {
     auto logged = m_worldClient->root().logger().info("WorldClientThread requesting destroy");

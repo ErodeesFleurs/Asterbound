@@ -280,7 +280,7 @@ std::expected<void, StarException> UniverseConnectionServer::initialize() {
       auto processed = server.processConnections(i, stopToken);
       if (!processed) {
         std::unique_lock connectionsLocker(server.m_connectionsMutex, std::defer_lock);
-        lockWithDiagnostics(connectionsLocker);
+        lock_with_diagnostics(connectionsLocker);
         for (auto&& p : server.m_connections[i]) {
           std::lock_guard connectionLocker(p.second->mutex);
           if (p.second->packetSocket)
@@ -303,7 +303,7 @@ std::expected<void, StarException> UniverseConnectionServer::initialize() {
 std::expected<void, StarException> UniverseConnectionServer::processConnections(std::size_t i, std::stop_token stopToken) {
   while (!stopToken.stop_requested()) {
     std::unique_lock connectionsLocker(m_connectionsMutex, std::defer_lock);
-    lockWithDiagnostics(connectionsLocker);
+    lock_with_diagnostics(connectionsLocker);
     auto connections = m_connections[i].pairs();
     connectionsLocker.unlock();
     bool dataTransmitted = false;
@@ -388,7 +388,7 @@ std::expected<void, StarException> UniverseConnectionServer::close() {
     return {};
   {
     std::unique_lock connectionsLocker(m_connectionsMutex, std::defer_lock);
-    lockWithDiagnostics(connectionsLocker);
+    lock_with_diagnostics(connectionsLocker);
     std::lock_guard workLocker(m_workMutex);
     m_stopSource.request_stop();
   }
@@ -403,7 +403,7 @@ std::expected<void, StarException> UniverseConnectionServer::close() {
       else
         failure = std::move(finished.error());
     }
-    joined = thread.isFinished() && joined;
+    joined = thread.is_finished() && joined;
   }
   if (!joined) {
     if (failure)
@@ -411,7 +411,7 @@ std::expected<void, StarException> UniverseConnectionServer::close() {
     return std::unexpected(UniverseConnectionException("Connection worker remained active after drain"));
   }
   std::unique_lock connectionsLocker(m_connectionsMutex, std::defer_lock);
-  lockWithDiagnostics(connectionsLocker);
+  lock_with_diagnostics(connectionsLocker);
   for (auto& shard : m_connections) {
     for (auto&& entry : shard) {
       std::lock_guard connectionLocker(entry.second->mutex);
@@ -432,13 +432,13 @@ bool UniverseConnectionServer::isClosed() const {
 
 bool UniverseConnectionServer::hasConnection(ConnectionId clientId) const {
   std::unique_lock connectionsLocker(m_connectionsMutex, std::defer_lock);
-  lockWithDiagnostics(connectionsLocker);
+  lock_with_diagnostics(connectionsLocker);
   return m_connections[clientId % m_numWorkerThreads].contains(clientId);
 }
 
 List<ConnectionId> UniverseConnectionServer::allConnections() const {
   std::unique_lock connectionsLocker(m_connectionsMutex, std::defer_lock);
-  lockWithDiagnostics(connectionsLocker);
+  lock_with_diagnostics(connectionsLocker);
   List<ConnectionId> connections;
   for (auto const& shard : m_connections)
     connections.append_range(shard.keys());
@@ -447,7 +447,7 @@ List<ConnectionId> UniverseConnectionServer::allConnections() const {
 
 std::expected<bool, StarException> UniverseConnectionServer::connectionIsOpen(ConnectionId clientId) const {
   std::unique_lock connectionsLocker(m_connectionsMutex, std::defer_lock);
-  lockWithDiagnostics(connectionsLocker);
+  lock_with_diagnostics(connectionsLocker);
   if (auto conn = m_connections[clientId % m_numWorkerThreads].value(clientId)) {
     std::lock_guard connectionLocker(conn->mutex);
     connectionsLocker.unlock();
@@ -459,7 +459,7 @@ std::expected<bool, StarException> UniverseConnectionServer::connectionIsOpen(Co
 
 std::expected<std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>, StarException> UniverseConnectionServer::lastActivityTime(ConnectionId clientId) const {
   std::unique_lock connectionsLocker(m_connectionsMutex, std::defer_lock);
-  lockWithDiagnostics(connectionsLocker);
+  lock_with_diagnostics(connectionsLocker);
   if (auto conn = m_connections[clientId % m_numWorkerThreads].value(clientId)) {
     std::lock_guard connectionLocker(conn->mutex);
     connectionsLocker.unlock();
@@ -470,7 +470,7 @@ std::expected<std::chrono::time_point<std::chrono::steady_clock, std::chrono::mi
 
 std::expected<void, StarException> UniverseConnectionServer::addConnection(ConnectionId clientId, UniverseConnection uc) {
   std::unique_lock connectionsLocker(m_connectionsMutex, std::defer_lock);
-  lockWithDiagnostics(connectionsLocker);
+  lock_with_diagnostics(connectionsLocker);
   if (m_stopSource.stop_requested())
     return std::unexpected(UniverseConnectionException("Cannot add a connection after network shutdown begins"));
   auto& shard = m_connections[clientId % m_numWorkerThreads];
@@ -491,7 +491,7 @@ std::expected<void, StarException> UniverseConnectionServer::addConnection(Conne
 
 std::expected<UniverseConnection, StarException> UniverseConnectionServer::removeConnection(ConnectionId clientId) {
   std::unique_lock connectionsLocker(m_connectionsMutex, std::defer_lock);
-  lockWithDiagnostics(connectionsLocker);
+  lock_with_diagnostics(connectionsLocker);
   auto& shard = m_connections[clientId % m_numWorkerThreads];
   if (!shard.contains(clientId))
     return std::unexpected(UniverseConnectionException::format("Client '{}' does not exist in UniverseConnectionServer::removeConnection", clientId));
@@ -513,7 +513,7 @@ std::expected<UniverseConnection, StarException> UniverseConnectionServer::remov
 List<UniverseConnection> UniverseConnectionServer::removeAllConnections() {
   List<UniverseConnection> removedConnections;
   std::unique_lock connectionsLocker(m_connectionsMutex, std::defer_lock);
-  lockWithDiagnostics(connectionsLocker);
+  lock_with_diagnostics(connectionsLocker);
   for (auto& shard : m_connections) {
     for (auto&& p : shard) {
       std::lock_guard connectionLocker(p.second->mutex);
@@ -530,7 +530,7 @@ List<UniverseConnection> UniverseConnectionServer::removeAllConnections() {
 
 std::expected<void, StarException> UniverseConnectionServer::sendPackets(ConnectionId clientId, List<std::shared_ptr<Packet>> packets) {
   std::unique_lock connectionsLocker(m_connectionsMutex, std::defer_lock);
-  lockWithDiagnostics(connectionsLocker);
+  lock_with_diagnostics(connectionsLocker);
   if (auto conn = m_connections[clientId % m_numWorkerThreads].value(clientId)) {
     std::lock_guard connectionLocker(conn->mutex);
     connectionsLocker.unlock();

@@ -85,7 +85,7 @@ std::expected<bool, StarException> Rebuilder::rebuild(Json store, StarException 
   if (!attempt)
     return std::unexpected(StarException("Cannot rebuild with an empty attempt callback"));
   std::unique_lock locker(m_luaMutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   for (auto& context : *m_contexts) {
     auto next = context.invokePath<Json>("error", store, Star::format("{}", Star::output_exception(lastError, false)));
     if (!next)

@@ -1895,7 +1895,7 @@ std::expected<void, StarException> ClientApplication::updateModsWarning(float) {
 
 std::expected<void, StarException> ClientApplication::updateSplash(float dt) {
   m_cinematicOverlay->update(dt);
-  if (!m_rootLoader.isRunning() && (m_cinematicOverlay->completable() || m_cinematicOverlay->completed()))
+  if (!m_rootLoader.is_running() && (m_cinematicOverlay->completable() || m_cinematicOverlay->completed()))
     return changeState(MainAppState::Title);
   return {};
 }

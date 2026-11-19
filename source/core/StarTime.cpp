@@ -103,48 +103,48 @@ Clock& Clock::operator=(Clock const& clock) {
 
 void Clock::reset() {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   updateElapsed();
   m_elapsed = std::chrono::steady_clock::duration::zero();
 }
 
 void Clock::stop() {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   m_lastUpdate.reset();
   m_running = false;
 }
 
 void Clock::start() {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   m_running = true;
   updateElapsed();
 }
 
 bool Clock::running() const {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   return m_running;
 }
 
 double Clock::time() const {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   updateElapsed();
   return std::chrono::duration<double>(m_elapsed).count();
 }
 
 std::int64_t Clock::milliseconds() const {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   updateElapsed();
   return std::chrono::duration_cast<std::chrono::milliseconds>(m_elapsed + std::chrono::microseconds(500)).count();
 }
 
 void Clock::setTime(double time) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   updateElapsed();
   auto ticks = std::chrono::duration<double, std::chrono::steady_clock::period>(std::chrono::duration<double>(time));
   m_elapsed = std::chrono::steady_clock::duration(
@@ -153,20 +153,20 @@ void Clock::setTime(double time) {
 
 void Clock::setMilliseconds(std::int64_t millis) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   updateElapsed();
   m_elapsed = std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::milliseconds(millis));
 }
 
 void Clock::adjustTime(double timeAdjustment) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   setTime(std::max<double>(0.0, time() + timeAdjustment));
 }
 
 void Clock::adjustMilliseconds(std::int64_t millisAdjustment) {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   setMilliseconds(milliseconds() + millisAdjustment);
 }
 

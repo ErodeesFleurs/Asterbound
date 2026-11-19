@@ -1028,7 +1028,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
   if (m_headless) {
     return {};
   }
-  if (m_lightingThreadStarted && m_lightingThread.isFinished()) {
+  if (m_lightingThreadStarted && m_lightingThread.is_finished()) {
     auto completed = m_lightingThread.finish();
     m_lightingThread = {};
     m_lightingThreadStarted = false;

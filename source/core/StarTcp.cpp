@@ -235,7 +235,7 @@ std::expected<void, StarException> TcpServer::stop() {
     m_listenSocket->shutdown();
   std::expected<void, StarException> status;
   // Keep the control block in place on native join failure so stop() can retry.
-  if (!m_callbackThread.isFinished())
+  if (!m_callbackThread.is_finished())
     status = m_callbackThread.finish();
   if (m_listenSocket)
     m_listenSocket->close();
@@ -249,7 +249,7 @@ bool TcpServer::isListening() const {
 }
 
 bool TcpServer::isClosed() const {
-  return (!m_listenSocket || !m_listenSocket->isOpen()) && m_callbackThread.isFinished();
+  return (!m_listenSocket || !m_listenSocket->isOpen()) && m_callbackThread.is_finished();
 }
 
 std::expected<std::shared_ptr<TcpSocket>, StarException> TcpServer::accept(unsigned timeout) {

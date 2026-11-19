@@ -725,7 +725,7 @@ const GameTestRegistration workerStartupFailure(
     EXPECT_EQ(errors.size(), 1);
     EXPECT_TRUE(worker->errorOccurred());
     EXPECT_TRUE(worker->shouldExpire());
-    EXPECT_TRUE(worker->isJoined());
+    EXPECT_TRUE(worker->is_joined());
     expectPromiseFailure(accepted.first);
     expectPromiseStatus(accepted.first, RpcPromiseStatus::Failed);
     auto late = RpcPromise<Json>::make_pair();
@@ -1386,7 +1386,7 @@ const GameTestRegistration closedWorkerMessages(
       // would hide a stale token that prevented the restarted loop from running.
       EXPECT_EQ(*status, RpcPromiseStatus::Failed);
       ASSERT_TRUE(worker->stop());
-      EXPECT_TRUE(worker->isJoined());
+      EXPECT_TRUE(worker->is_joined());
       EXPECT_TRUE(worker->shouldExpire());
       EXPECT_FALSE(worker->errorOccurred());
     }
@@ -1445,7 +1445,7 @@ const GameTestRegistration workerChainedReplyClosure(
     auto stopped = std::async(std::launch::async, [&] { return worker->stop(); });
     EXPECT_EQ(stopped.wait_for(std::chrono::seconds(5)), std::future_status::ready);
     ASSERT_TRUE(stopped.get());
-    EXPECT_TRUE(worker->isJoined());
+    EXPECT_TRUE(worker->is_joined());
     EXPECT_TRUE(worker->shouldExpire());
     EXPECT_FALSE(worker->errorOccurred());
     expectPromiseStatus(response.first, RpcPromiseStatus::Cancelled);

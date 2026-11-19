@@ -578,7 +578,7 @@ void LuaScriptUpdate::destroy() {
   List<ThreadMessage> messages;
   {
     std::unique_lock locker(m_threadMessageMutex, std::defer_lock);
-    lockWithDiagnostics(locker);
+    lock_with_diagnostics(locker);
     messages = std::move(m_threadMessages);
   }
   for (auto& message : messages) {
@@ -615,7 +615,7 @@ bool LuaScriptUpdate::updateReady() const { return m_updatePeriodic.ready(); }
 RpcPromise<Json> LuaScriptUpdate::threadPassMessage(String const& thread, String const& message, JsonArray const& args) {
   auto pair = RpcPromise<Json>::make_pair();
   std::unique_lock locker(m_threadMessageMutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   m_threadMessages.push_back({.originThread = thread, .message = message, .args = args, .promise = pair.second});
   return pair.first;
 }
@@ -659,7 +659,7 @@ RpcPromise<Json> LuaScriptUpdate::threadPassMessage(String const& thread, String
   List<ThreadMessage> messages;
   {
     std::unique_lock locker(m_threadMessageMutex, std::defer_lock);
-    lockWithDiagnostics(locker);
+    lock_with_diagnostics(locker);
     messages = std::move(m_threadMessages);
   }
   std::optional<StarException> error;

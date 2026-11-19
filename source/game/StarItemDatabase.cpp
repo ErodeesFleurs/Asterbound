@@ -355,7 +355,7 @@ std::expected<ItemDatabase::ItemConfig, StarException> ItemDatabase::itemConfig(
     return std::unexpected(std::move(builder.error()));
   if (*builder) {
     std::unique_lock locker(m_luaMutex, std::defer_lock);
-    lockWithDiagnostics(locker);
+    lock_with_diagnostics(locker);
     auto context = m_luaRoot->createContext(**builder);
     if (!context)
       return std::unexpected(std::move(context.error()));
@@ -623,7 +623,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::applyAugment(s
   if (!item)
     return item;
   std::unique_lock locker(m_luaMutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   LuaBaseComponent script(m_root);
   auto setup = [&]() -> std::expected<void, StarException> {
     auto removed = script.removeCallbacks("root");
@@ -682,7 +682,7 @@ std::expected<bool, StarException> ItemDatabase::ageItem(std::shared_ptr<Item>& 
     return false;
   ItemDescriptor original = item->descriptor();
   std::unique_lock locker(m_luaMutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   LuaBaseComponent script(m_root);
   auto removed = script.removeCallbacks("root");
   if (!removed)

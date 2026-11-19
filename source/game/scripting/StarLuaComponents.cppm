@@ -347,7 +347,7 @@ template <typename Ret, typename... V>
       List<ThreadMessage> messages;
       {
         std::unique_lock locker(m_threadMessageMutex, std::defer_lock);
-        lockWithDiagnostics(locker);
+        lock_with_diagnostics(locker);
         messages = std::move(m_threadMessages);
       }
       std::optional<StarException> error;

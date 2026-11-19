@@ -9,14 +9,14 @@ using namespace Star;
 TEST(ClockTest, All) {
   Clock clock;
 
-  Thread::sleepPrecise(20);
+  Thread::sleep_precise(20);
 
   // Only require progression; scheduler delays need not have an upper bound.
   EXPECT_GT(clock.time(), 0.0);
 
   clock.stop();
   double time = clock.time();
-  Thread::sleepPrecise(20);
+  Thread::sleep_precise(20);
   EXPECT_EQ(clock.time(), time);
 
   clock.reset();

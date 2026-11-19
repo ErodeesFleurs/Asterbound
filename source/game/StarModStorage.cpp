@@ -240,7 +240,7 @@ ModStorage::~ModStorage() {
   auto joined = m_thread.finish();
   if (!joined)
     EmergencyLog::error("Mod storage worker shutdown failed: {}", joined.error().what());
-  if (!m_thread.isFinished())
+  if (!m_thread.is_finished())
     Star::fatal_error("Cannot destroy mod storage with an unjoined writer", false);
   auto written = flush();
   if (!written)

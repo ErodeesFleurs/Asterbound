@@ -7,6 +7,8 @@ import star.worker_pool;
 import star.string;
 import star.format;
 import star.unique_function;
+import star.thread;
+import star.lru_cache;
 
 namespace {
 
@@ -305,6 +307,157 @@ void hot_invocation(benchmark::State& state) {
 BENCHMARK(inline_construct_move);
 BENCHMARK(heap_transfer);
 BENCHMARK(hot_invocation);
+
+class CountingThread final : public Star::Thread {
+public:
+  explicit CountingThread(bool blocked = false) : Thread("thread-bench"), release(blocked ? 1 : 0) {}
+
+  std::latch release;
+  std::int64_t runs = 0;
+
+private:
+  std::expected<void, Star::StarException> run() override {
+    release.wait();
+    ++runs;
+    return {};
+  }
+};
+
+void thread_start_join(benchmark::State& state) {
+  CountingThread thread;
+  for (auto _ : state) {
+    auto started = thread.start();
+    if (!started || !*started) {
+      state.SkipWithError(started ? "Thread did not restart" : started.error().what());
+      return;
+    }
+    auto joined = thread.join();
+    if (!joined || !*joined) {
+      state.SkipWithError(joined ? "Thread was not joined" : joined.error().what());
+      return;
+    }
+  }
+  if (thread.runs != state.iterations() || !thread.is_joined() || thread.is_running())
+    state.SkipWithError("Joined thread did not publish exactly one run per start");
+}
+
+void thread_query(benchmark::State& state) {
+  CountingThread thread(true);
+  auto started = thread.start();
+  if (!started || !*started) {
+    state.SkipWithError(started ? "Thread did not start" : started.error().what());
+    return;
+  }
+  // Hold the worker in run(): even the baseline's non-atomic joined flag is
+  // stable throughout this measurement. Never race a baseline join or restart.
+  if (!thread.is_running() || thread.is_joined()) {
+    state.SkipWithError("Gated thread did not report running and unjoined");
+  } else {
+    for (auto _ : state) {
+      benchmark::ClobberMemory();
+      auto joined = thread.is_joined();
+      auto running = thread.is_running();
+      benchmark::DoNotOptimize(joined);
+      benchmark::DoNotOptimize(running);
+    }
+  }
+  thread.release.count_down();
+  auto joined = thread.join();
+  if (!joined || !*joined || thread.runs != 1 || !thread.is_joined() || thread.is_running())
+    state.SkipWithError("Gated thread did not join cleanly");
+  state.SetItemsProcessed(2 * state.iterations());
+}
+
+void thread_rw_contention(benchmark::State& state) {
+  static Star::ReadersWriterMutex mutex;
+  static std::uint64_t version, inverse;
+  std::uint64_t mismatch = 0;
+  // Google Benchmark synchronizes all threads at both loop boundaries;
+  // setup and checking are not part of the measured lock operations.
+  if (state.thread_index() == 0) {
+    version = 0;
+    inverse = ~version;
+    for (auto _ : state) {
+      std::unique_lock guard(mutex);
+      inverse = ~++version;
+    }
+  } else {
+    for (auto _ : state) {
+      std::shared_lock guard(mutex);
+      mismatch |= version ^ ~inverse;
+    }
+  }
+  if (version != static_cast<std::uint64_t>(state.iterations()) || mismatch != 0)
+    state.SkipWithError("RW lock did not publish coherent writes");
+  state.SetItemsProcessed(state.iterations());
+}
+
+struct IndexCacheFixture {
+  static constexpr unsigned key_count = 16;
+  Star::SpinLock lock;
+  Star::LruCache<unsigned, std::shared_ptr<unsigned const>> cache{key_count};
+
+  IndexCacheFixture() {
+    for (unsigned key = 0; key < key_count; ++key)
+      cache.insert_or_assign(key, std::make_shared<unsigned const>(key + 1));
+  }
+
+  // Match BTreeImpl::load_index's hot hit: touch MRU and copy the shared
+  // index under the spin lock, then consume and release it outside the lock.
+  std::shared_ptr<unsigned const> load(unsigned key) {
+    std::lock_guard guard(lock);
+    auto hit = cache.find_ref(key);
+    return hit ? hit->get() : nullptr;
+  }
+};
+
+void thread_spin_index_cache(benchmark::State& state) {
+  static IndexCacheFixture fixture;
+  constexpr auto count = IndexCacheFixture::key_count;
+  auto offset = static_cast<unsigned>(state.thread_index());
+  std::uint64_t sum = 0;
+  for (auto _ : state) {
+    for (unsigned i = 0; i < count; ++i) {
+      auto value = fixture.load((i + offset) % count);
+      if (value)
+        sum += *value;
+    }
+  }
+  if (sum != static_cast<std::uint64_t>(state.iterations()) * (count * (count + 1) / 2))
+    state.SkipWithError("Incorrect BTree hot-index checksum");
+  state.SetItemsProcessed(state.iterations() * count);
+}
+
+constexpr int sleep_samples = 101;
+
+void thread_sleep_precise(benchmark::State& state) {
+  using namespace std::chrono;
+  auto requested = milliseconds(state.range(0));
+  std::array<double, sleep_samples> overshoot_us;
+  std::size_t samples = 0;
+  for (auto _ : state) {
+    auto begin = steady_clock::now();
+    Star::Thread::sleep_precise(static_cast<unsigned>(requested.count()));
+    overshoot_us[samples++] = duration<double, std::micro>(steady_clock::now() - begin - requested).count();
+  }
+  // The json cpu_time field is caller-thread CPU per sleep (unit: us).
+  // Preserve negative errors: the old millisecond-rounded deadline can wake early.
+  auto measured = std::span(overshoot_us).first(samples);
+  std::ranges::sort(measured);
+  auto percentile = [&](std::size_t p) { return measured[(p * samples + 99) / 100 - 1]; };
+  state.counters["overshoot_p50_us"] = percentile(50);
+  state.counters["overshoot_p95_us"] = percentile(95);
+  state.counters["early_samples"] = std::ranges::lower_bound(measured, 0.0) - measured.begin();
+  state.counters["samples"] = samples;
+  if (percentile(50) < -duration<double, std::micro>(requested).count() / 2)
+    state.SkipWithError("Median sleep did not reach half the requested duration");
+}
+
+BENCHMARK(thread_start_join)->UseRealTime();
+BENCHMARK(thread_query);
+BENCHMARK(thread_rw_contention)->Threads(4)->UseRealTime();
+BENCHMARK(thread_spin_index_cache)->Threads(1)->Threads(4)->UseRealTime();
+BENCHMARK(thread_sleep_precise)->Arg(1)->Arg(16)->Iterations(sleep_samples)->UseRealTime()->Unit(benchmark::kMicrosecond);
 
 }
 

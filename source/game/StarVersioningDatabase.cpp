@@ -290,14 +290,14 @@ std::expected<void, StarException> VersioningDatabase::init() {
 }
 std::expected<VersionedJson, StarException> VersioningDatabase::makeCurrentVersionedJson(String const& identifier, Json const& content) const {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   auto version = m_currentVersions.get(identifier);
   if (!version) return std::unexpected(std::move(version.error()));
   return VersionedJson{identifier, version->get(), content, m_currentSubVersions.value(identifier)};
 }
 std::expected<bool, StarException> VersioningDatabase::versionedJsonCurrent(VersionedJson const& json) const {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   auto version = m_currentVersions.get(json.identifier);
   if (!version) return std::unexpected(std::move(version.error()));
   return json.version == version->get() && json.subVersions == m_currentSubVersions.value(json.identifier);
@@ -307,7 +307,7 @@ std::expected<VersionedJson, StarException> VersioningDatabase::updateVersionedJ
 }
 std::expected<VersionedJson, StarException> VersioningDatabase::updateVersionedJson(VersionedJson const& versionedJson, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog) const {
   std::unique_lock locker(m_mutex, std::defer_lock);
-  lockWithDiagnostics(locker);
+  lock_with_diagnostics(locker);
   auto celestialDatabase = CelestialMasterDatabase::create(m_root);
   if (!celestialDatabase) return std::unexpected(std::move(celestialDatabase.error()));
   VersionedJson result = versionedJson;

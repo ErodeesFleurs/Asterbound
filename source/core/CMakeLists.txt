@@ -87,6 +87,7 @@ target_sources (star_modules PUBLIC FILE_SET CXX_MODULES
 # Concrete platform frames (including cpptrace on Unix) stay private to the
 # implementation; importing star.format never needs a native unwinder.
 target_sources (star_modules PRIVATE FILE_SET native_stack TYPE CXX_MODULES FILES StarNativeStack.cppm)
+target_sources (star_modules PRIVATE FILE_SET native_thread TYPE CXX_MODULES FILES StarThreadNative.cppm)
 target_sources (star_modules PRIVATE
     StarUuid.cpp StarHostAddress.cpp StarSocket.cpp StarTcp.cpp
     StarString.cpp StarStringView.cpp StarThread.cpp

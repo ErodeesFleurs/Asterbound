@@ -112,7 +112,7 @@ SystemWorldServerThread::~SystemWorldServerThread() {
   auto joined = join();
   if (!joined)
     EmergencyLog::error("System world thread cleanup failed: {}", Star::output_exception(joined.error(), true));
-  if (!isJoined()) {
+  if (!is_joined()) {
     EmergencyLog::error("System world thread {} remains unjoined during owner destruction", name());
     Star::fatal_error("Cannot destroy a system world thread with an unjoined native worker", false);
   }
@@ -165,7 +165,7 @@ void SystemWorldServerThread::setPause(std::shared_ptr<const std::atomic<bool>> 
 }
 
 std::expected<bool, StarException> SystemWorldServerThread::start() {
-  if (!isJoined())
+  if (!is_joined())
     return false;
   m_stopSource = std::stop_source();
   return Thread::start();
@@ -190,7 +190,7 @@ std::expected<void, StarException> SystemWorldServerThread::run() {
     tickApproacher.tick();
     double spareTime = tickApproacher.spareTime();
     if (spareTime > 0)
-      sleepPrecise(static_cast<std::uint64_t>(std::floor(spareTime * 1000)));
+      sleep_precise(static_cast<std::uint64_t>(std::floor(spareTime * 1000)));
   }
   return store();
 }
