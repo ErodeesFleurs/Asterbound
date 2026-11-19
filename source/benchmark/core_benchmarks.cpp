@@ -21,6 +21,63 @@ import star.a_star;
 import star.encode;
 import star.byte_array;
 import star.curve25519;
+import star.dynamic_lib;
+
+namespace DynamicLibBenchmarks {
+
+using Star::DynamicLib;
+using Star::String;
+
+enum class Operation { Open, Reopen, Find };
+
+static std::expected<int, Star::StarException> lookup_and_call(DynamicLib const& library, String const& name) {
+  auto symbol = library.find<int(int)>(name);
+  if (!symbol)
+    return std::unexpected(std::move(symbol.error()));
+  return (*symbol)(7);
+}
+
+static void measure(benchmark::State& state, Operation operation) {
+  String const path(STAR_DYNAMIC_LIB_FIXTURE);
+  String const name("asterbound_fixture_transform");
+  // Check the same exported ABI and result before timing either implementation.
+  auto resident = DynamicLib::open(path);
+  if (!resident) {
+    state.SkipWithError(resident.error().what());
+    return;
+  }
+  auto result = lookup_and_call(*resident, name);
+  if (!result || *result != 22) {
+    state.SkipWithError(result ? "unexpected fixture result" : result.error().what());
+    return;
+  }
+  if (operation == Operation::Open) {
+    // Release the validation reference before measuring open/last-close.
+    auto release = std::move(*resident);
+  }
+  for (auto _ : state) {
+    if (operation == Operation::Find) {
+      auto value = lookup_and_call(*resident, name);
+      if (!value || *value != 22) {
+        state.SkipWithError(value ? "unexpected fixture result" : value.error().what());
+        break;
+      }
+    } else {
+      auto library = DynamicLib::open(path);
+      if (!library) {
+        state.SkipWithError(library.error().what());
+        break;
+      }
+    }
+  }
+  state.SetItemsProcessed(state.iterations());
+}
+
+BENCHMARK_CAPTURE(measure, Open, Operation::Open)->Name("Core/DynamicLib/OpenClose")->UseRealTime();
+BENCHMARK_CAPTURE(measure, Reopen, Operation::Reopen)->Name("Core/DynamicLib/ResidentOpenClose")->UseRealTime();
+BENCHMARK_CAPTURE(measure, Find, Operation::Find)->Name("Core/DynamicLib/FindAndCall")->UseRealTime();
+
+} // namespace DynamicLibBenchmarks
 
 namespace Ed25519Benchmarks {
 

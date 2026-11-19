@@ -670,6 +670,27 @@ rows do not measure reusable-context throughput, network streams, embedded asset
 large high-ratio retained memory or whole-game performance.
 
 
+### Dynamic libraries
+
+`DynamicLib::open`, `open_base` and `open_current` return a move-only library.
+`find<int(int)>(name)` returns a callable that retains the lookup handle: resolve
+it once, check the `expected`, then call it after the `DynamicLib` is destroyed.
+This pins exports of the opened library and its load-time dependencies. A POSIX
+current-process lookup can also see independently loaded global libraries:
+open the exporting library itself if it may otherwise be unloaded. The signature,
+including calling convention, must match the export's ABI; the loader cannot
+check it. Paths and names containing NUL are rejected rather than truncated.
+Final release drops the loader reference; OS unmapping is not an API guarantee.
+
+Run `core_tests --gtest_filter='DynamicLibTest.*'` with the CMake-built fixture
+library (an independent DSO, not linked into the test executable). The existing
+`core_benchmarks --benchmark_filter='^Core/DynamicLib/'` uses the same exported
+C function. `OpenClose` releases the validation handle before timing; it does
+not drop the filesystem page cache. `ResidentOpenClose` holds a separate loader
+reference; `FindAndCall` resolves, invokes and releases a symbol each iteration.
+Compare elapsed time with the same fixture and build flags, pinning the CPU and
+alternating the two binaries. None of these rows measures gameplay latency.
+
 ### Ed25519 identities and broadcasts
 
 `star.curve25519` now uses libsodium, not the removed bundled curve arithmetic.

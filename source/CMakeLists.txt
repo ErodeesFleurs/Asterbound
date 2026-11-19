@@ -489,12 +489,20 @@ add_subdirectory(game)
 
 # Googletest based tests
 option(BUILD_TESTING "Build test projects" OFF)
+option(STAR_BUILD_BENCHMARKS "Build standalone performance benchmarks" OFF)
+if(BUILD_TESTING OR STAR_BUILD_BENCHMARKS)
+  add_library(star_dynamic_lib_fixture SHARED test/dynamic_lib_fixture.c)
+  target_link_libraries(star_dynamic_lib_fixture PRIVATE star_build_config)
+  if(DEFINED STAR_DYNAMIC_LIB_FIXTURE_DIR)
+    set_target_properties(star_dynamic_lib_fixture PROPERTIES
+      LIBRARY_OUTPUT_DIRECTORY "${STAR_DYNAMIC_LIB_FIXTURE_DIR}")
+  endif()
+endif()
 if(BUILD_TESTING)
   enable_testing()
   add_subdirectory(test)
 endif()
 
-option(STAR_BUILD_BENCHMARKS "Build standalone performance benchmarks" OFF)
 if(STAR_BUILD_BENCHMARKS)
   add_subdirectory(benchmark)
 endif()

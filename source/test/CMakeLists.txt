@@ -23,6 +23,7 @@ set (star_core_tests_SOURCES
       color_test.cpp
       container_test.cpp
       curve25519_test.cpp
+      dynamic_lib_test.cpp
       encode_test.cpp
       exception_test.cpp
       file_test.cpp
@@ -82,6 +83,8 @@ set (star_core_tests_SOURCES
 add_executable (core_tests
   $<TARGET_OBJECTS:star_extern> $<TARGET_OBJECTS:star_core>
   ${star_core_tests_SOURCES})
+add_dependencies(core_tests star_dynamic_lib_fixture)
+target_compile_definitions(core_tests PRIVATE STAR_DYNAMIC_LIB_FIXTURE="$<TARGET_FILE:star_dynamic_lib_fixture>")
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
   target_compile_definitions (core_tests PRIVATE STAR_TEST_WRAP_WRITE=1 STAR_TEST_WRAP_READ=1)
   target_link_options (core_tests PRIVATE "LINKER:--wrap=write" "LINKER:--wrap=read")

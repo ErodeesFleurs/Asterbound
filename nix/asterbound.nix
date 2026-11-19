@@ -367,6 +367,8 @@ stdenv.mkDerivation {
     ))
   ]
   ++ lib.optional withBenchmarks (lib.cmakeBool "STAR_BUILD_BENCHMARKS" true)
+  ++ lib.optional (withTests || withBenchmarks)
+    (lib.cmakeFeature "STAR_DYNAMIC_LIB_FIXTURE_DIR" "${placeholder "out"}/libexec")
   ++ lib.optionals steamSupport [
     (lib.cmakeFeature "STEAM_API_INCLUDE_DIR" "${sdks}/include")
     (lib.cmakeFeature "STEAM_API_LIBRARY" "${sdks}/lib/libsteam_api${sdkExtension}")
