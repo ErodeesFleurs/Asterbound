@@ -1409,6 +1409,18 @@ private:
       });
     }
 
+    std::optional<std::string> getClipboardPng() override {
+      return parent.m_dispatcher.invoke([&]() -> std::optional<std::string> {
+        if (!parent.m_focused.load(std::memory_order_relaxed) || !SDL_HasClipboardData("image/png"))
+          return {};
+        std::size_t size = 0;
+        std::unique_ptr<void, decltype(&SDL_free)> data(SDL_GetClipboardData("image/png", &size), &SDL_free);
+        if (!data || !size || size > 8 * 1024 * 1024)
+          return {};
+        return std::string(static_cast<char const*>(data.get()), size);
+      });
+    }
+
     bool setClipboard(String text) override {
       return parent.m_dispatcher.invoke([&]() -> bool {
         return SDL_SetClipboardText(text.utf8_data());

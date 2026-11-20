@@ -16,6 +16,10 @@ function clipboard.hasText() end
 ---@return String?
 function clipboard.getText() end
 
+--- Reads PNG bytes while focused and authorized; nil if unavailable or over 8 MiB.
+---@return string?
+function clipboard.getPng() end
+
 --- Replaces the clipboard contents with the supplied UTF-8 text. Returns `false` if the game window is unfocused or the operation is blocked. ---
 ---@param text string
 ---@return boolean

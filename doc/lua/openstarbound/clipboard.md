@@ -26,6 +26,13 @@ Returns the clipboard text when access is available, or `nil` otherwise.
 
 ---
 
+#### `Maybe<String>` clipboard.getPng()
+
+Reads binary `image/png` bytes from the system clipboard while focused and clipboard reads are authorized.
+Returns `nil` if unavailable or larger than 8 MiB. Does not decode images or open copied file paths.
+
+---
+
 #### `bool` clipboard.setText(`String` text)
 
 Replaces the clipboard contents with the supplied UTF-8 text. Returns `false` if the game window is unfocused or the operation is
