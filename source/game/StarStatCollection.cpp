@@ -18,24 +18,24 @@ namespace Star {
 
 std::expected<std::shared_ptr<StatCollection>, StarException> StatCollection::create(Json const& config) {
   auto collection = std::shared_ptr<StatCollection>(new StatCollection());
-  auto stats = config.getObject("stats", {});
+  auto stats = config.get_object("stats", {});
   if (!stats) return std::unexpected(std::move(stats.error()));
   for (auto const& stat : *stats) {
-    auto baseValue = stat.second.getFloat("baseValue", 0.0);
+    auto baseValue = stat.second.get_float("baseValue", 0.0);
     if (!baseValue) return std::unexpected(std::move(baseValue.error()));
     auto added = collection->m_stats.addStat(stat.first, *baseValue);
     if (!added) return std::unexpected(std::move(added.error()));
   }
 
-  auto resources = config.getObject("resources", {});
+  auto resources = config.get_object("resources", {});
   if (!resources) return std::unexpected(std::move(resources.error()));
   for (auto const& resource : *resources) {
     auto statOrValue = [&resource](String const& statName, String const& valueName) -> std::expected<std::variant<std::monostate, String, float>, StarException> {
-      auto stat = resource.second.optString(statName);
+      auto stat = resource.second.opt_string(statName);
       if (!stat) return std::unexpected(std::move(stat.error()));
       if (*stat)
         return std::variant<std::monostate, String, float>(std::move(**stat));
-      auto value = resource.second.optFloat(valueName);
+      auto value = resource.second.opt_float(valueName);
       if (!value) return std::unexpected(std::move(value.error()));
       if (*value)
         return std::variant<std::monostate, String, float>(**value);
@@ -47,14 +47,14 @@ std::expected<std::shared_ptr<StatCollection>, StarException> StatCollection::cr
     if (!resourceDelta) return std::unexpected(std::move(resourceDelta.error()));
     auto added = collection->m_stats.addResource(resource.first, std::move(*resourceMax), std::move(*resourceDelta));
     if (!added) return std::unexpected(std::move(added.error()));
-    auto initialValue = resource.second.optFloat("initialValue");
+    auto initialValue = resource.second.opt_float("initialValue");
     if (!initialValue) return std::unexpected(std::move(initialValue.error()));
     if (*initialValue) {
       auto set = collection->m_stats.setResourceValue(resource.first, **initialValue);
       if (!set) return std::unexpected(std::move(set.error()));
       collection->m_defaultResourceValues[resource.first] = AbsoluteResourceValue{**initialValue};
     } else {
-      auto maximumFraction = resource.second.optFloat("initialPercentage");
+      auto maximumFraction = resource.second.opt_float("initialPercentage");
       if (!maximumFraction)
         return std::unexpected(std::move(maximumFraction.error()));
       if (*maximumFraction) {

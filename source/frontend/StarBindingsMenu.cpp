@@ -94,8 +94,8 @@ std::expected<void, StarException> setGameBindings(GuiContext& context, Json con
       auto value = descriptor.get("value");
       if (!value)
         return std::unexpected(std::move(value.error()));
-      if (!value->isType(Json::Type::String)) {
-        auto number = value->toDouble();
+      if (!value->is_type(Json::Type::String)) {
+        auto number = value->to_double();
         if (!number)
           return std::unexpected(std::move(number.error()));
         if (*number != std::to_underlying(chord->key) || chord->key > KeyNames.back().first)

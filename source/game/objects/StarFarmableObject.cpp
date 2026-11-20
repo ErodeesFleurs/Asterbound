@@ -153,7 +153,7 @@ std::expected<std::shared_ptr<FarmableObject>, StarException> FarmableObject::cr
   if (!stagesConfigResult)
     return std::unexpected(std::move(stagesConfigResult.error()));
   auto stagesConfig = std::move(*stagesConfigResult);
-  auto stagesResult = stagesConfig.toArray();
+  auto stagesResult = stagesConfig.to_array();
   if (!stagesResult)
     return std::unexpected(std::move(stagesResult.error()));
   auto stages = std::move(*stagesResult);
@@ -162,7 +162,7 @@ std::expected<std::shared_ptr<FarmableObject>, StarException> FarmableObject::cr
   if (!startingStageConfigResult)
     return std::unexpected(std::move(startingStageConfigResult.error()));
   auto startingStageConfig = std::move(*startingStageConfigResult);
-  auto startingStageResult = startingStageConfig.toInt();
+  auto startingStageResult = startingStageConfig.to_int();
   if (!startingStageResult)
     return std::unexpected(std::move(startingStageResult.error()));
   auto startingStage = std::move(*startingStageResult);
@@ -171,7 +171,7 @@ std::expected<std::shared_ptr<FarmableObject>, StarException> FarmableObject::cr
   if (!minImmersionConfigResult)
     return std::unexpected(std::move(minImmersionConfigResult.error()));
   auto minImmersionConfig = std::move(*minImmersionConfigResult);
-  auto minImmersionResult = minImmersionConfig.toFloat();
+  auto minImmersionResult = minImmersionConfig.to_float();
   if (!minImmersionResult)
     return std::unexpected(std::move(minImmersionResult.error()));
   auto minImmersion = std::move(*minImmersionResult);
@@ -180,7 +180,7 @@ std::expected<std::shared_ptr<FarmableObject>, StarException> FarmableObject::cr
   if (!maxImmersionConfigResult)
     return std::unexpected(std::move(maxImmersionConfigResult.error()));
   auto maxImmersionConfig = std::move(*maxImmersionConfigResult);
-  auto maxImmersionResult = maxImmersionConfig.toFloat();
+  auto maxImmersionResult = maxImmersionConfig.to_float();
   if (!maxImmersionResult)
     return std::unexpected(std::move(maxImmersionResult.error()));
   auto maxImmersion = std::move(*maxImmersionResult);
@@ -189,7 +189,7 @@ std::expected<std::shared_ptr<FarmableObject>, StarException> FarmableObject::cr
   if (!consumeSoilMoistureConfigResult)
     return std::unexpected(std::move(consumeSoilMoistureConfigResult.error()));
   auto consumeSoilMoistureConfig = std::move(*consumeSoilMoistureConfigResult);
-  auto consumeSoilMoistureResult = consumeSoilMoistureConfig.toBool();
+  auto consumeSoilMoistureResult = consumeSoilMoistureConfig.to_bool();
   if (!consumeSoilMoistureResult)
     return std::unexpected(std::move(consumeSoilMoistureResult.error()));
   auto consumeSoilMoisture = std::move(*consumeSoilMoistureResult);
@@ -202,7 +202,7 @@ std::expected<std::shared_ptr<FarmableObject>, StarException> FarmableObject::cr
   if (!windowConfigResult)
     return std::unexpected(std::move(windowConfigResult.error()));
   auto windowConfig = std::move(*windowConfigResult);
-  auto windowResult = windowConfig.toFloat();
+  auto windowResult = windowConfig.to_float();
   if (!windowResult)
     return std::unexpected(std::move(windowResult.error()));
   auto window = std::move(*windowResult);
@@ -210,7 +210,7 @@ std::expected<std::shared_ptr<FarmableObject>, StarException> FarmableObject::cr
   if (!resolutionConfigResult)
     return std::unexpected(std::move(resolutionConfigResult.error()));
   auto resolutionConfig = std::move(*resolutionConfigResult);
-  auto resolutionResult = resolutionConfig.toUInt();
+  auto resolutionResult = resolutionConfig.to_uint();
   if (!resolutionResult)
     return std::unexpected(std::move(resolutionResult.error()));
   auto resolution = std::move(*resolutionResult);
@@ -291,7 +291,7 @@ std::expected<bool, StarException> FarmableObject::harvest() {
     if (!treasureResult)
       return std::unexpected(std::move(treasureResult.error()));
     auto treasure = std::move(*treasureResult);
-    auto poolResult = stage.getString("harvestPool");
+    auto poolResult = stage.get_string("harvestPool");
     if (!poolResult)
       return std::unexpected(std::move(poolResult.error()));
     auto pool = std::move(*poolResult);
@@ -331,7 +331,7 @@ std::expected<bool, StarException> FarmableObject::harvest() {
   auto reset = std::move(*resetResult);
   if (reset) {
     m_nextStageTime = currentWorld.get().epochTime();
-    auto resetStageResult = stage.getInt("resetToStage");
+    auto resetStageResult = stage.get_int("resetToStage");
     if (!resetStageResult)
       return std::unexpected(std::move(resetStageResult.error()));
     auto resetStage = std::move(*resetStageResult);
@@ -378,7 +378,7 @@ std::expected<void, StarException> FarmableObject::enterStage(int newStage) {
         if (!modNameResult)
           return std::unexpected(std::move(modNameResult.error()));
         auto modName = std::move(*modNameResult);
-        auto newModResult = wetToDryMods.optString(modName.get());
+        auto newModResult = wetToDryMods.opt_string(modName.get());
         if (!newModResult)
           return std::unexpected(std::move(newModResult.error()));
         auto newMod = std::move(*newModResult);
@@ -397,7 +397,7 @@ std::expected<void, StarException> FarmableObject::enterStage(int newStage) {
           if (!durationConfigResult)
             return std::unexpected(std::move(durationConfigResult.error()));
           auto durationConfig = std::move(*durationConfigResult);
-          auto durationResult = jsonToVec2F(durationConfig);
+          auto durationResult = json_to_vec2f(durationConfig);
           if (!durationResult)
             return std::unexpected(std::move(durationResult.error()));
           auto duration = std::move(*durationResult);
@@ -412,7 +412,7 @@ std::expected<void, StarException> FarmableObject::enterStage(int newStage) {
     }
   }
   auto nextStage = m_stages.get(newStage);
-  auto treeResult = nextStage.getBool("tree", false);
+  auto treeResult = nextStage.get_bool("tree", false);
   if (!treeResult)
     return std::unexpected(std::move(treeResult.error()));
   auto tree = std::move(*treeResult);
@@ -421,7 +421,7 @@ std::expected<void, StarException> FarmableObject::enterStage(int newStage) {
     if (!stemNameConfigResult)
       return std::unexpected(std::move(stemNameConfigResult.error()));
     auto stemNameConfig = std::move(*stemNameConfigResult);
-    auto stemNameResult = stemNameConfig.toString();
+    auto stemNameResult = stemNameConfig.to_string();
     if (!stemNameResult)
       return std::unexpected(std::move(stemNameResult.error()));
     auto stemName = std::move(*stemNameResult);
@@ -429,7 +429,7 @@ std::expected<void, StarException> FarmableObject::enterStage(int newStage) {
     if (!stemHueShiftConfigResult)
       return std::unexpected(std::move(stemHueShiftConfigResult.error()));
     auto stemHueShiftConfig = std::move(*stemHueShiftConfigResult);
-    auto stemHueShiftResult = stemHueShiftConfig.toFloat();
+    auto stemHueShiftResult = stemHueShiftConfig.to_float();
     if (!stemHueShiftResult)
       return std::unexpected(std::move(stemHueShiftResult.error()));
     auto stemHueShift = std::move(*stemHueShiftResult);
@@ -437,7 +437,7 @@ std::expected<void, StarException> FarmableObject::enterStage(int newStage) {
     if (!foliageNameConfigResult)
       return std::unexpected(std::move(foliageNameConfigResult.error()));
     auto foliageNameConfig = std::move(*foliageNameConfigResult);
-    auto foliageNameResult = foliageNameConfig.toString();
+    auto foliageNameResult = foliageNameConfig.to_string();
     if (!foliageNameResult)
       return std::unexpected(std::move(foliageNameResult.error()));
     auto foliageName = std::move(*foliageNameResult);
@@ -445,7 +445,7 @@ std::expected<void, StarException> FarmableObject::enterStage(int newStage) {
     if (!foliageHueShiftConfigResult)
       return std::unexpected(std::move(foliageHueShiftConfigResult.error()));
     auto foliageHueShiftConfig = std::move(*foliageHueShiftConfigResult);
-    auto foliageHueShiftResult = foliageHueShiftConfig.toFloat();
+    auto foliageHueShiftResult = foliageHueShiftConfig.to_float();
     if (!foliageHueShiftResult)
       return std::unexpected(std::move(foliageHueShiftResult.error()));
     auto foliageHueShift = std::move(*foliageHueShiftResult);
@@ -494,7 +494,7 @@ std::expected<void, StarException> FarmableObject::enterStage(int newStage) {
     if (!durationConfigResult)
       return std::unexpected(std::move(durationConfigResult.error()));
     auto durationConfig = std::move(*durationConfigResult);
-    auto durationResult = jsonToVec2F(durationConfig);
+    auto durationResult = json_to_vec2f(durationConfig);
     if (!durationResult)
       return std::unexpected(std::move(durationResult.error()));
     auto duration = std::move(*durationResult);
@@ -512,19 +512,19 @@ std::expected<void, StarException> FarmableObject::enterStage(int newStage) {
   // Keep the variant when adjacent stages have equal alternative counts.
   bool chooseAlt = m_stageAlt == -1;
   if (!chooseAlt) {
-    auto nextAltsResult = stage.getInt("alts", 1);
+    auto nextAltsResult = stage.get_int("alts", 1);
     if (!nextAltsResult)
       return std::unexpected(std::move(nextAltsResult.error()));
     auto nextAlts = std::move(*nextAltsResult);
     auto previousStage = m_stages.get(m_stage);
-    auto previousAltsResult = previousStage.getInt("alts", 1);
+    auto previousAltsResult = previousStage.get_int("alts", 1);
     if (!previousAltsResult)
       return std::unexpected(std::move(previousAltsResult.error()));
     auto previousAlts = std::move(*previousAltsResult);
     chooseAlt = nextAlts != previousAlts;
   }
   if (chooseAlt) {
-    auto altsResult = stage.getInt("alts", 1);
+    auto altsResult = stage.get_int("alts", 1);
     if (!altsResult)
       return std::unexpected(std::move(altsResult.error()));
     auto alts = std::move(*altsResult);
@@ -543,22 +543,22 @@ std::expected<void, StarException> FarmableObject::readStoredData(Json const& di
   auto operation14 = Object::readStoredData(diskStore);
   if (!operation14)
     return std::unexpected(std::move(operation14.error()));
-  auto stageResult = diskStore.getInt("stage");
+  auto stageResult = diskStore.get_int("stage");
   if (!stageResult)
     return std::unexpected(std::move(stageResult.error()));
   auto stage = std::move(*stageResult);
   m_stage = stage;
-  auto stageAltResult = diskStore.getInt("stageAlt");
+  auto stageAltResult = diskStore.get_int("stageAlt");
   if (!stageAltResult)
     return std::unexpected(std::move(stageAltResult.error()));
   auto stageAlt = std::move(*stageAltResult);
   m_stageAlt = stageAlt;
-  auto stageEnterTimeResult = diskStore.getDouble("stageEnterTime");
+  auto stageEnterTimeResult = diskStore.get_double("stageEnterTime");
   if (!stageEnterTimeResult)
     return std::unexpected(std::move(stageEnterTimeResult.error()));
   auto stageEnterTime = std::move(*stageEnterTimeResult);
   m_stageEnterTime = stageEnterTime;
-  auto nextStageTimeResult = diskStore.getDouble("nextStageTime");
+  auto nextStageTimeResult = diskStore.get_double("nextStageTime");
   if (!nextStageTimeResult)
     return std::unexpected(std::move(nextStageTimeResult.error()));
   auto nextStageTime = std::move(*nextStageTimeResult);

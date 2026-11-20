@@ -292,7 +292,7 @@ std::expected<void, StarException> WorldClientThread::runLoop(std::stop_token st
   auto measureConfig = (*assets)->json("/client.config:subWorldUpdateMeasureWindow");
   if (!measureConfig)
     return std::unexpected(std::move(measureConfig.error()));
-  auto updateMeasureWindow = measureConfig->toDouble();
+  auto updateMeasureWindow = measureConfig->to_double();
   if (!updateMeasureWindow)
     return std::unexpected(std::move(updateMeasureWindow.error()));
 

@@ -130,13 +130,13 @@ std::expected<void, StarException> JsonStreamer<Json>::to_json_stream(Json const
   switch (val.type()) {
   case Json::Type::Null: return stream.put_null();
   case Json::Type::Bool: {
-    auto value = val.toBool();
+    auto value = val.to_bool();
     if (!value)
       return std::unexpected(std::move(value.error()));
     return stream.put_boolean(*value);
   }
     case Json::Type::Float: {
-      auto value = val.toDouble();
+      auto value = val.to_double();
       if (!value) return std::unexpected(std::move(value.error()));
       // Binary64's shortest default form needs at most 17 significant digits,
       // a sign, decimal point and e+/-ddd (24 characters); fixed form is no longer.
@@ -149,7 +149,7 @@ std::expected<void, StarException> JsonStreamer<Json>::to_json_stream(Json const
       return stream.put_double(std::string_view(text.data(), static_cast<std::size_t>(formatted.size)));
     }
     case Json::Type::Int: {
-      auto value = val.toInt();
+      auto value = val.to_int();
       if (!value) return std::unexpected(std::move(value.error()));
       // digits10 excludes the final decimal digit; reserve that digit and a sign.
       std::array<char, std::numeric_limits<std::int64_t>::digits10 + 2> text;

@@ -4,6 +4,9 @@ import star.hash;
 import star.xx_hash;
 import star.json;
 import star.json_builder;
+import star.json_extra;
+import star.list;
+import star.vector;
 import star.string;
 import star.data_stream_devices;
 import star.text_formatter;
@@ -34,6 +37,34 @@ void expect_equivalent_key_lookup(Json const& stored, Json const& equivalent) {
   EXPECT_EQ(updated->second, 43);
 }
 }// namespace
+
+TEST(JsonContractTest, VectorConversionChecksShapeBeforeFirstInvalidComponent) {
+  auto wrong_shape = json_to_vec2f(JsonArray{JsonObject()});
+  ASSERT_FALSE(wrong_shape);
+  EXPECT_NE(std::string_view(wrong_shape.error().what()).find("array of size 2"), std::string_view::npos);
+  auto wrong_component = json_to_vec2f(JsonArray{"first", JsonObject()});
+  ASSERT_FALSE(wrong_component);
+  EXPECT_NE(std::string_view(wrong_component.error().what()).find("string"), std::string_view::npos);
+  auto valid = json_to_vec2f(JsonArray{2, -0.25});
+  ASSERT_TRUE(valid);
+  EXPECT_EQ((*valid)[0], 2.0f);
+  EXPECT_EQ((*valid)[1], -0.25f);
+}
+
+TEST(JsonContractTest, ListConversionUsesOneMutableLvalueConverter) {
+  struct Converter {
+    int total = 0;
+    std::expected<int, StarException> operator()(Json const& value) & {
+      auto number = value.to_int();
+      if (!number)
+        return std::unexpected(std::move(number.error()));
+      return total += static_cast<int>(*number);
+    }
+  };
+  auto result = json_to_list<int>(JsonArray{2, 3, 4}, Converter{});
+  ASSERT_TRUE(result);
+  EXPECT_EQ(*result, (List<int>{2, 5, 9}));
+}
 
 TEST(JsonContractTest, EqualNumericKeysShareHashesRecursively) {
   for (auto const& [integer, floating] : std::array<std::pair<Json, Json>, 7>{
@@ -138,17 +169,17 @@ TEST(JsonContractTest, BorrowedLookupDistinguishesMissingNullAndWrongContainer) 
   auto null = object.find("null");
   ASSERT_TRUE(null);
   ASSERT_TRUE(*null);
-  EXPECT_TRUE((*null)->get().isNull());
+  EXPECT_TRUE((*null)->get().is_null());
   auto child = object.find("child");
   ASSERT_TRUE(child);
   ASSERT_TRUE(*child);
 
   auto changed = object.set("child", 99);
   ASSERT_TRUE(changed);
-  auto originalValue = (*child)->get().getInt("value");
+  auto originalValue = (*child)->get().get_int("value");
   ASSERT_TRUE(originalValue);
   EXPECT_EQ(*originalValue, 7);
-  auto changedValue = changed->getInt("child");
+  auto changedValue = changed->get_int("child");
   ASSERT_TRUE(changedValue);
   EXPECT_EQ(*changedValue, 99);
 
@@ -156,7 +187,7 @@ TEST(JsonContractTest, BorrowedLookupDistinguishesMissingNullAndWrongContainer) 
   auto first = array.find(std::size_t{0});
   ASSERT_TRUE(first);
   ASSERT_TRUE(*first);
-  EXPECT_TRUE((*first)->get().isNull());
+  EXPECT_TRUE((*first)->get().is_null());
   auto outside = array.find(std::size_t{2});
   ASSERT_TRUE(outside);
   EXPECT_FALSE(*outside);
@@ -171,69 +202,69 @@ TEST(JsonContractTest, BorrowedLookupDistinguishesMissingNullAndWrongContainer) 
 TEST(JsonContractTest, DefaultsPreserveKeyIndexAndUntypedNullPolicies) {
   Json object = JsonObject{{"null", Json()}, {"wrong", "text"}};
   Json array = JsonArray{Json(), "text"};
-  auto keyed = object.getInt("null", 5);
+  auto keyed = object.get_int("null", 5);
   ASSERT_TRUE(keyed);
   EXPECT_EQ(*keyed, 5);
-  auto missing = object.getInt("missing", 5);
+  auto missing = object.get_int("missing", 5);
   ASSERT_TRUE(missing);
   EXPECT_EQ(*missing, 5);
-  auto indexed = array.getInt(std::size_t{0}, 5);
+  auto indexed = array.get_int(std::size_t{0}, 5);
   ASSERT_FALSE(indexed);
   EXPECT_TRUE(indexed.error().is<JsonException>());
-  auto outside = array.getInt(std::size_t{2}, 5);
+  auto outside = array.get_int(std::size_t{2}, 5);
   ASSERT_TRUE(outside);
   EXPECT_EQ(*outside, 5);
-  auto outside_without_default = array.getInt(std::size_t{2});
+  auto outside_without_default = array.get_int(std::size_t{2});
   ASSERT_FALSE(outside_without_default);
   EXPECT_TRUE(outside_without_default.error().is<JsonException>());
-  auto wrongKey = object.getInt("wrong", 5);
+  auto wrongKey = object.get_int("wrong", 5);
   ASSERT_FALSE(wrongKey);
-  auto wrongIndex = array.getInt(std::size_t{1}, 5);
+  auto wrongIndex = array.get_int(std::size_t{1}, 5);
   ASSERT_FALSE(wrongIndex);
 
   auto rawKey = object.get("null", 5);
   ASSERT_TRUE(rawKey);
-  EXPECT_TRUE(rawKey->isNull());
+  EXPECT_TRUE(rawKey->is_null());
   auto rawIndex = array.get(std::size_t{0}, 5);
   ASSERT_TRUE(rawIndex);
-  EXPECT_TRUE(rawIndex->isNull());
-  auto optional = object.optInt("null");
+  EXPECT_TRUE(rawIndex->is_null());
+  auto optional = object.opt_int("null");
   ASSERT_TRUE(optional);
   EXPECT_FALSE(*optional);
-  auto absentOptional = object.optInt("missing");
+  auto absentOptional = object.opt_int("missing");
   ASSERT_TRUE(absentOptional);
   EXPECT_FALSE(*absentOptional);
-  auto invalidOptional = object.optInt("wrong");
+  auto invalidOptional = object.opt_int("wrong");
   ASSERT_FALSE(invalidOptional);
-  auto scalar = Json(1).getInt(std::size_t{0}, 5);
+  auto scalar = Json(1).get_int(std::size_t{0}, 5);
   ASSERT_FALSE(scalar);
 }
 
 TEST(JsonContractTest, TypedQueriesPreserveNullDefaultsAndConversionErrors) {
   Json owner = JsonObject{{"array", JsonArray{Json(), 12}}, {"wrong", false}};
-  auto nullDefault = owner.queryInt("array[0]", 5);
+  auto nullDefault = owner.query_int("array[0]", 5);
   ASSERT_TRUE(nullDefault);
   EXPECT_EQ(*nullDefault, 5);
-  auto missingDefault = owner.queryInt("array[8]", 5);
+  auto missingDefault = owner.query_int("array[8]", 5);
   ASSERT_TRUE(missingDefault);
   EXPECT_EQ(*missingDefault, 5);
-  auto value = owner.queryInt("array[1]");
+  auto value = owner.query_int("array[1]");
   ASSERT_TRUE(value);
   EXPECT_EQ(*value, 12);
-  auto nullRequired = owner.queryInt("array[0]");
+  auto nullRequired = owner.query_int("array[0]");
   ASSERT_FALSE(nullRequired);
   auto rawNull = owner.query("array[0]", 5);
   ASSERT_TRUE(rawNull);
-  EXPECT_TRUE(rawNull->isNull());
-  auto wrong = owner.queryInt("wrong", 5);
+  EXPECT_TRUE(rawNull->is_null());
+  auto wrong = owner.query_int("wrong", 5);
   ASSERT_FALSE(wrong);
-  auto optionalNull = owner.optQueryInt("array[0]");
+  auto optionalNull = owner.opt_query_int("array[0]");
   ASSERT_TRUE(optionalNull);
   EXPECT_FALSE(*optionalNull);
-  auto optionalMissing = owner.optQueryInt("absent");
+  auto optionalMissing = owner.opt_query_int("absent");
   ASSERT_TRUE(optionalMissing);
   EXPECT_FALSE(*optionalMissing);
-  auto optionalWrong = owner.optQueryInt("wrong");
+  auto optionalWrong = owner.opt_query_int("wrong");
   ASSERT_FALSE(optionalWrong);
 }
 
@@ -261,19 +292,26 @@ TEST(JsonContractTest, NumericHashNormalizationDoesNotNormalizeWireTypes) {
   }
 }
 
+TEST(JsonContractTest, RecursiveMergeDistinguishesNullFromDeletion) {
+  Json base = JsonObject{{"nested", JsonObject{{"keep", 1}, {"remove", 2}}}};
+  Json patch = JsonObject{{"nested", JsonObject{{"remove", Json()}}}};
+  EXPECT_EQ(json_merge(base, patch), base);
+  EXPECT_EQ(json_merge_nulling(base, patch), (JsonObject{{"nested", JsonObject{{"keep", 1}}}}));
+}
+
 TEST(JsonContractTest, PartialMatchPreservesSharedObjectsAndArrayPatternDirection) {
   Json shared = JsonObject{{"value", std::numeric_limits<double>::quiet_NaN()}};
   Json snapshot = shared;
-  EXPECT_TRUE(jsonPartialMatch(shared, snapshot));
-  EXPECT_TRUE(jsonPartialMatch(shared, JsonObject{}));
+  EXPECT_TRUE(json_partial_match(shared, snapshot));
+  EXPECT_TRUE(json_partial_match(shared, JsonObject{}));
 
   Json subset = JsonObject{{"id", 1}};
   Json superset = JsonObject{{"id", 1}, {"extra", 2}};
-  EXPECT_TRUE(jsonPartialMatch(superset, subset));
-  EXPECT_FALSE(jsonPartialMatch(subset, superset));
-  EXPECT_TRUE(jsonPartialMatch(JsonArray{subset}, JsonArray{superset}));
-  EXPECT_FALSE(jsonPartialMatch(JsonArray{superset}, JsonArray{subset}));
-  EXPECT_TRUE(jsonPartialMatch(JsonArray{1, 2, 1}, JsonArray{1, 2, 1}));
+  EXPECT_TRUE(json_partial_match(superset, subset));
+  EXPECT_FALSE(json_partial_match(subset, superset));
+  EXPECT_TRUE(json_partial_match(JsonArray{subset}, JsonArray{superset}));
+  EXPECT_FALSE(json_partial_match(JsonArray{superset}, JsonArray{subset}));
+  EXPECT_TRUE(json_partial_match(JsonArray{1, 2, 1}, JsonArray{1, 2, 1}));
 }
 
 TEST(JsonContractTest, BinaryStringPreservesLongEmbeddedNullAndCommitsOnlyCompletePayload) {
@@ -301,7 +339,7 @@ TEST(JsonContractTest, BinaryStringPreservesLongEmbeddedNullAndCommitsOnlyComple
 TEST(JsonContractTest, ArrayMutationBoundsPreserveOriginalValues) {
   for (Json const& original : {Json(JsonArray{}), Json(JsonArray{1, Json(), 3})}) {
     auto snapshot = original;
-    auto values = original.toArray();
+    auto values = original.to_array();
     ASSERT_TRUE(values);
     auto count = values->size();
     for (std::size_t index : {count, count + 1, std::numeric_limits<std::size_t>::max()}) {
@@ -389,7 +427,7 @@ TEST(JsonContractTest, DirectObjectTextPreservesTraversalNestedValuesAndKeyQuirk
   output.append("prefix:");
   ASSERT_TRUE(write_text(output, object));
   EXPECT_EQ(output.view(), std::string("prefix:") + expected->utf8());
-  auto parsed = Json::parseJson(*expected);
+  auto parsed = Json::parse_json(*expected);
   ASSERT_TRUE(parsed);
   EXPECT_EQ(*parsed, Json(object));
 

@@ -83,18 +83,18 @@ std::expected<void, StarException> BeamItem::initializeBeam(Json config) {
   auto defaults = (*assets)->json("/player.config:beamGunConfig");
   if (!defaults)
     return std::unexpected(std::move(defaults.error()));
-  auto overrides = config.toObject();
+  auto overrides = config.to_object();
   if (!overrides)
     return std::unexpected(std::move(overrides.error()));
   auto merged = defaults->set_all(*overrides);
   if (!merged)
     return std::unexpected(std::move(merged.error()));
   config = std::move(*merged);
-  auto image = config.getString("image");
+  auto image = config.get_string("image");
   if (!image)
     return std::unexpected(std::move(image.error()));
   m_image = std::move(*image);
-  auto endImages = config.get("endImages").and_then(jsonToStringList);
+  auto endImages = config.get("endImages").and_then(json_to_string_list);
   if (!endImages)
     return std::unexpected(std::move(endImages.error()));
   m_endImages = std::move(*endImages);
@@ -104,16 +104,16 @@ std::expected<void, StarException> BeamItem::initializeBeam(Json config) {
       std::pair{std::string_view("nearControlPointElasticity"), std::ref(m_nearControlPointElasticity)},
       std::pair{std::string_view("farControlPointElasticity"), std::ref(m_farControlPointElasticity)},
       std::pair{std::string_view("nearControlPointDistance"), std::ref(m_nearControlPointDistance)}}) {
-    auto value = config.getFloat(key);
+    auto value = config.get_float(key);
     if (!value)
       return std::unexpected(std::move(value.error()));
     target.get() = *value;
   }
-  auto hand = config.get("handPosition").and_then(jsonToVec2F);
+  auto hand = config.get("handPosition").and_then(json_to_vec2f);
   if (!hand)
     return std::unexpected(std::move(hand.error()));
   m_handPosition = *hand;
-  auto fire = config.get("firePosition").and_then(jsonToVec2F);
+  auto fire = config.get("firePosition").and_then(json_to_vec2f);
   if (!fire)
     return std::unexpected(std::move(fire.error()));
   m_firePosition = *fire;
@@ -122,44 +122,44 @@ std::expected<void, StarException> BeamItem::initializeBeam(Json config) {
       std::pair{std::string_view("targetSegmentRun"), std::ref(m_targetSegmentRun)},
       std::pair{std::string_view("minBeamWidth"), std::ref(m_minBeamWidth)},
       std::pair{std::string_view("maxBeamWidth"), std::ref(m_maxBeamWidth)}}) {
-    auto value = config.getFloat(key);
+    auto value = config.get_float(key);
     if (!value)
       return std::unexpected(std::move(value.error()));
     target.get() = *value;
   }
-  auto widthDev = config.getFloat("beamWidthDev", (m_maxBeamWidth - m_minBeamWidth) / 3);
+  auto widthDev = config.get_float("beamWidthDev", (m_maxBeamWidth - m_minBeamWidth) / 3);
   if (!widthDev)
     return std::unexpected(std::move(widthDev.error()));
   m_beamWidthDev = *widthDev;
-  auto minJitter = config.getFloat("minBeamJitter");
+  auto minJitter = config.get_float("minBeamJitter");
   if (!minJitter)
     return std::unexpected(std::move(minJitter.error()));
   m_minBeamJitter = *minJitter;
-  auto maxJitter = config.getFloat("maxBeamJitter");
+  auto maxJitter = config.get_float("maxBeamJitter");
   if (!maxJitter)
     return std::unexpected(std::move(maxJitter.error()));
   m_maxBeamJitter = *maxJitter;
-  auto jitterDev = config.getFloat("beamJitterDev", (m_maxBeamJitter * 2) / 3);
+  auto jitterDev = config.get_float("beamJitterDev", (m_maxBeamJitter * 2) / 3);
   if (!jitterDev)
     return std::unexpected(std::move(jitterDev.error()));
   m_beamJitterDev = *jitterDev;
-  auto minTrans = config.getFloat("minBeamTrans");
+  auto minTrans = config.get_float("minBeamTrans");
   if (!minTrans)
     return std::unexpected(std::move(minTrans.error()));
   m_minBeamTrans = *minTrans;
-  auto maxTrans = config.getFloat("maxBeamTrans");
+  auto maxTrans = config.get_float("maxBeamTrans");
   if (!maxTrans)
     return std::unexpected(std::move(maxTrans.error()));
   m_maxBeamTrans = *maxTrans;
-  auto transDev = config.getFloat("beamTransDev", (m_maxBeamTrans - m_minBeamTrans) / 3);
+  auto transDev = config.get_float("beamTransDev", (m_maxBeamTrans - m_minBeamTrans) / 3);
   if (!transDev)
     return std::unexpected(std::move(transDev.error()));
   m_beamTransDev = *transDev;
-  auto minLines = config.getInt("minBeamLines");
+  auto minLines = config.get_int("minBeamLines");
   if (!minLines)
     return std::unexpected(std::move(minLines.error()));
   m_minBeamLines = *minLines;
-  auto maxLines = config.getInt("maxBeamLines");
+  auto maxLines = config.get_int("maxBeamLines");
   if (!maxLines)
     return std::unexpected(std::move(maxLines.error()));
   m_maxBeamLines = *maxLines;
@@ -167,7 +167,7 @@ std::expected<void, StarException> BeamItem::initializeBeam(Json config) {
       std::pair{std::string_view("innerBrightnessScale"), std::ref(m_innerBrightnessScale)},
       std::pair{std::string_view("firstStripeThickness"), std::ref(m_firstStripeThickness)},
       std::pair{std::string_view("secondStripeThickness"), std::ref(m_secondStripeThickness)}}) {
-    auto value = config.getFloat(key);
+    auto value = config.get_float(key);
     if (!value)
       return std::unexpected(std::move(value.error()));
     target.get() = *value;

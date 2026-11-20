@@ -168,7 +168,7 @@ Json Voice::Speaker::toJson() const {
                     {"muted", static_cast<bool>(muted)},
                     {"decibels", static_cast<float>(decibelLevel)},
                     {"smoothDecibels", static_cast<float>(smoothDb)},
-                    {"position", jsonFromVec2F(position)}};
+                    {"position", json_from_vec2f(position)}};
 }
 
 Voice::Voice(Root& root, std::shared_ptr<ApplicationController> appController)
@@ -235,23 +235,23 @@ inline bool change(T& value, T newValue, bool& out) {
 }
 
 std::expected<void, StarException> Voice::loadJson(Json const& config, bool skipSave) {
-  auto enabled = config.getBool("enabled", m_enabled);
+  auto enabled = config.get_bool("enabled", m_enabled);
   if (!enabled) return std::unexpected(std::move(enabled.error()));
-  auto inputEnabled = config.getBool("inputEnabled", m_inputEnabled);
+  auto inputEnabled = config.get_bool("inputEnabled", m_inputEnabled);
   if (!inputEnabled) return std::unexpected(std::move(inputEnabled.error()));
-  auto deviceName = config.optString("deviceName");
+  auto deviceName = config.opt_string("deviceName");
   if (!deviceName) return std::unexpected(std::move(deviceName.error()));
-  auto threshold = config.getFloat("threshold", m_threshold);
+  auto threshold = config.get_float("threshold", m_threshold);
   if (!threshold) return std::unexpected(std::move(threshold.error()));
-  auto inputVolume = config.getFloat("inputVolume", m_inputVolume);
+  auto inputVolume = config.get_float("inputVolume", m_inputVolume);
   if (!inputVolume) return std::unexpected(std::move(inputVolume.error()));
-  auto outputVolume = config.getFloat("outputVolume", m_outputVolume);
+  auto outputVolume = config.get_float("outputVolume", m_outputVolume);
   if (!outputVolume) return std::unexpected(std::move(outputVolume.error()));
-  auto loopback = config.getBool("loopback", m_loopback);
+  auto loopback = config.get_bool("loopback", m_loopback);
   if (!loopback) return std::unexpected(std::move(loopback.error()));
-  auto inputModeName = config.optString("inputMode");
+  auto inputModeName = config.opt_string("inputMode");
   if (!inputModeName) return std::unexpected(std::move(inputModeName.error()));
-  auto channelModeName = config.optString("channelMode");
+  auto channelModeName = config.opt_string("channelMode");
   if (!channelModeName) return std::unexpected(std::move(channelModeName.error()));
   auto inputMode = m_inputMode;
   if (*inputModeName) {
@@ -270,8 +270,8 @@ std::expected<void, StarException> Voice::loadJson(Json const& config, bool skip
   unsigned newBitrate = m_bitrate;
   if (*bitrate) {
     newBitrate = 0;
-    if ((**bitrate).canConvert(Json::Type::Int)) {
-      auto value = (**bitrate).toUInt();
+    if ((**bitrate).can_convert(Json::Type::Int)) {
+      auto value = (**bitrate).to_uint();
       if (!value) return std::unexpected(std::move(value.error()));
       newBitrate = std::clamp(static_cast<unsigned>(*value), 6000u, 510000u);
     }

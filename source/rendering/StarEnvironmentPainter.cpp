@@ -134,7 +134,7 @@ std::expected<void, StarException> EnvironmentPainter::renderStars(float pixelRa
   if (!m_starGenerator || !sky.settings || sky.starFrames == 0 || sky.starTypes().empty())
     return {};
 
-  auto screenBufferResult = sky.settings.queryFloat("stars.screenBuffer");
+  auto screenBufferResult = sky.settings.query_float("stars.screenBuffer");
   if (!screenBufferResult) return std::unexpected(std::move(screenBufferResult.error()));
   float screenBuffer = *screenBufferResult;
 
@@ -145,9 +145,9 @@ std::expected<void, StarException> EnvironmentPainter::renderStars(float pixelRa
   transform.translate(-viewMin);
   transform.rotate(sky.starRotation, viewCenter);
 
-  auto twinkleMin = sky.settings.queryInt("stars.twinkleMin");
+  auto twinkleMin = sky.settings.query_int("stars.twinkleMin");
   if (!twinkleMin) return std::unexpected(std::move(twinkleMin.error()));
-  auto twinkleMax = sky.settings.queryInt("stars.twinkleMax");
+  auto twinkleMax = sky.settings.query_int("stars.twinkleMax");
   if (!twinkleMax) return std::unexpected(std::move(twinkleMax.error()));
   std::size_t starTypesSize = sky.starTypes().size();
 
@@ -179,7 +179,7 @@ std::expected<void, StarException> EnvironmentPainter::renderStars(float pixelRa
 std::expected<void, StarException> EnvironmentPainter::renderDebrisFields(float pixelRatio, Vec2F const& screenSize, SkyRenderData const& sky) {
   if (!sky.settings || m_debrisGenerators.empty())
     return {};
-  auto debrisSkyTypes = sky.settings.optArray("debrisSkyTypes");
+  auto debrisSkyTypes = sky.settings.opt_array("debrisSkyTypes");
   if (!debrisSkyTypes) return std::unexpected(std::move(debrisSkyTypes.error()));
   if (*debrisSkyTypes) {
     if (!SkyTypeNames) return std::unexpected(SkyTypeNames.error());
@@ -187,7 +187,7 @@ std::expected<void, StarException> EnvironmentPainter::renderDebrisFields(float 
     if (!skyType) return std::unexpected(std::move(skyType.error()));
     StringList allowedTypes;
     for (auto const& type : **debrisSkyTypes) {
-      auto name = type.toString();
+      auto name = type.to_string();
       if (!name) return std::unexpected(std::move(name.error()));
       allowedTypes.push_back(std::move(*name));
     }
@@ -200,13 +200,13 @@ std::expected<void, StarException> EnvironmentPainter::renderDebrisFields(float 
   Vec2F viewCenter = viewSize / 2;
   Vec2D viewMin = Vec2D(sky.starOffset - viewCenter);
   Mat3F rotMatrix = Mat3F::rotation(sky.starRotation, viewCenter);
-  auto debrisFields = sky.settings.queryArray("spaceDebrisFields");
+  auto debrisFields = sky.settings.query_array("spaceDebrisFields");
   if (!debrisFields) return std::unexpected(std::move(debrisFields.error()));
   for (std::size_t i = 0; i < debrisFields->size(); ++i) {
     Json const& debrisField = (*debrisFields)[i];
     auto velocityJson = debrisField.query("velocityRange");
     if (!velocityJson) return std::unexpected(std::move(velocityJson.error()));
-    auto velocityRange = jsonToVec2F(*velocityJson);
+    auto velocityRange = json_to_vec2f(*velocityJson);
     if (!velocityRange) return std::unexpected(std::move(velocityRange.error()));
     auto debrisXVel =
       static_random_float_range((*velocityRange)[0], (*velocityRange)[1], sky.skyParameters.seed, i, "DebrisFieldXVel");
@@ -215,11 +215,11 @@ std::expected<void, StarException> EnvironmentPainter::renderDebrisFields(float 
       static_random_float_range((*velocityRange)[0], (*velocityRange)[1], sky.skyParameters.seed, i, "DebrisFieldYVel");
     if (!debrisYVel) return std::unexpected(std::move(debrisYVel.error()));
     Vec2D velocityOffset = -Vec2D(*debrisXVel, *debrisYVel) * sky.epochTime;
-    auto imageOptions = debrisField.queryArray("list");
+    auto imageOptions = debrisField.query_array("list");
     if (!imageOptions) return std::unexpected(std::move(imageOptions.error()));
     Vec2U biggest;
     for (Json const& json : *imageOptions) {
-      auto image = json.toString();
+      auto image = json.to_string();
       if (!image) return std::unexpected(std::move(image.error()));
       auto texture = m_textureGroup->loadTexture(*image);
       if (!texture) return std::unexpected(std::move(texture.error()));
@@ -229,13 +229,13 @@ std::expected<void, StarException> EnvironmentPainter::renderDebrisFields(float 
     PolyD field = PolyD(RectD::withSize(viewMin + velocityOffset, Vec2D(viewSize)).padded(screenBuffer));
     auto angularJson = debrisField.query("angularVelocityRange");
     if (!angularJson) return std::unexpected(std::move(angularJson.error()));
-    auto angularRange = jsonToVec2F(*angularJson);
+    auto angularRange = json_to_vec2f(*angularJson);
     if (!angularRange) return std::unexpected(std::move(angularRange.error()));
     auto debrisItems = m_debrisGenerators[i]->generate(field,
         [&](RandomSource& rand) -> std::expected<std::pair<String, float>, StarException> {
           auto option = rand.sample_ref(*imageOptions);
           if (!option) return std::unexpected(std::move(option.error()));
-          auto image = option->get().toString();
+          auto image = option->get().to_string();
           if (!image) return std::unexpected(std::move(image.error()));
           auto angularVelocity = rand.uniform_float((*angularRange)[0], (*angularRange)[1]);
           if (!angularVelocity) return std::unexpected(std::move(angularVelocity.error()));
@@ -487,7 +487,7 @@ std::expected<void, StarException> EnvironmentPainter::draw_rays(
       float percentFaded = MaxFade * (1.0f - std::min(1.0f, std::pow(timeSinceSunEvent / SunFadeRate, 2.0f)));
       color = (Vec3B)((Vec3F)color * (1 - percentFaded) + (Vec3F)sky.mainSkyColor.to_rgb() * percentFaded);
       float intensity = std::pow((color[0] + color[1]) * RayColorDependenceScale, RayColorDependenceLevel);
-      auto dynamicImage = sky.settings.queryBool("sun.dynamicImage.enabled", false);
+      auto dynamicImage = sky.settings.query_bool("sun.dynamicImage.enabled", false);
       if (!dynamicImage) return std::unexpected(std::move(dynamicImage.error()));
       auto rayColorJson = sky.settings.query("sun.rayColor", JsonArray{RayColor[0], RayColor[1], RayColor[2]});
       if (!rayColorJson) return std::unexpected(std::move(rayColorJson.error()));
@@ -496,9 +496,9 @@ std::expected<void, StarException> EnvironmentPainter::draw_rays(
         if (!dynamicColor) return std::unexpected(std::move(dynamicColor.error()));
         rayColorJson = std::move(dynamicColor);
       }
-      auto rayColorResult = jsonToVec3B(*rayColorJson);
+      auto rayColorResult = json_to_vec3b(*rayColorJson);
       if (!rayColorResult) return std::unexpected(std::move(rayColorResult.error()));
-      auto scale = sky.settings.queryFloat("sun.scale", 1.0f);
+      auto scale = sky.settings.query_float("sun.scale", 1.0f);
       if (!scale) return std::unexpected(std::move(scale.error()));
       style.emplace(RayStyle{*rayColorResult, intensity, *scale});
     }
@@ -611,23 +611,23 @@ std::expected<void, StarException> EnvironmentPainter::setupStars(SkyRenderData 
       textures[i * sky.starFrames + j] = std::move(*texture);
     }
   }
-  auto starCellSize = sky.settings.queryInt("stars.cellSize");
+  auto starCellSize = sky.settings.query_int("stars.cellSize");
   if (!starCellSize) return std::unexpected(std::move(starCellSize.error()));
   auto starCountJson = sky.settings.query("stars.cellCount");
   if (!starCountJson) return std::unexpected(std::move(starCountJson.error()));
-  auto starCount = jsonToVec2I(*starCountJson);
+  auto starCount = json_to_vec2i(*starCountJson);
   if (!starCount) return std::unexpected(std::move(starCount.error()));
   auto starGenerator = std::make_shared<Random2dPointGenerator<std::pair<std::size_t, float>>>(m_root.presentationRandom(), sky.skyParameters.seed, *starCellSize, *starCount);
-  auto debrisFields = sky.settings.queryArray("spaceDebrisFields");
+  auto debrisFields = sky.settings.query_array("spaceDebrisFields");
   if (!debrisFields) return std::unexpected(std::move(debrisFields.error()));
   decltype(m_debrisGenerators) debrisGenerators;
   debrisGenerators.resize(debrisFields->size());
   for (std::size_t i = 0; i < debrisFields->size(); ++i) {
-    auto cellSize = (*debrisFields)[i].getInt("cellSize");
+    auto cellSize = (*debrisFields)[i].get_int("cellSize");
     if (!cellSize) return std::unexpected(std::move(cellSize.error()));
     auto countJson = (*debrisFields)[i].get("cellCountRange");
     if (!countJson) return std::unexpected(std::move(countJson.error()));
-    auto count = jsonToVec2I(*countJson);
+    auto count = json_to_vec2i(*countJson);
     if (!count) return std::unexpected(std::move(count.error()));
     std::uint64_t seed = static_random_u64(sky.skyParameters.seed, i, "DebrisFieldSeed");
     debrisGenerators[i] = std::make_shared<Random2dPointGenerator<std::pair<String, float>, double>>(m_root.presentationRandom(), seed, *cellSize, *count);

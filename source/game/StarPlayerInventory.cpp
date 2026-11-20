@@ -177,7 +177,7 @@ PlayerInventory::PlayerInventory(Root& root, Json inventoryConfig, Json currenci
 }
 
 [[nodiscard]] std::expected<void, StarException> PlayerInventory::initialize() {
-  if (m_inventoryConfig.isNull()) {
+  if (m_inventoryConfig.is_null()) {
     auto assets = m_root.assets();
     if (!assets) return std::unexpected(std::move(assets.error()));
     auto config = (*assets)->json("/player.config:inventory");
@@ -187,11 +187,11 @@ PlayerInventory::PlayerInventory(Root& root, Json inventoryConfig, Json currenci
     m_inventoryConfig = std::move(*config);
     m_currenciesConfig = std::move(*currencies);
   }
-  auto bags = m_inventoryConfig.getObject("itemBags");
+  auto bags = m_inventoryConfig.get_object("itemBags");
   if (!bags) return std::unexpected(std::move(bags.error()));
   List<std::pair<String, std::int64_t>> bagOrder;
   for (auto const& bag : *bags) {
-    auto priority = bag.second.getInt("priority", 0);
+    auto priority = bag.second.get_int("priority", 0);
     if (!priority) return std::unexpected(std::move(priority.error()));
     bagOrder.push_back({bag.first, *priority});
   }
@@ -199,17 +199,17 @@ PlayerInventory::PlayerInventory(Root& root, Json inventoryConfig, Json currenci
   for (auto const& entry : bagOrder) {
     auto config = bags->get(entry.first);
     if (!config) return std::unexpected(std::move(config.error()));
-    auto size = config->get().getUInt("size");
+    auto size = config->get().get_uint("size");
     if (!size) return std::unexpected(std::move(size.error()));
     m_bags[entry.first] = std::make_shared<ItemBag>(m_root, *size);
     m_bagsNetState[entry.first].resize(*size);
   }
-  auto currencies = m_currenciesConfig.toObject();
+  auto currencies = m_currenciesConfig.to_object();
   if (!currencies) return std::unexpected(std::move(currencies.error()));
   for (auto const& currency : *currencies) m_currencies[currency.first] = 0;
-  auto groups = m_inventoryConfig.getUInt("customBarGroups");
+  auto groups = m_inventoryConfig.get_uint("customBarGroups");
   if (!groups) return std::unexpected(std::move(groups.error()));
-  auto indexes = m_inventoryConfig.getUInt("customBarIndexes");
+  auto indexes = m_inventoryConfig.get_uint("customBarIndexes");
   if (!indexes) return std::unexpected(std::move(indexes.error()));
   std::size_t customBarGroups = *groups;
   std::size_t customBarIndexes = *indexes;
@@ -872,7 +872,7 @@ std::uint64_t PlayerInventory::currency(String const& currencyType) const {
   if (!config) return std::unexpected(std::move(config.error()));
   auto currency = config->get(currencyType);
   if (!currency) return std::unexpected(std::move(currency.error()));
-  auto maximum = currency->getUInt("playerMax", std::numeric_limits<std::uint64_t>::max());
+  auto maximum = currency->get_uint("playerMax", std::numeric_limits<std::uint64_t>::max());
   if (!maximum) return std::unexpected(std::move(maximum.error()));
   m_currencies[currencyType] = std::min(*maximum, newTotal);
   return {};
@@ -1083,7 +1083,7 @@ void PlayerInventory::setEquipmentVisibility(EquipmentSlot slot, bool visible) {
     auto loaded = loadItem(Star::format("{}Slot", slot.second), m_equipment[slot.first], true);
     if (!loaded) return std::unexpected(std::move(loaded.error()));
   }
-  auto bags = store.getObject("itemBags");
+  auto bags = store.get_object("itemBags");
   if (!bags) return std::unexpected(std::move(bags.error()));
   m_inventoryLoadOverflow.clear();
   for (auto const& entry : *bags) {
@@ -1102,15 +1102,15 @@ void PlayerInventory::setEquipmentVisibility(EquipmentSlot slot, bool visible) {
   if (!swap) return std::unexpected(std::move(swap.error()));
   auto trash = loadItem("trashSlot", m_trashSlot);
   if (!trash) return std::unexpected(std::move(trash.error()));
-  auto currencies = store.getObject("currencies");
+  auto currencies = store.get_object("currencies");
   if (!currencies) return std::unexpected(std::move(currencies.error()));
   m_currencies.clear();
   for (auto const& entry : *currencies) {
-    auto count = entry.second.toUInt();
+    auto count = entry.second.to_uint();
     if (!count) return std::unexpected(std::move(count.error()));
     m_currencies[entry.first] = *count;
   }
-  auto group = store.getUInt("customBarGroup");
+  auto group = store.get_uint("customBarGroup");
   if (!group) return std::unexpected(std::move(group.error()));
   m_customBarGroup = *group;
   auto bar = store.get("customBar");
@@ -1125,7 +1125,7 @@ void PlayerInventory::setEquipmentVisibility(EquipmentSlot slot, bool visible) {
         auto json = links->get(hand, {});
         if (!json) return std::unexpected(std::move(json.error()));
         std::optional<InventorySlot> link;
-        if (!json->isNull()) {
+        if (!json->is_null()) {
           auto parsed = jsonToInventorySlot(*json);
           if (!parsed) return std::unexpected(std::move(parsed.error()));
           if (slotValid(*parsed)) link = std::move(*parsed);
@@ -1145,7 +1145,7 @@ void PlayerInventory::setEquipmentVisibility(EquipmentSlot slot, bool visible) {
     auto loaded = loadItem(entry.second, m_essential[entry.first]);
     if (!loaded) return std::unexpected(std::move(loaded.error()));
   }
-  auto visibility = store.optUInt("equipmentVisibilityMask");
+  auto visibility = store.opt_uint("equipmentVisibilityMask");
   if (!visibility) return std::unexpected(std::move(visibility.error()));
   m_equipmentVisibilityMask = static_cast<unsigned>(visibility->value_or(0xFFFFFFFF));
   return {};
@@ -1346,17 +1346,17 @@ void PlayerInventory::setPlayer(std::optional<std::reference_wrapper<Player>> pl
   Json filterConfig;
   auto filters = items->instanceValue("inventoryFilters");
   if (!filters) return std::unexpected(std::move(filters.error()));
-  if (filters->isType(Json::Type::Object)) {
+  if (filters->is_type(Json::Type::Object)) {
     auto selected = filters->opt(filterName);
     if (!selected) return std::unexpected(std::move(selected.error()));
     filterConfig = selected->value_or(Json{});
-    if (!filterConfig.isType(Json::Type::Object)) {
+    if (!filterConfig.is_type(Json::Type::Object)) {
       auto fallback = filters->opt("default");
       if (!fallback) return std::unexpected(std::move(fallback.error()));
       filterConfig = fallback->value_or(Json{});
     }
   }
-  if (!filterConfig.isType(Json::Type::Object)) {
+  if (!filterConfig.is_type(Json::Type::Object)) {
     auto assets = m_root.assets();
     if (!assets) return std::unexpected(std::move(assets.error()));
     auto config = (*assets)->json("/player.config:inventoryFilters");
@@ -1364,7 +1364,7 @@ void PlayerInventory::setPlayer(std::optional<std::reference_wrapper<Player>> pl
     auto selected = config->opt(filterName);
     if (!selected) return std::unexpected(std::move(selected.error()));
     filterConfig = selected->value_or(Json{});
-    if (!filterConfig.isType(Json::Type::Object)) {
+    if (!filterConfig.is_type(Json::Type::Object)) {
       auto fallback = config->get("default", JsonObject());
       if (!fallback) return std::unexpected(std::move(fallback.error()));
       filterConfig = std::move(*fallback);
@@ -1380,7 +1380,7 @@ void PlayerInventory::setPlayer(std::optional<std::reference_wrapper<Player>> pl
     auto present = filterConfig.contains(entry.first);
     if (!present) return std::unexpected(std::move(present.error()));
     if (*present) {
-      auto list = filterConfig.getArray(entry.first);
+      auto list = filterConfig.get_array(entry.first);
       if (!list) return std::unexpected(std::move(list.error()));
       if (list->contains(Json(String(*typeName))) == entry.second)
         return false;
@@ -1392,11 +1392,11 @@ void PlayerInventory::setPlayer(std::optional<std::reference_wrapper<Player>> pl
     auto present = filterConfig.contains(entry.first);
     if (!present) return std::unexpected(std::move(present.error()));
     if (*present) {
-      auto list = filterConfig.getArray(entry.first);
+      auto list = filterConfig.get_array(entry.first);
       if (!list) return std::unexpected(std::move(list.error()));
       bool matched = false;
       for (auto const& value : *list) {
-        auto tag = value.toString();
+        auto tag = value.to_string();
         if (!tag) return std::unexpected(std::move(tag.error()));
         if (tags->contains(*tag)) matched = true;
       }
@@ -1404,10 +1404,10 @@ void PlayerInventory::setPlayer(std::optional<std::reference_wrapper<Player>> pl
     }
   }
   for (auto const& entry : {std::pair<String, bool>{"categoryWhitelist", false}, {"categoryBlacklist", true}}) {
-    auto list = filterConfig.optArray(entry.first);
+    auto list = filterConfig.opt_array(entry.first);
     if (!list) return std::unexpected(std::move(list.error()));
     if (*list) {
-      auto categories = jsonToStringSet(**list);
+      auto categories = json_to_string_set(**list);
       if (!categories) return std::unexpected(std::move(categories.error()));
       if (categories->contains(items->category()) == entry.second) return false;
     }
@@ -1482,7 +1482,7 @@ void PlayerInventory::swapCustomBarLinks(InventorySlot a, InventorySlot b) {
   if (!configuration) return std::unexpected(std::move(configuration.error()));
   auto config = (*configuration)->getPath("inventory.pickupToActionBar");
   if (!config) return std::unexpected(std::move(config.error()));
-  auto enabled = config->toBool();
+  auto enabled = config->to_bool();
   if (!enabled) return std::unexpected(std::move(enabled.error()));
   if (!*enabled) return {};
   auto items = itemsAt(slot);

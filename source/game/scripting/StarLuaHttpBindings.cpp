@@ -101,7 +101,7 @@ struct LuaHttpSession::Impl {
     if (!sites)
       return std::unexpected(std::move(sites.error()));
     std::shared_ptr<JsonArray const> snapshot;
-    if (!sites->isNull()) {
+    if (!sites->is_null()) {
       auto array = sites->array_ptr();
       if (!array)
         return std::unexpected(std::move(array.error()));

@@ -114,7 +114,7 @@ std::expected<void, StarException> Tileset::exportTileset() const {
   if (!loaded)
     return std::unexpected(std::move(loaded.error()));
   Json root = std::move(*loaded);
-  auto properties = root.getObject("tileproperties", JsonObject{});
+  auto properties = root.get_object("tileproperties", JsonObject{});
   if (!properties)
     return std::unexpected(std::move(properties.error()));
   JsonObject tileProperties = std::move(*properties), tileImages;
@@ -145,7 +145,7 @@ std::expected<void, StarException> Tileset::exportTileset() const {
   auto complete = withProperties->set("tilecount", next_id);
   if (!complete)
     return std::unexpected(std::move(complete.error()));
-  auto text = complete->printJson(Indentation, true);
+  auto text = complete->print_json(Indentation, true);
   if (!text)
     return std::unexpected(std::move(text.error()));
   auto images = exportTilesetImages(exportDir);
@@ -240,7 +240,7 @@ std::expected<Json, StarException> Tileset::getTilesetJson(String const& tileset
     auto text = File::read_file_string(tilesetPath);
     if (!text)
       return std::unexpected(std::move(text.error()));
-    return Json::parseJson(*text);
+    return Json::parse_json(*text);
   } else {
     auto logged = m_logger.warn(
         "Tileset {} wasn't already present. Creating it from scratch. Any maps already using this tileset may be "
@@ -263,7 +263,7 @@ std::expected<Json, StarException> Tileset::getTilesetJson(String const& tileset
 std::expected<std::pair<StringMap<std::size_t>, std::size_t>, StarException> Tileset::indexExistingTiles(Json tileset) const {
   StringMap<std::size_t> existingTiles;
   std::size_t next_id = 0;
-  auto properties = tileset.getObject("tileproperties");
+  auto properties = tileset.get_object("tileproperties");
   if (!properties)
     return std::unexpected(std::move(properties.error()));
   for (auto const& entry : *properties) {
@@ -274,7 +274,7 @@ std::expected<std::pair<StringMap<std::size_t>, std::size_t>, StarException> Til
     if (!containsName)
       return std::unexpected(std::move(containsName.error()));
     if (*containsName) {
-      auto name = entry.second.getString("//name");
+      auto name = entry.second.get_string("//name");
       if (!name)
         return std::unexpected(std::move(name.error()));
       existingTiles[*name] = *id;

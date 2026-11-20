@@ -392,8 +392,8 @@ const GameTestRegistration
     ASSERT_TRUE(initialized) << initialized.error().what();
     auto expectState = [&](String const& input, String const& channel, int channels) {
       auto saved = voice.saveJson();
-      auto inputName = saved.getString("inputMode");
-      auto channelName = saved.getString("channelMode");
+      auto inputName = saved.get_string("inputMode");
+      auto channelName = saved.get_string("channelMode");
       ASSERT_TRUE(inputName);
       ASSERT_TRUE(channelName);
       EXPECT_EQ(*inputName, input);
@@ -445,7 +445,7 @@ const GameTestRegistration
   });
 
 const GameTestRegistration keybindingSpecificity("KeyBindings", "MostSpecificModifiersAndEventTypes", [](GameTest& fixture) {
-  auto config = Json::parseJson(R"JSON({
+  auto config = Json::parse_json(R"JSON({
     "PlayerLeft": [{"type":"key","value":"A","mods":[]}],
     "PlayerRight": [{"type":"key","value":"A","mods":["LShift"]}],
     "PlayerUp": [{"type":"key","value":"A","mods":["LCtrl"]}],
@@ -469,7 +469,7 @@ const GameTestRegistration keybindingSpecificity("KeyBindings", "MostSpecificMod
   EXPECT_EQ(bindings->actionsForKey(Key::A), (Set<InterfaceAction>{InterfaceAction::PlayerLeft,
       InterfaceAction::PlayerRight, InterfaceAction::PlayerUp, InterfaceAction::PlayerDown, InterfaceAction::PlayerJump}));
 
-  auto tiedConfig = Json::parseJson(R"JSON({
+  auto tiedConfig = Json::parse_json(R"JSON({
     "PlayerRight": [{"type":"key","value":"A","mods":["LShift"]}],
     "PlayerUp": [{"type":"key","value":"A","mods":["LCtrl"]}]
   })JSON");
@@ -1374,7 +1374,7 @@ const GameTestRegistration widgetMemberLifetime(
     auto& context = setup->context;
     auto& luaRoot = setup->luaRoot;
     auto pane = std::move(setup->pane);
-    auto schema = Json::parseJson(R"JSON({
+    auto schema = Json::parse_json(R"JSON({
     "spacing":[0,0], "memberSize":[80,12],
     "listTemplate":{"edit":{"type":"textbox","position":[0,0],"maxWidth":-1}}
   })JSON");
@@ -1458,7 +1458,7 @@ const GameTestRegistration memberCallbackErrorIsolation(
     auto target = ScriptTestPane::create(*setup->context);
     ASSERT_TRUE(target) << target.error().what();
     ASSERT_TRUE((*target)->setLuaRoot(setup->luaRoot));
-    auto schema = Json::parseJson(R"JSON({
+    auto schema = Json::parse_json(R"JSON({
       "spacing":[0,0], "memberSize":[80,12],
       "listTemplate":{"edit":{"type":"textbox","position":[0,0],"maxWidth":-1}}
     })JSON");
@@ -1792,7 +1792,7 @@ const GameTestRegistration
 const GameTestRegistration scriptInputEditor("ScriptPane", "ConsumingInputPrecedesFocusedNativeEditor", [](GameTest& fixture) {
   auto configuration = fixture.root().configuration();
   ASSERT_TRUE(configuration) << configuration.error().what();
-  auto bindings = Json::parseJson(R"JSON({
+  auto bindings = Json::parse_json(R"JSON({
     "ChatStop":[{"type":"key","value":"Backspace","mods":[]}],
     "GuiClose":[{"type":"key","value":"Esc","mods":[]}]
   })JSON");
@@ -1826,12 +1826,12 @@ const GameTestRegistration scriptInputEditor("ScriptPane", "ConsumingInputPreced
   auto action = pane.call("read", {});
   ASSERT_TRUE(action) << action.error().what();
   ASSERT_TRUE(*action);
-  auto actions = (**action).getArray("actions");
+  auto actions = (**action).get_array("actions");
   ASSERT_TRUE(actions) << actions.error().what();
   EXPECT_EQ(*actions, (JsonArray{"ChatStop"}));
   auto release = pane.inputJson(KeyUpEvent{Key::Backspace});
   ASSERT_TRUE(release) << release.error().what();
-  auto releaseActions = release->getArray("actions");
+  auto releaseActions = release->get_array("actions");
   ASSERT_TRUE(releaseActions) << releaseActions.error().what();
   EXPECT_TRUE(releaseActions->empty());
   auto committed = pane.sendEvent(TextInputEvent{"🙂"});
@@ -2323,7 +2323,7 @@ const GameTestRegistration statusPresentation("LuaStatusPresentation", "LayoutMa
     return {initial, empty, zero, absent[1], absent[2], frame[1][1]}
   )LUA");
   ASSERT_TRUE(result) << result.error().what();
-  auto expected = Json::parseJson(R"JSON([
+  auto expected = Json::parse_json(R"JSON([
     [[16,12],[5,-10],[
       ["/wide.png?blendmult=/dark.png;0;-10",[0,2]],
       ["/timed.png?blendmult=/dark.png;0;-2",[8,0]]
@@ -2395,7 +2395,7 @@ const GameTestRegistration bookmarkEditor("LuaBookmarkEditor", "NativeTextEditin
   ASSERT_TRUE(assets) << assets.error().what();
   auto config = (*assets)->json("/interface/asterbound/bookmarks/bookmarkeditor.config");
   ASSERT_TRUE(config) << config.error().what();
-  auto paneConfig = config->toObject();
+  auto paneConfig = config->to_object();
   ASSERT_TRUE(paneConfig) << paneConfig.error().what();
   auto textboxLayout = (*assets)->json("/interface/windowconfig/editbookmark.config:paneLayout.name");
   ASSERT_TRUE(textboxLayout) << textboxLayout.error().what();
@@ -2581,7 +2581,7 @@ const GameTestRegistration popupPresentation("LuaPopup", "NativeTitleLatestTextS
   ASSERT_TRUE(assets) << assets.error().what();
   auto config = (*assets)->json("/interface/asterbound/popup/popup.config");
   ASSERT_TRUE(config) << config.error().what();
-  auto paneConfig = config->toObject();
+  auto paneConfig = config->to_object();
   ASSERT_TRUE(paneConfig) << paneConfig.error().what();
   // Glyph layout/images require the GUI fixture. Use a real native TextBox as
   // the text sink here; pane.setTitle remains the actual native Pane binding.
@@ -2622,7 +2622,7 @@ const GameTestRegistration popupPresentation("LuaPopup", "NativeTitleLatestTextS
   ASSERT_TRUE(popup->call("showPopup", {JsonObject{{"message", "Random default"}}}));
   auto defaults = (*assets)->json("/interface/windowconfig/popup.config:onShowSound");
   ASSERT_TRUE(defaults) << defaults.error().what();
-  auto defaultSounds = defaults->toArray();
+  auto defaultSounds = defaults->to_array();
   ASSERT_TRUE(defaultSounds) << defaultSounds.error().what();
   if (defaultSounds->empty()) {
     EXPECT_EQ(sounds.size(), 1u);
@@ -2702,7 +2702,7 @@ const GameTestRegistration
     ASSERT_TRUE(assets) << assets.error().what();
     auto config = (*assets)->json("/interface/asterbound/songbook/songbook.config");
     ASSERT_TRUE(config) << config.error().what();
-    auto paneConfig = config->toObject();
+    auto paneConfig = config->to_object();
     ASSERT_TRUE(paneConfig) << paneConfig.error().what();
     // Use production Lua, real asset services, ListWidget and TextBox bindings.
     // Renderer-only imagery/labels stay in the GUI smoke; row text uses TextBox.
@@ -2719,7 +2719,7 @@ const GameTestRegistration
       ASSERT_TRUE(pane->addChild(name, *textbox));
     }
     auto songs = std::make_shared<Widget>(**context);
-    auto schema = Json::parseJson(R"JSON({
+    auto schema = Json::parse_json(R"JSON({
     "spacing":[0,0], "memberSize":[200,12],
     "listTemplate":{"songName":{"type":"textbox","position":[0,0],"maxWidth":-1}}
   })JSON");
@@ -2748,7 +2748,7 @@ const GameTestRegistration
     ASSERT_TRUE(pane->call("search", {}));
     StringList visibleResources;
     for (std::size_t index = 0; index < (*list)->listSize(); ++index) {
-      auto path = (*list)->itemAt(index)->data().toString();
+      auto path = (*list)->itemAt(index)->data().to_string();
       ASSERT_TRUE(path) << path.error().what();
       visibleResources.push_back(std::move(*path));
     }
@@ -2798,7 +2798,7 @@ const GameTestRegistration
     ASSERT_TRUE(pane->call("update", {}));
     visibleResources.clear();
     for (std::size_t index = 0; index < (*list)->listSize(); ++index) {
-      auto path = (*list)->itemAt(index)->data().toString();
+      auto path = (*list)->itemAt(index)->data().to_string();
       ASSERT_TRUE(path) << path.error().what();
       visibleResources.push_back(std::move(*path));
     }
@@ -2815,7 +2815,7 @@ const GameTestRegistration
     ASSERT_TRUE(panes.displayPane(PaneLayer::Window, pane, {}));
     visibleResources.clear();
     for (std::size_t index = 0; index < (*list)->listSize(); ++index) {
-      auto path = (*list)->itemAt(index)->data().toString();
+      auto path = (*list)->itemAt(index)->data().to_string();
       ASSERT_TRUE(path);
       visibleResources.push_back(std::move(*path));
     }
@@ -3347,7 +3347,7 @@ const GameTestRegistration
     ASSERT_TRUE(assets) << assets.error().what();
     auto config = (*assets)->json("/interface/asterbound/codex/codex.config");
     ASSERT_TRUE(config) << config.error().what();
-    auto paneConfig = config->toObject();
+    auto paneConfig = config->to_object();
     ASSERT_TRUE(paneConfig) << paneConfig.error().what();
     paneConfig->set("gui", JsonObject{});
     auto createdPane = BaseScriptPane::create(**context, *paneConfig);
@@ -3387,7 +3387,7 @@ const GameTestRegistration
       return {};
     });
     auto scroll = std::make_shared<Widget>(**context);
-    auto schema = Json::parseJson(R"JSON({
+    auto schema = Json::parse_json(R"JSON({
     "spacing":[0,0],"memberSize":[160,12],
     "listTemplate":{
       "bookName":{"type":"textbox","position":[0,0],"maxWidth":-1},
@@ -3620,7 +3620,7 @@ const GameTestRegistration questTrackerPresentation(
     ASSERT_TRUE(assets) << assets.error().what();
     auto style = (*assets)->json("/interface/questtracker/questtracker.config");
     ASSERT_TRUE(style) << style.error().what();
-    auto layoutJson = style->getObject("paneLayout");
+    auto layoutJson = style->get_object("paneLayout");
     ASSERT_TRUE(layoutJson) << layoutJson.error().what();
     auto progressLayout = style->query("paneLayout.questProgress");
     ASSERT_TRUE(progressLayout) << progressLayout.error().what();
@@ -3631,7 +3631,7 @@ const GameTestRegistration questTrackerPresentation(
     layoutJson->erase("lblQuestObjectiveList");
     auto config = (*assets)->json("/interface/asterbound/questtracker/questtracker.config");
     ASSERT_TRUE(config) << config.error().what();
-    auto paneConfig = config->toObject();
+    auto paneConfig = config->to_object();
     ASSERT_TRUE(paneConfig) << paneConfig.error().what();
     paneConfig->set("gui", *layoutJson);
     auto createdPane = ScriptTestPane::create(**context, Json(*paneConfig));
@@ -3675,7 +3675,7 @@ const GameTestRegistration questTrackerPresentation(
     EXPECT_EQ((*progress)->drawingOffset(), (Vec2I{0, -(*frame)->size()[1]}));
     auto frameImage = (*compassFrame)->image();
     ASSERT_TRUE(frameImage) << frameImage.error().what();
-    EXPECT_EQ(*frameImage, *style->getString("expandedCompassFrameImage"));
+    EXPECT_EQ(*frameImage, *style->get_string("expandedCompassFrameImage"));
 
     // Widget hit testing uses the drawing area established by rendering. Exercise
     // real pointer boundaries in the GL smoke, not an undrawn headless widget.
@@ -3720,10 +3720,10 @@ const GameTestRegistration questTrackerPresentation(
     ASSERT_TRUE(pane->tick(1.0f / 60));
     auto compactCompass = (*compassFrame)->image();
     ASSERT_TRUE(compactCompass) << compactCompass.error().what();
-    EXPECT_EQ(*compactCompass, *style->getString("compassFrameImage"));
+    EXPECT_EQ(*compactCompass, *style->get_string("compassFrameImage"));
 
-    auto acceleration = style->getFloat("compassAcceleration");
-    auto friction = style->getFloat("compassFriction");
+    auto acceleration = style->get_float("compassAcceleration");
+    auto friction = style->get_float("compassFriction");
     ASSERT_TRUE(acceleration && friction);
     float direction = 0, speed = 0;
     for (float target : {6.2f, 0.01f, 3.2f, -3.2f, 0.0f}) {
@@ -3896,7 +3896,7 @@ const GameTestRegistration questLogPresentation(
                                {"script", "/zzlog.lua"},
                                {"canBeAbandoned", id != "zzlog-a"},
                                {"showInLog", id != "zzlog-hidden"}};
-      auto printed = config.printJson();
+      auto printed = config.print_json();
       ASSERT_TRUE(printed) << printed.error().what();
       ASSERT_TRUE(File::write_file(*printed, File::relative_to(overlay, id + ".questtemplate")));
     }
@@ -3980,7 +3980,7 @@ const GameTestRegistration questLogPresentation(
     ASSERT_TRUE(assets);
     auto config = (*assets)->json("/interface/asterbound/questlog/questlog.config");
     ASSERT_TRUE(config) << config.error().what();
-    auto paneConfig = config->toObject();
+    auto paneConfig = config->to_object();
     ASSERT_TRUE(paneConfig);
     paneConfig->set("gui", JsonObject{});
     auto createdPane = ScriptTestPane::create(**context, *paneConfig);
@@ -4021,7 +4021,7 @@ const GameTestRegistration questLogPresentation(
     auto scroll = std::make_shared<Widget>(**context);
     auto layout = std::make_shared<VerticalLayout>(**context);
     layout->setFillDown(true);
-    auto schema = Json::parseJson(R"JSON({
+    auto schema = Json::parse_json(R"JSON({
     "spacing":[0,1],"memberSize":[150,19],
     "listTemplate":{
       "lblQuestEntry":{"type":"textbox","maxWidth":-1},
@@ -4157,7 +4157,7 @@ const GameTestRegistration questLogPresentation(
     // Quest allocation with the same ID must also invalidate revision caches.
     auto storedA = VersionedJson::fromJson(storedQuests["zzlog-a"]);
     ASSERT_TRUE(storedA) << storedA.error().what();
-    auto aData = storedA->content.toObject();
+    auto aData = storedA->content.to_object();
     ASSERT_TRUE(aData);
     aData->set("text", "Replacement body");
     aData->set("portraitTitles", JsonObject{{"Objective", "Replacement portrait"}});
@@ -4276,7 +4276,7 @@ const GameTestRegistration
     ASSERT_TRUE(File::create_directory(overlay));
     ASSERT_TRUE(File::create_directory(File::relative_to(overlay, "quests")));
     auto writeJson = [&](String const& path, Json const& json) -> std::expected<void, StarException> {
-      auto text = json.printJson();
+      auto text = json.print_json();
       if (!text)
         return std::unexpected(std::move(text.error()));
       return File::write_file(*text, File::relative_to(overlay, path));
@@ -4507,7 +4507,7 @@ const GameTestRegistration
       return child && *child ? (*child)->getText() : String{};
     };
     auto token = [&]() {
-      return pane->config().query("questDialog.token").and_then([](Json const& value) { return value.toUInt(); });
+      return pane->config().query("questDialog.token").and_then([](Json const& value) { return value.to_uint(); });
     };
     auto blocker = Pane::create(**context);
     ASSERT_TRUE(blocker);
@@ -4541,7 +4541,7 @@ const GameTestRegistration
     EXPECT_TRUE(domain->dialogValid(*completionToken));
     auto resolved = domain->dialogCinema(*completionToken);
     ASSERT_TRUE(resolved) << resolved.error().what();
-    EXPECT_EQ(resolved->getBool("suppressInput"), true);
+    EXPECT_EQ(resolved->get_bool("suppressInput"), true);
     ASSERT_TRUE(pane->call("close"));
     EXPECT_TRUE((*cinematic)->suppressInput());
     EXPECT_EQ(cinemaLoads, 1);
@@ -4556,7 +4556,7 @@ const GameTestRegistration
     ASSERT_TRUE(offerToken);
     auto repeatView = domain->pendingDialog("offer");
     ASSERT_TRUE(repeatView);
-    EXPECT_EQ(repeatView->getUInt("token"), *offerToken);
+    EXPECT_EQ(repeatView->get_uint("token"), *offerToken);
     auto objective = pane->fetchChild<ImageWidget>("objectivePortraitImage");
     ASSERT_TRUE(objective && *objective);
     EXPECT_NE((*objective)->size(), Vec2I{});
@@ -4728,7 +4728,7 @@ const GameTestRegistration
     ASSERT_TRUE(replace("zzdialog-offer", "Offer"));
     auto errorView = domain->pendingDialog("offer");
     ASSERT_TRUE(errorView);
-    auto errorToken = errorView->getUInt("token");
+    auto errorToken = errorView->get_uint("token");
     ASSERT_TRUE(errorToken);
     ASSERT_TRUE(controller->eval<LuaValue>("player.setProperty('zzdialogThrow', true)"));
     // A failed quest hook is isolated; the dialog decision and cleanup complete.
@@ -4778,7 +4778,7 @@ const GameTestRegistration
     EXPECT_TRUE(*available);
     auto config = (*assets)->json("/interface/asterbound/planettext/planettext.config");
     ASSERT_TRUE(config);
-    auto paneConfig = config->toObject();
+    auto paneConfig = config->to_object();
     ASSERT_TRUE(paneConfig);
     // Real LabelWidget construction requires renderInit, even for an empty
     // string. Use a real native TextBox for text/visibility policy, not a mock
@@ -4906,7 +4906,7 @@ const GameTestRegistration
         return testing::AssertionFailure() << timer.error().what();
       if (!*timer)
         return testing::AssertionFailure() << "Missing planet countdown";
-      auto timerValue = (**timer).toFloat();
+      auto timerValue = (**timer).to_float();
       if (!timerValue)
         return testing::AssertionFailure() << timerValue.error().what();
       if (*timerValue != expected.timer)
@@ -4918,7 +4918,7 @@ const GameTestRegistration
           return testing::AssertionFailure() << actual.error().what();
         if (!*actual)
           return testing::AssertionFailure() << "Missing planet alpha";
-        auto actualAlpha = (**actual).toFloat();
+        auto actualAlpha = (**actual).to_float();
         if (!actualAlpha)
           return testing::AssertionFailure() << actualAlpha.error().what();
         if (*actualAlpha != alpha)
@@ -5080,7 +5080,7 @@ const GameTestRegistration notificationPresentation("LuaNotifications", "Overflo
 
   auto maximum = (*assets)->json("/interface.config:maxMessageCount");
   ASSERT_TRUE(maximum);
-  auto capacity = maximum->toUInt();
+  auto capacity = maximum->to_uint();
   ASSERT_TRUE(capacity);
   ASSERT_TRUE(pane->evaluate(Star::format(
       "for index=1,{} do push({{text=tostring(index),cooldown=100}}) end", *capacity + 3)));
@@ -5132,7 +5132,7 @@ const GameTestRegistration mainbarGeometry("LuaMainBar", "PhysicalPolygonTransfo
   ASSERT_TRUE(config);
   auto sizeJson = config->get("size");
   ASSERT_TRUE(sizeJson);
-  auto barSize = jsonToVec2I(*sizeJson);
+  auto barSize = json_to_vec2i(*sizeJson);
   ASSERT_TRUE(barSize);
   auto luaRoot = LuaRoot::create(fixture.root());
   ASSERT_TRUE(luaRoot);
@@ -5154,7 +5154,7 @@ const GameTestRegistration mainbarGeometry("LuaMainBar", "PhysicalPolygonTransfo
         ASSERT_TRUE(button);
         auto polygonJson = button->get("poly");
         ASSERT_TRUE(polygonJson);
-        auto original = jsonToPolyI(*polygonJson);
+        auto original = json_to_polyi(*polygonJson);
         ASSERT_TRUE(original);
         PolyF polygon(*original);
         polygon.translate(origin);

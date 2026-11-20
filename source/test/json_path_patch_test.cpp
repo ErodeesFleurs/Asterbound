@@ -52,7 +52,7 @@ TEST(JsonPathPatchTest, SearchMutationsKeepFirstMatchAndSnapshots) {
   auto mergedItems = merged->query("root.items");
   ASSERT_TRUE(mergedItems);
   EXPECT_EQ(*mergedItems, Json(JsonArray{JsonObject{{"id", "a"}, {"count", 1}, {"extra", 9}}, second, third}));
-  auto sibling = merged->queryInt("root.other");
+  auto sibling = merged->query_int("root.other");
   ASSERT_TRUE(sibling);
   EXPECT_EQ(*sibling, 17);
   EXPECT_EQ(original, snapshot);
@@ -91,7 +91,7 @@ TEST(JsonPathPatchTest, ReplaceRequiresExistingLocationButAllowsNullAndRoot) {
   EXPECT_EQ(*items, Json(JsonArray{7, 2}));
   auto objectNull = json_patch(base, JsonArray{JsonObject{{"op", "replace"}, {"path", "/null"}, {"value", 8}}});
   ASSERT_TRUE(objectNull);
-  auto value = objectNull->getInt("null");
+  auto value = objectNull->get_int("null");
   ASSERT_TRUE(value);
   EXPECT_EQ(*value, 8);
   auto root = json_patch(base, JsonArray{JsonObject{{"op", "replace"}, {"path", ""}, {"value", JsonArray{9}}}});
@@ -118,7 +118,7 @@ TEST(JsonPathPatchTest, BorrowedLookupKeepsNullAndLazyErrorPrecedence) {
   auto nullValue = JsonPath::path_find_ref(base, JsonPath::parse_pointer, "/value");
   ASSERT_TRUE(nullValue);
   ASSERT_TRUE(*nullValue);
-  EXPECT_TRUE((*nullValue)->get().isNull());
+  EXPECT_TRUE((*nullValue)->get().is_null());
   auto missing = JsonPath::path_find_ref(base, JsonPath::parse_pointer, "/missing/~2");
   ASSERT_TRUE(missing);
   EXPECT_FALSE(*missing);
@@ -156,11 +156,11 @@ TEST(JsonPathPatchTest, ApplyKeepsLazyErrorsAndBorrowedSnapshots) {
   EXPECT_TRUE(malformed.error().is<JsonPath::ParsingException>());
   auto changed = JsonPath::QueryPath("items[0].value").set(base, Json(7));
   ASSERT_TRUE(changed);
-  auto value = changed->queryInt("items[0].value");
+  auto value = changed->query_int("items[0].value");
   ASSERT_TRUE(value);
   EXPECT_EQ(*value, 7);
   EXPECT_EQ(snapshot->get(), Json(JsonObject{{"value", 1}}));
-  auto originalValue = base.queryInt("items[0].value");
+  auto originalValue = base.query_int("items[0].value");
   ASSERT_TRUE(originalValue);
   EXPECT_EQ(*originalValue, 1);
 }

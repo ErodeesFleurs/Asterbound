@@ -101,7 +101,7 @@ std::expected<void, StarException> SliderBarWidget::initialize(String const& gri
   auto config = (*assets)->json("/interface.config:slider");
   if (!config)
     return std::unexpected(std::move(config.error()));
-  auto jogImage = config->getString("jog");
+  auto jogImage = config->get_string("jog");
   if (!jogImage)
     return std::unexpected(std::move(jogImage.error()));
   auto jog = ButtonWidget::create(context());
@@ -124,19 +124,19 @@ std::expected<void, StarException> SliderBarWidget::initialize(String const& gri
       if (!slider) return std::unexpected(GuiException("Slider callback target no longer exists"));
       return slider->rightCallback();
     });
-    auto leftBase = config->getString("leftBase");
+    auto leftBase = config->get_string("leftBase");
     if (!leftBase)
       return std::unexpected(std::move(leftBase.error()));
-    auto leftHover = config->getString("leftHover");
+    auto leftHover = config->get_string("leftHover");
     if (!leftHover)
       return std::unexpected(std::move(leftHover.error()));
-    auto rightBase = config->getString("rightBase");
+    auto rightBase = config->get_string("rightBase");
     if (!rightBase)
       return std::unexpected(std::move(rightBase.error()));
-    auto rightHover = config->getString("rightHover");
+    auto rightHover = config->get_string("rightHover");
     if (!rightHover)
       return std::unexpected(std::move(rightHover.error()));
-    auto padding = config->getInt("defaultPadding");
+    auto padding = config->get_int("defaultPadding");
     if (!padding)
       return std::unexpected(std::move(padding.error()));
     auto leftSize = (*metadata)->imageSize(*leftBase);

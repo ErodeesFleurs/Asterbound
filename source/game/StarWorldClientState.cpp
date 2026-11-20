@@ -40,10 +40,10 @@ std::expected<std::shared_ptr<WorldClientState>, StarException> WorldClientState
   auto clientConfig = (*assets)->json("/client.config");
   if (!clientConfig)
     return std::unexpected(std::move(clientConfig.error()));
-  auto windowBorder = clientConfig->getInt("windowMonitoringBorder");
+  auto windowBorder = clientConfig->get_int("windowMonitoringBorder");
   if (!windowBorder)
     return std::unexpected(std::move(windowBorder.error()));
-  auto presenceBorder = clientConfig->getInt("presenceEntityMonitoringBorder");
+  auto presenceBorder = clientConfig->get_int("presenceEntityMonitoringBorder");
   if (!presenceBorder)
     return std::unexpected(std::move(presenceBorder.error()));
   auto state = std::shared_ptr<WorldClientState>(new WorldClientState());

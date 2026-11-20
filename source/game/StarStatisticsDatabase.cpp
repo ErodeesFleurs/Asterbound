@@ -52,7 +52,7 @@ std::expected<void, StarException> StatisticsDatabase::load() {
     auto loaded = [&]() -> std::expected<void, StarException> {
       auto config = (*assets)->json(file);
       if (!config) return std::unexpected(std::move(config.error()));
-      auto name = config->getString("eventName");
+      auto name = config->get_string("eventName");
       if (!name) return std::unexpected(std::move(name.error()));
       if (m_eventPaths.contains(*name))
         loggingResult = m_root.logger().error("Event {} defined twice, second time from {}", *name, file);
@@ -76,16 +76,16 @@ std::expected<void, StarException> StatisticsDatabase::load() {
     auto loaded = [&]() -> std::expected<void, StarException> {
       auto config = (*assets)->json(file);
       if (!config) return std::unexpected(std::move(config.error()));
-      auto name = config->getString("name");
+      auto name = config->get_string("name");
       if (!name) return std::unexpected(std::move(name.error()));
       if (m_achievementPaths.contains(*name))
         loggingResult = m_root.logger().error("Achievement {} defined twice, second time from {}", *name, file);
       else
         m_achievementPaths[*name] = file;
-      auto triggers = config->getArray("triggers", {});
+      auto triggers = config->get_array("triggers", {});
       if (!triggers) return std::unexpected(std::move(triggers.error()));
       for (auto const& trigger : *triggers) {
-        auto stat = trigger.toString();
+        auto stat = trigger.to_string();
         if (!stat) return std::unexpected(std::move(stat.error()));
         m_statAchievements[*stat].push_back(*name);
       }
@@ -143,11 +143,11 @@ std::expected<std::shared_ptr<StatEvent>, StarException> StatisticsDatabase::rea
   auto parsed = [&]() -> std::expected<std::shared_ptr<StatEvent>, StarException> {
     auto config = assets.json(path);
     if (!config) return std::unexpected(std::move(config.error()));
-    auto name = config->getString("eventName");
+    auto name = config->get_string("eventName");
     if (!name) return std::unexpected(std::move(name.error()));
     auto scriptsJson = config->get("scripts");
     if (!scriptsJson) return std::unexpected(std::move(scriptsJson.error()));
-    auto scripts = jsonToStringList(*scriptsJson);
+    auto scripts = json_to_string_list(*scriptsJson);
     if (!scripts) return std::unexpected(std::move(scripts.error()));
     return std::make_shared<StatEvent>(StatEvent{std::move(*name), std::move(*scripts), std::move(*config)});
   }();
@@ -160,15 +160,15 @@ std::expected<std::shared_ptr<Achievement>, StarException> StatisticsDatabase::r
   auto parsed = [&]() -> std::expected<std::shared_ptr<Achievement>, StarException> {
     auto config = assets.json(path);
     if (!config) return std::unexpected(std::move(config.error()));
-    auto name = config->getString("name");
+    auto name = config->get_string("name");
     if (!name) return std::unexpected(std::move(name.error()));
     auto triggersJson = config->get("triggers");
     if (!triggersJson) return std::unexpected(std::move(triggersJson.error()));
-    auto triggers = jsonToStringList(*triggersJson);
+    auto triggers = json_to_string_list(*triggersJson);
     if (!triggers) return std::unexpected(std::move(triggers.error()));
     auto scriptsJson = config->get("scripts");
     if (!scriptsJson) return std::unexpected(std::move(scriptsJson.error()));
-    auto scripts = jsonToStringList(*scriptsJson);
+    auto scripts = json_to_string_list(*scriptsJson);
     if (!scripts) return std::unexpected(std::move(scripts.error()));
     return std::make_shared<Achievement>(Achievement{std::move(*name), std::move(*triggers), std::move(*scripts), std::move(*config)});
   }();

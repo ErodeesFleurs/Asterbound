@@ -115,7 +115,7 @@ extern std::expected<EnumMap<InterfaceAction>, StarException> const InterfaceAct
 
 std::expected<KeyChord, StarException> inputDescriptorFromJson(Json const& json) {
   Key key;
-  auto type = json.getString("type");
+  auto type = json.get_string("type");
   if (!type)
     return std::unexpected(std::move(type.error()));
   if (*type != "key")
@@ -123,16 +123,16 @@ std::expected<KeyChord, StarException> inputDescriptorFromJson(Json const& json)
   auto value = json.get("value");
   if (!value)
     return std::unexpected(std::move(value.error()));
-  if (value->isType(Json::Type::String)) {
-    auto name = value->toString();
+  if (value->is_type(Json::Type::String)) {
+    auto name = value->to_string();
     if (!name)
       return std::unexpected(std::move(name.error()));
     auto parsed = enum_value<KeyNames>(*name);
     if (!parsed)
       return std::unexpected(std::move(parsed.error()));
     key = *parsed;
-  } else if (value->canConvert(Json::Type::Int)) {
-    auto number = value->toUInt();
+  } else if (value->can_convert(Json::Type::Int)) {
+    auto number = value->to_uint();
     if (!number)
       return std::unexpected(std::move(number.error()));
     key = static_cast<Key>(*number);
@@ -150,7 +150,7 @@ std::expected<KeyChord, StarException> inputDescriptorFromJson(Json const& json)
     return std::unexpected(std::move(entries.error()));
   KeyMod mods = KeyMod::NoMod;
   for (auto const& entry : *entries) {
-    auto name = entry.toString();
+    auto name = entry.to_string();
     if (!name)
       return std::unexpected(std::move(name.error()));
     auto parsed = enum_value<KeyModNames>(*name);

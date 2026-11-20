@@ -375,7 +375,7 @@ std::expected<std::shared_ptr<Packet>, StarException> createPacket(RandomService
       break;
   }
 
-  if (args && !args->isNull()) {
+  if (args && !args->is_null()) {
     auto read = packet->readJson(*args);
     if (!read)
       return std::unexpected(std::move(read.error()));
@@ -618,13 +618,13 @@ std::expected<void, StarException> PausePacket::write(DataStream& ds, NetCompati
 
 std::expected<void, StarException> PausePacket::readJson(Json const& json) {
   {
-    auto result = json.getBool("pause");
+    auto result = json.get_bool("pause");
     if (!result)
       return std::unexpected(std::move(result.error()));
     pause = std::move(*result);
   }
   {
-    auto result = json.getFloat("timescale", 1.0f);
+    auto result = json.get_float("timescale", 1.0f);
     if (!result)
       return std::unexpected(std::move(result.error()));
     timescale = std::move(*result);
@@ -659,13 +659,13 @@ std::expected<void, StarException> ServerInfoPacket::write(DataStream& ds) const
 
 std::expected<void, StarException> ServerInfoPacket::readJson(Json const& json) {
   {
-    auto result = json.getUInt("players");
+    auto result = json.get_uint("players");
     if (!result)
       return std::unexpected(std::move(result.error()));
     players = std::move(*result);
   }
   {
-    auto result = json.getUInt("maxPlayers");
+    auto result = json.get_uint("maxPlayers");
     if (!result)
       return std::unexpected(std::move(result.error()));
     maxPlayers = std::move(*result);
@@ -1601,33 +1601,33 @@ std::expected<void, StarException> EntityMessagePacket::readJson(Json const& jso
   auto jEntityId = json.get("entityId");
   if (!jEntityId)
     return std::unexpected(std::move(jEntityId.error()));
-  if (jEntityId->canConvert(Json::Type::Int)) {
-    auto id = jEntityId->toInt();
+  if (jEntityId->can_convert(Json::Type::Int)) {
+    auto id = jEntityId->to_int();
     if (!id)
       return std::unexpected(std::move(id.error()));
     entityId = static_cast<EntityId>(*id);
   } else {
-    auto id = jEntityId->toString();
+    auto id = jEntityId->to_string();
     if (!id)
       return std::unexpected(std::move(id.error()));
     entityId = std::move(*id);
   }
-  auto decodedMessage = json.getString("message");
+  auto decodedMessage = json.get_string("message");
   if (!decodedMessage)
     return std::unexpected(std::move(decodedMessage.error()));
   message = std::move(*decodedMessage);
-  auto decodedArgs = json.getArray("args");
+  auto decodedArgs = json.get_array("args");
   if (!decodedArgs)
     return std::unexpected(std::move(decodedArgs.error()));
   args = std::move(*decodedArgs);
-  auto uuidString = json.getString("uuid");
+  auto uuidString = json.get_string("uuid");
   if (!uuidString)
     return std::unexpected(std::move(uuidString.error()));
   auto decodedUuid = Uuid::create(*uuidString);
   if (!decodedUuid)
     return std::unexpected(std::move(decodedUuid.error()));
   uuid = std::move(*decodedUuid);
-  auto from = json.getUInt("fromConnection");
+  auto from = json.get_uint("fromConnection");
   if (!from)
     return std::unexpected(std::move(from.error()));
   fromConnection = *from;
@@ -1678,7 +1678,7 @@ std::expected<void, StarException> UpdateWorldPropertiesPacket::write(DataStream
 
 std::expected<void, StarException> UpdateWorldPropertiesPacket::readJson(Json const& json) {
   {
-    auto result = json.getObject("updatedProperties");
+    auto result = json.get_object("updatedProperties");
     if (!result)
       return std::unexpected(std::move(result.error()));
     updatedProperties = std::move(*result);
@@ -1709,13 +1709,13 @@ std::expected<void, StarException> UpdateTileProtectionPacket::write(DataStream&
 
 std::expected<void, StarException> UpdateTileProtectionPacket::readJson(Json const& json) {
   {
-    auto result = json.getUInt("dungeonId");
+    auto result = json.get_uint("dungeonId");
     if (!result)
       return std::unexpected(std::move(result.error()));
     dungeonId = std::move(*result);
   }
   {
-    auto result = json.getBool("isProtected");
+    auto result = json.get_bool("isProtected");
     if (!result)
       return std::unexpected(std::move(result.error()));
     isProtected = std::move(*result);
@@ -1747,13 +1747,13 @@ std::expected<void, StarException> SetDungeonGravityPacket::write(DataStream& ds
 
 std::expected<void, StarException> SetDungeonGravityPacket::readJson(Json const& json) {
   {
-    auto result = json.getUInt("dungeonId");
+    auto result = json.get_uint("dungeonId");
     if (!result)
       return std::unexpected(std::move(result.error()));
     dungeonId = std::move(*result);
   }
   {
-    auto result = json.optFloat("gravity");
+    auto result = json.opt_float("gravity");
     if (!result)
       return std::unexpected(std::move(result.error()));
     gravity = std::move(*result);
@@ -1785,13 +1785,13 @@ std::expected<void, StarException> SetDungeonBreathablePacket::write(DataStream&
 
 std::expected<void, StarException> SetDungeonBreathablePacket::readJson(Json const& json) {
   {
-    auto result = json.getUInt("dungeonId");
+    auto result = json.get_uint("dungeonId");
     if (!result)
       return std::unexpected(std::move(result.error()));
     dungeonId = std::move(*result);
   }
   {
-    auto result = json.optBool("breathable");
+    auto result = json.opt_bool("breathable");
     if (!result)
       return std::unexpected(std::move(result.error()));
     breathable = std::move(*result);
@@ -1824,12 +1824,12 @@ std::expected<void, StarException> SetPlayerStartPacket::readJson(Json const& js
   auto startData = json.get("playerStart");
   if (!startData)
     return std::unexpected(std::move(startData.error()));
-  auto start = jsonToVec2F(*startData);
+  auto start = json_to_vec2f(*startData);
   if (!start)
     return std::unexpected(std::move(start.error()));
   playerStart = *start;
   {
-    auto result = json.getBool("respawnInWorld");
+    auto result = json.get_bool("respawnInWorld");
     if (!result)
       return std::unexpected(std::move(result.error()));
     respawnInWorld = std::move(*result);
@@ -1839,7 +1839,7 @@ std::expected<void, StarException> SetPlayerStartPacket::readJson(Json const& js
 
 std::expected<Json, StarException> SetPlayerStartPacket::writeJson() const {
   return JsonObject{
-    {"playerStart", jsonFromVec2F(playerStart)},
+    {"playerStart", json_from_vec2f(playerStart)},
     {"respawnInWorld", respawnInWorld}
   };
 }
@@ -2206,24 +2206,24 @@ std::expected<void, StarException> UniverseMessage::write(DataStream& ds) const 
 
 std::expected<void, StarException> UniverseMessage::readJson(Json const& json) {
   {
-    auto result = json.getUInt("connection");
+    auto result = json.get_uint("connection");
     if (!result)
       return std::unexpected(std::move(result.error()));
     connection = std::move(*result);
   }
   {
-    auto result = json.getString("message");
+    auto result = json.get_string("message");
     if (!result)
       return std::unexpected(std::move(result.error()));
     message = std::move(*result);
   }
   {
-    auto result = json.getArray("args");
+    auto result = json.get_array("args");
     if (!result)
       return std::unexpected(std::move(result.error()));
     args = std::move(*result);
   }
-  auto uuidString = json.getString("uuid");
+  auto uuidString = json.get_string("uuid");
   if (!uuidString)
     return std::unexpected(std::move(uuidString.error()));
   auto decodedUuid = Uuid::create(*uuidString);
@@ -2231,7 +2231,7 @@ std::expected<void, StarException> UniverseMessage::readJson(Json const& json) {
     return std::unexpected(std::move(decodedUuid.error()));
   uuid = std::move(*decodedUuid);
   {
-    auto result = json.getUInt("fromConnection");
+    auto result = json.get_uint("fromConnection");
     if (!result)
       return std::unexpected(std::move(result.error()));
     fromConnection = std::move(*result);

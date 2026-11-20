@@ -31,7 +31,7 @@ struct RvalueJsonConverter {
   int& calls;
   std::expected<bool, StarException> operator()(Json const& value) && {
     ++calls;
-    return value.toBool();
+    return value.to_bool();
   }
 };
 
@@ -62,34 +62,34 @@ TEST(JsonTest, MatrixRowsRetainAllNineScalars) {
 }
 
 TEST(JsonTest, ColorChannelsRetainIntegerCoercionAndAlphaQuantization) {
-  auto fractional = jsonToColor(JsonArray{0.5, 1.0, 255.9});
+  auto fractional = json_to_color(JsonArray{0.5, 1.0, 255.9});
   ASSERT_TRUE(fractional);
   EXPECT_EQ(fractional->to_rgba(), Vec4B(0, 1, 255, 255));
-  auto narrowed = jsonToColor(JsonArray{256, -1, 258, 128});
+  auto narrowed = json_to_color(JsonArray{256, -1, 258, 128});
   ASSERT_TRUE(narrowed);
   EXPECT_EQ(narrowed->to_rgba(), Vec4B(0, 255, 2, 128));
-  EXPECT_EQ(jsonFromColor(Color::rgba_f(0.5f, 0.0f, 1.0f, 0.5f)), (Json(JsonArray{128, 0, 255, 127})));
-  EXPECT_EQ(jsonFromColor(Color::rgba_f(0.5f, 0.0f, 1.0f, 1.0f)), (Json(JsonArray{128, 0, 255})));
+  EXPECT_EQ(json_from_color(Color::rgba_f(0.5f, 0.0f, 1.0f, 0.5f)), (Json(JsonArray{128, 0, 255, 127})));
+  EXPECT_EQ(json_from_color(Color::rgba_f(0.5f, 0.0f, 1.0f, 1.0f)), (Json(JsonArray{128, 0, 255})));
 }
 
 TEST(JsonTest, ColorErrorsRetainTypeAndValidParsingRecovers) {
   for (auto const& value : {Json(), Json(JsonArray{1, 2}), Json(JsonArray{1, "bad", 3})}) {
-    auto decoded = jsonToColor(value);
+    auto decoded = json_to_color(value);
     ASSERT_FALSE(decoded);
     EXPECT_TRUE(decoded.error().is<JsonException>());
   }
-  auto malformed = jsonToColor(Json("#ggg"));
+  auto malformed = json_to_color(Json("#ggg"));
   ASSERT_FALSE(malformed);
   EXPECT_TRUE(malformed.error().is<ColorException>());
-  EXPECT_EQ(jsonToColor(Json("RED")), Color::Red);
-  EXPECT_EQ(jsonToColor(Json("#1234")), Color::rgba(0x11, 0x22, 0x33, 0x44));
+  EXPECT_EQ(json_to_color(Json("RED")), Color::Red);
+  EXPECT_EQ(json_to_color(Json("#1234")), Color::rgba(0x11, 0x22, 0x33, 0x44));
 }
 
 TEST(JsonTest, OptionalNullSkipsConvertersAndFalseRemainsPresent) {
   int calls = 0;
   auto from_json = [&calls](Json const& value) {
     ++calls;
-    return value.toBool();
+    return value.to_bool();
   };
   auto empty = json_to_optional<bool>(Json(), RvalueJsonConverter{calls});
   ASSERT_TRUE(empty);
@@ -111,7 +111,7 @@ TEST(JsonTest, OptionalNullSkipsConvertersAndFalseRemainsPresent) {
   };
   auto absent_json = json_from_optional(std::optional<bool>{}, to_json);
   ASSERT_TRUE(absent_json);
-  EXPECT_TRUE(absent_json->isNull());
+  EXPECT_TRUE(absent_json->is_null());
   EXPECT_EQ(calls, 2);
   auto false_json = json_from_optional(std::optional<bool>{false}, to_json);
   ASSERT_TRUE(false_json);
@@ -131,7 +131,7 @@ TEST(JsonTest, OptionalConvertersPreserveErrorsWithoutFlatteningOtherValues) {
   std::function<std::expected<Json, StarException>(bool)> writer;
   auto absent_json = json_from_optional(std::optional<bool>{}, writer);
   ASSERT_TRUE(absent_json);
-  EXPECT_TRUE(absent_json->isNull());
+  EXPECT_TRUE(absent_json->is_null());
   auto missing_writer = json_from_optional(std::optional<bool>{false}, writer);
   ASSERT_FALSE(missing_writer);
   EXPECT_TRUE(missing_writer.error().is<JsonException>());
@@ -186,7 +186,7 @@ TEST(JsonTest, Merging) {
   JsonObject c{{"hello", "you"}, {"leg", "fiend"}};
   JsonObject d{{"goodbye", "you"}, {"friendly", "leg"}};
 
-  Json merged = jsonMerge(a, b, c, d);
+  Json merged = json_merge(a, b, c, d);
 
   auto result7 = merged.get("I");
   ASSERT_TRUE(result7);
@@ -230,7 +230,7 @@ TEST(JsonTest, Unicode) {
   auto result16 = Json::parse("{ \"first\" : \"日本語\", \"second\" : \"foobar\\u0019\" }");
   ASSERT_TRUE(result16);
   Json v = (*result16);
-  auto result17 = v.getString("first");
+  auto result17 = v.get_string("first");
   ASSERT_TRUE(result17);
   EXPECT_EQ((*result17), String("日本語"));
   auto result18 = v.get("second");
@@ -239,13 +239,13 @@ TEST(JsonTest, Unicode) {
   ASSERT_TRUE(result19);
   EXPECT_EQ((*result19), String("\"foobar\\u0019\""));
 
-  auto result20 = v.printJson();
+  auto result20 = v.print_json();
   ASSERT_TRUE(result20);
   String json = (*result20);
-  auto result21 = Json::parseJson(json);
+  auto result21 = Json::parse_json(json);
   ASSERT_TRUE(result21);
   Json v2 = (*result21);
-  auto result22 = v2.getString("first");
+  auto result22 = v2.get_string("first");
   ASSERT_TRUE(result22);
   EXPECT_EQ((*result22), String("日本語"));
 
@@ -254,7 +254,7 @@ TEST(JsonTest, Unicode) {
   auto result23 = Json::parse("\"\\ud83d\\ude00\"");
   ASSERT_TRUE(result23);
   EXPECT_EQ(Json("😀"), (*result23));
-  auto result25 = (*result23).toString();
+  auto result25 = (*result23).to_string();
   ASSERT_TRUE(result25);
   auto result26 = (*result25).size();
   ASSERT_TRUE(result26);
@@ -382,13 +382,13 @@ TEST(JsonTest, UnicodeFile) {
   String file = (*result31);
   auto finallyGuard = make_scope_exit([&file]() { EXPECT_TRUE(File::remove(file)); });
 
-  auto result32 = v.printJson();
+  auto result32 = v.print_json();
   ASSERT_TRUE(result32);
   auto result33 = File::write_file((*result32), file);
   ASSERT_TRUE(result33);
   auto result34 = File::read_file_string(file);
   ASSERT_TRUE(result34);
-  auto result35 = Json::parseJson((*result34));
+  auto result35 = Json::parse_json((*result34));
   ASSERT_TRUE(result35);
   Json v2 = (*result35);
   EXPECT_EQ(v, v2);
@@ -403,7 +403,7 @@ TEST(JsonTest, JsonParsingEdge) {
   };
 
   auto isValidJson = [](String const& json) -> bool {
-    auto result = Json::parseJson(json);
+    auto result = Json::parse_json(json);
     if (!result)
       EXPECT_TRUE(result.error().is<JsonParsingException>());
     return result.has_value();
@@ -430,12 +430,12 @@ TEST(JsonTest, CommentHeavyParsingRetainsValuesAndUnicodeValidation) {
      -2.5e+1, /* before null */ null],
     "text": "水😀" // before closing object
   } /* after document */)JSON";
-  auto parsed = Json::parseJson(String(text));
+  auto parsed = Json::parse_json(String(text));
   ASSERT_TRUE(parsed);
   EXPECT_EQ(*parsed, (Json{JsonObject{{"values", JsonArray{1, -25.0, Json()}}, {"text", "水😀"}}}));
 
   // Discarding comment text must still decode every visited codepoint.
-  auto invalid = Json::parseJson(String(std::string_view("[0] /*\xff*/", 9)));
+  auto invalid = Json::parse_json(String(std::string_view("[0] /*\xff*/", 9)));
   ASSERT_FALSE(invalid);
   EXPECT_TRUE(invalid.error().is<UnicodeException>());
 }
@@ -465,7 +465,7 @@ TEST(JsonTest, NumericParsingPreservesFullTokenRangeSemantics) {
     auto parsed = Json::parse(String(text));
     ASSERT_TRUE(parsed);
     EXPECT_EQ(parsed->type(), Json::Type::Int);
-    auto value = parsed->toInt();
+    auto value = parsed->to_int();
     ASSERT_TRUE(value);
     EXPECT_EQ(*value, 0);
   }
@@ -482,7 +482,7 @@ TEST(JsonTest, NumericParsingPreservesFullTokenRangeSemantics) {
     auto parsed = Json::parse(String(text));
     ASSERT_TRUE(parsed);
     EXPECT_EQ(parsed->type(), Json::Type::Float);
-    auto value = parsed->toDouble();
+    auto value = parsed->to_double();
     ASSERT_TRUE(value);
     std::uint64_t actual;
     std::memcpy(&actual, &*value, sizeof(actual));
@@ -594,7 +594,7 @@ TEST(JsonTest, NumericOutputPreservesIntegerExtrema) {
   ASSERT_TRUE(text);
   EXPECT_EQ(*text, "[-9223372036854775808,9223372036854775807,0,-1]");
 
-  auto parsed = Json::parseJson(*text);
+  auto parsed = Json::parse_json(*text);
   ASSERT_TRUE(parsed);
   EXPECT_EQ(*parsed, numbers);
 }
@@ -634,14 +634,14 @@ TEST(JsonTest, NumericStreamPreservesKindsAndSignedZero) {
     ASSERT_TRUE(rebuilt);
     EXPECT_EQ(rebuilt->type(), number.type());
     if (number.type() == Json::Type::Int) {
-      auto original = number.toInt();
-      auto actual = rebuilt->toInt();
+      auto original = number.to_int();
+      auto actual = rebuilt->to_int();
       ASSERT_TRUE(original);
       ASSERT_TRUE(actual);
       EXPECT_EQ(*actual, *original);
     } else {
-      auto original = number.toDouble();
-      auto actual = rebuilt->toDouble();
+      auto original = number.to_double();
+      auto actual = rebuilt->to_double();
       ASSERT_TRUE(original);
       ASSERT_TRUE(actual);
       EXPECT_EQ(std::bit_cast<std::uint64_t>(*actual), std::bit_cast<std::uint64_t>(*original));
@@ -703,7 +703,7 @@ TEST(JsonTest, Utf8OutputPreservesExactEscapesUnicodeAndFormatting) {
     auto repr = input.repr(indentation, true);
     ASSERT_TRUE(repr);
     EXPECT_EQ(repr->utf8(), indentation == 0 ? compact : pretty);
-    auto parsed = Json::parseJson(*repr);
+    auto parsed = Json::parse_json(*repr);
     ASSERT_TRUE(parsed);
     EXPECT_EQ(*parsed, input);
     for (bool sort : {false, true}) {
@@ -994,22 +994,22 @@ TEST(JsonTest, PatchingAdd) {
   ASSERT_TRUE(result61);
   Json badPatch3 = (*result61);
 
-  auto result62 = patch.toArray();
+  auto result62 = patch.to_array();
   ASSERT_TRUE(result62);
   auto result63 = json_patch(before, (*result62));
   ASSERT_TRUE(result63);
   EXPECT_EQ((*result63), after);
-  auto result64 = badPatch1.toArray();
+  auto result64 = badPatch1.to_array();
   ASSERT_TRUE(result64);
   auto error65 = json_patch(before, (*result64));
   ASSERT_FALSE(error65);
   EXPECT_TRUE(error65.error().is<JsonPatchException>());
-  auto result66 = badPatch2.toArray();
+  auto result66 = badPatch2.to_array();
   ASSERT_TRUE(result66);
   auto error67 = json_patch(before, (*result66));
   ASSERT_FALSE(error67);
   EXPECT_TRUE(error67.error().is<JsonPatchException>());
-  auto result68 = badPatch3.toArray();
+  auto result68 = badPatch3.to_array();
   ASSERT_TRUE(result68);
   auto error69 = json_patch(before, (*result68));
   ASSERT_FALSE(error69);
@@ -1083,22 +1083,22 @@ TEST(JsonTest, PatchingRemove) {
   ASSERT_TRUE(result75);
   Json badPatch3 = (*result75);
 
-  auto result76 = patch.toArray();
+  auto result76 = patch.to_array();
   ASSERT_TRUE(result76);
   auto result77 = json_patch(before, (*result76));
   ASSERT_TRUE(result77);
   EXPECT_EQ((*result77), after);
-  auto result78 = badPatch1.toArray();
+  auto result78 = badPatch1.to_array();
   ASSERT_TRUE(result78);
   auto error79 = json_patch(before, (*result78));
   ASSERT_FALSE(error79);
   EXPECT_TRUE(error79.error().is<JsonPatchException>());
-  auto result80 = badPatch2.toArray();
+  auto result80 = badPatch2.to_array();
   ASSERT_TRUE(result80);
   auto error81 = json_patch(before, (*result80));
   ASSERT_FALSE(error81);
   EXPECT_TRUE(error81.error().is<JsonPatchException>());
-  auto result82 = badPatch3.toArray();
+  auto result82 = badPatch3.to_array();
   ASSERT_TRUE(result82);
   auto error83 = json_patch(before, (*result82));
   ASSERT_FALSE(error83);
@@ -1180,22 +1180,22 @@ TEST(JsonTest, PatchingReplace) {
   ASSERT_TRUE(result89);
   Json badPatch3 = (*result89);
 
-  auto result90 = patch.toArray();
+  auto result90 = patch.to_array();
   ASSERT_TRUE(result90);
   auto result91 = json_patch(before, (*result90));
   ASSERT_TRUE(result91);
   EXPECT_EQ((*result91), after);
-  auto result92 = badPatch1.toArray();
+  auto result92 = badPatch1.to_array();
   ASSERT_TRUE(result92);
   auto error93 = json_patch(before, (*result92));
   ASSERT_FALSE(error93);
   EXPECT_TRUE(error93.error().is<JsonPatchException>());
-  auto result94 = badPatch2.toArray();
+  auto result94 = badPatch2.to_array();
   ASSERT_TRUE(result94);
   auto error95 = json_patch(before, (*result94));
   ASSERT_FALSE(error95);
   EXPECT_TRUE(error95.error().is<JsonPatchException>());
-  auto result96 = badPatch3.toArray();
+  auto result96 = badPatch3.to_array();
   ASSERT_TRUE(result96);
   auto error97 = json_patch(before, (*result96));
   ASSERT_FALSE(error97);
@@ -1292,32 +1292,32 @@ TEST(JsonTest, PatchingMove) {
   ASSERT_TRUE(result105);
   Json badPatch5 = (*result105);
 
-  auto result106 = patch.toArray();
+  auto result106 = patch.to_array();
   ASSERT_TRUE(result106);
   auto result107 = json_patch(before, (*result106));
   ASSERT_TRUE(result107);
   EXPECT_EQ((*result107), after);
-  auto result108 = badPatch1.toArray();
+  auto result108 = badPatch1.to_array();
   ASSERT_TRUE(result108);
   auto error109 = json_patch(before, (*result108));
   ASSERT_FALSE(error109);
   EXPECT_TRUE(error109.error().is<JsonPatchException>());
-  auto result110 = badPatch2.toArray();
+  auto result110 = badPatch2.to_array();
   ASSERT_TRUE(result110);
   auto error111 = json_patch(before, (*result110));
   ASSERT_FALSE(error111);
   EXPECT_TRUE(error111.error().is<JsonPatchException>());
-  auto result112 = badPatch3.toArray();
+  auto result112 = badPatch3.to_array();
   ASSERT_TRUE(result112);
   auto error113 = json_patch(before, (*result112));
   ASSERT_FALSE(error113);
   EXPECT_TRUE(error113.error().is<JsonPatchException>());
-  auto result114 = badPatch4.toArray();
+  auto result114 = badPatch4.to_array();
   ASSERT_TRUE(result114);
   auto error115 = json_patch(before, (*result114));
   ASSERT_FALSE(error115);
   EXPECT_TRUE(error115.error().is<JsonPatchException>());
-  auto result116 = badPatch5.toArray();
+  auto result116 = badPatch5.to_array();
   ASSERT_TRUE(result116);
   auto error117 = json_patch(before, (*result116));
   ASSERT_FALSE(error117);
@@ -1418,32 +1418,32 @@ TEST(JsonTest, PatchingCopy) {
   ASSERT_TRUE(result125);
   Json badPatch5 = (*result125);
 
-  auto result126 = patch.toArray();
+  auto result126 = patch.to_array();
   ASSERT_TRUE(result126);
   auto result127 = json_patch(before, (*result126));
   ASSERT_TRUE(result127);
   EXPECT_EQ((*result127), after);
-  auto result128 = badPatch1.toArray();
+  auto result128 = badPatch1.to_array();
   ASSERT_TRUE(result128);
   auto error129 = json_patch(before, (*result128));
   ASSERT_FALSE(error129);
   EXPECT_TRUE(error129.error().is<JsonPatchException>());
-  auto result130 = badPatch2.toArray();
+  auto result130 = badPatch2.to_array();
   ASSERT_TRUE(result130);
   auto error131 = json_patch(before, (*result130));
   ASSERT_FALSE(error131);
   EXPECT_TRUE(error131.error().is<JsonPatchException>());
-  auto result132 = badPatch3.toArray();
+  auto result132 = badPatch3.to_array();
   ASSERT_TRUE(result132);
   auto error133 = json_patch(before, (*result132));
   ASSERT_FALSE(error133);
   EXPECT_TRUE(error133.error().is<JsonPatchException>());
-  auto result134 = badPatch4.toArray();
+  auto result134 = badPatch4.to_array();
   ASSERT_TRUE(result134);
   auto error135 = json_patch(before, (*result134));
   ASSERT_FALSE(error135);
   EXPECT_TRUE(error135.error().is<JsonPatchException>());
-  auto result136 = badPatch5.toArray();
+  auto result136 = badPatch5.to_array();
   ASSERT_TRUE(result136);
   auto error137 = json_patch(before, (*result136));
   ASSERT_FALSE(error137);
@@ -1543,42 +1543,42 @@ TEST(JsonTest, PatchingTest) {
   ASSERT_TRUE(result146);
   Json failTest7 = (*result146);
 
-  auto result147 = goodTest.toArray();
+  auto result147 = goodTest.to_array();
   ASSERT_TRUE(result147);
   auto result148 = json_patch(base, (*result147));
   ASSERT_TRUE(result148);
 
-  auto result149 = failTest1.toArray();
+  auto result149 = failTest1.to_array();
   ASSERT_TRUE(result149);
   auto error150 = json_patch(base, (*result149));
   ASSERT_FALSE(error150);
   EXPECT_TRUE(error150.error().is<JsonPatchTestFail>());
-  auto result151 = failTest2.toArray();
+  auto result151 = failTest2.to_array();
   ASSERT_TRUE(result151);
   auto error152 = json_patch(base, (*result151));
   ASSERT_FALSE(error152);
   EXPECT_TRUE(error152.error().is<JsonPatchTestFail>());
-  auto result153 = failTest3.toArray();
+  auto result153 = failTest3.to_array();
   ASSERT_TRUE(result153);
   auto error154 = json_patch(base, (*result153));
   ASSERT_FALSE(error154);
   EXPECT_TRUE(error154.error().is<JsonPatchTestFail>());
-  auto result155 = failTest4.toArray();
+  auto result155 = failTest4.to_array();
   ASSERT_TRUE(result155);
   auto error156 = json_patch(base, (*result155));
   ASSERT_FALSE(error156);
   EXPECT_TRUE(error156.error().is<JsonPatchTestFail>());
-  auto result157 = failTest5.toArray();
+  auto result157 = failTest5.to_array();
   ASSERT_TRUE(result157);
   auto error158 = json_patch(base, (*result157));
   ASSERT_FALSE(error158);
   EXPECT_TRUE(error158.error().is<JsonPatchTestFail>());
-  auto result159 = failTest6.toArray();
+  auto result159 = failTest6.to_array();
   ASSERT_TRUE(result159);
   auto error160 = json_patch(base, (*result159));
   ASSERT_FALSE(error160);
   EXPECT_TRUE(error160.error().is<JsonPatchTestFail>());
-  auto result161 = failTest7.toArray();
+  auto result161 = failTest7.to_array();
   ASSERT_TRUE(result161);
   auto error162 = json_patch(base, (*result161));
   ASSERT_FALSE(error162);
@@ -1610,7 +1610,7 @@ TEST(JsonTest, PatchingEscaping) {
   ASSERT_TRUE(result164);
   Json test1 = (*result164);
 
-  auto result165 = test1.toArray();
+  auto result165 = test1.to_array();
   ASSERT_TRUE(result165);
   auto result166 = json_patch(base1, (*result165));
   ASSERT_TRUE(result166);
@@ -1659,9 +1659,9 @@ TEST(JsonTest, MergeQuery) {
   Json json3 = (*result169);
 
   auto testIdentical = [&](String const& key) {
-    auto result170 = jsonMergeQuery(key, json1, json2, json3);
+    auto result170 = json_merge_query(key, json1, json2, json3);
     ASSERT_TRUE(result170);
-    auto result171 = jsonMerge(json1, json2, json3).query(key, {});
+    auto result171 = json_merge(json1, json2, json3).query(key, {});
     ASSERT_TRUE(result171);
     EXPECT_EQ((*result170), (*result171));
   };

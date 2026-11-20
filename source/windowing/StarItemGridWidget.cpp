@@ -80,16 +80,16 @@ std::expected<std::shared_ptr<ItemGridWidget>, StarException> ItemGridWidget::cr
   if (!assets) return std::unexpected(std::move(assets.error()));
   auto areaJson = (*assets)->json("/interface.config:itemDraggableArea");
   if (!areaJson) return std::unexpected(std::move(areaJson.error()));
-  auto area = jsonToRectI(*areaJson);
+  auto area = json_to_recti(*areaJson);
   if (!area) return std::unexpected(std::move(area.error()));
   widget->m_itemDraggableArea = *area;
   auto durabilityJson = (*assets)->json("/interface.config:itemIconDurabilityOffset");
   if (!durabilityJson) return std::unexpected(std::move(durabilityJson.error()));
-  auto durabilityOffset = jsonToVec2I(*durabilityJson);
+  auto durabilityOffset = json_to_vec2i(*durabilityJson);
   if (!durabilityOffset) return std::unexpected(std::move(durabilityOffset.error()));
   auto anchorJson = (*assets)->json("/interface.config:itemCountRightAnchor");
   if (!anchorJson) return std::unexpected(std::move(anchorJson.error()));
-  auto anchor = jsonToVec2I(*anchorJson);
+  auto anchor = json_to_vec2i(*anchorJson);
   if (!anchor) return std::unexpected(std::move(anchor.error()));
   widget->m_scissorExtra = (*durabilityOffset * -1).piecewise_max(*anchor * -1).piecewise_max(Vec2I());
   Vec2I calculatedSize = {

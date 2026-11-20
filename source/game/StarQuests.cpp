@@ -220,12 +220,12 @@ std::expected<std::shared_ptr<Quest>, StarException> Quest::create(Root& root, Q
   if (!assets) return std::unexpected(std::move(assets.error()));
   auto tracked = (*assets)->json("/quests/quests.config:trackedCustomIndicator");
   if (!tracked) return std::unexpected(std::move(tracked.error()));
-  auto trackedString = tracked->toString();
+  auto trackedString = tracked->to_string();
   if (!trackedString) return std::unexpected(std::move(trackedString.error()));
   quest->m_trackedIndicator = std::move(*trackedString);
   auto untracked = (*assets)->json("/quests/quests.config:untrackedCustomIndicator");
   if (!untracked) return std::unexpected(std::move(untracked.error()));
-  auto untrackedString = untracked->toString();
+  auto untrackedString = untracked->to_string();
   if (!untrackedString) return std::unexpected(std::move(untrackedString.error()));
   quest->m_untrackedIndicator = std::move(*untrackedString);
   quest->m_lastUpdatedOn = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
@@ -282,12 +282,12 @@ std::expected<std::shared_ptr<Quest>, StarException> Quest::create(Root& root, J
   if (!assets) return std::unexpected(std::move(assets.error()));
   auto tracked = (*assets)->json("/quests/quests.config:trackedCustomIndicator");
   if (!tracked) return std::unexpected(std::move(tracked.error()));
-  auto trackedString = tracked->toString();
+  auto trackedString = tracked->to_string();
   if (!trackedString) return std::unexpected(std::move(trackedString.error()));
   quest->m_trackedIndicator = std::move(*trackedString);
   auto untracked = (*assets)->json("/quests/quests.config:untrackedCustomIndicator");
   if (!untracked) return std::unexpected(std::move(untracked.error()));
-  auto untrackedString = untracked->toString();
+  auto untrackedString = untracked->to_string();
   if (!untrackedString) return std::unexpected(std::move(untrackedString.error()));
   quest->m_untrackedIndicator = std::move(*untrackedString);
   auto versions = root.versioningDatabase();
@@ -296,7 +296,7 @@ std::expected<std::shared_ptr<Quest>, StarException> Quest::create(Root& root, J
   if (!versioned) return std::unexpected(std::move(versioned.error()));
   auto store = (*versions)->loadVersionedJson(*versioned, "Quest");
   if (!store) return std::unexpected(std::move(store.error()));
-  auto stateName = store->getString("state");
+  auto stateName = store->get_string("state");
   if (!stateName) return std::unexpected(std::move(stateName.error()));
   if (!QuestStateNames) return std::unexpected(QuestStateNames.error());
   auto state = QuestStateNames->get_left(*stateName);
@@ -307,7 +307,7 @@ std::expected<std::shared_ptr<Quest>, StarException> Quest::create(Root& root, J
   auto arc = QuestArcDescriptor::diskLoad(root, *arcJson);
   if (!arc) return std::unexpected(std::move(arc.error()));
   quest->m_arc = std::move(*arc);
-  auto position = store->getUInt("arcPos");
+  auto position = store->get_uint("arcPos");
   if (!position) return std::unexpected(std::move(position.error()));
   if (*position >= quest->m_arc.quests.size())
     return std::unexpected(StarException::format("Quest arc position {} out of range", *position));
@@ -317,7 +317,7 @@ std::expected<std::shared_ptr<Quest>, StarException> Quest::create(Root& root, J
   auto parameters = questParamsDiskLoad(root, *parametersJson);
   if (!parameters) return std::unexpected(std::move(parameters.error()));
   quest->m_parameters = std::move(*parameters);
-  auto worldName = store->optString("worldId");
+  auto worldName = store->opt_string("worldId");
   if (!worldName) return std::unexpected(std::move(worldName.error()));
   if (*worldName) {
     auto world = parseWorldId(**worldName);
@@ -329,7 +329,7 @@ std::expected<std::shared_ptr<Quest>, StarException> Quest::create(Root& root, J
   if (*locationJson) {
     auto systemJson = (**locationJson).get("system");
     if (!systemJson) return std::unexpected(std::move(systemJson.error()));
-    auto system = jsonToVec3I(*systemJson);
+    auto system = json_to_vec3i(*systemJson);
     if (!system) return std::unexpected(std::move(system.error()));
     auto value = (**locationJson).get("location");
     if (!value) return std::unexpected(std::move(value.error()));
@@ -337,40 +337,40 @@ std::expected<std::shared_ptr<Quest>, StarException> Quest::create(Root& root, J
     if (!location) return std::unexpected(std::move(location.error()));
     quest->m_location = std::make_pair(*system, std::move(*location));
   }
-  auto uuidString = store->optString("serverUuid");
+  auto uuidString = store->opt_string("serverUuid");
   if (!uuidString) return std::unexpected(std::move(uuidString.error()));
   if (*uuidString) {
     auto uuid = Uuid::create(**uuidString);
     if (!uuid) return std::unexpected(std::move(uuid.error()));
     quest->m_serverUuid = std::move(*uuid);
   }
-  auto money = store->getUInt("money");
+  auto money = store->get_uint("money");
   if (!money) return std::unexpected(std::move(money.error()));
   quest->m_money = *money;
   auto items = root.itemDatabase();
   if (!items) return std::unexpected(std::move(items.error()));
-  auto rewards = store->getArray("rewards");
+  auto rewards = store->get_array("rewards");
   if (!rewards) return std::unexpected(std::move(rewards.error()));
   for (auto const& entry : *rewards) {
     auto item = (*items)->diskLoad(entry);
     if (!item) return std::unexpected(std::move(item.error()));
     quest->m_rewards.push_back(*item);
   }
-  auto updated = store->getInt("lastUpdatedOn");
+  auto updated = store->get_int("lastUpdatedOn");
   if (!updated) return std::unexpected(std::move(updated.error()));
   quest->m_lastUpdatedOn = std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>(std::chrono::milliseconds(*updated));
-  auto unread = store->getBool("unread", true);
+  auto unread = store->get_bool("unread", true);
   if (!unread) return std::unexpected(std::move(unread.error()));
   quest->m_unread = *unread;
-  auto turnIn = store->getBool("canTurnIn", false);
+  auto turnIn = store->get_bool("canTurnIn", false);
   if (!turnIn) return std::unexpected(std::move(turnIn.error()));
   quest->m_canTurnIn = *turnIn;
   auto indicatorsJson = store->get("indicators", JsonArray{});
   if (!indicatorsJson) return std::unexpected(std::move(indicatorsJson.error()));
-  auto indicators = jsonToStringSet(*indicatorsJson);
+  auto indicators = json_to_string_set(*indicatorsJson);
   if (!indicators) return std::unexpected(std::move(indicators.error()));
   quest->m_indicators = std::move(*indicators);
-  auto storage = store->getObject("scriptStorage", {});
+  auto storage = store->get_object("scriptStorage", {});
   if (!storage) return std::unexpected(std::move(storage.error()));
   auto setStorage = quest->m_scriptComponent.setScriptStorage(std::move(*storage));
   if (!setStorage) return std::unexpected(std::move(setStorage.error()));
@@ -379,24 +379,24 @@ std::expected<std::shared_ptr<Quest>, StarException> Quest::create(Root& root, J
   auto const& qt = **config;
   quest->m_displayParameters = DisplayParameters{qt.ephemeral, qt.showInLog, qt.showAcceptDialog,
       qt.showCompleteDialog, qt.showFailDialog, qt.mainQuest, qt.hideCrossServer};
-  auto title = store->getString("title", qt.title);
+  auto title = store->get_string("title", qt.title);
   if (!title) return std::unexpected(std::move(title.error()));
   quest->m_title = std::move(*title);
-  auto text = store->getString("text", qt.text);
+  auto text = store->get_string("text", qt.text);
   if (!text) return std::unexpected(std::move(text.error()));
   quest->m_text = std::move(*text);
-  auto completion = store->getString("completionText", qt.completionText);
+  auto completion = store->get_string("completionText", qt.completionText);
   if (!completion) return std::unexpected(std::move(completion.error()));
   quest->m_completionText = std::move(*completion);
-  auto failure = store->getString("failureText", qt.failureText);
+  auto failure = store->get_string("failureText", qt.failureText);
   if (!failure) return std::unexpected(std::move(failure.error()));
   quest->m_failureText = std::move(*failure);
   auto portraitsJson = store->get("portraits", JsonObject{});
   if (!portraitsJson) return std::unexpected(std::move(portraitsJson.error()));
-  auto portraits = jsonToMapV<StringMap<List<Drawable>>>(*portraitsJson, [&root](Json const& portrait) -> std::expected<List<Drawable>, StarException> {
+  auto portraits = json_to_map_v<StringMap<List<Drawable>>>(*portraitsJson, [&root](Json const& portrait) -> std::expected<List<Drawable>, StarException> {
     auto metadata = root.imageMetadataDatabase();
     if (!metadata) return std::unexpected(std::move(metadata.error()));
-    auto array = portrait.toArray();
+    auto array = portrait.to_array();
     if (!array) return std::unexpected(std::move(array.error()));
     List<Drawable> result;
     for (auto const& value : *array) {
@@ -410,10 +410,10 @@ std::expected<std::shared_ptr<Quest>, StarException> Quest::create(Root& root, J
   quest->m_portraits = std::move(*portraits);
   auto titlesJson = store->get("portraitTitles", JsonObject{});
   if (!titlesJson) return std::unexpected(std::move(titlesJson.error()));
-  auto titles = jsonToMapV<StringMap<String>>(*titlesJson, [](Json const& json) { return json.toString(); });
+  auto titles = json_to_map_v<StringMap<String>>(*titlesJson, [](Json const& json) { return json.to_string(); });
   if (!titles) return std::unexpected(std::move(titles.error()));
   quest->m_portraitTitles = std::move(*titles);
-  auto show = store->getBool("showDialog", false);
+  auto show = store->get_bool("showDialog", false);
   if (!show) return std::unexpected(std::move(show.error()));
   quest->m_showDialog = *show;
   return quest;
@@ -435,20 +435,20 @@ std::expected<Json, StarException> Quest::diskStore() const {
   if (!world) return std::unexpected(std::move(world.error()));
   result["worldId"] = std::move(*world);
   auto location = json_from_optional(m_location, [](std::pair<Vec3I, SystemLocation> const& location) -> Json {
-    return JsonObject{{"system", jsonFromVec3I(location.first)}, {"location", jsonFromSystemLocation(location.second)}};
+    return JsonObject{{"system", json_from_vec3i(location.first)}, {"location", jsonFromSystemLocation(location.second)}};
   });
   if (!location) return std::unexpected(std::move(location.error()));
   result["location"] = std::move(*location);
   result["serverUuid"] = json_from_optional(m_serverUuid.transform(std::mem_fn(&Uuid::hex)));
   auto items = m_root.itemDatabase();
   if (!items) return std::unexpected(std::move(items.error()));
-  auto rewards = jsonFromList(m_rewards, [&items](auto const& item) { return (*items)->diskStore(item); });
+  auto rewards = json_from_list(m_rewards, [&items](auto const& item) { return (*items)->diskStore(item); });
   if (!rewards) return std::unexpected(std::move(rewards.error()));
   result["rewards"] = std::move(*rewards);
   result["lastUpdatedOn"] = m_lastUpdatedOn.time_since_epoch().count();
   result["unread"] = m_unread;
   result["canTurnIn"] = m_canTurnIn;
-  result["indicators"] = jsonFromStringSet(m_indicators);
+  result["indicators"] = json_from_string_set(m_indicators);
   auto storage = m_scriptComponent.getScriptStorage();
   if (!storage) return std::unexpected(std::move(storage.error()));
   result["scriptStorage"] = std::move(*storage);
@@ -456,12 +456,12 @@ std::expected<Json, StarException> Quest::diskStore() const {
   result["text"] = m_text;
   result["completionText"] = m_completionText;
   result["failureText"] = m_failureText;
-  auto portraits = jsonFromMapV(m_portraits, [](List<Drawable> const& portrait) {
-    return jsonFromList(portrait, [](Drawable const& drawable) { return drawable.toJson(); });
+  auto portraits = json_from_map_v(m_portraits, [](List<Drawable> const& portrait) {
+    return json_from_list(portrait, [](Drawable const& drawable) { return drawable.toJson(); });
   });
   if (!portraits) return std::unexpected(std::move(portraits.error()));
   result["portraits"] = std::move(*portraits);
-  auto titles = jsonFromMap(m_portraitTitles);
+  auto titles = json_from_map(m_portraitTitles);
   if (!titles) return std::unexpected(std::move(titles.error()));
   result["portraitTitles"] = std::move(*titles);
   result["showDialog"] = m_showDialog;
@@ -987,15 +987,15 @@ std::expected<LuaCallbacks, StarException> Quest::makeQuestCallbacks(Player& pla
     return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.registerCallback("location", [&quest = *this]() -> std::expected<Json, StarException> {
     if (auto loc = quest.location()) {
-      return JsonObject{{"system", jsonFromVec3I(loc->first)}, {"location", jsonFromSystemLocation(loc->second)}};
+      return JsonObject{{"system", json_from_vec3i(loc->first)}, {"location", jsonFromSystemLocation(loc->second)}};
     }
     return Json();
   }); !r) return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.registerCallback("setLocation", [&quest = *this](Json const& json) -> std::expected<void, StarException> {
-    if (json.isNull()) { quest.setLocation({}); return {}; }
+    if (json.is_null()) { quest.setLocation({}); return {}; }
     auto systemJson = json.get("system");
     if (!systemJson) return std::unexpected(std::move(systemJson.error()));
-    auto system = jsonToVec3I(*systemJson);
+    auto system = json_to_vec3i(*systemJson);
     if (!system) return std::unexpected(std::move(system.error()));
     auto locationJson = json.opt("location");
     if (!locationJson) return std::unexpected(std::move(locationJson.error()));
@@ -1085,7 +1085,7 @@ std::expected<void, StarException> Quest::setEntityParameter(String const& param
   if (auto portraitEntity = as_ref<PortraitEntity>(entity)) {
     auto drawables = portraitEntity->get().portrait(PortraitMode::Full);
     if (!drawables) return std::unexpected(std::move(drawables.error()));
-    auto json = jsonFromList(*drawables, [](Drawable const& drawable) { return drawable.toJson(); });
+    auto json = json_from_list(*drawables, [](Drawable const& drawable) { return drawable.toJson(); });
     if (!json) return std::unexpected(std::move(json.error()));
     portrait = std::move(*json);
     auto entityName = portraitEntity->get().name();
@@ -1126,7 +1126,7 @@ std::expected<std::shared_ptr<Quest>, StarException> createPreviewQuest(
   if (!*config) return std::shared_ptr<Quest>();
   auto drawables = player.portrait(PortraitMode::Full);
   if (!drawables) return std::unexpected(std::move(drawables.error()));
-  auto portrait = jsonFromList(*drawables, [](Drawable const& drawable) { return drawable.toJson(); });
+  auto portrait = json_from_list(*drawables, [](Drawable const& drawable) { return drawable.toJson(); });
   if (!portrait) return std::unexpected(std::move(portrait.error()));
   JsonObject paramJson = (*config)->parameterExamples;
   for (auto&& [name, parameter] : paramJson) {

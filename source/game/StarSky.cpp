@@ -120,7 +120,7 @@ std::expected<void, StarException> Sky::startFlying(bool enterHyperspace, bool s
   m_flyingTimer = 0;
   m_enterHyperspace = enterHyperspace;
   m_startInWarp = startInWarp;
-  if (settings.isType(Json::Type::Object)) {
+  if (settings.is_type(Json::Type::Object)) {
     m_skyParameters.settings = settings;
     auto updated = skyParametersUpdated();
     if (!updated) return std::unexpected(std::move(updated.error()));
@@ -215,7 +215,7 @@ std::expected<void, StarException> Sky::update(double dt) {
     m_flyingTimer += dt;
 
     if (m_flyingType == FlyingType::Disembarking) {
-      auto path = m_settings.getArray(m_skyParameters.skyType == SkyType::Space ? String("spaceDisembarkPath") : String("disembarkPath"));
+      auto path = m_settings.get_array(m_skyParameters.skyType == SkyType::Space ? String("spaceDisembarkPath") : String("disembarkPath"));
       if (!path) return std::unexpected(std::move(path.error()));
       auto origin = m_settings.get(m_skyParameters.skyType == SkyType::Space ? String("spaceDisembarkOrigin") : String("disembarkOrigin"));
       if (!origin) return std::unexpected(std::move(origin.error()));
@@ -225,7 +225,7 @@ std::expected<void, StarException> Sky::update(double dt) {
         m_flyingType = FlyingType::Warp;
       }
     } else if (m_flyingType == FlyingType::Arriving) {
-      auto path = m_settings.getArray(m_skyParameters.skyType == SkyType::Space ? String("spaceArrivalPath") : String("arrivalPath"));
+      auto path = m_settings.get_array(m_skyParameters.skyType == SkyType::Space ? String("spaceArrivalPath") : String("arrivalPath"));
       if (!path) return std::unexpected(std::move(path.error()));
       auto origin = m_settings.get(m_skyParameters.skyType == SkyType::Space ? String("spaceArrivalOrigin") : String("arrivalOrigin"));
       if (!origin) return std::unexpected(std::move(origin.error()));
@@ -359,9 +359,9 @@ std::shared_ptr<Clock const> Sky::referenceClock() const {
 std::expected<String, StarException> Sky::ambientNoise() const {
   if (flying()) {
     if (m_flyingType == FlyingType::Warp && m_warpPhase == WarpPhase::Maintain) {
-      return m_settings.queryString("hyperspaceAudio");
+      return m_settings.query_string("hyperspaceAudio");
     } else {
-      return m_settings.queryString("engineAudio");
+      return m_settings.query_string("engineAudio");
     }
   }
 
@@ -381,7 +381,7 @@ std::expected<List<std::shared_ptr<AudioInstance>>, StarException> Sky::pullSoun
       if (m_flyingTimer >= triggerTime) {
         auto assets = m_root.assets();
         if (!assets) return std::unexpected(std::move(assets.error()));
-        auto path = m_settings.queryString("enterHyperspaceAudio");
+        auto path = m_settings.query_string("enterHyperspaceAudio");
         if (!path) return std::unexpected(std::move(path.error()));
         auto sfx = (*assets)->audio(*path);
         if (!sfx) return std::unexpected(std::move(sfx.error()));
@@ -401,7 +401,7 @@ std::expected<List<std::shared_ptr<AudioInstance>>, StarException> Sky::pullSoun
       if (m_flyingTimer >= triggerTime) {
         auto assets = m_root.assets();
         if (!assets) return std::unexpected(std::move(assets.error()));
-        auto path = m_settings.queryString("exitHyperspaceAudio");
+        auto path = m_settings.query_string("exitHyperspaceAudio");
         if (!path) return std::unexpected(std::move(path.error()));
         auto sfx = (*assets)->audio(*path);
         if (!sfx) return std::unexpected(std::move(sfx.error()));
@@ -416,7 +416,7 @@ std::expected<List<std::shared_ptr<AudioInstance>>, StarException> Sky::pullSoun
     if (!m_sentSFX) {
       auto assets = m_root.assets();
       if (!assets) return std::unexpected(std::move(assets.error()));
-      auto path = m_settings.queryString("arrivalAudio");
+      auto path = m_settings.query_string("arrivalAudio");
       if (!path) return std::unexpected(std::move(path.error()));
       auto sfx = (*assets)->audio(*path);
       if (!sfx) return std::unexpected(std::move(sfx.error()));
@@ -715,15 +715,15 @@ std::expected<void, StarException> Sky::exitHyperspace() {
   setType(SkyType::Orbital);
 
   m_sentSFX = false;
-  auto origin = m_settings.getObject(m_skyParameters.skyType == SkyType::Space ? String("spaceArrivalOrigin") : String("arrivalOrigin"));
+  auto origin = m_settings.get_object(m_skyParameters.skyType == SkyType::Space ? String("spaceArrivalOrigin") : String("arrivalOrigin"));
   if (!origin) return std::unexpected(std::move(origin.error()));
   Json originMap = *origin;
   auto offset = originMap.get("offset");
   if (!offset) return std::unexpected(std::move(offset.error()));
-  auto position = jsonToVec2F(*offset);
+  auto position = json_to_vec2f(*offset);
   if (!position) return std::unexpected(std::move(position.error()));
   m_pathOffset = *position;
-  auto rotation = originMap.getFloat("rotation");
+  auto rotation = originMap.get_float("rotation");
   if (!rotation) return std::unexpected(std::move(rotation.error()));
   m_pathRotation = *rotation * Constants::degrees_to_radians;
 
@@ -745,10 +745,10 @@ std::expected<bool, StarException> Sky::controlledMovement(JsonArray const& path
   float previousTime = 0;
   auto originOffset = origin.get("offset");
   if (!originOffset) return std::unexpected(std::move(originOffset.error()));
-  auto previousPosition = jsonToVec2F(*originOffset);
+  auto previousPosition = json_to_vec2f(*originOffset);
   if (!previousPosition) return std::unexpected(std::move(previousPosition.error()));
   Vec2F previousOffset = *previousPosition;
-  auto originRotation = origin.getFloat("rotation");
+  auto originRotation = origin.get_float("rotation");
   if (!originRotation) return std::unexpected(std::move(originRotation.error()));
   float previousRotation = *originRotation * Constants::degrees_to_radians;
 
@@ -758,13 +758,13 @@ std::expected<bool, StarException> Sky::controlledMovement(JsonArray const& path
   for (auto const& entry : path) {
     auto offset = entry.get("offset");
     if (!offset) return std::unexpected(std::move(offset.error()));
-    auto position = jsonToVec2F(*offset);
+    auto position = json_to_vec2f(*offset);
     if (!position) return std::unexpected(std::move(position.error()));
     stepOffset = *position;
-    auto rotation = entry.getFloat("rotation");
+    auto rotation = entry.get_float("rotation");
     if (!rotation) return std::unexpected(std::move(rotation.error()));
     stepRotation = *rotation * Constants::degrees_to_radians;
-    auto time = entry.getFloat("time");
+    auto time = entry.get_float("time");
     if (!time) return std::unexpected(std::move(time.error()));
     stepTime += *time;
 
@@ -821,56 +821,56 @@ std::expected<void, StarException> Sky::skyParametersUpdated() {
   if (!assets) return std::unexpected(std::move(assets.error()));
   auto config = (*assets)->json("/sky.config");
   if (!config) return std::unexpected(std::move(config.error()));
-  auto settings = jsonMerge(*config, m_skyParameters.settings);
+  auto settings = json_merge(*config, m_skyParameters.settings);
   NumericSettings numeric;
-  auto flyMaxVelocity = settings.queryFloat("flyMaxVelocity");
+  auto flyMaxVelocity = settings.query_float("flyMaxVelocity");
   if (!flyMaxVelocity) return std::unexpected(std::move(flyMaxVelocity.error()));
   numeric.flyMaxVelocity = *flyMaxVelocity;
-  auto starVelocityFactor = settings.queryFloat("starVelocityFactor");
+  auto starVelocityFactor = settings.query_float("starVelocityFactor");
   if (!starVelocityFactor) return std::unexpected(std::move(starVelocityFactor.error()));
   numeric.starVelocityFactor = *starVelocityFactor;
-  auto correctionPower = settings.queryFloat("correctionPower");
+  auto correctionPower = settings.query_float("correctionPower");
   if (!correctionPower) return std::unexpected(std::move(correctionPower.error()));
   numeric.correctionPower = *correctionPower;
-  auto flyingTimer = settings.queryFloat("flyingTimer");
+  auto flyingTimer = settings.query_float("flyingTimer");
   if (!flyingTimer) return std::unexpected(std::move(flyingTimer.error()));
   numeric.flyingTimer = *flyingTimer;
-  auto enterHyperspaceAudioLeadIn = settings.queryFloat("enterHyperspaceAudioLeadIn");
+  auto enterHyperspaceAudioLeadIn = settings.query_float("enterHyperspaceAudioLeadIn");
   if (!enterHyperspaceAudioLeadIn) return std::unexpected(std::move(enterHyperspaceAudioLeadIn.error()));
   numeric.enterHyperspaceAudioLeadIn = *enterHyperspaceAudioLeadIn;
-  auto exitHyperspaceAudioLeadIn = settings.queryFloat("exitHyperspaceAudioLeadIn");
+  auto exitHyperspaceAudioLeadIn = settings.query_float("exitHyperspaceAudioLeadIn");
   if (!exitHyperspaceAudioLeadIn) return std::unexpected(std::move(exitHyperspaceAudioLeadIn.error()));
   numeric.exitHyperspaceAudioLeadIn = *exitHyperspaceAudioLeadIn;
-  auto dayTransitionTime = settings.queryFloat("dayTransitionTime");
+  auto dayTransitionTime = settings.query_float("dayTransitionTime");
   if (!dayTransitionTime) return std::unexpected(std::move(dayTransitionTime.error()));
   numeric.dayTransitionTime = *dayTransitionTime;
-  auto skyLevelExponent = settings.queryFloat("skyLevelExponent");
+  auto skyLevelExponent = settings.query_float("skyLevelExponent");
   if (!skyLevelExponent) return std::unexpected(std::move(skyLevelExponent.error()));
   numeric.skyLevelExponent = *skyLevelExponent;
-  auto flashTimer = settings.queryFloat("flashTimer");
+  auto flashTimer = settings.query_float("flashTimer");
   if (!flashTimer) return std::unexpected(std::move(flashTimer.error()));
   numeric.flashTimer = *flashTimer;
-  auto hyperspaceSpeedupTime = settings.queryFloat("hyperspaceSpeedupTime");
+  auto hyperspaceSpeedupTime = settings.query_float("hyperspaceSpeedupTime");
   if (!hyperspaceSpeedupTime) return std::unexpected(std::move(hyperspaceSpeedupTime.error()));
   numeric.hyperspaceSpeedupTime = *hyperspaceSpeedupTime;
-  auto speedupTime = settings.queryFloat("speedupTime");
+  auto speedupTime = settings.query_float("speedupTime");
   if (!speedupTime) return std::unexpected(std::move(speedupTime.error()));
   numeric.speedupTime = *speedupTime;
-  auto hyperspaceSlowdownTime = settings.queryFloat("hyperspaceSlowdownTime");
+  auto hyperspaceSlowdownTime = settings.query_float("hyperspaceSlowdownTime");
   if (!hyperspaceSlowdownTime) return std::unexpected(std::move(hyperspaceSlowdownTime.error()));
   numeric.hyperspaceSlowdownTime = *hyperspaceSlowdownTime;
-  auto slowdownTime = settings.queryFloat("slowdownTime");
+  auto slowdownTime = settings.query_float("slowdownTime");
   if (!slowdownTime) return std::unexpected(std::move(slowdownTime.error()));
   numeric.slowdownTime = *slowdownTime;
-  auto frames = settings.queryInt("stars.frames");
+  auto frames = settings.query_int("stars.frames");
   if (!frames) return std::unexpected(std::move(frames.error()));
   auto stars = settings.query("stars.list");
   if (!stars) return std::unexpected(std::move(stars.error()));
-  auto starList = jsonToStringList(*stars);
+  auto starList = json_to_string_list(*stars);
   if (!starList) return std::unexpected(std::move(starList.error()));
   auto hyperStars = settings.query("stars.hyperlist");
   if (!hyperStars) return std::unexpected(std::move(hyperStars.error()));
-  auto hyperStarList = jsonToStringList(*hyperStars);
+  auto hyperStarList = json_to_string_list(*hyperStars);
   if (!hyperStarList) return std::unexpected(std::move(hyperStarList.error()));
   m_settings = std::move(settings);
   m_numericSettings = numeric;

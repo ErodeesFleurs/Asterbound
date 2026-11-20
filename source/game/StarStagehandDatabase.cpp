@@ -62,7 +62,7 @@ std::expected<std::shared_ptr<StagehandDatabase>, StarException> StagehandDataba
       auto config = (*assets)->json(file);
       if (!config)
         return std::unexpected(std::move(config.error()));
-      auto typeName = config->getString("type");
+      auto typeName = config->get_string("type");
       if (!typeName)
         return std::unexpected(std::move(typeName.error()));
       if (database->m_stagehandTypes.contains(*typeName))
@@ -80,7 +80,7 @@ std::expected<std::shared_ptr<Stagehand>, StarException> StagehandDatabase::crea
   auto config = m_stagehandTypes.get(stagehandType);
   if (!config)
     return std::unexpected(std::move(config.error()));
-  return Stagehand::create(m_root, jsonMerge(config->get(), extraConfig));
+  return Stagehand::create(m_root, json_merge(config->get(), extraConfig));
 }
 
 }

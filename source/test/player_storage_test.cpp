@@ -37,7 +37,7 @@ std::expected<Json, StarException> read_metadata(String const& directory) {
   auto contents = File::read_file_string(File::relative_to(directory, "metadata"));
   if (!contents)
     return std::unexpected(std::move(contents.error()));
-  return Json::parseJson(*contents);
+  return Json::parse_json(*contents);
 }
 
 struct PlayerStorageContext {
@@ -181,13 +181,13 @@ const GameTestRegistration metadataRetry(
     EXPECT_FALSE(storage->setMetadata("selection", "new"));
     auto old_bytes = read_metadata(directory);
     ASSERT_TRUE(old_bytes);
-    EXPECT_EQ(old_bytes->getString("selection"), String("old"));
+    EXPECT_EQ(old_bytes->get_string("selection"), String("old"));
     EXPECT_EQ(storage->getMetadata("selection"), Json("new"));
     ASSERT_TRUE(File::remove(stage));
     ASSERT_TRUE(storage->setMetadata("selection", "new"));
     auto new_bytes = read_metadata(directory);
     ASSERT_TRUE(new_bytes);
-    EXPECT_EQ(new_bytes->getString("selection"), String("new"));
+    EXPECT_EQ(new_bytes->get_string("selection"), String("new"));
     ASSERT_TRUE(File::write_file(String("owned collision"), stage));
     EXPECT_TRUE(storage->setMetadata("selection", "new"));
     EXPECT_FALSE(storage->setMetadata("explicitNull", Json()));
@@ -195,7 +195,7 @@ const GameTestRegistration metadataRetry(
     ASSERT_TRUE(storage->setMetadata("explicitNull", Json()));
     auto null_bytes = read_metadata(directory);
     ASSERT_TRUE(null_bytes);
-    auto object = null_bytes->toObject();
+    auto object = null_bytes->to_object();
     ASSERT_TRUE(object);
     EXPECT_TRUE(object->contains("explicitNull"));
     EXPECT_FALSE(object->contains("missing"));

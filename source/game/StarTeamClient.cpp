@@ -191,17 +191,17 @@ std::expected<void, StarException> TeamClient::invitePlayer(String const& player
       self.m_pendingInviteResults.push_back(std::make_pair(playerName, true));
     else if (response == "inviteeNotFound")
       self.m_pendingInviteResults.push_back(std::make_pair(playerName, false));
-    else if (response.isType(Json::Type::Array)) {
+    else if (response.is_type(Json::Type::Array)) {
       self.m_pendingInviteResults.push_back(StringList());
       StringList& invited = std::get<StringList>(self.m_pendingInviteResults.back());
-      auto entries = response.toArray();
+      auto entries = response.to_array();
       if (!entries) return std::unexpected(std::move(entries.error()));
       for (auto& entry : *entries) {
-        if (!entry.isType(Json::Type::Array)) continue;
+        if (!entry.is_type(Json::Type::Array)) continue;
         auto name = entry.get(0, Json());
         if (!name) return std::unexpected(std::move(name.error()));
-        if (name->isType(Json::Type::String)) {
-          auto text = name->toString();
+        if (name->is_type(Json::Type::String)) {
+          auto text = name->to_string();
           if (!text) return std::unexpected(std::move(text.error()));
           invited.push_back(std::move(*text));
         }
@@ -280,7 +280,7 @@ std::expected<void, StarException> TeamClient::update() {
       summary.asset = std::move(path);
       return std::unexpected(std::move(error).with_summary(std::move(summary)));
     }
-    return value->toFloat();
+    return value->to_float();
   };
   if (!m_hasPendingInvitation) {
     auto interval = readInterval("invitationPollInterval");
@@ -290,12 +290,12 @@ std::expected<void, StarException> TeamClient::update() {
       JsonObject request;
       request["playerUuid"] = m_clientContext->playerUuid().hex();
       auto invoked = invoke_remote("team.pollInvitation", request, [&self = *this](Json response) -> std::expected<void, StarException> {
-        if (response.isNull() || self.m_hasPendingInvitation) return {};
-        auto uuidText = response.getString("inviterUuid");
+        if (response.is_null() || self.m_hasPendingInvitation) return {};
+        auto uuidText = response.get_string("inviterUuid");
         if (!uuidText) return std::unexpected(std::move(uuidText.error()));
         auto uuid = Uuid::create(*uuidText);
         if (!uuid) return std::unexpected(std::move(uuid.error()));
-        auto name = response.getString("inviterName");
+        auto name = response.get_string("inviterName");
         if (!name) return std::unexpected(std::move(name.error()));
         self.m_pendingInvitation = {*uuid, std::move(*name)};
         self.m_hasPendingInvitation = true;
@@ -332,10 +332,10 @@ std::expected<void, StarException> TeamClient::pullFullUpdate() {
   request["playerUuid"] = m_clientContext->playerUuid().hex();
   return invoke_remote("team.fetchTeamStatus", request, [&self = *this](Json response) -> std::expected<void, StarException> {
     self.m_fullUpdateRunning = false;
-    auto version = response.optInt("version");
+    auto version = response.opt_int("version");
     if (!version) return std::unexpected(std::move(version.error()));
     self.m_teamManagerVersion = version->value_or(0);
-    auto teamText = response.optString("teamUuid");
+    auto teamText = response.opt_string("teamUuid");
     if (!teamText) return std::unexpected(std::move(teamText.error()));
     auto previousTeam = self.m_teamUuid;
     self.m_teamUuid.reset();
@@ -347,43 +347,43 @@ std::expected<void, StarException> TeamClient::pullFullUpdate() {
     if (self.m_teamUuid != previousTeam)
       self.m_fullStatusRequired = true;
     if (self.m_teamUuid) {
-      auto leaderText = response.getString("leader");
+      auto leaderText = response.get_string("leader");
       if (!leaderText) return std::unexpected(std::move(leaderText.error()));
       auto leader = Uuid::create(*leaderText);
       if (!leader) return std::unexpected(std::move(leader.error()));
       self.m_teamLeader = *leader;
       auto previousMembers = std::exchange(self.m_members, {});
-      auto entries = response.getArray("members");
+      auto entries = response.get_array("members");
       if (!entries) return std::unexpected(std::move(entries.error()));
       for (auto const& m : *entries) {
-        auto name = m.getString("name");
+        auto name = m.get_string("name");
         if (!name) return std::unexpected(std::move(name.error()));
-        auto uuidText = m.getString("uuid");
+        auto uuidText = m.get_string("uuid");
         if (!uuidText) return std::unexpected(std::move(uuidText.error()));
         auto uuid = Uuid::create(*uuidText);
         if (!uuid) return std::unexpected(std::move(uuid.error()));
-        auto entity = m.getInt("entity");
+        auto entity = m.get_int("entity");
         if (!entity) return std::unexpected(std::move(entity.error()));
-        auto health = m.getFloat("health");
+        auto health = m.get_float("health");
         if (!health) return std::unexpected(std::move(health.error()));
-        auto energy = m.getFloat("energy");
+        auto energy = m.get_float("energy");
         if (!energy) return std::unexpected(std::move(energy.error()));
-        auto worldText = m.getString("world");
+        auto worldText = m.get_string("world");
         if (!worldText) return std::unexpected(std::move(worldText.error()));
         auto world = parseWorldId(*worldText);
         if (!world) return std::unexpected(std::move(world.error()));
-        auto x = m.getFloat("x");
+        auto x = m.get_float("x");
         if (!x) return std::unexpected(std::move(x.error()));
-        auto y = m.getFloat("y");
+        auto y = m.get_float("y");
         if (!y) return std::unexpected(std::move(y.error()));
-        auto warpText = m.getString("warpMode");
+        auto warpText = m.get_string("warpMode");
         if (!warpText) return std::unexpected(std::move(warpText.error()));
         if (!WarpModeNames) return std::unexpected(WarpModeNames.error());
         auto warp = WarpModeNames->get_left(*warpText);
         if (!warp) return std::unexpected(std::move(warp.error()));
         auto portraitJson = m.get("portrait");
         if (!portraitJson) return std::unexpected(std::move(portraitJson.error()));
-        auto portraitEntries = portraitJson->toArray();
+        auto portraitEntries = portraitJson->to_array();
         if (!portraitEntries) return std::unexpected(std::move(portraitEntries.error()));
         auto metadata = self.m_root.imageMetadataDatabase();
         if (!metadata) return std::unexpected(std::move(metadata.error()));

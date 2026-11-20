@@ -528,7 +528,7 @@ std::expected<void, StarException> MainInterface::initScriptAndHudPanes(std::sha
   auto mmUpgrade = (*assets)->json("/interface.config:mainBar.mmUpgrade");
   if (!mmUpgrade)
     return std::unexpected(std::move(mmUpgrade.error()));
-  auto mmUpgradeConfig = mmUpgrade->getString("scriptPane", "/interface/scripted/mmupgrade/mmupgradegui.config");
+  auto mmUpgradeConfig = mmUpgrade->get_string("scriptPane", "/interface/scripted/mmupgrade/mmupgradegui.config");
   if (!mmUpgradeConfig)
     return std::unexpected(std::move(mmUpgradeConfig.error()));
   if (auto result = installPane(m_paneManager, MainInterfacePanes::MmUpgrade, PaneLayer::Window,
@@ -538,7 +538,7 @@ std::expected<void, StarException> MainInterface::initScriptAndHudPanes(std::sha
   auto collections = (*assets)->json("/interface.config:mainBar.collections");
   if (!collections)
     return std::unexpected(std::move(collections.error()));
-  auto collectionConfig = collections->getString("scriptPane", "/interface/scripted/collections/collectionsgui.config");
+  auto collectionConfig = collections->get_string("scriptPane", "/interface/scripted/collections/collectionsgui.config");
   if (!collectionConfig)
     return std::unexpected(std::move(collectionConfig.error()));
   if (auto result = installPane(m_paneManager, MainInterfacePanes::Collections, PaneLayer::Window,
@@ -575,7 +575,7 @@ std::expected<void, StarException> MainInterface::initCharacterSwap() {
       auto moveToFrontConfig = (*configuration)->get("characterSwapMovesToFront", false);
       if (!moveToFrontConfig)
         return std::unexpected(std::move(moveToFrontConfig.error()));
-      auto moveToFront = moveToFrontConfig->toBool();
+      auto moveToFront = moveToFrontConfig->to_bool();
       if (!moveToFront)
         return std::unexpected(std::move(moveToFront.error()));
       if (*moveToFront) {
@@ -585,7 +585,7 @@ std::expected<void, StarException> MainInterface::initCharacterSwap() {
       auto dismissAfterSwapConfig = (*configuration)->get("characterSwapDismisses", false);
       if (!dismissAfterSwapConfig)
         return std::unexpected(std::move(dismissAfterSwapConfig.error()));
-      auto dismissAfterSwap = dismissAfterSwapConfig->toBool();
+      auto dismissAfterSwap = dismissAfterSwapConfig->to_bool();
       if (!dismissAfterSwap)
         return std::unexpected(std::move(dismissAfterSwap.error()));
       if (*dismissAfterSwap)
@@ -617,7 +617,7 @@ std::expected<void, StarException> MainInterface::initCharacterSwap() {
   auto dismissAfterSwapConfig = (*configuration)->get("characterSwapDismisses", false);
   if (!dismissAfterSwapConfig)
     return std::unexpected(std::move(dismissAfterSwapConfig.error()));
-  auto dismissAfterSwap = dismissAfterSwapConfig->toBool();
+  auto dismissAfterSwap = dismissAfterSwapConfig->to_bool();
   if (!dismissAfterSwap)
     return std::unexpected(std::move(dismissAfterSwap.error()));
   (*toggleDismiss)->setChecked(*dismissAfterSwap);
@@ -653,7 +653,7 @@ std::expected<LuaCallbacks, StarException> MainInterface::makeClientCallbacks() 
               if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
               auto value = storage->getMetadata(key);
               if (!value) return std::unexpected(std::move(value.error()));
-              return value->isNull() ? fallback.value_or(Json()) : *value;
+              return value->is_null() ? fallback.value_or(Json()) : *value;
             }); !added)
           return std::unexpected(std::move(added.error()));
         if (auto added = scoped.registerCallback("set", [storage, key, lifetime](Json value) -> std::expected<void, StarException> {
@@ -1047,9 +1047,9 @@ std::shared_ptr<PortraitEntity> MainInterface::portraitEntity(std::optional<Enti
 }
 
 Json MainInterface::cursorView() const {
-  return JsonObject{{"position", jsonFromVec2F(m_cursorScreenPos)},
-      {"roundedPosition", jsonFromVec2I(m_cursorScreenIPos)},
-      {"size", jsonFromVec2I(m_cursor->size())}, {"scale", m_cursor->scale(interfaceScale())}};
+  return JsonObject{{"position", json_from_vec2f(m_cursorScreenPos)},
+      {"roundedPosition", json_from_vec2i(m_cursorScreenIPos)},
+      {"size", json_from_vec2i(m_cursor->size())}, {"scale", m_cursor->scale(interfaceScale())}};
 }
 
 bool MainInterface::inventoryChanged() const {
@@ -1088,13 +1088,13 @@ std::expected<void, StarException> MainInterface::openMerchantWindow(Json const&
       return {};
     }
   }
-  auto openWithInventory = config.getBool("openWithInventory", true);
+  auto openWithInventory = config.get_bool("openWithInventory", true);
   if (!openWithInventory)
     return std::unexpected(std::move(openWithInventory.error()));
   auto inventoryDisplayed = m_paneManager.registeredPaneIsDisplayed(MainInterfacePanes::Inventory);
   if (!inventoryDisplayed)
     return std::unexpected(std::move(inventoryDisplayed.error()));
-  auto closeWithInventory = config.getBool("closeWithInventory", !*inventoryDisplayed);
+  auto closeWithInventory = config.get_bool("closeWithInventory", !*inventoryDisplayed);
   if (!closeWithInventory)
     return std::unexpected(std::move(closeWithInventory.error()));
   auto window = MerchantPane::create(context(), m_client->worldClient(), m_client->mainPlayer(), config, sourceEntityId);
@@ -1125,7 +1125,7 @@ std::expected<void, StarException> MainInterface::openMerchantWindow(Json const&
   auto gapConfig = (*assets)->json("/interface.config:bringAdjacentWindowGap");
   if (!gapConfig)
     return std::unexpected(std::move(gapConfig.error()));
-  auto gap = gapConfig->toFloat();
+  auto gap = gapConfig->to_float();
   if (!gap)
     return std::unexpected(std::move(gap.error()));
   return m_paneManager.bringPaneAdjacent(*inventory, m_merchantWindow, *gap);
@@ -1403,12 +1403,12 @@ std::expected<void, StarException> MainInterface::handleInteractAction(InteractA
     auto gapConfig = (*assets)->json("/interface.config:bringAdjacentWindowGap");
     if (!gapConfig)
       return std::unexpected(std::move(gapConfig.error()));
-    auto gap = gapConfig->toFloat();
+    auto gap = gapConfig->to_float();
     if (!gap)
       return std::unexpected(std::move(gap.error()));
     return m_paneManager.bringPaneAdjacent(*inventoryPane, m_containerPane, *gap);
   } else if (interactAction.type == InteractActionType::SitDown) {
-    auto index = interactAction.data.toUInt();
+    auto index = interactAction.data.to_uint();
     if (!index)
       return std::unexpected(std::move(index.error()));
     auto lounged = m_client->mainPlayer()->lounge(interactAction.entityId, *index);
@@ -1444,10 +1444,10 @@ std::expected<void, StarException> MainInterface::handleInteractAction(InteractA
     auto config = (*assets)->fetchJson(interactAction.data);
     if (!config)
       return std::unexpected(std::move(config.error()));
-    auto canBookmark = config->getBool("canBookmark", false);
+    auto canBookmark = config->get_bool("canBookmark", false);
     if (!canBookmark)
       return std::unexpected(std::move(canBookmark.error()));
-    auto canTeleport = config->getBool("canTeleport", true);
+    auto canTeleport = config->get_bool("canTeleport", true);
     if (!canTeleport)
       return std::unexpected(std::move(canTeleport.error()));
     if (*canBookmark) {
@@ -1469,7 +1469,7 @@ std::expected<void, StarException> MainInterface::handleInteractAction(InteractA
             icon = "default";
             planetName = "???";
           }
-          auto name = config->getString("bookmarkName", "");
+          auto name = config->get_string("bookmarkName", "");
           if (!name)
             return std::unexpected(std::move(name.error()));
           currentLocation = TeleportBookmark{.target = {playerWorld, SpawnTargetUniqueEntity(*uniqueEntityId)},
@@ -1510,16 +1510,16 @@ std::expected<void, StarException> MainInterface::handleInteractAction(InteractA
         return std::unexpected(std::move(displayed.error()));
     }
   } else if (interactAction.type == InteractActionType::ShowPopup) {
-    auto message = interactAction.data.getString("message");
+    auto message = interactAction.data.get_string("message");
     if (!message)
       return std::unexpected(std::move(message.error()));
-    auto title = interactAction.data.getString("title", "");
+    auto title = interactAction.data.get_string("title", "");
     if (!title)
       return std::unexpected(std::move(title.error()));
-    auto subtitle = interactAction.data.getString("subtitle", "");
+    auto subtitle = interactAction.data.get_string("subtitle", "");
     if (!subtitle)
       return std::unexpected(std::move(subtitle.error()));
-    auto sound = interactAction.data.optString("sound");
+    auto sound = interactAction.data.opt_string("sound");
     if (!sound)
       return std::unexpected(std::move(sound.error()));
     JsonObject payload{{"message", std::move(*message)}, {"title", std::move(*title)}, {"subtitle", std::move(*subtitle)}};
@@ -1537,10 +1537,10 @@ std::expected<void, StarException> MainInterface::handleInteractAction(InteractA
       return std::unexpected(std::move(pane.error()));
     return displayScriptPane(*pane, sourceEntity);
   } else if (interactAction.type == InteractActionType::Message) {
-    auto type = interactAction.data.getString("messageType");
+    auto type = interactAction.data.get_string("messageType");
     if (!type)
       return std::unexpected(std::move(type.error()));
-    auto arguments = interactAction.data.getArray("messageArgs");
+    auto arguments = interactAction.data.get_array("messageArgs");
     if (!arguments)
       return std::unexpected(std::move(arguments.error()));
     auto received = m_client->mainPlayer()->receiveMessage(connectionForEntity(interactAction.entityId), *type, *arguments);
@@ -1649,7 +1649,7 @@ std::expected<void, StarException> MainInterface::update(float dt) {
           } else {
             definition = std::move(*fetched);
           }
-          if (definition.isType(Json::Type::Object)) {
+          if (definition.is_type(Json::Type::Object)) {
             auto loaded = m_cinematicOverlay->load(definition);
             if (!loaded) {
               auto logged = context().root().logger().warn("MainInterface: rejected malformed cinematic ({}), stopping overlay", loaded.error().what());
@@ -1803,7 +1803,7 @@ std::expected<void, StarException> MainInterface::update(float dt) {
             auto received = ChatReceivedMessage::create(**message);
             if (!received)
               return std::unexpected(std::move(received.error()));
-            auto showPane = sayAction.config.getBool("showPane", false);
+            auto showPane = sayAction.config.get_bool("showPane", false);
             if (!showPane)
               return std::unexpected(std::move(showPane.error()));
             auto added = addChatMessages({std::move(*received)}, *showPane);
@@ -2248,7 +2248,7 @@ std::expected<void, StarException> MainInterface::displayScriptPane(std::shared_
   if (sourceEntity != NullEntityId)
     m_interactionScriptPanes[sourceEntity] = scriptPane;
   PaneLayer layer = PaneLayer::Window;
-  auto layerName = scriptPane->config().optString("paneLayer");
+  auto layerName = scriptPane->config().opt_string("paneLayer");
   if (!layerName)
     return std::unexpected(std::move(layerName.error()));
   if (*layerName) {
@@ -2275,7 +2275,7 @@ std::expected<void, StarException> MainInterface::displayScriptPane(std::shared_
     auto gapConfig = (*assets)->json("/interface.config:bringAdjacentWindowGap");
     if (!gapConfig)
       return std::unexpected(std::move(gapConfig.error()));
-    auto gap = gapConfig->toFloat();
+    auto gap = gapConfig->to_float();
     if (!gap)
       return std::unexpected(std::move(gap.error()));
     auto displayed = m_paneManager.displayPane(layer, scriptPane, [this, close = *close](std::shared_ptr<Pane> const&) -> std::expected<void, StarException> {

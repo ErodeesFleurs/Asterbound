@@ -267,7 +267,7 @@ const GameTestRegistration objectCursorPreviewRandomIsolation(
       auto flickering = config->contains("flickerPeriod");
       ASSERT_TRUE(flickering);
       if (*flickering) {
-        auto name = config->getString("objectName");
+        auto name = config->get_string("objectName");
         ASSERT_TRUE(name);
         objectName = std::move(*name);
         break;
@@ -384,7 +384,7 @@ const GameTestRegistration
     expect_batch_matches_scalar(**source, requests);
     auto recovered = (*assets)->json("/mutable.json");
     ASSERT_TRUE(recovered);
-    EXPECT_EQ(recovered->getInt("recovered"), 42);
+    EXPECT_EQ(recovered->get_int("recovered"), 42);
 
     ASSERT_TRUE(File::remove(path));
     auto missing = (*source)->file_size("/mutable.json");
@@ -795,12 +795,12 @@ const GameTestRegistration assetsConstAnimationCachesRefreshFramesAndParts("Asse
   EXPECT_EQ(part.activeState->frame, 1u);
   auto partFrame = part.properties.get("partFrame");
   ASSERT_TRUE(partFrame);
-  auto partFrameValue = partFrame->get().toInt();
+  auto partFrameValue = partFrame->get().to_int();
   ASSERT_TRUE(partFrameValue);
   EXPECT_EQ(*partFrameValue, 40);
   auto nextPartFrame = part.nextProperties.get("partFrame");
   ASSERT_TRUE(nextPartFrame);
-  auto nextPartFrameValue = nextPartFrame->get().toInt();
+  auto nextPartFrameValue = nextPartFrame->get().to_int();
   ASSERT_TRUE(nextPartFrameValue);
   EXPECT_EQ(*nextPartFrameValue, 30);
   auto stateResult = frozen.activeState("movement");
@@ -811,7 +811,7 @@ const GameTestRegistration assetsConstAnimationCachesRefreshFramesAndParts("Asse
   EXPECT_FLOAT_EQ(state.frameProgress, 0.5f);
   auto stateFrame = state.properties.get("stateFrame");
   ASSERT_TRUE(stateFrame);
-  auto stateFrameValue = stateFrame->get().toInt();
+  auto stateFrameValue = stateFrame->get().to_int();
   ASSERT_TRUE(stateFrameValue);
   EXPECT_EQ(*stateFrameValue, 20);
 
@@ -829,7 +829,7 @@ const GameTestRegistration assetsConstAnimationCachesRefreshFramesAndParts("Asse
     auto frame = active.properties.get("partFrame");
     if (!frame)
       return std::unexpected(std::move(frame.error()));
-    auto value = frame->get().toInt();
+    auto value = frame->get().to_int();
     if (!value)
       return std::unexpected(std::move(value.error()));
     EXPECT_EQ(*value, 40);
@@ -847,7 +847,7 @@ const GameTestRegistration assetsConstAnimationCachesRefreshFramesAndParts("Asse
   ASSERT_TRUE(updatedPart);
   auto base = updatedPart->get().properties.get("base");
   ASSERT_TRUE(base);
-  auto baseValue = base->get().toBool();
+  auto baseValue = base->get().to_bool();
   ASSERT_TRUE(baseValue);
   EXPECT_FALSE(*baseValue);
   ASSERT_TRUE(animation.setStateTypeEnabled("movement", false));
@@ -1521,7 +1521,7 @@ end
             continue;
           }
           ASSERT_TRUE(loaded) << loaded.error().what();
-          auto serial = loaded->getInt("serial");
+          auto serial = loaded->get_int("serial");
           ASSERT_TRUE(serial);
           EXPECT_GE(*serial, 1);
           EXPECT_LE(*serial, 32);
@@ -1531,7 +1531,7 @@ end
       EXPECT_EQ(serials.size(), 31u);
       auto final = (*assets)->json(paths[32]);
       ASSERT_TRUE(final) << final.error().what();
-      auto count = final->getInt("serial");
+      auto count = final->get_int("serial");
       ASSERT_TRUE(count);
       EXPECT_EQ(*count, 33);
       EXPECT_FALSE((*assets)->json(paths[17]));
@@ -1665,7 +1665,7 @@ const GameTestRegistration assetsFailureCacheReload(
     ASSERT_TRUE(AssetWorkerTestAccess::drain(**assets));
     auto following = (*assets)->json("/following.json");
     ASSERT_TRUE(following);
-    EXPECT_EQ(following->getInt("following"), 17);
+    EXPECT_EQ(following->get_int("following"), 17);
     auto cached = (*assets)->json("/failure.json");
     ASSERT_FALSE(cached);
     EXPECT_EQ(cached.error().diagnostic_summary()->reason, reason);
@@ -1674,7 +1674,7 @@ const GameTestRegistration assetsFailureCacheReload(
     ASSERT_TRUE(AssetWorkerTestAccess::drain(**assets));
     auto recovered = (*assets)->json("/failure.json");
     ASSERT_TRUE(recovered);
-    EXPECT_EQ(recovered->getInt("recovered"), 42);
+    EXPECT_EQ(recovered->get_int("recovered"), 42);
   });
 
 const GameTestRegistration recoverableDatabaseProvider(

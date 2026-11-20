@@ -90,7 +90,7 @@ void storage_updates(benchmark::State& state, Root& root, bool& failed, storage_
     auto contents = File::read_file_string(File::relative_to(directory, "metadata"));
     if (!contents)
       return std::unexpected(std::move(contents.error()));
-    auto json = Json::parseJson(*contents);
+    auto json = Json::parse_json(*contents);
     if (!json)
       return std::unexpected(std::move(json.error()));
     auto value = json->get(key);

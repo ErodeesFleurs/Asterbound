@@ -83,16 +83,16 @@ std::expected<WidgetConstructResult, StarException> GuiReader::titleHandler(Stri
   auto pane = m_pane.lock();
   if (!pane)
     return std::unexpected(StarException("Only Pane controls support the 'title' command"));
-  auto title = config.getString("title", "");
+  auto title = config.get_string("title", "");
   if (!title)
     return std::unexpected(std::move(title.error()));
-  auto subtitle = config.getString("subtitle", "");
+  auto subtitle = config.get_string("subtitle", "");
   if (!subtitle)
     return std::unexpected(std::move(subtitle.error()));
   auto iconConfig = config.get("icon", Json());
   if (!iconConfig)
     return std::unexpected(std::move(iconConfig.error()));
-  if (iconConfig->isNull()) {
+  if (iconConfig->is_null()) {
     pane->setTitleString(*title, *subtitle);
   } else {
     auto icon = makeSingle("icon", *iconConfig);
@@ -111,7 +111,7 @@ std::expected<WidgetConstructResult, StarException> GuiReader::paneFeatureHandle
   auto pane = m_pane.lock();
   if (!pane)
     return std::unexpected(StarException("Only Pane controls support the 'panefeature' command"));
-  auto anchorName = config.getString("anchor", "None");
+  auto anchorName = config.get_string("anchor", "None");
   if (!anchorName)
     return std::unexpected(std::move(anchorName.error()));
   if (!PaneAnchorNames)
@@ -127,12 +127,12 @@ std::expected<WidgetConstructResult, StarException> GuiReader::paneFeatureHandle
     auto offsetConfig = config.get("offset");
     if (!offsetConfig)
       return std::unexpected(std::move(offsetConfig.error()));
-    auto offset = jsonToVec2I(*offsetConfig);
+    auto offset = json_to_vec2i(*offsetConfig);
     if (!offset)
       return std::unexpected(std::move(offset.error()));
     pane->setAnchorOffset(*offset);
   }
-  auto positionLocked = config.getBool("positionLocked", false);
+  auto positionLocked = config.get_bool("positionLocked", false);
   if (!positionLocked)
     return std::unexpected(std::move(positionLocked.error()));
   if (*positionLocked)
@@ -144,13 +144,13 @@ std::expected<WidgetConstructResult, StarException> GuiReader::backgroundHandler
   auto pane = m_pane.lock();
   if (!pane)
     return std::unexpected(StarException("Only Pane controls support the 'background' command"));
-  auto header = config.getString("fileHeader", "");
+  auto header = config.get_string("fileHeader", "");
   if (!header)
     return std::unexpected(std::move(header.error()));
-  auto body = config.getString("fileBody", "");
+  auto body = config.get_string("fileBody", "");
   if (!body)
     return std::unexpected(std::move(body.error()));
-  auto footer = config.getString("fileFooter", "");
+  auto footer = config.get_string("fileFooter", "");
   if (!footer)
     return std::unexpected(std::move(footer.error()));
   auto result = pane->setBG(*header, *body, *footer);

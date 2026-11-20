@@ -61,7 +61,7 @@ std::expected<void, StarException> Statistics::writeStatistics() {
     stats.set(entry.first, entry.second.toJson());
   JsonObject storage = {
       { "stats", std::move(stats) },
-      { "achievements", jsonFromStringSet(m_achievements) }
+      { "achievements", json_from_string_set(m_achievements) }
     };
 
   auto versionedStorage = (*versioningDatabase)->makeCurrentVersionedJson("Statistics", storage);
@@ -146,7 +146,7 @@ std::expected<void, StarException> Statistics::update() {
 }
 
 std::expected<Statistics::Stat, StarException> Statistics::Stat::fromJson(Json const& json) {
-  auto type = json.getString("type");
+  auto type = json.get_string("type");
   if (!type) return std::unexpected(std::move(type.error()));
   auto value = json.get("value");
   if (!value) return std::unexpected(std::move(value.error()));
@@ -237,7 +237,7 @@ std::expected<void, StarException> Statistics::readStatistics() {
     auto storage = (*database)->loadVersionedJson(*versioned, "Statistics");
     if (!storage)
       return std::unexpected(std::move(storage.error()));
-    auto stats = storage->getObject("stats", {});
+    auto stats = storage->get_object("stats", {});
     if (!stats)
       return std::unexpected(std::move(stats.error()));
     StringMap<Stat> parsedStats;
@@ -251,7 +251,7 @@ std::expected<void, StarException> Statistics::readStatistics() {
     auto achievementsJson = storage->get("achievements", JsonArray{});
     if (!achievementsJson)
       return std::unexpected(std::move(achievementsJson.error()));
-    auto achievements = jsonToStringSet(*achievementsJson);
+    auto achievements = json_to_string_set(*achievementsJson);
     if (!achievements)
       return std::unexpected(std::move(achievements.error()));
     m_achievements = std::move(*achievements);

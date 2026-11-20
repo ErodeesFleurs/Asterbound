@@ -113,20 +113,20 @@ std::expected<void, StarException> BaseScriptPane::init(Json config, bool constr
     hasBase = *contains;
   }
   if (hasBase) {
-    auto path = config.getString("baseConfig");
+    auto path = config.get_string("baseConfig");
     if (!path)
       return std::unexpected(std::move(path.error()));
     auto baseConfig = (*assets)->fetchJson(*path);
     if (!baseConfig)
       return std::unexpected(std::move(baseConfig.error()));
-    m_config = jsonMerge(*baseConfig, config);
+    m_config = json_merge(*baseConfig, config);
   } else {
     auto fetched = (*assets)->fetchJson(config);
     if (!fetched)
       return std::unexpected(std::move(fetched.error()));
     m_config = std::move(*fetched);
   }
-  auto interactive = m_config.getBool("interactive", true);
+  auto interactive = m_config.get_bool("interactive", true);
   if (!interactive)
     return std::unexpected(std::move(interactive.error()));
   m_interactive = *interactive;
@@ -135,7 +135,7 @@ std::expected<void, StarException> BaseScriptPane::init(Json config, bool constr
   auto callbacksJson = m_config.get("scriptWidgetCallbacks", JsonArray{});
   if (!callbacksJson)
     return std::unexpected(std::move(callbacksJson.error()));
-  auto callbacks = jsonToStringList(*callbacksJson);
+  auto callbacks = json_to_string_list(*callbacksJson);
   if (!callbacks)
     return std::unexpected(std::move(callbacks.error()));
   for (auto const& callbackName : *callbacks) {
@@ -225,7 +225,7 @@ std::expected<void, StarException> BaseScriptPane::tick(float dt) {
     return std::unexpected(std::move(ticked.error()));
   for (auto const& p : m_canvasClickCallbacks) {
     for (auto const& clickEvent : p.first->pullClickEvents()) {
-      auto result = recoverLuaScriptError(m_script.invoke(p.second, jsonFromVec2I(clickEvent.position),
+      auto result = recoverLuaScriptError(m_script.invoke(p.second, json_from_vec2i(clickEvent.position),
                                     static_cast<std::uint8_t>(clickEvent.button), clickEvent.buttonDown));
       if (!result)
         return std::unexpected(std::move(result.error()));
@@ -266,7 +266,7 @@ std::expected<bool, StarException> BaseScriptPane::sendEvent(InputEvent const& e
   }
   // GuiClose must dismiss even when the canvas does not implement it.
   if (context().actions(event).contains(InterfaceAction::GuiClose)) {
-    auto dismissable = m_config.getBool("dismissable", true);
+    auto dismissable = m_config.get_bool("dismissable", true);
     if (!dismissable)
       return std::unexpected(std::move(dismissable.error()));
     if (*dismissable) {
@@ -286,10 +286,10 @@ std::expected<std::shared_ptr<Pane>, StarException> BaseScriptPane::createToolti
   auto result = recoverLuaScriptError(m_script.invoke<Json>("createTooltip", screenPosition));
   if (!result)
     return std::unexpected(std::move(result.error()));
-  if (*result && !(**result).isNull()) {
+  if (*result && !(**result).is_null()) {
     auto const& value = **result;
     if (value.type() == Json::Type::String) {
-      auto text = value.toString();
+      auto text = value.to_string();
       if (!text)
         return std::unexpected(std::move(text.error()));
       return SimpleTooltipBuilder::buildTooltip(context(), *text);
@@ -357,14 +357,14 @@ std::expected<std::optional<std::shared_ptr<Item>>, StarException> BaseScriptPan
   auto result = recoverLuaScriptError(m_script.invoke<Json>("shiftItemFromInventory", input->descriptor().toJson()));
   if (!result)
     return std::unexpected(std::move(result.error()));
-  if (!*result || (**result).isNull())
+  if (!*result || (**result).is_null())
     return std::optional<std::shared_ptr<Item>>{};
   auto database = context().root().itemDatabase();
   if (!database)
     return std::unexpected(std::move(database.error()));
   ItemDescriptor descriptor;
   if ((**result).type() == Json::Type::Bool) {
-    auto accepted = (**result).toBool();
+    auto accepted = (**result).to_bool();
     if (!accepted)
       return std::unexpected(std::move(accepted.error()));
     if (!*accepted)
@@ -393,7 +393,7 @@ std::expected<void, StarException> BaseScriptPane::construct(Json config) {
   if (!dimensions)
     return std::unexpected(std::move(dimensions.error()));
   if (*dimensions) {
-    auto configuredSize = jsonToVec2I(**dimensions);
+    auto configuredSize = json_to_vec2i(**dimensions);
     if (!configuredSize)
       return std::unexpected(std::move(configuredSize.error()));
     setSize(*configuredSize);
@@ -402,11 +402,11 @@ std::expected<void, StarException> BaseScriptPane::construct(Json config) {
     // enlarge them. Only widget-only panes need bounds inferred from children.
     determineSizeFromChildren();
   }
-  auto clicks = m_config.getObject("canvasClickCallbacks", {});
+  auto clicks = m_config.get_object("canvasClickCallbacks", {});
   if (!clicks)
     return std::unexpected(std::move(clicks.error()));
   for (auto const& pair : *clicks) {
-    auto callback = pair.second.toString();
+    auto callback = pair.second.to_string();
     if (!callback)
       return std::unexpected(std::move(callback.error()));
     auto canvas = findChild<CanvasWidget>(pair.first);
@@ -416,11 +416,11 @@ std::expected<void, StarException> BaseScriptPane::construct(Json config) {
       return std::unexpected(GUIBuilderException::format("Missing canvas widget '{}'", pair.first));
     m_canvasClickCallbacks.set(std::move(*canvas), std::move(*callback));
   }
-  auto keys = m_config.getObject("canvasKeyCallbacks", {});
+  auto keys = m_config.get_object("canvasKeyCallbacks", {});
   if (!keys)
     return std::unexpected(std::move(keys.error()));
   for (auto const& pair : *keys) {
-    auto callback = pair.second.toString();
+    auto callback = pair.second.to_string();
     if (!callback)
       return std::unexpected(std::move(callback.error()));
     auto canvas = findChild<CanvasWidget>(pair.first);
@@ -433,13 +433,13 @@ std::expected<void, StarException> BaseScriptPane::construct(Json config) {
   auto scriptsJson = m_config.get("scripts", JsonArray());
   if (!scriptsJson)
     return std::unexpected(std::move(scriptsJson.error()));
-  auto scripts = jsonToStringList(*scriptsJson);
+  auto scripts = json_to_string_list(*scriptsJson);
   if (!scripts)
     return std::unexpected(std::move(scripts.error()));
   auto configured = m_script.setScripts(std::move(*scripts));
   if (!configured)
     return std::unexpected(std::move(configured.error()));
-  auto delta = m_config.getUInt("scriptDelta", 1);
+  auto delta = m_config.get_uint("scriptDelta", 1);
   if (!delta)
     return std::unexpected(std::move(delta.error()));
   m_script.setUpdateDelta(*delta);
@@ -506,15 +506,15 @@ std::expected<Json, StarException> BaseScriptPane::inputJson(InputEvent const& e
       || std::holds_alternative<MouseButtonUpEvent>(event)
       || std::holds_alternative<MouseWheelEvent>(event)) {
     auto position = *context().mousePosition(event);
-    result.set("position", jsonFromVec2I(position - screenPosition()));
-    result.set("screenPosition", jsonFromVec2I(position));
+    result.set("position", json_from_vec2i(position - screenPosition()));
+    result.set("screenPosition", json_from_vec2i(position));
   }
   if (auto move = std::get_if<MouseMoveEvent>(&event))
-    result.set("physicalPosition", jsonFromVec2F(move->mousePosition));
+    result.set("physicalPosition", json_from_vec2f(move->mousePosition));
   else if (auto down = std::get_if<MouseButtonDownEvent>(&event))
-    result.set("physicalPosition", jsonFromVec2F(down->mousePosition));
+    result.set("physicalPosition", json_from_vec2f(down->mousePosition));
   else if (auto up = std::get_if<MouseButtonUpEvent>(&event))
-    result.set("physicalPosition", jsonFromVec2F(up->mousePosition));
+    result.set("physicalPosition", json_from_vec2f(up->mousePosition));
   if (auto down = std::get_if<KeyDownEvent>(&event)) {
     auto name = enum_name<KeyNames>(down->key);
     if (!name)

@@ -171,14 +171,14 @@ std::expected<std::shared_ptr<BlueprintItem>, StarException> BlueprintItem::crea
   if (!underlay)
     return std::unexpected(std::move(underlay.error()));
   item->m_recipeIconUnderlay = std::move(*underlay);
-  auto image = (*assets)->json("/blueprint.config:inHandImage").and_then([](Json const& value) { return value.toString(); });
+  auto image = (*assets)->json("/blueprint.config:inHandImage").and_then([](Json const& value) { return value.to_string(); });
   if (!image)
     return std::unexpected(std::move(image.error()));
   auto drawable = Drawable::makeImage(**metadata, *image, 1.0f / TilePixels, true, Vec2F());
   if (!drawable)
     return std::unexpected(std::move(drawable.error()));
   item->m_inHandDrawable = {std::move(*drawable)};
-  auto factor = (*assets)->json("/items/defaultParameters.config:blueprintPriceFactor").and_then([](Json const& value) { return value.toFloat(); });
+  auto factor = (*assets)->json("/items/defaultParameters.config:blueprintPriceFactor").and_then([](Json const& value) { return value.to_float(); });
   if (!factor)
     return std::unexpected(std::move(factor.error()));
   item->setPrice(int(item->price() * *factor));

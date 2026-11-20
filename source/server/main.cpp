@@ -195,7 +195,7 @@ static std::expected<void, StarException> runServer(int argc, char** argv, bool&
     if (!rateSetting)
       return std::unexpected(std::move(rateSetting.error()));
     if (*rateSetting) {
-      auto updateRate = rateSetting->toFloat();
+      auto updateRate = rateSetting->to_float();
       if (!updateRate)
         return std::unexpected(std::move(updateRate.error()));
       root->timing().serverTimestep = root->timing().timestep = 1.0f / *updateRate;
@@ -230,13 +230,13 @@ static std::expected<void, StarException> runServer(int argc, char** argv, bool&
       auto bind = (*configuration)->get(bind_key);
       if (!bind)
         return std::unexpected(std::move(bind.error()));
-      auto host = bind->toString();
+      auto host = bind->to_string();
       if (!host)
         return std::unexpected(std::move(host.error()));
       auto port = (*configuration)->get(port_key);
       if (!port)
         return std::unexpected(std::move(port.error()));
-      auto number = port->toInt();
+      auto number = port->to_int();
       if (!number)
         return std::unexpected(std::move(number.error()));
       if (!std::in_range<std::uint16_t>(*number))
@@ -247,7 +247,7 @@ static std::expected<void, StarException> runServer(int argc, char** argv, bool&
     auto querySetting = (*configuration)->get("runQueryServer");
     if (!querySetting)
       return std::unexpected(std::move(querySetting.error()));
-    auto queryEnabled = querySetting->toBool();
+    auto queryEnabled = querySetting->to_bool();
     if (!queryEnabled)
       return std::unexpected(std::move(queryEnabled.error()));
     if (*queryEnabled) {
@@ -266,7 +266,7 @@ static std::expected<void, StarException> runServer(int argc, char** argv, bool&
     auto rconSetting = (*configuration)->get("runRconServer");
     if (!rconSetting)
       return std::unexpected(std::move(rconSetting.error()));
-    auto rconEnabled = rconSetting->toBool();
+    auto rconEnabled = rconSetting->to_bool();
     if (!rconEnabled)
       return std::unexpected(std::move(rconEnabled.error()));
     if (*rconEnabled) {

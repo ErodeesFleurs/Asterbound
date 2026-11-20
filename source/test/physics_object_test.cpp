@@ -25,6 +25,42 @@ using namespace Star;
 
 namespace {
 
+const GameTestRegistration legacy_orientation_order("ObjectDatabase", "LegacyOrientationExpansion", [](GameTest& fixture) {
+  auto parse = [&](Json const& entries) {
+    return ObjectDatabase::parseOrientations(fixture.root(), "/test.object", entries, JsonObject());
+  };
+  auto entries = Json::parse(R"([
+    {"imageLayers":[]},
+    {"imageLayers":[],"dualImage":null,"leftImage":"ignored"},
+    {"imageLayers":[],"leftImage":"left"},
+    {"imageLayers":[],"leftImage":"a","rightImage":"b"},
+    {"imageLayers":[],"spaceScan":0,"imageKeys":{"color":"custom"}}
+  ])");
+  ASSERT_TRUE(entries);
+  auto orientations = parse(*entries);
+  ASSERT_TRUE(orientations) << orientations.error().what();
+  JsonArray actual;
+  for (auto const& orientation : *orientations)
+    actual.emplace_back(orientation->config);
+  auto expected = Json::parse(R"([
+    {"imageLayers":[]},
+    {"imageLayers":[],"dualImage":null,"leftImage":"ignored","image":null,"flipImages":true,"direction":"left"},
+    {"imageLayers":[],"dualImage":null,"leftImage":"ignored","image":null,"direction":"right"},
+    {"imageLayers":[],"leftImage":"left","image":"left","direction":"left"},
+    {"imageLayers":[],"leftImage":"left","image":null,"direction":"right"},
+    {"imageLayers":[],"leftImage":"a","rightImage":"b","image":"a","direction":"left"},
+    {"imageLayers":[],"leftImage":"a","rightImage":"b","image":"b","direction":"right"},
+    {"imageLayers":[],"spaceScan":0,"imageKeys":{"color":"custom"}}
+  ])");
+  ASSERT_TRUE(expected);
+  EXPECT_EQ(Json(std::move(actual)), *expected);
+
+  // The later non-object must fail before the earlier missing image is parsed.
+  auto malformed = parse(JsonArray{JsonObject(), Json()});
+  ASSERT_FALSE(malformed);
+  EXPECT_NE(std::string_view(malformed.error().what()).find("Improper conversion to JsonObject"), std::string_view::npos);
+});
+
 const GameTestRegistration
   localForceBounds("PhysicsObject", "LocalBoundsAndWorldForcesAtLargeCoordinates", [](GameTest& fixture) {
     // The empty world is sparse: no sectors or terrain need to be generated to
@@ -74,7 +110,7 @@ const GameTestRegistration
 
     for (bool enabled : {false, true}) {
       SCOPED_TRACE(enabled ? "enabled" : "disabled");
-      auto forces = forceConfig->toObject();
+      auto forces = forceConfig->to_object();
       ASSERT_TRUE(forces) << forces.error().what();
       for (auto&& pair : *forces) {
         auto changed = pair.second.set("enabled", enabled);

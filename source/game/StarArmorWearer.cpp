@@ -171,10 +171,10 @@ std::expected<bool, StarException> ArmorWearer::setupHumanoid(Humanoid& humanoid
     auto newConfig = item.instanceValue("humanoidConfig");
     if (!newConfig)
       return std::unexpected(std::move(newConfig.error()));
-    if (newConfig->isType(Json::Type::Object)) {
+    if (newConfig->is_type(Json::Type::Object)) {
       if (!humanoidConfig)
         humanoidConfig = JsonObject();
-      humanoidConfig = jsonMerge(humanoidConfig, *newConfig);
+      humanoidConfig = json_merge(humanoidConfig, *newConfig);
     }
     return {};
   };

@@ -70,14 +70,14 @@ std::string_view const MaxSelector::Name = "max";
 std::expected<std::shared_ptr<MaxSelector>, StarException> MaxSelector::create(
     Json const& config, TerrainSelectorParameters const& parameters, TerrainDatabase const& database) {
   auto result = std::make_shared<MaxSelector>(ConstructionKey{}, config, parameters);
-  auto sources = config.getArray("sources");
+  auto sources = config.get_array("sources");
   if (!sources)
     return std::unexpected(std::move(sources.error()));
   for (auto const& sourceConfig : *sources) {
-    auto sourceType = sourceConfig.getString("type");
+    auto sourceType = sourceConfig.get_string("type");
     if (!sourceType)
       return std::unexpected(std::move(sourceType.error()));
-    auto seedBias = sourceConfig.getUInt("seedBias", 0);
+    auto seedBias = sourceConfig.get_uint("seedBias", 0);
     if (!seedBias)
       return std::unexpected(std::move(seedBias.error()));
     TerrainSelectorParameters sourceParameters = parameters;
@@ -108,14 +108,14 @@ std::string_view const MinMaxSelector::Name = "minmax";
 std::expected<std::shared_ptr<MinMaxSelector>, StarException> MinMaxSelector::create(
     Json const& config, TerrainSelectorParameters const& parameters, TerrainDatabase const& database) {
   auto result = std::make_shared<MinMaxSelector>(ConstructionKey{}, config, parameters);
-  auto sources = config.getArray("sources");
+  auto sources = config.get_array("sources");
   if (!sources)
     return std::unexpected(std::move(sources.error()));
   for (auto const& sourceConfig : *sources) {
-    auto sourceType = sourceConfig.getString("type");
+    auto sourceType = sourceConfig.get_string("type");
     if (!sourceType)
       return std::unexpected(std::move(sourceType.error()));
-    auto seedBias = sourceConfig.getUInt("seedBias", 0);
+    auto seedBias = sourceConfig.get_uint("seedBias", 0);
     if (!seedBias)
       return std::unexpected(std::move(seedBias.error()));
     TerrainSelectorParameters sourceParameters = parameters;
@@ -154,7 +154,7 @@ std::expected<std::shared_ptr<MixSelector>, StarException> MixSelector::create(
     auto sourceConfig = config.get(name);
     if (!sourceConfig)
       return std::unexpected(std::move(sourceConfig.error()));
-    auto type = sourceConfig->getString("type");
+    auto type = sourceConfig->get_string("type");
     if (!type)
       return std::unexpected(std::move(type.error()));
     return database.createSelectorType(*type, *sourceConfig, parameters);

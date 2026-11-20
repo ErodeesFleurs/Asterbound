@@ -194,7 +194,7 @@ std::expected<void, StarException> WidgetParser::constructImpl(Json const& confi
 }
 
 std::expected<std::shared_ptr<Widget>, StarException> WidgetParser::makeSingle(String const& name, Json const& config) {
-  auto type = config.getString("type");
+  auto type = config.get_string("type");
   if (!type)
     return std::unexpected(std::move(type.error()));
   auto handler = m_constructors.find_ref(*type);
@@ -209,16 +209,16 @@ std::expected<std::shared_ptr<Widget>, StarException> WidgetParser::makeSingle(S
 std::expected<List<WidgetConstructResult>, StarException> WidgetParser::constructor(Json const& config) {
   List<WidgetConstructResult> widgets;
   auto addWidget = [&parser = *this, &widgets](Json const& memberConfig) -> std::expected<void, StarException> {
-    if (!memberConfig.isType(Json::Type::Object))
+    if (!memberConfig.is_type(Json::Type::Object))
       return std::unexpected(WidgetParserException("Malformed gui json: member configuration is not a map"));
-    auto type = memberConfig.getString("type");
+    auto type = memberConfig.get_string("type");
     if (!type)
       return std::unexpected(std::move(type.error()));
-    auto name = memberConfig.getString("name");
+    auto name = memberConfig.get_string("name");
     if (!name)
       return std::unexpected(std::move(name.error()));
     if (*type == "include") {
-      auto file = memberConfig.getString("file");
+      auto file = memberConfig.get_string("file");
       if (!file)
         return std::unexpected(std::move(file.error()));
       auto assets = parser.m_context.root().assets();
@@ -243,7 +243,7 @@ std::expected<List<WidgetConstructResult>, StarException> WidgetParser::construc
     }
     return {};
   };
-  if (config.isType(Json::Type::Object)) {
+  if (config.is_type(Json::Type::Object)) {
     auto members = config.iterate_object();
     if (!members)
       return std::unexpected(std::move(members.error()));
@@ -255,7 +255,7 @@ std::expected<List<WidgetConstructResult>, StarException> WidgetParser::construc
       if (!added)
         return std::unexpected(std::move(added.error()));
     }
-  } else if (config.isType(Json::Type::Array)) {
+  } else if (config.is_type(Json::Type::Array)) {
     auto members = config.iterate_array();
     if (!members)
       return std::unexpected(std::move(members.error()));
@@ -265,7 +265,7 @@ std::expected<List<WidgetConstructResult>, StarException> WidgetParser::construc
         return std::unexpected(std::move(added.error()));
     }
   } else {
-    return std::unexpected(WidgetParserException::format("Malformed gui json, expected a Map or a List. Instead got {}", config.typeName()));
+    return std::unexpected(WidgetParserException::format("Malformed gui json, expected a Map or a List. Instead got {}", config.type_name()));
   }
   return widgets;
 }
@@ -275,38 +275,38 @@ void WidgetParser::registerCallback(String const& name, WidgetCallbackFunc callb
 }
 
 std::expected<WidgetConstructResult, StarException> WidgetParser::buttonHandler(String const& name, Json const& config) {
-  auto invisible = config.getBool("invisible", false);
+  auto invisible = config.get_bool("invisible", false);
   if (!invisible)
     return std::unexpected(std::move(invisible.error()));
   String baseImage;
   if (!*invisible) {
-    auto base = config.getString("base");
+    auto base = config.get_string("base");
     if (!base)
       return std::unexpected(std::move(base.error()));
     baseImage = std::move(*base);
   }
-  auto hover = config.getString("hover", "");
+  auto hover = config.get_string("hover", "");
   if (!hover)
     return std::unexpected(std::move(hover.error()));
-  auto pressed = config.getString("pressed", "");
+  auto pressed = config.get_string("pressed", "");
   if (!pressed)
     return std::unexpected(std::move(pressed.error()));
-  auto disabledImage = config.getString("disabledImage", "");
+  auto disabledImage = config.get_string("disabledImage", "");
   if (!disabledImage)
     return std::unexpected(std::move(disabledImage.error()));
-  auto baseImageChecked = config.getString("baseImageChecked", "");
+  auto baseImageChecked = config.get_string("baseImageChecked", "");
   if (!baseImageChecked)
     return std::unexpected(std::move(baseImageChecked.error()));
-  auto hoverImageChecked = config.getString("hoverImageChecked", "");
+  auto hoverImageChecked = config.get_string("hoverImageChecked", "");
   if (!hoverImageChecked)
     return std::unexpected(std::move(hoverImageChecked.error()));
-  auto pressedImageChecked = config.getString("pressedImageChecked", "");
+  auto pressedImageChecked = config.get_string("pressedImageChecked", "");
   if (!pressedImageChecked)
     return std::unexpected(std::move(pressedImageChecked.error()));
-  auto disabledImageChecked = config.getString("disabledImageChecked", "");
+  auto disabledImageChecked = config.get_string("disabledImageChecked", "");
   if (!disabledImageChecked)
     return std::unexpected(std::move(disabledImageChecked.error()));
-  auto callback = config.getString("callback", name);
+  auto callback = config.get_string("callback", name);
   if (!callback)
     return std::unexpected(std::move(callback.error()));
   auto callbackFunc = m_callbacks.find_ref(*callback);
@@ -327,7 +327,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::buttonHandler(
   if (!has3)
     return std::unexpected(std::move(has3.error()));
   if (*has3) {
-    auto value3 = config.getString("caption");
+    auto value3 = config.get_string("caption");
     if (!value3)
       return std::unexpected(std::move(value3.error()));
     button->setText(*value3);
@@ -339,7 +339,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::buttonHandler(
     auto value4 = config.get("pressedOffset");
     if (!value4)
       return std::unexpected(std::move(value4.error()));
-    auto converted4 = jsonToVec2I(*value4);
+    auto converted4 = json_to_vec2i(*value4);
     if (!converted4)
       return std::unexpected(std::move(converted4.error()));
     button->setPressedOffset(*converted4);
@@ -351,7 +351,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::buttonHandler(
     auto value5 = config.get("textOffset");
     if (!value5)
       return std::unexpected(std::move(value5.error()));
-    auto converted5 = jsonToVec2I(*value5);
+    auto converted5 = json_to_vec2i(*value5);
     if (!converted5)
       return std::unexpected(std::move(converted5.error()));
     button->setTextOffset(*converted5);
@@ -360,7 +360,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::buttonHandler(
   if (!has6)
     return std::unexpected(std::move(has6.error()));
   if (*has6) {
-    auto value6 = config.getBool("checkable");
+    auto value6 = config.get_bool("checkable");
     if (!value6)
       return std::unexpected(std::move(value6.error()));
     button->setCheckable(*value6);
@@ -369,7 +369,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::buttonHandler(
   if (!has7)
     return std::unexpected(std::move(has7.error()));
   if (*has7) {
-    auto value7 = config.getBool("sustainCallbackOnDownHold");
+    auto value7 = config.get_bool("sustainCallbackOnDownHold");
     if (!value7)
       return std::unexpected(std::move(value7.error()));
     button->setSustainCallbackOnDownHold(*value7);
@@ -378,12 +378,12 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::buttonHandler(
   if (!has8)
     return std::unexpected(std::move(has8.error()));
   if (*has8) {
-    auto value8 = config.getBool("checked");
+    auto value8 = config.get_bool("checked");
     if (!value8)
       return std::unexpected(std::move(value8.error()));
     button->setChecked(*value8);
   }
-  auto hAnchor = config.getString("textAlign", "center");
+  auto hAnchor = config.get_string("textAlign", "center");
   if (!hAnchor)
     return std::unexpected(std::move(hAnchor.error()));
   if (*hAnchor == "right")
@@ -398,7 +398,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::buttonHandler(
   if (!has9)
     return std::unexpected(std::move(has9.error()));
   if (*has9) {
-    auto value9 = config.getInt("fontSize");
+    auto value9 = config.get_int("fontSize");
     if (!value9)
       return std::unexpected(std::move(value9.error()));
     button->setFontSize(*value9);
@@ -407,7 +407,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::buttonHandler(
   if (!has10)
     return std::unexpected(std::move(has10.error()));
   if (*has10) {
-    auto value10 = config.getString("fontDirectives");
+    auto value10 = config.get_string("fontDirectives");
     if (!value10)
       return std::unexpected(std::move(value10.error()));
     button->setFontDirectives(*value10);
@@ -419,7 +419,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::buttonHandler(
     auto value11 = config.get("fontColor");
     if (!value11)
       return std::unexpected(std::move(value11.error()));
-    auto converted11 = jsonToColor(*value11);
+    auto converted11 = json_to_color(*value11);
     if (!converted11)
       return std::unexpected(std::move(converted11.error()));
     button->setFontColor(*converted11);
@@ -431,7 +431,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::buttonHandler(
     auto value12 = config.get("fontColorDisabled");
     if (!value12)
       return std::unexpected(std::move(value12.error()));
-    auto converted12 = jsonToColor(*value12);
+    auto converted12 = json_to_color(*value12);
     if (!converted12)
       return std::unexpected(std::move(converted12.error()));
     button->setFontColorDisabled(*converted12);
@@ -440,12 +440,12 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::buttonHandler(
   if (!has13)
     return std::unexpected(std::move(has13.error()));
   if (*has13) {
-    auto value13 = config.getBool("disabled");
+    auto value13 = config.get_bool("disabled");
     if (!value13)
       return std::unexpected(std::move(value13.error()));
     button->setEnabled(!*value13);
   }
-  auto zlevel = config.getFloat("zlevel", 0);
+  auto zlevel = config.get_float("zlevel", 0);
   if (!zlevel)
     return std::unexpected(std::move(zlevel.error()));
   return WidgetConstructResult(button, name, *zlevel);
@@ -463,7 +463,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::imageHandler(S
   if (!has2)
     return std::unexpected(std::move(has2.error()));
   if (*has2) {
-    auto value2 = config.getString("file");
+    auto value2 = config.get_string("file");
     if (!value2)
       return std::unexpected(std::move(value2.error()));
     auto result3 = image->setImage(*value2);
@@ -474,7 +474,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::imageHandler(S
   if (!hasDrawables)
     return std::unexpected(std::move(hasDrawables.error()));
   if (*hasDrawables) {
-    auto drawableConfigs = config.getArray("drawables");
+    auto drawableConfigs = config.get_array("drawables");
     if (!drawableConfigs)
       return std::unexpected(std::move(drawableConfigs.error()));
     auto metadata = m_context.root().imageMetadataDatabase();
@@ -495,7 +495,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::imageHandler(S
   if (!has5)
     return std::unexpected(std::move(has5.error()));
   if (*has5) {
-    auto value5 = config.getFloat("scale");
+    auto value5 = config.get_float("scale");
     if (!value5)
       return std::unexpected(std::move(value5.error()));
     auto result6 = image->setScale(*value5);
@@ -506,7 +506,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::imageHandler(S
   if (!has7)
     return std::unexpected(std::move(has7.error()));
   if (*has7) {
-    auto value7 = config.getFloat("rotation");
+    auto value7 = config.get_float("rotation");
     if (!value7)
       return std::unexpected(std::move(value7.error()));
     auto result8 = image->setRotation(*value7);
@@ -517,7 +517,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::imageHandler(S
   if (!has9)
     return std::unexpected(std::move(has9.error()));
   if (*has9) {
-    auto value9 = config.getBool("centered");
+    auto value9 = config.get_bool("centered");
     if (!value9)
       return std::unexpected(std::move(value9.error()));
     auto result10 = image->setCentered(*value9);
@@ -528,7 +528,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::imageHandler(S
   if (!hasTrim)
     return std::unexpected(std::move(hasTrim.error()));
   if (*hasTrim) {
-    auto trim = config.getBool("trim");
+    auto trim = config.get_bool("trim");
     if (!trim)
       return std::unexpected(std::move(trim.error()));
     auto result11 = image->setTrim(*trim);
@@ -546,7 +546,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::imageHandler(S
     auto value13 = config.get("offset");
     if (!value13)
       return std::unexpected(std::move(value13.error()));
-    auto converted13 = jsonToVec2I(*value13);
+    auto converted13 = json_to_vec2i(*value13);
     if (!converted13)
       return std::unexpected(std::move(converted13.error()));
     image->setOffset(*converted13);
@@ -558,7 +558,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::imageHandler(S
     auto value14 = config.get("maxSize");
     if (!value14)
       return std::unexpected(std::move(value14.error()));
-    auto converted14 = jsonToVec2I(*value14);
+    auto converted14 = json_to_vec2i(*value14);
     if (!converted14)
       return std::unexpected(std::move(converted14.error()));
     auto result15 = image->setMaxSize(*converted14);
@@ -572,14 +572,14 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::imageHandler(S
     auto value16 = config.get("minSize");
     if (!value16)
       return std::unexpected(std::move(value16.error()));
-    auto converted16 = jsonToVec2I(*value16);
+    auto converted16 = json_to_vec2i(*value16);
     if (!converted16)
       return std::unexpected(std::move(converted16.error()));
     auto result17 = image->setMinSize(*converted16);
     if (!result17)
       return std::unexpected(std::move(result17.error()));
   }
-  auto zlevel = config.getFloat("zlevel", 0);
+  auto zlevel = config.get_float("zlevel", 0);
   if (!zlevel)
     return std::unexpected(std::move(zlevel.error()));
   return WidgetConstructResult(image, name, *zlevel);
@@ -592,7 +592,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::imageStretchHa
   auto stretchSet = parseImageStretchSet(*stretchConfig);
   if (!stretchSet)
     return std::unexpected(std::move(stretchSet.error()));
-  auto directionName = config.getString("direction", "horizontal");
+  auto directionName = config.get_string("direction", "horizontal");
   if (!directionName)
     return std::unexpected(std::move(directionName.error()));
   if (!GuiDirectionNames)
@@ -607,7 +607,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::imageStretchHa
   auto result1 = common(imageStretch, config);
   if (!result1)
     return std::unexpected(std::move(result1.error()));
-  auto zlevel = config.getFloat("zlevel", 0);
+  auto zlevel = config.get_float("zlevel", 0);
   if (!zlevel)
     return std::unexpected(std::move(zlevel.error()));
   return WidgetConstructResult(imageStretch, name, *zlevel);
@@ -618,7 +618,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::spinnerHandler
   auto result1 = common(container, config);
   if (!result1)
     return std::unexpected(std::move(result1.error()));
-  auto callback = config.getString("callback", name);
+  auto callback = config.get_string("callback", name);
   if (!callback)
     return std::unexpected(std::move(callback.error()));
   auto callbackDown = m_callbacks.find_ref(*callback + ".down");
@@ -636,25 +636,25 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::spinnerHandler
   auto leftBaseConfig = (*assets)->json("/interface.config:spinner.leftBase");
   if (!leftBaseConfig)
     return std::unexpected(std::move(leftBaseConfig.error()));
-  auto leftBase = leftBaseConfig->toString();
+  auto leftBase = leftBaseConfig->to_string();
   if (!leftBase)
     return std::unexpected(std::move(leftBase.error()));
   auto leftHoverConfig = (*assets)->json("/interface.config:spinner.leftHover");
   if (!leftHoverConfig)
     return std::unexpected(std::move(leftHoverConfig.error()));
-  auto leftHover = leftHoverConfig->toString();
+  auto leftHover = leftHoverConfig->to_string();
   if (!leftHover)
     return std::unexpected(std::move(leftHover.error()));
   auto rightBaseConfig = (*assets)->json("/interface.config:spinner.rightBase");
   if (!rightBaseConfig)
     return std::unexpected(std::move(rightBaseConfig.error()));
-  auto rightBase = rightBaseConfig->toString();
+  auto rightBase = rightBaseConfig->to_string();
   if (!rightBase)
     return std::unexpected(std::move(rightBase.error()));
   auto rightHoverConfig = (*assets)->json("/interface.config:spinner.rightHover");
   if (!rightHoverConfig)
     return std::unexpected(std::move(rightHoverConfig.error()));
-  auto rightHover = rightHoverConfig->toString();
+  auto rightHover = rightHoverConfig->to_string();
   if (!rightHover)
     return std::unexpected(std::move(rightHover.error()));
   auto imageSize = (*metadata)->imageSize(*leftBase);
@@ -663,22 +663,22 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::spinnerHandler
   auto paddingConfig = (*assets)->json("/interface.config:spinner.defaultPadding");
   if (!paddingConfig)
     return std::unexpected(std::move(paddingConfig.error()));
-  auto padding = paddingConfig->toInt();
+  auto padding = paddingConfig->to_int();
   if (!padding)
     return std::unexpected(std::move(padding.error()));
-  auto upOffset = config.getFloat("upOffset", static_cast<float>((*imageSize)[0]) + *padding);
+  auto upOffset = config.get_float("upOffset", static_cast<float>((*imageSize)[0]) + *padding);
   if (!upOffset)
     return std::unexpected(std::move(upOffset.error()));
-  auto leftBaseImage = config.getString("leftBase", *leftBase);
+  auto leftBaseImage = config.get_string("leftBase", *leftBase);
   if (!leftBaseImage)
     return std::unexpected(std::move(leftBaseImage.error()));
-  auto leftHoverImage = config.getString("leftHover", *leftHover);
+  auto leftHoverImage = config.get_string("leftHover", *leftHover);
   if (!leftHoverImage)
     return std::unexpected(std::move(leftHoverImage.error()));
-  auto rightBaseImage = config.getString("rightBase", *rightBase);
+  auto rightBaseImage = config.get_string("rightBase", *rightBase);
   if (!rightBaseImage)
     return std::unexpected(std::move(rightBaseImage.error()));
-  auto rightHoverImage = config.getString("rightHover", *rightHover);
+  auto rightHoverImage = config.get_string("rightHover", *rightHover);
   if (!rightHoverImage)
     return std::unexpected(std::move(rightHoverImage.error()));
   auto downResult = ButtonWidget::create(m_context, callbackDown->get(), *leftBaseImage, *leftHoverImage);
@@ -699,7 +699,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::spinnerHandler
   container->disableScissoring();
   container->markAsContainer();
   container->determineSizeFromChildren();
-  auto zlevel = config.getFloat("zlevel", 0);
+  auto zlevel = config.get_float("zlevel", 0);
   if (!zlevel)
     return std::unexpected(std::move(zlevel.error()));
   return WidgetConstructResult(container, name, *zlevel);
@@ -712,48 +712,48 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::radioGroupHand
     return std::unexpected(std::move(result1.error()));
   buttonGroup->markAsContainer();
   buttonGroup->disableScissoring();
-  auto toggle = config.getBool("toggleMode", false);
+  auto toggle = config.get_bool("toggleMode", false);
   if (!toggle)
     return std::unexpected(std::move(toggle.error()));
   buttonGroup->setToggle(*toggle);
-  auto callback = config.getString("callback", name);
+  auto callback = config.get_string("callback", name);
   if (!callback)
     return std::unexpected(std::move(callback.error()));
   auto callbackFunc = m_callbacks.find_ref(*callback);
   if (!callbackFunc || !callbackFunc->get())
     return std::unexpected(WidgetParserException::format("Failed to find callback named: {}", *callback));
-  auto buttons = config.getArray("buttons");
+  auto buttons = config.get_array("buttons");
   if (!buttons)
     return std::unexpected(std::move(buttons.error()));
-  auto baseImage = config.getString("baseImage", "");
+  auto baseImage = config.get_string("baseImage", "");
   if (!baseImage)
     return std::unexpected(std::move(baseImage.error()));
-  auto hoverImage = config.getString("hoverImage", "");
+  auto hoverImage = config.get_string("hoverImage", "");
   if (!hoverImage)
     return std::unexpected(std::move(hoverImage.error()));
-  auto baseImageChecked = config.getString("baseImageChecked", "");
+  auto baseImageChecked = config.get_string("baseImageChecked", "");
   if (!baseImageChecked)
     return std::unexpected(std::move(baseImageChecked.error()));
-  auto hoverImageChecked = config.getString("hoverImageChecked", "");
+  auto hoverImageChecked = config.get_string("hoverImageChecked", "");
   if (!hoverImageChecked)
     return std::unexpected(std::move(hoverImageChecked.error()));
-  auto pressedImage = config.getString("pressedImage", "");
+  auto pressedImage = config.get_string("pressedImage", "");
   if (!pressedImage)
     return std::unexpected(std::move(pressedImage.error()));
-  auto disabledImage = config.getString("disabledImage", "");
+  auto disabledImage = config.get_string("disabledImage", "");
   if (!disabledImage)
     return std::unexpected(std::move(disabledImage.error()));
-  auto pressedImageChecked = config.getString("pressedImageChecked", "");
+  auto pressedImageChecked = config.get_string("pressedImageChecked", "");
   if (!pressedImageChecked)
     return std::unexpected(std::move(pressedImageChecked.error()));
-  auto disabledImageChecked = config.getString("disabledImageChecked", "");
+  auto disabledImageChecked = config.get_string("disabledImageChecked", "");
   if (!disabledImageChecked)
     return std::unexpected(std::move(disabledImageChecked.error()));
   for (auto const& btnConfig : *buttons) {
-    auto overlayImage = btnConfig.getString("image", "");
+    auto overlayImage = btnConfig.get_string("image", "");
     if (!overlayImage)
       return std::unexpected(std::move(overlayImage.error()));
-    auto id = btnConfig.getInt("id", ButtonGroup::NoButton);
+    auto id = btnConfig.get_int("id", ButtonGroup::NoButton);
     if (!id)
       return std::unexpected(std::move(id.error()));
     auto buttonResult = ButtonWidget::create(m_context);
@@ -761,28 +761,28 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::radioGroupHand
       return std::unexpected(std::move(buttonResult.error()));
     auto button = std::move(*buttonResult);
     button->setButtonGroup(buttonGroup, *id);
-    auto buttonbaseImage = btnConfig.getString("baseImage", *baseImage);
+    auto buttonbaseImage = btnConfig.get_string("baseImage", *baseImage);
     if (!buttonbaseImage)
       return std::unexpected(std::move(buttonbaseImage.error()));
-    auto buttonhoverImage = btnConfig.getString("hoverImage", *hoverImage);
+    auto buttonhoverImage = btnConfig.get_string("hoverImage", *hoverImage);
     if (!buttonhoverImage)
       return std::unexpected(std::move(buttonhoverImage.error()));
-    auto buttonpressedImage = btnConfig.getString("pressedImage", *pressedImage);
+    auto buttonpressedImage = btnConfig.get_string("pressedImage", *pressedImage);
     if (!buttonpressedImage)
       return std::unexpected(std::move(buttonpressedImage.error()));
-    auto buttondisabledImage = btnConfig.getString("disabledImage", *disabledImage);
+    auto buttondisabledImage = btnConfig.get_string("disabledImage", *disabledImage);
     if (!buttondisabledImage)
       return std::unexpected(std::move(buttondisabledImage.error()));
-    auto buttonbaseImageChecked = btnConfig.getString("baseImageChecked", *baseImageChecked);
+    auto buttonbaseImageChecked = btnConfig.get_string("baseImageChecked", *baseImageChecked);
     if (!buttonbaseImageChecked)
       return std::unexpected(std::move(buttonbaseImageChecked.error()));
-    auto buttonhoverImageChecked = btnConfig.getString("hoverImageChecked", *hoverImageChecked);
+    auto buttonhoverImageChecked = btnConfig.get_string("hoverImageChecked", *hoverImageChecked);
     if (!buttonhoverImageChecked)
       return std::unexpected(std::move(buttonhoverImageChecked.error()));
-    auto buttonpressedImageChecked = btnConfig.getString("pressedImageChecked", *pressedImageChecked);
+    auto buttonpressedImageChecked = btnConfig.get_string("pressedImageChecked", *pressedImageChecked);
     if (!buttonpressedImageChecked)
       return std::unexpected(std::move(buttonpressedImageChecked.error()));
-    auto buttondisabledImageChecked = btnConfig.getString("hoverImageChecked", *disabledImageChecked);
+    auto buttondisabledImageChecked = btnConfig.get_string("hoverImageChecked", *disabledImageChecked);
     if (!buttondisabledImageChecked)
       return std::unexpected(std::move(buttondisabledImageChecked.error()));
     auto result2 = button->setImages(*buttonbaseImage, *buttonhoverImage, *buttonpressedImage, *buttondisabledImage);
@@ -792,12 +792,12 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::radioGroupHand
     if (!result3)
       return std::unexpected(std::move(result3.error()));
     button->setOverlayImage(*overlayImage);
-    auto disabled = btnConfig.getBool("disabled", false);
+    auto disabled = btnConfig.get_bool("disabled", false);
     if (!disabled)
       return std::unexpected(std::move(disabled.error()));
     if (*disabled)
       button->disable();
-    auto selected = btnConfig.getBool("selected", false);
+    auto selected = btnConfig.get_bool("selected", false);
     if (!selected)
       return std::unexpected(std::move(selected.error()));
     if (*selected) {
@@ -809,7 +809,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::radioGroupHand
     if (!has5)
       return std::unexpected(std::move(has5.error()));
     if (*has5) {
-      auto value5 = btnConfig.getInt("fontSize");
+      auto value5 = btnConfig.get_int("fontSize");
       if (!value5)
         return std::unexpected(std::move(value5.error()));
       button->setFontSize(*value5);
@@ -821,7 +821,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::radioGroupHand
       auto value6 = btnConfig.get("fontColor");
       if (!value6)
         return std::unexpected(std::move(value6.error()));
-      auto converted6 = jsonToColor(*value6);
+      auto converted6 = json_to_color(*value6);
       if (!converted6)
         return std::unexpected(std::move(converted6.error()));
       button->setFontColor(*converted6);
@@ -833,7 +833,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::radioGroupHand
       auto value7 = btnConfig.get("fontColorChecked");
       if (!value7)
         return std::unexpected(std::move(value7.error()));
-      auto converted7 = jsonToColor(*value7);
+      auto converted7 = json_to_color(*value7);
       if (!converted7)
         return std::unexpected(std::move(converted7.error()));
       button->setFontColorChecked(*converted7);
@@ -845,7 +845,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::radioGroupHand
       auto value8 = btnConfig.get("fontColorDisabled");
       if (!value8)
         return std::unexpected(std::move(value8.error()));
-      auto converted8 = jsonToColor(*value8);
+      auto converted8 = json_to_color(*value8);
       if (!converted8)
         return std::unexpected(std::move(converted8.error()));
       button->setFontColorDisabled(*converted8);
@@ -854,7 +854,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::radioGroupHand
     if (!has9)
       return std::unexpected(std::move(has9.error()));
     if (*has9) {
-      auto value9 = btnConfig.getString("text");
+      auto value9 = btnConfig.get_string("text");
       if (!value9)
         return std::unexpected(std::move(value9.error()));
       button->setText(*value9);
@@ -866,7 +866,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::radioGroupHand
       auto value10 = btnConfig.get("pressedOffset");
       if (!value10)
         return std::unexpected(std::move(value10.error()));
-      auto converted10 = jsonToVec2I(*value10);
+      auto converted10 = json_to_vec2i(*value10);
       if (!converted10)
         return std::unexpected(std::move(converted10.error()));
       button->setPressedOffset(*converted10);
@@ -880,7 +880,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::radioGroupHand
   }
   // Install only after loading every button to avoid callbacks during parsing.
   buttonGroup->setCallback(callbackFunc->get());
-  auto zlevel = config.getFloat("zlevel", 0);
+  auto zlevel = config.get_float("zlevel", 0);
   if (!zlevel)
     return std::unexpected(std::move(zlevel.error()));
   return WidgetConstructResult(buttonGroup, name, *zlevel);
@@ -895,7 +895,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::portraitHandle
   if (!hasMode)
     return std::unexpected(std::move(hasMode.error()));
   if (*hasMode) {
-    auto modeName = config.getString("portraitMode");
+    auto modeName = config.get_string("portraitMode");
     if (!modeName)
       return std::unexpected(std::move(modeName.error()));
     auto mode = enum_value<PortraitModeNames>(*modeName);
@@ -909,12 +909,12 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::portraitHandle
   if (!has1)
     return std::unexpected(std::move(has1.error()));
   if (*has1) {
-    auto value1 = config.getBool("renderHumanoid");
+    auto value1 = config.get_bool("renderHumanoid");
     if (!value1)
       return std::unexpected(std::move(value1.error()));
     portrait->setRenderHumanoid(*value1);
   }
-  auto scale = config.getFloat("scale", 1);
+  auto scale = config.get_float("scale", 1);
   if (!scale)
     return std::unexpected(std::move(scale.error()));
   auto changedScale = portrait->setScale(*scale);
@@ -923,23 +923,23 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::portraitHandle
   auto result2 = common(portrait, config);
   if (!result2)
     return std::unexpected(std::move(result2.error()));
-  auto zlevel = config.getFloat("zlevel", 0);
+  auto zlevel = config.get_float("zlevel", 0);
   if (!zlevel)
     return std::unexpected(std::move(zlevel.error()));
   return WidgetConstructResult(portrait, name, *zlevel);
 }
 
 std::expected<WidgetConstructResult, StarException> WidgetParser::textboxHandler(String const& name, Json const& config) {
-  auto callback = config.getString("callback", name);
+  auto callback = config.get_string("callback", name);
   if (!callback)
     return std::unexpected(std::move(callback.error()));
   auto callbackFunc = m_callbacks.find_ref(*callback);
   if (!callbackFunc || !callbackFunc->get())
     return std::unexpected(WidgetParserException::format("Failed to find callback named: {}", *callback));
-  auto initialText = config.getString("value", "");
+  auto initialText = config.get_string("value", "");
   if (!initialText)
     return std::unexpected(std::move(initialText.error()));
-  auto hintText = config.getString("hint", "");
+  auto hintText = config.get_string("hint", "");
   if (!hintText)
     return std::unexpected(std::move(hintText.error()));
   auto textboxResult = TextBoxWidget::create(m_context, *initialText, *hintText, callbackFunc->get());
@@ -950,7 +950,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::textboxHandler
   if (!hasblur)
     return std::unexpected(std::move(hasblur.error()));
   if (*hasblur) {
-    auto blurCallback = config.getString("blur");
+    auto blurCallback = config.get_string("blur");
     if (!blurCallback)
       return std::unexpected(std::move(blurCallback.error()));
     auto blurCallbackFunc = m_callbacks.find_ref(*blurCallback);
@@ -962,7 +962,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::textboxHandler
   if (!hasenterKey)
     return std::unexpected(std::move(hasenterKey.error()));
   if (*hasenterKey) {
-    auto enterKeyCallback = config.getString("enterKey");
+    auto enterKeyCallback = config.get_string("enterKey");
     if (!enterKeyCallback)
       return std::unexpected(std::move(enterKeyCallback.error()));
     auto enterKeyCallbackFunc = m_callbacks.find_ref(*enterKeyCallback);
@@ -974,7 +974,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::textboxHandler
   if (!hasescapeKey)
     return std::unexpected(std::move(hasescapeKey.error()));
   if (*hasescapeKey) {
-    auto escapeKeyCallback = config.getString("escapeKey");
+    auto escapeKeyCallback = config.get_string("escapeKey");
     if (!escapeKeyCallback)
       return std::unexpected(std::move(escapeKeyCallback.error()));
     auto escapeKeyCallbackFunc = m_callbacks.find_ref(*escapeKeyCallback);
@@ -986,7 +986,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::textboxHandler
   if (!has1)
     return std::unexpected(std::move(has1.error()));
   if (*has1) {
-    auto value1 = config.getString("nextFocus");
+    auto value1 = config.get_string("nextFocus");
     if (!value1)
       return std::unexpected(std::move(value1.error()));
     textbox->setNextFocus(*value1);
@@ -995,12 +995,12 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::textboxHandler
   if (!has2)
     return std::unexpected(std::move(has2.error()));
   if (*has2) {
-    auto value2 = config.getString("prevFocus");
+    auto value2 = config.get_string("prevFocus");
     if (!value2)
       return std::unexpected(std::move(value2.error()));
     textbox->setPrevFocus(*value2);
   }
-  auto hAnchor = config.getString("textAlign", "left");
+  auto hAnchor = config.get_string("textAlign", "left");
   if (!hAnchor)
     return std::unexpected(std::move(hAnchor.error()));
   if (*hAnchor == "right")
@@ -1013,7 +1013,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::textboxHandler
   if (!has3)
     return std::unexpected(std::move(has3.error()));
   if (*has3) {
-    auto value3 = config.getInt("fontSize");
+    auto value3 = config.get_int("fontSize");
     if (!value3)
       return std::unexpected(std::move(value3.error()));
     textbox->setFontSize(*value3);
@@ -1025,7 +1025,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::textboxHandler
     auto value4 = config.get("color");
     if (!value4)
       return std::unexpected(std::move(value4.error()));
-    auto converted4 = jsonToColor(*value4);
+    auto converted4 = json_to_color(*value4);
     if (!converted4)
       return std::unexpected(std::move(converted4.error()));
     textbox->setColor(*converted4);
@@ -1034,7 +1034,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::textboxHandler
   if (!has5)
     return std::unexpected(std::move(has5.error()));
   if (*has5) {
-    auto value5 = config.getString("directives");
+    auto value5 = config.get_string("directives");
     if (!value5)
       return std::unexpected(std::move(value5.error()));
     textbox->setDirectives(*value5);
@@ -1043,7 +1043,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::textboxHandler
   if (!has6)
     return std::unexpected(std::move(has6.error()));
   if (*has6) {
-    auto value6 = config.getString("font");
+    auto value6 = config.get_string("font");
     if (!value6)
       return std::unexpected(std::move(value6.error()));
     textbox->setFont(*value6);
@@ -1052,7 +1052,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::textboxHandler
   if (!has7)
     return std::unexpected(std::move(has7.error()));
   if (*has7) {
-    auto value7 = config.getBool("border");
+    auto value7 = config.get_bool("border");
     if (!value7)
       return std::unexpected(std::move(value7.error()));
     textbox->setDrawBorder(*value7);
@@ -1061,7 +1061,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::textboxHandler
   if (!has8)
     return std::unexpected(std::move(has8.error()));
   if (*has8) {
-    auto value8 = config.getInt("maxWidth");
+    auto value8 = config.get_int("maxWidth");
     if (!value8)
       return std::unexpected(std::move(value8.error()));
     textbox->setMaxWidth(*value8);
@@ -1070,7 +1070,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::textboxHandler
   if (!has9)
     return std::unexpected(std::move(has9.error()));
   if (*has9) {
-    auto value9 = config.getString("regex");
+    auto value9 = config.get_string("regex");
     if (!value9)
       return std::unexpected(std::move(value9.error()));
     textbox->setRegex(*value9);
@@ -1079,7 +1079,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::textboxHandler
   if (!has10)
     return std::unexpected(std::move(has10.error()));
   if (*has10) {
-    auto value10 = config.getBool("hidden");
+    auto value10 = config.get_bool("hidden");
     if (!value10)
       return std::unexpected(std::move(value10.error()));
     textbox->setHidden(*value10);
@@ -1087,14 +1087,14 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::textboxHandler
   auto result11 = common(textbox, config);
   if (!result11)
     return std::unexpected(std::move(result11.error()));
-  auto zlevel = config.getFloat("zlevel", 0);
+  auto zlevel = config.get_float("zlevel", 0);
   if (!zlevel)
     return std::unexpected(std::move(zlevel.error()));
   return WidgetConstructResult(textbox, name, *zlevel);
 }
 
 std::expected<WidgetConstructResult, StarException> WidgetParser::labelHandler(String const& name, Json const& config) {
-  auto text = config.getString("value", "");
+  auto text = config.get_string("value", "");
   if (!text)
     return std::unexpected(std::move(text.error()));
   Color color = Color::White;
@@ -1105,15 +1105,15 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::labelHandler(S
     auto value1 = config.get("color");
     if (!value1)
       return std::unexpected(std::move(value1.error()));
-    auto converted1 = jsonToColor(*value1);
+    auto converted1 = json_to_color(*value1);
     if (!converted1)
       return std::unexpected(std::move(converted1.error()));
     color = *converted1;
   }
-  auto horizontal = config.getString("hAnchor", "left");
+  auto horizontal = config.get_string("hAnchor", "left");
   if (!horizontal)
     return std::unexpected(std::move(horizontal.error()));
-  auto vertical = config.getString("vAnchor", "bottom");
+  auto vertical = config.get_string("vAnchor", "bottom");
   if (!vertical)
     return std::unexpected(std::move(vertical.error()));
   if (!HorizontalAnchorNames)
@@ -1137,7 +1137,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::labelHandler(S
   if (!has3)
     return std::unexpected(std::move(has3.error()));
   if (*has3) {
-    auto value3 = config.getInt("fontSize");
+    auto value3 = config.get_int("fontSize");
     if (!value3)
       return std::unexpected(std::move(value3.error()));
     auto result4 = label->setFontSize(*value3);
@@ -1148,7 +1148,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::labelHandler(S
   if (!has5)
     return std::unexpected(std::move(has5.error()));
   if (*has5) {
-    auto value5 = config.getInt("wrapWidth");
+    auto value5 = config.get_int("wrapWidth");
     if (!value5)
       return std::unexpected(std::move(value5.error()));
     auto result6 = label->setWrapWidth(*value5);
@@ -1159,7 +1159,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::labelHandler(S
   if (!has7)
     return std::unexpected(std::move(has7.error()));
   if (*has7) {
-    auto value7 = config.getInt("charLimit");
+    auto value7 = config.get_int("charLimit");
     if (!value7)
       return std::unexpected(std::move(value7.error()));
     auto result8 = label->setTextCharLimit(*value7);
@@ -1170,7 +1170,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::labelHandler(S
   if (!has9)
     return std::unexpected(std::move(has9.error()));
   if (*has9) {
-    auto value9 = config.getFloat("lineSpacing");
+    auto value9 = config.get_float("lineSpacing");
     if (!value9)
       return std::unexpected(std::move(value9.error()));
     auto result10 = label->setLineSpacing(*value9);
@@ -1181,7 +1181,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::labelHandler(S
   if (!has11)
     return std::unexpected(std::move(has11.error()));
   if (*has11) {
-    auto value11 = config.getString("directives");
+    auto value11 = config.get_string("directives");
     if (!value11)
       return std::unexpected(std::move(value11.error()));
     auto result12 = label->setDirectives(*value11);
@@ -1192,24 +1192,24 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::labelHandler(S
   if (!has13)
     return std::unexpected(std::move(has13.error()));
   if (*has13) {
-    auto value13 = config.getString("font");
+    auto value13 = config.get_string("font");
     if (!value13)
       return std::unexpected(std::move(value13.error()));
     auto result14 = label->setFont(*value13);
     if (!result14)
       return std::unexpected(std::move(result14.error()));
   }
-  auto zlevel = config.getFloat("zlevel", 0);
+  auto zlevel = config.get_float("zlevel", 0);
   if (!zlevel)
     return std::unexpected(std::move(zlevel.error()));
   return WidgetConstructResult(label, name, *zlevel);
 }
 
 std::expected<WidgetConstructResult, StarException> WidgetParser::itemSlotHandler(String const& name, Json const& config) {
-  auto backingImage = config.getString("backingImage", "");
+  auto backingImage = config.get_string("backingImage", "");
   if (!backingImage)
     return std::unexpected(std::move(backingImage.error()));
-  auto callback = config.getString("callback", name);
+  auto callback = config.get_string("callback", name);
   if (!callback)
     return std::unexpected(std::move(callback.error()));
   auto nullCallback = callback->equals("null");
@@ -1217,10 +1217,10 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::itemSlotHandle
     return std::unexpected(std::move(nullCallback.error()));
   String rightDefault = *nullCallback ? *callback : *callback + ".right";
   String middleDefault = *nullCallback ? *callback : *callback + ".middle";
-  auto rightClickCallback = config.getString("rightClickCallback", rightDefault);
+  auto rightClickCallback = config.get_string("rightClickCallback", rightDefault);
   if (!rightClickCallback)
     return std::unexpected(std::move(rightClickCallback.error()));
-  auto middleClickCallback = config.getString("middleClickCallback", middleDefault);
+  auto middleClickCallback = config.get_string("middleClickCallback", middleDefault);
   if (!middleClickCallback)
     return std::unexpected(std::move(middleClickCallback.error()));
   auto itemSlotResult = ItemSlotWidget::create(m_context, std::shared_ptr<Item>(), *backingImage);
@@ -1240,29 +1240,29 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::itemSlotHandle
       return std::unexpected(WidgetParserException::format("Empty itemSlot middleClickCallback named: '{}'", *middleClickCallback));
     itemSlot->setMiddleClickCallback(middleCallback->get());
   }
-  auto showFull = config.getBool("showBackingImageWhenFull", false);
+  auto showFull = config.get_bool("showBackingImageWhenFull", false);
   if (!showFull)
     return std::unexpected(std::move(showFull.error()));
-  auto showEmpty = config.getBool("showBackingImageWhenEmpty", true);
+  auto showEmpty = config.get_bool("showBackingImageWhenEmpty", true);
   if (!showEmpty)
     return std::unexpected(std::move(showEmpty.error()));
   itemSlot->setBackingImageAffinity(*showFull, *showEmpty);
-  auto showDurability = config.getBool("showDurability", false);
+  auto showDurability = config.get_bool("showDurability", false);
   if (!showDurability)
     return std::unexpected(std::move(showDurability.error()));
   itemSlot->showDurability(*showDurability);
-  auto showCount = config.getBool("showCount", true);
+  auto showCount = config.get_bool("showCount", true);
   if (!showCount)
     return std::unexpected(std::move(showCount.error()));
   itemSlot->showCount(*showCount);
-  auto showRarity = config.getBool("showRarity", true);
+  auto showRarity = config.get_bool("showRarity", true);
   if (!showRarity)
     return std::unexpected(std::move(showRarity.error()));
   itemSlot->showRarity(*showRarity);
   auto result1 = common(itemSlot, config);
   if (!result1)
     return std::unexpected(std::move(result1.error()));
-  auto zlevel = config.getFloat("zlevel", 0);
+  auto zlevel = config.get_float("zlevel", 0);
   if (!zlevel)
     return std::unexpected(std::move(zlevel.error()));
   return WidgetConstructResult(itemSlot, name, *zlevel);
@@ -1272,7 +1272,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::itemGridHandle
   auto dimensionsConfig = config.get("dimensions");
   if (!dimensionsConfig)
     return std::unexpected(std::move(dimensionsConfig.error()));
-  auto dimensions = jsonToVec2I(*dimensionsConfig);
+  auto dimensions = json_to_vec2i(*dimensionsConfig);
   if (!dimensions)
     return std::unexpected(std::move(dimensions.error()));
   Vec2I rowSpacing;
@@ -1284,7 +1284,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::itemGridHandle
     auto spacingConfig = config.get("spacing");
     if (!spacingConfig)
       return std::unexpected(std::move(spacingConfig.error()));
-    auto spacing = jsonToVec2I(*spacingConfig);
+    auto spacing = json_to_vec2i(*spacingConfig);
     if (!spacing)
       return std::unexpected(std::move(spacing.error()));
     rowSpacing = {(*spacing)[0], 0};
@@ -1296,16 +1296,16 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::itemGridHandle
     auto columnConfig = config.get("columnSpacing");
     if (!columnConfig)
       return std::unexpected(std::move(columnConfig.error()));
-    auto row = jsonToVec2I(*rowConfig);
+    auto row = json_to_vec2i(*rowConfig);
     if (!row)
       return std::unexpected(std::move(row.error()));
-    auto column = jsonToVec2I(*columnConfig);
+    auto column = json_to_vec2i(*columnConfig);
     if (!column)
       return std::unexpected(std::move(column.error()));
     rowSpacing = *row;
     columnSpacing = *column;
   }
-  auto callback = config.getString("callback", name);
+  auto callback = config.get_string("callback", name);
   if (!callback)
     return std::unexpected(std::move(callback.error()));
   auto nullCallback = callback->equals("null");
@@ -1313,32 +1313,32 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::itemGridHandle
     return std::unexpected(std::move(nullCallback.error()));
   String rightDefault = *nullCallback ? *callback : *callback + ".right";
   String middleDefault = *nullCallback ? *callback : *callback + ".middle";
-  auto rightClickCallback = config.getString("rightClickCallback", rightDefault);
+  auto rightClickCallback = config.get_string("rightClickCallback", rightDefault);
   if (!rightClickCallback)
     return std::unexpected(std::move(rightClickCallback.error()));
-  auto middleClickCallback = config.getString("middleClickCallback", middleDefault);
+  auto middleClickCallback = config.get_string("middleClickCallback", middleDefault);
   if (!middleClickCallback)
     return std::unexpected(std::move(middleClickCallback.error()));
-  auto slotOffset = config.getInt("slotOffset", 0);
+  auto slotOffset = config.get_int("slotOffset", 0);
   if (!slotOffset)
     return std::unexpected(std::move(slotOffset.error()));
-  auto backingImage = config.getString("backingImage", "");
+  auto backingImage = config.get_string("backingImage", "");
   if (!backingImage)
     return std::unexpected(std::move(backingImage.error()));
   auto itemGridResult = ItemGridWidget::create(m_context, std::shared_ptr<ItemBag const>(), *dimensions, rowSpacing, columnSpacing, *backingImage, *slotOffset);
   if (!itemGridResult)
     return std::unexpected(std::move(itemGridResult.error()));
   auto itemGrid = std::move(*itemGridResult);
-  auto showFull = config.getBool("showBackingImageWhenFull", false);
+  auto showFull = config.get_bool("showBackingImageWhenFull", false);
   if (!showFull)
     return std::unexpected(std::move(showFull.error()));
-  auto showEmpty = config.getBool("showBackingImageWhenEmpty", true);
+  auto showEmpty = config.get_bool("showBackingImageWhenEmpty", true);
   if (!showEmpty)
     return std::unexpected(std::move(showEmpty.error()));
   auto backingAffinity = itemGrid->setBackingImageAffinity(*showFull, *showEmpty);
   if (!backingAffinity)
     return std::unexpected(std::move(backingAffinity.error()));
-  auto durability = config.getBool("showDurability", false);
+  auto durability = config.get_bool("showDurability", false);
   if (!durability)
     return std::unexpected(std::move(durability.error()));
   auto showDurability = itemGrid->showDurability(*durability);
@@ -1360,7 +1360,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::itemGridHandle
   auto result1 = common(itemGrid, config);
   if (!result1)
     return std::unexpected(std::move(result1.error()));
-  auto zlevel = config.getFloat("zlevel", 0);
+  auto zlevel = config.get_float("zlevel", 0);
   if (!zlevel)
     return std::unexpected(std::move(zlevel.error()));
   return WidgetConstructResult(itemGrid, name, *zlevel);
@@ -1377,33 +1377,33 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::listHandler(St
   auto result1 = common(list, config);
   if (!result1)
     return std::unexpected(std::move(result1.error()));
-  auto callback = config.getString("callback", name);
+  auto callback = config.get_string("callback", name);
   if (!callback)
     return std::unexpected(std::move(callback.error()));
   auto callbackFunc = m_callbacks.find_ref(*callback);
   if (callbackFunc && callbackFunc->get())
     list->setCallback(callbackFunc->get());
-  auto fillDown = config.getBool("fillDown", false);
+  auto fillDown = config.get_bool("fillDown", false);
   if (!fillDown)
     return std::unexpected(std::move(fillDown.error()));
   list->setFillDown(*fillDown);
-  auto columns = config.getUInt("columns", 1);
+  auto columns = config.get_uint("columns", 1);
   if (!columns)
     return std::unexpected(std::move(columns.error()));
   auto result2 = list->setColumns(*columns);
   if (!result2)
     return std::unexpected(std::move(result2.error()));
-  auto zlevel = config.getFloat("zlevel", 0);
+  auto zlevel = config.get_float("zlevel", 0);
   if (!zlevel)
     return std::unexpected(std::move(zlevel.error()));
   return WidgetConstructResult(list, name, *zlevel);
 }
 
 std::expected<WidgetConstructResult, StarException> WidgetParser::sliderHandler(String const& name, Json const& config) {
-  auto grid = config.getString("gridImage");
+  auto grid = config.get_string("gridImage");
   if (!grid)
     return std::unexpected(std::move(grid.error()));
-  auto showSpinner = config.getBool("showSpinner", true);
+  auto showSpinner = config.get_bool("showSpinner", true);
   if (!showSpinner)
     return std::unexpected(std::move(showSpinner.error()));
   auto sliderResult = SliderBarWidget::create(m_context, *grid, *showSpinner);
@@ -1413,7 +1413,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::sliderHandler(
   auto result1 = common(slider, config);
   if (!result1)
     return std::unexpected(std::move(result1.error()));
-  auto callback = config.getString("callback", name);
+  auto callback = config.get_string("callback", name);
   if (!callback)
     return std::unexpected(std::move(callback.error()));
   auto callbackFunc = m_callbacks.find_ref(*callback);
@@ -1426,13 +1426,13 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::sliderHandler(
     auto range = config.get("range");
     if (!range)
       return std::unexpected(std::move(range.error()));
-    auto range0 = range->getInt(0);
+    auto range0 = range->get_int(0);
     if (!range0)
       return std::unexpected(std::move(range0.error()));
-    auto range1 = range->getInt(1);
+    auto range1 = range->get_int(1);
     if (!range1)
       return std::unexpected(std::move(range1.error()));
-    auto range2 = range->getInt(2);
+    auto range2 = range->get_int(2);
     if (!range2)
       return std::unexpected(std::move(range2.error()));
     auto result2 = slider->setRange(*range0, *range1, *range2);
@@ -1446,16 +1446,16 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::sliderHandler(
     auto jogConfig = config.get("jogImages");
     if (!jogConfig)
       return std::unexpected(std::move(jogConfig.error()));
-    auto baseImage = (*jogConfig).getString("baseImage");
+    auto baseImage = (*jogConfig).get_string("baseImage");
     if (!baseImage)
       return std::unexpected(std::move(baseImage.error()));
-    auto hoverImage = (*jogConfig).getString("hoverImage", "");
+    auto hoverImage = (*jogConfig).get_string("hoverImage", "");
     if (!hoverImage)
       return std::unexpected(std::move(hoverImage.error()));
-    auto pressedImage = (*jogConfig).getString("pressedImage", "");
+    auto pressedImage = (*jogConfig).get_string("pressedImage", "");
     if (!pressedImage)
       return std::unexpected(std::move(pressedImage.error()));
-    auto disabledImage = (*jogConfig).getString("disabledImage", "");
+    auto disabledImage = (*jogConfig).get_string("disabledImage", "");
     if (!disabledImage)
       return std::unexpected(std::move(disabledImage.error()));
     auto result3 = slider->setJogImages(*baseImage, *hoverImage, *pressedImage, *disabledImage);
@@ -1466,19 +1466,19 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::sliderHandler(
   if (!has4)
     return std::unexpected(std::move(has4.error()));
   if (*has4) {
-    auto value4 = config.getBool("disabled");
+    auto value4 = config.get_bool("disabled");
     if (!value4)
       return std::unexpected(std::move(value4.error()));
     slider->setEnabled(!*value4);
   }
-  auto zlevel = config.getFloat("zlevel", 0);
+  auto zlevel = config.get_float("zlevel", 0);
   if (!zlevel)
     return std::unexpected(std::move(zlevel.error()));
   return WidgetConstructResult(slider, name, *zlevel);
 }
 
 std::expected<WidgetConstructResult, StarException> WidgetParser::largeCharPlateHandler(String const& name, Json const& config) {
-  auto callback = config.getString("callback", name);
+  auto callback = config.get_string("callback", name);
   if (!callback)
     return std::unexpected(std::move(callback.error()));
   auto callbackFunc = m_callbacks.find_ref(*callback);
@@ -1491,7 +1491,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::largeCharPlate
   auto result1 = common(charPlate, config);
   if (!result1)
     return std::unexpected(std::move(result1.error()));
-  auto zlevel = config.getFloat("zlevel", 0);
+  auto zlevel = config.get_float("zlevel", 0);
   if (!zlevel)
     return std::unexpected(std::move(zlevel.error()));
   return WidgetConstructResult(charPlate, name, *zlevel);
@@ -1499,27 +1499,27 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::largeCharPlate
 
 std::expected<WidgetConstructResult, StarException> WidgetParser::tabSetHandler(String const& name, Json const& config) {
   TabSetConfig tabSetConfig;
-  auto tabButtonBaseImage = config.getString("tabButtonBaseImage");
+  auto tabButtonBaseImage = config.get_string("tabButtonBaseImage");
   if (!tabButtonBaseImage)
     return std::unexpected(std::move(tabButtonBaseImage.error()));
   tabSetConfig.tabButtonBaseImage = std::move(*tabButtonBaseImage);
-  auto tabButtonHoverImage = config.getString("tabButtonHoverImage");
+  auto tabButtonHoverImage = config.get_string("tabButtonHoverImage");
   if (!tabButtonHoverImage)
     return std::unexpected(std::move(tabButtonHoverImage.error()));
   tabSetConfig.tabButtonHoverImage = std::move(*tabButtonHoverImage);
-  auto tabButtonPressedImage = config.getString("tabButtonPressedImage", tabSetConfig.tabButtonHoverImage);
+  auto tabButtonPressedImage = config.get_string("tabButtonPressedImage", tabSetConfig.tabButtonHoverImage);
   if (!tabButtonPressedImage)
     return std::unexpected(std::move(tabButtonPressedImage.error()));
   tabSetConfig.tabButtonPressedImage = std::move(*tabButtonPressedImage);
-  auto tabButtonBaseImageSelected = config.getString("tabButtonBaseImageSelected", tabSetConfig.tabButtonBaseImage);
+  auto tabButtonBaseImageSelected = config.get_string("tabButtonBaseImageSelected", tabSetConfig.tabButtonBaseImage);
   if (!tabButtonBaseImageSelected)
     return std::unexpected(std::move(tabButtonBaseImageSelected.error()));
   tabSetConfig.tabButtonBaseImageSelected = std::move(*tabButtonBaseImageSelected);
-  auto tabButtonHoverImageSelected = config.getString("tabButtonHoverImageSelected", tabSetConfig.tabButtonHoverImage);
+  auto tabButtonHoverImageSelected = config.get_string("tabButtonHoverImageSelected", tabSetConfig.tabButtonHoverImage);
   if (!tabButtonHoverImageSelected)
     return std::unexpected(std::move(tabButtonHoverImageSelected.error()));
   tabSetConfig.tabButtonHoverImageSelected = std::move(*tabButtonHoverImageSelected);
-  auto tabButtonPressedImageSelected = config.getString("tabButtonPressedImageSelected", tabSetConfig.tabButtonHoverImageSelected);
+  auto tabButtonPressedImageSelected = config.get_string("tabButtonPressedImageSelected", tabSetConfig.tabButtonHoverImageSelected);
   if (!tabButtonPressedImageSelected)
     return std::unexpected(std::move(tabButtonPressedImageSelected.error()));
   tabSetConfig.tabButtonPressedImageSelected = std::move(*tabButtonPressedImageSelected);
@@ -1532,7 +1532,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::tabSetHandler(
   auto pressedOffsetConfig = config.get("tabButtonPressedOffset", *defaultPressedOffset);
   if (!pressedOffsetConfig)
     return std::unexpected(std::move(pressedOffsetConfig.error()));
-  auto pressedOffset = jsonToVec2I(*pressedOffsetConfig);
+  auto pressedOffset = json_to_vec2i(*pressedOffsetConfig);
   if (!pressedOffset)
     return std::unexpected(std::move(pressedOffset.error()));
   tabSetConfig.tabButtonPressedOffset = *pressedOffset;
@@ -1540,7 +1540,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::tabSetHandler(
   if (!tabButtonTextOffset)
     return std::unexpected(std::move(tabButtonTextOffset.error()));
   if (*tabButtonTextOffset) {
-    auto tabButtonTextOffsetVector = jsonToVec2I(**tabButtonTextOffset);
+    auto tabButtonTextOffsetVector = json_to_vec2i(**tabButtonTextOffset);
     if (!tabButtonTextOffsetVector)
       return std::unexpected(std::move(tabButtonTextOffsetVector.error()));
     tabSetConfig.tabButtonTextOffset = *tabButtonTextOffsetVector;
@@ -1551,7 +1551,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::tabSetHandler(
   if (!tabButtonSpacing)
     return std::unexpected(std::move(tabButtonSpacing.error()));
   if (*tabButtonSpacing) {
-    auto tabButtonSpacingVector = jsonToVec2I(**tabButtonSpacing);
+    auto tabButtonSpacingVector = json_to_vec2i(**tabButtonSpacing);
     if (!tabButtonSpacingVector)
       return std::unexpected(std::move(tabButtonSpacingVector.error()));
     tabSetConfig.tabButtonSpacing = *tabButtonSpacingVector;
@@ -1565,7 +1565,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::tabSetHandler(
   auto result1 = common(tabSet, config);
   if (!result1)
     return std::unexpected(std::move(result1.error()));
-  auto tabs = config.getArray("tabs");
+  auto tabs = config.get_array("tabs");
   if (!tabs)
     return std::unexpected(std::move(tabs.error()));
   for (auto const& entry : *tabs) {
@@ -1577,17 +1577,17 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::tabSetHandler(
     if (!result2)
       return std::unexpected(std::move(result2.error()));
     widget->determineSizeFromChildren();
-    auto tabName = entry.getString("tabName");
+    auto tabName = entry.get_string("tabName");
     if (!tabName)
       return std::unexpected(std::move(tabName.error()));
-    auto tabTitle = entry.getString("tabTitle");
+    auto tabTitle = entry.get_string("tabTitle");
     if (!tabTitle)
       return std::unexpected(std::move(tabTitle.error()));
     auto result3 = tabSet->addTab(*tabName, widget, *tabTitle);
     if (!result3)
       return std::unexpected(std::move(result3.error()));
   }
-  auto zlevel = config.getFloat("zlevel", 0);
+  auto zlevel = config.get_float("zlevel", 0);
   if (!zlevel)
     return std::unexpected(std::move(zlevel.error()));
   return WidgetConstructResult(tabSet, name, *zlevel);
@@ -1598,7 +1598,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::widgetHandler(
   auto result1 = common(widget, config);
   if (!result1)
     return std::unexpected(std::move(result1.error()));
-  auto zlevel = config.getFloat("zlevel", 0);
+  auto zlevel = config.get_float("zlevel", 0);
   if (!zlevel)
     return std::unexpected(std::move(zlevel.error()));
   return WidgetConstructResult(widget, name, *zlevel);
@@ -1614,7 +1614,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::containerHandl
 }
 
 std::expected<WidgetConstructResult, StarException> WidgetParser::layoutHandler(String const& name, Json const& config) {
-  auto type = config.getString("layoutType");
+  auto type = config.get_string("layoutType");
   if (!type)
     return std::unexpected(std::move(type.error()));
   std::shared_ptr<Widget> widget;
@@ -1623,17 +1623,17 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::layoutHandler(
     auto spacingConfig = config.get("spacing");
     if (!spacingConfig)
       return std::unexpected(std::move(spacingConfig.error()));
-    auto spacing = jsonToVec2I(*spacingConfig);
+    auto spacing = json_to_vec2i(*spacingConfig);
     if (!spacing)
       return std::unexpected(std::move(spacing.error()));
     flow->setSpacing(*spacing);
     widget = std::move(flow);
   } else if (*type == "vertical") {
     auto vert = std::make_shared<VerticalLayout>(m_context);
-    auto hName = config.getString("hAnchor", "left");
+    auto hName = config.get_string("hAnchor", "left");
     if (!hName)
       return std::unexpected(std::move(hName.error()));
-    auto vName = config.getString("vAnchor", "top");
+    auto vName = config.get_string("vAnchor", "top");
     if (!vName)
       return std::unexpected(std::move(vName.error()));
     if (!HorizontalAnchorNames)
@@ -1648,10 +1648,10 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::layoutHandler(
       return std::unexpected(std::move(vAnchor.error()));
     vert->setHorizontalAnchor(hAnchor->get());
     vert->setVerticalAnchor(vAnchor->get());
-    auto spacing = config.getInt("spacing", 0);
+    auto spacing = config.get_int("spacing", 0);
     if (!spacing)
       return std::unexpected(std::move(spacing.error()));
-    auto fillDown = config.getBool("fillDown", false);
+    auto fillDown = config.get_bool("fillDown", false);
     if (!fillDown)
       return std::unexpected(std::move(fillDown.error()));
     vert->setVerticalSpacing(*spacing);
@@ -1668,7 +1668,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::layoutHandler(
   auto result2 = widget->update(0);
   if (!result2)
     return std::unexpected(std::move(result2.error()));
-  auto zlevel = config.getFloat("zlevel", 0);
+  auto zlevel = config.get_float("zlevel", 0);
   if (!zlevel)
     return std::unexpected(std::move(zlevel.error()));
   return WidgetConstructResult(widget, name, *zlevel);
@@ -1679,22 +1679,22 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::canvasHandler(
   if (!canvasResult)
     return std::unexpected(std::move(canvasResult.error()));
   auto canvas = std::move(*canvasResult);
-  auto keyboard = config.getBool("captureKeyboardEvents", false);
+  auto keyboard = config.get_bool("captureKeyboardEvents", false);
   if (!keyboard)
     return std::unexpected(std::move(keyboard.error()));
-  auto mouse = config.getBool("captureMouseEvents", false);
+  auto mouse = config.get_bool("captureMouseEvents", false);
   if (!mouse)
     return std::unexpected(std::move(mouse.error()));
   canvas->setCaptureKeyboardEvents(*keyboard);
   canvas->setCaptureMouseEvents(*mouse);
-  auto ignoreInterfaceScale = config.getBool("ignoreInterfaceScale", false);
+  auto ignoreInterfaceScale = config.get_bool("ignoreInterfaceScale", false);
   if (!ignoreInterfaceScale)
     return std::unexpected(std::move(ignoreInterfaceScale.error()));
   canvas->setIgnoreInterfaceScale(*ignoreInterfaceScale);
   auto result1 = common(canvas, config);
   if (!result1)
     return std::unexpected(std::move(result1.error()));
-  auto zlevel = config.getFloat("zlevel", 0);
+  auto zlevel = config.get_float("zlevel", 0);
   if (!zlevel)
     return std::unexpected(std::move(zlevel.error()));
   return WidgetConstructResult(canvas, name, *zlevel);
@@ -1708,7 +1708,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::fuelGaugeHandl
   auto result1 = common(fuelGauge, config);
   if (!result1)
     return std::unexpected(std::move(result1.error()));
-  auto zlevel = config.getFloat("zlevel", 0);
+  auto zlevel = config.get_float("zlevel", 0);
   if (!zlevel)
     return std::unexpected(std::move(zlevel.error()));
   return WidgetConstructResult(fuelGauge, name, *zlevel);
@@ -1718,13 +1718,13 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::progressHandle
   auto backgroundConfig = config.get("background", "");
   if (!backgroundConfig)
     return std::unexpected(std::move(backgroundConfig.error()));
-  auto background = backgroundConfig->toString();
+  auto background = backgroundConfig->to_string();
   if (!background)
     return std::unexpected(std::move(background.error()));
   auto overlayConfig = config.get("overlay", "");
   if (!overlayConfig)
     return std::unexpected(std::move(overlayConfig.error()));
-  auto overlay = overlayConfig->toString();
+  auto overlay = overlayConfig->to_string();
   if (!overlay)
     return std::unexpected(std::move(overlay.error()));
   auto progressConfig = config.get("progressSet");
@@ -1733,7 +1733,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::progressHandle
   auto progressSet = parseImageStretchSet(*progressConfig);
   if (!progressSet)
     return std::unexpected(std::move(progressSet.error()));
-  auto directionName = config.getString("direction", "horizontal");
+  auto directionName = config.get_string("direction", "horizontal");
   if (!directionName)
     return std::unexpected(std::move(directionName.error()));
   if (!GuiDirectionNames)
@@ -1755,7 +1755,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::progressHandle
     auto value2 = config.get("barColor");
     if (!value2)
       return std::unexpected(std::move(value2.error()));
-    auto converted2 = jsonToColor(*value2);
+    auto converted2 = json_to_color(*value2);
     if (!converted2)
       return std::unexpected(std::move(converted2.error()));
     progress->setColor(*converted2);
@@ -1764,7 +1764,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::progressHandle
   if (!has3)
     return std::unexpected(std::move(has3.error()));
   if (*has3) {
-    auto value3 = config.getFloat("max");
+    auto value3 = config.get_float("max");
     if (!value3)
       return std::unexpected(std::move(value3.error()));
     progress->setMaxProgressLevel(*value3);
@@ -1773,12 +1773,12 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::progressHandle
   if (!has4)
     return std::unexpected(std::move(has4.error()));
   if (*has4) {
-    auto value4 = config.getFloat("initial");
+    auto value4 = config.get_float("initial");
     if (!value4)
       return std::unexpected(std::move(value4.error()));
     progress->setCurrentProgressLevel(*value4);
   }
-  auto zlevel = config.getFloat("zlevel", 0);
+  auto zlevel = config.get_float("zlevel", 0);
   if (!zlevel)
     return std::unexpected(std::move(zlevel.error()));
   return WidgetConstructResult(progress, name, *zlevel);
@@ -1790,7 +1790,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::stackHandler(S
   if (!hasStack)
     return std::unexpected(std::move(hasStack.error()));
   if (*hasStack) {
-    auto stackList = config.getArray("stack");
+    auto stackList = config.get_array("stack");
     if (!stackList)
       return std::unexpected(std::move(stackList.error()));
     for (auto const& widgetCfg : *stackList) {
@@ -1808,7 +1808,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::stackHandler(S
   auto result3 = common(stack, config);
   if (!result3)
     return std::unexpected(std::move(result3.error()));
-  auto zlevel = config.getFloat("zlevel", 0);
+  auto zlevel = config.get_float("zlevel", 0);
   if (!zlevel)
     return std::unexpected(std::move(zlevel.error()));
   return WidgetConstructResult(stack, name, *zlevel);
@@ -1856,7 +1856,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::scrollAreaHand
   if (!has7)
     return std::unexpected(std::move(has7.error()));
   if (*has7) {
-    auto value7 = config.getBool("horizontalScroll");
+    auto value7 = config.get_bool("horizontalScroll");
     if (!value7)
       return std::unexpected(std::move(value7.error()));
     scrollArea->setHorizontalScroll(*value7);
@@ -1865,19 +1865,19 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::scrollAreaHand
   if (!has8)
     return std::unexpected(std::move(has8.error()));
   if (*has8) {
-    auto value8 = config.getBool("verticalScroll");
+    auto value8 = config.get_bool("verticalScroll");
     if (!value8)
       return std::unexpected(std::move(value8.error()));
     scrollArea->setVerticalScroll(*value8);
   }
-  auto updatesChildren = config.getBool("updatesChildren", false);
+  auto updatesChildren = config.get_bool("updatesChildren", false);
   if (!updatesChildren)
     return std::unexpected(std::move(updatesChildren.error()));
   scrollArea->setUpdatesChildren(*updatesChildren);
   auto result9 = common(scrollArea, config, false);
   if (!result9)
     return std::unexpected(std::move(result9.error()));
-  auto zlevel = config.getFloat("zlevel", 0);
+  auto zlevel = config.get_float("zlevel", 0);
   if (!zlevel)
     return std::unexpected(std::move(zlevel.error()));
   return WidgetConstructResult(scrollArea, name, *zlevel);
@@ -1891,7 +1891,7 @@ std::expected<void, StarException> WidgetParser::common(std::shared_ptr<Widget> 
     auto rectConfig = config.get("rect");
     if (!rectConfig)
       return std::unexpected(std::move(rectConfig.error()));
-    auto rect = jsonToRectI(*rectConfig);
+    auto rect = json_to_recti(*rectConfig);
     if (!rect)
       return std::unexpected(std::move(rect.error()));
     widget->setPosition(rect->min());
@@ -1904,7 +1904,7 @@ std::expected<void, StarException> WidgetParser::common(std::shared_ptr<Widget> 
       auto value1 = config.get("size");
       if (!value1)
         return std::unexpected(std::move(value1.error()));
-      auto converted1 = jsonToVec2I(*value1);
+      auto converted1 = json_to_vec2i(*value1);
       if (!converted1)
         return std::unexpected(std::move(converted1.error()));
       widget->setSize(*converted1);
@@ -1916,7 +1916,7 @@ std::expected<void, StarException> WidgetParser::common(std::shared_ptr<Widget> 
       auto value2 = config.get("position");
       if (!value2)
         return std::unexpected(std::move(value2.error()));
-      auto converted2 = jsonToVec2I(*value2);
+      auto converted2 = json_to_vec2i(*value2);
       if (!converted2)
         return std::unexpected(std::move(converted2.error()));
       widget->setPosition(*converted2);
@@ -1926,14 +1926,14 @@ std::expected<void, StarException> WidgetParser::common(std::shared_ptr<Widget> 
   if (!has3)
     return std::unexpected(std::move(has3.error()));
   if (*has3) {
-    auto value3 = config.getBool("visible");
+    auto value3 = config.get_bool("visible");
     if (!value3)
       return std::unexpected(std::move(value3.error()));
     auto result4 = widget->setVisibility(*value3);
     if (!result4)
       return std::unexpected(std::move(result4.error()));
   }
-  auto focus = config.getBool("focus", false);
+  auto focus = config.get_bool("focus", false);
   if (!focus)
     return std::unexpected(std::move(focus.error()));
   if (*focus) {
@@ -1950,12 +1950,12 @@ std::expected<void, StarException> WidgetParser::common(std::shared_ptr<Widget> 
       return std::unexpected(std::move(value6.error()));
     widget->setData(*value6);
   }
-  auto scissoring = config.getBool("scissoring", true);
+  auto scissoring = config.get_bool("scissoring", true);
   if (!scissoring)
     return std::unexpected(std::move(scissoring.error()));
   if (!*scissoring)
     widget->disableScissoring();
-  auto mouseTransparent = config.getBool("mouseTransparent", false);
+  auto mouseTransparent = config.get_bool("mouseTransparent", false);
   if (!mouseTransparent)
     return std::unexpected(std::move(mouseTransparent.error()));
   widget->setMouseTransparent(*mouseTransparent);
@@ -1980,28 +1980,28 @@ std::expected<ImageStretchSet, StarException> WidgetParser::parseImageStretchSet
   auto beginConfig = config.get("begin", "");
   if (!beginConfig)
     return std::unexpected(std::move(beginConfig.error()));
-  auto begin = beginConfig->toString();
+  auto begin = beginConfig->to_string();
   if (!begin)
     return std::unexpected(std::move(begin.error()));
   res.begin = std::move(*begin);
   auto innerConfig = config.get("inner", "");
   if (!innerConfig)
     return std::unexpected(std::move(innerConfig.error()));
-  auto inner = innerConfig->toString();
+  auto inner = innerConfig->to_string();
   if (!inner)
     return std::unexpected(std::move(inner.error()));
   res.inner = std::move(*inner);
   auto endConfig = config.get("end", "");
   if (!endConfig)
     return std::unexpected(std::move(endConfig.error()));
-  auto end = endConfig->toString();
+  auto end = endConfig->to_string();
   if (!end)
     return std::unexpected(std::move(end.error()));
   res.end = std::move(*end);
   auto typeConfig = config.get("type", "stretch");
   if (!typeConfig)
     return std::unexpected(std::move(typeConfig.error()));
-  auto type = typeConfig->toString();
+  auto type = typeConfig->to_string();
   if (!type)
     return std::unexpected(std::move(type.error()));
   if (*type == "repeat")

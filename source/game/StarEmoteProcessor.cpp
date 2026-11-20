@@ -49,16 +49,16 @@ std::expected<std::shared_ptr<EmoteProcessor>, StarException> EmoteProcessor::cr
   auto result = std::shared_ptr<EmoteProcessor>(new EmoteProcessor());
   auto cfg = assets->json("/emotes.config");
   if (!cfg) return std::unexpected(std::move(cfg.error()));
-  auto bindings = cfg->getObject("emoteBindings");
+  auto bindings = cfg->get_object("emoteBindings");
   if (!bindings) return std::unexpected(std::move(bindings.error()));
   if (!HumanoidEmoteNames) return std::unexpected(HumanoidEmoteNames.error());
   for (auto const& binding : *bindings) {
-    auto array = binding.second.toArray();
+    auto array = binding.second.to_array();
     if (!array) return std::unexpected(std::move(array.error()));
     for (auto const& text : *array) {
       auto emote = HumanoidEmoteNames->get_left(binding.first);
       if (!emote) return std::unexpected(std::move(emote.error()));
-      auto string = text.toString();
+      auto string = text.to_string();
       if (!string) return std::unexpected(std::move(string.error()));
       EmoteBinding value;
       value.emote = emote->get();

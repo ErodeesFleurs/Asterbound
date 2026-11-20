@@ -105,10 +105,10 @@ std::expected<void, StarException> VersionedJson::readSubVersioning(DataStream& 
   if (extraVersioning == 1) {
     auto source = ds.read<JsonObject>();
     if (!source) return std::unexpected(std::move(source.error()));
-    auto subVersions = Json(std::move(*source)).getObject("subVersions");
+    auto subVersions = Json(std::move(*source)).get_object("subVersions");
     if (!subVersions) return std::unexpected(std::move(subVersions.error()));
     for (auto const& pair : *subVersions) {
-      auto value = pair.second.toUInt();
+      auto value = pair.second.to_uint();
       if (!value) return std::unexpected(std::move(value.error()));
       versionedJson.subVersions[pair.first] = *value;
     }
@@ -122,14 +122,14 @@ Json VersionedJson::toJson() const {
 }
 std::expected<VersionedJson, StarException> VersionedJson::fromJson(Json const& source) {
   // Legacy '__' fields remain readable; modern fields take precedence.
-  auto id = source.optString("id");
+  auto id = source.opt_string("id");
   if (!id) return std::unexpected(std::move(id.error()));
-  auto legacyId = source.optString("__id");
+  auto legacyId = source.opt_string("__id");
   if (!legacyId) return std::unexpected(std::move(legacyId.error()));
   if (!*id) *id = std::move(*legacyId);
-  auto version = source.optUInt("version");
+  auto version = source.opt_uint("version");
   if (!version) return std::unexpected(std::move(version.error()));
-  auto legacyVersion = source.optUInt("__version");
+  auto legacyVersion = source.opt_uint("__version");
   if (!legacyVersion) return std::unexpected(std::move(legacyVersion.error()));
   if (!*version) *version = std::move(*legacyVersion);
   auto content = source.opt("content");
@@ -138,10 +138,10 @@ std::expected<VersionedJson, StarException> VersionedJson::fromJson(Json const& 
   if (!legacyContent) return std::unexpected(std::move(legacyContent.error()));
   if (!*content) *content = std::move(*legacyContent);
   StringMap<VersionNumber> subVersions;
-  auto metadata = source.getObject("subVersions", JsonObject{});
+  auto metadata = source.get_object("subVersions", JsonObject{});
   if (!metadata) return std::unexpected(std::move(metadata.error()));
   for (auto const& pair : *metadata) {
-    auto value = pair.second.toUInt();
+    auto value = pair.second.to_uint();
     if (!value) return std::unexpected(std::move(value.error()));
     subVersions[pair.first] = *value;
   }
@@ -149,7 +149,7 @@ std::expected<VersionedJson, StarException> VersionedJson::fromJson(Json const& 
     return std::unexpected(VersionedJsonException("VersionedJson requires an identifier, version, and content"));
   return VersionedJson{std::move(**id), static_cast<VersionNumber>(**version), std::move(**content), std::move(subVersions)};
 }
-bool VersionedJson::empty() const { return content.isNull(); }
+bool VersionedJson::empty() const { return content.is_null(); }
 std::expected<void, StarException> VersionedJson::expectIdentifier(String const& expectedIdentifier) const {
   if (identifier != expectedIdentifier)
     return std::unexpected(VersionedJsonException::format("VersionedJson identifier mismatch, expected '{}' but got '{}'", expectedIdentifier, identifier));
@@ -165,14 +165,14 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
   auto content = ds.read(versionedJson.content);
   if (!content) return std::unexpected(std::move(content.error()));
   // Older writers smuggled sub-version metadata into the payload.
-  if (versionedJson.content.isType(Json::Type::Object)) {
+  if (versionedJson.content.is_type(Json::Type::Object)) {
     auto hasSubVersions = versionedJson.content.contains("subVersions");
     if (!hasSubVersions) return std::unexpected(std::move(hasSubVersions.error()));
     if (*hasSubVersions) {
-      auto metadata = versionedJson.content.getObject("subVersions", JsonObject{});
+      auto metadata = versionedJson.content.get_object("subVersions", JsonObject{});
       if (!metadata) return std::unexpected(std::move(metadata.error()));
       for (auto const& pair : *metadata) {
-        auto value = pair.second.toUInt();
+        auto value = pair.second.to_uint();
         if (!value) return std::unexpected(std::move(value.error()));
         versionedJson.subVersions[pair.first] = *value;
       }
@@ -211,7 +211,7 @@ std::expected<void, StarException> VersioningDatabase::init() {
     auto entries = versions->iterate_object();
     if (!entries) return std::unexpected(std::move(entries.error()));
     for (auto const& pair : *entries) {
-      auto version = pair.second.toUInt();
+      auto version = pair.second.to_uint();
       if (!version) return std::unexpected(std::move(version.error()));
       m_currentVersions[pair.first] = *version;
     }
@@ -228,7 +228,7 @@ std::expected<void, StarException> VersioningDatabase::init() {
       auto identifiers = pair.second.iterate_object();
       if (!identifiers) return std::unexpected(std::move(identifiers.error()));
       for (auto const& entry : *identifiers) {
-        auto version = entry.second.toUInt();
+        auto version = entry.second.to_uint();
         if (!version) return std::unexpected(std::move(version.error()));
         m_currentSubVersions[pair.first][entry.first] = *version;
       }

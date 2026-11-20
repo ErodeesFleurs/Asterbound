@@ -128,7 +128,7 @@ std::expected<void, StarException> ListWidget::setSchema(Json const& schema) {
   };
   for (auto entry : {std::pair{std::string_view("selectedBG"), std::ref(m_selectedBG)}, std::pair{std::string_view("unselectedBG"), std::ref(m_unselectedBG)},
            std::pair{std::string_view("hoverBG"), std::ref(m_hoverBG)}, std::pair{std::string_view("disabledBG"), std::ref(m_disabledBG)}}) {
-    auto value = schema.getString(entry.first, "");
+    auto value = schema.get_string(entry.first, "");
     if (!value)
       return schemaError(std::move(value.error()));
     entry.second.get() = std::move(*value);
@@ -140,7 +140,7 @@ std::expected<void, StarException> ListWidget::setSchema(Json const& schema) {
     auto json = (*assets)->json("/interface.config:disabledButton");
     if (!json)
       return schemaError(std::move(json.error()));
-    auto suffix = json->toString();
+    auto suffix = json->to_string();
     if (!suffix)
       return schemaError(std::move(suffix.error()));
     m_disabledBG = m_unselectedBG + *suffix;
@@ -148,13 +148,13 @@ std::expected<void, StarException> ListWidget::setSchema(Json const& schema) {
   auto spacingJson = schema.get("spacing");
   if (!spacingJson)
     return schemaError(std::move(spacingJson.error()));
-  auto spacing = jsonToVec2I(*spacingJson);
+  auto spacing = json_to_vec2i(*spacingJson);
   if (!spacing)
     return schemaError(std::move(spacing.error()));
   auto sizeJson = schema.get("memberSize");
   if (!sizeJson)
     return schemaError(std::move(sizeJson.error()));
-  auto size = jsonToVec2I(*sizeJson);
+  auto size = json_to_vec2i(*sizeJson);
   if (!size)
     return schemaError(std::move(size.error()));
   m_spacing = *spacing;

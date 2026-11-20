@@ -20,15 +20,15 @@ PlayerLog::PlayerLog() {
 
 std::expected<PlayerLog, StarException> PlayerLog::create(Json const& json) {
   PlayerLog log;
-  auto deaths = json.getInt("deathCount");
+  auto deaths = json.get_int("deathCount");
   if (!deaths)
     return std::unexpected(std::move(deaths.error()));
   log.m_deathCount = *deaths;
-  auto playTime = json.getDouble("playTime");
+  auto playTime = json.get_double("playTime");
   if (!playTime)
     return std::unexpected(std::move(playTime.error()));
   log.m_playTime = *playTime;
-  auto introComplete = json.getBool("introComplete");
+  auto introComplete = json.get_bool("introComplete");
   if (!introComplete)
     return std::unexpected(std::move(introComplete.error()));
   log.m_introComplete = *introComplete;
@@ -39,16 +39,16 @@ std::expected<PlayerLog, StarException> PlayerLog::create(Json const& json) {
     auto value = json.get(field.first);
     if (!value)
       return std::unexpected(std::move(value.error()));
-    auto strings = jsonToStringSet(*value);
+    auto strings = json_to_string_set(*value);
     if (!strings)
       return std::unexpected(std::move(strings.error()));
     field.second.get() = std::move(*strings);
   }
-  auto collections = json.getObject("collections");
+  auto collections = json.get_object("collections");
   if (!collections)
     return std::unexpected(std::move(collections.error()));
   for (auto const& entry : *collections) {
-    auto strings = jsonToStringSet(entry.second);
+    auto strings = json_to_string_set(entry.second);
     if (!strings)
       return std::unexpected(std::move(strings.error()));
     log.m_collections[entry.first] = std::move(*strings);
@@ -59,14 +59,14 @@ std::expected<PlayerLog, StarException> PlayerLog::create(Json const& json) {
 Json PlayerLog::toJson() const {
   auto collections = JsonObject();
   for (auto const& pair : m_collections)
-    collections[pair.first] = jsonFromStringSet(pair.second);
+    collections[pair.first] = json_from_string_set(pair.second);
 
   return JsonObject{{"deathCount", m_deathCount},
       {"playTime", m_playTime},
       {"introComplete", m_introComplete},
-      {"scannedObjects", jsonFromStringSet(m_scannedObjects)},
-      {"radioMessages", jsonFromStringSet(m_radioMessages)},
-      {"cinematics", jsonFromStringSet(m_cinematics)},
+      {"scannedObjects", json_from_string_set(m_scannedObjects)},
+      {"radioMessages", json_from_string_set(m_radioMessages)},
+      {"cinematics", json_from_string_set(m_cinematics)},
       {"collections", collections}};
 }
 

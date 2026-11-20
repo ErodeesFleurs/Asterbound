@@ -87,9 +87,9 @@ std::expected<std::shared_ptr<BiomeDatabase>, StarException> BiomeDatabase::crea
         auto parameters = (*assets)->json(path);
         if (!parameters)
           return std::unexpected(std::move(parameters.error()));
-        if (parameters->isNull())
+        if (parameters->is_null())
           return {};
-        auto name = parameters->getString("name");
+        auto name = parameters->get_string("name");
         if (!name)
           return std::unexpected(std::move(name.error()));
         if (map.contains(*name))
@@ -132,9 +132,9 @@ std::expected<WeatherPool, StarException> BiomeDatabase::biomeWeathers(String co
   if (!config) return std::unexpected(std::move(config.error()));
   auto weather = config->get().parameters.get("weather", JsonArray{});
   if (!weather) return std::unexpected(std::move(weather.error()));
-  auto bin = binnedChoiceFromJson(*weather, threatLevel);
+  auto bin = binned_choice_from_json(*weather, threatLevel);
   if (!bin) return std::unexpected(std::move(bin.error()));
-  auto weatherList = bin->optArray();
+  auto weatherList = bin->opt_array();
   if (!weatherList) return std::unexpected(std::move(weatherList.error()));
   if (*weatherList && !(*weatherList)->empty()) {
     auto path = static_random_from(**weatherList, seed, "WeatherPool");
@@ -151,14 +151,14 @@ std::expected<WeatherPool, StarException> BiomeDatabase::biomeWeathers(String co
 std::expected<bool, StarException> BiomeDatabase::biomeIsAirless(String const& biomeName) const {
   auto config = m_biomes.get(biomeName);
   if (!config) return std::unexpected(std::move(config.error()));
-  return config->get().parameters.getBool("airless", false);
+  return config->get().parameters.get_bool("airless", false);
 }
 
 std::expected<SkyColoring, StarException> BiomeDatabase::biomeSkyColoring(String const& biomeName, std::uint64_t seed) const {
   SkyColoring result;
   auto config = m_biomes.get(biomeName);
   if (!config) return std::unexpected(std::move(config.error()));
-  auto options = config->get().parameters.optArray("skyOptions");
+  auto options = config->get().parameters.opt_array("skyOptions");
   if (!options) return std::unexpected(std::move(options.error()));
   if (*options) {
     auto option = static_random_from(**options, seed, "BiomeSkyOption");
@@ -167,7 +167,7 @@ std::expected<SkyColoring, StarException> BiomeDatabase::biomeSkyColoring(String
       auto colorConfig = option->get().get("mainColor");
       if (!colorConfig) return std::unexpected(std::move(colorConfig.error()));
       {
-        auto value = jsonToColor(*colorConfig);
+        auto value = json_to_color(*colorConfig);
         if (!value) return std::unexpected(std::move(value.error()));
         result.mainColor = std::move(*value);
       }
@@ -176,7 +176,7 @@ std::expected<SkyColoring, StarException> BiomeDatabase::biomeSkyColoring(String
       auto colorConfig = option->get().query("morningColors[0]");
       if (!colorConfig) return std::unexpected(std::move(colorConfig.error()));
       {
-        auto value = jsonToColor(*colorConfig);
+        auto value = json_to_color(*colorConfig);
         if (!value) return std::unexpected(std::move(value.error()));
         result.morningColors.first = std::move(*value);
       }
@@ -185,7 +185,7 @@ std::expected<SkyColoring, StarException> BiomeDatabase::biomeSkyColoring(String
       auto colorConfig = option->get().query("morningColors[1]");
       if (!colorConfig) return std::unexpected(std::move(colorConfig.error()));
       {
-        auto value = jsonToColor(*colorConfig);
+        auto value = json_to_color(*colorConfig);
         if (!value) return std::unexpected(std::move(value.error()));
         result.morningColors.second = std::move(*value);
       }
@@ -194,7 +194,7 @@ std::expected<SkyColoring, StarException> BiomeDatabase::biomeSkyColoring(String
       auto colorConfig = option->get().query("dayColors[0]");
       if (!colorConfig) return std::unexpected(std::move(colorConfig.error()));
       {
-        auto value = jsonToColor(*colorConfig);
+        auto value = json_to_color(*colorConfig);
         if (!value) return std::unexpected(std::move(value.error()));
         result.dayColors.first = std::move(*value);
       }
@@ -203,7 +203,7 @@ std::expected<SkyColoring, StarException> BiomeDatabase::biomeSkyColoring(String
       auto colorConfig = option->get().query("dayColors[1]");
       if (!colorConfig) return std::unexpected(std::move(colorConfig.error()));
       {
-        auto value = jsonToColor(*colorConfig);
+        auto value = json_to_color(*colorConfig);
         if (!value) return std::unexpected(std::move(value.error()));
         result.dayColors.second = std::move(*value);
       }
@@ -212,7 +212,7 @@ std::expected<SkyColoring, StarException> BiomeDatabase::biomeSkyColoring(String
       auto colorConfig = option->get().query("eveningColors[0]");
       if (!colorConfig) return std::unexpected(std::move(colorConfig.error()));
       {
-        auto value = jsonToColor(*colorConfig);
+        auto value = json_to_color(*colorConfig);
         if (!value) return std::unexpected(std::move(value.error()));
         result.eveningColors.first = std::move(*value);
       }
@@ -221,7 +221,7 @@ std::expected<SkyColoring, StarException> BiomeDatabase::biomeSkyColoring(String
       auto colorConfig = option->get().query("eveningColors[1]");
       if (!colorConfig) return std::unexpected(std::move(colorConfig.error()));
       {
-        auto value = jsonToColor(*colorConfig);
+        auto value = json_to_color(*colorConfig);
         if (!value) return std::unexpected(std::move(value.error()));
         result.eveningColors.second = std::move(*value);
       }
@@ -230,7 +230,7 @@ std::expected<SkyColoring, StarException> BiomeDatabase::biomeSkyColoring(String
       auto colorConfig = option->get().query("nightColors[0]");
       if (!colorConfig) return std::unexpected(std::move(colorConfig.error()));
       {
-        auto value = jsonToColor(*colorConfig);
+        auto value = json_to_color(*colorConfig);
         if (!value) return std::unexpected(std::move(value.error()));
         result.nightColors.first = std::move(*value);
       }
@@ -239,7 +239,7 @@ std::expected<SkyColoring, StarException> BiomeDatabase::biomeSkyColoring(String
       auto colorConfig = option->get().query("nightColors[1]");
       if (!colorConfig) return std::unexpected(std::move(colorConfig.error()));
       {
-        auto value = jsonToColor(*colorConfig);
+        auto value = json_to_color(*colorConfig);
         if (!value) return std::unexpected(std::move(value.error()));
         result.nightColors.second = std::move(*value);
       }
@@ -248,7 +248,7 @@ std::expected<SkyColoring, StarException> BiomeDatabase::biomeSkyColoring(String
       auto colorConfig = option->get().get("morningLightColor");
       if (!colorConfig) return std::unexpected(std::move(colorConfig.error()));
       {
-        auto value = jsonToColor(*colorConfig);
+        auto value = json_to_color(*colorConfig);
         if (!value) return std::unexpected(std::move(value.error()));
         result.morningLightColor = std::move(*value);
       }
@@ -257,7 +257,7 @@ std::expected<SkyColoring, StarException> BiomeDatabase::biomeSkyColoring(String
       auto colorConfig = option->get().get("dayLightColor");
       if (!colorConfig) return std::unexpected(std::move(colorConfig.error()));
       {
-        auto value = jsonToColor(*colorConfig);
+        auto value = json_to_color(*colorConfig);
         if (!value) return std::unexpected(std::move(value.error()));
         result.dayLightColor = std::move(*value);
       }
@@ -266,7 +266,7 @@ std::expected<SkyColoring, StarException> BiomeDatabase::biomeSkyColoring(String
       auto colorConfig = option->get().get("eveningLightColor");
       if (!colorConfig) return std::unexpected(std::move(colorConfig.error()));
       {
-        auto value = jsonToColor(*colorConfig);
+        auto value = json_to_color(*colorConfig);
         if (!value) return std::unexpected(std::move(value.error()));
         result.eveningLightColor = std::move(*value);
       }
@@ -275,7 +275,7 @@ std::expected<SkyColoring, StarException> BiomeDatabase::biomeSkyColoring(String
       auto colorConfig = option->get().get("nightLightColor");
       if (!colorConfig) return std::unexpected(std::move(colorConfig.error()));
       {
-        auto value = jsonToColor(*colorConfig);
+        auto value = json_to_color(*colorConfig);
         if (!value) return std::unexpected(std::move(value.error()));
         result.nightLightColor = std::move(*value);
       }
@@ -287,7 +287,7 @@ std::expected<SkyColoring, StarException> BiomeDatabase::biomeSkyColoring(String
 std::expected<String, StarException> BiomeDatabase::biomeFriendlyName(String const& biomeName) const {
   auto config = m_biomes.get(biomeName);
   if (!config) return std::unexpected(std::move(config.error()));
-  return config->get().parameters.getString("friendlyName");
+  return config->get().parameters.get_string("friendlyName");
 }
 
 std::expected<StringList, StarException> BiomeDatabase::biomeStatusEffects(String const& biomeName) const {
@@ -295,7 +295,7 @@ std::expected<StringList, StarException> BiomeDatabase::biomeStatusEffects(Strin
   if (!config) return std::unexpected(std::move(config.error()));
   auto effects = config->get().parameters.opt("statusEffects");
   if (!effects) return std::unexpected(std::move(effects.error()));
-  if (*effects) return jsonToStringList(**effects);
+  if (*effects) return json_to_string_list(**effects);
   return StringList();
 }
 
@@ -305,7 +305,7 @@ std::expected<StringList, StarException> BiomeDatabase::biomeOres(String const& 
   if (!config) return std::unexpected(std::move(config.error()));
   auto distribution = config->get().parameters.get("ores", {});
   if (!distribution) return std::unexpected(std::move(distribution.error()));
-  if (!distribution->isNull()) {
+  if (!distribution->is_null()) {
     auto database = m_root.functionDatabase();
     if (!database) return std::unexpected(std::move(database.error()));
     auto function = (*database)->configFunction(*distribution);
@@ -315,10 +315,10 @@ std::expected<StringList, StarException> BiomeDatabase::biomeOres(String const& 
     auto entries = ores->iterate_array();
     if (!entries) return std::unexpected(std::move(entries.error()));
     for (auto const& entry : *entries) {
-      auto density = entry.getFloat(1);
+      auto density = entry.get_float(1);
       if (!density) return std::unexpected(std::move(density.error()));
       if (*density > 0) {
-        auto name = entry.getString(0);
+        auto name = entry.get_string(0);
         if (!name) return std::unexpected(std::move(name.error()));
         result.push_back(std::move(*name));
       }
@@ -355,11 +355,11 @@ std::expected<std::shared_ptr<Biome>, StarException> BiomeDatabase::createBiome(
     if (!hue) return std::unexpected(std::move(hue.error()));
     biome->baseName = biomeName;
     {
-      auto value = parameters.getString("description", "");
+      auto value = parameters.get_string("description", "");
       if (!value) return std::unexpected(std::move(value.error()));
       biome->description = std::move(*value);
     }
-    auto main = parameters.optString("mainBlock");
+    auto main = parameters.opt_string("mainBlock");
     if (!main) return std::unexpected(std::move(main.error()));
     if (*main) {
       {
@@ -368,10 +368,10 @@ std::expected<std::shared_ptr<Biome>, StarException> BiomeDatabase::createBiome(
         biome->mainBlock = std::move(*value);
       }
     }
-    auto subBlocks = parameters.getArray("subBlocks", {});
+    auto subBlocks = parameters.get_array("subBlocks", {});
     if (!subBlocks) return std::unexpected(std::move(subBlocks.error()));
     for (auto const& entry : *subBlocks) {
-      auto name = entry.toString();
+      auto name = entry.to_string();
       if (!name) return std::unexpected(std::move(name.error()));
       auto id = (*materials)->materialId(*name);
       if (!id) return std::unexpected(std::move(id.error()));
@@ -384,14 +384,14 @@ std::expected<std::shared_ptr<Biome>, StarException> BiomeDatabase::createBiome(
       if (!value) return std::unexpected(std::move(value.error()));
       biome->ores = std::move(*value);
     }
-    auto surfacePlaceablesConfig = parameters.getObject("surfacePlaceables", {});
+    auto surfacePlaceablesConfig = parameters.get_object("surfacePlaceables", {});
     if (!surfacePlaceablesConfig) return std::unexpected(std::move(surfacePlaceablesConfig.error()));
     {
       auto value = readBiomePlaceables(*surfacePlaceablesConfig, random.next_u64(), *hue);
       if (!value) return std::unexpected(std::move(value.error()));
       biome->surfacePlaceables = std::move(*value);
     }
-    auto undergroundPlaceablesConfig = parameters.getObject("undergroundPlaceables", {});
+    auto undergroundPlaceablesConfig = parameters.get_object("undergroundPlaceables", {});
     if (!undergroundPlaceablesConfig) return std::unexpected(std::move(undergroundPlaceablesConfig.error()));
     {
       auto value = readBiomePlaceables(*undergroundPlaceablesConfig, random.next_u64(), *hue);
@@ -400,7 +400,7 @@ std::expected<std::shared_ptr<Biome>, StarException> BiomeDatabase::createBiome(
     }
     biome->hueShift = *hue;
     biome->materialHueShift = materialHueFromDegrees(biome->hueShift);
-    auto parallax = parameters.optString("parallax");
+    auto parallax = parameters.opt_string("parallax");
     if (!parallax) return std::unexpected(std::move(parallax.error()));
     if (*parallax) {
       auto path = AssetPath::relative_to(config->get().path, **parallax);
@@ -410,21 +410,21 @@ std::expected<std::shared_ptr<Biome>, StarException> BiomeDatabase::createBiome(
         biome->parallax = std::move(*value);
       }
     }
-    auto musicTrackConfig = parameters.optObject("musicTrack");
+    auto musicTrackConfig = parameters.opt_object("musicTrack");
     if (!musicTrackConfig) return std::unexpected(std::move(musicTrackConfig.error()));
     if (*musicTrackConfig) {
       auto description = AmbientNoisesDescription::create(**musicTrackConfig, config->get().path);
       if (!description) return std::unexpected(std::move(description.error()));
       biome->musicTrack = std::make_shared<AmbientNoisesDescription>(std::move(*description));
     }
-    auto ambientNoisesConfig = parameters.optObject("ambientNoises");
+    auto ambientNoisesConfig = parameters.opt_object("ambientNoises");
     if (!ambientNoisesConfig) return std::unexpected(std::move(ambientNoisesConfig.error()));
     if (*ambientNoisesConfig) {
       auto description = AmbientNoisesDescription::create(**ambientNoisesConfig, config->get().path);
       if (!description) return std::unexpected(std::move(description.error()));
       biome->ambientNoises = std::make_shared<AmbientNoisesDescription>(std::move(*description));
     }
-    auto spawnConfig = parameters.optObject("spawnProfile");
+    auto spawnConfig = parameters.opt_object("spawnProfile");
     if (!spawnConfig) return std::unexpected(std::move(spawnConfig.error()));
     if (*spawnConfig) {
       auto assets = m_root.assets();
@@ -449,8 +449,8 @@ std::expected<Json, StarException> BiomeDatabase::biomeConfig(String const& biom
 }
 
 std::expected<float, StarException> BiomeDatabase::pickHueShiftFromJson(Json source, std::uint64_t seed, String const& key) {
-  if (source.isNull()) return 0;
-  auto options = jsonToFloatList(source);
+  if (source.is_null()) return 0;
+  auto options = json_to_float_list(source);
   if (!options) return std::unexpected(std::move(options.error()));
   if (options->empty()) return 0;
   auto t = static_random_u32(seed, key);
@@ -461,12 +461,12 @@ std::expected<BiomePlaceables, StarException> BiomeDatabase::readBiomePlaceables
   RandomSource rand(seed);
   BiomePlaceables result;
   {
-    auto options = config.optArray("grassMod");
+    auto options = config.opt_array("grassMod");
     if (!options) return std::unexpected(std::move(options.error()));
     if (*options && !(*options)->empty()) {
       auto choice = rand.sample_ref(**options);
       if (!choice) return std::unexpected(std::move(choice.error()));
-      auto name = choice->get().toString();
+      auto name = choice->get().to_string();
       if (!name) return std::unexpected(std::move(name.error()));
       auto materials = m_root.materialDatabase();
       if (!materials) return std::unexpected(std::move(materials.error()));
@@ -478,17 +478,17 @@ std::expected<BiomePlaceables, StarException> BiomeDatabase::readBiomePlaceables
     }
   }
   {
-    auto value = config.getFloat("grassModDensity", 0);
+    auto value = config.get_float("grassModDensity", 0);
     if (!value) return std::unexpected(std::move(value.error()));
     result.grassModDensity = std::move(*value);
   }
   {
-    auto options = config.optArray("ceilingGrassMod");
+    auto options = config.opt_array("ceilingGrassMod");
     if (!options) return std::unexpected(std::move(options.error()));
     if (*options && !(*options)->empty()) {
       auto choice = rand.sample_ref(**options);
       if (!choice) return std::unexpected(std::move(choice.error()));
-      auto name = choice->get().toString();
+      auto name = choice->get().to_string();
       if (!name) return std::unexpected(std::move(name.error()));
       auto materials = m_root.materialDatabase();
       if (!materials) return std::unexpected(std::move(materials.error()));
@@ -500,11 +500,11 @@ std::expected<BiomePlaceables, StarException> BiomeDatabase::readBiomePlaceables
     }
   }
   {
-    auto value = config.getFloat("ceilingGrassModDensity", 0);
+    auto value = config.get_float("ceilingGrassModDensity", 0);
     if (!value) return std::unexpected(std::move(value.error()));
     result.ceilingGrassModDensity = std::move(*value);
   }
-  auto items = config.getArray("items", {});
+  auto items = config.get_array("items", {});
   if (!items) return std::unexpected(std::move(items.error()));
   for (auto const& item : *items) {
     auto distribution = BiomeItemDistribution::create(m_root, item, rand.next_u64(), biomeHueShift);
@@ -516,7 +516,7 @@ std::expected<BiomePlaceables, StarException> BiomeDatabase::readBiomePlaceables
 
 std::expected<List<std::pair<ModId, float>>, StarException> BiomeDatabase::readOres(Json const& oreDistribution, float threatLevel) const {
   List<std::pair<ModId, float>> result;
-  if (!oreDistribution.isNull()) {
+  if (!oreDistribution.is_null()) {
     auto functions = m_root.functionDatabase();
     if (!functions) return std::unexpected(std::move(functions.error()));
     auto materials = m_root.materialDatabase();
@@ -528,10 +528,10 @@ std::expected<List<std::pair<ModId, float>>, StarException> BiomeDatabase::readO
     auto entries = ores->iterate_array();
     if (!entries) return std::unexpected(std::move(entries.error()));
     for (auto const& entry : *entries) {
-      auto density = entry.getFloat(1);
+      auto density = entry.get_float(1);
       if (!density) return std::unexpected(std::move(density.error()));
       if (*density > 0) {
-        auto name = entry.getString(0);
+        auto name = entry.get_string(0);
         if (!name) return std::unexpected(std::move(name.error()));
         auto id = (*materials)->modId(*name);
         if (!id) return std::unexpected(std::move(id.error()));

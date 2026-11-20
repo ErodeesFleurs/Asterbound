@@ -1330,7 +1330,7 @@ namespace LuaBindings {
       view.reserve(details ? 7 : 4);
       view.set("id", entity.entityId());
       view.set("type", type->get());
-      view.set("position", jsonFromVec2F(entity.position()));
+      view.set("position", json_from_vec2f(entity.position()));
       auto team = entity.getTeam().toJson();
       if (!team) return std::unexpected(std::move(team.error()));
       view.set("team", std::move(*team));
@@ -2567,8 +2567,8 @@ namespace LuaBindings {
       std::optional<float> const& intangibleTime) {
     bool emptyItem = false;
     auto spawn = [&]() -> std::expected<std::optional<EntityId>, StarException> {
-      auto descriptorResult = itemType.isType(Json::Type::String)
-          ? itemType.toString().and_then([&](String name) { return ItemDescriptor::create(std::move(name), inputCount.value_or(1), inputParameters ? inputParameters : JsonObject()); })
+      auto descriptorResult = itemType.is_type(Json::Type::String)
+          ? itemType.to_string().and_then([&](String name) { return ItemDescriptor::create(std::move(name), inputCount.value_or(1), inputParameters ? inputParameters : JsonObject()); })
           : ItemDescriptor::create(itemType);
       if (!descriptorResult)
         return std::unexpected(std::move(descriptorResult.error()));
@@ -2657,7 +2657,7 @@ namespace LuaBindings {
         if (!levelJsonResult)
           return std::unexpected(std::move(levelJsonResult.error()));
         auto levelJson = std::move(*levelJsonResult);
-        auto parsedLevelResult = levelJson.get().toFloat();
+        auto parsedLevelResult = levelJson.get().to_float();
         if (!parsedLevelResult)
           return std::unexpected(std::move(parsedLevelResult.error()));
         auto parsedLevel = std::move(*parsedLevelResult);
@@ -3182,7 +3182,7 @@ namespace LuaBindings {
     bool transient = entity->entityType() == EntityType::Projectile || entity->entityType() == EntityType::PlantDrop;
     JsonObject snapshot{
       {"schema", "asterbound.entitySnapshot"}, {"schemaVersion", 1},
-      {"type", type->get()}, {"entityId", entityId}, {"position", jsonFromVec2F(entity->position())},
+      {"type", type->get()}, {"entityId", entityId}, {"position", json_from_vec2f(entity->position())},
       {"authority", std::string_view(master ? "master" : "replica")}, {"complete", master && !transient},
       {"format", std::string_view(transient ? "net" : "disk")}
     };
@@ -3376,8 +3376,8 @@ namespace LuaBindings {
       result = JsonObject{
         {"nametag", std::move(*nametag)},
         {"displayed", nametagEntity->displayNametag()},
-        {"color", jsonFromColor(Color::rgb(*color))},
-        {"origin", jsonFromVec2F(*origin)},
+        {"color", json_from_color(Color::rgb(*color))},
+        {"origin", json_from_vec2f(*origin)},
       };
       if (auto status = nametagEntity->statusText())
         {
@@ -3718,7 +3718,7 @@ namespace LuaBindings {
         return std::unexpected(std::move(toSearchResult.error()));
       auto toSearch = std::move(*toSearchResult);
       auto res = itemBag->itemsFitWhere(optional_ref(toSearch));
-auto slotsResult = jsonFromList<std::size_t>(res.slots);
+auto slotsResult = json_from_list<std::size_t>(res.slots);
       if (!slotsResult)
         return std::unexpected(std::move(slotsResult.error()));
       auto slots = std::move(*slotsResult);

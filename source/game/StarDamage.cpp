@@ -43,7 +43,7 @@ DamageSource::DamageSource()
 
 std::expected<DamageSource, StarException> DamageSource::create(Json const& config) {
   DamageSource source;
-  auto dtype = config.optString("damageType");
+  auto dtype = config.opt_string("damageType");
   if (!dtype)
     return std::unexpected(std::move(dtype.error()));
   source.damageType = DamageType::Damage;
@@ -63,7 +63,7 @@ std::expected<DamageSource, StarException> DamageSource::create(Json const& conf
     auto value = config.get("poly");
     if (!value)
       return std::unexpected(std::move(value.error()));
-    auto poly = jsonToPolyF(*value);
+    auto poly = json_to_polyf(*value);
     if (!poly)
       return std::unexpected(std::move(poly.error()));
     source.damageArea = std::move(*poly);
@@ -71,22 +71,22 @@ std::expected<DamageSource, StarException> DamageSource::create(Json const& conf
     auto value = config.get("line");
     if (!value)
       return std::unexpected(std::move(value.error()));
-    auto line = jsonToLine2F(*value);
+    auto line = json_to_line2f(*value);
     if (!line)
       return std::unexpected(std::move(line.error()));
     source.damageArea = std::move(*line);
   } else {
     return std::unexpected(StarException("No 'poly' or 'line' key in DamageSource config"));
   }
-  auto damage = config.getFloat("damage");
+  auto damage = config.get_float("damage");
   if (!damage)
     return std::unexpected(std::move(damage.error()));
   source.damage = *damage;
-  auto track = config.getBool("trackSourceEntity", true);
+  auto track = config.get_bool("trackSourceEntity", true);
   if (!track)
     return std::unexpected(std::move(track.error()));
   source.trackSourceEntity = *track;
-  auto id = config.getInt("sourceEntityId", NullEntityId);
+  auto id = config.get_int("sourceEntityId", NullEntityId);
   if (!id)
     return std::unexpected(std::move(id.error()));
   source.sourceEntityId = *id;
@@ -99,31 +99,31 @@ std::expected<DamageSource, StarException> DamageSource::create(Json const& conf
       return std::unexpected(std::move(team.error()));
     source.team = *team;
   } else {
-    auto name = config.getString("teamType", "passive");
+    auto name = config.get_string("teamType", "passive");
     if (!name)
       return std::unexpected(std::move(name.error()));
     auto type = enum_value<TeamTypeNames>(*name);
     if (!type)
       return std::unexpected(std::move(type.error()));
     source.team.type = *type;
-    auto number = config.getUInt("teamNumber", 0);
+    auto number = config.get_uint("teamNumber", 0);
     if (!number)
       return std::unexpected(std::move(number.error()));
     source.team.team = *number;
   }
-  auto group = config.optString("damageRepeatGroup");
+  auto group = config.opt_string("damageRepeatGroup");
   if (!group)
     return std::unexpected(std::move(group.error()));
   source.damageRepeatGroup = std::move(*group);
-  auto timeout = config.optFloat("damageRepeatTimeout");
+  auto timeout = config.opt_float("damageRepeatTimeout");
   if (!timeout)
     return std::unexpected(std::move(timeout.error()));
   source.damageRepeatTimeout = *timeout;
-  auto kind = config.getString("damageSourceKind", "");
+  auto kind = config.get_string("damageSourceKind", "");
   if (!kind)
     return std::unexpected(std::move(kind.error()));
   source.damageSourceKind = std::move(*kind);
-  auto effects = config.getArray("statusEffects", {});
+  auto effects = config.get_array("statusEffects", {});
   if (!effects)
     return std::unexpected(std::move(effects.error()));
   for (auto const& effect : *effects) {
@@ -135,18 +135,18 @@ std::expected<DamageSource, StarException> DamageSource::create(Json const& conf
   auto knockback = config.get("knockback", Json(0.0f));
   if (!knockback)
     return std::unexpected(std::move(knockback.error()));
-  if (knockback->isType(Json::Type::Array)) {
-    auto parsed = jsonToVec2F(*knockback);
+  if (knockback->is_type(Json::Type::Array)) {
+    auto parsed = json_to_vec2f(*knockback);
     if (!parsed)
       return std::unexpected(std::move(parsed.error()));
     source.knockback = *parsed;
   } else {
-    auto parsed = knockback->toFloat();
+    auto parsed = knockback->to_float();
     if (!parsed)
       return std::unexpected(std::move(parsed.error()));
     source.knockback = *parsed;
   }
-  auto rayCheck = config.getBool("rayCheck", false);
+  auto rayCheck = config.get_bool("rayCheck", false);
   if (!rayCheck)
     return std::unexpected(std::move(rayCheck.error()));
   source.rayCheck = *rayCheck;
@@ -181,15 +181,15 @@ DamageSource::DamageSource(DamageType damageType,
 std::expected<Json, StarException> DamageSource::toJson() const {
   Json damageAreaJson;
   if (std::holds_alternative<PolyF>(damageArea))
-    damageAreaJson = jsonFromPolyF(std::get<PolyF>(damageArea));
+    damageAreaJson = json_from_polyf(std::get<PolyF>(damageArea));
   else if (std::holds_alternative<Line2F>(damageArea))
-    damageAreaJson = jsonFromLine2F(std::get<Line2F>(damageArea));
+    damageAreaJson = json_from_line2f(std::get<Line2F>(damageArea));
 
   Json knockbackJson;
   if (std::holds_alternative<float>(knockback))
     knockbackJson = std::get<float>(knockback);
   else if (std::holds_alternative<Vec2F>(knockback))
-    knockbackJson = jsonFromVec2F(std::get<Vec2F>(knockback));
+    knockbackJson = json_from_vec2f(std::get<Vec2F>(knockback));
 
   auto typeName = enum_name<DamageTypeNames>(damageType);
   if (!typeName)
@@ -283,40 +283,40 @@ DamageRequest::DamageRequest()
 
 std::expected<DamageRequest, StarException> DamageRequest::create(Json const& v) {
   DamageRequest request;
-  auto hitName = v.getString("hitType", "hit");
+  auto hitName = v.get_string("hitType", "hit");
   if (!hitName)
     return std::unexpected(std::move(hitName.error()));
   auto hit = enum_value<HitTypeNames>(*hitName);
   if (!hit)
     return std::unexpected(std::move(hit.error()));
   request.hitType = *hit;
-  auto typeName = v.getString("damageType", "damage");
+  auto typeName = v.get_string("damageType", "damage");
   if (!typeName)
     return std::unexpected(std::move(typeName.error()));
   auto type = enum_value<DamageTypeNames>(*typeName);
   if (!type)
     return std::unexpected(std::move(type.error()));
   request.damageType = *type;
-  auto damage = v.getFloat("damage");
+  auto damage = v.get_float("damage");
   if (!damage)
     return std::unexpected(std::move(damage.error()));
   request.damage = *damage;
   auto momentumJson = v.get("knockbackMomentum", JsonArray{0, 0});
   if (!momentumJson)
     return std::unexpected(std::move(momentumJson.error()));
-  auto momentum = jsonToVec2F(*momentumJson);
+  auto momentum = json_to_vec2f(*momentumJson);
   if (!momentum)
     return std::unexpected(std::move(momentum.error()));
   request.knockbackMomentum = *momentum;
-  auto id = v.getInt("sourceEntityId", NullEntityId);
+  auto id = v.get_int("sourceEntityId", NullEntityId);
   if (!id)
     return std::unexpected(std::move(id.error()));
   request.sourceEntityId = *id;
-  auto kind = v.getString("damageSourceKind", "");
+  auto kind = v.get_string("damageSourceKind", "");
   if (!kind)
     return std::unexpected(std::move(kind.error()));
   request.damageSourceKind = std::move(*kind);
-  auto effects = v.getArray("statusEffects", {});
+  auto effects = v.get_array("statusEffects", {});
   if (!effects)
     return std::unexpected(std::move(effects.error()));
   for (auto const& effect : *effects) {
@@ -353,7 +353,7 @@ std::expected<Json, StarException> DamageRequest::toJson() const {
   return JsonObject{{"hitType", String(*hit)},
                     {"damageType", String(*type)},
                     {"damage", damage},
-                    {"knockbackMomentum", jsonFromVec2F(knockbackMomentum)},
+                    {"knockbackMomentum", json_from_vec2f(knockbackMomentum)},
                     {"sourceEntityId", sourceEntityId},
                     {"damageSourceKind", damageSourceKind},
                     {"statusEffects", statusEffects.transformed(jsonFromEphemeralStatusEffect)}};
@@ -379,41 +379,41 @@ DamageNotification::DamageNotification() : sourceEntityId(), targetEntityId(), d
 
 std::expected<DamageNotification, StarException> DamageNotification::create(Json const& v) {
   DamageNotification notification;
-  auto source = v.getInt("sourceEntityId");
+  auto source = v.get_int("sourceEntityId");
   if (!source)
     return std::unexpected(std::move(source.error()));
   notification.sourceEntityId = *source;
-  auto target = v.getInt("targetEntityId");
+  auto target = v.get_int("targetEntityId");
   if (!target)
     return std::unexpected(std::move(target.error()));
   notification.targetEntityId = *target;
   auto positionJson = v.get("position");
   if (!positionJson)
     return std::unexpected(std::move(positionJson.error()));
-  auto position = jsonToVec2F(*positionJson);
+  auto position = json_to_vec2f(*positionJson);
   if (!position)
     return std::unexpected(std::move(position.error()));
   notification.position = *position;
-  auto damage = v.getFloat("damageDealt");
+  auto damage = v.get_float("damageDealt");
   if (!damage)
     return std::unexpected(std::move(damage.error()));
   notification.damageDealt = *damage;
-  auto health = v.getFloat("healthLost");
+  auto health = v.get_float("healthLost");
   if (!health)
     return std::unexpected(std::move(health.error()));
   notification.healthLost = *health;
-  auto hitName = v.getString("hitType");
+  auto hitName = v.get_string("hitType");
   if (!hitName)
     return std::unexpected(std::move(hitName.error()));
   auto hit = enum_value<HitTypeNames>(*hitName);
   if (!hit)
     return std::unexpected(std::move(hit.error()));
   notification.hitType = *hit;
-  auto sourceKind = v.getString("damageSourceKind");
+  auto sourceKind = v.get_string("damageSourceKind");
   if (!sourceKind)
     return std::unexpected(std::move(sourceKind.error()));
   notification.damageSourceKind = std::move(*sourceKind);
-  auto material = v.getString("targetMaterialKind");
+  auto material = v.get_string("targetMaterialKind");
   if (!material)
     return std::unexpected(std::move(material.error()));
   notification.targetMaterialKind = std::move(*material);
@@ -443,7 +443,7 @@ std::expected<Json, StarException> DamageNotification::toJson() const {
     return std::unexpected(std::move(hit.error()));
   return JsonObject{{"sourceEntityId", sourceEntityId},
                     {"targetEntityId", targetEntityId},
-                    {"position", jsonFromVec2F(position)},
+                    {"position", json_from_vec2f(position)},
                     {"damageDealt", damageDealt},
                     {"healthLost", healthLost},
                     {"hitType", String(*hit)},

@@ -28,7 +28,7 @@ std::expected<int, StarException> countWords(String const& text) {
 std::expected<int, StarException> countFields(Json const& json, std::initializer_list<char const*> fields) {
   int count = 0;
   for (auto field : fields) {
-    auto text = json.getString(field, "");
+    auto text = json.get_string(field, "");
     if (!text)
       return std::unexpected(std::move(text.error()));
     auto words = countWords(*text);
@@ -42,7 +42,7 @@ std::expected<int, StarException> countFields(Json const& json, std::initializer
 [[nodiscard]]
 std::expected<int, StarException> countOnlyStrings(Json const& json) {
   int count = 0;
-  if (json.isType(Json::Type::Object)) {
+  if (json.is_type(Json::Type::Object)) {
     auto entries = json.iterate_object();
     if (!entries)
       return std::unexpected(std::move(entries.error()));
@@ -52,7 +52,7 @@ std::expected<int, StarException> countOnlyStrings(Json const& json) {
         return std::unexpected(std::move(words.error()));
       count += *words;
     }
-  } else if (json.isType(Json::Type::Array)) {
+  } else if (json.is_type(Json::Type::Array)) {
     auto entries = json.iterate_array();
     if (!entries)
       return std::unexpected(std::move(entries.error()));
@@ -62,8 +62,8 @@ std::expected<int, StarException> countOnlyStrings(Json const& json) {
         return std::unexpected(std::move(words.error()));
       count += *words;
     }
-  } else if (json.isType(Json::Type::String)) {
-    auto text = json.toString();
+  } else if (json.is_type(Json::Type::String)) {
+    auto text = json.to_string();
     if (!text)
       return std::unexpected(std::move(text.error()));
     auto assetPath = text->starts_with("/");
@@ -117,7 +117,7 @@ int main(int argc, char** argv) {
         auto json = (*assets)->json(path);
         if (!json)
           return std::unexpected(std::move(json.error()));
-        if (json->isNull())
+        if (json->is_null())
           continue;
         auto count = countFunction(*json);
         if (!count)
@@ -145,11 +145,11 @@ int main(int argc, char** argv) {
       auto count = countFields(json, {"title", "description"});
       if (!count)
         return std::unexpected(std::move(count.error()));
-      auto pages = json.getArray("contentPages", JsonArray());
+      auto pages = json.get_array("contentPages", JsonArray());
       if (!pages)
         return std::unexpected(std::move(pages.error()));
       for (auto const& page : *pages) {
-        auto text = page.toString();
+        auto text = page.to_string();
         if (!text)
           return std::unexpected(std::move(text.error()));
         auto words = countWords(*text);
@@ -243,7 +243,7 @@ int main(int argc, char** argv) {
         return std::unexpected(std::move(entries.error()));
       int count = 0;
       for (auto const& panel : *entries) {
-        auto text = panel.optString("text");
+        auto text = panel.opt_string("text");
         if (!text)
           return std::unexpected(std::move(text.error()));
         if (!*text)

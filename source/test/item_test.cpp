@@ -532,7 +532,7 @@ namespace {
   auto bags = config->get("itemBags");
   if (!bags)
     return std::unexpected(std::move(bags.error()));
-  auto object = bags->toObject();
+  auto object = bags->to_object();
   if (!object)
     return std::unexpected(std::move(object.error()));
   for (auto const& name : object->keys()) {
@@ -914,7 +914,7 @@ const GameTestRegistration
       auto const& path = assetPath.string();
       auto config = baseAssets->json(path);
       ASSERT_TRUE(config);
-      auto kind = config->getString("kind");
+      auto kind = config->get_string("kind");
       ASSERT_TRUE(kind);
       if (*kind == "human") {
         humanPath = path;
@@ -930,20 +930,20 @@ const GameTestRegistration
       auto const& path = assetPath.string();
       auto config = baseAssets->json(path);
       ASSERT_TRUE(config);
-      auto type = config->getString("type");
+      auto type = config->get_string("type");
       ASSERT_TRUE(type);
       if (*type == "villager") {
         npcConfig = std::move(*config);
         break;
       }
     }
-    ASSERT_FALSE(npcConfig.isNull());
-    auto creationScripts = humanConfig.getArray("createScripts", {});
+    ASSERT_FALSE(npcConfig.is_null());
+    auto creationScripts = humanConfig.get_array("createScripts", {});
     ASSERT_TRUE(creationScripts);
     if (creationScripts->empty())
       creationScripts->push_back("/humanoid/asterbound/create.lua");
     creationScripts->push_back("/readycatalog/create.lua");
-    auto buildScripts = humanConfig.getArray("buildScripts", {});
+    auto buildScripts = humanConfig.get_array("buildScripts", {});
     ASSERT_TRUE(buildScripts);
     if (buildScripts->empty())
       buildScripts->push_back("/humanoid/asterbound/build.lua");
@@ -1113,7 +1113,7 @@ end
     ASSERT_TRUE(built);
     EXPECT_EQ(built->name(), "readycatalogbuilt");
     EXPECT_EQ(built->friendlyName(), "NestedReady_LeafOwner");
-    EXPECT_EQ(built->parameters().getString("nestedCatalog"), "builder");
+    EXPECT_EQ(built->parameters().get_string("nestedCatalog"), "builder");
     auto rebuiltResult = inventoryTestItem(*database, "readycatalogbroken", 3);
     ASSERT_TRUE(rebuiltResult);
     auto const& rebuilt = *rebuiltResult;
@@ -1121,7 +1121,7 @@ end
     EXPECT_EQ(rebuilt->name(), "readycatalogleaf");
     EXPECT_EQ(rebuilt->count(), 3u);
     EXPECT_EQ(rebuilt->friendlyName(), "RebuiltReady_LeafOwner");
-    EXPECT_EQ(rebuilt->parameters().getString("nestedCatalog"), "rebuilder");
+    EXPECT_EQ(rebuilt->parameters().get_string("nestedCatalog"), "rebuilder");
     auto collections = root.collectionDatabase();
     ASSERT_TRUE(collections);
     auto leaf = (*collections)->collectable("readycatalogcollection", "leaf");
@@ -1131,7 +1131,7 @@ end
     ASSERT_TRUE(configuration);
     auto marker = (*configuration)->get("readySpeciesBuild");
     ASSERT_TRUE(marker);
-    EXPECT_EQ(marker->toString(), "LeafOwner");
+    EXPECT_EQ(marker->to_string(), "LeafOwner");
   });
 
 const GameTestRegistration
@@ -1374,15 +1374,15 @@ function uninit() visit("uninit") end
       ASSERT_TRUE((*item)->update(dt, FireMode::Primary, false, {}));
       ASSERT_TRUE((*item)->update(dt, FireMode::Primary, false, {}));
       String expectedHook = failure == "uninit" ? "update" : failure;
-      EXPECT_EQ((*item)->instanceValue("lastHook").and_then([](Json const& value) { return value.toString(); }), expectedHook);
+      EXPECT_EQ((*item)->instanceValue("lastHook").and_then([](Json const& value) { return value.to_string(); }), expectedHook);
       // Storage retention is host work after activate/update. A failed script
       // must not prevent it, and the second tick must not re-enter that script.
       auto retained = (*item)->instanceValue("scriptStorage");
       ASSERT_TRUE(retained);
-      EXPECT_EQ(retained->getString("lastHook"), expectedHook);
+      EXPECT_EQ(retained->get_string("lastHook"), expectedHook);
       ASSERT_TRUE((*item)->uninit());
       EXPECT_FALSE((*item)->initialized());
-      EXPECT_EQ((*item)->instanceValue("lastHook").and_then([](Json const& value) { return value.toString(); }), failure);
+      EXPECT_EQ((*item)->instanceValue("lastHook").and_then([](Json const& value) { return value.to_string(); }), failure);
       std::string marker = "active-item-recovery:" + failure.utf8();
       EXPECT_EQ(std::ranges::count_if(sink->records, [&](std::string const& record) {
         return record.find(marker) != std::string::npos;
@@ -1651,18 +1651,18 @@ end
         EXPECT_EQ(*target == original, !changed);
         EXPECT_EQ(original->descriptor(), originalDescriptor);
         EXPECT_EQ((*target)->count(), 4u);
-        EXPECT_EQ((*target)->parameters().getBool("lifecycleChanged", false), changed);
+        EXPECT_EQ((*target)->parameters().get_bool("lifecycleChanged", false), changed);
         auto initCount = (*configuration)->get("lifecycleInit");
         auto invokeCount = (*configuration)->get("lifecycleInvoke");
         auto cleanupCount = (*configuration)->get("lifecycleCleanup");
         ASSERT_TRUE(initCount);
         ASSERT_TRUE(invokeCount);
         ASSERT_TRUE(cleanupCount);
-        EXPECT_EQ(initCount->toInt(), 1);
-        EXPECT_EQ(invokeCount->toInt(), test.stage == "init" ? 0 : 1);
+        EXPECT_EQ(initCount->to_int(), 1);
+        EXPECT_EQ(invokeCount->to_int(), test.stage == "init" ? 0 : 1);
         // DisableContext retires failed init/invoke sessions before explicit
         // uninit. A configured second hook failure must not resurrect the hook.
-        EXPECT_EQ(cleanupCount->toInt(), test.stage.empty() ? 1 : 0);
+        EXPECT_EQ(cleanupCount->to_int(), test.stage.empty() ? 1 : 0);
       }
     }
   });

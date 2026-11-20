@@ -117,7 +117,7 @@ std::expected<std::shared_ptr<PlayerConfig>, StarException> PlayerConfig::create
   if (!identity)
     return std::unexpected(std::move(identity.error()));
   config->defaultIdentity = std::move(*identity);
-  auto items = json.getArray("defaultItems", JsonArray());
+  auto items = json.get_array("defaultItems", JsonArray());
   if (!items)
     return std::unexpected(std::move(items.error()));
   for (auto const& itemJson : *items) {
@@ -129,7 +129,7 @@ std::expected<std::shared_ptr<PlayerConfig>, StarException> PlayerConfig::create
   auto blueprintConfig = json.get("defaultBlueprints", JsonObject());
   if (!blueprintConfig)
     return std::unexpected(std::move(blueprintConfig.error()));
-  auto blueprints = blueprintConfig->getArray("tier1", JsonArray());
+  auto blueprints = blueprintConfig->get_array("tier1", JsonArray());
   if (!blueprints)
     return std::unexpected(std::move(blueprints.error()));
   for (auto const& itemJson : *blueprints) {
@@ -141,7 +141,7 @@ std::expected<std::shared_ptr<PlayerConfig>, StarException> PlayerConfig::create
   auto boundsConfig = json.get("metaBoundBox");
   if (!boundsConfig)
     return std::unexpected(std::move(boundsConfig.error()));
-  auto bounds = jsonToRectF(*boundsConfig);
+  auto bounds = json_to_rectf(*boundsConfig);
   if (!bounds)
     return std::unexpected(std::move(bounds.error()));
   config->metaBoundBox = *bounds;
@@ -163,7 +163,7 @@ std::expected<std::shared_ptr<PlayerConfig>, StarException> PlayerConfig::create
       std::pair{std::string_view{"teleportOutTime"}, std::ref(config->teleportOutTime)},
       std::pair{std::string_view{"deployInTime"}, std::ref(config->deployInTime)},
       std::pair{std::string_view{"deployOutTime"}, std::ref(config->deployOutTime)}}) {
-    auto value = json.getFloat(field.first);
+    auto value = json.get_float(field.first);
     if (!value)
       return std::unexpected(std::move(value.error()));
     field.second.get() = *value;
@@ -174,7 +174,7 @@ std::expected<std::shared_ptr<PlayerConfig>, StarException> PlayerConfig::create
     auto value = json.get(field.first);
     if (!value)
       return std::unexpected(std::move(value.error()));
-    auto vector = jsonToVec2F(*value);
+    auto vector = json_to_vec2f(*value);
     if (!vector)
       return std::unexpected(std::move(vector.error()));
     field.second.get() = *vector;
@@ -189,7 +189,7 @@ std::expected<std::shared_ptr<PlayerConfig>, StarException> PlayerConfig::create
   for (auto const& field : {
       std::pair{std::string_view{"effectsAnimator"}, std::ref(config->effectsAnimator)},
       std::pair{std::string_view{"bodyMaterialKind"}, std::ref(config->bodyMaterialKind)}}) {
-    auto value = json.getString(field.first);
+    auto value = json.get_string(field.first);
     if (!value)
       return std::unexpected(std::move(value.error()));
     field.second.get() = std::move(*value);
@@ -197,12 +197,12 @@ std::expected<std::shared_ptr<PlayerConfig>, StarException> PlayerConfig::create
   auto contextConfig = json.get("genericScriptContexts");
   if (!contextConfig)
     return std::unexpected(std::move(contextConfig.error()));
-  auto contexts = contextConfig->optObject();
+  auto contexts = contextConfig->opt_object();
   if (!contexts)
     return std::unexpected(std::move(contexts.error()));
   if (*contexts) {
     for (auto const& entry : **contexts) {
-      auto name = entry.second.toString();
+      auto name = entry.second.to_string();
       if (!name)
         return std::unexpected(std::move(name.error()));
       config->genericScriptContexts[entry.first] = std::move(*name);
@@ -225,7 +225,7 @@ std::expected<std::shared_ptr<PlayerFactory>, StarException> PlayerFactory::crea
   auto configJson = (*assets)->json("/player.config");
   if (!configJson)
     return std::unexpected(std::move(configJson.error()));
-  auto object = configJson->toObject();
+  auto object = configJson->to_object();
   if (!object)
     return std::unexpected(std::move(object.error()));
   auto config = PlayerConfig::create(root, *object);

@@ -272,11 +272,11 @@ std::expected<std::shared_ptr<MaterialItem>, StarException> MaterialItem::create
   auto beam = item->initializeBeam(config);
   if (!beam)
     return std::unexpected(std::move(beam.error()));
-  auto material = config.getInt("materialId");
+  auto material = config.get_int("materialId");
   if (!material)
     return std::unexpected(std::move(material.error()));
   item->m_material = *material;
-  auto hue = item->instanceValue("materialHueShift", 0).and_then([](Json const& value) { return value.toFloat(); });
+  auto hue = item->instanceValue("materialHueShift", 0).and_then([](Json const& value) { return value.to_float(); });
   if (!hue)
     return std::unexpected(std::move(hue.error()));
   item->m_materialHueShift = materialHueFromDegrees(*hue);
@@ -301,7 +301,7 @@ std::expected<std::shared_ptr<MaterialItem>, StarException> MaterialItem::create
     if (!icons)
       return std::unexpected(std::move(icons.error()));
   }
-  auto twoHanded = config.getBool("twoHanded", true);
+  auto twoHanded = config.get_bool("twoHanded", true);
   if (!twoHanded)
     return std::unexpected(std::move(twoHanded.error()));
   item->setTwoHanded(*twoHanded);
@@ -311,28 +311,28 @@ std::expected<std::shared_ptr<MaterialItem>, StarException> MaterialItem::create
   auto defaults = (*assets)->json("/items/defaultParameters.config");
   if (!defaults)
     return std::unexpected(std::move(defaults.error()));
-  auto defaultCooldown = defaults->queryFloat("materialItems.cooldown");
+  auto defaultCooldown = defaults->query_float("materialItems.cooldown");
   if (!defaultCooldown)
     return std::unexpected(std::move(defaultCooldown.error()));
-  auto cooldown = config.queryFloat("materialItems.cooldown", *defaultCooldown);
+  auto cooldown = config.query_float("materialItems.cooldown", *defaultCooldown);
   if (!cooldown)
     return std::unexpected(std::move(cooldown.error()));
   item->setCooldownTime(*cooldown);
-  auto defaultRadius = defaults->getFloat("blockRadius");
+  auto defaultRadius = defaults->get_float("blockRadius");
   if (!defaultRadius)
     return std::unexpected(std::move(defaultRadius.error()));
-  auto radius = config.getFloat("blockRadius", *defaultRadius);
+  auto radius = config.get_float("blockRadius", *defaultRadius);
   if (!radius)
     return std::unexpected(std::move(radius.error()));
   item->m_blockRadius = *radius;
-  auto defaultAlt = defaults->getFloat("altBlockRadius");
+  auto defaultAlt = defaults->get_float("altBlockRadius");
   if (!defaultAlt)
     return std::unexpected(std::move(defaultAlt.error()));
-  auto alt = config.getFloat("altBlockRadius", *defaultAlt);
+  auto alt = config.get_float("altBlockRadius", *defaultAlt);
   if (!alt)
     return std::unexpected(std::move(alt.error()));
   item->m_altBlockRadius = *alt;
-  auto overrideName = config.getString("collisionOverride", "None");
+  auto overrideName = config.get_string("collisionOverride", "None");
   if (!overrideName)
     return std::unexpected(std::move(overrideName.error()));
   auto collisionOverride = maybe_enum_value<TileCollisionOverrideNames>(*overrideName);
@@ -343,11 +343,11 @@ std::expected<std::shared_ptr<MaterialItem>, StarException> MaterialItem::create
   auto collision = (*database)->materialCollisionKind(item->m_material);
   if (!collision)
     return std::unexpected(std::move(collision.error()));
-  auto multiplace = config.getBool("allowMultiplace", BlockCollisionSet.contains(*collision));
+  auto multiplace = config.get_bool("allowMultiplace", BlockCollisionSet.contains(*collision));
   if (!multiplace)
     return std::unexpected(std::move(multiplace.error()));
   item->m_multiplace = *multiplace;
-  auto sounds = config.get("placeSounds", JsonArray()).and_then(jsonToStringList);
+  auto sounds = config.get("placeSounds", JsonArray()).and_then(json_to_string_list);
   if (!sounds)
     return std::unexpected(std::move(sounds.error()));
   item->m_placeSounds = std::move(*sounds);
@@ -724,14 +724,14 @@ std::expected<std::size_t, StarException> MaterialItem::blockSwap(float radius, 
   auto defaultDamage = beamAxe.instanceValue("primaryAbility.tileDamage", 1.0f);
   if (!defaultDamage)
     return std::unexpected(std::move(defaultDamage.error()));
-  auto amount = beamAxe.instanceValue("tileDamage", *defaultDamage).and_then([](Json const& value) { return value.toFloat(); });
+  auto amount = beamAxe.instanceValue("tileDamage", *defaultDamage).and_then([](Json const& value) { return value.to_float(); });
   if (!amount)
     return std::unexpected(std::move(amount.error()));
   damage.amount = *amount;
   auto defaultHarvest = beamAxe.instanceValue("primaryAbility.harvestLevel", 1);
   if (!defaultHarvest)
     return std::unexpected(std::move(defaultHarvest.error()));
-  auto harvest = beamAxe.instanceValue("harvestLevel", *defaultHarvest).and_then([](Json const& value) { return value.toUInt(); });
+  auto harvest = beamAxe.instanceValue("harvestLevel", *defaultHarvest).and_then([](Json const& value) { return value.to_uint(); });
   if (!harvest)
     return std::unexpected(std::move(harvest.error()));
   damage.harvestLevel = *harvest;
@@ -800,7 +800,7 @@ std::expected<std::size_t, StarException> MaterialItem::blockSwap(float radius, 
         return std::unexpected(std::move(sound.error()));
       blockSound = std::move(*sound);
       if (!blockSound.empty()) {
-        auto defaultSound = (*assets)->json("/client.config:defaultFootstepSound").and_then([](Json const& value) { return value.toString(); });
+        auto defaultSound = (*assets)->json("/client.config:defaultFootstepSound").and_then([](Json const& value) { return value.to_string(); });
         if (!defaultSound)
           return std::unexpected(std::move(defaultSound.error()));
         if (blockSound != *defaultSound)
@@ -809,7 +809,7 @@ std::expected<std::size_t, StarException> MaterialItem::blockSwap(float radius, 
     }
   }
 
-  auto blockVolume = (*assets)->json("/sfx.config:miningBlockVolume").and_then([](Json const& value) { return value.toFloat(); });
+  auto blockVolume = (*assets)->json("/sfx.config:miningBlockVolume").and_then([](Json const& value) { return value.to_float(); });
   if (!blockVolume)
     return std::unexpected(std::move(blockVolume.error()));
   auto played = itemOwner->get().addSound(blockSound, *blockVolume);
@@ -818,15 +818,15 @@ std::expected<std::size_t, StarException> MaterialItem::blockSwap(float radius, 
   auto strikeSounds = beamAxe.instanceValue("strikeSounds");
   if (!strikeSounds)
     return std::unexpected(std::move(strikeSounds.error()));
-  if (!strikeSounds->isNull()) {
-    auto sounds = jsonToStringList(*strikeSounds);
+  if (!strikeSounds->is_null()) {
+    auto sounds = json_to_string_list(*strikeSounds);
     if (!sounds)
       return std::unexpected(std::move(sounds.error()));
     auto soundResult = root().random().sample_value(*sounds);
     if (!soundResult)
       return std::unexpected(std::move(soundResult.error()));
     auto sound = std::move(*soundResult);
-    auto toolVolume = (*assets)->json("/sfx.config:miningToolVolume").and_then([](Json const& value) { return value.toFloat(); });
+    auto toolVolume = (*assets)->json("/sfx.config:miningToolVolume").and_then([](Json const& value) { return value.to_float(); });
     if (!toolVolume)
       return std::unexpected(std::move(toolVolume.error()));
     auto played = itemOwner->get().addSound(sound, *toolVolume);
@@ -914,8 +914,8 @@ std::expected<void, StarException> MaterialItem::updatePropertiesFromPlayer(Play
   auto blockRadius = player.getSecretProperty(BlockRadiusPropertyKey);
   if (!blockRadius)
     return std::unexpected(std::move(blockRadius.error()));
-  if (blockRadius->isType(Json::Type::Float)) {
-    auto value = blockRadius->toFloat();
+  if (blockRadius->is_type(Json::Type::Float)) {
+    auto value = blockRadius->to_float();
     if (!value)
       return std::unexpected(std::move(value.error()));
     m_blockRadius = *value;
@@ -923,8 +923,8 @@ std::expected<void, StarException> MaterialItem::updatePropertiesFromPlayer(Play
   auto altRadius = player.getSecretProperty(AltBlockRadiusPropertyKey);
   if (!altRadius)
     return std::unexpected(std::move(altRadius.error()));
-  if (altRadius->isType(Json::Type::Float)) {
-    auto value = altRadius->toFloat();
+  if (altRadius->is_type(Json::Type::Float)) {
+    auto value = altRadius->to_float();
     if (!value)
       return std::unexpected(std::move(value.error()));
     m_altBlockRadius = *value;
@@ -932,8 +932,8 @@ std::expected<void, StarException> MaterialItem::updatePropertiesFromPlayer(Play
   auto collision = player.getSecretProperty(CollisionOverridePropertyKey);
   if (!collision)
     return std::unexpected(std::move(collision.error()));
-  if (collision->isType(Json::Type::String)) {
-    auto name = collision->toString();
+  if (collision->is_type(Json::Type::String)) {
+    auto name = collision->to_string();
     if (!name)
       return std::unexpected(std::move(name.error()));
     auto value = maybe_enum_value<TileCollisionOverrideNames>(*name);
@@ -944,8 +944,8 @@ std::expected<void, StarException> MaterialItem::updatePropertiesFromPlayer(Play
   auto blockSwap = player.getSecretProperty(BlockSwapPropertyKey);
   if (!blockSwap)
     return std::unexpected(std::move(blockSwap.error()));
-  if (blockSwap->isType(Json::Type::Bool)) {
-    auto value = blockSwap->toBool();
+  if (blockSwap->is_type(Json::Type::Bool)) {
+    auto value = blockSwap->to_bool();
     if (!value)
       return std::unexpected(std::move(value.error()));
     m_blockSwap = *value;
@@ -1079,7 +1079,7 @@ std::expected<MaterialHue, StarException> MaterialItem::placementHueShift(Vec2I 
   if (!hue)
     return std::unexpected(std::move(hue.error()));
   if (*hue) {
-    return hue->toFloat().transform(materialHueFromDegrees);
+    return hue->to_float().transform(materialHueFromDegrees);
   }
   auto itemWorld = world();
   if (!itemWorld)

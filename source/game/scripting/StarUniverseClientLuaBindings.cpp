@@ -170,24 +170,24 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseClientThread
     if (!hasSeed)
       return std::unexpected(std::move(hasSeed.error()));
     if (*hasSeed) {
-      auto seed = worldConfig.getUInt("seed");
+      auto seed = worldConfig.get_uint("seed");
       if (!seed)
         return std::unexpected(std::move(seed.error()));
       worldSeed = *seed;
     } else {
       worldSeed = root.random().next_u64();
     }
-    auto worldType = worldConfig.getString("type");
+    auto worldType = worldConfig.get_string("type");
     if (!worldType)
       return std::unexpected(std::move(worldType.error()));
     std::expected<std::shared_ptr<VisitableWorldParameters>, StarException> worldParameters;
     if (auto terrestrialMatch = worldType->equals_ignore_case("Terrestrial"); !terrestrialMatch) {
       return std::unexpected(std::move(terrestrialMatch.error()));
     } else if (*terrestrialMatch) {
-      auto planetType = worldConfig.getString("planetType");
+      auto planetType = worldConfig.get_string("planetType");
       if (!planetType)
         return std::unexpected(std::move(planetType.error()));
-      auto planetSize = worldConfig.getString("planetSize");
+      auto planetSize = worldConfig.get_string("planetSize");
       if (!planetSize)
         return std::unexpected(std::move(planetSize.error()));
       worldParameters = generateTerrestrialWorldParameters(root, *planetType, *planetSize, worldSeed);
@@ -198,7 +198,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseClientThread
     } else if (auto dungeonMatch = worldType->equals_ignore_case("FloatingDungeon"); !dungeonMatch) {
       return std::unexpected(std::move(dungeonMatch.error()));
     } else if (*dungeonMatch) {
-      auto dungeonWorld = worldConfig.getString("dungeonWorld");
+      auto dungeonWorld = worldConfig.get_string("dungeonWorld");
       if (!dungeonWorld)
         return std::unexpected(std::move(dungeonWorld.error()));
       worldParameters = generateFloatingDungeonWorldParameters(root, *dungeonWorld);
@@ -207,12 +207,12 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseClientThread
     }
     if (!worldParameters)
       return std::unexpected(std::move(worldParameters.error()));
-    auto level = worldConfig.optFloat("level");
+    auto level = worldConfig.opt_float("level");
     if (!level)
       return std::unexpected(std::move(level.error()));
     if (*level)
       (*worldParameters)->threatLevel = **level;
-    auto beamUpRule = worldConfig.optString("beamUpRule");
+    auto beamUpRule = worldConfig.opt_string("beamUpRule");
     if (!beamUpRule)
       return std::unexpected(std::move(beamUpRule.error()));
     if (*beamUpRule) {
@@ -223,7 +223,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseClientThread
         return std::unexpected(std::move(rule.error()));
       (*worldParameters)->beamUpRule = rule->get();
     }
-    auto disableDeathDrops = worldConfig.getBool("disableDeathDrops", false);
+    auto disableDeathDrops = worldConfig.get_bool("disableDeathDrops", false);
     if (!disableDeathDrops)
       return std::unexpected(std::move(disableDeathDrops.error()));
     (*worldParameters)->disableDeathDrops = *disableDeathDrops;

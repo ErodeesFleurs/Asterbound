@@ -143,15 +143,15 @@ std::expected<std::shared_ptr<TillingTool>, StarException> TillingTool::create(R
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto image = item->instanceValue("image").and_then([](Json const& value) { return value.toString(); });
+  auto image = item->instanceValue("image").and_then([](Json const& value) { return value.to_string(); });
   if (!image)
     return std::unexpected(std::move(image.error()));
   item->m_image = AssetPath::relative_to(directory, *image);
-  auto frames = item->instanceValue("frames", 1).and_then([](Json const& value) { return value.toInt(); });
+  auto frames = item->instanceValue("frames", 1).and_then([](Json const& value) { return value.to_int(); });
   if (!frames)
     return std::unexpected(std::move(frames.error()));
   item->m_frames = *frames;
-  auto cycle = item->instanceValue("animationCycle", 1.0f).and_then([](Json const& value) { return value.toFloat(); });
+  auto cycle = item->instanceValue("animationCycle", 1.0f).and_then([](Json const& value) { return value.to_float(); });
   if (!cycle)
     return std::unexpected(std::move(cycle.error()));
   item->m_frameCycle = *cycle;
@@ -165,15 +165,15 @@ std::expected<std::shared_ptr<TillingTool>, StarException> TillingTool::create(R
   if (!idle)
     return std::unexpected(std::move(idle.error()));
   item->m_idleFrame = std::move(*idle);
-  auto position = item->instanceValue("handPosition").and_then(jsonToVec2F);
+  auto position = item->instanceValue("handPosition").and_then(json_to_vec2f);
   if (!position)
     return std::unexpected(std::move(position.error()));
   item->m_handPosition = *position;
-  auto sounds = item->instanceValue("strikeSounds").and_then(jsonToStringList);
+  auto sounds = item->instanceValue("strikeSounds").and_then(json_to_string_list);
   if (!sounds)
     return std::unexpected(std::move(sounds.error()));
   item->m_strikeSounds = std::move(*sounds);
-  auto volume = (*assets)->json("/sfx.config:harvestToolVolume").and_then([](Json const& value) { return value.toFloat(); });
+  auto volume = (*assets)->json("/sfx.config:harvestToolVolume").and_then([](Json const& value) { return value.to_float(); });
   if (!volume)
     return std::unexpected(std::move(volume.error()));
   item->m_toolVolume = *volume;
@@ -260,7 +260,7 @@ std::expected<void, StarException> TillingTool::fire(FireMode mode, bool shiftin
           auto assets = root().assets();
           if (!assets)
             return std::unexpected(std::move(assets.error()));
-          auto ding = (*assets)->json("/client.config:defaultDingSound").and_then([](Json const& value) { return value.toString(); });
+          auto ding = (*assets)->json("/client.config:defaultDingSound").and_then([](Json const& value) { return value.to_string(); });
           if (!ding)
             return std::unexpected(std::move(ding.error()));
           strikeSound = std::move(*ding);

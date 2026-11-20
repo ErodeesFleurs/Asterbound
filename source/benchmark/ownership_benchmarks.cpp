@@ -868,7 +868,7 @@ void assetsMixedCleanup(benchmark::State& state, BenchmarkSession& session) {
     auto json = fixture->assets->json("/player.config");
     if (!json)
       return std::unexpected(std::move(json.error()));
-    if (!json->isType(Json::Type::Object))
+    if (!json->is_type(Json::Type::Object))
       return std::unexpected(StarException("Real player configuration fixture is not an object"));
     for (std::size_t i = 0; i != count; ++i) {
       images[i] = handles.images[i];

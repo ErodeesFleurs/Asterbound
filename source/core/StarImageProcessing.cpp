@@ -23,7 +23,7 @@ namespace Star {
 std::expected<StringList, StarException> color_directives_from_config(JsonArray const& directives) {
   StringList result;
   for (auto const& entry : directives) {
-    auto text = entry.type() == Json::Type::Object ? palette_swap_directives_from_config(entry) : entry.toString();
+    auto text = entry.type() == Json::Type::Object ? palette_swap_directives_from_config(entry) : entry.to_string();
     if (!text)
       return std::unexpected(std::move(text.error()));
     result.push_back(std::move(*text));
@@ -40,7 +40,7 @@ std::expected<String, StarException> palette_swap_directives_from_config(Json co
     auto from = Color::from_hex(swap.first);
     if (!from)
       return std::unexpected(std::move(from.error()));
-    auto text = swap.second.toString();
+    auto text = swap.second.to_string();
     if (!text)
       return std::unexpected(std::move(text.error()));
     auto to = Color::from_hex(*text);

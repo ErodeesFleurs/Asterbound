@@ -220,7 +220,7 @@ std::expected<void, StarException> CharCreationPane::init(
   auto speciesConfig = (*assets)->json("/interface/windowconfig/charcreation.config:speciesOrdering");
   if (!speciesConfig)
     return std::unexpected(std::move(speciesConfig.error()));
-  auto speciesList = jsonToStringList(*speciesConfig);
+  auto speciesList = json_to_string_list(*speciesConfig);
   if (!speciesList)
     return std::unexpected(std::move(speciesList.error()));
   m_speciesList = std::move(*speciesList);
@@ -494,7 +494,7 @@ std::expected<void, StarException> CharCreationPane::changed() {
     return std::unexpected(std::move(modeButton.error()));
   if (auto result = (*modeButton)->check(); !result)
     return std::unexpected(std::move(result.error()));
-  auto description = (*modeButton)->data().getString("description", "fail");
+  auto description = (*modeButton)->data().get_string("description", "fail");
   if (!description)
     return std::unexpected(std::move(description.error()));
   if (auto result = setRequiredLabel("labelMode", *description); !result)

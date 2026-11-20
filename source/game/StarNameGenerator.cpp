@@ -50,21 +50,21 @@ std::expected<std::shared_ptr<PatternedNameGenerator>, StarException> PatternedN
       auto config = (*assets)->json(file);
       if (!config)
         return std::unexpected(std::move(config.error()));
-      auto name = config->getString("name");
+      auto name = config->get_string("name");
       if (!name)
         return std::unexpected(std::move(name.error()));
       if (result->m_markovSources.contains(*name))
         return std::unexpected(NameGeneratorException::format("Duplicate name source '{}', config file '{}'", *name, file));
-      auto prefixSize = config->getUInt("prefixSize", 1);
+      auto prefixSize = config->get_uint("prefixSize", 1);
       if (!prefixSize)
         return std::unexpected(std::move(prefixSize.error()));
-      auto endSize = config->getUInt("endSize", 1);
+      auto endSize = config->get_uint("endSize", 1);
       if (!endSize)
         return std::unexpected(std::move(endSize.error()));
       auto namesConfig = config->get("sourceNames");
       if (!namesConfig)
         return std::unexpected(std::move(namesConfig.error()));
-      auto names = jsonToStringList(*namesConfig);
+      auto names = json_to_string_list(*namesConfig);
       if (!names)
         return std::unexpected(std::move(names.error()));
       auto source = result->makeMarkovSource(*prefixSize, *endSize, std::move(*names));
@@ -83,7 +83,7 @@ std::expected<std::shared_ptr<PatternedNameGenerator>, StarException> PatternedN
   if (!profanity)
     return std::unexpected(std::move(profanity.error()));
   for (auto const& entry : *profanity) {
-    auto word = entry.toString();
+    auto word = entry.to_string();
     if (!word)
       return std::unexpected(std::move(word.error()));
     auto lower = word->to_lower();
@@ -139,21 +139,21 @@ std::expected<String, StarException> PatternedNameGenerator::processRule(JsonArr
   String mode = "alts";
   std::size_t index = 0;
   bool title_case = false;
-  if (rule[0].isType(Json::Type::Object)) {
+  if (rule[0].is_type(Json::Type::Object)) {
     meta = rule[0];
-    auto configuredMode = meta.getString("mode", mode);
+    auto configuredMode = meta.get_string("mode", mode);
     if (!configuredMode)
       return std::unexpected(std::move(configuredMode.error()));
     mode = std::move(*configuredMode);
-    auto configuredTitleCase = meta.getBool("titleCase", false);
+    auto configuredTitleCase = meta.get_bool("titleCase", false);
     if (!configuredTitleCase)
       return std::unexpected(std::move(configuredTitleCase.error()));
     title_case = *configuredTitleCase;
     ++index;
   }
   auto evaluate = [&](Json const& entry) -> std::expected<String, StarException> {
-    if (!entry.isType(Json::Type::Array))
-      return entry.toString();
+    if (!entry.is_type(Json::Type::Array))
+      return entry.to_string();
     auto nested = entry.array_ptr();
     if (!nested)
       return std::unexpected(std::move(nested.error()));
@@ -177,7 +177,7 @@ std::expected<String, StarException> PatternedNameGenerator::processRule(JsonArr
       return std::unexpected(std::move(part.error()));
     result += *part;
   } else if (mode == "markov") {
-    auto sourceName = meta.getString("source");
+    auto sourceName = meta.get_string("source");
     if (!sourceName)
       return std::unexpected(std::move(sourceName.error()));
     auto source = m_markovSources.find_ref(*sourceName);
@@ -188,10 +188,10 @@ std::expected<String, StarException> PatternedNameGenerator::processRule(JsonArr
       return std::unexpected(std::move(range.error()));
     if ((*range)->size() < 2)
       return std::unexpected(NameGeneratorException("Name targetLength must contain two bounds"));
-    auto minimum = (**range)[0].toUInt();
+    auto minimum = (**range)[0].to_uint();
     if (!minimum)
       return std::unexpected(std::move(minimum.error()));
-    auto maximum = (**range)[1].toUInt();
+    auto maximum = (**range)[1].to_uint();
     if (!maximum)
       return std::unexpected(std::move(maximum.error()));
     auto target = random.uniform_uint(*minimum, *maximum);

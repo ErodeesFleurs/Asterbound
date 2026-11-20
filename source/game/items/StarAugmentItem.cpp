@@ -59,7 +59,7 @@ std::expected<StringList, StarException> AugmentItem::augmentScripts() const {
   auto scriptsValue = instanceValue("scripts");
   if (!scriptsValue)
     return std::unexpected(std::move(scriptsValue.error()));
-  auto scripts = jsonToStringList(*scriptsValue);
+  auto scripts = json_to_string_list(*scriptsValue);
   if (!scripts)
     return std::unexpected(std::move(scripts.error()));
   StringList result;

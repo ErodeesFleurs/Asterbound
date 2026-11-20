@@ -1432,7 +1432,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     if (!knownPortraitRevision || *knownPortraitRevision != quest.portraitRevision()) {
       result.set("portraitTitle", "");
       if (auto portrait = quest.portrait("Objective")) {
-        auto json = jsonFromList(*portrait, [](Drawable const& drawable) { return drawable.toJson(); });
+        auto json = json_from_list(*portrait, [](Drawable const& drawable) { return drawable.toJson(); });
         if (!json) return std::unexpected(std::move(json.error()));
         result.set("portrait", std::move(*json));
         result.set("portraitTitle", quest.portraitTitle("Objective").value_or(""));
@@ -1497,7 +1497,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   if (auto registered = callbacks.registerCallback("currentQuestLocation", [&player]() -> std::expected<Json, StarException> {
     if (auto quest = player.questManager()->currentQuest()) {
       if (auto location = (*quest)->location()) {
-        return JsonObject{{"system", jsonFromVec3I(location->first)}, {"location", jsonFromSystemLocation(location->second)}};
+        return JsonObject{{"system", json_from_vec3i(location->first)}, {"location", jsonFromSystemLocation(location->second)}};
       }
     }
     return Json();
@@ -1509,7 +1509,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     auto current = player.questManager()->currentQuest();
     for (auto const& quest : player.questManager()->listActiveQuests()) {
       if (auto location = quest->location()) {
-        Json locationJson = JsonObject{{"system", jsonFromVec3I(location->first)}, {"location", jsonFromSystemLocation(location->second)}};
+        Json locationJson = JsonObject{{"system", json_from_vec3i(location->first)}, {"location", jsonFromSystemLocation(location->second)}};
         bool selected = current && (*current)->questId() == quest->questId();
         result.push_back({std::move(locationJson), selected});
       }

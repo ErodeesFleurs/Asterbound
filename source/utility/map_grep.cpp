@@ -101,7 +101,7 @@ std::expected<void, StarException> grepMap(Root& root, SearchParameters const& s
   auto contents = File::read_file_string(file);
   if (!contents)
     return std::unexpected(std::move(contents.error()));
-  auto json = Json::parseJson(*contents);
+  auto json = Json::parse_json(*contents);
   if (!json)
     return std::unexpected(std::move(json.error()));
   auto map = TMXMap::create(root, *json);

@@ -68,13 +68,13 @@ std::expected<void, StarException> QuestManager::diskLoad(Json const& quests) {
   if (!loaded) return std::unexpected(std::move(loaded.error()));
   m_quests = std::move(*loaded);
   m_dialogs.clear();
-  auto current = quests.optString("currentQuest");
+  auto current = quests.opt_string("currentQuest");
   if (!current) return std::unexpected(std::move(current.error()));
   m_trackedQuestId = std::move(*current);
   return {};
 }
 std::expected<Json, StarException> QuestManager::diskStore() {
-  auto quests = jsonFromMapV(m_quests, [](std::shared_ptr<Quest> const& quest) { return quest->diskStore(); });
+  auto quests = json_from_map_v(m_quests, [](std::shared_ptr<Quest> const& quest) { return quest->diskStore(); });
   if (!quests) return std::unexpected(std::move(quests.error()));
   return JsonObject{{"quests", *quests}, {"currentQuest", json_from_optional(m_trackedQuestId)}};
 }
@@ -220,10 +220,10 @@ std::expected<Json, StarException> QuestManager::dialogView(std::uint64_t token,
   auto const& override = lease.kind == "offer" ? (*qt)->newQuestGuiConfig
       : lease.kind == "complete" ? (*qt)->questCompleteGuiConfig : (*qt)->questFailedGuiConfig;
   String portraitName = lease.kind == "offer" ? String("QuestStarted") : lease.kind == "complete" ? String("QuestComplete") : String("QuestFailed");
-  auto portrait = jsonFromList(quest.portrait(portraitName).value_or(List<Drawable>{}),
+  auto portrait = json_from_list(quest.portrait(portraitName).value_or(List<Drawable>{}),
       [](Drawable const& drawable) { return drawable.toJson(); });
   if (!portrait) return std::unexpected(std::move(portrait.error()));
-  auto objectiveJson = jsonFromList(std::move(objective).value_or(List<Drawable>{}),
+  auto objectiveJson = json_from_list(std::move(objective).value_or(List<Drawable>{}),
       [](Drawable const& drawable) { return drawable.toJson(); });
   if (!objectiveJson) return std::unexpected(std::move(objectiveJson.error()));
   JsonArray rewards;
@@ -430,7 +430,7 @@ std::expected<std::optional<QuestIndicator>, StarException> QuestManager::getQue
     if (!indicators) return std::unexpected(std::move(indicators.error()));
     auto indicator = indicators->get(*type);
     if (!indicator) return std::unexpected(std::move(indicator.error()));
-    auto image = indicator->getString("image");
+    auto image = indicator->get_string("image");
     if (!image) return std::unexpected(std::move(image.error()));
     if (giver) {
       auto indicatorPosition = giver->questIndicatorPosition();
@@ -461,7 +461,7 @@ std::expected<StringSet, StarException> QuestManager::interestingObjects() {
     if (!response) return std::unexpected(std::move(response.error()));
     if (*response) {
       if (std::holds_alternative<Json>(**response)) {
-        auto objects = jsonToStringSet(std::get<Json>(**response));
+        auto objects = json_to_string_set(std::get<Json>(**response));
         if (!objects) return std::unexpected(std::move(objects.error()));
         result.insert_range(*objects);
       }
@@ -525,7 +525,7 @@ std::expected<void, StarException> QuestManager::startInitialQuests() {
   if (!assets) return std::unexpected(std::move(assets.error()));
   auto json = (*assets)->json(Star::format("/quests/quests.config:initialquests.{}", m_player->get().species()));
   if (!json) return std::unexpected(std::move(json.error()));
-  auto initial = json->toArray();
+  auto initial = json->to_array();
   if (!initial) return std::unexpected(std::move(initial.error()));
   for (auto const& entry : *initial) {
     auto arc = QuestArcDescriptor::fromJson(m_root, entry);

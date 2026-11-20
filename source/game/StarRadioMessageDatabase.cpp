@@ -76,13 +76,13 @@ std::expected<RadioMessage, StarException> RadioMessageDatabase::radioMessage(St
 }
 
 std::expected<RadioMessage, StarException> RadioMessageDatabase::createRadioMessage(Json const& config, std::optional<String> const& messageId) const {
-  if (config.isType(Json::Type::String)) {
-    auto name = config.toString();
+  if (config.is_type(Json::Type::String)) {
+    auto name = config.to_string();
     if (!name)
       return std::unexpected(std::move(name.error()));
     return radioMessage(*name);
   }
-  if (!config.isType(Json::Type::Object))
+  if (!config.is_type(Json::Type::Object))
     return std::unexpected(RadioMessageDatabaseException("Invalid radio message specification; expected message name or configuration."));
   if (!RadioMessageTypeNames)
     return std::unexpected(RadioMessageTypeNames.error());
@@ -92,15 +92,15 @@ std::expected<RadioMessage, StarException> RadioMessageDatabase::createRadioMess
   auto defaults = (*assets)->json("/radiomessages.config:messageDefaults");
   if (!defaults)
     return std::unexpected((*assets)->withAssetContext(std::move(defaults.error()), "/radiomessages.config", "Loading radio message defaults"));
-  auto mergedConfig = jsonMerge(*defaults, config);
+  auto mergedConfig = json_merge(*defaults, config);
   RadioMessage message;
-  auto configuredId = mergedConfig.getString("messageId", "");
+  auto configuredId = mergedConfig.get_string("messageId", "");
   if (!configuredId)
     return std::unexpected(std::move(configuredId.error()));
   message.messageId = messageId.value_or(*configuredId);
   if (message.messageId.empty())
     return std::unexpected(RadioMessageDatabaseException("Custom radio messages must specify a messageId!"));
-  auto typeName = mergedConfig.getString("type");
+  auto typeName = mergedConfig.get_string("type");
   if (!typeName)
     return std::unexpected(std::move(typeName.error()));
   auto type = RadioMessageTypeNames->find_left_ref(*typeName);
@@ -110,43 +110,43 @@ std::expected<RadioMessage, StarException> RadioMessageDatabase::createRadioMess
     return std::unexpected(RadioMessageDatabaseException(Star::format("Unknown radio message type '{}'", *typeName)));
   message.type = (*type)->get();
   // Mission messages may repeat when the mission is replayed.
-  auto unique = message.type == RadioMessageType::Mission ? config.getBool("unique", false) : mergedConfig.getBool("unique");
+  auto unique = message.type == RadioMessageType::Mission ? config.get_bool("unique", false) : mergedConfig.get_bool("unique");
   if (!unique)
     return std::unexpected(std::move(unique.error()));
   message.unique = *unique;
-  auto important = mergedConfig.getBool("important");
+  auto important = mergedConfig.get_bool("important");
   if (!important)
     return std::unexpected(std::move(important.error()));
   message.important = *important;
-  auto text = mergedConfig.getString("text");
+  auto text = mergedConfig.get_string("text");
   if (!text)
     return std::unexpected(std::move(text.error()));
   message.text = std::move(*text);
-  auto senderName = mergedConfig.getString("senderName");
+  auto senderName = mergedConfig.get_string("senderName");
   if (!senderName)
     return std::unexpected(std::move(senderName.error()));
   message.senderName = std::move(*senderName);
-  auto portraitImage = mergedConfig.getString("portraitImage");
+  auto portraitImage = mergedConfig.get_string("portraitImage");
   if (!portraitImage)
     return std::unexpected(std::move(portraitImage.error()));
   message.portraitImage = std::move(*portraitImage);
-  auto portraitFrames = mergedConfig.getInt("portraitFrames");
+  auto portraitFrames = mergedConfig.get_int("portraitFrames");
   if (!portraitFrames)
     return std::unexpected(std::move(portraitFrames.error()));
   message.portraitFrames = *portraitFrames;
-  auto portraitSpeed = mergedConfig.getFloat("portraitSpeed");
+  auto portraitSpeed = mergedConfig.get_float("portraitSpeed");
   if (!portraitSpeed)
     return std::unexpected(std::move(portraitSpeed.error()));
   message.portraitSpeed = *portraitSpeed;
-  auto textSpeed = mergedConfig.getFloat("textSpeed");
+  auto textSpeed = mergedConfig.get_float("textSpeed");
   if (!textSpeed)
     return std::unexpected(std::move(textSpeed.error()));
   message.textSpeed = *textSpeed;
-  auto persistTime = mergedConfig.getFloat("persistTime");
+  auto persistTime = mergedConfig.get_float("persistTime");
   if (!persistTime)
     return std::unexpected(std::move(persistTime.error()));
   message.persistTime = *persistTime;
-  auto chatterSound = mergedConfig.getString("chatterSound");
+  auto chatterSound = mergedConfig.get_string("chatterSound");
   if (!chatterSound)
     return std::unexpected(std::move(chatterSound.error()));
   message.chatterSound = std::move(*chatterSound);
@@ -162,7 +162,7 @@ std::expected<RadioMessage, StarException> RadioMessageDatabase::createRadioMess
     if (!variants)
       return std::unexpected(std::move(variants.error()));
     for (auto const& pair : *variants) {
-      auto nested = createRadioMessage(jsonMerge(*merger, pair.second), messageId);
+      auto nested = createRadioMessage(json_merge(*merger, pair.second), messageId);
       if (!nested)
         return std::unexpected(std::move(nested.error()));
       message.speciesMessage[pair.first] = std::move(*nested);

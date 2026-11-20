@@ -418,19 +418,19 @@ std::expected<void, StarException> LuaConverter<Json>::from(LuaStack stack, Json
   switch (v.type()) {
   case Json::Type::Null: return stack.push(LuaNil);
   case Json::Type::Float: {
-    auto value = v.toDouble();
+    auto value = v.to_double();
     if (!value)
       return std::unexpected(std::move(value.error()));
     return stack.push(*value);
   }
   case Json::Type::Bool: {
-    auto value = v.toBool();
+    auto value = v.to_bool();
     if (!value)
       return std::unexpected(std::move(value.error()));
     return stack.push(*value);
   }
   case Json::Type::Int: {
-    auto value = v.toInt();
+    auto value = v.to_int();
     if (!value)
       return std::unexpected(std::move(value.error()));
     return stack.push(*value);
@@ -472,7 +472,7 @@ std::expected<std::optional<JsonObject>, StarException> LuaConverter<JsonObject>
   if (!*j)
     return std::nullopt;
   if ((**j).type() == Json::Type::Object)
-    return (**j).toObject();
+    return (**j).to_object();
   if ((**j).type() == Json::Type::Array) {
     auto values = (**j).array_ptr();
     if (!values)
@@ -494,7 +494,7 @@ std::expected<std::optional<JsonArray>, StarException> LuaConverter<JsonArray>::
   if (!*j)
     return std::nullopt;
   if ((**j).type() == Json::Type::Array)
-    return (**j).toArray();
+    return (**j).to_array();
   if ((**j).type() == Json::Type::Object) {
     auto values = (**j).object_ptr();
     if (!values)
@@ -2002,7 +2002,7 @@ std::expected<void, StarException> LuaDetail::insertJsonMetatable(LuaEngine& eng
 }
 
 std::expected<LuaTable, StarException> LuaDetail::jsonContainerToTable(LuaEngine& engine, Json const& container) {
-  if (!container.isType(Json::Type::Array) && !container.isType(Json::Type::Object))
+  if (!container.is_type(Json::Type::Array) && !container.is_type(Json::Type::Object))
     return std::unexpected(LuaException("jsonContainerToTable called on improper json type"));
   auto result = engine.luaFrom(container);
   if (!result)

@@ -64,47 +64,47 @@ std::expected<std::shared_ptr<Dance>, StarException> DanceDatabase::readDance(As
   if (!config)
     return std::unexpected(std::move(config.error()));
   auto dance = std::make_shared<Dance>();
-  auto name = config->getString("name");
+  auto name = config->get_string("name");
   if (!name)
     return std::unexpected(std::move(name.error()));
   dance->name = std::move(*name);
-  auto states = config->getArray("states");
+  auto states = config->get_array("states");
   if (!states)
     return std::unexpected(std::move(states.error()));
   for (auto const& state : *states) {
-    auto value = state.toString();
+    auto value = state.to_string();
     if (!value)
       return std::unexpected(std::move(value.error()));
     dance->states.push_back(std::move(*value));
   }
-  auto cycle = config->getFloat("cycle");
+  auto cycle = config->get_float("cycle");
   if (!cycle)
     return std::unexpected(std::move(cycle.error()));
   dance->cycle = *cycle;
-  auto cyclic = config->getBool("cyclic");
+  auto cyclic = config->get_bool("cyclic");
   if (!cyclic)
     return std::unexpected(std::move(cyclic.error()));
   dance->cyclic = *cyclic;
-  auto duration = config->getFloat("duration");
+  auto duration = config->get_float("duration");
   if (!duration)
     return std::unexpected(std::move(duration.error()));
   dance->duration = *duration;
-  auto steps = config->getArray("steps");
+  auto steps = config->get_array("steps");
   if (!steps)
     return std::unexpected(std::move(steps.error()));
   for (auto const& step : *steps) {
     DanceStep result{};
     auto readFrame = [&](String const& key, std::size_t index) -> std::expected<std::optional<String>, StarException> {
-      if (step.isType(Json::Type::Object))
-        return step.optString(key);
+      if (step.is_type(Json::Type::Object))
+        return step.opt_string(key);
       auto entry = step.get(index);
       if (!entry)
         return std::unexpected(std::move(entry.error()));
-      return entry->optString();
+      return entry->opt_string();
     };
     auto readOffset = [&](String const& key, std::size_t index) -> std::expected<Vec2F, StarException> {
       std::expected<std::optional<Json>, StarException> entry;
-      if (step.isType(Json::Type::Object)) {
+      if (step.is_type(Json::Type::Object)) {
         entry = step.opt(key);
       } else {
         auto value = step.get(index);
@@ -116,7 +116,7 @@ std::expected<std::shared_ptr<Dance>, StarException> DanceDatabase::readDance(As
         return std::unexpected(std::move(entry.error()));
       if (!*entry)
         return Vec2F();
-      return jsonToVec2F(**entry);
+      return json_to_vec2f(**entry);
     };
     auto body = readFrame("bodyFrame", 0);
     if (!body)
@@ -142,8 +142,8 @@ std::expected<std::shared_ptr<Dance>, StarException> DanceDatabase::readDance(As
     if (!backOffset)
       return std::unexpected(std::move(backOffset.error()));
     result.backArmOffset = *backOffset;
-    if (step.isType(Json::Type::Object)) {
-      auto rotation = step.optFloat("frontArmRotation");
+    if (step.is_type(Json::Type::Object)) {
+      auto rotation = step.opt_float("frontArmRotation");
       if (!rotation)
         return std::unexpected(std::move(rotation.error()));
       result.frontArmRotation = rotation->value_or(0.0f);

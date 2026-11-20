@@ -19,7 +19,7 @@ std::expected<PlayerBlueprints, StarException> PlayerBlueprints::create(Json con
   for (auto const& field : {
       std::pair{std::string_view{"knownBlueprints"}, std::ref(blueprints.m_knownBlueprints)},
       std::pair{std::string_view{"newBlueprints"}, std::ref(blueprints.m_newBlueprints)}}) {
-    auto entries = json.getArray(field.first);
+    auto entries = json.get_array(field.first);
     if (!entries)
       return std::unexpected(std::move(entries.error()));
     for (auto const& entry : *entries) {

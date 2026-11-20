@@ -149,19 +149,19 @@ std::expected<std::shared_ptr<ConsumableItem>, StarException> ConsumableItem::cr
   item->setWindupTime(0);
   item->setCooldownTime(0.25f);
   item->m_requireEdgeTrigger = true;
-  auto start = config.getFloat("swingStart", -60);
+  auto start = config.get_float("swingStart", -60);
   if (!start)
     return std::unexpected(std::move(start.error()));
   item->m_swingStart = *start * std::numbers::pi / 180;
-  auto finish = config.getFloat("swingFinish", 40);
+  auto finish = config.get_float("swingFinish", 40);
   if (!finish)
     return std::unexpected(std::move(finish.error()));
   item->m_swingFinish = *finish * std::numbers::pi / 180;
-  auto aim = config.getFloat("swingAimFactor", 0.2f);
+  auto aim = config.get_float("swingAimFactor", 0.2f);
   if (!aim)
     return std::unexpected(std::move(aim.error()));
   item->m_swingAimFactor = *aim;
-  auto blocking = item->instanceValue("blockingEffects", JsonArray()).and_then(jsonToStringSet);
+  auto blocking = item->instanceValue("blockingEffects", JsonArray()).and_then(json_to_string_set);
   if (!blocking)
     return std::unexpected(std::move(blocking.error()));
   item->m_blockingEffects = std::move(*blocking);
@@ -169,17 +169,17 @@ std::expected<std::shared_ptr<ConsumableItem>, StarException> ConsumableItem::cr
   if (!food)
     return std::unexpected(std::move(food.error()));
   if (*food) {
-    auto foodValue = food->toFloat();
+    auto foodValue = food->to_float();
     if (!foodValue)
       return std::unexpected(std::move(foodValue.error()));
     item->m_foodValue = *foodValue;
     item->m_blockingEffects.add("wellfed");
   }
-  auto emitters = item->instanceValue("emitters", JsonArray{"eating"}).and_then(jsonToStringSet);
+  auto emitters = item->instanceValue("emitters", JsonArray{"eating"}).and_then(json_to_string_set);
   if (!emitters)
     return std::unexpected(std::move(emitters.error()));
   item->m_emitters = std::move(*emitters);
-  auto emote = item->instanceValue("emote", "eat").and_then([](Json const& value) { return value.toString(); });
+  auto emote = item->instanceValue("emote", "eat").and_then([](Json const& value) { return value.to_string(); });
   if (!emote)
     return std::unexpected(std::move(emote.error()));
   item->m_emote = std::move(*emote);
@@ -265,7 +265,7 @@ std::expected<bool, StarException> ConsumableItem::canUse() const {
 }
 
 std::expected<void, StarException> ConsumableItem::triggerEffects() {
-  auto options = instanceValue("effects", JsonArray()).and_then([](Json const& value) { return value.toArray(); });
+  auto options = instanceValue("effects", JsonArray()).and_then([](Json const& value) { return value.to_array(); });
   if (!options)
     return std::unexpected(std::move(options.error()));
   auto itemOwner = owner();
@@ -275,7 +275,7 @@ std::expected<void, StarException> ConsumableItem::triggerEffects() {
     auto selected = root().random().sample_ref(*options);
     if (!selected)
       return std::unexpected(std::move(selected.error()));
-    auto option = selected->get().toArray();
+    auto option = selected->get().to_array();
     if (!option)
       return std::unexpected(std::move(option.error()));
     List<EphemeralStatusEffect> effects;

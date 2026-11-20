@@ -211,9 +211,9 @@ std::expected<std::shared_ptr<CommandProcessor>, StarException> CommandProcessor
   auto luaRoot = LuaRoot::create(root);
   if (!luaRoot) return std::unexpected(std::move(luaRoot.error()));
   processor->m_luaRoot = std::move(*luaRoot);
-  auto pause = config->getFloat("luaGcPause");
+  auto pause = config->get_float("luaGcPause");
   if (!pause) return std::unexpected(std::move(pause.error()));
-  auto step = config->getFloat("luaGcStepMultiplier");
+  auto step = config->get_float("luaGcStepMultiplier");
   if (!step) return std::unexpected(std::move(step.error()));
   processor->m_luaRoot->tuneAutoGarbageCollection(*pause, *step);
   auto universeCallbacks = LuaBindings::makeUniverseServerCallbacks(root, universe);
@@ -234,7 +234,7 @@ std::expected<std::shared_ptr<CommandProcessor>, StarException> CommandProcessor
   if (!commandsAdded) return std::unexpected(std::move(commandsAdded.error()));
   auto scriptJson = config->get("commandProcessorScripts");
   if (!scriptJson) return std::unexpected(std::move(scriptJson.error()));
-  auto scripts = jsonToStringList(*scriptJson);
+  auto scripts = json_to_string_list(*scriptJson);
   if (!scripts) return std::unexpected(std::move(scripts.error()));
   auto scriptsSet = processor->m_scriptComponent.setScripts(std::move(*scripts));
   if (!scriptsSet) return std::unexpected(std::move(scriptsSet.error()));
@@ -278,7 +278,7 @@ std::expected<String, StarException> CommandProcessor::help(ConnectionId connect
   }
   if (!arguments.empty()) {
     for (auto const& config : commands) {
-      auto text = config.optString(arguments[0]);
+      auto text = config.opt_string(arguments[0]);
       if (!text) return std::unexpected(std::move(text.error()));
       if (*text) return **text;
     }
@@ -288,13 +288,13 @@ std::expected<String, StarException> CommandProcessor::help(ConnectionId connect
   String result;
   for (std::size_t i = 0; i != commands.size(); ++i) {
     if (i >= 2 && *adminError) break;
-    auto object = commands[i].toObject();
+    auto object = commands[i].to_object();
     if (!object) return std::unexpected(std::move(object.error()));
     StringList list = object->keys();
     std::sort(list.begin(), list.end(), std::less<>());
     auto templateJson = assets->json("/help.config:" + names[i] + "HelpText");
     if (!templateJson) return std::unexpected(std::move(templateJson.error()));
-    auto text = templateJson->toString();
+    auto text = templateJson->to_string();
     if (!text) return std::unexpected(std::move(text.error()));
     String description = "/" + list.join(", /");
     std::array<std::pair<std::string_view, std::string_view>, 1> bindings{{{"commands", description.utf8()}}};
@@ -303,7 +303,7 @@ std::expected<String, StarException> CommandProcessor::help(ConnectionId connect
     if (i) result += "\n";
     result += *formatted;
   }
-  auto help = commands[0].getString("help");
+  auto help = commands[0].get_string("help");
   if (!help) return std::unexpected(std::move(help.error()));
   return result + "\n" + *help;
 }
@@ -334,7 +334,7 @@ std::expected<String, StarException> CommandProcessor::admin(ConnectionId connec
   if (targetClientId == ServerConnectionId) return "Invalid client state";
   auto allowJson = (*config)->get("allowAdminCommands");
   if (!allowJson) return std::unexpected(std::move(allowJson.error()));
-  auto allow = allowJson->toBool();
+  auto allow = allowJson->to_bool();
   if (!allow) return std::unexpected(std::move(allow.error()));
   if (!*allow) return "Admin commands disabled on this server.";
   auto wasAdmin = m_universe.isAdmin(targetClientId);
@@ -557,7 +557,7 @@ std::expected<String, StarException> CommandProcessor::setTileProtection(Connect
     auto protectedJson = Json::parse(*last);
     if (!protectedJson)
       return std::unexpected(std::move(protectedJson.error()));
-    auto protectedValue = protectedJson->toBool();
+    auto protectedValue = protectedJson->to_bool();
     if (!protectedValue)
       return std::unexpected(std::move(protectedValue.error()));
     bool isProtected = *protectedValue;
@@ -855,14 +855,14 @@ std::expected<String, StarException> CommandProcessor::spawnMonster(ConnectionId
     if (arguments.size() >= 3) {
       auto parsed = Json::parse(arguments[2]);
       if (!parsed) return std::unexpected(std::move(parsed.error()));
-      auto object = parsed->toObject();
+      auto object = parsed->to_object();
       if (!object) return std::unexpected(std::move(object.error()));
       auto merged = parameters.set_all(*object);
       if (!merged) return std::unexpected(std::move(merged.error()));
       parameters = std::move(*merged);
     }
 
-    auto parameterObject = parameters.toObject();
+    auto parameterObject = parameters.to_object();
     if (!parameterObject) return std::unexpected(std::move(parameterObject.error()));
     auto variant = monsterDatabase->randomMonster(arguments[0], *parameterObject);
     if (!variant) return std::unexpected(std::move(variant.error()));
@@ -926,7 +926,7 @@ std::expected<String, StarException> CommandProcessor::spawnNpc(ConnectionId con
     if (arguments.size() >= 5) {
       auto overridesJson = Json::parse(arguments[4]);
       if (!overridesJson) return std::unexpected(std::move(overridesJson.error()));
-      auto overridesObject = overridesJson->toObject();
+      auto overridesObject = overridesJson->to_object();
       if (!overridesObject) return std::unexpected(std::move(overridesObject.error()));
       overrides = Json(*overridesObject);
     }
@@ -982,7 +982,7 @@ std::expected<String, StarException> CommandProcessor::spawnVehicle(ConnectionId
     if (arguments.size() >= 2) {
       auto parametersJson = Json::parse(arguments[1]);
       if (!parametersJson) return std::unexpected(std::move(parametersJson.error()));
-      auto parametersObject = parametersJson->toObject();
+      auto parametersObject = parametersJson->to_object();
       if (!parametersObject) return std::unexpected(std::move(parametersObject.error()));
       parameters = Json(*parametersObject);
     }
@@ -1033,7 +1033,7 @@ std::expected<String, StarException> CommandProcessor::spawnStagehand(Connection
     if (arguments.size() >= 2) {
       auto parametersJson = Json::parse(arguments[1]);
       if (!parametersJson) return std::unexpected(std::move(parametersJson.error()));
-      auto parametersObject = parametersJson->toObject();
+      auto parametersObject = parametersJson->to_object();
       if (!parametersObject) return std::unexpected(std::move(parametersObject.error()));
       parameters = Json(*parametersObject);
     }
@@ -1735,19 +1735,19 @@ std::expected<ServerCommandResult, StarException> CommandProcessor::handleComman
   }
   auto arguments = m_parser.tokenizeToStringList(argumentString);
   if (!arguments) return std::unexpected(std::move(arguments.error()));
-  auto invoked = recoverLuaScriptError(m_scriptComponent.invoke<std::variant<RpcPromise<Json>, LuaValue>>("command", command, connectionId, jsonFromStringList(*arguments)));
+  auto invoked = recoverLuaScriptError(m_scriptComponent.invoke<std::variant<RpcPromise<Json>, LuaValue>>("command", command, connectionId, json_from_string_list(*arguments)));
   if (!invoked) return std::unexpected(std::move(invoked.error()));
   if (*invoked) {
     auto& result = **invoked;
     if (std::holds_alternative<RpcPromise<Json>>(result)) {
       auto& promise = std::get<RpcPromise<Json>>(result);
       auto wrapped = promise.wrap([](Json res) -> std::expected<String, StarException> {
-        if (res.isType(Json::Type::String)) {
+        if (res.is_type(Json::Type::String)) {
           auto text = res.string_ptr();
           if (!text) return std::unexpected(std::move(text.error()));
           return **text;
         }
-        if (!res.isNull()) return res.repr(1, true);
+        if (!res.is_null()) return res.repr(1, true);
         return String();
       });
       if (!wrapped) return std::unexpected(std::move(wrapped.error()));
@@ -1767,12 +1767,12 @@ std::expected<std::optional<String>, StarException> CommandProcessor::adminCheck
   auto config = std::move(*configResult);
   auto allowJson = config->get("allowAdminCommands");
   if (!allowJson) return std::unexpected(std::move(allowJson.error()));
-  auto allow = allowJson->toBool();
+  auto allow = allowJson->to_bool();
   if (!allow) return std::unexpected(std::move(allow.error()));
   if (!*allow) return std::optional<String>("Admin commands disabled on this server.");
   auto anyoneJson = config->get("allowAdminCommandsFromAnyone");
   if (!anyoneJson) return std::unexpected(std::move(anyoneJson.error()));
-  auto anyone = anyoneJson->toBool();
+  auto anyone = anyoneJson->to_bool();
   if (!anyone) return std::unexpected(std::move(anyone.error()));
   if (!*anyone) {
     auto admin = m_universe.isAdmin(connectionId);

@@ -99,7 +99,7 @@ namespace Dungeon {
   std::expected<std::shared_ptr<MaxSpawnCountRule>, StarException> MaxSpawnCountRule::create(Json const& rule) {
     auto settings = rule.get(1);
     if (!settings) return std::unexpected(std::move(settings.error()));
-    auto count = settings->getInt(0);
+    auto count = settings->get_int(0);
     if (!count) return std::unexpected(std::move(count.error()));
     auto result = std::shared_ptr<MaxSpawnCountRule>(new MaxSpawnCountRule);
     result->m_maxCount = *count;
@@ -107,11 +107,11 @@ namespace Dungeon {
   }
 
   std::expected<std::shared_ptr<DoNotConnectToPartRule>, StarException> DoNotConnectToPartRule::create(Json const& rule) {
-    auto entries = rule.getArray(1);
+    auto entries = rule.get_array(1);
     if (!entries) return std::unexpected(std::move(entries.error()));
     auto result = std::shared_ptr<DoNotConnectToPartRule>(new DoNotConnectToPartRule);
     for (auto const& entry : *entries) {
-      auto name = entry.toString();
+      auto name = entry.to_string();
       if (!name) return std::unexpected(std::move(name.error()));
       result->m_partNames.add(std::move(*name));
     }
@@ -119,11 +119,11 @@ namespace Dungeon {
   }
 
   std::expected<std::shared_ptr<DoNotCombineWithRule>, StarException> DoNotCombineWithRule::create(Json const& rule) {
-    auto entries = rule.getArray(1);
+    auto entries = rule.get_array(1);
     if (!entries) return std::unexpected(std::move(entries.error()));
     auto result = std::shared_ptr<DoNotCombineWithRule>(new DoNotCombineWithRule);
     for (auto const& entry : *entries) {
-      auto name = entry.toString();
+      auto name = entry.to_string();
       if (!name) return std::unexpected(std::move(name.error()));
       result->m_parts.add(std::move(*name));
     }
@@ -155,7 +155,7 @@ namespace Dungeon {
   }
 
   std::expected<std::optional<std::shared_ptr<Rule const>>, StarException> Rule::parse(Root& root, Json const& rule) {
-    auto key = rule.getString(0);
+    auto key = rule.get_string(0);
     if (!key) return std::unexpected(std::move(key.error()));
     if (*key == "worldGenMustContainLiquid") return std::make_shared<const WorldGenMustContainLiquidRule>();
     if (*key == "worldGenMustNotContainLiquid") return std::make_shared<const WorldGenMustNotContainLiquidRule>();
@@ -226,30 +226,30 @@ namespace Dungeon {
     std::optional<String> mod;
     std::optional<float> hueshift, modhueshift;
     std::optional<MaterialColorVariant> colorVariant;
-    if (brush.isType(Json::Type::Object)) {
-      auto m = brush.getString("material");
+    if (brush.is_type(Json::Type::Object)) {
+      auto m = brush.get_string("material");
       if (!m) return std::unexpected(std::move(m.error()));
       material = std::move(*m);
-      auto md = brush.optString("mod");
+      auto md = brush.opt_string("mod");
       if (!md) return std::unexpected(std::move(md.error()));
       mod = std::move(*md);
-      auto hue = brush.optFloat("hueshift");
+      auto hue = brush.opt_float("hueshift");
       if (!hue) return std::unexpected(std::move(hue.error()));
       hueshift = *hue;
-      auto modHue = brush.optFloat("modhueshift");
+      auto modHue = brush.opt_float("modhueshift");
       if (!modHue) return std::unexpected(std::move(modHue.error()));
       modhueshift = *modHue;
-      auto color = brush.optFloat("colorVariant");
+      auto color = brush.opt_float("colorVariant");
       if (!color) return std::unexpected(std::move(color.error()));
       colorVariant = *color;
     } else {
-      auto m = brush.getString(1);
+      auto m = brush.get_string(1);
       if (!m) return std::unexpected(std::move(m.error()));
       material = std::move(*m);
       auto size = brush.size();
       if (!size) return std::unexpected(std::move(size.error()));
       if (*size > 2) {
-        auto md = brush.getString(2);
+        auto md = brush.get_string(2);
         if (!md) return std::unexpected(std::move(md.error()));
         mod = std::move(*md);
       }
@@ -262,30 +262,30 @@ namespace Dungeon {
     std::optional<String> mod;
     std::optional<float> hueshift, modhueshift;
     std::optional<MaterialColorVariant> colorVariant;
-    if (brush.isType(Json::Type::Object)) {
-      auto m = brush.getString("material");
+    if (brush.is_type(Json::Type::Object)) {
+      auto m = brush.get_string("material");
       if (!m) return std::unexpected(std::move(m.error()));
       material = std::move(*m);
-      auto md = brush.optString("mod");
+      auto md = brush.opt_string("mod");
       if (!md) return std::unexpected(std::move(md.error()));
       mod = std::move(*md);
-      auto hue = brush.optFloat("hueshift");
+      auto hue = brush.opt_float("hueshift");
       if (!hue) return std::unexpected(std::move(hue.error()));
       hueshift = *hue;
-      auto modHue = brush.optFloat("modhueshift");
+      auto modHue = brush.opt_float("modhueshift");
       if (!modHue) return std::unexpected(std::move(modHue.error()));
       modhueshift = *modHue;
-      auto color = brush.optFloat("colorVariant");
+      auto color = brush.opt_float("colorVariant");
       if (!color) return std::unexpected(std::move(color.error()));
       colorVariant = *color;
     } else {
-      auto m = brush.getString(1);
+      auto m = brush.get_string(1);
       if (!m) return std::unexpected(std::move(m.error()));
       material = std::move(*m);
       auto size = brush.size();
       if (!size) return std::unexpected(std::move(size.error()));
       if (*size > 2) {
-        auto md = brush.getString(2);
+        auto md = brush.get_string(2);
         if (!md) return std::unexpected(std::move(md.error()));
         mod = std::move(*md);
       }
@@ -294,19 +294,19 @@ namespace Dungeon {
   }
 
   [[nodiscard]] std::expected<std::shared_ptr<Brush const>, StarException> parseObjectBrush(Json const& brush) {
-    auto object = brush.getString(1);
+    auto object = brush.get_string(1);
     if (!object) return std::unexpected(std::move(object.error()));
     auto size = brush.size();
     if (!size) return std::unexpected(std::move(size.error()));
     JsonObject settings;
     if (*size > 2) {
-      auto s = brush.getObject(2);
+      auto s = brush.get_object(2);
       if (!s) return std::unexpected(std::move(s.error()));
       settings = std::move(*s);
     }
     Star::Direction direction = Star::Direction::Left;
     if (auto d = settings.maybe("direction")) {
-      auto name = d->toString();
+      auto name = d->to_string();
       if (!name) return std::unexpected(std::move(name.error()));
       auto parsed = enum_value<DirectionNames>(*name);
       if (!parsed) return std::unexpected(std::move(parsed.error()));
@@ -325,9 +325,9 @@ namespace Dungeon {
       if (!value) return std::unexpected(std::move(value.error()));
       settings = std::move(*value);
     }
-    auto variant = settings.optInt("variant");
+    auto variant = settings.opt_int("variant");
     if (!variant) return std::unexpected(std::move(variant.error()));
-    auto mod = settings.optString("mod");
+    auto mod = settings.opt_string("mod");
     if (!mod) return std::unexpected(std::move(mod.error()));
     return std::make_shared<const SurfaceBrush>(*variant, *mod);
   }
@@ -341,9 +341,9 @@ namespace Dungeon {
       if (!value) return std::unexpected(std::move(value.error()));
       settings = std::move(*value);
     }
-    auto variant = settings.optInt("variant");
+    auto variant = settings.opt_int("variant");
     if (!variant) return std::unexpected(std::move(variant.error()));
-    auto mod = settings.optString("mod");
+    auto mod = settings.opt_string("mod");
     if (!mod) return std::unexpected(std::move(mod.error()));
     return std::make_shared<const SurfaceBackgroundBrush>(*variant, *mod);
   }
@@ -351,15 +351,15 @@ namespace Dungeon {
   [[nodiscard]] std::expected<std::shared_ptr<Brush const>, StarException> parseWireBrush(Json const& brush) {
     auto settings = brush.get(1);
     if (!settings) return std::unexpected(std::move(settings.error()));
-    auto group = settings->getString("group");
+    auto group = settings->get_string("group");
     if (!group) return std::unexpected(std::move(group.error()));
-    auto local = settings->getBool("local", true);
+    auto local = settings->get_bool("local", true);
     if (!local) return std::unexpected(std::move(local.error()));
     return std::make_shared<const WireBrush>(*group, *local);
   }
 
   [[nodiscard]] std::expected<std::shared_ptr<Brush const>, StarException> parseItemBrush(Json const& brush) {
-    auto name = brush.getString(1);
+    auto name = brush.get_string(1);
     if (!name) return std::unexpected(std::move(name.error()));
     auto item = ItemDescriptor::create(*name, 1, Json());
     if (!item) return std::unexpected(std::move(item.error()));
@@ -367,7 +367,7 @@ namespace Dungeon {
   }
 
   std::expected<std::shared_ptr<Brush const>, StarException> Brush::parse(Root& root, Json const& brush) {
-    auto key = brush.getString(0);
+    auto key = brush.get_string(0);
     if (!key) return std::unexpected(std::move(key.error()));
     if (*key == "clear") return std::make_shared<ClearBrush>();
     if (*key == "front") return parseFrontBrush(brush);
@@ -396,9 +396,9 @@ namespace Dungeon {
     if (*key == "surface") return parseSurfaceBrush(brush);
     if (*key == "surfacebackground") return parseSurfaceBackgroundBrush(brush);
     if (*key == "liquid") {
-      auto name = brush.getString(1);
+      auto name = brush.get_string(1);
       if (!name) return std::unexpected(std::move(name.error()));
-      auto source = brush.getBool(2, false);
+      auto source = brush.get_bool(2, false);
       if (!source) return std::unexpected(std::move(source.error()));
       return std::make_shared<LiquidBrush>(*name, 1.0f, *source);
     }
@@ -408,7 +408,7 @@ namespace Dungeon {
   }
 
   std::expected<std::shared_ptr<RandomBrush>, StarException> RandomBrush::create(Root& root, Json const& brush) {
-    auto options = brush.getArray(1);
+    auto options = brush.get_array(1);
     if (!options) return std::unexpected(std::move(options.error()));
     auto result = std::shared_ptr<RandomBrush>(new RandomBrush);
     for (auto const& option : *options) {
@@ -541,7 +541,7 @@ namespace Dungeon {
   }
 
   std::expected<std::shared_ptr<NpcBrush>, StarException> NpcBrush::create(Root& root, Json const& brush) {
-    auto map = brush.toObject();
+    auto map = brush.to_object();
     if (!map) return std::unexpected(std::move(map.error()));
     if (map->value("seed") == Json("stable")) (*map)["seed"] = root.random().next_u64();
     auto result = std::shared_ptr<NpcBrush>(new NpcBrush);
@@ -555,7 +555,7 @@ namespace Dungeon {
     if (!hasSpecies) return std::unexpected(std::move(hasSpecies.error()));
     if (*hasSpecies) {
       // Preserve comma-separated unquoted species and the original draw.
-      auto species = m_npc.getString("species");
+      auto species = m_npc.get_string("species");
       if (!species) return std::unexpected(std::move(species.error()));
       auto compact = species->replace(" ", "");
       if (!compact) return std::unexpected(std::move(compact.error()));
@@ -732,7 +732,7 @@ namespace Dungeon {
   [[nodiscard]] std::expected<std::shared_ptr<Part const>, StarException> parsePart(Root& root, DungeonDefinition const& dungeon, Json const& definition, std::optional<std::shared_ptr<ImageTileset const>> tileset) {
     auto def = definition.get("def");
     if (!def) return std::unexpected(std::move(def.error()));
-    auto kind = def->getString(0);
+    auto kind = def->get_string(0);
     if (!kind) return std::unexpected(std::move(kind.error()));
     std::shared_ptr<PartReader> reader;
     if (*kind == "image") {
@@ -751,7 +751,7 @@ namespace Dungeon {
   std::expected<std::shared_ptr<Part>, StarException> Part::create(Root& root, DungeonDefinition const& dungeon, Json const& part, std::shared_ptr<PartReader> reader) {
     auto result = std::shared_ptr<Part>(new Part(root));
 
-    auto name = part.getString("name");
+    auto name = part.get_string("name");
     if (!name) return std::unexpected(std::move(name.error()));
     result->m_name = std::move(*name);
     auto ruleJson = part.get("rules");
@@ -759,22 +759,22 @@ namespace Dungeon {
     auto rules = Rule::readRules(root, *ruleJson);
     if (!rules) return std::unexpected(std::move(rules.error()));
     result->m_rules = std::move(*rules);
-    auto chance = part.getFloat("chance", 1);
+    auto chance = part.get_float("chance", 1);
     if (!chance) return std::unexpected(std::move(chance.error()));
     result->m_chance = *chance <= 0 ? 0.0001f : *chance;
-    auto mark = part.getBool("markDungeonId", true);
+    auto mark = part.get_bool("markDungeonId", true);
     if (!mark) return std::unexpected(std::move(mark.error()));
     result->m_markDungeonId = *mark;
-    auto always = part.getBool("overrideAllowAlways", false);
+    auto always = part.get_bool("overrideAllowAlways", false);
     if (!always) return std::unexpected(std::move(always.error()));
     result->m_overrideAllowAlways = *always;
-    auto minimum = part.optFloat("minimumThreatLevel");
+    auto minimum = part.opt_float("minimumThreatLevel");
     if (!minimum) return std::unexpected(std::move(minimum.error()));
     result->m_minimumThreatLevel = *minimum;
-    auto maximum = part.optFloat("maximumThreatLevel");
+    auto maximum = part.opt_float("maximumThreatLevel");
     if (!maximum) return std::unexpected(std::move(maximum.error()));
     result->m_maximumThreatLevel = *maximum;
-    auto clear = part.getBool("clearAnchoredObjects", true);
+    auto clear = part.get_bool("clearAnchoredObjects", true);
     if (!clear) return std::unexpected(std::move(clear.error()));
     result->m_clearAnchoredObjects = *clear;
     result->m_reader = reader;
@@ -783,7 +783,7 @@ namespace Dungeon {
     auto assetDefinitions = def->get(1);
     if (!assetDefinitions) return std::unexpected(std::move(assetDefinitions.error()));
     if (assetDefinitions->type() == Json::Type::String) {
-      auto asset = assetDefinitions->toString();
+      auto asset = assetDefinitions->to_string();
       if (!asset) return std::unexpected(std::move(asset.error()));
       auto loaded = reader->readAsset(AssetPath::relative_to(dungeon.directory(), *asset));
       if (!loaded) return std::unexpected(std::move(loaded.error()));
@@ -791,7 +791,7 @@ namespace Dungeon {
       auto assets = assetDefinitions->iterate_array();
       if (!assets) return std::unexpected(std::move(assets.error()));
       for (auto const& definition : *assets) {
-        auto asset = definition.toString();
+        auto asset = definition.to_string();
         if (!asset) return std::unexpected(std::move(asset.error()));
         auto loaded = reader->readAsset(AssetPath::relative_to(dungeon.directory(), *asset));
         if (!loaded) return std::unexpected(std::move(loaded.error()));
@@ -1521,7 +1521,7 @@ std::expected<std::shared_ptr<DungeonDefinitions>, StarException> DungeonDefinit
     if (!dungeon) return std::unexpected(std::move(dungeon.error()));
     auto metadata = dungeon->get("metadata");
     if (!metadata) return std::unexpected(std::move(metadata.error()));
-    auto name = metadata->getString("name");
+    auto name = metadata->get_string("name");
     if (!name) return std::unexpected(std::move(name.error()));
     result->m_paths.insert(*name, file);
   }
@@ -1550,7 +1550,7 @@ std::expected<std::shared_ptr<DungeonDefinition>, StarException> DungeonDefiniti
     if (!assets) return std::unexpected(std::move(assets.error()));
     auto json = (*assets)->json(path);
     if (!json) return std::unexpected(std::move(json.error()));
-    auto definition = json->toObject();
+    auto definition = json->to_object();
     if (!definition) return std::unexpected(std::move(definition.error()));
     return DungeonDefinition::create(this->root(), *definition, AssetPath::directory(path));
   };
@@ -1565,19 +1565,19 @@ std::expected<std::shared_ptr<DungeonDefinition>, StarException> DungeonDefiniti
   auto metadataValue = definition.get("metadata");
   if (!metadataValue) return std::unexpected(std::move(metadataValue.error()));
   Json const& metadataJson = metadataValue->get();
-  auto metadata = metadataJson.toObject();
+  auto metadata = metadataJson.to_object();
   if (!metadata) return std::unexpected(std::move(metadata.error()));
   result->m_metadata = std::move(*metadata);
-  auto name = metadataJson.getString("name");
+  auto name = metadataJson.get_string("name");
   if (!name) return std::unexpected(std::move(name.error()));
   result->m_name = std::move(*name);
-  auto displayName = result->m_metadata.value("displayName", "").toString();
+  auto displayName = result->m_metadata.value("displayName", "").to_string();
   if (!displayName) return std::unexpected(std::move(displayName.error()));
   result->m_displayName = std::move(*displayName);
-  auto species = metadataJson.getString("species");
+  auto species = metadataJson.get_string("species");
   if (!species) return std::unexpected(std::move(species.error()));
   result->m_species = std::move(*species);
-  auto protectedValue = result->m_metadata.value("protected", false).toBool();
+  auto protectedValue = result->m_metadata.value("protected", false).to_bool();
   if (!protectedValue) return std::unexpected(std::move(protectedValue.error()));
   result->m_isProtected = *protectedValue;
   if (auto ruleJson = result->m_metadata.maybe("rules")) {
@@ -1585,18 +1585,18 @@ std::expected<std::shared_ptr<DungeonDefinition>, StarException> DungeonDefiniti
     if (!rules) return std::unexpected(std::move(rules.error()));
     result->m_rules = std::move(*rules);
   }
-  auto radius = result->m_metadata.value("maxRadius", 100).toInt();
+  auto radius = result->m_metadata.value("maxRadius", 100).to_int();
   if (!radius) return std::unexpected(std::move(radius.error()));
   result->m_maxRadius = *radius;
-  auto maxParts = result->m_metadata.value("maxParts", 100).toInt();
+  auto maxParts = result->m_metadata.value("maxParts", 100).to_int();
   if (!maxParts) return std::unexpected(std::move(maxParts.error()));
   result->m_maxParts = *maxParts;
-  auto freeSpace = result->m_metadata.value("extendSurfaceFreeSpace", 0).toInt();
+  auto freeSpace = result->m_metadata.value("extendSurfaceFreeSpace", 0).to_int();
   if (!freeSpace) return std::unexpected(std::move(freeSpace.error()));
   result->m_extendSurfaceFreeSpace = *freeSpace;
   auto anchorJson = metadataJson.get("anchor");
   if (!anchorJson) return std::unexpected(std::move(anchorJson.error()));
-  auto anchors = jsonToStringList(*anchorJson);
+  auto anchors = json_to_string_list(*anchorJson);
   if (!anchors) return std::unexpected(std::move(anchors.error()));
   result->m_anchors = std::move(*anchors);
   std::optional<std::shared_ptr<Dungeon::ImageTileset const>> tileset;
@@ -1618,12 +1618,12 @@ std::expected<std::shared_ptr<DungeonDefinition>, StarException> DungeonDefiniti
     result->m_parts.insert(partName, std::move(*part));
   }
   if (auto gravityJson = result->m_metadata.maybe("gravity")) {
-    auto gravity = gravityJson->toFloat();
+    auto gravity = gravityJson->to_float();
     if (!gravity) return std::unexpected(std::move(gravity.error()));
     result->m_gravity = *gravity;
   }
   if (auto breathableJson = result->m_metadata.maybe("breathable")) {
-    auto breathable = breathableJson->toBool();
+    auto breathable = breathableJson->to_bool();
     if (!breathable) return std::unexpected(std::move(breathable.error()));
     result->m_breathable = *breathable;
   }

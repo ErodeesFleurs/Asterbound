@@ -101,7 +101,7 @@ PlayerDeployment::PlayerDeployment(Root& root, Json const& config) : m_root(root
 }
 
 std::expected<void, StarException> PlayerDeployment::diskLoad(Json const& diskStore) {
-  auto storage = diskStore.getObject("scriptStorage", JsonObject{});
+  auto storage = diskStore.get_object("scriptStorage", JsonObject{});
   if (!storage)
     return std::unexpected(std::move(storage.error()));
   return m_scriptComponent.setScriptStorage(std::move(*storage));
@@ -121,13 +121,13 @@ std::expected<void, StarException> PlayerDeployment::init(Player& player, World&
     auto scriptsJson = m_config.get("scripts", JsonArray());
     if (!scriptsJson)
       return std::unexpected(std::move(scriptsJson.error()));
-    auto scripts = jsonToStringList(*scriptsJson);
+    auto scripts = json_to_string_list(*scriptsJson);
     if (!scripts)
       return std::unexpected(std::move(scripts.error()));
     auto installed = m_scriptComponent.setScripts(std::move(*scripts));
     if (!installed)
       return std::unexpected(std::move(installed.error()));
-    auto delta = m_config.getInt("scriptDelta", 10);
+    auto delta = m_config.get_int("scriptDelta", 10);
     if (!delta)
       return std::unexpected(std::move(delta.error()));
     m_scriptComponent.setUpdateDelta(*delta);

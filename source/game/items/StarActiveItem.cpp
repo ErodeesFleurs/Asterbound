@@ -131,7 +131,7 @@ std::expected<std::shared_ptr<ActiveItem>, StarException> ActiveItem::create(Roo
   if (!custom)
     return std::unexpected(std::move(custom.error()));
   if (*custom)
-    animationConfig = jsonMerge(*animationConfig, *custom);
+    animationConfig = json_merge(*animationConfig, *custom);
   auto animator = NetworkedAnimator::create(root, *animationConfig, directory);
   if (!animator)
     return std::unexpected(std::move(animator.error()));
@@ -142,12 +142,12 @@ std::expected<std::shared_ptr<ActiveItem>, StarException> ActiveItem::create(Roo
   if (!parts)
     return std::unexpected(std::move(parts.error()));
   for (auto const& pair : *parts) {
-    auto part = pair.second.toString();
+    auto part = pair.second.to_string();
     if (!part)
       return std::unexpected(std::move(part.error()));
     item->m_itemAnimator->setPartTag(pair.first, "partImage", *part);
   }
-  auto animationParameters = config.getObject("scriptedAnimationParameters", {});
+  auto animationParameters = config.get_object("scriptedAnimationParameters", {});
   if (!animationParameters)
     return std::unexpected(std::move(animationParameters.error()));
   item->m_scriptedAnimationParameters.reset(std::move(*animationParameters));
@@ -182,14 +182,14 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
   if (!mode)
     return std::unexpected(std::move(mode.error()));
   if (*mode == EntityMode::Master) {
-    auto scripts = instanceValue("scripts").and_then(jsonToStringList);
+    auto scripts = instanceValue("scripts").and_then(json_to_string_list);
     if (!scripts)
       return std::unexpected(std::move(scripts.error()));
     auto configured = m_script.setScripts(scripts->transformed(
       [directory = directory()](String const& script) { return AssetPath::relative_to(directory, script); }));
     if (!configured)
       return std::unexpected(std::move(configured.error()));
-    auto delta = instanceValue("scriptDelta", 1).and_then([](Json const& value) { return value.toUInt(); });
+    auto delta = instanceValue("scriptDelta", 1).and_then([](Json const& value) { return value.to_uint(); });
     if (!delta)
       return std::unexpected(std::move(delta.error()));
     m_script.setUpdateDelta(*delta);
@@ -198,7 +198,7 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
     if (!previousStorage)
       return std::unexpected(std::move(previousStorage.error()));
     if (*previousStorage) {
-      auto stored = previousStorage->toObject().and_then([&](JsonObject storage) { return m_script.setScriptStorage(std::move(storage)); });
+      auto stored = previousStorage->to_object().and_then([&](JsonObject storage) { return m_script.setScriptStorage(std::move(storage)); });
       if (!stored)
         return std::unexpected(std::move(stored.error()));
     }
@@ -248,14 +248,14 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
     if (!animationScripts)
       return std::unexpected(std::move(animationScripts.error()));
     if (*animationScripts) {
-      auto scripts = jsonToStringList(*animationScripts);
+      auto scripts = json_to_string_list(*animationScripts);
       if (!scripts)
         return std::unexpected(std::move(scripts.error()));
       auto configured = m_scriptedAnimator.setScripts(scripts->transformed(
         [directory = directory()](String const& script) { return AssetPath::relative_to(directory, script); }));
       if (!configured)
         return std::unexpected(std::move(configured.error()));
-      auto delta = instanceValue("animationDelta", 1).and_then([](Json const& value) { return value.toUInt(); });
+      auto delta = instanceValue("animationDelta", 1).and_then([](Json const& value) { return value.to_uint(); });
       if (!delta)
         return std::unexpected(std::move(delta.error()));
       m_scriptedAnimator.setUpdateDelta(*delta);
@@ -352,7 +352,7 @@ std::expected<void, StarException> ActiveItem::update(float dt, FireMode fireMod
     auto updated = recoverLuaScriptError(m_script.update(m_script.updateDt(dt), *fireModeName, shifting, moveMap));
     if (!updated)
       return std::unexpected(std::move(updated.error()));
-    auto retain = instanceValue("retainScriptStorageInItem", false).and_then([](Json const& value) { return value.toBool(); });
+    auto retain = instanceValue("retainScriptStorageInItem", false).and_then([](Json const& value) { return value.to_bool(); });
     if (!retain)
       return std::unexpected(std::move(retain.error()));
     if (*retain) {
@@ -631,11 +631,11 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Active
 }
 
 std::expected<float, StarException> ActiveItem::durabilityStatus() {
-  auto durability = instanceValue("durability").and_then([](Json const& value) { return value.optFloat(); });
+  auto durability = instanceValue("durability").and_then([](Json const& value) { return value.opt_float(); });
   if (!durability)
     return std::unexpected(std::move(durability.error()));
   if (*durability) {
-    auto durabilityHit = instanceValue("durabilityHit").and_then([](Json const& value) { return value.optFloat(); });
+    auto durabilityHit = instanceValue("durabilityHit").and_then([](Json const& value) { return value.opt_float(); });
     if (!durabilityHit)
       return std::unexpected(std::move(durabilityHit.error()));
     return durabilityHit->value_or(**durability) / **durability;
@@ -841,11 +841,11 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
   auto loadIcon = [this](Json const& icon) -> std::expected<List<Drawable>, StarException> {
     List<Drawable> drawables;
     if (icon.type() == Json::Type::Array) {
-      auto configs = icon.toArray();
+      auto configs = icon.to_array();
       if (!configs)
         return std::unexpected(std::move(configs.error()));
       for (auto config : *configs) {
-        auto image = config.optString("image");
+        auto image = config.opt_string("image");
         if (!image)
           return std::unexpected(std::move(image.error()));
         auto metadata = root().imageMetadataDatabase();
@@ -863,7 +863,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
         drawables.push_back(std::move(*drawable));
       }
     } else {
-      auto image = icon.toString();
+      auto image = icon.to_string();
       if (!image)
         return std::unexpected(std::move(image.error()));
       auto metadata = root().imageMetadataDatabase();

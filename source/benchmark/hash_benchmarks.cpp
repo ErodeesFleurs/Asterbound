@@ -256,7 +256,7 @@ void string_set_lookup(benchmark::State& state) {
 
 // JSON's pre-existing hash uses native scalar bytes, not the canonical integer
 // encoding of static_random. Build a separate, known fixture stream without
-// traversing Json or calling its hash/getHash implementation.
+// traversing Json or calling its hash/get_hash implementation.
 template <typename T> void append_native(std::vector<char>& bytes, T value) {
   auto representation = std::bit_cast<std::array<char, sizeof(T)>>(value);
   bytes.insert(bytes.end(), representation.begin(), representation.end());

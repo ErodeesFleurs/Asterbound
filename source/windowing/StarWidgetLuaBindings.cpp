@@ -143,9 +143,9 @@ template <typename T, typename Function>
 
 std::expected<TextStyle, StarException> canvasTextStyle(Json const& sizeOrStyle, std::optional<Color> const& color,
     std::optional<float> spacing, std::optional<String> const& font, std::optional<String> const& directives) {
-  if (sizeOrStyle.isType(Json::Type::Object))
+  if (sizeOrStyle.is_type(Json::Type::Object))
     return TextStyle::create(sizeOrStyle);
-  auto size = sizeOrStyle.toUInt();
+  auto size = sizeOrStyle.to_uint();
   if (!size)
     return std::unexpected(std::move(size.error()));
   TextStyle style;
@@ -715,16 +715,16 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.registerCallback("setButtonImages", [parentWidget](String const& widgetName, Json const& images) -> std::expected<void, StarException> {
     return withWidget<ButtonWidget>(parentWidget, widgetName, [&](std::shared_ptr<ButtonWidget> widget) -> std::expected<void, StarException> {
-      auto base = images.getString("base");
+      auto base = images.get_string("base");
       if (!base)
         return std::unexpected(std::move(base.error()));
-      auto hover = images.getString("hover", "");
+      auto hover = images.get_string("hover", "");
       if (!hover)
         return std::unexpected(std::move(hover.error()));
-      auto pressed = images.getString("pressed", "");
+      auto pressed = images.get_string("pressed", "");
       if (!pressed)
         return std::unexpected(std::move(pressed.error()));
-      auto disabled = images.getString("disabled", "");
+      auto disabled = images.get_string("disabled", "");
       if (!disabled)
         return std::unexpected(std::move(disabled.error()));
       return widget->setImages(*base, *hover, *pressed, *disabled);
@@ -733,16 +733,16 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.registerCallback("setButtonCheckedImages", [parentWidget](String const& widgetName, Json const& images) -> std::expected<void, StarException> {
     return withWidget<ButtonWidget>(parentWidget, widgetName, [&](std::shared_ptr<ButtonWidget> widget) -> std::expected<void, StarException> {
-      auto base = images.getString("base");
+      auto base = images.get_string("base");
       if (!base)
         return std::unexpected(std::move(base.error()));
-      auto hover = images.getString("hover", "");
+      auto hover = images.get_string("hover", "");
       if (!hover)
         return std::unexpected(std::move(hover.error()));
-      auto pressed = images.getString("pressed", "");
+      auto pressed = images.get_string("pressed", "");
       if (!pressed)
         return std::unexpected(std::move(pressed.error()));
-      auto disabled = images.getString("disabled", "");
+      auto disabled = images.get_string("disabled", "");
       if (!disabled)
         return std::unexpected(std::move(disabled.error()));
       return widget->setCheckedImages(*base, *hover, *pressed, *disabled);
@@ -975,7 +975,7 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
         auto found = display.contains(field);
         if (!found) return std::unexpected(std::move(found.error()));
         if (!*found) continue;
-        auto enabled = display.getBool(field);
+        auto enabled = display.get_bool(field);
         if (!enabled) return std::unexpected(std::move(enabled.error()));
         std::invoke(setter, *slot, *enabled);
       }
@@ -1023,13 +1023,13 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.registerCallback("setImageStretchSet", [parentWidget](String const& widgetName, Json const& images) -> std::expected<void, StarException> {
     return withWidget<ImageStretchWidget>(parentWidget, widgetName, [&](std::shared_ptr<ImageStretchWidget> widget) -> std::expected<void, StarException> {
-      auto begin = images.getString("begin", "");
+      auto begin = images.get_string("begin", "");
       if (!begin)
         return std::unexpected(std::move(begin.error()));
-      auto inner = images.getString("inner", "");
+      auto inner = images.get_string("inner", "");
       if (!inner)
         return std::unexpected(std::move(inner.error()));
-      auto end = images.getString("end", "");
+      auto end = images.get_string("end", "");
       if (!end)
         return std::unexpected(std::move(end.error()));
       widget->setImageStretchSet(*begin, *inner, *end);

@@ -364,9 +364,9 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeChatCallbacks(MainIn
     return client.sendChat(message, mode, speak, std::move(data));
   }); !r) return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.registerCallback("parseArguments", [](String const& args) -> std::expected<LuaVariadic<Json>, StarException> {
-    auto parsed = Json::parseSequence(args);
+    auto parsed = Json::parse_sequence(args);
     if (!parsed) return std::unexpected(std::move(parsed.error()));
-    auto values = parsed->toArray();
+    auto values = parsed->to_array();
     if (!values) return std::unexpected(std::move(values.error()));
     return LuaVariadic<Json>(std::move(*values));
   }); !r) return std::unexpected(std::move(r.error()));
@@ -379,26 +379,26 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeChatCallbacks(MainIn
     ChatReceivedMessage message({MessageContext::Mode::CommandResult, ""}, client.clientContext()->connectionId(), "", text);
     bool showPane = true;
     if (config) {
-      auto mode = config->optString("mode");
+      auto mode = config->opt_string("mode");
       if (!mode) return std::unexpected(std::move(mode.error()));
       if (*mode) {
         auto parsed = enum_value<MessageContextModeNames>(**mode);
         if (!parsed) return std::unexpected(std::move(parsed.error()));
         message.context.mode = *parsed;
       }
-      auto channel = config->optString("channelName");
+      auto channel = config->opt_string("channelName");
       if (!channel) return std::unexpected(std::move(channel.error()));
       if (*channel) message.context.channelName = std::move(**channel);
-      auto portrait = config->optString("portrait");
+      auto portrait = config->opt_string("portrait");
       if (!portrait) return std::unexpected(std::move(portrait.error()));
       if (*portrait) message.portrait = std::move(**portrait);
-      auto nickname = config->optString("fromNick");
+      auto nickname = config->opt_string("fromNick");
       if (!nickname) return std::unexpected(std::move(nickname.error()));
       if (*nickname) message.fromNick = std::move(**nickname);
-      auto fromConnection = config->optUInt("fromConnection");
+      auto fromConnection = config->opt_uint("fromConnection");
       if (!fromConnection) return std::unexpected(std::move(fromConnection.error()));
       if (*fromConnection) message.fromConnection = static_cast<ConnectionId>(**fromConnection);
-      auto show = config->getBool("showPane", true);
+      auto show = config->get_bool("showPane", true);
       if (!show) return std::unexpected(std::move(show.error()));
       showPane = *show;
     }
@@ -409,14 +409,14 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeChatCallbacks(MainIn
     auto value = mainInterface.callUi("chat", "currentChat", {});
     if (!value) return std::unexpected(std::move(value.error()));
     if (!*value) return std::unexpected(GuiException("Chat pane does not export currentChat"));
-    return (**value).toString();
+    return (**value).to_string();
   }); !r) return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.registerCallback("setInput", [&mainInterface, lifetime](String const& text, std::optional<bool> moveCursor) -> std::expected<bool, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     auto value = mainInterface.callUi("chat", "setCurrentChat", {text, moveCursor.value_or(false)});
     if (!value) return std::unexpected(std::move(value.error()));
     if (!*value) return std::unexpected(GuiException("Chat pane does not export setCurrentChat"));
-    return (**value).toBool();
+    return (**value).to_bool();
   }); !r) return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.registerCallback("clear", [&mainInterface, lifetime](std::optional<std::size_t> count) -> std::expected<void, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));

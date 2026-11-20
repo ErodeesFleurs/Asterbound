@@ -76,13 +76,13 @@ std::expected<TechConfig, StarException> TechDatabase::parseTech(Json const& con
     if (!TechTypeNames)
       return std::unexpected(TechTypeNames.error());
     TechConfig tech;
-    auto name = config.getString("name");
+    auto name = config.get_string("name");
     if (!name)
       return std::unexpected(std::move(name.error()));
     tech.name = std::move(*name);
     tech.path = path;
     tech.parameters = config;
-    auto typeName = config.getString("type");
+    auto typeName = config.get_string("type");
     if (!typeName)
       return std::unexpected(std::move(typeName.error()));
     auto type = TechTypeNames->find_left_ref(*typeName);
@@ -95,25 +95,25 @@ std::expected<TechConfig, StarException> TechDatabase::parseTech(Json const& con
     if (!scripts)
       return std::unexpected(std::move(scripts.error()));
     for (auto const& script : *scripts) {
-      auto scriptName = script.toString();
+      auto scriptName = script.to_string();
       if (!scriptName)
         return std::unexpected(std::move(scriptName.error()));
       tech.scripts.push_back(AssetPath::relative_to(path, *scriptName));
     }
-    auto animator = config.optString("animator");
+    auto animator = config.opt_string("animator");
     if (!animator)
       return std::unexpected(std::move(animator.error()));
     if (*animator)
       tech.animationConfig = AssetPath::relative_to(path, **animator);
-    auto description = config.getString("description");
+    auto description = config.get_string("description");
     if (!description)
       return std::unexpected(std::move(description.error()));
     tech.description = std::move(*description);
-    auto shortDescription = config.getString("shortDescription");
+    auto shortDescription = config.get_string("shortDescription");
     if (!shortDescription)
       return std::unexpected(std::move(shortDescription.error()));
     tech.shortDescription = std::move(*shortDescription);
-    auto rarityName = config.getString("rarity");
+    auto rarityName = config.get_string("rarity");
     if (!rarityName)
       return std::unexpected(std::move(rarityName.error()));
     auto rarity = maybe_enum_value<RarityNames>(*rarityName);
@@ -122,7 +122,7 @@ std::expected<TechConfig, StarException> TechDatabase::parseTech(Json const& con
     if (!*rarity)
       return std::unexpected(TechDatabaseException::format("Unknown tech rarity '{}'", *rarityName));
     tech.rarity = **rarity;
-    auto icon = config.getString("icon");
+    auto icon = config.get_string("icon");
     if (!icon)
       return std::unexpected(std::move(icon.error()));
     tech.icon = AssetPath::relative_to(path, *icon);

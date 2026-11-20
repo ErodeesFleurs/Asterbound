@@ -198,7 +198,7 @@ std::expected<void, StarException> UniverseServer::initialize() {
   auto digestConfig = configuration->get("serverOverrideAssetsDigest");
   if (!digestConfig)
     return std::unexpected(std::move(digestConfig.error()));
-  auto digestOverride = digestConfig->optString();
+  auto digestOverride = digestConfig->opt_string();
   if (!digestOverride)
     return std::unexpected(std::move(digestOverride.error()));
   if (*digestOverride) {
@@ -213,7 +213,7 @@ std::expected<void, StarException> UniverseServer::initialize() {
   auto clearConfig = configuration->get("clearUniverseFiles");
   if (!clearConfig)
     return std::unexpected(std::move(clearConfig.error()));
-  auto clear = clearConfig->toBool();
+  auto clear = clearConfig->to_bool();
   if (!clear)
     return std::unexpected(std::move(clear.error()));
   if (*clear) {
@@ -242,18 +242,18 @@ std::expected<void, StarException> UniverseServer::initialize() {
   auto playersConfig = configuration->get("maxPlayers");
   if (!playersConfig)
     return std::unexpected(std::move(playersConfig.error()));
-  auto players = playersConfig->toUInt();
+  auto players = playersConfig->to_uint();
   if (!players)
     return std::unexpected(std::move(players.error()));
   m_maxPlayers = *players;
   auto universeConfig = assets->json("/universe_server.config");
   if (!universeConfig)
     return std::unexpected(std::move(universeConfig.error()));
-  auto speciesShips = universeConfig->getObject("speciesShips");
+  auto speciesShips = universeConfig->get_object("speciesShips");
   if (!speciesShips)
     return std::unexpected(std::move(speciesShips.error()));
   for (auto const& pair : *speciesShips) {
-    auto ships = jsonToStringList(pair.second);
+    auto ships = json_to_string_list(pair.second);
     if (!ships)
       return std::unexpected(std::move(ships.error()));
     m_speciesShips[pair.first] = std::move(*ships);
@@ -262,7 +262,7 @@ std::expected<void, StarException> UniverseServer::initialize() {
   if (!teamManager)
     return std::unexpected(std::move(teamManager.error()));
   m_teamManager = std::move(*teamManager);
-  auto workerThreads = universeConfig->getUInt("workerPoolThreads");
+  auto workerThreads = universeConfig->get_uint("workerPoolThreads");
   if (!workerThreads)
     return std::unexpected(std::move(workerThreads.error()));
   if (auto result = m_workerPool.start(*workerThreads); !result)
@@ -276,7 +276,7 @@ std::expected<void, StarException> UniverseServer::initialize() {
     [processor = m_commandProcessor.get()](ConnectionId clientId, String const& command, String const& arguments) {
       return processor->userCommand(clientId, command, arguments);
     });
-  auto networkThreads = universeConfig->optUInt("networkWorkerThreads");
+  auto networkThreads = universeConfig->opt_uint("networkWorkerThreads");
   if (!networkThreads)
     return std::unexpected(std::move(networkThreads.error()));
   auto connections = UniverseConnectionServer::create(
@@ -292,7 +292,7 @@ std::expected<void, StarException> UniverseServer::initialize() {
   auto secureConfig = configuration->getPath("security.secureWarps");
   if (!secureConfig)
     return std::unexpected(std::move(secureConfig.error()));
-  auto secureWarps = secureConfig->optBool();
+  auto secureWarps = secureConfig->opt_bool();
   if (!secureWarps)
     return std::unexpected(std::move(secureWarps.error()));
   m_secureWarps = secureWarps->value_or(true);
@@ -722,12 +722,12 @@ std::expected<bool, StarException> UniverseServer::unbanUuid(String const& uuidS
   auto json = (*config)->get("bannedUuids");
   if (!json)
     return std::unexpected(std::move(json.error()));
-  auto entries = json->toArray();
+  auto entries = json->to_array();
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   bool found = false;
   for (auto it = entries->begin(); it != entries->end();) {
-    auto uuid = it->getString("uuid");
+    auto uuid = it->get_string("uuid");
     if (!uuid)
       return std::unexpected(std::move(uuid.error()));
     if (*uuid == uuidString) {
@@ -762,12 +762,12 @@ std::expected<bool, StarException> UniverseServer::unbanIp(String const& address
   auto json = (*config)->get("bannedIPs");
   if (!json)
     return std::unexpected(std::move(json.error()));
-  auto entries = json->toArray();
+  auto entries = json->to_array();
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   bool found = false;
   for (auto it = entries->begin(); it != entries->end();) {
-    auto ip = it->getString("ip");
+    auto ip = it->get_string("ip");
     if (!ip)
       return std::unexpected(std::move(ip.error()));
     if (*ip == clean) {
@@ -911,7 +911,7 @@ std::expected<void, StarException> UniverseServer::runLoop(std::stop_token stopT
   auto intervalJson = assets->json("/universe_server.config:mainWakeupInterval");
   if (!intervalJson)
     return std::unexpected(std::move(intervalJson.error()));
-  auto interval = intervalJson->toInt();
+  auto interval = intervalJson->to_int();
   if (!interval)
     return std::unexpected(std::move(interval.error()));
 
@@ -924,13 +924,13 @@ std::expected<void, StarException> UniverseServer::runLoop(std::stop_token stopT
         auto bind_json = (*configuration)->get("gameServerBind");
         if (!bind_json)
           return std::unexpected(std::move(bind_json.error()));
-        auto bind = bind_json->toString();
+        auto bind = bind_json->to_string();
         if (!bind)
           return std::unexpected(std::move(bind.error()));
         auto port_json = (*configuration)->get("gameServerPort");
         if (!port_json)
           return std::unexpected(std::move(port_json.error()));
-        auto port = port_json->toUInt();
+        auto port = port_json->to_uint();
         if (!port)
           return std::unexpected(std::move(port.error()));
         if (!std::in_range<std::uint16_t>(*port))
@@ -941,7 +941,7 @@ std::expected<void, StarException> UniverseServer::runLoop(std::stop_token stopT
         auto pendingJson = assets->json("/universe_server.config:maxPendingConnections");
         if (!pendingJson)
           return std::unexpected(std::move(pendingJson.error()));
-        auto pending = pendingJson->toUInt();
+        auto pending = pendingJson->to_uint();
         if (!pending)
           return std::unexpected(std::move(pending.error()));
         if (auto result = m_root.logger().info("UniverseServer: listening for incoming TCP connections on {}", *address); !result)
@@ -1411,8 +1411,8 @@ std::expected<void, StarException> UniverseServer::updateShips() {
         if (!speciesJson)
           return std::unexpected(std::move(speciesJson.error()));
         String species;
-        if (speciesJson->isType(Json::Type::String)) {
-          auto parsed = speciesJson->toString();
+        if (speciesJson->is_type(Json::Type::String)) {
+          auto parsed = speciesJson->to_string();
           if (!parsed)
             return std::unexpected(std::move(parsed.error()));
           species = std::move(*parsed);
@@ -1432,8 +1432,8 @@ std::expected<void, StarException> UniverseServer::updateShips() {
         if (!level)
           return std::unexpected(std::move(level.error()));
         unsigned newLevel = ships.empty() ? 0u : std::min<unsigned>(ships.size() - 1, upgrades.shipLevel);
-        if (level->isType(Json::Type::Int)) {
-          auto oldLevel = level->toUInt();
+        if (level->is_type(Json::Type::Int)) {
+          auto oldLevel = level->to_uint();
           if (!oldLevel)
             return std::unexpected(std::move(oldLevel.error()));
           if (*oldLevel < newLevel) {
@@ -1492,7 +1492,7 @@ std::expected<void, StarException> UniverseServer::sendClockUpdates() {
   auto json = (*assets)->json("/universe_server.config:clockUpdatePacketInterval");
   if (!json)
     return std::unexpected(std::move(json.error()));
-  auto interval = json->toInt();
+  auto interval = json->to_int();
   if (!interval)
     return std::unexpected(std::move(interval.error()));
   auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
@@ -1587,7 +1587,7 @@ std::expected<void, StarException> UniverseServer::reapConnections() {
   auto json = (*assets)->json("/universe_server.config:connectionTimeout");
   if (!json)
     return std::unexpected(std::move(json.error()));
-  auto timeout = json->toInt();
+  auto timeout = json->to_int();
   if (!timeout)
     return std::unexpected(std::move(timeout.error()));
   {
@@ -1912,7 +1912,7 @@ std::expected<void, StarException> UniverseServer::flyShips() {
   auto waitJson = (*assets)->json("/universe_server.config:queuedFlightWaitTime");
   if (!waitJson)
     return std::unexpected(std::move(waitJson.error()));
-  auto wait = waitJson->toDouble();
+  auto wait = waitJson->to_double();
   if (!wait)
     return std::unexpected(std::move(wait.error()));
   double queuedFlightWaitTime = *wait;
@@ -2210,7 +2210,7 @@ std::expected<void, StarException> UniverseServer::clearBrokenWorlds() {
     auto json = (*assets)->json("/universe_server.config:clearBrokenWorldsInterval");
     if (!json)
       return std::unexpected(std::move(json.error()));
-    auto interval = json->toInt();
+    auto interval = json->to_int();
     if (!interval)
       return std::unexpected(std::move(interval.error()));
     m_clearBrokenWorldsDeadline = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) + std::chrono::milliseconds(*interval);
@@ -2607,7 +2607,7 @@ std::expected<void, StarException> UniverseServer::doTriggeredStorage() {
   auto json = (*assets)->json("/universe_server.config:universeStorageInterval");
   if (!json)
     return std::unexpected(std::move(json.error()));
-  auto interval = json->toInt();
+  auto interval = json->to_int();
   if (!interval)
     return std::unexpected(std::move(interval.error()));
   m_storageTriggerDeadline = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) + std::chrono::milliseconds(*interval);
@@ -2658,7 +2658,7 @@ std::expected<void, StarException> UniverseServer::loadSettings() {
       auto settings = UniverseSettings::create(m_root, *json);
       if (!settings)
         return std::unexpected(std::move(settings.error()));
-      auto time = json->getDouble("time");
+      auto time = json->get_double("time");
       if (!time)
         return std::unexpected(std::move(time.error()));
       m_universeSettings = std::move(*settings);
@@ -2693,7 +2693,7 @@ std::expected<std::optional<CelestialCoordinate>, StarException> UniverseServer:
   auto defaultJson = (*assets)->json("/universe_server.config:defaultWorldCoordinate");
   if (!defaultJson)
     return std::unexpected(std::move(defaultJson.error()));
-  auto defaultCoordinate = defaultJson->toString();
+  auto defaultCoordinate = defaultJson->to_string();
   if (!defaultCoordinate)
     return std::unexpected(std::move(defaultCoordinate.error()));
   if (!defaultCoordinate->empty()) {
@@ -2726,7 +2726,7 @@ std::expected<std::optional<CelestialCoordinate>, StarException> UniverseServer:
         auto visitable = (*parameters)->visitableParameters();
         if (!visitable)
           return false;
-        auto biome = filter.optString("terrestrialBiome");
+        auto biome = filter.opt_string("terrestrialBiome");
         if (!biome)
           return std::unexpected(std::move(biome.error()));
         if (*biome) {
@@ -2734,7 +2734,7 @@ std::expected<std::optional<CelestialCoordinate>, StarException> UniverseServer:
           if (!terrestrial || **biome != terrestrial->primaryBiome)
             return false;
         }
-        auto size = filter.optString("terrestrialSize");
+        auto size = filter.opt_string("terrestrialSize");
         if (!size)
           return std::unexpected(std::move(size.error()));
         if (*size) {
@@ -2742,7 +2742,7 @@ std::expected<std::optional<CelestialCoordinate>, StarException> UniverseServer:
           if (!terrestrial || **size != terrestrial->sizeName)
             return false;
         }
-        auto dungeon = filter.optString("floatingDungeon");
+        auto dungeon = filter.opt_string("floatingDungeon");
         if (!dungeon)
           return std::unexpected(std::move(dungeon.error()));
         if (*dungeon) {
@@ -2755,10 +2755,10 @@ std::expected<std::optional<CelestialCoordinate>, StarException> UniverseServer:
       auto config = assets->json("/universe_server.config:findStarterWorldParameters");
       if (!config)
         return std::unexpected(std::move(config.error()));
-      auto tries = config->getUInt("tries");
+      auto tries = config->get_uint("tries");
       if (!tries)
         return std::unexpected(std::move(tries.error()));
-      auto range = config->getUInt("range");
+      auto range = config->get_uint("range");
       if (!range)
         return std::unexpected(std::move(range.error()));
       auto random = database->findRandomWorld(*tries, *range, [&](CelestialCoordinate const& coordinate) -> std::expected<bool, StarException> {
@@ -2784,7 +2784,7 @@ std::expected<std::optional<CelestialCoordinate>, StarException> UniverseServer:
             return std::unexpected(std::move(satellites.error()));
           children.append_range(*satellites);
         }
-        auto required = config->getArray("requiredSystemWorlds", {});
+        auto required = config->get_array("requiredSystemWorlds", {});
         if (!required)
           return std::unexpected(std::move(required.error()));
         for (auto const& filter : *required) {
@@ -2833,7 +2833,7 @@ std::expected<void, StarException> UniverseServer::loadTempWorldIndex() {
       auto settings = (*database)->loadVersionedJson(*versioned, "TempWorldIndex");
       if (!settings)
         return std::unexpected(std::move(settings.error()));
-      auto entries = settings->toObject();
+      auto entries = settings->to_object();
       if (!entries)
         return std::unexpected(std::move(entries.error()));
       for (auto const& entry : *entries) {
@@ -2848,10 +2848,10 @@ std::expected<void, StarException> UniverseServer::loadTempWorldIndex() {
         auto second = entry.second.get(1);
         if (!second)
           return std::unexpected(std::move(second.error()));
-        auto timestamp = first->toUInt();
+        auto timestamp = first->to_uint();
         if (!timestamp)
           return std::unexpected(std::move(timestamp.error()));
-        auto lifetime = second->toUInt();
+        auto lifetime = second->to_uint();
         if (!lifetime)
           return std::unexpected(std::move(lifetime.error()));
         m_tempWorldIndex.insert(std::get<InstanceWorldId>(*world), {*timestamp, *lifetime});
@@ -2934,18 +2934,18 @@ std::expected<std::optional<String>, StarException> UniverseServer::isBannedUser
     auto json = (*config)->get("bannedIPs");
     if (!json)
       return std::unexpected(std::move(json.error()));
-    auto bans = json->toArray();
+    auto bans = json->to_array();
     if (!bans)
       return std::unexpected(std::move(bans.error()));
     for (auto const& ban : *bans) {
-      auto text = ban.getString("ip");
+      auto text = ban.get_string("ip");
       if (!text)
         return std::unexpected(std::move(text.error()));
       auto address = HostAddress::lookup(*text);
       if (!address)
         return std::unexpected(std::move(address.error()));
       if (*address == *hostAddress) {
-        auto reason = ban.getString("reason");
+        auto reason = ban.get_string("reason");
         if (!reason)
           return std::unexpected(std::move(reason.error()));
         return std::optional<String>(std::move(*reason));
@@ -2959,18 +2959,18 @@ std::expected<std::optional<String>, StarException> UniverseServer::isBannedUser
   auto json = (*config)->get("bannedUuids");
   if (!json)
     return std::unexpected(std::move(json.error()));
-  auto bans = json->toArray();
+  auto bans = json->to_array();
   if (!bans)
     return std::unexpected(std::move(bans.error()));
   for (auto const& ban : *bans) {
-    auto text = ban.getString("uuid");
+    auto text = ban.get_string("uuid");
     if (!text)
       return std::unexpected(std::move(text.error()));
     auto uuid = Uuid::create(*text);
     if (!uuid)
       return std::unexpected(std::move(uuid.error()));
     if (*uuid == playerUuid) {
-      auto reason = ban.getString("reason");
+      auto reason = ban.get_string("reason");
       if (!reason)
         return std::unexpected(std::move(reason.error()));
       return std::optional<String>(std::move(*reason));
@@ -3019,7 +3019,7 @@ std::expected<void, StarException> UniverseServer::doPermBan(ConnectionId client
       auto json = (*config)->get("bannedIPs");
       if (!json)
         return std::unexpected(std::move(json.error()));
-      auto bannedIPs = json->toArray();
+      auto bannedIPs = json->to_array();
       if (!bannedIPs)
         return std::unexpected(std::move(bannedIPs.error()));
       bannedIPs->push_back(JsonObject{
@@ -3035,7 +3035,7 @@ std::expected<void, StarException> UniverseServer::doPermBan(ConnectionId client
       auto json = (*config)->get("bannedUuids");
       if (!json)
         return std::unexpected(std::move(json.error()));
-      auto bannedUuids = json->toArray();
+      auto bannedUuids = json->to_array();
       if (!bannedUuids)
         return std::unexpected(std::move(bannedUuids.error()));
       bannedUuids->push_back(JsonObject{
@@ -3150,13 +3150,13 @@ std::expected<void, StarException> UniverseServer::packetsReceived(UniverseConne
         if (m_secureWarps && entityMessage->message == "warp") {
           bool blocked = false;
 
-          if (entityMessage->args.empty() || !entityMessage->args[0].canConvert(Json::Type::String)) {
+          if (entityMessage->args.empty() || !entityMessage->args[0].can_convert(Json::Type::String)) {
             if (auto logged = m_root.logger().warn("UniverseServer: Blocked warp entity message with invalid args from client {}", clientId); !logged)
               return std::unexpected(std::move(logged.error()));
             blocked = true;
           } else {
             auto parsed = [&]() -> std::expected<WarpAction, StarException> {
-              auto text = entityMessage->args[0].toString();
+              auto text = entityMessage->args[0].to_string();
               if (!text)
                 return std::unexpected(std::move(text.error()));
               return parseWarpAction(*text);
@@ -3239,7 +3239,7 @@ std::expected<void, StarException> UniverseServer::packetsReceived(UniverseConne
             auto json = (*configuration)->get(name);
             if (!json)
               return std::unexpected(std::move(json.error()));
-            auto value = json->optBool();
+            auto value = json->opt_bool();
             if (!value)
               return std::unexpected(std::move(value.error()));
             return value->value_or(fallback);
@@ -3378,20 +3378,20 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
     auto waitJson = assets->json("/universe_server.config:clientWaitLimit");
     if (!waitJson)
       return std::unexpected(std::move(waitJson.error()));
-    auto wait = waitJson->toInt();
+    auto wait = waitJson->to_int();
     if (!wait)
       return std::unexpected(std::move(wait.error()));
     int clientWaitLimit = *wait;
     auto serverMismatchJson = assets->json("/universe_server.config:serverAssetsMismatchMessage");
     if (!serverMismatchJson)
       return std::unexpected(std::move(serverMismatchJson.error()));
-    auto serverMismatch = serverMismatchJson->toString();
+    auto serverMismatch = serverMismatchJson->to_string();
     if (!serverMismatch)
       return std::unexpected(std::move(serverMismatch.error()));
     auto clientMismatchJson = assets->json("/universe_server.config:clientAssetsMismatchMessage");
     if (!clientMismatchJson)
       return std::unexpected(std::move(clientMismatchJson.error()));
-    auto clientMismatch = clientMismatchJson->toString();
+    auto clientMismatch = clientMismatchJson->to_string();
     if (!clientMismatch)
       return std::unexpected(std::move(clientMismatch.error()));
     auto settings = configuration->get("connectionSettings");
@@ -3431,7 +3431,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
     bool compressionStream = false;
     response->allowed = true;
     if (!legacyClient) {
-      auto name = settings->getString("compression", "None");
+      auto name = settings->get_string("compression", "None");
       if (!name)
         return std::unexpected(std::move(name.error()));
       if (!NetCompressionModeNames)
@@ -3485,13 +3485,13 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
                                      std::chrono::steady_clock::now() + std::chrono::microseconds(500))});
       return {};
     };
-    auto latest = settings->getBool("requireLatestVersion", false);
+    auto latest = settings->get_bool("requireLatestVersion", false);
     if (!latest)
       return std::unexpected(std::move(latest.error()));
     if (*latest) {
       bool tooOld = legacyClient;
       if (!tooOld) {
-        auto version = connect->info.getUInt("openProtocolVersion", 0);
+        auto version = connect->info.get_uint("openProtocolVersion", 0);
         if (!version)
           return std::unexpected(std::move(version.error()));
         tooOld = *version < OpenProtocolVersion;
@@ -3510,7 +3510,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
         auto mismatchJson = configuration->get("allowAssetsMismatch");
         if (!mismatchJson)
           return std::unexpected(std::move(mismatchJson.error()));
-        auto mismatch = mismatchJson->toBool();
+        auto mismatch = mismatchJson->to_bool();
         if (!mismatch)
           return std::unexpected(std::move(mismatch.error()));
         if (!*mismatch)
@@ -3522,7 +3522,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
         auto lengthJson = assets->json("/universe_server.config:passwordSaltLength");
         if (!lengthJson)
           return std::unexpected(std::move(lengthJson.error()));
-        auto length = lengthJson->toUInt();
+        auto length = lengthJson->to_uint();
         if (!length)
           return std::unexpected(std::move(length.error()));
         auto salt = secure_random_bytes(*length);
@@ -3550,11 +3550,11 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
           return std::unexpected(std::move(account.error()));
         bool success = false;
         if (*account) {
-          auto admin = account->getBool("admin", false);
+          auto admin = account->get_bool("admin", false);
           if (!admin)
             return std::unexpected(std::move(admin.error()));
           administrator = *admin;
-          auto password = account->getString("password");
+          auto password = account->get_string("password");
           if (!password)
             return std::unexpected(std::move(password.error()));
           ByteArray salted = (*password + connect->account).utf8_bytes();
@@ -3567,7 +3567,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
         auto anonymousJson = configuration->get("allowAnonymousConnections");
         if (!anonymousJson)
           return std::unexpected(std::move(anonymousJson.error()));
-        auto anonymous = anonymousJson->toBool();
+        auto anonymous = anonymousJson->to_bool();
         if (!anonymous)
           return std::unexpected(std::move(anonymous.error()));
         if (!*anonymous)
@@ -3575,7 +3575,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
         auto adminJson = configuration->get("anonymousConnectionsAreAdmin");
         if (!adminJson)
           return std::unexpected(std::move(adminJson.error()));
-        auto admin = adminJson->toBool();
+        auto admin = adminJson->to_bool();
         if (!admin)
           return std::unexpected(std::move(admin.error()));
         administrator = *admin;
@@ -3590,7 +3590,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
     NetCompatibilityRules rules(legacyClient ? LegacyVersion : 1);
     rules.setIsAdmin(administrator);
     if (connect->info) {
-      auto version = connect->info.optUInt("openProtocolVersion");
+      auto version = connect->info.opt_uint("openProtocolVersion");
       if (!version)
         return std::unexpected(std::move(version.error()));
       if (*version)
@@ -3599,12 +3599,12 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
       if (!brand)
         return std::unexpected(std::move(brand.error()));
       if (*brand) {
-        auto text = brand->toString();
+        auto text = brand->to_string();
         if (!text)
           return std::unexpected(std::move(text.error()));
         connectionLog += Star::format(" ({} client)", *text);
       }
-      auto legacy = connect->info.getBool("legacy", false);
+      auto legacy = connect->info.get_bool("legacy", false);
       if (!legacy)
         return std::unexpected(std::move(legacy.error()));
       if (*legacy)
@@ -3708,10 +3708,10 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
     auto intro = assets->json("/universe_server.config:introInstance");
     if (!intro)
       return std::unexpected(std::move(intro.error()));
-    auto fallback = intro->getString("default", "");
+    auto fallback = intro->get_string("default", "");
     if (!fallback)
       return std::unexpected(std::move(fallback.error()));
-    auto speciesIntro = intro->getString(connect->shipSpecies, *fallback);
+    auto speciesIntro = intro->get_string(connect->shipSpecies, *fallback);
     if (!speciesIntro)
       return std::unexpected(std::move(speciesIntro.error()));
     if (!speciesIntro->empty() && !connect->introComplete) {
@@ -3731,7 +3731,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
         if (!*config)
           useRevive = false;
         else {
-          auto persistent = (*config)->getBool("persistent", false);
+          auto persistent = (*config)->get_bool("persistent", false);
           if (!persistent)
             return std::unexpected(std::move(persistent.error()));
           useRevive = *persistent;
@@ -3758,7 +3758,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
       auto config = assets->json("/universe_server.config");
       if (!config)
         return std::unexpected(std::move(config.error()));
-      auto defaultWarp = config->optString("defaultReviveWarp");
+      auto defaultWarp = config->opt_string("defaultReviveWarp");
       if (!defaultWarp)
         return std::unexpected(std::move(defaultWarp.error()));
       if (*defaultWarp) {
@@ -4246,7 +4246,7 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
       if (!configuredSize)
         return std::unexpected(std::move(configuredSize.error()));
       if (*configuredSize) {
-        auto parsed = jsonToVec2U(*configuredSize);
+        auto parsed = json_to_vec2u(*configuredSize);
         if (!parsed)
           return std::unexpected(std::move(parsed.error()));
         size = *parsed;
@@ -4298,11 +4298,11 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
     auto epoch = ship->getProperty("ship.epoch");
     if (!epoch)
       return std::unexpected(std::move(epoch.error()));
-    if (!epoch->canConvert(Json::Type::Float)) {
+    if (!epoch->can_convert(Json::Type::Float)) {
       if (auto set = ship->setProperty("ship.epoch", Time::timeSinceEpoch()); !set)
         return std::unexpected(std::move(set.error()));
     } else {
-      auto time = epoch->toDouble();
+      auto time = epoch->to_double();
       if (!time)
         return std::unexpected(std::move(time.error()));
       clock->setTime(Time::timeSinceEpoch() - *time);
@@ -4403,14 +4403,14 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
       return std::unexpected(std::move(hasSeed.error()));
     std::uint64_t seed;
     if (*hasSeed) {
-      auto configuredSeed = config->getUInt("seed");
+      auto configuredSeed = config->get_uint("seed");
       if (!configuredSeed)
         return std::unexpected(std::move(configuredSeed.error()));
       seed = *configuredSeed;
     } else {
       seed = m_root.random().next_u64();
     }
-    auto type = config->getString("type");
+    auto type = config->get_string("type");
     if (!type)
       return std::unexpected(std::move(type.error()));
     std::shared_ptr<VisitableWorldParameters> parameters;
@@ -4418,10 +4418,10 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
     if (!terrestrial)
       return std::unexpected(std::move(terrestrial.error()));
     if (*terrestrial) {
-      auto planetType = config->getString("planetType");
+      auto planetType = config->get_string("planetType");
       if (!planetType)
         return std::unexpected(std::move(planetType.error()));
-      auto size = config->getString("planetSize");
+      auto size = config->get_string("planetSize");
       if (!size)
         return std::unexpected(std::move(size.error()));
       auto generated = generateTerrestrialWorldParameters(m_root, *planetType, *size, seed);
@@ -4443,7 +4443,7 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
           return std::unexpected(std::move(floating.error()));
         if (!*floating)
           return std::unexpected(UniverseServerException(Star::format("Unknown world type: '{}'\n", *type)));
-        auto dungeon = config->getString("dungeonWorld");
+        auto dungeon = config->get_string("dungeonWorld");
         if (!dungeon)
           return std::unexpected(std::move(dungeon.error()));
         auto generated = generateFloatingDungeonWorldParameters(m_root, *dungeon);
@@ -4458,7 +4458,7 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
     if (!hasBeam)
       return std::unexpected(std::move(hasBeam.error()));
     if (*hasBeam) {
-      auto beam = config->getString("beamUpRule");
+      auto beam = config->get_string("beamUpRule");
       if (!beam)
         return std::unexpected(std::move(beam.error()));
       if (!BeamUpRuleNames)
@@ -4468,7 +4468,7 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
         return std::unexpected(std::move(rule.error()));
       parameters->beamUpRule = rule->get();
     }
-    auto deathDrops = config->getBool("disableDeathDrops", false);
+    auto deathDrops = config->get_bool("disableDeathDrops", false);
     if (!deathDrops)
       return std::unexpected(std::move(deathDrops.error()));
     parameters->disableDeathDrops = *deathDrops;
@@ -4481,16 +4481,16 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
     auto worldTemplate = WorldTemplate::create(m_root, parameters, *sky, seed);
     if (!worldTemplate)
       return std::unexpected(std::move(worldTemplate.error()));
-    auto properties = config->getObject("worldProperties", {});
+    auto properties = config->get_object("worldProperties", {});
     if (!properties)
       return std::unexpected(std::move(properties.error()));
-    auto spawning = config->getBool("spawningEnabled", true);
+    auto spawning = config->get_bool("spawningEnabled", true);
     if (!spawning)
       return std::unexpected(std::move(spawning.error()));
-    auto persistent = config->getBool("persistent", false);
+    auto persistent = config->get_bool("persistent", false);
     if (!persistent)
       return std::unexpected(std::move(persistent.error()));
-    auto useClock = config->getBool("useUniverseClock", false);
+    auto useClock = config->get_bool("useUniverseClock", false);
     if (!useClock)
       return std::unexpected(std::move(useClock.error()));
 
@@ -4542,7 +4542,7 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
       }
     } else {
       auto path = universe.tempWorldFile(id);
-      auto expiry = config->optInt("tempWorldDeleteTime");
+      auto expiry = config->opt_int("tempWorldDeleteTime");
       if (!expiry)
         return std::unexpected(std::move(expiry.error()));
       std::uint64_t deleteTime = expiry->value_or(0);
@@ -4682,7 +4682,7 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
   auto disallowJson = (*configuration)->get("disallowClientCustomWorlds");
   if (!disallowJson)
     return std::unexpected(std::move(disallowJson.error()));
-  auto disallow = disallowJson->optBool();
+  auto disallow = disallowJson->opt_bool();
   if (!disallow)
     return std::unexpected(std::move(disallow.error()));
   if (disallow->value_or(false))
@@ -4726,11 +4726,11 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
       auto epoch = world->getProperty("customWorld.epoch");
       if (!epoch)
         return std::unexpected(std::move(epoch.error()));
-      if (!epoch->canConvert(Json::Type::Float)) {
+      if (!epoch->can_convert(Json::Type::Float)) {
         if (auto set = world->setProperty("customWorld.epoch", Time::timeSinceEpoch()); !set)
           return std::unexpected(std::move(set.error()));
       } else {
-        auto time = epoch->toDouble();
+        auto time = epoch->to_double();
         if (!time)
           return std::unexpected(std::move(time.error()));
         clock->setTime(Time::timeSinceEpoch() - *time);
@@ -4785,7 +4785,7 @@ std::expected<void, StarException> UniverseServer::notifyWorldCreated(WorldId co
   auto allJson = (*configuration)->get("notifyClientsOnWorldCreate");
   if (!allJson)
     return std::unexpected(std::move(allJson.error()));
-  auto all = allJson->optBool();
+  auto all = allJson->opt_bool();
   if (!all)
     return std::unexpected(std::move(all.error()));
   bool notifyAll = all->value_or(false);
@@ -4794,7 +4794,7 @@ std::expected<void, StarException> UniverseServer::notifyWorldCreated(WorldId co
     auto adminsJson = (*configuration)->get("notifyAdminsOnWorldCreate");
     if (!adminsJson)
       return std::unexpected(std::move(adminsJson.error()));
-    auto admins = adminsJson->optBool();
+    auto admins = adminsJson->opt_bool();
     if (!admins)
       return std::unexpected(std::move(admins.error()));
     notifyAdmins = admins->value_or(false);
@@ -4925,14 +4925,14 @@ std::expected<void, StarException> UniverseServer::startLuaScripts() {
   if (!root)
     return std::unexpected(std::move(root.error()));
   m_luaRoot = std::move(*root);
-  auto pause = config->getFloat("luaGcPause");
+  auto pause = config->get_float("luaGcPause");
   if (!pause)
     return std::unexpected(std::move(pause.error()));
-  auto multiplier = config->getFloat("luaGcStepMultiplier");
+  auto multiplier = config->get_float("luaGcStepMultiplier");
   if (!multiplier)
     return std::unexpected(std::move(multiplier.error()));
   m_luaRoot->tuneAutoGarbageCollection(*pause, *multiplier);
-  auto contexts = config->getObject("scriptContexts");
+  auto contexts = config->get_object("scriptContexts");
   if (!contexts)
     return std::unexpected(std::move(contexts.error()));
   for (auto const& context : *contexts) {
@@ -4953,7 +4953,7 @@ std::expected<void, StarException> UniverseServer::startLuaScripts() {
       return std::unexpected(std::move(added.error()));
     if (auto added = script->addThreadCallbacks("celestial", *celestial); !added)
       return std::unexpected(std::move(added.error()));
-    auto scripts = jsonToStringList(context.second);
+    auto scripts = json_to_string_list(context.second);
     if (!scripts)
       return std::unexpected(std::move(scripts.error()));
     if (auto set = script->setScripts(std::move(*scripts)); !set)

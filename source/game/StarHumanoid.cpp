@@ -133,17 +133,17 @@ extern std::expected<EnumMap<HumanoidEmote>, StarException> const HumanoidEmoteF
 
 std::expected<Personality, StarException> parsePersonalityArray(Json const& config) {
   {
-auto checked1 = config.getString(0);
+auto checked1 = config.get_string(0);
 if (!checked1) return std::unexpected(std::move(checked1.error()));
-auto checked2 = config.getString(1);
+auto checked2 = config.get_string(1);
 if (!checked2) return std::unexpected(std::move(checked2.error()));
 auto checked3 = config.get(2);
 if (!checked3) return std::unexpected(std::move(checked3.error()));
-auto checked4 = jsonToVec2F(std::move(*checked3));
+auto checked4 = json_to_vec2f(std::move(*checked3));
 if (!checked4) return std::unexpected(std::move(checked4.error()));
 auto checked5 = config.get(3);
 if (!checked5) return std::unexpected(std::move(checked5.error()));
-auto checked6 = jsonToVec2F(std::move(*checked5));
+auto checked6 = json_to_vec2f(std::move(*checked5));
 if (!checked6) return std::unexpected(std::move(checked6.error()));
 return Personality{std::move(*checked1), std::move(*checked2), std::move(*checked4), std::move(*checked6)};
 }
@@ -155,7 +155,7 @@ auto checked7 = config.opt("idle");
 if (!checked7) return std::unexpected(std::move(checked7.error()));
 if (auto idle = std::move(*checked7))
     {
-      auto idleValue = idle->toString();
+      auto idleValue = idle->to_string();
       if (!idleValue) return std::unexpected(std::move(idleValue.error()));
       personality.idle = std::move(*idleValue);
     }
@@ -165,7 +165,7 @@ auto checked8 = config.opt("armIdle");
 if (!checked8) return std::unexpected(std::move(checked8.error()));
 if (auto armIdle = std::move(*checked8))
     {
-      auto armIdleValue = armIdle->toString();
+      auto armIdleValue = armIdle->to_string();
       if (!armIdleValue) return std::unexpected(std::move(armIdleValue.error()));
       personality.armIdle = std::move(*armIdleValue);
     }
@@ -175,7 +175,7 @@ auto checked9 = config.opt("headOffset");
 if (!checked9) return std::unexpected(std::move(checked9.error()));
 if (auto headOffset = std::move(*checked9))
     {
-auto checked10 = jsonToVec2F(*headOffset);
+auto checked10 = json_to_vec2f(*headOffset);
 if (!checked10) return std::unexpected(std::move(checked10.error()));
 personality.headOffset = std::move(*checked10);
 }
@@ -185,7 +185,7 @@ auto checked11 = config.opt("armOffset");
 if (!checked11) return std::unexpected(std::move(checked11.error()));
 if (auto armOffset = std::move(*checked11))
     {
-auto checked12 = jsonToVec2F(*armOffset);
+auto checked12 = json_to_vec2f(*armOffset);
 if (!checked12) return std::unexpected(std::move(checked12.error()));
 personality.armOffset = std::move(*checked12);
 }
@@ -205,8 +205,8 @@ Json jsonFromPersonality(Personality const& personality) {
   return JsonObject{
     { "idle", personality.idle },
     { "armIdle", personality.armIdle },
-    { "headOffset", jsonFromVec2F(personality.headOffset) },
-    { "armOffset", jsonFromVec2F(personality.armOffset)   }
+    { "headOffset", json_from_vec2f(personality.headOffset) },
+    { "armOffset", json_from_vec2f(personality.armOffset)   }
   };
 }
 
@@ -215,48 +215,48 @@ HumanoidIdentity::HumanoidIdentity()
 
 std::expected<HumanoidIdentity, StarException> HumanoidIdentity::create(Json config) {
   HumanoidIdentity identity;
-  if (config.isNull())
+  if (config.is_null())
     config = JsonObject();
 
   {
-auto checked13 = config.getString("name", "Humanoid");
+auto checked13 = config.get_string("name", "Humanoid");
 if (!checked13) return std::unexpected(std::move(checked13.error()));
 identity.name = std::move(*checked13);
 }
   {
-auto checked14 = config.getString("species", "human");
+auto checked14 = config.get_string("species", "human");
 if (!checked14) return std::unexpected(std::move(checked14.error()));
 identity.species = std::move(*checked14);
 }
   {
-auto checked15 = config.getString("gender", "male");
+auto checked15 = config.get_string("gender", "male");
 if (!checked15) return std::unexpected(std::move(checked15.error()));
 auto checked16 = enum_value<GenderNames>(*checked15);
 if (!checked16) return std::unexpected(std::move(checked16.error()));
 identity.gender = *checked16;
 }
   {
-auto checked17 = config.getString("hairGroup", "hair");
+auto checked17 = config.get_string("hairGroup", "hair");
 if (!checked17) return std::unexpected(std::move(checked17.error()));
 identity.hairGroup = std::move(*checked17);
 }
   {
-auto checked18 = config.getString("hairType", "male1");
+auto checked18 = config.get_string("hairType", "male1");
 if (!checked18) return std::unexpected(std::move(checked18.error()));
 identity.hairType = std::move(*checked18);
 }
   {
-auto checked19 = config.getString("hairDirectives", "");
+auto checked19 = config.get_string("hairDirectives", "");
 if (!checked19) return std::unexpected(std::move(checked19.error()));
 identity.hairDirectives = std::move(*checked19);
 }
   {
-auto checked20 = config.getString("bodyDirectives", "");
+auto checked20 = config.get_string("bodyDirectives", "");
 if (!checked20) return std::unexpected(std::move(checked20.error()));
 identity.bodyDirectives = std::move(*checked20);
 }
   {
-auto checked21 = config.optString("emoteDirectives");
+auto checked21 = config.opt_string("emoteDirectives");
 if (!checked21) return std::unexpected(std::move(checked21.error()));
 if (auto jEmoteDirectives = std::move(*checked21)) // Passing Directives as a default arg would be inefficient
     {
@@ -269,57 +269,57 @@ identity.emoteDirectives = std::move(*checked22);
 }
 
   {
-auto checked23 = config.getString("facialHairGroup", "");
+auto checked23 = config.get_string("facialHairGroup", "");
 if (!checked23) return std::unexpected(std::move(checked23.error()));
 identity.facialHairGroup = std::move(*checked23);
 }
   {
-auto checked24 = config.getString("facialHairType", "");
+auto checked24 = config.get_string("facialHairType", "");
 if (!checked24) return std::unexpected(std::move(checked24.error()));
 identity.facialHairType = std::move(*checked24);
 }
   {
-auto checked25 = config.getString("facialHairDirectives", "");
+auto checked25 = config.get_string("facialHairDirectives", "");
 if (!checked25) return std::unexpected(std::move(checked25.error()));
 identity.facialHairDirectives = std::move(*checked25);
 }
   {
-auto checked26 = config.getString("facialMaskGroup", "");
+auto checked26 = config.get_string("facialMaskGroup", "");
 if (!checked26) return std::unexpected(std::move(checked26.error()));
 identity.facialMaskGroup = std::move(*checked26);
 }
   {
-auto checked27 = config.getString("facialMaskType", "");
+auto checked27 = config.get_string("facialMaskType", "");
 if (!checked27) return std::unexpected(std::move(checked27.error()));
 identity.facialMaskType = std::move(*checked27);
 }
   {
-auto checked28 = config.getString("facialMaskDirectives", "");
+auto checked28 = config.get_string("facialMaskDirectives", "");
 if (!checked28) return std::unexpected(std::move(checked28.error()));
 identity.facialMaskDirectives = std::move(*checked28);
 }
 
   {
-auto checked29 = config.getString("personalityIdle", "idle.1");
+auto checked29 = config.get_string("personalityIdle", "idle.1");
 if (!checked29) return std::unexpected(std::move(checked29.error()));
 identity.personality.idle = std::move(*checked29);
 }
   {
-auto checked30 = config.getString("personalityArmIdle", "idle.1");
+auto checked30 = config.get_string("personalityArmIdle", "idle.1");
 if (!checked30) return std::unexpected(std::move(checked30.error()));
 identity.personality.armIdle = std::move(*checked30);
 }
   {
 auto checked31 = config.get("personalityHeadOffset", JsonArray{0, 0});
 if (!checked31) return std::unexpected(std::move(checked31.error()));
-auto checked32 = jsonToVec2F(std::move(*checked31));
+auto checked32 = json_to_vec2f(std::move(*checked31));
 if (!checked32) return std::unexpected(std::move(checked32.error()));
 identity.personality.headOffset = std::move(*checked32);
 }
   {
 auto checked33 = config.get("personalityArmOffset", JsonArray{0, 0});
 if (!checked33) return std::unexpected(std::move(checked33.error()));
-auto checked34 = jsonToVec2F(std::move(*checked33));
+auto checked34 = json_to_vec2f(std::move(*checked33));
 if (!checked34) return std::unexpected(std::move(checked34.error()));
 identity.personality.armOffset = std::move(*checked34);
 }
@@ -327,13 +327,13 @@ identity.personality.armOffset = std::move(*checked34);
   {
 auto checked35 = config.get("color", JsonArray({51, 117, 237, 255}));
 if (!checked35) return std::unexpected(std::move(checked35.error()));
-auto checked36 = jsonToColor(std::move(*checked35));
+auto checked36 = json_to_color(std::move(*checked35));
 if (!checked36) return std::unexpected(std::move(checked36.error()));
 identity.color = checked36->to_rgba();
 }
 
   {
-auto checked38 = config.optString("imagePath");
+auto checked38 = config.opt_string("imagePath");
 if (!checked38) return std::unexpected(std::move(checked38.error()));
 identity.imagePath = std::move(*checked38);
 }
@@ -362,9 +362,9 @@ std::expected<Json, StarException> HumanoidIdentity::toJson() const {
     {"facialMaskDirectives", facialMaskDirectives.string()},
     {"personalityIdle", personality.idle},
     {"personalityArmIdle", personality.armIdle},
-    {"personalityHeadOffset", jsonFromVec2F(personality.headOffset)},
-    {"personalityArmOffset", jsonFromVec2F(personality.armOffset)},
-    {"color", jsonFromColor(Color::rgba(color))},
+    {"personalityHeadOffset", json_from_vec2f(personality.headOffset)},
+    {"personalityArmOffset", json_from_vec2f(personality.armOffset)},
+    {"color", json_from_color(Color::rgba(color))},
   };
   if (imagePath)
     result["imagePath"] = *imagePath;
@@ -559,7 +559,7 @@ if (std::move(*checked81))
     {
 auto checked82 = config.get("stateCycle");
 if (!checked82) return std::unexpected(std::move(checked82.error()));
-auto checked83 = jsonToArrayF<STATESIZE>(std::move(*checked82));
+auto checked83 = json_to_array_f<STATESIZE>(std::move(*checked82));
 if (!checked83) return std::unexpected(std::move(checked83.error()));
 timing.stateCycle = std::move(*checked83);
 }
@@ -571,7 +571,7 @@ if (std::move(*checked84))
     {
 auto checked85 = config.get("stateFrames");
 if (!checked85) return std::unexpected(std::move(checked85.error()));
-auto checked86 = jsonToArrayU<STATESIZE>(std::move(*checked85));
+auto checked86 = json_to_array_u<STATESIZE>(std::move(*checked85));
 if (!checked86) return std::unexpected(std::move(checked86.error()));
 timing.stateFrames = std::move(*checked86);
 }
@@ -584,7 +584,7 @@ if (std::move(*checked87))
     {
 auto checked88 = config.get("emoteCycle");
 if (!checked88) return std::unexpected(std::move(checked88.error()));
-auto checked89 = jsonToArrayF<EmoteSize>(std::move(*checked88));
+auto checked89 = json_to_array_f<EmoteSize>(std::move(*checked88));
 if (!checked89) return std::unexpected(std::move(checked89.error()));
 timing.emoteCycle = std::move(*checked89);
 }
@@ -596,7 +596,7 @@ if (std::move(*checked90))
     {
 auto checked91 = config.get("emoteFrames");
 if (!checked91) return std::unexpected(std::move(checked91.error()));
-auto checked92 = jsonToArrayU<EmoteSize>(std::move(*checked91));
+auto checked92 = json_to_array_u<EmoteSize>(std::move(*checked91));
 if (!checked92) return std::unexpected(std::move(checked92.error()));
 timing.emoteFrames = std::move(*checked92);
 }
@@ -810,7 +810,7 @@ HumanoidIdentity const& Humanoid::identity() const {
 }
 
 std::expected<void, StarException> Humanoid::setHumanoidParameters(JsonObject parameters){
-  m_baseConfig = jsonMerge(m_baseConfig, std::move(parameters));
+  m_baseConfig = json_merge(m_baseConfig, std::move(parameters));
   auto checked100 = loadConfig(std::exchange(m_mergeConfig, {}), true);
   if (!checked100)
     return std::unexpected(std::move(checked100.error()));
@@ -822,8 +822,8 @@ std::expected<bool, StarException> Humanoid::loadConfig(Json merger, bool forceR
   if (m_mergeConfig == merger && !forceRefresh)
     return false;
 
-  auto config = jsonMerge(m_baseConfig, merger);
-  auto checked101 = config.getObject("humanoidTiming");
+  auto config = json_merge(m_baseConfig, merger);
+  auto checked101 = config.get_object("humanoidTiming");
 if (!checked101) return std::unexpected(std::move(checked101.error()));
 auto checked102 = HumanoidTiming::create(m_root, std::move(*checked101));
 if (!checked102) return std::unexpected(std::move(checked102.error()));
@@ -831,113 +831,113 @@ m_timing = std::move(*checked102);
 
   auto checked103 = config.get("globalOffset");
 if (!checked103) return std::unexpected(std::move(checked103.error()));
-auto checked104 = jsonToVec2F(std::move(*checked103));
+auto checked104 = json_to_vec2f(std::move(*checked103));
 if (!checked104) return std::unexpected(std::move(checked104.error()));
 m_globalOffset = std::move(*checked104) / TilePixels;
   auto checked105 = config.get("headRunOffset");
 if (!checked105) return std::unexpected(std::move(checked105.error()));
-auto checked106 = jsonToVec2F(std::move(*checked105));
+auto checked106 = json_to_vec2f(std::move(*checked105));
 if (!checked106) return std::unexpected(std::move(checked106.error()));
 m_headRunOffset = std::move(*checked106) / TilePixels;
   auto checked107 = config.get("headSwimOffset");
 if (!checked107) return std::unexpected(std::move(checked107.error()));
-auto checked108 = jsonToVec2F(std::move(*checked107));
+auto checked108 = json_to_vec2f(std::move(*checked107));
 if (!checked108) return std::unexpected(std::move(checked108.error()));
 m_headSwimOffset = std::move(*checked108) / TilePixels;
   auto checked109 = config.get("runFallOffset");
 if (!checked109) return std::unexpected(std::move(checked109.error()));
-auto checked110 = std::move(*checked109).toDouble();
+auto checked110 = std::move(*checked109).to_double();
 if (!checked110) return std::unexpected(std::move(checked110.error()));
 m_runFallOffset = std::move(*checked110) / TilePixels;
   auto checked111 = config.get("duckOffset");
 if (!checked111) return std::unexpected(std::move(checked111.error()));
-auto checked112 = std::move(*checked111).toDouble();
+auto checked112 = std::move(*checked111).to_double();
 if (!checked112) return std::unexpected(std::move(checked112.error()));
 m_duckOffset = std::move(*checked112) / TilePixels;
   auto checked113 = config.get("headDuckOffset");
 if (!checked113) return std::unexpected(std::move(checked113.error()));
-auto checked114 = jsonToVec2F(std::move(*checked113));
+auto checked114 = json_to_vec2f(std::move(*checked113));
 if (!checked114) return std::unexpected(std::move(checked114.error()));
 m_headDuckOffset = std::move(*checked114) / TilePixels;
   auto checked115 = config.get("sitOffset");
 if (!checked115) return std::unexpected(std::move(checked115.error()));
-auto checked116 = std::move(*checked115).toDouble();
+auto checked116 = std::move(*checked115).to_double();
 if (!checked116) return std::unexpected(std::move(checked116.error()));
 m_sitOffset = std::move(*checked116) / TilePixels;
   auto checked117 = config.get("layOffset");
 if (!checked117) return std::unexpected(std::move(checked117.error()));
-auto checked118 = std::move(*checked117).toDouble();
+auto checked118 = std::move(*checked117).to_double();
 if (!checked118) return std::unexpected(std::move(checked118.error()));
 m_layOffset = std::move(*checked118) / TilePixels;
   auto checked119 = config.get("headSitOffset");
 if (!checked119) return std::unexpected(std::move(checked119.error()));
-auto checked120 = jsonToVec2F(std::move(*checked119));
+auto checked120 = json_to_vec2f(std::move(*checked119));
 if (!checked120) return std::unexpected(std::move(checked120.error()));
 m_headSitOffset = std::move(*checked120) / TilePixels;
   auto checked121 = config.get("headLayOffset");
 if (!checked121) return std::unexpected(std::move(checked121.error()));
-auto checked122 = jsonToVec2F(std::move(*checked121));
+auto checked122 = json_to_vec2f(std::move(*checked121));
 if (!checked122) return std::unexpected(std::move(checked122.error()));
 m_headLayOffset = std::move(*checked122) / TilePixels;
   auto checked123 = config.get("recoilOffset");
 if (!checked123) return std::unexpected(std::move(checked123.error()));
-auto checked124 = jsonToVec2F(std::move(*checked123));
+auto checked124 = json_to_vec2f(std::move(*checked123));
 if (!checked124) return std::unexpected(std::move(checked124.error()));
 m_recoilOffset = std::move(*checked124) / TilePixels;
   auto checked125 = config.get("mouthOffset");
 if (!checked125) return std::unexpected(std::move(checked125.error()));
-auto checked126 = jsonToVec2F(std::move(*checked125));
+auto checked126 = json_to_vec2f(std::move(*checked125));
 if (!checked126) return std::unexpected(std::move(checked126.error()));
 m_mouthOffset = std::move(*checked126) / TilePixels;
   auto checked127 = config.get("feetOffset");
 if (!checked127) return std::unexpected(std::move(checked127.error()));
-auto checked128 = jsonToVec2F(std::move(*checked127));
+auto checked128 = json_to_vec2f(std::move(*checked127));
 if (!checked128) return std::unexpected(std::move(checked128.error()));
 m_feetOffset = std::move(*checked128) / TilePixels;
 
-  auto checked129 = config.getBool("bodyFullbright", false);
+  auto checked129 = config.get_bool("bodyFullbright", false);
 if (!checked129) return std::unexpected(std::move(checked129.error()));
 m_bodyFullbright = std::move(*checked129);
-  auto checked130 = config.getBool("useBodyMask", false);
+  auto checked130 = config.get_bool("useBodyMask", false);
 if (!checked130) return std::unexpected(std::move(checked130.error()));
 m_useBodyMask = std::move(*checked130);
-  auto checked131 = config.getBool("useBodyHeadMask", false);
+  auto checked131 = config.get_bool("useBodyHeadMask", false);
 if (!checked131) return std::unexpected(std::move(checked131.error()));
 m_useBodyHeadMask = std::move(*checked131);
 
   auto checked132 = config.get("headArmorOffset");
 if (!checked132) return std::unexpected(std::move(checked132.error()));
-auto checked133 = jsonToVec2F(std::move(*checked132));
+auto checked133 = json_to_vec2f(std::move(*checked132));
 if (!checked133) return std::unexpected(std::move(checked133.error()));
 m_headArmorOffset = std::move(*checked133) / TilePixels;
   auto checked134 = config.get("chestArmorOffset");
 if (!checked134) return std::unexpected(std::move(checked134.error()));
-auto checked135 = jsonToVec2F(std::move(*checked134));
+auto checked135 = json_to_vec2f(std::move(*checked134));
 if (!checked135) return std::unexpected(std::move(checked135.error()));
 m_chestArmorOffset = std::move(*checked135) / TilePixels;
   auto checked136 = config.get("legsArmorOffset");
 if (!checked136) return std::unexpected(std::move(checked136.error()));
-auto checked137 = jsonToVec2F(std::move(*checked136));
+auto checked137 = json_to_vec2f(std::move(*checked136));
 if (!checked137) return std::unexpected(std::move(checked137.error()));
 m_legsArmorOffset = std::move(*checked137) / TilePixels;
   auto checked138 = config.get("backArmorOffset");
 if (!checked138) return std::unexpected(std::move(checked138.error()));
-auto checked139 = jsonToVec2F(std::move(*checked138));
+auto checked139 = json_to_vec2f(std::move(*checked138));
 if (!checked139) return std::unexpected(std::move(checked139.error()));
 m_backArmorOffset = std::move(*checked139) / TilePixels;
 
-  auto checked140 = config.getBool("bodyHidden", false);
+  auto checked140 = config.get_bool("bodyHidden", false);
 if (!checked140) return std::unexpected(std::move(checked140.error()));
 m_bodyHidden = std::move(*checked140);
 
   auto checked141 = config.get("armWalkSeq");
 if (!checked141) return std::unexpected(std::move(checked141.error()));
-auto checked142 = jsonToIntList(std::move(*checked141));
+auto checked142 = json_to_int_list(std::move(*checked141));
 if (!checked142) return std::unexpected(std::move(checked142.error()));
 m_armWalkSeq = std::move(*checked142);
   auto checked143 = config.get("armRunSeq");
 if (!checked143) return std::unexpected(std::move(checked143.error()));
-auto checked144 = jsonToIntList(std::move(*checked143));
+auto checked144 = json_to_int_list(std::move(*checked143));
 if (!checked144) return std::unexpected(std::move(checked144.error()));
 m_armRunSeq = std::move(*checked144);
 
@@ -945,11 +945,11 @@ m_armRunSeq = std::move(*checked144);
   {
 auto checked145 = config.get("walkBob");
 if (!checked145) return std::unexpected(std::move(checked145.error()));
-auto checked146 = std::move(*checked145).toArray();
+auto checked146 = std::move(*checked145).to_array();
 if (!checked146) return std::unexpected(std::move(checked146.error()));
 for (auto const& v : std::move(*checked146))
     {
-auto checked147 = v.toDouble();
+auto checked147 = v.to_double();
 if (!checked147) return std::unexpected(std::move(checked147.error()));
 m_walkBob.push_back(std::move(*checked147) / TilePixels);
 }
@@ -958,11 +958,11 @@ m_walkBob.push_back(std::move(*checked147) / TilePixels);
   {
 auto checked148 = config.get("runBob");
 if (!checked148) return std::unexpected(std::move(checked148.error()));
-auto checked149 = std::move(*checked148).toArray();
+auto checked149 = std::move(*checked148).to_array();
 if (!checked149) return std::unexpected(std::move(checked149.error()));
 for (auto const& v : std::move(*checked149))
     {
-auto checked150 = v.toDouble();
+auto checked150 = v.to_double();
 if (!checked150) return std::unexpected(std::move(checked150.error()));
 m_runBob.push_back(std::move(*checked150) / TilePixels);
 }
@@ -971,11 +971,11 @@ m_runBob.push_back(std::move(*checked150) / TilePixels);
   {
 auto checked151 = config.get("swimBob");
 if (!checked151) return std::unexpected(std::move(checked151.error()));
-auto checked152 = std::move(*checked151).toArray();
+auto checked152 = std::move(*checked151).to_array();
 if (!checked152) return std::unexpected(std::move(checked152.error()));
 for (auto const& v : std::move(*checked152))
     {
-auto checked153 = v.toDouble();
+auto checked153 = v.to_double();
 if (!checked153) return std::unexpected(std::move(checked153.error()));
 m_swimBob.push_back(std::move(*checked153) / TilePixels);
 }
@@ -983,41 +983,41 @@ m_swimBob.push_back(std::move(*checked153) / TilePixels);
 
   auto checked154 = config.get("jumpBob");
 if (!checked154) return std::unexpected(std::move(checked154.error()));
-auto checked155 = std::move(*checked154).toDouble();
+auto checked155 = std::move(*checked154).to_double();
 if (!checked155) return std::unexpected(std::move(checked155.error()));
 m_jumpBob = std::move(*checked155) / TilePixels;
   auto checked156 = config.get("frontArmRotationCenter");
 if (!checked156) return std::unexpected(std::move(checked156.error()));
-auto checked157 = jsonToVec2F(std::move(*checked156));
+auto checked157 = json_to_vec2f(std::move(*checked156));
 if (!checked157) return std::unexpected(std::move(checked157.error()));
 m_frontArmRotationCenter = std::move(*checked157) / TilePixels;
   auto checked158 = config.get("backArmRotationCenter");
 if (!checked158) return std::unexpected(std::move(checked158.error()));
-auto checked159 = jsonToVec2F(std::move(*checked158));
+auto checked159 = json_to_vec2f(std::move(*checked158));
 if (!checked159) return std::unexpected(std::move(checked159.error()));
 m_backArmRotationCenter = std::move(*checked159) / TilePixels;
   auto checked160 = config.get("frontHandPosition");
 if (!checked160) return std::unexpected(std::move(checked160.error()));
-auto checked161 = jsonToVec2F(std::move(*checked160));
+auto checked161 = json_to_vec2f(std::move(*checked160));
 if (!checked161) return std::unexpected(std::move(checked161.error()));
 m_frontHandPosition = std::move(*checked161) / TilePixels;
   auto checked162 = config.get("backArmOffset");
 if (!checked162) return std::unexpected(std::move(checked162.error()));
-auto checked163 = jsonToVec2F(std::move(*checked162));
+auto checked163 = json_to_vec2f(std::move(*checked162));
 if (!checked163) return std::unexpected(std::move(checked163.error()));
 m_backArmOffset = std::move(*checked163) / TilePixels;
   auto checked164 = config.get("vaporTrailFrames");
 if (!checked164) return std::unexpected(std::move(checked164.error()));
-auto checked165 = std::move(*checked164).toInt();
+auto checked165 = std::move(*checked164).to_int();
 if (!checked165) return std::unexpected(std::move(checked165.error()));
 m_vaporTrailFrames = std::move(*checked165);
   auto checked166 = config.get("vaporTrailCycle");
 if (!checked166) return std::unexpected(std::move(checked166.error()));
-auto checked167 = std::move(*checked166).toFloat();
+auto checked167 = std::move(*checked166).to_float();
 if (!checked167) return std::unexpected(std::move(checked167.error()));
 m_vaporTrailCycle = std::move(*checked167);
 
-  auto checked168 = config.getString("deathParticles");
+  auto checked168 = config.get_string("deathParticles");
 if (!checked168) return std::unexpected(std::move(checked168.error()));
 m_defaultDeathParticles = std::move(*checked168);
   auto checked169 = config.get("particleEmitters");
@@ -1038,9 +1038,9 @@ std::optional<Json> newPlayerMovementParameters = std::move(*checked171);
   m_mergeConfig = merger;
 
 
-  auto checked172 = config.getArray("headRotationCenter", JsonArray{0,-2});
+  auto checked172 = config.get_array("headRotationCenter", JsonArray{0,-2});
 if (!checked172) return std::unexpected(std::move(checked172.error()));
-auto checked173 = jsonToVec2F(std::move(*checked172));
+auto checked173 = json_to_vec2f(std::move(*checked172));
 if (!checked173) return std::unexpected(std::move(checked173.error()));
 m_headRotationCenter = std::move(*checked173) / TilePixels;
 
@@ -1053,9 +1053,9 @@ if (!checked174) return std::unexpected(std::move(checked174.error()));
 auto animationConfig = std::move(*checked174);
   m_useAnimation = animationConfig.has_value();
 
-  auto checked175 = m_baseConfig.getArray("animationScripts", JsonArray());
+  auto checked175 = m_baseConfig.get_array("animationScripts", JsonArray());
 if (!checked175) return std::unexpected(std::move(checked175.error()));
-auto checked176 = jsonToStringList(std::move(*checked175));
+auto checked176 = json_to_string_list(std::move(*checked175));
 if (!checked176) return std::unexpected(std::move(checked176.error()));
 m_animationScripts = std::move(*checked176);
 
@@ -1079,78 +1079,78 @@ m_networkedAnimator = std::move(*checked178);
 }
 
   if (m_useAnimation) {
-    auto checked179 = m_baseConfig.getString("frontHandItemPart", "frontHandItem");
+    auto checked179 = m_baseConfig.get_string("frontHandItemPart", "frontHandItem");
 if (!checked179) return std::unexpected(std::move(checked179.error()));
 m_frontItemPart = std::move(*checked179);
-    auto checked180 = m_baseConfig.getString("backHandItemPart", "backHandItem");
+    auto checked180 = m_baseConfig.get_string("backHandItemPart", "backHandItem");
 if (!checked180) return std::unexpected(std::move(checked180.error()));
 m_backItemPart = std::move(*checked180);
 
-    auto checked181 = m_baseConfig.getString("headRotationPart", "head");
+    auto checked181 = m_baseConfig.get_string("headRotationPart", "head");
 if (!checked181) return std::unexpected(std::move(checked181.error()));
-auto checked182 = m_baseConfig.getString("headRotationPartPoint", "rotationCenter");
+auto checked182 = m_baseConfig.get_string("headRotationPartPoint", "rotationCenter");
 if (!checked182) return std::unexpected(std::move(checked182.error()));
 m_headRotationPoint = {std::move(*checked181), std::move(*checked182)};
-    auto checked183 = m_baseConfig.getString("frontArmRotationPart", "frontArm");
+    auto checked183 = m_baseConfig.get_string("frontArmRotationPart", "frontArm");
 if (!checked183) return std::unexpected(std::move(checked183.error()));
-auto checked184 = m_baseConfig.getString("frontArmRotationPartPoint", "rotationCenter");
+auto checked184 = m_baseConfig.get_string("frontArmRotationPartPoint", "rotationCenter");
 if (!checked184) return std::unexpected(std::move(checked184.error()));
 m_frontArmRotationPoint = {std::move(*checked183), std::move(*checked184)};
-    auto checked185 = m_baseConfig.getString("backArmRotationPart", "backArm");
+    auto checked185 = m_baseConfig.get_string("backArmRotationPart", "backArm");
 if (!checked185) return std::unexpected(std::move(checked185.error()));
-auto checked186 = m_baseConfig.getString("backArmRotationPartPoint", "rotationCenter");
+auto checked186 = m_baseConfig.get_string("backArmRotationPartPoint", "rotationCenter");
 if (!checked186) return std::unexpected(std::move(checked186.error()));
 m_backArmRotationPoint = {std::move(*checked185), std::move(*checked186)};
 
-    auto checked187 = m_baseConfig.getString("mouthOffsetPart", "head");
+    auto checked187 = m_baseConfig.get_string("mouthOffsetPart", "head");
 if (!checked187) return std::unexpected(std::move(checked187.error()));
-auto checked188 = m_baseConfig.getString("mouthOffsetPartPoint", "mouthOffset");
+auto checked188 = m_baseConfig.get_string("mouthOffsetPartPoint", "mouthOffset");
 if (!checked188) return std::unexpected(std::move(checked188.error()));
 m_mouthOffsetPoint = {std::move(*checked187), std::move(*checked188)};
-    auto checked189 = m_baseConfig.getString("headArmorOffsetPart", "headCosmetic");
+    auto checked189 = m_baseConfig.get_string("headArmorOffsetPart", "headCosmetic");
 if (!checked189) return std::unexpected(std::move(checked189.error()));
-auto checked190 = m_baseConfig.getString("headArmorOffsetPartPoint", "armorOffset");
+auto checked190 = m_baseConfig.get_string("headArmorOffsetPartPoint", "armorOffset");
 if (!checked190) return std::unexpected(std::move(checked190.error()));
 m_headArmorOffsetPoint = {std::move(*checked189), std::move(*checked190)};
-    auto checked191 = m_baseConfig.getString("chestArmorOffsetPart", "chestCosmetic");
+    auto checked191 = m_baseConfig.get_string("chestArmorOffsetPart", "chestCosmetic");
 if (!checked191) return std::unexpected(std::move(checked191.error()));
-auto checked192 = m_baseConfig.getString("chestArmorOffsetPartPoint", "armorOffset");
+auto checked192 = m_baseConfig.get_string("chestArmorOffsetPartPoint", "armorOffset");
 if (!checked192) return std::unexpected(std::move(checked192.error()));
 m_chestArmorOffsetPoint = {std::move(*checked191), std::move(*checked192)};
-    auto checked193 = m_baseConfig.getString("legsArmorOffsetPart", "legsCosmetic");
+    auto checked193 = m_baseConfig.get_string("legsArmorOffsetPart", "legsCosmetic");
 if (!checked193) return std::unexpected(std::move(checked193.error()));
-auto checked194 = m_baseConfig.getString("legsArmorOffsetPartPoint", "armorOffset");
+auto checked194 = m_baseConfig.get_string("legsArmorOffsetPartPoint", "armorOffset");
 if (!checked194) return std::unexpected(std::move(checked194.error()));
 m_legsArmorOffsetPoint = {std::move(*checked193), std::move(*checked194)};
-    auto checked195 = m_baseConfig.getString("backArmorOffsetPart", "backCosmetic");
+    auto checked195 = m_baseConfig.get_string("backArmorOffsetPart", "backCosmetic");
 if (!checked195) return std::unexpected(std::move(checked195.error()));
-auto checked196 = m_baseConfig.getString("backArmorOffsetPartPoint", "armorOffset");
+auto checked196 = m_baseConfig.get_string("backArmorOffsetPartPoint", "armorOffset");
 if (!checked196) return std::unexpected(std::move(checked196.error()));
 m_backArmorOffsetPoint = {std::move(*checked195), std::move(*checked196)};
-    auto checked197 = m_baseConfig.getString("feetOffsetPart", "body");
+    auto checked197 = m_baseConfig.get_string("feetOffsetPart", "body");
 if (!checked197) return std::unexpected(std::move(checked197.error()));
-auto checked198 = m_baseConfig.getString("feetOffsetPartPoint", "feetOffset");
+auto checked198 = m_baseConfig.get_string("feetOffsetPartPoint", "feetOffset");
 if (!checked198) return std::unexpected(std::move(checked198.error()));
 m_feetOffsetPoint = {std::move(*checked197), std::move(*checked198)};
-    auto checked199 = m_baseConfig.getString("throwPart", "head");
+    auto checked199 = m_baseConfig.get_string("throwPart", "head");
 if (!checked199) return std::unexpected(std::move(checked199.error()));
-auto checked200 = m_baseConfig.getString("throwPartPoint", "mouthOffset");
+auto checked200 = m_baseConfig.get_string("throwPartPoint", "mouthOffset");
 if (!checked200) return std::unexpected(std::move(checked200.error()));
 m_throwPoint = {std::move(*checked199), std::move(*checked200)};
-    auto checked201 = m_baseConfig.getString("interactPart", "body");
+    auto checked201 = m_baseConfig.get_string("interactPart", "body");
 if (!checked201) return std::unexpected(std::move(checked201.error()));
-auto checked202 = m_baseConfig.getString("interactPartPoint", "interact");
+auto checked202 = m_baseConfig.get_string("interactPartPoint", "interact");
 if (!checked202) return std::unexpected(std::move(checked202.error()));
 m_interactPoint = {std::move(*checked201), std::move(*checked202)};
 
-    auto checked203 = m_baseConfig.getObject("identityFramesetTags", JsonObject());
+    auto checked203 = m_baseConfig.get_object("identityFramesetTags", JsonObject());
 if (!checked203) return std::unexpected(std::move(checked203.error()));
-auto checked204 = jsonToMapV<StringMap<String>>(std::move(*checked203), std::mem_fn(&Json::toString));
+auto checked204 = json_to_map_v<StringMap<String>>(std::move(*checked203), std::mem_fn(&Json::to_string));
 if (!checked204) return std::unexpected(std::move(checked204.error()));
 m_identityFramesetTags = std::move(*checked204);
 
     {
-auto checked205 = m_baseConfig.getObject("stateAnimations", JsonObject());
+auto checked205 = m_baseConfig.get_object("stateAnimations", JsonObject());
 if (!checked205) return std::unexpected(std::move(checked205.error()));
 for (auto const& pair : std::move(*checked205)) {
   HashMap<String, AnimationStateArgs> animations;
@@ -1159,26 +1159,26 @@ for (auto const& pair : std::move(*checked205)) {
     if (!checked206)
       return std::unexpected(std::move(checked206.error()));
     for (auto const& anim : std::move(*checked206)) {
-      auto checked207 = anim.second.toArray();
+      auto checked207 = anim.second.to_array();
       if (!checked207)
         return std::unexpected(std::move(checked207.error()));
       auto args = std::move(*checked207);
       auto checked208 = args.at(0);
       if (!checked208)
         return std::unexpected(std::move(checked208.error()));
-      auto checked209 = checked208->get().toString();
+      auto checked209 = checked208->get().to_string();
       if (!checked209)
         return std::unexpected(std::move(checked209.error()));
       auto checked210 = args.at(1);
       if (!checked210)
         return std::unexpected(std::move(checked210.error()));
-      auto checked211 = checked210->get().toBool();
+      auto checked211 = checked210->get().to_bool();
       if (!checked211)
         return std::unexpected(std::move(checked211.error()));
       auto checked212 = args.at(2);
       if (!checked212)
         return std::unexpected(std::move(checked212.error()));
-      auto checked213 = checked212->get().toBool();
+      auto checked213 = checked212->get().to_bool();
       if (!checked213)
         return std::unexpected(std::move(checked213.error()));
       animations.set(anim.first, {std::move(*checked209), std::move(*checked211), std::move(*checked213)});
@@ -1193,7 +1193,7 @@ for (auto const& pair : std::move(*checked205)) {
 }
 }
     {
-auto checked215 = m_baseConfig.getObject("stateAnimationsBackwards", JsonObject());
+auto checked215 = m_baseConfig.get_object("stateAnimationsBackwards", JsonObject());
 if (!checked215) return std::unexpected(std::move(checked215.error()));
 for (auto const& pair : std::move(*checked215)) {
   HashMap<String, AnimationStateArgs> animations;
@@ -1202,26 +1202,26 @@ for (auto const& pair : std::move(*checked215)) {
     if (!checked216)
       return std::unexpected(std::move(checked216.error()));
     for (auto const& anim : std::move(*checked216)) {
-      auto checked217 = anim.second.toArray();
+      auto checked217 = anim.second.to_array();
       if (!checked217)
         return std::unexpected(std::move(checked217.error()));
       auto args = std::move(*checked217);
       auto checked218 = args.at(0);
       if (!checked218)
         return std::unexpected(std::move(checked218.error()));
-      auto checked219 = checked218->get().toString();
+      auto checked219 = checked218->get().to_string();
       if (!checked219)
         return std::unexpected(std::move(checked219.error()));
       auto checked220 = args.at(1);
       if (!checked220)
         return std::unexpected(std::move(checked220.error()));
-      auto checked221 = checked220->get().toBool();
+      auto checked221 = checked220->get().to_bool();
       if (!checked221)
         return std::unexpected(std::move(checked221.error()));
       auto checked222 = args.at(2);
       if (!checked222)
         return std::unexpected(std::move(checked222.error()));
-      auto checked223 = checked222->get().toBool();
+      auto checked223 = checked222->get().to_bool();
       if (!checked223)
         return std::unexpected(std::move(checked223.error()));
       animations.set(anim.first, {std::move(*checked219), std::move(*checked221), std::move(*checked223)});
@@ -1236,7 +1236,7 @@ for (auto const& pair : std::move(*checked215)) {
 }
 }
     {
-auto checked225 = m_baseConfig.getObject("emoteAnimations", JsonObject());
+auto checked225 = m_baseConfig.get_object("emoteAnimations", JsonObject());
 if (!checked225) return std::unexpected(std::move(checked225.error()));
 for (auto const& pair : std::move(*checked225)) {
   HashMap<String, AnimationStateArgs> animations;
@@ -1245,26 +1245,26 @@ for (auto const& pair : std::move(*checked225)) {
     if (!checked226)
       return std::unexpected(std::move(checked226.error()));
     for (auto const& anim : std::move(*checked226)) {
-      auto checked227 = anim.second.toArray();
+      auto checked227 = anim.second.to_array();
       if (!checked227)
         return std::unexpected(std::move(checked227.error()));
       auto args = std::move(*checked227);
       auto checked228 = args.at(0);
       if (!checked228)
         return std::unexpected(std::move(checked228.error()));
-      auto checked229 = checked228->get().toString();
+      auto checked229 = checked228->get().to_string();
       if (!checked229)
         return std::unexpected(std::move(checked229.error()));
       auto checked230 = args.at(1);
       if (!checked230)
         return std::unexpected(std::move(checked230.error()));
-      auto checked231 = checked230->get().toBool();
+      auto checked231 = checked230->get().to_bool();
       if (!checked231)
         return std::unexpected(std::move(checked231.error()));
       auto checked232 = args.at(2);
       if (!checked232)
         return std::unexpected(std::move(checked232.error()));
-      auto checked233 = checked232->get().toBool();
+      auto checked233 = checked232->get().to_bool();
       if (!checked233)
         return std::unexpected(std::move(checked233.error()));
       animations.set(anim.first, {std::move(*checked229), std::move(*checked231), std::move(*checked233)});
@@ -1279,7 +1279,7 @@ for (auto const& pair : std::move(*checked225)) {
 }
 }
     {
-auto checked235 = m_baseConfig.getObject("portraitAnimations", JsonObject());
+auto checked235 = m_baseConfig.get_object("portraitAnimations", JsonObject());
 if (!checked235) return std::unexpected(std::move(checked235.error()));
 for (auto const& pair : std::move(*checked235)) {
   HashMap<String, AnimationStateArgs> animations;
@@ -1288,26 +1288,26 @@ for (auto const& pair : std::move(*checked235)) {
     if (!checked236)
       return std::unexpected(std::move(checked236.error()));
     for (auto const& anim : std::move(*checked236)) {
-      auto checked237 = anim.second.toArray();
+      auto checked237 = anim.second.to_array();
       if (!checked237)
         return std::unexpected(std::move(checked237.error()));
       auto args = std::move(*checked237);
       auto checked238 = args.at(0);
       if (!checked238)
         return std::unexpected(std::move(checked238.error()));
-      auto checked239 = checked238->get().toString();
+      auto checked239 = checked238->get().to_string();
       if (!checked239)
         return std::unexpected(std::move(checked239.error()));
       auto checked240 = args.at(1);
       if (!checked240)
         return std::unexpected(std::move(checked240.error()));
-      auto checked241 = checked240->get().toBool();
+      auto checked241 = checked240->get().to_bool();
       if (!checked241)
         return std::unexpected(std::move(checked241.error()));
       auto checked242 = args.at(2);
       if (!checked242)
         return std::unexpected(std::move(checked242.error()));
-      auto checked243 = checked242->get().toBool();
+      auto checked243 = checked242->get().to_bool();
       if (!checked243)
         return std::unexpected(std::move(checked243.error()));
       animations.set(anim.first, {std::move(*checked239), std::move(*checked241), std::move(*checked243)});
@@ -1394,7 +1394,7 @@ for (auto const& tag : std::move(*checked248)) {
   auto checked250 = m_networkedAnimator->applyPartTags(m_headArmorOffsetPoint.first, std::move(*checked249));
   if (!checked250)
     return std::unexpected(std::move(checked250.error()));
-  auto checked251 = tag.second.toString();
+  auto checked251 = tag.second.to_string();
   if (!checked251)
     return std::unexpected(std::move(checked251.error()));
   auto checked252 = m_networkedAnimator->applyPartTags(m_headArmorOffsetPoint.first, std::move(*checked251));
@@ -1439,7 +1439,7 @@ for (auto const& tag : std::move(*checked255)) {
   auto checked257 = m_networkedAnimator->applyPartTags(m_chestArmorOffsetPoint.first, std::move(*checked256));
   if (!checked257)
     return std::unexpected(std::move(checked257.error()));
-  auto checked258 = tag.second.toString();
+  auto checked258 = tag.second.to_string();
   if (!checked258)
     return std::unexpected(std::move(checked258.error()));
   auto checked259 = m_networkedAnimator->applyPartTags(m_chestArmorOffsetPoint.first, std::move(*checked258));
@@ -1480,7 +1480,7 @@ for (auto const& tag : std::move(*checked262)) {
   auto checked264 = m_networkedAnimator->applyPartTags(m_legsArmorOffsetPoint.first, std::move(*checked263));
   if (!checked264)
     return std::unexpected(std::move(checked264.error()));
-  auto checked265 = tag.second.toString();
+  auto checked265 = tag.second.to_string();
   if (!checked265)
     return std::unexpected(std::move(checked265.error()));
   auto checked266 = m_networkedAnimator->applyPartTags(m_legsArmorOffsetPoint.first, std::move(*checked265));
@@ -1508,7 +1508,7 @@ Wearable& current = checked267->get();
   wornBack.frameset = back.frameset(gender);
   auto checked268 = back.instanceValue("rotateWithHead", false);
 if (!checked268) return std::unexpected(std::move(checked268.error()));
-auto checked269 = std::move(*checked268).optBool();
+auto checked269 = std::move(*checked268).opt_bool();
 if (!checked269) return std::unexpected(std::move(checked269.error()));
 wornBack.rotateWithHead = std::move(*checked269).value_or(false);
   wornBack.animationTags.clear();
@@ -1526,7 +1526,7 @@ for (auto const& tag : std::move(*checked271)) {
   auto checked273 = m_networkedAnimator->applyPartTags(m_backArmorOffsetPoint.first, std::move(*checked272));
   if (!checked273)
     return std::unexpected(std::move(checked273.error()));
-  auto checked274 = tag.second.toString();
+  auto checked274 = tag.second.to_string();
   if (!checked274)
     return std::unexpected(std::move(checked274.error()));
   auto checked275 = m_networkedAnimator->applyPartTags(m_backArmorOffsetPoint.first, std::move(*checked274));
@@ -1904,7 +1904,7 @@ if (!checked295) return std::unexpected(std::move(checked295.error()));
                          -(std::fabsf(headRotation / (static_cast<float>(std::numbers::pi) * 4.f)))};
       auto checked296 = animator.partProperty(m_headRotationPoint.first, m_headRotationPoint.second);
 if (!checked296) return std::unexpected(std::move(checked296.error()));
-auto checked297 = jsonToVec2F(std::move(*checked296));
+auto checked297 = json_to_vec2f(std::move(*checked296));
 if (!checked297) return std::unexpected(std::move(checked297.error()));
 auto rotationCenter = std::move(*checked297);
       auto checked298 = animator.partTransformation(m_headRotationPoint.first);
@@ -1999,7 +1999,7 @@ if (!checked323) return std::unexpected(std::move(checked323.error()));
       animator.setLocalTag("backArmDanceFrame");
       auto checked324 = animator.partProperty(m_backArmRotationPoint.first, m_backArmRotationPoint.second);
 if (!checked324) return std::unexpected(std::move(checked324.error()));
-auto checked325 = jsonToVec2F(std::move(*checked324));
+auto checked325 = json_to_vec2f(std::move(*checked324));
 if (!checked325) return std::unexpected(std::move(checked325.error()));
 auto checked326 = animator.rotateLocalTransformationGroup("backArmRotation",
         backAngle,
@@ -2029,7 +2029,7 @@ if (!checked332) return std::unexpected(std::move(checked332.error()));
       animator.setLocalTag("frontArmDanceFrame");
       auto checked333 = animator.partProperty(m_frontArmRotationPoint.first, m_frontArmRotationPoint.second);
 if (!checked333) return std::unexpected(std::move(checked333.error()));
-auto checked334 = jsonToVec2F(std::move(*checked333));
+auto checked334 = json_to_vec2f(std::move(*checked333));
 if (!checked334) return std::unexpected(std::move(checked334.error()));
 auto checked335 = animator.rotateLocalTransformationGroup("frontArmRotation",
         frontAngle,
@@ -3176,27 +3176,27 @@ std::shared_ptr<Humanoid> humanoid = std::move(*checked546);
 
   auto checked563 = assets->json("/humanoid/any/dummy.config:head");
 if (!checked563) return std::unexpected(std::move(checked563.error()));
-auto checked547 = std::move(*checked563).toString();
+auto checked547 = std::move(*checked563).to_string();
 if (!checked547) return std::unexpected(std::move(checked547.error()));
 humanoid->m_headFrameset = std::move(*checked547);
   auto checked564 = assets->json("/humanoid/any/dummy.config:body");
 if (!checked564) return std::unexpected(std::move(checked564.error()));
-auto checked548 = std::move(*checked564).toString();
+auto checked548 = std::move(*checked564).to_string();
 if (!checked548) return std::unexpected(std::move(checked548.error()));
 humanoid->m_bodyFrameset = std::move(*checked548);
   auto checked565 = assets->json("/humanoid/any/dummy.config:frontArm");
 if (!checked565) return std::unexpected(std::move(checked565.error()));
-auto checked549 = std::move(*checked565).toString();
+auto checked549 = std::move(*checked565).to_string();
 if (!checked549) return std::unexpected(std::move(checked549.error()));
 humanoid->m_frontArmFrameset = std::move(*checked549);
   auto checked566 = assets->json("/humanoid/any/dummy.config:backArm");
 if (!checked566) return std::unexpected(std::move(checked566.error()));
-auto checked550 = std::move(*checked566).toString();
+auto checked550 = std::move(*checked566).to_string();
 if (!checked550) return std::unexpected(std::move(checked550.error()));
 humanoid->m_backArmFrameset = std::move(*checked550);
 auto checked567 = assets->json("/humanoid/any/dummy.config:direction");
 if (!checked567) return std::unexpected(std::move(checked567.error()));
-auto checked551 = std::move(*checked567).toString();
+auto checked551 = std::move(*checked567).to_string();
 if (!checked551) return std::unexpected(std::move(checked551.error()));
 auto checked552 = enum_value<DirectionNames>(*checked551);
 if (!checked552) return std::unexpected(std::move(checked552.error()));
@@ -3290,17 +3290,17 @@ auto state = std::move(*checked572) ? m_primaryHand.frontFrame : "rotation";
       // make sure we ge the properties for the arm rotation state
       auto checked573 = m_networkedAnimator->partProperty(m_frontArmRotationPoint.first,m_frontArmRotationPoint.second,{"frontArm"},state,1);
 if (!checked573) return std::unexpected(std::move(checked573.error()));
-auto checked574 = jsonToVec2F(std::move(*checked573));
+auto checked574 = json_to_vec2f(std::move(*checked573));
 if (!checked574) return std::unexpected(std::move(checked574.error()));
 rotationCenter = std::move(*checked574);
       auto checked575 = m_networkedAnimator->partProperty(m_frontArmRotationPoint.first, "anchorPart", {"frontArm"},state,1);
 if (!checked575) return std::unexpected(std::move(checked575.error()));
-auto checked576 = std::move(*checked575).toString();
+auto checked576 = std::move(*checked575).to_string();
 if (!checked576) return std::unexpected(std::move(checked576.error()));
 anchor = std::move(*checked576);
       auto checked577 = m_networkedAnimator->partProperty(m_frontArmRotationPoint.first, "transformationGroups", {"frontArm"},state,1);
 if (!checked577) return std::unexpected(std::move(checked577.error()));
-auto checked578 = jsonToStringList(std::move(*checked577));
+auto checked578 = json_to_string_list(std::move(*checked577));
 if (!checked578) return std::unexpected(std::move(checked578.error()));
 transformationGroups = std::move(*checked578);
     } else {
@@ -3311,17 +3311,17 @@ auto state = std::move(*checked579) ? m_primaryHand.backFrame : "rotation";
       // make sure we ge the properties for the arm rotation state
       auto checked580 = m_networkedAnimator->partProperty(m_backArmRotationPoint.first,m_backArmRotationPoint.second,{"backArm"},state,1);
 if (!checked580) return std::unexpected(std::move(checked580.error()));
-auto checked581 = jsonToVec2F(std::move(*checked580));
+auto checked581 = json_to_vec2f(std::move(*checked580));
 if (!checked581) return std::unexpected(std::move(checked581.error()));
 rotationCenter = std::move(*checked581);
       auto checked582 = m_networkedAnimator->partProperty(m_backArmRotationPoint.first, "anchorPart", {"backArm"},state,1);
 if (!checked582) return std::unexpected(std::move(checked582.error()));
-auto checked583 = std::move(*checked582).toString();
+auto checked583 = std::move(*checked582).to_string();
 if (!checked583) return std::unexpected(std::move(checked583.error()));
 anchor = std::move(*checked583);
       auto checked584 = m_networkedAnimator->partProperty(m_backArmRotationPoint.first, "transformationGroups", {"backArm"},state,1);
 if (!checked584) return std::unexpected(std::move(checked584.error()));
-auto checked585 = jsonToStringList(std::move(*checked584));
+auto checked585 = json_to_string_list(std::move(*checked584));
 if (!checked585) return std::unexpected(std::move(checked585.error()));
 transformationGroups = std::move(*checked585);
     }
@@ -3403,17 +3403,17 @@ auto state = std::move(*checked593) ? m_primaryHand.frontFrame : "rotation";
       // make sure we ge the properties for the arm rotation state
       auto checked594 = m_networkedAnimator->partProperty(m_frontArmRotationPoint.first,m_frontArmRotationPoint.second,{"frontArm"},state,1);
 if (!checked594) return std::unexpected(std::move(checked594.error()));
-auto checked595 = jsonToVec2F(std::move(*checked594));
+auto checked595 = json_to_vec2f(std::move(*checked594));
 if (!checked595) return std::unexpected(std::move(checked595.error()));
 rotationCenter = std::move(*checked595);
       auto checked596 = m_networkedAnimator->partProperty(m_frontArmRotationPoint.first, "anchorPart", {"frontArm"},state,1);
 if (!checked596) return std::unexpected(std::move(checked596.error()));
-auto checked597 = std::move(*checked596).toString();
+auto checked597 = std::move(*checked596).to_string();
 if (!checked597) return std::unexpected(std::move(checked597.error()));
 anchor = std::move(*checked597);
       auto checked598 = m_networkedAnimator->partProperty(m_frontArmRotationPoint.first, "transformationGroups", {"frontArm"},state,1);
 if (!checked598) return std::unexpected(std::move(checked598.error()));
-auto checked599 = jsonToStringList(std::move(*checked598));
+auto checked599 = json_to_string_list(std::move(*checked598));
 if (!checked599) return std::unexpected(std::move(checked599.error()));
 transformationGroups = std::move(*checked599);
     } else {
@@ -3424,17 +3424,17 @@ auto state = std::move(*checked600) ? m_primaryHand.backFrame : "rotation";
       // make sure we ge the properties for the arm rotation state
       auto checked601 = m_networkedAnimator->partProperty(m_backArmRotationPoint.first,m_backArmRotationPoint.second,{"backArm"},state,1);
 if (!checked601) return std::unexpected(std::move(checked601.error()));
-auto checked602 = jsonToVec2F(std::move(*checked601));
+auto checked602 = json_to_vec2f(std::move(*checked601));
 if (!checked602) return std::unexpected(std::move(checked602.error()));
 rotationCenter = std::move(*checked602);
       auto checked603 = m_networkedAnimator->partProperty(m_backArmRotationPoint.first, "anchorPart", {"backArm"},state,1);
 if (!checked603) return std::unexpected(std::move(checked603.error()));
-auto checked604 = std::move(*checked603).toString();
+auto checked604 = std::move(*checked603).to_string();
 if (!checked604) return std::unexpected(std::move(checked604.error()));
 anchor = std::move(*checked604);
       auto checked605 = m_networkedAnimator->partProperty(m_backArmRotationPoint.first, "transformationGroups", {"backArm"},state,1);
 if (!checked605) return std::unexpected(std::move(checked605.error()));
-auto checked606 = jsonToStringList(std::move(*checked605));
+auto checked606 = json_to_string_list(std::move(*checked605));
 if (!checked606) return std::unexpected(std::move(checked606.error()));
 transformationGroups = std::move(*checked606);
     }
@@ -3507,11 +3507,11 @@ std::expected<Vec2F, StarException> Humanoid::primaryHandOffset(Direction facing
       {
 auto checked614 = m_networkedAnimator->partProperty(m_frontItemPart,"offset");
 if (!checked614) return std::unexpected(std::move(checked614.error()));
-auto checked615 = jsonToVec2F(std::move(*checked614));
+auto checked615 = json_to_vec2f(std::move(*checked614));
 if (!checked615) return std::unexpected(std::move(checked615.error()));
 auto checked616 = m_networkedAnimator->partProperty(m_frontArmRotationPoint.first,m_frontArmRotationPoint.second);
 if (!checked616) return std::unexpected(std::move(checked616.error()));
-auto checked617 = jsonToVec2F(std::move(*checked616));
+auto checked617 = json_to_vec2f(std::move(*checked616));
 if (!checked617) return std::unexpected(std::move(checked617.error()));
 return std::move(*checked615) - std::move(*checked617);
 }
@@ -3519,11 +3519,11 @@ return std::move(*checked615) - std::move(*checked617);
       {
 auto checked618 = m_networkedAnimator->partProperty(m_backItemPart,"offset");
 if (!checked618) return std::unexpected(std::move(checked618.error()));
-auto checked619 = jsonToVec2F(std::move(*checked618));
+auto checked619 = json_to_vec2f(std::move(*checked618));
 if (!checked619) return std::unexpected(std::move(checked619.error()));
 auto checked620 = m_networkedAnimator->partProperty(m_backArmRotationPoint.first,m_backArmRotationPoint.second);
 if (!checked620) return std::unexpected(std::move(checked620.error()));
-auto checked621 = jsonToVec2F(std::move(*checked620));
+auto checked621 = json_to_vec2f(std::move(*checked620));
 if (!checked621) return std::unexpected(std::move(checked621.error()));
 return std::move(*checked619) - std::move(*checked621);
 }
@@ -3540,11 +3540,11 @@ std::expected<Vec2F, StarException> Humanoid::altHandOffset(Direction facingDire
       {
 auto checked622 = m_networkedAnimator->partProperty(m_backItemPart,"offset");
 if (!checked622) return std::unexpected(std::move(checked622.error()));
-auto checked623 = jsonToVec2F(std::move(*checked622));
+auto checked623 = json_to_vec2f(std::move(*checked622));
 if (!checked623) return std::unexpected(std::move(checked623.error()));
 auto checked624 = m_networkedAnimator->partProperty(m_backArmRotationPoint.first,m_backArmRotationPoint.second);
 if (!checked624) return std::unexpected(std::move(checked624.error()));
-auto checked625 = jsonToVec2F(std::move(*checked624));
+auto checked625 = json_to_vec2f(std::move(*checked624));
 if (!checked625) return std::unexpected(std::move(checked625.error()));
 return std::move(*checked623) - std::move(*checked625);
 }
@@ -3552,11 +3552,11 @@ return std::move(*checked623) - std::move(*checked625);
       {
 auto checked626 = m_networkedAnimator->partProperty(m_frontItemPart,"offset");
 if (!checked626) return std::unexpected(std::move(checked626.error()));
-auto checked627 = jsonToVec2F(std::move(*checked626));
+auto checked627 = json_to_vec2f(std::move(*checked626));
 if (!checked627) return std::unexpected(std::move(checked627.error()));
 auto checked628 = m_networkedAnimator->partProperty(m_frontArmRotationPoint.first,m_frontArmRotationPoint.second);
 if (!checked628) return std::unexpected(std::move(checked628.error()));
-auto checked629 = jsonToVec2F(std::move(*checked628));
+auto checked629 = json_to_vec2f(std::move(*checked628));
 if (!checked629) return std::unexpected(std::move(checked629.error()));
 return std::move(*checked627) - std::move(*checked629);
 }
@@ -3959,7 +3959,7 @@ auto checked652 = std::move(*checked651).get("particles", {});
 if (!checked652) return std::unexpected(std::move(checked652.error()));
 Json particles = std::move(*checked652);
   {
-auto checked653 = particles.toArray();
+auto checked653 = particles.to_array();
 if (!checked653) return std::unexpected(std::move(checked653.error()));
 for (auto& particle : std::move(*checked653)) {
     auto checked654 = particle.get("particle", {});
@@ -4034,7 +4034,7 @@ List<String> Humanoid::animationScripts() const {
 
 std::expected<Json, StarException> Humanoid::humanoidConfig(bool withOverrides) {
   if (withOverrides)
-    return jsonMerge(m_baseConfig, m_mergeConfig);
+    return json_merge(m_baseConfig, m_mergeConfig);
   return m_baseConfig;
 }
 

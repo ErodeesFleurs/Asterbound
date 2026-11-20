@@ -1078,24 +1078,24 @@ bool shaderIdentifier(String const& name) {
 }
 Result<RenderEffectParameter> parseParameter(String const& type, Json const& value) {
   if (type == "bool") {
-    auto parsed = value.toBool(); if (!parsed) return std::unexpected(std::move(parsed.error()));
+    auto parsed = value.to_bool(); if (!parsed) return std::unexpected(std::move(parsed.error()));
     return RenderEffectParameter(*parsed);
   } else if (type == "int") {
-    auto parsed = value.toInt(); if (!parsed) return std::unexpected(std::move(parsed.error()));
+    auto parsed = value.to_int(); if (!parsed) return std::unexpected(std::move(parsed.error()));
     if (*parsed < std::numeric_limits<int>::min() || *parsed > std::numeric_limits<int>::max())
       return std::unexpected(RendererException("Vulkan integer effect parameter is outside int32 range"));
     return RenderEffectParameter(static_cast<int>(*parsed));
   } else if (type == "float") {
-    auto parsed = value.toFloat(); if (!parsed) return std::unexpected(std::move(parsed.error()));
+    auto parsed = value.to_float(); if (!parsed) return std::unexpected(std::move(parsed.error()));
     return RenderEffectParameter(static_cast<float>(*parsed));
   } else if (type == "vec2") {
-    auto parsed = jsonToVec2F(value); if (!parsed) return std::unexpected(std::move(parsed.error()));
+    auto parsed = json_to_vec2f(value); if (!parsed) return std::unexpected(std::move(parsed.error()));
     return RenderEffectParameter(*parsed);
   } else if (type == "vec3") {
-    auto parsed = jsonToVec3F(value); if (!parsed) return std::unexpected(std::move(parsed.error()));
+    auto parsed = json_to_vec3f(value); if (!parsed) return std::unexpected(std::move(parsed.error()));
     return RenderEffectParameter(*parsed);
   } else if (type == "vec4") {
-    auto parsed = jsonToVec4F(value); if (!parsed) return std::unexpected(std::move(parsed.error()));
+    auto parsed = json_to_vec4f(value); if (!parsed) return std::unexpected(std::move(parsed.error()));
     return RenderEffectParameter(*parsed);
   }
   return std::unexpected(RendererException::format("Unknown Vulkan effect parameter type '{}'", type));
@@ -1177,16 +1177,16 @@ Result<void> VulkanRenderer::State::loadEffect(String const& name, Json const& d
     return std::unexpected(RendererException::format("Vulkan effect '{}' requires explicit vertex and fragment shaders in effectShadersVulkan", name));
   auto effect = std::make_shared<Effect>();
   effect->device = device; effect->config = definition;
-  JSON_REQUIRE(include, definition.getBool("includeVBTextures", true));
+  JSON_REQUIRE(include, definition.get_bool("includeVBTextures", true));
   effect->includeTextures = *include;
-  JSON_REQUIRE(outputName, definition.optString("frameBuffer")); effect->output = *outputName;
-  JSON_REQUIRE(blitName, definition.optString("blitFrameBuffer")); effect->blit = *blitName;
+  JSON_REQUIRE(outputName, definition.opt_string("frameBuffer")); effect->output = *outputName;
+  JSON_REQUIRE(blitName, definition.opt_string("blitFrameBuffer")); effect->blit = *blitName;
   effect->pingPong = effect->output && effect->blit && *effect->output == *effect->blit;
-  JSON_REQUIRE(inputs, definition.getArray("frameBufferTextures", {}));
+  JSON_REQUIRE(inputs, definition.get_array("frameBufferTextures", {}));
   for (auto const& input : *inputs) {
-    JSON_REQUIRE(framebuffer, input.optString("framebuffer"));
+    JSON_REQUIRE(framebuffer, input.opt_string("framebuffer"));
     if (!*framebuffer) continue;
-    JSON_REQUIRE(texture, input.getString("texture"));
+    JSON_REQUIRE(texture, input.get_string("texture"));
     effect->inputs.emplace_back(*texture, **framebuffer);
     if (effect->output && **framebuffer == *effect->output) effect->pingPong = true;
   }
@@ -1195,16 +1195,16 @@ Result<void> VulkanRenderer::State::loadEffect(String const& name, Json const& d
     "layout(offset=64) vec2 textureSize0;\nlayout(offset=80) vec2 textureSize1;\n"
     "layout(offset=96) vec2 textureSize2;\nlayout(offset=112) vec2 textureSize3;\n";
   std::set<String> uniformNames{"screenSize", "vertexTransform", "textureSize0", "textureSize1", "textureSize2", "textureSize3", "texture0", "texture1", "texture2", "texture3", "starColorState", "starOutput"};
-  JSON_REQUIRE(parameters, definition.getObject("effectParameters", {}));
+  JSON_REQUIRE(parameters, definition.get_object("effectParameters", {}));
   // Sort public names so the descriptor/uniform ABI does not depend on hash-map
   // insertion order or JSON object serialization order.
   for (auto const& [parameterName, value] : *parameters) effect->parameters.emplace(parameterName, Parameter{});
   for (auto& [parameterName, parameter] : effect->parameters) {
     auto found = parameters->find_ref(parameterName);
     auto const& value = found->get();
-    JSON_REQUIRE(uniform, value.getString("uniform"));
-    JSON_REQUIRE(type, value.getString("type"));
-    JSON_REQUIRE(scriptable, value.getBool("scriptable", false));
+    JSON_REQUIRE(uniform, value.get_string("uniform"));
+    JSON_REQUIRE(type, value.get_string("type"));
+    JSON_REQUIRE(scriptable, value.get_bool("scriptable", false));
     if (!shaderIdentifier(*uniform) || !uniformNames.insert(*uniform).second)
       return std::unexpected(RendererException::format("Invalid or duplicate Vulkan uniform '{}'", *uniform));
     parameter.uniform = *uniform; parameter.scriptable = *scriptable; parameter.offset = effect->uniformSize;
@@ -1218,21 +1218,21 @@ Result<void> VulkanRenderer::State::loadEffect(String const& name, Json const& d
     declarations += std::format("layout(offset={}) {} {};\n", effect->uniformSize, type->utf8(), uniform->utf8());
     effect->uniformSize += 16;
     JSON_REQUIRE(defaultValue, value.get("default", {}));
-    if (!defaultValue->isNull()) {
+    if (!defaultValue->is_null()) {
       auto parsed = parseParameter(*type, *defaultValue);
       if (!parsed) return std::unexpected(std::move(parsed.error()));
       parameter.value = std::move(*parsed);
     }
   }
-  JSON_REQUIRE(textures, definition.getObject("effectTextures", {}));
+  JSON_REQUIRE(textures, definition.get_object("effectTextures", {}));
   for (auto const& [textureName, value] : *textures) effect->textures.emplace(textureName, EffectTexture{});
   std::uint32_t binding = 5;
   for (auto& [textureName, texture] : effect->textures) {
     auto const& value = textures->find_ref(textureName)->get();
-    JSON_REQUIRE(uniform, value.getString("textureUniform"));
-    JSON_REQUIRE(sizeUniform, value.optString("textureSizeUniform"));
-    JSON_REQUIRE(addressingName, value.getString("textureAddressing", "clamp"));
-    JSON_REQUIRE(filteringName, value.getString("textureFiltering", "nearest"));
+    JSON_REQUIRE(uniform, value.get_string("textureUniform"));
+    JSON_REQUIRE(sizeUniform, value.opt_string("textureSizeUniform"));
+    JSON_REQUIRE(addressingName, value.get_string("textureAddressing", "clamp"));
+    JSON_REQUIRE(filteringName, value.get_string("textureFiltering", "nearest"));
     JSON_REQUIRE(addressing, enum_value<TextureAddressingNames>(*addressingName));
     JSON_REQUIRE(filtering, enum_value<TextureFilteringNames>(*filteringName));
     if (!shaderIdentifier(*uniform) || !uniformNames.insert(*uniform).second)
@@ -1291,26 +1291,26 @@ vec4 starVertexColor(vec4 c) { return vec4(starColorState.x!=0.0?starSrgbToLinea
 }
 
 Result<std::map<String, Framebuffer>> VulkanRenderer::State::createTargets(Json const& definition) {
-  JSON_REQUIRE(definitions, definition.getObject("frameBuffers", {}));
+  JSON_REQUIRE(definitions, definition.get_object("frameBuffers", {}));
   std::map<String, Framebuffer> replacements;
   for (auto const& [name, value] : *definitions) {
     Framebuffer framebuffer;
     framebuffer.config = value;
-    JSON_REQUIRE(clear, value.getBool("clear", true)); framebuffer.clear = *clear;
-    JSON_REQUIRE(alpha, value.getBool("alpha", false)); framebuffer.alpha = *alpha;
-    JSON_REQUIRE(doubleBuffered, value.getBool("double", false)); framebuffer.doubleBuffered = *doubleBuffered;
-    JSON_REQUIRE(divisor, value.getUInt("sizeDiv", 1));
+    JSON_REQUIRE(clear, value.get_bool("clear", true)); framebuffer.clear = *clear;
+    JSON_REQUIRE(alpha, value.get_bool("alpha", false)); framebuffer.alpha = *alpha;
+    JSON_REQUIRE(doubleBuffered, value.get_bool("double", false)); framebuffer.doubleBuffered = *doubleBuffered;
+    JSON_REQUIRE(divisor, value.get_uint("sizeDiv", 1));
     if (!*divisor || *divisor > std::numeric_limits<unsigned>::max())
       return std::unexpected(RendererException("Vulkan framebuffer sizeDiv must be a positive unsigned integer"));
     framebuffer.divisor = *divisor;
-    JSON_REQUIRE(fixedSize, value.optArray("size"));
+    JSON_REQUIRE(fixedSize, value.opt_array("size"));
     if (*fixedSize) {
-      JSON_REQUIRE(parsedSize, jsonToVec2U(**fixedSize));
+      JSON_REQUIRE(parsedSize, json_to_vec2u(**fixedSize));
       if (!(*parsedSize)[0] || !(*parsedSize)[1]) return std::unexpected(RendererException("Vulkan fixed framebuffer dimensions must be positive"));
       framebuffer.fixedSize = *parsedSize;
     }
     auto dimensions = framebuffer.fixedSize.value_or(Vec2U(std::max(1u, size[0] / framebuffer.divisor), std::max(1u, size[1] / framebuffer.divisor)));
-    JSON_REQUIRE(hdrName, value.getString("hdr", "Disabled"));
+    JSON_REQUIRE(hdrName, value.get_string("hdr", "Disabled"));
     JSON_REQUIRE(hdrMode, hdrName->to_lower());
     bool floating = false;
     if (*hdrMode == "enabled") floating = true;
@@ -1319,14 +1319,14 @@ Result<std::map<String, Framebuffer>> VulkanRenderer::State::createTargets(Json 
     // Every scene/postprocessing target must preserve super-white values,
     // including targets whose legacy configuration explicitly disabled floats.
     floating |= outputSettings.mode != RenderOutputMode::Legacy;
-    JSON_REQUIRE(sampleCount, value.getUInt("multisample", samples));
+    JSON_REQUIRE(sampleCount, value.get_uint("multisample", samples));
     if (*sampleCount > 64 || (*sampleCount && (*sampleCount & (*sampleCount - 1))))
       return std::unexpected(RendererException("Vulkan framebuffer multisample must be 0 or a power of two up to 64"));
     if (*sampleCount > 1 && !device->sampleShading)
       return std::unexpected(RendererException("Vulkan device does not support per-sample shading"));
     auto sampleBits = static_cast<VkSampleCountFlagBits>(std::max<std::uint64_t>(*sampleCount, 1));
-    JSON_REQUIRE(addressingName, value.getString("textureAddressing", "clamp"));
-    JSON_REQUIRE(filteringName, value.getString("textureFiltering", "nearest"));
+    JSON_REQUIRE(addressingName, value.get_string("textureAddressing", "clamp"));
+    JSON_REQUIRE(filteringName, value.get_string("textureFiltering", "nearest"));
     JSON_REQUIRE(addressing, enum_value<TextureAddressingNames>(*addressingName));
     JSON_REQUIRE(filtering, enum_value<TextureFilteringNames>(*filteringName));
     for (unsigned i = 0; i < (framebuffer.doubleBuffered ? 2u : 1u); ++i) {

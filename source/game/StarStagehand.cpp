@@ -64,7 +64,7 @@ std::expected<std::shared_ptr<Stagehand>, StarException> Stagehand::create(Root&
   if (auto result = stagehand->m_netGroup.addNetElement(stagehand->m_xPosition); !result) return std::unexpected(std::move(result.error()));
   if (auto result = stagehand->m_netGroup.addNetElement(stagehand->m_yPosition); !result) return std::unexpected(std::move(result.error()));
   if (auto result = stagehand->m_netGroup.addNetElement(stagehand->m_uniqueIdNetState); !result) return std::unexpected(std::move(result.error()));
-  auto uniqueId = config.optString("uniqueId");
+  auto uniqueId = config.opt_string("uniqueId");
   if (!uniqueId)
     return std::unexpected(std::move(uniqueId.error()));
   stagehand->setUniqueId(std::move(*uniqueId));
@@ -90,7 +90,7 @@ std::expected<std::shared_ptr<Stagehand>, StarException> Stagehand::create(Root&
 }
 
 std::expected<Json, StarException> Stagehand::diskStore() const {
-  auto saveData = m_config.set_all({{"position", jsonFromVec2F({m_xPosition.get(), m_yPosition.get()})},
+  auto saveData = m_config.set_all({{"position", json_from_vec2f({m_xPosition.get(), m_yPosition.get()})},
                                     {"uniqueId", json_from_optional(uniqueId())}});
   if (!saveData)
     return std::unexpected(std::move(saveData.error()));
@@ -252,7 +252,7 @@ std::expected<void, StarException> Stagehand::readConfig(Json config) {
   if (!scripted)
     return std::unexpected(std::move(scripted.error()));
   m_scripted = *scripted;
-  auto clientModeName = m_config.getString("clientEntityMode", "ClientSlaveOnly");
+  auto clientModeName = m_config.get_string("clientEntityMode", "ClientSlaveOnly");
   if (!clientModeName)
     return std::unexpected(std::move(clientModeName.error()));
   if (!ClientEntityModeNames)
@@ -265,7 +265,7 @@ std::expected<void, StarException> Stagehand::readConfig(Json config) {
   if (!position)
     return std::unexpected(std::move(position.error()));
   if (*position) {
-    auto pos = jsonToVec2F(**position);
+    auto pos = json_to_vec2f(**position);
     if (!pos)
       return std::unexpected(std::move(pos.error()));
     m_xPosition.set((*pos)[0]);
@@ -274,22 +274,22 @@ std::expected<void, StarException> Stagehand::readConfig(Json config) {
   auto areaJson = m_config.opt("broadcastArea");
   if (!areaJson)
     return std::unexpected(std::move(areaJson.error()));
-  auto broadcastArea = json_to_optional<RectF>(areaJson->value_or(Json()), jsonToRectF);
+  auto broadcastArea = json_to_optional<RectF>(areaJson->value_or(Json()), json_to_rectf);
   if (!broadcastArea)
     return std::unexpected(std::move(broadcastArea.error()));
   if (*broadcastArea && ((**broadcastArea).size()[0] < 0.0 || (**broadcastArea).size()[1] < 0.0))
     broadcastArea->reset();
   m_boundBox = broadcastArea->value_or(RectF(-5.0, -5.0, 5.0, 5.0));
   if (m_scripted) {
-    auto scriptsJson = m_config.getArray("scripts", JsonArray());
+    auto scriptsJson = m_config.get_array("scripts", JsonArray());
     if (!scriptsJson)
       return std::unexpected(std::move(scriptsJson.error()));
-    auto scripts = jsonToStringList(*scriptsJson);
+    auto scripts = json_to_string_list(*scriptsJson);
     if (!scripts)
       return std::unexpected(std::move(scripts.error()));
     if (auto result = m_scriptComponent.setScripts(std::move(*scripts)); !result)
       return result;
-    auto delta = m_config.getInt("scriptDelta", 5);
+    auto delta = m_config.get_int("scriptDelta", 5);
     if (!delta)
       return std::unexpected(std::move(delta.error()));
     m_scriptComponent.setUpdateDelta(*delta);
@@ -297,14 +297,14 @@ std::expected<void, StarException> Stagehand::readConfig(Json config) {
     if (!storage)
       return std::unexpected(std::move(storage.error()));
     if (*storage) {
-      auto object = (**storage).toObject();
+      auto object = (**storage).to_object();
       if (!object)
         return std::unexpected(std::move(object.error()));
       if (auto result = m_scriptComponent.setScriptStorage(std::move(*object)); !result)
         return result;
     }
   }
-  auto keepAlive = m_config.getBool("keepAlive", false);
+  auto keepAlive = m_config.get_bool("keepAlive", false);
   if (!keepAlive)
     return std::unexpected(std::move(keepAlive.error()));
   setKeepAlive(*keepAlive);
@@ -333,7 +333,7 @@ ClientEntityMode Stagehand::clientEntityMode() const {
 }
 
 std::expected<String, StarException> Stagehand::typeName() const {
-  return m_config.getString("type");
+  return m_config.get_string("type");
 }
 
 std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Stagehand::receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) {

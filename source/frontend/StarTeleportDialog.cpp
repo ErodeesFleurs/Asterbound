@@ -270,17 +270,17 @@ std::expected<void, StarException> TeleportDialog::initialize(Json config) {
   auto destList = fetchChild<ListWidget>("bookmarkList.bookmarkItemList");
   if (!destList) return std::unexpected(std::move(destList.error()));
   (*destList)->registerMemberCallback("editBookmark", [this](Widget& button) { return editBookmark(button); });
-  auto destinations = config.getArray("destinations", JsonArray());
+  auto destinations = config.get_array("destinations", JsonArray());
   if (!destinations) return std::unexpected(std::move(destinations.error()));
   for (auto const& dest : *destinations) {
-    auto prerequisite = dest.optString("prerequisiteQuest");
+    auto prerequisite = dest.opt_string("prerequisiteQuest");
     if (!prerequisite) return std::unexpected(std::move(prerequisite.error()));
     if (*prerequisite && !m_client->mainPlayer()->questManager()->hasCompleted(**prerequisite)) continue;
-    auto warpText = dest.getString("warpAction");
+    auto warpText = dest.get_string("warpAction");
     if (!warpText) return std::unexpected(std::move(warpText.error()));
     auto warpAction = parseWarpAction(*warpText);
     if (!warpAction) return std::unexpected(std::move(warpAction.error()));
-    auto deploy = dest.getBool("deploy", false);
+    auto deploy = dest.get_bool("deploy", false);
     if (!deploy) return std::unexpected(std::move(deploy.error()));
     if (std::holds_alternative<WarpAlias>(*warpAction) && std::get<WarpAlias>(*warpAction) == WarpAlias::OrbitedWorld) {
       auto canBeamDown = m_client->canBeamDown(*deploy);
@@ -289,17 +289,17 @@ std::expected<void, StarException> TeleportDialog::initialize(Json config) {
     }
     auto entry = (*destList)->addItem();
     if (!entry) return std::unexpected(std::move(entry.error()));
-    auto name = dest.getString("name");
+    auto name = dest.get_string("name");
     if (!name) return std::unexpected(std::move(name.error()));
-    auto planet = dest.getString("planetName", "");
+    auto planet = dest.get_string("planetName", "");
     if (!planet) return std::unexpected(std::move(planet.error()));
-    auto iconName = dest.optString("icon");
+    auto iconName = dest.opt_string("icon");
     if (!iconName) return std::unexpected(std::move(iconName.error()));
     std::optional<String> icon;
     if (*iconName) icon = Star::format("/interface/bookmarks/icons/{}.png", **iconName);
     auto setup = setupTeleportEntry(**entry, *name, *planet, icon);
     if (!setup) return std::unexpected(std::move(setup.error()));
-    auto mission = dest.getBool("mission", false);
+    auto mission = dest.get_bool("mission", false);
     if (!mission) return std::unexpected(std::move(mission.error()));
     if (*mission) {
       // if the warpaction is for an instance world, set the uuid to the team uuid
@@ -315,21 +315,21 @@ std::expected<void, StarException> TeleportDialog::initialize(Json config) {
   }
   auto beamLabelConfig = (*assets)->json("/interface/windowconfig/teleportdialog.config:beamPartyMemberLabel");
   if (!beamLabelConfig) return std::unexpected(std::move(beamLabelConfig.error()));
-  auto beamPartyMember = beamLabelConfig->toString();
+  auto beamPartyMember = beamLabelConfig->to_string();
   if (!beamPartyMember) return std::unexpected(std::move(beamPartyMember.error()));
   auto deployLabelConfig = (*assets)->json("/interface/windowconfig/teleportdialog.config:deployPartyMemberLabel");
   if (!deployLabelConfig) return std::unexpected(std::move(deployLabelConfig.error()));
-  auto deployPartyMember = deployLabelConfig->toString();
+  auto deployPartyMember = deployLabelConfig->to_string();
   if (!deployPartyMember) return std::unexpected(std::move(deployPartyMember.error()));
   auto beamIconConfig = (*assets)->json("/interface/windowconfig/teleportdialog.config:beamPartyMemberIcon");
   if (!beamIconConfig) return std::unexpected(std::move(beamIconConfig.error()));
-  auto beamPartyMemberIcon = beamIconConfig->toString();
+  auto beamPartyMemberIcon = beamIconConfig->to_string();
   if (!beamPartyMemberIcon) return std::unexpected(std::move(beamPartyMemberIcon.error()));
   auto deployIconConfig = (*assets)->json("/interface/windowconfig/teleportdialog.config:deployPartyMemberIcon");
   if (!deployIconConfig) return std::unexpected(std::move(deployIconConfig.error()));
-  auto deployPartyMemberIcon = deployIconConfig->toString();
+  auto deployPartyMemberIcon = deployIconConfig->to_string();
   if (!deployPartyMemberIcon) return std::unexpected(std::move(deployPartyMemberIcon.error()));
-  auto includeParty = config.getBool("includePartyMembers", false);
+  auto includeParty = config.get_bool("includePartyMembers", false);
   if (!includeParty) return std::unexpected(std::move(includeParty.error()));
   if (*includeParty) {
     for (auto const& member : m_client->teamClient()->members()) {
@@ -342,7 +342,7 @@ std::expected<void, StarException> TeleportDialog::initialize(Json config) {
       m_destinations.push_back({WarpToPlayer(member.uuid), deploy});
     }
   }
-  auto includeBookmarks = config.getBool("includePlayerBookmarks", false);
+  auto includeBookmarks = config.get_bool("includePlayerBookmarks", false);
   if (!includeBookmarks) return std::unexpected(std::move(includeBookmarks.error()));
   if (*includeBookmarks) {
     auto bookmarks = m_client->mainPlayer()->universeMap()->teleportBookmarks();

@@ -44,8 +44,8 @@ CelestialCoordinate::CelestialCoordinate(Vec3I location, int planetaryOrbitNumbe
 
 std::expected<CelestialCoordinate, StarException> CelestialCoordinate::create(Json const& variant) {
   CelestialCoordinate coordinate;
-  if (variant.isType(Json::Type::String)) {
-    auto text = variant.toString();
+  if (variant.is_type(Json::Type::String)) {
+    auto text = variant.to_string();
     if (!text)
       return std::unexpected(std::move(text.error()));
     auto nullName = text->equals_ignore_case("null");
@@ -86,25 +86,25 @@ std::expected<CelestialCoordinate, StarException> CelestialCoordinate::create(Js
       if (!parsed)
         return std::unexpected(CelestialException(Star::format("Error parsing CelestialCoordinate from '{}'", *text), parsed.error()));
     }
-  } else if (variant.isType(Json::Type::Object)) {
+  } else if (variant.is_type(Json::Type::Object)) {
     auto locationJson = variant.get("location");
     if (!locationJson)
       return std::unexpected(std::move(locationJson.error()));
-    auto location = jsonToVec3I(*locationJson);
+    auto location = json_to_vec3i(*locationJson);
     if (!location)
       return std::unexpected(std::move(location.error()));
-    auto planet = variant.getInt("planet", 0);
+    auto planet = variant.get_int("planet", 0);
     if (!planet)
       return std::unexpected(std::move(planet.error()));
-    auto satellite = variant.getInt("satellite", 0);
+    auto satellite = variant.get_int("satellite", 0);
     if (!satellite)
       return std::unexpected(std::move(satellite.error()));
     coordinate.m_location = *location;
     coordinate.m_planetaryOrbitNumber = *planet;
     coordinate.m_satelliteOrbitNumber = *satellite;
-  } else if (!variant.isNull()) {
+  } else if (!variant.is_null()) {
     return std::unexpected(CelestialException(
-        Star::format("Improper variant type {} trying to convert to SystemCoordinate", variant.typeName())));
+        Star::format("Improper variant type {} trying to convert to SystemCoordinate", variant.type_name())));
   }
   return coordinate;
 }
@@ -173,7 +173,7 @@ Json CelestialCoordinate::toJson() const {
   if (isNull()) {
     return Json();
   } else {
-    return JsonObject{{"location", jsonFromVec3I(m_location)},
+    return JsonObject{{"location", json_from_vec3i(m_location)},
         {"planet", m_planetaryOrbitNumber},
         {"satellite", m_satelliteOrbitNumber}};
   }

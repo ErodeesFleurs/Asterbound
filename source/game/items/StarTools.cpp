@@ -155,15 +155,15 @@ std::expected<std::shared_ptr<MiningTool>, StarException> MiningTool::create(Roo
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto image = item->instanceValue("image").and_then([](Json const& value) { return value.toString(); });
+  auto image = item->instanceValue("image").and_then([](Json const& value) { return value.to_string(); });
   if (!image)
     return std::unexpected(std::move(image.error()));
   item->m_image = AssetPath::relative_to(directory, *image);
-  auto frames = item->instanceValue("frames", 1).and_then([](Json const& value) { return value.toInt(); });
+  auto frames = item->instanceValue("frames", 1).and_then([](Json const& value) { return value.to_int(); });
   if (!frames)
     return std::unexpected(std::move(frames.error()));
   item->m_frames = *frames;
-  auto cycle = item->instanceValue("animationCycle", 1.0f).and_then([](Json const& value) { return value.toFloat(); });
+  auto cycle = item->instanceValue("animationCycle", 1.0f).and_then([](Json const& value) { return value.to_float(); });
   if (!cycle)
     return std::unexpected(std::move(cycle.error()));
   item->m_frameCycle = *cycle;
@@ -178,30 +178,30 @@ std::expected<std::shared_ptr<MiningTool>, StarException> MiningTool::create(Roo
   if (!idle)
     return std::unexpected(std::move(idle.error()));
   item->m_idleFrame = std::move(*idle);
-  auto position = item->instanceValue("handPosition").and_then(jsonToVec2F);
+  auto position = item->instanceValue("handPosition").and_then(json_to_vec2f);
   if (!position)
     return std::unexpected(std::move(position.error()));
   item->m_handPosition = *position;
   for (auto const& [key, target] : {std::pair{std::string_view("blockRadius"), std::ref(item->m_blockRadius)}, std::pair{std::string_view("altBlockRadius"), std::ref(item->m_altBlockRadius)}}) {
-    auto value = item->instanceValue(key).and_then([](Json const& value) { return value.toFloat(); });
+    auto value = item->instanceValue(key).and_then([](Json const& value) { return value.to_float(); });
     if (!value)
       return std::unexpected(std::move(value.error()));
     target.get() = *value;
   }
-  auto sounds = item->instanceValue("strikeSounds").and_then(jsonToStringList);
+  auto sounds = item->instanceValue("strikeSounds").and_then(json_to_string_list);
   if (!sounds)
     return std::unexpected(std::move(sounds.error()));
   item->m_strikeSounds = std::move(*sounds);
-  auto breakSound = item->instanceValue("breakSound", "").and_then([](Json const& value) { return value.toString(); });
+  auto breakSound = item->instanceValue("breakSound", "").and_then([](Json const& value) { return value.to_string(); });
   if (!breakSound)
     return std::unexpected(std::move(breakSound.error()));
   item->m_breakSound = std::move(*breakSound);
-  auto pointable = item->instanceValue("pointable", false).and_then([](Json const& value) { return value.toBool(); });
+  auto pointable = item->instanceValue("pointable", false).and_then([](Json const& value) { return value.to_bool(); });
   if (!pointable)
     return std::unexpected(std::move(pointable.error()));
   item->m_pointable = *pointable;
   for (auto const& [path, target] : {std::pair{std::string_view("/sfx.config:miningToolVolume"), std::ref(item->m_toolVolume)}, std::pair{std::string_view("/sfx.config:miningBlockVolume"), std::ref(item->m_blockVolume)}}) {
-    auto volume = (*assets)->json(path).and_then([](Json const& value) { return value.toFloat(); });
+    auto volume = (*assets)->json(path).and_then([](Json const& value) { return value.to_float(); });
     if (!volume)
       return std::unexpected(std::move(volume.error()));
     target.get() = *volume;
@@ -282,7 +282,7 @@ std::expected<void, StarException> MiningTool::fire(FireMode mode, bool shifting
             auto assets = root().assets();
             if (!assets)
               return std::unexpected(std::move(assets.error()));
-            auto defaultSound = (*assets)->json("/client.config:defaultFootstepSound").and_then([](Json const& value) { return value.toString(); });
+            auto defaultSound = (*assets)->json("/client.config:defaultFootstepSound").and_then([](Json const& value) { return value.to_string(); });
             if (!defaultSound)
               return std::unexpected(std::move(defaultSound.error()));
             if (blockSound != *defaultSound)
@@ -292,7 +292,7 @@ std::expected<void, StarException> MiningTool::fire(FireMode mode, bool shifting
       }
 
       TileDamage damage;
-      auto damageTypeName = instanceValue("tileDamageType", "blockish").and_then([](Json const& value) { return value.toString(); });
+      auto damageTypeName = instanceValue("tileDamageType", "blockish").and_then([](Json const& value) { return value.to_string(); });
       if (!damageTypeName)
         return std::unexpected(std::move(damageTypeName.error()));
       if (!TileDamageTypeNames)
@@ -304,11 +304,11 @@ std::expected<void, StarException> MiningTool::fire(FireMode mode, bool shifting
       auto status = durabilityStatus();
       if (!status)
         return std::unexpected(std::move(status.error()));
-      auto amount = (*status == 0 ? instanceValue("tileDamageBlunted", 0.1f) : instanceValue("tileDamage", 1.0f)).and_then([](Json const& value) { return value.toFloat(); });
+      auto amount = (*status == 0 ? instanceValue("tileDamageBlunted", 0.1f) : instanceValue("tileDamage", 1.0f)).and_then([](Json const& value) { return value.to_float(); });
       if (!amount)
         return std::unexpected(std::move(amount.error()));
       damage.amount = *amount;
-      auto harvest = instanceValue("harvestLevel", 1).and_then([](Json const& value) { return value.toUInt(); });
+      auto harvest = instanceValue("harvestLevel", 1).and_then([](Json const& value) { return value.to_uint(); });
       if (!harvest)
         return std::unexpected(std::move(harvest.error()));
       damage.harvestLevel = *harvest;
@@ -318,7 +318,7 @@ std::expected<void, StarException> MiningTool::fire(FireMode mode, bool shifting
       if (*damageResult != TileDamageResult::None) {
         used = true;
         if (!itemOwner->get().isAdmin()) {
-          auto perUse = instanceValue("durabilityPerUse", 1.0f).and_then([](Json const& value) { return value.toFloat(); });
+          auto perUse = instanceValue("durabilityPerUse", 1.0f).and_then([](Json const& value) { return value.to_float(); });
           if (!perUse)
             return std::unexpected(std::move(perUse.error()));
           auto changed = changeDurability(*perUse);
@@ -330,7 +330,7 @@ std::expected<void, StarException> MiningTool::fire(FireMode mode, bool shifting
         auto assets = root().assets();
         if (!assets)
           return std::unexpected(std::move(assets.error()));
-        auto ding = (*assets)->json("/client.config:defaultDingSound").and_then([](Json const& value) { return value.toString(); });
+        auto ding = (*assets)->json("/client.config:defaultDingSound").and_then([](Json const& value) { return value.to_string(); });
         if (!ding)
           return std::unexpected(std::move(ding.error()));
         blockSound = std::move(*ding);
@@ -380,10 +380,10 @@ std::expected<void, StarException> MiningTool::update(float dt, FireMode mode, b
 }
 
 std::expected<float, StarException> MiningTool::durabilityStatus() {
-  auto hit = instanceValue("durabilityHit", 0.0f).and_then([](Json const& value) { return value.toFloat(); });
+  auto hit = instanceValue("durabilityHit", 0.0f).and_then([](Json const& value) { return value.to_float(); });
   if (!hit)
     return std::unexpected(std::move(hit.error()));
-  auto durability = instanceValue("durability").and_then([](Json const& value) { return value.toFloat(); });
+  auto durability = instanceValue("durability").and_then([](Json const& value) { return value.to_float(); });
   if (!durability)
     return std::unexpected(std::move(durability.error()));
   return std::clamp(1.0f - *hit / *durability, 0.0f, 1.0f);
@@ -396,10 +396,10 @@ std::expected<float, StarException> MiningTool::getAngle(float aimAngle) {
 }
 
 std::expected<void, StarException> MiningTool::changeDurability(float amount) {
-  auto hit = instanceValue("durabilityHit", 0.0f).and_then([](Json const& value) { return value.toFloat(); });
+  auto hit = instanceValue("durabilityHit", 0.0f).and_then([](Json const& value) { return value.to_float(); });
   if (!hit)
     return std::unexpected(std::move(hit.error()));
-  auto durability = instanceValue("durability").and_then([](Json const& value) { return value.toFloat(); });
+  auto durability = instanceValue("durability").and_then([](Json const& value) { return value.to_float(); });
   if (!durability)
     return std::unexpected(std::move(durability.error()));
   auto stored = setInstanceValue("durabilityHit", clamp(*hit + amount, 0.0f, *durability));
@@ -409,7 +409,7 @@ std::expected<void, StarException> MiningTool::changeDurability(float amount) {
   if (!status)
     return std::unexpected(std::move(status.error()));
   if (*status == 0.0f) {
-    auto repairable = instanceValue("canBeRepaired", false).and_then([](Json const& value) { return value.toBool(); });
+    auto repairable = instanceValue("canBeRepaired", false).and_then([](Json const& value) { return value.to_bool(); });
     if (!repairable)
       return std::unexpected(std::move(repairable.error()));
     if (!*repairable) {
@@ -436,15 +436,15 @@ std::expected<std::shared_ptr<HarvestingTool>, StarException> HarvestingTool::cr
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto image = item->instanceValue("image").and_then([](Json const& value) { return value.toString(); });
+  auto image = item->instanceValue("image").and_then([](Json const& value) { return value.to_string(); });
   if (!image)
     return std::unexpected(std::move(image.error()));
   item->m_image = AssetPath::relative_to(directory, *image);
-  auto frames = item->instanceValue("frames", 1).and_then([](Json const& value) { return value.toInt(); });
+  auto frames = item->instanceValue("frames", 1).and_then([](Json const& value) { return value.to_int(); });
   if (!frames)
     return std::unexpected(std::move(frames.error()));
   item->m_frames = *frames;
-  auto cycle = item->instanceValue("animationCycle", 1.0f).and_then([](Json const& value) { return value.toFloat(); });
+  auto cycle = item->instanceValue("animationCycle", 1.0f).and_then([](Json const& value) { return value.to_float(); });
   if (!cycle)
     return std::unexpected(std::move(cycle.error()));
   item->m_frameCycle = *cycle;
@@ -458,19 +458,19 @@ std::expected<std::shared_ptr<HarvestingTool>, StarException> HarvestingTool::cr
   if (!idle)
     return std::unexpected(std::move(idle.error()));
   item->m_idleFrame = std::move(*idle);
-  auto position = item->instanceValue("handPosition").and_then(jsonToVec2F);
+  auto position = item->instanceValue("handPosition").and_then(json_to_vec2f);
   if (!position)
     return std::unexpected(std::move(position.error()));
   item->m_handPosition = *position;
-  auto sounds = item->instanceValue("strikeSounds").and_then(jsonToStringList);
+  auto sounds = item->instanceValue("strikeSounds").and_then(json_to_string_list);
   if (!sounds)
     return std::unexpected(std::move(sounds.error()));
   item->m_strikeSounds = std::move(*sounds);
-  auto volume = (*assets)->json("/sfx.config:harvestToolVolume").and_then([](Json const& value) { return value.toFloat(); });
+  auto volume = (*assets)->json("/sfx.config:harvestToolVolume").and_then([](Json const& value) { return value.to_float(); });
   if (!volume)
     return std::unexpected(std::move(volume.error()));
   item->m_toolVolume = *volume;
-  auto power = item->instanceValue("harvestPower", 1.0f).and_then([](Json const& value) { return value.toFloat(); });
+  auto power = item->instanceValue("harvestPower", 1.0f).and_then([](Json const& value) { return value.to_float(); });
   if (!power)
     return std::unexpected(std::move(power.error()));
   item->m_harvestPower = *power;
@@ -566,7 +566,7 @@ std::expected<std::shared_ptr<WireTool>, StarException> WireTool::create(Root& r
   auto fireable = item->initializeFireable(config);
   if (!fireable)
     return std::unexpected(std::move(fireable.error()));
-  auto overrides = parameters.toObject();
+  auto overrides = parameters.to_object();
   if (!overrides)
     return std::unexpected(std::move(overrides.error()));
   auto merged = config.set_all(*overrides);
@@ -578,15 +578,15 @@ std::expected<std::shared_ptr<WireTool>, StarException> WireTool::create(Root& r
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto position = item->instanceValue("handPosition").and_then(jsonToVec2F);
+  auto position = item->instanceValue("handPosition").and_then(json_to_vec2f);
   if (!position)
     return std::unexpected(std::move(position.error()));
   item->m_handPosition = *position;
-  auto sounds = item->instanceValue("strikeSounds").and_then(jsonToStringList);
+  auto sounds = item->instanceValue("strikeSounds").and_then(json_to_string_list);
   if (!sounds)
     return std::unexpected(std::move(sounds.error()));
   item->m_strikeSounds = std::move(*sounds);
-  auto volume = (*assets)->json("/sfx.config:miningToolVolume").and_then([](Json const& value) { return value.toFloat(); });
+  auto volume = (*assets)->json("/sfx.config:miningToolVolume").and_then([](Json const& value) { return value.to_float(); });
   if (!volume)
     return std::unexpected(std::move(volume.error()));
   item->m_toolVolume = *volume;
@@ -675,7 +675,7 @@ std::expected<void, StarException> WireTool::fire(FireMode mode, bool shifting, 
         auto assets = root().assets();
         if (!assets)
           return std::unexpected(std::move(assets.error()));
-        auto wireErrorSound = (*assets)->json("/client.config:wireFailSound").and_then([](Json const& value) { return value.toString(); });
+        auto wireErrorSound = (*assets)->json("/client.config:wireFailSound").and_then([](Json const& value) { return value.to_string(); });
         if (!wireErrorSound)
           return std::unexpected(std::move(wireErrorSound.error()));
         auto sound = ownerp->get().addSound(*wireErrorSound, m_toolVolume);
@@ -704,7 +704,7 @@ std::expected<std::shared_ptr<BeamMiningTool>, StarException> BeamMiningTool::cr
   auto fireable = item->initializeFireable(config);
   if (!fireable)
     return std::unexpected(std::move(fireable.error()));
-  auto overrides = directoryParameters.toObject();
+  auto overrides = directoryParameters.to_object();
   if (!overrides)
     return std::unexpected(std::move(overrides.error()));
   auto merged = config.set_all(*overrides);
@@ -717,29 +717,29 @@ std::expected<std::shared_ptr<BeamMiningTool>, StarException> BeamMiningTool::cr
   if (!assets)
     return std::unexpected(std::move(assets.error()));
   for (auto const& [key, target] : {std::pair{std::string_view("blockRadius"), std::ref(item->m_blockRadius)}, std::pair{std::string_view("altBlockRadius"), std::ref(item->m_altBlockRadius)}}) {
-    auto value = item->instanceValue(key).and_then([](Json const& value) { return value.toFloat(); });
+    auto value = item->instanceValue(key).and_then([](Json const& value) { return value.to_float(); });
     if (!value)
       return std::unexpected(std::move(value.error()));
     target.get() = *value;
   }
-  auto damage = item->instanceValue("tileDamage", 1.0f).and_then([](Json const& value) { return value.toFloat(); });
+  auto damage = item->instanceValue("tileDamage", 1.0f).and_then([](Json const& value) { return value.to_float(); });
   if (!damage)
     return std::unexpected(std::move(damage.error()));
   item->m_tileDamage = *damage;
-  auto harvest = item->instanceValue("harvestLevel", 1).and_then([](Json const& value) { return value.toUInt(); });
+  auto harvest = item->instanceValue("harvestLevel", 1).and_then([](Json const& value) { return value.to_uint(); });
   if (!harvest)
     return std::unexpected(std::move(harvest.error()));
   item->m_harvestLevel = *harvest;
-  auto collect = item->instanceValue("canCollectLiquid", false).and_then([](Json const& value) { return value.toBool(); });
+  auto collect = item->instanceValue("canCollectLiquid", false).and_then([](Json const& value) { return value.to_bool(); });
   if (!collect)
     return std::unexpected(std::move(collect.error()));
   item->m_canCollectLiquid = *collect;
-  auto sounds = item->instanceValue("strikeSounds").and_then(jsonToStringList);
+  auto sounds = item->instanceValue("strikeSounds").and_then(json_to_string_list);
   if (!sounds)
     return std::unexpected(std::move(sounds.error()));
   item->m_strikeSounds = std::move(*sounds);
   for (auto const& [path, target] : {std::pair{std::string_view("/sfx.config:miningToolVolume"), std::ref(item->m_toolVolume)}, std::pair{std::string_view("/sfx.config:miningBlockVolume"), std::ref(item->m_blockVolume)}}) {
-    auto volume = (*assets)->json(path).and_then([](Json const& value) { return value.toFloat(); });
+    auto volume = (*assets)->json(path).and_then([](Json const& value) { return value.to_float(); });
     if (!volume)
       return std::unexpected(std::move(volume.error()));
     target.get() = *volume;
@@ -748,14 +748,14 @@ std::expected<std::shared_ptr<BeamMiningTool>, StarException> BeamMiningTool::cr
   auto rateValue = item->instanceValue("scaleRate");
   if (!rateValue)
     return std::unexpected(std::move(rateValue.error()));
-  if (*rateValue && rateValue->canConvert(Json::Type::Float)) {
-    auto rate = rateValue->toFloat();
+  if (*rateValue && rateValue->can_convert(Json::Type::Float)) {
+    auto rate = rateValue->to_float();
     if (!rate)
       return std::unexpected(std::move(rate.error()));
     item->m_tileDamage /= *rate;
     item->m_cooldownTime /= *rate;
   }
-  auto effects = item->instanceValue("inhandStatusEffects", JsonArray()).and_then([](Json const& value) { return value.toArray(); });
+  auto effects = item->instanceValue("inhandStatusEffects", JsonArray()).and_then([](Json const& value) { return value.to_array(); });
   if (!effects)
     return std::unexpected(std::move(effects.error()));
   for (auto const& value : *effects) {
@@ -901,7 +901,7 @@ std::expected<void, StarException> BeamMiningTool::fire(FireMode mode, bool shif
             auto assets = root().assets();
             if (!assets)
               return std::unexpected(std::move(assets.error()));
-            auto defaultSound = (*assets)->json("/client.config:defaultFootstepSound").and_then([](Json const& value) { return value.toString(); });
+            auto defaultSound = (*assets)->json("/client.config:defaultFootstepSound").and_then([](Json const& value) { return value.to_string(); });
             if (!defaultSound)
               return std::unexpected(std::move(defaultSound.error()));
             if (blockSound != *defaultSound)
@@ -919,7 +919,7 @@ std::expected<void, StarException> BeamMiningTool::fire(FireMode mode, bool shif
         auto assets = root().assets();
         if (!assets)
           return std::unexpected(std::move(assets.error()));
-        auto ding = (*assets)->json("/client.config:defaultDingSound").and_then([](Json const& value) { return value.toString(); });
+        auto ding = (*assets)->json("/client.config:defaultDingSound").and_then([](Json const& value) { return value.to_string(); });
         if (!ding)
           return std::unexpected(std::move(ding.error()));
         blockSound = std::move(*ding);
@@ -948,7 +948,7 @@ std::expected<void, StarException> BeamMiningTool::fire(FireMode mode, bool shif
         auto assets = root().assets();
         if (!assets)
           return std::unexpected(std::move(assets.error()));
-        auto bucketSize = (*assets)->json("/items/defaultParameters.config:liquidItems.bucketSize").and_then([](Json const& value) { return value.toUInt(); });
+        auto bucketSize = (*assets)->json("/items/defaultParameters.config:liquidItems.bucketSize").and_then([](Json const& value) { return value.to_uint(); });
         if (!bucketSize)
           return std::unexpected(std::move(bucketSize.error()));
         if (totalLiquid >= *bucketSize) {
@@ -957,7 +957,7 @@ std::expected<void, StarException> BeamMiningTool::fire(FireMode mode, bool shif
             if (!collected)
               return std::unexpected(std::move(collected.error()));
           }
-          auto sound = (*assets)->json("/items/defaultParameters.config:liquidBlockSound").and_then([](Json const& value) { return value.toString(); });
+          auto sound = (*assets)->json("/items/defaultParameters.config:liquidBlockSound").and_then([](Json const& value) { return value.to_string(); });
           if (!sound)
             return std::unexpected(std::move(sound.error()));
           blockSound = std::move(*sound);
@@ -1017,36 +1017,36 @@ std::expected<std::shared_ptr<PaintingBeamTool>, StarException> PaintingBeamTool
   if (!assets)
     return std::unexpected(std::move(assets.error()));
   for (auto const& [key, target] : {std::pair{std::string_view("blockRadius"), std::ref(item->m_blockRadius)}, std::pair{std::string_view("altBlockRadius"), std::ref(item->m_altBlockRadius)}}) {
-    auto value = item->instanceValue(key).and_then([](Json const& value) { return value.toFloat(); });
+    auto value = item->instanceValue(key).and_then([](Json const& value) { return value.to_float(); });
     if (!value)
       return std::unexpected(std::move(value.error()));
     target.get() = *value;
   }
-  auto sounds = item->instanceValue("strikeSounds").and_then(jsonToStringList);
+  auto sounds = item->instanceValue("strikeSounds").and_then(json_to_string_list);
   if (!sounds)
     return std::unexpected(std::move(sounds.error()));
   item->m_strikeSounds = std::move(*sounds);
   for (auto const& [path, target] : {std::pair{std::string_view("/sfx.config:miningToolVolume"), std::ref(item->m_toolVolume)}, std::pair{std::string_view("/sfx.config:miningBlockVolume"), std::ref(item->m_blockVolume)}}) {
-    auto volume = (*assets)->json(path).and_then([](Json const& value) { return value.toFloat(); });
+    auto volume = (*assets)->json(path).and_then([](Json const& value) { return value.to_float(); });
     if (!volume)
       return std::unexpected(std::move(volume.error()));
     target.get() = *volume;
   }
   item->m_endType = EndType::Object;
-  auto colors = item->instanceValue("colorNumbers").and_then([](Json const& value) { return value.toArray(); });
+  auto colors = item->instanceValue("colorNumbers").and_then([](Json const& value) { return value.to_array(); });
   if (!colors)
     return std::unexpected(std::move(colors.error()));
   for (auto const& color : *colors) {
-    auto value = jsonToColor(color);
+    auto value = json_to_color(color);
     if (!value)
       return std::unexpected(std::move(value.error()));
     item->m_colors.push_back(*value);
   }
-  auto keys = item->instanceValue("colorKeys").and_then(jsonToStringList);
+  auto keys = item->instanceValue("colorKeys").and_then(json_to_string_list);
   if (!keys)
     return std::unexpected(std::move(keys.error()));
   item->m_colorKeys = std::move(*keys);
-  auto index = item->instanceValue("colorIndex", 0).and_then([](Json const& value) { return value.toInt(); });
+  auto index = item->instanceValue("colorIndex", 0).and_then([](Json const& value) { return value.to_int(); });
   if (!index)
     return std::unexpected(std::move(index.error()));
   item->m_colorIndex = *index;

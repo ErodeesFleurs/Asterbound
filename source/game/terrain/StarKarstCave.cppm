@@ -86,23 +86,23 @@ std::string_view const KarstCaveSelector::Name = "karstcave";
 
 std::expected<std::shared_ptr<KarstCaveSelector>, StarException> KarstCaveSelector::create(Json const& config, TerrainSelectorParameters const& parameters) {
   auto result = std::make_shared<KarstCaveSelector>(ConstructionKey{}, config, parameters);
-  auto sectorSize = config.getUInt("sectorSize", 64);
+  auto sectorSize = config.get_uint("sectorSize", 64);
   if (!sectorSize)
     return std::unexpected(std::move(sectorSize.error()));
   result->m_sectorSize = *sectorSize;
-  auto layerResolution = config.getInt("layerResolution");
+  auto layerResolution = config.get_int("layerResolution");
   if (!layerResolution)
     return std::unexpected(std::move(layerResolution.error()));
   result->m_layerResolution = *layerResolution;
-  auto layerDensity = config.getFloat("layerDensity");
+  auto layerDensity = config.get_float("layerDensity");
   if (!layerDensity)
     return std::unexpected(std::move(layerDensity.error()));
   result->m_layerDensity = *layerDensity;
-  auto bufferHeight = config.getInt("bufferHeight");
+  auto bufferHeight = config.get_int("bufferHeight");
   if (!bufferHeight)
     return std::unexpected(std::move(bufferHeight.error()));
   result->m_bufferHeight = *bufferHeight;
-  auto caveTaperPoint = config.getFloat("caveTaperPoint");
+  auto caveTaperPoint = config.get_float("caveTaperPoint");
   if (!caveTaperPoint)
     return std::unexpected(std::move(caveTaperPoint.error()));
   result->m_caveTaperPoint = *caveTaperPoint;
@@ -124,11 +124,11 @@ std::expected<std::shared_ptr<KarstCaveSelector>, StarException> KarstCaveSelect
   result->m_caveFloorVariationPerlinConfig = std::move(*caveFloor);
   result->m_worldWidth = parameters.worldWidth;
   result->m_seed = parameters.seed;
-  auto layerCacheSize = config.getUInt("layerPerlinsCacheSize", 16);
+  auto layerCacheSize = config.get_uint("layerPerlinsCacheSize", 16);
   if (!layerCacheSize)
     return std::unexpected(std::move(layerCacheSize.error()));
   result->m_layerPerlinsCache.set_capacity(*layerCacheSize);
-  auto sectorCacheSize = config.getUInt("sectorCacheSize", 16);
+  auto sectorCacheSize = config.get_uint("sectorCacheSize", 16);
   if (!sectorCacheSize)
     return std::unexpected(std::move(sectorCacheSize.error()));
   result->m_sectorCache.set_capacity(*sectorCacheSize);

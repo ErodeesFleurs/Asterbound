@@ -28,7 +28,7 @@ ServerRconClient::create(UniverseServer& universe, std::shared_ptr<TcpSocket> so
   auto password = (*configuration)->get("rconServerPassword");
   if (!password)
     return std::unexpected(std::move(password.error()));
-  auto text = password->toString();
+  auto text = password->to_string();
   if (!text)
     return std::unexpected(std::move(text.error()));
   return std::shared_ptr<ServerRconClient>(new ServerRconClient(universe, std::move(socket), std::move(*text)));
@@ -288,7 +288,7 @@ ServerRconThread::create(UniverseServer& universe, HostAddressWithPort const& ad
   auto password = (*configuration)->get("rconServerPassword");
   if (!password)
     return std::unexpected(std::move(password.error()));
-  auto text = password->toString();
+  auto text = password->to_string();
   if (!text)
     return std::unexpected(std::move(text.error()));
   if (text->empty()) {
@@ -359,7 +359,7 @@ std::expected<void, StarException> ServerRconThread::run() {
     auto setting = (*configuration)->get("rconServerTimeout");
     if (!setting)
       return std::unexpected(std::move(setting.error()));
-    auto timeout = setting->toInt();
+    auto timeout = setting->to_int();
     if (!timeout)
       return std::unexpected(std::move(timeout.error()));
     while (!stopToken.stop_requested()) {

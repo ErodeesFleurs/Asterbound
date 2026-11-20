@@ -66,7 +66,7 @@ std::expected<MovementParameters, StarException> MovementParameters::sensibleDef
   if (!assets) return std::unexpected(std::move(assets.error()));
   auto config = (*assets)->json("/default_movement.config");
   if (!config) return std::unexpected(std::move(config.error()));
-  auto object = config->toObject();
+  auto object = config->to_object();
   if (!object) return std::unexpected(std::move(object.error()));
   return create(Json(std::move(*object)));
 }
@@ -75,93 +75,93 @@ MovementParameters::MovementParameters() = default;
 
 std::expected<MovementParameters, StarException> MovementParameters::create(Json const& config) {
   MovementParameters value;
-  if (config.isNull())
+  if (config.is_null())
     return value;
 
-  auto massResult = config.optFloat("mass");
+  auto massResult = config.opt_float("mass");
   if (!massResult) return std::unexpected(std::move(massResult.error()));
   value.mass = *massResult;
-  auto gravityMultiplierResult = config.optFloat("gravityMultiplier");
+  auto gravityMultiplierResult = config.opt_float("gravityMultiplier");
   if (!gravityMultiplierResult) return std::unexpected(std::move(gravityMultiplierResult.error()));
   value.gravityMultiplier = *gravityMultiplierResult;
-  auto liquidBuoyancyResult = config.optFloat("liquidBuoyancy");
+  auto liquidBuoyancyResult = config.opt_float("liquidBuoyancy");
   if (!liquidBuoyancyResult) return std::unexpected(std::move(liquidBuoyancyResult.error()));
   value.liquidBuoyancy = *liquidBuoyancyResult;
-  auto airBuoyancyResult = config.optFloat("airBuoyancy");
+  auto airBuoyancyResult = config.opt_float("airBuoyancy");
   if (!airBuoyancyResult) return std::unexpected(std::move(airBuoyancyResult.error()));
   value.airBuoyancy = *airBuoyancyResult;
-  auto bounceFactorResult = config.optFloat("bounceFactor");
+  auto bounceFactorResult = config.opt_float("bounceFactor");
   if (!bounceFactorResult) return std::unexpected(std::move(bounceFactorResult.error()));
   value.bounceFactor = *bounceFactorResult;
-  auto stopOnFirstBounceResult = config.optBool("stopOnFirstBounce");
+  auto stopOnFirstBounceResult = config.opt_bool("stopOnFirstBounce");
   if (!stopOnFirstBounceResult) return std::unexpected(std::move(stopOnFirstBounceResult.error()));
   value.stopOnFirstBounce = *stopOnFirstBounceResult;
-  auto enableSurfaceSlopeCorrectionResult = config.optBool("enableSurfaceSlopeCorrection");
+  auto enableSurfaceSlopeCorrectionResult = config.opt_bool("enableSurfaceSlopeCorrection");
   if (!enableSurfaceSlopeCorrectionResult) return std::unexpected(std::move(enableSurfaceSlopeCorrectionResult.error()));
   value.enableSurfaceSlopeCorrection = *enableSurfaceSlopeCorrectionResult;
-  auto slopeSlidingFactorResult = config.optFloat("slopeSlidingFactor");
+  auto slopeSlidingFactorResult = config.opt_float("slopeSlidingFactor");
   if (!slopeSlidingFactorResult) return std::unexpected(std::move(slopeSlidingFactorResult.error()));
   value.slopeSlidingFactor = *slopeSlidingFactorResult;
-  auto maxMovementPerStepResult = config.optFloat("maxMovementPerStep");
+  auto maxMovementPerStepResult = config.opt_float("maxMovementPerStep");
   if (!maxMovementPerStepResult) return std::unexpected(std::move(maxMovementPerStepResult.error()));
   value.maxMovementPerStep = *maxMovementPerStepResult;
-  auto maximumCorrectionResult = config.optFloat("maximumCorrection");
+  auto maximumCorrectionResult = config.opt_float("maximumCorrection");
   if (!maximumCorrectionResult) return std::unexpected(std::move(maximumCorrectionResult.error()));
   value.maximumCorrection = *maximumCorrectionResult;
-  auto speedLimitResult = config.optFloat("speedLimit");
+  auto speedLimitResult = config.opt_float("speedLimit");
   if (!speedLimitResult) return std::unexpected(std::move(speedLimitResult.error()));
   value.speedLimit = *speedLimitResult;
-  auto discontinuityThresholdResult = config.optFloat("discontinuityThreshold");
+  auto discontinuityThresholdResult = config.opt_float("discontinuityThreshold");
   if (!discontinuityThresholdResult) return std::unexpected(std::move(discontinuityThresholdResult.error()));
   value.discontinuityThreshold = *discontinuityThresholdResult;
   auto collisionPolyConfig = config.opt("collisionPoly");
   if (!collisionPolyConfig) return std::unexpected(std::move(collisionPolyConfig.error()));
   if (*collisionPolyConfig) {
-    auto collisionPolyValue = jsonToPolyF(**collisionPolyConfig);
+    auto collisionPolyValue = json_to_polyf(**collisionPolyConfig);
     if (!collisionPolyValue) return std::unexpected(std::move(collisionPolyValue.error()));
     value.collisionPoly = std::move(*collisionPolyValue);
   }
-  auto stickyCollisionResult = config.optBool("stickyCollision");
+  auto stickyCollisionResult = config.opt_bool("stickyCollision");
   if (!stickyCollisionResult) return std::unexpected(std::move(stickyCollisionResult.error()));
   value.stickyCollision = *stickyCollisionResult;
-  auto stickyForceResult = config.optFloat("stickyForce");
+  auto stickyForceResult = config.opt_float("stickyForce");
   if (!stickyForceResult) return std::unexpected(std::move(stickyForceResult.error()));
   value.stickyForce = *stickyForceResult;
-  auto airFrictionResult = config.optFloat("airFriction");
+  auto airFrictionResult = config.opt_float("airFriction");
   if (!airFrictionResult) return std::unexpected(std::move(airFrictionResult.error()));
   value.airFriction = *airFrictionResult;
-  auto liquidFrictionResult = config.optFloat("liquidFriction");
+  auto liquidFrictionResult = config.opt_float("liquidFriction");
   if (!liquidFrictionResult) return std::unexpected(std::move(liquidFrictionResult.error()));
   value.liquidFriction = *liquidFrictionResult;
-  auto groundFrictionResult = config.optFloat("groundFriction");
+  auto groundFrictionResult = config.opt_float("groundFriction");
   if (!groundFrictionResult) return std::unexpected(std::move(groundFrictionResult.error()));
   value.groundFriction = *groundFrictionResult;
-  auto collisionEnabledResult = config.optBool("collisionEnabled");
+  auto collisionEnabledResult = config.opt_bool("collisionEnabled");
   if (!collisionEnabledResult) return std::unexpected(std::move(collisionEnabledResult.error()));
   value.collisionEnabled = *collisionEnabledResult;
-  auto frictionEnabledResult = config.optBool("frictionEnabled");
+  auto frictionEnabledResult = config.opt_bool("frictionEnabled");
   if (!frictionEnabledResult) return std::unexpected(std::move(frictionEnabledResult.error()));
   value.frictionEnabled = *frictionEnabledResult;
-  auto gravityEnabledResult = config.optBool("gravityEnabled");
+  auto gravityEnabledResult = config.opt_bool("gravityEnabled");
   if (!gravityEnabledResult) return std::unexpected(std::move(gravityEnabledResult.error()));
   value.gravityEnabled = *gravityEnabledResult;
-  auto ignorePlatformCollisionResult = config.optBool("ignorePlatformCollision");
+  auto ignorePlatformCollisionResult = config.opt_bool("ignorePlatformCollision");
   if (!ignorePlatformCollisionResult) return std::unexpected(std::move(ignorePlatformCollisionResult.error()));
   value.ignorePlatformCollision = *ignorePlatformCollisionResult;
-  auto maximumPlatformCorrectionResult = config.optFloat("maximumPlatformCorrection");
+  auto maximumPlatformCorrectionResult = config.opt_float("maximumPlatformCorrection");
   if (!maximumPlatformCorrectionResult) return std::unexpected(std::move(maximumPlatformCorrectionResult.error()));
   value.maximumPlatformCorrection = *maximumPlatformCorrectionResult;
-  auto maximumPlatformCorrectionVelocityFactorResult = config.optFloat("maximumPlatformCorrectionVelocityFactor");
+  auto maximumPlatformCorrectionVelocityFactorResult = config.opt_float("maximumPlatformCorrectionVelocityFactor");
   if (!maximumPlatformCorrectionVelocityFactorResult) return std::unexpected(std::move(maximumPlatformCorrectionVelocityFactorResult.error()));
   value.maximumPlatformCorrectionVelocityFactor = *maximumPlatformCorrectionVelocityFactorResult;
   auto physicsEffectCategoriesConfig = config.opt("physicsEffectCategories");
   if (!physicsEffectCategoriesConfig) return std::unexpected(std::move(physicsEffectCategoriesConfig.error()));
   if (*physicsEffectCategoriesConfig) {
-    auto physicsEffectCategoriesValue = jsonToStringSet(**physicsEffectCategoriesConfig);
+    auto physicsEffectCategoriesValue = json_to_string_set(**physicsEffectCategoriesConfig);
     if (!physicsEffectCategoriesValue) return std::unexpected(std::move(physicsEffectCategoriesValue.error()));
     value.physicsEffectCategories = std::move(*physicsEffectCategoriesValue);
   }
-  auto restDurationResult = config.optInt("restDuration");
+  auto restDurationResult = config.opt_int("restDuration");
   if (!restDurationResult) return std::unexpected(std::move(restDurationResult.error()));
   value.restDuration = *restDurationResult;
   return value;
@@ -201,9 +201,9 @@ MovementParameters MovementParameters::merge(MovementParameters const& rhs) cons
 }
 
 std::expected<Json, StarException> MovementParameters::toJson() const {
-  auto collisionPolyJson = json_from_optional(collisionPoly, jsonFromPolyF);
+  auto collisionPolyJson = json_from_optional(collisionPoly, json_from_polyf);
   if (!collisionPolyJson) return std::unexpected(std::move(collisionPolyJson.error()));
-  auto physicsEffectCategoriesJson = json_from_optional(physicsEffectCategories, jsonFromStringSet);
+  auto physicsEffectCategoriesJson = json_from_optional(physicsEffectCategories, json_from_string_set);
   if (!physicsEffectCategoriesJson) return std::unexpected(std::move(physicsEffectCategoriesJson.error()));
 
   return JsonObject{
@@ -369,8 +369,8 @@ Root& MovementController::root() const {
 
 Json MovementController::storeState() const {
   return JsonObject{
-    {"position", jsonFromVec2F(position())},
-    {"velocity", jsonFromVec2F(velocity())},
+    {"position", json_from_vec2f(position())},
+    {"velocity", json_from_vec2f(velocity())},
     {"rotation", rotation()}
   };
 }
@@ -378,13 +378,13 @@ Json MovementController::storeState() const {
 std::expected<void, StarException> MovementController::loadState(Json const& state) {
   auto positionJson = state.get("position");
   if (!positionJson) return std::unexpected(std::move(positionJson.error()));
-  auto positionValue = jsonToVec2F(*positionJson);
+  auto positionValue = json_to_vec2f(*positionJson);
   if (!positionValue) return std::unexpected(std::move(positionValue.error()));
   auto velocityJson = state.get("velocity");
   if (!velocityJson) return std::unexpected(std::move(velocityJson.error()));
-  auto velocityValue = jsonToVec2F(*velocityJson);
+  auto velocityValue = json_to_vec2f(*velocityJson);
   if (!velocityValue) return std::unexpected(std::move(velocityValue.error()));
-  auto rotationValue = state.getFloat("rotation");
+  auto rotationValue = state.get_float("rotation");
   if (!rotationValue) return std::unexpected(std::move(rotationValue.error()));
   setPosition(*positionValue);
   setVelocity(*velocityValue);

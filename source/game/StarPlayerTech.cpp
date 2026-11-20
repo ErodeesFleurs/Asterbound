@@ -39,27 +39,27 @@ std::expected<std::shared_ptr<PlayerTech>, StarException> PlayerTech::create(Roo
   auto availableJson = json.get("availableTechs");
   if (!availableJson)
     return std::unexpected(std::move(availableJson.error()));
-  auto available = jsonToStringSet(*availableJson);
+  auto available = json_to_string_set(*availableJson);
   if (!available)
     return std::unexpected(std::move(available.error()));
   playerTech->m_availableTechs = std::move(*available);
   auto enabledJson = json.get("enabledTechs");
   if (!enabledJson)
     return std::unexpected(std::move(enabledJson.error()));
-  auto enabled = jsonToStringSet(*enabledJson);
+  auto enabled = json_to_string_set(*enabledJson);
   if (!enabled)
     return std::unexpected(std::move(enabled.error()));
   playerTech->m_enabledTechs = std::move(*enabled);
   auto techDatabase = root.techDatabase();
   if (!techDatabase)
     return std::unexpected(std::move(techDatabase.error()));
-  auto equipped = json.getObject("equippedTechs");
+  auto equipped = json.get_object("equippedTechs");
   if (!equipped)
     return std::unexpected(std::move(equipped.error()));
   if (!TechTypeNames)
     return std::unexpected(TechTypeNames.error());
   for (auto const& entry : *equipped) {
-    auto techName = entry.second.toString();
+    auto techName = entry.second.to_string();
     if (!techName)
       return std::unexpected(std::move(techName.error()));
     if ((*techDatabase)->contains(*techName)) {
@@ -87,8 +87,8 @@ std::expected<Json, StarException> PlayerTech::toJson() const {
     equipped[type->get()] = entry.second;
   }
   return JsonObject{
-      {"availableTechs", jsonFromStringSet(m_availableTechs)},
-      {"enabledTechs", jsonFromStringSet(m_enabledTechs)},
+      {"availableTechs", json_from_string_set(m_availableTechs)},
+      {"enabledTechs", json_from_string_set(m_enabledTechs)},
       {"equippedTechs", std::move(equipped)}};
 }
 

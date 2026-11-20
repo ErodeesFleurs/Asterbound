@@ -186,25 +186,25 @@ auto assets = std::move(*result3);
 
   auto result4 = assets->json("/npcs/npc.config:emoteCooldown");
 if (!result4) return std::unexpected(std::move(result4.error()));
-auto result5 = std::move(*result4).toFloat();
+auto result5 = std::move(*result4).to_float();
 if (!result5) return std::unexpected(std::move(result5.error()));
 m_emoteCooldownTimer = GameTimer(std::move(*result5));
   m_danceCooldownTimer = GameTimer(0.0f);
   auto result6 = assets->json("/npcs/npc.config:blinkInterval");
 if (!result6) return std::unexpected(std::move(result6.error()));
-auto result7 = jsonToVec2F(std::move(*result6));
+auto result7 = json_to_vec2f(std::move(*result6));
 if (!result7) return std::unexpected(std::move(result7.error()));
 m_blinkInterval = std::move(*result7);
 
   auto result8 = assets->json("/quests/quests.config:defaultIndicatorOffset");
 if (!result8) return std::unexpected(std::move(result8.error()));
-auto result9 = jsonToVec2F(std::move(*result8));
+auto result9 = json_to_vec2f(std::move(*result8));
 if (!result9) return std::unexpected(std::move(result9.error()));
 m_questIndicatorOffset = std::move(*result9);
 
   if (npcVariant.overrides)
     {
-  auto result10 = npcVariant.overrides.getString("clientEntityMode", "ClientSlaveOnly");
+  auto result10 = npcVariant.overrides.get_string("clientEntityMode", "ClientSlaveOnly");
   if (!result10) return std::unexpected(std::move(result10.error()));
   if (!ClientEntityModeNames) return std::unexpected(ClientEntityModeNames.error());
   auto result11 = ClientEntityModeNames->get_left(std::move(*result10));
@@ -228,7 +228,7 @@ if (!result12) return std::unexpected(std::move(result12.error()));
   m_scriptComponent.setUpdateDelta(m_npcVariant.initialScriptDelta);
   auto result13 = humanoid();
 if (!result13) return std::unexpected(std::move(result13.error()));
-auto result14 = ActorMovementParameters::create(jsonMerge(std::move(*result13)->defaultMovementParameters(), m_npcVariant.movementParameters));
+auto result14 = ActorMovementParameters::create(json_merge(std::move(*result13)->defaultMovementParameters(), m_npcVariant.movementParameters));
 if (!result14) return std::unexpected(std::move(result14.error()));
 auto movementParameters = std::move(*result14);
   if (!movementParameters.physicsEffectCategories)
@@ -270,7 +270,7 @@ m_effectEmitter = std::move(*result26);
   m_hitDamageNotificationLimiter = 0;
   auto result27 = assets->json("/npcs/npc.config:hitDamageNotificationLimit");
 if (!result27) return std::unexpected(std::move(result27.error()));
-auto result28 = std::move(*result27).toInt();
+auto result28 = std::move(*result27).to_int();
 if (!result28) return std::unexpected(std::move(result28.error()));
 m_hitDamageNotificationLimit = std::move(*result28);
 
@@ -314,14 +314,14 @@ if (!result35) return std::unexpected(std::move(result35.error()));
 
   auto result36 = diskStore.get("aimPosition");
 if (!result36) return std::unexpected(std::move(result36.error()));
-auto result37 = jsonToVec2F(std::move(*result36));
+auto result37 = json_to_vec2f(std::move(*result36));
 if (!result37) return std::unexpected(std::move(result37.error()));
 auto aimPosition = std::move(*result37);
   m_xAimPosition.set(aimPosition[0]);
   m_yAimPosition.set(aimPosition[1]);
   auto result38 = humanoid();
 if (!result38) return std::unexpected(std::move(result38.error()));
-auto result39 = diskStore.getString("humanoidState");
+auto result39 = diskStore.get_string("humanoidState");
 if (!result39) return std::unexpected(std::move(result39.error()));
 if (!Humanoid::StateNames) return std::unexpected(Humanoid::StateNames.error());
 auto result40 = Humanoid::StateNames->get_left(std::move(*result39));
@@ -331,7 +331,7 @@ if (!result41) return std::unexpected(std::move(result41.error()));
 
   auto result42 = humanoid();
 if (!result42) return std::unexpected(std::move(result42.error()));
-auto result43 = diskStore.getString("humanoidEmoteState");
+auto result43 = diskStore.get_string("humanoidEmoteState");
 if (!result43) return std::unexpected(std::move(result43.error()));
 if (!HumanoidEmoteNames) return std::unexpected(HumanoidEmoteNames.error());
 auto result44 = HumanoidEmoteNames->get_left(std::move(*result43));
@@ -339,13 +339,13 @@ if (!result44) return std::unexpected(std::move(result44.error()));
 auto result45 = std::move(*result42)->setEmoteState(result44->get());
 if (!result45) return std::unexpected(std::move(result45.error()));
 
-  auto result46 = diskStore.getBool("isInteractive");
+  auto result46 = diskStore.get_bool("isInteractive");
 if (!result46) return std::unexpected(std::move(result46.error()));
 m_isInteractive.set(std::move(*result46));
-  auto result47 = diskStore.getBool("shifting");
+  auto result47 = diskStore.get_bool("shifting");
 if (!result47) return std::unexpected(std::move(result47.error()));
 m_shifting.set(std::move(*result47));
-  auto result48 = diskStore.getBool("damageOnTouch", false);
+  auto result48 = diskStore.get_bool("damageOnTouch", false);
 if (!result48) return std::unexpected(std::move(result48.error()));
 m_damageOnTouch.set(std::move(*result48));
 
@@ -365,17 +365,17 @@ auto result54 = m_tools->diskLoad(std::move(*result53));
 if (!result54) return std::unexpected(std::move(result54.error()));
 
 
-  auto result55 = diskStore.getBool("disableWornArmor");
+  auto result55 = diskStore.get_bool("disableWornArmor");
 if (!result55) return std::unexpected(std::move(result55.error()));
 m_disableWornArmor.set(std::move(*result55));
 
-  auto result56 = diskStore.getObject("scriptStorage");
+  auto result56 = diskStore.get_object("scriptStorage");
 if (!result56) return std::unexpected(std::move(result56.error()));
 auto result57 = m_scriptComponent.setScriptStorage(std::move(*result56));
 if (!result57) return std::unexpected(std::move(result57.error()));
 
 
-  auto result58 = diskStore.optString("uniqueId");
+  auto result58 = diskStore.opt_string("uniqueId");
 if (!result58) return std::unexpected(std::move(result58.error()));
 setUniqueId(std::move(*result58));
   {
@@ -391,19 +391,19 @@ setUniqueId(std::move(*result58));
   }
 }
 
-  auto result62 = diskStore.optString("deathParticleBurst");
+  auto result62 = diskStore.opt_string("deathParticleBurst");
 if (!result62) return std::unexpected(std::move(result62.error()));
 m_deathParticleBurst.set(std::move(*result62));
 
-  auto result63 = diskStore.getArray("dropPools");
+  auto result63 = diskStore.get_array("dropPools");
 if (!result63) return std::unexpected(std::move(result63.error()));
-auto result64 = jsonToStringList(std::move(*result63));
+auto result64 = json_to_string_list(std::move(*result63));
 if (!result64) return std::unexpected(std::move(result64.error()));
 m_dropPools.set(std::move(*result64));
 
   m_blinkCooldownTimer = GameTimer();
 
-  auto result65 = diskStore.getBool("aggressive");
+  auto result65 = diskStore.get_bool("aggressive");
 if (!result65) return std::unexpected(std::move(result65.error()));
 m_aggressive.set(std::move(*result65));
   return {};
@@ -444,7 +444,7 @@ return JsonObject{
     {"statusController", std::move(*result69)},
     {"armor", std::move(*result70)},
     {"tools", std::move(*result71)},
-    {"aimPosition", jsonFromVec2F({m_xAimPosition.get(), m_yAimPosition.get()})},
+    {"aimPosition", json_from_vec2f({m_xAimPosition.get(), m_yAimPosition.get()})},
     {"humanoidState", result73->get()},
     {"humanoidEmoteState", result75->get()},
     {"isInteractive", m_isInteractive.get()},
@@ -778,7 +778,7 @@ std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Npc::writeNetS
   {
   bool condition166 = static_cast<bool>(m_npcVariant.overrides);
   if (condition166) {
-    auto result165 = m_npcVariant.overrides.getBool("overrideNetPoly", false);
+    auto result165 = m_npcVariant.overrides.get_bool("overrideNetPoly", false);
     if (!result165) return std::unexpected(std::move(result165.error()));
     condition166 = static_cast<bool>(std::move(*result165));
   }
@@ -1969,7 +1969,7 @@ if (!result419) return std::unexpected(std::move(result419.error()));
 
   auto result421 = callbacks.registerCallback("aimPosition", [this]() -> std::expected<Json, StarException> { auto result420 = aimPosition();
 if (!result420) return std::unexpected(std::move(result420.error()));
-return jsonFromVec2F(std::move(*result420)); });
+return json_from_vec2f(std::move(*result420)); });
 if (!result421) return std::unexpected(std::move(result421.error()));
 
   auto result423 = callbacks.registerCallback("setAimPosition", [this](Vec2F const& pos) -> std::expected<void, StarException> {
@@ -2287,21 +2287,21 @@ bool Npc::isInteractive() const {
 
 std::expected<InteractAction, StarException> Npc::interact(InteractRequest const& request) {
   auto result486 = recoverLuaScriptError(m_scriptComponent.invoke<Json>("interact",
-      JsonObject{{"sourceId", request.sourceId}, {"sourcePosition", jsonFromVec2F(request.sourcePosition)}}));
+      JsonObject{{"sourceId", request.sourceId}, {"sourcePosition", json_from_vec2f(request.sourcePosition)}}));
 if (!result486) return std::unexpected(std::move(result486.error()));
 auto result = std::move(*result486).value_or(Json{});
 
-  if (result.isNull())
+  if (result.is_null())
     return {};
 
-  if (result.isType(Json::Type::String))
+  if (result.is_type(Json::Type::String))
     {
-  auto result487 = result.toString();
+  auto result487 = result.to_string();
   if (!result487) return std::unexpected(std::move(result487.error()));
   return InteractAction::create(std::move(*result487), entityId(), Json());
 }
 
-  auto result488 = result.getString(0);
+  auto result488 = result.get_string(0);
 if (!result488) return std::unexpected(std::move(result488.error()));
 auto result489 = result.get(1);
 if (!result489) return std::unexpected(std::move(result489.error()));
@@ -2610,7 +2610,7 @@ std::expected<List<DamageSource>, StarException> Npc::damageSources() const {
 if (!result515) return std::unexpected(std::move(result515.error()));
 auto damageSources = std::move(*result515);
 
-  if (m_damageOnTouch.get() && !m_npcVariant.touchDamageConfig.isNull()) {
+  if (m_damageOnTouch.get() && !m_npcVariant.touchDamageConfig.is_null()) {
     Json config = m_npcVariant.touchDamageConfig;
     {
   auto result516 = config.contains("poly");
@@ -2622,7 +2622,7 @@ auto damageSources = std::move(*result515);
     condition518 = static_cast<bool>(!std::move(*result517));
   }
   if (condition518) {
-        auto result519 = config.set("poly", jsonFromPolyF(m_movementController->collisionPoly()));
+        auto result519 = config.set("poly", json_from_polyf(m_movementController->collisionPoly()));
   if (!result519) return std::unexpected(std::move(result519.error()));
   config = std::move(*result519);
       }
@@ -2918,7 +2918,7 @@ if (!result559) return std::unexpected(std::move(result559.error()));
 
   auto result560 = humanoid();
 if (!result560) return std::unexpected(std::move(result560.error()));
-auto result561 = ActorMovementParameters::create(jsonMerge(std::move(*result560)->defaultMovementParameters(), m_npcVariant.movementParameters));
+auto result561 = ActorMovementParameters::create(json_merge(std::move(*result560)->defaultMovementParameters(), m_npcVariant.movementParameters));
 if (!result561) return std::unexpected(std::move(result561.error()));
 auto result562 = m_movementController->resetBaseParameters(std::move(*result561));
 if (!result562) return std::unexpected(std::move(result562.error()));

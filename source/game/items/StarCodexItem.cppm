@@ -153,11 +153,11 @@ std::expected<std::shared_ptr<CodexItem>, StarException> CodexItem::create(Root&
   item->setWindupTime(0.2f);
   item->setCooldownTime(0.5f);
   item->m_requireEdgeTrigger = true;
-  auto codexId = item->instanceValue("codexId").and_then([](Json const& value) { return value.toString(); });
+  auto codexId = item->instanceValue("codexId").and_then([](Json const& value) { return value.to_string(); });
   if (!codexId)
     return std::unexpected(std::move(codexId.error()));
   item->m_codexId = std::move(*codexId);
-  auto iconPath = item->instanceValue("codexIcon").and_then([](Json const& value) { return value.toString(); });
+  auto iconPath = item->instanceValue("codexIcon").and_then([](Json const& value) { return value.to_string(); });
   if (!iconPath)
     return std::unexpected(std::move(iconPath.error()));
   auto metadata = root.imageMetadataDatabase();
@@ -194,13 +194,13 @@ std::expected<void, StarException> CodexItem::fireTriggered() {
     if (!assets)
       return std::unexpected(std::move(assets.error()));
     if (*codexLearned) {
-      auto message = (*assets)->json("/codex.config:messages.learned").and_then([](Json const& value) { return value.toString(); });
+      auto message = (*assets)->json("/codex.config:messages.learned").and_then([](Json const& value) { return value.to_string(); });
       if (!message)
         return std::unexpected(std::move(message.error()));
       return player->get().queueUIMessage(*message);
     }
     player->get().codexes()->markCodexUnread(m_codexId);
-    auto message = (*assets)->json("/codex.config:messages.alreadyKnown").and_then([](Json const& value) { return value.toString(); });
+    auto message = (*assets)->json("/codex.config:messages.alreadyKnown").and_then([](Json const& value) { return value.to_string(); });
     if (!message)
       return std::unexpected(std::move(message.error()));
     return player->get().queueUIMessage(*message);

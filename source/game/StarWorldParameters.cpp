@@ -65,24 +65,24 @@ extern std::expected<EnumMap<WorldEdgeForceRegionType>, StarException> const Wor
   {WorldEdgeForceRegionType::TopAndBottom, "TopAndBottom"}});
 
 std::expected<void, StarException> VisitableWorldParameters::load(Json const& store) {
-  auto typeNameValue1 = store.getString("typeName", "");
+  auto typeNameValue1 = store.get_string("typeName", "");
   if (!typeNameValue1) return std::unexpected(std::move(typeNameValue1.error()));
   typeName = std::move(*typeNameValue1);
-  auto threatLevelValue1 = store.getFloat("threatLevel");
+  auto threatLevelValue1 = store.get_float("threatLevel");
   if (!threatLevelValue1) return std::unexpected(std::move(threatLevelValue1.error()));
   threatLevel = std::move(*threatLevelValue1);
   auto worldSizeValue1 = store.get("worldSize");
   if (!worldSizeValue1) return std::unexpected(std::move(worldSizeValue1.error()));
-  auto worldSizeValue2 = jsonToVec2U((*worldSizeValue1));
+  auto worldSizeValue2 = json_to_vec2u((*worldSizeValue1));
   if (!worldSizeValue2) return std::unexpected(std::move(worldSizeValue2.error()));
   worldSize = std::move(*worldSizeValue2);
-  auto gravityValue1 = store.getFloat("gravity", 1.0f);
+  auto gravityValue1 = store.get_float("gravity", 1.0f);
   if (!gravityValue1) return std::unexpected(std::move(gravityValue1.error()));
   gravity = std::move(*gravityValue1);
-  auto airlessValue1 = store.getBool("airless", false);
+  auto airlessValue1 = store.get_bool("airless", false);
   if (!airlessValue1) return std::unexpected(std::move(airlessValue1.error()));
   airless = std::move(*airlessValue1);
-  auto weatherPoolValue1 = store.getArray("weatherPool", JsonArray());
+  auto weatherPoolValue1 = store.get_array("weatherPool", JsonArray());
   if (!weatherPoolValue1) return std::unexpected(std::move(weatherPoolValue1.error()));
   auto weatherPoolValue2 = json_to_weighted_pool<String>((*weatherPoolValue1));
   if (!weatherPoolValue2) return std::unexpected(std::move(weatherPoolValue2.error()));
@@ -90,7 +90,7 @@ std::expected<void, StarException> VisitableWorldParameters::load(Json const& st
   auto environmentStatusEffectsJson = store.opt("environmentStatusEffects");
   if (!environmentStatusEffectsJson) return std::unexpected(std::move(environmentStatusEffectsJson.error()));
   if (*environmentStatusEffectsJson) {
-    auto parsed = jsonToStringList(**environmentStatusEffectsJson);
+    auto parsed = json_to_string_list(**environmentStatusEffectsJson);
     if (!parsed) return std::unexpected(std::move(parsed.error()));
     environmentStatusEffects = std::move(*parsed);
   } else {
@@ -99,7 +99,7 @@ std::expected<void, StarException> VisitableWorldParameters::load(Json const& st
   auto overrideTechJson = store.opt("overrideTech");
   if (!overrideTechJson) return std::unexpected(std::move(overrideTechJson.error()));
   if (*overrideTechJson) {
-    auto parsed = jsonToStringList(**overrideTechJson);
+    auto parsed = json_to_string_list(**overrideTechJson);
     if (!parsed) return std::unexpected(std::move(parsed.error()));
     overrideTech = std::move(*parsed);
   } else {
@@ -108,25 +108,25 @@ std::expected<void, StarException> VisitableWorldParameters::load(Json const& st
   auto globalDirectivesJson = store.opt("globalDirectives");
   if (!globalDirectivesJson) return std::unexpected(std::move(globalDirectivesJson.error()));
   if (*globalDirectivesJson) {
-    auto parsed = jsonToDirectivesList(**globalDirectivesJson);
+    auto parsed = json_to_directives_list(**globalDirectivesJson);
     if (!parsed) return std::unexpected(std::move(parsed.error()));
     globalDirectives = std::move(*parsed);
   } else {
     globalDirectives = std::nullopt;
   }
-  auto beamUpRuleValue1 = store.getString("beamUpRule", "Surface");
+  auto beamUpRuleValue1 = store.get_string("beamUpRule", "Surface");
   if (!beamUpRuleValue1) return std::unexpected(std::move(beamUpRuleValue1.error()));
   if (!BeamUpRuleNames) return std::unexpected(BeamUpRuleNames.error());
   auto beamUpRuleValue2 = BeamUpRuleNames->get_left((*beamUpRuleValue1));
   if (!beamUpRuleValue2) return std::unexpected(std::move(beamUpRuleValue2.error()));
   beamUpRule = beamUpRuleValue2->get();
-  auto disableDeathDropsValue1 = store.getBool("disableDeathDrops", false);
+  auto disableDeathDropsValue1 = store.get_bool("disableDeathDrops", false);
   if (!disableDeathDropsValue1) return std::unexpected(std::move(disableDeathDropsValue1.error()));
   disableDeathDrops = std::move(*disableDeathDropsValue1);
-  auto terraformedValue1 = store.getBool("terraformed", false);
+  auto terraformedValue1 = store.get_bool("terraformed", false);
   if (!terraformedValue1) return std::unexpected(std::move(terraformedValue1.error()));
   terraformed = std::move(*terraformedValue1);
-  auto worldEdgeForceRegionsValue1 = store.getString("worldEdgeForceRegions", "None");
+  auto worldEdgeForceRegionsValue1 = store.get_string("worldEdgeForceRegions", "None");
   if (!worldEdgeForceRegionsValue1) return std::unexpected(std::move(worldEdgeForceRegionsValue1.error()));
   if (!WorldEdgeForceRegionTypeNames) return std::unexpected(WorldEdgeForceRegionTypeNames.error());
   auto worldEdgeForceRegionsValue2 = WorldEdgeForceRegionTypeNames->get_left((*worldEdgeForceRegionsValue1));
@@ -146,13 +146,13 @@ std::expected<Json, StarException> VisitableWorldParameters::store() const {
   if (!edge) return std::unexpected(std::move(edge.error()));
   return JsonObject{{"typeName", typeName},
       {"threatLevel", threatLevel},
-      {"worldSize", jsonFromVec2U(worldSize)},
+      {"worldSize", json_from_vec2u(worldSize)},
       {"gravity", gravity},
       {"airless", airless},
       {"weatherPool", std::move(*weather)},
-      {"environmentStatusEffects", jsonFromStringList(environmentStatusEffects)},
-      {"overrideTech", json_from_optional(overrideTech.transform(&jsonFromStringList))},
-      {"globalDirectives", json_from_optional(globalDirectives.transform(&jsonFromDirectivesList))},
+      {"environmentStatusEffects", json_from_string_list(environmentStatusEffects)},
+      {"overrideTech", json_from_optional(overrideTech.transform(&json_from_string_list))},
+      {"globalDirectives", json_from_optional(globalDirectives.transform(&json_from_directives_list))},
       {"beamUpRule", beam->get()},
       {"disableDeathDrops", disableDeathDrops},
       {"terraformed", terraformed},
@@ -284,43 +284,43 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> Terres
   if (!base) return std::unexpected(std::move(base.error()));
   auto loadTerrestrialRegion = [](Json const& config) -> std::expected<TerrestrialRegion, StarException> {
     TerrestrialRegion region;
-    auto biomeValue1 = config.getString("biome");
+    auto biomeValue1 = config.get_string("biome");
     if (!biomeValue1) return std::unexpected(std::move(biomeValue1.error()));
     region.biome = std::move(*biomeValue1);
-    auto blockSelectorValue1 = config.getString("blockSelector");
+    auto blockSelectorValue1 = config.get_string("blockSelector");
     if (!blockSelectorValue1) return std::unexpected(std::move(blockSelectorValue1.error()));
     region.blockSelector = std::move(*blockSelectorValue1);
-    auto fgCaveSelectorValue1 = config.getString("fgCaveSelector");
+    auto fgCaveSelectorValue1 = config.get_string("fgCaveSelector");
     if (!fgCaveSelectorValue1) return std::unexpected(std::move(fgCaveSelectorValue1.error()));
     region.fgCaveSelector = std::move(*fgCaveSelectorValue1);
-    auto bgCaveSelectorValue1 = config.getString("bgCaveSelector");
+    auto bgCaveSelectorValue1 = config.get_string("bgCaveSelector");
     if (!bgCaveSelectorValue1) return std::unexpected(std::move(bgCaveSelectorValue1.error()));
     region.bgCaveSelector = std::move(*bgCaveSelectorValue1);
-    auto fgOreSelectorValue1 = config.getString("fgOreSelector");
+    auto fgOreSelectorValue1 = config.get_string("fgOreSelector");
     if (!fgOreSelectorValue1) return std::unexpected(std::move(fgOreSelectorValue1.error()));
     region.fgOreSelector = std::move(*fgOreSelectorValue1);
-    auto bgOreSelectorValue1 = config.getString("bgOreSelector");
+    auto bgOreSelectorValue1 = config.get_string("bgOreSelector");
     if (!bgOreSelectorValue1) return std::unexpected(std::move(bgOreSelectorValue1.error()));
     region.bgOreSelector = std::move(*bgOreSelectorValue1);
-    auto subBlockSelectorValue1 = config.getString("subBlockSelector");
+    auto subBlockSelectorValue1 = config.get_string("subBlockSelector");
     if (!subBlockSelectorValue1) return std::unexpected(std::move(subBlockSelectorValue1.error()));
     region.subBlockSelector = std::move(*subBlockSelectorValue1);
-    auto caveLiquidValue1 = config.getUInt("caveLiquid");
+    auto caveLiquidValue1 = config.get_uint("caveLiquid");
     if (!caveLiquidValue1) return std::unexpected(std::move(caveLiquidValue1.error()));
     region.caveLiquid = static_cast<LiquidId>((*caveLiquidValue1));
-    auto caveLiquidSeedDensityValue1 = config.getFloat("caveLiquidSeedDensity");
+    auto caveLiquidSeedDensityValue1 = config.get_float("caveLiquidSeedDensity");
     if (!caveLiquidSeedDensityValue1) return std::unexpected(std::move(caveLiquidSeedDensityValue1.error()));
     region.caveLiquidSeedDensity = std::move(*caveLiquidSeedDensityValue1);
-    auto oceanLiquidValue1 = config.getUInt("oceanLiquid");
+    auto oceanLiquidValue1 = config.get_uint("oceanLiquid");
     if (!oceanLiquidValue1) return std::unexpected(std::move(oceanLiquidValue1.error()));
     region.oceanLiquid = static_cast<LiquidId>((*oceanLiquidValue1));
-    auto oceanLiquidLevelValue1 = config.getInt("oceanLiquidLevel");
+    auto oceanLiquidLevelValue1 = config.get_int("oceanLiquidLevel");
     if (!oceanLiquidLevelValue1) return std::unexpected(std::move(oceanLiquidLevelValue1.error()));
     region.oceanLiquidLevel = static_cast<int>((*oceanLiquidLevelValue1));
-    auto encloseLiquidsValue1 = config.getBool("encloseLiquids");
+    auto encloseLiquidsValue1 = config.get_bool("encloseLiquids");
     if (!encloseLiquidsValue1) return std::unexpected(std::move(encloseLiquidsValue1.error()));
     region.encloseLiquids = std::move(*encloseLiquidsValue1);
-    auto fillMicrodungeonsValue1 = config.getBool("fillMicrodungeons");
+    auto fillMicrodungeonsValue1 = config.get_bool("fillMicrodungeons");
     if (!fillMicrodungeonsValue1) return std::unexpected(std::move(fillMicrodungeonsValue1.error()));
     region.fillMicrodungeons = std::move(*fillMicrodungeonsValue1);
     return region;
@@ -328,18 +328,18 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> Terres
 
   auto loadTerrestrialLayer = [loadTerrestrialRegion](Json const& config) -> std::expected<TerrestrialLayer, StarException> {
     TerrestrialLayer layer;
-    auto layerMinHeightValue1 = config.getInt("layerMinHeight");
+    auto layerMinHeightValue1 = config.get_int("layerMinHeight");
     if (!layerMinHeightValue1) return std::unexpected(std::move(layerMinHeightValue1.error()));
     layer.layerMinHeight = static_cast<int>((*layerMinHeightValue1));
-    auto layerBaseHeightValue1 = config.getInt("layerBaseHeight");
+    auto layerBaseHeightValue1 = config.get_int("layerBaseHeight");
     if (!layerBaseHeightValue1) return std::unexpected(std::move(layerBaseHeightValue1.error()));
     layer.layerBaseHeight = static_cast<int>((*layerBaseHeightValue1));
     auto dungeonsValue1 = config.get("dungeons");
     if (!dungeonsValue1) return std::unexpected(std::move(dungeonsValue1.error()));
-    auto dungeonsValue2 = jsonToStringList((*dungeonsValue1));
+    auto dungeonsValue2 = json_to_string_list((*dungeonsValue1));
     if (!dungeonsValue2) return std::unexpected(std::move(dungeonsValue2.error()));
     layer.dungeons = std::move(*dungeonsValue2);
-    auto dungeonXVarianceValue1 = config.getInt("dungeonXVariance");
+    auto dungeonXVarianceValue1 = config.get_int("dungeonXVariance");
     if (!dungeonXVarianceValue1) return std::unexpected(std::move(dungeonXVarianceValue1.error()));
     layer.dungeonXVariance = static_cast<int>((*dungeonXVarianceValue1));
     auto primaryRegionValue1 = config.get("primaryRegion");
@@ -352,14 +352,14 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> Terres
     auto primarySubRegionValue2 = loadTerrestrialRegion((*primarySubRegionValue1));
     if (!primarySubRegionValue2) return std::unexpected(std::move(primarySubRegionValue2.error()));
     layer.primarySubRegion = std::move(*primarySubRegionValue2);
-    auto secondaryRegions = config.getArray("secondaryRegions");
+    auto secondaryRegions = config.get_array("secondaryRegions");
     if (!secondaryRegions) return std::unexpected(std::move(secondaryRegions.error()));
     for (auto const& entry : *secondaryRegions) {
       auto region = loadTerrestrialRegion(entry);
       if (!region) return std::unexpected(std::move(region.error()));
       layer.secondaryRegions.push_back(std::move(*region));
     }
-    auto secondarySubRegions = config.getArray("secondarySubRegions");
+    auto secondarySubRegions = config.get_array("secondarySubRegions");
     if (!secondarySubRegions) return std::unexpected(std::move(secondarySubRegions.error()));
     for (auto const& entry : *secondarySubRegions) {
       auto region = loadTerrestrialRegion(entry);
@@ -368,27 +368,27 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> Terres
     }
     auto secondaryRegionSizeRangeValue1 = config.get("secondaryRegionSizeRange");
     if (!secondaryRegionSizeRangeValue1) return std::unexpected(std::move(secondaryRegionSizeRangeValue1.error()));
-    auto secondaryRegionSizeRangeValue2 = jsonToVec2F((*secondaryRegionSizeRangeValue1));
+    auto secondaryRegionSizeRangeValue2 = json_to_vec2f((*secondaryRegionSizeRangeValue1));
     if (!secondaryRegionSizeRangeValue2) return std::unexpected(std::move(secondaryRegionSizeRangeValue2.error()));
     layer.secondaryRegionSizeRange = std::move(*secondaryRegionSizeRangeValue2);
     auto subRegionSizeRangeValue1 = config.get("subRegionSizeRange");
     if (!subRegionSizeRangeValue1) return std::unexpected(std::move(subRegionSizeRangeValue1.error()));
-    auto subRegionSizeRangeValue2 = jsonToVec2F((*subRegionSizeRangeValue1));
+    auto subRegionSizeRangeValue2 = json_to_vec2f((*subRegionSizeRangeValue1));
     if (!subRegionSizeRangeValue2) return std::unexpected(std::move(subRegionSizeRangeValue2.error()));
     layer.subRegionSizeRange = std::move(*subRegionSizeRangeValue2);
     return layer;
   };
 
-  auto primaryBiomeValue1 = store.getString("primaryBiome");
+  auto primaryBiomeValue1 = store.get_string("primaryBiome");
   if (!primaryBiomeValue1) return std::unexpected(std::move(primaryBiomeValue1.error()));
   result->primaryBiome = std::move(*primaryBiomeValue1);
-  auto primarySurfaceLiquidValue1 = store.getUInt("surfaceLiquid");
+  auto primarySurfaceLiquidValue1 = store.get_uint("surfaceLiquid");
   if (!primarySurfaceLiquidValue1) return std::unexpected(std::move(primarySurfaceLiquidValue1.error()));
   result->primarySurfaceLiquid = std::move(*primarySurfaceLiquidValue1);
-  auto sizeNameValue1 = store.getString("sizeName");
+  auto sizeNameValue1 = store.get_string("sizeName");
   if (!sizeNameValue1) return std::unexpected(std::move(sizeNameValue1.error()));
   result->sizeName = std::move(*sizeNameValue1);
-  auto hueShiftValue1 = store.getFloat("hueShift");
+  auto hueShiftValue1 = store.get_float("hueShift");
   if (!hueShiftValue1) return std::unexpected(std::move(hueShiftValue1.error()));
   result->hueShift = std::move(*hueShiftValue1);
   auto skyColoringValue1 = store.get("skyColoring");
@@ -396,7 +396,7 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> Terres
   auto skyColoringValue2 = SkyColoring::create((*skyColoringValue1));
   if (!skyColoringValue2) return std::unexpected(std::move(skyColoringValue2.error()));
   result->skyColoring = std::move(*skyColoringValue2);
-  auto dayLengthValue1 = store.getFloat("dayLength");
+  auto dayLengthValue1 = store.get_float("dayLength");
   if (!dayLengthValue1) return std::unexpected(std::move(dayLengthValue1.error()));
   result->dayLength = std::move(*dayLengthValue1);
   auto blockNoiseConfigValue1 = store.get("blockNoise");
@@ -405,7 +405,7 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> Terres
   auto blendNoiseConfigValue1 = store.get("blendNoise");
   if (!blendNoiseConfigValue1) return std::unexpected(std::move(blendNoiseConfigValue1.error()));
   result->blendNoiseConfig = std::move(*blendNoiseConfigValue1);
-  auto blendSizeValue1 = store.getFloat("blendSize");
+  auto blendSizeValue1 = store.get_float("blendSize");
   if (!blendSizeValue1) return std::unexpected(std::move(blendSizeValue1.error()));
   result->blendSize = std::move(*blendSizeValue1);
   auto spaceLayerValue1 = store.get("spaceLayer");
@@ -428,7 +428,7 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> Terres
   auto subsurfaceLayerValue2 = loadTerrestrialLayer((*subsurfaceLayerValue1));
   if (!subsurfaceLayerValue2) return std::unexpected(std::move(subsurfaceLayerValue2.error()));
   result->subsurfaceLayer = std::move(*subsurfaceLayerValue2);
-  auto layers = store.getArray("undergroundLayers");
+  auto layers = store.get_array("undergroundLayers");
   if (!layers) return std::unexpected(std::move(layers.error()));
   for (auto const& entry : *layers) {
     auto layer = loadTerrestrialLayer(entry);
@@ -488,14 +488,14 @@ std::expected<Json, StarException> TerrestrialWorldParameters::store() const {
   auto storeTerrestrialLayer = [storeTerrestrialRegion](TerrestrialLayer const& layer) -> Json {
     return JsonObject{{"layerMinHeight", layer.layerMinHeight},
         {"layerBaseHeight", layer.layerBaseHeight},
-        {"dungeons", jsonFromStringList(layer.dungeons)},
+        {"dungeons", json_from_string_list(layer.dungeons)},
         {"dungeonXVariance", layer.dungeonXVariance},
         {"primaryRegion", storeTerrestrialRegion(layer.primaryRegion)},
         {"primarySubRegion", storeTerrestrialRegion(layer.primarySubRegion)},
         {"secondaryRegions", layer.secondaryRegions.transformed(storeTerrestrialRegion)},
         {"secondarySubRegions", layer.secondarySubRegions.transformed(storeTerrestrialRegion)},
-        {"secondaryRegionSizeRange", jsonFromVec2F(layer.secondaryRegionSizeRange)},
-        {"subRegionSizeRange", jsonFromVec2F(layer.subRegionSizeRange)}};
+        {"secondaryRegionSizeRange", json_from_vec2f(layer.secondaryRegionSizeRange)},
+        {"subRegionSizeRange", json_from_vec2f(layer.subRegionSizeRange)}};
   };
 
   auto base = VisitableWorldParameters::store();
@@ -873,21 +873,21 @@ std::expected<std::shared_ptr<AsteroidsWorldParameters>, StarException> Asteroid
   auto result = std::make_shared<AsteroidsWorldParameters>();
   auto base = result->load(store);
   if (!base) return std::unexpected(std::move(base.error()));
-  auto asteroidTopLevelValue1 = store.getInt("asteroidTopLevel");
+  auto asteroidTopLevelValue1 = store.get_int("asteroidTopLevel");
   if (!asteroidTopLevelValue1) return std::unexpected(std::move(asteroidTopLevelValue1.error()));
   result->asteroidTopLevel = static_cast<int>((*asteroidTopLevelValue1));
-  auto asteroidBottomLevelValue1 = store.getInt("asteroidBottomLevel");
+  auto asteroidBottomLevelValue1 = store.get_int("asteroidBottomLevel");
   if (!asteroidBottomLevelValue1) return std::unexpected(std::move(asteroidBottomLevelValue1.error()));
   result->asteroidBottomLevel = static_cast<int>((*asteroidBottomLevelValue1));
-  auto blendSizeValue1 = store.getFloat("blendSize");
+  auto blendSizeValue1 = store.get_float("blendSize");
   if (!blendSizeValue1) return std::unexpected(std::move(blendSizeValue1.error()));
   result->blendSize = (*blendSizeValue1);
-  auto asteroidBiomeValue1 = store.getString("asteroidBiome");
+  auto asteroidBiomeValue1 = store.get_string("asteroidBiome");
   if (!asteroidBiomeValue1) return std::unexpected(std::move(asteroidBiomeValue1.error()));
   result->asteroidBiome = (*asteroidBiomeValue1);
   auto ambientLightLevelValue1 = store.get("ambientLightLevel");
   if (!ambientLightLevelValue1) return std::unexpected(std::move(ambientLightLevelValue1.error()));
-  auto ambientLightLevelValue2 = jsonToColor((*ambientLightLevelValue1));
+  auto ambientLightLevelValue2 = json_to_color((*ambientLightLevelValue1));
   if (!ambientLightLevelValue2) return std::unexpected(std::move(ambientLightLevelValue2.error()));
   result->ambientLightLevel = (*ambientLightLevelValue2);
   return result;
@@ -904,7 +904,7 @@ std::expected<Json, StarException> AsteroidsWorldParameters::store() const {
                                   {"asteroidBottomLevel", asteroidBottomLevel},
                                   {"blendSize", blendSize},
                                   {"asteroidBiome", asteroidBiome},
-                                  {"ambientLightLevel", jsonFromColor(ambientLightLevel)}});
+                                  {"ambientLightLevel", json_from_color(ambientLightLevel)}});
 }
 
 std::expected<void, StarException> AsteroidsWorldParameters::read(DataStream& ds) {
@@ -973,36 +973,36 @@ std::expected<std::shared_ptr<FloatingDungeonWorldParameters>, StarException> Fl
   auto result = std::make_shared<FloatingDungeonWorldParameters>();
   auto base = result->load(store);
   if (!base) return std::unexpected(std::move(base.error()));
-  auto dungeonBaseHeightValue1 = store.getInt("dungeonBaseHeight");
+  auto dungeonBaseHeightValue1 = store.get_int("dungeonBaseHeight");
   if (!dungeonBaseHeightValue1) return std::unexpected(std::move(dungeonBaseHeightValue1.error()));
   result->dungeonBaseHeight = static_cast<int>((*dungeonBaseHeightValue1));
-  auto dungeonSurfaceHeightValue1 = store.getInt("dungeonSurfaceHeight");
+  auto dungeonSurfaceHeightValue1 = store.get_int("dungeonSurfaceHeight");
   if (!dungeonSurfaceHeightValue1) return std::unexpected(std::move(dungeonSurfaceHeightValue1.error()));
   result->dungeonSurfaceHeight = static_cast<int>((*dungeonSurfaceHeightValue1));
-  auto dungeonUndergroundLevelValue1 = store.getInt("dungeonUndergroundLevel");
+  auto dungeonUndergroundLevelValue1 = store.get_int("dungeonUndergroundLevel");
   if (!dungeonUndergroundLevelValue1) return std::unexpected(std::move(dungeonUndergroundLevelValue1.error()));
   result->dungeonUndergroundLevel = static_cast<int>((*dungeonUndergroundLevelValue1));
-  auto primaryDungeonValue1 = store.getString("primaryDungeon");
+  auto primaryDungeonValue1 = store.get_string("primaryDungeon");
   if (!primaryDungeonValue1) return std::unexpected(std::move(primaryDungeonValue1.error()));
   result->primaryDungeon = (*primaryDungeonValue1);
-  auto biomeValue1 = store.optString("biome");
+  auto biomeValue1 = store.opt_string("biome");
   if (!biomeValue1) return std::unexpected(std::move(biomeValue1.error()));
   result->biome = (*biomeValue1);
   auto ambientLightLevelValue1 = store.get("ambientLightLevel");
   if (!ambientLightLevelValue1) return std::unexpected(std::move(ambientLightLevelValue1.error()));
-  auto ambientLightLevelValue2 = jsonToColor((*ambientLightLevelValue1));
+  auto ambientLightLevelValue2 = json_to_color((*ambientLightLevelValue1));
   if (!ambientLightLevelValue2) return std::unexpected(std::move(ambientLightLevelValue2.error()));
   result->ambientLightLevel = (*ambientLightLevelValue2);
-  auto dayMusicTrackValue1 = store.optString("dayMusicTrack");
+  auto dayMusicTrackValue1 = store.opt_string("dayMusicTrack");
   if (!dayMusicTrackValue1) return std::unexpected(std::move(dayMusicTrackValue1.error()));
   result->dayMusicTrack = (*dayMusicTrackValue1);
-  auto nightMusicTrackValue1 = store.optString("nightMusicTrack");
+  auto nightMusicTrackValue1 = store.opt_string("nightMusicTrack");
   if (!nightMusicTrackValue1) return std::unexpected(std::move(nightMusicTrackValue1.error()));
   result->nightMusicTrack = (*nightMusicTrackValue1);
-  auto dayAmbientNoisesValue1 = store.optString("dayAmbientNoises");
+  auto dayAmbientNoisesValue1 = store.opt_string("dayAmbientNoises");
   if (!dayAmbientNoisesValue1) return std::unexpected(std::move(dayAmbientNoisesValue1.error()));
   result->dayAmbientNoises = (*dayAmbientNoisesValue1);
-  auto nightAmbientNoisesValue1 = store.optString("nightAmbientNoises");
+  auto nightAmbientNoisesValue1 = store.opt_string("nightAmbientNoises");
   if (!nightAmbientNoisesValue1) return std::unexpected(std::move(nightAmbientNoisesValue1.error()));
   result->nightAmbientNoises = (*nightAmbientNoisesValue1);
   return result;
@@ -1020,7 +1020,7 @@ std::expected<Json, StarException> FloatingDungeonWorldParameters::store() const
                                   {"dungeonUndergroundLevel", dungeonUndergroundLevel},
                                   {"primaryDungeon", primaryDungeon},
                                   {"biome", json_from_optional(biome)},
-                                  {"ambientLightLevel", jsonFromColor(ambientLightLevel)},
+                                  {"ambientLightLevel", json_from_color(ambientLightLevel)},
                                   {"dayMusicTrack", json_from_optional(dayMusicTrack)},
                                   {"nightMusicTrack", json_from_optional(nightMusicTrack)},
                                   {"dayAmbientNoises", json_from_optional(dayAmbientNoises)},
@@ -1142,10 +1142,10 @@ std::expected<Json, StarException> diskStoreVisitableWorldParameters(std::shared
 }
 
 std::expected<std::shared_ptr<VisitableWorldParameters>, StarException> diskLoadVisitableWorldParameters(Json const& store) {
-  if (store.isNull())
+  if (store.is_null())
     return {};
 
-  auto typeName = store.getString("type");
+  auto typeName = store.get_string("type");
   if (!typeName) return std::unexpected(std::move(typeName.error()));
   if (!WorldParametersTypeNames) return std::unexpected(WorldParametersTypeNames.error());
   auto parsedType = WorldParametersTypeNames->get_left(*typeName);
@@ -1229,20 +1229,20 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
   auto autotypeConfigResult2 = (*autotypeConfigResult1).get(typeName);
   if (!autotypeConfigResult2) return std::unexpected(std::move(autotypeConfigResult2.error()));
   auto typeConfig = std::move((*autotypeConfigResult2));
-  auto config = jsonMerge(baseConfig, sizeConfig, typeConfig);
+  auto config = json_merge(baseConfig, sizeConfig, typeConfig);
   auto autogravityRangeResult1 = config.get("gravityRange");
   if (!autogravityRangeResult1) return std::unexpected(std::move(autogravityRangeResult1.error()));
-  auto autogravityRangeResult2 = jsonToVec2F((*autogravityRangeResult1));
+  auto autogravityRangeResult2 = json_to_vec2f((*autogravityRangeResult1));
   if (!autogravityRangeResult2) return std::unexpected(std::move(autogravityRangeResult2.error()));
   auto gravityRange = std::move((*autogravityRangeResult2));
   auto autodayLengthRangeResult1 = config.get("dayLengthRange");
   if (!autodayLengthRangeResult1) return std::unexpected(std::move(autodayLengthRangeResult1.error()));
-  auto autodayLengthRangeResult2 = jsonToVec2F((*autodayLengthRangeResult1));
+  auto autodayLengthRangeResult2 = json_to_vec2f((*autodayLengthRangeResult1));
   if (!autodayLengthRangeResult2) return std::unexpected(std::move(autodayLengthRangeResult2.error()));
   auto dayLengthRange = std::move((*autodayLengthRangeResult2));
   auto autothreatLevelRangeResult1 = config.query("threatRange");
   if (!autothreatLevelRangeResult1) return std::unexpected(std::move(autothreatLevelRangeResult1.error()));
-  auto autothreatLevelRangeResult2 = jsonToVec2F((*autothreatLevelRangeResult1));
+  auto autothreatLevelRangeResult2 = json_to_vec2f((*autothreatLevelRangeResult1));
   if (!autothreatLevelRangeResult2) return std::unexpected(std::move(autothreatLevelRangeResult2.error()));
   auto threatLevelRange = std::move((*autothreatLevelRangeResult2));
   auto threatLevel = std::move(static_cast<float>(
@@ -1256,94 +1256,94 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
     TerrestrialWorldParameters::TerrestrialRegion region;
     auto autobiomeChoicesResult1 = regionConfig.get("biome");
     if (!autobiomeChoicesResult1) return std::unexpected(std::move(autobiomeChoicesResult1.error()));
-    auto autobiomeChoicesResult2 = binnedChoiceFromJson((*autobiomeChoicesResult1), threatLevel);
+    auto autobiomeChoicesResult2 = binned_choice_from_json((*autobiomeChoicesResult1), threatLevel);
     if (!autobiomeChoicesResult2) return std::unexpected(std::move(autobiomeChoicesResult2.error()));
-    auto autobiomeChoicesResult3 = jsonToStringList((*autobiomeChoicesResult2));
+    auto autobiomeChoicesResult3 = json_to_string_list((*autobiomeChoicesResult2));
     if (!autobiomeChoicesResult3) return std::unexpected(std::move(autobiomeChoicesResult3.error()));
     auto biomeChoices = std::move((*autobiomeChoicesResult3));
     auto selected_biome = static_random_value_from(biomeChoices, seed, layerNameSeed);
     if (!selected_biome)
       return std::unexpected(std::move(selected_biome.error()));
     region.biome = std::move(*selected_biome);
-    auto block_selector_choices = regionConfig.getArray("blockSelector");
+    auto block_selector_choices = regionConfig.get_array("blockSelector");
     if (!block_selector_choices)
       return std::unexpected(std::move(block_selector_choices.error()));
     auto block_selector_choice = static_random_from((*block_selector_choices), seed, "blockSelector", layerNameSeed);
     if (!block_selector_choice)
       return std::unexpected(std::move(block_selector_choice.error()));
-    auto block_selector_name = block_selector_choice->get().toString();
+    auto block_selector_name = block_selector_choice->get().to_string();
     if (!block_selector_name)
       return std::unexpected(std::move(block_selector_name.error()));
     region.blockSelector = std::move((*block_selector_name));
-    auto foreground_cave_selector_choices = regionConfig.getArray("fgCaveSelector");
+    auto foreground_cave_selector_choices = regionConfig.get_array("fgCaveSelector");
     if (!foreground_cave_selector_choices)
       return std::unexpected(std::move(foreground_cave_selector_choices.error()));
     auto foreground_cave_selector_choice =
       static_random_from((*foreground_cave_selector_choices), seed, "fgCaveSelector", layerNameSeed);
     if (!foreground_cave_selector_choice)
       return std::unexpected(std::move(foreground_cave_selector_choice.error()));
-    auto foreground_cave_selector_name = foreground_cave_selector_choice->get().toString();
+    auto foreground_cave_selector_name = foreground_cave_selector_choice->get().to_string();
     if (!foreground_cave_selector_name)
       return std::unexpected(std::move(foreground_cave_selector_name.error()));
     region.fgCaveSelector = std::move((*foreground_cave_selector_name));
-    auto background_cave_selector_choices = regionConfig.getArray("bgCaveSelector");
+    auto background_cave_selector_choices = regionConfig.get_array("bgCaveSelector");
     if (!background_cave_selector_choices)
       return std::unexpected(std::move(background_cave_selector_choices.error()));
     auto background_cave_selector_choice =
       static_random_from((*background_cave_selector_choices), seed, "bgCaveSelector", layerNameSeed);
     if (!background_cave_selector_choice)
       return std::unexpected(std::move(background_cave_selector_choice.error()));
-    auto background_cave_selector_name = background_cave_selector_choice->get().toString();
+    auto background_cave_selector_name = background_cave_selector_choice->get().to_string();
     if (!background_cave_selector_name)
       return std::unexpected(std::move(background_cave_selector_name.error()));
     region.bgCaveSelector = std::move((*background_cave_selector_name));
-    auto foreground_ore_selector_choices = regionConfig.getArray("fgOreSelector");
+    auto foreground_ore_selector_choices = regionConfig.get_array("fgOreSelector");
     if (!foreground_ore_selector_choices)
       return std::unexpected(std::move(foreground_ore_selector_choices.error()));
     auto foreground_ore_selector_choice =
       static_random_from((*foreground_ore_selector_choices), seed, "fgOreSelector", layerNameSeed);
     if (!foreground_ore_selector_choice)
       return std::unexpected(std::move(foreground_ore_selector_choice.error()));
-    auto foreground_ore_selector_name = foreground_ore_selector_choice->get().toString();
+    auto foreground_ore_selector_name = foreground_ore_selector_choice->get().to_string();
     if (!foreground_ore_selector_name)
       return std::unexpected(std::move(foreground_ore_selector_name.error()));
     region.fgOreSelector = std::move((*foreground_ore_selector_name));
-    auto background_ore_selector_choices = regionConfig.getArray("bgOreSelector");
+    auto background_ore_selector_choices = regionConfig.get_array("bgOreSelector");
     if (!background_ore_selector_choices)
       return std::unexpected(std::move(background_ore_selector_choices.error()));
     auto background_ore_selector_choice =
       static_random_from((*background_ore_selector_choices), seed, "bgOreSelector", layerNameSeed);
     if (!background_ore_selector_choice)
       return std::unexpected(std::move(background_ore_selector_choice.error()));
-    auto background_ore_selector_name = background_ore_selector_choice->get().toString();
+    auto background_ore_selector_name = background_ore_selector_choice->get().to_string();
     if (!background_ore_selector_name)
       return std::unexpected(std::move(background_ore_selector_name.error()));
     region.bgOreSelector = std::move((*background_ore_selector_name));
-    auto sub_block_selector_choices = regionConfig.getArray("subBlockSelector");
+    auto sub_block_selector_choices = regionConfig.get_array("subBlockSelector");
     if (!sub_block_selector_choices)
       return std::unexpected(std::move(sub_block_selector_choices.error()));
     auto sub_block_selector_choice =
       static_random_from((*sub_block_selector_choices), seed, "subBlockSelector", layerNameSeed);
     if (!sub_block_selector_choice)
       return std::unexpected(std::move(sub_block_selector_choice.error()));
-    auto sub_block_selector_name = sub_block_selector_choice->get().toString();
+    auto sub_block_selector_name = sub_block_selector_choice->get().to_string();
     if (!sub_block_selector_name)
       return std::unexpected(std::move(sub_block_selector_name.error()));
     region.subBlockSelector = std::move((*sub_block_selector_name));
-    auto cave_liquid_choices = regionConfig.getArray("caveLiquid", {});
+    auto cave_liquid_choices = regionConfig.get_array("caveLiquid", {});
     if (!cave_liquid_choices)
       return std::unexpected(std::move(cave_liquid_choices.error()));
     auto selected_cave_liquid = static_random_value_from((*cave_liquid_choices), seed, "caveLiquid");
     if (!selected_cave_liquid)
       return std::unexpected(std::move(selected_cave_liquid.error()));
-    auto cave_liquid_name = selected_cave_liquid->optString();
+    auto cave_liquid_name = selected_cave_liquid->opt_string();
     if (!cave_liquid_name)
       return std::unexpected(std::move(cave_liquid_name.error()));
     auto caveLiquid = std::move((*cave_liquid_name));
     if (caveLiquid) {
       auto autocaveLiquidSeedDensityRangeResult1 = regionConfig.get("caveLiquidSeedDensityRange");
       if (!autocaveLiquidSeedDensityRangeResult1) return std::unexpected(std::move(autocaveLiquidSeedDensityRangeResult1.error()));
-      auto autocaveLiquidSeedDensityRangeResult2 = jsonToVec2F((*autocaveLiquidSeedDensityRangeResult1));
+      auto autocaveLiquidSeedDensityRangeResult2 = json_to_vec2f((*autocaveLiquidSeedDensityRangeResult1));
       if (!autocaveLiquidSeedDensityRangeResult2) return std::unexpected(std::move(autocaveLiquidSeedDensityRangeResult2.error()));
       auto caveLiquidSeedDensityRange = std::move((*autocaveLiquidSeedDensityRangeResult2));
       auto regioncaveLiquidResult1 = liquidsDatabase->liquidId(*caveLiquid);
@@ -1358,13 +1358,13 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
       region.caveLiquid = EmptyLiquidId;
       region.caveLiquidSeedDensity = 0.0f;
     }
-    auto ocean_liquid_choices = regionConfig.getArray("oceanLiquid", {});
+    auto ocean_liquid_choices = regionConfig.get_array("oceanLiquid", {});
     if (!ocean_liquid_choices)
       return std::unexpected(std::move(ocean_liquid_choices.error()));
     auto selected_ocean_liquid = static_random_value_from((*ocean_liquid_choices), seed, "oceanLiquid", layerNameSeed);
     if (!selected_ocean_liquid)
       return std::unexpected(std::move(selected_ocean_liquid.error()));
-    auto ocean_liquid_name = selected_ocean_liquid->optString();
+    auto ocean_liquid_name = selected_ocean_liquid->opt_string();
     if (!ocean_liquid_name)
       return std::unexpected(std::move(ocean_liquid_name.error()));
     auto oceanLiquid = std::move((*ocean_liquid_name));
@@ -1372,17 +1372,17 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
       auto regionoceanLiquidResult1 = liquidsDatabase->liquidId(*oceanLiquid);
       if (!regionoceanLiquidResult1) return std::unexpected(std::move(regionoceanLiquidResult1.error()));
       region.oceanLiquid = std::move((*regionoceanLiquidResult1));
-      auto regionoceanLiquidLevelResult1 = regionConfig.getInt("oceanLevelOffset", 0);
+      auto regionoceanLiquidLevelResult1 = regionConfig.get_int("oceanLevelOffset", 0);
       if (!regionoceanLiquidLevelResult1) return std::unexpected(std::move(regionoceanLiquidLevelResult1.error()));
       region.oceanLiquidLevel = std::move(static_cast<int>((*regionoceanLiquidLevelResult1) + layerBaseHeight));
     } else {
       region.oceanLiquid = EmptyLiquidId;
       region.oceanLiquidLevel = 0;
     }
-    auto regionencloseLiquidsResult1 = regionConfig.getBool("encloseLiquids", false);
+    auto regionencloseLiquidsResult1 = regionConfig.get_bool("encloseLiquids", false);
     if (!regionencloseLiquidsResult1) return std::unexpected(std::move(regionencloseLiquidsResult1.error()));
     region.encloseLiquids = std::move((*regionencloseLiquidsResult1));
-    auto regionfillMicrodungeonsResult1 = regionConfig.getBool("fillMicrodungeons", false);
+    auto regionfillMicrodungeonsResult1 = regionConfig.get_bool("fillMicrodungeons", false);
     if (!regionfillMicrodungeonsResult1) return std::unexpected(std::move(regionfillMicrodungeonsResult1.error()));
     region.fillMicrodungeons = std::move((*regionfillMicrodungeonsResult1));
     return region;
@@ -1401,20 +1401,20 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
     if (!autolayerConfigResult2) return std::unexpected(std::move(autolayerConfigResult2.error()));
     auto autolayerConfigResult3 = (*autolayerConfigResult2).get(layerName);
     if (!autolayerConfigResult3) return std::unexpected(std::move(autolayerConfigResult3.error()));
-    auto layerConfig = jsonMerge((*autolayerConfigResult1), (*autolayerConfigResult3));
+    auto layerConfig = json_merge((*autolayerConfigResult1), (*autolayerConfigResult3));
     if (!layerConfig) return {};
-    auto autoenabledResult1 = layerConfig.getBool("enabled");
+    auto autoenabledResult1 = layerConfig.get_bool("enabled");
     if (!autoenabledResult1) return std::unexpected(std::move(autoenabledResult1.error()));
     auto enabled = std::move((*autoenabledResult1));
     if (!enabled) return {};
     TerrestrialWorldParameters::TerrestrialLayer layer;
-    auto layerlayerMinHeightResult1 = layerConfig.getFloat("layerLevel");
+    auto layerlayerMinHeightResult1 = layerConfig.get_float("layerLevel");
     if (!layerlayerMinHeightResult1) return std::unexpected(std::move(layerlayerMinHeightResult1.error()));
     layer.layerMinHeight = std::move(static_cast<int>((*layerlayerMinHeightResult1)));
-    auto layerlayerBaseHeightResult1 = layerConfig.getFloat("baseHeight");
+    auto layerlayerBaseHeightResult1 = layerConfig.get_float("baseHeight");
     if (!layerlayerBaseHeightResult1) return std::unexpected(std::move(layerlayerBaseHeightResult1.error()));
     layer.layerBaseHeight = std::move(static_cast<int>((*layerlayerBaseHeightResult1)));
-    auto autoprimaryRegionListResult1 = layerConfig.getArray("primaryRegion");
+    auto autoprimaryRegionListResult1 = layerConfig.get_array("primaryRegion");
     if (!autoprimaryRegionListResult1) return std::unexpected(std::move(autoprimaryRegionListResult1.error()));
     auto primaryRegionList = std::move((*autoprimaryRegionListResult1));
     auto layerNameSeed = std::string_view(layerName.utf8());
@@ -1423,18 +1423,18 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
     auto primary_region_name = static_random_from(primaryRegionList, seed, layerNameSeed, "PrimaryRegionSelection");
     if (!primary_region_name)
       return std::unexpected(std::move(primary_region_name.error()));
-    auto primary_region_configuration_name = primary_region_name->get().toString();
+    auto primary_region_configuration_name = primary_region_name->get().to_string();
     if (!primary_region_configuration_name)
       return std::unexpected(std::move(primary_region_configuration_name.error()));
     auto primaryRegionConfigName = std::move((*primary_region_configuration_name));
     auto JsonprimaryRegionConfigResult1 = regionTypes.get(primaryRegionConfigName);
     if (!JsonprimaryRegionConfigResult1) return std::unexpected(std::move(JsonprimaryRegionConfigResult1.error()));
-    Json primaryRegionConfig = jsonMerge(regionDefaults, (*JsonprimaryRegionConfigResult1));
+    Json primaryRegionConfig = json_merge(regionDefaults, (*JsonprimaryRegionConfigResult1));
     auto layerprimaryRegionResult1 = readRegion(primaryRegionConfig, layerName, layer.layerBaseHeight);
     if (!layerprimaryRegionResult1) return std::unexpected(std::move(layerprimaryRegionResult1.error()));
     layer.primaryRegion = std::move((*layerprimaryRegionResult1));
     {
-      auto autosubRegionListResult1 = primaryRegionConfig.getArray("subRegion");
+      auto autosubRegionListResult1 = primaryRegionConfig.get_array("subRegion");
       if (!autosubRegionListResult1) return std::unexpected(std::move(autosubRegionListResult1.error()));
       auto subRegionList = std::move((*autosubRegionListResult1));
       Json subRegionConfig;
@@ -1442,13 +1442,13 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
         auto subregion_choice = static_random_from(subRegionList, seed, layerName, primaryRegionConfigName);
         if (!subregion_choice)
           return std::unexpected(std::move(subregion_choice.error()));
-        auto subregion_name = subregion_choice->get().toString();
+        auto subregion_name = subregion_choice->get().to_string();
         if (!subregion_name)
           return std::unexpected(std::move(subregion_name.error()));
         String subRegionName = std::move((*subregion_name));
         auto subRegionConfigResult1 = regionTypes.get(subRegionName);
         if (!subRegionConfigResult1) return std::unexpected(std::move(subRegionConfigResult1.error()));
-        subRegionConfig = jsonMerge(regionDefaults, (*subRegionConfigResult1));
+        subRegionConfig = json_merge(regionDefaults, (*subRegionConfigResult1));
       } else {
         subRegionConfig = primaryRegionConfig;
       }
@@ -1458,7 +1458,7 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
     }
     auto Vec2UsecondaryRegionCountRangeResult1 = layerConfig.get("secondaryRegionCount");
     if (!Vec2UsecondaryRegionCountRangeResult1) return std::unexpected(std::move(Vec2UsecondaryRegionCountRangeResult1.error()));
-    auto Vec2UsecondaryRegionCountRangeResult2 = jsonToVec2U((*Vec2UsecondaryRegionCountRangeResult1));
+    auto Vec2UsecondaryRegionCountRangeResult2 = json_to_vec2u((*Vec2UsecondaryRegionCountRangeResult1));
     if (!Vec2UsecondaryRegionCountRangeResult2) return std::unexpected(std::move(Vec2UsecondaryRegionCountRangeResult2.error()));
     Vec2U secondaryRegionCountRange = std::move((*Vec2UsecondaryRegionCountRangeResult2));
     auto secondary_region_count =
@@ -1467,7 +1467,7 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
     if (!secondary_region_count)
       return std::unexpected(std::move(secondary_region_count.error()));
     int secondaryRegionCount = *secondary_region_count;
-    auto autosecondaryRegionListResult1 = layerConfig.getArray("secondaryRegions");
+    auto autosecondaryRegionListResult1 = layerConfig.get_array("secondaryRegions");
     if (!autosecondaryRegionListResult1) return std::unexpected(std::move(autosecondaryRegionListResult1.error()));
     auto secondaryRegionList = std::move((*autosecondaryRegionListResult1));
     if (!secondaryRegionList.empty()) {
@@ -1476,33 +1476,33 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
         return std::unexpected(std::move(shuffled.error()));
       for (auto const& regionName : secondaryRegionList) {
         if (secondaryRegionCount <= 0) break;
-        auto JsonsecondaryRegionConfigResult1 = regionName.toString();
+        auto JsonsecondaryRegionConfigResult1 = regionName.to_string();
         if (!JsonsecondaryRegionConfigResult1) return std::unexpected(std::move(JsonsecondaryRegionConfigResult1.error()));
         auto JsonsecondaryRegionConfigResult2 = regionTypes.get((*JsonsecondaryRegionConfigResult1));
         if (!JsonsecondaryRegionConfigResult2) return std::unexpected(std::move(JsonsecondaryRegionConfigResult2.error()));
-        Json secondaryRegionConfig = jsonMerge(regionDefaults, (*JsonsecondaryRegionConfigResult2));
+        Json secondaryRegionConfig = json_merge(regionDefaults, (*JsonsecondaryRegionConfigResult2));
         auto autoregionResult1 = readRegion(secondaryRegionConfig, layerName, layer.layerBaseHeight);
         if (!autoregionResult1) return std::unexpected(std::move(autoregionResult1.error()));
         auto region = std::move((*autoregionResult1));
         layer.secondaryRegions.push_back(std::move(region));
-        auto autosubRegionListResult1 = secondaryRegionConfig.getArray("subRegion");
+        auto autosubRegionListResult1 = secondaryRegionConfig.get_array("subRegion");
         if (!autosubRegionListResult1) return std::unexpected(std::move(autosubRegionListResult1.error()));
         auto subRegionList = std::move((*autosubRegionListResult1));
         Json subRegionConfig;
         if (!subRegionList.empty()) {
-          auto subregion_choice = regionName.toString();
+          auto subregion_choice = regionName.to_string();
           if (!subregion_choice)
             return std::unexpected(std::move(subregion_choice.error()));
           auto subregion_name = static_random_from(subRegionList, seed, layerName, (*subregion_choice));
           if (!subregion_name)
             return std::unexpected(std::move(subregion_name.error()));
-          auto selected_subregion_name = subregion_name->get().toString();
+          auto selected_subregion_name = subregion_name->get().to_string();
           if (!selected_subregion_name)
             return std::unexpected(std::move(selected_subregion_name.error()));
           String subRegionName = std::move((*selected_subregion_name));
           auto subRegionConfigResult1 = regionTypes.get(subRegionName);
           if (!subRegionConfigResult1) return std::unexpected(std::move(subRegionConfigResult1.error()));
-          subRegionConfig = jsonMerge(regionDefaults, (*subRegionConfigResult1));
+          subRegionConfig = json_merge(regionDefaults, (*subRegionConfigResult1));
         } else {
           subRegionConfig = secondaryRegionConfig;
         }
@@ -1515,12 +1515,12 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
     }
     auto layersecondaryRegionSizeRangeResult1 = layerConfig.get("secondaryRegionSize");
     if (!layersecondaryRegionSizeRangeResult1) return std::unexpected(std::move(layersecondaryRegionSizeRangeResult1.error()));
-    auto layersecondaryRegionSizeRangeResult2 = jsonToVec2F((*layersecondaryRegionSizeRangeResult1));
+    auto layersecondaryRegionSizeRangeResult2 = json_to_vec2f((*layersecondaryRegionSizeRangeResult1));
     if (!layersecondaryRegionSizeRangeResult2) return std::unexpected(std::move(layersecondaryRegionSizeRangeResult2.error()));
     layer.secondaryRegionSizeRange = std::move((*layersecondaryRegionSizeRangeResult2));
     auto layersubRegionSizeRangeResult1 = layerConfig.get("subRegionSize");
     if (!layersubRegionSizeRangeResult1) return std::unexpected(std::move(layersubRegionSizeRangeResult1.error()));
-    auto layersubRegionSizeRangeResult2 = jsonToVec2F((*layersubRegionSizeRangeResult1));
+    auto layersubRegionSizeRangeResult2 = json_to_vec2f((*layersubRegionSizeRangeResult1));
     if (!layersubRegionSizeRangeResult2) return std::unexpected(std::move(layersubRegionSizeRangeResult2.error()));
     layer.subRegionSizeRange = std::move((*layersubRegionSizeRangeResult2));
     auto WeightedPoolStringdungeonPoolResult1 = layerConfig.get("dungeons");
@@ -1532,7 +1532,7 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
     auto rangeJson = layerConfig.opt("dungeonCountRange");
     if (!rangeJson) return std::unexpected(std::move(rangeJson.error()));
     if (*rangeJson) {
-      auto dungeonCountRangeResult1 = jsonToVec2U(**rangeJson);
+      auto dungeonCountRangeResult1 = json_to_vec2u(**rangeJson);
       if (!dungeonCountRangeResult1) return std::unexpected(std::move(dungeonCountRangeResult1.error()));
       dungeonCountRange = std::move((*dungeonCountRangeResult1));
     }
@@ -1543,7 +1543,7 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
     unsigned dungeonCount = *dungeon_count;
     layer.dungeons.append_range(
       dungeonPool.select_unique(dungeonCount, static_random_hash64(seed, layerName, "DungeonChoice")));
-    auto layerdungeonXVarianceResult1 = layerConfig.getInt("dungeonXVariance", 0);
+    auto layerdungeonXVarianceResult1 = layerConfig.get_int("dungeonXVariance", 0);
     if (!layerdungeonXVarianceResult1) return std::unexpected(std::move(layerdungeonXVarianceResult1.error()));
     layer.dungeonXVariance = std::move(static_cast<int>((*layerdungeonXVarianceResult1)));
     return layer;
@@ -1560,7 +1560,7 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
   parameters->typeName = std::move(typeName);
   auto parametersworldSizeResult1 = config.get("size");
   if (!parametersworldSizeResult1) return std::unexpected(std::move(parametersworldSizeResult1.error()));
-  auto parametersworldSizeResult2 = jsonToVec2U((*parametersworldSizeResult1));
+  auto parametersworldSizeResult2 = json_to_vec2u((*parametersworldSizeResult1));
   if (!parametersworldSizeResult2) return std::unexpected(std::move(parametersworldSizeResult2.error()));
   parameters->worldSize = std::move((*parametersworldSizeResult2));
   auto gravity_value = static_random_float_range(gravityRange[0], gravityRange[1], seed, "WorldGravity");
@@ -1576,18 +1576,18 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
   auto parametersoverrideTechJson = config.opt("overrideTech");
   if (!parametersoverrideTechJson) return std::unexpected(std::move(parametersoverrideTechJson.error()));
   if (*parametersoverrideTechJson) {
-    auto value = jsonToStringList(**parametersoverrideTechJson);
+    auto value = json_to_string_list(**parametersoverrideTechJson);
     if (!value) return std::unexpected(std::move(value.error()));
     parameters->overrideTech = std::move(*value);
   }
   auto parametersglobalDirectivesJson = config.opt("globalDirectives");
   if (!parametersglobalDirectivesJson) return std::unexpected(std::move(parametersglobalDirectivesJson.error()));
   if (*parametersglobalDirectivesJson) {
-    auto value = jsonToDirectivesList(**parametersglobalDirectivesJson);
+    auto value = json_to_directives_list(**parametersglobalDirectivesJson);
     if (!value) return std::unexpected(std::move(value.error()));
     parameters->globalDirectives = std::move(*value);
   }
-  auto beam_rule_name = config.getString("beamUpRule", "Surface");
+  auto beam_rule_name = config.get_string("beamUpRule", "Surface");
   if (!beam_rule_name)
     return std::unexpected(std::move(beam_rule_name.error()));
   if (!BeamUpRuleNames) return std::unexpected(BeamUpRuleNames.error());
@@ -1595,10 +1595,10 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
   if (!beam_rule)
     return std::unexpected(std::move(beam_rule.error()));
   parameters->beamUpRule = beam_rule->get();
-  auto parametersdisableDeathDropsResult1 = config.getBool("disableDeathDrops", false);
+  auto parametersdisableDeathDropsResult1 = config.get_bool("disableDeathDrops", false);
   if (!parametersdisableDeathDropsResult1) return std::unexpected(std::move(parametersdisableDeathDropsResult1.error()));
   parameters->disableDeathDrops = std::move((*parametersdisableDeathDropsResult1));
-  auto edge_region_name = config.getString("worldEdgeForceRegions", "Top");
+  auto edge_region_name = config.get_string("worldEdgeForceRegions", "Top");
   if (!edge_region_name)
     return std::unexpected(std::move(edge_region_name.error()));
   if (!WorldEdgeForceRegionTypeNames) return std::unexpected(WorldEdgeForceRegionTypeNames.error());
@@ -1630,7 +1630,7 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
   auto parametersblendNoiseConfigResult1 = config.get("blendNoise");
   if (!parametersblendNoiseConfigResult1) return std::unexpected(std::move(parametersblendNoiseConfigResult1.error()));
   parameters->blendNoiseConfig = std::move((*parametersblendNoiseConfigResult1));
-  auto parametersblendSizeResult1 = config.getFloat("blendSize");
+  auto parametersblendSizeResult1 = config.get_float("blendSize");
   if (!parametersblendSizeResult1) return std::unexpected(std::move(parametersblendSizeResult1.error()));
   parameters->blendSize = std::move((*parametersblendSizeResult1));
   auto autospaceLayerOptionalResult1 = readLayer("space");
@@ -1675,18 +1675,18 @@ std::expected<std::shared_ptr<AsteroidsWorldParameters>, StarException> generate
   auto autoasteroidsConfigResult1 = assets->json("/asteroids_worlds.config");
   if (!autoasteroidsConfigResult1) return std::unexpected(std::move(autoasteroidsConfigResult1.error()));
   auto asteroidsConfig = std::move((*autoasteroidsConfigResult1));
-  auto StringbiomeResult1 = asteroidsConfig.getString("biome");
+  auto StringbiomeResult1 = asteroidsConfig.get_string("biome");
   if (!StringbiomeResult1) return std::unexpected(std::move(StringbiomeResult1.error()));
   String biome = std::move((*StringbiomeResult1));
   auto autogravityRangeResult1 = asteroidsConfig.get("gravityRange");
   if (!autogravityRangeResult1) return std::unexpected(std::move(autogravityRangeResult1.error()));
-  auto autogravityRangeResult2 = jsonToVec2F((*autogravityRangeResult1));
+  auto autogravityRangeResult2 = json_to_vec2f((*autogravityRangeResult1));
   if (!autogravityRangeResult2) return std::unexpected(std::move(autogravityRangeResult2.error()));
   auto gravityRange = std::move((*autogravityRangeResult2));
 
   auto autothreatLevelRangeResult1 = asteroidsConfig.get("threatRange");
   if (!autothreatLevelRangeResult1) return std::unexpected(std::move(autothreatLevelRangeResult1.error()));
-  auto autothreatLevelRangeResult2 = jsonToVec2F((*autothreatLevelRangeResult1));
+  auto autothreatLevelRangeResult2 = json_to_vec2f((*autothreatLevelRangeResult1));
   if (!autothreatLevelRangeResult2) return std::unexpected(std::move(autothreatLevelRangeResult2.error()));
   auto threatLevelRange = std::move((*autothreatLevelRangeResult2));
   parameters->threatLevel = std::move(static_cast<float>(
@@ -1694,33 +1694,33 @@ std::expected<std::shared_ptr<AsteroidsWorldParameters>, StarException> generate
   parameters->typeName = std::move("asteroids");
   auto parametersworldSizeResult1 = asteroidsConfig.get("worldSize");
   if (!parametersworldSizeResult1) return std::unexpected(std::move(parametersworldSizeResult1.error()));
-  auto parametersworldSizeResult2 = jsonToVec2U((*parametersworldSizeResult1));
+  auto parametersworldSizeResult2 = json_to_vec2u((*parametersworldSizeResult1));
   if (!parametersworldSizeResult2) return std::unexpected(std::move(parametersworldSizeResult2.error()));
   parameters->worldSize = std::move((*parametersworldSizeResult2));
   auto gravity_value = static_random_float_range(gravityRange[0], gravityRange[1], seed, "WorldGravity");
   if (!gravity_value)
     return std::unexpected(std::move(gravity_value.error()));
   parameters->gravity = *gravity_value;
-  auto parametersenvironmentStatusEffectsResult1 = asteroidsConfig.getArray("environmentStatusEffects", JsonArray());
+  auto parametersenvironmentStatusEffectsResult1 = asteroidsConfig.get_array("environmentStatusEffects", JsonArray());
   if (!parametersenvironmentStatusEffectsResult1) return std::unexpected(std::move(parametersenvironmentStatusEffectsResult1.error()));
-  auto parametersenvironmentStatusEffectsResult2 = jsonToStringList((*parametersenvironmentStatusEffectsResult1));
+  auto parametersenvironmentStatusEffectsResult2 = json_to_string_list((*parametersenvironmentStatusEffectsResult1));
   if (!parametersenvironmentStatusEffectsResult2) return std::unexpected(std::move(parametersenvironmentStatusEffectsResult2.error()));
   parameters->environmentStatusEffects = std::move((*parametersenvironmentStatusEffectsResult2));
   auto parametersoverrideTechJson = asteroidsConfig.opt("overrideTech");
   if (!parametersoverrideTechJson) return std::unexpected(std::move(parametersoverrideTechJson.error()));
   if (*parametersoverrideTechJson) {
-    auto value = jsonToStringList(**parametersoverrideTechJson);
+    auto value = json_to_string_list(**parametersoverrideTechJson);
     if (!value) return std::unexpected(std::move(value.error()));
     parameters->overrideTech = std::move(*value);
   }
   auto parametersglobalDirectivesJson = asteroidsConfig.opt("globalDirectives");
   if (!parametersglobalDirectivesJson) return std::unexpected(std::move(parametersglobalDirectivesJson.error()));
   if (*parametersglobalDirectivesJson) {
-    auto value = jsonToDirectivesList(**parametersglobalDirectivesJson);
+    auto value = json_to_directives_list(**parametersglobalDirectivesJson);
     if (!value) return std::unexpected(std::move(value.error()));
     parameters->globalDirectives = std::move(*value);
   }
-  auto beam_rule_name = asteroidsConfig.getString("beamUpRule", "Surface");
+  auto beam_rule_name = asteroidsConfig.get_string("beamUpRule", "Surface");
   if (!beam_rule_name)
     return std::unexpected(std::move(beam_rule_name.error()));
   if (!BeamUpRuleNames) return std::unexpected(BeamUpRuleNames.error());
@@ -1728,10 +1728,10 @@ std::expected<std::shared_ptr<AsteroidsWorldParameters>, StarException> generate
   if (!beam_rule)
     return std::unexpected(std::move(beam_rule.error()));
   parameters->beamUpRule = beam_rule->get();
-  auto parametersdisableDeathDropsResult1 = asteroidsConfig.getBool("disableDeathDrops", false);
+  auto parametersdisableDeathDropsResult1 = asteroidsConfig.get_bool("disableDeathDrops", false);
   if (!parametersdisableDeathDropsResult1) return std::unexpected(std::move(parametersdisableDeathDropsResult1.error()));
   parameters->disableDeathDrops = std::move((*parametersdisableDeathDropsResult1));
-  auto edge_region_name = asteroidsConfig.getString("worldEdgeForceRegions", "TopAndBottom");
+  auto edge_region_name = asteroidsConfig.get_string("worldEdgeForceRegions", "TopAndBottom");
   if (!edge_region_name)
     return std::unexpected(std::move(edge_region_name.error()));
   if (!WorldEdgeForceRegionTypeNames) return std::unexpected(WorldEdgeForceRegionTypeNames.error());
@@ -1740,19 +1740,19 @@ std::expected<std::shared_ptr<AsteroidsWorldParameters>, StarException> generate
     return std::unexpected(std::move(edge_region.error()));
   parameters->worldEdgeForceRegions = edge_region->get();
 
-  auto parametersasteroidTopLevelResult1 = asteroidsConfig.getInt("asteroidsTop");
+  auto parametersasteroidTopLevelResult1 = asteroidsConfig.get_int("asteroidsTop");
   if (!parametersasteroidTopLevelResult1) return std::unexpected(std::move(parametersasteroidTopLevelResult1.error()));
   parameters->asteroidTopLevel = std::move(static_cast<int>((*parametersasteroidTopLevelResult1)));
-  auto parametersasteroidBottomLevelResult1 = asteroidsConfig.getInt("asteroidsBottom");
+  auto parametersasteroidBottomLevelResult1 = asteroidsConfig.get_int("asteroidsBottom");
   if (!parametersasteroidBottomLevelResult1) return std::unexpected(std::move(parametersasteroidBottomLevelResult1.error()));
   parameters->asteroidBottomLevel = std::move(static_cast<int>((*parametersasteroidBottomLevelResult1)));
-  auto parametersblendSizeResult1 = asteroidsConfig.getFloat("blendSize");
+  auto parametersblendSizeResult1 = asteroidsConfig.get_float("blendSize");
   if (!parametersblendSizeResult1) return std::unexpected(std::move(parametersblendSizeResult1.error()));
   parameters->blendSize = std::move((*parametersblendSizeResult1));
   parameters->asteroidBiome = std::move(biome);
   auto parametersambientLightLevelResult1 = asteroidsConfig.get("ambientLightLevel");
   if (!parametersambientLightLevelResult1) return std::unexpected(std::move(parametersambientLightLevelResult1.error()));
-  auto parametersambientLightLevelResult2 = jsonToColor((*parametersambientLightLevelResult1));
+  auto parametersambientLightLevelResult2 = json_to_color((*parametersambientLightLevelResult1));
   if (!parametersambientLightLevelResult2) return std::unexpected(std::move(parametersambientLightLevelResult2.error()));
   parameters->ambientLightLevel = std::move((*parametersambientLightLevelResult2));
 
@@ -1772,48 +1772,48 @@ std::expected<std::shared_ptr<FloatingDungeonWorldParameters>, StarException> ge
 
   auto parameters = std::make_shared<FloatingDungeonWorldParameters>();
 
-  auto parametersthreatLevelResult1 = worldConfig.getFloat("threatLevel", 0);
+  auto parametersthreatLevelResult1 = worldConfig.get_float("threatLevel", 0);
   if (!parametersthreatLevelResult1) return std::unexpected(std::move(parametersthreatLevelResult1.error()));
   parameters->threatLevel = std::move((*parametersthreatLevelResult1));
   parameters->typeName = std::move(dungeonWorldName);
   auto parametersworldSizeResult1 = worldConfig.get("worldSize");
   if (!parametersworldSizeResult1) return std::unexpected(std::move(parametersworldSizeResult1.error()));
-  auto parametersworldSizeResult2 = jsonToVec2U((*parametersworldSizeResult1));
+  auto parametersworldSizeResult2 = json_to_vec2u((*parametersworldSizeResult1));
   if (!parametersworldSizeResult2) return std::unexpected(std::move(parametersworldSizeResult2.error()));
   parameters->worldSize = std::move((*parametersworldSizeResult2));
-  auto parametersgravityResult1 = worldConfig.getFloat("gravity");
+  auto parametersgravityResult1 = worldConfig.get_float("gravity");
   if (!parametersgravityResult1) return std::unexpected(std::move(parametersgravityResult1.error()));
   parameters->gravity = std::move(*parametersgravityResult1);
-  auto parametersairlessResult1 = worldConfig.getBool("airless", false);
+  auto parametersairlessResult1 = worldConfig.get_bool("airless", false);
   if (!parametersairlessResult1) return std::unexpected(std::move(parametersairlessResult1.error()));
   parameters->airless = std::move((*parametersairlessResult1));
-  auto parametersenvironmentStatusEffectsResult1 = worldConfig.getArray("environmentStatusEffects", JsonArray());
+  auto parametersenvironmentStatusEffectsResult1 = worldConfig.get_array("environmentStatusEffects", JsonArray());
   if (!parametersenvironmentStatusEffectsResult1) return std::unexpected(std::move(parametersenvironmentStatusEffectsResult1.error()));
-  auto parametersenvironmentStatusEffectsResult2 = jsonToStringList((*parametersenvironmentStatusEffectsResult1));
+  auto parametersenvironmentStatusEffectsResult2 = json_to_string_list((*parametersenvironmentStatusEffectsResult1));
   if (!parametersenvironmentStatusEffectsResult2) return std::unexpected(std::move(parametersenvironmentStatusEffectsResult2.error()));
   parameters->environmentStatusEffects = std::move((*parametersenvironmentStatusEffectsResult2));
   auto parametersoverrideTechJson = worldConfig.opt("overrideTech");
   if (!parametersoverrideTechJson) return std::unexpected(std::move(parametersoverrideTechJson.error()));
   if (*parametersoverrideTechJson) {
-    auto value = jsonToStringList(**parametersoverrideTechJson);
+    auto value = json_to_string_list(**parametersoverrideTechJson);
     if (!value) return std::unexpected(std::move(value.error()));
     parameters->overrideTech = std::move(*value);
   }
   auto parametersglobalDirectivesJson = worldConfig.opt("globalDirectives");
   if (!parametersglobalDirectivesJson) return std::unexpected(std::move(parametersglobalDirectivesJson.error()));
   if (*parametersglobalDirectivesJson) {
-    auto value = jsonToDirectivesList(**parametersglobalDirectivesJson);
+    auto value = json_to_directives_list(**parametersglobalDirectivesJson);
     if (!value) return std::unexpected(std::move(value.error()));
     parameters->globalDirectives = std::move(*value);
   }
-  auto weatherPoolConfig = worldConfig.optArray("weatherPool");
+  auto weatherPoolConfig = worldConfig.opt_array("weatherPool");
   if (!weatherPoolConfig) return std::unexpected(std::move(weatherPoolConfig.error()));
   if (*weatherPoolConfig) {
     auto parametersweatherPoolResult1 = json_to_weighted_pool<String>(**weatherPoolConfig);
     if (!parametersweatherPoolResult1) return std::unexpected(std::move(parametersweatherPoolResult1.error()));
     parameters->weatherPool = std::move((*parametersweatherPoolResult1));
   }
-  auto beam_rule_name = worldConfig.getString("beamUpRule", "Surface");
+  auto beam_rule_name = worldConfig.get_string("beamUpRule", "Surface");
   if (!beam_rule_name)
     return std::unexpected(std::move(beam_rule_name.error()));
   if (!BeamUpRuleNames) return std::unexpected(BeamUpRuleNames.error());
@@ -1821,10 +1821,10 @@ std::expected<std::shared_ptr<FloatingDungeonWorldParameters>, StarException> ge
   if (!beam_rule)
     return std::unexpected(std::move(beam_rule.error()));
   parameters->beamUpRule = beam_rule->get();
-  auto parametersdisableDeathDropsResult1 = worldConfig.getBool("disableDeathDrops", false);
+  auto parametersdisableDeathDropsResult1 = worldConfig.get_bool("disableDeathDrops", false);
   if (!parametersdisableDeathDropsResult1) return std::unexpected(std::move(parametersdisableDeathDropsResult1.error()));
   parameters->disableDeathDrops = std::move((*parametersdisableDeathDropsResult1));
-  auto edge_region_name = worldConfig.getString("worldEdgeForceRegions", "Top");
+  auto edge_region_name = worldConfig.get_string("worldEdgeForceRegions", "Top");
   if (!edge_region_name)
     return std::unexpected(std::move(edge_region_name.error()));
   if (!WorldEdgeForceRegionTypeNames) return std::unexpected(WorldEdgeForceRegionTypeNames.error());
@@ -1833,41 +1833,41 @@ std::expected<std::shared_ptr<FloatingDungeonWorldParameters>, StarException> ge
     return std::unexpected(std::move(edge_region.error()));
   parameters->worldEdgeForceRegions = edge_region->get();
 
-  auto parametersdungeonBaseHeightResult1 = worldConfig.getInt("dungeonBaseHeight");
+  auto parametersdungeonBaseHeightResult1 = worldConfig.get_int("dungeonBaseHeight");
   if (!parametersdungeonBaseHeightResult1) return std::unexpected(std::move(parametersdungeonBaseHeightResult1.error()));
   parameters->dungeonBaseHeight = std::move(static_cast<int>((*parametersdungeonBaseHeightResult1)));
-  auto parametersdungeonSurfaceHeightResult1 = worldConfig.getInt("dungeonSurfaceHeight", parameters->dungeonBaseHeight);
+  auto parametersdungeonSurfaceHeightResult1 = worldConfig.get_int("dungeonSurfaceHeight", parameters->dungeonBaseHeight);
   if (!parametersdungeonSurfaceHeightResult1) return std::unexpected(std::move(parametersdungeonSurfaceHeightResult1.error()));
   parameters->dungeonSurfaceHeight = std::move(static_cast<int>((*parametersdungeonSurfaceHeightResult1)));
-  auto parametersdungeonUndergroundLevelResult1 = worldConfig.getInt("dungeonUndergroundLevel", 0);
+  auto parametersdungeonUndergroundLevelResult1 = worldConfig.get_int("dungeonUndergroundLevel", 0);
   if (!parametersdungeonUndergroundLevelResult1) return std::unexpected(std::move(parametersdungeonUndergroundLevelResult1.error()));
   parameters->dungeonUndergroundLevel = std::move(static_cast<int>((*parametersdungeonUndergroundLevelResult1)));
-  auto parametersprimaryDungeonResult1 = worldConfig.getString("primaryDungeon");
+  auto parametersprimaryDungeonResult1 = worldConfig.get_string("primaryDungeon");
   if (!parametersprimaryDungeonResult1) return std::unexpected(std::move(parametersprimaryDungeonResult1.error()));
   parameters->primaryDungeon = std::move((*parametersprimaryDungeonResult1));
-  auto parametersbiomeResult1 = worldConfig.optString("biome");
+  auto parametersbiomeResult1 = worldConfig.opt_string("biome");
   if (!parametersbiomeResult1) return std::unexpected(std::move(parametersbiomeResult1.error()));
   parameters->biome = std::move((*parametersbiomeResult1));
   auto parametersambientLightLevelResult1 = worldConfig.get("ambientLightLevel");
   if (!parametersambientLightLevelResult1) return std::unexpected(std::move(parametersambientLightLevelResult1.error()));
-  auto parametersambientLightLevelResult2 = jsonToColor((*parametersambientLightLevelResult1));
+  auto parametersambientLightLevelResult2 = json_to_color((*parametersambientLightLevelResult1));
   if (!parametersambientLightLevelResult2) return std::unexpected(std::move(parametersambientLightLevelResult2.error()));
   parameters->ambientLightLevel = std::move((*parametersambientLightLevelResult2));
   auto autohasmusicTrackResult1 = worldConfig.contains("musicTrack");
   if (!autohasmusicTrackResult1) return std::unexpected(std::move(autohasmusicTrackResult1.error()));
   auto hasmusicTrack = std::move((*autohasmusicTrackResult1));
   if (hasmusicTrack) {
-    auto parametersdayMusicTrackResult1 = worldConfig.optString("musicTrack");
+    auto parametersdayMusicTrackResult1 = worldConfig.opt_string("musicTrack");
     if (!parametersdayMusicTrackResult1) return std::unexpected(std::move(parametersdayMusicTrackResult1.error()));
     parameters->dayMusicTrack = std::move((*parametersdayMusicTrackResult1));
-    auto parametersnightMusicTrackResult1 = worldConfig.optString("musicTrack");
+    auto parametersnightMusicTrackResult1 = worldConfig.opt_string("musicTrack");
     if (!parametersnightMusicTrackResult1) return std::unexpected(std::move(parametersnightMusicTrackResult1.error()));
     parameters->nightMusicTrack = std::move((*parametersnightMusicTrackResult1));
   } else {
-    auto parametersdayMusicTrackResult1 = worldConfig.optString("dayMusicTrack");
+    auto parametersdayMusicTrackResult1 = worldConfig.opt_string("dayMusicTrack");
     if (!parametersdayMusicTrackResult1) return std::unexpected(std::move(parametersdayMusicTrackResult1.error()));
     parameters->dayMusicTrack = std::move((*parametersdayMusicTrackResult1));
-    auto parametersnightMusicTrackResult1 = worldConfig.optString("nightMusicTrack");
+    auto parametersnightMusicTrackResult1 = worldConfig.opt_string("nightMusicTrack");
     if (!parametersnightMusicTrackResult1) return std::unexpected(std::move(parametersnightMusicTrackResult1.error()));
     parameters->nightMusicTrack = std::move((*parametersnightMusicTrackResult1));
   }
@@ -1875,17 +1875,17 @@ std::expected<std::shared_ptr<FloatingDungeonWorldParameters>, StarException> ge
   if (!autohasambientNoisesResult1) return std::unexpected(std::move(autohasambientNoisesResult1.error()));
   auto hasambientNoises = std::move((*autohasambientNoisesResult1));
   if (hasambientNoises) {
-    auto parametersdayAmbientNoisesResult1 = worldConfig.optString("ambientNoises");
+    auto parametersdayAmbientNoisesResult1 = worldConfig.opt_string("ambientNoises");
     if (!parametersdayAmbientNoisesResult1) return std::unexpected(std::move(parametersdayAmbientNoisesResult1.error()));
     parameters->dayAmbientNoises = std::move((*parametersdayAmbientNoisesResult1));
-    auto parametersnightAmbientNoisesResult1 = worldConfig.optString("ambientNoises");
+    auto parametersnightAmbientNoisesResult1 = worldConfig.opt_string("ambientNoises");
     if (!parametersnightAmbientNoisesResult1) return std::unexpected(std::move(parametersnightAmbientNoisesResult1.error()));
     parameters->nightAmbientNoises = std::move((*parametersnightAmbientNoisesResult1));
   } else {
-    auto parametersdayAmbientNoisesResult1 = worldConfig.optString("dayAmbientNoises");
+    auto parametersdayAmbientNoisesResult1 = worldConfig.opt_string("dayAmbientNoises");
     if (!parametersdayAmbientNoisesResult1) return std::unexpected(std::move(parametersdayAmbientNoisesResult1.error()));
     parameters->dayAmbientNoises = std::move((*parametersdayAmbientNoisesResult1));
-    auto parametersnightAmbientNoisesResult1 = worldConfig.optString("nightAmbientNoises");
+    auto parametersnightAmbientNoisesResult1 = worldConfig.opt_string("nightAmbientNoises");
     if (!parametersnightAmbientNoisesResult1) return std::unexpected(std::move(parametersnightAmbientNoisesResult1.error()));
     parameters->nightAmbientNoises = std::move((*parametersnightAmbientNoisesResult1));
   }

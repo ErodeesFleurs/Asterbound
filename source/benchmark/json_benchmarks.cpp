@@ -151,7 +151,7 @@ Fixture flatFixture(bool object, std::size_t count, bool preserve) {
 }
 
 bool validateFormatted(benchmark::State& state, FormattedJson const& value, Fixture const& fixture, bool preserved) {
-  if (!require(state, value.toJson() == fixture.expected, "formatted semantic output differs from independent values"))
+  if (!require(state, value.to_json() == fixture.expected, "formatted semantic output differs from independent values"))
     return false;
   auto output = value.repr();
   if (!checked(state, output))
@@ -369,7 +369,7 @@ void label_result(benchmark::State& state, String const& input, String const& ex
 
 void bm_object_write_text_destroy(benchmark::State& state) {
   auto fixture = flatFixture(true, static_cast<std::size_t>(state.range(0)), false);
-  auto object = fixture.expected.toObject();
+  auto object = fixture.expected.to_object();
   if (!checked(state, object))
     return;
   auto snapshot = *object;
@@ -387,7 +387,7 @@ void bm_object_write_text_destroy(benchmark::State& state) {
   for (auto const& [key, value] : *object) {
     if (expected.size() != 1)
       expected += ',';
-    auto integer = value.toInt();
+    auto integer = value.to_int();
     if (!checked(state, integer))
       return;
     expected += '"' + key.utf8() + "\":" + std::to_string(*integer);

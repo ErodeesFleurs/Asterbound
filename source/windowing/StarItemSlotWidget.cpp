@@ -135,9 +135,9 @@ std::expected<std::shared_ptr<ItemSlotWidget>, StarException> ItemSlotWidget::cr
   if (!newConfig) return std::unexpected(std::move(newConfig.error()));
   auto indicator = Animation::create(context.root(), *newConfig);
   if (!indicator) return std::unexpected(std::move(indicator.error()));
-  auto cycle = newConfig->getDouble("animationCycle");
+  auto cycle = newConfig->get_double("animationCycle");
   if (!cycle) return std::unexpected(std::move(cycle.error()));
-  auto loops = newConfig->getDouble("loops", 1.0f);
+  auto loops = newConfig->get_double("loops", 1.0f);
   if (!loops) return std::unexpected(std::move(loops.error()));
   indicator->update(*cycle * *loops);
   auto highlightConfig = config->get("highlightAnimation");
@@ -147,7 +147,7 @@ std::expected<std::shared_ptr<ItemSlotWidget>, StarException> ItemSlotWidget::cr
   auto widget = std::shared_ptr<ItemSlotWidget>(new ItemSlotWidget(context, item, backingImage, std::move(*indicator), std::move(*highlight)));
   auto countJson = config->get("itemCountRightAnchor");
   if (!countJson) return std::unexpected(std::move(countJson.error()));
-  auto count = jsonToVec2F(*countJson);
+  auto count = json_to_vec2f(*countJson);
   if (!count) return std::unexpected(std::move(count.error()));
   widget->m_countPosition = TextPositioning(*count, HorizontalAnchor::RightAnchor);
   auto styleJson = config->get("itemSlotTextStyle");
@@ -157,12 +157,12 @@ std::expected<std::shared_ptr<ItemSlotWidget>, StarException> ItemSlotWidget::cr
   widget->m_textStyle = std::move(*style);
   auto areaJson = config->get("itemDraggableArea");
   if (!areaJson) return std::unexpected(std::move(areaJson.error()));
-  auto area = jsonToRectI(*areaJson);
+  auto area = json_to_recti(*areaJson);
   if (!area) return std::unexpected(std::move(area.error()));
   widget->m_itemDraggableArea = *area;
   auto offsetJson = config->get("itemIconDurabilityOffset");
   if (!offsetJson) return std::unexpected(std::move(offsetJson.error()));
-  auto offset = jsonToVec2I(*offsetJson);
+  auto offset = json_to_vec2i(*offsetJson);
   if (!offset) return std::unexpected(std::move(offset.error()));
   widget->m_durabilityOffset = *offset;
   Vec2I backingSize;
@@ -306,7 +306,7 @@ std::expected<void, StarException> ItemSlotWidget::renderImpl() {
       if (!rarity) return std::unexpected(std::move(rarity.error()));
       auto value = m_item->instanceValue("rarityBorder", String(*rarity));
       if (!value) return std::unexpected(std::move(value.error()));
-      auto name = value->toString();
+      auto name = value->to_string();
       if (!name) return std::unexpected(std::move(name.error()));
       auto border = rarityBorder(std::move(*name));
       if (!border) return std::unexpected(std::move(border.error()));

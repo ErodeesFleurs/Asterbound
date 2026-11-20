@@ -590,7 +590,7 @@ std::expected<std::shared_ptr<Assets const>, StarException> Root::assets() {
   auto configured = (*config)->getPath("safe.allowRemoteAssets", true);
   if (!configured)
     return std::unexpected(std::move(configured.error()));
-  auto allowed = configured->toBool();
+  auto allowed = configured->to_bool();
   if (!allowed)
     return std::unexpected(std::move(allowed.error()));
   return loadMemberFunction<Assets>(m_assets, m_assetsMutex, "Assets", [this, allowRemote = *allowed]() -> std::expected<std::shared_ptr<Assets>, StarException> {
@@ -636,8 +636,8 @@ std::expected<String, StarException> Root::modStorageId(Assets const& assets, St
     if (!metadata)
       return std::unexpected(std::move(metadata.error()));
     String name = File::base_name(path);
-    if (auto value = metadata->find_ref("name"); value && value->get().isType(Json::Type::String)) {
-      auto named = value->get().toString();
+    if (auto value = metadata->find_ref("name"); value && value->get().is_type(Json::Type::String)) {
+      auto named = value->get().to_string();
       if (!named)
         return std::unexpected(std::move(named.error()));
       if (!named->empty())
@@ -687,10 +687,10 @@ std::expected<std::shared_ptr<Configuration>, StarException> Root::configuration
             auto contents = File::read_file_string(*m_runtimeConfigFile);
             if (!contents)
               return std::unexpected(std::move(contents.error()));
-            auto parsed = Json::parseJson(*contents);
+            auto parsed = Json::parse_json(*contents);
             if (!parsed)
               return std::unexpected(std::move(parsed.error()));
-            if (!parsed->isType(Json::Type::Object))
+            if (!parsed->is_type(Json::Type::Object))
               return std::unexpected(ConfigurationException("User config is not of JSON type Object"));
             auto version = parsed->get("configurationVersion", {});
             if (!version)
@@ -700,7 +700,7 @@ std::expected<std::shared_ptr<Configuration>, StarException> Root::configuration
               return std::unexpected(std::move(defaultVersion.error()));
             if (*version != *defaultVersion)
               return std::unexpected(ConfigurationException("User config version does not match default config version"));
-            auto config = parsed->toObject();
+            auto config = parsed->to_object();
             if (!config)
               return std::unexpected(std::move(config.error()));
             auto defaults = m_settings.defaultConfiguration.object_ptr();
@@ -978,22 +978,22 @@ std::expected<StringList, StarException> Root::scanForAssetSources(StringList co
     auto assetSource = std::make_shared<AssetSource>();
     assetSource->path = sourcePath;
     if (auto value = metadata.maybe("name")) {
-      auto parsed = value->toString();
+      auto parsed = value->to_string();
       if (!parsed) return std::unexpected(std::move(parsed.error()));
       assetSource->name = std::move(*parsed);
     }
     if (auto value = metadata.maybe("version")) {
-      auto printed = value->printString();
+      auto printed = value->print_string();
       if (!printed) return std::unexpected(std::move(printed.error()));
       assetSource->version = std::move(*printed);
     }
-    auto priority = metadata.value("priority", 0.0f).toFloat();
+    auto priority = metadata.value("priority", 0.0f).to_float();
     if (!priority) return std::unexpected(std::move(priority.error()));
     assetSource->priority = *priority;
-    auto required = jsonToStringList(metadata.value("requires", JsonArray{}));
+    auto required = json_to_string_list(metadata.value("requires", JsonArray{}));
     if (!required) return std::unexpected(std::move(required.error()));
     assetSource->requires_ = std::move(*required);
-    auto included = jsonToStringList(metadata.value("includes", JsonArray{}));
+    auto included = json_to_string_list(metadata.value("includes", JsonArray{}));
     if (!included) return std::unexpected(std::move(included.error()));
     assetSource->includes = std::move(*included);
 
@@ -1162,7 +1162,7 @@ std::expected<std::reference_wrapper<bool>, StarException> Root::humanoidHeadRot
     if (!config) return std::unexpected(std::move(config.error()));
     auto setting = (*config)->get("humanoidHeadRotation");
     if (!setting) return std::unexpected(std::move(setting.error()));
-    auto value = setting->optBool();
+    auto value = setting->opt_bool();
     if (!value) return std::unexpected(std::move(value.error()));
     m_humanoidHeadRotation = value->value_or(true);
     m_headRotationInitialized = true;

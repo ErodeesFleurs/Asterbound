@@ -70,11 +70,11 @@ std::expected<CelestialOrbit, StarException> CelestialOrbit::fromJson(Json const
   if (!target)
     return std::unexpected(std::move(target.error()));
   
-  auto direction = json.getInt("direction");
+  auto direction = json.get_int("direction");
   if (!direction)
     return std::unexpected(std::move(direction.error()));
   
-  auto time = json.getDouble("enterTime");
+  auto time = json.get_double("enterTime");
   if (!time)
     return std::unexpected(std::move(time.error()));
   
@@ -82,7 +82,7 @@ std::expected<CelestialOrbit, StarException> CelestialOrbit::fromJson(Json const
   if (!positionData)
     return std::unexpected(std::move(positionData.error()));
   
-  auto position = jsonToVec2F(*positionData);
+  auto position = json_to_vec2f(*positionData);
   if (!position)
     return std::unexpected(std::move(position.error()));
 
@@ -94,7 +94,7 @@ Json CelestialOrbit::toJson() const {
   json.set("target", target.toJson());
   json.set("direction", direction);
   json.set("enterTime", enterTime);
-  json.set("enterPosition", jsonFromVec2F(enterPosition));
+  json.set("enterPosition", json_from_vec2f(enterPosition));
   return json;
 }
 
@@ -152,7 +152,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
 }
 
 std::expected<SystemLocation, StarException> jsonToSystemLocation(Json const& json) {
-  auto array = json.optArray();
+  auto array = json.opt_array();
   if (!array)
     return std::unexpected(std::move(array.error()));
   if (!*array)
@@ -162,7 +162,7 @@ std::expected<SystemLocation, StarException> jsonToSystemLocation(Json const& js
   if (!first)
     return std::unexpected(std::move(first.error()));
   if (first->type() == Json::Type::String) {
-    auto type = first->toString();
+    auto type = first->to_string();
     if (!type)
       return std::unexpected(std::move(type.error()));
     if (*type == "coordinate" || *type == "orbit" || *type == "object") {
@@ -180,7 +180,7 @@ std::expected<SystemLocation, StarException> jsonToSystemLocation(Json const& js
           return std::unexpected(std::move(orbit.error()));
         return SystemLocation(std::move(*orbit));
       }
-      auto uuidString = value->toString();
+      auto uuidString = value->to_string();
       if (!uuidString)
         return std::unexpected(std::move(uuidString.error()));
       auto uuid = Uuid::create(*uuidString);
@@ -189,7 +189,7 @@ std::expected<SystemLocation, StarException> jsonToSystemLocation(Json const& js
       return SystemLocation(std::move(*uuid));
     }
   } else {
-    auto position = json_to_optional<Vec2F>(location, jsonToVec2F);
+    auto position = json_to_optional<Vec2F>(location, json_to_vec2f);
     if (!position)
       return std::unexpected(std::move(position.error()));
     if (*position)
@@ -206,51 +206,51 @@ Json jsonFromSystemLocation(SystemLocation const& location) {
   else if (std::holds_alternative<Uuid>(location))
     return JsonArray{"object", std::get<Uuid>(location).hex()};
   else if (std::holds_alternative<Vec2F>(location))
-    return jsonFromVec2F(std::get<Vec2F>(location));
+    return json_from_vec2f(std::get<Vec2F>(location));
   else
     return {};
 }
 
 std::expected<SystemWorldConfig, StarException> SystemWorldConfig::fromJson(Json const& json) {
   SystemWorldConfig config;
-  auto starGravitationalConstant = json.getFloat("starGravitationalConstant");
+  auto starGravitationalConstant = json.get_float("starGravitationalConstant");
   if (!starGravitationalConstant)
     return std::unexpected(std::move(starGravitationalConstant.error()));
   config.starGravitationalConstant = *starGravitationalConstant;
-  auto planetGravitationalConstant = json.getFloat("planetGravitationalConstant");
+  auto planetGravitationalConstant = json.get_float("planetGravitationalConstant");
   if (!planetGravitationalConstant)
     return std::unexpected(std::move(planetGravitationalConstant.error()));
   config.planetGravitationalConstant = *planetGravitationalConstant;
-  auto sizes = json.getArray("planetSizes");
+  auto sizes = json.get_array("planetSizes");
   if (!sizes)
     return std::unexpected(std::move(sizes.error()));
   for (auto const& size : *sizes) {
-    auto width = size.getUInt(0);
+    auto width = size.get_uint(0);
     if (!width)
       return std::unexpected(std::move(width.error()));
-    auto radius = size.getFloat(1);
+    auto radius = size.get_float(1);
     if (!radius)
       return std::unexpected(std::move(radius.error()));
     config.planetSizes.set(*width, *radius);
   }
-  auto emptyOrbitSize = json.getFloat("emptyOrbitSize");
+  auto emptyOrbitSize = json.get_float("emptyOrbitSize");
   if (!emptyOrbitSize)
     return std::unexpected(std::move(emptyOrbitSize.error()));
   config.emptyOrbitSize = *emptyOrbitSize;
-  auto unvisitablePlanetSize = json.getFloat("unvisitablePlanetSize");
+  auto unvisitablePlanetSize = json.get_float("unvisitablePlanetSize");
   if (!unvisitablePlanetSize)
     return std::unexpected(std::move(unvisitablePlanetSize.error()));
   config.unvisitablePlanetSize = *unvisitablePlanetSize;
-  auto dungeonSizes = json.getObject("floatingDungeonWorldSizes");
+  auto dungeonSizes = json.get_object("floatingDungeonWorldSizes");
   if (!dungeonSizes)
     return std::unexpected(std::move(dungeonSizes.error()));
   for (auto const& entry : *dungeonSizes) {
-    auto size = entry.second.toFloat();
+    auto size = entry.second.to_float();
     if (!size)
       return std::unexpected(std::move(size.error()));
     config.floatingDungeonWorldSizes.set(entry.first, *size);
   }
-  auto starSize = json.getFloat("starSize");
+  auto starSize = json.get_float("starSize");
   if (!starSize)
     return std::unexpected(std::move(starSize.error()));
   config.starSize = *starSize;
@@ -258,7 +258,7 @@ std::expected<SystemWorldConfig, StarException> SystemWorldConfig::fromJson(Json
   if (!planetaryOrbitPaddingData)
     return std::unexpected(std::move(planetaryOrbitPaddingData.error()));
   
-  auto planetaryOrbitPadding = jsonToVec2F(*planetaryOrbitPaddingData);
+  auto planetaryOrbitPadding = json_to_vec2f(*planetaryOrbitPaddingData);
   if (!planetaryOrbitPadding)
     return std::unexpected(std::move(planetaryOrbitPadding.error()));
   config.planetaryOrbitPadding = std::move(*planetaryOrbitPadding);
@@ -266,7 +266,7 @@ std::expected<SystemWorldConfig, StarException> SystemWorldConfig::fromJson(Json
   if (!satelliteOrbitPaddingData)
     return std::unexpected(std::move(satelliteOrbitPaddingData.error()));
   
-  auto satelliteOrbitPadding = jsonToVec2F(*satelliteOrbitPaddingData);
+  auto satelliteOrbitPadding = json_to_vec2f(*satelliteOrbitPaddingData);
   if (!satelliteOrbitPadding)
     return std::unexpected(std::move(satelliteOrbitPadding.error()));
   config.satelliteOrbitPadding = std::move(*satelliteOrbitPadding);
@@ -274,15 +274,15 @@ std::expected<SystemWorldConfig, StarException> SystemWorldConfig::fromJson(Json
   if (!arrivalRangeData)
     return std::unexpected(std::move(arrivalRangeData.error()));
   
-  auto arrivalRange = jsonToVec2F(*arrivalRangeData);
+  auto arrivalRange = json_to_vec2f(*arrivalRangeData);
   if (!arrivalRange)
     return std::unexpected(std::move(arrivalRange.error()));
   config.arrivalRange = std::move(*arrivalRange);
-  auto objectSpawnPadding = json.getFloat("objectSpawnPadding");
+  auto objectSpawnPadding = json.get_float("objectSpawnPadding");
   if (!objectSpawnPadding)
     return std::unexpected(std::move(objectSpawnPadding.error()));
   config.objectSpawnPadding = *objectSpawnPadding;
-  auto clientObjectSpawnPadding = json.getFloat("clientObjectSpawnPadding");
+  auto clientObjectSpawnPadding = json.get_float("clientObjectSpawnPadding");
   if (!clientObjectSpawnPadding)
     return std::unexpected(std::move(clientObjectSpawnPadding.error()));
   config.clientObjectSpawnPadding = *clientObjectSpawnPadding;
@@ -290,19 +290,19 @@ std::expected<SystemWorldConfig, StarException> SystemWorldConfig::fromJson(Json
   if (!objectSpawnIntervalData)
     return std::unexpected(std::move(objectSpawnIntervalData.error()));
   
-  auto objectSpawnInterval = jsonToVec2F(*objectSpawnIntervalData);
+  auto objectSpawnInterval = json_to_vec2f(*objectSpawnIntervalData);
   if (!objectSpawnInterval)
     return std::unexpected(std::move(objectSpawnInterval.error()));
   config.objectSpawnInterval = std::move(*objectSpawnInterval);
-  auto objectSpawnCycle = json.getDouble("objectSpawnCycle");
+  auto objectSpawnCycle = json.get_double("objectSpawnCycle");
   if (!objectSpawnCycle)
     return std::unexpected(std::move(objectSpawnCycle.error()));
   config.objectSpawnCycle = *objectSpawnCycle;
-  auto minObjectOrbitTime = json.getFloat("minObjectOrbitTime");
+  auto minObjectOrbitTime = json.get_float("minObjectOrbitTime");
   if (!minObjectOrbitTime)
     return std::unexpected(std::move(minObjectOrbitTime.error()));
   config.minObjectOrbitTime = *minObjectOrbitTime;
-  auto asteroidBeamDistance = json.getFloat("asteroidBeamDistance");
+  auto asteroidBeamDistance = json.get_float("asteroidBeamDistance");
   if (!asteroidBeamDistance)
     return std::unexpected(std::move(asteroidBeamDistance.error()));
   config.asteroidBeamDistance = *asteroidBeamDistance;
@@ -542,22 +542,22 @@ std::expected<SystemObjectConfig, StarException> SystemWorld::systemObjectConfig
   auto orbitData = config->get("orbitRange");
   if (!orbitData)
     return std::unexpected(std::move(orbitData.error()));
-  auto orbitRange = jsonToVec2F(*orbitData);
+  auto orbitRange = json_to_vec2f(*orbitData);
   if (!orbitRange)
     return std::unexpected(std::move(orbitRange.error()));
   auto lifetimeData = config->get("lifeTime");
   if (!lifetimeData)
     return std::unexpected(std::move(lifetimeData.error()));
-  auto lifetimeRange = jsonToVec2F(*lifetimeData);
+  auto lifetimeRange = json_to_vec2f(*lifetimeData);
   if (!lifetimeRange)
     return std::unexpected(std::move(lifetimeRange.error()));
   SystemObjectConfig object;
   object.name = name;
-  auto moving = config->getBool("moving");
+  auto moving = config->get_bool("moving");
   if (!moving)
     return std::unexpected(std::move(moving.error()));
   object.moving = *moving;
-  auto speed = config->getFloat("speed");
+  auto speed = config->get_float("speed");
   if (!speed)
     return std::unexpected(std::move(speed.error()));
   object.speed = *speed;
@@ -569,11 +569,11 @@ std::expected<SystemObjectConfig, StarException> SystemWorld::systemObjectConfig
   if (!lifeTime)
     return std::unexpected(std::move(lifeTime.error()));
   object.lifeTime = *lifeTime;
-  auto permanent = config->getBool("permanent", false);
+  auto permanent = config->get_bool("permanent", false);
   if (!permanent)
     return std::unexpected(std::move(permanent.error()));
   object.permanent = *permanent;
-  auto warpText = config->getString("warpAction");
+  auto warpText = config->get_string("warpAction");
   if (!warpText)
     return std::unexpected(std::move(warpText.error()));
   
@@ -581,7 +581,7 @@ std::expected<SystemObjectConfig, StarException> SystemWorld::systemObjectConfig
   if (!warp)
     return std::unexpected(std::move(warp.error()));
   object.warpAction = std::move(*warp);
-  auto threat = config->optFloat("threatLevel");
+  auto threat = config->opt_float("threatLevel");
   if (!threat)
     return std::unexpected(std::move(threat.error()));
   object.threatLevel = *threat;
@@ -593,7 +593,7 @@ std::expected<SystemObjectConfig, StarException> SystemWorld::systemObjectConfig
   if (!sky)
     return std::unexpected(std::move(sky.error()));
   object.skyParameters = std::move(*sky);
-  auto parameters = config->getObject("parameters");
+  auto parameters = config->get_object("parameters");
   if (!parameters)
     return std::unexpected(std::move(parameters.error()));
   object.parameters = std::move(*parameters);
@@ -601,11 +601,11 @@ std::expected<SystemObjectConfig, StarException> SystemWorld::systemObjectConfig
   if (!generated)
     return std::unexpected(std::move(generated.error()));
   if (*generated) {
-    auto values = config->getObject("generatedParameters");
+    auto values = config->get_object("generatedParameters");
     if (!values)
       return std::unexpected(std::move(values.error()));
     for (auto const& entry : *values) {
-      auto value = entry.second.toString();
+      auto value = entry.second.to_string();
       if (!value)
         return std::unexpected(std::move(value.error()));
       object.generatedParameters[entry.first] = std::move(*value);
@@ -666,7 +666,7 @@ std::expected<std::optional<WarpAction>, StarException> SystemWorld::objectWarpA
       auto threatData = (**parameters).getParameter("spaceThreatLevel");
       if (!threatData)
         return std::unexpected(std::move(threatData.error()));
-      auto threat = threatData->optFloat();
+      auto threat = threatData->opt_float();
       if (!threat)
         return std::unexpected(std::move(threat.error()));
       auto objectThreat = object->threatLevel();
@@ -711,21 +711,21 @@ std::expected<std::shared_ptr<SystemObject>, StarException> SystemObject::create
 std::expected<std::shared_ptr<SystemObject>, StarException> SystemObject::create(Root& root, SystemWorld& system, Json const& diskStore) {
   // Preserve the old disk-load constructor's random identity draw order.
   auto object = std::shared_ptr<SystemObject>(new SystemObject(root, {}, Uuid(root.random()), {}, 0, {}));
-  auto uuidText = diskStore.getString("uuid");
+  auto uuidText = diskStore.get_string("uuid");
   if (!uuidText)
     return std::unexpected(std::move(uuidText.error()));
   auto uuid = Uuid::create(*uuidText);
   if (!uuid)
     return std::unexpected(std::move(uuid.error()));
   object->m_uuid = std::move(*uuid);
-  auto name = diskStore.getString("name");
+  auto name = diskStore.get_string("name");
   if (!name)
     return std::unexpected(std::move(name.error()));
   auto config = system.systemObjectConfig(*name, object->m_uuid);
   if (!config)
     return std::unexpected(std::move(config.error()));
   object->m_config = std::move(*config);
-  auto parameters = diskStore.getObject("parameters", {});
+  auto parameters = diskStore.get_object("parameters", {});
   if (!parameters)
     return std::unexpected(std::move(parameters.error()));
   object->m_parameters = std::move(*parameters);
@@ -736,14 +736,14 @@ std::expected<std::shared_ptr<SystemObject>, StarException> SystemObject::create
   if (!orbit)
     return std::unexpected(std::move(orbit.error()));
   object->m_orbit.set(std::move(*orbit));
-  auto spawnTime = diskStore.getDouble("spawnTime");
+  auto spawnTime = diskStore.get_double("spawnTime");
   if (!spawnTime)
     return std::unexpected(std::move(spawnTime.error()));
   object->m_spawnTime = *spawnTime;
   auto positionData = diskStore.get("position");
   if (!positionData)
     return std::unexpected(std::move(positionData.error()));
-  auto position = jsonToVec2F(*positionData);
+  auto position = json_to_vec2f(*positionData);
   if (!position)
     return std::unexpected(std::move(position.error()));
   object->setPosition(*position);
@@ -795,7 +795,7 @@ SkyParameters SystemObject::skyParameters() const {
 }
 
 std::expected<JsonObject, StarException> SystemObject::parameters() const {
-  return jsonMerge(m_config.parameters, m_parameters).toObject();
+  return json_merge(m_config.parameters, m_parameters).to_object();
 }
 
 bool SystemObject::shouldDestroy() const {
@@ -901,7 +901,7 @@ std::expected<Json, StarException> SystemObject::diskStore() const {
   if (!orbit)
     return std::unexpected(std::move(orbit.error()));
   return JsonObject{{"uuid", m_uuid.hex()}, {"name", m_config.name}, {"orbit", std::move(*orbit)},
-    {"spawnTime", m_spawnTime}, {"position", jsonFromVec2F(position())}, {"parameters", m_parameters}};
+    {"spawnTime", m_spawnTime}, {"position", json_from_vec2f(position())}, {"parameters", m_parameters}};
 }
 
 void SystemObject::setPosition(Vec2F const& position) {
@@ -935,13 +935,13 @@ std::expected<void, StarException> SystemClientShip::initialize(SystemWorld& sys
   auto config = (*assets)->json("/systemworld.config:clientShip");
   if (!config)
     return std::unexpected(std::move(config.error()));
-  auto orbitDistance = config->getFloat("orbitDistance");
+  auto orbitDistance = config->get_float("orbitDistance");
   if (!orbitDistance)
     return std::unexpected(std::move(orbitDistance.error()));
-  auto departTime = config->getFloat("departTime");
+  auto departTime = config->get_float("departTime");
   if (!departTime)
     return std::unexpected(std::move(departTime.error()));
-  auto spaceDepartTime = config->getFloat("spaceDepartTime");
+  auto spaceDepartTime = config->get_float("spaceDepartTime");
   if (!spaceDepartTime)
     return std::unexpected(std::move(spaceDepartTime.error()));
   m_config = ClientShipConfig{*orbitDistance, *departTime, *spaceDepartTime};

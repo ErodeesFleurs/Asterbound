@@ -36,12 +36,12 @@ InterpolationTracker::InterpolationTracker()
 
 std::expected<InterpolationTracker, StarException> InterpolationTracker::create(Root& root, Json config) {
   InterpolationTracker result;
-  if (config.isNull()) {
+  if (config.is_null()) {
     config = JsonObject();
   } else if (config.type() == Json::Type::String) {
     auto assets = root.assets();
     if (!assets) return std::unexpected(std::move(assets.error()));
-    auto path = config.toString();
+    auto path = config.to_string();
     if (!path) return std::unexpected(std::move(path.error()));
     auto loaded = (*assets)->json(*path);
     if (!loaded) return std::unexpected(std::move(loaded.error()));
@@ -53,22 +53,22 @@ std::expected<InterpolationTracker, StarException> InterpolationTracker::create(
 
 std::expected<void, StarException> InterpolationTracker::readConfig(Json const& config) {
 
-  auto m_interpolationEnabledResult = config.getBool("interpolationEnabled", false);
+  auto m_interpolationEnabledResult = config.get_bool("interpolationEnabled", false);
   if (!m_interpolationEnabledResult) return std::unexpected(std::move(m_interpolationEnabledResult.error()));
   m_interpolationEnabled = *m_interpolationEnabledResult;
-  auto m_entityUpdateDeltaResult = config.getDouble("entityUpdateDelta", 3);
+  auto m_entityUpdateDeltaResult = config.get_double("entityUpdateDelta", 3);
   if (!m_entityUpdateDeltaResult) return std::unexpected(std::move(m_entityUpdateDeltaResult.error()));
   m_entityUpdateDelta = *m_entityUpdateDeltaResult / VanillaStepsPerSecond;
-  auto m_timeLeadResult = config.getDouble("stepLead", 0);
+  auto m_timeLeadResult = config.get_double("stepLead", 0);
   if (!m_timeLeadResult) return std::unexpected(std::move(m_timeLeadResult.error()));
   m_timeLead = *m_timeLeadResult / VanillaStepsPerSecond;
-  auto m_extrapolationHintResult = config.getUInt("extrapolationHint", 0);
+  auto m_extrapolationHintResult = config.get_uint("extrapolationHint", 0);
   if (!m_extrapolationHintResult) return std::unexpected(std::move(m_extrapolationHintResult.error()));
   m_extrapolationHint = *m_extrapolationHintResult;
-  auto m_timeTrackFactorResult = config.getDouble("stepTrackFactor", 1.0);
+  auto m_timeTrackFactorResult = config.get_double("stepTrackFactor", 1.0);
   if (!m_timeTrackFactorResult) return std::unexpected(std::move(m_timeTrackFactorResult.error()));
   m_timeTrackFactor = *m_timeTrackFactorResult;
-  auto m_timeMaxDistanceResult = config.getDouble("stepMaxDistance", 0.0);
+  auto m_timeMaxDistanceResult = config.get_double("stepMaxDistance", 0.0);
   if (!m_timeMaxDistanceResult) return std::unexpected(std::move(m_timeMaxDistanceResult.error()));
   m_timeMaxDistance = *m_timeMaxDistanceResult / VanillaStepsPerSecond;
 

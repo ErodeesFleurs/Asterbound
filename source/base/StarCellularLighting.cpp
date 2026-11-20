@@ -113,19 +113,19 @@ std::expected<void, StarException> CellularLightingCalculator::setMonochrome(boo
 }
 
 std::expected<void, StarException> CellularLightingCalculator::setParameters(Json const& config) {
-  auto passes = config.getInt("spreadPasses");
+  auto passes = config.get_int("spreadPasses");
   if (!passes) return std::unexpected(std::move(passes.error()));
-  auto spreadAir = config.getFloat("spreadMaxAir");
+  auto spreadAir = config.get_float("spreadMaxAir");
   if (!spreadAir) return std::unexpected(std::move(spreadAir.error()));
-  auto spreadObstacle = config.getFloat("spreadMaxObstacle");
+  auto spreadObstacle = config.get_float("spreadMaxObstacle");
   if (!spreadObstacle) return std::unexpected(std::move(spreadObstacle.error()));
-  auto pointAir = config.getFloat("pointMaxAir");
+  auto pointAir = config.get_float("pointMaxAir");
   if (!pointAir) return std::unexpected(std::move(pointAir.error()));
-  auto pointObstacle = config.getFloat("pointMaxObstacle");
+  auto pointObstacle = config.get_float("pointMaxObstacle");
   if (!pointObstacle) return std::unexpected(std::move(pointObstacle.error()));
-  auto boost = config.getFloat("pointObstacleBoost");
+  auto boost = config.get_float("pointObstacleBoost");
   if (!boost) return std::unexpected(std::move(boost.error()));
-  auto additive = config.getBool("pointAdditive", false);
+  auto additive = config.get_bool("pointAdditive", false);
   if (!additive) return std::unexpected(std::move(additive.error()));
   m_config = config;
   std::visit([&](lighting_array auto& array) {
@@ -191,7 +191,7 @@ std::expected<void, StarException> CellularLightingCalculator::calculate(Lightma
 
   return std::visit([&]<lighting_array Array>(Array& array) -> std::expected<void, StarException> {
     array.calculate(array_min[0], array_min[1], array_max[0], array_max[1]);
-    auto brightness_limit = m_config.getFloat("brightnessLimit");
+    auto brightness_limit = m_config.get_float("brightnessLimit");
     if (!brightness_limit)
       return std::unexpected(std::move(brightness_limit.error()));
     auto resized = output.resizeForOverwrite(array_max[0] - array_min[0], array_max[1] - array_min[1]);
@@ -225,19 +225,19 @@ void CellularLightingCalculator::setupImage(Image& image, PixelFormat format) co
 }
 
 std::expected<void, StarException> CellularLightIntensityCalculator::setParameters(Json const& config) {
-  auto passes = config.getInt("spreadPasses");
+  auto passes = config.get_int("spreadPasses");
   if (!passes) return std::unexpected(std::move(passes.error()));
-  auto spreadAir = config.getFloat("spreadMaxAir");
+  auto spreadAir = config.get_float("spreadMaxAir");
   if (!spreadAir) return std::unexpected(std::move(spreadAir.error()));
-  auto spreadObstacle = config.getFloat("spreadMaxObstacle");
+  auto spreadObstacle = config.get_float("spreadMaxObstacle");
   if (!spreadObstacle) return std::unexpected(std::move(spreadObstacle.error()));
-  auto pointAir = config.getFloat("pointMaxAir");
+  auto pointAir = config.get_float("pointMaxAir");
   if (!pointAir) return std::unexpected(std::move(pointAir.error()));
-  auto pointObstacle = config.getFloat("pointMaxObstacle");
+  auto pointObstacle = config.get_float("pointMaxObstacle");
   if (!pointObstacle) return std::unexpected(std::move(pointObstacle.error()));
-  auto boost = config.getFloat("pointObstacleBoost");
+  auto boost = config.get_float("pointObstacleBoost");
   if (!boost) return std::unexpected(std::move(boost.error()));
-  auto additive = config.getBool("pointAdditive", false);
+  auto additive = config.get_bool("pointAdditive", false);
   if (!additive) return std::unexpected(std::move(additive.error()));
   m_lightArray.setParameters(*passes, *spreadAir, *spreadObstacle, *pointAir, *pointObstacle, *boost, *additive);
   return {};

@@ -462,7 +462,7 @@ std::expected<LuaCallbacks, StarException> LuaBaseComponent::makeThreadsCallback
                                    [&self = *this](Json parameters) -> std::expected<String, StarException> {
                                      if (auto cleaned = self.cleanThreads(); !cleaned)
                                        return std::unexpected(std::move(cleaned.error()));
-                                     auto name = parameters.getString("name", Uuid(self.m_root.random()).hex());
+                                     auto name = parameters.get_string("name", Uuid(self.m_root.random()).hex());
                                      if (!name)
                                        return std::unexpected(std::move(name.error()));
                                      if (auto old = self.m_threads.find_ref(*name)) {
@@ -759,13 +759,13 @@ std::expected<void, StarException> LuaScriptUpdate::finishShutdown(std::expected
     MessageHandler info;
     if (std::holds_alternative<Json>(message)) {
       auto const& config = std::get<Json>(message);
-      auto passName = config.getBool("passName", false);
+      auto passName = config.get_bool("passName", false);
       if (!passName)
         return std::unexpected(std::move(passName.error()));
-      auto localOnly = config.getBool("localOnly", false);
+      auto localOnly = config.get_bool("localOnly", false);
       if (!localOnly)
         return std::unexpected(std::move(localOnly.error()));
-      auto name = config.getString("name");
+      auto name = config.get_string("name");
       if (!name)
         return std::unexpected(std::move(name.error()));
       info.passName = *passName;

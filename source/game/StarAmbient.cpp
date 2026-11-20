@@ -45,7 +45,7 @@ std::expected<AmbientTrackGroup, StarException> AmbientTrackGroup::create(Json c
   auto trackConfig = config.get("tracks", JsonArray());
   if (!trackConfig)
     return std::unexpected(std::move(trackConfig.error()));
-  auto values = jsonToStringList(*trackConfig);
+  auto values = json_to_string_list(*trackConfig);
   if (!values)
     return std::unexpected(std::move(values.error()));
   AmbientTrackGroup group;
@@ -55,7 +55,7 @@ std::expected<AmbientTrackGroup, StarException> AmbientTrackGroup::create(Json c
 }
 
 Json AmbientTrackGroup::toJson() const {
-  return JsonObject{{"tracks", jsonFromStringList(tracks)}};
+  return JsonObject{{"tracks", json_from_string_list(tracks)}};
 }
 
 AmbientNoisesDescription::AmbientNoisesDescription() = default;
@@ -83,7 +83,7 @@ std::expected<AmbientNoisesDescription, StarException> AmbientNoisesDescription:
       return std::unexpected(std::move(sounds.error()));
     result.nightSounds = std::move(*sounds);
   }
-  auto loops = config.optInt("loops");
+  auto loops = config.opt_int("loops");
   if (!loops)
     return std::unexpected(std::move(loops.error()));
   if (*loops)

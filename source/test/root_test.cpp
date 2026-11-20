@@ -200,7 +200,7 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
   if (!assets) return std::unexpected(std::move(assets.error()));
   auto config = (*assets)->json("/root-isolation.config");
   if (!config) return std::unexpected(std::move(config.error()));
-  EXPECT_EQ(config->getString("owner"), owner);
+  EXPECT_EQ(config->get_string("owner"), owner);
   auto database = root.techDatabase();
   if (!database) return std::unexpected(std::move(database.error()));
   auto tech = (*database)->tech("root-isolation");
@@ -210,7 +210,7 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
   if (!configuration) return std::unexpected(std::move(configuration.error()));
   auto value = (*configuration)->get("rootIsolationOwner");
   if (!value) return std::unexpected(std::move(value.error()));
-  EXPECT_EQ(value->toString(), configurationOwner);
+  EXPECT_EQ(value->to_string(), configurationOwner);
   EXPECT_EQ(context.eval<String>("root.assetJson('/root-isolation.config').owner"), owner);
   EXPECT_EQ(context.eval<String>("root.techConfig('root-isolation').description"), owner);
   EXPECT_EQ(context.eval<String>("root.getConfiguration('rootIsolationOwner')"), configurationOwner);
@@ -241,9 +241,9 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
 [[nodiscard]] std::expected<String, StarException> isolationStoredOwner(String const& directory) {
   auto content = File::read_file_string(File::relative_to(directory, "root-isolation.config"));
   if (!content) return std::unexpected(std::move(content.error()));
-  auto json = Json::parseJson(*content);
+  auto json = Json::parse_json(*content);
   if (!json) return std::unexpected(std::move(json.error()));
-  return json->getString("rootIsolationOwner");
+  return json->get_string("rootIsolationOwner");
 }
 
 const GameTestRegistration secure_identity("RootTest", "SecureIdentityStability", [](GameTest& fixture) {
@@ -410,10 +410,10 @@ const GameTestRegistration strictLuaTags("RootTest", "StrictLuaTagFormatting", [
     }
   )LUA");
   ASSERT_TRUE(result) << result.error().what();
-  EXPECT_EQ(result->getString("text"), String("<worldName> 日%<literal> {not:std-format}"));
-  EXPECT_EQ(result->getString("binary"), String(std::string("a\0z\0qb", 6)));
+  EXPECT_EQ(result->get_string("text"), String("<worldName> 日%<literal> {not:std-format}"));
+  EXPECT_EQ(result->get_string("binary"), String(std::string("a\0z\0qb", 6)));
   EXPECT_EQ(result->get("rejected"), Json(JsonArray{true, true, true}));
-  EXPECT_EQ(result->getString("recovered"), String("again"));
+  EXPECT_EQ(result->get_string("recovered"), String("again"));
 });
 
 const GameTestRegistration lua_http_cancellation("RootTest", "LuaHttpCancellation", [](GameTest& fixture) {
@@ -727,7 +727,7 @@ const GameTestRegistration questTemplateItemBoundaries("RootTest", "QuestTemplat
     EXPECT_TRUE((*quest)->rewards.empty());
     EXPECT_TRUE((*quest)->requiredItems.empty());
   }
-  auto config = Json::parseJson(R"JSON({
+  auto config = Json::parse_json(R"JSON({
     "id": "borrowed-quest",
     "parameters": {
       "absent": {"type": "item"},
@@ -743,17 +743,17 @@ const GameTestRegistration questTemplateItemBoundaries("RootTest", "QuestTemplat
   EXPECT_FALSE((*quest)->parameterExamples.contains("absent"));
   auto nullExample = (*quest)->parameterExamples.get("null");
   ASSERT_TRUE(nullExample) << nullExample.error().what();
-  EXPECT_TRUE(nullExample->get().isNull());
+  EXPECT_TRUE(nullExample->get().is_null());
   auto valueExample = (*quest)->parameterExamples.get("value");
   ASSERT_TRUE(valueExample) << valueExample.error().what();
-  EXPECT_EQ(valueExample->get().getUInt("count"), 3u);
+  EXPECT_EQ(valueExample->get().get_uint("count"), 3u);
   ASSERT_EQ((*quest)->rewards.size(), 2u);
   EXPECT_TRUE((*quest)->rewards[0].empty());
   ASSERT_EQ((*quest)->rewards[1].size(), 2u);
   EXPECT_EQ((*quest)->rewards[1][0].name(), "money");
   EXPECT_EQ((*quest)->rewards[1][1].name(), "torch");
   EXPECT_EQ((*quest)->rewards[1][1].count(), 2u);
-  EXPECT_EQ((*quest)->rewards[1][1].parameters().getInt("colorIndex"), 4);
+  EXPECT_EQ((*quest)->rewards[1][1].parameters().get_int("colorIndex"), 4);
   ASSERT_EQ((*quest)->requiredItems.size(), 2u);
   EXPECT_TRUE((*quest)->requiredItems[0].isNull());
   EXPECT_EQ((*quest)->requiredItems[1].count(), 5u);
@@ -813,7 +813,7 @@ const GameTestRegistration bushShapeBoundaries("RootTest", "BushShapeBoundaries"
 const GameTestRegistration npcEquipmentBoundaries("RootTest", "NpcEquipmentBoundaries", [](GameTest& fixture) {
   auto database = fixture.root().npcDatabase();
   ASSERT_TRUE(database) << database.error().what();
-  auto overrides = Json::parseJson(R"JSON({
+  auto overrides = Json::parse_json(R"JSON({
     "levelVariance":[0,0], "npcname":"Borrowed", "matchColorIndices":true,
     "items":{"override":[
       [0,[{"head":["early"]}]],
@@ -834,10 +834,10 @@ const GameTestRegistration npcEquipmentBoundaries("RootTest", "NpcEquipmentBound
   ASSERT_TRUE(chest) << chest.error().what();
   EXPECT_EQ(head->get().name(), "late-head");
   EXPECT_EQ(chest->get().name(), "late-chest");
-  auto color = head->get().parameters().getInt("colorIndex");
+  auto color = head->get().parameters().get_int("colorIndex");
   ASSERT_TRUE(color) << color.error().what();
   EXPECT_TRUE(*color == 2 || *color == 4);
-  EXPECT_EQ(chest->get().parameters().getInt("colorIndex"), *color);
+  EXPECT_EQ(chest->get().parameters().get_int("colorIndex"), *color);
 
   // Removing unselected levels cannot change any generated variant field or
   // equipment RNG draw. The last qualifying entry wins, not the greatest level.
@@ -866,7 +866,7 @@ const GameTestRegistration npcEquipmentBoundaries("RootTest", "NpcEquipmentBound
   for (auto const& source :
        {R"JSON({"items":{"override":[[0,[]]]}})JSON", R"JSON({"items":{"override":[[0,[{"head":[]}]]]}})JSON",
         R"JSON({"items":{"override":[[0,[{"head":[{"name":"empty-color","parameters":{"colorIndex":[]}}]}]]]}})JSON"}) {
-    auto invalid = Json::parseJson(String(std::string_view(source)));
+    auto invalid = Json::parse_json(String(std::string_view(source)));
     ASSERT_TRUE(invalid) << invalid.error().what();
     EXPECT_FALSE((*database)->generateNpcVariant("human", "villager", 10.0f, 0x12345678, *invalid));
   }
@@ -879,13 +879,54 @@ const GameTestRegistration monsterDropPoolBoundaries("RootTest", "MonsterDropPoo
   for (auto const& config : {Json(JsonArray{}), Json("borrowed-pool"), Json(JsonArray{pool})}) {
     auto variant = (*database)->monsterVariant("poptop", 0x12345678, JsonObject{{"dropPools", config}});
     ASSERT_TRUE(variant) << variant.error().what();
-    auto expected = config.isType(Json::Type::Array) ? (config == Json(JsonArray{}) ? Json() : pool) : config;
+    auto expected = config.is_type(Json::Type::Array) ? (config == Json(JsonArray{}) ? Json() : pool) : config;
     EXPECT_EQ(variant->dropPoolConfig, expected);
   }
 });
 
+const GameTestRegistration monster_part_merge("RootTest", "MonsterPartShallowMerge", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory) << directory.error().what();
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto settings = isolationSettings(fixture.rootSettings(), *directory, "monster-part-merge");
+  ASSERT_TRUE(settings) << settings.error().what();
+  auto overlay = File::relative_to(*directory, "assets");
+  ASSERT_TRUE(writeIsolationModules(overlay, {
+    {"merge-probe.animation", "{}"},
+    {"merge-probe.monstertype", R"JSON({
+      "type":"merge-probe","categories":["merge-probe"],"parts":["body"],"animation":"merge-probe.animation",
+      "baseParameters":{"scripts":[],"scale":1,"metaBoundBox":[0,0,1,1],"mouthOffset":[0,0],"feetOffset":[0,0],
+        "statusSettings":{},"selfDamagePoly":[[0,0],[1,0],[0,1]]},
+      "partParameterDescription":{
+        "list":["merge",[1,2]],"map":["merge",{"left":1,"nested":{"old":1}}],
+        "same":["merge",1],"different":["merge",1],"absent":["merge",null],"ignored":["merge",true]
+      }
+    })JSON"},
+    {"merge-probe.monsterpart", R"JSON({
+      "name":"merge-probe-body","category":"merge-probe","type":"body","frames":{},
+      "parameters":{"list":[3,4],"map":{"right":2,"nested":{"new":2}},
+        "same":2,"different":"changed","absent":[5],"ignored":null}
+    })JSON"}
+  }));
+  auto root = Root::create(std::move(*settings));
+  ASSERT_TRUE(root) << root.error().what();
+  auto database = (*root)->monsterDatabase();
+  ASSERT_TRUE(database) << database.error().what();
+  auto variant = (*database)->monsterVariant("merge-probe", 42);
+  ASSERT_TRUE(variant) << variant.error().what();
+  auto expected = Json::parse_json(R"JSON({
+    "list":[1,2,3,4],"map":{"left":1,"nested":{"new":2},"right":2},
+    "same":1,"different":"changed","absent":[5],"ignored":true
+  })JSON");
+  ASSERT_TRUE(expected) << expected.error().what();
+  auto fields = expected->iterate_object();
+  ASSERT_TRUE(fields) << fields.error().what();
+  for (auto const& [key, value] : *fields)
+    EXPECT_EQ(variant->parameters.get(key), value) << key.utf8();
+});
+
 void expectIsolationModuleError(Json const& result, String const& field, String const& fragment) {
-  auto message = result.getString(field);
+  auto message = result.get_string(field);
   ASSERT_TRUE(message) << message.error().what();
   EXPECT_TRUE(message->contains(fragment)) << message->utf8();
 }
@@ -996,13 +1037,13 @@ const GameTestRegistration
     }
   )LUA");
     ASSERT_TRUE(failures) << failures.error().what();
-    EXPECT_EQ(failures->getBool("firstOk"), false);
-    EXPECT_EQ(failures->getBool("secondOk"), false);
+    EXPECT_EQ(failures->get_bool("firstOk"), false);
+    EXPECT_EQ(failures->get_bool("secondOk"), false);
     expectIsolationModuleError(*failures, "firstError", "controlled module failure");
     expectIsolationModuleError(*failures, "secondError", "controlled module failure");
-    EXPECT_EQ(failures->getInt("attempts"), 2);
-    EXPECT_EQ(failures->getInt("dependencies"), 1);
-    EXPECT_EQ(failures->getBool("ready"), false);
+    EXPECT_EQ(failures->get_int("attempts"), 2);
+    EXPECT_EQ(failures->get_int("dependencies"), 1);
+    EXPECT_EQ(failures->get_bool("ready"), false);
     auto retry = context->eval<Json>(R"LUA(
     allowSuccess = true
     local results = select("#", require("/p5-failure.lua"))
@@ -1022,16 +1063,16 @@ const GameTestRegistration
     }
   )LUA");
     ASSERT_TRUE(cycles) << cycles.error().what();
-    EXPECT_EQ(cycles->getBool("selfOk"), false);
-    EXPECT_EQ(cycles->getBool("cycleOk"), false);
+    EXPECT_EQ(cycles->get_bool("selfOk"), false);
+    EXPECT_EQ(cycles->get_bool("cycleOk"), false);
     expectIsolationModuleError(*cycles, "selfError", "/p5-self.lua -> /p5-self.lua");
     expectIsolationModuleError(*cycles, "cycleError", "/p5-cycle-a.lua -> /p5-cycle-b.lua -> /p5-cycle-a.lua");
-    EXPECT_EQ(cycles->getInt("selfAttempts"), 1);
-    EXPECT_EQ(cycles->getInt("aAttempts"), 1);
-    EXPECT_EQ(cycles->getInt("bAttempts"), 1);
-    EXPECT_EQ(cycles->getBool("selfReady"), false);
-    EXPECT_EQ(cycles->getBool("aReady"), false);
-    EXPECT_EQ(cycles->getBool("bReady"), false);
+    EXPECT_EQ(cycles->get_int("selfAttempts"), 1);
+    EXPECT_EQ(cycles->get_int("aAttempts"), 1);
+    EXPECT_EQ(cycles->get_int("bAttempts"), 1);
+    EXPECT_EQ(cycles->get_bool("selfReady"), false);
+    EXPECT_EQ(cycles->get_bool("aReady"), false);
+    EXPECT_EQ(cycles->get_bool("bReady"), false);
     auto recovered = context->eval<Json>(R"LUA(
     allowSelf = true
     allowCycle = true
@@ -1124,12 +1165,12 @@ const GameTestRegistration
     }
   )LUA");
     ASSERT_TRUE(staleReload) << staleReload.error().what();
-    EXPECT_EQ(staleReload->getBool("ok"), false);
+    EXPECT_EQ(staleReload->get_bool("ok"), false);
     expectIsolationModuleError(*staleReload, "message", "/p5-after-reload.lua");
-    EXPECT_EQ(staleReload->getInt("version"), 1);
-    EXPECT_EQ(staleReload->getInt("loadedResults"), 0);
-    EXPECT_EQ(staleReload->getInt("runs"), 1);
-    EXPECT_EQ(staleReload->getBool("unseenAbsent"), true);
+    EXPECT_EQ(staleReload->get_int("version"), 1);
+    EXPECT_EQ(staleReload->get_int("loadedResults"), 0);
+    EXPECT_EQ(staleReload->get_int("runs"), 1);
+    EXPECT_EQ(staleReload->get_bool("unseenAbsent"), true);
     auto reloaded = (*lua)->createContext(StringList{"/p5-version.lua", "/p5-after-reload.lua"});
     ASSERT_TRUE(reloaded) << reloaded.error().what();
     EXPECT_EQ(reloaded->invokePath<int>("version"), 2);
@@ -1149,12 +1190,12 @@ const GameTestRegistration
     }
   )LUA");
     ASSERT_TRUE(staleRestart) << staleRestart.error().what();
-    EXPECT_EQ(staleRestart->getBool("ok"), false);
+    EXPECT_EQ(staleRestart->get_bool("ok"), false);
     expectIsolationModuleError(*staleRestart, "message", "/p5-after-restart.lua");
-    EXPECT_EQ(staleRestart->getInt("version"), 2);
-    EXPECT_EQ(staleRestart->getInt("loadedResults"), 0);
-    EXPECT_EQ(staleRestart->getInt("runs"), 1);
-    EXPECT_EQ(staleRestart->getBool("unseenAbsent"), true);
+    EXPECT_EQ(staleRestart->get_int("version"), 2);
+    EXPECT_EQ(staleRestart->get_int("loadedResults"), 0);
+    EXPECT_EQ(staleRestart->get_int("runs"), 1);
+    EXPECT_EQ(staleRestart->get_bool("unseenAbsent"), true);
     EXPECT_EQ(original->invokePath<int>("version"), 1);
     EXPECT_EQ(reloaded->invokePath<int>("afterReload"), 2);
     auto restarted = (*lua)->createContext(StringList{"/p5-version.lua", "/p5-after-restart.lua"});
@@ -1198,10 +1239,10 @@ const GameTestRegistration
       return {ok = ok, message = tostring(message), runs = moduleRuns, retained = retainedValue()}
     )LUA");
       ASSERT_TRUE(interrupted) << interrupted.error().what();
-      EXPECT_EQ(interrupted->getBool("ok"), false);
+      EXPECT_EQ(interrupted->get_bool("ok"), false);
       expectIsolationModuleError(*interrupted, "message", "/p5-reentrant.lua");
-      EXPECT_EQ(interrupted->getInt("runs"), 1);
-      EXPECT_EQ(interrupted->getInt("retained"), 1);
+      EXPECT_EQ(interrupted->get_int("runs"), 1);
+      EXPECT_EQ(interrupted->get_int("retained"), 1);
       EXPECT_EQ(invalidations, 1);
       auto staleRetry = context->eval<Json>(R"LUA(
       invalidateDuringLoad = false
@@ -1209,9 +1250,9 @@ const GameTestRegistration
       return {ok = ok, message = tostring(message), runs = moduleRuns}
     )LUA");
       ASSERT_TRUE(staleRetry) << staleRetry.error().what();
-      EXPECT_EQ(staleRetry->getBool("ok"), false);
+      EXPECT_EQ(staleRetry->get_bool("ok"), false);
       expectIsolationModuleError(*staleRetry, "message", "/p5-reentrant.lua");
-      EXPECT_EQ(staleRetry->getInt("runs"), 1);
+      EXPECT_EQ(staleRetry->get_int("runs"), 1);
       EXPECT_EQ(invalidations, 1);
       auto fresh = (*lua)->createContext("/p5-reentrant.lua");
       ASSERT_TRUE(fresh) << fresh.error().what();
@@ -1498,7 +1539,7 @@ const GameTestRegistration simultaneousWorldMaterials("RootTest", "SimultaneousW
 });
 
 const GameTestRegistration animatorPartDrawableFirstAdd("AnimatorTest", "PartDrawableFirstAdd", [](GameTest& fixture) {
-  auto config = Json::parseJson(R"JSON({"animatedParts":{"parts":{"body":{"properties":{}}}}})JSON");
+  auto config = Json::parse_json(R"JSON({"animatedParts":{"parts":{"body":{"properties":{}}}}})JSON");
   ASSERT_TRUE(config) << config.error().what();
   for (bool scripted : {false, true}) {
     for (bool emptyFirst : {false, true}) {
@@ -1527,7 +1568,7 @@ const GameTestRegistration animatorPartDrawableFirstAdd("AnimatorTest", "PartDra
         for (auto const& drawable : *drawables) {
           auto json = drawable.toJson();
           if (!json) return std::unexpected(std::move(json.error()));
-          auto width = json->getFloat("width");
+          auto width = json->get_float("width");
           if (!width) return std::unexpected(std::move(width.error()));
           result.push_back(*width);
         }
@@ -1586,7 +1627,7 @@ std::expected<BagSlot, StarException> hudItemBagSlot(Root& root, PlayerInventory
   if (!assets) return std::unexpected(std::move(assets.error()));
   auto config = (*assets)->json("/player.config:inventory.itemBags");
   if (!config) return std::unexpected(std::move(config.error()));
-  auto bags = config->toObject();
+  auto bags = config->to_object();
   if (!bags) return std::unexpected(std::move(bags.error()));
   auto names = bags->keys();
   names.sort();
@@ -1618,7 +1659,7 @@ const GameTestRegistration hudInventoryLinks("HudDomainTest", "InventoryLinksPre
   };
   auto expectItem = [](std::expected<std::shared_ptr<Item>, StarException> const& actual, Json const& descriptor) {
     ASSERT_TRUE(actual) << actual.error().what();
-    if (descriptor.isNull()) {
+    if (descriptor.is_null()) {
       EXPECT_FALSE(*actual);
       return;
     }

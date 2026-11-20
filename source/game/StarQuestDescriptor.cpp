@@ -25,7 +25,7 @@ bool QuestNpcType::operator==(QuestNpcType const& rhs) const { return species ==
 bool QuestCoordinate::operator==(QuestCoordinate const& rhs) const { return coordinate == rhs.coordinate; }
 
 [[nodiscard]] std::expected<QuestParamDetail, StarException> questParamDetailFromJson(Json const& json) {
-  auto type = json.getString("type");
+  auto type = json.get_string("type");
   if (!type) return std::unexpected(std::move(type.error()));
   if (*type == "item") {
     auto spec = json.get("item");
@@ -34,11 +34,11 @@ bool QuestCoordinate::operator==(QuestCoordinate const& rhs) const { return coor
     if (!item) return std::unexpected(std::move(item.error()));
     return QuestParamDetail(QuestItem{item->name(), item->parameters()});
   } else if (*type == "itemTag") {
-    auto tag = json.getString("tag");
+    auto tag = json.get_string("tag");
     if (!tag) return std::unexpected(std::move(tag.error()));
     return QuestParamDetail(QuestItemTag(*tag));
   } else if (*type == "itemList") {
-    auto specs = json.getArray("items");
+    auto specs = json.get_array("items");
     if (!specs) return std::unexpected(std::move(specs.error()));
     QuestItemList items;
     for (auto const& spec : *specs) {
@@ -48,11 +48,11 @@ bool QuestCoordinate::operator==(QuestCoordinate const& rhs) const { return coor
     }
     return QuestParamDetail(std::move(items));
   } else if (*type == "entity") {
-    auto id = json.optString("uniqueId");
+    auto id = json.opt_string("uniqueId");
     if (!id) return std::unexpected(std::move(id.error()));
-    auto species = json.optString("species");
+    auto species = json.opt_string("species");
     if (!species) return std::unexpected(std::move(species.error()));
-    auto name = json.optString("gender");
+    auto name = json.opt_string("gender");
     if (!name) return std::unexpected(std::move(name.error()));
     std::optional<Gender> gender;
     if (*name) {
@@ -62,27 +62,27 @@ bool QuestCoordinate::operator==(QuestCoordinate const& rhs) const { return coor
     }
     return QuestParamDetail(QuestEntity{*id, *species, gender});
   } else if (*type == "location") {
-    auto id = json.optString("uniqueId");
+    auto id = json.opt_string("uniqueId");
     if (!id) return std::unexpected(std::move(id.error()));
     auto regionJson = json.get("region");
     if (!regionJson) return std::unexpected(std::move(regionJson.error()));
-    auto region = jsonToRectF(*regionJson);
+    auto region = json_to_rectf(*regionJson);
     if (!region) return std::unexpected(std::move(region.error()));
     return QuestParamDetail(QuestLocation{*id, *region});
   } else if (*type == "monsterType") {
-    auto name = json.getString("typeName");
+    auto name = json.get_string("typeName");
     if (!name) return std::unexpected(std::move(name.error()));
-    auto parameters = json.getObject("parameters", {});
+    auto parameters = json.get_object("parameters", {});
     if (!parameters) return std::unexpected(std::move(parameters.error()));
     return QuestParamDetail(QuestMonsterType{*name, *parameters});
   } else if (*type == "npcType") {
-    auto species = json.getString("species");
+    auto species = json.get_string("species");
     if (!species) return std::unexpected(std::move(species.error()));
-    auto name = json.getString("typeName");
+    auto name = json.get_string("typeName");
     if (!name) return std::unexpected(std::move(name.error()));
-    auto parameters = json.getObject("parameters", {});
+    auto parameters = json.get_object("parameters", {});
     if (!parameters) return std::unexpected(std::move(parameters.error()));
-    auto seed = json.optUInt("seed");
+    auto seed = json.opt_uint("seed");
     if (!seed) return std::unexpected(std::move(seed.error()));
     return QuestParamDetail(QuestNpcType{*species, *name, *parameters, *seed});
   } else if (*type == "coordinate") {
@@ -98,16 +98,16 @@ bool QuestCoordinate::operator==(QuestCoordinate const& rhs) const { return coor
 std::expected<QuestParam, StarException> QuestParam::fromJson(Json const& json) {
   auto detail = questParamDetailFromJson(json);
   if (!detail) return std::unexpected(std::move(detail.error()));
-  auto name = json.optString("name");
+  auto name = json.opt_string("name");
   if (!name) return std::unexpected(std::move(name.error()));
   auto portrait = json.opt("portrait");
   if (!portrait) return std::unexpected(std::move(portrait.error()));
-  auto indicator = json.optString("indicator");
+  auto indicator = json.opt_string("indicator");
   if (!indicator) return std::unexpected(std::move(indicator.error()));
   return QuestParam{std::move(*detail), *name, *portrait, *indicator};
 }
 [[nodiscard]] std::expected<QuestParamDetail, StarException> questParamDetailDiskLoad(Root& root, Json const& json) {
-  auto type = json.getString("type");
+  auto type = json.get_string("type");
   if (!type) return std::unexpected(std::move(type.error()));
   if (*type != "item" && *type != "itemList") return questParamDetailFromJson(json);
   auto database = root.versioningDatabase();
@@ -119,7 +119,7 @@ std::expected<QuestParam, StarException> QuestParam::fromJson(Json const& json) 
     if (!item) return std::unexpected(std::move(item.error()));
     return QuestParamDetail(QuestItem{item->name(), item->parameters()});
   }
-  auto specs = json.getArray("items");
+  auto specs = json.get_array("items");
   if (!specs) return std::unexpected(std::move(specs.error()));
   QuestItemList items;
   for (auto const& spec : *specs) {
@@ -132,11 +132,11 @@ std::expected<QuestParam, StarException> QuestParam::fromJson(Json const& json) 
 std::expected<QuestParam, StarException> QuestParam::diskLoad(Root& root, Json const& json) {
   auto detail = questParamDetailDiskLoad(root, json);
   if (!detail) return std::unexpected(std::move(detail.error()));
-  auto name = json.optString("name");
+  auto name = json.opt_string("name");
   if (!name) return std::unexpected(std::move(name.error()));
   auto portrait = json.opt("portrait");
   if (!portrait) return std::unexpected(std::move(portrait.error()));
-  auto indicator = json.optString("indicator");
+  auto indicator = json.opt_string("indicator");
   if (!indicator) return std::unexpected(std::move(indicator.error()));
   return QuestParam{std::move(*detail), *name, *portrait, *indicator};
 }
@@ -162,7 +162,7 @@ std::expected<QuestParam, StarException> QuestParam::diskLoad(Root& root, Json c
     return JsonObject{{"type", "entity"}, {"uniqueId", json_from_optional(entity.uniqueId)}, {"species", json_from_optional(entity.species)}, {"gender", gender}};
   } else if (std::holds_alternative<QuestLocation>(detail)) {
     auto const& location = std::get<QuestLocation>(detail);
-    return JsonObject{{"type", "location"}, {"uniqueId", json_from_optional(location.uniqueId)}, {"region", jsonFromRectF(location.region)}};
+    return JsonObject{{"type", "location"}, {"uniqueId", json_from_optional(location.uniqueId)}, {"region", json_from_rectf(location.region)}};
   } else if (std::holds_alternative<QuestMonsterType>(detail)) {
     auto const& monster = std::get<QuestMonsterType>(detail);
     return JsonObject{{"type", "monsterType"}, {"typeName", monster.typeName}, {"parameters", monster.parameters}};
@@ -195,7 +195,7 @@ std::expected<QuestParam, StarException> QuestParam::diskLoad(Root& root, Json c
 std::expected<Json, StarException> QuestParam::toJson() const {
   auto json = questParamDetailToJson(detail);
   if (!json) return std::unexpected(std::move(json.error()));
-  auto object = json->toObject();
+  auto object = json->to_object();
   if (!object) return std::unexpected(std::move(object.error()));
   (*object)["name"] = json_from_optional(name);
   (*object)["portrait"] = json_from_optional(portrait);
@@ -205,7 +205,7 @@ std::expected<Json, StarException> QuestParam::toJson() const {
 std::expected<Json, StarException> QuestParam::diskStore(Root& root) const {
   auto json = questParamDetailDiskStore(root, detail);
   if (!json) return std::unexpected(std::move(json.error()));
-  auto object = json->toObject();
+  auto object = json->to_object();
   if (!object) return std::unexpected(std::move(object.error()));
   (*object)["name"] = json_from_optional(name);
   (*object)["portrait"] = json_from_optional(portrait);
@@ -214,20 +214,20 @@ std::expected<Json, StarException> QuestParam::diskStore(Root& root) const {
 }
 bool QuestParam::operator==(QuestParam const& rhs) const { return detail == rhs.detail && name == rhs.name && portrait == rhs.portrait && indicator == rhs.indicator; }
 std::expected<QuestDescriptor, StarException> QuestDescriptor::fromJson(Root& root, Json const& json) {
-  if (json.isType(Json::Type::String)) {
-    auto name = json.toString();
+  if (json.is_type(Json::Type::String)) {
+    auto name = json.to_string();
     if (!name) return std::unexpected(std::move(name.error()));
     return QuestDescriptor{*name, *name, {}, root.random().next_u64()};
   }
-  auto id = json.getString("questId");
+  auto id = json.get_string("questId");
   if (!id) return std::unexpected(std::move(id.error()));
-  auto templateId = json.getString("templateId");
+  auto templateId = json.get_string("templateId");
   if (!templateId) return std::unexpected(std::move(templateId.error()));
   auto params = json.get("parameters");
   if (!params) return std::unexpected(std::move(params.error()));
   auto parameters = questParamsFromJson(*params);
   if (!parameters) return std::unexpected(std::move(parameters.error()));
-  auto seed = json.getUInt("seed", root.random().next_u64());
+  auto seed = json.get_uint("seed", root.random().next_u64());
   if (!seed) return std::unexpected(std::move(seed.error()));
   return QuestDescriptor{*id, *templateId, std::move(*parameters), *seed};
 }
@@ -238,15 +238,15 @@ std::expected<QuestDescriptor, StarException> QuestDescriptor::diskLoad(Root& ro
   if (!versioned) return std::unexpected(std::move(versioned.error()));
   auto json = (*database)->loadVersionedJson(*versioned, "QuestDescriptor");
   if (!json) return std::unexpected(std::move(json.error()));
-  auto id = json->getString("questId");
+  auto id = json->get_string("questId");
   if (!id) return std::unexpected(std::move(id.error()));
-  auto templateId = json->getString("templateId");
+  auto templateId = json->get_string("templateId");
   if (!templateId) return std::unexpected(std::move(templateId.error()));
   auto params = json->get("parameters");
   if (!params) return std::unexpected(std::move(params.error()));
   auto parameters = questParamsDiskLoad(root, *params);
   if (!parameters) return std::unexpected(std::move(parameters.error()));
-  auto seed = json->getUInt("seed", root.random().next_u64());
+  auto seed = json->get_uint("seed", root.random().next_u64());
   if (!seed) return std::unexpected(std::move(seed.error()));
   return QuestDescriptor{*id, *templateId, std::move(*parameters), *seed};
 }
@@ -266,11 +266,11 @@ std::expected<Json, StarException> QuestDescriptor::diskStore(Root& root) const 
 }
 bool QuestDescriptor::operator==(QuestDescriptor const& rhs) const { return questId == rhs.questId && templateId == rhs.templateId && parameters == rhs.parameters && seed == rhs.seed; }
 std::expected<QuestArcDescriptor, StarException> QuestArcDescriptor::fromJson(Root& root, Json const& json) {
-  if (json.isType(Json::Type::Object)) {
+  if (json.is_type(Json::Type::Object)) {
     auto contains = json.contains("quests");
     if (!contains) return std::unexpected(std::move(contains.error()));
     if (*contains) {
-      auto array = json.getArray("quests");
+      auto array = json.get_array("quests");
       if (!array) return std::unexpected(std::move(array.error()));
       QuestArcDescriptor arc;
       for (auto const& entry : *array) {
@@ -278,7 +278,7 @@ std::expected<QuestArcDescriptor, StarException> QuestArcDescriptor::fromJson(Ro
         if (!quest) return std::unexpected(std::move(quest.error()));
         arc.quests.push_back(std::move(*quest));
       }
-      auto id = json.optString("stagehandUniqueId");
+      auto id = json.opt_string("stagehandUniqueId");
       if (!id) return std::unexpected(std::move(id.error()));
       arc.stagehandUniqueId = std::move(*id);
       return arc;
@@ -295,7 +295,7 @@ std::expected<QuestArcDescriptor, StarException> QuestArcDescriptor::diskLoad(Ro
   if (!versioned) return std::unexpected(std::move(versioned.error()));
   auto json = (*database)->loadVersionedJson(*versioned, "QuestArcDescriptor");
   if (!json) return std::unexpected(std::move(json.error()));
-  auto array = json->getArray("quests");
+  auto array = json->get_array("quests");
   if (!array) return std::unexpected(std::move(array.error()));
   QuestArcDescriptor arc;
   for (auto const& entry : *array) {
@@ -303,7 +303,7 @@ std::expected<QuestArcDescriptor, StarException> QuestArcDescriptor::diskLoad(Ro
     if (!quest) return std::unexpected(std::move(quest.error()));
     arc.quests.push_back(std::move(*quest));
   }
-  auto id = json->optString("stagehandUniqueId");
+  auto id = json->opt_string("stagehandUniqueId");
   if (!id) return std::unexpected(std::move(id.error()));
   arc.stagehandUniqueId = std::move(*id);
   return arc;
@@ -361,10 +361,10 @@ std::expected<StringMap<String>, StarException> questParamTags(Root& root, Strin
   }
   return result;
 }
-std::expected<StringMap<QuestParam>, StarException> questParamsFromJson(Json const& json) { return jsonToMapV<StringMap<QuestParam>>(json, [](Json const& param) { return QuestParam::fromJson(param); }); }
-std::expected<StringMap<QuestParam>, StarException> questParamsDiskLoad(Root& root, Json const& json) { return jsonToMapV<StringMap<QuestParam>>(json, [&root](Json const& param) { return QuestParam::diskLoad(root, param); }); }
-std::expected<Json, StarException> questParamsToJson(StringMap<QuestParam> const& parameters) { return jsonFromMapV(parameters, [](QuestParam const& param) { return param.toJson(); }); }
-std::expected<Json, StarException> questParamsDiskStore(Root& root, StringMap<QuestParam> const& parameters) { return jsonFromMapV(parameters, [&root](QuestParam const& param) { return param.diskStore(root); }); }
+std::expected<StringMap<QuestParam>, StarException> questParamsFromJson(Json const& json) { return json_to_map_v<StringMap<QuestParam>>(json, [](Json const& param) { return QuestParam::fromJson(param); }); }
+std::expected<StringMap<QuestParam>, StarException> questParamsDiskLoad(Root& root, Json const& json) { return json_to_map_v<StringMap<QuestParam>>(json, [&root](Json const& param) { return QuestParam::diskLoad(root, param); }); }
+std::expected<Json, StarException> questParamsToJson(StringMap<QuestParam> const& parameters) { return json_from_map_v(parameters, [](QuestParam const& param) { return param.toJson(); }); }
+std::expected<Json, StarException> questParamsDiskStore(Root& root, StringMap<QuestParam> const& parameters) { return json_from_map_v(parameters, [&root](QuestParam const& param) { return param.diskStore(root); }); }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, QuestItem& item) {
   auto result = ds >> item.itemName >> item.parameters;

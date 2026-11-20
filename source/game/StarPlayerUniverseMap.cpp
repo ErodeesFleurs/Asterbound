@@ -46,7 +46,7 @@ template<> [[nodiscard]] std::expected<Json, StarException> jsonFromBookmarkTarg
 
 template<> [[nodiscard]] std::expected<OrbitTarget, StarException> jsonToBookmarkTarget<OrbitTarget>(Json const& json) {
   if (json.type() == Json::Type::String) {
-    auto text = json.toString();
+    auto text = json.to_string();
     if (!text)
       return std::unexpected(std::move(text.error()));
     auto uuid = Uuid::create(*text);
@@ -71,7 +71,7 @@ template<> [[nodiscard]] std::expected<TeleportTarget, StarException> jsonToBook
   auto worldJson = target.get(0);
   if (!worldJson)
     return std::unexpected(std::move(worldJson.error()));
-  auto worldText = worldJson->toString();
+  auto worldText = worldJson->to_string();
   if (!worldText)
     return std::unexpected(std::move(worldText.error()));
   auto world = parseWorldId(*worldText);
@@ -94,13 +94,13 @@ template <typename T>
   auto target = jsonToBookmarkTarget<T>(*targetJson);
   if (!target)
     return std::unexpected(std::move(target.error()));
-  auto targetName = json.getString("targetName");
+  auto targetName = json.get_string("targetName");
   if (!targetName)
     return std::unexpected(std::move(targetName.error()));
-  auto bookmarkName = json.getString("bookmarkName");
+  auto bookmarkName = json.get_string("bookmarkName");
   if (!bookmarkName)
     return std::unexpected(std::move(bookmarkName.error()));
-  auto icon = json.getString("icon");
+  auto icon = json.get_string("icon");
   if (!icon)
     return std::unexpected(std::move(icon.error()));
   return Bookmark<T>{std::move(*target), std::move(*targetName), std::move(*bookmarkName), std::move(*icon)};
@@ -119,7 +119,7 @@ PlayerUniverseMap::PlayerUniverseMap() = default;
 
 std::expected<PlayerUniverseMap, StarException> PlayerUniverseMap::create(Json const& json) {
   PlayerUniverseMap result;
-  auto maps = json.optObject();
+  auto maps = json.opt_object();
   if (!maps)
     return std::unexpected(std::move(maps.error()));
   if (*maps) {
@@ -338,7 +338,7 @@ void PlayerUniverseMap::setServerUuid(std::optional<Uuid> serverUuid) {
 
 std::expected<PlayerUniverseMap::SystemMap, StarException> PlayerUniverseMap::SystemMap::fromJson(Json const& json) {
   SystemMap map;
-  auto planets = json.getArray("mappedPlanets");
+  auto planets = json.get_array("mappedPlanets");
   if (!planets)
     return std::unexpected(std::move(planets.error()));
   for (auto const& value : *planets) {
@@ -347,11 +347,11 @@ std::expected<PlayerUniverseMap::SystemMap, StarException> PlayerUniverseMap::Sy
       return std::unexpected(std::move(coordinate.error()));
     map.mappedPlanets.add(std::move(*coordinate));
   }
-  auto objects = json.getObject("mappedObjects");
+  auto objects = json.get_object("mappedObjects");
   if (!objects)
     return std::unexpected(std::move(objects.error()));
   for (auto const& pair : *objects) {
-    auto typeName = pair.second.getString("typeName");
+    auto typeName = pair.second.get_string("typeName");
     if (!typeName)
       return std::unexpected(std::move(typeName.error()));
     auto orbitJson = pair.second.get("orbit");
@@ -360,7 +360,7 @@ std::expected<PlayerUniverseMap::SystemMap, StarException> PlayerUniverseMap::Sy
     auto orbit = json_to_optional<CelestialOrbit>(*orbitJson, [](Json const& value) { return CelestialOrbit::fromJson(value); });
     if (!orbit)
       return std::unexpected(std::move(orbit.error()));
-    auto parameters = pair.second.getObject("parameters", {});
+    auto parameters = pair.second.get_object("parameters", {});
     if (!parameters)
       return std::unexpected(std::move(parameters.error()));
     auto uuid = Uuid::create(pair.first);
@@ -368,7 +368,7 @@ std::expected<PlayerUniverseMap::SystemMap, StarException> PlayerUniverseMap::Sy
       return std::unexpected(std::move(uuid.error()));
     map.mappedObjects.set(std::move(*uuid), MappedObject{std::move(*typeName), std::move(*orbit), std::move(*parameters)});
   }
-  auto bookmarks = json.getArray("bookmarks");
+  auto bookmarks = json.get_array("bookmarks");
   if (!bookmarks)
     return std::unexpected(std::move(bookmarks.error()));
   for (auto const& value : *bookmarks) {
@@ -405,14 +405,14 @@ std::expected<Json, StarException> PlayerUniverseMap::SystemMap::toJson() const 
 
 std::expected<PlayerUniverseMap::UniverseMap, StarException> PlayerUniverseMap::UniverseMap::fromJson(Json const& json) {
   UniverseMap map;
-  auto systems = json.getArray("systems");
+  auto systems = json.get_array("systems");
   if (!systems)
     return std::unexpected(std::move(systems.error()));
   for (auto const& value : *systems) {
     auto locationJson = value.get(0);
     if (!locationJson)
       return std::unexpected(std::move(locationJson.error()));
-    auto location = jsonToVec3I(*locationJson);
+    auto location = json_to_vec3i(*locationJson);
     if (!location)
       return std::unexpected(std::move(location.error()));
     auto systemJson = value.get(1);
@@ -423,7 +423,7 @@ std::expected<PlayerUniverseMap::UniverseMap, StarException> PlayerUniverseMap::
       return std::unexpected(std::move(system.error()));
     map.systems.set(*location, std::move(*system));
   }
-  auto bookmarks = json.getArray("teleportBookmarks");
+  auto bookmarks = json.get_array("teleportBookmarks");
   if (!bookmarks)
     return std::unexpected(std::move(bookmarks.error()));
   for (auto const& value : *bookmarks) {
@@ -441,7 +441,7 @@ std::expected<Json, StarException> PlayerUniverseMap::UniverseMap::toJson() cons
     auto system = pair.second.toJson();
     if (!system)
       return std::unexpected(std::move(system.error()));
-    storedSystems.push_back(JsonArray{jsonFromVec3I(pair.first), std::move(*system)});
+    storedSystems.push_back(JsonArray{json_from_vec3i(pair.first), std::move(*system)});
   }
   JsonArray bookmarks;
   for (auto const& bookmark : teleportBookmarks) {

@@ -490,13 +490,13 @@ std::expected<void, StarException> WorldServerThread::runLoop(std::stop_token st
   auto config = (*assets)->json("/universe_server.config");
   if (!config)
     return std::unexpected(std::move(config.error()));
-  auto updateMeasureWindow = config->getDouble("updateMeasureWindow");
+  auto updateMeasureWindow = config->get_double("updateMeasureWindow");
   if (!updateMeasureWindow)
     return std::unexpected(std::move(updateMeasureWindow.error()));
-  auto fidelityDecrementScore = config->getDouble("fidelityDecrementScore");
+  auto fidelityDecrementScore = config->get_double("fidelityDecrementScore");
   if (!fidelityDecrementScore)
     return std::unexpected(std::move(fidelityDecrementScore.error()));
-  auto fidelityIncrementScore = config->getDouble("fidelityIncrementScore");
+  auto fidelityIncrementScore = config->get_double("fidelityIncrementScore");
   if (!fidelityIncrementScore)
     return std::unexpected(std::move(fidelityIncrementScore.error()));
   auto configuration = root.configuration();
@@ -505,7 +505,7 @@ std::expected<void, StarException> WorldServerThread::runLoop(std::stop_token st
   auto fidelityConfig = (*configuration)->get("serverFidelity");
   if (!fidelityConfig)
     return std::unexpected(std::move(fidelityConfig.error()));
-  auto serverFidelityMode = fidelityConfig->toString();
+  auto serverFidelityMode = fidelityConfig->to_string();
   if (!serverFidelityMode)
     return std::unexpected(std::move(serverFidelityMode.error()));
   auto automatic = serverFidelityMode->equals_ignore_case("automatic");
@@ -520,7 +520,7 @@ std::expected<void, StarException> WorldServerThread::runLoop(std::stop_token st
       return std::unexpected(std::move(fidelity.error()));
     lockedFidelity = fidelity->get();
   }
-  auto storageIntervalConfig = config->getDouble("worldStorageInterval");
+  auto storageIntervalConfig = config->get_double("worldStorageInterval");
   if (!storageIntervalConfig)
     return std::unexpected(std::move(storageIntervalConfig.error()));
   double storageInterval = *storageIntervalConfig / 1000.0;

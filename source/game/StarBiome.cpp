@@ -60,26 +60,26 @@ BiomePlaceables::BiomePlaceables() {
 std::expected<BiomePlaceables, StarException> BiomePlaceables::create(Assets const& assets, Json const& variant) {
   BiomePlaceables result;
   {
-    auto value = variant.getInt("grassMod");
+    auto value = variant.get_int("grassMod");
     if (!value) return std::unexpected(std::move(value.error()));
     result.grassMod = std::move(*value);
   }
   {
-    auto value = variant.getFloat("grassModDensity");
+    auto value = variant.get_float("grassModDensity");
     if (!value) return std::unexpected(std::move(value.error()));
     result.grassModDensity = std::move(*value);
   }
   {
-    auto value = variant.getInt("ceilingGrassMod");
+    auto value = variant.get_int("ceilingGrassMod");
     if (!value) return std::unexpected(std::move(value.error()));
     result.ceilingGrassMod = std::move(*value);
   }
   {
-    auto value = variant.getFloat("ceilingGrassModDensity");
+    auto value = variant.get_float("ceilingGrassModDensity");
     if (!value) return std::unexpected(std::move(value.error()));
     result.ceilingGrassModDensity = std::move(*value);
   }
-  auto items = variant.getArray("itemDistributions");
+  auto items = variant.get_array("itemDistributions");
   if (!items) return std::unexpected(std::move(items.error()));
   for (auto const& item : *items) {
     auto distribution = BiomeItemDistribution::create(assets, item);
@@ -119,43 +119,43 @@ Biome::Biome() {
 std::expected<Biome, StarException> Biome::create(Root& root, Json const& store) {
   Biome result;
   {
-    auto value = store.getString("baseName");
+    auto value = store.get_string("baseName");
     if (!value) return std::unexpected(std::move(value.error()));
     result.baseName = std::move(*value);
   }
   {
-    auto value = store.getString("description");
+    auto value = store.get_string("description");
     if (!value) return std::unexpected(std::move(value.error()));
     result.description = std::move(*value);
   }
   {
-    auto value = store.getUInt("mainBlock");
+    auto value = store.get_uint("mainBlock");
     if (!value) return std::unexpected(std::move(value.error()));
     result.mainBlock = std::move(*value);
   }
   {
-    auto value = store.getFloat("hueShift");
+    auto value = store.get_float("hueShift");
     if (!value) return std::unexpected(std::move(value.error()));
     result.hueShift = std::move(*value);
   }
   {
-    auto value = store.getUInt("materialHueShift");
+    auto value = store.get_uint("materialHueShift");
     if (!value) return std::unexpected(std::move(value.error()));
     result.materialHueShift = std::move(*value);
   }
-  auto blocks = store.getArray("subBlocks");
+  auto blocks = store.get_array("subBlocks");
   if (!blocks) return std::unexpected(std::move(blocks.error()));
   for (auto const& entry : *blocks) {
-    auto block = entry.toUInt();
+    auto block = entry.to_uint();
     if (!block) return std::unexpected(std::move(block.error()));
     result.subBlocks.push_back(*block);
   }
-  auto ores = store.getArray("ores");
+  auto ores = store.get_array("ores");
   if (!ores) return std::unexpected(std::move(ores.error()));
   for (auto const& entry : *ores) {
-    auto mod = entry.getUInt(0);
+    auto mod = entry.get_uint(0);
     if (!mod) return std::unexpected(std::move(mod.error()));
-    auto density = entry.getFloat(1);
+    auto density = entry.get_float(1);
     if (!density) return std::unexpected(std::move(density.error()));
     result.ores.push_back({static_cast<ModId>(*mod), *density});
   }

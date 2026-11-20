@@ -34,18 +34,18 @@ namespace Star {
 
 std::expected<std::shared_ptr<ParticleConfig>, StarException> ParticleConfig::create(Root& root, Json const& config) {
   auto result = std::shared_ptr<ParticleConfig>(new ParticleConfig(root));
-  auto kind = config.getString("kind");
+  auto kind = config.get_string("kind");
   if (!kind)
     return std::unexpected(std::move(kind.error()));
   result->m_kind = std::move(*kind);
-  auto definition = config.queryObject("definition");
+  auto definition = config.query_object("definition");
   if (!definition)
     return std::unexpected(std::move(definition.error()));
   auto particle = Particle::create(root, *definition);
   if (!particle)
     return std::unexpected(std::move(particle.error()));
   result->m_particle = std::move(*particle);
-  auto varianceDefinition = config.queryObject("definition.variance", {});
+  auto varianceDefinition = config.query_object("definition.variance", {});
   if (!varianceDefinition)
     return std::unexpected(std::move(varianceDefinition.error()));
   auto variance = Particle::create(root, *varianceDefinition);
@@ -105,8 +105,8 @@ std::expected<std::shared_ptr<ParticleConfig>, StarException> ParticleDatabase::
 }
 
 std::expected<ParticleVariantCreator, StarException> ParticleDatabase::particleCreator(Json const& kindOrConfig, String const& relativePath) const {
-  if (kindOrConfig.isType(Json::Type::String)) {
-    auto name = kindOrConfig.toString();
+  if (kindOrConfig.is_type(Json::Type::String)) {
+    auto name = kindOrConfig.to_string();
     if (!name)
       return std::unexpected(std::move(name.error()));
     auto particleConfig = config(*name);
@@ -114,13 +114,13 @@ std::expected<ParticleVariantCreator, StarException> ParticleDatabase::particleC
       return std::unexpected(std::move(particleConfig.error()));
     return ParticleVariantCreator([config = std::move(*particleConfig)]() { return config->instance(); });
   }
-  auto definition = kindOrConfig.toObject();
+  auto definition = kindOrConfig.to_object();
   if (!definition)
     return std::unexpected(std::move(definition.error()));
   auto particle = Particle::create(m_root, *definition, relativePath);
   if (!particle)
     return std::unexpected(std::move(particle.error()));
-  auto varianceDefinition = kindOrConfig.getObject("variance", {});
+  auto varianceDefinition = kindOrConfig.get_object("variance", {});
   if (!varianceDefinition)
     return std::unexpected(std::move(varianceDefinition.error()));
   auto variance = Particle::create(m_root, *varianceDefinition, relativePath);

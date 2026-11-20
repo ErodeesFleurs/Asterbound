@@ -174,13 +174,13 @@ ToolUser::ToolUser(Root& root)
   if (!assets) return std::unexpected(std::move(assets.error()));
   auto config = (*assets)->json("/player.config");
   if (!config) return std::unexpected(std::move(config.error()));
-  auto radius = config->getFloat("initialBeamGunRadius");
+  auto radius = config->get_float("initialBeamGunRadius");
   if (!radius) return std::unexpected(std::move(radius.error()));
-  auto border = config->getInt("previewGlowBorder");
+  auto border = config->get_int("previewGlowBorder");
   if (!border) return std::unexpected(std::move(border.error()));
-  auto inner = config->getFloat("objectPreviewInnerAlpha");
+  auto inner = config->get_float("objectPreviewInnerAlpha");
   if (!inner) return std::unexpected(std::move(inner.error()));
-  auto outer = config->getFloat("objectPreviewOuterAlpha");
+  auto outer = config->get_float("objectPreviewOuterAlpha");
   if (!outer) return std::unexpected(std::move(outer.error()));
   m_beamGunRadius = *radius;
   m_beamGunGlowBorder = *border;
@@ -890,7 +890,7 @@ void ToolUser::suppressItems(bool suppress) {
 }
 
 [[nodiscard]] std::expected<float, StarException> ToolUser::beamGunRadius() const {
-  auto bonus = m_user->get().statusController().statusProperty("bonusBeamGunRadius", 0).toFloat();
+  auto bonus = m_user->get().statusController().statusProperty("bonusBeamGunRadius", 0).to_float();
   if (!bonus) return std::unexpected(std::move(bonus.error()));
   return m_beamGunRadius + *bonus;
 }

@@ -72,13 +72,13 @@ std::expected<std::shared_ptr<CollectionDatabase>, StarException> CollectionData
       auto config = (*assets)->json(file);
       if (!config)
         return std::unexpected(std::move(config.error()));
-      auto name = config->getString("name");
+      auto name = config->get_string("name");
       if (!name)
         return std::unexpected(std::move(name.error()));
-      auto title = config->getString("title", *name);
+      auto title = config->get_string("title", *name);
       if (!title)
         return std::unexpected(std::move(title.error()));
-      auto typeName = config->getString("type", "generic");
+      auto typeName = config->get_string("type", "generic");
       if (!typeName)
         return std::unexpected(std::move(typeName.error()));
       auto type = maybe_enum_value<CollectionTypeNames>(*typeName);
@@ -186,16 +186,16 @@ bool CollectionDatabase::hasCollectable(String const& collectionName, String con
 }
 
 std::expected<Collectable, StarException> CollectionDatabase::parseGenericCollectable(String const& name, Json const& config) const {
-  auto order = config.getInt("order", 0);
+  auto order = config.get_int("order", 0);
   if (!order)
     return std::unexpected(std::move(order.error()));
-  auto title = config.getString("title", "");
+  auto title = config.get_string("title", "");
   if (!title)
     return std::unexpected(std::move(title.error()));
-  auto description = config.getString("description", "");
+  auto description = config.get_string("description", "");
   if (!description)
     return std::unexpected(std::move(description.error()));
-  auto icon = config.getString("icon", "");
+  auto icon = config.get_string("icon", "");
   if (!icon)
     return std::unexpected(std::move(icon.error()));
   return Collectable(name, *order, *title, *description, *icon);
@@ -205,7 +205,7 @@ std::expected<Collectable, StarException> CollectionDatabase::parseMonsterCollec
   auto collectable = parseGenericCollectable(name, config);
   if (!collectable)
     return std::unexpected(std::move(collectable.error()));
-  auto monsterType = config.getString("monsterType");
+  auto monsterType = config.get_string("monsterType");
   if (!monsterType)
     return std::unexpected(std::move(monsterType.error()));
   auto database = m_root.monsterDatabase();
@@ -231,7 +231,7 @@ std::expected<Collectable, StarException> CollectionDatabase::parseItemCollectab
     catalogOwner = std::move(*catalog);
     itemCatalog = std::cref(*catalogOwner);
   }
-  auto itemName = config.getString("item");
+  auto itemName = config.get_string("item");
   if (!itemName)
     return std::unexpected(std::move(itemName.error()));
   auto descriptor = ItemDescriptor::create(*itemName, 1);
@@ -244,7 +244,7 @@ std::expected<Collectable, StarException> CollectionDatabase::parseItemCollectab
     return std::unexpected(CollectionDatabaseException(Star::format("Collectable '{}' refers to an empty item", name)));
   collectable->title = (*item)->friendlyName();
   collectable->description = (*item)->description();
-  auto configuredIcon = config.optString("icon");
+  auto configuredIcon = config.opt_string("icon");
   if (!configuredIcon)
     return std::unexpected(std::move(configuredIcon.error()));
   if (*configuredIcon) {
@@ -253,11 +253,11 @@ std::expected<Collectable, StarException> CollectionDatabase::parseItemCollectab
     auto inventoryIcon = (*item)->instanceValue("inventoryIcon", "");
     if (!inventoryIcon)
       return std::unexpected(std::move(inventoryIcon.error()));
-    if (inventoryIcon->isType(Json::Type::String)) {
+    if (inventoryIcon->is_type(Json::Type::String)) {
       auto itemConfig = itemCatalog->get().itemConfig((*item)->name(), JsonObject());
       if (!itemConfig)
         return std::unexpected(std::move(itemConfig.error()));
-      auto icon = inventoryIcon->toString();
+      auto icon = inventoryIcon->to_string();
       if (!icon)
         return std::unexpected(std::move(icon.error()));
       collectable->icon = AssetPath::relative_to(itemConfig->directory, *icon);

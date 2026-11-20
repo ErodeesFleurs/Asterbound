@@ -56,20 +56,20 @@ import star.static_random;
 namespace Star {
 
 std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::drawSystemPlanetaryObject(CelestialParameters const& parameters) {
-  auto image = parameters.getParameter("smallImage").and_then([](Json const& value) { return value.toString(); });
+  auto image = parameters.getParameter("smallImage").and_then([](Json const& value) { return value.to_string(); });
   if (!image)
     return std::unexpected(std::move(image.error()));
-  auto scale = parameters.getParameter("smallImageScale").and_then([](Json const& value) { return value.toFloat(); });
+  auto scale = parameters.getParameter("smallImageScale").and_then([](Json const& value) { return value.to_float(); });
   if (!scale)
     return std::unexpected(std::move(scale.error()));
   return List<std::pair<String, float>>{{std::move(*image), *scale}};
 }
 
 std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::drawSystemCentralBody(CelestialParameters const& parameters) {
-  auto image = parameters.getParameter("image").and_then([](Json const& value) { return value.toString(); });
+  auto image = parameters.getParameter("image").and_then([](Json const& value) { return value.to_string(); });
   if (!image)
     return std::unexpected(std::move(image.error()));
-  auto scale = parameters.getParameter("imageScale").and_then([](Json const& value) { return value.toFloat(); });
+  auto scale = parameters.getParameter("imageScale").and_then([](Json const& value) { return value.to_float(); });
   if (!scale)
     return std::unexpected(std::move(scale.error()));
   return List<std::pair<String, float>>{{std::move(*image), *scale}};
@@ -84,7 +84,7 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
   if (!liquidsDatabase)
     return std::unexpected(std::move(liquidsDatabase.error()));
   auto const& shadowParameters = overrideShadowParameters ? *overrideShadowParameters : celestialParameters;
-  auto type = celestialParameters.getParameter("worldType").and_then([](Json const& value) { return value.toString(); });
+  auto type = celestialParameters.getParameter("worldType").and_then([](Json const& value) { return value.to_string(); });
   if (!type)
     return std::unexpected(std::move(type.error()));
   List<std::pair<String, float>> layers;
@@ -102,23 +102,23 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
     auto overrides = graphics->get(terrestrialParameters->typeName, JsonObject());
     if (!overrides)
       return std::unexpected(std::move(overrides.error()));
-    auto gfxConfig = jsonMerge(*defaults, *overrides);
-    auto liquidImages = gfxConfig.getString("liquidImages", "");
+    auto gfxConfig = json_merge(*defaults, *overrides);
+    auto liquidImages = gfxConfig.get_string("liquidImages", "");
     if (!liquidImages)
       return std::unexpected(std::move(liquidImages.error()));
-    auto baseImages = gfxConfig.getString("baseImages", "");
+    auto baseImages = gfxConfig.get_string("baseImages", "");
     if (!baseImages)
       return std::unexpected(std::move(baseImages.error()));
-    auto shadowImages = gfxConfig.getString("shadowImages", "");
+    auto shadowImages = gfxConfig.get_string("shadowImages", "");
     if (!shadowImages)
       return std::unexpected(std::move(shadowImages.error()));
-    auto baseCount = gfxConfig.getInt("baseCount", 0);
+    auto baseCount = gfxConfig.get_int("baseCount", 0);
     if (!baseCount)
       return std::unexpected(std::move(baseCount.error()));
-    auto dynamicsImages = gfxConfig.getString("dynamicsImages", "");
+    auto dynamicsImages = gfxConfig.get_string("dynamicsImages", "");
     if (!dynamicsImages)
       return std::unexpected(std::move(dynamicsImages.error()));
-    auto imageScale = celestialParameters.getParameter("imageScale", 1.0f).and_then([](Json const& value) { return value.toFloat(); });
+    auto imageScale = celestialParameters.getParameter("imageScale", 1.0f).and_then([](Json const& value) { return value.to_float(); });
     if (!imageScale)
       return std::unexpected(std::move(imageScale.error()));
 
@@ -143,9 +143,9 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
         return std::unexpected(std::move(baseImage.error()));
       String hueShiftString, dynamicMaskString;
       if (!dynamicsImages->empty()) {
-        auto dynamic = gfxConfig.getArray("dynamicsRange")
+        auto dynamic = gfxConfig.get_array("dynamicsRange")
             .and_then([&](JsonArray const& value) { return celestialParameters.randomizeParameterRange(value, i); })
-            .and_then([](Json const& value) { return value.toInt(); });
+            .and_then([](Json const& value) { return value.to_int(); });
         if (!dynamic)
           return std::unexpected(std::move(dynamic.error()));
         auto mask = dynamicsImages->replace("<num>", Star::to_string(*dynamic));
@@ -158,9 +158,9 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
       layers.push_back({*baseImage + hueShiftString + dynamicMaskString, *imageScale});
     }
     if (!shadowImages->empty()) {
-      auto number = gfxConfig.getArray("shadowNumber")
+      auto number = gfxConfig.get_array("shadowNumber")
           .and_then([&](JsonArray const& value) { return shadowParameters.randomizeParameterRange(value); })
-          .and_then([](Json const& value) { return value.toInt(); });
+          .and_then([](Json const& value) { return value.to_int(); });
       if (!number)
         return std::unexpected(std::move(number.error()));
       auto shadow = shadowImages->replace("<num>", Star::to_string(*number));
@@ -169,23 +169,23 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
       layers.push_back({std::move(*shadow), *imageScale});
     }
   } else if (*type == "Asteroids") {
-    auto maskImages = celestialParameters.getParameter("maskImages").and_then([](Json const& value) { return value.toString(); });
+    auto maskImages = celestialParameters.getParameter("maskImages").and_then([](Json const& value) { return value.to_string(); });
     if (!maskImages)
       return std::unexpected(std::move(maskImages.error()));
-    auto maskCount = celestialParameters.getParameter("masks").and_then([](Json const& value) { return value.toInt(); });
+    auto maskCount = celestialParameters.getParameter("masks").and_then([](Json const& value) { return value.to_int(); });
     if (!maskCount)
       return std::unexpected(std::move(maskCount.error()));
-    auto dynamicsImages = celestialParameters.getParameter("dynamicsImages").and_then([](Json const& value) { return value.toString(); });
+    auto dynamicsImages = celestialParameters.getParameter("dynamicsImages").and_then([](Json const& value) { return value.to_string(); });
     if (!dynamicsImages)
       return std::unexpected(std::move(dynamicsImages.error()));
-    auto imageScale = celestialParameters.getParameter("imageScale", 1.0f).and_then([](Json const& value) { return value.toFloat(); });
+    auto imageScale = celestialParameters.getParameter("imageScale", 1.0f).and_then([](Json const& value) { return value.to_float(); });
     if (!imageScale)
       return std::unexpected(std::move(imageScale.error()));
     for (int i = 0; i < *maskCount; ++i) {
       auto base = maskImages->replace("<num>", Star::to_string(*maskCount - i));
       if (!base)
         return std::unexpected(std::move(base.error()));
-      auto number = celestialParameters.randomizeParameterRange("dynamicsRange", i).and_then([](Json const& value) { return value.toInt(); });
+      auto number = celestialParameters.randomizeParameterRange("dynamicsRange", i).and_then([](Json const& value) { return value.to_int(); });
       if (!number)
         return std::unexpected(std::move(number.error()));
       auto mask = dynamicsImages->replace("<num>", Star::to_string(*number));
@@ -194,18 +194,18 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
       layers.push_back({Star::format("{}?addmask={}", *base, *mask), *imageScale});
     }
   } else if (*type == "FloatingDungeon") {
-    auto image = celestialParameters.getParameter("image").and_then([](Json const& value) { return value.toString(); });
+    auto image = celestialParameters.getParameter("image").and_then([](Json const& value) { return value.to_string(); });
     if (!image)
       return std::unexpected(std::move(image.error()));
-    auto imageScale = celestialParameters.getParameter("imageScale", 1.0f).and_then([](Json const& value) { return value.toFloat(); });
+    auto imageScale = celestialParameters.getParameter("imageScale", 1.0f).and_then([](Json const& value) { return value.to_float(); });
     if (!imageScale)
       return std::unexpected(std::move(imageScale.error()));
     layers.push_back({std::move(*image), *imageScale});
-    auto dynamicsImages = celestialParameters.getParameter("dynamicsImages").and_then([](Json const& value) { return value.toString(); });
+    auto dynamicsImages = celestialParameters.getParameter("dynamicsImages").and_then([](Json const& value) { return value.to_string(); });
     if (!dynamicsImages)
       return std::unexpected(std::move(dynamicsImages.error()));
     if (!dynamicsImages->empty()) {
-      auto number = celestialParameters.randomizeParameterRange("dynamicsRange").and_then([](Json const& value) { return value.toInt(); });
+      auto number = celestialParameters.randomizeParameterRange("dynamicsRange").and_then([](Json const& value) { return value.to_int(); });
       if (!number)
         return std::unexpected(std::move(number.error()));
       auto dynamic = dynamicsImages->replace("<num>", Star::to_string(*number));
@@ -217,42 +217,42 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
     auto gfxConfig = (*assets)->json("/celestial.config:gasGiantGraphics");
     if (!gfxConfig)
       return std::unexpected(std::move(gfxConfig.error()));
-    auto baseImage = gfxConfig->getString("baseImage", "");
+    auto baseImage = gfxConfig->get_string("baseImage", "");
     if (!baseImage)
       return std::unexpected(std::move(baseImage.error()));
-    auto shadowImages = gfxConfig->getString("shadowImages", "");
+    auto shadowImages = gfxConfig->get_string("shadowImages", "");
     if (!shadowImages)
       return std::unexpected(std::move(shadowImages.error()));
-    auto dynamicsImages = gfxConfig->getString("dynamicsImages", "");
+    auto dynamicsImages = gfxConfig->get_string("dynamicsImages", "");
     if (!dynamicsImages)
       return std::unexpected(std::move(dynamicsImages.error()));
-    auto overlayImages = gfxConfig->getString("overlayImages", "");
+    auto overlayImages = gfxConfig->get_string("overlayImages", "");
     if (!overlayImages)
       return std::unexpected(std::move(overlayImages.error()));
-    auto overlayCount = gfxConfig->getInt("overlayCount", 0);
+    auto overlayCount = gfxConfig->get_int("overlayCount", 0);
     if (!overlayCount)
       return std::unexpected(std::move(overlayCount.error()));
-    auto imageScale = celestialParameters.getParameter("imageScale", 1.0f).and_then([](Json const& value) { return value.toFloat(); });
+    auto imageScale = celestialParameters.getParameter("imageScale", 1.0f).and_then([](Json const& value) { return value.to_float(); });
     if (!imageScale)
       return std::unexpected(std::move(imageScale.error()));
-    auto hueShift = gfxConfig->getArray("primaryHueShiftRange")
+    auto hueShift = gfxConfig->get_array("primaryHueShiftRange")
         .and_then([&](JsonArray const& value) { return celestialParameters.randomizeParameterRange(value); })
-        .and_then([](Json const& value) { return value.toFloat(); });
+        .and_then([](Json const& value) { return value.to_float(); });
     if (!hueShift)
       return std::unexpected(std::move(hueShift.error()));
     if (!baseImage->empty())
       layers.push_back({Star::format("{}?hueshift={}", *baseImage, *hueShift), *imageScale});
     if (!overlayImages->empty()) {
       for (int i = 0; i < *overlayCount; ++i) {
-        auto offset = gfxConfig->getArray("hueShiftOffsetRange")
+        auto offset = gfxConfig->get_array("hueShiftOffsetRange")
             .and_then([&](JsonArray const& value) { return celestialParameters.randomizeParameterRange(value); })
-            .and_then([](Json const& value) { return value.toFloat(); });
+            .and_then([](Json const& value) { return value.to_float(); });
         if (!offset)
           return std::unexpected(std::move(offset.error()));
         *hueShift += *offset;
-        auto number = gfxConfig->getArray("dynamicsRange")
+        auto number = gfxConfig->get_array("dynamicsRange")
             .and_then([&](JsonArray const& value) { return celestialParameters.randomizeParameterRange(value, i); })
-            .and_then([](Json const& value) { return value.toInt(); });
+            .and_then([](Json const& value) { return value.to_int(); });
         if (!number)
           return std::unexpected(std::move(number.error()));
         auto mask = dynamicsImages->replace("<num>", Star::to_string(*number));
@@ -265,9 +265,9 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
       }
     }
     if (!shadowImages->empty()) {
-      auto number = gfxConfig->getArray("shadowNumber")
+      auto number = gfxConfig->get_array("shadowNumber")
           .and_then([&](JsonArray const& value) { return shadowParameters.randomizeParameterRange(value); })
-          .and_then([](Json const& value) { return value.toInt(); });
+          .and_then([](Json const& value) { return value.to_int(); });
       if (!number)
         return std::unexpected(std::move(number.error()));
       auto shadow = shadowImages->replace("<num>", Star::to_string(*number));
@@ -295,7 +295,7 @@ std::expected<List<std::pair<String, String>>, StarException> CelestialGraphics:
       return std::unexpected(std::move(right.error()));
     return std::pair<String, String>(std::move(*left), std::move(*right));
   };
-  auto type = celestialParameters.getParameter("worldType").and_then([](Json const& value) { return value.toString(); });
+  auto type = celestialParameters.getParameter("worldType").and_then([](Json const& value) { return value.to_string(); });
   if (!type)
     return std::unexpected(std::move(type.error()));
   List<std::pair<String, String>> images;
@@ -312,26 +312,26 @@ std::expected<List<std::pair<String, String>>, StarException> CelestialGraphics:
     auto overrides = graphics->get(terrestrialParameters->typeName, JsonObject());
     if (!overrides)
       return std::unexpected(std::move(overrides.error()));
-    auto gfxConfig = jsonMerge(*defaults, *overrides);
-    auto baseImages = gfxConfig.getString("baseImages");
+    auto gfxConfig = json_merge(*defaults, *overrides);
+    auto baseImages = gfxConfig.get_string("baseImages");
     if (!baseImages)
       return std::unexpected(std::move(baseImages.error()));
-    auto atmoTextures = gfxConfig.getString("atmosphereTextures");
+    auto atmoTextures = gfxConfig.get_string("atmosphereTextures");
     if (!atmoTextures)
       return std::unexpected(std::move(atmoTextures.error()));
-    auto shadowTextures = gfxConfig.getString("shadowTextures");
+    auto shadowTextures = gfxConfig.get_string("shadowTextures");
     if (!shadowTextures)
       return std::unexpected(std::move(shadowTextures.error()));
-    auto maskTextures = gfxConfig.getString("maskTextures");
+    auto maskTextures = gfxConfig.get_string("maskTextures");
     if (!maskTextures)
       return std::unexpected(std::move(maskTextures.error()));
-    auto liquidTextures = gfxConfig.getString("liquidTextures");
+    auto liquidTextures = gfxConfig.get_string("liquidTextures");
     if (!liquidTextures)
       return std::unexpected(std::move(liquidTextures.error()));
-    auto numMasks = gfxConfig.get("maskRange").and_then([](Json const& value) { return jsonToVec2I(value); });
+    auto numMasks = gfxConfig.get("maskRange").and_then([](Json const& value) { return json_to_vec2i(value); });
     if (!numMasks)
       return std::unexpected(std::move(numMasks.error()));
-    auto maskPerPlanetRange = gfxConfig.get("maskPerPlanetRange").and_then([](Json const& value) { return jsonToVec2I(value); });
+    auto maskPerPlanetRange = gfxConfig.get("maskPerPlanetRange").and_then([](Json const& value) { return json_to_vec2i(value); });
     if (!maskPerPlanetRange)
       return std::unexpected(std::move(maskPerPlanetRange.error()));
     auto biomeHueShift =
@@ -380,7 +380,7 @@ std::expected<List<std::pair<String, String>>, StarException> CelestialGraphics:
         return std::unexpected(std::move(base.error()));
       images.push_back(std::move(*base));
     }
-    auto atmosphere = celestialParameters.getParameter("atmosphere", true).and_then([](Json const& value) { return value.toBool(); });
+    auto atmosphere = celestialParameters.getParameter("atmosphere", true).and_then([](Json const& value) { return value.to_bool(); });
     if (!atmosphere)
       return std::unexpected(std::move(atmosphere.error()));
     if (*atmosphere) {
@@ -395,7 +395,7 @@ std::expected<List<std::pair<String, String>>, StarException> CelestialGraphics:
     images.push_back(std::move(*shadow));
   } else if (*type == "Asteroids") {
     auto image = (*assets)->json("/celestial.config:asteroidsHorizons")
-        .and_then([](Json const& value) { return value.toString(); }).and_then(getLR);
+        .and_then([](Json const& value) { return value.to_string(); }).and_then(getLR);
     if (!image)
       return std::unexpected(std::move(image.error()));
     images.push_back(std::move(*image));
@@ -409,7 +409,7 @@ std::expected<List<std::pair<String, String>>, StarException> CelestialGraphics:
       return std::unexpected(std::move(contains.error()));
     if (*contains) {
       auto image = horizons->get(dungeon->primaryDungeon)
-          .and_then([](Json const& value) { return value.toString(); }).and_then(getLR);
+          .and_then([](Json const& value) { return value.to_string(); }).and_then(getLR);
       if (!image)
         return std::unexpected(std::move(image.error()));
       images.push_back(std::move(*image));
@@ -429,12 +429,12 @@ std::expected<int, StarException> CelestialGraphics::worldRadialPosition(Root& r
 
 std::expected<int, StarException> CelestialGraphics::planetRadialPositions(Root& root) {
   return root.assets().and_then([](auto const& assets) { return assets->json("/celestial.config:planetRadialSlots"); })
-      .and_then([](Json const& value) { return value.toInt(); });
+      .and_then([](Json const& value) { return value.to_int(); });
 }
 
 std::expected<int, StarException> CelestialGraphics::satelliteRadialPositions(Root& root) {
   return root.assets().and_then([](auto const& assets) { return assets->json("/celestial.config:satelliteRadialSlots"); })
-      .and_then([](Json const& value) { return value.toInt(); });
+      .and_then([](Json const& value) { return value.to_int(); });
 }
 
 std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::drawSystemTwinkle(
@@ -447,19 +447,19 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto count = (*assets)->json("/celestial.config:twinkleFrames").and_then([](Json const& value) { return value.toInt(); });
+  auto count = (*assets)->json("/celestial.config:twinkleFrames").and_then([](Json const& value) { return value.to_int(); });
   if (!count)
     return std::unexpected(std::move(count.error()));
-  auto scale = (*assets)->json("/celestial.config:twinkleScale").and_then([](Json const& value) { return value.toFloat(); });
+  auto scale = (*assets)->json("/celestial.config:twinkleScale").and_then([](Json const& value) { return value.to_float(); });
   if (!scale)
     return std::unexpected(std::move(scale.error()));
-  auto frames = (**parameters).getParameter("twinkleFrames").and_then([](Json const& value) { return value.toString(); });
+  auto frames = (**parameters).getParameter("twinkleFrames").and_then([](Json const& value) { return value.to_string(); });
   if (!frames)
     return std::unexpected(std::move(frames.error()));
-  auto duration = (**parameters).randomizeParameterRange("twinkleTime").and_then([](Json const& value) { return value.toFloat(); });
+  auto duration = (**parameters).randomizeParameterRange("twinkleTime").and_then([](Json const& value) { return value.to_float(); });
   if (!duration)
     return std::unexpected(std::move(duration.error()));
-  auto background = (**parameters).getParameter("twinkleBackground").and_then([](Json const& value) { return value.toString(); });
+  auto background = (**parameters).getParameter("twinkleBackground").and_then([](Json const& value) { return value.to_string(); });
   if (!background)
     return std::unexpected(std::move(background.error()));
   double frame = std::fmod<double>(time / *duration, 1.0f) * *count;

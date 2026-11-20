@@ -53,15 +53,15 @@ std::expected<std::shared_ptr<TeamManager>, StarException> TeamManager::create(R
   if (!config) return std::unexpected(std::move(config.error()));
   auto sizeJson = (*config)->get("maxTeamSize");
   if (!sizeJson) return std::unexpected(std::move(sizeJson.error()));
-  auto size = sizeJson->toUInt();
+  auto size = sizeJson->to_uint();
   if (!size) return std::unexpected(std::move(size.error()));
   auto timeoutJson = (*config)->getPath("teamInvitationTimeout", Json(600.0));
   if (!timeoutJson) return std::unexpected(std::move(timeoutJson.error()));
-  auto timeout = timeoutJson->toDouble();
+  auto timeout = timeoutJson->to_double();
   if (!timeout) return std::unexpected(std::move(timeout.error()));
   auto secureJson = (*config)->getPath("security.secureTeams");
   if (!secureJson) return std::unexpected(std::move(secureJson.error()));
-  auto secure = secureJson->optBool();
+  auto secure = secureJson->opt_bool();
   if (!secure) return std::unexpected(std::move(secure.error()));
   return std::shared_ptr<TeamManager>(new TeamManager(root, *size, *timeout, secure->value_or(true)));
 }
@@ -275,13 +275,13 @@ bool TeamManager::removeFromTeam(Uuid const& playerUuid, Uuid const& teamUuid) {
 std::expected<Json, StarException> TeamManager::fetchTeamStatus(Json const& arguments) {
   std::unique_lock lock(m_mutex, std::defer_lock);
   lock_with_diagnostics(lock);
-  auto playerUuidText = arguments.getString("playerUuid");
+  auto playerUuidText = arguments.get_string("playerUuid");
   if (!playerUuidText) return std::unexpected(std::move(playerUuidText.error()));
   auto playerUuidResult = Uuid::create(*playerUuidText);
   if (!playerUuidResult) return std::unexpected(std::move(playerUuidResult.error()));
   auto playerUuid = *playerUuidResult;
 
-  auto callerHexResult = arguments.optString("_callerUuid");
+  auto callerHexResult = arguments.opt_string("_callerUuid");
   if (!callerHexResult) return std::unexpected(std::move(callerHexResult.error()));
   if (auto callerHex = *callerHexResult) {
     auto callerResult = Uuid::create(*callerHex);
@@ -326,7 +326,7 @@ std::expected<Json, StarException> TeamManager::fetchTeamStatus(Json const& argu
       auto warp = WarpModeNames->get_right(mem.warpMode);
       if (!warp) return std::unexpected(std::move(warp.error()));
       member["warpMode"] = warp->get();
-      auto portrait = jsonFromList(mem.portrait, std::mem_fn(&Drawable::toJson));
+      auto portrait = json_from_list(mem.portrait, std::mem_fn(&Drawable::toJson));
       if (!portrait) return std::unexpected(std::move(portrait.error()));
       member["portrait"] = *portrait;
       members.push_back(member);
@@ -339,13 +339,13 @@ std::expected<Json, StarException> TeamManager::fetchTeamStatus(Json const& argu
 std::expected<Json, StarException> TeamManager::updateStatus(Json const& arguments) {
   std::unique_lock lock(m_mutex, std::defer_lock);
   lock_with_diagnostics(lock);
-  auto playerUuidText = arguments.getString("playerUuid");
+  auto playerUuidText = arguments.get_string("playerUuid");
   if (!playerUuidText) return std::unexpected(std::move(playerUuidText.error()));
   auto playerUuidResult = Uuid::create(*playerUuidText);
   if (!playerUuidResult) return std::unexpected(std::move(playerUuidResult.error()));
   auto playerUuid = *playerUuidResult;
 
-  auto callerHexResult = arguments.optString("_callerUuid");
+  auto callerHexResult = arguments.opt_string("_callerUuid");
   if (!callerHexResult) return std::unexpected(std::move(callerHexResult.error()));
   if (auto callerHex = *callerHexResult) {
     auto callerResult = Uuid::create(*callerHex);
@@ -364,30 +364,30 @@ std::expected<Json, StarException> TeamManager::updateStatus(Json const& argumen
     auto hasName = arguments.contains("name");
     if (!hasName) return std::unexpected(std::move(hasName.error()));
     if (*hasName) {
-      auto value = arguments.getString("name");
+      auto value = arguments.get_string("name");
       if (!value) return std::unexpected(std::move(value.error()));
       entry.name = std::move(*value);
     }
     auto hasEntity = arguments.contains("entity");
     if (!hasEntity) return std::unexpected(std::move(hasEntity.error()));
     if (*hasEntity) {
-      auto value = arguments.getInt("entity");
+      auto value = arguments.get_int("entity");
       if (!value) return std::unexpected(std::move(value.error()));
       entry.entity = *value;
     }
-    auto health = arguments.getFloat("health");
+    auto health = arguments.get_float("health");
     if (!health) return std::unexpected(std::move(health.error()));
     entry.healthPercentage = *health;
-    auto energy = arguments.getFloat("energy");
+    auto energy = arguments.get_float("energy");
     if (!energy) return std::unexpected(std::move(energy.error()));
     entry.energyPercentage = *energy;
-    auto x = arguments.getFloat("x");
+    auto x = arguments.get_float("x");
     if (!x) return std::unexpected(std::move(x.error()));
     entry.position[0] = *x;
-    auto y = arguments.getFloat("y");
+    auto y = arguments.get_float("y");
     if (!y) return std::unexpected(std::move(y.error()));
     entry.position[1] = *y;
-    auto warpText = arguments.getString("warpMode");
+    auto warpText = arguments.get_string("warpMode");
     if (!warpText) return std::unexpected(std::move(warpText.error()));
     if (!WarpModeNames) return std::unexpected(WarpModeNames.error());
     auto warp = WarpModeNames->get_left(*warpText);
@@ -396,7 +396,7 @@ std::expected<Json, StarException> TeamManager::updateStatus(Json const& argumen
     auto hasWorld = arguments.contains("world");
     if (!hasWorld) return std::unexpected(std::move(hasWorld.error()));
     if (*hasWorld) {
-      auto worldText = arguments.getString("world");
+      auto worldText = arguments.get_string("world");
       if (!worldText) return std::unexpected(std::move(worldText.error()));
       auto world = parseWorldId(*worldText);
       if (!world) return std::unexpected(std::move(world.error()));
@@ -409,14 +409,14 @@ std::expected<Json, StarException> TeamManager::updateStatus(Json const& argumen
       if (!portraitJson) return std::unexpected(std::move(portraitJson.error()));
       auto metadata = m_root.imageMetadataDatabase();
       if (!metadata) return std::unexpected(std::move(metadata.error()));
-      auto portrait = jsonToList<Drawable>(*portraitJson, [&](Json const& value) { return Drawable::create(**metadata, value); });
+      auto portrait = json_to_list<Drawable>(*portraitJson, [&](Json const& value) { return Drawable::create(**metadata, value); });
       if (!portrait) return std::unexpected(std::move(portrait.error()));
       entry.portrait = std::move(*portrait);
     }
     auto hasVersion = arguments.contains("version");
     if (!hasVersion) return std::unexpected(std::move(hasVersion.error()));
     if (*hasVersion) {
-      auto value = arguments.getInt("version");
+      auto value = arguments.get_int("version");
       if (!value) return std::unexpected(std::move(value.error()));
       entry.version = *value;
     }
@@ -429,20 +429,20 @@ std::expected<Json, StarException> TeamManager::updateStatus(Json const& argumen
 std::expected<Json, StarException> TeamManager::invite(Json const& arguments) {
   std::unique_lock lock(m_mutex, std::defer_lock);
   lock_with_diagnostics(lock);
-  auto inviteeText = arguments.getString("inviteeName");
+  auto inviteeText = arguments.get_string("inviteeName");
   if (!inviteeText) return std::unexpected(std::move(inviteeText.error()));
   auto inviteeName = Text::stripEscapeCodes(*inviteeText);
 
   if (inviteeName.empty())
     return Json("inviteeNotFound");
 
-  auto inviterUuidText = arguments.getString("inviterUuid");
+  auto inviterUuidText = arguments.get_string("inviterUuid");
   if (!inviterUuidText) return std::unexpected(std::move(inviterUuidText.error()));
   auto inviterUuidResult = Uuid::create(*inviterUuidText);
   if (!inviterUuidResult) return std::unexpected(std::move(inviterUuidResult.error()));
   auto inviterUuid = *inviterUuidResult;
 
-  auto callerHexResult = arguments.optString("_callerUuid");
+  auto callerHexResult = arguments.opt_string("_callerUuid");
   if (!callerHexResult) return std::unexpected(std::move(callerHexResult.error()));
   if (auto callerHex = *callerHexResult) {
     auto callerResult = Uuid::create(*callerHex);
@@ -464,7 +464,7 @@ std::expected<Json, StarException> TeamManager::invite(Json const& arguments) {
     for (auto& inviteeUuid : entry.second) {
       Invitation invitation(m_root.random());
       invitation.inviterUuid = inviterUuid;
-      auto inviterName = arguments.getString("inviterName");
+      auto inviterName = arguments.get_string("inviterName");
       if (!inviterName) return std::unexpected(std::move(inviterName.error()));
       invitation.inviterName = *inviterName;
       m_invitations.try_emplace(inviteeUuid, m_root.random()).first->second = invitation;
@@ -482,13 +482,13 @@ std::expected<Json, StarException> TeamManager::invite(Json const& arguments) {
 std::expected<Json, StarException> TeamManager::pollInvitation(Json const& arguments) {
   std::unique_lock lock(m_mutex, std::defer_lock);
   lock_with_diagnostics(lock);
-  auto playerUuidText = arguments.getString("playerUuid");
+  auto playerUuidText = arguments.get_string("playerUuid");
   if (!playerUuidText) return std::unexpected(std::move(playerUuidText.error()));
   auto playerUuidResult = Uuid::create(*playerUuidText);
   if (!playerUuidResult) return std::unexpected(std::move(playerUuidResult.error()));
   auto playerUuid = *playerUuidResult;
 
-  auto callerHexResult = arguments.optString("_callerUuid");
+  auto callerHexResult = arguments.opt_string("_callerUuid");
   if (!callerHexResult) return std::unexpected(std::move(callerHexResult.error()));
   if (auto callerHex = *callerHexResult) {
     auto callerResult = Uuid::create(*callerHex);
@@ -519,18 +519,18 @@ std::expected<Json, StarException> TeamManager::pollInvitation(Json const& argum
 std::expected<Json, StarException> TeamManager::acceptInvitation(Json const& arguments) {
   std::unique_lock lock(m_mutex, std::defer_lock);
   lock_with_diagnostics(lock);
-  auto inviterUuidText = arguments.getString("inviterUuid");
+  auto inviterUuidText = arguments.get_string("inviterUuid");
   if (!inviterUuidText) return std::unexpected(std::move(inviterUuidText.error()));
   auto inviterUuidResult = Uuid::create(*inviterUuidText);
   if (!inviterUuidResult) return std::unexpected(std::move(inviterUuidResult.error()));
   auto inviterUuid = *inviterUuidResult;
-  auto inviteeUuidText = arguments.getString("inviteeUuid");
+  auto inviteeUuidText = arguments.get_string("inviteeUuid");
   if (!inviteeUuidText) return std::unexpected(std::move(inviteeUuidText.error()));
   auto inviteeUuidResult = Uuid::create(*inviteeUuidText);
   if (!inviteeUuidResult) return std::unexpected(std::move(inviteeUuidResult.error()));
   auto inviteeUuid = *inviteeUuidResult;
 
-  auto callerHexResult = arguments.optString("_callerUuid");
+  auto callerHexResult = arguments.opt_string("_callerUuid");
   if (!callerHexResult) return std::unexpected(std::move(callerHexResult.error()));
   if (auto callerHex = *callerHexResult) {
     auto callerResult = Uuid::create(*callerHex);
@@ -572,18 +572,18 @@ std::expected<Json, StarException> TeamManager::acceptInvitation(Json const& arg
 std::expected<Json, StarException> TeamManager::removeFromTeam(Json const& arguments) {
   std::unique_lock lock(m_mutex, std::defer_lock);
   lock_with_diagnostics(lock);
-  auto playerUuidText = arguments.getString("playerUuid");
+  auto playerUuidText = arguments.get_string("playerUuid");
   if (!playerUuidText) return std::unexpected(std::move(playerUuidText.error()));
   auto playerUuidResult = Uuid::create(*playerUuidText);
   if (!playerUuidResult) return std::unexpected(std::move(playerUuidResult.error()));
   auto playerUuid = *playerUuidResult;
-  auto teamUuidText = arguments.getString("teamUuid");
+  auto teamUuidText = arguments.get_string("teamUuid");
   if (!teamUuidText) return std::unexpected(std::move(teamUuidText.error()));
   auto teamUuidResult = Uuid::create(*teamUuidText);
   if (!teamUuidResult) return std::unexpected(std::move(teamUuidResult.error()));
   auto teamUuid = *teamUuidResult;
 
-  auto callerHexResult = arguments.optString("_callerUuid");
+  auto callerHexResult = arguments.opt_string("_callerUuid");
   if (!callerHexResult) return std::unexpected(std::move(callerHexResult.error()));
   if (auto callerHex = *callerHexResult) {
     auto callerResult = Uuid::create(*callerHex);
@@ -605,12 +605,12 @@ std::expected<Json, StarException> TeamManager::removeFromTeam(Json const& argum
 std::expected<Json, StarException> TeamManager::makeLeader(Json const& arguments) {
   std::unique_lock lock(m_mutex, std::defer_lock);
   lock_with_diagnostics(lock);
-  auto playerUuidText = arguments.getString("playerUuid");
+  auto playerUuidText = arguments.get_string("playerUuid");
   if (!playerUuidText) return std::unexpected(std::move(playerUuidText.error()));
   auto playerUuidResult = Uuid::create(*playerUuidText);
   if (!playerUuidResult) return std::unexpected(std::move(playerUuidResult.error()));
   auto playerUuid = *playerUuidResult;
-  auto teamUuidText = arguments.getString("teamUuid");
+  auto teamUuidText = arguments.get_string("teamUuid");
   if (!teamUuidText) return std::unexpected(std::move(teamUuidText.error()));
   auto teamUuidResult = Uuid::create(*teamUuidText);
   if (!teamUuidResult) return std::unexpected(std::move(teamUuidResult.error()));
@@ -621,7 +621,7 @@ std::expected<Json, StarException> TeamManager::makeLeader(Json const& arguments
 
   auto& team = m_teams.find_ref(teamUuid)->get();
 
-  auto callerHexResult = arguments.optString("_callerUuid");
+  auto callerHexResult = arguments.opt_string("_callerUuid");
   if (!callerHexResult) return std::unexpected(std::move(callerHexResult.error()));
   if (auto callerHex = *callerHexResult) {
     auto callerResult = Uuid::create(*callerHex);

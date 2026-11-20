@@ -48,7 +48,7 @@ namespace Star {
 std::string_view const ConstantSelector::Name = "constant";
 
 std::expected<std::shared_ptr<ConstantSelector>, StarException> ConstantSelector::create(Json const& config, TerrainSelectorParameters const& parameters) {
-  auto value = config.getFloat("value");
+  auto value = config.get_float("value");
   if (!value)
     return std::unexpected(std::move(value.error()));
   return std::make_shared<ConstantSelector>(ConstructionKey{}, config, parameters, *value);
@@ -66,10 +66,10 @@ std::expected<float, StarException> ConstantSelector::get(int, int) const {
 std::string_view const FlatSurfaceSelector::Name = "flatSurface";
 
 std::expected<std::shared_ptr<FlatSurfaceSelector>, StarException> FlatSurfaceSelector::create(Json const& config, TerrainSelectorParameters const& parameters) {
-  auto adjustment = config.getFloat("adjustment", 0);
+  auto adjustment = config.get_float("adjustment", 0);
   if (!adjustment)
     return std::unexpected(std::move(adjustment.error()));
-  auto flip = config.getBool("flip", false);
+  auto flip = config.get_bool("flip", false);
   if (!flip)
     return std::unexpected(std::move(flip.error()));
   return std::make_shared<FlatSurfaceSelector>(ConstructionKey{}, config, parameters, *adjustment, *flip ? -1.0f : 1.0f);

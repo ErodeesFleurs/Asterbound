@@ -437,7 +437,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
             auto const& action_names = InteractActionTypeNames;
             if (!action_names)
               return std::unexpected(action_names.error());
-            auto action_name = actionTypeName.toString();
+            auto action_name = actionTypeName.to_string();
             if (!action_name)
               return std::unexpected(std::move(action_name.error()));
             auto action_lookup = (*action_names).get_left(std::move(*action_name));
@@ -449,7 +449,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
               if (!instanceValueResult34)
                 return std::unexpected(std::move(instanceValueResult34.error()));
               auto actionData = std::move(*instanceValueResult34);
-              if (actionData.isType(Json::Type::Object))
+              if (actionData.is_type(Json::Type::Object))
                 {
                   auto setResult35 = actionData.set("openWithInventory", false);
                   if (!setResult35)
@@ -473,7 +473,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
   if (!getResult37)
     return std::unexpected(std::move(getResult37.error()));
   Json itemBagConfig = std::move(*getResult37);
-  auto toObjectResult38 = itemBagConfig.toObject();
+  auto toObjectResult38 = itemBagConfig.to_object();
   if (!toObjectResult38)
     return std::unexpected(std::move(toObjectResult38.error()));
   auto bagOrder = std::move(*toObjectResult38).keys();
@@ -481,7 +481,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
       auto getResult39 = itemBagConfig.get(name);
       if (!getResult39)
         return std::unexpected(std::move(getResult39.error()));
-      auto getIntResult40 = std::move(*getResult39).getInt("order", 0);
+      auto getIntResult40 = std::move(*getResult39).get_int("order", 0);
       if (!getIntResult40)
         return std::unexpected(std::move(getIntResult40.error()));
       return std::move(*getIntResult40);
@@ -492,7 +492,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
     auto getResult42 = itemBagConfig.get(name);
     if (!getResult42)
       return std::unexpected(std::move(getResult42.error()));
-    auto getStringResult43 = std::move(*getResult42).getString("itemGrid");
+    auto getStringResult43 = std::move(*getResult42).get_string("itemGrid");
     if (!getStringResult43)
       return std::unexpected(std::move(getStringResult43.error()));
     auto itemGrid = std::move(*getStringResult43);
@@ -536,7 +536,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
     auto button = convert_ref<ButtonWidget>(widget);
     if (!button)
       return std::unexpected(std::move(button.error()));
-    auto selected_value = button->get().data().toString();
+    auto selected_value = button->get().data().to_string();
     if (!selected_value)
       return std::unexpected(std::move(selected_value.error()));
     auto selected = std::move(*selected_value);
@@ -613,7 +613,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
   auto getResult59 = config.get("trashBurnTimeout");
   if (!getResult59)
     return std::unexpected(std::move(getResult59.error()));
-  auto toFloatResult60 = std::move(*getResult59).toFloat();
+  auto toFloatResult60 = std::move(*getResult59).to_float();
   if (!toFloatResult60)
     return std::unexpected(std::move(toFloatResult60.error()));
   m_trashBurn = GameTimer(std::move(*toFloatResult60));
@@ -674,7 +674,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
     if (!getResult70)
       return std::unexpected(std::move(getResult70.error()));
     auto itemTab = std::move(*getResult70);
-    auto getStringResult71 = itemTab.getString("itemGrid");
+    auto getStringResult71 = itemTab.get_string("itemGrid");
     if (!getStringResult71)
       return std::unexpected(std::move(getStringResult71.error()));
     auto fetchChildResult72 = fetchChild<ItemGridWidget>(std::move(*getStringResult71));
@@ -687,14 +687,14 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
     auto hideResult74 = m_itemGrids[name]->hide();
     if (!hideResult74)
       return std::unexpected(std::move(hideResult74.error()));
-    auto getStringResult75 = itemTab.getString("newItemMarker");
+    auto getStringResult75 = itemTab.get_string("newItemMarker");
     if (!getStringResult75)
       return std::unexpected(std::move(getStringResult75.error()));
     auto fetchChildResult76 = fetchChild<Widget>(std::move(*getStringResult75));
     if (!fetchChildResult76)
       return std::unexpected(std::move(fetchChildResult76.error()));
     m_newItemMarkers[name] = std::move(*fetchChildResult76);
-    auto getStringResult77 = itemTab.getString("tabButtonData");
+    auto getStringResult77 = itemTab.get_string("tabButtonData");
     if (!getStringResult77)
       return std::unexpected(std::move(getStringResult77.error()));
     m_tabButtonData[name] = std::move(*getStringResult77);
@@ -721,7 +721,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
   auto nameResult83 = m_player->name();
   if (!nameResult83)
     return std::unexpected(std::move(nameResult83.error()));
-  auto getStringResult84 = config.getString("subtitle");
+  auto getStringResult84 = config.get_string("subtitle");
   if (!getStringResult84)
     return std::unexpected(std::move(getStringResult84.error()));
   auto setTitleResult85 = setTitle(portrait, std::move(*nameResult83), std::move(*getStringResult84));
@@ -729,7 +729,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
     return std::unexpected(std::move(setTitleResult85.error()));
 
   {
-    auto getBoolResult86 = config.getBool("alwaysDisplayCosmetics", false);
+    auto getBoolResult86 = config.get_bool("alwaysDisplayCosmetics", false);
     if (!getBoolResult86)
       return std::unexpected(std::move(getBoolResult86.error()));
     if ((m_displayingCosmetics = m_alwaysDisplayCosmetics = std::move(*getBoolResult86))) {
@@ -767,7 +767,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
   auto getResult91 = std::move(*getResult90).get("pickup");
   if (!getResult91)
     return std::unexpected(std::move(getResult91.error()));
-  auto jsonToStringListResult92 = jsonToStringList(std::move(*getResult91));
+  auto jsonToStringListResult92 = json_to_string_list(std::move(*getResult91));
   if (!jsonToStringListResult92)
     return std::unexpected(std::move(jsonToStringListResult92.error()));
   m_pickUpSounds = std::move(*jsonToStringListResult92);
@@ -777,7 +777,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
   auto getResult94 = std::move(*getResult93).get("putdown");
   if (!getResult94)
     return std::unexpected(std::move(getResult94.error()));
-  auto jsonToStringListResult95 = jsonToStringList(std::move(*getResult94));
+  auto jsonToStringListResult95 = json_to_string_list(std::move(*getResult94));
   if (!jsonToStringListResult95)
     return std::unexpected(std::move(jsonToStringListResult95.error()));
   m_putDownSounds = std::move(*jsonToStringListResult95);
@@ -787,7 +787,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
   auto getResult97 = std::move(*getResult96).get("someup");
   if (!getResult97)
     return std::unexpected(std::move(getResult97.error()));
-  auto jsonToStringListResult98 = jsonToStringList(std::move(*getResult97));
+  auto jsonToStringListResult98 = json_to_string_list(std::move(*getResult97));
   if (!jsonToStringListResult98)
     return std::unexpected(std::move(jsonToStringListResult98.error()));
   m_someUpSounds = std::move(*jsonToStringListResult98);
@@ -797,7 +797,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
   auto getResult100 = std::move(*getResult99).get("somedown");
   if (!getResult100)
     return std::unexpected(std::move(getResult100.error()));
-  auto jsonToStringListResult101 = jsonToStringList(std::move(*getResult100));
+  auto jsonToStringListResult101 = json_to_string_list(std::move(*getResult100));
   if (!jsonToStringListResult101)
     return std::unexpected(std::move(jsonToStringListResult101.error()));
   m_someDownSounds = std::move(*jsonToStringListResult101);
@@ -831,7 +831,7 @@ std::expected<std::shared_ptr<Pane>, StarException> InventoryPane::createTooltip
         auto widgetData = itemSlot->data();
         if (widgetData && widgetData.type() == Json::Type::Object) {
           {
-            auto optStringResult104 = widgetData.optString("tooltipText");
+            auto optStringResult104 = widgetData.opt_string("tooltipText");
             if (!optStringResult104)
               return std::unexpected(std::move(optStringResult104.error()));
             if (auto text = std::move(*optStringResult104))
@@ -1341,7 +1341,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
         if (!setTextResult184)
           return std::unexpected(std::move(setTextResult184.error()));
       } else {
-        auto getStringResult185 = config.getString("defaultPetNameLabel");
+        auto getStringResult185 = config.get_string("defaultPetNameLabel");
         if (!getStringResult185)
           return std::unexpected(std::move(getStringResult185.error()));
         auto setTextResult186 = nameLabel->setText(std::move(*getStringResult185));
@@ -1425,7 +1425,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
     auto fetchChildResult201 = fetchChild<LabelWidget>("companionName");
     if (!fetchChildResult201)
       return std::unexpected(std::move(fetchChildResult201.error()));
-    auto getStringResult202 = config.getString("defaultPetNameLabel");
+    auto getStringResult202 = config.get_string("defaultPetNameLabel");
     if (!getStringResult202)
       return std::unexpected(std::move(getStringResult202.error()));
     auto setTextResult203 = std::move(*fetchChildResult201)->setText(std::move(*getStringResult202));
@@ -1540,7 +1540,7 @@ std::expected<void, StarException> InventoryPane::selectTab(String const& select
   auto tabs = std::move(*fetchChildResult222);
   for (auto button : tabs->buttons())
     {
-      auto toStringResult223 = button.get().data().toString();
+      auto toStringResult223 = button.get().data().to_string();
       if (!toStringResult223)
         return std::unexpected(std::move(toStringResult223.error()));
       auto equalsIgnoreCaseResult224 = std::move(*toStringResult223).equals_ignore_case(m_tabButtonData[selected]);

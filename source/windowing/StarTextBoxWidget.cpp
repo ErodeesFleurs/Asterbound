@@ -104,7 +104,7 @@ std::expected<void, StarException> TextBoxWidget::initialize() {
   auto config = (*assets)->json("/interface.config");
   if (!config)
     return std::unexpected(std::move(config.error()));
-  auto width = config->getInt("textBoxDefaultWidth");
+  auto width = config->get_int("textBoxDefaultWidth");
   if (!width)
     return std::unexpected(std::move(width.error()));
   m_maxWidth = *width;
@@ -119,13 +119,13 @@ std::expected<void, StarException> TextBoxWidget::initialize() {
   auto horizontalJson = config->get("textboxCursorHorizontal");
   if (!horizontalJson)
     return std::unexpected(std::move(horizontalJson.error()));
-  auto horizontal = jsonToVec2I(*horizontalJson);
+  auto horizontal = json_to_vec2i(*horizontalJson);
   if (!horizontal)
     return std::unexpected(std::move(horizontal.error()));
   auto verticalJson = config->get("textboxCursorVertical");
   if (!verticalJson)
     return std::unexpected(std::move(verticalJson.error()));
-  auto vertical = jsonToVec2I(*verticalJson);
+  auto vertical = json_to_vec2i(*verticalJson);
   if (!vertical)
     return std::unexpected(std::move(vertical.error()));
   m_cursorHoriz = *horizontal;

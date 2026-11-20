@@ -236,7 +236,7 @@ std::expected<void, StarException> ContainerPane::initialize(std::shared_ptr<Wor
     return std::unexpected(std::move(optResult227.error()));
   auto scriptsJson = std::move(*optResult227);
   if (scriptsJson) {
-    auto jsonToStringListResult228 = jsonToStringList(*scriptsJson);
+    auto jsonToStringListResult228 = json_to_string_list(*scriptsJson);
     if (!jsonToStringListResult228)
       return std::unexpected(std::move(jsonToStringListResult228.error()));
     auto scripts = std::move(*jsonToStringListResult228);
@@ -294,7 +294,7 @@ std::expected<void, StarException> ContainerPane::initialize(std::shared_ptr<Wor
     if (!addCallbacksResult242)
       return std::unexpected(std::move(addCallbacksResult242.error()));
 
-    auto getUIntResult243 = guiConfig.getUInt("scriptDelta", 1);
+    auto getUIntResult243 = guiConfig.get_uint("scriptDelta", 1);
     if (!getUIntResult243)
       return std::unexpected(std::move(getUIntResult243.error()));
     m_script->setUpdateDelta(std::move(*getUIntResult243));
@@ -441,7 +441,7 @@ std::expected<void, StarException> ContainerPane::initialize(std::shared_ptr<Wor
     auto getResult258 = guiConfig.get("scriptWidgetCallbacks", JsonArray{});
     if (!getResult258)
       return std::unexpected(std::move(getResult258.error()));
-    auto jsonToStringListResult259 = jsonToStringList(std::move(*getResult258));
+    auto jsonToStringListResult259 = json_to_string_list(std::move(*getResult258));
     if (!jsonToStringListResult259)
       return std::unexpected(std::move(jsonToStringListResult259.error()));
     for (auto const& callbackName : std::move(*jsonToStringListResult259)) {
@@ -845,14 +845,14 @@ std::expected<void, StarException> ContainerPane::update(float dt) {
         auto getPropertyResult325 = m_worldClient->getProperty("ship.fuel", 0);
         if (!getPropertyResult325)
           return std::unexpected(std::move(getPropertyResult325.error()));
-        auto toUIntResult326 = std::move(*getPropertyResult325).toUInt();
+        auto toUIntResult326 = std::move(*getPropertyResult325).to_uint();
         if (!toUIntResult326)
           return std::unexpected(std::move(toUIntResult326.error()));
         fuelGauge->setCurrentFuelLevel(std::move(*toUIntResult326));
         auto getPropertyResult327 = m_worldClient->getProperty("ship.maxFuel", 0);
         if (!getPropertyResult327)
           return std::unexpected(std::move(getPropertyResult327.error()));
-        auto toUIntResult328 = std::move(*getPropertyResult327).toUInt();
+        auto toUIntResult328 = std::move(*getPropertyResult327).to_uint();
         if (!toUIntResult328)
           return std::unexpected(std::move(toUIntResult328.error()));
         fuelGauge->setMaxFuelLevel(std::move(*toUIntResult328));
@@ -863,7 +863,7 @@ std::expected<void, StarException> ContainerPane::update(float dt) {
               auto instanceValueResult329 = item->instanceValue("fuelAmount", 0);
               if (!instanceValueResult329)
                 return std::unexpected(std::move(instanceValueResult329.error()));
-              auto toUIntResult330 = std::move(*instanceValueResult329).toUInt();
+              auto toUIntResult330 = std::move(*instanceValueResult329).to_uint();
               if (!toUIntResult330)
                 return std::unexpected(std::move(toUIntResult330.error()));
               totalFuelAmount += std::move(*toUIntResult330) * item->count();

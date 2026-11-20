@@ -124,7 +124,7 @@ std::expected<void, StarException> FireableItem::init(ToolUserEntity& owner, Too
   if (!mode)
     return std::unexpected(std::move(mode.error()));
   if (*mode == EntityMode::Master && *scriptValue) {
-    auto scripts = jsonToStringList(**scriptValue);
+    auto scripts = json_to_string_list(**scriptValue);
     if (!scripts)
       return std::unexpected(std::move(scripts.error()));
     if (!m_scriptComponent) {
@@ -385,14 +385,14 @@ bool FireableItem::validAimPos(Vec2F const&) {
 
 std::expected<void, StarException> FireableItem::setParams(Json const& params) {
   if (!m_alreadyInit) {
-    auto windup = params.getFloat("windupTime", 0.0f);
+    auto windup = params.get_float("windupTime", 0.0f);
     if (!windup)
       return std::unexpected(std::move(windup.error()));
     m_windupTime = *windup;
-    auto fireTime = params.getFloat("fireTime", 0.15f);
+    auto fireTime = params.get_float("fireTime", 0.15f);
     if (!fireTime)
       return std::unexpected(std::move(fireTime.error()));
-    auto cooldown = params.getFloat("cooldown", *fireTime - m_windupTime);
+    auto cooldown = params.get_float("cooldown", *fireTime - m_windupTime);
     if (!cooldown)
       return std::unexpected(std::move(cooldown.error()));
     m_cooldownTime = *cooldown;
@@ -400,24 +400,24 @@ std::expected<void, StarException> FireableItem::setParams(Json const& params) {
     if (!hasPosition)
       return std::unexpected(std::move(hasPosition.error()));
     if (*hasPosition) {
-      auto position = params.get("handPosition").and_then(jsonToVec2F);
+      auto position = params.get("handPosition").and_then(json_to_vec2f);
       if (!position)
         return std::unexpected(std::move(position.error()));
       m_handPosition = *position;
     }
-    auto edge = params.getBool("edgeTrigger", false);
+    auto edge = params.get_bool("edgeTrigger", false);
     if (!edge)
       return std::unexpected(std::move(edge.error()));
     m_requireEdgeTrigger = *edge;
-    auto release = params.getBool("fireOnRelease", false);
+    auto release = params.get_bool("fireOnRelease", false);
     if (!release)
       return std::unexpected(std::move(release.error()));
     m_fireOnRelease = *release;
-    auto walk = params.getBool("walkWhileFiring", false);
+    auto walk = params.get_bool("walkWhileFiring", false);
     if (!walk)
       return std::unexpected(std::move(walk.error()));
     m_walkWhileFiring = *walk;
-    auto stop = params.getBool("stopWhileFiring", false);
+    auto stop = params.get_bool("stopWhileFiring", false);
     if (!stop)
       return std::unexpected(std::move(stop.error()));
     m_stopWhileFiring = *stop;

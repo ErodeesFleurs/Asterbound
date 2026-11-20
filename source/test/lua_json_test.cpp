@@ -495,10 +495,10 @@ TEST(LuaJsonTest, IntFloat) {
 
   auto floatResult = context.invokePath<Json>("returnFloat");
   ASSERT_TRUE(floatResult);
-  EXPECT_TRUE(floatResult->isType(Json::Type::Float));
+  EXPECT_TRUE(floatResult->is_type(Json::Type::Float));
   auto intResult = context.invokePath<Json>("returnInt");
   ASSERT_TRUE(intResult);
-  EXPECT_TRUE(intResult->isType(Json::Type::Int));
+  EXPECT_TRUE(intResult->is_type(Json::Type::Int));
   EXPECT_EQ(context.invokePath<String>("printNumber", 1.0), "1.0");
   EXPECT_EQ(context.invokePath<String>("printNumber", 1), "1");
 }

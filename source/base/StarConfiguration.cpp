@@ -20,7 +20,7 @@ Json Configuration::currentConfiguration() const {
 
 std::expected<String, StarException> Configuration::printConfiguration() const {
   std::lock_guard locker(m_mutex);
-  return m_currentConfig.printJson(2, true);
+  return m_currentConfig.print_json(2, true);
 }
 
 std::expected<Json, StarException> Configuration::get(String const& key, Json def) const {

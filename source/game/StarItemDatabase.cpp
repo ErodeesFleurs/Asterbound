@@ -348,9 +348,9 @@ std::expected<ItemDatabase::ItemConfig, StarException> ItemDatabase::itemConfig(
     itemConfig.config = std::move(*config);
   }
   itemConfig.directory = data->get().directory;
-  itemConfig.config = jsonMerge(itemConfig.config, data->get().customConfig);
+  itemConfig.config = json_merge(itemConfig.config, data->get().customConfig);
   itemConfig.parameters = std::move(parameters);
-  auto builder = itemConfig.config.optString("builder");
+  auto builder = itemConfig.config.opt_string("builder");
   if (!builder)
     return std::unexpected(std::move(builder.error()));
   if (*builder) {
@@ -408,7 +408,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::itemShared(Ite
   auto created = tryCreateItem(descriptor, level, seed);
   if (!created)
     return std::unexpected(std::move(created.error()));
-  auto builtSeed = (*created)->parameters().optUInt("seed");
+  auto builtSeed = (*created)->parameters().opt_uint("seed");
   if (!builtSeed)
     return std::unexpected(std::move(builtSeed.error()));
   std::get<2>(entry) = *builtSeed;
@@ -533,12 +533,12 @@ std::expected<ItemRecipe, StarException> ItemDatabase::parseRecipe(Json const& c
   auto parsed = [&]() -> std::expected<ItemRecipe, StarException> {
     ItemRecipe res;
     auto currencies = config.get("currencyInputs", JsonObject()).and_then([](Json const& value) {
-      return jsonToMapV<StringMap<std::uint64_t>>(value, [](Json const& entry) { return entry.toUInt(); });
+      return json_to_map_v<StringMap<std::uint64_t>>(value, [](Json const& entry) { return entry.to_uint(); });
     });
     if (!currencies)
       return std::unexpected(std::move(currencies.error()));
     res.currencyInputs = std::move(*currencies);
-    auto inputs = config.getArray("input");
+    auto inputs = config.get_array("input");
     if (!inputs)
       return std::unexpected(std::move(inputs.error()));
     for (auto const& input : *inputs) {
@@ -568,14 +568,14 @@ std::expected<ItemRecipe, StarException> ItemDatabase::parseRecipe(Json const& c
     auto assets = m_root.assets();
     if (!assets)
       return std::unexpected(std::move(assets.error()));
-    auto defaultDuration = (*assets)->json("/items/defaultParameters.config:defaultCraftDuration").and_then([](Json const& value) { return value.toFloat(); });
+    auto defaultDuration = (*assets)->json("/items/defaultParameters.config:defaultCraftDuration").and_then([](Json const& value) { return value.to_float(); });
     if (!defaultDuration)
       return std::unexpected((*assets)->withAssetContext(std::move(defaultDuration.error()), "/items/defaultParameters.config", "Loading recipe defaults"));
-    auto duration = config.getFloat("duration", *defaultDuration);
+    auto duration = config.get_float("duration", *defaultDuration);
     if (!duration)
       return std::unexpected(std::move(duration.error()));
     res.duration = *duration;
-    auto groups = config.get("groups", JsonArray()).and_then([](Json const& value) { return jsonToStringSet(value); });
+    auto groups = config.get("groups", JsonArray()).and_then([](Json const& value) { return json_to_string_set(value); });
     if (!groups)
       return std::unexpected(std::move(groups.error()));
     res.groups = std::move(*groups);
@@ -590,12 +590,12 @@ std::expected<ItemRecipe, StarException> ItemDatabase::parseRecipe(Json const& c
       res.guiFilterString = std::move(*filter);
     }
     auto collectables = config.get("collectables", JsonObject()).and_then([](Json const& value) {
-      return jsonToMapV<StringMap<String>>(value, [](Json const& entry) { return entry.toString(); });
+      return json_to_map_v<StringMap<String>>(value, [](Json const& entry) { return entry.to_string(); });
     });
     if (!collectables)
       return std::unexpected(std::move(collectables.error()));
     res.collectables = std::move(*collectables);
-    auto match = config.getBool("matchInputParameters", false);
+    auto match = config.get_bool("matchInputParameters", false);
     if (!match)
       return std::unexpected(std::move(match.error()));
     res.matchInputParameters = *match;
@@ -660,7 +660,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::applyAugment(s
   locker.unlock();
   if (!luaResult)
     return std::unexpected(std::move(luaResult.error()));
-  if (*luaResult && !std::get<0>(**luaResult).isNull()) {
+  if (*luaResult && !std::get<0>(**luaResult).is_null()) {
     auto taken = augment.take(std::get<1>(**luaResult).value_or(1));
     if (!taken)
       return std::unexpected(std::move(taken.error()));
@@ -891,19 +891,19 @@ std::expected<void, StarException> ItemDatabase::addItemSet(ItemType type, Strin
       ItemData data;
       data.type = type;
       data.assetsConfig = file;
-      auto name = config->get("itemName").and_then([](Json const& value) { return value.toString(); });
+      auto name = config->get("itemName").and_then([](Json const& value) { return value.to_string(); });
       if (!name)
         return std::unexpected(std::move(name.error()));
       data.name = std::move(*name);
-      auto friendlyName = config->getString("shortdescription", {});
+      auto friendlyName = config->get_string("shortdescription", {});
       if (!friendlyName)
         return std::unexpected(std::move(friendlyName.error()));
       data.friendlyName = std::move(*friendlyName);
-      auto tags = config->get("itemTags", JsonArray{}).and_then([](Json const& value) { return jsonToStringSet(value); });
+      auto tags = config->get("itemTags", JsonArray{}).and_then([](Json const& value) { return json_to_string_set(value); });
       if (!tags)
         return std::unexpected(std::move(tags.error()));
       data.itemTags = std::move(*tags);
-      auto scripts = config->get("itemAgingScripts", JsonArray{}).and_then([](Json const& value) { return jsonToStringList(value); });
+      auto scripts = config->get("itemAgingScripts", JsonArray{}).and_then([](Json const& value) { return json_to_string_list(value); });
       if (!scripts)
         return std::unexpected(std::move(scripts.error()));
       data.directory = AssetPath::directory(file);
@@ -924,25 +924,25 @@ std::expected<void, StarException> ItemDatabase::addItemSet(ItemType type, Strin
 std::expected<void, StarException> ItemDatabase::addObjectDropItem(String const& objectPath, Json const& objectConfig) {
   ItemData data;
   data.type = ItemType::ObjectItem;
-  auto name = objectConfig.get("objectName").and_then([](Json const& value) { return value.toString(); });
+  auto name = objectConfig.get("objectName").and_then([](Json const& value) { return value.to_string(); });
   if (!name)
     return std::unexpected(std::move(name.error()));
   data.name = std::move(*name);
-  auto friendlyName = objectConfig.getString("shortdescription", {});
+  auto friendlyName = objectConfig.get_string("shortdescription", {});
   if (!friendlyName)
     return std::unexpected(std::move(friendlyName.error()));
   data.friendlyName = std::move(*friendlyName);
-  auto tags = objectConfig.get("itemTags", JsonArray{}).and_then([](Json const& value) { return jsonToStringSet(value); });
+  auto tags = objectConfig.get("itemTags", JsonArray{}).and_then([](Json const& value) { return json_to_string_set(value); });
   if (!tags)
     return std::unexpected(std::move(tags.error()));
   data.itemTags = std::move(*tags);
-  auto scripts = objectConfig.get("itemAgingScripts", JsonArray{}).and_then([](Json const& value) { return jsonToStringList(value); });
+  auto scripts = objectConfig.get("itemAgingScripts", JsonArray{}).and_then([](Json const& value) { return json_to_string_list(value); });
   if (!scripts)
     return std::unexpected(std::move(scripts.error()));
   data.agingScripts = std::move(*scripts);
   data.directory = AssetPath::directory(objectPath);
   data.filename = AssetPath::filename(objectPath);
-  auto configObject = objectConfig.toObject();
+  auto configObject = objectConfig.to_object();
   if (!configObject)
     return std::unexpected(std::move(configObject.error()));
   auto customConfig = std::move(*configObject);
@@ -1086,14 +1086,14 @@ std::expected<void, StarException> ItemDatabase::addBlueprints() {
       data.type = ItemType::Blueprint;
       JsonObject config;
       config["recipe"] = baseDesc.singular().toJson();
-      auto description = (*assets)->json("/blueprint.config:description").and_then([](Json const& value) { return value.toString(); });
+      auto description = (*assets)->json("/blueprint.config:description").and_then([](Json const& value) { return value.to_string(); });
       if (!description)
         return std::unexpected((*assets)->withAssetContext(std::move(description.error()), "/blueprint.config", "Loading blueprint defaults"));
       auto replacedDescription = description->replace("<item>", (*baseItem)->friendlyName());
       if (!replacedDescription)
         return std::unexpected(std::move(replacedDescription.error()));
       config["description"] = std::move(*replacedDescription);
-      auto shortDescription = (*assets)->json("/blueprint.config:shortdescription").and_then([](Json const& value) { return value.toString(); });
+      auto shortDescription = (*assets)->json("/blueprint.config:shortdescription").and_then([](Json const& value) { return value.to_string(); });
       if (!shortDescription)
         return std::unexpected((*assets)->withAssetContext(std::move(shortDescription.error()), "/blueprint.config", "Loading blueprint defaults"));
       auto replacedShortDescription = shortDescription->replace("<item>", (*baseItem)->friendlyName());
@@ -1101,7 +1101,7 @@ std::expected<void, StarException> ItemDatabase::addBlueprints() {
         return std::unexpected(std::move(replacedShortDescription.error()));
       data.friendlyName = std::move(*replacedShortDescription);
       config["shortdescription"] = data.friendlyName;
-      auto category = (*assets)->json("/blueprint.config:category").and_then([](Json const& value) { return value.toString(); });
+      auto category = (*assets)->json("/blueprint.config:category").and_then([](Json const& value) { return value.to_string(); });
       if (!category)
         return std::unexpected((*assets)->withAssetContext(std::move(category.error()), "/blueprint.config", "Loading blueprint defaults"));
       config["category"] = std::move(*category);
@@ -1167,7 +1167,7 @@ std::expected<void, StarException> ItemDatabase::addCodexes() {
       auto defaults = codexConfig->get("defaultItemConfig");
       if (!defaults)
         return std::unexpected((*assets)->withAssetContext(std::move(defaults.error()), "/codex.config", "Loading codex item defaults"));
-      auto merged = jsonMerge(*defaults, codexPair.second->itemConfig()).toObject();
+      auto merged = json_merge(*defaults, codexPair.second->itemConfig()).to_object();
       if (!merged)
         return std::unexpected(std::move(merged.error()));
       auto config = std::move(*merged);

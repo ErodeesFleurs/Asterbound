@@ -21,12 +21,12 @@ std::expected<AiState, StarException> AiState::create(Json const& v) {
   AiState result;
   auto available = v.get("availableMissions", JsonArray());
   if (!available) return std::unexpected(std::move(available.error()));
-  auto availableList = jsonToStringList(*available);
+  auto availableList = json_to_string_list(*available);
   if (!availableList) return std::unexpected(std::move(availableList.error()));
   result.availableMissions.insert_range(*availableList);
   auto completed = v.get("completedMissions", JsonArray());
   if (!completed) return std::unexpected(std::move(completed.error()));
-  auto completedList = jsonToStringList(*completed);
+  auto completedList = json_to_string_list(*completed);
   if (!completedList) return std::unexpected(std::move(completedList.error()));
   result.completedMissions.insert_range(*completedList);
   return result;

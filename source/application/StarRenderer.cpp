@@ -49,19 +49,19 @@ std::expected<void, StarException> validateRenderOutputSettings(RenderOutputSett
 }
 
 std::expected<RenderOutputSettings, StarException> renderOutputSettingsFromJson(Json const& config) {
-  auto name = config.getString("renderOutput");
+  auto name = config.get_string("renderOutput");
   if (!name)
     return std::unexpected(std::move(name.error()));
   auto mode = enum_value<RenderOutputModeNames>(*name);
   if (!mode)
     return std::unexpected(RendererException("renderOutput must be legacy, sdr or hdr10"));
-  auto exposure = config.getDouble("renderExposure");
+  auto exposure = config.get_double("renderExposure");
   if (!exposure)
     return std::unexpected(std::move(exposure.error()));
-  auto paperWhite = config.getDouble("hdrPaperWhite");
+  auto paperWhite = config.get_double("hdrPaperWhite");
   if (!paperWhite)
     return std::unexpected(std::move(paperWhite.error()));
-  auto peak = config.getDouble("hdrPeakLuminance");
+  auto peak = config.get_double("hdrPeakLuminance");
   if (!peak)
     return std::unexpected(std::move(peak.error()));
   if (auto result = validateOutputLevels(*exposure, *paperWhite, *peak); !result)

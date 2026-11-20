@@ -339,7 +339,7 @@ std::expected<ObjectFixture, StarException> prepareObjects(Root& root) {
     if (selected[scripted] == 4)
       continue;
     ++selected[scripted];
-    auto jsonName = (*config)->config.getString("objectName");
+    auto jsonName = (*config)->config.get_string("objectName");
     if (!jsonName)
       return std::unexpected(std::move(jsonName.error()));
     if (*jsonName != name)
@@ -453,7 +453,7 @@ void projectileColdCatalogParse(benchmark::State& state, BenchmarkSession& sessi
       session.fail(state, input.error());
       return;
     }
-    auto name = input->getString("projectileName");
+    auto name = input->get_string("projectileName");
     if (!name) {
       session.fail(state, name.error());
       return;
@@ -491,7 +491,7 @@ void projectileColdCatalogParse(benchmark::State& state, BenchmarkSession& sessi
 }
 
 std::expected<String, StarException> chooseWorldKey(Json const& config, String const& group, String const& preferred) {
-  auto entries = config.getObject(group);
+  auto entries = config.get_object(group);
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   auto keys = entries->keys();
@@ -633,10 +633,10 @@ std::expected<void, StarException> inspectProfile(Json const& entries, std::size
   if (!array)
     return std::unexpected(std::move(array.error()));
   for (auto const& entry : *array) {
-    auto name = entry.getString("function");
-    auto source = entry.getString("source");
-    auto self = entry.getInt("self");
-    auto total = entry.getInt("total");
+    auto name = entry.get_string("function");
+    auto source = entry.get_string("source");
+    auto self = entry.get_int("self");
+    auto total = entry.get_int("total");
     auto calls = entry.get("calls");
     if (!name) return std::unexpected(std::move(name.error()));
     if (!source) return std::unexpected(std::move(source.error()));
@@ -701,7 +701,7 @@ std::expected<void, StarException> consumeProfiles(String const& directory, bool
         auto text = File::read_file_string(path);
         if (!text)
           return std::unexpected(std::move(text.error()));
-        auto json = Json::parseJson(*text);
+        auto json = Json::parse_json(*text);
         if (!json)
           return std::unexpected(std::move(json.error()));
         ProfileShape shape;

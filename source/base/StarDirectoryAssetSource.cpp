@@ -42,10 +42,10 @@ std::expected<std::shared_ptr<DirectoryAssetSource>, StarException> DirectoryAss
       auto contents = File::read_file_string(*metadataFile);
       if (!contents)
         return std::unexpected(std::move(contents.error()));
-      auto parsed = Json::parseJson(*contents);
+      auto parsed = Json::parse_json(*contents);
       if (!parsed)
         return std::unexpected(AssetSourceException(Star::format("Could not load metadata file '{}' from assets", *metadataFile), parsed.error()));
-      auto metadata = parsed->toObject();
+      auto metadata = parsed->to_object();
       if (!metadata)
         return std::unexpected(AssetSourceException(Star::format("Could not load metadata file '{}' from assets", *metadataFile), metadata.error()));
       source->m_metadataFile = String(fileName);
@@ -128,7 +128,7 @@ std::expected<void, StarException> DirectoryAssetSource::setMetadata(JsonObject 
       if (!removed)
         return std::unexpected(std::move(removed.error()));
     } else {
-      auto printed = Json(metadata).printJson(2, true);
+      auto printed = Json(metadata).print_json(2, true);
       if (!printed)
         return std::unexpected(std::move(printed.error()));
       auto written = File::write_file(*printed, *filesystem);

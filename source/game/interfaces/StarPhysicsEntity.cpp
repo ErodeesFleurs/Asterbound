@@ -30,7 +30,7 @@ std::expected<PhysicsMovingCollision, StarException> PhysicsMovingCollision::fro
   if (!positionJson)
     return std::unexpected(std::move(positionJson.error()));
   if (*positionJson) {
-    auto position = jsonToVec2F(**positionJson);
+    auto position = json_to_vec2f(**positionJson);
     if (!position)
       return std::unexpected(std::move(position.error()));
     pmc.position = *position;
@@ -38,11 +38,11 @@ std::expected<PhysicsMovingCollision, StarException> PhysicsMovingCollision::fro
   auto collisionJson = json.get("collision");
   if (!collisionJson)
     return std::unexpected(std::move(collisionJson.error()));
-  auto collision = jsonToPolyF(*collisionJson);
+  auto collision = json_to_polyf(*collisionJson);
   if (!collision)
     return std::unexpected(std::move(collision.error()));
   pmc.collision = std::move(*collision);
-  auto kindName = json.getString("collisionKind", "block");
+  auto kindName = json.get_string("collisionKind", "block");
   if (!kindName)
     return std::unexpected(std::move(kindName.error()));
   auto kind = enum_value<CollisionKindNames>(*kindName);

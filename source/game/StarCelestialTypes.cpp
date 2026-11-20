@@ -106,15 +106,15 @@ std::expected<CelestialChunk, StarException> CelestialChunk::create(Json const& 
   auto indexJson = store.get("chunkIndex");
   if (!indexJson)
     return std::unexpected(std::move(indexJson.error()));
-  auto index = jsonToVec2I(*indexJson);
+  auto index = json_to_vec2i(*indexJson);
   if (!index)
     return std::unexpected(std::move(index.error()));
   chunk.chunkIndex = *index;
-  auto constellations = store.getArray("constellations");
+  auto constellations = store.get_array("constellations");
   if (!constellations)
     return std::unexpected(std::move(constellations.error()));
   for (auto const& linesJson : *constellations) {
-    auto lines = linesJson.toArray();
+    auto lines = linesJson.to_array();
     if (!lines)
       return std::unexpected(std::move(lines.error()));
     CelestialConstellation constellation;
@@ -122,27 +122,27 @@ std::expected<CelestialChunk, StarException> CelestialChunk::create(Json const& 
       auto startJson = line.get(0);
       if (!startJson)
         return std::unexpected(std::move(startJson.error()));
-      auto start = jsonToVec2I(*startJson);
+      auto start = json_to_vec2i(*startJson);
       if (!start)
         return std::unexpected(std::move(start.error()));
       auto endJson = line.get(1);
       if (!endJson)
         return std::unexpected(std::move(endJson.error()));
-      auto end = jsonToVec2I(*endJson);
+      auto end = json_to_vec2i(*endJson);
       if (!end)
         return std::unexpected(std::move(end.error()));
       constellation.push_back({*start, *end});
     }
     chunk.constellations.push_back(std::move(constellation));
   }
-  auto systems = store.getArray("systemParameters");
+  auto systems = store.get_array("systemParameters");
   if (!systems)
     return std::unexpected(std::move(systems.error()));
   for (auto const& system : *systems) {
     auto locationJson = system.get(0);
     if (!locationJson)
       return std::unexpected(std::move(locationJson.error()));
-    auto location = jsonToVec3I(*locationJson);
+    auto location = json_to_vec3i(*locationJson);
     if (!location)
       return std::unexpected(std::move(location.error()));
     auto parametersJson = system.get(1);
@@ -153,22 +153,22 @@ std::expected<CelestialChunk, StarException> CelestialChunk::create(Json const& 
       return std::unexpected(std::move(parameters.error()));
     chunk.systemParameters[*location] = std::move(*parameters);
   }
-  auto objects = store.getArray("systemObjects");
+  auto objects = store.get_array("systemObjects");
   if (!objects)
     return std::unexpected(std::move(objects.error()));
   for (auto const& system : *objects) {
     auto locationJson = system.get(0);
     if (!locationJson)
       return std::unexpected(std::move(locationJson.error()));
-    auto location = jsonToVec3I(*locationJson);
+    auto location = json_to_vec3i(*locationJson);
     if (!location)
       return std::unexpected(std::move(location.error()));
-    auto planets = system.getArray(1);
+    auto planets = system.get_array(1);
     if (!planets)
       return std::unexpected(std::move(planets.error()));
     HashMap<int, CelestialPlanet> systemObjects;
     for (auto const& pair : *planets) {
-      auto orbit = pair.getInt(0);
+      auto orbit = pair.get_int(0);
       if (!orbit)
         return std::unexpected(std::move(orbit.error()));
       auto planetJson = pair.get(1);
@@ -182,11 +182,11 @@ std::expected<CelestialChunk, StarException> CelestialChunk::create(Json const& 
         return std::unexpected(std::move(parameters.error()));
       CelestialPlanet planet;
       planet.planetParameters = std::move(*parameters);
-      auto satellites = planetJson->getArray("satellites");
+      auto satellites = planetJson->get_array("satellites");
       if (!satellites)
         return std::unexpected(std::move(satellites.error()));
       for (auto const& satellite : *satellites) {
-        auto satelliteOrbit = satellite.getInt(0);
+        auto satelliteOrbit = satellite.get_int(0);
         if (!satelliteOrbit)
           return std::unexpected(std::move(satelliteOrbit.error()));
         auto satelliteJson = satellite.get(1);
@@ -213,7 +213,7 @@ std::expected<Json, StarException> CelestialChunk::toJson() const {
   for (auto const& constellation : constellations) {
     JsonArray lines;
     for (auto const& pair : constellation)
-      lines.push_back(JsonArray{jsonFromVec2I(pair.first), jsonFromVec2I(pair.second)});
+      lines.push_back(JsonArray{json_from_vec2i(pair.first), json_from_vec2i(pair.second)});
     constellationStore.push_back(std::move(lines));
   }
   JsonArray systemParametersStore;
@@ -221,7 +221,7 @@ std::expected<Json, StarException> CelestialChunk::toJson() const {
     auto parameters = pair.second.diskStore();
     if (!parameters)
       return std::unexpected(std::move(parameters.error()));
-    systemParametersStore.push_back(JsonArray{jsonFromVec3I(pair.first), std::move(*parameters)});
+    systemParametersStore.push_back(JsonArray{json_from_vec3i(pair.first), std::move(*parameters)});
   }
   JsonArray systemObjectsStore;
   for (auto const& system : systemObjects) {
@@ -240,9 +240,9 @@ std::expected<Json, StarException> CelestialChunk::toJson() const {
       planetsStore.push_back(JsonArray{
         planet.first, JsonObject{{"parameters", std::move(*parameters)}, {"satellites", std::move(satellitesStore)}}});
     }
-    systemObjectsStore.push_back(JsonArray{jsonFromVec3I(system.first), std::move(planetsStore)});
+    systemObjectsStore.push_back(JsonArray{json_from_vec3i(system.first), std::move(planetsStore)});
   }
-  return JsonObject{{"chunkIndex", jsonFromVec2I(chunkIndex)},
+  return JsonObject{{"chunkIndex", json_from_vec2i(chunkIndex)},
       {"constellations", std::move(constellationStore)},
       {"systemParameters", std::move(systemParametersStore)},
       {"systemObjects", std::move(systemObjectsStore)}};

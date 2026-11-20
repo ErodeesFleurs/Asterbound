@@ -75,7 +75,7 @@ std::expected<WormCaveSector, StarException> WormCaveSector::create(int sectorSi
     auto value = config.get(name);
     if (!value)
       return std::unexpected(std::move(value.error()));
-    return jsonToVec2F(*value);
+    return json_to_vec2f(*value);
   };
   auto countRange = readRange("numberOfWormsPerSectorRange");
   if (!countRange)
@@ -89,7 +89,7 @@ std::expected<WormCaveSector, StarException> WormCaveSector::create(int sectorSi
   if (!lengthRange)
     return std::unexpected(std::move(lengthRange.error()));
   Vec2F wormLengthRange = *lengthRange;
-  auto taperDistance = config.getFloat("wormTaperDistance");
+  auto taperDistance = config.get_float("wormTaperDistance");
   if (!taperDistance)
     return std::unexpected(std::move(taperDistance.error()));
   float wormTaperDistance = *taperDistance;
@@ -97,15 +97,15 @@ std::expected<WormCaveSector, StarException> WormCaveSector::create(int sectorSi
   if (!angleRange)
     return std::unexpected(std::move(angleRange.error()));
   Vec2F wormAngleRange = *angleRange;
-  auto turnChance = config.getFloat("wormTurnChance");
+  auto turnChance = config.get_float("wormTurnChance");
   if (!turnChance)
     return std::unexpected(std::move(turnChance.error()));
   float wormTurnChance = *turnChance;
-  auto turnRate = config.getFloat("wormTurnRate");
+  auto turnRate = config.get_float("wormTurnRate");
   if (!turnRate)
     return std::unexpected(std::move(turnRate.error()));
   float wormTurnRate = *turnRate;
-  auto speed = config.getFloat("wormSpeed", 1);
+  auto speed = config.get_float("wormSpeed", 1);
   if (!speed)
     return std::unexpected(std::move(speed.error()));
   float wormSpeed = *speed;
@@ -115,7 +115,7 @@ std::expected<WormCaveSector, StarException> WormCaveSector::create(int sectorSi
   result.m_maxValue = wormSizeRange[1] / 2;
 
   // determine worms for the neighbouring sectors
-  auto configuredRadius = config.getInt("sectorRadius");
+  auto configuredRadius = config.get_int("sectorRadius");
   if (!configuredRadius)
     return std::unexpected(std::move(configuredRadius.error()));
   int sectorRadius = sectorSize * *configuredRadius;
@@ -250,11 +250,11 @@ void WormCaveSector::set(int x, int y, float value) {
 }
 
 std::expected<std::shared_ptr<WormCaveSelector>, StarException> WormCaveSelector::create(Json const& config, TerrainSelectorParameters const& parameters) {
-  auto sectorSize = config.getUInt("sectorSize", 64);
+  auto sectorSize = config.get_uint("sectorSize", 64);
   if (!sectorSize)
     return std::unexpected(std::move(sectorSize.error()));
   auto result = std::make_shared<WormCaveSelector>(ConstructionKey{}, config, parameters, *sectorSize);
-  auto cacheSize = config.getUInt("lruCacheSize", 16);
+  auto cacheSize = config.get_uint("lruCacheSize", 16);
   if (!cacheSize)
     return std::unexpected(std::move(cacheSize.error()));
   result->m_cache.set_capacity(*cacheSize);

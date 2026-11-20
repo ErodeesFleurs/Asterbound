@@ -134,11 +134,11 @@ std::expected<std::shared_ptr<SystemWorldServer>, StarException> SystemWorldServ
   auto locationData = diskStore.get("location");
   if (!locationData)
     return std::unexpected(std::move(locationData.error()));
-  auto location = jsonToVec3I(*locationData);
+  auto location = json_to_vec3i(*locationData);
   if (!location)
     return std::unexpected(std::move(location.error()));
   server->m_location = *location;
-  auto objects = diskStore.getArray("objects");
+  auto objects = diskStore.get_array("objects");
   if (!objects)
     return std::unexpected(std::move(objects.error()));
   for (auto const& store : *objects) {
@@ -148,11 +148,11 @@ std::expected<std::shared_ptr<SystemWorldServer>, StarException> SystemWorldServ
     auto uuid = (*object)->uuid();
     server->m_objects.set(uuid, std::move(*object));
   }
-  auto lastSpawn = diskStore.getDouble("lastSpawn");
+  auto lastSpawn = diskStore.get_double("lastSpawn");
   if (!lastSpawn)
     return std::unexpected(std::move(lastSpawn.error()));
   server->m_lastSpawn = *lastSpawn;
-  auto interval = diskStore.getDouble("objectSpawnTime");
+  auto interval = diskStore.get_double("objectSpawnTime");
   if (!interval)
     return std::unexpected(std::move(interval.error()));
   server->m_objectSpawnTime = *interval;
@@ -523,7 +523,7 @@ std::expected<Json, StarException> SystemWorldServer::diskStore() {
       return std::unexpected(std::move(store.error()));
     objects.push_back(std::move(*store));
   }
-  return JsonObject{{"location", jsonFromVec3I(m_location)}, {"objects", std::move(objects)},
+  return JsonObject{{"location", json_from_vec3i(m_location)}, {"objects", std::move(objects)},
     {"lastSpawn", m_lastSpawn}, {"objectSpawnTime", m_objectSpawnTime}};
 }
 
@@ -535,18 +535,18 @@ std::expected<void, StarException> SystemWorldServer::placeInitialObjects() {
   if (!config)
     return std::unexpected(std::move(config.error()));
   RandomSource random(static_random_u64("SystemWorldGeneration", Star::to_string(m_location)));
-  auto poolData = config->getArray("initialObjectPools");
+  auto poolData = config->get_array("initialObjectPools");
   if (!poolData)
     return std::unexpected(std::move(poolData.error()));
   auto pools = json_to_weighted_pool<JsonArray>(*poolData);
   if (!pools)
     return std::unexpected(std::move(pools.error()));
   Json spawn(pools->select(random));
-  auto count = spawn.getInt(0);
+  auto count = spawn.get_int(0);
   if (!count)
     return std::unexpected(std::move(count.error()));
   if (*count > 0) {
-    auto objectPoolData = spawn.getArray(1);
+    auto objectPoolData = spawn.get_array(1);
     if (!objectPoolData)
       return std::unexpected(std::move(objectPoolData.error()));
     auto pool = json_to_weighted_pool<String>(*objectPoolData);
@@ -586,7 +586,7 @@ std::expected<void, StarException> SystemWorldServer::spawnObjects() {
     auto poolJson = (*assets)->json("/systemworld.config:objectSpawnPool");
     if (!poolJson)
       return std::unexpected(std::move(poolJson.error()));
-    auto poolArray = poolJson->toArray();
+    auto poolArray = poolJson->to_array();
     if (!poolArray)
       return std::unexpected(std::move(poolArray.error()));
     auto pool = json_to_weighted_pool<String>(*poolArray);

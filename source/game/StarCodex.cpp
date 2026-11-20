@@ -19,23 +19,23 @@ std::expected<std::shared_ptr<Codex>, StarException> Codex::create(Json const& c
   auto result = std::shared_ptr<Codex>(new Codex());
   result->m_directory = AssetPath::directory(path);
   result->m_filename = AssetPath::filename(path);
-  auto id = config.getString("id");
+  auto id = config.get_string("id");
   if (!id)
     return std::unexpected(std::move(id.error()));
   result->m_id = std::move(*id);
-  auto species = config.getString("species", "other");
+  auto species = config.get_string("species", "other");
   if (!species)
     return std::unexpected(std::move(species.error()));
   result->m_species = std::move(*species);
-  auto title = config.getString("title");
+  auto title = config.get_string("title");
   if (!title)
     return std::unexpected(std::move(title.error()));
   result->m_title = std::move(*title);
-  auto description = config.getString("description", "");
+  auto description = config.get_string("description", "");
   if (!description)
     return std::unexpected(std::move(description.error()));
   result->m_description = std::move(*description);
-  auto icon = config.getString("icon");
+  auto icon = config.get_string("icon");
   if (!icon)
     return std::unexpected(std::move(icon.error()));
   result->m_icon = std::move(*icon);
@@ -43,7 +43,7 @@ std::expected<std::shared_ptr<Codex>, StarException> Codex::create(Json const& c
   if (!pages)
     return std::unexpected(std::move(pages.error()));
   for (auto const& page : *pages) {
-    auto text = page.toString();
+    auto text = page.to_string();
     if (!text)
       return std::unexpected(std::move(text.error()));
     result->m_pages.push_back(std::move(*text));
@@ -62,7 +62,7 @@ Json Codex::toJson() const {
       {"title", m_title},
       {"description", m_description},
       {"icon", m_icon},
-      {"contentPages", jsonFromStringList(m_pages)},
+      {"contentPages", json_from_string_list(m_pages)},
       {"itemConfig", m_itemConfig}};
   return result;
 }

@@ -63,12 +63,12 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::
       {"minimumLiquidLevel", &LiquidCellEngineParameters::minimumLiquidLevel},
       {"interactTransformationLevel", &LiquidCellEngineParameters::interactTransformationLevel}};
     for (auto const& [name, member] : fields) {
-      auto value = engine->getFloat(name);
+      auto value = engine->get_float(name);
       if (!value) return std::unexpected(std::move(value.error()));
       result->m_liquidEngineParameters.*member = *value;
     }
     {
-      auto value = config->getFloat("backgroundDrain");
+      auto value = config->get_float("backgroundDrain");
       if (!value) return std::unexpected(std::move(value.error()));
       result->m_backgroundDrain = std::move(*value);
     }
@@ -88,7 +88,7 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::
       auto config = assets->json(file);
       if (!config)
         return std::unexpected(std::move(config.error()));
-      auto id = config->getUInt("liquidId");
+      auto id = config->get_uint("liquidId");
       if (!id)
         return std::unexpected(std::move(id.error()));
       if (*id != static_cast<LiquidId>(*id))
@@ -97,7 +97,7 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::
       auto entry = std::make_shared<LiquidSettings>();
       entry->id = static_cast<LiquidId>(*id);
       {
-        auto value = config->getString("name");
+        auto value = config->get_string("name");
         if (!value)
           return std::unexpected(std::move(value.error()));
         entry->name = std::move(*value);
@@ -116,14 +116,14 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::
           descriptions[pair.first] = pair.second;
       }
       {
-        auto value = config->getString("description", "");
+        auto value = config->get_string("description", "");
         if (!value)
           return std::unexpected(std::move(value.error()));
         descriptions["description"] = std::move(*value);
       }
       entry->descriptions = std::move(descriptions);
       {
-        auto value = config->getUInt("tickDelta");
+        auto value = config->get_uint("tickDelta");
         if (!value)
           return std::unexpected(std::move(value.error()));
         entry->tickDelta = std::move(*value);
@@ -132,7 +132,7 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::
       if (!colorConfig)
         return std::unexpected(std::move(colorConfig.error()));
       {
-        auto value = jsonToVec4B(*colorConfig);
+        auto value = json_to_vec4b(*colorConfig);
         if (!value)
           return std::unexpected(std::move(value.error()));
         entry->liquidColor = std::move(*value);
@@ -141,7 +141,7 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::
       if (!lightConfig)
         return std::unexpected(std::move(lightConfig.error()));
       if (*lightConfig) {
-        auto light = jsonToVec3B(**lightConfig);
+        auto light = json_to_vec3b(**lightConfig);
         if (!light)
           return std::unexpected(std::move(light.error()));
         entry->radiantLightLevel = Color::rgb(*light).to_rgb_f();
@@ -156,20 +156,20 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::
         entry->itemDrop = std::move(*value);
       }
       {
-        auto value = config->getArray("statusEffects", {});
+        auto value = config->get_array("statusEffects", {});
         if (!value)
           return std::unexpected(std::move(value.error()));
         entry->statusEffects = std::move(*value);
       }
-      auto interactions = config->getArray("interactions", {});
+      auto interactions = config->get_array("interactions", {});
       if (!interactions)
         return std::unexpected(std::move(interactions.error()));
       for (auto const& interaction : *interactions) {
-        auto liquid = interaction.getUInt("liquid");
+        auto liquid = interaction.get_uint("liquid");
         if (!liquid)
           return std::unexpected(std::move(liquid.error()));
         auto other_id = static_cast<LiquidId>(*liquid);
-        auto materialResult = interaction.optString("materialResult");
+        auto materialResult = interaction.opt_string("materialResult");
         if (!materialResult)
           return std::unexpected(std::move(materialResult.error()));
         if (*materialResult) {
@@ -178,7 +178,7 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::
             return std::unexpected(std::move(material.error()));
           entry->interactions[other_id].emplace(make_left(*material));
         } else {
-          auto liquidResult = interaction.optUInt("liquidResult");
+          auto liquidResult = interaction.opt_uint("liquidResult");
           if (!liquidResult)
             return std::unexpected(std::move(liquidResult.error()));
           if (!*liquidResult)
@@ -229,16 +229,16 @@ std::expected<String, StarException> LiquidsDatabase::liquidName(LiquidId liquid
 std::expected<String, StarException> LiquidsDatabase::liquidDescription(LiquidId liquidId, String const& species) const {
   if (liquidId == EmptyLiquidId) return String();
   if (auto settings = liquidSettings(liquidId)) {
-    auto description = settings->descriptions.getString("description");
+    auto description = settings->descriptions.get_string("description");
     if (!description) return std::unexpected(std::move(description.error()));
-    return settings->descriptions.getString(Star::format("{}Description", species), *description);
+    return settings->descriptions.get_string(Star::format("{}Description", species), *description);
   }
   return std::unexpected(LiquidException::format("invalid liquid id {}", liquidId));
 }
 
 std::expected<String, StarException> LiquidsDatabase::liquidDescription(LiquidId liquidId) const {
   if (liquidId == EmptyLiquidId) return String();
-  if (auto settings = liquidSettings(liquidId)) return settings->descriptions.getString("description");
+  if (auto settings = liquidSettings(liquidId)) return settings->descriptions.get_string("description");
   return std::unexpected(LiquidException::format("invalid liquid id {}", liquidId));
 }
 

@@ -317,7 +317,7 @@ std::expected<void, StarException> ModStorage::set(String const& mod, String con
     return std::unexpected(std::move(loaded.error()));
   auto& data = loaded->get();
   auto found = data.entries.find(key);
-  if (value.isNull()) {
+  if (value.is_null()) {
     if (found != data.entries.end()) {
       data.bytes -= found->second.size() + (data.entries.size() > 1 ? 1 : 0);
       data.entries.erase(found);

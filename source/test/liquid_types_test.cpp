@@ -51,7 +51,7 @@ liquidsFixture(GameTest& fixture, String const& directory, Json const& config) {
   auto preload = File::write_file(String("[]"), File::relative_to(directory, "preload.config"));
   if (!preload)
     return std::unexpected(std::move(preload.error()));
-  auto contents = config.printJson();
+  auto contents = config.print_json();
   if (!contents)
     return std::unexpected(std::move(contents.error()));
   auto written = File::write_file(*contents, File::relative_to(directory, "liquids.config"));

@@ -301,7 +301,7 @@ std::expected<void, StarException> OptionsMenu::init(std::shared_ptr<UniverseCli
   auto sfxDeltaJson = (*assets)->json("/interface/optionsmenu/optionsmenu.config:sfxDelta");
   if (!sfxDeltaJson)
     return std::unexpected(std::move(sfxDeltaJson.error()));
-  auto sfxDelta = sfxDeltaJson->toInt();
+  auto sfxDelta = sfxDeltaJson->to_int();
   if (!sfxDelta)
     return std::unexpected(std::move(sfxDelta.error()));
   if (auto result = m_instrumentSlider->setRange(m_sfxRange, *sfxDelta); !result)
@@ -311,12 +311,12 @@ std::expected<void, StarException> OptionsMenu::init(std::shared_ptr<UniverseCli
   auto musicDeltaJson = (*assets)->json("/interface/optionsmenu/optionsmenu.config:musicDelta");
   if (!musicDeltaJson)
     return std::unexpected(std::move(musicDeltaJson.error()));
-  auto musicDelta = musicDeltaJson->toInt();
+  auto musicDelta = musicDeltaJson->to_int();
   if (!musicDelta)
     return std::unexpected(std::move(musicDelta.error()));
   if (auto result = m_musicSlider->setRange(m_musicRange, *musicDelta); !result)
     return std::unexpected(std::move(result.error()));
-  auto voicePath = config->getString("voiceSettingsPanePath", "/interface/asterbound/voicechat/voicechat.config");
+  auto voicePath = config->get_string("voiceSettingsPanePath", "/interface/asterbound/voicechat/voicechat.config");
   if (!voicePath)
     return std::unexpected(std::move(voicePath.error()));
   auto voiceConfig = (*assets)->json(*voicePath);
@@ -326,7 +326,7 @@ std::expected<void, StarException> OptionsMenu::init(std::shared_ptr<UniverseCli
   if (!voiceMenu)
     return std::unexpected(std::move(voiceMenu.error()));
   m_voiceSettingsMenu = std::move(*voiceMenu);
-  auto bindingsPath = config->getString("bindingsPanePath", "/interface/asterbound/bindings/bindings.config");
+  auto bindingsPath = config->get_string("bindingsPanePath", "/interface/asterbound/bindings/bindings.config");
   if (!bindingsPath)
     return std::unexpected(std::move(bindingsPath.error()));
   auto bindingsConfig = (*assets)->json(*bindingsPath);
@@ -422,7 +422,7 @@ std::expected<void, StarException> OptionsMenu::syncGuiToConf() {
     auto setting = m_localChanges.get(key);
     if (!setting)
       return std::unexpected(std::move(setting.error()));
-    auto value = setting->get().toInt();
+    auto value = setting->get().to_int();
     if (!value)
       return std::unexpected(std::move(value.error()));
     if (auto result = slider.get().setVal(*value, false); !result)
@@ -438,7 +438,7 @@ std::expected<void, StarException> OptionsMenu::syncGuiToConf() {
     auto setting = m_localChanges.get(key);
     if (!setting)
       return std::unexpected(std::move(setting.error()));
-    auto value = setting->get().toBool();
+    auto value = setting->get().to_bool();
     if (!value)
       return std::unexpected(std::move(value.error()));
     button.get().setChecked(*value);
@@ -446,7 +446,7 @@ std::expected<void, StarException> OptionsMenu::syncGuiToConf() {
   auto headRotationSetting = m_localChanges.get("humanoidHeadRotation");
   if (!headRotationSetting)
     return std::unexpected(std::move(headRotationSetting.error()));
-  auto headRotation = headRotationSetting->get().optBool();
+  auto headRotation = headRotationSetting->get().opt_bool();
   if (!headRotation)
     return std::unexpected(std::move(headRotation.error()));
   m_headRotationButton->setChecked(headRotation->value_or(true));

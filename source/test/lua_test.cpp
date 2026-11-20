@@ -2219,7 +2219,7 @@ TEST(LuaTest, PromiseUserdataObservesSharedOutcome) {
   auto promiseResult = promise.result();
   ASSERT_TRUE(promiseResult);
   ASSERT_TRUE(*promiseResult);
-  EXPECT_EQ((**promiseResult).getInt("answer"), 42);
+  EXPECT_EQ((**promiseResult).get_int("answer"), 42);
   {
     auto failure = context.load("keeper:fail('second resolution')");
     ASSERT_FALSE(failure);

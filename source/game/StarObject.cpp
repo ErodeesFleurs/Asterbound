@@ -123,25 +123,25 @@ std::expected<std::shared_ptr<Object>, StarException> Object::create(Root& rootC
 
 std::expected<void, StarException> Object::initialize(std::shared_ptr<ObjectConfig const> config, Json const& parameters) {
   m_config = std::move(config);
-  if (!parameters.isNull()) {
-    auto objectParametersResult = parameters.toObject();
+  if (!parameters.is_null()) {
+    auto objectParametersResult = parameters.to_object();
     if (!objectParametersResult)
       return std::unexpected(std::move(objectParametersResult.error()));
     auto objectParameters = std::move(*objectParametersResult);
     m_parameters.reset(std::move(objectParameters));
   }
   auto jOrientations = m_parameters.find_ref("customOrientations");
-  if (jOrientations && jOrientations->get().isType(Json::Type::Array)) {
-    auto baseResult = m_config->config.getArray("orientations");
+  if (jOrientations && jOrientations->get().is_type(Json::Type::Array)) {
+    auto baseResult = m_config->config.get_array("orientations");
     if (!baseResult)
       return std::unexpected(std::move(baseResult.error()));
     auto base = std::move(*baseResult);
-    auto orientationsResult = jOrientations->get().toArray();
+    auto orientationsResult = jOrientations->get().to_array();
     if (!orientationsResult)
       return std::unexpected(std::move(orientationsResult.error()));
     auto orientations = std::move(*orientationsResult);
     for (std::size_t i = 0; i != orientations.size(); ++i) {
-      auto mergedOrientation = jsonMergeNulling(base.get(i), orientations.get(i));
+      auto mergedOrientation = json_merge_nulling(base.get(i), orientations.get(i));
       if (auto assigned = base.set(i, std::move(mergedOrientation)); !assigned)
         return std::unexpected(std::move(assigned.error()));
     }
@@ -160,14 +160,14 @@ std::expected<void, StarException> Object::initialize(std::shared_ptr<ObjectConf
   if (!actionResult)
     return std::unexpected(std::move(actionResult.error()));
   auto action = std::move(*actionResult);
-  m_interactive.set(!action.isNull());
+  m_interactive.set(!action.is_null());
   m_unbreakable = m_config->unbreakable;
   if (!m_unbreakable) {
     auto unbreakableConfigResult = configValue("unbreakable", false);
     if (!unbreakableConfigResult)
       return std::unexpected(std::move(unbreakableConfigResult.error()));
     auto unbreakableConfig = std::move(*unbreakableConfigResult);
-    auto unbreakableResult = unbreakableConfig.toBool();
+    auto unbreakableResult = unbreakableConfig.to_bool();
     if (!unbreakableResult)
       return std::unexpected(std::move(unbreakableResult.error()));
     auto unbreakable = std::move(*unbreakableResult);
@@ -247,7 +247,7 @@ std::expected<void, StarException> Object::initialize(std::shared_ptr<ObjectConf
   if (!offeredConfigResult)
     return std::unexpected(std::move(offeredConfigResult.error()));
   auto offeredConfig = std::move(*offeredConfigResult);
-  auto offeredResult = offeredConfig.toArray();
+  auto offeredResult = offeredConfig.to_array();
   if (!offeredResult)
     return std::unexpected(std::move(offeredResult.error()));
   auto offered = std::move(*offeredResult);
@@ -264,7 +264,7 @@ std::expected<void, StarException> Object::initialize(std::shared_ptr<ObjectConf
   if (!turnInConfigResult)
     return std::unexpected(std::move(turnInConfigResult.error()));
   auto turnInConfig = std::move(*turnInConfigResult);
-  auto turnInResult = jsonToStringSet(turnInConfig);
+  auto turnInResult = json_to_string_set(turnInConfig);
   if (!turnInResult)
     return std::unexpected(std::move(turnInResult.error()));
   auto turnIn = std::move(*turnInResult);
@@ -275,7 +275,7 @@ std::expected<void, StarException> Object::initialize(std::shared_ptr<ObjectConf
   if (!colorConfigResult)
     return std::unexpected(std::move(colorConfigResult.error()));
   auto colorConfig = std::move(*colorConfigResult);
-  auto colorResult = colorConfig.toString();
+  auto colorResult = colorConfig.to_string();
   if (!colorResult)
     return std::unexpected(std::move(colorResult.error()));
   auto color = std::move(*colorResult);
@@ -284,12 +284,12 @@ std::expected<void, StarException> Object::initialize(std::shared_ptr<ObjectConf
   if (!keysConfigResult)
     return std::unexpected(std::move(keysConfigResult.error()));
   auto keysConfig = std::move(*keysConfigResult);
-  auto keysResult = keysConfig.toObject();
+  auto keysResult = keysConfig.to_object();
   if (!keysResult)
     return std::unexpected(std::move(keysResult.error()));
   auto keys = std::move(*keysResult);
   for (auto const& pair : keys) {
-    auto valueResult = pair.second.toString();
+    auto valueResult = pair.second.to_string();
     if (!valueResult)
       return std::unexpected(std::move(valueResult.error()));
     auto value = std::move(*valueResult);
@@ -299,7 +299,7 @@ std::expected<void, StarException> Object::initialize(std::shared_ptr<ObjectConf
   if (!uniqueIdConfigResult)
     return std::unexpected(std::move(uniqueIdConfigResult.error()));
   auto uniqueIdConfig = std::move(*uniqueIdConfigResult);
-  auto uniqueIdResult = uniqueIdConfig.optString();
+  auto uniqueIdResult = uniqueIdConfig.opt_string();
   if (!uniqueIdResult)
     return std::unexpected(std::move(uniqueIdResult.error()));
   auto uniqueId = std::move(*uniqueIdResult);
@@ -393,7 +393,7 @@ std::expected<void, StarException> Object::initialize(std::shared_ptr<ObjectConf
   if (!modeConfigResult)
     return std::unexpected(std::move(modeConfigResult.error()));
   auto modeConfig = std::move(*modeConfigResult);
-  auto modeNameResult = modeConfig.toString();
+  auto modeNameResult = modeConfig.to_string();
   if (!modeNameResult)
     return std::unexpected(std::move(modeNameResult.error()));
   auto modeName = std::move(*modeNameResult);
@@ -455,7 +455,7 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
     if (!colorConfigResult)
       return std::unexpected(std::move(colorConfigResult.error()));
     auto colorConfig = std::move(*colorConfigResult);
-    auto colorResult = colorConfig.toString();
+    auto colorResult = colorConfig.to_string();
     if (!colorResult)
       return std::unexpected(std::move(colorResult.error()));
     auto color = std::move(*colorResult);
@@ -480,8 +480,8 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
     if (!directivesResult)
       return std::unexpected(std::move(directivesResult.error()));
     auto directives = std::move(*directivesResult);
-    if (directives.isType(Json::Type::String)) {
-      auto directiveStringResult = directives.toString();
+    if (directives.is_type(Json::Type::String)) {
+      auto directiveStringResult = directives.to_string();
       if (!directiveStringResult)
         return std::unexpected(std::move(directiveStringResult.error()));
       auto directiveString = std::move(*directiveStringResult);
@@ -493,12 +493,12 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
       if (!keysConfigResult)
         return std::unexpected(std::move(keysConfigResult.error()));
       auto keysConfig = std::move(*keysConfigResult);
-      auto keysResult = keysConfig.toObject();
+      auto keysResult = keysConfig.to_object();
       if (!keysResult)
         return std::unexpected(std::move(keysResult.error()));
       auto keys = std::move(*keysResult);
       for (auto const& pair : keys) {
-        auto valueResult = pair.second.toString();
+        auto valueResult = pair.second.to_string();
         if (!valueResult)
           return std::unexpected(std::move(valueResult.error()));
         auto value = std::move(*valueResult);
@@ -516,7 +516,7 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
       if (!keepAliveConfigResult)
         return std::unexpected(std::move(keepAliveConfigResult.error()));
       auto keepAliveConfig = std::move(*keepAliveConfigResult);
-      auto keepAliveResult = keepAliveConfig.toBool();
+      auto keepAliveResult = keepAliveConfig.to_bool();
       if (!keepAliveResult)
         return std::unexpected(std::move(keepAliveResult.error()));
       auto keepAlive = std::move(*keepAliveResult);
@@ -525,8 +525,8 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
       if (!scriptsConfigResult)
         return std::unexpected(std::move(scriptsConfigResult.error()));
       auto scriptsConfig = std::move(*scriptsConfigResult);
-      if (scriptsConfig.isType(Json::Type::Array)) {
-        auto scriptsResult = jsonToStringList(scriptsConfig);
+      if (scriptsConfig.is_type(Json::Type::Array)) {
+        auto scriptsResult = json_to_string_list(scriptsConfig);
         if (!scriptsResult)
           return std::unexpected(std::move(scriptsResult.error()));
         auto scripts = std::move(*scriptsResult);
@@ -544,7 +544,7 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
       if (!deltaConfigResult)
         return std::unexpected(std::move(deltaConfigResult.error()));
       auto deltaConfig = std::move(*deltaConfigResult);
-      auto deltaResult = deltaConfig.toInt();
+      auto deltaResult = deltaConfig.to_int();
       if (!deltaResult)
         return std::unexpected(std::move(deltaResult.error()));
       auto delta = std::move(*deltaResult);
@@ -624,12 +624,12 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
     if (!partsConfigResult)
       return std::unexpected(std::move(partsConfigResult.error()));
     auto partsConfig = std::move(*partsConfigResult);
-    auto partsResult = partsConfig.toObject();
+    auto partsResult = partsConfig.to_object();
     if (!partsResult)
       return std::unexpected(std::move(partsResult.error()));
     auto parts = std::move(*partsResult);
     for (auto const& pair : parts) {
-      auto imageResult = pair.second.toString();
+      auto imageResult = pair.second.to_string();
       if (!imageResult)
         return std::unexpected(std::move(imageResult.error()));
       auto image = std::move(*imageResult);
@@ -639,7 +639,7 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
     if (!animationPositionConfigResult)
       return std::unexpected(std::move(animationPositionConfigResult.error()));
     auto animationPositionConfig = std::move(*animationPositionConfigResult);
-    auto animationPositionResult = jsonToVec2F(animationPositionConfig);
+    auto animationPositionResult = json_to_vec2f(animationPositionConfig);
     if (!animationPositionResult)
       return std::unexpected(std::move(animationPositionResult.error()));
     auto animationPosition = std::move(*animationPositionResult);
@@ -661,7 +661,7 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
     if (!centerConfigResult)
       return std::unexpected(std::move(centerConfigResult.error()));
     auto centerConfig = std::move(*centerConfigResult);
-    auto centerResult = centerConfig.toFloat();
+    auto centerResult = centerConfig.to_float();
     if (!centerResult)
       return std::unexpected(std::move(centerResult.error()));
     auto center = std::move(*centerResult);
@@ -1006,7 +1006,7 @@ std::expected<void, StarException> Object::destroy(std::optional<std::reference_
     if (!smashConfigResult)
       return std::unexpected(std::move(smashConfigResult.error()));
     auto smashConfig = std::move(*smashConfigResult);
-    auto smashResult = smashConfig.toBool();
+    auto smashResult = smashConfig.to_bool();
     if (!smashResult)
       return std::unexpected(std::move(smashResult.error()));
     auto smash = std::move(*smashResult);
@@ -1036,7 +1036,7 @@ std::expected<void, StarException> Object::destroy(std::optional<std::reference_
         if (!poolConfigResult)
           return std::unexpected(std::move(poolConfigResult.error()));
         auto poolConfig = std::move(*poolConfigResult);
-        auto poolResult = poolConfig.toString();
+        auto poolResult = poolConfig.to_string();
         if (!poolResult)
           return std::unexpected(std::move(poolResult.error()));
         auto pool = std::move(*poolResult);
@@ -1074,7 +1074,7 @@ std::expected<void, StarException> Object::destroy(std::optional<std::reference_
         if (!poolConfigResult)
           return std::unexpected(std::move(poolConfigResult.error()));
         auto poolConfig = std::move(*poolConfigResult);
-        auto poolResult = poolConfig.toString();
+        auto poolResult = poolConfig.to_string();
         if (!poolResult)
           return std::unexpected(std::move(poolResult.error()));
         auto pool = std::move(*poolResult);
@@ -1115,7 +1115,7 @@ std::expected<void, StarException> Object::destroy(std::optional<std::reference_
           if (!retainConfigResult)
             return std::unexpected(std::move(retainConfigResult.error()));
           auto retainConfig = std::move(*retainConfigResult);
-          auto retainResult = retainConfig.optBool();
+          auto retainResult = retainConfig.opt_bool();
           if (!retainResult)
             return std::unexpected(std::move(retainResult.error()));
           auto retain = std::move(*retainResult);
@@ -1183,7 +1183,7 @@ std::expected<void, StarException> Object::destroy(std::optional<std::reference_
       if (!creatorResult)
         return std::unexpected(std::move(creatorResult.error()));
       auto creator = std::move(*creatorResult);
-      auto countResult = config.getUInt("count", 1);
+      auto countResult = config.get_uint("count", 1);
       if (!countResult)
         return std::unexpected(std::move(countResult.error()));
       auto count = std::move(*countResult);
@@ -1191,11 +1191,11 @@ std::expected<void, StarException> Object::destroy(std::optional<std::reference_
       if (!offsetConfigResult)
         return std::unexpected(std::move(offsetConfigResult.error()));
       auto offsetConfig = std::move(*offsetConfigResult);
-      auto offsetResult = jsonToVec2F(offsetConfig);
+      auto offsetResult = json_to_vec2f(offsetConfig);
       if (!offsetResult)
         return std::unexpected(std::move(offsetResult.error()));
       auto offset = std::move(*offsetResult);
-      auto flipResult = config.getBool("flip", false);
+      auto flipResult = config.get_bool("flip", false);
       if (!flipResult)
         return std::unexpected(std::move(flipResult.error()));
       auto flip = std::move(*flipResult);
@@ -1231,7 +1231,7 @@ std::expected<String, StarException> Object::shortDescription() const {
   if (!valueResult)
     return std::unexpected(std::move(valueResult.error()));
   auto value = std::move(*valueResult);
-  return value.toString();
+  return value.to_string();
 }
 
 std::expected<String, StarException> Object::description() const {
@@ -1243,7 +1243,7 @@ std::expected<String, StarException> Object::description() const {
   if (!valueResult)
     return std::unexpected(std::move(valueResult.error()));
   auto value = std::move(*valueResult);
-  return value.toString();
+  return value.to_string();
 }
 
 bool Object::inspectable() const {
@@ -1255,7 +1255,7 @@ std::expected<std::optional<String>, StarException> Object::inspectionLogName() 
   if (!valueResult)
     return std::unexpected(std::move(valueResult.error()));
   auto value = std::move(*valueResult);
-  auto nameResult = value.optString();
+  auto nameResult = value.opt_string();
   if (!nameResult)
     return std::unexpected(std::move(nameResult.error()));
   auto name = std::move(*nameResult);
@@ -1267,7 +1267,7 @@ std::expected<std::optional<String>, StarException> Object::inspectionDescriptio
   if (!generalConfigResult)
     return std::unexpected(std::move(generalConfigResult.error()));
   auto generalConfig = std::move(*generalConfigResult);
-  auto generalResult = generalConfig.optString();
+  auto generalResult = generalConfig.opt_string();
   if (!generalResult)
     return std::unexpected(std::move(generalResult.error()));
   auto general = std::move(*generalResult);
@@ -1275,7 +1275,7 @@ std::expected<std::optional<String>, StarException> Object::inspectionDescriptio
   if (!specificConfigResult)
     return std::unexpected(std::move(specificConfigResult.error()));
   auto specificConfig = std::move(*specificConfigResult);
-  auto specificResult = specificConfig.optString();
+  auto specificResult = specificConfig.opt_string();
   if (!specificResult)
     return std::unexpected(std::move(specificResult.error()));
   auto specific = std::move(*specificResult);
@@ -1303,7 +1303,7 @@ std::expected<List<Drawable>, StarException> Object::cursorHintDrawables() const
     return std::unexpected(std::move(placementConfigResult.error()));
   auto placementConfig = std::move(*placementConfigResult);
   if (placementConfig) {
-    auto placementImageResult = placementConfig.toString();
+    auto placementImageResult = placementConfig.to_string();
     if (!placementImageResult)
       return std::unexpected(std::move(placementImageResult.error()));
     auto placementImage = std::move(*placementImageResult);
@@ -1313,11 +1313,11 @@ std::expected<List<Drawable>, StarException> Object::cursorHintDrawables() const
     if (!metadataResult)
       return std::unexpected(std::move(metadataResult.error()));
     auto metadata = std::move(*metadataResult);
-    auto positionConfigResult = configValue("placementImagePosition", jsonFromVec2F(Vec2F()));
+    auto positionConfigResult = configValue("placementImagePosition", json_from_vec2f(Vec2F()));
     if (!positionConfigResult)
       return std::unexpected(std::move(positionConfigResult.error()));
     auto positionConfig = std::move(*positionConfigResult);
-    auto imagePositionResult = jsonToVec2F(positionConfig);
+    auto imagePositionResult = json_to_vec2f(positionConfig);
     if (!imagePositionResult)
       return std::unexpected(std::move(imagePositionResult.error()));
     auto imagePosition = std::move(*imagePositionResult);
@@ -1396,7 +1396,7 @@ std::expected<Vec2F, StarException> Object::questIndicatorPosition() const {
       return std::unexpected(std::move(configPositionResult.error()));
     auto configPosition = std::move(*configPositionResult);
     if (configPosition) {
-      auto offsetResult = jsonToVec2F(configPosition);
+      auto offsetResult = json_to_vec2f(configPosition);
       if (!offsetResult)
         return std::unexpected(std::move(offsetResult.error()));
       auto offset = std::move(*offsetResult);
@@ -1419,9 +1419,9 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Object
 
 std::expected<Json, StarException> Object::configValue(String const& name, Json const& def) const {
   if (auto orientation = currentOrientation())
-    return jsonMergeQueryDef(name, def, m_config->config, orientation->config, m_parameters.baseMap());
+    return json_merge_query_def(name, def, m_config->config, orientation->config, m_parameters.baseMap());
   else
-    return jsonMergeQueryDef(name, def, m_config->config, m_parameters.baseMap());
+    return json_merge_query_def(name, def, m_config->config, m_parameters.baseMap());
 }
 
 std::shared_ptr<ObjectConfig const> Object::config() const {
@@ -1429,7 +1429,7 @@ std::shared_ptr<ObjectConfig const> Object::config() const {
 }
 
 std::expected<void, StarException> Object::readStoredData(Json const& diskStore) {
-  auto idResult = diskStore.optString("uniqueId");
+  auto idResult = diskStore.opt_string("uniqueId");
   if (!idResult)
     return std::unexpected(std::move(idResult.error()));
   auto id = std::move(*idResult);
@@ -1438,7 +1438,7 @@ std::expected<void, StarException> Object::readStoredData(Json const& diskStore)
   if (!positionConfigResult)
     return std::unexpected(std::move(positionConfigResult.error()));
   auto positionConfig = std::move(*positionConfigResult);
-  auto positionResult = jsonToVec2I(positionConfig);
+  auto positionResult = json_to_vec2i(positionConfig);
   if (!positionResult)
     return std::unexpected(std::move(positionResult.error()));
   auto position = std::move(*positionResult);
@@ -1449,14 +1449,14 @@ std::expected<void, StarException> Object::readStoredData(Json const& diskStore)
   if (!orientationConfigResult)
     return std::unexpected(std::move(orientationConfigResult.error()));
   auto orientationConfig = std::move(*orientationConfigResult);
-  auto indexResult = jsonToSize(orientationConfig);
+  auto indexResult = json_to_size(orientationConfig);
   if (!indexResult)
     return std::unexpected(std::move(indexResult.error()));
   auto index = std::move(*indexResult);
   auto operation2 = setOrientationIndex(index);
   if (!operation2)
     return std::unexpected(std::move(operation2.error()));
-  auto directionResult = diskStore.getString("direction");
+  auto directionResult = diskStore.get_string("direction");
   if (!directionResult)
     return std::unexpected(std::move(directionResult.error()));
   auto direction = std::move(*directionResult);
@@ -1469,26 +1469,26 @@ std::expected<void, StarException> Object::readStoredData(Json const& diskStore)
   if (!actionResult)
     return std::unexpected(std::move(actionResult.error()));
   auto action = std::move(*actionResult);
-  auto interactiveResult = diskStore.getBool("interactive", !action.isNull());
+  auto interactiveResult = diskStore.get_bool("interactive", !action.is_null());
   if (!interactiveResult)
     return std::unexpected(std::move(interactiveResult.error()));
   auto interactive = std::move(*interactiveResult);
   m_interactive.set(interactive);
-  auto storageResult = diskStore.getObject("scriptStorage", JsonObject());
+  auto storageResult = diskStore.get_object("scriptStorage", JsonObject());
   if (!storageResult)
     return std::unexpected(std::move(storageResult.error()));
   auto storage = std::move(*storageResult);
   auto operation3 = m_scriptComponent.setScriptStorage(std::move(storage));
   if (!operation3)
     return std::unexpected(std::move(operation3.error()));
-  auto inputNodesResult = diskStore.getArray("inputWireNodes");
+  auto inputNodesResult = diskStore.get_array("inputWireNodes");
   if (!inputNodesResult)
     return std::unexpected(std::move(inputNodesResult.error()));
   auto inputNodes = std::move(*inputNodesResult);
   for (std::size_t i = 0; i < m_inputNodes.size() && i < inputNodes.size(); ++i) {
     auto& node = m_inputNodes[i];
     List<WireConnection> connections;
-    auto storedConnectionsResult = inputNodes[i].getArray("connections");
+    auto storedConnectionsResult = inputNodes[i].get_array("connections");
     if (!storedConnectionsResult)
       return std::unexpected(std::move(storedConnectionsResult.error()));
     auto storedConnections = std::move(*storedConnectionsResult);
@@ -1497,11 +1497,11 @@ std::expected<void, StarException> Object::readStoredData(Json const& diskStore)
       if (!locationConfigResult)
         return std::unexpected(std::move(locationConfigResult.error()));
       auto locationConfig = std::move(*locationConfigResult);
-      auto locationResult = jsonToVec2I(locationConfig);
+      auto locationResult = json_to_vec2i(locationConfig);
       if (!locationResult)
         return std::unexpected(std::move(locationResult.error()));
       auto location = std::move(*locationResult);
-      auto nodeIndexResult = connection.getUInt(1);
+      auto nodeIndexResult = connection.get_uint(1);
       if (!nodeIndexResult)
         return std::unexpected(std::move(nodeIndexResult.error()));
       auto nodeIndex = std::move(*nodeIndexResult);
@@ -1509,20 +1509,20 @@ std::expected<void, StarException> Object::readStoredData(Json const& diskStore)
         WireConnection{.entityLocation = location, .nodeIndex = static_cast<std::size_t>(nodeIndex)});
     }
     node.connections.set(std::move(connections));
-    auto stateResult = inputNodes[i].getBool("state");
+    auto stateResult = inputNodes[i].get_bool("state");
     if (!stateResult)
       return std::unexpected(std::move(stateResult.error()));
     auto state = std::move(*stateResult);
     node.state.set(state);
   }
-  auto outputNodesResult = diskStore.getArray("outputWireNodes");
+  auto outputNodesResult = diskStore.get_array("outputWireNodes");
   if (!outputNodesResult)
     return std::unexpected(std::move(outputNodesResult.error()));
   auto outputNodes = std::move(*outputNodesResult);
   for (std::size_t i = 0; i < m_outputNodes.size() && i < outputNodes.size(); ++i) {
     auto& node = m_outputNodes[i];
     List<WireConnection> connections;
-    auto storedConnectionsResult = outputNodes[i].getArray("connections");
+    auto storedConnectionsResult = outputNodes[i].get_array("connections");
     if (!storedConnectionsResult)
       return std::unexpected(std::move(storedConnectionsResult.error()));
     auto storedConnections = std::move(*storedConnectionsResult);
@@ -1531,11 +1531,11 @@ std::expected<void, StarException> Object::readStoredData(Json const& diskStore)
       if (!locationConfigResult)
         return std::unexpected(std::move(locationConfigResult.error()));
       auto locationConfig = std::move(*locationConfigResult);
-      auto locationResult = jsonToVec2I(locationConfig);
+      auto locationResult = json_to_vec2i(locationConfig);
       if (!locationResult)
         return std::unexpected(std::move(locationResult.error()));
       auto location = std::move(*locationResult);
-      auto nodeIndexResult = connection.getUInt(1);
+      auto nodeIndexResult = connection.get_uint(1);
       if (!nodeIndexResult)
         return std::unexpected(std::move(nodeIndexResult.error()));
       auto nodeIndex = std::move(*nodeIndexResult);
@@ -1543,7 +1543,7 @@ std::expected<void, StarException> Object::readStoredData(Json const& diskStore)
         WireConnection{.entityLocation = location, .nodeIndex = static_cast<std::size_t>(nodeIndex)});
     }
     node.connections.set(std::move(connections));
-    auto stateResult = outputNodes[i].getBool("state");
+    auto stateResult = outputNodes[i].get_bool("state");
     if (!stateResult)
       return std::unexpected(std::move(stateResult.error()));
     auto state = std::move(*stateResult);
@@ -1558,7 +1558,7 @@ std::expected<Json, StarException> Object::writeStoredData() const {
     auto const& in = m_inputNodes[i];
     JsonArray connections;
     for (auto const& node : in.connections.get())
-      connections.push_back(JsonArray{jsonFromVec2I(node.entityLocation), node.nodeIndex});
+      connections.push_back(JsonArray{json_from_vec2i(node.entityLocation), node.nodeIndex});
 
     inputNodes.push_back(JsonObject{{"connections", std::move(connections)}, {"state", in.state.get()}});
   }
@@ -1568,7 +1568,7 @@ std::expected<Json, StarException> Object::writeStoredData() const {
     auto const& in = m_outputNodes[i];
     JsonArray connections;
     for (auto const& node : in.connections.get())
-      connections.push_back(JsonArray{jsonFromVec2I(node.entityLocation), node.nodeIndex});
+      connections.push_back(JsonArray{json_from_vec2i(node.entityLocation), node.nodeIndex});
 
     outputNodes.push_back(JsonObject{{"connections", std::move(connections)}, {"state", in.state.get()}});
   }
@@ -1580,8 +1580,8 @@ std::expected<Json, StarException> Object::writeStoredData() const {
   if (!storage)
     return std::unexpected(std::move(storage.error()));
   return JsonObject{{"uniqueId", json_from_optional(uniqueId())},
-                    {"tilePosition", jsonFromVec2I(tilePosition())},
-                    {"orientationIndex", jsonFromSize(m_orientationIndex)},
+                    {"tilePosition", json_from_vec2i(tilePosition())},
+                    {"orientationIndex", json_from_size(m_orientationIndex)},
                     {"direction", String(*direction)},
                     {"scriptStorage", std::move(*storage)},
                     {"interactive", m_interactive.get()},
@@ -2111,11 +2111,11 @@ std::expected<LuaCallbacks, StarException> Object::makeObjectCallbacks() {
     if (!positionConfigResult)
       return std::unexpected(std::move(positionConfigResult.error()));
     auto positionConfig = std::move(*positionConfigResult);
-    auto positionResult = jsonToVec2I(positionConfig);
+    auto positionResult = json_to_vec2i(positionConfig);
     if (!positionResult)
       return std::unexpected(std::move(positionResult.error()));
     auto position = std::move(*positionResult);
-    auto nameResult = space.getString(1);
+    auto nameResult = space.get_string(1);
     if (!nameResult)
       return std::unexpected(std::move(nameResult.error()));
     auto name = std::move(*nameResult);
@@ -2170,8 +2170,8 @@ std::expected<LuaCallbacks, StarException> Object::makeAnimatorObjectCallbacks()
 std::expected<List<DamageSource>, StarException> Object::damageSources() const {
   auto sources = m_damageSources.get();
   if (auto orientation = currentOrientation()) {
-    auto touchDamageConfig = jsonMerge(m_config->touchDamageConfig, orientation->touchDamageConfig);
-    if (!touchDamageConfig.isNull()) {
+    auto touchDamageConfig = json_merge(m_config->touchDamageConfig, orientation->touchDamageConfig);
+    if (!touchDamageConfig.is_null()) {
       auto sourceResult = DamageSource::create(touchDamageConfig);
       if (!sourceResult)
         return std::unexpected(std::move(sourceResult.error()));
@@ -2265,16 +2265,16 @@ std::expected<InteractAction, StarException> Object::interact(InteractRequest co
     return std::unexpected(std::move(resultResult.error()));
   auto result = std::move(*resultResult);
   if (result) {
-    if (result->isNull())
+    if (result->is_null())
       return InteractAction();
-    if (result->isType(Json::Type::String)) {
-      auto typeResult = result->toString();
+    if (result->is_type(Json::Type::String)) {
+      auto typeResult = result->to_string();
       if (!typeResult)
         return std::unexpected(std::move(typeResult.error()));
       auto type = std::move(*typeResult);
       return InteractAction::create(type, entityId(), Json());
     }
-    auto typeResult = result->getString(0);
+    auto typeResult = result->get_string(0);
     if (!typeResult)
       return std::unexpected(std::move(typeResult.error()));
     auto type = std::move(*typeResult);
@@ -2288,8 +2288,8 @@ std::expected<InteractAction, StarException> Object::interact(InteractRequest co
   if (!actionResult)
     return std::unexpected(std::move(actionResult.error()));
   auto action = std::move(*actionResult);
-  if (!action.isNull()) {
-    auto typeResult = action.toString();
+  if (!action.is_null()) {
+    auto typeResult = action.to_string();
     if (!typeResult)
       return std::unexpected(std::move(typeResult.error()));
     auto type = std::move(*typeResult);
@@ -2328,7 +2328,7 @@ std::expected<Vec2F, StarException> Object::mouthPosition() const {
       return std::unexpected(std::move(configPositionResult.error()));
     auto configPosition = std::move(*configPositionResult);
     if (configPosition) {
-      auto offsetResult = jsonToVec2F(configPosition);
+      auto offsetResult = json_to_vec2f(configPosition);
       if (!offsetResult)
         return std::unexpected(std::move(offsetResult.error()));
       auto offset = std::move(*offsetResult);
@@ -2561,21 +2561,21 @@ std::expected<void, StarException> Object::checkLiquidBroken() {
 
 std::expected<Object::OutputNode, StarException> Object::OutputNode::create(Json const& positionConfig, Json const& config) {
   OutputNode node;
-  auto positionResult = jsonToVec2I(positionConfig);
+  auto positionResult = json_to_vec2i(positionConfig);
   if (!positionResult)
     return std::unexpected(std::move(positionResult.error()));
   auto position = std::move(*positionResult);
   node.position = position;
-  auto colorConfigResult = config.get("color", jsonFromColor(Color::Red));
+  auto colorConfigResult = config.get("color", json_from_color(Color::Red));
   if (!colorConfigResult)
     return std::unexpected(std::move(colorConfigResult.error()));
   auto colorConfig = std::move(*colorConfigResult);
-  auto colorResult = jsonToColor(colorConfig);
+  auto colorResult = json_to_color(colorConfig);
   if (!colorResult)
     return std::unexpected(std::move(colorResult.error()));
   auto color = std::move(*colorResult);
   node.color = color;
-  auto iconResult = config.getString("icon", "/interface/wires/outbound.png");
+  auto iconResult = config.get_string("icon", "/interface/wires/outbound.png");
   if (!iconResult)
     return std::unexpected(std::move(iconResult.error()));
   auto icon = std::move(*iconResult);
@@ -2585,21 +2585,21 @@ std::expected<Object::OutputNode, StarException> Object::OutputNode::create(Json
 
 std::expected<Object::InputNode, StarException> Object::InputNode::create(Json const& positionConfig, Json const& config) {
   InputNode node;
-  auto positionResult = jsonToVec2I(positionConfig);
+  auto positionResult = json_to_vec2i(positionConfig);
   if (!positionResult)
     return std::unexpected(std::move(positionResult.error()));
   auto position = std::move(*positionResult);
   node.position = position;
-  auto colorConfigResult = config.get("color", jsonFromColor(Color::Red));
+  auto colorConfigResult = config.get("color", json_from_color(Color::Red));
   if (!colorConfigResult)
     return std::unexpected(std::move(colorConfigResult.error()));
   auto colorConfig = std::move(*colorConfigResult);
-  auto colorResult = jsonToColor(colorConfig);
+  auto colorResult = json_to_color(colorConfig);
   if (!colorResult)
     return std::unexpected(std::move(colorResult.error()));
   auto color = std::move(*colorResult);
   node.color = color;
-  auto iconResult = config.getString("icon", "/interface/wires/inbound.png");
+  auto iconResult = config.get_string("icon", "/interface/wires/inbound.png");
   if (!iconResult)
     return std::unexpected(std::move(iconResult.error()));
   auto icon = std::move(*iconResult);

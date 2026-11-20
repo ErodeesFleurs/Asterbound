@@ -47,9 +47,9 @@ const GameTestRegistration
     EXPECT_EQ(defaults->layer, Particle::Layer::Middle);
     auto defaultJson = defaults->toJson();
     ASSERT_TRUE(defaultJson) << defaultJson.error().what();
-    EXPECT_EQ(defaultJson->getString("type"), String("variance"));
-    EXPECT_EQ(defaultJson->getString("destructionAction"), String("none"));
-    EXPECT_EQ(defaultJson->getString("layer"), String("middle"));
+    EXPECT_EQ(defaultJson->get_string("type"), String("variance"));
+    EXPECT_EQ(defaultJson->get_string("destructionAction"), String("none"));
+    EXPECT_EQ(defaultJson->get_string("layer"), String("middle"));
 
     auto configured = Particle::create(fixture.root(),
                                        JsonObject{{"type", "EmBeR"},
@@ -66,9 +66,9 @@ const GameTestRegistration
     EXPECT_TRUE(configured->collidesLiquid);
     auto stored = configured->toJson();
     ASSERT_TRUE(stored) << stored.error().what();
-    EXPECT_EQ(stored->getString("type"), String("ember"));
-    EXPECT_EQ(stored->getString("destructionAction"), String("shrink"));
-    EXPECT_EQ(stored->getString("layer"), String("front"));
+    EXPECT_EQ(stored->get_string("type"), String("ember"));
+    EXPECT_EQ(stored->get_string("destructionAction"), String("shrink"));
+    EXPECT_EQ(stored->get_string("layer"), String("front"));
     auto restored = Particle::create(fixture.root(), *stored);
     ASSERT_TRUE(restored) << restored.error().what();
     auto restoredJson = restored->toJson();

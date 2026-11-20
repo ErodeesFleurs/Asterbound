@@ -33,7 +33,7 @@ std::expected<Json, StarException> storedObject(String const& directory, String 
   auto bytes = File::read_file_string(storagePath(directory, mod));
   if (!bytes)
     return std::unexpected(std::move(bytes.error()));
-  return Json::parseJson(*bytes);
+  return Json::parse_json(*bytes);
 }
 
 const GameTestRegistration jsonPersistence("ModStorageTest", "JsonKeysAndNamespacesRoundTrip", [](GameTest& fixture) {

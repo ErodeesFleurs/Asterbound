@@ -61,12 +61,12 @@ public:
   using ElementLocation = std::size_t;
 
   static std::expected<FormattedJson, StarException> parse(String const& string);
-  static std::expected<FormattedJson, StarException> parseJson(String const& string);
+  static std::expected<FormattedJson, StarException> parse_json(String const& string);
   static std::expected<FormattedJson, StarException> create(Json const& json);
   // Builds an unspaced array without discarding each value's original formatting.
-  static std::expected<FormattedJson, StarException> createArray(std::span<FormattedJson const> values);
+  static std::expected<FormattedJson, StarException> create_array(std::span<FormattedJson const> values);
 
-  static FormattedJson ofType(Json::Type type);
+  static FormattedJson of_type(Json::Type type);
 
   FormattedJson();
   FormattedJson(FormattedJson const&) = default;
@@ -74,7 +74,7 @@ public:
   FormattedJson(FormattedJson&& other);
   FormattedJson& operator=(FormattedJson&& other);
 
-  Json const& toJson() const;
+  Json const& to_json() const;
 
   std::expected<FormattedJson, StarException> get(String const& key) const;
   std::expected<FormattedJson, StarException> get(std::size_t index) const;
@@ -102,14 +102,14 @@ public:
   std::expected<bool, StarException> contains(String const& key) const;
 
   Json::Type type() const;
-  bool isType(Json::Type type) const;
-  String typeName() const;
+  bool is_type(Json::Type type) const;
+  String type_name() const;
 
-  std::expected<String, StarException> toFormattedDouble() const;
-  std::expected<String, StarException> toFormattedInt() const;
+  std::expected<String, StarException> to_formatted_double() const;
+  std::expected<String, StarException> to_formatted_int() const;
 
   std::expected<String, StarException> repr() const;
-  std::expected<String, StarException> printJson() const;
+  std::expected<String, StarException> print_json() const;
 
   ElementList const& elements() const;
 

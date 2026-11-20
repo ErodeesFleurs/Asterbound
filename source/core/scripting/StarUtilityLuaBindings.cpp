@@ -228,9 +228,9 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUtilityCallbacks(Ran
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallback("stripEscapeCodes", [](String const& text) { return Text::stripEscapeCodes(text); }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallback("parseJsonSequence", [](String const& json) { return Json::parseSequence(json); }); !result)
+  if (auto result = callbacks.registerCallback("parseJsonSequence", [](String const& json) { return Json::parse_sequence(json); }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallback("jsonMerge", [](Json const& a, Json const& b) { return jsonMerge(a, b); }); !result)
+  if (auto result = callbacks.registerCallback("jsonMerge", [](Json const& a, Json const& b) { return json_merge(a, b); }); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.registerCallback("jsonEqual", [](Json const& a, Json const& b) { return a == b; }); !result)
     return std::unexpected(std::move(result.error()));

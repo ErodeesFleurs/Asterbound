@@ -96,31 +96,31 @@ ActorJumpProfile::ActorJumpProfile() = default;
 
 std::expected<ActorJumpProfile, StarException> ActorJumpProfile::create(Json const& config) {
   ActorJumpProfile value;
-  auto jumpSpeedResult = config.optFloat("jumpSpeed");
+  auto jumpSpeedResult = config.opt_float("jumpSpeed");
   if (!jumpSpeedResult) return std::unexpected(std::move(jumpSpeedResult.error()));
   value.jumpSpeed = *jumpSpeedResult;
-  auto jumpControlForceResult = config.optFloat("jumpControlForce");
+  auto jumpControlForceResult = config.opt_float("jumpControlForce");
   if (!jumpControlForceResult) return std::unexpected(std::move(jumpControlForceResult.error()));
   value.jumpControlForce = *jumpControlForceResult;
-  auto jumpInitialPercentageResult = config.optFloat("jumpInitialPercentage");
+  auto jumpInitialPercentageResult = config.opt_float("jumpInitialPercentage");
   if (!jumpInitialPercentageResult) return std::unexpected(std::move(jumpInitialPercentageResult.error()));
   value.jumpInitialPercentage = *jumpInitialPercentageResult;
-  auto jumpHoldTimeResult = config.optFloat("jumpHoldTime");
+  auto jumpHoldTimeResult = config.opt_float("jumpHoldTime");
   if (!jumpHoldTimeResult) return std::unexpected(std::move(jumpHoldTimeResult.error()));
   value.jumpHoldTime = *jumpHoldTimeResult;
-  auto jumpTotalHoldTimeResult = config.optFloat("jumpTotalHoldTime");
+  auto jumpTotalHoldTimeResult = config.opt_float("jumpTotalHoldTime");
   if (!jumpTotalHoldTimeResult) return std::unexpected(std::move(jumpTotalHoldTimeResult.error()));
   value.jumpTotalHoldTime = *jumpTotalHoldTimeResult;
-  auto multiJumpResult = config.optBool("multiJump");
+  auto multiJumpResult = config.opt_bool("multiJump");
   if (!multiJumpResult) return std::unexpected(std::move(multiJumpResult.error()));
   value.multiJump = *multiJumpResult;
-  auto reJumpDelayResult = config.optFloat("reJumpDelay");
+  auto reJumpDelayResult = config.opt_float("reJumpDelay");
   if (!reJumpDelayResult) return std::unexpected(std::move(reJumpDelayResult.error()));
   value.reJumpDelay = *reJumpDelayResult;
-  auto autoJumpResult = config.optBool("autoJump");
+  auto autoJumpResult = config.opt_bool("autoJump");
   if (!autoJumpResult) return std::unexpected(std::move(autoJumpResult.error()));
   value.autoJump = *autoJumpResult;
-  auto collisionCancelledResult = config.optBool("collisionCancelled");
+  auto collisionCancelledResult = config.opt_bool("collisionCancelled");
   if (!collisionCancelledResult) return std::unexpected(std::move(collisionCancelledResult.error()));
   value.collisionCancelled = *collisionCancelledResult;
   return value;
@@ -189,7 +189,7 @@ std::expected<ActorMovementParameters, StarException> ActorMovementParameters::s
   if (!assets) return std::unexpected(std::move(assets.error()));
   auto config = (*assets)->json("/default_actor_movement.config");
   if (!config) return std::unexpected(std::move(config.error()));
-  auto object = config->toObject();
+  auto object = config->to_object();
   if (!object) return std::unexpected(std::move(object.error()));
   return create(Json(std::move(*object)));
 }
@@ -198,40 +198,40 @@ ActorMovementParameters::ActorMovementParameters() = default;
 
 std::expected<ActorMovementParameters, StarException> ActorMovementParameters::create(Json const& config) {
   ActorMovementParameters value;
-  if (config.isNull())
+  if (config.is_null())
     return value;
 
-  auto massResult = config.optFloat("mass");
+  auto massResult = config.opt_float("mass");
   if (!massResult) return std::unexpected(std::move(massResult.error()));
   value.mass = *massResult;
-  auto gravityMultiplierResult = config.optFloat("gravityMultiplier");
+  auto gravityMultiplierResult = config.opt_float("gravityMultiplier");
   if (!gravityMultiplierResult) return std::unexpected(std::move(gravityMultiplierResult.error()));
   value.gravityMultiplier = *gravityMultiplierResult;
-  auto liquidBuoyancyResult = config.optFloat("liquidBuoyancy");
+  auto liquidBuoyancyResult = config.opt_float("liquidBuoyancy");
   if (!liquidBuoyancyResult) return std::unexpected(std::move(liquidBuoyancyResult.error()));
   value.liquidBuoyancy = *liquidBuoyancyResult;
-  auto airBuoyancyResult = config.optFloat("airBuoyancy");
+  auto airBuoyancyResult = config.opt_float("airBuoyancy");
   if (!airBuoyancyResult) return std::unexpected(std::move(airBuoyancyResult.error()));
   value.airBuoyancy = *airBuoyancyResult;
-  auto bounceFactorResult = config.optFloat("bounceFactor");
+  auto bounceFactorResult = config.opt_float("bounceFactor");
   if (!bounceFactorResult) return std::unexpected(std::move(bounceFactorResult.error()));
   value.bounceFactor = *bounceFactorResult;
-  auto stopOnFirstBounceResult = config.optBool("stopOnFirstBounce");
+  auto stopOnFirstBounceResult = config.opt_bool("stopOnFirstBounce");
   if (!stopOnFirstBounceResult) return std::unexpected(std::move(stopOnFirstBounceResult.error()));
   value.stopOnFirstBounce = *stopOnFirstBounceResult;
-  auto enableSurfaceSlopeCorrectionResult = config.optBool("enableSurfaceSlopeCorrection");
+  auto enableSurfaceSlopeCorrectionResult = config.opt_bool("enableSurfaceSlopeCorrection");
   if (!enableSurfaceSlopeCorrectionResult) return std::unexpected(std::move(enableSurfaceSlopeCorrectionResult.error()));
   value.enableSurfaceSlopeCorrection = *enableSurfaceSlopeCorrectionResult;
-  auto slopeSlidingFactorResult = config.optFloat("slopeSlidingFactor");
+  auto slopeSlidingFactorResult = config.opt_float("slopeSlidingFactor");
   if (!slopeSlidingFactorResult) return std::unexpected(std::move(slopeSlidingFactorResult.error()));
   value.slopeSlidingFactor = *slopeSlidingFactorResult;
-  auto maxMovementPerStepResult = config.optFloat("maxMovementPerStep");
+  auto maxMovementPerStepResult = config.opt_float("maxMovementPerStep");
   if (!maxMovementPerStepResult) return std::unexpected(std::move(maxMovementPerStepResult.error()));
   value.maxMovementPerStep = *maxMovementPerStepResult;
-  auto maximumCorrectionResult = config.optFloat("maximumCorrection");
+  auto maximumCorrectionResult = config.opt_float("maximumCorrection");
   if (!maximumCorrectionResult) return std::unexpected(std::move(maximumCorrectionResult.error()));
   value.maximumCorrection = *maximumCorrectionResult;
-  auto speedLimitResult = config.optFloat("speedLimit");
+  auto speedLimitResult = config.opt_float("speedLimit");
   if (!speedLimitResult) return std::unexpected(std::move(speedLimitResult.error()));
   value.speedLimit = *speedLimitResult;
 
@@ -248,73 +248,73 @@ std::expected<ActorMovementParameters, StarException> ActorMovementParameters::c
   if (!crouchingPolyConfigResult) return std::unexpected(std::move(crouchingPolyConfigResult.error()));
   auto const& crouchingPolyConfig = *crouchingPolyConfigResult;
 
-  if (!standingPolyConfig.isNull())
+  if (!standingPolyConfig.is_null())
 {
-    auto standingPolyValue = jsonToPolyF(standingPolyConfig);
+    auto standingPolyValue = json_to_polyf(standingPolyConfig);
     if (!standingPolyValue) return std::unexpected(std::move(standingPolyValue.error()));
     value.standingPoly = std::move(*standingPolyValue);
   }
-  else if (!collisionPolyConfig.isNull())
+  else if (!collisionPolyConfig.is_null())
 {
-    auto standingPolyValue = jsonToPolyF(collisionPolyConfig);
+    auto standingPolyValue = json_to_polyf(collisionPolyConfig);
     if (!standingPolyValue) return std::unexpected(std::move(standingPolyValue.error()));
     value.standingPoly = std::move(*standingPolyValue);
   }
 
-  if (!crouchingPolyConfig.isNull())
+  if (!crouchingPolyConfig.is_null())
 {
-    auto crouchingPolyValue = jsonToPolyF(crouchingPolyConfig);
+    auto crouchingPolyValue = json_to_polyf(crouchingPolyConfig);
     if (!crouchingPolyValue) return std::unexpected(std::move(crouchingPolyValue.error()));
     value.crouchingPoly = std::move(*crouchingPolyValue);
   }
-  else if (!collisionPolyConfig.isNull())
+  else if (!collisionPolyConfig.is_null())
 {
-    auto crouchingPolyValue = jsonToPolyF(collisionPolyConfig);
+    auto crouchingPolyValue = json_to_polyf(collisionPolyConfig);
     if (!crouchingPolyValue) return std::unexpected(std::move(crouchingPolyValue.error()));
     value.crouchingPoly = std::move(*crouchingPolyValue);
   }
 
-  auto stickyCollisionResult = config.optBool("stickyCollision");
+  auto stickyCollisionResult = config.opt_bool("stickyCollision");
   if (!stickyCollisionResult) return std::unexpected(std::move(stickyCollisionResult.error()));
   value.stickyCollision = *stickyCollisionResult;
-  auto stickyForceResult = config.optFloat("stickyForce");
+  auto stickyForceResult = config.opt_float("stickyForce");
   if (!stickyForceResult) return std::unexpected(std::move(stickyForceResult.error()));
   value.stickyForce = *stickyForceResult;
 
-  auto walkSpeedResult = config.optFloat("walkSpeed");
+  auto walkSpeedResult = config.opt_float("walkSpeed");
   if (!walkSpeedResult) return std::unexpected(std::move(walkSpeedResult.error()));
   value.walkSpeed = *walkSpeedResult;
-  auto runSpeedResult = config.optFloat("runSpeed");
+  auto runSpeedResult = config.opt_float("runSpeed");
   if (!runSpeedResult) return std::unexpected(std::move(runSpeedResult.error()));
   value.runSpeed = *runSpeedResult;
-  auto flySpeedResult = config.optFloat("flySpeed");
+  auto flySpeedResult = config.opt_float("flySpeed");
   if (!flySpeedResult) return std::unexpected(std::move(flySpeedResult.error()));
   value.flySpeed = *flySpeedResult;
-  auto airFrictionResult = config.optFloat("airFriction");
+  auto airFrictionResult = config.opt_float("airFriction");
   if (!airFrictionResult) return std::unexpected(std::move(airFrictionResult.error()));
   value.airFriction = *airFrictionResult;
-  auto liquidFrictionResult = config.optFloat("liquidFriction");
+  auto liquidFrictionResult = config.opt_float("liquidFriction");
   if (!liquidFrictionResult) return std::unexpected(std::move(liquidFrictionResult.error()));
   value.liquidFriction = *liquidFrictionResult;
-  auto minimumLiquidPercentageResult = config.optFloat("minimumLiquidPercentage");
+  auto minimumLiquidPercentageResult = config.opt_float("minimumLiquidPercentage");
   if (!minimumLiquidPercentageResult) return std::unexpected(std::move(minimumLiquidPercentageResult.error()));
   value.minimumLiquidPercentage = *minimumLiquidPercentageResult;
-  auto liquidImpedanceResult = config.optFloat("liquidImpedance");
+  auto liquidImpedanceResult = config.opt_float("liquidImpedance");
   if (!liquidImpedanceResult) return std::unexpected(std::move(liquidImpedanceResult.error()));
   value.liquidImpedance = *liquidImpedanceResult;
-  auto normalGroundFrictionResult = config.optFloat("normalGroundFriction");
+  auto normalGroundFrictionResult = config.opt_float("normalGroundFriction");
   if (!normalGroundFrictionResult) return std::unexpected(std::move(normalGroundFrictionResult.error()));
   value.normalGroundFriction = *normalGroundFrictionResult;
-  auto ambulatingGroundFrictionResult = config.optFloat("ambulatingGroundFriction");
+  auto ambulatingGroundFrictionResult = config.opt_float("ambulatingGroundFriction");
   if (!ambulatingGroundFrictionResult) return std::unexpected(std::move(ambulatingGroundFrictionResult.error()));
   value.ambulatingGroundFriction = *ambulatingGroundFrictionResult;
-  auto groundForceResult = config.optFloat("groundForce");
+  auto groundForceResult = config.opt_float("groundForce");
   if (!groundForceResult) return std::unexpected(std::move(groundForceResult.error()));
   value.groundForce = *groundForceResult;
-  auto airForceResult = config.optFloat("airForce");
+  auto airForceResult = config.opt_float("airForce");
   if (!airForceResult) return std::unexpected(std::move(airForceResult.error()));
   value.airForce = *airForceResult;
-  auto liquidForceResult = config.optFloat("liquidForce");
+  auto liquidForceResult = config.opt_float("liquidForce");
   if (!liquidForceResult) return std::unexpected(std::move(liquidForceResult.error()));
   value.liquidForce = *liquidForceResult;
 
@@ -333,59 +333,59 @@ std::expected<ActorMovementParameters, StarException> ActorMovementParameters::c
     value.liquidJumpProfile = std::move(*liquidJumpProfileValue);
   }
 
-  auto fallStatusSpeedMinResult = config.optFloat("fallStatusSpeedMin");
+  auto fallStatusSpeedMinResult = config.opt_float("fallStatusSpeedMin");
   if (!fallStatusSpeedMinResult) return std::unexpected(std::move(fallStatusSpeedMinResult.error()));
   value.fallStatusSpeedMin = *fallStatusSpeedMinResult;
-  auto fallThroughSustainFramesResult = config.optInt("fallThroughSustainFrames");
+  auto fallThroughSustainFramesResult = config.opt_int("fallThroughSustainFrames");
   if (!fallThroughSustainFramesResult) return std::unexpected(std::move(fallThroughSustainFramesResult.error()));
   value.fallThroughSustainFrames = *fallThroughSustainFramesResult;
-  auto maximumPlatformCorrectionResult = config.optFloat("maximumPlatformCorrection");
+  auto maximumPlatformCorrectionResult = config.opt_float("maximumPlatformCorrection");
   if (!maximumPlatformCorrectionResult) return std::unexpected(std::move(maximumPlatformCorrectionResult.error()));
   value.maximumPlatformCorrection = *maximumPlatformCorrectionResult;
-  auto maximumPlatformCorrectionVelocityFactorResult = config.optFloat("maximumPlatformCorrectionVelocityFactor");
+  auto maximumPlatformCorrectionVelocityFactorResult = config.opt_float("maximumPlatformCorrectionVelocityFactor");
   if (!maximumPlatformCorrectionVelocityFactorResult) return std::unexpected(std::move(maximumPlatformCorrectionVelocityFactorResult.error()));
   value.maximumPlatformCorrectionVelocityFactor = *maximumPlatformCorrectionVelocityFactorResult;
 
   auto physicsEffectCategoriesConfig = config.opt("physicsEffectCategories");
   if (!physicsEffectCategoriesConfig) return std::unexpected(std::move(physicsEffectCategoriesConfig.error()));
   if (*physicsEffectCategoriesConfig) {
-    auto physicsEffectCategoriesValue = jsonToStringSet(**physicsEffectCategoriesConfig);
+    auto physicsEffectCategoriesValue = json_to_string_set(**physicsEffectCategoriesConfig);
     if (!physicsEffectCategoriesValue) return std::unexpected(std::move(physicsEffectCategoriesValue.error()));
     value.physicsEffectCategories = std::move(*physicsEffectCategoriesValue);
   }
 
-  auto groundMovementMinimumSustainResult = config.optFloat("groundMovementMinimumSustain");
+  auto groundMovementMinimumSustainResult = config.opt_float("groundMovementMinimumSustain");
   if (!groundMovementMinimumSustainResult) return std::unexpected(std::move(groundMovementMinimumSustainResult.error()));
   value.groundMovementMinimumSustain = *groundMovementMinimumSustainResult;
-  auto groundMovementMaximumSustainResult = config.optFloat("groundMovementMaximumSustain");
+  auto groundMovementMaximumSustainResult = config.opt_float("groundMovementMaximumSustain");
   if (!groundMovementMaximumSustainResult) return std::unexpected(std::move(groundMovementMaximumSustainResult.error()));
   value.groundMovementMaximumSustain = *groundMovementMaximumSustainResult;
-  auto groundMovementCheckDistanceResult = config.optFloat("groundMovementCheckDistance");
+  auto groundMovementCheckDistanceResult = config.opt_float("groundMovementCheckDistance");
   if (!groundMovementCheckDistanceResult) return std::unexpected(std::move(groundMovementCheckDistanceResult.error()));
   value.groundMovementCheckDistance = *groundMovementCheckDistanceResult;
 
-  auto collisionEnabledResult = config.optBool("collisionEnabled");
+  auto collisionEnabledResult = config.opt_bool("collisionEnabled");
   if (!collisionEnabledResult) return std::unexpected(std::move(collisionEnabledResult.error()));
   value.collisionEnabled = *collisionEnabledResult;
-  auto frictionEnabledResult = config.optBool("frictionEnabled");
+  auto frictionEnabledResult = config.opt_bool("frictionEnabled");
   if (!frictionEnabledResult) return std::unexpected(std::move(frictionEnabledResult.error()));
   value.frictionEnabled = *frictionEnabledResult;
-  auto gravityEnabledResult = config.optBool("gravityEnabled");
+  auto gravityEnabledResult = config.opt_bool("gravityEnabled");
   if (!gravityEnabledResult) return std::unexpected(std::move(gravityEnabledResult.error()));
   value.gravityEnabled = *gravityEnabledResult;
 
-  auto pathExploreRateResult = config.optFloat("pathExploreRate");
+  auto pathExploreRateResult = config.opt_float("pathExploreRate");
   if (!pathExploreRateResult) return std::unexpected(std::move(pathExploreRateResult.error()));
   value.pathExploreRate = *pathExploreRateResult;
   return value;
 }
 
 std::expected<Json, StarException> ActorMovementParameters::toJson() const {
-  auto standingPolyJson = json_from_optional(standingPoly, jsonFromPolyF);
+  auto standingPolyJson = json_from_optional(standingPoly, json_from_polyf);
   if (!standingPolyJson) return std::unexpected(std::move(standingPolyJson.error()));
-  auto crouchingPolyJson = json_from_optional(crouchingPoly, jsonFromPolyF);
+  auto crouchingPolyJson = json_from_optional(crouchingPoly, json_from_polyf);
   if (!crouchingPolyJson) return std::unexpected(std::move(crouchingPolyJson.error()));
-  auto physicsEffectCategoriesJson = json_from_optional(physicsEffectCategories, jsonFromStringSet);
+  auto physicsEffectCategoriesJson = json_from_optional(physicsEffectCategories, json_from_string_set);
   if (!physicsEffectCategoriesJson) return std::unexpected(std::move(physicsEffectCategoriesJson.error()));
 
   return JsonObject{{"mass", json_from_optional(mass)},
@@ -586,32 +586,32 @@ ActorMovementModifiers::ActorMovementModifiers() {
 
 std::expected<ActorMovementModifiers, StarException> ActorMovementModifiers::create(Json const& config) {
   ActorMovementModifiers value;
-  if (!config.isNull()) {
-    auto groundMovementModifierResult = config.getFloat("groundMovementModifier", 1.0f);
+  if (!config.is_null()) {
+    auto groundMovementModifierResult = config.get_float("groundMovementModifier", 1.0f);
     if (!groundMovementModifierResult) return std::unexpected(std::move(groundMovementModifierResult.error()));
     value.groundMovementModifier = *groundMovementModifierResult;
-    auto liquidMovementModifierResult = config.getFloat("liquidMovementModifier", 1.0f);
+    auto liquidMovementModifierResult = config.get_float("liquidMovementModifier", 1.0f);
     if (!liquidMovementModifierResult) return std::unexpected(std::move(liquidMovementModifierResult.error()));
     value.liquidMovementModifier = *liquidMovementModifierResult;
-    auto speedModifierResult = config.getFloat("speedModifier", 1.0f);
+    auto speedModifierResult = config.get_float("speedModifier", 1.0f);
     if (!speedModifierResult) return std::unexpected(std::move(speedModifierResult.error()));
     value.speedModifier = *speedModifierResult;
-    auto airJumpModifierResult = config.getFloat("airJumpModifier", 1.0f);
+    auto airJumpModifierResult = config.get_float("airJumpModifier", 1.0f);
     if (!airJumpModifierResult) return std::unexpected(std::move(airJumpModifierResult.error()));
     value.airJumpModifier = *airJumpModifierResult;
-    auto liquidJumpModifierResult = config.getFloat("liquidJumpModifier", 1.0f);
+    auto liquidJumpModifierResult = config.get_float("liquidJumpModifier", 1.0f);
     if (!liquidJumpModifierResult) return std::unexpected(std::move(liquidJumpModifierResult.error()));
     value.liquidJumpModifier = *liquidJumpModifierResult;
-    auto runningSuppressedResult = config.getBool("runningSuppressed", false);
+    auto runningSuppressedResult = config.get_bool("runningSuppressed", false);
     if (!runningSuppressedResult) return std::unexpected(std::move(runningSuppressedResult.error()));
     value.runningSuppressed = *runningSuppressedResult;
-    auto jumpingSuppressedResult = config.getBool("jumpingSuppressed", false);
+    auto jumpingSuppressedResult = config.get_bool("jumpingSuppressed", false);
     if (!jumpingSuppressedResult) return std::unexpected(std::move(jumpingSuppressedResult.error()));
     value.jumpingSuppressed = *jumpingSuppressedResult;
-    auto facingSuppressedResult = config.getBool("facingSuppressed", false);
+    auto facingSuppressedResult = config.get_bool("facingSuppressed", false);
     if (!facingSuppressedResult) return std::unexpected(std::move(facingSuppressedResult.error()));
     value.facingSuppressed = *facingSuppressedResult;
-    auto movementSuppressedResult = config.getBool("movementSuppressed", false);
+    auto movementSuppressedResult = config.get_bool("movementSuppressed", false);
     if (!movementSuppressedResult) return std::unexpected(std::move(movementSuppressedResult.error()));
     value.movementSuppressed = *movementSuppressedResult;
   }
@@ -759,8 +759,8 @@ std::expected<Json, StarException> ActorMovementController::storeState() const {
   if (!movingName) return std::unexpected(std::move(movingName.error()));
   auto facingName = enum_name<DirectionNames>(m_facingDirection.get());
   if (!facingName) return std::unexpected(std::move(facingName.error()));
-  return JsonObject{{"position", jsonFromVec2F(MovementController::position())},
-                    {"velocity", jsonFromVec2F(velocity())},
+  return JsonObject{{"position", json_from_vec2f(MovementController::position())},
+                    {"velocity", json_from_vec2f(velocity())},
                     {"rotation", MovementController::rotation()},
                     {"movingDirection", String(*movingName)},
                     {"facingDirection", String(*facingName)},
@@ -770,15 +770,15 @@ std::expected<Json, StarException> ActorMovementController::storeState() const {
 std::expected<void, StarException> ActorMovementController::loadState(Json const& state) {
   auto loaded = MovementController::loadState(state);
   if (!loaded) return std::unexpected(std::move(loaded.error()));
-  auto movingName = state.getString("movingDirection");
+  auto movingName = state.get_string("movingDirection");
   if (!movingName) return std::unexpected(std::move(movingName.error()));
   auto movingDirection = enum_value<DirectionNames>(*movingName);
   if (!movingDirection) return std::unexpected(std::move(movingDirection.error()));
-  auto facingName = state.getString("facingDirection");
+  auto facingName = state.get_string("facingDirection");
   if (!facingName) return std::unexpected(std::move(facingName.error()));
   auto facingDirection = enum_value<DirectionNames>(*facingName);
   if (!facingDirection) return std::unexpected(std::move(facingDirection.error()));
-  auto crouchingValue = state.getBool("crouching");
+  auto crouchingValue = state.get_bool("crouching");
   if (!crouchingValue) return std::unexpected(std::move(crouchingValue.error()));
   setMovingDirection(*movingDirection);
   m_facingDirection.set(*facingDirection);

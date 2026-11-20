@@ -76,9 +76,9 @@ std::expected<LuaTable, StarException> Blackboard::parameters(StringMap<NodePara
       if (!set) return std::unexpected(std::move(set.error()));
     } else {
       Json const& value = std::get<Json>(p.second.second);
-      if (value.isNull()) continue;
+      if (value.is_null()) continue;
       if (p.second.first == NodeParameterType::Vec2) {
-        auto vector = value.toArray();
+        auto vector = value.to_array();
         if (!vector) return std::unexpected(std::move(vector.error()));
         if (vector->size() < 2)
           return std::unexpected(StarException(Star::format("Vec2 parameter must contain at least two elements for key {}", p.first)));
@@ -86,8 +86,8 @@ std::expected<LuaTable, StarException> Blackboard::parameters(StringMap<NodePara
         if (!createdVector) return std::unexpected(std::move(createdVector.error()));
         LuaTable luaVector = std::move(*createdVector);
         for (int i = 0; i < 2; ++i) {
-          if ((*vector)[i].isType(Json::Type::String)) {
-            auto key = (*vector)[i].toString();
+          if ((*vector)[i].is_type(Json::Type::String)) {
+            auto key = (*vector)[i].to_string();
             if (!key) return std::unexpected(std::move(key.error()));
             m_vectorNumberInput[*key].push_back({i + 1, luaVector});
             auto number = get(NodeParameterType::Number, *key);

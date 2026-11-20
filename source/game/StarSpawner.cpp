@@ -119,97 +119,97 @@ std::expected<std::shared_ptr<Spawner>, StarException> Spawner::create(Root& roo
   auto config = (*assets)->json("/spawning.config");
   if (!config) return std::unexpected(std::move(config.error()));
   {
-    auto value = config->getUInt("spawnCellSize");
+    auto value = config->get_uint("spawnCellSize");
     if (!value) return std::unexpected(std::move(value.error()));
     result->m_spawnCellSize = std::move(*value);
   }
   {
-    auto value = config->getUInt("spawnCellMinimumEmptyTiles");
+    auto value = config->get_uint("spawnCellMinimumEmptyTiles");
     if (!value) return std::unexpected(std::move(value.error()));
     result->m_spawnCellMinimumEmptyTiles = std::move(*value);
   }
   {
-    auto value = config->getUInt("spawnCellMinimumLiquidTiles");
+    auto value = config->get_uint("spawnCellMinimumLiquidTiles");
     if (!value) return std::unexpected(std::move(value.error()));
     result->m_spawnCellMinimumLiquidTiles = std::move(*value);
   }
   {
-    auto value = config->getUInt("spawnCellMinimumNearSurfaceTiles");
+    auto value = config->get_uint("spawnCellMinimumNearSurfaceTiles");
     if (!value) return std::unexpected(std::move(value.error()));
     result->m_spawnCellMinimumNearSurfaceTiles = std::move(*value);
   }
   {
-    auto value = config->getUInt("spawnCellMinimumNearCeilingTiles");
+    auto value = config->get_uint("spawnCellMinimumNearCeilingTiles");
     if (!value) return std::unexpected(std::move(value.error()));
     result->m_spawnCellMinimumNearCeilingTiles = std::move(*value);
   }
   {
-    auto value = config->getUInt("spawnCellMinimumAirTiles");
+    auto value = config->get_uint("spawnCellMinimumAirTiles");
     if (!value) return std::unexpected(std::move(value.error()));
     result->m_spawnCellMinimumAirTiles = std::move(*value);
   }
   {
-    auto value = config->getUInt("spawnCellMinimumExposedTiles");
+    auto value = config->get_uint("spawnCellMinimumExposedTiles");
     if (!value) return std::unexpected(std::move(value.error()));
     result->m_spawnCellMinimumExposedTiles = std::move(*value);
   }
   {
-    auto value = config->getUInt("spawnCellNearSurfaceDistance");
+    auto value = config->get_uint("spawnCellNearSurfaceDistance");
     if (!value) return std::unexpected(std::move(value.error()));
     result->m_spawnCellNearSurfaceDistance = std::move(*value);
   }
   {
-    auto value = config->getUInt("spawnCellNearCeilingDistance");
+    auto value = config->get_uint("spawnCellNearCeilingDistance");
     if (!value) return std::unexpected(std::move(value.error()));
     result->m_spawnCellNearCeilingDistance = std::move(*value);
   }
   {
-    auto value = config->getFloat("minimumDayLevel");
+    auto value = config->get_float("minimumDayLevel");
     if (!value) return std::unexpected(std::move(value.error()));
     result->m_minimumDayLevel = std::move(*value);
   }
   {
-    auto value = config->getFloat("minimumLiquidLevel");
+    auto value = config->get_float("minimumLiquidLevel");
     if (!value) return std::unexpected(std::move(value.error()));
     result->m_minimumLiquidLevel = std::move(*value);
   }
   {
-    auto value = config->getFloat("spawnCheckResolution");
+    auto value = config->get_float("spawnCheckResolution");
     if (!value) return std::unexpected(std::move(value.error()));
     result->m_spawnCheckResolution = std::move(*value);
   }
   {
-    auto value = config->getInt("spawnSurfaceCheckDistance");
+    auto value = config->get_int("spawnSurfaceCheckDistance");
     if (!value) return std::unexpected(std::move(value.error()));
     result->m_spawnSurfaceCheckDistance = std::move(*value);
   }
   {
-    auto value = config->getInt("spawnCeilingCheckDistance");
+    auto value = config->get_int("spawnCeilingCheckDistance");
     if (!value) return std::unexpected(std::move(value.error()));
     result->m_spawnCeilingCheckDistance = std::move(*value);
   }
   {
-    auto value = config->getFloat("spawnProhibitedCheckPadding");
+    auto value = config->get_float("spawnProhibitedCheckPadding");
     if (!value) return std::unexpected(std::move(value.error()));
     result->m_spawnProhibitedCheckPadding = std::move(*value);
   }
   {
-    auto value = config->getFloat("spawnCellLifetime");
+    auto value = config->get_float("spawnCellLifetime");
     if (!value) return std::unexpected(std::move(value.error()));
     result->m_spawnCellLifetime = std::move(*value);
   }
   {
-    auto value = config->getUInt("windowActivationBorder");
+    auto value = config->get_uint("windowActivationBorder");
     if (!value) return std::unexpected(std::move(value.error()));
     result->m_windowActivationBorder = std::move(*value);
   }
   {
-    auto value = config->getBool("defaultActive", true);
+    auto value = config->get_bool("defaultActive", true);
     if (!value) return std::unexpected(std::move(value.error()));
     result->m_active = std::move(*value);
   }
   {
-    auto value = config->getBool("debug", false);
+    auto value = config->get_bool("debug", false);
     if (!value) return std::unexpected(std::move(value.error()));
     result->m_debug = std::move(*value);
   }

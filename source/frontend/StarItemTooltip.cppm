@@ -222,7 +222,7 @@ return {};
   if (!jsonResult778)
     return std::unexpected(std::move(jsonResult778.error()));
   Json categories = std::move(*jsonResult778);
-  auto getStringResult779 = categories.getString(category, category);
+  auto getStringResult779 = categories.get_string(category, category);
   if (!getStringResult779)
     return std::unexpected(std::move(getStringResult779.error()));
   return std::move(*getStringResult779);
@@ -298,7 +298,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
   auto instanceValueResult794 = item->instanceValue("fuelAmount", 0);
   if (!instanceValueResult794)
     return std::unexpected(std::move(instanceValueResult794.error()));
-  auto toUIntResult795 = std::move(*instanceValueResult794).toUInt();
+  auto toUIntResult795 = std::move(*instanceValueResult794).to_uint();
   if (!toUIntResult795)
     return std::unexpected(std::move(toUIntResult795.error()));
   auto setLabelResult796 = container->setLabel("countLabel", Star::to_string(std::move(*toUIntResult795) * item->count()));
@@ -393,7 +393,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
               auto jsonResult812 = assets->json("/interface.config:tooltip.previewArmorWith");
               if (!jsonResult812)
                 return std::unexpected(std::move(jsonResult812.error()));
-              auto toStringResult813 = std::move(*jsonResult812).toString();
+              auto toStringResult813 = std::move(*jsonResult812).to_string();
               if (!toStringResult813)
                 return std::unexpected(std::move(toStringResult813.error()));
               if (std::move(*toStringResult813) == "player")
@@ -441,7 +441,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
           return std::unexpected(std::move(equalsIgnoreCaseResult822.error()));
         if (std::move(*equalsIgnoreCaseResult822))
           {
-            auto toStringResult823 = pair.second.toString();
+            auto toStringResult823 = pair.second.to_string();
             if (!toStringResult823)
               return std::unexpected(std::move(toStringResult823.error()));
             subTitle = std::move(*toStringResult823);
@@ -455,7 +455,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
           {
             std::optional<String> conditional827;
             if (pair.second.type() == Json::Type::String) {
-              auto toStringResult825 = pair.second.toString();
+              auto toStringResult825 = pair.second.to_string();
               if (!toStringResult825)
                 return std::unexpected(std::move(toStringResult825.error()));
               conditional827.emplace(std::move(*toStringResult825));
@@ -483,12 +483,12 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
           condition831 = static_cast<bool>(std::move(*containsChildResult830));
         }
         if (condition831) {
-          if (pair.second.isType(Json::Type::String))
+          if (pair.second.is_type(Json::Type::String))
             {
               auto fetchChildResult832 = container->fetchChild<ImageWidget>(pair.first);
               if (!fetchChildResult832)
                 return std::unexpected(std::move(fetchChildResult832.error()));
-              auto toStringResult833 = pair.second.toString();
+              auto toStringResult833 = pair.second.to_string();
               if (!toStringResult833)
                 return std::unexpected(std::move(toStringResult833.error()));
               auto setImageResult834 = std::move(*fetchChildResult832)->setImage(std::move(*toStringResult833));
@@ -500,7 +500,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
             {
               List<Drawable> drawables;
               {
-                auto toArrayResult835 = pair.second.toArray();
+                auto toArrayResult835 = pair.second.to_array();
                 if (!toArrayResult835)
                   return std::unexpected(std::move(toArrayResult835.error()));
                 for (auto const& drawable : std::move(*toArrayResult835))
@@ -596,7 +596,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
             if (!instanceValueResult853)
               return std::unexpected(std::move(instanceValueResult853.error()));
             if (auto currentAugment = std::move(*instanceValueResult853)) {
-              auto getStringResult854 = currentAugment.getString("displayName", "???");
+              auto getStringResult854 = currentAugment.get_string("displayName", "???");
               if (!getStringResult854)
                 return std::unexpected(std::move(getStringResult854.error()));
               auto setLabelResult855 = container->setLabel("augmentNameLabel", std::move(*getStringResult854));
@@ -608,7 +608,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
                   return std::unexpected(std::move(fetchChildResult856.error()));
                 if (auto augmentIcon = std::move(*fetchChildResult856))
                   {
-                    auto getStringResult857 = currentAugment.getString("displayIcon", "");
+                    auto getStringResult857 = currentAugment.get_string("displayIcon", "");
                     if (!getStringResult857)
                       return std::unexpected(std::move(getStringResult857.error()));
                     auto setImageResult858 = augmentIcon->setImage(std::move(*getStringResult857));
@@ -716,7 +716,7 @@ std::expected<void, StarException> ItemTooltipBuilder::describePersistentEffect(
           auto getResult877 = statsConfig.get(baseMultiplier.statName);
           if (!getResult877)
             return std::unexpected(std::move(getResult877.error()));
-          auto getStringResult878 = std::move(*getResult877).getString("icon");
+          auto getStringResult878 = std::move(*getResult877).get_string("icon");
           if (!getStringResult878)
             return std::unexpected(std::move(getStringResult878.error()));
           auto setImageResult879 = std::move(*fetchChildResult876)
@@ -745,7 +745,7 @@ std::expected<void, StarException> ItemTooltipBuilder::describePersistentEffect(
           auto getResult884 = statsConfig.get(valueModifier.statName);
           if (!getResult884)
             return std::unexpected(std::move(getResult884.error()));
-          auto getStringResult885 = std::move(*getResult884).getString("icon");
+          auto getStringResult885 = std::move(*getResult884).get_string("icon");
           if (!getStringResult885)
             return std::unexpected(std::move(getStringResult885.error()));
           auto setImageResult886 = std::move(*fetchChildResult883)
@@ -774,7 +774,7 @@ std::expected<void, StarException> ItemTooltipBuilder::describePersistentEffect(
           auto getResult891 = statsConfig.get(effectiveMultiplier.statName);
           if (!getResult891)
             return std::unexpected(std::move(getResult891.error()));
-          auto getStringResult892 = std::move(*getResult891).getString("icon");
+          auto getStringResult892 = std::move(*getResult891).get_string("icon");
           if (!getStringResult892)
             return std::unexpected(std::move(getStringResult892.error()));
           auto setImageResult893 = std::move(*fetchChildResult890)

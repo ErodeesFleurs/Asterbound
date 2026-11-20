@@ -29,11 +29,11 @@ std::expected<String, StarException> wiredObjectName(ObjectDatabase const& datab
   for (auto const& name : database.allObjects()) {
     auto config = database.getConfig(name);
     if (!config) return std::unexpected(std::move(config.error()));
-    auto inputs = (*config)->config.getArray("inputNodes", {});
+    auto inputs = (*config)->config.get_array("inputNodes", {});
     if (!inputs) return std::unexpected(std::move(inputs.error()));
     if (inputs->empty())
       continue;
-    auto outputs = (*config)->config.getArray("outputNodes", {});
+    auto outputs = (*config)->config.get_array("outputNodes", {});
     if (!outputs) return std::unexpected(std::move(outputs.error()));
     if (outputs->empty())
       continue;

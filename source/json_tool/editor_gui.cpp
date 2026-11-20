@@ -238,7 +238,7 @@ void JsonEditor::updateImagePreview() {
       m_errorDialog->showMessage(value.error().what());
       return;
     }
-    auto image = value->toJson().toString();
+    auto image = value->to_json().to_string();
     if (!image) {
       m_errorDialog->showMessage(image.error().what());
       return;

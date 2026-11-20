@@ -165,8 +165,8 @@ const GameTestRegistration
     ASSERT_TRUE(metal);
     auto strong = metal->get().get(HitType::StrongHit);
     ASSERT_TRUE(strong);
-    EXPECT_TRUE(strong->get().sounds.isNull());
-    EXPECT_TRUE(strong->get().particles.isNull());
+    EXPECT_TRUE(strong->get().sounds.is_null());
+    EXPECT_TRUE(strong->get().particles.is_null());
     for (String const& name : {String("Missing"), String("Null")}) {
       auto empty = (*database)->damageKind(name);
       ASSERT_TRUE(empty);
@@ -223,8 +223,8 @@ const GameTestRegistration
       EXPECT_EQ(request->damageType, DamageType::Damage);
       auto stored = request->toJson();
       ASSERT_TRUE(stored);
-      EXPECT_EQ(stored->getString("hitType"), "Hit");
-      EXPECT_EQ(stored->getString("damageType"), "Damage");
+      EXPECT_EQ(stored->get_string("hitType"), "Hit");
+      EXPECT_EQ(stored->get_string("damageType"), "Damage");
     }
     auto mixedCase =
       DamageRequest::create(JsonObject{{"damage", 3}, {"hitType", "sTrOnGhIt"}, {"damageType", "iGnOrEsDeF"}});
@@ -233,8 +233,8 @@ const GameTestRegistration
     EXPECT_EQ(mixedCase->damageType, DamageType::IgnoresDef);
     auto stored = mixedCase->toJson();
     ASSERT_TRUE(stored);
-    EXPECT_EQ(stored->getString("hitType"), "StrongHit");
-    EXPECT_EQ(stored->getString("damageType"), "IgnoresDef");
+    EXPECT_EQ(stored->get_string("hitType"), "StrongHit");
+    EXPECT_EQ(stored->get_string("damageType"), "IgnoresDef");
 
     // An unknown first enum wins over a later malformed UTF-8 name or missing damage.
     for (String const& name : {String("unknown"), String("日本語"), String(std::string_view("Hit\0", 4))}) {

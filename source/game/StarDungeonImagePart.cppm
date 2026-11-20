@@ -152,13 +152,13 @@ namespace Dungeon {
       result.rules = std::move(*rules);
     }
     if (auto connectorDef = tile.maybe("connector")) {
-      auto enabled = connectorDef->toBool();
+      auto enabled = connectorDef->to_bool();
       if (!enabled) return std::unexpected(std::move(enabled.error()));
       if (*enabled) {
         TileConnector connector;
         connector.forwardOnly = false;
         if (auto forward = tile.maybe("connectForwardOnly")) {
-          auto value = forward->toBool();
+          auto value = forward->to_bool();
           if (!value) return std::unexpected(std::move(value.error()));
           connector.forwardOnly = *value;
         }
@@ -167,17 +167,17 @@ namespace Dungeon {
         Json connectorValue = value->get();
         if (auto customValue = tile.maybe("connector-value"))
           connectorValue = *customValue;
-        if (connectorValue.isType(Json::Type::String)) {
-          auto text = connectorValue.toString();
+        if (connectorValue.is_type(Json::Type::String)) {
+          auto text = connectorValue.to_string();
           if (!text) return std::unexpected(std::move(text.error()));
           connector.value = std::move(*text);
         } else {
-          auto color = jsonToVec4B(connectorValue);
+          auto color = json_to_vec4b(connectorValue);
           if (!color) return std::unexpected(std::move(color.error()));
           connector.value = connectorColorValue(*color);
         }
         if (auto direction = tile.maybe("direction")) {
-          auto text = direction->toString();
+          auto text = direction->to_string();
           if (!text) return std::unexpected(std::move(text.error()));
           auto parsed = enum_value<DungeonDirectionNames>(*text);
           if (!parsed) return std::unexpected(std::move(parsed.error()));
@@ -196,9 +196,9 @@ namespace Dungeon {
     for (Json const& definition : *definitions) {
       auto value = definition.get("value");
       if (!value) return std::unexpected(std::move(value.error()));
-      auto color = jsonToVec4B(*value);
+      auto color = json_to_vec4b(*value);
       if (!color) return std::unexpected(std::move(color.error()));
-      auto object = definition.toObject();
+      auto object = definition.to_object();
       if (!object) return std::unexpected(std::move(object.error()));
       auto tile = variantMapToTile(root, *object);
       if (!tile) return std::unexpected(std::move(tile.error()));

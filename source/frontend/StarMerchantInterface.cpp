@@ -224,12 +224,12 @@ std::expected<void, StarException> MerchantPane::initialize(std::shared_ptr<Worl
   auto fetchJsonResult570 = assets->fetchJson(baseConfig);
   if (!fetchJsonResult570)
     return std::unexpected(std::move(fetchJsonResult570.error()));
-  m_settings = jsonMerge(std::move(*fetchJsonResult570), settings);
+  m_settings = json_merge(std::move(*fetchJsonResult570), settings);
 
   auto jsonResult571 = assets->json("/merchant.config:autoRefreshRate");
   if (!jsonResult571)
     return std::unexpected(std::move(jsonResult571.error()));
-  auto toFloatResult572 = std::move(*jsonResult571).toFloat();
+  auto toFloatResult572 = std::move(*jsonResult571).to_float();
   if (!toFloatResult572)
     return std::unexpected(std::move(toFloatResult572.error()));
   m_refreshTimer = GameTimer(std::move(*toFloatResult572));
@@ -237,25 +237,25 @@ std::expected<void, StarException> MerchantPane::initialize(std::shared_ptr<Worl
   auto jsonResult573 = assets->json("/merchant.config:defaultBuyFactor");
   if (!jsonResult573)
     return std::unexpected(std::move(jsonResult573.error()));
-  auto toFloatResult574 = std::move(*jsonResult573).toFloat();
+  auto toFloatResult574 = std::move(*jsonResult573).to_float();
   if (!toFloatResult574)
     return std::unexpected(std::move(toFloatResult574.error()));
-  auto getFloatResult575 = m_settings.getFloat("buyFactor", std::move(*toFloatResult574));
+  auto getFloatResult575 = m_settings.get_float("buyFactor", std::move(*toFloatResult574));
   if (!getFloatResult575)
     return std::unexpected(std::move(getFloatResult575.error()));
   m_buyFactor = std::move(*getFloatResult575);
   auto jsonResult576 = assets->json("/merchant.config:defaultSellFactor");
   if (!jsonResult576)
     return std::unexpected(std::move(jsonResult576.error()));
-  auto toFloatResult577 = std::move(*jsonResult576).toFloat();
+  auto toFloatResult577 = std::move(*jsonResult576).to_float();
   if (!toFloatResult577)
     return std::unexpected(std::move(toFloatResult577.error()));
-  auto getFloatResult578 = m_settings.getFloat("sellFactor", std::move(*toFloatResult577));
+  auto getFloatResult578 = m_settings.get_float("sellFactor", std::move(*toFloatResult577));
   if (!getFloatResult578)
     return std::unexpected(std::move(getFloatResult578.error()));
   m_sellFactor = std::move(*getFloatResult578);
 
-  auto getUIntResult579 = m_settings.getUInt("sellContainerSize");
+  auto getUIntResult579 = m_settings.get_uint("sellContainerSize");
   if (!getUIntResult579)
     return std::unexpected(std::move(getUIntResult579.error()));
   m_itemBag = std::make_shared<ItemBag>(context().root(), std::move(*getUIntResult579));
@@ -263,10 +263,10 @@ std::expected<void, StarException> MerchantPane::initialize(std::shared_ptr<Worl
   auto jsonResult580 = assets->json("/interface/windowconfig/crafting.config:default");
   if (!jsonResult580)
     return std::unexpected(std::move(jsonResult580.error()));
-  auto getUIntResult581 = std::move(*jsonResult580).getUInt("maxSpinCount", 1000);
+  auto getUIntResult581 = std::move(*jsonResult580).get_uint("maxSpinCount", 1000);
   if (!getUIntResult581)
     return std::unexpected(std::move(getUIntResult581.error()));
-  auto getUIntResult582 = m_settings.getUInt("maxSpinCount", std::move(*getUIntResult581));
+  auto getUIntResult582 = m_settings.get_uint("maxSpinCount", std::move(*getUIntResult581));
   if (!getUIntResult582)
     return std::unexpected(std::move(getUIntResult582.error()));
   m_maxBuyCount = std::move(*getUIntResult582);
@@ -360,7 +360,7 @@ std::expected<void, StarException> MerchantPane::initialize(std::shared_ptr<Worl
   auto getResult594 = m_settings.get("paneLayoutOverride", {});
   if (!getResult594)
     return std::unexpected(std::move(getResult594.error()));
-  paneLayout = jsonMerge(paneLayout, std::move(*getResult594));
+  paneLayout = json_merge(paneLayout, std::move(*getResult594));
   auto constructResult595 = reader.construct(paneLayout, *this);
   if (!constructResult595)
     return std::unexpected(std::move(constructResult595.error()));
@@ -373,14 +373,14 @@ std::expected<void, StarException> MerchantPane::initialize(std::shared_ptr<Worl
     auto bgResult = getBG();
     if (m_tabSet->selectedTab() == 0)
       {
-        auto getStringResult597 = m_settings.getString("buyBody");
+        auto getStringResult597 = m_settings.get_string("buyBody");
         if (!getStringResult597)
           return std::unexpected(std::move(getStringResult597.error()));
         bgResult.body = std::move(*getStringResult597);
       }
     else
       {
-        auto getStringResult598 = m_settings.getString("sellBody");
+        auto getStringResult598 = m_settings.get_string("sellBody");
         if (!getStringResult598)
           return std::unexpected(std::move(getStringResult598.error()));
         bgResult.body = std::move(*getStringResult598);
@@ -627,7 +627,7 @@ std::expected<void, StarException> MerchantPane::buildItemList() {
   auto clearResult639 = m_itemGuiList->clear();
   if (!clearResult639)
     return std::unexpected(std::move(clearResult639.error()));
-  auto getArrayResult640 = m_settings.getArray("items");
+  auto getArrayResult640 = m_settings.get_array("items");
   if (!getArrayResult640)
     return std::unexpected(std::move(getArrayResult640.error()));
   m_itemList = std::move(*getArrayResult640);
@@ -651,7 +651,7 @@ std::expected<void, StarException> MerchantPane::buildItemList() {
       }
 
       {
-        auto optStringResult644 = itemConfig.optString("prerequisiteQuest");
+        auto optStringResult644 = itemConfig.opt_string("prerequisiteQuest");
         if (!optStringResult644)
           return std::unexpected(std::move(optStringResult644.error()));
         if (auto prerequisite = std::move(*optStringResult644)) {
@@ -661,13 +661,13 @@ std::expected<void, StarException> MerchantPane::buildItemList() {
       }
 
       {
-        auto optArrayResult645 = itemConfig.optArray("exclusiveQuests");
+        auto optArrayResult645 = itemConfig.opt_array("exclusiveQuests");
         if (!optArrayResult645)
           return std::unexpected(std::move(optArrayResult645.error()));
         if (auto quests = std::move(*optArrayResult645)) {
           for (auto const& quest : *quests) {
             {
-              auto toStringResult646 = quest.toString();
+              auto toStringResult646 = quest.to_string();
               if (!toStringResult646)
                 return std::unexpected(std::move(toStringResult646.error()));
               if (m_player->questManager()->hasQuest(std::move(*toStringResult646)))
@@ -678,7 +678,7 @@ std::expected<void, StarException> MerchantPane::buildItemList() {
       }
 
       {
-        auto optUIntResult647 = itemConfig.optUInt("prerequisiteShipLevel");
+        auto optUIntResult647 = itemConfig.opt_uint("prerequisiteShipLevel");
         if (!optUIntResult647)
           return std::unexpected(std::move(optUIntResult647.error()));
         if (auto prerequisite = std::move(*optUIntResult647)) {
@@ -688,7 +688,7 @@ std::expected<void, StarException> MerchantPane::buildItemList() {
       }
 
       {
-        auto optUIntResult648 = itemConfig.optUInt("maxShipLevel");
+        auto optUIntResult648 = itemConfig.opt_uint("maxShipLevel");
         if (!optUIntResult648)
           return std::unexpected(std::move(optUIntResult648.error()));
         if (auto maxLevel = std::move(*optUIntResult648)) {
@@ -750,7 +750,7 @@ std::expected<void, StarException> MerchantPane::setupWidget(std::shared_ptr<Wid
   if (!setTextResult657)
     return std::unexpected(std::move(setTextResult657.error()));
 
-  auto getIntResult658 = itemConfig.getInt("price", item->price());
+  auto getIntResult658 = itemConfig.get_int("price", item->price());
   if (!getIntResult658)
     return std::unexpected(std::move(getIntResult658.error()));
   unsigned price = std::ceil(std::move(*getIntResult658) * m_buyFactor);
@@ -839,7 +839,7 @@ std::expected<void, StarException> MerchantPane::updateSelection() {
 std::expected<void, StarException> MerchantPane::updateBuyTotal() {
   if (auto selected = m_itemGuiList->selectedWidget())
     {
-      auto toUIntResult674 = selected->data().toUInt();
+      auto toUIntResult674 = selected->data().to_uint();
       if (!toUIntResult674)
         return std::unexpected(std::move(toUIntResult674.error()));
       m_buyTotal = std::move(*toUIntResult674) * m_buyCount;
@@ -901,7 +901,7 @@ std::expected<void, StarException> MerchantPane::buy() {
     auto jsonResult681 = std::move(*assetsResult680)->json("/merchant.config:buySound");
     if (!jsonResult681)
       return std::unexpected(std::move(jsonResult681.error()));
-    auto toStringResult682 = std::move(*jsonResult681).toString();
+    auto toStringResult682 = std::move(*jsonResult681).to_string();
     if (!toStringResult682)
       return std::unexpected(std::move(toStringResult682.error()));
     auto playAudioResult683 = guiContext.playAudio(std::move(*toStringResult682));
@@ -960,7 +960,7 @@ std::expected<void, StarException> MerchantPane::sell() {
     auto jsonResult692 = std::move(*assetsResult691)->json("/merchant.config:sellSound");
     if (!jsonResult692)
       return std::unexpected(std::move(jsonResult692.error()));
-    auto toStringResult693 = std::move(*jsonResult692).toString();
+    auto toStringResult693 = std::move(*jsonResult692).to_string();
     if (!toStringResult693)
       return std::unexpected(std::move(toStringResult693.error()));
     auto playAudioResult694 = guiContext.playAudio(std::move(*toStringResult693));
@@ -976,7 +976,7 @@ std::expected<int, StarException> MerchantPane::maxBuyCount() {
     if (!assetsResult695)
       return std::unexpected(std::move(assetsResult695.error()));
     auto assets = std::move(*assetsResult695);
-    auto toUIntResult696 = selected->data().toUInt();
+    auto toUIntResult696 = selected->data().to_uint();
     if (!toUIntResult696)
       return std::unexpected(std::move(toUIntResult696.error()));
     auto unitPrice = std::move(*toUIntResult696);

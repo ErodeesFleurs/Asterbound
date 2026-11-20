@@ -33,13 +33,13 @@ ServerQueryThread::create(UniverseServer& universe, HostAddressWithPort const& b
   auto maxPlayers = (*configuration)->get("maxPlayers");
   if (!maxPlayers)
     return std::unexpected(std::move(maxPlayers.error()));
-  auto count = maxPlayers->toUInt();
+  auto count = maxPlayers->to_uint();
   if (!count)
     return std::unexpected(std::move(count.error()));
   auto name = (*configuration)->get("serverName");
   if (!name)
     return std::unexpected(std::move(name.error()));
-  auto text = name->toString();
+  auto text = name->to_string();
   if (!text)
     return std::unexpected(std::move(text.error()));
   return std::unique_ptr<ServerQueryThread>(

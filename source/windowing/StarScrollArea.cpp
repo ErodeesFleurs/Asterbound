@@ -104,13 +104,13 @@ std::expected<void, StarException> ScrollThumb::setImages(Json const& images) {
     auto state = direction->get(entry.first);
     if (!state)
       return std::unexpected(std::move(state.error()));
-    auto begin = state->getString("begin");
+    auto begin = state->get_string("begin");
     if (!begin)
       return std::unexpected(std::move(begin.error()));
-    auto end = state->getString("end");
+    auto end = state->get_string("end");
     if (!end)
       return std::unexpected(std::move(end.error()));
-    auto inner = state->getString("inner");
+    auto inner = state->get_string("inner");
     if (!inner)
       return std::unexpected(std::move(inner.error()));
     entry.second.get().begin = std::move(*begin);
@@ -221,13 +221,13 @@ std::expected<void, StarException> ScrollBar::setButtonImages(Json const& images
     auto state = direction->get(entry.first);
     if (!state)
       return std::unexpected(std::move(state.error()));
-    auto base = state->getString("base");
+    auto base = state->get_string("base");
     if (!base)
       return std::unexpected(std::move(base.error()));
-    auto hover = state->getString("hover");
+    auto hover = state->get_string("hover");
     if (!hover)
       return std::unexpected(std::move(hover.error()));
-    auto pressed = state->getString("pressed");
+    auto pressed = state->get_string("pressed");
     if (!pressed)
       return std::unexpected(std::move(pressed.error()));
     auto configured = entry.second.get().setImages(*base, *hover, *pressed);
@@ -399,7 +399,7 @@ std::expected<void, StarException> ScrollArea::initialize() {
   auto json = (*assets)->json("/interface.config:scrollArea.buttonAdvance");
   if (!json)
     return std::unexpected(std::move(json.error()));
-  auto advance = json->toInt();
+  auto advance = json->to_int();
   if (!advance)
     return std::unexpected(std::move(advance.error()));
   m_buttonAdvance = *advance;

@@ -125,7 +125,7 @@ StringMap<std::shared_ptr<SpeciesDefinition>> SpeciesDatabase::allSpecies() cons
 std::expected<Json, StarException> SpeciesDatabase::humanoidConfig(HumanoidIdentity identity, JsonObject parameters, Json config, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog) const {
   auto definition = species(identity.species);
   if (!definition) return std::unexpected(std::move(definition.error()));
-  if ((*definition)->m_buildScripts.empty() && config.isType(Json::Type::Object))
+  if ((*definition)->m_buildScripts.empty() && config.is_type(Json::Type::Object))
     return config;
   auto baseConfig = (*definition)->humanoidConfig();
   if (!baseConfig) return std::unexpected(std::move(baseConfig.error()));
@@ -148,7 +148,7 @@ std::expected<Json, StarException> SpeciesDatabase::humanoidConfig(HumanoidIdent
     if (!identityJson) return std::unexpected(std::move(identityJson.error()));
     return context->invokePath<Json>("build", *identityJson, parameters, *baseConfig, config);
   }
-  return jsonMerge(*baseConfig, parameters);
+  return json_merge(*baseConfig, parameters);
 }
 
 std::expected<CharacterCreationResult, StarException> SpeciesDatabase::createHumanoid(
@@ -325,19 +325,19 @@ std::expected<std::shared_ptr<SpeciesDefinition>, StarException> SpeciesDefiniti
 
 std::expected<void, StarException> SpeciesDefinition::init(Json const& config) {
   m_config = config;
-  auto kind = config.getString("kind");
+  auto kind = config.get_string("kind");
   if (!kind) return std::unexpected(std::move(kind.error()));
   m_kind = std::move(*kind);
-  auto humanoidPath = config.getString("humanoidConfig", "/humanoid.config");
+  auto humanoidPath = config.get_string("humanoidConfig", "/humanoid.config");
   if (!humanoidPath) return std::unexpected(std::move(humanoidPath.error()));
   m_humanoidConfig = std::move(*humanoidPath);
-  auto overrides = config.getObject("humanoidOverrides", JsonObject());
+  auto overrides = config.get_object("humanoidOverrides", JsonObject());
   if (!overrides) return std::unexpected(std::move(overrides.error()));
   m_humanoidOverrides = std::move(*overrides);
   auto readStrings = [&](String const& key, Json fallback, List<String>& destination) -> std::expected<void, StarException> {
     auto value = config.get(key, std::move(fallback));
     if (!value) return std::unexpected(std::move(value.error()));
-    auto strings = jsonToStringList(*value);
+    auto strings = json_to_string_list(*value);
     if (!strings) return std::unexpected(std::move(strings.error()));
     destination = std::move(*strings);
     return {};
@@ -348,35 +348,35 @@ std::expected<void, StarException> SpeciesDefinition::init(Json const& config) {
   if (!creation) return std::unexpected(std::move(creation.error()));
   auto tooltip = config.get("charCreationTooltip");
   if (!tooltip) return std::unexpected(std::move(tooltip.error()));
-  auto title = tooltip->getString("title", "");
+  auto title = tooltip->get_string("title", "");
   if (!title) return std::unexpected(std::move(title.error()));
   m_tooltip.title = std::move(*title);
-  auto subtitle = tooltip->getString("subTitle", "");
+  auto subtitle = tooltip->get_string("subTitle", "");
   if (!subtitle) return std::unexpected(std::move(subtitle.error()));
   m_tooltip.subTitle = std::move(*subtitle);
-  auto description = tooltip->getString("description", "");
+  auto description = tooltip->get_string("description", "");
   if (!description) return std::unexpected(std::move(description.error()));
   m_tooltip.description = std::move(*description);
   auto names = config.get("nameGen");
   if (!names) return std::unexpected(std::move(names.error()));
-  auto nameList = jsonToStringList(*names);
+  auto nameList = json_to_string_list(*names);
   if (!nameList) return std::unexpected(std::move(nameList.error()));
   m_nameGen = std::move(*nameList);
   auto labels = readStrings("charGenTextLabels", JsonArray{}, m_charGenTextLabels);
   if (!labels) return std::unexpected(std::move(labels.error()));
-  auto skull = config.getString("skull", "/humanoid/any/dead.png");
+  auto skull = config.get_string("skull", "/humanoid/any/dead.png");
   if (!skull) return std::unexpected(std::move(skull.error()));
   m_skull = std::move(*skull);
   auto noises = config.get("ouchNoises");
   if (!noises) return std::unexpected(std::move(noises.error()));
-  auto noiseList = jsonToStringList(*noises);
+  auto noiseList = json_to_string_list(*noises);
   if (!noiseList) return std::unexpected(std::move(noiseList.error()));
   m_ouchNoises = std::move(*noiseList);
   if (m_nameGen.size() < GenderNames.size() || m_ouchNoises.size() < GenderNames.size())
     return std::unexpected(
       StarException::format("Species '{}' must have at least {} nameGen and {} ouchNoises entries, has {} and {}",
                             m_kind, GenderNames.size(), GenderNames.size(), m_nameGen.size(), m_ouchNoises.size()));
-  auto items = config.getArray("defaultItems", JsonArray{});
+  auto items = config.get_array("defaultItems", JsonArray{});
   if (!items) return std::unexpected(std::move(items.error()));
   for (auto const& value : *items) {
     auto item = ItemDescriptor::create(value);
@@ -385,7 +385,7 @@ std::expected<void, StarException> SpeciesDefinition::init(Json const& config) {
   }
   auto blueprints = config.get("defaultBlueprints", JsonObject{});
   if (!blueprints) return std::unexpected(std::move(blueprints.error()));
-  auto tier = blueprints->getArray("tier1", JsonArray{});
+  auto tier = blueprints->get_array("tier1", JsonArray{});
   if (!tier) return std::unexpected(std::move(tier.error()));
   for (auto const& value : *tier) {
     auto item = ItemDescriptor::create(value);
@@ -395,7 +395,7 @@ std::expected<void, StarException> SpeciesDefinition::init(Json const& config) {
   auto personalitiesLoaded = [&]() -> std::expected<void, StarException> {
   auto humanoid = humanoidConfig();
   if (!humanoid) return std::unexpected(std::move(humanoid.error()));
-  auto personalities = humanoid->getArray("personalities");
+  auto personalities = humanoid->get_array("personalities");
   if (!personalities) return std::unexpected(std::move(personalities.error()));
   for (auto const& value : *personalities) {
     auto personality = parsePersonalityArray(value);
@@ -409,20 +409,20 @@ std::expected<void, StarException> SpeciesDefinition::init(Json const& config) {
     if (!assets) return std::unexpected(std::move(personalitiesLoaded.error()));
     return std::unexpected((*assets)->withAssetContext(std::move(personalitiesLoaded.error()), m_humanoidConfig, "Loading species humanoid personalities"));
   }
-  auto effects = config.getArray("statusEffects", {});
+  auto effects = config.get_array("statusEffects", {});
   if (!effects) return std::unexpected(std::move(effects.error()));
   for (auto const& value : *effects) {
     auto effect = jsonToPersistentStatusEffect(value);
     if (!effect) return std::unexpected(std::move(effect.error()));
     m_statusEffects.push_back(std::move(*effect));
   }
-  auto directives = config.getString("effectDirectives", "");
+  auto directives = config.get_string("effectDirectives", "");
   if (!directives) return std::unexpected(std::move(directives.error()));
   m_effectDirectives = std::move(*directives);
   SpeciesOption species;
   species.species = m_kind;
   auto readBool = [&](String const& key, bool& destination) -> std::expected<void, StarException> {
-    auto value = config.getBool(key, false);
+    auto value = config.get_bool(key, false);
     if (!value) return std::unexpected(std::move(value.error()));
     destination = *value;
     return {};
@@ -444,7 +444,7 @@ std::expected<void, StarException> SpeciesDefinition::init(Json const& config) {
   auto altColor = readBool("altColorAsFacialMaskSubColor", species.altColorAsFacialMaskSubColor);
   if (!altColor) return std::unexpected(std::move(altColor.error()));
   auto readColors = [&](String const& key, List<String>& destination) -> std::expected<void, StarException> {
-    auto values = config.getArray(key, JsonArray{""});
+    auto values = config.get_array(key, JsonArray{""});
     if (!values) return std::unexpected(std::move(values.error()));
     auto converted = color_directives_from_config(*values);
     if (!converted) return std::unexpected(std::move(converted.error()));
@@ -457,13 +457,13 @@ std::expected<void, StarException> SpeciesDefinition::init(Json const& config) {
   if (!undy) return std::unexpected(std::move(undy.error()));
   auto hair = readColors("hairColor", species.hairColorDirectives);
   if (!hair) return std::unexpected(std::move(hair.error()));
-  auto genders = config.getArray("genders", JsonArray{});
+  auto genders = config.get_array("genders", JsonArray{});
   if (!genders) return std::unexpected(std::move(genders.error()));
   for (auto const& data : *genders) {
     SpeciesGenderOption gender;
     gender.gender = species.genderOptions.empty() ? Gender::Male : Gender::Female;
     auto readString = [&](String const& key, String fallback, String& destination) -> std::expected<void, StarException> {
-      auto value = data.getString(key, std::move(fallback));
+      auto value = data.get_string(key, std::move(fallback));
       if (!value) return std::unexpected(std::move(value.error()));
       destination = std::move(*value);
       return {};
@@ -479,14 +479,14 @@ std::expected<void, StarException> SpeciesDefinition::init(Json const& config) {
       if (!fallback) return std::unexpected(std::move(fallback.error()));
       auto value = data.get(key, *fallback);
       if (!value) return std::unexpected(std::move(value.error()));
-      auto strings = jsonToStringList(*value);
+      auto strings = json_to_string_list(*value);
       if (!strings) return std::unexpected(std::move(strings.error()));
       destination = std::move(*strings);
       return {};
     };
     auto hairOptions = readOptions("hair", gender.hairOptions);
     if (!hairOptions) return std::unexpected(std::move(hairOptions.error()));
-    auto hairGroup = config.getString("HairGroup", "hair");
+    auto hairGroup = config.get_string("HairGroup", "hair");
     if (!hairGroup) return std::unexpected(std::move(hairGroup.error()));
     auto hairGroupRead = readString("hairGroup", *hairGroup, gender.hairGroup);
     if (!hairGroupRead) return std::unexpected(std::move(hairGroupRead.error()));
@@ -494,13 +494,13 @@ std::expected<void, StarException> SpeciesDefinition::init(Json const& config) {
     if (!shirts) return std::unexpected(std::move(shirts.error()));
     auto pants = readOptions("pants", gender.pantsOptions);
     if (!pants) return std::unexpected(std::move(pants.error()));
-    auto facialHairGroup = config.getString("facialHairGroup", "");
+    auto facialHairGroup = config.get_string("facialHairGroup", "");
     if (!facialHairGroup) return std::unexpected(std::move(facialHairGroup.error()));
     auto facialHairRead = readString("facialHairGroup", *facialHairGroup, gender.facialHairGroup);
     if (!facialHairRead) return std::unexpected(std::move(facialHairRead.error()));
     auto facialHair = readOptions("facialHair", gender.facialHairOptions);
     if (!facialHair) return std::unexpected(std::move(facialHair.error()));
-    auto facialMaskGroup = config.getString("facialMaskGroup", "");
+    auto facialMaskGroup = config.get_string("facialMaskGroup", "");
     if (!facialMaskGroup) return std::unexpected(std::move(facialMaskGroup.error()));
     auto facialMaskRead = readString("facialMaskGroup", *facialMaskGroup, gender.facialMaskGroup);
     if (!facialMaskRead) return std::unexpected(std::move(facialMaskRead.error()));
@@ -533,7 +533,7 @@ std::expected<Json, StarException> SpeciesDefinition::humanoidConfig() const {
   if (!assets) return std::unexpected(std::move(assets.error()));
   auto config = (*assets)->json(m_humanoidConfig);
   if (!config) return std::unexpected((*assets)->withAssetContext(std::move(config.error()), m_humanoidConfig, "Loading species humanoid configuration"));
-  return jsonMerge(*config, m_humanoidOverrides);
+  return json_merge(*config, m_humanoidOverrides);
 }
 
 List<Personality> const& SpeciesDefinition::personalities() const {

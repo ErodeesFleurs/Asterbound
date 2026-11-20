@@ -32,21 +32,21 @@ import star.algorithm;
 namespace Star {
 
 std::expected<UniverseFlagAction, StarException> parseUniverseFlagAction(Json const& json) {
-  auto actionType = json.getString("type");
+  auto actionType = json.get_string("type");
   if (!actionType)
     return std::unexpected(std::move(actionType.error()));
   if (*actionType != "placeDungeon")
     return std::unexpected(StarException::format("Unsupported universe flag action type {}", *actionType));
-  auto dungeon = json.getString("dungeonId");
+  auto dungeon = json.get_string("dungeonId");
   if (!dungeon)
     return std::unexpected(std::move(dungeon.error()));
-  auto instance = json.getString("targetInstance");
+  auto instance = json.get_string("targetInstance");
   if (!instance)
     return std::unexpected(std::move(instance.error()));
   auto positionData = json.get("targetPosition");
   if (!positionData)
     return std::unexpected(std::move(positionData.error()));
-  auto position = jsonToVec2I(*positionData);
+  auto position = json_to_vec2i(*positionData);
   if (!position)
     return std::unexpected(std::move(position.error()));
   return PlaceDungeonFlagAction{std::move(*dungeon), std::move(*instance), *position};
@@ -64,7 +64,7 @@ std::expected<std::shared_ptr<UniverseSettings>, StarException> UniverseSettings
 
 std::expected<std::shared_ptr<UniverseSettings>, StarException> UniverseSettings::create(Root& root, Json const& json) {
   auto settings = std::shared_ptr<UniverseSettings>(new UniverseSettings(root));
-  auto uuidText = json.getString("uuid");
+  auto uuidText = json.get_string("uuid");
   if (!uuidText)
     return std::unexpected(std::move(uuidText.error()));
   auto uuid = Uuid::create(*uuidText);
@@ -73,7 +73,7 @@ std::expected<std::shared_ptr<UniverseSettings>, StarException> UniverseSettings
   auto flagData = json.get("flags");
   if (!flagData)
     return std::unexpected(std::move(flagData.error()));
-  auto flags = jsonToStringSet(*flagData);
+  auto flags = json_to_string_set(*flagData);
   if (!flags)
     return std::unexpected(std::move(flags.error()));
   settings->m_uuid = std::move(*uuid);
@@ -89,7 +89,7 @@ Json UniverseSettings::toJson() const {
 
   return JsonObject{
       {"uuid", m_uuid.hex()},
-      {"flags", jsonFromStringSet(m_flags)}
+      {"flags", json_from_string_set(m_flags)}
     };
 }
 

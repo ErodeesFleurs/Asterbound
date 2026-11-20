@@ -134,13 +134,13 @@ std::expected<std::shared_ptr<ItemDrop>, StarException> ItemDrop::createRandomiz
   auto drop = create(rootContext, item);
   if (!drop)
     return std::unexpected(std::move(drop.error()));
-  auto distance = config->getFloat("randomizedDistance");
+  auto distance = config->get_float("randomizedDistance");
   if (!distance)
     return std::unexpected(std::move(distance.error()));
   auto offset = Vec2F(*distance, 0).rotate(std::numbers::pi * 2.0 * rootContext.random().uniform_float());
   offset[1] = std::fabs(offset[1]);
   (*drop)->setPosition(position + offset / TilePixels);
-  auto speed = config->getFloat("randomizedSpeed");
+  auto speed = config->get_float("randomizedSpeed");
   if (!speed)
     return std::unexpected(std::move(speed.error()));
   (*drop)->setVelocity(offset * *speed);
@@ -178,13 +178,13 @@ std::expected<std::shared_ptr<ItemDrop>, StarException> ItemDrop::throwDrop(Root
     return std::unexpected(std::move(drop.error()));
   (*drop)->setPosition(position);
   if (direction != Vec2F()) {
-    auto speed = config->getFloat("throwSpeed");
+    auto speed = config->get_float("throwSpeed");
     if (!speed)
       return std::unexpected(std::move(speed.error()));
     (*drop)->setVelocity(velocity + vnorm(direction) * *speed);
   }
   (*drop)->setEternal(eternal);
-  auto intangibleTime = config->getFloat("throwIntangibleTime");
+  auto intangibleTime = config->get_float("throwIntangibleTime");
   if (!intangibleTime)
     return std::unexpected(std::move(intangibleTime.error()));
   (*drop)->setIntangibleTime(*intangibleTime);
@@ -216,7 +216,7 @@ std::expected<void, StarException> ItemDrop::initializeItem(std::shared_ptr<Item
   m_item = std::move(item);
   m_parameters = std::move(*parameters);
   m_itemDescriptor.set(m_item->descriptor());
-  auto modeName = configValue("clientEntityMode", "ClientSlaveOnly").and_then([](Json const& value) { return value.toString(); });
+  auto modeName = configValue("clientEntityMode", "ClientSlaveOnly").and_then([](Json const& value) { return value.to_string(); });
   if (!modeName)
     return std::unexpected(std::move(modeName.error()));
   if (!ClientEntityModeNames)
@@ -254,11 +254,11 @@ std::expected<std::shared_ptr<ItemDrop>, StarException> ItemDrop::create(Root& r
     return std::unexpected(std::move(item.error()));
   if (auto initialized = drop->initializeItem(std::move(*item)); !initialized)
     return std::unexpected(std::move(initialized.error()));
-  auto position = store.get("position").and_then([](Json const& value) { return jsonToVec2F(value); });
+  auto position = store.get("position").and_then([](Json const& value) { return json_to_vec2f(value); });
   if (!position)
     return std::unexpected(std::move(position.error()));
   drop->m_movementController->setPosition(*position);
-  auto modeName = store.getString("mode");
+  auto modeName = store.get_string("mode");
   if (!modeName)
     return std::unexpected(std::move(modeName.error()));
   if (!ModeNames)
@@ -267,7 +267,7 @@ std::expected<std::shared_ptr<ItemDrop>, StarException> ItemDrop::create(Root& r
   if (!mode)
     return std::unexpected(std::move(mode.error()));
   drop->m_mode.set(mode->get());
-  auto eternal = store.getBool("eternal");
+  auto eternal = store.get_bool("eternal");
   if (!eternal)
     return std::unexpected(std::move(eternal.error()));
   drop->m_eternal = *eternal;
@@ -323,7 +323,7 @@ std::expected<Json, StarException> ItemDrop::diskStore() const {
     return std::unexpected(std::move(mode.error()));
   return Json(JsonObject{
     {"item", std::move(*stored)},
-    {"position", jsonFromVec2F(m_movementController->position())},
+    {"position", json_from_vec2f(m_movementController->position())},
     {"mode", mode->get()},
     {"eternal", m_eternal},
     {"dropAge", m_dropAge.toJson()},
@@ -357,19 +357,19 @@ std::expected<void, StarException> ItemDrop::init(World& world, EntityId entityI
   auto setup = [&]() -> std::expected<void, StarException> {
     if (!isMaster())
       return {};
-    auto scripts = configValue("scripts").and_then([](Json const& value) { return value.optArray(); });
+    auto scripts = configValue("scripts").and_then([](Json const& value) { return value.opt_array(); });
     if (!scripts)
       return std::unexpected(std::move(scripts.error()));
     if (!*scripts)
       return {};
-    auto scriptPaths = jsonToStringList(Json(**scripts));
+    auto scriptPaths = json_to_string_list(Json(**scripts));
     if (!scriptPaths)
       return std::unexpected(std::move(scriptPaths.error()));
     if (scriptPaths->empty())
       return {};
     if (auto set = m_scriptComponent.setScripts(std::move(*scriptPaths)); !set)
       return std::unexpected(std::move(set.error()));
-    auto delta = configValue("scriptDelta", 1).and_then([](Json const& value) { return value.toUInt(); });
+    auto delta = configValue("scriptDelta", 1).and_then([](Json const& value) { return value.to_uint(); });
     if (!delta)
       return std::unexpected(std::move(delta.error()));
     m_scriptComponent.setUpdateDelta(*delta);
@@ -643,7 +643,7 @@ std::expected<void, StarException> ItemDrop::render(RenderCallback& renderCallba
         return std::unexpected(std::move(drawables.error()));
       generated = std::move(*drawables);
     }
-    auto directives = m_config.getString("directives", "");
+    auto directives = m_config.get_string("directives", "");
     if (!directives)
       return std::unexpected(std::move(directives.error()));
     if (Directives dropDirectives = *directives) {
@@ -802,7 +802,7 @@ std::expected<void, StarException> ItemDrop::initialize() {
   if (auto added = m_netGroup.addNetElement(m_itemDescriptor); !added)
     return std::unexpected(std::move(added.error()));
   auto loadFloat = [&](String const& key, float& target) -> std::expected<void, StarException> {
-    auto value = m_config.getFloat(key);
+    auto value = m_config.get_float(key);
     if (!value)
       return std::unexpected(std::move(value.error()));
     target = *value;
@@ -820,7 +820,7 @@ std::expected<void, StarException> ItemDrop::initialize() {
     return std::unexpected(std::move(loaded.error()));
   if (auto loaded = loadFloat("overheadApproach", m_overheadApproach); !loaded)
     return std::unexpected(std::move(loaded.error()));
-  auto overheadDistance = m_config.getFloat("overheadRandomizedDistance");
+  auto overheadDistance = m_config.get_float("overheadRandomizedDistance");
   if (!overheadDistance)
     return std::unexpected(std::move(overheadDistance.error()));
   m_overheadOffset = Vec2F(*overheadDistance, 0).rotate(std::numbers::pi * 2.0 * root().random().uniform_float());
@@ -828,11 +828,11 @@ std::expected<void, StarException> ItemDrop::initialize() {
     return std::unexpected(std::move(loaded.error()));
   if (auto loaded = loadFloat("combineRadius", m_combineRadius); !loaded)
     return std::unexpected(std::move(loaded.error()));
-  auto ageEvery = m_config.getDouble("ageItemsEvery", 10);
+  auto ageEvery = m_config.get_double("ageItemsEvery", 10);
   if (!ageEvery)
     return std::unexpected(std::move(ageEvery.error()));
   m_ageItemsEvery = *ageEvery;
-  auto rarityBeam = m_config.getBool("drawRarityBeam", false);
+  auto rarityBeam = m_config.get_bool("drawRarityBeam", false);
   if (!rarityBeam)
     return std::unexpected(std::move(rarityBeam.error()));
   m_drawRarityBeam = *rarityBeam;

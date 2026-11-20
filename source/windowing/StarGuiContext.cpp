@@ -666,7 +666,7 @@ std::expected<void, StarException> GuiContext::cleanup() {
   auto config = (*assets)->json("/rendering.config:textureTimeout");
   if (!config)
     return std::unexpected(std::move(config.error()));
-  auto timeout = config->toInt();
+  auto timeout = config->to_int();
   if (!timeout)
     return std::unexpected(std::move(timeout.error()));
   if (m_textureCollection)

@@ -474,7 +474,7 @@ const GameTestRegistration shipWorldIsDeterministic("WorldSnapshot", "ShipWorldI
   ASSERT_TRUE(speciesShips) << speciesShips.error().what();
   auto humanShips = speciesShips->get("human");
   ASSERT_TRUE(humanShips) << humanShips.error().what();
-  auto shipPaths = jsonToStringList(*humanShips);
+  auto shipPaths = json_to_string_list(*humanShips);
   ASSERT_TRUE(shipPaths) << shipPaths.error().what();
   ASSERT_FALSE(shipPaths->empty());
   auto shipStructure = WorldStructure::create(fixture.root(), (*shipPaths)[0]);
@@ -483,7 +483,7 @@ const GameTestRegistration shipWorldIsDeterministic("WorldSnapshot", "ShipWorldI
   auto jWorldSize = shipStructure->configValue("worldSize");
   ASSERT_TRUE(jWorldSize) << jWorldSize.error().what();
   if (*jWorldSize) {
-    auto size = jsonToVec2U(*jWorldSize);
+    auto size = json_to_vec2u(*jWorldSize);
     ASSERT_TRUE(size) << size.error().what();
     worldSize = *size;
   }
@@ -557,7 +557,7 @@ const GameTestRegistration stoppedWorldRetainsClientsAndExportsRecoverableChunks
     ASSERT_TRUE(speciesShips) << speciesShips.error().what();
     auto humanShips = speciesShips->get("human");
     ASSERT_TRUE(humanShips) << humanShips.error().what();
-    auto shipPaths = jsonToStringList(*humanShips);
+    auto shipPaths = json_to_string_list(*humanShips);
     ASSERT_TRUE(shipPaths) << shipPaths.error().what();
     ASSERT_FALSE(shipPaths->empty());
     auto structure = WorldStructure::create(fixture.root(), (*shipPaths)[0]);

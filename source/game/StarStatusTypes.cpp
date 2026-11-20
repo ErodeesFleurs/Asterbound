@@ -48,17 +48,17 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
 }
 
 std::expected<StatModifier, StarException> jsonToStatModifier(Json const& config) {
-  auto statName = config.getString("stat");
+  auto statName = config.get_string("stat");
   if (!statName) return std::unexpected(std::move(statName.error()));
-  auto baseMultiplier = config.optFloat("baseMultiplier");
+  auto baseMultiplier = config.opt_float("baseMultiplier");
   if (!baseMultiplier) return std::unexpected(std::move(baseMultiplier.error()));
   if (*baseMultiplier)
     return StatModifier(StatBaseMultiplier{.statName = std::move(*statName), .baseMultiplier = **baseMultiplier});
-  auto amount = config.optFloat("amount");
+  auto amount = config.opt_float("amount");
   if (!amount) return std::unexpected(std::move(amount.error()));
   if (*amount)
     return StatModifier(StatValueModifier{.statName = std::move(*statName), .value = **amount});
-  auto effectiveMultiplier = config.optFloat("effectiveMultiplier");
+  auto effectiveMultiplier = config.opt_float("effectiveMultiplier");
   if (!effectiveMultiplier) return std::unexpected(std::move(effectiveMultiplier.error()));
   if (*effectiveMultiplier)
     return StatModifier(
@@ -83,12 +83,12 @@ std::expected<Json, StarException> jsonFromStatModifier(StatModifier const& modi
 }
 
 std::expected<PersistentStatusEffect, StarException> jsonToPersistentStatusEffect(Json const& config) {
-  if (config.isType(Json::Type::String)) {
-    auto name = config.toString();
+  if (config.is_type(Json::Type::String)) {
+    auto name = config.to_string();
     if (!name) return std::unexpected(std::move(name.error()));
     return PersistentStatusEffect(std::move(*name));
   }
-  if (config.isType(Json::Type::Object)) {
+  if (config.is_type(Json::Type::Object)) {
     auto modifier = jsonToStatModifier(config);
     if (!modifier) return std::unexpected(std::move(modifier.error()));
     return PersistentStatusEffect(std::move(*modifier));
@@ -117,15 +117,15 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
 }
 
 std::expected<EphemeralStatusEffect, StarException> jsonToEphemeralStatusEffect(Json const& config) {
-  if (config.isType(Json::Type::String)) {
-    auto name = config.toString();
+  if (config.is_type(Json::Type::String)) {
+    auto name = config.to_string();
     if (!name) return std::unexpected(std::move(name.error()));
     return EphemeralStatusEffect{.uniqueEffect = std::move(*name), .duration = {}};
   }
-  if (config.isType(Json::Type::Object)) {
-    auto name = config.getString("effect");
+  if (config.is_type(Json::Type::Object)) {
+    auto name = config.get_string("effect");
     if (!name) return std::unexpected(std::move(name.error()));
-    auto duration = config.optFloat("duration");
+    auto duration = config.opt_float("duration");
     if (!duration) return std::unexpected(std::move(duration.error()));
     return EphemeralStatusEffect{.uniqueEffect = std::move(*name), .duration = *duration};
   }

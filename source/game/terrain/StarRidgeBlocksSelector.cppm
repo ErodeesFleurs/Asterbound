@@ -46,23 +46,23 @@ std::string_view const RidgeBlocksSelector::Name = "ridgeblocks";
 std::expected<std::shared_ptr<RidgeBlocksSelector>, StarException> RidgeBlocksSelector::create(Json const& config, TerrainSelectorParameters const& parameters) {
   auto result = std::make_shared<RidgeBlocksSelector>(ConstructionKey{}, config, parameters);
   result->commonality = parameters.commonality;
-  auto amplitude = config.getFloat("amplitude");
+  auto amplitude = config.get_float("amplitude");
   if (!amplitude)
     return std::unexpected(std::move(amplitude.error()));
   result->amplitude = *amplitude;
-  auto frequency = config.getFloat("frequency");
+  auto frequency = config.get_float("frequency");
   if (!frequency)
     return std::unexpected(std::move(frequency.error()));
   result->frequency = *frequency;
-  auto bias = config.getFloat("bias");
+  auto bias = config.get_float("bias");
   if (!bias)
     return std::unexpected(std::move(bias.error()));
   result->bias = *bias;
-  auto noiseAmplitude = config.getFloat("noiseAmplitude");
+  auto noiseAmplitude = config.get_float("noiseAmplitude");
   if (!noiseAmplitude)
     return std::unexpected(std::move(noiseAmplitude.error()));
   result->noiseAmplitude = *noiseAmplitude;
-  auto noiseFrequency = config.getFloat("noiseFrequency");
+  auto noiseFrequency = config.get_float("noiseFrequency");
   if (!noiseFrequency)
     return std::unexpected(std::move(noiseFrequency.error()));
   result->noiseFrequency = *noiseFrequency;

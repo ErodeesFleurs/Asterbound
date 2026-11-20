@@ -271,7 +271,7 @@ std::expected<std::optional<String>, StarException> UniverseClient::connect(Univ
     if (!timeoutJsonResult)
       return std::unexpected(std::move(timeoutJsonResult.error()));
     auto timeoutJson = std::move(*timeoutJsonResult);
-    auto timeoutResult = timeoutJson.toUInt();
+    auto timeoutResult = timeoutJson.to_uint();
     if (!timeoutResult)
       return std::unexpected(std::move(timeoutResult.error()));
     auto timeout = std::move(*timeoutResult);
@@ -315,12 +315,12 @@ std::expected<std::optional<String>, StarException> UniverseClient::connect(Univ
     if (!legacyServer) {
       auto compressed = as_ref<CompressedPacketSocket>(socket);
       if (protocolResponse->info) {
-        auto versionResult = protocolResponse->info.getUInt("openProtocolVersion", 1);
+        auto versionResult = protocolResponse->info.get_uint("openProtocolVersion", 1);
         if (!versionResult)
           return std::unexpected(std::move(versionResult.error()));
         auto version = std::move(*versionResult);
         rules.setVersion(version);
-        auto compressionNameResult = protocolResponse->info.getString("compression", "None");
+        auto compressionNameResult = protocolResponse->info.get_string("compression", "None");
         if (!compressionNameResult)
           return std::unexpected(std::move(compressionNameResult.error()));
         auto compressionName = std::move(*compressionNameResult);
@@ -473,7 +473,7 @@ std::expected<void, StarException> UniverseClient::disconnect() {
     if (!timeoutJsonResult)
       return std::unexpected(std::move(timeoutJsonResult.error()));
     auto timeoutJson = std::move(*timeoutJsonResult);
-    auto timeoutResult = timeoutJson.toInt();
+    auto timeoutResult = timeoutJson.to_int();
     if (!timeoutResult)
       return std::unexpected(std::move(timeoutResult.error()));
     auto timeout = std::move(*timeoutResult);
@@ -589,7 +589,7 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
       if (!minimumJsonResult)
         return std::unexpected(std::move(minimumJsonResult.error()));
       auto minimumJson = std::move(*minimumJsonResult);
-      auto minimumResult = minimumJson.toFloat();
+      auto minimumResult = minimumJson.to_float();
       if (!minimumResult)
         return std::unexpected(std::move(minimumResult.error()));
       auto minimum = std::move(*minimumResult);
@@ -599,7 +599,7 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
       if (!cinematicPathJsonResult)
         return std::unexpected(std::move(cinematicPathJsonResult.error()));
       auto cinematicPathJson = std::move(*cinematicPathJsonResult);
-      auto cinematicPathResult = cinematicPathJson.toString();
+      auto cinematicPathResult = cinematicPathJson.to_string();
       if (!cinematicPathResult)
         return std::unexpected(std::move(cinematicPathResult.error()));
       auto cinematicPath = std::move(*cinematicPathResult);
@@ -612,7 +612,7 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
       if (!cinematicResult)
         return std::unexpected(std::move(cinematicResult.error()));
       auto cinematic = std::move(*cinematicResult);
-      auto merged = jsonMerge(base, cinematic);
+      auto merged = json_merge(base, cinematic);
       auto operation45 = m_mainPlayer->setPendingCinematic(merged);
       if (!operation45)
         return std::unexpected(std::move(operation45.error()));
@@ -834,7 +834,7 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
     if (!intervalJsonResult)
       return std::unexpected(std::move(intervalJsonResult.error()));
     auto intervalJson = std::move(*intervalJsonResult);
-    auto intervalResult = intervalJson.toUInt();
+    auto intervalResult = intervalJson.to_uint();
     if (!intervalResult)
       return std::unexpected(std::move(intervalResult.error()));
     auto interval = std::move(*intervalResult);
@@ -885,7 +885,7 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
           if (!cinematicJsonResult)
             return std::unexpected(std::move(cinematicJsonResult.error()));
           auto cinematicJson = std::move(*cinematicJsonResult);
-          auto cinematicResult = cinematicJson.toString();
+          auto cinematicResult = cinematicJson.to_string();
           if (!cinematicResult)
             return std::unexpected(std::move(cinematicResult.error()));
           auto cinematic = std::move(*cinematicResult);
@@ -1135,11 +1135,11 @@ std::expected<void, StarException> UniverseClient::restartLua() {
   if (!configResult)
     return std::unexpected(std::move(configResult.error()));
   auto config = std::move(*configResult);
-  auto pauseResult = config.getFloat("luaGcPause");
+  auto pauseResult = config.get_float("luaGcPause");
   if (!pauseResult)
     return std::unexpected(std::move(pauseResult.error()));
   auto pause = std::move(*pauseResult);
-  auto stepResult = config.getFloat("luaGcStepMultiplier");
+  auto stepResult = config.get_float("luaGcStepMultiplier");
   if (!stepResult)
     return std::unexpected(std::move(stepResult.error()));
   auto step = std::move(*stepResult);
@@ -1153,7 +1153,7 @@ std::expected<void, StarException> UniverseClient::restartLua() {
     return std::unexpected(std::move(enableResult.error()));
   auto enable = std::move(*enableResult);
   if (enable) {
-    auto enabledResult = enable.toBool();
+    auto enabledResult = enable.to_bool();
     if (!enabledResult)
       return std::unexpected(std::move(enabledResult.error()));
     auto enabled = std::move(*enabledResult);
@@ -1173,7 +1173,7 @@ std::expected<void, StarException> UniverseClient::startLuaScripts() {
     if (!contextsJsonResult)
       return std::unexpected(std::move(contextsJsonResult.error()));
     auto contextsJson = std::move(*contextsJsonResult);
-    auto contextsResult = contextsJson.toObject();
+    auto contextsResult = contextsJson.to_object();
     if (!contextsResult)
       return std::unexpected(std::move(contextsResult.error()));
     auto contexts = std::move(*contextsResult);
@@ -1182,11 +1182,11 @@ std::expected<void, StarException> UniverseClient::startLuaScripts() {
       auto operation25 = script->setLuaRoot(m_luaRoot);
       if (!operation25)
         return std::unexpected(std::move(operation25.error()));
-      auto scriptsJsonResult = p.second.toArray();
+      auto scriptsJsonResult = p.second.to_array();
       if (!scriptsJsonResult)
         return std::unexpected(std::move(scriptsJsonResult.error()));
       auto scriptsJson = std::move(*scriptsJsonResult);
-      auto scriptsResult = jsonToStringList(scriptsJson);
+      auto scriptsResult = json_to_string_list(scriptsJson);
       if (!scriptsResult)
         return std::unexpected(std::move(scriptsResult.error()));
       auto scripts = std::move(*scriptsResult);
@@ -1360,7 +1360,7 @@ std::expected<bool, StarException> UniverseClient::switchPlayer(Uuid const& uuid
       if (!configResult)
         return std::unexpected(std::move(configResult.error()));
       auto config = std::move(*configResult);
-      auto danceResult = config.optString("swapDance");
+      auto danceResult = config.opt_string("swapDance");
       if (!danceResult)
         return std::unexpected(std::move(danceResult.error()));
       auto dance = std::move(*danceResult);
@@ -1718,8 +1718,8 @@ std::expected<void, StarException> UniverseClient::handlePackets(List<std::share
             if (!speciesJsonResult)
               return std::unexpected(std::move(speciesJsonResult.error()));
             auto speciesJson = std::move(*speciesJsonResult);
-            if (speciesJson.isType(Json::Type::String)) {
-              auto speciesResult = speciesJson.toString();
+            if (speciesJson.is_type(Json::Type::String)) {
+              auto speciesResult = speciesJson.to_string();
               if (!speciesResult)
                 return std::unexpected(std::move(speciesResult.error()));
               auto species = std::move(*speciesResult);
@@ -1980,7 +1980,7 @@ std::expected<void, StarException> UniverseClient::reset() {
     if (!delayJsonResult)
       return std::unexpected(std::move(delayJsonResult.error()));
     auto delayJson = std::move(*delayJsonResult);
-    auto delayResult = delayJson.toFloat();
+    auto delayResult = delayJson.to_float();
     if (!delayResult)
       return std::unexpected(std::move(delayResult.error()));
     auto delay = std::move(*delayResult);
@@ -1989,7 +1989,7 @@ std::expected<void, StarException> UniverseClient::reset() {
     if (!reviveJsonResult)
       return std::unexpected(std::move(reviveJsonResult.error()));
     auto reviveJson = std::move(*reviveJsonResult);
-    auto reviveResult = reviveJson.toFloat();
+    auto reviveResult = reviveJson.to_float();
     if (!reviveResult)
       return std::unexpected(std::move(reviveResult.error()));
     auto revive = std::move(*reviveResult);

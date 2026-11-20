@@ -160,27 +160,27 @@ std::expected<OverheadBar, StarException> OverheadBar::create(Json const& json) 
   if (!position)
     return std::unexpected(std::move(position.error()));
   if (*position) {
-    auto parsed = jsonToVec2F(**position);
+    auto parsed = json_to_vec2f(**position);
     if (!parsed)
       return std::unexpected(std::move(parsed.error()));
     bar.entityPosition = *parsed;
   }
-  auto icon = json.optString("icon");
+  auto icon = json.opt_string("icon");
   if (!icon)
     return std::unexpected(std::move(icon.error()));
   bar.icon = std::move(*icon);
-  auto percentage = json.getFloat("percentage");
+  auto percentage = json.get_float("percentage");
   if (!percentage)
     return std::unexpected(std::move(percentage.error()));
   bar.percentage = *percentage;
   auto colorConfig = json.get("color");
   if (!colorConfig)
     return std::unexpected(std::move(colorConfig.error()));
-  auto color = jsonToColor(*colorConfig);
+  auto color = json_to_color(*colorConfig);
   if (!color)
     return std::unexpected(std::move(color.error()));
   bar.color = std::move(*color);
-  auto detailOnly = json.getBool("detailOnly", false);
+  auto detailOnly = json.get_bool("detailOnly", false);
   if (!detailOnly)
     return std::unexpected(std::move(detailOnly.error()));
   bar.detailOnly = *detailOnly;

@@ -320,7 +320,7 @@ std::expected<unsigned, StarException> LuaBindings::ItemCallbacks::fuelAmount(It
   auto value = item.instanceValue("fuelAmount", 0);
   if (!value)
     return std::unexpected(std::move(value.error()));
-  auto amount = value->toUInt();
+  auto amount = value->to_uint();
   if (!amount)
     return std::unexpected(std::move(amount.error()));
   return *amount;
@@ -334,7 +334,7 @@ std::expected<Json, StarException> LuaBindings::ItemCallbacks::iconDrawables(Ite
   auto drawables = item.iconDrawables();
   if (!drawables)
     return std::unexpected(std::move(drawables.error()));
-  return jsonFromList<Drawable>(*drawables, [](Drawable const& drawable) { return drawable.toJson(); });
+  return json_from_list<Drawable>(*drawables, [](Drawable const& drawable) { return drawable.toJson(); });
 }
 
 // Returns the dropDrawables for this item serialized into json
@@ -345,7 +345,7 @@ std::expected<Json, StarException> LuaBindings::ItemCallbacks::dropDrawables(Ite
   auto drawables = item.dropDrawables(std::nullopt);
   if (!drawables)
     return std::unexpected(std::move(drawables.error()));
-  return jsonFromList<Drawable>(*drawables, [](Drawable const& drawable) { return drawable.toJson(); });
+  return json_from_list<Drawable>(*drawables, [](Drawable const& drawable) { return drawable.toJson(); });
 }
 
 // Returns the large image for this item as displayed on mouseover in the
@@ -398,7 +398,7 @@ float LuaBindings::ItemCallbacks::timeToLive(Item& item) {
 //
 // @return a list of tables containing serialize item descriptors
 std::expected<Json, StarException> LuaBindings::ItemCallbacks::learnBlueprintsOnPickup(Item& item) {
-  return jsonFromList<ItemDescriptor>(
+  return json_from_list<ItemDescriptor>(
       item.learnBlueprintsOnPickup(), [](ItemDescriptor const& descriptor) { return descriptor.toJson(); });
 }
 
@@ -419,7 +419,7 @@ std::expected<Json, StarException> LuaBindings::ItemCallbacks::pickupQuestTempla
   auto templates = item.pickupQuestTemplates();
   if (!templates)
     return std::unexpected(std::move(templates.error()));
-  return jsonFromList<QuestArcDescriptor>(*templates, [](QuestArcDescriptor const& descriptor) { return descriptor.toJson(); });
+  return json_from_list<QuestArcDescriptor>(*templates, [](QuestArcDescriptor const& descriptor) { return descriptor.toJson(); });
 }
 
 }

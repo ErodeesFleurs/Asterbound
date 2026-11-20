@@ -18,8 +18,8 @@ namespace Star {
 
 std::expected<TextStyle, StarException> TextStyle::create(Json const& config) {
   TextStyle result;
-  if (config.isType(Json::Type::String)) {
-    auto font = config.toString();
+  if (config.is_type(Json::Type::String)) {
+    auto font = config.to_string();
     if (!font) return std::unexpected(std::move(font.error()));
     result.font = std::move(*font);
   } else {
@@ -30,33 +30,33 @@ std::expected<TextStyle, StarException> TextStyle::create(Json const& config) {
 }
 std::expected<std::reference_wrapper<TextStyle>, StarException> TextStyle::loadJson(Json const& config) {
   if (!config) return std::ref(*this);
-  auto spacing = config.getFloat("lineSpacing", lineSpacing);
+  auto spacing = config.get_float("lineSpacing", lineSpacing);
   if (!spacing) return std::unexpected(std::move(spacing.error()));
   lineSpacing = *spacing;
   auto jColor = config.opt("color");
   if (!jColor) return std::unexpected(std::move(jColor.error()));
   if (*jColor) {
-    auto converted = jsonToColor(**jColor);
+    auto converted = json_to_color(**jColor);
     if (!converted) return std::unexpected(std::move(converted.error()));
     color = converted->to_rgba();
   }
   auto jShadow = config.opt("shadow");
   if (!jShadow) return std::unexpected(std::move(jShadow.error()));
   if (*jShadow) {
-    auto converted = jsonToColor(**jShadow);
+    auto converted = json_to_color(**jShadow);
     if (!converted) return std::unexpected(std::move(converted.error()));
     shadow = converted->to_rgba();
   }
-  auto size = config.getUInt("fontSize", fontSize);
+  auto size = config.get_uint("fontSize", fontSize);
   if (!size) return std::unexpected(std::move(size.error()));
   fontSize = *size;
-  auto jFont = config.optString("font");
+  auto jFont = config.opt_string("font");
   if (!jFont) return std::unexpected(std::move(jFont.error()));
   if (*jFont) font = std::move(**jFont);
-  auto jDirectives = config.optString("directives");
+  auto jDirectives = config.opt_string("directives");
   if (!jDirectives) return std::unexpected(std::move(jDirectives.error()));
   if (*jDirectives) directives = **jDirectives;
-  auto jBackDirectives = config.optString("backDirectives");
+  auto jBackDirectives = config.opt_string("backDirectives");
   if (!jBackDirectives) return std::unexpected(std::move(jBackDirectives.error()));
   if (*jBackDirectives) backDirectives = **jBackDirectives;
   return std::ref(*this);

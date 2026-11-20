@@ -26,7 +26,7 @@ ScriptableThread::ScriptableThread(Json parameters, String name, LuaBaseComponen
     m_pause(false), m_errorOccurred(false), m_shouldExpire(false), m_parent(parent) {}
 
 std::expected<std::shared_ptr<ScriptableThread>, StarException> ScriptableThread::create(Json parameters, LuaBaseComponent& parent) {
-  auto name = parameters.getString("name");
+  auto name = parameters.get_string("name");
   if (!name)
     return std::unexpected(std::move(name.error()));
   auto thread = std::shared_ptr<ScriptableThread>(new ScriptableThread(std::move(parameters), std::move(*name), parent));
@@ -34,22 +34,22 @@ std::expected<std::shared_ptr<ScriptableThread>, StarException> ScriptableThread
   if (!root)
     return std::unexpected(std::move(root.error()));
   thread->m_luaRoot = std::move(*root);
-  auto pause = thread->m_parameters.getFloat("luaGcPause", 1.2f);
+  auto pause = thread->m_parameters.get_float("luaGcPause", 1.2f);
   if (!pause)
     return std::unexpected(std::move(pause.error()));
-  auto step = thread->m_parameters.getFloat("luaGcStepMultiplier", 1.2f);
+  auto step = thread->m_parameters.get_float("luaGcStepMultiplier", 1.2f);
   if (!step)
     return std::unexpected(std::move(step.error()));
   thread->m_luaRoot->tuneAutoGarbageCollection(*pause, *step);
-  auto logMapped = thread->m_parameters.getBool("logMapped", true);
+  auto logMapped = thread->m_parameters.get_bool("logMapped", true);
   if (!logMapped)
     return std::unexpected(std::move(logMapped.error()));
   thread->m_logMapped = *logMapped;
-  auto tickRate = thread->m_parameters.getFloat("tickRate", 60.0f);
+  auto tickRate = thread->m_parameters.get_float("tickRate", 60.0f);
   if (!tickRate)
     return std::unexpected(std::move(tickRate.error()));
   thread->m_timestep = 1.0f / *tickRate;
-  auto limit = thread->m_parameters.optUInt("instructionLimit");
+  auto limit = thread->m_parameters.opt_uint("instructionLimit");
   if (!limit)
     return std::unexpected(std::move(limit.error()));
   if (*limit)
@@ -212,17 +212,17 @@ std::expected<void, StarException> ScriptableThread::passMessage(Message&& messa
 std::expected<void, StarException> ScriptableThread::run() {
   auto stopToken = m_stopSource.get_token();
   auto result = [&]() -> std::expected<void, StarException> {
-    auto scripts = m_parameters.getObject("scripts");
+    auto scripts = m_parameters.get_object("scripts");
     if (!scripts)
       return std::unexpected(std::move(scripts.error()));
     for (auto const& p : *scripts) {
       auto component = std::make_shared<ScriptComponent>(m_luaRoot->root());
       if (auto set = component->setLuaRoot(m_luaRoot); !set)
         return std::unexpected(std::move(set.error()));
-      auto array = p.second.toArray();
+      auto array = p.second.to_array();
       if (!array)
         return std::unexpected(std::move(array.error()));
-      auto paths = jsonToStringList(*array);
+      auto paths = json_to_string_list(*array);
       if (!paths)
         return std::unexpected(std::move(paths.error()));
       if (auto set = component->setScripts(std::move(*paths)); !set)
@@ -241,7 +241,7 @@ std::expected<void, StarException> ScriptableThread::run() {
           return std::unexpected(std::move(initialized.error()));
       }
     }
-    auto window = m_parameters.getDouble("updateMeasureWindow", 0.5);
+    auto window = m_parameters.get_double("updateMeasureWindow", 0.5);
     if (!window)
       return std::unexpected(std::move(window.error()));
     TickRateApproacher approacher(1.0f / m_timestep, *window);

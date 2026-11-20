@@ -62,7 +62,7 @@ Particle::Particle() {
 
 std::expected<Particle, StarException> Particle::create(Root& root, Json const& config, String const& path) {
   Particle particle;
-  auto typeName = config.getString("type", "variance");
+  auto typeName = config.get_string("type", "variance");
   if (!typeName)
     return std::unexpected(std::move(typeName.error()));
   auto type = enum_value<TypeNames>(*typeName);
@@ -70,20 +70,20 @@ std::expected<Particle, StarException> Particle::create(Root& root, Json const& 
     return std::unexpected(std::move(type.error()));
   particle.type = *type;
   particle.color = particle.type == Type::Variance ? Color::Clear : Color::White;
-  auto size = config.getFloat("size", particle.type == Type::Variance ? 0.0f : 1.0f);
+  auto size = config.get_float("size", particle.type == Type::Variance ? 0.0f : 1.0f);
   if (!size)
     return std::unexpected(std::move(size.error()));
   particle.size = particle.baseSize = *size;
-  auto string = config.getString("string", "");
+  auto string = config.get_string("string", "");
   if (!string)
     return std::unexpected(std::move(string.error()));
-  auto animation = config.getString("animation", *string);
+  auto animation = config.get_string("animation", *string);
   if (!animation)
     return std::unexpected(std::move(animation.error()));
-  auto text = config.getString("text", *animation);
+  auto text = config.get_string("text", *animation);
   if (!text)
     return std::unexpected(std::move(text.error()));
-  auto image = config.getString("image", *text);
+  auto image = config.get_string("image", *text);
   if (!image)
     return std::unexpected(std::move(image.error()));
   particle.string = std::move(*image);
@@ -113,7 +113,7 @@ std::expected<Particle, StarException> Particle::create(Root& root, Json const& 
     auto value = config.get("color");
     if (!value)
       return std::unexpected(std::move(value.error()));
-    auto color = jsonToColor(*value);
+    auto color = json_to_color(*value);
     if (!color)
       return std::unexpected(std::move(color.error()));
     particle.color = *color;
@@ -121,22 +121,22 @@ std::expected<Particle, StarException> Particle::create(Root& root, Json const& 
   auto lightConfig = config.get("light", JsonArray{0, 0, 0, 0});
   if (!lightConfig)
     return std::unexpected(std::move(lightConfig.error()));
-  auto light = jsonToColor(*lightConfig);
+  auto light = json_to_color(*lightConfig);
   if (!light)
     return std::unexpected(std::move(light.error()));
   particle.light = *light;
-  auto fade = config.getFloat("fade", 0.0f);
+  auto fade = config.get_float("fade", 0.0f);
   if (!fade)
     return std::unexpected(std::move(fade.error()));
   particle.fade = *fade;
-  auto fullbright = config.getBool("fullbright", false);
+  auto fullbright = config.get_bool("fullbright", false);
   if (!fullbright)
     return std::unexpected(std::move(fullbright.error()));
   particle.fullbright = *fullbright;
   auto positionConfig = config.get("position", JsonArray{0.0f, 0.0f});
   if (!positionConfig)
     return std::unexpected(std::move(positionConfig.error()));
-  auto position = jsonToVec2F(*positionConfig);
+  auto position = json_to_vec2f(*positionConfig);
   if (!position)
     return std::unexpected(std::move(position.error()));
   particle.position = *position;
@@ -146,7 +146,7 @@ std::expected<Particle, StarException> Particle::create(Root& root, Json const& 
   auto velocityConfig = config.get("initialVelocity", *velocityDefault);
   if (!velocityConfig)
     return std::unexpected(std::move(velocityConfig.error()));
-  auto velocity = jsonToVec2F(*velocityConfig);
+  auto velocity = json_to_vec2f(*velocityConfig);
   if (!velocity)
     return std::unexpected(std::move(velocity.error()));
   particle.velocity = *velocity;
@@ -154,82 +154,82 @@ std::expected<Particle, StarException> Particle::create(Root& root, Json const& 
   auto finalVelocityConfig = config.get("finalVelocity", JsonArray::from(particle.finalVelocity));
   if (!finalVelocityConfig)
     return std::unexpected(std::move(finalVelocityConfig.error()));
-  auto finalVelocity = jsonToVec2F(*finalVelocityConfig);
+  auto finalVelocity = json_to_vec2f(*finalVelocityConfig);
   if (!finalVelocity)
     return std::unexpected(std::move(finalVelocity.error()));
   particle.finalVelocity = *finalVelocity;
   auto approachConfig = config.get("approach", JsonArray{0.0f, 0.0f});
   if (!approachConfig)
     return std::unexpected(std::move(approachConfig.error()));
-  auto approach = jsonToVec2F(*approachConfig);
+  auto approach = json_to_vec2f(*approachConfig);
   if (!approach)
     return std::unexpected(std::move(approach.error()));
   particle.approach = *approach;
-  auto flip = config.getBool("flip", false);
+  auto flip = config.get_bool("flip", false);
   if (!flip)
     return std::unexpected(std::move(flip.error()));
   particle.flip = *flip;
-  auto flippable = config.getBool("flippable", true);
+  auto flippable = config.get_bool("flippable", true);
   if (!flippable)
     return std::unexpected(std::move(flippable.error()));
   particle.flippable = *flippable;
-  auto rotation = config.getFloat("rotation", 0.0f);
+  auto rotation = config.get_float("rotation", 0.0f);
   if (!rotation)
     return std::unexpected(std::move(rotation.error()));
   particle.rotation = *rotation * std::numbers::pi / 180.0f;
-  auto angularVelocity = config.getFloat("angularVelocity", 0.0f);
+  auto angularVelocity = config.get_float("angularVelocity", 0.0f);
   if (!angularVelocity)
     return std::unexpected(std::move(angularVelocity.error()));
   particle.angularVelocity = *angularVelocity * std::numbers::pi / 180.0f;
-  auto length = config.getFloat("length", 10.0f);
+  auto length = config.get_float("length", 10.0f);
   if (!length)
     return std::unexpected(std::move(length.error()));
   particle.length = *length;
-  auto actionName = config.getString("destructionAction", "None");
+  auto actionName = config.get_string("destructionAction", "None");
   if (!actionName)
     return std::unexpected(std::move(actionName.error()));
   auto action = enum_value<DestructionActionNames>(*actionName);
   if (!action)
     return std::unexpected(std::move(action.error()));
   particle.destructionAction = *action;
-  auto destructionImage = config.getString("destructionImage", "");
+  auto destructionImage = config.get_string("destructionImage", "");
   if (!destructionImage)
     return std::unexpected(std::move(destructionImage.error()));
   if (particle.destructionAction == DestructionAction::Image)
     *destructionImage = AssetPath::relative_to(path, *destructionImage);
   particle.destructionImage = std::move(*destructionImage);
-  auto destructionTime = config.getFloat("destructionTime", 0.0f);
+  auto destructionTime = config.get_float("destructionTime", 0.0f);
   if (!destructionTime)
     return std::unexpected(std::move(destructionTime.error()));
   particle.destructionTime = *destructionTime;
-  auto timeToLive = config.getFloat("timeToLive", 0.0f);
+  auto timeToLive = config.get_float("timeToLive", 0.0f);
   if (!timeToLive)
     return std::unexpected(std::move(timeToLive.error()));
   particle.timeToLive = *timeToLive;
-  auto layerName = config.getString("layer", "middle");
+  auto layerName = config.get_string("layer", "middle");
   if (!layerName)
     return std::unexpected(std::move(layerName.error()));
   auto layer = enum_value<LayerNames>(*layerName);
   if (!layer)
     return std::unexpected(std::move(layer.error()));
   particle.layer = *layer;
-  auto underwaterOnly = config.getBool("underwaterOnly", false);
+  auto underwaterOnly = config.get_bool("underwaterOnly", false);
   if (!underwaterOnly)
     return std::unexpected(std::move(underwaterOnly.error()));
   particle.underwaterOnly = *underwaterOnly;
-  auto collidesForeground = config.getBool("collidesForeground", particle.layer != Layer::Front || particle.underwaterOnly);
+  auto collidesForeground = config.get_bool("collidesForeground", particle.layer != Layer::Front || particle.underwaterOnly);
   if (!collidesForeground)
     return std::unexpected(std::move(collidesForeground.error()));
   particle.collidesForeground = *collidesForeground;
-  auto collidesLiquid = config.getBool("collidesLiquid", particle.type == Type::Ember);
+  auto collidesLiquid = config.get_bool("collidesLiquid", particle.type == Type::Ember);
   if (!collidesLiquid)
     return std::unexpected(std::move(collidesLiquid.error()));
   particle.collidesLiquid = *collidesLiquid;
-  auto ignoreWind = config.getBool("ignoreWind", true);
+  auto ignoreWind = config.get_bool("ignoreWind", true);
   if (!ignoreWind)
     return std::unexpected(std::move(ignoreWind.error()));
   particle.ignoreWind = *ignoreWind;
-  auto trail = config.getBool("trail", false);
+  auto trail = config.get_bool("trail", false);
   if (!trail)
     return std::unexpected(std::move(trail.error()));
   particle.trail = *trail;
@@ -324,14 +324,14 @@ std::expected<Json, StarException> Particle::toJson() const {
   return JsonObject{{"type", *typeName},
                     {"size", size},
                     {"string", string},
-                    {"color", jsonFromColor(color)},
-                    {"light", jsonFromColor(light)},
+                    {"color", json_from_color(color)},
+                    {"light", json_from_color(light)},
                     {"fade", fade},
                     {"fullbright", fullbright},
-                    {"position", jsonFromVec2F(position)},
-                    {"velocity", jsonFromVec2F(velocity)},
-                    {"finalVelocity", jsonFromVec2F(finalVelocity)},
-                    {"approach", jsonFromVec2F(approach)},
+                    {"position", json_from_vec2f(position)},
+                    {"velocity", json_from_vec2f(velocity)},
+                    {"finalVelocity", json_from_vec2f(finalVelocity)},
+                    {"approach", json_from_vec2f(approach)},
                     {"flip", flip},
                     {"flippable", flippable},
                     {"rotation", rotation * 180.0f / std::numbers::pi},

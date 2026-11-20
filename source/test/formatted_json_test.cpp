@@ -23,10 +23,10 @@ TEST(FormattedJsonTest, JsonInterop) {
   ASSERT_TRUE(result2);
   FormattedJson farray2 = (*result2);
 
-  EXPECT_EQ(farray1.toJson(), array1);
-  EXPECT_EQ(farray2.toJson(), array2);
-  EXPECT_NE(farray1.toJson(), array2);
-  EXPECT_NE(farray2.toJson(), array1);
+  EXPECT_EQ(farray1.to_json(), array1);
+  EXPECT_EQ(farray2.to_json(), array2);
+  EXPECT_NE(farray1.to_json(), array2);
+  EXPECT_NE(farray2.to_json(), array1);
 }
 
 TEST(FormattedJsonTest, Parsing) {
@@ -119,18 +119,18 @@ TEST(FormattedJsonTest, Parsing) {
   auto error18 = FormattedJson::parse("x");
   ASSERT_FALSE(error18);
   EXPECT_TRUE(error18.error().is<JsonParsingException>());
-  auto error19 = FormattedJson::parseJson("123");
+  auto error19 = FormattedJson::parse_json("123");
   ASSERT_FALSE(error19);
   EXPECT_TRUE(error19.error().is<JsonParsingException>());
-  auto error20 = FormattedJson::parseJson("\"foo\"");
+  auto error20 = FormattedJson::parse_json("\"foo\"");
   ASSERT_FALSE(error20);
   EXPECT_TRUE(error20.error().is<JsonParsingException>());
   auto result21 = FormattedJson::parse("123");
   ASSERT_TRUE(result21);
-  EXPECT_TRUE((*result21).isType(Json::Type::Int));
+  EXPECT_TRUE((*result21).is_type(Json::Type::Int));
   auto result22 = FormattedJson::parse("\"foo\"");
   ASSERT_TRUE(result22);
-  EXPECT_TRUE((*result22).isType(Json::Type::String));
+  EXPECT_TRUE((*result22).is_type(Json::Type::String));
 }
 
 List<String> keyOrder(FormattedJson const& json) {
@@ -143,7 +143,7 @@ List<String> keyOrder(FormattedJson const& json) {
 }
 
 TEST(FormattedJsonTest, ObjectInsertion) {
-  FormattedJson json = FormattedJson::ofType(Json::Type::Object);
+  FormattedJson json = FormattedJson::of_type(Json::Type::Object);
   List<String> expectedKeys;
 
   EXPECT_EQ(keyOrder(json), expectedKeys);
@@ -245,7 +245,7 @@ TEST(FormattedJsonTest, ObjectInsertion) {
       ValueElement{*numberElement}};
   EXPECT_EQ(json.elements(), expectedElements);
 
-  FormattedJson emptyObject = FormattedJson::ofType(Json::Type::Object);
+  FormattedJson emptyObject = FormattedJson::of_type(Json::Type::Object);
   auto result210 = FormattedJson::create(Json{});
   ASSERT_TRUE(result210);
   auto error32 = emptyObject.insert_before("foo", (*result210), "bar");
@@ -258,7 +258,7 @@ TEST(FormattedJsonTest, ObjectInsertion) {
   EXPECT_TRUE(error33.error().is<JsonException>());
   auto result212 = FormattedJson::create(Json{});
   ASSERT_TRUE(result212);
-  auto error34 = FormattedJson::ofType(Json::Type::Array).set("foo", (*result212));
+  auto error34 = FormattedJson::of_type(Json::Type::Array).set("foo", (*result212));
   ASSERT_FALSE(error34);
   EXPECT_TRUE(error34.error().is<JsonException>());
 }
@@ -321,7 +321,7 @@ TEST(FormattedJsonTest, ArrayInsertion) {
   ASSERT_TRUE(result44);
   EXPECT_EQ((*result44), expected);
 
-  FormattedJson emptyArray = FormattedJson::ofType(Json::Type::Array);
+  FormattedJson emptyArray = FormattedJson::of_type(Json::Type::Array);
   auto result219 = FormattedJson::create(Json{});
   ASSERT_TRUE(result219);
   auto result45 = emptyArray.insert(0, (*result219));
@@ -336,7 +336,7 @@ TEST(FormattedJsonTest, ArrayInsertion) {
   EXPECT_TRUE(error47.error().is<JsonException>());
   auto result221 = FormattedJson::create(Json{});
   ASSERT_TRUE(result221);
-  auto error48 = FormattedJson::ofType(Json::Type::Object).insert(0, (*result221));
+  auto error48 = FormattedJson::of_type(Json::Type::Object).insert(0, (*result221));
   ASSERT_FALSE(error48);
   EXPECT_TRUE(error48.error().is<JsonException>());
 }
@@ -383,7 +383,7 @@ TEST(FormattedJsonTest, ObjectErase) {
   auto result56 = json.erase("bbb");
   ASSERT_TRUE(result56);
   ASSERT_EQ((*result56), json);
-  auto error57 = FormattedJson::ofType(Json::Type::Array).erase("foo");
+  auto error57 = FormattedJson::of_type(Json::Type::Array).erase("foo");
   ASSERT_FALSE(error57);
   EXPECT_TRUE(error57.error().is<JsonException>());
 }
@@ -424,7 +424,7 @@ TEST(FormattedJsonTest, ArrayErase) {
   ASSERT_TRUE(result71);
   EXPECT_EQ((*result71), "[]");
 
-  auto error72 = FormattedJson::ofType(Json::Type::Object).erase(0);
+  auto error72 = FormattedJson::of_type(Json::Type::Object).erase(0);
   ASSERT_FALSE(error72);
   EXPECT_TRUE(error72.error().is<JsonException>());
 }
@@ -546,40 +546,40 @@ TEST(FormattedJsonTest, Types) {
   auto result99 = FormattedJson::create(Json{"foo"});
   ASSERT_TRUE(result99);
   FormattedJson jsonString = (*result99);
-  auto result100 = FormattedJson::create(Json::ofType(Json::Type::Array));
+  auto result100 = FormattedJson::create(Json::of_type(Json::Type::Array));
   ASSERT_TRUE(result100);
   FormattedJson jsonArray = (*result100);
-  auto result101 = FormattedJson::create(Json::ofType(Json::Type::Object));
+  auto result101 = FormattedJson::create(Json::of_type(Json::Type::Object));
   ASSERT_TRUE(result101);
   FormattedJson jsonObject = (*result101);
 
   EXPECT_EQ(jsonNull.type(), Json::Type::Null);
-  EXPECT_TRUE(jsonNull.isType(Json::Type::Null));
-  EXPECT_EQ(jsonNull.typeName(), "null");
+  EXPECT_TRUE(jsonNull.is_type(Json::Type::Null));
+  EXPECT_EQ(jsonNull.type_name(), "null");
 
   EXPECT_EQ(jsonBool.type(), Json::Type::Bool);
-  EXPECT_TRUE(jsonBool.isType(Json::Type::Bool));
-  EXPECT_EQ(jsonBool.typeName(), "bool");
+  EXPECT_TRUE(jsonBool.is_type(Json::Type::Bool));
+  EXPECT_EQ(jsonBool.type_name(), "bool");
 
   EXPECT_EQ(jsonInt.type(), Json::Type::Int);
-  EXPECT_TRUE(jsonInt.isType(Json::Type::Int));
-  EXPECT_EQ(jsonInt.typeName(), "int");
+  EXPECT_TRUE(jsonInt.is_type(Json::Type::Int));
+  EXPECT_EQ(jsonInt.type_name(), "int");
 
   EXPECT_EQ(jsonFloat.type(), Json::Type::Float);
-  EXPECT_TRUE(jsonFloat.isType(Json::Type::Float));
-  EXPECT_EQ(jsonFloat.typeName(), "float");
+  EXPECT_TRUE(jsonFloat.is_type(Json::Type::Float));
+  EXPECT_EQ(jsonFloat.type_name(), "float");
 
   EXPECT_EQ(jsonString.type(), Json::Type::String);
-  EXPECT_TRUE(jsonString.isType(Json::Type::String));
-  EXPECT_EQ(jsonString.typeName(), "string");
+  EXPECT_TRUE(jsonString.is_type(Json::Type::String));
+  EXPECT_EQ(jsonString.type_name(), "string");
 
   EXPECT_EQ(jsonArray.type(), Json::Type::Array);
-  EXPECT_TRUE(jsonArray.isType(Json::Type::Array));
-  EXPECT_EQ(jsonArray.typeName(), "array");
+  EXPECT_TRUE(jsonArray.is_type(Json::Type::Array));
+  EXPECT_EQ(jsonArray.type_name(), "array");
 
   EXPECT_EQ(jsonObject.type(), Json::Type::Object);
-  EXPECT_TRUE(jsonObject.isType(Json::Type::Object));
-  EXPECT_EQ(jsonObject.typeName(), "object");
+  EXPECT_TRUE(jsonObject.is_type(Json::Type::Object));
+  EXPECT_EQ(jsonObject.type_name(), "object");
 }
 
 TEST(FormattedJsonTest, JsonPath) {
@@ -703,7 +703,7 @@ TEST(FormattedJsonTest, JsonPath) {
   json = (*result137);
   auto result138 = JsonPath::QueryPath("foo.bar").get(json);
   ASSERT_TRUE(result138);
-  EXPECT_EQ((*result138).toJson(), JsonArray{12});
+  EXPECT_EQ((*result138).to_json(), JsonArray{12});
 }
 
 TEST(FormattedJsonTest, NumberFormatPreservation) {
@@ -728,12 +728,12 @@ TEST(FormattedJsonTest, NumberFormatPreservation) {
   ASSERT_TRUE(result146);
   EXPECT_EQ((*result146), "0");
 
-  auto result147 = FormattedJson::parseJson("[-0.0,1.0,-0]");
+  auto result147 = FormattedJson::parse_json("[-0.0,1.0,-0]");
   ASSERT_TRUE(result147);
   auto result148 = (*result147).repr();
   ASSERT_TRUE(result148);
   EXPECT_EQ((*result148), "[-0.0,1.0,-0]");
-  auto result149 = FormattedJson::parseJson("[1,0]");
+  auto result149 = FormattedJson::parse_json("[1,0]");
   ASSERT_TRUE(result149);
   auto result150 = (*result149).repr();
   ASSERT_TRUE(result150);
@@ -769,7 +769,7 @@ TEST(FormattedJsonTest, LargeFlatContainersRetainValuesIndexesAndOldSnapshots) {
     Json expected = object ? Json(std::move(entries)) : Json(std::move(array));
     auto created = FormattedJson::create(expected);
     ASSERT_TRUE(created);
-    EXPECT_EQ(created->toJson(), expected);
+    EXPECT_EQ(created->to_json(), expected);
     auto createdSnapshot = *created;
     auto createdText = created->repr();
     auto semanticText = expected.repr();
@@ -778,9 +778,9 @@ TEST(FormattedJsonTest, LargeFlatContainersRetainValuesIndexesAndOldSnapshots) {
     EXPECT_EQ(*createdText, *semanticText);
     auto parsed = FormattedJson::parse(String(original));
     ASSERT_TRUE(parsed);
-    EXPECT_EQ(parsed->toJson(), expected);
+    EXPECT_EQ(parsed->to_json(), expected);
     auto oldSnapshot = *parsed;
-    auto oldSemantic = parsed->toJson();
+    auto oldSemantic = parsed->to_json();
     auto replacement = FormattedJson::parse("-0.00e+0");
     ASSERT_TRUE(replacement);
     auto updated = object ? parsed->set("k002048", *replacement) : parsed->set(Count / 2, *replacement);
@@ -789,7 +789,7 @@ TEST(FormattedJsonTest, LargeFlatContainersRetainValuesIndexesAndOldSnapshots) {
     auto createdOriginalText = createdSnapshot.repr();
     ASSERT_TRUE(createdOriginalText);
     EXPECT_EQ(*createdOriginalText, *semanticText);
-    EXPECT_EQ(created->toJson(), expected);
+    EXPECT_EQ(created->to_json(), expected);
     ASSERT_TRUE(updated);
     auto size = updated->size();
     ASSERT_TRUE(size);
@@ -799,11 +799,11 @@ TEST(FormattedJsonTest, LargeFlatContainersRetainValuesIndexesAndOldSnapshots) {
       auto value = object ? updated->get(key) : updated->get(i);
       auto createdValue = object ? changedCreated->get(key) : changedCreated->get(i);
       ASSERT_TRUE(createdValue);
-      auto createdInteger = createdValue->toJson().toInt();
+      auto createdInteger = createdValue->to_json().to_int();
       ASSERT_TRUE(createdInteger);
       EXPECT_EQ(*createdInteger, i == Count / 2 ? 0 : static_cast<std::int64_t>(i));
       ASSERT_TRUE(value);
-      auto integer = value->toJson().toInt();
+      auto integer = value->to_json().to_int();
       ASSERT_TRUE(integer);
       EXPECT_EQ(*integer, i == Count / 2 ? 0 : static_cast<std::int64_t>(i));
     }
@@ -817,7 +817,7 @@ TEST(FormattedJsonTest, LargeFlatContainersRetainValuesIndexesAndOldSnapshots) {
     EXPECT_EQ(*originalText, String(original));
     EXPECT_EQ(*snapshotText, String(original));
     EXPECT_EQ(oldSemantic, expected);
-    EXPECT_EQ(parsed->toJson(), expected);
+    EXPECT_EQ(parsed->to_json(), expected);
   }
 }
 
@@ -831,7 +831,7 @@ TEST(FormattedJsonTest, DuplicateTokensKeepLastSemanticValueAndRebuildIndex) {
   auto spelling = value->repr();
   ASSERT_TRUE(spelling);
   EXPECT_EQ(*spelling, "-0");
-  auto semantic = parsed->toJson().getInt("dup");
+  auto semantic = parsed->to_json().get_int("dup");
   ASSERT_TRUE(semantic);
   EXPECT_EQ(*semantic, 0);
   auto replacement = FormattedJson::parse("7.50");
@@ -851,7 +851,7 @@ TEST(FormattedJsonTest, DuplicateTokensKeepLastSemanticValueAndRebuildIndex) {
   auto revealedText = revealed->repr();
   ASSERT_TRUE(revealedText);
   EXPECT_EQ(*revealedText, "1.00");
-  auto revealedNumber = erased->toJson().getDouble("dup");
+  auto revealedNumber = erased->to_json().get_double("dup");
   ASSERT_TRUE(revealedNumber);
   EXPECT_EQ(*revealedNumber, 1.0);
   auto snapshotText = oldSnapshot.repr();
@@ -871,13 +871,13 @@ TEST(FormattedJsonTest, UnicodeEscapesRejectInvalidDigitsInKeysAndValues) {
   }
   auto valid = FormattedJson::parse(R"({ "\u006bey": ["\u0000", "\uD83D\uDE00", "\u00aF"] })");
   ASSERT_TRUE(valid);
-  EXPECT_EQ(valid->toJson(),
+  EXPECT_EQ(valid->to_json(),
       (Json(JsonObject{{"key", JsonArray{String(std::string_view("\0", 1)), "😀", "¯"}}})));
   auto output = valid->repr();
   ASSERT_TRUE(output);
   auto reparsed = FormattedJson::parse(*output);
   ASSERT_TRUE(reparsed);
-  EXPECT_EQ(reparsed->toJson(), valid->toJson());
+  EXPECT_EQ(reparsed->to_json(), valid->to_json());
 }
 
 TEST(FormattedJsonTest, NestedUnicodeTriviaAndNumberSpellingSurviveRebuild) {
@@ -900,7 +900,7 @@ TEST(FormattedJsonTest, NestedUnicodeTriviaAndNumberSpellingSurviveRebuild) {
   ASSERT_TRUE(output);
   EXPECT_EQ(*output, "{ /* 日本語 🌟 */ \"値\": [ -0.00e+0, \"改行\\n\\u0000尾\" ] // end\n}");
   Json expected = JsonObject{{"値", JsonArray{Json(-0.0), Json(String(replacementBytes))}}};
-  EXPECT_EQ(updated->toJson(), expected);
+  EXPECT_EQ(updated->to_json(), expected);
   auto oldNumber = array->get(std::size_t(0));
   ASSERT_TRUE(oldNumber);
   auto numberSpelling = oldNumber->repr();
@@ -926,7 +926,7 @@ TEST(FormattedJsonTest, CreateRetainsExactNestedValuesAndFloatingTags) {
   auto floating = created->get(std::size_t(1));
   ASSERT_TRUE(object);
   ASSERT_TRUE(floating);
-  auto integer = object->toJson().getInt("value");
+  auto integer = object->to_json().get_int("value");
   ASSERT_TRUE(integer);
   EXPECT_EQ(*integer, std::int64_t(9223372036854775807ll));
   EXPECT_EQ(floating->type(), Json::Type::Float);
@@ -937,7 +937,7 @@ TEST(FormattedJsonTest, CreateRetainsExactNestedValuesAndFloatingTags) {
   Json expectedInput = JsonArray{JsonObject{{"value", Json(std::int64_t(9223372036854775807ll))}}, Json(1.0), "café"};
   EXPECT_EQ(input, expectedInput);
   EXPECT_EQ(oldSnapshot, expectedInput);
-  EXPECT_EQ(created->toJson(), expectedInput);
+  EXPECT_EQ(created->to_json(), expectedInput);
 }
 
 TEST(FormattedJsonTest, Utf8WriterPreservesKeyQuirksAndValueNuls) {
@@ -954,7 +954,7 @@ TEST(FormattedJsonTest, Utf8WriterPreservesKeyQuirksAndValueNuls) {
   EXPECT_EQ(*output, R"({"é"key":"a\u0000b\n"})");
   auto retrieved = created->get(key);
   ASSERT_TRUE(retrieved);
-  auto value = retrieved->toJson().toString();
+  auto value = retrieved->to_json().to_string();
   ASSERT_TRUE(value);
   EXPECT_EQ(*value, text);
 }
@@ -993,12 +993,12 @@ TEST(FormattedJsonTest, BatchArrayPreservesOrderTriviaNumbersAndSnapshots) {
     ASSERT_TRUE(parsed);
     values.push_back(std::move(*parsed));
   }
-  auto empty = FormattedJson::createArray({});
+  auto empty = FormattedJson::create_array({});
   ASSERT_TRUE(empty);
   auto emptyText = empty->repr();
   ASSERT_TRUE(emptyText);
   EXPECT_EQ(*emptyText, "[]");
-  auto batch = FormattedJson::createArray(values);
+  auto batch = FormattedJson::create_array(values);
   ASSERT_TRUE(batch);
   auto snapshot = *batch;
   auto text = batch->repr();
@@ -1035,7 +1035,7 @@ TEST(FormattedJsonTest, BatchArrayUnicodeFailureDoesNotWritePartialOutput) {
   ASSERT_TRUE(invalid);
   ASSERT_TRUE(valid);
   List<FormattedJson> values{*valid, *invalid};
-  auto batch = FormattedJson::createArray(values);
+  auto batch = FormattedJson::create_array(values);
   ASSERT_TRUE(batch);
   TextBuffer output;
   output.append("unchanged");
@@ -1078,7 +1078,7 @@ TEST(FormattedJsonTest, ErasingAroundCommentRunsPreservesHistoricalTriviaOwnersh
     EXPECT_EQ(*output, entry.m_expected);
     auto expected = FormattedJson::parse(String(entry.m_expected));
     ASSERT_TRUE(expected);
-    EXPECT_EQ(erased->toJson(), expected->toJson());
+    EXPECT_EQ(erased->to_json(), expected->to_json());
     auto original_output = snapshot.repr();
     ASSERT_TRUE(original_output);
     EXPECT_EQ(*original_output, entry.m_input);
@@ -1119,7 +1119,7 @@ TEST(FormattedJsonTest, InsertingAroundCommentRunsPreservesLearnedStyle) {
     EXPECT_EQ(*output, entry.m_expected);
     auto expected = FormattedJson::parse(String(entry.m_expected));
     ASSERT_TRUE(expected);
-    EXPECT_EQ(inserted->toJson(), expected->toJson());
+    EXPECT_EQ(inserted->to_json(), expected->to_json());
     auto original_output = snapshot.repr();
     ASSERT_TRUE(original_output);
     EXPECT_EQ(*original_output, entry.m_input);
@@ -1146,7 +1146,7 @@ TEST(FormattedJsonTest, RepeatedInsertEraseRebuildsRetainEveryRawNumberSpelling)
       auto output = current.repr();
       ASSERT_TRUE(output);
       EXPECT_EQ(*output, original);
-      EXPECT_EQ(current.toJson(), snapshot.toJson());
+      EXPECT_EQ(current.to_json(), snapshot.to_json());
     }
     auto original_output = snapshot.repr();
     ASSERT_TRUE(original_output);

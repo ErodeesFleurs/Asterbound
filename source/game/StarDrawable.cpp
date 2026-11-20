@@ -140,10 +140,10 @@ std::expected<Drawable, StarException> Drawable::create(ImageMetadataDatabase co
   if (!line)
     return std::unexpected(std::move(line.error()));
   if (*line) {
-    auto geometry = jsonToLine2F(**line);
+    auto geometry = json_to_line2f(**line);
     if (!geometry)
       return std::unexpected(std::move(geometry.error()));
-    auto width = json.getFloat("width");
+    auto width = json.get_float("width");
     if (!width)
       return std::unexpected(std::move(width.error()));
     drawable.part = LinePart{*geometry, *width, {}};
@@ -152,7 +152,7 @@ std::expected<Drawable, StarException> Drawable::create(ImageMetadataDatabase co
     if (!poly)
       return std::unexpected(std::move(poly.error()));
     if (*poly) {
-      auto geometry = jsonToPolyF(**poly);
+      auto geometry = json_to_polyf(**poly);
       if (!geometry)
         return std::unexpected(std::move(geometry.error()));
       drawable.part = PolyPart{std::move(*geometry)};
@@ -161,7 +161,7 @@ std::expected<Drawable, StarException> Drawable::create(ImageMetadataDatabase co
       if (!image)
         return std::unexpected(std::move(image.error()));
       if (*image) {
-        auto imageString = (**image).toString();
+        auto imageString = (**image).to_string();
         if (!imageString)
           return std::unexpected(std::move(imageString.error()));
         AssetPath imagePath(std::move(*imageString));
@@ -175,7 +175,7 @@ std::expected<Drawable, StarException> Drawable::create(ImageMetadataDatabase co
             return std::unexpected(std::move(matrix.error()));
           transformation = *matrix;
         } else {
-          auto centered = json.getBool("centered", true);
+          auto centered = json.get_bool("centered", true);
           if (!centered)
             return std::unexpected(std::move(centered.error()));
           if (*centered) {
@@ -184,17 +184,17 @@ std::expected<Drawable, StarException> Drawable::create(ImageMetadataDatabase co
               return std::unexpected(std::move(size.error()));
             transformation.translate(-Vec2F(*size) / 2);
           }
-          auto rotation = json.optFloat("rotation");
+          auto rotation = json.opt_float("rotation");
           if (!rotation)
             return std::unexpected(std::move(rotation.error()));
           if (*rotation)
             transformation.rotate(**rotation);
-          auto mirrored = json.getBool("mirrored", false);
+          auto mirrored = json.get_bool("mirrored", false);
           if (!mirrored)
             return std::unexpected(std::move(mirrored.error()));
           if (*mirrored)
             transformation.scale(Vec2F(-1, 1));
-          auto scale = json.optFloat("scale");
+          auto scale = json.opt_float("scale");
           if (!scale)
             return std::unexpected(std::move(scale.error()));
           if (*scale)
@@ -208,7 +208,7 @@ std::expected<Drawable, StarException> Drawable::create(ImageMetadataDatabase co
   if (!position)
     return std::unexpected(std::move(position.error()));
   if (*position) {
-    auto value = jsonToVec2F(**position);
+    auto value = json_to_vec2f(**position);
     if (!value)
       return std::unexpected(std::move(value.error()));
     drawable.position = *value;
@@ -217,12 +217,12 @@ std::expected<Drawable, StarException> Drawable::create(ImageMetadataDatabase co
   if (!color)
     return std::unexpected(std::move(color.error()));
   if (*color) {
-    auto value = jsonToColor(**color);
+    auto value = json_to_color(**color);
     if (!value)
       return std::unexpected(std::move(value.error()));
     drawable.color = *value;
   }
-  auto fullbright = json.getBool("fullbright", false);
+  auto fullbright = json.get_bool("fullbright", false);
   if (!fullbright)
     return std::unexpected(std::move(fullbright.error()));
   drawable.fullbright = *fullbright;
@@ -233,17 +233,17 @@ std::expected<Json, StarException> Drawable::toJson() const {
   JsonObject json;
   if (std::holds_alternative<LinePart>(part)) {
     auto const& line = std::get<LinePart>(part);
-    json.set("line", jsonFromLine2F(line.line));
+    json.set("line", json_from_line2f(line.line));
     json.set("width", line.width);
   } else if (std::holds_alternative<PolyPart>(part)) {
-    json.set("poly", jsonFromPolyF(std::get<PolyPart>(part).poly));
+    json.set("poly", json_from_polyf(std::get<PolyPart>(part).poly));
   } else if (std::holds_alternative<ImagePart>(part)) {
     auto const& image = std::get<ImagePart>(part);
     json.set("image", AssetPath::join(image.image));
     json.set("transformation", json_from_mat3f(image.transformation));
   }
-  json.set("position", jsonFromVec2F(position));
-  json.set("color", jsonFromColor(color));
+  json.set("position", json_from_vec2f(position));
+  json.set("color", json_from_color(color));
   json.set("fullbright", fullbright);
   return json;
 }

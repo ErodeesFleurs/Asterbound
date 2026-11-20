@@ -111,7 +111,7 @@ std::expected<std::shared_ptr<TreasureDatabase>, StarException> TreasureDatabase
     if (!hasPool)
       return std::unexpected(std::move(hasPool.error()));
     if (*hasPool) {
-      auto pool = entry.getString("pool");
+      auto pool = entry.get_string("pool");
       if (!pool)
         return std::unexpected(std::move(pool.error()));
       return TreasureEntry(std::move(*pool));
@@ -151,14 +151,14 @@ std::expected<std::shared_ptr<TreasureDatabase>, StarException> TreasureDatabase
           return std::unexpected(std::move(size.error()));
         if (*size != 2)
           return std::unexpected(TreasureException("Wrong size for TreasurePool entry, list must be 2"));
-        auto startLevel = entry.getFloat(0);
+        auto startLevel = entry.get_float(0);
         if (!startLevel)
           return std::unexpected(std::move(startLevel.error()));
         auto config = entry.get(1);
         if (!config)
           return std::unexpected(std::move(config.error()));
         ItemPool itemPool;
-        auto fill = config->getArray("fill", {});
+        auto fill = config->get_array("fill", {});
         if (!fill)
           return std::unexpected(std::move(fill.error()));
         for (auto const& fillEntry : *fill) {
@@ -167,7 +167,7 @@ std::expected<std::shared_ptr<TreasureDatabase>, StarException> TreasureDatabase
             return std::unexpected(std::move(parsed.error()));
           itemPool.fill.push_back(std::move(*parsed));
         }
-        auto pool = config->getArray("pool", {});
+        auto pool = config->get_array("pool", {});
         if (!pool)
           return std::unexpected(std::move(pool.error()));
         for (auto const& poolEntry : *pool) {
@@ -180,7 +180,7 @@ std::expected<std::shared_ptr<TreasureDatabase>, StarException> TreasureDatabase
               return std::unexpected(std::move(text.error()));
             return std::unexpected(TreasureException::format("TreasurePool entry '{}' did not specify a weight", *text));
           }
-          auto weight = poolEntry.getFloat("weight");
+          auto weight = poolEntry.get_float("weight");
           if (!weight)
             return std::unexpected(std::move(weight.error()));
           auto parsed = parseEntry(poolEntry);
@@ -193,8 +193,8 @@ std::expected<std::shared_ptr<TreasureDatabase>, StarException> TreasureDatabase
         auto poolRounds = config->get("poolRounds", 1);
         if (!poolRounds)
           return std::unexpected(std::move(poolRounds.error()));
-        if (poolRounds->canConvert(Json::Type::Float)) {
-          auto rounds = poolRounds->toFloat();
+        if (poolRounds->can_convert(Json::Type::Float)) {
+          auto rounds = poolRounds->to_float();
           if (!rounds)
             return std::unexpected(std::move(rounds.error()));
           auto inserted = itemPool.poolRounds.insert(1.0, static_cast<int>(*rounds));
@@ -205,10 +205,10 @@ std::expected<std::shared_ptr<TreasureDatabase>, StarException> TreasureDatabase
           if (!rounds)
             return std::unexpected(std::move(rounds.error()));
           for (auto const& round : *rounds) {
-            auto weight = round.getDouble(0);
+            auto weight = round.get_double(0);
             if (!weight)
               return std::unexpected(std::move(weight.error()));
-            auto count = round.getInt(1);
+            auto count = round.get_int(1);
             if (!count)
               return std::unexpected(std::move(count.error()));
             auto inserted = itemPool.poolRounds.insert(*weight, *count);
@@ -216,11 +216,11 @@ std::expected<std::shared_ptr<TreasureDatabase>, StarException> TreasureDatabase
               return std::unexpected(std::move(inserted.error()));
           }
         }
-        auto variance = config->get("levelVariance", JsonArray{0, 0}).and_then([](Json const& value) { return jsonToVec2F(value); });
+        auto variance = config->get("levelVariance", JsonArray{0, 0}).and_then([](Json const& value) { return json_to_vec2f(value); });
         if (!variance)
           return std::unexpected(std::move(variance.error()));
         itemPool.levelVariance = *variance;
-        auto allowDuplication = config->getBool("allowDuplication", true);
+        auto allowDuplication = config->get_bool("allowDuplication", true);
         if (!allowDuplication)
           return std::unexpected(std::move(allowDuplication.error()));
         itemPool.allowDuplication = *allowDuplication;
@@ -242,15 +242,15 @@ std::expected<std::shared_ptr<TreasureDatabase>, StarException> TreasureDatabase
         return std::unexpected(std::move(entries.error()));
       for (auto const& entry : *entries) {
         TreasureChest chest;
-        auto containers = entry.get("containers").and_then([](Json const& value) { return jsonToStringList(value); });
+        auto containers = entry.get("containers").and_then([](Json const& value) { return json_to_string_list(value); });
         if (!containers)
           return std::unexpected(std::move(containers.error()));
         chest.containers = std::move(*containers);
-        auto pool = entry.getString("treasurePool");
+        auto pool = entry.get_string("treasurePool");
         if (!pool)
           return std::unexpected(std::move(pool.error()));
         chest.treasurePool = std::move(*pool);
-        auto minimumLevel = entry.getFloat("minimumLevel", 0);
+        auto minimumLevel = entry.get_float("minimumLevel", 0);
         if (!minimumLevel)
           return std::unexpected(std::move(minimumLevel.error()));
         chest.minimumLevel = *minimumLevel;

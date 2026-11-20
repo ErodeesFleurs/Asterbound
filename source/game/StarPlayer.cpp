@@ -347,7 +347,7 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
   // all of these are defaults and won't include the correct humanoid config for the species
   if (auto result = installHumanoid(); !result)
     return std::unexpected(std::move(result.error()));
-  auto movementParametersResult = ActorMovementParameters::create(jsonMerge(humanoid()->defaultMovementParameters(), humanoid()->playerMovementParameters().value_or(m_config->movementParameters)));
+  auto movementParametersResult = ActorMovementParameters::create(json_merge(humanoid()->defaultMovementParameters(), humanoid()->playerMovementParameters().value_or(m_config->movementParameters)));
   if (!movementParametersResult)
     return std::unexpected(std::move(movementParametersResult.error()));
   auto movementParameters = std::move(*movementParametersResult);
@@ -400,7 +400,7 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
   if (!footstepVolumeVarianceJsonResult)
     return std::unexpected(std::move(footstepVolumeVarianceJsonResult.error()));
   auto footstepVolumeVarianceJson = std::move(*footstepVolumeVarianceJsonResult);
-  auto footstepVolumeVarianceResult = footstepVolumeVarianceJson.toFloat();
+  auto footstepVolumeVarianceResult = footstepVolumeVarianceJson.to_float();
   if (!footstepVolumeVarianceResult)
     return std::unexpected(std::move(footstepVolumeVarianceResult.error()));
   auto footstepVolumeVariance = std::move(*footstepVolumeVarianceResult);
@@ -409,7 +409,7 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
   if (!landingVolumeJsonResult)
     return std::unexpected(std::move(landingVolumeJsonResult.error()));
   auto landingVolumeJson = std::move(*landingVolumeJsonResult);
-  auto landingVolumeResult = landingVolumeJson.toFloat();
+  auto landingVolumeResult = landingVolumeJson.to_float();
   if (!landingVolumeResult)
     return std::unexpected(std::move(landingVolumeResult.error()));
   auto landingVolume = std::move(*landingVolumeResult);
@@ -434,7 +434,7 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
   if (!interactRadiusJsonResult)
     return std::unexpected(std::move(interactRadiusJsonResult.error()));
   auto interactRadiusJson = std::move(*interactRadiusJsonResult);
-  auto interactRadiusResult = interactRadiusJson.toFloat();
+  auto interactRadiusResult = interactRadiusJson.to_float();
   if (!interactRadiusResult)
     return std::unexpected(std::move(interactRadiusResult.error()));
   auto interactRadius = std::move(*interactRadiusResult);
@@ -444,7 +444,7 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
   if (!walkIntoInteractBiasJsonResult)
     return std::unexpected(std::move(walkIntoInteractBiasJsonResult.error()));
   auto walkIntoInteractBiasJson = std::move(*walkIntoInteractBiasJsonResult);
-  auto walkIntoInteractBiasResult = jsonToVec2F(walkIntoInteractBiasJson);
+  auto walkIntoInteractBiasResult = json_to_vec2f(walkIntoInteractBiasJson);
   if (!walkIntoInteractBiasResult)
     return std::unexpected(std::move(walkIntoInteractBiasResult.error()));
   auto walkIntoInteractBias = std::move(*walkIntoInteractBiasResult);
@@ -459,7 +459,7 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
   if (!emoteCooldownJsonResult)
     return std::unexpected(std::move(emoteCooldownJsonResult.error()));
   auto emoteCooldownJson = std::move(*emoteCooldownJsonResult);
-  auto emoteCooldownResult = emoteCooldownJson.toFloat();
+  auto emoteCooldownResult = emoteCooldownJson.to_float();
   if (!emoteCooldownResult)
     return std::unexpected(std::move(emoteCooldownResult.error()));
   auto emoteCooldown = std::move(*emoteCooldownResult);
@@ -468,7 +468,7 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
   if (!blinkIntervalJsonResult)
     return std::unexpected(std::move(blinkIntervalJsonResult.error()));
   auto blinkIntervalJson = std::move(*blinkIntervalJsonResult);
-  auto blinkIntervalResult = jsonToVec2F(blinkIntervalJson);
+  auto blinkIntervalResult = json_to_vec2f(blinkIntervalJson);
   if (!blinkIntervalResult)
     return std::unexpected(std::move(blinkIntervalResult.error()));
   auto blinkInterval = std::move(*blinkIntervalResult);
@@ -495,7 +495,7 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
   if (!ageItemsEveryJsonResult)
     return std::unexpected(std::move(ageItemsEveryJsonResult.error()));
   auto ageItemsEveryJson = std::move(*ageItemsEveryJsonResult);
-  auto ageItemsEveryResult = ageItemsEveryJson.toFloat();
+  auto ageItemsEveryResult = ageItemsEveryJson.to_float();
   if (!ageItemsEveryResult)
     return std::unexpected(std::move(ageItemsEveryResult.error()));
   auto ageItemsEvery = std::move(*ageItemsEveryResult);
@@ -508,7 +508,7 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
   if (!foodLowThresholdJsonResult)
     return std::unexpected(std::move(foodLowThresholdJsonResult.error()));
   auto foodLowThresholdJson = std::move(*foodLowThresholdJsonResult);
-  auto foodLowThresholdResult = foodLowThresholdJson.toFloat();
+  auto foodLowThresholdResult = foodLowThresholdJson.to_float();
   if (!foodLowThresholdResult)
     return std::unexpected(std::move(foodLowThresholdResult.error()));
   auto foodLowThreshold = std::move(*foodLowThresholdResult);
@@ -517,7 +517,7 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
   if (!foodLowStatusEffectsJsonResult)
     return std::unexpected(std::move(foodLowStatusEffectsJsonResult.error()));
   auto foodLowStatusEffectsJson = std::move(*foodLowStatusEffectsJsonResult);
-  auto foodLowStatusEffectsArrayResult = foodLowStatusEffectsJson.toArray();
+  auto foodLowStatusEffectsArrayResult = foodLowStatusEffectsJson.to_array();
   if (!foodLowStatusEffectsArrayResult)
     return std::unexpected(std::move(foodLowStatusEffectsArrayResult.error()));
   auto foodLowStatusEffectsArray = std::move(*foodLowStatusEffectsArrayResult);
@@ -532,7 +532,7 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
   if (!foodEmptyStatusEffectsJsonResult)
     return std::unexpected(std::move(foodEmptyStatusEffectsJsonResult.error()));
   auto foodEmptyStatusEffectsJson = std::move(*foodEmptyStatusEffectsJsonResult);
-  auto foodEmptyStatusEffectsArrayResult = foodEmptyStatusEffectsJson.toArray();
+  auto foodEmptyStatusEffectsArrayResult = foodEmptyStatusEffectsJson.to_array();
   if (!foodEmptyStatusEffectsArrayResult)
     return std::unexpected(std::move(foodEmptyStatusEffectsArrayResult.error()));
   auto foodEmptyStatusEffectsArray = std::move(*foodEmptyStatusEffectsArrayResult);
@@ -548,7 +548,7 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
   if (!inCinematicStatusEffectsJsonResult)
     return std::unexpected(std::move(inCinematicStatusEffectsJsonResult.error()));
   auto inCinematicStatusEffectsJson = std::move(*inCinematicStatusEffectsJsonResult);
-  auto inCinematicStatusEffectsArrayResult = inCinematicStatusEffectsJson.toArray();
+  auto inCinematicStatusEffectsArrayResult = inCinematicStatusEffectsJson.to_array();
   if (!inCinematicStatusEffectsArrayResult)
     return std::unexpected(std::move(inCinematicStatusEffectsArrayResult.error()));
   auto inCinematicStatusEffectsArray = std::move(*inCinematicStatusEffectsArrayResult);
@@ -716,7 +716,7 @@ std::expected<void, StarException> Player::netLoad(ByteArray const& netStore, Ne
   }
   if (auto result = installHumanoid(); !result)
     return std::unexpected(std::move(result.error()));
-  auto movementParametersResult = ActorMovementParameters::create(jsonMerge(humanoid()->defaultMovementParameters(), humanoid()->playerMovementParameters().value_or(m_config->movementParameters)));
+  auto movementParametersResult = ActorMovementParameters::create(json_merge(humanoid()->defaultMovementParameters(), humanoid()->playerMovementParameters().value_or(m_config->movementParameters)));
   if (!movementParametersResult)
     return std::unexpected(std::move(movementParametersResult.error()));
   auto movementParameters = std::move(*movementParametersResult);
@@ -750,17 +750,17 @@ std::expected<std::shared_ptr<Player>, StarException> Player::create(Root& rootO
 }
 
 std::expected<void, StarException> Player::diskLoad(Json const& diskStore) {
-  auto idResult = diskStore.getString("uuid");
+  auto idResult = diskStore.get_string("uuid");
   if (!idResult)
     return std::unexpected(std::move(idResult.error()));
   auto id = std::move(*idResult);
   setUniqueId(std::move(id));
-  auto descriptionResult = diskStore.getString("description");
+  auto descriptionResult = diskStore.get_string("description");
   if (!descriptionResult)
     return std::unexpected(std::move(descriptionResult.error()));
   auto description = std::move(*descriptionResult);
   m_description = std::move(description);
-  auto modeNameResult = diskStore.getString("modeType");
+  auto modeNameResult = diskStore.get_string("modeType");
   if (!modeNameResult)
     return std::unexpected(std::move(modeNameResult.error()));
   auto modeName = std::move(*modeNameResult);
@@ -880,7 +880,7 @@ std::expected<void, StarException> Player::diskLoad(Json const& diskStore) {
   if (!speciesDefResult)
     return std::unexpected(std::move(speciesDefResult.error()));
   auto speciesDef = std::move(*speciesDefResult);
-  auto shipSpeciesResult = diskStore.getString("shipSpecies", m_identity.species);
+  auto shipSpeciesResult = diskStore.get_string("shipSpecies", m_identity.species);
   if (!shipSpeciesResult)
     return std::unexpected(std::move(shipSpeciesResult.error()));
   auto shipSpecies = std::move(*shipSpeciesResult);
@@ -903,14 +903,14 @@ std::expected<void, StarException> Player::diskLoad(Json const& diskStore) {
   auto deployment = std::move(*deploymentResult);
   if (auto result = m_deployment->diskLoad(deployment); !result)
     return std::unexpected(std::move(result.error()));
-  auto parametersResult = diskStore.getObject("humanoidParameters", JsonObject());
+  auto parametersResult = diskStore.get_object("humanoidParameters", JsonObject());
   if (!parametersResult)
     return std::unexpected(std::move(parametersResult.error()));
   auto parameters = std::move(*parametersResult);
   m_humanoidParameters = std::move(parameters);
   if (auto result = installHumanoid(); !result)
     return std::unexpected(std::move(result.error()));
-  auto movementParametersResult = ActorMovementParameters::create(jsonMerge(humanoid()->defaultMovementParameters(), humanoid()->playerMovementParameters().value_or(m_config->movementParameters)));
+  auto movementParametersResult = ActorMovementParameters::create(json_merge(humanoid()->defaultMovementParameters(), humanoid()->playerMovementParameters().value_or(m_config->movementParameters)));
   if (!movementParametersResult)
     return std::unexpected(std::move(movementParametersResult.error()));
   auto movementParameters = std::move(*movementParametersResult);
@@ -918,7 +918,7 @@ std::expected<void, StarException> Player::diskLoad(Json const& diskStore) {
     return std::unexpected(std::move(result.error()));
   m_effectsAnimator->setGlobalTag("effectDirectives", speciesDef->effectDirectives());
   m_deathParticleBurst.set(humanoid()->defaultDeathParticles());
-  auto propertiesResult = diskStore.getObject("genericProperties");
+  auto propertiesResult = diskStore.get_object("genericProperties");
   if (!propertiesResult)
     return std::unexpected(std::move(propertiesResult.error()));
   auto properties = std::move(*propertiesResult);
@@ -947,13 +947,13 @@ std::expected<void, StarException> Player::diskLoad(Json const& diskStore) {
   if (!storageJsonResult)
     return std::unexpected(std::move(storageJsonResult.error()));
   auto storageJson = std::move(*storageJsonResult);
-  auto storageResult = storageJson.toObject();
+  auto storageResult = storageJson.to_object();
   if (!storageResult)
     return std::unexpected(std::move(storageResult.error()));
   auto storage = std::move(*storageResult);
   for (auto&& p : storage) {
     if (auto script = m_genericScriptContexts.maybe(p.first).value_or(std::shared_ptr<GenericScriptComponent>{})) {
-      auto objectResult = p.second.toObject();
+      auto objectResult = p.second.to_object();
       if (!objectResult)
         return std::unexpected(std::move(objectResult.error()));
       auto object = std::move(*objectResult);
@@ -1735,8 +1735,8 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Player
   bool localMessage = fromConnection == currentWorld.connection();
   if (message == "queueRadioMessage" && !args.empty()) {
     float delay = 0;
-    if (args.size() > 1 && args[1].canConvert(Json::Type::Float)) {
-      auto valueResult = args[1].toFloat();
+    if (args.size() > 1 && args[1].can_convert(Json::Type::Float)) {
+      auto valueResult = args[1].to_float();
       if (!valueResult)
         return std::unexpected(std::move(valueResult.error()));
       auto value = std::move(*valueResult);
@@ -1747,7 +1747,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Player
   } else if (message == "warp") {
     std::optional<String> animation;
     if (args.size() > 1) {
-      auto valueResult = args[1].toString();
+      auto valueResult = args[1].to_string();
       if (!valueResult)
         return std::unexpected(std::move(valueResult.error()));
       auto value = std::move(*valueResult);
@@ -1755,13 +1755,13 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Player
     }
     bool deploy = false;
     if (args.size() > 2) {
-      auto valueResult = args[2].toBool();
+      auto valueResult = args[2].to_bool();
       if (!valueResult)
         return std::unexpected(std::move(valueResult.error()));
       auto value = std::move(*valueResult);
       deploy = value;
     }
-    auto actionResult = args.get(0).toString();
+    auto actionResult = args.get(0).to_string();
     if (!actionResult)
       return std::unexpected(std::move(actionResult.error()));
     auto action = std::move(*actionResult);
@@ -1771,7 +1771,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Player
   } else if (message == "playCinematic" && !args.empty()) {
     bool unique = false;
     if (args.size() > 1) {
-      auto valueResult = args[1].toBool();
+      auto valueResult = args[1].to_bool();
       if (!valueResult)
         return std::unexpected(std::move(valueResult.error()));
       auto value = std::move(*valueResult);
@@ -1782,7 +1782,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Player
   } else if (message == "playAltMusic" && !args.empty()) {
     float fadeTime = 0;
     if (args.size() > 1) {
-      auto valueResult = args[1].toFloat();
+      auto valueResult = args[1].to_float();
       if (!valueResult)
         return std::unexpected(std::move(valueResult.error()));
       auto value = std::move(*valueResult);
@@ -1790,19 +1790,19 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Player
     }
     int loops = -1;
     if (args.size() > 2) {
-      auto valueResult = args[2].toInt();
+      auto valueResult = args[2].to_int();
       if (!valueResult)
         return std::unexpected(std::move(valueResult.error()));
       auto value = std::move(*valueResult);
       loops = value;
     }
     StringList tracks;
-    if (args[0].canConvert(Json::Type::Array)) {
-      auto arrayResult = args[0].toArray();
+    if (args[0].can_convert(Json::Type::Array)) {
+      auto arrayResult = args[0].to_array();
       if (!arrayResult)
         return std::unexpected(std::move(arrayResult.error()));
       auto array = std::move(*arrayResult);
-      auto valuesResult = jsonToStringList(array);
+      auto valuesResult = json_to_string_list(array);
       if (!valuesResult)
         return std::unexpected(std::move(valuesResult.error()));
       auto values = std::move(*valuesResult);
@@ -1812,7 +1812,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Player
   } else if (message == "stopAltMusic") {
     float fadeTime = 0;
     if (!args.empty()) {
-      auto valueResult = args[0].toFloat();
+      auto valueResult = args[0].to_float();
       if (!valueResult)
         return std::unexpected(std::move(valueResult.error()));
       auto value = std::move(*valueResult);
@@ -1828,17 +1828,17 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Player
     if (!fieldsResult)
       return std::unexpected(std::move(fieldsResult.error()));
     auto const& fields = fieldsResult->get();
-    auto eventResult = eventJson.toString();
+    auto eventResult = eventJson.to_string();
     if (!eventResult)
       return std::unexpected(std::move(eventResult.error()));
     auto event = std::move(*eventResult);
     statistics()->recordEvent(event, fields);
   } else if (message == "addCollectable") {
-    auto collectionResult = args.get(0).toString();
+    auto collectionResult = args.get(0).to_string();
     if (!collectionResult)
       return std::unexpected(std::move(collectionResult.error()));
     auto collection = std::move(*collectionResult);
-    auto collectableResult = args.get(1).toString();
+    auto collectableResult = args.get(1).to_string();
     if (!collectableResult)
       return std::unexpected(std::move(collectableResult.error()));
     auto collectable = std::move(*collectableResult);
@@ -2404,8 +2404,8 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
       if (!headRotationPropertyResult)
         return std::unexpected(std::move(headRotationPropertyResult.error()));
       auto headRotationProperty = std::move(*headRotationPropertyResult);
-      if (headRotationProperty.isType(Json::Type::Float)) {
-        auto rotationResult = headRotationProperty.toFloat();
+      if (headRotationProperty.is_type(Json::Type::Float)) {
+        auto rotationResult = headRotationProperty.to_float();
         if (!rotationResult)
           return std::unexpected(std::move(rotationResult.error()));
         auto rotation = std::move(*rotationResult);
@@ -2424,8 +2424,8 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
         String const disableFlag = "disableHeadRotation";
         auto statusFlag = m_statusController->statusProperty(disableFlag);
         bool disabled = false;
-        if (statusFlag.isType(Json::Type::Bool)) {
-          auto flagResult = statusFlag.toBool();
+        if (statusFlag.is_type(Json::Type::Bool)) {
+          auto flagResult = statusFlag.to_bool();
           if (!flagResult)
             return std::unexpected(std::move(flagResult.error()));
           auto flag = std::move(*flagResult);
@@ -2618,8 +2618,8 @@ std::expected<void, StarException> Player::render(RenderCallback& renderCallback
   if (!overrideLayerResult)
     return std::unexpected(std::move(overrideLayerResult.error()));
   auto overrideLayer = std::move(*overrideLayerResult);
-  if (overrideLayer.canConvert(Json::Type::Int)) {
-    auto valueResult = overrideLayer.toUInt();
+  if (overrideLayer.can_convert(Json::Type::Int)) {
+    auto valueResult = overrideLayer.to_uint();
     if (!valueResult)
       return std::unexpected(std::move(valueResult.error()));
     layer = *valueResult;
@@ -2665,7 +2665,7 @@ Json Player::getGenericProperty(String const& name, Json const& defaultValue) co
 }
 
 void Player::setGenericProperty(String const& name, Json const& value) {
-  if (value.isNull())
+  if (value.is_null())
     m_genericProperties.erase(name);
   else
     m_genericProperties.set(name, value);
@@ -2756,18 +2756,18 @@ std::expected<void, StarException> Player::triggerPickupEvents(std::shared_ptr<I
   if (!messagesResult)
     return std::unexpected(std::move(messagesResult.error()));
   auto messages = std::move(*messagesResult);
-  auto messageArrayResult = messages.toArray();
+  auto messageArrayResult = messages.to_array();
   if (!messageArrayResult)
     return std::unexpected(std::move(messageArrayResult.error()));
   auto messageArray = std::move(*messageArrayResult);
   for (auto const& message : messageArray) {
-    if (message.isType(Json::Type::Array)) {
-      auto partsResult = message.toArray();
+    if (message.is_type(Json::Type::Array)) {
+      auto partsResult = message.to_array();
       if (!partsResult)
         return std::unexpected(std::move(partsResult.error()));
       auto parts = std::move(*partsResult);
-      if (parts.size() >= 2 && parts[1].canConvert(Json::Type::Float)) {
-        auto delayResult = parts[1].toFloat();
+      if (parts.size() >= 2 && parts[1].can_convert(Json::Type::Float)) {
+        auto delayResult = parts[1].to_float();
         if (!delayResult)
           return std::unexpected(std::move(delayResult.error()));
         auto delay = std::move(*delayResult);
@@ -2810,7 +2810,7 @@ std::expected<void, StarException> Player::triggerPickupEvents(std::shared_ptr<I
     return std::unexpected(std::move(consumeResult.error()));
   auto consume = std::move(*consumeResult);
   if (consume) {
-    auto enabledResult = consume.toBool();
+    auto enabledResult = consume.to_bool();
     if (!enabledResult)
       return std::unexpected(std::move(enabledResult.error()));
     auto enabled = std::move(*enabledResult);
@@ -2919,7 +2919,7 @@ std::expected<void, StarException> Player::refreshHumanoid() const {
       return std::unexpected(std::move(changedResult.error()));
     auto changed = std::move(*changedResult);
     if (changed) {
-      auto parametersResult = ActorMovementParameters::create(jsonMerge(humanoid()->defaultMovementParameters(), humanoid()->playerMovementParameters().value_or(m_config->movementParameters)));
+      auto parametersResult = ActorMovementParameters::create(json_merge(humanoid()->defaultMovementParameters(), humanoid()->playerMovementParameters().value_or(m_config->movementParameters)));
       if (!parametersResult)
         return std::unexpected(std::move(parametersResult.error()));
       auto parameters = std::move(*parametersResult);
@@ -2972,7 +2972,7 @@ std::expected<bool, StarException> Player::addBlueprint(ItemDescriptor const& de
     if (!messageResult)
       return std::unexpected(std::move(messageResult.error()));
     auto message = std::move(*messageResult);
-    auto textResult = message.toString();
+    auto textResult = message.to_string();
     if (!textResult)
       return std::unexpected(std::move(textResult.error()));
     auto text = std::move(*textResult);
@@ -2989,7 +2989,7 @@ std::expected<bool, StarException> Player::addBlueprint(ItemDescriptor const& de
     if (!messageResult)
       return std::unexpected(std::move(messageResult.error()));
     auto message = std::move(*messageResult);
-    auto textResult = message.toString();
+    auto textResult = message.to_string();
     if (!textResult)
       return std::unexpected(std::move(textResult.error()));
     auto text = std::move(*textResult);
@@ -3033,7 +3033,7 @@ std::expected<bool, StarException> Player::addCollectable(String const& collecti
   if (!messageResult)
     return std::unexpected(std::move(messageResult.error()));
   auto message = std::move(*messageResult);
-  auto textResult = message.toString();
+  auto textResult = message.to_string();
   if (!textResult)
     return std::unexpected(std::move(textResult.error()));
   auto text = std::move(*textResult);
@@ -4037,8 +4037,8 @@ std::expected<void, StarException> Player::getNetArmorSecrets() {
       if (!versionResult)
         return std::unexpected(std::move(versionResult.error()));
       auto version = std::move(*versionResult);
-      if (version.isType(Json::Type::Int)) {
-        auto valueResult = version.toUInt();
+      if (version.is_type(Json::Type::Int)) {
+        auto valueResult = version.to_uint();
         if (!valueResult)
           return std::unexpected(std::move(valueResult.error()));
         auto value = std::move(*valueResult);
@@ -4147,7 +4147,7 @@ std::expected<void, StarException> Player::teleportIn() {
   if (!jsonResult)
     return std::unexpected(std::move(jsonResult.error()));
   auto json = std::move(*jsonResult);
-  auto arrayResult = json.toArray();
+  auto arrayResult = json.to_array();
   if (!arrayResult)
     return std::unexpected(std::move(arrayResult.error()));
   auto array = std::move(*arrayResult);
@@ -4293,7 +4293,7 @@ std::expected<Vec3B, StarException> Player::nametagColor() const {
   if (!colorResult)
     return std::unexpected(std::move(colorResult.error()));
   auto color = std::move(*colorResult);
-  return jsonToVec3B(color);
+  return json_to_vec3b(color);
 }
 
 std::expected<Vec2F, StarException> Player::nametagOrigin() const {
@@ -4305,8 +4305,8 @@ std::expected<String, StarException> Player::nametag() const {
   if (!valueResult)
     return std::unexpected(std::move(valueResult.error()));
   auto value = std::move(*valueResult);
-  if (value.isType(Json::Type::String))
-    return value.toString();
+  if (value.is_type(Json::Type::String))
+    return value.to_string();
   return m_identity.name;
 }
 
@@ -4869,7 +4869,7 @@ std::expected<void, StarException> Player::queueRadioMessage(Json const& message
       if (!tutorialResult)
         return std::unexpected(std::move(tutorialResult.error()));
       auto tutorial = std::move(*tutorialResult);
-      auto enabledResult = tutorial.toBool();
+      auto enabledResult = tutorial.to_bool();
       if (!enabledResult)
         return std::unexpected(std::move(enabledResult.error()));
       auto enabled = std::move(*enabledResult);
@@ -4947,8 +4947,8 @@ std::expected<void, StarException> Player::queueRadioMessage(RadioMessage messag
 }
 
 std::expected<std::optional<Json>, StarException> Player::pullPendingCinematic() {
-  if (m_pendingCinematic && m_pendingCinematic->isType(Json::Type::String)) {
-    auto nameResult = m_pendingCinematic->toString();
+  if (m_pendingCinematic && m_pendingCinematic->is_type(Json::Type::String)) {
+    auto nameResult = m_pendingCinematic->to_string();
     if (!nameResult)
       return std::unexpected(std::move(nameResult.error()));
     auto name = std::move(*nameResult);
@@ -4958,8 +4958,8 @@ std::expected<std::optional<Json>, StarException> Player::pullPendingCinematic()
 }
 
 std::expected<void, StarException> Player::setPendingCinematic(Json const& cinematic, bool unique) {
-  if (unique && cinematic.isType(Json::Type::String)) {
-    auto nameResult = cinematic.toString();
+  if (unique && cinematic.is_type(Json::Type::String)) {
+    auto nameResult = cinematic.to_string();
     if (!nameResult)
       return std::unexpected(std::move(nameResult.error()));
     auto name = std::move(*nameResult);
@@ -5154,7 +5154,7 @@ std::expected<void, StarException> Player::refreshHumanoidParameters() {
     return std::unexpected(std::move(result.error()));
   if (auto result = m_armor->setupHumanoid(*humanoid(), forceNude()); !result)
     return std::unexpected(std::move(result.error()));
-  auto parametersResult = ActorMovementParameters::create(jsonMerge(humanoid()->defaultMovementParameters(), humanoid()->playerMovementParameters().value_or(m_config->movementParameters)));
+  auto parametersResult = ActorMovementParameters::create(json_merge(humanoid()->defaultMovementParameters(), humanoid()->playerMovementParameters().value_or(m_config->movementParameters)));
   if (!parametersResult)
     return std::unexpected(std::move(parametersResult.error()));
   auto parameters = std::move(*parametersResult);

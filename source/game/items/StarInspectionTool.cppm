@@ -176,28 +176,28 @@ std::expected<std::shared_ptr<InspectionTool>, StarException> InspectionTool::cr
   auto initialized = item->initialize(config, directory, parameters);
   if (!initialized)
     return std::unexpected(std::move(initialized.error()));
-  auto image = item->instanceValue("image").and_then([](Json const& value) { return value.toString(); });
+  auto image = item->instanceValue("image").and_then([](Json const& value) { return value.to_string(); });
   if (!image)
     return std::unexpected(std::move(image.error()));
   item->m_image = AssetPath::relative_to(directory, *image);
   for (auto const& [key, target] : {std::pair{std::string_view("handPosition"), std::ref(item->m_handPosition)}, std::pair{std::string_view("lightPosition"), std::ref(item->m_lightPosition)}}) {
-    auto value = item->instanceValue(key).and_then(jsonToVec2F);
+    auto value = item->instanceValue(key).and_then(json_to_vec2f);
     if (!value)
       return std::unexpected(std::move(value.error()));
     target.get() = *value;
   }
-  auto color = item->instanceValue("lightColor").and_then(jsonToColor);
+  auto color = item->instanceValue("lightColor").and_then(json_to_color);
   if (!color)
     return std::unexpected(std::move(color.error()));
   item->m_lightColor = *color;
   for (auto const& [key, target] : {std::pair{std::string_view("beamLevel"), std::ref(item->m_beamWidth)}, std::pair{std::string_view("beamAmbience"), std::ref(item->m_ambientFactor)}}) {
-    auto value = item->instanceValue(key).and_then([](Json const& value) { return value.toFloat(); });
+    auto value = item->instanceValue(key).and_then([](Json const& value) { return value.to_float(); });
     if (!value)
       return std::unexpected(std::move(value.error()));
     target.get() = *value;
   }
   for (auto const& [key, target] : {std::pair{std::string_view("showHighlights"), std::ref(item->m_showHighlights)}, std::pair{std::string_view("allowScanning"), std::ref(item->m_allowScanning)}}) {
-    auto value = item->instanceValue(key).and_then([](Json const& value) { return value.toBool(); });
+    auto value = item->instanceValue(key).and_then([](Json const& value) { return value.to_bool(); });
     if (!value)
       return std::unexpected(std::move(value.error()));
     target.get() = *value;
@@ -207,35 +207,35 @@ std::expected<std::shared_ptr<InspectionTool>, StarException> InspectionTool::cr
     return std::unexpected(std::move(lineOfSight.error()));
   item->m_requireLineOfSight = *lineOfSight == Json(true);
   for (auto const& [key, target] : {std::pair{std::string_view("inspectionAngles"), std::ref(item->m_inspectionAngles)}, std::pair{std::string_view("inspectionRanges"), std::ref(item->m_inspectionRanges)}}) {
-    auto value = item->instanceValue(key).and_then(jsonToVec2F);
+    auto value = item->instanceValue(key).and_then(json_to_vec2f);
     if (!value)
       return std::unexpected(std::move(value.error()));
     target.get() = *value;
   }
-  auto ambient = item->instanceValue("ambientInspectionRadius").and_then([](Json const& value) { return value.toFloat(); });
+  auto ambient = item->instanceValue("ambientInspectionRadius").and_then([](Json const& value) { return value.to_float(); });
   if (!ambient)
     return std::unexpected(std::move(ambient.error()));
   item->m_ambientInspectionRadius = *ambient;
-  auto spaces = item->instanceValue("fullInspectionSpaces").and_then([](Json const& value) { return value.toUInt(); });
+  auto spaces = item->instanceValue("fullInspectionSpaces").and_then([](Json const& value) { return value.to_uint(); });
   if (!spaces)
     return std::unexpected(std::move(spaces.error()));
   item->m_fullInspectionSpaces = *spaces;
-  auto minimum = item->instanceValue("minimumInspectionLevel").and_then([](Json const& value) { return value.toFloat(); });
+  auto minimum = item->instanceValue("minimumInspectionLevel").and_then([](Json const& value) { return value.to_float(); });
   if (!minimum)
     return std::unexpected(std::move(minimum.error()));
   item->m_minimumInspectionLevel = *minimum;
   auto filter = item->instanceValue("inspectableTypeFilter");
   if (!filter)
     return std::unexpected(std::move(filter.error()));
-  if (filter->isType(Json::Type::Array)) {
-    auto values = filter->toArray();
+  if (filter->is_type(Json::Type::Array)) {
+    auto values = filter->to_array();
     if (!values)
       return std::unexpected(std::move(values.error()));
     item->m_inspectableTypeFilter.emplace();
     for (auto const& value : *values) {
-      if (!value.isType(Json::Type::String))
+      if (!value.is_type(Json::Type::String))
         continue;
-      auto name = value.toString();
+      auto name = value.to_string();
       if (!name)
         return std::unexpected(std::move(name.error()));
       if (!EntityTypeNames)
@@ -520,13 +520,13 @@ std::expected<String, StarException> InspectionTool::inspectionFailureText(Strin
   auto contains = nothingThere->contains(species);
   if (!contains)
     return std::unexpected(std::move(contains.error()));
-  auto options = nothingThere->getArray(*contains ? species : String("default"));
+  auto options = nothingThere->get_array(*contains ? species : String("default"));
   if (!options)
     return std::unexpected(std::move(options.error()));
   auto option = options->wrap(root().random().next_u64());
   if (!option)
     return std::unexpected(std::move(option.error()));
-  return option->get().toString();
+  return option->get().to_string();
 }
 
 }

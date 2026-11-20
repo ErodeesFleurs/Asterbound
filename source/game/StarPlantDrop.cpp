@@ -144,10 +144,10 @@ if (!result361) return std::unexpected(std::move(result361.error()));
 if (!result362) return std::unexpected(std::move(result362.error()));
 
   m_stemConfig = std::move(stemConfig);
-  if (m_stemConfig.isNull())
+  if (m_stemConfig.is_null())
     m_stemConfig = JsonObject();
   m_foliageConfig = std::move(foliageConfig);
-  if (m_foliageConfig.isNull())
+  if (m_foliageConfig.is_null())
     m_foliageConfig = JsonObject();
   m_saplingConfig = std::move(saplingConfig);
 
@@ -417,20 +417,20 @@ if ((condition314) && !m_spawnedDrops.get()) {
         JsonArray dropOptions;
         if (plantPiece.kind == Plant::PlantPieceKind::Stem)
           {
-auto result315 = m_stemConfig.getArray("drops", {});
+auto result315 = m_stemConfig.get_array("drops", {});
 if (!result315) return std::unexpected(std::move(result315.error()));
 dropOptions = std::move(*result315);
 }
         if (plantPiece.kind == Plant::PlantPieceKind::Foliage)
           {
-auto result316 = m_foliageConfig.getArray("drops", {});
+auto result316 = m_foliageConfig.get_array("drops", {});
 if (!result316) return std::unexpected(std::move(result316.error()));
 dropOptions = std::move(*result316);
 }
         if (dropOptions.size()) {
           auto result317 = this->root().random().sample_ref(dropOptions);
 if (!result317) return std::unexpected(std::move(result317.error()));
-auto result318 = result317->get().toArray();
+auto result318 = result317->get().to_array();
 if (!result318) return std::unexpected(std::move(result318.error()));
 auto option = std::move(*result318);
 for (auto const& drop : option) {
@@ -446,14 +446,14 @@ for (auto const& drop : option) {
     return std::unexpected(std::move(result321.error()));
   Vec2F pos = Vec2F(plantPiece.offset + Vec2F(size) * .5f / TilePixels).rotate(m_movementController->rotation())
     + Vec2F(std::move(*result320), std::move(*result321));
-  auto result322 = drop.getString("item");
+  auto result322 = drop.get_string("item");
   if (!result322)
     return std::unexpected(std::move(result322.error()));
   if (std::move(*result322) == "sapling") {
     auto result323 = world();
     if (!result323)
       return std::unexpected(std::move(result323.error()));
-    auto result324 = drop.getInt("count", 1);
+    auto result324 = drop.get_int("count", 1);
     if (!result324)
       return std::unexpected(std::move(result324.error()));
     auto result325 =
@@ -470,10 +470,10 @@ for (auto const& drop : option) {
     auto result328 = world();
     if (!result328)
       return std::unexpected(std::move(result328.error()));
-    auto result329 = drop.getString("item");
+    auto result329 = drop.get_string("item");
     if (!result329)
       return std::unexpected(std::move(result329.error()));
-    auto result330 = drop.getInt("count", 1);
+    auto result330 = drop.get_int("count", 1);
     if (!result330)
       return std::unexpected(std::move(result330.error()));
     auto result331 = ItemDescriptor::create(std::move(*result329), static_cast<std::size_t>(std::move(*result330)));
@@ -513,7 +513,7 @@ if (!result295) return std::unexpected(std::move(result295.error()));
 auto result296 = std::move(*result295).get(mode, JsonObject());
 if (!result296) return std::unexpected(std::move(result296.error()));
 Json particleConfig = std::move(*result296);
-  auto result297 = particleConfig.getArray("options", {});
+  auto result297 = particleConfig.get_array("options", {});
 if (!result297) return std::unexpected(std::move(result297.error()));
 JsonArray particleOptions = std::move(*result297);
   if (!particleOptions.size())
@@ -528,7 +528,7 @@ auto imgMetadata = std::move(*result298);
   auto result299 = imgMetadata->imageSize(piece.image);
 if (!result299) return std::unexpected(std::move(result299.error()));
 Vec2F imageSize = Vec2F(std::move(*result299)) / TilePixels;
-  auto result300 = particleConfig.getFloat("density", 1);
+  auto result300 = particleConfig.get_float("density", 1);
 if (!result300) return std::unexpected(std::move(result300.error()));
 float density = (imageSize.x() * imageSize.y()) / std::move(*result300);
 
@@ -560,7 +560,7 @@ if (!result302) return std::unexpected(std::move(result302.error()));
 auto result303 = std::move(*result302)->particle(config);
 if (!result303) return std::unexpected(std::move(result303.error()));
 particle = std::move(*result303);
-    auto result304 = mainConfig.getFloat("hueshift", 0);
+    auto result304 = mainConfig.get_float("hueshift", 0);
 if (!result304) return std::unexpected(std::move(result304.error()));
 particle.color.hue_shift(std::move(*result304) / 360.0f);
 for (Directives const& directives : piece.image.m_directives.list())
@@ -593,14 +593,14 @@ auto assets = std::move(*result284);
       auto playBreakSound = [&self = *this, &assets, &renderCallback](Json const& config)  -> std::expected<void, StarException> {
         auto result263 = config.get("sounds", JsonObject());
 if (!result263) return std::unexpected(std::move(result263.error()));
-auto result264 = std::move(*result263).getArray("breakTree", JsonArray());
+auto result264 = std::move(*result263).get_array("breakTree", JsonArray());
 if (!result264) return std::unexpected(std::move(result264.error()));
 JsonArray breakTreeOptions = std::move(*result264);
         if (breakTreeOptions.size()) {
           auto result265 = self.root().random().sample_ref(breakTreeOptions);
 if (!result265) return std::unexpected(std::move(result265.error()));
 auto sound = result265->get();
-          auto result266 = sound.getString("file");
+          auto result266 = sound.get_string("file");
 if (!result266) return std::unexpected(std::move(result266.error()));
 auto result267 = assets->audio(std::move(*result266));
 if (!result267) return std::unexpected(std::move(result267.error()));
@@ -608,7 +608,7 @@ auto result1279 = AudioInstance::create(*std::move(*result267));
 if (!result1279) return std::unexpected(std::move(result1279.error()));
 auto audioInstance = std::move(*result1279);
 audioInstance->set_position(self.collisionRect().center() + self.position());
-auto result268 = sound.getFloat("volume", 1.0f);
+auto result268 = sound.get_float("volume", 1.0f);
 if (!result268) return std::unexpected(std::move(result268.error()));
 audioInstance->set_volume(std::move(*result268));
 auto result269 = renderCallback.addAudio(std::move(audioInstance));
@@ -643,14 +643,14 @@ if (!result288) return std::unexpected(std::move(result288.error()));
     auto playHitSound = [&self = *this, &assets, &renderCallback](Json const& config)  -> std::expected<void, StarException> {
       auto result256 = config.get("sounds", JsonObject());
 if (!result256) return std::unexpected(std::move(result256.error()));
-auto result257 = std::move(*result256).getArray("hitGround", JsonArray());
+auto result257 = std::move(*result256).get_array("hitGround", JsonArray());
 if (!result257) return std::unexpected(std::move(result257.error()));
 JsonArray hitGroundOptions = std::move(*result257);
       if (hitGroundOptions.size()) {
         auto result258 = self.root().random().sample_ref(hitGroundOptions);
 if (!result258) return std::unexpected(std::move(result258.error()));
 auto sound = result258->get();
-        auto result259 = sound.getString("file");
+        auto result259 = sound.get_string("file");
 if (!result259) return std::unexpected(std::move(result259.error()));
 auto result260 = assets->audio(std::move(*result259));
 if (!result260) return std::unexpected(std::move(result260.error()));
@@ -658,7 +658,7 @@ auto result1278 = AudioInstance::create(*std::move(*result260));
 if (!result1278) return std::unexpected(std::move(result1278.error()));
 auto audioInstance = std::move(*result1278);
 audioInstance->set_position(self.collisionRect().center() + self.position());
-auto result261 = sound.getFloat("volume", 1.0f);
+auto result261 = sound.get_float("volume", 1.0f);
 if (!result261) return std::unexpected(std::move(result261.error()));
 audioInstance->set_volume(std::move(*result261));
 auto result262 = renderCallback.addAudio(std::move(audioInstance));

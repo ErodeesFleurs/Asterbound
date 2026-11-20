@@ -50,7 +50,7 @@ std::expected<SkyColoring, StarException> SkyColoring::create(Json const& varian
   auto getColor = [&](String const& key) -> std::expected<Color, StarException> {
     auto value = variant.get(key);
     if (!value) return std::unexpected(std::move(value.error()));
-    return jsonToColor(*value);
+    return json_to_color(*value);
   };
   auto getColorPair = [&](String const& key) -> std::expected<std::pair<Color, Color>, StarException> {
     auto pair = variant.get(key);
@@ -59,9 +59,9 @@ std::expected<SkyColoring, StarException> SkyColoring::create(Json const& varian
     if (!first) return std::unexpected(std::move(first.error()));
     auto second = pair->get(1);
     if (!second) return std::unexpected(std::move(second.error()));
-    auto firstColor = jsonToColor(*first);
+    auto firstColor = json_to_color(*first);
     if (!firstColor) return std::unexpected(std::move(firstColor.error()));
-    auto secondColor = jsonToColor(*second);
+    auto secondColor = json_to_color(*second);
     if (!secondColor) return std::unexpected(std::move(secondColor.error()));
     return std::pair{*firstColor, *secondColor};
   };
@@ -97,18 +97,18 @@ std::expected<SkyColoring, StarException> SkyColoring::create(Json const& varian
 
 Json SkyColoring::toJson() const {
   auto makeColorPair = [](std::pair<Color, Color> const& p) {
-    return JsonArray{jsonFromColor(p.first), jsonFromColor(p.second)};
+    return JsonArray{json_from_color(p.first), json_from_color(p.second)};
   };
 
-  return JsonObject{{"mainColor", jsonFromColor(mainColor)},
+  return JsonObject{{"mainColor", json_from_color(mainColor)},
       {"morningColors", makeColorPair(morningColors)},
       {"dayColors", makeColorPair(dayColors)},
       {"eveningColors", makeColorPair(eveningColors)},
       {"nightColors", makeColorPair(nightColors)},
-      {"morningLightColor", jsonFromColor(morningLightColor)},
-      {"dayLightColor", jsonFromColor(dayLightColor)},
-      {"eveningLightColor", jsonFromColor(eveningLightColor)},
-      {"nightLightColor", jsonFromColor(nightLightColor)}};
+      {"morningLightColor", json_from_color(morningLightColor)},
+      {"dayLightColor", json_from_color(dayLightColor)},
+      {"eveningLightColor", json_from_color(eveningLightColor)},
+      {"nightLightColor", json_from_color(nightLightColor)}};
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, SkyColoring& skyColoring) {

@@ -258,10 +258,10 @@ std::expected<std::optional<RectU>, StarException> FramesSpecification::getRect(
 }
 
 std::expected<Json, StarException> FramesSpecification::toJson() const {
-  auto aliasJson = jsonFromMap(aliases);
+  auto aliasJson = json_from_map(aliases);
   if (!aliasJson)
     return std::unexpected(std::move(aliasJson.error()));
-  auto frameJson = jsonFromMapV(frames, jsonFromRectU);
+  auto frameJson = json_from_map_v(frames, json_from_rectu);
   if (!frameJson)
     return std::unexpected(std::move(frameJson.error()));
   return JsonObject{{"aliases", std::move(*aliasJson)}, {"frames", std::move(*frameJson)}, {"file", framesFile}};
@@ -650,12 +650,12 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
         return false;
       bool declared = false;
       for (String const& group : {String("onLoad"), String("postLoad")}) {
-        auto paths = scripts->get().optArray(group);
+        auto paths = scripts->get().opt_array(group);
         if (!paths)
           return std::unexpected(std::move(paths.error()));
         if (*paths) {
           for (auto const& path : **paths) {
-            auto text = path.toString();
+            auto text = path.to_string();
             if (!text)
               return std::unexpected(std::move(text.error()));
             declared = declared || *text == originalScriptPath;
@@ -769,14 +769,14 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
                 return std::unexpected(std::move(patchPairs.error()));
               std::size_t patchIndex = 0;
               for (auto const& patchPair : *patchPairs) {
-                auto patches = patchPair.getArray("patches");
+                auto patches = patchPair.get_array("patches");
                 if (!patches)
                   return std::unexpected(std::move(patches.error()));
-                auto paths = patchPair.getArray("paths");
+                auto paths = patchPair.get_array("paths");
                 if (!paths)
                   return std::unexpected(std::move(paths.error()));
                 for (auto const& path : *paths) {
-                  auto targetPath = path.toString();
+                  auto targetPath = path.to_string();
                   if (!targetPath)
                     return std::unexpected(std::move(targetPath.error()));
                   auto targetKey = CaseInsensitiveStringView::create(*targetPath);
@@ -785,8 +785,8 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
                   if (auto p = m_files.find_ref(*targetKey)) {
                     for (std::size_t i = 0; i != patches->size(); ++i) {
                       auto const& patch = (*patches)[i];
-                      if (patch.isType(Json::Type::String)) {
-                        auto patchPath = patch.toString();
+                      if (patch.is_type(Json::Type::String)) {
+                        auto patchPath = patch.to_string();
                         if (!patchPath)
                           return std::unexpected(std::move(patchPath.error()));
                         p->get().patchSources.push_back({std::move(*patchPath), source});
@@ -832,7 +832,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
   auto runLoadScripts = [&](String const& groupName, String const& sourcePath, std::shared_ptr<AssetSource> source) -> std::expected<void, StarException> {
     auto metadata = source->metadata();
     if (auto scripts = metadata.find_ref("scripts")) {
-      auto scriptGroup = scripts->get().optArray(groupName);
+      auto scriptGroup = scripts->get().opt_array(groupName);
       if (!scriptGroup)
         return std::unexpected(std::move(scriptGroup.error()));
       if (*scriptGroup) {
@@ -857,7 +857,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
           if (!decorated)
             return std::unexpected(std::move(decorated.error()));
           for (auto const& jPath : **scriptGroup) {
-            auto path = jPath.toString();
+            auto path = jPath.to_string();
             if (!path)
               return std::unexpected(std::move(path.error()));
             LoadScriptReference selected{.source = source, .path = *path};
@@ -882,7 +882,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
         // A failed script closes the rest of its group too; those declarations
         // will not be executed later and must not report a successful replacement.
         for (auto const& jPath : **scriptGroup) {
-          auto path = jPath.toString();
+          auto path = jPath.to_string();
           if (!path)
             return std::unexpected(std::move(path.error()));
           LoadScriptReference closed{.source = source, .path = std::move(*path)};
@@ -1071,7 +1071,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
       {"bytes", AssetType::Bytes}
   }};
   for (auto const& script : *preloadScripts) {
-    auto typeName = script.getString("type");
+    auto typeName = script.get_string("type");
     if (!typeName)
       return std::unexpected(std::move(typeName.error()));
     auto lowerTypeName = typeName->to_lower();
@@ -1086,7 +1086,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     }
     if (!type)
       return std::unexpected(AssetException::format("Unknown asset type '{}' in preload.config", *typeName));
-    auto path = script.getString("path");
+    auto path = script.get_string("path");
     if (!path)
       return std::unexpected(std::move(path.error()));
     auto components = AssetPath::split(*path);
@@ -1258,9 +1258,9 @@ std::expected<Json, StarException> Assets::json(String const& path) const {
 }
 
 std::expected<Json, StarException> Assets::fetchJson(Json const& v, String const& dir) const {
-  if (!v.isType(Json::Type::String))
+  if (!v.is_type(Json::Type::String))
     return v;
-  auto path = v.toString();
+  auto path = v.to_string();
   if (!path)
     return std::unexpected(std::move(path.error()));
   return json(AssetPath::relative_to(dir, *path));
@@ -1516,7 +1516,7 @@ std::expected<FramesSpecification, StarException> Assets::parseFramesSpecificati
     if (!list)
       return std::unexpected(std::move(list.error()));
     for (auto const& pair : *list) {
-      auto parsedRect = jsonToRectI(pair.second);
+      auto parsedRect = json_to_recti(pair.second);
       if (!parsedRect)
         return std::unexpected(std::move(parsedRect.error()));
       RectU rect(*parsedRect);
@@ -1536,7 +1536,7 @@ std::expected<FramesSpecification, StarException> Assets::parseFramesSpecificati
     Vec2I beginValue{};
     auto beginResult = grid.find_ref("begin");
     if (beginResult) {
-      auto parsedBegin = jsonToVec2I(beginResult->get());
+      auto parsedBegin = json_to_vec2i(beginResult->get());
       if (!parsedBegin)
         return std::unexpected(std::move(parsedBegin.error()));
       beginValue = *parsedBegin;
@@ -1544,13 +1544,13 @@ std::expected<FramesSpecification, StarException> Assets::parseFramesSpecificati
     auto sizeConfig = grid.get("size");
     if (!sizeConfig)
       return std::unexpected(std::move(sizeConfig.error()));
-    auto sizeResult = jsonToVec2I(sizeConfig->get());
+    auto sizeResult = json_to_vec2i(sizeConfig->get());
     if (!sizeResult)
       return std::unexpected(std::move(sizeResult.error()));
     auto dimensionsConfig = grid.get("dimensions");
     if (!dimensionsConfig)
       return std::unexpected(std::move(dimensionsConfig.error()));
-    auto dimensionsResult = jsonToVec2I(dimensionsConfig->get());
+    auto dimensionsResult = json_to_vec2i(dimensionsConfig->get());
     if (!dimensionsResult)
       return std::unexpected(std::move(dimensionsResult.error()));
     Vec2U begin(beginValue), size(*sizeResult), dimensions(*dimensionsResult);
@@ -1564,7 +1564,7 @@ std::expected<FramesSpecification, StarException> Assets::parseFramesSpecificati
         if (y >= dimensions[1])
           return std::unexpected(AssetException(Star::format("Image {} row {} is out of bounds for y-dimension {}", spec.framesFile, y + 1, dimensions[1])));
         auto const& rowConfig = (**names)[y];
-        if (rowConfig.isNull())
+        if (rowConfig.is_null())
           continue;
         auto row = rowConfig.array_ptr();
         if (!row)
@@ -1573,9 +1573,9 @@ std::expected<FramesSpecification, StarException> Assets::parseFramesSpecificati
           if (x >= dimensions[0])
             return std::unexpected(AssetException(Star::format("Image {} column {} is out of bounds for x-dimension {}", spec.framesFile, x + 1, dimensions[0])));
           auto const& frame = (**row)[x];
-          if (frame.isNull())
+          if (frame.is_null())
             continue;
-          auto name = frame.toString();
+          auto name = frame.to_string();
           if (!name)
             return std::unexpected(std::move(name.error()));
           if (!name->empty())
@@ -1593,11 +1593,11 @@ std::expected<FramesSpecification, StarException> Assets::parseFramesSpecificati
   if (!aliasesConfig)
     return std::unexpected(std::move(aliasesConfig.error()));
   if (*aliasesConfig) {
-    auto aliases = (**aliasesConfig).toObject();
+    auto aliases = (**aliasesConfig).to_object();
     if (!aliases)
       return std::unexpected(std::move(aliases.error()));
     for (auto const& pair : *aliases) {
-      auto parsedValue = pair.second.toString();
+      auto parsedValue = pair.second.to_string();
       if (!parsedValue)
         return std::unexpected(std::move(parsedValue.error()));
       String value = std::move(*parsedValue);
@@ -1607,7 +1607,7 @@ std::expected<FramesSpecification, StarException> Assets::parseFramesSpecificati
           break;
         if (i == aliases->size())
           return std::unexpected(AssetException(Star::format("Infinite alias loop detected for alias '{}'", pair.first)));
-        auto next = alias->get().toString();
+        auto next = alias->get().to_string();
         if (!next)
           return std::unexpected(std::move(next.error()));
         value = std::move(*next);
@@ -2003,7 +2003,7 @@ std::expected<Json, StarException> Assets::checkPatchArray(String const& path,
         break;
       }
       case Json::Type::String: {
-        auto referencePath = patch.toString();
+        auto referencePath = patch.to_string();
         if (!referencePath)
           return std::unexpected(std::move(referencePath.error()));
         auto reference = json(*referencePath);
@@ -2013,7 +2013,7 @@ std::expected<Json, StarException> Assets::checkPatchArray(String const& path,
         break;
       }
       default:
-        return std::unexpected(JsonPatchException(Star::format("Patch data is wrong type: {}", Json::typeName(patch.type()))));
+        return std::unexpected(JsonPatchException(Star::format("Patch data is wrong type: {}", Json::type_name(patch.type()))));
     }
   }
   return newResult;
@@ -2092,7 +2092,7 @@ std::expected<Json, StarException> Assets::applyJsonPatches(Json const& input, S
             return std::unexpected(std::move(selected.error()));
           *patchJson = std::move(*selected);
         }
-        if (patchJson->isType(Json::Type::Array)) {
+        if (patchJson->is_type(Json::Type::Array)) {
           auto patchData = patchJson->array_ptr();
           if (!patchData)
             return std::unexpected(std::move(patchData.error()));
@@ -2107,8 +2107,8 @@ std::expected<Json, StarException> Assets::applyJsonPatches(Json const& input, S
             if (!logged)
               return std::unexpected(std::move(logged.error()));
           }
-        } else if (patchJson->isType(Json::Type::Object)) {
-          result = jsonMergeNulling(result, *patchJson);
+        } else if (patchJson->is_type(Json::Type::Object)) {
+          result = json_merge_nulling(result, *patchJson);
         }
         return {};
       };

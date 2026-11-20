@@ -116,7 +116,7 @@ static std::expected<int, StarException> unpackAssets(int argc, char** argv) {
 
   auto metadata = (*assetsPack)->metadata();
   if (!metadata.empty()) {
-    auto printed = Json(std::move(metadata)).printJson(2);
+    auto printed = Json(std::move(metadata)).print_json(2);
     if (!printed)
       return std::unexpected(std::move(printed.error()));
     auto written = File::write_file(*printed, "_metadata");

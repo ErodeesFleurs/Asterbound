@@ -114,7 +114,7 @@ std::expected<void, StarException> ModsMenu::init() {
     if (auto result = (*modName)->setText(*name); !result)
       return std::unexpected(std::move(result.error()));
     if (auto iconImage = metadata->find_ref("icon")) {
-      auto image = iconImage->get().toString();
+      auto image = iconImage->get().to_string();
       if (!image)
         return std::unexpected(std::move(image.error()));
       auto icon = (*listItem)->requireChild<ImageWidget>("icon");
@@ -191,16 +191,16 @@ std::expected<void, StarException> ModsMenu::update(float dt) {
     auto name = bestModName(*metadata, source->get());
     if (!name)
       return std::unexpected(std::move(name.error()));
-    auto author = metadata->value("author", "No Author Set").toString();
+    auto author = metadata->value("author", "No Author Set").to_string();
     if (!author)
       return std::unexpected(std::move(author.error()));
-    auto version = metadata->value("version", "No Version Set").printString();
+    auto version = metadata->value("version", "No Version Set").print_string();
     if (!version)
       return std::unexpected(std::move(version.error()));
-    auto description = metadata->value("description", "").toString();
+    auto description = metadata->value("description", "").to_string();
     if (!description)
       return std::unexpected(std::move(description.error()));
-    auto link = metadata->value("link", "").toString();
+    auto link = metadata->value("link", "").to_string();
     if (!link)
       return std::unexpected(std::move(link.error()));
     if (auto result = m_modName->setText(*name); !result)
@@ -221,9 +221,9 @@ std::expected<void, StarException> ModsMenu::update(float dt) {
 
 std::expected<String, StarException> ModsMenu::bestModName(JsonObject const& metadata, String const& sourcePath) {
   if (auto value = metadata.find_ref("friendlyName"))
-    return value->get().toString();
+    return value->get().to_string();
   if (auto value = metadata.find_ref("name"))
-    return value->get().toString();
+    return value->get().to_string();
   String baseName = File::base_name(sourcePath);
   auto contains = baseName.contains(".");
   if (!contains)
@@ -248,7 +248,7 @@ std::expected<void, StarException> ModsMenu::openLink() {
   auto metadata = (*assets)->assetSourceMetadata(source->get());
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
-  auto link = metadata->value("link", "").toString();
+  auto link = metadata->value("link", "").to_string();
   if (!link)
     return std::unexpected(std::move(link.error()));
   if (link->empty())
@@ -268,7 +268,7 @@ std::expected<void, StarException> ModsMenu::openWorkshop() {
     auto config = (*assets)->json("/interface/modsmenu/modsmenu.config:workshopLink");
     if (!config)
       return std::unexpected(std::move(config.error()));
-    auto link = config->toString();
+    auto link = config->to_string();
     if (!link)
       return std::unexpected(std::move(link.error()));
     desktopService->openUrl(*link);

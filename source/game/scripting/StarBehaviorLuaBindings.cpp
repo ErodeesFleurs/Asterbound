@@ -57,8 +57,8 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeBehaviorCallbacks(Ro
     }
 
     std::expected<std::shared_ptr<BehaviorTree const>, StarException> tree;
-    if (config.isType(Json::Type::String)) {
-      auto name = config.toString();
+    if (config.is_type(Json::Type::String)) {
+      auto name = config.to_string();
       if (!name)
         return std::unexpected(std::move(name.error()));
       if (parameters.empty()) {
@@ -67,20 +67,20 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeBehaviorCallbacks(Ro
         auto treeConfig = (*behaviorDatabase)->behaviorConfig(*name);
         if (!treeConfig)
           return std::unexpected(std::move(treeConfig.error()));
-        auto object = treeConfig->toObject();
+        auto object = treeConfig->to_object();
         if (!object)
           return std::unexpected(std::move(object.error()));
         auto parameter = object->get("parameters");
         if (!parameter)
           return std::unexpected(std::move(parameter.error()));
-        object->set("parameters", jsonMerge(parameter->get(), parameters));
+        object->set("parameters", json_merge(parameter->get(), parameters));
         tree = (*behaviorDatabase)->buildTree(*object);
       }
     } else {
-      auto defaults = config.getObject("parameters", {});
+      auto defaults = config.get_object("parameters", {});
       if (!defaults)
         return std::unexpected(std::move(defaults.error()));
-      auto treeConfig = config.set("parameters", jsonMerge(*defaults, parameters));
+      auto treeConfig = config.set("parameters", json_merge(*defaults, parameters));
       if (!treeConfig)
         return std::unexpected(std::move(treeConfig.error()));
       tree = (*behaviorDatabase)->buildTree(*treeConfig);

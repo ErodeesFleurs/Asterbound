@@ -46,7 +46,7 @@ std::expected<std::shared_ptr<PlayerCodexes>, StarException> PlayerCodexes::crea
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   for (auto const& entry : *entries) {
-    auto read = entry.second.toBool();
+    auto read = entry.second.to_bool();
     if (!read)
       return std::unexpected(std::move(read.error()));
     if (auto codex = (*database)->codex(entry.first)) {
@@ -129,7 +129,7 @@ std::expected<void, StarException> PlayerCodexes::learnInitialCodexes(String con
   auto config = (*assets)->json(Star::format("/player.config:defaultCodexes.{}", playerSpecies));
   if (!config)
     return std::unexpected(std::move(config.error()));
-  auto codexes = jsonToStringList(*config);
+  auto codexes = json_to_string_list(*config);
   if (!codexes)
     return std::unexpected(std::move(codexes.error()));
   for (auto const& codexId : *codexes) {

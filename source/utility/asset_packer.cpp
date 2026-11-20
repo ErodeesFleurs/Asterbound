@@ -78,7 +78,7 @@ static std::expected<int, StarException> packAssets(int argc, char** argv) {
       return 1;
     }
 
-    auto configFileJson = Json::parseJson(*configFileContents);
+    auto configFileJson = Json::parse_json(*configFileContents);
     if (!configFileJson) {
       if (!configFileJson.error().is<JsonParsingException>())
         return std::unexpected(std::move(configFileJson.error()));
@@ -93,7 +93,7 @@ static std::expected<int, StarException> packAssets(int argc, char** argv) {
       auto globalIgnore = configFileJson->get("globalIgnore", JsonArray());
       if (!globalIgnore)
         return std::unexpected(std::move(globalIgnore.error()));
-      auto globalPatterns = jsonToStringList(*globalIgnore);
+      auto globalPatterns = json_to_string_list(*globalIgnore);
       if (!globalPatterns)
         return std::unexpected(std::move(globalPatterns.error()));
       ignoreFiles = std::move(*globalPatterns);
@@ -101,7 +101,7 @@ static std::expected<int, StarException> packAssets(int argc, char** argv) {
         auto serverIgnore = configFileJson->get("serverIgnore", JsonArray());
         if (!serverIgnore)
           return std::unexpected(std::move(serverIgnore.error()));
-        auto serverPatterns = jsonToStringList(*serverIgnore);
+        auto serverPatterns = json_to_string_list(*serverIgnore);
         if (!serverPatterns)
           return std::unexpected(std::move(serverPatterns.error()));
         ignoreFiles.append_range(std::move(*serverPatterns));
@@ -109,7 +109,7 @@ static std::expected<int, StarException> packAssets(int argc, char** argv) {
       auto ordering = configFileJson->get("extensionOrdering", JsonArray());
       if (!ordering)
         return std::unexpected(std::move(ordering.error()));
-      auto extensions = jsonToStringList(*ordering);
+      auto extensions = json_to_string_list(*ordering);
       if (!extensions)
         return std::unexpected(std::move(extensions.error()));
       extensionOrdering = std::move(*extensions);

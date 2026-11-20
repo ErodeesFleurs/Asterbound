@@ -258,7 +258,7 @@ Json spawnTargetToJson(SpawnTarget spawnTarget) {
   if (std::holds_alternative<SpawnTargetUniqueEntity>(spawnTarget))
     return std::get<SpawnTargetUniqueEntity>(spawnTarget);
   else if (std::holds_alternative<SpawnTargetPosition>(spawnTarget))
-    return jsonFromVec2F(std::get<SpawnTargetPosition>(spawnTarget));
+    return json_from_vec2f(std::get<SpawnTargetPosition>(spawnTarget));
   else if (std::holds_alternative<SpawnTargetX>(spawnTarget))
     return Json(std::get<SpawnTargetX>(spawnTarget));
   else
@@ -266,20 +266,20 @@ Json spawnTargetToJson(SpawnTarget spawnTarget) {
 }
 
 std::expected<SpawnTarget, StarException> spawnTargetFromJson(Json v) {
-  if (v.isNull()) {
+  if (v.is_null()) {
     return SpawnTarget();
-  } else if (v.isType(Json::Type::String)) {
-    auto text = v.toString();
+  } else if (v.is_type(Json::Type::String)) {
+    auto text = v.to_string();
     if (!text)
       return std::unexpected(std::move(text.error()));
     return SpawnTargetUniqueEntity(std::move(*text));
-  } else if (v.isType(Json::Type::Float)) {
-    auto x = v.toFloat();
+  } else if (v.is_type(Json::Type::Float)) {
+    auto x = v.to_float();
     if (!x)
       return std::unexpected(std::move(x.error()));
     return SpawnTargetX(*x);
   } else {
-    auto position = jsonToVec2F(v);
+    auto position = json_to_vec2f(v);
     if (!position)
       return std::unexpected(std::move(position.error()));
     return SpawnTargetPosition(*position);
@@ -305,7 +305,7 @@ WarpToWorld::WarpToWorld(WorldId world, SpawnTarget target) : world(std::move(wo
 std::expected<WarpToWorld, StarException> WarpToWorld::create(Json v) {
   WarpToWorld result;
   if (v) {
-    auto worldText = v.getString("world");
+    auto worldText = v.get_string("world");
     if (!worldText)
       return std::unexpected(std::move(worldText.error()));
     auto world = parseWorldId(*worldText);

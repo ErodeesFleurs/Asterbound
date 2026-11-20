@@ -111,11 +111,11 @@ std::expected<std::shared_ptr<AiDatabase>, StarException> AiDatabase::create(Roo
     if (!noCrew)
       return std::unexpected(std::move(noCrew.error()));
     result->m_noCrewSpeech = std::move(*noCrew);
-    auto charactersPerSecond = config->getFloat("charactersPerSecond");
+    auto charactersPerSecond = config->get_float("charactersPerSecond");
     if (!charactersPerSecond)
       return std::unexpected(std::move(charactersPerSecond.error()));
     result->m_animationConfig.charactersPerSecond = *charactersPerSecond;
-    auto defaultAnimation = config->getString("defaultAnimation");
+    auto defaultAnimation = config->get_string("defaultAnimation");
     if (!defaultAnimation)
       return std::unexpected(std::move(defaultAnimation.error()));
     result->m_animationConfig.defaultAnimation = std::move(*defaultAnimation);
@@ -123,7 +123,7 @@ std::expected<std::shared_ptr<AiDatabase>, StarException> AiDatabase::create(Roo
     if (!staticAnimation)
       return std::unexpected(std::move(staticAnimation.error()));
     result->m_animationConfig.staticAnimation = std::move(*staticAnimation);
-    auto staticOpacity = config->getFloat("staticOpacity");
+    auto staticOpacity = config->get_float("staticOpacity");
     if (!staticOpacity)
       return std::unexpected(std::move(staticOpacity.error()));
     result->m_animationConfig.staticOpacity = *staticOpacity;
@@ -131,7 +131,7 @@ std::expected<std::shared_ptr<AiDatabase>, StarException> AiDatabase::create(Roo
     if (!scanlineAnimation)
       return std::unexpected(std::move(scanlineAnimation.error()));
     result->m_animationConfig.scanlineAnimation = std::move(*scanlineAnimation);
-    auto scanlineOpacity = config->getFloat("scanlineOpacity");
+    auto scanlineOpacity = config->get_float("scanlineOpacity");
     if (!scanlineOpacity)
       return std::unexpected(std::move(scanlineOpacity.error()));
     result->m_animationConfig.scanlineOpacity = *scanlineOpacity;
@@ -229,36 +229,36 @@ String AiDatabase::defaultAnimation() const {
 }
 
 std::expected<AiSpeech, StarException> AiDatabase::parseSpeech(Json const& v) {
-  auto animation = v.getString("animation");
+  auto animation = v.get_string("animation");
   if (!animation)
     return std::unexpected(std::move(animation.error()));
-  auto text = v.getString("text");
+  auto text = v.get_string("text");
   if (!text)
     return std::unexpected(std::move(text.error()));
-  auto speed = v.getFloat("speedModifier", 1.0f);
+  auto speed = v.get_float("speedModifier", 1.0f);
   if (!speed)
     return std::unexpected(std::move(speed.error()));
   return AiSpeech{*animation, *text, *speed};
 }
 
 std::expected<AiDatabase::AiSpeciesParameters, StarException> AiDatabase::parseSpeciesParameters(Json const& v) {
-  auto aiFrames = v.getString("aiFrames");
+  auto aiFrames = v.get_string("aiFrames");
   if (!aiFrames)
     return std::unexpected(std::move(aiFrames.error()));
-  auto portraitFrames = v.getString("portraitFrames");
+  auto portraitFrames = v.get_string("portraitFrames");
   if (!portraitFrames)
     return std::unexpected(std::move(portraitFrames.error()));
-  auto staticFrames = v.getString("staticFrames");
+  auto staticFrames = v.get_string("staticFrames");
   if (!staticFrames)
     return std::unexpected(std::move(staticFrames.error()));
   return AiSpeciesParameters{*aiFrames, *portraitFrames, *staticFrames};
 }
 
 std::expected<AiSpeciesMissionText, StarException> AiDatabase::parseSpeciesMissionText(Json const& vm) {
-  auto button = vm.getString("buttonText");
+  auto button = vm.get_string("buttonText");
   if (!button)
     return std::unexpected(std::move(button.error()));
-  auto repeat = vm.getString("repeatButtonText");
+  auto repeat = vm.get_string("repeatButtonText");
   if (!repeat)
     return std::unexpected(std::move(repeat.error()));
   auto speechConfig = vm.get("selectSpeech", {});
@@ -271,19 +271,19 @@ std::expected<AiSpeciesMissionText, StarException> AiDatabase::parseSpeciesMissi
 }
 
 std::expected<AiMission, StarException> AiDatabase::parseMission(Json const& vm) {
-  auto name = vm.getString("missionName");
+  auto name = vm.get_string("missionName");
   if (!name)
     return std::unexpected(std::move(name.error()));
-  auto world = vm.getString("missionWorld");
+  auto world = vm.get_string("missionWorld");
   if (!world)
     return std::unexpected(std::move(world.error()));
-  auto warpAnimation = vm.optString("warpAnimation");
+  auto warpAnimation = vm.opt_string("warpAnimation");
   if (!warpAnimation)
     return std::unexpected(std::move(warpAnimation.error()));
-  auto warpDeploy = vm.optBool("warpDeploy");
+  auto warpDeploy = vm.opt_bool("warpDeploy");
   if (!warpDeploy)
     return std::unexpected(std::move(warpDeploy.error()));
-  auto icon = vm.getString("icon");
+  auto icon = vm.get_string("icon");
   if (!icon)
     return std::unexpected(std::move(icon.error()));
   AiMission mission;

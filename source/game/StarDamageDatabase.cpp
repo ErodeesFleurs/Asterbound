@@ -40,7 +40,7 @@ std::expected<std::shared_ptr<DamageDatabase>, StarException> DamageDatabase::cr
       return std::unexpected(std::move(elementalEntries.error()));
     for (auto const& p : *elementalEntries) {
       ElementalType type;
-      auto resistance = p.second.getString("resistanceStat");
+      auto resistance = p.second.get_string("resistanceStat");
       if (!resistance)
         return std::unexpected(std::move(resistance.error()));
       type.resistanceStat = std::move(*resistance);
@@ -52,7 +52,7 @@ std::expected<std::shared_ptr<DamageDatabase>, StarException> DamageDatabase::cr
         auto hit = enum_value<HitTypeNames>(particle.first);
         if (!hit)
           return std::unexpected(std::move(hit.error()));
-        auto name = particle.second.toString();
+        auto name = particle.second.to_string();
         if (!name)
           return std::unexpected(std::move(name.error()));
         type.damageNumberParticles.set(*hit, std::move(*name));
@@ -77,7 +77,7 @@ std::expected<std::shared_ptr<DamageDatabase>, StarException> DamageDatabase::cr
       auto config = assets->json(path);
       if (!config)
         return std::unexpected(std::move(config.error()));
-      auto name = config->getString("kind");
+      auto name = config->get_string("kind");
       if (!name)
         return std::unexpected(std::move(name.error()));
       auto key = CaseInsensitiveString::create(*name);
@@ -115,7 +115,7 @@ std::expected<std::shared_ptr<DamageDatabase>, StarException> DamageDatabase::cr
           kind.effects.set(effect.first, std::move(materialEffects));
         }
       }
-      auto elementalType = config->getString("elementalType", "default");
+      auto elementalType = config->get_string("elementalType", "default");
       if (!elementalType)
         return std::unexpected(std::move(elementalType.error()));
       kind.elementalType = std::move(*elementalType);

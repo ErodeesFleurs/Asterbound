@@ -55,13 +55,13 @@ std::optional<StarException> SteamStatisticsService::error() const {
 
 std::expected<bool, StarException> SteamStatisticsService::setStat(String const& name, String const& type, Json const& value) {
   if (type == "int") {
-    auto converted = value.toInt();
+    auto converted = value.to_int();
     if (!converted)
       return std::unexpected(std::move(converted.error()));
     return SteamAPI_ISteamUserStats_SetStatInt32(SteamAPI_SteamUserStats(), name.utf8_data(), (std::int32_t)*converted);
   }
   if (type == "float") {
-    auto converted = value.toFloat();
+    auto converted = value.to_float();
     if (!converted)
       return std::unexpected(std::move(converted.error()));
     return SteamAPI_ISteamUserStats_SetStatFloat(SteamAPI_SteamUserStats(), name.utf8_data(), *converted);

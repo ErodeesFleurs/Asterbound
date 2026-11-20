@@ -149,19 +149,19 @@ std::expected<std::shared_ptr<UnlockItem>, StarException> UnlockItem::create(Roo
   auto swingable = item->initializeSwingable(config);
   if (!swingable)
     return std::unexpected(std::move(swingable.error()));
-  auto recipes = item->instanceValue("tierRecipesUnlock").and_then([](Json const& value) { return value.optString(); });
+  auto recipes = item->instanceValue("tierRecipesUnlock").and_then([](Json const& value) { return value.opt_string(); });
   if (!recipes)
     return std::unexpected(std::move(recipes.error()));
   item->m_tierRecipesUnlock = std::move(*recipes);
-  auto upgrade = item->instanceValue("shipUpgrade").and_then([](Json const& value) { return value.optUInt(); });
+  auto upgrade = item->instanceValue("shipUpgrade").and_then([](Json const& value) { return value.opt_uint(); });
   if (!upgrade)
     return std::unexpected(std::move(upgrade.error()));
   item->m_shipUpgrade = *upgrade;
-  auto message = item->instanceValue("unlockMessage").and_then([](Json const& value) { return value.optString(); });
+  auto message = item->instanceValue("unlockMessage").and_then([](Json const& value) { return value.opt_string(); });
   if (!message)
     return std::unexpected(std::move(message.error()));
   item->m_unlockMessage = message->value_or(String{});
-  auto image = item->instanceValue("image").and_then([](Json const& value) { return value.toString(); });
+  auto image = item->instanceValue("image").and_then([](Json const& value) { return value.to_string(); });
   if (!image)
     return std::unexpected(std::move(image.error()));
   auto metadata = root.imageMetadataDatabase();
@@ -195,7 +195,7 @@ std::expected<void, StarException> UnlockItem::fireTriggered() {
     return std::unexpected(std::move(itemOwner.error()));
   // Only players can use unlock items.
   if (auto player = as_ref<Player>(itemOwner->get())) {
-    auto shouldConsume = instanceValue("consume", true).and_then([](Json const& value) { return value.toBool(); });
+    auto shouldConsume = instanceValue("consume", true).and_then([](Json const& value) { return value.to_bool(); });
     if (!shouldConsume)
       return std::unexpected(std::move(shouldConsume.error()));
     if (*shouldConsume && !consume(1))
@@ -222,7 +222,7 @@ std::expected<void, StarException> UnlockItem::fireTriggered() {
       if (!playerConfig)
         return std::unexpected(std::move(playerConfig.error()));
       List<ItemDescriptor> blueprints;
-      auto playerBlueprints = playerConfig->get("defaultBlueprints", JsonObject()).and_then([&](Json const& value) { return value.getArray(*m_tierRecipesUnlock, JsonArray()); });
+      auto playerBlueprints = playerConfig->get("defaultBlueprints", JsonObject()).and_then([&](Json const& value) { return value.get_array(*m_tierRecipesUnlock, JsonArray()); });
       if (!playerBlueprints)
         return std::unexpected(std::move(playerBlueprints.error()));
       for (auto const& value : *playerBlueprints) {
@@ -234,7 +234,7 @@ std::expected<void, StarException> UnlockItem::fireTriggered() {
       auto speciesConfig = (*assets)->json(Star::format("/species/{}.species", player->get().species()));
       if (!speciesConfig)
         return std::unexpected(std::move(speciesConfig.error()));
-      auto speciesBlueprints = speciesConfig->get("defaultBlueprints", JsonObject()).and_then([&](Json const& value) { return value.getArray(*m_tierRecipesUnlock, JsonArray()); });
+      auto speciesBlueprints = speciesConfig->get("defaultBlueprints", JsonObject()).and_then([&](Json const& value) { return value.get_array(*m_tierRecipesUnlock, JsonArray()); });
       if (!speciesBlueprints)
         return std::unexpected(std::move(speciesBlueprints.error()));
       for (auto const& value : *speciesBlueprints) {

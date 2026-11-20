@@ -286,7 +286,7 @@ TEST(WeightedPoolTest, JsonRoundTripPreservesWeightsOrderAndFirstConversionError
   Json invalid(JsonArray{JsonArray{1.0, 17}, JsonArray{-1.0, "not an integer"}, JsonArray{1.0, 23}});
   auto rejected = json_to_weighted_pool<int>(invalid, [&converted](Json const& value) {
     ++converted;
-    return value.toInt();
+    return value.to_int();
   });
   EXPECT_FALSE(rejected);
   EXPECT_EQ(converted, 2u);

@@ -148,7 +148,7 @@ std::expected<void, StarException> Monster::initialize(MonsterVariant const& mon
 if (!result1) return std::unexpected(std::move(result1.error()));
 auto result2 = std::move(*result1)->json("/quests/quests.config:defaultIndicatorOffset");
 if (!result2) return std::unexpected(std::move(result2.error()));
-auto result3 = jsonToVec2F(std::move(*result2));
+auto result3 = json_to_vec2f(std::move(*result2));
 if (!result3) return std::unexpected(std::move(result3.error()));
 m_questIndicatorOffset = std::move(*result3);
 
@@ -165,7 +165,7 @@ m_effectEmitter = std::move(*result5);
   m_networkedAnimator->setZoom(m_monsterVariant.animatorZoom);
   auto result6 = this->root().monsterDatabase();
 if (!result6) return std::unexpected(std::move(result6.error()));
-auto result7 = m_monsterVariant.parameters.getString("colors", "default");
+auto result7 = m_monsterVariant.parameters.get_string("colors", "default");
 if (!result7) return std::unexpected(std::move(result7.error()));
 auto result8 = std::move(*result6)->colorSwap(std::move(*result7), m_monsterVariant.seed);
 if (!result8) return std::unexpected(std::move(result8.error()));
@@ -177,10 +177,10 @@ auto colorSwap = m_monsterVariant.colorSwap.value_or(std::move(*result8));
 if (!result9) return std::unexpected(std::move(result9.error()));
 m_statusController = std::move(*result9);
 
-  auto scriptsConfig = m_monsterVariant.parameters.optArray("scripts");
+  auto scriptsConfig = m_monsterVariant.parameters.opt_array("scripts");
   if (!scriptsConfig) return std::unexpected(std::move(scriptsConfig.error()));
   if (*scriptsConfig) {
-    auto scripts = jsonToStringList(**scriptsConfig);
+    auto scripts = json_to_string_list(**scriptsConfig);
     if (!scripts) return std::unexpected(std::move(scripts.error()));
     auto result10 = m_scriptComponent.setScripts(*scripts);
 if (!result10) return std::unexpected(std::move(result10.error()));
@@ -235,7 +235,7 @@ std::expected<std::shared_ptr<Monster>, StarException> Monster::create(Root& roo
 }
 
 std::expected<void, StarException> Monster::loadState(Json const& diskStore) {
-  auto result16 = diskStore.optFloat("monsterLevel");
+  auto result16 = diskStore.opt_float("monsterLevel");
 if (!result16) return std::unexpected(std::move(result16.error()));
 m_monsterLevel = std::move(*result16);
   auto result17 = diskStore.get("movementState");
@@ -248,19 +248,19 @@ if (!result19) return std::unexpected(std::move(result19.error()));
 auto result20 = m_statusController->diskLoad(std::move(*result19));
 if (!result20) return std::unexpected(std::move(result20.error()));
 
-  auto result21 = diskStore.getBool("damageOnTouch");
+  auto result21 = diskStore.get_bool("damageOnTouch");
 if (!result21) return std::unexpected(std::move(result21.error()));
 m_damageOnTouch = std::move(*result21);
-  auto result22 = diskStore.getBool("aggressive");
+  auto result22 = diskStore.get_bool("aggressive");
 if (!result22) return std::unexpected(std::move(result22.error()));
 m_aggressive = std::move(*result22);
-  auto result23 = diskStore.getString("deathParticleBurst");
+  auto result23 = diskStore.get_string("deathParticleBurst");
 if (!result23) return std::unexpected(std::move(result23.error()));
 m_deathParticleBurst = std::move(*result23);
-  auto result24 = diskStore.getString("deathSound");
+  auto result24 = diskStore.get_string("deathSound");
 if (!result24) return std::unexpected(std::move(result24.error()));
 m_deathSound = std::move(*result24);
-  auto result25 = diskStore.getString("activeSkillName");
+  auto result25 = diskStore.get_string("activeSkillName");
 if (!result25) return std::unexpected(std::move(result25.error()));
 m_activeSkillName = std::move(*result25);
   auto result26 = diskStore.get("dropPool");
@@ -271,13 +271,13 @@ if (!result27) return std::unexpected(std::move(result27.error()));
 auto result28 = m_effectEmitter->fromJson(std::move(*result27));
 if (!result28) return std::unexpected(std::move(result28.error()));
 
-  auto result29 = diskStore.getObject("scriptStorage");
+  auto result29 = diskStore.get_object("scriptStorage");
 if (!result29) return std::unexpected(std::move(result29.error()));
 auto result30 = m_scriptComponent.setScriptStorage(std::move(*result29));
 if (!result30) return std::unexpected(std::move(result30.error()));
 
 
-  auto result31 = diskStore.optString("uniqueId");
+  auto result31 = diskStore.opt_string("uniqueId");
 if (!result31) return std::unexpected(std::move(result31.error()));
 setUniqueId(std::move(*result31));
   {
@@ -631,7 +631,7 @@ if (!result97) return std::unexpected(std::move(result97.error()));
 auto result98 = std::move(*result96)->evaluate(std::move(*result97));
 if (!result98) return std::unexpected(std::move(result98.error()));
 float levelPowerMultiplier = std::move(*result98);
-  if (m_damageOnTouch && !m_monsterVariant.touchDamageConfig.isNull()) {
+  if (m_damageOnTouch && !m_monsterVariant.touchDamageConfig.is_null()) {
     auto result99 = DamageSource::create(m_monsterVariant.touchDamageConfig);
 if (!result99) return std::unexpected(std::move(result99.error()));
 auto damageSource = std::move(*result99);
@@ -648,7 +648,7 @@ auto damageSource = std::move(*result99);
     if (!m_animationDamageParts.get().contains(pair.first))
       continue;
 
-    auto result100 = pair.second.getString("anchorPart");
+    auto result100 = pair.second.get_string("anchorPart");
 if (!result100) return std::unexpected(std::move(result100.error()));
 String anchorPart = std::move(*result100);
     auto result101 = pair.second.get("damageSource");
@@ -686,13 +686,13 @@ knockback = std::move(*result106).transform_point(knockback);
     List<DamageSource> partSources;
     if (std::holds_alternative<Line2F>(ds.damageArea)) {
       {
-  auto result107 = pair.second.getBool("checkLineCollision", false);
+  auto result107 = pair.second.get_bool("checkLineCollision", false);
   if (!result107) return std::unexpected(std::move(result107.error()));
   if (std::move(*result107)) {
           Line2F worldLine = std::get<Line2F>(ds.damageArea).translated(position());
           float length = worldLine.length();
 
-          auto result108 = pair.second.getInt("bounces", 0);
+          auto result108 = pair.second.get_int("bounces", 0);
   if (!result108) return std::unexpected(std::move(result108.error()));
   auto bounces = std::move(*result108);
           while (true) {
@@ -745,13 +745,13 @@ std::expected<bool, StarException> Monster::shouldDie() {
 
 std::expected<void, StarException> Monster::knockout() {
   m_knockedOut = true;
-  auto result113 = m_monsterVariant.parameters.getFloat("knockoutTime", 1.0f);
+  auto result113 = m_monsterVariant.parameters.get_float("knockoutTime", 1.0f);
 if (!result113) return std::unexpected(std::move(result113.error()));
 m_knockoutTimer = std::move(*result113);
 
   m_damageOnTouch = false;
 
-  auto result114 = m_monsterVariant.parameters.getString("knockoutEffect");
+  auto result114 = m_monsterVariant.parameters.get_string("knockoutEffect");
 if (!result114) return std::unexpected(std::move(result114.error()));
 String knockoutEffect = std::move(*result114);
   if (!knockoutEffect.empty())
@@ -761,11 +761,11 @@ String knockoutEffect = std::move(*result114);
 
 }
 
-  auto result116 = m_monsterVariant.parameters.getObject("knockoutAnimationStates", JsonObject());
+  auto result116 = m_monsterVariant.parameters.get_object("knockoutAnimationStates", JsonObject());
 if (!result116) return std::unexpected(std::move(result116.error()));
 auto knockoutAnimationStates = std::move(*result116);
 for (auto const& pair : knockoutAnimationStates) {
-  auto result117 = pair.second.toString();
+  auto result117 = pair.second.to_string();
   if (!result117) return std::unexpected(std::move(result117.error()));
   auto result118 = m_networkedAnimator->setState(pair.first, std::move(*result117));
   if (!result118) return std::unexpected(std::move(result118.error()));
@@ -782,14 +782,14 @@ std::expected<void, StarException> Monster::destroy(std::optional<std::reference
 if (!result119) return std::unexpected(std::move(result119.error()));
 
 
-  if (isMaster() && !m_dropPool.isNull()) {
+  if (isMaster() && !m_dropPool.is_null()) {
     auto result120 = this->root().treasureDatabase();
 if (!result120) return std::unexpected(std::move(result120.error()));
 auto treasureDatabase = std::move(*result120);
 
     String treasurePool;
-    if (m_dropPool.isType(Json::Type::String)) {
-      auto result121 = m_dropPool.toString();
+    if (m_dropPool.is_type(Json::Type::String)) {
+      auto result121 = m_dropPool.to_string();
 if (!result121) return std::unexpected(std::move(result121.error()));
 treasurePool = std::move(*result121);
     } else {
@@ -803,7 +803,7 @@ treasurePool = std::move(*result121);
   if (!result122) return std::unexpected(std::move(result122.error()));
   if (std::move(*result122))
             {
-    auto result123 = m_dropPool.getString(damageSourceKind);
+    auto result123 = m_dropPool.get_string(damageSourceKind);
     if (!result123) return std::unexpected(std::move(result123.error()));
     treasurePool = std::move(*result123);
   }
@@ -812,7 +812,7 @@ treasurePool = std::move(*result121);
 
       if (treasurePool.empty())
         {
-  auto result124 = m_dropPool.getString("default");
+  auto result124 = m_dropPool.get_string("default");
   if (!result124) return std::unexpected(std::move(result124.error()));
   treasurePool = std::move(*result124);
 }
@@ -1547,21 +1547,21 @@ std::expected<List<PhysicsForceRegion>, StarException> Monster::forceRegions() c
 }
 
 std::expected<InteractAction, StarException> Monster::interact(InteractRequest const& request) {
-  auto result246 = recoverLuaScriptError(m_scriptComponent.invoke<Json>("interact", JsonObject{{"sourceId", request.sourceId}, {"sourcePosition", jsonFromVec2F(request.sourcePosition)}}));
+  auto result246 = recoverLuaScriptError(m_scriptComponent.invoke<Json>("interact", JsonObject{{"sourceId", request.sourceId}, {"sourcePosition", json_from_vec2f(request.sourcePosition)}}));
 if (!result246) return std::unexpected(std::move(result246.error()));
 auto result = std::move(*result246).value_or(Json{});
 
-  if (result.isNull())
+  if (result.is_null())
     return {};
 
-  if (result.isType(Json::Type::String))
+  if (result.is_type(Json::Type::String))
     {
-  auto result247 = result.toString();
+  auto result247 = result.to_string();
   if (!result247) return std::unexpected(std::move(result247.error()));
   return InteractAction::create(std::move(*result247), entityId(), {});
 }
 
-  auto result248 = result.getString(0);
+  auto result248 = result.get_string(0);
 if (!result248) return std::unexpected(std::move(result248.error()));
 auto result249 = result.get(1);
 if (!result249) return std::unexpected(std::move(result249.error()));

@@ -72,71 +72,71 @@ auto processTransforms = [](Mat3F mat, Json const& transforms,
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   for (auto const& v : *entries) {
-    auto action = v.getString(0);
+    auto action = v.get_string(0);
     if (!action)
       return std::unexpected(std::move(action.error()));
     if (*action == "reset") {
       mat = Mat3F::identity();
     } else if (*action == "translate") {
-      auto offsetJson = v.getArray(1);
+      auto offsetJson = v.get_array(1);
       if (!offsetJson)
         return std::unexpected(std::move(offsetJson.error()));
-      auto offset = jsonToVec2F(*offsetJson);
+      auto offset = json_to_vec2f(*offsetJson);
       if (!offset)
         return std::unexpected(std::move(offset.error()));
       mat.translate(*offset);
     } else if (*action == "rotate" || *action == "rotateDegrees") {
-      auto angle = v.getFloat(1);
+      auto angle = v.get_float(1);
       if (!angle)
         return std::unexpected(std::move(angle.error()));
       auto configuredCenter = properties.maybe("rotationCenter");
       auto defaultCenter =
-        configuredCenter ? configuredCenter->toArray() : std::expected<JsonArray, StarException>(JsonArray{0, 0});
+        configuredCenter ? configuredCenter->to_array() : std::expected<JsonArray, StarException>(JsonArray{0, 0});
       if (!defaultCenter)
         return std::unexpected(std::move(defaultCenter.error()));
-      auto centerJson = v.getArray(2, *defaultCenter);
+      auto centerJson = v.get_array(2, *defaultCenter);
       if (!centerJson)
         return std::unexpected(std::move(centerJson.error()));
-      auto center = jsonToVec2F(*centerJson);
+      auto center = json_to_vec2f(*centerJson);
       if (!center)
         return std::unexpected(std::move(center.error()));
       mat.rotate(*action == "rotate" ? *angle : *angle * std::numbers::pi / 180, *center);
     } else if (*action == "scale") {
-      auto scaleJson = v.getArray(1);
+      auto scaleJson = v.get_array(1);
       if (!scaleJson)
         return std::unexpected(std::move(scaleJson.error()));
-      auto scale = jsonToVec2F(*scaleJson);
+      auto scale = json_to_vec2f(*scaleJson);
       if (!scale)
         return std::unexpected(std::move(scale.error()));
       auto configuredCenter = properties.maybe("scalingCenter");
       auto defaultCenter =
-        configuredCenter ? configuredCenter->toArray() : std::expected<JsonArray, StarException>(JsonArray{0, 0});
+        configuredCenter ? configuredCenter->to_array() : std::expected<JsonArray, StarException>(JsonArray{0, 0});
       if (!defaultCenter)
         return std::unexpected(std::move(defaultCenter.error()));
-      auto centerJson = v.getArray(2, *defaultCenter);
+      auto centerJson = v.get_array(2, *defaultCenter);
       if (!centerJson)
         return std::unexpected(std::move(centerJson.error()));
-      auto center = jsonToVec2F(*centerJson);
+      auto center = json_to_vec2f(*centerJson);
       if (!center)
         return std::unexpected(std::move(center.error()));
       mat.scale(*scale, *center);
     } else if (*action == "transform") {
-      auto v1 = v.getFloat(1);
+      auto v1 = v.get_float(1);
       if (!v1)
         return std::unexpected(std::move(v1.error()));
-      auto v2 = v.getFloat(2);
+      auto v2 = v.get_float(2);
       if (!v2)
         return std::unexpected(std::move(v2.error()));
-      auto v3 = v.getFloat(3);
+      auto v3 = v.get_float(3);
       if (!v3)
         return std::unexpected(std::move(v3.error()));
-      auto v4 = v.getFloat(4);
+      auto v4 = v.get_float(4);
       if (!v4)
         return std::unexpected(std::move(v4.error()));
-      auto v5 = v.getFloat(5);
+      auto v5 = v.get_float(5);
       if (!v5)
         return std::unexpected(std::move(v5.error()));
-      auto v6 = v.getFloat(6);
+      auto v6 = v.get_float(6);
       if (!v6)
         return std::unexpected(std::move(v6.error()));
       mat = Mat3F(*v1, *v2, *v3, *v4, *v5, *v6, 0, 0, 1) * mat;
@@ -507,9 +507,9 @@ std::expected<std::shared_ptr<NetworkedAnimator>, StarException> NetworkedAnimat
 
 std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, String relativePath) {
   auto& root = m_root.get();
-  if (config.isNull()) return setupNetStates();
+  if (config.is_null()) return setupNetStates();
   if (config.type() == Json::Type::String) {
-    auto path = config.toString();
+    auto path = config.to_string();
     if (!path) return std::unexpected(std::move(path.error()));
     if (relativePath.empty()) relativePath = *path;
     auto assets = root.assets();
@@ -520,7 +520,7 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
   } else if (relativePath.empty()) {
     relativePath = "/";
   }
-  auto versionValue = config.getUInt("version", 0);
+  auto versionValue = config.get_uint("version", 0);
   if (!versionValue) return std::unexpected(std::move(versionValue.error()));
   m_animatorVersion = *versionValue;
   if (version() > 0) {
@@ -546,7 +546,7 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
   auto globalTagDefaultsEntries = globalTagDefaultsConfig->iterate_object();
   if (!globalTagDefaultsEntries) return std::unexpected(std::move(globalTagDefaultsEntries.error()));
   for (auto const& pair : *globalTagDefaultsEntries) {
-    auto value = pair.second.toString();
+    auto value = pair.second.to_string();
     if (!value) return std::unexpected(std::move(value.error()));
     setGlobalTag(pair.first, *value);
   }
@@ -558,7 +558,7 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
     auto tags = pair.second.iterate_object();
     if (!tags) return std::unexpected(std::move(tags.error()));
     for (auto const& tag : *tags) {
-      auto value = tag.second.toString();
+      auto value = tag.second.to_string();
       if (!value) return std::unexpected(std::move(value.error()));
       setPartTag(pair.first, tag.first, *value);
     }
@@ -569,7 +569,7 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
   if (!transformationGroupsEntries) return std::unexpected(std::move(transformationGroupsEntries.error()));
   for (auto const& pair : *transformationGroupsEntries) {
     auto& tg = m_transformationGroups[pair.first];
-    auto interpolated = pair.second.getBool("interpolated", false);
+    auto interpolated = pair.second.get_bool("interpolated", false);
     if (!interpolated) return std::unexpected(std::move(interpolated.error()));
     tg.interpolated = *interpolated;
     tg.setAffineTransform(Mat3F::identity());
@@ -582,12 +582,12 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
   if (!rotationGroupsEntries) return std::unexpected(std::move(rotationGroupsEntries.error()));
   for (auto const& pair : *rotationGroupsEntries) {
     auto& rotationGroup = m_rotationGroups[pair.first];
-    auto velocity = pair.second.getFloat("angularVelocity", 0.0f);
+    auto velocity = pair.second.get_float("angularVelocity", 0.0f);
     if (!velocity) return std::unexpected(std::move(velocity.error()));
     rotationGroup.angularVelocity = std::move(*velocity);
     auto centerJson = pair.second.get("rotationCenter", JsonArray{0, 0});
     if (!centerJson) return std::unexpected(std::move(centerJson.error()));
-    auto center = jsonToVec2F(*centerJson);
+    auto center = json_to_vec2f(*centerJson);
     if (!center) return std::unexpected(std::move(center.error()));
     rotationGroup.rotationCenter = std::move(*center);
   }
@@ -598,36 +598,36 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
   for (auto const& pair : *particleEmittersEntries) {
     auto& emitter = m_particleEmitters[pair.first];
     auto const& particleEmitterConfig = pair.second;
-    auto rate = particleEmitterConfig.getFloat("emissionRate", 1.0f);
+    auto rate = particleEmitterConfig.get_float("emissionRate", 1.0f);
     if (!rate) return std::unexpected(std::move(rate.error()));
     emitter.emissionRate.set(*rate);
-    auto variance = particleEmitterConfig.getFloat("emissionRateVariance", 0.0f);
+    auto variance = particleEmitterConfig.get_float("emissionRateVariance", 0.0f);
     if (!variance) return std::unexpected(std::move(variance.error()));
     emitter.emissionRateVariance = std::move(*variance);
     RectF offsetRegion = RectF::null();
     auto region = particleEmitterConfig.opt("offsetRegion");
     if (!region) return std::unexpected(std::move(region.error()));
     if (*region) {
-      auto regionValue = jsonToRectF(**region);
+      auto regionValue = json_to_rectf(**region);
       if (!regionValue) return std::unexpected(std::move(regionValue.error()));
       offsetRegion = *regionValue;
     }
     emitter.offsetRegion.set(offsetRegion);
-    auto anchor = particleEmitterConfig.optString("anchorPart");
+    auto anchor = particleEmitterConfig.opt_string("anchorPart");
     if (!anchor) return std::unexpected(std::move(anchor.error()));
     emitter.anchorPart = std::move(*anchor);
     auto groupsJson = particleEmitterConfig.get("transformationGroups", JsonArray());
     if (!groupsJson) return std::unexpected(std::move(groupsJson.error()));
-    auto groups = jsonToStringList(*groupsJson);
+    auto groups = json_to_string_list(*groupsJson);
     if (!groups) return std::unexpected(std::move(groups.error()));
     emitter.transformationGroups = std::move(*groups);
-    auto rotation = particleEmitterConfig.optString("rotationGroup");
+    auto rotation = particleEmitterConfig.opt_string("rotationGroup");
     if (!rotation) return std::unexpected(std::move(rotation.error()));
     emitter.rotationGroup = std::move(*rotation);
     auto center = particleEmitterConfig.opt("rotationCenter");
     if (!center) return std::unexpected(std::move(center.error()));
     if (*center) {
-      auto centerValue = jsonToVec2F(**center);
+      auto centerValue = json_to_vec2f(**center);
       if (!centerValue) return std::unexpected(std::move(centerValue.error()));
       emitter.rotationCenter = *centerValue;
     }
@@ -642,23 +642,23 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
       if (!particle) return std::unexpected(std::move(particle.error()));
       auto creator = (*database)->particleCreator(*particle, relativePath);
       if (!creator) return std::unexpected(std::move(creator.error()));
-      auto count = particleConfig.getUInt("count", 1);
+      auto count = particleConfig.get_uint("count", 1);
       if (!count) return std::unexpected(std::move(count.error()));
       auto offsetJson = particleConfig.get("offset", JsonArray{0, 0});
       if (!offsetJson) return std::unexpected(std::move(offsetJson.error()));
-      auto offset = jsonToVec2F(*offsetJson);
+      auto offset = json_to_vec2f(*offsetJson);
       if (!offset) return std::unexpected(std::move(offset.error()));
-      auto flip = particleConfig.getBool("flip", false);
+      auto flip = particleConfig.get_bool("flip", false);
       if (!flip) return std::unexpected(std::move(flip.error()));
       emitter.particleList.push_back({*creator, static_cast<unsigned>(*count), *offset, *flip});
     }
-    auto burstCount = particleEmitterConfig.getUInt("burstCount", 1);
+    auto burstCount = particleEmitterConfig.get_uint("burstCount", 1);
     if (!burstCount) return std::unexpected(std::move(burstCount.error()));
     emitter.burstCount.set(*burstCount);
-    auto randomCount = particleEmitterConfig.getUInt("randomSelectCount", emitter.particleList.size());
+    auto randomCount = particleEmitterConfig.get_uint("randomSelectCount", emitter.particleList.size());
     if (!randomCount) return std::unexpected(std::move(randomCount.error()));
     emitter.randomSelectCount.set(*randomCount);
-    auto active = particleEmitterConfig.getBool("active", false);
+    auto active = particleEmitterConfig.get_bool("active", false);
     if (!active) return std::unexpected(std::move(active.error()));
     emitter.active.set(*active);
   }
@@ -669,14 +669,14 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
   for (auto const& pair : *lightsEntries) {
     auto& light = m_lights[pair.first];
     auto const& lightConfig = pair.second;
-    auto active = lightConfig.getBool("active", true);
+    auto active = lightConfig.get_bool("active", true);
     if (!active) return std::unexpected(std::move(active.error()));
     light.active.set(*active);
     Vec2F lightPosition{};
     auto position = lightConfig.opt("position");
     if (!position) return std::unexpected(std::move(position.error()));
     if (*position) {
-      auto positionValue = jsonToVec2F(**position);
+      auto positionValue = json_to_vec2f(**position);
       if (!positionValue) return std::unexpected(std::move(positionValue.error()));
       lightPosition = *positionValue;
     }
@@ -686,54 +686,54 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
     auto colorConfig = lightConfig.opt("color");
     if (!colorConfig) return std::unexpected(std::move(colorConfig.error()));
     if (*colorConfig) {
-      auto colorConfigValue = jsonToColor(**colorConfig);
+      auto colorConfigValue = json_to_color(**colorConfig);
       if (!colorConfigValue) return std::unexpected(std::move(colorConfigValue.error()));
       color = *colorConfigValue;
     }
     light.color.set(color);
-    auto anchor = lightConfig.optString("anchorPart");
+    auto anchor = lightConfig.opt_string("anchorPart");
     if (!anchor) return std::unexpected(std::move(anchor.error()));
     light.anchorPart = std::move(*anchor);
     auto groupsJson = lightConfig.get("transformationGroups", JsonArray());
     if (!groupsJson) return std::unexpected(std::move(groupsJson.error()));
-    auto groups = jsonToStringList(*groupsJson);
+    auto groups = json_to_string_list(*groupsJson);
     if (!groups) return std::unexpected(std::move(groups.error()));
     light.transformationGroups = std::move(*groups);
-    auto rotation = lightConfig.optString("rotationGroup");
+    auto rotation = lightConfig.opt_string("rotationGroup");
     if (!rotation) return std::unexpected(std::move(rotation.error()));
     light.rotationGroup = std::move(*rotation);
     auto center = lightConfig.opt("rotationCenter");
     if (!center) return std::unexpected(std::move(center.error()));
     if (*center) {
-      auto centerValue = jsonToVec2F(**center);
+      auto centerValue = json_to_vec2f(**center);
       if (!centerValue) return std::unexpected(std::move(centerValue.error()));
       light.rotationCenter = *centerValue;
     }
     auto hasFlicker = lightConfig.contains("flickerPeriod");
     if (!hasFlicker) return std::unexpected(std::move(hasFlicker.error()));
     if (*hasFlicker) {
-      auto period = lightConfig.getFloat("flickerPeriod");
+      auto period = lightConfig.get_float("flickerPeriod");
       if (!period) return std::unexpected(std::move(period.error()));
-      auto minimum = lightConfig.getFloat("flickerMinIntensity", 0.0);
+      auto minimum = lightConfig.get_float("flickerMinIntensity", 0.0);
       if (!minimum) return std::unexpected(std::move(minimum.error()));
-      auto maximum = lightConfig.getFloat("flickerMaxIntensity", 0.0);
+      auto maximum = lightConfig.get_float("flickerMaxIntensity", 0.0);
       if (!maximum) return std::unexpected(std::move(maximum.error()));
-      auto periodVariance = lightConfig.getFloat("flickerPeriodVariance", 0.0);
+      auto periodVariance = lightConfig.get_float("flickerPeriodVariance", 0.0);
       if (!periodVariance) return std::unexpected(std::move(periodVariance.error()));
-      auto intensityVariance = lightConfig.getFloat("flickerIntensityVariance", 0.0);
+      auto intensityVariance = lightConfig.get_float("flickerIntensityVariance", 0.0);
       if (!intensityVariance) return std::unexpected(std::move(intensityVariance.error()));
       light.flicker = PeriodicFunction<float>(root.random(), *period, *minimum, *maximum, *periodVariance, *intensityVariance);
     }
-    auto angle = lightConfig.getFloat("pointAngle", 0.0f);
+    auto angle = lightConfig.get_float("pointAngle", 0.0f);
     if (!angle) return std::unexpected(std::move(angle.error()));
     light.pointAngle.set(*angle * Constants::degrees_to_radians);
-    auto point = lightConfig.getBool("pointLight", false);
+    auto point = lightConfig.get_bool("pointLight", false);
     if (!point) return std::unexpected(std::move(point.error()));
     light.pointLight = std::move(*point);
-    auto beam = lightConfig.getFloat("pointBeam", 0.0f);
+    auto beam = lightConfig.get_float("pointBeam", 0.0f);
     if (!beam) return std::unexpected(std::move(beam.error()));
     light.pointBeam = std::move(*beam);
-    auto ambience = lightConfig.getFloat("beamAmbience", 0.0f);
+    auto ambience = lightConfig.get_float("beamAmbience", 0.0f);
     if (!ambience) return std::unexpected(std::move(ambience.error()));
     light.beamAmbience = std::move(*ambience);
   }
@@ -744,9 +744,9 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
   for (auto const& pair : *soundsEntries) {
     auto& sound = m_sounds[pair.first];
     auto const& soundConfig = pair.second;
-    if (soundConfig.isType(Json::Type::Array)) {
+    if (soundConfig.is_type(Json::Type::Array)) {
       sound.rangeMultiplier = 1.0f;
-      auto pool = jsonToStringList(soundConfig);
+      auto pool = json_to_string_list(soundConfig);
       if (!pool) return std::unexpected(std::move(pool.error()));
       sound.soundPool.set(pool->transformed(
         [relativePath = m_relativePath](String const& path) { return AssetPath::relative_to(relativePath, path); }));
@@ -755,34 +755,34 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
       sound.pitchMultiplierTarget.set(1.0f);
       sound.pitchMultiplierRampTime.set(0.0f);
     } else {
-      auto range = soundConfig.getFloat("rangeMultiplier", 1.0f);
+      auto range = soundConfig.get_float("rangeMultiplier", 1.0f);
       if (!range) return std::unexpected(std::move(range.error()));
       sound.rangeMultiplier = std::move(*range);
       Vec2F soundPosition{};
       auto position = soundConfig.opt("position");
       if (!position) return std::unexpected(std::move(position.error()));
       if (*position) {
-        auto positionValue = jsonToVec2F(**position);
+        auto positionValue = json_to_vec2f(**position);
         if (!positionValue) return std::unexpected(std::move(positionValue.error()));
         soundPosition = *positionValue;
       }
       sound.xPosition.set(soundPosition[0]);
       sound.yPosition.set(soundPosition[1]);
-      auto volume = soundConfig.getFloat("volume", 1.0f);
+      auto volume = soundConfig.get_float("volume", 1.0f);
       if (!volume) return std::unexpected(std::move(volume.error()));
       sound.volumeTarget.set(*volume);
-      auto volumeRamp = soundConfig.getFloat("volumeRampTime", 0.0f);
+      auto volumeRamp = soundConfig.get_float("volumeRampTime", 0.0f);
       if (!volumeRamp) return std::unexpected(std::move(volumeRamp.error()));
       sound.volumeRampTime.set(*volumeRamp);
-      auto pitch = soundConfig.getFloat("pitchMultiplier", 1.0f);
+      auto pitch = soundConfig.get_float("pitchMultiplier", 1.0f);
       if (!pitch) return std::unexpected(std::move(pitch.error()));
       sound.pitchMultiplierTarget.set(*pitch);
-      auto pitchRamp = soundConfig.getFloat("pitchMultiplierRampTime", 0.0f);
+      auto pitchRamp = soundConfig.get_float("pitchMultiplierRampTime", 0.0f);
       if (!pitchRamp) return std::unexpected(std::move(pitchRamp.error()));
       sound.pitchMultiplierRampTime.set(*pitchRamp);
       auto poolJson = soundConfig.get("pool", JsonArray());
       if (!poolJson) return std::unexpected(std::move(poolJson.error()));
-      auto pool = jsonToStringList(*poolJson);
+      auto pool = json_to_string_list(*poolJson);
       if (!pool) return std::unexpected(std::move(pool.error()));
       sound.soundPool.set(pool->transformed(
         [relativePath = m_relativePath](String const& path) { return AssetPath::relative_to(relativePath, path); }));
@@ -794,13 +794,13 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
   if (!effectsEntries) return std::unexpected(std::move(effectsEntries.error()));
   for (auto const& pair : *effectsEntries) {
     auto& effect = m_effects[pair.first];
-    auto type = pair.second.getString("type");
+    auto type = pair.second.get_string("type");
     if (!type) return std::unexpected(std::move(type.error()));
     effect.type = std::move(*type);
-    auto time = pair.second.getFloat("time", 0.0f);
+    auto time = pair.second.get_float("time", 0.0f);
     if (!time) return std::unexpected(std::move(time.error()));
     effect.time = std::move(*time);
-    auto directives = pair.second.getString("directives");
+    auto directives = pair.second.get_string("directives");
     if (!directives) return std::unexpected(std::move(directives.error()));
     effect.directives = *directives;
   }
@@ -1037,24 +1037,24 @@ std::expected<Mat3F, StarException> NetworkedAnimator::queryPartTransformation(S
   auto const& part = active->get();
   Mat3F transformation = Mat3F::identity();
   if (auto offsetJson = part.properties.value("offset").opt()) {
-    auto offset = jsonToVec2F(*offsetJson);
+    auto offset = json_to_vec2f(*offsetJson);
     if (!offset) return std::unexpected(std::move(offset.error()));
     transformation = Mat3F::translation(*offset) * transformation;
   }
   transformation = part.animationAffineTransform() * transformation;
-  auto groups = jsonToStringList(part.properties.value("transformationGroups", JsonArray()));
+  auto groups = json_to_string_list(part.properties.value("transformationGroups", JsonArray()));
   if (!groups) return std::unexpected(std::move(groups.error()));
   auto group = queryGroupTransformation(*groups, sample);
   if (!group) return std::unexpected(std::move(group.error()));
   transformation = *group * transformation;
-  auto rotationName = part.properties.value("rotationGroup").optString();
+  auto rotationName = part.properties.value("rotationGroup").opt_string();
   if (!rotationName) return std::unexpected(std::move(rotationName.error()));
   if (*rotationName) {
     auto rotation = m_rotationGroups.get(**rotationName);
     if (!rotation) return std::unexpected(std::move(rotation.error()));
     Vec2F center = rotation->get().rotationCenter;
     if (auto centerJson = part.properties.value("rotationCenter").opt()) {
-      auto configuredCenter = jsonToVec2F(*centerJson);
+      auto configuredCenter = json_to_vec2f(*centerJson);
       if (!configuredCenter) return std::unexpected(std::move(configuredCenter.error()));
       center = *configuredCenter;
     }
@@ -1064,7 +1064,7 @@ std::expected<Mat3F, StarException> NetworkedAnimator::queryPartTransformation(S
     transformation = Mat3F::rotation(angle, center) * transformation;
   }
   if (auto anchorJson = part.properties.find_ref("anchorPart")) {
-    auto anchorName = anchorJson->get().toString();
+    auto anchorName = anchorJson->get().to_string();
     if (!anchorName) return std::unexpected(std::move(anchorName.error()));
     auto anchor = queryPartTransformation(*anchorName, sample);
     if (!anchor) return std::unexpected(std::move(anchor.error()));
@@ -1088,7 +1088,7 @@ std::expected<std::optional<Vec2F>, StarException> NetworkedAnimator::queryPartP
   if (!active) return std::unexpected(std::move(active.error()));
   auto property = active->get().properties.value(propertyName);
   if (!property) return std::optional<Vec2F>{};
-  auto value = jsonToVec2F(property);
+  auto value = json_to_vec2f(property);
   if (!value) return std::unexpected(std::move(value.error()));
   auto transform = queryFinalPartTransformation(partName, sample);
   if (!transform) return std::unexpected(std::move(transform.error()));
@@ -1100,7 +1100,7 @@ std::expected<std::optional<PolyF>, StarException> NetworkedAnimator::queryPartP
   if (!active) return std::unexpected(std::move(active.error()));
   auto property = active->get().properties.value(propertyName);
   if (!property) return std::optional<PolyF>{};
-  auto value = jsonToPolyF(property);
+  auto value = json_to_polyf(property);
   if (!value) return std::unexpected(std::move(value.error()));
   auto transform = queryFinalPartTransformation(partName, sample);
   if (!transform) return std::unexpected(std::move(transform.error()));
@@ -1196,7 +1196,7 @@ std::expected<String, StarException> NetworkedAnimator::queryApplyPartTags(Strin
         if (!tags) return std::unexpected(std::move(tags.error()));
         for (auto const& tag : *tags) {
           if (!animationTags.contains(tag.first)) {
-            auto value = tag.second.toString();
+            auto value = tag.second.to_string();
             if (!value) return std::unexpected(std::move(value.error()));
             animationTags.set(tag.first, *value);
           }
@@ -1617,7 +1617,7 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
         if (!tags) return std::unexpected(std::move(tags.error()));
         for (auto const& tag : *tags) {
           if (!animationTags.contains(tag.first)) {
-            auto value = tag.second.toString();
+            auto value = tag.second.to_string();
             if (!value) return std::unexpected(std::move(value.error()));
             animationTags.set(tag.first, *value);
           }
@@ -1632,12 +1632,12 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
   auto collected = m_animatedParts.forEachActivePart([&](String const& partName, AnimatedPartSet::ActivePartInformation const& activePart) -> std::expected<void, StarException> {
     std::optional<float> maybeZLevel;
     if (m_flipped.get()) {
-      auto maybeFlipped = activePart.properties.value("flippedZLevel").optFloat();
+      auto maybeFlipped = activePart.properties.value("flippedZLevel").opt_float();
       if (!maybeFlipped) return std::unexpected(std::move(maybeFlipped.error()));
       if (*maybeFlipped) maybeZLevel = **maybeFlipped;
     }
     if (!maybeZLevel) {
-      auto z = activePart.properties.value("zLevel").optFloat();
+      auto z = activePart.properties.value("zLevel").opt_float();
       if (!z) return std::unexpected(std::move(z.error()));
       maybeZLevel = *z;
     }
@@ -1660,13 +1660,13 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
     String fallback = "";
     Json jImage = activePart.properties.value("image", {});
     if (version() > 0 && m_flipped.get()) {
-      auto maybeFlipped = activePart.properties.value("flippedImage").optString();
+      auto maybeFlipped = activePart.properties.value("flippedImage").opt_string();
       if (!maybeFlipped) return std::unexpected(std::move(maybeFlipped.error()));
       if (*maybeFlipped) jImage = **maybeFlipped;
     }
 
     std::shared_ptr<String const> imageString;
-    if (jImage.isType(Json::Type::String)) {
+    if (jImage.is_type(Json::Type::String)) {
       auto checkedImage = jImage.string_ptr();
       if (!checkedImage)
         return std::unexpected(std::move(checkedImage.error()));
@@ -1674,9 +1674,9 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
     }
     String const& image = imageString ? *imageString : fallback;
 
-    auto centeredValue = activePart.properties.value("centered").optBool();
+    auto centeredValue = activePart.properties.value("centered").opt_bool();
     if (!centeredValue) return std::unexpected(std::move(centeredValue.error()));
-    auto fullbrightValue = activePart.properties.value("fullbright").optBool();
+    auto fullbrightValue = activePart.properties.value("fullbright").opt_bool();
     if (!fullbrightValue) return std::unexpected(std::move(fullbrightValue.error()));
     bool centered = centeredValue->value_or(true);
     bool fullbright = fullbrightValue->value_or(false);
@@ -1687,7 +1687,7 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
     if (!partTagsResult) return std::unexpected(std::move(partTagsResult.error()));
     auto const& partTags = partTagsResult->get();
 
-    auto partDirectives = activePart.properties.value("processingDirectives").optString();
+    auto partDirectives = activePart.properties.value("processingDirectives").opt_string();
     if (!partDirectives) return std::unexpected(std::move(partDirectives.error()));
     if (auto directives = *partDirectives) {
       if (version() > 0){
@@ -1715,7 +1715,7 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
       frameStr = static_cast<String>(Star::to_string(stateFrame + 1));
       frameIndexStr = static_cast<String>(Star::to_string(stateFrame));
 
-      auto stateDirectives = activePart.activeState->properties.value("processingDirectives").optString();
+      auto stateDirectives = activePart.activeState->properties.value("processingDirectives").opt_string();
       if (!stateDirectives) return std::unexpected(std::move(stateDirectives.error()));
       if (auto directives = *stateDirectives) {
         if (version() > 0){
@@ -1873,16 +1873,16 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
         Json persistentSound = activeState.properties.value("persistentSound", "");
         String persistentSoundFile;
 
-        if (persistentSound.isType(Json::Type::String)) {
-          auto file = persistentSound.toString();
+        if (persistentSound.is_type(Json::Type::String)) {
+          auto file = persistentSound.to_string();
           if (!file) return std::unexpected(std::move(file.error()));
           persistentSoundFile = *file;
-        } else if (persistentSound.isType(Json::Type::Array)) {
+        } else if (persistentSound.is_type(Json::Type::Array)) {
           auto sound_pool = persistentSound.array_ptr();
           if (!sound_pool)
             return std::unexpected(std::move(sound_pool.error()));
           auto file = m_root.get().random().sample_value(**sound_pool, "").and_then([](Json const& value) {
-            return value.toString();
+            return value.to_string();
           });
           if (!file) return std::unexpected(std::move(file.error()));
           persistentSoundFile = *file;
@@ -1907,12 +1907,12 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
             auto instance = AudioInstance::create(**audio);
             if (!instance) return std::unexpected(std::move(instance.error()));
             activePersistentSound.audio = std::move(*instance);
-            auto range = activeState.properties.value("persistentSoundRangeMultiplier", 1.0f).toFloat();
+            auto range = activeState.properties.value("persistentSoundRangeMultiplier", 1.0f).to_float();
             if (!range) return std::unexpected(std::move(range.error()));
             activePersistentSound.audio->set_range_multiplier(*range);
             activePersistentSound.audio->set_loops(-1);
             activePersistentSound.audio->set_position(globalTransformation().transform_point(Vec2F()));
-            auto stopTime = activeState.properties.value("persistentSoundStopTime", 0.0f).toFloat();
+            auto stopTime = activeState.properties.value("persistentSoundStopTime", 0.0f).to_float();
             if (!stopTime) return std::unexpected(std::move(stopTime.error()));
             activePersistentSound.stopRampTime = *stopTime;
             dynamicTarget->get().pendingAudios.push_back(activePersistentSound.audio);
@@ -1924,16 +1924,16 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
         Json immediateSound = activeState.properties.value("immediateSound", "");
         String immediateSoundFile = "";
 
-        if (immediateSound.isType(Json::Type::String)) {
-          auto file = immediateSound.toString();
+        if (immediateSound.is_type(Json::Type::String)) {
+          auto file = immediateSound.to_string();
           if (!file) return std::unexpected(std::move(file.error()));
           immediateSoundFile = *file;
-        } else if (immediateSound.isType(Json::Type::Array)) {
+        } else if (immediateSound.is_type(Json::Type::Array)) {
           auto sound_pool = immediateSound.array_ptr();
           if (!sound_pool)
             return std::unexpected(std::move(sound_pool.error()));
           auto file = m_root.get().random().sample_value(**sound_pool, "").and_then([](Json const& value) {
-            return value.toString();
+            return value.to_string();
           });
           if (!file) return std::unexpected(std::move(file.error()));
           immediateSoundFile = *file;
@@ -1955,7 +1955,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
             auto instance = AudioInstance::create(**audio);
             if (!instance) return std::unexpected(std::move(instance.error()));
             activeImmediateSound.audio = std::move(*instance);
-            auto range = activeState.properties.value("immediateSoundRangeMultiplier", 1.0f).toFloat();
+            auto range = activeState.properties.value("immediateSoundRangeMultiplier", 1.0f).to_float();
             if (!range) return std::unexpected(std::move(range.error()));
             activeImmediateSound.audio->set_range_multiplier(*range);
             activeImmediateSound.audio->set_position(globalTransformation().transform_point(Vec2F()));
@@ -1968,7 +1968,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
         auto entries = lightsOn->get().iterate_array();
         if (!entries) return std::unexpected(std::move(entries.error()));
         for (auto const& nameJson : *entries) {
-          auto name = nameJson.toString();
+          auto name = nameJson.to_string();
           if (!name) return std::unexpected(std::move(name.error()));
           auto entry = m_lights.get(*name);
           if (!entry) return std::unexpected(std::move(entry.error()));
@@ -1979,7 +1979,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
         auto entries = lightsOff->get().iterate_array();
         if (!entries) return std::unexpected(std::move(entries.error()));
         for (auto const& nameJson : *entries) {
-          auto name = nameJson.toString();
+          auto name = nameJson.to_string();
           if (!name) return std::unexpected(std::move(name.error()));
           auto entry = m_lights.get(*name);
           if (!entry) return std::unexpected(std::move(entry.error()));
@@ -1991,7 +1991,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
         auto entries = particleEmittersOn->get().iterate_array();
         if (!entries) return std::unexpected(std::move(entries.error()));
         for (auto const& nameJson : *entries) {
-          auto name = nameJson.toString();
+          auto name = nameJson.to_string();
           if (!name) return std::unexpected(std::move(name.error()));
           auto entry = m_particleEmitters.get(*name);
           if (!entry) return std::unexpected(std::move(entry.error()));
@@ -2002,7 +2002,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
         auto entries = particleEmittersOff->get().iterate_array();
         if (!entries) return std::unexpected(std::move(entries.error()));
         for (auto const& nameJson : *entries) {
-          auto name = nameJson.toString();
+          auto name = nameJson.to_string();
           if (!name) return std::unexpected(std::move(name.error()));
           auto entry = m_particleEmitters.get(*name);
           if (!entry) return std::unexpected(std::move(entry.error()));
@@ -2378,7 +2378,7 @@ std::expected<Json, StarException> NetworkedAnimator::mergeIncludes(Root& root, 
   auto paths = includes.iterate_array();
   if (!paths) return std::unexpected(std::move(paths.error()));
   for (auto const& path : *paths) {
-    auto name = path.toString();
+    auto name = path.to_string();
     if (!name) return std::unexpected(std::move(name.error()));
     auto assets = root.assets();
     if (!assets) return std::unexpected(std::move(assets.error()));
@@ -2394,9 +2394,9 @@ std::expected<Json, StarException> NetworkedAnimator::mergeIncludes(Root& root, 
       if (!merged) return std::unexpected(std::move(merged.error()));
       includeConfig = std::move(*merged);
     }
-    includedConfigs = jsonMerge(includedConfigs, includeConfig);
+    includedConfigs = json_merge(includedConfigs, includeConfig);
   }
-  return jsonMerge(includedConfigs, config);
+  return json_merge(includedConfigs, config);
 }
 
 }

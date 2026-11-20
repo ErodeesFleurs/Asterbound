@@ -232,46 +232,46 @@ Vec2U OpenGlRenderer::screenSize() const {
 std::expected<RefPtr<OpenGlRenderer::GlFrameBuffer>, StarException> OpenGlRenderer::GlFrameBuffer::create(Json const& fbConfig) {
   auto result = make_ref<GlFrameBuffer>();
   result->config = fbConfig;
-  auto clear = fbConfig.getBool("clear", true);
+  auto clear = fbConfig.get_bool("clear", true);
   if (!clear) return std::unexpected(std::move(clear.error()));
   result->clear = *clear;
-  auto multisample = fbConfig.getUInt("multisample", 0);
+  auto multisample = fbConfig.get_uint("multisample", 0);
   if (!multisample) return std::unexpected(std::move(multisample.error()));
   if (*multisample > static_cast<std::uint64_t>(std::numeric_limits<GLsizei>::max()))
     return std::unexpected(RendererException("Framebuffer sample count exceeds the OpenGL integer range"));
   result->multisample = GLEW_VERSION_4_0 ? *multisample : 0;
-  auto hdrName = fbConfig.getString("hdr", "Disabled");
+  auto hdrName = fbConfig.get_string("hdr", "Disabled");
   if (!hdrName) return std::unexpected(std::move(hdrName.error()));
   auto hdrMode = enum_value<BoolSettingModeNames>(*hdrName);
   if (!hdrMode) return std::unexpected(std::move(hdrMode.error()));
   result->hdrMode = *hdrMode;
-  auto hdrSetting = fbConfig.getBool("hdrSetting", false);
+  auto hdrSetting = fbConfig.get_bool("hdrSetting", false);
   if (!hdrSetting) return std::unexpected(std::move(hdrSetting.error()));
   bool hdr = settingModeValue(result->hdrMode, *hdrSetting);
-  auto alpha = fbConfig.getBool("alpha", false);
+  auto alpha = fbConfig.get_bool("alpha", false);
   if (!alpha) return std::unexpected(std::move(alpha.error()));
   result->alpha = *alpha || result->multisample;
-  auto sizeDiv = fbConfig.getUInt("sizeDiv", 1);
+  auto sizeDiv = fbConfig.get_uint("sizeDiv", 1);
   if (!sizeDiv) return std::unexpected(std::move(sizeDiv.error()));
   if (*sizeDiv == 0 || *sizeDiv > std::numeric_limits<unsigned>::max())
     return std::unexpected(RendererException("Framebuffer sizeDiv must be a positive unsigned integer"));
   result->sizeDiv = *sizeDiv;
   Vec2U size(256, 256);
-  auto configuredSize = fbConfig.optArray("size");
+  auto configuredSize = fbConfig.opt_array("size");
   if (!configuredSize) return std::unexpected(std::move(configuredSize.error()));
   if (*configuredSize) {
-    auto parsedSize = jsonToVec2U(**configuredSize);
+    auto parsedSize = json_to_vec2u(**configuredSize);
     if (!parsedSize) return std::unexpected(std::move(parsedSize.error()));
     result->overrideSize = *parsedSize;
     size = *parsedSize;
   }
   if (!size[0] || !size[1])
     return std::unexpected(RendererException("Framebuffer size must be positive"));
-  auto addressingName = fbConfig.getString("textureAddressing", "clamp");
+  auto addressingName = fbConfig.get_string("textureAddressing", "clamp");
   if (!addressingName) return std::unexpected(std::move(addressingName.error()));
   auto addressing = enum_value<TextureAddressingNames>(*addressingName);
   if (!addressing) return std::unexpected(std::move(addressing.error()));
-  auto filteringName = fbConfig.getString("textureFiltering", "nearest");
+  auto filteringName = fbConfig.get_string("textureFiltering", "nearest");
   if (!filteringName) return std::unexpected(std::move(filteringName.error()));
   auto filtering = enum_value<TextureFilteringNames>(*filteringName);
   if (!filtering) return std::unexpected(std::move(filtering.error()));
@@ -349,7 +349,7 @@ OpenGlRenderer::GlFrameBuffer::~GlFrameBuffer() {
 }
 
 std::expected<void, StarException> OpenGlRenderer::loadConfig(Json const& config) {
-  auto definitions = config.getObject("frameBuffers", {});
+  auto definitions = config.get_object("frameBuffers", {});
   if (!definitions) return std::unexpected(std::move(definitions.error()));
   StringMap<RefPtr<GlFrameBuffer>> buffers;
   for (auto const& pair : *definitions) {
@@ -357,7 +357,7 @@ std::expected<void, StarException> OpenGlRenderer::loadConfig(Json const& config
     if (!multisampleConfig) return std::unexpected(std::move(multisampleConfig.error()));
     auto framebufferConfig = multisampleConfig->set("hdrSetting", m_hdrSetting);
     if (!framebufferConfig) return std::unexpected(std::move(framebufferConfig.error()));
-    auto doubleBuffered = framebufferConfig->getBool("double", false);
+    auto doubleBuffered = framebufferConfig->get_bool("double", false);
     if (!doubleBuffered) return std::unexpected(std::move(doubleBuffered.error()));
     auto logged = m_logger.info("Creating framebuffer {}", pair.first);
     if (!logged) return std::unexpected(std::move(logged.error()));
@@ -465,13 +465,13 @@ std::expected<void, StarException> OpenGlRenderer::loadEffectConfig(String const
   Effect effect;
   effect.program = program;
   effect.config = effectConfig;
-  auto includeTextures = effectConfig.getBool("includeVBTextures", true);
+  auto includeTextures = effectConfig.get_bool("includeVBTextures", true);
   if (!includeTextures) return std::unexpected(std::move(includeTextures.error()));
   effect.includeVBTextures = *includeTextures;
-  auto parameters = effectConfig.getObject("effectParameters", {});
+  auto parameters = effectConfig.get_object("effectParameters", {});
   if (!parameters) return std::unexpected(std::move(parameters.error()));
   for (auto const& entry : *parameters) {
-    auto uniform = entry.second.getString("uniform");
+    auto uniform = entry.second.get_string("uniform");
     if (!uniform) return std::unexpected(std::move(uniform.error()));
     EffectParameter parameter;
     parameter.parameterUniform = glGetUniformLocation(program, uniform->utf8_data());
@@ -480,7 +480,7 @@ std::expected<void, StarException> OpenGlRenderer::loadEffectConfig(String const
       if (!logged) return std::unexpected(std::move(logged.error()));
       continue;
     }
-    auto type = entry.second.getString("type");
+    auto type = entry.second.get_string("type");
     if (!type) return std::unexpected(std::move(type.error()));
     if (*type == "bool") parameter.parameterType = 5;
     else if (*type == "int") parameter.parameterType = 1;
@@ -489,38 +489,38 @@ std::expected<void, StarException> OpenGlRenderer::loadEffectConfig(String const
     else if (*type == "vec3") parameter.parameterType = 3;
     else if (*type == "vec4") parameter.parameterType = 2;
     else return std::unexpected(RendererException::format("Unrecognized effect parameter type '{}'", *type));
-    auto scriptable = entry.second.getBool("scriptable", false);
+    auto scriptable = entry.second.get_bool("scriptable", false);
     if (!scriptable) return std::unexpected(std::move(scriptable.error()));
     auto value = entry.second.get("default", {});
     if (!value) return std::unexpected(std::move(value.error()));
-    if (!value->isNull()) {
+    if (!value->is_null()) {
       auto parseValue = [&]() -> std::expected<RenderEffectParameter, StarException> {
         if (*type == "bool") {
-          auto parsed = value->toBool();
+          auto parsed = value->to_bool();
           if (!parsed) return std::unexpected(std::move(parsed.error()));
           return RenderEffectParameter(*parsed);
         }
         if (*type == "int") {
-          auto parsed = value->toInt();
+          auto parsed = value->to_int();
           if (!parsed) return std::unexpected(std::move(parsed.error()));
           return RenderEffectParameter(static_cast<int>(*parsed));
         }
         if (*type == "float") {
-          auto parsed = value->toFloat();
+          auto parsed = value->to_float();
           if (!parsed) return std::unexpected(std::move(parsed.error()));
           return RenderEffectParameter(*parsed);
         }
         if (*type == "vec2") {
-          auto parsed = jsonToVec2F(*value);
+          auto parsed = json_to_vec2f(*value);
           if (!parsed) return std::unexpected(std::move(parsed.error()));
           return RenderEffectParameter(*parsed);
         }
         if (*type == "vec3") {
-          auto parsed = jsonToVec3F(*value);
+          auto parsed = json_to_vec3f(*value);
           if (!parsed) return std::unexpected(std::move(parsed.error()));
           return RenderEffectParameter(*parsed);
         }
-        auto parsed = jsonToVec4F(*value);
+        auto parsed = json_to_vec4f(*value);
         if (!parsed) return std::unexpected(std::move(parsed.error()));
         return RenderEffectParameter(*parsed);
       };
@@ -532,10 +532,10 @@ std::expected<void, StarException> OpenGlRenderer::loadEffectConfig(String const
     else effect.parameters[entry.first] = std::move(parameter);
   }
   unsigned textureUnit = effect.includeVBTextures ? MultiTextureCount : 0;
-  auto textures = effectConfig.getObject("effectTextures", {});
+  auto textures = effectConfig.get_object("effectTextures", {});
   if (!textures) return std::unexpected(std::move(textures.error()));
   for (auto const& entry : *textures) {
-    auto uniform = entry.second.getString("textureUniform");
+    auto uniform = entry.second.get_string("textureUniform");
     if (!uniform) return std::unexpected(std::move(uniform.error()));
     EffectTexture texture;
     texture.textureUniform = glGetUniformLocation(program, uniform->utf8_data());
@@ -545,17 +545,17 @@ std::expected<void, StarException> OpenGlRenderer::loadEffectConfig(String const
       continue;
     }
     texture.textureUnit = textureUnit++;
-    auto addressingName = entry.second.getString("textureAddressing", "clamp");
+    auto addressingName = entry.second.get_string("textureAddressing", "clamp");
     if (!addressingName) return std::unexpected(std::move(addressingName.error()));
     auto addressing = enum_value<TextureAddressingNames>(*addressingName);
     if (!addressing) return std::unexpected(std::move(addressing.error()));
     texture.textureAddressing = *addressing;
-    auto filteringName = entry.second.getString("textureFiltering", "nearest");
+    auto filteringName = entry.second.get_string("textureFiltering", "nearest");
     if (!filteringName) return std::unexpected(std::move(filteringName.error()));
     auto filtering = enum_value<TextureFilteringNames>(*filteringName);
     if (!filtering) return std::unexpected(std::move(filtering.error()));
     texture.textureFiltering = *filtering;
-    auto sizeUniform = entry.second.optString("textureSizeUniform");
+    auto sizeUniform = entry.second.opt_string("textureSizeUniform");
     if (!sizeUniform) return std::unexpected(std::move(sizeUniform.error()));
     if (*sizeUniform) {
       texture.textureSizeUniform = glGetUniformLocation(program, (**sizeUniform).utf8_data());
@@ -566,17 +566,17 @@ std::expected<void, StarException> OpenGlRenderer::loadEffectConfig(String const
     }
     effect.textures[entry.first] = std::move(texture);
   }
-  auto output = effectConfig.optString("frameBuffer");
+  auto output = effectConfig.opt_string("frameBuffer");
   if (!output) return std::unexpected(std::move(output.error()));
-  auto blit = effectConfig.optString("blitFrameBuffer");
+  auto blit = effectConfig.opt_string("blitFrameBuffer");
   if (!blit) return std::unexpected(std::move(blit.error()));
-  auto framebufferTextures = effectConfig.optArray("frameBufferTextures");
+  auto framebufferTextures = effectConfig.opt_array("frameBufferTextures");
   if (!framebufferTextures) return std::unexpected(std::move(framebufferTextures.error()));
   if (*output) {
     effect.doubleBuffered = *blit && **output == **blit;
     if (!effect.doubleBuffered && *framebufferTextures) {
       for (auto const& texture : **framebufferTextures) {
-        auto input = texture.optString("framebuffer");
+        auto input = texture.opt_string("framebuffer");
         if (!input) return std::unexpected(std::move(input.error()));
         if (*input && **input == **output) {
           effect.doubleBuffered = true;
@@ -701,11 +701,11 @@ std::expected<bool, StarException> OpenGlRenderer::switchEffectConfig(String con
   Effect& effect = find->second;
   if (!m_effectTargetsDirty && !effect.doubleBuffered && m_currentEffect && std::addressof(m_currentEffect->get()) == std::addressof(effect))
     return true;
-  auto output = effect.config.optString("frameBuffer");
+  auto output = effect.config.opt_string("frameBuffer");
   if (!output) return std::unexpected(std::move(output.error()));
-  auto inputs = effect.config.optArray("frameBufferTextures");
+  auto inputs = effect.config.opt_array("frameBufferTextures");
   if (!inputs) return std::unexpected(std::move(inputs.error()));
-  auto blit = effect.config.optString("blitFrameBuffer");
+  auto blit = effect.config.opt_string("blitFrameBuffer");
   if (!blit) return std::unexpected(std::move(blit.error()));
   RefPtr<GlFrameBuffer> outputBuffer;
   RefPtr<GlFrameBuffer> blitBuffer;
@@ -728,10 +728,10 @@ std::expected<bool, StarException> OpenGlRenderer::switchEffectConfig(String con
   }
   if (*inputs) {
     for (auto const& input : **inputs) {
-      auto framebuffer = input.optString("framebuffer");
+      auto framebuffer = input.opt_string("framebuffer");
       if (!framebuffer) return std::unexpected(std::move(framebuffer.error()));
       if (!*framebuffer) continue;
-      auto textureName = input.getString("texture");
+      auto textureName = input.get_string("texture");
       if (!textureName) return std::unexpected(std::move(textureName.error()));
       if (auto texture = effect.textures.find_ref(*textureName)) {
         auto buffer = getGlFrameBuffer(**framebuffer);

@@ -56,7 +56,7 @@ std::expected<std::shared_ptr<TenantDatabase>, StarException> TenantDatabase::cr
       auto config = (*assets)->json(file);
       if (!config)
         return std::unexpected(std::move(config.error()));
-      return config->getString("name");
+      return config->get_string("name");
     }();
     if (!name) {
       auto logged = root.logger().error_exception(
@@ -116,10 +116,10 @@ std::expected<std::shared_ptr<Tenant>, StarException> TenantDatabase::readTenant
     auto config = assets.json(path);
     if (!config)
       return std::unexpected(std::move(config.error()));
-    auto name = config->getString("name");
+    auto name = config->get_string("name");
     if (!name)
       return std::unexpected(std::move(name.error()));
-    auto priority = config->getFloat("priority");
+    auto priority = config->get_float("priority");
     if (!priority)
       return std::unexpected(std::move(priority.error()));
     auto criteriaConfig =
@@ -128,7 +128,7 @@ std::expected<std::shared_ptr<Tenant>, StarException> TenantDatabase::readTenant
       return std::unexpected(std::move(criteriaConfig.error()));
     StringMap<unsigned> criteria;
     for (auto const& entry : *criteriaConfig) {
-      auto count = entry.second.toUInt();
+      auto count = entry.second.to_uint();
       if (!count)
         return std::unexpected(std::move(count.error()));
       criteria[entry.first] = *count;
@@ -138,13 +138,13 @@ std::expected<std::shared_ptr<Tenant>, StarException> TenantDatabase::readTenant
       return std::unexpected(std::move(tenantsConfig.error()));
     List<TenantSpawnable> tenants;
     for (auto const& json : *tenantsConfig) {
-      auto spawn = json.getString("spawn");
+      auto spawn = json.get_string("spawn");
       if (!spawn)
         return std::unexpected(std::move(spawn.error()));
-      auto type = json.getString("type");
+      auto type = json.get_string("type");
       if (!type)
         return std::unexpected(std::move(type.error()));
-      auto level = json.optFloat("level");
+      auto level = json.opt_float("level");
       if (!level)
         return std::unexpected(std::move(level.error()));
       auto overrides = json.opt("overrides");
@@ -159,18 +159,18 @@ std::expected<std::shared_ptr<Tenant>, StarException> TenantDatabase::readTenant
         if (!speciesConfig)
           return std::unexpected(std::move(speciesConfig.error()));
         List<String> species;
-        if (speciesConfig->isType(Json::Type::Array)) {
+        if (speciesConfig->is_type(Json::Type::Array)) {
           auto speciesArray = speciesConfig->iterate_array();
           if (!speciesArray)
             return std::unexpected(std::move(speciesArray.error()));
           for (auto const& entry : *speciesArray) {
-            auto value = entry.toString();
+            auto value = entry.to_string();
             if (!value)
               return std::unexpected(std::move(value.error()));
             species.push_back(std::move(*value));
           }
         } else {
-          auto value = speciesConfig->toString();
+          auto value = speciesConfig->to_string();
           if (!value)
             return std::unexpected(std::move(value.error()));
           species.push_back(std::move(*value));
@@ -186,10 +186,10 @@ std::expected<std::shared_ptr<Tenant>, StarException> TenantDatabase::readTenant
       auto periodConfig = (**rentConfig).get("periodRange");
       if (!periodConfig)
         return std::unexpected(std::move(periodConfig.error()));
-      auto period = jsonToVec2F(*periodConfig);
+      auto period = json_to_vec2f(*periodConfig);
       if (!period)
         return std::unexpected(std::move(period.error()));
-      auto pool = (**rentConfig).getString("pool");
+      auto pool = (**rentConfig).get_string("pool");
       if (!pool)
         return std::unexpected(std::move(pool.error()));
       rent = TenantRent{*period, *pool};

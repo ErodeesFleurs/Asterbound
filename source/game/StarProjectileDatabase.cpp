@@ -131,7 +131,7 @@ std::expected<String, StarException> ProjectileDatabase::damageKindImage(String 
 std::expected<float, StarException> ProjectileDatabase::gravityMultiplier(String const& type) const {
   auto config = m_configs.find_ref(type);
   if (!config) return std::unexpected(ProjectileDatabaseException(Star::format("Unknown projectile with typeName {}.", type)));
-  return config->get()->movementSettings.getFloat("gravityMultiplier", 1);
+  return config->get()->movementSettings.get_float("gravityMultiplier", 1);
 }
 
 std::expected<std::shared_ptr<Projectile>, StarException> ProjectileDatabase::netLoadProjectile(ByteArray const& netStore, NetCompatibilityRules rules) const {
@@ -156,41 +156,41 @@ Json config = std::move(*result75);
 
   auto projectileConfig = std::make_shared<ProjectileConfig>();
   projectileConfig->config = config;
-  auto result76 = config.getString("projectileName");
+  auto result76 = config.get_string("projectileName");
 if (!result76) return std::unexpected(std::move(result76.error()));
 projectileConfig->typeName = std::move(*result76);
   projectileConfig->directory = AssetPath::directory(path);
 
-  auto result77 = config.getString("description", "");
+  auto result77 = config.get_string("description", "");
 if (!result77) return std::unexpected(std::move(result77.error()));
 projectileConfig->description = std::move(*result77);
 
   auto boundBox = config.opt("boundBox");
   if (!boundBox) return std::unexpected(std::move(boundBox.error()));
   if (*boundBox) {
-    auto parsed = jsonToRectF(**boundBox);
+    auto parsed = json_to_rectf(**boundBox);
     if (!parsed) return std::unexpected(std::move(parsed.error()));
     projectileConfig->boundBox = *parsed;
   } else projectileConfig->boundBox = RectF{-5,-5,5,5};
 
-  auto result78 = config.getString("physics", "default");
+  auto result78 = config.get_string("physics", "default");
 if (!result78) return std::unexpected(std::move(result78.error()));
 auto physicsType = std::move(*result78);
-  auto result79 = config.getObject("movementSettings", JsonObject());
+  auto result79 = config.get_object("movementSettings", JsonObject());
 if (!result79) return std::unexpected(std::move(result79.error()));
 JsonObject movementSettings = std::move(*result79);
   auto physicsPath = Star::format("/projectiles/physics.config:{}", physicsType);
   auto result80 = assets->json(physicsPath);
 if (!result80) return std::unexpected(assets->withAssetContext(std::move(result80.error()), physicsPath, "Loading projectile physics"));
-  projectileConfig->movementSettings = jsonMerge(std::move(*result80), movementSettings);
+  projectileConfig->movementSettings = json_merge(std::move(*result80), movementSettings);
 
-  auto result82 = config.getFloat("speed", 50);
+  auto result82 = config.get_float("speed", 50);
 if (!result82) return std::unexpected(std::move(result82.error()));
 projectileConfig->initialSpeed = std::move(*result82);
-  auto result83 = config.getFloat("acceleration", 0);
+  auto result83 = config.get_float("acceleration", 0);
 if (!result83) return std::unexpected(std::move(result83.error()));
 projectileConfig->acceleration = std::move(*result83);
-  auto result84 = config.getFloat("power", 1);
+  auto result84 = config.get_float("power", 1);
 if (!result84) return std::unexpected(std::move(result84.error()));
 projectileConfig->power = std::move(*result84);
   auto result85 = config.contains("damagePoly");
@@ -198,80 +198,80 @@ if (!result85) return std::unexpected(std::move(result85.error()));
 if (std::move(*result85)) {
     auto result86 = config.get("damagePoly");
 if (!result86) return std::unexpected(std::move(result86.error()));
-auto result87 = jsonToPolyF(std::move(*result86));
+auto result87 = json_to_polyf(std::move(*result86));
 if (!result87) return std::unexpected(std::move(result87.error()));
 projectileConfig->damagePoly = std::move(*result87);
     projectileConfig->damagePoly.scale(1.0f / TilePixels);
   }
-  auto result88 = config.getBool("piercing", false);
+  auto result88 = config.get_bool("piercing", false);
 if (!result88) return std::unexpected(std::move(result88.error()));
 projectileConfig->piercing = std::move(*result88);
-  auto result89 = config.getBool("falldown", false);
+  auto result89 = config.get_bool("falldown", false);
 if (!result89) return std::unexpected(std::move(result89.error()));
 projectileConfig->falldown = std::move(*result89);
-  auto result90 = config.getInt("bounces", 0);
+  auto result90 = config.get_int("bounces", 0);
 if (!result90) return std::unexpected(std::move(result90.error()));
 projectileConfig->bounces = std::move(*result90);
 
-  auto result91 = config.getArray("actionOnCollide", {});
+  auto result91 = config.get_array("actionOnCollide", {});
 if (!result91) return std::unexpected(std::move(result91.error()));
 projectileConfig->actionOnCollide = std::move(*result91);
-  auto result92 = config.getArray("actionOnReap", {});
+  auto result92 = config.get_array("actionOnReap", {});
 if (!result92) return std::unexpected(std::move(result92.error()));
 projectileConfig->actionOnReap = std::move(*result92);
-  auto result93 = config.getArray("actionOnHit", {});
+  auto result93 = config.get_array("actionOnHit", {});
 if (!result93) return std::unexpected(std::move(result93.error()));
 projectileConfig->actionOnHit = std::move(*result93);
-  auto result94 = config.getArray("actionOnTimeout", {});
+  auto result94 = config.get_array("actionOnTimeout", {});
 if (!result94) return std::unexpected(std::move(result94.error()));
 projectileConfig->actionOnTimeout = std::move(*result94);
 
-  auto result95 = config.getArray("periodicActions", {});
+  auto result95 = config.get_array("periodicActions", {});
 if (!result95) return std::unexpected(std::move(result95.error()));
 for (auto const& c : std::move(*result95))
     {
-auto result96 = c.getFloat("time");
+auto result96 = c.get_float("time");
 if (!result96) return std::unexpected(std::move(result96.error()));
-auto result97 = c.getBool("repeat", true);
+auto result97 = c.get_bool("repeat", true);
 if (!result97) return std::unexpected(std::move(result97.error()));
 projectileConfig->periodicActions.push_back(std::make_tuple(std::move(*result96), std::move(*result97), c));
 }
 
-  auto result98 = config.getString("image");
+  auto result98 = config.get_string("image");
 if (!result98) return std::unexpected(std::move(result98.error()));
 projectileConfig->image = AssetPath::relative_to(path, std::move(*result98));
-auto result99 = config.getUInt("frameNumber", 1);
+auto result99 = config.get_uint("frameNumber", 1);
 if (!result99) return std::unexpected(std::move(result99.error()));
 projectileConfig->frameNumber = std::move(*result99);
-  auto result100 = config.getFloat("animationCycle", 1.0);
+  auto result100 = config.get_float("animationCycle", 1.0);
 if (!result100) return std::unexpected(std::move(result100.error()));
 projectileConfig->animationCycle = std::move(*result100);
-  auto result101 = config.getBool("animationLoops", true);
+  auto result101 = config.get_bool("animationLoops", true);
 if (!result101) return std::unexpected(std::move(result101.error()));
 projectileConfig->animationLoops = std::move(*result101);
-  auto result102 = config.getUInt("windupFrames", 0);
+  auto result102 = config.get_uint("windupFrames", 0);
 if (!result102) return std::unexpected(std::move(result102.error()));
 projectileConfig->windupFrames = std::move(*result102);
-  auto result103 = config.getBool("intangibleWindup", false);
+  auto result103 = config.get_bool("intangibleWindup", false);
 if (!result103) return std::unexpected(std::move(result103.error()));
 projectileConfig->intangibleWindup = std::move(*result103);
-  auto result104 = config.getUInt("winddownFrames", 0);
+  auto result104 = config.get_uint("winddownFrames", 0);
 if (!result104) return std::unexpected(std::move(result104.error()));
 projectileConfig->winddownFrames = std::move(*result104);
-  auto result105 = config.getBool("intangibleWinddown", false);
+  auto result105 = config.get_bool("intangibleWinddown", false);
 if (!result105) return std::unexpected(std::move(result105.error()));
 projectileConfig->intangibleWinddown = std::move(*result105);
-  auto result106 = config.getBool("flippable", false);
+  auto result106 = config.get_bool("flippable", false);
 if (!result106) return std::unexpected(std::move(result106.error()));
 projectileConfig->flippable = std::move(*result106);
-  auto result107 = config.getBool("orientationLocked", false);
+  auto result107 = config.get_bool("orientationLocked", false);
 if (!result107) return std::unexpected(std::move(result107.error()));
 projectileConfig->orientationLocked = std::move(*result107);
 
-  auto result108 = config.getBool("fullbright", false);
+  auto result108 = config.get_bool("fullbright", false);
 if (!result108) return std::unexpected(std::move(result108.error()));
 projectileConfig->fullbright = std::move(*result108);
-  auto result109 = config.getString("renderLayer", "Projectile");
+  auto result109 = config.get_string("renderLayer", "Projectile");
 if (!result109) return std::unexpected(std::move(result109.error()));
 auto result110 = parseRenderLayer(std::move(*result109));
 if (!result110) return std::unexpected(std::move(result110.error()));
@@ -279,15 +279,15 @@ projectileConfig->renderLayer = std::move(*result110);
 
   auto result111 = config.get("lightColor", JsonArray{0, 0, 0});
 if (!result111) return std::unexpected(std::move(result111.error()));
-auto result112 = jsonToColor(std::move(*result111));
+auto result112 = json_to_color(std::move(*result111));
 if (!result112) return std::unexpected(std::move(result112.error()));
 projectileConfig->lightColor = std::move(*result112);
   auto result113 = config.get("lightPosition", JsonArray{0, 0});
 if (!result113) return std::unexpected(std::move(result113.error()));
-auto result114 = jsonToVec2F(std::move(*result113));
+auto result114 = json_to_vec2f(std::move(*result113));
 if (!result114) return std::unexpected(std::move(result114.error()));
 projectileConfig->lightPosition = std::move(*result114);
-  auto result115 = config.optString("lightType");
+  auto result115 = config.opt_string("lightType");
 if (!result115) return std::unexpected(std::move(result115.error()));
 if (auto lightType = std::move(*result115))
     {
@@ -298,12 +298,12 @@ if (auto lightType = std::move(*result115))
 }
   else
     {
-auto result117 = config.getBool("pointLight", false);
+auto result117 = config.get_bool("pointLight", false);
 if (!result117) return std::unexpected(std::move(result117.error()));
 projectileConfig->lightType = static_cast<LightType>(std::move(*result117));
 }
 
-  auto result118 = config.getString("persistentAudio", "");
+  auto result118 = config.get_string("persistentAudio", "");
 if (!result118) return std::unexpected(std::move(result118.error()));
 projectileConfig->persistentAudio = std::move(*result118);
 
@@ -311,34 +311,34 @@ projectileConfig->persistentAudio = std::move(*result118);
   // based on animationCycle
   if (!projectileConfig->animationLoops)
     {
-auto result119 = config.getFloat("timeToLive", projectileConfig->animationCycle);
+auto result119 = config.get_float("timeToLive", projectileConfig->animationCycle);
 if (!result119) return std::unexpected(std::move(result119.error()));
 projectileConfig->timeToLive = std::move(*result119);
 }
   else
     {
-auto result120 = config.getFloat("timeToLive", 5.0);
+auto result120 = config.get_float("timeToLive", 5.0);
 if (!result120) return std::unexpected(std::move(result120.error()));
 projectileConfig->timeToLive = std::move(*result120);
 }
 
-  auto result121 = config.getString("damageKindImage", "");
+  auto result121 = config.get_string("damageKindImage", "");
 if (!result121) return std::unexpected(std::move(result121.error()));
 projectileConfig->damageKindImage = std::move(*result121);
 
-  auto result122 = config.getString("damageKind", "");
+  auto result122 = config.get_string("damageKind", "");
 if (!result122) return std::unexpected(std::move(result122.error()));
 projectileConfig->damageKind = std::move(*result122);
-  auto result123 = config.getString("damageType", "damage");
+  auto result123 = config.get_string("damageType", "damage");
 if (!result123) return std::unexpected(std::move(result123.error()));
 projectileConfig->damageType = std::move(*result123);
   auto result124 = config.get("damageTeam", Json());
 if (!result124) return std::unexpected(std::move(result124.error()));
 projectileConfig->damageTeam = std::move(*result124);
-  auto result125 = config.optString("damageRepeatGroup");
+  auto result125 = config.opt_string("damageRepeatGroup");
 if (!result125) return std::unexpected(std::move(result125.error()));
 projectileConfig->damageRepeatGroup = std::move(*result125);
-  auto result126 = config.optFloat("damageRepeatTimeout");
+  auto result126 = config.opt_float("damageRepeatTimeout");
 if (!result126) return std::unexpected(std::move(result126.error()));
 projectileConfig->damageRepeatTimeout = std::move(*result126);
 
@@ -346,7 +346,7 @@ projectileConfig->damageRepeatTimeout = std::move(*result126);
     projectileConfig->damageKindImage =
       AssetPath::relative_to(projectileConfig->directory, projectileConfig->damageKindImage);
 
-  auto result127 = config.getArray("statusEffects", {});
+  auto result127 = config.get_array("statusEffects", {});
 if (!result127) return std::unexpected(std::move(result127.error()));
 for (auto const& effect : std::move(*result127)) {
 auto result128 = jsonToEphemeralStatusEffect(effect);
@@ -354,43 +354,43 @@ if (!result128) return std::unexpected(std::move(result128.error()));
 projectileConfig->statusEffects.push_back(std::move(*result128));
 }
 
-  auto result129 = config.getArray("emitters", JsonArray());
+  auto result129 = config.get_array("emitters", JsonArray());
 if (!result129) return std::unexpected(std::move(result129.error()));
-auto result130 = jsonToStringSet(std::move(*result129));
+auto result130 = json_to_string_set(std::move(*result129));
 if (!result130) return std::unexpected(std::move(result130.error()));
 projectileConfig->emitters = std::move(*result130);
 
-  auto result131 = config.getBool("hydrophobic", false);
+  auto result131 = config.get_bool("hydrophobic", false);
 if (!result131) return std::unexpected(std::move(result131.error()));
 projectileConfig->hydrophobic = std::move(*result131);
 
-  auto result132 = config.getBool("rayCheckToSource", false);
+  auto result132 = config.get_bool("rayCheckToSource", false);
 if (!result132) return std::unexpected(std::move(result132.error()));
 projectileConfig->rayCheckToSource = std::move(*result132);
-  auto result133 = config.getFloat("knockback", 0.0f);
+  auto result133 = config.get_float("knockback", 0.0f);
 if (!result133) return std::unexpected(std::move(result133.error()));
 projectileConfig->knockback = std::move(*result133);
-  auto result134 = config.getBool("knockbackDirectional", false);
+  auto result134 = config.get_bool("knockbackDirectional", false);
 if (!result134) return std::unexpected(std::move(result134.error()));
 projectileConfig->knockbackDirectional = std::move(*result134);
 
-  auto result135 = config.getBool("onlyHitTerrain", false);
+  auto result135 = config.get_bool("onlyHitTerrain", false);
 if (!result135) return std::unexpected(std::move(result135.error()));
 projectileConfig->onlyHitTerrain = std::move(*result135);
 
-  auto result136 = config.getString("clientEntityMode", "ClientMasterAllowed");
+  auto result136 = config.get_string("clientEntityMode", "ClientMasterAllowed");
 if (!result136) return std::unexpected(std::move(result136.error()));
 if (!ClientEntityModeNames) return std::unexpected(ClientEntityModeNames.error());
 auto result137 = ClientEntityModeNames->get_left(std::move(*result136));
 if (!result137) return std::unexpected(std::move(result137.error()));
 projectileConfig->clientEntityMode = result137->get();
-  auto result138 = config.getBool("masterOnly", false);
+  auto result138 = config.get_bool("masterOnly", false);
 if (!result138) return std::unexpected(std::move(result138.error()));
 projectileConfig->masterOnly = std::move(*result138);
 
   auto result139 = config.get("scripts", JsonArray());
 if (!result139) return std::unexpected(std::move(result139.error()));
-auto result140 = jsonToStringList(std::move(*result139));
+auto result140 = json_to_string_list(std::move(*result139));
 if (!result140) return std::unexpected(std::move(result140.error()));
 std::ranges::for_each(*result140, [&](String& script) { script = AssetPath::relative_to(path, script); });
 projectileConfig->scripts = std::move(*result140);
@@ -402,7 +402,7 @@ projectileConfig->physicsForces = std::move(*result141);
 if (!result142) return std::unexpected(std::move(result142.error()));
 projectileConfig->physicsCollisions = std::move(*result142);
 
-  auto result143 = config.getArray("persistentStatusEffects", JsonArray());
+  auto result143 = config.get_array("persistentStatusEffects", JsonArray());
 if (!result143) return std::unexpected(std::move(result143.error()));
 for (auto const& effect : std::move(*result143)) {
 auto result144 = jsonToPersistentStatusEffect(effect);
@@ -411,7 +411,7 @@ projectileConfig->persistentStatusEffects.push_back(std::move(*result144));
 }
   auto result145 = config.get("statusEffectArea", JsonArray());
 if (!result145) return std::unexpected(std::move(result145.error()));
-auto result146 = jsonToPolyF(std::move(*result145));
+auto result146 = json_to_polyf(std::move(*result145));
 if (!result146) return std::unexpected(std::move(result146.error()));
 projectileConfig->statusEffectArea = std::move(*result146);
 

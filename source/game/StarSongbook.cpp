@@ -110,7 +110,7 @@ std::expected<std::reference_wrapper<Songbook::NoteMapping>, StarException> Song
     auto tuning = (*assets)->json(Star::format("/sfx/instruments/{}/tuning.config", instrument));
     if (!tuning)
       return std::unexpected(std::move(tuning.error()));
-    auto mapping = tuning->getObject("mapping");
+    auto mapping = tuning->get_object("mapping");
     if (!mapping)
       return std::unexpected(std::move(mapping.error()));
     for (auto const& entry : *mapping) {
@@ -132,7 +132,7 @@ std::expected<std::reference_wrapper<Songbook::NoteMapping>, StarException> Song
       if (!hasFile)
         return std::unexpected(std::move(hasFile.error()));
       if (*hasFile) {
-        auto file = entry.second.getString("file", "");
+        auto file = entry.second.get_string("file", "");
         if (!file)
           return std::unexpected(std::move(file.error()));
         auto added = addFile(std::move(*file));
@@ -143,11 +143,11 @@ std::expected<std::reference_wrapper<Songbook::NoteMapping>, StarException> Song
         if (!hasFiles)
           return std::unexpected(std::move(hasFiles.error()));
         if (*hasFiles) {
-          auto files = entry.second.getArray("files");
+          auto files = entry.second.get_array("files");
           if (!files)
             return std::unexpected(std::move(files.error()));
           for (auto const& fileJson : *files) {
-            auto file = fileJson.toString();
+            auto file = fileJson.to_string();
             if (!file)
               return std::unexpected(std::move(file.error()));
             auto added = addFile(std::move(*file));
@@ -156,15 +156,15 @@ std::expected<std::reference_wrapper<Songbook::NoteMapping>, StarException> Song
           }
         }
       }
-      auto frequency = entry.second.getDouble("f");
+      auto frequency = entry.second.get_double("f");
       if (!frequency)
         return std::unexpected(std::move(frequency.error()));
       nm.frequency = *frequency;
       nm.velocity = 1;
-      auto fallbackFadeout = tuning->getDouble("fadeout");
+      auto fallbackFadeout = tuning->get_double("fadeout");
       if (!fallbackFadeout)
         return std::unexpected(std::move(fallbackFadeout.error()));
-      auto fadeout = entry.second.getDouble("fadeOut", *fallbackFadeout);
+      auto fadeout = entry.second.get_double("fadeOut", *fallbackFadeout);
       if (!fadeout)
         return std::unexpected(std::move(fadeout.error()));
       nm.fadeout = *fadeout;
@@ -196,7 +196,7 @@ std::expected<void, StarException> Songbook::update(EntityMode mode, World& worl
   }
   if (m_dataUpdated) {
     m_dataUpdated = false;
-    if (!m_song.isNull()) {
+    if (!m_song.is_null()) {
       auto parsed = [&]() -> std::expected<List<Note>, StarException> {
         {
           std::lock_guard lock(m_synchronization.mutex);
@@ -210,7 +210,7 @@ std::expected<void, StarException> Songbook::update(EntityMode mode, World& worl
         }
         m_track.clear();
         m_stopped = false;
-        auto abc = m_song.getString("abc");
+        auto abc = m_song.get_string("abc");
         if (!abc)
           return std::unexpected(std::move(abc.error()));
         return parseABC(*abc);
@@ -421,8 +421,8 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
       auto signature = keys->get(*key);
       if (!signature)
         return std::unexpected(std::move(signature.error()));
-      if (signature->isType(Json::Type::String)) {
-        auto text = signature->toString();
+      if (signature->is_type(Json::Type::String)) {
+        auto text = signature->to_string();
         if (!text)
           return std::unexpected(std::move(text.error()));
         key = cleanupKey(*text);
@@ -435,7 +435,7 @@ std::expected<List<Songbook::Note>, StarException> Songbook::parseABC(String con
         return std::unexpected(std::move(entries.error()));
       List<int> mapping;
       for (auto const& entry : *entries) {
-        auto value = entry.toInt();
+        auto value = entry.to_int();
         if (!value)
           return std::unexpected(std::move(value.error()));
         mapping.push_back(*value);

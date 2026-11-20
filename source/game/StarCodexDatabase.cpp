@@ -45,10 +45,10 @@ std::expected<std::shared_ptr<CodexDatabase>, StarException> CodexDatabase::crea
       auto codexJson = assets->json(file);
       if (!codexJson)
         return std::unexpected(std::move(codexJson.error()));
-      auto defaultIcon = codexConfig->getString("defaultIcon");
+      auto defaultIcon = codexConfig->get_string("defaultIcon");
       if (!defaultIcon)
         return std::unexpected(assets->withAssetContext(std::move(defaultIcon.error()), "/codex.config", "Loading codex defaults"));
-      auto icon = codexJson->getString("icon", *defaultIcon);
+      auto icon = codexJson->get_string("icon", *defaultIcon);
       if (!icon)
         return std::unexpected(std::move(icon.error()));
       auto resolved = codexJson->set("icon", AssetPath::relative_to(AssetPath::directory(file), *icon));

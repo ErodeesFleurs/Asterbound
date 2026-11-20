@@ -22,87 +22,87 @@ namespace Star {
 
 
 // Extra checked conversions out of pure JSON.
-std::expected<std::size_t, StarException> jsonToSize(Json const& v);
-Json jsonFromSize(std::size_t s);
+std::expected<std::size_t, StarException> json_to_size(Json const& v);
+Json json_from_size(std::size_t s);
 
 // Must be array of appropriate size.
 
-std::expected<Vec2D, StarException> jsonToVec2D(Json const& v);
-std::expected<Vec2F, StarException> jsonToVec2F(Json const& v);
-Json jsonFromVec2F(Vec2F const& v);
-std::expected<Vec2I, StarException> jsonToVec2I(Json const& v);
-Json jsonFromVec2I(Vec2I const& v);
-std::expected<Vec2U, StarException> jsonToVec2U(Json const& v);
-Json jsonFromVec2U(Vec2U const& v);
-std::expected<Vec2B, StarException> jsonToVec2B(Json const& v);
-Json jsonFromVec2B(Vec2B const& v);
+std::expected<Vec2D, StarException> json_to_vec2d(Json const& v);
+std::expected<Vec2F, StarException> json_to_vec2f(Json const& v);
+Json json_from_vec2f(Vec2F const& v);
+std::expected<Vec2I, StarException> json_to_vec2i(Json const& v);
+Json json_from_vec2i(Vec2I const& v);
+std::expected<Vec2U, StarException> json_to_vec2u(Json const& v);
+Json json_from_vec2u(Vec2U const& v);
+std::expected<Vec2B, StarException> json_to_vec2b(Json const& v);
+Json json_from_vec2b(Vec2B const& v);
 
-std::expected<Vec3D, StarException> jsonToVec3D(Json const& v);
-std::expected<Vec3F, StarException> jsonToVec3F(Json const& v);
-Json jsonFromVec3F(Vec3F const& v);
-std::expected<Vec3I, StarException> jsonToVec3I(Json const& v);
-Json jsonFromVec3I(Vec3I const& v);
-std::expected<Vec3B, StarException> jsonToVec3B(Json const& v);
+std::expected<Vec3D, StarException> json_to_vec3d(Json const& v);
+std::expected<Vec3F, StarException> json_to_vec3f(Json const& v);
+Json json_from_vec3f(Vec3F const& v);
+std::expected<Vec3I, StarException> json_to_vec3i(Json const& v);
+Json json_from_vec3i(Vec3I const& v);
+std::expected<Vec3B, StarException> json_to_vec3b(Json const& v);
 
-std::expected<Vec4B, StarException> jsonToVec4B(Json const& v);
-std::expected<Vec4I, StarException> jsonToVec4I(Json const& v);
-std::expected<Vec4F, StarException> jsonToVec4F(Json const& v);
+std::expected<Vec4B, StarException> json_to_vec4b(Json const& v);
+std::expected<Vec4I, StarException> json_to_vec4i(Json const& v);
+std::expected<Vec4F, StarException> json_to_vec4f(Json const& v);
 
 // Must be array of size 4 or 2 arrays of size 2 in an array.
-std::expected<RectD, StarException> jsonToRectD(Json const& v);
-Json jsonFromRectD(RectD const& rect);
-std::expected<RectF, StarException> jsonToRectF(Json const& v);
-Json jsonFromRectF(RectF const& rect);
-std::expected<RectI, StarException> jsonToRectI(Json const& v);
-Json jsonFromRectI(RectI const& rect);
-std::expected<RectU, StarException> jsonToRectU(Json const& v);
-Json jsonFromRectU(RectU const& rect);
+std::expected<RectD, StarException> json_to_rectd(Json const& v);
+Json json_from_rectd(RectD const& rect);
+std::expected<RectF, StarException> json_to_rectf(Json const& v);
+Json json_from_rectf(RectF const& rect);
+std::expected<RectI, StarException> json_to_recti(Json const& v);
+Json json_from_recti(RectI const& rect);
+std::expected<RectU, StarException> json_to_rectu(Json const& v);
+Json json_from_rectu(RectU const& rect);
 
 // A named/hex string or an RGB[A] array. Numeric channels convert through
-// getInt (fractional values truncate), then narrow to bytes; absent alpha is 255.
-std::expected<Color, StarException> jsonToColor(Json const& v);
-Json jsonFromColor(Color const& color);
+// get_int (fractional values truncate), then narrow to bytes; absent alpha is 255.
+std::expected<Color, StarException> json_to_color(Json const& v);
+Json json_from_color(Color const& color);
 
 // HACK: Fix clockwise specified polygons in coming from JSON
 template <typename Float>
-Polygon<Float> fixInsideOutPoly(Polygon<Float> p);
+Polygon<Float> fix_inside_out_poly(Polygon<Float> p);
 
 // Array of size 2 arrays
-std::expected<PolyD, StarException> jsonToPolyD(Json const& v);
-std::expected<PolyF, StarException> jsonToPolyF(Json const& v);
-std::expected<PolyI, StarException> jsonToPolyI(Json const& v);
-Json jsonFromPolyF(PolyF const& poly);
+std::expected<PolyD, StarException> json_to_polyd(Json const& v);
+std::expected<PolyF, StarException> json_to_polyf(Json const& v);
+std::expected<PolyI, StarException> json_to_polyi(Json const& v);
+Json json_from_polyf(PolyF const& poly);
 
 // Expects a size 2 array of size 2 arrays
-std::expected<Line2F, StarException> jsonToLine2F(Json const& v);
-Json jsonFromLine2F(Line2F const& line);
+std::expected<Line2F, StarException> json_to_line2f(Json const& v);
+Json json_from_line2f(Line2F const& line);
 
 std::expected<Mat3F, StarException> json_to_mat3f(Json const& v);
 Json json_from_mat3f(Mat3F const& v);
 
-std::expected<StringList, StarException> jsonToStringList(Json const& v);
-Json jsonFromStringList(List<String> const& v);
-std::expected<StringSet, StarException> jsonToStringSet(Json const& v);
-Json jsonFromStringSet(StringSet const& v);
-std::expected<List<float>, StarException> jsonToFloatList(Json const& v);
-std::expected<List<int>, StarException> jsonToIntList(Json const& v);
-std::expected<List<Vec2I>, StarException> jsonToVec2IList(Json const& v);
-std::expected<List<Vec2U>, StarException> jsonToVec2UList(Json const& v);
-std::expected<List<Vec2F>, StarException> jsonToVec2FList(Json const& v);
-std::expected<List<Vec4B>, StarException> jsonToVec4BList(Json const& v);
-std::expected<List<Color>, StarException> jsonToColorList(Json const& v);
-std::expected<List<Directives>, StarException> jsonToDirectivesList(Json const& v);
-Json jsonFromDirectivesList(List<Directives> const& v);
+std::expected<StringList, StarException> json_to_string_list(Json const& v);
+Json json_from_string_list(List<String> const& v);
+std::expected<StringSet, StarException> json_to_string_set(Json const& v);
+Json json_from_string_set(StringSet const& v);
+std::expected<List<float>, StarException> json_to_float_list(Json const& v);
+std::expected<List<int>, StarException> json_to_int_list(Json const& v);
+std::expected<List<Vec2I>, StarException> json_to_vec2i_list(Json const& v);
+std::expected<List<Vec2U>, StarException> json_to_vec2u_list(Json const& v);
+std::expected<List<Vec2F>, StarException> json_to_vec2f_list(Json const& v);
+std::expected<List<Vec4B>, StarException> json_to_vec4b_list(Json const& v);
+std::expected<List<Color>, StarException> json_to_color_list(Json const& v);
+std::expected<List<Directives>, StarException> json_to_directives_list(Json const& v);
+Json json_from_directives_list(List<Directives> const& v);
 
-std::expected<Json, StarException> weightedChoiceFromJson(RandomService& random, Json const& source, Json const& default_);
+std::expected<Json, StarException> weighted_choice_from_json(RandomService& random, Json const& source, Json const& default_);
 
 // Assumes that the bins parameter is an array of pairs (arrays), where the
 // first element is a minimum value and the second element is the actual
 // important value.  Finds the pair with the highest value that is less than or
 // equal to the given target, and returns the second element.
-std::expected<Json, StarException> binnedChoiceFromJson(Json const& bins, float target, Json const& def = Json());
+std::expected<Json, StarException> binned_choice_from_json(Json const& bins, float target, Json const& def = Json());
 
-namespace JsonExtraDetail {
+namespace json_extra_detail {
   template <typename Result>
   concept checked_converter_result = requires {
     typename std::remove_cvref_t<Result>::value_type;
@@ -128,9 +128,9 @@ namespace JsonExtraDetail {
 
 template <typename T, typename Converter, typename Value>
 concept json_converter = std::invocable<Converter, Value const&>
-  && JsonExtraDetail::converter_result<T, std::invoke_result_t<Converter, Value const&>>;
+  && json_extra_detail::converter_result<T, std::invoke_result_t<Converter, Value const&>>;
 
-namespace JsonExtraDetail {
+namespace json_extra_detail {
   // Nonfallible converters are allowed; fallible converters retain their error.
   template <typename T, typename Converter, typename Value>
     requires(json_converter<T, Converter, Value>)
@@ -169,39 +169,44 @@ namespace JsonExtraDetail {
 }
 
 template <std::size_t Size>
-std::expected<Array<unsigned, Size>, StarException> jsonToArrayU(Json const& v) {
-  return JsonExtraDetail::array<unsigned, Size>(v, [](Json const& j, std::size_t i) { return j.getUInt(i); }, "jsonToArrayU");
+std::expected<Array<unsigned, Size>, StarException> json_to_array_u(Json const& v) {
+  return json_extra_detail::array<unsigned, Size>(v, [](Json const& j, std::size_t i) { return j.get_uint(i); }, "jsonToArrayU");
 }
 template <std::size_t Size>
-std::expected<Array<std::size_t, Size>, StarException> jsonToArrayS(Json const& v) {
-  return JsonExtraDetail::array<std::size_t, Size>(v, [](Json const& j, std::size_t i) { return j.getUInt(i); }, "jsonToArrayS");
+std::expected<Array<std::size_t, Size>, StarException> json_to_array_s(Json const& v) {
+  return json_extra_detail::array<std::size_t, Size>(v, [](Json const& j, std::size_t i) { return j.get_uint(i); }, "jsonToArrayS");
 }
 template <std::size_t Size>
-std::expected<Array<int, Size>, StarException> jsonToArrayI(Json const& v) {
-  return JsonExtraDetail::array<int, Size>(v, [](Json const& j, std::size_t i) { return j.getInt(i); }, "jsonToArrayI");
+std::expected<Array<int, Size>, StarException> json_to_array_i(Json const& v) {
+  return json_extra_detail::array<int, Size>(v, [](Json const& j, std::size_t i) { return j.get_int(i); }, "jsonToArrayI");
 }
 template <std::size_t Size>
-std::expected<Array<float, Size>, StarException> jsonToArrayF(Json const& v) {
-  return JsonExtraDetail::array<float, Size>(v, [](Json const& j, std::size_t i) { return j.getFloat(i); }, "jsonToArrayF");
+std::expected<Array<float, Size>, StarException> json_to_array_f(Json const& v) {
+  return json_extra_detail::array<float, Size>(v, [](Json const& j, std::size_t i) { return j.get_float(i); }, "jsonToArrayF");
 }
 template <std::size_t Size>
-std::expected<Array<double, Size>, StarException> jsonToArrayD(Json const& v) {
-  return JsonExtraDetail::array<double, Size>(v, [](Json const& j, std::size_t i) { return j.getDouble(i); }, "jsonToArrayD");
+std::expected<Array<double, Size>, StarException> json_to_array_d(Json const& v) {
+  return json_extra_detail::array<double, Size>(v, [](Json const& j, std::size_t i) { return j.get_double(i); }, "jsonToArrayD");
 }
 template <std::size_t Size>
-std::expected<Array<String, Size>, StarException> jsonToStringArray(Json const& v) {
-  return JsonExtraDetail::array<String, Size>(v, [](Json const& j, std::size_t i) { return j.getString(i); }, "jsonToStringArray");
+std::expected<Array<String, Size>, StarException> json_to_string_array(Json const& v) {
+  return json_extra_detail::array<String, Size>(v, [](Json const& j, std::size_t i) { return j.get_string(i); }, "jsonToStringArray");
 }
 
 template <typename Value, typename Converter>
-std::expected<List<Value>, StarException> jsonToList(Json const& v, Converter&& converter) {
+  requires (json_converter<Value, Converter&, Json>
+            && requires(List<Value>& list, Value& entry, std::size_t count) {
+                 list.reserve(count);
+                 list.push_back(std::move(entry));
+               })
+std::expected<List<Value>, StarException> json_to_list(Json const& v, Converter&& converter) {
   auto entries = v.iterate_array();
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   List<Value> result;
   result.reserve(entries->m_container->size());
   for (auto const& entry : *entries) {
-    auto converted = JsonExtraDetail::convert<Value>(converter, entry);
+    auto converted = json_extra_detail::convert<Value>(converter, entry);
     if (!converted)
       return std::unexpected(std::move(converted.error()));
     result.push_back(std::move(*converted));
@@ -209,35 +214,54 @@ std::expected<List<Value>, StarException> jsonToList(Json const& v, Converter&& 
   return result;
 }
 template <typename Value>
-std::expected<List<Value>, StarException> jsonToList(Json const& v) {
-  return jsonToList<Value>(v, Construct<Value>());
+  requires requires(Json const& source) { json_to_list<Value>(source, Construct<Value>()); }
+std::expected<List<Value>, StarException> json_to_list(Json const& v) {
+  return json_to_list<Value>(v, Construct<Value>());
+}
+
+namespace json_extra_detail {
+  template <typename Range, typename Converter>
+  concept json_array_source = std::ranges::input_range<Range const>
+    && requires(Range const& source, JsonArray& array) { array.reserve(source.size()); }
+    && json_converter<Json, Converter&, std::remove_reference_t<std::ranges::range_reference_t<Range const>>>;
+
+  template <typename Range, typename Converter>
+    requires json_array_source<Range, Converter>
+  std::expected<Json, StarException> encode_array(Range const& source, Converter& converter) {
+    JsonArray result;
+    result.reserve(source.size());
+    for (auto const& entry : source) {
+      auto converted = json_extra_detail::convert<Json>(converter, entry);
+      if (!converted)
+        return std::unexpected(std::move(converted.error()));
+      result.push_back(std::move(*converted));
+    }
+    return Json(std::move(result));
+  }
 }
 
 template <typename Value, typename Converter>
-std::expected<Json, StarException> jsonFromList(List<Value> const& list, Converter&& converter) {
-  JsonArray result;
-  result.reserve(list.size());
-  for (auto const& entry : list) {
-    auto converted = JsonExtraDetail::convert<Json>(converter, entry);
-    if (!converted)
-      return std::unexpected(std::move(converted.error()));
-    result.push_back(std::move(*converted));
-  }
-  return Json(std::move(result));
+  requires json_extra_detail::json_array_source<List<Value>, Converter>
+std::expected<Json, StarException> json_from_list(List<Value> const& list, Converter&& converter) {
+  return json_extra_detail::encode_array(list, converter);
 }
 template <typename Value>
-std::expected<Json, StarException> jsonFromList(List<Value> const& list) {
-  return jsonFromList(list, Construct<Json>());
+  requires json_extra_detail::json_array_source<List<Value>, Construct<Json>>
+std::expected<Json, StarException> json_from_list(List<Value> const& list) {
+  return json_from_list(list, Construct<Json>());
 }
 
 template <typename SetType, typename Converter>
-std::expected<SetType, StarException> jsonToSet(Json const& v, Converter&& converter) {
+  requires (std::default_initializable<SetType> && std::move_constructible<SetType>
+            && json_converter<typename SetType::value_type, Converter&, Json>
+            && requires(SetType& set, typename SetType::value_type& entry) { set.add(std::move(entry)); })
+std::expected<SetType, StarException> json_to_set(Json const& v, Converter&& converter) {
   auto entries = v.iterate_array();
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   SetType result;
   for (auto const& entry : *entries) {
-    auto converted = JsonExtraDetail::convert<typename SetType::value_type>(converter, entry);
+    auto converted = json_extra_detail::convert<typename SetType::value_type>(converter, entry);
     if (!converted)
       return std::unexpected(std::move(converted.error()));
     result.add(std::move(*converted));
@@ -245,37 +269,32 @@ std::expected<SetType, StarException> jsonToSet(Json const& v, Converter&& conve
   return result;
 }
 template <typename SetType>
-std::expected<SetType, StarException> jsonToSet(Json const& v) {
-  return jsonToSet<SetType>(v, Construct<typename SetType::value_type>());
+  requires requires(Json const& source) { json_to_set<SetType>(source, Construct<typename SetType::value_type>()); }
+std::expected<SetType, StarException> json_to_set(Json const& v) {
+  return json_to_set<SetType>(v, Construct<typename SetType::value_type>());
 }
 template <typename SetType, typename Converter>
-std::expected<Json, StarException> jsonFromSet(SetType const& set, Converter&& converter) {
-  JsonArray result;
-  result.reserve(set.size());
-  for (auto const& entry : set) {
-    auto converted = JsonExtraDetail::convert<Json>(converter, entry);
-    if (!converted)
-      return std::unexpected(std::move(converted.error()));
-    result.push_back(std::move(*converted));
-  }
-  return Json(std::move(result));
+  requires json_extra_detail::json_array_source<SetType, Converter>
+std::expected<Json, StarException> json_from_set(SetType const& set, Converter&& converter) {
+  return json_extra_detail::encode_array(set, converter);
 }
 template <typename SetType>
-std::expected<Json, StarException> jsonFromSet(SetType const& set) {
-  return jsonFromSet(set, Construct<Json>());
+  requires json_extra_detail::json_array_source<SetType, Construct<Json>>
+std::expected<Json, StarException> json_from_set(SetType const& set) {
+  return json_from_set(set, Construct<Json>());
 }
 
 template <typename MapType, typename KeyConverter, typename ValueConverter>
-std::expected<MapType, StarException> jsonToMapKV(Json const& v, KeyConverter&& keyConvert, ValueConverter&& valueConvert) {
+std::expected<MapType, StarException> json_to_map_kv(Json const& v, KeyConverter&& key_convert, ValueConverter&& value_convert) {
   auto entries = v.iterate_object();
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   MapType result;
   for (auto const& pair : *entries) {
-    auto key = JsonExtraDetail::convert<typename MapType::key_type>(keyConvert, pair.first);
+    auto key = json_extra_detail::convert<typename MapType::key_type>(key_convert, pair.first);
     if (!key)
       return std::unexpected(std::move(key.error()));
-    auto value = JsonExtraDetail::convert<typename MapType::mapped_type>(valueConvert, pair.second);
+    auto value = json_extra_detail::convert<typename MapType::mapped_type>(value_convert, pair.second);
     if (!value)
       return std::unexpected(std::move(value.error()));
     auto added = result.add(std::move(*key), std::move(*value));
@@ -285,25 +304,25 @@ std::expected<MapType, StarException> jsonToMapKV(Json const& v, KeyConverter&& 
   return result;
 }
 template <typename MapType, typename KeyConverter>
-std::expected<MapType, StarException> jsonToMapK(Json const& v, KeyConverter&& converter) {
-  return jsonToMapKV<MapType>(v, std::forward<KeyConverter>(converter), Construct<typename MapType::mapped_type>());
+std::expected<MapType, StarException> json_to_map_k(Json const& v, KeyConverter&& converter) {
+  return json_to_map_kv<MapType>(v, std::forward<KeyConverter>(converter), Construct<typename MapType::mapped_type>());
 }
 template <typename MapType, typename ValueConverter>
-std::expected<MapType, StarException> jsonToMapV(Json const& v, ValueConverter&& converter) {
-  return jsonToMapKV<MapType>(v, Construct<typename MapType::key_type>(), std::forward<ValueConverter>(converter));
+std::expected<MapType, StarException> json_to_map_v(Json const& v, ValueConverter&& converter) {
+  return json_to_map_kv<MapType>(v, Construct<typename MapType::key_type>(), std::forward<ValueConverter>(converter));
 }
 template <typename MapType>
-std::expected<MapType, StarException> jsonToMap(Json const& v) {
-  return jsonToMapKV<MapType>(v, Construct<typename MapType::key_type>(), Construct<typename MapType::mapped_type>());
+std::expected<MapType, StarException> json_to_map(Json const& v) {
+  return json_to_map_kv<MapType>(v, Construct<typename MapType::key_type>(), Construct<typename MapType::mapped_type>());
 }
 template <typename MapType, typename KeyConverter, typename ValueConverter>
-std::expected<Json, StarException> jsonFromMapKV(MapType const& map, KeyConverter&& keyConvert, ValueConverter&& valueConvert) {
+std::expected<Json, StarException> json_from_map_kv(MapType const& map, KeyConverter&& key_convert, ValueConverter&& value_convert) {
   JsonObject result;
   for (auto const& pair : map) {
-    auto key = JsonExtraDetail::convert<String>(keyConvert, pair.first);
+    auto key = json_extra_detail::convert<String>(key_convert, pair.first);
     if (!key)
       return std::unexpected(std::move(key.error()));
-    auto value = JsonExtraDetail::convert<Json>(valueConvert, pair.second);
+    auto value = json_extra_detail::convert<Json>(value_convert, pair.second);
     if (!value)
       return std::unexpected(std::move(value.error()));
     result[std::move(*key)] = std::move(*value);
@@ -311,16 +330,16 @@ std::expected<Json, StarException> jsonFromMapKV(MapType const& map, KeyConverte
   return Json(std::move(result));
 }
 template <typename MapType, typename KeyConverter>
-std::expected<Json, StarException> jsonFromMapK(MapType const& map, KeyConverter&& converter) {
-  return jsonFromMapKV(map, std::forward<KeyConverter>(converter), Construct<Json>());
+std::expected<Json, StarException> json_from_map_k(MapType const& map, KeyConverter&& converter) {
+  return json_from_map_kv(map, std::forward<KeyConverter>(converter), Construct<Json>());
 }
 template <typename MapType, typename ValueConverter>
-std::expected<Json, StarException> jsonFromMapV(MapType const& map, ValueConverter&& converter) {
-  return jsonFromMapKV(map, Construct<String>(), std::forward<ValueConverter>(converter));
+std::expected<Json, StarException> json_from_map_v(MapType const& map, ValueConverter&& converter) {
+  return json_from_map_kv(map, Construct<String>(), std::forward<ValueConverter>(converter));
 }
 template <typename MapType>
-std::expected<Json, StarException> jsonFromMap(MapType const& map) {
-  return jsonFromMapKV(map, Construct<String>(), Construct<Json>());
+std::expected<Json, StarException> json_from_map(MapType const& map) {
+  return json_from_map_kv(map, Construct<String>(), Construct<Json>());
 }
 
 template <typename T, typename Converter>
@@ -328,7 +347,7 @@ template <typename T, typename Converter>
 std::expected<Json, StarException> json_from_optional(std::optional<T> const& value, Converter&& converter) {
   if (!value)
     return Json();
-  return JsonExtraDetail::convert<Json>(std::forward<Converter>(converter), *value);
+  return json_extra_detail::convert<Json>(std::forward<Converter>(converter), *value);
 }
 template <typename T>
   requires requires(T const& value) { Json(value); }
@@ -339,9 +358,9 @@ template <typename T, typename Converter>
   requires(json_converter<T, Converter, Json>
            && requires(std::optional<T>& value, T& payload) { value.emplace(std::move(payload)); })
 std::expected<std::optional<T>, StarException> json_to_optional(Json const& v, Converter&& converter) {
-  if (v.isNull())
+  if (v.is_null())
     return std::expected<std::optional<T>, StarException>(std::in_place);
-  auto converted = JsonExtraDetail::convert<T>(std::forward<Converter>(converter), v);
+  auto converted = json_extra_detail::convert<T>(std::forward<Converter>(converter), v);
   if (!converted)
     return std::unexpected(std::move(converted.error()));
   return std::expected<std::optional<T>, StarException>(std::in_place, std::in_place, std::move(*converted));
@@ -358,19 +377,19 @@ template <typename T, typename Converter>
            && requires(WeightedPool<T>& pool, T& item) { pool.insert(0.0, std::move(item)); })
 std::expected<WeightedPool<T>, StarException> json_to_weighted_pool(Json const& source, Converter&& converter) {
   WeightedPool<T> result;
-  if (source.isNull())
+  if (source.is_null())
     return result;
   auto entries = source.iterate_array();
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   for (auto const& entry : *entries) {
-    auto weight = entry.isType(Json::Type::Array) ? entry.getDouble(0) : entry.getDouble("weight");
+    auto weight = entry.is_type(Json::Type::Array) ? entry.get_double(0) : entry.get_double("weight");
     if (!weight)
       return std::unexpected(std::move(weight.error()));
-    auto item = entry.isType(Json::Type::Array) ? entry.get(1) : entry.get("item");
+    auto item = entry.is_type(Json::Type::Array) ? entry.get(1) : entry.get("item");
     if (!item)
       return std::unexpected(std::move(item.error()));
-    auto converted = JsonExtraDetail::convert<T>(converter, *item);
+    auto converted = json_extra_detail::convert<T>(converter, *item);
     if (!converted)
       return std::unexpected(std::move(converted.error()));
     auto inserted = result.insert(*weight, std::move(*converted));
@@ -380,7 +399,7 @@ std::expected<WeightedPool<T>, StarException> json_to_weighted_pool(Json const& 
   return result;
 }
 
-namespace JsonExtraDetail {
+namespace json_extra_detail {
   template <typename T>
   concept weighted_pool_json_item =
     (std::same_as<T, int> || std::same_as<T, unsigned>
@@ -391,7 +410,7 @@ namespace JsonExtraDetail {
 }
 
 template <typename T>
-  requires(JsonExtraDetail::weighted_pool_json_item<T>)
+  requires(json_extra_detail::weighted_pool_json_item<T>)
 std::expected<WeightedPool<T>, StarException> json_to_weighted_pool(Json const& source) {
   return json_to_weighted_pool<T>(source, Construct<T>());
 }
@@ -400,7 +419,7 @@ template <typename T, typename Converter>
 std::expected<Json, StarException> json_from_weighted_pool(WeightedPool<T> const& pool, Converter&& converter) {
   JsonArray result;
   for (auto const& pair : pool.items()) {
-    auto converted = JsonExtraDetail::convert<Json>(converter, pair.second);
+    auto converted = json_extra_detail::convert<Json>(converter, pair.second);
     if (!converted)
       return std::unexpected(std::move(converted.error()));
     result.push_back(JsonObject{{"weight", pair.first}, {"item", std::move(*converted)}});
@@ -422,7 +441,7 @@ template <> std::expected<WeightedPool<JsonArray>, StarException> json_to_weight
 template <> std::expected<WeightedPool<JsonObject>, StarException> json_to_weighted_pool(Json const& source);
 
 template <typename Float>
-Polygon<Float> fixInsideOutPoly(Polygon<Float> p) {
+Polygon<Float> fix_inside_out_poly(Polygon<Float> p) {
   if (p.sides() > 2) {
     if ((p.side(1).diff() ^ p.side(0).diff()) > 0)
       std::reverse(p.vertexes().begin(), p.vertexes().end());
@@ -435,80 +454,80 @@ Polygon<Float> fixInsideOutPoly(Polygon<Float> p) {
 export module star.json_extra;
 
 export namespace Star {
-  using ::Star::jsonToSize;
-  using ::Star::jsonFromSize;
-  using ::Star::jsonToVec2D;
-  using ::Star::jsonToVec2F;
-  using ::Star::jsonFromVec2F;
-  using ::Star::jsonToVec2I;
-  using ::Star::jsonFromVec2I;
-  using ::Star::jsonToVec2U;
-  using ::Star::jsonFromVec2U;
-  using ::Star::jsonToVec2B;
-  using ::Star::jsonFromVec2B;
-  using ::Star::jsonToVec3D;
-  using ::Star::jsonToVec3F;
-  using ::Star::jsonFromVec3F;
-  using ::Star::jsonToVec3I;
-  using ::Star::jsonFromVec3I;
-  using ::Star::jsonToVec3B;
-  using ::Star::jsonToVec4B;
-  using ::Star::jsonToVec4I;
-  using ::Star::jsonToVec4F;
-  using ::Star::jsonToRectD;
-  using ::Star::jsonFromRectD;
-  using ::Star::jsonToRectF;
-  using ::Star::jsonFromRectF;
-  using ::Star::jsonToRectI;
-  using ::Star::jsonFromRectI;
-  using ::Star::jsonToRectU;
-  using ::Star::jsonFromRectU;
-  using ::Star::jsonToColor;
-  using ::Star::jsonFromColor;
-  using ::Star::fixInsideOutPoly;
-  using ::Star::jsonToPolyD;
-  using ::Star::jsonToPolyF;
-  using ::Star::jsonToPolyI;
-  using ::Star::jsonFromPolyF;
-  using ::Star::jsonToLine2F;
-  using ::Star::jsonFromLine2F;
+  using ::Star::json_to_size;
+  using ::Star::json_from_size;
+  using ::Star::json_to_vec2d;
+  using ::Star::json_to_vec2f;
+  using ::Star::json_from_vec2f;
+  using ::Star::json_to_vec2i;
+  using ::Star::json_from_vec2i;
+  using ::Star::json_to_vec2u;
+  using ::Star::json_from_vec2u;
+  using ::Star::json_to_vec2b;
+  using ::Star::json_from_vec2b;
+  using ::Star::json_to_vec3d;
+  using ::Star::json_to_vec3f;
+  using ::Star::json_from_vec3f;
+  using ::Star::json_to_vec3i;
+  using ::Star::json_from_vec3i;
+  using ::Star::json_to_vec3b;
+  using ::Star::json_to_vec4b;
+  using ::Star::json_to_vec4i;
+  using ::Star::json_to_vec4f;
+  using ::Star::json_to_rectd;
+  using ::Star::json_from_rectd;
+  using ::Star::json_to_rectf;
+  using ::Star::json_from_rectf;
+  using ::Star::json_to_recti;
+  using ::Star::json_from_recti;
+  using ::Star::json_to_rectu;
+  using ::Star::json_from_rectu;
+  using ::Star::json_to_color;
+  using ::Star::json_from_color;
+  using ::Star::fix_inside_out_poly;
+  using ::Star::json_to_polyd;
+  using ::Star::json_to_polyf;
+  using ::Star::json_to_polyi;
+  using ::Star::json_from_polyf;
+  using ::Star::json_to_line2f;
+  using ::Star::json_from_line2f;
   using ::Star::json_to_mat3f;
   using ::Star::json_from_mat3f;
-  using ::Star::jsonToStringList;
-  using ::Star::jsonFromStringList;
-  using ::Star::jsonToStringSet;
-  using ::Star::jsonFromStringSet;
-  using ::Star::jsonToFloatList;
-  using ::Star::jsonToIntList;
-  using ::Star::jsonToVec2IList;
-  using ::Star::jsonToVec2UList;
-  using ::Star::jsonToVec2FList;
-  using ::Star::jsonToVec4BList;
-  using ::Star::jsonToColorList;
-  using ::Star::jsonToDirectivesList;
-  using ::Star::jsonFromDirectivesList;
-  using ::Star::weightedChoiceFromJson;
-  using ::Star::binnedChoiceFromJson;
+  using ::Star::json_to_string_list;
+  using ::Star::json_from_string_list;
+  using ::Star::json_to_string_set;
+  using ::Star::json_from_string_set;
+  using ::Star::json_to_float_list;
+  using ::Star::json_to_int_list;
+  using ::Star::json_to_vec2i_list;
+  using ::Star::json_to_vec2u_list;
+  using ::Star::json_to_vec2f_list;
+  using ::Star::json_to_vec4b_list;
+  using ::Star::json_to_color_list;
+  using ::Star::json_to_directives_list;
+  using ::Star::json_from_directives_list;
+  using ::Star::weighted_choice_from_json;
+  using ::Star::binned_choice_from_json;
   using ::Star::json_to_weighted_pool;
   using ::Star::json_from_weighted_pool;
-  using ::Star::jsonToArrayU;
-  using ::Star::jsonToArrayS;
-  using ::Star::jsonToArrayI;
-  using ::Star::jsonToArrayF;
-  using ::Star::jsonToArrayD;
-  using ::Star::jsonToStringArray;
-  using ::Star::jsonToList;
-  using ::Star::jsonFromList;
-  using ::Star::jsonToSet;
-  using ::Star::jsonFromSet;
-  using ::Star::jsonToMapKV;
-  using ::Star::jsonToMapK;
-  using ::Star::jsonToMapV;
-  using ::Star::jsonToMap;
-  using ::Star::jsonFromMapKV;
-  using ::Star::jsonFromMapK;
-  using ::Star::jsonFromMapV;
-  using ::Star::jsonFromMap;
+  using ::Star::json_to_array_u;
+  using ::Star::json_to_array_s;
+  using ::Star::json_to_array_i;
+  using ::Star::json_to_array_f;
+  using ::Star::json_to_array_d;
+  using ::Star::json_to_string_array;
+  using ::Star::json_to_list;
+  using ::Star::json_from_list;
+  using ::Star::json_to_set;
+  using ::Star::json_from_set;
+  using ::Star::json_to_map_kv;
+  using ::Star::json_to_map_k;
+  using ::Star::json_to_map_v;
+  using ::Star::json_to_map;
+  using ::Star::json_from_map_kv;
+  using ::Star::json_from_map_k;
+  using ::Star::json_from_map_v;
+  using ::Star::json_from_map;
   using ::Star::json_converter;
   using ::Star::json_from_optional;
   using ::Star::json_to_optional;

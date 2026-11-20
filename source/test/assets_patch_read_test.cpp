@@ -508,7 +508,7 @@ const GameTestRegistration assetsSourceSpecificPatchReplacement(
     auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings,
         {base, original, shadow, repair});
     ASSERT_TRUE(assets) << assets.error().what();
-    auto expected = Json::parseJson(R"({"trace":["before","repaired","repaired","shadow","later"]})");
+    auto expected = Json::parse_json(R"({"trace":["before","repaired","repaired","shadow","later"]})");
     ASSERT_TRUE(expected);
     auto observed = (*assets)->json("/same-context.json");
     ASSERT_TRUE(observed) << observed.error().what();
@@ -698,7 +698,7 @@ const GameTestRegistration assetsRetargetSourceSpecificPatch(
     auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings,
         {base, original, foreign, repair});
     ASSERT_TRUE(assets) << assets.error().what();
-    auto expected = Json::parseJson(R"({"old":{"weights":{"old":1},"trace":["early-old","foreign"]},"new":{"weights":{"new":0},"trace":["early-new","foreign","repaired","repaired"]}})");
+    auto expected = Json::parse_json(R"({"old":{"weights":{"old":1},"trace":["early-old","foreign"]},"new":{"weights":{"new":0},"trace":["early-new","foreign","repaired","repaired"]}})");
     ASSERT_TRUE(expected);
     auto observed = (*assets)->json("/retarget-observed.json");
     ASSERT_TRUE(observed) << observed.error().what();

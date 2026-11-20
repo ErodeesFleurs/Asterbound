@@ -85,14 +85,14 @@ std::expected<std::unique_ptr<MainInterfaceConfig>, StarException> MainInterface
   {
     auto json = (*assets)->json("/interface.config:itemCountRightAnchor");
     if (!json) return std::unexpected(std::move(json.error()));
-    auto value = jsonToVec2I(*json);
+    auto value = json_to_vec2i(*json);
     if (!value) return std::unexpected(std::move(value.error()));
     config->itemCountRightAnchor = std::move(*value);
   }
   {
     auto json = (*assets)->json("/interface.config:inventoryItemMouseOffset");
     if (!json) return std::unexpected(std::move(json.error()));
-    auto value = jsonToVec2I(*json);
+    auto value = json_to_vec2i(*json);
     if (!value) return std::unexpected(std::move(value.error()));
     config->inventoryItemMouseOffset = std::move(*value);
   }
@@ -102,7 +102,7 @@ std::expected<std::unique_ptr<MainInterfaceConfig>, StarException> MainInterface
   {
     auto json = (*assets)->json("/interface.config:renderVirtualCursor");
     if (!json) return std::unexpected(std::move(json.error()));
-    auto value = json->toBool();
+    auto value = json->to_bool();
     if (!value) return std::unexpected(std::move(value.error()));
     config->renderVirtualCursor = std::move(*value);
   }
@@ -115,7 +115,7 @@ std::expected<std::unique_ptr<MainInterfaceConfig>, StarException> MainInterface
   {
     auto json = (*assets)->json("/interface.config:debugOffset");
     if (!json) return std::unexpected(std::move(json.error()));
-    auto value = jsonToVec2I(*json);
+    auto value = json_to_vec2i(*json);
     if (!value) return std::unexpected(std::move(value.error()));
     config->debugOffset = std::move(*value);
   }
@@ -129,28 +129,28 @@ std::expected<std::unique_ptr<MainInterfaceConfig>, StarException> MainInterface
   {
     auto json = (*assets)->json("/interface.config:debugSpatialClearTime");
     if (!json) return std::unexpected(std::move(json.error()));
-    auto value = json->toFloat();
+    auto value = json->to_float();
     if (!value) return std::unexpected(std::move(value.error()));
     config->debugSpatialClearTime = std::move(*value);
   }
   {
     auto json = (*assets)->json("/interface.config:debugMapClearTime");
     if (!json) return std::unexpected(std::move(json.error()));
-    auto value = json->toFloat();
+    auto value = json->to_float();
     if (!value) return std::unexpected(std::move(value.error()));
     config->debugMapClearTime = std::move(*value);
   }
   {
     auto json = (*assets)->json("/interface.config:debugBackgroundColor");
     if (!json) return std::unexpected(std::move(json.error()));
-    auto value = jsonToColor(*json);
+    auto value = json_to_color(*json);
     if (!value) return std::unexpected(std::move(value.error()));
     config->debugBackgroundColor = std::move(*value);
   }
   {
     auto json = (*assets)->json("/interface.config:debugBackgroundPad");
     if (!json) return std::unexpected(std::move(json.error()));
-    auto value = json->toUInt();
+    auto value = json->to_uint();
     if (!value) return std::unexpected(std::move(value.error()));
     config->debugBackgroundPad = std::move(*value);
   }
@@ -163,7 +163,7 @@ std::expected<std::unique_ptr<MainInterfaceConfig>, StarException> MainInterface
     auto entries = json->iterate_object();
     if (!entries) return std::unexpected(std::move(entries.error()));
     for (auto const& pair : *entries) {
-      auto commands = jsonToStringList(pair.second);
+      auto commands = json_to_string_list(pair.second);
       if (!commands) return std::unexpected(std::move(commands.error()));
       auto added = config->macroCommands.add(pair.first, std::move(*commands));
       if (!added) return std::unexpected(std::move(added.error()));

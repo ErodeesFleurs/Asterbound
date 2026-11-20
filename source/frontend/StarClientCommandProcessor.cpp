@@ -275,7 +275,7 @@ std::expected<bool, StarException> ClientCommandProcessor::adminCommandAllowed()
   if (!config) return std::unexpected(std::move(config.error()));
   auto allow = (*config)->get("allowAdminCommandsFromAnyone");
   if (!allow) return std::unexpected(std::move(allow.error()));
-  auto enabled = allow->toBool();
+  auto enabled = allow->to_bool();
   if (!enabled) return std::unexpected(std::move(enabled.error()));
   return *enabled || m_universeClient->mainPlayer()->isAdmin();
 }
@@ -342,11 +342,11 @@ std::expected<StringList, StarException> ClientCommandProcessor::executeCommand(
     if (*response) {
       if (std::holds_alternative<Json>(**response)) {
         auto const& value = std::get<Json>(**response);
-        if (value.isType(Json::Type::String)) {
+        if (value.is_type(Json::Type::String)) {
           auto text = value.string_ptr();
           if (!text) return std::unexpected(std::move(text.error()));
           result.push_back(**text);
-        } else if (!value.isNull()) {
+        } else if (!value.is_null()) {
           auto printed = value.repr(1, true);
           if (!printed) return std::unexpected(std::move(printed.error()));
           result.push_back(std::move(*printed));
@@ -377,11 +377,11 @@ std::expected<StringList, StarException> ClientCommandProcessor::updatePromises(
       if (!*response)
         return std::unexpected(StarException("Successful client command promise has no result"));
       auto& value = **response;
-      if (value.isType(Json::Type::String)) {
+      if (value.is_type(Json::Type::String)) {
         auto text = value.string_ptr();
         if (!text) return std::unexpected(std::move(text.error()));
         result.push_back(**text);
-      } else if (!value.isNull()) {
+      } else if (!value.is_null()) {
         auto printed = value.repr(1, true);
         if (!printed) return std::unexpected(std::move(printed.error()));
         result.push_back(std::move(*printed));
@@ -505,7 +505,7 @@ std::expected<String, StarException> ClientCommandProcessor::monochromeLighting(
   if (!config) return std::unexpected(std::move(config.error()));
   auto value = (*config)->get("monochromeLighting");
   if (!value) return std::unexpected(std::move(value.error()));
-  auto enabled = value->toBool();
+  auto enabled = value->to_bool();
   if (!enabled) return std::unexpected(std::move(enabled.error()));
   bool monochrome = !*enabled;
   if (auto set = (*config)->set("monochromeLighting", monochrome); !set)
@@ -549,7 +549,7 @@ std::expected<String, StarException> ClientCommandProcessor::startQuest(String c
   if (!*allowed) return "You must be an admin to use this command.";
   auto argument = arguments->at(0);
   if (!argument) return std::unexpected(std::move(argument.error()));
-  auto parsed = Json::parseSequence(argument->get());
+  auto parsed = Json::parse_sequence(argument->get());
   if (!parsed) return std::unexpected(std::move(parsed.error()));
   auto descriptor = parsed->get(0);
   if (!descriptor) return std::unexpected(std::move(descriptor.error()));
@@ -750,7 +750,7 @@ std::expected<String, StarException> ClientCommandProcessor::upgradeShip(String 
   if (!allowed) return std::unexpected(std::move(allowed.error()));
   if (!*allowed) return "You must be an admin to use this command.";
   if (arguments->empty()) return "Not enough arguments to /upgradeship";
-  auto upgrades = Json::parseJson((*arguments)[0]);
+  auto upgrades = Json::parse_json((*arguments)[0]);
   if (!upgrades) return std::unexpected(std::move(upgrades.error()));
   auto invoked = m_universeClient->rpcInterface()->invoke_remote("ship.applyShipUpgrades", *upgrades);
   if (!invoked) return std::unexpected(std::move(invoked.error()));
@@ -779,7 +779,7 @@ std::expected<String, StarException> ClientCommandProcessor::respawnInWorld(Stri
     return Star::format("Respawn in this world is currently {}", worldClient->respawnInWorld() ? std::string_view("true") : std::string_view("false"));
   auto parsed = Json::parse((*arguments)[0]);
   if (!parsed) return std::unexpected(std::move(parsed.error()));
-  auto enabled = parsed->toBool();
+  auto enabled = parsed->to_bool();
   if (!enabled) return std::unexpected(std::move(enabled.error()));
   worldClient->setRespawnInWorld(*enabled);
   return Star::format("Respawn in this world set to {} (This is client-side!)", *enabled ? std::string_view("true") : std::string_view("false"));

@@ -99,7 +99,7 @@ std::expected<void, StarException> JoinRequestDialog::displayRequest(String cons
   auto constructed = reader.construct(*layout, *this);
   if (!constructed)
     return std::unexpected(std::move(constructed.error()));
-  auto message = config->getString("joinMessage");
+  auto message = config->get_string("joinMessage");
   if (!message)
     return std::unexpected(std::move(message.error()));
   auto label = fetchChild<LabelWidget>("message");

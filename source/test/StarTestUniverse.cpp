@@ -424,7 +424,7 @@ TestUniverse::waitForWorldReady(std::int64_t timeoutMilliseconds) {
   auto contexts = (*assets)->json("/worldserver.config:scriptContexts");
   if (!contexts)
     return std::unexpected(std::move(contexts.error()));
-  auto configuredContexts = contexts->toObject();
+  auto configuredContexts = contexts->to_object();
   if (!configuredContexts)
     return std::unexpected(std::move(configuredContexts.error()));
 

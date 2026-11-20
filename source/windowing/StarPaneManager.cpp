@@ -90,19 +90,19 @@ std::expected<void, StarException> PaneManager::initializePaneManager() {
   auto radiusJson = (*assets)->json("/panes.config:tooltipMouseoverRadius");
   if (!radiusJson)
     return std::unexpected(std::move(radiusJson.error()));
-  auto radius = radiusJson->toFloat();
+  auto radius = radiusJson->to_float();
   if (!radius)
     return std::unexpected(std::move(radius.error()));
   auto offsetJson = (*assets)->json("/panes.config:tooltipMouseoverOffset");
   if (!offsetJson)
     return std::unexpected(std::move(offsetJson.error()));
-  auto offset = jsonToVec2I(*offsetJson);
+  auto offset = json_to_vec2i(*offsetJson);
   if (!offset)
     return std::unexpected(std::move(offset.error()));
   auto timeJson = (*assets)->json("/panes.config:tooltipMouseoverTime");
   if (!timeJson)
     return std::unexpected(std::move(timeJson.error()));
-  auto time = timeJson->toFloat();
+  auto time = timeJson->to_float();
   if (!time)
     return std::unexpected(std::move(time.error()));
   m_tooltipMouseoverRadius = *radius;

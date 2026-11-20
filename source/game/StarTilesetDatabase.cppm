@@ -99,13 +99,13 @@ namespace Tiled {
   [[nodiscard]] std::expected<T, StarException> getProperty(Json const& properties, String const& propertyName) {
     auto value = properties.get(propertyName);
     if (!value) return std::unexpected(std::move(value.error()));
-    auto text = value->toString();
+    auto text = value->to_string();
     if (!text) return std::unexpected(std::move(text.error()));
     return PropertyConverter<T>::to(*text);
   }
   template <typename T>
   [[nodiscard]] std::expected<std::optional<T>, StarException> optProperty(Json const& properties, String const& propertyName) {
-    auto value = properties.optString(propertyName);
+    auto value = properties.opt_string(propertyName);
     if (!value) return std::unexpected(std::move(value.error()));
     if (!*value) return std::optional<T>{};
     auto converted = PropertyConverter<T>::to(**value);

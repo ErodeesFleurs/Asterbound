@@ -167,7 +167,7 @@ std::expected<std::shared_ptr<WorldTemplate>, StarException> WorldTemplate::crea
   if (!initialized) return std::unexpected(std::move(initialized.error()));
   auto celestial = store.get("celestialParameters", {});
   if (!celestial) return std::unexpected(std::move(celestial.error()));
-  if (!celestial->isNull()) {
+  if (!celestial->is_null()) {
     auto parameters = CelestialParameters::create(*celestial);
     if (!parameters) return std::unexpected(std::move(parameters.error()));
     result->m_celestialParameters = std::move(*parameters);
@@ -182,12 +182,12 @@ std::expected<std::shared_ptr<WorldTemplate>, StarException> WorldTemplate::crea
   auto sky = SkyParameters::create(*skyJson);
   if (!sky) return std::unexpected(std::move(sky.error()));
   result->m_skyParameters = std::move(*sky);
-  auto seed = store.getUInt("seed");
+  auto seed = store.get_uint("seed");
   if (!seed) return std::unexpected(std::move(seed.error()));
   result->m_seed = *seed;
   auto sizeJson = store.get("size");
   if (!sizeJson) return std::unexpected(std::move(sizeJson.error()));
-  auto size = jsonToVec2U(*sizeJson);
+  auto size = json_to_vec2u(*sizeJson);
   if (!size) return std::unexpected(std::move(size.error()));
   result->m_geometry = WorldGeometry(*size);
   auto regionData = store.opt("regionData");
@@ -197,14 +197,14 @@ std::expected<std::shared_ptr<WorldTemplate>, StarException> WorldTemplate::crea
     if (!layout) return std::unexpected(std::move(layout.error()));
     result->m_layout = std::move(*layout);
   }
-  auto customRegions = store.getArray("customTerrainRegions", JsonArray());
+  auto customRegions = store.get_array("customTerrainRegions", JsonArray());
   if (!customRegions) return std::unexpected(std::move(customRegions.error()));
   for (auto const& config : *customRegions) {
     auto regionJson = config.get("region");
     if (!regionJson) return std::unexpected(std::move(regionJson.error()));
-    auto region = jsonToPolyF(*regionJson);
+    auto region = json_to_polyf(*regionJson);
     if (!region) return std::unexpected(std::move(region.error()));
-    auto solid = config.getBool("solid");
+    auto solid = config.get_bool("solid");
     if (!solid) return std::unexpected(std::move(solid.error()));
     auto bounds = region->boundBox();
     result->m_customTerrainRegions.push_back({.region = std::move(*region), .regionBounds = bounds, .solid = *solid});
@@ -238,10 +238,10 @@ std::expected<Json, StarException> WorldTemplate::store() const {
     {"worldParameters", std::move(*parameters)},
     {"skyParameters", std::move(*sky)},
     {"seed", m_seed},
-    {"size", jsonFromVec2U(m_geometry.size())},
+    {"size", json_from_vec2u(m_geometry.size())},
     {"regionData", std::move(regionData)},
     {"customTerrainRegions", transform<JsonArray>(m_customTerrainRegions, [](CustomTerrainRegion const& region) {
-      return JsonObject{{"region", jsonFromPolyF(region.region)}, {"solid", region.solid}};
+      return JsonObject{{"region", json_from_polyf(region.region)}, {"solid", region.solid}};
     })}
   };
 }
@@ -317,11 +317,11 @@ std::expected<std::optional<Vec2I>, StarException> WorldTemplate::findSensiblePl
   if (!m_layout) return {};
   auto playerStartSearchRegions = m_layout->playerStartSearchRegions();
   if (playerStartSearchRegions.empty()) return {};
-  auto tries = m_templateConfig.getInt("playerStartSearchTries");
+  auto tries = m_templateConfig.get_int("playerStartSearchTries");
   if (!tries) return std::unexpected(std::move(tries.error()));
-  auto radius = m_templateConfig.getInt("playerStartFreeBlocksRadius");
+  auto radius = m_templateConfig.get_int("playerStartFreeBlocksRadius");
   if (!radius) return std::unexpected(std::move(radius.error()));
-  auto height = m_templateConfig.getInt("playerStartFreeBlocksHeight");
+  auto height = m_templateConfig.get_int("playerStartFreeBlocksHeight");
   if (!height) return std::unexpected(std::move(height.error()));
   for (int i = 0; i < *tries; ++i) {
     auto searchRegion = this->root().random().sample_ref(playerStartSearchRegions);
@@ -511,7 +511,7 @@ std::expected<WorldTemplate::BlockInfo, StarException> WorldTemplate::blockBiome
   blockInfo.environmentBiomeIndex = primaryFlatWeighting.region.get().environmentBiomeIndex;
   auto transition = transitionWeighting.first();
   if (!transition) return std::unexpected(std::move(transition.error()));
-  auto threshold = m_templateConfig.getFloat("biomeTransitionThreshold", 0);
+  auto threshold = m_templateConfig.get_float("biomeTransitionThreshold", 0);
   if (!threshold) return std::unexpected(std::move(threshold.error()));
   blockInfo.biomeTransition = transition->get().weight < *threshold;
   auto biomeResult = biome(blockInfo.blockBiomeIndex);
@@ -817,7 +817,7 @@ std::expected<List<BiomeItemPlacement>, StarException> WorldTemplate::validBiome
 std::expected<float, StarException> WorldTemplate::gravity() const {
   if (m_worldParameters)
     return m_worldParameters->gravity;
-  return m_templateConfig.getFloat("defaultGravity");
+  return m_templateConfig.get_float("defaultGravity");
 }
 
 float WorldTemplate::threatLevel() const {
@@ -838,13 +838,13 @@ std::expected<void, StarException> WorldTemplate::initialize() {
   auto config = (*assets)->json("/world_template.config");
   if (!config) return std::unexpected(std::move(config.error()));
   m_templateConfig = std::move(*config);
-  auto size = m_templateConfig.getFloat("customTerrainBlendSize");
+  auto size = m_templateConfig.get_float("customTerrainBlendSize");
   if (!size) return std::unexpected(std::move(size.error()));
   m_customTerrainBlendSize = *size;
-  auto weight = m_templateConfig.getFloat("customTerrainBlendWeight");
+  auto weight = m_templateConfig.get_float("customTerrainBlendWeight");
   if (!weight) return std::unexpected(std::move(weight.error()));
   m_customTerrainBlendWeight = *weight;
-  auto cacheSize = m_templateConfig.getInt("blockCacheSize");
+  auto cacheSize = m_templateConfig.get_int("blockCacheSize");
   if (!cacheSize) return std::unexpected(std::move(cacheSize.error()));
   m_blockCache.set_capacity(*cacheSize);
   m_geometry = Vec2U(2048, 2048);
@@ -1024,7 +1024,7 @@ std::expected<WorldTemplate::BlockInfo, StarException> WorldTemplate::getBlockIn
 
       auto transition = transitionWeighting.first();
       if (!transition) return std::unexpected(std::move(transition.error()));
-      auto threshold = worldTemplate.m_templateConfig.getFloat("biomeTransitionThreshold", 0);
+      auto threshold = worldTemplate.m_templateConfig.get_float("biomeTransitionThreshold", 0);
       if (!threshold) return std::unexpected(std::move(threshold.error()));
       blockInfo.biomeTransition = transition->get().weight < *threshold;
 
@@ -1078,11 +1078,11 @@ std::expected<WorldTemplate::BlockInfo, StarException> WorldTemplate::getBlockIn
           }
         }
 
-        auto surfaceCaveAttenuationDistResult = worldTemplate.m_templateConfig.getFloat("surfaceCaveAttenuationDist", 0);
+        auto surfaceCaveAttenuationDistResult = worldTemplate.m_templateConfig.get_float("surfaceCaveAttenuationDist", 0);
         if (!surfaceCaveAttenuationDistResult) return std::unexpected(std::move(surfaceCaveAttenuationDistResult.error()));
         auto surfaceCaveAttenuationDist = *surfaceCaveAttenuationDistResult;
         if (terrainSelect < surfaceCaveAttenuationDist) {
-          auto surfaceCaveAttenuationFactorResult = worldTemplate.m_templateConfig.getFloat("surfaceCaveAttenuationFactor", 1);
+          auto surfaceCaveAttenuationFactorResult = worldTemplate.m_templateConfig.get_float("surfaceCaveAttenuationFactor", 1);
           if (!surfaceCaveAttenuationFactorResult) return std::unexpected(std::move(surfaceCaveAttenuationFactorResult.error()));
           auto surfaceCaveAttenuationFactor = *surfaceCaveAttenuationFactorResult;
           foregroundCaveSelect -= (surfaceCaveAttenuationDist - terrainSelect) * surfaceCaveAttenuationFactor;

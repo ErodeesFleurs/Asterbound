@@ -169,7 +169,7 @@ std::expected<void, StarException> ChatBubbleManager::initialize() {
   m_cachedInterfaceScale = context.interfaceScale();
   auto colorJson = config->get("textColor");
   if (!colorJson) return std::unexpected(std::move(colorJson.error()));
-  auto color = jsonToColor(*colorJson);
+  auto color = json_to_color(*colorJson);
   if (!color) return std::unexpected(std::move(color.error()));
   m_textStyle.color = color->to_rgba();
   auto styleJson = config->get("textStyle");
@@ -179,133 +179,133 @@ std::expected<void, StarException> ChatBubbleManager::initialize() {
   {
     auto json = config->get("textPadding");
     if (!json) return std::unexpected(std::move(json.error()));
-    auto value = jsonToVec2F(*json);
+    auto value = json_to_vec2f(*json);
     if (!value) return std::unexpected(std::move(value.error()));
     m_textPadding = *value;
   }
   {
     auto json = config->get("bubbleOffset");
     if (!json) return std::unexpected(std::move(json.error()));
-    auto value = jsonToVec2F(*json);
+    auto value = json_to_vec2f(*json);
     if (!value) return std::unexpected(std::move(value.error()));
     m_bubbleOffset = *value;
   }
   {
     auto json = config->get("portraitMorePosition");
     if (!json) return std::unexpected(std::move(json.error()));
-    auto value = jsonToVec2I(*json);
+    auto value = json_to_vec2i(*json);
     if (!value) return std::unexpected(std::move(value.error()));
     m_portraitMorePosition = *value;
   }
   {
     auto json = config->get("portraitBackgroundSize");
     if (!json) return std::unexpected(std::move(json.error()));
-    auto value = jsonToVec2I(*json);
+    auto value = json_to_vec2i(*json);
     if (!value) return std::unexpected(std::move(value.error()));
     m_portraitBackgroundSize = *value;
   }
   {
     auto json = config->get("portraitPosition");
     if (!json) return std::unexpected(std::move(json.error()));
-    auto value = jsonToVec2I(*json);
+    auto value = json_to_vec2i(*json);
     if (!value) return std::unexpected(std::move(value.error()));
     m_portraitPosition = *value;
   }
   {
     auto json = config->get("portraitSize");
     if (!json) return std::unexpected(std::move(json.error()));
-    auto value = jsonToVec2I(*json);
+    auto value = json_to_vec2i(*json);
     if (!value) return std::unexpected(std::move(value.error()));
     m_portraitSize = *value;
   }
   {
     auto json = config->get("portraitTextPosition");
     if (!json) return std::unexpected(std::move(json.error()));
-    auto value = jsonToVec2I(*json);
+    auto value = json_to_vec2i(*json);
     if (!value) return std::unexpected(std::move(value.error()));
     m_portraitTextPosition = *value;
   }
   {
-    auto value = config->getFloat("partSize");
+    auto value = config->get_float("partSize");
     if (!value) return std::unexpected(std::move(value.error()));
     m_partSize = *value;
   }
   {
-    auto value = config->getFloat("maxAge");
+    auto value = config->get_float("maxAge");
     if (!value) return std::unexpected(std::move(value.error()));
     m_maxAge = std::move(*value);
   }
   {
-    auto value = config->getFloat("portraitMaxAge");
+    auto value = config->get_float("portraitMaxAge");
     if (!value) return std::unexpected(std::move(value.error()));
     m_portraitMaxAge = std::move(*value);
   }
   {
-    auto value = config->getFloat("interBubbleMargin");
+    auto value = config->get_float("interBubbleMargin");
     if (!value) return std::unexpected(std::move(value.error()));
     m_interBubbleMargin = std::move(*value);
   }
   {
-    auto value = config->getInt("maxMessagePerEntity");
+    auto value = config->get_int("maxMessagePerEntity");
     if (!value) return std::unexpected(std::move(value.error()));
     m_maxMessagePerEntity = std::move(*value);
   }
   {
-    auto value = config->getString("portraitBackgroundImage");
+    auto value = config->get_string("portraitBackgroundImage");
     if (!value) return std::unexpected(std::move(value.error()));
     m_portraitBackgroundImage = std::move(*value);
   }
   {
-    auto value = config->getString("portraitMoreImage");
+    auto value = config->get_string("portraitMoreImage");
     if (!value) return std::unexpected(std::move(value.error()));
     m_portraitMoreImage = std::move(*value);
   }
   {
-    auto value = config->getUInt("portraitTextWidth");
+    auto value = config->get_uint("portraitTextWidth");
     if (!value) return std::unexpected(std::move(value.error()));
     m_portraitTextWidth = std::move(*value);
   }
   {
-    auto value = config->getFloat("portraitChatterFramerate");
+    auto value = config->get_float("portraitChatterFramerate");
     if (!value) return std::unexpected(std::move(value.error()));
     m_portraitChatterFramerate = std::move(*value);
   }
   {
-    auto value = config->getFloat("portraitChatterDuration");
+    auto value = config->get_float("portraitChatterDuration");
     if (!value) return std::unexpected(std::move(value.error()));
     m_portraitChatterDuration = std::move(*value);
   }
   {
-    auto value = config->getFloat("furthestTextDistance");
+    auto value = config->get_float("furthestTextDistance");
     if (!value) return std::unexpected(std::move(value.error()));
     m_furthestVisibleTextDistance = std::move(*value);
   }
-  auto wrap = config->getUInt("textWrapWidth");
+  auto wrap = config->get_uint("textWrapWidth");
   if (!wrap) return std::unexpected(std::move(wrap.error()));
   m_textTemplate = TextPositioning{Vec2F(), HorizontalAnchor::HMidAnchor, VerticalAnchor::TopAnchor, *wrap};
   m_portraitTextTemplate = TextPositioning{Vec2F(m_portraitTextPosition), HorizontalAnchor::LeftAnchor,
                                            VerticalAnchor::TopAnchor, m_portraitTextWidth};
   {
-    auto value = config->getFloat("tweenFactor");
+    auto value = config->get_float("tweenFactor");
     if (!value) return std::unexpected(std::move(value.error()));
     m_bubbles.setTweenFactor(*value);
   }
   {
-    auto value = config->getFloat("movementThreshold");
+    auto value = config->get_float("movementThreshold");
     if (!value) return std::unexpected(std::move(value.error()));
     m_bubbles.setMovementThreshold(*value);
   }
   auto functions = context.root().functionDatabase();
   if (!functions) return std::unexpected(std::move(functions.error()));
   {
-    auto name = config->getString("textFadeFunction");
+    auto name = config->get_string("textFadeFunction");
     if (!name) return std::unexpected(std::move(name.error()));
     auto value = (*functions)->function(*name);
     if (!value) return std::unexpected(std::move(value.error()));
     m_textFadeFunction = std::move(*value);
   }
   {
-    auto name = config->getString("bubbleFadeFunction");
+    auto name = config->get_string("bubbleFadeFunction");
     if (!name) return std::unexpected(std::move(name.error()));
     auto value = (*functions)->function(*name);
     if (!value) return std::unexpected(std::move(value.error()));
@@ -436,7 +436,7 @@ std::expected<void, StarException> ChatBubbleManager::render(WorldClient const& 
   if (!configuration) return std::unexpected(std::move(configuration.error()));
   auto setting = (*configuration)->get("speechBubbles");
   if (!setting) return std::unexpected(std::move(setting.error()));
-  auto enabled = setting->toBool();
+  auto enabled = setting->to_bool();
   if (!enabled) return std::unexpected(std::move(enabled.error()));
   if (!*enabled) return {};
 
@@ -501,13 +501,13 @@ std::expected<void, StarException> ChatBubbleManager::addChatActions(List<ChatAc
 
     if (std::holds_alternative<SayChatAction>(action)) {
       auto const& sayAction = std::get<SayChatAction>(action);
-      auto actionConfig = sayAction.config.optObject();
+      auto actionConfig = sayAction.config.opt_object();
       if (!actionConfig) return std::unexpected(std::move(actionConfig.error()));
       config = actionConfig->value_or(JsonObject{});
       position = sayAction.position;
 
       TextStyle textStyle = m_textStyle;
-      auto fontSize = config.getUInt("fontSize", textStyle.fontSize);
+      auto fontSize = config.get_uint("fontSize", textStyle.fontSize);
       if (!fontSize)
         return std::unexpected(std::move(fontSize.error()));
       textStyle.fontSize = *fontSize;
@@ -515,7 +515,7 @@ std::expected<void, StarException> ChatBubbleManager::addChatActions(List<ChatAc
       if (!jColor)
         return std::unexpected(std::move(jColor.error()));
       if (*jColor) {
-        auto color = jsonToColor(**jColor);
+        auto color = json_to_color(**jColor);
         if (!color)
           return std::unexpected(std::move(color.error()));
         textStyle.color = color->to_rgba();
@@ -543,7 +543,7 @@ std::expected<void, StarException> ChatBubbleManager::addChatActions(List<ChatAc
       int middleIdx = (innerTiles[0] - 1) / 2;
 
       List<BubbleImage> backgroundImages;
-      auto border = config.getBool("drawBorder", true);
+      auto border = config.get_bool("drawBorder", true);
       if (!border) return std::unexpected(std::move(border.error()));
       if (*border) {
         for (int y = 0; y < innerTiles[1]; y++) {
@@ -623,14 +623,14 @@ std::expected<void, StarException> ChatBubbleManager::addChatActions(List<ChatAc
 
     } else if (std::holds_alternative<PortraitChatAction>(action)) {
       auto const& portraitAction = std::get<PortraitChatAction>(action);
-      auto actionConfig = portraitAction.config.optObject();
+      auto actionConfig = portraitAction.config.opt_object();
       if (!actionConfig) return std::unexpected(std::move(actionConfig.error()));
       config = actionConfig->value_or(JsonObject{});
       position = portraitAction.position;
 
       List<BubbleImage> backgroundImages;
       backgroundImages.push_back(std::make_tuple(m_portraitBackgroundImage, Vec2F()));
-      auto more = config.getBool("drawMoreIndicator", false);
+      auto more = config.get_bool("drawMoreIndicator", false);
       if (!more) return std::unexpected(std::move(more.error()));
       if (*more)
         backgroundImages.push_back(std::make_tuple(m_portraitMoreImage, Vec2F(m_portraitMorePosition)));
@@ -656,7 +656,7 @@ std::expected<void, StarException> ChatBubbleManager::addChatActions(List<ChatAc
     }
 
     if (!silent) {
-      auto sound = config.optString("sound");
+      auto sound = config.opt_string("sound");
       if (!sound) return std::unexpected(std::move(sound.error()));
       if (*sound) {
         auto assets = m_guiContext.get().root().assets();
@@ -668,9 +668,9 @@ std::expected<void, StarException> ChatBubbleManager::addChatActions(List<ChatAc
         if (!instance) return std::unexpected(std::move(instance.error()));
         auto audioInstance = std::move(*instance);
         audioInstance->set_position(position);
-        auto volume = config.getFloat("volume", 1.0f);
+        auto volume = config.get_float("volume", 1.0f);
         if (!volume) return std::unexpected(std::move(volume.error()));
-        auto pitch = config.getFloat("pitch", 1.0f);
+        auto pitch = config.get_float("pitch", 1.0f);
         if (!pitch) return std::unexpected(std::move(pitch.error()));
         audioInstance->set_volume(*volume);
         audioInstance->set_pitch_multiplier(*pitch);

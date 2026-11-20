@@ -181,7 +181,7 @@ namespace Star {
 namespace {
 
 std::expected<double, StarException> validatedRenderFpsLimit(Json const& value) {
-  auto rate = value.toDouble();
+  auto rate = value.to_double();
   if (!rate)
     return std::unexpected(std::move(rate.error()));
   if (!is_finite(*rate) || *rate < 0 || *rate > std::numeric_limits<float>::max())
@@ -264,7 +264,7 @@ std::expected<void, StarException> GraphicsMenu::init(std::shared_ptr<UniverseCl
     auto resolution = m_resList.at((*slider)->val());
     if (!resolution)
       return std::unexpected(std::move(resolution.error()));
-    m_localChanges.set("fullscreenResolution", jsonFromVec2U(resolution->get()));
+    m_localChanges.set("fullscreenResolution", json_from_vec2u(resolution->get()));
     return syncGui();
   });
   // Resolution and interface scale remain staged until the menu is accepted.
@@ -379,32 +379,32 @@ std::expected<void, StarException> GraphicsMenu::init(std::shared_ptr<UniverseCl
   auto interfaceScalesJson = (*assets)->json("/interface/windowconfig/graphicsmenu.config:interfaceScaleList");
   if (!interfaceScalesJson)
     return std::unexpected(std::move(interfaceScalesJson.error()));
-  auto interfaceScales = jsonToFloatList(*interfaceScalesJson);
+  auto interfaceScales = json_to_float_list(*interfaceScalesJson);
   if (!interfaceScales)
     return std::unexpected(std::move(interfaceScales.error()));
   m_interfaceScaleList = std::move(*interfaceScales);
   auto resolutionsJson = (*assets)->json("/interface/windowconfig/graphicsmenu.config:resolutionList");
   if (!resolutionsJson)
     return std::unexpected(std::move(resolutionsJson.error()));
-  auto resolutions = jsonToVec2UList(*resolutionsJson);
+  auto resolutions = json_to_vec2u_list(*resolutionsJson);
   if (!resolutions)
     return std::unexpected(std::move(resolutions.error()));
   m_resList = std::move(*resolutions);
   auto zoomsJson = (*assets)->json("/interface/windowconfig/graphicsmenu.config:zoomList");
   if (!zoomsJson)
     return std::unexpected(std::move(zoomsJson.error()));
-  auto zooms = jsonToFloatList(*zoomsJson);
+  auto zooms = json_to_float_list(*zoomsJson);
   if (!zooms)
     return std::unexpected(std::move(zooms.error()));
   m_zoomList = std::move(*zooms);
   auto speedsJson = (*assets)->json("/interface/windowconfig/graphicsmenu.config:cameraSpeedList");
   if (!speedsJson)
     return std::unexpected(std::move(speedsJson.error()));
-  auto speeds = jsonToFloatList(*speedsJson);
+  auto speeds = json_to_float_list(*speedsJson);
   if (!speeds)
     return std::unexpected(std::move(speeds.error()));
   m_cameraSpeedList = std::move(*speeds);
-  auto renderFpsJson = config->getArray("renderFpsList");
+  auto renderFpsJson = config->get_array("renderFpsList");
   if (!renderFpsJson)
     return std::unexpected(std::move(renderFpsJson.error()));
   for (auto const& value : *renderFpsJson) {
@@ -435,7 +435,7 @@ std::expected<void, StarException> GraphicsMenu::init(std::shared_ptr<UniverseCl
     return std::unexpected(std::move(result.error()));
   if (auto result = syncGui(); !result)
     return std::unexpected(std::move(result.error()));
-  auto shadersPath = config->getString("shadersPanePath", "/interface/asterbound/shaders/shaders.config");
+  auto shadersPath = config->get_string("shadersPanePath", "/interface/asterbound/shaders/shaders.config");
   if (!shadersPath)
     return std::unexpected(std::move(shadersPath.error()));
   auto shadersConfig = (*assets)->json(*shadersPath);
@@ -464,13 +464,13 @@ std::expected<void, StarException> GraphicsMenu::toggleFullscreen() {
   auto fullscreenSetting = m_localChanges.get("fullscreen");
   if (!fullscreenSetting)
     return std::unexpected(std::move(fullscreenSetting.error()));
-  auto fullscreen = fullscreenSetting->get().toBool();
+  auto fullscreen = fullscreenSetting->get().to_bool();
   if (!fullscreen)
     return std::unexpected(std::move(fullscreen.error()));
   auto borderlessSetting = m_localChanges.get("borderless");
   if (!borderlessSetting)
     return std::unexpected(std::move(borderlessSetting.error()));
-  auto borderless = borderlessSetting->get().toBool();
+  auto borderless = borderlessSetting->get().to_bool();
   if (!borderless)
     return std::unexpected(std::move(borderless.error()));
   auto config = context().root().configuration();
@@ -551,7 +551,7 @@ std::expected<void, StarException> GraphicsMenu::initConfig() {
       std::tuple{std::string_view("renderExposureSlider"), std::string_view("renderExposure"), std::ref(m_renderExposureList)},
       std::tuple{std::string_view("hdrPaperWhiteSlider"), std::string_view("hdrPaperWhite"), std::ref(m_hdrPaperWhiteList)},
       std::tuple{std::string_view("hdrPeakSlider"), std::string_view("hdrPeakLuminance"), std::ref(m_hdrPeakList)}}) {
-    auto value = localConfig.getDouble(key);
+    auto value = localConfig.get_double(key);
     if (!value)
       return std::unexpected(std::move(value.error()));
     auto& list = values.get();
@@ -588,7 +588,7 @@ std::expected<void, StarException> GraphicsMenu::syncGui() {
   auto resolutionSetting = m_localChanges.get("fullscreenResolution");
   if (!resolutionSetting)
     return std::unexpected(std::move(resolutionSetting.error()));
-  auto resolution = jsonToVec2U(resolutionSetting->get());
+  auto resolution = json_to_vec2u(resolutionSetting->get());
   if (!resolution)
     return std::unexpected(std::move(resolution.error()));
   auto resSlider = requireChild<SliderBarWidget>("resSlider");
@@ -610,7 +610,7 @@ std::expected<void, StarException> GraphicsMenu::syncGui() {
   auto scaleSetting = m_localChanges.get("interfaceScale");
   if (!scaleSetting)
     return std::unexpected(std::move(scaleSetting.error()));
-  auto scale = scaleSetting->get().optFloat();
+  auto scale = scaleSetting->get().opt_float();
   if (!scale)
     return std::unexpected(std::move(scale.error()));
   float interfaceScale = scale->value_or(0.0f);
@@ -630,7 +630,7 @@ std::expected<void, StarException> GraphicsMenu::syncGui() {
   auto zoomSetting = m_localChanges.get("zoomLevel");
   if (!zoomSetting)
     return std::unexpected(std::move(zoomSetting.error()));
-  auto zoom = zoomSetting->get().toFloat();
+  auto zoom = zoomSetting->get().to_float();
   if (!zoom)
     return std::unexpected(std::move(zoom.error()));
   if (auto result = updateFloatSlider("zoomSlider", m_zoomList, *zoom); !result)
@@ -640,7 +640,7 @@ std::expected<void, StarException> GraphicsMenu::syncGui() {
   auto speedSetting = m_localChanges.get("cameraSpeedFactor");
   if (!speedSetting)
     return std::unexpected(std::move(speedSetting.error()));
-  auto speed = speedSetting->get().toFloat();
+  auto speed = speedSetting->get().to_float();
   if (!speed)
     return std::unexpected(std::move(speed.error()));
   if (auto result = updateFloatSlider("cameraSpeedSlider", m_cameraSpeedList, *speed); !result)
@@ -661,7 +661,7 @@ std::expected<void, StarException> GraphicsMenu::syncGui() {
     return std::unexpected(std::move(result.error()));
   if (auto result = setRequiredLabel("renderFpsValueLabel", *fps == 0 ? "UNLIMITED" : Star::to_string(*fps)); !result)
     return std::unexpected(std::move(result.error()));
-  auto modeName = localConfig.getString("renderOutput");
+  auto modeName = localConfig.get_string("renderOutput");
   if (!modeName)
     return std::unexpected(std::move(modeName.error()));
   auto mode = enum_value<RenderOutputModeNames>(*modeName);
@@ -679,7 +679,7 @@ std::expected<void, StarException> GraphicsMenu::syncGui() {
       std::tuple{std::string_view("renderExposure"), std::string_view("renderExposure"), std::cref(m_renderExposureList), std::string_view(" EV")},
       std::tuple{std::string_view("hdrPaperWhite"), std::string_view("hdrPaperWhite"), std::cref(m_hdrPaperWhiteList), std::string_view(" nits")},
       std::tuple{std::string_view("hdrPeak"), std::string_view("hdrPeakLuminance"), std::cref(m_hdrPeakList), std::string_view(" nits")}}) {
-    auto value = localConfig.getDouble(key);
+    auto value = localConfig.get_double(key);
     if (!value)
       return std::unexpected(std::move(value.error()));
     auto const& list = values.get();
@@ -708,7 +708,7 @@ std::expected<void, StarException> GraphicsMenu::syncGui() {
     auto setting = m_localChanges.get(key);
     if (!setting)
       return std::unexpected(std::move(setting.error()));
-    auto checked = setting->get().toBool();
+    auto checked = setting->get().to_bool();
     if (!checked)
       return std::unexpected(std::move(checked.error()));
     (*button)->setChecked(*checked);
@@ -723,7 +723,7 @@ std::expected<void, StarException> GraphicsMenu::syncGui() {
     auto setting = m_localChanges.get(key);
     if (!setting)
       return std::unexpected(std::move(setting.error()));
-    auto checked = setting->get().optBool();
+    auto checked = setting->get().opt_bool();
     if (!checked)
       return std::unexpected(std::move(checked.error()));
     (*button)->setChecked(checked->value_or(true));
@@ -744,7 +744,7 @@ std::expected<void, StarException> GraphicsMenu::apply() {
   auto vsyncSetting = m_localChanges.get("vsync");
   if (!vsyncSetting)
     return std::unexpected(std::move(vsyncSetting.error()));
-  auto vsync = vsyncSetting->get().toBool();
+  auto vsync = vsyncSetting->get().to_bool();
   if (!vsync)
     return std::unexpected(std::move(vsync.error()));
   auto output = renderOutputSettingsFromJson(Json(m_localChanges));
@@ -782,7 +782,7 @@ std::expected<void, StarException> GraphicsMenu::applyWindowSettings() {
     auto value = (*configuration)->get(key);
     if (!value)
       return std::unexpected(std::move(value.error()));
-    return value->toBool();
+    return value->to_bool();
   };
   auto appController = context().applicationController();
   auto fullscreen = getBool("fullscreen");
@@ -792,7 +792,7 @@ std::expected<void, StarException> GraphicsMenu::applyWindowSettings() {
     auto value = (*configuration)->get("fullscreenResolution");
     if (!value)
       return std::unexpected(std::move(value.error()));
-    auto resolution = jsonToVec2U(*value);
+    auto resolution = json_to_vec2u(*value);
     if (!resolution)
       return std::unexpected(std::move(resolution.error()));
     return appController->setFullscreenWindow(*resolution);
@@ -811,7 +811,7 @@ std::expected<void, StarException> GraphicsMenu::applyWindowSettings() {
     auto value = (*configuration)->get("windowedResolution");
     if (!value)
       return std::unexpected(std::move(value.error()));
-    auto resolution = jsonToVec2U(*value);
+    auto resolution = json_to_vec2u(*value);
     if (!resolution)
       return std::unexpected(std::move(resolution.error()));
     appController->setNormalWindow(*resolution);

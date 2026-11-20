@@ -55,37 +55,37 @@ TreeVariant::TreeVariant()
 
 std::expected<TreeVariant, StarException> TreeVariant::create(Assets const& assets, Json const& variant) {
   TreeVariant value;
-  auto result147 = variant.getString("stemName");
+  auto result147 = variant.get_string("stemName");
 if (!result147) return std::unexpected(std::move(result147.error()));
 value.stemName = std::move(*result147);
-  auto result148 = variant.getString("foliageName");
+  auto result148 = variant.get_string("foliageName");
 if (!result148) return std::unexpected(std::move(result148.error()));
 value.foliageName = std::move(*result148);
-  auto result149 = variant.getString("stemDirectory");
+  auto result149 = variant.get_string("stemDirectory");
 if (!result149) return std::unexpected(std::move(result149.error()));
 value.stemDirectory = std::move(*result149);
   auto result150 = variant.get("stemSettings");
 if (!result150) return std::unexpected(std::move(result150.error()));
 value.stemSettings = std::move(*result150);
-  auto result151 = variant.getFloat("stemHueShift");
+  auto result151 = variant.get_float("stemHueShift");
 if (!result151) return std::unexpected(std::move(result151.error()));
 value.stemHueShift = std::move(*result151);
-  auto result152 = variant.getString("foliageDirectory");
+  auto result152 = variant.get_string("foliageDirectory");
 if (!result152) return std::unexpected(std::move(result152.error()));
 value.foliageDirectory = std::move(*result152);
   auto result153 = variant.get("foliageSettings");
 if (!result153) return std::unexpected(std::move(result153.error()));
 value.foliageSettings = std::move(*result153);
-  auto result154 = variant.getFloat("foliageHueShift");
+  auto result154 = variant.get_float("foliageHueShift");
 if (!result154) return std::unexpected(std::move(result154.error()));
 value.foliageHueShift = std::move(*result154);
   auto result155 = variant.get("descriptions");
 if (!result155) return std::unexpected(std::move(result155.error()));
 value.descriptions = std::move(*result155);
-  auto result156 = variant.getBool("ceiling");
+  auto result156 = variant.get_bool("ceiling");
 if (!result156) return std::unexpected(std::move(result156.error()));
 value.ceiling = std::move(*result156);
-  auto result157 = variant.getBool("ephemeral");
+  auto result157 = variant.get_bool("ephemeral");
 if (!result157) return std::unexpected(std::move(result157.error()));
 value.ephemeral = std::move(*result157);
   auto result158 = variant.get("stemDropConfig");
@@ -127,27 +127,27 @@ GrassVariant::GrassVariant() : hueShift(), ceiling(), ephemeral() {}
 
 std::expected<GrassVariant, StarException> GrassVariant::create(Assets const& assets, Json const& variant) {
   GrassVariant value;
-  auto result162 = variant.getString("name");
+  auto result162 = variant.get_string("name");
 if (!result162) return std::unexpected(std::move(result162.error()));
 value.name = std::move(*result162);
-  auto result163 = variant.getString("directory");
+  auto result163 = variant.get_string("directory");
 if (!result163) return std::unexpected(std::move(result163.error()));
 value.directory = std::move(*result163);
   auto result164 = variant.get("images");
 if (!result164) return std::unexpected(std::move(result164.error()));
-auto result165 = jsonToStringList(std::move(*result164));
+auto result165 = json_to_string_list(std::move(*result164));
 if (!result165) return std::unexpected(std::move(result165.error()));
 value.images = std::move(*result165);
-  auto result166 = variant.getFloat("hueShift");
+  auto result166 = variant.get_float("hueShift");
 if (!result166) return std::unexpected(std::move(result166.error()));
 value.hueShift = std::move(*result166);
   auto result167 = variant.get("descriptions");
 if (!result167) return std::unexpected(std::move(result167.error()));
 value.descriptions = std::move(*result167);
-  auto result168 = variant.getBool("ceiling");
+  auto result168 = variant.get_bool("ceiling");
 if (!result168) return std::unexpected(std::move(result168.error()));
 value.ceiling = std::move(*result168);
-  auto result169 = variant.getBool("ephemeral");
+  auto result169 = variant.get_bool("ephemeral");
 if (!result169) return std::unexpected(std::move(result169.error()));
 value.ephemeral = std::move(*result169);
   auto result170 = variant.get("tileDamageParameters");
@@ -163,7 +163,7 @@ std::expected<Json, StarException> GrassVariant::toJson() const {
 if (!result187) return std::unexpected(std::move(result187.error()));
 return JsonObject{{"name", name},
       {"directory", directory},
-      {"images", jsonFromStringList(images)},
+      {"images", json_from_string_list(images)},
       {"hueShift", hueShift},
       {"descriptions", descriptions},
       {"ceiling", ceiling},
@@ -175,39 +175,39 @@ BushVariant::BushVariant() : baseHueShift(), modHueShift(), ceiling(), ephemeral
 
 std::expected<BushVariant, StarException> BushVariant::create(Assets const& assets, Json const& variant) {
   BushVariant value;
-  auto result172 = variant.getString("bushName");
+  auto result172 = variant.get_string("bushName");
 if (!result172) return std::unexpected(std::move(result172.error()));
 value.bushName = std::move(*result172);
-  auto result173 = variant.getString("modName");
+  auto result173 = variant.get_string("modName");
 if (!result173) return std::unexpected(std::move(result173.error()));
 value.modName = std::move(*result173);
-  auto result174 = variant.getString("directory");
+  auto result174 = variant.get_string("directory");
 if (!result174) return std::unexpected(std::move(result174.error()));
 value.directory = std::move(*result174);
-  auto result175 = variant.getArray("shapes");
+  auto result175 = variant.get_array("shapes");
 if (!result175) return std::unexpected(std::move(result175.error()));
 for (auto const& v : std::move(*result175)) {
-auto result176 = v.getString(0);
+auto result176 = v.get_string(0);
 if (!result176) return std::unexpected(std::move(result176.error()));
 auto result177 = v.get(1);
 if (!result177) return std::unexpected(std::move(result177.error()));
-auto result178 = jsonToStringList(std::move(*result177));
+auto result178 = json_to_string_list(std::move(*result177));
 if (!result178) return std::unexpected(std::move(result178.error()));
 value.shapes.push_back(BushShape{std::move(*result176), std::move(*result178)});
 }
-  auto result179 = variant.getFloat("baseHueShift");
+  auto result179 = variant.get_float("baseHueShift");
 if (!result179) return std::unexpected(std::move(result179.error()));
 value.baseHueShift = std::move(*result179);
-  auto result180 = variant.getFloat("modHueShift");
+  auto result180 = variant.get_float("modHueShift");
 if (!result180) return std::unexpected(std::move(result180.error()));
 value.modHueShift = std::move(*result180);
   auto result181 = variant.get("descriptions");
 if (!result181) return std::unexpected(std::move(result181.error()));
 value.descriptions = std::move(*result181);
-  auto result182 = variant.getBool("ceiling");
+  auto result182 = variant.get_bool("ceiling");
 if (!result182) return std::unexpected(std::move(result182.error()));
 value.ceiling = std::move(*result182);
-  auto result183 = variant.getBool("ephemeral");
+  auto result183 = variant.get_bool("ephemeral");
 if (!result183) return std::unexpected(std::move(result183.error()));
 value.ephemeral = std::move(*result183);
   auto result184 = variant.get("tileDamageParameters");
@@ -225,7 +225,7 @@ return JsonObject{{"bushName", bushName},
       {"modName", modName},
       {"directory", directory},
       {"shapes", shapes.transformed([](BushShape const& shape) -> Json {
-          return JsonArray{shape.image, jsonFromStringList(shape.mods)};
+          return JsonArray{shape.image, json_from_string_list(shape.mods)};
         })},
       {"baseHueShift", baseHueShift},
       {"modHueShift", modHueShift},
@@ -259,9 +259,9 @@ std::expected<std::shared_ptr<PlantDatabase>, StarException> PlantDatabase::crea
         auto loaded = [&]() -> std::expected<void, StarException> {
           auto config = (*assets)->json(file);
           if (!config) return std::unexpected(std::move(config.error()));
-          auto name = config->getString("name");
+          auto name = config->get_string("name");
           if (!name) return std::unexpected(std::move(name.error()));
-          auto settings = config->toObject();
+          auto settings = config->to_object();
           if (!settings) return std::unexpected(std::move(settings.error()));
           configs.insert(std::move(*name), Config{AssetPath::directory(file), std::move(*settings)});
           return {};
@@ -283,7 +283,7 @@ std::expected<std::shared_ptr<PlantDatabase>, StarException> PlantDatabase::crea
 std::expected<StringList, StarException> PlantDatabase::treeStemNames(bool ceiling) const {
   StringList names;
   for (auto const& pair : m_treeStemConfigs) {
-    auto result255 = pair.second.settings.getBool("ceiling", false);
+    auto result255 = pair.second.settings.get_bool("ceiling", false);
 if (!result255) return std::unexpected(std::move(result255.error()));
 if (std::move(*result255) == ceiling)
   names.push_back(pair.first);
@@ -300,7 +300,7 @@ std::expected<String, StarException> PlantDatabase::treeStemShape(String const& 
 if (!result252) return std::unexpected(std::move(result252.error()));
 auto result253 = result252->get().settings.get("shape");
 if (!result253) return std::unexpected(std::move(result253.error()));
-auto result254 = std::move(*result253).toString();
+auto result254 = std::move(*result253).to_string();
 if (!result254) return std::unexpected(std::move(result254.error()));
 return std::move(*result254);
 }
@@ -310,7 +310,7 @@ std::expected<String, StarException> PlantDatabase::treeFoliageShape(String cons
 if (!result249) return std::unexpected(std::move(result249.error()));
 auto result250 = result249->get().settings.get("shape");
 if (!result250) return std::unexpected(std::move(result250.error()));
-auto result251 = std::move(*result250).toString();
+auto result251 = std::move(*result250).to_string();
 if (!result251) return std::unexpected(std::move(result251.error()));
 return std::move(*result251);
 }
@@ -351,7 +351,7 @@ auto const& foliageConfig = result237->get();
   treeVariant.foliageSettings = foliageConfig.settings;
   treeVariant.foliageHueShift = foliageHueShift;
 
-  auto result238 = stemConfig.settings.getBool("ceiling", false);
+  auto result238 = stemConfig.settings.get_bool("ceiling", false);
 if (!result238) return std::unexpected(std::move(result238.error()));
 treeVariant.ceiling = std::move(*result238);
 
@@ -372,12 +372,12 @@ if (!result242) return std::unexpected(std::move(result242.error()));
 if (std::move(*result242))
       descriptions[entry.first] = entry.second;
   }
-  auto result243 = stemConfig.settings.getString("description", stemName + " with " + foliageName);
+  auto result243 = stemConfig.settings.get_string("description", stemName + " with " + foliageName);
 if (!result243) return std::unexpected(std::move(result243.error()));
 descriptions["description"] = std::move(*result243);
   treeVariant.descriptions = descriptions;
 
-  auto result244 = stemConfig.settings.getBool("allowsBlockPlacement", false);
+  auto result244 = stemConfig.settings.get_bool("allowsBlockPlacement", false);
 if (!result244) return std::unexpected(std::move(result244.error()));
 treeVariant.ephemeral = std::move(*result244);
 
@@ -385,7 +385,7 @@ treeVariant.ephemeral = std::move(*result244);
 if (!result245) return std::unexpected(std::move(result245.error()));
 auto result246 = stemConfig.settings.get("damageTable", "/plants/treeDamage.config");
 if (!result246) return std::unexpected(std::move(result246.error()));
-auto result247 = stemConfig.settings.getFloat("health", 1.0f);
+auto result247 = stemConfig.settings.get_float("health", 1.0f);
 if (!result247) return std::unexpected(std::move(result247.error()));
 auto result248 = TileDamageParameters::create(*std::move(*result245),
       std::move(*result246),
@@ -409,7 +409,7 @@ auto const& stemConfig = result225->get();
   treeVariant.stemSettings = stemConfig.settings;
   treeVariant.stemHueShift = stemHueShift;
 
-  auto result226 = stemConfig.settings.getBool("ceiling", false);
+  auto result226 = stemConfig.settings.get_bool("ceiling", false);
 if (!result226) return std::unexpected(std::move(result226.error()));
 treeVariant.ceiling = std::move(*result226);
 
@@ -430,12 +430,12 @@ if (!result229) return std::unexpected(std::move(result229.error()));
 if (std::move(*result229))
       descriptions[entry.first] = entry.second;
   }
-  auto result230 = stemConfig.settings.getString("description", stemName);
+  auto result230 = stemConfig.settings.get_string("description", stemName);
 if (!result230) return std::unexpected(std::move(result230.error()));
 descriptions["description"] = std::move(*result230);
   treeVariant.descriptions = descriptions;
 
-  auto result231 = stemConfig.settings.getBool("ephemeral", false);
+  auto result231 = stemConfig.settings.get_bool("ephemeral", false);
 if (!result231) return std::unexpected(std::move(result231.error()));
 treeVariant.ephemeral = std::move(*result231);
 
@@ -443,7 +443,7 @@ treeVariant.ephemeral = std::move(*result231);
 if (!result232) return std::unexpected(std::move(result232.error()));
 auto result233 = stemConfig.settings.get("damageTable", "/plants/treeDamage.config");
 if (!result233) return std::unexpected(std::move(result233.error()));
-auto result234 = stemConfig.settings.getFloat("health", 1.0f);
+auto result234 = stemConfig.settings.get_float("health", 1.0f);
 if (!result234) return std::unexpected(std::move(result234.error()));
 auto result235 = TileDamageParameters::create(*std::move(*result232),
       std::move(*result233),
@@ -457,7 +457,7 @@ treeVariant.tileDamageParameters = std::move(*result235);
 std::expected<StringList, StarException> PlantDatabase::grassNames(bool ceiling) const {
   StringList names;
   for (auto const& pair : m_grassConfigs) {
-    auto result224 = pair.second.settings.getBool("ceiling", false);
+    auto result224 = pair.second.settings.get_bool("ceiling", false);
 if (!result224) return std::unexpected(std::move(result224.error()));
 if (std::move(*result224) == ceiling)
   names.push_back(pair.first);
@@ -478,11 +478,11 @@ auto const& config = result212->get();
   grassVariant.directory = config.directory;
   auto result213 = config.settings.get("images");
 if (!result213) return std::unexpected(std::move(result213.error()));
-auto result214 = jsonToStringList(std::move(*result213));
+auto result214 = json_to_string_list(std::move(*result213));
 if (!result214) return std::unexpected(std::move(result214.error()));
 grassVariant.images = std::move(*result214);
   grassVariant.hueShift = hueShift;
-  auto result215 = config.settings.getBool("ceiling", false);
+  auto result215 = config.settings.get_bool("ceiling", false);
 if (!result215) return std::unexpected(std::move(result215.error()));
 grassVariant.ceiling = std::move(*result215);
 
@@ -496,19 +496,19 @@ if (!result217) return std::unexpected(std::move(result217.error()));
 if (std::move(*result217))
       descriptions[entry.first] = entry.second;
   }
-  auto result218 = config.settings.getString("description", name);
+  auto result218 = config.settings.get_string("description", name);
 if (!result218) return std::unexpected(std::move(result218.error()));
 descriptions["description"] = std::move(*result218);
   grassVariant.descriptions = descriptions;
 
-  auto result219 = config.settings.getBool("ephemeral", true);
+  auto result219 = config.settings.get_bool("ephemeral", true);
 if (!result219) return std::unexpected(std::move(result219.error()));
 grassVariant.ephemeral = std::move(*result219);
   auto result220 = m_root.assets();
 if (!result220) return std::unexpected(std::move(result220.error()));
 auto result221 = config.settings.get("damageTable", "/plants/grassDamage.config");
 if (!result221) return std::unexpected(std::move(result221.error()));
-auto result222 = config.settings.getFloat("health", 1.0f);
+auto result222 = config.settings.get_float("health", 1.0f);
 if (!result222) return std::unexpected(std::move(result222.error()));
 auto result223 = TileDamageParameters::create(*std::move(*result220),
       std::move(*result221),
@@ -522,7 +522,7 @@ grassVariant.tileDamageParameters = std::move(*result223);
 std::expected<StringList, StarException> PlantDatabase::bushNames(bool ceiling) const {
   StringList names;
   for (auto const& pair : m_bushConfigs) {
-    auto result211 = pair.second.settings.getBool("ceiling");
+    auto result211 = pair.second.settings.get_bool("ceiling");
 if (!result211) return std::unexpected(std::move(result211.error()));
 if (std::move(*result211) == ceiling)
   names.push_back(pair.first);
@@ -536,7 +536,7 @@ std::expected<StringList, StarException> PlantDatabase::bushMods(String const& b
   auto mods = config->get().settings.opt("mods");
   if (!mods) return std::unexpected(std::move(mods.error()));
   if (!*mods) return StringList{};
-  return jsonToStringList(**mods);
+  return json_to_string_list(**mods);
 }
 
 std::expected<BushVariant, StarException> PlantDatabase::buildBushVariant(String const& bushName, float baseHueShift, String const& modName, float modHueShift) const {
@@ -563,7 +563,7 @@ for (auto const& shapeVar : *shapes) {
   auto result197 = (*shapeMap)->get("base");
   if (!result197)
     return std::unexpected(std::move(result197.error()));
-  auto result198 = result197->get().toString();
+  auto result198 = result197->get().to_string();
   if (!result198)
     return std::unexpected(std::move(result198.error()));
   auto base = std::move(*result198);
@@ -575,7 +575,7 @@ for (auto const& shapeVar : *shapes) {
     auto result200 = result199->get().get(modName, JsonArray());
     if (!result200)
       return std::unexpected(std::move(result200.error()));
-    auto result201 = jsonToStringList(std::move(*result200));
+    auto result201 = json_to_string_list(std::move(*result200));
     if (!result201)
       return std::unexpected(std::move(result201.error()));
     mods = std::move(*result201);
@@ -584,7 +584,7 @@ for (auto const& shapeVar : *shapes) {
 }
   bushVariant.baseHueShift = baseHueShift;
   bushVariant.modHueShift = modHueShift;
-  auto result202 = config.settings.getBool("ceiling", false);
+  auto result202 = config.settings.get_bool("ceiling", false);
 if (!result202) return std::unexpected(std::move(result202.error()));
 bushVariant.ceiling = std::move(*result202);
 
@@ -598,19 +598,19 @@ if (!result204) return std::unexpected(std::move(result204.error()));
 if (std::move(*result204))
       descriptions[entry.first] = entry.second;
   }
-  auto result205 = config.settings.getString("description", bushName + " with " + modName);
+  auto result205 = config.settings.get_string("description", bushName + " with " + modName);
 if (!result205) return std::unexpected(std::move(result205.error()));
 descriptions["description"] = std::move(*result205);
   bushVariant.descriptions = descriptions;
 
-  auto result206 = config.settings.getBool("ephemeral", true);
+  auto result206 = config.settings.get_bool("ephemeral", true);
 if (!result206) return std::unexpected(std::move(result206.error()));
 bushVariant.ephemeral = std::move(*result206);
   auto result207 = m_root.assets();
 if (!result207) return std::unexpected(std::move(result207.error()));
 auto result208 = config.settings.get("damageTable", "/plants/bushDamage.config");
 if (!result208) return std::unexpected(std::move(result208.error()));
-auto result209 = config.settings.getFloat("health", 1.0f);
+auto result209 = config.settings.get_float("health", 1.0f);
 if (!result209) return std::unexpected(std::move(result209.error()));
 auto result210 = TileDamageParameters::create(*std::move(*result207),
       std::move(*result208),

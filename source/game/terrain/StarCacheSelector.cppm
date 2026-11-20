@@ -40,10 +40,10 @@ std::expected<std::shared_ptr<CacheSelector>, StarException> CacheSelector::crea
   auto sourceConfig = config.get("source");
   if (!sourceConfig)
     return std::unexpected(std::move(sourceConfig.error()));
-  auto sourceType = sourceConfig->getString("type");
+  auto sourceType = sourceConfig->get_string("type");
   if (!sourceType)
     return std::unexpected(std::move(sourceType.error()));
-  auto seedBias = sourceConfig->getUInt("seedBias", 0);
+  auto seedBias = sourceConfig->get_uint("seedBias", 0);
   if (!seedBias)
     return std::unexpected(std::move(seedBias.error()));
   TerrainSelectorParameters sourceParameters = parameters;
@@ -52,7 +52,7 @@ std::expected<std::shared_ptr<CacheSelector>, StarException> CacheSelector::crea
   if (!source)
     return std::unexpected(std::move(source.error()));
   result->m_source = std::move(*source);
-  auto cacheSize = config.getUInt("lruCacheSize", 20000);
+  auto cacheSize = config.get_uint("lruCacheSize", 20000);
   if (!cacheSize)
     return std::unexpected(std::move(cacheSize.error()));
   result->m_cache.set_capacity(*cacheSize);

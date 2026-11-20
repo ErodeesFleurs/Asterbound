@@ -170,7 +170,7 @@ std::expected<void, StarException> ServerClientContext::initialize() {
   auto speciesHandler = m_rpc.register_handler("ship.setShipSpecies", [&self = *this](Json const& species) -> std::expected<Json, StarException> {
     std::unique_lock locker(self.m_mutex, std::defer_lock);
     lock_with_diagnostics(locker);
-    auto newSpecies = species.toString();
+    auto newSpecies = species.to_string();
     if (!newSpecies)
       return std::unexpected(std::move(newSpecies.error()));
     if (!self.m_validShipSpecies.contains(*newSpecies)) {
@@ -186,7 +186,7 @@ std::expected<void, StarException> ServerClientContext::initialize() {
     return std::unexpected(std::move(speciesHandler.error()));
 
   auto containerHandler = m_rpc.register_handler("world.containerPutItems", [&self = *this](Json const& args) -> std::expected<Json, StarException> {
-    auto items = args.getArray("items");
+    auto items = args.get_array("items");
     if (!items)
       return std::unexpected(std::move(items.error()));
     List<ItemDescriptor> overflow;
@@ -201,7 +201,7 @@ std::expected<void, StarException> ServerClientContext::initialize() {
     lock_with_diagnostics(locker);
     if (self.m_worldThread) {
       auto executed = self.m_worldThread->executeAction([args, items = std::move(*items), &overflow](WorldServerThread&, WorldServer& server) -> std::expected<void, StarException> {
-        auto entityId = args.getInt("entityId");
+        auto entityId = args.get_int("entityId");
         if (!entityId)
           return std::unexpected(std::move(entityId.error()));
         auto itemDatabase = server.root().itemDatabase();
@@ -237,7 +237,7 @@ std::expected<void, StarException> ServerClientContext::initialize() {
     return std::unexpected(std::move(containerHandler.error()));
 
   auto flagHandler = m_rpc.register_handler("universe.setFlag", [&self = *this](Json const& args) -> std::expected<Json, StarException> {
-    auto flagName = args.toString();
+    auto flagName = args.to_string();
     if (!flagName)
       return std::unexpected(std::move(flagName.error()));
     std::unique_lock locker(self.m_mutex, std::defer_lock);
@@ -668,7 +668,7 @@ std::expected<void, StarException> ServerClientContext::loadServerData(Json cons
   if (!location)
     return std::unexpected(std::move(location.error()));
   m_shipSystemLocation = std::move(*location);
-  auto admin = store.getBool("isAdmin");
+  auto admin = store.get_bool("isAdmin");
   if (!admin)
     return std::unexpected(std::move(admin.error()));
   setAdmin(*admin);

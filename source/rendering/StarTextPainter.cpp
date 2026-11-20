@@ -84,30 +84,30 @@ std::expected<TextPositioning, StarException> TextPositioning::create(Json const
   if (!pos)
     return std::unexpected(std::move(pos.error()));
   if (*pos) {
-    auto parsed = jsonToVec2F(**pos);
+    auto parsed = json_to_vec2f(**pos);
     if (!parsed)
       return std::unexpected(std::move(parsed.error()));
     result.pos = *parsed;
   }
-  auto horizontal = v.getString("horizontalAnchor", "left");
+  auto horizontal = v.get_string("horizontalAnchor", "left");
   if (!horizontal)
     return std::unexpected(std::move(horizontal.error()));
   auto hAnchor = HorizontalAnchorNames->get_left(*horizontal);
   if (!hAnchor)
     return std::unexpected(std::move(hAnchor.error()));
   result.hAnchor = hAnchor->get();
-  auto vertical = v.getString("verticalAnchor", "top");
+  auto vertical = v.get_string("verticalAnchor", "top");
   if (!vertical)
     return std::unexpected(std::move(vertical.error()));
   auto vAnchor = VerticalAnchorNames->get_left(*vertical);
   if (!vAnchor)
     return std::unexpected(std::move(vAnchor.error()));
   result.vAnchor = vAnchor->get();
-  auto wrap = v.optUInt("wrapWidth");
+  auto wrap = v.opt_uint("wrapWidth");
   if (!wrap)
     return std::unexpected(std::move(wrap.error()));
   result.wrapWidth = *wrap;
-  auto limit = v.optUInt("charLimit");
+  auto limit = v.opt_uint("charLimit");
   if (!limit)
     return std::unexpected(std::move(limit.error()));
   result.charLimit = *limit;
@@ -126,7 +126,7 @@ std::expected<Json, StarException> TextPositioning::toJson() const {
   if (!vertical)
     return std::unexpected(std::move(vertical.error()));
   return JsonObject{
-    {"position", jsonFromVec2F(pos)},
+    {"position", json_from_vec2f(pos)},
     {"horizontalAnchor", horizontal->get()},
     {"verticalAnchor", vertical->get()},
     {"wrapWidth", json_from_optional(wrapWidth)}
@@ -489,13 +489,13 @@ std::expected<void, StarException> TextPainter::reloadFonts() {
   auto config = assets.json("/interface.config:font");
   if (!config)
     return std::unexpected(std::move(config.error()));
-  auto default_name = config->getString("defaultFont");
+  auto default_name = config->get_string("defaultFont");
   if (!default_name)
     return std::unexpected(std::move(default_name.error()));
-  auto fallback_name = config->getString("fallbackFont");
+  auto fallback_name = config->get_string("fallbackFont");
   if (!fallback_name)
     return std::unexpected(std::move(fallback_name.error()));
-  auto emoji_name = config->getString("emojiFont");
+  auto emoji_name = config->get_string("emojiFont");
   if (!emoji_name)
     return std::unexpected(std::move(emoji_name.error()));
   for (auto extension : std::array<std::string_view, 2>{"ttf", "woff2"}) {
@@ -518,7 +518,7 @@ std::expected<void, StarException> TextPainter::reloadFonts() {
       if (!options)
         return std::unexpected(std::move(options.error()));
       if (*options) {
-        auto threshold = (**options).getUInt("alphaThreshold", 0);
+        auto threshold = (**options).get_uint("alphaThreshold", 0);
         if (!threshold)
           return std::unexpected(std::move(threshold.error()));
         (*font)->set_alpha_threshold(*threshold);

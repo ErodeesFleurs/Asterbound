@@ -122,7 +122,7 @@ end
         break;
       }
       auto patched = !mixed || i % 2 == 0;
-      auto checksum = patched ? json->getInt("checksum") : json->getInt("index");
+      auto checksum = patched ? json->get_int("checksum") : json->get_int("index");
       if (!checksum || *checksum != (patched ? 257 + i : i)) {
         session.fail(state, "Asset worker produced an incorrect JSON result");
         valid = false;

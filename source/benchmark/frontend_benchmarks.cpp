@@ -60,7 +60,7 @@ bool bubblePreflight() {
 }
 
 std::expected<bool, StarException> keybindingPreflight(Root& root) {
-  auto config = Json::parseJson(R"JSON({
+  auto config = Json::parse_json(R"JSON({
     "PlayerLeft": [{"type":"key","value":"A","mods":[]}],
     "PlayerRight": [{"type":"key","value":"A","mods":["LShift"]}],
     "PlayerUp": [{"type":"key","value":"A","mods":["LCtrl"]}],
@@ -84,7 +84,7 @@ std::expected<bool, StarException> keybindingPreflight(Root& root) {
       || bindings->actionsForKey(Key::A) != Set<InterfaceAction>{InterfaceAction::PlayerLeft,
           InterfaceAction::PlayerRight, InterfaceAction::PlayerUp, InterfaceAction::PlayerDown, InterfaceAction::PlayerJump})
     return false;
-  auto tiedConfig = Json::parseJson(R"JSON({
+  auto tiedConfig = Json::parse_json(R"JSON({
     "PlayerRight": [{"type":"key","value":"A","mods":["LShift"]}],
     "PlayerUp": [{"type":"key","value":"A","mods":["LCtrl"]}]
   })JSON");
@@ -203,7 +203,7 @@ int main(int argc, char** argv) {
   }
   // RootLoader's standalone defaults intentionally do not contain the client's
   // bindings. Keep this workload explicit and identical on old/new binaries.
-  auto config = Json::parseJson(R"JSON({
+  auto config = Json::parse_json(R"JSON({
     "PlayerUp": [{"type":"key","value":"W","mods":[]}],
     "PlayerLeft": [{"type":"key","value":"A","mods":[]}],
     "PlayerDown": [{"type":"key","value":"S","mods":[]}],

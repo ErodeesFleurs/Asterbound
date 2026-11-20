@@ -36,9 +36,9 @@ namespace Star {
 ItemDescriptor::ItemDescriptor() : m_count(0), m_parameters(JsonObject()) {}
 
 std::expected<ItemDescriptor, StarException> ItemDescriptor::create(String name, std::uint64_t count, Json parameters) {
-  if (parameters.isNull())
+  if (parameters.is_null())
     parameters = JsonObject();
-  if (!parameters.isType(Json::Type::Object))
+  if (!parameters.is_type(Json::Type::Object))
     return std::unexpected(StarException("Item parameters not map in ItemDescriptor constructor"));
   return ItemDescriptor(std::move(name), count, std::move(parameters), {});
 }
@@ -63,13 +63,13 @@ ItemDescriptor& ItemDescriptor::operator=(ItemDescriptor&& rhs) noexcept(std::is
 std::expected<ItemDescriptor, StarException> ItemDescriptor::create(Json const& spec) {
   ItemDescriptor descriptor;
   if (spec.type() == Json::Type::Array) {
-    auto name = spec.getString(0);
+    auto name = spec.get_string(0);
     if (!name)
       return std::unexpected(std::move(name.error()));
-    auto count = spec.getInt(1, 1);
+    auto count = spec.get_int(1, 1);
     if (!count)
       return std::unexpected(std::move(count.error()));
-    auto parameters = spec.getObject(2, {});
+    auto parameters = spec.get_object(2, {});
     if (!parameters)
       return std::unexpected(std::move(parameters.error()));
     descriptor.m_name = std::move(*name);
@@ -84,28 +84,28 @@ std::expected<ItemDescriptor, StarException> ItemDescriptor::create(Json const& 
       return std::unexpected(std::move(hasItem.error()));
     if (!*hasName && !*hasItem)
       return std::unexpected(StarException("Item name missing."));
-    auto name = spec.getString(*hasName ? "name" : "item");
+    auto name = spec.get_string(*hasName ? "name" : "item");
     if (!name)
       return std::unexpected(std::move(name.error()));
-    auto count = spec.getInt("count", 1);
+    auto count = spec.get_int("count", 1);
     if (!count)
       return std::unexpected(std::move(count.error()));
-    auto data = spec.getObject("data", JsonObject{});
+    auto data = spec.get_object("data", JsonObject{});
     if (!data)
       return std::unexpected(std::move(data.error()));
-    auto parameters = spec.getObject("parameters", std::move(*data));
+    auto parameters = spec.get_object("parameters", std::move(*data));
     if (!parameters)
       return std::unexpected(std::move(parameters.error()));
     descriptor.m_name = std::move(*name);
     descriptor.m_count = *count;
     descriptor.m_parameters = std::move(*parameters);
   } else if (spec.type() == Json::Type::String) {
-    auto name = spec.toString();
+    auto name = spec.to_string();
     if (!name)
       return std::unexpected(std::move(name.error()));
     descriptor.m_name = std::move(*name);
     descriptor.m_count = 1;
-  } else if (!spec.isNull()) {
+  } else if (!spec.is_null()) {
     return std::unexpected(ItemException("ItemDescriptor spec variant not list, map, string, or null"));
   }
   return descriptor;

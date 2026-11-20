@@ -246,10 +246,10 @@ std::expected<void, StarException> CharSelectionPane::selectCharacter(unsigned b
       auto soundsConfig = (*assets)->json("/interface.config:buttonClickFailSound");
       if (!soundsConfig)
         return std::unexpected(std::move(soundsConfig.error()));
-      auto sounds = soundsConfig->toArray();
+      auto sounds = soundsConfig->to_array();
       if (!sounds)
         return std::unexpected(std::move(sounds.error()));
-      auto sound = context().root().random().sample_value(*sounds, "").and_then([](Json const& value) { return value.toString(); });
+      auto sound = context().root().random().sample_value(*sounds, "").and_then([](Json const& value) { return value.to_string(); });
       if (!sound)
         return std::unexpected(std::move(sound.error()));
       if (!sound->empty()) {

@@ -30,7 +30,7 @@ std::expected<String, StarException> GenericInputFormat::fromJson(FormattedJson 
 }
 
 std::expected<FormattedJson, StarException> GenericInputFormat::getDefault() const {
-  return FormattedJson::ofType(Json::Type::Null);
+  return FormattedJson::of_type(Json::Type::Null);
 }
 
 std::expected<FormattedJson, StarException> CommaSeparatedStrings::toJson(String const& input) const {
@@ -38,7 +38,7 @@ std::expected<FormattedJson, StarException> CommaSeparatedStrings::toJson(String
   if (!trimmed)
     return std::unexpected(std::move(trimmed.error()));
   if (trimmed->empty())
-    return FormattedJson::ofType(Json::Type::Array);
+    return FormattedJson::of_type(Json::Type::Array);
   auto fields = input.split(',');
   if (!fields)
     return std::unexpected(std::move(fields.error()));
@@ -53,12 +53,12 @@ std::expected<FormattedJson, StarException> CommaSeparatedStrings::toJson(String
 }
 
 std::expected<String, StarException> CommaSeparatedStrings::fromJson(FormattedJson const& json) const {
-  auto array = json.toJson().toArray();
+  auto array = json.to_json().to_array();
   if (!array)
     return std::unexpected(std::move(array.error()));
   StringList strings;
   for (auto const& entry : *array) {
-    auto text = entry.toString();
+    auto text = entry.to_string();
     if (!text)
       return std::unexpected(std::move(text.error()));
     strings.push_back(std::move(*text));
@@ -67,7 +67,7 @@ std::expected<String, StarException> CommaSeparatedStrings::fromJson(FormattedJs
 }
 
 std::expected<FormattedJson, StarException> CommaSeparatedStrings::getDefault() const {
-  return FormattedJson::ofType(Json::Type::Array);
+  return FormattedJson::of_type(Json::Type::Array);
 }
 
 std::expected<FormattedJson, StarException> StringInputFormat::toJson(String const& input) const {
@@ -75,7 +75,7 @@ std::expected<FormattedJson, StarException> StringInputFormat::toJson(String con
 }
 
 std::expected<String, StarException> StringInputFormat::fromJson(FormattedJson const& json) const {
-  return json.toJson().toString();
+  return json.to_json().to_string();
 }
 
 std::expected<FormattedJson, StarException> StringInputFormat::getDefault() const {
@@ -107,7 +107,7 @@ std::expected<void, StarException> ArrayOutput::out(FormattedJson const& json) {
 }
 
 std::expected<void, StarException> ArrayOutput::flush() {
-  auto array = FormattedJson::createArray(m_results);
+  auto array = FormattedJson::create_array(m_results);
   if (!array)
     return std::unexpected(std::move(array.error()));
   auto repr = reprWithLineEnding(*array);
@@ -202,8 +202,8 @@ using JsonOutput = std::function<std::expected<void, StarException>(FormattedJso
 
 [[nodiscard]]
 std::expected<void, StarException> forEachChild(FormattedJson const& parent, JsonOutput const& output) {
-  if (parent.isType(Json::Type::Object)) {
-    auto object = parent.toJson().toObject();
+  if (parent.is_type(Json::Type::Object)) {
+    auto object = parent.to_json().to_object();
     if (!object)
       return std::unexpected(std::move(object.error()));
     for (auto const& key : object->keys()) {
@@ -214,7 +214,7 @@ std::expected<void, StarException> forEachChild(FormattedJson const& parent, Jso
       if (!emitted)
         return std::unexpected(std::move(emitted.error()));
     }
-  } else if (parent.isType(Json::Type::Array)) {
+  } else if (parent.is_type(Json::Type::Array)) {
     auto size = parent.size();
     if (!size)
       return std::unexpected(std::move(size.error()));
@@ -228,7 +228,7 @@ std::expected<void, StarException> forEachChild(FormattedJson const& parent, Jso
     }
   } else {
     return std::unexpected(JsonPath::TraversalException::format(
-        "Cannot get the children of Json type {}, must be either Array or Object", parent.typeName()));
+        "Cannot get the children of Json type {}, must be either Array or Object", parent.type_name()));
   }
   return {};
 }

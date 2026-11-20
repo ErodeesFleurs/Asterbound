@@ -182,12 +182,12 @@ std::expected<void, StarException> NameplatePainter::initialize() {
   if (!assets) return std::unexpected(std::move(assets.error()));
   auto config = (*assets)->json("/interface.config:nametag");
   if (!config) return std::unexpected(std::move(config.error()));
-  { auto value = config->getBool("showMasterNames"); if (!value) return std::unexpected(std::move(value.error())); m_showMasterNames = *value; }
-  { auto value = config->getFloat("opacityRate"); if (!value) return std::unexpected(std::move(value.error())); m_opacityRate = *value; }
-  { auto value = config->queryFloat("inspectOpacityRate", m_opacityRate); if (!value) return std::unexpected(std::move(value.error())); m_inspectOpacityRate = *value; }
-  { auto value = config->getFloat("opacityBoost"); if (!value) return std::unexpected(std::move(value.error())); m_opacityBoost = *value; }
-  { auto json = config->get("offset"); if (!json) return std::unexpected(std::move(json.error())); auto value = jsonToVec2F(*json); if (!value) return std::unexpected(std::move(value.error())); m_offset = *value; }
-  { auto json = config->get("statusOffset"); if (!json) return std::unexpected(std::move(json.error())); auto value = jsonToVec2F(*json); if (!value) return std::unexpected(std::move(value.error())); m_statusOffset = *value; }
+  { auto value = config->get_bool("showMasterNames"); if (!value) return std::unexpected(std::move(value.error())); m_showMasterNames = *value; }
+  { auto value = config->get_float("opacityRate"); if (!value) return std::unexpected(std::move(value.error())); m_opacityRate = *value; }
+  { auto value = config->query_float("inspectOpacityRate", m_opacityRate); if (!value) return std::unexpected(std::move(value.error())); m_inspectOpacityRate = *value; }
+  { auto value = config->get_float("opacityBoost"); if (!value) return std::unexpected(std::move(value.error())); m_opacityBoost = *value; }
+  { auto json = config->get("offset"); if (!json) return std::unexpected(std::move(json.error())); auto value = json_to_vec2f(*json); if (!value) return std::unexpected(std::move(value.error())); m_offset = *value; }
+  { auto json = config->get("statusOffset"); if (!json) return std::unexpected(std::move(json.error())); auto value = json_to_vec2f(*json); if (!value) return std::unexpected(std::move(value.error())); m_statusOffset = *value; }
   auto textJson = config->get("textStyle");
   if (!textJson) return std::unexpected(std::move(textJson.error()));
   auto text = TextStyle::create(*textJson);
@@ -200,13 +200,13 @@ std::expected<void, StarException> NameplatePainter::initialize() {
   m_statusTextStyle = std::move(*status);
   auto colorJson = config->get("statusColor");
   if (!colorJson) return std::unexpected(std::move(colorJson.error()));
-  auto color = jsonToColor(*colorJson);
+  auto color = json_to_color(*colorJson);
   if (!color) return std::unexpected(std::move(color.error()));
   m_statusTextStyle.color = color->to_rgba();
-  auto tween = config->getFloat("tweenFactor");
+  auto tween = config->get_float("tweenFactor");
   if (!tween) return std::unexpected(std::move(tween.error()));
   m_nametags.setTweenFactor(*tween);
-  auto threshold = config->getFloat("movementThreshold");
+  auto threshold = config->get_float("movementThreshold");
   if (!threshold) return std::unexpected(std::move(threshold.error()));
   m_nametags.setMovementThreshold(*threshold);
   return {};

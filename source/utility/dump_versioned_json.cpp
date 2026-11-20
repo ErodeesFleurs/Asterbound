@@ -29,7 +29,7 @@ int main(int argc, char** argv) {
     if (!versionedJson)
       return std::unexpected(std::move(versionedJson.error()));
     auto json = versionedJson->toJson();
-    auto text = json.printJson(2);
+    auto text = json.print_json(2);
     if (!text)
       return std::unexpected(std::move(text.error()));
     auto written = File::write_file(*text, String(std::string_view(argv[2])));

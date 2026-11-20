@@ -70,11 +70,11 @@ std::expected<std::shared_ptr<CurrencyItem>, StarException> CurrencyItem::create
   auto initialized = item->initialize(config, directory);
   if (!initialized)
     return std::unexpected(std::move(initialized.error()));
-  auto currency = config.getString("currency");
+  auto currency = config.get_string("currency");
   if (!currency)
     return std::unexpected(std::move(currency.error()));
   item->m_currency = std::move(*currency);
-  auto value = config.getUInt("value");
+  auto value = config.get_uint("value");
   if (!value)
     return std::unexpected(std::move(value.error()));
   item->m_value = *value;
@@ -89,7 +89,7 @@ std::expected<String, StarException> CurrencyItem::pickupSound() const {
   auto smallLimitValue = instanceValue("smallStackLimit", 100);
   if (!smallLimitValue)
     return std::unexpected(std::move(smallLimitValue.error()));
-  auto smallLimit = smallLimitValue->toUInt();
+  auto smallLimit = smallLimitValue->to_uint();
   if (!smallLimit)
     return std::unexpected(std::move(smallLimit.error()));
   String soundsKey;
@@ -99,7 +99,7 @@ std::expected<String, StarException> CurrencyItem::pickupSound() const {
     auto mediumLimitValue = instanceValue("mediumStackLimit", 10000);
     if (!mediumLimitValue)
       return std::unexpected(std::move(mediumLimitValue.error()));
-    auto mediumLimit = mediumLimitValue->toUInt();
+    auto mediumLimit = mediumLimitValue->to_uint();
     if (!mediumLimit)
       return std::unexpected(std::move(mediumLimit.error()));
     soundsKey = count() <= *mediumLimit ? std::string_view("pickupSoundsMedium") : std::string_view("pickupSoundsLarge");
@@ -107,8 +107,8 @@ std::expected<String, StarException> CurrencyItem::pickupSound() const {
   auto soundsValue = instanceValue(soundsKey, {});
   if (!soundsValue)
     return std::unexpected(std::move(soundsValue.error()));
-  if (!soundsValue->isNull()) {
-    auto sounds = jsonToStringSet(*soundsValue);
+  if (!soundsValue->is_null()) {
+    auto sounds = json_to_string_set(*soundsValue);
     if (!sounds)
       return std::unexpected(std::move(sounds.error()));
     auto sound = root().random().sample_ref(*sounds);

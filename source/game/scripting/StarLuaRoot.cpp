@@ -87,7 +87,7 @@ std::expected<void, StarException> LuaRoot::restart() {
   auto safeScripts = (*configuration)->get("safeScripts");
   if (!safeScripts)
     return std::unexpected(std::move(safeScripts.error()));
-  auto safe = safeScripts->toBool();
+  auto safe = safeScripts->to_bool();
   if (!safe)
     return std::unexpected(std::move(safe.error()));
   auto engine = LuaEngine::create(*safe);
@@ -110,25 +110,25 @@ std::expected<void, StarException> LuaRoot::restart() {
   auto recursion = (*configuration)->get("scriptRecursionLimit");
   if (!recursion)
     return std::unexpected(std::move(recursion.error()));
-  auto recursionLimit = recursion->toUInt();
+  auto recursionLimit = recursion->to_uint();
   if (!recursionLimit)
     return std::unexpected(std::move(recursionLimit.error()));
   auto instruction = (*configuration)->get("scriptInstructionLimit");
   if (!instruction)
     return std::unexpected(std::move(instruction.error()));
-  auto instructionLimit = instruction->toUInt();
+  auto instructionLimit = instruction->to_uint();
   if (!instructionLimit)
     return std::unexpected(std::move(instructionLimit.error()));
   auto profiling = (*configuration)->get("scriptProfilingEnabled");
   if (!profiling)
     return std::unexpected(std::move(profiling.error()));
-  auto profilingEnabled = profiling->toBool();
+  auto profilingEnabled = profiling->to_bool();
   if (!profilingEnabled)
     return std::unexpected(std::move(profilingEnabled.error()));
   auto interval = (*configuration)->get("scriptInstructionMeasureInterval");
   if (!interval)
     return std::unexpected(std::move(interval.error()));
-  auto measureInterval = interval->toUInt();
+  auto measureInterval = interval->to_uint();
   if (!measureInterval)
     return std::unexpected(std::move(measureInterval.error()));
   (*engine)->setRecursionLimit(*recursionLimit);

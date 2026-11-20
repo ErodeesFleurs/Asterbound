@@ -630,7 +630,7 @@ std::expected<void, StarException> WorldStorage::unloadAll(bool force) {
     // of tries to completely uninit and store all entities before giving up
     // and just letting some entities not be stored.
     if (m_entityMap) {
-      auto unsignedforceUnloadTriesResult1 = storageConfig.getUInt("forceUnloadTries");
+      auto unsignedforceUnloadTriesResult1 = storageConfig.get_uint("forceUnloadTries");
       if (!unsignedforceUnloadTriesResult1) return std::unexpected(std::move(unsignedforceUnloadTriesResult1.error()));
       unsigned forceUnloadTries = std::move((*unsignedforceUnloadTriesResult1));
       for (unsigned i = 0; i < forceUnloadTries; ++i) {
@@ -863,27 +863,27 @@ std::expected<WorldStorage::TileSectorStore, StarException> WorldStorage::readTi
       }
 
       if (!matDatabase->isValidMaterialId(tile.foreground)) {
-        auto tileforegroundResult1 = storageConfig.getUInt("replacementMaterialId");
+        auto tileforegroundResult1 = storageConfig.get_uint("replacementMaterialId");
         if (!tileforegroundResult1) return std::unexpected(std::move(tileforegroundResult1.error()));
         tile.foreground = std::move((*tileforegroundResult1));
       }
       if (!matDatabase->isValidMaterialId(tile.background)) {
-        auto tilebackgroundResult1 = storageConfig.getUInt("replacementMaterialId");
+        auto tilebackgroundResult1 = storageConfig.get_uint("replacementMaterialId");
         if (!tilebackgroundResult1) return std::unexpected(std::move(tilebackgroundResult1.error()));
         tile.background = std::move((*tilebackgroundResult1));
       }
       if (!matDatabase->isValidModId(tile.foregroundMod)) {
-        auto tileforegroundModResult1 = storageConfig.getUInt("replacementModId");
+        auto tileforegroundModResult1 = storageConfig.get_uint("replacementModId");
         if (!tileforegroundModResult1) return std::unexpected(std::move(tileforegroundModResult1.error()));
         tile.foregroundMod = std::move((*tileforegroundModResult1));
       }
       if (!matDatabase->isValidModId(tile.backgroundMod)) {
-        auto tilebackgroundModResult1 = storageConfig.getUInt("replacementModId");
+        auto tilebackgroundModResult1 = storageConfig.get_uint("replacementModId");
         if (!tilebackgroundModResult1) return std::unexpected(std::move(tilebackgroundModResult1.error()));
         tile.backgroundMod = std::move((*tilebackgroundModResult1));
       }
       if (!liqDatabase->isValidLiquidId(tile.liquid.liquid)) {
-        auto LiquidIdreplacementLiquidResult1 = storageConfig.getUInt("replacementLiquidId");
+        auto LiquidIdreplacementLiquidResult1 = storageConfig.get_uint("replacementLiquidId");
         if (!LiquidIdreplacementLiquidResult1) return std::unexpected(std::move(LiquidIdreplacementLiquidResult1.error()));
         LiquidId replacementLiquid = std::move((*LiquidIdreplacementLiquidResult1));
         if (replacementLiquid == EmptyLiquidId)
@@ -1044,10 +1044,10 @@ std::expected<void, StarException> WorldStorage::initialize() {
   auto storageConfig = std::move((*autostorageConfigResult2));
   auto m_sectorTimeToLiveResult1 = storageConfig.get("sectorTimeToLive");
   if (!m_sectorTimeToLiveResult1) return std::unexpected(std::move(m_sectorTimeToLiveResult1.error()));
-  auto m_sectorTimeToLiveResult2 = jsonToVec2F((*m_sectorTimeToLiveResult1));
+  auto m_sectorTimeToLiveResult2 = json_to_vec2f((*m_sectorTimeToLiveResult1));
   if (!m_sectorTimeToLiveResult2) return std::unexpected(std::move(m_sectorTimeToLiveResult2.error()));
   m_sectorTimeToLive = std::move((*m_sectorTimeToLiveResult2));
-  auto m_generationQueueTimeToLiveResult1 = storageConfig.getFloat("generationQueueTimeToLive");
+  auto m_generationQueueTimeToLiveResult1 = storageConfig.get_float("generationQueueTimeToLive");
   if (!m_generationQueueTimeToLiveResult1) return std::unexpected(std::move(m_generationQueueTimeToLiveResult1.error()));
   m_generationQueueTimeToLive = std::move((*m_generationQueueTimeToLiveResult1));
   return {};

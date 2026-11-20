@@ -106,7 +106,7 @@ std::expected<void, StarException> StatusController::configure(Json const& confi
   auto stats = StatCollection::create(config);
   if (!stats) return std::unexpected(std::move(stats.error()));
   m_statCollection = std::move(*stats);
-  auto properties = config.getObject("statusProperties", {});
+  auto properties = config.get_object("statusProperties", {});
   if (!properties) return std::unexpected(std::move(properties.error()));
   m_statusProperties.reset(std::move(*properties));
   m_statusProperties.setOverrides(
@@ -147,30 +147,30 @@ std::expected<void, StarException> StatusController::configure(Json const& confi
       }
       return statusProperties.NetElementHashMap<String, Json>::readNetDelta(ds, interp, rules);
     });
-  auto minimumLiquidStatusEffectPercentage = config.getFloat("minimumLiquidStatusEffectPercentage");
+  auto minimumLiquidStatusEffectPercentage = config.get_float("minimumLiquidStatusEffectPercentage");
   if (!minimumLiquidStatusEffectPercentage) return std::unexpected(std::move(minimumLiquidStatusEffectPercentage.error()));
   m_minimumLiquidStatusEffectPercentage = *minimumLiquidStatusEffectPercentage;
-  auto appliesEnvironmentStatusEffects = config.getBool("appliesEnvironmentStatusEffects");
+  auto appliesEnvironmentStatusEffects = config.get_bool("appliesEnvironmentStatusEffects");
   if (!appliesEnvironmentStatusEffects) return std::unexpected(std::move(appliesEnvironmentStatusEffects.error()));
   m_appliesEnvironmentStatusEffects = *appliesEnvironmentStatusEffects;
-  auto appliesWeatherStatusEffects = config.getBool("appliesWeatherStatusEffects");
+  auto appliesWeatherStatusEffects = config.get_bool("appliesWeatherStatusEffects");
   if (!appliesWeatherStatusEffects) return std::unexpected(std::move(appliesWeatherStatusEffects.error()));
   m_appliesWeatherStatusEffects = *appliesWeatherStatusEffects;
-  auto timer = config.getFloat("environmentStatusEffectUpdateTimer", 0.15f);
+  auto timer = config.get_float("environmentStatusEffectUpdateTimer", 0.15f);
   if (!timer) return std::unexpected(std::move(timer.error()));
   m_environmentStatusEffectUpdateTimer = GameTimer(*timer);
-  auto animation = config.optString("primaryAnimationConfig");
+  auto animation = config.opt_string("primaryAnimationConfig");
   if (!animation) return std::unexpected(std::move(animation.error()));
   m_primaryAnimationConfig = std::move(*animation);
   auto scriptsJson = config.get("primaryScriptSources", JsonArray());
   if (!scriptsJson) return std::unexpected(std::move(scriptsJson.error()));
-  auto scripts = jsonToStringList(*scriptsJson);
+  auto scripts = json_to_string_list(*scriptsJson);
   if (!scripts) return std::unexpected(std::move(scripts.error()));
   if (auto result = m_primaryScript.setScripts(std::move(*scripts)); !result) return std::unexpected(std::move(result.error()));
-  auto delta = config.getUInt("primaryScriptDelta", 1);
+  auto delta = config.get_uint("primaryScriptDelta", 1);
   if (!delta) return std::unexpected(std::move(delta.error()));
   m_primaryScript.setUpdateDelta(*delta);
-  auto keepSteps = config.getUInt("keepDamageNotificationSteps", 120);
+  auto keepSteps = config.get_uint("keepDamageNotificationSteps", 120);
   if (!keepSteps) return std::unexpected(std::move(keepSteps.error()));
   m_recentHitsGiven.setHistoryLimit(*keepSteps);
   m_recentDamageGiven.setHistoryLimit(*keepSteps);
@@ -242,13 +242,13 @@ std::expected<Json, StarException> StatusController::diskStore() const {
 std::expected<void, StarException> StatusController::diskLoad(Json const& store) {
   if (auto result = clearAllPersistentEffects(); !result) return std::unexpected(std::move(result.error()));
   if (auto result = clearEphemeralEffects(); !result) return std::unexpected(std::move(result.error()));
-  auto properties = store.getObject("statusProperties");
+  auto properties = store.get_object("statusProperties");
   if (!properties) return std::unexpected(std::move(properties.error()));
   m_statusProperties.reset(std::move(*properties));
-  auto categories = store.getObject("persistentEffectCategories", {});
+  auto categories = store.get_object("persistentEffectCategories", {});
   if (!categories) return std::unexpected(std::move(categories.error()));
   for (auto const& category : *categories) {
-    auto values = category.second.toArray();
+    auto values = category.second.to_array();
     if (!values) return std::unexpected(std::move(values.error()));
     List<PersistentStatusEffect> effects;
     for (auto const& value : *values) {
@@ -258,7 +258,7 @@ std::expected<void, StarException> StatusController::diskLoad(Json const& store)
     }
     if (auto result = addPersistentEffects(category.first, effects); !result) return std::unexpected(std::move(result.error()));
   }
-  auto ephemeral = store.getArray("ephemeralEffects");
+  auto ephemeral = store.get_array("ephemeralEffects");
   if (!ephemeral) return std::unexpected(std::move(ephemeral.error()));
   List<EphemeralStatusEffect> effects;
   for (auto const& value : *ephemeral) {
@@ -267,20 +267,20 @@ std::expected<void, StarException> StatusController::diskLoad(Json const& store)
     effects.push_back(std::move(*effect));
   }
   if (auto result = addEphemeralEffects(effects); !result) return std::unexpected(std::move(result.error()));
-  auto values = store.getObject("resourceValues", {});
+  auto values = store.get_object("resourceValues", {});
   if (!values) return std::unexpected(std::move(values.error()));
   for (auto const& value : *values) {
     if (isResource(value.first)) {
-      auto amount = value.second.toFloat();
+      auto amount = value.second.to_float();
       if (!amount) return std::unexpected(std::move(amount.error()));
       if (auto result = setResource(value.first, *amount); !result) return std::unexpected(std::move(result.error()));
     }
   }
-  auto locks = store.getObject("resourcesLocked", {});
+  auto locks = store.get_object("resourcesLocked", {});
   if (!locks) return std::unexpected(std::move(locks.error()));
   for (auto const& value : *locks) {
     if (isResource(value.first)) {
-      auto locked = value.second.toBool();
+      auto locked = value.second.to_bool();
       if (!locked) return std::unexpected(std::move(locked.error()));
       if (auto result = setResourceLocked(value.first, *locked); !result) return std::unexpected(std::move(result.error()));
     }
@@ -293,7 +293,7 @@ Json StatusController::statusProperty(String const& name, Json const& def) const
 }
 
 void StatusController::setStatusProperty(String const& name, Json value) {
-  if (value.isNull())
+  if (value.is_null())
     m_statusProperties.remove(name);
   else
     m_statusProperties.set(name, value);

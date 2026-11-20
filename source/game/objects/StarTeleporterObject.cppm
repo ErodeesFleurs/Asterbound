@@ -99,7 +99,7 @@ std::expected<std::shared_ptr<TeleporterObject>, StarException> TeleporterObject
   auto idConfig = object->configValue("uniqueId", Uuid(rootContext.random()).hex());
   if (!idConfig)
     return std::unexpected(std::move(idConfig.error()));
-  auto id = idConfig->optString();
+  auto id = idConfig->opt_string();
   if (!id)
     return std::unexpected(std::move(id.error()));
   object->setUniqueId(std::move(*id));
@@ -111,7 +111,7 @@ std::expected<Vec2F, StarException> TeleporterObject::footPosition() const {
   if (!foot)
     return std::unexpected(std::move(foot.error()));
   if (*foot)
-    return jsonToVec2F(*foot);
+    return json_to_vec2f(*foot);
   return Vec2F();
 }
 

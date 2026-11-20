@@ -57,7 +57,7 @@ std::expected<void, StarException> InterfaceCursor::resetCursor() {
   auto config = (*assets)->json("/interface.config:defaultCursor");
   if (!config)
     return std::unexpected(std::move(config.error()));
-  auto path = config->toString();
+  auto path = config->to_string();
   if (!path)
     return std::unexpected(std::move(path.error()));
   return setCursor(*path);
@@ -80,7 +80,7 @@ std::expected<void, StarException> InterfaceCursor::setCursor(String const& conf
   auto offsetJson = config->get("offset");
   if (!offsetJson)
     return std::unexpected(std::move(offsetJson.error()));
-  auto offset = jsonToVec2I(*offsetJson);
+  auto offset = json_to_vec2i(*offsetJson);
   if (!offset)
     return std::unexpected(std::move(offset.error()));
 
@@ -89,7 +89,7 @@ std::expected<void, StarException> InterfaceCursor::setCursor(String const& conf
   auto hasImage = config->contains("image");
   if (!hasImage) return std::unexpected(std::move(hasImage.error()));
   if (*hasImage) {
-    auto image = config->getString("image");
+    auto image = config->get_string("image");
     if (!image)
       return std::unexpected(std::move(image.error()));
     auto imageSize = (*imageMetadata)->imageSize(*image);
@@ -113,7 +113,7 @@ std::expected<void, StarException> InterfaceCursor::setCursor(String const& conf
     size = Vec2I(bounds->size());
     drawable = std::move(*animation);
   }
-  auto scale = config->getUInt("scale", 0);
+  auto scale = config->get_uint("scale", 0);
   if (!scale)
     return std::unexpected(std::move(scale.error()));
   m_configFile = configFile;

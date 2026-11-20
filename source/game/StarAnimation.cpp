@@ -47,8 +47,8 @@ std::expected<Animation, StarException> Animation::create(Root& root, Json confi
 std::expected<void, StarException> Animation::initialize(Json config, String const& directory) {
   m_directory = directory;
   if (m_directory.empty()) {
-    if (config.isType(Json::Type::String)) {
-      auto path = config.toString();
+    if (config.is_type(Json::Type::String)) {
+      auto path = config.to_string();
       if (!path)
         return std::unexpected(std::move(path.error()));
       m_directory = AssetPath::directory(*path);
@@ -56,7 +56,7 @@ std::expected<void, StarException> Animation::initialize(Json config, String con
       m_directory = "/";
     }
   }
-  if (config.isNull())
+  if (config.is_null())
     config = JsonObject();
   auto assets = m_root.get().assets();
   if (!assets)
@@ -65,14 +65,14 @@ std::expected<void, StarException> Animation::initialize(Json config, String con
   if (!fetched)
     return std::unexpected(std::move(fetched.error()));
   config = std::move(*fetched);
-  auto modeName = config.getString("mode", "endAndDisappear");
+  auto modeName = config.get_string("mode", "endAndDisappear");
   if (!modeName)
     return std::unexpected(std::move(modeName.error()));
   auto mode = enum_value<AnimationModeNames>(*modeName);
   if (!mode)
     return std::unexpected(std::move(mode.error()));
   m_mode = *mode;
-  auto base = config.getString("frames", "");
+  auto base = config.get_string("frames", "");
   if (!base)
     return std::unexpected(std::move(base.error()));
   m_base = std::move(*base);
@@ -80,34 +80,34 @@ std::expected<void, StarException> Animation::initialize(Json config, String con
   if (!hasIndex)
     return std::unexpected(std::move(hasIndex.error()));
   m_appendFrame = !*hasIndex;
-  auto frameNumber = config.getInt("frameNumber", 1);
+  auto frameNumber = config.get_int("frameNumber", 1);
   if (!frameNumber)
     return std::unexpected(std::move(frameNumber.error()));
   m_frameNumber = *frameNumber;
-  auto cycle = config.getFloat("animationCycle", 1.0);
+  auto cycle = config.get_float("animationCycle", 1.0);
   if (!cycle)
     return std::unexpected(std::move(cycle.error()));
   m_animationCycle = *cycle;
-  auto loops = config.getFloat("loops", 1.0);
+  auto loops = config.get_float("loops", 1.0);
   if (!loops)
     return std::unexpected(std::move(loops.error()));
   m_animationTime = m_animationCycle * *loops;
-  auto angle = config.getFloat("angle", 0.0f);
+  auto angle = config.get_float("angle", 0.0f);
   if (!angle)
     return std::unexpected(std::move(angle.error()));
   m_angle = *angle;
   auto offsetConfig = config.get("offset", JsonArray{0.0f, 0.0f});
   if (!offsetConfig)
     return std::unexpected(std::move(offsetConfig.error()));
-  auto offset = jsonToVec2F(*offsetConfig);
+  auto offset = json_to_vec2f(*offsetConfig);
   if (!offset)
     return std::unexpected(std::move(offset.error()));
   m_offset = *offset;
-  auto centered = config.getBool("centered", true);
+  auto centered = config.get_bool("centered", true);
   if (!centered)
     return std::unexpected(std::move(centered.error()));
   m_centered = *centered;
-  auto processing = config.getString("processing", "");
+  auto processing = config.get_string("processing", "");
   if (!processing)
     return std::unexpected(std::move(processing.error()));
   m_processing = std::move(*processing);
@@ -116,12 +116,12 @@ std::expected<void, StarException> Animation::initialize(Json config, String con
     return std::unexpected(std::move(colorConfig.error()));
   m_color = Color::White;
   if (*colorConfig) {
-    auto color = jsonToColor(**colorConfig);
+    auto color = json_to_color(**colorConfig);
     if (!color)
       return std::unexpected(std::move(color.error()));
     m_color = *color;
   }
-  auto variants = config.getInt("variants", 1);
+  auto variants = config.get_int("variants", 1);
   if (!variants)
     return std::unexpected(std::move(variants.error()));
   auto variant = m_root.get().random().uniform_int(*variants - 1);

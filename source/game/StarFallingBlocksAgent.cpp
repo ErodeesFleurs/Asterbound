@@ -66,7 +66,7 @@ std::expected<std::shared_ptr<FallingBlocksAgent>, StarException> FallingBlocksA
   if (!assets) return std::unexpected(std::move(assets.error()));
   auto config = (*assets)->json("/worldserver.config:fallingBlocksImmediateUpwardPropogateProbability");
   if (!config) return std::unexpected(std::move(config.error()));
-  auto probability = config->toFloat();
+  auto probability = config->to_float();
   if (!probability) return std::unexpected(std::move(probability.error()));
   result->m_immediateUpwardPropagateProbability = *probability;
   return result;

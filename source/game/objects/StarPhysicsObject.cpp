@@ -96,7 +96,7 @@ std::expected<std::shared_ptr<PhysicsObject>, StarException> PhysicsObject::crea
   if (!forcesConfigResult)
     return std::unexpected(std::move(forcesConfigResult.error()));
   auto forcesConfig = std::move(*forcesConfigResult);
-  auto forcesResult = forcesConfig.toObject();
+  auto forcesResult = forcesConfig.to_object();
   if (!forcesResult)
     return std::unexpected(std::move(forcesResult.error()));
   auto forces = std::move(*forcesResult);
@@ -107,7 +107,7 @@ std::expected<std::shared_ptr<PhysicsObject>, StarException> PhysicsObject::crea
       return std::unexpected(std::move(regionResult.error()));
     auto region = std::move(*regionResult);
     force.forceRegion = std::move(region);
-    auto enabledResult = pair.second.getBool("enabled", true);
+    auto enabledResult = pair.second.get_bool("enabled", true);
     if (!enabledResult)
       return std::unexpected(std::move(enabledResult.error()));
     auto enabled = std::move(*enabledResult);
@@ -117,7 +117,7 @@ std::expected<std::shared_ptr<PhysicsObject>, StarException> PhysicsObject::crea
   if (!collisionsConfigResult)
     return std::unexpected(std::move(collisionsConfigResult.error()));
   auto collisionsConfig = std::move(*collisionsConfigResult);
-  auto collisionsResult = collisionsConfig.toObject();
+  auto collisionsResult = collisionsConfig.to_object();
   if (!collisionsResult)
     return std::unexpected(std::move(collisionsResult.error()));
   auto collisions = std::move(*collisionsResult);
@@ -130,7 +130,7 @@ std::expected<std::shared_ptr<PhysicsObject>, StarException> PhysicsObject::crea
     collision.movingCollision = std::move(movingCollision);
     collision.xPosition.set(std::exchange(collision.movingCollision.position[0], 0.0f));
     collision.yPosition.set(std::exchange(collision.movingCollision.position[1], 0.0f));
-    auto enabledResult = pair.second.getBool("enabled", true);
+    auto enabledResult = pair.second.get_bool("enabled", true);
     if (!enabledResult)
       return std::unexpected(std::move(enabledResult.error()));
     auto enabled = std::move(*enabledResult);

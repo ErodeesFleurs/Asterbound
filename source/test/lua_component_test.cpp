@@ -1044,7 +1044,7 @@ const GameTestRegistration inputBindNames("InputNameSerialization", "BindJsonPre
     ASSERT_TRUE(bind) << bind.error().what();
     auto serialized = Input::bindToJson(*bind);
     ASSERT_TRUE(serialized) << serialized.error().what();
-    auto type = json.getString("type");
+    auto type = json.get_string("type");
     ASSERT_TRUE(type);
     EXPECT_EQ(*serialized, *type == "mouse"
         ? Json(JsonObject{{"type", "mouse"}, {"value", "MouseFifth"}})
@@ -1708,7 +1708,7 @@ const GameTestRegistration fixedEnumJsonBoundaries("GameEnumNames", "ChatAndBeha
   ASSERT_TRUE(encoded);
   auto context = encoded->get("context");
   ASSERT_TRUE(context);
-  EXPECT_EQ(context->getString("mode"), "RadioMessage");
+  EXPECT_EQ(context->get_string("mode"), "RadioMessage");
 
   for (auto const& name : {String("unknown"), String(std::string("RadioMessage\0", 13)),
                            String(std::string(1, static_cast<char>(0xff)))}) {
@@ -1723,10 +1723,10 @@ const GameTestRegistration fixedEnumJsonBoundaries("GameEnumNames", "ChatAndBeha
   ASSERT_TRUE(parameter);
   EXPECT_EQ(parameter->first, NodeParameterType::Number);
   ASSERT_TRUE(std::holds_alternative<Json>(parameter->second));
-  EXPECT_TRUE(std::get<Json>(parameter->second).isNull());
+  EXPECT_TRUE(std::get<Json>(parameter->second).is_null());
   auto serialized = jsonFromNodeParameter(*parameter);
   ASSERT_TRUE(serialized);
-  EXPECT_EQ(serialized->getString("type"), "number");
+  EXPECT_EQ(serialized->get_string("type"), "number");
   auto output = jsonToNodeOutput(JsonObject{{"type", "BoOl"}, {"key", Json()}});
   ASSERT_TRUE(output);
   EXPECT_EQ(output->first, NodeParameterType::Bool);

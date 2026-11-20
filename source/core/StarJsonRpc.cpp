@@ -76,7 +76,7 @@ std::expected<void, StarException> JsonRpc::receive(ByteArray const& inbuffer) {
     return std::unexpected(std::move(status.error()));
 
   for (auto const& request : inbound) {
-    auto command = request.getString("command");
+    auto command = request.get_string("command");
     if (!command)
       return std::unexpected(std::move(command.error()));
     if (*command == "request") {
@@ -86,7 +86,7 @@ std::expected<void, StarException> JsonRpc::receive(ByteArray const& inbuffer) {
       if (!id)
         return std::unexpected(std::move(id.error()));
       auto invoke = [&]() -> std::expected<Json, StarException> {
-        auto name = request.getString("handler");
+        auto name = request.get_string("handler");
         if (!name)
           return std::unexpected(std::move(name.error()));
         auto handler = m_handlers.find(*name);
@@ -109,7 +109,7 @@ std::expected<void, StarException> JsonRpc::receive(ByteArray const& inbuffer) {
       }
     } else if (*command == "response" || *command == "fail") {
       auto complete = [&]() -> std::expected<void, StarException> {
-        auto id = request.getUInt("id");
+        auto id = request.get_uint("id");
         if (!id)
           return std::unexpected(std::move(id.error()));
         auto result = *command == "fail" ? std::expected<Json, StarException>(std::in_place) : request.get("result");

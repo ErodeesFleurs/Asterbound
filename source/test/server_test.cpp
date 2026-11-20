@@ -422,7 +422,7 @@ const GameTestRegistration
     WorldServerTestAccess::setConfiguration(*world, JsonObject{{"medium", medium}});
     ASSERT_TRUE(world->setFidelity(WorldServerFidelity::Medium));
     auto malformedLiquid = world->update(0.025f);
-    auto expectedLiquid = jsonToVec2U(Json("bad timing"));
+    auto expectedLiquid = json_to_vec2u(Json("bad timing"));
     ASSERT_FALSE(malformedLiquid);
     ASSERT_FALSE(expectedLiquid);
     EXPECT_STREQ(malformedLiquid.error().what(), expectedLiquid.error().what());
@@ -433,7 +433,7 @@ const GameTestRegistration
     WorldServerTestAccess::setConfiguration(*world, JsonObject{{"medium", medium}});
     ASSERT_TRUE(world->setFidelity(WorldServerFidelity::Medium));
     auto malformedLimit = world->update(0.025f);
-    auto expectedLimit = Json(false).optUInt();
+    auto expectedLimit = Json(false).opt_uint();
     ASSERT_FALSE(malformedLimit);
     ASSERT_FALSE(expectedLimit);
     EXPECT_STREQ(malformedLimit.error().what(), expectedLimit.error().what());

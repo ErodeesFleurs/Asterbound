@@ -190,14 +190,14 @@ std::expected<void, StarException> Cinematic::load(Json const& definition) {
 }
 
 std::expected<void, StarException> Cinematic::loadDefinition(Json const& definition) {
-  auto timeSkips = definition.getArray("timeSkips", JsonArray());
+  auto timeSkips = definition.get_array("timeSkips", JsonArray());
   if (!timeSkips)
     return std::unexpected(std::move(timeSkips.error()));
   for (auto const& timeSkipDefinition : *timeSkips) {
-    auto available = timeSkipDefinition.getFloat("available");
+    auto available = timeSkipDefinition.get_float("available");
     if (!available)
       return std::unexpected(std::move(available.error()));
-    auto skipTo = timeSkipDefinition.getFloat("skipTo");
+    auto skipTo = timeSkipDefinition.get_float("skipTo");
     if (!skipTo)
       return std::unexpected(std::move(skipTo.error()));
     m_timeSkips.push_back(TimeSkip{.availableTime = *available, .skipToTime = *skipTo});
@@ -206,14 +206,14 @@ std::expected<void, StarException> Cinematic::loadDefinition(Json const& definit
     return a.availableTime < b.availableTime;
   });
 
-  auto cameras = definition.getArray("camera", JsonArray());
+  auto cameras = definition.get_array("camera", JsonArray());
   if (!cameras)
     return std::unexpected(std::move(cameras.error()));
   for (auto const& cameraDefinition : *cameras) {
-    auto timecode = cameraDefinition.getFloat("timecode");
+    auto timecode = cameraDefinition.get_float("timecode");
     if (!timecode)
       return std::unexpected(std::move(timecode.error()));
-    auto zoom = cameraDefinition.getFloat("zoom", 1.0f);
+    auto zoom = cameraDefinition.get_float("zoom", 1.0f);
     if (!zoom)
       return std::unexpected(std::move(zoom.error()));
     CameraKeyFrame keyFrame{.timecode = *timecode, .zoom = *zoom, .pan = {}};
@@ -224,7 +224,7 @@ std::expected<void, StarException> Cinematic::loadDefinition(Json const& definit
       auto panJson = cameraDefinition.get("pan");
       if (!panJson)
         return std::unexpected(std::move(panJson.error()));
-      auto pan = jsonToVec2F(*panJson);
+      auto pan = json_to_vec2f(*panJson);
       if (!pan)
         return std::unexpected(std::move(pan.error()));
       keyFrame.pan = *pan;
@@ -232,24 +232,24 @@ std::expected<void, StarException> Cinematic::loadDefinition(Json const& definit
     m_cameraKeyFrames.push_back(keyFrame);
   }
 
-  auto panels = definition.getArray("panels");
+  auto panels = definition.get_array("panels");
   if (!panels)
     return std::unexpected(std::move(panels.error()));
   for (auto const& panelDefinition : *panels) {
     auto panel = std::make_shared<Panel>();
-    auto useCamera = panelDefinition.getBool("useCamera", true);
+    auto useCamera = panelDefinition.get_bool("useCamera", true);
     if (!useCamera)
       return std::unexpected(std::move(useCamera.error()));
     panel->useCamera = *useCamera;
-    auto drawables = panelDefinition.getArray("drawables", {});
+    auto drawables = panelDefinition.get_array("drawables", {});
     if (!drawables)
       return std::unexpected(std::move(drawables.error()));
     panel->drawables = std::move(*drawables);
-    auto animationFrames = panelDefinition.getInt("animationFrames", std::numeric_limits<int>::max());
+    auto animationFrames = panelDefinition.get_int("animationFrames", std::numeric_limits<int>::max());
     if (!animationFrames)
       return std::unexpected(std::move(animationFrames.error()));
     panel->animationFrames = *animationFrames;
-    auto text = panelDefinition.getString("text", "");
+    auto text = panelDefinition.get_string("text", "");
     if (!text)
       return std::unexpected(std::move(text.error()));
     panel->text = std::move(*text);
@@ -271,28 +271,28 @@ std::expected<void, StarException> Cinematic::loadDefinition(Json const& definit
     if (!fontColorJson)
       return std::unexpected(std::move(fontColorJson.error()));
     if (*fontColorJson) {
-      auto color = jsonToVec4B(**fontColorJson);
+      auto color = json_to_vec4b(**fontColorJson);
       if (!color)
         return std::unexpected(std::move(color.error()));
       panel->textStyle.color = *color;
     }
-    auto fontSize = panelDefinition.getUInt("fontSize", panel->textStyle.fontSize);
+    auto fontSize = panelDefinition.get_uint("fontSize", panel->textStyle.fontSize);
     if (!fontSize)
       return std::unexpected(std::move(fontSize.error()));
     panel->textStyle.fontSize = *fontSize;
-    auto avatar = panelDefinition.getString("avatar", "");
+    auto avatar = panelDefinition.get_string("avatar", "");
     if (!avatar)
       return std::unexpected(std::move(avatar.error()));
     panel->avatar = std::move(*avatar);
-    auto startTime = panelDefinition.getFloat("startTime", 0);
+    auto startTime = panelDefinition.get_float("startTime", 0);
     if (!startTime)
       return std::unexpected(std::move(startTime.error()));
     panel->startTime = *startTime;
-    auto endTime = panelDefinition.getFloat("endTime", 0);
+    auto endTime = panelDefinition.get_float("endTime", 0);
     if (!endTime)
       return std::unexpected(std::move(endTime.error()));
     panel->endTime = *endTime;
-    auto loopTime = panelDefinition.getFloat("loopTime", 0);
+    auto loopTime = panelDefinition.get_float("loopTime", 0);
     if (!loopTime)
       return std::unexpected(std::move(loopTime.error()));
     panel->loopTime = *loopTime;
@@ -301,7 +301,7 @@ std::expected<void, StarException> Cinematic::loadDefinition(Json const& definit
       return std::unexpected(std::move(keyframes.error()));
     for (auto const& keyframeDefinition : *keyframes) {
       KeyFrame keyframe;
-      auto timecode = keyframeDefinition.getFloat("timecode");
+      auto timecode = keyframeDefinition.get_float("timecode");
       if (!timecode)
         return std::unexpected(std::move(timecode.error()));
       keyframe.timecode = *timecode;
@@ -317,22 +317,22 @@ std::expected<void, StarException> Cinematic::loadDefinition(Json const& definit
         }
         return {};
       };
-      auto decoded = assignIfPresent("complete", keyframe.complete, &Json::toBool);
+      auto decoded = assignIfPresent("complete", keyframe.complete, &Json::to_bool);
       if (!decoded)
         return std::unexpected(std::move(decoded.error()));
-      decoded = assignIfPresent("zoom", keyframe.zoom, &Json::toFloat);
+      decoded = assignIfPresent("zoom", keyframe.zoom, &Json::to_float);
       if (!decoded)
         return std::unexpected(std::move(decoded.error()));
-      decoded = assignIfPresent("alpha", keyframe.alpha, &Json::toFloat);
+      decoded = assignIfPresent("alpha", keyframe.alpha, &Json::to_float);
       if (!decoded)
         return std::unexpected(std::move(decoded.error()));
-      decoded = assignIfPresent("position", keyframe.position, jsonToVec2F);
+      decoded = assignIfPresent("position", keyframe.position, json_to_vec2f);
       if (!decoded)
         return std::unexpected(std::move(decoded.error()));
-      decoded = assignIfPresent("frame", keyframe.frame, &Json::toFloat);
+      decoded = assignIfPresent("frame", keyframe.frame, &Json::to_float);
       if (!decoded)
         return std::unexpected(std::move(decoded.error()));
-      decoded = assignIfPresent("textPercentage", keyframe.textPercentage, &Json::toFloat);
+      decoded = assignIfPresent("textPercentage", keyframe.textPercentage, &Json::to_float);
       if (!decoded)
         return std::unexpected(std::move(decoded.error()));
       panel->keyFrames.push_back(std::move(keyframe));
@@ -342,24 +342,24 @@ std::expected<void, StarException> Cinematic::loadDefinition(Json const& definit
     m_panels.push_back(std::move(panel));
   }
 
-  auto audio = definition.getArray("audio");
+  auto audio = definition.get_array("audio");
   if (!audio)
     return std::unexpected(std::move(audio.error()));
   for (auto const& audioDefinition : *audio) {
     AudioCue cue;
-    auto timecode = audioDefinition.getFloat("timecode");
+    auto timecode = audioDefinition.get_float("timecode");
     if (!timecode)
       return std::unexpected(std::move(timecode.error()));
     cue.timecode = *timecode;
-    auto loops = audioDefinition.getInt("loops", 0);
+    auto loops = audioDefinition.get_int("loops", 0);
     if (!loops)
       return std::unexpected(std::move(loops.error()));
     cue.loops = *loops;
-    auto endTimecode = audioDefinition.getFloat("endTimecode", 0);
+    auto endTimecode = audioDefinition.get_float("endTimecode", 0);
     if (!endTimecode)
       return std::unexpected(std::move(endTimecode.error()));
     cue.endTimecode = *endTimecode;
-    auto resource = audioDefinition.getString("resource");
+    auto resource = audioDefinition.get_string("resource");
     if (!resource)
       return std::unexpected(std::move(resource.error()));
     cue.resource = std::move(*resource);
@@ -376,7 +376,7 @@ std::expected<void, StarException> Cinematic::loadDefinition(Json const& definit
     auto offsetJson = definition.get("offset");
     if (!offsetJson)
       return std::unexpected(std::move(offsetJson.error()));
-    auto offset = jsonToVec2F(*offsetJson);
+    auto offset = json_to_vec2f(*offsetJson);
     if (!offset)
       return std::unexpected(std::move(offset.error()));
     m_offset = *offset;
@@ -388,38 +388,38 @@ std::expected<void, StarException> Cinematic::loadDefinition(Json const& definit
     auto backgroundColorJson = definition.get("backgroundColor");
     if (!backgroundColorJson)
       return std::unexpected(std::move(backgroundColorJson.error()));
-    auto color = jsonToVec4B(*backgroundColorJson);
+    auto color = json_to_vec4b(*backgroundColorJson);
     if (!color)
       return std::unexpected(std::move(color.error()));
     m_backgroundColor = *color;
   }
-  auto backgroundFadeTime = definition.getFloat("backgroundFadeTime", 0);
+  auto backgroundFadeTime = definition.get_float("backgroundFadeTime", 0);
   if (!backgroundFadeTime)
     return std::unexpected(std::move(backgroundFadeTime.error()));
   m_backgroundFadeTime = *backgroundFadeTime;
   m_completionTime += 2 * m_backgroundFadeTime;
 
-  auto scissor = definition.getBool("scissor", true);
+  auto scissor = definition.get_bool("scissor", true);
   if (!scissor)
     return std::unexpected(std::move(scissor.error()));
   m_scissor = *scissor;
-  auto letterbox = definition.getBool("letterbox", true);
+  auto letterbox = definition.get_bool("letterbox", true);
   if (!letterbox)
     return std::unexpected(std::move(letterbox.error()));
   m_letterbox = *letterbox;
-  auto skippable = definition.getBool("skippable", true);
+  auto skippable = definition.get_bool("skippable", true);
   if (!skippable)
     return std::unexpected(std::move(skippable.error()));
   m_skippable = *skippable;
-  auto suppressInput = definition.getBool("suppressInput", true);
+  auto suppressInput = definition.get_bool("suppressInput", true);
   if (!suppressInput)
     return std::unexpected(std::move(suppressInput.error()));
   m_suppressInput = *suppressInput;
-  auto muteSfx = definition.getBool("muteSfx", false);
+  auto muteSfx = definition.get_bool("muteSfx", false);
   if (!muteSfx)
     return std::unexpected(std::move(muteSfx.error()));
   m_muteSfx = *muteSfx;
-  auto muteMusic = definition.getBool("muteMusic", false);
+  auto muteMusic = definition.get_bool("muteMusic", false);
   if (!muteMusic)
     return std::unexpected(std::move(muteMusic.error()));
   m_muteMusic = *muteMusic;
@@ -533,7 +533,7 @@ std::expected<void, StarException> Cinematic::render() {
         auto metadata = m_guiContext.get().root().imageMetadataDatabase();
         if (!metadata)
           return std::unexpected(std::move(metadata.error()));
-        auto image = d.getString("image");
+        auto image = d.get_string("image");
         if (!image)
           return std::unexpected(std::move(image.error()));
         auto definition = d.set("image", image->replace_tags(StringMap<String>{{"species", playerSpecies}, {"frame", frame}}));

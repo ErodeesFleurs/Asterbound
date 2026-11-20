@@ -925,7 +925,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::addDrop(Vec2F const& p
 
 std::expected<void, StarException> DungeonGeneratorWorld::spawnNpc(Vec2F const& position, Json const& parameters) {
   auto& generationRoot = m_worldServer.root();
-  auto autokindResult1 = parameters.getString("kind");
+  auto autokindResult1 = parameters.get_string("kind");
   if (!autokindResult1) return std::unexpected(std::move(autokindResult1.error()));
   auto kind = std::move((*autokindResult1));
   if (auto condition85 = [&]() -> std::expected<bool, StarException> {
@@ -939,16 +939,16 @@ std::expected<void, StarException> DungeonGeneratorWorld::spawnNpc(Vec2F const& 
     auto autonpcDatabaseResult1 = generationRoot.npcDatabase();
     if (!autonpcDatabaseResult1) return std::unexpected(std::move(autonpcDatabaseResult1.error()));
     auto npcDatabase = std::move((*autonpcDatabaseResult1));
-    auto stduint64_tseedResult1 = parameters.getUInt("seed", generationRoot.random().next_u64());
+    auto stduint64_tseedResult1 = parameters.get_uint("seed", generationRoot.random().next_u64());
     if (!stduint64_tseedResult1) return std::unexpected(std::move(stduint64_tseedResult1.error()));
     std::uint64_t seed = std::move((*stduint64_tseedResult1));
-    auto StringspeciesResult1 = parameters.getString("species");
+    auto StringspeciesResult1 = parameters.get_string("species");
     if (!StringspeciesResult1) return std::unexpected(std::move(StringspeciesResult1.error()));
     String species = std::move((*StringspeciesResult1));
-    auto StringtypeNameResult1 = parameters.getString("typeName", "default");
+    auto StringtypeNameResult1 = parameters.get_string("typeName", "default");
     if (!StringtypeNameResult1) return std::unexpected(std::move(StringtypeNameResult1.error()));
     String typeName = std::move((*StringtypeNameResult1));
-    auto JsonObjectuniqueParametersResult1 = parameters.getObject("parameters", {});
+    auto JsonObjectuniqueParametersResult1 = parameters.get_object("parameters", {});
     if (!JsonObjectuniqueParametersResult1) return std::unexpected(std::move(JsonObjectuniqueParametersResult1.error()));
     JsonObject uniqueParameters = std::move((*JsonObjectuniqueParametersResult1));
     if (!uniqueParameters.contains("persistent"))
@@ -980,13 +980,13 @@ std::expected<void, StarException> DungeonGeneratorWorld::spawnNpc(Vec2F const& 
     auto automonsterDatabaseResult1 = generationRoot.monsterDatabase();
     if (!automonsterDatabaseResult1) return std::unexpected(std::move(automonsterDatabaseResult1.error()));
     auto monsterDatabase = std::move((*automonsterDatabaseResult1));
-    auto stduint64_tseedResult1 = parameters.getUInt("seed", generationRoot.random().next_u64());
+    auto stduint64_tseedResult1 = parameters.get_uint("seed", generationRoot.random().next_u64());
     if (!stduint64_tseedResult1) return std::unexpected(std::move(stduint64_tseedResult1.error()));
     std::uint64_t seed = std::move((*stduint64_tseedResult1));
-    auto StringtypeNameResult1 = parameters.getString("typeName");
+    auto StringtypeNameResult1 = parameters.get_string("typeName");
     if (!StringtypeNameResult1) return std::unexpected(std::move(StringtypeNameResult1.error()));
     String typeName = std::move((*StringtypeNameResult1));
-    auto JsonObjectuniqueParametersResult1 = parameters.getObject("parameters", {});
+    auto JsonObjectuniqueParametersResult1 = parameters.get_object("parameters", {});
     if (!JsonObjectuniqueParametersResult1) return std::unexpected(std::move(JsonObjectuniqueParametersResult1.error()));
     JsonObject uniqueParameters = std::move((*JsonObjectuniqueParametersResult1));
     if (!uniqueParameters.contains("persistent"))
@@ -1011,7 +1011,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::spawnStagehand(Vec2F c
   auto& generationRoot = m_worldServer.root();
   auto autostagehandResult1 = generationRoot.stagehandDatabase();
   if (!autostagehandResult1) return std::unexpected(std::move(autostagehandResult1.error()));
-  auto autostagehandResult2 = definition.getString("type");
+  auto autostagehandResult2 = definition.get_string("type");
   if (!autostagehandResult2) return std::unexpected(std::move(autostagehandResult2.error()));
   auto autostagehandResult3 = definition.get("parameters", Json());
   if (!autostagehandResult3) return std::unexpected(std::move(autostagehandResult3.error()));

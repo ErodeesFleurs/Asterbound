@@ -204,25 +204,25 @@ std::expected<Perlin<Float>, StarException> Perlin<Float>::create(Json const& co
 
 template <typename Float>
 std::expected<Perlin<Float>, StarException> Perlin<Float>::create(Json const& json) {
-  auto seed = json.getUInt("seed");
+  auto seed = json.get_uint("seed");
   if (!seed) return std::unexpected(std::move(seed.error()));
-  auto octaves = json.getInt("octaves", 1);
+  auto octaves = json.get_int("octaves", 1);
   if (!octaves) return std::unexpected(std::move(octaves.error()));
-  auto frequency = json.getDouble("frequency", 1.0);
+  auto frequency = json.get_double("frequency", 1.0);
   if (!frequency) return std::unexpected(std::move(frequency.error()));
-  auto amplitude = json.getDouble("amplitude", 1.0);
+  auto amplitude = json.get_double("amplitude", 1.0);
   if (!amplitude) return std::unexpected(std::move(amplitude.error()));
-  auto bias = json.getDouble("bias", 0.0);
+  auto bias = json.get_double("bias", 0.0);
   if (!bias) return std::unexpected(std::move(bias.error()));
-  auto alpha = json.getDouble("alpha", 2.0);
+  auto alpha = json.get_double("alpha", 2.0);
   if (!alpha) return std::unexpected(std::move(alpha.error()));
-  auto beta = json.getDouble("beta", 2.0);
+  auto beta = json.get_double("beta", 2.0);
   if (!beta) return std::unexpected(std::move(beta.error()));
-  auto offset = json.getDouble("offset", 1.0);
+  auto offset = json.get_double("offset", 1.0);
   if (!offset) return std::unexpected(std::move(offset.error()));
-  auto gain = json.getDouble("gain", 2.0);
+  auto gain = json.get_double("gain", 2.0);
   if (!gain) return std::unexpected(std::move(gain.error()));
-  auto typeName = json.getString("type");
+  auto typeName = json.get_string("type");
   if (!typeName) return std::unexpected(std::move(typeName.error()));
   auto type = enum_value<PerlinTypeNames>(StringView(*typeName));
   if (!type) return std::unexpected(std::move(type.error()));

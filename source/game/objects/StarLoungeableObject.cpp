@@ -195,7 +195,7 @@ std::expected<void, StarException> LoungeableObject::setOrientationIndex(std::si
       return std::unexpected(std::move(positionConfigResult.error()));
     auto positionConfig = std::move(*positionConfigResult);
     if (positionConfig) {
-      auto positionResult = jsonToVec2F(positionConfig);
+      auto positionResult = json_to_vec2f(positionConfig);
       if (!positionResult)
         return std::unexpected(std::move(positionResult.error()));
       auto position = std::move(*positionResult);
@@ -206,13 +206,13 @@ std::expected<void, StarException> LoungeableObject::setOrientationIndex(std::si
         return std::unexpected(std::move(positionsConfigResult.error()));
       auto positionsConfig = std::move(*positionsConfigResult);
       if (positionsConfig) {
-        auto positionsResult = positionsConfig.toArray();
+        auto positionsResult = positionsConfig.to_array();
         if (!positionsResult)
           return std::unexpected(std::move(positionsResult.error()));
         auto positions = std::move(*positionsResult);
         m_sitPositions.clear();
         for (auto const& value : positions) {
-          auto positionResult = jsonToVec2F(value);
+          auto positionResult = json_to_vec2f(value);
           if (!positionResult)
             return std::unexpected(std::move(positionResult.error()));
           auto position = std::move(*positionResult);
@@ -224,7 +224,7 @@ std::expected<void, StarException> LoungeableObject::setOrientationIndex(std::si
     if (!sitFlipDirectionConfigResult)
       return std::unexpected(std::move(sitFlipDirectionConfigResult.error()));
     auto sitFlipDirectionConfig = std::move(*sitFlipDirectionConfigResult);
-    auto sitFlipDirectionResult = sitFlipDirectionConfig.toBool();
+    auto sitFlipDirectionResult = sitFlipDirectionConfig.to_bool();
     if (!sitFlipDirectionResult)
       return std::unexpected(std::move(sitFlipDirectionResult.error()));
     auto sitFlipDirection = std::move(*sitFlipDirectionResult);
@@ -233,7 +233,7 @@ std::expected<void, StarException> LoungeableObject::setOrientationIndex(std::si
     if (!sitAngleConfigResult)
       return std::unexpected(std::move(sitAngleConfigResult.error()));
     auto sitAngleConfig = std::move(*sitAngleConfigResult);
-    auto sitAngleResult = sitAngleConfig.toFloat();
+    auto sitAngleResult = sitAngleConfig.to_float();
     if (!sitAngleResult)
       return std::unexpected(std::move(sitAngleResult.error()));
     auto sitAngle = std::move(*sitAngleResult);
@@ -242,7 +242,7 @@ std::expected<void, StarException> LoungeableObject::setOrientationIndex(std::si
     if (!sitCoverImageConfigResult)
       return std::unexpected(std::move(sitCoverImageConfigResult.error()));
     auto sitCoverImageConfig = std::move(*sitCoverImageConfigResult);
-    auto sitCoverImageResult = sitCoverImageConfig.toString();
+    auto sitCoverImageResult = sitCoverImageConfig.to_string();
     if (!sitCoverImageResult)
       return std::unexpected(std::move(sitCoverImageResult.error()));
     auto sitCoverImage = std::move(*sitCoverImageResult);
@@ -251,7 +251,7 @@ std::expected<void, StarException> LoungeableObject::setOrientationIndex(std::si
     if (!flipImagesConfigResult)
       return std::unexpected(std::move(flipImagesConfigResult.error()));
     auto flipImagesConfig = std::move(*flipImagesConfigResult);
-    auto flipImagesResult = flipImagesConfig.toBool();
+    auto flipImagesResult = flipImagesConfig.to_bool();
     if (!flipImagesResult)
       return std::unexpected(std::move(flipImagesResult.error()));
     auto flipImages = std::move(*flipImagesResult);
@@ -260,7 +260,7 @@ std::expected<void, StarException> LoungeableObject::setOrientationIndex(std::si
     if (!sitEmoteConfigResult)
       return std::unexpected(std::move(sitEmoteConfigResult.error()));
     auto sitEmoteConfig = std::move(*sitEmoteConfigResult);
-    auto sitEmoteResult = sitEmoteConfig.optString();
+    auto sitEmoteResult = sitEmoteConfig.opt_string();
     if (!sitEmoteResult)
       return std::unexpected(std::move(sitEmoteResult.error()));
     auto sitEmote = std::move(*sitEmoteResult);
@@ -269,7 +269,7 @@ std::expected<void, StarException> LoungeableObject::setOrientationIndex(std::si
     if (!sitDanceConfigResult)
       return std::unexpected(std::move(sitDanceConfigResult.error()));
     auto sitDanceConfig = std::move(*sitDanceConfigResult);
-    auto sitDanceResult = sitDanceConfig.optString();
+    auto sitDanceResult = sitDanceConfig.opt_string();
     if (!sitDanceResult)
       return std::unexpected(std::move(sitDanceResult.error()));
     auto sitDance = std::move(*sitDanceResult);
@@ -278,7 +278,7 @@ std::expected<void, StarException> LoungeableObject::setOrientationIndex(std::si
     if (!sitArmorCosmeticOverridesConfigResult)
       return std::unexpected(std::move(sitArmorCosmeticOverridesConfigResult.error()));
     auto sitArmorCosmeticOverridesConfig = std::move(*sitArmorCosmeticOverridesConfigResult);
-    auto sitArmorCosmeticOverridesResult = sitArmorCosmeticOverridesConfig.toObject();
+    auto sitArmorCosmeticOverridesResult = sitArmorCosmeticOverridesConfig.to_object();
     if (!sitArmorCosmeticOverridesResult)
       return std::unexpected(std::move(sitArmorCosmeticOverridesResult.error()));
     auto sitArmorCosmeticOverrides = std::move(*sitArmorCosmeticOverridesResult);
@@ -287,7 +287,7 @@ std::expected<void, StarException> LoungeableObject::setOrientationIndex(std::si
     if (!sitCursorOverrideConfigResult)
       return std::unexpected(std::move(sitCursorOverrideConfigResult.error()));
     auto sitCursorOverrideConfig = std::move(*sitCursorOverrideConfigResult);
-    auto sitCursorOverrideResult = sitCursorOverrideConfig.optString();
+    auto sitCursorOverrideResult = sitCursorOverrideConfig.opt_string();
     if (!sitCursorOverrideResult)
       return std::unexpected(std::move(sitCursorOverrideResult.error()));
     auto sitCursorOverride = std::move(*sitCursorOverrideResult);
@@ -296,7 +296,7 @@ std::expected<void, StarException> LoungeableObject::setOrientationIndex(std::si
     if (!orientationConfigResult)
       return std::unexpected(std::move(orientationConfigResult.error()));
     auto orientationConfig = std::move(*orientationConfigResult);
-    auto orientationNameResult = orientationConfig.toString();
+    auto orientationNameResult = orientationConfig.to_string();
     if (!orientationNameResult)
       return std::unexpected(std::move(orientationNameResult.error()));
     auto orientationName = std::move(*orientationNameResult);
@@ -311,7 +311,7 @@ std::expected<void, StarException> LoungeableObject::setOrientationIndex(std::si
     if (!effectsConfigResult)
       return std::unexpected(std::move(effectsConfigResult.error()));
     auto effectsConfig = std::move(*effectsConfigResult);
-    auto effectsResult = effectsConfig.toArray();
+    auto effectsResult = effectsConfig.to_array();
     if (!effectsResult)
       return std::unexpected(std::move(effectsResult.error()));
     auto effects = std::move(*effectsResult);
@@ -328,7 +328,7 @@ std::expected<void, StarException> LoungeableObject::setOrientationIndex(std::si
     if (!emittersConfigResult)
       return std::unexpected(std::move(emittersConfigResult.error()));
     auto emittersConfig = std::move(*emittersConfigResult);
-    auto emittersResult = jsonToStringSet(emittersConfig);
+    auto emittersResult = json_to_string_set(emittersConfig);
     if (!emittersResult)
       return std::unexpected(std::move(emittersResult.error()));
     auto emitters = std::move(*emittersResult);

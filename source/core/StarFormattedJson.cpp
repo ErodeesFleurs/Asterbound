@@ -94,14 +94,14 @@ private:
           return std::unexpected(JsonException("Invalid FormattedJson object key element"));
         auto const& key = std::get<ObjectKeyElement>(key_element);
         if (m_values)
-          std::get<JsonObject>(*m_values).insert_or_assign(key.m_key, value.m_value->toJson());
+          std::get<JsonObject>(*m_values).insert_or_assign(key.m_key, value.m_value->to_json());
         m_result.m_object_entry_locations.insert_or_assign(key.m_key, std::pair{*m_last_key, loc});
         m_last_key.reset();
       } else {
         if (m_object)
           return std::unexpected(JsonException("Invalid FormattedJson array entry"));
         if (m_values)
-          std::get<JsonArray>(*m_values).push_back(value.m_value->toJson());
+          std::get<JsonArray>(*m_values).push_back(value.m_value->to_json());
         m_result.m_array_element_locations.push_back(loc);
       }
     }
@@ -171,15 +171,15 @@ std::expected<FormattedJson, StarException> FormattedJson::parse(String const& s
     bytes.begin(), bytes.end(), JsonParseType::Value);
 }
 
-std::expected<FormattedJson, StarException> FormattedJson::parseJson(String const& string) {
+std::expected<FormattedJson, StarException> FormattedJson::parse_json(String const& string) {
   auto const& bytes = string.utf8();
   return input_utf8_json<std::string::const_iterator, FormattedJsonBuilderStream, FormattedJson>(
     bytes.begin(), bytes.end(), JsonParseType::Top);
 }
 
-FormattedJson FormattedJson::ofType(Json::Type type) {
+FormattedJson FormattedJson::of_type(Json::Type type) {
   FormattedJson json;
-  json.m_value = Json::ofType(type);
+  json.m_value = Json::of_type(type);
   return json;
 }
 
@@ -205,10 +205,10 @@ FormattedJson& FormattedJson::operator=(FormattedJson&& other) {
 
 std::expected<FormattedJson, StarException> FormattedJson::create(Json const& json) {
   auto create_value = [](auto&& self, Json const& value, bool nested) -> std::expected<FormattedJson, StarException> {
-    bool object = value.isType(Json::Type::Object);
-    bool array = value.isType(Json::Type::Array);
+    bool object = value.is_type(Json::Type::Object);
+    bool array = value.is_type(Json::Type::Array);
     if (!object && !array) {
-      if (nested && value.isType(Json::Type::String)) {
+      if (nested && value.is_type(Json::Type::String)) {
         auto text = value.string_ptr();
         if (!text)
           return std::unexpected(std::move(text.error()));
@@ -216,8 +216,8 @@ std::expected<FormattedJson, StarException> FormattedJson::create(Json const& js
         if (!valid)
           return std::unexpected(std::move(valid.error()));
       }
-      if (nested && value.isType(Json::Type::Float)) {
-        auto number = value.toDouble();
+      if (nested && value.is_type(Json::Type::Float)) {
+        auto number = value.to_double();
         if (!number)
           return std::unexpected(std::move(number.error()));
         if (!std::isfinite(*number)) {
@@ -289,7 +289,7 @@ std::expected<FormattedJson, StarException> FormattedJson::create(Json const& js
   return create_value(create_value, json, false);
 }
 
-std::expected<FormattedJson, StarException> FormattedJson::createArray(std::span<FormattedJson const> values) {
+std::expected<FormattedJson, StarException> FormattedJson::create_array(std::span<FormattedJson const> values) {
   Builder builder(false, values.size(), values.size() * 2);
   bool first = true;
   for (auto const& value : values) {
@@ -306,11 +306,11 @@ std::expected<FormattedJson, StarException> FormattedJson::createArray(std::span
   return builder.finish();
 }
 
-Json const& FormattedJson::toJson() const { return m_value; }
+Json const& FormattedJson::to_json() const { return m_value; }
 
 std::expected<FormattedJson, StarException> FormattedJson::get(String const& key) const {
   if (type() != Json::Type::Object)
-    return std::unexpected(JsonException::format("Cannot call get with key on FormattedJson type {}, must be Object type", typeName()));
+    return std::unexpected(JsonException::format("Cannot call get with key on FormattedJson type {}, must be Object type", type_name()));
   auto entry = m_object_entry_locations.maybe(key);
   if (!entry)
     return std::unexpected(JsonException::format("No such key in FormattedJson::get(\"{}\")", key));
@@ -322,7 +322,7 @@ std::expected<FormattedJson, StarException> FormattedJson::get(String const& key
 
 std::expected<FormattedJson, StarException> FormattedJson::get(std::size_t index) const {
   if (type() != Json::Type::Array)
-    return std::unexpected(JsonException::format("Cannot call get with index on FormattedJson type {}, must be Array type", typeName()));
+    return std::unexpected(JsonException::format("Cannot call get with index on FormattedJson type {}, must be Array type", type_name()));
   if (index >= m_array_element_locations.size())
     return std::unexpected(JsonException::format("FormattedJson::get({}) out of range", index));
   auto value = get_formatted_json(m_array_element_locations[index]);
@@ -519,7 +519,7 @@ std::expected<FormattedJson, StarException> FormattedJson::set(String const& key
   return insert_object(key, value, m_elements.size());
 }
 
-void remove_value(FormattedJson::ElementList& elements, std::size_t prefix_loc, std::size_t value_loc) {
+static FormattedJson::ElementList without_value(FormattedJson::ElementList const& elements, std::size_t prefix_loc, std::size_t value_loc) {
   // Calculate the complete interval in the original token coordinates. A
   // following comma owns subsequent whitespace; a final value owns its prefix.
   auto comma_loc = index_of<CommaElement>(elements, value_loc);
@@ -533,25 +533,28 @@ void remove_value(FormattedJson::ElementList& elements, std::size_t prefix_loc, 
     comma_loc = last_index_of<CommaElement>(elements, prefix_loc);
     begin = comma_loc == NPos ? 0 : comma_loc;
   }
-  elements.erase_at(begin, end);
+  FormattedJson::ElementList result;
+  result.reserve(elements.size() - (end - begin));
+  std::span<JsonElement const> original(elements);
+  result.append_range(original.first(begin));
+  result.append_range(original.subspan(end));
+  return result;
 }
 
 std::expected<FormattedJson, StarException> FormattedJson::erase(String const& key) const {
   if (type() != Json::Type::Object)
-    return std::unexpected(JsonException::format("Cannot call erase with key on FormattedJson type {}, must be Object type", typeName()));
+    return std::unexpected(JsonException::format("Cannot call erase with key on FormattedJson type {}, must be Object type", type_name()));
 
   std::optional<std::pair<ElementLocation, ElementLocation>> maybe_entry = m_object_entry_locations.maybe(key);
   if (!maybe_entry.has_value())
     return *this;
 
-  ElementList elements = m_elements;
-  remove_value(elements, maybe_entry->first, maybe_entry->second);
-  return object(std::move(elements));
+  return object(without_value(m_elements, maybe_entry->first, maybe_entry->second));
 }
 
 std::expected<FormattedJson, StarException> FormattedJson::insert(std::size_t index, FormattedJson const& value) const {
   if (type() != Json::Type::Array)
-    return std::unexpected(JsonException::format("Cannot call insert with index on FormattedJson type {}, must be Array type", typeName()));
+    return std::unexpected(JsonException::format("Cannot call insert with index on FormattedJson type {}, must be Array type", type_name()));
   if (index > m_array_element_locations.size())
     return std::unexpected(JsonException::format("FormattedJson::insert({}) out of range", index));
   ElementLocation insert_position =
@@ -564,7 +567,7 @@ std::expected<FormattedJson, StarException> FormattedJson::insert(std::size_t in
 
 std::expected<FormattedJson, StarException> FormattedJson::append(FormattedJson const& value) const {
   if (type() != Json::Type::Array)
-    return std::unexpected(JsonException::format("Cannot call append on FormattedJson type {}, must be Array type", typeName()));
+    return std::unexpected(JsonException::format("Cannot call append on FormattedJson type {}, must be Array type", type_name()));
   auto inserted = insert_with_comma_and_formatting(m_elements, m_elements.size(), true, {ValueElement{value}});
   if (!inserted)
     return std::unexpected(std::move(inserted.error()));
@@ -573,7 +576,7 @@ std::expected<FormattedJson, StarException> FormattedJson::append(FormattedJson 
 
 std::expected<FormattedJson, StarException> FormattedJson::set(std::size_t index, FormattedJson const& value) const {
   if (type() != Json::Type::Array)
-    return std::unexpected(JsonException::format("Cannot call set with index on FormattedJson type {}, must be Array type", typeName()));
+    return std::unexpected(JsonException::format("Cannot call set with index on FormattedJson type {}, must be Array type", type_name()));
   if (index >= m_array_element_locations.size())
     return std::unexpected(JsonException::format("FormattedJson::set({}) out of range", index));
   ElementList elements = m_elements;
@@ -583,12 +586,11 @@ std::expected<FormattedJson, StarException> FormattedJson::set(std::size_t index
 
 std::expected<FormattedJson, StarException> FormattedJson::erase(std::size_t index) const {
   if (type() != Json::Type::Array)
-    return std::unexpected(JsonException::format("Cannot call set with index on FormattedJson type {}, must be Array type", typeName()));
+    return std::unexpected(JsonException::format("Cannot call set with index on FormattedJson type {}, must be Array type", type_name()));
   if (index >= m_array_element_locations.size())
     return std::unexpected(JsonException::format("FormattedJson::eraseIndex({}) out of range", index));
-  ElementList elements = m_elements;
-  remove_value(elements, m_array_element_locations[index], m_array_element_locations[index]);
-  return array(std::move(elements), m_array_element_locations.size() - 1);
+  auto loc = m_array_element_locations[index];
+  return array(without_value(m_elements, loc, loc), m_array_element_locations.size() - 1);
 }
 
 std::expected<std::size_t, StarException> FormattedJson::size() const { return m_value.size(); }
@@ -597,24 +599,24 @@ std::expected<bool, StarException> FormattedJson::contains(String const& key) co
 
 Json::Type FormattedJson::type() const { return m_value.type(); }
 
-bool FormattedJson::isType(Json::Type type) const { return m_value.isType(type); }
+bool FormattedJson::is_type(Json::Type type) const { return m_value.is_type(type); }
 
-String FormattedJson::typeName() const { return m_value.typeName(); }
+String FormattedJson::type_name() const { return m_value.type_name(); }
 
-std::expected<String, StarException> FormattedJson::toFormattedDouble() const {
-  if (!isType(Json::Type::Float))
-    return std::unexpected(JsonException::format("Cannot call toFormattedDouble on Json type {}, must be Float", typeName()));
+std::expected<String, StarException> FormattedJson::to_formatted_double() const {
+  if (!is_type(Json::Type::Float))
+    return std::unexpected(JsonException::format("Cannot call toFormattedDouble on Json type {}, must be Float", type_name()));
   if (m_formatting.has_value())
     return *m_formatting;
-  return toJson().repr();
+  return to_json().repr();
 }
 
-std::expected<String, StarException> FormattedJson::toFormattedInt() const {
-  if (!isType(Json::Type::Int))
-    return std::unexpected(JsonException::format("Cannot call toFormattedInt on Json type {}, must be Int", typeName()));
+std::expected<String, StarException> FormattedJson::to_formatted_int() const {
+  if (!is_type(Json::Type::Int))
+    return std::unexpected(JsonException::format("Cannot call toFormattedInt on Json type {}, must be Int", type_name()));
   if (m_formatting.has_value())
     return *m_formatting;
-  return toJson().repr();
+  return to_json().repr();
 }
 
 std::expected<String, StarException> FormattedJson::repr() const {
@@ -628,7 +630,7 @@ std::expected<String, StarException> FormattedJson::repr() const {
   return String(std::move(result));
 }
 
-std::expected<String, StarException> FormattedJson::printJson() const {
+std::expected<String, StarException> FormattedJson::print_json() const {
   if (type() != Json::Type::Object && type() != Json::Type::Array)
     return std::unexpected(JsonException("printJson called on non-top-level JSON type"));
   return repr();
@@ -654,7 +656,7 @@ std::expected<FormattedJson, StarException> FormattedJson::array(ElementList ele
 std::expected<FormattedJson, StarException> FormattedJson::insert_object(String const& key, FormattedJson const& value,
                                                                          ElementLocation loc) const {
   if (type() != Json::Type::Object)
-    return std::unexpected(JsonException::format("Cannot call set with key on FormattedJson type {}, must be Object type", typeName()));
+    return std::unexpected(JsonException::format("Cannot call set with key on FormattedJson type {}, must be Object type", type_name()));
   auto entry = m_object_entry_locations.maybe(key);
   if (entry) {
     ElementList elements = m_elements;
@@ -820,7 +822,7 @@ std::expected<void, StarException> FormattedJsonBuilderStream::put_value(Json co
       auto parsed = Json::parse(*formatting);
       if (!parsed)
         return std::unexpected(std::move(parsed.error()));
-      Star::star_assert_failed(*parsed == formatted->toJson());
+      Star::star_assert_failed(*parsed == formatted->to_json());
     }
     formatted->m_formatting = std::move(*formatting);
   }
@@ -832,14 +834,14 @@ std::expected<void, StarException> FormattedJsonBuilderStream::put_value(Json co
 
 std::expected<void, StarException> JsonStreamer<FormattedJson>::to_json_stream(FormattedJson const& val,
                                                                                JsonStream& stream, bool sort) {
-  bool object = val.isType(Json::Type::Object);
-  bool array = val.isType(Json::Type::Array);
+  bool object = val.is_type(Json::Type::Object);
+  bool array = val.is_type(Json::Type::Array);
   if (!object && !array) {
     if (val.m_formatting) {
       auto const& text = val.m_formatting->utf8();
-      return val.isType(Json::Type::Float) ? stream.put_double(text) : stream.put_integer(text);
+      return val.is_type(Json::Type::Float) ? stream.put_double(text) : stream.put_integer(text);
     }
-    return JsonStreamer<Json>::to_json_stream(val.toJson(), stream, sort);
+    return JsonStreamer<Json>::to_json_stream(val.to_json(), stream, sort);
   }
   auto begun = object ? stream.begin_object() : stream.begin_array();
   if (!begun)

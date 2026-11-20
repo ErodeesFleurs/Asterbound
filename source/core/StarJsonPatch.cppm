@@ -66,14 +66,14 @@ std::expected<std::shared_ptr<String const>, StarException> string_field(Json co
 
 std::expected<std::optional<std::size_t>, StarException> find_match(Json const& searchable, Json const& value,
                                                                     String const& path) {
-  if (!searchable.isType(Json::Type::Array))
+  if (!searchable.is_type(Json::Type::Array))
     return std::unexpected(
       JsonPatchException(Star::format("Search operation failure, value at '{}' is not an array.", path), false));
   auto array = searchable.array_ptr();
   if (!array)
     return std::unexpected(std::move(array.error()));
   for (std::size_t index = 0; index < (*array)->size(); ++index)
-    if (jsonPartialMatch((**array)[index], value))
+    if (json_partial_match((**array)[index], value))
       return index;
   return std::nullopt;
 }
@@ -110,7 +110,7 @@ std::expected<Json, StarException> apply_test(Json const& base, Json const& op) 
   auto path = string_field(op, "path");
   if (!path)
     return std::unexpected(std::move(path.error()));
-  auto inverse = op.getBool("inverse", false);
+  auto inverse = op.get_bool("inverse", false);
   if (!inverse)
     return std::unexpected(std::move(inverse.error()));
   auto tested = [&]() -> std::expected<Json, StarException> {
@@ -143,7 +143,7 @@ std::expected<Json, StarException> apply_test(Json const& base, Json const& op) 
     auto actual = JsonPath::path_get_ref(base, JsonPath::parse_pointer, **path);
     if (!actual)
       return std::unexpected(std::move(actual.error()));
-    if (!*value || (**value).get().isNull()) {
+    if (!*value || (**value).get().is_null()) {
       if (*inverse)
         return std::unexpected(
           JsonPatchTestFail(Star::format("Test operation failure, expected {} to be missing.", **path), false));
@@ -318,13 +318,13 @@ std::expected<Json, StarException> apply_merge(Json const& base, Json const& op)
                            auto value = require_field(op, "value");
                            if (!value)
                              return std::unexpected(std::move(value.error()));
-                           return searchable.set(index, jsonMerge((**old_value).get(), value->get()));
+                           return searchable.set(index, json_merge((**old_value).get(), value->get()));
                          });
   auto merge = [&](Json const& target) -> std::expected<Json, StarException> {
     auto value = require_field(op, "value");
     if (!value)
       return std::unexpected(std::move(value.error()));
-    return jsonMerge(target, value->get());
+    return json_merge(target, value->get());
   };
   return JsonPath::path_apply<Json>(
     base, JsonPath::parse_pointer, **path, merge,

@@ -78,7 +78,7 @@ Json keyModsToJson(KeyMod mod) {
 // Optional borrowed output for the calculated priority.
 [[nodiscard]] std::expected<KeyMod, StarException> keyModsFromJson(Json const& json, std::optional<std::reference_wrapper<std::uint8_t>> priority = std::nullopt) {
   KeyMod mod = KeyMod::NoMod;
-  if (json.isNull()) {
+  if (json.is_null()) {
     if (priority)
       priority->get() = 0;
     return mod;
@@ -88,7 +88,7 @@ Json keyModsToJson(KeyMod mod) {
   auto array = json.iterate_array();
   if (!array) return std::unexpected(std::move(array.error()));
   for (Json const& jMod : *array) {
-    auto text = jMod.toString();
+    auto text = jMod.to_string();
     if (!text) return std::unexpected(std::move(text.error()));
     auto named = maybe_enum_value<ModBindModifierNames>(*text);
     if (!named) return std::unexpected(std::move(named.error()));
@@ -150,7 +150,7 @@ std::expected<Json, StarException> Input::inputEventToJson(InputEvent const& inp
     if (!name) return std::unexpected(std::move(name.error()));
     data = JsonObject{
       {"mouseButton", String(*name)},
-      {"mousePosition", jsonFromVec2F(mouseDown.mousePosition)}
+      {"mousePosition", json_from_vec2f(mouseDown.mousePosition)}
     };
   } else if (std::holds_alternative<MouseButtonUpEvent>(input)) {
     auto const& mouseUp = std::get<MouseButtonUpEvent>(input);
@@ -159,21 +159,21 @@ std::expected<Json, StarException> Input::inputEventToJson(InputEvent const& inp
     if (!name) return std::unexpected(std::move(name.error()));
     data = JsonObject{
       {"mouseButton", String(*name)},
-      {"mousePosition", jsonFromVec2F(mouseUp.mousePosition)}
+      {"mousePosition", json_from_vec2f(mouseUp.mousePosition)}
     };
   } else if (std::holds_alternative<MouseWheelEvent>(input)) {
     auto const& mouseWheel = std::get<MouseWheelEvent>(input);
     type = "MouseWheel";
     data = JsonObject{
       {"mouseWheel", mouseWheel.mouseWheel == MouseWheel::Up ? 1 : -1},
-      {"mousePosition", jsonFromVec2F(mouseWheel.mousePosition)}
+      {"mousePosition", json_from_vec2f(mouseWheel.mousePosition)}
     };
   } else if (std::holds_alternative<MouseMoveEvent>(input)) {
     auto const& mouseMove = std::get<MouseMoveEvent>(input);
     type = "MouseMove";
     data = JsonObject{
-      {"mouseMove", jsonFromVec2F(mouseMove.mouseMove)},
-      {"mousePosition", jsonFromVec2F(mouseMove.mousePosition)}
+      {"mouseMove", json_from_vec2f(mouseMove.mouseMove)},
+      {"mousePosition", json_from_vec2f(mouseMove.mousePosition)}
     };
   } else if (std::holds_alternative<ControllerButtonDownEvent>(input)) {
     auto const& controllerDown = std::get<ControllerButtonDownEvent>(input);
@@ -214,16 +214,16 @@ std::expected<Json, StarException> Input::inputEventToJson(InputEvent const& inp
 
 std::expected<Input::Bind, StarException> Input::bindFromJson(Json const& json) {
   Bind bind;
-  if (json.isNull())
+  if (json.is_null())
     return bind;
 
-  auto typeResult = json.getString("type");
+  auto typeResult = json.get_string("type");
   if (!typeResult) return std::unexpected(std::move(typeResult.error()));
   String const& type = *typeResult;
   auto valueResult = json.get("value", {});
   if (!valueResult) return std::unexpected(std::move(valueResult.error()));
   Json const& value = *valueResult;
-  auto text = value.toString();
+  auto text = value.to_string();
   if ((type == "key" || type == "mouse" || type == "controller") && !text)
     return std::unexpected(std::move(text.error()));
 
@@ -259,7 +259,7 @@ std::expected<Input::Bind, StarException> Input::bindFromJson(Json const& json) 
     if (!button) return std::unexpected(std::move(button.error()));
     if (!*button) return bind;
     controllerBind.button = **button;
-    auto controller = json.getUInt("controller", 0);
+    auto controller = json.get_uint("controller", 0);
     if (!controller) return std::unexpected(std::move(controller.error()));
     controllerBind.controller = *controller;
     bind = std::move(controllerBind);
@@ -313,15 +313,15 @@ Input::BindEntry::BindEntry(Input& input, BindCategory const& parentCategory)
 std::expected<Input::BindEntry, StarException> Input::BindEntry::create(Input& input, String entryId, Json const& config, BindCategory const& parentCategory) {
   BindEntry result(input, parentCategory);
   result.id = std::move(entryId);
-  auto name = config.getString("name", result.id);
+  auto name = config.get_string("name", result.id);
   if (!name) return std::unexpected(std::move(name.error()));
   result.name = std::move(*name);
   auto tags = config.get("tags", JsonArray());
   if (!tags) return std::unexpected(std::move(tags.error()));
-  auto tagList = jsonToStringList(*tags);
+  auto tagList = json_to_string_list(*tags);
   if (!tagList) return std::unexpected(std::move(tagList.error()));
   result.tags = std::move(*tagList);
-  auto defaults = config.getArray("default", {});
+  auto defaults = config.get_array("default", {});
   if (!defaults) return std::unexpected(std::move(defaults.error()));
   for (Json const& jBind : *defaults) {
     auto bind = bindFromJson(jBind);
@@ -347,13 +347,13 @@ std::expected<void, StarException> Input::BindEntry::updated() {
   }
   auto root = (*config)->get(InputBindingConfigRoot);
   if (!root) return std::unexpected(std::move(root.error()));
-  if (!root->isType(Json::Type::Object)) {
+  if (!root->is_type(Json::Type::Object)) {
     if (auto r = (*config)->set(InputBindingConfigRoot, JsonObject()); !r) return std::unexpected(std::move(r.error()));
   }
   String path = Star::format("{}.{}", InputBindingConfigRoot, category.get().id);
   auto category = (*config)->getPath(path);
   if (!category) return std::unexpected(std::move(category.error()));
-  if (!category->isType(Json::Type::Object)) {
+  if (!category->is_type(Json::Type::Object)) {
     if (auto r = (*config)->setPath(path, JsonObject{{id, std::move(array)}}); !r) return std::unexpected(std::move(r.error()));
   } else {
     path = Star::format("{}.{}", path, id);
@@ -382,8 +382,8 @@ Input::BindCategory::BindCategory(Input& input) : owner(input) {}
 
 std::expected<void, StarException> Input::BindCategory::mergeJson(String const& categoryId, Json const& categoryConfig) {
   id = categoryId;
-  config = jsonMerge(config, categoryConfig);
-  auto categoryName = config.getString("name", id);
+  config = json_merge(config, categoryConfig);
+  auto categoryName = config.get_string("name", id);
   if (!categoryName) return std::unexpected(std::move(categoryName.error()));
   name = std::move(*categoryName);
   entries.clear();
@@ -391,17 +391,17 @@ std::expected<void, StarException> Input::BindCategory::mergeJson(String const& 
   if (!userConfig) return std::unexpected(std::move(userConfig.error()));
   auto userBindings = (*userConfig)->get(InputBindingConfigRoot);
   if (!userBindings) return std::unexpected(std::move(userBindings.error()));
-  auto configured = config.getObject("binds", {});
+  auto configured = config.get_object("binds", {});
   if (!configured) return std::unexpected(std::move(configured.error()));
   for (auto const& [bindId, bindConfig] : *configured) {
-    if (!bindConfig.isType(Json::Type::Object)) continue;
+    if (!bindConfig.is_type(Json::Type::Object)) continue;
     auto built = BindEntry::create(owner, bindId, bindConfig, *this);
     if (!built) return std::unexpected(std::move(built.error()));
     auto& entry = entries.try_emplace(bindId, std::move(*built)).first->second;
-    if (userBindings->isType(Json::Type::Object)) {
+    if (userBindings->is_type(Json::Type::Object)) {
       auto override = userBindings->query(Star::format("{}.{}", id, bindId), Json());
       if (!override) return std::unexpected(std::move(override.error()));
-      if (override->isType(Json::Type::Array)) {
+      if (override->is_type(Json::Type::Array)) {
         auto bindings = override->iterate_array();
         if (!bindings) return std::unexpected(std::move(bindings.error()));
         // An empty saved array is an intentional unbind, not a missing override.
@@ -666,10 +666,10 @@ std::expected<void, StarException> Input::reload() {
   for (auto const& bindPath : paths->get()) {
     auto json = (*assets)->json(bindPath.string());
     if (!json) return std::unexpected(std::move(json.error()));
-    auto categories = json->toObject();
+    auto categories = json->to_object();
     if (!categories) return std::unexpected(std::move(categories.error()));
     for (auto const& pair : *categories) {
-      if (!pair.second.isType(Json::Type::Object)) continue;
+      if (!pair.second.is_type(Json::Type::Object)) continue;
       auto r = m_bindCategories.try_emplace(pair.first, *this).first->second.mergeJson(pair.first, pair.second);
       if (!r) return std::unexpected(std::move(r.error()));
     }
@@ -788,7 +788,7 @@ std::expected<Json, StarException> Input::getBinds(String const& categoryId, Str
 std::expected<void, StarException> Input::setBinds(String const& categoryId, String const& bindId, Json const& jBinds) {
   auto entry = bindEntry(categoryId, bindId);
   if (!entry) return std::unexpected(std::move(entry.error()));
-  auto array = jBinds.toArray();
+  auto array = jBinds.to_array();
   if (!array) return std::unexpected(std::move(array.error()));
   List<Bind> binds;
   for (Json const& jBind : *array) {

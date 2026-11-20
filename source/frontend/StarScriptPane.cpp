@@ -272,10 +272,10 @@ std::expected<std::shared_ptr<Pane>, StarException> ScriptPane::createTooltip(Ve
   auto result = recoverLuaScriptError(m_script.invoke<Json>("createTooltip", screenPosition));
   if (!result)
     return std::unexpected(std::move(result.error()));
-  if (*result && !(**result).isNull()) {
+  if (*result && !(**result).is_null()) {
     auto const& value = **result;
     if (value.type() == Json::Type::String) {
-      auto text = value.toString();
+      auto text = value.to_string();
       if (!text)
         return std::unexpected(std::move(text.error()));
       return SimpleTooltipBuilder::buildTooltip(context(), *text);
@@ -315,14 +315,14 @@ std::expected<LuaCallbacks, StarException> ScriptPane::makePaneCallbacks() {
 }
 
 std::expected<bool, StarException> ScriptPane::openWithInventory() const {
-  return m_config.getBool("openWithInventory", false);
+  return m_config.get_bool("openWithInventory", false);
 }
 
 std::expected<bool, StarException> ScriptPane::closeWithInventory() const {
   auto open = openWithInventory();
   if (!open)
     return std::unexpected(std::move(open.error()));
-  return m_config.getBool("closeWithInventory", *open);
+  return m_config.get_bool("closeWithInventory", *open);
 }
 
 EntityId ScriptPane::sourceEntityId() const {

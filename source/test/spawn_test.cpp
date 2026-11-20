@@ -138,7 +138,7 @@ const GameTestRegistration randomInstanceWorld("SpawnTest", "RandomInstanceWorld
   ASSERT_TRUE(assets);
   auto config = (*assets)->json("/instance_worlds.config");
   ASSERT_TRUE(config);
-  auto worlds = config->toObject();
+  auto worlds = config->to_object();
   ASSERT_TRUE(worlds);
   StringList instanceWorlds = worlds->keys();
   ASSERT_GT(instanceWorlds.size(), 0u);

@@ -45,10 +45,10 @@ namespace Tiled {
   Properties::Properties(Json const& json) : m_properties(json) {}
   Json Properties::toJson() const { return m_properties; }
   std::expected<Properties, StarException> Properties::inherit(Json const& properties) const {
-    return Properties(jsonMerge(properties, m_properties));
+    return Properties(json_merge(properties, m_properties));
   }
   std::expected<Properties, StarException> Properties::inherit(Properties const& properties) const {
-    return Properties(jsonMerge(properties.m_properties, m_properties));
+    return Properties(json_merge(properties.m_properties, m_properties));
   }
   std::expected<bool, StarException> Properties::contains(String const& name) const {
     return m_properties.contains(name);
@@ -118,7 +118,7 @@ namespace Tiled {
     auto parameters = presentProperty<Json>(properties, "parameters");
     if (!parameters) return std::unexpected(std::move(parameters.error()));
     auto configuredParameters = parameters->value_or(JsonObject{});
-    if (configuredParameters.isNull()) configuredParameters = JsonObject{};
+    if (configuredParameters.is_null()) configuredParameters = JsonObject{};
     return std::make_shared<ObjectBrush>(name, direction, configuredParameters);
   }
   [[nodiscard]] std::expected<std::shared_ptr<Brush const>, StarException> getVehicleBrush(String const& name, Properties& properties) {
@@ -380,7 +380,7 @@ namespace Tiled {
     Properties defaults(properties->value_or(JsonObject{}));
     auto tileProperties = json.opt("tileproperties");
     if (!tileProperties) return std::unexpected(std::move(tileProperties.error()));
-    auto count = json.getInt("tilecount");
+    auto count = json.get_int("tilecount");
     if (!count) return std::unexpected(std::move(count.error()));
     if (*count < 0) return std::unexpected(StarException("Negative tile count in tileset"));
     result->m_tilesBack.resize(*count);
@@ -419,7 +419,7 @@ namespace Tiled {
   }
 
   std::expected<Json, StarException> PropertyConverter<Json>::to(String const& value) {
-    auto parsed = Json::parseJson(value);
+    auto parsed = Json::parse_json(value);
     if (!parsed) {
       if (parsed.error().is<JsonParsingException>())
         return std::unexpected(parsed.error().with_context("Error parsing Tiled property as Json"));

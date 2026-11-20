@@ -221,7 +221,7 @@ if (!result948) return std::unexpected(std::move(result948.error()));
   m_movementController->init(world);
   m_movementController->setIgnorePhysicsEntities({entityId});
 
-  auto result949 = m_parameters.getFloat("timeToLive", m_config->timeToLive);
+  auto result949 = m_parameters.get_float("timeToLive", m_config->timeToLive);
 if (!result949) return std::unexpected(std::move(result949.error()));
 m_timeToLive = std::move(*result949);
   setSourceEntity(m_sourceEntity, m_trackSourceEntity);
@@ -230,13 +230,13 @@ m_timeToLive = std::move(*result949);
   auto result950 = m_parameters.contains("periodicActions");
 if (!result950) return std::unexpected(std::move(result950.error()));
 if (std::move(*result950)) {
-    auto result951 = m_parameters.getArray("periodicActions", {});
+    auto result951 = m_parameters.get_array("periodicActions", {});
 if (!result951) return std::unexpected(std::move(result951.error()));
 for (auto const& c : std::move(*result951))
       {
-auto result952 = c.getFloat("time");
+auto result952 = c.get_float("time");
 if (!result952) return std::unexpected(std::move(result952.error()));
-auto result953 = c.getBool("repeat", true);
+auto result953 = c.get_bool("repeat", true);
 if (!result953) return std::unexpected(std::move(result953.error()));
 m_periodicActions.push_back(std::make_tuple(GameTimer(std::move(*result952)), std::move(*result953), c));
 }
@@ -248,16 +248,16 @@ m_periodicActions.push_back(std::make_tuple(GameTimer(std::move(*result952)), st
   if (isMaster()) {
     auto result957 = m_parameters.get("scripts", Json());
 if (!result957) return std::unexpected(std::move(result957.error()));
-auto result958 = json_to_optional<StringList>(std::move(*result957), jsonToStringList);
+auto result958 = json_to_optional<StringList>(std::move(*result957), json_to_string_list);
 if (!result958) return std::unexpected(std::move(result958.error()));
 auto parameterScripts = std::move(*result958);
     auto scripts = parameterScripts ? *parameterScripts : m_config->scripts;
     if (!scripts.empty()) {
       auto result959 = m_scriptComponent.setScripts(scripts);
 if (!result959) return std::unexpected(std::move(result959.error()));
-      auto result960 = m_config->config.getUInt("scriptDelta", 1);
+      auto result960 = m_config->config.get_uint("scriptDelta", 1);
 if (!result960) return std::unexpected(std::move(result960.error()));
-auto result961 = m_parameters.getUInt("scriptDelta", std::move(*result960));
+auto result961 = m_parameters.get_uint("scriptDelta", std::move(*result960));
 if (!result961) return std::unexpected(std::move(result961.error()));
 m_scriptComponent.setUpdateDelta(std::move(*result961));
 
@@ -287,8 +287,8 @@ if (!result970) return std::unexpected(std::move(result970.error()));
   auto result971 = m_parameters.get("referenceVelocity", Json());
 if (!result971) return std::unexpected(std::move(result971.error()));
 auto referenceVelocity = std::move(*result971);
-  if (!referenceVelocity.isNull()) {
-auto result972 = jsonToVec2F(referenceVelocity);
+  if (!referenceVelocity.is_null()) {
+auto result972 = json_to_vec2f(referenceVelocity);
 if (!result972) return std::unexpected(std::move(result972.error()));
 setReferenceVelocity(std::move(*result972));
 }
@@ -315,7 +315,7 @@ std::expected<void, StarException> Projectile::uninit() {
   if (isMaster()) {
     auto result940 = configValue("scripts", Json());
 if (!result940) return std::unexpected(std::move(result940.error()));
-auto result941 = json_to_optional<StringList>(std::move(*result940), jsonToStringList);
+auto result941 = json_to_optional<StringList>(std::move(*result940), json_to_string_list);
 if (!result941) return std::unexpected(std::move(result941.error()));
 auto scripts = std::move(*result941);
     if (scripts && !(*scripts).empty()) {
@@ -397,7 +397,7 @@ if (auto res = std::move(*result935))
 }
 
 std::expected<void, StarException> Projectile::destroy(std::optional<std::reference_wrapper<RenderCallback>> renderCallback) {
-  auto result927 = m_parameters.getArray("actionOnReap", m_config->actionOnReap);
+  auto result927 = m_parameters.get_array("actionOnReap", m_config->actionOnReap);
 if (!result927) return std::unexpected(std::move(result927.error()));
 for (auto const& action : std::move(*result927))
     {
@@ -406,7 +406,7 @@ if (!result928) return std::unexpected(std::move(result928.error()));
 }
 
   if (m_collision) {
-    auto result929 = m_parameters.getArray("actionOnHit", m_config->actionOnHit);
+    auto result929 = m_parameters.get_array("actionOnHit", m_config->actionOnHit);
 if (!result929) return std::unexpected(std::move(result929.error()));
 for (auto const& action : std::move(*result929))
       {
@@ -414,7 +414,7 @@ auto result930 = processAction(action);
 if (!result930) return std::unexpected(std::move(result930.error()));
 }
   } else {
-    auto result931 = m_parameters.getArray("actionOnTimeout", m_config->actionOnTimeout);
+    auto result931 = m_parameters.get_array("actionOnTimeout", m_config->actionOnTimeout);
 if (!result931) return std::unexpected(std::move(result931.error()));
 for (auto const& action : std::move(*result931))
       {
@@ -446,7 +446,7 @@ std::expected<List<DamageSource>, StarException> Projectile::damageSources() con
   EntityDamageTeam sourceTeam = getTeam();
 
   auto statusEffects = m_config->statusEffects;
-  auto result921 = m_parameters.getArray("statusEffects", {});
+  auto result921 = m_parameters.get_array("statusEffects", {});
 if (!result921) return std::unexpected(std::move(result921.error()));
 for (auto const& effect : std::move(*result921)) {
 auto result922 = jsonToEphemeralStatusEffect(effect);
@@ -454,12 +454,12 @@ if (!result922) return std::unexpected(std::move(result922.error()));
 statusEffects.push_back(std::move(*result922));
 }
 
-  auto result923 = m_parameters.getFloat("knockback", m_config->knockback);
+  auto result923 = m_parameters.get_float("knockback", m_config->knockback);
 if (!result923) return std::unexpected(std::move(result923.error()));
 float knockbackMagnitude = std::move(*result923);
 
   DamageSource::Knockback knockback;
-  auto result924 = m_parameters.getBool("knockbackDirectional", m_config->knockbackDirectional);
+  auto result924 = m_parameters.get_bool("knockbackDirectional", m_config->knockbackDirectional);
 if (!result924) return std::unexpected(std::move(result924.error()));
 if (std::move(*result924))
   knockback = Vec2F::with_angle(m_movementController->rotation()) * knockbackMagnitude;
@@ -500,7 +500,7 @@ if (!result925) return std::unexpected(std::move(result925.error()));
 }
 
 std::expected<void, StarException> Projectile::hitOther(EntityId entity, DamageRequest const&) {
-  auto result916 = m_parameters.getBool("piercing", m_config->piercing);
+  auto result916 = m_parameters.get_bool("piercing", m_config->piercing);
 if (!result916) return std::unexpected(std::move(result916.error()));
 if (!std::move(*result916)) {
     auto result917 = world();
@@ -923,13 +923,13 @@ std::expected<void, StarException> Projectile::processAction(Json const& action)
 
   if (action.type() == Json::Type::Object) {
     parameters = action;
-    auto result729 = parameters.getString("action");
+    auto result729 = parameters.get_string("action");
 if (!result729) return std::unexpected(std::move(result729.error()));
 auto result730 = std::move(*result729).to_lower();
 if (!result730) return std::unexpected(std::move(result730.error()));
 command = std::move(*result730);
   } else {
-    auto result731 = action.toString();
+    auto result731 = action.to_string();
 if (!result731) return std::unexpected(std::move(result731.error()));
 auto result732 = std::move(*result731).to_lower();
 if (!result732) return std::unexpected(std::move(result732.error()));
@@ -962,14 +962,14 @@ if (!result733) return std::unexpected(std::move(result733.error()));
 auto materialDatabase = std::move(*result733);
     List<MaterialId> tileDrops;
     unsigned totalDrops = 0;
-    auto result734 = parameters.getArray("materials");
+    auto result734 = parameters.get_array("materials");
 if (!result734) return std::unexpected(std::move(result734.error()));
 for (auto const& sets : std::move(*result734)) {
-  auto result735 = sets.getUInt("quantity", 1);
+  auto result735 = sets.get_uint("quantity", 1);
   if (!result735)
     return std::unexpected(std::move(result735.error()));
   unsigned numDrops = std::move(*result735);
-  auto result736 = sets.getString("kind");
+  auto result736 = sets.get_string("kind");
   if (!result736)
     return std::unexpected(std::move(result736.error()));
   auto result737 = materialDatabase->materialId(std::move(*result736));
@@ -983,7 +983,7 @@ for (auto const& sets : std::move(*result734)) {
 
     auto result738 = world();
 if (!result738) return std::unexpected(std::move(result738.error()));
-auto result739 = parameters.getInt("radius", 2);
+auto result739 = parameters.get_int("radius", 2);
 if (!result739) return std::unexpected(std::move(result739.error()));
 auto result740 = result738->get().findEmptyTiles(m_lastNonCollidingTile, std::move(*result739), totalDrops);
 if (!result740) return std::unexpected(std::move(result740.error()));
@@ -994,7 +994,7 @@ auto result741 = this->root().logger().debug("Couldn't find a place for all the 
 if (!result741) return std::unexpected(std::move(result741.error()));
 }
 
-    auto result742 = parameters.getBool("allowEntityOverlap", true);
+    auto result742 = parameters.get_bool("allowEntityOverlap", true);
 if (!result742) return std::unexpected(std::move(result742.error()));
 bool allowEntityOverlap = std::move(*result742);
 
@@ -1025,31 +1025,31 @@ if (!result752) return std::unexpected(std::move(result752.error()));
 if (!result753) return std::unexpected(std::move(result753.error()));
 auto materialDatabase = std::move(*result753);
     std::optional<ModId> previousMod;
-    auto result754 = parameters.optString("previousMod");
+    auto result754 = parameters.opt_string("previousMod");
 if (!result754) return std::unexpected(std::move(result754.error()));
 if (auto previousName = std::move(*result754)) {
 auto result755 = materialDatabase->modId(*previousName);
 if (!result755) return std::unexpected(std::move(result755.error()));
 previousMod = std::move(*result755);
 }
-    auto result756 = parameters.getString("newMod");
+    auto result756 = parameters.get_string("newMod");
 if (!result756) return std::unexpected(std::move(result756.error()));
 auto result757 = materialDatabase->modId(std::move(*result756));
 if (!result757) return std::unexpected(std::move(result757.error()));
 ModId newMod = std::move(*result757);
-    auto result758 = parameters.getInt("radius", 0);
+    auto result758 = parameters.get_int("radius", 0);
 if (!result758) return std::unexpected(std::move(result758.error()));
 int radius = std::move(*result758);
-    auto result759 = parameters.getFloat("chance", 1.0f);
+    auto result759 = parameters.get_float("chance", 1.0f);
 if (!result759) return std::unexpected(std::move(result759.error()));
 float chance = std::move(*result759);
 
     Set<TileLayer> layers;
-    auto result760 = parameters.getBool("foreground", true);
+    auto result760 = parameters.get_bool("foreground", true);
 if (!result760) return std::unexpected(std::move(result760.error()));
 if (std::move(*result760))
       layers.add(TileLayer::Foreground);
-    auto result761 = parameters.getBool("background", false);
+    auto result761 = parameters.get_bool("background", false);
 if (!result761) return std::unexpected(std::move(result761.error()));
 if (std::move(*result761))
       layers.add(TileLayer::Background);
@@ -1090,19 +1090,19 @@ if (!result766) return std::unexpected(std::move(result766.error()));
     if (isSlave())
       return {};
 
-    auto result767 = parameters.getFloat("quantity", 1.0f);
+    auto result767 = parameters.get_float("quantity", 1.0f);
 if (!result767) return std::unexpected(std::move(result767.error()));
 float waterAmount = std::move(*result767);
     auto result768 = this->root().liquidsDatabase();
 if (!result768) return std::unexpected(std::move(result768.error()));
-auto result769 = parameters.getString("liquid");
+auto result769 = parameters.get_string("liquid");
 if (!result769) return std::unexpected(std::move(result769.error()));
 auto result770 = std::move(*result768)->liquidId(std::move(*result769));
 if (!result770) return std::unexpected(std::move(result770.error()));
 LiquidId liquid = std::move(*result770);
     auto result771 = world();
 if (!result771) return std::unexpected(std::move(result771.error()));
-auto result772 = parameters.getInt("radius", 5);
+auto result772 = parameters.get_int("radius", 5);
 if (!result772) return std::unexpected(std::move(result772.error()));
 auto result773 = result771->get().findEmptyTiles(m_lastNonCollidingTile, std::move(*result772), 50);
 if (!result773) return std::unexpected(std::move(result773.error()));
@@ -1131,7 +1131,7 @@ if (!result778) return std::unexpected(std::move(result778.error()));
     if (isSlave())
       return {};
 
-    auto type_result = parameters.getString("type");
+    auto type_result = parameters.get_string("type");
     if (!type_result)
       return std::unexpected(std::move(type_result.error()));
     String projectile_type = std::move(*type_result);
@@ -1142,7 +1142,7 @@ if (!result778) return std::unexpected(std::move(result778.error()));
     std::optional<JsonObject> parameter_updates;
     auto set_parameter = [&](String key, Json value) -> std::expected<void, StarException> {
       if (!parameter_updates) {
-        auto object = projectile_parameters.toObject();
+        auto object = projectile_parameters.to_object();
         if (!object)
           return std::unexpected(std::move(object.error()));
         parameter_updates.emplace(std::move(*object));
@@ -1166,7 +1166,7 @@ if (!result778) return std::unexpected(std::move(result778.error()));
       if (!has_power)
         return std::unexpected(std::move(has_power.error()));
       if (!*has_power) {
-        auto damage_factor = parameters.getFloat("inheritDamageFactor");
+        auto damage_factor = parameters.get_float("inheritDamageFactor");
         if (!damage_factor)
           return std::unexpected(std::move(damage_factor.error()));
         auto updated = set_parameter("power", m_power * *damage_factor);
@@ -1178,7 +1178,7 @@ if (!result778) return std::unexpected(std::move(result778.error()));
     if (!inherits_speed)
       return std::unexpected(std::move(inherits_speed.error()));
     if (*inherits_speed) {
-      auto speed_factor = parameters.getFloat("inheritSpeedFactor");
+      auto speed_factor = parameters.get_float("inheritSpeedFactor");
       if (!speed_factor)
         return std::unexpected(std::move(speed_factor.error()));
       auto updated = set_parameter(
@@ -1199,9 +1199,9 @@ auto projectile = std::move(*result792);
     auto result793 = parameters.contains("offset");
 if (!result793) return std::unexpected(std::move(result793.error()));
 if (std::move(*result793)) {
-      auto result794 = parameters.getArray("offset", {0.0f, 0.0f});
+      auto result794 = parameters.get_array("offset", {0.0f, 0.0f});
 if (!result794) return std::unexpected(std::move(result794.error()));
-auto result795 = jsonToVec2F(std::move(*result794));
+auto result795 = json_to_vec2f(std::move(*result794));
 if (!result795) return std::unexpected(std::move(result795.error()));
 offset = std::move(*result795);
     } else {
@@ -1210,7 +1210,7 @@ if (!result796) return std::unexpected(std::move(result796.error()));
 if (std::move(*result796)) {
       auto result797 = parameters.get("offsetRange");
 if (!result797) return std::unexpected(std::move(result797.error()));
-auto result798 = jsonToVec4F(std::move(*result797));
+auto result798 = json_to_vec4f(std::move(*result797));
 if (!result798) return std::unexpected(std::move(result798.error()));
 auto offsetRange = std::move(*result798);
       auto result799 = this->root().random().uniform_float(offsetRange[0], offsetRange[2]);
@@ -1228,7 +1228,7 @@ if (!result801) return std::unexpected(std::move(result801.error()));
 if (std::move(*result801)) {
       auto result802 = parameters.get("direction");
 if (!result802) return std::unexpected(std::move(result802.error()));
-auto result803 = jsonToVec2F(std::move(*result802));
+auto result803 = json_to_vec2f(std::move(*result802));
 if (!result803) return std::unexpected(std::move(result803.error()));
 projectile->setInitialDirection(std::move(*result803));
     } else {
@@ -1238,7 +1238,7 @@ projectile->setInitialDirection(std::move(*result803));
 if (!result804) return std::unexpected(std::move(result804.error()));
 if (std::move(*result804))
         {
-auto result805 = parameters.getFloat("angle");
+auto result805 = parameters.get_float("angle");
 if (!result805) return std::unexpected(std::move(result805.error()));
 angle = std::move(*result805) * std::numbers::pi / 180.0f;
 }
@@ -1248,7 +1248,7 @@ if (std::move(*result806))
         {
 auto result807 = this->root().random().uniform_float(-1, 1);
 if (!result807) return std::unexpected(std::move(result807.error()));
-auto result808 = parameters.getFloat("fuzzAngle");
+auto result808 = parameters.get_float("fuzzAngle");
 if (!result808) return std::unexpected(std::move(result808.error()));
 angleAdjust += std::move(*result807) * std::move(*result808) * std::numbers::pi / 180.0f;
 }
@@ -1256,7 +1256,7 @@ angleAdjust += std::move(*result807) * std::move(*result808) * std::numbers::pi 
 if (!result809) return std::unexpected(std::move(result809.error()));
 if (std::move(*result809))
         {
-auto result810 = parameters.getFloat("angleAdjust");
+auto result810 = parameters.get_float("angleAdjust");
 if (!result810) return std::unexpected(std::move(result810.error()));
 angleAdjust += std::move(*result810) * std::numbers::pi / 180.0f;
 }
@@ -1264,7 +1264,7 @@ angleAdjust += std::move(*result810) * std::numbers::pi / 180.0f;
 if (!result811) return std::unexpected(std::move(result811.error()));
 bool condition813 = static_cast<bool>(std::move(*result811));
 if (condition813) {
-auto result812 = parameters.getBool("autoFlipAdjust");
+auto result812 = parameters.get_bool("autoFlipAdjust");
 if (!result812) return std::unexpected(std::move(result812.error()));
 condition813 = static_cast<bool>(std::move(*result812));
 }
@@ -1276,7 +1276,7 @@ if (condition813) {
 if (!result814) return std::unexpected(std::move(result814.error()));
 bool condition816 = static_cast<bool>(std::move(*result814));
 if (condition816) {
-auto result815 = parameters.getBool("autoFlipAngle");
+auto result815 = parameters.get_bool("autoFlipAngle");
 if (!result815) return std::unexpected(std::move(result815.error()));
 condition816 = static_cast<bool>(std::move(*result815));
 }
@@ -1300,7 +1300,7 @@ condition818 = static_cast<bool>(!result817->get().entity(m_sourceEntity));
 if (condition818)
       projectile->setTeam(getTeam());
 
-    auto result819 = parameters.getUInt("delaySteps", 0);
+    auto result819 = parameters.get_uint("delaySteps", 0);
 if (!result819) return std::unexpected(std::move(result819.error()));
 auto result820 = doWithDelay(std::move(*result819), [projectile](World& world)  -> std::expected<void, StarException> { auto result656 = world.addEntity(projectile);
 if (!result656) return std::unexpected(std::move(result656.error()));   return {};
@@ -1348,7 +1348,7 @@ auto result828 = std::move(*result826)->particle(std::move(*result827));
 if (!result828) return std::unexpected(std::move(result828.error()));
 Particle particle = std::move(*result828);
     particle.position = particle.position.rotate(m_movementController->rotation());
-    auto result829 = parameters.getBool("rotate", false);
+    auto result829 = parameters.get_bool("rotate", false);
 if (!result829) return std::unexpected(std::move(result829.error()));
 if (std::move(*result829)) {
       particle.rotation = m_movementController->rotation();
@@ -1362,27 +1362,27 @@ if (std::move(*result829)) {
     if (isSlave())
       return {};
 
-    auto result830 = parameters.getFloat("foregroundRadius");
+    auto result830 = parameters.get_float("foregroundRadius");
 if (!result830) return std::unexpected(std::move(result830.error()));
 float foregroundRadius = std::move(*result830);
-    auto result831 = parameters.getFloat("backgroundRadius");
+    auto result831 = parameters.get_float("backgroundRadius");
 if (!result831) return std::unexpected(std::move(result831.error()));
 float backgroundRadius = std::move(*result831);
-    auto result832 = parameters.getFloat("explosiveDamageAmount");
+    auto result832 = parameters.get_float("explosiveDamageAmount");
 if (!result832) return std::unexpected(std::move(result832.error()));
 float explosiveDamageAmount = std::move(*result832);
-    auto result833 = parameters.getString("tileDamageType", "explosive");
+    auto result833 = parameters.get_string("tileDamageType", "explosive");
 if (!result833) return std::unexpected(std::move(result833.error()));
 if (!TileDamageTypeNames) return std::unexpected(TileDamageTypeNames.error());
 auto result834 = TileDamageTypeNames->get_left(std::move(*result833));
 if (!result834) return std::unexpected(std::move(result834.error()));
 auto damageType = result834->get();
-    auto result835 = parameters.getUInt("harvestLevel", 0);
+    auto result835 = parameters.get_uint("harvestLevel", 0);
 if (!result835) return std::unexpected(std::move(result835.error()));
 unsigned harvestLevel = std::move(*result835);
     Vec2F explosionPosition = position();
 
-    auto result836 = parameters.getUInt("delaySteps", 0);
+    auto result836 = parameters.get_uint("delaySteps", 0);
 if (!result836) return std::unexpected(std::move(result836.error()));
 auto result837 = doWithDelay(std::move(*result836),
         [foregroundRadius, backgroundRadius, explosionPosition, damageType,
@@ -1405,17 +1405,17 @@ if (!result837) return std::unexpected(std::move(result837.error()));
 
   } else if (command == "spawnmonster") {
     if (isMaster()) {
-      auto result838 = parameters.getString("type");
+      auto result838 = parameters.get_string("type");
 if (!result838) return std::unexpected(std::move(result838.error()));
 String const type = std::move(*result838);
 
-      auto result839 = parameters.getObject("arguments", JsonObject{});
+      auto result839 = parameters.get_object("arguments", JsonObject{});
 if (!result839) return std::unexpected(std::move(result839.error()));
 JsonObject arguments = std::move(*result839);
 
-      auto result840 = m_parameters.getFloat("level", 0.0f);
+      auto result840 = m_parameters.get_float("level", 0.0f);
 if (!result840) return std::unexpected(std::move(result840.error()));
-auto result841 = parameters.getFloat("level", std::move(*result840));
+auto result841 = parameters.get_float("level", std::move(*result840));
 if (!result841) return std::unexpected(std::move(result841.error()));
 float level = std::move(*result841);
 
@@ -1435,7 +1435,7 @@ if (std::move(*result845))
         {
 auto result846 = parameters.get("offset");
 if (!result846) return std::unexpected(std::move(result846.error()));
-auto result847 = jsonToVec2F(std::move(*result846));
+auto result847 = json_to_vec2f(std::move(*result846));
 if (!result847) return std::unexpected(std::move(result847.error()));
 spawnPosition += std::move(*result847);
 }
@@ -1455,7 +1455,7 @@ if (!result851) return std::unexpected(std::move(result851.error()));
 condition852 = static_cast<bool>(std::move(*result851));
 }
 if (condition852) {
-      auto result853 = parameters.getObject("particle");
+      auto result853 = parameters.get_object("particle");
 if (!result853) return std::unexpected(std::move(result853.error()));
 auto result854 = Particle::create(root(), std::move(*result853));
 if (!result854) return std::unexpected(std::move(result854.error()));
@@ -1469,13 +1469,13 @@ auto particle = std::move(*result854);
     if (isSlave())
       return {};
 
-    auto result855 = parameters.getString("name");
+    auto result855 = parameters.get_string("name");
 if (!result855) return std::unexpected(std::move(result855.error()));
 String const name = std::move(*result855);
-    auto result856 = parameters.getInt("count", 1);
+    auto result856 = parameters.get_int("count", 1);
 if (!result856) return std::unexpected(std::move(result856.error()));
 std::size_t count = std::move(*result856);
-    auto result857 = parameters.getObject("data", JsonObject{});
+    auto result857 = parameters.get_object("data", JsonObject{});
 if (!result857) return std::unexpected(std::move(result857.error()));
 JsonObject data = std::move(*result857);
 
@@ -1497,9 +1497,9 @@ if (!result862->get().isClient())
 
     auto result863 = this->root().assets();
 if (!result863) return std::unexpected(std::move(result863.error()));
-auto result864 = parameters.getArray("options");
+auto result864 = parameters.get_array("options");
 if (!result864) return std::unexpected(std::move(result864.error()));
-auto result865 = this->root().random().sample_value(std::move(*result864)).and_then([](Json const& value) { return value.toString(); });
+auto result865 = this->root().random().sample_value(std::move(*result864)).and_then([](Json const& value) { return value.to_string(); });
 if (!result865) return std::unexpected(std::move(result865.error()));
 auto result866 = std::move(*result863)->audio(std::move(*result865));
 if (!result866) return std::unexpected(std::move(result866.error()));
@@ -1507,10 +1507,10 @@ auto result1275 = AudioInstance::create(*std::move(*result866));
 if (!result1275) return std::unexpected(std::move(result1275.error()));
 std::shared_ptr<AudioInstance> sound = std::move(*result1275);
 sound->set_position(position());
-auto result867 = parameters.getFloat("volume", 1.0f);
+auto result867 = parameters.get_float("volume", 1.0f);
 if (!result867) return std::unexpected(std::move(result867.error()));
 sound->set_volume(std::move(*result867));
-auto result868 = parameters.getFloat("pitch", 1.0f);
+auto result868 = parameters.get_float("pitch", 1.0f);
 if (!result868) return std::unexpected(std::move(result868.error()));
 sound->set_pitch_multiplier(std::move(*result868));
 m_pendingRenderables.push_back(std::move(sound));
@@ -1523,15 +1523,15 @@ if (!result869->get().isClient())
 
     auto result870 = parameters.get("color");
 if (!result870) return std::unexpected(std::move(result870.error()));
-auto result871 = jsonToColor(std::move(*result870));
+auto result871 = json_to_color(std::move(*result870));
 if (!result871) return std::unexpected(std::move(result871.error()));
-auto result872 = parameters.getBool("pointLight", true);
+auto result872 = parameters.get_bool("pointLight", true);
 if (!result872) return std::unexpected(std::move(result872.error()));
 m_pendingRenderables.push_back(LightSource{position(), std::move(*result871).to_rgb_f(),
                                            static_cast<LightType>(std::move(*result872)), 0.0f, 0.0f, 0.0f});
 
   } else if (command == "option") {
-    auto result873 = parameters.getArray("options");
+    auto result873 = parameters.get_array("options");
 if (!result873) return std::unexpected(std::move(result873.error()));
 JsonArray options = std::move(*result873);
     if (options.size())
@@ -1543,7 +1543,7 @@ if (!result875) return std::unexpected(std::move(result875.error()));
 }
 
   } else if (command == "actions") {
-    auto result876 = parameters.getArray("list");
+    auto result876 = parameters.get_array("list");
 if (!result876) return std::unexpected(std::move(result876.error()));
 JsonArray list = std::move(*result876);
     for (auto const& action : list)
@@ -1553,10 +1553,10 @@ if (!result877) return std::unexpected(std::move(result877.error()));
 }
 
   } else if (command == "loop") {
-    auto result878 = parameters.getInt("count");
+    auto result878 = parameters.get_int("count");
 if (!result878) return std::unexpected(std::move(result878.error()));
 int count = std::move(*result878);
-    auto result879 = parameters.getArray("body");
+    auto result879 = parameters.get_array("body");
 if (!result879) return std::unexpected(std::move(result879.error()));
 JsonArray body = std::move(*result879);
     while (count > 0) {
@@ -1571,7 +1571,7 @@ if (!result880) return std::unexpected(std::move(result880.error()));
   } else if (command == "config") {
     auto result881 = this->root().assets();
 if (!result881) return std::unexpected(std::move(result881.error()));
-auto result882 = parameters.getString("file");
+auto result882 = parameters.get_string("file");
 if (!result882) return std::unexpected(std::move(result882.error()));
 auto result883 = std::move(*result881)->json(std::move(*result882));
 if (!result883) return std::unexpected(std::move(result883.error()));
@@ -1600,7 +1600,7 @@ std::expected<void, StarException> Projectile::tickShared(float dt) {
 if (!result719) return std::unexpected(std::move(result719.error()));
 
   if (m_collisionEvent.pullOccurred()) {
-    auto result720 = m_parameters.getArray("actionOnCollide", m_config->actionOnCollide);
+    auto result720 = m_parameters.get_array("actionOnCollide", m_config->actionOnCollide);
 if (!result720) return std::unexpected(std::move(result720.error()));
 for (auto const& action : std::move(*result720))
       {
@@ -1632,22 +1632,22 @@ if (!result721) return std::unexpected(std::move(result721.error()));
 }
 
 std::expected<void, StarException> Projectile::setup() {
-  auto result681 = m_parameters.optString("uniqueId");
+  auto result681 = m_parameters.opt_string("uniqueId");
 if (!result681) return std::unexpected(std::move(result681.error()));
 if (auto uniqueId = std::move(*result681))
     setUniqueId(*uniqueId);
 
-  auto result682 = m_parameters.getFloat("acceleration", m_config->acceleration);
+  auto result682 = m_parameters.get_float("acceleration", m_config->acceleration);
 if (!result682) return std::unexpected(std::move(result682.error()));
 m_acceleration = std::move(*result682);
-  auto result683 = m_parameters.getFloat("power", m_config->power);
+  auto result683 = m_parameters.get_float("power", m_config->power);
 if (!result683) return std::unexpected(std::move(result683.error()));
 m_power = std::move(*result683);
-  auto result684 = m_parameters.getFloat("powerMultiplier", 1.0f);
+  auto result684 = m_parameters.get_float("powerMultiplier", 1.0f);
 if (!result684) return std::unexpected(std::move(result684.error()));
 m_powerMultiplier = std::move(*result684);
   { // it is possible to shove a frame name in processing. I hope nobody actually does this but account for it...
-    auto result685 = m_parameters.getString("processing", "");
+    auto result685 = m_parameters.get_string("processing", "");
 if (!result685) return std::unexpected(std::move(result685.error()));
 String processing = std::move(*result685);
     auto begin = processing.utf8().find_first_of('?');
@@ -1664,19 +1664,19 @@ String processing = std::move(*result685);
       m_imageSuffix = processing.utf8().substr(0, begin);
     }
   }
-  auto result686 = m_parameters.getString("persistentAudio", m_config->persistentAudio);
+  auto result686 = m_parameters.get_string("persistentAudio", m_config->persistentAudio);
 if (!result686) return std::unexpected(std::move(result686.error()));
 m_persistentAudioFile = std::move(*result686);
 
-  auto result687 = m_parameters.getString("damageKind", m_config->damageKind);
+  auto result687 = m_parameters.get_string("damageKind", m_config->damageKind);
 if (!result687) return std::unexpected(std::move(result687.error()));
 m_damageKind = std::move(*result687);
-  auto result688 = m_parameters.getString("damageType", m_config->damageType);
+  auto result688 = m_parameters.get_string("damageType", m_config->damageType);
 if (!result688) return std::unexpected(std::move(result688.error()));
 auto result689 = enum_value<DamageTypeNames>(*result688);
 if (!result689) return std::unexpected(std::move(result689.error()));
 m_damageType = *result689;
-auto result690 = m_parameters.getBool("rayCheckToSource", m_config->rayCheckToSource);
+auto result690 = m_parameters.get_bool("rayCheckToSource", m_config->rayCheckToSource);
 if (!result690) return std::unexpected(std::move(result690.error()));
 m_rayCheckToSource = std::move(*result690);
 
@@ -1688,31 +1688,31 @@ if (auto damageTeam = std::move(*result691)) {
 if (!result692) return std::unexpected(std::move(result692.error()));
 setTeam(std::move(*result692));
   }
-  auto result693 = m_parameters.optString("damageRepeatGroup");
+  auto result693 = m_parameters.opt_string("damageRepeatGroup");
 if (!result693) return std::unexpected(std::move(result693.error()));
 auto damageRepeatGroup = std::move(*result693);
   auto const& defaultDamageRepeatGroup = m_config->damageRepeatGroup;
   m_damageRepeatGroup = damageRepeatGroup ? damageRepeatGroup : defaultDamageRepeatGroup;
-  auto result694 = m_parameters.optFloat("damageRepeatTimeout");
+  auto result694 = m_parameters.opt_float("damageRepeatTimeout");
 if (!result694) return std::unexpected(std::move(result694.error()));
 auto damageRepeatTimeout = std::move(*result694);
   auto const& defaultDamageRepeatTimeout = m_config->damageRepeatTimeout;
   m_damageRepeatTimeout = damageRepeatTimeout ? damageRepeatTimeout : defaultDamageRepeatTimeout;
 
-  auto result695 = m_parameters.getBool("falldown", m_config->falldown);
+  auto result695 = m_parameters.get_bool("falldown", m_config->falldown);
 if (!result695) return std::unexpected(std::move(result695.error()));
 m_falldown = std::move(*result695);
 
-  auto result696 = m_parameters.getBool("hydrophobic", m_config->hydrophobic);
+  auto result696 = m_parameters.get_bool("hydrophobic", m_config->hydrophobic);
 if (!result696) return std::unexpected(std::move(result696.error()));
 m_hydrophobic = std::move(*result696);
-  auto result697 = m_parameters.getBool("onlyHitTerrain", m_config->onlyHitTerrain);
+  auto result697 = m_parameters.get_bool("onlyHitTerrain", m_config->onlyHitTerrain);
 if (!result697) return std::unexpected(std::move(result697.error()));
 m_onlyHitTerrain = std::move(*result697);
 
   auto result698 = m_parameters.get("movementSettings", Json());
 if (!result698) return std::unexpected(std::move(result698.error()));
-  auto movementSettings = jsonMerge(m_config->movementSettings, *result698);
+  auto movementSettings = json_merge(m_config->movementSettings, *result698);
   auto result700 = movementSettings.contains("physicsEffectCategories");
 if (!result700) return std::unexpected(std::move(result700.error()));
 if (!std::move(*result700))
@@ -1731,19 +1731,19 @@ m_movementController = std::move(*result703);
 if (!result704) return std::unexpected(std::move(result704.error()));
 m_effectEmitter = std::move(*result704);
 
-  auto result705 = m_parameters.getFloat("speed", m_config->initialSpeed);
+  auto result705 = m_parameters.get_float("speed", m_config->initialSpeed);
 if (!result705) return std::unexpected(std::move(result705.error()));
 m_initialSpeed = std::move(*result705);
   m_sourceEntity = NullEntityId;
   m_trackSourceEntity = false;
-  auto result706 = m_parameters.getInt("bounces", m_config->bounces);
+  auto result706 = m_parameters.get_int("bounces", m_config->bounces);
 if (!result706) return std::unexpected(std::move(result706.error()));
 m_bounces = std::move(*result706);
 
   m_frame = 0;
 
   m_animationTimer = 0.0f;
-  auto result707 = m_parameters.getFloat("animationCycle", m_config->animationCycle);
+  auto result707 = m_parameters.get_float("animationCycle", m_config->animationCycle);
 if (!result707) return std::unexpected(std::move(result707.error()));
 m_animationCycle = std::move(*result707);
   m_collision = false;
@@ -1757,7 +1757,7 @@ m_animationCycle = std::move(*result707);
     auto result709 = jsonToPhysicsForceRegion(p.second);
 if (!result709) return std::unexpected(std::move(result709.error()));
 forceConfig.forceRegion = std::move(*result709);
-    auto result710 = p.second.getBool("enabled", true);
+    auto result710 = p.second.get_bool("enabled", true);
 if (!result710) return std::unexpected(std::move(result710.error()));
 forceConfig.enabled.set(std::move(*result710));
   }
@@ -1771,7 +1771,7 @@ forceConfig.enabled.set(std::move(*result710));
     auto result712 = PhysicsMovingCollision::fromJson(p.second);
 if (!result712) return std::unexpected(std::move(result712.error()));
 forceConfig.movingCollision = std::move(*result712);
-    auto result713 = p.second.getBool("enabled", true);
+    auto result713 = p.second.get_bool("enabled", true);
 if (!result713) return std::unexpected(std::move(result713.error()));
 forceConfig.enabled.set(std::move(*result713));
   }

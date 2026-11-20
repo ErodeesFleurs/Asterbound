@@ -68,38 +68,38 @@ std::expected<UniqueStatusEffectConfig, StarException> StatusEffectDatabase::uni
 std::expected<UniqueStatusEffectConfig, StarException> StatusEffectDatabase::parseUniqueEffect(Json const& config, String const& path) const {
   auto parsed = [&]() -> std::expected<UniqueStatusEffectConfig, StarException> {
     UniqueStatusEffectConfig effect;
-    auto name = config.getString("name");
+    auto name = config.get_string("name");
     if (!name) return std::unexpected(std::move(name.error()));
     effect.name = std::move(*name);
-    auto blockingStat = config.optString("blockingStat");
+    auto blockingStat = config.opt_string("blockingStat");
     if (!blockingStat) return std::unexpected(std::move(blockingStat.error()));
     effect.blockingStat = std::move(*blockingStat);
     auto effectConfig = config.get("effectConfig", JsonObject());
     if (!effectConfig) return std::unexpected(std::move(effectConfig.error()));
     effect.effectConfig = std::move(*effectConfig);
-    auto defaultDuration = config.getFloat("defaultDuration", 0.0f);
+    auto defaultDuration = config.get_float("defaultDuration", 0.0f);
     if (!defaultDuration) return std::unexpected(std::move(defaultDuration.error()));
     effect.defaultDuration = *defaultDuration;
     auto scriptsConfig = config.get("scripts", JsonArray{});
     if (!scriptsConfig) return std::unexpected(std::move(scriptsConfig.error()));
-    auto scripts = jsonToStringList(*scriptsConfig);
+    auto scripts = json_to_string_list(*scriptsConfig);
     if (!scripts) return std::unexpected(std::move(scripts.error()));
     for (auto const& script : *scripts)
       effect.scripts.push_back(AssetPath::relative_to(path, script));
-    auto scriptDelta = config.getUInt("scriptDelta", 1);
+    auto scriptDelta = config.get_uint("scriptDelta", 1);
     if (!scriptDelta) return std::unexpected(std::move(scriptDelta.error()));
     effect.scriptDelta = *scriptDelta;
-    auto animationConfig = config.optString("animationConfig");
+    auto animationConfig = config.opt_string("animationConfig");
     if (!animationConfig) return std::unexpected(std::move(animationConfig.error()));
     if (*animationConfig)
       effect.animationConfig = AssetPath::relative_to(path, **animationConfig);
-    auto label = config.getString("label", "");
+    auto label = config.get_string("label", "");
     if (!label) return std::unexpected(std::move(label.error()));
     effect.label = std::move(*label);
-    auto description = config.getString("description", "");
+    auto description = config.get_string("description", "");
     if (!description) return std::unexpected(std::move(description.error()));
     effect.description = std::move(*description);
-    auto icon = config.optString("icon");
+    auto icon = config.opt_string("icon");
     if (!icon) return std::unexpected(std::move(icon.error()));
     if (*icon)
       effect.icon = AssetPath::relative_to(path, **icon);
@@ -116,7 +116,7 @@ JsonObject UniqueStatusEffectConfig::toJson() {
     {"blockingStat", blockingStat ? Json(*blockingStat) : Json()},
     {"effectConfig", effectConfig},
     {"defaultDuration", defaultDuration},
-    {"scripts", jsonFromStringList(scripts)},
+    {"scripts", json_from_string_list(scripts)},
     {"scriptDelta", scriptDelta},
     {"animationConfig", animationConfig ? Json(*animationConfig) : Json()},
     {"label", label},

@@ -226,7 +226,7 @@ std::expected<void, StarException> ModUploader::loadDirectoryImpl() {
   std::array<String, 7> fields;
   std::array<std::string_view, 7> keys = {"name", "friendlyName", "author", "version", "description", "tags", "steamContentId"};
   for (std::size_t i = 0; i < keys.size(); ++i) {
-    auto field = metadata.value(keys[i], "").toString();
+    auto field = metadata.value(keys[i], "").to_string();
     if (!field)
       return std::unexpected(StarException(Star::format("Invalid mod metadata field '{}'", keys[i]), ExceptionDiagnostic(field.error())));
     fields[i] = std::move(*field);
@@ -379,7 +379,7 @@ std::expected<void, StarException> ModUploader::uploadToSteamImpl(QProgressDialo
   m_steamItemCreateResult.reset();
   m_steamItemSubmitResult.reset();
   auto metadata = m_assetSource->metadata();
-  auto modIdField = metadata.value("steamContentId", "").toString();
+  auto modIdField = metadata.value("steamContentId", "").to_string();
   if (!modIdField)
     return std::unexpected(std::move(modIdField.error()));
   String modIdString = std::move(*modIdField);

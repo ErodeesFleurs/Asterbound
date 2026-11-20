@@ -70,7 +70,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
     auto metas = metaConfig->iterate_array();
     if (!metas) return std::unexpected(std::move(metas.error()));
     for (auto const& meta : *metas) {
-      auto name = meta.getString("name");
+      auto name = meta.get_string("name");
       if (!name) return std::unexpected(std::move(name.error()));
       auto matName = "metamaterial:" + *name;
       if (isMaterialName(matName)) {
@@ -78,7 +78,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
         if (!logged) return std::unexpected(std::move(logged.error()));
         continue;
       }
-      auto id = meta.getUInt("materialId");
+      auto id = meta.get_uint("materialId");
       if (!id) return std::unexpected(std::move(id.error()));
       MaterialId matId = *id;
       if (isRealMaterial(matId) || matId >= FirstEngineMetaMaterialId) {
@@ -90,11 +90,11 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
         if (!logged) return std::unexpected(std::move(logged.error()));
         continue;
       }
-      auto collisionName = meta.getString("collisionKind");
+      auto collisionName = meta.get_string("collisionKind");
       if (!collisionName) return std::unexpected(std::move(collisionName.error()));
       auto collision = enum_value<CollisionKindNames>(*collisionName);
       if (!collision) return std::unexpected(std::move(collision.error()));
-      auto blocks = meta.getBool("blocksLiquidFlow", isSolidColliding(*collision));
+      auto blocks = meta.get_bool("blocksLiquidFlow", isSolidColliding(*collision));
       if (!blocks) return std::unexpected(std::move(blocks.error()));
       setMetaMaterial(matId, MetaMaterialInfo{matName, matId, *collision, *blocks});
     }
@@ -118,12 +118,12 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
       if (!config)
         return std::unexpected(std::move(config.error()));
       MaterialInfo material;
-      auto id = config->getInt("materialId");
+      auto id = config->get_int("materialId");
       if (!id)
         return std::unexpected(std::move(id.error()));
       material.id = *id;
       {
-        auto value = config->getString("materialName");
+        auto value = config->get_string("materialName");
         if (!value)
           return std::unexpected(std::move(value.error()));
         material.name = std::move(*value);
@@ -131,7 +131,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
       material.path = file;
       material.config = *config;
       {
-        auto value = config->getString("itemDrop", "");
+        auto value = config->get_string("itemDrop", "");
         if (!value)
           return std::unexpected(std::move(value.error()));
         material.itemDrop = std::move(*value);
@@ -148,20 +148,20 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
           descriptions[entry.first] = entry.second;
       }
       {
-        auto value = config->getString("description", "");
+        auto value = config->get_string("description", "");
         if (!value)
           return std::unexpected(std::move(value.error()));
         descriptions["description"] = std::move(*value);
       }
       {
-        auto value = config->getString("shortdescription", "");
+        auto value = config->get_string("shortdescription", "");
         if (!value)
           return std::unexpected(std::move(value.error()));
         descriptions["shortdescription"] = std::move(*value);
       }
       material.descriptions = std::move(descriptions);
       {
-        auto value = config->getString("category");
+        auto value = config->get_string("category");
         if (!value)
           return std::unexpected(std::move(value.error()));
         material.category = std::move(*value);
@@ -170,12 +170,12 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
       if (!colorConfig)
         return std::unexpected(std::move(colorConfig.error()));
       {
-        auto value = jsonToColor(*colorConfig);
+        auto value = json_to_color(*colorConfig);
         if (!value)
           return std::unexpected(std::move(value.error()));
         material.particleColor = std::move(*value);
       }
-      auto particle = config->optString("miningParticle");
+      auto particle = config->opt_string("miningParticle");
       if (!particle)
         return std::unexpected(std::move(particle.error()));
       if (*particle) {
@@ -190,37 +190,37 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
       if (!sounds)
         return std::unexpected(std::move(sounds.error()));
       if (*sounds) {
-        auto names = jsonToStringList(**sounds);
+        auto names = json_to_string_list(**sounds);
         if (!names)
           return std::unexpected(std::move(names.error()));
         for (auto const& name : *names)
           material.miningSounds.push_back(AssetPath::relative_to(file, name));
       }
-      auto footstep = config->optString("footstepSound");
+      auto footstep = config->opt_string("footstepSound");
       if (!footstep)
         return std::unexpected(std::move(footstep.error()));
       if (*footstep)
         material.footstepSound = AssetPath::relative_to(file, **footstep);
       {
-        auto value = config->getInt("tillableMod", NoModId);
+        auto value = config->get_int("tillableMod", NoModId);
         if (!value)
           return std::unexpected(std::move(value.error()));
         material.tillableMod = std::move(*value);
       }
       {
-        auto value = config->getBool("soil", false);
+        auto value = config->get_bool("soil", false);
         if (!value)
           return std::unexpected(std::move(value.error()));
         material.soil = std::move(*value);
       }
       {
-        auto value = config->getBool("falling", false);
+        auto value = config->get_bool("falling", false);
         if (!value)
           return std::unexpected(std::move(value.error()));
         material.falling = std::move(*value);
       }
       {
-        auto value = config->getBool("cascading", false);
+        auto value = config->get_bool("cascading", false);
         if (!value)
           return std::unexpected(std::move(value.error()));
         material.cascading = std::move(*value);
@@ -235,7 +235,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
         auto parameters = config->get("renderParameters");
         if (!parameters)
           return std::unexpected(std::move(parameters.error()));
-        auto merged = jsonMerge(*renderTemplate, *parameters);
+        auto merged = json_merge(*renderTemplate, *parameters);
         auto profile = parseMaterialRenderProfile(imageMetadata, merged, file);
         if (!profile)
           return std::unexpected(std::move(profile.error()));
@@ -247,10 +247,10 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
       auto damage = assets->fetchJson(*damageConfig);
       if (!damage)
         return std::unexpected(std::move(damage.error()));
-      auto health = config->optFloat("health");
+      auto health = config->opt_float("health");
       if (!health)
         return std::unexpected(std::move(health.error()));
-      auto harvest = config->optUInt("requiredHarvestLevel");
+      auto harvest = config->opt_uint("requiredHarvestLevel");
       if (!harvest)
         return std::unexpected(std::move(harvest.error()));
       std::optional<unsigned> harvestLevel;
@@ -262,7 +262,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
           return std::unexpected(std::move(value.error()));
         material.damageParameters = std::move(*value);
       }
-      auto collisionName = config->getString("collisionKind", "block");
+      auto collisionName = config->get_string("collisionKind", "block");
       if (!collisionName)
         return std::unexpected(std::move(collisionName.error()));
       auto collision = enum_value<CollisionKindNames>(*collisionName);
@@ -270,19 +270,19 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
         return std::unexpected(std::move(collision.error()));
       material.collisionKind = *collision;
       {
-        auto value = config->getBool("foregroundOnly", false);
+        auto value = config->get_bool("foregroundOnly", false);
         if (!value)
           return std::unexpected(std::move(value.error()));
         material.foregroundOnly = std::move(*value);
       }
       {
-        auto value = config->getBool("supportsMods", !(material.falling || material.cascading || material.collisionKind != CollisionKind::Block));
+        auto value = config->get_bool("supportsMods", !(material.falling || material.cascading || material.collisionKind != CollisionKind::Block));
         if (!value)
           return std::unexpected(std::move(value.error()));
         material.supportsMods = std::move(*value);
       }
       {
-        auto value = config->getBool("blocksLiquidFlow", isSolidColliding(material.collisionKind));
+        auto value = config->get_bool("blocksLiquidFlow", isSolidColliding(material.collisionKind));
         if (!value)
           return std::unexpected(std::move(value.error()));
         material.blocksLiquidFlow = std::move(*value);
@@ -295,28 +295,28 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
         return std::unexpected(MaterialException(Star::format("Duplicate material name '{}' found", material.name)));
       database.setMaterial(material.id, material);
 
-      auto interactions = config->getArray("liquidInteractions", {});
+      auto interactions = config->get_array("liquidInteractions", {});
       if (!interactions)
         return std::unexpected(std::move(interactions.error()));
       for (auto const& entry : *interactions) {
-        auto liquid = entry.getUInt("liquidId");
+        auto liquid = entry.get_uint("liquidId");
         if (!liquid)
           return std::unexpected(std::move(liquid.error()));
         LiquidMaterialInteraction interaction;
         {
-          auto value = entry.getFloat("consumeLiquid", 0.0f);
+          auto value = entry.get_float("consumeLiquid", 0.0f);
           if (!value)
             return std::unexpected(std::move(value.error()));
           interaction.consumeLiquid = std::move(*value);
         }
         {
-          auto value = entry.getUInt("transformMaterialId", NullMaterialId);
+          auto value = entry.get_uint("transformMaterialId", NullMaterialId);
           if (!value)
             return std::unexpected(std::move(value.error()));
           interaction.transformTo = std::move(*value);
         }
         {
-          auto value = entry.getBool("topOnly", false);
+          auto value = entry.get_bool("topOnly", false);
           if (!value)
             return std::unexpected(std::move(value.error()));
           interaction.topOnly = std::move(*value);
@@ -335,12 +335,12 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
       if (!config)
         return std::unexpected(std::move(config.error()));
       ModInfo mod;
-      auto id = config->getInt("modId");
+      auto id = config->get_int("modId");
       if (!id)
         return std::unexpected(std::move(id.error()));
       mod.id = *id;
       {
-        auto value = config->getString("modName");
+        auto value = config->get_string("modName");
         if (!value)
           return std::unexpected(std::move(value.error()));
         mod.name = std::move(*value);
@@ -348,7 +348,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
       mod.path = file;
       mod.config = *config;
       {
-        auto value = config->getString("itemDrop", "");
+        auto value = config->get_string("itemDrop", "");
         if (!value)
           return std::unexpected(std::move(value.error()));
         mod.itemDrop = std::move(*value);
@@ -365,7 +365,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
           descriptions[entry.first] = entry.second;
       }
       {
-        auto value = config->getString("description", "");
+        auto value = config->get_string("description", "");
         if (!value)
           return std::unexpected(std::move(value.error()));
         descriptions["description"] = std::move(*value);
@@ -377,12 +377,12 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
       if (!colorConfig)
         return std::unexpected(std::move(colorConfig.error()));
       {
-        auto value = jsonToColor(*colorConfig);
+        auto value = json_to_color(*colorConfig);
         if (!value)
           return std::unexpected(std::move(value.error()));
         mod.particleColor = std::move(*value);
       }
-      auto particle = config->optString("miningParticle");
+      auto particle = config->opt_string("miningParticle");
       if (!particle)
         return std::unexpected(std::move(particle.error()));
       if (*particle) {
@@ -397,25 +397,25 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
       if (!sounds)
         return std::unexpected(std::move(sounds.error()));
       if (*sounds) {
-        auto names = jsonToStringList(**sounds);
+        auto names = json_to_string_list(**sounds);
         if (!names)
           return std::unexpected(std::move(names.error()));
         for (auto const& name : *names)
           mod.miningSounds.push_back(AssetPath::relative_to(file, name));
       }
-      auto footstep = config->optString("footstepSound");
+      auto footstep = config->opt_string("footstepSound");
       if (!footstep)
         return std::unexpected(std::move(footstep.error()));
       if (*footstep)
         mod.footstepSound = AssetPath::relative_to(file, **footstep);
       {
-        auto value = config->getBool("tilled", false);
+        auto value = config->get_bool("tilled", false);
         if (!value)
           return std::unexpected(std::move(value.error()));
         mod.tilled = std::move(*value);
       }
       {
-        auto value = config->getBool("breaksWithTile", false);
+        auto value = config->get_bool("breaksWithTile", false);
         if (!value)
           return std::unexpected(std::move(value.error()));
         mod.breaksWithTile = std::move(*value);
@@ -430,7 +430,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
         auto parameters = config->get("renderParameters");
         if (!parameters)
           return std::unexpected(std::move(parameters.error()));
-        auto merged = jsonMerge(*renderTemplate, *parameters);
+        auto merged = json_merge(*renderTemplate, *parameters);
         auto profile = parseMaterialRenderProfile(imageMetadata, merged, file);
         if (!profile)
           return std::unexpected(std::move(profile.error()));
@@ -442,10 +442,10 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
       auto damage = assets->fetchJson(*damageConfig);
       if (!damage)
         return std::unexpected(std::move(damage.error()));
-      auto health = config->optFloat("health");
+      auto health = config->opt_float("health");
       if (!health)
         return std::unexpected(std::move(health.error()));
-      auto harvest = config->optUInt("harvestLevel");
+      auto harvest = config->opt_uint("harvestLevel");
       if (!harvest)
         return std::unexpected(std::move(harvest.error()));
       std::optional<unsigned> harvestLevel;
@@ -466,28 +466,28 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
         return std::unexpected(MaterialException(Star::format("Duplicate mod name '{}' found", mod.name)));
       database.setMod(mod.id, mod);
       database.m_modIndex[mod.name] = mod.id;
-      auto interactions = config->getArray("liquidInteractions", {});
+      auto interactions = config->get_array("liquidInteractions", {});
       if (!interactions)
         return std::unexpected(std::move(interactions.error()));
       for (auto const& entry : *interactions) {
-        auto liquid = entry.getUInt("liquidId");
+        auto liquid = entry.get_uint("liquidId");
         if (!liquid)
           return std::unexpected(std::move(liquid.error()));
         LiquidModInteraction interaction;
         {
-          auto value = entry.getFloat("consumeLiquid", 0.0f);
+          auto value = entry.get_float("consumeLiquid", 0.0f);
           if (!value)
             return std::unexpected(std::move(value.error()));
           interaction.consumeLiquid = std::move(*value);
         }
         {
-          auto value = entry.getUInt("transformModId", NoModId);
+          auto value = entry.get_uint("transformModId", NoModId);
           if (!value)
             return std::unexpected(std::move(value.error()));
           interaction.transformTo = std::move(*value);
         }
         {
-          auto value = entry.getBool("topOnly", false);
+          auto value = entry.get_bool("topOnly", false);
           if (!value)
             return std::unexpected(std::move(value.error()));
           interaction.topOnly = std::move(*value);
@@ -502,7 +502,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
   auto footstepConfig = assets->json("/client.config:defaultFootstepSound");
   if (!footstepConfig) return std::unexpected(assets->withAssetContext(std::move(footstepConfig.error()), "/client.config:defaultFootstepSound", "Loading default footstep sound"));
   {
-    auto value = footstepConfig->toString();
+    auto value = footstepConfig->to_string();
     if (!value) return std::unexpected(assets->withAssetContext(std::move(value.error()), "/client.config:defaultFootstepSound", "Loading default footstep sound"));
     m_defaultFootstepSound = std::move(*value);
   }
@@ -565,21 +565,21 @@ std::expected<std::optional<Json>, StarException> MaterialDatabase::materialConf
 std::expected<String, StarException> MaterialDatabase::materialDescription(MaterialId id, String const& species) const {
   auto info = getMaterialInfo(id);
   if (!info) return std::unexpected(std::move(info.error()));
-  auto description = info->get().descriptions.getString("description");
+  auto description = info->get().descriptions.get_string("description");
   if (!description) return std::unexpected(std::move(description.error()));
-  return info->get().descriptions.getString(Star::format("{}Description", species), *description);
+  return info->get().descriptions.get_string(Star::format("{}Description", species), *description);
 }
 
 std::expected<String, StarException> MaterialDatabase::materialDescription(MaterialId id) const {
   auto info = getMaterialInfo(id);
   if (!info) return std::unexpected(std::move(info.error()));
-  return info->get().descriptions.getString("description");
+  return info->get().descriptions.get_string("description");
 }
 
 std::expected<String, StarException> MaterialDatabase::materialShortDescription(MaterialId id) const {
   auto info = getMaterialInfo(id);
   if (!info) return std::unexpected(std::move(info.error()));
-  return info->get().descriptions.getString("shortdescription");
+  return info->get().descriptions.get_string("shortdescription");
 }
 
 std::expected<String, StarException> MaterialDatabase::materialCategory(MaterialId id) const {
@@ -638,21 +638,21 @@ std::expected<std::optional<Json>, StarException> MaterialDatabase::modConfig(Mo
 std::expected<String, StarException> MaterialDatabase::modDescription(ModId id, String const& species) const {
   auto info = getModInfo(id);
   if (!info) return std::unexpected(std::move(info.error()));
-  auto description = info->get().descriptions.getString("description");
+  auto description = info->get().descriptions.get_string("description");
   if (!description) return std::unexpected(std::move(description.error()));
-  return info->get().descriptions.getString(Star::format("{}Description", species), *description);
+  return info->get().descriptions.get_string(Star::format("{}Description", species), *description);
 }
 
 std::expected<String, StarException> MaterialDatabase::modDescription(ModId id) const {
   auto info = getModInfo(id);
   if (!info) return std::unexpected(std::move(info.error()));
-  return info->get().descriptions.getString("description");
+  return info->get().descriptions.get_string("description");
 }
 
 std::expected<String, StarException> MaterialDatabase::modShortDescription(ModId id) const {
   auto info = getModInfo(id);
   if (!info) return std::unexpected(std::move(info.error()));
-  return info->get().descriptions.getString("shortdescription");
+  return info->get().descriptions.get_string("shortdescription");
 }
 
 String MaterialDatabase::defaultFootstepSound() const {

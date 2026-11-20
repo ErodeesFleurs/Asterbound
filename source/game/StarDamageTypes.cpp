@@ -14,13 +14,13 @@ EntityDamageTeam::EntityDamageTeam() : type(TeamType::Null), team(0) {}
 EntityDamageTeam::EntityDamageTeam(TeamType type, TeamNumber team) : type(type), team(team) {}
 
 std::expected<EntityDamageTeam, StarException> EntityDamageTeam::create(Json const& json) {
-  auto name = json.getString("type");
+  auto name = json.get_string("type");
   if (!name)
     return std::unexpected(std::move(name.error()));
   auto type = enum_value<TeamTypeNames>(*name);
   if (!type)
     return std::unexpected(std::move(type.error()));
-  auto team = json.getUInt("team", 0);
+  auto team = json.get_uint("team", 0);
   if (!team)
     return std::unexpected(std::move(team.error()));
   return EntityDamageTeam(*type, *team);

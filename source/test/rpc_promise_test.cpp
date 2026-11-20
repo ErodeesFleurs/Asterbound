@@ -384,7 +384,7 @@ TEST(JsonRpcTest, RemoteFailureStillFulfillsNull) {
   List<Json> requests;
   ASSERT_TRUE(requestBuffer.read_container(requests));
   ASSERT_EQ(requests.size(), 1u);
-  EXPECT_EQ(requests[0].getString("handler"), "remote");
+  EXPECT_EQ(requests[0].get_string("handler"), "remote");
   auto id = requests[0].get("id");
   ASSERT_TRUE(id);
   DataStreamBuffer failBuffer;
@@ -396,7 +396,7 @@ TEST(JsonRpcTest, RemoteFailureStillFulfillsNull) {
   auto result = response->result();
   ASSERT_TRUE(result);
   ASSERT_TRUE(*result);
-  EXPECT_TRUE((*result)->isNull());
+  EXPECT_TRUE((*result)->is_null());
   auto error = response->error();
   ASSERT_TRUE(error);
   EXPECT_EQ(*error, std::optional<String>{});
@@ -875,7 +875,7 @@ TEST(RpcPromiseTest, ScopedNullAndNonDefaultPayloadsRemainCachedWithoutStatusCop
   auto null = terminal->result();
   ASSERT_TRUE(null);
   ASSERT_TRUE(*null);
-  EXPECT_TRUE((*null)->isNull());
+  EXPECT_TRUE((*null)->is_null());
 
   auto [source, keeper] = RpcPromise<Json>::make_pair();
   std::stop_source lifetime;
@@ -885,7 +885,7 @@ TEST(RpcPromiseTest, ScopedNullAndNonDefaultPayloadsRemainCachedWithoutStatusCop
   auto result = view->result();
   ASSERT_TRUE(result);
   ASSERT_TRUE(*result);
-  EXPECT_TRUE((*result)->isNull());
+  EXPECT_TRUE((*result)->is_null());
   lifetime.request_stop();
   EXPECT_EQ(view->status(), RpcPromiseStatus::Succeeded);
 

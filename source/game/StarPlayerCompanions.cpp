@@ -95,7 +95,7 @@ namespace Star {
 
 std::expected<std::shared_ptr<Companion>, StarException> Companion::create(Root& root, Json const& json) {
   auto companion = std::shared_ptr<Companion>(new Companion(json));
-  auto portrait = json.getArray("portrait", JsonArray{});
+  auto portrait = json.get_array("portrait", JsonArray{});
   if (!portrait)
     return std::unexpected(std::move(portrait.error()));
   if (portrait->empty())
@@ -117,18 +117,18 @@ Json Companion::toJson() const {
 }
 
 std::expected<Uuid, StarException> Companion::podUuid() const {
-  auto text = m_json.getString("podUuid");
+  auto text = m_json.get_string("podUuid");
   if (!text)
     return std::unexpected(std::move(text.error()));
   return Uuid::create(*text);
 }
 
 std::expected<std::optional<String>, StarException> Companion::name() const {
-  return m_json.optString("name");
+  return m_json.opt_string("name");
 }
 
 std::expected<std::optional<String>, StarException> Companion::description() const {
-  return m_json.optString("description");
+  return m_json.opt_string("description");
 }
 
 List<Drawable> Companion::portrait() const {
@@ -146,7 +146,7 @@ std::expected<std::optional<float>, StarException> Companion::statusValue(String
     return std::unexpected(std::move(values.error()));
   if (!*values)
     return std::optional<float>();
-  return (*values)->optFloat(name);
+  return (*values)->opt_float(name);
 }
 
 std::expected<std::optional<float>, StarException> Companion::resource(String const& name) const {
@@ -164,13 +164,13 @@ std::expected<std::optional<float>, StarException> Companion::stat(String const&
 PlayerCompanions::PlayerCompanions(Root& root, Json const& config) : m_root(root), m_config(config), m_scriptComponent(root) {}
 
 std::expected<void, StarException> PlayerCompanions::diskLoad(Json const& diskStore) {
-  auto storage = diskStore.getObject("scriptStorage", JsonObject{});
+  auto storage = diskStore.get_object("scriptStorage", JsonObject{});
   if (!storage)
     return std::unexpected(std::move(storage.error()));
   auto stored = m_scriptComponent.setScriptStorage(std::move(*storage));
   if (!stored)
     return std::unexpected(std::move(stored.error()));
-  auto categories = diskStore.getObject("companions", JsonObject{});
+  auto categories = diskStore.get_object("companions", JsonObject{});
   if (!categories)
     return std::unexpected(std::move(categories.error()));
   StringMap<List<std::shared_ptr<Companion>>> loaded;
@@ -216,13 +216,13 @@ std::expected<void, StarException> PlayerCompanions::init(Player& player, World&
     auto scriptsJson = m_config.get("scripts", JsonArray());
     if (!scriptsJson)
       return std::unexpected(std::move(scriptsJson.error()));
-    auto scripts = jsonToStringList(*scriptsJson);
+    auto scripts = json_to_string_list(*scriptsJson);
     if (!scripts)
       return std::unexpected(std::move(scripts.error()));
     auto installed = m_scriptComponent.setScripts(std::move(*scripts));
     if (!installed)
       return std::unexpected(std::move(installed.error()));
-    auto delta = m_config.getInt("scriptDelta", 10);
+    auto delta = m_config.get_int("scriptDelta", 10);
     if (!delta)
       return std::unexpected(std::move(delta.error()));
     m_scriptComponent.setUpdateDelta(*delta);

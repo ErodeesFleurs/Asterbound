@@ -133,31 +133,31 @@ std::expected<void, StarException> Pane::initializePane() {
   auto iconJson = (*assets)->json("/interface.config:paneIconOffset");
   if (!iconJson)
     return std::unexpected(std::move(iconJson.error()));
-  auto icon = jsonToVec2I(*iconJson);
+  auto icon = json_to_vec2i(*iconJson);
   if (!icon)
     return std::unexpected(std::move(icon.error()));
   auto titleJson = (*assets)->json("/interface.config:paneTitleOffset");
   if (!titleJson)
     return std::unexpected(std::move(titleJson.error()));
-  auto title = jsonToVec2I(*titleJson);
+  auto title = json_to_vec2i(*titleJson);
   if (!title)
     return std::unexpected(std::move(title.error()));
   auto subtitleJson = (*assets)->json("/interface.config:paneSubTitleOffset");
   if (!subtitleJson)
     return std::unexpected(std::move(subtitleJson.error()));
-  auto subtitle = jsonToVec2I(*subtitleJson);
+  auto subtitle = json_to_vec2i(*subtitleJson);
   if (!subtitle)
     return std::unexpected(std::move(subtitle.error()));
   auto titleColorJson = (*assets)->json("/interface.config:paneTitleColor");
   if (!titleColorJson)
     return std::unexpected(std::move(titleColorJson.error()));
-  auto titleColor = jsonToColor(*titleColorJson);
+  auto titleColor = json_to_color(*titleColorJson);
   if (!titleColor)
     return std::unexpected(std::move(titleColor.error()));
   auto subtitleColorJson = (*assets)->json("/interface.config:paneSubTitleColor");
   if (!subtitleColorJson)
     return std::unexpected(std::move(subtitleColorJson.error()));
-  auto subtitleColor = jsonToColor(*subtitleColorJson);
+  auto subtitleColor = json_to_color(*subtitleColorJson);
   if (!subtitleColor)
     return std::unexpected(std::move(subtitleColor.error()));
   m_textStyle = std::move(*style);

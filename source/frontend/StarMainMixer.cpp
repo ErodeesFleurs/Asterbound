@@ -49,7 +49,7 @@ std::expected<void, StarException> MainMixer::update(float dt, bool mute_sfx, bo
     auto setting = (*configuration)->get(setting_name);
     if (!setting)
       return std::unexpected(std::move(setting.error()));
-    auto raw_volume = setting->toFloat();
+    auto raw_volume = setting->to_float();
     if (!raw_volume)
       return std::unexpected(std::move(raw_volume.error()));
 
@@ -133,16 +133,16 @@ std::expected<void, StarException> MainMixer::update(float dt, bool mute_sfx, bo
     auto sfx_config = (*assets)->json("/sfx.config");
     if (!sfx_config)
       return std::unexpected(std::move(sfx_config.error()));
-    auto distance = sfx_config->getFloat("baseMaxDistance");
+    auto distance = sfx_config->get_float("baseMaxDistance");
     if (!distance) return std::unexpected(std::move(distance.error()));
     float base_max_distance = *distance;
     auto stereo_json = sfx_config->get("stereoAdjustmentRange");
     if (!stereo_json)
       return std::unexpected(std::move(stereo_json.error()));
-    auto stereo = jsonToVec2F(*stereo_json);
+    auto stereo = json_to_vec2f(*stereo_json);
     if (!stereo) return std::unexpected(std::move(stereo.error()));
     Vec2F stereo_adjustment_range = *stereo;
-    auto gamma = sfx_config->getFloat("attenuationGamma");
+    auto gamma = sfx_config->get_float("attenuationGamma");
     if (!gamma) return std::unexpected(std::move(gamma.error()));
     float inverse_attenuation_gamma = 1.0f / *gamma;
     auto player_position = m_universe_client->mainPlayer()->position();

@@ -113,7 +113,7 @@ std::expected<void, StarException> WorldPainter::initialize() {
   if (!configuration) return std::unexpected(std::move(configuration.error()));
   auto zoomJson = (*configuration)->get("zoomLevel");
   if (!zoomJson) return std::unexpected(std::move(zoomJson.error()));
-  auto zoom = zoomJson->toFloat();
+  auto zoom = zoomJson->to_float();
   if (!zoom) return std::unexpected(std::move(zoom.error()));
   m_camera.setScreenSize({800, 600});
   m_camera.setCenterWorldPosition(Vec2F());
@@ -129,16 +129,16 @@ std::expected<void, StarException> WorldPainter::initialize() {
   for (auto const& p : *entries) {
     auto type = enum_value<EntityHighlightEffectTypeNames>(p.first);
     if (!type) return std::unexpected(std::move(type.error()));
-    auto underlay = p.second.getString("underlay", "");
+    auto underlay = p.second.get_string("underlay", "");
     if (!underlay) return std::unexpected(std::move(underlay.error()));
-    auto overlay = p.second.getString("overlay", "");
+    auto overlay = p.second.get_string("overlay", "");
     if (!overlay) return std::unexpected(std::move(overlay.error()));
     m_highlightDirectives.set(*type, {Directives(*underlay), Directives(*overlay)});
   }
   auto loadVector = [this](String const& path) -> std::expected<Vec2F, StarException> {
     auto json = m_assets->json(path);
     if (!json) return std::unexpected(std::move(json.error()));
-    return jsonToVec2F(*json);
+    return json_to_vec2f(*json);
   };
   auto offset = loadVector("/rendering.config:entityBarOffset");
   if (!offset) return std::unexpected(std::move(offset.error()));
@@ -154,7 +154,7 @@ std::expected<void, StarException> WorldPainter::initialize() {
   m_entityBarIconOffset = *iconOffset;
   auto preloadJson = m_assets->json("/rendering.config:preloadTextureChance");
   if (!preloadJson) return std::unexpected(std::move(preloadJson.error()));
-  auto preload = preloadJson->toFloat();
+  auto preload = preloadJson->to_float();
   if (!preload) return std::unexpected(std::move(preload.error()));
   m_preloadTextureChance = *preload;
   return {};
@@ -206,7 +206,7 @@ std::expected<void, StarException> WorldPainter::render(WorldRenderData& renderD
   if (!configuration) return std::unexpected(std::move(configuration.error()));
   auto zoomJson = (*configuration)->get("zoomLevel");
   if (!zoomJson) return std::unexpected(std::move(zoomJson.error()));
-  auto zoom = zoomJson->toFloat();
+  auto zoom = zoomJson->to_float();
   if (!zoom) return std::unexpected(std::move(zoom.error()));
   m_camera.setTargetPixelRatio(*zoom);
   auto assets = m_root.assets();
@@ -267,7 +267,7 @@ std::expected<void, StarException> WorldPainter::render(WorldRenderData& renderD
     }
     auto multiplierJson = m_assets->json("/rendering.config:lightMapMultiplier");
     if (!multiplierJson) return std::unexpected(std::move(multiplierJson.error()));
-    auto multiplier = multiplierJson->toFloat();
+    auto multiplier = multiplierJson->to_float();
     if (!multiplier) return std::unexpected(std::move(multiplier.error()));
     if (auto result = m_renderer->setEffectParameter("lightMapMultiplier", *multiplier); !result)
       return std::unexpected(std::move(result.error()));
@@ -350,7 +350,7 @@ std::expected<void, StarException> WorldPainter::render(WorldRenderData& renderD
 
   auto timeoutJson = m_assets->json("/rendering.config:textureTimeout");
   if (!timeoutJson) return std::unexpected(std::move(timeoutJson.error()));
-  auto timeout = timeoutJson->toInt();
+  auto timeout = timeoutJson->to_int();
   if (!timeout) return std::unexpected(std::move(timeout.error()));
   std::int64_t textureTimeout = *timeout;
   m_textPainter->cleanup(textureTimeout);
@@ -367,12 +367,12 @@ std::expected<void, StarException> WorldPainter::adjustLighting(WorldRenderData&
 std::expected<void, StarException> WorldPainter::renderParticles(WorldRenderData& renderData, Particle::Layer layer) {
   auto fontSizeJson = m_assets->json("/rendering.config:textParticleFontSize");
   if (!fontSizeJson) return std::unexpected(std::move(fontSizeJson.error()));
-  auto fontSize = fontSizeJson->toInt();
+  auto fontSize = fontSizeJson->to_int();
   if (!fontSize) return std::unexpected(std::move(fontSize.error()));
   const int textParticleFontSize = *fontSize;
   auto paddingJson = m_assets->json("/rendering.config:particleRenderWindowPadding");
   if (!paddingJson) return std::unexpected(std::move(paddingJson.error()));
-  auto padding = paddingJson->toInt();
+  auto padding = paddingJson->to_int();
   if (!padding) return std::unexpected(std::move(padding.error()));
   const RectF particleRenderWindow = RectF::withSize(Vec2F(), Vec2F(m_camera.screenSize())).padded(*padding);
 
@@ -473,7 +473,7 @@ std::expected<void, StarException> WorldPainter::renderBars(WorldRenderData& ren
 }
 
 std::expected<void, StarException> WorldPainter::drawEntityLayer(List<Drawable> const& drawables, EntityHighlightEffect highlightEffect) {
-  auto maxLevel = m_highlightConfig.getFloat("maxHighlightLevel", 1.0);
+  auto maxLevel = m_highlightConfig.get_float("maxHighlightLevel", 1.0);
   if (!maxLevel) return std::unexpected(std::move(maxLevel.error()));
   highlightEffect.level *= *maxLevel;
   if (auto directives = m_highlightDirectives.find_ref(highlightEffect.type); directives && highlightEffect.level > 0) {

@@ -45,9 +45,9 @@ std::expected<void, StarException> Item::initialize(Json config, String director
   m_config = std::move(config);
   m_directory = std::move(directory);
   m_parameters = std::move(parameters);
-  if (!m_parameters.isType(Json::Type::Object))
+  if (!m_parameters.is_type(Json::Type::Object))
     return std::unexpected(ItemException("Item parameters not an object"));
-  auto name = m_config.getString("itemName");
+  auto name = m_config.get_string("itemName");
   if (!name)
     return std::unexpected(std::move(name.error()));
   m_name = std::move(*name);
@@ -58,22 +58,22 @@ std::expected<void, StarException> Item::initialize(Json config, String director
   auto defaults = (*assets)->json("/items/defaultParameters.config");
   if (!defaults)
     return std::unexpected(std::move(defaults.error()));
-  auto defaultMaxStack = defaults->get("defaultMaxStack").and_then([](Json const& value) { return value.toInt(); });
+  auto defaultMaxStack = defaults->get("defaultMaxStack").and_then([](Json const& value) { return value.to_int(); });
   if (!defaultMaxStack)
     return std::unexpected(std::move(defaultMaxStack.error()));
-  auto maxStack = instanceValue("maxStack", *defaultMaxStack).and_then([](Json const& value) { return value.toInt(); });
+  auto maxStack = instanceValue("maxStack", *defaultMaxStack).and_then([](Json const& value) { return value.to_int(); });
   if (!maxStack)
     return std::unexpected(std::move(maxStack.error()));
   m_maxStack = *maxStack;
-  auto shortDescription = instanceValue("shortdescription", "").and_then([](Json const& value) { return value.toString(); });
+  auto shortDescription = instanceValue("shortdescription", "").and_then([](Json const& value) { return value.to_string(); });
   if (!shortDescription)
     return std::unexpected(std::move(shortDescription.error()));
   m_shortDescription = std::move(*shortDescription);
-  auto description = instanceValue("description", "").and_then([](Json const& value) { return value.toString(); });
+  auto description = instanceValue("description", "").and_then([](Json const& value) { return value.to_string(); });
   if (!description)
     return std::unexpected(std::move(description.error()));
   m_description = std::move(*description);
-  auto rarity = instanceValue("rarity").and_then([](Json const& value) { return value.toString(); });
+  auto rarity = instanceValue("rarity").and_then([](Json const& value) { return value.to_string(); });
   if (!rarity)
     return std::unexpected(std::move(rarity.error()));
   auto rarityValue = enum_value<RarityNames>(*rarity);
@@ -91,7 +91,7 @@ std::expected<void, StarException> Item::initialize(Json config, String director
       if (!array)
         return std::unexpected(std::move(array.error()));
       for (auto imageConfig : *array) {
-        auto image = imageConfig.optString("image");
+        auto image = imageConfig.opt_string("image");
         if (!image)
           return std::unexpected(std::move(image.error()));
         if (*image) {
@@ -106,7 +106,7 @@ std::expected<void, StarException> Item::initialize(Json config, String director
         drawables.push_back(std::move(*drawable));
       }
     } else {
-      auto image = icon.toString();
+      auto image = icon.to_string();
       if (!image)
         return std::unexpected(std::move(image.error()));
       auto drawable = Drawable::makeImage(**metadata, AssetPath::relative_to(m_directory, *image), 1.0f, true, Vec2F());
@@ -131,7 +131,7 @@ std::expected<void, StarException> Item::initialize(Json config, String director
   auto secondaryIcon = instanceValue("secondaryIcon", Json());
   if (!secondaryIcon)
     return std::unexpected(std::move(secondaryIcon.error()));
-  if (secondaryIcon->isType(Json::Type::Array) || secondaryIcon->isType(Json::Type::String)) {
+  if (secondaryIcon->is_type(Json::Type::Array) || secondaryIcon->is_type(Json::Type::String)) {
     auto secondary = loadIcon(*secondaryIcon);
     if (!secondary)
       return std::unexpected(std::move(secondary.error()));
@@ -142,52 +142,52 @@ std::expected<void, StarException> Item::initialize(Json config, String director
     m_secondaryIconDrawables.reset();
   }
 
-  auto twoHanded = instanceValue("twoHanded", false).and_then([](Json const& value) { return value.toBool(); });
+  auto twoHanded = instanceValue("twoHanded", false).and_then([](Json const& value) { return value.to_bool(); });
   if (!twoHanded)
     return std::unexpected(std::move(twoHanded.error()));
   m_twoHanded = *twoHanded;
   auto defaultPrice = defaults->get("defaultPrice");
   if (!defaultPrice)
     return std::unexpected(std::move(defaultPrice.error()));
-  auto price = instanceValue("price", *defaultPrice).and_then([](Json const& value) { return value.toInt(); });
+  auto price = instanceValue("price", *defaultPrice).and_then([](Json const& value) { return value.to_int(); });
   if (!price)
     return std::unexpected(std::move(price.error()));
   m_price = *price;
-  auto tooltipKind = instanceValue("tooltipKind", "").and_then([](Json const& value) { return value.toString(); });
+  auto tooltipKind = instanceValue("tooltipKind", "").and_then([](Json const& value) { return value.to_string(); });
   if (!tooltipKind)
     return std::unexpected(std::move(tooltipKind.error()));
   m_tooltipKind = std::move(*tooltipKind);
   auto largeImage = instanceValue("largeImage");
   if (!largeImage)
     return std::unexpected(std::move(largeImage.error()));
-  if (!largeImage->isNull()) {
-    auto image = largeImage->toString();
+  if (!largeImage->is_null()) {
+    auto image = largeImage->to_string();
     if (!image)
       return std::unexpected(std::move(image.error()));
     m_largeImage = AssetPath::relative_to(m_directory, *image);
   }
-  auto category = instanceValue("category", "").and_then([](Json const& value) { return value.toString(); });
+  auto category = instanceValue("category", "").and_then([](Json const& value) { return value.to_string(); });
   if (!category)
     return std::unexpected(std::move(category.error()));
   m_category = std::move(*category);
-  auto pickupSounds = m_config.get("pickupSounds", JsonArray{}).and_then([](Json const& value) { return jsonToStringSet(value); });
+  auto pickupSounds = m_config.get("pickupSounds", JsonArray{}).and_then([](Json const& value) { return json_to_string_set(value); });
   if (!pickupSounds)
     return std::unexpected(std::move(pickupSounds.error()));
   m_pickupSounds = std::move(*pickupSounds);
   if (m_pickupSounds.empty()) {
-    auto sounds = defaults->get("pickupSounds").and_then([](Json const& value) { return jsonToStringSet(value); });
+    auto sounds = defaults->get("pickupSounds").and_then([](Json const& value) { return json_to_string_set(value); });
     if (!sounds)
       return std::unexpected(std::move(sounds.error()));
     m_pickupSounds = std::move(*sounds);
   }
-  auto defaultTimeToLive = defaults->get("defaultTimeToLive").and_then([](Json const& value) { return value.toFloat(); });
+  auto defaultTimeToLive = defaults->get("defaultTimeToLive").and_then([](Json const& value) { return value.to_float(); });
   if (!defaultTimeToLive)
     return std::unexpected(std::move(defaultTimeToLive.error()));
-  auto timeToLive = instanceValue("timeToLive", *defaultTimeToLive).and_then([](Json const& value) { return value.toFloat(); });
+  auto timeToLive = instanceValue("timeToLive", *defaultTimeToLive).and_then([](Json const& value) { return value.to_float(); });
   if (!timeToLive)
     return std::unexpected(std::move(timeToLive.error()));
   m_timeToLive = *timeToLive;
-  auto blueprints = instanceValue("learnBlueprintsOnPickup", JsonArray{}).and_then([](Json const& value) { return jsonToStringList(value); });
+  auto blueprints = instanceValue("learnBlueprintsOnPickup", JsonArray{}).and_then([](Json const& value) { return json_to_string_list(value); });
   if (!blueprints)
     return std::unexpected(std::move(blueprints.error()));
   for (auto const& blueprint : *blueprints) {
@@ -202,7 +202,7 @@ std::expected<void, StarException> Item::initialize(Json config, String director
   if (!collectables)
     return std::unexpected(std::move(collectables.error()));
   for (auto const& pair : *collectables) {
-    auto value = pair.second.toString();
+    auto value = pair.second.to_string();
     if (!value)
       return std::unexpected(std::move(value.error()));
     m_collectablesOnPickup[pair.first] = std::move(*value);
@@ -455,7 +455,7 @@ std::expected<List<QuestArcDescriptor>, StarException> Item::pickupQuestTemplate
 }
 
 std::expected<StringSet, StarException> Item::itemTags() const {
-  return m_config.get("itemTags", JsonArray{}).and_then([](Json const& value) { return jsonToStringSet(value); });
+  return m_config.get("itemTags", JsonArray{}).and_then([](Json const& value) { return json_to_string_set(value); });
 }
 
 std::expected<bool, StarException> Item::hasItemTag(String const& itemTag) const {
@@ -466,20 +466,20 @@ std::expected<bool, StarException> Item::hasItemTag(String const& itemTag) const
 }
 
 std::expected<Json, StarException> Item::instanceValue(String const& name, Json const& def) const {
-  return jsonMergeQueryDef(name, def, m_config, m_parameters);
+  return json_merge_query_def(name, def, m_config, m_parameters);
 }
 
 std::expected<Json, StarException> Item::instanceValueOfType(String const& name, Json::Type type, Json const& def) const {
   auto value = instanceValue(name, def);
   if (!value)
     return std::unexpected(std::move(value.error()));
-  if (value->isType(type))
+  if (value->is_type(type))
     return value;
   return def;
 }
 
 std::expected<Json, StarException> Item::instanceValues() const {
-  auto parameters = m_parameters.toObject();
+  auto parameters = m_parameters.to_object();
   if (!parameters)
     return std::unexpected(std::move(parameters.error()));
   return m_config.set_all(std::move(*parameters));

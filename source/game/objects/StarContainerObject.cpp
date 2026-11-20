@@ -126,7 +126,7 @@ std::expected<std::shared_ptr<ContainerObject>, StarException> ContainerObject::
   if (!slotConfigResult)
     return std::unexpected(std::move(slotConfigResult.error()));
   auto slotConfig = std::move(*slotConfigResult);
-  auto slotsResult = slotConfig.toInt();
+  auto slotsResult = slotConfig.to_int();
   if (!slotsResult)
     return std::unexpected(std::move(slotsResult.error()));
   auto slots = std::move(*slotsResult);
@@ -164,7 +164,7 @@ std::expected<void, StarException> ContainerObject::init(World& world, EntityId 
       if (!seedConfigResult)
         return std::unexpected(std::move(seedConfigResult.error()));
       auto seedConfig = std::move(*seedConfigResult);
-      auto seedResult = seedConfig.toUInt();
+      auto seedResult = seedConfig.to_uint();
       if (!seedResult)
         return std::unexpected(std::move(seedResult.error()));
       auto seed = std::move(*seedResult);
@@ -172,7 +172,7 @@ std::expected<void, StarException> ContainerObject::init(World& world, EntityId 
       if (!levelConfigResult)
         return std::unexpected(std::move(levelConfigResult.error()));
       auto levelConfig = std::move(*levelConfigResult);
-      auto objectLevelResult = levelConfig.toFloat();
+      auto objectLevelResult = levelConfig.to_float();
       if (!objectLevelResult)
         return std::unexpected(std::move(objectLevelResult.error()));
       auto objectLevel = std::move(*objectLevelResult);
@@ -181,7 +181,7 @@ std::expected<void, StarException> ContainerObject::init(World& world, EntityId 
       if (!adjustmentConfigResult)
         return std::unexpected(std::move(adjustmentConfigResult.error()));
       auto adjustmentConfig = std::move(*adjustmentConfigResult);
-      auto adjustmentResult = adjustmentConfig.toFloat();
+      auto adjustmentResult = adjustmentConfig.to_float();
       if (!adjustmentResult)
         return std::unexpected(std::move(adjustmentResult.error()));
       auto adjustment = std::move(*adjustmentResult);
@@ -190,7 +190,7 @@ std::expected<void, StarException> ContainerObject::init(World& world, EntityId 
       if (!initialItemsResult)
         return std::unexpected(std::move(initialItemsResult.error()));
       auto initialItems = std::move(*initialItemsResult);
-      if (!initialItems.isNull()) {
+      if (!initialItems.is_null()) {
         auto itemsConfigResult = configValue("initialItems");
         if (!itemsConfigResult)
           return std::unexpected(std::move(itemsConfigResult.error()));
@@ -221,12 +221,12 @@ std::expected<void, StarException> ContainerObject::init(World& world, EntityId 
       if (!poolConfigResult)
         return std::unexpected(std::move(poolConfigResult.error()));
       auto poolConfig = std::move(*poolConfigResult);
-      if (!poolConfig.isNull()) {
+      if (!poolConfig.is_null()) {
         auto poolsConfigResult = configValue("treasurePools");
         if (!poolsConfigResult)
           return std::unexpected(std::move(poolsConfigResult.error()));
         auto poolsConfig = std::move(*poolsConfigResult);
-        auto poolsResult = poolsConfig.toArray();
+        auto poolsResult = poolsConfig.to_array();
         if (!poolsResult)
           return std::unexpected(std::move(poolsResult.error()));
         auto pools = std::move(*poolsResult);
@@ -234,7 +234,7 @@ std::expected<void, StarException> ContainerObject::init(World& world, EntityId 
         if (!poolValueResult)
           return std::unexpected(std::move(poolValueResult.error()));
         auto poolValue = std::move(*poolValueResult);
-        auto poolResult = poolValue.toString();
+        auto poolResult = poolValue.to_string();
         if (!poolResult)
           return std::unexpected(std::move(poolResult.error()));
         auto pool = std::move(*poolResult);
@@ -294,7 +294,7 @@ std::expected<void, StarException> ContainerObject::update(float dt, std::uint64
           if (!cooldownConfigResult)
             return std::unexpected(std::move(cooldownConfigResult.error()));
           auto cooldownConfig = std::move(*cooldownConfigResult);
-          auto cooldownResult = cooldownConfig.toInt();
+          auto cooldownResult = cooldownConfig.to_int();
           if (!cooldownResult)
             return std::unexpected(std::move(cooldownResult.error()));
           auto cooldown = std::move(*cooldownResult);
@@ -307,7 +307,7 @@ std::expected<void, StarException> ContainerObject::update(float dt, std::uint64
     if (!ageConfigResult)
       return std::unexpected(std::move(ageConfigResult.error()));
     auto ageConfig = std::move(*ageConfigResult);
-    auto ageIntervalResult = ageConfig.toDouble();
+    auto ageIntervalResult = ageConfig.to_double();
     if (!ageIntervalResult)
       return std::unexpected(std::move(ageIntervalResult.error()));
     auto ageInterval = std::move(*ageIntervalResult);
@@ -316,7 +316,7 @@ std::expected<void, StarException> ContainerObject::update(float dt, std::uint64
       if (!multiplierConfigResult)
         return std::unexpected(std::move(multiplierConfigResult.error()));
       auto multiplierConfig = std::move(*multiplierConfigResult);
-      auto multiplierResult = multiplierConfig.toDouble();
+      auto multiplierResult = multiplierConfig.to_double();
       if (!multiplierResult)
         return std::unexpected(std::move(multiplierResult.error()));
       auto multiplier = std::move(*multiplierResult);
@@ -360,12 +360,12 @@ std::expected<void, StarException> ContainerObject::collectRenderEvents(RenderCa
         if (!openConfigResult)
           return std::unexpected(std::move(openConfigResult.error()));
         auto openConfig = std::move(*openConfigResult);
-        if (!openConfig.isNull()) {
+        if (!openConfig.is_null()) {
           auto soundsConfigResult = configValue("openSounds");
           if (!soundsConfigResult)
             return std::unexpected(std::move(soundsConfigResult.error()));
           auto soundsConfig = std::move(*soundsConfigResult);
-          auto soundsResult = soundsConfig.toArray();
+          auto soundsResult = soundsConfig.to_array();
           if (!soundsResult)
             return std::unexpected(std::move(soundsResult.error()));
           auto sounds = std::move(*soundsResult);
@@ -373,7 +373,7 @@ std::expected<void, StarException> ContainerObject::collectRenderEvents(RenderCa
           if (!soundValueResult)
             return std::unexpected(std::move(soundValueResult.error()));
           auto soundValue = std::move(*soundValueResult);
-          auto soundNameResult = soundValue.toString();
+          auto soundNameResult = soundValue.to_string();
           if (!soundNameResult)
             return std::unexpected(std::move(soundNameResult.error()));
           auto soundName = std::move(*soundNameResult);
@@ -396,7 +396,7 @@ std::expected<void, StarException> ContainerObject::collectRenderEvents(RenderCa
       if (!openFrameConfigResult)
         return std::unexpected(std::move(openFrameConfigResult.error()));
       auto openFrameConfig = std::move(*openFrameConfigResult);
-      auto openFrameResult = openFrameConfig.toInt();
+      auto openFrameResult = openFrameConfig.to_int();
       if (!openFrameResult)
         return std::unexpected(std::move(openFrameResult.error()));
       auto openFrame = std::move(*openFrameResult);
@@ -405,12 +405,12 @@ std::expected<void, StarException> ContainerObject::collectRenderEvents(RenderCa
         if (!closeConfigResult)
           return std::unexpected(std::move(closeConfigResult.error()));
         auto closeConfig = std::move(*closeConfigResult);
-        if (!closeConfig.isNull()) {
+        if (!closeConfig.is_null()) {
           auto soundsConfigResult = configValue("closeSounds");
           if (!soundsConfigResult)
             return std::unexpected(std::move(soundsConfigResult.error()));
           auto soundsConfig = std::move(*soundsConfigResult);
-          auto soundsResult = soundsConfig.toArray();
+          auto soundsResult = soundsConfig.to_array();
           if (!soundsResult)
             return std::unexpected(std::move(soundsResult.error()));
           auto sounds = std::move(*soundsResult);
@@ -418,7 +418,7 @@ std::expected<void, StarException> ContainerObject::collectRenderEvents(RenderCa
           if (!soundValueResult)
             return std::unexpected(std::move(soundValueResult.error()));
           auto soundValue = std::move(*soundValueResult);
-          auto soundNameResult = soundValue.toString();
+          auto soundNameResult = soundValue.to_string();
           if (!soundNameResult)
             return std::unexpected(std::move(soundNameResult.error()));
           auto soundName = std::move(*soundNameResult);
@@ -445,7 +445,7 @@ std::expected<void, StarException> ContainerObject::collectRenderEvents(RenderCa
       if (!frameConfigResult)
         return std::unexpected(std::move(frameConfigResult.error()));
       auto frameConfig = std::move(*frameConfigResult);
-      auto cooldownResult = frameConfig.toInt();
+      auto cooldownResult = frameConfig.to_int();
       if (!cooldownResult)
         return std::unexpected(std::move(cooldownResult.error()));
       auto cooldown = std::move(*cooldownResult);
@@ -542,7 +542,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
     if (!slotArgResult)
       return std::unexpected(std::move(slotArgResult.error()));
     auto slotArg = std::move(*slotArgResult);
-    auto slotResult = slotArg.get().toUInt();
+    auto slotResult = slotArg.get().to_uint();
     if (!slotResult)
       return std::unexpected(std::move(slotResult.error()));
     auto slot = std::move(*slotResult);
@@ -569,7 +569,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
     if (!slotArgResult)
       return std::unexpected(std::move(slotArgResult.error()));
     auto slotArg = std::move(*slotArgResult);
-    auto slotResult = slotArg.get().toUInt();
+    auto slotResult = slotArg.get().to_uint();
     if (!slotResult)
       return std::unexpected(std::move(slotResult.error()));
     auto slot = std::move(*slotResult);
@@ -577,7 +577,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
     if (!countArgResult)
       return std::unexpected(std::move(countArgResult.error()));
     auto countArg = std::move(*countArgResult);
-    auto countResult = countArg.get().toUInt();
+    auto countResult = countArg.get().to_uint();
     if (!countResult)
       return std::unexpected(std::move(countResult.error()));
     auto count = std::move(*countResult);
@@ -596,7 +596,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
     if (!slotArgResult)
       return std::unexpected(std::move(slotArgResult.error()));
     auto slotArg = std::move(*slotArgResult);
-    auto slotResult = slotArg.get().toUInt();
+    auto slotResult = slotArg.get().to_uint();
     if (!slotResult)
       return std::unexpected(std::move(slotResult.error()));
     auto slot = std::move(*slotResult);
@@ -609,7 +609,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
       return std::unexpected(std::move(itemResult.error()));
     auto item = std::move(*itemResult);
     auto combineArg = args.get(2);
-    auto combineResult = combineArg.optBool();
+    auto combineResult = combineArg.opt_bool();
     if (!combineResult)
       return std::unexpected(std::move(combineResult.error()));
     auto combine = std::move(*combineResult);
@@ -628,7 +628,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
     if (!slotArgResult)
       return std::unexpected(std::move(slotArgResult.error()));
     auto slotArg = std::move(*slotArgResult);
-    auto slotResult = slotArg.get().toUInt();
+    auto slotResult = slotArg.get().to_uint();
     if (!slotResult)
       return std::unexpected(std::move(slotResult.error()));
     auto slot = std::move(*slotResult);
@@ -674,7 +674,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
     if (!slotArgResult)
       return std::unexpected(std::move(slotArgResult.error()));
     auto slotArg = std::move(*slotArgResult);
-    auto slotResult = slotArg.get().toUInt();
+    auto slotResult = slotArg.get().to_uint();
     if (!slotResult)
       return std::unexpected(std::move(slotResult.error()));
     auto slot = std::move(*slotResult);
@@ -682,7 +682,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Contai
     if (!countArgResult)
       return std::unexpected(std::move(countArgResult.error()));
     auto countArg = std::move(*countArgResult);
-    auto countResult = countArg.get().toUInt();
+    auto countResult = countArg.get().to_uint();
     if (!countResult)
       return std::unexpected(std::move(countResult.error()));
     auto count = std::move(*countResult);
@@ -722,7 +722,7 @@ std::expected<Json, StarException> ContainerObject::containerGuiConfig() const {
   if (!configResult)
     return std::unexpected(std::move(configResult.error()));
   auto config = std::move(*configResult);
-  auto pathResult = config.toString();
+  auto pathResult = config.to_string();
   if (!pathResult)
     return std::unexpected(std::move(pathResult.error()));
   auto path = std::move(*pathResult);
@@ -746,7 +746,7 @@ std::expected<String, StarException> ContainerObject::containerSubTitle() const 
   if (!categoriesResult)
     return std::unexpected(std::move(categoriesResult.error()));
   auto categories = std::move(*categoriesResult);
-  return categories.getString(Object::category(), Object::category());
+  return categories.get_string(Object::category(), Object::category());
 }
 
 std::expected<ItemDescriptor, StarException> ContainerObject::iconItem() const {
@@ -754,7 +754,7 @@ std::expected<ItemDescriptor, StarException> ContainerObject::iconItem() const {
   if (!configResult)
     return std::unexpected(std::move(configResult.error()));
   auto config = std::move(*configResult);
-  auto hasIconResult = config.toBool();
+  auto hasIconResult = config.to_bool();
   if (!hasIconResult)
     return std::unexpected(std::move(hasIconResult.error()));
   auto hasIcon = std::move(*hasIconResult);
@@ -777,7 +777,7 @@ std::expected<void, StarException> ContainerObject::containerOpen() {
   if (!frameConfigResult)
     return std::unexpected(std::move(frameConfigResult.error()));
   auto frameConfig = std::move(*frameConfigResult);
-  auto frameResult = frameConfig.toInt();
+  auto frameResult = frameConfig.to_int();
   if (!frameResult)
     return std::unexpected(std::move(frameResult.error()));
   auto frame = std::move(*frameResult);
@@ -787,7 +787,7 @@ std::expected<void, StarException> ContainerObject::containerOpen() {
   if (!cooldownConfigResult)
     return std::unexpected(std::move(cooldownConfigResult.error()));
   auto cooldownConfig = std::move(*cooldownConfigResult);
-  auto cooldownResult = cooldownConfig.toInt();
+  auto cooldownResult = cooldownConfig.to_int();
   if (!cooldownResult)
     return std::unexpected(std::move(cooldownResult.error()));
   auto cooldown = std::move(*cooldownResult);
@@ -959,7 +959,7 @@ std::expected<RpcPromise<bool>, StarException> ContainerObject::consumeItems(Ite
     if (!promiseResult)
       return std::unexpected(std::move(promiseResult.error()));
     auto promise = std::move(*promiseResult);
-    return promise.wrap([](Json res) { return res.toBool(); });
+    return promise.wrap([](Json res) { return res.to_bool(); });
   }
   auto resultResult = doConsumeItems(descriptor);
   if (!resultResult)
@@ -978,7 +978,7 @@ std::expected<RpcPromise<bool>, StarException> ContainerObject::consumeItems(std
     if (!promiseResult)
       return std::unexpected(std::move(promiseResult.error()));
     auto promise = std::move(*promiseResult);
-    return promise.wrap([](Json res) { return res.toBool(); });
+    return promise.wrap([](Json res) { return res.to_bool(); });
   }
   auto resultResult = doConsumeItems(pos, count);
   if (!resultResult)
@@ -1002,7 +1002,7 @@ std::expected<RpcPromise<List<std::shared_ptr<Item>>>, StarException> ContainerO
   if (!databaseResult)
     return std::unexpected(std::move(databaseResult.error()));
   auto database = std::move(*databaseResult);
-  auto entriesResult = res.toArray();
+  auto entriesResult = res.to_array();
   if (!entriesResult)
     return std::unexpected(std::move(entriesResult.error()));
   auto entries = std::move(*entriesResult);
@@ -1102,7 +1102,7 @@ std::expected<void, StarException> ContainerObject::burnContainerContents() {
     if (!fuelConfigResult)
       return std::unexpected(std::move(fuelConfigResult.error()));
     auto fuelConfig = std::move(*fuelConfigResult);
-    auto levelResult = fuelConfig.toUInt();
+    auto levelResult = fuelConfig.to_uint();
     if (!levelResult)
       return std::unexpected(std::move(levelResult.error()));
     auto level = std::move(*levelResult);
@@ -1110,7 +1110,7 @@ std::expected<void, StarException> ContainerObject::burnContainerContents() {
     if (!maxConfigResult)
       return std::unexpected(std::move(maxConfigResult.error()));
     auto maxConfig = std::move(*maxConfigResult);
-    auto maxLevelResult = maxConfig.toUInt();
+    auto maxLevelResult = maxConfig.to_uint();
     if (!maxLevelResult)
       return std::unexpected(std::move(maxLevelResult.error()));
     auto maxLevel = std::move(*maxLevelResult);
@@ -1125,7 +1125,7 @@ std::expected<void, StarException> ContainerObject::burnContainerContents() {
         if (!itemFuelConfigResult)
           return std::unexpected(std::move(itemFuelConfigResult.error()));
         auto itemFuelConfig = std::move(*itemFuelConfigResult);
-        auto fuelSingleResult = itemFuelConfig.toUInt();
+        auto fuelSingleResult = itemFuelConfig.to_uint();
         if (!fuelSingleResult)
           return std::unexpected(std::move(fuelSingleResult.error()));
         auto fuelSingle = std::move(*fuelSingleResult);
@@ -1180,27 +1180,27 @@ std::expected<void, StarException> ContainerObject::readStoredData(Json const& d
   auto operation1 = Object::readStoredData(diskStore);
   if (!operation1)
     return std::unexpected(std::move(operation1.error()));
-  auto openedResult = diskStore.getInt("opened");
+  auto openedResult = diskStore.get_int("opened");
   if (!openedResult)
     return std::unexpected(std::move(openedResult.error()));
   auto opened = std::move(*openedResult);
   m_opened.set(opened);
-  auto currentStateResult = diskStore.getInt("currentState");
+  auto currentStateResult = diskStore.get_int("currentState");
   if (!currentStateResult)
     return std::unexpected(std::move(currentStateResult.error()));
   auto currentState = std::move(*currentStateResult);
   m_currentState = currentState;
-  auto craftingResult = diskStore.getBool("crafting");
+  auto craftingResult = diskStore.get_bool("crafting");
   if (!craftingResult)
     return std::unexpected(std::move(craftingResult.error()));
   auto crafting = std::move(*craftingResult);
   m_crafting.set(crafting);
-  auto progressResult = diskStore.getFloat("craftingProgress");
+  auto progressResult = diskStore.get_float("craftingProgress");
   if (!progressResult)
     return std::unexpected(std::move(progressResult.error()));
   auto progress = std::move(*progressResult);
   m_craftingProgress.set(progress);
-  auto initializedResult = diskStore.getBool("initialized");
+  auto initializedResult = diskStore.get_bool("initialized");
   if (!initializedResult)
     return std::unexpected(std::move(initializedResult.error()));
   auto initialized = std::move(*initializedResult);
@@ -1227,7 +1227,7 @@ std::expected<void, StarException> ContainerObject::readStoredData(Json const& d
   if (!slotsConfigResult)
     return std::unexpected(std::move(slotsConfigResult.error()));
   auto slotsConfig = std::move(*slotsConfigResult);
-  auto slotsResult = slotsConfig.toUInt();
+  auto slotsResult = slotsConfig.to_uint();
   if (!slotsResult)
     return std::unexpected(std::move(slotsResult.error()));
   auto slots = std::move(*slotsResult);
@@ -1266,8 +1266,8 @@ std::expected<ItemRecipe, StarException> ContainerObject::recipeForMaterials(Lis
   if (!recipeGroupResult)
     return std::unexpected(std::move(recipeGroupResult.error()));
   auto recipeGroup = std::move(*recipeGroupResult);
-  if (!recipeGroup.isNull()) {
-    auto groupResult = recipeGroup.toString();
+  if (!recipeGroup.is_null()) {
+    auto groupResult = recipeGroup.to_string();
     if (!groupResult)
       return std::unexpected(std::move(groupResult.error()));
     auto group = std::move(*groupResult);
@@ -1283,7 +1283,7 @@ std::expected<ItemRecipe, StarException> ContainerObject::recipeForMaterials(Lis
   if (!resultResult)
     return std::unexpected(std::move(resultResult.error()));
   auto result = std::move(*resultResult);
-  if (!result || result->isNull())
+  if (!result || result->is_null())
     return ItemRecipe();
   return database->parseRecipe(*result);
 }

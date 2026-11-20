@@ -51,7 +51,7 @@ const GameTestRegistration weatherNoParallax("WeatherTest", "NoParallax", [](Gam
   ASSERT_TRUE(stored);
   auto parallax = stored->get("parallax");
   ASSERT_TRUE(parallax);
-  EXPECT_TRUE(parallax->isNull());
+  EXPECT_TRUE(parallax->is_null());
   auto roundTrip = WeatherType::create(fixture.root(), *stored);
   ASSERT_TRUE(roundTrip);
   EXPECT_FALSE(roundTrip->parallax);

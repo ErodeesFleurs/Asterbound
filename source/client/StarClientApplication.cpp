@@ -389,10 +389,10 @@ ClientApplication::~ClientApplication() {
 }
 
 std::expected<void, StarException> ClientApplication::startup(StringList const& cmdLineArgs) {
-  auto assetsSettings = Json::parseJson(AdditionalAssetsSettings);
+  auto assetsSettings = Json::parse_json(AdditionalAssetsSettings);
   if (!assetsSettings)
     return std::unexpected(std::move(assetsSettings.error()));
-  auto defaults = Json::parseJson(AdditionalDefaultConfiguration);
+  auto defaults = Json::parse_json(AdditionalDefaultConfiguration);
   if (!defaults)
     return std::unexpected(std::move(defaults.error()));
   auto loader = RootLoader::create({std::move(*assetsSettings), std::move(*defaults), String("starbound.log"), LogLevel::Info, false, String("starbound.config")});
@@ -478,27 +478,27 @@ std::expected<void, StarException> ClientApplication::applicationInit(std::share
   if (!configResult)
     return std::unexpected(std::move(configResult.error()));
   auto configuration = *configResult;
-  auto windowedSize = configuration->get("windowedResolution").and_then([](Json j) { return jsonToVec2U(j); });
+  auto windowedSize = configuration->get("windowedResolution").and_then([](Json j) { return json_to_vec2u(j); });
   if (!windowedSize)
     return std::unexpected(std::move(windowedSize.error()));
-  auto fullscreenSize = configuration->get("fullscreenResolution").and_then([](Json j) { return jsonToVec2U(j); });
+  auto fullscreenSize = configuration->get("fullscreenResolution").and_then([](Json j) { return json_to_vec2u(j); });
   if (!fullscreenSize)
     return std::unexpected(std::move(fullscreenSize.error()));
-  auto fullscreen = configuration->get("fullscreen").and_then([](Json j) { return j.toBool(); });
+  auto fullscreen = configuration->get("fullscreen").and_then([](Json j) { return j.to_bool(); });
   if (!fullscreen)
     return std::unexpected(std::move(fullscreen.error()));
-  auto borderless = configuration->get("borderless").and_then([](Json j) { return j.toBool(); });
+  auto borderless = configuration->get("borderless").and_then([](Json j) { return j.to_bool(); });
   if (!borderless)
     return std::unexpected(std::move(borderless.error()));
-  auto maximized = configuration->get("maximized").and_then([](Json j) { return j.toBool(); });
+  auto maximized = configuration->get("maximized").and_then([](Json j) { return j.to_bool(); });
   if (!maximized)
     return std::unexpected(std::move(maximized.error()));
-  auto controller = configuration->get("controllerInput").and_then([](Json j) { return j.optBool(); });
+  auto controller = configuration->get("controllerInput").and_then([](Json j) { return j.opt_bool(); });
   if (!controller)
     return std::unexpected(std::move(controller.error()));
   m_controllerInput = controller->value_or(false);
   #ifdef STAR_SYSTEM_WINDOWS
-  auto workaround = configuration->get("borderlessWorkaround", true).and_then([](Json j) { return j.toBool(); });
+  auto workaround = configuration->get("borderlessWorkaround", true).and_then([](Json j) { return j.to_bool(); });
   if (!workaround)
     return std::unexpected(std::move(workaround.error()));
   appController->setBorderlessWorkaround(*workaround);
@@ -521,7 +521,7 @@ std::expected<void, StarException> ClientApplication::applicationInit(std::share
   if (!jUpdateRate)
     return std::unexpected(std::move(jUpdateRate.error()));
   if (*jUpdateRate) {
-    auto rate = jUpdateRate->toFloat();
+    auto rate = jUpdateRate->to_float();
     if (!rate)
       return std::unexpected(std::move(rate.error()));
     if (!is_finite(*rate) || *rate <= 0.0f)
@@ -533,7 +533,7 @@ std::expected<void, StarException> ClientApplication::applicationInit(std::share
   if (!jServerRate)
     return std::unexpected(std::move(jServerRate.error()));
   if (*jServerRate) {
-    auto rate = jServerRate->toFloat();
+    auto rate = jServerRate->to_float();
     if (!rate)
       return std::unexpected(std::move(rate.error()));
     if (!is_finite(*rate) || *rate <= 0.0f)
@@ -543,7 +543,7 @@ std::expected<void, StarException> ClientApplication::applicationInit(std::share
   appController->setTargetUpdateRate(updateRate);
   if (auto applied = applyRenderSettings(*configuration); !applied)
     return std::unexpected(std::move(applied.error()));
-  auto hardware = configuration->get("hardwareCursor").and_then([](Json j) { return j.optBool(); });
+  auto hardware = configuration->get("hardwareCursor").and_then([](Json j) { return j.opt_bool(); });
   if (!hardware)
     return std::unexpected(std::move(hardware.error()));
   appController->setCursorHardware(hardware->value_or(true));
@@ -590,23 +590,23 @@ std::expected<void, StarException> ClientApplication::applicationInit(std::share
     io.Fonts->AddFontFromMemoryTTF(m_immediateFont.data(), m_immediateFont.size(),
       16, &config, io.Fonts->GetGlyphRangesDefault());
   }
-  auto minScale = assets->json("/interface.config:minInterfaceScale").and_then([](Json j) { return j.toFloat(); });
+  auto minScale = assets->json("/interface.config:minInterfaceScale").and_then([](Json j) { return j.to_float(); });
   if (!minScale)
     return std::unexpected(std::move(minScale.error()));
   m_minInterfaceScale = *minScale;
-  auto maxScale = assets->json("/interface.config:maxInterfaceScale").and_then([](Json j) { return j.toFloat(); });
+  auto maxScale = assets->json("/interface.config:maxInterfaceScale").and_then([](Json j) { return j.to_float(); });
   if (!maxScale)
     return std::unexpected(std::move(maxScale.error()));
   m_maxInterfaceScale = *maxScale;
-  auto crossover = assets->json("/interface.config:interfaceCrossoverRes").and_then([](Json j) { return jsonToVec2F(j); });
+  auto crossover = assets->json("/interface.config:interfaceCrossoverRes").and_then([](Json j) { return json_to_vec2f(j); });
   if (!crossover)
     return std::unexpected(std::move(crossover.error()));
   m_crossoverRes = *crossover;
-  auto title = assets->json("/client.config:windowTitle").and_then([](Json j) { return j.toString(); });
+  auto title = assets->json("/client.config:windowTitle").and_then([](Json j) { return j.to_string(); });
   if (!title)
     return std::unexpected(std::move(title.error()));
   appController->setApplicationTitle(*title);
-  auto frameSkip = assets->json("/client.config:maxFrameSkip").and_then([](Json j) { return j.toUInt(); });
+  auto frameSkip = assets->json("/client.config:maxFrameSkip").and_then([](Json j) { return j.to_uint(); });
   if (!frameSkip)
     return std::unexpected(std::move(frameSkip.error()));
   appController->setMaxFrameSkip(*frameSkip);
@@ -642,12 +642,12 @@ std::expected<void, StarException> ClientApplication::renderInit(std::shared_ptr
   m_appliedOutputSettings.reset();
   if (auto applied = applyRenderSettings(*config); !applied)
     return std::unexpected(std::move(applied.error()));
-  auto limit = config->get("limitTextureAtlasSize").and_then([](Json j) { return j.optBool(); });
+  auto limit = config->get("limitTextureAtlasSize").and_then([](Json j) { return j.opt_bool(); });
   if (!limit)
     return std::unexpected(std::move(limit.error()));
   if (limit->value_or(false))
     renderer->setSizeLimitEnabled(true);
-  auto multi = config->get("useMultiTexturing").and_then([](Json j) { return j.optBool(); });
+  auto multi = config->get("useMultiTexturing").and_then([](Json j) { return j.opt_bool(); });
   if (!multi)
     return std::unexpected(std::move(multi.error()));
   renderer->setMultiTexturingEnabled(multi->value_or(true));
@@ -676,7 +676,7 @@ std::expected<void, StarException> ClientApplication::renderInit(std::shared_ptr
   #ifdef STAR_ENABLE_STEAM_INTEGRATION
   #ifdef STAR_SYSTEM_LINUX
   if (appController()->steamIsFlatpak()) {
-    auto shown = config->get("steamFlatpakWarningShown").and_then([](Json j) { return j.optBool(); });
+    auto shown = config->get("steamFlatpakWarningShown").and_then([](Json j) { return j.opt_bool(); });
     if (!shown)
       return std::unexpected(std::move(shown.error()));
     if (!shown->value_or(false)) {
@@ -684,7 +684,7 @@ std::expected<void, StarException> ClientApplication::renderInit(std::shared_ptr
       if (!saved)
         return std::unexpected(std::move(saved.error()));
       auto message = m_root->assets().and_then([](auto assets) { return assets->json("/interface.config:steamFlatpakWarning"); })
-          .and_then([](Json j) { return j.toString(); });
+          .and_then([](Json j) { return j.to_string(); });
       if (!message)
         return std::unexpected(std::move(message.error()));
       auto displayed = m_errorScreen->setMessage(*message);
@@ -704,7 +704,7 @@ std::expected<void, StarException> ClientApplication::windowChanged(WindowMode w
     return std::unexpected(std::move(configResult.error()));
   auto config = *configResult;
   if (windowMode == WindowMode::Fullscreen) {
-    if (auto saved = config->set("fullscreenResolution", jsonFromVec2U(screenSize)); !saved)
+    if (auto saved = config->set("fullscreenResolution", json_from_vec2u(screenSize)); !saved)
       return std::unexpected(std::move(saved.error()));
     if (auto saved = config->set("fullscreen", true); !saved)
       return std::unexpected(std::move(saved.error()));
@@ -729,7 +729,7 @@ std::expected<void, StarException> ClientApplication::windowChanged(WindowMode w
       return std::unexpected(std::move(saved.error()));
     if (auto saved = config->set("borderless", false); !saved)
       return std::unexpected(std::move(saved.error()));
-    if (auto saved = config->set("windowedResolution", jsonFromVec2U(screenSize)); !saved)
+    if (auto saved = config->set("windowedResolution", json_from_vec2u(screenSize)); !saved)
       return std::unexpected(std::move(saved.error()));
   }
   return {};
@@ -951,12 +951,12 @@ std::expected<void, StarException> ClientApplication::applyRenderSettings(Config
       return std::unexpected(std::move(applied.error()));
     m_appliedOutputSettings = *output;
   }
-  auto limit = configuration.get("renderFpsLimit").and_then([](Json value) { return value.toDouble(); });
+  auto limit = configuration.get("renderFpsLimit").and_then([](Json value) { return value.to_double(); });
   if (!limit)
     return std::unexpected(std::move(limit.error()));
   if (!is_finite(*limit) || *limit < 0.0 || *limit > std::numeric_limits<float>::max())
     return std::unexpected(StarException("renderFpsLimit must be finite, nonnegative and representable as a float"));
-  auto vsync = configuration.get("vsync").and_then([](Json value) { return value.toBool(); });
+  auto vsync = configuration.get("vsync").and_then([](Json value) { return value.to_bool(); });
   if (!vsync)
     return std::unexpected(std::move(vsync.error()));
   if (m_appliedVSync != *vsync) {
@@ -981,13 +981,13 @@ std::expected<void, StarException> ClientApplication::render() {
   auto config = *configResult;
   auto& renderer = Application::renderer();
 
-  auto aa = config->get("antiAliasing").and_then([](Json j) { return j.optBool(); });
+  auto aa = config->get("antiAliasing").and_then([](Json j) { return j.opt_bool(); });
   if (!aa)
     return std::unexpected(std::move(aa.error()));
   auto sampling = renderer->setMultiSampling(aa->value_or(false) ? 4 : 0);
   if (!sampling)
     return std::unexpected(std::move(sampling.error()));
-  auto hdr = config->get("hdr").and_then([](Json j) { return j.optBool(); });
+  auto hdr = config->get("hdr").and_then([](Json j) { return j.opt_bool(); });
   if (!hdr)
     return std::unexpected(std::move(hdr.error()));
   auto mainHdr = renderer->setMainHDR(hdr->value_or(true));
@@ -996,7 +996,7 @@ std::expected<void, StarException> ClientApplication::render() {
   auto effect = renderer->switchEffectConfig("interface");
   if (!effect)
     return std::unexpected(std::move(effect.error()));
-  auto scale = config->get("interfaceScale").and_then([](Json j) { return j.optFloat(); });
+  auto scale = config->get("interfaceScale").and_then([](Json j) { return j.opt_float(); });
   if (!scale)
     return std::unexpected(std::move(scale.error()));
   if (scale->value_or(0.0f) != 0) {
@@ -1157,7 +1157,7 @@ std::expected<void, StarException> ClientApplication::renderReload() {
     if (!config)
       return std::unexpected(std::move(config.error()));
     auto sourceFor = [&](Json const& value) -> std::expected<String, StarException> {
-      auto shader = value.toString();
+      auto shader = value.to_string();
       if (!shader) return std::unexpected(std::move(shader.error()));
       auto multiline = shader->has_char('\n');
       if (!multiline) return std::unexpected(std::move(multiline.error()));
@@ -1170,13 +1170,13 @@ std::expected<void, StarException> ClientApplication::renderReload() {
     };
     bool vulkan = renderer->rendererId() == "Vulkan";
     if (vulkan) {
-      auto guards = config->getObject("vulkanLegacySourceGuard", {});
+      auto guards = config->get_object("vulkanLegacySourceGuard", {});
       if (!guards) return std::unexpected(std::move(guards.error()));
       if (!guards->empty()) {
-        auto legacy = config->getObject("effectShaders");
+        auto legacy = config->get_object("effectShaders");
         if (!legacy) return std::unexpected(std::move(legacy.error()));
         for (auto const& [stage, expectedValue] : *guards) {
-          auto expected = expectedValue.toString();
+          auto expected = expectedValue.to_string();
           if (!expected) return std::unexpected(std::move(expected.error()));
           auto entry = legacy->find_ref(stage);
           if (!entry)
@@ -1189,7 +1189,7 @@ std::expected<void, StarException> ClientApplication::renderReload() {
         }
       }
     }
-    auto shaderConfig = vulkan ? config->getObject("effectShadersVulkan") : config->getObject("effectShaders");
+    auto shaderConfig = vulkan ? config->get_object("effectShadersVulkan") : config->get_object("effectShaders");
     if (!shaderConfig) {
       if (vulkan)
         return std::unexpected(RendererException::format("Effect '{}' has no effectShadersVulkan; use -renderer opengl or provide explicit Vulkan vertex/fragment shaders", name));
@@ -1197,7 +1197,7 @@ std::expected<void, StarException> ClientApplication::renderReload() {
     }
     StringMap<String> shaders;
     for (auto const& [stage, value] : *shaderConfig) {
-      if (!value.isType(Json::Type::String)) continue;
+      if (!value.is_type(Json::Type::String)) continue;
       auto shader = sourceFor(value);
       if (!shader) return std::unexpected(std::move(shader.error()));
       shaders[stage] = std::move(*shader);
@@ -1220,25 +1220,25 @@ std::expected<void, StarException> ClientApplication::renderReload() {
   auto groupsConfig = config->get(postProcessGroupsRoot);
   if (!groupsConfig)
     return std::unexpected(std::move(groupsConfig.error()));
-  if (!groupsConfig->isType(Json::Type::Object)) {
+  if (!groupsConfig->is_type(Json::Type::Object)) {
     auto saved = config->set(postProcessGroupsRoot, JsonObject());
     if (!saved)
       return std::unexpected(std::move(saved.error()));
     *groupsConfig = JsonObject();
   }
   m_postProcessGroups.clear();
-  auto groups = assets->json("/client.config:postProcessGroups").and_then([](Json j) { return j.toObject(); });
+  auto groups = assets->json("/client.config:postProcessGroups").and_then([](Json j) { return j.to_object(); });
   if (!groups)
     return std::unexpected(std::move(groups.error()));
   for (auto&& [name, definition] : *groups) {
     auto groupConfig = groupsConfig->opt(name);
     if (!groupConfig)
       return std::unexpected(std::move(groupConfig.error()));
-    auto enabled = definition.getBool("enabledDefault", true);
+    auto enabled = definition.get_bool("enabledDefault", true);
     if (!enabled)
       return std::unexpected(std::move(enabled.error()));
     if (*groupConfig) {
-      enabled = (**groupConfig).getBool("enabled", *enabled);
+      enabled = (**groupConfig).get_bool("enabled", *enabled);
       if (!enabled)
         return std::unexpected(std::move(enabled.error()));
     } else {
@@ -1256,7 +1256,7 @@ std::expected<void, StarException> ClientApplication::renderReload() {
   if (!layers)
     return std::unexpected(std::move(layers.error()));
   for (auto const& layer : *layers) {
-    auto effects = layer.get("effects").and_then(jsonToStringList);
+    auto effects = layer.get("effects").and_then(json_to_string_list);
     if (!effects)
       return std::unexpected(std::move(effects.error()));
     for (auto& effect : *effects) {
@@ -1265,7 +1265,7 @@ std::expected<void, StarException> ClientApplication::renderReload() {
         return std::unexpected(std::move(loadedEffect.error()));
     }
     std::optional<std::reference_wrapper<PostProcessGroup>> group;
-    auto groupName = layer.optString("group");
+    auto groupName = layer.opt_string("group");
     if (!groupName)
       return std::unexpected(std::move(groupName.error()));
     if (*groupName) {
@@ -1274,7 +1274,7 @@ std::expected<void, StarException> ClientApplication::renderReload() {
         return std::unexpected(std::move(found.error()));
       group = *found;
     }
-    auto label = layer.optString("name");
+    auto label = layer.opt_string("name");
     if (!label)
       return std::unexpected(std::move(label.error()));
     if (*label) {
@@ -1282,7 +1282,7 @@ std::expected<void, StarException> ClientApplication::renderReload() {
       if (!added)
         return std::unexpected(std::move(added.error()));
     }
-    auto passes = layer.getUInt("passes", 1);
+    auto passes = layer.get_uint("passes", 1);
     if (!passes)
       return std::unexpected(std::move(passes.error()));
     m_postProcessLayers.push_back(
@@ -1477,7 +1477,7 @@ std::expected<void, StarException> ClientApplication::prepareTitleServices() {
     return std::unexpected(std::move(alwaysAllow.error()));
   bool allowClipboard = false;
   if (*alwaysAllow) {
-    auto allowed = alwaysAllow->toBool();
+    auto allowed = alwaysAllow->to_bool();
     if (!allowed)
       return std::unexpected(std::move(allowed.error()));
     allowClipboard = *allowed;
@@ -1486,7 +1486,7 @@ std::expected<void, StarException> ClientApplication::prepareTitleServices() {
         "clipboard", LuaBindings::makeClipboardCallbacks(*m_input, *m_root, m_root->logger(), app, allowClipboard));
       !installed)
     return installed;
-  auto httpEnabled = (*config)->getPath("safe.luaHttp.enabled").and_then([](Json j) { return j.optBool(); });
+  auto httpEnabled = (*config)->getPath("safe.luaHttp.enabled").and_then([](Json j) { return j.opt_bool(); });
   if (!httpEnabled)
     return std::unexpected(std::move(httpEnabled.error()));
   if (auto installed =
@@ -1542,10 +1542,10 @@ std::expected<void, StarException> ClientApplication::prepareTitleForm() {
   if (m_pendingMultiPlayerConnection
       && std::holds_alternative<P2PNetworkingPeerId>(m_pendingMultiPlayerConnection->server))
     return m_titleScreen->goToMultiPlayerSelectCharacter(true);
-  auto address = (*config)->getPath("title.multiPlayerAddress").and_then([](Json j) { return j.toString(); });
+  auto address = (*config)->getPath("title.multiPlayerAddress").and_then([](Json j) { return j.to_string(); });
   if (!address)
     return std::unexpected(std::move(address.error()));
-  auto port = (*config)->getPath("title.multiPlayerPort").and_then([](Json j) { return j.toString(); });
+  auto port = (*config)->getPath("title.multiPlayerPort").and_then([](Json j) { return j.to_string(); });
   if (!port)
     return std::unexpected(std::move(port.error()));
   if (m_pendingMultiPlayerConnection) {
@@ -1557,12 +1557,12 @@ std::expected<void, StarException> ClientApplication::prepareTitleForm() {
     return updated;
   if (auto updated = m_titleScreen->setMultiPlayerPort(*port); !updated)
     return updated;
-  auto account = (*config)->getPath("title.multiPlayerAccount").and_then([](Json j) { return j.toString(); });
+  auto account = (*config)->getPath("title.multiPlayerAccount").and_then([](Json j) { return j.to_string(); });
   if (!account)
     return std::unexpected(std::move(account.error()));
   if (auto updated = m_titleScreen->setMultiPlayerAccount(*account); !updated)
     return updated;
-  auto legacy = (*config)->getPath("title.multiPlayerForceLegacy").and_then([](Json j) { return j.optBool(); });
+  auto legacy = (*config)->getPath("title.multiPlayerForceLegacy").and_then([](Json j) { return j.opt_bool(); });
   if (!legacy)
     return std::unexpected(std::move(legacy.error()));
   if (auto updated = m_titleScreen->setMultiPlayerForceLegacy(legacy->value_or(false)); !updated)
@@ -1582,7 +1582,7 @@ std::expected<void, StarException> ClientApplication::startSession(MainAppState 
   auto assets = m_root->assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto loading = (*assets)->json("/client.config:loadingCinematic").and_then([](Json j) { return j.toString(); });
+  auto loading = (*assets)->json("/client.config:loadingCinematic").and_then([](Json j) { return j.to_string(); });
   if (!loading)
     return std::unexpected(std::move(loading.error()));
   auto cinematic = (*assets)->json(*loading);
@@ -1591,7 +1591,7 @@ std::expected<void, StarException> ClientApplication::startSession(MainAppState 
   if (auto loaded = m_cinematicOverlay->load(*cinematic); !loaded)
     return loaded;
   if (!m_player->log()->introComplete()) {
-    auto intro = (*assets)->json("/client.config:introCinematic").and_then([](Json j) { return j.toString(); });
+    auto intro = (*assets)->json("/client.config:introCinematic").and_then([](Json j) { return j.to_string(); });
     if (!intro)
       return std::unexpected(std::move(intro.error()));
     if (auto pending =
@@ -1671,7 +1671,7 @@ std::expected<bool, StarException> ClientApplication::connectMultiPlayer() {
     return false;
   auto mismatch = m_root->configuration()
                     .and_then([](auto config) { return config->get("allowAssetsMismatch"); })
-                    .and_then([](Json json) { return json.toBool(); });
+                    .and_then([](Json json) { return json.to_bool(); });
   if (!mismatch)
     return std::unexpected(std::move(mismatch.error()));
   auto connected = m_universeClient->connect(UniverseConnection(std::move(packetSocket)), *mismatch, pending->account,
@@ -1792,7 +1792,7 @@ std::expected<void, StarException> ClientApplication::setError(String const& err
 std::expected<void, StarException> ClientApplication::loadMods() {
   auto service = appController()->userGeneratedContentService();
   auto include = m_root->configuration().and_then([&](auto config) { return config->get("includeUGC", m_root->settings().includeUGC); })
-      .and_then([](Json j) { return j.toBool(); });
+      .and_then([](Json j) { return j.to_bool(); });
   if (!include)
     return std::unexpected(std::move(include.error()));
   if (!service || !*include)
@@ -1838,7 +1838,7 @@ std::expected<void, StarException> ClientApplication::updateMods(float dt) {
   auto config = m_root->configuration();
   if (!config)
     return std::unexpected(std::move(config.error()));
-  auto include = (*config)->get("includeUGC", m_root->settings().includeUGC).and_then([](Json j) { return j.toBool(); });
+  auto include = (*config)->get("includeUGC", m_root->settings().includeUGC).and_then([](Json j) { return j.to_bool(); });
   if (!include)
     return std::unexpected(std::move(include.error()));
   if (!service || !*include)
@@ -1896,14 +1896,14 @@ std::expected<void, StarException> ClientApplication::updateMods(float dt) {
   auto assets = m_root->assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto shown = (*config)->get("modsWarningShown").and_then([](Json j) { return j.optBool(); });
+  auto shown = (*config)->get("modsWarningShown").and_then([](Json j) { return j.opt_bool(); });
   if (!shown)
     return std::unexpected(std::move(shown.error()));
   if (shown->value_or(false))
     return changeState(MainAppState::Splash);
   if (auto saved = (*config)->set("modsWarningShown", true); !saved)
     return std::unexpected(std::move(saved.error()));
-  auto message = (*assets)->json("/interface.config:modsWarningMessage").and_then([](Json j) { return j.toString(); });
+  auto message = (*assets)->json("/interface.config:modsWarningMessage").and_then([](Json j) { return j.to_string(); });
   if (!message)
     return std::unexpected(std::move(message.error()));
   if (auto displayed = m_errorScreen->setMessage(*message); !displayed)
@@ -2006,7 +2006,7 @@ std::expected<void, StarException> ClientApplication::updateTitle(float dt) {
       if (!config)
         return std::unexpected(std::move(config.error()));
       if (port_text->empty()) {
-        auto default_port = (*config)->get("gameServerPort").and_then([](Json j) { return j.toUInt(); });
+        auto default_port = (*config)->get("gameServerPort").and_then([](Json j) { return j.to_uint(); });
         if (!default_port)
           return std::unexpected(std::move(default_port.error()));
         *port_text = Star::to_string(*default_port);
@@ -2046,10 +2046,10 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
     if (!configResult)
       return std::unexpected(std::move(configResult.error()));
     auto config = *configResult;
-    auto clientIPJoinable = config->get("clientIPJoinable").and_then([](Json j) { return j.toBool(); });
+    auto clientIPJoinable = config->get("clientIPJoinable").and_then([](Json j) { return j.to_bool(); });
     if (!clientIPJoinable)
       return std::unexpected(std::move(clientIPJoinable.error()));
-    auto clientP2PJoinable = config->get("clientP2PJoinable").and_then([](Json j) { return j.toBool(); });
+    auto clientP2PJoinable = config->get("clientP2PJoinable").and_then([](Json j) { return j.to_bool(); });
     if (!clientP2PJoinable)
       return std::unexpected(std::move(clientP2PJoinable.error()));
     std::optional<std::pair<std::uint16_t, std::uint16_t>> party = std::make_pair(m_universeClient->players(), m_universeClient->maxPlayers());
@@ -2116,13 +2116,13 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
       auto activityDetails = config->getPath("discord.activityDetails");
       if (!activityDetails)
         return std::unexpected(std::move(activityDetails.error()));
-      if (activityDetails->isType(Json::Type::Array)) {
+      if (activityDetails->is_type(Json::Type::Array)) {
         auto details = activityDetails->iterate_array();
         if (!details)
           return std::unexpected(std::move(details.error()));
         StringList detailsList;
         for (auto& detail : *details) {
-          auto tag = detail.toString();
+          auto tag = detail.to_string();
           if (!tag)
             return std::unexpected(std::move(tag.error()));
           auto text = getActivityDetail(*tag);
@@ -2131,8 +2131,8 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
           detailsList.push_back(std::move(*text));
         }
         finalDetails = detailsList.join("\n");
-      } else if (activityDetails->isType(Json::Type::String)) {
-        auto text = activityDetails->toString();
+      } else if (activityDetails->is_type(Json::Type::String)) {
+        auto text = activityDetails->to_string();
         if (!text)
           return std::unexpected(std::move(text.error()));
         auto details = text->lookup_tags(getActivityDetail);
@@ -2238,7 +2238,7 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
     if (m_cameraZoomDirection != 0) {
       const float threshold = 0.01f;
       bool goingIn = m_cameraZoomDirection == 1;
-      auto zoom = config->get("zoomLevel").and_then([](Json j) { return j.toFloat(); });
+      auto zoom = config->get("zoomLevel").and_then([](Json j) { return j.to_float(); });
       if (!zoom)
         return std::unexpected(std::move(zoom.error()));
       float curZoom = *zoom,
@@ -2456,7 +2456,7 @@ std::expected<void, StarException> ClientApplication::updateCamera(float dt) {
   camera.beginUpdate();
   camera.setScreenSize(Application::renderer()->screenSize());
   auto zoom = m_root->configuration().and_then([](auto config) { return config->get("zoomLevel"); })
-      .and_then([](Json value) { return value.toFloat(); });
+      .and_then([](Json value) { return value.to_float(); });
   if (!zoom)
     return std::unexpected(std::move(zoom.error()));
   camera.setTargetPixelRatio(*zoom);
@@ -2476,7 +2476,7 @@ std::expected<void, StarException> ClientApplication::updateCamera(float dt) {
   const float deadzone = 0.1f;
   const float panFactor = 1.5f;
   auto speed = m_root->configuration().and_then([](auto config) { return config->get("cameraSpeedFactor"); })
-      .and_then([](Json j) { return j.toFloat(); });
+      .and_then([](Json j) { return j.to_float(); });
   if (!speed)
     return std::unexpected(std::move(speed.error()));
   float cameraSpeedFactor = 30.0f / *speed;
@@ -2520,11 +2520,11 @@ std::expected<void, StarException> ClientApplication::updateCamera(float dt) {
 
   auto baseCamera = newCameraPosition;
 
-  auto smoothRadius = assets->json("/interface.config:cameraSmoothRadius").and_then([](Json j) { return j.toFloat(); });
+  auto smoothRadius = assets->json("/interface.config:cameraSmoothRadius").and_then([](Json j) { return j.to_float(); });
   if (!smoothRadius)
     return std::unexpected(std::move(smoothRadius.error()));
   const float cameraSmoothRadius = *smoothRadius;
-  auto smoothFactor = assets->json("/interface.config:cameraSmoothFactor").and_then([](Json j) { return j.toFloat(); });
+  auto smoothFactor = assets->json("/interface.config:cameraSmoothFactor").and_then([](Json j) { return j.to_float(); });
   if (!smoothFactor)
     return std::unexpected(std::move(smoothFactor.error()));
   const float cameraSmoothFactor = *smoothFactor;
@@ -2537,7 +2537,7 @@ std::expected<void, StarException> ClientApplication::updateCamera(float dt) {
   }
 
   auto cameraDelta = m_universeClient->worldClient()->geometry().diff(m_cameraPositionSmoother, newCameraPosition);
-  auto deadzoneValue = assets->json("/interface.config:cameraSmoothDeadzone").and_then([](Json j) { return j.toFloat(); });
+  auto deadzoneValue = assets->json("/interface.config:cameraSmoothDeadzone").and_then([](Json j) { return j.to_float(); });
   if (!deadzoneValue)
     return std::unexpected(std::move(deadzoneValue.error()));
   if (cameraDelta.magnitude() > *deadzoneValue)

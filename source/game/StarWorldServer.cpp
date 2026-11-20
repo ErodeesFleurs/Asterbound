@@ -448,15 +448,15 @@ std::expected<void, StarException> WorldServer::initLua(UniverseServer& universe
   auto result8 = assets->json("/worldserver.config:scriptContexts");
   if (!result8)
     return std::unexpected(std::move(result8.error()));
-  auto result9 = std::move(*result8).toObject();
+  auto result9 = std::move(*result8).to_object();
   if (!result9)
     return std::unexpected(std::move(result9.error()));
   for (auto&& p : std::move(*result9)) {
     auto scriptComponent = std::make_shared<ScriptComponent>(this->root());
-    auto result10 = p.second.toArray();
+    auto result10 = p.second.to_array();
     if (!result10)
       return std::unexpected(std::move(result10.error()));
-    auto result11 = jsonToStringList(std::move(*result10));
+    auto result11 = json_to_string_list(std::move(*result10));
     if (!result11)
       return std::unexpected(std::move(result11.error()));
     auto result12 = scriptComponent->setScripts(std::move(*result11));
@@ -675,7 +675,7 @@ std::expected<bool, StarException> WorldServer::addClient(ConnectionId clientId,
       playerStart = m_playerStart;
     }
   }
-  auto result43 = m_serverConfig.getInt("playerStartInitialGenRadius");
+  auto result43 = m_serverConfig.get_int("playerStartInitialGenRadius");
   if (!result43)
     return std::unexpected(std::move(result43.error()));
   RectF spawnRegion = RectF(playerStart, playerStart).padded(std::move(*result43));
@@ -730,7 +730,7 @@ std::expected<bool, StarException> WorldServer::addClient(ConnectionId clientId,
     return std::unexpected(std::move(result52.error()));
   auto& templateData = worldStartPacket->templateData = std::move(*result52);
   // this makes it possible to use custom InstanceWorlds without clients having the mod that adds their dungeon:
-  auto result53 = templateData.optQueryString("worldParameters.primaryDungeon");
+  auto result53 = templateData.opt_query_string("worldParameters.primaryDungeon");
   if (!result53)
     return std::unexpected(std::move(result53.error()));
   bool condition57 = static_cast<bool>(std::move(*result53));
@@ -741,7 +741,7 @@ std::expected<bool, StarException> WorldServer::addClient(ConnectionId clientId,
     auto result55 = std::move(*result54)->getPath("compatibility.customDungeonWorld");
     if (!result55)
       return std::unexpected(std::move(result55.error()));
-    auto result56 = std::move(*result55).optBool();
+    auto result56 = std::move(*result55).opt_bool();
     if (!result56)
       return std::unexpected(std::move(result56.error()));
     condition57 = static_cast<bool>(std::move(*result56).value_or(false));
@@ -1253,11 +1253,11 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       if (entityMessagePacket->message == "playCinematic" && !entityMessagePacket->args.empty()) {
         Json const& cinematicArg = entityMessagePacket->args[0];
         bool valid = false;
-        if (cinematicArg.isType(Json::Type::Object)) {
+        if (cinematicArg.is_type(Json::Type::Object)) {
           // Inline cinematic definition - accept as-is.
           valid = true;
-        } else if (cinematicArg.isType(Json::Type::String)) {
-          auto result118 = cinematicArg.toString();
+        } else if (cinematicArg.is_type(Json::Type::String)) {
+          auto result118 = cinematicArg.to_string();
           if (!result118)
             return std::unexpected(std::move(result118.error()));
           auto exists = assetPathExists(*result118);
@@ -1269,14 +1269,14 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
           }
           valid = *exists;
           if (!valid) {
-            auto result119 = cinematicArg.toString();
+            auto result119 = cinematicArg.to_string();
             if (!result119)
               return std::unexpected(std::move(result119.error()));
             auto result120 = rejectMessage(Star::format("invalid cinematic asset path '{}'", std::move(*result119)));
             if (!result120)
               return std::unexpected(std::move(result120.error()));
           }
-        } else if (!cinematicArg.isNull()) {
+        } else if (!cinematicArg.is_null()) {
           auto result121 = rejectMessage(
             Star::format("non-string/non-object cinematic argument of type {}", static_cast<int>(cinematicArg.type())));
           if (!result121)
@@ -1287,14 +1287,14 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       } else if (entityMessagePacket->message == "playAltMusic" && !entityMessagePacket->args.empty()) {
         Json const& tracksArg = entityMessagePacket->args[0];
         bool valid = true;
-        if (tracksArg.canConvert(Json::Type::Array)) {
-          auto result123 = tracksArg.toArray();
+        if (tracksArg.can_convert(Json::Type::Array)) {
+          auto result123 = tracksArg.to_array();
           if (!result123)
             return std::unexpected(std::move(result123.error()));
           for (auto const& trackJson : std::move(*result123)) {
-            bool condition125 = static_cast<bool>(!trackJson.isType(Json::Type::String));
+            bool condition125 = static_cast<bool>(!trackJson.is_type(Json::Type::String));
             if (!condition125) {
-              auto result124 = trackJson.toString();
+              auto result124 = trackJson.to_string();
               if (!result124)
                 return std::unexpected(std::move(result124.error()));
               auto exists = assetPathExists(*result124);
@@ -1309,7 +1309,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
             }
             if (condition125) {
               valid = false;
-              auto result126 = trackJson.toString();
+              auto result126 = trackJson.to_string();
               if (!result126)
                 return std::unexpected(std::move(result126.error()));
               auto result127 = rejectMessage(Star::format("invalid music asset path '{}'", std::move(*result126)));
@@ -1318,8 +1318,8 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
               break;
             }
           }
-        } else if (tracksArg.isType(Json::Type::String)) {
-          auto result128 = tracksArg.toString();
+        } else if (tracksArg.is_type(Json::Type::String)) {
+          auto result128 = tracksArg.to_string();
           if (!result128)
             return std::unexpected(std::move(result128.error()));
           auto exists = assetPathExists(*result128);
@@ -1331,7 +1331,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
           }
           if (!*exists) {
             valid = false;
-            auto result129 = tracksArg.toString();
+            auto result129 = tracksArg.to_string();
             if (!result129)
               return std::unexpected(std::move(result129.error()));
             auto result130 = rejectMessage(Star::format("invalid music asset path '{}'", std::move(*result129)));
@@ -1350,8 +1350,8 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       } else if (entityMessagePacket->message == "warp" && !entityMessagePacket->args.empty()) {
         Json const& warpArg = entityMessagePacket->args[0];
         bool valid = false;
-        if (warpArg.isType(Json::Type::String)) {
-          auto warpString = warpArg.toString();
+        if (warpArg.is_type(Json::Type::String)) {
+          auto warpString = warpArg.to_string();
           if (!warpString)
             return std::unexpected(std::move(warpString.error()));
           auto warpAction = parseWarpAction(*warpString);
@@ -1459,7 +1459,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
     } else if (auto updateWorldProperties = as<UpdateWorldPropertiesPacket>(packet)) {
       // Kae: Properties set to null (nil from Lua) should be erased instead of lingering around
       for (auto&& pair : updateWorldProperties->updatedProperties) {
-        if (pair.second.isNull())
+        if (pair.second.is_null())
           m_worldProperties.erase(pair.first); else {
           m_worldProperties[pair.first] = pair.second;
         }
@@ -1834,7 +1834,7 @@ std::expected<void, StarException> WorldServer::update(float dt) {
         auto result191 = m_serverConfig.get("playerActiveRegionPad");
         if (!result191)
           return std::unexpected(std::move(result191.error()));
-        auto result192 = jsonToVec2I(std::move(*result191));
+        auto result192 = json_to_vec2i(std::move(*result191));
         if (!result192)
           return std::unexpected(std::move(result192.error()));
         activeRegionPad = std::move(*result192);
@@ -2310,7 +2310,7 @@ std::expected<TileDamageResult, StarException> WorldServer::damageTiles(List<Vec
               if (!result240)
                 return std::unexpected(std::move(result240.error()));
               auto result241 = sendEntityMessage(*sourceEntity, "tileEntityBroken", {
-                                jsonFromVec2I(pos),
+                                json_from_vec2i(pos),
                                 result240->get(),
                                 json_from_optional(name),
                               });
@@ -2357,7 +2357,7 @@ std::expected<TileDamageResult, StarException> WorldServer::damageTiles(List<Vec
                 return std::unexpected(std::move(result246.error()));
               auto result247 = sendEntityMessage(*sourceEntity, "tileBroken",
                                                  {
-                                                   jsonFromVec2I(pos),
+                                                   json_from_vec2i(pos),
                                                    String(*result246),
                                                    tile->get().foreground,
                                                    tile->get().dungeonId,
@@ -2389,7 +2389,7 @@ std::expected<TileDamageResult, StarException> WorldServer::damageTiles(List<Vec
               return std::unexpected(std::move(result250.error()));
             auto result251 = sendEntityMessage(*sourceEntity, "tileBroken",
                                                {
-                                                 jsonFromVec2I(pos),
+                                                 json_from_vec2i(pos),
                                                  String(*result250),
                                                  tile->get().background,
                                                  tile->get().dungeonId,
@@ -2438,7 +2438,7 @@ std::expected<ItemDescriptor, StarException> WorldServer::collectLiquid(List<Vec
   auto result255 = std::move(*result254)->json("/items/defaultParameters.config:liquidItems.bucketSize");
   if (!result255)
     return std::unexpected(std::move(result255.error()));
-  auto result256 = std::move(*result255).toFloat();
+  auto result256 = std::move(*result255).to_float();
   if (!result256)
     return std::unexpected(std::move(result256.error()));
   float bucketSize = std::move(*result256);
@@ -2885,10 +2885,10 @@ std::expected<void, StarException> WorldServer::init(bool firstTime) {
   if (!result306)
     return std::unexpected(std::move(result306.error()));
   m_luaRoot = std::move(*result306);
-  auto result307 = m_serverConfig.getFloat("luaGcPause");
+  auto result307 = m_serverConfig.get_float("luaGcPause");
   if (!result307)
     return std::unexpected(std::move(result307.error()));
-  auto result308 = m_serverConfig.getFloat("luaGcStepMultiplier");
+  auto result308 = m_serverConfig.get_float("luaGcStepMultiplier");
   if (!result308)
     return std::unexpected(std::move(result308.error()));
   m_luaRoot->tuneAutoGarbageCollection(std::move(*result307), std::move(*result308));
@@ -2915,11 +2915,11 @@ std::expected<void, StarException> WorldServer::init(bool firstTime) {
   auto result312 = m_serverConfig.query("interpolationSettings.normal");
   if (!result312)
     return std::unexpected(std::move(result312.error()));
-  auto result313 = std::move(*result312).getFloat("entityUpdateDelta");
+  auto result313 = std::move(*result312).get_float("entityUpdateDelta");
   if (!result313)
     return std::unexpected(std::move(result313.error()));
   m_entityUpdateTimer = GameTimer(std::move(*result313) / 60.f);
-  auto result314 = m_serverConfig.getFloat("tileEntityBreakCheckInterval");
+  auto result314 = m_serverConfig.get_float("tileEntityBreakCheckInterval");
   if (!result314)
     return std::unexpected(std::move(result314.error()));
   m_tileEntityBreakCheckTimer = GameTimer(std::move(*result314));
@@ -2970,7 +2970,7 @@ std::expected<void, StarException> WorldServer::init(bool firstTime) {
       auto result321 = world.root().logger().info("Placing dungeon {}", dungeon.dungeon);
       if (!result321)
         return std::unexpected(std::move(result321.error()));
-      auto result322 = world.m_serverConfig.getInt("spawnDungeonRetries");
+      auto result322 = world.m_serverConfig.get_int("spawnDungeonRetries");
       if (!result322)
         return std::unexpected(std::move(result322.error()));
       int retryCounter = std::move(*result322);
@@ -3031,7 +3031,7 @@ std::expected<void, StarException> WorldServer::init(bool firstTime) {
     world.m_playerStart = std::move(*result328);
   }
 
-  auto result329 = world.m_serverConfig.getInt("playerStartInitialGenRadius");
+  auto result329 = world.m_serverConfig.get_int("playerStartInitialGenRadius");
   if (!result329)
     return std::unexpected(std::move(result329.error()));
   auto result330 = world.generateRegion(RectI::integral(RectF(world.m_playerStart, world.m_playerStart)).padded(std::move(*result329)));
@@ -3059,7 +3059,7 @@ std::expected<std::optional<unsigned>, StarException> WorldServer::shouldRunThis
     auto configured = m_fidelityConfig.get(names[index]);
     if (!configured)
       return std::unexpected(std::move(configured.error()));
-    auto timing = jsonToVec2U(*configured);
+    auto timing = json_to_vec2u(*configured);
     if (!timing)
       return std::unexpected(std::move(timing.error()));
     cached = std::move(*timing);
@@ -3075,7 +3075,7 @@ std::expected<std::optional<std::uint64_t>, StarException> WorldServer::processi
   if (!cached) {
     static constexpr std::array<std::string_view, static_cast<std::size_t>(ProcessingLimit::Count)> names{
         "liquidEngineBackgroundProcessingLimit", "worldStorageGenerationLevelLimit"};
-    auto configured = m_fidelityConfig.optUInt(names[index]);
+    auto configured = m_fidelityConfig.opt_uint(names[index]);
     if (!configured)
       return std::unexpected(std::move(configured.error()));
     cached.emplace(std::move(*configured));
@@ -4258,14 +4258,14 @@ std::expected<bool, StarException> WorldServer::exposedToWeather(Vec2F const& po
     auto result452 = assets->json("/weather.config:weatherRayCheckDistance");
     if (!result452)
       return std::unexpected(std::move(result452.error()));
-    auto result453 = std::move(*result452).toFloat();
+    auto result453 = std::move(*result452).to_float();
     if (!result453)
       return std::unexpected(std::move(result453.error()));
     float weatherRayCheckDistance = std::move(*result453);
     auto result454 = assets->json("/weather.config:weatherRayCheckWindInfluence");
     if (!result454)
       return std::unexpected(std::move(result454.error()));
-    auto result455 = std::move(*result454).toFloat();
+    auto result455 = std::move(*result454).to_float();
     if (!result455)
       return std::unexpected(std::move(result455.error()));
     float weatherRayCheckWindInfluence = std::move(*result455);
@@ -4311,9 +4311,9 @@ std::expected<void, StarException> WorldServer::setProperty(String const& proper
   // Kae: Properties set to null (nil from Lua) should be erased instead of lingering around
   auto entry = m_worldProperties.find(propertyName);
   bool missing = entry == m_worldProperties.end();
-  if (missing ? !property.isNull() : property != entry->second) {
+  if (missing ? !property.is_null() : property != entry->second) {
     if (missing)
-      m_worldProperties.emplace(propertyName, property); else if (property.isNull())
+      m_worldProperties.emplace(propertyName, property); else if (property.is_null())
       m_worldProperties.erase(entry); else {
       entry->second = property;
     }
@@ -4441,15 +4441,15 @@ std::expected<Vec2F, StarException> WorldServer::findPlayerStart(std::optional<V
   auto result465 = m_serverConfig.get("playerStartRegionSize");
   if (!result465)
     return std::unexpected(std::move(result465.error()));
-  auto result466 = jsonToVec2F(std::move(*result465));
+  auto result466 = json_to_vec2f(std::move(*result465));
   if (!result466)
     return std::unexpected(std::move(result466.error()));
   Vec2F spawnRectSize = std::move(*result466);
-  auto result467 = m_serverConfig.getInt("playerStartRegionMaximumVerticalSearch");
+  auto result467 = m_serverConfig.get_int("playerStartRegionMaximumVerticalSearch");
   if (!result467)
     return std::unexpected(std::move(result467.error()));
   auto maximumVerticalSearch = std::move(*result467);
-  auto result468 = m_serverConfig.getInt("playerStartRegionMaximumTries");
+  auto result468 = m_serverConfig.get_int("playerStartRegionMaximumTries");
   if (!result468)
     return std::unexpected(std::move(result468.error()));
   auto maximumTries = std::move(*result468);
@@ -4529,15 +4529,15 @@ std::expected<Vec2F, StarException> WorldServer::findPlayerSpaceStart(float targ
   auto result477 = m_serverConfig.get("playerSpaceStartRegionSize");
   if (!result477)
     return std::unexpected(std::move(result477.error()));
-  auto result478 = jsonToVec2F(std::move(*result477));
+  auto result478 = json_to_vec2f(std::move(*result477));
   if (!result478)
     return std::unexpected(std::move(result478.error()));
   Vec2F testRectSize = std::move(*result478);
-  auto result479 = m_serverConfig.getFloat("playerSpaceStartDistanceIncrement");
+  auto result479 = m_serverConfig.get_float("playerSpaceStartDistanceIncrement");
   if (!result479)
     return std::unexpected(std::move(result479.error()));
   auto distanceIncrement = std::move(*result479);
-  auto result480 = m_serverConfig.getInt("playerSpaceStartMaximumTries");
+  auto result480 = m_serverConfig.get_int("playerSpaceStartMaximumTries");
   if (!result480)
     return std::unexpected(std::move(result480.error()));
   auto maximumTries = std::move(*result480);
@@ -4583,15 +4583,15 @@ std::expected<void, StarException> WorldServer::readMetadata() {
   auto result487 = metadata.get("playerStart");
   if (!result487)
     return std::unexpected(std::move(result487.error()));
-  auto result488 = jsonToVec2F(std::move(*result487));
+  auto result488 = json_to_vec2f(std::move(*result487));
   if (!result488)
     return std::unexpected(std::move(result488.error()));
   m_playerStart = std::move(*result488);
-  auto result489 = metadata.getBool("respawnInWorld");
+  auto result489 = metadata.get_bool("respawnInWorld");
   if (!result489)
     return std::unexpected(std::move(result489.error()));
   m_respawnInWorld = std::move(*result489);
-  auto result490 = metadata.getBool("adjustPlayerStart");
+  auto result490 = metadata.get_bool("adjustPlayerStart");
   if (!result490)
     return std::unexpected(std::move(result490.error()));
   m_adjustPlayerStart = std::move(*result490);
@@ -4612,42 +4612,42 @@ std::expected<void, StarException> WorldServer::readMetadata() {
   auto result494 = metadata.get("protectedDungeonIds");
   if (!result494)
     return std::unexpected(std::move(result494.error()));
-  auto result495 = jsonToSet<StableHashSet<DungeonId>>(std::move(*result494), std::mem_fn(&Json::toUInt));
+  auto result495 = json_to_set<StableHashSet<DungeonId>>(std::move(*result494), std::mem_fn(&Json::to_uint));
   if (!result495)
     return std::unexpected(std::move(result495.error()));
   m_protectedDungeonIds = std::move(*result495);
-  auto result496 = metadata.getObject("worldProperties");
+  auto result496 = metadata.get_object("worldProperties");
   if (!result496)
     return std::unexpected(std::move(result496.error()));
   m_worldProperties = std::move(*result496);
-  auto result497 = metadata.getBool("spawningEnabled");
+  auto result497 = metadata.get_bool("spawningEnabled");
   if (!result497)
     return std::unexpected(std::move(result497.error()));
   m_spawner->setActive(std::move(*result497));
 
   m_dungeonIdGravity.clear();
-  auto result498 = metadata.getArray("dungeonIdGravity");
+  auto result498 = metadata.get_array("dungeonIdGravity");
   if (!result498)
     return std::unexpected(std::move(result498.error()));
   for (auto const& p : std::move(*result498)) {
-    auto result499 = p.getInt(0);
+    auto result499 = p.get_int(0);
     if (!result499)
       return std::unexpected(std::move(result499.error()));
-    auto result500 = p.getFloat(1);
+    auto result500 = p.get_float(1);
     if (!result500)
       return std::unexpected(std::move(result500.error()));
     m_dungeonIdGravity.set(std::move(*result499), std::move(*result500));
   }
 
   m_dungeonIdBreathable.clear();
-  auto result501 = metadata.getArray("dungeonIdBreathable");
+  auto result501 = metadata.get_array("dungeonIdBreathable");
   if (!result501)
     return std::unexpected(std::move(result501.error()));
   for (auto const& p : std::move(*result501)) {
-    auto result502 = p.getInt(0);
+    auto result502 = p.get_int(0);
     if (!result502)
       return std::unexpected(std::move(result502.error()));
-    auto result503 = p.getBool(1);
+    auto result503 = p.get_bool(1);
     if (!result503)
       return std::unexpected(std::move(result503.error()));
     m_dungeonIdBreathable.set(std::move(*result502), std::move(*result503));
@@ -4667,11 +4667,11 @@ std::expected<void, StarException> WorldServer::writeMetadata() {
   auto result506 = m_centralStructure.store();
   if (!result506)
     return std::unexpected(std::move(result506.error()));
-  auto result507 = jsonFromSet(m_protectedDungeonIds);
+  auto result507 = json_from_set(m_protectedDungeonIds);
   if (!result507)
     return std::unexpected(std::move(result507.error()));
   Json metadata = JsonObject{
-    {"playerStart", jsonFromVec2F(m_playerStart)},
+    {"playerStart", json_from_vec2f(m_playerStart)},
     {"respawnInWorld", m_respawnInWorld},
     {"adjustPlayerStart", m_adjustPlayerStart},
     {"worldTemplate", std::move(*result505)},
@@ -4793,15 +4793,15 @@ std::expected<void, StarException> WorldServer::setupForceRegions() {
   bool addTopRegion = forceRegionType == WorldEdgeForceRegionType::Top || forceRegionType == WorldEdgeForceRegionType::TopAndBottom;
   bool addBottomRegion = forceRegionType == WorldEdgeForceRegionType::Bottom || forceRegionType == WorldEdgeForceRegionType::TopAndBottom;
 
-  auto result514 = m_serverConfig.getFloat("worldEdgeForceRegionHeight");
+  auto result514 = m_serverConfig.get_float("worldEdgeForceRegionHeight");
   if (!result514)
     return std::unexpected(std::move(result514.error()));
   auto regionHeight = std::move(*result514);
-  auto result515 = m_serverConfig.getFloat("worldEdgeForceRegionForce");
+  auto result515 = m_serverConfig.get_float("worldEdgeForceRegionForce");
   if (!result515)
     return std::unexpected(std::move(result515.error()));
   auto regionForce = std::move(*result515);
-  auto result516 = m_serverConfig.getFloat("worldEdgeForceRegionVelocity");
+  auto result516 = m_serverConfig.get_float("worldEdgeForceRegionVelocity");
   if (!result516)
     return std::unexpected(std::move(result516.error()));
   auto regionVelocity = std::move(*result516);

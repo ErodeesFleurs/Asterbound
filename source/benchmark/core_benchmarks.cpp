@@ -1383,7 +1383,7 @@ void BM_JsonSerialize(benchmark::State& state) {
     state.SkipWithError("JSON fixture serialization failed");
     return;
   }
-  auto parsed = Json::parseJson(*reference);
+  auto parsed = Json::parse_json(*reference);
   if (!parsed || *parsed != document) {
     state.SkipWithError("JSON serialization did not round-trip the deterministic fixture");
     return;

@@ -55,10 +55,10 @@ std::expected<std::optional<Json>, StarException> repairTileset(Json tileset, St
     return std::unexpected(std::move(external.error()));
   if (*external)
     return std::optional<Json>{};
-  auto firstGid = tileset.getUInt("firstgid");
+  auto firstGid = tileset.get_uint("firstgid");
   if (!firstGid)
     return std::unexpected(std::move(firstGid.error()));
-  auto tilesetName = tileset.getString("name");
+  auto tilesetName = tileset.get_string("name");
   if (!tilesetName)
     return std::unexpected(std::move(tilesetName.error()));
   String filename = File::relative_to(tilesetPath, *tilesetName + ".json");
@@ -75,7 +75,7 @@ std::expected<std::optional<Json>, StarException> repairTileset(Json tileset, St
 
 [[nodiscard]]
 std::expected<std::optional<Json>, StarException> repair(Json mapJson, String const& mapPath, String const& tilesetPath) {
-  auto tilesets = mapJson.getArray("tilesets");
+  auto tilesets = mapJson.get_array("tilesets");
   if (!tilesets)
     return std::unexpected(std::move(tilesets.error()));
   bool changed = false;
@@ -140,7 +140,7 @@ std::expected<void, StarException> fixEmbeddedTilesets(Logger& logger, String co
                                      auto contents = File::read_file_string(path);
                                      if (!contents)
                                        return std::unexpected(std::move(contents.error()));
-                                     auto json = Json::parseJson(*contents);
+                                     auto json = Json::parse_json(*contents);
                                      if (!json)
                                        return std::unexpected(std::move(json.error()));
                                      auto hasTilesets = json->contains("tilesets");

@@ -48,12 +48,12 @@ const GameTestRegistration storageRoundTrip("BiomePlacement", "ConfigAndStorageP
       EXPECT_EQ(created->mode(), expectedMode);
       auto stored = created->toJson();
       ASSERT_TRUE(stored) << stored.error().what();
-      auto canonicalMode = stored->getString("mode");
+      auto canonicalMode = stored->get_string("mode");
       ASSERT_TRUE(canonicalMode) << canonicalMode.error().what();
       auto loweredMode = String(mode).to_lower();
       ASSERT_TRUE(loweredMode) << loweredMode.error().what();
       EXPECT_EQ(*canonicalMode, *loweredMode);
-      auto canonicalType = stored->getString("distribution");
+      auto canonicalType = stored->get_string("distribution");
       ASSERT_TRUE(canonicalType) << canonicalType.error().what();
       auto loweredType = String(type).to_lower();
       ASSERT_TRUE(loweredType) << loweredType.error().what();

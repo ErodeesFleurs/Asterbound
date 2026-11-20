@@ -98,7 +98,7 @@ std::expected<TileDamageParameters, StarException> TileDamageParameters::create(
   auto parsed = [&]() -> std::expected<TileDamageParameters, StarException> {
   TileDamageParameters result;
   if (config.type() == Json::Type::String) {
-    auto path = config.toString();
+    auto path = config.to_string();
     if (!path) return std::unexpected(std::move(path.error()));
     sourcePath = std::move(*path);
     auto loaded = assets.json(*sourcePath);
@@ -106,25 +106,25 @@ std::expected<TileDamageParameters, StarException> TileDamageParameters::create(
     config = std::move(*loaded);
   }
   if (!TileDamageTypeNames) return std::unexpected(TileDamageTypeNames.error());
-  auto factors = config.getObject("damageFactors");
+  auto factors = config.get_object("damageFactors");
   if (!factors) return std::unexpected(std::move(factors.error()));
   for (auto const& pair : *factors) {
     auto type = TileDamageTypeNames->get_left(pair.first);
     if (!type) return std::unexpected(std::move(type.error()));
-    auto amount = pair.second.toFloat();
+    auto amount = pair.second.to_float();
     if (!amount) return std::unexpected(std::move(amount.error()));
     result.m_damages[type->get()] = *amount;
   }
-  auto recovery = config.getFloat("damageRecovery");
+  auto recovery = config.get_float("damageRecovery");
   if (!recovery) return std::unexpected(std::move(recovery.error()));
   result.m_damageRecoveryPerSecond = *recovery;
-  auto harvest = config.getUInt("harvestLevel", 1);
+  auto harvest = config.get_uint("harvestLevel", 1);
   if (!harvest) return std::unexpected(std::move(harvest.error()));
   result.m_requiredHarvestLevel = *harvest;
-  auto maximum = config.getFloat("maximumEffectTime", 1.5);
+  auto maximum = config.get_float("maximumEffectTime", 1.5);
   if (!maximum) return std::unexpected(std::move(maximum.error()));
   result.m_maximumEffectTime = *maximum;
-  auto health = config.getFloat("totalHealth", 1.0f);
+  auto health = config.get_float("totalHealth", 1.0f);
   if (!health) return std::unexpected(std::move(health.error()));
   result.m_totalHealth = *health;
   if (healthOverride) result.m_totalHealth = *healthOverride;

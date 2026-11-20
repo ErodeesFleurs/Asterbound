@@ -389,7 +389,7 @@ const GameTestRegistration transientMovementAnimation(
     ASSERT_TRUE(assets);
     auto abortTime = (*assets)->json("/player.config:teleportInTime");
     ASSERT_TRUE(abortTime);
-    auto abortSeconds = abortTime->toFloat();
+    auto abortSeconds = abortTime->to_float();
     ASSERT_TRUE(abortSeconds);
     auto abortTicks = static_cast<unsigned>(std::ceil(*abortSeconds / dt)) + 1;
     for (unsigned i = 0; i < abortTicks && player.isTeleporting(); ++i)

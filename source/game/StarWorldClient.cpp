@@ -265,14 +265,14 @@ std::expected<void, StarException> WorldClient::initialize(std::shared_ptr<Playe
   m_currentTime = 0;
   m_fullBright = false;
   m_asyncLighting = false;
-  auto result3 = m_clientConfig.getFloat("worldDimTime");
+  auto result3 = m_clientConfig.get_float("worldDimTime");
   if (!result3)
     return std::unexpected(std::move(result3.error()));
   m_worldDimTimer = GameTimer((std::move(*result3)));
   m_worldDimTimer.setDone();
   m_worldDimLevel = 0.0f;
   
-  auto result4 = m_clientConfig.getFloat("parallaxFadeTime");
+  auto result4 = m_clientConfig.get_float("parallaxFadeTime");
   if (!result4)
     return std::unexpected(std::move(result4.error()));
   m_parallaxFadeTimer = GameTimer((std::move(*result4)));
@@ -306,7 +306,7 @@ std::expected<void, StarException> WorldClient::initialize(std::shared_ptr<Playe
     return self.m_tileArray->tile({x, y}).collision;
   });
   
-  auto result7 = m_clientConfig.getFloat("modifiedTilePredictionTimeout");
+  auto result7 = m_clientConfig.get_float("modifiedTilePredictionTimeout");
   if (!result7)
     return std::unexpected(std::move(result7.error()));
   m_modifiedTilePredictionTimeout =
@@ -314,45 +314,45 @@ std::expected<void, StarException> WorldClient::initialize(std::shared_ptr<Playe
 
   m_latency = std::chrono::milliseconds::zero();
   
-  auto result8 = m_clientConfig.getObject("blockDamageParticle");
+  auto result8 = m_clientConfig.get_object("blockDamageParticle");
   if (!result8)
     return std::unexpected(std::move(result8.error()));
   auto result9 = Particle::create(this->root(), (std::move(*result8)));
   if (!result9)
     return std::unexpected(std::move(result9.error()));
   m_blockDamageParticle = (std::move(*result9));
-  auto result10 = m_clientConfig.getObject("blockDamageParticleVariance");
+  auto result10 = m_clientConfig.get_object("blockDamageParticleVariance");
   if (!result10)
     return std::unexpected(std::move(result10.error()));
   auto result11 = Particle::create(this->root(), (std::move(*result10)));
   if (!result11)
     return std::unexpected(std::move(result11.error()));
   m_blockDamageParticleVariance = (std::move(*result11));
-  auto result12 = m_clientConfig.getFloat("blockDamageParticleProbability");
+  auto result12 = m_clientConfig.get_float("blockDamageParticleProbability");
   if (!result12)
     return std::unexpected(std::move(result12.error()));
   m_blockDamageParticleProbability = (std::move(*result12));
   
-  auto result13 = m_clientConfig.getObject("blockDingParticle");
+  auto result13 = m_clientConfig.get_object("blockDingParticle");
   if (!result13)
     return std::unexpected(std::move(result13.error()));
   auto result14 = Particle::create(this->root(), (std::move(*result13)));
   if (!result14)
     return std::unexpected(std::move(result14.error()));
   m_blockDingParticle = (std::move(*result14));
-  auto result15 = m_clientConfig.getObject("blockDingParticleVariance");
+  auto result15 = m_clientConfig.get_object("blockDingParticleVariance");
   if (!result15)
     return std::unexpected(std::move(result15.error()));
   auto result16 = Particle::create(this->root(), (std::move(*result15)));
   if (!result16)
     return std::unexpected(std::move(result16.error()));
   m_blockDingParticleVariance = (std::move(*result16));
-  auto result17 = m_clientConfig.getFloat("blockDingParticleProbability");
+  auto result17 = m_clientConfig.get_float("blockDingParticleProbability");
   if (!result17)
     return std::unexpected(std::move(result17.error()));
   m_blockDingParticleProbability = (std::move(*result17));
   
-  auto result18 = m_clientConfig.getFloat("damageNotificationBatchDuration");
+  auto result18 = m_clientConfig.get_float("damageNotificationBatchDuration");
   if (!result18)
     return std::unexpected(std::move(result18.error()));
   m_damageNotificationBatchDuration = std::chrono::duration<float>(std::move(*result18));
@@ -360,14 +360,14 @@ std::expected<void, StarException> WorldClient::initialize(std::shared_ptr<Playe
   auto result19 = assets->json("/interface.config:ambientTrackFadeInTime");
   if (!result19)
     return std::unexpected(std::move(result19.error()));
-  auto result20 = (std::move(*result19)).toFloat();
+  auto result20 = (std::move(*result19)).to_float();
   if (!result20)
     return std::unexpected(std::move(result20.error()));
   m_ambientSounds.setTrackFadeInTime((std::move(*result20)));
   auto result21 = assets->json("/interface.config:ambientTrackSwitchGrace");
   if (!result21)
     return std::unexpected(std::move(result21.error()));
-  auto result22 = (std::move(*result21)).toFloat();
+  auto result22 = (std::move(*result21)).to_float();
   if (!result22)
     return std::unexpected(std::move(result22.error()));
   m_ambientSounds.setTrackSwitchGrace((std::move(*result22)));
@@ -375,14 +375,14 @@ std::expected<void, StarException> WorldClient::initialize(std::shared_ptr<Playe
   auto result23 = assets->json("/interface.config:musicTrackSwitchGrace");
   if (!result23)
     return std::unexpected(std::move(result23.error()));
-  auto result24 = (std::move(*result23)).toFloat();
+  auto result24 = (std::move(*result23)).to_float();
   if (!result24)
     return std::unexpected(std::move(result24.error()));
   m_musicTrack.setTrackSwitchGrace((std::move(*result24)));
   auto result25 = assets->json("/interface.config:musicTrackFadeInTime");
   if (!result25)
     return std::unexpected(std::move(result25.error()));
-  auto result26 = (std::move(*result25)).toFloat();
+  auto result26 = (std::move(*result25)).to_float();
   if (!result26)
     return std::unexpected(std::move(result26.error()));
   m_musicTrack.setTrackFadeInTime((std::move(*result26)));
@@ -390,14 +390,14 @@ std::expected<void, StarException> WorldClient::initialize(std::shared_ptr<Playe
   auto result27 = assets->json("/interface.config:musicTrackFadeInTime");
   if (!result27)
     return std::unexpected(std::move(result27.error()));
-  auto result28 = (std::move(*result27)).toFloat();
+  auto result28 = (std::move(*result27)).to_float();
   if (!result28)
     return std::unexpected(std::move(result28.error()));
   m_altMusicTrack.setTrackFadeInTime((std::move(*result28)));
   auto result29 = assets->json("/interface.config:musicTrackFadeInTime");
   if (!result29)
     return std::unexpected(std::move(result29.error()));
-  auto result30 = (std::move(*result29)).toFloat();
+  auto result30 = (std::move(*result29)).to_float();
   if (!result30)
     return std::unexpected(std::move(result30.error()));
   m_altMusicTrack.setTrackSwitchGrace((std::move(*result30)));
@@ -446,7 +446,7 @@ std::expected<void, StarException> WorldClient::initialize(ClientSubWorldId subW
   if (!result33)
     return std::unexpected(std::move(result33.error()));
   m_clientConfig = (std::move(*result33));
-  auto result34 = m_clientConfig.getFloat("idleSubWorldExpireTime");
+  auto result34 = m_clientConfig.get_float("idleSubWorldExpireTime");
   if (!result34)
     return std::unexpected(std::move(result34.error()));
   m_expiryTimer = GameTimer((std::move(*result34)));
@@ -462,10 +462,10 @@ std::expected<void, StarException> WorldClient::initialize(ClientSubWorldId subW
   if (!result35)
     return std::unexpected(std::move(result35.error()));
   m_luaRoot = (std::move(*result35));
-  auto result36 = m_clientConfig.getFloat("luaGcPause");
+  auto result36 = m_clientConfig.get_float("luaGcPause");
   if (!result36)
     return std::unexpected(std::move(result36.error()));
-  auto result37 = m_clientConfig.getFloat("luaGcStepMultiplier");
+  auto result37 = m_clientConfig.get_float("luaGcStepMultiplier");
   if (!result37)
     return std::unexpected(std::move(result37.error()));
   m_luaRoot->tuneAutoGarbageCollection((std::move(*result36)), (std::move(*result37)));
@@ -491,7 +491,7 @@ std::expected<void, StarException> WorldClient::initialize(ClientSubWorldId subW
     return self.m_tileArray->tile({x, y}).collision;
   });
   
-  auto result42 = m_clientConfig.getFloat("modifiedTilePredictionTimeout");
+  auto result42 = m_clientConfig.get_float("modifiedTilePredictionTimeout");
   if (!result42)
     return std::unexpected(std::move(result42.error()));
   m_modifiedTilePredictionTimeout =
@@ -499,7 +499,7 @@ std::expected<void, StarException> WorldClient::initialize(ClientSubWorldId subW
 
   m_latency = std::chrono::milliseconds::zero();
   
-  auto result43 = m_clientConfig.getFloat("damageNotificationBatchDuration");
+  auto result43 = m_clientConfig.get_float("damageNotificationBatchDuration");
   if (!result43)
     return std::unexpected(std::move(result43.error()));
   m_damageNotificationBatchDuration = std::chrono::duration<float>(std::move(*result43));
@@ -1127,7 +1127,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
   auto result50 = (std::move(*result49))->json("/highlights.config:interactivePulseAmount");
   if (!result50)
     return std::unexpected(std::move(result50.error()));
-  auto result51 = (std::move(*result50)).toFloat();
+  auto result51 = (std::move(*result50)).to_float();
   if (!result51)
     return std::unexpected(std::move(result51.error()));
   float pulseAmount = (std::move(*result51));
@@ -1137,7 +1137,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
   auto result53 = (std::move(*result52))->json("/highlights.config:interactivePulseRate");
   if (!result53)
     return std::unexpected(std::move(result53.error()));
-  auto result54 = (std::move(*result53)).toFloat();
+  auto result54 = (std::move(*result53)).to_float();
   if (!result54)
     return std::unexpected(std::move(result54.error()));
   float pulseRate = (std::move(*result54));
@@ -1153,7 +1153,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
     auto result60 = (std::move(*result59))->get("interactiveHighlight");
     if (!result60)
       return std::unexpected(std::move(result60.error()));
-    auto result61 = (std::move(*result60)).toBool();
+    auto result61 = (std::move(*result60)).to_bool();
     if (!result61)
       return std::unexpected(std::move(result61.error()));
     if ((std::move(*result61))) {
@@ -1976,7 +1976,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
     } else if (auto updateWorldProperties = as<UpdateWorldPropertiesPacket>(packet)) {
       // Kae: Properties set to null (nil from Lua) should be erased instead of lingering around
       for (auto&& pair : updateWorldProperties->updatedProperties) {
-        if (pair.second.isNull()) {
+        if (pair.second.is_null()) {
           m_worldProperties.erase(pair.first);
         } else {
           m_worldProperties[pair.first] = pair.second;
@@ -2239,7 +2239,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     m_clientState->setPlayer(m_mainPlayer->entityId());
     m_sky->setAltitude(m_clientState->windowCenter()[1]);
     auto clientWindow = m_clientState->window();
-    auto result161 = m_clientConfig.getInt("particleRegionPadding");
+    auto result161 = m_clientConfig.get_int("particleRegionPadding");
     if (!result161)
       return std::unexpected(std::move(result161.error()));
     particleRegion = clientWindow.padded((std::move(*result161)));
@@ -2301,7 +2301,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     auto flickerAmount = assets->json("/highlights.config:inspectionFlickerAmount");
     if (!flickerAmount)
       return std::unexpected(std::move(flickerAmount.error()));
-    auto flicker = flickerAmount->toFloat();
+    auto flicker = flickerAmount->to_float();
     if (!flicker)
       return std::unexpected(std::move(flicker.error()));
     auto flickerSample = this->root().random().uniform_float(1 - *flicker, 1);
@@ -2318,7 +2318,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
       // Clear m_requestedDrops every so often in case of entity id reuse or
       // desyncs etc
       {
-        auto result168 = m_clientConfig.getInt("itemRequestReset");
+        auto result168 = m_clientConfig.get_int("itemRequestReset");
         if (!result168)
           return std::unexpected(std::move(result168.error()));
         if (m_currentStep % (std::move(*result168)) == 0) {
@@ -2759,7 +2759,7 @@ std::expected<void, StarException> WorldClient::collectLiquid(List<Vec2I> const&
   auto result198 = (std::move(*result197))->json("/items/defaultParameters.config:liquidItems.bucketSize");
   if (!result198)
     return std::unexpected(std::move(result198.error()));
-  auto result199 = (std::move(*result198)).toFloat();
+  auto result199 = (std::move(*result198)).to_float();
   if (!result199)
     return std::unexpected(std::move(result199.error()));
   float bucketSize = (std::move(*result199));
@@ -2853,7 +2853,7 @@ std::expected<void, StarException> WorldClient::queueUpdatePackets(bool sendEnti
   m_outgoingPackets.push_back(std::make_shared<StepUpdatePacket>(m_currentTime));
 
   {
-    auto result205 = m_clientConfig.getInt("worldClientStateUpdateDelta");
+    auto result205 = m_clientConfig.get_int("worldClientStateUpdateDelta");
     if (!result205)
       return std::unexpected(std::move(result205.error()));
     if (m_currentStep % (std::move(*result205)) == 0) {
@@ -3253,14 +3253,14 @@ std::expected<void, StarException> WorldClient::lightingCalc() {
   auto result239 = configuration->get("newLighting");
   if (!result239)
     return std::unexpected(std::move(result239.error()));
-  auto result240 = (std::move(*result239)).optBool();
+  auto result240 = (std::move(*result239)).opt_bool();
   if (!result240)
     return std::unexpected(std::move(result240.error()));
   bool newLighting = (std::move(*result240)).value_or(true);
   auto result241 = configuration->get("monochromeLighting");
   if (!result241)
     return std::unexpected(std::move(result241.error()));
-  auto result242 = (std::move(*result241)).toBool();
+  auto result242 = (std::move(*result241)).to_bool();
   if (!result242)
     return std::unexpected(std::move(result242.error()));
   bool monochrome = (std::move(*result242));
@@ -3423,7 +3423,7 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
     m_damageManager = std::make_shared<DamageManager>(*this, startPacket.clientId);
     m_playerStart = startPacket.playerRespawn;
     m_respawnInWorld = startPacket.respawnInWorld;
-    auto result259 = startPacket.worldProperties.optObject();
+    auto result259 = startPacket.worldProperties.opt_object();
     if (!result259)
       return std::unexpected(std::move(result259.error()));
     m_worldProperties = (std::move(*result259)).value_or(JsonObject{});
@@ -3470,7 +3470,7 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
     auto result266 = (std::move(*result265))->get("monochromeLighting");
     if (!result266)
       return std::unexpected(std::move(result266.error()));
-    auto result267 = (std::move(*result266)).toBool();
+    auto result267 = (std::move(*result266)).to_bool();
     if (!result267)
       return std::unexpected(std::move(result267.error()));
     auto result268 = m_lightingCalculator.setMonochrome((std::move(*result267)));
@@ -3525,15 +3525,15 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
     }
     // script contexts for both kinds of worlds
     {
-      auto result279 = m_clientConfig.getObject("worldScriptContexts");
+      auto result279 = m_clientConfig.get_object("worldScriptContexts");
       if (!result279)
         return std::unexpected(std::move(result279.error()));
       for (auto&& p : (std::move(*result279))) {
         auto scriptComponent = std::make_shared<ScriptComponent>(this->root());
-        auto result280 = p.second.toArray();
+        auto result280 = p.second.to_array();
         if (!result280)
           return std::unexpected(std::move(result280.error()));
-        auto result281 = jsonToStringList((std::move(*result280)));
+        auto result281 = json_to_string_list((std::move(*result280)));
         if (!result281)
           return std::unexpected(std::move(result281.error()));
         auto result282 = scriptComponent->setScripts((std::move(*result281)));
@@ -3547,7 +3547,7 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
       }
     }
     {
-      auto result284 = m_clientConfig.getObject(m_headless ? std::string_view("subWorldScriptContexts") : std::string_view("mainWorldScriptContexts"));
+      auto result284 = m_clientConfig.get_object(m_headless ? std::string_view("subWorldScriptContexts") : std::string_view("mainWorldScriptContexts"));
       if (!result284)
         return std::unexpected(std::move(result284.error()));
       for (auto&& p : (std::move(*result284))) {
@@ -3558,10 +3558,10 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
           continue;
         }
         auto scriptComponent = std::make_shared<ScriptComponent>(this->root());
-        auto result286 = p.second.toArray();
+        auto result286 = p.second.to_array();
         if (!result286)
           return std::unexpected(std::move(result286.error()));
-        auto result287 = jsonToStringList((std::move(*result286)));
+        auto result287 = json_to_string_list((std::move(*result286)));
         if (!result287)
           return std::unexpected(std::move(result287.error()));
         auto result288 = scriptComponent->setScripts((std::move(*result287)));
@@ -4050,14 +4050,14 @@ std::expected<bool, StarException> WorldClient::exposedToWeather(Vec2F const& po
     auto result304 = assets->json("/weather.config:weatherRayCheckDistance");
     if (!result304)
       return std::unexpected(std::move(result304.error()));
-    auto result305 = (std::move(*result304)).toFloat();
+    auto result305 = (std::move(*result304)).to_float();
     if (!result305)
       return std::unexpected(std::move(result305.error()));
     float weatherRayCheckDistance = (std::move(*result305));
     auto result306 = assets->json("/weather.config:weatherRayCheckWindInfluence");
     if (!result306)
       return std::unexpected(std::move(result306.error()));
-    auto result307 = (std::move(*result306)).toFloat();
+    auto result307 = (std::move(*result306)).to_float();
     if (!result307)
       return std::unexpected(std::move(result307.error()));
     float weatherRayCheckWindInfluence = (std::move(*result307));
@@ -4523,15 +4523,15 @@ std::expected<void, StarException> WorldClient::setupForceRegions() {
     return std::unexpected(std::move(result319.error()));
   auto worldServerConfig = (std::move(*result319));
   
-  auto result320 = worldServerConfig.getFloat("worldEdgeForceRegionHeight");
+  auto result320 = worldServerConfig.get_float("worldEdgeForceRegionHeight");
   if (!result320)
     return std::unexpected(std::move(result320.error()));
   auto regionHeight = (std::move(*result320));
-  auto result321 = worldServerConfig.getFloat("worldEdgeForceRegionForce");
+  auto result321 = worldServerConfig.get_float("worldEdgeForceRegionForce");
   if (!result321)
     return std::unexpected(std::move(result321.error()));
   auto regionForce = (std::move(*result321));
-  auto result322 = worldServerConfig.getFloat("worldEdgeForceRegionVelocity");
+  auto result322 = worldServerConfig.get_float("worldEdgeForceRegionVelocity");
   if (!result322)
     return std::unexpected(std::move(result322.error()));
   auto regionVelocity = (std::move(*result322));

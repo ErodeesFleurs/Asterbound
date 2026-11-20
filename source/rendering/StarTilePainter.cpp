@@ -123,7 +123,7 @@ std::expected<std::shared_ptr<TilePainter>, StarException> TilePainter::create(R
   auto chunkTimeoutJson = (*assets)->json("/rendering.config:chunkCacheTimeout");
   if (!chunkTimeoutJson)
     return std::unexpected(std::move(chunkTimeoutJson.error()));
-  auto chunkTimeout = chunkTimeoutJson->toInt();
+  auto chunkTimeout = chunkTimeoutJson->to_int();
   if (!chunkTimeout)
     return std::unexpected(std::move(chunkTimeout.error()));
   painter->m_terrainChunkCache.set_time_to_live(std::chrono::milliseconds(*chunkTimeout));
@@ -134,7 +134,7 @@ std::expected<std::shared_ptr<TilePainter>, StarException> TilePainter::create(R
   auto textureTimeoutJson = (*assets)->json("/rendering.config:textureTimeout");
   if (!textureTimeoutJson)
     return std::unexpected(std::move(textureTimeoutJson.error()));
-  auto textureTimeout = textureTimeoutJson->toInt();
+  auto textureTimeout = textureTimeoutJson->to_int();
   if (!textureTimeout)
     return std::unexpected(std::move(textureTimeout.error()));
   painter->m_textureCache.set_time_to_live(std::chrono::milliseconds(*textureTimeout));
@@ -143,7 +143,7 @@ std::expected<std::shared_ptr<TilePainter>, StarException> TilePainter::create(R
   if (!liquids)
     return std::unexpected(std::move(liquids.error()));
   for (auto const& liquid : (*liquids)->allLiquidSettings()) {
-    auto texturePath = liquid->config.getString("texture");
+    auto texturePath = liquid->config.get_string("texture");
     if (!texturePath)
       return std::unexpected(std::move(texturePath.error()));
     auto image = (*assets)->image(*texturePath);
@@ -155,16 +155,16 @@ std::expected<std::shared_ptr<TilePainter>, StarException> TilePainter::create(R
     auto colorJson = liquid->config.get("color");
     if (!colorJson)
       return std::unexpected(std::move(colorJson.error()));
-    auto color = jsonToColor(*colorJson);
+    auto color = json_to_color(*colorJson);
     if (!color)
       return std::unexpected(std::move(color.error()));
     auto bottomLightJson = liquid->config.get("bottomLightMix");
     if (!bottomLightJson)
       return std::unexpected(std::move(bottomLightJson.error()));
-    auto bottomLight = jsonToColor(*bottomLightJson);
+    auto bottomLight = json_to_color(*bottomLightJson);
     if (!bottomLight)
       return std::unexpected(std::move(bottomLight.error()));
-    auto movement = liquid->config.getFloat("textureMovementFactor");
+    auto movement = liquid->config.get_float("textureMovementFactor");
     if (!movement)
       return std::unexpected(std::move(movement.error()));
     auto stored = painter->m_liquids.set(

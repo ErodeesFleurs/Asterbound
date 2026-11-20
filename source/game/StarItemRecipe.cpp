@@ -38,10 +38,10 @@ std::expected<Json, StarException> ItemRecipe::toJson() const {
   inputList.reserve(inputs.size());
   for (auto const& input : inputs)
     inputList.push_back(input.toJson());
-  auto currencies = jsonFromMap(currencyInputs);
+  auto currencies = json_from_map(currencyInputs);
   if (!currencies)
     return std::unexpected(std::move(currencies.error()));
-  auto collectableJson = jsonFromMap(collectables);
+  auto collectableJson = json_from_map(collectables);
   if (!collectableJson)
     return std::unexpected(std::move(collectableJson.error()));
   return Json(JsonObject{
@@ -49,7 +49,7 @@ std::expected<Json, StarException> ItemRecipe::toJson() const {
       {"input", std::move(inputList)},
       {"output", output.toJson()},
       {"duration", duration},
-      {"groups", jsonFromStringSet(groups)},
+      {"groups", json_from_string_set(groups)},
       {"collectables", std::move(*collectableJson)},
       {"matchInputParameters", matchInputParameters}
     });

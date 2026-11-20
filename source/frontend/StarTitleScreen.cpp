@@ -317,7 +317,7 @@ std::expected<void, StarException> TitleScreen::initialize(std::shared_ptr<Unive
   auto musicConfig = (*assets)->json("/interface/windowconfig/title.config:music");
   if (!musicConfig)
     return std::unexpected(std::move(musicConfig.error()));
-  auto musicObject = musicConfig->toObject();
+  auto musicObject = musicConfig->to_object();
   if (!musicObject)
     return std::unexpected(std::move(musicObject.error()));
   auto music = AmbientNoisesDescription::create(*musicObject, "/");
@@ -367,7 +367,7 @@ std::expected<void, StarException> TitleScreen::render(float interpolation) {
   auto darkenConfig = (*assets)->json("/interface/windowconfig/title.config:skyBackdropDarken");
   if (!darkenConfig)
     return std::unexpected(std::move(darkenConfig.error()));
-  auto darken = jsonToColor(*darkenConfig);
+  auto darken = json_to_color(*darkenConfig);
   if (!darken)
     return std::unexpected(std::move(darken.error()));
   m_renderer->render(renderFlatRect(RectF(0, 0, screenSize[0], screenSize[1]), darken->to_rgba(), 0.0f));
@@ -556,22 +556,22 @@ std::expected<void, StarException> TitleScreen::initMainMenu() {
   buttonCallbacks["quit"] = [this](Widget&) { return switchState(TitleState::Quit); };
   buttonCallbacks["back"] = [this](Widget&) { return back(); };
   buttonCallbacks["mods"] = [this](Widget&) { return switchState(TitleState::Mods); };
-  auto buttons = config->getArray("mainMenuButtons");
+  auto buttons = config->get_array("mainMenuButtons");
   if (!buttons) return std::unexpected(std::move(buttons.error()));
   for (auto const& buttonConfig : *buttons) {
-    auto key = buttonConfig.getString("key");
+    auto key = buttonConfig.get_string("key");
     if (!key) return std::unexpected(std::move(key.error()));
-    auto image = buttonConfig.getString("button");
+    auto image = buttonConfig.get_string("button");
     if (!image) return std::unexpected(std::move(image.error()));
-    auto hover = buttonConfig.getString("hover");
+    auto hover = buttonConfig.get_string("hover");
     if (!hover) return std::unexpected(std::move(hover.error()));
     auto offsetConfig = buttonConfig.get("offset");
     if (!offsetConfig) return std::unexpected(std::move(offsetConfig.error()));
-    auto offset = jsonToVec2I(*offsetConfig);
+    auto offset = json_to_vec2i(*offsetConfig);
     if (!offset) return std::unexpected(std::move(offset.error()));
     auto callback = buttonCallbacks.get(*key);
     if (!callback) return std::unexpected(std::move(callback.error()));
-    auto rightAnchored = buttonConfig.getBool("rightAnchored", false);
+    auto rightAnchored = buttonConfig.get_bool("rightAnchored", false);
     if (!rightAnchored) return std::unexpected(std::move(rightAnchored.error()));
     auto button = ButtonWidget::create(m_guiContext, callback->get(), *image, *hover, "", "");
     if (!button) return std::unexpected(std::move(button.error()));
@@ -607,9 +607,9 @@ std::expected<void, StarException> TitleScreen::initMainMenu() {
   auto widgetCallbacks = LuaBindings::makeWidgetCallbacks(m_guiContext, *m_mainMenu);
   if (!widgetCallbacks) return std::unexpected(std::move(widgetCallbacks.error()));
   if (auto r = m_scriptComponent->addCallbacks("widget", std::move(*widgetCallbacks)); !r) return std::unexpected(std::move(r.error()));
-  auto scriptConfig = config->getArray("scripts", JsonArray());
+  auto scriptConfig = config->get_array("scripts", JsonArray());
   if (!scriptConfig) return std::unexpected(std::move(scriptConfig.error()));
-  auto scripts = jsonToStringList(*scriptConfig);
+  auto scripts = json_to_string_list(*scriptConfig);
   if (!scripts) return std::unexpected(std::move(scripts.error()));
   if (auto r = m_scriptComponent->setScripts(std::move(*scripts)); !r) return std::unexpected(std::move(r.error()));
   auto initialized = recoverLuaScriptError(m_scriptComponent->init());
@@ -687,7 +687,7 @@ std::expected<void, StarException> TitleScreen::initCharCreationMenu() {
 
 
 std::expected<void, StarException> TitleScreen::populateServerList(ListWidget& list) {
-  if (!m_serverList.isNull()) {
+  if (!m_serverList.is_null()) {
     if (auto r = list.clear(); !r) return std::unexpected(std::move(r.error()));
     auto servers = m_serverList.iterate_array();
     if (!servers) return std::unexpected(std::move(servers.error()));
@@ -696,14 +696,14 @@ std::expected<void, StarException> TitleScreen::populateServerList(ListWidget& l
       if (!item) return std::unexpected(std::move(item.error()));
       auto addressLabel = (*item)->fetchChild<LabelWidget>("address");
       if (!addressLabel) return std::unexpected(std::move(addressLabel.error()));
-      auto address = server.getString("address");
+      auto address = server.get_string("address");
       if (!address) return std::unexpected(std::move(address.error()));
       if (auto r = (*addressLabel)->setText(*address); !r) return std::unexpected(std::move(r.error()));
       auto accountLabel = (*item)->fetchChild<LabelWidget>("account");
       if (!accountLabel) return std::unexpected(std::move(accountLabel.error()));
       auto accountConfig = server.get("account", "");
       if (!accountConfig) return std::unexpected(std::move(accountConfig.error()));
-      auto account = accountConfig->toString();
+      auto account = accountConfig->to_string();
       if (!account) return std::unexpected(std::move(account.error()));
       if (auto r = (*accountLabel)->setText(*account); !r) return std::unexpected(std::move(r.error()));
       (*item)->setData(server);
@@ -726,7 +726,7 @@ std::expected<void, StarException> TitleScreen::initMultiPlayerMenu() {
   auto servers = (*configuration)->get("serverList");
   if (!servers) return std::unexpected(std::move(servers.error()));
   m_serverList = std::move(*servers);
-  if (!m_serverList.isType(Json::Type::Array))
+  if (!m_serverList.is_type(Json::Type::Array))
     m_serverList = JsonArray();
   auto assets = m_guiContext.root().assets();
   if (!assets) return std::unexpected(std::move(assets.error()));
@@ -769,19 +769,19 @@ std::expected<void, StarException> TitleScreen::initMultiPlayerMenu() {
       if (*deleteButton && (*deleteButton)->isHovered())
         return {};
       auto const& data = selected->data();
-      auto address = data.getString("address", "");
+      auto address = data.get_string("address", "");
       if (!address) return std::unexpected(std::move(address.error()));
       if (auto r = setMultiPlayerAddress(std::move(*address)); !r) return std::unexpected(std::move(r.error()));
-      auto port = data.getString("port", "");
+      auto port = data.get_string("port", "");
       if (!port) return std::unexpected(std::move(port.error()));
       if (auto r = setMultiPlayerPort(std::move(*port)); !r) return std::unexpected(std::move(r.error()));
-      auto account = data.getString("account", "");
+      auto account = data.get_string("account", "");
       if (!account) return std::unexpected(std::move(account.error()));
       if (auto r = setMultiPlayerAccount(std::move(*account)); !r) return std::unexpected(std::move(r.error()));
-      auto password = data.getString("password", "");
+      auto password = data.get_string("password", "");
       if (!password) return std::unexpected(std::move(password.error()));
       if (auto r = setMultiPlayerPassword(std::move(*password)); !r) return std::unexpected(std::move(r.error()));
-      auto legacy = data.getBool("forceLegacy", false);
+      auto legacy = data.get_bool("forceLegacy", false);
       if (!legacy) return std::unexpected(std::move(legacy.error()));
       if (auto r = setMultiPlayerForceLegacy(*legacy); !r) return std::unexpected(std::move(r.error()));
       auto passwordWidget = m_multiPlayerMenu->fetchChild("password");

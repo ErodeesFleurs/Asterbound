@@ -165,7 +165,7 @@ std::expected<void, StarException> EffectEmitter::collectRenderEvents(RenderCall
 }
 
 std::expected<Json, StarException> EffectEmitter::toJson() const {
-  auto sources = jsonFromSet<Set<std::pair<String, String>>>(m_activeSources.get(),
+  auto sources = json_from_set<Set<std::pair<String, String>>>(m_activeSources.get(),
       [](std::pair<String, String> const& entry) {
         return JsonObject{{"position", entry.first}, {"source", entry.second}};
       });
@@ -178,12 +178,12 @@ std::expected<void, StarException> EffectEmitter::fromJson(Json const& diskStore
   auto config = diskStore.get("activeSources");
   if (!config)
     return std::unexpected(std::move(config.error()));
-  auto sources = jsonToSet<Set<std::pair<String, String>>>(*config,
+  auto sources = json_to_set<Set<std::pair<String, String>>>(*config,
       [](Json const& value) -> std::expected<std::pair<String, String>, StarException> {
-        auto position = value.getString("position");
+        auto position = value.get_string("position");
         if (!position)
           return std::unexpected(std::move(position.error()));
-        auto source = value.getString("source");
+        auto source = value.get_string("source");
         if (!source)
           return std::unexpected(std::move(source.error()));
         return std::pair{std::move(*position), std::move(*source)};

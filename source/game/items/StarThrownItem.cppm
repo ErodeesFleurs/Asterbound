@@ -127,7 +127,7 @@ std::expected<std::shared_ptr<ThrownItem>, StarException> ThrownItem::create(Roo
   auto swingable = item->initializeSwingable(config);
   if (!swingable)
     return std::unexpected(std::move(swingable.error()));
-  auto projectileType = item->instanceValue("projectileType").and_then([](Json const& value) { return value.toString(); });
+  auto projectileType = item->instanceValue("projectileType").and_then([](Json const& value) { return value.to_string(); });
   if (!projectileType)
     return std::unexpected(std::move(projectileType.error()));
   item->m_projectileType = std::move(*projectileType);
@@ -135,11 +135,11 @@ std::expected<std::shared_ptr<ThrownItem>, StarException> ThrownItem::create(Roo
   if (!projectileConfig)
     return std::unexpected(std::move(projectileConfig.error()));
   item->m_projectileConfig = std::move(*projectileConfig);
-  auto ammoUsage = item->instanceValue("ammoUsage", 1).and_then([](Json const& value) { return value.toUInt(); });
+  auto ammoUsage = item->instanceValue("ammoUsage", 1).and_then([](Json const& value) { return value.to_uint(); });
   if (!ammoUsage)
     return std::unexpected(std::move(ammoUsage.error()));
   item->m_ammoUsage = *ammoUsage;
-  auto image = item->instanceValue("image").and_then([](Json const& value) { return value.toString(); });
+  auto image = item->instanceValue("image").and_then([](Json const& value) { return value.to_string(); });
   if (!image)
     return std::unexpected(std::move(image.error()));
   auto metadata = root.imageMetadataDatabase();

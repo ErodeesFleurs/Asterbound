@@ -95,7 +95,7 @@ std::expected<void, StarException> ButtonWidget::initialize() {
   auto offsetJson = config->get("buttonPressedOffset");
   if (!offsetJson)
     return std::unexpected(std::move(offsetJson.error()));
-  auto offset = jsonToVec2I(*offsetJson);
+  auto offset = json_to_vec2i(*offsetJson);
   if (!offset)
     return std::unexpected(std::move(offset.error()));
   m_pressedOffset = *offset;
@@ -113,7 +113,7 @@ std::expected<void, StarException> ButtonWidget::initialize() {
     auto json = config->get(entry.first);
     if (!json)
       return std::unexpected(std::move(json.error()));
-    auto sounds = jsonToStringList(*json);
+    auto sounds = json_to_string_list(*json);
     if (!sounds)
       return std::unexpected(std::move(sounds.error()));
     entry.second.get() = std::move(*sounds);
@@ -447,7 +447,7 @@ std::expected<void, StarException> ButtonWidget::setImages(String const& baseIma
     auto json = (*assets)->json("/interface.config:disabledButton");
     if (!json)
       return std::unexpected(std::move(json.error()));
-    auto suffix = json->toString();
+    auto suffix = json->to_string();
     if (!suffix)
       return std::unexpected(std::move(suffix.error()));
     disabled = baseImage + *suffix;
@@ -468,7 +468,7 @@ std::expected<void, StarException> ButtonWidget::setCheckedImages(String const& 
     auto json = (*assets)->json("/interface.config:disabledButton");
     if (!json)
       return std::unexpected(std::move(json.error()));
-    auto suffix = json->toString();
+    auto suffix = json->to_string();
     if (!suffix)
       return std::unexpected(std::move(suffix.error()));
     disabled = baseImage + *suffix;

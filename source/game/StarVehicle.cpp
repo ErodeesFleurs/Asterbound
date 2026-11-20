@@ -134,18 +134,18 @@ std::expected<void, StarException> Vehicle::initialize(Root& rootContext, Json b
 if (!result1006) return std::unexpected(std::move(result1006.error()));
 m_movementController = std::move(*result1006);
 
-  auto result1007 = m_baseConfig.getString("name");
+  auto result1007 = m_baseConfig.get_string("name");
 if (!result1007) return std::unexpected(std::move(result1007.error()));
 m_typeName = std::move(*result1007);
 
   auto result1008 = configValue("persistent", false);
 if (!result1008) return std::unexpected(std::move(result1008.error()));
-auto result1009 = std::move(*result1008).toBool();
+auto result1009 = std::move(*result1008).to_bool();
 if (!result1009) return std::unexpected(std::move(result1009.error()));
 setPersistent(std::move(*result1009));
   auto result1010 = configValue("clientEntityMode", "ClientSlaveOnly");
 if (!result1010) return std::unexpected(std::move(result1010.error()));
-auto result1011 = std::move(*result1010).toString();
+auto result1011 = std::move(*result1010).to_string();
 if (!result1011) return std::unexpected(std::move(result1011.error()));
 if (!ClientEntityModeNames) return std::unexpected(ClientEntityModeNames.error());
 auto result1012 = ClientEntityModeNames->get_left(std::move(*result1011));
@@ -154,39 +154,39 @@ m_clientEntityMode = result1012->get();
 
   auto result1013 = configValue("script");
 if (!result1013) return std::unexpected(std::move(result1013.error()));
-auto result1014 = std::move(*result1013).toString();
+auto result1014 = std::move(*result1013).to_string();
 if (!result1014) return std::unexpected(std::move(result1014.error()));
 auto result1015 = m_scriptComponent.setScript(AssetPath::relative_to(m_path, std::move(*result1014)));
 if (!result1015) return std::unexpected(std::move(result1015.error()));
   auto result1016 = configValue("scriptDelta", 1);
 if (!result1016) return std::unexpected(std::move(result1016.error()));
-auto result1017 = std::move(*result1016).toUInt();
+auto result1017 = std::move(*result1016).to_uint();
 if (!result1017) return std::unexpected(std::move(result1017.error()));
 m_scriptComponent.setUpdateDelta(std::move(*result1017));
   auto result1018 = configValue("boundBox");
 if (!result1018) return std::unexpected(std::move(result1018.error()));
-auto result1019 = jsonToRectF(std::move(*result1018));
+auto result1019 = json_to_rectf(std::move(*result1018));
 if (!result1019) return std::unexpected(std::move(result1019.error()));
 m_boundBox = std::move(*result1019);
   auto result1020 = configValue("slaveControlTimeout");
 if (!result1020) return std::unexpected(std::move(result1020.error()));
-auto result1021 = std::move(*result1020).toFloat();
+auto result1021 = std::move(*result1020).to_float();
 if (!result1021) return std::unexpected(std::move(result1021.error()));
 m_slaveControlTimeout = std::move(*result1021);
   auto result1022 = configValue("receiveExtraControls", false);
 if (!result1022) return std::unexpected(std::move(result1022.error()));
-auto result1023 = std::move(*result1022).toBool();
+auto result1023 = std::move(*result1022).to_bool();
 if (!result1023) return std::unexpected(std::move(result1023.error()));
 m_receiveExtraControls = std::move(*result1023);
   auto result1024 = configValue("slaveControlHeartbeat");
 if (!result1024) return std::unexpected(std::move(result1024.error()));
-auto result1025 = std::move(*result1024).toFloat();
+auto result1025 = std::move(*result1024).to_float();
 if (!result1025) return std::unexpected(std::move(result1025.error()));
 m_slaveHeartbeatTimer = GameTimer(std::move(*result1025));
   auto result1026 = configValue("damageTeam");
 if (!result1026) return std::unexpected(std::move(result1026.error()));
 auto teamConfig = std::move(*result1026);
-  if (!teamConfig.isNull()) {
+  if (!teamConfig.is_null()) {
 auto result1027 = EntityDamageTeam::create(teamConfig);
 if (!result1027) return std::unexpected(std::move(result1027.error()));
 m_damageTeam.set(std::move(*result1027));
@@ -194,22 +194,22 @@ m_damageTeam.set(std::move(*result1027));
   else m_damageTeam.set(EntityDamageTeam{});
   auto result1028 = configValue("interactive", true);
 if (!result1028) return std::unexpected(std::move(result1028.error()));
-auto result1029 = std::move(*result1028).toBool();
+auto result1029 = std::move(*result1028).to_bool();
 if (!result1029) return std::unexpected(std::move(result1029.error()));
 m_interactive.set(std::move(*result1029));
   auto result1030 = configValue("baseRenderLayer","Vehicle");
 if (!result1030) return std::unexpected(std::move(result1030.error()));
-auto result1031 = std::move(*result1030).toString();
+auto result1031 = std::move(*result1030).to_string();
 if (!result1031) return std::unexpected(std::move(result1031.error()));
 auto result1032 = parseRenderLayer(std::move(*result1031));
 if (!result1032) return std::unexpected(std::move(result1032.error()));
 m_baseRenderLayer = std::move(*result1032);
   auto result1033 = configValue("overrideRenderLayer");
 if (!result1033) return std::unexpected(std::move(result1033.error()));
-if (!std::move(*result1033).isNull()) {
+if (!std::move(*result1033).is_null()) {
     auto result1034 = configValue("overrideRenderLayer");
 if (!result1034) return std::unexpected(std::move(result1034.error()));
-auto result1035 = std::move(*result1034).toString();
+auto result1035 = std::move(*result1034).to_string();
 if (!result1035) return std::unexpected(std::move(result1035.error()));
 auto result1036 = parseRenderLayer(std::move(*result1035));
 if (!result1036) return std::unexpected(std::move(result1036.error()));
@@ -218,7 +218,7 @@ m_overrideRenderLayer = std::move(*result1036);
 
   auto result1037 = configValue("animationScript");
 if (!result1037) return std::unexpected(std::move(result1037.error()));
-auto result1038 = std::move(*result1037).optString();
+auto result1038 = std::move(*result1037).opt_string();
 if (!result1038) return std::unexpected(std::move(result1038.error()));
 if (auto animationScript = std::move(*result1038))
     {
@@ -232,30 +232,30 @@ auto result1041 = std::move(*result1040).iterate_object();
 if (!result1041) return std::unexpected(std::move(result1041.error()));
 for (auto const& pair : std::move(*result1041)) {
     auto& loungePosition = m_loungePositions[pair.first];
-    auto result1042 = pair.second.getString("part");
+    auto result1042 = pair.second.get_string("part");
 if (!result1042) return std::unexpected(std::move(result1042.error()));
 loungePosition.part = std::move(*result1042);
-    auto result1043 = pair.second.getString("partAnchor");
+    auto result1043 = pair.second.get_string("partAnchor");
 if (!result1043) return std::unexpected(std::move(result1043.error()));
 loungePosition.partAnchor = std::move(*result1043);
     auto result1044 = pair.second.get("exitBottomOffset",Json());
 if (!result1044) return std::unexpected(std::move(result1044.error()));
-auto result1045 = json_to_optional<Vec2F>(std::move(*result1044),jsonToVec2F);
+auto result1045 = json_to_optional<Vec2F>(std::move(*result1044),json_to_vec2f);
 if (!result1045) return std::unexpected(std::move(result1045.error()));
 loungePosition.exitBottomOffset = std::move(*result1045);
-    auto result1046 = pair.second.getObject("armorCosmeticOverrides", JsonObject());
+    auto result1046 = pair.second.get_object("armorCosmeticOverrides", JsonObject());
 if (!result1046) return std::unexpected(std::move(result1046.error()));
 loungePosition.armorCosmeticOverrides = std::move(*result1046);
-    auto result1047 = pair.second.optString("cursorOverride");
+    auto result1047 = pair.second.opt_string("cursorOverride");
 if (!result1047) return std::unexpected(std::move(result1047.error()));
 loungePosition.cursorOverride = std::move(*result1047);
-    auto result1048 = pair.second.getBool("cameraFocus", false);
+    auto result1048 = pair.second.get_bool("cameraFocus", false);
 if (!result1048) return std::unexpected(std::move(result1048.error()));
 loungePosition.cameraFocus = std::move(*result1048);
-    auto result1049 = pair.second.getBool("enabled", true);
+    auto result1049 = pair.second.get_bool("enabled", true);
 if (!result1049) return std::unexpected(std::move(result1049.error()));
 loungePosition.enabled.set(std::move(*result1049));
-    auto result1050 = pair.second.optString("orientation");
+    auto result1050 = pair.second.opt_string("orientation");
 if (!result1050) return std::unexpected(std::move(result1050.error()));
 if (auto orientation = std::move(*result1050))
       {
@@ -264,21 +264,21 @@ auto result1051 = LoungeOrientationNames->get_left(*orientation);
 if (!result1051) return std::unexpected(std::move(result1051.error()));
 loungePosition.orientation.set(result1051->get());
 }
-    auto result1052 = pair.second.optString("emote");
+    auto result1052 = pair.second.opt_string("emote");
 if (!result1052) return std::unexpected(std::move(result1052.error()));
 loungePosition.emote.set(std::move(*result1052));
-    auto result1053 = pair.second.optString("dance");
+    auto result1053 = pair.second.opt_string("dance");
 if (!result1053) return std::unexpected(std::move(result1053.error()));
 loungePosition.dance.set(std::move(*result1053));
-    auto result1054 = pair.second.optString("directives");
+    auto result1054 = pair.second.opt_string("directives");
 if (!result1054) return std::unexpected(std::move(result1054.error()));
 loungePosition.directives.set(std::move(*result1054));
     auto result1055 = pair.second.get("statusEffects", JsonArray{});
 if (!result1055) return std::unexpected(std::move(result1055.error()));
-auto result1056 = jsonToList<PersistentStatusEffect>(std::move(*result1055),jsonToPersistentStatusEffect);
+auto result1056 = json_to_list<PersistentStatusEffect>(std::move(*result1055),jsonToPersistentStatusEffect);
 if (!result1056) return std::unexpected(std::move(result1056.error()));
 loungePosition.statusEffects.set(std::move(*result1056));
-    auto result1057 = pair.second.optBool("suppressTools");
+    auto result1057 = pair.second.opt_bool("suppressTools");
 if (!result1057) return std::unexpected(std::move(result1057.error()));
 loungePosition.suppressTools = std::move(*result1057);
   }
@@ -292,10 +292,10 @@ for (auto const& pair : std::move(*result1059)) {
     auto result1060 = PhysicsMovingCollision::fromJson(pair.second);
 if (!result1060) return std::unexpected(std::move(result1060.error()));
 collisionConfig.movingCollision = std::move(*result1060);
-    auto result1061 = pair.second.optString("attachToPart");
+    auto result1061 = pair.second.opt_string("attachToPart");
 if (!result1061) return std::unexpected(std::move(result1061.error()));
 collisionConfig.attachToPart = std::move(*result1061);
-    auto result1062 = pair.second.getBool("enabled", true);
+    auto result1062 = pair.second.get_bool("enabled", true);
 if (!result1062) return std::unexpected(std::move(result1062.error()));
 collisionConfig.enabled.set(std::move(*result1062));
   }
@@ -309,10 +309,10 @@ for (auto const& pair : std::move(*result1064)) {
     auto result1065 = jsonToPhysicsForceRegion(pair.second);
 if (!result1065) return std::unexpected(std::move(result1065.error()));
 forceRegionConfig.forceRegion = std::move(*result1065);
-    auto result1066 = pair.second.optString("attachToPart");
+    auto result1066 = pair.second.opt_string("attachToPart");
 if (!result1066) return std::unexpected(std::move(result1066.error()));
 forceRegionConfig.attachToPart = std::move(*result1066);
-    auto result1067 = pair.second.getBool("enabled", true);
+    auto result1067 = pair.second.get_bool("enabled", true);
 if (!result1067) return std::unexpected(std::move(result1067.error()));
 forceRegionConfig.enabled.set(std::move(*result1067));
   }
@@ -326,10 +326,10 @@ for (auto const& pair : std::move(*result1069)) {
     auto result1070 = DamageSource::create(pair.second);
 if (!result1070) return std::unexpected(std::move(result1070.error()));
 damageSourceConfig.damageSource = std::move(*result1070);
-    auto result1071 = pair.second.optString("attachToPart");
+    auto result1071 = pair.second.opt_string("attachToPart");
 if (!result1071) return std::unexpected(std::move(result1071.error()));
 damageSourceConfig.attachToPart = std::move(*result1071);
-    auto result1072 = pair.second.getBool("enabled", true);
+    auto result1072 = pair.second.get_bool("enabled", true);
 if (!result1072) return std::unexpected(std::move(result1072.error()));
 damageSourceConfig.enabled.set(std::move(*result1072));
   }
@@ -345,7 +345,7 @@ auto animationConfig = std::move(*result1075);
   auto result1076 = configValue("animationCustom");
 if (!result1076) return std::unexpected(std::move(result1076.error()));
 if (auto customConfig = std::move(*result1076))
-    animationConfig = jsonMerge(animationConfig, customConfig);
+    animationConfig = json_merge(animationConfig, customConfig);
 
   auto result1078 = NetworkedAnimator::create(this->root(), animationConfig, m_path);
 if (!result1078) return std::unexpected(std::move(result1078.error()));
@@ -357,7 +357,7 @@ auto result1080 = std::move(*result1079).iterate_object();
 if (!result1080) return std::unexpected(std::move(result1080.error()));
 for (auto const& p : std::move(*result1080))
     {
-auto result1081 = p.second.toString();
+auto result1081 = p.second.to_string();
 if (!result1081) return std::unexpected(std::move(result1081.error()));
 m_networkedAnimator->setGlobalTag(p.first, std::move(*result1081));
 }
@@ -370,7 +370,7 @@ for (auto const& partPair : std::move(*result1083)) {
   if (!result1084)
     return std::unexpected(std::move(result1084.error()));
   for (auto const& tagPair : std::move(*result1084)) {
-    auto result1085 = tagPair.second.toString();
+    auto result1085 = tagPair.second.to_string();
     if (!result1085)
       return std::unexpected(std::move(result1085.error()));
     m_networkedAnimator->setPartTag(partPair.first, tagPair.first, std::move(*result1085));
@@ -480,10 +480,10 @@ if (!result1268) return std::unexpected(std::move(result1268.error()));
 auto result1269 = EntityDamageTeam::create(std::move(*result1268));
 if (!result1269) return std::unexpected(std::move(result1269.error()));
 m_damageTeam.set(std::move(*result1269));
-  auto result1270 = diskStore.getBool("persistent");
+  auto result1270 = diskStore.get_bool("persistent");
 if (!result1270) return std::unexpected(std::move(result1270.error()));
 setPersistent(std::move(*result1270));
-  auto result1271 = diskStore.getObject("scriptStorage");
+  auto result1271 = diskStore.get_object("scriptStorage");
 if (!result1271) return std::unexpected(std::move(result1271.error()));
 auto result1272 = m_scriptComponent.setScriptStorage(std::move(*result1271));
 if (!result1272) return std::unexpected(std::move(result1272.error()));
@@ -869,14 +869,14 @@ if (!result1145) return std::unexpected(std::move(result1145.error()));
 if (std::move(*result1145)) {
     auto result1146 = args.at(0);
 if (!result1146) return std::unexpected(std::move(result1146.error()));
-auto result1147 = result1146->get().toUInt();
+auto result1147 = result1146->get().to_uint();
 if (!result1147) return std::unexpected(std::move(result1147.error()));
 auto result1148 = m_loungePositions.value_at(std::move(*result1147));
 if (!result1148) return std::unexpected(std::move(result1148.error()));
 auto& loungePosition = result1148->get();
     auto result1149 = args.at(1);
 if (!result1149) return std::unexpected(std::move(result1149.error()));
-auto result1150 = result1149->get().toString();
+auto result1150 = result1149->get().to_string();
 if (!result1150) return std::unexpected(std::move(result1150.error()));
 if (!LoungeControlNames) return std::unexpected(LoungeControlNames.error());
 auto result1151 = LoungeControlNames->get_left(std::move(*result1150));
@@ -889,14 +889,14 @@ if (!result1152) return std::unexpected(std::move(result1152.error()));
 if (std::move(*result1152)) {
     auto result1153 = args.at(0);
 if (!result1153) return std::unexpected(std::move(result1153.error()));
-auto result1154 = result1153->get().toUInt();
+auto result1154 = result1153->get().to_uint();
 if (!result1154) return std::unexpected(std::move(result1154.error()));
 auto result1155 = m_loungePositions.value_at(std::move(*result1154));
 if (!result1155) return std::unexpected(std::move(result1155.error()));
 auto& loungePosition = result1155->get();
     auto result1156 = args.at(1);
 if (!result1156) return std::unexpected(std::move(result1156.error()));
-auto result1157 = result1156->get().toString();
+auto result1157 = result1156->get().to_string();
 if (!result1157) return std::unexpected(std::move(result1157.error()));
 if (!LoungeControlNames) return std::unexpected(LoungeControlNames.error());
 auto result1158 = LoungeControlNames->get_left(std::move(*result1157));
@@ -909,7 +909,7 @@ if (!result1159) return std::unexpected(std::move(result1159.error()));
 if (std::move(*result1159)) {
     auto result1160 = args.at(0);
 if (!result1160) return std::unexpected(std::move(result1160.error()));
-auto result1161 = result1160->get().toUInt();
+auto result1161 = result1160->get().to_uint();
 if (!result1161) return std::unexpected(std::move(result1161.error()));
 auto result1162 = m_loungePositions.value_at(std::move(*result1161));
 if (!result1162) return std::unexpected(std::move(result1162.error()));
@@ -921,7 +921,7 @@ auto result1164 = result1163->get().iterate_array();
 if (!result1164) return std::unexpected(std::move(result1164.error()));
 for (auto const& s : std::move(*result1164))
       {
-auto result1165 = s.toString();
+auto result1165 = s.to_string();
 if (!result1165) return std::unexpected(std::move(result1165.error()));
 if (!LoungeControlNames) return std::unexpected(LoungeControlNames.error());
 auto result1166 = LoungeControlNames->get_left(std::move(*result1165));
@@ -941,18 +941,18 @@ if (!result1167) return std::unexpected(std::move(result1167.error()));
 if (std::move(*result1167)) {
     auto result1168 = args.at(0);
 if (!result1168) return std::unexpected(std::move(result1168.error()));
-auto result1169 = result1168->get().toUInt();
+auto result1169 = result1168->get().to_uint();
 if (!result1169) return std::unexpected(std::move(result1169.error()));
 auto result1170 = m_loungePositions.value_at(std::move(*result1169));
 if (!result1170) return std::unexpected(std::move(result1170.error()));
 auto& loungePosition = result1170->get();
     auto result1171 = args.at(1);
 if (!result1171) return std::unexpected(std::move(result1171.error()));
-auto result1172 = result1171->get().toFloat();
+auto result1172 = result1171->get().to_float();
 if (!result1172) return std::unexpected(std::move(result1172.error()));
 auto result1173 = args.at(2);
 if (!result1173) return std::unexpected(std::move(result1173.error()));
-auto result1174 = result1173->get().toFloat();
+auto result1174 = result1173->get().to_float();
 if (!result1174) return std::unexpected(std::move(result1174.error()));
 loungePosition.masterAimPosition = {std::move(*result1172), std::move(*result1174)};
     return ChainableJsonMessageResponse(Json());
@@ -979,23 +979,23 @@ bool Vehicle::isInteractive() const {
 std::expected<InteractAction, StarException> Vehicle::interact(InteractRequest const& request) {
   auto result1134 = recoverLuaScriptError(m_scriptComponent.invoke<Json>("onInteraction", JsonObject{
       {"sourceId", request.sourceId},
-      {"sourcePosition", jsonFromVec2F(request.sourcePosition)},
-      {"interactPosition", jsonFromVec2F(request.interactPosition)}
+      {"sourcePosition", json_from_vec2f(request.sourcePosition)},
+      {"interactPosition", json_from_vec2f(request.interactPosition)}
     }));
 if (!result1134) return std::unexpected(std::move(result1134.error()));
   auto result = std::move(*result1134).value_or(Json{});
 
-  if (result.isType(Json::Type::String))
+  if (result.is_type(Json::Type::String))
     {
-auto result1136 = result.toString();
+auto result1136 = result.to_string();
 if (!result1136) return std::unexpected(std::move(result1136.error()));
 auto result1137 = InteractAction::create(std::move(*result1136), entityId(), Json());
 if (!result1137) return std::unexpected(std::move(result1137.error()));
 return std::move(*result1137);
 }
-  else if (!result.isNull())
+  else if (!result.is_null())
     {
-auto result1138 = result.getString(0);
+auto result1138 = result.get_string(0);
 if (!result1138) return std::unexpected(std::move(result1138.error()));
 auto result1139 = result.get(1);
 if (!result1139) return std::unexpected(std::move(result1139.error()));
@@ -1061,7 +1061,7 @@ if (!result1131) return std::unexpected(std::move(result1131.error()));
 Mat3F partTransformation = std::move(*result1131);
   auto result1132 = m_networkedAnimator->partProperty(positionConfig.part, positionConfig.partAnchor);
 if (!result1132) return std::unexpected(std::move(result1132.error()));
-auto result1133 = jsonToVec2F(std::move(*result1132));
+auto result1133 = json_to_vec2f(std::move(*result1132));
 if (!result1133) return std::unexpected(std::move(result1133.error()));
 Vec2F partAnchor = std::move(*result1133);
 
@@ -1321,7 +1321,7 @@ if (!result1112) return std::unexpected(std::move(result1112.error()));
   auto result1113 = callbacks.registerCallback("setLoungeStatusEffects", [this](String const& name, JsonArray const& statusEffects)  -> std::expected<void, StarException> {
       auto result988 = m_loungePositions.get(name);
 if (!result988) return std::unexpected(std::move(result988.error()));
-auto result989 = jsonToList<PersistentStatusEffect>(Json(statusEffects),jsonToPersistentStatusEffect);
+auto result989 = json_to_list<PersistentStatusEffect>(Json(statusEffects),jsonToPersistentStatusEffect);
 if (!result989) return std::unexpected(std::move(result989.error()));
 result988->get().statusEffects.set(std::move(*result989));
       return {};
@@ -1384,7 +1384,7 @@ if (!result1121) return std::unexpected(std::move(result1121.error()));
 }
 
 std::expected<Json, StarException> Vehicle::configValue(String const& name, Json def) const {
-  auto result1103 = jsonMergeQueryDef(name, std::move(def), m_baseConfig, m_dynamicConfig);
+  auto result1103 = json_merge_query_def(name, std::move(def), m_baseConfig, m_dynamicConfig);
 if (!result1103) return std::unexpected(std::move(result1103.error()));
 return std::move(*result1103);
 }

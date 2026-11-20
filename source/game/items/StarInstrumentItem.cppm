@@ -145,10 +145,10 @@ std::expected<std::shared_ptr<InstrumentItem>, StarException> InstrumentItem::cr
   auto metadata = root.imageMetadataDatabase();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
-  auto image = item->instanceValue("image").and_then([](Json const& value) { return value.toString(); });
+  auto image = item->instanceValue("image").and_then([](Json const& value) { return value.to_string(); });
   if (!image)
     return std::unexpected(std::move(image.error()));
-  auto position = item->instanceValue("handPosition", JsonArray{0, 0}).and_then(jsonToVec2F);
+  auto position = item->instanceValue("handPosition", JsonArray{0, 0}).and_then(json_to_vec2f);
   if (!position)
     return std::unexpected(std::move(position.error()));
   auto drawable =
@@ -156,10 +156,10 @@ std::expected<std::shared_ptr<InstrumentItem>, StarException> InstrumentItem::cr
   if (!drawable)
     return std::unexpected(std::move(drawable.error()));
   item->m_drawables.push_back(std::move(*drawable));
-  auto activeImage = item->instanceValue("activeImage").and_then([](Json const& value) { return value.toString(); });
+  auto activeImage = item->instanceValue("activeImage").and_then([](Json const& value) { return value.to_string(); });
   if (!activeImage)
     return std::unexpected(std::move(activeImage.error()));
-  auto activePosition = item->instanceValue("activeHandPosition", JsonArray{0, 0}).and_then(jsonToVec2F);
+  auto activePosition = item->instanceValue("activeHandPosition", JsonArray{0, 0}).and_then(json_to_vec2f);
   if (!activePosition)
     return std::unexpected(std::move(activePosition.error()));
   auto activeDrawable = Drawable::makeImage(**metadata, AssetPath::relative_to(directory, *activeImage),
@@ -167,12 +167,12 @@ std::expected<std::shared_ptr<InstrumentItem>, StarException> InstrumentItem::cr
   if (!activeDrawable)
     return std::unexpected(std::move(activeDrawable.error()));
   item->m_activeDrawables.push_back(std::move(*activeDrawable));
-  auto angle = item->instanceValue("activeAngle").and_then([](Json const& value) { return value.toFloat(); });
+  auto angle = item->instanceValue("activeAngle").and_then([](Json const& value) { return value.to_float(); });
   if (!angle)
     return std::unexpected(std::move(angle.error()));
   item->m_activeAngle = (*angle / 180.0f) * std::numbers::pi;
   for (auto const& [key, target] : {std::pair{std::string_view("activeStatusEffects"), std::ref(item->m_activeStatusEffects)}, std::pair{std::string_view("inactiveStatusEffects"), std::ref(item->m_inactiveStatusEffects)}}) {
-    auto effects = item->instanceValue(key, JsonArray()).and_then([](Json const& value) { return value.toArray(); });
+    auto effects = item->instanceValue(key, JsonArray()).and_then([](Json const& value) { return value.to_array(); });
     if (!effects)
       return std::unexpected(std::move(effects.error()));
     for (auto const& value : *effects) {
@@ -182,15 +182,15 @@ std::expected<std::shared_ptr<InstrumentItem>, StarException> InstrumentItem::cr
       target.get().push_back(std::move(*effect));
     }
   }
-  auto activeSources = item->instanceValue("activeEffectSources", JsonArray()).and_then(jsonToStringSet);
+  auto activeSources = item->instanceValue("activeEffectSources", JsonArray()).and_then(json_to_string_set);
   if (!activeSources)
     return std::unexpected(std::move(activeSources.error()));
   item->m_activeEffectSources = std::move(*activeSources);
-  auto inactiveSources = item->instanceValue("inactiveEffectSources", JsonArray()).and_then(jsonToStringSet);
+  auto inactiveSources = item->instanceValue("inactiveEffectSources", JsonArray()).and_then(json_to_string_set);
   if (!inactiveSources)
     return std::unexpected(std::move(inactiveSources.error()));
   item->m_inactiveEffectSources = std::move(*inactiveSources);
-  auto kind = item->instanceValue("kind").and_then([](Json const& value) { return value.toString(); });
+  auto kind = item->instanceValue("kind").and_then([](Json const& value) { return value.to_string(); });
   if (!kind)
     return std::unexpected(std::move(kind.error()));
   item->m_kind = std::move(*kind);

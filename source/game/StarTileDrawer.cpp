@@ -122,21 +122,21 @@ std::expected<void, StarException> TileDrawer::initializeTileDrawer() {
   auto backgroundConfig = (*assets)->json("/rendering.config:backgroundLayerColor");
   if (!backgroundConfig)
     return std::unexpected(std::move(backgroundConfig.error()));
-  auto background = jsonToColor(*backgroundConfig);
+  auto background = json_to_color(*backgroundConfig);
   if (!background)
     return std::unexpected(std::move(background.error()));
   m_backgroundLayerColor = background->to_rgba();
   auto foregroundConfig = (*assets)->json("/rendering.config:foregroundLayerColor");
   if (!foregroundConfig)
     return std::unexpected(std::move(foregroundConfig.error()));
-  auto foreground = jsonToColor(*foregroundConfig);
+  auto foreground = json_to_color(*foregroundConfig);
   if (!foreground)
     return std::unexpected(std::move(foreground.error()));
   m_foregroundLayerColor = foreground->to_rgba();
   auto liquidConfig = (*assets)->json("/rendering.config:liquidDrawLevels");
   if (!liquidConfig)
     return std::unexpected(std::move(liquidConfig.error()));
-  auto liquid = jsonToVec2F(*liquidConfig);
+  auto liquid = json_to_vec2f(*liquidConfig);
   if (!liquid)
     return std::unexpected(std::move(liquid.error()));
   m_liquidDrawLevels = *liquid;

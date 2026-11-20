@@ -212,47 +212,47 @@ std::expected<void, StarException> WirePane::initialize() {
   auto config = (*assets)->json("/player.config:wireConfig");
   if (!config) return std::unexpected(std::move(config.error()));
   {
-    auto value = config->getFloat("minWireWidth");
+    auto value = config->get_float("minWireWidth");
     if (!value) return std::unexpected(std::move(value.error()));
     m_minBeamWidth = *value;
   }
   {
-    auto value = config->getFloat("maxWireWidth");
+    auto value = config->get_float("maxWireWidth");
     if (!value) return std::unexpected(std::move(value.error()));
     m_maxBeamWidth = *value;
   }
   {
-    auto value = config->getFloat("wireWidthDev", (m_maxBeamWidth - m_minBeamWidth) / 3);
+    auto value = config->get_float("wireWidthDev", (m_maxBeamWidth - m_minBeamWidth) / 3);
     if (!value) return std::unexpected(std::move(value.error()));
     m_beamWidthDev = *value;
   }
   {
-    auto value = config->getFloat("minWireTrans");
+    auto value = config->get_float("minWireTrans");
     if (!value) return std::unexpected(std::move(value.error()));
     m_minBeamTrans = *value;
   }
   {
-    auto value = config->getFloat("maxWireTrans");
+    auto value = config->get_float("maxWireTrans");
     if (!value) return std::unexpected(std::move(value.error()));
     m_maxBeamTrans = *value;
   }
   {
-    auto value = config->getFloat("wireTransDev", (m_maxBeamTrans - m_minBeamTrans) / 3);
+    auto value = config->get_float("wireTransDev", (m_maxBeamTrans - m_minBeamTrans) / 3);
     if (!value) return std::unexpected(std::move(value.error()));
     m_beamTransDev = *value;
   }
   {
-    auto value = config->getFloat("innerBrightnessScale");
+    auto value = config->get_float("innerBrightnessScale");
     if (!value) return std::unexpected(std::move(value.error()));
     m_innerBrightnessScale = *value;
   }
   {
-    auto value = config->getFloat("firstStripeThickness");
+    auto value = config->get_float("firstStripeThickness");
     if (!value) return std::unexpected(std::move(value.error()));
     m_firstStripeThickness = *value;
   }
   {
-    auto value = config->getFloat("secondStripeThickness");
+    auto value = config->get_float("secondStripeThickness");
     if (!value) return std::unexpected(std::move(value.error()));
     m_secondStripeThickness = *value;
   }

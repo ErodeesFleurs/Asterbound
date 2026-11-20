@@ -70,19 +70,19 @@ std::expected<void, StarException> SwingableItem::initializeSwingable(Json const
 }
 
 std::expected<void, StarException> SwingableItem::setParams(Json const& params) {
-  auto start = params.getFloat("swingStart", 60);
+  auto start = params.get_float("swingStart", 60);
   if (!start)
     return std::unexpected(std::move(start.error()));
   m_swingStart = *start * std::numbers::pi / 180;
-  auto finish = params.getFloat("swingFinish", -40);
+  auto finish = params.get_float("swingFinish", -40);
   if (!finish)
     return std::unexpected(std::move(finish.error()));
   m_swingFinish = *finish * std::numbers::pi / 180;
-  auto factor = params.getFloat("swingAimFactor", 1);
+  auto factor = params.get_float("swingAimFactor", 1);
   if (!factor)
     return std::unexpected(std::move(factor.error()));
   m_swingAimFactor = *factor;
-  auto coolingDown = params.optFloat("coolingDownAngle");
+  auto coolingDown = params.opt_float("coolingDownAngle");
   if (!coolingDown)
     return std::unexpected(std::move(coolingDown.error()));
   m_coolingDownAngle = coolingDown->transform([](float angle) { return angle * std::numbers::pi / 180; });

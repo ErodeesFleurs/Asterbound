@@ -177,19 +177,19 @@ std::expected<StringSet, StarException> categorizeObject(Root& root, String cons
   if (!config)
     return std::unexpected(std::move(config.error()));
   StringSet categories;
-  auto category = defaults->getString("category");
+  auto category = defaults->get_string("category");
   if (!category)
     return std::unexpected(std::move(category.error()));
   if ((*config)->category != *category)
     categories.insert("objects-by-category/" + (*config)->category);
   for (auto const& tag : (*config)->colonyTags)
     categories.insert("objects-by-colonytag/" + tag);
-  auto type = defaults->getString("objectType");
+  auto type = defaults->get_string("objectType");
   if (!type)
     return std::unexpected(std::move(type.error()));
   if ((*config)->type != *type)
     categories.insert("objects-by-type/" + (*config)->type);
-  auto race = defaults->getString("race");
+  auto race = defaults->get_string("race");
   if (!race)
     return std::unexpected(std::move(race.error()));
   if ((*config)->race != *race)
@@ -212,7 +212,7 @@ std::expected<void, StarException> drawNodes(Assets const& assets, std::shared_p
   if (!nodeImage)
     return std::unexpected(std::move(nodeImage.error()));
   for (Json const& node : nodes) {
-    auto position = jsonToVec2I(node);
+    auto position = json_to_vec2i(node);
     if (!position)
       return std::unexpected(std::move(position.error()));
     Vec2I nodePos = *position * TilePixels + Vec2I(0, TilePixels - (*nodeImage)->height());
@@ -275,13 +275,13 @@ std::expected<void, StarException> defineObjectOrientation(Root& root, TilesetUp
   auto objectConfig = objects->getConfig(objectName);
   if (!objectConfig)
     return std::unexpected(std::move(objectConfig.error()));
-  auto inputNodes = (*objectConfig)->config.getArray("inputNodes", {});
+  auto inputNodes = (*objectConfig)->config.get_array("inputNodes", {});
   if (!inputNodes)
     return std::unexpected(std::move(inputNodes.error()));
   auto inputsDrawn = drawNodes(*assets, combinedImage, imagePosition, *inputNodes, InboundNode);
   if (!inputsDrawn)
     return std::unexpected(std::move(inputsDrawn.error()));
-  auto outputNodes = (*objectConfig)->config.getArray("outputNodes", {});
+  auto outputNodes = (*objectConfig)->config.get_array("outputNodes", {});
   if (!outputNodes)
     return std::unexpected(std::move(outputNodes.error()));
   auto outputsDrawn = drawNodes(*assets, combinedImage, imagePosition, *outputNodes, OutboundNode);

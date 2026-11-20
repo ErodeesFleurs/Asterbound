@@ -60,16 +60,16 @@ std::expected<std::shared_ptr<IslandSurfaceSelector>, StarException> IslandSurfa
   auto result = std::make_shared<IslandSurfaceSelector>(ConstructionKey{}, config, parameters);
   result->layerBaseHeight = parameters.baseHeight;
   result->worldWidth = parameters.worldWidth;
-  auto elevation = config.getFloat("islandElevation");
+  auto elevation = config.get_float("islandElevation");
   if (!elevation)
     return std::unexpected(std::move(elevation.error()));
   result->islandElevation = *elevation;
-  auto taper = config.getFloat("islandTaperPoint");
+  auto taper = config.get_float("islandTaperPoint");
   if (!taper)
     return std::unexpected(std::move(taper.error()));
   result->islandTaperPoint = *taper;
   auto readFunction = [&](String const& name) -> std::expected<PerlinF, StarException> {
-    auto functionConfig = config.getObject(name);
+    auto functionConfig = config.get_object(name);
     if (!functionConfig)
       return std::unexpected(std::move(functionConfig.error()));
     return PerlinF::create(*functionConfig, static_random_u64(parameters.seed, parameters.baseHeight, name));

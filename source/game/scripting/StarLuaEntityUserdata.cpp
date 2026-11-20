@@ -328,8 +328,8 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           result = JsonObject{
             {"nametag", std::move(*nametag)},
             {"displayed", nametagEntity->get().displayNametag()},
-            {"color", jsonFromColor(Color::rgb(*color))},
-            {"origin", jsonFromVec2F(*origin)},
+            {"color", json_from_color(Color::rgb(*color))},
+            {"origin", json_from_vec2f(*origin)},
           };
           if (auto status = nametagEntity->get().statusText()) {
             auto setStatus = result.set("status", *status);
@@ -1216,7 +1216,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
               if (!item)
                 return std::unexpected(std::move(item.error()));
               auto result = container->get().itemBag()->itemsFitWhere(optional_ref(*item));
-              auto slots = jsonFromList<std::size_t>(result.slots);
+              auto slots = json_from_list<std::size_t>(result.slots);
               if (!slots)
                 return std::unexpected(std::move(slots.error()));
               return JsonObject{{"leftover", result.leftover}, {"slots", std::move(*slots)}};

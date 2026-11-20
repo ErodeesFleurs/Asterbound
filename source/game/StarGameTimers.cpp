@@ -131,10 +131,10 @@ std::expected<EpochTimer, StarException> EpochTimer::create(Json json) {
   EpochTimer result;
   auto last = json.get("lastEpochTime");
   if (!last) return std::unexpected(std::move(last.error()));
-  auto lastTime = last->optDouble();
+  auto lastTime = last->opt_double();
   if (!lastTime) return std::unexpected(std::move(lastTime.error()));
   result.m_lastSeenEpochTime = *lastTime;
-  auto elapsed = json.getDouble("elapsedTime");
+  auto elapsed = json.get_double("elapsedTime");
   if (!elapsed) return std::unexpected(std::move(elapsed.error()));
   result.m_elapsedTime = *elapsed;
   return result;

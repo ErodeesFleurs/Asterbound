@@ -45,19 +45,19 @@ TerrainSelectorParameters::TerrainSelectorParameters(RandomService& random) {
 
 std::expected<TerrainSelectorParameters, StarException> TerrainSelectorParameters::create(Json const& v) {
   TerrainSelectorParameters result;
-  auto worldWidth = v.getUInt("worldWidth");
+  auto worldWidth = v.get_uint("worldWidth");
   if (!worldWidth)
     return std::unexpected(std::move(worldWidth.error()));
   result.worldWidth = *worldWidth;
-  auto baseHeight = v.getFloat("baseHeight");
+  auto baseHeight = v.get_float("baseHeight");
   if (!baseHeight)
     return std::unexpected(std::move(baseHeight.error()));
   result.baseHeight = *baseHeight;
-  auto seed = v.getUInt("seed");
+  auto seed = v.get_uint("seed");
   if (!seed)
     return std::unexpected(std::move(seed.error()));
   result.seed = *seed;
-  auto commonality = v.getFloat("commonality");
+  auto commonality = v.get_float("commonality");
   if (!commonality)
     return std::unexpected(std::move(commonality.error()));
   result.commonality = *commonality;
@@ -104,12 +104,12 @@ std::expected<std::shared_ptr<TerrainDatabase>, StarException> TerrainDatabase::
         auto parameters = assets->json(path.string());
         if (!parameters)
           return std::unexpected(std::move(parameters.error()));
-        auto name = parameters->getString("name");
+        auto name = parameters->get_string("name");
         if (!name)
           return std::unexpected(std::move(name.error()));
         auto selectorType = type;
         if (composed) {
-          auto configuredType = parameters->getString("type");
+          auto configuredType = parameters->get_string("type");
           if (!configuredType)
             return std::unexpected(std::move(configuredType.error()));
           selectorType = std::move(*configuredType);
@@ -157,9 +157,9 @@ Json TerrainDatabase::storeSelector(std::shared_ptr<TerrainSelector const> const
 }
 
 std::expected<std::shared_ptr<TerrainSelector const>, StarException> TerrainDatabase::loadSelector(Json const& store) const {
-  if (store.isNull())
+  if (store.is_null())
     return std::shared_ptr<TerrainSelector const>{};
-  auto type = store.getString("type");
+  auto type = store.get_string("type");
   if (!type)
     return std::unexpected(std::move(type.error()));
   auto config = store.get("config");

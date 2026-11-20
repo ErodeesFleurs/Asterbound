@@ -34,12 +34,12 @@ extern std::expected<EnumMap<EquipmentSlot>, StarException> const EquipmentSlotN
 });
 
 [[nodiscard]] std::expected<InventorySlot, StarException> jsonToInventorySlot(Json const& json) {
-  auto type = json.getString("type");
+  auto type = json.get_string("type");
   if (!type) return std::unexpected(std::move(type.error()));
   auto location = json.get("location", Json());
   if (!location) return std::unexpected(std::move(location.error()));
   if (*type == "equipment") {
-    auto name = location->toString();
+    auto name = location->to_string();
     if (!name) return std::unexpected(std::move(name.error()));
     if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
     auto slot = EquipmentSlotNames->get_left(*name);
@@ -50,7 +50,7 @@ extern std::expected<EnumMap<EquipmentSlot>, StarException> const EquipmentSlotN
   } else if (*type == "trash") {
     return InventorySlot(TrashSlot());
   } else {
-    auto index = location->toUInt();
+    auto index = location->to_uint();
     if (!index) return std::unexpected(std::move(index.error()));
     return InventorySlot(BagSlot(*type, *index));
   }
@@ -103,17 +103,17 @@ extern std::expected<EnumMap<EssentialItem>, StarException> const EssentialItemN
 });
 
 [[nodiscard]] std::expected<SelectedActionBarLocation, StarException> jsonToSelectedActionBarLocation(Json const& json) {
-  if (json.isType(Json::Type::String)) {
-    auto name = json.toString();
+  if (json.is_type(Json::Type::String)) {
+    auto name = json.to_string();
     if (!name) return std::unexpected(std::move(name.error()));
     if (!EssentialItemNames) return std::unexpected(EssentialItemNames.error());
     auto item = EssentialItemNames->get_left(*name);
     if (!item) return std::unexpected(std::move(item.error()));
     return SelectedActionBarLocation(item->get());
-  } else if (json.isNull()) {
+  } else if (json.is_null()) {
     return SelectedActionBarLocation();
   } else {
-    auto index = json.toUInt();
+    auto index = json.to_uint();
     if (!index) return std::unexpected(std::move(index.error()));
     return SelectedActionBarLocation(static_cast<CustomBarIndex>(*index));
   }

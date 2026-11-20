@@ -38,13 +38,13 @@ SpawnParameters::SpawnParameters()
 
 std::expected<SpawnParameters, StarException> SpawnParameters::create(Json const& config) {
   SpawnParameters result;
-  if (config.isNull())
+  if (config.is_null())
     return result;
   result.areas.clear();
   if (!AreaNames) return std::unexpected(AreaNames.error());
   if (!RegionNames) return std::unexpected(RegionNames.error());
   if (!TimeNames) return std::unexpected(TimeNames.error());
-  auto areaName = config.optString("area");
+  auto areaName = config.opt_string("area");
   if (!areaName) return std::unexpected(std::move(areaName.error()));
   if (*areaName) {
     if (**areaName == "all")
@@ -55,11 +55,11 @@ std::expected<SpawnParameters, StarException> SpawnParameters::create(Json const
       result.areas.add(area->get());
     }
   } else {
-    auto areaNames = config.optArray("areas");
+    auto areaNames = config.opt_array("areas");
     if (!areaNames) return std::unexpected(std::move(areaNames.error()));
     if (*areaNames) {
       for (auto const& entry : **areaNames) {
-        auto name = entry.toString();
+        auto name = entry.to_string();
         if (!name) return std::unexpected(std::move(name.error()));
         auto area = AreaNames->get_left(*name);
         if (!area) return std::unexpected(std::move(area.error()));
@@ -67,12 +67,12 @@ std::expected<SpawnParameters, StarException> SpawnParameters::create(Json const
       }
     }
   }
-  auto regionName = config.getString("region");
+  auto regionName = config.get_string("region");
   if (!regionName) return std::unexpected(std::move(regionName.error()));
   auto region = RegionNames->get_left(*regionName);
   if (!region) return std::unexpected(std::move(region.error()));
   result.region = region->get();
-  auto timeName = config.getString("time");
+  auto timeName = config.get_string("time");
   if (!timeName) return std::unexpected(std::move(timeName.error()));
   auto time = TimeNames->get_left(*timeName);
   if (!time) return std::unexpected(std::move(time.error()));
@@ -97,17 +97,17 @@ std::expected<EnumMap<SpawnParameters::Time>, StarException> const SpawnParamete
 
 std::expected<SpawnType, StarException> spawnTypeFromJson(Json const& config) {
   SpawnType result;
-  auto name = config.getString("name");
+  auto name = config.get_string("name");
   if (!name) return std::unexpected(std::move(name.error()));
   result.typeName = std::move(*name);
   auto dayConfig = config.get("dayLevelAdjustment", JsonArray{0, 0});
   if (!dayConfig) return std::unexpected(std::move(dayConfig.error()));
-  auto day = jsonToVec2F(*dayConfig);
+  auto day = json_to_vec2f(*dayConfig);
   if (!day) return std::unexpected(std::move(day.error()));
   result.dayLevelAdjustment = *day;
   auto nightConfig = config.get("nightLevelAdjustment", JsonArray{0, 0});
   if (!nightConfig) return std::unexpected(std::move(nightConfig.error()));
-  auto night = jsonToVec2F(*nightConfig);
+  auto night = json_to_vec2f(*nightConfig);
   if (!night) return std::unexpected(std::move(night.error()));
   result.nightLevelAdjustment = *night;
   auto monsterType = config.get("monsterType");
@@ -117,7 +117,7 @@ std::expected<SpawnType, StarException> spawnTypeFromJson(Json const& config) {
     if (!pool) return std::unexpected(std::move(pool.error()));
     result.monsterType = std::move(*pool);
   } else {
-    auto name = monsterType->toString();
+    auto name = monsterType->to_string();
     if (!name) return std::unexpected(std::move(name.error()));
     result.monsterType = std::move(*name);
   }
@@ -126,10 +126,10 @@ std::expected<SpawnType, StarException> spawnTypeFromJson(Json const& config) {
   result.monsterParameters = std::move(*parameters);
   auto sizeConfig = config.get("groupSize", JsonArray{1, 1});
   if (!sizeConfig) return std::unexpected(std::move(sizeConfig.error()));
-  auto size = jsonToVec2I(*sizeConfig);
+  auto size = json_to_vec2i(*sizeConfig);
   if (!size) return std::unexpected(std::move(size.error()));
   result.groupSize = *size;
-  auto chance = config.getFloat("spawnChance");
+  auto chance = config.get_float("spawnChance");
   if (!chance) return std::unexpected(std::move(chance.error()));
   result.spawnChance = *chance;
   auto spawnConfig = config.get("spawnParameters", {});
@@ -137,7 +137,7 @@ std::expected<SpawnType, StarException> spawnTypeFromJson(Json const& config) {
   auto spawn = SpawnParameters::create(*spawnConfig);
   if (!spawn) return std::unexpected(std::move(spawn.error()));
   result.spawnParameters = std::move(*spawn);
-  auto seed = config.getUInt("seedMix", 0);
+  auto seed = config.get_uint("seedMix", 0);
   if (!seed) return std::unexpected(std::move(seed.error()));
   result.seedMix = *seed;
   return result;
@@ -148,7 +148,7 @@ SpawnProfile::SpawnProfile() = default;
 std::expected<SpawnProfile, StarException> SpawnProfile::create(Json const& config) {
   auto typesConfig = config.get("spawnTypes", JsonArray());
   if (!typesConfig) return std::unexpected(std::move(typesConfig.error()));
-  auto types = jsonToStringSet(*typesConfig);
+  auto types = json_to_string_set(*typesConfig);
   if (!types) return std::unexpected(std::move(types.error()));
   auto parameters = config.get("monsterParameters", {});
   if (!parameters) return std::unexpected(std::move(parameters.error()));
@@ -160,7 +160,7 @@ SpawnProfile::SpawnProfile(StringSet spawnTypes, Json monsterParameters)
 
 Json SpawnProfile::toJson() const {
   return JsonObject{
-    {"spawnTypes", jsonFromStringSet(spawnTypes)},
+    {"spawnTypes", json_from_string_set(spawnTypes)},
     {"monsterParameters", monsterParameters}
   };
 }
@@ -169,14 +169,14 @@ std::expected<SpawnProfile, StarException> constructSpawnProfile(Assets const& a
   SpawnProfile result;
   auto commonGroups = assets.json("/spawning.config:spawnGroups");
   if (!commonGroups) return std::unexpected(assets.withAssetContext(std::move(commonGroups.error()), "/spawning.config:spawnGroups", "Loading common spawn groups"));
-  auto groups = config.getArray("groups", JsonArray());
+  auto groups = config.get_array("groups", JsonArray());
   if (!groups) return std::unexpected(std::move(groups.error()));
   for (auto const& group : *groups) {
     auto poolConfig = group.get("pool");
     if (!poolConfig) return std::unexpected(std::move(poolConfig.error()));
     bool commonPool = false;
-    if (poolConfig->canConvert(Json::Type::String)) {
-      auto name = poolConfig->toString();
+    if (poolConfig->can_convert(Json::Type::String)) {
+      auto name = poolConfig->to_string();
       if (!name) return std::unexpected(std::move(name.error()));
       auto common = commonGroups->get(*name);
       if (!common) return std::unexpected(assets.withAssetContext(std::move(common.error()), "/spawning.config:spawnGroups", "Loading common spawn group"));
@@ -189,11 +189,11 @@ std::expected<SpawnProfile, StarException> constructSpawnProfile(Assets const& a
         return std::unexpected(assets.withAssetContext(std::move(pool.error()), "/spawning.config:spawnGroups", "Loading common spawn group"));
       return std::unexpected(std::move(pool.error()));
     }
-    auto count = group.getUInt("select");
+    auto count = group.get_uint("select");
     if (!count) return std::unexpected(std::move(count.error()));
     result.spawnTypes.insert_range(pool->select_unique(*count, ++seed));
   }
-  auto parameters = config.getObject("monsterParameters", JsonObject());
+  auto parameters = config.get_object("monsterParameters", JsonObject());
   if (!parameters) return std::unexpected(std::move(parameters.error()));
   result.monsterParameters = std::move(*parameters);
   return result;

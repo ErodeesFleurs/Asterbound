@@ -227,8 +227,8 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
         auto metadata = (*assets)->assetSourceMetadata(sourcePath);
         if (!metadata)
           return std::unexpected(std::move(metadata.error()));
-        if (auto name = metadata->find_ref("name"); name && name->get().isType(Json::Type::String)) {
-          auto text = name->get().toString();
+        if (auto name = metadata->find_ref("name"); name && name->get().is_type(Json::Type::String)) {
+          auto text = name->get().to_string();
           if (!text)
             return std::unexpected(std::move(text.error()));
           if (*text == *modName)
@@ -1046,7 +1046,7 @@ std::expected<String, StarException> LuaBindings::RootCallbacks::itemType(ItemDa
 std::expected<Json, StarException> LuaBindings::RootCallbacks::itemTags(ItemDatabase const& database, String const& itemName) {
   auto tags = database.itemTags(itemName);
   if (!tags) return std::unexpected(std::move(tags.error()));
-  return jsonFromStringSet(*tags);
+  return json_from_string_set(*tags);
 }
 
 std::expected<bool, StarException> LuaBindings::RootCallbacks::itemHasTag(ItemDatabase const& database, String const& itemName, String const& itemTag) {

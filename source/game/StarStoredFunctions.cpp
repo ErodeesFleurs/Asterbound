@@ -239,8 +239,8 @@ StringList FunctionDatabase::namedConfigFunctions() const {
 }
 
 std::expected<std::shared_ptr<StoredFunction>, StarException> FunctionDatabase::function(Json const& configOrName) const {
-  if (configOrName.isType(Json::Type::String)) {
-    auto name = configOrName.toString();
+  if (configOrName.is_type(Json::Type::String)) {
+    auto name = configOrName.to_string();
     if (!name)
       return std::unexpected(std::move(name.error()));
     auto value = m_functions.get(*name);
@@ -255,8 +255,8 @@ std::expected<std::shared_ptr<StoredFunction>, StarException> FunctionDatabase::
 }
 
 std::expected<std::shared_ptr<StoredFunction2>, StarException> FunctionDatabase::function2(Json const& configOrName) const {
-  if (configOrName.isType(Json::Type::String)) {
-    auto name = configOrName.toString();
+  if (configOrName.is_type(Json::Type::String)) {
+    auto name = configOrName.to_string();
     if (!name)
       return std::unexpected(std::move(name.error()));
     auto value = m_functions2.get(*name);
@@ -271,8 +271,8 @@ std::expected<std::shared_ptr<StoredFunction2>, StarException> FunctionDatabase:
 }
 
 std::expected<std::shared_ptr<StoredConfigFunction>, StarException> FunctionDatabase::configFunction(Json const& configOrName) const {
-  if (configOrName.isType(Json::Type::String)) {
-    auto name = configOrName.toString();
+  if (configOrName.is_type(Json::Type::String)) {
+    auto name = configOrName.to_string();
     if (!name)
       return std::unexpected(std::move(name.error()));
     auto value = m_configFunctions.get(*name);
@@ -330,10 +330,10 @@ namespace {
 
 std::expected<ParametricFunction<double, double>, StarException> FunctionDatabase::parametricFunctionFromConfig(Json descriptor) {
   auto parsed = [&]() -> std::expected<ParametricFunction<double, double>, StarException> {
-    auto interpolationName = descriptor.getString(0);
+    auto interpolationName = descriptor.get_string(0);
     if (!interpolationName)
       return std::unexpected(std::move(interpolationName.error()));
-    auto boundName = descriptor.getString(1);
+    auto boundName = descriptor.get_string(1);
     if (!boundName)
       return std::unexpected(std::move(boundName.error()));
     auto size = descriptor.size();
@@ -346,10 +346,10 @@ std::expected<ParametricFunction<double, double>, StarException> FunctionDatabas
         return std::unexpected(std::move(pair.error()));
       if ((*pair)->size() != 2)
         return std::unexpected(StoredFunctionException("Each point must be a list of size 2"));
-      auto index = (**pair)[0].toDouble();
+      auto index = (**pair)[0].to_double();
       if (!index)
         return std::unexpected(std::move(index.error()));
-      auto value = (**pair)[1].toDouble();
+      auto value = (**pair)[1].to_double();
       if (!value)
         return std::unexpected(std::move(value.error()));
       points.push_back({*index, *value});
@@ -379,7 +379,7 @@ std::expected<ParametricTable<int, Json>, StarException> FunctionDatabase::param
         return std::unexpected(std::move(pair.error()));
       if ((*pair)->size() != 2)
         return std::unexpected(StoredFunctionException("Each point must be a list of size 2"));
-      auto index = (**pair)[0].toInt();
+      auto index = (**pair)[0].to_int();
       if (!index)
         return std::unexpected(std::move(index.error()));
       points.push_back({*index, (**pair)[1]});
@@ -393,10 +393,10 @@ std::expected<ParametricTable<int, Json>, StarException> FunctionDatabase::param
 
 std::expected<MultiTable2D, StarException> FunctionDatabase::multiTable2DFromConfig(Json descriptor) {
   auto parsed = [&]() -> std::expected<MultiTable2D, StarException> {
-    auto interpolationName = descriptor.getString(0);
+    auto interpolationName = descriptor.get_string(0);
     if (!interpolationName)
       return std::unexpected(std::move(interpolationName.error()));
-    auto boundName = descriptor.getString(1);
+    auto boundName = descriptor.get_string(1);
     if (!boundName)
       return std::unexpected(std::move(boundName.error()));
     auto grid = descriptor.get(2).and_then([](Json const& value) { return value.array_ptr(); });
@@ -415,7 +415,7 @@ std::expected<MultiTable2D, StarException> FunctionDatabase::multiTable2DFromCon
         if ((*row)->empty())
           return std::unexpected(StoredFunctionException("Function2 axis row must contain a header"));
         for (std::size_t x = 1; x < (*row)->size(); ++x) {
-          auto value = (**row)[x].toFloat();
+          auto value = (**row)[x].to_float();
           if (!value)
             return std::unexpected(std::move(value.error()));
           xaxis.push_back(*value);
@@ -426,7 +426,7 @@ std::expected<MultiTable2D, StarException> FunctionDatabase::multiTable2DFromCon
       } else {
         if ((*row)->size() < 2)
           return std::unexpected(StoredFunctionException("Function2 row must contain an axis and samples"));
-        auto axis = (**row)[0].toFloat();
+        auto axis = (**row)[0].to_float();
         if (!axis)
           return std::unexpected(std::move(axis.error()));
         yaxis.push_back(*axis);
@@ -436,7 +436,7 @@ std::expected<MultiTable2D, StarException> FunctionDatabase::multiTable2DFromCon
         if ((*cells)->size() != xaxis.size())
           return std::unexpected(StarException("Number of sample points doesn't match axis size."));
         for (std::size_t x = 0; x < (*cells)->size(); ++x) {
-          auto value = (**cells)[x].toFloat();
+          auto value = (**cells)[x].to_float();
           if (!value)
             return std::unexpected(std::move(value.error()));
           auto set = points.set({x, y - 1}, *value);

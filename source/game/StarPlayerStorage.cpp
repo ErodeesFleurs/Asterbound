@@ -156,7 +156,7 @@ std::expected<void, StarException> PlayerStorage::initialize(String const& stora
   auto clearSetting = (*configuration)->get("clearPlayerFiles");
   if (!clearSetting)
     return std::unexpected(std::move(clearSetting.error()));
-  auto clearPlayerFiles = clearSetting->toBool();
+  auto clearPlayerFiles = clearSetting->to_bool();
   if (!clearPlayerFiles)
     return std::unexpected(std::move(clearPlayerFiles.error()));
   auto files = File::directory_entries(m_storageDirectory);
@@ -192,7 +192,7 @@ std::expected<void, StarException> PlayerStorage::initialize(String const& stora
         auto json = VersionedJson::read_file(filename);
         if (!json)
           return std::unexpected(std::move(json.error()));
-        auto uuidText = json->content.getString("uuid");
+        auto uuidText = json->content.get_string("uuid");
         if (!uuidText)
           return std::unexpected(std::move(uuidText.error()));
         auto uuid = Uuid::create(*uuidText);
@@ -233,7 +233,7 @@ std::expected<void, StarException> PlayerStorage::initialize(String const& stora
     // Quarantine malformed saves from the visible cache, retaining their files.
     for (auto it = m_savedPlayersCache.begin(); it != m_savedPlayersCache.end();) {
       auto& entry = *it;
-      if (entry.second.isNull()) {
+      if (entry.second.is_null()) {
         it = m_savedPlayersCache.erase(it);
         continue;
       }
@@ -274,22 +274,22 @@ std::expected<void, StarException> PlayerStorage::initialize(String const& stora
     auto contents = File::read_file_string(File::relative_to(m_storageDirectory, "metadata"));
     if (!contents)
       return std::unexpected(std::move(contents.error()));
-    auto json = Json::parseJson(*contents);
+    auto json = Json::parse_json(*contents);
     if (!json)
       return std::unexpected(std::move(json.error()));
-    auto object = json->toObject();
+    auto object = json->to_object();
     if (!object)
       return std::unexpected(std::move(object.error()));
     m_metadata = std::move(*object);
     auto order = json->get("order", Json());
     if (!order)
       return std::unexpected(std::move(order.error()));
-    if (!order->isNull()) {
+    if (!order->is_null()) {
       auto entries = order->iterate_array();
       if (!entries)
         return std::unexpected(std::move(entries.error()));
       for (auto const& jUuid : *entries) {
-        auto text = jUuid.toString();
+        auto text = jUuid.to_string();
         if (!text)
           return std::unexpected(std::move(text.error()));
         auto uuid = Uuid::create(*text);
@@ -344,7 +344,7 @@ std::expected<std::optional<Uuid>, StarException> PlayerStorage::playerUuidByNam
   for (auto& cache : m_savedPlayersCache) {
     if (except && *except == cache.first)
       continue;
-    auto playerName = cache.second.optQueryString("identity.name");
+    auto playerName = cache.second.opt_query_string("identity.name");
     if (!playerName)
       return std::unexpected(std::move(playerName.error()));
     if (!*playerName)
@@ -373,7 +373,7 @@ std::expected<List<Uuid>, StarException> PlayerStorage::playerUuidListByName(Str
   for (auto& cache : m_savedPlayersCache) {
     if (except && *except == cache.first)
       continue;
-    auto playerName = cache.second.optQueryString("identity.name");
+    auto playerName = cache.second.opt_query_string("identity.name");
     if (!playerName)
       return std::unexpected(std::move(playerName.error()));
     if (!*playerName)
@@ -501,7 +501,7 @@ std::expected<void, StarException> PlayerStorage::deletePlayer(Uuid const& uuid)
   auto setting = (*configuration)->get("playerBackupFileCount");
   if (!setting)
     return std::unexpected(std::move(setting.error()));
-  auto playerBackupFileCount = setting->toUInt();
+  auto playerBackupFileCount = setting->to_uint();
   if (!playerBackupFileCount)
     return std::unexpected(std::move(playerBackupFileCount.error()));
   for (unsigned i = 1, count = static_cast<unsigned>(*playerBackupFileCount); i <= count; ++i) {
@@ -573,7 +573,7 @@ std::expected<void, StarException> PlayerStorage::backupCycle(Uuid const& uuid) 
   auto setting = (*configuration)->get("playerBackupFileCount");
   if (!setting)
     return std::unexpected(std::move(setting.error()));
-  auto playerBackupFileCount = setting->toUInt();
+  auto playerBackupFileCount = setting->to_uint();
   if (!playerBackupFileCount)
     return std::unexpected(std::move(playerBackupFileCount.error()));
   auto fileName = uuidFileName(uuid);
@@ -632,7 +632,7 @@ std::expected<void, StarException> PlayerStorage::writeMetadata() {
   Json metadata(m_metadata);
   if (m_writtenMetadata && *m_writtenMetadata == metadata)
     return {};
-  auto contents = metadata.printJson(0);
+  auto contents = metadata.print_json(0);
   if (!contents)
     return std::unexpected(std::move(contents.error()));
   String filename = File::relative_to(m_storageDirectory, "metadata");

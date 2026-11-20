@@ -155,33 +155,33 @@ std::expected<std::shared_ptr<LiquidItem>, StarException> LiquidItem::create(Roo
   auto database = root.liquidsDatabase();
   if (!database)
     return std::unexpected(std::move(database.error()));
-  auto liquid = config.getString("liquid");
+  auto liquid = config.get_string("liquid");
   if (!liquid)
     return std::unexpected(std::move(liquid.error()));
   auto id = (*database)->liquidId(*liquid);
   if (!id)
     return std::unexpected(std::move(id.error()));
   item->m_liquidId = *id;
-  auto twoHanded = config.getBool("twoHanded", true);
+  auto twoHanded = config.get_bool("twoHanded", true);
   if (!twoHanded)
     return std::unexpected(std::move(twoHanded.error()));
   item->setTwoHanded(*twoHanded);
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto quantity = (*assets)->json("/items/defaultParameters.config:liquidItems.bucketSize").and_then([](Json const& value) { return value.toUInt(); });
+  auto quantity = (*assets)->json("/items/defaultParameters.config:liquidItems.bucketSize").and_then([](Json const& value) { return value.to_uint(); });
   if (!quantity)
     return std::unexpected(std::move(quantity.error()));
   item->m_quantity = *quantity;
-  auto cooldown = (*assets)->json("/items/defaultParameters.config:liquidItems.cooldown").and_then([](Json const& value) { return value.toFloat(); });
+  auto cooldown = (*assets)->json("/items/defaultParameters.config:liquidItems.cooldown").and_then([](Json const& value) { return value.to_float(); });
   if (!cooldown)
     return std::unexpected(std::move(cooldown.error()));
   item->setCooldownTime(*cooldown);
-  auto radius = (*assets)->json("/items/defaultParameters.config:blockRadius").and_then([](Json const& value) { return value.toFloat(); });
+  auto radius = (*assets)->json("/items/defaultParameters.config:blockRadius").and_then([](Json const& value) { return value.to_float(); });
   if (!radius)
     return std::unexpected(std::move(radius.error()));
   item->m_blockRadius = *radius;
-  auto altRadius = (*assets)->json("/items/defaultParameters.config:altBlockRadius").and_then([](Json const& value) { return value.toFloat(); });
+  auto altRadius = (*assets)->json("/items/defaultParameters.config:altBlockRadius").and_then([](Json const& value) { return value.to_float(); });
   if (!altRadius)
     return std::unexpected(std::move(altRadius.error()));
   item->m_altBlockRadius = *altRadius;

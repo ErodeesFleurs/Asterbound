@@ -39,35 +39,35 @@ std::string_view const PerlinSelector::Name = "perlin";
 
 std::expected<std::shared_ptr<PerlinSelector>, StarException> PerlinSelector::create(Json const& config, TerrainSelectorParameters const& parameters) {
   RandomSource random(parameters.seed);
-  auto functionName = config.getString("function");
+  auto functionName = config.get_string("function");
   if (!functionName)
     return std::unexpected(std::move(functionName.error()));
   auto type = enum_value<PerlinTypeNames>(StringView(*functionName));
   if (!type)
     return std::unexpected(std::move(type.error()));
-  auto octaves = config.getFloat("octaves");
+  auto octaves = config.get_float("octaves");
   if (!octaves)
     return std::unexpected(std::move(octaves.error()));
-  auto freq = config.getFloat("freq");
+  auto freq = config.get_float("freq");
   if (!freq)
     return std::unexpected(std::move(freq.error()));
-  auto amp = config.getFloat("amp");
+  auto amp = config.get_float("amp");
   if (!amp)
     return std::unexpected(std::move(amp.error()));
-  auto bias = config.getFloat("bias", 0.0f);
+  auto bias = config.get_float("bias", 0.0f);
   if (!bias)
     return std::unexpected(std::move(bias.error()));
-  auto alpha = config.getFloat("alpha", 2.0f);
+  auto alpha = config.get_float("alpha", 2.0f);
   if (!alpha)
     return std::unexpected(std::move(alpha.error()));
-  auto beta = config.getFloat("beta", 2.0f);
+  auto beta = config.get_float("beta", 2.0f);
   if (!beta)
     return std::unexpected(std::move(beta.error()));
   PerlinF function(*type, *octaves, *freq, *amp, *bias, *alpha, *beta, random.next_u64());
-  auto xInfluence = config.getFloat("xInfluence", 1.0f);
+  auto xInfluence = config.get_float("xInfluence", 1.0f);
   if (!xInfluence)
     return std::unexpected(std::move(xInfluence.error()));
-  auto yInfluence = config.getFloat("yInfluence", 1.0f);
+  auto yInfluence = config.get_float("yInfluence", 1.0f);
   if (!yInfluence)
     return std::unexpected(std::move(yInfluence.error()));
   return std::make_shared<PerlinSelector>(ConstructionKey{}, config, parameters, std::move(function), *xInfluence, *yInfluence);

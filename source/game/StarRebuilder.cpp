@@ -51,13 +51,13 @@ std::expected<std::shared_ptr<Rebuilder>, StarException> Rebuilder::create(Root&
     auto scripts = metadata->maybe("errorHandlers");
     if (!scripts)
       continue;
-    auto scriptPaths = scripts->optArray(id);
+    auto scriptPaths = scripts->opt_array(id);
     if (!scriptPaths)
       return std::unexpected(std::move(scriptPaths.error()));
     if (!*scriptPaths)
       continue;
     for (auto const& scriptPath : **scriptPaths) {
-      auto pathString = scriptPath.toString();
+      auto pathString = scriptPath.to_string();
       if (!pathString)
         return std::unexpected(std::move(pathString.error()));
       auto context = rebuilder->m_luaRoot->createContext(*pathString);

@@ -59,7 +59,7 @@ std::expected<CelestialParameters, StarException> CelestialParameters::create(
   auto typeJson = result.getParameter("worldType");
   if (!typeJson)
     return std::unexpected(std::move(typeJson.error()));
-  auto worldType = typeJson->optString();
+  auto worldType = typeJson->opt_string();
   if (!worldType)
     return std::unexpected(std::move(worldType.error()));
   if (*worldType) {
@@ -76,13 +76,13 @@ std::expected<CelestialParameters, StarException> CelestialParameters::create(
       auto sizeJson = result.getParameter("worldSize");
       if (!sizeJson)
         return std::unexpected(std::move(sizeJson.error()));
-      auto worldSize = sizeJson->toString();
+      auto worldSize = sizeJson->to_string();
       if (!worldSize)
         return std::unexpected(std::move(worldSize.error()));
       auto selected = result.randomizeParameterList("terrestrialType");
       if (!selected)
         return std::unexpected(std::move(selected.error()));
-      auto type = selected->toString();
+      auto type = selected->to_string();
       if (!type)
         return std::unexpected(std::move(type.error()));
       auto visitable = generateTerrestrialWorldParameters(root, *type, *worldSize, seed);
@@ -98,7 +98,7 @@ std::expected<CelestialParameters, StarException> CelestialParameters::create(
       auto dungeonJson = result.getParameter("dungeonWorld");
       if (!dungeonJson)
         return std::unexpected(std::move(dungeonJson.error()));
-      auto dungeonName = dungeonJson->toString();
+      auto dungeonName = dungeonJson->to_string();
       if (!dungeonName)
         return std::unexpected(std::move(dungeonName.error()));
       auto visitable = generateFloatingDungeonWorldParameters(root, *dungeonName);
@@ -134,10 +134,10 @@ std::expected<CelestialParameters, StarException> CelestialParameters::create(Js
   auto coordinate = CelestialCoordinate::create(*coordinateJson);
   if (!coordinate)
     return std::unexpected(std::move(coordinate.error()));
-  auto seed = variant.getUInt("seed");
+  auto seed = variant.get_uint("seed");
   if (!seed)
     return std::unexpected(std::move(seed.error()));
-  auto name = variant.getString("name");
+  auto name = variant.get_string("name");
   if (!name)
     return std::unexpected(std::move(name.error()));
   auto parameters = variant.get("parameters");
@@ -206,9 +206,9 @@ std::expected<Json, StarException> CelestialParameters::randomizeParameterList(S
   auto parameter = getParameter(name, Json());
   if (!parameter)
     return std::unexpected(std::move(parameter.error()));
-  if (parameter->isNull())
+  if (parameter->is_null())
     return Json();
-  auto array = parameter->toArray();
+  auto array = parameter->to_array();
   if (!array)
     return std::unexpected(std::move(array.error()));
   auto selected = static_random_from(*array, mix, m_seed, name);
@@ -221,9 +221,9 @@ std::expected<Json, StarException> CelestialParameters::randomizeParameterRange(
   auto parameter = getParameter(name, Json());
   if (!parameter)
     return std::unexpected(std::move(parameter.error()));
-  if (parameter->isNull())
+  if (parameter->is_null())
     return Json();
-  auto list = parameter->toArray();
+  auto list = parameter->to_array();
   if (!list)
     return std::unexpected(std::move(list.error()));
   if (list->size() != 2)
@@ -235,18 +235,18 @@ std::expected<Json, StarException> CelestialParameters::randomizeParameterRange(
 std::expected<Json, StarException> CelestialParameters::randomizeParameterRange(
     JsonArray const& range, std::int32_t mix, std::optional<String> const& name) const {
   if (range[0].type() == Json::Type::Int) {
-    auto min = range[0].toInt();
+    auto min = range[0].to_int();
     if (!min)
       return std::unexpected(std::move(min.error()));
-    auto max = range[1].toInt();
+    auto max = range[1].to_int();
     if (!max)
       return std::unexpected(std::move(max.error()));
     return Json(static_random_u64(mix, m_seed, name.value_or("")) % (*max - *min + 1) + *min);
   } else {
-    auto min = range[0].toDouble();
+    auto min = range[0].to_double();
     if (!min)
       return std::unexpected(std::move(min.error()));
-    auto max = range[1].toDouble();
+    auto max = range[1].to_double();
     if (!max)
       return std::unexpected(std::move(max.error()));
     return Json(static_random_double(mix, m_seed, name.value_or("")) * (*max - *min) + *min);

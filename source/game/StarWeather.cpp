@@ -171,11 +171,11 @@ std::expected<void, StarException> ServerWeather::update(double dt) {
     if (!assets) return std::unexpected(std::move(assets.error()));
     auto cooldownConfig = (*assets)->json("/weather.config:weatherCooldownTime");
     if (!cooldownConfig) return std::unexpected(std::move(cooldownConfig.error()));
-    auto cooldown = cooldownConfig->toDouble();
+    auto cooldown = cooldownConfig->to_double();
     if (!cooldown) return std::unexpected(std::move(cooldown.error()));
     auto warmupConfig = (*assets)->json("/weather.config:weatherWarmupTime");
     if (!warmupConfig) return std::unexpected(std::move(warmupConfig.error()));
-    auto warmup = warmupConfig->toDouble();
+    auto warmup = warmupConfig->to_double();
     if (!warmup) return std::unexpected(std::move(warmup.error()));
     if (m_currentTime >= m_nextWeatherChangeTime) {
       m_currentWeatherIndex = m_weatherPool.select_index(m_root.get().random());

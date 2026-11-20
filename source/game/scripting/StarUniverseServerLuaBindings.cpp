@@ -291,7 +291,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseServerCallba
     auto users = (*config)->get("serverUsers");
     if (!users)
       return std::unexpected(std::move(users.error()));
-    auto serverUsers = users->toObject();
+    auto serverUsers = users->to_object();
     if (!serverUsers)
       return std::unexpected(std::move(serverUsers.error()));
     (*serverUsers)[account] = JsonObject{{"password", password}, {"admin", admin.value_or(false)}};
@@ -306,7 +306,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseServerCallba
     auto users = (*config)->get("serverUsers");
     if (!users)
       return std::unexpected(std::move(users.error()));
-    auto serverUsers = users->toObject();
+    auto serverUsers = users->to_object();
     if (!serverUsers)
       return std::unexpected(std::move(serverUsers.error()));
     serverUsers->erase(account);
@@ -326,7 +326,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseServerCallba
       return std::unexpected(std::move(serverUsers.error()));
     JsonObject result;
     for (auto const& p : *serverUsers) {
-      auto admin = p.second.getBool("admin", false);
+      auto admin = p.second.get_bool("admin", false);
       if (!admin)
         return std::unexpected(std::move(admin.error()));
       result[p.first] = JsonObject{{"admin", *admin}};
@@ -354,24 +354,24 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseServerCallba
     if (!hasSeed)
       return std::unexpected(std::move(hasSeed.error()));
     if (*hasSeed) {
-      auto seed = worldConfig.getUInt("seed");
+      auto seed = worldConfig.get_uint("seed");
       if (!seed)
         return std::unexpected(std::move(seed.error()));
       worldSeed = *seed;
     } else {
       worldSeed = root.random().next_u64();
     }
-    auto worldType = worldConfig.getString("type");
+    auto worldType = worldConfig.get_string("type");
     if (!worldType)
       return std::unexpected(std::move(worldType.error()));
     std::expected<std::shared_ptr<VisitableWorldParameters>, StarException> worldParameters;
     if (auto terrestrialMatch = worldType->equals_ignore_case("Terrestrial"); !terrestrialMatch) {
       return std::unexpected(std::move(terrestrialMatch.error()));
     } else if (*terrestrialMatch) {
-      auto planetType = worldConfig.getString("planetType");
+      auto planetType = worldConfig.get_string("planetType");
       if (!planetType)
         return std::unexpected(std::move(planetType.error()));
-      auto planetSize = worldConfig.getString("planetSize");
+      auto planetSize = worldConfig.get_string("planetSize");
       if (!planetSize)
         return std::unexpected(std::move(planetSize.error()));
       worldParameters = generateTerrestrialWorldParameters(root, *planetType, *planetSize, worldSeed);
@@ -382,7 +382,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseServerCallba
     } else if (auto dungeonMatch = worldType->equals_ignore_case("FloatingDungeon"); !dungeonMatch) {
       return std::unexpected(std::move(dungeonMatch.error()));
     } else if (*dungeonMatch) {
-      auto dungeonWorld = worldConfig.getString("dungeonWorld");
+      auto dungeonWorld = worldConfig.get_string("dungeonWorld");
       if (!dungeonWorld)
         return std::unexpected(std::move(dungeonWorld.error()));
       worldParameters = generateFloatingDungeonWorldParameters(root, *dungeonWorld);
@@ -391,12 +391,12 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseServerCallba
     }
     if (!worldParameters)
       return std::unexpected(std::move(worldParameters.error()));
-    auto level = worldConfig.optFloat("level");
+    auto level = worldConfig.opt_float("level");
     if (!level)
       return std::unexpected(std::move(level.error()));
     if (*level)
       (*worldParameters)->threatLevel = **level;
-    auto beamUpRule = worldConfig.optString("beamUpRule");
+    auto beamUpRule = worldConfig.opt_string("beamUpRule");
     if (!beamUpRule)
       return std::unexpected(std::move(beamUpRule.error()));
     if (*beamUpRule) {
@@ -407,7 +407,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseServerCallba
         return std::unexpected(std::move(rule.error()));
       (*worldParameters)->beamUpRule = rule->get();
     }
-    auto disableDeathDrops = worldConfig.getBool("disableDeathDrops", false);
+    auto disableDeathDrops = worldConfig.get_bool("disableDeathDrops", false);
     if (!disableDeathDrops)
       return std::unexpected(std::move(disableDeathDrops.error()));
     (*worldParameters)->disableDeathDrops = *disableDeathDrops;

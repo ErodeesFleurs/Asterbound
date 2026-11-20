@@ -90,8 +90,8 @@ std::expected<void, StarException> ConfirmationDialog::displayConfirmation(Json 
   if (!assets)
     return std::unexpected(std::move(assets.error()));
   Json config = dialogConfig;
-  if (dialogConfig.isType(Json::Type::String)) {
-    auto path = dialogConfig.toString();
+  if (dialogConfig.is_type(Json::Type::String)) {
+    auto path = dialogConfig.to_string();
     if (!path)
       return std::unexpected(std::move(path.error()));
     auto loaded = (*assets)->json(*path);
@@ -107,7 +107,7 @@ std::expected<void, StarException> ConfirmationDialog::displayConfirmation(Json 
   reader.registerCallback("cancel", [this](Widget&) -> std::expected<void, StarException> { dismiss(); return {}; });
   reader.registerCallback("ok", [this](Widget&) { return ok(); });
   m_confirmed = false;
-  auto layoutPath = config.optString("paneLayout");
+  auto layoutPath = config.opt_string("paneLayout");
   if (!layoutPath)
     return std::unexpected(std::move(layoutPath.error()));
   auto layout = (*assets)->json(layoutPath->value_or("/interface/windowconfig/confirmation.config:paneLayout"));
@@ -117,7 +117,7 @@ std::expected<void, StarException> ConfirmationDialog::displayConfirmation(Json 
   if (!constructed)
     return std::unexpected(std::move(constructed.error()));
   std::shared_ptr<ImageWidget> titleIcon;
-  auto icon = config.optString("icon");
+  auto icon = config.opt_string("icon");
   if (!icon)
     return std::unexpected(std::move(icon.error()));
   if (*icon) {
@@ -126,16 +126,16 @@ std::expected<void, StarException> ConfirmationDialog::displayConfirmation(Json 
       return std::unexpected(std::move(created.error()));
     titleIcon = std::move(*created);
   }
-  auto title = config.getString("title", "");
+  auto title = config.get_string("title", "");
   if (!title)
     return std::unexpected(std::move(title.error()));
-  auto subtitle = config.getString("subtitle", "");
+  auto subtitle = config.get_string("subtitle", "");
   if (!subtitle)
     return std::unexpected(std::move(subtitle.error()));
   auto titled = setTitle(titleIcon, *title, *subtitle);
   if (!titled)
     return std::unexpected(std::move(titled.error()));
-  auto message = config.getString("message");
+  auto message = config.get_string("message");
   if (!message)
     return std::unexpected(std::move(message.error()));
   auto label = fetchChild<LabelWidget>("message");
@@ -146,7 +146,7 @@ std::expected<void, StarException> ConfirmationDialog::displayConfirmation(Json 
   auto text = (*label)->setText(*message);
   if (!text)
     return std::unexpected(std::move(text.error()));
-  auto okCaption = config.optString("okCaption");
+  auto okCaption = config.opt_string("okCaption");
   if (!okCaption)
     return std::unexpected(std::move(okCaption.error()));
   if (*okCaption) {
@@ -157,7 +157,7 @@ std::expected<void, StarException> ConfirmationDialog::displayConfirmation(Json 
       return std::unexpected(GUIBuilderException("Missing confirmation OK button"));
     (*button)->setText(**okCaption);
   }
-  auto cancelCaption = config.optString("cancelCaption");
+  auto cancelCaption = config.opt_string("cancelCaption");
   if (!cancelCaption)
     return std::unexpected(std::move(cancelCaption.error()));
   if (*cancelCaption) {
@@ -168,11 +168,11 @@ std::expected<void, StarException> ConfirmationDialog::displayConfirmation(Json 
       return std::unexpected(GUIBuilderException("Missing confirmation cancel button"));
     (*button)->setText(**cancelCaption);
   }
-  auto source = config.optInt("sourceEntityId");
+  auto source = config.opt_int("sourceEntityId");
   if (!source)
     return std::unexpected(std::move(source.error()));
   m_sourceEntityId = *source;
-  auto images = config.optObject("images");
+  auto images = config.opt_object("images");
   if (!images)
     return std::unexpected(std::move(images.error()));
   if (*images) {
@@ -182,15 +182,15 @@ std::expected<void, StarException> ConfirmationDialog::displayConfirmation(Json 
         return std::unexpected(std::move(widget.error()));
       if (!*widget)
         return std::unexpected(GUIBuilderException::format("Missing confirmation image '{}'", image.first));
-      if (image.second.isType(Json::Type::String)) {
-        auto path = image.second.toString();
+      if (image.second.is_type(Json::Type::String)) {
+        auto path = image.second.to_string();
         if (!path)
           return std::unexpected(std::move(path.error()));
         auto set = (*widget)->setImage(*path);
         if (!set)
           return std::unexpected(std::move(set.error()));
       } else {
-        auto array = image.second.toArray();
+        auto array = image.second.to_array();
         if (!array)
           return std::unexpected(std::move(array.error()));
         auto metadata = context().root().imageMetadataDatabase();
@@ -209,7 +209,7 @@ std::expected<void, StarException> ConfirmationDialog::displayConfirmation(Json 
       }
     }
   }
-  auto labels = config.optObject("labels");
+  auto labels = config.opt_object("labels");
   if (!labels)
     return std::unexpected(std::move(labels.error()));
   if (*labels) {
@@ -219,7 +219,7 @@ std::expected<void, StarException> ConfirmationDialog::displayConfirmation(Json 
         return std::unexpected(std::move(widget.error()));
       if (!*widget)
         return std::unexpected(GUIBuilderException::format("Missing confirmation label '{}'", entry.first));
-      auto value = entry.second.toString();
+      auto value = entry.second.to_string();
       if (!value)
         return std::unexpected(std::move(value.error()));
       auto set = (*widget)->setText(*value);
@@ -233,10 +233,10 @@ std::expected<void, StarException> ConfirmationDialog::displayConfirmation(Json 
   auto soundsJson = (*assets)->json("/interface/windowconfig/confirmation.config:onShowSound");
   if (!soundsJson)
     return std::unexpected(std::move(soundsJson.error()));
-  auto sounds = soundsJson->toArray();
+  auto sounds = soundsJson->to_array();
   if (!sounds)
     return std::unexpected(std::move(sounds.error()));
-  auto sound = context().root().random().sample_value(*sounds, "").and_then([](Json const& value) { return value.toString(); });
+  auto sound = context().root().random().sample_value(*sounds, "").and_then([](Json const& value) { return value.to_string(); });
   if (!sound)
     return std::unexpected(std::move(sound.error()));
   if (!sound->empty()) {

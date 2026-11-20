@@ -181,15 +181,15 @@ std::expected<Json, StarException> TechController::diskStore() {
 }
 
 std::expected<void, StarException> TechController::diskLoad(Json const& store) {
-  auto modules = store.getArray("techModules", {});
+  auto modules = store.get_array("techModules", {});
   if (!modules)
     return std::unexpected(std::move(modules.error()));
   List<std::tuple<String, JsonObject>> moduleInits;
   for (auto const& module : *modules) {
-    auto name = module.getString("module");
+    auto name = module.get_string("module");
     if (!name)
       return std::unexpected(std::move(name.error()));
-    auto data = module.getObject("scriptData", {});
+    auto data = module.get_object("scriptData", {});
     if (!data)
       return std::unexpected(std::move(data.error()));
     moduleInits.push_back(std::make_tuple(std::move(*name), std::move(*data)));
@@ -602,17 +602,17 @@ std::expected<void, StarException> TechController::setupTechModules(List<std::tu
     auto config = (*techDatabase)->tech(std::get<0>(moduleInit));
     if (!config)
       return std::unexpected(std::move(config.error()));
-    auto visible = config->parameters.getBool("visible", true);
+    auto visible = config->parameters.get_bool("visible", true);
     if (!visible)
       return std::unexpected(std::move(visible.error()));
     auto moduleAnimator = TechAnimator::create(m_root, config->animationConfig);
     if (!moduleAnimator)
       return std::unexpected(std::move(moduleAnimator.error()));
-    auto parts = config->parameters.getObject("animationParts", JsonObject());
+    auto parts = config->parameters.get_object("animationParts", JsonObject());
     if (!parts)
       return std::unexpected(std::move(parts.error()));
     for (auto const& entry : *parts) {
-      auto image = entry.second.toString();
+      auto image = entry.second.to_string();
       if (!image)
         return std::unexpected(std::move(image.error()));
       (*moduleAnimator)->animator->setPartTag(entry.first, "partImage", std::move(*image));

@@ -85,7 +85,7 @@ const GameTestRegistration teamStatusSynchronization(
       auto accepted = invokeTeam(peerHandlers, "team.acceptInvitation", JsonObject{
           {"inviterUuid", uuid->hex()}, {"inviteeUuid", peer.hex()}});
       if (!accepted) return std::unexpected(std::move(accepted.error()));
-      if (!accepted->isNull())
+      if (!accepted->is_null())
         return std::unexpected(StarException("Real team invitation was rejected", false));
       return {};
     };
@@ -126,7 +126,7 @@ const GameTestRegistration teamStatusSynchronization(
       List<Json> messages;
       ASSERT_TRUE(stream.read_container(messages));
       ASSERT_EQ(messages.size(), 1u);
-      EXPECT_EQ(messages.front().getString("handler"), "team.updateStatus");
+      EXPECT_EQ(messages.front().get_string("handler"), "team.updateStatus");
       auto args = messages.front().get("arguments");
       ASSERT_TRUE(args);
       EXPECT_EQ(args->contains("name"), full);
