@@ -113,6 +113,7 @@ private:
   [[nodiscard]] std::expected<bool, StarException> connectMultiPlayer();
   [[nodiscard]] std::expected<bool, StarException> connectSinglePlayer();
   [[nodiscard]] std::expected<void, StarException> prepareSessionInterface();
+  [[nodiscard]] std::expected<void, StarException> update_http();
   [[nodiscard]] std::expected<void, StarException>
   installLuaCallbacks(String const& name, std::expected<LuaCallbacks, StarException> callbacks);
   [[nodiscard]] std::expected<void, StarException> recoverToTitle(std::expected<void, StarException> logged,
@@ -146,7 +147,8 @@ private:
   std::shared_ptr<GuiContext> m_guiContext;
   std::shared_ptr<Input> m_input;
   std::shared_ptr<Voice> m_voice;
-  std::shared_ptr<LuaHttpSession> m_httpSession;
+  std::shared_ptr<LuaHttpSession> http_session;
+  std::optional<std::uint64_t> displayed_approval;
 
   // Valid after renderInit is called the first time
   std::shared_ptr<Cinematic> m_cinematicOverlay;

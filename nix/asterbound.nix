@@ -10,6 +10,7 @@
   pkg-config,
   autoPatchelfHook,
   zlib-ng,
+  curl,
   dependencies,
   libpng,
   freetype,
@@ -223,6 +224,7 @@ let
         stdenv.cc.libc
         zlib-ng
         libcpr
+        curl
         libpng
         freetype
         libogg
@@ -277,6 +279,7 @@ stdenv.mkDerivation {
     mimalloc
     zlib-ng
     libcpr
+    curl
     libpng
     freetype
     libogg

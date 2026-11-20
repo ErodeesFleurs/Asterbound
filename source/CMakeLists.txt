@@ -309,7 +309,8 @@ find_package(zlib-ng CONFIG REQUIRED)
 target_compile_definitions(star_build_config INTERFACE WITH_GZFILEOP)
 find_package(PNG REQUIRED)
 find_package(Freetype REQUIRED)
-find_package(cpr CONFIG REQUIRED)
+find_package(cpr 1.14.2 CONFIG REQUIRED)
+find_package(CURL 8.8 REQUIRED)
 find_package(OggVorbis REQUIRED)
 find_package(zstd CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
@@ -348,7 +349,7 @@ target_link_libraries(star_core_dependencies INTERFACE
   $<IF:$<TARGET_EXISTS:zstd::libzstd_shared>,zstd::libzstd_shared,zstd::libzstd_static>
   $<IF:$<TARGET_EXISTS:re2::re2>,re2::re2,re2>)
 target_link_libraries(star_module_dependencies INTERFACE
-  zlib-ng::zlib cpr::cpr star_vorbis_dependencies)
+  zlib-ng::zlib cpr::cpr CURL::libcurl star_vorbis_dependencies)
 # Lua's ImGui bindings are available in headless builds too.
 target_link_libraries(star_extern_dependencies INTERFACE imgui::imgui)
 

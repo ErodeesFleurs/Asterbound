@@ -15,7 +15,8 @@
     { "name": "mimalloc", "default-features": false },
     "re2",
     { "name": "imgui", "features": ["sdl3-binding", "opengl3-binding", "freetype"] },
-    { "name": "cpr", "version>=": "1.10.5", "features": ["ssl"] }
+    { "name": "curl", "version>=": "8.8.0", "default-features": false, "features": ["ssl", "idn"] },
+    { "name": "cpr", "version>=": "1.14.2", "features": ["ssl"] }
   ],
   "features": {
     "vulkan": {

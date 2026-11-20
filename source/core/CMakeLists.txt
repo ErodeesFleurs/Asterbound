@@ -94,7 +94,7 @@ target_sources (star_modules PRIVATE
     StarIODevice.cpp StarFile.cpp StarDataStream.cpp
     StarCompression.cpp
     StarCurve25519.cpp
-    StarDynamicLib.cpp
+    StarDynamicLib.cpp StarHttpClient.cpp
     StarJson.cpp StarLogging.cpp StarLua.cpp
     StarNativeRuntime.cpp StarException.cpp
     StarWorkerPool.cpp StarOptionParser.cpp StarShellParser.cpp StarJsonPath.cpp

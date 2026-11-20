@@ -427,8 +427,8 @@ std::expected<void, StarException> ClientApplication::shutdown() {
   };
   if (m_rootLoader)
     remember(m_rootLoader.finish());
-  if (m_httpSession)
-    remember(m_httpSession->stop());
+  if (http_session)
+    remember(http_session->stop());
   if (m_player)
     m_player->setInput(std::nullopt);
   // Lua uninit may still invoke the interface and camera callbacks.
@@ -445,7 +445,7 @@ std::expected<void, StarException> ClientApplication::shutdown() {
     remember(m_statistics->writeStatistics());
   m_universeClient.reset();
   m_statistics.reset();
-  m_httpSession.reset();
+  http_session.reset();
   if (m_titleScreen)
     remember(m_titleScreen->close());
   m_titleScreen.reset();
@@ -802,6 +802,10 @@ std::expected<void, StarException> ClientApplication::processInput(InputEvent co
 }
 
 std::expected<void, StarException> ClientApplication::update() {
+  if (http_session) {
+    if (auto result = update_http(); !result)
+      return result;
+  }
   restorePresentedCamera();
   // Input between logic ticks must keep using the transform actually shown,
   // even when a low render cap allows several updates before the next present.
@@ -898,6 +902,44 @@ std::expected<void, StarException> ClientApplication::update() {
   m_edgeKeyEvents.clear();
   m_input->update();
   ++m_framesSkipped;
+  return {};
+}
+
+std::expected<void, StarException> ClientApplication::update_http() {
+  if (auto result = http_session->poll(); !result)
+    return result;
+  if (!m_mainInterface)
+    return {};
+  auto next = http_session->approval();
+  if (next ? displayed_approval == next->id : !displayed_approval)
+    return {};
+
+  auto& manager = m_mainInterface->paneManager();
+  constexpr auto pane = MainInterfacePanes::HttpTrustDialog;
+  if (displayed_approval) {
+    // Release the old pane and its reply before reusing its widgets.
+    auto removed = manager.dismissRegisteredPane(pane);
+    if (!removed)
+      return std::unexpected(std::move(removed.error()));
+    displayed_approval.reset();
+  }
+  if (!next)
+    return {};
+  auto dialog = manager.registeredPane<HttpTrustDialog>(pane);
+  if (!dialog)
+    return std::unexpected(std::move(dialog.error()));
+  auto prepared = (*dialog)->display_request(next->domain,
+    [session = std::weak_ptr(http_session), id = next->id](bool allow, bool remember) -> std::expected<void, StarException> {
+      if (auto owner = session.lock())
+        return owner->resolve_approval(id, allow, remember);
+      return {};
+    });
+  if (!prepared)
+    return prepared;
+  auto shown = manager.displayRegisteredPane(pane);
+  if (!shown)
+    return std::unexpected(std::move(shown.error()));
+  displayed_approval = next->id;
   return {};
 }
 
@@ -1348,8 +1390,9 @@ std::expected<void, StarException> ClientApplication::teardownTransition(MainApp
       m_universeServer.reset();
     }
     m_cinematicOverlay->stop();
-    if (m_httpSession)
-      m_httpSession->clearHttpTrustRequestCallback();
+    if (http_session)
+      remember(http_session->set_approval_available(false));
+    displayed_approval.reset();
     if (m_player)
       m_player->setInput(std::nullopt);
     if (m_mainInterface)
@@ -1371,10 +1414,10 @@ std::expected<void, StarException> ClientApplication::teardownTransition(MainApp
       remember(m_statistics->writeStatistics());
       m_statistics.reset();
     }
-    if (m_httpSession)
-      remember(m_httpSession->stop());
+    if (http_session)
+      remember(http_session->stop());
     m_universeClient.reset();
-    m_httpSession.reset();
+    http_session.reset();
     m_mainMixer->set_universe_client({});
     if (m_titleScreen)
       remember(m_titleScreen->close());
@@ -1412,10 +1455,7 @@ std::expected<void, StarException> ClientApplication::prepareTitleServices() {
   if (!client)
     return std::unexpected(std::move(client.error()));
   m_universeClient = std::move(*client);
-  auto http = LuaHttpSession::create(*m_root);
-  if (!http)
-    return std::unexpected(std::move(http.error()));
-  m_httpSession = std::move(*http);
+  http_session = std::make_shared<LuaHttpSession>(*m_root);
   if (auto installed =
         installLuaCallbacks("universe", LuaBindings::makeUniverseClientCallbacks(*m_root, *m_universeClient));
       !installed)
@@ -1451,7 +1491,7 @@ std::expected<void, StarException> ClientApplication::prepareTitleServices() {
   if (!httpEnabled)
     return std::unexpected(std::move(httpEnabled.error()));
   if (auto installed =
-        installLuaCallbacks("http", LuaBindings::makeHttpCallbacks(m_httpSession, httpEnabled->value_or(false)));
+        installLuaCallbacks("http", LuaBindings::make_http_callbacks(http_session, httpEnabled->value_or(false)));
       !installed)
     return installed;
   installPlayerReloadCallbacks();
@@ -1699,23 +1739,8 @@ std::expected<void, StarException> ClientApplication::prepareSessionInterface() 
         installLuaCallbacks("world", LuaBindings::makeWorldCallbacks(*m_root, *m_universeClient->worldClient()));
       !installed)
     return installed;
-  m_httpSession->setHttpTrustRequestCallback(
-    [session = std::weak_ptr<LuaHttpSession>(m_httpSession),
-     mainInterface = std::ref(*m_mainInterface)](String const& domain) -> std::expected<void, StarException> {
-      auto& manager = mainInterface.get().paneManager();
-      auto dialog = manager.registeredPane<HttpTrustDialog>(MainInterfacePanes::HttpTrustDialog);
-      if (!dialog)
-        return std::unexpected(std::move(dialog.error()));
-      auto displayed = (*dialog)->displayRequest(
-        domain, [session, domain](HttpTrustReply reply, bool) -> std::expected<void, StarException> {
-          if (auto owner = session.lock())
-            return owner->handleHttpTrustReply(domain, reply == HttpTrustReply::Allow);
-          return {};
-        });
-      if (!displayed)
-        return std::unexpected(std::move(displayed.error()));
-      return manager.displayRegisteredPane(MainInterfacePanes::HttpTrustDialog).transform([](bool) {});
-    });
+  if (auto available = http_session->set_approval_available(true); !available)
+    return available;
   if (auto started = m_universeClient->startLuaScripts(); !started)
     return started;
   m_mainMixer->set_world_painter(optional_ref(m_worldPainter));

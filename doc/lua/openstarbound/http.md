@@ -5,8 +5,8 @@
 The `http` table provides asynchronous HTTP request functionality for Lua scripts. All HTTP requests are executed
 asynchronously and return promises that can be checked for completion.
 
-For security, domains must be explicitly trusted before requests can be made to them. Requests to untrusted domains will
-trigger a trust dialog (if configured) before execution.
+Only absolute HTTP and HTTPS URLs are accepted. Trust applies to the canonical host, independent of port.
+Redirects are not followed: a 3xx response belongs to the URL the script actually requested.
 
 HTTP promises use the standard promise methods: `status()`, `finished()`, `succeeded()`, `failed()`,
 `cancelled()`, `cancel()`, `result()`, and `error()`. `status()` returns `"pending"`, `"succeeded"`,
@@ -17,7 +17,8 @@ Cancelling a request removes it from pending trust approval or active result tra
 other requests. Closing the owning Lua session also cancels its outstanding requests, even when the
 script discarded the promise. A late trust approval cannot submit a cancelled pending request. An already
 running native HTTP operation may still finish; cancellation discards its result rather than promising
-transport interruption or rolling back server-side effects.
+transport interruption or rolling back server-side effects. When the client HTTP session shuts down, it
+also requests interruption of native transfers before joining its workers. This is not an instant deadline.
 
 Successful responses contain `{status = <HTTP status code>, body = <response string>}`. HTTP error status
 codes such as 404 or 503 are still successful HTTP responses; trust denial and transport errors fail the
@@ -37,9 +38,10 @@ Creates and executes an asynchronous HTTP GET request to the specified URL.
 
 **Options table fields:**
 
-* `headers` - `Table<String, String>` - Optional. HTTP headers to include in the request
+* `headers` - `Table<String, String>` - Optional. Header names must be HTTP tokens and values must not
+  contain NUL or line breaks. The transport sets `Host` from the approved URL; scripts cannot override it.
 * `timeout` - `int` - Optional. Request timeout in seconds (default 30; 0 disables the timeout)
-* `body` - `String` or `Table` - Optional. Request body (not typically used with GET)
+* `body` - `String` or `Table` - Optional. Sent with POST, PUT, and PATCH. GET and DELETE send no body.
 
 Returns an `HttpPromise` object that can be checked for completion.
 
@@ -89,7 +91,8 @@ Returns an `HttpPromise` object that can be checked for completion.
 
 #### `HttpPromise` http.createRequest(`String` method, `String` url, [`Table` options])
 
-Creates and executes an asynchronous HTTP request with a custom method to the specified URL.
+Creates an asynchronous request. Supported methods are `GET`, `POST`, `PUT`, `DELETE`, and `PATCH`
+(uppercase). An unsupported method or out-of-range timeout fails the promise without asking for trust.
 
 Returns an `HttpPromise` object that can be checked for completion.
 
@@ -119,10 +122,11 @@ end
 
 HTTP requests require domain trust for security. When a script attempts to make a request to an untrusted domain:
 
-1. The request is queued and not immediately executed
-2. A trust dialog is shown to the user (if configured)
-3. If the user approves, the request executes; the domain is saved to the trusted list only if the user chooses to remember the decision
-4. If the user denies, the request fails with an error
+1. If no trust dialog is available, the promise fails without contacting the host.
+2. Otherwise, the client shows one host at a time, in order. Requests waiting for the same host share a decision.
+3. Allowing a host submits its waiting requests. Only “Remember” on the current approval saves trust.
+4. Denying or closing the dialog fails the waiting requests. Cancelling the last request for a host retires
+   that approval; an old dialog cannot approve a later request, even for the same host.
 
 Trusted domains are stored in the configuration under `safe.luaHttp.trustedSites`.
 
@@ -145,7 +149,6 @@ function init()
                 ["User-Agent"] = "Starbound-Script/1.0",
                 ["Accept"] = "application/json"
             },
-            body = '{"query":"example"}',
             timeout = 10 -- seconds
         }),
                 handleSuccess,

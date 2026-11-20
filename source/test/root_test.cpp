@@ -416,7 +416,7 @@ const GameTestRegistration strictLuaTags("RootTest", "StrictLuaTagFormatting", [
   EXPECT_EQ(result->getString("recovered"), String("again"));
 });
 
-const GameTestRegistration luaHttpCancellation("RootTest", "LuaHttpCancellation", [](GameTest& fixture) {
+const GameTestRegistration lua_http_cancellation("RootTest", "LuaHttpCancellation", [](GameTest& fixture) {
   auto directory = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directory) << directory.error().what();
   auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
@@ -427,90 +427,143 @@ const GameTestRegistration luaHttpCancellation("RootTest", "LuaHttpCancellation"
   auto configuration = (*root)->configuration();
   ASSERT_TRUE(configuration) << configuration.error().what();
   ASSERT_TRUE((*configuration)->setPath("safe.luaHttp.trustedSites", JsonArray{}));
-  auto session = LuaHttpSession::create(**root);
-  ASSERT_TRUE(session) << session.error().what();
-  auto callbacks = LuaBindings::makeHttpCallbacks(*session, true);
+  auto session = std::make_shared<LuaHttpSession>(**root);
+  auto callbacks = LuaBindings::make_http_callbacks(session, true);
   ASSERT_TRUE(callbacks) << callbacks.error().what();
   auto engine = LuaEngine::create();
   ASSERT_TRUE(engine) << engine.error().what();
   auto context = (*engine)->createContext();
   ASSERT_TRUE(context) << context.error().what();
   ASSERT_TRUE(context->setCallbacks("http", *callbacks));
+  auto lua = [&](String const& script) -> testing::AssertionResult {
+    if (auto result = context->eval<void>(script); !result)
+      return testing::AssertionFailure() << result.error().what();
+    return testing::AssertionSuccess();
+  };
   auto listener = TcpSocket::listen((*root)->logger(), {HostAddress::localhost(), 0});
   ASSERT_TRUE(listener) << listener.error().what();
   ASSERT_TRUE((*listener)->setNonBlocking(true));
   ASSERT_TRUE(context->setPath("url", Star::format("http://127.0.0.1:{}/", (*listener)->localAddress().port())));
-  unsigned trustRequests = 0;
-  (*session)->setHttpTrustRequestCallback([&](String const&) -> std::expected<void, StarException> {
-    ++trustRequests;
-    return {};
-  });
-  std::stop_source firstScope;
-  (*engine)->setPromiseLifetime(firstScope.get_token());
-  ASSERT_TRUE(context->eval<void>("first = http.get(url)"));
-  std::stop_source secondScope;
-  (*engine)->setPromiseLifetime(secondScope.get_token());
-  ASSERT_TRUE(context->eval<void>("second = http.get('http://other.invalid/')"));
-  EXPECT_EQ(trustRequests, 2u);
-  EXPECT_EQ(context->eval<bool>(R"LUA(
+  ASSERT_TRUE(lua("unavailable = http.get(url); assert(unavailable:status() == 'failed')"));
+  ASSERT_TRUE(session->set_approval_available(true));
+  ASSERT_FALSE(session->approval());
+  ASSERT_TRUE(lua(R"LUA(
+    for _, p in ipairs({
+      http.createRequest("HEAD", url),
+      http.get("http://"),
+      http.get("file:///example"),
+      http.get("https://user@example.test/"),
+      http.get(url .. "\0suffix"),
+      http.get(url, {headers = {hOsT = "other.example"}}),
+      http.get(url, {headers = {[":authority"] = "example.test"}}),
+      http.get(url, {headers = {["Not A Token"] = "value"}}),
+      http.get(url, {headers = {["X-Label"] = "embedded\0byte"}}),
+      http.get(url, {headers = {["X-Label"] = "carriage\rreturn"}}),
+      http.get(url, {headers = {["X-Label"] = "line\nbreak"}}),
+      http.get(url, {timeout = -1}),
+      http.get(url, {timeout = 2147483647})
+    }) do
+      assert(p:status() == "failed" and p:error() ~= nil)
+    end
+  )LUA"));
+  ASSERT_FALSE(session->approval());
+  ASSERT_TRUE(lua("ipv6 = http.get('http://[::1]:8080/?a=b')"));
+  auto ipv6 = session->approval();
+  ASSERT_TRUE(ipv6);
+  EXPECT_EQ(ipv6->domain, String("[::1]"));
+  ASSERT_TRUE(lua("assert(ipv6:cancel())"));
+  ASSERT_FALSE(session->approval());
+
+  ASSERT_TRUE(lua(R"LUA(
+    first = http.get(url)
+    second = http.get("https://MiXeD.Example:8443?x=1")
+    third = http.get("http://third.example/")
+    same = http.get("http://mixed.example/another-path")
     assert(first:status() == "pending" and second:status() == "pending")
+  )LUA"));
+  auto first = session->approval();
+  ASSERT_TRUE(first);
+  EXPECT_EQ(first->domain, String("127.0.0.1"));
+  ASSERT_TRUE(lua(R"LUA(
     assert(first:cancel() and not first:cancel())
-    return first:finished() and first:failed() and first:cancelled()
-      and not first:succeeded() and first:result() == nil
-      and first:error() ~= nil and second:status() == "pending"
-  )LUA"),
-            true);
-  ASSERT_TRUE((*session)->handleHttpTrustReply("127.0.0.1", true));
-  ASSERT_TRUE((*session)->handleHttpTrustReply("other.invalid", false));
-  EXPECT_EQ(context->eval<bool>("return second:status() == 'failed' and not second:cancelled()"), true);
+    assert(first:finished() and first:failed() and first:cancelled())
+    assert(not first:succeeded() and first:result() == nil and first:error() ~= nil)
+    reissued = http.get(url)
+  )LUA"));
+  auto second = session->approval();
+  ASSERT_TRUE(second);
+  EXPECT_EQ(second->domain, String("mixed.example"));
+  ASSERT_TRUE(lua("sibling = http.get('https://MIXED.example/last'); assert(sibling:cancel())"));
+  ASSERT_EQ(session->approval(), second);
+  ASSERT_TRUE(session->resolve_approval(second->id, false, true));
+  ASSERT_TRUE(lua(R"LUA(
+    assert(second:status() == "failed" and not second:cancelled())
+    assert(same:status() == "failed" and not http.isTrusted("mixed.example"))
+    assert(third:status() == "pending" and reissued:status() == "pending")
+  )LUA"));
+  auto third = session->approval();
+  ASSERT_TRUE(third);
+  EXPECT_EQ(third->domain, String("third.example"));
+  ASSERT_TRUE(session->resolve_approval(third->id, false, false));
+  auto reissued = session->approval();
+  ASSERT_TRUE(reissued);
+  ASSERT_EQ(reissued->domain, first->domain);
+  ASSERT_NE(reissued->id, first->id);
+  ASSERT_TRUE(session->resolve_approval(first->id, true, true));
+  ASSERT_EQ(session->approval(), reissued);
+  ASSERT_TRUE(lua("assert(reissued:status() == 'pending' and not http.isTrusted('127.0.0.1'))"));
+  ASSERT_TRUE(session->resolve_approval(reissued->id, false, false));
+  ASSERT_FALSE(session->approval());
 
-  // Dropping Lua observation must not drop the native owner's stop registration.
-  std::stop_source discardedScope;
-  (*engine)->setPromiseLifetime(discardedScope.get_token());
-  ASSERT_TRUE(context->eval<void>("http.get(url)"));
+  // A discarded Lua value must neither abandon a live request nor outlive its scope.
+  std::stop_source discarded_scope;
+  (*engine)->setPromiseLifetime(discarded_scope.get_token());
+  ASSERT_TRUE(lua("http.get(url)"));
   ASSERT_TRUE((*engine)->collectGarbage());
-  discardedScope.request_stop();
-  ASSERT_TRUE((*session)->handleHttpTrustReply("127.0.0.1", true));
-  (*engine)->setPromiseLifetime(discardedScope.get_token());
-  ASSERT_TRUE(context->eval<void>("alreadyStopped = http.get(url)"));
-  EXPECT_EQ(context->eval<bool>("return alreadyStopped:cancelled()"), true);
-  ASSERT_TRUE((*session)->handleHttpTrustReply("127.0.0.1", true));
-
-  // Synchronous trust callbacks may cancel and approve reentrantly.
-  std::stop_source reentrantScope;
-  (*session)->setHttpTrustRequestCallback([&](String const& domain) -> std::expected<void, StarException> {
-    reentrantScope.request_stop();
-    return (*session)->handleHttpTrustReply(domain, true);
-  });
-  (*engine)->setPromiseLifetime(reentrantScope.get_token());
-  ASSERT_TRUE(context->eval<void>("reentrant = http.get(url)"));
-  EXPECT_EQ(context->eval<bool>("return reentrant:status() == 'cancelled'"), true);
-  (*session)->setHttpTrustRequestCallback([](String const&) -> std::expected<void, StarException> { return {}; });
+  auto discarded = session->approval();
+  ASSERT_TRUE(discarded);
+  discarded_scope.request_stop();
+  ASSERT_FALSE(session->approval());
+  ASSERT_TRUE(session->resolve_approval(discarded->id, true, true));
+  ASSERT_TRUE(lua("assert(http.get(url):cancelled())"));
+  ASSERT_FALSE(session->approval());
   (*engine)->setPromiseLifetime({});
-  ASSERT_TRUE(context->eval<void>("stopPending = http.get(url)"));
-  ASSERT_TRUE((*session)->stop());
-  EXPECT_EQ(context->eval<bool>("return stopPending:cancelled()"), true);
-  // stop joins all worker submissions: a removed trust entry cannot connect late.
-  auto unexpectedConnection = (*listener)->accept((*root)->logger());
-  ASSERT_TRUE(unexpectedConnection) << unexpectedConnection.error().what();
-  EXPECT_FALSE(*unexpectedConnection);
-  (*engine)->setPromiseLifetime({});
-  ASSERT_TRUE(context->eval<void>("stopped = http.get(url)"));
-  EXPECT_EQ(context->eval<bool>("return stopped:status() == 'cancelled' and first:cancelled()"), true);
-  ASSERT_TRUE((*session)->handleHttpTrustReply("127.0.0.1", true));
-  ASSERT_TRUE((*session)->poll());
 
-  // Real loopback requests exercise active cancellation and late native completion.
-  auto liveSession = LuaHttpSession::create(**root);
-  ASSERT_TRUE(liveSession) << liveSession.error().what();
-  auto liveCallbacks = LuaBindings::makeHttpCallbacks(*liveSession, true);
-  ASSERT_TRUE(liveCallbacks) << liveCallbacks.error().what();
+  ASSERT_TRUE(lua("withdrawn = http.get(url); queued = http.get('http://queued.example/')"));
+  auto withdrawn = session->approval();
+  ASSERT_TRUE(withdrawn);
+  ASSERT_TRUE(session->set_approval_available(false));
+  ASSERT_FALSE(session->approval());
+  ASSERT_TRUE(lua("assert(withdrawn:status() == 'failed' and queued:status() == 'failed')"));
+  ASSERT_TRUE(session->set_approval_available(true));
+  ASSERT_TRUE(lua("stop_pending = http.get(url)"));
+  auto stop_pending = session->approval();
+  ASSERT_TRUE(stop_pending);
+  ASSERT_TRUE(session->resolve_approval(withdrawn->id, true, true));
+  ASSERT_EQ(session->approval(), stop_pending);
+  ASSERT_TRUE(session->stop());
+  ASSERT_FALSE(session->approval());
+  ASSERT_TRUE(session->resolve_approval(stop_pending->id, true, true));
+  ASSERT_TRUE(session->poll());
+  ASSERT_TRUE(lua("assert(stop_pending:cancelled() and http.get(url):cancelled() and first:cancelled())"));
+  EXPECT_EQ((*configuration)->getPath("safe.luaHttp.trustedSites"), Json(JsonArray{}));
+  // After joining, a stale approval cannot have left a connection in the backlog.
+  auto unexpected_connection = (*listener)->accept((*root)->logger());
+  ASSERT_TRUE(unexpected_connection) << unexpected_connection.error().what();
+  ASSERT_FALSE(*unexpected_connection);
+
+  session = std::make_shared<LuaHttpSession>(**root);
+  auto live_callbacks = LuaBindings::make_http_callbacks(session, true);
+  ASSERT_TRUE(live_callbacks) << live_callbacks.error().what();
   ASSERT_TRUE(context->setPath("http", LuaNil));
-  ASSERT_TRUE(context->setCallbacks("http", *liveCallbacks));
-  (*liveSession)->setHttpTrustRequestCallback([&](String const& domain) {
-    return (*liveSession)->handleHttpTrustReply(domain, true);
-  });
-  auto acceptRequest = [&]() -> std::expected<std::shared_ptr<TcpSocket>, StarException> {
+  ASSERT_TRUE(context->setCallbacks("http", *live_callbacks));
+  ASSERT_TRUE(session->set_approval_available(true));
+  ASSERT_TRUE((*configuration)->setPath("safe.luaHttp.trustedSites", JsonArray{"Known.Example"}));
+  ASSERT_TRUE(lua("assert(http.isTrusted('known.example') and http.isTrusted('KNOWN.EXAMPLE'))"));
+  ASSERT_TRUE((*configuration)->setPath("safe.luaHttp.trustedSites", JsonArray{}));
+  ASSERT_TRUE(lua("assert(not http.isTrusted('KNOWN.EXAMPLE'))"));
+  auto accept_request = [&](std::string_view method = "GET", std::string_view body = {}, std::string_view expected_header = {})
+      -> std::expected<std::shared_ptr<TcpSocket>, StarException> {
     auto ready = (*listener)->waitForData(false, std::chrono::steady_clock::now() + std::chrono::seconds(5));
     if (!ready)
       return std::unexpected(std::move(ready.error()));
@@ -531,73 +584,129 @@ const GameTestRegistration luaHttpCancellation("RootTest", "LuaHttpCancellation"
         return std::unexpected(StarException("HTTP loopback closed before request headers"));
       headers.append(buffer.data(), *received);
     }
+    if (!headers.starts_with(std::format("{} / HTTP/", method)))
+      return std::unexpected(StarException("Incorrect HTTP request line"));
+    auto body_offset = headers.find("\r\n\r\n") + 4;
+    if (!expected_header.empty() && !std::string_view(headers).substr(0, body_offset).contains(expected_header))
+      return std::unexpected(StarException("Missing expected HTTP request header"));
+    while (headers.size() - body_offset < body.size()) {
+      std::array<char, 1024> buffer;
+      auto received = (*socket)->receive(buffer);
+      if (!received)
+        return std::unexpected(std::move(received.error()));
+      if (!*received)
+        return std::unexpected(StarException("Truncated HTTP request body"));
+      headers.append(buffer.data(), *received);
+    }
+    if (std::string_view(headers).substr(body_offset) != body)
+      return std::unexpected(StarException("Incorrect HTTP request body"));
     return std::move(*socket);
   };
-  auto respond = [](std::shared_ptr<TcpSocket> const& socket,
-                    std::string_view body) -> std::expected<void, StarException> {
-    auto response =
-      std::format("HTTP/1.1 503 Test\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}", body.size(), body);
+  auto respond = [](TcpSocket& socket, std::string_view status, std::string_view body,
+                    std::string_view headers = {}) -> std::expected<void, StarException> {
+    auto response = std::format("HTTP/1.1 {}\r\n{}Content-Length: {}\r\nConnection: close\r\n\r\n{}",
+                                status, headers, body.size(), body);
     std::span<char const> remaining(response.data(), response.size());
     while (!remaining.empty()) {
-      auto sent = socket->send(remaining);
+      auto sent = socket.send(remaining);
       if (!sent)
         return std::unexpected(std::move(sent.error()));
       if (!*sent)
         return std::unexpected(StarException("HTTP loopback send made no progress"));
       remaining = remaining.subspan(*sent);
     }
-    socket->close();
+    socket.close();
     return {};
   };
-  std::stop_source activeScope;
-  (*engine)->setPromiseLifetime(activeScope.get_token());
-  ASSERT_TRUE(context->eval<void>("active = http.get(url, {timeout = 5})"));
-  auto active = acceptRequest();
-  ASSERT_TRUE(active) << active.error().what() << "; "
-                      << context
-                           ->eval<String>("return active:status() .. ': ' .. tostring(active:error()) .. ' at ' .. url")
-                           .value_or("Lua query failed").utf8();
+  auto await_response = [&]() -> testing::AssertionResult {
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    while (std::chrono::steady_clock::now() < deadline) {
+      auto finished = context->eval<bool>("return response:finished()");
+      if (!finished)
+        return testing::AssertionFailure() << finished.error().what();
+      if (*finished)
+        return testing::AssertionSuccess();
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    return testing::AssertionFailure() << "HTTP response did not settle";
+  };
+
+  std::stop_source active_scope;
+  (*engine)->setPromiseLifetime(active_scope.get_token());
+  ASSERT_TRUE(lua("active = http.get(url, {timeout = 5})"));
+  auto current = session->approval();
+  ASSERT_TRUE(current);
+  ASSERT_EQ(current->domain, String("127.0.0.1"));
+  ASSERT_TRUE(session->resolve_approval(current->id, true, true));
+  ASSERT_TRUE(lua("assert(http.isTrusted('127.0.0.1'))"));
+  ASSERT_EQ((*configuration)->getPath("safe.luaHttp.trustedSites"), Json(JsonArray{"127.0.0.1"}));
+  auto active = accept_request();
+  ASSERT_TRUE(active) << active.error().what();
   (*engine)->setPromiseLifetime({});
-  ASSERT_TRUE(context->eval<void>("successful = http.get(url, {timeout = 5})"));
-  auto successful = acceptRequest();
+  ASSERT_TRUE(lua("response = http.get(url, {timeout = 5}); successful = response"));
+  ASSERT_FALSE(session->approval());
+  auto successful = accept_request();
   ASSERT_TRUE(successful) << successful.error().what();
-  activeScope.request_stop();
-  ASSERT_TRUE(respond(*active, "late"));
-  ASSERT_TRUE(respond(*successful, "null"));
-  auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-  bool finished = false;
-  while (!finished && (deadline - std::chrono::steady_clock::now()).count() > 0) {
-    auto queried = context->eval<bool>("return successful:finished()");
-    ASSERT_TRUE(queried) << queried.error().what();
-    finished = *queried;
-    std::this_thread::yield();
-  }
-  ASSERT_TRUE(finished);
-  EXPECT_EQ(context->eval<bool>(R"LUA(
+  active_scope.request_stop();
+  (*active)->close(); // Late native completion cannot overwrite scope cancellation.
+  ASSERT_TRUE(respond(**successful, "503 Test", "null"));
+  ASSERT_TRUE(await_response());
+  ASSERT_TRUE(lua(R"LUA(
     assert(active:cancelled() and active:result() == nil)
-    assert(successful:status() == "succeeded" and not successful:failed())
-    assert(not successful:cancel())
-    local response = successful:result()
-    return response.status == 503 and response.body == "null"
-  )LUA"),
-            true);
-  ASSERT_TRUE(context->eval<void>("empty = http.get(url, {timeout = 5})"));
-  auto empty = acceptRequest();
-  ASSERT_TRUE(empty) << empty.error().what();
-  ASSERT_TRUE(respond(*empty, ""));
-  deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-  finished = false;
-  while (!finished && (deadline - std::chrono::steady_clock::now()).count() > 0) {
-    auto queried = context->eval<bool>("return empty:finished()");
-    ASSERT_TRUE(queried) << queried.error().what();
-    finished = *queried;
-    std::this_thread::yield();
+    assert(successful:succeeded() and not successful:failed() and not successful:cancel())
+    assert(successful:result().status == 503 and successful:result().body == "null")
+  )LUA"));
+  for (std::string_view body : {std::string_view{}, std::string_view{"a\0b", 3}}) {
+    ASSERT_TRUE(lua("response = http.get(url, {timeout = 5})"));
+    auto peer = accept_request();
+    ASSERT_TRUE(peer) << peer.error().what();
+    ASSERT_TRUE(respond(**peer, "200 OK", body));
+    ASSERT_TRUE(await_response());
+    ASSERT_TRUE(body.empty() ? lua("assert(response:succeeded() and response:result().body == '')")
+                             : lua(R"(assert(response:succeeded() and response:result().body == "a\0b"))"));
   }
-  ASSERT_TRUE(finished);
-  EXPECT_EQ(context->eval<bool>("return empty:succeeded() and empty:result().body == ''"), true);
-  ASSERT_TRUE((*liveSession)->stop());
-  ASSERT_TRUE((*liveSession)->poll());
-  EXPECT_EQ(context->eval<bool>("return active:cancelled() and successful:succeeded() and empty:succeeded()"), true);
+  for (std::string_view method : {"GET", "POST", "PUT", "DELETE", "PATCH"}) {
+    ASSERT_TRUE(lua(Star::format(
+      R"(response = http.createRequest("{}", url, {{body = "a\0b", headers = {{["X-Label"] = "one\ttwo"}}}}))", method)));
+    auto body = method == "DELETE" || method == "GET" ? std::string_view{} : std::string_view{"a\0b", 3};
+    auto peer = accept_request(method, body, "\r\nX-Label: one\ttwo\r\n");
+    ASSERT_TRUE(peer) << peer.error().what();
+    ASSERT_TRUE(respond(**peer, "200 OK", "ack"));
+    ASSERT_TRUE(await_response());
+    ASSERT_TRUE(lua("assert(response:succeeded() and response:result().body == 'ack')"));
+  }
+
+  // Even another URL on the same trusted loopback server must not be fetched implicitly.
+  ASSERT_TRUE(lua("response = http.get(url, {timeout = 3})"));
+  auto redirect = accept_request();
+  ASSERT_TRUE(redirect) << redirect.error().what();
+  ASSERT_TRUE(respond(**redirect, "302 Found", "moved", "Location: /next\r\n"));
+  ASSERT_TRUE(await_response());
+  ASSERT_TRUE(lua("assert(response:result().status == 302 and response:result().body == 'moved')"));
+  auto followed = (*listener)->accept((*root)->logger());
+  ASSERT_TRUE(followed) << followed.error().what();
+  ASSERT_FALSE(*followed);
+
+  // Keep the peer silent. A regression waiting for the infinite request timeout
+  // must fail rather than hang the test: the watchdog closes the peer as a last resort.
+  ASSERT_TRUE(lua("hanging = http.get(url, {timeout = 0})"));
+  auto hanging = accept_request();
+  ASSERT_TRUE(hanging) << hanging.error().what();
+  std::promise<void> stopped;
+  bool fallback_used = false;
+  std::jthread watchdog([&, done = stopped.get_future()] {
+    if (done.wait_for(std::chrono::seconds(8)) == std::future_status::timeout) {
+      fallback_used = true;
+      (*hanging)->close();
+    }
+  });
+  auto stop_result = session->stop();
+  stopped.set_value();
+  watchdog.join();
+  ASSERT_FALSE(fallback_used) << "Session stop needed peer-side EOF";
+  ASSERT_TRUE(stop_result) << stop_result.error().what();
+  ASSERT_TRUE(session->poll());
+  ASSERT_TRUE(lua("assert(hanging:cancelled() and active:cancelled() and successful:succeeded())"));
 });
 
 [[nodiscard]] std::expected<void, StarException>

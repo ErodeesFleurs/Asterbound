@@ -6,7 +6,7 @@ http = {}
 
 ---@class HttpOptions
 ---@field headers table<string, string>|nil Optional. HTTP headers to include in the request
----@field body string|table|nil Optional. Request body; tables are JSON-encoded
+---@field body string|table|nil Optional. Sent with POST, PUT and PATCH; tables are JSON-encoded
 ---@field timeout integer|nil Optional. Request timeout in seconds (default 30; 0 disables the timeout)
 
 ---@class HttpResponse
@@ -16,7 +16,7 @@ http = {}
 ---@class HttpPromise
 ---@field status fun(self: HttpPromise): "pending"|"succeeded"|"failed"|"cancelled" Returns the standard promise state
 ---@field finished fun(self: HttpPromise): boolean Returns `true` after success, failure, or cancellation
----@field succeeded fun(self: HttpPromise): boolean Returns `true` for a completed HTTP response, including HTTP 4xx/5xx
+---@field succeeded fun(self: HttpPromise): boolean Returns `true` for a completed HTTP response, including unfollowed redirects and HTTP 4xx/5xx
 ---@field failed fun(self: HttpPromise): boolean Returns `true` after failure, denial, or cancellation
 ---@field cancelled fun(self: HttpPromise): boolean Returns `true` if this request was cancelled
 ---@field cancel fun(self: HttpPromise): boolean Cancels a pending request without affecting other requests; a running native operation may still finish
@@ -60,8 +60,8 @@ function http.delete(url, options) end
 ---@return HttpPromise
 function http.patch(url, options) end
 
---- Creates and executes an asynchronous HTTP request with a custom method to the specified URL. Returns an `HttpPromise` object that can be checked for completion. ---
----@param method string HTTP method (e.g., "GET", "POST", "HEAD", "OPTIONS")
+--- Creates an asynchronous HTTP request. Other method names fail without requesting approval.
+---@param method "GET"|"POST"|"PUT"|"DELETE"|"PATCH"
 ---@param url string Target URL
 ---@param options HttpOptions|nil Optional request options (headers, body, timeout)
 ---@return HttpPromise
