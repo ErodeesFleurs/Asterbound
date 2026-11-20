@@ -49,6 +49,7 @@ import star.algorithm;
 import star.file;
 import star.random;
 import star.collection_database;
+import star.entity;
 import star.player;
 import star.player_blueprints;
 import star.player_factory;
@@ -1164,8 +1165,9 @@ const GameTestRegistration
     auto context = ClientContext::create(root, Uuid(root.random()), *uuid);
     ASSERT_TRUE(context);
     player.setClientContext(*context);
-    ASSERT_TRUE(player.init(**world, 100, EntityMode::Master));
-    auto uninitPlayer = make_scope_exit([&] { EXPECT_TRUE(player.uninit()); });
+    Entity& entity = player;
+    ASSERT_TRUE(entity.init(**world, 100, EntityMode::Master));
+    auto uninitPlayer = make_scope_exit([&] { EXPECT_TRUE(entity.uninit()); });
     ASSERT_TRUE(player.refreshHumanoid());
     Vec2F const origin(1024, 1024);
     ASSERT_TRUE(player.moveTo(origin));
@@ -1330,8 +1332,9 @@ function uninit() visit("uninit") end
     auto context = ClientContext::create(root, Uuid(root.random()), *uuid);
     ASSERT_TRUE(context);
     player.setClientContext(*context);
-    ASSERT_TRUE(player.init(**world, 100, EntityMode::Master));
-    auto uninitPlayer = make_scope_exit([&] { EXPECT_TRUE(player.uninit()); });
+    Entity& entity = player;
+    ASSERT_TRUE(entity.init(**world, 100, EntityMode::Master));
+    auto uninitPlayer = make_scope_exit([&] { EXPECT_TRUE(entity.uninit()); });
     ASSERT_TRUE(player.refreshHumanoid());
     ASSERT_TRUE(player.moveTo(Vec2F(1024, 1024)));
 
