@@ -227,7 +227,7 @@ std::expected<std::shared_ptr<LuaRoot>, StarException> storageLua(Root& root) {
   auto callbacks = LuaBindings::makeRootCallbacks(root);
   if (!callbacks)
     return std::unexpected(std::move(callbacks.error()));
-  (*lua)->addCallbacks("root", *callbacks);
+  (*lua)->add_callbacks("root", *callbacks);
   return std::move(*lua);
 }
 
@@ -260,14 +260,14 @@ const GameTestRegistration luaScopes("ModStorageTest", "LuaAssetScopesExplicitNa
     ASSERT_TRUE(root) << root.error().what();
     auto lua = storageLua(**root);
     ASSERT_TRUE(lua);
-    auto a = (*lua)->createContext("/storage-a.lua");
-    auto b = (*lua)->createContext("/storage-b.lua");
+    auto a = (*lua)->create_context("/storage-a.lua");
+    auto b = (*lua)->create_context("/storage-b.lua");
     ASSERT_TRUE(a);
     ASSERT_TRUE(b);
-    ASSERT_TRUE(a->invokePath<void>("save", 11));
-    ASSERT_TRUE(b->invokePath<void>("save", 22));
-    EXPECT_EQ(a->invokePath<int>("read"), 11);
-    EXPECT_EQ(b->invokePath<int>("read"), 22);
+    ASSERT_TRUE(a->invoke_path<void>("save", 11));
+    ASSERT_TRUE(b->invoke_path<void>("save", 22));
+    EXPECT_EQ(a->invoke_path<int>("read"), 11);
+    EXPECT_EQ(b->invoke_path<int>("read"), 22);
     EXPECT_EQ(a->eval<int>("root.getModStorage('value', 'StorageB')"), 22);
     ASSERT_TRUE(a->eval<void>("root.setModStorage('named', 33, 'StorageB')"));
     EXPECT_EQ(b->eval<int>("root.getModStorage('named', 'StorageB')"), 33);
@@ -283,36 +283,36 @@ const GameTestRegistration luaScopes("ModStorageTest", "LuaAssetScopesExplicitNa
     EXPECT_FALSE(a->eval<Json>("loadstring(\"return root.getModStorage('value')\")()"));
     EXPECT_FALSE(a->eval<Json>("root.getModStorage('value', 'unknown-storage-mod')"));
     EXPECT_EQ(a->eval<bool>("io == nil and debug == nil"), true);
-    EXPECT_EQ(a->invokePath<int>("count"), 1);
-    ASSERT_TRUE(a->invokePath<void>("erase"));
-    EXPECT_EQ(a->invokePath<Json>("read"), Json());
-    ASSERT_TRUE(a->invokePath<void>("save", 44));
+    EXPECT_EQ(a->invoke_path<int>("count"), 1);
+    ASSERT_TRUE(a->invoke_path<void>("erase"));
+    EXPECT_EQ(a->invoke_path<Json>("read"), Json());
+    ASSERT_TRUE(a->invoke_path<void>("save", 44));
     auto before = (*root)->modStorage();
     ASSERT_TRUE(before);
     ASSERT_TRUE((*root)->reload());
     auto after = (*root)->modStorage();
     ASSERT_TRUE(after);
     EXPECT_EQ(&before->get(), &after->get());
-    EXPECT_EQ(a->invokePath<int>("read"), 44);
-    auto current = (*lua)->createContext("/storage-a.lua");
+    EXPECT_EQ(a->invoke_path<int>("read"), 44);
+    auto current = (*lua)->create_context("/storage-a.lua");
     ASSERT_TRUE(current);
-    EXPECT_EQ(current->invokePath<int>("read"), 44);
-    ASSERT_TRUE(b->invokePath<void>("clear"));
-    EXPECT_EQ(b->invokePath<int>("count"), 0);
+    EXPECT_EQ(current->invoke_path<int>("read"), 44);
+    ASSERT_TRUE(b->invoke_path<void>("clear"));
+    EXPECT_EQ(b->invoke_path<int>("count"), 0);
     ASSERT_TRUE(a->eval<void>("root.flushModStorage()"));
-    ASSERT_TRUE(a->invokePath<void>("save", 55));
+    ASSERT_TRUE(a->invoke_path<void>("save", 55));
     // The final write deliberately relies on Root/service shutdown, not flush.
   }
   auto root = Root::create(*settings);
   ASSERT_TRUE(root);
   auto lua = storageLua(**root);
   ASSERT_TRUE(lua);
-  auto a = (*lua)->createContext("/storage-a.lua");
-  auto b = (*lua)->createContext("/storage-b.lua");
+  auto a = (*lua)->create_context("/storage-a.lua");
+  auto b = (*lua)->create_context("/storage-b.lua");
   ASSERT_TRUE(a);
   ASSERT_TRUE(b);
-  EXPECT_EQ(a->invokePath<int>("read"), 55);
-  EXPECT_EQ(b->invokePath<int>("count"), 0);
+  EXPECT_EQ(a->invoke_path<int>("read"), 55);
+  EXPECT_EQ(b->invoke_path<int>("count"), 0);
 });
 
 const GameTestRegistration sourceCollisions("ModStorageTest", "DuplicateSourcesAndRootsDoNotShareNamespaces", [](GameTest& fixture) {

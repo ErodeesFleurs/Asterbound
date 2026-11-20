@@ -10,15 +10,15 @@ namespace Star {
 std::expected<void, StarException> LuaConverter<Color>::from(LuaStack stack, Color const& c) {
   auto alpha = c.alpha();
   return alpha == 255
-    ? stack.pushArray(std::initializer_list<std::uint8_t>{c.red(), c.green(), c.blue()})
-    : stack.pushArray(std::initializer_list<std::uint8_t>{c.red(), c.green(), c.blue(), alpha});
+    ? stack.push_array(std::initializer_list<std::uint8_t>{c.red(), c.green(), c.blue()})
+    : stack.push_array(std::initializer_list<std::uint8_t>{c.red(), c.green(), c.blue(), alpha});
 }
 
 std::expected<std::optional<Color>, StarException> LuaConverter<Color>::to(LuaStackValue v) {
   if (v.is<LuaTable>()) {
     std::array<int, 3> channels;
     for (std::size_t i = 0; i < channels.size(); ++i) {
-      auto channel = v.maybeGet<int>(i + 1);
+      auto channel = v.maybe_get<int>(i + 1);
       if (!channel)
         return std::unexpected(std::move(channel.error()));
       if (!*channel)
@@ -26,14 +26,14 @@ std::expected<std::optional<Color>, StarException> LuaConverter<Color>::to(LuaSt
       channels[i] = **channel;
     }
     Color c = Color::rgba(channels[0], channels[1], channels[2], 255);
-    auto alpha = v.maybeGet<int>(4);
+    auto alpha = v.maybe_get<int>(4);
     if (!alpha)
       return std::unexpected(std::move(alpha.error()));
     if (*alpha)
       c.set_alpha(**alpha);
     return c;
   } else if (v.is<LuaString>()) {
-    auto text = v.stringView().utf8();
+    auto text = v.string_view().utf8();
     auto color = Color::create(StringView(text.substr(0, text.find('\0'))));
     if (!color) {
       if (color.error().is<ColorException>())
@@ -45,24 +45,9 @@ std::expected<std::optional<Color>, StarException> LuaConverter<Color>::to(LuaSt
   return std::nullopt;
 }
 
-std::expected<void, StarException> LuaConverter<LuaCallbacks>::from(LuaStack stack, LuaCallbacks const& c) {
-  auto convert = [&](LuaCallbacks const& callbacks) -> std::expected<void, StarException> {
-    auto created = stack.createTable(0, callbacks.callbacks().size());
-    if (!created)
-      return std::unexpected(std::move(created.error()));
-    auto table = std::move(*created);
-    for (auto&& callback : callbacks.callbacks()) {
-      auto function = stack.engine().createWrappedFunction(callback.second);
-      if (!function)
-        return std::unexpected(std::move(function.error()));
-      auto result = table.set(callback.first, std::move(*function));
-      if (!result)
-        return std::unexpected(std::move(result.error()));
-    }
-    return {};
-  };
-  auto const& lifetime = stack.engine().promiseLifetime();
-  return lifetime.stop_possible() ? convert(c.withLifetime(lifetime)) : convert(c);
+std::expected<void, StarException> LuaConverter<LuaCallbacks>::from(LuaStack stack, LuaCallbacks const& callbacks) {
+  auto const& lifetime = stack.engine().promise_lifetime();
+  return lifetime.stop_possible() ? stack.push_callback_table(callbacks.with_lifetime(lifetime)) : stack.push_callback_table(callbacks);
 }
 
 std::expected<std::optional<LuaCallbacks>, StarException> LuaConverter<LuaCallbacks>::to(LuaStackValue) {

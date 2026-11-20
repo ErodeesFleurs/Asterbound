@@ -238,8 +238,12 @@ See [engine notes](engine-notes.md) for runtime ownership, the
 
 ### Stack values and typed calls
 
+Native C++ embedding methods use snake_case (for example, `create_context`, `set_execution_host`, and `set_promise_lifetime`). Lua-visible callback keys, including `setPause`, are mod APIs and keep their existing spelling.
+
 - `LuaConverter<T>` converts through `LuaStack`/`LuaStackValue`, including coroutines. Stack/string views borrow; retain with `own()` or owning Lua handles.
 - Typed `void`, scalar, tuple and `LuaVariadic` calls request zero, one, tuple-N and all results; discard unused results before conversion.
+- Dotted path segments are byte strings: an embedded NUL is part of the table key, and adjacent dots denote an empty key. Reads and writes must respect Lua table metamethods. `eval` parses the entire byte span, trying the expression form before falling back to a statement on syntax error.
+- Keep a saved `loadstring` function's default environment reachable through Lua, not through a reusable integer registry slot. Install native callbacks on the destination stack; only materialize a persistent function handle when a caller needs to retain it. Forward owned callback returns without consuming borrowed results.
 
 ### Context retirement and shutdown
 

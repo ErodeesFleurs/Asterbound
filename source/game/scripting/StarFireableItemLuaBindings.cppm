@@ -87,72 +87,72 @@ namespace Star {
 std::expected<LuaCallbacks, StarException> LuaBindings::makeFireableItemCallbacks(FireableItem& fireableItem) {
   LuaCallbacks callbacks;
 
-  if (auto registration = callbacks.registerCallbackWithSignature<void, std::optional<String>>(
+  if (auto registration = callbacks.register_callback_with_signature<void, std::optional<String>>(
         "fire",
         [&fireableItem](std::optional<String> const& mode) { return FireableItemCallbacks::fire(fireableItem, mode); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<void>(
+  if (auto registration = callbacks.register_callback_with_signature<void>(
         "triggerCooldown", [&fireableItem]() { return FireableItemCallbacks::triggerCooldown(fireableItem); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<void, float>(
+  if (auto registration = callbacks.register_callback_with_signature<void, float>(
         "setCooldown", [&fireableItem](float time) { return FireableItemCallbacks::setCooldown(fireableItem, time); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<void>(
+  if (auto registration = callbacks.register_callback_with_signature<void>(
         "endCooldown", [&fireableItem]() { return FireableItemCallbacks::endCooldown(fireableItem); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<float>(
+  if (auto registration = callbacks.register_callback_with_signature<float>(
         "cooldownTime", [&fireableItem]() { return FireableItemCallbacks::cooldownTime(fireableItem); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<Json, String, Json>(
+  if (auto registration = callbacks.register_callback_with_signature<Json, String, Json>(
         "fireableParam",
         [&fireableItem](String const& name, Json const& def) {
           return FireableItemCallbacks::fireableParam(fireableItem, name, def);
         });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<String>(
+  if (auto registration = callbacks.register_callback_with_signature<String>(
         "fireMode", [&fireableItem]() { return FireableItemCallbacks::fireMode(fireableItem); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<bool>(
+  if (auto registration = callbacks.register_callback_with_signature<bool>(
         "ready", [&fireableItem]() { return FireableItemCallbacks::ready(fireableItem); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<bool>(
+  if (auto registration = callbacks.register_callback_with_signature<bool>(
         "firing", [&fireableItem]() { return FireableItemCallbacks::firing(fireableItem); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<bool>(
+  if (auto registration = callbacks.register_callback_with_signature<bool>(
         "windingUp", [&fireableItem]() { return FireableItemCallbacks::windingUp(fireableItem); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<bool>(
+  if (auto registration = callbacks.register_callback_with_signature<bool>(
         "coolingDown", [&fireableItem]() { return FireableItemCallbacks::coolingDown(fireableItem); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<bool>(
+  if (auto registration = callbacks.register_callback_with_signature<bool>(
         "ownerFullEnergy", [&fireableItem]() { return FireableItemCallbacks::ownerFullEnergy(fireableItem); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<bool>(
+  if (auto registration = callbacks.register_callback_with_signature<bool>(
         "ownerEnergy", [&fireableItem]() { return FireableItemCallbacks::ownerEnergy(fireableItem); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<bool>(
+  if (auto registration = callbacks.register_callback_with_signature<bool>(
         "ownerEnergyLocked", [&fireableItem]() { return FireableItemCallbacks::ownerEnergyLocked(fireableItem); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<bool, float>(
+  if (auto registration = callbacks.register_callback_with_signature<bool, float>(
         "ownerConsumeEnergy",
         [&fireableItem](float energy) { return FireableItemCallbacks::ownerConsumeEnergy(fireableItem, energy); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<Vec2F>("ownerAimPosition", [&fireableItem]() -> std::expected<Vec2F, StarException> {
+  if (auto registration = callbacks.register_callback_with_signature<Vec2F>("ownerAimPosition", [&fireableItem]() -> std::expected<Vec2F, StarException> {
       auto owner = fireableItem.owner();
       if (!owner)
         return std::unexpected(std::move(owner.error()));

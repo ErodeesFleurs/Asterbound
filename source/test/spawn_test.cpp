@@ -128,7 +128,7 @@ const GameTestRegistration celestialCoordinatorMigration("SpawnTest", "Celestial
   // Compile that same asset explicitly even if NPC scheduling changes.
   auto lua = LuaRoot::create(fixture.root());
   ASSERT_TRUE(lua) << lua.error().what();
-  auto context = (*lua)->createContext("/stagehands/coordinator/npccombat.lua");
+  auto context = (*lua)->create_context("/stagehands/coordinator/npccombat.lua");
   ASSERT_TRUE(context) << context.error().what();
 });
 

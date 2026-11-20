@@ -258,7 +258,7 @@ const GameTestRegistration
   damageEnumLuaBoundaries("DamageTypesTest", "LuaOptionalLookupAndCanonicalRoundTrip", [](GameTest&) {
     auto engine = LuaEngine::create();
     ASSERT_TRUE(engine);
-    auto context = (*engine)->createContext();
+    auto context = (*engine)->create_context();
     ASSERT_TRUE(context);
     auto defaults = context->eval<DamageRequest>("return {damage = 3}");
     ASSERT_TRUE(defaults);
@@ -267,35 +267,35 @@ const GameTestRegistration
     auto request =
       context->eval<DamageRequest>("return {damage = 3, hitType = 'sTrOnGhIt', damageType = 'iGnOrEsDeF'}");
     ASSERT_TRUE(request);
-    ASSERT_TRUE(context->setPath("request", *request));
+    ASSERT_TRUE(context->set_path("request", *request));
     auto rendered = context->eval<bool>("return request.hitType == 'StrongHit' and request.damageType == 'IgnoresDef'");
     ASSERT_TRUE(rendered);
     EXPECT_TRUE(*rendered);
 
     for (String const& name : {String("unknown"), String("日本語"), String(std::string_view("Hit\0", 4))}) {
-      ASSERT_TRUE(context->setPath("name", name));
+      ASSERT_TRUE(context->set_path("name", name));
       auto value = context->eval<LuaValue>("return {damage = 3, hitType = name, damageType = string.char(255)}");
       ASSERT_TRUE(value);
-      auto rejected = (*engine)->luaMaybeTo<DamageRequest>(*value);
+      auto rejected = (*engine)->lua_maybe_to<DamageRequest>(*value);
       ASSERT_TRUE(rejected);
       EXPECT_FALSE(*rejected);
     }
     auto malformed =
       context->eval<LuaValue>("return {damage = 3, hitType = 'Hit' .. string.char(255), damageType = 'unknown'}");
     ASSERT_TRUE(malformed);
-    auto rejected = (*engine)->luaMaybeTo<DamageRequest>(*malformed);
+    auto rejected = (*engine)->lua_maybe_to<DamageRequest>(*malformed);
     ASSERT_FALSE(rejected);
     EXPECT_TRUE(rejected.error().is<UnicodeException>());
 
     DamageNotification notification;
     notification.hitType = HitType::ShieldHit;
-    ASSERT_TRUE(context->setPath("notification", notification));
+    ASSERT_TRUE(context->set_path("notification", notification));
     auto roundTrip = context->eval<DamageNotification>("return notification");
     ASSERT_TRUE(roundTrip);
     EXPECT_EQ(roundTrip->hitType, HitType::ShieldHit);
     auto unknown = context->eval<LuaValue>("notification.hitType = 'unknown'; return notification");
     ASSERT_TRUE(unknown);
-    auto noNotification = (*engine)->luaMaybeTo<DamageNotification>(*unknown);
+    auto noNotification = (*engine)->lua_maybe_to<DamageNotification>(*unknown);
     ASSERT_TRUE(noNotification);
     EXPECT_FALSE(*noNotification);
   });

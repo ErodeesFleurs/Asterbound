@@ -597,11 +597,11 @@ std::expected<std::shared_ptr<LuaRoot>, StarException> prepareProfile(Root& root
   auto lua = LuaRoot::create(root);
   if (!lua)
     return std::unexpected(std::move(lua.error()));
-  auto& engine = (*lua)->luaEngine();
-  engine.setProfilingEnabled(true);
-  engine.setInstructionMeasureInterval(100);
+  auto& engine = (*lua)->lua_engine();
+  engine.set_profiling_enabled(true);
+  engine.set_instruction_measure_interval(100);
   auto executed = [&]() -> std::expected<void, StarException> {
-    auto context = (*lua)->createContext();
+    auto context = (*lua)->create_context();
     if (!context)
       return std::unexpected(std::move(context.error()));
     if (auto loaded = context->load(program, "game_benchmarks_nested_profile"); !loaded)

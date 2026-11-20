@@ -16,7 +16,7 @@ namespace Star {
 std::expected<LuaCallbacks, StarException> LuaBindings::makeConfigCallbacks(std::function<std::expected<Json, StarException>(String const&, Json const&)> getParameter) {
   LuaCallbacks callbacks;
 
-  if (auto result = callbacks.registerCallback("getParameter", std::move(getParameter)); !result)
+  if (auto result = callbacks.register_callback("getParameter", std::move(getParameter)); !result)
     return std::unexpected(std::move(result.error()));
 
   return callbacks;

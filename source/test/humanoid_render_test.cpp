@@ -219,11 +219,11 @@ const GameTestRegistration transientMovementAnimation(
     // names, and accepts nil. No fixture implementation stands in for it.
     auto lua = LuaRoot::create(**root);
     ASSERT_TRUE(lua);
-    auto context = (*lua)->createContext(StringList{});
+    auto context = (*lua)->create_context(StringList{});
     ASSERT_TRUE(context);
     auto callbacks = LuaBindings::makePlayerCallbacks(**root, player);
     ASSERT_TRUE(callbacks);
-    ASSERT_TRUE(context->setCallbacks("player", *callbacks));
+    ASSERT_TRUE(context->set_callbacks("player", *callbacks));
     auto valid = context->eval<bool>(R"LUA(
       for _, state in ipairs({"idle", "walk", "run", "jump", "fall", "duck"}) do
         assert(pcall(player.controlMovementState, state))
@@ -887,11 +887,11 @@ const GameTestRegistration playerPresentationEvents(
 
     auto lua = LuaRoot::create(root);
     ASSERT_TRUE(lua);
-    auto context = (*lua)->createContext(StringList{});
+    auto context = (*lua)->create_context(StringList{});
     ASSERT_TRUE(context);
     auto callbacks = LuaBindings::makeMovementControllerCallbacks(player.movementController());
     ASSERT_TRUE(callbacks);
-    ASSERT_TRUE(context->setCallbacks("mcontroller", *callbacks));
+    ASSERT_TRUE(context->set_callbacks("mcontroller", *callbacks));
     auto epoch = player.presentationEpoch();
     auto moved = context->eval<bool>(R"LUA(
       mcontroller.translate({0.1, 0})

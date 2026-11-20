@@ -1252,7 +1252,7 @@ const GameTestRegistration audioMixerGroupBindings("AssetsTest", "AudioMixerGrou
   ASSERT_TRUE(instance);
   auto engine = LuaEngine::create();
   ASSERT_TRUE(engine);
-  auto context = (*engine)->createContext();
+  auto context = (*engine)->create_context();
   ASSERT_TRUE(context);
   ASSERT_TRUE(context->set("audio", *instance));
   ASSERT_TRUE(context->load(R"LUA(
@@ -1271,18 +1271,18 @@ const GameTestRegistration audioMixerGroupBindings("AssetsTest", "AudioMixerGrou
                                  {"MUSIC", "Music", MixerGroup::Music},
                                  {"cinematic", "Cinematic", MixerGroup::Cinematic},
                                  {"Instruments", "Instruments", MixerGroup::Instruments}})) {
-    auto selected = context->invokePath<String>("selectGroup", String(inputName));
+    auto selected = context->invoke_path<String>("selectGroup", String(inputName));
     ASSERT_TRUE(selected);
     EXPECT_EQ((*instance)->mixer_group(), group);
     EXPECT_EQ(selected->utf8(), canonical);
   }
   for (auto const& invalid : {String("unknown"), String("Músic"), String(std::string("Music\0Effects", 13)),
                               String(std::string(1, static_cast<char>(0xff)))}) {
-    auto selected = context->invokePath<String>("selectGroup", invalid);
+    auto selected = context->invoke_path<String>("selectGroup", invalid);
     EXPECT_FALSE(selected);
     EXPECT_EQ((*instance)->mixer_group(), MixerGroup::Instruments);
   }
-  auto recovered = context->invokePath<String>("selectGroup", String("effects"));
+  auto recovered = context->invoke_path<String>("selectGroup", String("effects"));
   ASSERT_TRUE(recovered);
   EXPECT_EQ(*recovered, "Effects");
   EXPECT_EQ((*instance)->mixer_group(), MixerGroup::Effects);

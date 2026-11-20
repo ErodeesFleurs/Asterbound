@@ -406,11 +406,11 @@ const GameTestRegistration
       parameters.gravityEnabled = false;
       auto lua_root = LuaRoot::create(fixture.root());
       ASSERT_TRUE(lua_root) << lua_root.error().what();
-      auto context = (*lua_root)->luaEngine().createContext();
+      auto context = (*lua_root)->lua_engine().create_context();
       ASSERT_TRUE(context) << context.error().what();
       auto callbacks = LuaBindings::makeWorldCallbacks(fixture.root(), world);
       ASSERT_TRUE(callbacks) << callbacks.error().what();
-      ASSERT_TRUE(context->setCallbacks("world", *callbacks));
+      ASSERT_TRUE(context->set_callbacks("world", *callbacks));
       ASSERT_TRUE(context->set("movement", parameters));
       ASSERT_TRUE(context->set("start_position", origin + Vec2F(-6, 4.25f)));
       ASSERT_TRUE(context->set("target_position", origin + Vec2F(6, 4.25f)));

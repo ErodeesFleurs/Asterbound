@@ -222,10 +222,10 @@ m_questIndicatorOffset = std::move(*result9);
 
   setTeam(EntityDamageTeam(m_npcVariant.damageTeamType, m_npcVariant.damageTeam));
 
-  auto result12 = m_scriptComponent.setScripts(m_npcVariant.scripts);
+  auto result12 = m_scriptComponent.set_scripts(m_npcVariant.scripts);
 if (!result12) return std::unexpected(std::move(result12.error()));
 
-  m_scriptComponent.setUpdateDelta(m_npcVariant.initialScriptDelta);
+  m_scriptComponent.set_update_delta(m_npcVariant.initialScriptDelta);
   auto result13 = humanoid();
 if (!result13) return std::unexpected(std::move(result13.error()));
 auto result14 = ActorMovementParameters::create(json_merge(std::move(*result13)->defaultMovementParameters(), m_npcVariant.movementParameters));
@@ -371,7 +371,7 @@ m_disableWornArmor.set(std::move(*result55));
 
   auto result56 = diskStore.get_object("scriptStorage");
 if (!result56) return std::unexpected(std::move(result56.error()));
-auto result57 = m_scriptComponent.setScriptStorage(std::move(*result56));
+auto result57 = m_scriptComponent.set_script_storage(std::move(*result56));
 if (!result57) return std::unexpected(std::move(result57.error()));
 
 
@@ -434,7 +434,7 @@ auto result75 = HumanoidEmoteNames->get_right(std::move(*result74)->emoteState()
 if (!result75) return std::unexpected(std::move(result75.error()));
 auto result76 = m_effectEmitter->toJson();
 if (!result76) return std::unexpected(std::move(result76.error()));
-auto result77 = m_scriptComponent.getScriptStorage();
+auto result77 = m_scriptComponent.get_script_storage();
 if (!result77) return std::unexpected(std::move(result77.error()));
 auto result78 = getTeam().toJson();
 if (!result78) return std::unexpected(std::move(result78.error()));
@@ -510,34 +510,34 @@ auto itemDatabase = std::move(*result86);
 }
     auto result88 = makeNpcCallbacks();
 if (!result88) return std::unexpected(std::move(result88.error()));
-auto result89 = m_scriptComponent.addCallbacks("npc", std::move(*result88));
+auto result89 = m_scriptComponent.add_callbacks("npc", std::move(*result88));
 if (!result89) return std::unexpected(std::move(result89.error()));
 
     auto result90 = LuaBindings::makeConfigCallbacks([this](String const& name, Json const& def)
             { return m_npcVariant.scriptConfig.query(name, def); });
 if (!result90) return std::unexpected(std::move(result90.error()));
-auto result91 = m_scriptComponent.addCallbacks("config",
+auto result91 = m_scriptComponent.add_callbacks("config",
         std::move(*result90));
 if (!result91) return std::unexpected(std::move(result91.error()));
 
     auto result92 = LuaBindings::makeEntityCallbacks(*this);
 if (!result92) return std::unexpected(std::move(result92.error()));
-auto result93 = m_scriptComponent.addCallbacks("entity", std::move(*result92));
+auto result93 = m_scriptComponent.add_callbacks("entity", std::move(*result92));
 if (!result93) return std::unexpected(std::move(result93.error()));
 
     auto result94 = LuaBindings::makeStatusControllerCallbacks(*m_statusController);
 if (!result94) return std::unexpected(std::move(result94.error()));
-auto result95 = m_scriptComponent.addCallbacks("status", std::move(*result94));
+auto result95 = m_scriptComponent.add_callbacks("status", std::move(*result94));
 if (!result95) return std::unexpected(std::move(result95.error()));
 
     auto result96 = LuaBindings::makeBehaviorCallbacks(this->root(), m_behaviors);
 if (!result96) return std::unexpected(std::move(result96.error()));
-auto result97 = m_scriptComponent.addCallbacks("behavior", std::move(*result96));
+auto result97 = m_scriptComponent.add_callbacks("behavior", std::move(*result96));
 if (!result97) return std::unexpected(std::move(result97.error()));
 
     auto result98 = LuaBindings::makeSongbookCallbacks(*m_songbook);
 if (!result98) return std::unexpected(std::move(result98.error()));
-auto result99 = m_scriptComponent.addCallbacks("songbook", std::move(*result98));
+auto result99 = m_scriptComponent.add_callbacks("songbook", std::move(*result98));
 if (!result99) return std::unexpected(std::move(result99.error()));
 
     auto result100 = humanoid();
@@ -545,20 +545,20 @@ if (!result100) return std::unexpected(std::move(result100.error()));
 auto animator = (*result100)->networkedAnimator();
 auto result101 = LuaBindings::makeNetworkedAnimatorCallbacks(animator->get());
 if (!result101) return std::unexpected(std::move(result101.error()));
-auto result102 = m_scriptComponent.addCallbacks("animator", std::move(*result101));
+auto result102 = m_scriptComponent.add_callbacks("animator", std::move(*result101));
 if (!result102) return std::unexpected(std::move(result102.error()));
 
-    auto result103 = m_scriptComponent.addActorMovementCallbacks(*m_movementController);
+    auto result103 = m_scriptComponent.add_actor_movement_callbacks(*m_movementController);
 if (!result103) return std::unexpected(std::move(result103.error()));
 
-    auto result104 = recoverLuaScriptError(m_scriptComponent.init(world));
+    auto result104 = recover_lua_script_error(m_scriptComponent.init(world));
 if (!result104) return std::unexpected(std::move(result104.error()));
 
   }
   if (world.isClient()) {
     auto result105 = humanoid();
 if (!result105) return std::unexpected(std::move(result105.error()));
-auto result106 = m_scriptedAnimator.setScripts(std::move(*result105)->animationScripts());
+auto result106 = m_scriptedAnimator.set_scripts(std::move(*result105)->animationScripts());
 if (!result106) return std::unexpected(std::move(result106.error()));
 
     auto result107 = humanoid();
@@ -569,22 +569,22 @@ auto result108 = LuaBindings::makeScriptedAnimatorCallbacks(animator->get(),
         return m_scriptedAnimationParameters.value(name, defaultValue);
       });
 if (!result108) return std::unexpected(std::move(result108.error()));
-auto result109 = m_scriptedAnimator.addCallbacks("animationConfig", std::move(*result108));
+auto result109 = m_scriptedAnimator.add_callbacks("animationConfig", std::move(*result108));
 if (!result109) return std::unexpected(std::move(result109.error()));
 
     auto result110 = LuaBindings::makeConfigCallbacks([this](String const& name, Json const& def)
             { return m_npcVariant.scriptConfig.query(name, def); });
 if (!result110) return std::unexpected(std::move(result110.error()));
-auto result111 = m_scriptedAnimator.addCallbacks("config",
+auto result111 = m_scriptedAnimator.add_callbacks("config",
         std::move(*result110));
 if (!result111) return std::unexpected(std::move(result111.error()));
 
     auto result112 = LuaBindings::makeEntityCallbacks(*this);
 if (!result112) return std::unexpected(std::move(result112.error()));
-auto result113 = m_scriptedAnimator.addCallbacks("entity", std::move(*result112));
+auto result113 = m_scriptedAnimator.add_callbacks("entity", std::move(*result112));
 if (!result113) return std::unexpected(std::move(result113.error()));
 
-    auto result114 = recoverLuaScriptError(m_scriptedAnimator.init(world));
+    auto result114 = recover_lua_script_error(m_scriptedAnimator.init(world));
 if (!result114) return std::unexpected(std::move(result114.error()));
 
   }
@@ -602,31 +602,31 @@ std::expected<void, StarException> Npc::uninit() {
     auto result115 = m_movementController->resetAnchorState();
 if (!result115) return std::unexpected(std::move(result115.error()));
 
-    auto result116 = recoverLuaScriptError(m_scriptComponent.uninit());
+    auto result116 = recover_lua_script_error(m_scriptComponent.uninit());
 if (!result116) return std::unexpected(std::move(result116.error()));
 
-    auto result117 = m_scriptComponent.removeCallbacks("npc");
+    auto result117 = m_scriptComponent.remove_callbacks("npc");
 if (!result117) return std::unexpected(std::move(result117.error()));
 
-    auto result118 = m_scriptComponent.removeCallbacks("config");
+    auto result118 = m_scriptComponent.remove_callbacks("config");
 if (!result118) return std::unexpected(std::move(result118.error()));
 
-    auto result119 = m_scriptComponent.removeCallbacks("entity");
+    auto result119 = m_scriptComponent.remove_callbacks("entity");
 if (!result119) return std::unexpected(std::move(result119.error()));
 
-    auto result120 = m_scriptComponent.removeCallbacks("status");
+    auto result120 = m_scriptComponent.remove_callbacks("status");
 if (!result120) return std::unexpected(std::move(result120.error()));
 
-    auto result121 = m_scriptComponent.removeCallbacks("behavior");
+    auto result121 = m_scriptComponent.remove_callbacks("behavior");
 if (!result121) return std::unexpected(std::move(result121.error()));
 
-    auto result122 = m_scriptComponent.removeCallbacks("songbook");
+    auto result122 = m_scriptComponent.remove_callbacks("songbook");
 if (!result122) return std::unexpected(std::move(result122.error()));
 
-    auto result123 = m_scriptComponent.removeCallbacks("animator");
+    auto result123 = m_scriptComponent.remove_callbacks("animator");
 if (!result123) return std::unexpected(std::move(result123.error()));
 
-    auto result124 = m_scriptComponent.removeActorMovementCallbacks();
+    auto result124 = m_scriptComponent.remove_actor_movement_callbacks();
 if (!result124) return std::unexpected(std::move(result124.error()));
 
   }
@@ -634,16 +634,16 @@ if (!result124) return std::unexpected(std::move(result124.error()));
   auto result125 = world();
   if (!result125) return std::unexpected(std::move(result125.error()));
   if (result125->get().isClient()) {
-      auto result126 = recoverLuaScriptError(m_scriptedAnimator.uninit());
+      auto result126 = recover_lua_script_error(m_scriptedAnimator.uninit());
   if (!result126) return std::unexpected(std::move(result126.error()));
 
-      auto result127 = m_scriptedAnimator.removeCallbacks("animationConfig");
+      auto result127 = m_scriptedAnimator.remove_callbacks("animationConfig");
   if (!result127) return std::unexpected(std::move(result127.error()));
 
-      auto result128 = m_scriptedAnimator.removeCallbacks("config");
+      auto result128 = m_scriptedAnimator.remove_callbacks("config");
   if (!result128) return std::unexpected(std::move(result128.error()));
 
-      auto result129 = m_scriptedAnimator.removeCallbacks("entity");
+      auto result129 = m_scriptedAnimator.remove_callbacks("entity");
   if (!result129) return std::unexpected(std::move(result129.error()));
 
     }
@@ -865,7 +865,7 @@ auto notifications = std::move(*result171);
     totalDamage += notification.healthLost;
 
   if (totalDamage > 0 && m_hitDamageNotificationLimiter < m_hitDamageNotificationLimit) {
-    auto result172 = recoverLuaScriptError(m_scriptComponent.invoke("damage", JsonObject{
+    auto result172 = recover_lua_script_error(m_scriptComponent.invoke("damage", JsonObject{
         {"sourceId", damage.sourceEntityId},
         {"damage", totalDamage},
         {"sourceDamage", damage.damage},
@@ -884,7 +884,7 @@ std::expected<List<DamageNotification>, StarException> Npc::selfDamageNotificati
 }
 
 std::expected<bool, StarException> Npc::shouldDestroy() const {
-  auto result = recoverLuaScriptError(m_scriptComponent.invoke<bool>("shouldDie"));
+  auto result = recover_lua_script_error(m_scriptComponent.invoke<bool>("shouldDie"));
   if (!result)
     return std::unexpected(std::move(result.error()));
   if (*result)
@@ -893,7 +893,7 @@ std::expected<bool, StarException> Npc::shouldDestroy() const {
 }
 
 std::expected<void, StarException> Npc::destroy(std::optional<std::reference_wrapper<RenderCallback>> renderCallback) {
-  auto result174 = recoverLuaScriptError(m_scriptComponent.invoke("die"));
+  auto result174 = recover_lua_script_error(m_scriptComponent.invoke("die"));
 if (!result174) return std::unexpected(std::move(result174.error()));
 
 
@@ -959,7 +959,7 @@ std::expected<void, StarException> Npc::update(float dt, std::uint64_t) {
   m_movementController->setTimestep(dt);
 
   if (isMaster()) {
-    auto result185 = recoverLuaScriptError(m_scriptComponent.update(m_scriptComponent.updateDt(dt)));
+    auto result185 = recover_lua_script_error(m_scriptComponent.update(m_scriptComponent.update_dt(dt)));
 if (!result185) return std::unexpected(std::move(result185.error()));
 
 
@@ -1356,11 +1356,11 @@ bool Npc::aggressive() const {
 }
 
 std::expected<std::optional<LuaValue>, StarException> Npc::callScript(String const& func, LuaVariadic<LuaValue> const& args) {
-  return recoverLuaScriptError(m_scriptComponent.invoke(func, args));
+  return recover_lua_script_error(m_scriptComponent.invoke(func, args));
 }
 
 std::expected<std::optional<LuaValue>, StarException> Npc::evalScript(String const& code) {
-  return recoverLuaScriptError(m_scriptComponent.eval(code));
+  return recover_lua_script_error(m_scriptComponent.eval(code));
 }
 
 std::expected<Vec2F, StarException> Npc::getAbsolutePosition(Vec2F relativePosition) const {
@@ -1487,7 +1487,7 @@ if (!result284) return std::unexpected(std::move(result284.error()));
 
     }
 }
-  auto result293 = recoverLuaScriptError(m_scriptedAnimator.update());
+  auto result293 = recover_lua_script_error(m_scriptedAnimator.update());
 if (!result293) return std::unexpected(std::move(result293.error()));
 
   return {};
@@ -1496,13 +1496,13 @@ if (!result293) return std::unexpected(std::move(result293.error()));
 std::expected<LuaCallbacks, StarException> Npc::makeNpcCallbacks() {
   LuaCallbacks callbacks;
 
-  auto result294 = callbacks.registerCallback("toAbsolutePosition", [this](Vec2F const& p) { return getAbsolutePosition(p); });
+  auto result294 = callbacks.register_callback("toAbsolutePosition", [this](Vec2F const& p) { return getAbsolutePosition(p); });
 if (!result294) return std::unexpected(std::move(result294.error()));
 
-  auto result295 = callbacks.registerCallback("species", [this]() { return m_npcVariant.species; });
+  auto result295 = callbacks.register_callback("species", [this]() { return m_npcVariant.species; });
 if (!result295) return std::unexpected(std::move(result295.error()));
 
-auto result298 = callbacks.registerCallback("gender", [this]() -> std::expected<String, StarException> {
+auto result298 = callbacks.register_callback("gender", [this]() -> std::expected<String, StarException> {
   auto result296 = humanoid();
   if (!result296)
     return std::unexpected(std::move(result296.error()));
@@ -1513,18 +1513,18 @@ auto result298 = callbacks.registerCallback("gender", [this]() -> std::expected<
 });
 if (!result298) return std::unexpected(std::move(result298.error()));
 
-  auto result300 = callbacks.registerCallback("humanoidIdentity", [this]() -> std::expected<Json, StarException> { auto result299 = humanoid();
+  auto result300 = callbacks.register_callback("humanoidIdentity", [this]() -> std::expected<Json, StarException> { auto result299 = humanoid();
 if (!result299) return std::unexpected(std::move(result299.error()));
 return std::move(*result299)->identity().toJson(); });
 if (!result300) return std::unexpected(std::move(result300.error()));
-  auto result303 = callbacks.registerCallback("setHumanoidIdentity", [this](Json const& id) -> std::expected<void, StarException> { auto result301 = HumanoidIdentity::create(id);
+  auto result303 = callbacks.register_callback("setHumanoidIdentity", [this](Json const& id) -> std::expected<void, StarException> { auto result301 = HumanoidIdentity::create(id);
 if (!result301) return std::unexpected(std::move(result301.error()));
 auto result302 = setIdentity(std::move(*result301));
 if (!result302) return std::unexpected(std::move(result302.error()));
    return {};
 });
 if (!result303) return std::unexpected(std::move(result303.error()));
-auto result305 = callbacks.registerCallback(
+auto result305 = callbacks.register_callback(
   "setHumanoidParameter", [this](String key, std::optional<Json> value) -> std::expected<void, StarException> {
     auto result304 = setHumanoidParameter(std::move(key), std::move(value));
     if (!result304)
@@ -1532,10 +1532,10 @@ auto result305 = callbacks.registerCallback(
     return {};
   });
 if (!result305) return std::unexpected(std::move(result305.error()));
-auto result306 = callbacks.registerCallback(
+auto result306 = callbacks.register_callback(
   "getHumanoidParameter", [this](String key) -> std::optional<Json> { return getHumanoidParameter(std::move(key)); });
 if (!result306) return std::unexpected(std::move(result306.error()));
-auto result308 = callbacks.registerCallback("setHumanoidParameters",
+auto result308 = callbacks.register_callback("setHumanoidParameters",
                                             [this](JsonObject parameters) -> std::expected<void, StarException> {
                                               auto result307 = setHumanoidParameters(std::move(parameters));
                                               if (!result307)
@@ -1543,97 +1543,97 @@ auto result308 = callbacks.registerCallback("setHumanoidParameters",
                                               return {};
                                             });
 if (!result308) return std::unexpected(std::move(result308.error()));
-  auto result309 = callbacks.registerCallback("getHumanoidParameters", [this]() -> JsonObject { return getHumanoidParameters(); });
+  auto result309 = callbacks.register_callback("getHumanoidParameters", [this]() -> JsonObject { return getHumanoidParameters(); });
 if (!result309) return std::unexpected(std::move(result309.error()));
-  auto result311 = callbacks.registerCallback("refreshHumanoidParameters", [this]() -> std::expected<void, StarException> { auto result310 = refreshHumanoidParameters();
+  auto result311 = callbacks.register_callback("refreshHumanoidParameters", [this]() -> std::expected<void, StarException> { auto result310 = refreshHumanoidParameters();
 if (!result310) return std::unexpected(std::move(result310.error()));
    return {};
 });
 if (!result311) return std::unexpected(std::move(result311.error()));
-  auto result313 = callbacks.registerCallback("humanoidConfig", [this](bool withOverrides) -> std::expected<Json, StarException> { auto result312 = humanoid();
+  auto result313 = callbacks.register_callback("humanoidConfig", [this](bool withOverrides) -> std::expected<Json, StarException> { auto result312 = humanoid();
 if (!result312) return std::unexpected(std::move(result312.error()));
 return std::move(*result312)->humanoidConfig(withOverrides); });
 if (!result313) return std::unexpected(std::move(result313.error()));
 
-  auto result314 = callbacks.registerCallback(   "bodyDirectives", [this]()   { return identity().bodyDirectives;      });
+  auto result314 = callbacks.register_callback(   "bodyDirectives", [this]()   { return identity().bodyDirectives;      });
 if (!result314) return std::unexpected(std::move(result314.error()));
-  auto result316 = callbacks.registerCallback("setBodyDirectives", [this](String const& str) -> std::expected<void, StarException> { auto result315 = setBodyDirectives(str);
+  auto result316 = callbacks.register_callback("setBodyDirectives", [this](String const& str) -> std::expected<void, StarException> { auto result315 = setBodyDirectives(str);
 if (!result315) return std::unexpected(std::move(result315.error()));
    return {};
 });
 if (!result316) return std::unexpected(std::move(result316.error()));
 
-  auto result317 = callbacks.registerCallback(   "emoteDirectives", [this]()   { return identity().emoteDirectives;      });
+  auto result317 = callbacks.register_callback(   "emoteDirectives", [this]()   { return identity().emoteDirectives;      });
 if (!result317) return std::unexpected(std::move(result317.error()));
-  auto result319 = callbacks.registerCallback("setEmoteDirectives", [this](String const& str) -> std::expected<void, StarException> { auto result318 = setEmoteDirectives(str);
+  auto result319 = callbacks.register_callback("setEmoteDirectives", [this](String const& str) -> std::expected<void, StarException> { auto result318 = setEmoteDirectives(str);
 if (!result318) return std::unexpected(std::move(result318.error()));
    return {};
 });
 if (!result319) return std::unexpected(std::move(result319.error()));
 
-  auto result320 = callbacks.registerCallback(   "hairGroup",      [this]()   { return identity().hairGroup;      });
+  auto result320 = callbacks.register_callback(   "hairGroup",      [this]()   { return identity().hairGroup;      });
 if (!result320) return std::unexpected(std::move(result320.error()));
-  auto result322 = callbacks.registerCallback("setHairGroup",      [this](String const& str) -> std::expected<void, StarException> { auto result321 = setHairGroup(str);
+  auto result322 = callbacks.register_callback("setHairGroup",      [this](String const& str) -> std::expected<void, StarException> { auto result321 = setHairGroup(str);
 if (!result321) return std::unexpected(std::move(result321.error()));
    return {};
 });
 if (!result322) return std::unexpected(std::move(result322.error()));
-  auto result323 = callbacks.registerCallback(   "hairType",       [this]()   { return identity().hairType;      });
+  auto result323 = callbacks.register_callback(   "hairType",       [this]()   { return identity().hairType;      });
 if (!result323) return std::unexpected(std::move(result323.error()));
-  auto result325 = callbacks.registerCallback("setHairType",       [this](String const& str) -> std::expected<void, StarException> { auto result324 = setHairType(str);
+  auto result325 = callbacks.register_callback("setHairType",       [this](String const& str) -> std::expected<void, StarException> { auto result324 = setHairType(str);
 if (!result324) return std::unexpected(std::move(result324.error()));
    return {};
 });
 if (!result325) return std::unexpected(std::move(result325.error()));
-  auto result326 = callbacks.registerCallback(   "hairDirectives", [this]()   { return identity().hairDirectives;     });
+  auto result326 = callbacks.register_callback(   "hairDirectives", [this]()   { return identity().hairDirectives;     });
 if (!result326) return std::unexpected(std::move(result326.error()));
-  auto result328 = callbacks.registerCallback("setHairDirectives", [this](String const& str) -> std::expected<void, StarException> { auto result327 = setHairDirectives(str);
+  auto result328 = callbacks.register_callback("setHairDirectives", [this](String const& str) -> std::expected<void, StarException> { auto result327 = setHairDirectives(str);
 if (!result327) return std::unexpected(std::move(result327.error()));
    return {};
 });
 if (!result328) return std::unexpected(std::move(result328.error()));
 
-  auto result329 = callbacks.registerCallback(   "facialHairGroup",      [this]()   { return identity().facialHairGroup;      });
+  auto result329 = callbacks.register_callback(   "facialHairGroup",      [this]()   { return identity().facialHairGroup;      });
 if (!result329) return std::unexpected(std::move(result329.error()));
-  auto result331 = callbacks.registerCallback("setFacialHairGroup",      [this](String const& str) -> std::expected<void, StarException> { auto result330 = setFacialHairGroup(str);
+  auto result331 = callbacks.register_callback("setFacialHairGroup",      [this](String const& str) -> std::expected<void, StarException> { auto result330 = setFacialHairGroup(str);
 if (!result330) return std::unexpected(std::move(result330.error()));
    return {};
 });
 if (!result331) return std::unexpected(std::move(result331.error()));
-  auto result332 = callbacks.registerCallback(   "facialHairType",       [this]()   { return identity().facialHairType;      });
+  auto result332 = callbacks.register_callback(   "facialHairType",       [this]()   { return identity().facialHairType;      });
 if (!result332) return std::unexpected(std::move(result332.error()));
-  auto result334 = callbacks.registerCallback("setFacialHairType",       [this](String const& str) -> std::expected<void, StarException> { auto result333 = setFacialHairType(str);
+  auto result334 = callbacks.register_callback("setFacialHairType",       [this](String const& str) -> std::expected<void, StarException> { auto result333 = setFacialHairType(str);
 if (!result333) return std::unexpected(std::move(result333.error()));
    return {};
 });
 if (!result334) return std::unexpected(std::move(result334.error()));
-  auto result335 = callbacks.registerCallback(   "facialHairDirectives", [this]()   { return identity().facialHairDirectives;      });
+  auto result335 = callbacks.register_callback(   "facialHairDirectives", [this]()   { return identity().facialHairDirectives;      });
 if (!result335) return std::unexpected(std::move(result335.error()));
-  auto result337 = callbacks.registerCallback("setFacialHairDirectives", [this](String const& str) -> std::expected<void, StarException> { auto result336 = setFacialHairDirectives(str);
+  auto result337 = callbacks.register_callback("setFacialHairDirectives", [this](String const& str) -> std::expected<void, StarException> { auto result336 = setFacialHairDirectives(str);
 if (!result336) return std::unexpected(std::move(result336.error()));
    return {};
 });
 if (!result337) return std::unexpected(std::move(result337.error()));
 
-  auto result338 = callbacks.registerCallback("hair", [this]() {
+  auto result338 = callbacks.register_callback("hair", [this]() {
     HumanoidIdentity const& humanoidIdentity = identity();
-    return luaTupleReturn(humanoidIdentity.hairGroup, humanoidIdentity.hairType, humanoidIdentity.hairDirectives);
+    return lua_tuple_return(humanoidIdentity.hairGroup, humanoidIdentity.hairType, humanoidIdentity.hairDirectives);
   });
 if (!result338) return std::unexpected(std::move(result338.error()));
 
-  auto result339 = callbacks.registerCallback("facialHair", [this]() {
+  auto result339 = callbacks.register_callback("facialHair", [this]() {
     HumanoidIdentity const& humanoidIdentity = identity();
-    return luaTupleReturn(humanoidIdentity.facialHairGroup, humanoidIdentity.facialHairType, humanoidIdentity.facialHairDirectives);
+    return lua_tuple_return(humanoidIdentity.facialHairGroup, humanoidIdentity.facialHairType, humanoidIdentity.facialHairDirectives);
   });
 if (!result339) return std::unexpected(std::move(result339.error()));
 
-  auto result340 = callbacks.registerCallback("facialMask", [this]() {
+  auto result340 = callbacks.register_callback("facialMask", [this]() {
     HumanoidIdentity const& humanoidIdentity = identity();
-    return luaTupleReturn(humanoidIdentity.facialMaskGroup, humanoidIdentity.facialMaskType, humanoidIdentity.facialMaskDirectives);
+    return lua_tuple_return(humanoidIdentity.facialMaskGroup, humanoidIdentity.facialMaskType, humanoidIdentity.facialMaskDirectives);
   });
 if (!result340) return std::unexpected(std::move(result340.error()));
 
-  auto result345 = callbacks.registerCallback("setFacialHair", [this](std::optional<String> const& group, std::optional<String> const& type, std::optional<String> const& directives) -> std::expected<void, StarException> {
+  auto result345 = callbacks.register_callback("setFacialHair", [this](std::optional<String> const& group, std::optional<String> const& type, std::optional<String> const& directives) -> std::expected<void, StarException> {
     if (group && type && directives)
       {
   auto result341 = setFacialHair(*group, *type, *directives);
@@ -1661,7 +1661,7 @@ if (!result340) return std::unexpected(std::move(result340.error()));
 });
 if (!result345) return std::unexpected(std::move(result345.error()));
 
-  auto result350 = callbacks.registerCallback("setFacialMask", [this](std::optional<String> const& group, std::optional<String> const& type, std::optional<String> const& directives) -> std::expected<void, StarException> {
+  auto result350 = callbacks.register_callback("setFacialMask", [this](std::optional<String> const& group, std::optional<String> const& type, std::optional<String> const& directives) -> std::expected<void, StarException> {
     if (group && type && directives)
       {
   auto result346 = setFacialMask(*group, *type, *directives);
@@ -1689,7 +1689,7 @@ if (!result345) return std::unexpected(std::move(result345.error()));
 });
 if (!result350) return std::unexpected(std::move(result350.error()));
 
-  auto result355 = callbacks.registerCallback("setHair", [this](std::optional<String> const& group, std::optional<String> const& type, std::optional<String> const& directives) -> std::expected<void, StarException> {
+  auto result355 = callbacks.register_callback("setHair", [this](std::optional<String> const& group, std::optional<String> const& type, std::optional<String> const& directives) -> std::expected<void, StarException> {
     if (group && type && directives)
       {
   auto result351 = setHair(*group, *type, *directives);
@@ -1717,35 +1717,35 @@ if (!result350) return std::unexpected(std::move(result350.error()));
 });
 if (!result355) return std::unexpected(std::move(result355.error()));
 
-  auto result356 = callbacks.registerCallback(   "description", [this]()                          { return description(); });
+  auto result356 = callbacks.register_callback(   "description", [this]()                          { return description(); });
 if (!result356) return std::unexpected(std::move(result356.error()));
-  auto result357 = callbacks.registerCallback("setDescription", [this](String const& description) { setDescription(description); });
+  auto result357 = callbacks.register_callback("setDescription", [this](String const& description) { setDescription(description); });
 if (!result357) return std::unexpected(std::move(result357.error()));
 
-  auto result358 = callbacks.registerCallback(   "name", [this]()                   { return name(); });
+  auto result358 = callbacks.register_callback(   "name", [this]()                   { return name(); });
 if (!result358) return std::unexpected(std::move(result358.error()));
-  auto result360 = callbacks.registerCallback("setName", [this](String const& name) -> std::expected<void, StarException> { auto result359 = setName(name);
+  auto result360 = callbacks.register_callback("setName", [this](String const& name) -> std::expected<void, StarException> { auto result359 = setName(name);
 if (!result359) return std::unexpected(std::move(result359.error()));
    return {};
 });
 if (!result360) return std::unexpected(std::move(result360.error()));
 
-  auto result362 = callbacks.registerCallback("setSpecies", [this](String const& species) -> std::expected<void, StarException> { auto result361 = setSpecies(species);
+  auto result362 = callbacks.register_callback("setSpecies", [this](String const& species) -> std::expected<void, StarException> { auto result361 = setSpecies(species);
 if (!result361) return std::unexpected(std::move(result361.error()));
    return {};
 });
 if (!result362) return std::unexpected(std::move(result362.error()));
 
-  auto result363 = callbacks.registerCallback(   "imagePath", [this]()                        { return identity().imagePath;    });
+  auto result363 = callbacks.register_callback(   "imagePath", [this]()                        { return identity().imagePath;    });
 if (!result363) return std::unexpected(std::move(result363.error()));
-  auto result365 = callbacks.registerCallback("setImagePath", [this](std::optional<String> const& imagePath) -> std::expected<void, StarException> { auto result364 = setImagePath(imagePath);
+  auto result365 = callbacks.register_callback("setImagePath", [this](std::optional<String> const& imagePath) -> std::expected<void, StarException> { auto result364 = setImagePath(imagePath);
 if (!result364) return std::unexpected(std::move(result364.error()));
    return {};
 });
 if (!result365) return std::unexpected(std::move(result365.error()));
 
 auto result368 =
-  callbacks.registerCallback("setGender", [this](String const& gender) -> std::expected<void, StarException> {
+  callbacks.register_callback("setGender", [this](String const& gender) -> std::expected<void, StarException> {
     auto result366 = enum_value<GenderNames>(gender);
     if (!result366)
       return std::unexpected(std::move(result366.error()));
@@ -1756,9 +1756,9 @@ auto result368 =
   });
 if (!result368) return std::unexpected(std::move(result368.error()));
 
-  auto result369 = callbacks.registerCallback(   "personality", [this]() { return jsonFromPersonality(identity().personality); });
+  auto result369 = callbacks.register_callback(   "personality", [this]() { return jsonFromPersonality(identity().personality); });
 if (!result369) return std::unexpected(std::move(result369.error()));
-  auto result372 = callbacks.registerCallback("setPersonality", [this](Json const& personalityConfig) -> std::expected<void, StarException> {
+  auto result372 = callbacks.register_callback("setPersonality", [this](Json const& personalityConfig) -> std::expected<void, StarException> {
     Personality const& oldPersonality = identity().personality;
     Personality newPersonality = oldPersonality;
     auto result370 = parsePersonality(newPersonality, personalityConfig);
@@ -1771,37 +1771,37 @@ if (!result371) return std::unexpected(std::move(result371.error()));
 });
 if (!result372) return std::unexpected(std::move(result372.error()));
 
-  auto result373 = callbacks.registerCallback(   "favoriteColor", [this]()            { return favoriteColor();  });
+  auto result373 = callbacks.register_callback(   "favoriteColor", [this]()            { return favoriteColor();  });
 if (!result373) return std::unexpected(std::move(result373.error()));
-  auto result375 = callbacks.registerCallback("setFavoriteColor", [this](Color color) -> std::expected<void, StarException> { auto result374 = setFavoriteColor(color);
+  auto result375 = callbacks.register_callback("setFavoriteColor", [this](Color color) -> std::expected<void, StarException> { auto result374 = setFavoriteColor(color);
 if (!result374) return std::unexpected(std::move(result374.error()));
    return {};
 });
 if (!result375) return std::unexpected(std::move(result375.error()));
 
 
-  auto result376 = callbacks.registerCallback("npcType", [this]() { return npcType(); });
+  auto result376 = callbacks.register_callback("npcType", [this]() { return npcType(); });
 if (!result376) return std::unexpected(std::move(result376.error()));
 
-  auto result377 = callbacks.registerCallback("seed", [this]() { return m_npcVariant.seed; });
+  auto result377 = callbacks.register_callback("seed", [this]() { return m_npcVariant.seed; });
 if (!result377) return std::unexpected(std::move(result377.error()));
 
-  auto result378 = callbacks.registerCallback("level", [this]() { return m_npcVariant.level; });
+  auto result378 = callbacks.register_callback("level", [this]() { return m_npcVariant.level; });
 if (!result378) return std::unexpected(std::move(result378.error()));
 
-  auto result379 = callbacks.registerCallback("dropPools", [this]() { return m_dropPools.get(); });
+  auto result379 = callbacks.register_callback("dropPools", [this]() { return m_dropPools.get(); });
 if (!result379) return std::unexpected(std::move(result379.error()));
 
-  auto result380 = callbacks.registerCallback("setDropPools", [this](StringList const& dropPools) { m_dropPools.set(dropPools); });
+  auto result380 = callbacks.register_callback("setDropPools", [this](StringList const& dropPools) { m_dropPools.set(dropPools); });
 if (!result380) return std::unexpected(std::move(result380.error()));
 
-  auto result381 = callbacks.registerCallback("energy", [this]() { return m_statusController->resource("energy"); });
+  auto result381 = callbacks.register_callback("energy", [this]() { return m_statusController->resource("energy"); });
 if (!result381) return std::unexpected(std::move(result381.error()));
 
-  auto result382 = callbacks.registerCallback("maxEnergy", [this]() { return m_statusController->resourceMax("energy"); });
+  auto result382 = callbacks.register_callback("maxEnergy", [this]() { return m_statusController->resourceMax("energy"); });
 if (!result382) return std::unexpected(std::move(result382.error()));
 
-  auto result384 = callbacks.registerCallback("say", [this](String line, std::optional<StringMap<String>> const& tags, Json const& config) -> std::expected<bool, StarException> {
+  auto result384 = callbacks.register_callback("say", [this](String line, std::optional<StringMap<String>> const& tags, Json const& config) -> std::expected<bool, StarException> {
       if (tags)
         line = line.replace_tags(*tags, false);
 
@@ -1816,7 +1816,7 @@ if (!result383) return std::unexpected(std::move(result383.error()));
     });
 if (!result384) return std::unexpected(std::move(result384.error()));
 
-  auto result386 = callbacks.registerCallback("sayPortrait", [this](String line, String portrait, std::optional<StringMap<String>> const& tags, Json const& config) -> std::expected<bool, StarException> {
+  auto result386 = callbacks.register_callback("sayPortrait", [this](String line, String portrait, std::optional<StringMap<String>> const& tags, Json const& config) -> std::expected<bool, StarException> {
       if (tags)
         line = line.replace_tags(*tags, false);
 
@@ -1831,7 +1831,7 @@ if (!result385) return std::unexpected(std::move(result385.error()));
     });
 if (!result386) return std::unexpected(std::move(result386.error()));
 
-  auto result388 = callbacks.registerCallback("emote", [this](String const& arg1) -> std::expected<void, StarException> { if (!HumanoidEmoteNames) return std::unexpected(HumanoidEmoteNames.error());
+  auto result388 = callbacks.register_callback("emote", [this](String const& arg1) -> std::expected<void, StarException> { if (!HumanoidEmoteNames) return std::unexpected(HumanoidEmoteNames.error());
     auto result387 = HumanoidEmoteNames->get_left(arg1);
     if (!result387)
       return std::unexpected(std::move(result387.error()));
@@ -1840,16 +1840,16 @@ if (!result386) return std::unexpected(std::move(result386.error()));
 });
 if (!result388) return std::unexpected(std::move(result388.error()));
 
-  auto result390 = callbacks.registerCallback("dance", [this](std::optional<String> const& danceName) -> std::expected<void, StarException> { auto result389 = setDance(danceName);
+  auto result390 = callbacks.register_callback("dance", [this](std::optional<String> const& danceName) -> std::expected<void, StarException> { auto result389 = setDance(danceName);
 if (!result389) return std::unexpected(std::move(result389.error()));
    return {};
 });
 if (!result390) return std::unexpected(std::move(result390.error()));
 
-  auto result391 = callbacks.registerCallback("setInteractive", [this](bool interactive) { m_isInteractive.set(interactive); });
+  auto result391 = callbacks.register_callback("setInteractive", [this](bool interactive) { m_isInteractive.set(interactive); });
 if (!result391) return std::unexpected(std::move(result391.error()));
 
-  auto result399 = callbacks.registerCallback("setLounging", [this](EntityId loungeableEntityId, std::optional<std::size_t> maybeAnchorIndex) -> std::expected<bool, StarException> {
+  auto result399 = callbacks.register_callback("setLounging", [this](EntityId loungeableEntityId, std::optional<std::size_t> maybeAnchorIndex) -> std::expected<bool, StarException> {
       std::size_t anchorIndex = maybeAnchorIndex.value_or(0);
       auto result392 = world();
 if (!result392) return std::unexpected(std::move(result392.error()));
@@ -1878,16 +1878,16 @@ if (!result398) return std::unexpected(std::move(result398.error()));
     });
 if (!result399) return std::unexpected(std::move(result399.error()));
 
-  auto result401 = callbacks.registerCallback("resetLounging", [this]() -> std::expected<void, StarException> { auto result400 = m_movementController->resetAnchorState();
+  auto result401 = callbacks.register_callback("resetLounging", [this]() -> std::expected<void, StarException> { auto result400 = m_movementController->resetAnchorState();
 if (!result400) return std::unexpected(std::move(result400.error()));
    return {};
 });
 if (!result401) return std::unexpected(std::move(result401.error()));
 
-  auto result402 = callbacks.registerCallback("isLounging", [this]() { return is<LoungeAnchor>(m_movementController->entityAnchor()); });
+  auto result402 = callbacks.register_callback("isLounging", [this]() { return is<LoungeAnchor>(m_movementController->entityAnchor()); });
 if (!result402) return std::unexpected(std::move(result402.error()));
 
-  auto result403 = callbacks.registerCallback("loungingIn", [this]() -> std::optional<EntityId> {
+  auto result403 = callbacks.register_callback("loungingIn", [this]() -> std::optional<EntityId> {
       auto loungingState = loungingIn();
       if (loungingState)
         return loungingState.value_or(EntityAnchorState{}).entityId;
@@ -1896,7 +1896,7 @@ if (!result402) return std::unexpected(std::move(result402.error()));
     });
 if (!result403) return std::unexpected(std::move(result403.error()));
 
-  auto result404 = callbacks.registerCallback("setOfferedQuests", [this](std::optional<JsonArray> const& offeredQuests) -> std::expected<void, StarException> {
+  auto result404 = callbacks.register_callback("setOfferedQuests", [this](std::optional<JsonArray> const& offeredQuests) -> std::expected<void, StarException> {
       List<QuestArcDescriptor> parsed;
       for (auto const& quest : offeredQuests.value_or(JsonArray{})) {
         auto arc = QuestArcDescriptor::fromJson(root(), quest);
@@ -1908,19 +1908,19 @@ if (!result403) return std::unexpected(std::move(result403.error()));
     });
 if (!result404) return std::unexpected(std::move(result404.error()));
 
-  auto result405 = callbacks.registerCallback("setTurnInQuests", [this](std::optional<StringList> const& turnInQuests) {
+  auto result405 = callbacks.register_callback("setTurnInQuests", [this](std::optional<StringList> const& turnInQuests) {
       m_turnInQuests.set(StringSet::from(turnInQuests.value_or(StringList{})));
     });
 if (!result405) return std::unexpected(std::move(result405.error()));
 
-  auto result407 = callbacks.registerCallback("setItemSlot", [this](String const& slot, Json const& itemDescriptor) -> std::expected<Json, StarException> {
+  auto result407 = callbacks.register_callback("setItemSlot", [this](String const& slot, Json const& itemDescriptor) -> std::expected<Json, StarException> {
       auto result406 = ItemDescriptor::create(itemDescriptor);
 if (!result406) return std::unexpected(std::move(result406.error()));
 return setItemSlot(slot, std::move(*result406));
     });
 if (!result407) return std::unexpected(std::move(result407.error()));
 
-  auto result412 = callbacks.registerCallback("getItemSlot", [this](String const& entry) -> std::expected<Json, StarException> {
+  auto result412 = callbacks.register_callback("getItemSlot", [this](String const& entry) -> std::expected<Json, StarException> {
       {
   if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
   auto result408 = EquipmentSlotNames->find_left_ref(entry);
@@ -1951,28 +1951,28 @@ if (!result407) return std::unexpected(std::move(result407.error()));
     });
 if (!result412) return std::unexpected(std::move(result412.error()));
 
-  auto result413 = callbacks.registerCallback("disableWornArmor", [this](bool disable) { m_disableWornArmor.set(disable); });
+  auto result413 = callbacks.register_callback("disableWornArmor", [this](bool disable) { m_disableWornArmor.set(disable); });
 if (!result413) return std::unexpected(std::move(result413.error()));
 
-  auto result414 = callbacks.registerCallback("beginPrimaryFire", [this]() { m_tools->beginPrimaryFire(); });
+  auto result414 = callbacks.register_callback("beginPrimaryFire", [this]() { m_tools->beginPrimaryFire(); });
 if (!result414) return std::unexpected(std::move(result414.error()));
-  auto result415 = callbacks.registerCallback("beginAltFire", [this]() { m_tools->beginAltFire(); });
+  auto result415 = callbacks.register_callback("beginAltFire", [this]() { m_tools->beginAltFire(); });
 if (!result415) return std::unexpected(std::move(result415.error()));
-  auto result416 = callbacks.registerCallback("endPrimaryFire", [this]() { m_tools->endPrimaryFire(); });
+  auto result416 = callbacks.register_callback("endPrimaryFire", [this]() { m_tools->endPrimaryFire(); });
 if (!result416) return std::unexpected(std::move(result416.error()));
-  auto result417 = callbacks.registerCallback("endAltFire", [this]() { m_tools->endAltFire(); });
+  auto result417 = callbacks.register_callback("endAltFire", [this]() { m_tools->endAltFire(); });
 if (!result417) return std::unexpected(std::move(result417.error()));
-  auto result418 = callbacks.registerCallback("setShifting", [this](bool shifting) { m_shifting.set(shifting); });
+  auto result418 = callbacks.register_callback("setShifting", [this](bool shifting) { m_shifting.set(shifting); });
 if (!result418) return std::unexpected(std::move(result418.error()));
-  auto result419 = callbacks.registerCallback("setDamageOnTouch", [this](bool damageOnTouch) { m_damageOnTouch.set(damageOnTouch); });
+  auto result419 = callbacks.register_callback("setDamageOnTouch", [this](bool damageOnTouch) { m_damageOnTouch.set(damageOnTouch); });
 if (!result419) return std::unexpected(std::move(result419.error()));
 
-  auto result421 = callbacks.registerCallback("aimPosition", [this]() -> std::expected<Json, StarException> { auto result420 = aimPosition();
+  auto result421 = callbacks.register_callback("aimPosition", [this]() -> std::expected<Json, StarException> { auto result420 = aimPosition();
 if (!result420) return std::unexpected(std::move(result420.error()));
 return json_from_vec2f(std::move(*result420)); });
 if (!result421) return std::unexpected(std::move(result421.error()));
 
-  auto result423 = callbacks.registerCallback("setAimPosition", [this](Vec2F const& pos) -> std::expected<void, StarException> {
+  auto result423 = callbacks.register_callback("setAimPosition", [this](Vec2F const& pos) -> std::expected<void, StarException> {
       auto result422 = world();
 if (!result422) return std::unexpected(std::move(result422.error()));
 auto aimPosition = result422->get().geometry().diff(pos, position());
@@ -1982,36 +1982,36 @@ auto aimPosition = result422->get().geometry().diff(pos, position());
 });
 if (!result423) return std::unexpected(std::move(result423.error()));
 
-  auto result424 = callbacks.registerCallback("setDeathParticleBurst", [this](std::optional<String> const& deathParticleBurst) {
+  auto result424 = callbacks.register_callback("setDeathParticleBurst", [this](std::optional<String> const& deathParticleBurst) {
       m_deathParticleBurst.set(deathParticleBurst);
     });
 if (!result424) return std::unexpected(std::move(result424.error()));
 
-  auto result425 = callbacks.registerCallback("setStatusText", [this](std::optional<String> const& status) { m_statusText.set(status); });
+  auto result425 = callbacks.register_callback("setStatusText", [this](std::optional<String> const& status) { m_statusText.set(status); });
 if (!result425) return std::unexpected(std::move(result425.error()));
-  auto result426 = callbacks.registerCallback("setDisplayNametag", [this](bool display) { m_displayNametag.set(display); });
+  auto result426 = callbacks.register_callback("setDisplayNametag", [this](bool display) { m_displayNametag.set(display); });
 if (!result426) return std::unexpected(std::move(result426.error()));
 
-  auto result427 = callbacks.registerCallback("setPersistent", [this](bool persistent) { setPersistent(persistent); });
+  auto result427 = callbacks.register_callback("setPersistent", [this](bool persistent) { setPersistent(persistent); });
 if (!result427) return std::unexpected(std::move(result427.error()));
 
-  auto result428 = callbacks.registerCallback("setKeepAlive", [this](bool keepAlive) { setKeepAlive(keepAlive); });
+  auto result428 = callbacks.register_callback("setKeepAlive", [this](bool keepAlive) { setKeepAlive(keepAlive); });
 if (!result428) return std::unexpected(std::move(result428.error()));
 
-  auto result430 = callbacks.registerCallback("setDamageTeam", [this](Json const& team) -> std::expected<void, StarException> { auto result429 = EntityDamageTeam::create(team);
+  auto result430 = callbacks.register_callback("setDamageTeam", [this](Json const& team) -> std::expected<void, StarException> { auto result429 = EntityDamageTeam::create(team);
 if (!result429) return std::unexpected(std::move(result429.error()));
 setTeam(std::move(*result429));   return {};
 });
 if (!result430) return std::unexpected(std::move(result430.error()));
 
-  auto result431 = callbacks.registerCallback("setAggressive", [this](bool aggressive) { m_aggressive.set(aggressive); });
+  auto result431 = callbacks.register_callback("setAggressive", [this](bool aggressive) { m_aggressive.set(aggressive); });
 if (!result431) return std::unexpected(std::move(result431.error()));
 
-auto result432 = callbacks.registerCallback(
+auto result432 = callbacks.register_callback(
   "setUniqueId", [this](std::optional<String> uniqueId) { setUniqueId(std::move(uniqueId)); });
 if (!result432) return std::unexpected(std::move(result432.error()));
 
-  auto result433 = callbacks.registerCallback("setAnimationParameter", [this](String name, Json value) {
+  auto result433 = callbacks.register_callback("setAnimationParameter", [this](String name, Json value) {
     m_scriptedAnimationParameters.set(std::move(name), std::move(value));
   });
 if (!result433) return std::unexpected(std::move(result433.error()));
@@ -2286,7 +2286,7 @@ bool Npc::isInteractive() const {
 }
 
 std::expected<InteractAction, StarException> Npc::interact(InteractRequest const& request) {
-  auto result486 = recoverLuaScriptError(m_scriptComponent.invoke<Json>("interact",
+  auto result486 = recover_lua_script_error(m_scriptComponent.invoke<Json>("interact",
       JsonObject{{"sourceId", request.sourceId}, {"sourcePosition", json_from_vec2f(request.sourcePosition)}}));
 if (!result486) return std::unexpected(std::move(result486.error()));
 auto result = std::move(*result486).value_or(Json{});
@@ -2416,7 +2416,7 @@ return lights;
 std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Npc::receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) {
   auto result502 = world();
 if (!result502) return std::unexpected(std::move(result502.error()));
-auto result503 = recoverLuaScriptError(m_scriptComponent.handleMessage(message, result502->get().connection() == sendingConnection, args));
+auto result503 = recover_lua_script_error(m_scriptComponent.handle_message(message, result502->get().connection() == sendingConnection, args));
 if (!result503) return std::unexpected(std::move(result503.error()));
 std::optional<ChainableJsonMessageResponse> result = std::move(*result503);
   if (!result)
@@ -2927,7 +2927,7 @@ if (!result562) return std::unexpected(std::move(result562.error()));
   if (inWorld()) {
     if (isMaster()) {
       if (m_scriptComponent.initialized()) {
-        auto result563 = m_scriptComponent.removeCallbacks("animator");
+        auto result563 = m_scriptComponent.remove_callbacks("animator");
 if (!result563) return std::unexpected(std::move(result563.error()));
 
         auto result564 = humanoid();
@@ -2935,10 +2935,10 @@ if (!result564) return std::unexpected(std::move(result564.error()));
 auto animator = (*result564)->networkedAnimator();
 auto result565 = LuaBindings::makeNetworkedAnimatorCallbacks(animator->get());
 if (!result565) return std::unexpected(std::move(result565.error()));
-auto result566 = m_scriptComponent.addCallbacks("animator", std::move(*result565));
+auto result566 = m_scriptComponent.add_callbacks("animator", std::move(*result565));
 if (!result566) return std::unexpected(std::move(result566.error()));
 
-        auto result567 = recoverLuaScriptError(m_scriptComponent.invoke("refreshHumanoidParameters"));
+        auto result567 = recover_lua_script_error(m_scriptComponent.invoke("refreshHumanoidParameters"));
 if (!result567) return std::unexpected(std::move(result567.error()));
 
       }
@@ -2947,22 +2947,22 @@ if (!result567) return std::unexpected(std::move(result567.error()));
   auto result568 = world();
   if (!result568) return std::unexpected(std::move(result568.error()));
   if (result568->get().isClient() && m_scriptedAnimator.initialized()) {
-        auto result569 = recoverLuaScriptError(m_scriptedAnimator.uninit());
+        auto result569 = recover_lua_script_error(m_scriptedAnimator.uninit());
   if (!result569) return std::unexpected(std::move(result569.error()));
 
-        auto result570 = m_scriptedAnimator.removeCallbacks("animationConfig");
+        auto result570 = m_scriptedAnimator.remove_callbacks("animationConfig");
   if (!result570) return std::unexpected(std::move(result570.error()));
 
-        auto result571 = m_scriptedAnimator.removeCallbacks("config");
+        auto result571 = m_scriptedAnimator.remove_callbacks("config");
   if (!result571) return std::unexpected(std::move(result571.error()));
 
-        auto result572 = m_scriptedAnimator.removeCallbacks("entity");
+        auto result572 = m_scriptedAnimator.remove_callbacks("entity");
   if (!result572) return std::unexpected(std::move(result572.error()));
 
 
         auto result573 = humanoid();
   if (!result573) return std::unexpected(std::move(result573.error()));
-  auto result574 = m_scriptedAnimator.setScripts(std::move(*result573)->animationScripts());
+  auto result574 = m_scriptedAnimator.set_scripts(std::move(*result573)->animationScripts());
   if (!result574) return std::unexpected(std::move(result574.error()));
 
         auto result575 = humanoid();
@@ -2973,24 +2973,24 @@ if (!result567) return std::unexpected(std::move(result567.error()));
             return m_scriptedAnimationParameters.value(name, defaultValue);
           });
   if (!result576) return std::unexpected(std::move(result576.error()));
-  auto result577 = m_scriptedAnimator.addCallbacks("animationConfig", std::move(*result576));
+  auto result577 = m_scriptedAnimator.add_callbacks("animationConfig", std::move(*result576));
   if (!result577) return std::unexpected(std::move(result577.error()));
 
         auto result578 = LuaBindings::makeConfigCallbacks([this](String const& name, Json const& def)
                 { return m_npcVariant.scriptConfig.query(name, def); });
   if (!result578) return std::unexpected(std::move(result578.error()));
-  auto result579 = m_scriptedAnimator.addCallbacks("config",
+  auto result579 = m_scriptedAnimator.add_callbacks("config",
             std::move(*result578));
   if (!result579) return std::unexpected(std::move(result579.error()));
 
         auto result580 = LuaBindings::makeEntityCallbacks(*this);
   if (!result580) return std::unexpected(std::move(result580.error()));
-  auto result581 = m_scriptedAnimator.addCallbacks("entity", std::move(*result580));
+  auto result581 = m_scriptedAnimator.add_callbacks("entity", std::move(*result580));
   if (!result581) return std::unexpected(std::move(result581.error()));
 
         auto result582 = world();
   if (!result582) return std::unexpected(std::move(result582.error()));
-  auto result583 = recoverLuaScriptError(m_scriptedAnimator.init(result582->get()));
+  auto result583 = recover_lua_script_error(m_scriptedAnimator.init(result582->get()));
   if (!result583) return std::unexpected(std::move(result583.error()));
 
       }

@@ -59,9 +59,9 @@ public:
 
   [[nodiscard]] static std::expected<std::shared_ptr<BaseScriptPane>, StarException> create(GuiContext& guiContext, Json config, bool construct = true);
 
-  [[nodiscard]] std::expected<void, StarException> addCallbacks(String name, LuaCallbacks callbacks);
-  [[nodiscard]] std::expected<bool, StarException> removeCallbacks(String const& name);
-  [[nodiscard]] std::expected<void, StarException> setLuaRoot(std::shared_ptr<LuaRoot> root);
+  [[nodiscard]] std::expected<void, StarException> add_callbacks(String name, LuaCallbacks callbacks);
+  [[nodiscard]] std::expected<bool, StarException> remove_callbacks(String const& name);
+  [[nodiscard]] std::expected<void, StarException> set_lua_root(std::shared_ptr<LuaRoot> root);
   // Retire borrowed script capabilities without dismissing the presentation.
   [[nodiscard]] std::expected<void, StarException> stopScripts();
   [[nodiscard]] std::expected<void, StarException> resumeScripts();

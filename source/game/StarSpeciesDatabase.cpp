@@ -132,21 +132,21 @@ std::expected<Json, StarException> SpeciesDatabase::humanoidConfig(HumanoidIdent
   if (!(*definition)->m_buildScripts.empty()) {
     std::unique_lock locker(m_luaMutex, std::defer_lock);
     lock_with_diagnostics(locker);
-    auto context = m_luaRoot->createContext((*definition)->m_buildScripts);
+    auto context = m_luaRoot->create_context((*definition)->m_buildScripts);
     if (!context) return std::unexpected(std::move(context.error()));
     auto removed = context->remove("root");
     if (!removed) return std::unexpected(std::move(removed.error()));
     auto rootCallbacks = LuaBindings::makeRootCallbacks(m_root, itemCatalog);
     if (!rootCallbacks) return std::unexpected(std::move(rootCallbacks.error()));
-    auto installed = context->setCallbacks("root", *rootCallbacks);
+    auto installed = context->set_callbacks("root", *rootCallbacks);
     if (!installed) return std::unexpected(std::move(installed.error()));
     auto utility = LuaBindings::makeUtilityCallbacks(m_root.random(), m_root.logger(), m_root.logMap());
     if (!utility) return std::unexpected(std::move(utility.error()));
-    installed = context->setCallbacks("sb", *utility);
+    installed = context->set_callbacks("sb", *utility);
     if (!installed) return std::unexpected(std::move(installed.error()));
     auto identityJson = identity.toJson();
     if (!identityJson) return std::unexpected(std::move(identityJson.error()));
-    return context->invokePath<Json>("build", *identityJson, parameters, *baseConfig, config);
+    return context->invoke_path<Json>("build", *identityJson, parameters, *baseConfig, config);
   }
   return json_merge(*baseConfig, parameters);
 }
@@ -175,24 +175,24 @@ std::expected<CharacterCreationResult, StarException> SpeciesDatabase::createHum
   if (!speciesDefinition->m_creationScripts.empty()) {
     std::unique_lock locker(m_luaMutex, std::defer_lock);
     lock_with_diagnostics(locker);
-    auto context = m_luaRoot->createContext(speciesDefinition->m_creationScripts);
+    auto context = m_luaRoot->create_context(speciesDefinition->m_creationScripts);
     if (!context) return std::unexpected(std::move(context.error()));
     auto removed = context->remove("root");
     if (!removed) return std::unexpected(std::move(removed.error()));
     auto callbacks = LuaBindings::makeRootCallbacks(m_root, itemCatalog);
     if (!callbacks) return std::unexpected(std::move(callbacks.error()));
-    auto installed = context->setCallbacks("root", *callbacks);
+    auto installed = context->set_callbacks("root", *callbacks);
     if (!installed) return std::unexpected(std::move(installed.error()));
     auto utility = LuaBindings::makeUtilityCallbacks(m_root.random(), m_root.logger(), m_root.logMap());
     if (!utility) return std::unexpected(std::move(utility.error()));
-    installed = context->setCallbacks("sb", *utility);
+    installed = context->set_callbacks("sb", *utility);
     if (!installed) return std::unexpected(std::move(installed.error()));
-    auto created = context->invokePath<LuaTupleReturn<Json, JsonObject, JsonObject>>(
+    auto created = context->invoke_path<LuaTupleReturn<Json, JsonObject, JsonObject>>(
       "create", name, speciesChoice, genderChoice, bodyColorChoice, alty, hairChoice,
       heady, shirtChoice, shirtColor, pantsChoice, pantsColor, personality, ext);
     if (!created) return std::unexpected(std::move(created.error()));
     Json identityReturn;
-    luaTie(identityReturn, result.humanoidParameters, result.armor) = std::move(*created);
+    lua_tie(identityReturn, result.humanoidParameters, result.armor) = std::move(*created);
     auto identity = HumanoidIdentity::create(identityReturn);
     if (!identity) return std::unexpected(std::move(identity.error()));
     result.identity = std::move(*identity);

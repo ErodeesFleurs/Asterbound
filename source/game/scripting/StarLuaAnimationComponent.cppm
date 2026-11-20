@@ -39,11 +39,11 @@ public:
   LuaScriptAnimation(LuaScriptAnimation const&) = delete;
   LuaScriptAnimation& operator=(LuaScriptAnimation const&) = delete;
   List<std::pair<Drawable, std::optional<EntityRenderLayer>>> const& drawables();
-  List<LightSource> const& lightSources();
-  List<Particle> pullNewParticles();
-  List<std::shared_ptr<AudioInstance>> pullNewAudios();
-  [[nodiscard]] std::expected<void, StarException> contextSetup();
-  void contextShutdown();
+  List<LightSource> const& light_sources();
+  List<Particle> pull_new_particles();
+  List<std::shared_ptr<AudioInstance>> pull_new_audios();
+  [[nodiscard]] std::expected<void, StarException> context_setup();
+  void context_shutdown();
 private:
   LuaBaseComponent& m_host;
   List<Particle> m_pendingParticles;
@@ -53,11 +53,11 @@ private:
   List<LightSource> m_lightSources;
 };
 
-[[nodiscard]] inline std::expected<void, StarException> LuaScriptAnimation::contextSetup() {
-  if (m_host.hasCallbacks("localAnimator"))
+[[nodiscard]] inline std::expected<void, StarException> LuaScriptAnimation::context_setup() {
+  if (m_host.has_callbacks("localAnimator"))
     return {};
   LuaCallbacks callbacks;
-  if (auto result = callbacks.registerCallback("playAudio", [&self = *this](String const& sound, std::optional<int> loops, std::optional<float> volume) -> std::expected<std::shared_ptr<AudioInstance>, StarException> {
+  if (auto result = callbacks.register_callback("playAudio", [&self = *this](String const& sound, std::optional<int> loops, std::optional<float> volume) -> std::expected<std::shared_ptr<AudioInstance>, StarException> {
     auto assets = self.m_host.root().assets();
     if (!assets)
       return std::unexpected(std::move(assets.error()));
@@ -74,7 +74,7 @@ private:
     return audio;
   }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallback("spawnParticle", [&self = *this](Json const& config, std::optional<Vec2F> const& position) -> std::expected<void, StarException> {
+  if (auto result = callbacks.register_callback("spawnParticle", [&self = *this](Json const& config, std::optional<Vec2F> const& position) -> std::expected<void, StarException> {
     auto database = self.m_host.root().particleDatabase();
     if (!database)
       return std::unexpected(std::move(database.error()));
@@ -86,9 +86,9 @@ private:
     return {};
   }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallback("clearDrawables", [&self = *this]() { self.m_drawables.clear(); }); !result)
+  if (auto result = callbacks.register_callback("clearDrawables", [&self = *this]() { self.m_drawables.clear(); }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallback("addDrawable", [&self = *this](Drawable drawable, std::optional<String> layerName) -> std::expected<void, StarException> {
+  if (auto result = callbacks.register_callback("addDrawable", [&self = *this](Drawable drawable, std::optional<String> layerName) -> std::expected<void, StarException> {
     std::optional<EntityRenderLayer> layer;
     if (layerName) {
       auto parsed = parseRenderLayer(*layerName);
@@ -102,7 +102,7 @@ private:
     return {};
   }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallback("addJsonDrawable", [&self = *this](Json config, std::optional<String> layerName) -> std::expected<void, StarException> {
+  if (auto result = callbacks.register_callback("addJsonDrawable", [&self = *this](Json config, std::optional<String> layerName) -> std::expected<void, StarException> {
     auto metadata = self.m_host.root().imageMetadataDatabase();
     if (!metadata)
       return std::unexpected(std::move(metadata.error()));
@@ -122,9 +122,9 @@ private:
     return {};
   }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallback("clearLightSources", [&self = *this]() { self.m_lightSources.clear(); }); !result)
+  if (auto result = callbacks.register_callback("clearLightSources", [&self = *this]() { self.m_lightSources.clear(); }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallback("addLightSource", [&self = *this](LuaTable const& table) -> std::expected<void, StarException> {
+  if (auto result = callbacks.register_callback("addLightSource", [&self = *this](LuaTable const& table) -> std::expected<void, StarException> {
     auto position = table.get<Vec2F>("position");
     if (!position)
       return std::unexpected(std::move(position.error()));
@@ -152,21 +152,21 @@ private:
     return {};
   }); !result)
     return std::unexpected(std::move(result.error()));
-  return m_host.addCallbacks("localAnimator", std::move(callbacks));
+  return m_host.add_callbacks("localAnimator", std::move(callbacks));
 }
 
 inline List<std::pair<Drawable, std::optional<EntityRenderLayer>>> const& LuaScriptAnimation::drawables() { return m_drawables; }
 
-inline List<LightSource> const& LuaScriptAnimation::lightSources() { return m_lightSources; }
+inline List<LightSource> const& LuaScriptAnimation::light_sources() { return m_lightSources; }
 
-inline List<Particle> LuaScriptAnimation::pullNewParticles() { return std::exchange(m_pendingParticles, {}); }
+inline List<Particle> LuaScriptAnimation::pull_new_particles() { return std::exchange(m_pendingParticles, {}); }
 
-inline List<std::shared_ptr<AudioInstance>> LuaScriptAnimation::pullNewAudios() {
+inline List<std::shared_ptr<AudioInstance>> LuaScriptAnimation::pull_new_audios() {
   m_activeAudio.filter([](std::shared_ptr<AudioInstance> const& audio) { return !audio->finished(); });
   return std::exchange(m_pendingAudios, {});
 }
 
-inline void LuaScriptAnimation::contextShutdown() {
+inline void LuaScriptAnimation::context_shutdown() {
   for (auto const& audio : m_activeAudio)
     audio->set_loops(0);
   m_activeAudio.clear();
@@ -179,43 +179,43 @@ public:
   ~LuaAnimationScript() override { m_update.destroy(); }
   [[nodiscard]] std::expected<void, StarException> init(World& world) { return m_world.init(world); }
   [[nodiscard]] std::expected<void, StarException> uninit() { return m_world.uninit(); }
-  unsigned updateDelta() const { return m_update.updateDelta(); }
-  float updateDt(float dt) const { return m_update.updateDt(dt); }
-  float updateDt() const { return m_update.updateDt(); }
-  void setUpdateDelta(unsigned delta) { m_update.setUpdateDelta(delta); }
-  bool updateReady() const { return m_update.updateReady(); }
+  unsigned update_delta() const { return m_update.update_delta(); }
+  float update_dt(float dt) const { return m_update.update_dt(dt); }
+  float update_dt() const { return m_update.update_dt(); }
+  void set_update_delta(unsigned delta) { m_update.set_update_delta(delta); }
+  bool update_ready() const { return m_update.update_ready(); }
   template <typename Ret = LuaValue, typename... V>
   [[nodiscard]] std::expected<std::optional<Ret>, StarException> update(V&&... args) {
     return m_update.template update<Ret>(std::forward<V>(args)...);
   }
-  RpcPromise<Json> threadPassMessage(String const& thread, String const& message, JsonArray const& args) override {
-    return m_update.threadPassMessage(thread, message, args);
+  RpcPromise<Json> thread_pass_message(String const& thread, String const& message, JsonArray const& args) override {
+    return m_update.thread_pass_message(thread, message, args);
   }
   List<std::pair<Drawable, std::optional<EntityRenderLayer>>> const& drawables() { return m_animation.drawables(); }
-  List<LightSource> const& lightSources() { return m_animation.lightSources(); }
-  List<Particle> pullNewParticles() { return m_animation.pullNewParticles(); }
-  List<std::shared_ptr<AudioInstance>> pullNewAudios() { return m_animation.pullNewAudios(); }
+  List<LightSource> const& light_sources() { return m_animation.light_sources(); }
+  List<Particle> pull_new_particles() { return m_animation.pull_new_particles(); }
+  List<std::shared_ptr<AudioInstance>> pull_new_audios() { return m_animation.pull_new_audios(); }
 protected:
-  using LuaBaseComponent::setLuaRoot;
-  [[nodiscard]] std::expected<void, StarException> contextSetup() override {
-    if (auto result = LuaBaseComponent::contextSetup(); !result)
+  using LuaBaseComponent::set_lua_root;
+  [[nodiscard]] std::expected<void, StarException> context_setup() override {
+    if (auto result = LuaBaseComponent::context_setup(); !result)
       return std::unexpected(std::move(result.error()));
-    if (auto result = m_update.contextSetup(); !result)
+    if (auto result = m_update.context_setup(); !result)
       return std::unexpected(std::move(result.error()));
-    if (auto result = m_animation.contextSetup(); !result)
+    if (auto result = m_animation.context_setup(); !result)
       return std::unexpected(std::move(result.error()));
     return {};
   }
-  [[nodiscard]] std::expected<void, StarException> contextShutdown() override {
-    m_animation.contextShutdown();
-    auto stopped = m_update.contextShutdown();
-    return LuaScriptUpdate::finishShutdown(std::move(stopped), LuaBaseComponent::contextShutdown());
+  [[nodiscard]] std::expected<void, StarException> context_shutdown() override {
+    m_animation.context_shutdown();
+    auto stopped = m_update.context_shutdown();
+    return LuaScriptUpdate::finish_shutdown(std::move(stopped), LuaBaseComponent::context_shutdown());
   }
-  [[nodiscard]] std::expected<LuaCallbacks, StarException> makeThreadsCallbacks() override {
-    auto callbacks = LuaBaseComponent::makeThreadsCallbacks();
+  [[nodiscard]] std::expected<LuaCallbacks, StarException> make_threads_callbacks() override {
+    auto callbacks = LuaBaseComponent::make_threads_callbacks();
     if (!callbacks)
       return std::unexpected(std::move(callbacks.error()));
-    if (auto result = m_update.addThreadsCallbacks(*callbacks); !result)
+    if (auto result = m_update.add_threads_callbacks(*callbacks); !result)
       return std::unexpected(std::move(result.error()));
     return callbacks;
   }
@@ -232,55 +232,55 @@ public:
   ~LuaDeploymentScript() override { m_update.destroy(); }
   [[nodiscard]] std::expected<void, StarException> init(World& world) { return m_world.init(world); }
   [[nodiscard]] std::expected<void, StarException> uninit() { return m_world.uninit(); }
-  unsigned updateDelta() const { return m_update.updateDelta(); }
-  float updateDt(float dt) const { return m_update.updateDt(dt); }
-  float updateDt() const { return m_update.updateDt(); }
-  void setUpdateDelta(unsigned delta) { m_update.setUpdateDelta(delta); }
-  bool updateReady() const { return m_update.updateReady(); }
+  unsigned update_delta() const { return m_update.update_delta(); }
+  float update_dt(float dt) const { return m_update.update_dt(dt); }
+  float update_dt() const { return m_update.update_dt(); }
+  void set_update_delta(unsigned delta) { m_update.set_update_delta(delta); }
+  bool update_ready() const { return m_update.update_ready(); }
   template <typename Ret = LuaValue, typename... V>
   [[nodiscard]] std::expected<std::optional<Ret>, StarException> update(V&&... args) {
     return m_update.template update<Ret>(std::forward<V>(args)...);
   }
-  RpcPromise<Json> threadPassMessage(String const& thread, String const& message, JsonArray const& args) override {
-    return m_update.threadPassMessage(thread, message, args);
+  RpcPromise<Json> thread_pass_message(String const& thread, String const& message, JsonArray const& args) override {
+    return m_update.thread_pass_message(thread, message, args);
   }
-  [[nodiscard]] std::expected<JsonObject, StarException> getScriptStorage() const { return m_storage.getScriptStorage(); }
-  [[nodiscard]] std::expected<void, StarException> setScriptStorage(JsonObject storage) { return m_storage.setScriptStorage(std::move(storage)); }
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> handleMessage(String const& message, bool localMessage, JsonArray const& args = {}) {
-    return m_messages.handleMessage(message, localMessage, args);
+  [[nodiscard]] std::expected<JsonObject, StarException> get_script_storage() const { return m_storage.get_script_storage(); }
+  [[nodiscard]] std::expected<void, StarException> set_script_storage(JsonObject storage) { return m_storage.set_script_storage(std::move(storage)); }
+  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> handle_message(String const& message, bool localMessage, JsonArray const& args = {}) {
+    return m_messages.handle_message(message, localMessage, args);
   }
   List<std::pair<Drawable, std::optional<EntityRenderLayer>>> const& drawables() { return m_animation.drawables(); }
-  List<LightSource> const& lightSources() { return m_animation.lightSources(); }
-  List<Particle> pullNewParticles() { return m_animation.pullNewParticles(); }
-  List<std::shared_ptr<AudioInstance>> pullNewAudios() { return m_animation.pullNewAudios(); }
+  List<LightSource> const& light_sources() { return m_animation.light_sources(); }
+  List<Particle> pull_new_particles() { return m_animation.pull_new_particles(); }
+  List<std::shared_ptr<AudioInstance>> pull_new_audios() { return m_animation.pull_new_audios(); }
 protected:
-  using LuaBaseComponent::setLuaRoot;
-  [[nodiscard]] std::expected<void, StarException> contextSetup() override {
-    if (auto result = LuaBaseComponent::contextSetup(); !result)
+  using LuaBaseComponent::set_lua_root;
+  [[nodiscard]] std::expected<void, StarException> context_setup() override {
+    if (auto result = LuaBaseComponent::context_setup(); !result)
       return std::unexpected(std::move(result.error()));
-    if (auto result = m_update.contextSetup(); !result)
+    if (auto result = m_update.context_setup(); !result)
       return std::unexpected(std::move(result.error()));
-    if (auto result = m_storage.contextSetup(); !result)
+    if (auto result = m_storage.context_setup(); !result)
       return std::unexpected(std::move(result.error()));
-    if (auto result = m_messages.contextSetup(); !result)
+    if (auto result = m_messages.context_setup(); !result)
       return std::unexpected(std::move(result.error()));
-    if (auto result = m_animation.contextSetup(); !result)
+    if (auto result = m_animation.context_setup(); !result)
       return std::unexpected(std::move(result.error()));
     return {};
   }
-  [[nodiscard]] std::expected<void, StarException> contextShutdown() override {
-    m_animation.contextShutdown();
-    m_messages.contextShutdown();
-    auto storage = m_storage.readStorage();
-    auto stopped = m_update.contextShutdown();
-    auto shutdown = LuaScriptUpdate::finishShutdown(std::move(stopped), LuaBaseComponent::contextShutdown());
-    return m_storage.finishShutdown(std::move(storage), std::move(shutdown));
+  [[nodiscard]] std::expected<void, StarException> context_shutdown() override {
+    m_animation.context_shutdown();
+    m_messages.context_shutdown();
+    auto storage = m_storage.read_storage();
+    auto stopped = m_update.context_shutdown();
+    auto shutdown = LuaScriptUpdate::finish_shutdown(std::move(stopped), LuaBaseComponent::context_shutdown());
+    return m_storage.finish_shutdown(std::move(storage), std::move(shutdown));
   }
-  [[nodiscard]] std::expected<LuaCallbacks, StarException> makeThreadsCallbacks() override {
-    auto callbacks = LuaBaseComponent::makeThreadsCallbacks();
+  [[nodiscard]] std::expected<LuaCallbacks, StarException> make_threads_callbacks() override {
+    auto callbacks = LuaBaseComponent::make_threads_callbacks();
     if (!callbacks)
       return std::unexpected(std::move(callbacks.error()));
-    if (auto result = m_update.addThreadsCallbacks(*callbacks); !result)
+    if (auto result = m_update.add_threads_callbacks(*callbacks); !result)
       return std::unexpected(std::move(result.error()));
     return callbacks;
   }

@@ -36,38 +36,38 @@ TEST(LuaJsonTest, Scope) {
   ASSERT_TRUE(script2Result);
   auto script2 = std::move(*script2Result);
 
-  auto context1Result = engine->createContext();
+  auto context1Result = engine->create_context();
   ASSERT_TRUE(context1Result);
   auto context1 = std::move(*context1Result);
-  auto context2Result = engine->createContext();
+  auto context2Result = engine->create_context();
   ASSERT_TRUE(context2Result);
   auto context2 = std::move(*context2Result);
 
   ASSERT_TRUE((context1.load(script1)));
   ASSERT_TRUE((context2.load(script2)));
 
-  ASSERT_TRUE((context1.setPath("self", JsonObject{{"called", 0}})));
-  ASSERT_TRUE((context2.setPath("self", JsonObject{{"called", 0}})));
+  ASSERT_TRUE((context1.set_path("self", JsonObject{{"called", 0}})));
+  ASSERT_TRUE((context2.set_path("self", JsonObject{{"called", 0}})));
 
   EXPECT_EQ(context1.contains("self"), true);
   EXPECT_EQ(context1.contains("increment"), true);
 
-  EXPECT_EQ(context1.invokePath<Json>("increment"), 1);
-  EXPECT_EQ(context1.invokePath<Json>("increment"), 2);
-  EXPECT_EQ(context1.invokePath<Json>("increment"), 3);
-  EXPECT_EQ(context2.invokePath<Json>("increment"), 1);
-  EXPECT_EQ(context1.invokePath<Json>("increment"), 4);
-  EXPECT_EQ(context2.invokePath<Json>("increment"), 2);
+  EXPECT_EQ(context1.invoke_path<Json>("increment"), 1);
+  EXPECT_EQ(context1.invoke_path<Json>("increment"), 2);
+  EXPECT_EQ(context1.invoke_path<Json>("increment"), 3);
+  EXPECT_EQ(context2.invoke_path<Json>("increment"), 1);
+  EXPECT_EQ(context1.invoke_path<Json>("increment"), 4);
+  EXPECT_EQ(context2.invoke_path<Json>("increment"), 2);
 
-  auto context3Result = engine->createContext();
+  auto context3Result = engine->create_context();
   ASSERT_TRUE(context3Result);
   auto context3 = std::move(*context3Result);
   ASSERT_TRUE((context3.load(script2)));
-  ASSERT_TRUE((context3.setPath("self", JsonObject{{"called", 0}})));
+  ASSERT_TRUE((context3.set_path("self", JsonObject{{"called", 0}})));
 
-  EXPECT_EQ(context2.invokePath<Json>("increment"), 3);
-  EXPECT_EQ(context3.invokePath<Json>("increment"), 1);
-  EXPECT_EQ(context1.invokePath<Json>("increment"), 5);
+  EXPECT_EQ(context2.invoke_path<Json>("increment"), 3);
+  EXPECT_EQ(context3.invoke_path<Json>("increment"), 1);
+  EXPECT_EQ(context1.invoke_path<Json>("increment"), 5);
 
   EXPECT_EQ(context1.contains("scopeValue"), false);
   EXPECT_EQ(context3.contains("scopeValue"), true);
@@ -78,7 +78,7 @@ TEST(LuaJsonTest, FunkyRecursion) {
   ASSERT_TRUE(engineResult);
   auto& engine = *engineResult;
 
-  auto context1Result = engine->createContext();
+  auto context1Result = engine->create_context();
   ASSERT_TRUE(context1Result);
   auto context1 = std::move(*context1Result);
   ASSERT_TRUE((context1.load(
@@ -96,7 +96,7 @@ TEST(LuaJsonTest, FunkyRecursion) {
         end
       )SCRIPT")));
 
-  auto context2Result = engine->createContext();
+  auto context2Result = engine->create_context();
   ASSERT_TRUE(context2Result);
   auto context2 = std::move(*context2Result);
   ASSERT_TRUE((context2.load(
@@ -124,26 +124,26 @@ TEST(LuaJsonTest, FunkyRecursion) {
       )SCRIPT")));
 
   LuaCallbacks callbacks;
-  ASSERT_TRUE((callbacks.registerCallback("util", [&context1]() -> std::expected<Json, StarException> { return context1.invokePath<Json>("util"); })));
-  ASSERT_TRUE((callbacks.registerCallback("util2", [&context2]() -> std::expected<Json, StarException> { return context2.invokePath<Json>("util2"); })));
-  ASSERT_TRUE((callbacks.registerCallback("util3", [&context1]() -> std::expected<Json, StarException> { return context1.invokePath<Json>("util3"); })));
+  ASSERT_TRUE((callbacks.register_callback("util", [&context1]() -> std::expected<Json, StarException> { return context1.invoke_path<Json>("util"); })));
+  ASSERT_TRUE((callbacks.register_callback("util2", [&context2]() -> std::expected<Json, StarException> { return context2.invoke_path<Json>("util2"); })));
+  ASSERT_TRUE((callbacks.register_callback("util3", [&context1]() -> std::expected<Json, StarException> { return context1.invoke_path<Json>("util3"); })));
 
-  ASSERT_TRUE((context1.setCallbacks("callbacks", callbacks)));
-  ASSERT_TRUE((context2.setCallbacks("callbacks", callbacks)));
+  ASSERT_TRUE((context1.set_callbacks("callbacks", callbacks)));
+  ASSERT_TRUE((context2.set_callbacks("callbacks", callbacks)));
 
-  auto resResult = context2.invokePath<Json>("entry");
+  auto resResult = context2.invoke_path<Json>("entry");
   ASSERT_TRUE(resResult);
   auto res = std::move(*resResult);
   EXPECT_EQ(res.get(0), 1);
   EXPECT_EQ(res.get(1), 2);
 
-  auto res2Result = context2.invokePath<Json>("entry2");
+  auto res2Result = context2.invoke_path<Json>("entry2");
   ASSERT_TRUE(res2Result);
   auto res2 = std::move(*res2Result);
   EXPECT_EQ(res2.get(0), 4);
   EXPECT_EQ(res2.get(1), 2);
 
-  auto res3Result = context2.invokePath<Json>("entry3");
+  auto res3Result = context2.invoke_path<Json>("entry3");
   ASSERT_TRUE(res3Result);
   auto res3 = std::move(*res3Result);
   EXPECT_EQ(res3.get(0), 4);
@@ -154,7 +154,7 @@ TEST(LuaJsonTest, TypeConversion) {
   auto engineResult = LuaEngine::create();
   ASSERT_TRUE(engineResult);
   auto& engine = *engineResult;
-  auto contextResult = engine->createContext();
+  auto contextResult = engine->create_context();
   ASSERT_TRUE(contextResult);
   auto context = std::move(*contextResult);
   ASSERT_TRUE((context.load(
@@ -163,10 +163,10 @@ TEST(LuaJsonTest, TypeConversion) {
         var2 = {}
       )SCRIPT")));
 
-  EXPECT_EQ(context.getPath<String>("var1"), "1");
-  EXPECT_EQ(context.getPath<double>("var1"), 1.0);
-  EXPECT_EQ(context.getPath<JsonArray>("var2"), JsonArray());
-  EXPECT_EQ(context.getPath<JsonObject>("var2"), JsonObject());
+  EXPECT_EQ(context.get_path<String>("var1"), "1");
+  EXPECT_EQ(context.get_path<double>("var1"), 1.0);
+  EXPECT_EQ(context.get_path<JsonArray>("var2"), JsonArray());
+  EXPECT_EQ(context.get_path<JsonObject>("var2"), JsonObject());
   EXPECT_EQ(context.eval<JsonObject>("jarray()"), JsonObject());
   EXPECT_EQ(context.eval<JsonArray>("jobject()"), JsonArray());
 }
@@ -175,7 +175,7 @@ TEST(LuaJsonTest, ChunkBoundaries) {
   auto engineResult = LuaEngine::create();
   ASSERT_TRUE(engineResult);
   auto& engine = *engineResult;
-  auto contextResult = engine->createContext();
+  auto contextResult = engine->create_context();
   ASSERT_TRUE(contextResult);
   auto context = std::move(*contextResult);
 
@@ -199,16 +199,16 @@ TEST(LuaJsonTest, ChunkBoundaries) {
         end
       )SCRIPT")));
 
-  ASSERT_TRUE((context.setPath("extern", JsonObject{{"var", 1}})));
+  ASSERT_TRUE((context.set_path("extern", JsonObject{{"var", 1}})));
 
-  EXPECT_EQ(context.invokePath<int>("func"), 1);
+  EXPECT_EQ(context.invoke_path<int>("func"), 1);
 }
 
 TEST(LuaJsonTest, CustomObjectType) {
   auto engineResult = LuaEngine::create();
   ASSERT_TRUE(engineResult);
   auto& engine = *engineResult;
-  auto contextResult = engine->createContext();
+  auto contextResult = engine->create_context();
   ASSERT_TRUE(contextResult);
   auto context = std::move(*contextResult);
 
@@ -255,13 +255,13 @@ TEST(LuaJsonTest, CustomObjectType) {
         end
       )SCRIPT")));
 
-  auto testResult = context.invokePath<JsonObject>("createObject");
+  auto testResult = context.invoke_path<JsonObject>("createObject");
   ASSERT_TRUE(testResult);
   auto test = std::move(*testResult);
   JsonObject comp = {{"foo", "hello"}, {"bar", Json()}, {"baz", Json()}};
   EXPECT_EQ(test, comp);
 
-  auto updatedTest = context.invokePath<JsonObject>("handleObject", JsonObject{
+  auto updatedTest = context.invoke_path<JsonObject>("handleObject", JsonObject{
       {"foo", JsonArray()},
       {"bar", Json()},
       {"baz", "hunky dory"},
@@ -279,19 +279,19 @@ TEST(LuaJsonTest, CustomObjectType) {
   };
   EXPECT_EQ(test, comp);
 
-  auto testArrayResult = context.invokePath<JsonArray>("iteratePairs");
+  auto testArrayResult = context.invoke_path<JsonArray>("iteratePairs");
   ASSERT_TRUE(testArrayResult);
   auto testArray = std::move(*testArrayResult);
   JsonArray compArray = {"bar"};
   EXPECT_EQ(testArray, compArray);
 
-  auto testValueResult = context.invokePath<Json>("nilsRemoved");
+  auto testValueResult = context.invoke_path<Json>("nilsRemoved");
   ASSERT_TRUE(testValueResult);
   auto testValue = std::move(*testValueResult);
   EXPECT_EQ(testValue, Json());
 
   auto testValue2Result =
-      context.invokePath<Json>("removeObject", JsonObject{{"foo", 1}, {"bar", Json()}, {"baz", Json()}}, "bar");
+      context.invoke_path<Json>("removeObject", JsonObject{{"foo", 1}, {"bar", Json()}, {"baz", Json()}}, "bar");
   ASSERT_TRUE(testValue2Result);
   auto testValue2 = std::move(*testValue2Result);
   Json compValue2 = JsonObject{{"foo", 1}, {"baz", Json()}};
@@ -302,7 +302,7 @@ TEST(LuaJsonTest, CustomArrayType) {
   auto engineResult = LuaEngine::create();
   ASSERT_TRUE(engineResult);
   auto& engine = *engineResult;
-  auto contextResult = engine->createContext();
+  auto contextResult = engine->create_context();
   ASSERT_TRUE(contextResult);
   auto context = std::move(*contextResult);
 
@@ -354,7 +354,7 @@ TEST(LuaJsonTest, CustomArrayType) {
         end
       )SCRIPT")));
 
-  auto testResult = context.invokePath<JsonArray>("createArray");
+  auto testResult = context.invoke_path<JsonArray>("createArray");
   ASSERT_TRUE(testResult);
   auto test = std::move(*testResult);
   JsonArray comp = {
@@ -362,7 +362,7 @@ TEST(LuaJsonTest, CustomArrayType) {
   };
   EXPECT_EQ(test, comp);
 
-  auto updatedTest = context.invokePath<JsonArray>("handleArray",
+  auto updatedTest = context.invoke_path<JsonArray>("handleArray",
       JsonArray{
           2, {}, 5, 6, {}, {}, "omg",
       });
@@ -373,37 +373,37 @@ TEST(LuaJsonTest, CustomArrayType) {
   };
   EXPECT_EQ(test, comp);
 
-  auto testArrayResult = context.invokePath<JsonArray>("iteratePairs");
+  auto testArrayResult = context.invoke_path<JsonArray>("iteratePairs");
   ASSERT_TRUE(testArrayResult);
   auto testArray = std::move(*testArrayResult);
   JsonArray compArray = {1, 4};
   EXPECT_EQ(testArray, compArray);
 
-  auto testArray2Result = context.invokePath<JsonArray>("resizeArray", JsonArray{1, 2, 3, 4, 5, Json(), Json(), 8}, 4);
+  auto testArray2Result = context.invoke_path<JsonArray>("resizeArray", JsonArray{1, 2, 3, 4, 5, Json(), Json(), 8}, 4);
   ASSERT_TRUE(testArray2Result);
   auto testArray2 = std::move(*testArray2Result);
   JsonArray compArray2 = {1, 2, 3, 4};
   EXPECT_EQ(testArray2, compArray2);
 
-  auto testArray3Result = context.invokePath<JsonArray>("resizeArray", JsonArray{1, 2, 3, 4}, 6);
+  auto testArray3Result = context.invoke_path<JsonArray>("resizeArray", JsonArray{1, 2, 3, 4}, 6);
   ASSERT_TRUE(testArray3Result);
   auto testArray3 = std::move(*testArray3Result);
   JsonArray compArray3 = {1, 2, 3, 4, Json(), Json()};
   EXPECT_EQ(testArray3, compArray3);
 
-  auto test4Result = context.invokePath<Json>("listSize", JsonArray{1, 2, 3, 4, Json(), Json(), Json()});
+  auto test4Result = context.invoke_path<Json>("listSize", JsonArray{1, 2, 3, 4, Json(), Json(), Json()});
   ASSERT_TRUE(test4Result);
   auto test4 = std::move(*test4Result);
   EXPECT_EQ(test4, 7);
 
-  EXPECT_EQ(context.invokePath<Json>("listSize2"), Json(5));
+  EXPECT_EQ(context.invoke_path<Json>("listSize2"), Json(5));
 }
 
 TEST(LuaJsonTest, CustomArrayType2) {
   auto engineResult = LuaEngine::create();
   ASSERT_TRUE(engineResult);
   auto& engine = *engineResult;
-  auto contextResult = engine->createContext();
+  auto contextResult = engine->create_context();
   ASSERT_TRUE(contextResult);
   auto context = std::move(*contextResult);
 
@@ -445,25 +445,25 @@ TEST(LuaJsonTest, CustomArrayType2) {
         end
       )SCRIPT")));
 
-  auto testResult = context.invokePath<JsonObject>("doTest");
+  auto testResult = context.invoke_path<JsonObject>("doTest");
   ASSERT_TRUE(testResult);
   auto test = std::move(*testResult);
   JsonObject comp = {{"18", 0}, {"37", 0}};
   EXPECT_EQ(test, comp);
 
-  auto arrayTest1Result = context.invokePath<Json>("arrayLogic1");
+  auto arrayTest1Result = context.invoke_path<Json>("arrayLogic1");
   ASSERT_TRUE(arrayTest1Result);
   auto arrayTest1 = std::move(*arrayTest1Result);
   Json arrayComp1 = JsonArray{"foo", "bar"};
   EXPECT_EQ(arrayTest1, arrayComp1);
 
-  auto arrayTest2Result = context.invokePath<Json>("arrayLogic2");
+  auto arrayTest2Result = context.invoke_path<Json>("arrayLogic2");
   ASSERT_TRUE(arrayTest2Result);
   auto arrayTest2 = std::move(*arrayTest2Result);
   Json arrayComp2 = JsonObject{{"1", "foo"}, {"2.1", "bar"}};
   EXPECT_EQ(arrayTest2, arrayComp2);
 
-  auto arrayTest3Result = context.invokePath<Json>("arrayLogic3");
+  auto arrayTest3Result = context.invoke_path<Json>("arrayLogic3");
   ASSERT_TRUE(arrayTest3Result);
   auto arrayTest3 = std::move(*arrayTest3Result);
   Json arrayComp3 = JsonArray{"foo", "bar"};
@@ -474,7 +474,7 @@ TEST(LuaJsonTest, IntFloat) {
   auto engineResult = LuaEngine::create();
   ASSERT_TRUE(engineResult);
   auto& engine = *engineResult;
-  auto contextResult = engine->createContext();
+  auto contextResult = engine->create_context();
   ASSERT_TRUE(contextResult);
   auto context = std::move(*contextResult);
 
@@ -493,20 +493,20 @@ TEST(LuaJsonTest, IntFloat) {
         end
       )SCRIPT")));
 
-  auto floatResult = context.invokePath<Json>("returnFloat");
+  auto floatResult = context.invoke_path<Json>("returnFloat");
   ASSERT_TRUE(floatResult);
   EXPECT_TRUE(floatResult->is_type(Json::Type::Float));
-  auto intResult = context.invokePath<Json>("returnInt");
+  auto intResult = context.invoke_path<Json>("returnInt");
   ASSERT_TRUE(intResult);
   EXPECT_TRUE(intResult->is_type(Json::Type::Int));
-  EXPECT_EQ(context.invokePath<String>("printNumber", 1.0), "1.0");
-  EXPECT_EQ(context.invokePath<String>("printNumber", 1), "1");
+  EXPECT_EQ(context.invoke_path<String>("printNumber", 1.0), "1.0");
+  EXPECT_EQ(context.invoke_path<String>("printNumber", 1), "1");
 }
 
 TEST(LuaJsonTest, MixedKeysPreserveNestedJsonKinds) {
   auto engine = LuaEngine::create();
   ASSERT_TRUE(engine);
-  auto context = (*engine)->createContext();
+  auto context = (*engine)->create_context();
   ASSERT_TRUE(context);
   ASSERT_TRUE(context->load(R"SCRIPT(
     function mixedKeys()
@@ -518,7 +518,7 @@ TEST(LuaJsonTest, MixedKeysPreserveNestedJsonKinds) {
       return result
     end
   )SCRIPT"));
-  auto result = context->invokePath<Json>("mixedKeys");
+  auto result = context->invoke_path<Json>("mixedKeys");
   ASSERT_TRUE(result);
   Json expected = JsonObject{{"1", JsonArray{}}, {"2.5", JsonObject{}},
       {"named", Json()}, {"nested", JsonArray{JsonArray{}, JsonObject{}}}};
@@ -528,7 +528,7 @@ TEST(LuaJsonTest, MixedKeysPreserveNestedJsonKinds) {
 TEST(LuaJsonTest, ActualValuesOverrideNullTracking) {
   auto engine = LuaEngine::create();
   ASSERT_TRUE(engine);
-  auto context = (*engine)->createContext();
+  auto context = (*engine)->create_context();
   ASSERT_TRUE(context);
   ASSERT_TRUE(context->load(R"SCRIPT(
     function overwrittenNulls()
@@ -541,7 +541,7 @@ TEST(LuaJsonTest, ActualValuesOverrideNullTracking) {
       return {object, array}
     end
   )SCRIPT"));
-  auto result = context->invokePath<Json>("overwrittenNulls");
+  auto result = context->invoke_path<Json>("overwrittenNulls");
   ASSERT_TRUE(result);
   Json expected = JsonArray{JsonObject{{"value", 42}}, JsonArray{7}};
   EXPECT_EQ(*result, expected);
@@ -550,7 +550,7 @@ TEST(LuaJsonTest, ActualValuesOverrideNullTracking) {
 TEST(LuaJsonTest, InvalidArrayIndexDoesNotPoisonContext) {
   auto engine = LuaEngine::create();
   ASSERT_TRUE(engine);
-  auto context = (*engine)->createContext();
+  auto context = (*engine)->create_context();
   ASSERT_TRUE(context);
   ASSERT_TRUE(context->load(R"SCRIPT(
     function invalidArray()
@@ -562,9 +562,9 @@ TEST(LuaJsonTest, InvalidArrayIndexDoesNotPoisonContext) {
       return {42}
     end
   )SCRIPT"));
-  auto invalid = context->invokePath<Json>("invalidArray");
+  auto invalid = context->invoke_path<Json>("invalidArray");
   EXPECT_FALSE(invalid);
-  auto valid = context->invokePath<Json>("validArray");
+  auto valid = context->invoke_path<Json>("validArray");
   ASSERT_TRUE(valid);
   EXPECT_EQ(*valid, Json(JsonArray{42}));
 }
@@ -572,7 +572,7 @@ TEST(LuaJsonTest, InvalidArrayIndexDoesNotPoisonContext) {
 TEST(LuaJsonTest, UnsupportedFunctionsAreConversionMisses) {
   auto engine = LuaEngine::create();
   ASSERT_TRUE(engine);
-  auto context = (*engine)->createContext();
+  auto context = (*engine)->create_context();
   ASSERT_TRUE(context);
   ASSERT_TRUE(context->load(R"SCRIPT(
     function unsupportedValue()
@@ -583,15 +583,15 @@ TEST(LuaJsonTest, UnsupportedFunctionsAreConversionMisses) {
     end
   )SCRIPT"));
   for (std::string_view name : {"unsupportedValue", "unsupportedKey"}) {
-    auto value = context->invokePath<LuaValue>(name);
+    auto value = context->invoke_path<LuaValue>(name);
     ASSERT_TRUE(value);
-    auto converted = (*engine)->luaMaybeTo<Json>(*value);
+    auto converted = (*engine)->lua_maybe_to<Json>(*value);
     ASSERT_TRUE(converted);
     EXPECT_FALSE(*converted);
-    auto array = (*engine)->luaMaybeTo<JsonArray>(*value);
+    auto array = (*engine)->lua_maybe_to<JsonArray>(*value);
     ASSERT_TRUE(array);
     EXPECT_FALSE(*array);
-    auto object = (*engine)->luaMaybeTo<JsonObject>(*value);
+    auto object = (*engine)->lua_maybe_to<JsonObject>(*value);
     ASSERT_TRUE(object);
     EXPECT_FALSE(*object);
   }
@@ -600,7 +600,7 @@ TEST(LuaJsonTest, UnsupportedFunctionsAreConversionMisses) {
 TEST(LuaJsonTest, UnsupportedNativeValuesRemainErrorsBeforeConversionMisses) {
   auto engine = LuaEngine::create(false);
   ASSERT_TRUE(engine);
-  auto context = (*engine)->createContext();
+  auto context = (*engine)->create_context();
   ASSERT_TRUE(context);
   ASSERT_TRUE(context->load(R"SCRIPT(
     local captured = {}
@@ -616,15 +616,15 @@ TEST(LuaJsonTest, UnsupportedNativeValuesRemainErrorsBeforeConversionMisses) {
     end
   )SCRIPT"));
   for (std::string_view name : {"invalidValue", "invalidKey", "invalidValueWithFunctionKey", "invalidNullTracking"}) {
-    auto value = context->invokePath<LuaValue>(name);
+    auto value = context->invoke_path<LuaValue>(name);
     ASSERT_TRUE(value);
-    auto converted = (*engine)->luaMaybeTo<Json>(*value);
+    auto converted = (*engine)->lua_maybe_to<Json>(*value);
     ASSERT_FALSE(converted);
     EXPECT_TRUE(converted.error().is<LuaException>());
-    auto array = (*engine)->luaMaybeTo<std::variant<JsonArray, LuaTable>>(*value);
+    auto array = (*engine)->lua_maybe_to<std::variant<JsonArray, LuaTable>>(*value);
     ASSERT_FALSE(array);
     EXPECT_TRUE(array.error().is<LuaException>());
-    auto object = (*engine)->luaMaybeTo<std::variant<JsonObject, LuaTable>>(*value);
+    auto object = (*engine)->lua_maybe_to<std::variant<JsonObject, LuaTable>>(*value);
     ASSERT_FALSE(object);
     EXPECT_TRUE(object.error().is<LuaException>());
   }
@@ -634,14 +634,14 @@ TEST(LuaJsonTest, UnsupportedNativeValuesRemainErrorsBeforeConversionMisses) {
 TEST(LuaJsonTest, EmbeddedNullStringsRetainBytesAcrossLuaOperations) {
   auto engine = LuaEngine::create();
   ASSERT_TRUE(engine);
-  auto context = (*engine)->createContext();
+  auto context = (*engine)->create_context();
   ASSERT_TRUE(context);
   for (auto bytes : {std::string_view{}, std::string_view("\0", 1), std::string_view("\0a\0\0b\0", 6),
                      std::string_view("before\0after", 12), std::string_view("你\0好", 7)}) {
-    auto value = (*engine)->createString(bytes);
+    auto value = (*engine)->create_string(bytes);
     ASSERT_TRUE(value);
     EXPECT_EQ(value->length(), bytes.size());
-    EXPECT_EQ(value->toString().utf8(), bytes);
+    EXPECT_EQ(value->to_string().utf8(), bytes);
     EXPECT_EQ(value->view().utf8(), bytes);
     ASSERT_TRUE(context->set("value", *value));
     auto concatenated = context->eval<LuaString>("value .. '\\0tail'");
@@ -649,7 +649,7 @@ TEST(LuaJsonTest, EmbeddedNullStringsRetainBytesAcrossLuaOperations) {
     std::string expected(bytes);
     expected.append("\0tail", 5);
     EXPECT_EQ(concatenated->length(), expected.size());
-    EXPECT_EQ(concatenated->toString().utf8(), expected);
+    EXPECT_EQ(concatenated->to_string().utf8(), expected);
     EXPECT_EQ(concatenated->view().utf8(), expected);
   }
 }
@@ -657,7 +657,7 @@ TEST(LuaJsonTest, EmbeddedNullStringsRetainBytesAcrossLuaOperations) {
 TEST(LuaJsonTest, EmbeddedNullObjectKeysRemainDistinctDuringRoundTrip) {
   auto engine = LuaEngine::create();
   ASSERT_TRUE(engine);
-  auto context = (*engine)->createContext();
+  auto context = (*engine)->create_context();
   ASSERT_TRUE(context);
   ASSERT_TRUE(context->load(R"SCRIPT(
     function embeddedNull()
@@ -676,7 +676,7 @@ TEST(LuaJsonTest, EmbeddedNullObjectKeysRemainDistinctDuringRoundTrip) {
                {"nested",
                 JsonArray{String(std::string_view("before\0after", 12)), String(std::string_view("\0a\0\0b\0", 6)),
                           String(std::string_view("你\0好", 7))}}};
-  auto converted = context->invokePath<Json>("embeddedNull");
+  auto converted = context->invoke_path<Json>("embeddedNull");
   ASSERT_TRUE(converted);
   EXPECT_EQ(*converted, expected);
   ASSERT_TRUE(context->set("input", expected));

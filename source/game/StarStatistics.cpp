@@ -297,33 +297,33 @@ std::expected<void, StarException> Statistics::mergeServiceStatistics() {
 std::expected<LuaCallbacks, StarException> Statistics::makeStatisticsCallbacks() {
   LuaCallbacks callbacks;
 
-  if (auto result = callbacks.registerCallbackWithSignature<std::expected<void, StarException>, String, String, Json>(
+  if (auto result = callbacks.register_callback_with_signature<std::expected<void, StarException>, String, String, Json>(
         "setStat",
         [this](String const& name, String const& type, Json const& value) { return setStat(name, type, value); });
       !result)
     return std::unexpected(std::move(result.error()));
 
-  if (auto result = callbacks.registerCallbackWithSignature<Json, String, Json>(
+  if (auto result = callbacks.register_callback_with_signature<Json, String, Json>(
         "stat", [this](String const& name, Json def) { return stat(name, std::move(def)); });
       !result)
     return std::unexpected(std::move(result.error()));
 
-  if (auto result = callbacks.registerCallbackWithSignature<std::optional<String>, String>(
+  if (auto result = callbacks.register_callback_with_signature<std::optional<String>, String>(
         "statType", [this](String const& name) { return statType(name); });
       !result)
     return std::unexpected(std::move(result.error()));
 
-  if (auto result = callbacks.registerCallbackWithSignature<bool, String>(
+  if (auto result = callbacks.register_callback_with_signature<bool, String>(
         "achievementUnlocked", [this](String const& name) { return achievementUnlocked(name); });
       !result)
     return std::unexpected(std::move(result.error()));
 
-  if (auto result = callbacks.registerCallbackWithSignature<std::expected<bool, StarException>, String>(
+  if (auto result = callbacks.register_callback_with_signature<std::expected<bool, StarException>, String>(
         "checkAchievement", [this](String const& name) { return checkAchievement(name); });
       !result)
     return std::unexpected(std::move(result.error()));
 
-  if (auto result = callbacks.registerCallbackWithSignature<std::expected<void, StarException>, String>(
+  if (auto result = callbacks.register_callback_with_signature<std::expected<void, StarException>, String>(
         "unlockAchievement", [this](String const& name) { return unlockAchievement(name); });
       !result)
     return std::unexpected(std::move(result.error()));
@@ -334,16 +334,16 @@ std::expected<LuaCallbacks, StarException> Statistics::makeStatisticsCallbacks()
 template <typename Result, typename... V>
 [[nodiscard]] std::expected<std::optional<Result>, StarException> Statistics::runStatScript(StringList const& scripts, Json const& config, String const& functionName, V&&... args) {
   LuaBaseComponent script(m_root);
-  if (auto result = script.setLuaRoot(m_luaRoot); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = script.setScripts(scripts); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = script.set_lua_root(m_luaRoot); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = script.set_scripts(scripts); !result) return std::unexpected(std::move(result.error()));
   auto configCallbacks = LuaBindings::makeConfigCallbacks([config](String const& name, Json const& def) {
     return config.query(name, def);
   });
   if (!configCallbacks) return std::unexpected(std::move(configCallbacks.error()));
-  if (auto result = script.addCallbacks("config", std::move(*configCallbacks)); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = script.add_callbacks("config", std::move(*configCallbacks)); !result) return std::unexpected(std::move(result.error()));
   auto statisticsCallbacks = makeStatisticsCallbacks();
   if (!statisticsCallbacks) return std::unexpected(std::move(statisticsCallbacks.error()));
-  if (auto result = script.addCallbacks("statistics", std::move(*statisticsCallbacks)); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = script.add_callbacks("statistics", std::move(*statisticsCallbacks)); !result) return std::unexpected(std::move(result.error()));
   auto initialized = script.init();
   if (!initialized) {
     auto cleanup = script.uninit();

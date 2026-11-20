@@ -122,7 +122,7 @@ std::expected<std::shared_ptr<BindingsMenu>, StarException> BindingsMenu::create
   auto luaRoot = LuaRoot::create(guiContext.root());
   if (!luaRoot)
     return std::unexpected(std::move(luaRoot.error()));
-  if (auto result = menu->setLuaRoot(std::move(*luaRoot)); !result)
+  if (auto result = menu->set_lua_root(std::move(*luaRoot)); !result)
     return std::unexpected(std::move(result.error()));
   auto input = guiContext.input();
   if (!input)
@@ -130,23 +130,23 @@ std::expected<std::shared_ptr<BindingsMenu>, StarException> BindingsMenu::create
   auto callbacks = LuaBindings::makeInputCallbacks(input->get());
   if (!callbacks)
     return std::unexpected(std::move(callbacks.error()));
-  if (auto result = menu->addCallbacks("input", std::move(*callbacks)); !result)
+  if (auto result = menu->add_callbacks("input", std::move(*callbacks)); !result)
     return std::unexpected(std::move(result.error()));
 
   LuaCallbacks gameBinds;
-  if (auto result = gameBinds.registerCallback("get", [&guiContext] {
+  if (auto result = gameBinds.register_callback("get", [&guiContext] {
         return guiContext.root().configuration().and_then([](auto const& config) { return config->get("bindings"); });
       }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = gameBinds.registerCallback("defaults", [&guiContext] {
+  if (auto result = gameBinds.register_callback("defaults", [&guiContext] {
         return guiContext.root().configuration().and_then([](auto const& config) { return config->getDefault("bindings"); });
       }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = gameBinds.registerCallback("set", [&guiContext](Json const& bindings) {
+  if (auto result = gameBinds.register_callback("set", [&guiContext](Json const& bindings) {
         return setGameBindings(guiContext, bindings);
       }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = menu->addCallbacks("gameBinds", std::move(gameBinds)); !result)
+  if (auto result = menu->add_callbacks("gameBinds", std::move(gameBinds)); !result)
     return std::unexpected(std::move(result.error()));
   return menu;
 }

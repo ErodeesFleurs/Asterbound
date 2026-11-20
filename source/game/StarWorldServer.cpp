@@ -312,7 +312,7 @@ std::expected<void, StarException> WorldServer::close() {
       error = std::move(next);
   };
   for (auto&& p : m_scriptContexts) {
-    if (auto result = recoverLuaScriptError(p.second->uninit()); !result)
+    if (auto result = recover_lua_script_error(p.second->uninit()); !result)
       recordError(std::move(result.error()));
   }
   m_scriptContexts.clear();
@@ -439,8 +439,8 @@ std::expected<void, StarException> WorldServer::initLua(UniverseServer& universe
   if (!result6)
     return std::unexpected(std::move(result6.error()));
   m_luaThreadCallbacks["celestial"] = std::move(*result6);
-  m_luaRoot->addCallbacks("universe",m_luaThreadCallbacks["universe"]);
-  m_luaRoot->addCallbacks("celestial",m_luaThreadCallbacks["celestial"]);
+  m_luaRoot->add_callbacks("universe",m_luaThreadCallbacks["universe"]);
+  m_luaRoot->add_callbacks("celestial",m_luaThreadCallbacks["celestial"]);
   auto result7 = this->root().assets();
   if (!result7)
     return std::unexpected(std::move(result7.error()));
@@ -459,12 +459,12 @@ std::expected<void, StarException> WorldServer::initLua(UniverseServer& universe
     auto result11 = json_to_string_list(std::move(*result10));
     if (!result11)
       return std::unexpected(std::move(result11.error()));
-    auto result12 = scriptComponent->setScripts(std::move(*result11));
+    auto result12 = scriptComponent->set_scripts(std::move(*result11));
     if (!result12)
       return std::unexpected(std::move(result12.error()));
 
     m_scriptContexts.set(p.first, scriptComponent);
-    auto result13 = recoverLuaScriptError(scriptComponent->init(*this));
+    auto result13 = recover_lua_script_error(scriptComponent->init(*this));
     if (!result13)
       return std::unexpected(std::move(result13.error()));
   }
@@ -778,7 +778,7 @@ std::expected<bool, StarException> WorldServer::addClient(ConnectionId clientId,
   clientInfo->outgoingPackets.push_back(std::make_shared<CentralStructureUpdatePacket>(std::move(*result61)));
 
   for (auto&& p : m_scriptContexts) {
-    auto result62 = recoverLuaScriptError(p.second->invoke("addClient", clientId, isLocal));
+    auto result62 = recover_lua_script_error(p.second->invoke("addClient", clientId, isLocal));
     if (!result62)
       return std::unexpected(std::move(result62.error()));
   }
@@ -793,7 +793,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> WorldServer::removeC
   auto const& info = result63->get();
 
   for (auto&& p : m_scriptContexts) {
-    auto result64 = recoverLuaScriptError(p.second->invoke("removeClient", clientId));
+    auto result64 = recover_lua_script_error(p.second->invoke("removeClient", clientId));
     if (!result64)
       return std::unexpected(std::move(result64.error()));
   }
@@ -1519,7 +1519,7 @@ bool WorldServer::sendPacket(ConnectionId clientId, std::shared_ptr<Packet> cons
 std::expected<std::optional<ChainableJsonMessageResponse>, StarException> WorldServer::receiveMessage(ConnectionId fromConnection, String const& message, JsonArray const& args) {
   std::optional<ChainableJsonMessageResponse> result;
   for (auto&& p : m_scriptContexts) {
-    auto result149 = recoverLuaScriptError(p.second->handleMessage(message, fromConnection == ServerConnectionId, args));
+    auto result149 = recover_lua_script_error(p.second->handle_message(message, fromConnection == ServerConnectionId, args));
     if (!result149)
       return std::unexpected(std::move(result149.error()));
     result = std::move(*result149);
@@ -1657,7 +1657,7 @@ std::expected<void, StarException> WorldServer::update(float dt) {
     return std::unexpected(std::move(result162.error()));
 
   for (auto&& pair : m_scriptContexts) {
-    auto result163 = recoverLuaScriptError(pair.second->update(pair.second->updateDt(dt)));
+    auto result163 = recover_lua_script_error(pair.second->update(pair.second->update_dt(dt)));
     if (!result163)
       return std::unexpected(std::move(result163.error()));
   }
@@ -1861,7 +1861,7 @@ std::expected<void, StarException> WorldServer::update(float dt) {
   this->root().logMap().set(Star::format("server_{}_entities", m_worldId), Star::format("{} in {} sectors", m_entityMap->size(), m_tileArray->loadedSectorCount()));
   this->root().logMap().set(Star::format("server_{}_time", m_worldId), Star::format("age = {:4.2f}, day = {:4.2f}/{:4.2f}s", epochTime(), timeOfDay(), dayLength()));
   this->root().logMap().set(Star::format("server_{}_active_liquid", m_worldId), m_liquidEngine->activeCells());
-  this->root().logMap().set(Star::format("server_{}_lua_mem", m_worldId), m_luaRoot->luaMemoryUsage());
+  this->root().logMap().set(Star::format("server_{}_lua_mem", m_worldId), m_luaRoot->lua_memory_usage());
   return {};
 }
 
@@ -2891,7 +2891,7 @@ std::expected<void, StarException> WorldServer::init(bool firstTime) {
   auto result308 = m_serverConfig.get_float("luaGcStepMultiplier");
   if (!result308)
     return std::unexpected(std::move(result308.error()));
-  m_luaRoot->tuneAutoGarbageCollection(std::move(*result307), std::move(*result308));
+  m_luaRoot->tune_auto_garbage_collection(std::move(*result307), std::move(*result308));
 
   auto result309 = Sky::create(this->root(), m_worldTemplate->skyParameters(), false);
   if (!result309)

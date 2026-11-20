@@ -190,38 +190,38 @@ namespace Star {
 std::expected<LuaCallbacks, StarException> LuaBindings::makeInterfaceCallbacks(MainInterface& mainInterface) {
   LuaCallbacks callbacks;
   auto lifetime = mainInterface.callbackStopToken();
-  if (auto r = callbacks.registerCallback("hudVisible", [&mainInterface, lifetime]() -> std::expected<bool, StarException> {
+  if (auto r = callbacks.register_callback("hudVisible", [&mainInterface, lifetime]() -> std::expected<bool, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     return mainInterface.hudVisible();
   }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("setHudVisible", [&mainInterface, lifetime](bool visible) -> std::expected<void, StarException> {
+  if (auto r = callbacks.register_callback("setHudVisible", [&mainInterface, lifetime](bool visible) -> std::expected<void, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     mainInterface.setHudVisible(visible);
     return {};
   }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("returnToTitle", [&mainInterface, lifetime]() -> std::expected<void, StarException> {
+  if (auto r = callbacks.register_callback("returnToTitle", [&mainInterface, lifetime]() -> std::expected<void, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     mainInterface.returnToTitle();
     return {};
   }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("itemTooltip", [&mainInterface, lifetime](LuaUserData const& handle) -> std::expected<LuaUserData, StarException> {
+  if (auto r = callbacks.register_callback("itemTooltip", [&mainInterface, lifetime](LuaUserData const& handle) -> std::expected<LuaUserData, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     auto item = handle.get<std::shared_ptr<Item>>();
     if (!item) return std::unexpected(std::move(item.error()));
     auto tooltip = mainInterface.itemTooltip(item->get());
     if (!tooltip) return std::unexpected(std::move(tooltip.error()));
-    return handle.engine().createUserData(std::move(*tooltip));
+    return handle.engine().create_userdata(std::move(*tooltip));
   }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("playCinematic", [&mainInterface, lifetime](Json const& config) -> std::expected<void, StarException> {
+  if (auto r = callbacks.register_callback("playCinematic", [&mainInterface, lifetime](Json const& config) -> std::expected<void, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     return mainInterface.playCinematic(config);
   }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback(
+  if (auto r = callbacks.register_callback(
         "bindCanvas",
         [&mainInterface, lifetime](LuaEngine& engine, String const& name, std::optional<bool> ignoreScale)
           -> std::expected<std::optional<LuaCanvas>, StarException> {
@@ -232,70 +232,70 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeInterfaceCallbacks(M
             return std::unexpected(std::move(canvas.error()));
           if (*canvas)
             return std::optional<LuaCanvas>(LuaCanvas{.canvas = std::move(*canvas),
-                                                      .lifetime = engine.promiseLifetime(),
+                                                      .lifetime = engine.promise_lifetime(),
                                                       .hostLifetime = lifetime,
                                                       .owner = {}});
           return std::optional<LuaCanvas>{};
         });
       !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("callPane", [&mainInterface, lifetime](String const& id, String const& method, std::optional<JsonArray> arguments) -> std::expected<std::optional<Json>, StarException> {
+  if (auto r = callbacks.register_callback("callPane", [&mainInterface, lifetime](String const& id, String const& method, std::optional<JsonArray> arguments) -> std::expected<std::optional<Json>, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     return mainInterface.callPane(id, method, arguments.value_or(JsonArray{}));
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("sendPaneEvent", [&mainInterface, lifetime](String const& id, String const& event, Json payload) -> std::expected<void, StarException> {
+  if (auto r = callbacks.register_callback("sendPaneEvent", [&mainInterface, lifetime](String const& id, String const& event, Json payload) -> std::expected<void, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     return mainInterface.sendPaneEvent(id, event, std::move(payload));
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("createPane", [&mainInterface, lifetime](String const& id, Json config, String const& layer) -> std::expected<void, StarException> {
+  if (auto r = callbacks.register_callback("createPane", [&mainInterface, lifetime](String const& id, Json config, String const& layer) -> std::expected<void, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     return mainInterface.createPane(id, std::move(config), layer);
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("destroyPane", [&mainInterface, lifetime](String const& id) -> std::expected<void, StarException> {
+  if (auto r = callbacks.register_callback("destroyPane", [&mainInterface, lifetime](String const& id) -> std::expected<void, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     return mainInterface.destroyPane(id);
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("session", [&mainInterface, lifetime]() -> std::expected<Json, StarException> {
+  if (auto r = callbacks.register_callback("session", [&mainInterface, lifetime]() -> std::expected<Json, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     return mainInterface.uiSession();
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("paneIdAvailable", [lifetime](String const& id) -> std::expected<bool, StarException> {
+  if (auto r = callbacks.register_callback("paneIdAvailable", [lifetime](String const& id) -> std::expected<bool, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     return MainInterface::paneIdAvailable(id);
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("paneInputTargets", [&mainInterface, lifetime]() -> std::expected<JsonArray, StarException> {
+  if (auto r = callbacks.register_callback("paneInputTargets", [&mainInterface, lifetime]() -> std::expected<JsonArray, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     return mainInterface.paneInputTargets();
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("paneLayerOccupied", [&mainInterface, lifetime](String const& layer) -> std::expected<bool, StarException> {
+  if (auto r = callbacks.register_callback("paneLayerOccupied", [&mainInterface, lifetime](String const& layer) -> std::expected<bool, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     return mainInterface.paneLayerOccupied(layer);
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("paneDisplayed", [&mainInterface, lifetime](String const& name) -> std::expected<bool, StarException> {
+  if (auto r = callbacks.register_callback("paneDisplayed", [&mainInterface, lifetime](String const& name) -> std::expected<bool, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     auto pane = mainInterface.findRegisteredPane(name);
     if (!pane) return std::unexpected(std::move(pane.error()));
     return *pane && (*pane)->isDisplayed();
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("paneVisible", [&mainInterface, lifetime](String const& name) -> std::expected<bool, StarException> {
+  if (auto r = callbacks.register_callback("paneVisible", [&mainInterface, lifetime](String const& name) -> std::expected<bool, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     auto pane = mainInterface.findRegisteredPane(name);
     if (!pane) return std::unexpected(std::move(pane.error()));
     return *pane && (*pane)->isDisplayed() && (*pane)->visibility();
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("cinematicActive", [&mainInterface, lifetime]() -> std::expected<bool, StarException> {
+  if (auto r = callbacks.register_callback("cinematicActive", [&mainInterface, lifetime]() -> std::expected<bool, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     return mainInterface.cinematicActive();
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("cursorWorldPosition", [&mainInterface, lifetime]() -> std::expected<Vec2F, StarException> {
+  if (auto r = callbacks.register_callback("cursorWorldPosition", [&mainInterface, lifetime]() -> std::expected<Vec2F, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     return mainInterface.cursorWorldPosition();
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("travelState", [&mainInterface, lifetime]() -> std::expected<Json, StarException> {
+  if (auto r = callbacks.register_callback("travelState", [&mainInterface, lifetime]() -> std::expected<Json, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     return mainInterface.travelState();
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("travel", [&mainInterface, lifetime](String const& operation, std::optional<String> member) -> std::expected<bool, StarException> {
+  if (auto r = callbacks.register_callback("travel", [&mainInterface, lifetime](String const& operation, std::optional<String> member) -> std::expected<bool, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     std::optional<Uuid> target;
     if (member) {
@@ -305,27 +305,27 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeInterfaceCallbacks(M
     }
     return mainInterface.travel(operation, target);
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("portraitEntity", [&mainInterface, lifetime](LuaEngine& engine, std::optional<EntityId> id) -> std::expected<std::optional<LuaUserData>, StarException> {
+  if (auto r = callbacks.register_callback("portraitEntity", [&mainInterface, lifetime](LuaEngine& engine, std::optional<EntityId> id) -> std::expected<std::optional<LuaUserData>, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     auto entity = mainInterface.portraitEntity(id);
     if (!entity) return std::optional<LuaUserData>{};
-    auto handle = engine.createUserData(std::move(entity));
+    auto handle = engine.create_userdata(std::move(entity));
     if (!handle) return std::unexpected(std::move(handle.error()));
     return std::optional<LuaUserData>(std::move(*handle));
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("cursorView", [&mainInterface, lifetime]() -> std::expected<Json, StarException> {
+  if (auto r = callbacks.register_callback("cursorView", [&mainInterface, lifetime]() -> std::expected<Json, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     return mainInterface.cursorView();
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("inventoryChanged", [&mainInterface, lifetime]() -> std::expected<bool, StarException> {
+  if (auto r = callbacks.register_callback("inventoryChanged", [&mainInterface, lifetime]() -> std::expected<bool, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     return mainInterface.inventoryChanged();
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("togglePane", [&mainInterface, lifetime](String const& id) -> std::expected<void, StarException> {
+  if (auto r = callbacks.register_callback("togglePane", [&mainInterface, lifetime](String const& id) -> std::expected<void, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     return mainInterface.togglePane(id);
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("bindRegisteredPane", [&mainInterface, lifetime](String const& name) -> std::expected<std::optional<LuaCallbacks>, StarException> {
+  if (auto r = callbacks.register_callback("bindRegisteredPane", [&mainInterface, lifetime](String const& name) -> std::expected<std::optional<LuaCallbacks>, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     auto pane = mainInterface.findRegisteredPane(name);
     if (!pane) return std::unexpected(std::move(pane.error()));
@@ -334,16 +334,16 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeInterfaceCallbacks(M
     if (!bound) return std::unexpected(std::move(bound.error()));
     return std::optional<LuaCallbacks>(std::move(*bound));
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("displayRegisteredPane", [&mainInterface, lifetime](String const& name) -> std::expected<void, StarException> {
+  if (auto r = callbacks.register_callback("displayRegisteredPane", [&mainInterface, lifetime](String const& name) -> std::expected<void, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     return mainInterface.displayRegisteredPane(name);
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("scale", [&mainInterface, lifetime]() -> std::expected<float, StarException> {
+  if (auto r = callbacks.register_callback("scale", [&mainInterface, lifetime]() -> std::expected<float, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     return mainInterface.context().interfaceScale();
   }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("queueMessage", [&mainInterface, lifetime](String const& message, std::optional<float> cooldown, std::optional<float> spring) -> std::expected<void, StarException> {
+  if (auto r = callbacks.register_callback("queueMessage", [&mainInterface, lifetime](String const& message, std::optional<float> cooldown, std::optional<float> spring) -> std::expected<void, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     return mainInterface.queueMessage(message, cooldown, spring.value_or(0));
   }); !r) return std::unexpected(std::move(r.error()));
@@ -353,7 +353,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeInterfaceCallbacks(M
 std::expected<LuaCallbacks, StarException> LuaBindings::makeChatCallbacks(MainInterface& mainInterface, UniverseClient& client) {
   LuaCallbacks callbacks;
   auto lifetime = mainInterface.callbackStopToken();
-  if (auto r = callbacks.registerCallback("send", [&client, lifetime](String const& message, std::optional<String> modeName, std::optional<bool> speak, std::optional<JsonObject> data) -> std::expected<void, StarException> {
+  if (auto r = callbacks.register_callback("send", [&client, lifetime](String const& message, std::optional<String> modeName, std::optional<bool> speak, std::optional<JsonObject> data) -> std::expected<void, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     ChatSendMode mode = ChatSendMode::Broadcast;
     if (modeName) {
@@ -363,18 +363,18 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeChatCallbacks(MainIn
     }
     return client.sendChat(message, mode, speak, std::move(data));
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("parseArguments", [](String const& args) -> std::expected<LuaVariadic<Json>, StarException> {
+  if (auto r = callbacks.register_callback("parseArguments", [](String const& args) -> std::expected<LuaVariadic<Json>, StarException> {
     auto parsed = Json::parse_sequence(args);
     if (!parsed) return std::unexpected(std::move(parsed.error()));
     auto values = parsed->to_array();
     if (!values) return std::unexpected(std::move(values.error()));
     return LuaVariadic<Json>(std::move(*values));
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("command", [&mainInterface, lifetime](String const& command) -> std::expected<StringList, StarException> {
+  if (auto r = callbacks.register_callback("command", [&mainInterface, lifetime](String const& command) -> std::expected<StringList, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     return mainInterface.executeClientCommand(command);
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("addMessage", [&client, &mainInterface, lifetime](String const& text, std::optional<Json> config) -> std::expected<void, StarException> {
+  if (auto r = callbacks.register_callback("addMessage", [&client, &mainInterface, lifetime](String const& text, std::optional<Json> config) -> std::expected<void, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     ChatReceivedMessage message({MessageContext::Mode::CommandResult, ""}, client.clientContext()->connectionId(), "", text);
     bool showPane = true;
@@ -404,21 +404,21 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeChatCallbacks(MainIn
     }
     return mainInterface.addChatMessages({std::move(message)}, showPane);
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("input", [&mainInterface, lifetime]() -> std::expected<String, StarException> {
+  if (auto r = callbacks.register_callback("input", [&mainInterface, lifetime]() -> std::expected<String, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     auto value = mainInterface.callUi("chat", "currentChat", {});
     if (!value) return std::unexpected(std::move(value.error()));
     if (!*value) return std::unexpected(GuiException("Chat pane does not export currentChat"));
     return (**value).to_string();
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("setInput", [&mainInterface, lifetime](String const& text, std::optional<bool> moveCursor) -> std::expected<bool, StarException> {
+  if (auto r = callbacks.register_callback("setInput", [&mainInterface, lifetime](String const& text, std::optional<bool> moveCursor) -> std::expected<bool, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     auto value = mainInterface.callUi("chat", "setCurrentChat", {text, moveCursor.value_or(false)});
     if (!value) return std::unexpected(std::move(value.error()));
     if (!*value) return std::unexpected(GuiException("Chat pane does not export setCurrentChat"));
     return (**value).to_bool();
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("clear", [&mainInterface, lifetime](std::optional<std::size_t> count) -> std::expected<void, StarException> {
+  if (auto r = callbacks.register_callback("clear", [&mainInterface, lifetime](std::optional<std::size_t> count) -> std::expected<void, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     auto value = mainInterface.callUi("chat", "clear", {count ? Json(*count) : Json()});
     if (!value) return std::unexpected(std::move(value.error()));

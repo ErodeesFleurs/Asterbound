@@ -63,14 +63,14 @@ struct SnapshotWorld {
     if (!madeLua)
       return std::unexpected(std::move(madeLua.error()));
     lua = std::move(*madeLua);
-    auto madeContext = lua->createContext(StringList{});
+    auto madeContext = lua->create_context(StringList{});
     if (!madeContext)
       return std::unexpected(std::move(madeContext.error()));
     context = std::move(*madeContext);
     auto callbacks = LuaBindings::makeWorldCallbacks(root, *world);
     if (!callbacks)
       return std::unexpected(std::move(callbacks.error()));
-    return context->setCallbacks("world", *callbacks);
+    return context->set_callbacks("world", *callbacks);
   }
 
   std::shared_ptr<WorldServer> world;
@@ -79,7 +79,7 @@ struct SnapshotWorld {
 };
 
 std::expected<Json, StarException> snapshot(SnapshotWorld& setup, EntityId id) {
-  return setup.context->invokePath<Json>("world.entitySnapshot", id);
+  return setup.context->invoke_path<Json>("world.entitySnapshot", id);
 }
 
 const GameTestRegistration missingSnapshot("EntitySnapshot", "MissingEntityReturnsNil", [](GameTest& fixture) {

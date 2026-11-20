@@ -339,7 +339,7 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
 
   for (auto&& p : m_config->genericScriptContexts) {
     auto scriptComponent = std::make_shared<GenericScriptComponent>(root());
-    if (auto result = scriptComponent->setScript(p.second); !result)
+    if (auto result = scriptComponent->set_script(p.second); !result)
       return std::unexpected(std::move(result.error()));
     m_genericScriptContexts.set(p.first, scriptComponent);
   }
@@ -940,7 +940,7 @@ std::expected<void, StarException> Player::diskLoad(Json const& diskStore) {
   auto aiState = std::move(*aiStateResult);
   m_aiState = std::move(aiState);
   for (auto&& script : m_genericScriptContexts) {
-    if (auto result = script.second->setScriptStorage({}); !result)
+    if (auto result = script.second->set_script_storage({}); !result)
       return std::unexpected(std::move(result.error()));
   }
   auto storageJsonResult = diskStore.get("genericScriptStorage", JsonObject{});
@@ -957,7 +957,7 @@ std::expected<void, StarException> Player::diskLoad(Json const& diskStore) {
       if (!objectResult)
         return std::unexpected(std::move(objectResult.error()));
       auto object = std::move(*objectResult);
-      if (auto result = script->setScriptStorage(std::move(object)); !result)
+      if (auto result = script->set_script_storage(std::move(object)); !result)
         return std::unexpected(std::move(result.error()));
     }
   }
@@ -1044,44 +1044,44 @@ std::expected<void, StarException> Player::init(World& world, EntityId entityId,
     if (auto result = m_statusController->setPersistentEffects("species", speciesDefinition->statusEffects()); !result)
       return std::unexpected(std::move(result.error()));
     for (auto&& p : m_genericScriptContexts) {
-      if (auto result = p.second->addActorMovementCallbacks(*m_movementController); !result)
+      if (auto result = p.second->add_actor_movement_callbacks(*m_movementController); !result)
         return std::unexpected(std::move(result.error()));
       auto playerCallbacksResult = LuaBindings::makePlayerCallbacks(root(), *this);
       if (!playerCallbacksResult)
         return std::unexpected(std::move(playerCallbacksResult.error()));
       auto playerCallbacks = std::move(*playerCallbacksResult);
-      if (auto result = p.second->addCallbacks("player", std::move(playerCallbacks)); !result)
+      if (auto result = p.second->add_callbacks("player", std::move(playerCallbacks)); !result)
         return std::unexpected(std::move(result.error()));
       auto entityCallbacksResult = LuaBindings::makeEntityCallbacks(*this);
       if (!entityCallbacksResult)
         return std::unexpected(std::move(entityCallbacksResult.error()));
       auto entityCallbacks = std::move(*entityCallbacksResult);
-      if (auto result = p.second->addCallbacks("entity", std::move(entityCallbacks)); !result)
+      if (auto result = p.second->add_callbacks("entity", std::move(entityCallbacks)); !result)
         return std::unexpected(std::move(result.error()));
       auto statusCallbacksResult = LuaBindings::makeStatusControllerCallbacks(*m_statusController);
       if (!statusCallbacksResult)
         return std::unexpected(std::move(statusCallbacksResult.error()));
       auto statusCallbacks = std::move(*statusCallbacksResult);
-      if (auto result = p.second->addCallbacks("status", std::move(statusCallbacks)); !result)
+      if (auto result = p.second->add_callbacks("status", std::move(statusCallbacks)); !result)
         return std::unexpected(std::move(result.error()));
       auto songbookCallbacksResult = LuaBindings::makeSongbookCallbacks(*m_songbook);
       if (!songbookCallbacksResult)
         return std::unexpected(std::move(songbookCallbacksResult.error()));
       auto songbookCallbacks = std::move(*songbookCallbacksResult);
-      if (auto result = p.second->addCallbacks("songbook", std::move(songbookCallbacks)); !result)
+      if (auto result = p.second->add_callbacks("songbook", std::move(songbookCallbacks)); !result)
         return std::unexpected(std::move(result.error()));
       auto animatorCallbacksResult = LuaBindings::makeNetworkedAnimatorCallbacks(humanoid()->networkedAnimator()->get());
       if (!animatorCallbacksResult)
         return std::unexpected(std::move(animatorCallbacksResult.error()));
       auto animatorCallbacks = std::move(*animatorCallbacksResult);
-      if (auto result = p.second->addCallbacks("animator", std::move(animatorCallbacks)); !result)
+      if (auto result = p.second->add_callbacks("animator", std::move(animatorCallbacks)); !result)
         return std::unexpected(std::move(result.error()));
       if (m_client) {
         auto celestialCallbacksResult = LuaBindings::makeCelestialCallbacks(root(), m_client->get());
         if (!celestialCallbacksResult)
           return std::unexpected(std::move(celestialCallbacksResult.error()));
         auto celestialCallbacks = std::move(*celestialCallbacksResult);
-        if (auto result = p.second->addCallbacks("celestial", std::move(celestialCallbacks)); !result)
+        if (auto result = p.second->add_callbacks("celestial", std::move(celestialCallbacks)); !result)
           return std::unexpected(std::move(result.error()));
       }
       if (auto result = p.second->init(world); !result)
@@ -1099,7 +1099,7 @@ std::expected<void, StarException> Player::init(World& world, EntityId entityId,
       return std::unexpected(std::move(result.error()));
   }
   if (world.isClient()) {
-    if (auto result = m_scriptedAnimator.setScripts(humanoid()->animationScripts()); !result)
+    if (auto result = m_scriptedAnimator.set_scripts(humanoid()->animationScripts()); !result)
       return std::unexpected(std::move(result.error()));
     auto animationCallbacksResult = LuaBindings::makeScriptedAnimatorCallbacks(humanoid()->networkedAnimator()->get(),
       [&parameters = m_scriptedAnimationParameters](String const& name, Json const& defaultValue) -> std::expected<Json, StarException> {
@@ -1108,15 +1108,15 @@ std::expected<void, StarException> Player::init(World& world, EntityId entityId,
     if (!animationCallbacksResult)
       return std::unexpected(std::move(animationCallbacksResult.error()));
     auto animationCallbacks = std::move(*animationCallbacksResult);
-    if (auto result = m_scriptedAnimator.addCallbacks("animationConfig", std::move(animationCallbacks)); !result)
+    if (auto result = m_scriptedAnimator.add_callbacks("animationConfig", std::move(animationCallbacks)); !result)
       return std::unexpected(std::move(result.error()));
     auto entityCallbacksResult = LuaBindings::makeEntityCallbacks(*this);
     if (!entityCallbacksResult)
       return std::unexpected(std::move(entityCallbacksResult.error()));
     auto entityCallbacks = std::move(*entityCallbacksResult);
-    if (auto result = m_scriptedAnimator.addCallbacks("entity", std::move(entityCallbacks)); !result)
+    if (auto result = m_scriptedAnimator.add_callbacks("entity", std::move(entityCallbacks)); !result)
       return std::unexpected(std::move(result.error()));
-    if (auto result = recoverLuaScriptError(m_scriptedAnimator.init(world)); !result)
+    if (auto result = recover_lua_script_error(m_scriptedAnimator.init(world)); !result)
       return std::unexpected(std::move(result.error()));
   }
   m_xAimPositionNetState.setInterpolator(world.geometry().xLerpFunction());
@@ -1153,15 +1153,15 @@ std::expected<void, StarException> Player::uninit() {
     for (auto&& p : m_genericScriptContexts) {
       remember(p.second->uninit());
       for (auto group : std::array<std::string_view, 7>{"animator", "entity", "player", "mcontroller", "status", "songbook", "world"})
-        remember(p.second->removeCallbacks(group));
+        remember(p.second->remove_callbacks(group));
       if (m_client)
-        remember(p.second->removeCallbacks("celestial"));
+        remember(p.second->remove_callbacks("celestial"));
     }
   }
   if (auto world = maybeWorld(); world && world->get().isClient()) {
-    remember(recoverLuaScriptError(m_scriptedAnimator.uninit()));
-    remember(m_scriptedAnimator.removeCallbacks("animationConfig"));
-    remember(m_scriptedAnimator.removeCallbacks("entity"));
+    remember(recover_lua_script_error(m_scriptedAnimator.uninit()));
+    remember(m_scriptedAnimator.remove_callbacks("animationConfig"));
+    remember(m_scriptedAnimator.remove_callbacks("entity"));
   }
   m_controlMovementState.reset();
   m_movementAnimationState.reset();
@@ -1900,7 +1900,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Player
         return response;
     }
     for (auto&& script : m_genericScriptContexts) {
-      auto responseResult = script.second->handleMessage(message, localMessage, args);
+      auto responseResult = script.second->handle_message(message, localMessage, args);
       if (!responseResult)
         return std::unexpected(std::move(responseResult.error()));
       auto response = std::move(*responseResult);
@@ -2083,7 +2083,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
       }
 
       for (auto&& p : m_genericScriptContexts) {
-        if (auto result = p.second->update(p.second->updateDt(dt)); !result)
+        if (auto result = p.second->update(p.second->update_dt(dt)); !result)
           return std::unexpected(std::move(result.error()));
       }
 
@@ -3702,7 +3702,7 @@ std::expected<void, StarException> Player::processStateChanges(float dt) {
         return std::unexpected(std::move(result.error()));
     }
   }
-  if (auto result = recoverLuaScriptError(m_scriptedAnimator.update()); !result)
+  if (auto result = recover_lua_script_error(m_scriptedAnimator.update()); !result)
     return std::unexpected(std::move(result.error()));
 
   if (auto techState = m_techController->parentState()) {
@@ -4611,7 +4611,7 @@ std::shared_ptr<QuestManager> Player::questManager() const {
 std::expected<Json, StarException> Player::diskStore() {
   JsonObject storage;
   for (auto&& script : m_genericScriptContexts) {
-    auto entryResult = script.second->getScriptStorage();
+    auto entryResult = script.second->get_script_storage();
     if (!entryResult)
       return std::unexpected(std::move(entryResult.error()));
     auto entry = std::move(*entryResult);
@@ -5164,13 +5164,13 @@ std::expected<void, StarException> Player::refreshHumanoidParameters() {
     if (isMaster()) {
       for (auto&& script : m_genericScriptContexts) {
         if (script.second->initialized()) {
-          if (auto result = script.second->removeCallbacks("animator"); !result)
+          if (auto result = script.second->remove_callbacks("animator"); !result)
             return std::unexpected(std::move(result.error()));
           auto callbacksResult = LuaBindings::makeNetworkedAnimatorCallbacks(humanoid()->networkedAnimator()->get());
           if (!callbacksResult)
             return std::unexpected(std::move(callbacksResult.error()));
           auto callbacks = std::move(*callbacksResult);
-          if (auto result = script.second->addCallbacks("animator", std::move(callbacks)); !result)
+          if (auto result = script.second->add_callbacks("animator", std::move(callbacks)); !result)
             return std::unexpected(std::move(result.error()));
           if (auto result = script.second->invoke("refreshHumanoidParameters"); !result)
             return std::unexpected(std::move(result.error()));
@@ -5182,13 +5182,13 @@ std::expected<void, StarException> Player::refreshHumanoidParameters() {
       return std::unexpected(std::move(currentWorldResult.error()));
     auto& currentWorld = currentWorldResult->get();
     if (currentWorld.isClient() && m_scriptedAnimator.initialized()) {
-      if (auto result = recoverLuaScriptError(m_scriptedAnimator.uninit()); !result)
+      if (auto result = recover_lua_script_error(m_scriptedAnimator.uninit()); !result)
         return std::unexpected(std::move(result.error()));
-      if (auto result = m_scriptedAnimator.removeCallbacks("animationConfig"); !result)
+      if (auto result = m_scriptedAnimator.remove_callbacks("animationConfig"); !result)
         return std::unexpected(std::move(result.error()));
-      if (auto result = m_scriptedAnimator.removeCallbacks("entity"); !result)
+      if (auto result = m_scriptedAnimator.remove_callbacks("entity"); !result)
         return std::unexpected(std::move(result.error()));
-      if (auto result = m_scriptedAnimator.setScripts(humanoid()->animationScripts()); !result)
+      if (auto result = m_scriptedAnimator.set_scripts(humanoid()->animationScripts()); !result)
         return std::unexpected(std::move(result.error()));
       auto animationCallbacksResult = LuaBindings::makeScriptedAnimatorCallbacks(humanoid()->networkedAnimator()->get(),
         [&parameters = m_scriptedAnimationParameters](String const& name, Json const& defaultValue) -> std::expected<Json, StarException> {
@@ -5197,15 +5197,15 @@ std::expected<void, StarException> Player::refreshHumanoidParameters() {
       if (!animationCallbacksResult)
         return std::unexpected(std::move(animationCallbacksResult.error()));
       auto animationCallbacks = std::move(*animationCallbacksResult);
-      if (auto result = m_scriptedAnimator.addCallbacks("animationConfig", std::move(animationCallbacks)); !result)
+      if (auto result = m_scriptedAnimator.add_callbacks("animationConfig", std::move(animationCallbacks)); !result)
         return std::unexpected(std::move(result.error()));
       auto entityCallbacksResult = LuaBindings::makeEntityCallbacks(*this);
       if (!entityCallbacksResult)
         return std::unexpected(std::move(entityCallbacksResult.error()));
       auto entityCallbacks = std::move(*entityCallbacksResult);
-      if (auto result = m_scriptedAnimator.addCallbacks("entity", std::move(entityCallbacks)); !result)
+      if (auto result = m_scriptedAnimator.add_callbacks("entity", std::move(entityCallbacks)); !result)
         return std::unexpected(std::move(result.error()));
-      if (auto result = recoverLuaScriptError(m_scriptedAnimator.init(currentWorld)); !result)
+      if (auto result = recover_lua_script_error(m_scriptedAnimator.init(currentWorld)); !result)
         return std::unexpected(std::move(result.error()));
     }
   }

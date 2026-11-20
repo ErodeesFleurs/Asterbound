@@ -138,7 +138,7 @@ namespace Star {
 std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseClientThreadCallbacks(Root& root, UniverseClient& universe) {
   LuaCallbacks callbacks;
   
-  if (auto registration = callbacks.registerCallback("sendOwnUniverseMessage", [&universe](String const& message, LuaVariadic<Json> args) -> std::expected<RpcPromise<Json>, StarException> {
+  if (auto registration = callbacks.register_callback("sendOwnUniverseMessage", [&universe](String const& message, LuaVariadic<Json> args) -> std::expected<RpcPromise<Json>, StarException> {
     auto pair = RpcPromise<Json>::make_pair();
     auto passed =
       universe.passMessage({.message = message, .args = JsonArray::from(std::move(args)), .keeper = pair.second});
@@ -147,24 +147,24 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseClientThread
     return std::move(pair.first);
   }); !registration)
       return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallback("sendUniverseMessage", [&universe](ConnectionId const& connection, String const& message, LuaVariadic<Json> args) -> std::expected<RpcPromise<Json>, StarException> {
+  if (auto registration = callbacks.register_callback("sendUniverseMessage", [&universe](ConnectionId const& connection, String const& message, LuaVariadic<Json> args) -> std::expected<RpcPromise<Json>, StarException> {
     return universe.sendUniverseMessage(connection,message,JsonArray::from(std::move(args)));
   }); !registration)
       return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallback("sendServerUniverseMessage", [&universe](String const& message, LuaVariadic<Json> args) -> std::expected<RpcPromise<Json>, StarException> {
+  if (auto registration = callbacks.register_callback("sendServerUniverseMessage", [&universe](String const& message, LuaVariadic<Json> args) -> std::expected<RpcPromise<Json>, StarException> {
     return universe.sendUniverseMessage(ServerConnectionId,message,JsonArray::from(std::move(args)));
   }); !registration)
       return std::unexpected(std::move(registration.error()));
 
   if (auto registration =
-        callbacks.registerCallback("createClientCustomWorld",
+        callbacks.register_callback("createClientCustomWorld",
                                    [&universe](String name, Json templateData) -> std::expected<void, StarException> {
                                      return universe.createCustomWorld(name, std::move(templateData));
                                    });
       !registration)
     return std::unexpected(std::move(registration.error()));
 
-  if (auto registration = callbacks.registerCallback("createClientCustomWorldFromConfig", [&root, &universe](String name, Json worldConfig)  -> std::expected<void, StarException> {
+  if (auto registration = callbacks.register_callback("createClientCustomWorldFromConfig", [&root, &universe](String name, Json worldConfig)  -> std::expected<void, StarException> {
     std::uint64_t worldSeed;
     auto hasSeed = worldConfig.contains("seed");
     if (!hasSeed)
@@ -243,26 +243,26 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseClientThread
   }); !registration)
       return std::unexpected(std::move(registration.error()));
   
-  if (auto registration = callbacks.registerCallback("connectionId", [&universe]()  -> std::expected<ConnectionId, StarException> {
+  if (auto registration = callbacks.register_callback("connectionId", [&universe]()  -> std::expected<ConnectionId, StarException> {
     if (!universe.isConnected())
       return std::unexpected(StarException("Universe is not connected"));
     return universe.clientContext()->connectionId();
   }); !registration)
       return std::unexpected(std::move(registration.error()));
   
-  if (auto registration = callbacks.registerCallback("clientUuid", [&universe]()  -> std::expected<String, StarException> {
+  if (auto registration = callbacks.register_callback("clientUuid", [&universe]()  -> std::expected<String, StarException> {
     if (!universe.isConnected())
       return std::unexpected(StarException("Universe is not connected"));
     return universe.clientContext()->playerUuid().hex();
   }); !registration)
       return std::unexpected(std::move(registration.error()));
   
-  if (auto registration = callbacks.registerCallback("serverOpenProtocolVersion", [&universe]() {
+  if (auto registration = callbacks.register_callback("serverOpenProtocolVersion", [&universe]() {
     return universe.connectionVersion();
   }); !registration)
       return std::unexpected(std::move(registration.error()));
   
-  if (auto registration = callbacks.registerCallback("playerCount", [&universe]() -> Vec2U {
+  if (auto registration = callbacks.register_callback("playerCount", [&universe]() -> Vec2U {
     if (!universe.isConnected())
       return Vec2U();
     return Vec2U(universe.players(),universe.maxPlayers());
@@ -278,7 +278,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseClientCallba
     return std::unexpected(std::move(createdCallbacks.error()));
   LuaCallbacks callbacks = std::move(*createdCallbacks);
   
-  if (auto registration = callbacks.registerCallback("subWorldActive", [&universe](String const& worldId) -> std::expected<bool, StarException> {
+  if (auto registration = callbacks.register_callback("subWorldActive", [&universe](String const& worldId) -> std::expected<bool, StarException> {
     auto id = parseWorldId(worldId);
     if (!id)
       return std::unexpected(std::move(id.error()));
@@ -286,7 +286,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseClientCallba
   }); !registration)
       return std::unexpected(std::move(registration.error()));
   
-  if (auto registration = callbacks.registerCallback("loadSubWorld", [&universe](String const& worldId)  -> std::expected<void, StarException> {
+  if (auto registration = callbacks.register_callback("loadSubWorld", [&universe](String const& worldId)  -> std::expected<void, StarException> {
     auto id = parseWorldId(worldId);
     if (!id)
       return std::unexpected(std::move(id.error()));
@@ -297,7 +297,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseClientCallba
   }); !registration)
       return std::unexpected(std::move(registration.error()));
   
-  if (auto registration = callbacks.registerCallback("unloadSubWorld", [&universe](String const& worldId)  -> std::expected<void, StarException> {
+  if (auto registration = callbacks.register_callback("unloadSubWorld", [&universe](String const& worldId)  -> std::expected<void, StarException> {
     auto id = parseWorldId(worldId);
     if (!id)
       return std::unexpected(std::move(id.error()));
@@ -308,7 +308,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseClientCallba
   }); !registration)
       return std::unexpected(std::move(registration.error()));
   
-  if (auto registration = callbacks.registerCallback("sendSubWorldMessage", [&universe](String const& worldId, String const& message, LuaVariadic<Json> args) -> std::expected<RpcPromise<Json>, StarException> {
+  if (auto registration = callbacks.register_callback("sendSubWorldMessage", [&universe](String const& worldId, String const& message, LuaVariadic<Json> args) -> std::expected<RpcPromise<Json>, StarException> {
     auto id = parseWorldId(worldId);
     if (!id)
       return std::unexpected(std::move(id.error()));
@@ -316,13 +316,13 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseClientCallba
   }); !registration)
       return std::unexpected(std::move(registration.error()));
   
-  if (auto registration = callbacks.registerCallback("sendMainWorldMessage", [&universe](String const& message, LuaVariadic<Json> args) -> std::expected<RpcPromise<Json>, StarException> {
+  if (auto registration = callbacks.register_callback("sendMainWorldMessage", [&universe](String const& message, LuaVariadic<Json> args) -> std::expected<RpcPromise<Json>, StarException> {
     return universe.sendMainWorldMessage(message, JsonArray::from(std::move(args)));
   }); !registration)
       return std::unexpected(std::move(registration.error()));
   
   // primarily useful on the main world and other non-universe contexts, as universe is accessible everywhere on the main client thread
-  if (auto registration = callbacks.registerCallback("callScriptContext", [&universe](String const& contextName, String const& function, LuaVariadic<LuaValue> const& args) -> std::expected<std::optional<LuaValue>, StarException> {
+  if (auto registration = callbacks.register_callback("callScriptContext", [&universe](String const& contextName, String const& function, LuaVariadic<LuaValue> const& args) -> std::expected<std::optional<LuaValue>, StarException> {
     auto context = universe.scriptContext(contextName);
     if (!context)
       return std::unexpected(StarException::format("Context {} does not exist", contextName));
@@ -331,7 +331,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseClientCallba
       return std::unexpected(std::move(registration.error()));
   
   // primarily useful on universe contexts
-  if (auto registration = callbacks.registerCallback("callMainWorldScriptContext", [&universe](String const& contextName, String const& function, LuaVariadic<LuaValue> const& args) -> std::expected<std::optional<LuaValue>, StarException> {
+  if (auto registration = callbacks.register_callback("callMainWorldScriptContext", [&universe](String const& contextName, String const& function, LuaVariadic<LuaValue> const& args) -> std::expected<std::optional<LuaValue>, StarException> {
     if (!universe.isConnected())
       return std::unexpected(StarException("Universe is not connected"));
     auto world = universe.worldClient();

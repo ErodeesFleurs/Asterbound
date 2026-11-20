@@ -187,14 +187,14 @@ namespace Star {
 std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root& root, Player& player) {
   LuaCallbacks callbacks;
 
-  if (auto registered = callbacks.registerCallback("inWorld", [&player] { return player.inWorld(); }); !registered)
+  if (auto registered = callbacks.register_callback("inWorld", [&player] { return player.inWorld(); }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("save", [&player]() -> std::expected<Json, StarException> {
+  if (auto registered = callbacks.register_callback("save", [&player]() -> std::expected<Json, StarException> {
     return player.diskStore();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("load", [&player](Json const& data) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("load", [&player](Json const& data) -> std::expected<void, StarException> {
     auto saved = player.diskStore();
     if (!saved) return std::unexpected(std::move(saved.error()));
     auto loaded = player.diskLoad(data);
@@ -206,12 +206,12 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("effectsAnimator", [&player]() -> std::expected<LuaCallbacks, StarException> {
+  if (auto registered = callbacks.register_callback("effectsAnimator", [&player]() -> std::expected<LuaCallbacks, StarException> {
     return LuaBindings::makeNetworkedAnimatorCallbacks(*player.effectsAnimator());
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("teamMembers", [&player]() -> std::expected<std::optional<JsonArray>, StarException> {
+  if (auto registered = callbacks.register_callback("teamMembers", [&player]() -> std::expected<std::optional<JsonArray>, StarException> {
     if (auto client = player.universeClient()) {
       return client->get().teamClient()->members().transformed([](TeamClient::Member const& member) -> Json {
         return JsonObject{
@@ -226,17 +226,17 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback(   "humanoidIdentity", [&player]() -> std::expected<Json, StarException> {
+  if (auto registered = callbacks.register_callback(   "humanoidIdentity", [&player]() -> std::expected<Json, StarException> {
     return player.humanoid()->identity().toJson();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setHumanoidIdentity", [&player](Json const& id) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setHumanoidIdentity", [&player](Json const& id) -> std::expected<void, StarException> {
     auto identity = HumanoidIdentity::create(id);
     if (!identity) return std::unexpected(std::move(identity.error()));
     return player.setIdentity(std::move(*identity));
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback(
+  if (auto registered = callbacks.register_callback(
         "setHumanoidParameter",
         [&player](String key, std::optional<Json> value) -> std::expected<void, StarException> {
           return player.setHumanoidParameter(std::move(key), std::move(value));
@@ -244,148 +244,148 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
       !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered =
-        callbacks.registerCallback("getHumanoidParameter",
+        callbacks.register_callback("getHumanoidParameter",
                                    [&player](String key) -> std::expected<std::optional<Json>, StarException> {
                                      return player.getHumanoidParameter(std::move(key));
                                    });
       !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered =
-        callbacks.registerCallback("setHumanoidParameters",
+        callbacks.register_callback("setHumanoidParameters",
                                    [&player](JsonObject parameters) -> std::expected<void, StarException> {
                                      return player.setHumanoidParameters(std::move(parameters));
                                    });
       !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("getHumanoidParameters", [&player]() -> std::expected<JsonObject, StarException> {
+  if (auto registered = callbacks.register_callback("getHumanoidParameters", [&player]() -> std::expected<JsonObject, StarException> {
     return player.getHumanoidParameters();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("refreshHumanoidParameters", [&player]() -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("refreshHumanoidParameters", [&player]() -> std::expected<void, StarException> {
     return player.refreshHumanoidParameters();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("humanoidConfig", [&player](bool withOverrides) -> std::expected<Json, StarException> {
+  if (auto registered = callbacks.register_callback("humanoidConfig", [&player](bool withOverrides) -> std::expected<Json, StarException> {
     return player.humanoid()->humanoidConfig(withOverrides);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("controlMovementState", [&player](std::optional<String> const& state) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("controlMovementState", [&player](std::optional<String> const& state) -> std::expected<void, StarException> {
     return player.controlMovementState(state);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback(   "bodyDirectives", [&player]() -> std::expected<String, StarException> {
+  if (auto registered = callbacks.register_callback(   "bodyDirectives", [&player]() -> std::expected<String, StarException> {
     return player.identity().bodyDirectives.string();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setBodyDirectives", [&player](String const& str) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setBodyDirectives", [&player](String const& str) -> std::expected<void, StarException> {
     return player.setBodyDirectives(str);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback(   "emoteDirectives", [&player]() -> std::expected<String, StarException> {
+  if (auto registered = callbacks.register_callback(   "emoteDirectives", [&player]() -> std::expected<String, StarException> {
     return player.identity().emoteDirectives.string();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setEmoteDirectives", [&player](String const& str) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setEmoteDirectives", [&player](String const& str) -> std::expected<void, StarException> {
     return player.setEmoteDirectives(str);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback(   "hairGroup",      [&player]() -> std::expected<String, StarException> {
+  if (auto registered = callbacks.register_callback(   "hairGroup",      [&player]() -> std::expected<String, StarException> {
     return player.identity().hairGroup;
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setHairGroup",      [&player](String const& str) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setHairGroup",      [&player](String const& str) -> std::expected<void, StarException> {
     return player.setHairGroup(str);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback(   "hairType",       [&player]() -> std::expected<String, StarException> {
+  if (auto registered = callbacks.register_callback(   "hairType",       [&player]() -> std::expected<String, StarException> {
     return player.identity().hairType;
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setHairType",       [&player](String const& str) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setHairType",       [&player](String const& str) -> std::expected<void, StarException> {
     return player.setHairType(str);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback(   "hairDirectives", [&player]() -> std::expected<String, StarException> {
+  if (auto registered = callbacks.register_callback(   "hairDirectives", [&player]() -> std::expected<String, StarException> {
     return player.identity().hairDirectives.string();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setHairDirectives", [&player](String const& str) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setHairDirectives", [&player](String const& str) -> std::expected<void, StarException> {
     return player.setHairDirectives(str);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback(   "facialHairGroup",      [&player]() -> std::expected<String, StarException> {
+  if (auto registered = callbacks.register_callback(   "facialHairGroup",      [&player]() -> std::expected<String, StarException> {
     return player.identity().facialHairGroup;
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setFacialHairGroup",      [&player](String const& str) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setFacialHairGroup",      [&player](String const& str) -> std::expected<void, StarException> {
     return player.setFacialHairGroup(str);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback(   "facialHairType",       [&player]() -> std::expected<String, StarException> {
+  if (auto registered = callbacks.register_callback(   "facialHairType",       [&player]() -> std::expected<String, StarException> {
     return player.identity().facialHairType;
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setFacialHairType",       [&player](String const& str) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setFacialHairType",       [&player](String const& str) -> std::expected<void, StarException> {
     return player.setFacialHairType(str);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback(   "facialHairDirectives", [&player]() -> std::expected<String, StarException> {
+  if (auto registered = callbacks.register_callback(   "facialHairDirectives", [&player]() -> std::expected<String, StarException> {
     return player.identity().facialHairDirectives.string();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setFacialHairDirectives", [&player](String const& str) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setFacialHairDirectives", [&player](String const& str) -> std::expected<void, StarException> {
     return player.setFacialHairDirectives(str);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback(   "facialMaskGroup",      [&player]() -> std::expected<String, StarException> {
+  if (auto registered = callbacks.register_callback(   "facialMaskGroup",      [&player]() -> std::expected<String, StarException> {
     return player.identity().facialMaskGroup;
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setFacialMaskGroup",      [&player](String const& str) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setFacialMaskGroup",      [&player](String const& str) -> std::expected<void, StarException> {
     return player.setFacialMaskGroup(str);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback(   "facialMaskType",       [&player]() -> std::expected<String, StarException> {
+  if (auto registered = callbacks.register_callback(   "facialMaskType",       [&player]() -> std::expected<String, StarException> {
     return player.identity().facialMaskType;
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setFacialMaskType",       [&player](String const& str) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setFacialMaskType",       [&player](String const& str) -> std::expected<void, StarException> {
     return player.setFacialMaskType(str);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback(   "facialMaskDirectives", [&player]() -> std::expected<String, StarException> {
+  if (auto registered = callbacks.register_callback(   "facialMaskDirectives", [&player]() -> std::expected<String, StarException> {
     return player.identity().facialMaskDirectives.string();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setFacialMaskDirectives", [&player](String const& str) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setFacialMaskDirectives", [&player](String const& str) -> std::expected<void, StarException> {
     return player.setFacialMaskDirectives(str);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("hair", [&player]() -> std::expected<decltype(luaTupleReturn(String(), String(), String())), StarException> {
+  if (auto registered = callbacks.register_callback("hair", [&player]() -> std::expected<decltype(lua_tuple_return(String(), String(), String())), StarException> {
     HumanoidIdentity const& identity = player.identity();
-    return luaTupleReturn(identity.hairGroup, identity.hairType, identity.hairDirectives.string());
+    return lua_tuple_return(identity.hairGroup, identity.hairType, identity.hairDirectives.string());
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("facialHair", [&player]() -> std::expected<decltype(luaTupleReturn(String(), String(), String())), StarException> {
+  if (auto registered = callbacks.register_callback("facialHair", [&player]() -> std::expected<decltype(lua_tuple_return(String(), String(), String())), StarException> {
     HumanoidIdentity const& identity = player.identity();
-    return luaTupleReturn(identity.facialHairGroup, identity.facialHairType, identity.facialHairDirectives.string());
+    return lua_tuple_return(identity.facialHairGroup, identity.facialHairType, identity.facialHairDirectives.string());
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("facialMask", [&player]() -> std::expected<decltype(luaTupleReturn(String(), String(), String())), StarException> {
+  if (auto registered = callbacks.register_callback("facialMask", [&player]() -> std::expected<decltype(lua_tuple_return(String(), String(), String())), StarException> {
     HumanoidIdentity const& identity = player.identity();
-    return luaTupleReturn(identity.facialMaskGroup, identity.facialMaskType, identity.facialMaskDirectives.string());
+    return lua_tuple_return(identity.facialMaskGroup, identity.facialMaskType, identity.facialMaskDirectives.string());
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("setFacialHair", [&player](std::optional<String> const& group, std::optional<String> const& type, std::optional<String> const& directives) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setFacialHair", [&player](std::optional<String> const& group, std::optional<String> const& type, std::optional<String> const& directives) -> std::expected<void, StarException> {
     if (group && type && directives)
       return player.setFacialHair(*group, *type, *directives);
     if (group) { auto changed = player.setFacialHairGroup(*group);
@@ -401,7 +401,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("setFacialMask", [&player](std::optional<String> const& group, std::optional<String> const& type, std::optional<String> const& directives) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setFacialMask", [&player](std::optional<String> const& group, std::optional<String> const& type, std::optional<String> const& directives) -> std::expected<void, StarException> {
     if (group && type && directives)
       return player.setFacialMask(*group, *type, *directives);
     if (group) { auto changed = player.setFacialMaskGroup(*group);
@@ -417,7 +417,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("setHair", [&player](std::optional<String> const& group, std::optional<String> const& type, std::optional<String> const& directives) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setHair", [&player](std::optional<String> const& group, std::optional<String> const& type, std::optional<String> const& directives) -> std::expected<void, StarException> {
     if (group && type && directives)
       return player.setHair(*group, *type, *directives);
     if (group) { auto changed = player.setHairGroup(*group);
@@ -433,53 +433,53 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback(   "description", [&player]() -> std::expected<String, StarException> {
+  if (auto registered = callbacks.register_callback(   "description", [&player]() -> std::expected<String, StarException> {
     return player.description();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setDescription", [&player](String const& description) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setDescription", [&player](String const& description) -> std::expected<void, StarException> {
     player.setDescription(description);
     return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback(   "name", [&player]() -> std::expected<String, StarException> {
+  if (auto registered = callbacks.register_callback(   "name", [&player]() -> std::expected<String, StarException> {
     return player.name();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setName", [&player](String const& name) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setName", [&player](String const& name) -> std::expected<void, StarException> {
     return player.setName(name);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback(   "nametag", [&player]() -> std::expected<String, StarException> {
+  if (auto registered = callbacks.register_callback(   "nametag", [&player]() -> std::expected<String, StarException> {
     return player.nametag();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setNametag", [&player](std::optional<String> const& nametag) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setNametag", [&player](std::optional<String> const& nametag) -> std::expected<void, StarException> {
     return player.setNametag(nametag);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback(   "species", [&player]() -> std::expected<String, StarException> {
+  if (auto registered = callbacks.register_callback(   "species", [&player]() -> std::expected<String, StarException> {
     return player.species();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setSpecies", [&player](String const& species) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setSpecies", [&player](String const& species) -> std::expected<void, StarException> {
     return player.setSpecies(species);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback(   "imagePath", [&player]() -> std::expected<std::optional<String>, StarException> {
+  if (auto registered = callbacks.register_callback(   "imagePath", [&player]() -> std::expected<std::optional<String>, StarException> {
     return player.identity().imagePath;
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setImagePath", [&player](std::optional<String> const& imagePath) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setImagePath", [&player](std::optional<String> const& imagePath) -> std::expected<void, StarException> {
     return player.setImagePath(imagePath);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("gender",
+  if (auto registered = callbacks.register_callback("gender",
                                                    [&player]() -> std::expected<String, StarException> {
                                                      auto value = enum_name<GenderNames>(player.gender());
                                                      if (!value)
@@ -489,7 +489,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
       !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered =
-        callbacks.registerCallback("setGender",
+        callbacks.register_callback("setGender",
                                    [&player](String const& gender) -> std::expected<void, StarException> {
                                      auto value = enum_value<GenderNames>(gender);
                                      if (!value)
@@ -499,11 +499,11 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
       !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback(   "personality", [&player]() -> std::expected<Json, StarException> {
+  if (auto registered = callbacks.register_callback(   "personality", [&player]() -> std::expected<Json, StarException> {
     return jsonFromPersonality(player.identity().personality);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setPersonality", [&player](Json const& personalityConfig) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setPersonality", [&player](Json const& personalityConfig) -> std::expected<void, StarException> {
     Personality personality = player.identity().personality;
     auto parsed = parsePersonality(personality, personalityConfig);
     if (!parsed) return std::unexpected(std::move(parsed.error()));
@@ -511,40 +511,40 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback(   "favoriteColor", [&player]() -> std::expected<Color, StarException> {
+  if (auto registered = callbacks.register_callback(   "favoriteColor", [&player]() -> std::expected<Color, StarException> {
     return player.favoriteColor();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setFavoriteColor", [&player](Color color) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setFavoriteColor", [&player](Color color) -> std::expected<void, StarException> {
     return player.setFavoriteColor(color);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback(   "mode", [&player]() -> std::expected<String, StarException> {
+  if (auto registered = callbacks.register_callback(   "mode", [&player]() -> std::expected<String, StarException> {
     if (!PlayerModeNames) return std::unexpected(PlayerModeNames.error());
     auto value = PlayerModeNames->get_right(player.modeType());
     if (!value) return std::unexpected(std::move(value.error()));
     return value->get();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("hungerEnabled", [&player]() {
+  if (auto registered = callbacks.register_callback("hungerEnabled", [&player]() {
     return player.mode_config().hunger;
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("lastDamagedTarget", [&player]() -> std::optional<EntityId> {
+  if (auto registered = callbacks.register_callback("lastDamagedTarget", [&player]() -> std::optional<EntityId> {
     auto id = player.lastDamagedTarget();
     return id == NullEntityId ? std::nullopt : std::optional<EntityId>(id);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("timeSinceLastGaveDamage", [&player]() {
+  if (auto registered = callbacks.register_callback("timeSinceLastGaveDamage", [&player]() {
     return player.timeSinceLastGaveDamage();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("position", [&player]() {
+  if (auto registered = callbacks.register_callback("position", [&player]() {
     return player.position();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setMode", [&player](String const& modeName) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setMode", [&player](String const& modeName) -> std::expected<void, StarException> {
     if (!PlayerModeNames) return std::unexpected(PlayerModeNames.error());
     auto value = PlayerModeNames->get_left(modeName);
     if (!value) return std::unexpected(std::move(value.error()));
@@ -552,17 +552,17 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback(   "interactRadius", [&player]() -> std::expected<float, StarException> {
+  if (auto registered = callbacks.register_callback(   "interactRadius", [&player]() -> std::expected<float, StarException> {
     return player.interactRadius();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setInteractRadius", [&player](float radius) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setInteractRadius", [&player](float radius) -> std::expected<void, StarException> {
     player.setInteractRadius(radius);
     return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   
-  if (auto registered = callbacks.registerCallback("setRenderLayer", [&player](std::optional<String> const& layer) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setRenderLayer", [&player](std::optional<String> const& layer) -> std::expected<void, StarException> {
     if (layer) {
       auto parsed = parseRenderLayer(*layer);
     if (!parsed) return std::unexpected(std::move(parsed.error()));
@@ -572,13 +572,13 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("actionBarGroup", [&player]() -> std::expected<decltype(luaTupleReturn(int(), std::uint8_t())), StarException> {
-    return luaTupleReturn(player.inventory()->customBarGroup() + 1, player.inventory()->customBarGroups());
+  if (auto registered = callbacks.register_callback("actionBarGroup", [&player]() -> std::expected<decltype(lua_tuple_return(int(), std::uint8_t())), StarException> {
+    return lua_tuple_return(player.inventory()->customBarGroup() + 1, player.inventory()->customBarGroups());
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered =
-        callbacks.registerCallback("setActionBarGroup",
+        callbacks.register_callback("setActionBarGroup",
                                    [&player](int group) -> std::expected<void, StarException> {
                                      player.inventory()->setCustomBarGroup(
                                        (group - 1) % static_cast<unsigned>(player.inventory()->customBarGroups()));
@@ -587,10 +587,10 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
       !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("selectedActionBarSlot", [&player](LuaEngine& engine) -> std::expected<std::optional<LuaValue>, StarException> {
+  if (auto registered = callbacks.register_callback("selectedActionBarSlot", [&player](LuaEngine& engine) -> std::expected<std::optional<LuaValue>, StarException> {
     auto location = player.inventory()->selectedActionBarLocation();
     if (std::holds_alternative<CustomBarIndex>(location)) {
-      auto value = engine.luaFrom<CustomBarIndex>(std::get<CustomBarIndex>(location) + 1);
+      auto value = engine.lua_from<CustomBarIndex>(std::get<CustomBarIndex>(location) + 1);
     if (!value) return std::unexpected(std::move(value.error()));
     return std::optional<LuaValue>(std::move(*value));
     }
@@ -599,7 +599,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
       auto name = EssentialItemNames->get_right(std::get<EssentialItem>(location));
       if (!name)
         return std::unexpected(std::move(name.error()));
-      auto value = engine.luaFrom<String>(name->get());
+      auto value = engine.lua_from<String>(name->get());
       if (!value)
         return std::unexpected(std::move(value.error()));
       return std::optional<LuaValue>(std::move(*value));
@@ -608,7 +608,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("setSelectedActionBarSlot", [&player](std::variant<std::monostate, int, String> const& slot) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setSelectedActionBarSlot", [&player](std::variant<std::monostate, int, String> const& slot) -> std::expected<void, StarException> {
     auto inventory = player.inventory();
     if (std::holds_alternative<std::monostate>(slot)) {
       inventory->selectActionBarLocation({});
@@ -626,7 +626,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("actionBarSlotLink", [&player](int slot, String const& handName) -> std::expected<std::optional<InventorySlot>, StarException> {
+  if (auto registered = callbacks.register_callback("actionBarSlotLink", [&player](int slot, String const& handName) -> std::expected<std::optional<InventorySlot>, StarException> {
     auto inventory = player.inventory();
     CustomBarIndex wrapped = (slot - 1) % static_cast<unsigned>(inventory->customBarIndexes());
     if (handName == "primary") return inventory->customBarPrimarySlot(wrapped);
@@ -635,7 +635,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("setActionBarSlotLink", [&player](int slot, String const& handName, std::optional<InventorySlot> inventorySlot) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setActionBarSlotLink", [&player](int slot, String const& handName, std::optional<InventorySlot> inventorySlot) -> std::expected<void, StarException> {
     auto inventory = player.inventory();
     CustomBarIndex wrapped = (slot - 1) % static_cast<unsigned>(inventory->customBarIndexes());
     if (inventorySlot && !inventory->slotValid(*inventorySlot)) inventorySlot.reset();
@@ -653,7 +653,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     unsigned group = 0;
     std::uint64_t revision = 0;
   };
-  if (auto registered = callbacks.registerCallback("actionBarView",
+  if (auto registered = callbacks.register_callback("actionBarView",
       [&player, cache = ActionBarViewCache{}](LuaEngine& engine, std::optional<std::uint64_t> knownRevision) mutable -> std::expected<std::optional<LuaTable>, StarException> {
     auto inventory = player.inventory();
     auto indexes = inventory->customBarIndexes();
@@ -690,7 +690,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     static std::atomic<std::uint64_t> nextRevision{0};
     if (changed || !cache.revision) cache.revision = nextRevision.fetch_add(1, std::memory_order_relaxed) + 1;
     if (knownRevision && *knownRevision == cache.revision) return {};
-    auto view = engine.createTable(0, 7);
+    auto view = engine.create_table(0, 7);
     if (!view) return std::unexpected(std::move(view.error()));
     auto put = [&](std::string_view name, auto value) { return view->set(name, std::move(value)); };
     if (auto r = put("revision", cache.revision); !r) return std::unexpected(std::move(r.error()));
@@ -705,13 +705,13 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
       if (!name) return std::unexpected(std::move(name.error()));
       if (auto r = put("selected", name->get()); !r) return std::unexpected(std::move(r.error()));
     }
-    auto items = engine.createTable(static_cast<int>(size), 0);
+    auto items = engine.create_table(static_cast<int>(size), 0);
     if (!items) return std::unexpected(std::move(items.error()));
     for (std::size_t i = 0; i < size; ++i) {
-      auto entry = engine.createTable(0, 4);
+      auto entry = engine.create_table(0, 4);
       if (!entry) return std::unexpected(std::move(entry.error()));
       if (auto const& item = cache.items[i]) {
-        auto handle = engine.createUserData(item);
+        auto handle = engine.create_userdata(item);
         if (!handle) return std::unexpected(std::move(handle.error()));
         if (auto r = entry->set("handle", std::move(*handle)); !r) return std::unexpected(std::move(r.error()));
         std::size_t identity = 0;
@@ -727,21 +727,21 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("linkActionBarSwap", [&player](unsigned slot, bool primary) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("linkActionBarSwap", [&player](unsigned slot, bool primary) -> std::expected<void, StarException> {
     if (!slot || slot > player.inventory()->customBarIndexes())
       return std::unexpected(StarException("Action bar slot out of range"));
     return player.inventory()->linkCustomBarSwap(static_cast<CustomBarIndex>(slot - 1), primary);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("clearActionBarLink", [&player](unsigned slot, bool primary) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("clearActionBarLink", [&player](unsigned slot, bool primary) -> std::expected<void, StarException> {
     if (!slot || slot > player.inventory()->customBarIndexes())
       return std::unexpected(StarException("Action bar slot out of range"));
     return player.inventory()->clearCustomBarLink(static_cast<CustomBarIndex>(slot - 1), primary);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("itemBagSize", [&player](String const& bagName) -> std::expected<std::optional<unsigned>, StarException> {
+  if (auto registered = callbacks.register_callback("itemBagSize", [&player](String const& bagName) -> std::expected<std::optional<unsigned>, StarException> {
     if (auto bag = player.inventory()->bagContents(bagName))
       return static_cast<unsigned>(bag->size());
     else
@@ -749,7 +749,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("itemAllowedInBag", [&root, &player](String const& bagName, Json const& item) -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("itemAllowedInBag", [&root, &player](String const& bagName, Json const& item) -> std::expected<bool, StarException> {
     auto inventory = player.inventory();
     if (!inventory->bagContents(bagName)) return false;
     auto database = root.itemDatabase();
@@ -762,7 +762,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("item", [&player](InventorySlot const& slot) -> std::expected<std::optional<Json>, StarException> {
+  if (auto registered = callbacks.register_callback("item", [&player](InventorySlot const& slot) -> std::expected<std::optional<Json>, StarException> {
     if (!player.inventory()->slotValid(slot)) return {};
     auto item = player.inventory()->itemsAt(slot);
     if (!item) return std::unexpected(std::move(item.error()));
@@ -771,7 +771,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("setItem", [&root, &player](InventorySlot const& slot, Json const& item) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setItem", [&root, &player](InventorySlot const& slot, Json const& item) -> std::expected<void, StarException> {
     if (!player.inventory()->slotValid(slot)) return {};
     auto database = root.itemDatabase();
     if (!database) return std::unexpected(std::move(database.error()));
@@ -785,7 +785,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback(
+  if (auto registered = callbacks.register_callback(
         "setDamageTeam",
         [&player](String const& typeName,
                   std::optional<std::uint16_t> teamNumber) -> std::expected<void, StarException> {
@@ -798,12 +798,12 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
       !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("say", [&player](String const& message) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("say", [&player](String const& message) -> std::expected<void, StarException> {
     return player.addChatMessage(message);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("emote", [&player](String const& emote, std::optional<float> cooldown) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("emote", [&player](String const& emote, std::optional<float> cooldown) -> std::expected<void, StarException> {
     if (!HumanoidEmoteNames) return std::unexpected(HumanoidEmoteNames.error());
     auto value = HumanoidEmoteNames->get_left(emote);
     if (!value) return std::unexpected(std::move(value.error()));
@@ -812,21 +812,21 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("currentEmote", [&player]() -> std::expected<decltype(luaTupleReturn(String(), float())), StarException> {
+  if (auto registered = callbacks.register_callback("currentEmote", [&player]() -> std::expected<decltype(lua_tuple_return(String(), float())), StarException> {
     auto emote = player.currentEmote();
     if (!HumanoidEmoteNames) return std::unexpected(HumanoidEmoteNames.error());
     auto name = HumanoidEmoteNames->get_right(emote.first);
     if (!name) return std::unexpected(std::move(name.error()));
-    return luaTupleReturn(name->get(), emote.second);
+    return lua_tuple_return(name->get(), emote.second);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("dance", [&player](std::optional<String> const& dance) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("dance", [&player](std::optional<String> const& dance) -> std::expected<void, StarException> {
     return player.setDance(dance);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("currentState", [&player]() -> std::expected<String, StarException> {
+  if (auto registered = callbacks.register_callback("currentState", [&player]() -> std::expected<String, StarException> {
     if (!Player::StateNames) return std::unexpected(Player::StateNames.error());
     auto value = Player::StateNames->get_right(player.currentState());
     if (!value) return std::unexpected(std::move(value.error()));
@@ -834,48 +834,48 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("aimPosition", [&player]() -> std::expected<Vec2F, StarException> {
+  if (auto registered = callbacks.register_callback("aimPosition", [&player]() -> std::expected<Vec2F, StarException> {
     return player.aimPosition();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("id",       [&player]() -> std::expected<EntityId, StarException> {
+  if (auto registered = callbacks.register_callback("id",       [&player]() -> std::expected<EntityId, StarException> {
     return player.entityId();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("uniqueId", [&player]() -> std::expected<std::optional<String>, StarException> {
+  if (auto registered = callbacks.register_callback("uniqueId", [&player]() -> std::expected<std::optional<String>, StarException> {
     return player.uniqueId();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("isAdmin",  [&player]() -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("isAdmin",  [&player]() -> std::expected<bool, StarException> {
     return player.isAdmin();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("interact", [&player](String const& type, Json const& configData, std::optional<EntityId> const& sourceEntityId) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("interact", [&player](String const& type, Json const& configData, std::optional<EntityId> const& sourceEntityId) -> std::expected<void, StarException> {
     auto action = InteractAction::create(type, sourceEntityId.value_or(NullEntityId), configData);
     if (!action) return std::unexpected(std::move(action.error()));
     return player.interact(*action);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("shipUpgrades", [&player]() -> std::expected<Json, StarException> {
+  if (auto registered = callbacks.register_callback("shipUpgrades", [&player]() -> std::expected<Json, StarException> {
     return player.shipUpgrades().toJson();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("upgradeShip", [&player](Json const& upgrades) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("upgradeShip", [&player](Json const& upgrades) -> std::expected<void, StarException> {
     return player.applyShipUpgrades(upgrades);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("setUniverseFlag", [&player](String const& flagName) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setUniverseFlag", [&player](String const& flagName) -> std::expected<void, StarException> {
     auto invoked = player.clientContext()->rpcInterface()->invoke_remote("universe.setFlag", flagName);
     if (!invoked) return std::unexpected(std::move(invoked.error()));
     return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("giveBlueprint", [&player](Json const& item) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("giveBlueprint", [&player](Json const& item) -> std::expected<void, StarException> {
     auto descriptor = ItemDescriptor::create(item);
     if (!descriptor) return std::unexpected(std::move(descriptor.error()));
     auto given = player.addBlueprint(*descriptor);
@@ -884,14 +884,14 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("blueprintKnown", [&player](Json const& item) -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("blueprintKnown", [&player](Json const& item) -> std::expected<bool, StarException> {
     auto descriptor = ItemDescriptor::create(item);
     if (!descriptor) return std::unexpected(std::move(descriptor.error()));
     return player.blueprintKnown(*descriptor);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("availableRecipes", [&root, &player](std::optional<StringSet> const& filter) -> std::expected<JsonArray, StarException> {
+  if (auto registered = callbacks.register_callback("availableRecipes", [&root, &player](std::optional<StringSet> const& filter) -> std::expected<JsonArray, StarException> {
     auto database = root.itemDatabase();
     if (!database) return std::unexpected(std::move(database.error()));
     auto inventory = player.inventory();
@@ -909,38 +909,38 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("makeTechAvailable", [&player](String const& tech) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("makeTechAvailable", [&player](String const& tech) -> std::expected<void, StarException> {
     player.techs()->makeAvailable(tech);
     return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("makeTechUnavailable", [&player](String const& tech) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("makeTechUnavailable", [&player](String const& tech) -> std::expected<void, StarException> {
     player.techs()->makeUnavailable(tech);
     return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("enableTech", [&player](String const& tech) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("enableTech", [&player](String const& tech) -> std::expected<void, StarException> {
     return player.techs()->enable(tech);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("equipTech", [&player](String const& tech) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("equipTech", [&player](String const& tech) -> std::expected<void, StarException> {
     return player.techs()->equip(tech);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("unequipTech", [&player](String const& tech) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("unequipTech", [&player](String const& tech) -> std::expected<void, StarException> {
     player.techs()->unequip(tech);
     return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("availableTechs", [&player]() -> std::expected<StringSet, StarException> {
+  if (auto registered = callbacks.register_callback("availableTechs", [&player]() -> std::expected<StringSet, StarException> {
     return player.techs()->availableTechs();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("enabledTechs", [&player]() -> std::expected<StringSet, StarException> {
+  if (auto registered = callbacks.register_callback("enabledTechs", [&player]() -> std::expected<StringSet, StarException> {
     return player.techs()->enabledTechs();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("equippedTech", [&player](String typeName) -> std::expected<std::optional<String>, StarException> {
+  if (auto registered = callbacks.register_callback("equippedTech", [&player](String typeName) -> std::expected<std::optional<String>, StarException> {
     if (!TechTypeNames) return std::unexpected(TechTypeNames.error());
     auto techType = TechTypeNames->get_left(typeName);
     if (!techType) return std::unexpected(std::move(techType.error()));
@@ -948,32 +948,32 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("currency", [&player](String const& currencyType) -> std::expected<std::uint64_t, StarException> {
+  if (auto registered = callbacks.register_callback("currency", [&player](String const& currencyType) -> std::expected<std::uint64_t, StarException> {
     return player.currency(currencyType);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("addCurrency", [&player](String const& currencyType, std::uint64_t amount) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("addCurrency", [&player](String const& currencyType, std::uint64_t amount) -> std::expected<void, StarException> {
     return player.inventory()->addCurrency(currencyType, amount);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("consumeCurrency", [&player](String const& currencyType, std::uint64_t amount) -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("consumeCurrency", [&player](String const& currencyType, std::uint64_t amount) -> std::expected<bool, StarException> {
     return player.inventory()->consumeCurrency(currencyType, amount);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("cleanupItems", [&player]() -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("cleanupItems", [&player]() -> std::expected<void, StarException> {
     return player.inventory()->cleanup();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("giveItem", [&player](Json const& item) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("giveItem", [&player](Json const& item) -> std::expected<void, StarException> {
     auto descriptor = ItemDescriptor::create(item);
     if (!descriptor) return std::unexpected(std::move(descriptor.error()));
     return player.giveItem(*descriptor);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("giveEssentialItem", [&root, &player](String const& slotName, Json const& item) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("giveEssentialItem", [&root, &player](String const& slotName, Json const& item) -> std::expected<void, StarException> {
     if (!EssentialItemNames) return std::unexpected(EssentialItemNames.error());
     auto slot = EssentialItemNames->get_left(slotName);
     if (!slot) return std::unexpected(std::move(slot.error()));
@@ -988,7 +988,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("essentialItem", [&player](String const& slotName) -> std::expected<Json, StarException> {
+  if (auto registered = callbacks.register_callback("essentialItem", [&player](String const& slotName) -> std::expected<Json, StarException> {
     if (!EssentialItemNames) return std::unexpected(EssentialItemNames.error());
     auto slot = EssentialItemNames->get_left(slotName);
     if (!slot) return std::unexpected(std::move(slot.error()));
@@ -996,7 +996,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("removeEssentialItem", [&player](String const& slotName) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("removeEssentialItem", [&player](String const& slotName) -> std::expected<void, StarException> {
     if (!EssentialItemNames) return std::unexpected(EssentialItemNames.error());
     auto slot = EssentialItemNames->get_left(slotName);
     if (!slot) return std::unexpected(std::move(slot.error()));
@@ -1005,7 +1005,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("setEquippedItem", [&root, &player](String const& slotName, Json const& item) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setEquippedItem", [&root, &player](String const& slotName, Json const& item) -> std::expected<void, StarException> {
     if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
     auto slot = EquipmentSlotNames->get_left(slotName);
     if (!slot) return std::unexpected(std::move(slot.error()));
@@ -1021,7 +1021,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("equippedItem", [&player](String const& slotName) -> std::expected<Json, StarException> {
+  if (auto registered = callbacks.register_callback("equippedItem", [&player](String const& slotName) -> std::expected<Json, StarException> {
     if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
     auto slot = EquipmentSlotNames->get_left(slotName);
     if (!slot) return std::unexpected(std::move(slot.error()));
@@ -1032,7 +1032,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("armorVisible", [&player](String const& slotName) -> std::expected<std::optional<bool>, StarException> {
+  if (auto registered = callbacks.register_callback("armorVisible", [&player](String const& slotName) -> std::expected<std::optional<bool>, StarException> {
     if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
     auto slot = EquipmentSlotNames->find_left_ref(slotName);
     if (!slot) return std::unexpected(std::move(slot.error()));
@@ -1042,7 +1042,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("setArmorVisible", [&player](String const& slotName, bool visible) -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("setArmorVisible", [&player](String const& slotName, bool visible) -> std::expected<bool, StarException> {
     if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
     auto slot = EquipmentSlotNames->find_left_ref(slotName);
     if (!slot) return std::unexpected(std::move(slot.error()));
@@ -1054,21 +1054,21 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("hasItem", [&player](Json const& item, std::optional<bool> exactMatch) -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("hasItem", [&player](Json const& item, std::optional<bool> exactMatch) -> std::expected<bool, StarException> {
     auto descriptor = ItemDescriptor::create(item);
     if (!descriptor) return std::unexpected(std::move(descriptor.error()));
     return player.hasItem(*descriptor, exactMatch.value_or(false));
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("hasCountOfItem", [&player](Json const& item, std::optional<bool> exactMatch) -> std::expected<std::uint64_t, StarException> {
+  if (auto registered = callbacks.register_callback("hasCountOfItem", [&player](Json const& item, std::optional<bool> exactMatch) -> std::expected<std::uint64_t, StarException> {
     auto descriptor = ItemDescriptor::create(item);
     if (!descriptor) return std::unexpected(std::move(descriptor.error()));
     return player.hasCountOfItem(*descriptor, exactMatch.value_or(false));
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("consumeItem", [&player](Json const& item, std::optional<bool> consumePartial, std::optional<bool> exactMatch) -> std::expected<Json, StarException> {
+  if (auto registered = callbacks.register_callback("consumeItem", [&player](Json const& item, std::optional<bool> consumePartial, std::optional<bool> exactMatch) -> std::expected<Json, StarException> {
     auto descriptor = ItemDescriptor::create(item);
     if (!descriptor) return std::unexpected(std::move(descriptor.error()));
     auto taken = player.takeItem(*descriptor, consumePartial.value_or(false), exactMatch.value_or(false));
@@ -1077,7 +1077,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("inventoryTags", [&player]() -> std::expected<StringMap<std::size_t>, StarException> {
+  if (auto registered = callbacks.register_callback("inventoryTags", [&player]() -> std::expected<StringMap<std::size_t>, StarException> {
     auto items = player.inventory()->allItems();
     if (!items) return std::unexpected(std::move(items.error()));
     StringMap<std::size_t> counts;
@@ -1090,7 +1090,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("itemsWithTag", [&player](String const& tag) -> std::expected<JsonArray, StarException> {
+  if (auto registered = callbacks.register_callback("itemsWithTag", [&player](String const& tag) -> std::expected<JsonArray, StarException> {
     auto inventory = player.inventory()->allItems();
     if (!inventory) return std::unexpected(std::move(inventory.error()));
     JsonArray items;
@@ -1106,7 +1106,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("consumeTaggedItem", [&player](String const& itemTag, std::uint64_t count) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("consumeTaggedItem", [&player](String const& itemTag, std::uint64_t count) -> std::expected<void, StarException> {
     auto items = player.inventory()->allItems();
     if (!items) return std::unexpected(std::move(items.error()));
     for (auto const& item : *items) {
@@ -1124,7 +1124,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("hasItemWithParameter", [&player](String const& parameterName, Json const& parameterValue) -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("hasItemWithParameter", [&player](String const& parameterName, Json const& parameterValue) -> std::expected<bool, StarException> {
     auto items = player.inventory()->allItems();
     if (!items) return std::unexpected(std::move(items.error()));
     for (auto const& item : *items) {
@@ -1136,7 +1136,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("consumeItemWithParameter", [&player](String const& parameterName, Json const& parameterValue, std::uint64_t count) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("consumeItemWithParameter", [&player](String const& parameterName, Json const& parameterValue, std::uint64_t count) -> std::expected<void, StarException> {
     auto items = player.inventory()->allItems();
     if (!items) return std::unexpected(std::move(items.error()));
     for (auto const& item : *items) {
@@ -1154,7 +1154,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("getItemWithParameter", [&player](String const& parameterName, Json const& parameterValue) -> std::expected<Json, StarException> {
+  if (auto registered = callbacks.register_callback("getItemWithParameter", [&player](String const& parameterName, Json const& parameterValue) -> std::expected<Json, StarException> {
     auto items = player.inventory()->allItems();
     if (!items) return std::unexpected(std::move(items.error()));
     for (auto const& item : *items) {
@@ -1166,42 +1166,42 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("primaryHandItem", [&player]() -> std::expected<std::optional<Json>, StarException> {
+  if (auto registered = callbacks.register_callback("primaryHandItem", [&player]() -> std::expected<std::optional<Json>, StarException> {
     if (!player.primaryHandItem())
         return {};
       return player.primaryHandItem()->descriptor().toJson();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("altHandItem", [&player]() -> std::expected<std::optional<Json>, StarException> {
+  if (auto registered = callbacks.register_callback("altHandItem", [&player]() -> std::expected<std::optional<Json>, StarException> {
     if (!player.altHandItem())
         return {};
       return player.altHandItem()->descriptor().toJson();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("primaryHandItemTags", [&player]() -> std::expected<StringSet, StarException> {
+  if (auto registered = callbacks.register_callback("primaryHandItemTags", [&player]() -> std::expected<StringSet, StarException> {
     if (!player.primaryHandItem())
         return {};
       return player.primaryHandItem()->itemTags();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("altHandItemTags", [&player]() -> std::expected<StringSet, StarException> {
+  if (auto registered = callbacks.register_callback("altHandItemTags", [&player]() -> std::expected<StringSet, StarException> {
     if (!player.altHandItem())
         return {};
       return player.altHandItem()->itemTags();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("swapSlotItem", [&player]() -> std::expected<std::optional<Json>, StarException> {
+  if (auto registered = callbacks.register_callback("swapSlotItem", [&player]() -> std::expected<std::optional<Json>, StarException> {
     if (!player.inventory()->swapSlotItem())
         return {};
       return player.inventory()->swapSlotItem()->descriptor().toJson();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("setSwapSlotItem", [&root, &player](Json const& item) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setSwapSlotItem", [&root, &player](Json const& item) -> std::expected<void, StarException> {
     auto database = root.itemDatabase();
     if (!database) return std::unexpected(std::move(database.error()));
     auto descriptor = ItemDescriptor::create(item);
@@ -1212,7 +1212,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("canStartQuest",
+  if (auto registered = callbacks.register_callback("canStartQuest",
       [&root, &player](Json const& quest) -> std::expected<bool, StarException> {
     auto arc = QuestArcDescriptor::fromJson(root, quest);
     if (!arc) return std::unexpected(std::move(arc.error()));
@@ -1220,7 +1220,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("startQuest", [&root, &player](Json const& quest, std::optional<String> const& serverUuid, std::optional<String> const& worldId) -> std::expected<String, StarException> {
+  if (auto registered = callbacks.register_callback("startQuest", [&root, &player](Json const& quest, std::optional<String> const& serverUuid, std::optional<String> const& worldId) -> std::expected<String, StarException> {
     auto arc = QuestArcDescriptor::fromJson(root, quest);
     if (!arc) return std::unexpected(std::move(arc.error()));
     auto created = Quest::create(root, *arc, 0, player);
@@ -1242,17 +1242,17 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("questIds", [&player]() -> std::expected<StringList, StarException> {
+  if (auto registered = callbacks.register_callback("questIds", [&player]() -> std::expected<StringList, StarException> {
     return player.questManager()->quests().keys();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("serverQuestIds", [&player]() -> std::expected<StringList, StarException> {
+  if (auto registered = callbacks.register_callback("serverQuestIds", [&player]() -> std::expected<StringList, StarException> {
     return player.questManager()->serverQuests().keys();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("quest", [&player](String const& questId) -> std::expected<Json, StarException> {
+  if (auto registered = callbacks.register_callback("quest", [&player](String const& questId) -> std::expected<Json, StarException> {
     if (!player.questManager()->hasQuest(questId)) return {};
     auto quest = player.questManager()->getQuest(questId);
     if (!quest) return std::unexpected(std::move(quest.error()));
@@ -1260,7 +1260,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("questPortrait", [&player](String const& questId, String const& portraitName) -> std::expected<std::optional<List<Drawable>>, StarException> {
+  if (auto registered = callbacks.register_callback("questPortrait", [&player](String const& questId, String const& portraitName) -> std::expected<std::optional<List<Drawable>>, StarException> {
     if (!player.questManager()->hasQuest(questId)) return {};
     auto quest = player.questManager()->getQuest(questId);
     if (!quest) return std::unexpected(std::move(quest.error()));
@@ -1269,7 +1269,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
 
-  if (auto registered = callbacks.registerCallback("questState", [&player](String const& questId) -> std::expected<std::optional<String>, StarException> {
+  if (auto registered = callbacks.register_callback("questState", [&player](String const& questId) -> std::expected<std::optional<String>, StarException> {
     if (!player.questManager()->hasQuest(questId)) return {};
     auto quest = player.questManager()->getQuest(questId);
     if (!quest) return std::unexpected(std::move(quest.error()));
@@ -1280,14 +1280,14 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("questObjectives", [&player](String const& questId) -> std::expected<std::optional<JsonArray>, StarException> {
+  if (auto registered = callbacks.register_callback("questObjectives", [&player](String const& questId) -> std::expected<std::optional<JsonArray>, StarException> {
     auto quest = player.questManager()->getQuest(questId);
     if (!quest) return std::unexpected(std::move(quest.error()));
     return (*quest)->objectiveList();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("callQuest", [&player](String const& questId, String const& func, LuaVariadic<LuaValue> const& args) -> std::expected<std::optional<LuaValue>, StarException> {
+  if (auto registered = callbacks.register_callback("callQuest", [&player](String const& questId, String const& func, LuaVariadic<LuaValue> const& args) -> std::expected<std::optional<LuaValue>, StarException> {
     if (!player.questManager()->hasQuest(questId)) return {};
     auto quest = player.questManager()->getQuest(questId);
     if (!quest) return std::unexpected(std::move(quest.error()));
@@ -1295,32 +1295,32 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("hasQuest", [&player](String const& questId) -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("hasQuest", [&player](String const& questId) -> std::expected<bool, StarException> {
     return player.questManager()->hasQuest(questId);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("hasAcceptedQuest", [&player](String const& questId) -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("hasAcceptedQuest", [&player](String const& questId) -> std::expected<bool, StarException> {
     return player.questManager()->hasAcceptedQuest(questId);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("hasActiveQuest", [&player](String const& questId) -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("hasActiveQuest", [&player](String const& questId) -> std::expected<bool, StarException> {
     return player.questManager()->isActive(questId);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("hasCompletedQuest", [&player](String const& questId) -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("hasCompletedQuest", [&player](String const& questId) -> std::expected<bool, StarException> {
     return player.questManager()->hasCompleted(questId);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("trackedQuestId", [&player]() -> std::expected<std::optional<String>, StarException> {
+  if (auto registered = callbacks.register_callback("trackedQuestId", [&player]() -> std::expected<std::optional<String>, StarException> {
     return player.questManager()->trackedQuestId();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("setTrackedQuest", [&player](String const& questId) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setTrackedQuest", [&player](String const& questId) -> std::expected<void, StarException> {
     if (!player.questManager()->isCurrent(questId))
       player.questManager()->setAsTracked(questId);
     else
@@ -1329,17 +1329,17 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("canTurnInQuest", [&player](String const& questId) -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("canTurnInQuest", [&player](String const& questId) -> std::expected<bool, StarException> {
     return player.questManager()->canTurnIn(questId);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("currentQuestId", [&player]() -> std::expected<std::optional<String>, StarException> {
+  if (auto registered = callbacks.register_callback("currentQuestId", [&player]() -> std::expected<std::optional<String>, StarException> {
     return player.questManager()->currentQuestId();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("currentQuest", [&player]() -> std::expected<Json, StarException> {
+  if (auto registered = callbacks.register_callback("currentQuest", [&player]() -> std::expected<Json, StarException> {
     auto maybeQuest = player.questManager()->currentQuest();
     if (maybeQuest) {
       return (*maybeQuest)->diskStore();
@@ -1348,7 +1348,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("currentQuestView", [&player]() -> Json {
+  if (auto registered = callbacks.register_callback("currentQuestView", [&player]() -> Json {
     auto current = player.questManager()->currentQuest();
     if (!current)
       return {};
@@ -1366,28 +1366,28 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("pendingQuestDialog", [&player](String const& kind) {
+  if (auto registered = callbacks.register_callback("pendingQuestDialog", [&player](String const& kind) {
     return player.questManager()->pendingDialog(kind);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("questDialogValid", [&player](std::uint64_t token) {
+  if (auto registered = callbacks.register_callback("questDialogValid", [&player](std::uint64_t token) {
     return player.questManager()->dialogValid(token);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("acknowledgeQuestDialog", [&player](std::uint64_t token) {
+  if (auto registered = callbacks.register_callback("acknowledgeQuestDialog", [&player](std::uint64_t token) {
     return player.questManager()->acknowledgeDialog(token);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("questDialogCinema", [&player](std::uint64_t token) {
+  if (auto registered = callbacks.register_callback("questDialogCinema", [&player](std::uint64_t token) {
     return player.questManager()->dialogCinema(token);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("finishQuestDialog", [&player](std::uint64_t token, String const& decision) {
+  if (auto registered = callbacks.register_callback("finishQuestDialog", [&player](std::uint64_t token, String const& decision) {
     return player.questManager()->finishDialog(token, decision);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("questLogEntries", [&player](bool completed) -> Json {
+  if (auto registered = callbacks.register_callback("questLogEntries", [&player](bool completed) -> Json {
     auto manager = player.questManager();
     auto quests = completed ? manager->listCompletedQuests() : manager->listActiveQuests();
     auto playerWorld = player.clientContext() ? player.clientContext()->playerWorldId() : WorldId{};
@@ -1407,7 +1407,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("questLogDetails", [&player](String const& id,
+  if (auto registered = callbacks.register_callback("questLogDetails", [&player](String const& id,
       std::optional<std::uint64_t> knownRevision, std::optional<std::uint64_t> knownPortraitRevision,
       std::optional<std::uint64_t> knownRewardsRevision) -> std::expected<Json, StarException> {
     auto manager = player.questManager();
@@ -1448,12 +1448,12 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("markQuestRead", [&player](String const& id) {
+  if (auto registered = callbacks.register_callback("markQuestRead", [&player](String const& id) {
     player.questManager()->markAsRead(id);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("abandonQuest", [&player](String const& id) -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("abandonQuest", [&player](String const& id) -> std::expected<bool, StarException> {
     auto manager = player.questManager();
     if (!manager->isActive(id)) return false;
     auto quest = manager->getQuest(id);
@@ -1467,7 +1467,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("currentQuestWorld", [&player]() -> std::expected<std::optional<String>, StarException> {
+  if (auto registered = callbacks.register_callback("currentQuestWorld", [&player]() -> std::expected<std::optional<String>, StarException> {
     if (auto quest = player.questManager()->currentQuest()) {
       if (auto worldId = (*quest)->worldId()) {
         auto id = Star::print_world_id(*worldId);
@@ -1479,7 +1479,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("questWorlds", [&player]() -> std::expected<List<std::pair<String, bool>>, StarException> {
+  if (auto registered = callbacks.register_callback("questWorlds", [&player]() -> std::expected<List<std::pair<String, bool>>, StarException> {
     List<std::pair<String, bool>> result;
     auto current = player.questManager()->currentQuest();
     for (auto const& quest : player.questManager()->listActiveQuests()) {
@@ -1494,7 +1494,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("currentQuestLocation", [&player]() -> std::expected<Json, StarException> {
+  if (auto registered = callbacks.register_callback("currentQuestLocation", [&player]() -> std::expected<Json, StarException> {
     if (auto quest = player.questManager()->currentQuest()) {
       if (auto location = (*quest)->location()) {
         return JsonObject{{"system", json_from_vec3i(location->first)}, {"location", jsonFromSystemLocation(location->second)}};
@@ -1504,7 +1504,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("questLocations", [&player]() -> std::expected<List<std::pair<Json, bool>>, StarException> {
+  if (auto registered = callbacks.register_callback("questLocations", [&player]() -> std::expected<List<std::pair<Json, bool>>, StarException> {
     List<std::pair<Json, bool>> result;
     auto current = player.questManager()->currentQuest();
     for (auto const& quest : player.questManager()->listActiveQuests()) {
@@ -1518,7 +1518,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("enableMission", [&player](String const& mission) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("enableMission", [&player](String const& mission) -> std::expected<void, StarException> {
     AiState& aiState = player.aiState();
       if (!aiState.completedMissions.contains(mission))
         aiState.availableMissions.add(mission);
@@ -1526,7 +1526,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("completeMission", [&player](String const& mission) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("completeMission", [&player](String const& mission) -> std::expected<void, StarException> {
     AiState& aiState = player.aiState();
       aiState.availableMissions.remove(mission);
       aiState.completedMissions.add(mission);
@@ -1534,20 +1534,20 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("hasCompletedMission", [&player](String const& mission) -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("hasCompletedMission", [&player](String const& mission) -> std::expected<bool, StarException> {
     return player.aiState().completedMissions.contains(mission);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("radioMessage", [&player](Json const& messageConfig, std::optional<float> const& delay) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("radioMessage", [&player](Json const& messageConfig, std::optional<float> const& delay) -> std::expected<void, StarException> {
     return player.queueRadioMessage(messageConfig, delay.value_or(0));
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("interruptRadioMessage", [&player]() {
+  if (auto registered = callbacks.register_callback("interruptRadioMessage", [&player]() {
     return player.interruptRadioMessage();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("pullPendingRadioMessage", [&player]() -> std::expected<std::optional<Json>, StarException> {
+  if (auto registered = callbacks.register_callback("pullPendingRadioMessage", [&player]() -> std::expected<std::optional<Json>, StarException> {
     auto pending = player.pullPendingRadioMessage();
     if (!pending) return std::unexpected(std::move(pending.error()));
     if (!*pending) return std::optional<Json>{};
@@ -1561,93 +1561,93 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("worldId", [&player]() -> std::expected<String, StarException> {
+  if (auto registered = callbacks.register_callback("worldId", [&player]() -> std::expected<String, StarException> {
     return Star::print_world_id(player.clientContext()->playerWorldId());
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("serverUuid", [&player]() -> std::expected<String, StarException> {
+  if (auto registered = callbacks.register_callback("serverUuid", [&player]() -> std::expected<String, StarException> {
     return player.clientContext()->serverUuid().hex();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("ownShipWorldId", [&player]() -> std::expected<String, StarException> {
+  if (auto registered = callbacks.register_callback("ownShipWorldId", [&player]() -> std::expected<String, StarException> {
     auto uuid = player.uuid();
     if (!uuid) return std::unexpected(std::move(uuid.error()));
     return Star::print_world_id(ClientShipWorldId(*uuid));
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("lounge", [&player](EntityId entityId, std::optional<std::size_t> anchorIndex) -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("lounge", [&player](EntityId entityId, std::optional<std::size_t> anchorIndex) -> std::expected<bool, StarException> {
     return player.lounge(entityId, anchorIndex.value_or(0));
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback(
+  if (auto registered = callbacks.register_callback(
         "isLounging",
         [&player]() -> std::expected<bool, StarException> { return static_cast<bool>(player.loungingIn()); });
       !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("loungingIn", [&player]() -> std::expected<std::optional<EntityId>, StarException> {
+  if (auto registered = callbacks.register_callback("loungingIn", [&player]() -> std::expected<std::optional<EntityId>, StarException> {
     if (auto anchorState = player.loungingIn())
         return anchorState->entityId;
       return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("stopLounging", [&player]() -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("stopLounging", [&player]() -> std::expected<void, StarException> {
     return player.stopLounging();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("playTime", [&player]() -> std::expected<double, StarException> {
+  if (auto registered = callbacks.register_callback("playTime", [&player]() -> std::expected<double, StarException> {
     return player.log()->playTime();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("introComplete", [&player]() -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("introComplete", [&player]() -> std::expected<bool, StarException> {
     return player.log()->introComplete();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setIntroComplete", [&player](bool complete) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setIntroComplete", [&player](bool complete) -> std::expected<void, StarException> {
     player.log()->setIntroComplete(complete);
     return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("warp", [&player](String action, std::optional<String> animation, std::optional<bool> deploy) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("warp", [&player](String action, std::optional<String> animation, std::optional<bool> deploy) -> std::expected<void, StarException> {
     player.setPendingWarp(action, animation, deploy.value_or(false));
     return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("canDeploy", [&player]() -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("canDeploy", [&player]() -> std::expected<bool, StarException> {
     return player.canDeploy();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("isDeployed", [&player]() -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("isDeployed", [&player]() -> std::expected<bool, StarException> {
     return player.isDeployed();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("confirm", [&player](Json dialogConfig) -> std::expected<RpcPromise<Json>, StarException> {
+  if (auto registered = callbacks.register_callback("confirm", [&player](Json dialogConfig) -> std::expected<RpcPromise<Json>, StarException> {
     auto pair = RpcPromise<Json>::make_pair();
       player.queueConfirmation(dialogConfig, pair.second);
       return pair.first;
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("playCinematic", [&player](Json const& cinematic, std::optional<bool> unique) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("playCinematic", [&player](Json const& cinematic, std::optional<bool> unique) -> std::expected<void, StarException> {
     return player.setPendingCinematic(cinematic, unique.value_or(false));
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("recordEvent", [&player](String const& eventName, Json const& fields) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("recordEvent", [&player](String const& eventName, Json const& fields) -> std::expected<void, StarException> {
     player.statistics()->recordEvent(eventName, fields);
     return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("worldHasOrbitBookmark", [&player](Json const& coords) -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("worldHasOrbitBookmark", [&player](Json const& coords) -> std::expected<bool, StarException> {
     auto coordinate = CelestialCoordinate::create(coords);
     if (!coordinate) return std::unexpected(std::move(coordinate.error()));
     auto bookmark = player.universeMap()->worldBookmark(*coordinate);
@@ -1656,7 +1656,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("orbitBookmarks", [&player]() -> std::expected<List<std::pair<Vec3I, Json>>, StarException> {
+  if (auto registered = callbacks.register_callback("orbitBookmarks", [&player]() -> std::expected<List<std::pair<Vec3I, Json>>, StarException> {
     auto bookmarks = player.universeMap()->orbitBookmarks();
     if (!bookmarks) return std::unexpected(std::move(bookmarks.error()));
     List<std::pair<Vec3I, Json>> result;
@@ -1669,7 +1669,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("systemBookmarks", [&player](Json const& coords) -> std::expected<List<Json>, StarException> {
+  if (auto registered = callbacks.register_callback("systemBookmarks", [&player](Json const& coords) -> std::expected<List<Json>, StarException> {
     auto coordinate = CelestialCoordinate::create(coords);
     if (!coordinate) return std::unexpected(std::move(coordinate.error()));
     auto bookmarks = player.universeMap()->systemBookmarks(*coordinate);
@@ -1684,7 +1684,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("addOrbitBookmark", [&player](Json const& system, Json const& bookmarkConfig) -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("addOrbitBookmark", [&player](Json const& system, Json const& bookmarkConfig) -> std::expected<bool, StarException> {
     auto coordinate = CelestialCoordinate::create(system);
     if (!coordinate) return std::unexpected(std::move(coordinate.error()));
     auto bookmark = OrbitBookmark::fromJson(bookmarkConfig);
@@ -1693,7 +1693,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("removeOrbitBookmark", [&player](Json const& system, Json const& bookmarkConfig) -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("removeOrbitBookmark", [&player](Json const& system, Json const& bookmarkConfig) -> std::expected<bool, StarException> {
     auto coordinate = CelestialCoordinate::create(system);
     if (!coordinate) return std::unexpected(std::move(coordinate.error()));
     auto bookmark = OrbitBookmark::fromJson(bookmarkConfig);
@@ -1702,7 +1702,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("teleportBookmarks", [&player]() -> std::expected<List<Json>, StarException> {
+  if (auto registered = callbacks.register_callback("teleportBookmarks", [&player]() -> std::expected<List<Json>, StarException> {
     auto bookmarks = player.universeMap()->teleportBookmarks();
     if (!bookmarks) return std::unexpected(std::move(bookmarks.error()));
     List<Json> result;
@@ -1715,28 +1715,28 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("addTeleportBookmark", [&player](Json const& bookmarkConfig) -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("addTeleportBookmark", [&player](Json const& bookmarkConfig) -> std::expected<bool, StarException> {
     auto bookmark = TeleportBookmark::fromJson(bookmarkConfig);
     if (!bookmark) return std::unexpected(std::move(bookmark.error()));
     return player.universeMap()->addTeleportBookmark(*bookmark);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("removeTeleportBookmark", [&player](Json const& bookmarkConfig) -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("removeTeleportBookmark", [&player](Json const& bookmarkConfig) -> std::expected<bool, StarException> {
     auto bookmark = TeleportBookmark::fromJson(bookmarkConfig);
     if (!bookmark) return std::unexpected(std::move(bookmark.error()));
     return player.universeMap()->removeTeleportBookmark(*bookmark);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("isMapped", [&player](Json const& coords) -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("isMapped", [&player](Json const& coords) -> std::expected<bool, StarException> {
     auto coordinate = CelestialCoordinate::create(coords);
     if (!coordinate) return std::unexpected(std::move(coordinate.error()));
     return player.universeMap()->isMapped(*coordinate);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("mappedObjects", [&player](Json const& coords) -> std::expected<Json, StarException> {
+  if (auto registered = callbacks.register_callback("mappedObjects", [&player](Json const& coords) -> std::expected<Json, StarException> {
     auto coordinate = CelestialCoordinate::create(coords);
     if (!coordinate) return std::unexpected(std::move(coordinate.error()));
     auto objects = player.universeMap()->mappedObjects(*coordinate);
@@ -1752,67 +1752,67 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("collectables", [&player](String const& collection) -> std::expected<StringSet, StarException> {
+  if (auto registered = callbacks.register_callback("collectables", [&player](String const& collection) -> std::expected<StringSet, StarException> {
     return player.log()->collectables(collection);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("getProperty", [&player](String const& name, std::optional<Json> const& defaultValue) -> std::expected<Json, StarException> {
+  if (auto registered = callbacks.register_callback("getProperty", [&player](String const& name, std::optional<Json> const& defaultValue) -> std::expected<Json, StarException> {
     return player.getGenericProperty(name, defaultValue.value_or(Json()));
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("setProperty", [&player](String const& name, Json const& value) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setProperty", [&player](String const& name, Json const& value) -> std::expected<void, StarException> {
     player.setGenericProperty(name, value);
     return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("addScannedObject", [&player](String const& objectName) -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("addScannedObject", [&player](String const& objectName) -> std::expected<bool, StarException> {
     return player.log()->addScannedObject(objectName);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("removeScannedObject", [&player](String const& objectName) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("removeScannedObject", [&player](String const& objectName) -> std::expected<void, StarException> {
     player.log()->removeScannedObject(objectName);
     return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
   // codex bindings
-  if (auto registered = callbacks.registerCallback("isCodexKnown", [&player](String const& codexId) -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("isCodexKnown", [&player](String const& codexId) -> std::expected<bool, StarException> {
     return player.codexes()->codexKnown(codexId);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("isCodexRead", [&player](String const& codexId) -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("isCodexRead", [&player](String const& codexId) -> std::expected<bool, StarException> {
     return player.codexes()->codexRead(codexId);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("markCodexRead", [&player](String const& codexId) -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("markCodexRead", [&player](String const& codexId) -> std::expected<bool, StarException> {
     return player.codexes()->markCodexRead(codexId);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("markCodexUnread", [&player](String const& codexId) -> std::expected<bool, StarException> {
+  if (auto registered = callbacks.register_callback("markCodexUnread", [&player](String const& codexId) -> std::expected<bool, StarException> {
     return player.codexes()->markCodexUnread(codexId);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("learnCodex", [&player](String const& codexId, std::optional<bool> markRead) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("learnCodex", [&player](String const& codexId, std::optional<bool> markRead) -> std::expected<void, StarException> {
     auto learned = player.codexes()->learnCodex(codexId, markRead.value_or(false));
     if (!learned) return std::unexpected(std::move(learned.error()));
     return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("getCodexes", [&player]() -> std::expected<Json, StarException> {
+  if (auto registered = callbacks.register_callback("getCodexes", [&player]() -> std::expected<Json, StarException> {
     return player.codexes()->toJson();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("getCodex", [&player](String const& id) -> std::expected<Json, StarException> {
+  if (auto registered = callbacks.register_callback("getCodex", [&player](String const& id) -> std::expected<Json, StarException> {
     auto codex = player.codexes()->codex(id);
     if (!codex) return Json();
     JsonArray pages;
@@ -1826,7 +1826,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("getCodexList", [&player]() -> std::expected<JsonArray, StarException> {
+  if (auto registered = callbacks.register_callback("getCodexList", [&player]() -> std::expected<JsonArray, StarException> {
     JsonArray result;
     auto entries = player.codexes()->codexes();
     result.reserve(entries.size());
@@ -1836,14 +1836,14 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("getNewCodexId", [&player]() -> std::expected<std::optional<String>, StarException> {
+  if (auto registered = callbacks.register_callback("getNewCodexId", [&player]() -> std::expected<std::optional<String>, StarException> {
     if (auto codex = player.codexes()->firstNewCodex())
       return codex->id();
     return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("getNewCodex", [&player]() -> std::expected<std::optional<String>, StarException> {
+  if (auto registered = callbacks.register_callback("getNewCodex", [&player]() -> std::expected<std::optional<String>, StarException> {
     auto codexPtr = player.codexes()->firstNewCodex();
     if (codexPtr)
       return codexPtr->title();
@@ -1853,25 +1853,25 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered =
-        callbacks.registerCallback("setAnimationParameter",
+        callbacks.register_callback("setAnimationParameter",
                                    [&player](String name, Json value) -> std::expected<void, StarException> {
                                      return player.setAnimationParameter(std::move(name), std::move(value));
                                    });
       !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("setCameraFocusEntity", [&player](std::optional<EntityId> const& entityId) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setCameraFocusEntity", [&player](std::optional<EntityId> const& entityId) -> std::expected<void, StarException> {
     player.setCameraFocusEntity(entityId);
     return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.registerCallback("headRotation", [&player]() -> std::expected<Json, StarException> {
+  if (auto registered = callbacks.register_callback("headRotation", [&player]() -> std::expected<Json, StarException> {
     return player.getSecretProperty("humanoid.headRotation");
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   // more accurate than mcontroller.facingDirection
-  if (auto registered = callbacks.registerCallback("facingDirection", [&player]() -> std::expected<int, StarException> {
+  if (auto registered = callbacks.register_callback("facingDirection", [&player]() -> std::expected<int, StarException> {
     return numericalDirection(player.humanoid()->facingDirection());
   }); !registered)
     return std::unexpected(std::move(registered.error()));

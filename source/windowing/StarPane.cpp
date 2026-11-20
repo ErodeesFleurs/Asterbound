@@ -570,7 +570,7 @@ std::expected<LuaCallbacks, StarException> Pane::makePaneCallbacks() {
         return std::invoke(function, *pane, std::forward<Args>(args)...);
       };
     }(std::type_identity<typename FunctionTraits<Function>::argument_types>{});
-    return callbacks.registerCallback(std::move(name), std::move(guarded));
+    return callbacks.register_callback(std::move(name), std::move(guarded));
   };
 
   auto toWidget = registerPaneCallback("toWidget", [](Pane& pane) -> std::expected<LuaCallbacks, StarException> {

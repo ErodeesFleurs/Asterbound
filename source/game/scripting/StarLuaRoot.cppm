@@ -24,7 +24,7 @@ private:
   Root& m_root;
 };
 
-[[nodiscard]] std::expected<std::reference_wrapper<Root>, StarException> luaExecutionRoot(LuaEngine& engine);
+[[nodiscard]] std::expected<std::reference_wrapper<Root>, StarException> lua_execution_root(LuaEngine& engine);
 
 // Loads and caches Lua scripts from assets, clearing the cache on root reload.
 // The internal engine and all contexts require single-threaded access.
@@ -35,7 +35,7 @@ public:
   ~LuaRoot();
   Root& root() const;
 
-  bool scriptLoaded(String const& assetPath) const;
+  bool script_loaded(String const& assetPath) const;
 
   [[nodiscard]] std::expected<void, StarException> restart();
   [[nodiscard]] std::expected<void, StarException> shutdown();
@@ -49,21 +49,21 @@ public:
   // execute for side effects; cycles fail rather than expose partial modules.
   // Cache invalidation requires a fresh context to load any new module.
   // loadLifetime scopes entry-script async work and inherited callbacks; the host owns later execution.
-  [[nodiscard]] std::expected<LuaContext, StarException> createContext(String const& script,
+  [[nodiscard]] std::expected<LuaContext, StarException> create_context(String const& script,
                                                                        std::stop_token loadLifetime = {});
-  [[nodiscard]] std::expected<LuaContext, StarException> createContext(StringList const& scriptPaths = {},
+  [[nodiscard]] std::expected<LuaContext, StarException> create_context(StringList const& scriptPaths = {},
                                                                        std::stop_token loadLifetime = {});
 
-  [[nodiscard]] std::expected<void, StarException> collectGarbage(std::optional<unsigned> steps = {});
-  void setAutoGarbageCollection(bool autoGarbageColleciton);
-  void tuneAutoGarbageCollection(float pause, float stepMultiplier);
-  std::size_t luaMemoryUsage() const;
+  [[nodiscard]] std::expected<void, StarException> collect_garbage(std::optional<unsigned> steps = {});
+  void set_auto_garbage_collection(bool autoGarbageColleciton);
+  void tune_auto_garbage_collection(float pause, float stepMultiplier);
+  std::size_t lua_memory_usage() const;
 
-  std::size_t scriptCacheMemoryUsage() const;
+  std::size_t script_cache_memory_usage() const;
 
-  void addCallbacks(String const& groupName, LuaCallbacks const& callbacks);
+  void add_callbacks(String const& groupName, LuaCallbacks const& callbacks);
 
-  LuaEngine& luaEngine() const;
+  LuaEngine& lua_engine() const;
   // Changes only after a replacement engine has been successfully published.
   std::uint64_t generation() const { return m_generation; }
 private:
@@ -73,10 +73,10 @@ private:
     explicit ScriptCache(Root& root) : m_root(root) {}
     [[nodiscard]] std::expected<std::shared_ptr<ByteArray const>, StarException>
     script(LuaEngine& engine, String const& path, std::uint64_t revision, StringMap<String>& sourceDiagnostics);
-    bool scriptLoaded(String const& path) const;
+    bool script_loaded(String const& path) const;
     void clear();
     std::uint64_t revision() const;
-    std::size_t memoryUsage() const;
+    std::size_t memory_usage() const;
 
   private:
     Root& m_root;
@@ -105,5 +105,5 @@ export module star.lua_root;
 export namespace Star {
   using ::Star::LuaRoot;
   using ::Star::LuaExecutionScope;
-  using ::Star::luaExecutionRoot;
+  using ::Star::lua_execution_root;
 }

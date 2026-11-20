@@ -3789,7 +3789,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
         return std::unexpected(std::move(sent.error()));
     }
     for (auto&& script : m_scriptContexts) {
-      if (auto invoked = recoverLuaScriptError(script.second->invoke("acceptConnection", clientId)); !invoked)
+      if (auto invoked = recover_lua_script_error(script.second->invoke("acceptConnection", clientId)); !invoked)
         return std::unexpected(std::move(invoked.error()));
     }
     return {};
@@ -3935,7 +3935,7 @@ std::expected<void, StarException> UniverseServer::doDisconnection(ConnectionId 
   };
   if (m_disconnectingClients.add(clientId)) {
     for (auto&& script : m_scriptContexts)
-      record(recoverLuaScriptError(script.second->invoke("doDisconnection", clientId)));
+      record(recover_lua_script_error(script.second->invoke("doDisconnection", clientId)));
     m_teamManager->playerDisconnected(client->playerUuid());
   }
   clientsLocker.unlock();
@@ -4931,13 +4931,13 @@ std::expected<void, StarException> UniverseServer::startLuaScripts() {
   auto multiplier = config->get_float("luaGcStepMultiplier");
   if (!multiplier)
     return std::unexpected(std::move(multiplier.error()));
-  m_luaRoot->tuneAutoGarbageCollection(*pause, *multiplier);
+  m_luaRoot->tune_auto_garbage_collection(*pause, *multiplier);
   auto contexts = config->get_object("scriptContexts");
   if (!contexts)
     return std::unexpected(std::move(contexts.error()));
   for (auto const& context : *contexts) {
     auto script = std::make_shared<ScriptComponent>(m_root);
-    if (auto set = script->setLuaRoot(m_luaRoot); !set)
+    if (auto set = script->set_lua_root(m_luaRoot); !set)
       return std::unexpected(std::move(set.error()));
     auto universe = LuaBindings::makeUniverseServerCallbacks(m_root, *this);
     if (!universe)
@@ -4945,21 +4945,21 @@ std::expected<void, StarException> UniverseServer::startLuaScripts() {
     auto celestial = LuaBindings::makeCelestialCallbacks(m_root, *this);
     if (!celestial)
       return std::unexpected(std::move(celestial.error()));
-    if (auto added = script->addCallbacks("universe", *universe); !added)
+    if (auto added = script->add_callbacks("universe", *universe); !added)
       return std::unexpected(std::move(added.error()));
-    if (auto added = script->addCallbacks("celestial", *celestial); !added)
+    if (auto added = script->add_callbacks("celestial", *celestial); !added)
       return std::unexpected(std::move(added.error()));
-    if (auto added = script->addThreadCallbacks("universe", *universe); !added)
+    if (auto added = script->add_thread_callbacks("universe", *universe); !added)
       return std::unexpected(std::move(added.error()));
-    if (auto added = script->addThreadCallbacks("celestial", *celestial); !added)
+    if (auto added = script->add_thread_callbacks("celestial", *celestial); !added)
       return std::unexpected(std::move(added.error()));
     auto scripts = json_to_string_list(context.second);
     if (!scripts)
       return std::unexpected(std::move(scripts.error()));
-    if (auto set = script->setScripts(std::move(*scripts)); !set)
+    if (auto set = script->set_scripts(std::move(*scripts)); !set)
       return std::unexpected(std::move(set.error()));
     m_scriptContexts.set(context.first, script);
-    if (auto initialized = recoverLuaScriptError(script->init()); !initialized)
+    if (auto initialized = recover_lua_script_error(script->init()); !initialized)
       return std::unexpected(std::move(initialized.error()));
   }
   return {};
@@ -4967,7 +4967,7 @@ std::expected<void, StarException> UniverseServer::startLuaScripts() {
 
 std::expected<void, StarException> UniverseServer::updateLua() {
   for (auto&& context : m_scriptContexts) {
-    if (auto updated = recoverLuaScriptError(context.second->update()); !updated)
+    if (auto updated = recover_lua_script_error(context.second->update()); !updated)
       return std::unexpected(std::move(updated.error()));
   }
   return {};
@@ -4976,7 +4976,7 @@ std::expected<void, StarException> UniverseServer::updateLua() {
 std::expected<void, StarException> UniverseServer::stopLua() {
   std::optional<StarException> error;
   for (auto&& context : m_scriptContexts) {
-    if (auto stopped = recoverLuaScriptError(context.second->uninit()); !stopped) {
+    if (auto stopped = recover_lua_script_error(context.second->uninit()); !stopped) {
       if (error)
         *error = error->with_related(stopped.error(), "Additional universe Lua shutdown failure");
       else
@@ -5027,7 +5027,7 @@ std::expected<RpcPromise<Json>, StarException> UniverseServer::sendUniverseMessa
 
 std::expected<std::optional<ChainableJsonMessageResponse>, StarException> UniverseServer::receiveMessage(String const& message, bool const& local, JsonArray const& args) {
   for (auto&& context : m_scriptContexts) {
-    auto response = recoverLuaScriptError(context.second->handleMessage(message, local, args));
+    auto response = recover_lua_script_error(context.second->handle_message(message, local, args));
     if (!response)
       return std::unexpected(std::move(response.error()));
     if (*response)

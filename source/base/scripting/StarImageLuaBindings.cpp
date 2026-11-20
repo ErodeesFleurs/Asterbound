@@ -35,24 +35,24 @@ namespace Star {
 std::expected<LuaMethods<Image>, StarException> LuaUserDataMethods<Image>::make() {
   LuaMethods<Image> methods;
 
-  if (auto result = methods.registerMethodWithSignature<Vec2U, Image&>("size", std::mem_fn(&Image::size)); !result)
+  if (auto result = methods.register_method_with_signature<Vec2U, Image&>("size", std::mem_fn(&Image::size)); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = methods.registerMethod(
+  if (auto result = methods.register_method(
         "drawInto",
         [](Image& image, Vec2U position, Image const& source) { return image.draw_into(position, source); });
       !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = methods.registerMethod(
+  if (auto result = methods.register_method(
         "copyInto",
         [](Image& image, Vec2U position, Image const& source) { return image.copy_into(position, source); });
       !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = methods.registerMethod("set", [](Image& image, unsigned x, unsigned y, Color const& color) {
+  if (auto result = methods.register_method("set", [](Image& image, unsigned x, unsigned y, Color const& color) {
     return image.set(x, y, color.to_rgba());
   }); !result)
     return std::unexpected(std::move(result.error()));
 
-  if (auto result = methods.registerMethod("get", [](Image& image, unsigned x, unsigned y) -> std::expected<Color, StarException> {
+  if (auto result = methods.register_method("get", [](Image& image, unsigned x, unsigned y) -> std::expected<Color, StarException> {
     auto pixel = image.get(x, y);
     if (!pixel)
       return std::unexpected(std::move(pixel.error()));
@@ -60,19 +60,19 @@ std::expected<LuaMethods<Image>, StarException> LuaUserDataMethods<Image>::make(
   }); !result)
     return std::unexpected(std::move(result.error()));
 
-  if (auto result = methods.registerMethod(
+  if (auto result = methods.register_method(
         "subImage", [](Image& image, Vec2U const& min, Vec2U const& size) { return image.sub_image(min, size); });
       !result)
     return std::unexpected(std::move(result.error()));
 
-  if (auto result = methods.registerMethod("process", [](Image& image, LuaEngine& engine, String const& directives) -> std::expected<Image, StarException> {
+  if (auto result = methods.register_method("process", [](Image& image, LuaEngine& engine, String const& directives) -> std::expected<Image, StarException> {
     List<std::shared_ptr<Image const>> resolvedImages;
     return process_image_operations(
       parse_image_operations(directives), image,
       [&](String const& path) -> std::expected<std::optional<std::reference_wrapper<Image const>>, StarException> {
-        if (!engine.imageResolver())
+        if (!engine.image_resolver())
           return std::nullopt;
-        auto resolved = engine.imageResolver()(path);
+        auto resolved = engine.image_resolver()(path);
         if (!resolved)
           return std::unexpected(std::move(resolved.error()));
         auto result = optional_ref(*resolved);
@@ -82,7 +82,7 @@ std::expected<LuaMethods<Image>, StarException> LuaUserDataMethods<Image>::make(
   }); !result)
     return std::unexpected(std::move(result.error()));
 
-  if (auto result = methods.registerMethod("embed",
+  if (auto result = methods.register_method("embed",
       [](Image const& image, String const& compression, std::optional<std::variant<String, Json>> const& frames,
           std::optional<String> const& framesCompression) -> std::expected<String, StarException> {
         auto method = embeddedCompressionMethod(compression);

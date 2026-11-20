@@ -39,7 +39,7 @@ namespace Star {
 std::expected<LuaCallbacks, StarException> LuaBindings::makeBehaviorCallbacks(Root& root, List<std::shared_ptr<BehaviorState>>& list) {
   LuaCallbacks callbacks;
 
-  auto registration = callbacks.registerCallback("behavior", [&root, &list](Json const& config, JsonObject const& parameters, LuaTable context, std::optional<LuaUserData> blackboard) -> std::expected<std::weak_ptr<BehaviorState>, StarException> {
+  auto registration = callbacks.register_callback("behavior", [&root, &list](Json const& config, JsonObject const& parameters, LuaTable context, std::optional<LuaUserData> blackboard) -> std::expected<std::weak_ptr<BehaviorState>, StarException> {
     auto behaviorDatabase = root.behaviorDatabase();
     if (!behaviorDatabase)
       return std::unexpected(std::move(behaviorDatabase.error()));

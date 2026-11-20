@@ -265,8 +265,8 @@ end
 
 Module `star.base_script_pane` exports the generic `BaseScriptPane` host.
 `create(context, config)` constructs its widgets without initializing scripts.
-Install service tables using `addCallbacks(name, callbacks)` and choose the
-existing shared engine with `setLuaRoot(root)` before `displayed()` (normally
+Install service tables using `add_callbacks(name, callbacks)` and choose the
+existing shared engine with `set_lua_root(root)` before `displayed()` (normally
 called by PaneManager). `dismissed()` invokes dismissal and uninitialization
 hooks. It must finish while all borrowed service targets are still alive.
 Component-owned callback group names take precedence over inherited LuaRoot
@@ -281,7 +281,7 @@ context remain rejected after reinitialization or rebinding, even if the old
 service target is still alive. Service owners must keep borrowed targets alive
 through shutdown.
 
-`removeCallbacks(name)` removes a service table. To rebind services, centrally
+`remove_callbacks(name)` removes a service table. To rebind services, centrally
 stop the instance, replace callback groups/root, then display it again.
 `LuaRoot::generation()` identifies successful engine replacements even when the
 root pointer is unchanged. `LuaBaseComponent` handles generation and asset reload

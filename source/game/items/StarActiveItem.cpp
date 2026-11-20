@@ -185,57 +185,57 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
     auto scripts = instanceValue("scripts").and_then(json_to_string_list);
     if (!scripts)
       return std::unexpected(std::move(scripts.error()));
-    auto configured = m_script.setScripts(scripts->transformed(
+    auto configured = m_script.set_scripts(scripts->transformed(
       [directory = directory()](String const& script) { return AssetPath::relative_to(directory, script); }));
     if (!configured)
       return std::unexpected(std::move(configured.error()));
     auto delta = instanceValue("scriptDelta", 1).and_then([](Json const& value) { return value.to_uint(); });
     if (!delta)
       return std::unexpected(std::move(delta.error()));
-    m_script.setUpdateDelta(*delta);
+    m_script.set_update_delta(*delta);
     m_twoHandedGrip.set(twoHanded());
     auto previousStorage = instanceValue("scriptStorage");
     if (!previousStorage)
       return std::unexpected(std::move(previousStorage.error()));
     if (*previousStorage) {
-      auto stored = previousStorage->to_object().and_then([&](JsonObject storage) { return m_script.setScriptStorage(std::move(storage)); });
+      auto stored = previousStorage->to_object().and_then([&](JsonObject storage) { return m_script.set_script_storage(std::move(storage)); });
       if (!stored)
         return std::unexpected(std::move(stored.error()));
     }
-    auto activeCallbacks = makeActiveItemCallbacks().and_then([&](LuaCallbacks callbacks) { return m_script.addCallbacks("activeItem", std::move(callbacks)); });
+    auto activeCallbacks = makeActiveItemCallbacks().and_then([&](LuaCallbacks callbacks) { return m_script.add_callbacks("activeItem", std::move(callbacks)); });
     if (!activeCallbacks)
       return std::unexpected(std::move(activeCallbacks.error()));
-    auto itemCallbacks = LuaBindings::makeItemCallbacks(*this).and_then([&](LuaCallbacks callbacks) { return m_script.addCallbacks("item", std::move(callbacks)); });
+    auto itemCallbacks = LuaBindings::makeItemCallbacks(*this).and_then([&](LuaCallbacks callbacks) { return m_script.add_callbacks("item", std::move(callbacks)); });
     if (!itemCallbacks)
       return std::unexpected(std::move(itemCallbacks.error()));
     auto configCallbacks =
       LuaBindings::makeConfigCallbacks([this](String const& name,
                                               Json const& defaultValue) -> std::expected<Json, StarException> {
         return instanceValue(name, defaultValue);
-      }).and_then([&](LuaCallbacks callbacks) { return m_script.addCallbacks("config", std::move(callbacks)); });
+      }).and_then([&](LuaCallbacks callbacks) { return m_script.add_callbacks("config", std::move(callbacks)); });
     if (!configCallbacks)
       return std::unexpected(std::move(configCallbacks.error()));
-    auto animatorCallbacks = LuaBindings::makeNetworkedAnimatorCallbacks(*m_itemAnimator).and_then([&](LuaCallbacks callbacks) { return m_script.addCallbacks("animator", std::move(callbacks)); });
+    auto animatorCallbacks = LuaBindings::makeNetworkedAnimatorCallbacks(*m_itemAnimator).and_then([&](LuaCallbacks callbacks) { return m_script.add_callbacks("animator", std::move(callbacks)); });
     if (!animatorCallbacks)
       return std::unexpected(std::move(animatorCallbacks.error()));
-    auto statusCallbacks = LuaBindings::makeStatusControllerCallbacks(owner.statusController()).and_then([&](LuaCallbacks callbacks) { return m_script.addCallbacks("status", std::move(callbacks)); });
+    auto statusCallbacks = LuaBindings::makeStatusControllerCallbacks(owner.statusController()).and_then([&](LuaCallbacks callbacks) { return m_script.add_callbacks("status", std::move(callbacks)); });
     if (!statusCallbacks)
       return std::unexpected(std::move(statusCallbacks.error()));
-    auto movementCallbacks = m_script.addActorMovementCallbacks(owner.movementController());
+    auto movementCallbacks = m_script.add_actor_movement_callbacks(owner.movementController());
     if (!movementCallbacks)
       return std::unexpected(std::move(movementCallbacks.error()));
     if (auto player = as_ref<Player>(owner)) {
-      auto playerCallbacks = LuaBindings::makePlayerCallbacks(root(), player->get()).and_then([&](LuaCallbacks callbacks) { return m_script.addCallbacks("player", std::move(callbacks)); });
+      auto playerCallbacks = LuaBindings::makePlayerCallbacks(root(), player->get()).and_then([&](LuaCallbacks callbacks) { return m_script.add_callbacks("player", std::move(callbacks)); });
       if (!playerCallbacks)
         return std::unexpected(std::move(playerCallbacks.error()));
     }
-    auto entityCallbacks = LuaBindings::makeEntityCallbacks(owner).and_then([&](LuaCallbacks callbacks) { return m_script.addCallbacks("entity", std::move(callbacks)); });
+    auto entityCallbacks = LuaBindings::makeEntityCallbacks(owner).and_then([&](LuaCallbacks callbacks) { return m_script.add_callbacks("entity", std::move(callbacks)); });
     if (!entityCallbacks)
       return std::unexpected(std::move(entityCallbacks.error()));
     auto itemWorld = world();
     if (!itemWorld)
       return std::unexpected(std::move(itemWorld.error()));
-    auto scriptInitialized = recoverLuaScriptError(m_script.init(itemWorld->get()));
+    auto scriptInitialized = recover_lua_script_error(m_script.init(itemWorld->get()));
     if (!scriptInitialized)
       return std::unexpected(std::move(scriptInitialized.error()));
     m_currentFireMode = FireMode::None;
@@ -251,20 +251,20 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
       auto scripts = json_to_string_list(*animationScripts);
       if (!scripts)
         return std::unexpected(std::move(scripts.error()));
-      auto configured = m_scriptedAnimator.setScripts(scripts->transformed(
+      auto configured = m_scriptedAnimator.set_scripts(scripts->transformed(
         [directory = directory()](String const& script) { return AssetPath::relative_to(directory, script); }));
       if (!configured)
         return std::unexpected(std::move(configured.error()));
       auto delta = instanceValue("animationDelta", 1).and_then([](Json const& value) { return value.to_uint(); });
       if (!delta)
         return std::unexpected(std::move(delta.error()));
-      m_scriptedAnimator.setUpdateDelta(*delta);
+      m_scriptedAnimator.set_update_delta(*delta);
       auto animationCallbacks = LuaBindings::makeScriptedAnimatorCallbacks(*m_itemAnimator,
           [this](String const& name, Json const& defaultValue) -> Json { return m_scriptedAnimationParameters.value(name, defaultValue); })
-          .and_then([&](LuaCallbacks callbacks) { return m_scriptedAnimator.addCallbacks("animationConfig", std::move(callbacks)); });
+          .and_then([&](LuaCallbacks callbacks) { return m_scriptedAnimator.add_callbacks("animationConfig", std::move(callbacks)); });
       if (!animationCallbacks)
         return std::unexpected(std::move(animationCallbacks.error()));
-      auto activeCallbacks = makeScriptedAnimationCallbacks().and_then([&](LuaCallbacks callbacks) { return m_scriptedAnimator.addCallbacks("activeItemAnimation", std::move(callbacks)); });
+      auto activeCallbacks = makeScriptedAnimationCallbacks().and_then([&](LuaCallbacks callbacks) { return m_scriptedAnimator.add_callbacks("activeItemAnimation", std::move(callbacks)); });
       if (!activeCallbacks)
         return std::unexpected(std::move(activeCallbacks.error()));
       auto configCallbacks =
@@ -272,11 +272,11 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
                                                 Json const& defaultValue) -> std::expected<Json, StarException> {
           return instanceValue(name, defaultValue);
         }).and_then([&](LuaCallbacks callbacks) {
-          return m_scriptedAnimator.addCallbacks("config", std::move(callbacks));
+          return m_scriptedAnimator.add_callbacks("config", std::move(callbacks));
         });
       if (!configCallbacks)
         return std::unexpected(std::move(configCallbacks.error()));
-      auto animationInitialized = recoverLuaScriptError(m_scriptedAnimator.init(itemWorld->get()));
+      auto animationInitialized = recover_lua_script_error(m_scriptedAnimator.init(itemWorld->get()));
       if (!animationInitialized)
         return std::unexpected(std::move(animationInitialized.error()));
     }
@@ -298,12 +298,12 @@ std::expected<void, StarException> ActiveItem::uninit() {
   if (!mode) {
     remember(std::move(mode));
   } else if (*mode == EntityMode::Master) {
-    remember(recoverLuaScriptError(m_script.uninit()));
+    remember(recover_lua_script_error(m_script.uninit()));
     for (auto const& name : std::initializer_list<std::string_view>{"activeItem", "item", "config", "animator", "status"})
-      remember(m_script.removeCallbacks(name));
-    remember(m_script.removeActorMovementCallbacks());
+      remember(m_script.remove_callbacks(name));
+    remember(m_script.remove_actor_movement_callbacks());
     for (auto const& name : std::initializer_list<std::string_view>{"player", "entity"})
-      remember(m_script.removeCallbacks(name));
+      remember(m_script.remove_callbacks(name));
   }
   auto itemWorld = world();
   if (!itemWorld) {
@@ -313,9 +313,9 @@ std::expected<void, StarException> ActiveItem::uninit() {
     if (!animationScripts) {
       remember(std::move(animationScripts));
     } else if (*animationScripts) {
-      remember(recoverLuaScriptError(m_scriptedAnimator.uninit()));
+      remember(recover_lua_script_error(m_scriptedAnimator.uninit()));
       for (auto const& name : std::initializer_list<std::string_view>{"animationConfig", "activeItemAnimation", "config"})
-        remember(m_scriptedAnimator.removeCallbacks(name));
+        remember(m_scriptedAnimator.remove_callbacks(name));
     }
   }
   m_itemAnimatorDynamicTarget.stopAudio();
@@ -344,19 +344,19 @@ std::expected<void, StarException> ActiveItem::update(float dt, FireMode fireMod
     if (fireMode != m_currentFireMode) {
       m_currentFireMode = fireMode;
       if (fireMode != FireMode::None) {
-        auto activated = recoverLuaScriptError(m_script.invoke("activate", *fireModeName, shifting, moveMap));
+        auto activated = recover_lua_script_error(m_script.invoke("activate", *fireModeName, shifting, moveMap));
         if (!activated)
           return std::unexpected(std::move(activated.error()));
       }
     }
-    auto updated = recoverLuaScriptError(m_script.update(m_script.updateDt(dt), *fireModeName, shifting, moveMap));
+    auto updated = recover_lua_script_error(m_script.update(m_script.update_dt(dt), *fireModeName, shifting, moveMap));
     if (!updated)
       return std::unexpected(std::move(updated.error()));
     auto retain = instanceValue("retainScriptStorageInItem", false).and_then([](Json const& value) { return value.to_bool(); });
     if (!retain)
       return std::unexpected(std::move(retain.error()));
     if (*retain) {
-      auto storage = m_script.getScriptStorage();
+      auto storage = m_script.get_script_storage();
       if (!storage)
         return std::unexpected(std::move(storage.error()));
       auto stored = setInstanceValue("scriptStorage", *storage);
@@ -372,7 +372,7 @@ std::expected<void, StarException> ActiveItem::update(float dt, FireMode fireMod
   if (!animated)
     return std::unexpected(std::move(animated.error()));
   if (isClient) {
-    auto updated = recoverLuaScriptError(m_scriptedAnimator.update(m_scriptedAnimator.updateDt(dt)));
+    auto updated = recover_lua_script_error(m_scriptedAnimator.update(m_scriptedAnimator.update_dt(dt)));
     if (!updated)
       return std::unexpected(std::move(updated.error()));
   }
@@ -572,7 +572,7 @@ std::expected<List<LightSource>, StarException> ActiveItem::lights(float interpo
     }
     result.push_back(std::move(light));
   }
-  result.append_range(m_scriptedAnimator.lightSources());
+  result.append_range(m_scriptedAnimator.light_sources());
   return result;
 }
 
@@ -596,7 +596,7 @@ std::expected<List<std::shared_ptr<AudioInstance>>, StarException> ActiveItem::p
     audio->set_position(itemOwner->get().position() + *position);
     result.push_back(std::move(audio));
   }
-  result.append_range(m_scriptedAnimator.pullNewAudios());
+  result.append_range(m_scriptedAnimator.pull_new_audios());
   return result;
 }
 
@@ -618,7 +618,7 @@ std::expected<List<Particle>, StarException> ActiveItem::pullNewParticles() {
     }
     result.push_back(std::move(particle));
   }
-  result.append_range(m_scriptedAnimator.pullNewParticles());
+  result.append_range(m_scriptedAnimator.pull_new_particles());
   return result;
 }
 
@@ -627,7 +627,7 @@ std::optional<String> ActiveItem::cursor() const {
 }
 
 std::expected<std::optional<ChainableJsonMessageResponse>, StarException> ActiveItem::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
-  return recoverLuaScriptError(m_script.handleMessage(message, localMessage, args));
+  return recover_lua_script_error(m_script.handle_message(message, localMessage, args));
 }
 
 std::expected<float, StarException> ActiveItem::durabilityStatus() {
@@ -668,23 +668,23 @@ std::expected<Vec2F, StarException> ActiveItem::handPosition(Vec2F const& offset
 
 std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks() {
   LuaCallbacks callbacks;
-  if (auto added = callbacks.registerCallback("ownerEntityId", [this]() {
+  if (auto added = callbacks.register_callback("ownerEntityId", [this]() {
       return owner().transform([](std::reference_wrapper<ToolUserEntity> owner) { return owner.get().entityId(); });
     }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("ownerTeam", [this]() {
+  if (auto added = callbacks.register_callback("ownerTeam", [this]() {
       return owner().and_then([](std::reference_wrapper<ToolUserEntity> owner) { return owner.get().getTeam().toJson(); });
     }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("ownerAimPosition", [this]() {
+  if (auto added = callbacks.register_callback("ownerAimPosition", [this]() {
       return owner().and_then([](std::reference_wrapper<ToolUserEntity> owner) { return owner.get().aimPosition(); });
     }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("ownerPowerMultiplier", [this]() {
+  if (auto added = callbacks.register_callback("ownerPowerMultiplier", [this]() {
       return owner().and_then([](std::reference_wrapper<ToolUserEntity> owner) { return owner.get().powerMultiplier(); });
     }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback(
+  if (auto added = callbacks.register_callback(
         "fireMode",
         [this]() -> std::expected<String, StarException> {
           return enum_name<FireModeNames>(m_currentFireMode).transform([](std::string_view name) {
@@ -693,20 +693,20 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
         });
       !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("hand", [this]() -> std::expected<String, StarException> {
+  if (auto added = callbacks.register_callback("hand", [this]() -> std::expected<String, StarException> {
       auto itemHand = hand();
       if (!itemHand)
         return std::unexpected(std::move(itemHand.error()));
       return enum_name<ToolHandNames>(*itemHand).transform([](std::string_view name) { return String(name); });
     }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("handPosition", [this](std::optional<Vec2F> offset) {
+  if (auto added = callbacks.register_callback("handPosition", [this](std::optional<Vec2F> offset) {
       return handPosition(offset.value_or(Vec2F{}));
     }); !added)
     return std::unexpected(std::move(added.error()));
 
   // Aim a barrel with a vertical offset from the hand at the given target.
-  if (auto added = callbacks.registerCallback("aimAngleAndDirection", [this](float aimVerticalOffset, Vec2F targetPosition) -> std::expected<LuaTupleReturn<float, int>, StarException> {
+  if (auto added = callbacks.register_callback("aimAngleAndDirection", [this](float aimVerticalOffset, Vec2F targetPosition) -> std::expected<LuaTupleReturn<float, int>, StarException> {
       auto itemOwner = owner();
       if (!itemOwner)
         return std::unexpected(std::move(itemOwner.error()));
@@ -733,10 +733,10 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       // Clamp targets inside the barrel-offset circle to retain continuity.
       float angleAdjust = -std::asin(std::clamp(aimVerticalOffset / toTargetDist, -1.0f, 1.0f));
       auto angleSide = getAngleSide(toTarget.angle());
-      return luaTupleReturn(angleSide.first + angleAdjust, numericalDirection(angleSide.second));
+      return lua_tuple_return(angleSide.first + angleAdjust, numericalDirection(angleSide.second));
     }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("aimAngle", [this](float aimVerticalOffset, Vec2F targetPosition) -> std::expected<float, StarException> {
+  if (auto added = callbacks.register_callback("aimAngle", [this](float aimVerticalOffset, Vec2F targetPosition) -> std::expected<float, StarException> {
       auto itemOwner = owner();
       if (!itemOwner)
         return std::unexpected(std::move(itemOwner.error()));
@@ -757,23 +757,23 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       return toTarget.angle() + angleAdjust;
     }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("setHoldingItem", [this](bool value) { m_holdingItem.set(value); }); !added)
+  if (auto added = callbacks.register_callback("setHoldingItem", [this](bool value) { m_holdingItem.set(value); }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("setBackArmFrame", [this](std::optional<String> value) { m_backArmFrame.set(value); }); !added)
+  if (auto added = callbacks.register_callback("setBackArmFrame", [this](std::optional<String> value) { m_backArmFrame.set(value); }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("setFrontArmFrame", [this](std::optional<String> value) { m_frontArmFrame.set(value); }); !added)
+  if (auto added = callbacks.register_callback("setFrontArmFrame", [this](std::optional<String> value) { m_frontArmFrame.set(value); }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("setTwoHandedGrip", [this](bool value) { m_twoHandedGrip.set(value); }); !added)
+  if (auto added = callbacks.register_callback("setTwoHandedGrip", [this](bool value) { m_twoHandedGrip.set(value); }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("setRecoil", [this](bool value) { m_recoil.set(value); }); !added)
+  if (auto added = callbacks.register_callback("setRecoil", [this](bool value) { m_recoil.set(value); }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("setOutsideOfHand", [this](bool value) { m_outsideOfHand.set(value); }); !added)
+  if (auto added = callbacks.register_callback("setOutsideOfHand", [this](bool value) { m_outsideOfHand.set(value); }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("setArmAngle", [this](float value) { m_armAngle.set(value); }); !added)
+  if (auto added = callbacks.register_callback("setArmAngle", [this](float value) { m_armAngle.set(value); }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("setFacingDirection", [this](float value) { m_facingDirection.set(directionOf(value)); }); !added)
+  if (auto added = callbacks.register_callback("setFacingDirection", [this](float value) { m_facingDirection.set(directionOf(value)); }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("setDamageSources", [this](std::optional<JsonArray> const& values) -> std::expected<void, StarException> {
+  if (auto added = callbacks.register_callback("setDamageSources", [this](std::optional<JsonArray> const& values) -> std::expected<void, StarException> {
       List<DamageSource> sources;
       if (values) {
         for (auto const& value : *values) {
@@ -787,7 +787,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       return {};
     }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("setItemDamageSources", [this](std::optional<JsonArray> const& values) -> std::expected<void, StarException> {
+  if (auto added = callbacks.register_callback("setItemDamageSources", [this](std::optional<JsonArray> const& values) -> std::expected<void, StarException> {
       List<DamageSource> sources;
       if (values) {
         for (auto const& value : *values) {
@@ -801,11 +801,11 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       return {};
     }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("setShieldPolys", [this](std::optional<List<PolyF>> const& value) { m_shieldPolys.set(value.value_or(List<PolyF>{})); }); !added)
+  if (auto added = callbacks.register_callback("setShieldPolys", [this](std::optional<List<PolyF>> const& value) { m_shieldPolys.set(value.value_or(List<PolyF>{})); }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("setItemShieldPolys", [this](std::optional<List<PolyF>> const& value) { m_itemShieldPolys.set(value.value_or(List<PolyF>{})); }); !added)
+  if (auto added = callbacks.register_callback("setItemShieldPolys", [this](std::optional<List<PolyF>> const& value) { m_itemShieldPolys.set(value.value_or(List<PolyF>{})); }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("setForceRegions", [this](std::optional<JsonArray> const& values) -> std::expected<void, StarException> {
+  if (auto added = callbacks.register_callback("setForceRegions", [this](std::optional<JsonArray> const& values) -> std::expected<void, StarException> {
       List<PhysicsForceRegion> regions;
       if (values) {
         for (auto const& value : *values) {
@@ -819,7 +819,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       return {};
     }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("setItemForceRegions", [this](std::optional<JsonArray> const& values) -> std::expected<void, StarException> {
+  if (auto added = callbacks.register_callback("setItemForceRegions", [this](std::optional<JsonArray> const& values) -> std::expected<void, StarException> {
       List<PhysicsForceRegion> regions;
       if (values) {
         for (auto const& value : *values) {
@@ -833,9 +833,9 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       return {};
     }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("setCursor", [this](std::optional<String> value) { m_cursor = std::move(value); }); !added)
+  if (auto added = callbacks.register_callback("setCursor", [this](std::optional<String> value) { m_cursor = std::move(value); }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("setScriptedAnimationParameter", [this](String name, Json value) { m_scriptedAnimationParameters.set(std::move(name), std::move(value)); }); !added)
+  if (auto added = callbacks.register_callback("setScriptedAnimationParameter", [this](String name, Json value) { m_scriptedAnimationParameters.set(std::move(name), std::move(value)); }); !added)
     return std::unexpected(std::move(added.error()));
 
   auto loadIcon = [this](Json const& icon) -> std::expected<List<Drawable>, StarException> {
@@ -876,14 +876,14 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
     }
     return drawables;
   };
-  if (auto added = callbacks.registerCallback("setInventoryIcon", [this, loadIcon](Json icon) -> std::expected<void, StarException> {
+  if (auto added = callbacks.register_callback("setInventoryIcon", [this, loadIcon](Json icon) -> std::expected<void, StarException> {
       auto stored = setInstanceValue("inventoryIcon", icon);
       if (!stored)
         return std::unexpected(std::move(stored.error()));
       return loadIcon(icon).and_then([&](List<Drawable> drawables) { return setIconDrawables(std::move(drawables)); });
     }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("setSecondaryIcon", [this, loadIcon](Json icon) -> std::expected<void, StarException> {
+  if (auto added = callbacks.register_callback("setSecondaryIcon", [this, loadIcon](Json icon) -> std::expected<void, StarException> {
       auto stored = setInstanceValue("secondaryIcon", icon);
       if (!stored)
         return std::unexpected(std::move(stored.error()));
@@ -892,9 +892,9 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       return setSecondaryIconDrawables(std::nullopt);
     }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("setInstanceValue", [this](String name, Json value) { return setInstanceValue(std::move(name), std::move(value)); }); !added)
+  if (auto added = callbacks.register_callback("setInstanceValue", [this](String name, Json value) { return setInstanceValue(std::move(name), std::move(value)); }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("callOtherHandScript", [this](String const& function, LuaVariadic<LuaValue> const& args) -> std::expected<LuaValue, StarException> {
+  if (auto added = callbacks.register_callback("callOtherHandScript", [this](String const& function, LuaVariadic<LuaValue> const& args) -> std::expected<LuaValue, StarException> {
       auto itemOwner = owner();
       if (!itemOwner)
         return std::unexpected(std::move(itemOwner.error()));
@@ -903,14 +903,14 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
         return std::unexpected(std::move(itemHand.error()));
       if (auto otherHandItem = itemOwner->get().handItem(*itemHand == ToolHand::Primary ? ToolHand::Alt : ToolHand::Primary)) {
         if (auto otherActiveItem = as<ActiveItem>(otherHandItem))
-          return recoverLuaScriptError(otherActiveItem->m_script.invoke(function, args)).transform([](std::optional<LuaValue> value) {
+          return recover_lua_script_error(otherActiveItem->m_script.invoke(function, args)).transform([](std::optional<LuaValue> value) {
             return std::move(value).value_or(LuaValue{});
           });
       }
       return LuaValue{};
     }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("interact", [this](String const& type, Json const& configData, std::optional<EntityId> const& sourceEntityId) -> std::expected<void, StarException> {
+  if (auto added = callbacks.register_callback("interact", [this](String const& type, Json const& configData, std::optional<EntityId> const& sourceEntityId) -> std::expected<void, StarException> {
       auto itemOwner = owner();
       if (!itemOwner)
         return std::unexpected(std::move(itemOwner.error()));
@@ -920,7 +920,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       return itemOwner->get().interact(*action);
     }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("emote", [this](String const& name) -> std::expected<void, StarException> {
+  if (auto added = callbacks.register_callback("emote", [this](String const& name) -> std::expected<void, StarException> {
       if (!HumanoidEmoteNames)
         return std::unexpected(HumanoidEmoteNames.error());
       auto emote = HumanoidEmoteNames->get_left(name);
@@ -934,7 +934,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       return {};
     }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("setCameraFocusEntity", [this](std::optional<EntityId> const& entity) -> std::expected<void, StarException> {
+  if (auto added = callbacks.register_callback("setCameraFocusEntity", [this](std::optional<EntityId> const& entity) -> std::expected<void, StarException> {
       auto itemOwner = owner();
       if (!itemOwner)
         return std::unexpected(std::move(itemOwner.error()));
@@ -942,7 +942,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       return {};
     }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("setDescription", [this](String const& value) -> std::expected<void, StarException> {
+  if (auto added = callbacks.register_callback("setDescription", [this](String const& value) -> std::expected<void, StarException> {
       auto stored = setInstanceValue("description", value);
       if (!stored)
         return std::unexpected(std::move(stored.error()));
@@ -950,7 +950,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       return {};
     }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("setShortDescription", [this](String const& value) -> std::expected<void, StarException> {
+  if (auto added = callbacks.register_callback("setShortDescription", [this](String const& value) -> std::expected<void, StarException> {
       auto stored = setInstanceValue("shortdescription", value);
       if (!stored)
         return std::unexpected(std::move(stored.error()));
@@ -963,21 +963,21 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
 
 std::expected<LuaCallbacks, StarException> ActiveItem::makeScriptedAnimationCallbacks() {
   LuaCallbacks callbacks;
-  if (auto added = callbacks.registerCallback("ownerPosition", [this]() {
+  if (auto added = callbacks.register_callback("ownerPosition", [this]() {
       return owner().transform([](std::reference_wrapper<ToolUserEntity> owner) { return owner.get().position(); });
     }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("ownerAimPosition", [this]() {
+  if (auto added = callbacks.register_callback("ownerAimPosition", [this]() {
       return owner().and_then([](std::reference_wrapper<ToolUserEntity> owner) { return owner.get().aimPosition(); });
     }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("ownerArmAngle", [this]() { return m_armAngle.get(); }); !added)
+  if (auto added = callbacks.register_callback("ownerArmAngle", [this]() { return m_armAngle.get(); }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("ownerFacingDirection", [this]() {
+  if (auto added = callbacks.register_callback("ownerFacingDirection", [this]() {
       return owner().transform([](std::reference_wrapper<ToolUserEntity> owner) { return numericalDirection(owner.get().facingDirection()); });
     }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.registerCallback("handPosition", [this](std::optional<Vec2F> offset) { return handPosition(offset.value_or(Vec2F{})); }); !added)
+  if (auto added = callbacks.register_callback("handPosition", [this](std::optional<Vec2F> offset) { return handPosition(offset.value_or(Vec2F{})); }); !added)
     return std::unexpected(std::move(added.error()));
   return callbacks;
 }

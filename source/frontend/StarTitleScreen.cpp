@@ -238,7 +238,7 @@ std::expected<void, StarException> TitleScreen::close() {
   m_optionsMenu.reset();
   std::optional<StarException> error;
   if (m_scriptComponent) {
-    if (auto r = recoverLuaScriptError(m_scriptComponent->uninit()); !r)
+    if (auto r = recover_lua_script_error(m_scriptComponent->uninit()); !r)
       error = std::move(r.error());
     m_scriptComponent.reset();
   }
@@ -381,7 +381,7 @@ std::expected<void, StarException> TitleScreen::render(float interpolation) {
     (*canvas)->setPosition(Vec2I());
     (*canvas)->setSize(Vec2I(*interfaceSize));
   }
-  if (auto r = recoverLuaScriptError(m_scriptComponent->invoke("render", JsonObject{{"interfaceScale", interfaceScale()}})); !r)
+  if (auto r = recover_lua_script_error(m_scriptComponent->invoke("render", JsonObject{{"interfaceScale", interfaceScale()}})); !r)
     return std::unexpected(std::move(r.error()));
   if (auto r = m_renderer->flush(); !r) return std::unexpected(std::move(r.error()));
   if (auto r = m_backgroundMenu->render(RectI(Vec2I(), Vec2I(*interfaceSize))); !r) return std::unexpected(std::move(r.error()));
@@ -416,7 +416,7 @@ std::expected<void, StarException> TitleScreen::update(float dt) {
   m_environmentPainter->update(dt);
   if (auto r = m_backgroundMenu->update(dt); !r) return std::unexpected(std::move(r.error()));
   if (auto r = m_paneManager->update(dt); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = recoverLuaScriptError(m_scriptComponent->update(dt)); !r) return std::unexpected(std::move(r.error()));
+  if (auto r = recover_lua_script_error(m_scriptComponent->update(dt)); !r) return std::unexpected(std::move(r.error()));
   if (!finishedState()) {
     auto audioSample = m_musicTrackManager.updateAmbient(m_musicTrack, m_skyBackdrop->isDayTime());
     if (!audioSample)
@@ -600,19 +600,19 @@ std::expected<void, StarException> TitleScreen::initMainMenu() {
   m_scriptComponent = std::make_shared<ScriptComponent>(m_guiContext.root());
   auto luaRoot = LuaRoot::create(m_guiContext.root());
   if (!luaRoot) return std::unexpected(std::move(luaRoot.error()));
-  if (auto r = m_scriptComponent->setLuaRoot(*luaRoot); !r) return std::unexpected(std::move(r.error()));
+  if (auto r = m_scriptComponent->set_lua_root(*luaRoot); !r) return std::unexpected(std::move(r.error()));
   auto backgroundCallbacks = LuaBindings::makeWidgetCallbacks(m_guiContext, *m_backgroundMenu);
   if (!backgroundCallbacks) return std::unexpected(std::move(backgroundCallbacks.error()));
-  if (auto r = m_scriptComponent->addCallbacks("background", std::move(*backgroundCallbacks)); !r) return std::unexpected(std::move(r.error()));
+  if (auto r = m_scriptComponent->add_callbacks("background", std::move(*backgroundCallbacks)); !r) return std::unexpected(std::move(r.error()));
   auto widgetCallbacks = LuaBindings::makeWidgetCallbacks(m_guiContext, *m_mainMenu);
   if (!widgetCallbacks) return std::unexpected(std::move(widgetCallbacks.error()));
-  if (auto r = m_scriptComponent->addCallbacks("widget", std::move(*widgetCallbacks)); !r) return std::unexpected(std::move(r.error()));
+  if (auto r = m_scriptComponent->add_callbacks("widget", std::move(*widgetCallbacks)); !r) return std::unexpected(std::move(r.error()));
   auto scriptConfig = config->get_array("scripts", JsonArray());
   if (!scriptConfig) return std::unexpected(std::move(scriptConfig.error()));
   auto scripts = json_to_string_list(*scriptConfig);
   if (!scripts) return std::unexpected(std::move(scripts.error()));
-  if (auto r = m_scriptComponent->setScripts(std::move(*scripts)); !r) return std::unexpected(std::move(r.error()));
-  auto initialized = recoverLuaScriptError(m_scriptComponent->init());
+  if (auto r = m_scriptComponent->set_scripts(std::move(*scripts)); !r) return std::unexpected(std::move(r.error()));
+  auto initialized = recover_lua_script_error(m_scriptComponent->init());
   if (!initialized) return std::unexpected(std::move(initialized.error()));
   return {};
 }

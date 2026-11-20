@@ -215,39 +215,39 @@ std::expected<std::shared_ptr<CommandProcessor>, StarException> CommandProcessor
   if (!pause) return std::unexpected(std::move(pause.error()));
   auto step = config->get_float("luaGcStepMultiplier");
   if (!step) return std::unexpected(std::move(step.error()));
-  processor->m_luaRoot->tuneAutoGarbageCollection(*pause, *step);
+  processor->m_luaRoot->tune_auto_garbage_collection(*pause, *step);
   auto universeCallbacks = LuaBindings::makeUniverseServerCallbacks(root, universe);
   if (!universeCallbacks) return std::unexpected(std::move(universeCallbacks.error()));
   auto celestialCallbacks = LuaBindings::makeCelestialCallbacks(root, universe);
   if (!celestialCallbacks) return std::unexpected(std::move(celestialCallbacks.error()));
-  auto universeAdded = processor->m_scriptComponent.addCallbacks("universe", *universeCallbacks);
+  auto universeAdded = processor->m_scriptComponent.add_callbacks("universe", *universeCallbacks);
   if (!universeAdded) return std::unexpected(std::move(universeAdded.error()));
-  auto celestialAdded = processor->m_scriptComponent.addCallbacks("celestial", *celestialCallbacks);
+  auto celestialAdded = processor->m_scriptComponent.add_callbacks("celestial", *celestialCallbacks);
   if (!celestialAdded) return std::unexpected(std::move(celestialAdded.error()));
-  auto universeThreadAdded = processor->m_scriptComponent.addThreadCallbacks("universe", *universeCallbacks);
+  auto universeThreadAdded = processor->m_scriptComponent.add_thread_callbacks("universe", *universeCallbacks);
   if (!universeThreadAdded) return std::unexpected(std::move(universeThreadAdded.error()));
-  auto celestialThreadAdded = processor->m_scriptComponent.addThreadCallbacks("celestial", *celestialCallbacks);
+  auto celestialThreadAdded = processor->m_scriptComponent.add_thread_callbacks("celestial", *celestialCallbacks);
   if (!celestialThreadAdded) return std::unexpected(std::move(celestialThreadAdded.error()));
   auto commandCallbacks = processor->makeCommandCallbacks();
   if (!commandCallbacks) return std::unexpected(std::move(commandCallbacks.error()));
-  auto commandsAdded = processor->m_scriptComponent.addCallbacks("CommandProcessor", std::move(*commandCallbacks));
+  auto commandsAdded = processor->m_scriptComponent.add_callbacks("CommandProcessor", std::move(*commandCallbacks));
   if (!commandsAdded) return std::unexpected(std::move(commandsAdded.error()));
   auto scriptJson = config->get("commandProcessorScripts");
   if (!scriptJson) return std::unexpected(std::move(scriptJson.error()));
   auto scripts = json_to_string_list(*scriptJson);
   if (!scripts) return std::unexpected(std::move(scripts.error()));
-  auto scriptsSet = processor->m_scriptComponent.setScripts(std::move(*scripts));
+  auto scriptsSet = processor->m_scriptComponent.set_scripts(std::move(*scripts));
   if (!scriptsSet) return std::unexpected(std::move(scriptsSet.error()));
-  auto rootSet = processor->m_scriptComponent.setLuaRoot(processor->m_luaRoot);
+  auto rootSet = processor->m_scriptComponent.set_lua_root(processor->m_luaRoot);
   if (!rootSet) return std::unexpected(std::move(rootSet.error()));
-  auto initialized = recoverLuaScriptError(processor->m_scriptComponent.init());
+  auto initialized = recover_lua_script_error(processor->m_scriptComponent.init());
   if (!initialized) return std::unexpected(std::move(initialized.error()));
   return processor;
 }
 
 std::expected<void, StarException> CommandProcessor::close() {
   std::lock_guard locker(m_mutex);
-  return recoverLuaScriptError(m_scriptComponent.uninit());
+  return recover_lua_script_error(m_scriptComponent.uninit());
 }
 
 std::expected<ServerCommandResult, StarException> CommandProcessor::adminCommand(String const& command, String const& argumentString) {
@@ -1735,7 +1735,7 @@ std::expected<ServerCommandResult, StarException> CommandProcessor::handleComman
   }
   auto arguments = m_parser.tokenizeToStringList(argumentString);
   if (!arguments) return std::unexpected(std::move(arguments.error()));
-  auto invoked = recoverLuaScriptError(m_scriptComponent.invoke<std::variant<RpcPromise<Json>, LuaValue>>("command", command, connectionId, json_from_string_list(*arguments)));
+  auto invoked = recover_lua_script_error(m_scriptComponent.invoke<std::variant<RpcPromise<Json>, LuaValue>>("command", command, connectionId, json_from_string_list(*arguments)));
   if (!invoked) return std::unexpected(std::move(invoked.error()));
   if (*invoked) {
     auto& result = **invoked;
@@ -1793,7 +1793,7 @@ std::expected<std::optional<String>, StarException> CommandProcessor::localCheck
 std::expected<LuaCallbacks, StarException> CommandProcessor::makeCommandCallbacks() {
   LuaCallbacks callbacks;
   auto registered =
-    callbacks.registerCallbackWithSignature<std::expected<std::optional<String>, StarException>, ConnectionId, String>(
+    callbacks.register_callback_with_signature<std::expected<std::optional<String>, StarException>, ConnectionId, String>(
       "adminCheck", [this](ConnectionId connectionId, String const& commandDescription) {
         return adminCheck(connectionId, commandDescription);
       });

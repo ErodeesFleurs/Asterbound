@@ -200,7 +200,7 @@ std::expected<LuaMethods<LuaCanvas>, StarException> LuaUserDataMethods<LuaCanvas
         }
       };
     }(std::type_identity<typename FunctionTraits<Function>::argument_types>{});
-    return methods.registerMethod(std::move(name), std::move(guarded));
+    return methods.register_method(std::move(name), std::move(guarded));
   };
   if (auto registered =
         registerCanvasMethod("size", [](std::shared_ptr<CanvasWidget> canvas) { return canvas->size(); });
@@ -397,7 +397,7 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
   if (!reader)
     reader = std::make_shared<GuiReader>(context);
   LuaCallbacks callbacks;
-  if (auto registered = callbacks.registerCallback("playSound", [parentWidget](String const& audio, std::optional<int> loops, std::optional<float> volume) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("playSound", [parentWidget](String const& audio, std::optional<int> loops, std::optional<float> volume) -> std::expected<void, StarException> {
     auto owner = parentWidget.lock();
     if (!owner)
       return std::unexpected(GuiException("Widget callback target no longer exists"));
@@ -407,7 +407,7 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback(
+  if (auto registered = callbacks.register_callback(
         "bindCanvas",
         [parentWidget](LuaEngine& engine,
                        String const& widgetName) -> std::expected<std::optional<LuaCanvas>, StarException> {
@@ -415,47 +415,47 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
             parentWidget, widgetName,
             [&](std::shared_ptr<CanvasWidget> widget) -> std::expected<std::optional<LuaCanvas>, StarException> {
               return LuaCanvas{.canvas = std::move(widget),
-                               .lifetime = engine.promiseLifetime(),
+                               .lifetime = engine.promise_lifetime(),
                                .hostLifetime = {},
                                .owner = parentWidget};
             });
         });
       !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("getPosition", [parentWidget](String const& widgetName) -> std::expected<std::optional<Vec2I>, StarException> {
+  if (auto registered = callbacks.register_callback("getPosition", [parentWidget](String const& widgetName) -> std::expected<std::optional<Vec2I>, StarException> {
     return withWidget<Widget>(parentWidget, widgetName, [&](std::shared_ptr<Widget> widget) -> std::expected<std::optional<Vec2I>, StarException> {
       return widget->relativePosition();
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setPosition", [parentWidget](String const& widgetName, Vec2I const& position) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setPosition", [parentWidget](String const& widgetName, Vec2I const& position) -> std::expected<void, StarException> {
     return withWidget<Widget>(parentWidget, widgetName, [&](std::shared_ptr<Widget> widget) -> std::expected<void, StarException> {
       widget->setPosition(position);
       return {};
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("getSize", [parentWidget](String const& widgetName) -> std::expected<std::optional<Vec2I>, StarException> {
+  if (auto registered = callbacks.register_callback("getSize", [parentWidget](String const& widgetName) -> std::expected<std::optional<Vec2I>, StarException> {
     return withWidget<Widget>(parentWidget, widgetName, [&](std::shared_ptr<Widget> widget) -> std::expected<std::optional<Vec2I>, StarException> {
       return widget->size();
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setSize", [parentWidget](String const& widgetName, Vec2I const& size) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setSize", [parentWidget](String const& widgetName, Vec2I const& size) -> std::expected<void, StarException> {
     return withWidget<Widget>(parentWidget, widgetName, [&](std::shared_ptr<Widget> widget) -> std::expected<void, StarException> {
       widget->setSize(size);
       return {};
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setDrawingOffset", [parentWidget](String const& widgetName, Vec2I const& offset) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setDrawingOffset", [parentWidget](String const& widgetName, Vec2I const& offset) -> std::expected<void, StarException> {
     return withWidget<Widget>(parentWidget, widgetName, [&](std::shared_ptr<Widget> widget) -> std::expected<void, StarException> {
       widget->setDrawingOffset(offset);
       return {};
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setScissoringEnabled", [parentWidget](String const& widgetName, bool enabled) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setScissoringEnabled", [parentWidget](String const& widgetName, bool enabled) -> std::expected<void, StarException> {
     return withWidget<Widget>(parentWidget, widgetName, [&](std::shared_ptr<Widget> widget) -> std::expected<void, StarException> {
       if (enabled)
         widget->enableScissoring();
@@ -465,25 +465,25 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setVisible", [parentWidget](String const& widgetName, bool visible) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setVisible", [parentWidget](String const& widgetName, bool visible) -> std::expected<void, StarException> {
     return withWidget<Widget>(parentWidget, widgetName, [&](std::shared_ptr<Widget> widget) -> std::expected<void, StarException> {
       return widget->setVisibility(visible);
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("active", [parentWidget](String const& widgetName) -> std::expected<std::optional<bool>, StarException> {
+  if (auto registered = callbacks.register_callback("active", [parentWidget](String const& widgetName) -> std::expected<std::optional<bool>, StarException> {
     return withWidget<Widget>(parentWidget, widgetName, [&](std::shared_ptr<Widget> widget) -> std::expected<std::optional<bool>, StarException> {
       return widget->active();
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("focus", [parentWidget](String const& widgetName) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("focus", [parentWidget](String const& widgetName) -> std::expected<void, StarException> {
     return withWidget<Widget>(parentWidget, widgetName, [&](std::shared_ptr<Widget> widget) -> std::expected<void, StarException> {
       return widget->focus();
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("hasFocus", [parentWidget](String const& widgetName) -> std::expected<std::optional<bool>, StarException> {
+  if (auto registered = callbacks.register_callback("hasFocus", [parentWidget](String const& widgetName) -> std::expected<std::optional<bool>, StarException> {
     return withWidget<Widget>(parentWidget, widgetName, [&](std::shared_ptr<Widget> widget) -> std::expected<std::optional<bool>, StarException> {
       auto focused = widget->hasFocus();
       if (!focused)
@@ -492,26 +492,26 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("blur", [parentWidget](String const& widgetName) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("blur", [parentWidget](String const& widgetName) -> std::expected<void, StarException> {
     return withWidget<Widget>(parentWidget, widgetName, [&](std::shared_ptr<Widget> widget) -> std::expected<void, StarException> {
       return widget->blur();
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("getData", [parentWidget](String const& widgetName) -> std::expected<Json, StarException> {
+  if (auto registered = callbacks.register_callback("getData", [parentWidget](String const& widgetName) -> std::expected<Json, StarException> {
     return withWidget<Widget>(parentWidget, widgetName, [&](std::shared_ptr<Widget> widget) -> std::expected<Json, StarException> {
       return widget->data();
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setData", [parentWidget](String const& widgetName, Json const& data) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setData", [parentWidget](String const& widgetName, Json const& data) -> std::expected<void, StarException> {
     return withWidget<Widget>(parentWidget, widgetName, [&](std::shared_ptr<Widget> widget) -> std::expected<void, StarException> {
       widget->setData(data);
       return {};
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("getChildAt", [parentWidget](Vec2I const& position) -> std::expected<std::optional<String>, StarException> {
+  if (auto registered = callbacks.register_callback("getChildAt", [parentWidget](Vec2I const& position) -> std::expected<std::optional<String>, StarException> {
     auto owner = parentWidget.lock();
     if (!owner)
       return std::unexpected(GuiException("Widget callback target no longer exists"));
@@ -520,13 +520,13 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("inMember", [parentWidget](String const& widgetName, Vec2I const& position) -> std::expected<std::optional<bool>, StarException> {
+  if (auto registered = callbacks.register_callback("inMember", [parentWidget](String const& widgetName, Vec2I const& position) -> std::expected<std::optional<bool>, StarException> {
     return withWidget<Widget>(parentWidget, widgetName, [&](std::shared_ptr<Widget> widget) -> std::expected<std::optional<bool>, StarException> {
       return widget->inMember(position);
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("addChild", [parentWidget, reader](String const& widgetName, Json const& config, std::optional<String> const& childName) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("addChild", [parentWidget, reader](String const& widgetName, Json const& config, std::optional<String> const& childName) -> std::expected<void, StarException> {
     return withWidget<Widget>(parentWidget, widgetName, [&](std::shared_ptr<Widget> widget) -> std::expected<void, StarException> {
       String name = childName.value_or(Star::to_string(widget->context().root().random().next_u64()));
       auto child = reader->makeSingle(name, config);
@@ -538,65 +538,65 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("removeAllChildren", [parentWidget](String const& widgetName) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("removeAllChildren", [parentWidget](String const& widgetName) -> std::expected<void, StarException> {
     return withWidget<Widget>(parentWidget, widgetName, [&](std::shared_ptr<Widget> widget) -> std::expected<void, StarException> {
       widget->removeAllChildren();
       return {};
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("removeChild", [parentWidget](String const& widgetName, String const& childName) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("removeChild", [parentWidget](String const& widgetName, String const& childName) -> std::expected<void, StarException> {
     return withWidget<Widget>(parentWidget, widgetName, [&](std::shared_ptr<Widget> widget) -> std::expected<void, StarException> {
       widget->removeChild(childName);
       return {};
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setHint", [parentWidget](String const& widgetName, String const& hint) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setHint", [parentWidget](String const& widgetName, String const& hint) -> std::expected<void, StarException> {
     return withWidget<TextBoxWidget>(parentWidget, widgetName, [&](std::shared_ptr<TextBoxWidget> widget) -> std::expected<void, StarException> {
       widget->setHint(hint);
       return {};
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("getHint", [parentWidget](String const& widgetName) -> std::expected<std::optional<String>, StarException> {
+  if (auto registered = callbacks.register_callback("getHint", [parentWidget](String const& widgetName) -> std::expected<std::optional<String>, StarException> {
     return withWidget<TextBoxWidget>(parentWidget, widgetName, [&](std::shared_ptr<TextBoxWidget> widget) -> std::expected<std::optional<String>, StarException> {
       return widget->getHint();
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setCursorPosition", [parentWidget](String const& widgetName, int position) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setCursorPosition", [parentWidget](String const& widgetName, int position) -> std::expected<void, StarException> {
     return withWidget<TextBoxWidget>(parentWidget, widgetName, [&](std::shared_ptr<TextBoxWidget> widget) -> std::expected<void, StarException> {
       return widget->setCursorPosition(position);
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("getCursorPosition", [parentWidget](String const& widgetName) -> std::expected<std::optional<int>, StarException> {
+  if (auto registered = callbacks.register_callback("getCursorPosition", [parentWidget](String const& widgetName) -> std::expected<std::optional<int>, StarException> {
     return withWidget<TextBoxWidget>(parentWidget, widgetName, [&](std::shared_ptr<TextBoxWidget> widget) -> std::expected<std::optional<int>, StarException> {
       return widget->getCursorPosition();
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setTextEditorRendering", [parentWidget](String const& name, bool enabled) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setTextEditorRendering", [parentWidget](String const& name, bool enabled) -> std::expected<void, StarException> {
     return withWidget<TextBoxWidget>(parentWidget, name, [&](std::shared_ptr<TextBoxWidget> editor) -> std::expected<void, StarException> {
       editor->setEditorRendering(enabled);
       return {};
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("getTextEditorState", [parentWidget](String const& name) -> std::expected<Json, StarException> {
+  if (auto registered = callbacks.register_callback("getTextEditorState", [parentWidget](String const& name) -> std::expected<Json, StarException> {
     return withWidget<TextBoxWidget>(parentWidget, name, [&](std::shared_ptr<TextBoxWidget> editor) {
       return editor->editorState();
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setTextSelection", [parentWidget](String const& name, int anchor, int cursor) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setTextSelection", [parentWidget](String const& name, int anchor, int cursor) -> std::expected<void, StarException> {
     return withWidget<TextBoxWidget>(parentWidget, name, [&](std::shared_ptr<TextBoxWidget> editor) {
       return editor->setSelection(anchor, cursor);
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setTextStyle", [parentWidget](String const& name, Json const& config) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setTextStyle", [parentWidget](String const& name, Json const& config) -> std::expected<void, StarException> {
     auto style = TextStyle::create(config);
     if (!style)
       return std::unexpected(std::move(style.error()));
@@ -609,7 +609,7 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("getText", [parentWidget](String const& widgetName) -> std::expected<std::optional<String>, StarException> {
+  if (auto registered = callbacks.register_callback("getText", [parentWidget](String const& widgetName) -> std::expected<std::optional<String>, StarException> {
     return withWidget<Widget>(parentWidget, widgetName, [&](std::shared_ptr<Widget> widget) -> std::expected<std::optional<String>, StarException> {
       if (auto label = as<LabelWidget>(widget))
         return label->text();
@@ -621,7 +621,7 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setText", [parentWidget](String const& widgetName, String const& text) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setText", [parentWidget](String const& widgetName, String const& text) -> std::expected<void, StarException> {
     return withWidget<Widget>(parentWidget, widgetName, [&](std::shared_ptr<Widget> widget) -> std::expected<void, StarException> {
       if (auto label = as<LabelWidget>(widget))
         return label->setText(text);
@@ -636,27 +636,27 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setTextCharLimit", [parentWidget](String const& name, std::optional<unsigned> limit) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setTextCharLimit", [parentWidget](String const& name, std::optional<unsigned> limit) -> std::expected<void, StarException> {
     return withWidget<LabelWidget>(parentWidget, name, [&](std::shared_ptr<LabelWidget> label) {
       return label->setTextCharLimit(limit);
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setProgressColor", [parentWidget](String const& name, Color color, std::optional<Color> mix, std::optional<float> amount) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setProgressColor", [parentWidget](String const& name, Color color, std::optional<Color> mix, std::optional<float> amount) -> std::expected<void, StarException> {
     return withWidget<ProgressWidget>(parentWidget, name, [&](std::shared_ptr<ProgressWidget> progress) -> std::expected<void, StarException> {
       progress->setColor(mix ? color.mix(*mix, amount.value_or(0)) : color);
       return {};
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setProgressOverlay", [parentWidget](String const& name, String const& image) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setProgressOverlay", [parentWidget](String const& name, String const& image) -> std::expected<void, StarException> {
     return withWidget<ProgressWidget>(parentWidget, name, [&](std::shared_ptr<ProgressWidget> progress) -> std::expected<void, StarException> {
       progress->setOverlay(image);
       return {};
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setPortraitEntity", [parentWidget](String const& name, std::optional<LuaUserData> const& handle) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setPortraitEntity", [parentWidget](String const& name, std::optional<LuaUserData> const& handle) -> std::expected<void, StarException> {
     return withWidget<PortraitWidget>(parentWidget, name, [&](std::shared_ptr<PortraitWidget> portrait) -> std::expected<void, StarException> {
       std::shared_ptr<PortraitEntity> entity;
       if (handle) {
@@ -668,7 +668,7 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setFontColor", [parentWidget](String const& widgetName, Color color, std::optional<float> alpha) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setFontColor", [parentWidget](String const& widgetName, Color color, std::optional<float> alpha) -> std::expected<void, StarException> {
     if (alpha)
       color.set_alpha_f(*alpha);
     return withWidget<Widget>(parentWidget, widgetName, [&](std::shared_ptr<Widget> widget) -> std::expected<void, StarException> {
@@ -682,38 +682,38 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setImage", [parentWidget](String const& widgetName, String const& image) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setImage", [parentWidget](String const& widgetName, String const& image) -> std::expected<void, StarException> {
     return withWidget<ImageWidget>(parentWidget, widgetName, [&](std::shared_ptr<ImageWidget> widget) -> std::expected<void, StarException> {
       return widget->setImage(image);
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setImageScale", [parentWidget](String const& widgetName, float scale) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setImageScale", [parentWidget](String const& widgetName, float scale) -> std::expected<void, StarException> {
     return withWidget<ImageWidget>(parentWidget, widgetName, [&](std::shared_ptr<ImageWidget> widget) -> std::expected<void, StarException> {
       return widget->setScale(scale);
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setImageRotation", [parentWidget](String const& widgetName, float rotation) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setImageRotation", [parentWidget](String const& widgetName, float rotation) -> std::expected<void, StarException> {
     return withWidget<ImageWidget>(parentWidget, widgetName, [&](std::shared_ptr<ImageWidget> widget) -> std::expected<void, StarException> {
       return widget->setRotation(rotation);
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setButtonEnabled", [parentWidget](String const& widgetName, bool enabled) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setButtonEnabled", [parentWidget](String const& widgetName, bool enabled) -> std::expected<void, StarException> {
     return withWidget<ButtonWidget>(parentWidget, widgetName, [&](std::shared_ptr<ButtonWidget> widget) -> std::expected<void, StarException> {
       widget->setEnabled(enabled);
       return {};
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setButtonImage", [parentWidget](String const& widgetName, String const& image) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setButtonImage", [parentWidget](String const& widgetName, String const& image) -> std::expected<void, StarException> {
     return withWidget<ButtonWidget>(parentWidget, widgetName, [&](std::shared_ptr<ButtonWidget> widget) -> std::expected<void, StarException> {
       return widget->setImages(image);
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setButtonImages", [parentWidget](String const& widgetName, Json const& images) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setButtonImages", [parentWidget](String const& widgetName, Json const& images) -> std::expected<void, StarException> {
     return withWidget<ButtonWidget>(parentWidget, widgetName, [&](std::shared_ptr<ButtonWidget> widget) -> std::expected<void, StarException> {
       auto base = images.get_string("base");
       if (!base)
@@ -731,7 +731,7 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setButtonCheckedImages", [parentWidget](String const& widgetName, Json const& images) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setButtonCheckedImages", [parentWidget](String const& widgetName, Json const& images) -> std::expected<void, StarException> {
     return withWidget<ButtonWidget>(parentWidget, widgetName, [&](std::shared_ptr<ButtonWidget> widget) -> std::expected<void, StarException> {
       auto base = images.get_string("base");
       if (!base)
@@ -749,33 +749,33 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setButtonOverlayImage", [parentWidget](String const& widgetName, String const& image) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setButtonOverlayImage", [parentWidget](String const& widgetName, String const& image) -> std::expected<void, StarException> {
     return withWidget<ButtonWidget>(parentWidget, widgetName, [&](std::shared_ptr<ButtonWidget> widget) -> std::expected<void, StarException> {
       widget->setOverlayImage(image);
       return {};
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("getChecked", [parentWidget](String const& widgetName) -> std::expected<std::optional<bool>, StarException> {
+  if (auto registered = callbacks.register_callback("getChecked", [parentWidget](String const& widgetName) -> std::expected<std::optional<bool>, StarException> {
     return withWidget<ButtonWidget>(parentWidget, widgetName, [&](std::shared_ptr<ButtonWidget> widget) -> std::expected<std::optional<bool>, StarException> {
       return widget->isChecked();
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setChecked", [parentWidget](String const& widgetName, bool checked) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setChecked", [parentWidget](String const& widgetName, bool checked) -> std::expected<void, StarException> {
     return withWidget<ButtonWidget>(parentWidget, widgetName, [&](std::shared_ptr<ButtonWidget> widget) -> std::expected<void, StarException> {
       widget->setChecked(checked);
       return {};
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("getSelectedOption", [parentWidget](String const& widgetName) -> std::expected<std::optional<int>, StarException> {
+  if (auto registered = callbacks.register_callback("getSelectedOption", [parentWidget](String const& widgetName) -> std::expected<std::optional<int>, StarException> {
     return withWidget<ButtonGroupWidget>(parentWidget, widgetName, [&](std::shared_ptr<ButtonGroupWidget> widget) -> std::expected<std::optional<int>, StarException> {
       return widget->checkedId();
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("getSelectedData", [parentWidget](String const& widgetName) -> std::expected<Json, StarException> {
+  if (auto registered = callbacks.register_callback("getSelectedData", [parentWidget](String const& widgetName) -> std::expected<Json, StarException> {
     return withWidget<ButtonGroupWidget>(parentWidget, widgetName, [&](std::shared_ptr<ButtonGroupWidget> widget) -> std::expected<Json, StarException> {
       if (auto button = widget->checkedButton())
         return button->get().data();
@@ -783,13 +783,13 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setSelectedOption", [parentWidget](String const& widgetName, std::optional<int> index) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setSelectedOption", [parentWidget](String const& widgetName, std::optional<int> index) -> std::expected<void, StarException> {
     return withWidget<ButtonGroupWidget>(parentWidget, widgetName, [&](std::shared_ptr<ButtonGroupWidget> widget) -> std::expected<void, StarException> {
       return widget->select(index.value_or(ButtonGroup::NoButton));
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setOptionEnabled", [parentWidget](String const& widgetName, int index, bool enabled) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setOptionEnabled", [parentWidget](String const& widgetName, int index, bool enabled) -> std::expected<void, StarException> {
     return withWidget<ButtonGroupWidget>(parentWidget, widgetName, [&](std::shared_ptr<ButtonGroupWidget> widget) -> std::expected<void, StarException> {
       if (auto button = widget->button(index))
         button->get().setEnabled(enabled);
@@ -797,7 +797,7 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setOptionVisible", [parentWidget](String const& widgetName, int index, bool visible) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setOptionVisible", [parentWidget](String const& widgetName, int index, bool visible) -> std::expected<void, StarException> {
     return withWidget<ButtonGroupWidget>(parentWidget, widgetName, [&](std::shared_ptr<ButtonGroupWidget> widget) -> std::expected<void, StarException> {
       if (auto button = widget->button(index))
         return button->get().setVisibility(visible);
@@ -805,45 +805,45 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setProgress", [parentWidget](String const& widgetName, float value) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setProgress", [parentWidget](String const& widgetName, float value) -> std::expected<void, StarException> {
     return withWidget<ProgressWidget>(parentWidget, widgetName, [&](std::shared_ptr<ProgressWidget> widget) -> std::expected<void, StarException> {
       widget->setCurrentProgressLevel(value);
       return {};
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setSliderEnabled", [parentWidget](String const& widgetName, bool enabled) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setSliderEnabled", [parentWidget](String const& widgetName, bool enabled) -> std::expected<void, StarException> {
     return withWidget<SliderBarWidget>(parentWidget, widgetName, [&](std::shared_ptr<SliderBarWidget> widget) -> std::expected<void, StarException> {
       widget->setEnabled(enabled);
       return {};
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("getSliderValue", [parentWidget](String const& widgetName) -> std::expected<std::optional<int>, StarException> {
+  if (auto registered = callbacks.register_callback("getSliderValue", [parentWidget](String const& widgetName) -> std::expected<std::optional<int>, StarException> {
     return withWidget<SliderBarWidget>(parentWidget, widgetName, [&](std::shared_ptr<SliderBarWidget> widget) -> std::expected<std::optional<int>, StarException> {
       return widget->val();
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setSliderValue", [parentWidget](String const& widgetName, int value) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setSliderValue", [parentWidget](String const& widgetName, int value) -> std::expected<void, StarException> {
     return withWidget<SliderBarWidget>(parentWidget, widgetName, [&](std::shared_ptr<SliderBarWidget> widget) -> std::expected<void, StarException> {
       return widget->setVal(value);
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setSliderRange", [parentWidget](String const& widgetName, int min, int max, std::optional<int> delta) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setSliderRange", [parentWidget](String const& widgetName, int min, int max, std::optional<int> delta) -> std::expected<void, StarException> {
     return withWidget<SliderBarWidget>(parentWidget, widgetName, [&](std::shared_ptr<SliderBarWidget> widget) -> std::expected<void, StarException> {
       return widget->setRange(min, max, delta.value_or(1));
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("clearListItems", [parentWidget](String const& widgetName) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("clearListItems", [parentWidget](String const& widgetName) -> std::expected<void, StarException> {
     return withWidget<ListWidget>(parentWidget, widgetName, [&](std::shared_ptr<ListWidget> widget) -> std::expected<void, StarException> {
       return widget->clear();
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("addListItem", [parentWidget](String const& widgetName) -> std::expected<std::optional<String>, StarException> {
+  if (auto registered = callbacks.register_callback("addListItem", [parentWidget](String const& widgetName) -> std::expected<std::optional<String>, StarException> {
     return withWidget<ListWidget>(parentWidget, widgetName, [&](std::shared_ptr<ListWidget> widget) -> std::expected<std::optional<String>, StarException> {
       auto item = widget->addItem();
       if (!item)
@@ -852,13 +852,13 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("removeListItem", [parentWidget](String const& widgetName, std::size_t index) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("removeListItem", [parentWidget](String const& widgetName, std::size_t index) -> std::expected<void, StarException> {
     return withWidget<ListWidget>(parentWidget, widgetName, [&](std::shared_ptr<ListWidget> widget) -> std::expected<void, StarException> {
       return widget->removeItem(index);
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("getListSelected", [parentWidget](String const& widgetName) -> std::expected<std::optional<String>, StarException> {
+  if (auto registered = callbacks.register_callback("getListSelected", [parentWidget](String const& widgetName) -> std::expected<std::optional<String>, StarException> {
     return withWidget<ListWidget>(parentWidget, widgetName, [&](std::shared_ptr<ListWidget> widget) -> std::expected<std::optional<String>, StarException> {
       if (widget->selectedItem() != NPos)
         return widget->selectedWidget()->name();
@@ -866,7 +866,7 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setListSelected", [parentWidget](String const& widgetName, String const& name) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setListSelected", [parentWidget](String const& widgetName, String const& name) -> std::expected<void, StarException> {
     return withWidget<ListWidget>(parentWidget, widgetName, [&](std::shared_ptr<ListWidget> widget) -> std::expected<void, StarException> {
       auto selected = widget->fetchChild(name);
       if (!selected)
@@ -877,20 +877,20 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("clearListSelected", [parentWidget](String const& widgetName) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("clearListSelected", [parentWidget](String const& widgetName) -> std::expected<void, StarException> {
     return withWidget<ListWidget>(parentWidget, widgetName, [&](std::shared_ptr<ListWidget> widget) -> std::expected<void, StarException> {
       return widget->clearSelected();
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback(
+  if (auto registered = callbacks.register_callback(
         "registerMemberCallback",
         [parentWidget](LuaEngine& engine, String const& widgetName, String const& name,
                        LuaFunction callback) -> std::expected<void, StarException> {
           return withWidget<ListWidget>(
             parentWidget, widgetName, [&](std::shared_ptr<ListWidget> widget) -> std::expected<void, StarException> {
               auto scoped = std::make_shared<ScopedMemberCallback>(
-                std::move(callback), engine.promiseLifetime(), LuaBaseComponent::activeComponent());
+                std::move(callback), engine.promise_lifetime(), LuaBaseComponent::active_component());
               widget->registerMemberCallback(
                 name, [scoped = std::move(scoped)](Widget& member) -> std::expected<void, StarException> {
                   if (scoped->lifetime.stop_requested() || !scoped->callback)
@@ -898,8 +898,8 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
                   // The call may retire its own group and release the stored reference.
                   auto callback = *scoped->callback;
                   if (scoped->issuer) {
-                    auto result = recoverLuaScriptError(
-                      scoped->issuer->get().invokeCallback<LuaValue>(callback, member.name(), member.data()));
+                    auto result = recover_lua_script_error(
+                      scoped->issuer->get().invoke_callback<LuaValue>(callback, member.name(), member.data()));
                     if (!result)
                       return std::unexpected(std::move(result.error()));
                     return {};
@@ -911,20 +911,20 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
         });
       !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("refreshLayout", [parentWidget](String const& widgetName) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("refreshLayout", [parentWidget](String const& widgetName) -> std::expected<void, StarException> {
     return withWidget<Layout>(parentWidget, widgetName, [](std::shared_ptr<Layout> widget) {
       return widget->update(0);
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setImageDrawables", [parentWidget](String const& widgetName, List<Drawable> drawables, std::optional<Vec2F> scale) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setImageDrawables", [parentWidget](String const& widgetName, List<Drawable> drawables, std::optional<Vec2F> scale) -> std::expected<void, StarException> {
     return withWidget<ImageWidget>(parentWidget, widgetName, [&](std::shared_ptr<ImageWidget> widget) -> std::expected<void, StarException> {
       if (scale) Drawable::scaleAll(drawables, *scale);
       return widget->setDrawables(std::move(drawables));
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setItemGridItems", [parentWidget](String const& widgetName, JsonArray const& items, std::optional<std::size_t> size) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setItemGridItems", [parentWidget](String const& widgetName, JsonArray const& items, std::optional<std::size_t> size) -> std::expected<void, StarException> {
     return withWidget<ItemGridWidget>(parentWidget, widgetName, [&](std::shared_ptr<ItemGridWidget> widget) -> std::expected<void, StarException> {
       auto database = widget->context().root().itemDatabase();
       if (!database) return std::unexpected(std::move(database.error()));
@@ -939,13 +939,13 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("itemGridItems", [parentWidget](String const& widgetName) -> std::expected<Json, StarException> {
+  if (auto registered = callbacks.register_callback("itemGridItems", [parentWidget](String const& widgetName) -> std::expected<Json, StarException> {
     return withWidget<ItemGridWidget>(parentWidget, widgetName, [&](std::shared_ptr<ItemGridWidget> widget) -> std::expected<Json, StarException> {
       return widget->bag()->toJson();
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("itemSlotItem", [parentWidget](String const& widgetName) -> std::expected<std::optional<Json>, StarException> {
+  if (auto registered = callbacks.register_callback("itemSlotItem", [parentWidget](String const& widgetName) -> std::expected<std::optional<Json>, StarException> {
     return withWidget<ItemSlotWidget>(parentWidget, widgetName, [&](std::shared_ptr<ItemSlotWidget> widget) -> std::expected<std::optional<Json>, StarException> {
       if (auto item = widget->item())
         return item->descriptor().toJson();
@@ -953,7 +953,7 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setItemSlotHandle", [parentWidget](String const& name, std::optional<LuaUserData> const& handle) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setItemSlotHandle", [parentWidget](String const& name, std::optional<LuaUserData> const& handle) -> std::expected<void, StarException> {
     return withWidget<ItemSlotWidget>(parentWidget, name, [&](std::shared_ptr<ItemSlotWidget> slot) -> std::expected<void, StarException> {
       std::shared_ptr<Item> item;
       if (handle) {
@@ -966,7 +966,7 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setItemSlotDisplay", [parentWidget](String const& name, Json const& display) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setItemSlotDisplay", [parentWidget](String const& name, Json const& display) -> std::expected<void, StarException> {
     return withWidget<ItemSlotWidget>(parentWidget, name, [&](std::shared_ptr<ItemSlotWidget> slot) -> std::expected<void, StarException> {
       static auto const fields = std::array{std::pair{String("durability"), &ItemSlotWidget::showDurability},
           std::pair{String("count"), &ItemSlotWidget::showCount}, std::pair{String("secondaryIcon"), &ItemSlotWidget::showSecondaryIcon},
@@ -992,7 +992,7 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setItemSlotItem", [parentWidget](String const& widgetName, Json const& config) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setItemSlotItem", [parentWidget](String const& widgetName, Json const& config) -> std::expected<void, StarException> {
     return withWidget<ItemSlotWidget>(parentWidget, widgetName, [&](std::shared_ptr<ItemSlotWidget> widget) -> std::expected<void, StarException> {
       auto database = widget->context().root().itemDatabase();
       if (!database)
@@ -1005,14 +1005,14 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setItemSlotProgress", [parentWidget](String const& widgetName, float progress) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setItemSlotProgress", [parentWidget](String const& widgetName, float progress) -> std::expected<void, StarException> {
     return withWidget<ItemSlotWidget>(parentWidget, widgetName, [&](std::shared_ptr<ItemSlotWidget> widget) -> std::expected<void, StarException> {
       widget->setProgress(progress);
       return {};
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("addFlowImage", [parentWidget](String const& widgetName, String const& name, String const& image) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("addFlowImage", [parentWidget](String const& widgetName, String const& name, String const& image) -> std::expected<void, StarException> {
     return withWidget<FlowLayout>(parentWidget, widgetName, [&](std::shared_ptr<FlowLayout> widget) -> std::expected<void, StarException> {
       auto child = ImageWidget::create(widget->context(), image);
       if (!child)
@@ -1021,7 +1021,7 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setImageStretchSet", [parentWidget](String const& widgetName, Json const& images) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setImageStretchSet", [parentWidget](String const& widgetName, Json const& images) -> std::expected<void, StarException> {
     return withWidget<ImageStretchWidget>(parentWidget, widgetName, [&](std::shared_ptr<ImageStretchWidget> widget) -> std::expected<void, StarException> {
       auto begin = images.get_string("begin", "");
       if (!begin)
@@ -1037,20 +1037,20 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("getScrollOffset", [parentWidget](String const& widgetName) -> std::expected<std::optional<Vec2I>, StarException> {
+  if (auto registered = callbacks.register_callback("getScrollOffset", [parentWidget](String const& widgetName) -> std::expected<std::optional<Vec2I>, StarException> {
     return withWidget<ScrollArea>(parentWidget, widgetName, [&](std::shared_ptr<ScrollArea> widget) -> std::expected<std::optional<Vec2I>, StarException> {
       return widget->scrollOffset();
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setScrollOffset", [parentWidget](String const& widgetName, Vec2I const& offset) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setScrollOffset", [parentWidget](String const& widgetName, Vec2I const& offset) -> std::expected<void, StarException> {
     return withWidget<ScrollArea>(parentWidget, widgetName, [&](std::shared_ptr<ScrollArea> widget) -> std::expected<void, StarException> {
       widget->scrollAreaBy(offset - widget->scrollOffset());
       return {};
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("getMaxScrollPosition", [parentWidget](String const& widgetName) -> std::expected<std::optional<Vec2I>, StarException> {
+  if (auto registered = callbacks.register_callback("getMaxScrollPosition", [parentWidget](String const& widgetName) -> std::expected<std::optional<Vec2I>, StarException> {
     return withWidget<ScrollArea>(parentWidget, widgetName, [&](std::shared_ptr<ScrollArea> widget) -> std::expected<std::optional<Vec2I>, StarException> {
       return widget->maxScrollPosition();
     });

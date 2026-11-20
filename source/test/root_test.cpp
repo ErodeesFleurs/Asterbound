@@ -214,7 +214,7 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
   EXPECT_EQ(context.eval<String>("root.assetJson('/root-isolation.config').owner"), owner);
   EXPECT_EQ(context.eval<String>("root.techConfig('root-isolation').description"), owner);
   EXPECT_EQ(context.eval<String>("root.getConfiguration('rootIsolationOwner')"), configurationOwner);
-  EXPECT_EQ(context.invokePath<String>("isolationScriptOwner"), scriptOwner);
+  EXPECT_EQ(context.invoke_path<String>("isolationScriptOwner"), scriptOwner);
   return {};
 }
 
@@ -223,11 +223,11 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
   if (!lua) return std::unexpected(std::move(lua.error()));
   auto callbacks = LuaBindings::makeRootCallbacks(root);
   if (!callbacks) return std::unexpected(std::move(callbacks.error()));
-  (*lua)->addCallbacks("root", *callbacks);
+  (*lua)->add_callbacks("root", *callbacks);
   if (utilities) {
     auto utilityCallbacks = LuaBindings::makeUtilityCallbacks(root.random(), root.logger(), root.logMap());
     if (!utilityCallbacks) return std::unexpected(std::move(utilityCallbacks.error()));
-    (*lua)->addCallbacks("sb", *utilityCallbacks);
+    (*lua)->add_callbacks("sb", *utilityCallbacks);
   }
   return std::move(*lua);
 }
@@ -394,7 +394,7 @@ const GameTestRegistration signed_broadcast_lifecycle("RootTest", "SignedBroadca
 const GameTestRegistration strictLuaTags("RootTest", "StrictLuaTagFormatting", [](GameTest& fixture) {
   auto lua = isolationLua(fixture.root(), true);
   ASSERT_TRUE(lua) << lua.error().what();
-  auto context = (*lua)->createContext(StringList{});
+  auto context = (*lua)->create_context(StringList{});
   ASSERT_TRUE(context) << context.error().what();
   auto result = context->eval<Json>(R"LUA(
     local rejected = {}
@@ -432,9 +432,9 @@ const GameTestRegistration lua_http_cancellation("RootTest", "LuaHttpCancellatio
   ASSERT_TRUE(callbacks) << callbacks.error().what();
   auto engine = LuaEngine::create();
   ASSERT_TRUE(engine) << engine.error().what();
-  auto context = (*engine)->createContext();
+  auto context = (*engine)->create_context();
   ASSERT_TRUE(context) << context.error().what();
-  ASSERT_TRUE(context->setCallbacks("http", *callbacks));
+  ASSERT_TRUE(context->set_callbacks("http", *callbacks));
   auto lua = [&](String const& script) -> testing::AssertionResult {
     if (auto result = context->eval<void>(script); !result)
       return testing::AssertionFailure() << result.error().what();
@@ -443,7 +443,7 @@ const GameTestRegistration lua_http_cancellation("RootTest", "LuaHttpCancellatio
   auto listener = TcpSocket::listen((*root)->logger(), {HostAddress::localhost(), 0});
   ASSERT_TRUE(listener) << listener.error().what();
   ASSERT_TRUE((*listener)->setNonBlocking(true));
-  ASSERT_TRUE(context->setPath("url", Star::format("http://127.0.0.1:{}/", (*listener)->localAddress().port())));
+  ASSERT_TRUE(context->set_path("url", Star::format("http://127.0.0.1:{}/", (*listener)->localAddress().port())));
   ASSERT_TRUE(lua("unavailable = http.get(url); assert(unavailable:status() == 'failed')"));
   ASSERT_TRUE(session->set_approval_available(true));
   ASSERT_FALSE(session->approval());
@@ -517,9 +517,9 @@ const GameTestRegistration lua_http_cancellation("RootTest", "LuaHttpCancellatio
 
   // A discarded Lua value must neither abandon a live request nor outlive its scope.
   std::stop_source discarded_scope;
-  (*engine)->setPromiseLifetime(discarded_scope.get_token());
+  (*engine)->set_promise_lifetime(discarded_scope.get_token());
   ASSERT_TRUE(lua("http.get(url)"));
-  ASSERT_TRUE((*engine)->collectGarbage());
+  ASSERT_TRUE((*engine)->collect_garbage());
   auto discarded = session->approval();
   ASSERT_TRUE(discarded);
   discarded_scope.request_stop();
@@ -527,7 +527,7 @@ const GameTestRegistration lua_http_cancellation("RootTest", "LuaHttpCancellatio
   ASSERT_TRUE(session->resolve_approval(discarded->id, true, true));
   ASSERT_TRUE(lua("assert(http.get(url):cancelled())"));
   ASSERT_FALSE(session->approval());
-  (*engine)->setPromiseLifetime({});
+  (*engine)->set_promise_lifetime({});
 
   ASSERT_TRUE(lua("withdrawn = http.get(url); queued = http.get('http://queued.example/')"));
   auto withdrawn = session->approval();
@@ -555,8 +555,8 @@ const GameTestRegistration lua_http_cancellation("RootTest", "LuaHttpCancellatio
   session = std::make_shared<LuaHttpSession>(**root);
   auto live_callbacks = LuaBindings::make_http_callbacks(session, true);
   ASSERT_TRUE(live_callbacks) << live_callbacks.error().what();
-  ASSERT_TRUE(context->setPath("http", LuaNil));
-  ASSERT_TRUE(context->setCallbacks("http", *live_callbacks));
+  ASSERT_TRUE(context->set_path("http", LuaNil));
+  ASSERT_TRUE(context->set_callbacks("http", *live_callbacks));
   ASSERT_TRUE(session->set_approval_available(true));
   ASSERT_TRUE((*configuration)->setPath("safe.luaHttp.trustedSites", JsonArray{"Known.Example"}));
   ASSERT_TRUE(lua("assert(http.isTrusted('known.example') and http.isTrusted('KNOWN.EXAMPLE'))"));
@@ -632,7 +632,7 @@ const GameTestRegistration lua_http_cancellation("RootTest", "LuaHttpCancellatio
   };
 
   std::stop_source active_scope;
-  (*engine)->setPromiseLifetime(active_scope.get_token());
+  (*engine)->set_promise_lifetime(active_scope.get_token());
   ASSERT_TRUE(lua("active = http.get(url, {timeout = 5})"));
   auto current = session->approval();
   ASSERT_TRUE(current);
@@ -642,7 +642,7 @@ const GameTestRegistration lua_http_cancellation("RootTest", "LuaHttpCancellatio
   ASSERT_EQ((*configuration)->getPath("safe.luaHttp.trustedSites"), Json(JsonArray{"127.0.0.1"}));
   auto active = accept_request();
   ASSERT_TRUE(active) << active.error().what();
-  (*engine)->setPromiseLifetime({});
+  (*engine)->set_promise_lifetime({});
   ASSERT_TRUE(lua("response = http.get(url, {timeout = 5}); successful = response"));
   ASSERT_FALSE(session->approval());
   auto successful = accept_request();
@@ -958,9 +958,9 @@ const GameTestRegistration
     auto lua = isolationLua(**root);
     ASSERT_TRUE(lua) << lua.error().what();
     StringList scripts{"/p5-top.lua", "/p5-entry.lua", "/p5-top.lua", "/p5-dependency.lua", "/p5-entry.lua"};
-    auto first = (*lua)->createContext(scripts);
+    auto first = (*lua)->create_context(scripts);
     ASSERT_TRUE(first) << first.error().what();
-    auto second = (*lua)->createContext(scripts);
+    auto second = (*lua)->create_context(scripts);
     ASSERT_TRUE(second) << second.error().what();
     for (auto* context : {&*first, &*second}) {
       auto result = context->eval<Json>(R"LUA(
@@ -982,10 +982,10 @@ const GameTestRegistration
                                 {"value", 10}}));
       EXPECT_EQ(context->eval<int>("topRuns"), 1);
     }
-    EXPECT_EQ(first->invokePath<int>("advance"), 11);
-    EXPECT_EQ(first->invokePath<int>("advance"), 12);
+    EXPECT_EQ(first->invoke_path<int>("advance"), 11);
+    EXPECT_EQ(first->invoke_path<int>("advance"), 12);
     EXPECT_EQ(second->eval<int>("state.value"), 10);
-    EXPECT_EQ(second->invokePath<int>("advance"), 11);
+    EXPECT_EQ(second->invoke_path<int>("advance"), 11);
     EXPECT_EQ(first->eval<int>("state.value"), 12);
   });
 
@@ -1025,7 +1025,7 @@ const GameTestRegistration
     (*root)->logger().add_sink(std::make_shared<RootIsolationErrorSink>());
     auto lua = isolationLua(**root);
     ASSERT_TRUE(lua) << lua.error().what();
-    auto context = (*lua)->createContext(StringList{});
+    auto context = (*lua)->create_context(StringList{});
     ASSERT_TRUE(context) << context.error().what();
     auto failures = context->eval<Json>(R"LUA(
     local firstOk, firstError = pcall(require, "/p5-failure.lua")
@@ -1120,7 +1120,7 @@ const GameTestRegistration
     sink->set_level(LogLevel::Debug);
     logger.add_sink(sink);
     for (unsigned attempt = 0; attempt < 3; ++attempt) {
-      auto failure = (*lua)->createContext("/p5-cycle-a.lua");
+      auto failure = (*lua)->create_context("/p5-cycle-a.lua");
       ASSERT_FALSE(failure);
       EXPECT_TRUE(failure.error().is<LuaException>());
       EXPECT_EQ(failure.error().diagnostic_summary()->kind, ExceptionSummaryKind::ScriptRuntime);
@@ -1148,9 +1148,9 @@ const GameTestRegistration
     (*root)->logger().add_sink(std::make_shared<RootIsolationErrorSink>());
     auto lua = isolationLua(**root);
     ASSERT_TRUE(lua) << lua.error().what();
-    auto original = (*lua)->createContext("/p5-version.lua");
+    auto original = (*lua)->create_context("/p5-version.lua");
     ASSERT_TRUE(original) << original.error().what();
-    EXPECT_EQ(original->invokePath<int>("version"), 1);
+    EXPECT_EQ(original->invoke_path<int>("version"), 1);
     ASSERT_TRUE(writeIsolationModules(
       overlay,
       {{"p5-version.lua", "versionRuns = (versionRuns or 0) + 1; function version() return 2 end"},
@@ -1171,11 +1171,11 @@ const GameTestRegistration
     EXPECT_EQ(staleReload->get_int("loadedResults"), 0);
     EXPECT_EQ(staleReload->get_int("runs"), 1);
     EXPECT_EQ(staleReload->get_bool("unseenAbsent"), true);
-    auto reloaded = (*lua)->createContext(StringList{"/p5-version.lua", "/p5-after-reload.lua"});
+    auto reloaded = (*lua)->create_context(StringList{"/p5-version.lua", "/p5-after-reload.lua"});
     ASSERT_TRUE(reloaded) << reloaded.error().what();
-    EXPECT_EQ(reloaded->invokePath<int>("version"), 2);
-    EXPECT_EQ(reloaded->invokePath<int>("afterReload"), 2);
-    auto beforeRestart = (*lua)->createContext("/p5-version.lua");
+    EXPECT_EQ(reloaded->invoke_path<int>("version"), 2);
+    EXPECT_EQ(reloaded->invoke_path<int>("afterReload"), 2);
+    auto beforeRestart = (*lua)->create_context("/p5-version.lua");
     ASSERT_TRUE(beforeRestart) << beforeRestart.error().what();
     // This asset has never been fetched: restart alone is the invalidation under
     // test, without a hotReload that could independently make this context stale.
@@ -1196,12 +1196,12 @@ const GameTestRegistration
     EXPECT_EQ(staleRestart->get_int("loadedResults"), 0);
     EXPECT_EQ(staleRestart->get_int("runs"), 1);
     EXPECT_EQ(staleRestart->get_bool("unseenAbsent"), true);
-    EXPECT_EQ(original->invokePath<int>("version"), 1);
-    EXPECT_EQ(reloaded->invokePath<int>("afterReload"), 2);
-    auto restarted = (*lua)->createContext(StringList{"/p5-version.lua", "/p5-after-restart.lua"});
+    EXPECT_EQ(original->invoke_path<int>("version"), 1);
+    EXPECT_EQ(reloaded->invoke_path<int>("afterReload"), 2);
+    auto restarted = (*lua)->create_context(StringList{"/p5-version.lua", "/p5-after-restart.lua"});
     ASSERT_TRUE(restarted) << restarted.error().what();
-    EXPECT_EQ(restarted->invokePath<int>("version"), 2);
-    EXPECT_EQ(restarted->invokePath<int>("afterRestart"), 3);
+    EXPECT_EQ(restarted->invoke_path<int>("version"), 2);
+    EXPECT_EQ(restarted->invoke_path<int>("afterRestart"), 3);
   });
 
 const GameTestRegistration
@@ -1226,13 +1226,13 @@ const GameTestRegistration
       SCOPED_TRACE(restart ? "native restart" : "native hot reload");
       int invalidations = 0;
       LuaCallbacks callbacks;
-      ASSERT_TRUE(callbacks.registerCallback("invalidate", [&]() -> std::expected<void, StarException> {
+      ASSERT_TRUE(callbacks.register_callback("invalidate", [&]() -> std::expected<void, StarException> {
         ++invalidations;
         return restart ? (*lua)->restart() : (*root)->hotReload();
       }));
-      auto context = (*lua)->createContext(StringList{});
+      auto context = (*lua)->create_context(StringList{});
       ASSERT_TRUE(context) << context.error().what();
-      ASSERT_TRUE(context->setCallbacks("test", callbacks));
+      ASSERT_TRUE(context->set_callbacks("test", callbacks));
       auto interrupted = context->eval<Json>(R"LUA(
       invalidateDuringLoad = true
       local ok, message = pcall(require, "/p5-reentrant.lua")
@@ -1254,12 +1254,12 @@ const GameTestRegistration
       expectIsolationModuleError(*staleRetry, "message", "/p5-reentrant.lua");
       EXPECT_EQ(staleRetry->get_int("runs"), 1);
       EXPECT_EQ(invalidations, 1);
-      auto fresh = (*lua)->createContext("/p5-reentrant.lua");
+      auto fresh = (*lua)->create_context("/p5-reentrant.lua");
       ASSERT_TRUE(fresh) << fresh.error().what();
-      EXPECT_EQ(fresh->invokePath<int>("retainedValue"), 1);
+      EXPECT_EQ(fresh->invoke_path<int>("retainedValue"), 1);
       EXPECT_EQ(fresh->eval<int>("select('#', require('/p5-reentrant.lua'))"), 0);
       EXPECT_EQ(fresh->eval<int>("moduleRuns"), 1);
-      EXPECT_EQ(context->invokePath<int>("retainedValue"), 1);
+      EXPECT_EQ(context->invoke_path<int>("retainedValue"), 1);
     }
   });
 
@@ -1303,10 +1303,10 @@ const GameTestRegistration simultaneousRoots("RootTest", "SimultaneousRoots", []
     auto createdLuaB = isolationLua(*rootB, true);
     ASSERT_TRUE(createdLuaB) << createdLuaB.error().what();
     auto luaB = std::move(*createdLuaB);
-    auto createdContextA = luaA->createContext("/root-isolation.lua");
+    auto createdContextA = luaA->create_context("/root-isolation.lua");
     ASSERT_TRUE(createdContextA) << createdContextA.error().what();
     auto contextA = std::make_unique<LuaContext>(std::move(*createdContextA));
-    auto contextB = luaB->createContext("/root-isolation.lua");
+    auto contextB = luaB->create_context("/root-isolation.lua");
     ASSERT_TRUE(contextB) << contextB.error().what();
     ASSERT_TRUE(expectIsolationConsumers(*rootA, *contextA, "A", "A", "A"));
     ASSERT_TRUE(expectIsolationConsumers(*rootB, *contextB, "B", "B", "B"));
@@ -1343,7 +1343,7 @@ const GameTestRegistration simultaneousRoots("RootTest", "SimultaneousRoots", []
       (*recovered)->logger().add_sink(std::make_shared<RootIsolationErrorSink>());
       auto recoveredLua = isolationLua(**recovered);
       ASSERT_TRUE(recoveredLua) << recoveredLua.error().what();
-      auto recoveredContext = (*recoveredLua)->createContext("/root-isolation.lua");
+      auto recoveredContext = (*recoveredLua)->create_context("/root-isolation.lua");
       ASSERT_TRUE(recoveredContext) << recoveredContext.error().what();
       ASSERT_TRUE(expectIsolationConsumers(**recovered, *recoveredContext, "A", "A", "A"));
     }
@@ -1369,8 +1369,8 @@ const GameTestRegistration simultaneousRoots("RootTest", "SimultaneousRoots", []
       ASSERT_TRUE(rootA->reload());
       EXPECT_TRUE(listener_a->consume());
       EXPECT_FALSE(listener_b->consume());
-      EXPECT_FALSE(luaA->scriptLoaded("/root-isolation.lua"));
-      EXPECT_TRUE(luaB->scriptLoaded("/root-isolation.lua"));
+      EXPECT_FALSE(luaA->script_loaded("/root-isolation.lua"));
+      EXPECT_TRUE(luaB->script_loaded("/root-isolation.lua"));
       auto reloadedAssetsA = rootA->assets();
       ASSERT_TRUE(reloadedAssetsA) << reloadedAssetsA.error().what();
       auto reloadedDatabaseA = rootA->techDatabase();
@@ -1389,11 +1389,11 @@ const GameTestRegistration simultaneousRoots("RootTest", "SimultaneousRoots", []
       // Existing closures follow their own owner's reloaded services, while
       // already instantiated Lua functions keep their original script body.
       ASSERT_TRUE(expectIsolationConsumers(*rootA, *contextA, "A-reloaded", "A", "A-written"));
-      auto reloadedContextA = luaA->createContext("/root-isolation.lua");
+      auto reloadedContextA = luaA->create_context("/root-isolation.lua");
       ASSERT_TRUE(reloadedContextA) << reloadedContextA.error().what();
       ASSERT_TRUE(expectIsolationConsumers(*rootA, *reloadedContextA, "A-reloaded", "A-reloaded", "A-written"));
       ASSERT_TRUE(expectIsolationConsumers(*rootB, *contextB, "B", "B", "B-written"));
-      auto cachedContextB = luaB->createContext("/root-isolation.lua");
+      auto cachedContextB = luaB->create_context("/root-isolation.lua");
       ASSERT_TRUE(cachedContextB) << cachedContextB.error().what();
       ASSERT_TRUE(expectIsolationConsumers(*rootB, *cachedContextB, "B", "B", "B-written"));
     }
@@ -1415,9 +1415,9 @@ const GameTestRegistration simultaneousRoots("RootTest", "SimultaneousRoots", []
 
     ASSERT_TRUE(rootB->reload());
     EXPECT_TRUE(listener_b->consume());
-    EXPECT_FALSE(luaB->scriptLoaded("/root-isolation.lua"));
+    EXPECT_FALSE(luaB->script_loaded("/root-isolation.lua"));
     ASSERT_TRUE(expectIsolationConsumers(*rootB, *contextB, "B-reloaded", "B", "B-survives"));
-    auto reloadedContextB = luaB->createContext("/root-isolation.lua");
+    auto reloadedContextB = luaB->create_context("/root-isolation.lua");
     ASSERT_TRUE(reloadedContextB) << reloadedContextB.error().what();
     ASSERT_TRUE(expectIsolationConsumers(*rootB, *reloadedContextB, "B-reloaded", "B-reloaded", "B-survives"));
   }
@@ -1555,11 +1555,11 @@ const GameTestRegistration animatorPartDrawableFirstAdd("AnimatorTest", "PartDra
       ASSERT_TRUE(callbacks) << callbacks.error().what();
       auto engine = LuaEngine::create();
       ASSERT_TRUE(engine) << engine.error().what();
-      (*engine)->setExecutionHost(std::make_unique<LuaExecutionScope>(fixture.root()));
-      auto contextResult = (*engine)->createContext();
+      (*engine)->set_execution_host(std::make_unique<LuaExecutionScope>(fixture.root()));
+      auto contextResult = (*engine)->create_context();
       ASSERT_TRUE(contextResult) << contextResult.error().what();
       auto context = std::move(*contextResult);
-      ASSERT_TRUE(context.setCallbacks("animator", *callbacks));
+      ASSERT_TRUE(context.set_callbacks("animator", *callbacks));
 
       auto widths = [&]() -> std::expected<std::vector<float>, StarException> {
         auto drawables = animator->drawables();
@@ -1811,11 +1811,11 @@ const GameTestRegistration hudWorldViews("HudDomainTest", "WorldPortraitDeltasFo
   ASSERT_TRUE((*world)->addEntity(*second));
   auto luaRoot = LuaRoot::create(root);
   ASSERT_TRUE(luaRoot) << luaRoot.error().what();
-  auto context = (*luaRoot)->createContext(StringList{});
+  auto context = (*luaRoot)->create_context(StringList{});
   ASSERT_TRUE(context) << context.error().what();
   auto callbacks = LuaBindings::makeWorldCallbacks(root, **world);
   ASSERT_TRUE(callbacks) << callbacks.error().what();
-  ASSERT_TRUE(context->setCallbacks("world", *callbacks));
+  ASSERT_TRUE(context->set_callbacks("world", *callbacks));
   ASSERT_TRUE(context->set("firstId", (*first)->entityId()));
   ASSERT_TRUE(context->set("secondId", (*second)->entityId()));
   auto discovery = context->eval<bool>(R"LUA(

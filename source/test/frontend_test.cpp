@@ -800,9 +800,9 @@ const GameTestRegistration panePositionQueryFailure(
     ASSERT_TRUE(callbacks) << callbacks.error().what();
     auto engine = LuaEngine::create();
     ASSERT_TRUE(engine) << engine.error().what();
-    auto lua = (*engine)->createContext();
+    auto lua = (*engine)->create_context();
     ASSERT_TRUE(lua) << lua.error().what();
-    ASSERT_TRUE(lua->setCallbacks("pane", *callbacks));
+    ASSERT_TRUE(lua->set_callbacks("pane", *callbacks));
     for (auto anchor : {PaneAnchor::None, PaneAnchor::BottomLeft, PaneAnchor::BottomRight, PaneAnchor::TopLeft,
                         PaneAnchor::TopRight, PaneAnchor::CenterBottom, PaneAnchor::CenterTop, PaneAnchor::CenterLeft,
                         PaneAnchor::CenterRight, PaneAnchor::Center}) {
@@ -1023,7 +1023,7 @@ std::expected<ScriptPaneContext, StarException> scriptPaneContext(GameTest& fixt
   auto pane = ScriptTestPane::create(**context, interactive);
   if (!pane)
     return std::unexpected(std::move(pane.error()));
-  auto bound = (*pane)->setLuaRoot(*luaRoot);
+  auto bound = (*pane)->set_lua_root(*luaRoot);
   if (!bound)
     return std::unexpected(std::move(bound.error()));
   return ScriptPaneContext{std::move(*context), std::move(*luaRoot), std::move(*pane)};
@@ -1114,26 +1114,26 @@ const GameTestRegistration paneErrorIsolation(
     PaneManager manager(**context);
     auto healthy = ScriptTestPane::create(**context);
     ASSERT_TRUE(healthy) << healthy.error().what();
-    ASSERT_TRUE((*healthy)->setLuaRoot(*luaRoot));
+    ASSERT_TRUE((*healthy)->set_lua_root(*luaRoot));
     (*healthy)->setAnchor(PaneAnchor::BottomLeft);
     unsigned healthyUpdates = 0;
     LuaCallbacks healthyProbe;
-    ASSERT_TRUE(healthyProbe.registerCallback("updated", [&] { ++healthyUpdates; }));
-    ASSERT_TRUE((*healthy)->addCallbacks("probe", std::move(healthyProbe)));
+    ASSERT_TRUE(healthyProbe.register_callback("updated", [&] { ++healthyUpdates; }));
+    ASSERT_TRUE((*healthy)->add_callbacks("probe", std::move(healthyProbe)));
     auto created = ScriptTestPane::create(**context, JsonObject{
       {"gui", JsonObject{}}, {"scripts", JsonArray{"/pane-recovery.lua"}}});
     ASSERT_TRUE(created) << created.error().what();
     auto pane = *created;
-    ASSERT_TRUE(pane->setLuaRoot(*luaRoot));
+    ASSERT_TRUE(pane->set_lua_root(*luaRoot));
     pane->setAnchor(PaneAnchor::BottomLeft);
     String failingHook;
     StringList reached;
     List<LuaFunction> retained;
     LuaCallbacks probe;
-    ASSERT_TRUE(probe.registerCallback("reached", [&](String const& hook) { reached.push_back(hook); }));
-    ASSERT_TRUE(probe.registerCallback("fail", [&](String const& hook) { return hook == failingHook; }));
-    ASSERT_TRUE(probe.registerCallback("capture", [&](LuaFunction callback) { retained.push_back(std::move(callback)); }));
-    ASSERT_TRUE(pane->addCallbacks("probe", std::move(probe)));
+    ASSERT_TRUE(probe.register_callback("reached", [&](String const& hook) { reached.push_back(hook); }));
+    ASSERT_TRUE(probe.register_callback("fail", [&](String const& hook) { return hook == failingHook; }));
+    ASSERT_TRUE(probe.register_callback("capture", [&](LuaFunction callback) { retained.push_back(std::move(callback)); }));
+    ASSERT_TRUE(pane->add_callbacks("probe", std::move(probe)));
     unsigned dismissals = 0;
     auto display = [&] {
       return manager.displayPane(PaneLayer::Window, pane, [&](std::shared_ptr<Pane> const&) -> std::expected<void, StarException> {
@@ -1226,7 +1226,7 @@ const GameTestRegistration paneErrorDefaults(
     });
     EXPECT_FALSE(pane.scriptsInitialized());
     ASSERT_TRUE(pane.resumeScripts());
-    auto duplicate = pane.addCallbacks("pane", LuaCallbacks{});
+    auto duplicate = pane.add_callbacks("pane", LuaCallbacks{});
     EXPECT_FALSE(duplicate);
     auto malformed = ScriptTestPane::create(*setup->context, JsonObject{
       {"gui", JsonObject{{"broken", JsonObject{{"type", "missingWidgetType"}}}}}});
@@ -1286,8 +1286,8 @@ const GameTestRegistration
     List<LuaFunction> retained;
     LuaCallbacks probe;
     ASSERT_TRUE(
-      probe.registerCallback("capture", [&](LuaFunction function) { retained.push_back(std::move(function)); }));
-    ASSERT_TRUE(pane->addCallbacks("probe", std::move(probe)));
+      probe.register_callback("capture", [&](LuaFunction function) { retained.push_back(std::move(function)); }));
+    ASSERT_TRUE(pane->add_callbacks("probe", std::move(probe)));
     ASSERT_TRUE(pane->displayed());
     String capture = R"LUA(
     local canvas = widget.bindCanvas("surface")
@@ -1312,13 +1312,13 @@ const GameTestRegistration
     ASSERT_EQ(retained.size(), 3u);
     EXPECT_FALSE(retained[1].invoke<Vec2I>());
     EXPECT_TRUE(retained[2].invoke<Vec2I>());
-    auto removed = pane->removeCallbacks("widget");
+    auto removed = pane->remove_callbacks("widget");
     ASSERT_TRUE(removed) << removed.error().what();
     EXPECT_TRUE(*removed);
     EXPECT_FALSE(retained[2].invoke<Vec2I>());
     auto callbacks = LuaBindings::makeWidgetCallbacks(*context, *pane);
     ASSERT_TRUE(callbacks) << callbacks.error().what();
-    ASSERT_TRUE(pane->addCallbacks("widget", std::move(*callbacks)));
+    ASSERT_TRUE(pane->add_callbacks("widget", std::move(*callbacks)));
     ASSERT_TRUE(pane->evaluate(capture));
     ASSERT_EQ(retained.size(), 4u);
     EXPECT_TRUE(retained[3].invoke<Vec2I>());
@@ -1331,7 +1331,7 @@ const GameTestRegistration
     pane.reset();
     EXPECT_FALSE(retained[3].invoke<Vec2I>());
     retained.clear();
-    ASSERT_TRUE(luaRoot->collectGarbage());
+    ASSERT_TRUE(luaRoot->collect_garbage());
     EXPECT_TRUE(ownedSurface.expired());
   });
 
@@ -1341,7 +1341,7 @@ const GameTestRegistration
     ASSERT_TRUE(context) << context.error().what();
     auto engine = LuaEngine::create();
     ASSERT_TRUE(engine) << engine.error().what();
-    auto lua = (*engine)->createContext();
+    auto lua = (*engine)->create_context();
     ASSERT_TRUE(lua) << lua.error().what();
     auto owner = std::make_shared<Widget>(**context);
     auto surface = CanvasWidget::create(**context);
@@ -1349,7 +1349,7 @@ const GameTestRegistration
     ASSERT_TRUE(owner->addChild("surface", *surface));
     auto callbacks = LuaBindings::makeWidgetCallbacks(**context, *owner);
     ASSERT_TRUE(callbacks) << callbacks.error().what();
-    ASSERT_TRUE(lua->setCallbacks("widget", *callbacks));
+    ASSERT_TRUE(lua->set_callbacks("widget", *callbacks));
     auto retained =
       lua->eval<LuaFunction>("local canvas = widget.bindCanvas('surface'); return function() return canvas:size() end");
     ASSERT_TRUE(retained) << retained.error().what();
@@ -1358,7 +1358,7 @@ const GameTestRegistration
     EXPECT_FALSE(retained->invoke<Vec2I>());
 
     std::stop_source host;
-    auto interfaceCanvas = (*engine)->createUserData(LuaCanvas{*surface, {}, host.get_token(), {}});
+    auto interfaceCanvas = (*engine)->create_userdata(LuaCanvas{*surface, {}, host.get_token(), {}});
     ASSERT_TRUE(interfaceCanvas) << interfaceCanvas.error().what();
     ASSERT_TRUE(lua->set("surface", *interfaceCanvas));
     auto beforeStop = lua->eval<Json>("return surface:size()");
@@ -1385,19 +1385,19 @@ const GameTestRegistration widgetMemberLifetime(
     int calls = 0;
     std::weak_ptr<int> sentinel;
     LuaCallbacks probe;
-    ASSERT_TRUE(probe.registerCallback("sentinel", [&](LuaEngine& engine) -> std::expected<LuaUserData, StarException> {
+    ASSERT_TRUE(probe.register_callback("sentinel", [&](LuaEngine& engine) -> std::expected<LuaUserData, StarException> {
       auto value = std::make_shared<int>(0);
       sentinel = value;
-      return engine.createUserData(std::move(value));
+      return engine.create_userdata(std::move(value));
     }));
-    ASSERT_TRUE(probe.registerCallback("called", [&]() { ++calls; }));
-    ASSERT_TRUE(probe.registerCallback("retire", [&]() -> std::expected<void, StarException> {
-      auto removed = pane->removeCallbacks("widget");
+    ASSERT_TRUE(probe.register_callback("called", [&]() { ++calls; }));
+    ASSERT_TRUE(probe.register_callback("retire", [&]() -> std::expected<void, StarException> {
+      auto removed = pane->remove_callbacks("widget");
       if (!removed)
         return std::unexpected(std::move(removed.error()));
       return {};
     }));
-    ASSERT_TRUE(pane->addCallbacks("probe", std::move(probe)));
+    ASSERT_TRUE(pane->add_callbacks("probe", std::move(probe)));
     ASSERT_TRUE(pane->displayed());
     String registerMember = R"LUA(
     local sentinel = probe.sentinel()
@@ -1415,7 +1415,7 @@ const GameTestRegistration widgetMemberLifetime(
     ASSERT_TRUE((*oldEditor)->setText("active"));
     EXPECT_EQ(calls, 1);
     ASSERT_TRUE(pane->dismissed());
-    ASSERT_TRUE(luaRoot->collectGarbage());
+    ASSERT_TRUE(luaRoot->collect_garbage());
     EXPECT_TRUE(sentinel.expired());
     ASSERT_TRUE((*oldEditor)->setText("retired"));
     EXPECT_EQ(calls, 1);
@@ -1446,7 +1446,7 @@ const GameTestRegistration widgetMemberLifetime(
     EXPECT_EQ(calls, 3);
     ASSERT_TRUE((*retiringEditor)->setText("retired inside callback"));
     EXPECT_EQ(calls, 3);
-    ASSERT_TRUE(luaRoot->collectGarbage());
+    ASSERT_TRUE(luaRoot->collect_garbage());
     EXPECT_TRUE(sentinel.expired());
     ASSERT_TRUE(pane->dismissed());
   });
@@ -1457,7 +1457,7 @@ const GameTestRegistration memberCallbackErrorIsolation(
     ASSERT_TRUE(setup) << setup.error().what();
     auto target = ScriptTestPane::create(*setup->context);
     ASSERT_TRUE(target) << target.error().what();
-    ASSERT_TRUE((*target)->setLuaRoot(setup->luaRoot));
+    ASSERT_TRUE((*target)->set_lua_root(setup->luaRoot));
     auto schema = Json::parse_json(R"JSON({
       "spacing":[0,0], "memberSize":[80,12],
       "listTemplate":{"edit":{"type":"textbox","position":[0,0],"maxWidth":-1}}
@@ -1467,8 +1467,8 @@ const GameTestRegistration memberCallbackErrorIsolation(
     ASSERT_TRUE(list) << list.error().what();
     ASSERT_TRUE((*target)->addChild("list", *list));
     LuaCallbacks probe;
-    ASSERT_TRUE(probe.registerCallback("target", [&] { return (*target)->makePaneCallbacks(); }));
-    ASSERT_TRUE(setup->pane->addCallbacks("probe", std::move(probe)));
+    ASSERT_TRUE(probe.register_callback("target", [&] { return (*target)->makePaneCallbacks(); }));
+    ASSERT_TRUE(setup->pane->add_callbacks("probe", std::move(probe)));
     ASSERT_TRUE((*target)->displayed());
     ASSERT_TRUE(setup->pane->displayed());
     ASSERT_TRUE(setup->pane->evaluate(R"LUA(
@@ -1496,25 +1496,25 @@ const GameTestRegistration componentCallbackOwnership("ScriptPane", "ComponentCa
   ASSERT_TRUE(luaRoot) << luaRoot.error().what();
   std::stop_source previousLifetime;
   LuaCallbacks previous;
-  ASSERT_TRUE(previous.registerCallback("session",
+  ASSERT_TRUE(previous.register_callback("session",
       [lifetime = previousLifetime.get_token()]() -> std::expected<String, StarException> {
     if (lifetime.stop_requested())
       return std::unexpected(StarException("Previous interface is detached"));
     return String("previous");
   }));
-  (*luaRoot)->addCallbacks("interface", previous);
-  (*luaRoot)->addCallbacks("world", previous);
-  (*luaRoot)->addCallbacks("inheritedOnly", previous);
+  (*luaRoot)->add_callbacks("interface", previous);
+  (*luaRoot)->add_callbacks("world", previous);
+  (*luaRoot)->add_callbacks("inheritedOnly", previous);
 
   LuaBaseComponent first(fixture.root());
-  ASSERT_TRUE(first.addCallbacks("interface", previous));
-  ASSERT_TRUE(first.setLuaRoot(*luaRoot));
+  ASSERT_TRUE(first.add_callbacks("interface", previous));
+  ASSERT_TRUE(first.set_lua_root(*luaRoot));
   ASSERT_TRUE(first.init());
   auto firstSession = first.eval<String>("return interface.session()");
   ASSERT_TRUE(firstSession) << firstSession.error().what();
   ASSERT_TRUE(*firstSession);
   EXPECT_EQ(**firstSession, String("previous"));
-  auto retainedSession = first.context()->getPath<LuaFunction>("interface.session");
+  auto retainedSession = first.context()->get_path<LuaFunction>("interface.session");
   ASSERT_TRUE(retainedSession) << retainedSession.error().what();
   ASSERT_TRUE(first.uninit());
   ASSERT_TRUE(previousLifetime.request_stop());
@@ -1523,16 +1523,16 @@ const GameTestRegistration componentCallbackOwnership("ScriptPane", "ComponentCa
 
   std::stop_source currentLifetime;
   LuaCallbacks current;
-  ASSERT_TRUE(current.registerCallback("session",
+  ASSERT_TRUE(current.register_callback("session",
       [lifetime = currentLifetime.get_token()]() -> std::expected<String, StarException> {
     if (lifetime.stop_requested())
       return std::unexpected(StarException("Current interface is detached"));
     return String("current");
   }));
   LuaBaseComponent second(fixture.root());
-  ASSERT_TRUE(second.addCallbacks("interface", current));
-  ASSERT_TRUE(second.addCallbacks("world", LuaCallbacks{}));
-  ASSERT_TRUE(second.setLuaRoot(*luaRoot));
+  ASSERT_TRUE(second.add_callbacks("interface", current));
+  ASSERT_TRUE(second.add_callbacks("world", LuaCallbacks{}));
+  ASSERT_TRUE(second.set_lua_root(*luaRoot));
   ASSERT_TRUE(second.init());
   auto secondSession = second.eval<String>("return interface.session()");
   ASSERT_TRUE(secondSession) << secondSession.error().what();
@@ -1554,23 +1554,23 @@ const GameTestRegistration componentCallbackOwnership("ScriptPane", "ComponentCa
   // Adding an explicit group to an already-running component has the same
   // precedence, without altering inherited tables in sibling contexts.
   LuaBaseComponent live(fixture.root());
-  ASSERT_TRUE(live.setLuaRoot(*luaRoot));
+  ASSERT_TRUE(live.set_lua_root(*luaRoot));
   ASSERT_TRUE(live.init());
   auto inheritedBeforeBinding = live.eval<bool>("return not pcall(interface.session)");
   ASSERT_TRUE(inheritedBeforeBinding) << inheritedBeforeBinding.error().what();
   EXPECT_TRUE(inheritedBeforeBinding->value_or(false));
-  ASSERT_TRUE(live.addCallbacks("interface", current));
+  ASSERT_TRUE(live.add_callbacks("interface", current));
   auto liveSession = live.eval<String>("return interface.session()");
   ASSERT_TRUE(liveSession) << liveSession.error().what();
   ASSERT_TRUE(*liveSession);
   EXPECT_EQ(**liveSession, String("current"));
-  ASSERT_TRUE(live.addCallbacks("world", LuaCallbacks{}));
+  ASSERT_TRUE(live.add_callbacks("world", LuaCallbacks{}));
   auto shadowedWorld = live.eval<bool>("return type(world) == 'table' and world.session == nil");
   ASSERT_TRUE(shadowedWorld) << shadowedWorld.error().what();
   EXPECT_TRUE(shadowedWorld->value_or(false));
   ASSERT_TRUE(live.uninit());
 
-  auto rootContext = (*luaRoot)->createContext(StringList{});
+  auto rootContext = (*luaRoot)->create_context(StringList{});
   ASSERT_TRUE(rootContext) << rootContext.error().what();
   auto stillRetired = rootContext->eval<bool>("return not pcall(interface.session) and not pcall(world.session)");
   ASSERT_TRUE(stillRetired) << stillRetired.error().what();
@@ -1583,8 +1583,8 @@ class ReentrantReloadScript : public LuaBaseComponent {
 public:
   explicit ReentrantReloadScript(Root& root) : LuaBaseComponent(root) {}
 protected:
-  std::expected<void, StarException> contextSetup() override {
-    if (auto result = LuaBaseComponent::contextSetup(); !result)
+  std::expected<void, StarException> context_setup() override {
+    if (auto result = LuaBaseComponent::context_setup(); !result)
       return std::unexpected(std::move(result.error()));
     auto defined = context()->eval<LuaValue>(R"LUA(
       function probe() return true end
@@ -1602,13 +1602,13 @@ const GameTestRegistration scriptReloadReentry("ScriptPane", "ExplicitInitAndAut
   auto luaRoot = LuaRoot::create(fixture.root());
   ASSERT_TRUE(luaRoot) << luaRoot.error().what();
   ReentrantReloadScript script(fixture.root());
-  ASSERT_TRUE(script.setLuaRoot(*luaRoot));
-  script.setAutoReInit(true);
+  ASSERT_TRUE(script.set_lua_root(*luaRoot));
+  script.set_auto_reinit(true);
   int initialized = 0;
   int uninitialized = 0;
   int dismissed = 0;
   LuaCallbacks callbacks;
-  ASSERT_TRUE(callbacks.registerCallback("reenter", [&](String const& hook) -> std::expected<void, StarException> {
+  ASSERT_TRUE(callbacks.register_callback("reenter", [&](String const& hook) -> std::expected<void, StarException> {
     if (hook == "init")
       ++initialized;
     else if (hook == "uninit")
@@ -1622,7 +1622,7 @@ const GameTestRegistration scriptReloadReentry("ScriptPane", "ExplicitInitAndAut
       return std::unexpected(StarException("Reentrant hook lost its script context"));
     return {};
   }));
-  ASSERT_TRUE(script.addCallbacks("host", std::move(callbacks)));
+  ASSERT_TRUE(script.add_callbacks("host", std::move(callbacks)));
   ASSERT_TRUE(script.init());
   EXPECT_EQ(initialized, 1);
   ASSERT_TRUE(fixture.root().reload());
@@ -1654,8 +1654,8 @@ public:
   explicit ShutdownFailureScript(Root& root) : LuaBaseComponent(root) {}
   unsigned shutdowns = 0;
 protected:
-  std::expected<void, StarException> contextSetup() override {
-    if (auto result = LuaBaseComponent::contextSetup(); !result)
+  std::expected<void, StarException> context_setup() override {
+    if (auto result = LuaBaseComponent::context_setup(); !result)
       return std::unexpected(std::move(result.error()));
     auto defined = context()->eval<LuaValue>(R"LUA(
       function fail() error("shutdown reentry failure") end
@@ -1666,9 +1666,9 @@ protected:
       return std::unexpected(std::move(defined.error()));
     return {};
   }
-  std::expected<void, StarException> contextShutdown() override {
+  std::expected<void, StarException> context_shutdown() override {
     ++shutdowns;
-    return LuaBaseComponent::contextShutdown();
+    return LuaBaseComponent::context_shutdown();
   }
 };
 
@@ -1676,17 +1676,17 @@ const GameTestRegistration scriptShutdownFailure("ScriptPane", "ReentrantOwnerHo
   auto luaRoot = LuaRoot::create(fixture.root());
   ASSERT_TRUE(luaRoot) << luaRoot.error().what();
   ShutdownFailureScript script(fixture.root());
-  ASSERT_TRUE(script.setLuaRoot(*luaRoot));
+  ASSERT_TRUE(script.set_lua_root(*luaRoot));
   unsigned uninitReached = 0;
   LuaCallbacks callbacks;
-  ASSERT_TRUE(callbacks.registerCallback("reenterFailure", [&]() -> std::expected<void, StarException> {
+  ASSERT_TRUE(callbacks.register_callback("reenterFailure", [&]() -> std::expected<void, StarException> {
     auto result = script.invoke("fail");
     if (!result)
       return std::unexpected(std::move(result.error()));
     return {};
   }));
-  ASSERT_TRUE(callbacks.registerCallback("uninitReached", [&]() { ++uninitReached; }));
-  ASSERT_TRUE(script.addCallbacks("host", std::move(callbacks)));
+  ASSERT_TRUE(callbacks.register_callback("uninitReached", [&]() { ++uninitReached; }));
+  ASSERT_TRUE(script.add_callbacks("host", std::move(callbacks)));
   ASSERT_TRUE(script.init());
   std::expected<void, StarException> stopped;
   testing::TestPartResultArray expectedErrors;
@@ -1805,7 +1805,7 @@ const GameTestRegistration scriptInputEditor("ScriptPane", "ConsumingInputPreced
   auto created = ScriptTestPane::create(**context);
   ASSERT_TRUE(created) << created.error().what();
   auto& pane = **created;
-  ASSERT_TRUE(pane.setLuaRoot(*luaRoot));
+  ASSERT_TRUE(pane.set_lua_root(*luaRoot));
   ASSERT_TRUE(pane.displayed());
   ASSERT_TRUE(pane.evaluate(R"LUA(
     function onInput(event)
@@ -1924,24 +1924,24 @@ const GameTestRegistration uiWorldScope("LuaUiManager", "WorldAndPlayerTransitio
   ASSERT_TRUE(context) << context.error().what();
   auto luaRoot = LuaRoot::create(fixture.root());
   ASSERT_TRUE(luaRoot) << luaRoot.error().what();
-  auto script = (*luaRoot)->createContext("/interface/asterbound/ui/manager.lua");
+  auto script = (*luaRoot)->create_context("/interface/asterbound/ui/manager.lua");
   ASSERT_TRUE(script) << script.error().what();
   PaneManager panes(**context);
   auto created = ScriptTestPane::create(**context);
   ASSERT_TRUE(created) << created.error().what();
   auto worldPane = std::move(*created);
-  ASSERT_TRUE(worldPane->setLuaRoot(*luaRoot));
+  ASSERT_TRUE(worldPane->set_lua_root(*luaRoot));
   worldPane->setAnchor(PaneAnchor::BottomLeft);
   auto displayed = panes.displayPane(PaneLayer::Window, worldPane, {});
   ASSERT_TRUE(displayed) << displayed.error().what();
   std::weak_ptr<Pane> released = worldPane;
   auto retained = worldPane->makePaneCallbacks();
   ASSERT_TRUE(retained) << retained.error().what();
-  ASSERT_TRUE(script->setCallbacks("retained", *retained));
+  ASSERT_TRUE(script->set_callbacks("retained", *retained));
   LuaCallbacks callbacks;
-  ASSERT_TRUE(callbacks.registerCallback("paneIdAvailable", &MainInterface::paneIdAvailable));
+  ASSERT_TRUE(callbacks.register_callback("paneIdAvailable", &MainInterface::paneIdAvailable));
   unsigned destroyed = 0;
-  ASSERT_TRUE(callbacks.registerCallback("destroyPane", [&](String const& id) -> std::expected<void, StarException> {
+  ASSERT_TRUE(callbacks.register_callback("destroyPane", [&](String const& id) -> std::expected<void, StarException> {
     if ((id == "worldOpen" || id == "playerOpen") && worldPane) {
       if (auto dismissed = panes.dismissPane(worldPane); !dismissed)
         return std::unexpected(std::move(dismissed.error()));
@@ -1950,17 +1950,17 @@ const GameTestRegistration uiWorldScope("LuaUiManager", "WorldAndPlayerTransitio
     }
     return {};
   }));
-  ASSERT_TRUE(callbacks.registerCallback("bindRegisteredPane", [&](String const&) -> std::expected<std::optional<LuaCallbacks>, StarException> {
+  ASSERT_TRUE(callbacks.register_callback("bindRegisteredPane", [&](String const&) -> std::expected<std::optional<LuaCallbacks>, StarException> {
     if (!worldPane) return std::optional<LuaCallbacks>{};
     auto bound = worldPane->makePaneCallbacks();
     if (!bound) return std::unexpected(std::move(bound.error()));
     return std::optional<LuaCallbacks>(std::move(*bound));
   }));
-  ASSERT_TRUE(callbacks.registerCallback("displayRegisteredPane", [&](String const&) -> std::expected<void, StarException> {
+  ASSERT_TRUE(callbacks.register_callback("displayRegisteredPane", [&](String const&) -> std::expected<void, StarException> {
     if (!worldPane) return std::unexpected(GuiException("Missing scoped pane"));
     return worldPane->show();
   }));
-  ASSERT_TRUE(script->setCallbacks("interface", callbacks));
+  ASSERT_TRUE(script->set_callbacks("interface", callbacks));
   // Suspension releases a real displayed Pane before any queued dispatch.
   // No callPane echo exists: dispatch before teardown fails.
   auto suspended = script->eval<Json>(R"LUA(
@@ -1996,7 +1996,7 @@ const GameTestRegistration uiWorldScope("LuaUiManager", "WorldAndPlayerTransitio
   created = ScriptTestPane::create(**context);
   ASSERT_TRUE(created) << created.error().what();
   worldPane = std::move(*created);
-  ASSERT_TRUE(worldPane->setLuaRoot(*luaRoot));
+  ASSERT_TRUE(worldPane->set_lua_root(*luaRoot));
   worldPane->setAnchor(PaneAnchor::BottomLeft);
   displayed = panes.displayPane(PaneLayer::Window, worldPane, {});
   ASSERT_TRUE(displayed) << displayed.error().what();
@@ -2027,7 +2027,7 @@ const GameTestRegistration uiWorldScope("LuaUiManager", "WorldAndPlayerTransitio
     created = ScriptTestPane::create(**context);
     ASSERT_TRUE(created) << created.error().what();
     worldPane = std::move(*created);
-    ASSERT_TRUE(worldPane->setLuaRoot(*luaRoot));
+    ASSERT_TRUE(worldPane->set_lua_root(*luaRoot));
     worldPane->setAnchor(PaneAnchor::BottomLeft);
     ASSERT_TRUE(panes.displayPane(PaneLayer::Window, worldPane, {}));
     released = worldPane;
@@ -2081,11 +2081,11 @@ const GameTestRegistration uiInputAndQueue("LuaUiManager", "NativePriorityReload
   PaneManager panes(**context);
   Map<String, std::shared_ptr<ScriptTestPane>> instances;
   LuaUpdateScript controller(fixture.root());
-  ASSERT_TRUE(controller.setScript("/interface/asterbound/ui/manager.lua"));
-  ASSERT_TRUE(controller.setLuaRoot(*luaRoot));
+  ASSERT_TRUE(controller.set_script("/interface/asterbound/ui/manager.lua"));
+  ASSERT_TRUE(controller.set_lua_root(*luaRoot));
   LuaCallbacks callbacks;
-  ASSERT_TRUE(callbacks.registerCallback("paneIdAvailable", &MainInterface::paneIdAvailable));
-  ASSERT_TRUE(callbacks.registerCallback(
+  ASSERT_TRUE(callbacks.register_callback("paneIdAvailable", &MainInterface::paneIdAvailable));
+  ASSERT_TRUE(callbacks.register_callback(
     "bindRegisteredPane", [&](String const& id) -> std::expected<std::optional<LuaCallbacks>, StarException> {
       auto instance = instances.find_ref(id);
       if (!instance)
@@ -2095,7 +2095,7 @@ const GameTestRegistration uiInputAndQueue("LuaUiManager", "NativePriorityReload
         return std::unexpected(std::move(bound.error()));
       return std::optional<LuaCallbacks>(std::move(*bound));
     }));
-  ASSERT_TRUE(callbacks.registerCallback("callPane",
+  ASSERT_TRUE(callbacks.register_callback("callPane",
                                          [&](String const& id, String const& method, JsonArray const& args)
                                            -> std::expected<std::optional<Json>, StarException> {
                                            auto instance = instances.find_ref(id);
@@ -2104,7 +2104,7 @@ const GameTestRegistration uiInputAndQueue("LuaUiManager", "NativePriorityReload
                                            return instance->get()->call(method, args);
                                          }));
   ASSERT_TRUE(
-    callbacks.registerCallback("displayRegisteredPane", [&](String const& id) -> std::expected<void, StarException> {
+    callbacks.register_callback("displayRegisteredPane", [&](String const& id) -> std::expected<void, StarException> {
       auto instance = instances.find_ref(id);
       if (!instance)
         return std::unexpected(GuiException("Missing test pane"));
@@ -2112,7 +2112,7 @@ const GameTestRegistration uiInputAndQueue("LuaUiManager", "NativePriorityReload
         return instance->get()->show();
       return panes.displayPane(PaneLayer::Window, instance->get(), {});
     }));
-  ASSERT_TRUE(callbacks.registerCallback("destroyPane", [&](String const& id) -> std::expected<void, StarException> {
+  ASSERT_TRUE(callbacks.register_callback("destroyPane", [&](String const& id) -> std::expected<void, StarException> {
     auto instance = instances.find_ref(id);
     if (!instance)
       return {};
@@ -2123,10 +2123,10 @@ const GameTestRegistration uiInputAndQueue("LuaUiManager", "NativePriorityReload
     instances.remove(id);
     return {};
   }));
-  ASSERT_TRUE(callbacks.registerCallback("paneLayerOccupied", [&](String const&) {
+  ASSERT_TRUE(callbacks.register_callback("paneLayerOccupied", [&](String const&) {
     return static_cast<bool>(panes.topPane({PaneLayer::ModalWindow}));
   }));
-  ASSERT_TRUE(callbacks.registerCallback("paneInputTargets", [&]() -> std::expected<JsonArray, StarException> {
+  ASSERT_TRUE(callbacks.register_callback("paneInputTargets", [&]() -> std::expected<JsonArray, StarException> {
     auto targets = panes.inputTargetPanes();
     if (!targets) return std::unexpected(std::move(targets.error()));
     JsonArray ids;
@@ -2136,7 +2136,7 @@ const GameTestRegistration uiInputAndQueue("LuaUiManager", "NativePriorityReload
           ids.push_back(entry.first);
     return ids;
   }));
-  ASSERT_TRUE(controller.addCallbacks("interface", callbacks));
+  ASSERT_TRUE(controller.add_callbacks("interface", callbacks));
   ASSERT_TRUE(controller.init());
   unsigned cancellations = 0;
   for (auto const& id : {String("a"), String("b")}) {
@@ -2144,15 +2144,15 @@ const GameTestRegistration uiInputAndQueue("LuaUiManager", "NativePriorityReload
     ASSERT_TRUE(created) << created.error().what();
     auto pane = std::move(*created);
     pane->setAnchor(PaneAnchor::BottomLeft);
-    ASSERT_TRUE(pane->setLuaRoot(*luaRoot));
+    ASSERT_TRUE(pane->set_lua_root(*luaRoot));
     LuaCallbacks host;
-    ASSERT_TRUE(host.registerCallback("send", [&, id](String const& event, Json payload) -> std::expected<void, StarException> {
+    ASSERT_TRUE(host.register_callback("send", [&, id](String const& event, Json payload) -> std::expected<void, StarException> {
       auto queued = controller.invoke<Json>("enqueue", id, event, std::move(payload));
       if (!queued) return std::unexpected(std::move(queued.error()));
       return {};
     }));
-    ASSERT_TRUE(host.registerCallback("cancelled", [&]() { ++cancellations; }));
-    ASSERT_TRUE(pane->addCallbacks("host", std::move(host)));
+    ASSERT_TRUE(host.register_callback("cancelled", [&]() { ++cancellations; }));
+    ASSERT_TRUE(pane->add_callbacks("host", std::move(host)));
     auto displayed = panes.displayPane(PaneLayer::Window, pane, {});
     ASSERT_TRUE(displayed) << displayed.error().what();
     ASSERT_TRUE(pane->evaluate(R"LUA(
@@ -2263,7 +2263,7 @@ const GameTestRegistration uiInputAndQueue("LuaUiManager", "NativePriorityReload
 const GameTestRegistration statusPresentation("LuaStatusPresentation", "LayoutMasksAndOverlappingTooltips", [](GameTest& fixture) {
   auto root = LuaRoot::create(fixture.root());
   ASSERT_TRUE(root) << root.error().what();
-  auto script = (*root)->createContext("/interface/asterbound/status/status.lua");
+  auto script = (*root)->create_context("/interface/asterbound/status/status.lua");
   ASSERT_TRUE(script) << script.error().what();
   // Exercise the production presentation algorithm independently of a display.
   // The GUI smoke separately checks these commands against real effect pixels.
@@ -2341,7 +2341,7 @@ const GameTestRegistration statusPresentation("LuaStatusPresentation", "LayoutMa
 const GameTestRegistration breathPresentation("LuaBreathPresentation", "FloatBlockEdgesPhysicalGeometryAndWarningClock", [](GameTest& fixture) {
   auto root = LuaRoot::create(fixture.root());
   ASSERT_TRUE(root) << root.error().what();
-  auto script = (*root)->createContext("/interface/asterbound/breath/breath.lua");
+  auto script = (*root)->create_context("/interface/asterbound/breath/breath.lua");
   ASSERT_TRUE(script) << script.error().what();
 
   // Compare the production numeric policy against the former float renderer at
@@ -2350,13 +2350,13 @@ const GameTestRegistration breathPresentation("LuaBreathPresentation", "FloatBlo
     for (int block = 0; block < 10; ++block) {
       float edge = maximum * ((block + 0.5f) / 10.0f);
       for (float value : {std::nextafter(edge, 0.0f), edge, std::nextafter(edge, maximum)}) {
-        auto blocks = script->invokePath<int>("breathPresentation.blocks", value, maximum);
+        auto blocks = script->invoke_path<int>("breathPresentation.blocks", value, maximum);
         ASSERT_TRUE(blocks) << blocks.error().what();
         EXPECT_EQ(*blocks, static_cast<int>(std::round((10 * value) / maximum)))
             << "value=" << value << ", maximum=" << maximum;
       }
     }
-    auto full = script->invokePath<int>("breathPresentation.blocks", maximum, maximum);
+    auto full = script->invoke_path<int>("breathPresentation.blocks", maximum, maximum);
     ASSERT_TRUE(full) << full.error().what();
     EXPECT_EQ(*full, 10);
   }
@@ -2365,7 +2365,7 @@ const GameTestRegistration breathPresentation("LuaBreathPresentation", "FloatBlo
   Vec2I barPosition{-17, -2};
   for (auto size : {Vec2U{801, 601}, Vec2U{800, 600}}) {
     for (float scale : {1.0f, 1.25f, 1.3f, 1.75f, 2.5f}) {
-      auto layout = script->invokePath<Json>("breathPresentation.layout",
+      auto layout = script->invoke_path<Json>("breathPresentation.layout",
           JsonArray{size[0], size[1]}, scale, JsonArray{position[0], position[1]},
           JsonArray{barPosition[0], barPosition[1]}, 3);
       ASSERT_TRUE(layout) << layout.error().what();
@@ -2380,7 +2380,7 @@ const GameTestRegistration breathPresentation("LuaBreathPresentation", "FloatBlo
   }
 
   for (auto milliseconds : {0, 250, 251, 499, 500, 750, 751}) {
-    auto warning = script->invokePath<bool>("breathPresentation.warning", milliseconds);
+    auto warning = script->invoke_path<bool>("breathPresentation.warning", milliseconds);
     ASSERT_TRUE(warning) << warning.error().what();
     EXPECT_EQ(*warning, milliseconds % 500 > 250);
   }
@@ -2407,7 +2407,7 @@ const GameTestRegistration bookmarkEditor("LuaBookmarkEditor", "NativeTextEditin
   Json session = JsonObject{{"hasPlayer", true}, {"inWorld", true}, {"playerGeneration", 1}, {"worldGeneration", 1}};
   bool sourceExists = true;
   LuaCallbacks player;
-  ASSERT_TRUE(player.registerCallback("teleportBookmarks", [&]() -> std::expected<JsonArray, StarException> {
+  ASSERT_TRUE(player.register_callback("teleportBookmarks", [&]() -> std::expected<JsonArray, StarException> {
     auto bookmarks = model.teleportBookmarks();
     if (!bookmarks) return std::unexpected(std::move(bookmarks.error()));
     JsonArray result;
@@ -2418,21 +2418,21 @@ const GameTestRegistration bookmarkEditor("LuaBookmarkEditor", "NativeTextEditin
     }
     return result;
   }));
-  ASSERT_TRUE(player.registerCallback("addTeleportBookmark", [&](Json const& value) -> std::expected<bool, StarException> {
+  ASSERT_TRUE(player.register_callback("addTeleportBookmark", [&](Json const& value) -> std::expected<bool, StarException> {
     auto bookmark = TeleportBookmark::fromJson(value);
     if (!bookmark) return std::unexpected(std::move(bookmark.error()));
     return model.addTeleportBookmark(std::move(*bookmark));
   }));
-  ASSERT_TRUE(player.registerCallback("removeTeleportBookmark", [&](Json const& value) -> std::expected<bool, StarException> {
+  ASSERT_TRUE(player.register_callback("removeTeleportBookmark", [&](Json const& value) -> std::expected<bool, StarException> {
     auto bookmark = TeleportBookmark::fromJson(value);
     if (!bookmark) return std::unexpected(std::move(bookmark.error()));
     return model.removeTeleportBookmark(*bookmark);
   }));
   LuaCallbacks interface;
-  ASSERT_TRUE(interface.registerCallback("session", [&]() { return session; }));
+  ASSERT_TRUE(interface.register_callback("session", [&]() { return session; }));
   LuaCallbacks world;
-  ASSERT_TRUE(world.registerCallback("entityExists", [&](EntityId) { return sourceExists; }));
-  ASSERT_TRUE(world.registerCallback("entityUniqueId", [](EntityId) { return String("local-source"); }));
+  ASSERT_TRUE(world.register_callback("entityExists", [&](EntityId) { return sourceExists; }));
+  ASSERT_TRUE(world.register_callback("entityUniqueId", [](EntityId) { return String("local-source"); }));
   PaneManager panes(**context);
   std::shared_ptr<BaseScriptPane> editor;
   auto open = [&](Json bookmark) -> std::expected<void, StarException> {
@@ -2443,14 +2443,14 @@ const GameTestRegistration bookmarkEditor("LuaBookmarkEditor", "NativeTextEditin
     if (!created) return std::unexpected(std::move(created.error()));
     editor = std::move(*created);
     editor->setAnchor(PaneAnchor::BottomLeft);
-    if (auto added = editor->setLuaRoot(*luaRoot); !added) return std::unexpected(std::move(added.error()));
+    if (auto added = editor->set_lua_root(*luaRoot); !added) return std::unexpected(std::move(added.error()));
     auto textbox = editor->fetchChild<TextBoxWidget>("name");
     if (!textbox) return std::unexpected(std::move(textbox.error()));
     // No glyph measurement is available in this renderer-free input fixture.
     (*textbox)->setMaxWidth(-1);
-    if (auto added = editor->addCallbacks("player", player); !added) return std::unexpected(std::move(added.error()));
-    if (auto added = editor->addCallbacks("interface", interface); !added) return std::unexpected(std::move(added.error()));
-    if (auto added = editor->addCallbacks("world", world); !added) return std::unexpected(std::move(added.error()));
+    if (auto added = editor->add_callbacks("player", player); !added) return std::unexpected(std::move(added.error()));
+    if (auto added = editor->add_callbacks("interface", interface); !added) return std::unexpected(std::move(added.error()));
+    if (auto added = editor->add_callbacks("world", world); !added) return std::unexpected(std::move(added.error()));
     if (auto displayed = panes.displayPane(PaneLayer::ModalWindow, editor, {}); !displayed)
       return std::unexpected(std::move(displayed.error()));
     auto edited = editor->call("editBookmark", {JsonObject{
@@ -2554,9 +2554,9 @@ public:
   std::expected<LuaCallbacks, StarException> makePaneCallbacks() override {
     auto callbacks = BaseScriptPane::makePaneCallbacks();
     if (!callbacks) return std::unexpected(std::move(callbacks.error()));
-    callbacks->removeCallback("playSound");
+    callbacks->remove_callback("playSound");
     if (auto added =
-          callbacks->registerCallback("playSound", [this](String const& sound) { m_sounds.push_back(sound); });
+          callbacks->register_callback("playSound", [this](String const& sound) { m_sounds.push_back(sound); });
         !added)
       return std::unexpected(std::move(added.error()));
     return callbacks;
@@ -2590,7 +2590,7 @@ const GameTestRegistration popupPresentation("LuaPopup", "NativeTitleLatestTextS
   auto created = PopupSoundTestPane::create(**context, *paneConfig, sounds);
   ASSERT_TRUE(created) << created.error().what();
   auto popup = std::move(*created);
-  ASSERT_TRUE(popup->setLuaRoot(*luaRoot));
+  ASSERT_TRUE(popup->set_lua_root(*luaRoot));
   popup->setAnchor(PaneAnchor::BottomLeft);
   auto message = textEditor(**context, "");
   ASSERT_TRUE(message) << message.error().what();
@@ -2609,7 +2609,7 @@ const GameTestRegistration popupPresentation("LuaPopup", "NativeTitleLatestTextS
   auto back = ScriptTestPane::create(**context);
   ASSERT_TRUE(back) << back.error().what();
   (*back)->setAnchor(PaneAnchor::BottomLeft);
-  ASSERT_TRUE((*back)->setLuaRoot(*luaRoot));
+  ASSERT_TRUE((*back)->set_lua_root(*luaRoot));
   ASSERT_TRUE(panes.displayPane(PaneLayer::Window, *back, {}));
   ASSERT_TRUE(popup->hide());
   ASSERT_TRUE(popup->call("showPopup", {JsonObject{{"message", "Latest"}, {"sound", "/override.ogg"}}}));
@@ -2711,7 +2711,7 @@ const GameTestRegistration
     ASSERT_TRUE(created) << created.error().what();
     auto pane = std::move(*created);
     pane->setAnchor(PaneAnchor::BottomLeft);
-    ASSERT_TRUE(pane->setLuaRoot(*luaRoot));
+    ASSERT_TRUE(pane->set_lua_root(*luaRoot));
     for (auto const& name : {String("group"), String("search")}) {
       auto textbox = textEditor(**context, "");
       ASSERT_TRUE(textbox) << textbox.error().what();
@@ -2733,7 +2733,7 @@ const GameTestRegistration
     ASSERT_TRUE(domain) << domain.error().what();
     auto callbacks = LuaBindings::makeSongbookCallbacks(**domain);
     ASSERT_TRUE(callbacks) << callbacks.error().what();
-    ASSERT_TRUE(pane->addCallbacks("songbook", *callbacks));
+    ASSERT_TRUE(pane->add_callbacks("songbook", *callbacks));
     PaneManager panes(**context);
     auto displayed = panes.displayPane(PaneLayer::Window, pane, {});
     ASSERT_TRUE(displayed) << displayed.error().what();
@@ -2834,26 +2834,26 @@ const GameTestRegistration uiRetainedWindow("LuaUiManager", "RetainedDismissalRe
   ASSERT_TRUE(context) << context.error().what();
   auto luaRoot = LuaRoot::create(fixture.root());
   ASSERT_TRUE(luaRoot) << luaRoot.error().what();
-  auto script = (*luaRoot)->createContext("/interface/asterbound/ui/manager.lua");
+  auto script = (*luaRoot)->create_context("/interface/asterbound/ui/manager.lua");
   ASSERT_TRUE(script) << script.error().what();
   auto rootCallbacks = LuaBindings::makeRootCallbacks(fixture.root());
   ASSERT_TRUE(rootCallbacks) << rootCallbacks.error().what();
-  ASSERT_TRUE(script->setCallbacks("root", *rootCallbacks));
+  ASSERT_TRUE(script->set_callbacks("root", *rootCallbacks));
   PaneManager panes(**context);
   std::shared_ptr<ScriptTestPane> instance;
   LuaCallbacks callbacks;
-  ASSERT_TRUE(callbacks.registerCallback("paneIdAvailable", &MainInterface::paneIdAvailable));
-  ASSERT_TRUE(callbacks.registerCallback("bindRegisteredPane", [&](String const&) -> std::expected<std::optional<LuaCallbacks>, StarException> {
+  ASSERT_TRUE(callbacks.register_callback("paneIdAvailable", &MainInterface::paneIdAvailable));
+  ASSERT_TRUE(callbacks.register_callback("bindRegisteredPane", [&](String const&) -> std::expected<std::optional<LuaCallbacks>, StarException> {
     if (!instance) return std::optional<LuaCallbacks>{};
     auto bound = instance->makePaneCallbacks();
     if (!bound) return std::unexpected(std::move(bound.error()));
     return std::optional<LuaCallbacks>(std::move(*bound));
   }));
-  ASSERT_TRUE(callbacks.registerCallback("displayRegisteredPane", [&](String const&) -> std::expected<void, StarException> {
+  ASSERT_TRUE(callbacks.register_callback("displayRegisteredPane", [&](String const&) -> std::expected<void, StarException> {
     if (!instance) return std::unexpected(GuiException("Missing retained pane"));
     return panes.displayPane(PaneLayer::Window, instance, {});
   }));
-  ASSERT_TRUE(callbacks.registerCallback("destroyPane", [&](String const&) -> std::expected<void, StarException> {
+  ASSERT_TRUE(callbacks.register_callback("destroyPane", [&](String const&) -> std::expected<void, StarException> {
     if (!instance) return {};
     if (panes.isDisplayed(instance)) {
       if (auto dismissed = panes.dismissPane(instance); !dismissed)
@@ -2862,12 +2862,12 @@ const GameTestRegistration uiRetainedWindow("LuaUiManager", "RetainedDismissalRe
     instance.reset();
     return {};
   }));
-  ASSERT_TRUE(script->setCallbacks("interface", callbacks));
+  ASSERT_TRUE(script->set_callbacks("interface", callbacks));
   auto created = ScriptTestPane::create(**context);
   ASSERT_TRUE(created) << created.error().what();
   instance = std::move(*created);
   instance->setAnchor(PaneAnchor::BottomLeft);
-  ASSERT_TRUE(instance->setLuaRoot(*luaRoot));
+  ASSERT_TRUE(instance->set_lua_root(*luaRoot));
   auto textbox = textEditor(**context, "Retained band Ω");
   ASSERT_TRUE(textbox) << textbox.error().what();
   ASSERT_TRUE(instance->addChild("band", *textbox));
@@ -2912,7 +2912,7 @@ const GameTestRegistration uiRetainedWindow("LuaUiManager", "RetainedDismissalRe
     auto replacement = ScriptTestPane::create(**context);
     ASSERT_TRUE(replacement) << replacement.error().what();
     instance = std::move(*replacement);
-    ASSERT_TRUE(instance->setLuaRoot(*luaRoot));
+    ASSERT_TRUE(instance->set_lua_root(*luaRoot));
     released = instance;
     // This is an allocated but normally dismissed retained instance.
     ASSERT_TRUE(script->eval<LuaValue>("checkpoint.open.songbook = false"));
@@ -2933,18 +2933,18 @@ const GameTestRegistration songbookCallbackScope("LuaSongbook", "EscapedNativeDo
   auto secondCallbacks = LuaBindings::makeSongbookCallbacks(**second);
   ASSERT_TRUE(firstCallbacks) << firstCallbacks.error().what();
   ASSERT_TRUE(secondCallbacks) << secondCallbacks.error().what();
-  (*luaRoot)->addCallbacks("inheritedSongbook", *firstCallbacks);
+  (*luaRoot)->add_callbacks("inheritedSongbook", *firstCallbacks);
   Json song = JsonObject{{"resource", "/songs/scope.abc"}, {"abc", "X:1\nK:C\nC|\n"}};
   LuaBaseComponent component(fixture.root());
-  ASSERT_TRUE(component.setLuaRoot(*luaRoot));
-  ASSERT_TRUE(component.addCallbacks("songbook", *firstCallbacks));
+  ASSERT_TRUE(component.set_lua_root(*luaRoot));
+  ASSERT_TRUE(component.add_callbacks("songbook", *firstCallbacks));
   ASSERT_TRUE(component.init());
-  auto oldPlay = component.context()->getPath<LuaFunction>("songbook.play");
-  auto inheritedPlay = component.context()->getPath<LuaFunction>("inheritedSongbook.play");
+  auto oldPlay = component.context()->get_path<LuaFunction>("songbook.play");
+  auto inheritedPlay = component.context()->get_path<LuaFunction>("inheritedSongbook.play");
   ASSERT_TRUE(oldPlay) << oldPlay.error().what();
   ASSERT_TRUE(inheritedPlay) << inheritedPlay.error().what();
-  ASSERT_TRUE(component.addCallbacks("liveSongbook", *firstCallbacks));
-  auto livePlay = component.context()->getPath<LuaFunction>("liveSongbook.play");
+  ASSERT_TRUE(component.add_callbacks("liveSongbook", *firstCallbacks));
+  auto livePlay = component.context()->get_path<LuaFunction>("liveSongbook.play");
   ASSERT_TRUE(livePlay) << livePlay.error().what();
   ASSERT_TRUE(component.eval<LuaValue>(R"LUA(
     function uninit()
@@ -2959,11 +2959,11 @@ const GameTestRegistration songbookCallbackScope("LuaSongbook", "EscapedNativeDo
   EXPECT_EQ((*first)->timeSource(), std::optional<String>("uninit band"));
   EXPECT_FALSE(inheritedPlay->invoke<LuaValue>(song, "inherited"));
   EXPECT_EQ((*first)->timeSource(), std::optional<String>("uninit band"));
-  ASSERT_TRUE(component.removeCallbacks("songbook"));
-  ASSERT_TRUE(component.removeCallbacks("liveSongbook"));
-  ASSERT_TRUE(component.addCallbacks("songbook", *secondCallbacks));
+  ASSERT_TRUE(component.remove_callbacks("songbook"));
+  ASSERT_TRUE(component.remove_callbacks("liveSongbook"));
+  ASSERT_TRUE(component.add_callbacks("songbook", *secondCallbacks));
   ASSERT_TRUE(component.init());
-  auto newPlay = component.context()->getPath<LuaFunction>("songbook.play");
+  auto newPlay = component.context()->get_path<LuaFunction>("songbook.play");
   ASSERT_TRUE(newPlay) << newPlay.error().what();
   ASSERT_TRUE(newPlay->invoke<LuaValue>(song, "current"));
   EXPECT_EQ((*second)->song(), song);
@@ -2983,7 +2983,7 @@ const GameTestRegistration songbookCallbackScope("LuaSongbook", "EscapedNativeDo
   EXPECT_FALSE(newPlay->invoke<LuaValue>(song, "error revived"));
   EXPECT_EQ((*second)->timeSource(), std::optional<String>("current"));
   ASSERT_TRUE(component.init());
-  auto reinitializedPlay = component.context()->getPath<LuaFunction>("songbook.play");
+  auto reinitializedPlay = component.context()->get_path<LuaFunction>("songbook.play");
   ASSERT_TRUE(reinitializedPlay) << reinitializedPlay.error().what();
   ASSERT_TRUE(component.init()); // Explicit reinit also retires escaped values.
   EXPECT_FALSE(reinitializedPlay->invoke<LuaValue>(song, "reinit revived"));
@@ -2991,29 +2991,29 @@ const GameTestRegistration songbookCallbackScope("LuaSongbook", "EscapedNativeDo
   std::optional<LuaFunction> destroyedPlay;
   {
     LuaBaseComponent temporary(fixture.root());
-    ASSERT_TRUE(temporary.setLuaRoot(*luaRoot));
-    ASSERT_TRUE(temporary.addCallbacks("songbook", *secondCallbacks));
+    ASSERT_TRUE(temporary.set_lua_root(*luaRoot));
+    ASSERT_TRUE(temporary.add_callbacks("songbook", *secondCallbacks));
     ASSERT_TRUE(temporary.init());
-    auto escaped = temporary.context()->getPath<LuaFunction>("songbook.play");
+    auto escaped = temporary.context()->get_path<LuaFunction>("songbook.play");
     ASSERT_TRUE(escaped) << escaped.error().what();
     destroyedPlay = std::move(*escaped);
   }
   EXPECT_FALSE(destroyedPlay->invoke<LuaValue>(song, "destroyed revived"));
   EXPECT_EQ((*second)->timeSource(), std::optional<String>("current"));
   LuaUpdateScript updating(fixture.root());
-  ASSERT_TRUE(updating.setLuaRoot(*luaRoot));
+  ASSERT_TRUE(updating.set_lua_root(*luaRoot));
   ASSERT_TRUE(updating.init());
-  auto oldScript = updating.context()->getPath<LuaFunction>("script.setUpdateDelta");
+  auto oldScript = updating.context()->get_path<LuaFunction>("script.setUpdateDelta");
   ASSERT_TRUE(oldScript) << oldScript.error().what();
   ASSERT_TRUE(updating.uninit());
   EXPECT_FALSE(oldScript->invoke<LuaValue>(99));
   ASSERT_TRUE(updating.init());
-  auto currentScript = updating.context()->getPath<LuaFunction>("script.setUpdateDelta");
+  auto currentScript = updating.context()->get_path<LuaFunction>("script.setUpdateDelta");
   ASSERT_TRUE(currentScript) << currentScript.error().what();
   ASSERT_TRUE(currentScript->invoke<LuaValue>(7));
-  EXPECT_EQ(updating.updateDelta(), 7u);
+  EXPECT_EQ(updating.update_delta(), 7u);
   EXPECT_FALSE(oldScript->invoke<LuaValue>(99));
-  EXPECT_EQ(updating.updateDelta(), 7u);
+  EXPECT_EQ(updating.update_delta(), 7u);
   ASSERT_TRUE(updating.uninit());
 });
 
@@ -3026,14 +3026,14 @@ const GameTestRegistration scriptReloadDuringEditorCallback("ScriptPane", "Reloa
   ASSERT_TRUE(created) << created.error().what();
   auto pane = std::move(*created);
   pane->setAnchor(PaneAnchor::BottomLeft);
-  ASSERT_TRUE(pane->setLuaRoot(*luaRoot));
+  ASSERT_TRUE(pane->set_lua_root(*luaRoot));
   std::optional<LuaFunction> escapedGetText;
   LuaCallbacks host;
-  ASSERT_TRUE(host.registerCallback("reload", [&]() { return fixture.root().reload(); }));
-  ASSERT_TRUE(host.registerCallback("retain", [&](LuaFunction function) {
+  ASSERT_TRUE(host.register_callback("reload", [&]() { return fixture.root().reload(); }));
+  ASSERT_TRUE(host.register_callback("retain", [&](LuaFunction function) {
     escapedGetText = std::move(function);
   }));
-  ASSERT_TRUE(pane->addCallbacks("host", std::move(host)));
+  ASSERT_TRUE(pane->add_callbacks("host", std::move(host)));
   auto editor = TextBoxWidget::create(**context, "before", "",
       [&pane](Widget&) -> std::expected<void, StarException> {
     // The same synchronous native callback boundary used by GuiReader's
@@ -3085,36 +3085,36 @@ const GameTestRegistration uiGlobalActions("LuaUiManager", "LazyGlobalToggleResp
   ASSERT_TRUE(context) << context.error().what();
   auto luaRoot = LuaRoot::create(fixture.root());
   ASSERT_TRUE(luaRoot) << luaRoot.error().what();
-  auto script = (*luaRoot)->createContext("/interface/asterbound/ui/manager.lua");
+  auto script = (*luaRoot)->create_context("/interface/asterbound/ui/manager.lua");
   ASSERT_TRUE(script) << script.error().what();
   PaneManager panes(**context);
   std::shared_ptr<ScriptTestPane> instance;
   bool modalMenu = false;
   unsigned created = 0;
   LuaCallbacks callbacks;
-  ASSERT_TRUE(callbacks.registerCallback("paneIdAvailable", &MainInterface::paneIdAvailable));
-  ASSERT_TRUE(callbacks.registerCallback("paneLayerOccupied", [&](String const&) {
+  ASSERT_TRUE(callbacks.register_callback("paneIdAvailable", &MainInterface::paneIdAvailable));
+  ASSERT_TRUE(callbacks.register_callback("paneLayerOccupied", [&](String const&) {
     return static_cast<bool>(panes.topPane({PaneLayer::ModalWindow}));
   }));
-  ASSERT_TRUE(callbacks.registerCallback("paneInputTargets", [&] {
+  ASSERT_TRUE(callbacks.register_callback("paneInputTargets", [&] {
     if (!instance || panes.topPane() != instance) return JsonArray{};
     return modalMenu ? JsonArray{"EscapeDialog"} : JsonArray{"probe"};
   }));
-  ASSERT_TRUE(callbacks.registerCallback("createPane", [&](String const&, Json const&, String const&) -> std::expected<void, StarException> {
+  ASSERT_TRUE(callbacks.register_callback("createPane", [&](String const&, Json const&, String const&) -> std::expected<void, StarException> {
     auto result = ScriptTestPane::create(**context);
     if (!result) return std::unexpected(std::move(result.error()));
     instance = std::move(*result);
     instance->setAnchor(PaneAnchor::BottomLeft);
     ++created;
-    return instance->setLuaRoot(*luaRoot);
+    return instance->set_lua_root(*luaRoot);
   }));
-  ASSERT_TRUE(callbacks.registerCallback("bindRegisteredPane", [&](String const&) -> std::expected<std::optional<LuaCallbacks>, StarException> {
+  ASSERT_TRUE(callbacks.register_callback("bindRegisteredPane", [&](String const&) -> std::expected<std::optional<LuaCallbacks>, StarException> {
     if (!instance) return std::optional<LuaCallbacks>{};
     auto bound = instance->makePaneCallbacks();
     if (!bound) return std::unexpected(std::move(bound.error()));
     return std::optional<LuaCallbacks>(std::move(*bound));
   }));
-  ASSERT_TRUE(callbacks.registerCallback("displayRegisteredPane", [&](String const&) -> std::expected<void, StarException> {
+  ASSERT_TRUE(callbacks.register_callback("displayRegisteredPane", [&](String const&) -> std::expected<void, StarException> {
     if (panes.isDisplayed(instance)) return instance->show();
     auto displayed = panes.displayPane(modalMenu ? PaneLayer::ModalWindow : PaneLayer::Window, instance, {});
     if (!displayed) return std::unexpected(std::move(displayed.error()));
@@ -3125,7 +3125,7 @@ const GameTestRegistration uiGlobalActions("LuaUiManager", "LazyGlobalToggleResp
     }
     return {};
   }));
-  ASSERT_TRUE(callbacks.registerCallback("destroyPane", [&](String const&) -> std::expected<void, StarException> {
+  ASSERT_TRUE(callbacks.register_callback("destroyPane", [&](String const&) -> std::expected<void, StarException> {
     if (instance && panes.isDisplayed(instance)) {
       if (auto dismissed = panes.dismissPane(instance); !dismissed)
         return std::unexpected(std::move(dismissed.error()));
@@ -3133,10 +3133,10 @@ const GameTestRegistration uiGlobalActions("LuaUiManager", "LazyGlobalToggleResp
     instance.reset();
     return {};
   }));
-  ASSERT_TRUE(callbacks.registerCallback("callPane", [&](String const&, String const& method, JsonArray const& arguments) {
+  ASSERT_TRUE(callbacks.register_callback("callPane", [&](String const&, String const& method, JsonArray const& arguments) {
     return instance->call(method, arguments);
   }));
-  ASSERT_TRUE(script->setCallbacks("interface", callbacks));
+  ASSERT_TRUE(script->set_callbacks("interface", callbacks));
   ASSERT_TRUE(script->eval<LuaValue>(R"LUA(
     state = {}
     definitions = {probe = {config = {}, scope = "player", retain = true, globalActions = {Probe = "toggle"}}}
@@ -3201,7 +3201,7 @@ const GameTestRegistration uiGlobalActions("LuaUiManager", "LazyGlobalToggleResp
   modalMenu = true;
   auto rootCallbacks = LuaBindings::makeRootCallbacks(fixture.root());
   ASSERT_TRUE(rootCallbacks);
-  ASSERT_TRUE(script->setCallbacks("root", *rootCallbacks));
+  ASSERT_TRUE(script->set_callbacks("root", *rootCallbacks));
   ASSERT_TRUE(script->eval<LuaValue>(R"LUA(
     state = {}
     definitions = {EscapeDialog = root.assetJson("/interface.config:panes.EscapeDialog")}
@@ -3233,16 +3233,16 @@ const GameTestRegistration uiPausePolicy("LuaUiManager", "OnlyDisplayedPauseMenu
   ASSERT_TRUE(context) << context.error().what();
   auto luaRoot = LuaRoot::create(fixture.root());
   ASSERT_TRUE(luaRoot) << luaRoot.error().what();
-  auto script = (*luaRoot)->createContext("/interface/asterbound/ui/controller.lua");
+  auto script = (*luaRoot)->create_context("/interface/asterbound/ui/controller.lua");
   ASSERT_TRUE(script) << script.error().what();
   PaneManager panes(**context);
   std::shared_ptr<Pane> escape, options;
   LuaCallbacks callbacks;
-  ASSERT_TRUE(callbacks.registerCallback("paneDisplayed", [&](String const& id) {
+  ASSERT_TRUE(callbacks.register_callback("paneDisplayed", [&](String const& id) {
     auto pane = id == "EscapeDialog" ? escape : id == "Options" ? options : nullptr;
     return pane && pane->isDisplayed();
   }));
-  ASSERT_TRUE(script->setCallbacks("interface", callbacks));
+  ASSERT_TRUE(script->set_callbacks("interface", callbacks));
   auto checkPause = [&](bool expected) {
     auto paused = script->eval<bool>("return pauseRequested()");
     ASSERT_TRUE(paused) << paused.error().what();
@@ -3354,8 +3354,8 @@ const GameTestRegistration
     ASSERT_TRUE(createdPane) << createdPane.error().what();
     auto pane = std::move(*createdPane);
     pane->setAnchor(PaneAnchor::BottomLeft);
-    ASSERT_TRUE(pane->setLuaRoot(*luaRoot));
-    ASSERT_TRUE(pane->addCallbacks("player", *playerCallbacks));
+    ASSERT_TRUE(pane->set_lua_root(*luaRoot));
+    ASSERT_TRUE(pane->add_callbacks("player", *playerCallbacks));
     // Actual native controls and domain callbacks; only renderer-dependent label
     // drawing is replaced by the same widget.setText-capable native TextBox.
     for (auto const& name :
@@ -3407,17 +3407,17 @@ const GameTestRegistration
     ASSERT_TRUE(scroll->addChild("bookList", *list));
     ASSERT_TRUE(pane->addChild("scrollArea", scroll));
     PaneManager panes(**context);
-    auto controller = (*luaRoot)->createContext("/interface/asterbound/ui/manager.lua");
+    auto controller = (*luaRoot)->create_context("/interface/asterbound/ui/manager.lua");
     ASSERT_TRUE(controller) << controller.error().what();
     auto rootCallbacks = LuaBindings::makeRootCallbacks(root);
     ASSERT_TRUE(rootCallbacks) << rootCallbacks.error().what();
-    ASSERT_TRUE(controller->setCallbacks("root", *rootCallbacks));
-    ASSERT_TRUE(controller->setCallbacks("player", *playerCallbacks));
+    ASSERT_TRUE(controller->set_callbacks("root", *rootCallbacks));
+    ASSERT_TRUE(controller->set_callbacks("player", *playerCallbacks));
     LuaCallbacks interface;
-    ASSERT_TRUE(interface.registerCallback("paneIdAvailable", &MainInterface::paneIdAvailable));
-    ASSERT_TRUE(interface.registerCallback(
+    ASSERT_TRUE(interface.register_callback("paneIdAvailable", &MainInterface::paneIdAvailable));
+    ASSERT_TRUE(interface.register_callback(
       "paneLayerOccupied", [&](String const&) { return static_cast<bool>(panes.topPane({PaneLayer::ModalWindow})); }));
-    ASSERT_TRUE(interface.registerCallback(
+    ASSERT_TRUE(interface.register_callback(
       "bindRegisteredPane", [&](String const&) -> std::expected<std::optional<LuaCallbacks>, StarException> {
         auto result = pane->makePaneCallbacks();
         if (!result)
@@ -3425,15 +3425,15 @@ const GameTestRegistration
         return std::optional<LuaCallbacks>(std::move(*result));
       }));
     ASSERT_TRUE(
-      interface.registerCallback("displayRegisteredPane", [&](String const&) -> std::expected<void, StarException> {
+      interface.register_callback("displayRegisteredPane", [&](String const&) -> std::expected<void, StarException> {
         if (panes.isDisplayed(pane))
           return pane->show();
         return panes.displayPane(PaneLayer::Window, pane, {});
       }));
-    ASSERT_TRUE(interface.registerCallback("callPane", [&](String const&, String const& method, JsonArray const& args) {
+    ASSERT_TRUE(interface.register_callback("callPane", [&](String const&, String const& method, JsonArray const& args) {
       return pane->call(method, args);
     }));
-    ASSERT_TRUE(controller->setCallbacks("interface", interface));
+    ASSERT_TRUE(controller->set_callbacks("interface", interface));
     auto initialized = controller->eval<LuaValue>(R"LUA(
     require "/interface/asterbound/codex/unread.lua"
     definitions = {codex = root.assetJson("/interface.config:panes.codex")}
@@ -3599,9 +3599,9 @@ const GameTestRegistration questTrackerPresentation(
     (*quest)->setCompassDirection(0.0f);
     auto playerCallbacks = LuaBindings::makePlayerCallbacks(root, **player);
     ASSERT_TRUE(playerCallbacks) << playerCallbacks.error().what();
-    auto probe = (*luaRoot)->createContext(StringList{});
+    auto probe = (*luaRoot)->create_context(StringList{});
     ASSERT_TRUE(probe) << probe.error().what();
-    ASSERT_TRUE(probe->setCallbacks("player", *playerCallbacks));
+    ASSERT_TRUE(probe->set_callbacks("player", *playerCallbacks));
     auto compact = probe->eval<Json>("return player.currentQuestView()");
     ASSERT_TRUE(compact) << compact.error().what();
     EXPECT_EQ(
@@ -3638,12 +3638,12 @@ const GameTestRegistration questTrackerPresentation(
     ASSERT_TRUE(createdPane) << createdPane.error().what();
     auto pane = std::move(*createdPane);
     pane->setAnchor(PaneAnchor::BottomLeft);
-    ASSERT_TRUE(pane->setLuaRoot(*luaRoot));
-    ASSERT_TRUE(pane->addCallbacks("player", *playerCallbacks));
+    ASSERT_TRUE(pane->set_lua_root(*luaRoot));
+    ASSERT_TRUE(pane->add_callbacks("player", *playerCallbacks));
     LuaCallbacks interface;
     bool hasPlayer = true;
-    ASSERT_TRUE(interface.registerCallback("session", [&] { return JsonObject{{"hasPlayer", hasPlayer}}; }));
-    ASSERT_TRUE(pane->addCallbacks("interface", interface));
+    ASSERT_TRUE(interface.register_callback("session", [&] { return JsonObject{{"hasPlayer", hasPlayer}}; }));
+    ASSERT_TRUE(pane->add_callbacks("interface", interface));
     // Headless GuiContext has no font painter. Keep actual image/stretch/progress
     // widgets and a native text-capable TextBox; supply its measured bounds here.
     // Real label wrapping and pixels are covered by the renderer-backed GUI run.
@@ -3657,7 +3657,7 @@ const GameTestRegistration questTrackerPresentation(
     ASSERT_TRUE(panes.displayPane(PaneLayer::Hud, pane, {}));
     auto publicCallbacks = pane->makePaneCallbacks();
     ASSERT_TRUE(publicCallbacks) << publicCallbacks.error().what();
-    ASSERT_TRUE(probe->setCallbacks("tracker", *publicCallbacks));
+    ASSERT_TRUE(probe->set_callbacks("tracker", *publicCallbacks));
     ASSERT_TRUE(probe->eval<LuaValue>("cachedWidgets = tracker.toWidget()"));
     auto frame = pane->fetchChild<ImageWidget>("imgFrame");
     auto expanded = pane->fetchChild<ImageStretchWidget>("imgFrameExpanded");
@@ -3778,8 +3778,8 @@ const GameTestRegistration questTrackerPresentation(
     auto replacementCallbacks = LuaBindings::makePlayerCallbacks(root, **replacement);
     ASSERT_TRUE(replacementCallbacks) << replacementCallbacks.error().what();
     ASSERT_TRUE(pane->dismissed());
-    ASSERT_TRUE(pane->removeCallbacks("player"));
-    ASSERT_TRUE(pane->addCallbacks("player", *replacementCallbacks));
+    ASSERT_TRUE(pane->remove_callbacks("player"));
+    ASSERT_TRUE(pane->add_callbacks("player", *replacementCallbacks));
     hasPlayer = true;
     ASSERT_TRUE(pane->displayed());
     ASSERT_TRUE(root.reload());
@@ -3793,8 +3793,8 @@ const GameTestRegistration questTrackerPresentation(
     ASSERT_TRUE(retainedPublicHandle) << retainedPublicHandle.error().what();
     EXPECT_EQ(*retainedPublicHandle, (Json(JsonArray{true, false, false})));
     ASSERT_TRUE(pane->dismissed());
-    ASSERT_TRUE(pane->removeCallbacks("player"));
-    ASSERT_TRUE(pane->addCallbacks("player", *playerCallbacks));
+    ASSERT_TRUE(pane->remove_callbacks("player"));
+    ASSERT_TRUE(pane->add_callbacks("player", *playerCallbacks));
     ASSERT_TRUE(pane->displayed());
     ASSERT_TRUE(pane->tick(1.0f / 60));
     EXPECT_TRUE(pane->visibility());
@@ -3816,7 +3816,7 @@ const GameTestRegistration questTrackerPresentation(
 const GameTestRegistration drawableGeometry("LuaDrawable", "SerializedImagesPreserveGeometryWithoutDoubleCentering", [](GameTest& fixture) {
   auto luaRoot = LuaRoot::create(fixture.root());
   ASSERT_TRUE(luaRoot) << luaRoot.error().what();
-  auto context = (*luaRoot)->createContext(StringList{});
+  auto context = (*luaRoot)->create_context(StringList{});
   ASSERT_TRUE(context) << context.error().what();
   auto metadata = fixture.root().imageMetadataDatabase();
   ASSERT_TRUE(metadata) << metadata.error().what();
@@ -3964,9 +3964,9 @@ const GameTestRegistration questLogPresentation(
     ASSERT_TRUE(domain->diskLoad(JsonObject{{"quests", storedQuests}, {"currentQuest", "zzlog-b"}}));
     auto playerCallbacks = LuaBindings::makePlayerCallbacks(root, **player);
     ASSERT_TRUE(playerCallbacks) << playerCallbacks.error().what();
-    auto probe = (*luaRoot)->createContext(StringList{});
+    auto probe = (*luaRoot)->create_context(StringList{});
     ASSERT_TRUE(probe) << probe.error().what();
-    ASSERT_TRUE(probe->setCallbacks("player", *playerCallbacks));
+    ASSERT_TRUE(probe->set_callbacks("player", *playerCallbacks));
     auto entries = probe->eval<Json>("local s = player.questLogEntries(false); return "
                                      "{s.entries[1].id,s.entries[2].id,s.entries[3].id,#s.entries,s.current}");
     ASSERT_TRUE(entries) << entries.error().what();
@@ -3987,8 +3987,8 @@ const GameTestRegistration questLogPresentation(
     ASSERT_TRUE(createdPane) << createdPane.error().what();
     auto pane = std::move(*createdPane);
     pane->setAnchor(PaneAnchor::BottomLeft);
-    ASSERT_TRUE(pane->setLuaRoot(*luaRoot));
-    ASSERT_TRUE(pane->addCallbacks("player", *playerCallbacks));
+    ASSERT_TRUE(pane->set_lua_root(*luaRoot));
+    ASSERT_TRUE(pane->add_callbacks("player", *playerCallbacks));
     for (auto const& name : {String("lblQuestTitle"), String("lblQuestBody"), String("lblPortraitTitle")}) {
       auto text = textEditor(**context, "");
       ASSERT_TRUE(text);
@@ -4209,11 +4209,11 @@ const GameTestRegistration questLogPresentation(
 
     // Production registration and manager retention/scope policy, using the
     // actual consumer pane and native pane stack rather than an echoed service.
-    auto controller = (*luaRoot)->createContext("/interface/asterbound/ui/manager.lua");
+    auto controller = (*luaRoot)->create_context("/interface/asterbound/ui/manager.lua");
     ASSERT_TRUE(controller);
     LuaCallbacks interface;
-    ASSERT_TRUE(interface.registerCallback("paneIdAvailable", &MainInterface::paneIdAvailable));
-    ASSERT_TRUE(interface.registerCallback(
+    ASSERT_TRUE(interface.register_callback("paneIdAvailable", &MainInterface::paneIdAvailable));
+    ASSERT_TRUE(interface.register_callback(
       "bindRegisteredPane", [&](String const&) -> std::expected<std::optional<LuaCallbacks>, StarException> {
         if (!pane)
           return std::optional<LuaCallbacks>{};
@@ -4222,11 +4222,11 @@ const GameTestRegistration questLogPresentation(
           return std::unexpected(std::move(bound.error()));
         return std::optional<LuaCallbacks>(std::move(*bound));
       }));
-    ASSERT_TRUE(interface.registerCallback(
+    ASSERT_TRUE(interface.register_callback(
       "createPane", [](String const&, Json const&, String const&) -> std::expected<void, StarException> {
         return std::unexpected(StarException("Unexpected recreation of retained QuestLog"));
       }));
-    ASSERT_TRUE(interface.registerCallback("destroyPane", [&](String const&) -> std::expected<void, StarException> {
+    ASSERT_TRUE(interface.register_callback("destroyPane", [&](String const&) -> std::expected<void, StarException> {
       if (pane && panes.isDisplayed(pane)) {
         auto dismissed = panes.dismissPane(pane);
         if (!dismissed)
@@ -4236,15 +4236,15 @@ const GameTestRegistration questLogPresentation(
       return {};
     }));
     ASSERT_TRUE(
-      interface.registerCallback("displayRegisteredPane", [&](String const&) -> std::expected<void, StarException> {
+      interface.register_callback("displayRegisteredPane", [&](String const&) -> std::expected<void, StarException> {
         if (panes.isDisplayed(pane))
           return pane->show();
         return panes.displayPane(PaneLayer::Window, pane, {});
       }));
-    ASSERT_TRUE(controller->setCallbacks("interface", interface));
+    ASSERT_TRUE(controller->set_callbacks("interface", interface));
     auto rootCallbacks = LuaBindings::makeRootCallbacks(root);
     ASSERT_TRUE(rootCallbacks);
-    ASSERT_TRUE(controller->setCallbacks("root", *rootCallbacks));
+    ASSERT_TRUE(controller->set_callbacks("root", *rootCallbacks));
     ASSERT_TRUE(controller->eval<LuaValue>(R"LUA(
     definitions = {QuestLog = root.assetJson('/interface.config:panes.QuestLog')}
     session = {hasPlayer=true,inWorld=true,playerGeneration=1,worldGeneration=1}
@@ -4434,10 +4434,10 @@ const GameTestRegistration
     PaneManager panes(**context);
     std::shared_ptr<ScriptTestPane> pane;
     LuaCallbacks interface;
-    ASSERT_TRUE(interface.registerCallback("paneIdAvailable", &MainInterface::paneIdAvailable));
-    ASSERT_TRUE(interface.registerCallback(
+    ASSERT_TRUE(interface.register_callback("paneIdAvailable", &MainInterface::paneIdAvailable));
+    ASSERT_TRUE(interface.register_callback(
       "paneLayerOccupied", [&](String const&) { return static_cast<bool>(panes.topPane({PaneLayer::ModalWindow})); }));
-    ASSERT_TRUE(interface.registerCallback(
+    ASSERT_TRUE(interface.register_callback(
       "bindRegisteredPane", [&](String const&) -> std::expected<std::optional<LuaCallbacks>, StarException> {
         if (!pane)
           return std::optional<LuaCallbacks>{};
@@ -4447,14 +4447,14 @@ const GameTestRegistration
         return std::optional<LuaCallbacks>(std::move(*bound));
       }));
     ASSERT_TRUE(
-      interface.registerCallback("playCinematic", [&](Json const& json) -> std::expected<void, StarException> {
+      interface.register_callback("playCinematic", [&](Json const& json) -> std::expected<void, StarException> {
         auto loaded = (*cinematic)->load(json);
         if (!loaded)
           return std::unexpected(std::move(loaded.error()));
         ++cinemaLoads;
         return {};
       }));
-    ASSERT_TRUE(interface.registerCallback(
+    ASSERT_TRUE(interface.register_callback(
       "createPane", [&](String const&, Json config, String const&) -> std::expected<void, StarException> {
         auto created = ScriptTestPane::create(**context, std::move(config));
         if (!created)
@@ -4465,13 +4465,13 @@ const GameTestRegistration
           return std::unexpected(std::move(button.error()));
         if (auto added = pane->addChild("btnDecline", *button); !added)
           return std::unexpected(std::move(added.error()));
-        if (auto bound = pane->setLuaRoot(*luaRoot); !bound)
+        if (auto bound = pane->set_lua_root(*luaRoot); !bound)
           return std::unexpected(std::move(bound.error()));
-        if (auto bound = pane->addCallbacks("player", *playerCallbacks); !bound)
+        if (auto bound = pane->add_callbacks("player", *playerCallbacks); !bound)
           return std::unexpected(std::move(bound.error()));
-        return pane->addCallbacks("interface", interface);
+        return pane->add_callbacks("interface", interface);
       }));
-    ASSERT_TRUE(interface.registerCallback("destroyPane", [&](String const&) -> std::expected<void, StarException> {
+    ASSERT_TRUE(interface.register_callback("destroyPane", [&](String const&) -> std::expected<void, StarException> {
       if (pane && panes.isDisplayed(pane)) {
         auto dismissed = panes.dismissPane(pane);
         if (!dismissed)
@@ -4481,7 +4481,7 @@ const GameTestRegistration
       return {};
     }));
     ASSERT_TRUE(
-      interface.registerCallback("displayRegisteredPane", [&](String const&) -> std::expected<void, StarException> {
+      interface.register_callback("displayRegisteredPane", [&](String const&) -> std::expected<void, StarException> {
         if (panes.isDisplayed(pane)) {
           if (auto shown = pane->show(); !shown)
             return std::unexpected(std::move(shown.error()));
@@ -4489,11 +4489,11 @@ const GameTestRegistration
         }
         return panes.displayPane(PaneLayer::ModalWindow, pane, {});
       }));
-    auto controller = (*luaRoot)->createContext("/interface/asterbound/ui/manager.lua");
+    auto controller = (*luaRoot)->create_context("/interface/asterbound/ui/manager.lua");
     ASSERT_TRUE(controller);
-    ASSERT_TRUE(controller->setCallbacks("root", *rootCallbacks));
-    ASSERT_TRUE(controller->setCallbacks("player", *playerCallbacks));
-    ASSERT_TRUE(controller->setCallbacks("interface", interface));
+    ASSERT_TRUE(controller->set_callbacks("root", *rootCallbacks));
+    ASSERT_TRUE(controller->set_callbacks("player", *playerCallbacks));
+    ASSERT_TRUE(controller->set_callbacks("interface", interface));
     ASSERT_TRUE(controller->eval<LuaValue>(R"LUA(
     require "/interface/asterbound/questdialogs/pending.lua"
     session = {hasPlayer=true,inWorld=true,playerGeneration=1,worldGeneration=1}
@@ -4565,8 +4565,8 @@ const GameTestRegistration
     ASSERT_TRUE(pane->stopScripts());
     EXPECT_TRUE(panes.isDisplayed(pane));
     EXPECT_EQ((*offered)->state(), QuestState::Offer);
-    ASSERT_TRUE(pane->removeCallbacks("player"));
-    ASSERT_TRUE(pane->addCallbacks("player", *playerCallbacks));
+    ASSERT_TRUE(pane->remove_callbacks("player"));
+    ASSERT_TRUE(pane->add_callbacks("player", *playerCallbacks));
     ASSERT_TRUE(controller->eval<LuaValue>("manager:open('QuestDialog')"));
     ASSERT_TRUE(pane->tick(0));
     ASSERT_TRUE(root.reload());
@@ -4794,17 +4794,17 @@ const GameTestRegistration
     ASSERT_TRUE(pane->addChild("planetText", *text));
     auto luaRoot = LuaRoot::create(root);
     ASSERT_TRUE(luaRoot);
-    ASSERT_TRUE(pane->setLuaRoot(*luaRoot));
+    ASSERT_TRUE(pane->set_lua_root(*luaRoot));
     auto factory = root.playerFactory();
     ASSERT_TRUE(factory);
     auto player = (*factory)->create();
     ASSERT_TRUE(player);
     auto playerCallbacks = LuaBindings::makePlayerCallbacks(root, **player);
     ASSERT_TRUE(playerCallbacks);
-    ASSERT_TRUE(pane->addCallbacks("player", *playerCallbacks));
+    ASSERT_TRUE(pane->add_callbacks("player", *playerCallbacks));
     auto rootCallbacks = LuaBindings::makeRootCallbacks(root);
     ASSERT_TRUE(rootCallbacks);
-    ASSERT_TRUE(pane->addCallbacks("root", *rootCallbacks));
+    ASSERT_TRUE(pane->add_callbacks("root", *rootCallbacks));
     auto cinematic = Cinematic::create(**context);
     ASSERT_TRUE(cinematic);
     // Cinematic uses a real clock. Keep it active through expensive Root reloads;
@@ -4821,11 +4821,11 @@ const GameTestRegistration
     bool hasPlayer = true, worldAvailable = true;
     float scale = 1.25f;
     LuaCallbacks interface;
-    ASSERT_TRUE(interface.registerCallback(
+    ASSERT_TRUE(interface.register_callback(
       "session", [&] { return JsonObject{{"hasPlayer", hasPlayer}, {"inWorld", worldAvailable}}; }));
-    ASSERT_TRUE(interface.registerCallback("cinematicActive", [&] { return !(*cinematic)->completed(); }));
-    ASSERT_TRUE(interface.registerCallback("scale", [&] { return scale; }));
-    ASSERT_TRUE(pane->addCallbacks("interface", interface));
+    ASSERT_TRUE(interface.register_callback("cinematicActive", [&] { return !(*cinematic)->completed(); }));
+    ASSERT_TRUE(interface.register_callback("scale", [&] { return scale; }));
+    ASSERT_TRUE(pane->add_callbacks("interface", interface));
 
     // Stored native templates let the name query read the exact domain name,
     // including tag-like characters, without generating/serializing a planet.
@@ -4870,10 +4870,10 @@ const GameTestRegistration
       auto callbacks = LuaBindings::makeWorldCallbacks(root, world);
       if (!callbacks)
         return std::unexpected(std::move(callbacks.error()));
-      auto removed = pane->removeCallbacks("world");
+      auto removed = pane->remove_callbacks("world");
       if (!removed)
         return std::unexpected(std::move(removed.error()));
-      return pane->addCallbacks("world", *callbacks);
+      return pane->add_callbacks("world", *callbacks);
     };
     ASSERT_TRUE(bindWorld(**worldA));
     PaneManager panes(**context);
@@ -4883,9 +4883,9 @@ const GameTestRegistration
     EXPECT_FALSE(pane->visibility());
     auto publicCallbacks = pane->makePaneCallbacks();
     ASSERT_TRUE(publicCallbacks);
-    auto probe = (*luaRoot)->createContext(StringList{});
+    auto probe = (*luaRoot)->create_context(StringList{});
     ASSERT_TRUE(probe);
-    ASSERT_TRUE(probe->setCallbacks("planet", *publicCallbacks));
+    ASSERT_TRUE(probe->set_callbacks("planet", *publicCallbacks));
     ASSERT_TRUE(probe->eval<LuaValue>("cached = planet.toWidget()"));
 
     GameTimer expected(0.7f);
@@ -4952,8 +4952,8 @@ const GameTestRegistration
     EXPECT_TRUE(pane->visibility());
     EXPECT_EQ((*text)->getText(), String("[B] B"));
     worldAvailable = false;// No world capability/template, actor still present.
-    ASSERT_TRUE(pane->removeCallbacks("world"));
-    ASSERT_TRUE(pane->addCallbacks("world", LuaCallbacks{}));
+    ASSERT_TRUE(pane->remove_callbacks("world"));
+    ASSERT_TRUE(pane->add_callbacks("world", LuaCallbacks{}));
     ASSERT_TRUE(step(0.1f));
     EXPECT_TRUE(pane->visibility());
     ASSERT_TRUE(root.reload());
@@ -4964,8 +4964,8 @@ const GameTestRegistration
     ASSERT_TRUE(replacement);
     auto replacementCallbacks = LuaBindings::makePlayerCallbacks(root, **replacement);
     ASSERT_TRUE(replacementCallbacks);
-    ASSERT_TRUE(pane->removeCallbacks("player"));
-    ASSERT_TRUE(pane->addCallbacks("player", *replacementCallbacks));
+    ASSERT_TRUE(pane->remove_callbacks("player"));
+    ASSERT_TRUE(pane->add_callbacks("player", *replacementCallbacks));
     activePlayer = *replacement;
     ASSERT_TRUE(pane->resumeScripts());
     ASSERT_TRUE(step(0.01f));// Off-world without a cinematic continues, never resets.
@@ -4975,8 +4975,8 @@ const GameTestRegistration
     ASSERT_TRUE(startCinema());
     ASSERT_TRUE(step(0.1f));// Replacement actor is off-world: reset and hide.
     ASSERT_TRUE(pane->stopScripts());
-    ASSERT_TRUE(pane->removeCallbacks("player"));
-    ASSERT_TRUE(pane->addCallbacks("player", *playerCallbacks));
+    ASSERT_TRUE(pane->remove_callbacks("player"));
+    ASSERT_TRUE(pane->add_callbacks("player", *playerCallbacks));
     activePlayer = *player;
     ASSERT_TRUE(pane->resumeScripts());
     worldAvailable = true;
@@ -5001,19 +5001,19 @@ const GameTestRegistration
       auto boundaryText = textEditor(**context, "");
       ASSERT_TRUE(boundaryText) << boundaryText.error().what();
       ASSERT_TRUE((*boundaryPane)->addChild("planetText", *boundaryText));
-      ASSERT_TRUE((*boundaryPane)->setLuaRoot(*luaRoot));
+      ASSERT_TRUE((*boundaryPane)->set_lua_root(*luaRoot));
       LuaCallbacks styleInputs;
       ASSERT_TRUE(
-        styleInputs.registerCallback("assetJson", [&](String const& path) -> std::expected<Json, StarException> {
+        styleInputs.register_callback("assetJson", [&](String const& path) -> std::expected<Json, StarException> {
           if (path == "/interface.config:planetNameTime")
             return Json(duration);
           if (path == "/interface.config:planetNameFadeTime")
             return Json(fadeTime);
           return (*assets)->json(path);
         }));
-      ASSERT_TRUE((*boundaryPane)->addCallbacks("root", std::move(styleInputs)));
-      ASSERT_TRUE((*boundaryPane)->addCallbacks("player", *playerCallbacks));
-      ASSERT_TRUE((*boundaryPane)->addCallbacks("interface", interface));
+      ASSERT_TRUE((*boundaryPane)->add_callbacks("root", std::move(styleInputs)));
+      ASSERT_TRUE((*boundaryPane)->add_callbacks("player", *playerCallbacks));
+      ASSERT_TRUE((*boundaryPane)->add_callbacks("interface", interface));
       ASSERT_TRUE((*boundaryPane)->displayed());
       GameTimer boundaryTimer(duration);
       ASSERT_TRUE(startCinema());
@@ -5052,19 +5052,19 @@ const GameTestRegistration notificationPresentation("LuaNotifications", "Overflo
   auto created = ScriptTestPane::create(**context, *config);
   ASSERT_TRUE(created);
   auto pane = *created;
-  ASSERT_TRUE(pane->setLuaRoot(*luaRoot));
+  ASSERT_TRUE(pane->set_lua_root(*luaRoot));
   auto rootCallbacks = LuaBindings::makeRootCallbacks(fixture.root());
   ASSERT_TRUE(rootCallbacks);
-  ASSERT_TRUE(pane->addCallbacks("root", *rootCallbacks));
+  ASSERT_TRUE(pane->add_callbacks("root", *rootCallbacks));
   WorldCamera camera;
   camera.setScreenSize({800, 600});
   auto cameraCallbacks = LuaBindings::makeCameraCallbacks(fixture.root(), camera);
   ASSERT_TRUE(cameraCallbacks);
-  ASSERT_TRUE(pane->addCallbacks("camera", *cameraCallbacks));
+  ASSERT_TRUE(pane->add_callbacks("camera", *cameraCallbacks));
   // Queue/storage behavior only: real Canvas commands, no renderer or drawing claims.
   LuaCallbacks interface;
-  ASSERT_TRUE(interface.registerCallback("scale", [] { return 1.25f; }));
-  ASSERT_TRUE(pane->addCallbacks("interface", interface));
+  ASSERT_TRUE(interface.register_callback("scale", [] { return 1.25f; }));
+  ASSERT_TRUE(pane->add_callbacks("interface", interface));
   PaneManager panes(**context);
   ASSERT_TRUE(panes.displayPane(PaneLayer::Background, pane, {}));
 
@@ -5136,11 +5136,11 @@ const GameTestRegistration mainbarGeometry("LuaMainBar", "PhysicalPolygonTransfo
   ASSERT_TRUE(barSize);
   auto luaRoot = LuaRoot::create(fixture.root());
   ASSERT_TRUE(luaRoot);
-  auto script = (*luaRoot)->createContext("/interface/asterbound/mainbar/geometry.lua");
+  auto script = (*luaRoot)->create_context("/interface/asterbound/mainbar/geometry.lua");
   ASSERT_TRUE(script);
   auto callbacks = LuaBindings::makeRootCallbacks(fixture.root());
   ASSERT_TRUE(callbacks);
-  ASSERT_TRUE(script->setCallbacks("root", *callbacks));
+  ASSERT_TRUE(script->set_callbacks("root", *callbacks));
   for (Vec2U screen : {Vec2U{800, 600}, Vec2U{801, 601}}) {
     for (float scale : {1.0f, 1.25f, 3.0f}) {
       auto layout = script->eval<Json>(Star::format(

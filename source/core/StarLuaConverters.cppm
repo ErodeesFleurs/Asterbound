@@ -18,7 +18,7 @@ namespace Star {
 template <typename T1, typename T2>
 struct LuaConverter<std::pair<T1, T2>> {
   template <typename Pair> [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, Pair&& v) {
-    auto created = stack.createTable(2, 0);
+    auto created = stack.create_table(2, 0);
     if (!created)
       return std::unexpected(std::move(created.error()));
     auto t = std::move(*created);
@@ -34,12 +34,12 @@ struct LuaConverter<std::pair<T1, T2>> {
   [[nodiscard]] static std::expected<std::optional<std::pair<T1, T2>>, StarException> to(LuaStackValue v) {
     if (!v.is<LuaTable>())
       return std::nullopt;
-    auto p1 = v.template maybeGet<T1>(1);
+    auto p1 = v.template maybe_get<T1>(1);
     if (!p1)
       return std::unexpected(std::move(p1.error()));
     if (!*p1)
       return std::nullopt;
-    auto p2 = v.template maybeGet<T2>(2);
+    auto p2 = v.template maybe_get<T2>(2);
     if (!p2)
       return std::unexpected(std::move(p2.error()));
     if (!*p2)
@@ -51,7 +51,7 @@ struct LuaConverter<std::pair<T1, T2>> {
 template <typename T, std::size_t N>
 struct LuaConverter<Vector<T, N>> {
   [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, Vector<T, N> const& v) {
-    return stack.pushArray(v);
+    return stack.push_array(v);
   }
 
   [[nodiscard]] static std::expected<std::optional<Vector<T, N>>, StarException> to(LuaStackValue v) {
@@ -59,7 +59,7 @@ struct LuaConverter<Vector<T, N>> {
       return std::nullopt;
     Vector<T, N> vec;
     for (std::size_t i = 0; i < N; ++i) {
-      auto converted = v.template maybeGet<T>(i + 1);
+      auto converted = v.template maybe_get<T>(i + 1);
       if (!converted)
         return std::unexpected(std::move(converted.error()));
       if (!*converted)
@@ -81,7 +81,7 @@ struct LuaConverter<Matrix3<T>> {
             -> std::convertible_to<std::expected<void, StarException>>;
         }))
   {
-    auto created = stack.createTable(3, 0);
+    auto created = stack.create_table(3, 0);
     if (!created)
       return std::unexpected(std::move(created.error()));
     auto table = std::move(*created);
@@ -117,7 +117,7 @@ struct LuaConverter<Rect<T>> {
   [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, Rect<T> const& v) {
     if (v.isNull())
       return stack.push(LuaNil);
-    return stack.pushArray(Vector<T, 4>(v.xMin(), v.yMin(), v.xMax(), v.yMax()));
+    return stack.push_array(Vector<T, 4>(v.xMin(), v.yMin(), v.xMax(), v.yMax()));
   }
 
   [[nodiscard]] static std::expected<std::optional<Rect<T>>, StarException> to(LuaStackValue v) {
@@ -135,11 +135,11 @@ struct LuaConverter<Rect<T>> {
 template <typename T>
 struct LuaConverter<Polygon<T>> {
   [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, Polygon<T> const& poly) {
-    return stack.pushArray(poly.vertexes());
+    return stack.push_array(poly.vertexes());
   }
 
   [[nodiscard]] static std::expected<std::optional<Polygon<T>>, StarException> to(LuaStackValue v) {
-    auto points = v.template maybeTo<typename Polygon<T>::VertexList>();
+    auto points = v.template maybe_to<typename Polygon<T>::VertexList>();
     if (!points)
       return std::unexpected(std::move(points.error()));
     if (!*points)
@@ -193,25 +193,25 @@ struct LuaConverter<std::variant<Types...>> {
   }
 
   template <std::size_t Index = 0>
-  [[nodiscard]] static std::expected<std::optional<Value>, StarException> checkTypeTo(LuaStackValue v) {
+  [[nodiscard]] static std::expected<std::optional<Value>, StarException> check_type_to(LuaStackValue v) {
     using Type = std::variant_alternative_t<Index, Value>;
     if constexpr (std::is_same_v<Type, std::monostate>) {
       if (v.is<LuaNilType>())
         return std::optional<Value>(std::in_place, std::in_place_index<Index>);
     } else {
-      auto converted = v.template maybeTo<Type>();
+      auto converted = v.template maybe_to<Type>();
       if (!converted)
         return std::unexpected(std::move(converted.error()));
       if (*converted)
         return std::optional<Value>(std::in_place, std::in_place_index<Index>, std::move(**converted));
     }
     if constexpr (Index + 1 < sizeof...(Types))
-      return checkTypeTo<Index + 1>(v);
+      return check_type_to<Index + 1>(v);
     else
       return std::nullopt;
   }
 
-  [[nodiscard]] static std::expected<std::optional<Value>, StarException> to(LuaStackValue v) { return checkTypeTo(v); }
+  [[nodiscard]] static std::expected<std::optional<Value>, StarException> to(LuaStackValue v) { return check_type_to(v); }
 };
 
 template <>
@@ -228,7 +228,7 @@ struct LuaConverter<LuaCallbacks> {
 
 template <typename T> struct LuaConverter<RpcPromise<T>> {
   [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, RpcPromise<T> const& promise) {
-    auto scoped = promise.with_cancellation(stack.engine().promiseLifetime(), "Lua session stopped");
+    auto scoped = promise.with_cancellation(stack.engine().promise_lifetime(), "Lua session stopped");
     if (!scoped)
       return std::unexpected(std::move(scoped.error()));
     return LuaUserDataConverter<RpcPromise<T>>::from(stack, std::move(*scoped));
@@ -237,7 +237,7 @@ template <typename T> struct LuaConverter<RpcPromise<T>> {
     auto promise = LuaUserDataConverter<RpcPromise<T>>::to(value);
     if (!promise || !*promise)
       return promise;
-    auto scoped = (**promise).with_cancellation(value.stack().engine().promiseLifetime(), "Lua session stopped");
+    auto scoped = (**promise).with_cancellation(value.stack().engine().promise_lifetime(), "Lua session stopped");
     if (!scoped)
       return std::unexpected(std::move(scoped.error()));
     return std::optional<RpcPromise<T>>(std::move(*scoped));
@@ -253,7 +253,7 @@ template <typename T>
 [[nodiscard]] std::expected<LuaMethods<RpcPromise<T>>, StarException> LuaUserDataMethods<RpcPromise<T>>::make() {
   LuaMethods<RpcPromise<T>> methods;
   if (auto registered =
-        methods.registerMethod("status",
+        methods.register_method("status",
                                [](RpcPromise<T>& promise) -> std::expected<std::string_view, StarException> {
                                  auto status = promise.status();
                                  if (!status)
@@ -268,26 +268,26 @@ template <typename T>
                                });
       !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = methods.registerMethod("failed", [](RpcPromise<T>& promise) { return promise.failed(); });
+  if (auto registered = methods.register_method("failed", [](RpcPromise<T>& promise) { return promise.failed(); });
       !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = methods.registerMethod("cancelled", [](RpcPromise<T>& promise) { return promise.cancelled(); });
+  if (auto registered = methods.register_method("cancelled", [](RpcPromise<T>& promise) { return promise.cancelled(); });
       !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered =
-        methods.registerMethod("cancel", [](RpcPromise<T>& promise) { return promise.cancel("Cancelled"); });
+        methods.register_method("cancel", [](RpcPromise<T>& promise) { return promise.cancel("Cancelled"); });
       !registered)
     return std::unexpected(std::move(registered.error()));
-  auto finished = methods.template registerMethodWithSignature<bool, RpcPromise<T>&>("finished", std::mem_fn(&RpcPromise<T>::finished));
+  auto finished = methods.template register_method_with_signature<bool, RpcPromise<T>&>("finished", std::mem_fn(&RpcPromise<T>::finished));
   if (!finished)
     return std::unexpected(std::move(finished.error()));
-  auto succeeded = methods.template registerMethodWithSignature<bool, RpcPromise<T>&>("succeeded", std::mem_fn(&RpcPromise<T>::succeeded));
+  auto succeeded = methods.template register_method_with_signature<bool, RpcPromise<T>&>("succeeded", std::mem_fn(&RpcPromise<T>::succeeded));
   if (!succeeded)
     return std::unexpected(std::move(succeeded.error()));
-  auto result = methods.template registerMethodWithSignature<std::optional<T>, RpcPromise<T>&>("result", std::mem_fn(&RpcPromise<T>::result));
+  auto result = methods.template register_method_with_signature<std::optional<T>, RpcPromise<T>&>("result", std::mem_fn(&RpcPromise<T>::result));
   if (!result)
     return std::unexpected(std::move(result.error()));
-  auto error = methods.template registerMethodWithSignature<std::optional<String>, RpcPromise<T>&>("error", std::mem_fn(&RpcPromise<T>::error));
+  auto error = methods.template register_method_with_signature<std::optional<String>, RpcPromise<T>&>("error", std::mem_fn(&RpcPromise<T>::error));
   if (!error)
     return std::unexpected(std::move(error.error()));
   return methods;
@@ -305,22 +305,22 @@ struct LuaUserDataMethods<std::shared_ptr<AutoFailRpcPromiseKeeper<T>>> {
 template <typename T>
 [[nodiscard]] std::expected<LuaMethods<std::shared_ptr<AutoFailRpcPromiseKeeper<T>>>, StarException> LuaUserDataMethods<std::shared_ptr<AutoFailRpcPromiseKeeper<T>>>::make() {
   LuaMethods<std::shared_ptr<AutoFailRpcPromiseKeeper<T>>> methods;
-  auto chain = methods.template registerMethodWithSignature<void, std::shared_ptr<AutoFailRpcPromiseKeeper<T>>, RpcPromise<T>>("chain", [](std::shared_ptr<AutoFailRpcPromiseKeeper<T>> const& keeper, RpcPromise<T> const& promise) {
+  auto chain = methods.template register_method_with_signature<void, std::shared_ptr<AutoFailRpcPromiseKeeper<T>>, RpcPromise<T>>("chain", [](std::shared_ptr<AutoFailRpcPromiseKeeper<T>> const& keeper, RpcPromise<T> const& promise) {
     return keeper->chain(promise);
   });
   if (!chain)
     return std::unexpected(std::move(chain.error()));
-  auto fulfill = methods.template registerMethodWithSignature<void, std::shared_ptr<AutoFailRpcPromiseKeeper<T>>, T>("fulfill", [](std::shared_ptr<AutoFailRpcPromiseKeeper<T>> const& keeper, T const& result) {
+  auto fulfill = methods.template register_method_with_signature<void, std::shared_ptr<AutoFailRpcPromiseKeeper<T>>, T>("fulfill", [](std::shared_ptr<AutoFailRpcPromiseKeeper<T>> const& keeper, T const& result) {
     return keeper->fulfill(result);
   });
   if (!fulfill)
     return std::unexpected(std::move(fulfill.error()));
-  auto fail = methods.template registerMethodWithSignature<void, std::shared_ptr<AutoFailRpcPromiseKeeper<T>>, String>("fail", [](std::shared_ptr<AutoFailRpcPromiseKeeper<T>> const& keeper, String const& error) {
+  auto fail = methods.template register_method_with_signature<void, std::shared_ptr<AutoFailRpcPromiseKeeper<T>>, String>("fail", [](std::shared_ptr<AutoFailRpcPromiseKeeper<T>> const& keeper, String const& error) {
     return keeper->fail(error);
   });
   if (!fail)
     return std::unexpected(std::move(fail.error()));
-  if (auto registered = methods.registerMethod(
+  if (auto registered = methods.register_method(
         "cancel",
         [](std::shared_ptr<AutoFailRpcPromiseKeeper<T>> const& keeper) { return keeper->cancel("Cancelled"); });
       !registered)

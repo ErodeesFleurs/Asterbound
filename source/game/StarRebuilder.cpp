@@ -60,19 +60,19 @@ std::expected<std::shared_ptr<Rebuilder>, StarException> Rebuilder::create(Root&
       auto pathString = scriptPath.to_string();
       if (!pathString)
         return std::unexpected(std::move(pathString.error()));
-      auto context = rebuilder->m_luaRoot->createContext(*pathString);
+      auto context = rebuilder->m_luaRoot->create_context(*pathString);
       if (!context)
         return std::unexpected(std::move(context.error()));
       auto rootCallbacks = LuaBindings::makeRootCallbacks(root, itemCatalog);
       if (!rootCallbacks)
         return std::unexpected(std::move(rootCallbacks.error()));
-      auto setRoot = context->setCallbacks("root", *rootCallbacks);
+      auto setRoot = context->set_callbacks("root", *rootCallbacks);
       if (!setRoot)
         return std::unexpected(std::move(setRoot.error()));
       auto utilityCallbacks = LuaBindings::makeUtilityCallbacks(root.random(), root.logger(), root.logMap());
       if (!utilityCallbacks)
         return std::unexpected(std::move(utilityCallbacks.error()));
-      auto setUtility = context->setCallbacks("sb", *utilityCallbacks);
+      auto setUtility = context->set_callbacks("sb", *utilityCallbacks);
       if (!setUtility)
         return std::unexpected(std::move(setUtility.error()));
       rebuilder->m_contexts->push_back(std::move(*context));
@@ -87,7 +87,7 @@ std::expected<bool, StarException> Rebuilder::rebuild(Json store, StarException 
   std::unique_lock locker(m_luaMutex, std::defer_lock);
   lock_with_diagnostics(locker);
   for (auto& context : *m_contexts) {
-    auto next = context.invokePath<Json>("error", store, Star::format("{}", Star::output_exception(lastError, false)));
+    auto next = context.invoke_path<Json>("error", store, Star::format("{}", Star::output_exception(lastError, false)));
     if (!next)
       return std::unexpected(std::move(next.error()));
     if (!*next || *next == store)

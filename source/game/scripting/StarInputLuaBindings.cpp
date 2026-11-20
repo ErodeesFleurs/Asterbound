@@ -26,28 +26,28 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeInputCallbacks(Input
 
   auto& input = owner;
 
-  if (auto registration = callbacks.registerCallbackWithSignature<std::optional<unsigned>, String, String>(
+  if (auto registration = callbacks.register_callback_with_signature<std::optional<unsigned>, String, String>(
         "bindDown",
         [&input](String const& categoryId, String const& bindId) { return input.bindDown(categoryId, bindId); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<bool, String, String>(
+  if (auto registration = callbacks.register_callback_with_signature<bool, String, String>(
         "bindHeld",
         [&input](String const& categoryId, String const& bindId) { return input.bindHeld(categoryId, bindId); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<bool, String, String>(
+  if (auto registration = callbacks.register_callback_with_signature<bool, String, String>(
         "bind",
         [&input](String const& categoryId, String const& bindId) { return input.bindHeld(categoryId, bindId); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<std::optional<unsigned>, String, String>(
+  if (auto registration = callbacks.register_callback_with_signature<std::optional<unsigned>, String, String>(
         "bindUp",
         [&input](String const& categoryId, String const& bindId) { return input.bindUp(categoryId, bindId); });
       !registration)
     return std::unexpected(std::move(registration.error()));
 
-  if (auto registration = callbacks.registerCallback("keyDown", [&input](String const& keyName, std::optional<StringList> const& modNames) -> std::expected<std::optional<unsigned>, StarException> {
+  if (auto registration = callbacks.register_callback("keyDown", [&input](String const& keyName, std::optional<StringList> const& modNames) -> std::expected<std::optional<unsigned>, StarException> {
     auto key = enum_value<KeyNames>(keyName);
     if (!key)
       return std::unexpected(std::move(key.error()));
@@ -70,11 +70,11 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeInputCallbacks(Input
       return std::unexpected(std::move(key.error()));
     return input.keyHeld(*key);
   };
-  if (auto registration = callbacks.registerCallback("keyHeld", keyHeld); !registration)
+  if (auto registration = callbacks.register_callback("keyHeld", keyHeld); !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallback("key",     keyHeld); !registration)
+  if (auto registration = callbacks.register_callback("key",     keyHeld); !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallback("keyUp", [&input](String const& keyName) -> std::expected<std::optional<unsigned>, StarException> {
+  if (auto registration = callbacks.register_callback("keyUp", [&input](String const& keyName) -> std::expected<std::optional<unsigned>, StarException> {
     auto key = enum_value<KeyNames>(keyName);
     if (!key)
       return std::unexpected(std::move(key.error()));
@@ -82,7 +82,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeInputCallbacks(Input
   }); !registration)
     return std::unexpected(std::move(registration.error()));
 
-  if (auto registration = callbacks.registerCallback("mouseDown", [&input](String const& buttonName) -> std::expected<std::optional<List<Vec2F>>, StarException> {
+  if (auto registration = callbacks.register_callback("mouseDown", [&input](String const& buttonName) -> std::expected<std::optional<List<Vec2F>>, StarException> {
     auto button = enum_value<MouseButtonNames>(buttonName);
     if (!button)
       return std::unexpected(std::move(button.error()));
@@ -96,11 +96,11 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeInputCallbacks(Input
       return std::unexpected(std::move(button.error()));
     return input.mouseHeld(*button);
   };
-  if (auto registration = callbacks.registerCallback("mouseHeld", mouseHeld); !registration)
+  if (auto registration = callbacks.register_callback("mouseHeld", mouseHeld); !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallback("mouse",     mouseHeld); !registration)
+  if (auto registration = callbacks.register_callback("mouse",     mouseHeld); !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallback("mouseUp", [&input](String const& buttonName) -> std::expected<std::optional<List<Vec2F>>, StarException> {
+  if (auto registration = callbacks.register_callback("mouseUp", [&input](String const& buttonName) -> std::expected<std::optional<List<Vec2F>>, StarException> {
     auto button = enum_value<MouseButtonNames>(buttonName);
     if (!button)
       return std::unexpected(std::move(button.error()));
@@ -108,30 +108,30 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeInputCallbacks(Input
   }); !registration)
     return std::unexpected(std::move(registration.error()));
 
-  if (auto registration = callbacks.registerCallbackWithSignature<void, String, String>(
+  if (auto registration = callbacks.register_callback_with_signature<void, String, String>(
         "resetBinds",
         [&input](String const& categoryId, String const& bindId) { return input.resetBinds(categoryId, bindId); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<void, String, String, Json>(
+  if (auto registration = callbacks.register_callback_with_signature<void, String, String, Json>(
         "setBinds",
         [&input](String const& categoryId, String const& bindId, Json const& binds) {
           return input.setBinds(categoryId, bindId, binds);
         });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<Json, String, String>(
+  if (auto registration = callbacks.register_callback_with_signature<Json, String, String>(
         "getDefaultBinds",
         [&input](String const& categoryId, String const& bindId) { return input.getDefaultBinds(categoryId, bindId); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<Json, String, String>(
+  if (auto registration = callbacks.register_callback_with_signature<Json, String, String>(
         "getBinds",
         [&input](String const& categoryId, String const& bindId) { return input.getBinds(categoryId, bindId); });
       !registration)
     return std::unexpected(std::move(registration.error()));
 
-  if (auto registration = callbacks.registerCallback("events", [&input]() -> std::expected<Json, StarException> {
+  if (auto registration = callbacks.register_callback("events", [&input]() -> std::expected<Json, StarException> {
     JsonArray result;
     for (auto& pair : input.inputEventsThisFrame()) {
       auto event = Input::inputEventToJson(pair.first);
@@ -149,10 +149,10 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeInputCallbacks(Input
     return std::unexpected(std::move(registration.error()));
 
   if (auto registration =
-        callbacks.registerCallbackWithSignature<Vec2F>("mousePosition", [&input]() { return input.mousePosition(); });
+        callbacks.register_callback_with_signature<Vec2F>("mousePosition", [&input]() { return input.mousePosition(); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<unsigned, String>(
+  if (auto registration = callbacks.register_callback_with_signature<unsigned, String>(
         "getTag", [&input](String const& name) { return input.getTag(name); });
       !registration)
     return std::unexpected(std::move(registration.error()));

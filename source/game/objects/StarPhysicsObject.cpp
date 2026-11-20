@@ -170,7 +170,7 @@ std::expected<void, StarException> PhysicsObject::disableInterpolation() {
 std::expected<void, StarException> PhysicsObject::init(World& world, EntityId entityId, EntityMode mode) {
   if (mode == EntityMode::Master) {
     LuaCallbacks callbacks;
-    auto operation6 = callbacks.registerCallback("setForceEnabled", [this](String const& force, bool enabled) -> std::expected<void, StarException> {
+    auto operation6 = callbacks.register_callback("setForceEnabled", [this](String const& force, bool enabled) -> std::expected<void, StarException> {
   auto configResult = m_physicsForces.get(force);
   if (!configResult)
     return std::unexpected(std::move(configResult.error()));
@@ -180,7 +180,7 @@ std::expected<void, StarException> PhysicsObject::init(World& world, EntityId en
 });
     if (!operation6)
       return std::unexpected(std::move(operation6.error()));
-    auto operation7 = callbacks.registerCallback("setCollisionPosition", [this](String const& collision, Vec2F const& pos) -> std::expected<void, StarException> {
+    auto operation7 = callbacks.register_callback("setCollisionPosition", [this](String const& collision, Vec2F const& pos) -> std::expected<void, StarException> {
   auto configResult = m_physicsCollisions.get(collision);
   if (!configResult)
     return std::unexpected(std::move(configResult.error()));
@@ -191,7 +191,7 @@ std::expected<void, StarException> PhysicsObject::init(World& world, EntityId en
 });
     if (!operation7)
       return std::unexpected(std::move(operation7.error()));
-    auto operation8 = callbacks.registerCallback("setCollisionEnabled", [this](String const& collision, bool enabled) -> std::expected<void, StarException> {
+    auto operation8 = callbacks.register_callback("setCollisionEnabled", [this](String const& collision, bool enabled) -> std::expected<void, StarException> {
   auto configResult = m_physicsCollisions.get(collision);
   if (!configResult)
     return std::unexpected(std::move(configResult.error()));
@@ -201,13 +201,13 @@ std::expected<void, StarException> PhysicsObject::init(World& world, EntityId en
 });
     if (!operation8)
       return std::unexpected(std::move(operation8.error()));
-    auto operation9 = m_scriptComponent.addCallbacks("physics", std::move(callbacks));
+    auto operation9 = m_scriptComponent.add_callbacks("physics", std::move(callbacks));
     if (!operation9)
       return std::unexpected(std::move(operation9.error()));
   }
   auto initialized = Object::init(world, entityId, mode);
   if (!initialized) {
-    auto removed = m_scriptComponent.removeCallbacks("physics");
+    auto removed = m_scriptComponent.remove_callbacks("physics");
     if (!removed)
       return std::unexpected(initialized.error().with_context(Star::format("Physics callback cleanup failed: {}", Star::output_exception(removed.error(), false))));
     return std::unexpected(std::move(initialized.error()));
@@ -219,7 +219,7 @@ std::expected<void, StarException> PhysicsObject::init(World& world, EntityId en
 }
 
 std::expected<void, StarException> PhysicsObject::uninit() {
-  auto callbacks = m_scriptComponent.removeCallbacks("physics");
+  auto callbacks = m_scriptComponent.remove_callbacks("physics");
   auto uninitialized = Object::uninit();
   if (!callbacks)
     return std::unexpected(std::move(callbacks.error()));

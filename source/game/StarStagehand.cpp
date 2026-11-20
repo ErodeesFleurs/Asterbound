@@ -96,7 +96,7 @@ std::expected<Json, StarException> Stagehand::diskStore() const {
     return std::unexpected(std::move(saveData.error()));
   if (!m_scripted)
     return saveData;
-  auto storage = m_scriptComponent.getScriptStorage();
+  auto storage = m_scriptComponent.get_script_storage();
   if (!storage)
     return std::unexpected(std::move(storage.error()));
   return saveData->set("scriptStorage", std::move(*storage));
@@ -114,26 +114,26 @@ std::expected<void, StarException> Stagehand::init(World& world, EntityId entity
       auto stagehandCallbacks = self.makeStagehandCallbacks();
       if (!stagehandCallbacks)
         return std::unexpected(std::move(stagehandCallbacks.error()));
-      if (auto result = self.m_scriptComponent.addCallbacks("stagehand", std::move(*stagehandCallbacks)); !result)
+      if (auto result = self.m_scriptComponent.add_callbacks("stagehand", std::move(*stagehandCallbacks)); !result)
         return result;
       auto configCallbacks = LuaBindings::makeConfigCallbacks([&self](String const& name, Json const& def) {
           return self.m_config.query(name, def);
         });
       if (!configCallbacks)
         return std::unexpected(std::move(configCallbacks.error()));
-      if (auto result = self.m_scriptComponent.addCallbacks("config", std::move(*configCallbacks)); !result)
+      if (auto result = self.m_scriptComponent.add_callbacks("config", std::move(*configCallbacks)); !result)
         return result;
       auto entityCallbacks = LuaBindings::makeEntityCallbacks(self);
       if (!entityCallbacks)
         return std::unexpected(std::move(entityCallbacks.error()));
-      if (auto result = self.m_scriptComponent.addCallbacks("entity", std::move(*entityCallbacks)); !result)
+      if (auto result = self.m_scriptComponent.add_callbacks("entity", std::move(*entityCallbacks)); !result)
         return result;
       auto behaviorCallbacks = LuaBindings::makeBehaviorCallbacks(self.root(), self.m_behaviors);
       if (!behaviorCallbacks)
         return std::unexpected(std::move(behaviorCallbacks.error()));
-      if (auto result = self.m_scriptComponent.addCallbacks("behavior", std::move(*behaviorCallbacks)); !result)
+      if (auto result = self.m_scriptComponent.add_callbacks("behavior", std::move(*behaviorCallbacks)); !result)
         return result;
-      return recoverLuaScriptError(self.m_scriptComponent.init(world));
+      return recover_lua_script_error(self.m_scriptComponent.init(world));
     }
     return {};
   }();
@@ -153,10 +153,10 @@ std::expected<void, StarException> Stagehand::uninit() {
   };
   remember(Entity::uninit());
   if (m_scripted) {
-    remember(recoverLuaScriptError(m_scriptComponent.uninit()));
-    remember(m_scriptComponent.removeCallbacks("stagehand"));
-    remember(m_scriptComponent.removeCallbacks("config"));
-    remember(m_scriptComponent.removeCallbacks("entity"));
+    remember(recover_lua_script_error(m_scriptComponent.uninit()));
+    remember(m_scriptComponent.remove_callbacks("stagehand"));
+    remember(m_scriptComponent.remove_callbacks("config"));
+    remember(m_scriptComponent.remove_callbacks("entity"));
   }
   if (error)
     return std::unexpected(std::move(*error));
@@ -197,7 +197,7 @@ std::expected<void, StarException> Stagehand::update(float dt, std::uint64_t) {
     return {};
 
   if (isMaster() && m_scripted) {
-    auto result = recoverLuaScriptError(m_scriptComponent.update(m_scriptComponent.updateDt(dt)));
+    auto result = recover_lua_script_error(m_scriptComponent.update(m_scriptComponent.update_dt(dt)));
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
@@ -220,11 +220,11 @@ std::expected<bool, StarException> Stagehand::shouldDestroy() const {
 }
 
 std::expected<std::optional<LuaValue>, StarException> Stagehand::callScript(String const& func, LuaVariadic<LuaValue> const& args) {
-  return recoverLuaScriptError(m_scriptComponent.invoke(func, args));
+  return recover_lua_script_error(m_scriptComponent.invoke(func, args));
 }
 
 std::expected<std::optional<LuaValue>, StarException> Stagehand::evalScript(String const& code) {
-  return recoverLuaScriptError(m_scriptComponent.eval(code));
+  return recover_lua_script_error(m_scriptComponent.eval(code));
 }
 
 std::expected<Json, StarException> Stagehand::configValue(String const& name, Json const& def) const {
@@ -287,12 +287,12 @@ std::expected<void, StarException> Stagehand::readConfig(Json config) {
     auto scripts = json_to_string_list(*scriptsJson);
     if (!scripts)
       return std::unexpected(std::move(scripts.error()));
-    if (auto result = m_scriptComponent.setScripts(std::move(*scripts)); !result)
+    if (auto result = m_scriptComponent.set_scripts(std::move(*scripts)); !result)
       return result;
     auto delta = m_config.get_int("scriptDelta", 5);
     if (!delta)
       return std::unexpected(std::move(delta.error()));
-    m_scriptComponent.setUpdateDelta(*delta);
+    m_scriptComponent.set_update_delta(*delta);
     auto storage = m_config.opt("scriptStorage");
     if (!storage)
       return std::unexpected(std::move(storage.error()));
@@ -300,7 +300,7 @@ std::expected<void, StarException> Stagehand::readConfig(Json config) {
       auto object = (**storage).to_object();
       if (!object)
         return std::unexpected(std::move(object.error()));
-      if (auto result = m_scriptComponent.setScriptStorage(std::move(*object)); !result)
+      if (auto result = m_scriptComponent.set_script_storage(std::move(*object)); !result)
         return result;
     }
   }
@@ -313,17 +313,17 @@ std::expected<void, StarException> Stagehand::readConfig(Json config) {
 
 std::expected<LuaCallbacks, StarException> Stagehand::makeStagehandCallbacks() {
   LuaCallbacks callbacks;
-  if (auto result = callbacks.registerCallback("id", [&self = *this]() { return self.entityId(); }); !result)
+  if (auto result = callbacks.register_callback("id", [&self = *this]() { return self.entityId(); }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallback("position", [&self = *this]() { return self.position(); }); !result)
+  if (auto result = callbacks.register_callback("position", [&self = *this]() { return self.position(); }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallback("setPosition", [&self = *this](Vec2F const& position) { self.setPosition(position); }); !result)
+  if (auto result = callbacks.register_callback("setPosition", [&self = *this](Vec2F const& position) { self.setPosition(position); }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallback("die", [&self = *this]() { self.m_dead = true; }); !result)
+  if (auto result = callbacks.register_callback("die", [&self = *this]() { self.m_dead = true; }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallback("typeName", [&self = *this]() { return self.typeName(); }); !result)
+  if (auto result = callbacks.register_callback("typeName", [&self = *this]() { return self.typeName(); }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallback("setUniqueId", [&self = *this](std::optional<String> const& uniqueId) { self.setUniqueId(uniqueId); }); !result)
+  if (auto result = callbacks.register_callback("setUniqueId", [&self = *this](std::optional<String> const& uniqueId) { self.setUniqueId(uniqueId); }); !result)
     return std::unexpected(std::move(result.error()));
   return callbacks;
 }
@@ -340,7 +340,7 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Stageh
   auto currentWorld = world();
   if (!currentWorld)
     return std::unexpected(std::move(currentWorld.error()));
-  return recoverLuaScriptError(m_scriptComponent.handleMessage(message, sendingConnection == currentWorld->get().connection(), args));
+  return recover_lua_script_error(m_scriptComponent.handle_message(message, sendingConnection == currentWorld->get().connection(), args));
 }
 
 }

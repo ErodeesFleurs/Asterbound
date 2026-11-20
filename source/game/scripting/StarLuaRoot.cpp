@@ -36,8 +36,8 @@ import star.root;
 
 namespace Star {
 
-std::expected<std::reference_wrapper<Root>, StarException> luaExecutionRoot(LuaEngine& engine) {
-  if (auto host = engine.executionHost()) {
+std::expected<std::reference_wrapper<Root>, StarException> lua_execution_root(LuaEngine& engine) {
+  if (auto host = engine.execution_host()) {
     if (auto scope = as_ref<LuaExecutionScope>(host->get()))
       return std::ref(scope->get().root());
   }
@@ -73,8 +73,8 @@ Root& LuaRoot::root() const {
   return m_root;
 }
 
-bool LuaRoot::scriptLoaded(String const& assetPath) const {
-  return m_scriptCache->scriptLoaded(assetPath);
+bool LuaRoot::script_loaded(String const& assetPath) const {
+  return m_scriptCache->script_loaded(assetPath);
 }
 
 std::expected<void, StarException> LuaRoot::restart() {
@@ -93,14 +93,14 @@ std::expected<void, StarException> LuaRoot::restart() {
   auto engine = LuaEngine::create(*safe);
   if (!engine)
     return std::unexpected(std::move(engine.error()));
-  (*engine)->setExecutionHost(std::make_unique<LuaExecutionScope>(m_root));
+  (*engine)->set_execution_host(std::make_unique<LuaExecutionScope>(m_root));
   auto sourceDiagnostics = std::make_shared<StringMap<String>>();
-  (*engine)->setSourceResolver([sourceDiagnostics](String const& source) -> std::expected<String, StarException> {
+  (*engine)->set_source_resolver([sourceDiagnostics](String const& source) -> std::expected<String, StarException> {
     if (auto diagnostic = sourceDiagnostics->find_ref(source))
       return diagnostic->get();
     return String();
   });
-  (*engine)->setImageResolver([&root = m_root](String const& path) -> std::expected<std::shared_ptr<Image const>, StarException> {
+  (*engine)->set_image_resolver([&root = m_root](String const& path) -> std::expected<std::shared_ptr<Image const>, StarException> {
     auto assets = root.assets();
     if (!assets)
       return std::unexpected(std::move(assets.error()));
@@ -131,10 +131,10 @@ std::expected<void, StarException> LuaRoot::restart() {
   auto measureInterval = interval->to_uint();
   if (!measureInterval)
     return std::unexpected(std::move(measureInterval.error()));
-  (*engine)->setRecursionLimit(*recursionLimit);
-  (*engine)->setInstructionLimit(*instructionLimit);
-  (*engine)->setProfilingEnabled(*profilingEnabled);
-  (*engine)->setInstructionMeasureInterval(*measureInterval);
+  (*engine)->set_recursion_limit(*recursionLimit);
+  (*engine)->set_instruction_limit(*instructionLimit);
+  (*engine)->set_profiling_enabled(*profilingEnabled);
+  (*engine)->set_instruction_measure_interval(*measureInterval);
   m_luaEngine = std::move(*engine);
   m_sourceDiagnostics = std::move(sourceDiagnostics);
   if (m_generation != 0)
@@ -150,7 +150,7 @@ std::expected<void, StarException> LuaRoot::shutdown() {
 
   // Detach even when writing the profile fails; no half-shutdown engine remains.
   auto engine = std::move(m_luaEngine);
-  auto profile = engine->getProfile();
+  auto profile = engine->get_profile();
   if (profile.empty())
     return {};
   profile.sort([](auto const& a, auto const& b) { return a.totalTime > b.totalTime; });
@@ -198,24 +198,24 @@ std::expected<void, StarException> LuaRoot::shutdown() {
   return File::write_file(*summary, path);
 }
 
-std::expected<LuaContext, StarException> LuaRoot::createContext(String const& script, std::stop_token loadLifetime) {
-  return createContext(StringList{script}, std::move(loadLifetime));
+std::expected<LuaContext, StarException> LuaRoot::create_context(String const& script, std::stop_token loadLifetime) {
+  return create_context(StringList{script}, std::move(loadLifetime));
 }
 
-std::expected<LuaContext, StarException> LuaRoot::createContext(StringList const& scriptPaths,
+std::expected<LuaContext, StarException> LuaRoot::create_context(StringList const& scriptPaths,
                                                                 std::stop_token loadLifetime) {
   if (!m_luaEngine)
     return std::unexpected(LuaException("Cannot create a context from a shut down Lua root"));
   LuaEnginePtr engine = m_luaEngine;
-  auto previousLifetime = engine->setPromiseLifetime(loadLifetime);
-  auto restored = make_scope_exit([&] { engine->setPromiseLifetime(std::move(previousLifetime)); });
-  auto created = engine->createContext();
+  auto previousLifetime = engine->set_promise_lifetime(loadLifetime);
+  auto restored = make_scope_exit([&] { engine->set_promise_lifetime(std::move(previousLifetime)); });
+  auto created = engine->create_context();
   if (!created)
     return std::unexpected(std::move(created.error()));
   auto context = std::move(*created);
   auto cache = m_scriptCache;
   auto sourceDiagnostics = m_sourceDiagnostics;
-  if (auto required = context.setRequireFunction(
+  if (auto required = context.set_require_function(
         [cache, sourceDiagnostics, revision = cache->revision(), loaded = HashSet<String, hash<String>, std::equal_to<>>{},
          loading = std::vector<String>{}](LuaStackValue environment,
                                           StringView module) mutable -> std::expected<void, StarException> {
@@ -274,43 +274,43 @@ std::expected<LuaContext, StarException> LuaRoot::createContext(StringList const
   }
   for (auto const& callbacks : m_luaCallbacks) {
     auto result = loadLifetime.stop_possible()
-      ? context.setCallbacks(callbacks.first, callbacks.second.withLifetime(loadLifetime))
-      : context.setCallbacks(callbacks.first, callbacks.second);
+      ? context.set_callbacks(callbacks.first, callbacks.second.with_lifetime(loadLifetime))
+      : context.set_callbacks(callbacks.first, callbacks.second);
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
   return context;
 }
 
-std::expected<void, StarException> LuaRoot::collectGarbage(std::optional<unsigned> steps) {
+std::expected<void, StarException> LuaRoot::collect_garbage(std::optional<unsigned> steps) {
   if (m_luaEngine)
-    return m_luaEngine->collectGarbage(steps);
+    return m_luaEngine->collect_garbage(steps);
   return {};
 }
 
-void LuaRoot::setAutoGarbageCollection(bool enabled) {
+void LuaRoot::set_auto_garbage_collection(bool enabled) {
   if (m_luaEngine)
-    m_luaEngine->setAutoGarbageCollection(enabled);
+    m_luaEngine->set_auto_garbage_collection(enabled);
 }
 
-void LuaRoot::tuneAutoGarbageCollection(float pause, float multiplier) {
+void LuaRoot::tune_auto_garbage_collection(float pause, float multiplier) {
   if (m_luaEngine)
-    m_luaEngine->tuneAutoGarbageCollection(pause, multiplier);
+    m_luaEngine->tune_auto_garbage_collection(pause, multiplier);
 }
 
-std::size_t LuaRoot::luaMemoryUsage() const {
-  return m_luaEngine ? m_luaEngine->memoryUsage() : 0;
+std::size_t LuaRoot::lua_memory_usage() const {
+  return m_luaEngine ? m_luaEngine->memory_usage() : 0;
 }
 
-std::size_t LuaRoot::scriptCacheMemoryUsage() const {
-  return m_luaEngine ? m_scriptCache->memoryUsage() : 0;
+std::size_t LuaRoot::script_cache_memory_usage() const {
+  return m_luaEngine ? m_scriptCache->memory_usage() : 0;
 }
 
-void LuaRoot::addCallbacks(String const& groupName, LuaCallbacks const& callbacks) {
+void LuaRoot::add_callbacks(String const& groupName, LuaCallbacks const& callbacks) {
   m_luaCallbacks[groupName] = callbacks;
 }
 
-LuaEngine& LuaRoot::luaEngine() const {
+LuaEngine& LuaRoot::lua_engine() const {
   return *m_luaEngine;
 }
 
@@ -375,7 +375,7 @@ LuaRoot::ScriptCache::script(LuaEngine& engine, String const& path, std::uint64_
   return script;
 }
 
-bool LuaRoot::ScriptCache::scriptLoaded(String const& path) const {
+bool LuaRoot::ScriptCache::script_loaded(String const& path) const {
   std::lock_guard locker(mutex);
   return scripts.contains(path);
 }
@@ -391,7 +391,7 @@ std::uint64_t LuaRoot::ScriptCache::revision() const {
   return m_revision;
 }
 
-std::size_t LuaRoot::ScriptCache::memoryUsage() const {
+std::size_t LuaRoot::ScriptCache::memory_usage() const {
   std::lock_guard locker(mutex);
   std::size_t total = 0;
   for (auto const& p : scripts)

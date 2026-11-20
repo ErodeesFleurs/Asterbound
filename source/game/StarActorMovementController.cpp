@@ -1763,7 +1763,7 @@ std::expected<bool, StarException> PathController::validate_edge(ActorMovementCo
     bool opened = false;
     for (auto const& entity : *objects) {
       if (auto object = as<Object>(entity); object && object->isMaster()) {
-        auto arg = world.luaRoot()->luaEngine().createString("closedDoor");
+        auto arg = world.luaRoot()->lua_engine().create_string("closedDoor");
         if (!arg)
           return std::unexpected(std::move(arg.error()));
         auto response = object->callScript("hasCapability", LuaVariadic<LuaValue>{*arg});

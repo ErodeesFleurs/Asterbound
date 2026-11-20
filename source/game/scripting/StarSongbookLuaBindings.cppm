@@ -24,11 +24,11 @@ namespace Star {
 std::expected<LuaCallbacks, StarException> LuaBindings::makeSongbookCallbacks(Songbook& songbook) {
   LuaCallbacks callbacks;
 
-  if (auto registration = callbacks.registerCallbackWithSignature<void, Json, String>(
+  if (auto registration = callbacks.register_callback_with_signature<void, Json, String>(
         "play", [&songbook](Json const& song, String const& timeSource) { return songbook.play(song, timeSource); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<void, String, Vec2F>(
+  if (auto registration = callbacks.register_callback_with_signature<void, String, Vec2F>(
         "keepAlive",
         [&songbook](String const& instrument, Vec2F const& position) {
           return songbook.keepAlive(instrument, position);
@@ -36,27 +36,27 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeSongbookCallbacks(So
       !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration =
-        callbacks.registerCallbackWithSignature<void>("stop", [&songbook]() { return songbook.stop(); });
+        callbacks.register_callback_with_signature<void>("stop", [&songbook]() { return songbook.stop(); });
       !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration =
-        callbacks.registerCallbackWithSignature<bool>("active", [&songbook]() { return songbook.active(); });
+        callbacks.register_callback_with_signature<bool>("active", [&songbook]() { return songbook.active(); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<std::optional<String>>(
+  if (auto registration = callbacks.register_callback_with_signature<std::optional<String>>(
         "band", [&songbook]() { return songbook.timeSource(); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<std::optional<String>>(
+  if (auto registration = callbacks.register_callback_with_signature<std::optional<String>>(
         "instrument", [&songbook]() { return songbook.instrument(); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<bool>(
+  if (auto registration = callbacks.register_callback_with_signature<bool>(
         "instrumentPlaying", [&songbook]() { return songbook.instrumentPlaying(); });
       !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration =
-        callbacks.registerCallbackWithSignature<Json>("song", [&songbook]() { return songbook.song(); });
+        callbacks.register_callback_with_signature<Json>("song", [&songbook]() { return songbook.song(); });
       !registration)
     return std::unexpected(std::move(registration.error()));
 

@@ -293,25 +293,25 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
   if (!created_lua_engine)
     return std::unexpected(std::move(created_lua_engine.error()));
   m_lua_engine = std::move(*created_lua_engine);
-  m_lua_engine->setImageResolver([this](String const& path) { return image(path); });
+  m_lua_engine->set_image_resolver([this](String const& path) { return image(path); });
   auto push_global_context = [this](String const& name, LuaCallbacks const& callbacks) -> std::expected<void, StarException> {
-    auto table = m_lua_engine->createTable();
+    auto table = m_lua_engine->create_table();
     if (!table)
       return std::unexpected(std::move(table.error()));
     for (auto const& p : callbacks.callbacks()) {
-      auto function = m_lua_engine->createWrappedFunction(p.second);
+      auto function = m_lua_engine->create_wrapped_function(p.second);
       if (!function)
         return std::unexpected(std::move(function.error()));
       auto set = table->set(p.first, std::move(*function));
       if (!set)
         return std::unexpected(std::move(set.error()));
     }
-    return m_lua_engine->setGlobal(name, std::move(*table));
+    return m_lua_engine->set_global(name, std::move(*table));
   };
 
   auto makeBaseAssetCallbacks = [this]() -> std::expected<LuaCallbacks, StarException> {
     LuaCallbacks callbacks;
-    auto registered = callbacks.registerCallback("byExtension", [this](String const& extension) -> std::expected<StringSet, StarException> {
+    auto registered = callbacks.register_callback("byExtension", [this](String const& extension) -> std::expected<StringSet, StarException> {
       auto paths = scanExtension(extension);
       if (!paths)
         return std::unexpected(std::move(paths.error()));
@@ -323,16 +323,16 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     });
     if (!registered)
       return std::unexpected(std::move(registered.error()));
-    registered = callbacks.registerCallback("json", [this](String const& path) { return json(path); });
+    registered = callbacks.register_callback("json", [this](String const& path) { return json(path); });
     if (!registered)
       return std::unexpected(std::move(registered.error()));
-    registered = callbacks.registerCallback("exists", [this](String const& path) { return assetExists(path); });
+    registered = callbacks.register_callback("exists", [this](String const& path) { return assetExists(path); });
     if (!registered)
       return std::unexpected(std::move(registered.error()));
 
-    registered = callbacks.registerCallback("sourcePaths", [this](LuaEngine& engine, std::optional<bool> withMetaData) -> std::expected<LuaTable, StarException> {
+    registered = callbacks.register_callback("sourcePaths", [this](LuaEngine& engine, std::optional<bool> withMetaData) -> std::expected<LuaTable, StarException> {
       auto assetSources = this->assetSources();
-      auto table = engine.createTable(assetSources.size(), 0);
+      auto table = engine.create_table(assetSources.size(), 0);
       if (!table)
         return std::unexpected(std::move(table.error()));
       if (withMetaData.value_or(false)) {
@@ -358,7 +358,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
       return std::unexpected(std::move(registered.error()));
 
     registered =
-      callbacks.registerCallback("sourceMetadata", [this](String const& sourcePath) -> std::optional<JsonObject> {
+      callbacks.register_callback("sourceMetadata", [this](String const& sourcePath) -> std::optional<JsonObject> {
         if (auto assetSource = m_assetSourcePaths.find_right_ref(sourcePath))
           return assetSource->get()->metadata();
         return {};
@@ -366,7 +366,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     if (!registered)
       return std::unexpected(std::move(registered.error()));
 
-    registered = callbacks.registerCallback("origin", [this](String const& path) -> std::expected<std::optional<String>, StarException> {
+    registered = callbacks.register_callback("origin", [this](String const& path) -> std::expected<std::optional<String>, StarException> {
       auto descriptor = this->assetDescriptor(path);
       if (!descriptor)
         return std::unexpected(std::move(descriptor.error()));
@@ -377,7 +377,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     if (!registered)
       return std::unexpected(std::move(registered.error()));
 
-    registered = callbacks.registerCallback("bytes", [this](String const& path, std::optional<bool> allowRemote) -> std::expected<String, StarException> {
+    registered = callbacks.register_callback("bytes", [this](String const& path, std::optional<bool> allowRemote) -> std::expected<String, StarException> {
       auto assetBytes = bytes(path, allowRemote.value_or(false));
       if (!assetBytes)
         return std::unexpected(std::move(assetBytes.error()));
@@ -386,7 +386,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     if (!registered)
       return std::unexpected(std::move(registered.error()));
 
-    registered = callbacks.registerCallback(
+    registered = callbacks.register_callback(
       "sourceBytes", [this](String const& sourcePath, String const& path) -> std::expected<String, StarException> {
         auto source = m_assetSourcePaths.find_right_ref(sourcePath);
         if (!source)
@@ -413,7 +413,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     if (!registered)
       return std::unexpected(std::move(registered.error()));
 
-    registered = callbacks.registerCallback("image", [this](String const& path) -> std::expected<Image, StarException> {
+    registered = callbacks.register_callback("image", [this](String const& path) -> std::expected<Image, StarException> {
       auto assetImage = image(path);
       if (!assetImage)
         return std::unexpected(std::move(assetImage.error()));
@@ -424,7 +424,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     if (!registered)
       return std::unexpected(std::move(registered.error()));
 
-    registered = callbacks.registerCallback("frames", [this](String const& path) -> std::expected<Json, StarException> {
+    registered = callbacks.register_callback("frames", [this](String const& path) -> std::expected<Json, StarException> {
       auto frames = imageFrames(path);
       if (!frames)
         return std::unexpected(std::move(frames.error()));
@@ -435,7 +435,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     if (!registered)
       return std::unexpected(std::move(registered.error()));
 
-    registered = callbacks.registerCallback("scan", [this](std::optional<String> const& a, std::optional<String> const& b) -> std::expected<StringList, StarException> {
+    registered = callbacks.register_callback("scan", [this](std::optional<String> const& a, std::optional<String> const& b) -> std::expected<StringList, StarException> {
       return b ? scan(a.value_or(String{}), *b) : scan(a.value_or(String{}));
     });
     if (!registered)
@@ -484,22 +484,22 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     auto callbacks = makeBaseAssetCallbacks();
     if (!callbacks)
       return std::unexpected(std::move(callbacks.error()));
-    auto registered = callbacks->registerCallback("add", [newFiles](LuaEngine& engine, String const& path, LuaValue const& data) -> std::expected<void, StarException> {
-      auto str = engine.luaMaybeTo<String>(data);
+    auto registered = callbacks->register_callback("add", [newFiles](LuaEngine& engine, String const& path, LuaValue const& data) -> std::expected<void, StarException> {
+      auto str = engine.lua_maybe_to<String>(data);
       if (!str)
         return std::unexpected(std::move(str.error()));
       if (*str) {
         newFiles->set(path, (*str)->utf8_bytes());
         return {};
       }
-      auto image = engine.luaMaybeTo<Image>(data);
+      auto image = engine.lua_maybe_to<Image>(data);
       if (!image)
         return std::unexpected(std::move(image.error()));
       if (*image) {
         newFiles->set(path, std::move(**image));
         return {};
       }
-      auto json = engine.luaTo<Json>(data);
+      auto json = engine.lua_to<Json>(data);
       if (!json)
         return std::unexpected(std::move(json.error()));
       auto text = json->repr();
@@ -511,7 +511,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     if (!registered)
       return std::unexpected(std::move(registered.error()));
 
-    registered = callbacks->registerCallback("patch", [this, newFiles](String const& path, String const& patchPath) -> std::expected<bool, StarException> {
+    registered = callbacks->register_callback("patch", [this, newFiles](String const& path, String const& patchPath) -> std::expected<bool, StarException> {
       if (newFiles->contains(path)) {
         auto image = newFiles->image(path);
         if (!image)
@@ -571,7 +571,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     if (!registered)
       return std::unexpected(std::move(registered.error()));
 
-    registered = callbacks->registerCallback(
+    registered = callbacks->register_callback(
       "patchReplace",
       [this, newFiles](String const& target, String const& originalPatchPath, String const& sourcePath,
                        String const& replacementPatchPath,
@@ -633,7 +633,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     if (!registered)
       return std::unexpected(std::move(registered.error()));
 
-    registered = callbacks->registerCallback("loadScriptReplace", [this, newFiles, loadScriptState](
+    registered = callbacks->register_callback("loadScriptReplace", [this, newFiles, loadScriptState](
         String const& sourcePath, String const& originalScriptPath, String const& replacementScriptPath) -> std::expected<bool, StarException> {
       if (!loadScriptState->active)
         return false;
@@ -685,7 +685,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     if (!registered)
       return std::unexpected(std::move(registered.error()));
 
-    registered = callbacks->registerCallback("erase", [this](String const& path) -> std::expected<bool, StarException> {
+    registered = callbacks->register_callback("erase", [this](String const& path) -> std::expected<bool, StarException> {
       auto pathKey = CaseInsensitiveStringView::create(path);
       if (!pathKey)
         return std::unexpected(std::move(pathKey.error()));
@@ -707,7 +707,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     });
     if (!registered)
       return std::unexpected(std::move(registered.error()));
-    return context.setCallbacks("assets", *callbacks);
+    return context.set_callbacks("assets", *callbacks);
   };
 
   auto addSource = [&](String const& sourcePath, std::shared_ptr<AssetSource> source) -> std::expected<void, StarException> {
@@ -849,7 +849,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
         if (!logged)
           return std::unexpected(std::move(logged.error()));
         auto runScripts = [&]() -> std::expected<void, StarException> {
-          auto context = m_lua_engine->createContext();
+          auto context = m_lua_engine->create_context();
           if (!context)
             return std::unexpected(std::move(context.error()));
           auto decorated = decorateLuaContext(*context, memoryAssets);
@@ -1719,7 +1719,7 @@ std::expected<void, StarException> Assets::workerMain(std::stop_token stopToken)
         {
           std::unique_lock luaLocker(m_luaMutex, std::defer_lock);
           lock_with_diagnostics(luaLocker);
-          collected = m_lua_engine->collectGarbage();
+          collected = m_lua_engine->collect_garbage();
         }
         assetsLocker.lock();
         if (!collected) {
@@ -1891,7 +1891,7 @@ std::expected<std::shared_ptr<Image const>, StarException> Assets::readImage(Str
 std::expected<std::shared_ptr<Image const>, StarException> Assets::applyImagePatches(std::shared_ptr<Image const> image, String const& path, List<std::pair<String, std::shared_ptr<AssetSource>>> patches) const {
   std::unique_lock luaLocker(m_luaMutex, std::defer_lock);
   lock_with_diagnostics(luaLocker);
-  auto imageUserData = m_lua_engine->createUserData(*image);
+  auto imageUserData = m_lua_engine->create_userdata(*image);
   if (!imageUserData)
     return std::unexpected(std::move(imageUserData.error()));
   LuaValue result = std::move(*imageUserData);
@@ -1912,7 +1912,7 @@ std::expected<std::shared_ptr<Image const>, StarException> Assets::applyImagePat
       lock_with_diagnostics(luaLocker);
       std::shared_ptr<LuaContext>& context = m_patchContexts[contextKey];
       if (!context) {
-        auto createdContext = m_lua_engine->createContext();
+        auto createdContext = m_lua_engine->create_context();
         if (!createdContext)
           return std::unexpected(std::move(createdContext.error()));
         auto newContext = std::make_shared<LuaContext>(std::move(*createdContext));
@@ -1922,7 +1922,7 @@ std::expected<std::shared_ptr<Image const>, StarException> Assets::applyImagePat
                                                  m_assetSourcePaths.find_left_ref(patchSource)));
         context = std::move(newContext);
       }
-      auto newResult = context->invokePath<LuaValue>("patch", result, path);
+      auto newResult = context->invoke_path<LuaValue>("patch", result, path);
       if (!newResult)
         return std::unexpected(luaPatchFailure(std::move(newResult.error()), path, patchPath, *patchSource,
                                                m_assetSourcePaths.find_left_ref(patchSource)));
@@ -2062,7 +2062,7 @@ std::expected<Json, StarException> Assets::applyJsonPatches(Json const& input, S
       lock_with_diagnostics(luaLocker);
       std::shared_ptr<LuaContext>& context = m_patchContexts[contextKey];
       if (!context) {
-        auto createdContext = m_lua_engine->createContext();
+        auto createdContext = m_lua_engine->create_context();
         if (!createdContext)
           return std::unexpected(std::move(createdContext.error()));
         auto newContext = std::make_shared<LuaContext>(std::move(*createdContext));
@@ -2072,7 +2072,7 @@ std::expected<Json, StarException> Assets::applyJsonPatches(Json const& input, S
                                                  m_assetSourcePaths.find_left_ref(patchSource)));
         context = std::move(newContext);
       }
-      auto newResult = context->invokePath<Json>("patch", result, path);
+      auto newResult = context->invoke_path<Json>("patch", result, path);
       if (!newResult)
         return std::unexpected(luaPatchFailure(std::move(newResult.error()), path, pair.first, *patchSource,
                                                m_assetSourcePaths.find_left_ref(patchSource)));

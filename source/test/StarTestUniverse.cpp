@@ -215,61 +215,61 @@ std::expected<std::unique_ptr<TestUniverse>, StarException> TestUniverse::create
   auto bindState = [](String const&, String const&) -> std::optional<unsigned> { return {}; };
   auto noKey = [](String const&) -> std::optional<unsigned> { return {}; };
   auto noButton = [](String const&) -> std::optional<List<Vec2F>> { return {}; };
-  auto bindDown = inputCallbacks.registerCallback("bindDown", bindState);
+  auto bindDown = inputCallbacks.register_callback("bindDown", bindState);
   if (!bindDown)
     return std::unexpected(std::move(bindDown.error()));
-  auto bindUp = inputCallbacks.registerCallback("bindUp", bindState);
+  auto bindUp = inputCallbacks.register_callback("bindUp", bindState);
   if (!bindUp)
     return std::unexpected(std::move(bindUp.error()));
-  auto bindHeld = inputCallbacks.registerCallback("bindHeld", [](String const&, String const&) -> bool { return false; });
+  auto bindHeld = inputCallbacks.register_callback("bindHeld", [](String const&, String const&) -> bool { return false; });
   if (!bindHeld)
     return std::unexpected(std::move(bindHeld.error()));
-  auto bind = inputCallbacks.registerCallback("bind", [](String const&, String const&) -> bool { return false; });
+  auto bind = inputCallbacks.register_callback("bind", [](String const&, String const&) -> bool { return false; });
   if (!bind)
     return std::unexpected(std::move(bind.error()));
-  auto keyDown = inputCallbacks.registerCallback("keyDown", noKey);
+  auto keyDown = inputCallbacks.register_callback("keyDown", noKey);
   if (!keyDown)
     return std::unexpected(std::move(keyDown.error()));
-  auto keyUp = inputCallbacks.registerCallback("keyUp", noKey);
+  auto keyUp = inputCallbacks.register_callback("keyUp", noKey);
   if (!keyUp)
     return std::unexpected(std::move(keyUp.error()));
-  auto keyHeld = inputCallbacks.registerCallback("keyHeld", [](String const&) -> bool { return false; });
+  auto keyHeld = inputCallbacks.register_callback("keyHeld", [](String const&) -> bool { return false; });
   if (!keyHeld)
     return std::unexpected(std::move(keyHeld.error()));
-  auto key = inputCallbacks.registerCallback("key", [](String const&) -> bool { return false; });
+  auto key = inputCallbacks.register_callback("key", [](String const&) -> bool { return false; });
   if (!key)
     return std::unexpected(std::move(key.error()));
-  auto mouseDown = inputCallbacks.registerCallback("mouseDown", noButton);
+  auto mouseDown = inputCallbacks.register_callback("mouseDown", noButton);
   if (!mouseDown)
     return std::unexpected(std::move(mouseDown.error()));
-  auto mouseUp = inputCallbacks.registerCallback("mouseUp", noButton);
+  auto mouseUp = inputCallbacks.register_callback("mouseUp", noButton);
   if (!mouseUp)
     return std::unexpected(std::move(mouseUp.error()));
-  auto mouseHeld = inputCallbacks.registerCallback("mouseHeld", [](String const&) -> bool { return false; });
+  auto mouseHeld = inputCallbacks.register_callback("mouseHeld", [](String const&) -> bool { return false; });
   if (!mouseHeld)
     return std::unexpected(std::move(mouseHeld.error()));
-  auto mouse = inputCallbacks.registerCallback("mouse", [](String const&) -> bool { return false; });
+  auto mouse = inputCallbacks.register_callback("mouse", [](String const&) -> bool { return false; });
   if (!mouse)
     return std::unexpected(std::move(mouse.error()));
-  auto mousePosition = inputCallbacks.registerCallback("mousePosition", []() -> Vec2F { return {}; });
+  auto mousePosition = inputCallbacks.register_callback("mousePosition", []() -> Vec2F { return {}; });
   if (!mousePosition)
     return std::unexpected(std::move(mousePosition.error()));
-  auto getTag = inputCallbacks.registerCallback("getTag", [](String const&) -> unsigned { return 0; });
+  auto getTag = inputCallbacks.register_callback("getTag", [](String const&) -> unsigned { return 0; });
   if (!getTag)
     return std::unexpected(std::move(getTag.error()));
-  auto events = inputCallbacks.registerCallback("events", []() -> Json { return JsonArray(); });
+  auto events = inputCallbacks.register_callback("events", []() -> Json { return JsonArray(); });
   if (!events)
     return std::unexpected(std::move(events.error()));
-  auto resetBinds = inputCallbacks.registerCallback("resetBinds", [](String const&, String const&) {});
+  auto resetBinds = inputCallbacks.register_callback("resetBinds", [](String const&, String const&) {});
   if (!resetBinds)
     return std::unexpected(std::move(resetBinds.error()));
-  auto setBinds = inputCallbacks.registerCallback("setBinds", [](String const&, String const&, Json const&) {});
+  auto setBinds = inputCallbacks.register_callback("setBinds", [](String const&, String const&, Json const&) {});
   if (!setBinds)
     return std::unexpected(std::move(setBinds.error()));
-  auto getDefaultBinds = inputCallbacks.registerCallback("getDefaultBinds", [](String const&, String const&) -> Json { return JsonObject(); });
+  auto getDefaultBinds = inputCallbacks.register_callback("getDefaultBinds", [](String const&, String const&) -> Json { return JsonObject(); });
   if (!getDefaultBinds)
     return std::unexpected(std::move(getDefaultBinds.error()));
-  auto getBinds = inputCallbacks.registerCallback("getBinds", [](String const&, String const&) -> Json { return JsonObject(); });
+  auto getBinds = inputCallbacks.register_callback("getBinds", [](String const&, String const&) -> Json { return JsonObject(); });
   if (!getBinds)
     return std::unexpected(std::move(getBinds.error()));
   auto callbacks = fixture->m_client->setLuaCallbacks("input", inputCallbacks);
@@ -500,7 +500,7 @@ TestUniverse::waitForWorldReady(std::int64_t timeoutMilliseconds) {
           if (!context || context->error() || !context->context())
             return std::unexpected(StarException(Star::format("Test world script context is not healthy: {}", name)));
           auto& observation = observedWorldScripts.try_emplace(name.utf8(), Observation{step}).first->second;
-          settled(observation, context->updateDt());
+          settled(observation, context->update_dt());
         }
         for (auto id : world.entityIds()) {
           auto entity = world.entity(id);

@@ -40,7 +40,7 @@ std::expected<std::shared_ptr<ScriptableThread>, StarException> ScriptableThread
   auto step = thread->m_parameters.get_float("luaGcStepMultiplier", 1.2f);
   if (!step)
     return std::unexpected(std::move(step.error()));
-  thread->m_luaRoot->tuneAutoGarbageCollection(*pause, *step);
+  thread->m_luaRoot->tune_auto_garbage_collection(*pause, *step);
   auto logMapped = thread->m_parameters.get_bool("logMapped", true);
   if (!logMapped)
     return std::unexpected(std::move(logMapped.error()));
@@ -53,17 +53,17 @@ std::expected<std::shared_ptr<ScriptableThread>, StarException> ScriptableThread
   if (!limit)
     return std::unexpected(std::move(limit.error()));
   if (*limit)
-    thread->m_luaRoot->luaEngine().setInstructionLimit(**limit);
-  auto callbacks = thread->makeThreadCallbacks();
+    thread->m_luaRoot->lua_engine().set_instruction_limit(**limit);
+  auto callbacks = thread->make_thread_callbacks();
   if (!callbacks)
     return std::unexpected(std::move(callbacks.error()));
-  thread->m_luaRoot->addCallbacks("thread", *callbacks);
+  thread->m_luaRoot->add_callbacks("thread", *callbacks);
   auto configCallbacks = LuaBindings::makeConfigCallbacks([owner = std::ref(*thread)](String const& name, Json const& def) {
-    return owner.get().configValue(name, def);
+    return owner.get().config_value(name, def);
   });
   if (!configCallbacks)
     return std::unexpected(std::move(configCallbacks.error()));
-  thread->m_luaRoot->addCallbacks("config", *configCallbacks);
+  thread->m_luaRoot->add_callbacks("config", *configCallbacks);
   return thread;
 }
 
@@ -73,24 +73,24 @@ ScriptableThread::~ScriptableThread() {
   m_scriptContexts.clear();
 }
 
-std::expected<void, StarException> ScriptableThread::addCallbacks(String const& group, LuaCallbacks const& callbacks) {
+std::expected<void, StarException> ScriptableThread::add_callbacks(String const& group, LuaCallbacks const& callbacks) {
   if (m_threadCallbacks.contains(group))
     return {};
   List<std::shared_ptr<ScriptComponent>> changed;
   for (auto const& p : m_scriptContexts) {
-    auto result = p.second->addCallbacks(group, callbacks);
+    auto result = p.second->add_callbacks(group, callbacks);
     if (result) {
-      result = p.second->addThreadCallbacks(group, callbacks);
+      result = p.second->add_thread_callbacks(group, callbacks);
       if (!result) {
-        if (auto rollback = p.second->removeCallbacks(group); !rollback)
+        if (auto rollback = p.second->remove_callbacks(group); !rollback)
           EmergencyLog::error("Error rolling back script thread callbacks: {}", Star::output_exception(rollback.error(), true));
       }
     }
     if (!result) {
       for (auto const& component : changed) {
-        if (auto rollback = component->removeCallbacks(group); !rollback)
+        if (auto rollback = component->remove_callbacks(group); !rollback)
           EmergencyLog::error("Error rolling back script thread callbacks: {}", Star::output_exception(rollback.error(), true));
-        if (auto rollback = component->removeThreadCallbacks(group); !rollback)
+        if (auto rollback = component->remove_thread_callbacks(group); !rollback)
           EmergencyLog::error("Error rolling back nested thread callbacks: {}", Star::output_exception(rollback.error(), true));
       }
       return std::unexpected(std::move(result.error()));
@@ -101,7 +101,7 @@ std::expected<void, StarException> ScriptableThread::addCallbacks(String const& 
   return {};
 }
 
-std::expected<void, StarException> ScriptableThread::removeCallbacks(String const& group) {
+std::expected<void, StarException> ScriptableThread::remove_callbacks(String const& group) {
   auto callbacks = m_threadCallbacks.find_ref(group);
   if (!callbacks)
     return {};
@@ -114,22 +114,22 @@ std::expected<void, StarException> ScriptableThread::removeCallbacks(String cons
   auto rollback = [&](StarException error) -> std::expected<void, StarException> {
     for (auto const& removed : changed) {
       if (removed.callbacks) {
-        if (auto restored = removed.component->addCallbacks(group, callbacks->get()); !restored)
+        if (auto restored = removed.component->add_callbacks(group, callbacks->get()); !restored)
           error = restored.error().with_related(error, "Original script callback removal failure");
       }
       if (removed.threadCallbacks) {
-        if (auto restored = removed.component->addThreadCallbacks(group, callbacks->get()); !restored)
+        if (auto restored = removed.component->add_thread_callbacks(group, callbacks->get()); !restored)
           error = restored.error().with_related(error, "Original script callback removal failure");
       }
     }
     return std::unexpected(std::move(error));
   };
   for (auto const& p : m_scriptContexts) {
-    auto removed = p.second->removeCallbacks(group);
+    auto removed = p.second->remove_callbacks(group);
     if (!removed)
       return rollback(std::move(removed.error()));
     changed.push_back({.component = p.second, .callbacks = *removed, .threadCallbacks = false});
-    auto removedThread = p.second->removeThreadCallbacks(group);
+    auto removedThread = p.second->remove_thread_callbacks(group);
     if (!removedThread)
       return rollback(std::move(removedThread.error()));
     changed.back().threadCallbacks = *removedThread;
@@ -150,7 +150,7 @@ std::expected<bool, StarException> ScriptableThread::start() {
   }
   auto started = Thread::start();
   if (!started) {
-    requestStop();
+    request_stop();
     m_errorOccurred = true;
     if (auto stopped = stop(); !stopped)
       started.error() = started.error().with_related(stopped.error(), "Error settling failed worker startup");
@@ -159,7 +159,7 @@ std::expected<bool, StarException> ScriptableThread::start() {
   return started;
 }
 
-void ScriptableThread::requestStop() {
+void ScriptableThread::request_stop() {
   {
     std::lock_guard lock(m_sleepMutex);
     m_stopSource.request_stop();
@@ -168,7 +168,7 @@ void ScriptableThread::requestStop() {
 }
 
 std::expected<void, StarException> ScriptableThread::stop() {
-  requestStop();
+  request_stop();
   auto joined = Thread::join();
   List<Message> messages;
   {
@@ -194,11 +194,11 @@ std::expected<void, StarException> ScriptableThread::stop() {
   return {};
 }
 
-void ScriptableThread::setPause(bool pause) { m_pause = pause; }
-bool ScriptableThread::errorOccurred() { return m_errorOccurred; }
-bool ScriptableThread::shouldExpire() { return m_shouldExpire.load(std::memory_order_acquire); }
+void ScriptableThread::set_pause(bool pause) { m_pause = pause; }
+bool ScriptableThread::error_occurred() { return m_errorOccurred; }
+bool ScriptableThread::should_expire() { return m_shouldExpire.load(std::memory_order_acquire); }
 
-std::expected<void, StarException> ScriptableThread::passMessage(Message&& message) {
+std::expected<void, StarException> ScriptableThread::pass_message(Message&& message) {
   std::unique_lock locker(m_messageMutex, std::defer_lock);
   lock_with_diagnostics(locker);
   if (m_errorOccurred)
@@ -217,7 +217,7 @@ std::expected<void, StarException> ScriptableThread::run() {
       return std::unexpected(std::move(scripts.error()));
     for (auto const& p : *scripts) {
       auto component = std::make_shared<ScriptComponent>(m_luaRoot->root());
-      if (auto set = component->setLuaRoot(m_luaRoot); !set)
+      if (auto set = component->set_lua_root(m_luaRoot); !set)
         return std::unexpected(std::move(set.error()));
       auto array = p.second.to_array();
       if (!array)
@@ -225,12 +225,12 @@ std::expected<void, StarException> ScriptableThread::run() {
       auto paths = json_to_string_list(*array);
       if (!paths)
         return std::unexpected(std::move(paths.error()));
-      if (auto set = component->setScripts(std::move(*paths)); !set)
+      if (auto set = component->set_scripts(std::move(*paths)); !set)
         return std::unexpected(std::move(set.error()));
       for (auto const& callbacks : m_threadCallbacks) {
-        if (auto added = component->addCallbacks(callbacks.first, callbacks.second); !added)
+        if (auto added = component->add_callbacks(callbacks.first, callbacks.second); !added)
           return std::unexpected(std::move(added.error()));
-        if (auto added = component->addThreadCallbacks(callbacks.first, callbacks.second); !added)
+        if (auto added = component->add_thread_callbacks(callbacks.first, callbacks.second); !added)
           return std::unexpected(std::move(added.error()));
       }
       m_scriptContexts.set(p.first, component);
@@ -264,7 +264,7 @@ std::expected<void, StarException> ScriptableThread::run() {
     m_errorOccurred = true;
   // Always tear down all contexts and settle messages, including failed startup.
   for (auto const& p : m_scriptContexts) {
-    if (auto uninitialized = recoverLuaScriptError(p.second->uninit()); !uninitialized) {
+    if (auto uninitialized = recover_lua_script_error(p.second->uninit()); !uninitialized) {
       if (result)
         result = std::unexpected(std::move(uninitialized.error()));
       else
@@ -276,7 +276,7 @@ std::expected<void, StarException> ScriptableThread::run() {
   {
     std::unique_lock locker(m_messageMutex, std::defer_lock);
     lock_with_diagnostics(locker);
-    requestStop();
+    request_stop();
     messages = std::move(m_messages);
   }
   for (auto& message : messages) {
@@ -305,9 +305,9 @@ std::expected<void, StarException> ScriptableThread::run() {
   return result;
 }
 
-std::expected<std::optional<ChainableJsonMessageResponse>, StarException> ScriptableThread::receiveMessage(String const& message, JsonArray const& args) {
+std::expected<std::optional<ChainableJsonMessageResponse>, StarException> ScriptableThread::receive_message(String const& message, JsonArray const& args) {
   for (auto const& p : m_scriptContexts) {
-    auto result = p.second->handleMessage(message, true, args);
+    auto result = p.second->handle_message(message, true, args);
     if (!result) {
       if (result.error().is<LuaScriptError>())
         continue; // The failed component logged/reset itself; try the next one.
@@ -323,7 +323,7 @@ std::expected<void, StarException> ScriptableThread::update() {
   std::optional<StarException> error;
   if (m_timestep > 0.0f && !m_pause) {
     for (auto const& p : m_scriptContexts) {
-      if (auto updated = p.second->update(p.second->updateDt(m_timestep)); !updated) {
+      if (auto updated = p.second->update(p.second->update_dt(m_timestep)); !updated) {
         if (updated.error().is<LuaScriptError>())
           continue; // Retain the existing logged per-context recovery boundary.
         if (!error)
@@ -340,7 +340,7 @@ std::expected<void, StarException> ScriptableThread::update() {
     messages = std::move(m_messages);
   }
   for (auto& message : messages) {
-    auto response = receiveMessage(message.message, message.args);
+    auto response = receive_message(message.message, message.args);
     std::expected<void, StarException> settled;
     if (!response) {
       settled = message.promise.fail(Star::print_exception(response.error(), false));
@@ -361,26 +361,26 @@ std::expected<void, StarException> ScriptableThread::update() {
     }
   }
   if (m_logMapped)
-    m_luaRoot->root().logMap().set(Star::format("lua_{}_lua_mem", m_name), m_luaRoot->luaMemoryUsage());
+    m_luaRoot->root().logMap().set(Star::format("lua_{}_lua_mem", m_name), m_luaRoot->lua_memory_usage());
   if (error)
     return std::unexpected(std::move(*error));
   return {};
 }
 
-std::expected<LuaCallbacks, StarException> ScriptableThread::makeThreadCallbacks() {
+std::expected<LuaCallbacks, StarException> ScriptableThread::make_thread_callbacks() {
   LuaCallbacks callbacks;
-  if (auto result = callbacks.registerCallback("stop", [&self = *this]() {
-    self.requestStop();
+  if (auto result = callbacks.register_callback("stop", [&self = *this]() {
+    self.request_stop();
   }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.registerCallback("sendParentMessage", [&self = *this](String const& message, LuaVariadic<Json> args) {
-    return self.m_parent.get().threadPassMessage(self.m_name, message, JsonArray::from(std::move(args)));
+  if (auto result = callbacks.register_callback("sendParentMessage", [&self = *this](String const& message, LuaVariadic<Json> args) {
+    return self.m_parent.get().thread_pass_message(self.m_name, message, JsonArray::from(std::move(args)));
   }); !result)
     return std::unexpected(std::move(result.error()));
   return callbacks;
 }
 
-std::expected<Json, StarException> ScriptableThread::configValue(String const& name, Json def) const {
+std::expected<Json, StarException> ScriptableThread::config_value(String const& name, Json def) const {
   return m_parameters.get(name, std::move(def));
 }
 

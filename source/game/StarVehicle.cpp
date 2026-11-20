@@ -156,13 +156,13 @@ m_clientEntityMode = result1012->get();
 if (!result1013) return std::unexpected(std::move(result1013.error()));
 auto result1014 = std::move(*result1013).to_string();
 if (!result1014) return std::unexpected(std::move(result1014.error()));
-auto result1015 = m_scriptComponent.setScript(AssetPath::relative_to(m_path, std::move(*result1014)));
+auto result1015 = m_scriptComponent.set_script(AssetPath::relative_to(m_path, std::move(*result1014)));
 if (!result1015) return std::unexpected(std::move(result1015.error()));
   auto result1016 = configValue("scriptDelta", 1);
 if (!result1016) return std::unexpected(std::move(result1016.error()));
 auto result1017 = std::move(*result1016).to_uint();
 if (!result1017) return std::unexpected(std::move(result1017.error()));
-m_scriptComponent.setUpdateDelta(std::move(*result1017));
+m_scriptComponent.set_update_delta(std::move(*result1017));
   auto result1018 = configValue("boundBox");
 if (!result1018) return std::unexpected(std::move(result1018.error()));
 auto result1019 = json_to_rectf(std::move(*result1018));
@@ -222,7 +222,7 @@ auto result1038 = std::move(*result1037).opt_string();
 if (!result1038) return std::unexpected(std::move(result1038.error()));
 if (auto animationScript = std::move(*result1038))
     {
-auto result1039 = m_scriptedAnimator.setScript(*animationScript);
+auto result1039 = m_scriptedAnimator.set_script(*animationScript);
 if (!result1039) return std::unexpected(std::move(result1039.error()));
 }
 
@@ -460,7 +460,7 @@ Json Vehicle::dynamicConfig() const {
 std::expected<Json, StarException> Vehicle::diskStore() const {
   auto result1273 = m_damageTeam.get().toJson();
 if (!result1273) return std::unexpected(std::move(result1273.error()));
-auto result1274 = m_scriptComponent.getScriptStorage();
+auto result1274 = m_scriptComponent.get_script_storage();
 if (!result1274) return std::unexpected(std::move(result1274.error()));
 return JsonObject{
     {"movement", m_movementController->storeState()},
@@ -485,7 +485,7 @@ if (!result1270) return std::unexpected(std::move(result1270.error()));
 setPersistent(std::move(*result1270));
   auto result1271 = diskStore.get_object("scriptStorage");
 if (!result1271) return std::unexpected(std::move(result1271.error()));
-auto result1272 = m_scriptComponent.setScriptStorage(std::move(*result1271));
+auto result1272 = m_scriptComponent.set_script_storage(std::move(*result1271));
 if (!result1272) return std::unexpected(std::move(result1272.error()));
   return {};
 }
@@ -517,13 +517,13 @@ std::expected<List<DamageNotification>, StarException> Vehicle::applyDamage(Dama
   if (!inWorld())
     return {};
 
-  auto result1262 = recoverLuaScriptError(m_scriptComponent.invoke<List<DamageNotification>>("applyDamage", damage));
+  auto result1262 = recover_lua_script_error(m_scriptComponent.invoke<List<DamageNotification>>("applyDamage", damage));
 if (!result1262) return std::unexpected(std::move(result1262.error()));
   return std::move(*result1262).value_or(List<DamageNotification>{});
 }
 
 std::expected<List<DamageNotification>, StarException> Vehicle::selfDamageNotifications() {
-  auto result1260 = recoverLuaScriptError(m_scriptComponent.invoke<List<DamageNotification>>("selfDamageNotifications"));
+  auto result1260 = recover_lua_script_error(m_scriptComponent.invoke<List<DamageNotification>>("selfDamageNotifications"));
 if (!result1260) return std::unexpected(std::move(result1260.error()));
   return std::move(*result1260).value_or(List<DamageNotification>{});
 }
@@ -536,27 +536,27 @@ if (!result1241) return std::unexpected(std::move(result1241.error()));
   if (isMaster()) {
     auto result1242 = makeVehicleCallbacks();
 if (!result1242) return std::unexpected(std::move(result1242.error()));
-auto result1243 = m_scriptComponent.addCallbacks("vehicle", std::move(*result1242));
+auto result1243 = m_scriptComponent.add_callbacks("vehicle", std::move(*result1242));
 if (!result1243) return std::unexpected(std::move(result1243.error()));
 auto result1244 =
   LuaBindings::makeConfigCallbacks([this](String const& name, Json const& def) { return configValue(name, def); });
 if (!result1244) return std::unexpected(std::move(result1244.error()));
-auto result1245 = m_scriptComponent.addCallbacks(
+auto result1245 = m_scriptComponent.add_callbacks(
         "config", std::move(*result1244));
 if (!result1245) return std::unexpected(std::move(result1245.error()));
     auto result1246 = LuaBindings::makeEntityCallbacks(*this);
 if (!result1246) return std::unexpected(std::move(result1246.error()));
-auto result1247 = m_scriptComponent.addCallbacks("entity", std::move(*result1246));
+auto result1247 = m_scriptComponent.add_callbacks("entity", std::move(*result1246));
 if (!result1247) return std::unexpected(std::move(result1247.error()));
     auto result1248 = LuaBindings::makeMovementControllerCallbacks(*m_movementController);
 if (!result1248) return std::unexpected(std::move(result1248.error()));
-auto result1249 = m_scriptComponent.addCallbacks("mcontroller", std::move(*result1248));
+auto result1249 = m_scriptComponent.add_callbacks("mcontroller", std::move(*result1248));
 if (!result1249) return std::unexpected(std::move(result1249.error()));
     auto result1250 = LuaBindings::makeNetworkedAnimatorCallbacks(*m_networkedAnimator);
 if (!result1250) return std::unexpected(std::move(result1250.error()));
-auto result1251 = m_scriptComponent.addCallbacks("animator", std::move(*result1250));
+auto result1251 = m_scriptComponent.add_callbacks("animator", std::move(*result1250));
 if (!result1251) return std::unexpected(std::move(result1251.error()));
-    auto result1252 = recoverLuaScriptError(m_scriptComponent.init(world));
+    auto result1252 = recover_lua_script_error(m_scriptComponent.init(world));
 if (!result1252) return std::unexpected(std::move(result1252.error()));
   } else {
     m_slaveHeartbeatTimer.reset();
@@ -568,48 +568,48 @@ if (!result1252) return std::unexpected(std::move(result1252.error()));
         return m_scriptedAnimationParameters.value(name, defaultValue);
       });
 if (!result1253) return std::unexpected(std::move(result1253.error()));
-auto result1254 = m_scriptedAnimator.addCallbacks("animationConfig", std::move(*result1253));
+auto result1254 = m_scriptedAnimator.add_callbacks("animationConfig", std::move(*result1253));
 if (!result1254) return std::unexpected(std::move(result1254.error()));
     auto result1255 = LuaBindings::makeConfigCallbacks([this](String const& name, Json const& def) {
         return configValue(name, def);
       });
 if (!result1255) return std::unexpected(std::move(result1255.error()));
-auto result1256 = m_scriptedAnimator.addCallbacks("config", std::move(*result1255));
+auto result1256 = m_scriptedAnimator.add_callbacks("config", std::move(*result1255));
 if (!result1256) return std::unexpected(std::move(result1256.error()));
     auto result1257 = LuaBindings::makeEntityCallbacks(*this);
 if (!result1257) return std::unexpected(std::move(result1257.error()));
-auto result1258 = m_scriptedAnimator.addCallbacks("entity", std::move(*result1257));
+auto result1258 = m_scriptedAnimator.add_callbacks("entity", std::move(*result1257));
 if (!result1258) return std::unexpected(std::move(result1258.error()));
 
-    auto result1259 = recoverLuaScriptError(m_scriptedAnimator.init(world));
+    auto result1259 = recover_lua_script_error(m_scriptedAnimator.init(world));
 if (!result1259) return std::unexpected(std::move(result1259.error()));
   }
   return {};
 }
 
 std::expected<void, StarException> Vehicle::uninit() {
-  auto result1230 = recoverLuaScriptError(m_scriptComponent.uninit());
+  auto result1230 = recover_lua_script_error(m_scriptComponent.uninit());
 if (!result1230) return std::unexpected(std::move(result1230.error()));
-  auto result1231 = m_scriptComponent.removeCallbacks("vehicle");
+  auto result1231 = m_scriptComponent.remove_callbacks("vehicle");
 if (!result1231) return std::unexpected(std::move(result1231.error()));
-  auto result1232 = m_scriptComponent.removeCallbacks("config");
+  auto result1232 = m_scriptComponent.remove_callbacks("config");
 if (!result1232) return std::unexpected(std::move(result1232.error()));
-  auto result1233 = m_scriptComponent.removeCallbacks("entity");
+  auto result1233 = m_scriptComponent.remove_callbacks("entity");
 if (!result1233) return std::unexpected(std::move(result1233.error()));
-  auto result1234 = m_scriptComponent.removeCallbacks("mcontroller");
+  auto result1234 = m_scriptComponent.remove_callbacks("mcontroller");
 if (!result1234) return std::unexpected(std::move(result1234.error()));
-  auto result1235 = m_scriptComponent.removeCallbacks("animator");
+  auto result1235 = m_scriptComponent.remove_callbacks("animator");
 if (!result1235) return std::unexpected(std::move(result1235.error()));
   m_movementController->uninit();
 
   auto result1236 = world();
 if (!result1236) return std::unexpected(std::move(result1236.error()));
 if (result1236->get().isClient()) {
-    auto result1237 = m_scriptedAnimator.removeCallbacks("animationConfig");
+    auto result1237 = m_scriptedAnimator.remove_callbacks("animationConfig");
 if (!result1237) return std::unexpected(std::move(result1237.error()));
-    auto result1238 = m_scriptedAnimator.removeCallbacks("config");
+    auto result1238 = m_scriptedAnimator.remove_callbacks("config");
 if (!result1238) return std::unexpected(std::move(result1238.error()));
-    auto result1239 = m_scriptedAnimator.removeCallbacks("entity");
+    auto result1239 = m_scriptedAnimator.remove_callbacks("entity");
 if (!result1239) return std::unexpected(std::move(result1239.error()));
   }
 
@@ -675,7 +675,7 @@ if (!result1203) return std::unexpected(std::move(result1203.error()));
   if (isMaster()) {
     auto result1204 = m_movementController->tickMaster(dt);
 if (!result1204) return std::unexpected(std::move(result1204.error()));
-    auto result1205 = recoverLuaScriptError(m_scriptComponent.update(m_scriptComponent.updateDt(dt)));
+    auto result1205 = recover_lua_script_error(m_scriptComponent.update(m_scriptComponent.update_dt(dt)));
 if (!result1205) return std::unexpected(std::move(result1205.error()));
 
     Star::erase_if(m_aliveMasterConnections, [this](auto& p) {
@@ -765,7 +765,7 @@ p.second.slaveOldAimPosition = p.second.slaveNewAimPosition;
 if (!result1223) return std::unexpected(std::move(result1223.error()));
 if (result1223->get().isClient())
     {
-auto result1224 = recoverLuaScriptError(m_scriptedAnimator.update());
+auto result1224 = recover_lua_script_error(m_scriptedAnimator.update());
 if (!result1224) return std::unexpected(std::move(result1224.error()));
 }
 
@@ -788,10 +788,10 @@ if (!result1191) return std::unexpected(std::move(result1191.error()));
   auto&& result1192 = m_networkedAnimatorDynamicTarget.pullNewParticles();
 auto result1193 = renderer.addParticles(result1192);
 if (!result1193) return std::unexpected(std::move(result1193.error()));
-  auto&& result1196 = m_scriptedAnimator.pullNewAudios();
+  auto&& result1196 = m_scriptedAnimator.pull_new_audios();
 auto result1197 = renderer.addAudios(result1196);
 if (!result1197) return std::unexpected(std::move(result1197.error()));
-  auto&& result1198 = m_scriptedAnimator.pullNewParticles();
+  auto&& result1198 = m_scriptedAnimator.pull_new_particles();
 auto result1199 = renderer.addParticles(result1198);
 if (!result1199) return std::unexpected(std::move(result1199.error()));
   return {};
@@ -830,7 +830,7 @@ std::expected<void, StarException> Vehicle::renderLightSources(RenderCallback& r
 if (!result1183) return std::unexpected(std::move(result1183.error()));
 auto result1184 = renderer.addLightSources(std::move(*result1183));
 if (!result1184) return std::unexpected(std::move(result1184.error()));
-  auto&& result1185 = m_scriptedAnimator.lightSources();
+  auto&& result1185 = m_scriptedAnimator.light_sources();
 auto result1186 = renderer.addLightSources(result1185);
 if (!result1186) return std::unexpected(std::move(result1186.error()));
   return {};
@@ -959,7 +959,7 @@ loungePosition.masterAimPosition = {std::move(*result1172), std::move(*result117
   } else {
     auto result1175 = world();
 if (!result1175) return std::unexpected(std::move(result1175.error()));
-auto result1176 = recoverLuaScriptError(m_scriptComponent.handleMessage(message, connectionId == result1175->get().connection(), args));
+auto result1176 = recover_lua_script_error(m_scriptComponent.handle_message(message, connectionId == result1175->get().connection(), args));
 if (!result1176) return std::unexpected(std::move(result1176.error()));
 return std::move(*result1176);
   }
@@ -977,7 +977,7 @@ bool Vehicle::isInteractive() const {
 }
 
 std::expected<InteractAction, StarException> Vehicle::interact(InteractRequest const& request) {
-  auto result1134 = recoverLuaScriptError(m_scriptComponent.invoke<Json>("onInteraction", JsonObject{
+  auto result1134 = recover_lua_script_error(m_scriptComponent.invoke<Json>("onInteraction", JsonObject{
       {"sourceId", request.sourceId},
       {"sourcePosition", json_from_vec2f(request.sourcePosition)},
       {"interactPosition", json_from_vec2f(request.interactPosition)}
@@ -1190,13 +1190,13 @@ Mat3F partTransformation = std::move(*result1125);
 }
 
 std::expected<std::optional<LuaValue>, StarException> Vehicle::callScript(String const& func, LuaVariadic<LuaValue> const& args) {
-  auto result1123 = recoverLuaScriptError(m_scriptComponent.invoke(func, args));
+  auto result1123 = recover_lua_script_error(m_scriptComponent.invoke(func, args));
 if (!result1123) return std::unexpected(std::move(result1123.error()));
 return std::move(*result1123);
 }
 
 std::expected<std::optional<LuaValue>, StarException> Vehicle::evalScript(String const& code) {
-  auto result1122 = recoverLuaScriptError(m_scriptComponent.eval(code));
+  auto result1122 = recover_lua_script_error(m_scriptComponent.eval(code));
 if (!result1122) return std::unexpected(std::move(result1122.error()));
 return std::move(*result1122);
 }
@@ -1221,7 +1221,7 @@ EntityRenderLayer Vehicle::renderLayer(VehicleLayer vehicleLayer) const {
 std::expected<LuaCallbacks, StarException> Vehicle::makeVehicleCallbacks() {
   LuaCallbacks callbacks;
 
-  auto result1104 = callbacks.registerCallback("controlHeld", [this](String const& loungeName, String const& controlName)  -> std::expected<bool, StarException> {
+  auto result1104 = callbacks.register_callback("controlHeld", [this](String const& loungeName, String const& controlName)  -> std::expected<bool, StarException> {
       auto result1004 = m_loungePositions.get(loungeName);
 if (!result1004) return std::unexpected(std::move(result1004.error()));
 if (!LoungeControlNames) return std::unexpected(LoungeControlNames.error());
@@ -1232,7 +1232,7 @@ auto const& mc = result1004->get().masterControlState[result1005->get()];
     });
 if (!result1104) return std::unexpected(std::move(result1104.error()));
 
-  auto result1105 = callbacks.registerCallback("shiftingHeld", [this](String const& loungeName)  -> std::expected<bool, StarException> {
+  auto result1105 = callbacks.register_callback("shiftingHeld", [this](String const& loungeName)  -> std::expected<bool, StarException> {
       auto result1000 = m_loungePositions.get(loungeName);
 if (!result1000) return std::unexpected(std::move(result1000.error()));
 auto const& mc = result1000->get().masterControlState[LoungeControl::Walk];
@@ -1254,14 +1254,14 @@ if (auto player = result1003->get().get<Player>(entity))
     });
 if (!result1105) return std::unexpected(std::move(result1105.error()));
 
-  auto result1106 = callbacks.registerCallback( "aimPosition", [this](String const& loungeName)  -> std::expected<Vec2F, StarException> {
+  auto result1106 = callbacks.register_callback( "aimPosition", [this](String const& loungeName)  -> std::expected<Vec2F, StarException> {
       auto result999 = m_loungePositions.get(loungeName);
 if (!result999) return std::unexpected(std::move(result999.error()));
 return result999->get().masterAimPosition;
     });
 if (!result1106) return std::unexpected(std::move(result1106.error()));
 
-  auto result1107 = callbacks.registerCallback("entityLoungingIn", [this](String const& name) -> std::expected<LuaValue, StarException> {
+  auto result1107 = callbacks.register_callback("entityLoungingIn", [this](String const& name) -> std::expected<LuaValue, StarException> {
       auto result996 = loungeIndex(name);
 if (!result996) return std::unexpected(std::move(result996.error()));
 auto result997 = entitiesLoungingIn(std::move(*result996));
@@ -1275,7 +1275,7 @@ return LuaInt(*result998);
     });
 if (!result1107) return std::unexpected(std::move(result1107.error()));
 
-  auto result1108 = callbacks.registerCallback("setLoungeEnabled", [this](String const& name, bool enabled)  -> std::expected<void, StarException> {
+  auto result1108 = callbacks.register_callback("setLoungeEnabled", [this](String const& name, bool enabled)  -> std::expected<void, StarException> {
       auto result995 = m_loungePositions.get(name);
 if (!result995) return std::unexpected(std::move(result995.error()));
 result995->get().enabled.set(enabled);
@@ -1283,7 +1283,7 @@ result995->get().enabled.set(enabled);
 });
 if (!result1108) return std::unexpected(std::move(result1108.error()));
 
-  auto result1109 = callbacks.registerCallback("setLoungeOrientation", [this](String const& name, String const& orientation)  -> std::expected<void, StarException> {
+  auto result1109 = callbacks.register_callback("setLoungeOrientation", [this](String const& name, String const& orientation)  -> std::expected<void, StarException> {
       auto result993 = m_loungePositions.get(name);
 if (!result993) return std::unexpected(std::move(result993.error()));
 if (!LoungeOrientationNames) return std::unexpected(LoungeOrientationNames.error());
@@ -1294,7 +1294,7 @@ result993->get().orientation.set(result994->get());
 });
 if (!result1109) return std::unexpected(std::move(result1109.error()));
 
-  auto result1110 = callbacks.registerCallback("setLoungeEmote", [this](String const& name, std::optional<String> emote)  -> std::expected<void, StarException> {
+  auto result1110 = callbacks.register_callback("setLoungeEmote", [this](String const& name, std::optional<String> emote)  -> std::expected<void, StarException> {
       auto result992 = m_loungePositions.get(name);
 if (!result992) return std::unexpected(std::move(result992.error()));
 result992->get().emote.set(std::move(emote));
@@ -1302,7 +1302,7 @@ result992->get().emote.set(std::move(emote));
 });
 if (!result1110) return std::unexpected(std::move(result1110.error()));
 
-  auto result1111 = callbacks.registerCallback("setLoungeDance", [this](String const& name, std::optional<String> dance)  -> std::expected<void, StarException> {
+  auto result1111 = callbacks.register_callback("setLoungeDance", [this](String const& name, std::optional<String> dance)  -> std::expected<void, StarException> {
       auto result991 = m_loungePositions.get(name);
 if (!result991) return std::unexpected(std::move(result991.error()));
 result991->get().dance.set(std::move(dance));
@@ -1310,7 +1310,7 @@ result991->get().dance.set(std::move(dance));
 });
 if (!result1111) return std::unexpected(std::move(result1111.error()));
 
-  auto result1112 = callbacks.registerCallback("setLoungeDirectives", [this](String const& name, std::optional<String> directives)  -> std::expected<void, StarException> {
+  auto result1112 = callbacks.register_callback("setLoungeDirectives", [this](String const& name, std::optional<String> directives)  -> std::expected<void, StarException> {
       auto result990 = m_loungePositions.get(name);
 if (!result990) return std::unexpected(std::move(result990.error()));
 result990->get().directives.set(std::move(directives));
@@ -1318,7 +1318,7 @@ result990->get().directives.set(std::move(directives));
 });
 if (!result1112) return std::unexpected(std::move(result1112.error()));
 
-  auto result1113 = callbacks.registerCallback("setLoungeStatusEffects", [this](String const& name, JsonArray const& statusEffects)  -> std::expected<void, StarException> {
+  auto result1113 = callbacks.register_callback("setLoungeStatusEffects", [this](String const& name, JsonArray const& statusEffects)  -> std::expected<void, StarException> {
       auto result988 = m_loungePositions.get(name);
 if (!result988) return std::unexpected(std::move(result988.error()));
 auto result989 = json_to_list<PersistentStatusEffect>(Json(statusEffects),jsonToPersistentStatusEffect);
@@ -1328,17 +1328,17 @@ result988->get().statusEffects.set(std::move(*result989));
 });
 if (!result1113) return std::unexpected(std::move(result1113.error()));
 
-  auto result1114 = callbacks.registerCallback("setPersistent", [this](bool persistent) {
+  auto result1114 = callbacks.register_callback("setPersistent", [this](bool persistent) {
       setPersistent(persistent);
     });
 if (!result1114) return std::unexpected(std::move(result1114.error()));
 
-  auto result1115 = callbacks.registerCallback("setInteractive", [this](bool interactive) {
+  auto result1115 = callbacks.register_callback("setInteractive", [this](bool interactive) {
       m_interactive.set(interactive);
     });
 if (!result1115) return std::unexpected(std::move(result1115.error()));
 
-  auto result1116 = callbacks.registerCallback("setDamageTeam", [this](Json damageTeam)  -> std::expected<void, StarException> {
+  auto result1116 = callbacks.register_callback("setDamageTeam", [this](Json damageTeam)  -> std::expected<void, StarException> {
       auto result987 = EntityDamageTeam::create(damageTeam);
 if (!result987) return std::unexpected(std::move(result987.error()));
 m_damageTeam.set(std::move(*result987));
@@ -1346,7 +1346,7 @@ m_damageTeam.set(std::move(*result987));
 });
 if (!result1116) return std::unexpected(std::move(result1116.error()));
 
-  auto result1117 = callbacks.registerCallback("setDamageSourceEnabled", [this](String const& name, bool enabled)  -> std::expected<void, StarException> {
+  auto result1117 = callbacks.register_callback("setDamageSourceEnabled", [this](String const& name, bool enabled)  -> std::expected<void, StarException> {
       auto result986 = m_damageSources.get(name);
 if (!result986) return std::unexpected(std::move(result986.error()));
 result986->get().enabled.set(enabled);
@@ -1354,7 +1354,7 @@ result986->get().enabled.set(enabled);
 });
 if (!result1117) return std::unexpected(std::move(result1117.error()));
 
-  auto result1118 = callbacks.registerCallback("setMovingCollisionEnabled", [this](String const& name, bool enabled)  -> std::expected<void, StarException> {
+  auto result1118 = callbacks.register_callback("setMovingCollisionEnabled", [this](String const& name, bool enabled)  -> std::expected<void, StarException> {
       auto result985 = m_movingCollisions.get(name);
 if (!result985) return std::unexpected(std::move(result985.error()));
 result985->get().enabled.set(enabled);
@@ -1362,7 +1362,7 @@ result985->get().enabled.set(enabled);
 });
 if (!result1118) return std::unexpected(std::move(result1118.error()));
 
-  auto result1119 = callbacks.registerCallback("setForceRegionEnabled", [this](String const& name, bool enabled)  -> std::expected<void, StarException> {
+  auto result1119 = callbacks.register_callback("setForceRegionEnabled", [this](String const& name, bool enabled)  -> std::expected<void, StarException> {
       auto result984 = m_forceRegions.get(name);
 if (!result984) return std::unexpected(std::move(result984.error()));
 result984->get().enabled.set(enabled);
@@ -1370,12 +1370,12 @@ result984->get().enabled.set(enabled);
 });
 if (!result1119) return std::unexpected(std::move(result1119.error()));
 
-  auto result1120 = callbacks.registerCallback("destroy", [this]() {
+  auto result1120 = callbacks.register_callback("destroy", [this]() {
       m_shouldDestroy = true;
     });
 if (!result1120) return std::unexpected(std::move(result1120.error()));
 
-  auto result1121 = callbacks.registerCallback("setAnimationParameter", [this](String name, Json value) {
+  auto result1121 = callbacks.register_callback("setAnimationParameter", [this](String name, Json value) {
       m_scriptedAnimationParameters.set(std::move(name), std::move(value));
     });
 if (!result1121) return std::unexpected(std::move(result1121.error()));

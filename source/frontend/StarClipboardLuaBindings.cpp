@@ -42,22 +42,22 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeClipboardCallbacks(I
   auto available = [appController, alwaysAllow, &input]() {
     return alwaysAllow || (appController->isFocused() && input.clipboardAllowed());
   };
-  if (auto r = callbacks.registerCallback("available", [=]() { return available(); }); !r)
+  if (auto r = callbacks.register_callback("available", [=]() { return available(); }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("hasText", [=]() { return available() && appController->hasClipboard(); }); !r)
+  if (auto r = callbacks.register_callback("hasText", [=]() { return available() && appController->hasClipboard(); }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("getText", [=]() -> std::optional<String> {
+  if (auto r = callbacks.register_callback("getText", [=]() -> std::optional<String> {
     if (!available()) return {};
     return appController->getClipboard();
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("getPng", [=]() -> std::optional<std::string> {
+  if (auto r = callbacks.register_callback("getPng", [=]() -> std::optional<std::string> {
     if (!available()) return {};
     return appController->getClipboardPng();
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("setText", [=](String const& text) {
+  if (auto r = callbacks.register_callback("setText", [=](String const& text) {
     return appController->isFocused() && appController->setClipboard(text);
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("setData", [=](LuaTable const& data) -> std::expected<bool, StarException> {
+  if (auto r = callbacks.register_callback("setData", [=](LuaTable const& data) -> std::expected<bool, StarException> {
     if (!appController->isFocused()) return false;
     StringMap<ByteArray> clipboardData;
     auto iteration = data.iterate([&](LuaValue const& key, LuaValue const& value) -> std::expected<void, StarException> {
@@ -65,13 +65,13 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeClipboardCallbacks(I
         return std::unexpected(LuaException("Clipboard data keys and values must be strings"));
       auto const& stringKey = std::get<LuaString>(key);
       auto const& stringValue = std::get<LuaString>(value);
-      clipboardData[stringKey.toString()] = ByteArray(std::span<char const>(stringValue.view().utf8()));
+      clipboardData[stringKey.to_string()] = ByteArray(std::span<char const>(stringValue.view().utf8()));
       return {};
     });
     if (!iteration) return std::unexpected(std::move(iteration.error()));
     return appController->setClipboardData(std::move(clipboardData));
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("setImage", [appController, &root, &logger](LuaValue const& imgOrPath) -> std::expected<bool, StarException> {
+  if (auto r = callbacks.register_callback("setImage", [appController, &root, &logger](LuaValue const& imgOrPath) -> std::expected<bool, StarException> {
     if (!appController->isFocused()) return false;
     auto buffer = std::make_shared<Buffer>();
     std::optional<std::reference_wrapper<Image const>> image;
@@ -89,7 +89,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeClipboardCallbacks(I
       auto const& path = std::get<LuaString>(imgOrPath);
       auto assets = root.assets();
       if (!assets) return std::unexpected(std::move(assets.error()));
-      auto loaded = (*assets)->image(path.toString());
+      auto loaded = (*assets)->image(path.to_string());
       if (!loaded) return std::unexpected(std::move(loaded.error()));
       ownedImage = std::move(*loaded);
       image = std::cref(*ownedImage);

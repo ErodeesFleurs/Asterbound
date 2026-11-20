@@ -35,26 +35,26 @@ int main(int argc, char** argv) {
     auto engine = LuaEngine::create(true);
     if (!engine)
       return std::unexpected(std::move(engine.error()));
-    (*engine)->setExecutionHost(std::make_unique<LuaExecutionScope>(*root));
-    (*engine)->setImageResolver([&root](String const& path) -> std::expected<std::shared_ptr<Image const>, StarException> {
+    (*engine)->set_execution_host(std::make_unique<LuaExecutionScope>(*root));
+    (*engine)->set_image_resolver([&root](String const& path) -> std::expected<std::shared_ptr<Image const>, StarException> {
       auto assets = root->assets();
       if (!assets)
         return std::unexpected(std::move(assets.error()));
       return (*assets)->image(path);
     });
-    auto context = (*engine)->createContext();
+    auto context = (*engine)->create_context();
     if (!context)
       return std::unexpected(std::move(context.error()));
     auto utilityCallbacks = LuaBindings::makeUtilityCallbacks(root->random(), root->logger(), root->logMap());
     if (!utilityCallbacks)
       return std::unexpected(std::move(utilityCallbacks.error()));
-    auto registered = context->setCallbacks("sb", *utilityCallbacks);
+    auto registered = context->set_callbacks("sb", *utilityCallbacks);
     if (!registered)
       return std::unexpected(std::move(registered.error()));
     auto rootCallbacks = LuaBindings::makeRootCallbacks(*root);
     if (!rootCallbacks)
       return std::unexpected(std::move(rootCallbacks.error()));
-    registered = context->setCallbacks("root", *rootCallbacks);
+    registered = context->set_callbacks("root", *rootCallbacks);
     if (!registered)
       return std::unexpected(std::move(registered.error()));
 

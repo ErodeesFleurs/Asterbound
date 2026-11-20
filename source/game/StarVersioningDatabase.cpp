@@ -315,7 +315,7 @@ std::expected<VersionedJson, StarException> VersioningDatabase::updateVersionedJ
   if (!targetVersion)
     return std::unexpected(VersioningDatabaseException::format("Versioned JSON has an unregistered identifier '{}'", versionedJson.identifier));
   LuaCallbacks celestialCallbacks;
-  auto registered = celestialCallbacks.registerCallback("parameters", [&celestialDatabase](Json const& coordinate) -> std::expected<Json, StarException> {
+  auto registered = celestialCallbacks.register_callback("parameters", [&celestialDatabase](Json const& coordinate) -> std::expected<Json, StarException> {
     auto coord = CelestialCoordinate::create(coordinate);
     if (!coord) return std::unexpected(std::move(coord.error()));
     auto parameters = (*celestialDatabase)->parameters(*coord);
@@ -326,7 +326,7 @@ std::expected<VersionedJson, StarException> VersioningDatabase::updateVersionedJ
   });
   if (!registered) return std::unexpected(std::move(registered.error()));
   auto invokeUpdate = [&](String const& script, Json const& content) -> std::expected<Json, StarException> {
-    auto context = m_luaRoot->createContext();
+    auto context = m_luaRoot->create_context();
     if (!context) return std::unexpected(std::move(context.error()));
     auto previousRoot = context->get("root");
     if (!previousRoot) return std::unexpected(std::move(previousRoot.error()));
@@ -339,17 +339,17 @@ std::expected<VersionedJson, StarException> VersioningDatabase::updateVersionedJ
       if (!removed) return std::unexpected(std::move(removed.error()));
       auto callbacks = LuaBindings::makeRootCallbacks(m_root, itemCatalog);
       if (!callbacks) return std::unexpected(std::move(callbacks.error()));
-      auto installed = context->setCallbacks("root", *callbacks);
+      auto installed = context->set_callbacks("root", *callbacks);
       if (!installed) return std::unexpected(std::move(installed.error()));
       auto utility = LuaBindings::makeUtilityCallbacks(m_root.random(), m_root.logger(), m_root.logMap());
       if (!utility) return std::unexpected(std::move(utility.error()));
-      installed = context->setCallbacks("sb", *utility);
+      installed = context->set_callbacks("sb", *utility);
       if (!installed) return std::unexpected(std::move(installed.error()));
-      installed = context->setCallbacks("celestial", celestialCallbacks);
+      installed = context->set_callbacks("celestial", celestialCallbacks);
       if (!installed) return std::unexpected(std::move(installed.error()));
       auto versioning = makeVersioningCallbacks(itemCatalog);
       if (!versioning) return std::unexpected(std::move(versioning.error()));
-      installed = context->setCallbacks("versioning", *versioning);
+      installed = context->set_callbacks("versioning", *versioning);
       if (!installed) return std::unexpected(std::move(installed.error()));
       auto assets = m_root.assets();
       if (!assets) return std::unexpected(std::move(assets.error()));
@@ -357,7 +357,7 @@ std::expected<VersionedJson, StarException> VersioningDatabase::updateVersionedJ
       if (!bytes) return std::unexpected(std::move(bytes.error()));
       auto loaded = context->load(**bytes, script);
       if (!loaded) return std::unexpected(std::move(loaded.error()));
-      return context->invokePath<Json>("update", content);
+      return context->invoke_path<Json>("update", content);
     }();
     // Both restorations run even if script execution or one restoration fails.
     auto restoredRoot = context->set("root", *previousRoot);
@@ -423,7 +423,7 @@ std::expected<Json, StarException> VersioningDatabase::loadVersionedJson(Version
 }
 std::expected<LuaCallbacks, StarException> VersioningDatabase::makeVersioningCallbacks(std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog) const {
   LuaCallbacks callbacks;
-  auto registered = callbacks.registerCallback(
+  auto registered = callbacks.register_callback(
     "loadVersionedJson",
     [&database = *this, itemCatalog](String const& storagePath) -> std::expected<Json, StarException> {
       auto loaded = [&]() -> std::expected<Json, StarException> {

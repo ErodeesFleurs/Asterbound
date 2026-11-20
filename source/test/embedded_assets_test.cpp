@@ -80,14 +80,14 @@ struct EmbeddedFixture {
     if (!createdEngine)
       return std::unexpected(std::move(createdEngine.error()));
     engine = std::move(*createdEngine);
-    auto context = engine->createContext();
+    auto context = engine->create_context();
     if (!context)
       return std::unexpected(std::move(context.error()));
     lua.emplace(std::move(*context));
     auto utilities = LuaBindings::makeUtilityCallbacks(random, logger, logMap);
     if (!utilities)
       return std::unexpected(std::move(utilities.error()));
-    return lua->setCallbacks("sb", *utilities);
+    return lua->set_callbacks("sb", *utilities);
   }
 };
 
@@ -154,11 +154,11 @@ std::expected<std::shared_ptr<LuaRoot>, StarException> embeddedRootLua(Root& roo
   auto callbacks = LuaBindings::makeRootCallbacks(root);
   if (!callbacks)
     return std::unexpected(std::move(callbacks.error()));
-  (*lua)->addCallbacks("root", *callbacks);
+  (*lua)->add_callbacks("root", *callbacks);
   auto utilities = LuaBindings::makeUtilityCallbacks(root.random(), root.logger(), root.logMap());
   if (!utilities)
     return std::unexpected(std::move(utilities.error()));
-  (*lua)->addCallbacks("sb", *utilities);
+  (*lua)->add_callbacks("sb", *utilities);
   return std::move(*lua);
 }
 
@@ -173,15 +173,15 @@ const GameTestRegistration embeddedEncoders("EmbeddedAssetsTest", "LuaEncodersPr
   for (unsigned byte = 0; byte != 256; ++byte)
     arbitrary.push_back(static_cast<char>(byte));
   arbitrary.append("\0tail", 5);
-  ASSERT_TRUE(lua.setPath("binary", String(arbitrary)));
+  ASSERT_TRUE(lua.set_path("binary", String(arbitrary)));
   String text(std::string("%:;?/\0", 6) + "雪 /opensb_data;text;literal");
-  ASSERT_TRUE(lua.setPath("text", text));
+  ASSERT_TRUE(lua.set_path("text", text));
   Json value(JsonObject{{"nested", JsonObject{{"values", JsonArray{false, 19, "雪%:;?/"}}}},
                         {"nul", String(std::string("a\0b", 3))}});
-  ASSERT_TRUE(lua.setPath("value", value));
+  ASSERT_TRUE(lua.set_path("value", value));
   for (auto const& compression : {String("nOnE"), String("ZlIb"), String("zStD")}) {
     SCOPED_TRACE(compression.utf8());
-    ASSERT_TRUE(lua.setPath("compression", compression));
+    ASSERT_TRUE(lua.set_path("compression", compression));
     auto path = lua.eval<String>("return sb.embedData(binary, compression)");
     ASSERT_TRUE(path) << path.error().what();
     EXPECT_TRUE(AssetPath::is_embedded(*path));
@@ -236,7 +236,7 @@ const GameTestRegistration embeddedImages("EmbeddedAssetsTest", "ImageEmbeddingF
   auto image = embeddedPixels();
   ASSERT_TRUE(image);
   auto& lua = *setup.lua;
-  ASSERT_TRUE(lua.setPath("image", *image));
+  ASSERT_TRUE(lua.set_path("image", *image));
   auto plain = lua.eval<String>("return image:embed('None')");
   ASSERT_TRUE(plain) << plain.error().what();
   auto loaded = setup.assets->image(*plain);
@@ -312,7 +312,7 @@ const GameTestRegistration embeddedAudioFont("EmbeddedAssetsTest", "EmbeddedWavA
     'f', 'm', 't', ' ', 16, 0, 0, 0, 1, 0, 1, 0,
     0x40, 0x1f, 0, 0, 0x80, 0x3e, 0, 0, 2, 0, 16, 0,
     'd', 'a', 't', 'a', 4, 0, 0, 0, 0x34, 0x12, 0xfe, 0xff};
-  ASSERT_TRUE(setup.lua->setPath("wav", String(std::string_view(reinterpret_cast<char const*>(wav.data()), wav.size()))));
+  ASSERT_TRUE(setup.lua->set_path("wav", String(std::string_view(reinterpret_cast<char const*>(wav.data()), wav.size()))));
   auto audioPath = setup.lua->eval<String>("return sb.embedData(wav, 'Zlib')");
   ASSERT_TRUE(audioPath) << audioPath.error().what();
   auto audio = setup.assets->audio(*audioPath);
@@ -423,7 +423,7 @@ const GameTestRegistration embeddedErrors("EmbeddedAssetsTest", "TypedFailuresDo
   }
   auto pixels = embeddedPixels();
   ASSERT_TRUE(pixels);
-  ASSERT_TRUE(setup.lua->setPath("recoveredImage", *pixels));
+  ASSERT_TRUE(setup.lua->set_path("recoveredImage", *pixels));
   auto validImagePath = setup.lua->eval<String>("return recoveredImage:embed('Zstd')");
   ASSERT_TRUE(validImagePath);
   auto recoveredImage = setup.assets->image(*validImagePath);
@@ -443,7 +443,7 @@ const GameTestRegistration embeddedScriptBoundary("EmbeddedAssetsTest", "RootCal
   ASSERT_TRUE(root) << root.error().what();
   auto lua = embeddedRootLua(**root);
   ASSERT_TRUE(lua) << lua.error().what();
-  auto context = (*lua)->createContext(StringList{});
+  auto context = (*lua)->create_context(StringList{});
   ASSERT_TRUE(context) << context.error().what();
   auto result = context->eval<Json>(R"LUA(
     local data = 'a\0b\255:;?/%'
@@ -464,7 +464,7 @@ const GameTestRegistration embeddedScriptBoundary("EmbeddedAssetsTest", "RootCal
   auto warmed = (*assets)->bytes(*script, true);
   ASSERT_TRUE(warmed) << warmed.error().what();
   EXPECT_EQ(**warmed, ByteArray::from_string("embeddedExecuted = true"));
-  ASSERT_TRUE(context->setPath("embeddedScript", *script));
+  ASSERT_TRUE(context->set_path("embeddedScript", *script));
   auto requireResult = context->eval<Json>(R"LUA(
     require('/embedded-control.lua')
     local ok = pcall(require, embeddedScript)
@@ -472,10 +472,10 @@ const GameTestRegistration embeddedScriptBoundary("EmbeddedAssetsTest", "RootCal
   )LUA");
   ASSERT_TRUE(requireResult) << requireResult.error().what();
   EXPECT_EQ(*requireResult, Json(JsonObject{{"control", 17}, {"rejected", true}, {"untouched", true}}));
-  auto rejectedContext = (*lua)->createContext(StringList{*script});
+  auto rejectedContext = (*lua)->create_context(StringList{*script});
   ASSERT_FALSE(rejectedContext);
   EXPECT_TRUE(rejectedContext.error().is<LuaException>() || rejectedContext.error().is<AssetException>());
-  auto recoveredContext = (*lua)->createContext(StringList{"/embedded-control.lua"});
+  auto recoveredContext = (*lua)->create_context(StringList{"/embedded-control.lua"});
   ASSERT_TRUE(recoveredContext) << recoveredContext.error().what();
   EXPECT_EQ(recoveredContext->eval<int>("return embeddedControl"), 17);
 });
@@ -503,7 +503,7 @@ const GameTestRegistration embeddedDisabled("EmbeddedAssetsTest", "SafeConfigura
   ASSERT_TRUE(root) << root.error().what();
   auto lua = embeddedRootLua(**root);
   ASSERT_TRUE(lua) << lua.error().what();
-  auto context = (*lua)->createContext(StringList{});
+  auto context = (*lua)->create_context(StringList{});
   ASSERT_TRUE(context) << context.error().what();
   auto result = context->eval<Json>(R"LUA(
     local path = sb.embedJson({answer = 42}, 'None')
@@ -526,17 +526,17 @@ const GameTestRegistration embeddedEscapedFrameNames(
     ASSERT_TRUE(root) << root.error().what();
     auto lua = embeddedRootLua(**root);
     ASSERT_TRUE(lua) << lua.error().what();
-    auto context = (*lua)->createContext(StringList{});
+    auto context = (*lua)->create_context(StringList{});
     ASSERT_TRUE(context) << context.error().what();
     auto image = embeddedPixels();
     ASSERT_TRUE(image);
-    ASSERT_TRUE(context->setPath("image", *image));
+    ASSERT_TRUE(context->set_path("image", *image));
     auto expected = image->sub_image({1, 0}, {1, 2});
     ASSERT_TRUE(expected);
     auto assets = (*root)->assets();
     ASSERT_TRUE(assets);
     for (String const& name : {String("quote\"and\\backslash"), String(std::string("nul\0frame", 9))}) {
-      ASSERT_TRUE(context->setPath("frameName", name));
+      ASSERT_TRUE(context->set_path("frameName", name));
       auto path = context->eval<String>(R"LUA(
         return image:embed('Zstd', {frameList = {[frameName] = {1, 0, 2, 2}}}, 'text')
       )LUA");
@@ -548,7 +548,7 @@ const GameTestRegistration embeddedEscapedFrameNames(
       ASSERT_TRUE(loaded) << loaded.error().what();
       expectPixels(**loaded, *expected);
       if (name == "quote\"and\\backslash") {
-        ASSERT_TRUE(context->setPath("embeddedImage", *path));
+        ASSERT_TRUE(context->set_path("embeddedImage", *path));
         auto luaImage = context->eval<Image>("return root.assetImage(embeddedImage .. ':' .. frameName)");
         ASSERT_TRUE(luaImage) << luaImage.error().what();
         expectPixels(*luaImage, *expected);

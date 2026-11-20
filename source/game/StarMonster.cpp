@@ -182,15 +182,15 @@ m_statusController = std::move(*result9);
   if (*scriptsConfig) {
     auto scripts = json_to_string_list(**scriptsConfig);
     if (!scripts) return std::unexpected(std::move(scripts.error()));
-    auto result10 = m_scriptComponent.setScripts(*scripts);
+    auto result10 = m_scriptComponent.set_scripts(*scripts);
 if (!result10) return std::unexpected(std::move(result10.error()));
 
   } else {
-    auto result11 = m_scriptComponent.setScripts(m_monsterVariant.scripts);
+    auto result11 = m_scriptComponent.set_scripts(m_monsterVariant.scripts);
 if (!result11) return std::unexpected(std::move(result11.error()));
 
   }
-  m_scriptComponent.setUpdateDelta(m_monsterVariant.initialScriptDelta);
+  m_scriptComponent.set_update_delta(m_monsterVariant.initialScriptDelta);
 
   auto result12 = ActorMovementParameters::sensibleDefaults(this->root());
 if (!result12) return std::unexpected(std::move(result12.error()));
@@ -273,7 +273,7 @@ if (!result28) return std::unexpected(std::move(result28.error()));
 
   auto result29 = diskStore.get_object("scriptStorage");
 if (!result29) return std::unexpected(std::move(result29.error()));
-auto result30 = m_scriptComponent.setScriptStorage(std::move(*result29));
+auto result30 = m_scriptComponent.set_script_storage(std::move(*result29));
 if (!result30) return std::unexpected(std::move(result30.error()));
 
 
@@ -306,7 +306,7 @@ auto result38 = this->root().monsterDatabase();
 if (!result38) return std::unexpected(std::move(result38.error()));
 auto result39 = std::move(*result38)->writeMonsterVariantToJson(m_monsterVariant);
 if (!result39) return std::unexpected(std::move(result39.error()));
-auto result40 = m_scriptComponent.getScriptStorage();
+auto result40 = m_scriptComponent.get_script_storage();
 if (!result40) return std::unexpected(std::move(result40.error()));
 auto result41 = getTeam().toJson();
 if (!result41) return std::unexpected(std::move(result41.error()));
@@ -377,46 +377,46 @@ if (!result50) return std::unexpected(std::move(result50.error()));
 
     auto result51 = makeMonsterCallbacks();
 if (!result51) return std::unexpected(std::move(result51.error()));
-auto result52 = m_scriptComponent.addCallbacks("monster", std::move(*result51));
+auto result52 = m_scriptComponent.add_callbacks("monster", std::move(*result51));
 if (!result52) return std::unexpected(std::move(result52.error()));
 
     auto result53 = LuaBindings::makeConfigCallbacks([this](String const& name, Json const& def) {
         return m_monsterVariant.parameters.query(name, def);
       });
 if (!result53) return std::unexpected(std::move(result53.error()));
-auto result54 = m_scriptComponent.addCallbacks("config", std::move(*result53));
+auto result54 = m_scriptComponent.add_callbacks("config", std::move(*result53));
 if (!result54) return std::unexpected(std::move(result54.error()));
 
     auto result55 = LuaBindings::makeEntityCallbacks(*this);
 if (!result55) return std::unexpected(std::move(result55.error()));
-auto result56 = m_scriptComponent.addCallbacks("entity", std::move(*result55));
+auto result56 = m_scriptComponent.add_callbacks("entity", std::move(*result55));
 if (!result56) return std::unexpected(std::move(result56.error()));
 
     auto result57 = LuaBindings::makeNetworkedAnimatorCallbacks(*m_networkedAnimator);
 if (!result57) return std::unexpected(std::move(result57.error()));
-auto result58 = m_scriptComponent.addCallbacks("animator", std::move(*result57));
+auto result58 = m_scriptComponent.add_callbacks("animator", std::move(*result57));
 if (!result58) return std::unexpected(std::move(result58.error()));
 
     auto result59 = LuaBindings::makeStatusControllerCallbacks(*m_statusController);
 if (!result59) return std::unexpected(std::move(result59.error()));
-auto result60 = m_scriptComponent.addCallbacks("status", std::move(*result59));
+auto result60 = m_scriptComponent.add_callbacks("status", std::move(*result59));
 if (!result60) return std::unexpected(std::move(result60.error()));
 
     auto result61 = LuaBindings::makeBehaviorCallbacks(this->root(), m_behaviors);
 if (!result61) return std::unexpected(std::move(result61.error()));
-auto result62 = m_scriptComponent.addCallbacks("behavior", std::move(*result61));
+auto result62 = m_scriptComponent.add_callbacks("behavior", std::move(*result61));
 if (!result62) return std::unexpected(std::move(result62.error()));
 
-    auto result63 = m_scriptComponent.addActorMovementCallbacks(*m_movementController);
+    auto result63 = m_scriptComponent.add_actor_movement_callbacks(*m_movementController);
 if (!result63) return std::unexpected(std::move(result63.error()));
 
-    auto result64 = recoverLuaScriptError(m_scriptComponent.init(world));
+    auto result64 = recover_lua_script_error(m_scriptComponent.init(world));
 if (!result64) return std::unexpected(std::move(result64.error()));
 
   }
 
   if (world.isClient()) {
-    auto result65 = m_scriptedAnimator.setScripts(m_monsterVariant.animationScripts);
+    auto result65 = m_scriptedAnimator.set_scripts(m_monsterVariant.animationScripts);
 if (!result65) return std::unexpected(std::move(result65.error()));
 
 
@@ -425,22 +425,22 @@ if (!result65) return std::unexpected(std::move(result65.error()));
         return m_scriptedAnimationParameters.value(name, defaultValue);
       });
 if (!result66) return std::unexpected(std::move(result66.error()));
-auto result67 = m_scriptedAnimator.addCallbacks("animationConfig", std::move(*result66));
+auto result67 = m_scriptedAnimator.add_callbacks("animationConfig", std::move(*result66));
 if (!result67) return std::unexpected(std::move(result67.error()));
 
     auto result68 = LuaBindings::makeConfigCallbacks([this](String const& name, Json const& def) {
         return m_monsterVariant.parameters.query(name, def);
       });
 if (!result68) return std::unexpected(std::move(result68.error()));
-auto result69 = m_scriptedAnimator.addCallbacks("config", std::move(*result68));
+auto result69 = m_scriptedAnimator.add_callbacks("config", std::move(*result68));
 if (!result69) return std::unexpected(std::move(result69.error()));
 
     auto result70 = LuaBindings::makeEntityCallbacks(*this);
 if (!result70) return std::unexpected(std::move(result70.error()));
-auto result71 = m_scriptedAnimator.addCallbacks("entity", std::move(*result70));
+auto result71 = m_scriptedAnimator.add_callbacks("entity", std::move(*result70));
 if (!result71) return std::unexpected(std::move(result71.error()));
 
-    auto result72 = recoverLuaScriptError(m_scriptedAnimator.init(world));
+    auto result72 = recover_lua_script_error(m_scriptedAnimator.init(world));
 if (!result72) return std::unexpected(std::move(result72.error()));
 
   }
@@ -451,25 +451,25 @@ if (!result72) return std::unexpected(std::move(result72.error()));
 
 std::expected<void, StarException> Monster::uninit() {
   if (isMaster()) {
-    auto result73 = recoverLuaScriptError(m_scriptComponent.uninit());
+    auto result73 = recover_lua_script_error(m_scriptComponent.uninit());
 if (!result73) return std::unexpected(std::move(result73.error()));
 
-    auto result74 = m_scriptComponent.removeCallbacks("monster");
+    auto result74 = m_scriptComponent.remove_callbacks("monster");
 if (!result74) return std::unexpected(std::move(result74.error()));
 
-    auto result75 = m_scriptComponent.removeCallbacks("config");
+    auto result75 = m_scriptComponent.remove_callbacks("config");
 if (!result75) return std::unexpected(std::move(result75.error()));
 
-    auto result76 = m_scriptComponent.removeCallbacks("entity");
+    auto result76 = m_scriptComponent.remove_callbacks("entity");
 if (!result76) return std::unexpected(std::move(result76.error()));
 
-    auto result77 = m_scriptComponent.removeCallbacks("animator");
+    auto result77 = m_scriptComponent.remove_callbacks("animator");
 if (!result77) return std::unexpected(std::move(result77.error()));
 
-    auto result78 = m_scriptComponent.removeCallbacks("status");
+    auto result78 = m_scriptComponent.remove_callbacks("status");
 if (!result78) return std::unexpected(std::move(result78.error()));
 
-    auto result79 = m_scriptComponent.removeActorMovementCallbacks();
+    auto result79 = m_scriptComponent.remove_actor_movement_callbacks();
 if (!result79) return std::unexpected(std::move(result79.error()));
 
   }
@@ -477,13 +477,13 @@ if (!result79) return std::unexpected(std::move(result79.error()));
   auto result80 = world();
   if (!result80) return std::unexpected(std::move(result80.error()));
   if (result80->get().isClient()) {
-      auto result81 = m_scriptedAnimator.removeCallbacks("animationConfig");
+      auto result81 = m_scriptedAnimator.remove_callbacks("animationConfig");
   if (!result81) return std::unexpected(std::move(result81.error()));
 
-      auto result82 = m_scriptedAnimator.removeCallbacks("config");
+      auto result82 = m_scriptedAnimator.remove_callbacks("config");
   if (!result82) return std::unexpected(std::move(result82.error()));
 
-      auto result83 = m_scriptedAnimator.removeCallbacks("entity");
+      auto result83 = m_scriptedAnimator.remove_callbacks("entity");
   if (!result83) return std::unexpected(std::move(result83.error()));
 
     }
@@ -599,7 +599,7 @@ auto notifications = std::move(*result93);
     totalDamage += notification.healthLost;
 
   if (totalDamage > 0.0f) {
-    auto result94 = recoverLuaScriptError(m_scriptComponent.invoke("damage", JsonObject{
+    auto result94 = recover_lua_script_error(m_scriptComponent.invoke("damage", JsonObject{
         {"sourceId", damage.sourceEntityId},
         {"damage", totalDamage},
         {"sourceDamage", damage.damage},
@@ -735,7 +735,7 @@ knockback = std::move(*result106).transform_point(knockback);
 }
 
 std::expected<bool, StarException> Monster::shouldDie() {
-  auto result = recoverLuaScriptError(m_scriptComponent.invoke<bool>("shouldDie"));
+  auto result = recover_lua_script_error(m_scriptComponent.invoke<bool>("shouldDie"));
   if (!result)
     return std::unexpected(std::move(result.error()));
   if (*result)
@@ -778,7 +778,7 @@ std::expected<bool, StarException> Monster::shouldDestroy() const {
 }
 
 std::expected<void, StarException> Monster::destroy(std::optional<std::reference_wrapper<RenderCallback>> renderCallback) {
-  auto result119 = recoverLuaScriptError(m_scriptComponent.invoke("die"));
+  auto result119 = recover_lua_script_error(m_scriptComponent.invoke("die"));
 if (!result119) return std::unexpected(std::move(result119.error()));
 
 
@@ -918,9 +918,9 @@ std::expected<void, StarException> Monster::update(float dt, std::uint64_t) {
     if (m_knockedOut) {
       m_knockoutTimer -= dt;
     } else {
-      if (m_scriptComponent.updateReady())
+      if (m_scriptComponent.update_ready())
         m_physicsForces.set({});
-      auto result140 = recoverLuaScriptError(m_scriptComponent.update(m_scriptComponent.updateDt(dt)));
+      auto result140 = recover_lua_script_error(m_scriptComponent.update(m_scriptComponent.update_dt(dt)));
 if (!result140) return std::unexpected(std::move(result140.error()));
 
 
@@ -976,7 +976,7 @@ if (!result149) return std::unexpected(std::move(result149.error()));
 
       m_networkedAnimatorDynamicTarget.updatePosition(position());
 
-      auto result153 = recoverLuaScriptError(m_scriptedAnimator.update());
+      auto result153 = recover_lua_script_error(m_scriptedAnimator.update());
   if (!result153) return std::unexpected(std::move(result153.error()));
 
   this->root().spatialLogger().log_poly("world", m_movementController->collisionBody(), {255, 0, 0, 255});
@@ -1001,9 +1001,9 @@ if (!result163) return std::unexpected(std::move(result163.error()));
 
   auto result164 = m_effectEmitter->collectRenderEvents(renderCallback);
 if (!result164) return std::unexpected(std::move(result164.error()));
-  auto result166 = renderCallback.addAudios(m_scriptedAnimator.pullNewAudios());
+  auto result166 = renderCallback.addAudios(m_scriptedAnimator.pull_new_audios());
 if (!result166) return std::unexpected(std::move(result166.error()));
-  auto result167 = renderCallback.addParticles(m_scriptedAnimator.pullNewParticles());
+  auto result167 = renderCallback.addParticles(m_scriptedAnimator.pull_new_particles());
 if (!result167) return std::unexpected(std::move(result167.error()));
   return {};
 }
@@ -1050,7 +1050,7 @@ if (!result169) return std::unexpected(std::move(result169.error()));
 if (!result170) return std::unexpected(std::move(result170.error()));
 auto result171 = renderCallback.addLightSources(std::move(*result170));
 if (!result171) return std::unexpected(std::move(result171.error()));
-  auto result172 = renderCallback.addLightSources(m_scriptedAnimator.lightSources());
+  auto result172 = renderCallback.addLightSources(m_scriptedAnimator.light_sources());
 if (!result172) return std::unexpected(std::move(result172.error()));
   return {};
 }
@@ -1063,7 +1063,7 @@ void Monster::setPosition(Vec2F const& pos) {
 std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Monster::receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) {
   auto result173 = world();
 if (!result173) return std::unexpected(std::move(result173.error()));
-auto result174 = recoverLuaScriptError(m_scriptComponent.handleMessage(message, result173->get().connection() == sendingConnection, args));
+auto result174 = recover_lua_script_error(m_scriptComponent.handle_message(message, result173->get().connection() == sendingConnection, args));
 if (!result174) return std::unexpected(std::move(result174.error()));
 std::optional<ChainableJsonMessageResponse> result = std::move(*result174);
   if (!result)
@@ -1118,32 +1118,32 @@ if (!result179) return std::unexpected(std::move(result179.error()));
 std::expected<LuaCallbacks, StarException> Monster::makeMonsterCallbacks() {
   LuaCallbacks callbacks;
 
-  auto result180 = callbacks.registerCallback("type", [this]() {
+  auto result180 = callbacks.register_callback("type", [this]() {
       return m_monsterVariant.type;
     });
 if (!result180) return std::unexpected(std::move(result180.error()));
 
-  auto result181 = callbacks.registerCallback("seed", [this]() {
+  auto result181 = callbacks.register_callback("seed", [this]() {
       return Star::to_string(m_monsterVariant.seed);
     });
 if (!result181) return std::unexpected(std::move(result181.error()));
 
-  auto result182 = callbacks.registerCallback("uniqueParameters", [this]() {
+  auto result182 = callbacks.register_callback("uniqueParameters", [this]() {
       return m_monsterVariant.uniqueParameters;
     });
 if (!result182) return std::unexpected(std::move(result182.error()));
 
-  auto result183 = callbacks.registerCallback("level", [this]() {
+  auto result183 = callbacks.register_callback("level", [this]() {
       return monsterLevel();
     });
 if (!result183) return std::unexpected(std::move(result183.error()));
 
-  auto result184 = callbacks.registerCallback("setDamageOnTouch", [this](bool arg1) {
+  auto result184 = callbacks.register_callback("setDamageOnTouch", [this](bool arg1) {
       m_damageOnTouch = arg1;
     });
 if (!result184) return std::unexpected(std::move(result184.error()));
 
-  auto result185 = callbacks.registerCallback("setDamageSources", [this](std::optional<JsonArray> const& damageSources) -> std::expected<void, StarException> {
+  auto result185 = callbacks.register_callback("setDamageSources", [this](std::optional<JsonArray> const& damageSources) -> std::expected<void, StarException> {
       List<DamageSource> parsed;
       for (auto const& source : damageSources.value_or(JsonArray{})) {
         auto damage = DamageSource::create(source);
@@ -1155,32 +1155,32 @@ if (!result184) return std::unexpected(std::move(result184.error()));
     });
 if (!result185) return std::unexpected(std::move(result185.error()));
 
-  auto result186 = callbacks.registerCallback("setDamageParts", [this](StringSet const& parts) {
+  auto result186 = callbacks.register_callback("setDamageParts", [this](StringSet const& parts) {
       m_animationDamageParts.set(parts);
     });
 if (!result186) return std::unexpected(std::move(result186.error()));
 
-  auto result187 = callbacks.registerCallback("setAggressive", [this](bool arg1) {
+  auto result187 = callbacks.register_callback("setAggressive", [this](bool arg1) {
       m_aggressive = arg1;
     });
 if (!result187) return std::unexpected(std::move(result187.error()));
 
-  auto result188 = callbacks.registerCallback("setActiveSkillName", [this](std::optional<String> const& activeSkillName) {
+  auto result188 = callbacks.register_callback("setActiveSkillName", [this](std::optional<String> const& activeSkillName) {
       m_activeSkillName = activeSkillName.value_or(String{});
     });
 if (!result188) return std::unexpected(std::move(result188.error()));
 
-  auto result189 = callbacks.registerCallback("setDropPool", [this](Json dropPool) {
+  auto result189 = callbacks.register_callback("setDropPool", [this](Json dropPool) {
       m_dropPool = std::move(dropPool);
     });
 if (!result189) return std::unexpected(std::move(result189.error()));
 
-  auto result190 = callbacks.registerCallback("toAbsolutePosition", [this](Vec2F const& p) {
+  auto result190 = callbacks.register_callback("toAbsolutePosition", [this](Vec2F const& p) {
       return getAbsolutePosition(p);
     });
 if (!result190) return std::unexpected(std::move(result190.error()));
 
-  auto result191 = callbacks.registerCallback("mouthPosition", [this]() {
+  auto result191 = callbacks.register_callback("mouthPosition", [this]() {
       return mouthPosition();
     });
 if (!result191) return std::unexpected(std::move(result191.error()));
@@ -1188,7 +1188,7 @@ if (!result191) return std::unexpected(std::move(result191.error()));
   // This callback is registered here rather than in
   // makeActorMovementControllerCallbacks
   // because it requires access to world
-  auto result193 = callbacks.registerCallback("flyTo", [this](Vec2F const& arg1) -> std::expected<void, StarException> {
+  auto result193 = callbacks.register_callback("flyTo", [this](Vec2F const& arg1) -> std::expected<void, StarException> {
       auto result192 = world();
 if (!result192) return std::unexpected(std::move(result192.error()));
 m_movementController->controlFly(result192->get().geometry().diff(arg1, position()));
@@ -1196,17 +1196,17 @@ m_movementController->controlFly(result192->get().geometry().diff(arg1, position
 });
 if (!result193) return std::unexpected(std::move(result193.error()));
 
-  auto result194 = callbacks.registerCallback("setDeathParticleBurst", [this](std::optional<String> const& arg1) {
+  auto result194 = callbacks.register_callback("setDeathParticleBurst", [this](std::optional<String> const& arg1) {
       m_deathParticleBurst = arg1.value_or(String{});
     });
 if (!result194) return std::unexpected(std::move(result194.error()));
 
-  auto result195 = callbacks.registerCallback("setDeathSound", [this](std::optional<String> const& arg1) {
+  auto result195 = callbacks.register_callback("setDeathSound", [this](std::optional<String> const& arg1) {
       m_deathSound = arg1.value_or(String{});
     });
 if (!result195) return std::unexpected(std::move(result195.error()));
 
-  auto result196 = callbacks.registerCallback("setPhysicsForces", [this](JsonArray const& forces) -> std::expected<void, StarException> {
+  auto result196 = callbacks.register_callback("setPhysicsForces", [this](JsonArray const& forces) -> std::expected<void, StarException> {
       List<PhysicsForceRegion> parsed;
       for (auto const& force : forces) {
         auto region = jsonToPhysicsForceRegion(force);
@@ -1218,16 +1218,16 @@ if (!result195) return std::unexpected(std::move(result195.error()));
     });
 if (!result196) return std::unexpected(std::move(result196.error()));
 
-  auto result197 = callbacks.registerCallback("setName", [this](String const& name) {
+  auto result197 = callbacks.register_callback("setName", [this](String const& name) {
       m_name.set(name);
     });
 if (!result197) return std::unexpected(std::move(result197.error()));
-  auto result198 = callbacks.registerCallback("setDisplayNametag", [this](bool display) {
+  auto result198 = callbacks.register_callback("setDisplayNametag", [this](bool display) {
       m_displayNametag.set(display);
     });
 if (!result198) return std::unexpected(std::move(result198.error()));
 
-  auto result200 = callbacks.registerCallback("say", [this](String line, std::optional<StringMap<String>> const& tags) -> std::expected<bool, StarException> {
+  auto result200 = callbacks.register_callback("say", [this](String line, std::optional<StringMap<String>> const& tags) -> std::expected<bool, StarException> {
       if (tags)
         line = line.replace_tags(*tags, false);
 
@@ -1242,7 +1242,7 @@ if (!result199) return std::unexpected(std::move(result199.error()));
     });
 if (!result200) return std::unexpected(std::move(result200.error()));
 
-  auto result202 = callbacks.registerCallback("sayPortrait", [this](String line, String portrait, std::optional<StringMap<String>> const& tags) -> std::expected<bool, StarException> {
+  auto result202 = callbacks.register_callback("sayPortrait", [this](String line, String portrait, std::optional<StringMap<String>> const& tags) -> std::expected<bool, StarException> {
       if (tags)
         line = line.replace_tags(*tags, false);
 
@@ -1257,7 +1257,7 @@ if (!result201) return std::unexpected(std::move(result201.error()));
     });
 if (!result202) return std::unexpected(std::move(result202.error()));
 
-  auto result204 = callbacks.registerCallback("setDamageTeam", [this](Json const& team) -> std::expected<void, StarException> {
+  auto result204 = callbacks.register_callback("setDamageTeam", [this](Json const& team) -> std::expected<void, StarException> {
       auto result203 = EntityDamageTeam::create(team);
 if (!result203) return std::unexpected(std::move(result203.error()));
 setTeam(std::move(*result203));
@@ -1265,11 +1265,11 @@ setTeam(std::move(*result203));
 });
 if (!result204) return std::unexpected(std::move(result204.error()));
 
-auto result205 = callbacks.registerCallback(
+auto result205 = callbacks.register_callback(
   "setUniqueId", [this](std::optional<String> uniqueId) { setUniqueId(std::move(uniqueId)); });
 if (!result205) return std::unexpected(std::move(result205.error()));
 
-  auto result207 = callbacks.registerCallback("setDamageBar", [this](String const& damageBarType) -> std::expected<void, StarException> {
+  auto result207 = callbacks.register_callback("setDamageBar", [this](String const& damageBarType) -> std::expected<void, StarException> {
       if (!DamageBarTypeNames) return std::unexpected(DamageBarTypeNames.error());
       auto result206 = DamageBarTypeNames->get_left(damageBarType);
       if (!result206)
@@ -1279,12 +1279,12 @@ if (!result205) return std::unexpected(std::move(result205.error()));
 });
 if (!result207) return std::unexpected(std::move(result207.error()));
 
-  auto result208 = callbacks.registerCallback("setInteractive", [this](bool interactive) {
+  auto result208 = callbacks.register_callback("setInteractive", [this](bool interactive) {
       m_interactive.set(interactive);
     });
 if (!result208) return std::unexpected(std::move(result208.error()));
 
-  auto result209 = callbacks.registerCallback("setAnimationParameter", [this](String name, Json value) {
+  auto result209 = callbacks.register_callback("setAnimationParameter", [this](String name, Json value) {
       m_scriptedAnimationParameters.set(std::move(name), std::move(value));
     });
 if (!result209) return std::unexpected(std::move(result209.error()));
@@ -1521,11 +1521,11 @@ bool Monster::aggressive() const {
 }
 
 std::expected<std::optional<LuaValue>, StarException> Monster::callScript(String const& func, LuaVariadic<LuaValue> const& args) {
-  return recoverLuaScriptError(m_scriptComponent.invoke(func, args));
+  return recover_lua_script_error(m_scriptComponent.invoke(func, args));
 }
 
 std::expected<std::optional<LuaValue>, StarException> Monster::evalScript(String const& code) {
-  return recoverLuaScriptError(m_scriptComponent.eval(code));
+  return recover_lua_script_error(m_scriptComponent.eval(code));
 }
 
 std::expected<Vec2F, StarException> Monster::mouthPosition() const {
@@ -1547,7 +1547,7 @@ std::expected<List<PhysicsForceRegion>, StarException> Monster::forceRegions() c
 }
 
 std::expected<InteractAction, StarException> Monster::interact(InteractRequest const& request) {
-  auto result246 = recoverLuaScriptError(m_scriptComponent.invoke<Json>("interact", JsonObject{{"sourceId", request.sourceId}, {"sourcePosition", json_from_vec2f(request.sourcePosition)}}));
+  auto result246 = recover_lua_script_error(m_scriptComponent.invoke<Json>("interact", JsonObject{{"sourceId", request.sourceId}, {"sourcePosition", json_from_vec2f(request.sourcePosition)}}));
 if (!result246) return std::unexpected(std::move(result246.error()));
 auto result = std::move(*result246).value_or(Json{});
 

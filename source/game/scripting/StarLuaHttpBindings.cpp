@@ -359,7 +359,7 @@ std::expected<void, StarException> LuaHttpSession::stop() {
 template <>
 struct LuaConverter<HttpResponse> {
   [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, HttpResponse const& response) {
-    auto table = stack.createTable(0, 2);
+    auto table = stack.create_table(0, 2);
     if (!table)
       return std::unexpected(std::move(table.error()));
     if (auto result = table->set("status", response.status_code); !result)
@@ -389,11 +389,11 @@ namespace {
   if (std::holds_alternative<LuaTable>(*headers)) {
     auto parsed = std::get<LuaTable>(*headers).iterate([&](LuaValue key, LuaValue value) -> std::expected<void, StarException> {
       if (std::holds_alternative<LuaString>(key)) {
-        auto name = std::get<LuaString>(key).toString();
+        auto name = std::get<LuaString>(key).to_string();
         if (std::holds_alternative<LuaString>(value))
-          request.headers[std::move(name)] = std::get<LuaString>(value).toString();
+          request.headers[std::move(name)] = std::get<LuaString>(value).to_string();
         else {
-          auto text = engine.luaTo<String>(value);
+          auto text = engine.lua_to<String>(value);
           if (!text)
             return std::unexpected(std::move(text.error()));
           request.headers[std::move(name)] = std::move(*text);
@@ -412,9 +412,9 @@ namespace {
   if (!body)
     return std::unexpected(std::move(body.error()));
   if (std::holds_alternative<LuaString>(*body))
-    request.body = std::get<LuaString>(*body).toString();
+    request.body = std::get<LuaString>(*body).to_string();
   else if (!std::holds_alternative<LuaNilType>(*body)) {
-    auto json = engine.luaTo<Json>(*body);
+    auto json = engine.lua_to<Json>(*body);
     if (!json)
       return std::unexpected(std::move(json.error()));
     auto printed = json->repr();
@@ -432,7 +432,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::make_http_callbacks(std:
     return std::unexpected(LuaException("HTTP callbacks require an owning LuaHttpSession"));
   LuaCallbacks callbacks;
   std::weak_ptr<LuaHttpSession> weak_session = session;
-  if (auto result = callbacks.registerCallback("available", [enabled]() { return enabled; }); !result)
+  if (auto result = callbacks.register_callback("available", [enabled]() { return enabled; }); !result)
     return std::unexpected(std::move(result.error()));
   auto request = [weak_session, enabled](LuaEngine& engine, std::expected<HttpMethod, StarException> method,
                                          String const& url, std::optional<LuaTable> const& options) -> HttpPromise {
@@ -453,12 +453,12 @@ std::expected<LuaCallbacks, StarException> LuaBindings::make_http_callbacks(std:
       if (auto parsed = apply_options(prepared, engine, *options); !parsed)
         return HttpPromise::make_failed(request_error(parsed.error()));
     }
-    auto promise = owner->m_impl->request(std::move(prepared), std::move(target->host), engine.promiseLifetime(), weak_session);
+    auto promise = owner->m_impl->request(std::move(prepared), std::move(target->host), engine.promise_lifetime(), weak_session);
     if (!promise)
       return HttpPromise::make_failed(request_error(promise.error()));
     return std::move(*promise);
   };
-  if (auto result = callbacks.registerCallback("createRequest", [request](LuaEngine& engine, String const& method,
+  if (auto result = callbacks.register_callback("createRequest", [request](LuaEngine& engine, String const& method,
       String const& url, std::optional<LuaTable> const& options) {
         return request(engine, parse_http_method(method), url, options);
       }); !result)
@@ -468,11 +468,11 @@ std::expected<LuaCallbacks, StarException> LuaBindings::make_http_callbacks(std:
     {"delete", HttpMethod::Delete}, {"patch", HttpMethod::Patch}
   };
   for (auto [name, method] : methods) {
-    if (auto result = callbacks.registerCallback(name, [request, method](LuaEngine& engine, String const& url,
+    if (auto result = callbacks.register_callback(name, [request, method](LuaEngine& engine, String const& url,
         std::optional<LuaTable> const& options) { return request(engine, method, url, options); }); !result)
       return std::unexpected(std::move(result.error()));
   }
-  if (auto result = callbacks.registerCallback("isTrusted", [weak_session](String const& domain) -> std::expected<bool, StarException> {
+  if (auto result = callbacks.register_callback("isTrusted", [weak_session](String const& domain) -> std::expected<bool, StarException> {
         auto owner = weak_session.lock();
         if (!owner)
           return false;

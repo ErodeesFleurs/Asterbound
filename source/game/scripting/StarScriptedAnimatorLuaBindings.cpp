@@ -45,13 +45,13 @@ namespace Star {
 std::expected<LuaCallbacks, StarException> LuaBindings::makeScriptedAnimatorCallbacks(NetworkedAnimator& networkedAnimator, std::function<std::expected<Json, StarException>(String const&, Json const&)> getParameter) {
   LuaCallbacks callbacks;
 
-  if (auto result = callbacks.registerCallback("animationParameter", std::move(getParameter)); !result)
+  if (auto result = callbacks.register_callback("animationParameter", std::move(getParameter)); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = Detail::registerAnimatorPartQueryCallbacks(callbacks, networkedAnimator); !result) return std::unexpected(std::move(result.error()));
 
   if (auto result = Detail::registerAnimatorStateCallbacks(callbacks, networkedAnimator, Detail::AnimatorStateCallbackOrder::Scripted); !result) return std::unexpected(std::move(result.error()));
 
-  if (auto result = callbacks.registerCallbackWithSignature<bool, String>(
+  if (auto result = callbacks.register_callback_with_signature<bool, String>(
       "hasTransformationGroup", std::bind_front(&NetworkedAnimator::hasTransformationGroup, std::ref(networkedAnimator))); !result) return std::unexpected(std::move(result.error()));
 
   if (auto result = Detail::registerAnimatorLocalTransformationCallbacks(callbacks, networkedAnimator); !result) return std::unexpected(std::move(result.error()));

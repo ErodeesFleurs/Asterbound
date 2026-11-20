@@ -60,7 +60,7 @@ template <typename... Fields>
     return (0 + ... + int(std::is_integral_v<std::remove_cvref_t<
         std::tuple_element_t<2 * I, std::tuple<Fields...>>>>));
   }(std::make_index_sequence<sizeof...(Fields) / 2>{});
-  auto created = stack.createTable(arrayFields, static_cast<int>(sizeof...(Fields) / 2) - arrayFields);
+  auto created = stack.create_table(arrayFields, static_cast<int>(sizeof...(Fields) / 2) - arrayFields);
   if (!created)
     return std::unexpected(std::move(created.error()));
   auto table = std::move(*created);
@@ -72,7 +72,7 @@ template <typename... Fields>
 
 template <typename T, typename Key>
 [[nodiscard]] std::expected<std::optional<T>, StarException> maybeField(LuaStackValue table, Key&& key) {
-  return table.maybeGet<T>(std::forward<Key>(key));
+  return table.maybe_get<T>(std::forward<Key>(key));
 }
 
 [[nodiscard]] std::expected<bool, StarException> readFields(LuaStackValue) { return true; }
@@ -126,7 +126,7 @@ std::expected<void, StarException> LuaConverter<InventorySlot>::from(LuaStack st
 
 std::expected<std::optional<InventorySlot>, StarException> LuaConverter<InventorySlot>::to(LuaStackValue v) {
   if (v.is<LuaString>()) {
-    auto string = v.toString();
+    auto string = v.to_string();
     auto swap = string.equals_ignore_case("swap");
     if (!swap)
       return std::unexpected(std::move(swap.error()));
@@ -164,14 +164,14 @@ std::expected<void, StarException> LuaConverter<CollisionKind>::from(LuaStack st
 
 std::expected<std::optional<CollisionKind>, StarException> LuaConverter<CollisionKind>::to(LuaStackValue v) {
   if (v.is<LuaString>()) {
-    auto name = v.toString();
+    auto name = v.to_string();
     return maybe_enum_value<CollisionKindNames>(name);
   }
   return std::nullopt;
 }
 
 std::expected<void, StarException> LuaConverter<CollisionSet>::from(LuaStack stack, CollisionSet const& s) {
-  auto created = stack.createTable(static_cast<int>(CollisionKindNames.size()), 0);
+  auto created = stack.create_table(static_cast<int>(CollisionKindNames.size()), 0);
   if (!created)
     return std::unexpected(std::move(created.error()));
   auto table = std::move(*created);
@@ -193,7 +193,7 @@ std::expected<std::optional<CollisionSet>, StarException> LuaConverter<Collision
   CollisionSet result;
   bool compatible = true;
   auto iterated = table.iterate([&](LuaStackValue, LuaStackValue value) -> std::expected<bool, StarException> {
-    auto kind = value.maybeTo<CollisionKind>();
+    auto kind = value.maybe_to<CollisionKind>();
     if (!kind)
       return std::unexpected(std::move(kind.error()));
     if (!*kind) {
@@ -217,7 +217,7 @@ std::expected<void, StarException> LuaConverter<PlatformerAStar::Path>::from(Lua
   };
   if (path.size() > static_cast<std::size_t>(std::numeric_limits<int>::max()))
     return std::unexpected(LuaException("Too many entries for a Lua path table"));
-  auto created = stack.createTable(static_cast<int>(path.size()), 0);
+  auto created = stack.create_table(static_cast<int>(path.size()), 0);
   if (!created)
     return std::unexpected(std::move(created.error()));
   auto path_table = std::move(*created);
@@ -254,7 +254,7 @@ struct LuaPathFinder {
 template <> struct LuaUserDataMethods<LuaPathFinder> {
   static std::expected<LuaMethods<LuaPathFinder>, StarException> make() {
     LuaMethods<LuaPathFinder> methods;
-    if (auto registered = methods.registerMethod(
+    if (auto registered = methods.register_method(
           "explore",
           [](LuaPathFinder const& value,
              std::optional<unsigned> limit) -> std::expected<std::optional<bool>, StarException> {
@@ -265,7 +265,7 @@ template <> struct LuaUserDataMethods<LuaPathFinder> {
         !registered)
       return std::unexpected(std::move(registered.error()));
     if (auto registered =
-          methods.registerMethod("result", [](LuaPathFinder const& value) { return value.finder->result(); });
+          methods.register_method("result", [](LuaPathFinder const& value) { return value.finder->result(); });
         !registered)
       return std::unexpected(std::move(registered.error()));
     return methods;
@@ -275,7 +275,7 @@ template <> struct LuaUserDataMethods<LuaPathFinder> {
 std::expected<void, StarException>
 LuaConverter<std::shared_ptr<PlatformerAStar::PathFinder>>::from(LuaStack stack,
                                                                  std::shared_ptr<PlatformerAStar::PathFinder> finder) {
-  return stack.pushUserData(LuaPathFinder{.finder = std::move(finder), .lifetime = stack.engine().promiseLifetime()});
+  return stack.push_userdata(LuaPathFinder{.finder = std::move(finder), .lifetime = stack.engine().promise_lifetime()});
 }
 
 std::expected<std::optional<std::shared_ptr<PlatformerAStar::PathFinder>>, StarException>
@@ -456,7 +456,7 @@ std::expected<void, StarException> LuaConverter<StatModifier>::from(LuaStack sta
 }
 
 std::expected<std::optional<StatModifier>, StarException> LuaConverter<StatModifier>::to(LuaStackValue v) {
-  auto json = v.maybeTo<Json>();
+  auto json = v.maybe_to<Json>();
   if (!json)
     return std::unexpected(std::move(json.error()));
   if (!*json)
@@ -478,7 +478,7 @@ std::expected<void, StarException> LuaConverter<EphemeralStatusEffect>::from(Lua
 std::expected<std::optional<EphemeralStatusEffect>, StarException>
 LuaConverter<EphemeralStatusEffect>::to(LuaStackValue v) {
   if (v.is<LuaString>())
-    return EphemeralStatusEffect{.uniqueEffect = UniqueStatusEffect(v.toString()), .duration = {}};
+    return EphemeralStatusEffect{.uniqueEffect = UniqueStatusEffect(v.to_string()), .duration = {}};
   if (!v.is<LuaTable>())
     return std::nullopt;
   auto const& table = v;
@@ -604,7 +604,7 @@ std::expected<std::optional<LiquidLevel>, StarException> LuaConverter<LiquidLeve
 }
 
 std::expected<void, StarException> LuaConverter<Drawable>::from(LuaStack stack, Drawable const& v) {
-  auto created = stack.createTable(0, std::holds_alternative<Drawable::PolyPart>(v.part) ? 4 : 5);
+  auto created = stack.create_table(0, std::holds_alternative<Drawable::PolyPart>(v.part) ? 4 : 5);
   if (!created)
     return std::unexpected(std::move(created.error()));
   auto table = std::move(*created);
@@ -678,7 +678,7 @@ std::expected<std::optional<Drawable>, StarException> LuaConverter<Drawable>::to
         return std::unexpected(std::move(readCentered.error()));
       if (!*readCentered)
         return std::nullopt;
-      auto root = luaExecutionRoot(v.stack().engine());
+      auto root = lua_execution_root(v.stack().engine());
       if (!root)
         return std::unexpected(std::move(root.error()));
       auto metadata = root->get().imageMetadataDatabase();
@@ -793,7 +793,7 @@ std::expected<std::optional<Collectable>, StarException> LuaConverter<Collectabl
 
 std::expected<void, StarException> LuaConverter<PhysicsMovingCollision>::from(LuaStack stack,
                                                                               PhysicsMovingCollision const& v) {
-  auto created = stack.createTable(0, 4);
+  auto created = stack.create_table(0, 4);
   if (!created)
     return std::unexpected(std::move(created.error()));
   auto table = *created;
@@ -812,7 +812,7 @@ std::expected<void, StarException> LuaConverter<PhysicsMovingCollision>::from(Lu
 
 std::expected<LuaMethods<std::weak_ptr<BehaviorState>>, StarException> LuaUserDataMethods<std::weak_ptr<BehaviorState>>::make() {
   LuaMethods<std::weak_ptr<BehaviorState>> methods;
-  auto run = methods.registerMethodWithSignature<NodeStatus, std::weak_ptr<BehaviorState> const&, float>(
+  auto run = methods.register_method_with_signature<NodeStatus, std::weak_ptr<BehaviorState> const&, float>(
     "run", [](std::weak_ptr<BehaviorState> const& behavior, float dt) -> std::expected<NodeStatus, StarException> {
       auto state = behavior.lock();
       if (!state)
@@ -821,7 +821,7 @@ std::expected<LuaMethods<std::weak_ptr<BehaviorState>>, StarException> LuaUserDa
     });
   if (!run)
     return std::unexpected(std::move(run.error()));
-  auto clear = methods.registerMethodWithSignature<void, std::weak_ptr<BehaviorState> const&>(
+  auto clear = methods.register_method_with_signature<void, std::weak_ptr<BehaviorState> const&>(
     "clear", [](std::weak_ptr<BehaviorState> const& behavior) -> std::expected<void, StarException> {
       auto state = behavior.lock();
       if (!state)
@@ -831,7 +831,7 @@ std::expected<LuaMethods<std::weak_ptr<BehaviorState>>, StarException> LuaUserDa
     });
   if (!clear)
     return std::unexpected(std::move(clear.error()));
-  auto blackboard = methods.registerMethodWithSignature<std::weak_ptr<Blackboard>, std::weak_ptr<BehaviorState> const&>(
+  auto blackboard = methods.register_method_with_signature<std::weak_ptr<Blackboard>, std::weak_ptr<BehaviorState> const&>(
     "blackboard", [](std::weak_ptr<BehaviorState> const& behavior) -> std::expected<std::weak_ptr<Blackboard>, StarException> {
       auto state = behavior.lock();
       if (!state)
@@ -871,7 +871,7 @@ std::expected<LuaMethods<std::weak_ptr<Blackboard>>, StarException> LuaUserDataM
       return std::unexpected(StarException("Use of expired blackboard"));
     return locked->set(type, key, value);
   };
-  auto getMethod = methods.registerMethodWithSignature<LuaValue, std::weak_ptr<Blackboard> const&, String, String>(
+  auto getMethod = methods.register_method_with_signature<LuaValue, std::weak_ptr<Blackboard> const&, String, String>(
     "get",
     [get](std::weak_ptr<Blackboard> const& board, String const& type,
           String const& key) -> std::expected<LuaValue, StarException> {
@@ -883,7 +883,7 @@ std::expected<LuaMethods<std::weak_ptr<Blackboard>>, StarException> LuaUserDataM
   if (!getMethod)
     return std::unexpected(std::move(getMethod.error()));
   auto setMethod =
-    methods.registerMethodWithSignature<void, std::weak_ptr<Blackboard> const&, String, String, LuaValue>(
+    methods.register_method_with_signature<void, std::weak_ptr<Blackboard> const&, String, String, LuaValue>(
       "set",
       [set](std::weak_ptr<Blackboard> const& board, String const& type, String const& key,
             LuaValue const& value) -> std::expected<void, StarException> {
@@ -904,13 +904,13 @@ std::expected<LuaMethods<std::weak_ptr<Blackboard>>, StarException> LuaUserDataM
       {"getTable", "setTable", NodeParameterType::Table},
       {"getString", "setString", NodeParameterType::String}}};
   for (auto const& [getName, setName, type] : typedMethods) {
-    auto getter = methods.registerMethodWithSignature<LuaValue, std::weak_ptr<Blackboard> const&, String>(
+    auto getter = methods.register_method_with_signature<LuaValue, std::weak_ptr<Blackboard> const&, String>(
         getName, [get, type](std::weak_ptr<Blackboard> const& board, String const& key) {
           return get(board, type, key);
         });
     if (!getter)
       return std::unexpected(std::move(getter.error()));
-    auto setter = methods.registerMethodWithSignature<void, std::weak_ptr<Blackboard> const&, String, LuaValue>(
+    auto setter = methods.register_method_with_signature<void, std::weak_ptr<Blackboard> const&, String, LuaValue>(
         setName, [set, type](std::weak_ptr<Blackboard> const& board, String const& key, LuaValue const& value) {
           return set(board, type, key, value);
         });
@@ -924,38 +924,38 @@ std::expected<LuaMethods<std::shared_ptr<AudioInstance>>, StarException>
 LuaUserDataMethods<std::shared_ptr<AudioInstance>>::make() {
   LuaMethods<std::shared_ptr<AudioInstance>> methods;
   auto position =
-    methods.registerMethod("position", [](std::shared_ptr<AudioInstance> const& audio) { return audio->position(); });
+    methods.register_method("position", [](std::shared_ptr<AudioInstance> const& audio) { return audio->position(); });
   if (!position)
     return std::unexpected(std::move(position.error()));
-  auto set_position = methods.registerMethod("setPosition",
+  auto set_position = methods.register_method("setPosition",
                                              [](std::shared_ptr<AudioInstance> const& audio,
                                                 std::optional<Vec2F> const& pos) { return audio->set_position(pos); });
   if (!set_position)
     return std::unexpected(std::move(set_position.error()));
   auto translate =
-    methods.registerMethod("translate", [](std::shared_ptr<AudioInstance> const& audio, Vec2F const& distance) {
+    methods.register_method("translate", [](std::shared_ptr<AudioInstance> const& audio, Vec2F const& distance) {
       return audio->translate(distance);
     });
   if (!translate)
     return std::unexpected(std::move(translate.error()));
-  auto range_multiplier = methods.registerMethod(
+  auto range_multiplier = methods.register_method(
     "rangeMultiplier", [](std::shared_ptr<AudioInstance> const& audio) { return audio->range_multiplier(); });
   if (!range_multiplier)
     return std::unexpected(std::move(range_multiplier.error()));
   auto set_range_multiplier =
-    methods.registerMethod("setRangeMultiplier", [](std::shared_ptr<AudioInstance> const& audio, float const& value) {
+    methods.register_method("setRangeMultiplier", [](std::shared_ptr<AudioInstance> const& audio, float const& value) {
       return audio->set_range_multiplier(value);
     });
   if (!set_range_multiplier)
     return std::unexpected(std::move(set_range_multiplier.error()));
-  auto set_volume = methods.registerMethod(
+  auto set_volume = methods.register_method(
     "setVolume",
     [](std::shared_ptr<AudioInstance> const& audio, float const& value, std::optional<float> const& ramp_time) {
       return audio->set_volume(value, ramp_time.value_or(0.0f));
     });
   if (!set_volume)
     return std::unexpected(std::move(set_volume.error()));
-  auto set_pitch = methods.registerMethod(
+  auto set_pitch = methods.register_method(
     "setPitchMultiplier",
     [](std::shared_ptr<AudioInstance> const& audio, float const& value, std::optional<float> const& ramp_time) {
       return audio->set_pitch_multiplier(value, ramp_time.value_or(0.0f));
@@ -963,26 +963,26 @@ LuaUserDataMethods<std::shared_ptr<AudioInstance>>::make() {
   if (!set_pitch)
     return std::unexpected(std::move(set_pitch.error()));
   auto loops =
-    methods.registerMethod("loops", [](std::shared_ptr<AudioInstance> const& audio) { return audio->loops(); });
+    methods.register_method("loops", [](std::shared_ptr<AudioInstance> const& audio) { return audio->loops(); });
   if (!loops)
     return std::unexpected(std::move(loops.error()));
-  auto set_loops = methods.registerMethod(
+  auto set_loops = methods.register_method(
     "setLoops", [](std::shared_ptr<AudioInstance> const& audio, int const& value) { return audio->set_loops(value); });
   if (!set_loops)
     return std::unexpected(std::move(set_loops.error()));
-  auto current_time = methods.registerMethod(
+  auto current_time = methods.register_method(
     "currentTime", [](std::shared_ptr<AudioInstance> const& audio) { return audio->current_time(); });
   if (!current_time)
     return std::unexpected(std::move(current_time.error()));
-  auto total_time = methods.registerMethod(
+  auto total_time = methods.register_method(
     "totalTime", [](std::shared_ptr<AudioInstance> const& audio) { return audio->total_time(); });
   if (!total_time)
     return std::unexpected(std::move(total_time.error()));
-  auto seek_time = methods.registerMethod(
+  auto seek_time = methods.register_method(
     "seekTime", [](std::shared_ptr<AudioInstance> const& audio, double const& time) { return audio->seek_time(time); });
   if (!seek_time)
     return std::unexpected(std::move(seek_time.error()));
-  auto mixer_group = methods.registerMethod(
+  auto mixer_group = methods.register_method(
     "mixerGroup", [](std::shared_ptr<AudioInstance> const& audio) -> std::expected<String, StarException> {
       return enum_name<mixer_group_names>(audio->mixer_group()).transform([](std::string_view name) {
         return String(name);
@@ -990,7 +990,7 @@ LuaUserDataMethods<std::shared_ptr<AudioInstance>>::make() {
     });
   if (!mixer_group)
     return std::unexpected(std::move(mixer_group.error()));
-  auto set_mixer_group = methods.registerMethod(
+  auto set_mixer_group = methods.register_method(
     "setMixerGroup",
     [](std::shared_ptr<AudioInstance> const& audio, String const& group) -> std::expected<void, StarException> {
       auto converted = enum_value<mixer_group_names>(group);
@@ -1001,28 +1001,28 @@ LuaUserDataMethods<std::shared_ptr<AudioInstance>>::make() {
     });
   if (!set_mixer_group)
     return std::unexpected(std::move(set_mixer_group.error()));
-  auto set_clock_start = methods.registerMethod(
+  auto set_clock_start = methods.register_method(
     "setClockStart", [](std::shared_ptr<AudioInstance> const& audio, std::optional<std::int64_t> const& time) {
       return audio->set_clock_start(time);
     });
   if (!set_clock_start)
     return std::unexpected(std::move(set_clock_start.error()));
   auto set_clock_stop =
-    methods.registerMethod("setClockStop",
+    methods.register_method("setClockStop",
                            [](std::shared_ptr<AudioInstance> const& audio, std::optional<std::int64_t> const& time,
                               std::optional<std::int64_t> const& fade_out_time) {
                              return audio->set_clock_stop(time, fade_out_time.value_or(0));
                            });
   if (!set_clock_stop)
     return std::unexpected(std::move(set_clock_stop.error()));
-  auto stop = methods.registerMethod(
+  auto stop = methods.register_method(
     "stop", [](std::shared_ptr<AudioInstance> const& audio, std::optional<float> const& ramp_time) {
       return audio->stop(ramp_time.value_or(0.0f));
     });
   if (!stop)
     return std::unexpected(std::move(stop.error()));
   auto finished =
-    methods.registerMethod("finished", [](std::shared_ptr<AudioInstance> const& audio) { return audio->finished(); });
+    methods.register_method("finished", [](std::shared_ptr<AudioInstance> const& audio) { return audio->finished(); });
   if (!finished)
     return std::unexpected(std::move(finished.error()));
   return methods;

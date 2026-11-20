@@ -367,16 +367,16 @@ std::expected<void, StarException> ItemDrop::init(World& world, EntityId entityI
       return std::unexpected(std::move(scriptPaths.error()));
     if (scriptPaths->empty())
       return {};
-    if (auto set = m_scriptComponent.setScripts(std::move(*scriptPaths)); !set)
+    if (auto set = m_scriptComponent.set_scripts(std::move(*scriptPaths)); !set)
       return std::unexpected(std::move(set.error()));
     auto delta = configValue("scriptDelta", 1).and_then([](Json const& value) { return value.to_uint(); });
     if (!delta)
       return std::unexpected(std::move(delta.error()));
-    m_scriptComponent.setUpdateDelta(*delta);
+    m_scriptComponent.set_update_delta(*delta);
     auto add = [&](String name, std::expected<LuaCallbacks, StarException> callbacks) -> std::expected<void, StarException> {
       if (!callbacks)
         return std::unexpected(std::move(callbacks.error()));
-      return m_scriptComponent.addCallbacks(std::move(name), std::move(*callbacks));
+      return m_scriptComponent.add_callbacks(std::move(name), std::move(*callbacks));
     };
     if (auto added = add("itemDrop", makeItemDropCallbacks()); !added)
       return std::unexpected(std::move(added.error()));
@@ -388,7 +388,7 @@ std::expected<void, StarException> ItemDrop::init(World& world, EntityId entityI
       return std::unexpected(std::move(added.error()));
     if (auto added = add("mcontroller", LuaBindings::makeMovementControllerCallbacks(*m_movementController)); !added)
       return std::unexpected(std::move(added.error()));
-    return recoverLuaScriptError(m_scriptComponent.init(world));
+    return recover_lua_script_error(m_scriptComponent.init(world));
   }();
   if (!setup) {
     auto cleaned = uninit();
@@ -413,12 +413,12 @@ std::expected<void, StarException> ItemDrop::uninit() {
     }
   };
   if (isMaster()) {
-    remember(recoverLuaScriptError(m_scriptComponent.uninit()));
-    remember(m_scriptComponent.removeCallbacks("itemDrop"));
-    remember(m_scriptComponent.removeCallbacks("item"));
-    remember(m_scriptComponent.removeCallbacks("config"));
-    remember(m_scriptComponent.removeCallbacks("entity"));
-    remember(m_scriptComponent.removeCallbacks("mcontroller"));
+    remember(recover_lua_script_error(m_scriptComponent.uninit()));
+    remember(m_scriptComponent.remove_callbacks("itemDrop"));
+    remember(m_scriptComponent.remove_callbacks("item"));
+    remember(m_scriptComponent.remove_callbacks("config"));
+    remember(m_scriptComponent.remove_callbacks("entity"));
+    remember(m_scriptComponent.remove_callbacks("mcontroller"));
   }
   m_movementController->uninit();
   remember(Entity::uninit());
@@ -480,7 +480,7 @@ std::expected<void, StarException> ItemDrop::update(float dt, std::uint64_t) {
   auto& world = currentWorld->get();
   m_dropAge.update(world.epochTime());
   if (isMaster()) {
-    auto updated = recoverLuaScriptError(m_scriptComponent.update(m_scriptComponent.updateDt(dt)));
+    auto updated = recover_lua_script_error(m_scriptComponent.update(m_scriptComponent.update_dt(dt)));
     if (!updated)
       return std::unexpected(std::move(updated.error()));
     if (m_owningEntity.get() != NullEntityId) {
@@ -702,7 +702,7 @@ std::expected<bool, StarException> ItemDrop::canTake() const {
   if (m_mode.get() != Mode::Available || m_owningEntity.get() != NullEntityId || m_item->empty())
     return false;
   if (isMaster()) {
-    auto result = recoverLuaScriptError(m_scriptComponent.invoke<bool>("canTake"));
+    auto result = recover_lua_script_error(m_scriptComponent.invoke<bool>("canTake"));
     if (!result)
       return std::unexpected(std::move(result.error()));
     if (*result)
@@ -882,30 +882,30 @@ std::expected<void, StarException> ItemDrop::updateTaken(bool master) {
 }
 
 std::expected<std::optional<LuaValue>, StarException> ItemDrop::callScript(String const& func, LuaVariadic<LuaValue> const& args) {
-  return recoverLuaScriptError(m_scriptComponent.invoke(func, args));
+  return recover_lua_script_error(m_scriptComponent.invoke(func, args));
 }
 
 std::expected<std::optional<LuaValue>, StarException> ItemDrop::evalScript(String const& code) {
-  return recoverLuaScriptError(m_scriptComponent.eval(code));
+  return recover_lua_script_error(m_scriptComponent.eval(code));
 }
 
 std::expected<LuaCallbacks, StarException> ItemDrop::makeItemDropCallbacks() {
   LuaCallbacks callbacks;
-  if (auto registered = callbacks.registerCallback("takingEntity", [this]() -> std::optional<EntityId> {
+  if (auto registered = callbacks.register_callback("takingEntity", [this]() -> std::optional<EntityId> {
     if (m_owningEntity.get() == NullEntityId)
       return {};
     return m_owningEntity.get();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setEternal", [this](bool eternal) { setEternal(eternal); }); !registered)
+  if (auto registered = callbacks.register_callback("setEternal", [this](bool eternal) { setEternal(eternal); }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("eternal", [this]() { return m_eternal; }); !registered)
+  if (auto registered = callbacks.register_callback("eternal", [this]() { return m_eternal; }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setIntangibleTime", [this](float time) { setIntangibleTime(time); }); !registered)
+  if (auto registered = callbacks.register_callback("setIntangibleTime", [this](float time) { setIntangibleTime(time); }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("intangibleTime", [this]() { return m_intangibleTimer.timer; }); !registered)
+  if (auto registered = callbacks.register_callback("intangibleTime", [this]() { return m_intangibleTimer.timer; }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("setOverrideMode", [this](std::optional<String> const& mode) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setOverrideMode", [this](std::optional<String> const& mode) -> std::expected<void, StarException> {
     if (!mode) {
       m_overrideMode.reset();
       return {};
@@ -919,7 +919,7 @@ std::expected<LuaCallbacks, StarException> ItemDrop::makeItemDropCallbacks() {
     return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.registerCallback("overrideMode", [this]() -> std::expected<std::optional<String>, StarException> {
+  if (auto registered = callbacks.register_callback("overrideMode", [this]() -> std::expected<std::optional<String>, StarException> {
     if (!m_overrideMode)
       return std::optional<String>();
     if (!ModeNames)

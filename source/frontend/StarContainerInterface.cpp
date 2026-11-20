@@ -242,14 +242,14 @@ std::expected<void, StarException> ContainerPane::initialize(std::shared_ptr<Wor
     auto scripts = std::move(*jsonToStringListResult228);
     if (!m_script) {
       m_script.emplace(context().root());
-      auto setScriptsResult229 = m_script->setScripts(scripts);
+      auto setScriptsResult229 = m_script->set_scripts(scripts);
       if (!setScriptsResult229)
         return std::unexpected(std::move(setScriptsResult229.error()));
     }
     auto makeWidgetCallbacksResult230 = LuaBindings::makeWidgetCallbacks(context(), *this);
     if (!makeWidgetCallbacksResult230)
       return std::unexpected(std::move(makeWidgetCallbacksResult230.error()));
-    auto addCallbacksResult231 = m_script->addCallbacks("widget", std::move(*makeWidgetCallbacksResult230));
+    auto addCallbacksResult231 = m_script->add_callbacks("widget", std::move(*makeWidgetCallbacksResult230));
     if (!addCallbacksResult231)
       return std::unexpected(std::move(addCallbacksResult231.error()));
     auto makeConfigCallbacksResult233 = LuaBindings::makeConfigCallbacks( [guiConfig](String const& name, Json const& def)  -> std::expected<Json, StarException> {
@@ -260,44 +260,44 @@ std::expected<void, StarException> ContainerPane::initialize(std::shared_ptr<Wor
           });
     if (!makeConfigCallbacksResult233)
       return std::unexpected(std::move(makeConfigCallbacksResult233.error()));
-    auto addCallbacksResult234 = m_script->addCallbacks("config", std::move(*makeConfigCallbacksResult233));
+    auto addCallbacksResult234 = m_script->add_callbacks("config", std::move(*makeConfigCallbacksResult233));
     if (!addCallbacksResult234)
       return std::unexpected(std::move(addCallbacksResult234.error()));
     auto makePlayerCallbacksResult235 = LuaBindings::makePlayerCallbacks(context().root(), *m_player);
     if (!makePlayerCallbacksResult235)
       return std::unexpected(std::move(makePlayerCallbacksResult235.error()));
-    auto addCallbacksResult236 = m_script->addCallbacks("player", std::move(*makePlayerCallbacksResult235));
+    auto addCallbacksResult236 = m_script->add_callbacks("player", std::move(*makePlayerCallbacksResult235));
     if (!addCallbacksResult236)
       return std::unexpected(std::move(addCallbacksResult236.error()));
     auto makeStatusControllerCallbacksResult237 = LuaBindings::makeStatusControllerCallbacks(m_player->statusController());
     if (!makeStatusControllerCallbacksResult237)
       return std::unexpected(std::move(makeStatusControllerCallbacksResult237.error()));
-    auto addCallbacksResult238 = m_script->addCallbacks("status", std::move(*makeStatusControllerCallbacksResult237));
+    auto addCallbacksResult238 = m_script->add_callbacks("status", std::move(*makeStatusControllerCallbacksResult237));
     if (!addCallbacksResult238)
       return std::unexpected(std::move(addCallbacksResult238.error()));
 
     LuaCallbacks containerPaneCallbacks;
-    auto registerCallbackResult239 = containerPaneCallbacks.registerCallback("containerEntityId", [this]() -> std::optional<EntityId> {
+    auto registerCallbackResult239 = containerPaneCallbacks.register_callback("containerEntityId", [this]() -> std::optional<EntityId> {
             return m_containerInteractor->openContainerId();
           });
     if (!registerCallbackResult239)
       return std::unexpected(std::move(registerCallbackResult239.error()));
-    auto registerCallbackResult240 = containerPaneCallbacks.registerCallback("playerEntityId", [this]() { return m_player->entityId(); });
+    auto registerCallbackResult240 = containerPaneCallbacks.register_callback("playerEntityId", [this]() { return m_player->entityId(); });
     if (!registerCallbackResult240)
       return std::unexpected(std::move(registerCallbackResult240.error()));
-    auto registerCallbackResult241 = containerPaneCallbacks.registerCallback("dismiss", [this]()  -> std::expected<void, StarException> { dismiss(); 
+    auto registerCallbackResult241 = containerPaneCallbacks.register_callback("dismiss", [this]()  -> std::expected<void, StarException> { dismiss(); 
       return {};
     });
     if (!registerCallbackResult241)
       return std::unexpected(std::move(registerCallbackResult241.error()));
-    auto addCallbacksResult242 = m_script->addCallbacks("pane", containerPaneCallbacks);
+    auto addCallbacksResult242 = m_script->add_callbacks("pane", containerPaneCallbacks);
     if (!addCallbacksResult242)
       return std::unexpected(std::move(addCallbacksResult242.error()));
 
     auto getUIntResult243 = guiConfig.get_uint("scriptDelta", 1);
     if (!getUIntResult243)
       return std::unexpected(std::move(getUIntResult243.error()));
-    m_script->setUpdateDelta(std::move(*getUIntResult243));
+    m_script->set_update_delta(std::move(*getUIntResult243));
   }
 
   auto rightClickCallback = [this](std::size_t index)  -> std::expected<void, StarException> {
@@ -446,7 +446,7 @@ std::expected<void, StarException> ContainerPane::initialize(std::shared_ptr<Wor
       return std::unexpected(std::move(jsonToStringListResult259.error()));
     for (auto const& callbackName : std::move(*jsonToStringListResult259)) {
       m_reader.registerCallback(callbackName, [this, callbackName](Widget& widget)  -> std::expected<void, StarException> {
-        auto invokeResult260 = recoverLuaScriptError(m_script->invoke(callbackName, widget.name(), widget.data()));
+        auto invokeResult260 = recover_lua_script_error(m_script->invoke(callbackName, widget.name(), widget.data()));
         if (!invokeResult260)
           return std::unexpected(std::move(invokeResult260.error()));
       
@@ -587,13 +587,13 @@ std::expected<void, StarException> ContainerPane::displayed() {
   if (m_script) {
     if (m_worldClient && m_worldClient->inWorld())
       {
-        auto initResult287 = recoverLuaScriptError(m_script->init(*m_worldClient));
+        auto initResult287 = recover_lua_script_error(m_script->init(*m_worldClient));
         if (!initResult287)
           return std::unexpected(std::move(initResult287.error()));
         
       }
 
-    auto invokeResult288 = recoverLuaScriptError(m_script->invoke("displayed"));
+    auto invokeResult288 = recover_lua_script_error(m_script->invoke("displayed"));
     if (!invokeResult288)
       return std::unexpected(std::move(invokeResult288.error()));
   }
@@ -606,10 +606,10 @@ std::expected<void, StarException> ContainerPane::dismissed() {
     return std::unexpected(std::move(dismissedResult289.error()));
 
   if (m_script) {
-    auto invokeResult290 = recoverLuaScriptError(m_script->invoke("dismissed"));
+    auto invokeResult290 = recover_lua_script_error(m_script->invoke("dismissed"));
     if (!invokeResult290)
       return std::unexpected(std::move(invokeResult290.error()));
-    auto uninitResult291 = recoverLuaScriptError(m_script->uninit());
+    auto uninitResult291 = recover_lua_script_error(m_script->uninit());
     if (!uninitResult291)
       return std::unexpected(std::move(uninitResult291.error()));
   }
@@ -782,7 +782,7 @@ std::expected<void, StarException> ContainerPane::update(float dt) {
 
   if (m_script)
     {
-      auto updateResult315 = recoverLuaScriptError(m_script->update(m_script->updateDt(dt)));
+      auto updateResult315 = recover_lua_script_error(m_script->update(m_script->update_dt(dt)));
       if (!updateResult315)
         return std::unexpected(std::move(updateResult315.error()));
       

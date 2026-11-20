@@ -61,7 +61,7 @@ std::expected<LuaValue, StarException> Blackboard::get(NodeParameterType type, S
 
 std::expected<LuaTable, StarException> Blackboard::parameters(StringMap<NodeParameter> const& parameters, std::uint64_t nodeId) {
   if (auto table = m_parameters.maybe(nodeId)) return *table;
-  auto created = m_luaContext.engine().createTable();
+  auto created = m_luaContext.engine().create_table();
   if (!created) return std::unexpected(std::move(created.error()));
   LuaTable table = std::move(*created);
   for (auto const& p : parameters) {
@@ -82,7 +82,7 @@ std::expected<LuaTable, StarException> Blackboard::parameters(StringMap<NodePara
         if (!vector) return std::unexpected(std::move(vector.error()));
         if (vector->size() < 2)
           return std::unexpected(StarException(Star::format("Vec2 parameter must contain at least two elements for key {}", p.first)));
-        auto createdVector = m_luaContext.engine().createTable();
+        auto createdVector = m_luaContext.engine().create_table();
         if (!createdVector) return std::unexpected(std::move(createdVector.error()));
         LuaTable luaVector = std::move(*createdVector);
         for (int i = 0; i < 2; ++i) {
@@ -189,13 +189,13 @@ std::expected<std::shared_ptr<Blackboard>, StarException> BehaviorState::board()
 std::expected<LuaThread, StarException> BehaviorState::nodeLuaThread(String const& name) {
   auto thread = m_threads.try_take_back();
   if (!thread) {
-    auto created = m_luaContext.engine().createThread();
+    auto created = m_luaContext.engine().create_thread();
     if (!created) return std::unexpected(std::move(created.error()));
     thread.emplace(std::move(*created));
   }
   auto function = m_functions.get(name);
   if (!function) return std::unexpected(std::move(function.error()));
-  auto pushed = thread->pushFunction(function->get());
+  auto pushed = thread->push_function(function->get());
   if (!pushed) return std::unexpected(std::move(pushed.error()));
   return std::move(*thread);
 }
@@ -349,7 +349,7 @@ std::expected<NodeStatus, StarException> BehaviorState::runDynamic(DynamicNode c
 }
 std::expected<NodeStatus, StarException> BehaviorState::runRandomize(RandomizeNode const& node, NodeState& state) {
   if (!state) {
-    auto root = luaExecutionRoot(m_luaContext.engine());
+    auto root = lua_execution_root(m_luaContext.engine());
     if (!root) return std::unexpected(std::move(root.error()));
     state.emplace(CompositeState(node.children.size(), root->get().random().uniform_uint(node.children.size() - 1)));
   }

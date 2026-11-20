@@ -213,19 +213,19 @@ std::expected<std::shared_ptr<ScriptPane>, StarException> ScriptPane::create(Gui
   auto player = LuaBindings::makePlayerCallbacks(guiContext.root(), *pane->m_client->mainPlayer());
   if (!player)
     return std::unexpected(std::move(player.error()));
-  auto playerAdded = pane->m_script.addCallbacks("player", std::move(*player));
+  auto playerAdded = pane->m_script.add_callbacks("player", std::move(*player));
   if (!playerAdded)
     return std::unexpected(std::move(playerAdded.error()));
   auto status = LuaBindings::makeStatusControllerCallbacks(pane->m_client->mainPlayer()->statusController());
   if (!status)
     return std::unexpected(std::move(status.error()));
-  auto statusAdded = pane->m_script.addCallbacks("status", std::move(*status));
+  auto statusAdded = pane->m_script.add_callbacks("status", std::move(*status));
   if (!statusAdded)
     return std::unexpected(std::move(statusAdded.error()));
   auto celestial = LuaBindings::makeCelestialCallbacks(guiContext.root(), *pane->m_client);
   if (!celestial)
     return std::unexpected(std::move(celestial.error()));
-  auto celestialAdded = pane->m_script.addCallbacks("celestial", std::move(*celestial));
+  auto celestialAdded = pane->m_script.add_callbacks("celestial", std::move(*celestial));
   if (!celestialAdded)
     return std::unexpected(std::move(celestialAdded.error()));
   return pane;
@@ -234,13 +234,13 @@ std::expected<std::shared_ptr<ScriptPane>, StarException> ScriptPane::create(Gui
 std::expected<void, StarException> ScriptPane::displayed() {
   auto world = m_client->worldClient();
   if (world && world->inWorld()) {
-    auto configured = m_script.setLuaRoot(world->luaRoot());
+    auto configured = m_script.set_lua_root(world->luaRoot());
     if (!configured)
       return std::unexpected(std::move(configured.error()));
     auto callbacks = LuaBindings::makeWorldCallbacks(context().root(), *world);
     if (!callbacks)
       return std::unexpected(std::move(callbacks.error()));
-    auto added = m_script.addCallbacks("world", std::move(*callbacks));
+    auto added = m_script.add_callbacks("world", std::move(*callbacks));
     if (!added)
       return std::unexpected(std::move(added.error()));
   }
@@ -249,7 +249,7 @@ std::expected<void, StarException> ScriptPane::displayed() {
 
 std::expected<void, StarException> ScriptPane::dismissed() {
   auto dismissed = BaseScriptPane::dismissed();
-  auto removed = m_script.removeCallbacks("world");
+  auto removed = m_script.remove_callbacks("world");
   if (!dismissed)
     return std::unexpected(std::move(dismissed.error()));
   if (!removed)
@@ -269,7 +269,7 @@ std::expected<void, StarException> ScriptPane::tick(float dt) {
 }
 
 std::expected<std::shared_ptr<Pane>, StarException> ScriptPane::createTooltip(Vec2I const& screenPosition) {
-  auto result = recoverLuaScriptError(m_script.invoke<Json>("createTooltip", screenPosition));
+  auto result = recover_lua_script_error(m_script.invoke<Json>("createTooltip", screenPosition));
   if (!result)
     return std::unexpected(std::move(result.error()));
   if (*result && !(**result).is_null()) {
@@ -308,7 +308,7 @@ std::expected<LuaCallbacks, StarException> ScriptPane::makePaneCallbacks() {
   auto callbacks = BaseScriptPane::makePaneCallbacks();
   if (!callbacks)
     return std::unexpected(std::move(callbacks.error()));
-  auto registered = callbacks->registerCallback("sourceEntity", [this]() { return m_sourceEntityId; });
+  auto registered = callbacks->register_callback("sourceEntity", [this]() { return m_sourceEntityId; });
   if (!registered)
     return std::unexpected(std::move(registered.error()));
   return std::move(*callbacks);

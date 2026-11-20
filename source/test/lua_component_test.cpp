@@ -50,7 +50,7 @@ template <> struct LuaUserDataMethods<SessionPromiseFactory> {
   static std::expected<LuaMethods<SessionPromiseFactory>, StarException> make() {
     LuaMethods<SessionPromiseFactory> methods;
     if (auto registered =
-          methods.registerMethod("request", [](SessionPromiseFactory const& factory) { return factory.source; });
+          methods.register_method("request", [](SessionPromiseFactory const& factory) { return factory.source; });
         !registered)
       return std::unexpected(std::move(registered.error()));
     return methods;
@@ -133,8 +133,8 @@ void expectStorageLifecycle(Root& root, WorldServer& world) {
   Host component(root);
   auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
   JsonObject initial{{"total", 7}, {"saves", 0}};
-  ASSERT_TRUE(component.setScriptStorage(initial));
-  auto beforeInit = component.getScriptStorage();
+  ASSERT_TRUE(component.set_script_storage(initial));
+  auto beforeInit = component.get_script_storage();
   ASSERT_TRUE(beforeInit) << beforeInit.error().what();
   EXPECT_EQ(*beforeInit, initial);
 
@@ -170,7 +170,7 @@ void expectStorageLifecycle(Root& root, WorldServer& world) {
   ASSERT_TRUE(*updated);
   EXPECT_EQ(**updated, Json(JsonArray{12, 0.25}));
   JsonObject live{{"total", 12}, {"saves", 0}, {"lastDt", 0.25}};
-  auto liveStorage = component.getScriptStorage();
+  auto liveStorage = component.get_script_storage();
   ASSERT_TRUE(liveStorage) << liveStorage.error().what();
   EXPECT_EQ(*liveStorage, live);
 
@@ -178,7 +178,7 @@ void expectStorageLifecycle(Root& root, WorldServer& world) {
   ASSERT_TRUE(component.uninit());
   EXPECT_FALSE(component.initialized());
   JsonObject saved{{"total", 12}, {"saves", 1}, {"lastDt", 0.25}};
-  auto stored = component.getScriptStorage();
+  auto stored = component.get_script_storage();
   ASSERT_TRUE(stored) << stored.error().what();
   EXPECT_EQ(*stored, saved);
   auto stoppedUpdate = component.template update<Json>(0.25f, 5);
@@ -194,7 +194,7 @@ void expectStorageLifecycle(Root& root, WorldServer& world) {
   ASSERT_TRUE(*restored);
   EXPECT_TRUE(**restored);
   ASSERT_TRUE(component.uninit());
-  auto unchanged = component.getScriptStorage();
+  auto unchanged = component.get_script_storage();
   ASSERT_TRUE(unchanged) << unchanged.error().what();
   EXPECT_EQ(*unchanged, saved);
 }
@@ -228,10 +228,10 @@ const GameTestRegistration messageLifecycle("LuaComponentLifecycle", "MessageArg
   unsigned calls = 0;
   LuaMessageScript component(fixture.root());
   auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
-  ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+  ASSERT_TRUE(component.set_lua_root(*luaRoot));
   LuaCallbacks observer;
-  ASSERT_TRUE(observer.registerCallback("record", [&] { ++calls; }));
-  ASSERT_TRUE(component.addCallbacks("observer", std::move(observer)));
+  ASSERT_TRUE(observer.register_callback("record", [&] { ++calls; }));
+  ASSERT_TRUE(component.add_callbacks("observer", std::move(observer)));
   auto initialized = component.init();
   ASSERT_TRUE(initialized) << initialized.error().what();
   ASSERT_TRUE(*initialized);
@@ -258,16 +258,16 @@ const GameTestRegistration messageLifecycle("LuaComponentLifecycle", "MessageArg
   ASSERT_TRUE(*defined);
   EXPECT_TRUE(**defined);
 
-  expectNoResponse(component.handleMessage("localUnnamed", false, {7}));
+  expectNoResponse(component.handle_message("localUnnamed", false, {7}));
   EXPECT_EQ(calls, 0u);
-  expectResponse(component.handleMessage("localUnnamed", true, {7}), Json(14));
-  expectResponse(component.handleMessage("localNamed", true, {9}), Json(JsonArray{"localNamed", 9}));
-  expectResponse(component.handleMessage("remoteUnnamed", false, {11}), Json(JsonArray{false, 11}));
-  expectResponse(component.handleMessage("legacy", true, {13, "tail"}), Json(JsonArray{"legacy", true, 13, "tail"}));
+  expectResponse(component.handle_message("localUnnamed", true, {7}), Json(14));
+  expectResponse(component.handle_message("localNamed", true, {9}), Json(JsonArray{"localNamed", 9}));
+  expectResponse(component.handle_message("remoteUnnamed", false, {11}), Json(JsonArray{false, 11}));
+  expectResponse(component.handle_message("legacy", true, {13, "tail"}), Json(JsonArray{"legacy", true, 13, "tail"}));
   EXPECT_EQ(calls, 4u);
 
   ASSERT_TRUE(component.uninit());
-  expectNoResponse(component.handleMessage("legacy", true, {13, "tail"}));
+  expectNoResponse(component.handle_message("legacy", true, {13, "tail"}));
   EXPECT_EQ(calls, 4u);
   auto reinitialized = component.init();
   ASSERT_TRUE(reinitialized) << reinitialized.error().what();
@@ -275,7 +275,7 @@ const GameTestRegistration messageLifecycle("LuaComponentLifecycle", "MessageArg
   // Checking after reinit catches retained LuaFunction handlers; checking only
   // while uninitialized would merely exercise the initialized() guard.
   for (std::string_view name : {"legacy", "localUnnamed", "localNamed", "remoteUnnamed"})
-    expectNoResponse(component.handleMessage(name, true, {17, "unused"}));
+    expectNoResponse(component.handle_message(name, true, {17, "unused"}));
   EXPECT_EQ(calls, 4u);
   auto registered = component.eval<bool>(R"LUA(
     message.setHandler({name = "replacement", localOnly = true}, function(value)
@@ -287,7 +287,7 @@ const GameTestRegistration messageLifecycle("LuaComponentLifecycle", "MessageArg
   ASSERT_TRUE(registered) << registered.error().what();
   ASSERT_TRUE(*registered);
   EXPECT_TRUE(**registered);
-  expectResponse(component.handleMessage("replacement", true, {19}), Json(19));
+  expectResponse(component.handle_message("replacement", true, {19}), Json(19));
   EXPECT_EQ(calls, 5u);
 });
 
@@ -298,7 +298,7 @@ const GameTestRegistration threadMessages("LuaComponentLifecycle", "ThreadPromis
   {
     // Heap ownership fixes callback targets' addresses through queue teardown.
     auto component = std::make_unique<LuaMessageScript>(fixture.root());
-    ASSERT_TRUE(component->setLuaRoot(*luaRoot));
+    ASSERT_TRUE(component->set_lua_root(*luaRoot));
     auto initialized = component->init();
     ASSERT_TRUE(initialized) << initialized.error().what();
     ASSERT_TRUE(*initialized);
@@ -311,8 +311,8 @@ const GameTestRegistration threadMessages("LuaComponentLifecycle", "ThreadPromis
     ASSERT_TRUE(defined) << defined.error().what();
     ASSERT_TRUE(*defined);
     EXPECT_TRUE(**defined);
-    auto handled = component->threadPassMessage("worker", "echo", {23});
-    auto missing = component->threadPassMessage("worker", "missing", {});
+    auto handled = component->thread_pass_message("worker", "echo", {23});
+    auto missing = component->thread_pass_message("worker", "missing", {});
     expectPending(handled);
     expectPending(missing);
     auto updated = component->update<Json>();
@@ -324,19 +324,19 @@ const GameTestRegistration threadMessages("LuaComponentLifecycle", "ThreadPromis
     EXPECT_EQ(**result, Json(JsonArray{"worker", "echo", 23}));
     expectPromiseFailure(missing);
 
-    auto pending = component->threadPassMessage("worker", "echo", {29});
+    auto pending = component->thread_pass_message("worker", "echo", {29});
     expectPending(pending);
     ASSERT_TRUE(component->uninit());
     expectPromiseFailure(pending);
     auto reinitialized = component->init();
     ASSERT_TRUE(reinitialized) << reinitialized.error().what();
     ASSERT_TRUE(*reinitialized);
-    auto oldHandler = component->threadPassMessage("worker", "echo", {31});
+    auto oldHandler = component->thread_pass_message("worker", "echo", {31});
     auto afterReinit = component->update<Json>();
     ASSERT_TRUE(afterReinit) << afterReinit.error().what();
     EXPECT_FALSE(*afterReinit);
     expectPromiseFailure(oldHandler);
-    destroyed.emplace(component->threadPassMessage("worker", "echo", {37}));
+    destroyed.emplace(component->thread_pass_message("worker", "echo", {37}));
     expectPending(*destroyed);
   }
   ASSERT_TRUE(destroyed);
@@ -350,29 +350,29 @@ const GameTestRegistration reloadFirstMessage("LuaComponentLifecycle",
                                                 ASSERT_TRUE(luaRoot);
                                                 LuaMessageScript component(fixture.root());
                                                 auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
-                                                ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+                                                ASSERT_TRUE(component.set_lua_root(*luaRoot));
                                                 ASSERT_TRUE(component.init());
                                                 ASSERT_TRUE(component.eval<LuaValue>(R"LUA(
     self.retired = true
     message.setHandler("old", function() error("retired ordinary handler") end)
     threads.setMessageHandler("old", function() error("retired thread handler") end)
   )LUA"));
-                                                auto queued = component.threadPassMessage("worker", "old", {});
+                                                auto queued = component.thread_pass_message("worker", "old", {});
                                                 ASSERT_TRUE((*luaRoot)->restart());
                                                 // No invoke/eval/update may be needed to make ordinary dispatch reload-safe.
-                                                expectNoResponse(component.handleMessage("old", true));
+                                                expectNoResponse(component.handle_message("old", true));
                                                 expectPromiseFailure(queued);
                                                 auto fresh = component.eval<bool>("return self.retired == nil");
                                                 ASSERT_TRUE(fresh);
                                                 EXPECT_TRUE(fresh->value_or(false));
-                                                auto afterReload = component.threadPassMessage("worker", "old", {});
+                                                auto afterReload = component.thread_pass_message("worker", "old", {});
                                                 ASSERT_TRUE(component.update<LuaValue>());
                                                 expectPromiseFailure(afterReload);
                                                 ASSERT_TRUE(component.eval<LuaValue>(R"LUA(
     threads.setMessageHandler("old", function() error("retired first thread handler") end)
   )LUA"));
                                                 auto firstThreadMessage =
-                                                  component.threadPassMessage("worker", "old", {});
+                                                  component.thread_pass_message("worker", "old", {});
                                                 ASSERT_TRUE((*luaRoot)->restart());
                                                 ASSERT_TRUE(component.update<LuaValue>());
                                                 expectPromiseFailure(firstThreadMessage);
@@ -387,9 +387,9 @@ const GameTestRegistration
                              ASSERT_TRUE(luaRoot);
                              LuaMessageScript component(fixture.root());
                              auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
-                             ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+                             ASSERT_TRUE(component.set_lua_root(*luaRoot));
                              LuaCallbacks host;
-                             ASSERT_TRUE(host.registerCallback("reload", [&]() -> std::expected<Json, StarException> {
+                             ASSERT_TRUE(host.register_callback("reload", [&]() -> std::expected<Json, StarException> {
                                if (auto restarted = (*luaRoot)->restart(); !restarted)
                                  return std::unexpected(std::move(restarted.error()));
                                auto nested = component.invoke<Json>("probe");
@@ -399,7 +399,7 @@ const GameTestRegistration
                                  return std::unexpected(StarException("Reload retired the active message frame"));
                                return std::move(**nested);
                              }));
-                             ASSERT_TRUE(component.addCallbacks("host", std::move(host)));
+                             ASSERT_TRUE(component.add_callbacks("host", std::move(host)));
                              ASSERT_TRUE(component.init());
                              ASSERT_TRUE(component.eval<LuaValue>(R"LUA(
       self.marker = "active"
@@ -417,17 +417,17 @@ const GameTestRegistration
     )LUA"));
                              Json expected = JsonArray{"active", "active"};
                              if (threadMessage) {
-                               auto response = component.threadPassMessage("worker", "reload", {});
+                               auto response = component.thread_pass_message("worker", "reload", {});
                                ASSERT_TRUE(component.update<LuaValue>());
                                auto result = response.result();
                                ASSERT_TRUE(result);
                                ASSERT_TRUE(*result);
                                EXPECT_EQ(**result, expected);
                              } else {
-                               expectResponse(component.handleMessage("reload", true), expected);
+                               expectResponse(component.handle_message("reload", true), expected);
                              }
                              // The next top-level entry, not a nested native call, retires the frame.
-                             expectNoResponse(component.handleMessage("reload", true));
+                             expectNoResponse(component.handle_message("reload", true));
                              auto fresh = component.eval<bool>("return self.marker == nil and probe == nil");
                              ASSERT_TRUE(fresh);
                              EXPECT_TRUE(fresh->value_or(false));
@@ -440,7 +440,7 @@ const GameTestRegistration threadBatchFailure(
     ASSERT_TRUE(luaRoot);
     LuaMessageScript component(fixture.root());
     auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
-    ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+    ASSERT_TRUE(component.set_lua_root(*luaRoot));
     ASSERT_TRUE(component.init());
     ASSERT_TRUE(component.eval<LuaValue>(R"LUA(
     threads.setMessageHandler("fail", function()
@@ -449,9 +449,9 @@ const GameTestRegistration threadBatchFailure(
     end)
     threads.setMessageHandler("later", function() error("stale batch handler") end)
   )LUA"));
-    auto first = component.threadPassMessage("worker", "fail", {});
-    auto second = component.threadPassMessage("worker", "later", {});
-    auto third = component.threadPassMessage("worker", "missing", {});
+    auto first = component.thread_pass_message("worker", "fail", {});
+    auto second = component.thread_pass_message("worker", "later", {});
+    auto third = component.thread_pass_message("worker", "missing", {});
     auto result = expectLoggedFailure([&] { return component.update<LuaValue>(); }, "local batch failure");
     ASSERT_FALSE(result);
     EXPECT_TRUE(result.error().is<LuaException>());
@@ -461,7 +461,7 @@ const GameTestRegistration threadBatchFailure(
     expectPromiseFailure(second);
     expectPromiseFailure(third);
     ASSERT_TRUE(component.init());
-    auto retired = component.threadPassMessage("worker", "later", {});
+    auto retired = component.thread_pass_message("worker", "later", {});
     ASSERT_TRUE(component.update<LuaValue>());
     expectPromiseFailure(retired);
   });
@@ -472,7 +472,7 @@ const GameTestRegistration
     ASSERT_TRUE(luaRoot);
     LuaMessageScript component(fixture.root());
     auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
-    ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+    ASSERT_TRUE(component.set_lua_root(*luaRoot));
     ASSERT_TRUE(component.init());
     ASSERT_TRUE(component.eval<LuaValue>("self.marker = 41; function fail() error('invoke policy failure') end"));
     auto evaluated =
@@ -497,15 +497,15 @@ public:
   bool failSetup = false;
   bool failCleanup = false;
 protected:
-  std::expected<void, StarException> contextSetup() override {
+  std::expected<void, StarException> context_setup() override {
     if (failSetup)
       return std::unexpected(LuaException("host setup failure"));
-    return LuaBaseComponent::contextSetup();
+    return LuaBaseComponent::context_setup();
   }
-  std::expected<void, StarException> contextShutdown() override {
+  std::expected<void, StarException> context_shutdown() override {
     if (failCleanup)
       return std::unexpected(LuaException("host cleanup failure"));
-    return LuaBaseComponent::contextShutdown();
+    return LuaBaseComponent::context_shutdown();
   }
 };
 
@@ -517,12 +517,12 @@ const GameTestRegistration scriptRecoveryCategories(
       // Independent scenarios must not share the five-second diagnostic repeat window.
       fixture.root().logger().reset_exception_repeats();
       RecoveryBoundaryScript script(fixture.root());
-      ASSERT_TRUE(script.setLuaRoot(*luaRoot));
+      ASSERT_TRUE(script.set_lua_root(*luaRoot));
       ASSERT_TRUE(script.init());
       script.failCleanup = failCleanup;
       ASSERT_TRUE(script.eval<LuaValue>("function fail() error('isolated script fault', 0) end"));
       auto result = expectLoggedFailure(
-        [&] { return recoverLuaScriptError(script.invoke<Json>("fail")); }, "isolated script fault");
+        [&] { return recover_lua_script_error(script.invoke<Json>("fail")); }, "isolated script fault");
       EXPECT_FALSE(script.initialized());
       EXPECT_TRUE(script.error());
       if (failCleanup) {
@@ -535,10 +535,10 @@ const GameTestRegistration scriptRecoveryCategories(
       }
     }
     RecoveryBoundaryScript script(fixture.root());
-    ASSERT_TRUE(script.setLuaRoot(*luaRoot));
+    ASSERT_TRUE(script.set_lua_root(*luaRoot));
     script.failSetup = true;
     auto initialized = expectLoggedFailure(
-      [&] { return recoverLuaScriptError(script.init()); }, "host setup failure");
+      [&] { return recover_lua_script_error(script.init()); }, "host setup failure");
     ASSERT_FALSE(initialized);
     EXPECT_FALSE(script.initialized());
   });
@@ -549,7 +549,7 @@ const GameTestRegistration nestedHostFailure(
     ASSERT_TRUE(luaRoot);
     for (bool cleanupFailure : {false, true}) {
       RecoveryBoundaryScript inner(fixture.root());
-      ASSERT_TRUE(inner.setLuaRoot(*luaRoot));
+      ASSERT_TRUE(inner.set_lua_root(*luaRoot));
       if (cleanupFailure) {
         ASSERT_TRUE(inner.init());
         ASSERT_TRUE(inner.eval<LuaValue>("function fail() error('nested script fault', 0) end"));
@@ -558,21 +558,21 @@ const GameTestRegistration nestedHostFailure(
         inner.failSetup = true;
       }
       LuaBaseComponent outer(fixture.root());
-      ASSERT_TRUE(outer.setLuaRoot(*luaRoot));
+      ASSERT_TRUE(outer.set_lua_root(*luaRoot));
       LuaCallbacks host;
-      ASSERT_TRUE(host.registerCallback("fail", [&]() -> std::expected<void, StarException> {
+      ASSERT_TRUE(host.register_callback("fail", [&]() -> std::expected<void, StarException> {
         if (!cleanupFailure)
           return inner.init().transform([](bool) {});
         return inner.invoke("fail").transform([](std::optional<LuaValue>) {});
       }));
-      ASSERT_TRUE(outer.addCallbacks("host", std::move(host)));
+      ASSERT_TRUE(outer.add_callbacks("host", std::move(host)));
       ASSERT_TRUE(outer.init());
       ASSERT_TRUE(outer.eval<LuaValue>("function fail() host.fail() end"));
       testing::TestPartResultArray errors;
       auto result = [&] {
         testing::ScopedFakeTestPartResultReporter capture(
           testing::ScopedFakeTestPartResultReporter::INTERCEPT_ONLY_CURRENT_THREAD, &errors);
-        return recoverLuaScriptError(outer.invoke<Json>("fail"));
+        return recover_lua_script_error(outer.invoke<Json>("fail"));
       }();
       ASSERT_FALSE(result);
       EXPECT_TRUE(result.error().is<LuaHostError>());
@@ -667,15 +667,15 @@ const GameTestRegistration
                          auto remote = RpcPromise<Json>::make_pair();
                          LuaMessageScript component(fixture.root());
                          auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
-                         ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+                         ASSERT_TRUE(component.set_lua_root(*luaRoot));
                          LuaCallbacks host;
-                         ASSERT_TRUE(host.registerCallback("promise", [&] { return remote.first; }));
-                         ASSERT_TRUE(component.addCallbacks("host", std::move(host)));
+                         ASSERT_TRUE(host.register_callback("promise", [&] { return remote.first; }));
+                         ASSERT_TRUE(component.add_callbacks("host", std::move(host)));
                          ASSERT_TRUE(component.init());
                          ASSERT_TRUE(component.eval<LuaValue>(R"LUA(
     threads.setMessageHandler("async", function() return host.promise() end)
   )LUA"));
-                         auto response = component.threadPassMessage("worker", "async", {});
+                         auto response = component.thread_pass_message("worker", "async", {});
                          ASSERT_TRUE(component.update<LuaValue>());
                          expectPending(response);
                          auto pendingResult = response.result();
@@ -690,7 +690,7 @@ const GameTestRegistration
                          ASSERT_TRUE(failedResult);
                          EXPECT_FALSE(*failedResult);
                          remote = RpcPromise<Json>::make_pair();
-                         auto success = component.threadPassMessage("worker", "async", {});
+                         auto success = component.thread_pass_message("worker", "async", {});
                          ASSERT_TRUE(component.update<LuaValue>());
                          expectPending(success);
                          ASSERT_TRUE(remote.second.fulfill(Json(53)));
@@ -708,7 +708,7 @@ const GameTestRegistration workerStartupFailure(
     auto worker = std::move(*created);
     auto cleanup = make_scope_exit([&] { EXPECT_TRUE(worker->stop()); });
     auto accepted = RpcPromise<Json>::make_pair();
-    ASSERT_TRUE(worker->passMessage({"queued-before-start", {}, accepted.second}));
+    ASSERT_TRUE(worker->pass_message({"queued-before-start", {}, accepted.second}));
     expectPending(accepted.first);
     testing::TestPartResultArray errors;
     {
@@ -723,13 +723,13 @@ const GameTestRegistration workerStartupFailure(
       EXPECT_TRUE(*joined);
     }
     EXPECT_EQ(errors.size(), 1);
-    EXPECT_TRUE(worker->errorOccurred());
-    EXPECT_TRUE(worker->shouldExpire());
+    EXPECT_TRUE(worker->error_occurred());
+    EXPECT_TRUE(worker->should_expire());
     EXPECT_TRUE(worker->is_joined());
     expectPromiseFailure(accepted.first);
     expectPromiseStatus(accepted.first, RpcPromiseStatus::Failed);
     auto late = RpcPromise<Json>::make_pair();
-    ASSERT_TRUE(worker->passMessage({"after-failure", {}, late.second}));
+    ASSERT_TRUE(worker->pass_message({"after-failure", {}, late.second}));
     expectPromiseFailure(late.first);
     expectPromiseStatus(late.first, RpcPromiseStatus::Failed);
     ASSERT_TRUE(worker->stop());
@@ -747,8 +747,8 @@ const GameTestRegistration
                           LuaStoredEntityScript component(fixture.root());
                           auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
                           LuaCallbacks host;
-                          ASSERT_TRUE(host.registerCallback("retire", [&] { return component.uninit(); }));
-                          ASSERT_TRUE(component.addCallbacks("host", std::move(host)));
+                          ASSERT_TRUE(host.register_callback("retire", [&] { return component.uninit(); }));
+                          ASSERT_TRUE(component.add_callbacks("host", std::move(host)));
                           ASSERT_TRUE(component.init(**world));
                           ASSERT_TRUE(component.eval<LuaValue>(R"LUA(
     function uninit() storage.width = world.size()[1] end
@@ -757,9 +757,9 @@ const GameTestRegistration
       return world.size()[1]
     end)
   )LUA"));
-                          expectResponse(component.handleMessage("retire", true), Json(2048));
+                          expectResponse(component.handle_message("retire", true), Json(2048));
                           EXPECT_FALSE(component.initialized());
-                          auto saved = component.getScriptStorage();
+                          auto saved = component.get_script_storage();
                           ASSERT_TRUE(saved);
                           EXPECT_EQ(*saved, (JsonObject{{"width", 2048}}));
                         });
@@ -770,22 +770,22 @@ const GameTestRegistration deferredCallbackRemoval(
     ASSERT_TRUE(luaRoot);
     LuaMessageScript component(fixture.root());
     auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
-    ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+    ASSERT_TRUE(component.set_lua_root(*luaRoot));
     int cleanups = 0;
     LuaCallbacks capability;
-    ASSERT_TRUE(capability.registerCallback("cleanup", [&] { ++cleanups; }));
-    ASSERT_TRUE(component.addCallbacks("capability", capability));
+    ASSERT_TRUE(capability.register_callback("cleanup", [&] { ++cleanups; }));
+    ASSERT_TRUE(component.add_callbacks("capability", capability));
     LuaCallbacks host;
-    ASSERT_TRUE(host.registerCallback("close", [&]() -> std::expected<void, StarException> {
+    ASSERT_TRUE(host.register_callback("close", [&]() -> std::expected<void, StarException> {
       auto stopped = component.uninit();
       if (!stopped)
         return stopped;
-      auto removed = component.removeCallbacks("capability");
+      auto removed = component.remove_callbacks("capability");
       if (!removed)
         return std::unexpected(std::move(removed.error()));
       return {};
     }));
-    ASSERT_TRUE(component.addCallbacks("host", std::move(host)));
+    ASSERT_TRUE(component.add_callbacks("host", std::move(host)));
     ASSERT_TRUE(component.init());
     ASSERT_TRUE(component.eval<LuaValue>(R"LUA(
       function uninit() capability.cleanup() end
@@ -794,13 +794,13 @@ const GameTestRegistration deferredCallbackRemoval(
         return "closed"
       end)
     )LUA"));
-    auto saved = component.context()->getPath<LuaFunction>("capability.cleanup");
+    auto saved = component.context()->get_path<LuaFunction>("capability.cleanup");
     ASSERT_TRUE(saved);
-    expectResponse(component.handleMessage("close", true), Json("closed"));
+    expectResponse(component.handle_message("close", true), Json("closed"));
     EXPECT_EQ(cleanups, 1);
     EXPECT_FALSE(component.initialized());
     EXPECT_FALSE(saved->invoke<LuaValue>());
-    ASSERT_TRUE(component.addCallbacks("capability", capability));
+    ASSERT_TRUE(component.add_callbacks("capability", capability));
     ASSERT_TRUE(component.init());
     ASSERT_TRUE(component.eval<LuaValue>("function uninit() capability.cleanup() end"));
     ASSERT_TRUE(component.uninit());
@@ -825,7 +825,7 @@ const GameTestRegistration
     ASSERT_TRUE(luaRoot);
     LuaMessageScript component(fixture.root());
     auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
-    ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+    ASSERT_TRUE(component.set_lua_root(*luaRoot));
     ASSERT_TRUE(component.init());
     ASSERT_TRUE(component.eval<LuaValue>("function fail() error('original script failure') end"));
     auto sink = std::make_shared<FailingSink>();
@@ -861,14 +861,14 @@ const GameTestRegistration nativeLoggingFailure(
     auto luaRoot = LuaRoot::create(fixture.root());
     ASSERT_TRUE(luaRoot);
     LuaBaseComponent script(fixture.root());
-    ASSERT_TRUE(script.setLuaRoot(*luaRoot));
+    ASSERT_TRUE(script.set_lua_root(*luaRoot));
     ASSERT_TRUE(script.init());
     ASSERT_TRUE(script.eval<LuaValue>("function write() sb.logInfo('native info write') end"));
     auto sink = std::make_shared<InfoFailingSink>();
     fixture.root().logger().add_sink(sink);
     auto removed = make_scope_exit([&] { fixture.root().logger().remove_sink(sink); });
     auto result = expectLoggedFailure(
-      [&] { return recoverLuaScriptError(script.invoke<Json>("write")); }, "info sink unavailable");
+      [&] { return recover_lua_script_error(script.invoke<Json>("write")); }, "info sink unavailable");
     ASSERT_FALSE(result);
     EXPECT_TRUE(result.error().is<LuaHostError>());
     EXPECT_EQ(sink->writes, 1u);
@@ -882,11 +882,11 @@ const GameTestRegistration
                       ASSERT_TRUE(luaRoot);
                       LuaMessageScript component(fixture.root());
                       auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
-                      ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+                      ASSERT_TRUE(component.set_lua_root(*luaRoot));
                       LuaCallbacks host;
-                      ASSERT_TRUE(host.registerCallback("reinit", [&] { return component.init(); }));
-                      ASSERT_TRUE(host.registerCallback("uninit", [&] { return component.uninit(); }));
-                      ASSERT_TRUE(component.addCallbacks("host", std::move(host)));
+                      ASSERT_TRUE(host.register_callback("reinit", [&] { return component.init(); }));
+                      ASSERT_TRUE(host.register_callback("uninit", [&] { return component.uninit(); }));
+                      ASSERT_TRUE(component.add_callbacks("host", std::move(host)));
                       ASSERT_TRUE(component.init());
                       ASSERT_TRUE(component.eval<LuaValue>(R"LUA(
     self.marker = "before reinit"
@@ -895,8 +895,8 @@ const GameTestRegistration
       return self.marker
     end)
   )LUA"));
-                      expectResponse(component.handleMessage("reinit", true), Json("before reinit"));
-                      expectNoResponse(component.handleMessage("reinit", true));
+                      expectResponse(component.handle_message("reinit", true), Json("before reinit"));
+                      expectNoResponse(component.handle_message("reinit", true));
                       ASSERT_TRUE(component.eval<LuaValue>(R"LUA(
     self.marker = "before uninit"
     function uninit()
@@ -908,9 +908,9 @@ const GameTestRegistration
       return self.marker
     end)
   )LUA"));
-                      expectResponse(component.handleMessage("uninit", true), Json("before uninit"));
+                      expectResponse(component.handle_message("uninit", true), Json("before uninit"));
                       EXPECT_FALSE(component.initialized());
-                      expectNoResponse(component.handleMessage("uninit", true));
+                      expectNoResponse(component.handle_message("uninit", true));
                       EXPECT_TRUE(component.initialized());
                     });
 
@@ -932,7 +932,7 @@ const GameTestRegistration
                         auto unbind = make_scope_exit([&] { (*controller)->uninit(); });
                         LuaActorScript component(fixture.root());
                         auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
-                        ASSERT_TRUE(component.addActorMovementCallbacks(**controller));
+                        ASSERT_TRUE(component.add_actor_movement_callbacks(**controller));
                         ASSERT_TRUE(component.init(**world));
                         ASSERT_TRUE(component.context()->set("roundtripInput", parameters));
                         auto decoded = component.eval<ActorMovementParameters>("return roundtripInput");
@@ -1112,11 +1112,11 @@ const GameTestRegistration luaEntityIdentifiers(
       SCOPED_TRACE(restart ? "restarted engine" : "fresh engine");
       if (restart)
         ASSERT_TRUE((*luaRoot)->restart());
-      auto context = (*luaRoot)->luaEngine().createContext();
+      auto context = (*luaRoot)->lua_engine().create_context();
       ASSERT_TRUE(context);
       auto callbacks = LuaBindings::makeWorldCallbacks(fixture.root(), **world);
       ASSERT_TRUE(callbacks);
-      ASSERT_TRUE(context->setCallbacks("world", *callbacks));
+      ASSERT_TRUE(context->set_callbacks("world", *callbacks));
       ASSERT_TRUE(context->set("id", (*npc)->entityId()));
       auto identifiers = context->eval<Json>("{world.entityUniqueId(id), world.entity(id):uniqueId()}");
       ASSERT_TRUE(identifiers) << identifiers.error().what();
@@ -1135,15 +1135,15 @@ const GameTestRegistration
                          auto remote = RpcPromise<Json>::make_pair();
                          LuaMessageScript component(fixture.root());
                          auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
-                         ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+                         ASSERT_TRUE(component.set_lua_root(*luaRoot));
                          LuaCallbacks host;
-                         ASSERT_TRUE(host.registerCallback("promise", [&] { return remote.first; }));
-                         ASSERT_TRUE(component.addCallbacks("host", std::move(host)));
+                         ASSERT_TRUE(host.register_callback("promise", [&] { return remote.first; }));
+                         ASSERT_TRUE(component.add_callbacks("host", std::move(host)));
                          ASSERT_TRUE(component.init());
                          ASSERT_TRUE(component.eval<LuaValue>(R"LUA(
       threads.setMessageHandler("async", function() return host.promise() end)
     )LUA"));
-                         auto response = component.threadPassMessage("worker", "async", {});
+                         auto response = component.thread_pass_message("worker", "async", {});
                          ASSERT_TRUE(component.update<LuaValue>());
                          expectPending(response);
                          ASSERT_TRUE(component.uninit());
@@ -1170,7 +1170,7 @@ const GameTestRegistration
                               ASSERT_TRUE(luaRoot);
                               LuaMessageScript component(fixture.root());
                               auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
-                              ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+                              ASSERT_TRUE(component.set_lua_root(*luaRoot));
                               ASSERT_TRUE(component.init());
                               auto producer = RpcPromise<Json>::make_pair();
                               ASSERT_TRUE(component.context()->set("injected", producer.first));
@@ -1178,10 +1178,10 @@ const GameTestRegistration
         message.setHandler("async", function() return injected end)
         threads.setMessageHandler("async", function() return injected end)
       )LUA"));
-                              auto ordinary = promiseResponse(component.handleMessage("async", true));
+                              auto ordinary = promiseResponse(component.handle_message("async", true));
                               ASSERT_TRUE(ordinary) << ordinary.error();
                               auto reply = std::move(*ordinary);
-                              auto queued = component.threadPassMessage("worker", "async", {});
+                              auto queued = component.thread_pass_message("worker", "async", {});
                               ASSERT_TRUE(component.update<LuaValue>());
                               expectPromiseStatus(reply, RpcPromiseStatus::Pending);
                               expectPromiseStatus(queued, RpcPromiseStatus::Pending);
@@ -1191,7 +1191,7 @@ const GameTestRegistration
                                 ASSERT_TRUE(component.init());
                               } else {
                                 ASSERT_TRUE((*luaRoot)->restart());
-                                expectNoResponse(component.handleMessage("async", true));
+                                expectNoResponse(component.handle_message("async", true));
                               }
                               expectPromiseStatus(reply, RpcPromiseStatus::Cancelled);
                               expectPromiseStatus(queued, RpcPromiseStatus::Cancelled);
@@ -1214,7 +1214,7 @@ const GameTestRegistration publishedNullReply("LuaComponentLifecycle",
                                                 ASSERT_TRUE(luaRoot);
                                                 LuaMessageScript component(fixture.root());
                                                 auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
-                                                ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+                                                ASSERT_TRUE(component.set_lua_root(*luaRoot));
                                                 ASSERT_TRUE(component.init());
                                                 for (bool completedBeforeDispatch : {true, false}) {
                                                   SCOPED_TRACE(completedBeforeDispatch ? "completed before dispatch"
@@ -1227,7 +1227,7 @@ const GameTestRegistration publishedNullReply("LuaComponentLifecycle",
         message.setHandler("async", function() return injected end)
       )LUA"));
                                                   auto response =
-                                                    promiseResponse(component.handleMessage("async", true));
+                                                    promiseResponse(component.handle_message("async", true));
                                                   ASSERT_TRUE(response) << response.error();
                                                   auto reply = std::move(*response);
                                                   if (!completedBeforeDispatch)
@@ -1258,15 +1258,15 @@ const GameTestRegistration
                                 EXPECT_TRUE(second.uninit());
                               });
                               for (auto component : {&first, &second}) {
-                                ASSERT_TRUE(component->setLuaRoot(*luaRoot));
+                                ASSERT_TRUE(component->set_lua_root(*luaRoot));
                                 ASSERT_TRUE(component->init());
                                 ASSERT_TRUE(component->context()->set("injected", producer.first));
                                 ASSERT_TRUE(component->eval<LuaValue>(R"LUA(
         message.setHandler("async", function() return injected end)
       )LUA"));
                               }
-                              auto firstResponse = promiseResponse(first.handleMessage("async", true));
-                              auto secondResponse = promiseResponse(second.handleMessage("async", true));
+                              auto firstResponse = promiseResponse(first.handle_message("async", true));
+                              auto secondResponse = promiseResponse(second.handle_message("async", true));
                               ASSERT_TRUE(firstResponse) << firstResponse.error();
                               ASSERT_TRUE(secondResponse) << secondResponse.error();
                               auto firstReply = std::move(*firstResponse);
@@ -1288,25 +1288,25 @@ const GameTestRegistration
                           ASSERT_TRUE(luaRoot);
                           LuaMessageScript component(fixture.root());
                           auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
-                          ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+                          ASSERT_TRUE(component.set_lua_root(*luaRoot));
                           ASSERT_TRUE(component.init());
                           auto producer = RpcPromise<Json>::make_pair();
-                          auto userdata = component.context()->createUserData(SessionPromiseFactory{producer.first});
+                          auto userdata = component.context()->create_userdata(SessionPromiseFactory{producer.first});
                           ASSERT_TRUE(userdata);
                           ASSERT_TRUE(component.context()->set("factory", *userdata));
                           std::stop_source outer;
-                          auto& engine = (*luaRoot)->luaEngine();
-                          auto previous = engine.setPromiseLifetime(outer.get_token());
-                          auto restore = make_scope_exit([&] { engine.setPromiseLifetime(previous); });
+                          auto& engine = (*luaRoot)->lua_engine();
+                          auto previous = engine.set_promise_lifetime(outer.get_token());
+                          auto restore = make_scope_exit([&] { engine.set_promise_lifetime(previous); });
                           ASSERT_TRUE(component.eval<LuaValue>("savedRequest = factory:request()"));
-                          EXPECT_EQ(engine.promiseLifetime(), outer.get_token());
+                          EXPECT_EQ(engine.promise_lifetime(), outer.get_token());
                           auto saved = component.context()->get<RpcPromise<Json>>("savedRequest");
                           ASSERT_TRUE(saved);
                           expectPromiseStatus(*saved, RpcPromiseStatus::Pending);
                           ASSERT_TRUE(component.uninit());
                           expectPromiseStatus(*saved, RpcPromiseStatus::Cancelled);
                           expectPromiseStatus(producer.first, RpcPromiseStatus::Pending);
-                          EXPECT_EQ(engine.promiseLifetime(), outer.get_token());
+                          EXPECT_EQ(engine.promise_lifetime(), outer.get_token());
                           ASSERT_TRUE(producer.second.fulfill(Json(79)));
                           expectPromiseStatus(*saved, RpcPromiseStatus::Cancelled);
                         });
@@ -1319,13 +1319,13 @@ const GameTestRegistration deferredReplyCancellation(
       SCOPED_TRACE(completed ? "completed before deferred close" : "pending at deferred close");
       LuaMessageScript component(fixture.root());
       auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
-      ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+      ASSERT_TRUE(component.set_lua_root(*luaRoot));
       auto producer = RpcPromise<Json>::make_pair();
       if (completed)
         ASSERT_TRUE(producer.second.fulfill(Json()));
       LuaCallbacks host;
-      ASSERT_TRUE(host.registerCallback("close", [&] { return component.uninit(); }));
-      ASSERT_TRUE(component.addCallbacks("host", std::move(host)));
+      ASSERT_TRUE(host.register_callback("close", [&] { return component.uninit(); }));
+      ASSERT_TRUE(component.add_callbacks("host", std::move(host)));
       ASSERT_TRUE(component.init());
       ASSERT_TRUE(component.context()->set("injected", producer.first));
       ASSERT_TRUE(component.eval<LuaValue>(R"LUA(
@@ -1334,7 +1334,7 @@ const GameTestRegistration deferredReplyCancellation(
           return injected
         end)
       )LUA"));
-      auto response = promiseResponse(component.handleMessage("close", true));
+      auto response = promiseResponse(component.handle_message("close", true));
       ASSERT_TRUE(response) << response.error();
       auto reply = std::move(*response);
       EXPECT_FALSE(component.initialized());
@@ -1361,7 +1361,7 @@ const GameTestRegistration closedWorkerMessages(
     auto worker = *created;
     auto cleanup = make_scope_exit([&] { EXPECT_TRUE(worker->stop()); });
     auto beforeStart = RpcPromise<Json>::make_pair();
-    ASSERT_TRUE(worker->passMessage({"queued", {}, beforeStart.second}));
+    ASSERT_TRUE(worker->pass_message({"queued", {}, beforeStart.second}));
     ASSERT_TRUE(worker->stop());
     expectPromiseStatus(beforeStart.first, RpcPromiseStatus::Cancelled);
     for (unsigned generation = 0; generation < 2; ++generation) {
@@ -1373,7 +1373,7 @@ const GameTestRegistration closedWorkerMessages(
       ASSERT_TRUE(alreadyStarted);
       EXPECT_FALSE(*alreadyStarted);
       auto running = RpcPromise<Json>::make_pair();
-      ASSERT_TRUE(worker->passMessage({"no-handler", {}, running.second}));
+      ASSERT_TRUE(worker->pass_message({"no-handler", {}, running.second}));
       auto status = running.first.status();
       auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
       while (status && *status == RpcPromiseStatus::Pending
@@ -1387,11 +1387,11 @@ const GameTestRegistration closedWorkerMessages(
       EXPECT_EQ(*status, RpcPromiseStatus::Failed);
       ASSERT_TRUE(worker->stop());
       EXPECT_TRUE(worker->is_joined());
-      EXPECT_TRUE(worker->shouldExpire());
-      EXPECT_FALSE(worker->errorOccurred());
+      EXPECT_TRUE(worker->should_expire());
+      EXPECT_FALSE(worker->error_occurred());
     }
     auto late = RpcPromise<Json>::make_pair();
-    ASSERT_TRUE(worker->passMessage({"after-close", {}, late.second}));
+    ASSERT_TRUE(worker->pass_message({"after-close", {}, late.second}));
     expectPromiseStatus(late.first, RpcPromiseStatus::Cancelled);
   });
 
@@ -1429,14 +1429,14 @@ const GameTestRegistration workerChainedReplyClosure(
     std::promise<void> entered;
     auto handlerEntered = entered.get_future();
     LuaCallbacks host;
-    ASSERT_TRUE(host.registerCallback("promise", [&] {
+    ASSERT_TRUE(host.register_callback("promise", [&] {
       entered.set_value();
       return producer.first;
     }));
-    ASSERT_TRUE(worker->addCallbacks("host", host));
+    ASSERT_TRUE(worker->add_callbacks("host", host));
     auto response = RpcPromise<Json>::make_pair();
     auto cleanup = make_scope_exit([&] { EXPECT_TRUE(worker->stop()); });
-    ASSERT_TRUE(worker->passMessage({"pending", {}, response.second}));
+    ASSERT_TRUE(worker->pass_message({"pending", {}, response.second}));
     auto started = worker->start();
     ASSERT_TRUE(started);
     ASSERT_TRUE(*started);
@@ -1446,8 +1446,8 @@ const GameTestRegistration workerChainedReplyClosure(
     EXPECT_EQ(stopped.wait_for(std::chrono::seconds(5)), std::future_status::ready);
     ASSERT_TRUE(stopped.get());
     EXPECT_TRUE(worker->is_joined());
-    EXPECT_TRUE(worker->shouldExpire());
-    EXPECT_FALSE(worker->errorOccurred());
+    EXPECT_TRUE(worker->should_expire());
+    EXPECT_FALSE(worker->error_occurred());
     expectPromiseStatus(response.first, RpcPromiseStatus::Cancelled);
     expectPromiseStatus(producer.first, RpcPromiseStatus::Pending);
     ASSERT_TRUE(producer.second.fulfill(Json(89)));
@@ -1461,13 +1461,13 @@ const GameTestRegistration
     ASSERT_TRUE(luaRoot);
     LuaMessageScript component(fixture.root());
     auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
-    ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+    ASSERT_TRUE(component.set_lua_root(*luaRoot));
     ASSERT_TRUE((*luaRoot)->shutdown());
     auto failed = [&] {
       testing::TestPartResultArray errors;
       testing::ScopedFakeTestPartResultReporter capture(
         testing::ScopedFakeTestPartResultReporter::INTERCEPT_ONLY_CURRENT_THREAD, &errors);
-      return recoverLuaScriptError(component.init());
+      return recover_lua_script_error(component.init());
     }();
     ASSERT_FALSE(failed);
     EXPECT_TRUE(failed.error().is<LuaException>());
@@ -1485,22 +1485,22 @@ const GameTestRegistration removedCapability(
     ASSERT_TRUE(luaRoot);
     LuaMessageScript component(fixture.root());
     auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
-    ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+    ASSERT_TRUE(component.set_lua_root(*luaRoot));
     int oldCalls = 0;
     LuaCallbacks old;
-    ASSERT_TRUE(old.registerCallback("read", [&] { return ++oldCalls; }));
-    ASSERT_TRUE(component.addCallbacks("capability", std::move(old)));
+    ASSERT_TRUE(old.register_callback("read", [&] { return ++oldCalls; }));
+    ASSERT_TRUE(component.add_callbacks("capability", std::move(old)));
     ASSERT_TRUE(component.init());
-    auto saved = component.context()->getPath<LuaFunction>("capability.read");
+    auto saved = component.context()->get_path<LuaFunction>("capability.read");
     ASSERT_TRUE(saved);
     EXPECT_EQ(saved->invoke<int>(), 1);
-    ASSERT_TRUE(component.removeCallbacks("capability"));
+    ASSERT_TRUE(component.remove_callbacks("capability"));
     EXPECT_FALSE(saved->invoke<int>());
     EXPECT_EQ(oldCalls, 1);
     EXPECT_EQ(component.eval<bool>("return capability == nil and type(sb.makePromise) == 'function'"), true);
     LuaCallbacks fresh;
-    ASSERT_TRUE(fresh.registerCallback("read", [] { return 73; }));
-    ASSERT_TRUE(component.addCallbacks("capability", std::move(fresh)));
+    ASSERT_TRUE(fresh.register_callback("read", [] { return 73; }));
+    ASSERT_TRUE(component.add_callbacks("capability", std::move(fresh)));
     EXPECT_EQ(component.eval<int>("return capability.read()"), 73);
     EXPECT_FALSE(saved->invoke<int>());
     EXPECT_EQ(oldCalls, 1);
@@ -1512,13 +1512,13 @@ const GameTestRegistration
     ASSERT_TRUE(luaRoot);
     int calls = 0;
     LuaCallbacks inherited;
-    ASSERT_TRUE(inherited.registerCallback("read", [&] { return ++calls; }));
-    (*luaRoot)->addCallbacks("inherited", inherited);
+    ASSERT_TRUE(inherited.register_callback("read", [&] { return ++calls; }));
+    (*luaRoot)->add_callbacks("inherited", inherited);
     LuaMessageScript component(fixture.root());
     auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
-    ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+    ASSERT_TRUE(component.set_lua_root(*luaRoot));
     ASSERT_TRUE(component.init());
-    auto saved = component.context()->getPath<LuaFunction>("inherited.read");
+    auto saved = component.context()->get_path<LuaFunction>("inherited.read");
     ASSERT_TRUE(saved);
     EXPECT_EQ(saved->invoke<int>(), 1);
     ASSERT_TRUE(component.uninit());
@@ -1536,23 +1536,23 @@ const GameTestRegistration
     ASSERT_TRUE(luaRoot);
     LuaMessageScript component(fixture.root());
     auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
-    ASSERT_TRUE(component.setLuaRoot(*luaRoot));
+    ASSERT_TRUE(component.set_lua_root(*luaRoot));
     int calls = 0;
     LuaCallbacks host;
-    ASSERT_TRUE(host.registerCallback("nested", [&]() -> std::expected<LuaCallbacks, StarException> {
+    ASSERT_TRUE(host.register_callback("nested", [&]() -> std::expected<LuaCallbacks, StarException> {
       LuaCallbacks nested;
-      auto result = nested.registerCallback("read", [&] { return ++calls; });
+      auto result = nested.register_callback("read", [&] { return ++calls; });
       if (!result)
         return std::unexpected(std::move(result.error()));
       return nested;
     }));
-    ASSERT_TRUE(component.addCallbacks("host", std::move(host)));
+    ASSERT_TRUE(component.add_callbacks("host", std::move(host)));
     ASSERT_TRUE(component.init());
     ASSERT_TRUE(component.eval<LuaValue>("nested = host.nested()"));
-    auto read = component.context()->getPath<LuaFunction>("nested.read");
+    auto read = component.context()->get_path<LuaFunction>("nested.read");
     ASSERT_TRUE(read);
     EXPECT_EQ(read->invoke<int>(), 1);
-    ASSERT_TRUE(component.removeCallbacks("host"));
+    ASSERT_TRUE(component.remove_callbacks("host"));
     EXPECT_FALSE(read->invoke<int>());
     EXPECT_EQ(calls, 1);
   });
@@ -1596,7 +1596,7 @@ const GameTestRegistration
                                  ASSERT_TRUE(lua);
                                  LuaMessageScript component(fixture.root());
                                  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
-                                 ASSERT_TRUE(component.setLuaRoot(*lua));
+                                 ASSERT_TRUE(component.set_lua_root(*lua));
                                  ASSERT_TRUE(component.init());
                                  ASSERT_TRUE(component.eval<LuaValue>(R"LUA(
       setmetatable(_ENV, {__newindex = function(env, name, value)
@@ -1609,8 +1609,8 @@ const GameTestRegistration
     )LUA"));
                                  int calls = 0;
                                  LuaCallbacks callbacks;
-                                 ASSERT_TRUE(callbacks.registerCallback("read", [&] { return ++calls; }));
-                                 EXPECT_FALSE(component.addCallbacks("candidate", std::move(callbacks)));
+                                 ASSERT_TRUE(callbacks.register_callback("read", [&] { return ++calls; }));
+                                 EXPECT_FALSE(component.add_callbacks("candidate", std::move(callbacks)));
                                  auto escaped = component.context()->get<LuaFunction>("escaped");
                                  ASSERT_TRUE(escaped);
                                  EXPECT_FALSE(escaped->invoke<int>());
@@ -1625,24 +1625,24 @@ const GameTestRegistration reentrantCapabilityRemoval(
     ASSERT_TRUE(lua);
     LuaMessageScript component(fixture.root());
     auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
-    ASSERT_TRUE(component.setLuaRoot(*lua));
+    ASSERT_TRUE(component.set_lua_root(*lua));
     LuaCallbacks old;
-    ASSERT_TRUE(old.registerCallback("read", [] { return 17; }));
-    ASSERT_TRUE(component.addCallbacks("candidate", std::move(old)));
+    ASSERT_TRUE(old.register_callback("read", [] { return 17; }));
+    ASSERT_TRUE(component.add_callbacks("candidate", std::move(old)));
     LuaCallbacks control;
-    ASSERT_TRUE(control.registerCallback("replace", [&]() -> std::expected<void, StarException> {
-      auto removed = component.removeCallbacks("candidate");
+    ASSERT_TRUE(control.register_callback("replace", [&]() -> std::expected<void, StarException> {
+      auto removed = component.remove_callbacks("candidate");
       if (!removed)
         return std::unexpected(std::move(removed.error()));
       LuaCallbacks fresh;
-      auto registered = fresh.registerCallback("read", [] { return 83; });
+      auto registered = fresh.register_callback("read", [] { return 83; });
       if (!registered)
         return std::unexpected(std::move(registered.error()));
-      return component.addCallbacks("candidate", std::move(fresh));
+      return component.add_callbacks("candidate", std::move(fresh));
     }));
-    ASSERT_TRUE(component.addCallbacks("control", std::move(control)));
+    ASSERT_TRUE(component.add_callbacks("control", std::move(control)));
     ASSERT_TRUE(component.init());
-    auto oldRead = component.context()->getPath<LuaFunction>("candidate.read");
+    auto oldRead = component.context()->get_path<LuaFunction>("candidate.read");
     ASSERT_TRUE(oldRead);
     ASSERT_TRUE(component.eval<LuaValue>(R"LUA(
       rawset(_ENV, "candidate", nil)
@@ -1657,10 +1657,10 @@ const GameTestRegistration reentrantCapabilityRemoval(
         rawset(env, name, value)
       end})
     )LUA"));
-    ASSERT_TRUE(component.removeCallbacks("candidate"));
+    ASSERT_TRUE(component.remove_callbacks("candidate"));
     EXPECT_EQ(component.eval<int>("return candidate.read()"), 83);
     EXPECT_FALSE(oldRead->invoke<int>());
-    auto freshRead = component.context()->getPath<LuaFunction>("candidate.read");
+    auto freshRead = component.context()->get_path<LuaFunction>("candidate.read");
     ASSERT_TRUE(freshRead);
     ASSERT_TRUE(component.uninit());
     EXPECT_FALSE(freshRead->invoke<int>());
@@ -1673,10 +1673,10 @@ const GameTestRegistration
                                    ASSERT_TRUE(lua);
                                    LuaMessageScript component(fixture.root());
                                    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
-                                   ASSERT_TRUE(component.setLuaRoot(*lua));
+                                   ASSERT_TRUE(component.set_lua_root(*lua));
                                    LuaCallbacks control;
-                                   ASSERT_TRUE(control.registerCallback("close", [&] { return component.uninit(); }));
-                                   ASSERT_TRUE(component.addCallbacks("control", std::move(control)));
+                                   ASSERT_TRUE(control.register_callback("close", [&] { return component.uninit(); }));
+                                   ASSERT_TRUE(component.add_callbacks("control", std::move(control)));
                                    ASSERT_TRUE(component.init());
                                    auto retained = *component.context();
                                    ASSERT_TRUE(component.eval<LuaValue>(R"LUA(
@@ -1690,8 +1690,8 @@ const GameTestRegistration
     )LUA"));
                                    int calls = 0;
                                    LuaCallbacks callbacks;
-                                   ASSERT_TRUE(callbacks.registerCallback("read", [&] { return ++calls; }));
-                                   EXPECT_FALSE(component.addCallbacks("candidate", std::move(callbacks)));
+                                   ASSERT_TRUE(callbacks.register_callback("read", [&] { return ++calls; }));
+                                   EXPECT_FALSE(component.add_callbacks("candidate", std::move(callbacks)));
                                    EXPECT_FALSE(component.initialized());
                                    auto escaped = retained.get<LuaFunction>("escaped");
                                    ASSERT_TRUE(escaped);
@@ -1748,7 +1748,7 @@ const GameTestRegistration
   fixedEnumLuaBoundaries("GameEnumNames", "CollisionAndCollectionLuaBoundaries", [](GameTest&) {
     auto engine = LuaEngine::create();
     ASSERT_TRUE(engine);
-    auto context = (*engine)->createContext();
+    auto context = (*engine)->create_context();
     ASSERT_TRUE(context);
     CollisionSet collisions{CollisionKind::Block, CollisionKind::Null, CollisionKind::Platform};
     ASSERT_TRUE(context->set("collisions", collisions));

@@ -356,22 +356,22 @@ std::expected<ItemDatabase::ItemConfig, StarException> ItemDatabase::itemConfig(
   if (*builder) {
     std::unique_lock locker(m_luaMutex, std::defer_lock);
     lock_with_diagnostics(locker);
-    auto context = m_luaRoot->createContext(**builder);
+    auto context = m_luaRoot->create_context(**builder);
     if (!context)
       return std::unexpected(std::move(context.error()));
     auto rootCallbacks = LuaBindings::makeRootCallbacks(m_root, std::cref(*this));
     if (!rootCallbacks)
       return std::unexpected(std::move(rootCallbacks.error()));
-    auto setRoot = context->setCallbacks("root", *rootCallbacks);
+    auto setRoot = context->set_callbacks("root", *rootCallbacks);
     if (!setRoot)
       return std::unexpected(std::move(setRoot.error()));
     auto utilityCallbacks = LuaBindings::makeUtilityCallbacks(m_root.random(), m_root.logger(), m_root.logMap());
     if (!utilityCallbacks)
       return std::unexpected(std::move(utilityCallbacks.error()));
-    auto setUtility = context->setCallbacks("sb", *utilityCallbacks);
+    auto setUtility = context->set_callbacks("sb", *utilityCallbacks);
     if (!setUtility)
       return std::unexpected(std::move(setUtility.error()));
-    auto built = context->invokePath<LuaTupleReturn<Json, Json>>(
+    auto built = context->invoke_path<LuaTupleReturn<Json, Json>>(
         "build", itemConfig.directory, itemConfig.config, itemConfig.parameters, level, seed);
     if (!built)
       return std::unexpected(std::move(built.error()));
@@ -626,31 +626,31 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::applyAugment(s
   lock_with_diagnostics(locker);
   LuaBaseComponent script(m_root);
   auto setup = [&]() -> std::expected<void, StarException> {
-    auto removed = script.removeCallbacks("root");
+    auto removed = script.remove_callbacks("root");
     if (!removed)
       return std::unexpected(std::move(removed.error()));
     auto rootCallbacks = LuaBindings::makeRootCallbacks(m_root, std::cref(*this));
     if (!rootCallbacks)
       return std::unexpected(std::move(rootCallbacks.error()));
-    if (auto added = script.addCallbacks("root", std::move(*rootCallbacks)); !added)
+    if (auto added = script.add_callbacks("root", std::move(*rootCallbacks)); !added)
       return std::unexpected(std::move(added.error()));
-    if (auto set = script.setLuaRoot(m_luaRoot); !set)
+    if (auto set = script.set_lua_root(m_luaRoot); !set)
       return std::unexpected(std::move(set.error()));
     auto scripts = augment.augmentScripts();
     if (!scripts)
       return std::unexpected(std::move(scripts.error()));
-    if (auto set = script.setScripts(std::move(*scripts)); !set)
+    if (auto set = script.set_scripts(std::move(*scripts)); !set)
       return std::unexpected(std::move(set.error()));
     auto itemCallbacks = LuaBindings::makeItemCallbacks(augment);
     if (!itemCallbacks)
       return std::unexpected(std::move(itemCallbacks.error()));
-    if (auto added = script.addCallbacks("item", std::move(*itemCallbacks)); !added)
+    if (auto added = script.add_callbacks("item", std::move(*itemCallbacks)); !added)
       return std::unexpected(std::move(added.error()));
     auto configCallbacks = LuaBindings::makeConfigCallbacks(
       [&augment](String const& name, Json const& def) { return augment.instanceValue(name, def); });
     if (!configCallbacks)
       return std::unexpected(std::move(configCallbacks.error()));
-    return script.addCallbacks("config", std::move(*configCallbacks));
+    return script.add_callbacks("config", std::move(*configCallbacks));
   }();
   if (!setup)
     return std::unexpected(std::move(setup.error()));
@@ -684,17 +684,17 @@ std::expected<bool, StarException> ItemDatabase::ageItem(std::shared_ptr<Item>& 
   std::unique_lock locker(m_luaMutex, std::defer_lock);
   lock_with_diagnostics(locker);
   LuaBaseComponent script(m_root);
-  auto removed = script.removeCallbacks("root");
+  auto removed = script.remove_callbacks("root");
   if (!removed)
     return std::unexpected(std::move(removed.error()));
   auto callbacks = LuaBindings::makeRootCallbacks(m_root, std::cref(*this));
   if (!callbacks)
     return std::unexpected(std::move(callbacks.error()));
-  if (auto added = script.addCallbacks("root", std::move(*callbacks)); !added)
+  if (auto added = script.add_callbacks("root", std::move(*callbacks)); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto set = script.setLuaRoot(m_luaRoot); !set)
+  if (auto set = script.set_lua_root(m_luaRoot); !set)
     return std::unexpected(std::move(set.error()));
-  if (auto set = script.setScripts(data->get().agingScripts); !set)
+  if (auto set = script.set_scripts(data->get().agingScripts); !set)
     return std::unexpected(std::move(set.error()));
   auto agedJson =
     invokeItemScript<Json>(script, [&] { return script.invoke<Json>("ageItem", original.toJson(), aging); });

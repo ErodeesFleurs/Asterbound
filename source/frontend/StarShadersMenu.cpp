@@ -174,7 +174,7 @@ std::expected<void, StarException> ShadersMenu::show() {
 }
 
 std::expected<void, StarException> ShadersMenu::displayed() {
-  if (auto result = m_script.setLuaRoot(m_client->luaRoot()); !result)
+  if (auto result = m_script.set_lua_root(m_client->luaRoot()); !result)
     return std::unexpected(std::move(result.error()));
   return BaseScriptPane::displayed();
 }

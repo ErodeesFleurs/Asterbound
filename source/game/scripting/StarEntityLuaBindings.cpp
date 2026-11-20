@@ -112,30 +112,30 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeEntityCallbacks(Enti
   LuaCallbacks callbacks;
 
   if (auto registration =
-        callbacks.registerCallbackWithSignature<EntityId>("id", [&entity]() { return EntityCallbacks::id(entity); });
+        callbacks.register_callback_with_signature<EntityId>("id", [&entity]() { return EntityCallbacks::id(entity); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<LuaTable, LuaEngine&>(
+  if (auto registration = callbacks.register_callback_with_signature<LuaTable, LuaEngine&>(
         "damageTeam", [&entity](LuaEngine& engine) { return EntityCallbacks::damageTeam(entity, engine); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<bool, EntityId>(
+  if (auto registration = callbacks.register_callback_with_signature<bool, EntityId>(
         "isValidTarget", [&entity](EntityId entityId) { return EntityCallbacks::isValidTarget(entity, entityId); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<Vec2F, EntityId>(
+  if (auto registration = callbacks.register_callback_with_signature<Vec2F, EntityId>(
         "distanceToEntity",
         [&entity](EntityId entityId) { return EntityCallbacks::distanceToEntity(entity, entityId); });
       !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallbackWithSignature<bool, EntityId>(
+  if (auto registration = callbacks.register_callback_with_signature<bool, EntityId>(
         "entityInSight", [&entity](EntityId entityId) { return EntityCallbacks::entityInSight(entity, entityId); });
       !registration)
     return std::unexpected(std::move(registration.error()));
 
-  if (auto registration = callbacks.registerCallback("position", [&entity]() { return entity.position(); }); !registration)
+  if (auto registration = callbacks.register_callback("position", [&entity]() { return entity.position(); }); !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallback("entityType", [&entity]() -> std::expected<String, StarException> {
+  if (auto registration = callbacks.register_callback("entityType", [&entity]() -> std::expected<String, StarException> {
     if (!EntityTypeNames)
       return std::unexpected(EntityTypeNames.error());
     auto name = EntityTypeNames->get_right(entity.entityType());
@@ -144,9 +144,9 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeEntityCallbacks(Enti
     return name->get();
   }); !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallback("uniqueId", [&entity]() { return entity.uniqueId(); }); !registration)
+  if (auto registration = callbacks.register_callback("uniqueId", [&entity]() { return entity.uniqueId(); }); !registration)
     return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.registerCallback("persistent", [&entity]() { return entity.persistent(); }); !registration)
+  if (auto registration = callbacks.register_callback("persistent", [&entity]() { return entity.persistent(); }); !registration)
     return std::unexpected(std::move(registration.error()));
 
   return callbacks;
@@ -157,7 +157,7 @@ EntityId LuaBindings::EntityCallbacks::id(Entity const& entity) {
 }
 
 std::expected<LuaTable, StarException> LuaBindings::EntityCallbacks::damageTeam(Entity const& entity, LuaEngine& engine) {
-  auto table = engine.createTable();
+  auto table = engine.create_table();
   if (!table)
     return std::unexpected(std::move(table.error()));
   auto team = entity.getTeam();

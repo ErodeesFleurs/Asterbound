@@ -167,7 +167,7 @@ std::expected<void, StarException> PlayerCompanions::diskLoad(Json const& diskSt
   auto storage = diskStore.get_object("scriptStorage", JsonObject{});
   if (!storage)
     return std::unexpected(std::move(storage.error()));
-  auto stored = m_scriptComponent.setScriptStorage(std::move(*storage));
+  auto stored = m_scriptComponent.set_script_storage(std::move(*storage));
   if (!stored)
     return std::unexpected(std::move(stored.error()));
   auto categories = diskStore.get_object("companions", JsonObject{});
@@ -192,7 +192,7 @@ std::expected<void, StarException> PlayerCompanions::diskLoad(Json const& diskSt
 }
 
 std::expected<Json, StarException> PlayerCompanions::diskStore() const {
-  auto storage = m_scriptComponent.getScriptStorage();
+  auto storage = m_scriptComponent.get_script_storage();
   if (!storage)
     return std::unexpected(std::move(storage.error()));
   JsonObject companions;
@@ -219,17 +219,17 @@ std::expected<void, StarException> PlayerCompanions::init(Player& player, World&
     auto scripts = json_to_string_list(*scriptsJson);
     if (!scripts)
       return std::unexpected(std::move(scripts.error()));
-    auto installed = m_scriptComponent.setScripts(std::move(*scripts));
+    auto installed = m_scriptComponent.set_scripts(std::move(*scripts));
     if (!installed)
       return std::unexpected(std::move(installed.error()));
     auto delta = m_config.get_int("scriptDelta", 10);
     if (!delta)
       return std::unexpected(std::move(delta.error()));
-    m_scriptComponent.setUpdateDelta(*delta);
+    m_scriptComponent.set_update_delta(*delta);
     auto add = [&](String name, std::expected<LuaCallbacks, StarException> callbacks) -> std::expected<void, StarException> {
       if (!callbacks)
         return std::unexpected(std::move(callbacks.error()));
-      return m_scriptComponent.addCallbacks(std::move(name), std::move(*callbacks));
+      return m_scriptComponent.add_callbacks(std::move(name), std::move(*callbacks));
     };
     if (auto result = add("entity", LuaBindings::makeEntityCallbacks(player)); !result)
       return std::unexpected(std::move(result.error()));
@@ -242,7 +242,7 @@ std::expected<void, StarException> PlayerCompanions::init(Player& player, World&
     if (auto result = add("config", LuaBindings::makeConfigCallbacks(
         [this](String const& name, Json const& def) { return m_config.query(name, def); })); !result)
       return std::unexpected(std::move(result.error()));
-    return recoverLuaScriptError(m_scriptComponent.init(world));
+    return recover_lua_script_error(m_scriptComponent.init(world));
   }();
   if (!setup) {
     auto cleanup = uninit();
@@ -262,27 +262,27 @@ std::expected<void, StarException> PlayerCompanions::uninit() {
         error = std::move(result.error());
     }
   };
-  remember(recoverLuaScriptError(m_scriptComponent.uninit()));
+  remember(recover_lua_script_error(m_scriptComponent.uninit()));
   for (auto const& name : std::initializer_list<std::string_view>{"entity", "player", "status", "playerCompanions", "config"})
-    remember(m_scriptComponent.removeCallbacks(name));
+    remember(m_scriptComponent.remove_callbacks(name));
   if (error)
     return std::unexpected(std::move(*error));
   return {};
 }
 
 std::expected<void, StarException> PlayerCompanions::dismissCompanion(String const& category, Uuid const& podUuid) {
-  auto result = recoverLuaScriptError(m_scriptComponent.invoke("dismissCompanion", category, podUuid.hex()));
+  auto result = recover_lua_script_error(m_scriptComponent.invoke("dismissCompanion", category, podUuid.hex()));
   if (!result)
     return std::unexpected(std::move(result.error()));
   return {};
 }
 
 std::expected<std::optional<ChainableJsonMessageResponse>, StarException> PlayerCompanions::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
-  return recoverLuaScriptError(m_scriptComponent.handleMessage(message, localMessage, args));
+  return recover_lua_script_error(m_scriptComponent.handle_message(message, localMessage, args));
 }
 
 std::expected<void, StarException> PlayerCompanions::update(float dt) {
-  auto updated = recoverLuaScriptError(m_scriptComponent.update(m_scriptComponent.updateDt(dt)));
+  auto updated = recover_lua_script_error(m_scriptComponent.update(m_scriptComponent.update_dt(dt)));
   if (!updated)
     return std::unexpected(std::move(updated.error()));
   return {};
@@ -290,12 +290,12 @@ std::expected<void, StarException> PlayerCompanions::update(float dt) {
 
 std::expected<LuaCallbacks, StarException> PlayerCompanions::makeCompanionsCallbacks() {
   LuaCallbacks callbacks;
-  auto get = callbacks.registerCallback("getCompanions", [this](String const& category) {
+  auto get = callbacks.register_callback("getCompanions", [this](String const& category) {
     return m_companions[category].transformed([](std::shared_ptr<Companion> const& companion) { return companion->toJson(); });
   });
   if (!get)
     return std::unexpected(std::move(get.error()));
-  auto set = callbacks.registerCallback("setCompanions",
+  auto set = callbacks.register_callback("setCompanions",
       [this](String const& category, JsonArray const& companions) -> std::expected<void, StarException> {
     List<std::shared_ptr<Companion>> loaded;
     for (auto const& json : companions) {

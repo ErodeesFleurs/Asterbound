@@ -77,13 +77,13 @@ std::expected<std::shared_ptr<VoiceSettingsMenu>, StarException> VoiceSettingsMe
     return std::unexpected(std::move(initialized.error()));
   auto luaRoot = LuaRoot::create(menu->context().root());
   if (!luaRoot) return std::unexpected(std::move(luaRoot.error()));
-  if (auto set = menu->m_script.setLuaRoot(std::move(*luaRoot)); !set)
+  if (auto set = menu->m_script.set_lua_root(std::move(*luaRoot)); !set)
     return std::unexpected(std::move(set.error()));
   auto voice = menu->context().voice();
   if (!voice) return std::unexpected(std::move(voice.error()));
   auto callbacks = LuaBindings::makeVoiceCallbacks(voice->get());
   if (!callbacks) return std::unexpected(std::move(callbacks.error()));
-  if (auto added = menu->m_script.addCallbacks("voice", std::move(*callbacks)); !added)
+  if (auto added = menu->m_script.add_callbacks("voice", std::move(*callbacks)); !added)
     return std::unexpected(std::move(added.error()));
   return menu;
 }

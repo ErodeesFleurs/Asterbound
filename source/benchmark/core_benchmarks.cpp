@@ -1521,11 +1521,11 @@ std::expected<LuaContext, StarException> makeContext() {
   auto engine = LuaEngine::create();
   if (!engine)
     return std::unexpected(std::move(engine.error()));
-  return (*engine)->createContext();
+  return (*engine)->create_context();
 }
 
 template <typename Function> bool installCallback(benchmark::State& state, LuaContext& context, Function&& callback) {
-  auto function = context.createFunction(std::forward<Function>(callback));
+  auto function = context.create_function(std::forward<Function>(callback));
   return checked(state, function) && checked(state, context.set("native", *function))
     && checked(state, context.load(R"LUA(
         function entry(...)
@@ -1561,14 +1561,14 @@ template <bool Path> void BM_Invoke(benchmark::State& state) {
       )LUA")))
     return;
   String const path = "api.nested.add";
-  auto function = context->getPath<LuaFunction>(path);
+  auto function = context->get_path<LuaFunction>(path.utf8());
   if (!checked(state, function))
     return;
   measure(
     state,
     [&] {
       if constexpr (Path)
-        return context->invokePath<int>(path, 17, 25);
+        return context->invoke_path<int>(path.utf8(), 17, 25);
       else
         return function->invoke<int>(17, 25);
     },
@@ -1629,7 +1629,7 @@ template <ReturnKind Kind> auto returnCallback(std::uint64_t& calls) {
   } else if constexpr (Kind == ReturnKind::Tuple) {
     return [&calls] {
       ++calls;
-      return luaTupleReturn(11, 22);
+      return lua_tuple_return(11, 22);
     };
   } else {
     return [&calls] {
@@ -1648,7 +1648,7 @@ bool validateReturn(benchmark::State& state, std::expected<ReturnType<Kind>, Sta
   } else if constexpr (Kind == ReturnKind::Tuple) {
     int first = 0;
     int second = 0;
-    luaTie(first, second) = *result;
+    lua_tie(first, second) = *result;
     return require(state, first == 11 && second == 22, "Tuple Lua returns changed");
   } else {
     return require(state, *result == LuaVariadic<int>{11, 22, 33}, "Variadic Lua returns changed");
@@ -1688,11 +1688,11 @@ void BM_ContextCreateDestroy(benchmark::State& state) {
   auto engine = LuaEngine::create();
   if (!checked(state, engine))
     return;
-  auto retained = (*engine)->createContext();
+  auto retained = (*engine)->create_context();
   if (!checked(state, retained) || !checked(state, retained->set("sentinel", 42)))
     return;
   {
-    auto independent = (*engine)->createContext();
+    auto independent = (*engine)->create_context();
     if (!checked(state, independent))
       return;
     auto sentinel = independent->get<LuaValue>("sentinel");
@@ -1704,7 +1704,7 @@ void BM_ContextCreateDestroy(benchmark::State& state) {
   if (!measure(
         state,
         [&]() -> std::expected<void, StarException> {
-          auto context = (*engine)->createContext();
+          auto context = (*engine)->create_context();
           if (!context)
             return std::unexpected(std::move(context.error()));
           benchmark::DoNotOptimize(*context);
@@ -1728,8 +1728,8 @@ void BM_CoroutineYieldResume(benchmark::State& state) {
       )LUA")))
     return;
   auto function = context->get<LuaFunction>("run");
-  auto thread = context->engine().createThread();
-  if (!checked(state, function) || !checked(state, thread) || !checked(state, thread->pushFunction(*function)))
+  auto thread = context->engine().create_thread();
+  if (!checked(state, function) || !checked(state, thread) || !checked(state, thread->push_function(*function)))
     return;
   if (measure(
         state, [&] { return thread->resume<int>(7); },
@@ -1739,6 +1739,37 @@ void BM_CoroutineYieldResume(benchmark::State& state) {
     require(state, thread->status() == LuaThread::Status::Active, "Yielding coroutine stopped unexpectedly");
 }
 
+void read_path_string(benchmark::State& state) {
+  auto context = makeContext();
+  String path = "nested.child.value";
+  String text = payload<String>();
+  if (!checked(state, context) || !checked(state, context->set_path(path.utf8(), text)))
+    return;
+  measure(state, [&] { return context->get_path<String>(path.utf8()); },
+      [&](auto const& result) { return require(state, *result == text, "Path changed binary string"); });
+}
+
+void install_callback_group(benchmark::State& state) {
+  auto context = makeContext();
+  if (!checked(state, context))
+    return;
+  LuaCallbacks callbacks;
+  for (int i = 0; i < 16; ++i) {
+    if (!checked(state, callbacks.register_callback(Star::format("f{}", i), [i](int value) { return value + i; })))
+      return;
+  }
+  String name = "group";
+  for (auto _ : state) {
+    if (!checked(state, context->remove(name)) || !checked(state, context->set_callbacks(name, callbacks)))
+      return;
+  }
+  auto result = context->eval<int>("group.f0(1) + group.f15(2)");
+  if (checked(state, result))
+    require(state, *result == 18, "Installed group lost callable state");
+}
+
+BENCHMARK(read_path_string)->Name("Lua/Path/ReadNestedBinaryString");
+BENCHMARK(install_callback_group)->Name("Lua/Bindings/Replace16Callbacks");
 BENCHMARK_TEMPLATE(BM_Invoke, false)->Name("Lua/Invoke/Direct");
 BENCHMARK_TEMPLATE(BM_Invoke, true)->Name("Lua/Invoke/Path");
 BENCHMARK_TEMPLATE(BM_CallbackRoundTrip, int)->Name("Lua/Callback/Scalar");

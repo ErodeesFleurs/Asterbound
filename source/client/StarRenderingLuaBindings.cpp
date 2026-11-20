@@ -20,34 +20,34 @@ namespace Star {
 
 std::expected<LuaCallbacks, StarException> LuaBindings::makeRenderingCallbacks(ClientApplication& app) {
   LuaCallbacks callbacks;
-  auto frames = callbacks.registerCallbackWithSignature<unsigned>("framesSkipped", [&app] { return app.framesSkipped(); });
+  auto frames = callbacks.register_callback_with_signature<unsigned>("framesSkipped", [&app] { return app.framesSkipped(); });
   if (!frames)
     return std::unexpected(std::move(frames.error()));
-  auto setGroup = callbacks.registerCallback("setPostProcessGroupEnabled", [&app](String const& group, bool enabled, std::optional<bool> save) {
+  auto setGroup = callbacks.register_callback("setPostProcessGroupEnabled", [&app](String const& group, bool enabled, std::optional<bool> save) {
     return app.setPostProcessGroupEnabled(group, enabled, save);
   });
   if (!setGroup)
     return std::unexpected(std::move(setGroup.error()));
-  auto getGroup = callbacks.registerCallback("postProcessGroupEnabled", [&app](String const& group) {
+  auto getGroup = callbacks.register_callback("postProcessGroupEnabled", [&app](String const& group) {
     return app.postProcessGroupEnabled(group);
   });
   if (!getGroup)
     return std::unexpected(std::move(getGroup.error()));
-  auto groups = callbacks.registerCallback("postProcessGroups", [&app] { return app.postProcessGroups(); });
+  auto groups = callbacks.register_callback("postProcessGroups", [&app] { return app.postProcessGroups(); });
   if (!groups)
     return std::unexpected(std::move(groups.error()));
 
-  auto setParameter = callbacks.registerCallback("setEffectParameter", [&app](String const& effectName, String const& effectParameter, RenderEffectParameter const& value) -> std::expected<void, StarException> {
+  auto setParameter = callbacks.register_callback("setEffectParameter", [&app](String const& effectName, String const& effectParameter, RenderEffectParameter const& value) -> std::expected<void, StarException> {
     return app.renderer()->setEffectScriptableParameter(effectName, effectParameter, value);
   });
   if (!setParameter)
     return std::unexpected(std::move(setParameter.error()));
-  auto getParameter = callbacks.registerCallback("getEffectParameter", [&app](String const& effectName, String const& effectParameter) {
+  auto getParameter = callbacks.register_callback("getEffectParameter", [&app](String const& effectName, String const& effectParameter) {
     return app.renderer()->getEffectScriptableParameter(effectName, effectParameter);
   });
   if (!getParameter)
     return std::unexpected(std::move(getParameter.error()));
-  auto setPasses = callbacks.registerCallback("setPostProcessLayerPasses", [&app](String const& layer, unsigned passes) {
+  auto setPasses = callbacks.register_callback("setPostProcessLayerPasses", [&app](String const& layer, unsigned passes) {
     return app.setPostProcessLayerPasses(layer, passes);
   });
   if (!setPasses)

@@ -372,7 +372,7 @@ std::expected<std::shared_ptr<Quest>, StarException> Quest::create(Root& root, J
   quest->m_indicators = std::move(*indicators);
   auto storage = store->get_object("scriptStorage", {});
   if (!storage) return std::unexpected(std::move(storage.error()));
-  auto setStorage = quest->m_scriptComponent.setScriptStorage(std::move(*storage));
+  auto setStorage = quest->m_scriptComponent.set_script_storage(std::move(*storage));
   if (!setStorage) return std::unexpected(std::move(setStorage.error()));
   auto config = quest->getTemplate();
   if (!config) return std::unexpected(std::move(config.error()));
@@ -449,7 +449,7 @@ std::expected<Json, StarException> Quest::diskStore() const {
   result["unread"] = m_unread;
   result["canTurnIn"] = m_canTurnIn;
   result["indicators"] = json_from_string_set(m_indicators);
-  auto storage = m_scriptComponent.getScriptStorage();
+  auto storage = m_scriptComponent.get_script_storage();
   if (!storage) return std::unexpected(std::move(storage.error()));
   result["scriptStorage"] = std::move(*storage);
   result["title"] = m_title;
@@ -502,15 +502,15 @@ void Quest::detachPlayer() {
 }
 std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Quest::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
   if (!m_inited) return std::optional<ChainableJsonMessageResponse>();
-  return recoverLuaScriptError(m_scriptComponent.handleMessage(message, localMessage, args));
+  return recover_lua_script_error(m_scriptComponent.handle_message(message, localMessage, args));
 }
 std::expected<std::optional<LuaValue>, StarException> Quest::callScript(String const& func, LuaVariadic<LuaValue> const& args) {
   if (!m_inited) return std::optional<LuaValue>();
-  return recoverLuaScriptError(m_scriptComponent.invoke(func, args));
+  return recover_lua_script_error(m_scriptComponent.invoke(func, args));
 }
 std::expected<void, StarException> Quest::update(float dt) {
   if (!m_inited) return {};
-  auto result = recoverLuaScriptError(m_scriptComponent.update(m_scriptComponent.updateDt(dt)));
+  auto result = recover_lua_script_error(m_scriptComponent.update(m_scriptComponent.update_dt(dt)));
   if (!result) return std::unexpected(std::move(result.error()));
   return {};
 }
@@ -519,19 +519,19 @@ std::expected<void, StarException> Quest::offer() {
   setState(QuestState::Offer);
   auto initialized = initScript();
   if (!initialized) return std::unexpected(std::move(initialized.error()));
-  auto result = recoverLuaScriptError(m_scriptComponent.invoke("questOffer"));
+  auto result = recover_lua_script_error(m_scriptComponent.invoke("questOffer"));
   if (!result) return std::unexpected(std::move(result.error()));
   return {};
 }
 std::expected<void, StarException> Quest::declineOffer() {
   setState(QuestState::New);
-  auto result = recoverLuaScriptError(m_scriptComponent.invoke("questDecline"));
+  auto result = recover_lua_script_error(m_scriptComponent.invoke("questDecline"));
   if (!result) return std::unexpected(std::move(result.error()));
   return uninitScript();
 }
 std::expected<void, StarException> Quest::cancelOffer() {
   setState(QuestState::New);
-  auto result = recoverLuaScriptError(m_scriptComponent.invoke("questCancel"));
+  auto result = recover_lua_script_error(m_scriptComponent.invoke("questCancel"));
   if (!result) return std::unexpected(std::move(result.error()));
   return uninitScript();
 }
@@ -543,7 +543,7 @@ std::expected<void, StarException> Quest::start() {
   if (!initialized) return std::unexpected(std::move(initialized.error()));
   auto current = m_player->get().questManager()->trackedQuest();
   if (mainQuest() || !current) m_player->get().questManager()->setAsTracked(questId());
-  auto result = recoverLuaScriptError(m_scriptComponent.invoke("questStart"));
+  auto result = recover_lua_script_error(m_scriptComponent.invoke("questStart"));
   if (!result) return std::unexpected(std::move(result.error()));
   return {};
 }
@@ -552,7 +552,7 @@ std::expected<void, StarException> Quest::complete(std::optional<std::size_t> fo
     return std::unexpected(StarException("Cannot complete a quest without an attached player world"));
   setState(QuestState::Complete);
   m_showDialog = showCompleteDialog();
-  auto result = recoverLuaScriptError(m_scriptComponent.invoke("questComplete"));
+  auto result = recover_lua_script_error(m_scriptComponent.invoke("questComplete"));
   if (!result) return std::unexpected(std::move(result.error()));
   auto uninitialized = uninitScript();
   if (!uninitialized) return std::unexpected(std::move(uninitialized.error()));
@@ -584,19 +584,19 @@ std::expected<void, StarException> Quest::complete(std::optional<std::size_t> fo
 std::expected<void, StarException> Quest::fail() {
   setState(QuestState::Failed);
   m_showDialog = showFailDialog();
-  auto result = recoverLuaScriptError(m_scriptComponent.invoke("questFail", false));
+  auto result = recover_lua_script_error(m_scriptComponent.invoke("questFail", false));
   if (!result) return std::unexpected(std::move(result.error()));
   return uninitScript();
 }
 std::expected<void, StarException> Quest::abandon() {
   setState(QuestState::Failed);
   m_showDialog = false;
-  auto result = recoverLuaScriptError(m_scriptComponent.invoke("questFail", true));
+  auto result = recover_lua_script_error(m_scriptComponent.invoke("questFail", true));
   if (!result) return std::unexpected(std::move(result.error()));
   return uninitScript();
 }
 std::expected<bool, StarException> Quest::interactWithEntity(EntityId entity) {
-  auto result = recoverLuaScriptError(m_scriptComponent.invoke<bool>("questInteract", entity));
+  auto result = recover_lua_script_error(m_scriptComponent.invoke<bool>("questInteract", entity));
   if (!result) return std::unexpected(std::move(result.error()));
   return result->value_or(false);
 }
@@ -874,23 +874,23 @@ std::expected<void, StarException> Quest::initScript() {
 std::expected<void, StarException> Quest::initScriptBindings() {
   auto config = getTemplate();
   if (!config) return std::unexpected(std::move(config.error()));
-  auto scripts = (*config)->script ? m_scriptComponent.setScript(*(*config)->script)
-      : m_scriptComponent.setScripts(StringList{});
+  auto scripts = (*config)->script ? m_scriptComponent.set_script(*(*config)->script)
+      : m_scriptComponent.set_scripts(StringList{});
   if (!scripts) return std::unexpected(std::move(scripts.error()));
-  m_scriptComponent.setUpdateDelta((*config)->updateDelta);
+  m_scriptComponent.set_update_delta((*config)->updateDelta);
   auto quest = makeQuestCallbacks(m_player->get());
   if (!quest) return std::unexpected(std::move(quest.error()));
-  auto addedQuest = m_scriptComponent.addCallbacks("quest", std::move(*quest));
+  auto addedQuest = m_scriptComponent.add_callbacks("quest", std::move(*quest));
   if (!addedQuest) return std::unexpected(std::move(addedQuest.error()));
   if (m_client) {
     auto celestial = LuaBindings::makeCelestialCallbacks(m_root, m_client->get());
     if (!celestial) return std::unexpected(std::move(celestial.error()));
-    auto addedCelestial = m_scriptComponent.addCallbacks("celestial", std::move(*celestial));
+    auto addedCelestial = m_scriptComponent.add_callbacks("celestial", std::move(*celestial));
     if (!addedCelestial) return std::unexpected(std::move(addedCelestial.error()));
   }
   auto player = LuaBindings::makePlayerCallbacks(m_root, m_player->get());
   if (!player) return std::unexpected(std::move(player.error()));
-  auto addedPlayer = m_scriptComponent.addCallbacks("player", std::move(*player));
+  auto addedPlayer = m_scriptComponent.add_callbacks("player", std::move(*player));
   if (!addedPlayer) return std::unexpected(std::move(addedPlayer.error()));
   auto configuration = LuaBindings::makeConfigCallbacks([&quest = *this](String const& name, Json const& def) -> std::expected<Json, StarException> {
     auto config = quest.getTemplate();
@@ -898,30 +898,30 @@ std::expected<void, StarException> Quest::initScriptBindings() {
     return Json((*config)->scriptConfig).query(name, def);
   });
   if (!configuration) return std::unexpected(std::move(configuration.error()));
-  auto addedConfig = m_scriptComponent.addCallbacks("config", std::move(*configuration));
+  auto addedConfig = m_scriptComponent.add_callbacks("config", std::move(*configuration));
   if (!addedConfig) return std::unexpected(std::move(addedConfig.error()));
   auto entity = LuaBindings::makeEntityCallbacks(m_player->get());
   if (!entity) return std::unexpected(std::move(entity.error()));
-  auto addedEntity = m_scriptComponent.addCallbacks("entity", std::move(*entity));
+  auto addedEntity = m_scriptComponent.add_callbacks("entity", std::move(*entity));
   if (!addedEntity) return std::unexpected(std::move(addedEntity.error()));
   auto status = LuaBindings::makeStatusControllerCallbacks(m_player->get().statusController());
   if (!status) return std::unexpected(std::move(status.error()));
-  auto addedStatus = m_scriptComponent.addCallbacks("status", std::move(*status));
+  auto addedStatus = m_scriptComponent.add_callbacks("status", std::move(*status));
   if (!addedStatus) return std::unexpected(std::move(addedStatus.error()));
-  auto movement = m_scriptComponent.addActorMovementCallbacks(m_player->get().movementController());
+  auto movement = m_scriptComponent.add_actor_movement_callbacks(m_player->get().movementController());
   if (!movement) return std::unexpected(std::move(movement.error()));
   m_inited = true;
-  return recoverLuaScriptError(m_scriptComponent.init(m_world->get()));
+  return recover_lua_script_error(m_scriptComponent.init(m_world->get()));
 }
 std::expected<void, StarException> Quest::uninitScript() {
   std::optional<StarException> error;
-  auto uninitialized = recoverLuaScriptError(m_scriptComponent.uninit());
+  auto uninitialized = recover_lua_script_error(m_scriptComponent.uninit());
   if (!uninitialized) error = std::move(uninitialized.error());
   for (String const& group : {String("quest"), String("celestial"), String("player"), String("config"), String("entity"), String("status")}) {
-    auto removed = m_scriptComponent.removeCallbacks(group);
+    auto removed = m_scriptComponent.remove_callbacks(group);
     if (!removed && !error) error = std::move(removed.error());
   }
-  auto movement = m_scriptComponent.removeActorMovementCallbacks();
+  auto movement = m_scriptComponent.remove_actor_movement_callbacks();
   if (!movement && !error) error = std::move(movement.error());
   m_inited = false;
   if (error) return std::unexpected(std::move(*error));
@@ -930,68 +930,68 @@ std::expected<void, StarException> Quest::uninitScript() {
 
 std::expected<LuaCallbacks, StarException> Quest::makeQuestCallbacks(Player& player) {
   LuaCallbacks callbacks;
-  if (auto r = callbacks.registerCallback("context", [&quest = *this]() { quest.m_scriptComponent.context(); }); !r)
+  if (auto r = callbacks.register_callback("context", [&quest = *this]() { quest.m_scriptComponent.context(); }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("state", [&quest = *this]() -> std::expected<String, StarException> {
+  if (auto r = callbacks.register_callback("state", [&quest = *this]() -> std::expected<String, StarException> {
     if (!QuestStateNames) return std::unexpected(QuestStateNames.error());
     auto name = QuestStateNames->get_right(quest.state());
     if (!name) return std::unexpected(std::move(name.error()));
     return name->get();
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("complete", [&quest = *this](std::optional<std::size_t> followup) { return quest.complete(followup); }); !r)
+  if (auto r = callbacks.register_callback("complete", [&quest = *this](std::optional<std::size_t> followup) { return quest.complete(followup); }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("fail", [&quest = *this]() { return quest.fail(); }); !r)
+  if (auto r = callbacks.register_callback("fail", [&quest = *this]() { return quest.fail(); }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("abandon", [&quest = *this]() { return quest.abandon(); }); !r)
+  if (auto r = callbacks.register_callback("abandon", [&quest = *this]() { return quest.abandon(); }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("decline", [&quest = *this]() { return quest.declineOffer(); }); !r)
+  if (auto r = callbacks.register_callback("decline", [&quest = *this]() { return quest.declineOffer(); }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("cancel", [&quest = *this]() { return quest.cancelOffer(); }); !r)
+  if (auto r = callbacks.register_callback("cancel", [&quest = *this]() { return quest.cancelOffer(); }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("setCanTurnIn", [&quest = *this](bool value) { quest.m_canTurnIn = value; }); !r)
+  if (auto r = callbacks.register_callback("setCanTurnIn", [&quest = *this](bool value) { quest.m_canTurnIn = value; }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("questId", [&quest = *this]() { return quest.questId(); }); !r)
+  if (auto r = callbacks.register_callback("questId", [&quest = *this]() { return quest.questId(); }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("templateId", [&quest = *this]() { return quest.templateId(); }); !r)
+  if (auto r = callbacks.register_callback("templateId", [&quest = *this]() { return quest.templateId(); }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("seed", [&quest = *this]() { return quest.questDescriptor().seed; }); !r)
+  if (auto r = callbacks.register_callback("seed", [&quest = *this]() { return quest.questDescriptor().seed; }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("questDescriptor", [&quest = *this]() { return quest.questDescriptor().toJson(); }); !r)
+  if (auto r = callbacks.register_callback("questDescriptor", [&quest = *this]() { return quest.questDescriptor().toJson(); }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("questArcDescriptor", [&quest = *this]() { return quest.questArcDescriptor().toJson(); }); !r)
+  if (auto r = callbacks.register_callback("questArcDescriptor", [&quest = *this]() { return quest.questArcDescriptor().toJson(); }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("questArcPosition", [&quest = *this]() { return quest.m_arcPos; }); !r)
+  if (auto r = callbacks.register_callback("questArcPosition", [&quest = *this]() { return quest.m_arcPos; }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("worldId", [&quest = *this]() -> std::expected<std::optional<String>, StarException> {
+  if (auto r = callbacks.register_callback("worldId", [&quest = *this]() -> std::expected<std::optional<String>, StarException> {
     if (!quest.m_worldId) return std::optional<String>();
     auto name = Star::print_world_id(*quest.m_worldId);
     if (!name) return std::unexpected(std::move(name.error()));
     return std::optional<String>(*name);
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("setWorldId", [&quest = *this](std::optional<String> const& name) -> std::expected<void, StarException> {
+  if (auto r = callbacks.register_callback("setWorldId", [&quest = *this](std::optional<String> const& name) -> std::expected<void, StarException> {
     if (!name) { quest.setWorldId({}); return {}; }
     auto world = parseWorldId(*name);
     if (!world) return std::unexpected(std::move(world.error()));
     quest.setWorldId(std::move(*world));
     return {};
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("serverUuid", [&quest = *this]() { return quest.serverUuid().transform(std::mem_fn(&Uuid::hex)); }); !r)
+  if (auto r = callbacks.register_callback("serverUuid", [&quest = *this]() { return quest.serverUuid().transform(std::mem_fn(&Uuid::hex)); }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("setServerUuid", [&quest = *this](String const& value) -> std::expected<void, StarException> {
+  if (auto r = callbacks.register_callback("setServerUuid", [&quest = *this](String const& value) -> std::expected<void, StarException> {
     auto uuid = Uuid::create(value);
     if (!uuid) return std::unexpected(std::move(uuid.error()));
     quest.setServerUuid(std::move(*uuid));
     return {};
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("isCurrent", [&quest = *this, &player]() { return player.questManager()->isCurrent(quest.questId()); }); !r)
+  if (auto r = callbacks.register_callback("isCurrent", [&quest = *this, &player]() { return player.questManager()->isCurrent(quest.questId()); }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("location", [&quest = *this]() -> std::expected<Json, StarException> {
+  if (auto r = callbacks.register_callback("location", [&quest = *this]() -> std::expected<Json, StarException> {
     if (auto loc = quest.location()) {
       return JsonObject{{"system", json_from_vec3i(loc->first)}, {"location", jsonFromSystemLocation(loc->second)}};
     }
     return Json();
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("setLocation", [&quest = *this](Json const& json) -> std::expected<void, StarException> {
+  if (auto r = callbacks.register_callback("setLocation", [&quest = *this](Json const& json) -> std::expected<void, StarException> {
     if (json.is_null()) { quest.setLocation({}); return {}; }
     auto systemJson = json.get("system");
     if (!systemJson) return std::unexpected(std::move(systemJson.error()));
@@ -1004,35 +1004,35 @@ std::expected<LuaCallbacks, StarException> Quest::makeQuestCallbacks(Player& pla
     quest.setLocation(std::make_pair(*system, std::move(*location)));
     return {};
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("parameters", [&quest = *this]() { return questParamsToJson(quest.parameters()); }); !r)
+  if (auto r = callbacks.register_callback("parameters", [&quest = *this]() { return questParamsToJson(quest.parameters()); }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("setParameter", [&quest = *this](String const& name, Json const& json) -> std::expected<void, StarException> {
+  if (auto r = callbacks.register_callback("setParameter", [&quest = *this](String const& name, Json const& json) -> std::expected<void, StarException> {
     auto parameter = QuestParam::fromJson(json);
     if (!parameter) return std::unexpected(std::move(parameter.error()));
     quest.m_parameters[name] = std::move(*parameter);
     return {};
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("setIndicators", [&quest = *this](StringList indicators) { quest.m_indicators = StringSet::from(indicators); }); !r)
+  if (auto r = callbacks.register_callback("setIndicators", [&quest = *this](StringList indicators) { quest.m_indicators = StringSet::from(indicators); }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("setObjectiveList", [&quest = *this](std::optional<JsonArray> const& value) { quest.setObjectiveList(value); }); !r)
+  if (auto r = callbacks.register_callback("setObjectiveList", [&quest = *this](std::optional<JsonArray> const& value) { quest.setObjectiveList(value); }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("setProgress", [&quest = *this](std::optional<float> const& value) { quest.setProgress(value); }); !r)
+  if (auto r = callbacks.register_callback("setProgress", [&quest = *this](std::optional<float> const& value) { quest.setProgress(value); }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("setCompassDirection", [&quest = *this](std::optional<float> const& value) { quest.setCompassDirection(value); }); !r)
+  if (auto r = callbacks.register_callback("setCompassDirection", [&quest = *this](std::optional<float> const& value) { quest.setCompassDirection(value); }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("setTitle", [&quest = *this](String const& value) {
+  if (auto r = callbacks.register_callback("setTitle", [&quest = *this](String const& value) {
     if (quest.m_title != value) { quest.m_title = value; quest.m_presentationRevision = nextQuestPresentationRevision(); }
   }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("setText", [&quest = *this](String const& value) {
+  if (auto r = callbacks.register_callback("setText", [&quest = *this](String const& value) {
     if (quest.m_text != value) { quest.m_text = value; quest.m_presentationRevision = nextQuestPresentationRevision(); }
   }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("setCompletionText", [&quest = *this](String const& value) { quest.m_completionText = value; }); !r)
+  if (auto r = callbacks.register_callback("setCompletionText", [&quest = *this](String const& value) { quest.m_completionText = value; }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("setFailureText", [&quest = *this](String const& value) { quest.m_failureText = value; }); !r)
+  if (auto r = callbacks.register_callback("setFailureText", [&quest = *this](String const& value) { quest.m_failureText = value; }); !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("setPortrait", [&quest = *this](String const& name, std::optional<JsonArray> const& portrait) -> std::expected<void, StarException> {
+  if (auto r = callbacks.register_callback("setPortrait", [&quest = *this](String const& name, std::optional<JsonArray> const& portrait) -> std::expected<void, StarException> {
     if (!portrait) {
       if (quest.m_portraits.contains(name)) {
         quest.m_portraits.remove(name);
@@ -1056,7 +1056,7 @@ std::expected<LuaCallbacks, StarException> Quest::makeQuestCallbacks(Player& pla
     return {};
   }); !r) return std::unexpected(std::move(r.error()));
   if (auto r =
-        callbacks.registerCallback("setPortraitTitle",
+        callbacks.register_callback("setPortraitTitle",
                                    [&quest = *this](String const& name, std::optional<String> const& title) {
                                      auto previous = quest.m_portraitTitles.find_ref(name);
                                      if ((!previous && !title) || (previous && title && previous->get() == *title))
@@ -1069,7 +1069,7 @@ std::expected<LuaCallbacks, StarException> Quest::makeQuestCallbacks(Player& pla
                                    });
       !r)
     return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.registerCallback("addReward", [&quest = *this](Json const& reward) -> std::expected<void, StarException> {
+  if (auto r = callbacks.register_callback("addReward", [&quest = *this](Json const& reward) -> std::expected<void, StarException> {
     auto descriptor = ItemDescriptor::create(reward);
     if (!descriptor) return std::unexpected(std::move(descriptor.error()));
     return quest.addReward(*descriptor);
