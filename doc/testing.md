@@ -491,6 +491,8 @@ ownership and the lifetime of borrowed keys. An overwrite may be passed keys
 borrowed from the map itself. Node addresses, not hash-table iterators, must
 survive unrelated insertion. A reference obtained through a temporary
 `expected` does not extend the lifetime of the map it contains.
+Run `StringTest.FixedEnumNames*` for `enum_name`, `enum_value`, and `maybe_enum_value`:
+canonical spellings, case-insensitive lookup, and malformed UTF-8 versus a valid miss.
 
 Use the existing `core_benchmarks` filter `^Core/(BiMap|Perlin)/` for comparisons.
 The 128-entry move round trip includes both move construction and move assignment;

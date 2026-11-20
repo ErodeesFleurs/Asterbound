@@ -291,7 +291,7 @@ projectileConfig->lightPosition = std::move(*result114);
 if (!result115) return std::unexpected(std::move(result115.error()));
 if (auto lightType = std::move(*result115))
     {
-  auto result116 = enumValue<LightTypeNames>(*lightType);
+  auto result116 = enum_value<LightTypeNames>(*lightType);
   if (!result116)
     return std::unexpected(std::move(result116.error()));
   projectileConfig->lightType = *result116;

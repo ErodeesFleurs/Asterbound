@@ -578,10 +578,10 @@ TEST(StringTest, FixedEnumNamesPreserveCaseInsensitiveLookupAndCanonicalNames) {
     for (auto const& [value, spelling] : Names) {
       auto lower = String(spelling).to_lower();
       ASSERT_TRUE(lower);
-      auto parsed = enumValue<Names>(*lower);
+      auto parsed = enum_value<Names>(*lower);
       ASSERT_TRUE(parsed);
       EXPECT_EQ(*parsed, value);
-      auto canonical = enumName<Names>(*parsed);
+      auto canonical = enum_name<Names>(*parsed);
       ASSERT_TRUE(canonical);
       EXPECT_EQ(*canonical, spelling);
     }
@@ -593,44 +593,44 @@ TEST(StringTest, FixedEnumNamesPreserveCaseInsensitiveLookupAndCanonicalNames) {
   roundTrip.operator()<MouseWheelNames>();
   roundTrip.operator()<ControllerAxisNames>();
   roundTrip.operator()<ControllerButtonNames>();
-  EXPECT_EQ(enumValue<KeyNames>("kEyPaD eNtEr"), Key::KeypadEnter);
-  EXPECT_EQ(enumValue<KeyModNames>("lMeTa"), KeyMod::LGui);
-  EXPECT_EQ(enumName<KeyNames>(Key::Escape), "Esc");
-  EXPECT_EQ(enumName<KeyNames>(Key::Delete), "Del");
-  EXPECT_EQ(enumName<ControllerButtonNames>(ControllerButton::Invalid), "Invalid");
+  EXPECT_EQ(enum_value<KeyNames>("kEyPaD eNtEr"), Key::KeypadEnter);
+  EXPECT_EQ(enum_value<KeyModNames>("lMeTa"), KeyMod::LGui);
+  EXPECT_EQ(enum_name<KeyNames>(Key::Escape), "Esc");
+  EXPECT_EQ(enum_name<KeyNames>(Key::Delete), "Del");
+  EXPECT_EQ(enum_name<ControllerButtonNames>(ControllerButton::Invalid), "Invalid");
 }
 
 TEST(StringTest, FixedEnumNamesDistinguishUnknownNamesInvalidUtf8AndSparseValues) {
   for (std::string_view text : {"", "Escape", "LMeta", "日本語", "K", "A "}) {
-    auto optional = maybeEnumValue<KeyNames>(text);
+    auto optional = maybe_enum_value<KeyNames>(text);
     ASSERT_TRUE(optional);
     EXPECT_FALSE(*optional);
-    auto required = enumValue<KeyNames>(text);
+    auto required = enum_value<KeyNames>(text);
     ASSERT_FALSE(required);
     EXPECT_TRUE(required.error().is<MapException>());
   }
-  auto embeddedNull = enumValue<KeyNames>(std::string_view("A\0", 2));
+  auto embeddedNull = enum_value<KeyNames>(std::string_view("A\0", 2));
   ASSERT_FALSE(embeddedNull);
   EXPECT_TRUE(embeddedNull.error().is<MapException>());
   for (std::string_view bytes : {std::string_view("\xff", 1), std::string_view("A\xff", 2),
       std::string_view("zzzz\xc3", 5), std::string_view("\xc3\xa9\xff", 3)}) {
-    auto optional = maybeEnumValue<KeyNames>(bytes);
+    auto optional = maybe_enum_value<KeyNames>(bytes);
     ASSERT_FALSE(optional);
     EXPECT_TRUE(optional.error().is<UnicodeException>());
-    auto required = enumValue<LogLevelNames>(bytes);
+    auto required = enum_value<LogLevelNames>(bytes);
     ASSERT_FALSE(required);
     EXPECT_TRUE(required.error().is<UnicodeException>());
   }
-  auto unknownKey = enumName<KeyNames>(static_cast<Key>(65535));
+  auto unknownKey = enum_name<KeyNames>(static_cast<Key>(65535));
   ASSERT_FALSE(unknownKey);
   EXPECT_TRUE(unknownKey.error().is<MapException>());
-  auto unnamedModifier = enumName<KeyModNames>(KeyMod::Scroll);
+  auto unnamedModifier = enum_name<KeyModNames>(KeyMod::Scroll);
   ASSERT_FALSE(unnamedModifier);
   EXPECT_TRUE(unnamedModifier.error().is<MapException>());
-  auto unnamedAxis = enumName<ControllerAxisNames>(ControllerAxis::Invalid);
+  auto unnamedAxis = enum_name<ControllerAxisNames>(ControllerAxis::Invalid);
   ASSERT_FALSE(unnamedAxis);
   EXPECT_TRUE(unnamedAxis.error().is<MapException>());
-  auto unknownLevel = enumValue<LogLevelNames>("warning");
+  auto unknownLevel = enum_value<LogLevelNames>("warning");
   ASSERT_FALSE(unknownLevel);
   EXPECT_TRUE(unknownLevel.error().is<MapException>());
 }

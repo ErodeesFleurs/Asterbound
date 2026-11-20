@@ -664,7 +664,7 @@ std::expected<void, StarException> GraphicsMenu::syncGui() {
   auto modeName = localConfig.getString("renderOutput");
   if (!modeName)
     return std::unexpected(std::move(modeName.error()));
-  auto mode = enumValue<RenderOutputModeNames>(*modeName);
+  auto mode = enum_value<RenderOutputModeNames>(*modeName);
   if (!mode)
     return std::unexpected(std::move(mode.error()));
   auto modeSlider = requireChild<SliderBarWidget>("renderOutputSlider");

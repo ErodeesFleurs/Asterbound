@@ -755,9 +755,9 @@ void ActorMovementController::uninit() {
 }
 
 std::expected<Json, StarException> ActorMovementController::storeState() const {
-  auto movingName = enumName<DirectionNames>(movingDirection());
+  auto movingName = enum_name<DirectionNames>(movingDirection());
   if (!movingName) return std::unexpected(std::move(movingName.error()));
-  auto facingName = enumName<DirectionNames>(m_facingDirection.get());
+  auto facingName = enum_name<DirectionNames>(m_facingDirection.get());
   if (!facingName) return std::unexpected(std::move(facingName.error()));
   return JsonObject{{"position", jsonFromVec2F(MovementController::position())},
                     {"velocity", jsonFromVec2F(velocity())},
@@ -772,11 +772,11 @@ std::expected<void, StarException> ActorMovementController::loadState(Json const
   if (!loaded) return std::unexpected(std::move(loaded.error()));
   auto movingName = state.getString("movingDirection");
   if (!movingName) return std::unexpected(std::move(movingName.error()));
-  auto movingDirection = enumValue<DirectionNames>(*movingName);
+  auto movingDirection = enum_value<DirectionNames>(*movingName);
   if (!movingDirection) return std::unexpected(std::move(movingDirection.error()));
   auto facingName = state.getString("facingDirection");
   if (!facingName) return std::unexpected(std::move(facingName.error()));
-  auto facingDirection = enumValue<DirectionNames>(*facingName);
+  auto facingDirection = enum_value<DirectionNames>(*facingName);
   if (!facingDirection) return std::unexpected(std::move(facingDirection.error()));
   auto crouchingValue = state.getBool("crouching");
   if (!crouchingValue) return std::unexpected(std::move(crouchingValue.error()));

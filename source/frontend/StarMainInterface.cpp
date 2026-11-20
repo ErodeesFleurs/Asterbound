@@ -810,7 +810,7 @@ std::expected<void, StarException> MainInterface::synchronizeUiSession() {
 
 std::expected<bool, StarException> MainInterface::paneIdAvailable(String const& id) {
   if (id.empty() || id == "$ui") return false;
-  return !enumValue<MainInterfacePanesNames>(id).has_value();
+  return !enum_value<MainInterfacePanesNames>(id).has_value();
 }
 
 std::expected<JsonArray, StarException> MainInterface::paneInputTargets() const {
@@ -868,7 +868,7 @@ std::expected<void, StarException> MainInterface::destroyPane(String const& id) 
 std::expected<std::shared_ptr<Pane>, StarException> MainInterface::findRegisteredPane(String const& id) {
   if (auto instance = m_paneInstances.find_ref(id))
     return std::shared_ptr<Pane>(instance->get().first);
-  auto type = enumValue<MainInterfacePanesNames>(id);
+  auto type = enum_value<MainInterfacePanesNames>(id);
   if (!type) return std::shared_ptr<Pane>{};
   auto pane = m_paneManager.maybeRegisteredPane(*type);
   if (!pane) return std::unexpected(std::move(pane.error()));
@@ -885,7 +885,7 @@ std::expected<void, StarException> MainInterface::displayRegisteredPane(String c
     }
     return m_paneManager.displayPane(layer, pane);
   }
-  auto type = enumValue<MainInterfacePanesNames>(id);
+  auto type = enum_value<MainInterfacePanesNames>(id);
   if (!type) {
     if (!m_uiController) return std::unexpected(std::move(type.error()));
     auto opened = recoverLuaScriptError(m_uiController->invoke<Json>("open", id));
@@ -898,7 +898,7 @@ std::expected<void, StarException> MainInterface::displayRegisteredPane(String c
 }
 
 std::expected<void, StarException> MainInterface::togglePane(String const& id) {
-  auto type = enumValue<MainInterfacePanesNames>(id);
+  auto type = enum_value<MainInterfacePanesNames>(id);
   if (type) {
     if (*type == MainInterfacePanes::CraftingPlain)
       return togglePlainCraftingWindow();

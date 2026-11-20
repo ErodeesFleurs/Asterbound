@@ -551,7 +551,7 @@ std::expected<void, StarException> Cinematic::render() {
           return std::unexpected(std::move(drawn.error()));
       }
       if (!panel->avatar.empty() && m_player) {
-        auto portraitMode = enumValue<PortraitModeNames>(panel->avatar);
+        auto portraitMode = enum_value<PortraitModeNames>(panel->avatar);
         if (!portraitMode)
           return std::unexpected(std::move(portraitMode.error()));
         auto portrait = m_player->portrait(*portraitMode);

@@ -150,7 +150,7 @@ enum class Key : std::uint16_t {
   F23,
   F24
 };
-inline constexpr auto KeyNames = sortedEnumNames(std::to_array<std::pair<Key, std::string_view>>({
+inline constexpr auto KeyNames = sorted_enum_names(std::to_array<std::pair<Key, std::string_view>>({
   {Key::Backspace, "Backspace"},
   {Key::Tab, "Tab"},
   {Key::Clear, "Clear"},
@@ -291,7 +291,7 @@ inline constexpr auto KeyNames = sortedEnumNames(std::to_array<std::pair<Key, st
   {Key::Menu, "Menu"},
   {Key::Power, "Power"}
 }));
-static_assert(validEnumNames<KeyNames>());
+static_assert(valid_enum_names<KeyNames>());
 
 enum class KeyMod : std::uint16_t {
   NoMod = 0x0000,
@@ -308,7 +308,7 @@ enum class KeyMod : std::uint16_t {
   AltGr = 0x4000,
   Scroll = 0x8000
 };
-inline constexpr auto KeyModNames = sortedEnumNames(std::to_array<std::pair<KeyMod, std::string_view>>({
+inline constexpr auto KeyModNames = sorted_enum_names(std::to_array<std::pair<KeyMod, std::string_view>>({
   {KeyMod::NoMod, "NoMod"},
   {KeyMod::LShift, "LShift"},
   {KeyMod::RShift, "RShift"},
@@ -322,7 +322,7 @@ inline constexpr auto KeyModNames = sortedEnumNames(std::to_array<std::pair<KeyM
   {KeyMod::Caps, "Caps"},
   {KeyMod::AltGr, "AltGr"}
 }));
-static_assert(validEnumNames<KeyModNames>());
+static_assert(valid_enum_names<KeyModNames>());
 
 KeyMod operator|(KeyMod a, KeyMod b);
 KeyMod operator&(KeyMod a, KeyMod b);
@@ -337,24 +337,24 @@ enum class MouseButton : std::uint8_t {
   FourthButton,
   FifthButton
 };
-inline constexpr auto MouseButtonNames = sortedEnumNames(std::to_array<std::pair<MouseButton, std::string_view>>({
+inline constexpr auto MouseButtonNames = sorted_enum_names(std::to_array<std::pair<MouseButton, std::string_view>>({
   {MouseButton::Left, "MouseLeft"},
   {MouseButton::Middle, "MouseMiddle"},
   {MouseButton::Right, "MouseRight"},
   {MouseButton::FourthButton, "MouseFourth"},
   {MouseButton::FifthButton, "MouseFifth"}
 }));
-static_assert(validEnumNames<MouseButtonNames>());
+static_assert(valid_enum_names<MouseButtonNames>());
 
 enum class MouseWheel : std::uint8_t {
   Up,
   Down
 };
-inline constexpr auto MouseWheelNames = sortedEnumNames(std::to_array<std::pair<MouseWheel, std::string_view>>({
+inline constexpr auto MouseWheelNames = sorted_enum_names(std::to_array<std::pair<MouseWheel, std::string_view>>({
   {MouseWheel::Up, "MouseWheelUp"},
   {MouseWheel::Down, "MouseWheelDown"}
 }));
-static_assert(validEnumNames<MouseWheelNames>());
+static_assert(valid_enum_names<MouseWheelNames>());
 
 using ControllerId = std::uint32_t;
 
@@ -367,7 +367,7 @@ enum class ControllerAxis : std::uint8_t {
   TriggerRight,
   Invalid = 255
 };
-inline constexpr auto ControllerAxisNames = sortedEnumNames(std::to_array<std::pair<ControllerAxis, std::string_view>>({
+inline constexpr auto ControllerAxisNames = sorted_enum_names(std::to_array<std::pair<ControllerAxis, std::string_view>>({
   {ControllerAxis::LeftX, "LeftX"},
   {ControllerAxis::LeftY, "LeftY"},
   {ControllerAxis::RightX, "RightX"},
@@ -375,7 +375,7 @@ inline constexpr auto ControllerAxisNames = sortedEnumNames(std::to_array<std::p
   {ControllerAxis::TriggerLeft, "TriggerLeft"},
   {ControllerAxis::TriggerRight, "TriggerRight"},
 }));
-static_assert(validEnumNames<ControllerAxisNames>());
+static_assert(valid_enum_names<ControllerAxisNames>());
 
 enum class ControllerButton : std::uint8_t {
   A,
@@ -401,7 +401,7 @@ enum class ControllerButton : std::uint8_t {
   Touchpad,
   Invalid = 255
 };
-inline constexpr auto ControllerButtonNames = sortedEnumNames(std::to_array<std::pair<ControllerButton, std::string_view>>({
+inline constexpr auto ControllerButtonNames = sorted_enum_names(std::to_array<std::pair<ControllerButton, std::string_view>>({
   {ControllerButton::A, "A"},
   {ControllerButton::B, "B"},
   {ControllerButton::X, "X"},
@@ -425,7 +425,7 @@ inline constexpr auto ControllerButtonNames = sortedEnumNames(std::to_array<std:
   {ControllerButton::Touchpad, "Touchpad"},
   {ControllerButton::Invalid, "Invalid"}
 }));
-static_assert(validEnumNames<ControllerButtonNames>());
+static_assert(valid_enum_names<ControllerButtonNames>());
 
 struct KeyDownEvent {
   Key key;

@@ -62,7 +62,7 @@ enum class MainInterfacePanes {
 };
 
 inline constexpr auto MainInterfacePanesNames =
-  sortedEnumNames(std::to_array<std::pair<MainInterfacePanes, std::string_view>>(
+  sorted_enum_names(std::to_array<std::pair<MainInterfacePanes, std::string_view>>(
     {{MainInterfacePanes::Inventory, "Inventory"},
      {MainInterfacePanes::Cockpit, "Cockpit"},
      {MainInterfacePanes::Tech, "Tech"},

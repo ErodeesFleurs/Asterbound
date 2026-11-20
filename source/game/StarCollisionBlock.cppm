@@ -63,14 +63,14 @@ extern CollisionSet const DefaultCollisionSet;
 // Defines what can be "blocks" e.g. for tile rendering: Block and Slippery
 extern CollisionSet const BlockCollisionSet;
 
-inline constexpr auto TileCollisionOverrideNames = sortedEnumNames(
+inline constexpr auto TileCollisionOverrideNames = sorted_enum_names(
   std::to_array<std::pair<TileCollisionOverride, std::string_view>>({{TileCollisionOverride::None, "None"},
                                                                      {TileCollisionOverride::Empty, "Empty"},
                                                                      {TileCollisionOverride::Platform, "Platform"},
                                                                      {TileCollisionOverride::Block, "Block"}}));
 
 inline constexpr auto CollisionKindNames =
-  sortedEnumNames(std::to_array<std::pair<CollisionKind, std::string_view>>({{CollisionKind::Null, "Null"},
+  sorted_enum_names(std::to_array<std::pair<CollisionKind, std::string_view>>({{CollisionKind::Null, "Null"},
                                                                              {CollisionKind::None, "None"},
                                                                              {CollisionKind::Platform, "Platform"},
                                                                              {CollisionKind::Dynamic, "Dynamic"},

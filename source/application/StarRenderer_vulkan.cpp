@@ -1233,8 +1233,8 @@ Result<void> VulkanRenderer::State::loadEffect(String const& name, Json const& d
     JSON_REQUIRE(sizeUniform, value.optString("textureSizeUniform"));
     JSON_REQUIRE(addressingName, value.getString("textureAddressing", "clamp"));
     JSON_REQUIRE(filteringName, value.getString("textureFiltering", "nearest"));
-    JSON_REQUIRE(addressing, enumValue<TextureAddressingNames>(*addressingName));
-    JSON_REQUIRE(filtering, enumValue<TextureFilteringNames>(*filteringName));
+    JSON_REQUIRE(addressing, enum_value<TextureAddressingNames>(*addressingName));
+    JSON_REQUIRE(filtering, enum_value<TextureFilteringNames>(*filteringName));
     if (!shaderIdentifier(*uniform) || !uniformNames.insert(*uniform).second)
       return std::unexpected(RendererException::format("Invalid or duplicate Vulkan texture uniform '{}'", *uniform));
     texture.uniform = *uniform; texture.binding = binding++;
@@ -1327,8 +1327,8 @@ Result<std::map<String, Framebuffer>> VulkanRenderer::State::createTargets(Json 
     auto sampleBits = static_cast<VkSampleCountFlagBits>(std::max<std::uint64_t>(*sampleCount, 1));
     JSON_REQUIRE(addressingName, value.getString("textureAddressing", "clamp"));
     JSON_REQUIRE(filteringName, value.getString("textureFiltering", "nearest"));
-    JSON_REQUIRE(addressing, enumValue<TextureAddressingNames>(*addressingName));
-    JSON_REQUIRE(filtering, enumValue<TextureFilteringNames>(*filteringName));
+    JSON_REQUIRE(addressing, enum_value<TextureAddressingNames>(*addressingName));
+    JSON_REQUIRE(filtering, enum_value<TextureFilteringNames>(*filteringName));
     for (unsigned i = 0; i < (framebuffer.doubleBuffered ? 2u : 1u); ++i) {
       auto target = makeTarget(dimensions, floating ? VK_FORMAT_R16G16B16A16_SFLOAT : VK_FORMAT_R8G8B8A8_UNORM, sampleBits, *addressing, *filtering, framebuffer.alpha);
       if (!target) return std::unexpected(std::move(target.error()));

@@ -231,7 +231,7 @@ identity.species = std::move(*checked14);
   {
 auto checked15 = config.getString("gender", "male");
 if (!checked15) return std::unexpected(std::move(checked15.error()));
-auto checked16 = enumValue<GenderNames>(*checked15);
+auto checked16 = enum_value<GenderNames>(*checked15);
 if (!checked16) return std::unexpected(std::move(checked16.error()));
 identity.gender = *checked16;
 }
@@ -342,7 +342,7 @@ identity.imagePath = std::move(*checked38);
 }
 
 std::expected<Json, StarException> HumanoidIdentity::toJson() const {
-  auto checked39 = enumName<GenderNames>(gender);
+  auto checked39 = enum_name<GenderNames>(gender);
   if (!checked39)
     return std::unexpected(std::move(checked39.error()));
   auto result = JsonObject{
@@ -732,7 +732,7 @@ std::expected<std::shared_ptr<Humanoid>, StarException> Humanoid::create(Root& r
 }
 
 std::expected<void, StarException> Humanoid::setIdentity(HumanoidIdentity const& identity) {
-  auto checked93 = enumName<GenderNames>(identity.gender);
+  auto checked93 = enum_name<GenderNames>(identity.gender);
   if (!checked93)
     return std::unexpected(std::move(checked93.error()));
   m_genderName = String(*checked93);
@@ -1313,7 +1313,7 @@ for (auto const& pair : std::move(*checked235)) {
       animations.set(anim.first, {std::move(*checked239), std::move(*checked241), std::move(*checked243)});
     }
   }
-  auto checked244 = enumValue<PortraitModeNames>(pair.first);
+  auto checked244 = enum_value<PortraitModeNames>(pair.first);
   if (!checked244)
     return std::unexpected(std::move(checked244.error()));
   m_portraitAnimationStates.set(*checked244, animations);
@@ -3198,7 +3198,7 @@ auto checked567 = assets->json("/humanoid/any/dummy.config:direction");
 if (!checked567) return std::unexpected(std::move(checked567.error()));
 auto checked551 = std::move(*checked567).toString();
 if (!checked551) return std::unexpected(std::move(checked551.error()));
-auto checked552 = enumValue<DirectionNames>(*checked551);
+auto checked552 = enum_value<DirectionNames>(*checked551);
 if (!checked552) return std::unexpected(std::move(checked552.error()));
 humanoid->setFacingDirection(*checked552);
 

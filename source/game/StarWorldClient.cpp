@@ -1215,7 +1215,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
           auto toolUser = as<ToolUserEntity>(entity);
           String image = "/rendering/sprites/error.png";
           if (toolUser) {
-            auto result65 = enumName<DirectionNames>(toolUser->facingDirection());
+            auto result65 = enum_name<DirectionNames>(toolUser->facingDirection());
             if (!result65)
               return std::unexpected(std::move(result65.error()));
             image = Star::format("/rendering/sprites/error_{}.png", *result65);

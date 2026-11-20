@@ -281,7 +281,7 @@ std::expected<bool, StarException> FireableItem::windup() const {
 
 std::expected<void, StarException> FireableItem::update(float dt, FireMode fireMode, bool shifting, HashSet<MoveControlType> const&) {
   if (m_scriptComponent) {
-    auto modeName = enumName<FireModeNames>(fireMode);
+    auto modeName = enum_name<FireModeNames>(fireMode);
     if (!modeName)
       return std::unexpected(std::move(modeName.error()));
     auto invoked = recoverLuaScriptError(m_scriptComponent->invoke("update", dt, *modeName, shifting));

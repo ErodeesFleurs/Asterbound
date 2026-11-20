@@ -108,7 +108,7 @@ namespace Tiled {
     auto configured = presentProperty<String>(properties, "tilesetDirection");
     if (!configured) return std::unexpected(std::move(configured.error()));
     if (*configured) {
-      auto parsed = enumValue<DirectionNames>(**configured);
+      auto parsed = enum_value<DirectionNames>(**configured);
       if (!parsed) return std::unexpected(std::move(parsed.error()));
       direction = *parsed;
     }
@@ -364,7 +364,7 @@ namespace Tiled {
       auto direction = properties.opt<String>("connectDirection");
       if (!direction) return std::unexpected(std::move(direction.error()));
       if (*direction) {
-        auto parsed = enumValue<DungeonDirectionNames>(**direction);
+        auto parsed = enum_value<DungeonDirectionNames>(**direction);
         if (!parsed) return std::unexpected(std::move(parsed.error()));
         configured.direction = *parsed;
       }

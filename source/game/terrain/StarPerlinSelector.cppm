@@ -42,7 +42,7 @@ std::expected<std::shared_ptr<PerlinSelector>, StarException> PerlinSelector::cr
   auto functionName = config.getString("function");
   if (!functionName)
     return std::unexpected(std::move(functionName.error()));
-  auto type = enumValue<PerlinTypeNames>(StringView(*functionName));
+  auto type = enum_value<PerlinTypeNames>(StringView(*functionName));
   if (!type)
     return std::unexpected(std::move(type.error()));
   auto octaves = config.getFloat("octaves");

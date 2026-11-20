@@ -76,7 +76,7 @@ std::expected<void, StarException> Item::initialize(Json config, String director
   auto rarity = instanceValue("rarity").and_then([](Json const& value) { return value.toString(); });
   if (!rarity)
     return std::unexpected(std::move(rarity.error()));
-  auto rarityValue = enumValue<RarityNames>(*rarity);
+  auto rarityValue = enum_value<RarityNames>(*rarity);
   if (!rarityValue)
     return std::unexpected(std::move(rarityValue.error()));
   m_rarity = *rarityValue;

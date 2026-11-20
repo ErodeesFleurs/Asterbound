@@ -127,7 +127,7 @@ std::expected<void, StarException> WorldPainter::initialize() {
   auto entries = directives->iterate_object();
   if (!entries) return std::unexpected(std::move(entries.error()));
   for (auto const& p : *entries) {
-    auto type = enumValue<EntityHighlightEffectTypeNames>(p.first);
+    auto type = enum_value<EntityHighlightEffectTypeNames>(p.first);
     if (!type) return std::unexpected(std::move(type.error()));
     auto underlay = p.second.getString("underlay", "");
     if (!underlay) return std::unexpected(std::move(underlay.error()));

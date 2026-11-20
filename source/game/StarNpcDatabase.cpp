@@ -491,7 +491,7 @@ if (!result83) return std::unexpected(std::move(result83.error()));
 variant.damageTeam = std::move(*result83);
   auto result84 = config.getString("damageTeamType", "enemy");
 if (!result84) return std::unexpected(std::move(result84.error()));
-auto damageTeamType = enumValue<TeamTypeNames>(*result84);
+auto damageTeamType = enum_value<TeamTypeNames>(*result84);
 if (!damageTeamType)
   return std::unexpected(std::move(damageTeamType.error()));
 variant.damageTeamType = *damageTeamType;
@@ -747,7 +747,7 @@ auto result154 = jsonFromMapV<StringMap<ItemDescriptor>>(variant.items, [&versio
       return descriptor.diskStore(*versioningDatabase);
     });
 if (!result154) return std::unexpected(std::move(result154.error()));
-auto damageTeamName = enumName<TeamTypeNames>(variant.damageTeamType);
+auto damageTeamName = enum_name<TeamTypeNames>(variant.damageTeamType);
 if (!damageTeamName)
   return std::unexpected(std::move(damageTeamName.error()));
 JsonObject store{{"species", variant.species},
@@ -921,7 +921,7 @@ if (!result199) return std::unexpected(std::move(result199.error()));
 variant.damageTeam = std::move(*result199);
   auto result200 = data.getString("damageTeamType");
 if (!result200) return std::unexpected(std::move(result200.error()));
-auto damageTeamType = enumValue<TeamTypeNames>(*result200);
+auto damageTeamType = enum_value<TeamTypeNames>(*result200);
 if (!damageTeamType)
   return std::unexpected(std::move(damageTeamType.error()));
 variant.damageTeamType = *damageTeamType;

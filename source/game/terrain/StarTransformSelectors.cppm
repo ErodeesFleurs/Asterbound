@@ -109,7 +109,7 @@ std::expected<std::shared_ptr<DisplacementSelector>, StarException> Displacement
     auto name = config.getString(key("Type"));
     if (!name)
       return std::unexpected(std::move(name.error()));
-    auto type = enumValue<PerlinTypeNames>(StringView(*name));
+    auto type = enum_value<PerlinTypeNames>(StringView(*name));
     if (!type)
       return std::unexpected(std::move(type.error()));
     auto octaves = config.getFloat(key("Octaves"));

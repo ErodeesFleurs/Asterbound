@@ -481,7 +481,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
 
   if (auto registered = callbacks.registerCallback("gender",
                                                    [&player]() -> std::expected<String, StarException> {
-                                                     auto value = enumName<GenderNames>(player.gender());
+                                                     auto value = enum_name<GenderNames>(player.gender());
                                                      if (!value)
                                                        return std::unexpected(std::move(value.error()));
                                                      return String(*value);
@@ -491,7 +491,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   if (auto registered =
         callbacks.registerCallback("setGender",
                                    [&player](String const& gender) -> std::expected<void, StarException> {
-                                     auto value = enumValue<GenderNames>(gender);
+                                     auto value = enum_value<GenderNames>(gender);
                                      if (!value)
                                        return std::unexpected(std::move(value.error()));
                                      return player.setGender(*value);
@@ -789,7 +789,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
         "setDamageTeam",
         [&player](String const& typeName,
                   std::optional<std::uint16_t> teamNumber) -> std::expected<void, StarException> {
-          auto type = enumValue<TeamTypeNames>(typeName);
+          auto type = enum_value<TeamTypeNames>(typeName);
           if (!type)
             return std::unexpected(std::move(type.error()));
           player.setTeam(EntityDamageTeam(*type, teamNumber.value_or(0)));

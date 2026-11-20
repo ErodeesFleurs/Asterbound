@@ -177,11 +177,11 @@ constexpr auto packet_type_names = std::to_array<std::pair<PacketType, std::stri
 }
 
 std::expected<std::string_view, StarException> packet_type_name(PacketType type) {
-  return enumName<packet_type_names>(type);
+  return enum_name<packet_type_names>(type);
 }
 
 std::expected<PacketType, StarException> packet_type_from_name(StringView name) {
-  return enumValue<packet_type_names>(name);
+  return enum_value<packet_type_names>(name);
 }
 
 extern std::expected<EnumMap<NetCompressionMode>, StarException> const NetCompressionModeNames = EnumMap<NetCompressionMode>::create({

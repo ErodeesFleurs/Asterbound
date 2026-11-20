@@ -179,7 +179,7 @@ namespace Dungeon {
         if (auto direction = tile.maybe("direction")) {
           auto text = direction->toString();
           if (!text) return std::unexpected(std::move(text.error()));
-          auto parsed = enumValue<DungeonDirectionNames>(*text);
+          auto parsed = enum_value<DungeonDirectionNames>(*text);
           if (!parsed) return std::unexpected(std::move(parsed.error()));
           connector.direction = *parsed;
         }

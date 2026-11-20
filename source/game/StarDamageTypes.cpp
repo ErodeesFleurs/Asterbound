@@ -17,7 +17,7 @@ std::expected<EntityDamageTeam, StarException> EntityDamageTeam::create(Json con
   auto name = json.getString("type");
   if (!name)
     return std::unexpected(std::move(name.error()));
-  auto type = enumValue<TeamTypeNames>(*name);
+  auto type = enum_value<TeamTypeNames>(*name);
   if (!type)
     return std::unexpected(std::move(type.error()));
   auto team = json.getUInt("team", 0);
@@ -27,7 +27,7 @@ std::expected<EntityDamageTeam, StarException> EntityDamageTeam::create(Json con
 }
 
 std::expected<Json, StarException> EntityDamageTeam::toJson() const {
-  auto name = enumName<TeamTypeNames>(type);
+  auto name = enum_name<TeamTypeNames>(type);
   if (!name)
     return std::unexpected(std::move(name.error()));
   return JsonObject{{"type", String(*name)}, {"team", team}};

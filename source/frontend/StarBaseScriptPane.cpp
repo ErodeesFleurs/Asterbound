@@ -233,7 +233,7 @@ std::expected<void, StarException> BaseScriptPane::tick(float dt) {
   }
   for (auto const& p : m_canvasKeyCallbacks) {
     for (auto const& keyEvent : p.first->pullKeyEvents()) {
-      auto keyName = enumName<KeyNames>(keyEvent.key);
+      auto keyName = enum_name<KeyNames>(keyEvent.key);
       if (!keyName)
         return std::unexpected(std::move(keyName.error()));
       // KeyNames borrows whole static string literals; Lua copies their bytes.
@@ -516,14 +516,14 @@ std::expected<Json, StarException> BaseScriptPane::inputJson(InputEvent const& e
   else if (auto up = std::get_if<MouseButtonUpEvent>(&event))
     result.set("physicalPosition", jsonFromVec2F(up->mousePosition));
   if (auto down = std::get_if<KeyDownEvent>(&event)) {
-    auto name = enumName<KeyNames>(down->key);
+    auto name = enum_name<KeyNames>(down->key);
     if (!name)
       return std::unexpected(std::move(name.error()));
     result.set("type", "keyDown");
     result.set("key", String(*name));
     result.set("mods", static_cast<int>(down->mods));
   } else if (auto up = std::get_if<KeyUpEvent>(&event)) {
-    auto name = enumName<KeyNames>(up->key);
+    auto name = enum_name<KeyNames>(up->key);
     if (!name)
       return std::unexpected(std::move(name.error()));
     result.set("type", "keyUp");
@@ -536,7 +536,7 @@ std::expected<Json, StarException> BaseScriptPane::inputJson(InputEvent const& e
   } else if (auto down = std::get_if<MouseButtonDownEvent>(&event)) {
     result.set("type", "buttonDown");
     result.set("button", static_cast<int>(down->mouseButton));
-    auto name = enumName<MouseButtonNames>(down->mouseButton);
+    auto name = enum_name<MouseButtonNames>(down->mouseButton);
     if (!name)
       return std::unexpected(std::move(name.error()));
     result.set("buttonName", String(*name));
@@ -549,7 +549,7 @@ std::expected<Json, StarException> BaseScriptPane::inputJson(InputEvent const& e
   } else {
     result.set("type", "controller");
     if (auto down = std::get_if<ControllerButtonDownEvent>(&event)) {
-      auto name = enumName<ControllerButtonNames>(down->controllerButton);
+      auto name = enum_name<ControllerButtonNames>(down->controllerButton);
       if (!name)
         return std::unexpected(std::move(name.error()));
       result.set("controllerButton", String(*name));

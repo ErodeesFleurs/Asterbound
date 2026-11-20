@@ -2353,7 +2353,7 @@ std::expected<TileDamageResult, StarException> WorldServer::damageTiles(List<Vec
 
             // if the tile is broken, send a message back to the source entity with position, layer, dungeonId, and whether the tile was harvested
             if (sourceEntity.has_value() && tile->get().foregroundDamage.dead()) {
-              auto result246 = enumName<TileLayerNames>(TileLayer::Foreground);
+              auto result246 = enum_name<TileLayerNames>(TileLayer::Foreground);
               if (!result246)
                 return std::unexpected(std::move(result246.error()));
               auto result247 = sendEntityMessage(*sourceEntity, "tileBroken",
@@ -2385,7 +2385,7 @@ std::expected<TileDamageResult, StarException> WorldServer::damageTiles(List<Vec
 
           // if the tile is broken, send a message back to the source entity with position and whether the tile was harvested
           if (sourceEntity.has_value() && tile->get().backgroundDamage.dead()) {
-            auto result250 = enumName<TileLayerNames>(TileLayer::Background);
+            auto result250 = enum_name<TileLayerNames>(TileLayer::Background);
             if (!result250)
               return std::unexpected(std::move(result250.error()));
             auto result251 = sendEntityMessage(*sourceEntity, "tileBroken",

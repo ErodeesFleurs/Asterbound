@@ -49,7 +49,7 @@ std::expected<ChatReceivedMessage, StarException> ChatReceivedMessage::create(Js
   if (!context) return std::unexpected(std::move(context.error()));
   auto modeName = context->getString("mode");
   if (!modeName) return std::unexpected(std::move(modeName.error()));
-  auto mode = enumValue<MessageContextModeNames>(*modeName);
+  auto mode = enum_value<MessageContextModeNames>(*modeName);
   if (!mode) return std::unexpected(std::move(mode.error()));
   auto channel = context->getString("channelName", "");
   if (!channel) return std::unexpected(std::move(channel.error()));
@@ -73,7 +73,7 @@ std::expected<ChatReceivedMessage, StarException> ChatReceivedMessage::create(Js
 }
 
 std::expected<Json, StarException> ChatReceivedMessage::toJson() const {
-  auto mode = enumName<MessageContextModeNames>(context.mode);
+  auto mode = enum_name<MessageContextModeNames>(context.mode);
   if (!mode) return std::unexpected(std::move(mode.error()));
   return Json(JsonObject{
     {"context",

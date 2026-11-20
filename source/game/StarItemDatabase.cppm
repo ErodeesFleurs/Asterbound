@@ -74,7 +74,7 @@ enum class ItemType {
   ActiveItem,
   AugmentItem
 };
-inline constexpr auto ItemTypeNames = sortedEnumNames(std::to_array<std::pair<ItemType, std::string_view>>({
+inline constexpr auto ItemTypeNames = sorted_enum_names(std::to_array<std::pair<ItemType, std::string_view>>({
   {ItemType::Generic, "generic"},
   {ItemType::LiquidItem, "liquid"},
   {ItemType::MaterialItem, "material"},

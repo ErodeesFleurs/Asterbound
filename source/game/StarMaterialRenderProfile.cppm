@@ -29,7 +29,7 @@ using MaterialRenderProfileException = StarError<MaterialRenderProfileExceptionT
 
 enum class MaterialJoinType : std::uint8_t { All, Any };
 inline constexpr auto MaterialJoinTypeNames =
-  sortedEnumNames(std::to_array<std::pair<MaterialJoinType, std::string_view>>(
+  sorted_enum_names(std::to_array<std::pair<MaterialJoinType, std::string_view>>(
     {{MaterialJoinType::All, "All"}, {MaterialJoinType::Any, "Any"}}));
 
 struct MaterialRule {

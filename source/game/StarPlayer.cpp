@@ -1462,7 +1462,7 @@ std::expected<void, StarException> Player::destroy(std::optional<std::reference_
       } else {
         Set<ItemType> types;
         for (auto const& name : drop_types.right_ref()) {
-          auto typeResult = enumValue<ItemTypeNames>(name);
+          auto typeResult = enum_value<ItemTypeNames>(name);
           if (!typeResult)
             return std::unexpected(std::move(typeResult.error()));
           auto const& type = *typeResult;

@@ -9,7 +9,7 @@ import star.game_types;
 namespace Star {
 
 enum DamageType : std::uint8_t { NoDamage, Damage, IgnoresDef, Knockback, Environment, Status };
-inline constexpr auto DamageTypeNames = sortedEnumNames(std::to_array<std::pair<DamageType, std::string_view>>({
+inline constexpr auto DamageTypeNames = sorted_enum_names(std::to_array<std::pair<DamageType, std::string_view>>({
   {DamageType::NoDamage, "NoDamage"},
   {DamageType::Damage, "Damage"},
   {DamageType::IgnoresDef, "IgnoresDef"},
@@ -19,7 +19,7 @@ inline constexpr auto DamageTypeNames = sortedEnumNames(std::to_array<std::pair<
 }));
 
 enum class HitType { Hit, StrongHit, WeakHit, ShieldHit, Kill };
-inline constexpr auto HitTypeNames = sortedEnumNames(std::to_array<std::pair<HitType, std::string_view>>({
+inline constexpr auto HitTypeNames = sorted_enum_names(std::to_array<std::pair<HitType, std::string_view>>({
   {HitType::Hit, "Hit"},
   {HitType::StrongHit, "StrongHit"},
   {HitType::WeakHit, "WeakHit"},
@@ -47,7 +47,7 @@ enum class TeamType : std::uint8_t {
   // cannot damage friendlies and cannot be damaged by anything
   Assistant
 };
-inline constexpr auto TeamTypeNames = sortedEnumNames(std::to_array<std::pair<TeamType, std::string_view>>({
+inline constexpr auto TeamTypeNames = sorted_enum_names(std::to_array<std::pair<TeamType, std::string_view>>({
   {TeamType::Null, "null"},
   {TeamType::Friendly, "friendly"},
   {TeamType::Enemy, "enemy"},

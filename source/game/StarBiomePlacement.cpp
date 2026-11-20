@@ -337,7 +337,7 @@ std::expected<BiomeItemDistribution, StarException> BiomeItemDistribution::creat
   RandomSource rand(seed);
   auto modeName = config.getString("mode", "floor");
   if (!modeName) return std::unexpected(std::move(modeName.error()));
-  auto mode = enumValue<BiomePlacementModeNames>(*modeName);
+  auto mode = enum_value<BiomePlacementModeNames>(*modeName);
   if (!mode) return std::unexpected(std::move(mode.error()));
   result.m_mode = *mode;
   {
@@ -362,7 +362,7 @@ std::expected<BiomeItemDistribution, StarException> BiomeItemDistribution::creat
   }
   auto typeName = settings->getString("type");
   if (!typeName) return std::unexpected(std::move(typeName.error()));
-  auto type = enumValue<DistributionTypeNames>(*typeName);
+  auto type = enum_value<DistributionTypeNames>(*typeName);
   if (!type) return std::unexpected(std::move(type.error()));
   result.m_distribution = *type;
   if (result.m_distribution == DistributionType::Random) {
@@ -423,12 +423,12 @@ std::expected<BiomeItemDistribution, StarException> BiomeItemDistribution::creat
   BiomeItemDistribution result;
   auto modeName = store.getString("mode");
   if (!modeName) return std::unexpected(std::move(modeName.error()));
-  auto mode = enumValue<BiomePlacementModeNames>(*modeName);
+  auto mode = enum_value<BiomePlacementModeNames>(*modeName);
   if (!mode) return std::unexpected(std::move(mode.error()));
   result.m_mode = *mode;
   auto distributionName = store.getString("distribution");
   if (!distributionName) return std::unexpected(std::move(distributionName.error()));
-  auto distribution = enumValue<DistributionTypeNames>(*distributionName);
+  auto distribution = enum_value<DistributionTypeNames>(*distributionName);
   if (!distribution) return std::unexpected(std::move(distribution.error()));
   result.m_distribution = *distribution;
   {
@@ -494,9 +494,9 @@ std::expected<BiomeItemDistribution, StarException> BiomeItemDistribution::creat
 }
 
 std::expected<Json, StarException> BiomeItemDistribution::toJson() const {
-  auto mode = enumName<BiomePlacementModeNames>(m_mode);
+  auto mode = enum_name<BiomePlacementModeNames>(m_mode);
   if (!mode) return std::unexpected(std::move(mode.error()));
-  auto distribution = enumName<DistributionTypeNames>(m_distribution);
+  auto distribution = enum_name<DistributionTypeNames>(m_distribution);
   if (!distribution) return std::unexpected(std::move(distribution.error()));
   JsonArray randomItems;
   for (auto const& item : m_randomItems) {

@@ -255,13 +255,13 @@ std::expected<void, StarException> Voice::loadJson(Json const& config, bool skip
   if (!channelModeName) return std::unexpected(std::move(channelModeName.error()));
   auto inputMode = m_inputMode;
   if (*inputModeName) {
-    auto parsed = enumValue<VoiceInputModeNames>(**inputModeName);
+    auto parsed = enum_value<VoiceInputModeNames>(**inputModeName);
     if (!parsed) return std::unexpected(std::move(parsed.error()));
     inputMode = *parsed;
   }
   auto channelMode = m_channelMode;
   if (*channelModeName) {
-    auto parsed = enumValue<VoiceChannelModeNames>(**channelModeName);
+    auto parsed = enum_value<VoiceChannelModeNames>(**channelModeName);
     if (!parsed) return std::unexpected(std::move(parsed.error()));
     channelMode = *parsed;
   }

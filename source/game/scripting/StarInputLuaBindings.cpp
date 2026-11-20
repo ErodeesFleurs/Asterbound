@@ -48,14 +48,14 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeInputCallbacks(Input
     return std::unexpected(std::move(registration.error()));
 
   if (auto registration = callbacks.registerCallback("keyDown", [&input](String const& keyName, std::optional<StringList> const& modNames) -> std::expected<std::optional<unsigned>, StarException> {
-    auto key = enumValue<KeyNames>(keyName);
+    auto key = enum_value<KeyNames>(keyName);
     if (!key)
       return std::unexpected(std::move(key.error()));
     std::optional<KeyMod> mod;
     if (modNames) {
       mod = KeyMod::NoMod;
       for (auto& modName : *modNames) {
-        auto modifier = enumValue<KeyModNames>(modName);
+        auto modifier = enum_value<KeyModNames>(modName);
         if (!modifier)
           return std::unexpected(std::move(modifier.error()));
         *mod |= *modifier;
@@ -65,7 +65,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeInputCallbacks(Input
   }); !registration)
     return std::unexpected(std::move(registration.error()));
   auto keyHeld = [&input](String const& keyName) -> std::expected<bool, StarException> {
-    auto key = enumValue<KeyNames>(keyName);
+    auto key = enum_value<KeyNames>(keyName);
     if (!key)
       return std::unexpected(std::move(key.error()));
     return input.keyHeld(*key);
@@ -75,7 +75,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeInputCallbacks(Input
   if (auto registration = callbacks.registerCallback("key",     keyHeld); !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.registerCallback("keyUp", [&input](String const& keyName) -> std::expected<std::optional<unsigned>, StarException> {
-    auto key = enumValue<KeyNames>(keyName);
+    auto key = enum_value<KeyNames>(keyName);
     if (!key)
       return std::unexpected(std::move(key.error()));
     return input.keyUp(*key);
@@ -83,7 +83,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeInputCallbacks(Input
     return std::unexpected(std::move(registration.error()));
 
   if (auto registration = callbacks.registerCallback("mouseDown", [&input](String const& buttonName) -> std::expected<std::optional<List<Vec2F>>, StarException> {
-    auto button = enumValue<MouseButtonNames>(buttonName);
+    auto button = enum_value<MouseButtonNames>(buttonName);
     if (!button)
       return std::unexpected(std::move(button.error()));
     return input.mouseDown(*button);
@@ -91,7 +91,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeInputCallbacks(Input
     return std::unexpected(std::move(registration.error()));
 
   auto mouseHeld = [&input](String const& buttonName) -> std::expected<bool, StarException> {
-    auto button = enumValue<MouseButtonNames>(buttonName);
+    auto button = enum_value<MouseButtonNames>(buttonName);
     if (!button)
       return std::unexpected(std::move(button.error()));
     return input.mouseHeld(*button);
@@ -101,7 +101,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeInputCallbacks(Input
   if (auto registration = callbacks.registerCallback("mouse",     mouseHeld); !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.registerCallback("mouseUp", [&input](String const& buttonName) -> std::expected<std::optional<List<Vec2F>>, StarException> {
-    auto button = enumValue<MouseButtonNames>(buttonName);
+    auto button = enum_value<MouseButtonNames>(buttonName);
     if (!button)
       return std::unexpected(std::move(button.error()));
     return input.mouseUp(*button);

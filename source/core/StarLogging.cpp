@@ -36,7 +36,7 @@ LogLevel LogSink::level() { return m_level; }
 
 std::expected<void, StarException> StdoutLogSink::log(std::string_view msg, LogLevel level) {
   std::lock_guard locker(m_logMutex);
-  auto name = enumName<LogLevelNames>(level);
+  auto name = enum_name<LogLevelNames>(level);
   if (!name)
     return std::unexpected(std::move(name.error()));
   return Star::print("[{}] {}\n", *name, msg);
@@ -66,7 +66,7 @@ std::expected<void, StarException> FileLogSink::log(std::string_view msg, LogLev
   auto timestamp = Time::localTime(std::chrono::system_clock::now());
   if (!timestamp)
     return std::unexpected(std::move(timestamp.error()));
-  auto name = enumName<LogLevelNames>(level);
+  auto name = enum_name<LogLevelNames>(level);
   if (!name)
     return std::unexpected(std::move(name.error()));
   auto line = Star::format("[{:%H:%M:%S}] [{}] {}\n", *timestamp, *name, msg);

@@ -30,7 +30,7 @@ enum class BoolSettingMode {
   FromSetting,
   Disabled
 };
-inline constexpr auto BoolSettingModeNames = sortedEnumNames(std::to_array<std::pair<BoolSettingMode, std::string_view>>({
+inline constexpr auto BoolSettingModeNames = sorted_enum_names(std::to_array<std::pair<BoolSettingMode, std::string_view>>({
   {BoolSettingMode::Enabled, "Enabled"},
   {BoolSettingMode::FromSetting, "FromSetting"},
   {BoolSettingMode::Disabled, "Disabled"}

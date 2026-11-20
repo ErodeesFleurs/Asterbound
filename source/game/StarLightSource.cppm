@@ -14,7 +14,7 @@ enum class LightType : std::uint8_t {
   PointAsSpread = 2 // Point with spread-like range
 };
 
-inline constexpr auto LightTypeNames = sortedEnumNames(std::to_array<std::pair<LightType, std::string_view>>(
+inline constexpr auto LightTypeNames = sorted_enum_names(std::to_array<std::pair<LightType, std::string_view>>(
   {{LightType::Spread, "Spread"}, {LightType::Point, "Point"}, {LightType::PointAsSpread, "PointAsSpread"}}));
 
 struct LightSource {

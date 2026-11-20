@@ -297,24 +297,24 @@ private:
     typename LeftMap::iterator position;
     InsertStatus status;
   };
-  template <InsertUse Use, typename L, typename R>
+  template <InsertUse use, typename L, typename R>
     requires std::same_as<std::remove_cvref_t<L>, Left> && std::same_as<std::remove_cvref_t<R>, Right>
   InsertResult insert_impl(L&& left, R&& right) {
     // The iterator overload must return the existing left node on a conflict.
     // Probe it before allocating a tentative right node that would be discarded.
-    if constexpr (Use == InsertUse::Position) {
+    if constexpr (use == InsertUse::Position) {
       auto existing = m_indices.left.find(left);
       if (existing != m_indices.left.end())
         return {existing, InsertStatus::LeftConflict};
     }
     auto [r, new_right] = m_indices.right.try_emplace(std::forward<R>(right));
     if (!new_right) {
-      if constexpr (Use == InsertUse::Checked) {
+      if constexpr (use == InsertUse::Checked) {
         auto l = m_indices.left.find(left);
         if (l != m_indices.left.end())
           return {l, InsertStatus::LeftConflict};
       }
-      if constexpr (Use == InsertUse::Position)
+      if constexpr (use == InsertUse::Position)
         return {m_indices.left.find(r->second->get()), InsertStatus::RightConflict};
       return {m_indices.left.end(), InsertStatus::RightConflict};
     }
@@ -392,43 +392,43 @@ concept fixed_name_table = std::ranges::random_access_range<Table const> && requ
   { names[0].second } -> std::convertible_to<std::string_view>;
 };
 
-template <ordered_name_key Enum, std::size_t N>
-consteval auto sortedEnumNames(std::array<std::pair<Enum, std::string_view>, N> names) {
+template <ordered_name_key Enum, std::size_t size>
+consteval auto sorted_enum_names(std::array<std::pair<Enum, std::string_view>, size> names) {
   std::sort(names.begin(), names.end(), [](auto const& a, auto const& b) { return a.first < b.first; });
   return names;
 }
 
-template <auto const& Names> requires fixed_name_table<std::remove_cvref_t<decltype(Names)>>
-consteval bool validEnumNames() {
-  for (std::size_t i = 0; i < Names.size(); ++i) {
-    for (unsigned char c : Names[i].second)
+template <auto const& names> requires fixed_name_table<std::remove_cvref_t<decltype(names)>>
+consteval bool valid_enum_names() {
+  for (std::size_t i = 0; i < names.size(); ++i) {
+    for (unsigned char c : names[i].second)
       if (c >= 0x80)
         return false;
-    if (i && !(Names[i - 1].first < Names[i].first))
+    if (i && !(names[i - 1].first < names[i].first))
       return false;
     for (std::size_t j = 0; j < i; ++j)
-      if (compare_enum_name_bytes(Names[i].second, Names[j].second) == 0)
+      if (compare_enum_name_bytes(names[i].second, names[j].second) == 0)
         return false;
   }
   return true;
 }
 
-template <auto const& Names> requires fixed_name_table<std::remove_cvref_t<decltype(Names)>>
-[[nodiscard]] std::expected<std::string_view, StarException> enumName(
-    typename std::remove_cvref_t<decltype(Names)>::value_type::first_type value) {
-  static_assert(validEnumNames<Names>(), "Fixed enum names must be unique ASCII spellings in enum order");
-  auto position = std::lower_bound(Names.begin(), Names.end(), value,
+template <auto const& names> requires fixed_name_table<std::remove_cvref_t<decltype(names)>>
+[[nodiscard]] std::expected<std::string_view, StarException> enum_name(
+    typename std::remove_cvref_t<decltype(names)>::value_type::first_type value) {
+  static_assert(valid_enum_names<names>(), "Fixed enum names must be unique ASCII spellings in enum order");
+  auto position = std::lower_bound(names.begin(), names.end(), value,
       [](auto const& pair, auto key) { return pair.first < key; });
-  if (position == Names.end() || value < position->first)
+  if (position == names.end() || value < position->first)
     return std::unexpected(map_diagnostic_error("Key '{}' not found in Map::get()",
-                                                "enumName: key not found while rendering its diagnostic", value));
+                                                "enum_name: key not found while rendering its diagnostic", value));
   return position->second;
 }
 
-template <auto const& Names> requires fixed_name_table<std::remove_cvref_t<decltype(Names)>>
-[[nodiscard]] auto maybeEnumValue(StringView name)
-    -> std::expected<std::optional<typename std::remove_cvref_t<decltype(Names)>::value_type::first_type>, StarException> {
-  static_assert(validEnumNames<Names>(), "Fixed enum names must be unique ASCII spellings in enum order");
+template <auto const& names> requires fixed_name_table<std::remove_cvref_t<decltype(names)>>
+[[nodiscard]] auto maybe_enum_value(StringView name)
+    -> std::expected<std::optional<typename std::remove_cvref_t<decltype(names)>::value_type::first_type>, StarException> {
+  static_assert(valid_enum_names<names>(), "Fixed enum names must be unique ASCII spellings in enum order");
   auto bytes = name.utf8();
   if (!std::ranges::all_of(bytes, [](unsigned char c) { return c < 0x80; })) {
     // String::to_lower only folds ASCII, so non-ASCII cannot match this table.
@@ -439,31 +439,31 @@ template <auto const& Names> requires fixed_name_table<std::remove_cvref_t<declt
     return std::nullopt;
   }
   static constexpr auto indices = [] {
-    std::array<std::size_t, Names.size()> result{};
+    std::array<std::size_t, names.size()> result{};
     for (std::size_t i = 0; i < result.size(); ++i)
       result[i] = i;
     std::sort(result.begin(), result.end(), [](auto a, auto b) {
-      return compare_enum_name_bytes(Names[a].second, Names[b].second) < 0;
+      return compare_enum_name_bytes(names[a].second, names[b].second) < 0;
     });
     return result;
   }();
   auto position = std::ranges::lower_bound(indices, bytes,
       [](std::string_view a, std::string_view b) { return compare_enum_name_bytes(a, b) < 0; },
-      [](std::size_t index) { return Names[index].second; });
-  if (position == indices.end() || compare_enum_name_bytes(Names[*position].second, bytes) != 0)
+      [](std::size_t index) { return names[index].second; });
+  if (position == indices.end() || compare_enum_name_bytes(names[*position].second, bytes) != 0)
     return std::nullopt;
-  return Names[*position].first;
+  return names[*position].first;
 }
 
-template <auto const& Names> requires fixed_name_table<std::remove_cvref_t<decltype(Names)>>
-[[nodiscard]] auto enumValue(StringView name)
-    -> std::expected<typename std::remove_cvref_t<decltype(Names)>::value_type::first_type, StarException> {
-  auto lookup = maybeEnumValue<Names>(name);
+template <auto const& names> requires fixed_name_table<std::remove_cvref_t<decltype(names)>>
+[[nodiscard]] auto enum_value(StringView name)
+    -> std::expected<typename std::remove_cvref_t<decltype(names)>::value_type::first_type, StarException> {
+  auto lookup = maybe_enum_value<names>(name);
   if (!lookup)
     return std::unexpected(std::move(lookup.error()));
   if (!*lookup)
     return std::unexpected(map_diagnostic_error("Key '{}' not found in Map::get()",
-                                                "enumValue: key not found while rendering its diagnostic", name));
+                                                "enum_value: key not found while rendering its diagnostic", name));
   return **lookup;
 }
 
@@ -693,9 +693,9 @@ export namespace Star {
   using ::Star::bimap_pair_range;
   using ::Star::BiHashMap;
   using ::Star::EnumMap;
-  using ::Star::sortedEnumNames;
-  using ::Star::validEnumNames;
-  using ::Star::enumName;
-  using ::Star::maybeEnumValue;
-  using ::Star::enumValue;
+  using ::Star::sorted_enum_names;
+  using ::Star::valid_enum_names;
+  using ::Star::enum_name;
+  using ::Star::maybe_enum_value;
+  using ::Star::enum_value;
 }

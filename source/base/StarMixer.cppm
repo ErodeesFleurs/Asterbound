@@ -28,7 +28,7 @@ enum class MixerGroup : std::uint8_t {
   Instruments
 };
 inline constexpr auto mixer_group_names =
-  sortedEnumNames(std::to_array<std::pair<MixerGroup, std::string_view>>({{MixerGroup::Effects, "Effects"},
+  sorted_enum_names(std::to_array<std::pair<MixerGroup, std::string_view>>({{MixerGroup::Effects, "Effects"},
                                                                           {MixerGroup::Music, "Music"},
                                                                           {MixerGroup::Cinematic, "Cinematic"},
                                                                           {MixerGroup::Instruments, "Instruments"}}));

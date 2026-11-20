@@ -49,7 +49,7 @@ std::expected<std::shared_ptr<DamageDatabase>, StarException> DamageDatabase::cr
       if (!particles)
         return std::unexpected(std::move(particles.error()));
       for (auto const& particle : *particles) {
-        auto hit = enumValue<HitTypeNames>(particle.first);
+        auto hit = enum_value<HitTypeNames>(particle.first);
         if (!hit)
           return std::unexpected(std::move(hit.error()));
         auto name = particle.second.toString();
@@ -107,7 +107,7 @@ std::expected<std::shared_ptr<DamageDatabase>, StarException> DamageDatabase::cr
             auto particles = hit.second.get("particles", JsonArray());
             if (!particles)
               return std::unexpected(std::move(particles.error()));
-            auto hitType = enumValue<HitTypeNames>(hit.first);
+            auto hitType = enum_value<HitTypeNames>(hit.first);
             if (!hitType)
               return std::unexpected(std::move(hitType.error()));
             materialEffects.set(*hitType, DamageEffect{std::move(*sounds), std::move(*particles)});

@@ -357,7 +357,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeChatCallbacks(MainIn
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     ChatSendMode mode = ChatSendMode::Broadcast;
     if (modeName) {
-      auto parsed = enumValue<ChatSendModeNames>(*modeName);
+      auto parsed = enum_value<ChatSendModeNames>(*modeName);
       if (!parsed) return std::unexpected(std::move(parsed.error()));
       mode = *parsed;
     }
@@ -382,7 +382,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeChatCallbacks(MainIn
       auto mode = config->optString("mode");
       if (!mode) return std::unexpected(std::move(mode.error()));
       if (*mode) {
-        auto parsed = enumValue<MessageContextModeNames>(**mode);
+        auto parsed = enum_value<MessageContextModeNames>(**mode);
         if (!parsed) return std::unexpected(std::move(parsed.error()));
         message.context.mode = *parsed;
       }

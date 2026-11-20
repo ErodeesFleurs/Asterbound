@@ -161,7 +161,7 @@ std::expected<LuaTable, StarException> LuaBindings::EntityCallbacks::damageTeam(
   if (!table)
     return std::unexpected(std::move(table.error()));
   auto team = entity.getTeam();
-  auto type = enumName<TeamTypeNames>(team.type);
+  auto type = enum_name<TeamTypeNames>(team.type);
   if (!type)
     return std::unexpected(std::move(type.error()));
   if (auto result = table->set("type", *type); !result)

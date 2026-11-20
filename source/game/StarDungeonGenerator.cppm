@@ -590,7 +590,7 @@ namespace Dungeon {
     Any = 5
   };
   inline constexpr auto DungeonDirectionNames =
-    sortedEnumNames(std::to_array<std::pair<Direction, std::string_view>>({{Direction::Left, "left"},
+    sorted_enum_names(std::to_array<std::pair<Direction, std::string_view>>({{Direction::Left, "left"},
                                                                            {Direction::Right, "right"},
                                                                            {Direction::Up, "up"},
                                                                            {Direction::Down, "down"},

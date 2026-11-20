@@ -1460,7 +1460,7 @@ std::expected<void, StarException> Object::readStoredData(Json const& diskStore)
   if (!directionResult)
     return std::unexpected(std::move(directionResult.error()));
   auto direction = std::move(*directionResult);
-  auto directionValueResult = enumValue<DirectionNames>(direction);
+  auto directionValueResult = enum_value<DirectionNames>(direction);
   if (!directionValueResult)
     return std::unexpected(std::move(directionValueResult.error()));
   auto directionValue = std::move(*directionValueResult);
@@ -1573,7 +1573,7 @@ std::expected<Json, StarException> Object::writeStoredData() const {
     outputNodes.push_back(JsonObject{{"connections", std::move(connections)}, {"state", in.state.get()}});
   }
 
-  auto direction = enumName<DirectionNames>(m_direction.get());
+  auto direction = enum_name<DirectionNames>(m_direction.get());
   if (!direction)
     return std::unexpected(std::move(direction.error()));
   auto storage = m_scriptComponent.getScriptStorage();

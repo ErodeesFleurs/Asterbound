@@ -1506,7 +1506,7 @@ auto result298 = callbacks.registerCallback("gender", [this]() -> std::expected<
   auto result296 = humanoid();
   if (!result296)
     return std::unexpected(std::move(result296.error()));
-  auto result297 = enumName<GenderNames>(std::move(*result296)->identity().gender);
+  auto result297 = enum_name<GenderNames>(std::move(*result296)->identity().gender);
   if (!result297)
     return std::unexpected(std::move(result297.error()));
   return String(*result297);
@@ -1746,7 +1746,7 @@ if (!result365) return std::unexpected(std::move(result365.error()));
 
 auto result368 =
   callbacks.registerCallback("setGender", [this](String const& gender) -> std::expected<void, StarException> {
-    auto result366 = enumValue<GenderNames>(gender);
+    auto result366 = enum_value<GenderNames>(gender);
     if (!result366)
       return std::unexpected(std::move(result366.error()));
     auto result367 = setGender(*result366);

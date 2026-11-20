@@ -81,7 +81,7 @@ std::expected<std::shared_ptr<CollectionDatabase>, StarException> CollectionData
       auto typeName = config->getString("type", "generic");
       if (!typeName)
         return std::unexpected(std::move(typeName.error()));
-      auto type = maybeEnumValue<CollectionTypeNames>(*typeName);
+      auto type = maybe_enum_value<CollectionTypeNames>(*typeName);
       if (!type)
         return std::unexpected(std::move(type.error()));
       if (!*type)

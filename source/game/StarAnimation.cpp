@@ -68,7 +68,7 @@ std::expected<void, StarException> Animation::initialize(Json config, String con
   auto modeName = config.getString("mode", "endAndDisappear");
   if (!modeName)
     return std::unexpected(std::move(modeName.error()));
-  auto mode = enumValue<AnimationModeNames>(*modeName);
+  auto mode = enum_value<AnimationModeNames>(*modeName);
   if (!mode)
     return std::unexpected(std::move(mode.error()));
   m_mode = *mode;

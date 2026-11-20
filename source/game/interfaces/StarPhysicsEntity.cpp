@@ -45,7 +45,7 @@ std::expected<PhysicsMovingCollision, StarException> PhysicsMovingCollision::fro
   auto kindName = json.getString("collisionKind", "block");
   if (!kindName)
     return std::unexpected(std::move(kindName.error()));
-  auto kind = enumValue<CollisionKindNames>(*kindName);
+  auto kind = enum_value<CollisionKindNames>(*kindName);
   if (!kind)
     return std::unexpected(std::move(kind.error()));
   pmc.collisionKind = *kind;

@@ -188,7 +188,7 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
     if (!autokeyField7Result1) return std::unexpected(std::move(autokeyField7Result1.error()));
     auto keyField7 = std::move((*autokeyField7Result1));
     auto objectDirection = blockKeyConfig.getString("objectDirection", "left").and_then([](String const& name) {
-      return enumValue<DirectionNames>(name);
+      return enum_value<DirectionNames>(name);
     });
     if (!objectDirection)
       return std::unexpected(std::move(objectDirection.error()));
@@ -394,7 +394,7 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Json const& 
     if (!autofield1Result1) return std::unexpected(std::move(autofield1Result1.error()));
     auto field1 = std::move((*autofield1Result1));
     auto direction =
-      v.getString("direction").and_then([](String const& name) { return enumValue<DirectionNames>(name); });
+      v.getString("direction").and_then([](String const& name) { return enum_value<DirectionNames>(name); });
     if (!direction)
       return std::unexpected(std::move(direction.error()));
     auto field2 = *direction;
@@ -564,7 +564,7 @@ std::expected<Json, StarException> WorldStructure::store() const {
   };
 
   auto objectToJson = [](Object const& o) -> std::expected<Json, StarException> {
-    auto direction = enumName<DirectionNames>(o.direction);
+    auto direction = enum_name<DirectionNames>(o.direction);
     if (!direction)
       return std::unexpected(std::move(direction.error()));
     return JsonObject{

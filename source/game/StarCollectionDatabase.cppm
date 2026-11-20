@@ -24,7 +24,7 @@ enum class CollectionType : std::uint16_t {
   Item,
   Monster
 };
-inline constexpr auto CollectionTypeNames = sortedEnumNames(std::to_array<std::pair<CollectionType, std::string_view>>(
+inline constexpr auto CollectionTypeNames = sorted_enum_names(std::to_array<std::pair<CollectionType, std::string_view>>(
   {{CollectionType::Generic, "generic"}, {CollectionType::Item, "item"}, {CollectionType::Monster, "monster"}}));
 
 struct Collectable {

@@ -18,7 +18,7 @@ std::expected<NodeParameterValue, StarException> nodeParameterValueFromJson(Json
   return NodeParameterValue(*value);
 }
 std::expected<Json, StarException> jsonFromNodeParameter(NodeParameter const& parameter) {
-  auto type = enumName<NodeParameterTypeNames>(parameter.first);
+  auto type = enum_name<NodeParameterTypeNames>(parameter.first);
   if (!type) return std::unexpected(std::move(type.error()));
   JsonObject result{{"type", *type}};
   if (std::holds_alternative<String>(parameter.second)) result["key"] = std::get<String>(parameter.second);
@@ -28,7 +28,7 @@ std::expected<Json, StarException> jsonFromNodeParameter(NodeParameter const& pa
 std::expected<NodeParameter, StarException> jsonToNodeParameter(Json const& json) {
   auto name = json.getString("type");
   if (!name) return std::unexpected(std::move(name.error()));
-  auto type = enumValue<NodeParameterTypeNames>(*name);
+  auto type = enum_value<NodeParameterTypeNames>(*name);
   if (!type) return std::unexpected(std::move(type.error()));
   auto key = json.optString("key");
   if (!key) return std::unexpected(std::move(key.error()));
@@ -39,7 +39,7 @@ std::expected<NodeParameter, StarException> jsonToNodeParameter(Json const& json
   return NodeParameter{*type, value->value_or(Json())};
 }
 std::expected<Json, StarException> jsonFromNodeOutput(NodeOutput const& output) {
-  auto type = enumName<NodeParameterTypeNames>(output.first);
+  auto type = enum_name<NodeParameterTypeNames>(output.first);
   if (!type) return std::unexpected(std::move(type.error()));
   return JsonObject{{"type", *type},
                     {"key", output.second.first ? Json(*output.second.first) : Json()},
@@ -48,7 +48,7 @@ std::expected<Json, StarException> jsonFromNodeOutput(NodeOutput const& output) 
 std::expected<NodeOutput, StarException> jsonToNodeOutput(Json const& json) {
   auto name = json.getString("type");
   if (!name) return std::unexpected(std::move(name.error()));
-  auto type = enumValue<NodeParameterTypeNames>(*name);
+  auto type = enum_value<NodeParameterTypeNames>(*name);
   if (!type) return std::unexpected(std::move(type.error()));
   auto keyJson = json.get("key");
   if (!keyJson) return std::unexpected(std::move(keyJson.error()));
@@ -233,7 +233,7 @@ std::expected<CompositeNode, StarException> BehaviorDatabase::compositeNode(Json
   }
   auto name = config.getString("name");
   if (!name) return std::unexpected(std::move(name.error()));
-  auto type = enumValue<CompositeTypeNames>(*name);
+  auto type = enum_value<CompositeTypeNames>(*name);
   if (!type) return std::unexpected(std::move(type.error()));
   switch (*type) {
   case CompositeType::Sequence: return CompositeNode(SequenceNode(std::move(children)));
@@ -270,7 +270,7 @@ std::expected<CompositeNode, StarException> BehaviorDatabase::compositeNode(Json
 std::expected<std::shared_ptr<BehaviorNode const>, StarException> BehaviorDatabase::behaviorNode(Json const& json, StringMap<NodeParameterValue> const& treeParameters, BehaviorTree& tree) const {
   auto typeName = json.getString("type");
   if (!typeName) return std::unexpected(std::move(typeName.error()));
-  auto type = enumValue<BehaviorNodeTypeNames>(*typeName);
+  auto type = enum_value<BehaviorNodeTypeNames>(*typeName);
   if (!type) return std::unexpected(std::move(type.error()));
   auto name = json.getString("name");
   if (!name) return std::unexpected(std::move(name.error()));

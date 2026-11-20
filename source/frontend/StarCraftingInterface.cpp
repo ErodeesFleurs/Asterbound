@@ -883,7 +883,7 @@ std::expected<void, StarException> CraftingPane::updateAvailableRecipes() {
           if (!rarityNames)
             return std::unexpected(std::move(rarityNames.error()));
           for (auto const& entry : std::move(*rarityNames)) {
-            auto rarity = enumValue<RarityNames>(entry);
+            auto rarity = enum_value<RarityNames>(entry);
             if (!rarity)
               return std::unexpected(std::move(rarity.error()));
             rarityFilter.add(*rarity);
@@ -1488,7 +1488,7 @@ std::expected<List<ItemRecipe>, StarException> CraftingPane::determineRecipes() 
           if (!rarityNames)
             return std::unexpected(std::move(rarityNames.error()));
           for (auto const& entry : std::move(*rarityNames)) {
-            auto rarity = enumValue<RarityNames>(entry);
+            auto rarity = enum_value<RarityNames>(entry);
             if (!rarity)
               return std::unexpected(std::move(rarity.error()));
             rarityFilter.add(*rarity);

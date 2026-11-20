@@ -1116,7 +1116,7 @@ std::expected<void, StarException> ItemDatabase::addBlueprints() {
           return std::unexpected(std::move(inventoryIcon.error()));
         config["inventoryIcon"] = std::move(*inventoryIcon);
       }
-      auto rarity = enumName<RarityNames>((*baseItem)->rarity());
+      auto rarity = enum_name<RarityNames>((*baseItem)->rarity());
       if (!rarity)
         return std::unexpected(std::move(rarity.error()));
       config["rarity"] = String(*rarity);

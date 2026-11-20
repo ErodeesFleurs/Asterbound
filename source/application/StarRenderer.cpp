@@ -52,7 +52,7 @@ std::expected<RenderOutputSettings, StarException> renderOutputSettingsFromJson(
   auto name = config.getString("renderOutput");
   if (!name)
     return std::unexpected(std::move(name.error()));
-  auto mode = enumValue<RenderOutputModeNames>(*name);
+  auto mode = enum_value<RenderOutputModeNames>(*name);
   if (!mode)
     return std::unexpected(RendererException("renderOutput must be legacy, sdr or hdr10"));
   auto exposure = config.getDouble("renderExposure");

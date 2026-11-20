@@ -21,13 +21,13 @@ enum class LogLevel {
   Warn,
   Error
 };
-inline constexpr auto LogLevelNames = sortedEnumNames(std::to_array<std::pair<LogLevel, std::string_view>>({
+inline constexpr auto LogLevelNames = sorted_enum_names(std::to_array<std::pair<LogLevel, std::string_view>>({
   {LogLevel::Debug, "Debug"},
   {LogLevel::Info, "Info"},
   {LogLevel::Warn, "Warn"},
   {LogLevel::Error, "Error"}
 }));
-static_assert(validEnumNames<LogLevelNames>());
+static_assert(valid_enum_names<LogLevelNames>());
 
 // A sink for Logger messages.
 class LogSink {

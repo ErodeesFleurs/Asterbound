@@ -16,7 +16,7 @@ enum class ChatSendMode : std::uint8_t {
   Party
 };
 
-inline constexpr auto ChatSendModeNames = sortedEnumNames(std::to_array<std::pair<ChatSendMode, std::string_view>>(
+inline constexpr auto ChatSendModeNames = sorted_enum_names(std::to_array<std::pair<ChatSendMode, std::string_view>>(
   {{ChatSendMode::Broadcast, "Broadcast"}, {ChatSendMode::Local, "Local"}, {ChatSendMode::Party, "Party"}}));
 
 struct MessageContext {
@@ -43,7 +43,7 @@ struct MessageContext {
 };
 
 inline constexpr auto MessageContextModeNames =
-  sortedEnumNames(std::to_array<std::pair<MessageContext::Mode, std::string_view>>(
+  sorted_enum_names(std::to_array<std::pair<MessageContext::Mode, std::string_view>>(
     {{MessageContext::Mode::Local, "Local"},
      {MessageContext::Mode::Party, "Party"},
      {MessageContext::Mode::Broadcast, "Broadcast"},

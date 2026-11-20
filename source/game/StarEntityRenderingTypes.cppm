@@ -108,7 +108,7 @@ enum class EntityHighlightEffectType {
   Inspected
 };
 inline constexpr auto EntityHighlightEffectTypeNames =
-  sortedEnumNames(std::to_array<std::pair<EntityHighlightEffectType, std::string_view>>(
+  sorted_enum_names(std::to_array<std::pair<EntityHighlightEffectType, std::string_view>>(
     {{EntityHighlightEffectType::None, "none"},
      {EntityHighlightEffectType::Interactive, "interactive"},
      {EntityHighlightEffectType::Inspectable, "inspectable"},

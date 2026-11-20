@@ -116,7 +116,7 @@ std::expected<TechConfig, StarException> TechDatabase::parseTech(Json const& con
     auto rarityName = config.getString("rarity");
     if (!rarityName)
       return std::unexpected(std::move(rarityName.error()));
-    auto rarity = maybeEnumValue<RarityNames>(*rarityName);
+    auto rarity = maybe_enum_value<RarityNames>(*rarityName);
     if (!rarity)
       return std::unexpected(std::move(rarity.error()));
     if (!*rarity)

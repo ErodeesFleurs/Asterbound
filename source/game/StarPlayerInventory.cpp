@@ -1374,7 +1374,7 @@ void PlayerInventory::setPlayer(std::optional<std::reference_wrapper<Player>> pl
   if (!database) return std::unexpected(std::move(database.error()));
   auto type = (*database)->itemType(items->name());
   if (!type) return std::unexpected(std::move(type.error()));
-  auto typeName = enumName<ItemTypeNames>(*type);
+  auto typeName = enum_name<ItemTypeNames>(*type);
   if (!typeName) return std::unexpected(std::move(typeName.error()));
   for (auto const& entry : {std::pair<String, bool>{"typeWhitelist", false}, {"typeBlacklist", true}}) {
     auto present = filterConfig.contains(entry.first);

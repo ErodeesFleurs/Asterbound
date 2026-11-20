@@ -268,7 +268,7 @@ std::expected<CharacterCreationResult, StarException> SpeciesDatabase::createHum
     result.identity.name = name;
     result.identity.species = species.species;
     result.identity.bodyDirectives = bodyColor + altColor;
-    auto selectedGender = enumValue<GenderNames>(gender.name);
+    auto selectedGender = enum_value<GenderNames>(gender.name);
     if (!selectedGender) return std::unexpected(std::move(selectedGender.error()));
     result.identity.gender = *selectedGender;
     result.identity.hairGroup = gender.hairGroup;

@@ -1673,7 +1673,7 @@ if (!result687) return std::unexpected(std::move(result687.error()));
 m_damageKind = std::move(*result687);
   auto result688 = m_parameters.getString("damageType", m_config->damageType);
 if (!result688) return std::unexpected(std::move(result688.error()));
-auto result689 = enumValue<DamageTypeNames>(*result688);
+auto result689 = enum_value<DamageTypeNames>(*result688);
 if (!result689) return std::unexpected(std::move(result689.error()));
 m_damageType = *result689;
 auto result690 = m_parameters.getBool("rayCheckToSource", m_config->rayCheckToSource);

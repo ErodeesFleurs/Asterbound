@@ -38,7 +38,7 @@ struct Particle {
     Text
   };
   inline static constexpr auto TypeNames =
-    sortedEnumNames(std::to_array<std::pair<Type, std::string_view>>({{Type::Variance, "variance"},
+    sorted_enum_names(std::to_array<std::pair<Type, std::string_view>>({{Type::Variance, "variance"},
                                                                       {Type::Ember, "ember"},
                                                                       {Type::Textured, "textured"},
                                                                       {Type::Animated, "animated"},
@@ -51,7 +51,7 @@ struct Particle {
     Fade,
     Shrink
   };
-  inline static constexpr auto DestructionActionNames = sortedEnumNames(
+  inline static constexpr auto DestructionActionNames = sorted_enum_names(
     std::to_array<std::pair<DestructionAction, std::string_view>>({{DestructionAction::None, "none"},
                                                                    {DestructionAction::Image, "image"},
                                                                    {DestructionAction::Fade, "fade"},
@@ -62,7 +62,7 @@ struct Particle {
     Middle,
     Front
   };
-  inline static constexpr auto LayerNames = sortedEnumNames(std::to_array<std::pair<Layer, std::string_view>>(
+  inline static constexpr auto LayerNames = sorted_enum_names(std::to_array<std::pair<Layer, std::string_view>>(
     {{Layer::Back, "back"}, {Layer::Middle, "middle"}, {Layer::Front, "front"}}));
 
   Particle();

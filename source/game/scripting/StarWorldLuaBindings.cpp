@@ -1399,7 +1399,7 @@ namespace LuaBindings {
             std::optional<std::uint64_t> knownRevision) -> std::expected<std::optional<LuaTable>, StarException> {
       auto entity = world.get<PortraitEntity>(id);
       if (!entity) return {};
-      auto mode = enumValue<PortraitModeNames>(modeName);
+      auto mode = enum_value<PortraitModeNames>(modeName);
       if (!mode) return std::unexpected(std::move(mode.error()));
       auto portrait = entity->portrait(*mode);
       if (!portrait) return std::unexpected(std::move(portrait.error()));
@@ -2075,7 +2075,7 @@ namespace LuaBindings {
     if (auto result = callbacks.registerCallback(
           "radialTileQuery",
           [&world](Vec2F center, float radius, String layerName) -> std::expected<List<Vec2I>, StarException> {
-            auto layerPointerResult = enumValue<TileLayerNames>(layerName);
+            auto layerPointerResult = enum_value<TileLayerNames>(layerName);
             if (!layerPointerResult)
               return std::unexpected(std::move(layerPointerResult.error()));
             auto layerPointer = std::move(*layerPointerResult);
@@ -3340,7 +3340,7 @@ namespace LuaBindings {
       gender = npc->gender();
     if (!gender)
       return {};
-    auto namePointerResult = enumName<GenderNames>(*gender);
+    auto namePointerResult = enum_name<GenderNames>(*gender);
     if (!namePointerResult)
       return std::unexpected(std::move(namePointerResult.error()));
     auto namePointer = std::move(*namePointerResult);
@@ -3417,7 +3417,7 @@ namespace LuaBindings {
   std::expected<std::optional<List<Drawable>>, StarException>
   WorldEntityCallbacks::entityPortrait(World& world, EntityId entityId, String const& portraitMode) {
     if (auto entity = as<PortraitEntity>(world.entity(entityId))) {
-      auto modePointerResult = enumValue<PortraitModeNames>(portraitMode);
+      auto modePointerResult = enum_value<PortraitModeNames>(portraitMode);
       if (!modePointerResult)
         return std::unexpected(std::move(modePointerResult.error()));
       auto modePointer = std::move(*modePointerResult);

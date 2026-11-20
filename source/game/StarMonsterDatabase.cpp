@@ -806,7 +806,7 @@ if (!result132) return std::unexpected(std::move(result132.error()));
 variant.persistent = std::move(*result132);
   auto result133 = variant.parameters.getString("damageTeamType", "enemy");
 if (!result133) return std::unexpected(std::move(result133.error()));
-auto damageTeamType = enumValue<TeamTypeNames>(*result133);
+auto damageTeamType = enum_value<TeamTypeNames>(*result133);
 if (!damageTeamType)
   return std::unexpected(std::move(damageTeamType.error()));
 variant.damageTeamType = *damageTeamType;

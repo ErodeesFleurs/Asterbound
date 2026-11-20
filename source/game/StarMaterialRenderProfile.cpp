@@ -118,7 +118,7 @@ std::expected<MaterialRenderMatchList, StarException> parseMaterialRenderMatchLi
     auto layer = config.optString("requiredLayer");
     if (!layer) return std::unexpected(std::move(layer.error()));
     if (*layer) {
-      auto value = enumValue<TileLayerNames>(**layer);
+      auto value = enum_value<TileLayerNames>(**layer);
       if (!value) return std::unexpected(std::move(value.error()));
       match->requiredLayer = *value;
     }
@@ -219,7 +219,7 @@ std::expected<MaterialRenderProfile, StarException> parseMaterialRenderProfile(I
     auto rule = std::make_shared<MaterialRule>();
     auto joinName = pair.second.getString("join", "all");
     if (!joinName) return std::unexpected(std::move(joinName.error()));
-    auto join = enumValue<MaterialJoinTypeNames>(*joinName);
+    auto join = enum_value<MaterialJoinTypeNames>(*joinName);
     if (!join) return std::unexpected(std::move(join.error()));
     rule->join = *join;
     auto entries = pair.second.getArray("entries", {});

@@ -31,7 +31,7 @@ enum class TextureAddressing {
   Clamp,
   Wrap
 };
-inline constexpr auto TextureAddressingNames = sortedEnumNames(std::to_array<std::pair<TextureAddressing, std::string_view>>({
+inline constexpr auto TextureAddressingNames = sorted_enum_names(std::to_array<std::pair<TextureAddressing, std::string_view>>({
   {TextureAddressing::Clamp, "Clamp"},
   {TextureAddressing::Wrap, "Wrap"}
 }));
@@ -40,7 +40,7 @@ enum class TextureFiltering {
   Nearest,
   Linear
 };
-inline constexpr auto TextureFilteringNames = sortedEnumNames(std::to_array<std::pair<TextureFiltering, std::string_view>>({
+inline constexpr auto TextureFilteringNames = sorted_enum_names(std::to_array<std::pair<TextureFiltering, std::string_view>>({
   {TextureFiltering::Nearest, "Nearest"},
   {TextureFiltering::Linear, "Linear"}
 }));
@@ -163,7 +163,7 @@ enum class RenderOutputMode {
   Sdr,
   Hdr10
 };
-inline constexpr auto RenderOutputModeNames = sortedEnumNames(std::to_array<std::pair<RenderOutputMode, std::string_view>>({
+inline constexpr auto RenderOutputModeNames = sorted_enum_names(std::to_array<std::pair<RenderOutputMode, std::string_view>>({
   {RenderOutputMode::Legacy, "legacy"},
   {RenderOutputMode::Sdr, "sdr"},
   {RenderOutputMode::Hdr10, "hdr10"}

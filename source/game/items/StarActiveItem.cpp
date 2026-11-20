@@ -329,7 +329,7 @@ std::expected<void, StarException> ActiveItem::uninit() {
 std::expected<void, StarException> ActiveItem::update(float dt, FireMode fireMode, bool shifting, HashSet<MoveControlType> const& moves) {
   StringMap<bool> moveMap;
   for (auto move : moves) {
-    auto name = enumName<MoveControlTypeNames>(move);
+    auto name = enum_name<MoveControlTypeNames>(move);
     if (!name)
       return std::unexpected(std::move(name.error()));
     moveMap[String(*name)] = true;
@@ -338,7 +338,7 @@ std::expected<void, StarException> ActiveItem::update(float dt, FireMode fireMod
   if (!mode)
     return std::unexpected(std::move(mode.error()));
   if (*mode == EntityMode::Master) {
-    auto fireModeName = enumName<FireModeNames>(fireMode);
+    auto fireModeName = enum_name<FireModeNames>(fireMode);
     if (!fireModeName)
       return std::unexpected(std::move(fireModeName.error()));
     if (fireMode != m_currentFireMode) {
@@ -687,7 +687,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
   if (auto added = callbacks.registerCallback(
         "fireMode",
         [this]() -> std::expected<String, StarException> {
-          return enumName<FireModeNames>(m_currentFireMode).transform([](std::string_view name) {
+          return enum_name<FireModeNames>(m_currentFireMode).transform([](std::string_view name) {
             return String(name);
           });
         });
@@ -697,7 +697,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       auto itemHand = hand();
       if (!itemHand)
         return std::unexpected(std::move(itemHand.error()));
-      return enumName<ToolHandNames>(*itemHand).transform([](std::string_view name) { return String(name); });
+      return enum_name<ToolHandNames>(*itemHand).transform([](std::string_view name) { return String(name); });
     }); !added)
     return std::unexpected(std::move(added.error()));
   if (auto added = callbacks.registerCallback("handPosition", [this](std::optional<Vec2F> offset) {

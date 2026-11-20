@@ -65,7 +65,7 @@ std::expected<Particle, StarException> Particle::create(Root& root, Json const& 
   auto typeName = config.getString("type", "variance");
   if (!typeName)
     return std::unexpected(std::move(typeName.error()));
-  auto type = enumValue<TypeNames>(*typeName);
+  auto type = enum_value<TypeNames>(*typeName);
   if (!type)
     return std::unexpected(std::move(type.error()));
   particle.type = *type;
@@ -188,7 +188,7 @@ std::expected<Particle, StarException> Particle::create(Root& root, Json const& 
   auto actionName = config.getString("destructionAction", "None");
   if (!actionName)
     return std::unexpected(std::move(actionName.error()));
-  auto action = enumValue<DestructionActionNames>(*actionName);
+  auto action = enum_value<DestructionActionNames>(*actionName);
   if (!action)
     return std::unexpected(std::move(action.error()));
   particle.destructionAction = *action;
@@ -209,7 +209,7 @@ std::expected<Particle, StarException> Particle::create(Root& root, Json const& 
   auto layerName = config.getString("layer", "middle");
   if (!layerName)
     return std::unexpected(std::move(layerName.error()));
-  auto layer = enumValue<LayerNames>(*layerName);
+  auto layer = enum_value<LayerNames>(*layerName);
   if (!layer)
     return std::unexpected(std::move(layer.error()));
   particle.layer = *layer;
@@ -312,13 +312,13 @@ Particle& Particle::operator=(Particle&& other) {
 }
 
 std::expected<Json, StarException> Particle::toJson() const {
-  auto typeName = enumName<TypeNames>(type);
+  auto typeName = enum_name<TypeNames>(type);
   if (!typeName)
     return std::unexpected(std::move(typeName.error()));
-  auto actionName = enumName<DestructionActionNames>(destructionAction);
+  auto actionName = enum_name<DestructionActionNames>(destructionAction);
   if (!actionName)
     return std::unexpected(std::move(actionName.error()));
-  auto layerName = enumName<LayerNames>(layer);
+  auto layerName = enum_name<LayerNames>(layer);
   if (!layerName)
     return std::unexpected(std::move(layerName.error()));
   return JsonObject{{"type", *typeName},

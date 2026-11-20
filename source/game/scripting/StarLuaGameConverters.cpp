@@ -91,14 +91,14 @@ template <typename Key, typename Value, typename... Rest>
 }
 
 template <typename Enum>
-[[nodiscard]] std::expected<std::reference_wrapper<String const>, StarException> enumName(std::expected<EnumMap<Enum>, StarException> const& names, Enum value) {
+[[nodiscard]] std::expected<std::reference_wrapper<String const>, StarException> enum_name(std::expected<EnumMap<Enum>, StarException> const& names, Enum value) {
   if (!names)
     return std::unexpected(names.error());
   return names->get_right(value);
 }
 
 template <typename Enum>
-[[nodiscard]] std::expected<std::optional<Enum>, StarException> enumValue(std::expected<EnumMap<Enum>, StarException> const& names, String const& value) {
+[[nodiscard]] std::expected<std::optional<Enum>, StarException> enum_value(std::expected<EnumMap<Enum>, StarException> const& names, String const& value) {
   if (!names)
     return std::unexpected(names.error());
   return names->maybe_left(value);
@@ -109,7 +109,7 @@ template <typename Enum>
 
 std::expected<void, StarException> LuaConverter<InventorySlot>::from(LuaStack stack, InventorySlot k) {
   if (std::holds_alternative<EquipmentSlot>(k)) {
-    auto name = enumName(EquipmentSlotNames, std::get<EquipmentSlot>(k));
+    auto name = enum_name(EquipmentSlotNames, std::get<EquipmentSlot>(k));
     if (!name)
       return std::unexpected(std::move(name.error()));
     return stack.push(name->get());
@@ -137,7 +137,7 @@ std::expected<std::optional<InventorySlot>, StarException> LuaConverter<Inventor
       return std::unexpected(std::move(trash.error()));
     if (*trash)
       return InventorySlot(TrashSlot());
-    auto equipment = enumValue(EquipmentSlotNames, string);
+    auto equipment = enum_value(EquipmentSlotNames, string);
     if (!equipment)
       return std::unexpected(std::move(equipment.error()));
     if (*equipment)
@@ -156,7 +156,7 @@ std::expected<std::optional<InventorySlot>, StarException> LuaConverter<Inventor
 }
 
 std::expected<void, StarException> LuaConverter<CollisionKind>::from(LuaStack stack, CollisionKind k) {
-  auto name = Star::enumName<CollisionKindNames>(k);
+  auto name = Star::enum_name<CollisionKindNames>(k);
   if (!name)
     return std::unexpected(std::move(name.error()));
   return stack.push(*name);
@@ -165,7 +165,7 @@ std::expected<void, StarException> LuaConverter<CollisionKind>::from(LuaStack st
 std::expected<std::optional<CollisionKind>, StarException> LuaConverter<CollisionKind>::to(LuaStackValue v) {
   if (v.is<LuaString>()) {
     auto name = v.toString();
-    return maybeEnumValue<CollisionKindNames>(name);
+    return maybe_enum_value<CollisionKindNames>(name);
   }
   return std::nullopt;
 }
@@ -499,10 +499,10 @@ LuaConverter<EphemeralStatusEffect>::to(LuaStackValue v) {
 }
 
 std::expected<void, StarException> LuaConverter<DamageRequest>::from(LuaStack stack, DamageRequest const& v) {
-  auto hitType = enumName<HitTypeNames>(v.hitType);
+  auto hitType = enum_name<HitTypeNames>(v.hitType);
   if (!hitType)
     return std::unexpected(std::move(hitType.error()));
-  auto damageType = enumName<DamageTypeNames>(v.damageType);
+  auto damageType = enum_name<DamageTypeNames>(v.damageType);
   if (!damageType)
     return std::unexpected(std::move(damageType.error()));
   return makeTable(stack, "hitType", *hitType, "damageType", *damageType, "damage", v.damage, "knockbackMomentum",
@@ -527,7 +527,7 @@ std::expected<std::optional<DamageRequest>, StarException> LuaConverter<DamageRe
   if (!*read)
     return std::nullopt;
   if (hitType) {
-    auto converted = maybeEnumValue<HitTypeNames>(*hitType);
+    auto converted = maybe_enum_value<HitTypeNames>(*hitType);
     if (!converted)
       return std::unexpected(std::move(converted.error()));
     if (!*converted)
@@ -535,7 +535,7 @@ std::expected<std::optional<DamageRequest>, StarException> LuaConverter<DamageRe
     result.hitType = **converted;
   }
   if (damageType) {
-    auto converted = maybeEnumValue<DamageTypeNames>(*damageType);
+    auto converted = maybe_enum_value<DamageTypeNames>(*damageType);
     if (!converted)
       return std::unexpected(std::move(converted.error()));
     if (!*converted)
@@ -554,7 +554,7 @@ std::expected<std::optional<DamageRequest>, StarException> LuaConverter<DamageRe
 }
 
 std::expected<void, StarException> LuaConverter<DamageNotification>::from(LuaStack stack, DamageNotification const& v) {
-  auto hitType = enumName<HitTypeNames>(v.hitType);
+  auto hitType = enum_name<HitTypeNames>(v.hitType);
   if (!hitType)
     return std::unexpected(std::move(hitType.error()));
   return makeTable(stack, "sourceEntityId", v.sourceEntityId, "targetEntityId", v.targetEntityId, "position",
@@ -576,7 +576,7 @@ std::expected<std::optional<DamageNotification>, StarException> LuaConverter<Dam
     return std::unexpected(std::move(read.error()));
   if (!*read)
     return std::nullopt;
-  auto converted = maybeEnumValue<HitTypeNames>(hitType);
+  auto converted = maybe_enum_value<HitTypeNames>(hitType);
   if (!converted)
     return std::unexpected(std::move(converted.error()));
   if (!*converted)
@@ -738,7 +738,7 @@ std::expected<std::optional<Drawable>, StarException> LuaConverter<Drawable>::to
 }
 
 std::expected<void, StarException> LuaConverter<Collection>::from(LuaStack stack, Collection const& c) {
-  auto type = Star::enumName<CollectionTypeNames>(c.type);
+  auto type = Star::enum_name<CollectionTypeNames>(c.type);
   if (!type)
     return std::unexpected(std::move(type.error()));
   return makeTable(stack, "name", c.name, "type", *type, "title", c.title);
@@ -754,7 +754,7 @@ std::expected<std::optional<Collection>, StarException> LuaConverter<Collection>
     return std::unexpected(std::move(read.error()));
   if (!*read)
     return std::nullopt;
-  auto converted = maybeEnumValue<CollectionTypeNames>(type);
+  auto converted = maybe_enum_value<CollectionTypeNames>(type);
   if (!converted)
     return std::unexpected(std::move(converted.error()));
   if (!*converted)
@@ -875,7 +875,7 @@ std::expected<LuaMethods<std::weak_ptr<Blackboard>>, StarException> LuaUserDataM
     "get",
     [get](std::weak_ptr<Blackboard> const& board, String const& type,
           String const& key) -> std::expected<LuaValue, StarException> {
-      auto converted = Star::enumValue<NodeParameterTypeNames>(type);
+      auto converted = Star::enum_value<NodeParameterTypeNames>(type);
       if (!converted)
         return std::unexpected(std::move(converted.error()));
       return get(board, *converted, key);
@@ -887,7 +887,7 @@ std::expected<LuaMethods<std::weak_ptr<Blackboard>>, StarException> LuaUserDataM
       "set",
       [set](std::weak_ptr<Blackboard> const& board, String const& type, String const& key,
             LuaValue const& value) -> std::expected<void, StarException> {
-        auto converted = Star::enumValue<NodeParameterTypeNames>(type);
+        auto converted = Star::enum_value<NodeParameterTypeNames>(type);
         if (!converted)
           return std::unexpected(std::move(converted.error()));
         return set(board, *converted, key, value);
@@ -984,7 +984,7 @@ LuaUserDataMethods<std::shared_ptr<AudioInstance>>::make() {
     return std::unexpected(std::move(seek_time.error()));
   auto mixer_group = methods.registerMethod(
     "mixerGroup", [](std::shared_ptr<AudioInstance> const& audio) -> std::expected<String, StarException> {
-      return enumName<mixer_group_names>(audio->mixer_group()).transform([](std::string_view name) {
+      return enum_name<mixer_group_names>(audio->mixer_group()).transform([](std::string_view name) {
         return String(name);
       });
     });
@@ -993,7 +993,7 @@ LuaUserDataMethods<std::shared_ptr<AudioInstance>>::make() {
   auto set_mixer_group = methods.registerMethod(
     "setMixerGroup",
     [](std::shared_ptr<AudioInstance> const& audio, String const& group) -> std::expected<void, StarException> {
-      auto converted = enumValue<mixer_group_names>(group);
+      auto converted = enum_value<mixer_group_names>(group);
       if (!converted)
         return std::unexpected(std::move(converted.error()));
       audio->set_mixer_group(*converted);

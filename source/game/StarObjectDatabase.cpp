@@ -569,7 +569,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
       if (!directionResult)
         return std::unexpected(std::move(directionResult.error()));
       auto direction = std::move(*directionResult);
-      auto affinityResult = enumValue<DirectionNames>(direction);
+      auto affinityResult = enum_value<DirectionNames>(direction);
       if (!affinityResult)
         return std::unexpected(std::move(affinityResult.error()));
       orientation->directionAffinity = *affinityResult;
@@ -938,7 +938,7 @@ std::expected<void, StarException> readObjectDamageTeam(Json const& config, Enti
     return std::unexpected(std::move(damageTeam.error()));
   auto type = damageTeam->getString("type", "environment")
                 .and_then([](String const& name) -> std::expected<TeamType, StarException> {
-                  return enumValue<TeamTypeNames>(name);
+                  return enum_value<TeamTypeNames>(name);
                 });
   if (!type)
     return std::unexpected(std::move(type.error()));
@@ -979,7 +979,7 @@ std::expected<void, StarException> readObjectLighting(Root& root, Json const& co
   if (!type)
     return std::unexpected(std::move(type.error()));
   if (*type) {
-    auto namedType = enumValue<LightTypeNames>(**type);
+    auto namedType = enum_value<LightTypeNames>(**type);
     if (!namedType)
       return std::unexpected(std::move(namedType.error()));
     object.lightType = *namedType;

@@ -1104,7 +1104,7 @@ using Star::String;
 // Fixture construction and semantic validation precede the State iteration
 // range, so Google Benchmark excludes them from timing. Only the explicitly
 // named ConstructDestroy case times table construction and destruction.
-constexpr auto FixedPerlinNames = Star::sortedEnumNames(std::array{
+constexpr auto FixedPerlinNames = Star::sorted_enum_names(std::array{
     std::pair{PerlinType::Uninitialized, std::string_view("uninitialized")},
     std::pair{PerlinType::Perlin, std::string_view("perlin")},
     std::pair{PerlinType::Billow, std::string_view("billow")},
@@ -1118,8 +1118,8 @@ auto makePerlinMap() {
   return EnumMap<PerlinType>::from(entries);
 }
 
-// A borrowed optional array access candidate, not a replacement enumName API:
-// enumName is checked and constructs a diagnostic on a missing enum value.
+// A borrowed optional array access candidate, not a replacement enum_name API:
+// enum_name is checked and constructs a diagnostic on a missing enum value.
 std::optional<std::string_view> arrayPerlinName(PerlinType value) {
   auto found = std::lower_bound(FixedPerlinNames.begin(), FixedPerlinNames.end(), value,
       [](auto const& pair, auto key) { return pair.first < key; });
@@ -1149,7 +1149,7 @@ bool validatePerlin(benchmark::State& state, EnumMap<PerlinType> const& dynamic,
   for (auto const& [value, spelling] : FixedPerlinNames) {
     auto dynamicOptional = dynamic.maybe_right(value);
     auto dynamicChecked = dynamic.get_right(value);
-    auto fixedChecked = Star::enumName<FixedPerlinNames>(value);
+    auto fixedChecked = Star::enum_name<FixedPerlinNames>(value);
     auto fixedOptional = arrayPerlinName(value);
     if (!dynamicOptional || !dynamicChecked || !fixedChecked || !fixedOptional
         || dynamicOptional->utf8() != spelling || dynamicChecked->get().utf8() != spelling
@@ -1166,7 +1166,7 @@ bool validatePerlin(benchmark::State& state, EnumMap<PerlinType> const& dynamic,
   }
   for (std::size_t i = 0; i < queries.reverseHits.size(); ++i) {
     auto dynamicValue = dynamic.maybe_left(queries.reverseHits[i]);
-    auto fixedValue = Star::maybeEnumValue<FixedPerlinNames>(Star::StringView(queries.reverseHits[i]));
+    auto fixedValue = Star::maybe_enum_value<FixedPerlinNames>(Star::StringView(queries.reverseHits[i]));
     auto expected = queries.hits[i % queries.hits.size()];
     if (!dynamicValue || !fixedValue || !*dynamicValue || !*fixedValue
         || **dynamicValue != expected || **fixedValue != expected) {
@@ -1176,7 +1176,7 @@ bool validatePerlin(benchmark::State& state, EnumMap<PerlinType> const& dynamic,
   }
   for (auto const& text : queries.reverseMisses) {
     auto dynamicValue = dynamic.maybe_left(text);
-    auto fixedValue = Star::maybeEnumValue<FixedPerlinNames>(Star::StringView(text));
+    auto fixedValue = Star::maybe_enum_value<FixedPerlinNames>(Star::StringView(text));
     if (!dynamicValue || !fixedValue || *dynamicValue || *fixedValue) {
       state.SkipWithError("Perlin reverse optional miss returned an error or a match");
       return false;
@@ -1226,16 +1226,16 @@ void BM_PerlinForwardCheckedHit(benchmark::State& state) {
   PerlinQueries queries;
   if (!validatePerlin(state, dynamic, queries))
     return;
-  state.SetLabel(Fixed ? "checked borrowed string_view; enumName helper"
+  state.SetLabel(Fixed ? "checked borrowed string_view; enum_name helper"
                        : "checked borrowed String reference; EnumMap::get_right");
   for (auto _ : state) {
     (void)_;
     for (auto value : queries.hits) {
       benchmark::DoNotOptimize(value);
       if constexpr (Fixed) {
-        auto result = Star::enumName<FixedPerlinNames>(value);
+        auto result = Star::enum_name<FixedPerlinNames>(value);
         if (!result) {
-          state.SkipWithError("enumName failed for a validated hit");
+          state.SkipWithError("enum_name failed for a validated hit");
           return;
         }
         benchmark::DoNotOptimize(*result);
@@ -1277,7 +1277,7 @@ void BM_PerlinReverseOptional(benchmark::State& state) {
       benchmark::DoNotOptimize(text);
       auto result = [&] {
         if constexpr (Fixed)
-          return Star::maybeEnumValue<FixedPerlinNames>(Star::StringView(text));
+          return Star::maybe_enum_value<FixedPerlinNames>(Star::StringView(text));
         else
           return dynamic.maybe_left(text);
       }();

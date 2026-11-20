@@ -308,7 +308,7 @@ namespace Dungeon {
     if (auto d = settings.maybe("direction")) {
       auto name = d->toString();
       if (!name) return std::unexpected(std::move(name.error()));
-      auto parsed = enumValue<DirectionNames>(*name);
+      auto parsed = enum_value<DirectionNames>(*name);
       if (!parsed) return std::unexpected(std::move(parsed.error()));
       direction = *parsed;
     }

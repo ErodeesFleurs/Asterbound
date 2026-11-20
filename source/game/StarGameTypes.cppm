@@ -18,7 +18,7 @@ enum class Direction : std::uint8_t {
   Left,
   Right
 };
-inline constexpr auto DirectionNames = sortedEnumNames(std::to_array<std::pair<Direction, std::string_view>>({
+inline constexpr auto DirectionNames = sorted_enum_names(std::to_array<std::pair<Direction, std::string_view>>({
   {Direction::Left, "left"},
   {Direction::Right, "right"},
 }));
@@ -48,7 +48,7 @@ enum class Gender : std::uint8_t {
   Male,
   Female
 };
-inline constexpr auto GenderNames = sortedEnumNames(std::to_array<std::pair<Gender, std::string_view>>({
+inline constexpr auto GenderNames = sorted_enum_names(std::to_array<std::pair<Gender, std::string_view>>({
   {Gender::Male, "male"},
   {Gender::Female, "female"},
 }));
@@ -58,7 +58,7 @@ enum class FireMode : std::uint8_t {
   Primary,
   Alt
 };
-inline constexpr auto FireModeNames = sortedEnumNames(std::to_array<std::pair<FireMode, std::string_view>>({
+inline constexpr auto FireModeNames = sorted_enum_names(std::to_array<std::pair<FireMode, std::string_view>>({
   {FireMode::None, "none"},
   {FireMode::Primary, "primary"},
   {FireMode::Alt, "alt"},
@@ -68,7 +68,7 @@ enum class ToolHand : std::uint8_t {
   Primary,
   Alt
 };
-inline constexpr auto ToolHandNames = sortedEnumNames(std::to_array<std::pair<ToolHand, std::string_view>>({
+inline constexpr auto ToolHandNames = sorted_enum_names(std::to_array<std::pair<ToolHand, std::string_view>>({
   {ToolHand::Primary, "primary"},
   {ToolHand::Alt, "alt"},
 }));
@@ -77,7 +77,7 @@ enum class TileLayer : std::uint8_t {
   Foreground,
   Background
 };
-inline constexpr auto TileLayerNames = sortedEnumNames(std::to_array<std::pair<TileLayer, std::string_view>>({
+inline constexpr auto TileLayerNames = sorted_enum_names(std::to_array<std::pair<TileLayer, std::string_view>>({
   {TileLayer::Foreground, "foreground"},
   {TileLayer::Background, "background"},
 }));
@@ -90,7 +90,7 @@ enum class MoveControlType : std::uint8_t {
   Jump
 };
 inline constexpr auto MoveControlTypeNames =
-  sortedEnumNames(std::to_array<std::pair<MoveControlType, std::string_view>>({
+  sorted_enum_names(std::to_array<std::pair<MoveControlType, std::string_view>>({
     {MoveControlType::Left, "left"},
     {MoveControlType::Right, "right"},
     {MoveControlType::Down, "down"},
@@ -106,7 +106,7 @@ enum class PortraitMode {
   FullNude,
   FullNeutralNude
 };
-inline constexpr auto PortraitModeNames = sortedEnumNames(std::to_array<std::pair<PortraitMode, std::string_view>>({
+inline constexpr auto PortraitModeNames = sorted_enum_names(std::to_array<std::pair<PortraitMode, std::string_view>>({
   {PortraitMode::Head, "head"},
   {PortraitMode::Bust, "bust"},
   {PortraitMode::Full, "full"},
@@ -122,7 +122,7 @@ enum class Rarity {
   Legendary,
   Essential
 };
-inline constexpr auto RarityNames = sortedEnumNames(std::to_array<std::pair<Rarity, std::string_view>>({
+inline constexpr auto RarityNames = sorted_enum_names(std::to_array<std::pair<Rarity, std::string_view>>({
   {Rarity::Common, "common"},
   {Rarity::Uncommon, "uncommon"},
   {Rarity::Rare, "rare"},

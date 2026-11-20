@@ -36,7 +36,7 @@ enum class NodeParameterType : std::uint8_t {
   Table,
   String
 };
-inline constexpr auto NodeParameterTypeNames = sortedEnumNames(
+inline constexpr auto NodeParameterTypeNames = sorted_enum_names(
   std::to_array<std::pair<NodeParameterType, std::string_view>>({{NodeParameterType::Json, "json"},
                                                                  {NodeParameterType::Entity, "entity"},
                                                                  {NodeParameterType::Position, "position"},
@@ -65,7 +65,7 @@ enum class BehaviorNodeType : std::uint16_t {
   Composite,
   Module
 };
-inline constexpr auto BehaviorNodeTypeNames = sortedEnumNames(
+inline constexpr auto BehaviorNodeTypeNames = sorted_enum_names(
   std::to_array<std::pair<BehaviorNodeType, std::string_view>>({{BehaviorNodeType::Action, "Action"},
                                                                 {BehaviorNodeType::Decorator, "Decorator"},
                                                                 {BehaviorNodeType::Composite, "Composite"},
@@ -79,7 +79,7 @@ enum class CompositeType : std::uint16_t {
   Randomize
 };
 inline constexpr auto CompositeTypeNames =
-  sortedEnumNames(std::to_array<std::pair<CompositeType, std::string_view>>({{CompositeType::Sequence, "Sequence"},
+  sorted_enum_names(std::to_array<std::pair<CompositeType, std::string_view>>({{CompositeType::Sequence, "Sequence"},
                                                                              {CompositeType::Selector, "Selector"},
                                                                              {CompositeType::Parallel, "Parallel"},
                                                                              {CompositeType::Dynamic, "Dynamic"},

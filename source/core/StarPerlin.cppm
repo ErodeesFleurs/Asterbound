@@ -23,13 +23,13 @@ enum class PerlinType {
   Billow,
   RidgedMulti
 };
-inline constexpr auto PerlinTypeNames = sortedEnumNames(std::array{
+inline constexpr auto PerlinTypeNames = sorted_enum_names(std::array{
   std::pair{PerlinType::Uninitialized, std::string_view("uninitialized")},
   std::pair{PerlinType::Perlin, std::string_view("perlin")},
   std::pair{PerlinType::Billow, std::string_view("billow")},
   std::pair{PerlinType::RidgedMulti, std::string_view("ridgedMulti")},
 });
-static_assert(validEnumNames<PerlinTypeNames>());
+static_assert(valid_enum_names<PerlinTypeNames>());
 
 inline constexpr int PerlinSampleSize = 512;
 
@@ -224,7 +224,7 @@ std::expected<Perlin<Float>, StarException> Perlin<Float>::create(Json const& js
   if (!gain) return std::unexpected(std::move(gain.error()));
   auto typeName = json.getString("type");
   if (!typeName) return std::unexpected(std::move(typeName.error()));
-  auto type = enumValue<PerlinTypeNames>(StringView(*typeName));
+  auto type = enum_value<PerlinTypeNames>(StringView(*typeName));
   if (!type) return std::unexpected(std::move(type.error()));
   Perlin perlin;
   perlin.m_seed = *seed;
@@ -386,7 +386,7 @@ Float Perlin<Float>::beta() const {
 
 template <typename Float>
 std::expected<Json, StarException> Perlin<Float>::toJson() const {
-  auto type = enumName<PerlinTypeNames>(m_type);
+  auto type = enum_name<PerlinTypeNames>(m_type);
   if (!type) return std::unexpected(std::move(type.error()));
   return JsonObject{
     {"seed", m_seed},
