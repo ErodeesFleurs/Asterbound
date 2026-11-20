@@ -615,7 +615,7 @@ catalog; implementation and detailed labels live in [benchmark sources](../sourc
 | Scalar math | `./result/bin/math_common_benchmarks --benchmark_filter='MathCommon/'` | Fractions, modular wrapping, angles, comparison policy and byte quantization; scalar and batched inputs. |
 | I/O | `./result/bin/io_benchmarks --benchmark_filter='IO/'` | Borrowed deserialization, VLQ, UUID, file writes and full asset payload reads. |
 | Universe directory locks | `file_benchmarks --benchmark_filter='^LockFile/'` | Uncontended acquire/release, immediate contention and a 2 ms wait. Compare elapsed time for all three; CPU time distinguishes sleeping from busy retrying. |
-| Logging | `./result/bin/logging_benchmarks --benchmark_filter='Logging/'` | Raw/formatted messages, sinks, concurrent callers, files and spatial logs. |
+| Logging | `logging_benchmarks --benchmark_filter='^Logging/'` | Ordinary and suppressed messages, whole short/multiline file records, four-recipient local/dedicated map preparation, concurrent callers, and spatial logs. Map timings exclude packet encoding and network I/O. |
 | Audio | `ownership_benchmarks -bootconfig <private-config> --benchmark_filter='^Ownership/Audio/'` | Shared-byte clone/seek/read, PCM resampling, looping mixer callbacks and cold filter lifecycles. |
 | Flat hash storage | `./result/bin/flat_hash_benchmarks --benchmark_filter='FlatHash/'` | Insertion/duplicates, collision rehash, lookup, churn, reuse and sparse iteration. |
 | Images | `./result/bin/image_benchmarks --benchmark_filter='^(Image/\|Vector/ImageBlend/)'` | Ownership, pixel operations, scaling, masks/blends, directives and libpng; historical `Vector/ImageBlend/*` rows now live here, not in `vector_benchmarks`. |

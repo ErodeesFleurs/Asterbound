@@ -21,13 +21,13 @@ enum class LogLevel {
   Warn,
   Error
 };
-inline constexpr auto LogLevelNames = sorted_enum_names(std::to_array<std::pair<LogLevel, std::string_view>>({
+inline constexpr auto log_level_names = sorted_enum_names(std::to_array<std::pair<LogLevel, std::string_view>>({
   {LogLevel::Debug, "Debug"},
   {LogLevel::Info, "Info"},
   {LogLevel::Warn, "Warn"},
   {LogLevel::Error, "Error"}
 }));
-static_assert(valid_enum_names<LogLevelNames>());
+static_assert(valid_enum_names<log_level_names>());
 
 // A sink for Logger messages.
 class LogSink {
@@ -38,7 +38,7 @@ public:
   [[nodiscard]] virtual std::expected<void, StarException> log(std::string_view msg, LogLevel level) = 0;
 
   void set_level(LogLevel level);
-  LogLevel level();
+  [[nodiscard]] LogLevel level() const noexcept;
 
 private:
   std::atomic<LogLevel> m_level;
@@ -49,33 +49,34 @@ public:
   [[nodiscard]] std::expected<void, StarException> log(std::string_view msg, LogLevel level) override;
 
 private:
-  std::mutex m_logMutex;
+  std::mutex m_log_mutex;
 };
 
 class FileLogSink : public LogSink {
 private:
   struct ConstructionKey { explicit ConstructionKey() = default; };
 public:
-  FileLogSink(ConstructionKey, String filename, std::uint64_t sizeLimit, unsigned backups, String backupFilename)
-    : m_output(std::move(filename)), m_sizeLimit(sizeLimit), m_backups(backups),
-      m_backupFilename(std::move(backupFilename)) {}
+  FileLogSink(ConstructionKey, String filename, std::uint64_t size_limit, unsigned backups, String backup_filename)
+    : m_output(std::move(filename)), m_size_limit(size_limit), m_backups(backups),
+      m_backup_filename(std::move(backup_filename)) {}
 
   // Zero disables size-based rotation. Oversized records remain whole, rotating
   // before the next record. The sink exclusively owns writes to this file.
   [[nodiscard]] static std::expected<std::shared_ptr<FileLogSink>, StarException> create(
-      String const& filename, LogLevel level, bool truncate, std::uint64_t sizeLimit = 0,
-      unsigned backups = 10, std::optional<String> backupFilename = {});
+      String const& filename, LogLevel level, bool truncate, std::uint64_t size_limit = 0,
+      unsigned backups = 10, std::optional<String> backup_filename = {});
 
   [[nodiscard]] std::expected<void, StarException> log(std::string_view msg, LogLevel level) override;
 
 private:
   File m_output;
-  std::uint64_t m_sizeLimit;
+  std::uint64_t m_size_limit;
   unsigned m_backups;
-  String m_backupFilename;
+  String m_backup_filename;
   // A failed write may have partially succeeded; refresh only on that path.
   std::optional<std::uint64_t> m_size = 0;
-  std::mutex m_logMutex;
+  std::string m_line;
+  std::mutex m_log_mutex;
 };
 
 // A fixed-address log domain. Its sinks never affect another owner.
@@ -123,10 +124,12 @@ public:
 
 private:
   using SinkRegistry = HashSet<std::shared_ptr<LogSink>>;
-  std::shared_ptr<SinkRegistry const> sink_snapshot(std::optional<LogLevel> level);
-  static SinkRegistry::const_iterator first_loggable(SinkRegistry const& sinks, LogLevel level);
+  std::shared_ptr<SinkRegistry const> sink_snapshot(LogLevel level);
+  static bool accepts(SinkRegistry const& sinks, LogLevel level);
   [[nodiscard]] std::expected<void, StarException> dispatch(SinkRegistry const& sinks, LogLevel level,
                                                             std::string_view message);
+  [[nodiscard]] static std::expected<void, StarException> dispatch_locked(SinkRegistry const& sinks, LogLevel level,
+                                                                         std::string_view message);
 
   struct RepeatedException {
     LogLevel level;
@@ -135,13 +138,15 @@ private:
     std::shared_ptr<ExceptionSummary const> summary;
     std::chrono::steady_clock::time_point reported;
     std::uint64_t repeats = 0;
+    std::uint64_t delivery_id = 0;
   };
-  std::vector<RepeatedException> s_repeatedExceptions;
+  std::vector<RepeatedException> m_repeated_exceptions;
+  std::uint64_t m_delivery_sequence = 0;
 
-  std::shared_ptr<StdoutLogSink> s_stdoutSink;
-  std::shared_ptr<SinkRegistry const> s_sinks;
-  std::mutex s_mutex;
-  std::recursive_mutex s_dispatchMutex;
+  std::shared_ptr<StdoutLogSink> m_stdout_sink;
+  std::shared_ptr<SinkRegistry const> m_sinks;
+  std::mutex m_registry_mutex;
+  std::recursive_mutex m_dispatch_mutex;
 };
 
 // Stateless diagnostics for process/bootstrap code without a business owner.
@@ -181,28 +186,31 @@ public:
 // be displayed every frame, or in a debug output window, etc.
 class LogMap {
 public:
-  String get_value(String const& key);
+  [[nodiscard]] String get_value(String const& key) const;
   void set_value(String const& key, String const& value);
 
   template <typename T>
     requires format_argument<T>
   void set(String const& key, T const& t);
 
-  Map<String, String> get_values();
+  [[nodiscard]] Map<String, String> snapshot() const;
+  [[nodiscard]] Map<String, String> drain();
+  // Restore a failed drain without overwriting values published since then.
+  void restore_missing(Map<String, String> const& drained);
   void clear();
 
 private:
-  HashMap<String, String> s_logMap;
-  std::mutex s_logMapMutex;
+  HashMap<String, String> m_values;
+  mutable std::mutex m_mutex;
 };
 
 // Logging for spatial data.  Divided into multiple named coordinate spaces.
 class SpatialLogger {
 public:
   // Maximum count of objects stored per space
-  static std::size_t const MaximumLines = 200000;
-  static std::size_t const MaximumPoints = 200000;
-  static std::size_t const MaximumText = 10000;
+  static constexpr std::size_t max_lines = 200000;
+  static constexpr std::size_t max_points = 200000;
+  static constexpr std::size_t max_text = 10000;
 
   struct Line {
     Vec2F begin;
@@ -227,19 +235,19 @@ public:
   void log_point(std::string_view space, Vec2F const& position, Vec4B const& color);
   void log_text(std::string_view space, String text, Vec2F const& position, Vec4B const& color);
 
-  Deque<Line> get_lines(std::string_view space, bool andClear);
-  Deque<Point> get_points(std::string_view space, bool andClear);
-  Deque<LogText> get_text(std::string_view space, bool andClear);
+  Deque<Line> get_lines(std::string_view space, bool and_clear);
+  Deque<Point> get_points(std::string_view space, bool and_clear);
+  Deque<LogText> get_text(std::string_view space, bool and_clear);
   void clear();
-  bool observed();
+  bool observed() const noexcept;
   void set_observed(bool observed);
 
 private:
-  std::mutex s_mutex;
-  StringMap<Deque<Line>> s_lines;
-  StringMap<Deque<Point>> s_points;
-  StringMap<Deque<LogText>> s_logText;
-  std::atomic<bool> s_observed{false};
+  std::mutex m_mutex;
+  StringMap<Deque<Line>> m_lines;
+  StringMap<Deque<Point>> m_points;
+  StringMap<Deque<LogText>> m_text;
+  std::atomic<bool> m_observed{false};
 };
 
 template <typename... Args>
@@ -288,7 +296,7 @@ export module star.logging;
 
 export namespace Star {
   using ::Star::LogLevel;
-  using ::Star::LogLevelNames;
+  using ::Star::log_level_names;
   using ::Star::LogSink;
   using ::Star::StdoutLogSink;
   using ::Star::FileLogSink;

@@ -46,6 +46,7 @@ set (star_core_tests_SOURCES
       lexical_cast_test.cpp
       list_contract_test.cpp
       list_slice_test.cpp
+      log_map_test.cpp
       lua_test.cpp
       lua_json_test.cpp
       lua_syntax_test.cpp

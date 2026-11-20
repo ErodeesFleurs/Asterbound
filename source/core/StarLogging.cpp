@@ -32,26 +32,26 @@ LogSink::~LogSink() = default;
 
 void LogSink::set_level(LogLevel level) { m_level = level; }
 
-LogLevel LogSink::level() { return m_level; }
+LogLevel LogSink::level() const noexcept { return m_level; }
 
 std::expected<void, StarException> StdoutLogSink::log(std::string_view msg, LogLevel level) {
-  std::lock_guard locker(m_logMutex);
-  auto name = enum_name<LogLevelNames>(level);
+  std::lock_guard locker(m_log_mutex);
+  auto name = enum_name<log_level_names>(level);
   if (!name)
     return std::unexpected(std::move(name.error()));
   return Star::print("[{}] {}\n", *name, msg);
 }
 
 std::expected<std::shared_ptr<FileLogSink>, StarException> FileLogSink::create(
-    String const& filename, LogLevel level, bool truncate, std::uint64_t sizeLimit, unsigned backups,
-    std::optional<String> backupFilename) {
+    String const& filename, LogLevel level, bool truncate, std::uint64_t size_limit, unsigned backups,
+    std::optional<String> backup_filename) {
   auto sink = std::make_shared<FileLogSink>(
-      ConstructionKey{}, filename, sizeLimit, backups, backupFilename.value_or(filename));
+      ConstructionKey{}, filename, size_limit, backups, std::move(backup_filename).value_or(filename));
   auto opened =
     sink->m_output.open(truncate ? IOMode::Write | IOMode::Append | IOMode::Truncate : IOMode::Write | IOMode::Append);
   if (!opened)
     return std::unexpected(std::move(opened.error()));
-  if (sizeLimit && !truncate) {
+  if (size_limit && !truncate) {
     auto size = sink->m_output.size();
     if (!size)
       return std::unexpected(std::move(size.error()));
@@ -62,23 +62,32 @@ std::expected<std::shared_ptr<FileLogSink>, StarException> FileLogSink::create(
 }
 
 std::expected<void, StarException> FileLogSink::log(std::string_view msg, LogLevel level) {
-  std::lock_guard locker(m_logMutex);
+  std::lock_guard locker(m_log_mutex);
   auto timestamp = Time::localTime(std::chrono::system_clock::now());
   if (!timestamp)
     return std::unexpected(std::move(timestamp.error()));
-  auto name = enum_name<LogLevelNames>(level);
+  auto name = enum_name<log_level_names>(level);
   if (!name)
     return std::unexpected(std::move(name.error()));
-  auto line = Star::format("[{:%H:%M:%S}] [{}] {}\n", *timestamp, *name, msg);
-  if (m_sizeLimit) {
+  // Keep ordinary records in the sink, not an occasional oversized diagnostic.
+  constexpr std::size_t max_cached_message = 8 * 1024;
+  constexpr std::size_t line_framing = std::string_view("[00:00:00.000] [] \n").size();
+  std::string oversized;
+  auto& line = msg.size() <= max_cached_message ? m_line : oversized;
+  line.clear();
+  line.reserve(line_framing + name->size() + msg.size());
+  std::format_to(std::back_inserter(line), "[{:%H:%M:%S}] [{}] ", *timestamp, *name);
+  line.append(msg);
+  line.push_back('\n');
+  if (m_size_limit) {
     if (!m_size) {
       auto size = m_output.size();
       if (!size)
         return std::unexpected(std::move(size.error()));
       m_size = static_cast<std::uint64_t>(*size);
     }
-    if (*m_size && (*m_size >= m_sizeLimit || line.size() > m_sizeLimit - *m_size)) {
-      auto backup = File::backup_file_in_sequence(m_output.file_name(), m_backupFilename, m_backups);
+    if (*m_size && (*m_size >= m_size_limit || line.size() > m_size_limit - *m_size)) {
+      auto backup = File::backup_file_in_sequence(m_output.file_name(), m_backup_filename, m_backups);
       if (!backup)
         return std::unexpected(std::move(backup.error()));
       auto opened = m_output.open(IOMode::Write | IOMode::Append | IOMode::Truncate);
@@ -88,7 +97,7 @@ std::expected<void, StarException> FileLogSink::log(std::string_view msg, LogLev
     }
   }
   auto written = m_output.write_full(line);
-  if (m_sizeLimit) {
+  if (m_size_limit) {
     if (written)
       *m_size += line.size();
     else
@@ -100,46 +109,51 @@ std::expected<void, StarException> FileLogSink::log(std::string_view msg, LogLev
 void Logger::add_sink(std::shared_ptr<LogSink> sink) {
   std::shared_ptr<SinkRegistry const> retired;
   {
-    std::lock_guard locker(s_mutex);
-    if (s_sinks->contains(sink))
+    std::lock_guard locker(m_registry_mutex);
+    if (m_sinks->contains(sink))
       return;
-    auto next = std::make_shared<SinkRegistry>(*s_sinks);
+    auto next = std::make_shared<SinkRegistry>(*m_sinks);
     next->insert(std::move(sink));
-    retired = std::exchange(s_sinks, std::move(next));
+    retired = std::exchange(m_sinks, std::move(next));
   }
 }
 
 void Logger::remove_sink(std::shared_ptr<LogSink> sink) {
   std::shared_ptr<SinkRegistry const> retired;
   {
-    std::lock_guard locker(s_mutex);
-    if (!s_sinks->contains(sink))
+    std::lock_guard locker(m_registry_mutex);
+    if (!m_sinks->contains(sink))
       return;
-    auto next = std::make_shared<SinkRegistry>(*s_sinks);
+    auto next = std::make_shared<SinkRegistry>(*m_sinks);
     next->erase(sink);
-    retired = std::exchange(s_sinks, std::move(next));
+    retired = std::exchange(m_sinks, std::move(next));
   }
 }
 
-std::shared_ptr<LogSink> Logger::stdout_sink() { return s_stdoutSink; }
+std::shared_ptr<LogSink> Logger::stdout_sink() { return m_stdout_sink; }
 
-void Logger::remove_stdout_sink() { remove_sink(s_stdoutSink); }
+void Logger::remove_stdout_sink() { remove_sink(m_stdout_sink); }
 
-std::shared_ptr<Logger::SinkRegistry const> Logger::sink_snapshot(std::optional<LogLevel> level) {
-  std::lock_guard locker(s_mutex);
-  if (level && first_loggable(*s_sinks, *level) == s_sinks->end())
+std::shared_ptr<Logger::SinkRegistry const> Logger::sink_snapshot(LogLevel level) {
+  std::lock_guard locker(m_registry_mutex);
+  if (!accepts(*m_sinks, level))
     return {};
-  return s_sinks;
+  return m_sinks;
 }
 
-Logger::SinkRegistry::const_iterator Logger::first_loggable(SinkRegistry const& sinks, LogLevel level) {
-  return std::find_if(sinks.begin(), sinks.end(),
-                      [level](std::shared_ptr<LogSink> const& sink) { return sink->level() <= level; });
+bool Logger::accepts(SinkRegistry const& sinks, LogLevel level) {
+  return std::any_of(sinks.begin(), sinks.end(),
+                     [level](std::shared_ptr<LogSink> const& sink) { return sink->level() <= level; });
 }
 
 std::expected<void, StarException> Logger::dispatch(SinkRegistry const& sinks, LogLevel level,
                                                     std::string_view message) {
-  std::lock_guard locker(s_dispatchMutex);
+  std::lock_guard locker(m_dispatch_mutex);
+  return dispatch_locked(sinks, level, message);
+}
+
+std::expected<void, StarException> Logger::dispatch_locked(SinkRegistry const& sinks, LogLevel level,
+                                                           std::string_view message) {
   // The pre-format check is only a hint. Threshold changes during
   // formatting or while waiting for another dispatch remain effective.
   for (auto const& sink : sinks) {
@@ -162,35 +176,38 @@ std::expected<void, StarException> Logger::log(LogLevel level, std::string_view 
 
 std::expected<void, StarException> Logger::log_exception(LogLevel level, std::string_view operation,
                                                          ExceptionDiagnostic const& diagnostic) {
-  auto sinks = sink_snapshot(std::nullopt);
-  auto first = first_loggable(*sinks, level);
-  bool debug = first_loggable(*sinks, LogLevel::Debug) != sinks->end();
-  if (first == sinks->end() && !debug)
+  auto sinks = sink_snapshot(level);
+  if (!sinks)
     return {};
 
   // Serialize the decision with emission, including same-thread sink reentry.
-  std::lock_guard locker(s_dispatchMutex);
+  std::lock_guard locker(m_dispatch_mutex);
+  if (!accepts(*sinks, level))
+    return {};
   auto const& summary = diagnostic.diagnostic_summary();
   bool limited = summary->kind == ExceptionSummaryKind::ScriptRuntime
       || summary->kind == ExceptionSummaryKind::ScriptSyntax
       || summary->kind == ExceptionSummaryKind::PatchRuntime
       || summary->kind == ExceptionSummaryKind::PatchSyntax;
-  auto matches = [&](RepeatedException const& entry) {
-    auto const& other = *entry.summary;
-    return entry.level == level && entry.debug == debug && entry.operation == operation
-        && other.kind == summary->kind && other.category == summary->category
-        && other.reason == summary->reason && other.operation == summary->operation
-        && other.asset == summary->asset && other.assetProvider == summary->assetProvider
-        && other.patch == summary->patch && other.patchProvider == summary->patchProvider
-        && std::ranges::equal(other.locations, summary->locations, [](auto const& a, auto const& b) {
-             return a.source == b.source && a.line == b.line && a.provider == b.provider;
-           });
-  };
+  std::uint64_t delivery_id = 0;
   std::uint64_t repeats = 0;
   if (limited) {
+    bool debug = accepts(*sinks, LogLevel::Debug);
+    auto matches = [&](RepeatedException const& entry) {
+      auto const& other = *entry.summary;
+      return entry.level == level && entry.debug == debug && entry.operation == operation
+          && other.kind == summary->kind && other.category == summary->category
+          && other.reason == summary->reason && other.operation == summary->operation
+          && other.asset == summary->asset && other.assetProvider == summary->assetProvider
+          && other.patch == summary->patch && other.patchProvider == summary->patchProvider
+          && std::ranges::equal(other.locations, summary->locations,
+              [](ExceptionSummary::Location const& a, ExceptionSummary::Location const& b) {
+                return a.source == b.source && a.line == b.line && a.provider == b.provider;
+              });
+    };
     auto now = std::chrono::steady_clock::now();
-    auto entry = std::ranges::find_if(s_repeatedExceptions, matches);
-    if (entry != s_repeatedExceptions.end()) {
+    auto entry = std::ranges::find_if(m_repeated_exceptions, matches);
+    if (entry != m_repeated_exceptions.end()) {
       if (entry->repeats != std::numeric_limits<std::uint64_t>::max())
         ++entry->repeats;
       if (now - entry->reported < std::chrono::seconds(5))
@@ -199,39 +216,35 @@ std::expected<void, StarException> Logger::log_exception(LogLevel level, std::st
       entry->reported = now;
     } else {
       // Bound retained identities; never retain full exception stacks.
-      if (s_repeatedExceptions.size() == 128) {
-        auto oldest = std::ranges::min_element(s_repeatedExceptions, {}, &RepeatedException::reported);
-        s_repeatedExceptions.erase(oldest);
+      if (m_repeated_exceptions.size() == 128) {
+        auto oldest = std::ranges::min_element(m_repeated_exceptions, {}, &RepeatedException::reported);
+        m_repeated_exceptions.erase(oldest);
       }
-      s_repeatedExceptions.push_back({level, debug, std::string(operation), summary, now});
+      m_repeated_exceptions.push_back({level, debug, std::string(operation), summary, now});
+      entry = std::prev(m_repeated_exceptions.end());
     }
+    delivery_id = ++m_delivery_sequence;
+    entry->delivery_id = delivery_id;
   }
-  auto emit = [&]() -> std::expected<void, StarException> {
-    if (repeats != 0)
-      return dispatch(*sinks, level, Star::format("{}: repeated {} additional times: {}",
-          operation, repeats, Star::exception_summary(diagnostic)));
-    if (first != sinks->end()) {
-      auto message = Star::format("{}: {}", operation, Star::exception_summary(diagnostic));
-      if (auto result = dispatch(*sinks, level, message); !result)
-        return std::unexpected(std::move(result.error()));
-    }
-    if (debug) {
-      auto details = Star::format("{} details:\n{}", operation, Star::output_exception(diagnostic, true));
-      return dispatch(*sinks, LogLevel::Debug, details);
-    }
-    return {};
-  };
-  auto result = emit();
-  // A failed write must not make the next attempt silently succeed.
-  // Sink callbacks may have changed the vector: do not retain an iterator.
+  auto result = dispatch_locked(*sinks, level, repeats == 0
+      ? Star::format("{}: {}", operation, Star::exception_summary(diagnostic))
+      : Star::format("{}: repeated {} additional times: {}", operation, repeats, Star::exception_summary(diagnostic)));
+  // A summary callback can enable or disable details on the retained snapshot.
+  if (result && repeats == 0 && accepts(*sinks, LogLevel::Debug))
+    result = dispatch_locked(*sinks, LogLevel::Debug,
+        Star::format("{} details:\n{}", operation, Star::output_exception(diagnostic, true)));
+
+  // Retry a failed delivery, but don't erase a newer one installed by a callback.
   if (!result && limited)
-    std::erase_if(s_repeatedExceptions, matches);
+    std::erase_if(m_repeated_exceptions, [delivery_id](RepeatedException const& entry) {
+      return entry.delivery_id == delivery_id;
+    });
   return result;
 }
 
 void Logger::reset_exception_repeats() {
-  std::lock_guard locker(s_dispatchMutex);
-  s_repeatedExceptions.clear();
+  std::lock_guard locker(m_dispatch_mutex);
+  m_repeated_exceptions.clear();
 }
 
 std::expected<void, StarException> Logger::error_exception(std::string_view operation,
@@ -245,12 +258,12 @@ std::expected<void, StarException> Logger::warn_exception(std::string_view opera
 }
 
 Logger::Logger()
-    : s_stdoutSink(std::make_shared<StdoutLogSink>()),
-      s_sinks(std::make_shared<SinkRegistry>(std::initializer_list<std::shared_ptr<LogSink>>{s_stdoutSink})) {}
+    : m_stdout_sink(std::make_shared<StdoutLogSink>()),
+      m_sinks(std::make_shared<SinkRegistry>(std::initializer_list<std::shared_ptr<LogSink>>{m_stdout_sink})) {}
 
 bool Logger::loggable(LogLevel level) {
-  std::lock_guard locker(s_mutex);
-  return first_loggable(*s_sinks, level) != s_sinks->end();
+  std::lock_guard locker(m_registry_mutex);
+  return accepts(*m_sinks, level);
 }
 
 void EmergencyLog::log(LogLevel, std::string_view message) {
@@ -292,29 +305,43 @@ void EmergencyLog::log(LogLevel, std::string_view message) {
 #endif
 }
 
-String LogMap::get_value(String const& key) {
-  std::lock_guard locker(s_logMapMutex);
-  return s_logMap.value(key);
+String LogMap::get_value(String const& key) const {
+  std::lock_guard lock(m_mutex);
+  return m_values.value(key);
 }
 
 void LogMap::set_value(String const& key, String const& value) {
-  std::lock_guard locker(s_logMapMutex);
-  s_logMap[key] = value;
+  std::lock_guard lock(m_mutex);
+  m_values.insert_or_assign(key, value);
 }
 
-Map<String, String> LogMap::get_values() {
-  std::lock_guard locker(s_logMapMutex);
-  return Map<String, String>::from(s_logMap);
+Map<String, String> LogMap::snapshot() const {
+  std::lock_guard lock(m_mutex);
+  return Map<String, String>::from(m_values);
+}
+
+Map<String, String> LogMap::drain() {
+  auto detached = [&] {
+    std::lock_guard lock(m_mutex);
+    return std::move(m_values);
+  }();
+  Map<String, String> sorted;
+  for (auto&& [key, value] : detached)
+    sorted.emplace(key, std::move(value));
+  return sorted;
+}
+
+void LogMap::restore_missing(Map<String, String> const& drained) {
+  std::lock_guard lock(m_mutex);
+  for (auto const& [key, value] : drained)
+    m_values.try_emplace(key, value);
 }
 
 void LogMap::clear() {
-  std::lock_guard locker(s_logMapMutex);
-  s_logMap.clear();
+  std::lock_guard lock(m_mutex);
+  m_values.clear();
 }
 
-std::size_t const SpatialLogger::MaximumLines;
-std::size_t const SpatialLogger::MaximumPoints;
-std::size_t const SpatialLogger::MaximumText;
 
 namespace {
 
@@ -328,11 +355,11 @@ template <spatial_log_value T> void append_capped(Deque<T>& values, T value, std
 }
 
 template <spatial_log_value T>
-Deque<T> query_spatial(StringMap<Deque<T>>& spaces, std::string_view space, bool andClear) {
+Deque<T> query_spatial(StringMap<Deque<T>>& spaces, std::string_view space, bool and_clear) {
   auto found = spaces.find(space);
   if (found == spaces.end())
     return {};
-  if (andClear)
+  if (and_clear)
     return std::exchange(found->second, {});
   return found->second;
 }
@@ -343,16 +370,16 @@ void SpatialLogger::log_poly(std::string_view space, PolyF const& poly, Vec4B co
   if (!observed())
     return;
 
-  std::lock_guard locker(s_mutex);
-  auto& lines = s_lines[space];
+  std::lock_guard locker(m_mutex);
+  auto& lines = m_lines[space];
 
   auto sides = poly.sides();
-  auto first = sides > MaximumLines ? sides - MaximumLines : 0;
+  auto first = sides > max_lines ? sides - max_lines : 0;
   if (first != 0)
     lines.clear();
   for (std::size_t i = first; i < sides; ++i) {
     auto side = poly.side(i);
-    append_capped(lines, Line{.begin = side.min(), .end = side.max(), .color = color}, MaximumLines);
+    append_capped(lines, Line{.begin = side.min(), .end = side.max(), .color = color}, max_lines);
   }
 }
 
@@ -364,60 +391,60 @@ void SpatialLogger::log_line(std::string_view space, Vec2F const& begin, Vec2F c
   if (!observed())
     return;
 
-  std::lock_guard locker(s_mutex);
-  auto& lines = s_lines[space];
+  std::lock_guard locker(m_mutex);
+  auto& lines = m_lines[space];
 
-  append_capped(lines, Line{.begin = begin, .end = end, .color = color}, MaximumLines);
+  append_capped(lines, Line{.begin = begin, .end = end, .color = color}, max_lines);
 }
 
 void SpatialLogger::log_point(std::string_view space, Vec2F const& position, Vec4B const& color) {
   if (!observed())
     return;
 
-  std::lock_guard locker(s_mutex);
-  auto& points = s_points[space];
+  std::lock_guard locker(m_mutex);
+  auto& points = m_points[space];
 
-  append_capped(points, Point{.position = position, .color = color}, MaximumPoints);
+  append_capped(points, Point{.position = position, .color = color}, max_points);
 }
 
 void SpatialLogger::log_text(std::string_view space, String text, Vec2F const& position, Vec4B const& color) {
   if (!observed())
     return;
 
-  std::lock_guard locker(s_mutex);
-  auto& texts = s_logText[space];
+  std::lock_guard locker(m_mutex);
+  auto& texts = m_text[space];
 
-  append_capped(texts, LogText{.text = std::move(text), .position = position, .color = color}, MaximumText);
+  append_capped(texts, LogText{.text = std::move(text), .position = position, .color = color}, max_text);
 }
 
-Deque<SpatialLogger::Line> SpatialLogger::get_lines(std::string_view space, bool andClear) {
-  std::lock_guard locker(s_mutex);
-  return query_spatial(s_lines, space, andClear);
+Deque<SpatialLogger::Line> SpatialLogger::get_lines(std::string_view space, bool and_clear) {
+  std::lock_guard locker(m_mutex);
+  return query_spatial(m_lines, space, and_clear);
 }
 
-Deque<SpatialLogger::Point> SpatialLogger::get_points(std::string_view space, bool andClear) {
-  std::lock_guard locker(s_mutex);
-  return query_spatial(s_points, space, andClear);
+Deque<SpatialLogger::Point> SpatialLogger::get_points(std::string_view space, bool and_clear) {
+  std::lock_guard locker(m_mutex);
+  return query_spatial(m_points, space, and_clear);
 }
 
-Deque<SpatialLogger::LogText> SpatialLogger::get_text(std::string_view space, bool andClear) {
-  std::lock_guard locker(s_mutex);
-  return query_spatial(s_logText, space, andClear);
+Deque<SpatialLogger::LogText> SpatialLogger::get_text(std::string_view space, bool and_clear) {
+  std::lock_guard locker(m_mutex);
+  return query_spatial(m_text, space, and_clear);
 }
 
 void SpatialLogger::clear() {
-  decltype(s_lines) lines;
-  decltype(s_points) points;
-  decltype(s_logText) logText;
+  decltype(m_lines) lines;
+  decltype(m_points) points;
+  decltype(m_text) text;
   {
-    std::lock_guard locker(s_mutex);
-    lines = std::move(s_lines);
-    points = std::move(s_points);
-    logText = std::move(s_logText);
+    std::lock_guard locker(m_mutex);
+    lines = std::move(m_lines);
+    points = std::move(m_points);
+    text = std::move(m_text);
   }// Move while locked to deallocate contents while unlocked.
 }
 
-bool SpatialLogger::observed() { return s_observed; }
+bool SpatialLogger::observed() const noexcept { return m_observed; }
 
-void SpatialLogger::set_observed(bool observed) { s_observed = observed; }
+void SpatialLogger::set_observed(bool observed) { m_observed = observed; }
 }// namespace Star

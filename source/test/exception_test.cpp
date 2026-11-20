@@ -24,8 +24,8 @@ static_assert(sizeof(StarException) == sizeof(std::shared_ptr<void const>));
 static_assert(sizeof(ExceptionDiagnostic) == sizeof(std::shared_ptr<void const>));
 
 struct LogFormattingProbe {
-  unsigned* calls;
-  std::function<void()> const* on_format = nullptr;
+  unsigned& calls;
+  std::optional<std::reference_wrapper<std::function<void()> const>> on_format = {};
 };
 
 template <typename Context>
@@ -36,9 +36,9 @@ concept log_probe_format_context = requires(std::formatter<std::string_view> con
 template <> struct std::formatter<LogFormattingProbe> : std::formatter<std::string_view> {
   template <log_probe_format_context Context>
   auto format(LogFormattingProbe const& value, Context& context) const -> typename Context::iterator {
-    ++*value.calls;
+    ++value.calls;
     if (value.on_format)
-      (*value.on_format)();
+      value.on_format->get()();
     return std::formatter<std::string_view>::format("probe", context);
   }
 };
@@ -494,7 +494,7 @@ void exercise_reentrant_logging() {
     formatting.add_sink(replacement);
     captured->set_level(LogLevel::Error);
   };
-  ASSERT_TRUE(formatting.info("{}", LogFormattingProbe{&formats, &mutate}));
+  ASSERT_TRUE(formatting.info("{}", LogFormattingProbe{formats, std::cref(mutate)}));
   EXPECT_EQ(formats, 1u);
   EXPECT_EQ(capturedCalls, 0u);// Formatting-time threshold changes still apply.
   EXPECT_EQ(replacementCalls, 0u);
@@ -523,10 +523,10 @@ void exercise_reentrant_logging() {
       waitingFailed = true;
   });
   entered.wait();
-  std::function<void()> markFormatted = [&] { formatted.count_down(); };
-  unsigned waitingFormats = 0;
+  std::function<void()> mark_formatted = [&] { formatted.count_down(); };
+  unsigned waiting_formats = 0;
   std::thread waiter([&] {
-    if (!waiting.info("{}", LogFormattingProbe{&waitingFormats, &markFormatted}))
+    if (!waiting.info("{}", LogFormattingProbe{waiting_formats, std::cref(mark_formatted)}))
       waitingFailed = true;
   });
   formatted.wait();
@@ -535,7 +535,7 @@ void exercise_reentrant_logging() {
   holder.join();
   waiter.join();
   EXPECT_FALSE(waitingFailed.load());
-  EXPECT_EQ(waitingFormats, 1u);
+  EXPECT_EQ(waiting_formats, 1u);
   EXPECT_EQ(waitingCalls, 1u);
 }
 #endif
@@ -553,6 +553,73 @@ TEST(LoggingDeathTest, ReentrantRegistryAndSnapshotsRetainRemovedSinks) {
     ::testing::ExitedWithCode(0), "");
 }
 #endif
+
+TEST(LoggingTest, SummaryCallbackChangesVisibilityOfFullDiagnostics) {
+  Logger logger;
+  logger.remove_stdout_sink();
+  auto sink = std::make_shared<CallbackLogSink>();
+  logger.add_sink(sink);
+  auto diagnostic = ExceptionDiagnostic(StarException("reason", false).with_context("full-only-marker"));
+  auto next_level = LogLevel::Debug;
+  unsigned summaries = 0;
+  unsigned details = 0;
+  sink->callback = [&](std::string_view message, LogLevel level) -> std::expected<void, StarException> {
+    if (level == LogLevel::Error) {
+      ++summaries;
+      sink->set_level(next_level);
+    } else {
+      EXPECT_EQ(level, LogLevel::Debug);
+      EXPECT_NE(message.find("full-only-marker"), std::string_view::npos);
+      ++details;
+    }
+    return {};
+  };
+  sink->set_level(LogLevel::Info);
+  ASSERT_TRUE(logger.error_exception("operation", diagnostic));
+  EXPECT_EQ(summaries, 1u);
+  EXPECT_EQ(details, 1u);
+  next_level = LogLevel::Info;
+  ASSERT_TRUE(logger.error_exception("operation", diagnostic));
+  EXPECT_EQ(summaries, 2u);
+  EXPECT_EQ(details, 1u);
+}
+
+TEST(LoggingTest, FailedOuterDeliveryPreservesReentrantReplacement) {
+  ExceptionSummary summary;
+  summary.kind = ExceptionSummaryKind::ScriptRuntime;
+  summary.reason = "script failure";
+  auto diagnostic = ExceptionDiagnostic(StarException("details", false).with_summary(std::move(summary)));
+  for (bool evict : {false, true}) {
+    SCOPED_TRACE(evict ? "evict" : "reset");
+    Logger logger;
+    logger.remove_stdout_sink();
+    auto sink = std::make_shared<CallbackLogSink>();
+    logger.add_sink(sink);
+    unsigned target_writes = 0;
+    sink->callback = [&](std::string_view message, LogLevel) -> std::expected<void, StarException> {
+      if (!message.starts_with("target:") || ++target_writes != 1)
+        return {};
+      if (evict) {
+        for (unsigned i = 0; i < 128; ++i)
+          if (auto fill = logger.error_exception(std::to_string(i), diagnostic); !fill)
+            return fill;
+      } else {
+        logger.reset_exception_repeats();
+      }
+      if (auto nested = logger.error_exception("target", diagnostic); !nested)
+        return nested;
+      return std::unexpected(IOException("outer delivery failed", false));
+    };
+
+    auto outer = logger.error_exception("target", diagnostic);
+    ASSERT_FALSE(outer);
+    EXPECT_TRUE(outer.error().is<IOException>());
+    EXPECT_EQ(outer.error().diagnostic_summary()->reason, "outer delivery failed");
+    ASSERT_EQ(target_writes, 2u);
+    ASSERT_TRUE(logger.error_exception("target", diagnostic));
+    EXPECT_EQ(target_writes, 2u);
+  }
+}
 
 TEST(LoggingTest, DynamicLevelsFilterBeforeFormattingAndFirstFailureStopsDispatch) {
   Logger logger;
@@ -574,12 +641,13 @@ TEST(LoggingTest, DynamicLevelsFilterBeforeFormattingAndFirstFailureStopsDispatc
   a->set_level(LogLevel::Error);
   b->set_level(LogLevel::Error);
   EXPECT_FALSE(logger.loggable(LogLevel::Info));
-  ASSERT_TRUE(logger.info("{}", LogFormattingProbe{&formats}));
+  ASSERT_TRUE(logger.log(LogLevel::Info, "filtered raw message"));
+  ASSERT_TRUE(logger.info("{}", LogFormattingProbe{formats}));
   EXPECT_EQ(formats, 0u);
   EXPECT_TRUE(order.empty());
   a->set_level(LogLevel::Info);
   EXPECT_TRUE(logger.loggable(LogLevel::Info));
-  ASSERT_TRUE(logger.info("{}", LogFormattingProbe{&formats}));
+  ASSERT_TRUE(logger.info("{}", LogFormattingProbe{formats}));
   EXPECT_EQ(formats, 1u);
   EXPECT_EQ(order, (std::vector<unsigned>{0}));
   a->set_level(LogLevel::Error);
@@ -587,7 +655,7 @@ TEST(LoggingTest, DynamicLevelsFilterBeforeFormattingAndFirstFailureStopsDispatc
   b->set_level(LogLevel::Info);
   EXPECT_TRUE(logger.loggable(LogLevel::Info));
   order.clear();
-  ASSERT_TRUE(logger.info("{}", LogFormattingProbe{&formats}));
+  ASSERT_TRUE(logger.info("{}", LogFormattingProbe{formats}));
   EXPECT_EQ(formats, 2u);
   EXPECT_EQ(order, (std::vector<unsigned>{1}));
 
@@ -613,27 +681,27 @@ TEST(LoggingTest, DynamicLevelsFilterBeforeFormattingAndFirstFailureStopsDispatc
   lowering.remove_stdout_sink();
   auto x = std::make_shared<CallbackLogSink>();
   auto y = std::make_shared<CallbackLogSink>();
-  std::vector<unsigned> loweredOrder;
+  std::vector<unsigned> lowered_order;
   x->callback = [&](std::string_view, LogLevel) -> std::expected<void, StarException> {
-    loweredOrder.push_back(0);
+    lowered_order.push_back(0);
     return {};
   };
   y->callback = [&](std::string_view, LogLevel) -> std::expected<void, StarException> {
-    loweredOrder.push_back(1);
+    lowered_order.push_back(1);
     return {};
   };
   lowering.add_sink(x);
   lowering.add_sink(y);
   ASSERT_TRUE(lowering.info("discover threshold order"));
-  ASSERT_EQ(loweredOrder.size(), 2u);
-  auto initiallyFiltered = loweredOrder.front() == 0 ? x : y;
-  initiallyFiltered->set_level(LogLevel::Error);
-  loweredOrder.clear();
-  std::function<void()> lowerThreshold = [&] { initiallyFiltered->set_level(LogLevel::Info); };
-  unsigned loweringFormats = 0;
-  ASSERT_TRUE(lowering.info("{}", LogFormattingProbe{&loweringFormats, &lowerThreshold}));
-  EXPECT_EQ(loweringFormats, 1u);
-  EXPECT_EQ(loweredOrder.size(), 2u);
+  ASSERT_EQ(lowered_order.size(), 2u);
+  auto initially_filtered = lowered_order.front() == 0 ? x : y;
+  initially_filtered->set_level(LogLevel::Error);
+  lowered_order.clear();
+  std::function<void()> lower_threshold = [&] { initially_filtered->set_level(LogLevel::Info); };
+  unsigned lowering_formats = 0;
+  ASSERT_TRUE(lowering.info("{}", LogFormattingProbe{lowering_formats, std::cref(lower_threshold)}));
+  EXPECT_EQ(lowering_formats, 1u);
+  EXPECT_EQ(lowered_order.size(), 2u);
 }
 
 TEST(LoggingTest, SpatialCapsKeepSuffixAndQueriesDrainWithoutChangingObservation) {
@@ -653,38 +721,38 @@ TEST(LoggingTest, SpatialCapsKeepSuffixAndQueriesDrainWithoutChangingObservation
   EXPECT_TRUE(logger.get_lines("unobserved", false).empty());
   EXPECT_TRUE(logger.get_text("unobserved", false).empty());
   logger.set_observed(true);
-  for (std::size_t i = 0; i != SpatialLogger::MaximumPoints + 3; ++i)
+  for (std::size_t i = 0; i != SpatialLogger::max_points + 3; ++i)
     logger.log_point("points", {static_cast<float>(i), 2}, color);
   auto copied = logger.get_points("points", false);
-  ASSERT_EQ(copied.size(), SpatialLogger::MaximumPoints);
+  ASSERT_EQ(copied.size(), SpatialLogger::max_points);
   EXPECT_EQ(copied.front().position, Vec2F(3, 2));
-  EXPECT_EQ(copied.back().position, Vec2F(SpatialLogger::MaximumPoints + 2, 2));
+  EXPECT_EQ(copied.back().position, Vec2F(SpatialLogger::max_points + 2, 2));
   auto drained = logger.get_points("points", true);
   EXPECT_EQ(drained.size(), copied.size());
   EXPECT_TRUE(logger.get_points("points", true).empty());
-  for (std::size_t i = 0; i != SpatialLogger::MaximumText + 2; ++i)
+  for (std::size_t i = 0; i != SpatialLogger::max_text + 2; ++i)
     logger.log_text("text", Star::format("text-{}", i), {static_cast<float>(i), 0}, color);
   auto text = logger.get_text("text", true);
-  ASSERT_EQ(text.size(), SpatialLogger::MaximumText);
+  ASSERT_EQ(text.size(), SpatialLogger::max_text);
   EXPECT_EQ(text.front().text, "text-2");
-  EXPECT_EQ(text.back().text, String(Star::format("text-{}", SpatialLogger::MaximumText + 1)));
+  EXPECT_EQ(text.back().text, String(Star::format("text-{}", SpatialLogger::max_text + 1)));
   EXPECT_TRUE(logger.get_text("text", false).empty());
-  for (std::size_t i = 0; i != SpatialLogger::MaximumLines + 2; ++i)
+  for (std::size_t i = 0; i != SpatialLogger::max_lines + 2; ++i)
     logger.log_line("lines", {static_cast<float>(i), 0}, {static_cast<float>(i), 1}, color);
   auto lines = logger.get_lines("lines", true);
-  ASSERT_EQ(lines.size(), SpatialLogger::MaximumLines);
+  ASSERT_EQ(lines.size(), SpatialLogger::max_lines);
   EXPECT_EQ(lines.front().begin, Vec2F(2, 0));
-  EXPECT_EQ(lines.back().begin, Vec2F(SpatialLogger::MaximumLines + 1, 0));
+  EXPECT_EQ(lines.back().begin, Vec2F(SpatialLogger::max_lines + 1, 0));
   EXPECT_TRUE(logger.get_lines("lines", false).empty());
 
   List<Vec2F> vertices;
-  for (std::size_t i = 0; i != SpatialLogger::MaximumLines + 3; ++i)
+  for (std::size_t i = 0; i != SpatialLogger::max_lines + 3; ++i)
     vertices.push_back({static_cast<float>(i), static_cast<float>(i % 2)});
   PolyF polygon(std::move(vertices));
   logger.log_line("polygon", {-1, -1}, {-2, -2}, color);
   logger.log_poly("polygon", polygon, color);
   auto polygonLines = logger.get_lines("polygon", true);
-  ASSERT_EQ(polygonLines.size(), SpatialLogger::MaximumLines);
+  ASSERT_EQ(polygonLines.size(), SpatialLogger::max_lines);
   auto firstSide = polygon.side(3);
   auto lastSide = polygon.side(polygon.sides() - 1);
   EXPECT_EQ(polygonLines.front().begin, firstSide.min());

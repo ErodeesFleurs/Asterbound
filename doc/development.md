@@ -194,6 +194,8 @@ values in named locals and preserve first-error, ownership and transaction order
 ### Logging and native process output
 
 - Filter before formatting, then recheck levels under the dispatch lock. File sinks report short writes without retries/rollback/sync; checked `make_shared` construction uses a private key. Preserve non-inserting spatial queries, newest-suffix queue caps and ownership-transferring drains.
+- Exception summaries and details share one dispatch. A summary callback can change Debug visibility before details are rendered; when a delivery fails, retry only that delivery's repeat record, not a newer one installed by a reentrant callback.
+- Use `LogMap::snapshot()` for a sorted read and `drain()` to detach a complete batch before sorting. Never compose a read and `clear()` for HUD consumption. A dedicated server that cannot enqueue the debug batch restores only missing keys; newer writes take precedence. Local broadcasts must leave the HUD's values intact.
 - The SDL logger borrow exists only after startup and resets after application destruction/native callback shutdown. GUI entries create `NativeRuntime` with `StandardStreams::Optional` before initialization/workers. Repair only missing stdout/stderr with `NUL` or `/dev/null`, preserving redirection/errors, including valid CRT output without a Win32 handle. POSIX repair reserves the original descriptor; default `Inherit` keeps CLI output checked.
 - `EmergencyLog` is best-effort reporting, not exit policy. On stderr failure, send the original message/error to `OutputDebugString` or syslog without recursion/blocking dialogs. Restore thread-local CRT invalid-parameter policy after recovery. Ordinary logger/file/`Star::print` errors remain checked.
 

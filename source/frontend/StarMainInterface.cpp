@@ -2089,15 +2089,14 @@ std::expected<void, StarException> MainInterface::renderDebug() {
     if (m_clientCommandProcessor->debugHudEnabled()) {
       if (auto r = context().setTextStyle(m_config->debugTextStyle); !r) return std::unexpected(std::move(r.error()));
       if (auto r = context().setLineSpacing(0.5f); !r) return std::unexpected(std::move(r.error()));
-      bool clearMap = std::exchange(m_debugMapClearDue, false);
-      auto logMapValues = context().root().logMap().get_values();
-      if (clearMap) context().root().logMap().clear();
+      auto& log_map = context().root().logMap();
+      auto log_map_values = std::exchange(m_debugMapClearDue, false) ? log_map.drain() : log_map.snapshot();
       auto height = windowHeight();
       if (!height) return std::unexpected(std::move(height.error()));
       List<String> formatted;
-      formatted.reserve(logMapValues.size());
+      formatted.reserve(log_map_values.size());
       int counter = 0;
-      for (auto const& pair : logMapValues) {
+      for (auto const& pair : log_map_values) {
         TextPositioning positioning = {Vec2F(m_config->debugOffset[0], *height - m_config->debugOffset[1] - m_config->textStyle.fontSize * interfaceScale() * counter++)};
         String& text = formatted.emplace_back(Star::format("{}^lightgray;:^green,set; {}", pair.first, pair.second));
         auto size = context().determineTextSize(text, positioning);

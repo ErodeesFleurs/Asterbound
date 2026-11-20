@@ -1279,8 +1279,8 @@ const GameTestRegistration simultaneousRoots("RootTest", "SimultaneousRoots", []
     ASSERT_TRUE(contextB->eval("sb.logInfo('root-isolation-log-B'); sb.setLogMap('root-isolation', 'B')"));
     EXPECT_EQ(rootA->logMap().get_value("root-isolation"), "A");
     EXPECT_EQ(rootB->logMap().get_value("root-isolation"), "B");
-    rootA->logMap().clear();
-    EXPECT_TRUE(rootA->logMap().get_values().empty());
+    EXPECT_EQ(rootA->logMap().drain().value("root-isolation"), "A");
+    EXPECT_TRUE(rootA->logMap().snapshot().empty());
     EXPECT_EQ(rootB->logMap().get_value("root-isolation"), "B");
     EXPECT_EQ(isolationLogContains(logPathA, "root-isolation-log-A"), true);
     EXPECT_EQ(isolationLogContains(logPathA, "root-isolation-log-B"), false);

@@ -586,7 +586,7 @@ TEST(StringTest, FixedEnumNamesPreserveCaseInsensitiveLookupAndCanonicalNames) {
       EXPECT_EQ(*canonical, spelling);
     }
   };
-  roundTrip.operator()<LogLevelNames>();
+  roundTrip.operator()<log_level_names>();
   roundTrip.operator()<KeyNames>();
   roundTrip.operator()<KeyModNames>();
   roundTrip.operator()<MouseButtonNames>();
@@ -617,7 +617,7 @@ TEST(StringTest, FixedEnumNamesDistinguishUnknownNamesInvalidUtf8AndSparseValues
     auto optional = maybe_enum_value<KeyNames>(bytes);
     ASSERT_FALSE(optional);
     EXPECT_TRUE(optional.error().is<UnicodeException>());
-    auto required = enum_value<LogLevelNames>(bytes);
+    auto required = enum_value<log_level_names>(bytes);
     ASSERT_FALSE(required);
     EXPECT_TRUE(required.error().is<UnicodeException>());
   }
@@ -630,7 +630,7 @@ TEST(StringTest, FixedEnumNamesDistinguishUnknownNamesInvalidUtf8AndSparseValues
   auto unnamedAxis = enum_name<ControllerAxisNames>(ControllerAxis::Invalid);
   ASSERT_FALSE(unnamedAxis);
   EXPECT_TRUE(unnamedAxis.error().is<MapException>());
-  auto unknownLevel = enum_value<LogLevelNames>("warning");
+  auto unknownLevel = enum_value<log_level_names>("warning");
   ASSERT_FALSE(unknownLevel);
   EXPECT_TRUE(unknownLevel.error().is<MapException>());
 }

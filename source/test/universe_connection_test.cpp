@@ -551,6 +551,47 @@ const GameTestRegistration packet_names_preserve_wire_and_lua_spelling(
   EXPECT_TRUE(unnamed.error().is<MapException>());
 });
 
+const GameTestRegistration log_map_broadcast("UniverseConnections", "LogMapBroadcastRetainsWireAndLocalPacket", [](GameTest& fixture) {
+  LogMap log_map;
+  log_map.set_value("z", "last");
+  log_map.set_value("a", "first");
+  auto batch = std::make_shared<LogMapUpdate>(log_map.drain());
+  auto local = LocalPacketSocket::openPair();
+  ASSERT_TRUE(local.first->sendPackets({batch}));
+  log_map.set_value("z", "next batch");
+
+  auto pair = connectionTestTcpPair(fixture.root().logger());
+  ASSERT_TRUE(pair) << pair.error().what();
+  auto tcp = TcpPacketSocket::open(fixture.root().logger(), pair->first);
+  ASSERT_TRUE(tcp) << tcp.error().what();
+  UniverseConnection sender(std::move(*tcp));
+  auto peer = TcpPacketSocket::open(fixture.root().logger(), pair->second);
+  ASSERT_TRUE(peer) << peer.error().what();
+  UniverseConnection receiver(std::move(*peer));
+  ASSERT_TRUE(sender.pushSingle(batch));
+  ASSERT_EQ(sender.sendAll(2000), true);
+  ASSERT_EQ(receiver.receiveAny(2000), true);
+  auto received = receiver.pullSingle();
+  ASSERT_TRUE(received);
+  auto decoded = as<LogMapUpdate>(*received);
+  ASSERT_TRUE(decoded);
+  EXPECT_EQ(decoded->map, batch->map);
+  auto forwarded = local.second->receivePackets();
+  ASSERT_TRUE(forwarded);
+  ASSERT_EQ(forwarded->size(), 1u);
+  EXPECT_EQ(forwarded->front(), batch);
+  EXPECT_EQ(batch->compressionMode(), PacketCompressionMode::Automatic);
+  EXPECT_EQ(log_map.get_value("z"), "next batch");
+
+  DataStreamBuffer wire;
+  ASSERT_TRUE(batch->write(wire));
+  DataStreamBuffer expected;
+  ASSERT_TRUE(expected.write_vlq_u(2));
+  for (auto const& field : std::array<String, 4>{"a", "first", "z", "last"})
+    ASSERT_TRUE(expected.write(field));
+  EXPECT_EQ(wire.data(), expected.data());
+});
+
 const GameTestRegistration universeConnectionsWorldUpdatePacketsTransferRvaluesAndCopyLvalues(
     "UniverseConnections", "WorldUpdatePacketsTransferRvaluesAndCopyLvalues", [](GameTest&) {
   ByteArray parameters(4096, 'p');

@@ -9,6 +9,7 @@ import star.file;
 import star.format;
 import star.list;
 import star.logging;
+import star.map;
 import star.memory;
 import star.benchmark_runner;
 import star.random;
@@ -22,6 +23,9 @@ constexpr std::size_t caller_count = 4;
 constexpr std::size_t capture_capacity = batch_size * caller_count;
 constexpr std::string_view space = "logging-benchmark-space";
 constexpr Star::Vec4B color{17, 43, 127, 255};
+
+static_assert(batch_size <= Star::SpatialLogger::max_lines && batch_size <= Star::SpatialLogger::max_points
+              && batch_size <= Star::SpatialLogger::max_text);
 
 std::array<std::string, batch_size> fixture() {
   std::array<std::string, batch_size> messages;
@@ -45,9 +49,9 @@ void account(benchmark::State& state, std::size_t count, std::size_t bytes, std:
 // Capture complete bytes into preallocated slots; no formatting, allocation or
 // correctness comparisons in the timed sink. Atomic reservation also permits
 // concurrent dispatch if the logger releases its registry lock before delivery.
-class capture_sink : public Star::LogSink {
+class CaptureSink : public Star::LogSink {
 public:
-  struct entry {
+  struct Entry {
     std::array<char, 96> bytes;
     std::size_t size;
     Star::LogLevel level;
@@ -83,16 +87,16 @@ public:
 
   void reset() { count.store(0, std::memory_order_relaxed); }
   std::atomic<std::size_t> count{0};
-  std::array<entry, capture_capacity> entries;
+  std::array<Entry, capture_capacity> entries;
 };
 
 void logger_messages(benchmark::State& state, bool formatted, std::size_t sinks, bool disabled = false) {
   auto messages = fixture();
   Star::Logger logger;
   logger.remove_stdout_sink();
-  std::vector<std::shared_ptr<capture_sink>> outputs;
+  std::vector<std::shared_ptr<CaptureSink>> outputs;
   for (std::size_t i = 0; i != sinks; ++i) {
-    auto sink = std::make_shared<capture_sink>();
+    auto sink = std::make_shared<CaptureSink>();
     sink->set_level(disabled ? Star::LogLevel::Warn : Star::LogLevel::Info);
     logger.add_sink(sink);
     outputs.push_back(std::move(sink));
@@ -126,7 +130,7 @@ void concurrent_callers(benchmark::State& state) {
   auto messages = fixture();
   Star::Logger logger;
   logger.remove_stdout_sink();
-  auto sink = std::make_shared<capture_sink>();
+  auto sink = std::make_shared<CaptureSink>();
   logger.add_sink(sink);
   std::atomic<unsigned> generation{0};
   std::atomic<unsigned> completed{0};
@@ -192,6 +196,45 @@ void concurrent_callers(benchmark::State& state) {
           "4 persistent native callers; includes wakeup/completion; process CPU time");
 }
 
+void repeated_diagnostic(benchmark::State& state) {
+  Star::Logger logger;
+  logger.remove_stdout_sink();
+  auto sink = std::make_shared<CaptureSink>();
+  sink->set_level(Star::LogLevel::Debug);
+  logger.add_sink(sink);
+  Star::ExceptionSummary summary;
+  summary.kind = Star::ExceptionSummaryKind::ScriptRuntime;
+  summary.reason = "Cyclic Lua require: /a.lua -> /b.lua -> /a.lua";
+  summary.locations.push_back({"/b.lua", 1, "benchmark"});
+  auto error = Star::StarException("cycle details", false);
+  Star::ExceptionDiagnostic first(error.with_summary(summary));
+  Star::ExceptionDiagnostic repeat(error.with_summary(summary));
+  for (auto _ : state) {
+    (void)_;
+    state.PauseTiming();
+    logger.reset_exception_repeats();
+    sink->reset();
+    auto seeded = logger.error_exception("script update", first);
+    bool valid = seeded && sink->count.load() == 2 && sink->entries[0].level == Star::LogLevel::Error
+      && sink->entries[1].level == Star::LogLevel::Debug;
+    state.ResumeTiming();
+    if (!require(state, valid))
+      break;
+    for (std::size_t i = 0; i != batch_size; ++i) {
+      if (auto result = logger.error_exception("script update", repeat); !result) {
+        state.SkipWithError(result.error().what());
+        return;
+      }
+    }
+    state.PauseTiming();
+    valid = sink->count.load() == 2;
+    state.ResumeTiming();
+    if (!require(state, valid))
+      break;
+  }
+  account(state, batch_size, 0, "one seeded identity; equal independent summary; Debug enabled; no Lua execution");
+}
+
 bool valid_file(std::string_view contents, std::array<std::string, batch_size> const& messages, std::size_t batches) {
   constexpr std::size_t prefix_size = 22;// [HH:MM:SS.mmm] [Info]
   std::size_t cursor = 0;
@@ -213,7 +256,7 @@ bool valid_file(std::string_view contents, std::array<std::string, batch_size> c
   return cursor == contents.size();
 }
 
-void file_lines(benchmark::State& state) {
+void file_lines(benchmark::State& state, bool multiline) {
   auto random = Star::RandomService::create();
   if (!random) {
     state.SkipWithError(random.error().what());
@@ -239,6 +282,12 @@ void file_lines(benchmark::State& state) {
   logger.remove_stdout_sink();
   logger.add_sink(*output);
   auto messages = fixture();
+  if (multiline) {
+    for (auto& message : messages) {
+      message.reserve(message.size() + 1088);
+      message.append("\n  first frame: ").append(512, 'x').append("\n  second frame: ").append(512, 'y');
+    }
+  }
   for (auto _ : state) {
     (void)_;
     bool success = true;
@@ -261,7 +310,8 @@ void file_lines(benchmark::State& state) {
   else
     require(state, valid_file(std::string_view(contents->data(), contents->size()), messages, state.iterations()));
   account(state, batch_size, batch_size * (messages[0].size() + 23),
-          "warm private temp file; complete timestamped lines; no durability claim");
+          multiline ? "long multiline records; warm private temp file; no durability claim"
+                    : "warm private temp file; complete timestamped lines; no durability claim");
 }
 
 void spatial_append_drain(benchmark::State& state, bool observed) {
@@ -310,7 +360,7 @@ void spatial_append_drain(benchmark::State& state, bool observed) {
 void spatial_capacity(benchmark::State& state) {
   Star::SpatialLogger logger;
   logger.set_observed(true);
-  for (std::size_t i = 0; i != Star::SpatialLogger::MaximumPoints; ++i)
+  for (std::size_t i = 0; i != Star::SpatialLogger::max_points; ++i)
     logger.log_point(space, Star::Vec2F{static_cast<float>(i), -1.0f}, color);
   std::uint64_t batches = 0;
   for (auto _ : state) {
@@ -320,10 +370,10 @@ void spatial_capacity(benchmark::State& state) {
     ++batches;
   }
   auto points = logger.get_points(space, true);
-  bool valid = points.size() == Star::SpatialLogger::MaximumPoints;
+  bool valid = points.size() == Star::SpatialLogger::max_points;
   auto appended = batches * batch_size;
   auto initial_remaining =
-    appended < Star::SpatialLogger::MaximumPoints ? Star::SpatialLogger::MaximumPoints - appended : 0;
+    appended < Star::SpatialLogger::max_points ? Star::SpatialLogger::max_points - appended : 0;
   if (valid) {
     for (std::size_t i = 0; i != points.size(); ++i) {
       auto expected = i < initial_remaining
@@ -344,6 +394,40 @@ void raw_four(benchmark::State& state) { logger_messages(state, false, 4); }
 void formatted_four(benchmark::State& state) { logger_messages(state, true, 4); }
 void spatial_unobserved(benchmark::State& state) { spatial_append_drain(state, false); }
 void spatial_observed(benchmark::State& state) { spatial_append_drain(state, true); }
+// Model the owner's map and one retained payload reference per recipient, not
+// packet encoding, contextual updates, connection queues, or network delivery.
+void log_map_batch(benchmark::State& state, bool local) {
+  using Payload = Star::Map<Star::String, Star::String>;
+  constexpr std::size_t recipients = 4;
+  Payload expected;
+  auto messages = fixture();
+  for (std::size_t i = 0; i != batch_size; ++i)
+    expected[Star::String(std::format("server_world_{:02}_update", i))] = Star::String(messages[i]);
+  Star::LogMap map;
+  for (auto _ : state) {
+    (void)_;
+    state.PauseTiming();
+    for (auto const& [key, value] : expected)
+      map.set_value(key, value);
+    state.ResumeTiming();
+    std::array<std::shared_ptr<Payload const>, recipients> delivered;
+    auto payload = std::make_shared<Payload const>(local ? map.snapshot() : map.drain());
+    delivered.fill(payload);
+    state.PauseTiming();
+    bool valid = std::ranges::all_of(delivered, [&](auto const& item) { return item && *item == expected; });
+    valid &= local ? map.snapshot() == expected : map.snapshot().empty();
+    state.ResumeTiming();
+    if (!require(state, valid))
+      break;
+  }
+  account(state, recipients, 0, local ? "local tick; 64 map entries; simulated payload fanout only"
+                                      : "dedicated tick; 64 map entries; simulated payload fanout only");
+}
+
+void local_map_batch(benchmark::State& state) { log_map_batch(state, true); }
+void dedicated_map_batch(benchmark::State& state) { log_map_batch(state, false); }
+void short_file_lines(benchmark::State& state) { file_lines(state, false); }
+void multiline_file_lines(benchmark::State& state) { file_lines(state, true); }
 
 BENCHMARK(disabled_formatted)->Name("Logging/DisabledFormatted");
 BENCHMARK(disabled_raw)->Name("Logging/DisabledRaw");
@@ -352,7 +436,11 @@ BENCHMARK(formatted_one)->Name("Logging/FormattedOneSink");
 BENCHMARK(raw_four)->Name("Logging/RawFourSinks");
 BENCHMARK(formatted_four)->Name("Logging/FormattedFourSinks");
 BENCHMARK(concurrent_callers)->Name("Logging/ConcurrentFourCallers")->MeasureProcessCPUTime();
-BENCHMARK(file_lines)->Name("Logging/FileCompleteLines");
+BENCHMARK(repeated_diagnostic)->Name("Logging/RepeatSuppressedDiagnostic");
+BENCHMARK(short_file_lines)->Name("Logging/FileCompleteLines");
+BENCHMARK(multiline_file_lines)->Name("Logging/FileLongMultiline")->Iterations(256);
+BENCHMARK(local_map_batch)->Name("Logging/LogMapLocalFourRecipients");
+BENCHMARK(dedicated_map_batch)->Name("Logging/LogMapDedicatedFourRecipients");
 BENCHMARK(spatial_unobserved)->Name("Logging/SpatialUnobserved");
 BENCHMARK(spatial_observed)->Name("Logging/SpatialObservedDrain");
 BENCHMARK(spatial_capacity)->Name("Logging/SpatialCapacitySteady");

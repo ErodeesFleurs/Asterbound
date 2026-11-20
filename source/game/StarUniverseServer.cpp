@@ -1521,29 +1521,40 @@ std::expected<void, StarException> UniverseServer::sendClientContextUpdate(std::
 std::expected<void, StarException> UniverseServer::sendClientContextUpdates() {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lock_with_diagnostics(locker);
-  std::shared_lock clientsLocker(m_clientsLock);
+  std::shared_lock clients_lock(m_clientsLock);
 
-  HashMap<ConnectionId, ByteArray> contextUpdates;
+  auto& log_map = m_root.logMap();
+  std::shared_ptr<LogMapUpdate> debug_update;
+  // A failed context write or debug send must leave the batch available for retry.
+  auto restore = make_scope_exit([&] {
+    if (!m_isLocal && debug_update)
+      log_map.restore_missing(debug_update->map);
+  });
+  HashMap<ConnectionId, ByteArray> context_updates;
   for (auto const& p : m_clients) {
     if (m_disconnectingClients.contains(p.first))
       continue;
-    auto clientContextData = p.second->writeUpdate();
-    if (!clientContextData)
-      return std::unexpected(std::move(clientContextData.error()));
-    if (!clientContextData->empty())
-      contextUpdates[p.first] = std::move(*clientContextData);
+    auto context_data = p.second->writeUpdate();
+    if (!context_data)
+      return std::unexpected(std::move(context_data.error()));
+    if (!context_data->empty())
+      context_updates[p.first] = std::move(*context_data);
 
     if (p.second->serverDebug() && p.second->netRules().version() >= 17) {
-      if (auto sent =
-            m_connectionServer->sendPackets(p.first, {std::make_shared<LogMapUpdate>(m_root.logMap().get_values())});
-          !sent)
+      // The send paths serialize const packets or forward them to the local reader.
+      if (!debug_update) {
+        debug_update = std::make_shared<LogMapUpdate>();
+        debug_update->map = m_isLocal ? log_map.snapshot() : log_map.drain();
+      }
+      if (auto sent = m_connectionServer->sendPackets(p.first, {debug_update}); !sent)
         return std::unexpected(std::move(sent.error()));
     }
   }
-  if (!m_isLocal)
-    m_root.logMap().clear();
+  restore.release();
+  if (!m_isLocal && !debug_update)
+    log_map.clear();
 
-  for (auto&& update : contextUpdates) {
+  for (auto&& update : context_updates) {
     if (auto sent = m_connectionServer->sendPackets(update.first, {std::make_shared<ClientContextUpdatePacket>(std::move(update.second))}); !sent)
       return std::unexpected(std::move(sent.error()));
   }

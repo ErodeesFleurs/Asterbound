@@ -3060,7 +3060,7 @@ namespace LuaBindings {
     if (!textResult)
       return std::unexpected(std::move(textResult.error()));
     auto text = std::move(*textResult);
-    root.spatialLogger().log_text("world", text, position, color.to_rgba());
+    root.spatialLogger().log_text("world", std::move(text), position, color.to_rgba());
     return {};
   }
 

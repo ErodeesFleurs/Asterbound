@@ -34,6 +34,7 @@ static_assert(!std::is_copy_constructible_v<File>);
 static_assert(!std::is_copy_assignable_v<File>);
 static_assert(!std::is_move_constructible_v<File>);
 static_assert(!std::is_move_assignable_v<File>);
+static_assert(noexcept(std::declval<LogSink const&>().level()));
 
 #ifdef STAR_TEST_WRAP_WRITE
 namespace {
@@ -531,16 +532,22 @@ TEST(FileTest, LogSinkKeepsOversizedMultilineRecordsWhole) {
   auto path = File::relative_to(*directory, "oversized.log");
   auto sink = FileLogSink::create(path, LogLevel::Info, true, 1, 2);
   ASSERT_TRUE(sink);
-  std::string message = "first line\n" + std::string(1024, '#') + "\nlast line";
+  std::string message(64 * 1024, '#');
+  message += "\nfirst line";
+  message.push_back('\0');
+  message += "尾\nlast line";
   ASSERT_TRUE((*sink)->log(message, LogLevel::Info));
   auto first = File::read_file_string(path);
   ASSERT_TRUE(first);
+  constexpr auto info_framing = std::string_view("[00:00:00.000] [Info] \n").size();
+  EXPECT_EQ(first->utf8_size(), info_framing + message.size());
   EXPECT_TRUE(first->utf8().ends_with(message + "\n"));
   EXPECT_EQ(File::exists(path + ".1"), false);
   ASSERT_TRUE((*sink)->log("next", LogLevel::Info));
   EXPECT_EQ(File::read_file_string(path + ".1"), *first);
   auto second = File::read_file_string(path);
   ASSERT_TRUE(second);
+  EXPECT_EQ(second->utf8_size(), info_framing + std::string_view("next").size());
   EXPECT_TRUE(second->utf8().ends_with("next\n"));
   ASSERT_TRUE((*sink)->log("last", LogLevel::Info));
   EXPECT_EQ(File::read_file_string(path + ".2"), *first);
