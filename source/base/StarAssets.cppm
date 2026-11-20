@@ -33,6 +33,7 @@ class Audio;
 class Image;
 
 class LuaContext;
+class LuaEngine;
 
 struct AssetExceptionTag {
   static constexpr std::string_view name() { return "AssetException"; }
@@ -420,7 +421,7 @@ private:
     }
   };
 
-  RefPtr<RefCounter> m_luaEngine; // dumb but to avoid including Lua.hpp in here...
+  RefPtr<LuaEngine> m_lua_engine;
   mutable HashMap<PatchContextKey, std::shared_ptr<LuaContext>, PatchContextKeyHash> m_patchContexts;
   mutable std::recursive_mutex m_luaMutex;
 

@@ -581,12 +581,6 @@ public:
 
   ~LuaEngine() override;
 
-  LuaEngine(LuaEngine const&) = delete;
-  LuaEngine(LuaEngine&&) = default;
-
-  LuaEngine& operator=(LuaEngine const&) = delete;
-  LuaEngine& operator=(LuaEngine&&) = default;
-
   // Optional host capability. Core-only engines leave image resolution unset.
   using ImageResolver = std::function<std::expected<std::shared_ptr<Image const>, StarException>(String const&)>;
   void setImageResolver(ImageResolver resolver) { m_imageResolver = std::move(resolver); }
@@ -2536,7 +2530,7 @@ template <typename T>
   auto reference = popHandle(m_state);
   if (!reference)
     return std::unexpected(std::move(reference.error()));
-  return LuaUserData(LuaDetail::LuaHandle(RefPtr<LuaEngine>(this), *reference));
+  return LuaUserData(LuaDetail::LuaHandle(LuaEnginePtr(*this), *reference));
 }
 
 template <typename T, typename K>

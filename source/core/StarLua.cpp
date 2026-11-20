@@ -506,7 +506,7 @@ std::expected<std::optional<JsonArray>, StarException> LuaConverter<JsonArray>::
 }
 
 std::expected<LuaEnginePtr, StarException> LuaEngine::create(bool safe) {
-  LuaEnginePtr self(new LuaEngine);
+  LuaEnginePtr self(*new LuaEngine);
 
   self->m_state = lua_newstate(allocate, nullptr, luaL_makeseed(nullptr));
 
@@ -873,7 +873,7 @@ std::expected<LuaString, StarException> LuaEngine::createString(std::string_view
   auto handle = popHandle(m_state);
   if (!handle)
     return std::unexpected(std::move(handle.error()));
-  return LuaString(LuaDetail::LuaHandle(RefPtr<LuaEngine>(this), *handle));
+  return LuaString(LuaDetail::LuaHandle(LuaEnginePtr(*this), *handle));
 }
 
 std::expected<LuaString, StarException> LuaEngine::createString(String const& str) {
@@ -897,7 +897,7 @@ std::expected<LuaTable, StarException> LuaEngine::createTable(int narr, int nrec
   auto handle = popHandle(m_state);
   if (!handle)
     return std::unexpected(std::move(handle.error()));
-  return LuaTable(LuaDetail::LuaHandle(RefPtr<LuaEngine>(this), *handle));
+  return LuaTable(LuaDetail::LuaHandle(LuaEnginePtr(*this), *handle));
 }
 
 std::expected<LuaThread, StarException> LuaEngine::createThread() {
@@ -914,7 +914,7 @@ std::expected<LuaThread, StarException> LuaEngine::createThread() {
   auto handle = popHandle(m_state);
   if (!handle)
     return std::unexpected(std::move(handle.error()));
-  return LuaThread(LuaDetail::LuaHandle(RefPtr<LuaEngine>(this), *handle));
+  return LuaThread(LuaDetail::LuaHandle(LuaEnginePtr(*this), *handle));
 }
 
 std::expected<void*, StarException> LuaEngine::allocateUserData(lua_State* state, std::size_t size) {
@@ -984,7 +984,7 @@ std::expected<LuaContext, StarException> LuaEngine::createContext() {
   auto handle = popHandle(m_state);
   if (!handle)
     return std::unexpected(std::move(handle.error()));
-  auto context = LuaContext(LuaDetail::LuaHandle(RefPtr<LuaEngine>(this), *handle));
+  auto context = LuaContext(LuaDetail::LuaHandle(LuaEnginePtr(*this), *handle));
   // Add loadstring
   auto handleIndex = context.handleIndex();
   auto loadstring = createFunction([&engine = *this, handleIndex](String const& source, std::optional<String> const& name, std::optional<LuaTable> const& env) -> std::expected<LuaFunction, StarException> {
@@ -1543,7 +1543,7 @@ std::expected<std::optional<LuaTable>, StarException> LuaEngine::tableGetMetatab
   auto handle = popHandle(m_state);
   if (!handle)
     return std::unexpected(std::move(handle.error()));
-  return LuaTable(LuaDetail::LuaHandle(RefPtr<LuaEngine>(this), *handle));
+  return LuaTable(LuaDetail::LuaHandle(LuaEnginePtr(*this), *handle));
 }
 
 std::expected<void, StarException> LuaEngine::tableSetMetatable(int handleIndex, LuaTable const& table) {
@@ -1796,7 +1796,7 @@ std::expected<LuaFunction, StarException> LuaEngine::createWrappedFunction(LuaDe
   auto handle = popHandle(m_state);
   if (!handle)
     return std::unexpected(std::move(handle.error()));
-  return LuaFunction(LuaDetail::LuaHandle(RefPtr<LuaEngine>(this), *handle));
+  return LuaFunction(LuaDetail::LuaHandle(LuaEnginePtr(*this), *handle));
 }
 
 std::expected<LuaFunction, StarException> LuaEngine::createRawFunction(lua_CFunction function) {
@@ -1809,7 +1809,7 @@ std::expected<LuaFunction, StarException> LuaEngine::createRawFunction(lua_CFunc
   auto handle = popHandle(m_state);
   if (!handle)
     return std::unexpected(std::move(handle.error()));
-  return LuaFunction(LuaDetail::LuaHandle(RefPtr<LuaEngine>(this), *handle));
+  return LuaFunction(LuaDetail::LuaHandle(LuaEnginePtr(*this), *handle));
 }
 
 std::expected<LuaFunction, StarException> LuaEngine::createFunctionFromSource(int handleIndex, std::span<char const> contents, String const& name) {
@@ -1826,7 +1826,7 @@ std::expected<LuaFunction, StarException> LuaEngine::createFunctionFromSource(in
   auto handle = popHandle(m_state);
   if (!handle)
     return std::unexpected(std::move(handle.error()));
-  return LuaFunction(LuaDetail::LuaHandle(RefPtr<LuaEngine>(this), *handle));
+  return LuaFunction(LuaDetail::LuaHandle(LuaEnginePtr(*this), *handle));
 }
 
 std::expected<void, StarException> LuaEngine::pushLuaValue(lua_State* state, LuaValue const& luaValue) {
@@ -1885,28 +1885,28 @@ std::expected<LuaValue, StarException> LuaEngine::popLuaValue(lua_State* state) 
       auto handle = popHandle(state);
       if (!handle)
         return std::unexpected(std::move(handle.error()));
-      result = LuaString(LuaDetail::LuaHandle(RefPtr<LuaEngine>(this), *handle));
+      result = LuaString(LuaDetail::LuaHandle(LuaEnginePtr(*this), *handle));
       break;
     }
     case LUA_TTABLE: {
       auto handle = popHandle(state);
       if (!handle)
         return std::unexpected(std::move(handle.error()));
-      result = LuaTable(LuaDetail::LuaHandle(RefPtr<LuaEngine>(this), *handle));
+      result = LuaTable(LuaDetail::LuaHandle(LuaEnginePtr(*this), *handle));
       break;
     }
     case LUA_TFUNCTION: {
       auto handle = popHandle(state);
       if (!handle)
         return std::unexpected(std::move(handle.error()));
-      result = LuaFunction(LuaDetail::LuaHandle(RefPtr<LuaEngine>(this), *handle));
+      result = LuaFunction(LuaDetail::LuaHandle(LuaEnginePtr(*this), *handle));
       break;
     }
     case LUA_TTHREAD: {
       auto handle = popHandle(state);
       if (!handle)
         return std::unexpected(std::move(handle.error()));
-      result = LuaThread(LuaDetail::LuaHandle(RefPtr<LuaEngine>(this), *handle));
+      result = LuaThread(LuaDetail::LuaHandle(LuaEnginePtr(*this), *handle));
       break;
     }
     case LUA_TUSERDATA: {
@@ -1918,7 +1918,7 @@ std::expected<LuaValue, StarException> LuaEngine::popLuaValue(lua_State* state) 
       auto handle = popHandle(state);
       if (!handle)
         return std::unexpected(std::move(handle.error()));
-      result = LuaUserData(LuaDetail::LuaHandle(RefPtr<LuaEngine>(this), *handle));
+      result = LuaUserData(LuaDetail::LuaHandle(LuaEnginePtr(*this), *handle));
       break;
     }
     default: {

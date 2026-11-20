@@ -96,14 +96,28 @@ TEST(IntrusivePtr, All) {
 }
 
 namespace {
-struct QueryLeft : virtual RefCounter {
+struct QueryCounter : RefCounter {
+  mutable int retains = 0;
+  mutable int drops = 0;
+  mutable int queries = 0;
+
+  friend void ref_ptr_inc_ref(QueryCounter const& value) noexcept {
+    ++value.retains;
+    Star::ref_ptr_inc_ref(static_cast<RefCounter const&>(value));
+  }
+  friend void ref_ptr_dec_ref(QueryCounter const& value) noexcept {
+    ++value.drops;
+    Star::ref_ptr_dec_ref(static_cast<RefCounter const&>(value));
+  }
+};
+struct QueryLeft : virtual QueryCounter {
   int left = 17;
   void const* query_type(TypeKey key) const noexcept override {
     return query_type_of<QueryLeft, RefCounter>(this, key);
   }
 };
 
-struct QueryRight : virtual RefCounter {
+struct QueryRight : virtual QueryCounter {
   int right = 29;
   void const* query_type(TypeKey key) const noexcept override {
     return query_type_of<QueryRight, RefCounter>(this, key);
@@ -114,6 +128,7 @@ struct QueryBoth : QueryLeft, QueryRight {
   explicit QueryBoth(bool& destroyed) : destroyed(destroyed) {}
   ~QueryBoth() { destroyed = true; }
   void const* query_type(TypeKey key) const noexcept override {
+    ++queries;
     return query_type_of<QueryBoth, QueryLeft, QueryRight>(this, key);
   }
   bool& destroyed;
@@ -123,7 +138,7 @@ struct QueryBoth : QueryLeft, QueryRight {
 TEST(IntrusivePtr, VirtualCrossCastSharesObject) {
   bool destroyed = false;
   {
-    RefPtr<QueryLeft> left(new QueryBoth(destroyed));
+    RefPtr<QueryLeft> left = make_ref<QueryBoth>(destroyed);
     auto right = as<QueryRight>(left);
     ASSERT_TRUE(right);
     EXPECT_EQ(29, right->right);
@@ -133,6 +148,26 @@ TEST(IntrusivePtr, VirtualCrossCastSharesObject) {
     EXPECT_FALSE(destroyed);
     EXPECT_EQ(29, right->right);
   }
+  EXPECT_TRUE(destroyed);
+}
+
+TEST(IntrusivePtr, AdjustedRvalueQueriesOnceAndTransfersWithoutCountChurn) {
+  bool destroyed = false;
+  auto object = make_ref<QueryBoth>(destroyed);
+  QueryRight const& expected = *object;
+  RefPtr<QueryLeft const> left = std::move(object);
+  ASSERT_EQ(1, left->retains);
+  EXPECT_FALSE(as<Test2>(std::move(left)));
+  ASSERT_TRUE(left);
+  EXPECT_EQ(1, left->queries);
+  auto right = as<QueryRight>(std::move(left));
+  ASSERT_TRUE(right);
+  EXPECT_FALSE(left);
+  EXPECT_EQ(std::addressof(expected), right.get());
+  EXPECT_EQ(2, right->queries);
+  EXPECT_EQ(1, right->retains);
+  EXPECT_EQ(0, right->drops);
+  right.reset();
   EXPECT_TRUE(destroyed);
 }
 
@@ -240,6 +275,36 @@ struct Tracked : RefCounter {
   int& destructions;
 };
 struct OtherTracked : RefCounter {};
+struct WithPlainBase : PlainBase, RefCounter {};
+struct NonVoidHook {
+  friend int ref_ptr_inc_ref(NonVoidHook const&) noexcept { return 0; }
+  friend void ref_ptr_dec_ref(NonVoidHook const&) noexcept {}
+};
+struct ThrowingHook {
+  friend void ref_ptr_inc_ref(ThrowingHook const&) noexcept {}
+  friend void ref_ptr_dec_ref(ThrowingHook const&) {}
+};
+
+struct ListNode;
+static_assert(std::copy_constructible<RefPtr<ListNode>>);
+struct ListNode : RefCounter {
+  explicit ListNode(int& destroyed) : destroyed(destroyed) {}
+  ~ListNode() override { ++destroyed; }
+  int& destroyed;
+  RefPtr<ListNode> next;
+};
+
+static_assert(!std::is_copy_constructible_v<OtherTracked> && !std::is_move_constructible_v<OtherTracked>);
+static_assert(!std::is_copy_assignable_v<OtherTracked> && !std::is_move_assignable_v<OtherTracked>);
+static_assert(intrusive_counted<ListNode> && intrusive_counted<Tracked const>);
+static_assert(!intrusive_counted<NonVoidHook> && !intrusive_counted<ThrowingHook>);
+static_assert(!std::constructible_from<RefPtr<PlainBase>, RefPtr<WithPlainBase>&&>);
+static_assert(!cast_input<PlainBase, RefPtr<WithPlainBase>&>);
+static_assert(!cast_input<PlainBase, RefPtr<WithPlainBase const>&&>);
+static_assert(std::movable<DetachedRef<Tracked>> && !std::copy_constructible<DetachedRef<Tracked>>);
+static_assert(!std::constructible_from<RefPtr<Tracked const>, Tracked&&>);
+static_assert(!std::constructible_from<RefPtr<RefCounter const>, Tracked const&&>);
+static_assert(!std::constructible_from<RefPtr<Tracked>, Tracked*>);
 
 template <typename Target, typename Source>
 concept pointer_cast_available = requires(Source* source) { as<Target>(source); };
@@ -430,35 +495,68 @@ TEST(IntrusivePtr, ConvertRvalueTransfersAndConstAssignmentsRetainLifetime) {
   EXPECT_EQ(1, destructions);
 }
 
-TEST(IntrusivePtr, AdoptAndSelfMoveDestroyExactlyOnce) {
+TEST(IntrusivePtr, SelfMoveAndSameAddressAdoptionConsumeExactlyOneCount) {
   using namespace CastingRegression;
   int destructions = 0;
-  {
-    auto allocated = std::make_unique<Tracked>(destructions);
-    ref_ptr_inc_ref(allocated.get());
-    RefPtr<Tracked const> owner(allocated.release(), false);
-    // Indirection tests actual self-move without relying on a diagnostic pragma.
-    auto& alias = owner;
-    owner = std::move(alias);
-    ASSERT_TRUE(owner);
-    EXPECT_EQ(37, owner->value);
-    owner.reset(owner.get());
-    EXPECT_EQ(0, destructions);
-    auto copied = owner;
-    owner.reset();
-    EXPECT_EQ(0, destructions);
-    copied.reset();
-    EXPECT_EQ(1, destructions);
-  }
+  auto owner = make_ref<Tracked>(destructions);
+  owner.adopt(owner.detach());
+  auto& alias = owner;
+  owner = std::move(alias);
+  ASSERT_TRUE(owner);
+  owner.reset(*owner);
+  RefPtr<Tracked> second(*owner);
+  auto token = owner.detach();
+  EXPECT_FALSE(owner);
+  ASSERT_EQ(second.get(), token.get());
+  second.adopt(std::move(token));
+  EXPECT_FALSE(token);
+  ASSERT_TRUE(second);
+  EXPECT_EQ(37, second->value);
+  EXPECT_EQ(0, destructions);
+  second.reset();
   EXPECT_EQ(1, destructions);
+}
+
+TEST(IntrusivePtr, DroppingDetachedOwnerAndAdoptingDifferentAddress) {
+  using namespace CastingRegression;
+  int old_destructions = 0;
+  int new_destructions = 0;
+  RefPtr<Tracked const> old_owner = make_ref<Tracked>(old_destructions);
+  auto new_owner = make_ref<Tracked>(new_destructions);
+  old_owner.adopt(new_owner.detach());
+  EXPECT_FALSE(new_owner);
+  EXPECT_EQ(1, old_destructions);
   {
-    auto allocated = std::make_unique<Tracked>(destructions);
-    ref_ptr_inc_ref(allocated.get());
-    RefPtr<Tracked const> owner;
-    owner.reset(allocated.release(), false);
-    EXPECT_EQ(37, owner->value);
+    auto token = old_owner.detach();
+    EXPECT_TRUE(token);
+    EXPECT_FALSE(old_owner);
+    EXPECT_EQ(0, new_destructions);
   }
-  EXPECT_EQ(2, destructions);
+  EXPECT_EQ(1, new_destructions);
+}
+
+TEST(IntrusivePtr, MovingFromOwnedMemberReleasesParentButNotChild) {
+  using namespace CastingRegression;
+  int parent_destructions = 0;
+  int child_destructions = 0;
+  auto owner = make_ref<ListNode>(parent_destructions);
+  owner->next = make_ref<ListNode>(child_destructions);
+  owner = std::move(owner->next);
+  ASSERT_TRUE(owner);
+  EXPECT_EQ(1, parent_destructions);
+  EXPECT_EQ(0, child_destructions);
+  EXPECT_EQ(std::addressof(child_destructions), std::addressof(owner->destroyed));
+  owner.reset();
+  EXPECT_EQ(1, child_destructions);
+}
+
+TEST(IntrusivePtr, UncountedBaseCanBeBorrowed) {
+  using namespace CastingRegression;
+  auto owner = make_ref<WithPlainBase>();
+  EXPECT_TRUE(is<PlainBase>(owner));
+  auto borrowed = as_ref<PlainBase>(*owner);
+  ASSERT_TRUE(borrowed);
+  EXPECT_EQ(static_cast<PlainBase*>(owner.get()), std::addressof(borrowed->get()));
 }
 
 namespace {
@@ -477,7 +575,7 @@ private:
 TEST(IntrusivePtr, FactoryDoesNotRequirePublicDestruction) {
   int destroyed = 0;
   auto owner = make_ref<ProtectedIntrusive>(destroyed);
-  auto copied = owner;
+  RefPtr<ProtectedIntrusive const> copied = owner;
   owner.reset();
   EXPECT_EQ(destroyed, 0);
   copied.reset();

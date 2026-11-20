@@ -207,7 +207,7 @@ std::expected<bool, StarException> LuaBaseComponent::init() {
       if (!context)
         return std::unexpected(context.error().with_context(Star::format("Creating Lua context for scripts '{}'", m_scripts)));
       m_context = std::move(*context);
-      LuaEnginePtr engine(&m_context->engine());
+      LuaEnginePtr engine(m_context->engine());
       auto previousLifetime = engine->setPromiseLifetime(m_callbackScope.get_token());
       auto restoreLifetime = make_scope_exit([&] { engine->setPromiseLifetime(previousLifetime); });
       if (auto setup = contextSetup(); !setup)

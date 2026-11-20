@@ -72,7 +72,8 @@ values in named locals and preserve first-error, ownership and transaction order
 - Use `type_key`, `type_name`, `query_type`, `query_type_of` and `dynamic_type_name`. Keys normalize top-level cv/reference qualifiers and are process-local, not persistent/plugin ABI IDs. Identity/name functions accept all C++ types.
 - Capability graphs use `capability_queryable`, `capability_base` and `capability_graph`. Qualify base queries to avoid redispatch. Shared virtual bases merge; distinct matching subobjects are ambiguous. Removing redundant registrations must not remove inherited capabilities/bases.
 - `as_ref`/`convert_ref` borrow and preserve constness; `as`/`convert` preserve pointer/aliasing-owner semantics. Successful shared/intrusive rvalue casts transfer ownership; failure, including null stored-pointer aliases, leaves the source intact. Lvalue aliases retain their control block; weak aliases require successfully locked/cast owners.
-- `RefPtr` retains unique storage ownership, an intrusive deleter, externally synchronized non-atomic counts, incomplete-type support, protected destruction through `RefCounter` and acquire-before-release reset. Entity callbacks may retain aliases; reentrant `NetItem`/stream callbacks require fresh borrows afterward.
+- `RefPtr<T>(T&)` retains a live object; `detach()` transfers one count into a move-only `DetachedRef`, and `adopt()` consumes it even when both owners refer to the same address. Dropping the token releases its count. Move assignment must detach before destroying the old target: the source may be a member of that target. `RefCounter` cannot be copied or moved; counts remain non-atomic and externally synchronized. Keep incomplete-type declarations and protected destruction through the counter.
+- Entity callbacks may retain aliases; reentrant `NetItem`/stream callbacks require fresh borrows afterward.
 
 ### Collections, names and value semantics
 

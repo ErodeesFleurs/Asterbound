@@ -260,7 +260,7 @@ LuaBaseComponent::execute(StringView name, char const* operation, ErrorPolicy po
       return std::optional<Ret>{};
   }
   // Keep the original engine alive even if a lifecycle call replaces it.
-  LuaEnginePtr engine = m_context ? LuaEnginePtr(&m_context->engine()) : LuaEnginePtr{};
+  LuaEnginePtr engine = m_context ? LuaEnginePtr(m_context->engine()) : LuaEnginePtr{};
   auto previousLifetime = engine ? engine->setPromiseLifetime(m_callbackScope.get_token()) : std::stop_token{};
   auto restoreLifetime = make_scope_exit([&] {
     if (engine)

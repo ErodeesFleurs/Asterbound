@@ -289,25 +289,24 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
   m_settings = std::move(settings);
   m_assetSources = std::move(assetSources);
 
-  auto createdLuaEngine = LuaEngine::create();
-  if (!createdLuaEngine)
-    return std::unexpected(std::move(createdLuaEngine.error()));
-  auto luaEngine = std::move(*createdLuaEngine);
-  luaEngine->setImageResolver([this](String const& path) { return image(path); });
-  m_luaEngine = luaEngine;
-  auto pushGlobalContext = [&luaEngine](String const& name, LuaCallbacks const& callbacks) -> std::expected<void, StarException> {
-    auto table = luaEngine->createTable();
+  auto created_lua_engine = LuaEngine::create();
+  if (!created_lua_engine)
+    return std::unexpected(std::move(created_lua_engine.error()));
+  m_lua_engine = std::move(*created_lua_engine);
+  m_lua_engine->setImageResolver([this](String const& path) { return image(path); });
+  auto push_global_context = [this](String const& name, LuaCallbacks const& callbacks) -> std::expected<void, StarException> {
+    auto table = m_lua_engine->createTable();
     if (!table)
       return std::unexpected(std::move(table.error()));
     for (auto const& p : callbacks.callbacks()) {
-      auto function = luaEngine->createWrappedFunction(p.second);
+      auto function = m_lua_engine->createWrappedFunction(p.second);
       if (!function)
         return std::unexpected(std::move(function.error()));
       auto set = table->set(p.first, std::move(*function));
       if (!set)
         return std::unexpected(std::move(set.error()));
     }
-    return luaEngine->setGlobal(name, std::move(*table));
+    return m_lua_engine->setGlobal(name, std::move(*table));
   };
 
   auto makeBaseAssetCallbacks = [this]() -> std::expected<LuaCallbacks, StarException> {
@@ -447,13 +446,13 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
   auto utilityCallbacks = LuaBindings::makeUtilityCallbacks(random, m_logger, logMap);
   if (!utilityCallbacks)
     return std::unexpected(std::move(utilityCallbacks.error()));
-  auto pushedUtility = pushGlobalContext("sb", *utilityCallbacks);
+  auto pushedUtility = push_global_context("sb", *utilityCallbacks);
   if (!pushedUtility)
     return std::unexpected(std::move(pushedUtility.error()));
   auto baseCallbacks = makeBaseAssetCallbacks();
   if (!baseCallbacks)
     return std::unexpected(std::move(baseCallbacks.error()));
-  auto pushedAssets = pushGlobalContext("assets", *baseCallbacks);
+  auto pushedAssets = push_global_context("assets", *baseCallbacks);
   if (!pushedAssets)
     return std::unexpected(std::move(pushedAssets.error()));
 
@@ -850,7 +849,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
         if (!logged)
           return std::unexpected(std::move(logged.error()));
         auto runScripts = [&]() -> std::expected<void, StarException> {
-          auto context = luaEngine->createContext();
+          auto context = m_lua_engine->createContext();
           if (!context)
             return std::unexpected(std::move(context.error()));
           auto decorated = decorateLuaContext(*context, memoryAssets);
@@ -1720,7 +1719,7 @@ std::expected<void, StarException> Assets::workerMain(std::stop_token stopToken)
         {
           std::unique_lock luaLocker(m_luaMutex, std::defer_lock);
           lock_with_diagnostics(luaLocker);
-          collected = as_ref<LuaEngine>(*m_luaEngine)->get().collectGarbage();
+          collected = m_lua_engine->collectGarbage();
         }
         assetsLocker.lock();
         if (!collected) {
@@ -1892,8 +1891,7 @@ std::expected<std::shared_ptr<Image const>, StarException> Assets::readImage(Str
 std::expected<std::shared_ptr<Image const>, StarException> Assets::applyImagePatches(std::shared_ptr<Image const> image, String const& path, List<std::pair<String, std::shared_ptr<AssetSource>>> patches) const {
   std::unique_lock luaLocker(m_luaMutex, std::defer_lock);
   lock_with_diagnostics(luaLocker);
-  auto& luaEngine = as_ref<LuaEngine>(*m_luaEngine)->get();
-  auto imageUserData = luaEngine.createUserData(*image);
+  auto imageUserData = m_lua_engine->createUserData(*image);
   if (!imageUserData)
     return std::unexpected(std::move(imageUserData.error()));
   LuaValue result = std::move(*imageUserData);
@@ -1914,7 +1912,7 @@ std::expected<std::shared_ptr<Image const>, StarException> Assets::applyImagePat
       lock_with_diagnostics(luaLocker);
       std::shared_ptr<LuaContext>& context = m_patchContexts[contextKey];
       if (!context) {
-        auto createdContext = luaEngine.createContext();
+        auto createdContext = m_lua_engine->createContext();
         if (!createdContext)
           return std::unexpected(std::move(createdContext.error()));
         auto newContext = std::make_shared<LuaContext>(std::move(*createdContext));
@@ -2064,7 +2062,7 @@ std::expected<Json, StarException> Assets::applyJsonPatches(Json const& input, S
       lock_with_diagnostics(luaLocker);
       std::shared_ptr<LuaContext>& context = m_patchContexts[contextKey];
       if (!context) {
-        auto createdContext = as_ref<LuaEngine>(*m_luaEngine)->get().createContext();
+        auto createdContext = m_lua_engine->createContext();
         if (!createdContext)
           return std::unexpected(std::move(createdContext.error()));
         auto newContext = std::make_shared<LuaContext>(std::move(*createdContext));
