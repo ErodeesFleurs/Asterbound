@@ -310,7 +310,8 @@ private:
   StringMap<std::shared_ptr<UniverseClient::ScriptComponent>> m_scriptContexts;
   
   BiMap<ClientSubWorldId, WorldId> m_subWorlds;
-  IdMap<ClientSubWorldId,std::shared_ptr<WorldClientThread>> m_subWorldThreads;
+  IdMap<ClientSubWorldId, std::shared_ptr<WorldClientThread>> m_subWorldThreads =
+      decltype(m_subWorldThreads)::with_range<MinClientSubWorldId, MaxClientSubWorldId>();
 
   ReloadPlayerCallback m_playerReloadPreCallback;
   ReloadPlayerCallback m_playerReloadCallback;

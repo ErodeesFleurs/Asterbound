@@ -173,7 +173,7 @@ private:
 template <typename Element>
 [[nodiscard]] auto NetElementDynamicGroup<Element>::addNetElement(std::shared_ptr<Element> element) -> std::expected<ElementId, StarException> {
   { auto result = readyElement(element); if (!result) return std::unexpected(std::move(result.error())); }
-  auto id = m_idMap.add(std::move(element));
+  auto id = m_idMap.emplace(std::move(element));
   if (!id) return std::unexpected(std::move(id.error()));
   addChangeData(ElementAddition(*id, {}));
   return *id;
@@ -181,12 +181,14 @@ template <typename Element>
 
 template <typename Element>
 void NetElementDynamicGroup<Element>::removeNetElement(ElementId id) {
-  m_idMap.remove(id);
+  // Finish erasing the node before releasing the element: its destructor can reenter the group.
+  m_idMap.try_extract_value(id);
   addChangeData(ElementRemoval{id});
 }
 
 template <typename Element>
 void NetElementDynamicGroup<Element>::clearNetElements() {
+  // Snapshot the original ids in removal order. Destructors may add or remove elements.
   for (auto const& id : netElementIds())
     removeNetElement(id);
 }
@@ -292,7 +294,7 @@ template <typename Element>
     if (!*element) return std::unexpected(IOException("Null dynamic net element"));
     { auto result = (*element)->netLoad(storeBuffer, rules); if (!result) return std::unexpected(std::move(result.error())); }
     { auto result = readyElement(*element); if (!result) return std::unexpected(std::move(result.error())); }
-    { auto result = m_idMap.add(static_cast<ElementId>(*id), std::move(*element)); if (!result) return std::unexpected(std::move(result.error())); }
+    { auto result = m_idMap.try_emplace(static_cast<ElementId>(*id), std::move(*element)); if (!result) return std::unexpected(std::move(result.error())); }
     addChangeData(ElementAddition(static_cast<ElementId>(*id), storeBuffer.take_data()));
   }
   return {};
@@ -405,7 +407,7 @@ template <typename Element>
         DataStreamBuffer storeBuffer(std::get<ElementAddition>(*change).second);
         { auto result = (*element)->netLoad(storeBuffer, rules); if (!result) return std::unexpected(std::move(result.error())); }
         { auto result = readyElement(*element); if (!result) return std::unexpected(std::move(result.error())); }
-        { auto result = m_idMap.add(std::get<ElementAddition>(*change).first, std::move(*element)); if (!result) return std::unexpected(std::move(result.error())); }
+        { auto result = m_idMap.try_emplace(std::get<ElementAddition>(*change).first, std::move(*element)); if (!result) return std::unexpected(std::move(result.error())); }
       } else if (std::holds_alternative<ElementRemoval>(*change)) {
         m_idMap.remove(std::get<ElementRemoval>(*change));
       }

@@ -497,6 +497,16 @@ The 128-entry move round trip includes both move construction and move assignmen
 the right-conflict case also checks the returned left iterator. The Perlin rows
 measure a four-entry enum table and are not a proxy for moving a large map.
 
+### ID allocation
+
+Use `core_tests --gtest_filter='IdMapTest.*:NetElements.*DynamicGroup*'` for inclusive
+range wraparound, move-only payloads on collision, transactional decoding, and ordered
+network removals. `core_benchmarks --benchmark_filter='^Core/IdMap/'` compares ordered
+and hashed storage on the same ID sequences. The dense cases cross 256 occupied IDs
+per operation; explicit duplicate rejection includes building the caller-visible error.
+Do not infer hashed insertion cost from hole lookup alone: attempting insertion
+at every occupied ID also runs the storage's duplicate-insertion path.
+
 ### Asset locators
 
 - `core_tests --gtest_filter='AssetPathTest.*:PathEmbedTest.*:ImageDirectivePipelineTest.*'`

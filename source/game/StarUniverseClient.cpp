@@ -201,11 +201,6 @@ std::expected<std::shared_ptr<UniverseClient>, StarException> UniverseClient::cr
     return std::unexpected(std::move(luaRootResult.error()));
   auto luaRoot = std::move(*luaRootResult);
   client->m_luaRoot = std::move(luaRoot);
-  auto threadsResult = IdMap<ClientSubWorldId, std::shared_ptr<WorldClientThread>>::create(MinClientSubWorldId, MaxClientSubWorldId);
-  if (!threadsResult)
-    return std::unexpected(std::move(threadsResult.error()));
-  auto threads = std::move(*threadsResult);
-  client->m_subWorldThreads = std::move(threads);
   auto reset = client->reset();
   if (!reset)
     return std::unexpected(std::move(reset.error()));
@@ -844,6 +839,7 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
       return std::unexpected(std::move(intervalResult.error()));
     auto interval = std::move(*intervalResult);
     m_storageTriggerDeadline = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) + std::chrono::milliseconds(interval);
+    // Closing a world runs script teardown. Keep iterators out of the shutdown path.
     for (auto const& id : m_subWorldThreads.keys()) {
       auto entryResult = m_subWorldThreads.get(id);
       if (!entryResult)
@@ -1490,7 +1486,7 @@ std::expected<ClientSubWorldId, StarException> UniverseClient::createSubWorld() 
   auto operation32 = thread->start();
   if (!operation32)
     return std::unexpected(std::move(operation32.error()));
-  auto added = m_subWorldThreads.add(id, thread);
+  auto added = m_subWorldThreads.try_emplace(id, std::move(thread));
   if (!added) {
     auto stopped = thread->stop();
     auto drained = thread->clearMessages();
@@ -1864,12 +1860,8 @@ std::expected<void, StarException> UniverseClient::handlePackets(List<std::share
           return std::unexpected(std::move(operation91.error()));
         if (m_subWorlds.contains_left(rejected->subWorldId))
           m_subWorlds.erase_left(rejected->subWorldId);
-        if (m_subWorldThreads.contains(rejected->subWorldId)) {
-          auto threadResult = m_subWorldThreads.get(rejected->subWorldId);
-          if (!threadResult)
-            return std::unexpected(std::move(threadResult.error()));
-          auto thread = std::move(*threadResult);
-          auto operation92 = thread.get()->clearMessages();
+        if (auto thread = m_subWorldThreads.find_ref(rejected->subWorldId)) {
+          auto operation92 = thread->get()->clearMessages();
           if (!operation92)
             return std::unexpected(std::move(operation92.error()));
         }
@@ -1879,12 +1871,8 @@ std::expected<void, StarException> UniverseClient::handlePackets(List<std::share
             return std::unexpected(std::move(operation93.error()));
         }
       } else if (auto subworld = as<ClientSubWorldPackets>(packet)) {
-        if (m_subWorldThreads.contains(subworld->subWorldId)) {
-          auto threadResult = m_subWorldThreads.get(subworld->subWorldId);
-          if (!threadResult)
-            return std::unexpected(std::move(threadResult.error()));
-          auto thread = std::move(*threadResult);
-          thread.get()->pushIncomingPackets(subworld->packets);
+        if (auto thread = m_subWorldThreads.find_ref(subworld->subWorldId)) {
+          thread->get()->pushIncomingPackets(subworld->packets);
         } else {
           auto operation94 = m_root.logger().warn("UniverseClient: Received packets for non-existent subworld {}", subworld->subWorldId);
           if (!operation94)

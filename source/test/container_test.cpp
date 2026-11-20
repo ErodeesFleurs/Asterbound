@@ -344,11 +344,29 @@ TEST(ContainerBorrowTest, ReferenceEntriesRemainRebindableSlots) {
   EXPECT_FALSE(optional_ref(constOptional));
 }
 
+namespace {
+
+template <template <typename, typename> typename Store, typename Key>
+concept accepts_id_key = requires { typename Store<Key, int>; };
+
+enum class ScopedId : int {};
+
+template <template <typename, typename> typename Store>
+concept has_integral_id_keys =
+  accepts_id_key<Store, std::int64_t> && accepts_id_key<Store, std::uint64_t> &&
+  !accepts_id_key<Store, bool> && !accepts_id_key<Store, double> && !accepts_id_key<Store, ScopedId>;
+
+static_assert(has_integral_id_keys<IdMap>);
+static_assert(has_integral_id_keys<IdHashMap>);
+
+} // namespace
+
 TEST(IdMapTest, InclusiveNarrowRangesExhaustAndRecycleWithoutNarrowing) {
-  auto check = []<typename Id, template <typename, typename> typename Container>() {
+  auto check = []<std::integral Id, template <typename, typename> typename Container>()
+    requires (has_integral_id_keys<Container> && sizeof(Id) == 1) {
     Container<Id, int> map;
     for (int value = std::numeric_limits<Id>::lowest(); value <= std::numeric_limits<Id>::max(); ++value) {
-      auto added = map.add(value);
+      auto added = map.emplace(value);
       ASSERT_TRUE(added);
       EXPECT_EQ(*added, static_cast<Id>(value));
     }
@@ -356,10 +374,10 @@ TEST(IdMapTest, InclusiveNarrowRangesExhaustAndRecycleWithoutNarrowing) {
     ASSERT_FALSE(full);
     EXPECT_TRUE(full.error().template is<IdMapException>());
     EXPECT_TRUE(map.remove(static_cast<Id>(0)));
-    auto recycled = map.add(999);
+    auto recycled = map.emplace(999);
     ASSERT_TRUE(recycled);
     EXPECT_EQ(*recycled, static_cast<Id>(0));
-    EXPECT_FALSE(map.add(1000));
+    EXPECT_FALSE(map.emplace(1000));
     map.clear();
     EXPECT_TRUE(map.empty());
     auto reset = map.next_id();
@@ -376,15 +394,15 @@ TEST(IdMapTest, ExplicitIdsOutsideRangeRemainValidAndDoNotConsumeCursor) {
   auto created = IdMap<int, int>::create(1, 2);
   ASSERT_TRUE(created);
   auto& map = *created;
-  ASSERT_TRUE(map.add(-1, 10));
-  ASSERT_TRUE(map.add(8, 20));
-  ASSERT_TRUE(map.add(9, 30));
-  auto duplicate = map.add(8, 99);
+  ASSERT_TRUE(map.try_emplace(-1, 10));
+  ASSERT_TRUE(map.try_emplace(8, 20));
+  ASSERT_TRUE(map.try_emplace(9, 30));
+  auto duplicate = map.try_emplace(8, 99);
   ASSERT_FALSE(duplicate);
   EXPECT_TRUE(duplicate.error().is<IdMapException>());
   EXPECT_EQ(map.value(8), 20);
-  auto first = map.add(40);
-  auto second = map.add(50);
+  auto first = map.emplace(40);
+  auto second = map.emplace(50);
   ASSERT_TRUE(first);
   ASSERT_TRUE(second);
   EXPECT_EQ(*first, 1);
@@ -403,7 +421,7 @@ TEST(IdMapTest, ExplicitIdsOutsideRangeRemainValidAndDoNotConsumeCursor) {
 }
 
 TEST(IdMapTest, FullWidthSignedAndUnsignedEndpointsWrapSafely) {
-  auto check = []<typename Id>() {
+  auto check = []<std::integral Id>() {
     constexpr auto min_id = std::numeric_limits<Id>::lowest();
     constexpr auto max_id = std::numeric_limits<Id>::max();
     IdMap<Id, std::uint8_t> map;
@@ -426,10 +444,10 @@ TEST(IdMapTest, FullWidthSignedAndUnsignedEndpointsWrapSafely) {
     auto sentinel = stream.read<std::uint8_t>();
     ASSERT_TRUE(sentinel);
     EXPECT_EQ(*sentinel, 0xa5);
-    auto last = map.add(8);
+    auto last = map.emplace(8);
     ASSERT_TRUE(last);
     EXPECT_EQ(*last, max_id);
-    auto wrapped = map.add(9);
+    auto wrapped = map.emplace(9);
     ASSERT_TRUE(wrapped);
     EXPECT_EQ(*wrapped, min_id + 1);
   };
@@ -437,11 +455,103 @@ TEST(IdMapTest, FullWidthSignedAndUnsignedEndpointsWrapSafely) {
   check.template operator()<std::uint64_t>();
 }
 
+TEST(IdMapTest, DenseOccupiedEndpointsWrapToFirstGapInNumericOrder) {
+  auto check = []<typename Store>() {
+    using Id = typename Store::key_type;
+    constexpr auto low = std::numeric_limits<Id>::lowest();
+    constexpr auto high = std::numeric_limits<Id>::max();
+    Map<Id, int> entries;
+    for (int offset = 0; offset < 32; ++offset) {
+      entries.try_emplace(high - offset, offset);
+      entries.try_emplace(low + offset, offset);
+    }
+    entries.try_emplace(low + 33, 0);
+    DataStreamBuffer stream;
+    ASSERT_TRUE(stream.write_map_container(entries));
+    ASSERT_TRUE(stream.write(low));
+    ASSERT_TRUE(stream.write(high));
+    ASSERT_TRUE(stream.write<Id>(high - 31));
+    Store map;
+    ASSERT_TRUE(stream.seek(0));
+    ASSERT_TRUE(stream >> map);
+    auto first_gap = map.next_id();
+    ASSERT_TRUE(first_gap);
+    EXPECT_EQ(*first_gap, low + 32);
+    EXPECT_FALSE(map.contains(*first_gap));
+    ASSERT_TRUE(stream.seek(0));
+    ASSERT_TRUE(stream >> map);
+    auto inserted = map.emplace(41);
+    ASSERT_TRUE(inserted);
+    EXPECT_EQ(*inserted, low + 32);
+    EXPECT_EQ(map.value(*inserted), 41);
+    auto following = map.next_id();
+    ASSERT_TRUE(following);
+    EXPECT_EQ(*following, low + 34);
+  };
+  check.template operator()<IdMap<std::int64_t, int>>();
+  check.template operator()<IdMap<std::uint64_t, int>>();
+  check.template operator()<IdMapWrapper<Map<std::int64_t, int, std::greater<>>>>();
+}
+
+TEST(IdMapTest, MoveOnlyPayloadIsConsumedOnlyForInsertedId) {
+  auto check = []<template <typename, typename> typename Store>() {
+    auto map = Store<int, std::unique_ptr<int>>::template with_range<1, 4>();
+    for (int id = 1; id < 4; ++id)
+      ASSERT_TRUE(map.try_emplace(id, std::make_unique<int>(id)));
+    auto payload = std::make_unique<int>(42);
+    auto duplicate = map.try_emplace(1, std::move(payload));
+    ASSERT_FALSE(duplicate);
+    ASSERT_TRUE(duplicate.error().template is<IdMapException>());
+    ASSERT_TRUE(payload);
+    EXPECT_EQ(*payload, 42);
+    auto inserted = map.emplace(std::move(payload));
+    ASSERT_TRUE(inserted);
+    EXPECT_EQ(*inserted, 4);
+    EXPECT_FALSE(payload);
+    for (int id = 1; id <= 4; ++id) {
+      auto stored = map.find_ref(id);
+      ASSERT_TRUE(stored);
+      ASSERT_TRUE(stored->get());
+      EXPECT_EQ(*stored->get(), id == 4 ? 42 : id);
+    }
+    auto unplaced = std::make_unique<int>(91);
+    auto full = map.emplace(std::move(unplaced));
+    ASSERT_FALSE(full);
+    EXPECT_TRUE(full.error().template is<IdMapException>());
+    ASSERT_TRUE(unplaced);
+    EXPECT_EQ(*unplaced, 91);
+    EXPECT_EQ(map.size(), 4u);
+  };
+  check.template operator()<IdMap>();
+  check.template operator()<IdHashMap>();
+}
+
+TEST(IdMapTest, EqualityComparesEntriesAndRangeButNotCursor) {
+  auto check = []<typename Store>() {
+    auto left = Store::template with_range<1, 3>();
+    auto right = Store::template with_range<1, 3>();
+    ASSERT_TRUE(left.try_emplace(9, 17));
+    ASSERT_TRUE(right.try_emplace(9, 17));
+    ASSERT_TRUE(left.next_id());
+    EXPECT_EQ(left, right);
+    auto different_min = Store::template with_range<0, 3>();
+    auto different_max = Store::template with_range<1, 4>();
+    ASSERT_TRUE(different_min.try_emplace(9, 17));
+    ASSERT_TRUE(different_max.try_emplace(9, 17));
+    EXPECT_NE(left, different_min);
+    EXPECT_NE(left, different_max);
+    ASSERT_TRUE(right.try_emplace(1, 17));
+    EXPECT_NE(left, right);
+  };
+  check.template operator()<IdMap<int, int>>();
+  check.template operator()<IdHashMap<int, int>>();
+}
+
 TEST(IdMapTest, WireOrderAndLegacyEntriesPreserveFollowingSentinel) {
   auto created = IdMap<std::uint8_t, std::uint8_t>::create(1, 3);
   ASSERT_TRUE(created);
-  ASSERT_TRUE(created->add(9, 0x99));
-  ASSERT_TRUE(created->add(0x11));
+  ASSERT_TRUE(created->try_emplace(9, 0x99));
+  ASSERT_TRUE(created->emplace(0x11));
   DataStreamBuffer stream;
   ASSERT_TRUE(stream << *created);
   ASSERT_TRUE(stream.write<std::uint8_t>(0xa5));
@@ -450,7 +560,7 @@ TEST(IdMapTest, WireOrderAndLegacyEntriesPreserveFollowingSentinel) {
   IdMap<std::uint8_t, std::uint8_t> decoded;
   ASSERT_TRUE(stream >> decoded);
   EXPECT_EQ(decoded, *created);
-  auto next = decoded.add(0x22);
+  auto next = decoded.emplace(0x22);
   ASSERT_TRUE(next);
   EXPECT_EQ(*next, 2);
   auto sentinel = stream.read<std::uint8_t>();
@@ -472,7 +582,7 @@ TEST(IdMapTest, WireOrderAndLegacyEntriesPreserveFollowingSentinel) {
 TEST(IdMapTest, MalformedDecodeRetainsExistingEntriesRangeAndCursor) {
   auto created = IdMap<std::uint8_t, std::uint8_t>::create(4, 6);
   ASSERT_TRUE(created);
-  ASSERT_TRUE(created->add(0x44));
+  ASSERT_TRUE(created->emplace(0x44));
   auto original = DataStreamBuffer::serialize(*created);
   ASSERT_TRUE(original);
   for (auto const& bytes : {ByteArray({"\x01\x01", 2}), ByteArray({"\x01\x01\x11", 3}),
@@ -791,11 +901,11 @@ TEST(BiMapTest, CopyPreservesSourceIndexComparisonPolicies) {
 TEST(IdMapTest, HashDecodeAcceptsAnOccupiedCursorAndKeepsFraming) {
   DataStreamBuffer stream(ByteArray({"\x01\x01\x11\x01\x03\x01\xa5", 7}));
   IdHashMap<std::uint8_t, std::uint8_t> decoded;
-  ASSERT_TRUE(decoded.add(9, 0x99));
+  ASSERT_TRUE(decoded.try_emplace(9, 0x99));
   ASSERT_TRUE(stream >> decoded);
   EXPECT_FALSE(decoded.contains(9));
   EXPECT_EQ(decoded.value(1), 0x11);
-  auto next = decoded.add(0x22);
+  auto next = decoded.emplace(0x22);
   ASSERT_TRUE(next);
   EXPECT_EQ(*next, 2);
   auto sentinel = stream.read<std::uint8_t>();

@@ -409,7 +409,8 @@ private:
 
   mutable ReadersWriterMutex m_clientsLock;
   unsigned m_maxPlayers;
-  IdMap<ConnectionId, std::shared_ptr<ServerClientContext>> m_clients;
+  IdMap<ConnectionId, std::shared_ptr<ServerClientContext>> m_clients =
+      decltype(m_clients)::with_range<MinClientConnectionId, MaxClientConnectionId>();
   // Retain context/save/removal ownership after a disconnect error without
   // re-running disconnect scripts or treating it as an active service client.
   Set<ConnectionId> m_disconnectingClients;

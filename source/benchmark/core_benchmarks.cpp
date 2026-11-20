@@ -13,6 +13,7 @@ import star.hash;
 import star.json;
 import star.list;
 import star.map;
+import star.id_map;
 import star.benchmark_runner;
 import star.perlin;
 import star.string;
@@ -33,6 +34,100 @@ import star.json_rpc;
 import star.logging;
 import star.host_address;
 import star.net_impl;
+
+namespace IdMapBenchmarks {
+
+using Ordered = Star::IdMap<int, int>;
+using Hashed = Star::IdHashMap<int, int>;
+
+template <class Map>
+concept benchmark_id_map = std::same_as<Map, Ordered> || std::same_as<Map, Hashed>;
+
+template <benchmark_id_map Map>
+void sparse_insert(benchmark::State& state) {
+  constexpr int batch = 256;
+  auto ids = Map::template with_range<0, 65535>();
+  while (state.KeepRunningBatch(batch)) {
+    state.PauseTiming();
+    ids.clear();
+    state.ResumeTiming();
+    for (int id = 0; id < batch; ++id) {
+      auto result = ids.emplace(id);
+      if (!result || *result != id) {
+        state.SkipWithError("Unexpected sparse ID");
+        return;
+      }
+      benchmark::DoNotOptimize(result);
+    }
+  }
+  state.SetItemsProcessed(state.iterations());
+}
+
+template <benchmark_id_map Map, bool insert>
+void occupied_run(benchmark::State& state) {
+  constexpr int stride = 257;
+  constexpr int batch = 16;
+  auto ids = Map::template with_range<0, stride * batch - 1>();
+  for (int id = 0; id < stride * batch; ++id) {
+    if ((id + 1) % stride != 0 && !ids.try_emplace(id, id)) {
+      state.SkipWithError("Failed to populate occupied ID run");
+      return;
+    }
+  }
+  // The last hole wraps the cursor to zero: every measured call starts at
+  // the first of 256 occupied keys, including the first call of each batch.
+  while (state.KeepRunningBatch(batch)) {
+    for (int hole = stride - 1; hole < stride * batch; hole += stride) {
+      auto result = [&] {
+        if constexpr (insert)
+          return ids.emplace(hole);
+        else
+          return ids.next_id();
+      }();
+      if (!result || *result != hole) {
+        state.SkipWithError("Unexpected hole after occupied ID run");
+        return;
+      }
+      benchmark::DoNotOptimize(result);
+    }
+    if constexpr (insert) {
+      state.PauseTiming();
+      for (int hole = stride - 1; hole < stride * batch; hole += stride)
+        ids.remove(hole);
+      state.ResumeTiming();
+    }
+  }
+  state.SetItemsProcessed(state.iterations());
+}
+
+template <benchmark_id_map Map>
+void explicit_duplicate(benchmark::State& state) {
+  Map ids;
+  if (!ids.try_emplace(42, 1)) {
+    state.SkipWithError("Failed to populate duplicate ID");
+    return;
+  }
+  for (auto _ : state) {
+    auto result = ids.try_emplace(42, 2);
+    if (result) {
+      state.SkipWithError("Duplicate ID unexpectedly accepted");
+      return;
+    }
+    benchmark::DoNotOptimize(result);
+  }
+  state.SetItemsProcessed(state.iterations());
+}
+
+BENCHMARK_TEMPLATE(sparse_insert, Ordered)->Name("Core/IdMap/Ordered/SparseInsert");
+BENCHMARK_TEMPLATE(sparse_insert, Hashed)->Name("Core/IdMap/Hash/SparseInsert");
+BENCHMARK_TEMPLATE(occupied_run, Ordered, false)->Name("Core/IdMap/Ordered/FindHole256");
+BENCHMARK_TEMPLATE(occupied_run, Hashed, false)->Name("Core/IdMap/Hash/FindHole256");
+BENCHMARK_TEMPLATE(occupied_run, Ordered, true)->Name("Core/IdMap/Ordered/InsertAfterRun256");
+BENCHMARK_TEMPLATE(occupied_run, Hashed, true)->Name("Core/IdMap/Hash/InsertAfterRun256");
+BENCHMARK_TEMPLATE(explicit_duplicate, Ordered)->Name("Core/IdMap/Ordered/ExplicitDuplicate");
+BENCHMARK_TEMPLATE(explicit_duplicate, Hashed)->Name("Core/IdMap/Hash/ExplicitDuplicate");
+
+} // namespace IdMapBenchmarks
 
 namespace HostBenchmarks {
 using namespace Star;

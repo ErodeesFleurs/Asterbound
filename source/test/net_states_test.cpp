@@ -1106,6 +1106,36 @@ TEST(NetElements, NetElementDynamicGroup) {
   }
 }
 
+TEST(NetElements, DynamicGroupClearSendsOrderedRemovalsAndRetainsCursor) {
+  using Group = NetElementTop<NetElementDynamicGroup<NetElementGroup>>;
+  Group cleared;
+  Group individually_removed;
+  for (std::uint32_t id = 1; id <= 3; ++id) {
+    for (Group& group : {std::ref(cleared), std::ref(individually_removed)}) {
+      auto added = group.addNetElement(std::make_shared<NetElementGroup>());
+      ASSERT_TRUE(added);
+      ASSERT_EQ(*added, id);
+    }
+  }
+  auto clear_baseline = cleared.writeNetState(0);
+  auto individual_baseline = individually_removed.writeNetState(0);
+  ASSERT_TRUE(clear_baseline);
+  ASSERT_TRUE(individual_baseline);
+  cleared.clearNetElements();
+  for (std::uint32_t id = 1; id <= 3; ++id)
+    individually_removed.removeNetElement(id);
+  EXPECT_TRUE(cleared.netElementIds().empty());
+  auto clear_delta = cleared.writeNetState(clear_baseline->second);
+  auto individual_delta = individually_removed.writeNetState(individual_baseline->second);
+  ASSERT_TRUE(clear_delta);
+  ASSERT_TRUE(individual_delta);
+  EXPECT_FALSE(clear_delta->first.empty());
+  EXPECT_EQ(clear_delta->first, individual_delta->first);
+  auto next = cleared.addNetElement(std::make_shared<NetElementGroup>());
+  ASSERT_TRUE(next);
+  EXPECT_EQ(*next, 4u);
+}
+
 TEST(NetElements, NetElementMap) {
   NetElementTop<NetElementMap<String, String>> masterMap;
   NetElementTop<NetElementMap<String, String>> slaveMap;

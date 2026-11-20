@@ -176,10 +176,6 @@ std::expected<void, StarException> UniverseServer::initialize(String const& stor
   m_isLocal = isLocal;
   String const lockFile = "universe.lock";
   m_storageDirectory = storageDir;
-  auto clients = decltype(m_clients)::create(MinClientConnectionId, MaxClientConnectionId);
-  if (!clients)
-    return std::unexpected(std::move(clients.error()));
-  m_clients = std::move(*clients);
   auto directory = File::is_directory(storageDir);
   if (!directory)
     return std::unexpected(std::move(directory.error()));
@@ -1618,6 +1614,8 @@ std::expected<void, StarException> UniverseServer::reapConnections() {
   std::shared_lock clientsLocker(m_clientsLock);
   for (auto clientId : m_clients.keys()) {
     auto client = m_clients.value(clientId);
+    if (!client) // Another disconnect can complete while the clients lock is released below.
+      continue;
     std::expected<bool, StarException> open = false;
     if (m_connectionServer->hasConnection(clientId))
       open = m_connectionServer->connectionIsOpen(clientId);
@@ -3669,7 +3667,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
     registered = clientId;
     if (auto sent = m_connectionServer->sendPackets(clientId, {std::make_shared<ConnectSuccessPacket>(clientId, m_universeSettings->uuid(), m_celestialDatabase->baseInformation()), std::make_shared<UniverseTimeUpdatePacket>(m_universeClock->time()), std::make_shared<PausePacket>(*m_pause, m_root.timing().timescale)}); !sent)
       return std::unexpected(std::move(sent.error()));
-    if (auto added = m_clients.add(clientId, client); !added)
+    if (auto added = m_clients.try_emplace(clientId, client); !added)
       return std::unexpected(std::move(added.error()));
     if (auto joined = m_chatProcessor->connectClient(clientId, connect->playerName); !joined)
       return std::unexpected(std::move(joined.error()));

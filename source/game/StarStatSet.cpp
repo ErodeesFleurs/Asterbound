@@ -55,7 +55,7 @@ std::expected<void, StarException> StatSet::setStatBaseValue(String const& statN
 
 std::expected<StatModifierGroupId, StarException> StatSet::addStatModifierGroup(List<StatModifier> modifiers) {
   bool empty = modifiers.empty();
-  auto id = m_statModifierGroups.add(std::move(modifiers));
+  auto id = m_statModifierGroups.emplace(std::move(modifiers));
   if (!id) return std::unexpected(std::move(id.error()));
   if (!empty)
     update(0.0f);
@@ -74,7 +74,7 @@ std::expected<List<StatModifier>, StarException> StatSet::statModifierGroup(Stat
 
 std::expected<void, StarException> StatSet::addStatModifierGroup(StatModifierGroupId groupId, List<StatModifier> modifiers) {
   bool empty = modifiers.empty();
-  auto added = m_statModifierGroups.add(groupId, std::move(modifiers));
+  auto added = m_statModifierGroups.try_emplace(groupId, std::move(modifiers));
   if (!added) return std::unexpected(std::move(added.error()));
   if (!empty)
     update(0.0f);

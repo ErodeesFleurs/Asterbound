@@ -220,12 +220,12 @@ void StatCollection::tickSlave(float) {
 
 std::expected<void, StarException> StatCollection::netElementsNeedLoad(bool) {
   if (m_statModifiersNetState.pullUpdated()) {
-    StatModifierGroupMap allModifiers;
-    for (auto const& p : m_statModifiersNetState) {
-      auto added = allModifiers.add(p.first, p.second);
+    StatModifierGroupMap all_modifiers;
+    for (auto const& [id, modifiers] : m_statModifiersNetState) {
+      auto added = all_modifiers.try_emplace(id, modifiers);
       if (!added) return std::unexpected(std::move(added.error()));
     }
-    m_stats.setAllStatModifierGroups(std::move(allModifiers));
+    m_stats.setAllStatModifierGroups(std::move(all_modifiers));
   }
   for (auto const& pair : m_resourceValuesNetStates) {
     auto set = m_stats.setResourceValue(pair.first, pair.second.get());
