@@ -159,15 +159,15 @@ std::expected<bool, StarException> LuaBaseComponent::removeThreadCallbacks(Strin
   return true;
 }
 
-bool LuaBaseComponent::autoReInit() const { return static_cast<bool>(m_reloadTracker); }
+bool LuaBaseComponent::autoReInit() const { return static_cast<bool>(m_reload_tracker); }
 
 void LuaBaseComponent::setAutoReInit(bool enabled) {
-  m_reloadSubscription.disconnect();
+  m_reload_subscription.disconnect();
   if (enabled) {
-    m_reloadTracker = std::make_shared<TrackerListener>();
-    m_reloadSubscription = m_root.registerReloadListener(m_reloadTracker);
+    m_reload_tracker = std::make_shared<TrackerListener>();
+    m_reload_subscription = m_root.subscribe_reload(m_reload_tracker);
   } else {
-    m_reloadTracker.reset();
+    m_reload_tracker.reset();
   }
 }
 
@@ -193,8 +193,8 @@ std::expected<bool, StarException> LuaBaseComponent::init() {
     "init", "Exception while initializing Lua session", ErrorPolicy::DisableContext,
     [&]() -> std::expected<std::optional<bool>, StarException> {
       m_initPending = false;
-      if (m_reloadTracker)
-        (void)m_reloadTracker->pullTriggered();
+      if (m_reload_tracker)
+        (void)m_reload_tracker->consume();
       m_rootGeneration = m_luaRoot ? m_luaRoot->generation() : 0;
       if (auto stopped = shutdownContext({}); !stopped)
         return std::unexpected(std::move(stopped.error()));
@@ -234,8 +234,8 @@ std::expected<void, StarException> LuaBaseComponent::uninit(String const& before
     "uninit", "Exception while uninitializing Lua session", ErrorPolicy::KeepContext,
     [&]() -> std::expected<std::optional<bool>, StarException> {
       m_initPending = false;
-      if (m_reloadTracker)
-        (void)m_reloadTracker->pullTriggered();
+      if (m_reload_tracker)
+        (void)m_reload_tracker->consume();
       m_rootGeneration = m_luaRoot ? m_luaRoot->generation() : 0;
       if (auto stopped = shutdownContext(beforeUninit); !stopped)
         return std::unexpected(std::move(stopped.error()));
@@ -410,7 +410,7 @@ std::expected<void, StarException> LuaBaseComponent::finishExecution() {
 std::expected<bool, StarException> LuaBaseComponent::checkInitialization() {
   if (m_activeCalls != 0)
     return initialized() && !m_shutdownPending;
-  bool reloaded = m_reloadTracker && m_reloadTracker->pullTriggered();
+  bool reloaded = m_reload_tracker && m_reload_tracker->consume();
   bool replaced = m_luaRoot && m_rootGeneration != m_luaRoot->generation();
   if (m_initPending || ((initialized() || error()) && (reloaded || replaced)))
     return init();

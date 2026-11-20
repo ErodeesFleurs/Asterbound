@@ -386,7 +386,7 @@ constexpr char AdditionalDefaultConfiguration[] = R"JSON(
   )JSON";
 
 ClientApplication::~ClientApplication() {
-  m_reloadSubscription.disconnect();
+  m_reload_subscription.disconnect();
 }
 
 std::expected<void, StarException> ClientApplication::startup(StringList const& cmdLineArgs) {
@@ -414,7 +414,7 @@ std::expected<void, StarException> ClientApplication::startup(StringList const& 
 }
 
 std::expected<void, StarException> ClientApplication::shutdown() {
-  m_reloadSubscription.disconnect();
+  m_reload_subscription.disconnect();
   std::optional<StarException> failure;
   auto remember = [&](std::expected<void, StarException> result) {
     if (!result) {
@@ -633,9 +633,9 @@ std::expected<void, StarException> ClientApplication::renderInit(std::shared_ptr
   auto reloaded = renderReload();
   if (!reloaded)
     return std::unexpected(std::move(reloaded.error()));
-  m_reloadSubscription.disconnect();
-  m_reloadSubscription = m_root->registerReloadListener(
-      m_reloadListener = std::make_shared<CallbackListener>([app = std::ref(*this)] { return app.get().renderReload(); }));
+  m_reload_subscription.disconnect();
+  m_reload_subscription = m_root->subscribe_reload(
+      m_reload_listener = std::make_shared<CallbackListener>([app = std::ref(*this)] { return app.get().renderReload(); }));
   auto configResult = m_root->configuration();
   if (!configResult)
     return std::unexpected(std::move(configResult.error()));

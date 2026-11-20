@@ -35,8 +35,8 @@ namespace Star {
 
 AssetTextureGroup::AssetTextureGroup(Root& root, std::shared_ptr<TextureGroup> textureGroup)
   : m_root(root), m_textureGroup(std::move(textureGroup)) {
-  m_reloadTracker = std::make_shared<TrackerListener>();
-  m_reloadSubscription = m_root.registerReloadListener(m_reloadTracker);
+  m_reload_tracker = std::make_shared<TrackerListener>();
+  m_reload_subscription = m_root.subscribe_reload(m_reload_tracker);
 }
 
 std::expected<TexturePtr, StarException> AssetTextureGroup::loadTexture(AssetPath const& imagePath) {
@@ -52,7 +52,7 @@ bool AssetTextureGroup::textureLoaded(AssetPath const& imagePath) const {
 }
 
 void AssetTextureGroup::cleanup(std::int64_t textureTimeout) {
-  if (m_reloadTracker->pullTriggered()) {
+  if (m_reload_tracker->consume()) {
     m_textureMap.clear();
     m_textureDeduplicationMap.clear();
 

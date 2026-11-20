@@ -34,6 +34,68 @@ import star.json_rpc;
 import star.logging;
 import star.host_address;
 import star.net_impl;
+import star.listener;
+
+namespace ListenerBenchmarks {
+using namespace Star;
+
+void idle_consume(benchmark::State& state) {
+  TrackerListener tracker;
+  benchmark::DoNotOptimize(&tracker);
+  for (auto _ : state) {
+    auto consumed = tracker.consume();
+    benchmark::DoNotOptimize(consumed);
+  }
+}
+
+void trigger_consume(benchmark::State& state) {
+  TrackerListener tracker;
+  benchmark::DoNotOptimize(&tracker);
+  for (auto _ : state) {
+    if (auto result = static_cast<Listener&>(tracker).trigger(); !result) {
+      state.SkipWithError(result.error().what());
+      return;
+    }
+    auto consumed = tracker.consume();
+    benchmark::DoNotOptimize(consumed);
+  }
+}
+
+// Model dispatch after cancellation: both the disconnected handles and their
+// listeners remain alive, so weak-pointer expiration cannot clean them up.
+void dispatch(benchmark::State& state, int disconnected) {
+  constexpr int live = 64;
+  std::int64_t calls = 0;
+  ListenerGroup group;
+  std::vector<std::shared_ptr<CallbackListener>> listeners;
+  std::vector<ListenerSubscription> subscriptions;
+  listeners.reserve(live + disconnected);
+  subscriptions.reserve(live + disconnected);
+  for (int i = 0; i < live + disconnected; ++i) {
+    auto& listener = listeners.emplace_back(std::make_shared<CallbackListener>([&calls]() -> std::expected<void, StarException> {
+      ++calls;
+      return {};
+    }));
+    auto& subscription = subscriptions.emplace_back(group.subscribe(listener));
+    if (i >= live)
+      subscription.disconnect();
+  }
+  for (auto _ : state) {
+    if (auto result = group.trigger(); !result) {
+      state.SkipWithError(result.error().what());
+      return;
+    }
+  }
+  if (calls != live * state.iterations())
+    state.SkipWithError("Unexpected number of listener invocations");
+  state.SetItemsProcessed(calls);
+}
+
+BENCHMARK(idle_consume)->Name("Core/Listener/IdleConsume");
+BENCHMARK(trigger_consume)->Name("Core/Listener/TriggerConsume");
+BENCHMARK_CAPTURE(dispatch, Live, 0)->Name("Core/Listener/Dispatch64");
+BENCHMARK_CAPTURE(dispatch, Retained, 256)->Name("Core/Listener/Dispatch64RetainedDisconnected256");
+} // namespace ListenerBenchmarks
 
 namespace IdMapBenchmarks {
 

@@ -146,8 +146,8 @@ std::expected<std::shared_ptr<TextPainter>, StarException> TextPainter::create(R
   auto loaded = painter->reloadFonts();
   if (!loaded)
     return std::unexpected(std::move(loaded.error()));
-  painter->m_reloadTracker = std::make_shared<TrackerListener>();
-  painter->m_reloadSubscription = root.registerReloadListener(painter->m_reloadTracker);
+  painter->m_reload_tracker = std::make_shared<TrackerListener>();
+  painter->m_reload_subscription = root.subscribe_reload(painter->m_reload_tracker);
   return painter;
 }
 
@@ -471,7 +471,7 @@ std::expected<void, StarException> TextPainter::clearTextStyle() {
 }
 
 std::expected<void, StarException> TextPainter::refresh_fonts() {
-  if (m_reloadTracker->pullTriggered()) {
+  if (m_reload_tracker->consume()) {
     auto reloaded = reloadFonts();
     if (!reloaded)
       return std::unexpected(std::move(reloaded.error()));

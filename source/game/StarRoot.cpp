@@ -244,7 +244,7 @@ std::expected<void, StarException> Root::initialize() {
   auto maintenance = Thread::invoke("Root::maintenanceMain", [this, stopToken = m_maintenanceStopSource.get_token()]() -> std::expected<void, StarException> {
       std::unique_lock locker(m_maintenanceStopMutex);
       while (!stopToken.stop_requested()) {
-        m_reloadListeners.clearExpiredListeners();
+        m_reload_listeners.prune();
 
         {
           std::unique_lock locker(m_objectDatabaseMutex);
@@ -327,7 +327,7 @@ Root::~Root() {
   if (auto finished = m_workers.finish(); !finished)
     EmergencyLog::error("Root: Worker shutdown failed: {}", Star::output_exception(finished.error(), true));
 
-  m_reloadListeners.clearAllListeners();
+  m_reload_listeners.clear();
 
   if (auto written = writeConfig(); !written)
     EmergencyLog::error("Root: Could not write configuration during shutdown: {}", Star::output_exception(written.error(), true));
@@ -461,7 +461,7 @@ std::expected<void, StarException> Root::reload() {
     m_configuration.reset();
   }
 
-  return m_reloadListeners.trigger();
+  return m_reload_listeners.trigger();
 }
 
 std::expected<void, StarException> Root::loadMods(StringList modDirectories, bool _reload) {
@@ -560,8 +560,8 @@ std::expected<void, StarException> Root::fullyLoad() {
   return {};
 }
 
-ListenerSubscription Root::registerReloadListener(std::weak_ptr<Listener> reloadListener) {
-  return m_reloadListeners.addListener(std::move(reloadListener));
+ListenerSubscription Root::subscribe_reload(std::weak_ptr<Listener> reload_listener) {
+  return m_reload_listeners.subscribe(std::move(reload_listener));
 }
 
 std::expected<void, StarException> Root::hotReload() {
@@ -569,7 +569,7 @@ std::expected<void, StarException> Root::hotReload() {
   if (!loaded)
     return std::unexpected(std::move(loaded.error()));
   (*loaded)->hotReload();
-  return m_reloadListeners.trigger();
+  return m_reload_listeners.trigger();
 }
 
 String Root::toStoragePath(String const& path) const {

@@ -471,15 +471,15 @@ Input::Input(Root& root) : m_root(root), m_pressedMods(KeyMod::NoMod) {}
 std::expected<std::shared_ptr<Input>, StarException> Input::create(Root& root) {
   auto result = std::shared_ptr<Input>(new Input(root));
   if (auto r = result->reload(); !r) return std::unexpected(std::move(r.error()));
-  result->m_rootReloadListener = std::make_shared<CallbackListener>([input = std::ref(*result)]() {
+  result->m_root_reload_listener = std::make_shared<CallbackListener>([input = std::ref(*result)]() {
     return input.get().reload();
   });
-  result->m_rootReloadSubscription = root.registerReloadListener(result->m_rootReloadListener);
+  result->m_root_reload_subscription = root.subscribe_reload(result->m_root_reload_listener);
   return result;
 }
 
 Input::~Input() {
-  m_rootReloadSubscription.disconnect();
+  m_root_reload_subscription.disconnect();
 }
 
 List<std::pair<InputEvent, bool>> const& Input::inputEventsThisFrame() const {

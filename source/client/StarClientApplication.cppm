@@ -137,8 +137,8 @@ private:
 
   std::unique_ptr<Root> m_root;
   ThreadFunction<void> m_rootLoader;
-  std::shared_ptr<CallbackListener> m_reloadListener;
-  ListenerSubscription m_reloadSubscription;
+  std::shared_ptr<CallbackListener> m_reload_listener;
+  ListenerSubscription m_reload_subscription;
 
   MainAppState m_state = MainAppState::Startup;
 

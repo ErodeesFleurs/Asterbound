@@ -55,8 +55,8 @@ private:
   std::shared_ptr<TextureGroup> m_textureGroup;
   HashMap<AssetPath, std::pair<TexturePtr, std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>>> m_textureMap;
   HashMap<std::shared_ptr<Image const>, TexturePtr> m_textureDeduplicationMap;
-  std::shared_ptr<TrackerListener> m_reloadTracker;
-  ListenerSubscription m_reloadSubscription;
+  std::shared_ptr<TrackerListener> m_reload_tracker;
+  ListenerSubscription m_reload_subscription;
   std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> m_lastCleanup{};
 };
 

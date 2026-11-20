@@ -132,8 +132,8 @@ private:
   TextStyle m_renderSettings;
   TextStyle m_savedRenderSettings;
 
-  std::shared_ptr<TrackerListener> m_reloadTracker;
-  ListenerSubscription m_reloadSubscription;
+  std::shared_ptr<TrackerListener> m_reload_tracker;
+  ListenerSubscription m_reload_subscription;
 };
 
 }

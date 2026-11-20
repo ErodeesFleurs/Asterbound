@@ -1,44 +1,51 @@
 import std;
 import star.listener;
 import star.format;
+import star.unique_function;
 
 namespace Star {
 
 struct ListenerRegistration {
+  explicit ListenerRegistration(std::weak_ptr<Listener> listener) : target(std::move(listener)) {}
+
+  std::weak_ptr<Listener> const target;
   std::mutex mutex;
   std::condition_variable idle;
-  bool active = true;
+  std::atomic<bool> active{true};
   std::size_t running = 0;
-  std::thread::id invokingThread;
+  std::thread::id invoking_thread;
 
-  bool connected() {
+  bool prunable() {
+    if (active.load(std::memory_order_relaxed) && !target.expired())
+      return false;
+    // Neither expiration nor cancellation alone guarantees callback teardown is over.
     std::lock_guard lock(mutex);
-    return active;
+    return running == 0;
   }
 
   void deactivate() {
     std::lock_guard lock(mutex);
-    active = false;
+    active.store(false, std::memory_order_relaxed);
   }
 
   void disconnect() {
     std::unique_lock lock(mutex);
-    active = false;
+    active.store(false, std::memory_order_relaxed);
     // Dispatch is serial per group. Nested invocations run on the same thread;
     // self-disconnection cannot wait for its own stack frames to return.
-    if (running && invokingThread == std::this_thread::get_id())
+    if (running && invoking_thread == std::this_thread::get_id())
       return;
     idle.wait(lock, [&] { return running == 0; });
   }
 
-  [[nodiscard]] std::expected<void, StarException> invoke(std::weak_ptr<Listener> const& weakListener) {
+  [[nodiscard]] std::expected<void, StarException> invoke() {
     std::shared_ptr<Listener> listener;
     {
       std::lock_guard lock(mutex);
-      if (!active || !(listener = weakListener.lock()))
+      if (!active.load(std::memory_order_relaxed) || !(listener = target.lock()))
         return {};
       ++running;
-      invokingThread = std::this_thread::get_id();
+      invoking_thread = std::this_thread::get_id();
     }
     auto result = listener->trigger();
     listener.reset();
@@ -48,7 +55,7 @@ struct ListenerRegistration {
 
   void complete() {
     std::lock_guard lock(mutex);
-    if (--running == 0)
+    if (--running == 0 && !active.load(std::memory_order_relaxed))
       idle.notify_all();
   }
 };
@@ -56,15 +63,13 @@ struct ListenerRegistration {
 Listener::~Listener() = default;
 
 CallbackListener::CallbackListener(std::function<std::expected<void, StarException>()> callback)
-  : callback(std::move(callback)) {}
+  : m_callback(callback ? Callback(std::move(callback)) : Callback{}) {}
 
 [[nodiscard]] std::expected<void, StarException> CallbackListener::trigger() {
-  if (callback)
-    return callback();
+  if (m_callback)
+    return m_callback();
   return std::unexpected(StarException("Cannot invoke an empty listener callback"));
 }
-
-TrackerListener::TrackerListener() : triggered(false) {}
 
 ListenerSubscription::ListenerSubscription(std::shared_ptr<ListenerRegistration> registration)
   : m_registration(std::move(registration)) {}
@@ -91,25 +96,35 @@ void ListenerSubscription::disconnect() {
 }
 
 ListenerGroup::~ListenerGroup() {
-  clearAllListeners();
+  clear();
 }
 
-ListenerSubscription ListenerGroup::addListener(std::weak_ptr<Listener> listener) {
+ListenerSubscription ListenerGroup::subscribe(std::weak_ptr<Listener> listener) {
   std::lock_guard lock(m_mutex);
-  auto existing = m_listeners.find(listener);
-  if (existing != m_listeners.end() && existing->second->connected())
-    return ListenerSubscription(existing->second);
-  auto registration = std::make_shared<ListenerRegistration>();
-  m_listeners.insert_or_assign(std::move(listener), registration);
+  auto const [first, end] = m_listeners.equal_range(listener);
+  auto slot = end;
+  if (first != end) {
+    // The newest registration is last among equivalent owners.
+    auto previous = std::prev(end);
+    if (previous->second->active.load(std::memory_order_relaxed))
+      return ListenerSubscription(previous->second);
+    if (previous->second->prunable())
+      slot = previous;
+  }
+  auto registration = std::make_shared<ListenerRegistration>(listener);
+  if (slot != end)
+    slot->second = registration;
+  else
+    m_listeners.emplace_hint(end, std::move(listener), registration);
   return ListenerSubscription(std::move(registration));
 }
 
-void ListenerGroup::clearExpiredListeners() {
+void ListenerGroup::prune() {
   std::lock_guard lock(m_mutex);
-  std::erase_if(m_listeners, [](auto const& entry) { return entry.first.expired(); });
+  std::erase_if(m_listeners, [](decltype(m_listeners)::value_type const& entry) { return entry.second->prunable(); });
 }
 
-void ListenerGroup::clearAllListeners() {
+void ListenerGroup::clear() {
   decltype(m_listeners) listeners;
   {
     std::lock_guard lock(m_mutex);
@@ -122,17 +137,23 @@ void ListenerGroup::clearAllListeners() {
 }
 
 [[nodiscard]] std::expected<void, StarException> ListenerGroup::trigger() {
-  std::lock_guard dispatchLock(m_dispatchMutex);
-  std::vector<std::pair<std::weak_ptr<Listener>, std::shared_ptr<ListenerRegistration>>> listeners;
+  std::lock_guard dispatch_lock(m_dispatch_mutex);
+  std::vector<std::shared_ptr<ListenerRegistration>> snapshot;
   {
-    std::lock_guard registryLock(m_mutex);
-    std::erase_if(m_listeners, [](auto const& entry) { return entry.first.expired(); });
-    listeners.assign(m_listeners.begin(), m_listeners.end());
+    std::lock_guard registry_lock(m_mutex);
+    snapshot.reserve(m_listeners.size());
+    for (auto it = m_listeners.begin(); it != m_listeners.end();) {
+      if (it->second->prunable()) {
+        it = m_listeners.erase(it);
+      } else {
+        snapshot.push_back(it->second);
+        ++it;
+      }
+    }
   }
-  for (auto const& entry : listeners) {
-    auto result = entry.second->invoke(entry.first);
-    if (!result)
-      return std::unexpected(std::move(result.error()));
+  for (auto const& registration : snapshot) {
+    if (auto result = registration->invoke(); !result)
+      return result;
   }
   return {};
 }

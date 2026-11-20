@@ -1309,10 +1309,10 @@ const GameTestRegistration simultaneousRoots("RootTest", "SimultaneousRoots", []
     ASSERT_TRUE(expectIsolationConsumers(*rootA, *contextA, "A", "A", "A-written"));
     ASSERT_TRUE(expectIsolationConsumers(*rootB, *contextB, "B", "B", "B-written"));
 
-    auto listenerA = std::make_shared<TrackerListener>();
-    auto listenerB = std::make_shared<TrackerListener>();
-    auto subscriptionA = rootA->registerReloadListener(listenerA);
-    auto subscriptionB = rootB->registerReloadListener(listenerB);
+    auto listener_a = std::make_shared<TrackerListener>();
+    auto listener_b = std::make_shared<TrackerListener>();
+    auto subscription_a = rootA->subscribe_reload(listener_a);
+    auto subscription_b = rootB->subscribe_reload(listener_b);
     {
       auto assetsA = rootA->assets();
       ASSERT_TRUE(assetsA) << assetsA.error().what();
@@ -1326,8 +1326,8 @@ const GameTestRegistration simultaneousRoots("RootTest", "SimultaneousRoots", []
       ASSERT_TRUE(writeIsolationAssets(overlayB, "B-reloaded"));
 
       ASSERT_TRUE(rootA->reload());
-      EXPECT_TRUE(listenerA->pullTriggered());
-      EXPECT_FALSE(listenerB->pullTriggered());
+      EXPECT_TRUE(listener_a->consume());
+      EXPECT_FALSE(listener_b->consume());
       EXPECT_FALSE(luaA->scriptLoaded("/root-isolation.lua"));
       EXPECT_TRUE(luaB->scriptLoaded("/root-isolation.lua"));
       auto reloadedAssetsA = rootA->assets();
@@ -1360,9 +1360,9 @@ const GameTestRegistration simultaneousRoots("RootTest", "SimultaneousRoots", []
     // Destroy all A script borrowers before A. B remains live throughout.
     contextA.reset();
     luaA.reset();
-    subscriptionA.disconnect();
+    subscription_a.disconnect();
     rootA.reset();
-    EXPECT_FALSE(listenerB->pullTriggered());
+    EXPECT_FALSE(listener_b->consume());
     ASSERT_TRUE(expectIsolationConsumers(*rootB, *contextB, "B", "B", "B-written"));
     ASSERT_TRUE(contextB->eval("root.setConfiguration('rootIsolationOwner', 'B-survives')"));
     ASSERT_TRUE(expectIsolationConsumers(*rootB, *contextB, "B", "B", "B-survives"));
@@ -1373,7 +1373,7 @@ const GameTestRegistration simultaneousRoots("RootTest", "SimultaneousRoots", []
     EXPECT_EQ(isolationLogContains(logPathA, "root-isolation-log-B-survives"), false);
 
     ASSERT_TRUE(rootB->reload());
-    EXPECT_TRUE(listenerB->pullTriggered());
+    EXPECT_TRUE(listener_b->consume());
     EXPECT_FALSE(luaB->scriptLoaded("/root-isolation.lua"));
     ASSERT_TRUE(expectIsolationConsumers(*rootB, *contextB, "B-reloaded", "B", "B-survives"));
     auto reloadedContextB = luaB->createContext("/root-isolation.lua");

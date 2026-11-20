@@ -144,7 +144,7 @@ public:
   // Callbacks run synchronously on the reload/hotReload caller, not on the
   // maintenance thread. Retain the subscription; owners of raw-this callbacks
   // must disconnect before tearing down any state used by the callback.
-  [[nodiscard]] ListenerSubscription registerReloadListener(std::weak_ptr<Listener> reloadListener);
+  [[nodiscard]] ListenerSubscription subscribe_reload(std::weak_ptr<Listener> reload_listener);
 
   [[nodiscard]] std::expected<void, StarException> hotReload();
 
@@ -255,7 +255,7 @@ private:
   std::unordered_map<std::string, String> m_modStorageIds;
   std::unordered_set<std::string> m_modStorageUsedIds;
 
-  ListenerGroup m_reloadListeners;
+  ListenerGroup m_reload_listeners;
 
   Json m_lastRuntimeConfig;
   std::optional<String> m_runtimeConfigFile;

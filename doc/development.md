@@ -48,6 +48,8 @@ and the title screen at its configured image scale after changes.
 - `add_work()` and `add_producer<T>()` store the concrete callable and invoke it as an lvalue. Errors belong to the task's shared completion. `poll()` never waits; `wait(millis)` can time out. Keep a named producer promise alive while using a reference returned by `get()`. Publication does not synchronize subsequent edits to a mutable result.
 - `UniqueFunction` calls its stored target as an lvalue. Empty invocation reports a `StarException`; an `expected<T, StarException>` result is not wrapped a second time. Reference results borrow their referent. A void task may discard an ordinary result, but not a `std::expected` error.
 - A target's move constructor or destructor may observe the withdrawn source wrapper as empty and clear it again. Do not install a new target into storage whose previous target is still being destroyed.
+- `ListenerGroup::subscribe()` deduplicates active subscriptions by shared **owner**, not target address. Any duplicate handle can cancel the registration. Re-subscribing after cancellation uses the newly supplied target, even if it aliases a different subobject of the same owner.
+- Listener dispatch is serial per group and may recurse. `disconnect()` waits for an in-flight callback except on that callback's own thread. `prune()` never removes a running registration, so `clear()` can still drain it after the owner subscribes again. `TrackerListener::consume()` coalesces notifications; it is not an event counter.
 
 ## C++ implementation boundaries
 

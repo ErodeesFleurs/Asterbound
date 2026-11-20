@@ -1,6 +1,7 @@
 module;
 import std;
 import star.format;
+import star.unique_function;
 
 
 namespace Star {
@@ -12,27 +13,32 @@ public:
 };
 
 class CallbackListener : public Listener {
+  using Callback = UniqueFunction<std::expected<void, StarException>()>;
+
 public:
-  CallbackListener(std::function<std::expected<void, StarException>()> callback);
+  template <typename Function>
+    requires std::constructible_from<Callback, Function&&>
+  explicit CallbackListener(Function&& callback) : m_callback(std::forward<Function>(callback)) {}
+
+  // An empty std::function is invocable by type, but has no target.
+  explicit CallbackListener(std::function<std::expected<void, StarException>()> callback);
 
 protected:
   [[nodiscard]] std::expected<void, StarException> trigger() override;
 
 private:
-  std::function<std::expected<void, StarException>()> callback;
+  Callback m_callback;
 };
 
 class TrackerListener : public Listener {
 public:
-  TrackerListener();
-
-  bool pullTriggered();
+  [[nodiscard]] bool consume() noexcept;
 
 protected:
   [[nodiscard]] std::expected<void, StarException> trigger() override;
 
 private:
-  std::atomic<bool> triggered;
+  std::atomic<bool> m_triggered{false};
 };
 
 struct ListenerRegistration;
@@ -60,9 +66,9 @@ private:
 class ListenerGroup {
 public:
   ~ListenerGroup();
-  [[nodiscard]] ListenerSubscription addListener(std::weak_ptr<Listener> listener);
-  void clearExpiredListeners();
-  void clearAllListeners();
+  [[nodiscard]] ListenerSubscription subscribe(std::weak_ptr<Listener> listener);
+  void prune();
+  void clear();
 
   [[nodiscard]] std::expected<void, StarException> trigger();
 
@@ -70,17 +76,18 @@ private:
   // Registry access never invokes callbacks. Dispatch is serial within a group,
   // but permits a callback to trigger that same group recursively.
   std::mutex m_mutex;
-  std::recursive_mutex m_dispatchMutex;
-  std::map<std::weak_ptr<Listener>, std::shared_ptr<ListenerRegistration>,
+  std::recursive_mutex m_dispatch_mutex;
+  // An inactive registration may still be running when its owner re-subscribes.
+  std::multimap<std::weak_ptr<Listener>, std::shared_ptr<ListenerRegistration>,
       std::owner_less<std::weak_ptr<Listener>>> m_listeners;
 };
 
-inline bool TrackerListener::pullTriggered() {
-  return triggered.exchange(false);
+inline bool TrackerListener::consume() noexcept {
+  return m_triggered.load() && m_triggered.exchange(false);
 }
 
 [[nodiscard]] inline std::expected<void, StarException> TrackerListener::trigger() {
-  triggered = true;
+  m_triggered = true;
   return {};
 }
 

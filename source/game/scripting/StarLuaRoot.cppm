@@ -92,8 +92,8 @@ private:
   std::shared_ptr<ScriptCache> m_scriptCache;
   std::shared_ptr<StringMap<String>> m_sourceDiagnostics;
 
-  std::shared_ptr<Listener> m_rootReloadListener;
-  ListenerSubscription m_rootReloadSubscription;
+  std::shared_ptr<Listener> m_root_reload_listener;
+  ListenerSubscription m_root_reload_subscription;
 
   String m_storageDirectory;
 };

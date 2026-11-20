@@ -220,8 +220,8 @@ private:
   // Contains references to bind entries in categories, so also regenerated on reload.
   HashMap<InputVariant, List<BindRef>> m_bindMappings;
 
-  std::shared_ptr<Listener> m_rootReloadListener;
-  ListenerSubscription m_rootReloadSubscription;
+  std::shared_ptr<Listener> m_root_reload_listener;
+  ListenerSubscription m_root_reload_subscription;
 
   // Per-frame input event storage for Lua.
   List<std::pair<InputEvent, bool>> m_inputEvents;

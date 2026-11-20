@@ -577,12 +577,12 @@ TEST(Listener, DisconnectWaitsForInvocationAndPreventsLaterTriggers) {
   std::latch release(1);
   std::atomic<int> calls = 0;
   auto listener = std::make_shared<CallbackListener>([&]() -> std::expected<void, StarException> {
-    ++calls;
-    entered.count_down();
+    if (++calls == 1)
+      entered.count_down();
     release.wait();
     return {};
   });
-  auto subscription = group.addListener(listener);
+  auto subscription = group.subscribe(listener);
   std::thread triggering([&] { EXPECT_TRUE(group.trigger()); });
   entered.wait();
   std::latch disconnecting(1);
@@ -609,33 +609,78 @@ TEST(Listener, ReentrantTriggerAndSelfDisconnect) {
     subscription.disconnect();
     return {};
   });
-  subscription = group.addListener(listener);
+  subscription = group.subscribe(listener);
   ASSERT_TRUE(group.trigger());
   ASSERT_TRUE(group.trigger());
   EXPECT_EQ(calls, 2);
 }
 
+TEST(Listener, PruningSelfDisconnectedInvocationPreservesClearBarrier) {
+  ListenerGroup group;
+  ListenerSubscription subscription;
+  ListenerSubscription replacement;
+  std::shared_ptr<CallbackListener> listener;
+  std::latch replaced(1);
+  std::latch release(1);
+  listener = std::make_shared<CallbackListener>([&]() -> std::expected<void, StarException> {
+    subscription.disconnect();
+    group.prune();
+    // Snapshot cleanup must also keep an inactive but running registration.
+    EXPECT_TRUE(group.trigger());
+    // Re-subscribing this owner must not discard the old invocation's barrier.
+    replacement = group.subscribe(listener);
+    replaced.count_down();
+    release.wait();
+    return {};
+  });
+  subscription = group.subscribe(listener);
+  std::thread triggering([&] { EXPECT_TRUE(group.trigger()); });
+  replaced.wait();
+  std::latch clearing(1);
+  auto cleared = std::async(std::launch::async, [&] {
+    clearing.count_down();
+    group.clear();
+  });
+  clearing.wait();
+  EXPECT_EQ(cleared.wait_for(std::chrono::milliseconds(25)), std::future_status::timeout);
+  release.count_down();
+  triggering.join();
+  cleared.get();
+}
+
+TEST(Listener, EmptyCallbackReturnsError) {
+  ListenerGroup group;
+  auto listener = std::make_shared<CallbackListener>(nullptr);
+  auto subscription = group.subscribe(listener);
+  auto result = group.trigger();
+  ASSERT_FALSE(result);
+  EXPECT_TRUE(result.error().is<StarException>());
+  subscription.disconnect();
+  listener = std::make_shared<CallbackListener>(std::function<std::expected<void, StarException>()>{});
+  subscription = group.subscribe(listener);
+  EXPECT_FALSE(group.trigger());
+}
+
 TEST(Listener, RegistryMutationFromCallbackAndErrorRelease) {
   ListenerGroup group;
   int calls = 0;
-  bool failNow = true;
-  auto listener = std::make_shared<CallbackListener>([&]() -> std::expected<void, StarException> {
+  auto listener = std::make_shared<CallbackListener>([&, fail_next = std::make_unique<bool>(true)]()
+      -> std::expected<void, StarException> {
     ++calls;
     // A callback may mutate the registry without holding its lock, including
     // adding and immediately cancelling another listener.
     auto tracker = std::make_shared<TrackerListener>();
-    auto temporary = group.addListener(tracker);
-    group.clearExpiredListeners();
-    if (failNow)
+    auto temporary = group.subscribe(tracker);
+    group.prune();
+    if (std::exchange(*fail_next, false))
       return std::unexpected(StarException("listener failure"));
     return {};
   });
-  auto subscription = group.addListener(listener);
+  auto subscription = group.subscribe(listener);
   auto failed = group.trigger();
   ASSERT_FALSE(failed);
   EXPECT_TRUE(failed.error().is<StarException>());
   EXPECT_NE(std::string_view(failed.error().what()).find("listener failure"), std::string_view::npos);
-  failNow = false;
   ASSERT_TRUE(group.trigger());
   EXPECT_EQ(calls, 2);
   auto disconnected = std::async(std::launch::async, [&] { subscription.disconnect(); });
@@ -645,81 +690,87 @@ TEST(Listener, RegistryMutationFromCallbackAndErrorRelease) {
   EXPECT_EQ(calls, 2);
 }
 
-TEST(Listener, DuplicateOwnerIdentityAndScopedCancellation) {
+TEST(Listener, OwnerAliasesShareCancellationButReplacementUsesNewTarget) {
   ListenerGroup group;
-  int calls = 0;
-  auto listener = std::make_shared<CallbackListener>([&]() -> std::expected<void, StarException> {
-    ++calls;
-    return {};
-  });
-  auto first = group.addListener(listener);
-  // An aliasing shared_ptr must not create a second registration.
-  std::shared_ptr<Listener> alias(listener, listener.get());
-  auto duplicate = group.addListener(alias);
+  struct CountingListener : Listener {
+    int calls = 0;
+    std::expected<void, StarException> trigger() override {
+      ++calls;
+      return {};
+    }
+  };
+  auto owner = std::make_shared<std::pair<CountingListener, CountingListener>>();
+  std::shared_ptr<Listener> first_target(owner, &owner->first);
+  std::shared_ptr<Listener> second_target(owner, &owner->second);
+  auto first = group.subscribe(first_target);
+  auto duplicate = group.subscribe(second_target);
   ASSERT_TRUE(group.trigger());
-  EXPECT_EQ(calls, 1);
+  EXPECT_EQ(owner->first.calls, 1);
+  EXPECT_EQ(owner->second.calls, 0);
   duplicate.disconnect();
-  ASSERT_TRUE(group.trigger());
-  EXPECT_EQ(calls, 1);
   {
-    auto replacement = group.addListener(listener);
+    // Neither prune nor trigger has removed the inactive registry entry.
+    auto replacement = group.subscribe(second_target);
     ASSERT_TRUE(group.trigger());
-    EXPECT_EQ(calls, 2);
+    EXPECT_EQ(owner->first.calls, 1);
+    EXPECT_EQ(owner->second.calls, 1);
     // Disconnecting an old registration cannot cancel its replacement.
     first.disconnect();
     ASSERT_TRUE(group.trigger());
-    EXPECT_EQ(calls, 3);
+    EXPECT_EQ(owner->first.calls, 1);
+    EXPECT_EQ(owner->second.calls, 2);
   }
   ASSERT_TRUE(group.trigger());
-  EXPECT_EQ(calls, 3);
+  EXPECT_EQ(owner->first.calls, 1);
+  EXPECT_EQ(owner->second.calls, 2);
 }
 
 TEST(Listener, TrackerCoalescesAndOwningCallbackDoesNotKeepOwnerAlive) {
   ListenerGroup group;
   auto tracker = std::make_shared<TrackerListener>();
-  auto tracking = group.addListener(tracker);
-  EXPECT_FALSE(tracker->pullTriggered());
+  auto tracking = group.subscribe(tracker);
+  EXPECT_FALSE(tracker->consume());
   ASSERT_TRUE(group.trigger());
   ASSERT_TRUE(group.trigger());
-  EXPECT_TRUE(tracker->pullTriggered());
-  EXPECT_FALSE(tracker->pullTriggered());
+  EXPECT_TRUE(tracker->consume());
+  EXPECT_FALSE(tracker->consume());
   auto cache = std::make_shared<int>(0);
-  std::weak_ptr<int> weakCache = cache;
+  std::weak_ptr<int> weak_cache = cache;
   auto listener = std::make_shared<CallbackListener>([cache]() -> std::expected<void, StarException> {
     ++*cache;
     return {};
   });
-  auto subscription = group.addListener(listener);
+  auto subscription = group.subscribe(listener);
   cache.reset();
   ASSERT_TRUE(group.trigger());
-  auto retainedCache = weakCache.lock();
-  ASSERT_TRUE(retainedCache);
-  EXPECT_EQ(*retainedCache, 1);
-  retainedCache.reset();
+  auto retained_cache = weak_cache.lock();
+  ASSERT_TRUE(retained_cache);
+  EXPECT_EQ(*retained_cache, 1);
+  retained_cache.reset();
   listener.reset();
-  EXPECT_TRUE(weakCache.expired());
-  group.clearExpiredListeners();
-  group.clearAllListeners();
-  EXPECT_TRUE(tracker->pullTriggered());
+  EXPECT_TRUE(weak_cache.expired());
+  group.prune();
+  group.clear();
+  EXPECT_TRUE(tracker->consume());
   ASSERT_TRUE(group.trigger());
-  EXPECT_FALSE(tracker->pullTriggered());
+  EXPECT_FALSE(tracker->consume());
 }
 
-TEST(Listener, ClearAllFromCallbackCancelsRemainingSnapshot) {
+TEST(Listener, ClearFromCallbackCancelsRemainingSnapshot) {
   ListenerGroup group;
   int calls = 0;
   auto first = std::make_shared<CallbackListener>([&]() -> std::expected<void, StarException> {
     ++calls;
-    group.clearAllListeners();
+    group.clear();
     return {};
   });
   auto second = std::make_shared<CallbackListener>([&]() -> std::expected<void, StarException> {
     ++calls;
-    group.clearAllListeners();
+    group.clear();
     return {};
   });
-  auto firstSubscription = group.addListener(first);
-  auto secondSubscription = group.addListener(second);
+  auto first_subscription = group.subscribe(first);
+  auto second_subscription = group.subscribe(second);
   ASSERT_TRUE(group.trigger());
   EXPECT_EQ(calls, 1);
   ASSERT_TRUE(group.trigger());
@@ -730,7 +781,7 @@ TEST(Listener, ConcurrentTriggersRemainSerial) {
   ListenerGroup group;
   std::latch entered(1);
   std::latch release(1);
-  std::latch secondStarting(1);
+  std::latch second_starting(1);
   std::atomic<int> calls = 0;
   std::atomic<int> running = 0;
   std::atomic<bool> overlapped = false;
@@ -744,14 +795,14 @@ TEST(Listener, ConcurrentTriggersRemainSerial) {
     running.fetch_sub(1);
     return {};
   });
-  auto subscription = group.addListener(listener);
+  auto subscription = group.subscribe(listener);
   std::thread first([&] { EXPECT_TRUE(group.trigger()); });
   entered.wait();
   std::thread second([&] {
-    secondStarting.count_down();
+    second_starting.count_down();
     EXPECT_TRUE(group.trigger());
   });
-  secondStarting.wait();
+  second_starting.wait();
   release.count_down();
   first.join();
   second.join();

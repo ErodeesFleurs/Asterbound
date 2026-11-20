@@ -141,8 +141,8 @@ private:
   StringMap<CallbackGroup> m_callbacks;
   StringMap<LuaCallbacks> m_threadCallbacks;
   std::shared_ptr<LuaRoot> m_luaRoot;
-  std::shared_ptr<TrackerListener> m_reloadTracker;
-  ListenerSubscription m_reloadSubscription;
+  std::shared_ptr<TrackerListener> m_reload_tracker;
+  ListenerSubscription m_reload_subscription;
   std::uint64_t m_rootGeneration = 0;
   std::optional<LuaContext> m_context;
   std::stop_source m_callbackScope{std::nostopstate};

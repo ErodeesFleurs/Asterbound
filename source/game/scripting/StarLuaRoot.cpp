@@ -52,11 +52,11 @@ std::expected<std::shared_ptr<LuaRoot>, StarException> LuaRoot::create(Root& roo
   auto luaRoot = std::shared_ptr<LuaRoot>(new LuaRoot(root));
   if (auto result = luaRoot->restart(); !result)
     return std::unexpected(std::move(result.error()));
-  luaRoot->m_rootReloadListener = std::make_shared<CallbackListener>([cache = luaRoot->m_scriptCache]() -> std::expected<void, StarException> {
+  luaRoot->m_root_reload_listener = std::make_shared<CallbackListener>([cache = luaRoot->m_scriptCache]() -> std::expected<void, StarException> {
     cache->clear();
     return {};
   });
-  luaRoot->m_rootReloadSubscription = root.registerReloadListener(luaRoot->m_rootReloadListener);
+  luaRoot->m_root_reload_subscription = root.subscribe_reload(luaRoot->m_root_reload_listener);
   return luaRoot;
 }
 
