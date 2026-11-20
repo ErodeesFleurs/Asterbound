@@ -204,6 +204,12 @@ Nix also builds double-conversion with the project's static C++ runtime and
 fixes the installed Qt host tools' C-library RPATHs, so `moc` does not need
 `LD_LIBRARY_PATH`.
 
+Native vcpkg builds compile and run Qt's host tools in the same build; do
+not set `QT_HOST_PATH` for them. The triplets leave CMake's system selection
+to xclang rather than forcing cross mode with vcpkg's platform name. In
+`windows-cross`, xclang still targets Windows and vcpkg supplies the Linux
+host Qt tools from the host triplet.
+
 Use a fresh directory when switching from Qt 5 to Qt 6:
 
 ```sh

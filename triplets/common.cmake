@@ -42,6 +42,10 @@ list(APPEND VCPKG_CMAKE_CONFIGURE_OPTIONS
     "-DCMAKE_C_COMPILER_TARGET=${XCLANG_TARGET}"
     "-DCMAKE_CXX_COMPILER_TARGET=${XCLANG_TARGET}"
     "-DCMAKE_SYSTEM_PROCESSOR=${OSB_TARGET_PROCESSOR}")
+# vcpkg-cmake passes its platform name even for a native build. Let the
+# xclang toolchain set CMAKE_SYSTEM_NAME only when the target needs it;
+# otherwise CMake treats native tools (including Qt's moc) as cross-built.
+list(APPEND VCPKG_CMAKE_CONFIGURE_OPTIONS "-UCMAKE_SYSTEM_NAME")
 # Some upstream generators invoke the compiler with CFLAGS directly, without
 # CMake's COMPILER_TARGET (for example libpng's genout.cmake preprocessing).
 string(APPEND VCPKG_C_FLAGS " --target=${XCLANG_TARGET}")
@@ -53,9 +57,6 @@ list(APPEND VCPKG_CMAKE_CONFIGURE_OPTIONS
     "-DCMAKE_CXX_FLAGS=${VCPKG_CXX_FLAGS}")
 
 if(VCPKG_CMAKE_SYSTEM_NAME STREQUAL "MinGW")
-    # MinGW is vcpkg's platform name; CMake's platform is Windows. The official
-    # xclang file replaces vcpkg's mingw.cmake, which normally translates this.
-    list(APPEND VCPKG_CMAKE_CONFIGURE_OPTIONS "-DCMAKE_SYSTEM_NAME=Windows")
     # PATH separators follow the host, not the target.
     if(CMAKE_HOST_WIN32)
         set(ENV{PATH} "$ENV{XCLANG_ROOT}/bin;$ENV{PATH}")
