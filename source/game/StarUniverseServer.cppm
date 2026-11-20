@@ -146,13 +146,16 @@ using UniverseServerException = StarError<UniverseServerExceptionTag, StarExcept
 // between all the different worlds and all the different client connections
 // and routes packets between them.
 class UniverseServer : public Universe, public Thread {
+  struct ConstructionKey { explicit ConstructionKey() = default; };
+
 public:
   void const* query_type(TypeKey key) const noexcept override {
     return query_type_of<UniverseServer, Universe, Thread>(this, key);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<UniverseServer>(); }
 
-  [[nodiscard]] static std::expected<std::shared_ptr<UniverseServer>, StarException> create(Root& root, String const& storageDir, bool const& isLocal = false);
+  [[nodiscard]] static std::expected<std::shared_ptr<UniverseServer>, StarException> create(Root& root, String const& storage_dir, bool is_local = false);
+  UniverseServer(ConstructionKey, Root& root, String const& storage_dir, bool is_local, LockFile&& directory_lock);
   [[nodiscard]] std::expected<void, StarException> close();
   ~UniverseServer() override;
 
@@ -253,8 +256,7 @@ protected:
   [[nodiscard]] std::expected<void, StarException> run() override;
 
 private:
-  explicit UniverseServer(Root& root);
-  [[nodiscard]] std::expected<void, StarException> initialize(String const& storageDir, bool const& isLocal);
+  [[nodiscard]] std::expected<void, StarException> initialize();
   [[nodiscard]] std::expected<void, StarException> runLoop(std::stop_token stopToken);
   [[nodiscard]] std::expected<void, StarException> shutdown();
   bool m_closed = false;
@@ -392,8 +394,9 @@ private:
   bool m_isLocal;
 
   String m_storageDirectory;
+  // Outlives all storage users, including during partial initialization.
+  LockFile m_storage_directory_lock;
   ByteArray m_assetsDigest;
-  std::optional<LockFile> m_storageDirectoryLock;
   StringMap<StringList> m_speciesShips;
   std::shared_ptr<CelestialMasterDatabase> m_celestialDatabase;
   std::shared_ptr<Clock> m_universeClock;

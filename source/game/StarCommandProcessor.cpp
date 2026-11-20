@@ -53,7 +53,6 @@ import star.btree;
 import star.data_stream_devices;
 import star.btree_database;
 import star.ordered_set;
-import star.lock_file;
 import star.io_device;
 
 using ZSTD_CCtx = struct ZSTD_CCtx_s;

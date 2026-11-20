@@ -72,7 +72,6 @@ import star.btree_database;
 import star.client_application;
 import star.ttl_cache;
 import star.random_point;
-import star.lock_file;
 import star.zstd_compression;
 import star.universe;
 import star.host_address;

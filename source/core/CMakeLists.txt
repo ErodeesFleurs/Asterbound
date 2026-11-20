@@ -91,7 +91,7 @@ target_sources (star_modules PRIVATE FILE_SET native_thread TYPE CXX_MODULES FIL
 target_sources (star_modules PRIVATE
     StarUuid.cpp StarHostAddress.cpp StarSocket.cpp StarTcp.cpp
     StarString.cpp StarStringView.cpp StarThread.cpp
-    StarIODevice.cpp StarFile.cpp StarDataStream.cpp
+    StarIODevice.cpp StarFile.cpp StarLockFile.cpp StarDataStream.cpp
     StarCompression.cpp
     StarCurve25519.cpp
     StarDynamicLib.cpp StarHttpClient.cpp

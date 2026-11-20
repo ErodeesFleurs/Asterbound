@@ -7,34 +7,47 @@ namespace Star {
 
 class LockFile {
 public:
-  // Convenience function, tries to acquire a lock, and if succesfull returns an
-  // already locked
-  // LockFile.
-  [[nodiscard]] static std::expected<std::optional<LockFile>, StarException> acquireLock(String const& filename, std::int64_t lockTimeout = 1000);
+  // Empty means contention; filesystem errors remain errors.
+  [[nodiscard]] static std::expected<std::optional<LockFile>, StarException> try_acquire(String filename, std::int64_t timeout_ms = 1000);
 
-  LockFile(String const& filename);
-  LockFile(LockFile&& lockFile);
-  // Automatically unlocks.
+  explicit LockFile(String filename);
+  LockFile(LockFile&& other) noexcept;
   ~LockFile();
 
   LockFile(LockFile const&) = delete;
   LockFile& operator=(LockFile const&) = delete;
 
-  LockFile& operator=(LockFile&& lockFile);
+  LockFile& operator=(LockFile&& other) noexcept;
 
-  // Wait at most timeout time to acquire the file lock, and return true if the
-  // lock was acquired.  If timeout is negative, wait forever.
-  [[nodiscard]] std::expected<bool, StarException> lock(std::int64_t timeout = 0);
+  // Zero makes one attempt. Negative waits indefinitely.
+  [[nodiscard]] std::expected<bool, StarException> lock(std::int64_t timeout_ms = 0);
   // Consumes the handle, including when releasing it fails.
   [[nodiscard]] std::expected<void, StarException> unlock();
 
-  bool isLocked() const;
+  [[nodiscard]] bool owns_lock() const noexcept { return m_handle != invalid_handle; }
 
 private:
-  static std::int64_t const MaximumSleepMillis = 25;
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+  using Handle = std::uintptr_t;
+#else
+  using Handle = int;
+#endif
+  static constexpr Handle invalid_handle = static_cast<Handle>(-1);
+  [[nodiscard]] std::expected<void, StarException> close_native(Handle handle) const;
+
+  class RetryWindow {
+  public:
+    explicit RetryWindow(std::int64_t timeout_ms);
+    bool wait() const;
+
+  private:
+    using Clock = std::chrono::steady_clock;
+    Clock::time_point m_deadline;
+    std::chrono::milliseconds m_interval;
+  };
 
   String m_filename;
-  std::shared_ptr<void> m_handle;
+  Handle m_handle = invalid_handle;
 };
 
 }

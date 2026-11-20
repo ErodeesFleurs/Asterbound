@@ -2,7 +2,6 @@ import star.json;
 import star.xx_hash;
 import star.id_map;
 import star.string;
-import star.lock_file;
 import star.thread;
 import star.game_types;
 import star.data_stream;
@@ -178,6 +177,56 @@ const GameTestRegistration serverRun("ServerTest", "Run", [](GameTest& fixture) 
   EXPECT_TRUE(stopped) << (stopped ? "" : stopped.error().what());
   auto joined = (*server)->join();
   ASSERT_TRUE(joined) << joined.error().what();
+});
+
+const GameTestRegistration universe_directory_lock("ServerTest", "DirectoryLockPrecedesLuaInit", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory) << directory.error().what();
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto overlay = File::relative_to(*directory, "assets");
+  ASSERT_TRUE(File::create_directory(overlay));
+  ASSERT_TRUE(File::write_file(String(R"([
+    {"op":"add","path":"/scriptContexts/lockProbe","value":["/lock_probe.lua"]}
+  ])"), File::relative_to(overlay, "universe_server.config.patch")));
+  ASSERT_TRUE(File::write_file(String(R"(
+    function init()
+      root.setConfiguration("lockProbeCount", root.getConfiguration("lockProbeCount") + 1)
+    end
+  )"), File::relative_to(overlay, "lock_probe.lua")));
+  auto settings = fixture.rootSettings();
+  settings.assetSources.push_back(overlay);
+  settings.storageDirectory = File::relative_to(*directory, "storage");
+  settings.runtimeConfigFile = {};
+  settings.logDirectory = {};
+  settings.logFile = {};
+  settings.includeUGC = false;
+  auto root = Root::create(std::move(settings));
+  ASSERT_TRUE(root) << root.error().what();
+  auto config = (*root)->configuration();
+  ASSERT_TRUE(config) << config.error().what();
+  ASSERT_TRUE((*config)->set("lockProbeCount", 0));
+  ASSERT_TRUE((*config)->set("clearUniverseFiles", true));
+  auto universe = (*root)->toStoragePath("universe");
+  {
+    auto holder = UniverseServer::create(**root, universe);
+    ASSERT_TRUE(holder) << holder.error().what();
+    ASSERT_EQ((*config)->get("lockProbeCount"), Json(1));
+    auto contender = UniverseServer::create(**root, universe);
+    ASSERT_FALSE(contender);
+    EXPECT_NE(std::string_view(contender.error().what()).find("Could not acquire lock"), std::string_view::npos);
+    EXPECT_EQ((*config)->get("lockProbeCount"), Json(1));
+  }
+
+  // Fail after Lua init, while the directory belongs to the partially built server.
+  ASSERT_TRUE((*config)->set("clearUniverseFiles", "not a boolean"));
+  auto failed = UniverseServer::create(**root, universe);
+  ASSERT_FALSE(failed);
+  ASSERT_EQ((*config)->get("lockProbeCount"), Json(2));
+
+  ASSERT_TRUE((*config)->set("clearUniverseFiles", false));
+  auto successor = UniverseServer::create(**root, universe);
+  ASSERT_TRUE(successor) << successor.error().what();
+  EXPECT_EQ((*config)->get("lockProbeCount"), Json(3));
 });
 
 const GameTestRegistration

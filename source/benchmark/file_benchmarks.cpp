@@ -10,6 +10,7 @@ import star.format;
 import star.byte_array;
 import star.file;
 import star.io_device;
+import star.lock_file;
 import star.benchmark_runner;
 import star.random;
 import star.string;
@@ -58,7 +59,7 @@ struct FileFixture {
     }
   }
 
-  bool prepare(std::size_t length) {
+  bool prepare_directory() {
     auto random = Star::RandomService::create();
     if (!random) {
       state.SkipWithError(random.error().what());
@@ -71,6 +72,12 @@ struct FileFixture {
     }
     directory = std::move(*temporary);
     path = directory + "/fixture.bin";
+    return true;
+  }
+
+  bool prepare(std::size_t length) {
+    if (!prepare_directory())
+      return false;
     bytes.resize(length);
     // Valid UTF-8 ASCII, including embedded NULs; identical for both readers.
     for (std::size_t i = 0; i < length; ++i)
@@ -125,6 +132,59 @@ struct FileFixture {
     return require(state, *position == 137, "Metadata or positioned read changed the sequential cursor");
   }
 };
+
+bool check_lock(benchmark::State& state, Star::LockFile& lock, std::int64_t timeout_ms, bool expected) {
+  auto acquired = lock.lock(timeout_ms);
+  if (!acquired) {
+    state.SkipWithError(acquired.error().what());
+    return false;
+  }
+  return require(state, *acquired == expected, expected ? "Free lock was unavailable" : "Contender acquired held lock");
+}
+
+bool check_unlock(benchmark::State& state, Star::LockFile& lock) {
+  auto released = lock.unlock();
+  if (!released)
+    state.SkipWithError(released.error().what());
+  return released.has_value();
+}
+
+void lock_file_lifecycle(benchmark::State& state) {
+  FileFixture fixture(state);
+  if (!fixture.prepare_directory())
+    return;
+  for (auto _ : state) {
+    (void)_;
+    Star::LockFile lock(fixture.path);
+    if (!check_lock(state, lock, 0, true) || !check_unlock(state, lock))
+      break;
+  }
+  state.SetItemsProcessed(state.iterations());
+}
+
+void lock_file_contention(benchmark::State& state) {
+  FileFixture fixture(state);
+  if (!fixture.prepare_directory())
+    return;
+  // No release/reacquire in the timed loop: all attempts encounter the same owner.
+  Star::LockFile owner(fixture.path);
+  if (!check_lock(state, owner, 0, true))
+    return;
+  {
+    Star::LockFile contender(fixture.path);
+    auto timeout_ms = state.range(0);
+    for (auto _ : state) {
+      (void)_;
+      if (!check_lock(state, contender, timeout_ms, false))
+        break;
+    }
+  }
+  check_unlock(state, owner);
+  state.SetItemsProcessed(state.iterations());
+}
+
+BENCHMARK(lock_file_lifecycle)->Name("LockFile/Lifecycle")->UseRealTime();
+BENCHMARK(lock_file_contention)->Name("LockFile/Contention")->ArgName("timeout_ms")->Arg(0)->Arg(2)->UseRealTime();
 
 void file_size(benchmark::State& state) {
   FileFixture fixture(state);

@@ -9,7 +9,6 @@ import star.id_map;
 import std;
 import star.format;
 import star.string;
-import star.lock_file;
 import star.thread;
 import star.data_stream;
 import star.io_device;

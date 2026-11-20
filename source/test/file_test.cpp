@@ -3,11 +3,17 @@
 #ifndef STAR_SYSTEM_FAMILY_WINDOWS
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
+#include <signal.h>
+#include <sys/file.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #endif
 
 import star.file;
+import star.lock_file;
 import star.io_device;
 import star.string;
 import star.buffer;
@@ -172,6 +178,292 @@ namespace {
     std::filesystem::remove_all(fsPath(path), ignored);
   }
 }
+
+namespace {
+void in_lock_directory(std::invocable<String const&> auto&& scenario) {
+  auto random = RandomService::create();
+  ASSERT_TRUE(random);
+  auto directory = File::temporary_directory(**random);
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  scenario(File::relative_to(*directory, "宇宙.lock"));
+}
+}
+
+TEST(LockFileTest, MoveReleasesTargetAndTransfersExclusiveOwnership) {
+  static_assert(!std::is_copy_constructible_v<LockFile> && !std::is_copy_assignable_v<LockFile>);
+  in_lock_directory([](String const& path) {
+    auto acquired = LockFile::try_acquire(path);
+    ASSERT_TRUE(acquired && acquired->has_value());
+    LockFile source(std::move(**acquired));
+    EXPECT_FALSE((**acquired).owns_lock());
+    EXPECT_TRUE(source.owns_lock());
+    EXPECT_EQ(source.lock(), true);
+
+    auto other_path = path + ".other";
+    LockFile target(other_path);
+    ASSERT_EQ(target.lock(), true);
+    target = std::move(source);
+    EXPECT_FALSE(source.owns_lock());
+    EXPECT_TRUE(target.owns_lock());
+    EXPECT_EQ(LockFile(other_path).lock(), true);
+    auto busy = LockFile::try_acquire(path, 0);
+    ASSERT_TRUE(busy);
+    EXPECT_FALSE(busy->has_value());
+    ASSERT_TRUE(target.unlock());
+    EXPECT_FALSE(target.owns_lock());
+    EXPECT_TRUE(target.unlock());
+    EXPECT_EQ(LockFile(path).lock(), true);
+  });
+}
+
+TEST(LockFileTest, BusyTimeoutsAreDistinctFromOpenErrors) {
+  in_lock_directory([](String const& path) {
+    LockFile owner(path), contender(path);
+    ASSERT_EQ(owner.lock(), true);
+    for (int timeout_ms : {0, 1, 3, 30}) {
+      SCOPED_TRACE(timeout_ms);
+      auto start = std::chrono::steady_clock::now();
+      ASSERT_EQ(contender.lock(timeout_ms), false);
+      EXPECT_GE(std::chrono::steady_clock::now() - start, std::chrono::milliseconds(timeout_ms));
+      EXPECT_FALSE(contender.owns_lock());
+    }
+    auto invalid = LockFile::try_acquire(path + ".missing/child", 30);
+    EXPECT_FALSE(invalid.has_value());
+    ASSERT_TRUE(owner.unlock());
+    EXPECT_EQ(contender.lock(1), true);
+  });
+}
+
+#if !defined(STAR_SYSTEM_FAMILY_WINDOWS) && GTEST_HAS_DEATH_TEST
+namespace {
+// Start in a fresh, single-threaded test process before forking peers. Neither
+// descriptor surgery nor signal dispositions can affect the rest of core_tests.
+void isolated_lock_scenario(std::invocable<String const&> auto&& scenario) {
+  testing::GTEST_FLAG(death_test_style) = "threadsafe";
+  EXPECT_EXIT((in_lock_directory(scenario), std::_Exit(testing::Test::HasFailure() ? 1 : 0)),
+              testing::ExitedWithCode(0), "");
+}
+
+class LockPeer {
+public:
+  LockPeer() = default;
+  LockPeer(LockPeer const&) = delete;
+  LockPeer& operator=(LockPeer const&) = delete;
+  ~LockPeer() {
+    if (channel >= 0)
+      ::close(channel);
+    if (pid > 0) {
+      ::kill(pid, SIGKILL);
+      reap(0);
+    }
+  }
+
+  bool start(std::invocable<int> auto&& body) {
+    int ends[2];
+    if (::socketpair(AF_UNIX, SOCK_STREAM, 0, ends) != 0)
+      return false;
+    pid = ::fork();
+    if (pid == 0) {
+      ::close(ends[0]);
+      body(ends[1]);
+      std::_Exit(testing::Test::HasFailure() ? 1 : 0);
+    }
+    ::close(ends[1]);
+    channel = ends[0];
+    return pid > 0;
+  }
+
+  // The parent only receives markers and sends EOF, never writes to a peer
+  // that may have already failed (SIGPIPE).
+  bool reports(char expected) const {
+    pollfd event{channel, POLLIN, 0};
+    char byte;
+    return ::poll(&event, 1, 5000) > 0 && ::read(channel, &byte, 1) == 1 && byte == expected;
+  }
+
+  bool finish(int expected_signal = 0) {
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    while (std::chrono::steady_clock::now() < deadline) {
+      if (auto status = reap(WNOHANG))
+        return expected_signal ? WIFSIGNALED(*status) && WTERMSIG(*status) == expected_signal
+                               : WIFEXITED(*status) && WEXITSTATUS(*status) == 0;
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    return false;
+  }
+
+  pid_t pid = -1;
+  int channel = -1;
+
+private:
+  std::optional<int> reap(int options) {
+    int status;
+    pid_t result;
+    do { result = ::waitpid(pid, &status, options); } while (result < 0 && errno == EINTR);
+    if (result != pid)
+      return {};
+    pid = -1;
+    return status;
+  }
+};
+
+void hold_until_eof(String const& path, int channel) {
+  LockFile owner(path);
+  ASSERT_EQ(owner.lock(), true);
+  ASSERT_EQ(::write(channel, "L", 1), 1);
+  char byte;
+  ASSERT_EQ(::read(channel, &byte, 1), 0);
+  ASSERT_TRUE(owner.unlock());
+}
+}
+
+TEST(LockFileTest, ThreeProcessesKeepOneInodeAcrossHandoff) {
+  isolated_lock_scenario([](String const& path) {
+    LockPeer owner;
+    ASSERT_TRUE(owner.start([&](int channel) { hold_until_eof(path, channel); }));
+    ASSERT_TRUE(owner.reports('L'));
+    // B opened A's inode before release. Even if A unlinks the name, B can
+    // still lock its descriptor; C must not acquire a newly created inode.
+    int waiter = ::open(path.utf8_data(), O_RDONLY | O_CLOEXEC);
+    ASSERT_GE(waiter, 0);
+    auto close_waiter = make_scope_exit([&] { ::close(waiter); });
+    struct stat original{};
+    ASSERT_EQ(::fstat(waiter, &original), 0);
+    ASSERT_EQ(::flock(waiter, LOCK_EX | LOCK_NB), -1);
+    ASSERT_EQ(errno, EWOULDBLOCK);
+    ASSERT_EQ(::shutdown(owner.channel, SHUT_WR), 0);
+    ASSERT_TRUE(owner.finish());
+    ASSERT_EQ(::flock(waiter, LOCK_EX | LOCK_NB), 0);
+
+    LockPeer contender;
+    ASSERT_TRUE(contender.start([&](int) {
+      ASSERT_EQ(::close(waiter), 0); // C owns no share of B's description.
+      LockFile fresh(path);
+      EXPECT_EQ(fresh.lock(), false);
+      struct stat named{};
+      ASSERT_EQ(::stat(path.utf8_data(), &named), 0);
+      EXPECT_EQ(named.st_dev, original.st_dev);
+      EXPECT_EQ(named.st_ino, original.st_ino);
+    }));
+    EXPECT_TRUE(contender.finish());
+  });
+}
+
+TEST(LockFileTest, DescriptorZeroIsOwnedAndFailedCloseConsumesIt) {
+  isolated_lock_scenario([](String const& path) {
+    ASSERT_TRUE(::close(STDIN_FILENO) == 0 || errno == EBADF);
+    LockFile owner(path);
+    ASSERT_EQ(owner.lock(), true);
+    ASSERT_TRUE(owner.owns_lock());
+    auto flags = ::fcntl(STDIN_FILENO, F_GETFD);
+    ASSERT_GE(flags, 0);
+    EXPECT_NE(flags & FD_CLOEXEC, 0);
+    EXPECT_EQ(LockFile(path).lock(), false);
+    ASSERT_TRUE(owner.unlock());
+    EXPECT_EQ(::fcntl(STDIN_FILENO, F_GETFD), -1);
+    EXPECT_EQ(errno, EBADF);
+
+    ASSERT_EQ(owner.lock(), true);
+    ASSERT_EQ(::close(STDIN_FILENO), 0);
+    EXPECT_FALSE(owner.unlock().has_value());
+    EXPECT_FALSE(owner.owns_lock());
+    EXPECT_TRUE(owner.unlock());
+  });
+}
+
+TEST(LockFileTest, ExecDoesNotRetainAnInheritedLock) {
+  isolated_lock_scenario([](String const& path) {
+    LockFile owner(path);
+    ASSERT_EQ(owner.lock(), true);
+    LockPeer shell;
+    ASSERT_TRUE(shell.start([](int channel) {
+      ASSERT_EQ(::dup2(channel, STDIN_FILENO), STDIN_FILENO);
+      ASSERT_EQ(::dup2(channel, STDOUT_FILENO), STDOUT_FILENO);
+      ::close(channel);
+      ::execlp("sh", "sh", "-c", "printf E; read line; exit 0", static_cast<char*>(nullptr));
+      FAIL() << "exec sh: " << std::strerror(errno);
+    }));
+    ASSERT_TRUE(shell.reports('E')); // exec completed; shell is still alive.
+    ASSERT_TRUE(owner.unlock());
+    EXPECT_EQ(LockFile(path).lock(), true);
+    ASSERT_EQ(::shutdown(shell.channel, SHUT_WR), 0);
+    EXPECT_TRUE(shell.finish());
+  });
+}
+
+TEST(LockFileTest, ProcessDeathReleasesLockWithoutDestructors) {
+  isolated_lock_scenario([](String const& path) {
+    LockPeer owner;
+    ASSERT_TRUE(owner.start([&](int channel) { hold_until_eof(path, channel); }));
+    ASSERT_TRUE(owner.reports('L'));
+    LockFile contender(path);
+    ASSERT_EQ(contender.lock(), false);
+    ASSERT_EQ(::kill(owner.pid, SIGKILL), 0);
+    ASSERT_TRUE(owner.finish(SIGKILL));
+    EXPECT_EQ(contender.lock(), true);
+  });
+}
+
+#ifdef STAR_SYSTEM_LINUX
+namespace {
+// /proc/locks marks a queued waiter with "->". Observing it avoids racing a
+// signal against the window between an IPC "ready" and entering flock(2).
+bool queued_for_flock(pid_t pid) {
+  auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+  do {
+    std::ifstream locks("/proc/locks");
+    if (!locks)
+      return false;
+    for (std::string line; std::getline(locks, line);) {
+      int waiter;
+      if (std::sscanf(line.c_str(), "%*d: -> FLOCK %*s %*s %d", &waiter) == 1 && waiter == pid)
+        return true;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  } while (std::chrono::steady_clock::now() < deadline);
+  return false;
+}
+volatile sig_atomic_t signal_channel = -1;
+void report_interrupt(int) {
+  int saved = errno;
+  (void)::write(signal_channel, "I", 1);
+  errno = saved;
+}
+}
+
+TEST(LockFileTest, BlockingFlockRetriesAfterRealSignalInterruption) {
+  isolated_lock_scenario([](String const& path) {
+    int holder = ::open(path.utf8_data(), O_CREAT | O_RDWR | O_CLOEXEC, 0600);
+    ASSERT_GE(holder, 0);
+    auto close_holder = make_scope_exit([&] { ::close(holder); });
+    ASSERT_EQ(::flock(holder, LOCK_EX | LOCK_NB), 0);
+    LockPeer waiter;
+    ASSERT_TRUE(waiter.start([&](int channel) {
+      ASSERT_EQ(::close(holder), 0);
+      signal_channel = channel;
+      struct sigaction action{};
+      action.sa_handler = report_interrupt; // deliberately no SA_RESTART
+      ASSERT_EQ(::sigemptyset(&action.sa_mask), 0);
+      ASSERT_EQ(::sigaction(SIGUSR1, &action, nullptr), 0);
+      sigset_t unblocked;
+      ASSERT_EQ(::sigemptyset(&unblocked), 0);
+      ASSERT_EQ(::sigaddset(&unblocked, SIGUSR1), 0);
+      ASSERT_EQ(::sigprocmask(SIG_UNBLOCK, &unblocked, nullptr), 0);
+      LockFile contender(path);
+      EXPECT_EQ(contender.lock(-1), true);
+      EXPECT_TRUE(contender.owns_lock());
+    }));
+    ASSERT_TRUE(queued_for_flock(waiter.pid));
+    ASSERT_EQ(::kill(waiter.pid, SIGUSR1), 0);
+    ASSERT_TRUE(waiter.reports('I'));
+    ASSERT_TRUE(queued_for_flock(waiter.pid));
+    ASSERT_EQ(::flock(holder, LOCK_UN), 0);
+    EXPECT_TRUE(waiter.finish());
+  });
+}
+#endif
+#endif
 
 TEST(FileTest, LogSinkRotatesAtTheBoundaryAndRetainsOnlyNewestBackups) {
   auto random = RandomService::create();

@@ -158,33 +158,35 @@ import star.command_processor;
 import star.algorithm;
 namespace Star {
 
-UniverseServer::UniverseServer(Root& root)
-  : Thread("UniverseServer"), m_root(root), m_isLocal(false),
+namespace {
+constexpr char universe_lock_filename[] = "universe.lock";
+}
+
+UniverseServer::UniverseServer(ConstructionKey, Root& root, String const& storage_dir, bool is_local, LockFile&& directory_lock)
+  : Thread("UniverseServer"), m_root(root), m_isLocal(is_local), m_storageDirectory(storage_dir),
+    m_storage_directory_lock(std::move(directory_lock)),
     m_workerPool("UniverseServerWorkerPool"), m_storageTriggerDeadline(), m_clearBrokenWorldsDeadline(),
     m_lastClockUpdateSent(), m_tcpState(TcpState::No),
     m_maxPlayers(0), m_secureWarps(true) {}
 
-std::expected<std::shared_ptr<UniverseServer>, StarException> UniverseServer::create(Root& root, String const& storageDir, bool const& isLocal) {
-  auto server = std::shared_ptr<UniverseServer>(new UniverseServer(root));
-  if (auto result = server->initialize(storageDir, isLocal); !result)
+std::expected<std::shared_ptr<UniverseServer>, StarException> UniverseServer::create(Root& root, String const& storage_dir, bool is_local) {
+  if (auto result = File::create_directories(storage_dir); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = root.logger().info("UniverseServer: Acquiring universe lock file"); !result)
+    return std::unexpected(std::move(result.error()));
+  auto acquired = LockFile::try_acquire(File::relative_to(storage_dir, universe_lock_filename));
+  if (!acquired)
+    return std::unexpected(std::move(acquired.error()));
+  if (!*acquired)
+    return std::unexpected(UniverseServerException("Could not acquire lock for the universe directory"));
+  auto server = std::make_shared<UniverseServer>(ConstructionKey{}, root, storage_dir, is_local, std::move(**acquired));
+  if (auto result = server->initialize(); !result)
     return std::unexpected(std::move(result.error()));
   server->m_initialized = true;
   return server;
 }
 
-std::expected<void, StarException> UniverseServer::initialize(String const& storageDir, bool const& isLocal) {
-  m_isLocal = isLocal;
-  String const lockFile = "universe.lock";
-  m_storageDirectory = storageDir;
-  auto directory = File::is_directory(storageDir);
-  if (!directory)
-    return std::unexpected(std::move(directory.error()));
-  if (!*directory) {
-    if (auto result = m_root.logger().info("UniverseServer: Creating universe storage directory"); !result)
-      return std::unexpected(std::move(result.error()));
-    if (auto result = File::create_directory(storageDir); !result)
-      return std::unexpected(std::move(result.error()));
-  }
+std::expected<void, StarException> UniverseServer::initialize() {
   auto assetsResult = m_root.assets();
   if (!assetsResult)
     return std::unexpected(std::move(assetsResult.error()));
@@ -208,14 +210,6 @@ std::expected<void, StarException> UniverseServer::initialize(String const& stor
   }
   if (auto result = startLuaScripts(); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = m_root.logger().info("UniverseServer: Acquiring universe lock file"); !result)
-    return std::unexpected(std::move(result.error()));
-  auto lock = LockFile::acquireLock(File::relative_to(storageDir, lockFile));
-  if (!lock)
-    return std::unexpected(std::move(lock.error()));
-  m_storageDirectoryLock = std::move(*lock);
-  if (!m_storageDirectoryLock)
-    return std::unexpected(UniverseServerException("Could not acquire lock for the universe directory"));
   auto clearConfig = configuration->get("clearUniverseFiles");
   if (!clearConfig)
     return std::unexpected(std::move(clearConfig.error()));
@@ -225,17 +219,17 @@ std::expected<void, StarException> UniverseServer::initialize(String const& stor
   if (*clear) {
     if (auto result = m_root.logger().info("UniverseServer: Clearing all universe files"); !result)
       return std::unexpected(std::move(result.error()));
-    auto files = File::directory_entries(storageDir);
+    auto files = File::directory_entries(m_storageDirectory);
     if (!files)
       return std::unexpected(std::move(files.error()));
     for (auto const& file : *files) {
-      if (!file.second && file.first != lockFile) {
-        if (auto result = File::remove(File::relative_to(storageDir, file.first)); !result)
+      if (!file.second && file.first != universe_lock_filename) {
+        if (auto result = File::remove(File::relative_to(m_storageDirectory, file.first)); !result)
           return std::unexpected(std::move(result.error()));
       }
     }
   }
-  auto celestial = CelestialMasterDatabase::create(m_root, File::relative_to(storageDir, "universe.chunks"));
+  auto celestial = CelestialMasterDatabase::create(m_root, File::relative_to(m_storageDirectory, "universe.chunks"));
   if (!celestial)
     return std::unexpected(std::move(celestial.error()));
   m_celestialDatabase = std::move(*celestial);

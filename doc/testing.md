@@ -563,6 +563,15 @@ These are dispatch costs, not full asset reload times.
   rendered images. Use bounded readiness timeouts, not fixed frame counts; keep
   fixed-world coordinator script compilation explicit even without its entity.
 
+### Universe directory locking
+
+Run `core_tests --gtest_filter='LockFileTest.*'` for transfer, contention, and
+filesystem errors. Unix subprocesses also check inode handoff, descriptor zero,
+exec and process death; Linux checks an interrupted blocking `flock`.
+With private assets and storage, run `game_tests --gtest_filter=ServerTest.DirectoryLockPrecedesLuaInit`.
+The Lua counter distinguishes a rejected contender from a server that ran scripts
+before discovering the lock, and checks reacquisition after failed initialization.
+
 ## Benchmarks
 
 ### Build and run
@@ -605,6 +614,7 @@ catalog; implementation and detailed labels live in [benchmark sources](../sourc
 | Matrices | `./result/bin/matrix3_benchmarks --benchmark_filter='Matrix3/'` | Arithmetic, aliasing, affine composition, transforms, inverse and row-major packing. |
 | Scalar math | `./result/bin/math_common_benchmarks --benchmark_filter='MathCommon/'` | Fractions, modular wrapping, angles, comparison policy and byte quantization; scalar and batched inputs. |
 | I/O | `./result/bin/io_benchmarks --benchmark_filter='IO/'` | Borrowed deserialization, VLQ, UUID, file writes and full asset payload reads. |
+| Universe directory locks | `file_benchmarks --benchmark_filter='^LockFile/'` | Uncontended acquire/release, immediate contention and a 2 ms wait. Compare elapsed time for all three; CPU time distinguishes sleeping from busy retrying. |
 | Logging | `./result/bin/logging_benchmarks --benchmark_filter='Logging/'` | Raw/formatted messages, sinks, concurrent callers, files and spatial logs. |
 | Audio | `ownership_benchmarks -bootconfig <private-config> --benchmark_filter='^Ownership/Audio/'` | Shared-byte clone/seek/read, PCM resampling, looping mixer callbacks and cold filter lifecycles. |
 | Flat hash storage | `./result/bin/flat_hash_benchmarks --benchmark_filter='FlatHash/'` | Insertion/duplicates, collision rehash, lookup, churn, reuse and sparse iteration. |

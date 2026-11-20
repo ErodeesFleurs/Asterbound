@@ -11,7 +11,6 @@ import star.logging;
 import star.id_map;
 import star.format;
 import star.string;
-import star.lock_file;
 import star.game_types;
 import star.data_stream;
 import star.rpc_promise;
