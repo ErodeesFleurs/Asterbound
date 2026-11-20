@@ -1,0 +1,11 @@
+diff --git a/src/corelib/global/qsimd.cpp b/src/corelib/global/qsimd.cpp
+--- a/src/corelib/global/qsimd.cpp
++++ b/src/corelib/global/qsimd.cpp
+@@ -10,6 +10,7 @@
+ #include "qsimd_p.h"
+ #include "qalgorithms.h"
+ 
+ #include <stdio.h>
++#include <stdlib.h>
+ #include <string.h>
+ 
