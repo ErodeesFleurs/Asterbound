@@ -305,8 +305,7 @@ std::expected<std::optional<String>, StarException> UniverseClient::connect(Univ
     }
     if (!protocolResponse->allowed)
       return String(Star::format("Join failed! Server does not support connections with protocol version {}", StarProtocolVersion));
-    NetCompatibilityRules rules;
-    rules.setVersion(LegacyVersion);
+    VersionNumber peer_version = LegacyVersion;
     bool legacyServer = forceLegacy || protocolResponse->compressionMode() != PacketCompressionMode::Enabled;
     auto socketResult = connection.packetSocket();
     if (!socketResult)
@@ -315,11 +314,10 @@ std::expected<std::optional<String>, StarException> UniverseClient::connect(Univ
     if (!legacyServer) {
       auto compressed = as_ref<CompressedPacketSocket>(socket);
       if (protocolResponse->info) {
-        auto versionResult = protocolResponse->info.get_uint("openProtocolVersion", 1);
-        if (!versionResult)
-          return std::unexpected(std::move(versionResult.error()));
-        auto version = std::move(*versionResult);
-        rules.setVersion(version);
+        auto version = read_open_protocol_version(protocolResponse->info, 1);
+        if (!version)
+          return std::unexpected(std::move(version.error()));
+        peer_version = *version;
         auto compressionNameResult = protocolResponse->info.get_string("compression", "None");
         if (!compressionNameResult)
           return std::unexpected(std::move(compressionNameResult.error()));
@@ -343,7 +341,7 @@ std::expected<std::optional<String>, StarException> UniverseClient::connect(Univ
           compressed->get().setCompressionStreamEnabled(*compression == NetCompressionMode::Zstd);
         }
       } else {
-        rules.setVersion(1);
+        peer_version = 1;
         if (compressed) {
           auto operation7 = m_root.logger().info("UniverseClient: Defaulting to Zstd network stream compression (older server version)");
           if (!operation7)
@@ -352,6 +350,7 @@ std::expected<std::optional<String>, StarException> UniverseClient::connect(Univ
         }
       }
     }
+    NetCompatibilityRules rules(peer_version);
     socket.setNetRules(rules);
     auto uuidResult = m_mainPlayer->uuid();
     if (!uuidResult)
@@ -367,7 +366,8 @@ std::expected<std::optional<String>, StarException> UniverseClient::connect(Univ
     auto shipData = std::move(*shipDataResult);
     auto request = std::make_shared<ClientConnectPacket>(assets->digest(), allowAssetsMismatch, uuid, name,
         m_mainPlayer->shipSpecies(), std::move(shipData), m_mainPlayer->shipUpgrades(), m_mainPlayer->log()->introComplete(), account);
-    request->info = JsonObject{{"brand", "Asterbound"}, {"openProtocolVersion", OpenProtocolVersion}};
+    if (!legacyServer)
+      request->info = JsonObject{{"brand", "Asterbound"}, {"openProtocolVersion", OpenProtocolVersion}};
     auto operation8 = connection.pushSingle(std::move(request));
     if (!operation8)
       return std::unexpected(std::move(operation8.error()));
@@ -793,7 +793,7 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
     }
     m_pendingMessages.emplace_back(MessageContext::CommandResult, 0, "", printout);
   }
-  auto contextUpdateResult = m_clientContext->writeUpdate(m_clientContext->netCompatibilityRules());
+  auto contextUpdateResult = m_clientContext->write_update();
   if (!contextUpdateResult)
     return std::unexpected(std::move(contextUpdateResult.error()));
   auto contextUpdate = std::move(*contextUpdateResult);
@@ -1667,7 +1667,7 @@ std::expected<void, StarException> UniverseClient::handlePackets(List<std::share
         }
       }
       if (auto update = as<ClientContextUpdatePacket>(packet)) {
-        auto operation72 = m_clientContext->readUpdate(update->updateData, m_clientContext->netCompatibilityRules());
+        auto operation72 = m_clientContext->read_update(update->updateData);
         if (!operation72)
           return std::unexpected(std::move(operation72.error()));
         auto operation73 = m_playerStorage->applyShipUpdates(m_clientContext->playerUuid(), m_clientContext->newShipUpdates());

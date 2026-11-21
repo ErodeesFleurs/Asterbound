@@ -43,6 +43,9 @@ import star.player_inventory;
 import star.inventory_types;
 import star.armors;
 import star.net_element_top;
+import star.net_compatibility;
+import star.map;
+import star.byte_array;
 import star.format;
 import star.game_test;
 import star.algorithm;
@@ -775,6 +778,55 @@ const GameTestRegistration inventoryMutationNormalizesEmptySlots("ItemTest", "In
   auto pastEndTake = inventory.takeSlot(pastEnd);
   ASSERT_FALSE(pastEndTake);
   EXPECT_TRUE(pastEndTake.error().is<OutOfRangeException>());
+});
+
+const GameTestRegistration inventory_delta_visibility(
+    "ItemTest", "CachedReplicaInventoryDeltaRespectsRecipient", [](GameTest& fixture) {
+  auto& root = fixture.root();
+  auto storage = File::ephemeral_file(root.random());
+  ASSERT_TRUE(storage);
+  auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
+  ASSERT_TRUE(world);
+  auto close = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
+  auto factory = root.playerFactory();
+  ASSERT_TRUE(factory);
+  auto player = (*factory)->create();
+  ASSERT_TRUE(player);
+  ASSERT_TRUE((*player)->finalizeCreation());
+  Entity& entity = **player;
+  ASSERT_TRUE(entity.init(**world, 100, EntityMode::Slave));
+  auto uninit = make_scope_exit([&] { EXPECT_TRUE(entity.uninit()); });
+  auto database = root.itemDatabase();
+  ASSERT_TRUE(database);
+
+  for (bool admin_first : {false, true}) {
+    auto source = NetElementTop<PlayerInventory>::create(root);
+    ASSERT_TRUE(source);
+    (*source)->setPlayer(std::ref(**player));
+    NetCompatibilityRules privileged(OpenProtocolVersion, true);
+    auto initial = (*source)->writeNetState(0, privileged);
+    ASSERT_TRUE(initial);
+    auto item = inventoryTestItem(**database, "perfectlygenericitem", 2);
+    ASSERT_TRUE(item);
+    ASSERT_EQ((*source)->setItem(SwapSlot(), std::move(*item)), true);
+
+    // One entity and one starting cursor: only recipient policy may differ.
+    HashMap<NetCompatibilityRules, ByteArray> deltas;
+    for (bool admin : {admin_first, !admin_first}) {
+      NetCompatibilityRules rules(OpenProtocolVersion, admin);
+      if (!deltas.contains(rules)) {
+        auto delta = (*source)->writeNetState(initial->second, rules);
+        ASSERT_TRUE(delta);
+        deltas[rules] = std::move(delta->first);
+      }
+      auto observer = NetElementTop<PlayerInventory>::create(root);
+      ASSERT_TRUE(observer);
+      ASSERT_TRUE((*observer)->readNetState(initial->first, 0.0f, rules));
+      ASSERT_TRUE((*observer)->readNetState(deltas[rules], 0.0f, rules));
+      auto received = (*observer)->swapSlotItem();
+      EXPECT_EQ(received ? received->count() : 0u, admin ? 2u : 0u);
+    }
+  }
 });
 
 const GameTestRegistration inventoryMutableTraversalAndNetworkNormalizeConsumption("ItemTest", "InventoryMutableTraversalAndNetworkNormalizeConsumption", [](GameTest& fixture) {

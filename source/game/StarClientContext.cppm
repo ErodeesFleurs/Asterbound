@@ -111,8 +111,8 @@ public:
   
   StringMap<WorldChunks> newCustomWorldUpdates();
 
-  [[nodiscard]] std::expected<void, StarException> readUpdate(ByteArray data, NetCompatibilityRules rules);
-  [[nodiscard]] std::expected<ByteArray, StarException> writeUpdate(NetCompatibilityRules rules);
+  [[nodiscard]] std::expected<void, StarException> read_update(ByteArray data);
+  [[nodiscard]] std::expected<ByteArray, StarException> write_update();
 
   void setConnectionId(ConnectionId connectionId);
   ConnectionId connectionId() const;

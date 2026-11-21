@@ -157,7 +157,8 @@ namespace Star {
 TestUniverse::TestUniverse(Vec2U clientWindowSize)
   : m_clientWindowSize(clientWindowSize) {}
 
-std::expected<std::unique_ptr<TestUniverse>, StarException> TestUniverse::create(Root& root, Vec2U clientWindowSize) {
+std::expected<std::unique_ptr<TestUniverse>, StarException> TestUniverse::create(
+    Root& root, Vec2U clientWindowSize, bool force_legacy) {
   auto fixture = std::unique_ptr<TestUniverse>(new TestUniverse(clientWindowSize));
   auto storagePath = File::temporary_directory(root.random());
   if (!storagePath)
@@ -278,11 +279,27 @@ std::expected<std::unique_ptr<TestUniverse>, StarException> TestUniverse::create
   auto localClient = fixture->m_server->addLocalClient();
   if (!localClient)
     return std::unexpected(std::move(localClient.error()));
-  auto connected = fixture->m_client->connect(std::move(*localClient), true);
+  auto connected = fixture->m_client->connect(std::move(*localClient), true, "", "", force_legacy);
   if (!connected)
     return std::unexpected(std::move(connected.error()));
   if (*connected)
     return std::unexpected(StarException(Star::format("Test universe login rejected: {}", **connected)));
+  // LocalPacketSocket forwards the original packet, not its version-filtered wire image.
+  auto uuid = fixture->m_mainPlayer->uuid();
+  if (!uuid)
+    return std::unexpected(std::move(uuid.error()));
+  auto id = fixture->m_server->clientForUuid(*uuid);
+  auto context = fixture->m_client->clientContext();
+  if (!id || !context)
+    return std::unexpected(TestUniverseException("Missing peer after local handshake"));
+  auto server_version = fixture->m_server->clientConnectionVersion(*id);
+  if (!server_version)
+    return std::unexpected(std::move(server_version.error()));
+  auto client_version = context->netCompatibilityRules().version();
+  auto expected_version = force_legacy ? LegacyVersion : OpenProtocolVersion;
+  if (*server_version != expected_version || client_version != expected_version)
+    return std::unexpected(TestUniverseException::format("Local handshake expected {}, got client {} and server {}",
+                                                         expected_version, client_version, *server_version));
   return fixture;
 }
 

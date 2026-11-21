@@ -27,6 +27,8 @@ Asterbound is the current product; OpenStarbound is the upstream and compatibili
 
 The existing handshake does not negotiate a common minimum version. Accepting a version number is not proof of compatibility with a future implementation. The owned asset namespace has moved to `asterbound`; this does not rename entity IDs, script contexts or public APIs. The `doc/lua/openstarbound/` and `doc/json/openstarbound/` reference paths also remain stable.
 
+The extension version selects the packet and nested entity field layouts; it is an unsigned 32-bit value. It does not grant access to another player's inventory. Cached entity deltas must also distinguish the recipient's inventory visibility, even for two clients using the same extension version.
+
 Brand artwork and scripts change the asset digest. A server requiring identical assets can reject an otherwise wire-compatible client. Do not disable this policy globally or advertise digest equality; deploy matching assets, or explicitly allow the difference on both endpoints when appropriate.
 
 ### Scope of interoperability evidence

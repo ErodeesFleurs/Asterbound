@@ -10,11 +10,9 @@ import star.net_compatibility;
 import star.byte_array;
 namespace Star {
 
-extern unsigned const CurrentStreamVersion = 18; // update OpenProtocolVersion too!
-
 DataStream::DataStream()
   : m_byteOrder(ByteOrder::BigEndian), m_nullTerminatedStrings(false),
-    m_streamCompatibilityVersion(CurrentStreamVersion) {}
+    m_streamCompatibilityVersion(OpenProtocolVersion) {}
 ByteOrder DataStream::byte_order() const { return m_byteOrder; }
 void DataStream::set_byte_order(ByteOrder order) { m_byteOrder = order; }
 bool DataStream::null_terminated_strings() const { return m_nullTerminatedStrings; }

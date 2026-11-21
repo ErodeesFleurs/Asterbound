@@ -101,6 +101,15 @@ namespace Star {
 
 static constexpr auto PacketSocketPollInterval = std::chrono::milliseconds(1);
 
+std::expected<VersionNumber, StarException> read_open_protocol_version(Json const& info, VersionNumber fallback) {
+  auto version = info.get_uint("openProtocolVersion", fallback);
+  if (!version)
+    return std::unexpected(std::move(version.error()));
+  if (!std::in_range<VersionNumber>(*version))
+    return std::unexpected(UniverseConnectionException::format("openProtocolVersion {} is out of range", *version));
+  return static_cast<VersionNumber>(*version);
+}
+
 UniverseConnection::UniverseConnection(std::unique_ptr<PacketSocket> packetSocket)
     : m_packetSocket(std::move(packetSocket)) {}
 

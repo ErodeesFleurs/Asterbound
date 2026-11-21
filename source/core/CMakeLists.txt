@@ -102,7 +102,7 @@ target_sources (star_modules PRIVATE
     StarNetElement.cpp StarNetElementBasicFields.cpp
     StarNetElementGroup.cpp StarNetElementSyncGroup.cpp
     StarByteArray.cpp StarLexicalCast.cpp StarMemory.cpp
-    StarNetCompatibility.cpp StarRandom.cpp
+    StarRandom.cpp
     StarAssetPath.cpp
     StarPathEmbed.cpp
     StarBTreeDatabase.cpp

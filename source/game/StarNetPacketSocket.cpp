@@ -237,7 +237,7 @@ std::expected<void, StarException> LocalPacketSocket::sendPackets(List<std::shar
     for (auto const& inPacket : packets) {
       DataStreamBuffer buffer;
       buffer.set_stream_compatibility_version(netRules());
-      auto written = inPacket->write(buffer, netRules());
+      auto written = inPacket->write(buffer);
       if (!written)
         return std::unexpected(std::move(written.error()));
       auto created = createPacket(inPacket->type());
@@ -335,7 +335,7 @@ std::expected<void, StarException> TcpPacketSocket::sendPackets(List<std::shared
       auto packetType = packet->type();
       DataStreamBuffer packetBuffer;
       packetBuffer.set_stream_compatibility_version(netRules());
-      auto written = packet->write(packetBuffer, netRules());
+      auto written = packet->write(packetBuffer);
       if (!written)
         return std::unexpected(std::move(written.error()));
       auto typeWritten = outBuffer.write(packetType);
@@ -363,7 +363,7 @@ std::expected<void, StarException> TcpPacketSocket::sendPackets(List<std::shared
       while (it != packets.end()
              && (*it)->type() == currentType
              && (*it)->compressionMode() == currentCompressionMode) {
-        auto written = (*it++)->write(packetBuffer, netRules());
+        auto written = (*it++)->write(packetBuffer);
         if (!written)
           return std::unexpected(std::move(written.error()));
       }
@@ -489,7 +489,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> TcpPacketSocket::rec
           return std::unexpected(std::move(created.error()));
         auto packet = std::move(*created);
         packet->setCompressionMode(packetCompressed ? PacketCompressionMode::Enabled : PacketCompressionMode::Disabled);
-        auto read = packet->read(packetStream, netRules());
+        auto read = packet->read(packetStream);
         if (!read)
           return std::unexpected(std::move(read.error()));
         packets.push_back(std::move(packet));
@@ -690,7 +690,7 @@ std::expected<void, StarException> P2PPacketSocket::sendPackets(List<std::shared
       DataStreamBuffer packetBuffer;
       packetBuffer.set_stream_compatibility_version(netRules());
       while (it != packets.end() && (*it)->type() == currentType) {
-        auto written = (*it++)->write(packetBuffer, netRules());
+        auto written = (*it++)->write(packetBuffer);
         if (!written)
           return std::unexpected(std::move(written.error()));
       }
@@ -719,7 +719,7 @@ std::expected<void, StarException> P2PPacketSocket::sendPackets(List<std::shared
       while (it != packets.end()
              && (*it)->type() == currentType
              && (*it)->compressionMode() == currentCompressionMode) {
-        auto written = (*it++)->write(packetBuffer, netRules());
+        auto written = (*it++)->write(packetBuffer);
         if (!written)
           return std::unexpected(std::move(written.error()));
       }
@@ -804,7 +804,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> P2PPacketSocket::rec
           return std::unexpected(std::move(created.error()));
         auto packet = std::move(*created);
         packet->setCompressionMode(*compressed ? PacketCompressionMode::Enabled : PacketCompressionMode::Disabled);
-        auto read = packet->read(packetStream, netRules());
+        auto read = packet->read(packetStream);
         if (!read)
           return std::unexpected(std::move(read.error()));
         packets.push_back(std::move(packet));

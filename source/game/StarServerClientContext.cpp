@@ -432,15 +432,20 @@ std::expected<ByteArray, StarException> ServerClientContext::writeUpdate() {
   auto& [netGroupUpdate, version] = *netState;
   m_netVersion = version;
   StringMap<ByteArray> customWorldChunksUpdate;
+  bool const send_custom_chunks = m_netRules.version() >= 15;
   for (auto&& p : m_customWorlds) {
     if (!p.second.chunksUpdate.empty()) {
+      if (!send_custom_chunks) {
+        p.second.chunksUpdate.clear();
+        continue;
+      }
       auto serialized = DataStreamBuffer::serialize(std::exchange(p.second.chunksUpdate, {}));
       if (!serialized)
         return std::unexpected(std::move(serialized.error()));
       customWorldChunksUpdate[p.first] = std::move(*serialized);
     }
   }
-  if (rpcUpdate->empty() && shipChunksUpdate.empty() && netGroupUpdate.empty() && (m_netRules.version() < 15 || customWorldChunksUpdate.empty()))
+  if (rpcUpdate->empty() && shipChunksUpdate.empty() && netGroupUpdate.empty() && customWorldChunksUpdate.empty())
     return ByteArray{};
   DataStreamBuffer ds;
   auto rpcWritten = ds.write(*rpcUpdate);
@@ -449,7 +454,7 @@ std::expected<ByteArray, StarException> ServerClientContext::writeUpdate() {
   auto shipWritten = ds.write(shipChunksUpdate);
   if (!shipWritten)
     return std::unexpected(std::move(shipWritten.error()));
-  if (m_netRules.version() >= 15) {
+  if (send_custom_chunks) {
     auto customWritten = ds.write(customWorldChunksUpdate);
     if (!customWritten)
       return std::unexpected(std::move(customWritten.error()));

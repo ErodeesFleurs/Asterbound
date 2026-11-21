@@ -14,7 +14,6 @@ struct DataStreamExceptionTag {
   static constexpr std::string_view name() { return "DataStreamException"; }
 };
 using DataStreamException = StarError<DataStreamExceptionTag, IOException>;
-extern unsigned const CurrentStreamVersion;
 
 class DataStream;
 
@@ -562,7 +561,6 @@ template <typename Container>
 
 export module star.data_stream;
 export namespace Star {
-using ::Star::CurrentStreamVersion;
 using ::Star::DataStream;
 using ::Star::DataStreamException;
 using ::Star::DataStreamExceptionTag;

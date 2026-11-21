@@ -3488,17 +3488,15 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
     auto latest = settings->get_bool("requireLatestVersion", false);
     if (!latest)
       return std::unexpected(std::move(latest.error()));
-    if (*latest) {
-      bool tooOld = legacyClient;
-      if (!tooOld) {
-        auto version = connect->info.get_uint("openProtocolVersion", 0);
-        if (!version)
-          return std::unexpected(std::move(version.error()));
-        tooOld = *version < OpenProtocolVersion;
-      }
-      if (tooOld)
-        return fail(Star::format("OpenStarbound protocol {} or later is required.\nAsterbound v{}, Source ID: {}...", OpenProtocolVersion, ProductVersionString, StarSourceIdentifierString.substr(0, 8)));
+    VersionNumber peer_version = legacyClient ? LegacyVersion : 1;
+    if (!legacyClient && (*latest || connect->info)) {
+      auto version = read_open_protocol_version(connect->info, *latest ? LegacyVersion : 1);
+      if (!version)
+        return std::unexpected(std::move(version.error()));
+      peer_version = *version;
     }
+    if (*latest && peer_version < OpenProtocolVersion)
+      return fail(Star::format("OpenStarbound protocol {} or later is required.\nAsterbound v{}, Source ID: {}...", OpenProtocolVersion, ProductVersionString, StarSourceIdentifierString.substr(0, 8)));
     if (!m_speciesShips.contains(connect->shipSpecies))
       return fail("Unknown ship species");
     if (!remoteAddress) {
@@ -3587,14 +3585,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
         return fail("You are banned: " + **banned);
     }
     String connectionLog = Star::format("UniverseServer: Logged in account '{}' as player '{}' from address {}", accountString, connect->playerName, remote);
-    NetCompatibilityRules rules(legacyClient ? LegacyVersion : 1);
-    rules.setIsAdmin(administrator);
     if (connect->info) {
-      auto version = connect->info.opt_uint("openProtocolVersion");
-      if (!version)
-        return std::unexpected(std::move(version.error()));
-      if (*version)
-        rules.setVersion(**version);
       auto brand = connect->info.get("brand", "custom");
       if (!brand)
         return std::unexpected(std::move(brand.error()));
@@ -3608,8 +3599,9 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
       if (!legacy)
         return std::unexpected(std::move(legacy.error()));
       if (*legacy)
-        rules.setVersion(LegacyVersion);
+        peer_version = LegacyVersion;
     }
+    NetCompatibilityRules rules(peer_version, administrator);
     socket->get().setNetRules(rules);
     if (auto logged = m_root.logger().log(LogLevel::Info, connectionLog.utf8()); !logged)
       return std::unexpected(std::move(logged.error()));

@@ -1325,7 +1325,7 @@ void PlayerInventory::setPlayer(std::optional<std::reference_wrapper<Player>> pl
 }
 
 [[nodiscard]] std::expected<void, StarException> PlayerInventory::netStore(DataStream& ds, NetCompatibilityRules rules) const {
-  if (m_player && !m_player->get().isMaster() && !rules.isAdmin()) {
+  if (m_player && !m_player->get().isMaster() && !rules.is_admin()) {
     auto blank = blankInventory();
     if (!blank) return std::unexpected(std::move(blank.error()));
     return blank->get().netStore(ds, rules);
@@ -1334,7 +1334,7 @@ void PlayerInventory::setPlayer(std::optional<std::reference_wrapper<Player>> pl
 }
 
 [[nodiscard]] std::expected<bool, StarException> PlayerInventory::writeNetDelta(DataStream& ds, std::uint64_t version, NetCompatibilityRules rules) const {
-  if (m_player && !m_player->get().isMaster() && !rules.isAdmin()) {
+  if (m_player && !m_player->get().isMaster() && !rules.is_admin()) {
     auto blank = blankInventory();
     if (!blank) return std::unexpected(std::move(blank.error()));
     return blank->get().writeNetDelta(ds, version, rules);

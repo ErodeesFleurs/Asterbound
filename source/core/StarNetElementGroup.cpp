@@ -7,12 +7,22 @@ import star.net_element;
 import star.net_element_group;
 
 import star.net_compatibility;
-import star.version;
 namespace Star {
+
+std::span<NetElementGroup::GroupEntry const> NetElementGroup::visible_bounds(NetCompatibilityRules const& rules) const {
+  // Both endpoints are visible; interior entries still need filtering. The
+  // resulting span distinguishes zero, one and multiple without an exact count.
+  std::span<GroupEntry const> entries = m_elements;
+  while (!entries.empty() && !entries.front().first.get().checkWithRules(rules))
+    entries = entries.subspan(1);
+  while (entries.size() > 1 && !entries.back().first.get().checkWithRules(rules))
+    entries = entries.first(entries.size() - 1);
+  return entries;
+}
 
 std::expected<void, StarException> NetElementGroup::addNetElement(NetElement& element, bool propagateInterpolation) {
   if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((!m_elements.any([&element](auto p) { return &p.first.get() == &element; })));
+    Star::star_assert_failed((!m_elements.any([&element](GroupEntry const& p) { return &p.first.get() == &element; })));
   }
 
   element.initNetVersion(m_version);
@@ -20,17 +30,11 @@ std::expected<void, StarException> NetElementGroup::addNetElement(NetElement& el
     auto result = element.enableNetInterpolation(m_extrapolationHint);
     if (!result) return std::unexpected(std::move(result.error()));
   }
-  m_elements.push_back(std::pair<std::reference_wrapper<NetElement>, bool>(std::ref(element), propagateInterpolation));
-
-  for (VersionNumber i = 0; i < (CurrentStreamVersion + 1); i++) {
-    if (element.checkWithRules(NetCompatibilityRules(i)))
-      m_elementCounts[i]++;
-  }
+  m_elements.emplace_back(std::ref(element), propagateInterpolation);
   return {};
 }
 
 void NetElementGroup::clearNetElements() {
-  m_elementCounts.clear();
   m_elements.clear();
 }
 
@@ -99,66 +103,54 @@ std::expected<void, StarException> NetElementGroup::tickNetInterpolation(float d
 std::expected<bool, StarException> NetElementGroup::writeNetDelta(DataStream& ds, std::uint64_t fromVersion, NetCompatibilityRules rules) const {
   if (!checkWithRules(rules)) return false;
 
-  auto expectedSize = m_elementCounts.maybe(rules.version()).value_or(m_elements.size());
-
-  if (expectedSize == 0) {
+  auto entries = visible_bounds(rules);
+  if (entries.empty())
     return false;
-  } else if (expectedSize == 1) {
-    for (auto& element : m_elements) {
-      if (element.first.get().checkWithRules(rules)) {
-        return element.first.get().writeNetDelta(ds, fromVersion, rules);
-      }
-    }
-  } else {
-    bool deltaWritten = false;
-    std::uint64_t i = 0;
-    m_buffer.set_stream_compatibility_version(rules);
-    for (auto& element : m_elements) {
-      if (i > expectedSize)
-        break;
-      if (!element.first.get().checkWithRules(rules))
-        continue;
-      ++i;
+  if (entries.size() == 1)
+    return entries.front().first.get().writeNetDelta(ds, fromVersion, rules);
 
-      auto written = element.first.get().writeNetDelta(m_buffer, fromVersion, rules);
-      if (!written) {
-        m_buffer.clear();
-        return std::unexpected(std::move(written.error()));
-      }
-      if (*written) {
-        deltaWritten = true;
-        auto indexResult = ds.write_vlq_u(i);
-        if (!indexResult) { m_buffer.clear(); return std::unexpected(std::move(indexResult.error())); }
-        auto bytesResult = ds.write_bytes(m_buffer.data());
-        m_buffer.clear();
-        if (!bytesResult) return std::unexpected(std::move(bytesResult.error()));
-      }
+  bool delta_written = false;
+  std::uint64_t index = 0;
+  m_buffer.set_stream_compatibility_version(rules);
+  for (auto const& entry : entries) {
+    auto& element = entry.first.get();
+    if (!element.checkWithRules(rules))
+      continue;
+    ++index;
+
+    auto written = element.writeNetDelta(m_buffer, fromVersion, rules);
+    if (!written) {
+      m_buffer.clear();
+      return std::unexpected(std::move(written.error()));
     }
-    if (deltaWritten) {
-      auto result = ds.write_vlq_u(0);
-      if (!result) return std::unexpected(std::move(result.error()));
+    if (*written) {
+      delta_written = true;
+      auto index_result = ds.write_vlq_u(index);
+      if (!index_result) { m_buffer.clear(); return std::unexpected(std::move(index_result.error())); }
+      auto bytes_result = ds.write_bytes(m_buffer.data());
+      m_buffer.clear();
+      if (!bytes_result) return std::unexpected(std::move(bytes_result.error()));
     }
-    return deltaWritten;
   }
-  return false;
+  if (delta_written) {
+    auto result = ds.write_vlq_u(0);
+    if (!result) return std::unexpected(std::move(result.error()));
+  }
+  return delta_written;
 }
 
 std::expected<void, StarException> NetElementGroup::readNetDelta(DataStream& ds, float interpolationTime, NetCompatibilityRules rules) {
   if (!checkWithRules(rules)) return {};
-  auto expectedSize = m_elementCounts.maybe(rules.version()).value_or(m_elements.size());
-  if (expectedSize == 0)
+  auto entries = visible_bounds(rules);
+  if (entries.empty())
     return std::unexpected(IOException("readNetDelta called on empty NetElementGroup"));
-  if (expectedSize == 1) {
-    for (auto& element : m_elements)
-      if (element.first.get().checkWithRules(rules))
-        return element.first.get().readNetDelta(ds, interpolationTime, rules);
-    return {};
-  }
+  if (entries.size() == 1)
+    return entries.front().first.get().readNetDelta(ds, interpolationTime, rules);
   auto indexResult = ds.read_vlq_u();
   if (!indexResult) return std::unexpected(std::move(indexResult.error()));
   std::uint64_t readIndex = *indexResult;
   std::uint64_t i = 0;
-  for (auto& element : m_elements) {
+  for (auto const& element : entries) {
     if (!element.first.get().checkWithRules(rules)) continue;
     if (readIndex == 0 || readIndex - 1 > i) {
       if (m_interpolationEnabled) {

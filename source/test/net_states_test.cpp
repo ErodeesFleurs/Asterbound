@@ -10,6 +10,8 @@ import star.string;
 import star.vector;
 import star.data_stream_extra;
 import star.interpolation;
+import star.net_compatibility;
+import star.net_element;
 import star.net_element_basic_fields;
 import star.net_element_float_fields;
 import star.net_element_containers;
@@ -199,6 +201,57 @@ TEST(NetElements, DeltaSize) {
 
   ASSERT_TRUE(slave.readNetState(masterUpdate2->first));
   EXPECT_EQ(slaveField1.get(), 50);
+}
+
+TEST(NetElements, GroupDeltaUsesCurrentlyVisibleFields) {
+  for (auto protocol : {LegacyVersion, OpenProtocolVersion + 1}) {
+    SCOPED_TRACE(protocol);
+    NetCompatibilityRules rules(protocol);
+    NetElementVersion version;
+    std::array<NetElementUInt, 5> sent, received;
+    NetElementGroup sender, receiver;
+    sender.initNetVersion(std::cref(version));
+    auto set_visible = [&](std::size_t index, bool visible) {
+      auto minimum = visible ? AnyVersion : protocol + 1;
+      sent[index].setCompatibilityVersion(minimum);
+      received[index].setCompatibilityVersion(minimum);
+    };
+    for (std::size_t i = 0; i < sent.size(); ++i) {
+      set_visible(i, i == 1);
+      ASSERT_TRUE(sender.addNetElement(sent[i]));
+      ASSERT_TRUE(receiver.addNetElement(received[i]));
+      sent[i].set(10 + i);
+    }
+
+    DataStreamBuffer wire;
+    EXPECT_EQ(sender.writeNetDelta(wire, 0, rules), true);
+    EXPECT_TRUE(std::ranges::equal(wire.span(), std::array<char, 1>{11}));
+    ASSERT_TRUE(wire.seek(0));
+    ASSERT_TRUE(receiver.readNetDelta(wire, 0.0f, rules));
+    EXPECT_EQ(received[1].get(), 11u);
+
+    set_visible(1, false);
+    wire.clear();
+    EXPECT_EQ(sender.writeNetDelta(wire, 0, rules), false);
+    EXPECT_TRUE(wire.empty());
+    ASSERT_TRUE(wire.write<std::uint8_t>(0));
+    ASSERT_TRUE(wire.seek(0));
+    EXPECT_FALSE(receiver.readNetDelta(wire, 0.0f, rules));
+    EXPECT_EQ(wire.pos(), 0u);
+
+    // Registration hasn't changed, but the second visible field is now dirty.
+    set_visible(1, true);
+    set_visible(3, true);
+    auto from_version = version.increment();
+    sent[3].set(42);
+    wire.clear();
+    EXPECT_EQ(sender.writeNetDelta(wire, from_version, rules), true);
+    EXPECT_TRUE(std::ranges::equal(wire.span(), std::array<char, 3>{2, 42, 0}));
+    ASSERT_TRUE(wire.seek(0));
+    ASSERT_TRUE(receiver.readNetDelta(wire, 0.0f, rules));
+    EXPECT_EQ(received[3].get(), 42u);
+    EXPECT_EQ(received[2].get(), 0u);
+  }
 }
 
 TEST(NetElements, Forwarding) {
@@ -1104,6 +1157,52 @@ TEST(NetElements, NetElementDynamicGroup) {
     ASSERT_TRUE(*element);
     EXPECT_EQ((*element)->getData(), 4003);
   }
+}
+
+TEST(NetElements, DynamicGroupForwardsNestedFieldsWithPeerProtocol) {
+  class VersionedField : public NetElementData<std::uint32_t> {
+  public:
+    VersionedField() : NetElementData(
+        [](DataStream& stream, std::uint32_t& value) {
+          return stream.stream_compatibility_version() == LegacyVersion ? stream.cread<std::uint8_t>(value) : stream.read(value);
+        },
+        [](DataStream& stream, std::uint32_t const& value) {
+          return stream.stream_compatibility_version() == LegacyVersion ? stream.cwrite<std::uint8_t>(value) : stream.write(value);
+        }) {}
+  };
+  static_assert(dynamic_net_element<VersionedField> && !dynamic_net_element<VersionedField const>);
+  NetElementTop<NetElementDynamicGroup<VersionedField>> sender, relay, receiver;
+  NetCompatibilityRules legacy(LegacyVersion);
+
+  auto first = std::make_shared<VersionedField>();
+  first->set(41);
+  ASSERT_EQ(sender.addNetElement(std::move(first)), 1u);
+  auto full = sender.writeNetState();
+  ASSERT_TRUE(full);
+  ASSERT_TRUE(relay.readNetState(std::move(full->first)));
+  auto legacy_full = relay.writeNetState(0, legacy);
+  ASSERT_TRUE(legacy_full);
+  // Full frame, count, id, payload length, one-byte legacy value.
+  EXPECT_TRUE(std::ranges::equal(legacy_full->first.span(), std::array<char, 5>{1, 1, 1, 1, 41}));
+  ASSERT_TRUE(receiver.readNetState(std::move(legacy_full->first), 0.0f, legacy));
+  auto received_first = receiver.getNetElement(1);
+  ASSERT_TRUE(received_first);
+  EXPECT_EQ((*received_first)->get(), 41u);
+
+  auto second = std::make_shared<VersionedField>();
+  second->set(42);
+  ASSERT_EQ(sender.addNetElement(std::move(second)), 2u);
+  auto delta = sender.writeNetState(full->second);
+  ASSERT_TRUE(delta);
+  ASSERT_TRUE(relay.readNetState(std::move(delta->first)));
+  auto legacy_delta = relay.writeNetState(legacy_full->second, legacy);
+  ASSERT_TRUE(legacy_delta);
+  // Frame/inner delta flags, change code, add tag, uint32 id, length, value, terminator.
+  EXPECT_TRUE(std::ranges::equal(legacy_delta->first.span(), std::array<char, 11>{0, 0, 1, 2, 0, 0, 0, 2, 1, 42, 0}));
+  ASSERT_TRUE(receiver.readNetState(std::move(legacy_delta->first), 0.0f, legacy));
+  auto received_second = receiver.getNetElement(2);
+  ASSERT_TRUE(received_second);
+  EXPECT_EQ((*received_second)->get(), 42u);
 }
 
 TEST(NetElements, DynamicGroupClearSendsOrderedRemovalsAndRetainsCursor) {

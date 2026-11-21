@@ -911,7 +911,7 @@ std::expected<TileModificationList, StarException> WorldClient::replaceTiles(Til
   
   // Tell client it can't send a replace packet
   auto netRules = m_clientState->netCompatibilityRules();
-  if (netRules.isLegacy() || netRules.version() <= 3)
+  if (netRules.version() <= 3)
     return modificationList;
   
   TileModificationList success, failures;
@@ -2549,7 +2549,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
   if (!result194)
     return std::unexpected(std::move(result194.error()));
   
-  if ((!m_clientState->netCompatibilityRules().isLegacy() && m_currentStep % 3 == 0) || !m_pingTime.has_value()) {
+  if ((!m_clientState->netCompatibilityRules().is_legacy() && m_currentStep % 3 == 0) || !m_pingTime.has_value()) {
     m_pingTime = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
     m_outgoingPackets.push_back(std::make_shared<PingPacket>(m_pingTime->time_since_epoch().count()));
   }

@@ -62,6 +62,8 @@ struct UniverseConnectionExceptionTag {
 };
 using UniverseConnectionException = StarError<UniverseConnectionExceptionTag, StarException>;
 
+[[nodiscard]] std::expected<VersionNumber, StarException> read_open_protocol_version(Json const& info, VersionNumber fallback);
+
 // Symmetric NetPacket based connection between the UniverseServer and the
 // UniverseClient.
 class UniverseConnection {
@@ -217,6 +219,7 @@ export module star.universe_connection;
 export namespace Star {
   using ::Star::UniverseConnectionExceptionTag;
   using ::Star::UniverseConnectionException;
+  using ::Star::read_open_protocol_version;
   using ::Star::UniverseConnection;
   using ::Star::UniverseConnectionServer;
 }

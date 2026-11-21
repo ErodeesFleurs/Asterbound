@@ -3,9 +3,7 @@ import std;
 import star.format;
 import star.type_identity;
 import star.net_compatibility;
-import star.version;
 import star.list;
-import star.map;
 import star.data_stream;
 import star.set;
 import star.data_stream_devices;
@@ -53,12 +51,13 @@ public:
   float netExtrapolationHint() const;
 
 private:
-  List<std::pair<std::reference_wrapper<NetElement>, bool>> m_elements;
+  using GroupEntry = std::pair<std::reference_wrapper<NetElement>, bool>;
+  std::span<GroupEntry const> visible_bounds(NetCompatibilityRules const& rules) const;
+
+  List<GroupEntry> m_elements;
   std::optional<std::reference_wrapper<NetElementVersion const>> m_version = std::nullopt;
   bool m_interpolationEnabled = false;
   float m_extrapolationHint = 0.0f;
-
-  HashMap<VersionNumber, std::size_t> m_elementCounts;
 
   mutable DataStreamBuffer m_buffer;
 };

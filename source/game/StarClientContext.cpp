@@ -193,11 +193,11 @@ ShipUpgrades ClientContext::shipUpgrades() const {
   return m_shipUpgrades.get();
 }
 
-std::expected<void, StarException> ClientContext::readUpdate(ByteArray data, NetCompatibilityRules rules) {
+std::expected<void, StarException> ClientContext::read_update(ByteArray data) {
   if (data.empty())
     return {};
   DataStreamBuffer ds(std::move(data));
-  ds.set_stream_compatibility_version(rules);
+  ds.set_stream_compatibility_version(m_netCompatibilityRules);
   auto rpcData = ds.read<ByteArray>();
   if (!rpcData)
     return std::unexpected(std::move(rpcData.error()));
@@ -213,7 +213,7 @@ std::expected<void, StarException> ClientContext::readUpdate(ByteArray data, Net
       return std::unexpected(std::move(decoded.error()));
     m_newShipUpdates.merge(*decoded, true);
   }
-  if (rules.version() >= 15) {
+  if (m_netCompatibilityRules.version() >= 15) {
     auto customWorldUpdates = ds.read<StringMap<ByteArray>>();
     if (!customWorldUpdates)
       return std::unexpected(std::move(customWorldUpdates.error()));
@@ -227,10 +227,10 @@ std::expected<void, StarException> ClientContext::readUpdate(ByteArray data, Net
   auto netData = ds.read<ByteArray>();
   if (!netData)
     return std::unexpected(std::move(netData.error()));
-  return m_netGroup.readNetState(std::move(*netData), 0.0f, rules);
+  return m_netGroup.readNetState(std::move(*netData), 0.0f, m_netCompatibilityRules);
 }
 
-std::expected<ByteArray, StarException> ClientContext::writeUpdate(NetCompatibilityRules) {
+std::expected<ByteArray, StarException> ClientContext::write_update() {
   return m_rpc->send();
 }
 

@@ -36,7 +36,8 @@ public:
 
   // Publishes only a fully connected fixture; failed setup tears down its
   // partially created client, server, and temporary storage.
-  [[nodiscard]] static std::expected<std::unique_ptr<TestUniverse>, StarException> create(Root& root, Vec2U clientWindowSize);
+  [[nodiscard]] static std::expected<std::unique_ptr<TestUniverse>, StarException> create(
+      Root& root, Vec2U clientWindowSize, bool force_legacy = false);
   ~TestUniverse();
 
   [[nodiscard]] std::expected<void, StarException> warpPlayer(WorldId worldId);

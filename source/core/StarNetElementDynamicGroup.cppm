@@ -18,12 +18,16 @@ import star.math_common;
 import star.algorithm;
 namespace Star {
 
+template <typename Element>
+concept dynamic_net_element = std::derived_from<Element, NetElement>
+    && std::same_as<Element, std::remove_cv_t<Element>>;
+
 // A dynamic group of NetElements that manages creation and destruction of
 // individual elements, that is itself a NetElement.  Element changes are not
 // delayed by the interpolation delay, they will always happen immediately, but
 // this does not inhibit the Elements themselves from handling their own delta
 // update delays normally.
-template <typename Element>
+template <dynamic_net_element Element>
 class NetElementDynamicGroup : public NetElement {
 public:
   using ElementId = std::uint32_t;
@@ -170,7 +174,7 @@ private:
   mutable HashSet<ElementId> m_receivedDeltaIds;
 };
 
-template <typename Element>
+template <dynamic_net_element Element>
 [[nodiscard]] auto NetElementDynamicGroup<Element>::addNetElement(std::shared_ptr<Element> element) -> std::expected<ElementId, StarException> {
   { auto result = readyElement(element); if (!result) return std::unexpected(std::move(result.error())); }
   auto id = m_idMap.emplace(std::move(element));
@@ -179,38 +183,38 @@ template <typename Element>
   return *id;
 }
 
-template <typename Element>
+template <dynamic_net_element Element>
 void NetElementDynamicGroup<Element>::removeNetElement(ElementId id) {
   // Finish erasing the node before releasing the element: its destructor can reenter the group.
   m_idMap.try_extract_value(id);
   addChangeData(ElementRemoval{id});
 }
 
-template <typename Element>
+template <dynamic_net_element Element>
 void NetElementDynamicGroup<Element>::clearNetElements() {
   // Snapshot the original ids in removal order. Destructors may add or remove elements.
   for (auto const& id : netElementIds())
     removeNetElement(id);
 }
 
-template <typename Element>
+template <dynamic_net_element Element>
 auto NetElementDynamicGroup<Element>::netElementIds() const -> List<ElementId> {
   return m_idMap.keys();
 }
 
-template <typename Element>
+template <dynamic_net_element Element>
 [[nodiscard]] auto NetElementDynamicGroup<Element>::getNetElement(ElementId id) const -> std::expected<std::shared_ptr<Element>, StarException> {
   auto element = m_idMap.get(id);
   if (!element) return std::unexpected(std::move(element.error()));
   return element->get();
 }
 
-template <typename Element>
+template <dynamic_net_element Element>
 auto NetElementDynamicGroup<Element>::netElements() const -> List<std::shared_ptr<Element>> {
   return m_idMap.values();
 }
 
-template <typename Element>
+template <dynamic_net_element Element>
 void NetElementDynamicGroup<Element>::initNetVersion(std::optional<std::reference_wrapper<NetElementVersion const>> version) {
   m_netVersion = version;
   m_changeData.clear();
@@ -223,7 +227,7 @@ void NetElementDynamicGroup<Element>::initNetVersion(std::optional<std::referenc
   }
 }
 
-template <typename Element>
+template <dynamic_net_element Element>
 [[nodiscard]] std::expected<void, StarException> NetElementDynamicGroup<Element>::enableNetInterpolation(float extrapolationHint) {
   m_interpolationEnabled = true;
   m_extrapolationHint = extrapolationHint;
@@ -232,7 +236,7 @@ template <typename Element>
   return {};
 }
 
-template <typename Element>
+template <dynamic_net_element Element>
 [[nodiscard]] std::expected<void, StarException> NetElementDynamicGroup<Element>::disableNetInterpolation() {
   m_interpolationEnabled = false;
   m_extrapolationHint = 0.0f;
@@ -241,14 +245,14 @@ template <typename Element>
   return {};
 }
 
-template <typename Element>
+template <dynamic_net_element Element>
 [[nodiscard]] std::expected<void, StarException> NetElementDynamicGroup<Element>::tickNetInterpolation(float dt) {
   for (auto& p : m_idMap)
     { auto result = p.second->tickNetInterpolation(dt); if (!result) return std::unexpected(std::move(result.error())); }
   return {};
 }
 
-template <typename Element>
+template <dynamic_net_element Element>
 [[nodiscard]] std::expected<void, StarException> NetElementDynamicGroup<Element>::netStore(DataStream& ds, NetCompatibilityRules rules) const {
   if (!checkWithRules(rules)) return {};
   struct ClearBuffer { DataStreamBuffer& buffer; ~ClearBuffer() { buffer.clear(); } } clear{m_buffer};
@@ -271,7 +275,7 @@ template <typename Element>
   return {};
 }
 
-template <typename Element>
+template <dynamic_net_element Element>
 [[nodiscard]] std::expected<void, StarException> NetElementDynamicGroup<Element>::netLoad(DataStream& ds, NetCompatibilityRules rules) {
   if (!checkWithRules(rules)) return {};
   m_changeData.clear();
@@ -288,6 +292,7 @@ template <typename Element>
     auto bytes = ds.read<ByteArray>();
     if (!bytes) return std::unexpected(std::move(bytes.error()));
     DataStreamBuffer storeBuffer(std::move(*bytes));
+    storeBuffer.set_stream_compatibility_version(rules);
     if (!m_createElement) return std::unexpected(IOException("Missing dynamic net element factory"));
     auto element = m_createElement();
     if (!element) return std::unexpected(std::move(element.error()));
@@ -300,7 +305,7 @@ template <typename Element>
   return {};
 }
 
-template <typename Element>
+template <dynamic_net_element Element>
 [[nodiscard]] std::expected<bool, StarException> NetElementDynamicGroup<Element>::writeNetDelta(DataStream& ds, std::uint64_t fromVersion, NetCompatibilityRules rules) const {
   if (!checkWithRules(rules)) return false;
   struct ClearBuffer { DataStreamBuffer& buffer; ~ClearBuffer() { buffer.clear(); } } clear{m_buffer};
@@ -331,6 +336,7 @@ template <typename Element>
                 return std::unexpected(std::move(result.error()));
             }
             DataStreamBuffer storeBuffer;
+            storeBuffer.set_stream_compatibility_version(rules);
             { auto result = element->get()->netStore(storeBuffer, rules); if (!result) return std::unexpected(std::move(result.error())); }
             {
               auto result = ds.write((ElementChange)ElementAddition(id, storeBuffer.take_data()));
@@ -380,7 +386,7 @@ template <typename Element>
   }
 }
 
-template <typename Element>
+template <dynamic_net_element Element>
 [[nodiscard]] std::expected<void, StarException> NetElementDynamicGroup<Element>::readNetDelta(DataStream& ds, float interpolationTime, NetCompatibilityRules rules) {
   if (!checkWithRules(rules)) return {};
   m_receivedDeltaIds.clear();
@@ -405,6 +411,7 @@ template <typename Element>
         if (!element) return std::unexpected(std::move(element.error()));
         if (!*element) return std::unexpected(IOException("Null dynamic net element"));
         DataStreamBuffer storeBuffer(std::get<ElementAddition>(*change).second);
+        storeBuffer.set_stream_compatibility_version(rules);
         { auto result = (*element)->netLoad(storeBuffer, rules); if (!result) return std::unexpected(std::move(result.error())); }
         { auto result = readyElement(*element); if (!result) return std::unexpected(std::move(result.error())); }
         { auto result = m_idMap.try_emplace(std::get<ElementAddition>(*change).first, std::move(*element)); if (!result) return std::unexpected(std::move(result.error())); }
@@ -431,7 +438,7 @@ template <typename Element>
   return {};
 }
 
-template <typename Element>
+template <dynamic_net_element Element>
 [[nodiscard]] std::expected<void, StarException> NetElementDynamicGroup<Element>::blankNetDelta(float interpolationTime) {
   if (m_interpolationEnabled) {
     for (auto& p : m_idMap)
@@ -440,7 +447,7 @@ template <typename Element>
   return {};
 }
 
-template <typename Element>
+template <dynamic_net_element Element>
 void NetElementDynamicGroup<Element>::addChangeData(ElementChange change) {
   std::uint64_t currentVersion = m_netVersion ? m_netVersion->get().current() : 0;
   if constexpr (Star::DebugEnabled) {
@@ -455,7 +462,7 @@ void NetElementDynamicGroup<Element>::addChangeData(ElementChange change) {
     m_changeData.pop_front();
 }
 
-template <typename Element>
+template <dynamic_net_element Element>
 [[nodiscard]] std::expected<void, StarException> NetElementDynamicGroup<Element>::readyElement(std::shared_ptr<Element> const& element) {
   if (!element) return std::unexpected(IOException("Null dynamic net element"));
   element->initNetVersion(m_netVersion);
@@ -469,5 +476,6 @@ template <typename Element>
 export module star.net_element_dynamic_group;
 
 export namespace Star {
+  using ::Star::dynamic_net_element;
   using ::Star::NetElementDynamicGroup;
 }

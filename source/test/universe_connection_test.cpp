@@ -3,6 +3,7 @@
 #else
 #include <sys/socket.h>
 #endif
+#include "gtest/gtest-spi.h"
 
 import star.xx_hash;
 import star.algorithm;
@@ -21,6 +22,7 @@ import star.bi_map;
 import star.game_types;
 import star.format;
 import star.version;
+import star.vector;
 import star.ordered_map;
 import star.color;
 import star.random;
@@ -102,6 +104,8 @@ import star.net_packets;
 import star.net_packet_socket;
 import star.universe_connection;
 import star.game_test;
+import star.test_universe;
+import star.configuration;
 import star.root;
 
 #include "gtest/gtest.h"
@@ -516,6 +520,55 @@ std::expected<void, StarException> wait_for_wire_progress(
     return std::unexpected(std::move(ready.error()));
   return {};
 }
+
+const GameTestRegistration handshake_version_range("UniverseConnections", "HandshakeVersionRange", [](GameTest&) {
+  EXPECT_EQ(read_open_protocol_version(JsonObject{}, 1), 1u);
+  EXPECT_EQ(read_open_protocol_version(JsonObject{{"openProtocolVersion", Json()}}, LegacyVersion), LegacyVersion);
+  auto read_version = [](Json version) {
+    return read_open_protocol_version(JsonObject{{"openProtocolVersion", std::move(version)}}, 1);
+  };
+  constexpr auto max_version = std::numeric_limits<VersionNumber>::max();
+  EXPECT_EQ(read_version(0), LegacyVersion);
+  EXPECT_EQ(read_version(max_version), max_version);
+  for (auto invalid : {std::int64_t(max_version) + 1, std::int64_t(-1)}) {
+    auto version = read_version(invalid);
+    ASSERT_FALSE(version);
+    EXPECT_TRUE(version.error().is<UniverseConnectionException>());
+  }
+  auto malformed = read_version("18");
+  ASSERT_FALSE(malformed);
+  EXPECT_TRUE(malformed.error().is<JsonException>());
+});
+
+const GameTestRegistration local_legacy_handshake("UniverseConnections", "LocalForcedLegacyHandshake", [](GameTest& fixture) {
+  auto legacy = TestUniverse::create(fixture.root(), Vec2U(100, 100), true);
+  ASSERT_TRUE(legacy) << legacy.error().what();
+  ASSERT_TRUE((*legacy)->close());
+
+  auto config = fixture.root().configuration();
+  ASSERT_TRUE(config);
+  auto settings = (*config)->get("connectionSettings");
+  ASSERT_TRUE(settings);
+  auto strict = settings->set("requireLatestVersion", true);
+  ASSERT_TRUE(strict);
+  ASSERT_TRUE((*config)->set("connectionSettings", *strict));
+  auto restore = make_scope_exit([&] { EXPECT_TRUE((*config)->set("connectionSettings", *settings)); });
+  testing::TestPartResultArray errors;
+  auto rejected = [&] {
+    testing::ScopedFakeTestPartResultReporter capture(
+        testing::ScopedFakeTestPartResultReporter::INTERCEPT_ONLY_CURRENT_THREAD, &errors);
+    return TestUniverse::create(fixture.root(), Vec2U(100, 100), true);
+  }();
+  ASSERT_EQ(errors.size(), 1);
+  auto const& logged = errors.GetTestPartResult(0);
+  EXPECT_EQ(logged.type(), testing::TestPartResult::kNonFatalFailure);
+  EXPECT_TRUE(std::string_view(logged.message()).contains("UniverseClient: Join failed: OpenStarbound protocol"));
+  ASSERT_FALSE(rejected);
+  EXPECT_TRUE(std::string_view(rejected.error().what()).contains("or later is required"));
+  auto current = TestUniverse::create(fixture.root(), Vec2U(100, 100));
+  ASSERT_TRUE(current) << current.error().what();
+  ASSERT_TRUE((*current)->close());
+});
 
 const GameTestRegistration packet_names_preserve_wire_and_lua_spelling(
     "UniverseConnections", "PacketNamesPreserveWireAndLuaSpelling", [](GameTest&) {

@@ -133,6 +133,31 @@ import star.algorithm;
 import star.game_test;
 using namespace Star;
 
+TEST(PacketWire, PauseUsesStreamVersionThroughBaseInterface) {
+  PausePacket original(true, 0.5f);
+  Packet const& source = original;
+  for (auto version : {LegacyVersion, OpenProtocolVersion}) {
+    DataStreamBuffer wire;
+    wire.set_stream_compatibility_version(version);
+    ASSERT_TRUE(source.write(wire));
+    DataStreamBuffer expected;
+    ASSERT_TRUE(expected.write(true));
+    if (version != LegacyVersion)
+      ASSERT_TRUE(expected.write(0.5f));
+    ASSERT_EQ(wire.data(), expected.data());
+
+    ASSERT_TRUE(wire.seek(0));
+    PausePacket decoded(false, 0.0f);
+    Packet& destination = decoded;
+    ASSERT_TRUE(destination.read(wire));
+    EXPECT_TRUE(decoded.pause);
+    EXPECT_EQ(decoded.timescale, version == LegacyVersion ? 1.0f : 0.5f);
+    auto ended = wire.at_end();
+    ASSERT_TRUE(ended);
+    EXPECT_TRUE(*ended);
+  }
+}
+
 namespace {
   // Hashes one tile together with its position.  The per sample hashes are
   // combined order independently, so that two worlds can be compared without
@@ -869,17 +894,17 @@ const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
         for (auto const& original : *packets) {
           DataStreamBuffer wire;
           wire.set_stream_compatibility_version(rules);
-          ASSERT_TRUE(original->write(wire, rules));
+          ASSERT_TRUE(original->write(wire));
           auto decoded = createPacket(original->type());
           ASSERT_TRUE(decoded) << decoded.error().what();
           ASSERT_TRUE(wire.seek(0));
-          ASSERT_TRUE((*decoded)->read(wire, rules));
+          ASSERT_TRUE((*decoded)->read(wire));
           auto atEnd = wire.at_end();
           ASSERT_TRUE(atEnd);
           EXPECT_TRUE(*atEnd);
           DataStreamBuffer encodedAgain;
           encodedAgain.set_stream_compatibility_version(rules);
-          ASSERT_TRUE((*decoded)->write(encodedAgain, rules));
+          ASSERT_TRUE((*decoded)->write(encodedAgain));
           if (auto expected = as<WorldStartPacket>(original)) {
             auto actual = as<WorldStartPacket>(*decoded);
             ASSERT_TRUE(actual);
@@ -999,7 +1024,7 @@ const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
       for (auto const& retained : retainedSnapshots) {
         DataStreamBuffer wire;
         wire.set_stream_compatibility_version(retained.rules);
-        ASSERT_TRUE(static_cast<Packet const&>(*retained.packet).write(wire, retained.rules));
+        ASSERT_TRUE(retained.packet->write(wire));
         EXPECT_EQ(wire.data(), retained.wire);
       }
     }

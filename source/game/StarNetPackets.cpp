@@ -191,9 +191,7 @@ extern std::expected<EnumMap<NetCompressionMode>, StarException> const NetCompre
 
 Packet::~Packet() = default;
 
-std::expected<void, StarException> Packet::read(DataStream& ds, NetCompatibilityRules) { return read(ds); }
 std::expected<void, StarException> Packet::read(DataStream&) { return {}; }
-std::expected<void, StarException> Packet::write(DataStream& ds, NetCompatibilityRules) const { return write(ds); }
 std::expected<void, StarException> Packet::write(DataStream&) const { return {}; }
 std::expected<void, StarException> Packet::readJson(Json const&) { return {}; }
 std::expected<Json, StarException> Packet::writeJson() const  { return JsonObject{}; }
@@ -428,13 +426,13 @@ std::expected<void, StarException> ProtocolResponsePacket::read(DataStream& ds) 
   return {};
 }
 
-std::expected<void, StarException> ProtocolResponsePacket::write(DataStream& ds, NetCompatibilityRules netRules) const {
+std::expected<void, StarException> ProtocolResponsePacket::write(DataStream& ds) const {
   {
     auto result = ds.write(allowed);
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
-  if (!netRules.isLegacy())
+  if (ds.stream_compatibility_version() != LegacyVersion)
     {
       auto result = ds.write(info);
       if (!result)
@@ -584,13 +582,13 @@ PausePacket::PausePacket() = default;
 
 PausePacket::PausePacket(bool pause, float timescale) : pause(pause), timescale(timescale) {}
 
-std::expected<void, StarException> PausePacket::read(DataStream& ds, NetCompatibilityRules netRules) {
+std::expected<void, StarException> PausePacket::read(DataStream& ds) {
   {
     auto result = ds.read(pause);
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
-  if (!netRules.isLegacy())
+  if (ds.stream_compatibility_version() != LegacyVersion)
     {
       auto result = ds.read(timescale);
       if (!result)
@@ -601,13 +599,13 @@ std::expected<void, StarException> PausePacket::read(DataStream& ds, NetCompatib
   return {};
 }
 
-std::expected<void, StarException> PausePacket::write(DataStream& ds, NetCompatibilityRules netRules) const {
+std::expected<void, StarException> PausePacket::write(DataStream& ds) const {
   {
     auto result = ds.write(pause);
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
-  if (!netRules.isLegacy())
+  if (ds.stream_compatibility_version() != LegacyVersion)
     {
       auto result = ds.write(timescale);
       if (!result)
@@ -690,14 +688,14 @@ ClientConnectPacket::ClientConnectPacket(ByteArray assetsDigest, bool allowAsset
     shipUpgrades(std::move(shipUpgrades)), introComplete(std::move(introComplete)), account(std::move(account)), info(std::move(info)) {}
 
 
-std::expected<void, StarException> ClientConnectPacket::read(DataStream& ds, NetCompatibilityRules netRules) {
+std::expected<void, StarException> ClientConnectPacket::read(DataStream& ds) {
   {
     auto fields = std::tie(assetsDigest, allowAssetsMismatch, playerUuid, playerName, shipSpecies, shipChunks, shipUpgrades, introComplete, account);
     auto result = ds.read(fields);
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
-  if (!netRules.isLegacy())
+  if (ds.stream_compatibility_version() != LegacyVersion)
     {
       auto result = ds.read(info);
       if (!result)
@@ -706,14 +704,14 @@ std::expected<void, StarException> ClientConnectPacket::read(DataStream& ds, Net
   return {};
 }
 
-std::expected<void, StarException> ClientConnectPacket::write(DataStream& ds, NetCompatibilityRules netRules) const {
+std::expected<void, StarException> ClientConnectPacket::write(DataStream& ds) const {
   {
     auto fields = std::tie(assetsDigest, allowAssetsMismatch, playerUuid, playerName, shipSpecies, shipChunks, shipUpgrades, introComplete, account);
     auto result = ds.write(fields);
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
-  if (!netRules.isLegacy())
+  if (ds.stream_compatibility_version() != LegacyVersion)
     {
       auto result = ds.write(info);
       if (!result)
@@ -769,14 +767,14 @@ FlyShipPacket::FlyShipPacket() = default;
 
 FlyShipPacket::FlyShipPacket(Vec3I system, SystemLocation location, Json settings) : system(std::move(system)), location(std::move(location)), settings(std::move(settings)) {}
 
-std::expected<void, StarException> FlyShipPacket::read(DataStream& ds, NetCompatibilityRules netRules) {
+std::expected<void, StarException> FlyShipPacket::read(DataStream& ds) {
   {
     auto fields = std::tie(system, location);
     auto result = ds.read(fields);
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
-  if (netRules.version() >= 3)
+  if (ds.stream_compatibility_version() >= 3)
     {
       auto result = ds.read(settings);
       if (!result)
@@ -785,14 +783,14 @@ std::expected<void, StarException> FlyShipPacket::read(DataStream& ds, NetCompat
   return {};
 }
 
-std::expected<void, StarException> FlyShipPacket::write(DataStream& ds, NetCompatibilityRules netRules) const {
+std::expected<void, StarException> FlyShipPacket::write(DataStream& ds) const {
   {
     auto fields = std::tie(system, location);
     auto result = ds.write(fields);
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
-  if (netRules.version() >= 3)
+  if (ds.stream_compatibility_version() >= 3)
     {
       auto result = ds.write(settings);
       if (!result)
@@ -1414,8 +1412,8 @@ std::expected<void, StarException> WorldStartAcknowledgePacket::write(DataStream
 PingPacket::PingPacket() = default;
 PingPacket::PingPacket(std::int64_t time) : time(time) {}
 
-std::expected<void, StarException> PingPacket::read(DataStream& ds, NetCompatibilityRules netRules) {
-  if (netRules.isLegacy()) {
+std::expected<void, StarException> PingPacket::read(DataStream& ds) {
+  if (ds.stream_compatibility_version() == LegacyVersion) {
     // Packets can't be empty, read the trash data
     {
       auto result = ds.read<bool>();
@@ -1433,8 +1431,8 @@ std::expected<void, StarException> PingPacket::read(DataStream& ds, NetCompatibi
   return {};
 }
 
-std::expected<void, StarException> PingPacket::write(DataStream& ds, NetCompatibilityRules netRules) const {
-  if (netRules.isLegacy()) {
+std::expected<void, StarException> PingPacket::write(DataStream& ds) const {
+  if (ds.stream_compatibility_version() == LegacyVersion) {
     // Packets can't be empty, write some trash data
     {
       auto result = ds.write<bool>(false);
@@ -1863,8 +1861,8 @@ PongPacket::PongPacket() = default;
 PongPacket::PongPacket(std::int64_t time) : time(time) {}
 
 
-std::expected<void, StarException> PongPacket::read(DataStream& ds, NetCompatibilityRules netRules) {
-  if (netRules.isLegacy()) {
+std::expected<void, StarException> PongPacket::read(DataStream& ds) {
+  if (ds.stream_compatibility_version() == LegacyVersion) {
     // Packets can't be empty, read the trash data
     {
       auto result = ds.read<bool>();
@@ -1883,8 +1881,8 @@ std::expected<void, StarException> PongPacket::read(DataStream& ds, NetCompatibi
   return {};
 }
 
-std::expected<void, StarException> PongPacket::write(DataStream& ds, NetCompatibilityRules netRules) const {
-  if (netRules.isLegacy()) {
+std::expected<void, StarException> PongPacket::write(DataStream& ds) const {
+  if (ds.stream_compatibility_version() == LegacyVersion) {
     // Packets can't be empty, write some trash data
     {
       auto result = ds.write<bool>(false);
@@ -1906,8 +1904,8 @@ StepUpdatePacket::StepUpdatePacket() : remoteTime(0.0) {}
 StepUpdatePacket::StepUpdatePacket(double remoteTime) : remoteTime(remoteTime) {}
 
 
-std::expected<void, StarException> StepUpdatePacket::read(DataStream& ds, NetCompatibilityRules netRules) {
-  if (netRules.isLegacy()) {
+std::expected<void, StarException> StepUpdatePacket::read(DataStream& ds) {
+  if (ds.stream_compatibility_version() == LegacyVersion) {
     auto steps = ds.read_vlq_u();
     if (!steps)
       return std::unexpected(std::move(steps.error()));
@@ -1922,8 +1920,8 @@ std::expected<void, StarException> StepUpdatePacket::read(DataStream& ds, NetCom
   return {};
 }
 
-std::expected<void, StarException> StepUpdatePacket::write(DataStream& ds, NetCompatibilityRules netRules) const {
-  if (netRules.isLegacy()) {
+std::expected<void, StarException> StepUpdatePacket::write(DataStream& ds) const {
+  if (ds.stream_compatibility_version() == LegacyVersion) {
     {
       auto result = ds.write_vlq_u(static_cast<std::uint64_t>(std::round(remoteTime * 60.0)));
       if (!result)

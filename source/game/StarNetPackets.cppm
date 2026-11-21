@@ -24,7 +24,6 @@ import star.directives;
 import star.asset_path;
 import star.casting;
 import star.strong_typedef;
-import star.net_compatibility;
 import std;
 import star.type_identity;
 import star.set;
@@ -225,9 +224,7 @@ struct Packet {
 
   virtual PacketType type() const = 0;
 
-  [[nodiscard]] virtual std::expected<void, StarException> read(DataStream& ds, NetCompatibilityRules netRules);
   [[nodiscard]] virtual std::expected<void, StarException> read(DataStream& ds);
-  [[nodiscard]] virtual std::expected<void, StarException> write(DataStream& ds, NetCompatibilityRules netRules) const;
   [[nodiscard]] virtual std::expected<void, StarException> write(DataStream& ds) const;
 
   [[nodiscard]] virtual std::expected<void, StarException> readJson(Json const& json);
@@ -281,7 +278,7 @@ struct ProtocolResponsePacket : PacketBase<PacketType::ProtocolResponse> {
   ProtocolResponsePacket(bool allowed, Json info = {});
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
-  [[nodiscard]] std::expected<void, StarException> write(DataStream& ds, NetCompatibilityRules netRules) const override;
+  [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
   bool allowed;
   Json info;
@@ -439,8 +436,8 @@ struct PausePacket : PacketBase<PacketType::Pause> {
   PausePacket();
   PausePacket(bool pause, float timescale = 1.0f);
 
-  [[nodiscard]] std::expected<void, StarException> read(DataStream& ds, NetCompatibilityRules netRules) override;
-  [[nodiscard]] std::expected<void, StarException> write(DataStream& ds, NetCompatibilityRules netRules) const override;
+  [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
+  [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
   [[nodiscard]] std::expected<void, StarException> readJson(Json const& json) override;
   [[nodiscard]] std::expected<Json, StarException> writeJson() const override;
@@ -479,8 +476,8 @@ struct ClientConnectPacket : PacketBase<PacketType::ClientConnect> {
       String shipSpecies, WorldChunks shipChunks, ShipUpgrades shipUpgrades, bool introComplete,
       String account, Json info = {});
 
-  [[nodiscard]] std::expected<void, StarException> read(DataStream& ds, NetCompatibilityRules netRules) override;
-  [[nodiscard]] std::expected<void, StarException> write(DataStream& ds, NetCompatibilityRules netRules) const override;
+  [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
+  [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
   ByteArray assetsDigest;
   bool allowAssetsMismatch;
@@ -548,8 +545,8 @@ struct FlyShipPacket : PacketBase<PacketType::FlyShip> {
   FlyShipPacket();
   FlyShipPacket(Vec3I system, SystemLocation location, Json settings = {});
 
-  [[nodiscard]] std::expected<void, StarException> read(DataStream& ds, NetCompatibilityRules netRules) override;
-  [[nodiscard]] std::expected<void, StarException> write(DataStream& ds, NetCompatibilityRules netRules) const override;
+  [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
+  [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
   Vec3I system;
   SystemLocation location;
@@ -916,8 +913,8 @@ struct PongPacket : PacketBase<PacketType::Pong> {
   PongPacket();
   PongPacket(std::int64_t time);
 
-  [[nodiscard]] std::expected<void, StarException> read(DataStream& ds, NetCompatibilityRules netRules) override;
-  [[nodiscard]] std::expected<void, StarException> write(DataStream& ds, NetCompatibilityRules netRules) const override;
+  [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
+  [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
   std::int64_t time = 0;
 };
@@ -1109,8 +1106,8 @@ struct PingPacket : PacketBase<PacketType::Ping> {
   PingPacket();
   PingPacket(std::int64_t time);
 
-  [[nodiscard]] std::expected<void, StarException> read(DataStream& ds, NetCompatibilityRules netRules) override;
-  [[nodiscard]] std::expected<void, StarException> write(DataStream& ds, NetCompatibilityRules netRules) const override;
+  [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
+  [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
   std::int64_t time = 0;
 };
@@ -1318,8 +1315,8 @@ struct StepUpdatePacket : PacketBase<PacketType::StepUpdate> {
   StepUpdatePacket();
   StepUpdatePacket(double remoteTime);
 
-  [[nodiscard]] std::expected<void, StarException> read(DataStream& ds, NetCompatibilityRules netRules) override;
-  [[nodiscard]] std::expected<void, StarException> write(DataStream& ds, NetCompatibilityRules netRules) const override;
+  [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
+  [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
   double remoteTime;
 };

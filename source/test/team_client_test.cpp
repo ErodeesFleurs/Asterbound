@@ -111,14 +111,14 @@ const GameTestRegistration teamStatusSynchronization(
     auto fetchTeam = [&]() -> std::expected<void, StarException> {
       if (auto pulled = team.pullFullUpdate(); !pulled)
         return std::unexpected(std::move(pulled.error()));
-      auto packet = (*context)->writeUpdate({});
+      auto packet = (*context)->write_update();
       if (!packet) return std::unexpected(std::move(packet.error()));
       return exchange(*packet);
     };
     auto submit = [&]() -> std::expected<ByteArray, StarException> {
       if (auto sent = team.statusUpdate(); !sent)
         return std::unexpected(std::move(sent.error()));
-      return (*context)->writeUpdate({});
+      return (*context)->write_update();
     };
     auto checkPacket = [&](ByteArray const& packet, bool full, std::string_view phase) {
       SCOPED_TRACE(phase);
