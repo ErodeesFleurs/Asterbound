@@ -340,6 +340,7 @@ std::expected<ParametricFunction<double, double>, StarException> FunctionDatabas
     if (!size)
       return std::unexpected(std::move(size.error()));
     List<std::pair<double, double>> points;
+    points.reserve(*size - 2); // Both mode entries were read above.
     for (std::size_t i = 2; i < *size; ++i) {
       auto pair = descriptor.get(i).and_then([](Json const& value) { return value.array_ptr(); });
       if (!pair)
@@ -373,6 +374,7 @@ std::expected<ParametricTable<int, Json>, StarException> FunctionDatabase::param
     if (!entries)
       return std::unexpected(std::move(entries.error()));
     List<std::pair<int, Json>> points;
+    points.reserve(std::ranges::size(*entries));
     for (auto const& entry : *entries) {
       auto pair = entry.array_ptr();
       if (!pair)

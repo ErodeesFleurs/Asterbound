@@ -224,7 +224,7 @@ std::expected<std::shared_ptr<TreasureDatabase>, StarException> TreasureDatabase
         if (!allowDuplication)
           return std::unexpected(std::move(allowDuplication.error()));
         itemPool.allowDuplication = *allowDuplication;
-        treasurePool.addPoint(*startLevel, std::move(itemPool));
+        treasurePool.insert(*startLevel, std::move(itemPool));
       }
     }
   }

@@ -6,6 +6,7 @@ Use this page to understand observable engine behavior and runtime ownership.
 For implementation rules, see the [development guide](development.md); for test
 commands and measurement limits, see [tests and benchmarks](testing.md).
 
+- [Parametric table thresholds](#parametric-table-thresholds)
 - [Subsystem behavior and upstream sources](#selected-upstream-optimizations-and-fixes)
   - [Image processing](#image-processing)
   - [Asset and texture caches](#asset-and-texture-caches)
@@ -19,6 +20,21 @@ commands and measurement limits, see [tests and benchmarks](testing.md).
   - [Presentation and tick-owned effects](#presentation-and-tick-owned-effects)
   - [Command transport and GPU resources](#command-transport-and-gpu-resources)
   - [Shutdown order](#shutdown-order)
+
+## Parametric table thresholds
+
+`ParametricTable::get` selects the value **strictly below** the query, clamping
+to the first value if there is no lower index. For thresholds `1, 5, 10`, a
+query of `5` still selects the value at `1`. Bulk `create` rejects duplicate
+indexes; incremental `insert` places a duplicate after earlier entries at the
+same index. Just above that threshold, the last duplicate supplies the value.
+
+`index`, `value` and `get` borrow from an lvalue table. Do not retain their
+results across mutation or destruction. In-place inversion requires matching
+index and value types and strictly increasing values; failure leaves the table
+unchanged. For a different specialization use `Target::convert(source)`, which
+reports invalid conversions and preserves interpolation and bound modes for
+functions.
 
 ## Selected upstream optimizations and fixes
 
