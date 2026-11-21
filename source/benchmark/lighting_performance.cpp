@@ -9,6 +9,7 @@ import star.liquid_types;
 import star.liquids_database;
 import star.material_database;
 import star.material_types;
+import star.multi_array;
 import star.performance_benchmarks;
 import star.rect;
 import star.root;
@@ -102,15 +103,15 @@ std::expected<std::shared_ptr<LightingFixture>, StarException> prepareLighting(R
   if (samples.empty() || radiantSamples.empty() || liquidIds.empty())
     return std::unexpected(StarException("Lighting benchmarks need real materials, radiant materials and liquids"));
 
-  auto sectors = fixture->tiles.validSectorsFor(RectI(0, 0, 384, 192));
+  auto sectors = fixture->tiles.valid_sectors_for(RectI(0, 0, 384, 192));
   if (!sectors)
     return std::unexpected(std::move(sectors.error()));
   for (auto const& sector : *sectors) {
     // Keep genuine unloaded-sector gaps, including near the wrapping boundary.
     if ((sector[0] * 3 + sector[1]) % 11 != 0)
-      fixture->tiles.loadDefaultSector(sector);
+      fixture->tiles.load_default_sector(sector);
   }
-  auto filled = fixture->tiles.tileEval(
+  auto filled = fixture->tiles.tile_eval(
     RectI(0, 0, 384, 192), [&](Vec2I const& pos, ClientTile& tile) -> std::expected<void, StarException> {
       unsigned key = static_cast<unsigned>(pos[0] * 73 + pos[1] * 151);
       auto const& foreground =
@@ -144,7 +145,7 @@ std::expected<void, StarException> gatherReference(LightingFixture const& fixtur
   for (int x = region.x_min(); x < region.x_max(); ++x) {
     for (int y = region.y_min(); y < region.y_max(); ++y) {
       Vec2I position{x, y};
-      if (y < 0 || y >= static_cast<int>(fixture.tiles.size()[1]) || !fixture.tiles.tileLoaded(position))
+      if (y < 0 || y >= static_cast<int>(fixture.tiles.size()[1]) || !fixture.tiles.tile_loaded(position))
         continue;
       auto const& tile = fixture.tiles.tile(position);
       Vec3F light;
@@ -230,7 +231,7 @@ void lightingBenchmark(benchmark::State& state, PerformanceBenchmarkSession& ses
   }
   std::vector<float> reference(output.data().begin(), output.data().end());
   state.SetLabel(std::format("snapshot={:016x}; loaded={}; workers={}", lightDigest(reference),
-                             fixture.tiles.loadedSectorCount(), workers.worker_count()));
+                             fixture.tiles.loaded_sector_count(), workers.worker_count()));
   auto gather = [&]() {
     return gatherClientLightingTiles(calculator, fixture.tiles, workers, *fixture.materials, *fixture.liquids,
                                      fixture.environment, fixture.underground);
@@ -278,12 +279,65 @@ void lightingBenchmark(benchmark::State& state, PerformanceBenchmarkSession& ses
   state.SetItemsProcessed(state.iterations() * query.width() * query.height());
 }
 
+// Isolate the traversal used by the render-data projection, without measuring
+// lighting propagation, GPU work or allocation of a fresh viewport each frame.
+void sector_projection(benchmark::State& state, PerformanceBenchmarkSession& session, LightingFixture const& fixture,
+                       WorkerPool& workers, RectI const& query) {
+  MultiArray<MaterialId, 2> output(Vec2S(query.size()));
+  auto project = [&] {
+    return fixture.tiles.tile_each_to(workers, output, query,
+      [](MaterialId& dest, Vec2I const&, ClientTile const& tile) -> std::expected<void, StarException> {
+        dest = tile.foreground;
+        return {};
+      });
+  };
+  auto first = project();
+  if (!first) {
+    session.fail(state, first.error());
+    return;
+  }
+  for (int x = query.x_min(); x < query.x_max(); ++x) {
+    for (int y = query.y_min(); y < query.y_max(); ++y) {
+      if (output(x - query.x_min(), y - query.y_min()) != fixture.tiles.tile({x, y}).foreground) {
+        session.fail(state, "Sector projection differs from point lookup");
+        return;
+      }
+    }
+  }
+  state.counters["workers"] = workers.worker_count();
+  for (auto _ : state) {
+    auto result = project();
+    if (!result) {
+      session.fail(state, result.error());
+      break;
+    }
+    benchmark::ClobberMemory();
+  }
+  state.SetItemsProcessed(state.iterations() * query.width() * query.height());
+}
+
 }// namespace
 
 std::expected<void, StarException> registerLightingPerformanceBenchmarks(PerformanceBenchmarkSession& session) {
   auto fixture = prepareLighting(session.root);
   if (!fixture)
     return std::unexpected(std::move(fixture.error()));
+  auto root_workers = session.root.workers();
+  if (!root_workers)
+    return std::unexpected(std::move(root_workers.error()));
+  for (auto const& [name, query] : std::array{
+         std::pair{"SingleSector", RectI(36, 4, 60, 28)},
+         std::pair{"CrossSector", RectI(52, 20, 76, 44)},
+         std::pair{"Sparse", RectI(0, 0, 48, 32)},  // Sector (0, 0) is unloaded.
+         std::pair{"LargeWrap", RectI(-24, -6, 296, 164)}}) {
+    for (bool caller : {true, false}) {
+      auto& workers = caller ? (*fixture)->callerWorkers : root_workers->get();
+      auto label = std::format("Sector/Project/{}/{}", name, caller ? "Caller" : "Workers");
+      benchmark::RegisterBenchmark(label.c_str(), [&, fixture = *fixture, query](benchmark::State& state) {
+        sector_projection(state, session, *fixture, workers, query);
+      })->UseRealTime();
+    }
+  }
   for (bool monochrome : {false, true}) {
     for (bool edge : {false, true}) {
       for (bool caller : {false, true}) {

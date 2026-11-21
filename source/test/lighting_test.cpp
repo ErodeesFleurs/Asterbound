@@ -138,7 +138,7 @@ void gatherTileOracle(CellularLightingCalculator& calculator, ClientTileSectorAr
   for (int x = region.x_min(); x < region.x_max(); ++x) {
     for (int y = region.y_min(); y < region.y_max(); ++y) {
       Vec2I position{x, y};
-      if (y < 0 || y >= static_cast<int>(tiles.size()[1]) || !tiles.tileLoaded(position))
+      if (y < 0 || y >= static_cast<int>(tiles.size()[1]) || !tiles.tile_loaded(position))
         continue;
       auto const& tile = tiles.tile(position);
       Vec3F emission;
@@ -196,12 +196,12 @@ void checkWideLightingSnapshot(GameTest& fixture, RectI const& query) {
   ASSERT_TRUE(radiantLiquid);
 
   ClientTileSectorArray tiles({64, 64});
-  tiles.loadDefaultSector({0, 0});
-  tiles.loadDefaultSector({1, 0});
-  tiles.loadDefaultSector({0, 1});
+  tiles.load_default_sector({0, 0});
+  tiles.load_default_sector({1, 0});
+  tiles.load_default_sector({0, 1});
   // Sector (1, 1) stays unloaded in every repeated world image.
   ASSERT_TRUE(
-    tiles.tileEval(RectI(0, 0, 64, 64), [&](Vec2I const& pos, ClientTile& tile) -> std::expected<void, StarException> {
+    tiles.tile_eval(RectI(0, 0, 64, 64), [&](Vec2I const& pos, ClientTile& tile) -> std::expected<void, StarException> {
       int key = pos[0] * 11 + pos[1] * 23;
       tile.foreground = key % 17 == 0 ? *radiantMaterial : EmptyMaterialId;
       tile.foregroundMod = NoModId;
@@ -460,13 +460,13 @@ const GameTestRegistration
     regionProbe.begin(RectI(-8, -4, 48, 40));
     unsigned worldWidth = static_cast<unsigned>(regionProbe.calculationRegion().width()) + 32;
     ClientTileSectorArray tiles({worldWidth, 96});
-    auto sectors = tiles.validSectorsFor(RectI(0, 0, static_cast<int>(worldWidth), 96));
+    auto sectors = tiles.valid_sectors_for(RectI(0, 0, static_cast<int>(worldWidth), 96));
     ASSERT_TRUE(sectors);
     for (auto const& sector : *sectors) {
       if (sector != ClientTileSectorArray::Sector{1, 1})
-        tiles.loadDefaultSector(sector);
+        tiles.load_default_sector(sector);
     }
-    ASSERT_TRUE(tiles.tileEval(RectI(0, 0, static_cast<int>(worldWidth), 96),
+    ASSERT_TRUE(tiles.tile_eval(RectI(0, 0, static_cast<int>(worldWidth), 96),
                                [&](Vec2I const& pos, ClientTile& tile) -> std::expected<void, StarException> {
                                  int key = pos[0] * 11 + pos[1] * 23;
                                  tile.foreground = key % 17 == 0 ? *radiantMaterial : EmptyMaterialId;

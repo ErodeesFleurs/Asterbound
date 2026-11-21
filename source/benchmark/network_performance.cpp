@@ -50,9 +50,9 @@ struct WorldServerTestAccess {
     // activeCells() alone does not include pending generation-region visits.
     if (!world.m_liquidEngine || world.m_currentStep != 0 || world.m_liquidEngine->activeCells() != 0)
       return std::unexpected(StarException("Snapshot liquid seed requires a world without active simulation"));
-    auto sectors = world.m_tileArray->loadedSectors();
+    auto sectors = world.m_tileArray->loaded_sectors();
     for (auto const& sector : sectors) {
-      auto region = world.m_tileArray->sectorRegion(sector);
+      auto region = world.m_tileArray->sector_region(sector);
       for (int x = region.x_min(); x < region.x_max(); ++x) {
         for (int y = region.y_min(); y < region.y_max(); ++y) {
           auto const& liquid = world.m_tileArray->tile(Vec2I(x, y)).liquid;
@@ -74,7 +74,7 @@ struct WorldServerTestAccess {
     // World generation schedules visits even for empty sectors. Replay those
     // visits so replacing the empty engine does not remove the queued scan.
     for (auto const& sector : sectors)
-      engine->visitRegion(world.m_tileArray->sectorRegion(sector));
+      engine->visitRegion(world.m_tileArray->sector_region(sector));
     world.m_liquidEngine = std::move(engine);
     return {};
   }

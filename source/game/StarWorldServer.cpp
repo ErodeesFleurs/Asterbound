@@ -494,7 +494,7 @@ std::expected<WorldStructure, StarException> WorldServer::setCentralStructure(Wo
     auto result17 = generateRegion(RectI::with_size(foregroundBlock.position, {1, 1}));
     if (!result17)
       return std::unexpected(std::move(result17.error()));
-    if (auto tile = m_tileArray->modifyTile(foregroundBlock.position)) {
+    if (auto tile = m_tileArray->modify_tile(foregroundBlock.position)) {
       if (tile->get().foreground == EmptyMaterialId) {
         tile->get().foreground = foregroundBlock.materialId;
         tile->get().foregroundColorVariant = foregroundBlock.materialColor;
@@ -518,7 +518,7 @@ std::expected<WorldStructure, StarException> WorldServer::setCentralStructure(Wo
     auto result21 = generateRegion(RectI::with_size(backgroundBlock.position, {1, 1}));
     if (!result21)
       return std::unexpected(std::move(result21.error()));
-    if (auto tile = m_tileArray->modifyTile(backgroundBlock.position)) {
+    if (auto tile = m_tileArray->modify_tile(backgroundBlock.position)) {
       if (tile->get().background == EmptyMaterialId) {
         tile->get().background = backgroundBlock.materialId;
         tile->get().backgroundColorVariant = backgroundBlock.materialColor;
@@ -594,7 +594,7 @@ std::expected<void, StarException> WorldServer::removeCentralStructure() {
       auto result33 = generateRegion(RectI::with_size(backgroundBlock.position, {1, 1}));
       if (!result33)
         return std::unexpected(std::move(result33.error()));
-      if (auto tile = m_tileArray->modifyTile(backgroundBlock.position)) {
+      if (auto tile = m_tileArray->modify_tile(backgroundBlock.position)) {
         if (tile->get().background == backgroundBlock.materialId) {
           tile->get().background = EmptyMaterialId;
           tile->get().backgroundMod = NoModId;
@@ -611,7 +611,7 @@ std::expected<void, StarException> WorldServer::removeCentralStructure() {
       auto result35 = generateRegion(RectI::with_size(foregroundBlock.position, {1, 1}));
       if (!result35)
         return std::unexpected(std::move(result35.error()));
-      if (auto tile = m_tileArray->modifyTile(foregroundBlock.position)) {
+      if (auto tile = m_tileArray->modify_tile(foregroundBlock.position)) {
         if (tile->get().foreground == foregroundBlock.materialId) {
           tile->get().foreground = EmptyMaterialId;
           tile->get().foregroundMod = NoModId;
@@ -912,7 +912,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       if (!result70)
         return std::unexpected(std::move(result70.error()));
       for (auto const& monitoredRegion : std::move(*result70)) {
-        auto result71 = m_tileArray->validSectorsFor(monitoredRegion);
+        auto result71 = m_tileArray->valid_sectors_for(monitoredRegion);
         if (!result71)
           return std::unexpected(std::move(result71.error()));
         clientInfo->activeSectors.insert_range(std::move(*result71));
@@ -1858,7 +1858,7 @@ std::expected<void, StarException> WorldServer::update(float dt) {
 
   m_expiryTimer.tick(dt);
 
-  this->root().logMap().set(Star::format("server_{}_entities", m_worldId), Star::format("{} in {} sectors", m_entityMap->size(), m_tileArray->loadedSectorCount()));
+  this->root().logMap().set(Star::format("server_{}_entities", m_worldId), Star::format("{} in {} sectors", m_entityMap->size(), m_tileArray->loaded_sector_count()));
   this->root().logMap().set(Star::format("server_{}_time", m_worldId), Star::format("age = {:4.2f}, day = {:4.2f}/{:4.2f}s", epochTime(), timeOfDay(), dayLength()));
   this->root().logMap().set(Star::format("server_{}_active_liquid", m_worldId), m_liquidEngine->activeCells());
   this->root().logMap().set(Star::format("server_{}_lua_mem", m_worldId), m_luaRoot->lua_memory_usage());
@@ -2004,7 +2004,7 @@ std::expected<CollisionKind, StarException> WorldServer::tileCollisionKind(Vec2I
 std::expected<void, StarException> WorldServer::forEachCollisionBlock(RectI const& region, std::function<std::expected<void, StarException>(CollisionBlock const&)> const& iterator) const {
   if (auto result = const_cast<WorldServer&>(*this).freshenCollision(region); !result)
     return std::unexpected(std::move(result.error()));
-  auto result211 = m_tileArray->tileEach(region, [iterator](Vec2I const& pos, ServerTile const& tile) -> std::expected<void, StarException> {
+  auto result211 = m_tileArray->tile_each(region, [iterator](Vec2I const& pos, ServerTile const& tile) -> std::expected<void, StarException> {
     if (!iterator)
       return std::unexpected(WorldServerException("Empty collision block iterator"));
     if (tile.getCollision() == CollisionKind::Null) {
@@ -2145,7 +2145,7 @@ std::expected<bool, StarException> WorldServer::replaceTile(Vec2I const& pos, Ti
     if (!std::move(*result224))
       return false;
 
-    if (auto tile = m_tileArray->modifyTile(pos)) {
+    if (auto tile = m_tileArray->modify_tile(pos)) {
       auto result225 = WorldImpl::tileDamageParameters(this->root(), tile->get(), placeMaterial.layer, tileDamage);
       if (!result225)
         return std::unexpected(std::move(result225.error()));
@@ -2263,7 +2263,7 @@ std::expected<TileDamageResult, StarException> WorldServer::damageTiles(List<Vec
   auto res = TileDamageResult::None;
 
   for (auto const& pos : positionSet) {
-    if (auto tile = m_tileArray->modifyTile(pos)) {
+    if (auto tile = m_tileArray->modify_tile(pos)) {
       auto tileDamage = damage;
       if (isTileProtected(pos))
         tileDamage.type = TileDamageType::Protected;
@@ -2423,7 +2423,7 @@ DungeonId WorldServer::dungeonId(Vec2I const& pos) const {
 }
 
 std::expected<bool, StarException> WorldServer::isPlayerModified(RectI const& region) const {
-  auto result253 = m_tileArray->tileSatisfies(region, [](Vec2I const&, ServerTile const& tile) -> std::expected<bool, StarException> {
+  auto result253 = m_tileArray->tile_satisfies(region, [](Vec2I const&, ServerTile const& tile) -> std::expected<bool, StarException> {
     return tile.dungeonId == ConstructionDungeonId || tile.dungeonId == DestroyedBlockDungeonId;
   });
   if (!result253)
@@ -2447,7 +2447,7 @@ std::expected<ItemDescriptor, StarException> WorldServer::collectLiquid(List<Vec
   List<std::reference_wrapper<ServerTile>> maybeDrainTiles;
 
   for (auto pos : tilePositions) {
-    auto tile = m_tileArray->modifyTile(pos);
+    auto tile = m_tileArray->modify_tile(pos);
     if (tile->get().liquid.liquid == liquidId && !isTileProtected(pos)) {
       if (tile->get().liquid.level >= nextUnit) {
         tile->get().liquid.take(nextUnit);
@@ -2466,7 +2466,7 @@ std::expected<ItemDescriptor, StarException> WorldServer::collectLiquid(List<Vec
       }
 
       for (auto const& pair : m_clientInfo) {
-        if (pair.second->activeSectors.contains(m_tileArray->sectorFor(pos)))
+        if (pair.second->activeSectors.contains(m_tileArray->sector_for(pos)))
           pair.second->pendingLiquidUpdates.add(pos);
       }
       m_liquidEngine->visitLocation(pos);
@@ -2805,7 +2805,7 @@ std::expected<void, StarException> WorldServer::setDungeonId(RectI const& tileAr
   for (int x = tileArea.x_min(); x < tileArea.x_max(); ++x) {
     for (int y = tileArea.y_min(); y < tileArea.y_max(); ++y) {
       auto pos = Vec2I{x, y};
-      if (auto tile = m_tileArray->modifyTile(pos)) {
+      if (auto tile = m_tileArray->modify_tile(pos)) {
         tile->get().dungeonId = dungeonId;
         auto result299 = queueTileUpdates(pos);
         if (!result299)
@@ -3110,7 +3110,7 @@ std::expected<TileModificationList, StarException> WorldServer::doApplyTileModif
       if (!std::move(*result336))
         continue;
 
-      auto tile = m_tileArray->modifyTile(pos);
+      auto tile = m_tileArray->modify_tile(pos);
       if (!tile)
         continue;
 
@@ -3187,7 +3187,7 @@ std::expected<TileModificationList, StarException> WorldServer::doApplyTileModif
       if (!std::move(*result344))
         continue;
 
-      auto tile = m_tileArray->modifyTile(pos);
+      auto tile = m_tileArray->modify_tile(pos);
       if (!tile)
         continue;
 
@@ -3223,7 +3223,7 @@ std::expected<TileModificationList, StarException> WorldServer::doApplyTileModif
       if (!std::move(*result348))
         continue;
 
-      auto tile = m_tileArray->modifyTile(pos);
+      auto tile = m_tileArray->modify_tile(pos);
       if (!tile)
         continue;
 
@@ -3309,7 +3309,7 @@ std::expected<void, StarException> WorldServer::updateTileEntityTiles(std::share
 
   // remove all old roots
   for (auto const& rootPos : spaces.roots) {
-    if (auto tile = m_tileArray->modifyTile(rootPos + entity->tilePosition()))
+    if (auto tile = m_tileArray->modify_tile(rootPos + entity->tilePosition()))
       tile->get().rootSource = {};
   }
 
@@ -3317,7 +3317,7 @@ std::expected<void, StarException> WorldServer::updateTileEntityTiles(std::share
   for (auto const& materialSpace : spaces.materials) {
     Vec2I pos = materialSpace.space + entity->tilePosition();
 
-    auto tile = m_tileArray->modifyTile(pos);
+    auto tile = m_tileArray->modify_tile(pos);
     if (tile) {
       tile->get().rootSource = {};
       bool updatedTile = false;
@@ -3356,7 +3356,7 @@ std::expected<void, StarException> WorldServer::updateTileEntityTiles(std::share
 
       bool updatedTile = false;
       bool updatedCollision = false;
-      auto tile = m_tileArray->modifyTile(pos);
+      auto tile = m_tileArray->modify_tile(pos);
       if (tile) {
         if (tile->get().foreground == EmptyMaterialId) {
           tile->get().foreground = materialSpace.material;
@@ -3388,7 +3388,7 @@ std::expected<void, StarException> WorldServer::updateTileEntityTiles(std::share
 
     // add new roots and update known roots entry
     for (auto const& rootPos : newRoots) {
-      if (auto tile = m_tileArray->modifyTile(rootPos + entity->tilePosition()))
+      if (auto tile = m_tileArray->modify_tile(rootPos + entity->tilePosition()))
         tile->get().rootSource = entity->tilePosition();
     }
     spaces.roots = std::move(newRoots);
@@ -3486,7 +3486,7 @@ std::expected<std::optional<std::reference_wrapper<ServerTile>>, StarException> 
       return std::unexpected(std::move(result369.error()));
   }
 
-  auto tile = m_tileArray->modifyTile(position);
+  auto tile = m_tileArray->modify_tile(position);
   if (tile) {
     auto result370 = dirtyCollision(RectI::with_size(position, {1, 1}));
     if (!result370)
@@ -3518,7 +3518,7 @@ std::expected<void, StarException> WorldServer::modifyLiquid(Vec2I const& pos, L
   if (liquid == EmptyLiquidId)
     quantity = 0;
 
-  if (auto tile = m_tileArray->modifyTile(pos)) {
+  if (auto tile = m_tileArray->modify_tile(pos)) {
     auto result373 = this->root().materialDatabase();
     if (!result373)
       return std::unexpected(std::move(result373.error()));
@@ -3544,13 +3544,13 @@ std::expected<void, StarException> WorldServer::modifyLiquid(Vec2I const& pos, L
 }
 
 std::expected<void, StarException> WorldServer::setLiquid(Vec2I const& pos, LiquidId liquid, float level, float pressure) {
-  if (auto tile = m_tileArray->modifyTile(pos)) {
+  if (auto tile = m_tileArray->modify_tile(pos)) {
     if (liquid == EmptyLiquidId)
       level = 0;
 
     if (auto netUpdate = tile->get().liquid.update(liquid, level, pressure)) {
       for (auto const& pair : m_clientInfo) {
-        if (pair.second->activeSectors.contains(m_tileArray->sectorFor(pos)))
+        if (pair.second->activeSectors.contains(m_tileArray->sector_for(pos)))
           pair.second->pendingLiquidUpdates.add(pos);
       }
     }
@@ -3564,7 +3564,7 @@ std::expected<List<ItemDescriptor>, StarException> WorldServer::destroyBlock(Til
     return std::unexpected(std::move(result378.error()));
   auto materialDatabase = std::move(*result378);
 
-  auto tile = m_tileArray->modifyTile(pos);
+  auto tile = m_tileArray->modify_tile(pos);
   if (!tile)
     return {};
 
@@ -3732,7 +3732,7 @@ std::expected<void, StarException> WorldServer::queueUpdatePackets(ConnectionId 
     auto snapshot = sectorSnapshots.find(sector);
     if (snapshot == sectorSnapshots.end()) {
       auto tileArrayUpdate = std::make_shared<TileArrayUpdatePacket>();
-      auto sectorTiles = m_tileArray->sectorRegion(sector);
+      auto sectorTiles = m_tileArray->sector_region(sector);
       tileArrayUpdate->min = sectorTiles.min();
       auto resized = tileArrayUpdate->array.set_size(Vec2S(sectorTiles.width(), sectorTiles.height()));
       if (!resized)
@@ -3923,7 +3923,7 @@ std::expected<void, StarException> WorldServer::updateDamagedBlocks(float dt) {
   auto materialDatabase = std::move(*result416);
 
   for (auto pos : m_damagedBlocks.values()) {
-    auto tile = m_tileArray->modifyTile(pos);
+    auto tile = m_tileArray->modify_tile(pos);
     if (!tile) {
       m_damagedBlocks.remove(pos);
       continue;
@@ -4060,7 +4060,7 @@ std::expected<void, StarException> WorldServer::checkEntityBreaks(RectF const& r
 
 std::expected<void, StarException> WorldServer::queueTileUpdates(Vec2I const& pos) {
   for (auto const& pair : m_clientInfo) {
-    if (pair.second->activeSectors.contains(m_tileArray->sectorFor(pos)))
+    if (pair.second->activeSectors.contains(m_tileArray->sector_for(pos)))
       pair.second->pendingTileUpdates.add(pos);
   }
   return {};
@@ -4068,7 +4068,7 @@ std::expected<void, StarException> WorldServer::queueTileUpdates(Vec2I const& po
 
 std::expected<void, StarException> WorldServer::queueTileDamageUpdates(Vec2I const& pos, TileLayer layer) {
   for (auto const& pair : m_clientInfo) {
-    if (pair.second->activeSectors.contains(m_tileArray->sectorFor(pos)))
+    if (pair.second->activeSectors.contains(m_tileArray->sector_for(pos)))
       pair.second->pendingTileDamageUpdates.add({pos, layer});
   }
   return {};
@@ -4098,7 +4098,7 @@ std::expected<void, StarException> WorldServer::dirtyCollision(RectI const& regi
   auto dirtyRegion = region.padded(CollisionGenerator::BlockInfluenceRadius);
   for (int x = dirtyRegion.x_min(); x < dirtyRegion.x_max(); ++x) {
     for (int y = dirtyRegion.y_min(); y < dirtyRegion.y_max(); ++y) {
-      if (auto tile = m_tileArray->modifyTile({x, y}))
+      if (auto tile = m_tileArray->modify_tile({x, y}))
         tile->get().collisionCacheDirty = true;
     }
   }
@@ -4109,7 +4109,7 @@ std::expected<void, StarException> WorldServer::freshenCollision(RectI const& re
   RectI freshenRegion = RectI::null();
   for (int x = region.x_min(); x < region.x_max(); ++x) {
     for (int y = region.y_min(); y < region.y_max(); ++y) {
-      if (auto tile = m_tileArray->modifyTile({x, y})) {
+      if (auto tile = m_tileArray->modify_tile({x, y})) {
         if (tile->get().collisionCacheDirty)
           freshenRegion.combine(RectI(x, y, x + 1, y + 1));
       }
@@ -4119,7 +4119,7 @@ std::expected<void, StarException> WorldServer::freshenCollision(RectI const& re
   if (!freshenRegion.is_null()) {
     for (int x = freshenRegion.x_min(); x < freshenRegion.x_max(); ++x) {
       for (int y = freshenRegion.y_min(); y < freshenRegion.y_max(); ++y) {
-        if (auto tile = m_tileArray->modifyTile({x, y})) {
+        if (auto tile = m_tileArray->modify_tile({x, y})) {
           tile->get().collisionCacheDirty = false;
           tile->get().collisionCache.clear();
         }
@@ -4130,7 +4130,7 @@ std::expected<void, StarException> WorldServer::freshenCollision(RectI const& re
     if (!result439)
       return std::unexpected(std::move(result439.error()));
     for (auto collisionBlock : std::move(*result439)) {
-      if (auto tile = m_tileArray->modifyTile(collisionBlock.space)) {
+      if (auto tile = m_tileArray->modify_tile(collisionBlock.space)) {
         if (auto appended = tile->get().collisionCache.push_back(std::move(collisionBlock)); !appended)
           return std::unexpected(std::move(appended.error()));
       }

@@ -772,7 +772,7 @@ std::expected<void, StarException> WorldClient::forEachCollisionBlock(RectI cons
   auto freshened = const_cast<WorldClient&>(*this).freshenCollision(region);
   if (!freshened)
     return std::unexpected(std::move(freshened.error()));
-  return m_tileArray->tileEach(region, [iterator](Vec2I const& pos, ClientTile const& tile) -> std::expected<void, StarException> {
+  return m_tileArray->tile_each(region, [iterator](Vec2I const& pos, ClientTile const& tile) -> std::expected<void, StarException> {
     if (tile.getCollision() == CollisionKind::Null)
       return iterator(CollisionBlock::nullBlock(pos));
     if constexpr (Star::DebugEnabled)
@@ -1282,7 +1282,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
   auto result73 = this->root().workers();
   if (!result73)
     return std::unexpected(std::move(result73.error()));
-  auto result74 = m_tileArray->tileEachTo(result73->get(), renderData.tiles, tileRange, [](RenderTile& renderTile, Vec2I const&, ClientTile const& clientTile)  -> std::expected<void, StarException> {
+  auto result74 = m_tileArray->tile_each_to(result73->get(), renderData.tiles, tileRange, [](RenderTile& renderTile, Vec2I const&, ClientTile const& clientTile)  -> std::expected<void, StarException> {
       renderTile.foreground = clientTile.foreground;
       renderTile.foregroundMod = clientTile.foregroundMod;
       
@@ -1719,11 +1719,11 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
       // tileArrayUpdate happens for all valid client side sectors first before
       // any other tile updates.
       {
-        auto result113 = m_tileArray->validSectorsFor(tileRegion);
+        auto result113 = m_tileArray->valid_sectors_for(tileRegion);
         if (!result113)
           return std::unexpected(std::move(result113.error()));
         for (auto const& sector : (std::move(*result113))) {
-          m_tileArray->loadDefaultSector(sector);
+          m_tileArray->load_default_sector(sector);
         }
       }
       
@@ -1740,7 +1740,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
       if (!result115)
         return std::unexpected(std::move(result115.error()));
     } else if (auto tileDamageUpdate = as<TileDamageUpdatePacket>(packet)) {
-      if (auto tile = m_tileArray->modifyTile(tileDamageUpdate->position)) {
+      if (auto tile = m_tileArray->modify_tile(tileDamageUpdate->position)) {
         if (tileDamageUpdate->layer == TileLayer::Foreground) {
           tile->get().foregroundDamage = tileDamageUpdate->tileDamage;
         } else {
@@ -1824,7 +1824,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
       }
     } else if (auto liquidUpdate = as<TileLiquidUpdatePacket>(packet)) {
       m_predictedTiles.remove(liquidUpdate->position);
-      if (auto tile = m_tileArray->modifyTile(liquidUpdate->position)) {
+      if (auto tile = m_tileArray->modify_tile(liquidUpdate->position)) {
         tile->get().liquid = liquidUpdate->liquidUpdate.liquidLevel();
       }
     } else if (auto giveItem = as<GiveItemPacket>(packet)) {
@@ -2565,16 +2565,16 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     return {};
   });
   for (auto const& monitoredRegion : monitoredRegions) {
-    auto result195 = m_tileArray->validSectorsFor(monitoredRegion.padded(WorldSectorSize));
+    auto result195 = m_tileArray->valid_sectors_for(monitoredRegion.padded(WorldSectorSize));
     if (!result195)
       return std::unexpected(std::move(result195.error()));
     neededSectors.insert_range((std::move(*result195)));
   }
 
-  auto loadedSectors = m_tileArray->loadedSectors();
+  auto loadedSectors = m_tileArray->loaded_sectors();
   for (auto sector : loadedSectors) {
     if (!neededSectors.contains(sector)) {
-      m_tileArray->unloadSector(sector);
+      m_tileArray->unload_sector(sector);
     }
   }
   
@@ -3061,7 +3061,7 @@ std::expected<void, StarException> WorldClient::sparkDamagedBlocks() {
   auto materialDatabase = (std::move(*result229));
   
   for (auto pos : m_damagedBlocks.values()) {
-    if (auto tile = m_tileArray->modifyTile(pos)) {
+    if (auto tile = m_tileArray->modify_tile(pos)) {
       if (tile->get().backgroundDamage.healthy() && tile->get().foregroundDamage.healthy()) {
         m_damagedBlocks.remove(pos);
       }
@@ -3185,8 +3185,8 @@ std::expected<void, StarException> gatherClientLightingTiles(CellularLightingCal
   if (region.width() < worldWidth && region.x_min() >= -worldWidth
       && static_cast<std::int64_t>(region.x_max()) <= 2 * static_cast<std::int64_t>(worldWidth)) {
     if (useCaller)
-      return tiles.tileEvalColumns(region, gatherColumn);
-    return tiles.tileEvalColumnsParallel(workers, region, gatherColumn);
+      return tiles.tile_eval_columns(region, gatherColumn);
+    return tiles.tile_eval_columns_parallel(workers, region, gatherColumn);
   }
 
   // Whole-world tile traversal deduplicates wrapped x coordinates. Lighting
@@ -3199,8 +3199,8 @@ std::expected<void, StarException> gatherClientLightingTiles(CellularLightingCal
     auto gatherStrip = [&](Vec2I const& pos, std::span<ClientTile const> column) -> std::expected<void, StarException> {
       return gatherColumn({destinationX + (pos[0] - sourceX), pos[1]}, column);
     };
-    auto gathered = useCaller ? tiles.tileEvalColumns(strip, gatherStrip)
-                              : tiles.tileEvalColumnsParallel(workers, strip, gatherStrip);
+    auto gathered = useCaller ? tiles.tile_eval_columns(strip, gatherStrip)
+                              : tiles.tile_eval_columns_parallel(workers, strip, gatherStrip);
     // The column API drains all borrowed jobs even on failure before either
     // the translation captures or the world snapshot can be released.
     if (!gathered)
@@ -3841,7 +3841,7 @@ std::expected<std::shared_ptr<Biome const>, StarException> WorldClient::mainEnvi
 }
 
 std::expected<bool, StarException> WorldClient::readNetTile(Vec2I const& pos, NetTile const& netTile, bool updateCollision) {
-  auto tile = m_tileArray->modifyTile(pos);
+  auto tile = m_tileArray->modify_tile(pos);
   if (!tile) {
     return false;
   }
@@ -3930,7 +3930,7 @@ void WorldClient::dirtyCollision(RectI const& region) {
   auto dirtyRegion = region.padded(CollisionGenerator::BlockInfluenceRadius);
   for (int x = dirtyRegion.x_min(); x < dirtyRegion.x_max(); ++x) {
     for (int y = dirtyRegion.y_min(); y < dirtyRegion.y_max(); ++y) {
-      if (auto tile = m_tileArray->modifyTile({x, y}))
+      if (auto tile = m_tileArray->modify_tile({x, y}))
         tile->get().collisionCacheDirty = true;
     }
   }
@@ -3944,7 +3944,7 @@ std::expected<void, StarException> WorldClient::freshenCollision(RectI const& re
   RectI freshenRegion = RectI::null();
   for (int x = region.x_min(); x < region.x_max(); ++x) {
     for (int y = region.y_min(); y < region.y_max(); ++y) {
-      if (auto tile = m_tileArray->modifyTile({x, y})) {
+      if (auto tile = m_tileArray->modify_tile({x, y})) {
         if (tile->get().collisionCacheDirty) {
           freshenRegion.combine(RectI(x, y, x + 1, y + 1));
         }
@@ -3955,7 +3955,7 @@ std::expected<void, StarException> WorldClient::freshenCollision(RectI const& re
   if (!freshenRegion.is_null()) {
     for (int x = freshenRegion.x_min(); x < freshenRegion.x_max(); ++x) {
       for (int y = freshenRegion.y_min(); y < freshenRegion.y_max(); ++y) {
-        if (auto tile = m_tileArray->modifyTile({x, y})) {
+        if (auto tile = m_tileArray->modify_tile({x, y})) {
           tile->get().collisionCacheDirty = false;
           tile->get().collisionCache.clear();
         }
@@ -3967,7 +3967,7 @@ std::expected<void, StarException> WorldClient::freshenCollision(RectI const& re
       return std::unexpected(std::move(blocks.error()));
     }
     for (auto& collisionBlock : *blocks) {
-      if (auto tile = m_tileArray->modifyTile(collisionBlock.space)) {
+      if (auto tile = m_tileArray->modify_tile(collisionBlock.space)) {
         auto appended = tile->get().collisionCache.push_back(std::move(collisionBlock));
         if (!appended)
           return std::unexpected(std::move(appended.error()));

@@ -1404,7 +1404,7 @@ std::expected<void, StarException> WorldGenerator::generateSectorLevel(WorldStor
         if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
       }
     {
-      auto operationResult1 = m_worldServer.activateLiquidRegion(worldStorage.tileArray()->sectorRegion(sector));
+      auto operationResult1 = m_worldServer.activateLiquidRegion(worldStorage.tileArray()->sector_region(sector));
       if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
     }
   }
@@ -1416,7 +1416,7 @@ std::expected<void, StarException> WorldGenerator::sectorLoadLevelChanged(WorldS
   if (loadLevel == SectorLoadLevel::Loaded) {
     if (worldStorage.sectorGenerationLevel(sector) == SectorGenerationLevel::Complete)
       {
-        auto operationResult1 = m_worldServer.activateLiquidRegion(worldStorage.tileArray()->sectorRegion(sector));
+        auto operationResult1 = m_worldServer.activateLiquidRegion(worldStorage.tileArray()->sector_region(sector));
         if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
       }
   }
@@ -1556,11 +1556,11 @@ std::expected<void, StarException> WorldGenerator::prepareTiles(WorldStorage& wo
   auto planet = worldTemplate;
   // Generate sector.
   auto tileArray = worldStorage.tileArray();
-  RectI sectorRegion = tileArray->sectorRegion(sector);
+  RectI sectorRegion = tileArray->sector_region(sector);
   for (int x = sectorRegion.x_min(); x < sectorRegion.x_max(); ++x) {
     for (int y = sectorRegion.y_min(); y < sectorRegion.y_max(); ++y) {
       Vec2I pos(x, y);
-      auto tile = tileArray->modifyTile(pos);
+      auto tile = tileArray->modify_tile(pos);
       if constexpr (Star::DebugEnabled) {
         Star::star_assert_failed((tile));
       }
@@ -1637,7 +1637,7 @@ std::expected<void, StarException> WorldGenerator::generateMicroDungeons(WorldSt
   auto const& worldTemplate = m_worldServer.worldTemplate();
   auto facade = std::make_shared<DungeonGeneratorWorld>(m_worldServer, false);
 
-  RectI sectorTiles = worldStorage.tileArray()->sectorRegion(sector);
+  RectI sectorTiles = worldStorage.tileArray()->sector_region(sector);
   RectI bounds = sectorTiles.padded(WorldSectorSize - 1);
 
   struct PlacementEntry {
@@ -1753,7 +1753,7 @@ std::expected<void, StarException> WorldGenerator::generateCaveLiquid(WorldStora
 
   auto wrapCoords = [=](Vec2I const& coord) -> Vec2I { return Vec2I{positive_mod<int>(coord[0], dimensions[0]), coord[1]}; };
 
-  RectI sectorTiles = tileArray->sectorRegion(sector);
+  RectI sectorTiles = tileArray->sector_region(sector);
   RectI bounds = sectorTiles.padded(Vec2I(WorldSectorSize - 1, WorldSectorSize - 1));
 
   bounds.min()[1] = clamp<int>(bounds.min()[1], 0, dimensions[1] - 1);
@@ -1883,7 +1883,7 @@ std::expected<void, StarException> WorldGenerator::generateCaveLiquid(WorldStora
   MaterialId biomeBlock = std::move((*MaterialIdbiomeBlockResult1)->mainBlock);
   Map<Vec2I, float> drops = determineLiquidLevel(candidateNodes, solidSurroundings);
   for (auto iter = drops.begin(); iter != drops.end(); ++iter) {
-    auto tile = tileArray->modifyTile(wrapCoords(iter->first));
+    auto tile = tileArray->modify_tile(wrapCoords(iter->first));
     if constexpr (Star::DebugEnabled) {
       Star::star_assert_failed((tile));
     }
@@ -1906,12 +1906,12 @@ std::expected<void, StarException> WorldGenerator::prepareSector(WorldStorage& w
   auto materialDatabase = std::move((*automaterialDatabaseResult1));
   auto planet = worldTemplate;
   auto tileArray = worldStorage.tileArray();
-  RectI sectorTiles = tileArray->sectorRegion(sector);
+  RectI sectorTiles = tileArray->sector_region(sector);
 
   for (int x = sectorTiles.x_min(); x < sectorTiles.x_max(); ++x) {
     for (int y = sectorTiles.y_min(); y < sectorTiles.y_max(); ++y) {
       Vec2I position(x, y);
-      auto tile = tileArray->modifyTile(position);
+      auto tile = tileArray->modify_tile(position);
       if constexpr (Star::DebugEnabled) {
         Star::star_assert_failed((tile));
       }
@@ -2043,7 +2043,7 @@ std::expected<void, StarException> WorldGenerator::prepareSector(WorldStorage& w
 
   for (int x = sectorTiles.x_min(); x < sectorTiles.x_max(); ++x) {
     for (int y = sectorTiles.y_min(); y < sectorTiles.y_max(); ++y) {
-      if (auto tile = worldStorage.tileArray()->modifyTile({x, y}))
+      if (auto tile = worldStorage.tileArray()->modify_tile({x, y}))
         tile->get().collisionCacheDirty = true;
     }
   }
@@ -2057,12 +2057,12 @@ std::expected<void, StarException> WorldGenerator::prepareSectorBiomeBlocks(Worl
   auto automaterialDatabaseResult1 = generationRoot.materialDatabase();
   if (!automaterialDatabaseResult1) return std::unexpected(std::move(automaterialDatabaseResult1.error()));
   auto materialDatabase = std::move((*automaterialDatabaseResult1));
-  RectI sectorTiles = tileArray->sectorRegion(sector);
+  RectI sectorTiles = tileArray->sector_region(sector);
 
   for (int x = sectorTiles.x_min(); x < sectorTiles.x_max(); ++x) {
     for (int y = sectorTiles.y_min(); y < sectorTiles.y_max(); ++y) {
       Vec2I position(x, y);
-      auto tile = tileArray->modifyTile(position);
+      auto tile = tileArray->modify_tile(position);
       {
         auto operationResult1 = replaceBiomeBlocks(tile->get());
         if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
@@ -2148,7 +2148,7 @@ std::expected<void, StarException> WorldGenerator::reapplyBiome(WorldStorage& wo
   auto materialDatabase = std::move((*automaterialDatabaseResult1));
   auto planet = worldTemplate;
   auto tileArray = worldStorage.tileArray();
-  RectI sectorTiles = tileArray->sectorRegion(sector);
+  RectI sectorTiles = tileArray->sector_region(sector);
 
   // generationRoot.logger().info("Reapplying biome in sector {}...", sectorTiles);
   auto autoentitiesResult1 = m_worldServer.entityQuery(RectF(sectorTiles.padded(1)));
@@ -2537,7 +2537,7 @@ std::expected<void, StarException> WorldGenerator::reapplyBiome(WorldStorage& wo
 
 std::expected<Set<Vec2I>, StarException> WorldGenerator::caveLiquidSeeds(WorldStorage& worldStorage, ServerTileSectorArray::Sector const& sector) {
   auto const& worldTemplate = m_worldServer.worldTemplate();
-  RectI sectorTiles = worldStorage.tileArray()->sectorRegion(sector);
+  RectI sectorTiles = worldStorage.tileArray()->sector_region(sector);
   auto samplePoint = sectorTiles.center();
   auto autoblockInfoResult1 = worldTemplate->blockInfo(samplePoint[0], samplePoint[1]);
   if (!autoblockInfoResult1) return std::unexpected(std::move(autoblockInfoResult1.error()));
@@ -2675,7 +2675,7 @@ std::expected<bool, StarException> WorldGenerator::placePlant(WorldStorage& worl
       continue;
 
     space += position;
-    if (auto tile = worldStorage.tileArray()->modifyTile(space)) {
+    if (auto tile = worldStorage.tileArray()->modify_tile(space)) {
       if (isConnectableMaterial(tile->get().foreground))
         tile->get() = primaryTile;
       if (adjustBackground)
@@ -2690,7 +2690,7 @@ std::expected<bool, StarException> WorldGenerator::placePlant(WorldStorage& worl
   // Make all the root blocks a real material based on the primary root.
   for (auto root : roots) {
     root += position;
-    if (auto tile = worldStorage.tileArray()->modifyTile(root)) {
+    if (auto tile = worldStorage.tileArray()->modify_tile(root)) {
       if (!isRealMaterial(tile->get().foreground)) {
         tile->get() = rootTile;
         auto tilecollisionResult1 = generationRoot.materialDatabase();

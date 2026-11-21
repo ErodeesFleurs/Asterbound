@@ -200,7 +200,7 @@ namespace WorldImpl {
   template <typename TileSectorArray>
   [[nodiscard]]
   std::expected<bool, StarException> rectTileCollision(std::shared_ptr<TileSectorArray> const& tileSectorArray, RectI const& region, CollisionSet const& collisionSet) {
-    return tileSectorArray->tileSatisfies(region, [&collisionSet](Vec2I const&, typename TileSectorArray::Tile const& tile) -> std::expected<bool, StarException> {
+    return tileSectorArray->tile_satisfies(region, [&collisionSet](Vec2I const&, typename TileSectorArray::Tile const& tile) -> std::expected<bool, StarException> {
         return isColliding(tile.getCollision(), collisionSet);
       });
   }
@@ -280,7 +280,7 @@ namespace WorldImpl {
     // common liquid is reported.
     float totalSpace = 0;
     Map<LiquidId, float> totals;
-    auto sampled = tileSectorArray->tileEach(sampleRect, [&region, &totalSpace, &totals](Vec2I const& pos, typename TileSectorArray::Tile const& tile) -> std::expected<void, StarException> {
+    auto sampled = tileSectorArray->tile_each(sampleRect, [&region, &totalSpace, &totals](Vec2I const& pos, typename TileSectorArray::Tile const& tile) -> std::expected<void, StarException> {
         float blockIncidence = RectF(pos[0], pos[1], pos[0] + 1, pos[1] + 1).overlap(region).volume();
         totalSpace += blockIncidence;
         auto liquidLevel = tile.liquid;
@@ -362,7 +362,7 @@ namespace WorldImpl {
   template <typename TileSectorArray>
   [[nodiscard]]
   std::expected<bool, StarException> damageWouldDestroy(Root& root, std::shared_ptr<TileSectorArray> const& tileSectorArray, Vec2I pos, TileLayer layer, TileDamage const& tileDamage) {
-    if (auto tile = tileSectorArray->modifyTile(pos)) {
+    if (auto tile = tileSectorArray->modify_tile(pos)) {
       auto damageParameters = tileDamageParameters(root, tile->get(), layer, tileDamage);
       if (!damageParameters)
         return std::unexpected(std::move(damageParameters.error()));
@@ -640,7 +640,7 @@ namespace WorldImpl {
     if (pos[1] < 0 || pos[1] >= worldGeometry.height())
       return 0;
 
-    // tileEach can't handle rects that are WAY out of range.
+    // Normalize the floating-point input before constructing integer lighting bounds.
     pos = worldGeometry.xwrap(pos);
 
     Vec3F environmentLight = sky->environmentLight().to_rgb_f();
@@ -654,10 +654,10 @@ namespace WorldImpl {
 
     lighting.begin(pos);
 
-    // Each column in tileEvalColumns is guaranteed to be no larger than the
+    // Each column in tile_eval_columns is guaranteed to be no larger than the
     // sector size.
     CellularLightIntensityCalculator::Cell lightingCellColumn[WorldSectorSize];
-    auto evaluated = tileSectorArray->tileEvalColumns(lighting.calculationRegion(), [&](Vec2I const& pos, std::span<typename TileSectorArray::Tile> column) -> std::expected<void, StarException> {
+    auto evaluated = tileSectorArray->tile_eval_columns(lighting.calculationRegion(), [&](Vec2I const& pos, std::span<typename TileSectorArray::Tile> column) -> std::expected<void, StarException> {
         for (std::size_t y = 0; y < column.size(); ++y) {
           auto& tile = column[y];
           auto& cell = lightingCellColumn[y];

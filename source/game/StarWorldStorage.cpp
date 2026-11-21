@@ -292,19 +292,19 @@ std::shared_ptr<EntityMap> const& WorldStorage::entityMap() const {
 }
 
 std::optional<WorldStorage::Sector> WorldStorage::sectorForPosition(Vec2I const& position) const {
-  auto s = m_tileArray->sectorFor(position);
-  if (m_tileArray->sectorValid(s))
+  auto s = m_tileArray->sector_for(position);
+  if (m_tileArray->sector_valid(s))
     return s;
   return {};
 }
 
 std::expected<List<WorldStorage::Sector>, StarException> WorldStorage::sectorsForRegion(RectI const& region) const {
-  return m_tileArray->validSectorsFor(region);
+  return m_tileArray->valid_sectors_for(region);
 }
 
 std::optional<RectI> WorldStorage::regionForSector(Sector sector) const {
-  if (m_tileArray->sectorValid(sector))
-    return m_tileArray->sectorRegion(sector);
+  if (m_tileArray->sector_valid(sector))
+    return m_tileArray->sector_region(sector);
   return {};
 }
 
@@ -513,7 +513,7 @@ std::expected<void, StarException> WorldStorage::tick(float dt, std::optional<st
 
       bool keepAlive = false;
       List<std::shared_ptr<Entity>> zombieEntities;
-      auto scanned = m_entityMap->forEachEntity(RectF(m_tileArray->sectorRegion(sector)), [&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
+      auto scanned = m_entityMap->forEachEntity(RectF(m_tileArray->sector_region(sector)), [&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
           if (belongsInSector(sector, entity->position())) {
             if (!keepAlive) {
               auto active = m_generatorFacade->entityKeepAlive(*this, entity);
@@ -1066,7 +1066,7 @@ StarException WorldStorage::invalidate(StarException error, std::string context)
 
 bool WorldStorage::belongsInSector(Sector const& sector, Vec2F const& position) const {
   WorldGeometry geometry(m_tileArray->size());
-  return RectF(m_tileArray->sectorRegion(sector)).belongs(geometry.limit(position));
+  return RectF(m_tileArray->sector_region(sector)).belongs(geometry.limit(position));
 }
 
 std::expected<float, StarException> WorldStorage::randomizedSectorTTL() const {
@@ -1074,7 +1074,7 @@ std::expected<float, StarException> WorldStorage::randomizedSectorTTL() const {
 }
 
 std::expected<std::pair<bool, std::size_t>, StarException> WorldStorage::generateSectorToLevel(Sector const& sector, SectorGenerationLevel targetGenerationLevel, std::size_t sectorGenerationLevelLimit) {
-  if (!m_tileArray->sectorValid(sector))
+  if (!m_tileArray->sector_valid(sector))
     return std::pair<bool, std::size_t>{false, 0};
 
   {
@@ -1136,7 +1136,7 @@ std::expected<std::pair<bool, std::size_t>, StarException> WorldStorage::generat
 }
 
 std::expected<void, StarException> WorldStorage::loadSectorToLevel(Sector const& sector, SectorLoadLevel targetLoadLevel) {
-  if (!m_tileArray->sectorValid(sector)) return {};
+  if (!m_tileArray->sector_valid(sector)) return {};
   auto autoentityFactoryResult1 = this->root().entityFactory();
   if (!autoentityFactoryResult1) return std::unexpected(std::move(autoentityFactoryResult1.error()));
   auto entityFactory = std::move((*autoentityFactoryResult1));
@@ -1170,10 +1170,10 @@ std::expected<void, StarException> WorldStorage::loadSectorToLevel(Sector const&
         auto autosectorStoreResult1 = readTileSector(*found);
         if (!autosectorStoreResult1) return std::unexpected(std::move(autosectorStoreResult1.error()));
         auto sectorStore = std::move((*autosectorStoreResult1));
-        m_tileArray->loadSector(sector, std::move(sectorStore.tiles));
+        m_tileArray->load_sector(sector, std::move(sectorStore.tiles));
         metadata.generationLevel = sectorStore.generationLevel;
-      } else if (!m_tileArray->sectorLoaded(sector)) {
-        m_tileArray->loadDefaultSector(sector);
+      } else if (!m_tileArray->is_sector_loaded(sector)) {
+        m_tileArray->load_default_sector(sector);
       }
       metadata.loadLevel = currentLoad;
       {
@@ -1240,7 +1240,7 @@ std::expected<void, StarException> WorldStorage::loadSectorToLevel(Sector const&
 }
 
 std::expected<bool, StarException> WorldStorage::unloadSectorToLevel(Sector const& sector, SectorLoadLevel targetLoadLevel, bool force) {
-  if (!m_tileArray->sectorValid(sector) || targetLoadLevel == SectorLoadLevel::Loaded)
+  if (!m_tileArray->sector_valid(sector) || targetLoadLevel == SectorLoadLevel::Loaded)
     return true;
 
   auto& metadata = m_sectorMetadata[sector];
@@ -1251,7 +1251,7 @@ std::expected<bool, StarException> WorldStorage::unloadSectorToLevel(Sector cons
     auto entityFactory = std::move((*autoentityFactoryResult1));
     List<std::shared_ptr<Entity>> entitiesToStore;
     List<std::shared_ptr<Entity>> entitiesToRemove;
-    auto autosectorEntitiesResult1 = m_entityMap->entityQuery(RectF(m_tileArray->sectorRegion(sector)));
+    auto autosectorEntitiesResult1 = m_entityMap->entityQuery(RectF(m_tileArray->sector_region(sector)));
     if (!autosectorEntitiesResult1) return std::unexpected(std::move(autosectorEntitiesResult1.error()));
     auto sectorEntities = std::move((*autosectorEntitiesResult1));
 
@@ -1358,7 +1358,7 @@ std::expected<bool, StarException> WorldStorage::unloadSectorToLevel(Sector cons
   if (targetLoadLevel == SectorLoadLevel::None) {
     if (metadata.loadLevel > SectorLoadLevel::None && !entitiesOverlap) {
       TileSectorStore sectorStore;
-      sectorStore.tiles = m_tileArray->unloadSector(sector);
+      sectorStore.tiles = m_tileArray->unload_sector(sector);
       sectorStore.generationLevel = metadata.generationLevel;
       {
         auto operationResult1 = tileSectorKey(sector);
@@ -1381,7 +1381,7 @@ std::expected<bool, StarException> WorldStorage::unloadSectorToLevel(Sector cons
 }
 
 std::expected<void, StarException> WorldStorage::syncSector(Sector const& sector) {
-  if (!m_tileArray->sectorValid(sector))
+  if (!m_tileArray->sector_valid(sector))
     return {};
   auto autoentityFactoryResult1 = this->root().entityFactory();
   if (!autoentityFactoryResult1) return std::unexpected(std::move(autoentityFactoryResult1.error()));
@@ -1396,7 +1396,7 @@ std::expected<void, StarException> WorldStorage::syncSector(Sector const& sector
   if (metadata.loadLevel >= SectorLoadLevel::Entities) {
     EntitySectorStore sectorStore;
     UniqueIndexStore storedUniques;
-    auto autosectorEntitiesResult1 = m_entityMap->entityQuery(RectF(m_tileArray->sectorRegion(sector)));
+    auto autosectorEntitiesResult1 = m_entityMap->entityQuery(RectF(m_tileArray->sector_region(sector)));
     if (!autosectorEntitiesResult1) return std::unexpected(std::move(autosectorEntitiesResult1.error()));
     auto sectorEntities = std::move((*autosectorEntitiesResult1));
     for (auto const& entity : sectorEntities) {
@@ -1433,7 +1433,7 @@ std::expected<void, StarException> WorldStorage::syncSector(Sector const& sector
 
   if (metadata.loadLevel >= SectorLoadLevel::Tiles) {
     TileSectorStore sectorStore;
-    sectorStore.tiles = m_tileArray->copySector(sector);
+    sectorStore.tiles = m_tileArray->copy_sector(sector);
     sectorStore.generationLevel = metadata.generationLevel;
     {
       auto operationResult1 = tileSectorKey(sector);
@@ -1448,8 +1448,8 @@ std::expected<void, StarException> WorldStorage::syncSector(Sector const& sector
 }
 
 std::expected<List<WorldStorage::Sector>, StarException> WorldStorage::adjacentSectors(Sector const& sector) const {
-  auto tiles = m_tileArray->sectorRegion(sector);
-  return m_tileArray->validSectorsFor(tiles.padded(WorldSectorSize));
+  auto tiles = m_tileArray->sector_region(sector);
+  return m_tileArray->valid_sectors_for(tiles.padded(WorldSectorSize));
 }
 
 std::expected<void, StarException> WorldStorage::updateSectorUniques(Sector const& sector, UniqueIndexStore const& sectorUniques) {

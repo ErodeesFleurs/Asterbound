@@ -3,7 +3,6 @@
 import std;
 import star.algorithm;
 import star.assets;
-import star.casting;
 import star.file;
 import star.format;
 import star.json;
@@ -30,12 +29,12 @@ struct AssetWorkerBenchmarkAccess {
       return std::unexpected(StarException("Asset worker stopped before benchmark completion"));
     lock.unlock();
     std::lock_guard luaLock(assets.m_luaMutex);
-    return as_ref<LuaEngine>(*assets.m_luaEngine)->get().memory_usage();
+    return assets.m_lua_engine->memory_usage();
   }
 
   static std::expected<std::size_t, StarException> collect(Assets& assets) {
     std::lock_guard lock(assets.m_luaMutex);
-    auto& engine = as_ref<LuaEngine>(*assets.m_luaEngine)->get();
+    auto& engine = *assets.m_lua_engine;
     auto collected = engine.collect_garbage();
     if (!collected)
       return std::unexpected(std::move(collected.error()));

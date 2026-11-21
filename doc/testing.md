@@ -310,6 +310,14 @@ references; proxy storage uses indexing, `set`/`get` and traversal. Reacquire bo
 after structural changes. Visitors and table evaluators are borrowed, including
 noncopyable mutable callables; moved-from owners retain valid empty shapes.
 
+Run `TileSectorArrayTest.*` for wrapped world coordinates and default tiles.
+Sector regions are half-open; zero width or height visits nothing, including
+when the origin is inside a sector rather than at its boundary. A missing
+column has no span but retains its clipped length. Parallel callbacks can
+finish out of order: a `false` stops that strip, and all submitted work must
+finish before the callback or array can be released. Distinct logical cells
+of a packed-bit output are not necessarily independently writable.
+
 `MultiTable` validates nondecreasing axes once when configuring or adopting data.
 Duplicates and empty axes remain supported; failed configuration preserves the
 old table. `assign` move-adopts matching axes and data without a second grid.
