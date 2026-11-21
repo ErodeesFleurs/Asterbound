@@ -431,6 +431,9 @@ shuffling retains its single seed draw, including empty inputs. Reference sampli
 borrows only from lvalues or borrowed ranges, never owning temporaries.
 Keep exact output/next-state regressions and error recovery; do not repin world
 snapshots merely to hide changed output.
+Point-coordinate regressions check the two components separately: each cell
+draws `x`, then `y`, then invokes the data callback. A next-state check alone
+cannot detect swapped coordinates.
 
 Keep integer fast paths interface-visible and error construction cold. Batched
 finite classification retains its reference/noinline boundary under fast-math;
@@ -438,6 +441,8 @@ speculative width subtraction and overflow interpolation stay narrowly precise.
 
 `fill_uniform` retains the ordered scalar float draws under one service lock;
 batching changes the possible interleaving between concurrent callers.
+`fill_bytes` emits each 32-bit draw least-significant byte first. A partial tail
+consumes one whole draw, and an empty span consumes none.
 
 `secure_random_fill` borrows a bounded byte span and uses only the OS CSPRNG;
 errors may leave a filled prefix. Grid point generation retains whole intersecting

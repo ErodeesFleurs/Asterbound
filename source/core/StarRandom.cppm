@@ -12,6 +12,10 @@ struct RandomExceptionTag {
 };
 using RandomException = StarError<RandomExceptionTag, StarException>;
 
+[[gnu::cold, gnu::noinline]] inline std::unexpected<StarException> random_parameter_error(std::string_view message) {
+  return std::unexpected<StarException>(RandomException(std::string(message)));
+}
+
 template <typename Range>
 concept random_borrowable_range = static_random_reference_container<Range>;
 
@@ -58,7 +62,7 @@ public:
   }
   [[nodiscard]] std::expected<std::int64_t, StarException> uniform_int(std::int64_t max) {
     if (max < 0)
-      return parameter_error("Maximum uniform_int bound must be nonnegative");
+      return random_parameter_error("Maximum uniform_int bound must be nonnegative");
     return static_cast<std::int64_t>(uniform_uint(static_cast<std::uint64_t>(max)));
   }
   std::uint64_t uniform_uint(std::uint64_t max) {
@@ -73,13 +77,13 @@ public:
   }
   [[nodiscard]] std::expected<std::int64_t, StarException> uniform_int(std::int64_t min, std::int64_t max) {
     if (max < min)
-      return parameter_error("Maximum uniform_int bound must be >= minimum bound");
+      return random_parameter_error("Maximum uniform_int bound must be >= minimum bound");
     auto width = static_cast<std::uint64_t>(max) - static_cast<std::uint64_t>(min);
     return std::bit_cast<std::int64_t>(static_cast<std::uint64_t>(min) + uniform_uint(width));
   }
   [[nodiscard]] std::expected<std::uint64_t, StarException> uniform_uint(std::uint64_t min, std::uint64_t max) {
     if (max < min)
-      return parameter_error("Maximum uniform_uint bound must be >= minimum bound");
+      return random_parameter_error("Maximum uniform_uint bound must be >= minimum bound");
     return uniform_uint(max - min) + min;
   }
   // Keep literal-bound arithmetic and checked-result elimination in the caller.
@@ -88,7 +92,7 @@ public:
     auto width = range_width(min, max);
     auto finite = classify_finite(min, max, width);
     if (!finite[0] || !finite[1] || max < min)
-      return parameter_error("Uniform real bounds must be finite and ordered");
+      return random_parameter_error("Uniform real bounds must be finite and ordered");
     auto unit = uniform_float();
     return finite[2] ? unit * width + min : interpolate_overflow(min, max, unit);
   }
@@ -96,7 +100,7 @@ public:
     auto width = range_width(min, max);
     auto finite = classify_finite(min, max, width);
     if (!finite[0] || !finite[1] || max < min)
-      return parameter_error("Uniform real bounds must be finite and ordered");
+      return random_parameter_error("Uniform real bounds must be finite and ordered");
     auto unit = uniform_double();
     return finite[2] ? unit * width + min : interpolate_overflow(min, max, unit);
   }
@@ -106,7 +110,7 @@ public:
   [[nodiscard]] std::expected<float, StarException> normal_float(float stddev = 1.0f, float mean = 0.0f) {
     auto finite = classify_finite(stddev, mean);
     if (!finite[0] || !finite[1] || stddev < 0)
-      return parameter_error("Normal parameters must be finite with nonnegative deviation");
+      return random_parameter_error("Normal parameters must be finite with nonnegative deviation");
     float first, second, radius_squared;
     do {
       first = 2 * uniform_float() - 1;
@@ -118,13 +122,13 @@ public:
     float mapping = std::sqrt(-2 * std::log(radius_squared) / radius_squared);
     auto result = first * mapping * stddev + mean;
     if (!is_finite(result))
-      return parameter_error("Normal result is not finite");
+      return random_parameter_error("Normal result is not finite");
     return result;
   }
   [[nodiscard]] std::expected<double, StarException> normal_double(double stddev = 1.0, double mean = 0.0) {
     auto finite = classify_finite(stddev, mean);
     if (!finite[0] || !finite[1] || stddev < 0)
-      return parameter_error("Normal parameters must be finite with nonnegative deviation");
+      return random_parameter_error("Normal parameters must be finite with nonnegative deviation");
     double first, second, radius_squared;
     do {
       first = 2 * uniform_double() - 1;
@@ -136,7 +140,7 @@ public:
     double mapping = std::sqrt(-2 * std::log(radius_squared) / radius_squared);
     auto result = first * mapping * stddev + mean;
     if (!is_finite(result))
-      return parameter_error("Normal result is not finite");
+      return random_parameter_error("Normal result is not finite");
     return result;
   }
   [[nodiscard]] std::expected<std::int64_t, StarException> stochastic_round(double value);
@@ -159,7 +163,6 @@ public:
   void shuffle(Container& container);
 
 private:
-  [[gnu::cold, gnu::noinline]] static std::unexpected<StarException> parameter_error(std::string_view message);
   template <finite_classifiable Real>
   static Real range_width(Real min, Real max);
   template <finite_classifiable Real>
@@ -238,28 +241,33 @@ private:
   RandomSource m_source;
 };
 
+template <typename Result, typename Random, static_random_container Container>
+  requires (std::same_as<Random, RandomSource> || std::same_as<Random, RandomService>)
+    && std::is_constructible_v<Result, static_random_container_reference<Container>>
+std::expected<Result, StarException> sample_nonempty(Random& random, Container& container) {
+  using Difference = typename std::iterator_traits<static_random_container_iterator<Container>>::difference_type;
+  auto max_index = container.size() - 1;
+  if (std::cmp_greater(max_index, +std::numeric_limits<Difference>::max()))
+    return random_parameter_error("Sample index exceeds iterator difference range");
+  auto iterator(container.begin());
+  // Only the draw touches the service lock; begin, traversal and construction do not.
+  auto index = random.uniform_uint(max_index);
+  std::advance(iterator, static_cast<Difference>(index));
+  return std::expected<Result, StarException>(std::in_place, *iterator);
+}
+
 template <random_borrowable_range Container>
 std::expected<random_reference_t<Container>, StarException> RandomSource::sample_ref(Container&& container) {
   if (container.empty())
-    return parameter_error("Empty container in sample_ref");
-  using Difference = typename std::iterator_traits<static_random_container_iterator<Container>>::difference_type;
-  if (std::cmp_greater(container.size() - 1, std::numeric_limits<Difference>::max()))
-    return parameter_error("Sample index exceeds iterator difference range");
-  auto iterator = container.begin();
-  std::advance(iterator, static_cast<Difference>(uniform_uint(container.size() - 1)));
-  return random_reference_t<Container>(*iterator);
+    return random_parameter_error("Empty container in sample_ref");
+  return sample_nonempty<random_reference_t<Container>>(*this, container);
 }
 
 template <random_borrowable_range Container>
 std::expected<random_reference_t<Container>, StarException> RandomService::sample_ref(Container&& container) {
   if (container.empty())
-    return std::unexpected(RandomException("Empty container in sample_ref"));
-  using Difference = typename std::iterator_traits<static_random_container_iterator<Container>>::difference_type;
-  if (std::cmp_greater(container.size() - 1, std::numeric_limits<Difference>::max()))
-    return std::unexpected(RandomException("Sample index exceeds iterator difference range"));
-  auto iterator = container.begin();
-  std::advance(iterator, static_cast<Difference>(uniform_uint(container.size() - 1)));
-  return random_reference_t<Container>(*iterator);
+    return random_parameter_error("Empty container in sample_ref");
+  return sample_nonempty<random_reference_t<Container>>(*this, container);
 }
 
 template <random_value_range Container>
@@ -268,12 +276,7 @@ std::expected<static_random_container_value<Container>, StarException> RandomSou
   using Value = static_random_container_value<Container>;
   if (container.empty())
     return std::expected<Value, StarException>(std::in_place);
-  using Difference = typename std::iterator_traits<static_random_container_iterator<Container const>>::difference_type;
-  if (std::cmp_greater(container.size() - 1, std::numeric_limits<Difference>::max()))
-    return parameter_error("Sample index exceeds iterator difference range");
-  auto iterator = container.begin();
-  std::advance(iterator, static_cast<Difference>(uniform_uint(container.size() - 1)));
-  return std::expected<Value, StarException>(std::in_place, *iterator);
+  return sample_nonempty<Value>(*this, container);
 }
 
 template <random_value_range Container>
@@ -282,12 +285,7 @@ std::expected<static_random_container_value<Container>, StarException> RandomSou
   using Value = static_random_container_value<Container>;
   if (container.empty())
     return std::expected<Value, StarException>(std::in_place, default_value);
-  using Difference = typename std::iterator_traits<static_random_container_iterator<Container const>>::difference_type;
-  if (std::cmp_greater(container.size() - 1, std::numeric_limits<Difference>::max()))
-    return parameter_error("Sample index exceeds iterator difference range");
-  auto iterator = container.begin();
-  std::advance(iterator, static_cast<Difference>(uniform_uint(container.size() - 1)));
-  return std::expected<Value, StarException>(std::in_place, *iterator);
+  return sample_nonempty<Value>(*this, container);
 }
 
 template <random_value_range Container>
@@ -296,12 +294,7 @@ std::expected<static_random_container_value<Container>, StarException> RandomSer
   using Value = static_random_container_value<Container>;
   if (container.empty())
     return std::expected<Value, StarException>(std::in_place);
-  using Difference = typename std::iterator_traits<static_random_container_iterator<Container const>>::difference_type;
-  if (std::cmp_greater(container.size() - 1, std::numeric_limits<Difference>::max()))
-    return std::unexpected(RandomException("Sample index exceeds iterator difference range"));
-  auto iterator = container.begin();
-  std::advance(iterator, static_cast<Difference>(uniform_uint(container.size() - 1)));
-  return std::expected<Value, StarException>(std::in_place, *iterator);
+  return sample_nonempty<Value>(*this, container);
 }
 
 template <random_value_range Container>
@@ -310,12 +303,7 @@ std::expected<static_random_container_value<Container>, StarException> RandomSer
   using Value = static_random_container_value<Container>;
   if (container.empty())
     return std::expected<Value, StarException>(std::in_place, default_value);
-  using Difference = typename std::iterator_traits<static_random_container_iterator<Container const>>::difference_type;
-  if (std::cmp_greater(container.size() - 1, std::numeric_limits<Difference>::max()))
-    return std::unexpected(RandomException("Sample index exceeds iterator difference range"));
-  auto iterator = container.begin();
-  std::advance(iterator, static_cast<Difference>(uniform_uint(container.size() - 1)));
-  return std::expected<Value, StarException>(std::in_place, *iterator);
+  return sample_nonempty<Value>(*this, container);
 }
 
 template <random_shuffle_range Container>

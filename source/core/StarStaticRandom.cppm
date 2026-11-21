@@ -202,6 +202,8 @@ concept static_random_advance_iterator =
     typename std::iterator_traits<Iterator>::difference_type;
     ++iterator;
   } && std::is_base_of_v<std::input_iterator_tag, typename std::iterator_traits<Iterator>::iterator_category>
+  && (std::is_base_of_v<std::random_access_iterator_tag, typename std::iterator_traits<Iterator>::iterator_category>
+      || requires(typename std::iterator_traits<Iterator>::difference_type count) { --count; })
   && (!std::is_base_of_v<std::bidirectional_iterator_tag, typename std::iterator_traits<Iterator>::iterator_category>
       || requires(Iterator& iterator) { --iterator; })
   && (!std::is_base_of_v<std::random_access_iterator_tag, typename std::iterator_traits<Iterator>::iterator_category>
@@ -219,12 +221,16 @@ template <typename Container>
 using static_random_container_value = std::iter_value_t<static_random_container_iterator<Container>>;
 
 template <typename Container>
-concept static_random_container = requires(Container& container) {
-  typename static_random_container_value<Container>;
+concept static_random_sized_container = requires(Container& container) {
   container.empty() ? true : false;
-  requires std::integral<decltype(container.size())>;
-  container.begin();
-} && static_random_advance_iterator<static_random_container_iterator<Container>>;
+  requires std::integral<std::remove_cvref_t<decltype(container.size())>>;
+  requires std::integral<typename std::iterator_traits<static_random_container_iterator<Container>>::difference_type>;
+  static_random_container_iterator<Container>(container.begin());
+};
+
+template <typename Container>
+concept static_random_container = static_random_sized_container<Container>
+  && static_random_advance_iterator<static_random_container_iterator<Container>>;
 
 template <typename Container>
 concept static_random_reference_container = static_random_container<Container>
@@ -234,23 +240,35 @@ concept static_random_reference_container = static_random_container<Container>
 template <typename Container>
 using static_random_reference = std::reference_wrapper<std::remove_reference_t<static_random_container_reference<Container>>>;
 
+[[gnu::cold, gnu::noinline]] inline std::unexpected<StarException> static_random_selection_error(std::string_view message) {
+  return std::unexpected(StarException(std::string(message)));
+}
+
+template <typename Result, static_random_container Container, typename T, typename... TL>
+  requires std::is_constructible_v<Result, static_random_container_reference<Container>>
+    && static_random_inputs<XXHash64, T, TL...>
+std::expected<Result, StarException> static_random_select_nonempty(Container& container, T const& data, TL const&... rest) {
+  using Difference = typename std::iterator_traits<static_random_container_iterator<Container>>::difference_type;
+  auto max_index = container.size() - 1;
+  if (std::cmp_greater(max_index, std::numeric_limits<std::int32_t>::max()))
+    return static_random_selection_error("Static selection index exceeds int32 range");
+  if (std::cmp_greater(max_index, +std::numeric_limits<Difference>::max()))
+    return static_random_selection_error("Static selection index exceeds iterator difference range");
+  auto index = static_random_i32_range(0, static_cast<std::int32_t>(max_index), data, rest...);
+  if (!index)
+    return std::unexpected(std::move(index.error()));
+  auto iterator(container.begin());
+  std::advance(iterator, *index);
+  return std::expected<Result, StarException>(std::in_place, *iterator);
+}
+
 template <typename Container, typename T, typename... TL>
   requires static_random_reference_container<Container> && static_random_inputs<XXHash64, T, TL...>
 [[nodiscard]] std::expected<static_random_reference<Container>, StarException>
 static_random_from(Container&& container, T const& data, TL const&... rest) {
   if (container.empty())
-    return std::unexpected(StarException("static_random_from called on an empty container"));
-  if (std::cmp_greater(container.size() - 1, std::numeric_limits<std::int32_t>::max()))
-    return std::unexpected(StarException("Static selection index exceeds int32 range"));
-  using Difference = typename std::iterator_traits<static_random_container_iterator<Container>>::difference_type;
-  if (std::cmp_greater(container.size() - 1, std::numeric_limits<Difference>::max()))
-    return std::unexpected(StarException("Static selection index exceeds iterator difference range"));
-  auto index = static_random_i32_range(0, static_cast<std::int32_t>(container.size() - 1), data, rest...);
-  if (!index)
-    return std::unexpected(std::move(index.error()));
-  auto iterator = container.begin();
-  std::advance(iterator, *index);
-  return static_random_reference<Container>(*iterator);
+    return static_random_selection_error("static_random_from called on an empty container");
+  return static_random_select_nonempty<static_random_reference<Container>>(container, data, rest...);
 }
 
 template <typename Container>
@@ -266,44 +284,35 @@ static_random_value_from(Container const& container, T const& data, TL const&...
     if constexpr (std::is_default_constructible_v<Value>)
       return std::expected<Value, StarException>(std::in_place);
     else
-      return std::unexpected(StarException("static_random_value_from called on an empty container"));
+      return static_random_selection_error("static_random_value_from called on an empty container");
   }
-  if (std::cmp_greater(container.size() - 1, std::numeric_limits<std::int32_t>::max()))
-    return std::unexpected(StarException("Static selection index exceeds int32 range"));
-  using Difference = typename std::iterator_traits<static_random_container_iterator<Container const>>::difference_type;
-  if (std::cmp_greater(container.size() - 1, std::numeric_limits<Difference>::max()))
-    return std::unexpected(StarException("Static selection index exceeds iterator difference range"));
-  auto index = static_random_i32_range(0, static_cast<std::int32_t>(container.size() - 1), data, rest...);
-  if (!index)
-    return std::unexpected(std::move(index.error()));
-  auto iterator = container.begin();
-  std::advance(iterator, *index);
-  return std::expected<Value, StarException>(std::in_place, *iterator);
+  return static_random_select_nonempty<Value>(container, data, rest...);
 }
 
 template <typename Container>
-concept static_random_shuffle_container = static_random_container<Container>
-  && requires(Container& container, static_random_container_iterator<Container>& iterator) {
+concept static_random_shuffle_container = static_random_sized_container<Container>
+  && requires(Container& container, static_random_container_iterator<Container>& iterator, std::uint32_t& offset) {
     container.end();
     ++iterator != container.end() ? true : false;
-    std::swap(*iterator, *(iterator + 0));
+    std::swap(*iterator, *(iterator + offset));
   }
   && std::is_constructible_v<static_random_container_iterator<Container>, static_random_container_iterator<Container>&>;
 
 template <typename Container, typename T, typename... TL>
-  requires static_random_shuffle_container<Container> && static_random_inputs<XXHash64, T, TL...>
+  requires static_random_shuffle_container<Container> && static_random_inputs<XXHash64, int, T, TL...>
 [[nodiscard]] std::expected<void, StarException>
 static_random_shuffle(Container& container, T const& data, TL const&... rest) {
   if (container.empty())
     return {};
   // The historical mix input is an int, including its hash encoding.
-  if (std::cmp_greater(container.size() - 1, std::numeric_limits<int>::max()))
-    return std::unexpected(StarException("Static shuffle index exceeds int range"));
+  auto max_index = container.size() - 1;
+  if (std::cmp_greater(max_index, std::numeric_limits<int>::max()))
+    return static_random_selection_error("Static shuffle index exceeds int range");
   using Difference = typename std::iterator_traits<static_random_container_iterator<Container>>::difference_type;
-  if (std::cmp_greater(container.size() - 1, std::numeric_limits<Difference>::max()))
-    return std::unexpected(StarException("Static shuffle index exceeds iterator difference range"));
-  auto begin = container.begin();
-  auto iterator = begin;
+  if (std::cmp_greater(max_index, +std::numeric_limits<Difference>::max()))
+    return static_random_selection_error("Static shuffle index exceeds iterator difference range");
+  auto begin(container.begin());
+  auto iterator(begin);
   for (int i = 1; ++iterator != container.end(); ++i) {
     auto offset = static_random_u32_range(0, static_cast<std::uint32_t>(i), i, data, rest...);
     if (!offset)

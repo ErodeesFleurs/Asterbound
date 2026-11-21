@@ -65,6 +65,68 @@ static_assert(!can_sample_value<RandomSource, std::vector<std::unique_ptr<int>>>
 static_assert(!can_sample_value<RandomSource, std::array<ExplicitCopy, 1>>);
 static_assert(can_sample_default_value<RandomSource, std::array<ExplicitCopy, 1>>);
 static_assert(can_sample_default_value<RandomService, std::array<ExplicitCopy, 1>>);
+
+// A single-pass cursor with just the extra offset operation static shuffle uses.
+struct CountedSelection {
+  struct Iterator {
+    using value_type = int;
+    using difference_type = std::ptrdiff_t;
+    using iterator_category = std::input_iterator_tag;
+    using reference = int&;
+    using pointer = void;
+
+    std::span<int> rest;
+    explicit Iterator(std::span<int> rest) : rest(rest) {}
+    explicit Iterator(Iterator&) = default;
+    int& operator*() const { return rest.front(); }
+    Iterator& operator++() { rest = rest.subspan(1); return *this; }
+    Iterator operator+(std::uint32_t& offset) const { return Iterator(rest.subspan(offset)); }
+    bool operator==(std::default_sentinel_t) const { return rest.empty(); }
+  };
+
+  std::span<int> values;
+  mutable int size_calls = 0;
+  bool empty() const { return values.empty(); }
+  std::size_t size() const { ++size_calls; return values.size(); }
+  Iterator begin() const { return Iterator(values); }
+  std::default_sentinel_t end() const { return {}; }
+};
+}
+
+TEST(RandTest, SelectionReadsOneBoundAndUsesTheActualOffsetType) {
+  std::array storage{11, 22, 33, 44, 55};
+  CountedSelection range{storage};
+  auto check = [&]<typename Random>(Random& random)
+    requires (std::same_as<Random, RandomSource> || std::same_as<Random, RandomService>)
+  {
+    RandomSource oracle(23);
+    auto ref = random.sample_ref(range);
+    ASSERT_TRUE(ref);
+    EXPECT_EQ(std::addressof(ref->get()), std::addressof(storage[oracle.uniform_uint(4)]));
+    EXPECT_EQ(random.sample_value(range), storage[oracle.uniform_uint(4)]);
+    EXPECT_EQ(random.sample_value(range, -1), storage[oracle.uniform_uint(4)]);
+    EXPECT_EQ(random.next_u64(), oracle.next_u64());
+    EXPECT_EQ(range.size_calls, 3);
+    range.size_calls = 0;
+  };
+  RandomSource source(23);
+  RandomService service(23);
+  check(source);
+  check(service);
+
+  auto index = static_random_i32_range(0, 4, 23);
+  ASSERT_TRUE(index);
+  auto ref = static_random_from(range, 23);
+  ASSERT_TRUE(ref);
+  EXPECT_EQ(std::addressof(ref->get()), std::addressof(storage[*index]));
+  EXPECT_EQ(static_random_value_from(range, 23), storage[*index]);
+  EXPECT_EQ(range.size_calls, 2);
+
+  auto expected = storage;
+  ASSERT_TRUE(static_random_shuffle(expected, 23));
+  ASSERT_TRUE(static_random_shuffle(range, 23));
+  EXPECT_EQ(storage, expected);
+  EXPECT_EQ(range.size_calls, 3);
 }
 
 TEST(StaticRandomTest, FromEmptyContainerReturnsError) {
@@ -523,21 +585,27 @@ TEST(RandTest, IntegerDomainsPreserveQuotientsAndState) {
 }
 
 TEST(RandTest, UniformBatchBytesAndReseedPreserveOrderedDraws) {
-  auto check = []<typename Random>() {
-    Random random(31415926);
+  auto check = []<typename Random>(Random& random)
+    requires (std::same_as<Random, RandomSource> || std::same_as<Random, RandomService>) {
     RandomSource oracle(31415926);
     std::array<float, 11> values;
     random.fill_uniform(values);
     for (float value : values)
       EXPECT_EQ(std::bit_cast<std::uint32_t>(value), std::bit_cast<std::uint32_t>(oracle.uniform_float()));
     random.fill_uniform({});
-    random.fill_bytes({});
-    std::array<char, 7> bytes;
-    random.fill_bytes(bytes);
-    for (std::size_t offset = 0; offset < bytes.size();) {
-      auto bits = oracle.next_u32();
-      for (std::size_t i = 0; i < 4 && offset < bytes.size(); ++i)
-        EXPECT_EQ(static_cast<unsigned char>(bytes[offset++]), static_cast<unsigned char>(bits >> (8 * i)));
+    for (std::size_t size = 0; size <= 8; ++size) {
+      std::array<char, 10> storage;
+      storage.fill('!');
+      auto bytes = std::span(storage).subspan(1, size);
+      random.fill_bytes(bytes);
+      for (std::size_t offset = 0; offset < bytes.size();) {
+        auto bits = oracle.next_u32();
+        for (std::size_t i = 0; i < 4 && offset < bytes.size(); ++i)
+          EXPECT_EQ(static_cast<unsigned char>(bytes[offset++]), static_cast<unsigned char>(bits >> (8 * i)));
+      }
+      EXPECT_EQ(storage.front(), '!');
+      EXPECT_EQ(storage[1 + size], '!');
+      EXPECT_EQ(random.next_u32(), oracle.next_u32());
     }
     EXPECT_EQ(random.next_u64(), oracle.next_u64());
     random.seed(9);
@@ -546,8 +614,10 @@ TEST(RandTest, UniformBatchBytesAndReseedPreserveOrderedDraws) {
     oracle.mix_seed(42);
     EXPECT_EQ(random.next_u64(), oracle.next_u64());
   };
-  check.template operator()<RandomSource>();
-  check.template operator()<RandomService>();
+  RandomSource source(31415926);
+  RandomService service(31415926);
+  check(source);
+  check(service);
 }
 
 TEST(RandTest, FullWidthShuffleMatchesStandardGeneratorAndServiceSeedConsumption) {

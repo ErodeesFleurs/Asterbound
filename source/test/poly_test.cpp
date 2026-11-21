@@ -6,6 +6,7 @@ import star.random;
 
 import star.vector;
 import star.line;
+import star.rect;
 import star.math_common;
 using namespace Star;
 
@@ -99,6 +100,44 @@ TEST(PolyTest, EmptyAndLowerDimensionalPenetration) {
   auto shortest = shifted.sat_intersection(box);
   ASSERT_TRUE(shortest.intersects);
   EXPECT_NEAR(shortest.overlap[1], 0.25f, 1e-6f);
+}
+
+TEST(PolyTest, RectanglePreservesStrictSat) {
+  RectF box(-1, -1, 1, 1);
+  EXPECT_EQ(PolyF(box), (PolyF{{-1, -1}, {1, -1}, {1, 1}, {-1, 1}}));
+  EXPECT_FALSE(PolyF{}.intersects_rect(box));
+  EXPECT_TRUE(PolyF(Vec2F(0, 0)).intersects_rect(box));
+  EXPECT_FALSE(PolyF(Vec2F(1, 0)).intersects_rect(box));
+  PolyF square(box);
+  EXPECT_FALSE(square.intersects_rect(RectF(1, -1, 2, 1))); // edge
+  EXPECT_FALSE(square.intersects_rect(RectF(1, 1, 2, 2)));  // corner
+  EXPECT_TRUE(square.intersects_rect(RectF(std::nextafter(1.f, 0.f), -1, 2, 1)));
+  EXPECT_TRUE(square.intersects_rect(RectF(0, 0, 0, 0)));
+
+  PolyF segment{{-1, 0}, {1, 0}};
+  EXPECT_TRUE(segment.intersects_rect(RectF(0, -1, 0, 1)));
+  EXPECT_FALSE(segment.intersects_rect(RectF(0, 0, 1, 0)));
+  EXPECT_FALSE(segment.intersects_rect(RectF(0, 0, 0, 0)));
+}
+
+TEST(PolyTest, RectangleMatchesOwningPath) {
+  // Include reversed rectangle axes and non-convex input: do not canonicalize
+  // inputs or substitute a bounding-box overlap for the existing SAT.
+  for (auto const& poly : {PolyD{}, PolyD(Vec2D(1, 1)), PolyD{{-3, 0}, {3, 0}},
+           PolyD{{-2, -2}, {2, 2}, {3, 3}}, PolyD{{-3, 0}, {0, -3}, {3, 0}, {0, 3}},
+           PolyD{{-2, -1}, {2, -1}, {2, -1}, {0, 0}, {-1, 2}}}) {
+    for (auto const& rect : {RectD(-1, -1, 1, 1), RectD(1, 1, -1, -1), RectD(-1, 1, 1, -1),
+             RectD(3, 0, 4, 1), RectD(2, 2, 4, 4), RectD(0, 0, 0, 0), RectD(0, -1, 0, 1),
+             RectD(-1, 0, 1, 0), RectD(1.5 - 0x1p-50, 1.5, 2, 2)}) {
+      EXPECT_EQ(poly.intersects_rect(rect), poly.intersects(PolyD(rect)))
+          << std::format("polygon {} and rectangle {}", poly, rect);
+    }
+  }
+
+  constexpr auto lo = std::numeric_limits<int>::min(), hi = std::numeric_limits<int>::max();
+  RectI wide(lo, lo, hi, hi);
+  EXPECT_TRUE(PolyI(Vec2I()).intersects_rect(wide));
+  EXPECT_FALSE(PolyI(Vec2I(hi, hi)).intersects_rect(wide));
 }
 
 TEST(PolyTest, AxisBoundsAndWideOrientation) {

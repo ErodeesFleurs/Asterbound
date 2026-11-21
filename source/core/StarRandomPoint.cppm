@@ -45,7 +45,7 @@ public:
   using Rect = Star::Rect<DataType>;
   using Sector = Star::Vector<std::int64_t, 2>;
   using PointSet = List<std::pair<Point, PointData>>;
-  Random2dPointGenerator(RandomService& random, std::uint64_t seed, float cellSize, Vec2I const& densityRange);
+  Random2dPointGenerator(RandomService& random, std::uint64_t seed, float cell_size, Vec2I const& density_range);
 
   // Immutable configuration is validated once. Invalid configuration is reported
   // here before arithmetic, cache mutation, random draws or callback invocation.
@@ -54,45 +54,45 @@ public:
   [[nodiscard]] std::expected<PointSet, StarException> generate(Poly const& area, PointCallback&& callback);
 
 private:
-  HashTtlCache<Sector, PointSet> m_cache;
+  HashTtlCache<Sector, PointSet> cache_;
 
-  std::uint64_t m_seed;
-  float m_cellSize;
-  Vec2I m_densityRange;
-  bool m_cellSizeValid;
-  bool m_densityRangeValid;
+  std::uint64_t seed_;
+  float cell_size_;
+  Vec2I density_range_;
+  bool cell_size_valid_;
+  bool density_range_valid_;
 };
 
 template <typename PointData, finite_classifiable DataType>
   requires std::is_constructible_v<PointData, PointData const&>
-inline Random2dPointGenerator<PointData, DataType>::Random2dPointGenerator(RandomService& random, std::uint64_t seed, float cellSize, Vec2I const& densityRange)
-  : m_cache(random), m_seed(seed), m_cellSize(cellSize), m_densityRange(densityRange),
-    m_cellSizeValid(is_finite(cellSize) && cellSize > 0),
-    m_densityRangeValid(densityRange[0] >= 0 && densityRange[1] >= densityRange[0]) {}
+inline Random2dPointGenerator<PointData, DataType>::Random2dPointGenerator(RandomService& random, std::uint64_t seed, float cell_size, Vec2I const& density_range)
+  : cache_(random), seed_(seed), cell_size_(cell_size), density_range_(density_range),
+    cell_size_valid_(is_finite(cell_size) && cell_size > 0),
+    density_range_valid_(density_range[0] >= 0 && density_range[1] >= density_range[0]) {}
 
 template <typename PointData, finite_classifiable DataType>
   requires std::is_constructible_v<PointData, PointData const&>
 template <typename PointCallback>
   requires point_callback<PointCallback, PointData>
 auto Random2dPointGenerator<PointData, DataType>::generate(Poly const& area, PointCallback&& callback) -> std::expected<PointSet, StarException> {
-  if (!m_cellSizeValid)
+  if (!cell_size_valid_)
     return std::unexpected(StarException("Point generator cell size must be finite and positive"));
-  if (!m_densityRangeValid)
+  if (!density_range_valid_)
     return std::unexpected(StarException("Point generator density must be ordered and nonnegative"));
   for (auto const& vertex : area.vertices()) {
     auto finite = classify_finite(vertex[0], vertex[1]);
     if (!finite[0] || !finite[1])
       return std::unexpected(StarException("Point generator area coordinates must be finite"));
   }
-  PointSet finalResult;
+  PointSet result;
   if (area.empty()) {
-    m_cache.cleanup();
-    return finalResult;
+    cache_.cleanup();
+    return result;
   }
 
   auto bound = area.bounding_box();
   auto sector_coordinate = [&](DataType coordinate, bool upper) -> std::expected<std::int64_t, StarException> {
-    auto quotient = coordinate / m_cellSize;
+    auto quotient = coordinate / cell_size_;
     if (!is_finite(quotient))
       return std::unexpected(StarException("Point generator sector coordinate overflow"));
     auto rounded = upper ? std::ceil(quotient) : std::floor(quotient);
@@ -102,14 +102,14 @@ auto Random2dPointGenerator<PointData, DataType>::generate(Poly const& area, Poi
       return std::unexpected(StarException("Point generator sector coordinate is outside int64 range"));
     return static_cast<std::int64_t>(rounded);
   };
-  auto xMin = sector_coordinate(bound.xMin(), false);
-  auto yMin = sector_coordinate(bound.yMin(), false);
-  auto xMax = sector_coordinate(bound.xMax(), true);
-  auto yMax = sector_coordinate(bound.yMax(), true);
-  if (!xMin) return std::unexpected(std::move(xMin.error()));
-  if (!yMin) return std::unexpected(std::move(yMin.error()));
-  if (!xMax) return std::unexpected(std::move(xMax.error()));
-  if (!yMax) return std::unexpected(std::move(yMax.error()));
+  auto x_min = sector_coordinate(bound.xMin(), false);
+  auto y_min = sector_coordinate(bound.yMin(), false);
+  auto x_max = sector_coordinate(bound.xMax(), true);
+  auto y_max = sector_coordinate(bound.yMax(), true);
+  if (!x_min) return std::unexpected(std::move(x_min.error()));
+  if (!y_min) return std::unexpected(std::move(y_min.error()));
+  if (!x_max) return std::unexpected(std::move(x_max.error()));
+  if (!y_max) return std::unexpected(std::move(y_max.error()));
 
   auto sector_extent = [](std::int64_t lower, std::int64_t upper) -> std::expected<std::size_t, StarException> {
     auto difference = static_cast<std::uint64_t>(upper) - static_cast<std::uint64_t>(lower);
@@ -117,71 +117,79 @@ auto Random2dPointGenerator<PointData, DataType>::generate(Poly const& area, Poi
       return std::unexpected(StarException("Point generator sector extent overflow"));
     return static_cast<std::size_t>(difference) + 1;
   };
-  auto width = sector_extent(*xMin, *xMax);
-  auto height = sector_extent(*yMin, *yMax);
+  auto width = sector_extent(*x_min, *x_max);
+  auto height = sector_extent(*y_min, *y_max);
   if (!width) return std::unexpected(std::move(width.error()));
   if (!height) return std::unexpected(std::move(height.error()));
   if (*width > std::numeric_limits<std::size_t>::max() / *height)
     return std::unexpected(StarException("Point generator sector count overflow"));
-  auto sectorCount = *width * *height;
-  auto maxDensity = static_cast<std::size_t>(m_densityRange[1]);
-  if (maxDensity > finalResult.max_size() || (maxDensity && sectorCount > finalResult.max_size() / maxDensity))
+  auto sector_count = *width * *height;
+  auto max_density = static_cast<std::size_t>(density_range_[1]);
+  if (max_density > result.max_size() || (max_density && sector_count > result.max_size() / max_density))
     return std::unexpected(StarException("Point generator point reserve overflow"));
 
   // Check extrema before narrowing or multiplying in the coordinate type.
   // Long double has ample range for int64 * finite float on supported targets.
   auto valid_axis = [&](std::int64_t lower, std::int64_t upper) {
-    auto minimum = static_cast<long double>(static_cast<DataType>(lower)) * m_cellSize;
-    auto maximum = (static_cast<long double>(static_cast<DataType>(upper)) + 1) * m_cellSize;
+    auto minimum = static_cast<long double>(static_cast<DataType>(lower)) * cell_size_;
+    auto maximum = (static_cast<long double>(static_cast<DataType>(upper)) + 1) * cell_size_;
     auto limit = static_cast<long double>(std::numeric_limits<DataType>::max());
     if (minimum < -limit || maximum > limit)
       return false;
-    auto origin = static_cast<DataType>(upper) * m_cellSize;
-    return static_cast<long double>(origin) + m_cellSize <= limit;
+    auto origin = static_cast<DataType>(upper) * cell_size_;
+    return static_cast<long double>(origin) + cell_size_ <= limit;
   };
-  if (!valid_axis(*xMin, *xMax) || !valid_axis(*yMin, *yMax))
+  if (!valid_axis(*x_min, *x_max) || !valid_axis(*y_min, *y_max))
     return std::unexpected(StarException("Point generator cell coordinate overflow"));
 
-  finalResult.reserve(sectorCount * maxDensity);
-  m_cache.cleanup();
+  // Eager reservation avoids growth for small dense queries. A thin diagonal can
+  // intersect O(n) cells inside an O(n²) box: never speculate unbounded storage.
+  constexpr std::size_t eager_reserve_bytes = 4096;
+  auto maximum_points = sector_count * max_density;
+  if (maximum_points <= eager_reserve_bytes / sizeof(typename PointSet::value_type))
+    result.reserve(maximum_points);
+  cache_.cleanup();
   // Break before incrementing inclusive endpoints, including INT64_MAX.
-  for (std::int64_t x = *xMin;;) {
-    for (std::int64_t y = *yMin;;) {
-      auto sector = Rect::withSize({static_cast<DataType>(x) * m_cellSize, static_cast<DataType>(y) * m_cellSize}, Point::filled(m_cellSize));
-      if (area.intersects(Poly(sector))) {
-        auto points = m_cache.get(Sector(x, y), [&](Sector const&) -> std::expected<PointSet, StarException> {
-          PointSet sectorResult;
-          RandomSource sectorRandomness(static_random_u64(m_seed, x, y));
-          auto count = sectorRandomness.uniform_int(m_densityRange[0], m_densityRange[1]);
+  for (std::int64_t x = *x_min;;) {
+    for (std::int64_t y = *y_min;;) {
+      auto sector = Rect::withSize({static_cast<DataType>(x) * cell_size_, static_cast<DataType>(y) * cell_size_}, Point::filled(cell_size_));
+      if (area.intersects_rect(sector)) {
+        auto points = cache_.get(Sector(x, y), [&](Sector const&) -> std::expected<PointSet, StarException> {
+          PointSet sector_points;
+          RandomSource sector_random(static_random_u64(seed_, x, y));
+          auto count = sector_random.uniform_int(density_range_[0], density_range_[1]);
           if (!count)
             return std::unexpected(std::move(count.error()));
-          sectorResult.reserve(static_cast<std::size_t>(*count));
+          sector_points.reserve(static_cast<std::size_t>(*count));
           for (std::int64_t i = 0; i < *count; ++i) {
-            Point pointPos = Point(x + static_cast<DataType>(sectorRandomness.uniform_double()), y + static_cast<DataType>(sectorRandomness.uniform_double())) * m_cellSize;
+            // Pinned native order: x, y, then the callback on the same stream.
+            auto x_offset = static_cast<DataType>(sector_random.uniform_double());
+            auto y_offset = static_cast<DataType>(sector_random.uniform_double());
+            auto point = Point(x + x_offset, y + y_offset) * cell_size_;
             if constexpr (RandomPointDetail::CallbackResult<PointData, std::invoke_result_t<PointCallback&, RandomSource&>>::checked) {
-              auto data = std::invoke(callback, sectorRandomness);
+              auto data = std::invoke(callback, sector_random);
               if (!data)
                 return std::unexpected(std::move(data.error()));
-              sectorResult.emplace_back(pointPos, std::move(*data));
+              sector_points.emplace_back(point, std::move(*data));
             } else {
-              sectorResult.emplace_back(pointPos, std::invoke(callback, sectorRandomness));
+              sector_points.emplace_back(point, std::invoke(callback, sector_random));
             }
           }
-          return sectorResult;
+          return sector_points;
         });
         if (!points)
           return std::unexpected(std::move(points.error()));
-        finalResult.append_range(std::as_const(points->get()));
+        result.append_range(std::as_const(points->get()));
       }
-      if (y == *yMax)
+      if (y == *y_max)
         break;
       ++y;
     }
-    if (x == *xMax)
+    if (x == *x_max)
       break;
     ++x;
   }
-  return finalResult;
+  return result;
 }
 
 }

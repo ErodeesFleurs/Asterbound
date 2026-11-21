@@ -90,6 +90,44 @@ TEST(RandomPointTest, RejectsInvalidParametersBeforeDrawsOrCallbacks) {
   EXPECT_EQ(calls, 1);
 }
 
+TEST(RandomPointTest, MatchesPinnedNativeCoordinateOrder) {
+  constexpr std::uint64_t seed = 31415926;
+  RandomService service(seed);
+  Random2dPointGenerator<std::uint64_t> generator(service, seed, 16.f, {2, 4});
+  auto result = generator.generate(PolyF(RectF({0.f, 0.f}, {48.f, 48.f})),
+      [](RandomSource& source) { return source.next_u64(); });
+  ASSERT_TRUE(result);
+  ASSERT_FALSE(result->empty());
+  // Recorded before sequencing the coordinate draws; no shared RNG oracle.
+  auto const& [point, data] = result->front();
+  EXPECT_EQ(std::bit_cast<std::uint32_t>(point[0]), 1083064124u);
+  EXPECT_EQ(std::bit_cast<std::uint32_t>(point[1]), 1062688472u);
+  EXPECT_EQ(data, 9532015190245600424ull);
+}
+
+TEST(RandomPointTest, ThinDiagonalGrowsWithReturnedCellsNotBoundingBox) {
+  RandomService service(17);
+  RandomService reference(17);
+  Random2dPointGenerator<std::uint32_t> generator(service, 29, 1, {1, 1});
+  PolyF area = {{0.125f, 0.25f}, {0.25f, 0.125f}, {31.875f, 31.75f}, {31.75f, 31.875f}};
+  // 33 x 33 candidates; the strip covers the 32 diagonal cells plus the
+  // two adjacent cells at each of the 31 interior diagonal crossings.
+  constexpr int hit_cells = 32 + 2 * 31;
+  int calls = 0;
+  auto callback = [&](RandomSource& random) { ++calls; return random.next_u32(); };
+  auto result = generator.generate(area, callback);
+  ASSERT_TRUE(result);
+  ASSERT_EQ(result->size(), hit_cells);
+  EXPECT_LT(result->capacity(), 33u * 33u);
+  auto repeated = generator.generate(area, callback);
+  ASSERT_TRUE(repeated);
+  EXPECT_EQ(*repeated, *result);
+  EXPECT_EQ(calls, hit_cells);
+  for (int i = 0; i < 2 * hit_cells; ++i)
+    ASSERT_TRUE(reference.uniform_int(-1000, 1000));
+  EXPECT_EQ(service.next_u64(), reference.next_u64());
+}
+
 TEST(RandomPointTest, PreservesCompleteCellsSeedDrawsDataAndOrder) {
   RandomService service(17);
   constexpr std::uint64_t seed = 29;
@@ -109,7 +147,9 @@ TEST(RandomPointTest, PreservesCompleteCellsSeedDrawsDataAndOrder) {
       ASSERT_TRUE(count);
       ASSERT_EQ(*count, 2);
       for (int i = 0; i < 2; ++i) {
-        Vec2F expected(x + static_cast<float>(random.uniform_double()), y + static_cast<float>(random.uniform_double()));
+        auto x_offset = static_cast<float>(random.uniform_double());
+        auto y_offset = static_cast<float>(random.uniform_double());
+        Vec2F expected(x + x_offset, y + y_offset);
         EXPECT_EQ((*result)[index].first, expected);
         EXPECT_EQ((*result)[index].second, random.next_u32());
         ++index;
@@ -143,7 +183,9 @@ TEST(RandomPointTest, DoubleSectorGeometryDoesNotNarrowThroughFloat) {
     ASSERT_EQ(result->size(), 1u);
     RandomSource random(static_random_u64(seed, x, std::int64_t{0}));
     ASSERT_TRUE(random.uniform_int(1, 1));
-    Vec2D expected(x + random.uniform_double(), random.uniform_double());
+    auto x_offset = random.uniform_double();
+    auto y_offset = random.uniform_double();
+    Vec2D expected(x + x_offset, y_offset);
     EXPECT_EQ(result->front().first, expected);
     EXPECT_EQ(result->front().second, random.next_u64());
     auto repeated = generator.generate(area, callback);
@@ -206,7 +248,9 @@ TEST(RandomPointTest, IntegerKeysSeparateCellsThatShareFloatCoordinates) {
   for (std::int64_t x = -16777218; x <= -16777216; ++x) {
     RandomSource random(static_random_u64(seed, x, std::int64_t{0}));
     ASSERT_TRUE(random.uniform_int(1, 1));
-    Vec2F expected(x + static_cast<float>(random.uniform_double()), static_cast<float>(random.uniform_double()));
+    auto x_offset = static_cast<float>(random.uniform_double());
+    auto y_offset = static_cast<float>(random.uniform_double());
+    Vec2F expected(x + x_offset, y_offset);
     EXPECT_EQ((*result)[index].first, expected);
     EXPECT_EQ((*result)[index].second, random.next_u64());
     ++index;

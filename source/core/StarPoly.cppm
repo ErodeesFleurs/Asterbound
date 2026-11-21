@@ -55,15 +55,8 @@ public:
 
   template <typename Other>
     requires std::constructible_from<Vertex, Vector<Other, 2> const&>
-  explicit Polygon(Box<Other, 2> const& rect) {
-    Vertex low(rect.min());
-    Vertex high(rect.max());
-    vertices_.reserve(4);
-    vertices_.push_back(low);
-    vertices_.emplace_back(high[0], low[1]);
-    vertices_.push_back(high);
-    vertices_.emplace_back(low[0], high[1]);
-  }
+  explicit Polygon(Box<Other, 2> const& rect)
+    : vertices_(rect_vertices(Vertex(rect.min()), Vertex(rect.max()))) {}
 
   template <typename Other>
     requires std::constructible_from<Vertex, Vector<Other, 2> const&>
@@ -180,8 +173,14 @@ public:
   std::optional<LineIntersectResult> line_intersection(Line const& line) const requires std::floating_point<DataType>;
   bool intersects(Polygon const& other) const requires polygon_coordinate<DataType>;
   bool intersects(Line const& line) const requires polygon_coordinate<DataType>;
+  // Strict SAT, including degenerate rectangles, exactly as intersects(Polygon(rect)).
+  bool intersects_rect(Rect const& rect) const requires polygon_coordinate<DataType>;
 
 private:
+  static std::array<Vertex, 4> rect_vertices(Vertex const& low, Vertex const& high) {
+    return {low, Vertex(high[0], low[1]), high, Vertex(low[0], high[1])};
+  }
+
   std::size_t wrapped_index(std::size_t i) const {
     auto count = sides();
     if (i < count)
@@ -441,10 +440,10 @@ namespace polygon_detail {
 
 // The order and signs of these axes are observable: equal depths keep the first
 // axis, and movement also uses the signed correction for directional contacts.
-template <polygon_coordinate T, typename Visitor>
+template <polygon_coordinate T, std::size_t Extent, typename Visitor>
   requires std::invocable<Visitor&, Vector<Determinant<T>, 2> const&, Determinant<T>>
     && std::same_as<std::invoke_result_t<Visitor&, Vector<Determinant<T>, 2> const&, Determinant<T>>, bool>
-bool visit_sat_projections(Polygon<T> const& left, Polygon<T> const& right, Visitor&& visit) {
+bool visit_sat_projections(std::span<Vector<T, 2> const> left, std::span<Vector<T, 2> const, Extent> right, Visitor&& visit) {
   if (left.empty() || right.empty())
     return false;
 
@@ -452,8 +451,8 @@ bool visit_sat_projections(Polygon<T> const& left, Polygon<T> const& right, Visi
   using Axis = Vector<Scalar, 2>;
   Axis first_axis;
   bool spans_plane = false;
-  auto visit_edges = [&](Polygon<T> const& polygon, bool reverse) {
-    Axis previous(polygon.vertices().back());
+  auto visit_edges = [&](auto polygon, bool reverse) {
+    Axis previous(polygon.back());
     for (auto const& vertex : polygon) {
       Axis current(vertex);
       Axis axis = (previous - current).rot90();
@@ -488,6 +487,13 @@ bool visit_sat_projections(Polygon<T> const& left, Polygon<T> const& right, Visi
     return true;
   };
   return visit_edges(left, true) && visit_edges(right, false) && spans_plane;
+}
+
+template <polygon_coordinate T, std::size_t Extent>
+bool sat_intersects(std::span<Vector<T, 2> const> left, std::span<Vector<T, 2> const, Extent> right) {
+  return visit_sat_projections(left, right, [](Vector<Determinant<T>, 2> const&, Determinant<T> depth) {
+    return depth > 0;
+  });
 }
 
 // Inclusive segment contact, unlike strict SAT penetration. Keep collinear
@@ -548,7 +554,7 @@ auto Polygon<DataType>::sat_intersection(Polygon const& other) const -> Intersec
 {
   auto shortest = std::numeric_limits<DataType>::max();
   Vertex separation;
-  if (!polygon_detail::visit_sat_projections(*this, other, [&](Vertex const& axis, DataType depth) {
+  if (!polygon_detail::visit_sat_projections(std::span{vertices_}, std::span{other.vertices_}, [&](Vertex const& axis, DataType depth) {
         if (depth < shortest) {
           shortest = depth;
           separation = axis;
@@ -586,7 +592,7 @@ auto Polygon<DataType>::directional_sat_intersection(Polygon const& other, Verte
     }
     return true;
   };
-  if (!polygon_detail::visit_sat_projections(*this, other, visit) || separation == Vertex{})
+  if (!polygon_detail::visit_sat_projections(std::span{vertices_}, std::span{other.vertices_}, visit) || separation == Vertex{})
     return {};
   return {shortest > 0, separation * shortest};
 }
@@ -612,10 +618,13 @@ auto Polygon<DataType>::line_intersection(Line const& line) const -> std::option
 
 template <typename DataType>
 bool Polygon<DataType>::intersects(Polygon const& other) const requires polygon_coordinate<DataType> {
-  using Scalar = polygon_detail::Determinant<DataType>;
-  return polygon_detail::visit_sat_projections(*this, other, [](Vector<Scalar, 2> const&, Scalar depth) {
-    return depth > 0;
-  });
+  return polygon_detail::sat_intersects(std::span{vertices_}, std::span{other.vertices_});
+}
+
+template <typename DataType>
+bool Polygon<DataType>::intersects_rect(Rect const& rect) const requires polygon_coordinate<DataType> {
+  auto const corners = rect_vertices(rect.min(), rect.max());
+  return polygon_detail::sat_intersects(std::span{vertices_}, std::span{corners});
 }
 
 template <typename DataType>

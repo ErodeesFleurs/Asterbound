@@ -7,10 +7,6 @@ import star.secure_random;
 
 namespace Star {
 
-std::unexpected<StarException> RandomSource::parameter_error(std::string_view message) {
-  return std::unexpected<StarException>(RandomException(std::string(message)));
-}
-
 RandomSource::RandomSource(std::uint64_t value) {
   seed(value);
 }
@@ -51,11 +47,20 @@ bool RandomSource::next_bool() {
 }
 
 void RandomSource::fill_bytes(std::span<char> bytes) {
-  std::size_t offset = 0;
-  while (offset < bytes.size()) {
-    auto value = generate_u32();
-    for (std::size_t i = 0; i < 4 && offset < bytes.size(); ++i)
-      bytes[offset++] = static_cast<char>(value >> (i * 8));
+  while (bytes.size() >= 4) {
+    auto word = generate_u32();
+    bytes[0] = static_cast<char>(word);
+    bytes[1] = static_cast<char>(word >> 8);
+    bytes[2] = static_cast<char>(word >> 16);
+    bytes[3] = static_cast<char>(word >> 24);
+    bytes = bytes.subspan(4);
+  }
+  if (!bytes.empty()) {
+    auto word = generate_u32();
+    for (auto& byte : bytes) {
+      byte = static_cast<char>(word);
+      word >>= 8;
+    }
   }
 }
 
