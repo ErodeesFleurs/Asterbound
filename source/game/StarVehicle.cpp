@@ -641,9 +641,7 @@ return std::move(*result1229);
 }
 
 std::expected<void, StarException> Vehicle::readNetState(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
-  auto result1228 = m_netGroup.readNetState(data, interpolationTime, rules);
-if (!result1228) return std::unexpected(std::move(result1228.error()));
-  return {};
+  return m_netGroup.readNetState(std::move(data), interpolationTime, rules);
 }
 
 std::expected<void, StarException> Vehicle::enableInterpolation(float extrapolationHint) {

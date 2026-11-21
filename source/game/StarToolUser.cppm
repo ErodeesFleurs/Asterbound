@@ -111,7 +111,7 @@ public:
   [[nodiscard]] std::expected<float, StarException> beamGunRadius() const;
 
 private:
-  template <typename> friend class NetElementTop;
+  template <std::derived_from<NetElement>> friend class NetElementTop;
   explicit ToolUser(Root& root);
   [[nodiscard]] std::expected<void, StarException> initialize();
   void setupHumanoidHandItemPose(Humanoid& humanoid) const;

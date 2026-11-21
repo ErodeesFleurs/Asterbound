@@ -29,6 +29,8 @@ The existing handshake does not negotiate a common minimum version. Accepting a 
 
 The extension version selects the packet and nested entity field layouts; it is an unsigned 32-bit value. It does not grant access to another player's inventory. Cached entity deltas must also distinguish the recipient's inventory visibility, even for two clients using the same extension version.
 
+Status properties use a full property object for extension versions 0 and 1, including when a delta is needed. Later versions use map change records. A relay encodes newly added dynamic elements for the receiving peer; it does not forward opaque bytes from the sending peer.
+
 Brand artwork and scripts change the asset digest. A server requiring identical assets can reject an otherwise wire-compatible client. Do not disable this policy globally or advertise digest equality; deploy matching assets, or explicitly allow the difference on both endpoints when appropriate.
 
 ### Scope of interoperability evidence

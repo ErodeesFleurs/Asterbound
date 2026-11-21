@@ -14,6 +14,11 @@ import star.net_element;
 import star.algorithm;
 namespace Star {
 
+template <typename Mutator, typename T>
+concept net_field_mutator = requires(Mutator& mutator, T& value) {
+  mutator(value) ? true : false;
+};
+
 template <typename T>
 class NetElementBasicField : public NetElement {
 public:
@@ -34,6 +39,7 @@ public:
   // Update the value in place.  The mutator will be called as bool
   // mutator(T&), return true to signal that the value was updated.
   template <typename Mutator>
+    requires net_field_mutator<Mutator, T>
   void update(Mutator&& mutator);
 
   void initNetVersion(std::optional<std::reference_wrapper<NetElementVersion const>> version = std::nullopt) override;
@@ -57,6 +63,9 @@ protected:
   virtual void updated();
 
 private:
+  T const& wire_value() const &;
+  void mark_local_update();
+
   std::optional<std::reference_wrapper<NetElementVersion const>> m_netVersion = std::nullopt;
   std::uint64_t m_latestUpdateVersion = 0;
   T m_value = T();
@@ -128,16 +137,42 @@ private:
   bool m_ignoreOccurrencesOnNetLoad = false;
 };
 
-// Holds an arbitrary serializable value
 template <typename T>
+concept net_field_value = requires(T& value) {
+  T();
+  T(std::move(value));
+  value = std::move(value);
+};
+
+// The common case needs only the payload and field state.
+template <net_field_value T>
+  requires (stream_readable<T> && stream_writable<T>)
 class NetElementData : public NetElementBasicField<T> {
+protected:
+  [[nodiscard]] std::expected<void, StarException> readData(DataStream& ds, T& v) const override {
+    return ds.read(v);
+  }
+  [[nodiscard]] std::expected<void, StarException> writeData(DataStream& ds, T const& v) const override {
+    return ds.write(v);
+  }
+};
+
+template <net_field_value T>
+class NetElementCustomData : public NetElementBasicField<T> {
 public:
-  NetElementData();
-  NetElementData(std::function<std::expected<void, StarException>(DataStream&, T&)> reader, std::function<std::expected<void, StarException>(DataStream&, T const&)> writer);
+  NetElementCustomData(std::function<std::expected<void, StarException>(DataStream&, T&)> reader,
+      std::function<std::expected<void, StarException>(DataStream&, T const&)> writer)
+    : m_reader(std::move(reader)), m_writer(std::move(writer)) {}
 
 protected:
-  [[nodiscard]] std::expected<void, StarException> readData(DataStream& ds, T& v) const override;
-  [[nodiscard]] std::expected<void, StarException> writeData(DataStream& ds, T const& v) const override;
+  [[nodiscard]] std::expected<void, StarException> readData(DataStream& ds, T& v) const override {
+    if (!m_reader) return std::unexpected(StarException("Missing NetElementData reader"));
+    return m_reader(ds, v);
+  }
+  [[nodiscard]] std::expected<void, StarException> writeData(DataStream& ds, T const& v) const override {
+    if (!m_writer) return std::unexpected(StarException("Missing NetElementData writer"));
+    return m_writer(ds, v);
+  }
 
 private:
   std::function<std::expected<void, StarException>(DataStream&, T&)> m_reader;
@@ -153,6 +188,12 @@ T const& NetElementBasicField<T>::get() const {
 }
 
 template <typename T>
+T const& NetElementBasicField<T>::wire_value() const & {
+  return m_pendingInterpolatedValues && !m_pendingInterpolatedValues->empty()
+      ? m_pendingInterpolatedValues->back().second : m_value;
+}
+
+template <typename T>
 void NetElementBasicField<T>::set(T const& value) {
   if (!(m_value == value))
     push(value);
@@ -161,6 +202,11 @@ void NetElementBasicField<T>::set(T const& value) {
 template <typename T>
 void NetElementBasicField<T>::push(T value) {
   m_value = std::move(value);
+  mark_local_update();
+}
+
+template <typename T>
+void NetElementBasicField<T>::mark_local_update() {
   updated();
   m_latestUpdateVersion = m_netVersion ? m_netVersion->get().current() : 0;
   if (m_pendingInterpolatedValues)
@@ -174,13 +220,10 @@ bool NetElementBasicField<T>::pullUpdated() {
 
 template <typename T>
 template <typename Mutator>
+  requires net_field_mutator<Mutator, T>
 void NetElementBasicField<T>::update(Mutator&& mutator) {
-  if (mutator(m_value)) {
-    updated();
-    m_latestUpdateVersion = m_netVersion ? m_netVersion->get().current() : 0;
-    if (m_pendingInterpolatedValues)
-      m_pendingInterpolatedValues->clear();
-  }
+  if (mutator(m_value))
+    mark_local_update();
 }
 
 template <typename T>
@@ -223,10 +266,7 @@ template <typename T>
 template <typename T>
 [[nodiscard]] std::expected<void, StarException> NetElementBasicField<T>::netStore(DataStream& ds, NetCompatibilityRules rules) const {
   if (!checkWithRules(rules)) return {};
-  if (m_pendingInterpolatedValues && !m_pendingInterpolatedValues->empty())
-    return writeData(ds, m_pendingInterpolatedValues->back().second);
-  else
-    return writeData(ds, m_value);
+  return writeData(ds, wire_value());
 }
 
 template <typename T>
@@ -246,8 +286,7 @@ template <typename T>
   if (m_latestUpdateVersion < fromVersion)
     return false;
 
-  auto result = (m_pendingInterpolatedValues && !m_pendingInterpolatedValues->empty())
-      ? writeData(ds, m_pendingInterpolatedValues->back().second) : writeData(ds, m_value);
+  auto result = writeData(ds, wire_value());
   if (!result) return std::unexpected(std::move(result.error()));
 
   return true;
@@ -259,22 +298,16 @@ template <typename T>
   T t;
   { auto result = readData(ds, t); if (!result) return std::unexpected(std::move(result.error())); }
   m_latestUpdateVersion = m_netVersion ? m_netVersion->get().current() : 0;
-  if (m_pendingInterpolatedValues) {
-    // Only append an incoming delta to our pending value list if the incoming
-    // step is forward in time of every other pending value.  In any other
-    // case, this is an error or the step tracking is wildly off, so just clear
-    // any other incoming values.
-    if (interpolationTime > 0.0f && (m_pendingInterpolatedValues->empty() || interpolationTime >= m_pendingInterpolatedValues->back().first)) {
-      m_pendingInterpolatedValues->push_back({interpolationTime, std::move(t)});
-    } else {
-      m_value = std::move(t);
-      m_pendingInterpolatedValues->clear();
-      updated();
-    }
-  } else {
-    m_value = std::move(t);
-    updated();
+  // A non-forward step replaces the visible value and cancels queued steps.
+  if (m_pendingInterpolatedValues && interpolationTime > 0.0f
+      && (m_pendingInterpolatedValues->empty() || interpolationTime >= m_pendingInterpolatedValues->back().first)) {
+    m_pendingInterpolatedValues->emplace_back(interpolationTime, std::move(t));
+    return {};
   }
+  m_value = std::move(t);
+  if (m_pendingInterpolatedValues)
+    m_pendingInterpolatedValues->clear();
+  updated();
   return {};
 }
 
@@ -324,27 +357,6 @@ template <typename Enum>
     return ds.viwrite(static_cast<std::int64_t>(v));
 }
 
-template <typename T>
-NetElementData<T>::NetElementData()
-  : NetElementData([](DataStream& ds, T& t) -> std::expected<void, StarException> { return ds.read(t); },
-      [](DataStream& ds, T const& t) -> std::expected<void, StarException> { return ds.write(t); }) {}
-
-template <typename T>
-NetElementData<T>::NetElementData(std::function<std::expected<void, StarException>(DataStream&, T&)> reader, std::function<std::expected<void, StarException>(DataStream&, T const&)> writer)
-  : m_reader(std::move(reader)), m_writer(std::move(writer)) {}
-
-template <typename T>
-[[nodiscard]] std::expected<void, StarException> NetElementData<T>::readData(DataStream& ds, T& v) const {
-  if (!m_reader) return std::unexpected(StarException("Missing NetElementData reader"));
-  return m_reader(ds, v);
-}
-
-template <typename T>
-[[nodiscard]] std::expected<void, StarException> NetElementData<T>::writeData(DataStream& ds, T const& v) const {
-  if (!m_writer) return std::unexpected(StarException("Missing NetElementData writer"));
-  return m_writer(ds, v);
-}
-
 }
 
 export module star.net_element_basic_fields;
@@ -359,6 +371,7 @@ export namespace Star {
   using ::Star::NetElementEnum;
   using ::Star::NetElementEvent;
   using ::Star::NetElementData;
+  using ::Star::NetElementCustomData;
   using ::Star::NetElementString;
   using ::Star::NetElementBytes;
 }

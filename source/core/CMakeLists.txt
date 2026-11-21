@@ -40,7 +40,7 @@ target_sources (star_modules PUBLIC FILE_SET CXX_MODULES
           StarRpcPromise.cppm StarJsonRpc.cppm
           StarNetElement.cppm StarNetElementBasicFields.cppm
           StarNetElementContainers.cppm StarNetElementDynamicGroup.cppm
-          StarNetElementExt.cppm StarNetElementFloatFields.cppm
+          StarNetElementFloatFields.cppm
           StarNetElementGroup.cppm StarNetElementSignal.cppm
           StarNetElementSyncGroup.cppm StarNetElementSystem.cppm StarNetElementTop.cppm
           StarAssetPath.cppm

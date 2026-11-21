@@ -90,6 +90,39 @@ import star.net_compatibility;
 import star.algorithm;
 namespace Star {
 
+std::expected<void, StarException> StatusPropertyMap::netStore(DataStream& ds, NetCompatibilityRules rules) const {
+  if (rules.version() > 1)
+    return NetElementHashMap<String, Json>::netStore(ds, rules);
+  auto result = ds << baseMap();
+  if (!result) return std::unexpected(std::move(result.error()));
+  return {};
+}
+
+std::expected<void, StarException> StatusPropertyMap::netLoad(DataStream& ds, NetCompatibilityRules rules) {
+  if (rules.version() > 1)
+    return NetElementHashMap<String, Json>::netLoad(ds, rules);
+  auto properties = ds.read<JsonObject>();
+  if (!properties) return std::unexpected(std::move(properties.error()));
+  reset(std::move(*properties));
+  return {};
+}
+
+std::expected<bool, StarException> StatusPropertyMap::writeNetDelta(DataStream& ds, std::uint64_t from_version, NetCompatibilityRules rules) const {
+  if (rules.version() > 1)
+    return NetElementHashMap<String, Json>::writeNetDelta(ds, from_version, rules);
+  if (!should_write_delta(from_version, rules))
+    return false;
+  auto result = netStore(ds, rules);
+  if (!result) return std::unexpected(std::move(result.error()));
+  return true;
+}
+
+std::expected<void, StarException> StatusPropertyMap::readNetDelta(DataStream& ds, float interpolation_time, NetCompatibilityRules rules) {
+  if (rules.version() > 1)
+    return NetElementHashMap<String, Json>::readNetDelta(ds, interpolation_time, rules);
+  return netLoad(ds, rules);
+}
+
 StatusController::StatusController(Root& root)
   : m_root(root), m_uniqueEffectMetadata([] { return UniqueEffectMetadata::create(); }),
     m_effectAnimators([&root] { return EffectAnimator::create(root); }),
@@ -109,44 +142,6 @@ std::expected<void, StarException> StatusController::configure(Json const& confi
   auto properties = config.get_object("statusProperties", {});
   if (!properties) return std::unexpected(std::move(properties.error()));
   m_statusProperties.reset(std::move(*properties));
-  m_statusProperties.setOverrides(
-    [&statusProperties = m_statusProperties](DataStream& ds, NetCompatibilityRules rules) -> std::expected<void, StarException> {
-      if (rules.version() <= 1) {
-        auto result = ds << statusProperties.baseMap();
-        if (!result) return std::unexpected(std::move(result.error()));
-        return {};
-      }
-      return statusProperties.NetElementHashMap<String, Json>::netStore(ds, rules);
-    },
-    [&statusProperties = m_statusProperties](DataStream& ds, NetCompatibilityRules rules) -> std::expected<void, StarException> {
-      if (rules.version() <= 1) {
-        auto properties = ds.read<JsonObject>();
-        if (!properties) return std::unexpected(std::move(properties.error()));
-        statusProperties.reset(std::move(*properties));
-        return {};
-      }
-      return statusProperties.NetElementHashMap<String, Json>::netLoad(ds, rules);
-    },
-    [&statusProperties = m_statusProperties](DataStream& ds, std::uint64_t fromVersion, NetCompatibilityRules rules) -> std::expected<bool, StarException> {
-      if (rules.version() <= 1) {
-        if (statusProperties.shouldWriteNetDelta(fromVersion, rules)) {
-          auto result = ds << statusProperties.baseMap();
-          if (!result) return std::unexpected(std::move(result.error()));
-          return true;
-        }
-        return false;
-      }
-      return statusProperties.NetElementHashMap<String, Json>::writeNetDelta(ds, fromVersion, rules);
-    },
-    [&statusProperties = m_statusProperties](DataStream& ds, float interp, NetCompatibilityRules rules) -> std::expected<void, StarException> {
-      if (rules.version() <= 1) {
-        auto properties = ds.read<JsonObject>();
-        if (!properties) return std::unexpected(std::move(properties.error()));
-        statusProperties.reset(std::move(*properties));
-        return {};
-      }
-      return statusProperties.NetElementHashMap<String, Json>::readNetDelta(ds, interp, rules);
-    });
   auto minimumLiquidStatusEffectPercentage = config.get_float("minimumLiquidStatusEffectPercentage");
   if (!minimumLiquidStatusEffectPercentage) return std::unexpected(std::move(minimumLiquidStatusEffectPercentage.error()));
   m_minimumLiquidStatusEffectPercentage = *minimumLiquidStatusEffectPercentage;

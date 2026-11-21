@@ -531,10 +531,7 @@ std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Monster::write
 }
 
 std::expected<void, StarException> Monster::readNetState(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
-  auto result88 = m_netGroup.readNetState(data, interpolationTime, rules);
-if (!result88) return std::unexpected(std::move(result88.error()));
-
-  return {};
+  return m_netGroup.readNetState(std::move(data), interpolationTime, rules);
 }
 
 std::expected<void, StarException> Monster::enableInterpolation(float extrapolationHint) {

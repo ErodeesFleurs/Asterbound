@@ -185,7 +185,7 @@ std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Stagehand::wri
 }
 
 std::expected<void, StarException> Stagehand::readNetState(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
-  return m_netGroup.readNetState(data, interpolationTime, rules);
+  return m_netGroup.readNetState(std::move(data), interpolationTime, rules);
 }
 
 std::expected<String, StarException> Stagehand::name() const {

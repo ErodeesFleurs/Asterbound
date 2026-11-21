@@ -8,7 +8,6 @@ import star.net_compatibility;
 import star.byte_array;
 
 import star.id_map;
-import star.strong_typedef;
 import star.data_stream_extra;
 import star.data_stream_devices;
 
@@ -75,88 +74,25 @@ private:
   // will fall back to a full serialization of the entire state.
   static std::int64_t const MaxChangeDataVersions = 100;
 
-  using ElementRemovalType = ElementId;
-  using ElementAdditionType = std::pair<ElementId, ByteArray>;
-
-  template <typename BaseType>
-  struct ElementResetWrapper : BaseType {
-    using BaseType::BaseType;
-
-    ElementResetWrapper() : BaseType() {}
-
-    ElementResetWrapper(ElementResetWrapper const& nt) : BaseType(nt) {}
-
-    ElementResetWrapper(ElementResetWrapper&& nt) : BaseType(std::move(nt)) {}
-
-    explicit ElementResetWrapper(BaseType const& bt) : BaseType(bt) {}
-
-    explicit ElementResetWrapper(BaseType&& bt) : BaseType(std::move(bt)) {}
-
-    ElementResetWrapper& operator=(ElementResetWrapper const& rhs) {
-      BaseType::operator=(rhs);
-      return *this;
-    }
-
-    ElementResetWrapper& operator=(ElementResetWrapper&& rhs) {
-      BaseType::operator=(std::move(rhs));
-      return *this;
-    }
-
-    template <class Arg>
-    ElementResetWrapper& operator=(Arg&& other) {
-      static_assert(std::is_base_of_v<BaseType, std::decay_t<Arg>> == false
-                      || std::is_same_v<ElementResetWrapper, std::decay_t<Arg>>,
-                    "ElementReset can not implicitly be assigned from std::monostate-derived classes or strong "
-                    "std::monostate typedefs");
-
-      BaseType::operator=(std::forward<Arg>(other));
-      return *this;
-    }
+  using Reset = std::monostate;
+  struct Remove {
+    ElementId id;
+    friend auto operator<<(DataStream& ds, Remove const& change) { return ds << change.id; }
+    friend auto operator>>(DataStream& ds, Remove& change) { return ds >> change.id; }
   };
-  using ElementReset = ElementResetWrapper<std::monostate>;
-  using ElementRemoval = StrongTypedefBuiltin<ElementRemovalType, struct ElementRemovalTag>;
-  template <typename BaseType>
-  struct ElementAdditionWrapper : BaseType {
-    using BaseType::BaseType;
-
-    ElementAdditionWrapper() : BaseType() {}
-
-    ElementAdditionWrapper(ElementAdditionWrapper const& nt) : BaseType(nt) {}
-
-    ElementAdditionWrapper(ElementAdditionWrapper&& nt) : BaseType(std::move(nt)) {}
-
-    explicit ElementAdditionWrapper(BaseType const& bt) : BaseType(bt) {}
-
-    explicit ElementAdditionWrapper(BaseType&& bt) : BaseType(std::move(bt)) {}
-
-    ElementAdditionWrapper& operator=(ElementAdditionWrapper const& rhs) {
-      BaseType::operator=(rhs);
-      return *this;
-    }
-
-    ElementAdditionWrapper& operator=(ElementAdditionWrapper&& rhs) {
-      BaseType::operator=(std::move(rhs));
-      return *this;
-    }
-
-    template <class Arg>
-    ElementAdditionWrapper& operator=(Arg&& other) {
-      static_assert(std::is_base_of_v<BaseType, std::decay_t<Arg>> == false
-                      || std::is_same_v<ElementAdditionWrapper, std::decay_t<Arg>>,
-                    "ElementAddition can not implicitly be assigned from ElementAdditionType-derived classes or strong "
-                    "ElementAdditionType typedefs");
-
-      BaseType::operator=(std::forward<Arg>(other));
-      return *this;
-    }
+  struct Add {
+    ElementId id;
+    friend auto operator<<(DataStream& ds, Add const& change) { return ds << change.id; }
+    friend auto operator>>(DataStream& ds, Add& change) { return ds >> change.id; }
   };
-  using ElementAddition = ElementAdditionWrapper<ElementAdditionType>;
-
-  using ElementChange = std::variant<ElementReset, ElementRemoval, ElementAddition>;
+  // These slots are the wire tags. An Add header is followed by a length-prefixed
+  // child record on the wire, never in the history: each peer gets the live state.
+  using ElementChange = std::variant<Reset, Remove, Add>;
 
   using ElementMap = IdMap<ElementId, std::shared_ptr<Element>>;
 
   void addChangeData(ElementChange change);
+  [[nodiscard]] std::expected<void, StarException> load_element(ElementId id, ByteArray&& bytes, NetCompatibilityRules rules);
 
   [[nodiscard]] std::expected<void, StarException> readyElement(std::shared_ptr<Element> const& element);
 
@@ -179,7 +115,7 @@ template <dynamic_net_element Element>
   { auto result = readyElement(element); if (!result) return std::unexpected(std::move(result.error())); }
   auto id = m_idMap.emplace(std::move(element));
   if (!id) return std::unexpected(std::move(id.error()));
-  addChangeData(ElementAddition(*id, {}));
+  addChangeData(Add{*id});
   return *id;
 }
 
@@ -187,7 +123,7 @@ template <dynamic_net_element Element>
 void NetElementDynamicGroup<Element>::removeNetElement(ElementId id) {
   // Finish erasing the node before releasing the element: its destructor can reenter the group.
   m_idMap.try_extract_value(id);
-  addChangeData(ElementRemoval{id});
+  addChangeData(Remove{id});
 }
 
 template <dynamic_net_element Element>
@@ -220,10 +156,10 @@ void NetElementDynamicGroup<Element>::initNetVersion(std::optional<std::referenc
   m_changeData.clear();
   m_changeDataLastVersion = 0;
 
-  addChangeData(ElementReset());
+  addChangeData(Reset{});
   for (auto& pair : m_idMap) {
     pair.second->initNetVersion(m_netVersion);
-    addChangeData(ElementAddition(pair.first, {})); // we will write the data stream once we know the rules for the one recieving
+    addChangeData(Add{pair.first});
   }
 }
 
@@ -281,7 +217,7 @@ template <dynamic_net_element Element>
   m_changeData.clear();
   m_changeDataLastVersion = m_netVersion ? m_netVersion->get().current() : 0;
   m_idMap.clear();
-  addChangeData(ElementReset());
+  addChangeData(Reset{});
   auto count = ds.read_vlq_u();
   if (!count) return std::unexpected(std::move(count.error()));
   for (std::uint64_t i = 0; i < *count; ++i) {
@@ -291,16 +227,8 @@ template <dynamic_net_element Element>
       return std::unexpected(IOException("Invalid dynamic net element id"));
     auto bytes = ds.read<ByteArray>();
     if (!bytes) return std::unexpected(std::move(bytes.error()));
-    DataStreamBuffer storeBuffer(std::move(*bytes));
-    storeBuffer.set_stream_compatibility_version(rules);
-    if (!m_createElement) return std::unexpected(IOException("Missing dynamic net element factory"));
-    auto element = m_createElement();
-    if (!element) return std::unexpected(std::move(element.error()));
-    if (!*element) return std::unexpected(IOException("Null dynamic net element"));
-    { auto result = (*element)->netLoad(storeBuffer, rules); if (!result) return std::unexpected(std::move(result.error())); }
-    { auto result = readyElement(*element); if (!result) return std::unexpected(std::move(result.error())); }
-    { auto result = m_idMap.try_emplace(static_cast<ElementId>(*id), std::move(*element)); if (!result) return std::unexpected(std::move(result.error())); }
-    addChangeData(ElementAddition(static_cast<ElementId>(*id), storeBuffer.take_data()));
+    if (auto result = load_element(static_cast<ElementId>(*id), std::move(*bytes), rules); !result)
+      return std::unexpected(std::move(result.error()));
   }
   return {};
 }
@@ -316,43 +244,38 @@ template <dynamic_net_element Element>
 
   } else {
     bool deltaWritten = false;
-    auto willWrite = [&]() -> std::expected<void, StarException> {
+    auto write_code = [&](std::uint64_t code) -> std::expected<void, StarException> {
       if (!deltaWritten) {
         deltaWritten = true;
         { auto result = ds.write<bool>(false); if (!result) return std::unexpected(std::move(result.error())); }
       }
+      if (auto result = ds.write_vlq_u(code); !result)
+        return std::unexpected(std::move(result.error()));
       return {};
     };
 
-    for (auto const& p : m_changeData) {
-      if (p.first >= fromVersion) {
-        if (std::holds_alternative<ElementAddition>(p.second)) {
-          ElementId id = std::get<ElementAddition>(p.second).first;
-          if (auto element = m_idMap.find_ref(id)) {
-            { auto result = willWrite(); if (!result) return std::unexpected(std::move(result.error())); }
-            {
-              auto result = ds.write_vlq_u(1);
-              if (!result)
-                return std::unexpected(std::move(result.error()));
-            }
-            DataStreamBuffer storeBuffer;
-            storeBuffer.set_stream_compatibility_version(rules);
-            { auto result = element->get()->netStore(storeBuffer, rules); if (!result) return std::unexpected(std::move(result.error())); }
-            {
-              auto result = ds.write((ElementChange)ElementAddition(id, storeBuffer.take_data()));
-              if (!result)
-                return std::unexpected(std::move(result.error()));
-            }
-          }
-        } else {
-          { auto result = willWrite(); if (!result) return std::unexpected(std::move(result.error())); }
-          {
-            auto result = ds.write_vlq_u(1);
-            if (!result)
-              return std::unexpected(std::move(result.error()));
-          }
-          { auto result = ds.write(p.second); if (!result) return std::unexpected(std::move(result.error())); }
-        }
+    for (auto const& [version, change] : m_changeData) {
+      if (version < fromVersion)
+        continue;
+      if (std::holds_alternative<Add>(change)) {
+        auto element = m_idMap.find_ref(std::get<Add>(change).id);
+        if (!element)
+          continue;
+        if (auto result = write_code(1); !result)
+          return std::unexpected(std::move(result.error()));
+        m_buffer.set_stream_compatibility_version(rules);
+        if (auto result = element->get()->netStore(m_buffer, rules); !result)
+          return std::unexpected(std::move(result.error()));
+        if (auto result = ds.write(change); !result)
+          return std::unexpected(std::move(result.error()));
+        if (auto result = ds.write(m_buffer.data()); !result)
+          return std::unexpected(std::move(result.error()));
+        m_buffer.clear();
+      } else {
+        if (auto result = write_code(1); !result)
+          return std::unexpected(std::move(result.error()));
+        if (auto result = ds.write(change); !result)
+          return std::unexpected(std::move(result.error()));
       }
     }
 
@@ -361,17 +284,10 @@ template <dynamic_net_element Element>
       auto written = p.second->writeNetDelta(m_buffer, fromVersion, rules);
       if (!written) return std::unexpected(std::move(written.error()));
       if (*written) {
-        { auto result = willWrite(); if (!result) return std::unexpected(std::move(result.error())); }
-        {
-          auto result = ds.write_vlq_u(p.first + 1);
-          if (!result)
-            return std::unexpected(std::move(result.error()));
-        }
-        {
-          auto result = ds.write_bytes(m_buffer.data());
-          if (!result)
-            return std::unexpected(std::move(result.error()));
-        }
+        if (auto result = write_code(std::uint64_t{p.first} + 1); !result)
+          return std::unexpected(std::move(result.error()));
+        if (auto result = ds.write_bytes(m_buffer.data()); !result)
+          return std::unexpected(std::move(result.error()));
         m_buffer.clear();
       }
     }
@@ -401,24 +317,20 @@ template <dynamic_net_element Element>
     if (*code == 1) {
       auto change = ds.read<ElementChange>();
       if (!change) return std::unexpected(std::move(change.error()));
-      if (std::holds_alternative<ElementReset>(*change)) {
-        m_idMap.clear();
-      } else if (std::holds_alternative<ElementAddition>(*change)) {
-        if (std::get<ElementAddition>(*change).first == NullElementId)
+      if (std::holds_alternative<Add>(*change)) {
+        auto bytes = ds.read<ByteArray>();
+        if (!bytes) return std::unexpected(std::move(bytes.error()));
+        auto id = std::get<Add>(*change).id;
+        if (id == NullElementId)
           return std::unexpected(IOException("Invalid dynamic net element id"));
-        if (!m_createElement) return std::unexpected(IOException("Missing dynamic net element factory"));
-        auto element = m_createElement();
-        if (!element) return std::unexpected(std::move(element.error()));
-        if (!*element) return std::unexpected(IOException("Null dynamic net element"));
-        DataStreamBuffer storeBuffer(std::get<ElementAddition>(*change).second);
-        storeBuffer.set_stream_compatibility_version(rules);
-        { auto result = (*element)->netLoad(storeBuffer, rules); if (!result) return std::unexpected(std::move(result.error())); }
-        { auto result = readyElement(*element); if (!result) return std::unexpected(std::move(result.error())); }
-        { auto result = m_idMap.try_emplace(std::get<ElementAddition>(*change).first, std::move(*element)); if (!result) return std::unexpected(std::move(result.error())); }
-      } else if (std::holds_alternative<ElementRemoval>(*change)) {
-        m_idMap.remove(std::get<ElementRemoval>(*change));
+        if (auto result = load_element(id, std::move(*bytes), rules); !result)
+          return std::unexpected(std::move(result.error()));
+      } else if (std::holds_alternative<Remove>(*change)) {
+        removeNetElement(std::get<Remove>(*change).id);
+      } else {
+        m_idMap.clear();
+        addChangeData(Reset{});
       }
-      addChangeData(std::move(*change));
     } else {
       if (*code - 1 > std::numeric_limits<ElementId>::max())
         return std::unexpected(IOException("Dynamic net element id out of range"));
@@ -460,6 +372,25 @@ void NetElementDynamicGroup<Element>::addChangeData(ElementChange change) {
     std::max<std::int64_t>(static_cast<std::int64_t>(currentVersion) - MaxChangeDataVersions, 0);
   while (!m_changeData.empty() && m_changeData.front().first < m_changeDataLastVersion)
     m_changeData.pop_front();
+}
+
+template <dynamic_net_element Element>
+[[nodiscard]] std::expected<void, StarException> NetElementDynamicGroup<Element>::load_element(
+    ElementId id, ByteArray&& bytes, NetCompatibilityRules rules) {
+  if (!m_createElement) return std::unexpected(IOException("Missing dynamic net element factory"));
+  auto element = m_createElement();
+  if (!element) return std::unexpected(std::move(element.error()));
+  if (!*element) return std::unexpected(IOException("Null dynamic net element"));
+  DataStreamBuffer buffer(std::move(bytes));
+  buffer.set_stream_compatibility_version(rules);
+  if (auto result = (*element)->netLoad(buffer, rules); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = readyElement(*element); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = m_idMap.try_emplace(id, std::move(*element)); !result)
+    return std::unexpected(std::move(result.error()));
+  addChangeData(Add{id});
+  return {};
 }
 
 template <dynamic_net_element Element>

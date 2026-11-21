@@ -49,7 +49,6 @@ import star.net_element_basic_fields;
 import star.net_element_float_fields;
 import star.net_element_containers;
 import star.net_element_dynamic_group;
-import star.net_element_ext;
 import star.net_element_group;
 import star.net_element_sync_group;
 
@@ -59,6 +58,14 @@ class Root;
 class Entity;
 class ActorMovementController;
 
+
+class StatusPropertyMap final : public NetElementHashMap<String, Json> {
+public:
+  [[nodiscard]] std::expected<void, StarException> netStore(DataStream& ds, NetCompatibilityRules rules) const override;
+  [[nodiscard]] std::expected<void, StarException> netLoad(DataStream& ds, NetCompatibilityRules rules) override;
+  [[nodiscard]] std::expected<bool, StarException> writeNetDelta(DataStream& ds, std::uint64_t from_version, NetCompatibilityRules rules) const override;
+  [[nodiscard]] std::expected<void, StarException> readNetDelta(DataStream& ds, float interpolation_time, NetCompatibilityRules rules) override;
+};
 
 class StatusController : public NetElement {
 public:
@@ -258,7 +265,7 @@ private:
 
   NetElementGroup m_netGroup;
   std::shared_ptr<StatCollection> m_statCollection;
-  NetElementOverride<NetElementHashMap<String, Json>> m_statusProperties;
+  StatusPropertyMap m_statusProperties;
   NetElementData<DirectivesGroup> m_parentDirectives;
   NetElementBool m_toolUsageSuppressed;
 
@@ -297,4 +304,5 @@ export module star.status_controller;
 
 export namespace Star {
   using ::Star::StatusController;
+  using ::Star::StatusPropertyMap;
 }

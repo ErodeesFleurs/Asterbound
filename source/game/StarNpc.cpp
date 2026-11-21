@@ -799,10 +799,7 @@ std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Npc::writeNetS
 }
 
 std::expected<void, StarException> Npc::readNetState(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
-  auto result167 = m_netGroup.readNetState(data, interpolationTime, rules);
-if (!result167) return std::unexpected(std::move(result167.error()));
-
-  return {};
+  return m_netGroup.readNetState(std::move(data), interpolationTime, rules);
 }
 
 std::expected<String, StarException> Npc::description() const {

@@ -5,6 +5,12 @@ import star.strong_typedef;
 import star.data_stream;
 import star.id_map;
 import star.status_types;
+import star.status_controller;
+import star.net_element;
+import star.net_element_containers;
+import star.net_compatibility;
+import star.data_stream_devices;
+import star.data_stream_extra;
 
 #include "gtest/gtest.h"
 import star.stat_collection;
@@ -15,6 +21,55 @@ using namespace Star;
 
 bool withinAmount(float value, float target, float amount) {
   return std::fabs(value - target) <= amount;
+}
+
+TEST(StatTest, StatusPropertyMapWireCompatibility) {
+  for (std::uint32_t protocol : {1u, 2u}) {
+    SCOPED_TRACE(protocol);
+    NetCompatibilityRules rules(protocol);
+    NetElementVersion version;
+    StatusPropertyMap source, replica;
+    NetElementHashMap<String, Json> modern;
+    source.initNetVersion(std::cref(version));
+    modern.initNetVersion(std::cref(version));
+    source.set("property", Json(1));
+    modern.set("property", Json(1));
+
+    DataStreamBuffer full, expected_full;
+    ASSERT_TRUE(source.netStore(full, rules));
+    if (protocol == 1) {
+      ASSERT_TRUE(expected_full << source.baseMap());
+    } else {
+      ASSERT_TRUE(modern.netStore(expected_full, rules));
+    }
+    EXPECT_TRUE(std::ranges::equal(full.span(), expected_full.span()));
+    ASSERT_TRUE(full.seek(0));
+    ASSERT_TRUE(replica.netLoad(full, rules));
+    EXPECT_EQ(replica.baseMap(), source.baseMap());
+
+    auto since = version.increment();
+    DataStreamBuffer delta, expected_delta;
+    auto unchanged = source.writeNetDelta(delta, since, rules);
+    ASSERT_TRUE(unchanged);
+    EXPECT_FALSE(*unchanged);
+    EXPECT_EQ(delta.size(), 0u);
+    source.set("property", Json(2));
+    modern.set("property", Json(2));
+    auto changed = source.writeNetDelta(delta, since, rules);
+    ASSERT_TRUE(changed);
+    ASSERT_TRUE(*changed);
+    if (protocol == 1) {
+      ASSERT_TRUE(expected_delta << source.baseMap());
+    } else {
+      auto written = modern.writeNetDelta(expected_delta, since, rules);
+      ASSERT_TRUE(written);
+      ASSERT_TRUE(*written);
+    }
+    EXPECT_TRUE(std::ranges::equal(delta.span(), expected_delta.span()));
+    ASSERT_TRUE(delta.seek(0));
+    ASSERT_TRUE(replica.readNetDelta(delta, 0.0f, rules));
+    EXPECT_EQ(replica.baseMap(), source.baseMap());
+  }
 }
 
 TEST(StatTest, Set) {

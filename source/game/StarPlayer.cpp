@@ -3442,7 +3442,7 @@ std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Player::writeN
 }
 
 std::expected<void, StarException> Player::readNetState(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
-  return m_netGroup.readNetState(data, interpolationTime, rules);
+  return m_netGroup.readNetState(std::move(data), interpolationTime, rules);
 }
 
 std::expected<void, StarException> Player::enableInterpolation(float) {

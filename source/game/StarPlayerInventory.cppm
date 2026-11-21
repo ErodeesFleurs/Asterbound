@@ -13,6 +13,7 @@ import star.multi_array;
 import star.data_stream;
 import star.item_descriptor;
 
+import star.net_element;
 import star.net_element_basic_fields;
 import star.net_element_sync_group;
 
@@ -226,7 +227,7 @@ public:
 private:
   using CustomBarLink = std::pair<std::optional<InventorySlot>, std::optional<InventorySlot>>;
 
-  template <typename> friend class NetElementTop;
+  template <std::derived_from<NetElement>> friend class NetElementTop;
   explicit PlayerInventory(Root& root);
   PlayerInventory(Root& root, Json inventoryConfig, Json currenciesConfig);
   [[nodiscard]] static std::expected<std::shared_ptr<PlayerInventory>, StarException> create(Root& root, Json inventoryConfig, Json currenciesConfig);

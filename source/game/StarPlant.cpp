@@ -1109,9 +1109,7 @@ return std::move(*result634);
 }
 
 std::expected<void, StarException> Plant::readNetState(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
-  auto result633 = m_netGroup.readNetState(data, interpolationTime, rules);
-if (!result633) return std::unexpected(std::move(result633.error()));
-  return {};
+  return m_netGroup.readNetState(std::move(data), interpolationTime, rules);
 }
 
 std::expected<void, StarException> Plant::enableInterpolation(float extrapolationHint) {

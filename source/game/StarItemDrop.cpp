@@ -442,7 +442,7 @@ std::expected<std::pair<ByteArray, std::uint64_t>, StarException> ItemDrop::writ
 }
 
 std::expected<void, StarException> ItemDrop::readNetState(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
-  return m_netGroup.readNetState(data, interpolationTime, rules);
+  return m_netGroup.readNetState(std::move(data), interpolationTime, rules);
 }
 
 std::expected<void, StarException> ItemDrop::enableInterpolation(float extrapolationHint) {

@@ -726,9 +726,7 @@ std::expected<std::pair<ByteArray, std::uint64_t>, StarException> PlantDrop::sna
 }
 
 std::expected<void, StarException> PlantDrop::readNetState(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
-  auto result282 = m_netGroup.readNetState(data, interpolationTime, rules);
-if (!result282) return std::unexpected(std::move(result282.error()));
-  return {};
+  return m_netGroup.readNetState(std::move(data), interpolationTime, rules);
 }
 
 std::expected<void, StarException> PlantDrop::enableInterpolation(float extrapolationHint) {

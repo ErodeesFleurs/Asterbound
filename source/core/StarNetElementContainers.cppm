@@ -36,7 +36,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> netStore(DataStream& ds, NetCompatibilityRules rules = {}) const override;
   [[nodiscard]] std::expected<void, StarException> netLoad(DataStream& ds, NetCompatibilityRules rules) override;
 
-  bool shouldWriteNetDelta(std::uint64_t fromVersion, NetCompatibilityRules rules = {}) const;
+  bool should_write_delta(std::uint64_t from_version, NetCompatibilityRules rules = {}) const;
   [[nodiscard]] std::expected<bool, StarException> writeNetDelta(DataStream& ds, std::uint64_t fromVersion, NetCompatibilityRules rules = {}) const override;
   [[nodiscard]] std::expected<void, StarException> readNetDelta(DataStream& ds, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
 
@@ -212,25 +212,16 @@ template <typename BaseMap>
 }
 
 template <typename BaseMap>
-bool NetElementMapWrapper<BaseMap>::shouldWriteNetDelta(std::uint64_t fromVersion, NetCompatibilityRules rules) const {
-  if (!checkWithRules(rules)) return false;
-  if (fromVersion < m_changeDataLastVersion)
-    return true;
-
-  for (auto const& p : m_changeData)
-    if (p.first >= fromVersion)
-      return true;
-
-  return false;
+bool NetElementMapWrapper<BaseMap>::should_write_delta(std::uint64_t from_version, NetCompatibilityRules rules) const {
+  return checkWithRules(rules) && (from_version < m_changeDataLastVersion ||
+      (!m_changeData.empty() && m_changeData.back().first >= from_version));
 }
 
 template <typename BaseMap>
 [[nodiscard]] std::expected<bool, StarException> NetElementMapWrapper<BaseMap>::writeNetDelta(DataStream& ds, std::uint64_t fromVersion, NetCompatibilityRules rules) const {
-  if (!checkWithRules(rules)) return false;
-  bool deltaWritten = false;
+  if (!should_write_delta(fromVersion, rules)) return false;
 
   if (fromVersion < m_changeDataLastVersion) {
-    deltaWritten = true;
     {
       auto result = ds.write_vlq_u(1);
       if (!result)
@@ -241,7 +232,6 @@ template <typename BaseMap>
   } else {
     for (auto const& p : m_changeData) {
       if (p.first >= fromVersion) {
-        deltaWritten = true;
         {
           auto result = ds.write_vlq_u(2);
           if (!result)
@@ -252,13 +242,9 @@ template <typename BaseMap>
     }
   }
 
-  if (deltaWritten) {
-    auto result = ds.write_vlq_u(0);
-    if (!result)
-      return std::unexpected(std::move(result.error()));
-  }
-
-  return deltaWritten;
+  auto result = ds.write_vlq_u(0);
+  if (!result) return std::unexpected(std::move(result.error()));
+  return true;
 }
 
 template <typename BaseMap>
@@ -365,9 +351,7 @@ template <typename BaseMap>
 bool NetElementMapWrapper<BaseMap>::remove(key_type const& k) {
   auto i = BaseMap::find(k);
   if (i != BaseMap::end()) {
-    BaseMap::erase(i);
-    addChangeData(RemoveChange{k});
-    m_updated = true;
+    erase(i);
     return true;
   }
   return false;

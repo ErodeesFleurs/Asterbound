@@ -24,6 +24,26 @@ import star.net_element_top;
 import star.math_common;
 using namespace Star;
 
+// Use a copyable leaf: noncopyable group bases would mask a movable publisher.
+static_assert(!std::is_copy_constructible_v<NetElementTop<NetElementFloat>>);
+static_assert(!std::is_move_constructible_v<NetElementTop<NetElementFloat>>);
+static_assert(!std::is_copy_assignable_v<NetElementTop<NetElementFloat>>);
+static_assert(!std::is_move_assignable_v<NetElementTop<NetElementFloat>>);
+
+TEST(NetElements, FilteredFloatDeltaLeavesValueAndCursorUntouched) {
+  NetElementFloat field;
+  field.setCompatibilityVersion(1);
+  field.set(2.0f);
+  DataStreamBuffer wire;
+  ASSERT_TRUE(wire.write(5.0f));
+  ASSERT_TRUE(wire.seek(0));
+  ASSERT_TRUE(field.readNetDelta(wire, 0.0f, LegacyVersion));
+  EXPECT_EQ(field.get(), 2.0f);
+  EXPECT_EQ(wire.pos(), 0u);
+  ASSERT_TRUE(field.readNetDelta(wire, 0.0f));
+  EXPECT_EQ(field.get(), 5.0f);
+}
+
 TEST(NetElements, DataRounding) {
   NetElementFloat masterField1;
   NetElementFloat masterField2;
@@ -252,6 +272,76 @@ TEST(NetElements, GroupDeltaUsesCurrentlyVisibleFields) {
     EXPECT_EQ(received[3].get(), 42u);
     EXPECT_EQ(received[2].get(), 0u);
   }
+}
+
+namespace {
+template <typename T>
+concept has_default_net_field = requires { typename NetElementData<T>; };
+
+template <typename Mutator>
+concept updates_int_field = requires(NetElementInt& field, Mutator&& mutator) {
+  field.update(std::forward<Mutator>(mutator));
+};
+
+struct ContextualFlag {
+  bool changed;
+  explicit operator bool() const { return changed; }
+};
+
+struct FieldMutator {
+  FieldMutator() = default;
+  FieldMutator(FieldMutator const&) = delete;
+  ContextualFlag operator()(std::int64_t& value) & { return {++value == 2}; }
+};
+
+struct RvalueMutator {
+  bool operator()(std::int64_t&) &&;
+};
+
+struct CustomPayload {
+  std::uint8_t count = 0;
+};
+
+static_assert(updates_int_field<FieldMutator>);
+static_assert(!updates_int_field<RvalueMutator>);
+static_assert(!updates_int_field<decltype([](std::int64_t&) {})>);
+static_assert(!has_default_net_field<CustomPayload>);
+static_assert(has_default_net_field<String>);
+}
+
+TEST(NetElements, MutatorUsesLvalueAndContextualBool) {
+  NetElementInt field;
+  FieldMutator mutator;
+  field.update(mutator);
+  EXPECT_FALSE(field.pullUpdated());
+  field.update(FieldMutator{});
+  EXPECT_TRUE(field.pullUpdated());
+  EXPECT_EQ(field.get(), 2);
+}
+
+TEST(NetElements, CustomCodecForwardsPendingWireValue) {
+  auto reader = [](DataStream& stream, CustomPayload& value) { return stream.read(value.count); };
+  auto writer = [](DataStream& stream, CustomPayload const& value) { return stream.write(value.count); };
+  NetElementCustomData<CustomPayload> field(reader, writer);
+  field.push({3});
+  ASSERT_TRUE(field.enableNetInterpolation());
+  DataStreamBuffer wire;
+  ASSERT_TRUE(wire.write<std::uint8_t>(91));
+  ASSERT_TRUE(wire.seek(0));
+  ASSERT_TRUE(field.readNetDelta(wire, 1.0f));
+  ASSERT_EQ(field.get().count, 3);
+  wire.clear();
+  ASSERT_TRUE(field.netStore(wire));
+  EXPECT_EQ(field.writeNetDelta(wire, 0), true);
+  EXPECT_TRUE(std::ranges::equal(wire.span(), std::array<char, 2>{91, 91}));
+  ASSERT_TRUE(field.tickNetInterpolation(1.0f));
+  EXPECT_EQ(field.get().count, 91);
+
+  NetElementCustomData<CustomPayload> missing({}, {});
+  wire.clear();
+  EXPECT_FALSE(missing.netLoad(wire, {}));
+  EXPECT_FALSE(missing.netStore(wire));
+  EXPECT_TRUE(wire.empty());
 }
 
 TEST(NetElements, Forwarding) {
@@ -1159,10 +1249,124 @@ TEST(NetElements, NetElementDynamicGroup) {
   }
 }
 
+TEST(NetElements, DynamicGroupForwardsMaximumIdWithoutTerminatingDelta) {
+  NetElementVersion version;
+  NetElementDynamicGroup<NetElementUInt> relay, receiver;
+  relay.initNetVersion(std::cref(version));
+  auto loaded_version = version.increment();
+  constexpr auto max_id = std::numeric_limits<std::uint32_t>::max();
+  DataStreamBuffer full;
+  ASSERT_TRUE(full.write_vlq_u(1)); // count
+  ASSERT_TRUE(full.write_vlq_u(max_id));
+  ASSERT_TRUE(full.write_vlq_u(1)); // child payload length
+  ASSERT_TRUE(full.write_vlq_u(41));
+  ASSERT_TRUE(full.seek(0));
+  ASSERT_TRUE(relay.netLoad(full, {}));
+  ASSERT_TRUE(full.seek(0));
+  ASSERT_TRUE(receiver.netLoad(full, {}));
+
+  auto changed_version = version.increment();
+  auto child = relay.getNetElement(max_id);
+  ASSERT_TRUE(child);
+  (*child)->set(42);
+  DataStreamBuffer delta;
+  ASSERT_EQ(relay.writeNetDelta(delta, changed_version), true);
+  ASSERT_TRUE(delta.seek(0));
+  ASSERT_EQ(delta.read<bool>(), false);
+  EXPECT_EQ(delta.read_vlq_u(), std::uint64_t{1} << 32);
+  EXPECT_EQ(delta.read_vlq_u(), 42u);
+  EXPECT_EQ(delta.read_vlq_u(), 0u);
+  EXPECT_EQ(delta.at_end(), true);
+  ASSERT_TRUE(delta.seek(0));
+  ASSERT_TRUE(receiver.readNetDelta(delta));
+  auto received = receiver.getNetElement(max_id);
+  ASSERT_TRUE(received);
+  EXPECT_EQ((*received)->get(), 42u);
+
+  // A peer starting at the full load also gets Reset/Add. The addition must
+  // contain the live value, not the original payload retained by the relay.
+  DataStreamBuffer backlog;
+  ASSERT_EQ(relay.writeNetDelta(backlog, loaded_version), true);
+  ASSERT_TRUE(backlog.seek(0));
+  ASSERT_EQ(backlog.read<bool>(), false);
+  ASSERT_EQ(backlog.read_vlq_u(), 1u);
+  ASSERT_EQ(backlog.read<std::uint8_t>(), 0u);
+  ASSERT_EQ(backlog.read_vlq_u(), 1u);
+  ASSERT_EQ(backlog.read<std::uint8_t>(), 2u);
+  ASSERT_EQ(backlog.read<std::uint32_t>(), max_id);
+  ASSERT_EQ(backlog.read_vlq_u(), 1u);
+  EXPECT_EQ(backlog.read_vlq_u(), 42u);
+}
+
+TEST(NetElements, DynamicGroupHistoryRetainsVersionsAndSkipsRemovedAdditions) {
+  NetElementVersion version;
+  NetElementDynamicGroup<NetElementGroup> group;
+  group.initNetVersion(std::cref(version));
+  auto first = version.increment();
+  // More than 100 records at one version. No longer-live additions must not
+  // be serialized, but every removal remains in its original slot and order.
+  for (std::uint32_t id = 1; id <= 101; ++id) {
+    ASSERT_EQ(group.addNetElement(std::make_shared<NetElementGroup>()), id);
+    group.removeNetElement(id);
+  }
+  for (int i = 0; i < 100; ++i)
+    version.increment();
+  group.removeNetElement(102);
+  DataStreamBuffer retained;
+  ASSERT_EQ(group.writeNetDelta(retained, first), true);
+  ASSERT_TRUE(retained.seek(0));
+  ASSERT_EQ(retained.read<bool>(), false);
+  for (std::uint32_t id = 1; id <= 102; ++id) {
+    ASSERT_EQ(retained.read_vlq_u(), 1u);
+    ASSERT_EQ(retained.read<std::uint8_t>(), 1u);
+    ASSERT_EQ(retained.read<std::uint32_t>(), id);
+  }
+  EXPECT_EQ(retained.read_vlq_u(), 0u);
+  EXPECT_EQ(retained.at_end(), true);
+
+  version.increment();
+  group.removeNetElement(103);
+  DataStreamBuffer expired;
+  ASSERT_EQ(group.writeNetDelta(expired, first), true);
+  EXPECT_TRUE(std::ranges::equal(expired.span(), std::array<char, 2>{1, 0}));
+}
+
+TEST(NetElements, DynamicGroupClearLogsReentrantChangesInRemovalOrder) {
+  struct ReentrantElement : NetElementGroup {
+    std::function<void()> on_destroy;
+    ~ReentrantElement() override {
+      if (on_destroy)
+        on_destroy();
+    }
+  };
+  NetElementTop<NetElementDynamicGroup<ReentrantElement>> group;
+  auto first = std::make_shared<ReentrantElement>();
+  ASSERT_EQ(group.addNetElement(first), 1u);
+  ASSERT_EQ(group.addNetElement(std::make_shared<ReentrantElement>()), 2u);
+  auto baseline = group.writeNetState();
+  ASSERT_TRUE(baseline);
+  first->on_destroy = [&group] {
+    EXPECT_FALSE(group.getNetElement(1));
+    EXPECT_EQ(group.addNetElement(std::make_shared<ReentrantElement>()), 3u);
+  };
+  first.reset();
+  group.clearNetElements();
+  ASSERT_TRUE(group.getNetElement(3));
+  auto delta = group.writeNetState(baseline->second);
+  ASSERT_TRUE(delta);
+  constexpr std::array<char, 22> expected{
+      0, 0,                    // frame, inner delta
+      1, 2, 0, 0, 0, 3, 0,     // destructor added id 3 with empty payload
+      1, 1, 0, 0, 0, 1,        // completed removal of id 1
+      1, 1, 0, 0, 0, 2,        // completed removal of id 2
+      0};
+  EXPECT_TRUE(std::ranges::equal(delta->first.span(), expected));
+}
+
 TEST(NetElements, DynamicGroupForwardsNestedFieldsWithPeerProtocol) {
-  class VersionedField : public NetElementData<std::uint32_t> {
+  class VersionedField : public NetElementCustomData<std::uint32_t> {
   public:
-    VersionedField() : NetElementData(
+    VersionedField() : NetElementCustomData(
         [](DataStream& stream, std::uint32_t& value) {
           return stream.stream_compatibility_version() == LegacyVersion ? stream.cread<std::uint8_t>(value) : stream.read(value);
         },
@@ -1319,6 +1523,25 @@ TEST(NetElements, NetElementMap) {
     ASSERT_TRUE(value);
     EXPECT_EQ(value->get(), "f");
   }
+}
+
+TEST(NetElements, MapRemoveOwnLongKey) {
+  NetElementVersion version;
+  NetElementHashMap<String, String> source, replica;
+  source.initNetVersion(std::cref(version));
+  String const key(std::string(256, 'k'));
+  source.set(key, "value");
+  replica.set(key, "value");
+  auto since = version.increment();
+  ASSERT_TRUE(source.remove(source.begin()->first));
+  ASSERT_TRUE(source.empty());
+  DataStreamBuffer delta;
+  auto written = source.writeNetDelta(delta, since);
+  ASSERT_TRUE(written);
+  ASSERT_TRUE(*written);
+  ASSERT_TRUE(delta.seek(0));
+  ASSERT_TRUE(replica.readNetDelta(delta));
+  EXPECT_TRUE(replica.empty());
 }
 
 TEST(NetElements, MapFullStorePreservesPendingWireOrder) {
@@ -1587,6 +1810,23 @@ TEST(NetElements, NetElementMapInterpolated) {
     auto value = slaveMap.get("fob");
     ASSERT_TRUE(value);
     EXPECT_EQ(value->get(), "fub");
+  }
+}
+
+TEST(NetElements, ConsumedSignalRetainsPayloadForOtherCursors) {
+  NetElementSignal<String> sender;
+  sender.send("payload that cannot fit in an inline string");
+  auto received = sender.receive();
+  ASSERT_EQ(received.size(), 1u);
+  received.front() = "changed locally";
+  EXPECT_TRUE(sender.receive().empty());
+  for (int i = 0; i != 2; ++i) {
+    NetElementSignal<String> receiver;
+    DataStreamBuffer wire;
+    ASSERT_EQ(sender.writeNetDelta(wire, 0), true);
+    ASSERT_TRUE(wire.seek(0));
+    ASSERT_TRUE(receiver.readNetDelta(wire));
+    EXPECT_EQ(receiver.receive(), List<String>({"payload that cannot fit in an inline string"}));
   }
 }
 

@@ -143,7 +143,7 @@ template <typename Signal>
 
 template <typename Signal>
 void NetElementSignal<Signal>::send(Signal signal) {
-  m_signals.push_back({m_netVersion ? m_netVersion->get().current() : 0, signal, false});
+  m_signals.emplace_back(m_netVersion ? m_netVersion->get().current() : 0, std::move(signal), false);
   while (m_signals.size() > m_maxSignalQueue)
     m_signals.pop_front();
 }
