@@ -5,7 +5,6 @@ import star.json;
 import star.json_extra;
 import star.lua;
 import star.list;
-import star.observer_stream;
 import star.strong_typedef;
 import star.data_stream;
 import star.id_map;
@@ -84,10 +83,9 @@ namespace Star::LuaBindings::StatusControllerCallbacks {
   [[nodiscard]] std::expected<void, StarException> addEphemeralEffects(StatusController& statController, JsonArray const& arg1, std::optional<EntityId> sourceEntityId);
   [[nodiscard]] std::expected<void, StarException> removeEphemeralEffect(StatusController& statController, String const& arg1);
   [[nodiscard]] std::expected<void, StarException> clearEphemeralEffects(StatusController& statController);
-  [[nodiscard]] std::expected<LuaTupleReturn<List<Json>, std::uint64_t>, StarException> damageTakenSince(StatusController& statController, std::optional<std::uint64_t> timestep);
-  [[nodiscard]] std::expected<LuaTupleReturn<List<Json>, std::uint64_t>, StarException> inflictedHitsSince(StatusController& statController, std::optional<std::uint64_t> timestep);
-  [[nodiscard]] std::expected<LuaTupleReturn<List<Json>, std::uint64_t>, StarException> inflictedDamageSince(
-      StatusController& statController, std::optional<std::uint64_t> timestep);
+  static LuaTupleReturn<List<Json>, std::uint64_t> history_tuple(StatusController::DamageHistory&& history) {
+    return lua_tuple_return(std::move(history.first), history.second);
+  }
   List<JsonArray> activeUniqueStatusEffectSummary(StatusController& statController);
   bool uniqueStatusEffectActive(StatusController& statController, String const& effectName);
 }
@@ -302,8 +300,8 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeStatusControllerCall
         callbacks
           .register_callback_with_signature<LuaTupleReturn<List<Json>, std::uint64_t>, std::optional<std::uint64_t>>(
             "damageTakenSince",
-            [&statController](std::optional<std::uint64_t> timestep) {
-              return StatusControllerCallbacks::damageTakenSince(statController, timestep);
+            [&controller = statController](std::optional<std::uint64_t> since) {
+              return controller.damage_taken_since(since.value_or(0)).transform(StatusControllerCallbacks::history_tuple);
             });
       !result)
     return std::unexpected(std::move(result.error()));
@@ -311,8 +309,8 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeStatusControllerCall
         callbacks
           .register_callback_with_signature<LuaTupleReturn<List<Json>, std::uint64_t>, std::optional<std::uint64_t>>(
             "inflictedHitsSince",
-            [&statController](std::optional<std::uint64_t> timestep) {
-              return StatusControllerCallbacks::inflictedHitsSince(statController, timestep);
+            [&controller = statController](std::optional<std::uint64_t> since) {
+              return controller.inflicted_hits_since(since.value_or(0)).transform(StatusControllerCallbacks::history_tuple);
             });
       !result)
     return std::unexpected(std::move(result.error()));
@@ -320,8 +318,8 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeStatusControllerCall
         callbacks
           .register_callback_with_signature<LuaTupleReturn<List<Json>, std::uint64_t>, std::optional<std::uint64_t>>(
             "inflictedDamageSince",
-            [&statController](std::optional<std::uint64_t> timestep) {
-              return StatusControllerCallbacks::inflictedDamageSince(statController, timestep);
+            [&controller = statController](std::optional<std::uint64_t> since) {
+              return controller.inflicted_damage_since(since.value_or(0)).transform(StatusControllerCallbacks::history_tuple);
             });
       !result)
     return std::unexpected(std::move(result.error()));
@@ -346,8 +344,8 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeStatusControllerCall
 
   if (auto result = callbacks.register_callback_with_signature<void, DamageRequest>(
         "applySelfDamageRequest",
-        [&statController](DamageRequest&& request) {
-          return statController.applySelfDamageRequest(std::move(request));
+        [&controller = statController](DamageRequest const& request) {
+          return controller.apply_self_damage_request(request);
         });
       !result)
     return std::unexpected(std::move(result.error()));
@@ -523,44 +521,6 @@ std::expected<void, StarException> LuaBindings::StatusControllerCallbacks::remov
 
 std::expected<void, StarException> LuaBindings::StatusControllerCallbacks::clearEphemeralEffects(StatusController& statController) {
   return statController.clearEphemeralEffects();
-}
-
-std::expected<LuaTupleReturn<List<Json>, std::uint64_t>, StarException> LuaBindings::StatusControllerCallbacks::damageTakenSince(
-    StatusController& statController, std::optional<std::uint64_t> timestep) {
-  auto pair = statController.damageTakenSince(timestep.value_or(std::uint64_t{}));
-  List<Json> notifications;
-  for (auto const& notification : pair.first) {
-    auto json = notification.toJson();
-    if (!json) return std::unexpected(std::move(json.error()));
-    notifications.push_back(std::move(*json));
-  }
-  return lua_tuple_return(std::move(notifications), pair.second);
-}
-
-std::expected<LuaTupleReturn<List<Json>, std::uint64_t>, StarException> LuaBindings::StatusControllerCallbacks::inflictedHitsSince(
-    StatusController& statController, std::optional<std::uint64_t> timestep) {
-  auto pair = statController.inflictedHitsSince(timestep.value_or(std::uint64_t{}));
-  List<Json> hits;
-  for (auto const& hit : pair.first) {
-    auto json = hit.second.toJson();
-    if (!json) return std::unexpected(std::move(json.error()));
-    auto tagged = json->set("targetEntityId", hit.first);
-    if (!tagged) return std::unexpected(std::move(tagged.error()));
-    hits.push_back(std::move(*tagged));
-  }
-  return lua_tuple_return(std::move(hits), pair.second);
-}
-
-std::expected<LuaTupleReturn<List<Json>, std::uint64_t>, StarException> LuaBindings::StatusControllerCallbacks::inflictedDamageSince(
-    StatusController& statController, std::optional<std::uint64_t> timestep) {
-  auto pair = statController.inflictedDamageSince(timestep.value_or(std::uint64_t{}));
-  List<Json> notifications;
-  for (auto const& notification : pair.first) {
-    auto json = notification.toJson();
-    if (!json) return std::unexpected(std::move(json.error()));
-    notifications.push_back(std::move(*json));
-  }
-  return lua_tuple_return(std::move(notifications), pair.second);
 }
 
 List<JsonArray> LuaBindings::StatusControllerCallbacks::activeUniqueStatusEffectSummary(

@@ -46,7 +46,6 @@ import star.listener;
 import std;
 import star.format;
 import star.version;
-import star.observer_stream;
 
 import star.npc;
 import star.lua_root;
@@ -853,7 +852,7 @@ std::expected<List<DamageNotification>, StarException> Npc::applyDamage(DamageRe
   if (!inWorld())
     return {};
 
-  auto result171 = m_statusController->applyDamageRequest(damage);
+  auto result171 = m_statusController->apply_damage_request(damage);
 if (!result171) return std::unexpected(std::move(result171.error()));
 auto notifications = std::move(*result171);
 
@@ -877,7 +876,7 @@ if (!result172) return std::unexpected(std::move(result172.error()));
 }
 
 std::expected<List<DamageNotification>, StarException> Npc::selfDamageNotifications() {
-  return m_statusController->pullSelfDamageNotifications();
+  return m_statusController->pull_self_damage_notifications();
 }
 
 std::expected<bool, StarException> Npc::shouldDestroy() const {
@@ -945,7 +944,7 @@ auto treasureDatabase = std::move(*result175);
 
 std::expected<void, StarException> Npc::damagedOther(DamageNotification const& damage) {
   if (inWorld() && isMaster())
-    m_statusController->damagedOther(damage);
+    m_statusController->damaged_other(damage);
   return {};
 }
 

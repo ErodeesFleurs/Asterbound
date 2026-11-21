@@ -1,101 +1,122 @@
 module;
 import std;
+import star.format;
 import star.list;
 
 namespace Star {
 
-// Holds a stream of values which separate observers can query and track
-// occurrences in the stream without pulling them from the stream.  Each
-// addition to the stream is given an abstract step value, and queries to the
-// stream can reference a given step value in order to track events since the
-// last query.
+// Independent observers track retained events with a cursor, without consuming them.
 template <typename T>
+  requires std::is_object_v<T>
 class ObserverStream {
+  using Entry = std::pair<std::uint64_t, T>;
+
 public:
-  ObserverStream();
-  ObserverStream(std::uint64_t historyLimit);
+  // History is measured in steps, not event count. A zero window retains nothing.
+  explicit ObserverStream(std::uint64_t history_limit = 0) : m_history_limit(history_limit) {}
 
-  // If a history limit is set, then any entries with step values older than
-  // the given limit will be discarded automatically.  A historyLimit of 0
-  // means that no values will be forgotten.  The step value increases by one
-  // with each entry added, or can be increased artificially by a call to
-  // tickStep.
-  std::uint64_t historyLimit() const;
-  void setHistoryLimit(std::uint64_t historyLimit = 0);
+  std::uint64_t history_limit() const { return m_history_limit; }
 
-  // Add a value to the end of the stream and increment the step value by 1.
-  void add(T value);
+  void set_history_limit(std::uint64_t history_limit = 0) {
+    m_history_limit = history_limit;
+    prune();
+  }
 
-  // Artificially tick the step by the given delta, which can be used to clear
-  // older values.
-  void tick(std::uint64_t delta = 1);
+  void push_back(T const& value) requires std::constructible_from<T, T const&> {
+    append(value);
+  }
 
-  // Query values in the stream since the given step value.  Will return the
-  // values in the stream, and a new since value to pass to query on the next
-  // call.
-  std::pair<List<T>, std::uint64_t> query(std::uint64_t since = 0) const;
+  void push_back(T&& value) requires std::constructible_from<T, T&&> {
+    append(std::move(value));
+  }
 
-  // Resets the step value to 0 and clears all values.
-  void reset();
+  void tick(std::uint64_t delta = 1) {
+    m_next_step = advanced_step(delta);
+    prune();
+  }
+
+  // Return an independent snapshot together with the cursor for the next query.
+  [[nodiscard]] std::pair<List<T>, std::uint64_t> query(std::uint64_t since = 0) const
+    requires std::constructible_from<T, T const&>
+  {
+    auto entries = entries_since(since);
+    List<T> result;
+    result.reserve(entries.size());
+    for (auto const& entry : entries)
+      result.emplace_back(entry.second);
+    return {std::move(result), m_next_step};
+  }
+
+  // Synchronously borrow each event. The callback must not mutate this stream
+  // or retain references to its events.
+  template <typename U, typename Transform>
+    requires (std::constructible_from<U, U&&> || std::constructible_from<U, U const&>)
+      && requires(Transform& transform, T const& event) {
+        { std::invoke(transform, event) } -> std::same_as<std::expected<U, StarException>>;
+      }
+  [[nodiscard]] std::expected<std::pair<List<U>, std::uint64_t>, StarException>
+  transform_since(std::uint64_t since, Transform&& transform) const {
+    auto entries = entries_since(since);
+    List<U> result;
+    result.reserve(entries.size());
+    for (auto const& entry : entries) {
+      auto projected = std::invoke(transform, entry.second);
+      if (!projected)
+        return std::unexpected(std::move(projected).error());
+      if constexpr (std::constructible_from<U, U&&>)
+        result.emplace_back(*std::move(projected));
+      else
+        result.emplace_back(std::as_const(*projected));
+    }
+    return std::expected<std::pair<List<U>, std::uint64_t>, StarException>(
+        std::in_place, std::move(result), m_next_step);
+  }
+
+  void reset() {
+    m_next_step = 0;
+    m_values.clear();
+  }
 
 private:
-  std::uint64_t m_historyLimit;
-  std::uint64_t m_nextStep;
-  Deque<std::pair<std::uint64_t, T>> m_values;
-};
-
-template <typename T>
-ObserverStream<T>::ObserverStream()
-  : ObserverStream(0) {}
-
-template <typename T>
-ObserverStream<T>::ObserverStream(std::uint64_t historyLimit)
-  : m_historyLimit(historyLimit), m_nextStep(0) {}
-
-template <typename T>
-std::uint64_t ObserverStream<T>::historyLimit() const {
-  return m_historyLimit;
-}
-
-template <typename T>
-void ObserverStream<T>::setHistoryLimit(std::uint64_t historyLimit) {
-  m_historyLimit = historyLimit;
-  tick(0);
-}
-
-template <typename T>
-void ObserverStream<T>::add(T value) {
-  m_values.push_back({m_nextStep, std::move(value)});
-  tick(1);
-}
-
-template <typename T>
-void ObserverStream<T>::tick(std::uint64_t delta) {
-  m_nextStep += delta;
-  std::uint64_t removeBefore = m_nextStep - std::min(m_nextStep, m_historyLimit);
-  while (!m_values.empty() && m_values.front().first < removeBefore)
-    m_values.pop_front();
-}
-
-template <typename T>
-std::pair<List<T>, std::uint64_t> ObserverStream<T>::query(std::uint64_t since) const {
-  List<T> res;
-  auto i = std::lower_bound(m_values.begin(),
-      m_values.end(),
-      since,
-      [](std::pair<std::uint64_t, T> const& p, std::uint64_t step) { return p.first < step; });
-  while (i != m_values.end()) {
-    res.push_back(i->second);
-    ++i;
+  std::uint64_t advanced_step(std::uint64_t delta) const {
+    if (delta > std::numeric_limits<std::uint64_t>::max() - m_next_step)
+      Star::fatal_error("ObserverStream cursor exhausted", false);
+    return m_next_step + delta;
   }
-  return {res, m_nextStep};
-}
 
-template <typename T>
-void ObserverStream<T>::reset() {
-  m_nextStep = 0;
-  m_values.clear();
-}
+  template <typename Value>
+    requires std::constructible_from<T, Value&&>
+  void append(Value&& value) {
+    auto next_step = advanced_step(1);
+    if (m_history_limit == 0) {
+      m_next_step = next_step;
+      return;
+    }
+    m_values.emplace_back(m_next_step, std::forward<Value>(value));
+    m_next_step = next_step;
+    prune();
+  }
+
+  void prune() {
+    auto oldest = m_next_step - std::min(m_next_step, m_history_limit);
+    while (!m_values.empty() && m_values.front().first < oldest)
+      m_values.pop_front();
+  }
+
+  auto entries_since(std::uint64_t since) const {
+    auto end = m_values.end();
+    auto first = end;
+    if (since < m_next_step && !m_values.empty()) {
+      first = since <= m_values.front().first ? m_values.begin()
+          : std::ranges::lower_bound(m_values, since, {}, &Entry::first);
+    }
+    return std::ranges::subrange(first, end);
+  }
+
+  std::uint64_t m_history_limit;
+  std::uint64_t m_next_step = 0;
+  Deque<Entry> m_values;
+};
 
 }
 

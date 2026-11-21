@@ -27,7 +27,6 @@ import star.hash;
 import star.string_view;
 import star.directives;
 import star.asset_path;
-import star.observer_stream;
 import star.periodic_function;
 import star.audio;
 import star.map;

@@ -49,7 +49,6 @@ import star.output_proxy;
 import star.version;
 import star.spline;
 import star.lua;
-import star.observer_stream;
 import star.weighted_pool;
 import star.data_stream_devices;
 
@@ -1395,17 +1394,17 @@ std::expected<List<DamageNotification>, StarException> Player::applyDamage(Damag
   if (!inWorld() || isDead() || m_isAdmin)
     return {};
 
-  return m_statusController->applyDamageRequest(request);
+  return m_statusController->apply_damage_request(request);
 }
 
 std::expected<List<DamageNotification>, StarException> Player::selfDamageNotifications() {
-  return m_statusController->pullSelfDamageNotifications();
+  return m_statusController->pull_self_damage_notifications();
 }
 
 std::expected<void, StarException> Player::hitOther(EntityId targetEntityId, DamageRequest const& damageRequest) {
   if (!isMaster())
     return {};
-  m_statusController->hitOther(targetEntityId, damageRequest);
+  m_statusController->hit_other(targetEntityId, damageRequest);
   auto currentWorldResult = world();
   if (!currentWorldResult)
     return std::unexpected(std::move(currentWorldResult.error()));
@@ -1419,7 +1418,7 @@ std::expected<void, StarException> Player::hitOther(EntityId targetEntityId, Dam
 
 std::expected<void, StarException> Player::damagedOther(DamageNotification const& damage) {
   if (isMaster())
-    m_statusController->damagedOther(damage);
+    m_statusController->damaged_other(damage);
   return {};
 }
 

@@ -55,6 +55,7 @@ set (star_core_tests_SOURCES
       multi_table_test.cpp
       native_runtime_stdio_test.cpp
       net_states_test.cpp
+      observer_stream_test.cpp
       ordered_map_test.cpp
       ordered_set_test.cpp
       periodic_test.cpp

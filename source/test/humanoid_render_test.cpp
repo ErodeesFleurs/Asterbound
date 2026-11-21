@@ -10,6 +10,7 @@ import star.asset_path;
 import star.assets;
 import star.casting;
 import star.client_context;
+import star.damage;
 import star.drawable;
 import star.file;
 import star.entity_rendering;
@@ -21,6 +22,7 @@ import star.mixer;
 import star.movement_controller_lua_bindings;
 import star.particle;
 import star.status_controller;
+import star.status_controller_lua_bindings;
 import star.status_types;
 import star.game_test;
 import star.game_types;
@@ -32,6 +34,7 @@ import star.json;
 import star.line;
 import star.matrix3;
 import star.networked_animator;
+import star.lua;
 import star.lua_root;
 import star.net_compatibility;
 import star.player;
@@ -104,6 +107,68 @@ struct PlayerWorldContext {
   bool initialized = false;
 };
 }// namespace
+
+const GameTestRegistration self_damage_history(
+  "StatusControllerTest", "SelfDamageRecordedOnceForObserversAndPendingDelivery", [](GameTest& fixture) {
+    PlayerWorldContext setup;
+    auto initialized = setup.init(fixture.root());
+    ASSERT_TRUE(initialized) << initialized.error().what();
+    auto& player = *setup.player;
+    auto lua = LuaRoot::create(fixture.root());
+    ASSERT_TRUE(lua) << lua.error().what();
+    auto context = (*lua)->create_context(StringList{});
+    ASSERT_TRUE(context) << context.error().what();
+    auto callbacks = LuaBindings::makeStatusControllerCallbacks(player.statusController());
+    ASSERT_TRUE(callbacks) << callbacks.error().what();
+    ASSERT_TRUE(context->set_callbacks("status", *callbacks));
+    ASSERT_TRUE(context->set_path("player_id", player.entityId()));
+
+    // Use the same request as the primary player script's fall-damage path.
+    auto observed = context->eval<Json>(R"LUA(
+      local _, before = status.damageTakenSince()
+      local _, hits_before = status.inflictedHitsSince()
+      local _, dealt_before = status.inflictedDamageSince()
+      status.applySelfDamageRequest({
+        damageType = "IgnoresDef", damage = 1, damageSourceKind = "falling", sourceEntityId = player_id
+      })
+      local events, after = status.damageTakenSince(before)
+      assert(#events == 1 and after == before + 1)
+      local unseen, cursor = status.damageTakenSince(after)
+      assert(#unseen == 0 and cursor == after)
+      local hits, hits_after = status.inflictedHitsSince(hits_before)
+      local dealt, dealt_after = status.inflictedDamageSince(dealt_before)
+      assert(#hits == 0 and hits_after == hits_before and #dealt == 0 and dealt_after == dealt_before)
+      return events[1]
+    )LUA");
+    ASSERT_TRUE(observed) << observed.error().what();
+    EXPECT_EQ(observed->get_int("targetEntityId"), player.entityId());
+    EXPECT_EQ(observed->get_string("damageSourceKind"), "falling");
+    auto pending = player.selfDamageNotifications();
+    ASSERT_TRUE(pending) << pending.error().what();
+    ASSERT_EQ(pending->size(), 1u);
+    EXPECT_EQ(pending->front().toJson(), *observed);
+    auto drained = player.selfDamageNotifications();
+    ASSERT_TRUE(drained) << drained.error().what();
+    EXPECT_TRUE(drained->empty());
+
+    auto request = DamageRequest::create(JsonObject{{"damage", 3}});
+    ASSERT_TRUE(request) << request.error().what();
+    ASSERT_TRUE(player.hitOther(41, *request));
+    ASSERT_TRUE(player.hitOther(42, *request));
+    ASSERT_TRUE(player.damagedOther(pending->front()));
+    auto inflicted = context->eval<Json>(R"LUA(
+      local hits, cursor = status.inflictedHitsSince()
+      assert(#hits == 2 and hits[1].targetEntityId == 41 and hits[2].targetEntityId == 42)
+      assert(hits[1].damage == 3 and hits[2].hitType == "Hit")
+      local unseen, next_cursor = status.inflictedHitsSince(cursor)
+      assert(#unseen == 0 and next_cursor == cursor)
+      local events, after = status.inflictedDamageSince()
+      assert(#events == 1 and #status.inflictedDamageSince(after) == 0)
+      return events[1]
+    )LUA");
+    ASSERT_TRUE(inflicted) << inflicted.error().what();
+    EXPECT_EQ(*inflicted, *observed);
+  });
 
 const GameTestRegistration
   sleeveLighting("HumanoidRenderTest", "BackSleeveRetainsArmorLightingWhileHolding", [](GameTest& fixture) {

@@ -134,22 +134,18 @@ public:
   void setPrimaryDirectives(Directives const& directives);
 
   // damage request and notification methods should only be called on the master controller.
-  [[nodiscard]] std::expected<List<DamageNotification>, StarException> applyDamageRequest(DamageRequest const& damageRequest);
-  void hitOther(EntityId targetEntityId, DamageRequest damageRequest);
-  void damagedOther(DamageNotification damageNotification);
-  List<DamageNotification> pullSelfDamageNotifications();
-  [[nodiscard]] std::expected<void, StarException> applySelfDamageRequest(DamageRequest dr);
+  [[nodiscard]] std::expected<List<DamageNotification>, StarException> apply_damage_request(DamageRequest const& request);
+  void hit_other(EntityId target_id, DamageRequest const& request);
+  void damaged_other(DamageNotification const& notification);
+  List<DamageNotification> pull_self_damage_notifications();
+  [[nodiscard]] std::expected<void, StarException> apply_self_damage_request(DamageRequest const& request);
 
-  // Pulls recent incoming and outgoing damage notifications.  In order for
-  // multiple viewers keep track of notifications and avoid duplicates, the
-  // damage notifications are indexed by a monotonically increasing 'step'
-  // value.  Every call will return the recent damage notifications, along with
-  // another step value to pass into the function on the next call to get
-  // damage notifications SINCE the first call.  If since is 0, returns all
-  // recent notifications available.
-  std::pair<List<DamageNotification>, std::uint64_t> damageTakenSince(std::uint64_t since = 0) const;
-  std::pair<List<std::pair<EntityId, DamageRequest>>, std::uint64_t> inflictedHitsSince(std::uint64_t since = 0) const;
-  std::pair<List<DamageNotification>, std::uint64_t> inflictedDamageSince(std::uint64_t since = 0) const;
+  // Each history has its own cursor. Readers receive owned JSON values and
+  // pass the returned cursor to the same history to read subsequent events.
+  using DamageHistory = std::pair<List<Json>, std::uint64_t>;
+  [[nodiscard]] std::expected<DamageHistory, StarException> damage_taken_since(std::uint64_t since = 0) const;
+  [[nodiscard]] std::expected<DamageHistory, StarException> inflicted_hits_since(std::uint64_t since = 0) const;
+  [[nodiscard]] std::expected<DamageHistory, StarException> inflicted_damage_since(std::uint64_t since = 0) const;
 
   [[nodiscard]] std::expected<void, StarException> init(Entity& parentEntity, ActorMovementController& movementController);
   [[nodiscard]] std::expected<void, StarException> uninit();
@@ -291,11 +287,11 @@ private:
   Directives m_primaryDirectives;
   EffectAnimatorGroup::ElementId m_primaryAnimatorId;
 
-  List<DamageNotification> m_pendingSelfDamageNotifications;
+  List<DamageNotification> m_pending_self_damage_notifications;
 
-  ObserverStream<std::pair<EntityId, DamageRequest>> m_recentHitsGiven;
-  ObserverStream<DamageNotification> m_recentDamageGiven;
-  ObserverStream<DamageNotification> m_recentDamageTaken;
+  ObserverStream<std::pair<EntityId, DamageRequest>> m_recent_hits_given;
+  ObserverStream<DamageNotification> m_recent_damage_given;
+  ObserverStream<DamageNotification> m_recent_damage_taken;
 };
 
 }

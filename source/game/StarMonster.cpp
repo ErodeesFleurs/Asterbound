@@ -42,7 +42,6 @@ import star.listener;
 import std;
 import star.format;
 import star.version;
-import star.observer_stream;
 
 import star.monster;
 import star.data_stream_extra;
@@ -587,7 +586,7 @@ std::expected<List<DamageNotification>, StarException> Monster::applyDamage(Dama
   if (!inWorld())
     return {};
 
-  auto result93 = m_statusController->applyDamageRequest(damage);
+  auto result93 = m_statusController->apply_damage_request(damage);
 if (!result93) return std::unexpected(std::move(result93.error()));
 auto notifications = std::move(*result93);
 
@@ -613,7 +612,7 @@ if (!result94) return std::unexpected(std::move(result94.error()));
 }
 
 std::expected<List<DamageNotification>, StarException> Monster::selfDamageNotifications() {
-  return m_statusController->pullSelfDamageNotifications();
+  return m_statusController->pull_self_damage_notifications();
 }
 
 std::expected<List<DamageSource>, StarException> Monster::damageSources() const {
@@ -893,13 +892,13 @@ return lightSources;
 
 std::expected<void, StarException> Monster::hitOther(EntityId targetEntityId, DamageRequest const& damageRequest) {
   if (inWorld() && isMaster())
-    m_statusController->hitOther(targetEntityId, damageRequest);
+    m_statusController->hit_other(targetEntityId, damageRequest);
   return {};
 }
 
 std::expected<void, StarException> Monster::damagedOther(DamageNotification const& damage) {
   if (inWorld() && isMaster())
-    m_statusController->damagedOther(damage);
+    m_statusController->damaged_other(damage);
   return {};
 }
 

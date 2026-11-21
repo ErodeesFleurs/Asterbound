@@ -202,11 +202,17 @@ Clears all ephemeral status effects.
 
 ---
 
-#### `List<pair<DamageNotification>>`, `unsigned` status.damageTakenSince([`unsigned` since = 0]])
+#### `List<DamageNotification>`, `unsigned` status.damageTakenSince([`unsigned` since = 0])
 
 Returns two values:
 * A list of damage notifications for the entity's damage taken since the specified heartbeat.
 * The most recent heartbeat to be passed into the function again to get the damage notifications taken since this function call.
+
+Pass the returned cursor back to the **same** query. Damage taken, inflicted
+hits and inflicted damage have independent histories. Each event and each
+master update advances the corresponding cursor. `keepDamageNotificationSteps`
+defaults to 120 steps; zero disables retention but still advances cursors.
+Reading does not consume events for other observers.
 
 Example:
 

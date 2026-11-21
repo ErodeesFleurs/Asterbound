@@ -165,11 +165,11 @@ std::expected<void, StarException> StatusController::configure(Json const& confi
   auto delta = config.get_uint("primaryScriptDelta", 1);
   if (!delta) return std::unexpected(std::move(delta.error()));
   m_primaryScript.set_update_delta(*delta);
-  auto keepSteps = config.get_uint("keepDamageNotificationSteps", 120);
-  if (!keepSteps) return std::unexpected(std::move(keepSteps.error()));
-  m_recentHitsGiven.setHistoryLimit(*keepSteps);
-  m_recentDamageGiven.setHistoryLimit(*keepSteps);
-  m_recentDamageTaken.setHistoryLimit(*keepSteps);
+  auto keep_steps = config.get_uint("keepDamageNotificationSteps", 120);
+  if (!keep_steps) return std::unexpected(std::move(keep_steps.error()));
+  m_recent_hits_given.set_history_limit(*keep_steps);
+  m_recent_damage_given.set_history_limit(*keep_steps);
+  m_recent_damage_taken.set_history_limit(*keep_steps);
   if (auto result = m_netGroup.add_net_element(*m_statCollection); !result) return std::unexpected(std::move(result.error()));
   if (auto result = m_netGroup.add_net_element(m_statusProperties); !result) return std::unexpected(std::move(result.error()));
   if (auto result = m_netGroup.add_net_element(m_parentDirectives); !result) return std::unexpected(std::move(result.error()));
@@ -532,49 +532,62 @@ void StatusController::setPrimaryDirectives(Directives const& directives) {
   m_primaryDirectives = directives;
 }
 
-std::expected<List<DamageNotification>, StarException> StatusController::applyDamageRequest(DamageRequest const& damageRequest) {
-  auto notifications = m_primaryScript.invoke<List<DamageNotification>>("applyDamageRequest", damageRequest);
+std::expected<List<DamageNotification>, StarException> StatusController::apply_damage_request(DamageRequest const& request) {
+  auto notifications = m_primaryScript.invoke<List<DamageNotification>>("applyDamageRequest", request);
   if (!notifications) {
     if (notifications.error().is<LuaScriptError>()) return List<DamageNotification>{};
     return std::unexpected(std::move(notifications.error()));
   }
   if (*notifications) {
-    for (auto const& notification : **notifications) m_recentDamageTaken.add(notification);
+    for (auto const& notification : **notifications) m_recent_damage_taken.push_back(notification);
     return std::move(**notifications);
   }
   return List<DamageNotification>{};
 }
 
-void StatusController::hitOther(EntityId targetEntityId, DamageRequest damageRequest) {
-  m_recentHitsGiven.add({targetEntityId, std::move(damageRequest)});
+void StatusController::hit_other(EntityId target_id, DamageRequest const& request) {
+  if (m_recent_hits_given.history_limit() == 0)
+    m_recent_hits_given.tick();
+  else
+    m_recent_hits_given.push_back({target_id, request});
 }
 
-void StatusController::damagedOther(DamageNotification damageNotification) {
-  m_recentDamageGiven.add(std::move(damageNotification));
+void StatusController::damaged_other(DamageNotification const& notification) {
+  m_recent_damage_given.push_back(notification);
 }
 
-List<DamageNotification> StatusController::pullSelfDamageNotifications() {
-  return std::exchange(m_pendingSelfDamageNotifications, {});
+List<DamageNotification> StatusController::pull_self_damage_notifications() {
+  return std::exchange(m_pending_self_damage_notifications, {});
 }
 
-std::expected<void, StarException> StatusController::applySelfDamageRequest(DamageRequest dr) {
-  auto notifications = applyDamageRequest(std::move(dr));
+std::expected<void, StarException> StatusController::apply_self_damage_request(DamageRequest const& request) {
+  auto notifications = apply_damage_request(request);
   if (!notifications) return std::unexpected(std::move(notifications.error()));
-  for (auto const& notification : *notifications) m_recentDamageTaken.add(notification);
-  m_pendingSelfDamageNotifications.append_range(std::move(*notifications));
+  if (m_pending_self_damage_notifications.empty())
+    m_pending_self_damage_notifications = std::move(*notifications);
+  else
+    m_pending_self_damage_notifications.append_range(std::move(*notifications));
   return {};
 }
 
-std::pair<List<DamageNotification>, std::uint64_t> StatusController::damageTakenSince(std::uint64_t since) const {
-  return m_recentDamageTaken.query(since);
+std::expected<StatusController::DamageHistory, StarException> StatusController::damage_taken_since(std::uint64_t since) const {
+  return m_recent_damage_taken.transform_since<Json>(since, [](DamageNotification const& notification) {
+    return notification.toJson();
+  });
 }
 
-std::pair<List<std::pair<EntityId, DamageRequest>>, std::uint64_t> StatusController::inflictedHitsSince(std::uint64_t since) const {
-  return m_recentHitsGiven.query(since);
+std::expected<StatusController::DamageHistory, StarException> StatusController::inflicted_hits_since(std::uint64_t since) const {
+  return m_recent_hits_given.transform_since<Json>(since, [](std::pair<EntityId, DamageRequest> const& hit) -> std::expected<Json, StarException> {
+    auto json = hit.second.toJson();
+    if (!json) return std::unexpected(std::move(json.error()));
+    return json->set("targetEntityId", hit.first);
+  });
 }
 
-std::pair<List<DamageNotification>, std::uint64_t> StatusController::inflictedDamageSince(std::uint64_t since) const {
-  return m_recentDamageGiven.query(since);
+std::expected<StatusController::DamageHistory, StarException> StatusController::inflicted_damage_since(std::uint64_t since) const {
+  return m_recent_damage_given.transform_since<Json>(since, [](DamageNotification const& notification) {
+    return notification.toJson();
+  });
 }
 
 std::expected<void, StarException> StatusController::init(Entity& parentEntity, ActorMovementController& movementController) {
@@ -604,9 +617,9 @@ std::expected<void, StarException> StatusController::uninit() {
   }
   auto primary = uninitPrimaryScript();
   if (!primary && !error) error = std::move(primary.error());
-  m_recentHitsGiven.reset();
-  m_recentDamageGiven.reset();
-  m_recentDamageTaken.reset();
+  m_recent_hits_given.reset();
+  m_recent_damage_given.reset();
+  m_recent_damage_taken.reset();
   m_parentEntity.reset();
   m_movementController.reset();
   if (error) return std::unexpected(std::move(*error));
@@ -655,9 +668,9 @@ std::expected<void, StarException> StatusController::blank_net_delta(float inter
 
 std::expected<void, StarException> StatusController::tickMaster(float dt) {
   m_statCollection->tickMaster(dt);
-  m_recentHitsGiven.tick(1);
-  m_recentDamageGiven.tick(1);
-  m_recentDamageTaken.tick(1);
+  m_recent_hits_given.tick();
+  m_recent_damage_given.tick();
+  m_recent_damage_taken.tick();
   bool statusImmune = statPositive("statusImmunity");
   if (!statusImmune && m_movementController->get().liquidPercentage() > m_minimumLiquidStatusEffectPercentage) {
     auto database = m_root.liquidsDatabase();
