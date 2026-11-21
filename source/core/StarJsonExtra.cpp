@@ -211,7 +211,7 @@ namespace {
     if (!vertices)
       return std::unexpected(std::move(vertices.error()));
     Polygon<Coordinate> polygon;
-    polygon.vertexes().reserve((*vertices)->size());
+    polygon.vertices().reserve((*vertices)->size());
     for (auto const& vertex : **vertices) {
       auto converted = convert(vertex);
       if (!converted)
@@ -234,7 +234,7 @@ std::expected<PolyI, StarException> json_to_polyi(Json const& source) {
 Json json_from_polyf(PolyF const& poly) {
   JsonArray result;
   result.reserve(poly.sides());
-  for (auto const& vertex : poly.vertexes())
+  for (auto const& vertex : poly.vertices())
     result.push_back(JsonArray{vertex[0], vertex[1]});
   return result;
 }

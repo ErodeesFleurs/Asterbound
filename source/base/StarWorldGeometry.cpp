@@ -142,7 +142,7 @@ std::expected<StaticList<Line2F, 2>, StarException> WorldGeometry::splitLine(Lin
 }
 
 std::expected<StaticList<PolyF, 2>, StarException> WorldGeometry::splitPoly(PolyF const& poly) const {
-  if (poly.isNull() || m_size[0] == 0)
+  if (poly.empty() || m_size[0] == 0)
     return StaticList<PolyF, 2>::create({poly});
 
   Array<PolyF, 2> res;
@@ -192,9 +192,9 @@ std::expected<StaticList<PolyF, 2>, StarException> WorldGeometry::splitPoly(Poly
     }
   }
 
-  if (res[1].isNull())
+  if (res[1].empty())
     return StaticList<PolyF, 2>::create({res[0]});
-  if (res[0].isNull())
+  if (res[0].empty())
     return StaticList<PolyF, 2>::create({res[1]});
   else
     return StaticList<PolyF, 2>::create({res[0], res[1]});
@@ -299,7 +299,7 @@ std::expected<float, StarException> WorldGeometry::polyOverlapArea(PolyF const& 
     auto second = splitPoly(poly2);
     if (!second) return std::unexpected(std::move(second.error()));
     for (auto const& p2 : *second)
-      area += PolyF::clip(p1, p2).convexArea();
+      area += PolyF::clip(p1, p2).signed_area();
   }
   return area;
 }
@@ -379,7 +379,7 @@ std::expected<std::optional<Vec2F>, StarException> WorldGeometry::lineIntersects
     auto polys = splitPoly(poly);
     if (!polys) return std::unexpected(std::move(polys.error()));
     for (auto const& b : *polys) {
-      if (auto intersection = b.lineIntersection(a))
+      if (auto intersection = b.line_intersection(a))
         return intersection->point;
     }
   }

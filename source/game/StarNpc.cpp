@@ -768,7 +768,7 @@ return Vec2F{std::move(*result161)[0] * numericalDirection(std::move(*result162)
 }
 
 RectF Npc::collisionArea() const {
-  return m_movementController->collisionPoly().boundBox();
+  return m_movementController->collisionPoly().bounding_box();
 }
 
 std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Npc::write_net_state(std::uint64_t fromVersion, NetCompatibilityRules rules) {
@@ -2305,7 +2305,7 @@ return InteractAction::create(std::move(*result488), entityId(), std::move(*resu
 }
 
 RectF Npc::interactiveBoundBox() const {
-  return m_movementController->collisionPoly().boundBox();
+  return m_movementController->collisionPoly().bounding_box();
 }
 
 std::optional<EntityAnchorState> Npc::loungingIn() const {

@@ -642,7 +642,7 @@ std::expected<std::optional<bool>, StarException> PathFinder::explore(std::optio
 
   RectF PathFinder::standing_bounds() const {
     if (!m_standing_bounds)
-      m_standing_bounds = m_movement_params.standingPoly->boundBox();
+      m_standing_bounds = m_movement_params.standingPoly->bounding_box();
     return *m_standing_bounds;
   }
 

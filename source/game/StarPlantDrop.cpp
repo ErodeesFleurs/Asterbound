@@ -355,7 +355,7 @@ RectF PlantDrop::metaBoundBox() const {
 RectF PlantDrop::collisionRect() const {
   PolyF shape = PolyF(m_collisionRect);
   shape.rotate(m_movementController->rotation());
-  return shape.boundBox();
+  return shape.bounding_box();
 }
 
 std::expected<void, StarException> PlantDrop::update(float dt, std::uint64_t) {

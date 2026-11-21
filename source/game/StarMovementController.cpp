@@ -442,11 +442,11 @@ PolyF MovementController::collisionBody() const {
 RectF MovementController::localBoundBox() const {
   auto poly = collisionPoly();
   poly.rotate(rotation());
-  return poly.boundBox();
+  return poly.bounding_box();
 }
 
 RectF MovementController::collisionBoundBox() const {
-  return collisionBody().boundBox();
+  return collisionBody().bounding_box();
 }
 
 bool MovementController::isColliding() const {
@@ -483,7 +483,7 @@ bool MovementController::zeroG() const {
 
 bool MovementController::atWorldLimit(bool bottomOnly) const {
   if (m_world) {
-    if (!collisionPoly().isNull()) {
+    if (!collisionPoly().empty()) {
       auto bounds = collisionBoundBox();
       return bounds.yMin() <= 0 || (!bottomOnly && bounds.yMax() >= m_world->get().geometry().height());
     } else {
@@ -697,7 +697,7 @@ std::expected<void, StarException> MovementController::tickMaster(float dt) {
     float dtSteps = dt / steps;
     Vec2F movement = relativeVelocity * dtSteps;
 
-    if (!(*m_parameters.collisionEnabled) || collisionPoly().isNull()) {
+    if (!(*m_parameters.collisionEnabled) || collisionPoly().empty()) {
       setPosition(position() + movement);
       m_surfaceSlope = Vec2F(1, 0);
       m_surfaceVelocity = Vec2F(0, 0);
@@ -720,7 +720,7 @@ std::expected<void, StarException> MovementController::tickMaster(float dt) {
           + (*m_parameters.maximumPlatformCorrectionVelocityFactor) * velocityMagnitude;
       Vec2F bodyCenter = body.center();
 
-      RectF queryBounds = body.boundBox().padded(maximumCorrection);
+      RectF queryBounds = body.bounding_box().padded(maximumCorrection);
       queryBounds.combine(queryBounds.translated(movement));
       if (auto result = queryCollisions(queryBounds); !result) return std::unexpected(std::move(result.error()));
       auto result = collisionMove(m_workingCollisions, body, movement, ignorePlatforms, (*m_parameters.enableSurfaceSlopeCorrection) && !zeroG(),
@@ -885,7 +885,7 @@ std::expected<void, StarException> MovementController::tickSlave(float dt) {
     }
   }
 
-  auto liquid = worldRef.liquidLevel(collisionBody().boundBox());
+  auto liquid = worldRef.liquidLevel(collisionBody().bounding_box());
   if (!liquid) return std::unexpected(std::move(liquid.error()));
   LiquidLevel cll = *liquid;
   m_liquidPercentage = std::clamp(cll.level, 0.0f, 1.0f);
@@ -914,7 +914,7 @@ std::expected<void, StarException> MovementController::forEachMovingCollision(Re
         if (mc->categoryFilter.check(m_parameters.physicsEffectCategories.value_or(StringSet{}))) {
           PolyF poly = std::move(mc->collision);
           poly.translate(geometry.nearestTo(region.min(), mc->position));
-          RectF polyBounds = poly.boundBox();
+          RectF polyBounds = poly.bounding_box();
 
           if (region.intersects(polyBounds)) {
             // early exit if the callback returns false
@@ -936,7 +936,7 @@ std::expected<void, StarException> MovementController::updateForceRegions(float)
   auto geometry = worldRef.geometry();
   auto pos = position();
   auto body = collisionBody();
-  RectF boundBox = body.boundBox();
+  RectF boundBox = body.bounding_box();
 
   m_appliedForceRegion = false;
   auto handleForceRegions = [&, &controller = *this](List<PhysicsForceRegion> const& forces) -> std::expected<void, StarException> {
@@ -959,7 +959,7 @@ std::expected<void, StarException> MovementController::updateForceRegions(float)
           auto const& directionalForceRegion = std::get<DirectionalForceRegion>(force);
           auto overlap = geometry.polyOverlapArea(directionalForceRegion.region, body);
           if (!overlap) return std::unexpected(std::move(overlap.error()));
-          float forceEffect = *overlap / body.convexArea();
+          float forceEffect = *overlap / body.signed_area();
           if (directionalForceRegion.xTargetVelocity)
             controller.approachXVelocity(*directionalForceRegion.xTargetVelocity, directionalForceRegion.controlForce * forceEffect);
           if (directionalForceRegion.yTargetVelocity)
@@ -982,7 +982,7 @@ std::expected<void, StarException> MovementController::updateForceRegions(float)
           auto const& gradientForceRegion = std::get<GradientForceRegion>(force);
           auto overlap = geometry.polyOverlapArea(gradientForceRegion.region, body);
           if (!overlap) return std::unexpected(std::move(overlap.error()));
-          float overlapFactor = *overlap / body.convexArea();
+          float overlapFactor = *overlap / body.signed_area();
 
           Vec2F gNorm = gradientForceRegion.gradient.direction();
           Vec2F pDiff = geometry.diff(pos, gradientForceRegion.gradient.min());
@@ -1021,7 +1021,7 @@ std::expected<void, StarException> MovementController::updateLiquidPercentage() 
   World& worldRef = activeWorld->get();
   auto pos = position();
   auto body = collisionBody();
-  RectF boundBox = body.boundBox();
+  RectF boundBox = body.bounding_box();
 
   LiquidLevel cll;
   if (boundBox.isEmpty())
@@ -1078,7 +1078,7 @@ MovementController::CollisionResult MovementController::collisionMove(List<Colli
   float separationTolerance = 0.001f * (dt * 60.f);
   maximumPlatformCorrection *= (dt * 60.f);
 
-  if (body.isNull())
+  if (body.empty())
     return {movement, Vec2F(), {}, false, false, Vec2F(1, 0), CollisionKind::None};
 
   // The center and candidate positions stay fixed through all separation passes.
@@ -1201,7 +1201,7 @@ MovementController::CollisionResult MovementController::collisionMove(List<Colli
       // touching edge that is the most horizontally overlapped with the
       // geometry, rather than off to the side.
       float maxSideHorizontalOverlap = 0.0f;
-      RectF touchingBounds = checkBody.boundBox();
+      RectF touchingBounds = checkBody.bounding_box();
       touchingBounds.pad(separationTolerance);
       for (auto const& cp : collisionPolys) {
         if (!cp.polyBounds.intersects(touchingBounds))
@@ -1247,17 +1247,17 @@ MovementController::CollisionSeparation MovementController::collisionSeparate(Li
 
   PolyF::IntersectResult intersectResult;
   PolyF correctedPoly = poly;
-  RectF correctedBoundBox = correctedPoly.boundBox();
+  RectF correctedBoundBox = correctedPoly.bounding_box();
   for (auto const& cp : collisionPolys) {
     if ((ignorePlatforms && cp.collisionKind == CollisionKind::Platform) || !correctedBoundBox.intersects(cp.polyBounds, false))
       continue;
 
     if (upward)
-      intersectResult = correctedPoly.directionalSatIntersection(cp.poly, Vec2F(0, 1), false);
+      intersectResult = correctedPoly.directional_sat_intersection(cp.poly, Vec2F(0, 1), false);
     else if (cp.collisionKind == CollisionKind::Platform)
-      intersectResult = correctedPoly.directionalSatIntersection(cp.poly, Vec2F(0, 1), true);
+      intersectResult = correctedPoly.directional_sat_intersection(cp.poly, Vec2F(0, 1), true);
     else
-      intersectResult = correctedPoly.satIntersection(cp.poly);
+      intersectResult = correctedPoly.sat_intersection(cp.poly);
 
     if (cp.collisionKind == CollisionKind::Platform && intersectResult.intersects) {
       if (intersectResult.overlap[1] <= 0 || intersectResult.overlap[1] > maximumPlatformCorrection)
@@ -1267,7 +1267,7 @@ MovementController::CollisionSeparation MovementController::collisionSeparate(Li
     if (intersectResult.intersects) {
       intersects = true;
       correctedPoly.translate(intersectResult.overlap);
-      correctedBoundBox = correctedPoly.boundBox();
+      correctedBoundBox = correctedPoly.bounding_box();
       separation.correction += intersectResult.overlap;
       if (cp.movingCollisionId)
         separation.movingCollisionId = cp.movingCollisionId;
@@ -1282,7 +1282,7 @@ MovementController::CollisionSeparation MovementController::collisionSeparate(Li
       if (cp.collisionKind == CollisionKind::Platform || !correctedBoundBox.intersects(cp.polyBounds, false))
         continue;
 
-      intersectResult = correctedPoly.satIntersection(cp.poly);
+      intersectResult = correctedPoly.sat_intersection(cp.poly);
       if (intersectResult.intersects && intersectResult.overlap.magnitude_squared() > separationToleranceSquared) {
         separation.collisionKind = maxOrNullCollision(separation.collisionKind, cp.collisionKind);
         separation.solutionFound = false;
@@ -1361,7 +1361,7 @@ std::expected<void, StarException> MovementController::queryCollisions(RectF con
   auto geometry = worldRef.geometry();
 
   auto blocks = worldRef.forEachCollisionBlock(RectI::integral(region.padded(1)), [&](CollisionBlock const& block) -> std::expected<void, StarException> {
-      if (block.kind != CollisionKind::None && !block.poly.isNull()) {
+      if (block.kind != CollisionKind::None && !block.poly.empty()) {
         RectF polyBounds = block.polyBounds;
         Vec2F basePosition = block.poly.vertex(0);
         Vec2F nearTranslation = geometry.nearestTo(region.min(), basePosition) - basePosition;

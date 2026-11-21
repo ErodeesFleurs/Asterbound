@@ -788,7 +788,7 @@ std::expected<void, StarException> ItemDrop::initialize() {
   if (!parameters->physicsEffectCategories)
     parameters->physicsEffectCategories = StringSet({"itemdrop"});
   if (parameters->collisionPoly)
-    m_boundBox = parameters->collisionPoly->boundBox();
+    m_boundBox = parameters->collisionPoly->bounding_box();
   else
     m_boundBox = RectF{-0.499, -0.499, 0.499, 0.499};
   if (auto applied = m_movementController->applyParameters(*parameters); !applied)

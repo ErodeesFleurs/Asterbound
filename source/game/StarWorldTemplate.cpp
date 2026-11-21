@@ -206,7 +206,7 @@ std::expected<std::shared_ptr<WorldTemplate>, StarException> WorldTemplate::crea
     if (!region) return std::unexpected(std::move(region.error()));
     auto solid = config.get_bool("solid");
     if (!solid) return std::unexpected(std::move(solid.error()));
-    auto bounds = region->boundBox();
+    auto bounds = region->bounding_box();
     result->m_customTerrainRegions.push_back({.region = std::move(*region), .regionBounds = bounds, .solid = *solid});
   }
   auto name = result->determineWorldName();
@@ -346,13 +346,13 @@ std::expected<std::optional<Vec2I>, StarException> WorldTemplate::findSensiblePl
 }
 
 void WorldTemplate::addCustomTerrainRegion(PolyF poly) {
-  auto bounds = poly.boundBox();
+  auto bounds = poly.bounding_box();
   m_customTerrainRegions.push_back({.region = std::move(poly), .regionBounds = bounds, .solid = true});
   m_blockCache.clear();
 }
 
 void WorldTemplate::addCustomSpaceRegion(PolyF poly) {
-  auto bounds = poly.boundBox();
+  auto bounds = poly.bounding_box();
   m_customTerrainRegions.push_back({.region = std::move(poly), .regionBounds = bounds, .solid = false});
   m_blockCache.clear();
 }

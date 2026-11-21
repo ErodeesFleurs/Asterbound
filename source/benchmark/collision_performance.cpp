@@ -33,7 +33,7 @@ struct MovementCollisionBenchmarkAccess {
 
   static Candidate candidate(PolyF poly, CollisionKind kind = CollisionKind::Block,
                              std::optional<MovingCollisionId> id = {}) {
-    auto bounds = poly.boundBox();
+    auto bounds = poly.bounding_box();
     auto center = poly.center();
     return {std::move(poly), bounds, center, id, kind, 0.0f};
   }

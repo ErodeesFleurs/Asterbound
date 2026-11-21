@@ -195,11 +195,11 @@ std::expected<std::optional<std::pair<Vec2F, std::optional<Vec2F>>>, StarExcepti
   std::optional<PolyF::LineIntersectResult> closestIntersection;
 
   auto scanned = forEachCollisionBlock(RectI::integral(RectF::boundBoxOf(line.min(), line.max()).padded(1)), [&](CollisionBlock const& block) -> std::expected<void, StarException> {
-      if (block.poly.isNull() || !isColliding(block.kind, collisionSet))
+      if (block.poly.empty() || !isColliding(block.kind, collisionSet))
         return {};
 
       Vec2F nearMin = geometry.nearestTo(block.poly.center(), line.min());
-      auto intersection = block.poly.lineIntersection(Line2F(nearMin, nearMin + line.diff()));
+      auto intersection = block.poly.line_intersection(Line2F(nearMin, nearMin + line.diff()));
       if (intersection && (!closestIntersection || intersection->along < closestIntersection->along)) {
         intersectPoly = block.poly;
         closestIntersection = intersection;
@@ -211,7 +211,7 @@ std::expected<std::optional<std::pair<Vec2F, std::optional<Vec2F>>>, StarExcepti
 
   if (closestIntersection) {
     auto point = line.eval(closestIntersection->along);
-    auto normal = closestIntersection->intersectedSide.transform([&](std::uint64_t side) { return intersectPoly->normal(side); });
+    auto normal = closestIntersection->intersected_side.transform([&](std::uint64_t side) { return intersectPoly->normal(side); });
     return std::make_pair(point, normal);
   }
   return {};
@@ -223,7 +223,7 @@ std::expected<bool, StarException> World::polyCollision(PolyF const& poly, Colli
   PolyF translatedPoly;
   bool collided = false;
 
-  auto scanned = forEachCollisionBlock(RectI::integral(poly.boundBox()).padded(1), [&](CollisionBlock const& block) -> std::expected<void, StarException> {
+  auto scanned = forEachCollisionBlock(RectI::integral(poly.bounding_box()).padded(1), [&](CollisionBlock const& block) -> std::expected<void, StarException> {
       if (collided || !isColliding(block.kind, collisionSet))
         return {};
 

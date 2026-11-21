@@ -141,7 +141,7 @@ RenderQuad renderFlatRect(RectF const& rect, Vec4B color, float param1) {
 }
 
 RenderPoly renderFlatPoly(PolyF const& poly, Vec4B color, float param1) {
-  return RenderPoly(poly.vertexes(), color, param1);
+  return RenderPoly(poly.vertices(), color, param1);
 }
 
 }

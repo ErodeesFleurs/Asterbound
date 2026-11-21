@@ -1971,7 +1971,7 @@ std::expected<LuaCallbacks, StarException> Object::makeObjectCallbacks() {
     return std::unexpected(std::move(currentWorldResult.error()));
   auto& currentWorld = currentWorldResult->get();
   if (auto entity = currentWorld.entity(entityId))
-    return !entity->collisionArea().overlap(volume().boundBox()).isEmpty();
+    return !entity->collisionArea().overlap(volume().bounding_box()).isEmpty();
   return false;
 });
   if (!operation25)

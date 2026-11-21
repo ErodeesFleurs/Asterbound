@@ -57,7 +57,7 @@ std::expected<PhysicsMovingCollision, StarException> PhysicsMovingCollision::fro
 }
 
 RectF PhysicsMovingCollision::boundBox() const {
-  return collision.boundBox().translated(position);
+  return collision.bounding_box().translated(position);
 }
 
 void PhysicsMovingCollision::translate(Vec2F const& pos) {

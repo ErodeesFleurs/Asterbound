@@ -372,6 +372,15 @@ Reuse `File/BTree/StageRollback` and `File/BTree/Commit` for matched timings;
 pressure separately: the corrected capacity bound can increase misses compared
 with the former unbounded insertion path.
 
+### Polygon geometry
+
+`PolyTest.*` covers strict SAT penetration (touching is not penetration),
+singleton hulls, adjacent vertex compaction, axis-aligned bounds and signed
+area. For movement changes run the existing `performance_benchmarks` with
+`--benchmark_filter='^Collision/'`: compare the full result and permutation
+labels between builds before comparing timings. One iteration is 64 moves;
+these workloads do not measure clipping or hull construction.
+
 ### Periodic scheduling
 
 `PeriodicTest.*` checks tick cadence and phase preservation when the interval changes.

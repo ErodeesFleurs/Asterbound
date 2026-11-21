@@ -627,7 +627,7 @@ RectF Vehicle::metaBoundBox() const {
 }
 
 RectF Vehicle::collisionArea() const {
-  return m_movementController->collisionPoly().boundBox();
+  return m_movementController->collisionPoly().bounding_box();
 }
 
 Vec2F Vehicle::velocity() const {

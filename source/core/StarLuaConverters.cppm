@@ -135,7 +135,7 @@ struct LuaConverter<Rect<T>> {
 template <typename T>
 struct LuaConverter<Polygon<T>> {
   [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, Polygon<T> const& poly) {
-    return stack.push_array(poly.vertexes());
+    return stack.push_array(poly.vertices());
   }
 
   [[nodiscard]] static std::expected<std::optional<Polygon<T>>, StarException> to(LuaStackValue v) {

@@ -164,7 +164,7 @@ std::expected<std::shared_ptr<LoungeAnchor const>, StarException> LoungeableObje
     loungeAnchor->position[0] *= -1;
   loungeAnchor->position += position();
 
-  loungeAnchor->exitBottomPosition = Vec2F(loungeAnchor->position[0], position()[1] + volume().boundBox().min()[1]);
+  loungeAnchor->exitBottomPosition = Vec2F(loungeAnchor->position[0], position()[1] + volume().bounding_box().min()[1]);
 
   loungeAnchor->angle = m_sitAngle;
   if (loungeAnchor->direction == Direction::Left)

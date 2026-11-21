@@ -63,7 +63,7 @@ std::expected<void, StarException> DrawablePainter::drawDrawableProjected(Drawab
     poly.scale(Vec2F::filled(scale));
     poly.translate(position);
 
-    primitives.emplace_back(std::in_place_type_t<RenderPoly>(), poly.vertexes(), color, 0.0f);
+    primitives.emplace_back(std::in_place_type_t<RenderPoly>(), poly.vertices(), color, 0.0f);
 
   } else if (std::holds_alternative<Drawable::ImagePart>(drawable.part)) {
     auto const& imagePart = std::get<Drawable::ImagePart>(drawable.part);

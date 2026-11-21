@@ -99,7 +99,7 @@ std::expected<DirectionalForceRegion, StarException> DirectionalForceRegion::fro
 }
 
 RectF DirectionalForceRegion::boundBox() const {
-  return region.boundBox();
+  return region.bounding_box();
 }
 
 void DirectionalForceRegion::translate(Vec2F const& pos) {
@@ -204,7 +204,7 @@ std::expected<GradientForceRegion, StarException> GradientForceRegion::fromJson(
 }
 
 RectF GradientForceRegion::boundBox() const {
-  return region.boundBox();
+  return region.bounding_box();
 }
 
 void GradientForceRegion::translate(Vec2F const& pos) {

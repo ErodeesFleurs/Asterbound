@@ -1791,7 +1791,7 @@ std::expected<bool, StarException> PathController::validate_edge(ActorMovementCo
     collided = *moving;
   }
   if (collided) {
-    auto bounds = RectI::integral(poly.boundBox());
+    auto bounds = RectI::integral(poly.bounding_box());
     auto tile_collision = m_world.get().rectTileCollision(bounds);
     if (!tile_collision)
       return std::unexpected(std::move(tile_collision.error()));
@@ -1800,7 +1800,7 @@ std::expected<bool, StarException> PathController::validate_edge(ActorMovementCo
     auto solid = m_world.get().rectTileCollision(bounds, solid_collision);
     if (!solid) return std::unexpected(std::move(solid.error()));
     if (*solid) return false;
-    auto opened = open_doors(poly.boundBox());
+    auto opened = open_doors(poly.bounding_box());
     if (!opened) return std::unexpected(std::move(opened.error()));
     if (!*opened) return false;
   }
@@ -1839,7 +1839,7 @@ std::expected<bool, StarException> PathController::moving_collision(ActorMovemen
                                                                     PolyF const& collision_poly) {
   bool collided = false;
   auto scanned = movement_controller.forEachMovingCollision(
-    collision_poly.boundBox(),
+    collision_poly.bounding_box(),
     [&](MovingCollisionId, PhysicsMovingCollision, PolyF poly, RectF) -> std::expected<bool, StarException> {
       if (poly.intersects(collision_poly)) {
         // set collided and stop iterating

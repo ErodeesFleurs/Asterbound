@@ -299,14 +299,14 @@ template <typename DataT>
   requires(stream_writable<DataT>)
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds,
                                                                                           Polygon<DataT> const& poly) {
-  return ds.write_container(poly.vertexes()).transform([&ds] { return std::ref(ds); });
+  return ds.write_container(poly.vertices()).transform([&ds] { return std::ref(ds); });
 }
 
 template <typename DataT>
   requires(stream_readable<DataT>)
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds,
                                                                                           Polygon<DataT>& poly) {
-  return ds.read_container(poly.vertexes()).transform([&ds] { return std::ref(ds); });
+  return ds.read_container(poly.vertices()).transform([&ds] { return std::ref(ds); });
 }
 
 template <typename DataT, std::size_t Dimensions>

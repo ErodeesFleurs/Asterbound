@@ -70,11 +70,11 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeMovementControllerCa
       !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.register_callback("boundBox", [&movementController]() -> RectF {
-      return movementController.collisionPoly().boundBox();
+      return movementController.collisionPoly().bounding_box();
     }); !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.register_callback("collisionArea", [&movementController]() -> float {
-      return movementController.collisionPoly().convexArea();
+      return movementController.collisionPoly().signed_area();
     }); !registration)
     return std::unexpected(std::move(registration.error()));
 

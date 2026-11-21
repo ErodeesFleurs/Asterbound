@@ -5159,7 +5159,7 @@ const GameTestRegistration mainbarGeometry("LuaMainBar", "PhysicalPolygonTransfo
         PolyF polygon(*original);
         polygon.translate(origin);
         polygon.scale(scale, origin);
-        auto bounds = polygon.boundBox();
+        auto bounds = polygon.bounding_box();
         for (Vec2F point : {bounds.center(), bounds.min(), bounds.max(),
             Vec2F{bounds.xMin(), bounds.center().y()}, Vec2F{bounds.xMax(), bounds.center().y()},
             Vec2F{bounds.center().x(), bounds.yMin()}, Vec2F{bounds.center().x(), bounds.yMax()},

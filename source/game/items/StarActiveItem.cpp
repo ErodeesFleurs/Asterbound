@@ -425,7 +425,7 @@ std::expected<List<DamageSource>, StarException> ActiveItem::damageSources() con
       if (!itemOwner)
         return std::unexpected(std::move(itemOwner.error()));
       if (itemOwner->get().facingDirection() == Direction::Left)
-        poly.flipHorizontal(0.0f);
+        poly.flip_horizontal(0.0f);
       auto position = handPosition(Vec2F());
       if (!position)
         return std::unexpected(std::move(position.error()));
@@ -456,7 +456,7 @@ std::expected<List<PolyF>, StarException> ActiveItem::shieldPolys() const {
     if (!itemOwner)
       return std::unexpected(std::move(itemOwner.error()));
     if (itemOwner->get().facingDirection() == Direction::Left)
-      sp.flipHorizontal(0.0f);
+      sp.flip_horizontal(0.0f);
     auto position = handPosition(Vec2F());
     if (!position)
       return std::unexpected(std::move(position.error()));
@@ -476,7 +476,7 @@ std::expected<List<PhysicsForceRegion>, StarException> ActiveItem::forceRegions(
       if (!itemOwner)
         return std::unexpected(std::move(itemOwner.error()));
       if (itemOwner->get().facingDirection() == Direction::Left)
-        dfr.region.flipHorizontal(0.0f);
+        dfr.region.flip_horizontal(0.0f);
       auto position = handPosition(Vec2F());
       if (!position)
         return std::unexpected(std::move(position.error()));

@@ -689,7 +689,7 @@ std::expected<void, StarException> StatusController::tickMaster(float dt) {
     if (!world) return std::unexpected(std::move(world.error()));
     List<PersistentStatusEffect> entityEffects;
     if (!statusImmune) {
-      auto visited = world->get().forEachEntity(collisionBody.boundBox(),
+      auto visited = world->get().forEachEntity(collisionBody.bounding_box(),
         [world = *world, collisionBody, &entityEffects](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
           if (auto effectEntity = as<StatusEffectEntity>(entity)) {
             auto area = effectEntity->statusEffectArea();

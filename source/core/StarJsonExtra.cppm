@@ -444,7 +444,7 @@ template <typename Float>
 Polygon<Float> fix_inside_out_poly(Polygon<Float> p) {
   if (p.sides() > 2) {
     if ((p.side(1).diff() ^ p.side(0).diff()) > 0)
-      std::reverse(p.vertexes().begin(), p.vertexes().end());
+      std::reverse(p.vertices().begin(), p.vertices().end());
   }
   return p;
 }

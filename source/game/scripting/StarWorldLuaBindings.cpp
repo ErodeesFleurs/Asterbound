@@ -581,7 +581,7 @@ namespace LuaBindings {
       auto queried = std::move(*queriedResult);
       entities = std::move(queried);
     } else if (polyQuery) {
-      auto queriedResult = world.query<EntityT>(polyQuery->boundBox(), innerSelector);
+      auto queriedResult = world.query<EntityT>(polyQuery->bounding_box(), innerSelector);
       if (!queriedResult)
         return std::unexpected(std::move(queriedResult.error()));
       auto queried = std::move(*queriedResult);
@@ -2435,7 +2435,7 @@ namespace LuaBindings {
     poly.translate(position);
     List<CollisionPoly> collisions;
     CollisionSet collisionSet = maybeCollisionSet.value_or(DefaultCollisionSet);
-    auto blocksResult = world.forEachCollisionBlock(RectI::integral(poly.boundBox().padded(maximumCorrection + 1.0f)),
+    auto blocksResult = world.forEachCollisionBlock(RectI::integral(poly.bounding_box().padded(maximumCorrection + 1.0f)),
         [&](auto const& block) -> std::expected<void, StarException> {
           if (collisionSet.contains(block.kind))
             collisions.push_back({block.poly, Vec2F(block.space), 0.0f});
@@ -2457,9 +2457,9 @@ namespace LuaBindings {
         for (auto const& cp : collisions) {
           PolyF::IntersectResult intersection;
           if (direction)
-            intersection = body.directionalSatIntersection(cp.poly, *direction, false);
+            intersection = body.directional_sat_intersection(cp.poly, *direction, false);
           else
-            intersection = body.satIntersection(cp.poly);
+            intersection = body.sat_intersection(cp.poly);
 
           if (intersection.intersects) {
             anyIntersects = true;

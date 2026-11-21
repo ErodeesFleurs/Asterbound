@@ -518,7 +518,7 @@ RectF Monster::metaBoundBox() const {
 }
 
 RectF Monster::collisionArea() const {
-  return m_movementController->collisionPoly().boundBox();
+  return m_movementController->collisionPoly().bounding_box();
 }
 
 Vec2F Monster::velocity() const {
@@ -658,12 +658,8 @@ DamageSource ds = std::move(*result102);
         auto result103 = m_networkedAnimator->partTransformation(anchorPart);
 if (!result103) return std::unexpected(std::move(result103.error()));
 poly.transform(std::move(*result103));
-if (m_networkedAnimator->flipped()) {
-  if constexpr (std::same_as<std::remove_cvref_t<decltype(poly)>, Line2F>)
-    poly.flip_horizontal(m_networkedAnimator->flippedRelativeCenterLine());
-  else
-    poly.flipHorizontal(m_networkedAnimator->flippedRelativeCenterLine());
-}
+        if (m_networkedAnimator->flipped())
+          poly.flip_horizontal(m_networkedAnimator->flippedRelativeCenterLine());
       }
       return {};
     }, ds.damageArea);

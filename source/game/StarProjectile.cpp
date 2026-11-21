@@ -479,12 +479,12 @@ if (!result925) return std::unexpected(std::move(result925.error()));
   if (useDamageLine)
     addDamageSource(Line2F(positionDelta, Vec2F()));
 
-  if (!m_config->damagePoly.isNull()) {
+  if (!m_config->damagePoly.empty()) {
     PolyF damagePoly = m_config->damagePoly;
     if (m_config->flippable) {
       auto angleSide = getAngleSide(m_movementController->rotation(), true);
       if (angleSide.second == Direction::Left)
-        damagePoly.flipHorizontal(0);
+        damagePoly.flip_horizontal(0);
       damagePoly.rotate(angleSide.first);
     } else {
       damagePoly.rotate(m_movementController->rotation());
@@ -514,7 +514,7 @@ if (!result919) return std::unexpected(std::move(result919.error()));
 auto geometry = result919->get().geometry();
           Vec2F checkVec = m_movementController->velocity().normalized() * 5;
           Vec2F nearMin = geometry.nearestTo(hitPoly->center(), m_movementController->position() - checkVec);
-          if (auto intersection = hitPoly->lineIntersection(Line2F(nearMin, nearMin + checkVec * 2)))
+          if (auto intersection = hitPoly->line_intersection(Line2F(nearMin, nearMin + checkVec * 2)))
             m_movementController->setPosition(intersection->point);
         }
       }

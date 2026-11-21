@@ -1604,7 +1604,7 @@ std::expected<Vec2F, StarException> Player::mouthPosition(bool ignoreAdjustments
 }
 
 RectF Player::collisionArea() const {
-  return m_movementController->collisionPoly().boundBox();
+  return m_movementController->collisionPoly().bounding_box();
 }
 
 std::expected<void, StarException> Player::revive(Vec2F const& footPosition) {

@@ -10,25 +10,23 @@ import star.math_common;
 using namespace Star;
 
 TEST(PolyTest, ConvexHull) {
-  auto randomResult = RandomService::create();
-  ASSERT_TRUE(randomResult);
-  auto& random = **randomResult;
-  PolyF::VertexList inputVertexes;
+  RandomService random(1947);
+  PolyF::VertexList input_vertices;
   for (unsigned i = 0; i < 1000; ++i) {
     float angle = random.uniform_float() * 2 * std::numbers::pi;
-    inputVertexes.push_back({std::sin(angle), std::cos(angle)});
+    input_vertices.push_back({std::sin(angle), std::cos(angle)});
   }
 
-  PolyF convex = PolyF::convexHull(inputVertexes);
+  PolyF convex = PolyF::convex_hull(input_vertices);
 
-  PolyF::VertexList testVertexes;
+  PolyF::VertexList test_vertices;
   for (unsigned i = 0; i < 1000; ++i) {
     float angle = random.uniform_float() * 2 * std::numbers::pi;
-    testVertexes.push_back({std::sin(angle) * 0.75f, std::cos(angle) * 0.75f});
+    test_vertices.push_back({std::sin(angle) * 0.75f, std::cos(angle) * 0.75f});
   }
 
-  for (auto const& vertex : testVertexes)
-    EXPECT_TRUE(convex.contains(vertex * 0.75f));
+  for (auto const& vertex : test_vertices)
+    EXPECT_TRUE(convex.contains(vertex));
 }
 
 TEST(PolyTest, Distance) {
@@ -39,24 +37,84 @@ TEST(PolyTest, Distance) {
 
 TEST(PolyTest, LineCollision) {
   PolyF square = {{-1.0f, -1.0f}, {1.0f, -1.0f}, {1.0f, 1.0f}, {-1.0f, 1.0f}};
-  auto fromLeft = square.lineIntersection(Line2F({-2, 0}, {2, 0}));
-  ASSERT_TRUE(fromLeft);
-  EXPECT_TRUE(vmag(Vec2F(-1, 0) - fromLeft->point) < 0.0001f);
-  auto fromRight = square.lineIntersection(Line2F({2, 0}, {-2, 0}));
-  ASSERT_TRUE(fromRight);
-  EXPECT_TRUE(vmag(Vec2F(1, 0) - fromRight->point) < 0.0001f);
+  auto from_left = square.line_intersection(Line2F({-2, 0}, {2, 0}));
+  ASSERT_TRUE(from_left);
+  EXPECT_TRUE(vmag(Vec2F(-1, 0) - from_left->point) < 0.0001f);
+  auto from_right = square.line_intersection(Line2F({2, 0}, {-2, 0}));
+  ASSERT_TRUE(from_right);
+  EXPECT_TRUE(vmag(Vec2F(1, 0) - from_right->point) < 0.0001f);
 }
 
 TEST(PolyTest, ConvexArea) {
   PolyF triangle = {{-1.0f, -1.0f}, {1.0f, -1.0f}, {0.0f, 1.0f}};
-  EXPECT_TRUE(std::fabs(triangle.convexArea() - 2.0f) < 0.0001f);
+  EXPECT_FLOAT_EQ(triangle.signed_area(), 2.0f);
 }
 
 TEST(PolyTest, Clipping) {
   PolyF triangle1 = {{-2.0f, -1.0f}, {2.0f, -1.0f}, {0.0f, 1.0f}};
   PolyF triangle2 = {{2.0f, 1.0f}, {-2.0f, 1.0f}, {0.0f, -1.0f}};
   PolyF overlap = PolyF::clip(triangle1, triangle2);
-  overlap.deduplicateVertexes(0.0001f);
-  EXPECT_TRUE(overlap.sides() == 4);
-  EXPECT_TRUE(overlap.convexArea() - 2 < 0.0001f);
+  overlap.deduplicate_vertices(0.0001f);
+  EXPECT_EQ(overlap.sides(), 4u);
+  EXPECT_NEAR(overlap.signed_area(), 2, 0.0001);
+}
+
+TEST(PolyTest, DegenerateHullAndAdjacentDuplicates) {
+  PolyI point(Vec2I(3, 4));
+  EXPECT_EQ(PolyI::convex_hull({{3, 4}}), point);
+  EXPECT_EQ(PolyI::convex_hull({{3, 4}, {3, 4}, {3, 4}}), point);
+  point.deduplicate_vertices(0);
+  EXPECT_EQ(point.sides(), 1u);
+  PolyF chain{{0, 0}, {0.75f, 0}, {1.5f, 0}, {0, 0}};
+  chain.deduplicate_vertices(1);
+  EXPECT_EQ(chain, (PolyF{{0, 0}, {1.5f, 0}}));
+  EXPECT_EQ(PolyI::convex_hull({{4, 4}, {2, 2}, {0, 0}}), (PolyI{{0, 0}, {4, 4}}));
+}
+
+TEST(PolyTest, EmptyAndLowerDimensionalPenetration) {
+  PolyF empty, point(Vec2F(0, 0));
+  PolyF box{{-1, -1}, {1, -1}, {1, 1}, {-1, 1}};
+  PolyF segment{{-1, 0}, {1, 0}};
+  EXPECT_EQ(empty.center(), Vec2F());
+  EXPECT_FALSE(empty.sat_intersection(empty).intersects);
+  EXPECT_FALSE(box.intersects(empty));
+  EXPECT_FALSE(point.intersects(point));
+  EXPECT_FALSE(segment.intersects(PolyF{{0, 0}, {3, 0}}));
+  EXPECT_TRUE(box.intersects(point));
+  EXPECT_FALSE(box.intersects(PolyF(Vec2F(1, 0))));
+  EXPECT_FALSE(box.directional_sat_intersection(point, Vec2F(), false).intersects);
+  auto hit = box.line_intersection(Line2F({0, 0}, {2, 0}));
+  ASSERT_TRUE(hit);
+  EXPECT_FALSE(hit->intersected_side);
+  EXPECT_DOUBLE_EQ(PolyI(Vec2I(3, 4)).distance(Vec2I()), 5.0);
+  auto touching = PolyF{{1, -1}, {3, -1}, {3, 1}, {1, 1}};
+  EXPECT_FALSE(box.intersects(touching));
+  EXPECT_TRUE(PolyF::clip(box, touching).empty());
+  auto shifted = box;
+  shifted.translate({0, 1.75f});
+  auto correction = shifted.directional_sat_intersection(box, Vec2F(0, 1), true);
+  ASSERT_TRUE(correction.intersects);
+  EXPECT_NEAR(correction.overlap[1], 0.25f, 1e-6f);
+  EXPECT_EQ(correction.overlap[0], 0);
+  auto shortest = shifted.sat_intersection(box);
+  ASSERT_TRUE(shortest.intersects);
+  EXPECT_NEAR(shortest.overlap[1], 0.25f, 1e-6f);
+}
+
+TEST(PolyTest, AxisBoundsAndWideOrientation) {
+  PolyF triangle{{0, 4}, {2, 0}, {2, 8}};
+  EXPECT_EQ(triangle.bottom_center(), Vec2F(4.0f / 3, 1));
+  constexpr auto lo = std::numeric_limits<int>::min(), hi = std::numeric_limits<int>::max();
+  PolyI rectangle{{lo, lo}, {hi, lo}, {hi, hi}, {lo, hi}};
+  EXPECT_EQ(PolyI::convex_hull(rectangle.vertices()), rectangle);
+  EXPECT_EQ(rectangle.winding_number(Vec2I()), 1);
+  EXPECT_GT(rectangle.signed_area(), 1.8e19);
+  PolyD thin{{0, 0}, {1, 0}, {1, 1.0 + 0x1p-40}, {0, 1.0 + 0x1p-40}};
+  EXPECT_EQ(thin.signed_area(), 1.0 + 0x1p-40);
+}
+
+namespace {
+template <typename P>
+concept borrows_vertices = requires(P&& polygon) { std::forward<P>(polygon).vertices(); };
+static_assert(borrows_vertices<PolyF&> && !borrows_vertices<PolyF>);
 }

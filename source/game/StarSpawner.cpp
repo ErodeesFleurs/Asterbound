@@ -480,7 +480,7 @@ std::expected<void, StarException> Spawner::spawnInCell(Vec2I const& cell) {
         if (!variant) return std::unexpected(std::move(variant.error()));
         if (!variant->movementSettings.standingPoly)
           return std::unexpected(MonsterException("Monster has no standing polygon"));
-        auto box = variant->movementSettings.standingPoly->boundBox();
+        auto box = variant->movementSettings.standingPoly->bounding_box();
         if (m_debug) m_debugSpawnInfo[cell].spawnAttempts++;
         auto position = adjustSpawnRegion(region, box, type->spawnParameters);
         if (!position) return std::unexpected(std::move(position.error()));

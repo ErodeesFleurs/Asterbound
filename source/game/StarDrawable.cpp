@@ -313,7 +313,7 @@ std::expected<RectF, StarException> Drawable::boundBox(ImageMetadataDatabase con
     boundBox.combine(line.max());
 
   } else if (std::holds_alternative<PolyPart>(part)) {
-    boundBox.combine(std::get<PolyPart>(part).poly.boundBox());
+    boundBox.combine(std::get<PolyPart>(part).poly.bounding_box());
 
   } else if (std::holds_alternative<ImagePart>(part)) {
     auto const& image = std::get<ImagePart>(part);

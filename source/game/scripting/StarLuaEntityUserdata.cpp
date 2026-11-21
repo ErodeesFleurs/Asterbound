@@ -555,7 +555,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "boundBox",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<RectF>, StarException> {
             if (auto mobile = as_ref<MobileEntity>(*entity))
-              return mobile->get().movementController().collisionPoly().boundBox();
+              return mobile->get().movementController().collisionPoly().bounding_box();
             return {};
           });
         !registration)
@@ -582,7 +582,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "collisionBoundBox",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<RectF>, StarException> {
             if (auto mobile = as_ref<MobileEntity>(*entity))
-              return mobile->get().movementController().collisionBody().boundBox();
+              return mobile->get().movementController().collisionBody().bounding_box();
             return {};
           });
         !registration)

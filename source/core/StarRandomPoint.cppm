@@ -79,18 +79,18 @@ auto Random2dPointGenerator<PointData, DataType>::generate(Poly const& area, Poi
     return std::unexpected(StarException("Point generator cell size must be finite and positive"));
   if (!m_densityRangeValid)
     return std::unexpected(StarException("Point generator density must be ordered and nonnegative"));
-  for (auto const& vertex : area.vertexes()) {
+  for (auto const& vertex : area.vertices()) {
     auto finite = classify_finite(vertex[0], vertex[1]);
     if (!finite[0] || !finite[1])
       return std::unexpected(StarException("Point generator area coordinates must be finite"));
   }
   PointSet finalResult;
-  if (area.isNull()) {
+  if (area.empty()) {
     m_cache.cleanup();
     return finalResult;
   }
 
-  auto bound = area.boundBox();
+  auto bound = area.bounding_box();
   auto sector_coordinate = [&](DataType coordinate, bool upper) -> std::expected<std::int64_t, StarException> {
     auto quotient = coordinate / m_cellSize;
     if (!is_finite(quotient))

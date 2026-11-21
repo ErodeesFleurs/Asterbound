@@ -241,7 +241,7 @@ std::expected<SmallList<std::pair<EntityId, HitType>, 4>, StarException> DamageM
     if (source.rayCheck) {
       if (std::holds_alternative<PolyF>(source.damageArea)) {
         if (auto sourceEntity = world.entity(source.sourceEntityId)) {
-          auto overlap = world.geometry().rectOverlap(targetEntity->metaBoundBox().translated(targetEntity->position()), std::get<PolyF>(source.damageArea).boundBox());
+          auto overlap = world.geometry().rectOverlap(targetEntity->metaBoundBox().translated(targetEntity->position()), std::get<PolyF>(source.damageArea).bounding_box());
           if (!overlap.isEmpty()) {
             auto collision = world.lineTileCollision(overlap.center(), sourceEntity->position());
             if (!collision) return std::unexpected(std::move(collision.error()));
@@ -269,7 +269,7 @@ std::expected<SmallList<std::pair<EntityId, HitType>, 4>, StarException> DamageM
     return {};
   };
   if (std::holds_alternative<PolyF>(source.damageArea)) {
-    auto result = m_world.get().forEachEntity(std::get<PolyF>(source.damageArea).boundBox(), doQueryHit);
+    auto result = m_world.get().forEachEntity(std::get<PolyF>(source.damageArea).bounding_box(), doQueryHit);
     if (!result) return std::unexpected(std::move(result.error()));
   } else if (std::holds_alternative<Line2F>(source.damageArea)) {
     auto const& line = std::get<Line2F>(source.damageArea);

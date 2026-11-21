@@ -41,7 +41,7 @@ void CollisionGenerator::getBlocksPlatforms(List<CollisionBlock>& list, RectI co
           block.space = Vec2I(x, y);
           block.kind = kind;
           block.poly = PolyF(std::move(vertices));
-          block.polyBounds = block.poly.boundBox();
+          block.polyBounds = block.poly.bounding_box();
           list.push_back(std::move(block));
         };
 
@@ -156,7 +156,7 @@ void CollisionGenerator::getBlocksMarchingSquares(List<CollisionBlock>& list, Re
         break;
       block.poly.add(Vec2F(x, y) + msv[i]);
     }
-    block.polyBounds = block.poly.boundBox();
+    block.polyBounds = block.poly.bounding_box();
     block.kind = std::max({collisionKind(x, y), collisionKind(x + 1, y), collisionKind(x, y + 1), collisionKind(x + 1, y + 1)});
     list.push_back(std::move(block));
   };

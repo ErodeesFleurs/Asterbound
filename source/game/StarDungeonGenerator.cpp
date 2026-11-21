@@ -1410,9 +1410,9 @@ namespace Dungeon {
     }
 
     if (!terrainBlendingVertexes.empty())
-      if (auto applied = m_facade->markTerrain(PolyF::convexHull(terrainBlendingVertexes)); !applied) return std::unexpected(std::move(applied.error()));
+      if (auto applied = m_facade->markTerrain(PolyF::convex_hull(std::move(terrainBlendingVertexes))); !applied) return std::unexpected(std::move(applied.error()));
     if (!spaceBlendingVertexes.empty())
-      if (auto applied = m_facade->markSpace(PolyF::convexHull(spaceBlendingVertexes)); !applied) return std::unexpected(std::move(applied.error()));
+      if (auto applied = m_facade->markSpace(PolyF::convex_hull(std::move(spaceBlendingVertexes))); !applied) return std::unexpected(std::move(applied.error()));
 
     for (auto iter = m_backgroundMaterial.begin(); iter != m_backgroundMaterial.end(); iter++)
       if (auto applied = m_facade->setBackgroundMaterial(displace(iter->first), iter->second.material, iter->second.hueshift, iter->second.colorVariant); !applied) return std::unexpected(std::move(applied.error()));
