@@ -1639,7 +1639,7 @@ std::expected<bool, StarException> ClientApplication::connectMultiPlayer() {
   auto opened = std::visit(
     [&]<typename Server>(Server const& server) -> std::expected<bool, StarException> {
       if constexpr (std::same_as<Server, HostAddressWithPort>) {
-        auto socket = TcpSocket::connectTo(server).and_then(
+        auto socket = TcpSocket::connect_to(server).and_then(
           [&](auto tcp) { return TcpPacketSocket::open(m_root->logger(), std::move(tcp)); });
         if (!socket)
           return setError(Star::format("Join failed! Error connecting to '{}'", server), ExceptionDiagnostic(socket.error()))

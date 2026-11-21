@@ -442,8 +442,8 @@ const GameTestRegistration lua_http_cancellation("RootTest", "LuaHttpCancellatio
   };
   auto listener = TcpSocket::listen((*root)->logger(), {HostAddress::localhost(), 0});
   ASSERT_TRUE(listener) << listener.error().what();
-  ASSERT_TRUE((*listener)->setNonBlocking(true));
-  ASSERT_TRUE(context->set_path("url", Star::format("http://127.0.0.1:{}/", (*listener)->localAddress().port())));
+  ASSERT_TRUE((*listener)->set_non_blocking(true));
+  ASSERT_TRUE(context->set_path("url", Star::format("http://127.0.0.1:{}/", (*listener)->local_address().port())));
   ASSERT_TRUE(lua("unavailable = http.get(url); assert(unavailable:status() == 'failed')"));
   ASSERT_TRUE(session->set_approval_available(true));
   ASSERT_FALSE(session->approval());
@@ -564,7 +564,7 @@ const GameTestRegistration lua_http_cancellation("RootTest", "LuaHttpCancellatio
   ASSERT_TRUE(lua("assert(not http.isTrusted('KNOWN.EXAMPLE'))"));
   auto accept_request = [&](std::string_view method = "GET", std::string_view body = {}, std::string_view expected_header = {})
       -> std::expected<std::shared_ptr<TcpSocket>, StarException> {
-    auto ready = (*listener)->waitForData(false, std::chrono::steady_clock::now() + std::chrono::seconds(5));
+    auto ready = (*listener)->wait_for_data(false, std::chrono::steady_clock::now() + std::chrono::seconds(5));
     if (!ready)
       return std::unexpected(std::move(ready.error()));
     auto socket = (*listener)->accept((*root)->logger());
@@ -572,7 +572,7 @@ const GameTestRegistration lua_http_cancellation("RootTest", "LuaHttpCancellatio
       return std::unexpected(std::move(socket.error()));
     if (!*socket)
       return std::unexpected(StarException("HTTP loopback request was not accepted"));
-    if (auto timeout = (*socket)->setTimeout(5000); !timeout)
+    if (auto timeout = (*socket)->set_timeout(5000); !timeout)
       return std::unexpected(std::move(timeout.error()));
     std::string headers;
     while (headers.find("\r\n\r\n") == std::string::npos) {

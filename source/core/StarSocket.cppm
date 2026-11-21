@@ -47,7 +47,7 @@ using SocketPollResult = Map<std::shared_ptr<Socket>, SocketPollResultEntry>;
 
 class Socket {
 public:
-  // Waits for sockets that are readable, writiable, or have pending error
+  // Waits for sockets that are readable, writable, or have pending error
   // conditions within the given timeout.  Returns result if any sockets are
   // ready for I/O or have had error events occur on them within the timeout,
   // nothing otherwise.  If socket hangup occurs during this call, this will
@@ -56,7 +56,7 @@ public:
 
   // Wait for native read/write readiness or shutdown until a steady deadline.
   // Retains the native handle, not m_mutex, so close can shut down and wake it.
-  [[nodiscard]] std::expected<void, StarException> waitForData(bool writable, std::chrono::steady_clock::time_point deadline) const;
+  [[nodiscard]] std::expected<void, StarException> wait_for_data(bool writable, std::chrono::steady_clock::time_point deadline) const;
 
   ~Socket();
 
@@ -64,18 +64,19 @@ public:
   [[nodiscard]] std::expected<void, StarException> listen(int backlog);
 
   // Sockets default to blocking mode
-  [[nodiscard]] std::expected<void, StarException> setNonBlocking(bool nonBlocking);
-  // Sockets default to 60 second timeout
-  [[nodiscard]] std::expected<void, StarException> setTimeout(unsigned millis);
+  [[nodiscard]] std::expected<void, StarException> set_non_blocking(bool non_blocking);
+  // Native send/receive timeout in milliseconds. Zero disables the timeout;
+  // sockets default to 60 seconds.
+  [[nodiscard]] std::expected<void, StarException> set_timeout(unsigned millis);
 
-  NetworkMode networkMode() const;
-  SocketMode socketMode() const;
+  NetworkMode network_mode() const;
+  SocketMode socket_mode() const;
 
-  // Is the socketMode either Bound or Connected?
-  bool isActive() const;
+  // Is the socket_mode either Bound or Connected?
+  bool is_active() const;
 
-  // Is the socketMode not closed?
-  bool isOpen() const;
+  // Is the socket_mode not closed?
+  bool is_open() const;
 
   // Shuts down the underlying socket only.
   void shutdown();
@@ -91,20 +92,20 @@ protected:
     Udp
   };
 
-  explicit Socket(NetworkMode networkMode);
+  explicit Socket(NetworkMode network_mode);
   [[nodiscard]] std::expected<void, StarException> initialize(SocketType type);
   [[nodiscard]] std::expected<void, StarException> configure();
-  Socket(NetworkMode networkMode, std::shared_ptr<SocketImpl> impl, SocketMode socketMode);
+  Socket(NetworkMode network_mode, std::shared_ptr<SocketImpl> impl, SocketMode socket_mode);
 
-  [[nodiscard]] std::expected<void, StarException> checkOpen(std::string_view methodName) const;
-  void doShutdown();
-  void doClose();
+  [[nodiscard]] std::expected<void, StarException> check_open(std::string_view method_name) const;
+  void do_shutdown();
+  void do_close();
 
   mutable ReadersWriterMutex m_mutex;
-  NetworkMode m_networkMode;
+  NetworkMode m_network_mode;
   std::shared_ptr<SocketImpl> m_impl;
-  std::atomic<SocketMode> m_socketMode;
-  HostAddressWithPort m_localAddress;
+  std::atomic<SocketMode> m_socket_mode;
+  HostAddressWithPort m_local_address;
 };
 
 }

@@ -4,23 +4,15 @@ module;
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#include <stdio.h>
-
+#include <windows.h>
 #else
-#ifdef STAR_SYSTEM_FREEBSD
 #include <sys/types.h>
 #include <sys/socket.h>
-#endif
+#include <sys/time.h>
 #include <errno.h>
-#include <string.h>
 #include <arpa/inet.h>
-#include <netdb.h>
 #include <netinet/in.h>
-#include <netinet/udp.h>
-#include <netinet/tcp.h>
 #include <unistd.h>
-#include <fcntl.h>
-#include <poll.h>
 #endif
 import std;
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
@@ -30,53 +22,55 @@ import star.string;
 import star.format;
 import star.host_address;
 
-#ifndef AI_ADDRCONFIG
-#define AI_ADDRCONFIG 0
-#endif
-
 namespace Star {
 
+[[nodiscard]] inline int last_socket_error() noexcept {
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+  return ::WSAGetLastError();
+#else
+  return errno;
+#endif
+}
 
-inline String netErrorString() {
-#ifdef STAR_SYSTEM_WINDOWS
-  LPWSTR lpMsgBuf = NULL;
-  int error = WSAGetLastError();
-
-  FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM
-              | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_MAX_WIDTH_MASK,
-      NULL,
-      error,
-      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
-      (LPTSTR)&lpMsgBuf,
-      0,
-      NULL);
-
-  auto text = lpMsgBuf ? utf16ToString(lpMsgBuf) : std::expected<String, StarException>(String{});
-  if (lpMsgBuf != NULL)
-    LocalFree(lpMsgBuf);
-  // This is already a diagnostic boundary: preserve the native status even if
-  // its human-readable message cannot be converted to UTF-8.
+[[nodiscard]] inline String socket_error_message(int error) {
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+  // FormatMessageW requires its allocated buffer as a type-erased out parameter.
+  std::unique_ptr<wchar_t, decltype([](LPWSTR text) { ::LocalFree(text); })> buffer;
+  auto length = ::FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM
+          | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_MAX_WIDTH_MASK,
+      nullptr, static_cast<DWORD>(error), 0, reinterpret_cast<LPWSTR>(static_cast<LPWSTR*>(std::out_ptr(buffer))), 0, nullptr);
+  if (length == 0)
+    return Star::format("{} - native error text unavailable (FormatMessageW error {})", error, ::GetLastError());
+  auto text = utf16ToString(std::wstring_view{buffer.get(), length});
   if (!text)
     return Star::format("{} - native error text conversion failed: {}", error, text.error().what());
   return Star::format("{} - {}", error, *text);
 #else
-  return Star::format("{} - {}", errno, std::strerror(errno));
+  return Star::format("{} - {}", error, std::generic_category().message(error));
 #endif
 }
 
-inline bool netErrorConnectionReset() {
+[[nodiscard]] inline bool is_connection_reset(int error) noexcept {
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
-  return WSAGetLastError() == WSAECONNRESET || WSAGetLastError() == WSAENETRESET;
+  return error == WSAECONNRESET || error == WSAENETRESET;
 #else
-  return errno == ECONNRESET || errno == ETIMEDOUT;
+  return error == ECONNRESET || error == ETIMEDOUT;
 #endif
 }
 
-inline bool netErrorInterrupt() {
+[[nodiscard]] inline bool is_interrupted(int error) noexcept {
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
-  return WSAGetLastError() == WSAEINTR || WSAGetLastError() == WSAEWOULDBLOCK;
+  return error == WSAEINTR;
 #else
-  return errno == EAGAIN || errno == EINTR || errno == EWOULDBLOCK;
+  return error == EINTR;
+#endif
+}
+
+[[nodiscard]] inline bool would_block(int error) noexcept {
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+  return error == WSAEWOULDBLOCK;
+#else
+  return error == EAGAIN || error == EWOULDBLOCK;
 #endif
 }
 
@@ -159,13 +153,57 @@ inline int native_address_family(NetworkMode mode) {
 }
 
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
-inline bool invalidSocketDescriptor(SOCKET socket) {
-  return socket == INVALID_SOCKET;
-}
+using SocketDescriptor = SOCKET;
+inline constexpr SocketDescriptor invalid_descriptor = INVALID_SOCKET;
 #else
-inline bool invalidSocketDescriptor(int socket) {
-  return socket < 0;
+using SocketDescriptor = int;
+inline constexpr SocketDescriptor invalid_descriptor = -1;
+#endif
+
+[[nodiscard]] inline bool invalid_socket_descriptor(SocketDescriptor descriptor) noexcept {
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+  return descriptor == invalid_descriptor;
+#else
+  return descriptor < 0;
+#endif
 }
+
+inline void close_socket_descriptor(SocketDescriptor descriptor) noexcept {
+  if (!invalid_socket_descriptor(descriptor)) {
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+    ::closesocket(descriptor);
+#else
+    ::close(descriptor);
+#endif
+  }
+}
+
+class SocketHandle {
+public:
+  explicit SocketHandle(SocketDescriptor descriptor = invalid_descriptor) noexcept : descriptor(descriptor) {}
+  SocketHandle(SocketHandle const&) = delete;
+  SocketHandle& operator=(SocketHandle const&) = delete;
+  SocketHandle(SocketHandle&& other) noexcept : descriptor(other.release()) {}
+  SocketHandle& operator=(SocketHandle&& other) noexcept {
+    if (this != &other)
+      close_socket_descriptor(std::exchange(descriptor, other.release()));
+    return *this;
+  }
+  ~SocketHandle() { close_socket_descriptor(descriptor); }
+
+  [[nodiscard]] SocketDescriptor get() const noexcept { return descriptor; }
+  [[nodiscard]] SocketDescriptor release() noexcept { return std::exchange(descriptor, invalid_descriptor); }
+
+private:
+  SocketDescriptor descriptor;
+};
+
+template <typename T>
+concept native_socket_option = std::same_as<T, int> || std::same_as<T, linger>
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+    || std::same_as<T, DWORD>;
+#else
+    || std::same_as<T, timeval>;
 #endif
 
 struct SocketImpl {
@@ -173,80 +211,69 @@ struct SocketImpl {
   SocketImpl(SocketImpl const&) = delete;
   SocketImpl& operator=(SocketImpl const&) = delete;
 
-  ~SocketImpl() {
-#ifdef STAR_SYSTEM_FAMILY_WINDOWS
-    if (!invalidSocketDescriptor(socketDesc))
-      ::closesocket(socketDesc);
-    if (!invalidSocketDescriptor(wakeReader))
-      ::closesocket(wakeReader);
-    if (!invalidSocketDescriptor(wakeWriter))
-      ::closesocket(wakeWriter);
-#else
-    if (!invalidSocketDescriptor(socketDesc))
-      ::close(socketDesc);
-#endif
-  }
+  ~SocketImpl() { close_socket_descriptor(socket_desc); }
 
-  [[nodiscard]] std::expected<void, StarException> setSockOpt(int level, int optname, const void* optval, socklen_t len) {
+  SocketDescriptor socket_desc = invalid_descriptor;
+
+  template <native_socket_option T>
+  [[nodiscard]] std::expected<void, StarException> set_option(int level, int name, T const& value) const {
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
-    int ret = ::setsockopt(socketDesc, level, optname, (const char*)optval, len);
+    auto result = ::setsockopt(socket_desc, level, name, reinterpret_cast<char const*>(&value), sizeof(value));
 #else
-    int ret = ::setsockopt(socketDesc, level, optname, optval, len);
+    auto result = ::setsockopt(socket_desc, level, name, &value, sizeof(value));
 #endif
-    if (ret < 0)
-      return std::unexpected(NetworkException(Star::format("setSockOpt failed to set {}, {}: {}", level, optname, netErrorString())));
+    if (result != 0) {
+      auto error = last_socket_error();
+      return std::unexpected(NetworkException::format("setsockopt failed for {}, {}: {}", level, name, socket_error_message(error)));
+    }
     return {};
   }
 
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
-  [[nodiscard]] std::expected<SOCKET, StarException> prepareWait() {
-    std::lock_guard locker(waitMutex);
-    if (invalidSocketDescriptor(wakeReader)) {
+  [[nodiscard]] std::expected<SOCKET, StarException> prepare_wait() {
+    std::lock_guard lock(wait_mutex);
+    if (invalid_socket_descriptor(wake_reader.get())) {
       // select does not reliably wake when a retained data socket is shut down.
       // A persistent readable socket is a level-triggered wake for every waiter.
-      SocketImpl reader;
-      SocketImpl writer;
-      reader.socketDesc = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-      writer.socketDesc = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-      if (invalidSocketDescriptor(reader.socketDesc) || invalidSocketDescriptor(writer.socketDesc))
-        return std::unexpected(NetworkException::format("Cannot create socket readiness wake channel: {}", netErrorString()));
+      SocketHandle reader(::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP));
+      if (invalid_socket_descriptor(reader.get()))
+        return std::unexpected(NetworkException::format("Cannot create socket readiness wake reader: {}", socket_error_message(last_socket_error())));
+      SocketHandle writer(::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP));
+      if (invalid_socket_descriptor(writer.get()))
+        return std::unexpected(NetworkException::format("Cannot create socket readiness wake writer: {}", socket_error_message(last_socket_error())));
       sockaddr_in address{};
       address.sin_family = AF_INET;
       address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-      if (::bind(reader.socketDesc, reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0)
-        return std::unexpected(NetworkException::format("Cannot bind socket readiness wake channel: {}", netErrorString()));
+      if (::bind(reader.get(), reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0)
+        return std::unexpected(NetworkException::format("Cannot bind socket readiness wake channel: {}", socket_error_message(last_socket_error())));
       int length = sizeof(address);
-      if (::getsockname(reader.socketDesc, reinterpret_cast<sockaddr*>(&address), &length) != 0
-          || ::connect(writer.socketDesc, reinterpret_cast<sockaddr*>(&address), length) != 0)
-        return std::unexpected(NetworkException::format("Cannot connect socket readiness wake channel: {}", netErrorString()));
+      if (::getsockname(reader.get(), reinterpret_cast<sockaddr*>(&address), &length) != 0)
+        return std::unexpected(NetworkException::format("Cannot query socket readiness wake address: {}", socket_error_message(last_socket_error())));
+      if (::connect(writer.get(), reinterpret_cast<sockaddr const*>(&address), length) != 0)
+        return std::unexpected(NetworkException::format("Cannot connect socket readiness wake channel: {}", socket_error_message(last_socket_error())));
       unsigned long nonblocking = 1;
-      if (::ioctlsocket(reader.socketDesc, FIONBIO, &nonblocking) != 0
-          || ::ioctlsocket(writer.socketDesc, FIONBIO, &nonblocking) != 0)
-        return std::unexpected(NetworkException::format("Cannot configure socket readiness wake channel: {}", netErrorString()));
-      wakeReader = std::exchange(reader.socketDesc, INVALID_SOCKET);
-      wakeWriter = std::exchange(writer.socketDesc, INVALID_SOCKET);
+      if (::ioctlsocket(reader.get(), FIONBIO, &nonblocking) != 0
+          || ::ioctlsocket(writer.get(), FIONBIO, &nonblocking) != 0)
+        return std::unexpected(NetworkException::format("Cannot configure socket readiness wake channel: {}", socket_error_message(last_socket_error())));
+      wake_reader = std::move(reader);
+      wake_writer = std::move(writer);
     }
-    return wakeReader;
+    return wake_reader.get();
   }
 
-  void signalWaiters() {
-    std::lock_guard locker(waitMutex);
-    if (!invalidSocketDescriptor(wakeWriter)) {
+  void signal_waiters() {
+    std::lock_guard lock(wait_mutex);
+    if (!invalid_socket_descriptor(wake_writer.get())) {
       // Never drain the byte: shutdown is permanent, and all concurrent waits
       // must wake. A full send buffer already has a wake queued.
-      ::send(wakeWriter, "", 1, 0);
+      ::send(wake_writer.get(), "", 1, 0);
     }
   }
 
-  std::mutex waitMutex;
-  SOCKET wakeReader = INVALID_SOCKET;
-  SOCKET wakeWriter = INVALID_SOCKET;
-#endif
-
-#ifdef STAR_SYSTEM_FAMILY_WINDOWS
-  SOCKET socketDesc = INVALID_SOCKET;
-#else
-  int socketDesc = -1;
+private:
+  std::mutex wait_mutex;
+  SocketHandle wake_reader;
+  SocketHandle wake_writer;
 #endif
 };
 
@@ -255,13 +282,17 @@ struct SocketImpl {
 export module star.net_impl;
 
 export namespace Star {
-  using ::Star::netErrorString;
-  using ::Star::netErrorConnectionReset;
-  using ::Star::netErrorInterrupt;
+  using ::Star::last_socket_error;
+  using ::Star::socket_error_message;
+  using ::Star::is_connection_reset;
+  using ::Star::is_interrupted;
+  using ::Star::would_block;
   using ::Star::native_address_family;
   using ::Star::address_from_native;
   using ::Star::native_from_address;
-  using ::Star::invalidSocketDescriptor;
+  using ::Star::invalid_socket_descriptor;
+  using ::Star::native_socket_option;
+  using ::Star::SocketHandle;
   using ::Star::SocketImpl;
 }
 

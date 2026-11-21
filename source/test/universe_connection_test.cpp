@@ -2,6 +2,7 @@
 #include <winsock2.h>
 #else
 #include <sys/socket.h>
+#include <sys/time.h>
 #endif
 #include "gtest/gtest-spi.h"
 
@@ -161,24 +162,46 @@ namespace Star {
 // Only this real-socket fixture changes native buffer sizes; production sockets
 // retain their normal settings and expose no test/failure control API.
 struct SocketTestAccess {
-  [[nodiscard]] static std::expected<void, StarException> setBufferSize(Socket& socket, int option, int bytes) {
+  [[nodiscard]] static std::expected<void, StarException> set_buffer_size(Socket& socket, int option, int bytes) {
     std::shared_lock locker(socket.m_mutex);
-    return socket.m_impl->setSockOpt(SOL_SOCKET, option, &bytes, sizeof(bytes));
+    return socket.m_impl->set_option(SOL_SOCKET, option, bytes);
   }
-  static bool operationHoldsLock(Socket& socket) {
+  static void expect_timeout(Socket const& socket, unsigned milliseconds) {
+    std::shared_lock lock(socket.m_mutex);
+    for (int name : {SO_RCVTIMEO, SO_SNDTIMEO}) {
+#ifdef STAR_SYSTEM_FAMILY_WINDOWS
+      DWORD value{};
+      int size = sizeof(value);
+      ASSERT_EQ(::getsockopt(socket.m_impl->socket_desc, SOL_SOCKET, name, reinterpret_cast<char*>(&value), &size), 0);
+      EXPECT_EQ(value, milliseconds);
+#else
+      timeval value{};
+      socklen_t size = sizeof(value);
+      ASSERT_EQ(::getsockopt(socket.m_impl->socket_desc, SOL_SOCKET, name, &value, &size), 0);
+      auto actual = std::chrono::seconds(value.tv_sec) + std::chrono::microseconds(value.tv_usec);
+      auto requested = std::chrono::milliseconds(milliseconds);
+      // Some kernels round nonzero timeouts up to the next clock tick.
+      EXPECT_GE(actual.count(), std::chrono::duration_cast<std::chrono::microseconds>(requested).count());
+      EXPECT_LT((actual - requested).count(), 100000);
+      if (milliseconds == 0)
+        EXPECT_EQ(actual.count(), 0);
+#endif
+    }
+  }
+  static bool operation_holds_lock(Socket& socket) {
     std::unique_lock locker(socket.m_mutex, std::try_to_lock);
     return !locker.owns_lock();
   }
-  static std::span<char const> pendingPlain(TcpPacketSocket const& socket) {
+  static std::span<char const> pending_plain(TcpPacketSocket const& socket) {
     return socket.m_outputBuffer.span();
   }
-  static std::span<char const> pendingCompressed(TcpPacketSocket const& socket) {
+  static std::span<char const> pending_compressed(TcpPacketSocket const& socket) {
     return socket.m_compressedOutputBuffer.span();
   }
-  [[nodiscard]] static std::expected<void, StarException> resetOnClose(Socket& socket) {
+  [[nodiscard]] static std::expected<void, StarException> reset_on_close(Socket& socket) {
     std::shared_lock locker(socket.m_mutex);
     linger reset{1, 0};
-    return socket.m_impl->setSockOpt(SOL_SOCKET, SO_LINGER, &reset, sizeof(reset));
+    return socket.m_impl->set_option(SOL_SOCKET, SO_LINGER, reset);
   }
 };
 }
@@ -338,9 +361,9 @@ const GameTestRegistration universeConnectionsAll("UniverseConnections", "All", 
   ConnectionId clientId = ServerConnectionId;
   auto tcpServer = TcpServer::create(logger, HostAddressWithPort(HostAddress::localhost(), ServerPort));
   ASSERT_TRUE(tcpServer) << tcpServer.error().what();
-  auto acceptCallback = (*tcpServer)->setAcceptCallback([&logger, &server, &clientId](
+  auto acceptCallback = (*tcpServer)->set_accept_callback([&logger, &server, &clientId](
       std::shared_ptr<::Star::TcpSocket> socket) -> std::expected<void, StarException> {
-    auto nonblocking = socket->setNonBlocking(true);
+    auto nonblocking = socket->set_non_blocking(true);
     if (!nonblocking)
       return std::unexpected(std::move(nonblocking.error()));
     auto packetSocket = TcpPacketSocket::open(logger, std::move(socket));
@@ -370,9 +393,9 @@ const GameTestRegistration universeConnectionsAll("UniverseConnections", "All", 
 
   List<std::unique_ptr<ASyncClientThread>> remoteASyncClients;
   for (unsigned i = 0; i < NumRemoteASyncConnections; ++i) {
-    auto socket = TcpSocket::connectTo({HostAddress::localhost(), ServerPort});
+    auto socket = TcpSocket::connect_to({HostAddress::localhost(), ServerPort});
     ASSERT_TRUE(socket) << socket.error().what();
-    ASSERT_TRUE((*socket)->setNonBlocking(true));
+    ASSERT_TRUE((*socket)->set_non_blocking(true));
     auto packetSocket = TcpPacketSocket::open(logger, std::move(*socket));
     ASSERT_TRUE(packetSocket) << packetSocket.error().what();
     auto client = ASyncClientThread::create(UniverseConnection(std::move(*packetSocket)));
@@ -382,9 +405,9 @@ const GameTestRegistration universeConnectionsAll("UniverseConnections", "All", 
 
   List<std::unique_ptr<SyncClientThread>> remoteSyncClients;
   for (unsigned i = 0; i < NumRemoteSyncConnections; ++i) {
-    auto socket = TcpSocket::connectTo({HostAddress::localhost(), ServerPort});
+    auto socket = TcpSocket::connect_to({HostAddress::localhost(), ServerPort});
     ASSERT_TRUE(socket) << socket.error().what();
-    ASSERT_TRUE((*socket)->setNonBlocking(true));
+    ASSERT_TRUE((*socket)->set_non_blocking(true));
     auto packetSocket = TcpPacketSocket::open(logger, std::move(*socket));
     ASSERT_TRUE(packetSocket) << packetSocket.error().what();
     auto client = SyncClientThread::create(UniverseConnection(std::move(*packetSocket)));
@@ -414,13 +437,13 @@ namespace {
   auto listener = TcpSocket::listen(logger, {HostAddress::localhost(), 0});
   if (!listener)
     return std::unexpected(std::move(listener.error()));
-  auto nonblocking = (*listener)->setNonBlocking(true);
+  auto nonblocking = (*listener)->set_non_blocking(true);
   if (!nonblocking)
     return std::unexpected(std::move(nonblocking.error()));
-  auto client = TcpSocket::connectTo((*listener)->localAddress());
+  auto client = TcpSocket::connect_to((*listener)->local_address());
   if (!client)
     return std::unexpected(std::move(client.error()));
-  auto ready = (*listener)->waitForData(false, std::chrono::steady_clock::now() + std::chrono::seconds(2));
+  auto ready = (*listener)->wait_for_data(false, std::chrono::steady_clock::now() + std::chrono::seconds(2));
   if (!ready)
     return std::unexpected(std::move(ready.error()));
   auto server = (*listener)->accept(logger);
@@ -430,6 +453,17 @@ namespace {
     return std::unexpected(StarException("Loopback connection was not accepted"));
   return std::pair{std::move(*client), std::move(*server)};
 }
+
+const GameTestRegistration native_socket_timeouts("UniverseConnections", "NativeSocketTimeouts", [](GameTest& fixture) {
+  auto pair = connectionTestTcpPair(fixture.root().logger());
+  ASSERT_TRUE(pair) << pair.error().what();
+  auto& socket = *pair->first;
+  SocketTestAccess::expect_timeout(socket, 60000);
+  for (unsigned milliseconds : {999u, 1000u, 1250u, 0u}) {
+    ASSERT_TRUE(socket.set_timeout(milliseconds));
+    SocketTestAccess::expect_timeout(socket, milliseconds);
+  }
+});
 
 [[nodiscard]] std::expected<ByteArray, StarException> connectionTestFrame(VersionNumber version) {
   ProtocolRequestPacket packet(version);
@@ -671,8 +705,8 @@ const GameTestRegistration universeConnectionsTcpPartialDrainPreservesWireAndApp
   auto pair = connectionTestTcpPair(fixture.root().logger());
   ASSERT_TRUE(pair) << pair.error().what();
   auto [outgoing, incoming] = std::move(*pair);
-  ASSERT_TRUE(SocketTestAccess::setBufferSize(*outgoing, SO_SNDBUF, 16384));
-  ASSERT_TRUE(incoming->setNonBlocking(true));
+  ASSERT_TRUE(SocketTestAccess::set_buffer_size(*outgoing, SO_SNDBUF, 16384));
+  ASSERT_TRUE(incoming->set_non_blocking(true));
   auto transport = TcpPacketSocket::open(fixture.root().logger(), outgoing);
   ASSERT_TRUE(transport) << transport.error().what();
   auto parameters = std::make_shared<WorldParametersUpdatePacket>(ByteArray(4 << 20, 'p'));
@@ -686,7 +720,7 @@ const GameTestRegistration universeConnectionsTcpPartialDrainPreservesWireAndApp
   ASSERT_TRUE((*transport)->sendPackets({parameters}));
   ASSERT_EQ((*transport)->writeData(), true);
   ASSERT_TRUE((*transport)->sentPacketsPending());
-  auto pending = SocketTestAccess::pendingPlain(**transport);
+  auto pending = SocketTestAccess::pending_plain(**transport);
   ASSERT_LT(pending.size(), expected.size());
   ASSERT_FALSE(pending.empty());
   EXPECT_TRUE(std::ranges::equal(pending, expected.span().last(pending.size())));
@@ -743,8 +777,8 @@ const GameTestRegistration universeConnectionsTcpCompressedTailPrecedesNewPlainF
   auto pair = connectionTestTcpPair(fixture.root().logger());
   ASSERT_TRUE(pair) << pair.error().what();
   auto [outgoing, incoming] = std::move(*pair);
-  ASSERT_TRUE(SocketTestAccess::setBufferSize(*outgoing, SO_SNDBUF, 16384));
-  ASSERT_TRUE(incoming->setNonBlocking(true));
+  ASSERT_TRUE(SocketTestAccess::set_buffer_size(*outgoing, SO_SNDBUF, 16384));
+  ASSERT_TRUE(incoming->set_non_blocking(true));
   auto transport = TcpPacketSocket::open(fixture.root().logger(), outgoing);
   ASSERT_TRUE(transport) << transport.error().what();
   (*transport)->setCompressionStreamEnabled(true);
@@ -758,7 +792,7 @@ const GameTestRegistration universeConnectionsTcpCompressedTailPrecedesNewPlainF
   }
   auto parameters = std::make_shared<WorldParametersUpdatePacket>(std::move(bytes));
   ASSERT_TRUE((*transport)->sendPackets({parameters}));
-  ByteArray original(SocketTestAccess::pendingPlain(**transport));
+  ByteArray original(SocketTestAccess::pending_plain(**transport));
   auto compressor = CompressionStream::create();
   ASSERT_TRUE(compressor) << compressor.error().what();
   auto encoded = compressor->compress(original);
@@ -767,8 +801,8 @@ const GameTestRegistration universeConnectionsTcpCompressedTailPrecedesNewPlainF
   auto compressedSize = expected.size();
   ASSERT_EQ((*transport)->writeData(), true);
   ASSERT_TRUE((*transport)->sentPacketsPending());
-  ASSERT_FALSE(SocketTestAccess::pendingCompressed(**transport).empty());
-  EXPECT_TRUE(SocketTestAccess::pendingPlain(**transport).empty());
+  ASSERT_FALSE(SocketTestAccess::pending_compressed(**transport).empty());
+  EXPECT_TRUE(SocketTestAccess::pending_plain(**transport).empty());
 
   (*transport)->setCompressionStreamEnabled(false);
   auto plain = connectionTestFrame(73);
@@ -805,16 +839,16 @@ const GameTestRegistration universeConnectionsTcpEnablingCompressionUsesOnlyUnse
   auto pair = connectionTestTcpPair(fixture.root().logger());
   ASSERT_TRUE(pair) << pair.error().what();
   auto [outgoing, incoming] = std::move(*pair);
-  ASSERT_TRUE(SocketTestAccess::setBufferSize(*outgoing, SO_SNDBUF, 16384));
-  ASSERT_TRUE(incoming->setNonBlocking(true));
+  ASSERT_TRUE(SocketTestAccess::set_buffer_size(*outgoing, SO_SNDBUF, 16384));
+  ASSERT_TRUE(incoming->set_non_blocking(true));
   auto transport = TcpPacketSocket::open(fixture.root().logger(), outgoing);
   ASSERT_TRUE(transport) << transport.error().what();
   auto parameters = std::make_shared<WorldParametersUpdatePacket>(ByteArray(4 << 20, 'p'));
   parameters->setCompressionMode(PacketCompressionMode::Disabled);
   ASSERT_TRUE((*transport)->sendPackets({parameters}));
-  ByteArray original(SocketTestAccess::pendingPlain(**transport));
+  ByteArray original(SocketTestAccess::pending_plain(**transport));
   ASSERT_EQ((*transport)->writeData(), true);
-  auto pending = SocketTestAccess::pendingPlain(**transport);
+  auto pending = SocketTestAccess::pending_plain(**transport);
   ASSERT_FALSE(pending.empty());
   ASSERT_LT(pending.size(), original.size());
   auto consumed = original.size() - pending.size();
@@ -822,7 +856,7 @@ const GameTestRegistration universeConnectionsTcpEnablingCompressionUsesOnlyUnse
 
   (*transport)->setCompressionStreamEnabled(true);
   ASSERT_TRUE((*transport)->sendPackets({std::make_shared<ProtocolRequestPacket>(74)}));
-  ByteArray compressionInput(SocketTestAccess::pendingPlain(**transport));
+  ByteArray compressionInput(SocketTestAccess::pending_plain(**transport));
   auto compressor = CompressionStream::create();
   ASSERT_TRUE(compressor) << compressor.error().what();
   auto encoded = compressor->compress(compressionInput);
@@ -838,7 +872,7 @@ const GameTestRegistration universeConnectionsTcpEnablingCompressionUsesOnlyUnse
     auto written = (*transport)->writeData();
     ASSERT_TRUE(written) << written.error().what();
     if (*received == 0 && !*written)
-      ASSERT_TRUE(incoming->waitForData(false, deadline));
+      ASSERT_TRUE(incoming->wait_for_data(false, deadline));
   }
   ASSERT_EQ(wire, expected);
   EXPECT_FALSE((*transport)->sentPacketsPending());
@@ -856,14 +890,14 @@ const GameTestRegistration universeConnectionsTcpDrainCommitsPrefixBeforeNativeR
     auto pair = connectionTestTcpPair(fixture.root().logger());
     ASSERT_TRUE(pair) << pair.error().what();
     auto [outgoing, incoming] = std::move(*pair);
-    ASSERT_TRUE(SocketTestAccess::setBufferSize(*outgoing, SO_SNDBUF, 16384));
-    ASSERT_TRUE(SocketTestAccess::resetOnClose(*incoming));
+    ASSERT_TRUE(SocketTestAccess::set_buffer_size(*outgoing, SO_SNDBUF, 16384));
+    ASSERT_TRUE(SocketTestAccess::reset_on_close(*incoming));
     // A blocking native send returns its successful prefix on peer reset; the
     // next send in the same drain sees the real transport error.
     auto transport = TcpPacketSocket::open(fixture.root().logger(), outgoing);
     ASSERT_TRUE(transport) << transport.error().what();
-    ASSERT_TRUE(outgoing->setNonBlocking(false));
-    ASSERT_TRUE(outgoing->setTimeout(500));
+    ASSERT_TRUE(outgoing->set_non_blocking(false));
+    ASSERT_TRUE(outgoing->set_timeout(500));
     (*transport)->setCompressionStreamEnabled(compressed);
     ByteArray bytes(8 << 20, 0);
     std::uint32_t state = 0x12345678;
@@ -876,7 +910,7 @@ const GameTestRegistration universeConnectionsTcpDrainCommitsPrefixBeforeNativeR
     auto packet = std::make_shared<WorldParametersUpdatePacket>(std::move(bytes));
     packet->setCompressionMode(PacketCompressionMode::Disabled);
     ASSERT_TRUE((*transport)->sendPackets({packet}));
-    ByteArray expected(SocketTestAccess::pendingPlain(**transport));
+    ByteArray expected(SocketTestAccess::pending_plain(**transport));
     if (compressed) {
       auto compressor = CompressionStream::create();
       ASSERT_TRUE(compressor) << compressor.error().what();
@@ -891,7 +925,7 @@ const GameTestRegistration universeConnectionsTcpDrainCommitsPrefixBeforeNativeR
       outgoing->shutdown();
     });
     auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
-    ASSERT_TRUE(incoming->waitForData(false, deadline));
+    ASSERT_TRUE(incoming->wait_for_data(false, deadline));
     std::array<char, 1> prefix;
     ASSERT_EQ(incoming->receive(prefix), 1u);
     EXPECT_EQ(prefix[0], expected[0]);
@@ -900,9 +934,9 @@ const GameTestRegistration universeConnectionsTcpDrainCommitsPrefixBeforeNativeR
     auto written = (*drain)->get();
     ASSERT_TRUE(written) << written.error().what();
     EXPECT_TRUE(*written);
-    EXPECT_FALSE(outgoing->isActive());
-    auto pending = compressed ? SocketTestAccess::pendingCompressed(**transport)
-                              : SocketTestAccess::pendingPlain(**transport);
+    EXPECT_FALSE(outgoing->is_active());
+    auto pending = compressed ? SocketTestAccess::pending_compressed(**transport)
+                              : SocketTestAccess::pending_plain(**transport);
     ASSERT_FALSE(pending.empty());
     ASSERT_LT(pending.size(), expected.size());
     EXPECT_TRUE(std::ranges::equal(pending, expected.span().last(pending.size())));
@@ -942,7 +976,7 @@ const GameTestRegistration universe_connections_tcp_compressed_batch_backpressur
       ++received_count;
     }
     if (!*read && received_count != 2)
-      ASSERT_TRUE(pair->second->waitForData(false, deadline));
+      ASSERT_TRUE(pair->second->wait_for_data(false, deadline));
   }
   EXPECT_EQ(received_count, 2u);
   EXPECT_TRUE((*receiver)->isOpen());
@@ -1029,13 +1063,13 @@ const GameTestRegistration universeConnectionsTcpPartialHeaderBodyAndZeroDeadlin
   auto& frame = *frameResult;
   ASSERT_GT(frame.size(), 2u);
   ASSERT_EQ(sender->send(std::span<char const>(frame).first(1)), 1u);
-  ASSERT_TRUE(socket->waitForData(false, std::chrono::steady_clock::now() + std::chrono::seconds(2)));
+  ASSERT_TRUE(socket->wait_for_data(false, std::chrono::steady_clock::now() + std::chrono::seconds(2)));
   EXPECT_EQ(receiver.receiveAny(0), false);
   ASSERT_EQ(sender->send(std::span<char const>(frame).subspan(1, frame.size() - 2)), frame.size() - 2);
-  ASSERT_TRUE(socket->waitForData(false, std::chrono::steady_clock::now() + std::chrono::seconds(2)));
+  ASSERT_TRUE(socket->wait_for_data(false, std::chrono::steady_clock::now() + std::chrono::seconds(2)));
   EXPECT_EQ(receiver.receiveAny(0), false);
   ASSERT_EQ(sender->send(std::span<char const>(frame).last(1)), 1u);
-  ASSERT_TRUE(socket->waitForData(false, std::chrono::steady_clock::now() + std::chrono::seconds(2)));
+  ASSERT_TRUE(socket->wait_for_data(false, std::chrono::steady_clock::now() + std::chrono::seconds(2)));
   ASSERT_EQ(receiver.receiveAny(0), true);
   EXPECT_EQ(connectionTestVersion(receiver), 43u);
   EXPECT_EQ(receiver.receiveAny(0), false);
@@ -1110,8 +1144,8 @@ const GameTestRegistration universeConnectionsTcpCloseInterruptsBlockingReceive(
   auto pair = connectionTestTcpPair(fixture.root().logger());
   ASSERT_TRUE(pair) << pair.error().what();
   auto [sender, socket] = std::move(*pair);
-  ASSERT_TRUE(socket->setNonBlocking(false));
-  ASSERT_TRUE(socket->setTimeout(5000));
+  ASSERT_TRUE(socket->set_non_blocking(false));
+  ASSERT_TRUE(socket->set_timeout(5000));
   std::array<char, 1> buffer{};
   auto receiveTask = ConnectionTestAsync<std::size_t>::create([&] { return socket->receive(buffer); });
   ASSERT_TRUE(receiveTask) << receiveTask.error().what();
@@ -1124,7 +1158,7 @@ const GameTestRegistration universeConnectionsTcpCloseInterruptsBlockingReceive(
   auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
   bool receiving = false;
   while ((deadline - std::chrono::steady_clock::now()).count() > 0) {
-    if (SocketTestAccess::operationHoldsLock(*socket)) {
+    if (SocketTestAccess::operation_holds_lock(*socket)) {
       receiving = true;
       break;
     }
@@ -1146,7 +1180,7 @@ const GameTestRegistration universeConnectionsTcpCloseInterruptsBlockingReceive(
     EXPECT_EQ(*received, 0u);
   else
     EXPECT_TRUE(received.error().is<SocketClosedException>()) << received.error().what();
-  EXPECT_FALSE(socket->isOpen());
+  EXPECT_FALSE(socket->is_open());
 });
 
 const GameTestRegistration universeConnectionsTcpBufferedPacketSurvivesLocalClose(
@@ -1159,7 +1193,7 @@ const GameTestRegistration universeConnectionsTcpBufferedPacketSurvivesLocalClos
   auto frame = connectionTestFrame(49);
   ASSERT_TRUE(frame) << frame.error().what();
   ASSERT_EQ(sender->send(*frame), frame->size());
-  ASSERT_TRUE(socket->waitForData(false, std::chrono::steady_clock::now() + std::chrono::seconds(2)));
+  ASSERT_TRUE(socket->wait_for_data(false, std::chrono::steady_clock::now() + std::chrono::seconds(2)));
   ASSERT_EQ((*packetSocket)->readData(), true);
 
   UniverseConnection receiver(std::move(*packetSocket));
@@ -1176,7 +1210,7 @@ const GameTestRegistration universeConnectionsTcpShutdownWakesEveryNativeReadine
   ASSERT_TRUE(pair) << pair.error().what();
   auto [sender, socket] = std::move(*pair);
   auto wait = [&] {
-    return socket->waitForData(false, std::chrono::steady_clock::now() + std::chrono::seconds(2));
+    return socket->wait_for_data(false, std::chrono::steady_clock::now() + std::chrono::seconds(2));
   };
   auto firstTask = ConnectionTestAsync<void>::create(wait);
   ASSERT_TRUE(firstTask) << firstTask.error().what();
@@ -1194,7 +1228,7 @@ const GameTestRegistration universeConnectionsTcpShutdownWakesEveryNativeReadine
   EXPECT_TRUE(first.get());
   EXPECT_TRUE(second.get());
   before = std::chrono::steady_clock::now();
-  EXPECT_TRUE(socket->waitForData(false, before + std::chrono::seconds(2)));
+  EXPECT_TRUE(socket->wait_for_data(false, before + std::chrono::seconds(2)));
   EXPECT_LT(std::chrono::steady_clock::now() - before, std::chrono::milliseconds(500));
 });
 
@@ -1247,8 +1281,8 @@ const GameTestRegistration universeConnectionsTcpCompressedBackpressureRetainsAn
   auto pair = connectionTestTcpPair(fixture.root().logger());
   ASSERT_TRUE(pair) << pair.error().what();
   auto [outgoing, incoming] = std::move(*pair);
-  ASSERT_TRUE(SocketTestAccess::setBufferSize(*outgoing, SO_SNDBUF, 16384));
-  ASSERT_TRUE(SocketTestAccess::setBufferSize(*incoming, SO_RCVBUF, 65536));
+  ASSERT_TRUE(SocketTestAccess::set_buffer_size(*outgoing, SO_SNDBUF, 16384));
+  ASSERT_TRUE(SocketTestAccess::set_buffer_size(*incoming, SO_RCVBUF, 65536));
   auto sendSocket = TcpPacketSocket::open(fixture.root().logger(), outgoing);
   ASSERT_TRUE(sendSocket) << sendSocket.error().what();
   auto& sendTransport = **sendSocket;

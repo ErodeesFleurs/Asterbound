@@ -198,7 +198,7 @@ std::expected<void, StarException> ServerRconClient::processRequest() {
       auto decoded = m_packetBuffer >> command;
       if (!decoded)
         return std::unexpected(std::move(decoded.error()));
-      auto logged = m_universe.get().root().logger().info("RCON {}: {}", m_socket->remoteAddress(), command);
+      auto logged = m_universe.get().root().logger().info("RCON {}: {}", m_socket->remote_address(), command);
       if (!logged)
         return std::unexpected(std::move(logged.error()));
       auto result = handleCommand(command);
@@ -370,7 +370,7 @@ std::expected<void, StarException> ServerRconThread::run() {
         continue;
       if (stopToken.stop_requested())
         break;
-      auto configured = (*client)->setTimeout(*timeout);
+      auto configured = (*client)->set_timeout(*timeout);
       if (!configured)
         return std::unexpected(std::move(configured.error()));
       auto rconClient = ServerRconClient::create(m_universe.get(), *client);
@@ -383,7 +383,7 @@ std::expected<void, StarException> ServerRconThread::run() {
         std::lock_guard clientsLocker(m_clientsMutex);
         if (stopToken.stop_requested())
           break;
-        m_clients[(*client)->remoteAddress().address()] = std::move(*rconClient);
+        m_clients[(*client)->remote_address().address()] = std::move(*rconClient);
       }
       clearClients();
     }

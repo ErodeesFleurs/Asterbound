@@ -288,7 +288,7 @@ void ServerQueryThread::pruneChallenges() {
 std::expected<void, StarException> ServerQueryThread::run() {
   auto stopToken = m_stopSource.get_token();
   HostAddressWithPort udpAddress;
-  char udpData[MaxUdpData];
+  char udpData[max_udp_data];
   auto report = [this](StarException const& error) -> std::expected<void, StarException> {
     if (!error.is<SocketClosedException>())
       return m_universe.get().root().logger().error("ServerQueryThread error: {}",

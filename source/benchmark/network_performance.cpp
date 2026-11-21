@@ -114,13 +114,13 @@ openSnapshotTransport(Root& root, NetCompatibilityRules rules) {
   auto listener = TcpSocket::listen(root.logger(), {HostAddress::localhost(), 0});
   if (!listener)
     return std::unexpected(std::move(listener.error()));
-  auto nonblocking = (*listener)->setNonBlocking(true);
+  auto nonblocking = (*listener)->set_non_blocking(true);
   if (!nonblocking)
     return std::unexpected(std::move(nonblocking.error()));
-  auto outgoing = TcpSocket::connectTo((*listener)->localAddress());
+  auto outgoing = TcpSocket::connect_to((*listener)->local_address());
   if (!outgoing)
     return std::unexpected(std::move(outgoing.error()));
-  auto ready = (*listener)->waitForData(false, std::chrono::steady_clock::now() + std::chrono::seconds(2));
+  auto ready = (*listener)->wait_for_data(false, std::chrono::steady_clock::now() + std::chrono::seconds(2));
   if (!ready)
     return std::unexpected(std::move(ready.error()));
   auto incoming = (*listener)->accept(root.logger());
@@ -128,10 +128,10 @@ openSnapshotTransport(Root& root, NetCompatibilityRules rules) {
     return std::unexpected(std::move(incoming.error()));
   if (!*incoming)
     return std::unexpected(StarException("Snapshot benchmark loopback connection was not accepted"));
-  auto outgoingNonblocking = (*outgoing)->setNonBlocking(true);
+  auto outgoingNonblocking = (*outgoing)->set_non_blocking(true);
   if (!outgoingNonblocking)
     return std::unexpected(std::move(outgoingNonblocking.error()));
-  auto incomingNonblocking = (*incoming)->setNonBlocking(true);
+  auto incomingNonblocking = (*incoming)->set_non_blocking(true);
   if (!incomingNonblocking)
     return std::unexpected(std::move(incomingNonblocking.error()));
   auto sender = TcpPacketSocket::open(root.logger(), std::move(*outgoing));

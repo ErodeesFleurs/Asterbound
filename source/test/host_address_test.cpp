@@ -14,6 +14,7 @@ import star.host_address;
 import star.hash;
 import star.net_impl;
 import star.logging;
+import star.socket;
 import star.tcp;
 import star.udp;
 
@@ -199,18 +200,18 @@ void check_tcp_loopback(NetworkMode mode) {
   auto host = HostAddress::localhost(mode);
   auto listener = TcpSocket::listen(logger, HostAddressWithPort(host, 0));
   ASSERT_TRUE(listener) << listener.error().what();
-  auto destination = (*listener)->localAddress();
+  auto destination = (*listener)->local_address();
   ASSERT_EQ(destination.address(), host);
   ASSERT_NE(destination.port(), 0);
-  auto client = TcpSocket::connectTo(destination);
+  auto client = TcpSocket::connect_to(destination);
   ASSERT_TRUE(client) << client.error().what();
   auto peer = (*listener)->accept(logger);
   ASSERT_TRUE(peer) << peer.error().what();
   ASSERT_TRUE(*peer);
-  EXPECT_EQ((*client)->remoteAddress(), destination);
-  EXPECT_EQ((*peer)->localAddress(), destination);
-  EXPECT_EQ((*peer)->remoteAddress().address(), host);
-  EXPECT_NE((*peer)->remoteAddress().port(), 0);
+  EXPECT_EQ((*client)->remote_address(), destination);
+  EXPECT_EQ((*peer)->local_address(), destination);
+  EXPECT_EQ((*peer)->remote_address().address(), host);
+  EXPECT_NE((*peer)->remote_address().port(), 0);
 }
 
 TEST(HostAddressWithPort, TcpIPv4Loopback) {
@@ -220,15 +221,15 @@ TEST(HostAddressWithPort, TcpIPv4Loopback) {
 TEST(HostAddressWithPort, TcpIPv6Loopback) {
   // Probe the OS independently; a conversion regression must never cause a skip.
   SocketImpl probe;
-  probe.socketDesc = ::socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
+  probe.socket_desc = ::socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
   sockaddr_in6 address{};
 #if defined(STAR_SYSTEM_MACOS) || defined(STAR_SYSTEM_FREEBSD)
   address.sin6_len = sizeof(address);
 #endif
   address.sin6_family = AF_INET6;
   address.sin6_addr = in6addr_loopback;
-  if (invalidSocketDescriptor(probe.socketDesc)
-      || ::bind(probe.socketDesc, reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0) {
+  if (invalid_socket_descriptor(probe.socket_desc)
+      || ::bind(probe.socket_desc, reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0) {
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
     auto error = WSAGetLastError();
     if (error == WSAEAFNOSUPPORT || error == WSAEPROTONOSUPPORT || error == WSAEADDRNOTAVAIL)
@@ -244,13 +245,13 @@ TEST(HostAddressWithPort, TcpIPv6Loopback) {
 
 TEST(HostAddressWithPort, UdpLoopbackReturnsReplyAddress) {
   SocketImpl server;
-  server.socketDesc = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-  ASSERT_FALSE(invalidSocketDescriptor(server.socketDesc));
+  server.socket_desc = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  ASSERT_FALSE(invalid_socket_descriptor(server.socket_desc));
   auto local = HostAddress::localhost();
   sockaddr_storage bound{};
   auto length = native_from_address(HostAddressWithPort(local, 0), bound);
-  ASSERT_EQ(::bind(server.socketDesc, reinterpret_cast<sockaddr const*>(&bound), length), 0);
-  ASSERT_EQ(::getsockname(server.socketDesc, reinterpret_cast<sockaddr*>(&bound), &length), 0);
+  ASSERT_EQ(::bind(server.socket_desc, reinterpret_cast<sockaddr const*>(&bound), length), 0);
+  ASSERT_EQ(::getsockname(server.socket_desc, reinterpret_cast<sockaddr*>(&bound), &length), 0);
   auto destination = address_from_native(bound, length, AF_INET);
   ASSERT_TRUE(destination);
 
@@ -265,21 +266,44 @@ TEST(HostAddressWithPort, UdpLoopbackReturnsReplyAddress) {
 #else
   timeval timeout{2, 0};
 #endif
-  ASSERT_TRUE(server.setSockOpt(SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)));
+  ASSERT_TRUE(server.set_option(SOL_SOCKET, SO_RCVTIMEO, timeout));
   sockaddr_storage sender{};
   socklen_t sender_length = sizeof(sender);
   std::array<char, 3> buffer{};
-  ASSERT_EQ(::recvfrom(server.socketDesc, buffer.data(), buffer.size(), 0,
+  ASSERT_EQ(::recvfrom(server.socket_desc, buffer.data(), buffer.size(), 0,
       reinterpret_cast<sockaddr*>(&sender), &sender_length), 3);
   ASSERT_EQ(buffer, payload);
-  ASSERT_EQ(::sendto(server.socketDesc, buffer.data(), buffer.size(), 0,
+  ASSERT_EQ(::sendto(server.socket_desc, buffer.data(), buffer.size(), 0,
       reinterpret_cast<sockaddr const*>(&sender), sender_length), 3);
-  ASSERT_TRUE((*client)->setTimeout(2000));
+  ASSERT_TRUE((*client)->set_timeout(2000));
   HostAddressWithPort peer;
   buffer.fill(0);
   ASSERT_EQ((*client)->receive(std::ref(peer), buffer), payload.size());
   EXPECT_EQ(peer, *destination);
   EXPECT_EQ(buffer, payload);
+}
+
+TEST(SocketPoll, ReportsClosedAndReadyDescriptors) {
+  auto closed = UdpSocket::create(NetworkMode::IPv4);
+  ASSERT_TRUE(closed);
+  (*closed)->close();
+  SocketPollQuery query{{*closed, {true, false}}};
+  auto result = Socket::poll(query, 0);
+  ASSERT_TRUE(result && *result);
+  auto const& closed_event = (**result)[*closed];
+  EXPECT_TRUE(closed_event.exception);
+  EXPECT_FALSE(closed_event.readable);
+  EXPECT_FALSE(closed_event.writable);
+
+  Logger logger;
+  auto ready = UdpSocket::create(NetworkMode::IPv4);
+  ASSERT_TRUE(ready);
+  ASSERT_TRUE((*ready)->bind(logger, {HostAddress::localhost(), 0}));
+  query.emplace(*ready, SocketPollQueryEntry{false, true});
+  result = Socket::poll(query, 1000);
+  ASSERT_TRUE(result && *result);
+  EXPECT_TRUE((**result)[*closed].exception);
+  EXPECT_TRUE((**result)[*ready].writable);
 }
 
 }

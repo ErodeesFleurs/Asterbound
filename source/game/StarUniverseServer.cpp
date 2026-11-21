@@ -950,20 +950,20 @@ std::expected<void, StarException> UniverseServer::runLoop(std::stop_token stopT
         if (!server)
           return std::unexpected(std::move(server.error()));
         m_tcpServer = std::move(*server);
-        return m_tcpServer->setAcceptCallback([&universe = *this, maxPendingConnections = *pending, stopToken](std::shared_ptr<TcpSocket> socket) -> std::expected<void, StarException> {
+        return m_tcpServer->set_accept_callback([&universe = *this, maxPendingConnections = *pending, stopToken](std::shared_ptr<TcpSocket> socket) -> std::expected<void, StarException> {
           std::unique_lock acceptThreadsLocker(universe.m_connectionAcceptThreadsMutex, std::defer_lock);
           lock_with_diagnostics(acceptThreadsLocker);
           if (stopToken.stop_requested())
             return {};
           if (universe.m_connectionAcceptThreads.size() >= maxPendingConnections)
-            return universe.m_root.logger().warn("UniverseServer: maximum pending connections, dropping connection from: {}", socket->remoteAddress().address());
-          if (auto result = universe.m_root.logger().info("UniverseServer: Connection received from: {}", socket->remoteAddress()); !result)
+            return universe.m_root.logger().warn("UniverseServer: maximum pending connections, dropping connection from: {}", socket->remote_address().address());
+          if (auto result = universe.m_root.logger().info("UniverseServer: Connection received from: {}", socket->remote_address()); !result)
             return std::unexpected(std::move(result.error()));
           auto thread = Thread::invoke("UniverseServer::acceptConnection", [&universe, socket]() -> std::expected<void, StarException> {
             auto packetSocket = TcpPacketSocket::open(universe.m_root.logger(), socket);
             if (!packetSocket)
               return std::unexpected(std::move(packetSocket.error()));
-            return universe.acceptConnection(UniverseConnection(std::move(*packetSocket)), socket->remoteAddress().address());
+            return universe.acceptConnection(UniverseConnection(std::move(*packetSocket)), socket->remote_address().address());
           });
           if (!thread)
             return std::unexpected(std::move(thread.error()));
@@ -975,7 +975,7 @@ std::expected<void, StarException> UniverseServer::runLoop(std::stop_token stopT
         m_tcpState = TcpState::Fuck;
         if (m_tcpServer) {
           if (auto stopped = m_tcpServer->stop(); !stopped) {
-            if (!m_tcpServer->isClosed())
+            if (!m_tcpServer->is_closed())
               return std::unexpected(setup.error().with_related(stopped.error(), "TCP setup rollback failed"));
             setup = std::unexpected(setup.error().with_related(stopped.error(), "TCP setup rollback failed"));
           }
@@ -990,7 +990,7 @@ std::expected<void, StarException> UniverseServer::runLoop(std::stop_token stopT
       if (auto logged = m_root.logger().info("UniverseServer: Not listening for incoming TCP connections"); !logged)
         return std::unexpected(std::move(logged.error()));
       if (auto stopped = m_tcpServer->stop(); !stopped) {
-        if (!m_tcpServer->isClosed())
+        if (!m_tcpServer->is_closed())
           return std::unexpected(std::move(stopped.error()));
         if (auto logged = m_root.logger().error_exception("UniverseServer: Error stopping TCP server",
                                                           ExceptionDiagnostic(stopped.error()));
@@ -1059,7 +1059,7 @@ std::expected<void, StarException> UniverseServer::runLoop(std::stop_token stopT
 
 bool UniverseServer::shutdownThreadsJoined() const {
   if (!is_joined() || m_workerPool.worker_count() != 0
-      || (m_tcpServer && !m_tcpServer->isClosed())
+      || (m_tcpServer && !m_tcpServer->is_closed())
       || (m_connectionServer && !m_connectionServer->isClosed()))
     return false;
   for (auto const& thread : m_connectionAcceptThreads) {
@@ -1139,7 +1139,7 @@ std::expected<void, StarException> UniverseServer::shutdown() {
   if (m_tcpServer) {
     record(m_root.logger().info("UniverseServer: Stopping TCP Server"));
     record(m_tcpServer->stop());
-    tcpJoined = m_tcpServer->isClosed();
+    tcpJoined = m_tcpServer->is_closed();
     if (tcpJoined)
       m_tcpServer.reset();
   }

@@ -305,10 +305,10 @@ LocalPacketSocket::LocalPacketSocket(std::shared_ptr<Pipe> incomingPipe, std::we
   : m_incomingPipe(std::move(incomingPipe)), m_outgoingPipe(std::move(outgoingPipe)) {}
 
 std::expected<std::unique_ptr<TcpPacketSocket>, StarException> TcpPacketSocket::open(Logger& logger, std::shared_ptr<TcpSocket> socket) {
-  auto noDelay = socket->setNoDelay(true);
+  auto noDelay = socket->set_no_delay(true);
   if (!noDelay)
     return std::unexpected(std::move(noDelay.error()));
-  auto nonBlocking = socket->setNonBlocking(true);
+  auto nonBlocking = socket->set_non_blocking(true);
   if (!nonBlocking)
     return std::unexpected(std::move(nonBlocking.error()));
   auto result = std::unique_ptr<TcpPacketSocket>(new TcpPacketSocket(logger, std::move(socket)));
@@ -319,7 +319,7 @@ std::expected<std::unique_ptr<TcpPacketSocket>, StarException> TcpPacketSocket::
 }
 
 bool TcpPacketSocket::isOpen() const {
-  return m_socket->isActive();
+  return m_socket->is_active();
 }
 
 void TcpPacketSocket::close() {
@@ -585,7 +585,7 @@ std::expected<bool, StarException> TcpPacketSocket::writeData() {
 std::expected<bool, StarException> TcpPacketSocket::readData() {
   // Drain codec-owned output and saved compressed input even after peer EOF.
   // A local close is terminal for reads, not for already buffered packets.
-  if (!m_socket->isOpen())
+  if (!m_socket->is_open())
     return false;
   bool data_received = false;
   auto read = [&]() -> std::expected<void, StarException> {
@@ -645,7 +645,7 @@ std::expected<bool, StarException> TcpPacketSocket::readData() {
 }
 
 std::expected<void, StarException> TcpPacketSocket::waitForData(bool writable, std::chrono::steady_clock::time_point deadline) {
-  return m_socket->waitForData(writable, deadline);
+  return m_socket->wait_for_data(writable, deadline);
 }
 
 std::optional<PacketStats> TcpPacketSocket::incomingStats() const {
