@@ -15,16 +15,20 @@ using namespace Star;
 
 namespace {
 
-String pathFor(std::span<char const> bytes, std::string_view type = "bin",
-    EmbeddedCompressionMethod method = EmbeddedCompressionMethod::None) {
-  auto payload = embedAndCompressData(bytes, method);
-  return String("/opensb_data;" + std::string(type) + ";" + payload.value().utf8());
+std::expected<String, StarException> encoded_payload(std::span<char const> bytes, EmbeddedCompressionMethod method) {
+  std::string payload;
+  auto appended = append_embedded_data(payload, bytes, method);
+  if (!appended) return std::unexpected(std::move(appended.error()));
+  return String(std::move(payload));
 }
 
-std::expected<Json, StarException> decodeJson(std::span<char const> bytes) {
-  auto decoded = decodeEmbeddedData(pathFor(bytes, "json"));
+std::expected<Json, StarException> decode_json(std::span<char const> bytes) {
+  std::string path = "/opensb_data;json;";
+  auto appended = append_embedded_data(path, bytes, EmbeddedCompressionMethod::None);
+  if (!appended) return std::unexpected(std::move(appended.error()));
+  auto decoded = decode_embedded_data(String(std::move(path)));
   if (!decoded) return std::unexpected(std::move(decoded.error()));
-  return embeddedDataToJson(*decoded);
+  return embedded_data_to_json(*decoded);
 }
 
 // Produce a large logical stream from a small reusable input. Only the codec
@@ -84,13 +88,13 @@ std::expected<ByteArray, StarException> compressed_zstd_zeros(std::size_t size) 
 }
 
 TEST(PathEmbedTest, CompressionNamesAreAsciiCaseInsensitive) {
-  EXPECT_EQ(embeddedCompressionMethod("nOnE").value(), EmbeddedCompressionMethod::None);
-  EXPECT_EQ(embeddedCompressionMethod("GZIP").value(), EmbeddedCompressionMethod::Gzip);
-  EXPECT_EQ(embeddedCompressionMethod("ZlIb").value(), EmbeddedCompressionMethod::Zlib);
-  EXPECT_EQ(embeddedCompressionMethod("zStD").value(), EmbeddedCompressionMethod::Zstd);
-  EXPECT_FALSE(embeddedCompressionMethod(""));
-  EXPECT_FALSE(embeddedCompressionMethod("zlib "));
-  EXPECT_FALSE(embeddedCompressionMethod("brotli"));
+  EXPECT_EQ(embedded_compression_method("nOnE").value(), EmbeddedCompressionMethod::None);
+  EXPECT_EQ(embedded_compression_method("GZIP").value(), EmbeddedCompressionMethod::Gzip);
+  EXPECT_EQ(embedded_compression_method("ZlIb").value(), EmbeddedCompressionMethod::Zlib);
+  EXPECT_EQ(embedded_compression_method("zStD").value(), EmbeddedCompressionMethod::Zstd);
+  EXPECT_FALSE(embedded_compression_method(""));
+  EXPECT_FALSE(embedded_compression_method("zlib "));
+  EXPECT_FALSE(embedded_compression_method("brotli"));
 }
 
 TEST(PathEmbedTest, GeneratableCompressionModesRoundTripEveryByteAndEmptyInput) {
@@ -98,59 +102,127 @@ TEST(PathEmbedTest, GeneratableCompressionModesRoundTripEveryByteAndEmptyInput) 
   for (std::size_t i = 0; i < bytes.size(); ++i) bytes[i] = static_cast<char>(i);
   for (auto method : {EmbeddedCompressionMethod::None, EmbeddedCompressionMethod::Zlib, EmbeddedCompressionMethod::Zstd}) {
     for (auto input : std::array<std::span<char const>, 2>{bytes.span(), {}}) {
-      auto encoded = embedAndCompressData(input, method);
+      auto encoded = encoded_payload(input, method);
       ASSERT_TRUE(encoded) << encoded.error().what();
       EXPECT_EQ(encoded->utf8().find('/'), std::string::npos);
-      auto decoded = decodeEmbeddedData(String("/opensb_data;bin;" + encoded->utf8()));
+      auto decoded = decode_embedded_data(String("/opensb_data;bin;" + encoded->utf8()));
       ASSERT_TRUE(decoded) << decoded.error().what();
       EXPECT_EQ(decoded->type, EmbeddedAssetType::Binary);
       EXPECT_EQ(decoded->bytes, ByteArray(input));
     }
   }
-  EXPECT_FALSE(embedAndCompressData(bytes.span(), EmbeddedCompressionMethod::Gzip));
-  auto explicitNone = decodeEmbeddedData("/opensb_data;bin;NoNe;AA==");
-  ASSERT_TRUE(explicitNone);
-  ASSERT_EQ(explicitNone->bytes.size(), 1u);
-  EXPECT_EQ(explicitNone->bytes[0], '\0');
+  EXPECT_FALSE(encoded_payload(bytes.span(), EmbeddedCompressionMethod::Gzip));
+  auto explicit_none = decode_embedded_data("/opensb_data;bin;NoNe;AA==");
+  ASSERT_TRUE(explicit_none);
+  ASSERT_EQ(explicit_none->bytes.size(), 1u);
+  EXPECT_EQ(explicit_none->bytes[0], '\0');
+}
+
+TEST(PathEmbedTest, AppendingPayloadPreservesPrefixAndCanonicalPadding) {
+  constexpr std::array bytes{static_cast<char>(0xfb), static_cast<char>(0xff), static_cast<char>(0xff)};
+  constexpr std::array<std::string_view, 4> expected{"", "-w==", "-_8=", "-___"};
+  for (std::size_t size = 0; size <= bytes.size(); ++size) {
+    std::string path("/opensb_data;bin;");
+    ASSERT_TRUE(append_embedded_data(path, std::span(bytes).first(size), EmbeddedCompressionMethod::None));
+    EXPECT_EQ(path, std::string("/opensb_data;bin;").append(expected[size]));
+    auto unchanged = path;
+    EXPECT_FALSE(append_embedded_data(path, bytes, EmbeddedCompressionMethod::Gzip));
+    EXPECT_EQ(path, unchanged);
+  }
 }
 
 TEST(PathEmbedTest, IndependentGzipFixtureDecodesAndDetectsDamage) {
   // Generated by gzip -n, not by the embedded codec (which cannot emit gzip).
-  auto decoded = decodeEmbeddedData("/opensb_data;bin;gzip;H4sIAAAAAAAAA0vNTUpNSUlNUUivyixgSMusKCktSuUCAGSMmgAWAAAA");
+  auto decoded = decode_embedded_data("/opensb_data;bin;gzip;H4sIAAAAAAAAA0vNTUpNSUlNUUivyixgSMusKCktSuUCAGSMmgAWAAAA");
   ASSERT_TRUE(decoded) << decoded.error().what();
   EXPECT_EQ(decoded->bytes, ByteArray::from_string(std::string_view("embedded gzip\0fixture\n", 22)));
-  EXPECT_FALSE(decodeEmbeddedData("/opensb_data;bin;gzip;H4sIAAAAAAAAA0vNTUpNSUlNUUivyixgSMusKCktSuUCAGSMmgAWAAA="));
-  EXPECT_FALSE(decodeEmbeddedData("/opensb_data;bin;gzip;H4sIAAAAAAAAA0vNTUpNSUlNUUivyixgSMusKCktSuUCAGSMmgAXAAAA"));
-  EXPECT_FALSE(decodeEmbeddedData("/opensb_data;bin;gzip;"));
+  EXPECT_FALSE(decode_embedded_data("/opensb_data;bin;gzip;H4sIAAAAAAAAA0vNTUpNSUlNUUivyixgSMusKCktSuUCAGSMmgAWAAA="));
+  EXPECT_FALSE(decode_embedded_data("/opensb_data;bin;gzip;H4sIAAAAAAAAA0vNTUpNSUlNUUivyixgSMusKCktSuUCAGSMmgAXAAAA"));
+  EXPECT_FALSE(decode_embedded_data("/opensb_data;bin;gzip;"));
 }
 
 TEST(PathEmbedTest, SpecialTextRoundTripsIncludingNulAndUtf8) {
   std::string text = "percent% colon: question? semicolon; slash/\n雪";
   text += '\0';
   text += "after NUL";
-  auto escaped = embedEscapeText(String(text));
-  ASSERT_TRUE(escaped);
-  EXPECT_EQ(escaped->utf8().find("%%"), 7u);
-  EXPECT_NE(escaped->utf8().find("%c"), std::string::npos);
-  EXPECT_NE(escaped->utf8().find("%q"), std::string::npos);
-  EXPECT_NE(escaped->utf8().find("%s"), std::string::npos);
-  EXPECT_NE(escaped->utf8().find("%b"), std::string::npos);
-  auto decoded = decodeEmbeddedData(String("/opensb_data;text;" + escaped->utf8()));
+  std::string path = "/opensb_data;text;";
+  ASSERT_TRUE(append_escaped_text(path, text));
+  EXPECT_TRUE(path.starts_with("/opensb_data;text;percent%%"));
+  EXPECT_NE(path.find("%c"), std::string::npos);
+  EXPECT_NE(path.find("%q"), std::string::npos);
+  EXPECT_NE(path.find("%s"), std::string::npos);
+  EXPECT_NE(path.find("%b"), std::string::npos);
+  auto decoded = decode_embedded_data(String(std::move(path)));
   ASSERT_TRUE(decoded);
   EXPECT_EQ(decoded->type, EmbeddedAssetType::Text);
   EXPECT_EQ(decoded->bytes, ByteArray::from_string(text));
-  EXPECT_TRUE(decodeEmbeddedData("/opensb_data;text;"));
-  for (auto bad : {"%", "%x", "abc%", "%C", "unescaped:colon", "unescaped?question", "unescaped/slash", "extra;field"})
-    EXPECT_FALSE(decodeEmbeddedData(String("/opensb_data;text;" + std::string(bad)))) << bad;
+  EXPECT_TRUE(decode_embedded_data("/opensb_data;text;"));
+  for (std::string_view bad : {"%", "%x", "abc%", "%C", "unescaped:colon", "unescaped?question", "unescaped/slash", "extra;field"})
+    EXPECT_FALSE(decode_embedded_data(String("/opensb_data;text;" + std::string(bad)))) << bad;
 }
 
 TEST(PathEmbedTest, RejectsInvalidBase64AndExtraFieldsWithoutDroppingTokens) {
-  for (auto bad : {"A", "A===", "AA=", "AA===", "AA==A", "AB==", "AAB=", "A A=", "AA/+=", "AA\n", "AA==;", "AA==;extra"})
-    EXPECT_FALSE(decodeEmbeddedData(String("/opensb_data;bin;" + std::string(bad)))) << bad;
-  for (auto good : {"AA", "AAA", "AAAA", "AA==", "AAA=", "", "-_8="})
-    EXPECT_TRUE(decodeEmbeddedData(String("/opensb_data;bin;" + std::string(good)))) << good;
-  for (auto bad : {"", "/opensb_data", "/opensb_data;", "/opensb_data;bin", "/OPENSB_data;bin;AA==", "/opensb_data;unknown;AA==", "/opensb_data;bin;brotli;AA=="})
-    EXPECT_FALSE(decodeEmbeddedData(String(std::string(bad)))) << bad;
+  for (std::string_view bad : {"A", "A===", "AA=", "AA===", "AA==A", "AB==", "AAB=", "A A=", "AA/+=", "AA\n", "AA==;", "AA==;extra"})
+    EXPECT_FALSE(decode_embedded_data(String("/opensb_data;bin;" + std::string(bad)))) << bad;
+  for (std::string_view good : {"AA", "AAA", "AAAA", "AA==", "AAA=", "", "-_8="})
+    EXPECT_TRUE(decode_embedded_data(String("/opensb_data;bin;" + std::string(good)))) << good;
+  for (std::string_view bad : {"", "/opensb_data", "/opensb_data;", "/opensb_data;bin", "/OPENSB_data;bin;AA==", "/opensb_data;unknown;AA==", "/opensb_data;bin;brotli;AA=="})
+    EXPECT_FALSE(decode_embedded_data(String(bad))) << bad;
+}
+
+TEST(PathEmbedTest, LayoutErrorsPrecedePayloadDecoding) {
+  struct Case { std::string_view body; std::string_view diagnostic; };
+  for (auto const& test : {
+      Case{"text;%;extra", "extra payload fields"},
+      Case{"bin;!;extra", "extra payload fields"},
+      Case{"json;zlib;AA==;extra", "extra payload fields"},
+      Case{"image;zstd;AA;framespath;", "framespath requires"},
+      Case{"image;!;frames;json;AA;extra", "extra embedded frames"},
+      Case{"image;!;frames;image;AA", "cannot be nested"},
+      Case{"image;!;unknown", "unsupported image frame specification"}}) {
+    std::string path = "/opensb_data;";
+    path.append(test.body);
+    String input(std::move(path));
+    for (auto mode : {DecodeMode::Asset, DecodeMode::RawBytes}) {
+      auto result = decode_embedded_data(input, mode);
+      ASSERT_FALSE(result) << test.body;
+      EXPECT_TRUE(std::string_view(result.error().what()).contains(test.diagnostic)) << test.body;
+    }
+  }
+  auto asset = decode_embedded_data("/opensb_data;image;!");
+  ASSERT_FALSE(asset);
+  EXPECT_TRUE(std::string_view(asset.error().what()).contains("requires frames"));
+  auto raw = decode_embedded_data("/opensb_data;image;!", DecodeMode::RawBytes);
+  ASSERT_FALSE(raw);
+  EXPECT_TRUE(std::string_view(raw.error().what()).contains("Base64URL"));
+
+  // A structurally valid frames payload is the JSON consumer's responsibility.
+  auto image = decode_embedded_data("/opensb_data;image;AA;frames;json;AA!!");
+  ASSERT_TRUE(image);
+  ASSERT_TRUE(std::holds_alternative<EmbeddedFramesPath>(image->frame_source));
+  EXPECT_FALSE(decode_embedded_data(std::get<EmbeddedFramesPath>(image->frame_source).path));
+}
+
+TEST(PathEmbedTest, TerminalCompressionNameIsPayloadNotToken) {
+  // "gzip" is itself four Base64URL digits.
+  auto result = decode_embedded_data("/opensb_data;bin;gzip");
+  ASSERT_TRUE(result);
+  EXPECT_EQ(result->bytes, ByteArray::from_string(std::string_view("\x83\x38\xa9", 3)));
+}
+
+TEST(PathEmbedTest, RawSizeLimitPrecedesCharacterDecoding) {
+  constexpr auto decoded_size = max_embedded_data_size + 1;
+  constexpr auto digits = (decoded_size * 4 + 2) / 3;
+  for (std::string_view prefix : {"/opensb_data;bin;none;", "/opensb_data;bin;zlib;"}) {
+    std::string path(prefix);
+    path.resize(prefix.size() + digits, 'A');
+    path[prefix.size()] = '!';
+    auto result = decode_embedded_data(String(std::move(path)));
+    ASSERT_FALSE(result);
+    // Compressed representations retain their larger independent input bound.
+    auto diagnostic = prefix.ends_with("none;") ? std::string_view("size limit") : std::string_view("invalid Base64URL character");
+    EXPECT_TRUE(std::string_view(result.error().what()).contains(diagnostic)) << prefix;
+  }
 }
 
 TEST(PathEmbedTest, BinaryJsonRetainsDataStreamWireForScalarsArraysAndObjects) {
@@ -160,24 +232,25 @@ TEST(PathEmbedTest, BinaryJsonRetainsDataStreamWireForScalarsArraysAndObjects) {
       Json(JsonObject{{"array", JsonArray{false, Json()}}, {"value", 9}})}) {
     auto wire = DataStreamBuffer::serialize(value);
     ASSERT_TRUE(wire);
-    auto decoded = decodeJson(wire->span());
+    auto decoded = decode_json(wire->span());
     ASSERT_TRUE(decoded) << decoded.error().what();
     EXPECT_EQ(*decoded, value);
   }
   for (char tag : {char{0}, char{1}}) {
-    auto decoded = decodeJson(std::span<char const>(&tag, 1));
+    auto decoded = decode_json(std::array{tag});
     ASSERT_TRUE(decoded);
     EXPECT_EQ(*decoded, Json());
   }
 }
 
 TEST(PathEmbedTest, BinaryJsonRejectsTruncationCountsOverflowAndTrailingBytes) {
-  for (auto const& wire : std::vector<std::vector<unsigned char>>{
-      {}, {255}, {2, 0}, {3}, {4, 128}, {5, 127}, {5, 2, 'a'}, {6, 127}, {7, 1},
-      {7, 1, 2, 'a'}, {1, 1}, {4, 130, 128, 128, 128, 128, 128, 128, 128, 128, 0},
-      {6, 255, 255, 255, 255, 255, 255, 255, 255, 255, 127},
-      {5, 255, 255, 255, 255, 255, 255, 255, 255, 255, 127}}) {
-    EXPECT_FALSE(decodeJson(std::span<char const>(reinterpret_cast<char const*>(wire.data()), wire.size())));
+  using std::literals::operator""sv;
+  for (auto wire : {""sv, "\xff"sv, "\x02\0"sv, "\x03"sv, "\x04\x80"sv, "\x05\x7f"sv,
+      "\x05\x02\x61"sv, "\x06\x7f"sv, "\x07\x01"sv, "\x07\x01\x02\x61"sv, "\x01\x01"sv,
+      "\x04\x82\x80\x80\x80\x80\x80\x80\x80\x80\x00"sv,
+      "\x06\xff\xff\xff\xff\xff\xff\xff\xff\xff\x7f"sv,
+      "\x05\xff\xff\xff\xff\xff\xff\xff\xff\xff\x7f"sv}) {
+    EXPECT_FALSE(decode_json(wire));
   }
 }
 
@@ -186,87 +259,91 @@ TEST(PathEmbedTest, TextAndBinaryJsonEnforceDepth256WithoutChangingOrdinaryJson)
     std::string wire;
     for (unsigned i = 0; i < depth; ++i) wire.append({char{6}, char{1}});
     wire += char{1};
-    auto binary = decodeJson(std::span<char const>(wire.data(), wire.size()));
+    auto binary = decode_json(wire);
     EXPECT_EQ(static_cast<bool>(binary), depth == 256);
     std::string text(depth, '[');
     text += '0';
     text.append(depth, ']');
-    EmbeddedData data{EmbeddedAssetType::Binary, ByteArray::from_string(text), {}, {}};
-    EXPECT_EQ(static_cast<bool>(embeddedDataToJson(data)), depth == 256);
+    EmbeddedData data{EmbeddedAssetType::Binary, ByteArray::from_string(text), {}};
+    EXPECT_EQ(static_cast<bool>(embedded_data_to_json(data)), depth == 256);
   }
   EmbeddedData comments{EmbeddedAssetType::Text,
-      ByteArray::from_string("/*[[[*/{\"braces\":\"[\\\"{\",\"value\":true}//[[[\r[[[\n"), {}, {}};
-  EXPECT_TRUE(embeddedDataToJson(comments));
-  for (auto text : {"null false", "{}x", "[0] trailing", "\"unfinished", "[}"}) {
-    EmbeddedData data{EmbeddedAssetType::Binary, ByteArray::from_string(text), {}, {}};
-    EXPECT_FALSE(embeddedDataToJson(data)) << text;
+      ByteArray::from_string("/*[[[*/{\"braces\":\"[\\\"{\",\"value\":true}//[[[\r[[[\n"), {}};
+  EXPECT_TRUE(embedded_data_to_json(comments));
+  for (std::string_view text : {"null false", "{}x", "[0] trailing", "\"unfinished", "[}"}) {
+    EmbeddedData data{EmbeddedAssetType::Binary, ByteArray::from_string(text), {}};
+    EXPECT_FALSE(embedded_data_to_json(data)) << text;
   }
-  EmbeddedData nul{EmbeddedAssetType::Text, ByteArray::from_string(std::string_view("0\0", 2)), {}, {}};
-  EXPECT_FALSE(embeddedDataToJson(nul));
+  EmbeddedData nul{EmbeddedAssetType::Text, ByteArray::from_string(std::string_view("0\0", 2)), {}};
+  EXPECT_FALSE(embedded_data_to_json(nul));
   EXPECT_TRUE(Json::parse("[0]"));
 }
 
 TEST(PathEmbedTest, ImagesRequireUnambiguousFramesAndKeepCompleteFramesPath) {
-  auto image = decodeEmbeddedData("/opensb_data;image;AA==;frames;text;{}");
+  auto image = decode_embedded_data("/opensb_data;image;AA==;frames;text;{}");
   ASSERT_TRUE(image);
   EXPECT_EQ(image->type, EmbeddedAssetType::Image);
-  EXPECT_EQ(image->framesData, std::optional<String>("/opensb_data;text;{}"));
-  EXPECT_FALSE(image->framesPath);
-  auto frames = decodeEmbeddedData(*image->framesData);
+  ASSERT_TRUE(std::holds_alternative<EmbeddedFramesPath>(image->frame_source));
+  auto const& embedded_path = std::get<EmbeddedFramesPath>(image->frame_source).path;
+  EXPECT_EQ(embedded_path, String("/opensb_data;text;{}"));
+  auto frames = decode_embedded_data(embedded_path);
   ASSERT_TRUE(frames);
-  EXPECT_EQ(embeddedDataToJson(*frames).value(), Json(JsonObject{}));
-  auto path = decodeEmbeddedData("/opensb_data;image;AA==;framespath;/images/default.frames");
+  EXPECT_EQ(embedded_data_to_json(*frames).value(), Json(JsonObject{}));
+  auto path = decode_embedded_data("/opensb_data;image;AA==;framespath;/images/default.frames");
   ASSERT_TRUE(path);
-  EXPECT_EQ(path->framesPath, std::optional<String>("/images/default.frames"));
-  EXPECT_FALSE(path->framesData);
-  EXPECT_FALSE(decodeEmbeddedData("/opensb_data;image;AA=="));
-  EXPECT_TRUE(decodeEmbeddedData("/opensb_data;image;AA==", true));
-  EXPECT_TRUE(decodeEmbeddedData("/opensb_data;bin;AA=="));
-  EXPECT_FALSE(embeddedDataToJson(*image));
+  ASSERT_TRUE(std::holds_alternative<ExternalFramesPath>(path->frame_source));
+  EXPECT_EQ(std::get<ExternalFramesPath>(path->frame_source).path, String("/images/default.frames"));
+  EXPECT_FALSE(decode_embedded_data("/opensb_data;image;AA=="));
+  auto raw = decode_embedded_data("/opensb_data;image;AA==", DecodeMode::RawBytes);
+  ASSERT_TRUE(raw);
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(raw->frame_source));
+  EXPECT_TRUE(decode_embedded_data("/opensb_data;bin;AA=="));
+  EXPECT_FALSE(embedded_data_to_json(*image));
 
-  auto frameWire = DataStreamBuffer::serialize(Json(JsonObject{{"frameGrid", JsonObject{{"size", JsonArray{1, 1}}}}}));
-  ASSERT_TRUE(frameWire);
+  auto frame_wire = DataStreamBuffer::serialize(Json(JsonObject{{"frameGrid", JsonObject{{"size", JsonArray{1, 1}}}}}));
+  ASSERT_TRUE(frame_wire);
   for (auto method : {EmbeddedCompressionMethod::None, EmbeddedCompressionMethod::Zlib, EmbeddedCompressionMethod::Zstd}) {
-    auto payload = embedAndCompressData(std::span<char const>("png", 3), method);
-    auto framePayload = embedAndCompressData(frameWire->span(), method);
+    auto payload = encoded_payload(std::span<char const>("png", 3), method);
+    auto frame_payload = encoded_payload(frame_wire->span(), method);
     ASSERT_TRUE(payload);
-    ASSERT_TRUE(framePayload);
-    auto decoded = decodeEmbeddedData(String("/opensb_data;image;" + payload->utf8() + ";frames;json;" + framePayload->utf8()));
+    ASSERT_TRUE(frame_payload);
+    auto decoded = decode_embedded_data(String("/opensb_data;image;" + payload->utf8() + ";frames;json;" + frame_payload->utf8()));
     ASSERT_TRUE(decoded) << decoded.error().what();
-    auto decodedFrames = decodeEmbeddedData(*decoded->framesData);
-    ASSERT_TRUE(decodedFrames);
-    EXPECT_TRUE(embeddedDataToJson(*decodedFrames));
+    ASSERT_TRUE(std::holds_alternative<EmbeddedFramesPath>(decoded->frame_source));
+    auto decoded_frames = decode_embedded_data(std::get<EmbeddedFramesPath>(decoded->frame_source).path);
+    ASSERT_TRUE(decoded_frames);
+    EXPECT_TRUE(embedded_data_to_json(*decoded_frames));
   }
   for (auto suffix : {"frames", "framespath", "framespath;", "framespath;/a;extra", "unknown;/a",
       "frames;image;AA==;frames;text;{}", "frames;text;{};extra", "frames;json;AA==;extra", "frames;text"}) {
-    auto invalidPath = String("/opensb_data;image;AA==;" + std::string(suffix));
-    EXPECT_FALSE(decodeEmbeddedData(invalidPath)) << suffix;
-    EXPECT_FALSE(decodeEmbeddedData(invalidPath, true)) << suffix;
+    auto invalid_path = String("/opensb_data;image;AA==;" + std::string(suffix));
+    EXPECT_FALSE(decode_embedded_data(invalid_path)) << suffix;
+    EXPECT_FALSE(decode_embedded_data(invalid_path, DecodeMode::RawBytes)) << suffix;
   }
 }
 
 TEST(PathEmbedTest, CompressedStreamsRejectCorruptionTruncationAndConcatenation) {
   auto input = ByteArray::from_string("compressed payload");
   for (auto method : {EmbeddedCompressionMethod::Zlib, EmbeddedCompressionMethod::Zstd}) {
-    auto encoded = embedAndCompressData(input.span(), method);
+    auto encoded = encoded_payload(input.span(), method);
     ASSERT_TRUE(encoded);
     auto separator = encoded->utf8().find(';');
     auto token = encoded->utf8().substr(0, separator + 1);
-    auto compressed = decodeEmbeddedData(String("/opensb_data;bin;" + encoded->utf8().substr(separator + 1)));
+    auto compressed = decode_embedded_data(String("/opensb_data;bin;" + encoded->utf8().substr(separator + 1)));
     ASSERT_TRUE(compressed);
     auto bytes = compressed->bytes;
     bytes.remove_suffix(1);
-    EXPECT_FALSE(decodeEmbeddedData(String("/opensb_data;bin;" + token + embedAndCompressData(bytes.span(), EmbeddedCompressionMethod::None).value().utf8())));
+    EXPECT_FALSE(decode_embedded_data(String("/opensb_data;bin;" + token + encoded_payload(bytes.span(), EmbeddedCompressionMethod::None).value().utf8())));
     bytes = compressed->bytes;
     bytes[0] ^= 0x7f;
-    EXPECT_FALSE(decodeEmbeddedData(String("/opensb_data;bin;" + token + embedAndCompressData(bytes.span(), EmbeddedCompressionMethod::None).value().utf8())));
+    EXPECT_FALSE(decode_embedded_data(String("/opensb_data;bin;" + token + encoded_payload(bytes.span(), EmbeddedCompressionMethod::None).value().utf8())));
     bytes = compressed->bytes;
     bytes.append(compressed->bytes);
-    EXPECT_FALSE(decodeEmbeddedData(String("/opensb_data;bin;" + token + embedAndCompressData(bytes.span(), EmbeddedCompressionMethod::None).value().utf8())));
+    EXPECT_FALSE(decode_embedded_data(String("/opensb_data;bin;" + token + encoded_payload(bytes.span(), EmbeddedCompressionMethod::None).value().utf8())));
     bytes = compressed->bytes;
     bytes.push_back('\0');
-    EXPECT_FALSE(decodeEmbeddedData(String("/opensb_data;bin;" + token + embedAndCompressData(bytes.span(), EmbeddedCompressionMethod::None).value().utf8())));
-    EXPECT_FALSE(decodeEmbeddedData(String("/opensb_data;bin;" + token)));
+    EXPECT_FALSE(decode_embedded_data(String("/opensb_data;bin;" + token + encoded_payload(bytes.span(), EmbeddedCompressionMethod::None).value().utf8())));
+    EXPECT_FALSE(decode_embedded_data(String("/opensb_data;bin;" + token)));
   }
 }
 
@@ -279,9 +356,9 @@ TEST(PathEmbedTest, GzipStreamsRejectTrailingBytesAndConcatenation) {
       bytes.append(*compressed);
     else
       bytes.push_back('\0');
-    auto encoded = embedAndCompressData(bytes.span(), EmbeddedCompressionMethod::None);
+    auto encoded = encoded_payload(bytes.span(), EmbeddedCompressionMethod::None);
     ASSERT_TRUE(encoded);
-    auto decoded = decodeEmbeddedData(String("/opensb_data;bin;gzip;" + encoded->utf8()));
+    auto decoded = decode_embedded_data(String("/opensb_data;bin;gzip;" + encoded->utf8()));
     ASSERT_FALSE(decoded);
     EXPECT_NE(std::string(decoded.error().what()).find("trailing compressed bytes"), std::string::npos);
   }
@@ -296,36 +373,36 @@ TEST(PathEmbedTest, ZstandardUnknownSizeStreamsDecodeAndHugeDeclaredSizesFailEar
   auto size = ZSTD_compress2(context.get(), compressed.data(), compressed.size(), "stream", 6);
   ASSERT_FALSE(ZSTD_isError(size));
   compressed.resize(size);
-  auto encoded = embedAndCompressData(compressed.span(), EmbeddedCompressionMethod::None);
+  auto encoded = encoded_payload(compressed.span(), EmbeddedCompressionMethod::None);
   ASSERT_TRUE(encoded);
-  auto decoded = decodeEmbeddedData(String("/opensb_data;bin;zstd;" + encoded->utf8()));
+  auto decoded = decode_embedded_data(String("/opensb_data;bin;zstd;" + encoded->utf8()));
   ASSERT_TRUE(decoded);
   EXPECT_EQ(decoded->bytes, ByteArray::from_string("stream"));
   // Single-segment frame header declaring 64MiB + 1, with no body. Rejection
   // must not reserve the attacker-controlled declared size.
   std::array<char, 9> header{char{0x28}, static_cast<char>(0xb5), char{0x2f},
       static_cast<char>(0xfd), static_cast<char>(0xa0), 1, 0, 0, 4};
-  auto huge = embedAndCompressData(header, EmbeddedCompressionMethod::None);
+  auto huge = encoded_payload(header, EmbeddedCompressionMethod::None);
   ASSERT_TRUE(huge);
-  EXPECT_FALSE(decodeEmbeddedData(String("/opensb_data;bin;zstd;" + huge->utf8())));
+  EXPECT_FALSE(decode_embedded_data(String("/opensb_data;bin;zstd;" + huge->utf8())));
 }
 
 TEST(PathEmbedTest, StreamingDecompressionAcceptsExact64MiBAndRejectsOneByteMore) {
   for (auto method : {EmbeddedCompressionMethod::Zlib, EmbeddedCompressionMethod::Gzip, EmbeddedCompressionMethod::Zstd}) {
-    for (auto size : {MaxEmbeddedDataSize, MaxEmbeddedDataSize + 1}) {
+    for (auto size : {max_embedded_data_size, max_embedded_data_size + 1}) {
       auto compressed = method == EmbeddedCompressionMethod::Zstd
           ? compressed_zstd_zeros(size)
           : compressed_zeros(size, method == EmbeddedCompressionMethod::Gzip);
       ASSERT_TRUE(compressed);
-      auto encoded = embedAndCompressData(compressed->span(), EmbeddedCompressionMethod::None);
+      auto encoded = encoded_payload(compressed->span(), EmbeddedCompressionMethod::None);
       ASSERT_TRUE(encoded);
       std::string_view token = method == EmbeddedCompressionMethod::Zstd ? "zstd;"
           : method == EmbeddedCompressionMethod::Gzip ? "gzip;" : "zlib;";
-      auto result = decodeEmbeddedData(String("/opensb_data;bin;" + std::string(token) + encoded->utf8()));
-      if (size == MaxEmbeddedDataSize) {
+      auto result = decode_embedded_data(String("/opensb_data;bin;" + std::string(token) + encoded->utf8()));
+      if (size == max_embedded_data_size) {
         ASSERT_TRUE(result) << result.error().what();
         EXPECT_EQ(result->bytes.size(), size);
-        EXPECT_LE(result->bytes.capacity(), MaxEmbeddedDataSize);
+        EXPECT_LE(result->bytes.capacity(), max_embedded_data_size);
         EXPECT_TRUE(std::ranges::all_of(result->bytes, [](char byte) { return byte == '\0'; }));
       } else {
         ASSERT_FALSE(result);

@@ -84,57 +84,58 @@ std::expected<LuaMethods<Image>, StarException> LuaUserDataMethods<Image>::make(
 
   if (auto result = methods.register_method("embed",
       [](Image const& image, String const& compression, std::optional<std::variant<String, Json>> const& frames,
-          std::optional<String> const& framesCompression) -> std::expected<String, StarException> {
-        auto method = embeddedCompressionMethod(compression);
+          std::optional<String> const& frames_compression) -> std::expected<String, StarException> {
+        auto method = embedded_compression_method(compression);
         if (!method) return std::unexpected(std::move(method.error()));
         auto buffer = std::make_shared<Buffer>();
         Logger logger;
         if (auto written = image.write_png(logger, buffer); !written)
           return std::unexpected(std::move(written.error()));
-        auto payload = embedAndCompressData(buffer->span(), *method);
-        if (!payload) return std::unexpected(std::move(payload.error()));
-        String output = String(frames ? std::string_view("/opensb_data;image;") : std::string_view("/opensb_data;bin;")) + *payload;
+        std::string output = frames ? "/opensb_data;image;" : "/opensb_data;bin;";
+        if (auto encoded = append_embedded_data(output, buffer->span(), *method); !encoded)
+          return std::unexpected(std::move(encoded.error()));
         if (!frames)
-          return output;
-        if (auto path = std::get_if<String>(&*frames)) {
-          if (AssetPath::is_embedded(*path)) {
+          return String(std::move(output));
+        if (std::holds_alternative<String>(*frames)) {
+          auto const& path = std::get<String>(*frames);
+          if (AssetPath::is_embedded(path)) {
             // A self-contained frames asset is represented inline, rather than
             // inserting its semicolons into the single framespath field.
-            if (path->utf8().find_first_of(":?") != std::string::npos)
+            if (path.utf8().find_first_of(":?") != std::string::npos)
               return std::unexpected(StarException("Embedded frames cannot contain a subpath or directives"));
-            output += String(";frames;") + String(std::string_view(path->utf8()).substr(std::string_view("/opensb_data;").size()));
+            output.append(";frames;").append(std::string_view(path.utf8()).substr(std::string_view("/opensb_data;").size()));
           } else {
-            if (path->empty() || path->utf8().find_first_of(";:?") != std::string::npos)
+            if (path.empty() || path.utf8().find_first_of(";:?") != std::string::npos)
               return std::unexpected(StarException("Embedded frames path must be nonempty and contain no ';', ':' or '?'"));
-            output += String(";framespath;") + *path;
+            output.append(";framespath;").append(path.utf8());
           }
         } else {
           auto const& json = std::get<Json>(*frames);
-          if (framesCompression && std::ranges::equal(framesCompression->utf8(), std::string_view("text"),
+          if (frames_compression && std::ranges::equal(frames_compression->utf8(), std::string_view("text"),
               [](char a, char b) { return (a >= 'A' && a <= 'Z' ? a + ('a' - 'A') : a) == b; })) {
             std::string text;
             JsonWriter<JsonUtf8StringOutputIterator, true, true> writer{JsonUtf8StringOutputIterator(text)};
             auto written = JsonStreamer<Json>::to_json_stream(json, writer, false);
             if (!written) return std::unexpected(std::move(written.error()));
-            auto escaped = embedEscapeText(String(std::move(text)));
-            if (!escaped) return std::unexpected(std::move(escaped.error()));
-            output += String(";frames;text;") + *escaped;
+            output.append(";frames;text;");
+            if (auto escaped = append_escaped_text(output, text); !escaped)
+              return std::unexpected(std::move(escaped.error()));
           } else {
-            auto framesMethod = *method;
-            if (framesCompression) {
-              auto parsed = embeddedCompressionMethod(*framesCompression);
+            auto frames_method = *method;
+            if (frames_compression) {
+              auto parsed = embedded_compression_method(*frames_compression);
               if (!parsed) return std::unexpected(std::move(parsed.error()));
-              framesMethod = *parsed;
+              frames_method = *parsed;
             }
             DataStreamBuffer stream;
             if (auto written = stream.write(json); !written)
               return std::unexpected(std::move(written.error()));
-            auto encoded = embedAndCompressData(stream.span(), framesMethod);
-            if (!encoded) return std::unexpected(std::move(encoded.error()));
-            output += String(";frames;json;") + *encoded;
+            output.append(";frames;json;");
+            if (auto encoded = append_embedded_data(output, stream.span(), frames_method); !encoded)
+              return std::unexpected(std::move(encoded.error()));
           }
         }
-        return output;
+        return String(std::move(output));
       }); !result)
     return std::unexpected(std::move(result.error()));
 

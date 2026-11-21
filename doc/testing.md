@@ -729,6 +729,10 @@ a cumulative connection or multi-packet batch limit. P2P decoding applies the
 same 64MiB packet-body bound as TCP. Embedded decoders independently retain their
 strict 64MiB cap, bounded window, complete-frame consumption and rejection of
 trailing/concatenated streams.
+Embedded path layout errors take precedence over payload errors: validate all fields
+before allocating decoded bytes. Raw image reads may omit frames but must validate
+any supplied frame specification. Inline frame payloads are decoded by their JSON
+consumer, not eagerly during image layout validation.
 
 Run `CompressionTest.*:PathEmbedTest.*` in `core_tests`, and
 `UniverseConnections.*:EmbeddedAssetsTest.*` in a private asset-backed `game_tests`

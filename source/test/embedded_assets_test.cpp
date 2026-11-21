@@ -119,12 +119,13 @@ void expectPixels(Image const& actual, Image const& expected) {
   }
 }
 
-std::expected<String, StarException> binaryPath(std::span<char const> bytes,
+std::expected<String, StarException> binary_path(std::span<char const> bytes,
     EmbeddedCompressionMethod compression = EmbeddedCompressionMethod::Zstd) {
-  auto payload = embedAndCompressData(bytes, compression);
-  if (!payload)
-    return std::unexpected(std::move(payload.error()));
-  return "/opensb_data;bin;" + *payload;
+  std::string path = "/opensb_data;bin;";
+  auto appended = append_embedded_data(path, bytes, compression);
+  if (!appended)
+    return std::unexpected(std::move(appended.error()));
+  return String(std::move(path));
 }
 
 std::expected<Root::Settings, StarException> embeddedRootSettings(GameTest& fixture, String const& directory,
@@ -341,7 +342,7 @@ const GameTestRegistration embeddedAudioFont("EmbeddedAssetsTest", "EmbeddedWavA
   ASSERT_TRUE(original_face);
   auto bytes = setup.assets->bytes(paths.front());
   ASSERT_TRUE(bytes) << bytes.error().what();
-  auto fontPath = binaryPath((*bytes)->span());
+  auto fontPath = binary_path((*bytes)->span());
   ASSERT_TRUE(fontPath);
   auto font = setup.assets->font(*fontPath);
   ASSERT_TRUE(font) << font.error().what();
@@ -398,7 +399,7 @@ const GameTestRegistration embeddedErrors("EmbeddedAssetsTest", "TypedFailuresDo
   EXPECT_TRUE(malformed.error().is<AssetException>());
   EXPECT_EQ(setup.assets->json(*path + ":valid"), Json(41));
   ByteArray invalid(64, 'x');
-  auto binary = binaryPath(invalid.span());
+  auto binary = binary_path(invalid.span());
   ASSERT_TRUE(binary);
   std::array<std::string, 3> originalErrors;
   for (unsigned attempt = 0; attempt != 2; ++attempt) {
@@ -497,6 +498,11 @@ const GameTestRegistration embeddedDisabled("EmbeddedAssetsTest", "SafeConfigura
   expectDenied(setup.assets->image(*path));
   expectDenied(setup.assets->audio(*path));
   expectDenied(setup.assets->font(*path));
+  // Even a doubly invalid path must not reach the layout or payload decoder.
+  auto disabled = setup.assets->openFile("/opensb_data;bin;!;extra");
+  ASSERT_FALSE(disabled);
+  EXPECT_TRUE(disabled.error().is<AssetException>());
+  EXPECT_TRUE(std::string_view(disabled.error().what()).contains("safe.allowRemoteAssets"));
   auto settings = embeddedRootSettings(fixture, setup.directory, false);
   ASSERT_TRUE(settings) << settings.error().what();
   auto root = Root::create(std::move(*settings));
@@ -582,7 +588,7 @@ const GameTestRegistration embeddedPngBudget(
         crc = (crc >> 1) ^ (0xedb88320u & (0u - (crc & 1u)));
     }
     write32(29, ~crc);
-    auto path = binaryPath(png.span(), EmbeddedCompressionMethod::Zlib);
+    auto path = binary_path(png.span(), EmbeddedCompressionMethod::Zlib);
     ASSERT_TRUE(path) << path.error().what();
     auto raw = setup.assets->bytes(*path, true);
     ASSERT_TRUE(raw);

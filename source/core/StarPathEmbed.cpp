@@ -15,16 +15,16 @@ import star.format;
 namespace Star {
 namespace {
 
-constexpr std::string_view Prefix = "/opensb_data;";
-constexpr std::size_t MaxJsonDepth = 256;
+constexpr std::string_view path_prefix = "/opensb_data;";
+constexpr std::size_t max_json_depth = 256;
 // Compressed representations can be slightly larger than their plaintext.
-constexpr std::size_t MaxEncodedBytes = MaxEmbeddedDataSize + MaxEmbeddedDataSize / 128 + 1024;
+constexpr std::size_t max_encoded_bytes = max_embedded_data_size + max_embedded_data_size / 128 + 1024;
 
 std::unexpected<StarException> invalid(std::string_view detail) {
   return std::unexpected(StarException(Star::format("Invalid embedded data: {}", detail)));
 }
 
-std::optional<EmbeddedCompressionMethod> compressionMethod(std::string_view name) {
+std::optional<EmbeddedCompressionMethod> compression_method(std::string_view name) {
   auto equal = [name](std::string_view wanted) {
     if (name.size() != wanted.size())
       return false;
@@ -44,25 +44,32 @@ std::optional<EmbeddedCompressionMethod> compressionMethod(std::string_view name
   return {};
 }
 
-String encodeBase64(std::span<char const> bytes, std::string_view prefix = {}) {
-  constexpr std::string_view Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-  std::string output(prefix.size() + (bytes.size() + 2) / 3 * 4, '=');
-  std::ranges::copy(prefix, output.begin());
-  std::size_t out = prefix.size();
-  for (std::size_t i = 0; i < bytes.size(); i += 3) {
-    auto a = static_cast<unsigned char>(bytes[i]);
-    auto b = i + 1 < bytes.size() ? static_cast<unsigned char>(bytes[i + 1]) : 0;
-    auto c = i + 2 < bytes.size() ? static_cast<unsigned char>(bytes[i + 2]) : 0;
-    output[out++] = Alphabet[a >> 2];
-    output[out++] = Alphabet[((a & 3) << 4) | (b >> 4)];
-    if (i + 1 < bytes.size()) output[out + 0] = Alphabet[((b & 15) << 2) | (c >> 6)];
-    if (i + 2 < bytes.size()) output[out + 1] = Alphabet[c & 63];
-    out += 2;
-  }
-  return String(std::move(output));
+// The caller bounds bytes by the embedded payload or compression bound.
+std::expected<void, StarException> append_base64(std::string& output, std::span<char const> bytes, std::string_view token = {}) {
+  constexpr std::string_view alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  auto const start = output.size();
+  auto const extra = token.size() + (bytes.size() + 2) / 3 * 4;
+  if (extra > output.max_size() - start)
+    return invalid("embedded path exceeds string capacity");
+  output.resize_and_overwrite(start + extra, [&](std::same_as<char*> auto storage, std::size_t capacity) noexcept {
+    auto tail = std::span(storage, capacity).subspan(start);
+    std::ranges::copy(token, tail.begin());
+    auto out = token.size();
+    for (std::size_t i = 0; i < bytes.size(); i += 3) {
+      auto a = static_cast<unsigned char>(bytes[i]);
+      auto b = i + 1 < bytes.size() ? static_cast<unsigned char>(bytes[i + 1]) : 0;
+      auto c = i + 2 < bytes.size() ? static_cast<unsigned char>(bytes[i + 2]) : 0;
+      tail[out++] = alphabet[a >> 2];
+      tail[out++] = alphabet[((a & 3) << 4) | (b >> 4)];
+      tail[out++] = i + 1 < bytes.size() ? alphabet[((b & 15) << 2) | (c >> 6)] : '=';
+      tail[out++] = i + 2 < bytes.size() ? alphabet[c & 63] : '=';
+    }
+    return start + out;
+  });
+  return {};
 }
 
-std::expected<ByteArray, StarException> decodeBase64(std::string_view text) {
+std::expected<ByteArray, StarException> decode_base64(std::string_view text, std::size_t limit) {
   auto value = [](char c) -> int {
     if (c >= 'A' && c <= 'Z') return c - 'A';
     if (c >= 'a' && c <= 'z') return c - 'a' + 26;
@@ -80,28 +87,28 @@ std::expected<ByteArray, StarException> decodeBase64(std::string_view text) {
   auto remainder = digits % 4;
   if (remainder == 1 || (padding && padding != 4 - remainder))
     return invalid("invalid Base64URL length");
-  if (digits / 4 > MaxEncodedBytes / 3)
+  if (digits / 4 > limit / 3)
     return invalid("encoded payload exceeds size limit");
-  auto decodedSize = digits / 4 * 3 + (remainder ? remainder - 1 : 0);
-  if (decodedSize > MaxEncodedBytes)
+  auto decoded_size = digits / 4 * 3 + (remainder ? remainder - 1 : 0);
+  if (decoded_size > limit)
     return invalid("encoded payload exceeds size limit");
   ByteArray bytes;
-  bytes.resize(decodedSize);
+  bytes.resize(decoded_size);
   std::uint32_t bits = 0;
-  unsigned bitCount = 0;
+  unsigned bit_count = 0;
   std::size_t out = 0;
   for (std::size_t i = 0; i < digits; ++i) {
     auto digit = value(text[i]);
     if (digit < 0)
       return invalid("invalid Base64URL character");
     bits = (bits << 6) | static_cast<unsigned>(digit);
-    bitCount += 6;
-    if (bitCount >= 8) {
-      bitCount -= 8;
-      bytes[out++] = static_cast<char>(bits >> bitCount);
+    bit_count += 6;
+    if (bit_count >= 8) {
+      bit_count -= 8;
+      bytes[out++] = static_cast<char>(bits >> bit_count);
     }
   }
-  if (bitCount && (bits & ((1u << bitCount) - 1)))
+  if (bit_count && (bits & ((1u << bit_count) - 1)))
     return invalid("nonzero Base64URL padding bits");
   return bytes;
 }
@@ -110,10 +117,10 @@ std::expected<ByteArray, StarException> decodeBase64(std::string_view text) {
 // probe byte lets the codec consume trailers without allocating past the cap.
 std::span<char> prepare_output_tail(ByteArray& output, std::span<char, 1> probe) {
   auto previous_size = output.size();
-  if (previous_size == MaxEmbeddedDataSize)
+  if (previous_size == max_embedded_data_size)
     return probe;
   if (previous_size == output.capacity())
-    output.reserve(output.capacity() ? std::min(MaxEmbeddedDataSize, output.capacity() * 2) : 4096);
+    output.reserve(output.capacity() ? std::min(max_embedded_data_size, output.capacity() * 2) : 4096);
   output.resize(output.capacity());
   return output.span().subspan(previous_size);
 }
@@ -142,7 +149,7 @@ std::expected<ByteArray, StarException> inflate_bytes(std::span<char const> byte
       return std::unexpected(StarException(Star::format("Embedded inflate error ({}): {}", status,
           stream.msg ? stream.msg : "corrupt or truncated compressed payload")));
     auto produced = tail.size() - stream.avail_out;
-    if (produced > MaxEmbeddedDataSize - previous_size)
+    if (produced > max_embedded_data_size - previous_size)
       return invalid("decompressed payload exceeds size limit");
     output.resize(previous_size + produced);
     if (status == Z_STREAM_END) {
@@ -159,7 +166,7 @@ std::expected<ByteArray, StarException> inflate_zstd(std::span<char const> bytes
   auto declared = ZSTD_getFrameContentSize(bytes.data(), bytes.size());
   if (declared == ZSTD_CONTENTSIZE_ERROR)
     return invalid("invalid Zstandard header");
-  if (declared != ZSTD_CONTENTSIZE_UNKNOWN && declared > MaxEmbeddedDataSize)
+  if (declared != ZSTD_CONTENTSIZE_UNKNOWN && declared > max_embedded_data_size)
     return invalid("Zstandard payload exceeds size limit");
   auto cleanup = [](ZSTD_DCtx* context) noexcept { (void)ZSTD_freeDCtx(context); };
   std::unique_ptr<ZSTD_DCtx, decltype(cleanup)> context(ZSTD_createDCtx(), cleanup);
@@ -179,7 +186,7 @@ std::expected<ByteArray, StarException> inflate_zstd(std::span<char const> bytes
     status = ZSTD_decompressStream(context.get(), &out, &input);
     if (ZSTD_isError(status))
       return std::unexpected(StarException(Star::format("Embedded Zstandard decompression: {}", ZSTD_getErrorName(status))));
-    if (out.pos > MaxEmbeddedDataSize - previous_size)
+    if (out.pos > max_embedded_data_size - previous_size)
       return invalid("decompressed payload exceeds size limit");
     output.resize(previous_size + out.pos);
     if (!status) {
@@ -192,11 +199,11 @@ std::expected<ByteArray, StarException> inflate_zstd(std::span<char const> bytes
   }
 }
 
-std::expected<ByteArray, StarException> unescapeText(std::string_view text) {
-  if (text.size() > MaxEmbeddedDataSize * 2)
+std::expected<ByteArray, StarException> unescape_text(std::string_view text) {
+  if (text.size() > max_embedded_data_size * 2)
     return invalid("escaped text exceeds size limit");
   // Reserve at most the decoded limit, not an arbitrarily large escaped input.
-  ByteArray output = ByteArray::with_reserve(std::min(text.size(), MaxEmbeddedDataSize));
+  ByteArray output = ByteArray::with_reserve(std::min(text.size(), max_embedded_data_size));
   for (std::size_t i = 0; i < text.size(); ++i) {
     char c = text[i];
     if (c == '%') {
@@ -213,7 +220,7 @@ std::expected<ByteArray, StarException> unescapeText(std::string_view text) {
     } else if (c == ':' || c == '?' || c == '/') {
       return invalid("unescaped asset-path delimiter in text");
     }
-    if (output.size() == MaxEmbeddedDataSize)
+    if (output.size() == max_embedded_data_size)
       return invalid("text payload exceeds size limit");
     output.push_back(c);
   }
@@ -237,75 +244,50 @@ struct Fields {
   }
 };
 
-std::expected<void, StarException> validateFramesFields(std::string_view body) {
-  Fields fields{body};
-  auto type = fields.take();
-  auto payload = fields.take();
-  if (!type || !payload)
-    return invalid("missing embedded frames type or payload");
-  if (*type == "text") {
-    if (fields.available) return invalid("extra embedded frames text fields");
-  } else if (*type == "bin" || *type == "json") {
-    if (fields.available && compressionMethod(*payload))
-      payload = fields.take();
-    if (fields.available) return invalid("extra embedded frames payload fields");
-  } else {
-    return invalid("unsupported frames type (images cannot be nested in frames)");
-  }
-  return {};
-}
+struct Payload {
+  EmbeddedAssetType type;
+  EmbeddedCompressionMethod method;
+  std::string_view text;
+};
 
-std::expected<EmbeddedData, StarException> decodeBody(std::string_view body, bool asBytes) {
-  Fields fields{body};
+std::expected<Payload, StarException> parse_payload(Fields& fields) {
   auto type = fields.take();
-  auto payload = fields.take();
-  if (!type || !payload)
+  auto text = fields.take();
+  if (!type || !text)
     return invalid("missing type or payload");
-  EmbeddedAssetType assetType;
-  if (*type == "text") assetType = EmbeddedAssetType::Text;
-  else if (*type == "bin") assetType = EmbeddedAssetType::Binary;
-  else if (*type == "json") assetType = EmbeddedAssetType::Json;
-  else if (*type == "image") assetType = EmbeddedAssetType::Image;
+  EmbeddedAssetType asset_type;
+  if (*type == "text") asset_type = EmbeddedAssetType::Text;
+  else if (*type == "bin") asset_type = EmbeddedAssetType::Binary;
+  else if (*type == "json") asset_type = EmbeddedAssetType::Json;
+  else if (*type == "image") asset_type = EmbeddedAssetType::Image;
   else return invalid("unsupported type");
 
-  ByteArray bytes;
-  if (assetType == EmbeddedAssetType::Text) {
-    if (fields.available)
-      return invalid("extra text fields");
-    auto decoded = unescapeText(*payload);
-    if (!decoded) return std::unexpected(std::move(decoded.error()));
-    bytes = std::move(*decoded);
-  } else {
-    auto method = EmbeddedCompressionMethod::None;
-    if (fields.available) {
-      if (auto named = compressionMethod(*payload)) {
-        method = *named;
-        payload = fields.take();
-      }
-    }
-    auto decoded = decodeBase64(*payload);
-    if (!decoded) return std::unexpected(std::move(decoded.error()));
-    if (method == EmbeddedCompressionMethod::None) {
-      if (decoded->size() > MaxEmbeddedDataSize)
-        return invalid("payload exceeds size limit");
-      bytes = std::move(*decoded);
-    } else {
-      auto inflated = method == EmbeddedCompressionMethod::Zstd
-          ? inflate_zstd(decoded->span())
-          : inflate_bytes(decoded->span(), method == EmbeddedCompressionMethod::Gzip);
-      if (!inflated) return std::unexpected(std::move(inflated.error()));
-      bytes = std::move(*inflated);
+  auto method = EmbeddedCompressionMethod::None;
+  if (asset_type != EmbeddedAssetType::Text && fields.available) {
+    if (auto named = compression_method(*text)) {
+      method = *named;
+      text = fields.take();
     }
   }
+  return Payload{asset_type, method, *text};
+}
 
-  EmbeddedData result{assetType, std::move(bytes), {}, {}};
-  if (assetType != EmbeddedAssetType::Image) {
-    if (fields.available)
-      return invalid("extra payload fields");
-    return result;
+struct Layout {
+  Payload payload;
+  enum class Frames { None, External, Embedded } frames = Frames::None;
+  std::string_view frames_value{};
+};
+
+std::expected<Layout, StarException> parse_layout(std::string_view body, DecodeMode mode) {
+  Fields fields{body};
+  auto payload = parse_payload(fields);
+  if (!payload) return std::unexpected(std::move(payload.error()));
+  if (payload->type != EmbeddedAssetType::Image) {
+    if (fields.available) return invalid("extra payload fields");
+    return Layout{*payload};
   }
   if (!fields.available) {
-    if (asBytes) return result;
+    if (mode == DecodeMode::RawBytes) return Layout{*payload};
     return invalid("image requires frames or framespath (use bin for an unframed image)");
   }
   auto specification = fields.take();
@@ -313,23 +295,29 @@ std::expected<EmbeddedData, StarException> decodeBody(std::string_view body, boo
     auto path = fields.take();
     if (!path || path->empty() || fields.available)
       return invalid("framespath requires exactly one nonempty path");
-    result.framesPath = String(std::string(*path));
-  } else if (*specification == "frames") {
-    if (!fields.available)
-      return invalid("missing embedded frames");
-    // Validate the complete suffix without decoding it twice. Its ordinary
-    // JSON consumer performs payload validation and bounded decompression.
-    auto frames = validateFramesFields(fields.remaining);
-    if (!frames) return std::unexpected(std::move(frames.error()));
-    std::string path;
-    path.reserve(Prefix.size() + fields.remaining.size());
-    path.append(Prefix);
-    path.append(fields.remaining);
-    result.framesData = String(std::move(path));
-  } else {
-    return invalid("unsupported image frame specification");
+    return Layout{*payload, Layout::Frames::External, *path};
   }
-  return result;
+  if (*specification != "frames") return invalid("unsupported image frame specification");
+  if (!fields.available) return invalid("missing embedded frames");
+  // Check the nested layout; the JSON consumer decodes its payload once.
+  auto suffix = fields.remaining;
+  auto frames = parse_payload(fields);
+  if (!frames) return std::unexpected(std::move(frames.error()));
+  if (frames->type == EmbeddedAssetType::Image) return invalid("images cannot be nested in frames");
+  if (fields.available) return invalid("extra embedded frames payload fields");
+  return Layout{*payload, Layout::Frames::Embedded, suffix};
+}
+
+std::expected<ByteArray, StarException> decode_payload(Payload const& payload) {
+  if (payload.type == EmbeddedAssetType::Text)
+    return unescape_text(payload.text);
+  auto bytes = decode_base64(payload.text,
+      payload.method == EmbeddedCompressionMethod::None ? max_embedded_data_size : max_encoded_bytes);
+  if (!bytes || payload.method == EmbeddedCompressionMethod::None)
+    return bytes;
+  if (payload.method == EmbeddedCompressionMethod::Zstd)
+    return inflate_zstd(bytes->span());
+  return inflate_bytes(bytes->span(), payload.method == EmbeddedCompressionMethod::Gzip);
 }
 
 // Validate wire before the ordinary decoder can allocate strings or recurse.
@@ -340,7 +328,7 @@ public:
 
   std::expected<void, StarException> scan() {
     struct Frame { std::uint64_t remaining; bool object; };
-    std::array<Frame, MaxJsonDepth + 1> stack{};
+    std::array<Frame, max_json_depth + 1> stack{};
     stack[0] = {1, false};
     std::size_t depth = 0;
     for (;;) {
@@ -373,7 +361,7 @@ public:
         if (!count) return std::unexpected(std::move(count.error()));
         if (*count > m_input.size() / (tag == 7 ? 2 : 1))
           return invalid("binary JSON count exceeds remaining bytes");
-        if (depth == MaxJsonDepth)
+        if (depth == max_json_depth)
           return invalid("binary JSON exceeds nesting depth 256");
         stack[++depth] = {*count, tag == 7};
       } else {
@@ -412,7 +400,7 @@ private:
 
 // Only bound recursion here; the existing parser still owns JSON syntax,
 // Unicode, numbers, comments, and complete-document validation.
-std::expected<void, StarException> checkTextDepth(std::span<char const> text) {
+std::expected<void, StarException> check_text_depth(std::span<char const> text) {
   enum class State { Normal, String, Escape, LineComment, BlockComment };
   auto state = State::Normal;
   std::size_t depth = 0;
@@ -444,7 +432,7 @@ std::expected<void, StarException> checkTextDepth(std::span<char const> text) {
       ++i;
       state = State::BlockComment;
     } else if (c == '[' || c == '{') {
-      if (++depth > MaxJsonDepth) return invalid("textual JSON exceeds nesting depth 256");
+      if (++depth > max_json_depth) return invalid("textual JSON exceeds nesting depth 256");
     } else if ((c == ']' || c == '}') && depth) {
       --depth;
     }
@@ -454,16 +442,16 @@ std::expected<void, StarException> checkTextDepth(std::span<char const> text) {
 
 }
 
-std::expected<EmbeddedCompressionMethod, StarException> embeddedCompressionMethod(String const& name) {
-  if (auto method = compressionMethod(name.utf8())) return *method;
+std::expected<EmbeddedCompressionMethod, StarException> embedded_compression_method(String const& name) {
+  if (auto method = compression_method(name.utf8())) return *method;
   return invalid("unsupported compression method");
 }
 
-std::expected<String, StarException> embedAndCompressData(std::span<char const> data, EmbeddedCompressionMethod method) {
-  if (data.size() > MaxEmbeddedDataSize)
+std::expected<void, StarException> append_embedded_data(std::string& output, std::span<char const> data, EmbeddedCompressionMethod method) {
+  if (data.size() > max_embedded_data_size)
     return invalid("input exceeds size limit");
   if (method == EmbeddedCompressionMethod::None)
-    return encodeBase64(data);
+    return append_base64(output, data);
   if (method == EmbeddedCompressionMethod::Gzip)
     return std::unexpected(StarException("Compressing data in gzip is unsupported."));
   ByteArray bytes;
@@ -490,39 +478,67 @@ std::expected<String, StarException> embedAndCompressData(std::span<char const> 
   } else {
     return invalid("unsupported compression method");
   }
-  return encodeBase64(bytes.span(), token);
+  return append_base64(output, bytes.span(), token);
 }
 
-std::expected<String, StarException> embedEscapeText(String const& text) {
-  auto const& input = text.utf8();
-  if (input.size() > MaxEmbeddedDataSize)
+std::expected<void, StarException> append_escaped_text(std::string& output, std::string_view input) {
+  if (input.size() > max_embedded_data_size)
     return invalid("text input exceeds size limit");
   std::size_t escaped = 0;
   for (char c : input)
     escaped += c == '%' || c == ':' || c == '?' || c == ';' || c == '/';
-  std::string output;
-  output.reserve(input.size() + escaped);
-  for (char c : input) {
-    switch (c) {
-      case '%': output += "%%"; break;
-      case ':': output += "%c"; break;
-      case '?': output += "%q"; break;
-      case ';': output += "%s"; break;
-      case '/': output += "%b"; break;
-      default: output += c; break;
+  auto const start = output.size();
+  auto const extra = input.size() + escaped;
+  if (extra > output.max_size() - start)
+    return invalid("embedded path exceeds string capacity");
+  output.resize_and_overwrite(start + extra, [&](std::same_as<char*> auto storage, std::size_t capacity) noexcept {
+    auto tail = std::span(storage, capacity).subspan(start);
+    std::size_t out = 0;
+    for (char c : input) {
+      switch (c) {
+        case '%': break;
+        case ':': c = 'c'; break;
+        case '?': c = 'q'; break;
+        case ';': c = 's'; break;
+        case '/': c = 'b'; break;
+        default: tail[out++] = c; continue;
+      }
+      tail[out++] = '%';
+      tail[out++] = c;
     }
+    return start + out;
+  });
+  return {};
+}
+
+std::expected<EmbeddedData, StarException> decode_embedded_data(String const& base_path, DecodeMode mode) {
+  std::string_view path = base_path.utf8();
+  if (!path.starts_with(path_prefix)) return invalid("missing /opensb_data; prefix");
+  auto layout = parse_layout(path.substr(path_prefix.size()), mode);
+  if (!layout) return std::unexpected(std::move(layout.error()));
+  auto bytes = decode_payload(layout->payload);
+  if (!bytes) return std::unexpected(std::move(bytes.error()));
+
+  EmbeddedData result{layout->payload.type, std::move(*bytes), {}};
+  switch (layout->frames) {
+    case Layout::Frames::External:
+      result.frame_source.emplace<ExternalFramesPath>(String(layout->frames_value));
+      break;
+    case Layout::Frames::Embedded: {
+      std::string complete;
+      complete.reserve(path_prefix.size() + layout->frames_value.size());
+      complete.append(path_prefix).append(layout->frames_value);
+      result.frame_source.emplace<EmbeddedFramesPath>(String(std::move(complete)));
+      break;
+    }
+    case Layout::Frames::None:
+      break;
   }
-  return String(std::move(output));
+  return result;
 }
 
-std::expected<EmbeddedData, StarException> decodeEmbeddedData(String const& basePath, bool asBytes) {
-  std::string_view path = basePath.utf8();
-  if (!path.starts_with(Prefix)) return invalid("missing /opensb_data; prefix");
-  return decodeBody(path.substr(Prefix.size()), asBytes);
-}
-
-std::expected<Json, StarException> embeddedDataToJson(EmbeddedData const& data) {
-  if (data.bytes.size() > MaxEmbeddedDataSize)
+std::expected<Json, StarException> embedded_data_to_json(EmbeddedData const& data) {
+  if (data.bytes.size() > max_embedded_data_size)
     return invalid("JSON payload exceeds size limit");
   if (data.type == EmbeddedAssetType::Json) {
     auto checked = WireScanner(data.bytes.span()).scan();
@@ -532,7 +548,7 @@ std::expected<Json, StarException> embeddedDataToJson(EmbeddedData const& data) 
   }
   if (data.type == EmbeddedAssetType::Image)
     return invalid("image payload is not JSON");
-  auto checked = checkTextDepth(data.bytes.span());
+  auto checked = check_text_depth(data.bytes.span());
   if (!checked) return std::unexpected(std::move(checked.error()));
   return input_utf8_json(data.bytes.begin(), data.bytes.end(), JsonParseType::Value);
 }

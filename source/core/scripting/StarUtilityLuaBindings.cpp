@@ -329,30 +329,33 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUtilityCallbacks(Ran
 
   if (auto result = callbacks.register_callback("embedData",
       [](String const& data, String const& compression) -> std::expected<String, StarException> {
-        auto method = embeddedCompressionMethod(compression);
+        auto method = embedded_compression_method(compression);
         if (!method) return std::unexpected(std::move(method.error()));
-        auto payload = embedAndCompressData(std::span(data.utf8()), *method);
-        if (!payload) return std::unexpected(std::move(payload.error()));
-        return String("/opensb_data;bin;") + *payload;
+        std::string output = "/opensb_data;bin;";
+        if (auto encoded = append_embedded_data(output, std::span(data.utf8()), *method); !encoded)
+          return std::unexpected(std::move(encoded.error()));
+        return String(std::move(output));
       }); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback("embedJson",
       [](Json const& data, String const& compression) -> std::expected<String, StarException> {
-        auto method = embeddedCompressionMethod(compression);
+        auto method = embedded_compression_method(compression);
         if (!method) return std::unexpected(std::move(method.error()));
         DataStreamBuffer stream;
         if (auto written = stream.write(data); !written)
           return std::unexpected(std::move(written.error()));
-        auto payload = embedAndCompressData(stream.span(), *method);
-        if (!payload) return std::unexpected(std::move(payload.error()));
-        return String("/opensb_data;json;") + *payload;
+        std::string output = "/opensb_data;json;";
+        if (auto encoded = append_embedded_data(output, stream.span(), *method); !encoded)
+          return std::unexpected(std::move(encoded.error()));
+        return String(std::move(output));
       }); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback("embedText",
       [](String const& data) -> std::expected<String, StarException> {
-        auto payload = embedEscapeText(data);
-        if (!payload) return std::unexpected(std::move(payload.error()));
-        return String("/opensb_data;text;") + *payload;
+        std::string output = "/opensb_data;text;";
+        if (auto escaped = append_escaped_text(output, data.utf8()); !escaped)
+          return std::unexpected(std::move(escaped.error()));
+        return String(std::move(output));
       }); !result)
     return std::unexpected(std::move(result.error()));
 

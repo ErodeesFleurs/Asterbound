@@ -102,10 +102,10 @@ static std::optional<std::string_view> validateBasePath(std::string_view const& 
   return {};
 }
 
-static std::expected<EmbeddedData, StarException> readEmbedded(String const& path, bool allowed, bool asBytes = false) {
+static std::expected<EmbeddedData, StarException> read_embedded(String const& path, bool allowed, DecodeMode mode = DecodeMode::Asset) {
   if (!allowed)
     return std::unexpected(AssetException("Embedded assets are disabled by safe.allowRemoteAssets"));
-  auto data = decodeEmbeddedData(path, asBytes);
+  auto data = decode_embedded_data(path, mode);
   if (!data)
     return std::unexpected(AssetException("Invalid embedded asset", std::move(data.error())));
   return data;
@@ -1832,7 +1832,7 @@ std::expected<std::shared_ptr<FramesSpecification const>, StarException> Assets:
 
 std::expected<std::shared_ptr<IODevice>, StarException> Assets::open(String const& path) const {
   if (AssetPath::is_embedded(path)) {
-    auto data = readEmbedded(path, m_settings.allowRemoteAssets, true);
+    auto data = read_embedded(path, m_settings.allowRemoteAssets, DecodeMode::RawBytes);
     if (!data)
       return std::unexpected(std::move(data.error()));
     return std::make_shared<Buffer>(std::move(data->bytes));
@@ -1847,7 +1847,7 @@ std::expected<std::shared_ptr<IODevice>, StarException> Assets::open(String cons
 
 std::expected<ByteArray, StarException> Assets::read(String const& path) const {
   if (AssetPath::is_embedded(path)) {
-    auto data = readEmbedded(path, m_settings.allowRemoteAssets, true);
+    auto data = read_embedded(path, m_settings.allowRemoteAssets, DecodeMode::RawBytes);
     if (!data)
       return std::unexpected(std::move(data.error()));
     return std::move(data->bytes);
@@ -2019,10 +2019,10 @@ std::expected<Json, StarException> Assets::checkPatchArray(String const& path,
 
 std::expected<Json, StarException> Assets::readJson(String const& path) const {
   if (AssetPath::is_embedded(path)) {
-    auto data = readEmbedded(path, m_settings.allowRemoteAssets);
+    auto data = read_embedded(path, m_settings.allowRemoteAssets);
     if (!data)
       return std::unexpected(std::move(data.error()));
-    return embeddedDataToJson(*data);
+    return embedded_data_to_json(*data);
   }
   auto streamData = read(path);
   if (!streamData)
@@ -2349,7 +2349,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadIma
   }
   if (AssetPath::is_embedded(path.m_base_path)) {
     return unlockDuring([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
-      auto embedded = readEmbedded(path.m_base_path, m_settings.allowRemoteAssets);
+      auto embedded = read_embedded(path.m_base_path, m_settings.allowRemoteAssets);
       if (!embedded)
         return std::unexpected(std::move(embedded.error()));
       if (embedded->type != EmbeddedAssetType::Binary && embedded->type != EmbeddedAssetType::Image)
@@ -2359,7 +2359,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadIma
       if (!metadata)
         return std::unexpected(std::move(metadata.error()));
       auto size = std::get<0>(*metadata);
-      if (std::uint64_t(size[0]) * size[1] > MaxEmbeddedDataSize / 4)
+      if (std::uint64_t(size[0]) * size[1] > max_embedded_data_size / 4)
         return std::unexpected(AssetException("Embedded PNG exceeds the 64 MiB decoded pixel limit"));
       auto rewound = device->seek(0);
       if (!rewound)
@@ -2369,25 +2369,26 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadIma
         return std::unexpected(std::move(image.error()));
       auto data = std::make_shared<ImageData>();
       data->image = std::make_shared<Image>(std::move(*image));
-      std::optional<Json> frameConfig;
-      String frameName = "<embedded frames>";
-      if (embedded->framesPath) {
-        auto frames = json(*embedded->framesPath);
+      std::optional<Json> frame_config;
+      String frame_name;
+      if (std::holds_alternative<ExternalFramesPath>(embedded->frame_source)) {
+        frame_name = std::move(std::get<ExternalFramesPath>(embedded->frame_source).path);
+        auto frames = json(frame_name);
         if (!frames)
           return std::unexpected(std::move(frames.error()));
-        frameConfig = std::move(*frames);
-        frameName = *embedded->framesPath;
-      } else if (embedded->framesData) {
-        auto frames = readEmbedded(*embedded->framesData, m_settings.allowRemoteAssets);
+        frame_config = std::move(*frames);
+      } else if (std::holds_alternative<EmbeddedFramesPath>(embedded->frame_source)) {
+        frame_name = "<embedded frames>";
+        auto frames = read_embedded(std::get<EmbeddedFramesPath>(embedded->frame_source).path, m_settings.allowRemoteAssets);
         if (!frames)
           return std::unexpected(std::move(frames.error()));
-        auto config = embeddedDataToJson(*frames);
+        auto config = embedded_data_to_json(*frames);
         if (!config)
           return std::unexpected(std::move(config.error()));
-        frameConfig = std::move(*config);
+        frame_config = std::move(*config);
       }
-      if (frameConfig) {
-        auto frames = parseFramesSpecification(*frameConfig, std::move(frameName));
+      if (frame_config) {
+        auto frames = parseFramesSpecification(*frame_config, std::move(frame_name));
         if (!frames)
           return std::unexpected(std::move(frames.error()));
         data->frames = std::make_shared<FramesSpecification>(std::move(*frames));
@@ -2412,7 +2413,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadAud
     auto device = [&]() -> std::expected<std::shared_ptr<IODevice>, StarException> {
       if (!AssetPath::is_embedded(path.m_base_path))
         return open(path.m_base_path);
-      auto embedded = readEmbedded(path.m_base_path, m_settings.allowRemoteAssets);
+      auto embedded = read_embedded(path.m_base_path, m_settings.allowRemoteAssets);
       if (!embedded)
         return std::unexpected(std::move(embedded.error()));
       if (embedded->type != EmbeddedAssetType::Binary)
@@ -2436,7 +2437,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadFon
     auto bytes = [&]() -> std::expected<ByteArray, StarException> {
       if (!AssetPath::is_embedded(path.m_base_path))
         return read(path.m_base_path);
-      auto embedded = readEmbedded(path.m_base_path, m_settings.allowRemoteAssets);
+      auto embedded = read_embedded(path.m_base_path, m_settings.allowRemoteAssets);
       if (!embedded)
         return std::unexpected(std::move(embedded.error()));
       if (embedded->type != EmbeddedAssetType::Binary)
