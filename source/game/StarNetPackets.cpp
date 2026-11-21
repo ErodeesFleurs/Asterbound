@@ -1,4 +1,5 @@
 import star.json_extra;
+import star.sha256;
 import star.xx_hash;
 import star.json;
 import star.id_map;
@@ -735,6 +736,14 @@ std::expected<void, StarException> ClientDisconnectRequestPacket::read(DataStrea
 std::expected<void, StarException> ClientDisconnectRequestPacket::write(DataStream& ds) const {
   // Packets cannot be empty due to the way packet serialization is handled.
   return ds.write<std::uint8_t>(0);
+}
+
+ByteArray HandshakeResponsePacket::password_digest(String const& password, String const& account, ByteArray const& salt) {
+  Sha256Hasher digest;
+  digest.push(password);
+  digest.push(account);
+  digest.push(salt);
+  return digest.compute();
 }
 
 HandshakeResponsePacket::HandshakeResponsePacket() = default;

@@ -506,6 +506,7 @@ struct ClientDisconnectRequestPacket : PacketBase<PacketType::ClientDisconnectRe
 };
 
 struct HandshakeResponsePacket : PacketBase<PacketType::HandshakeResponse> {
+  [[nodiscard]] static ByteArray password_digest(String const& password, String const& account, ByteArray const& salt);
   void const* query_type(TypeKey key) const noexcept override {
     return query_type_of<HandshakeResponsePacket, PacketBase<PacketType::HandshakeResponse>>(this, key);
   }

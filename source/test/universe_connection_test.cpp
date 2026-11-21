@@ -6,6 +6,7 @@
 #endif
 #include "gtest/gtest-spi.h"
 
+import star.encode;
 import star.xx_hash;
 import star.algorithm;
 import star.json;
@@ -157,6 +158,11 @@ extern "C" int __wrap_pthread_create(pthread_t* thread, pthread_attr_t const* at
 #endif
 
 using namespace Star;
+
+TEST(HandshakeDigestTest, Utf8CredentialsAndBinarySalt) {
+  auto digest = HandshakeResponsePacket::password_digest("páss", "用户", hex_decode("00ff"));
+  EXPECT_EQ(digest, hex_decode("90b7b1151a80bd041027d8838ae3c9f5dc07549c44684afc75b86ffbbbabf199"));
+}
 
 namespace Star {
 // Only this real-socket fixture changes native buffer sizes; production sockets

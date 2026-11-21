@@ -142,7 +142,6 @@ import star.ai_database;
 import star.versioning_database;
 import star.universe_server_lua_bindings;
 import star.celestial_lua_bindings;
-import star.sha256;
 import star.secure_random;
 import star.biome_database;
 import star.celestial_database;
@@ -3555,9 +3554,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
           auto password = account->get_string("password");
           if (!password)
             return std::unexpected(std::move(password.error()));
-          ByteArray salted = (*password + connect->account).utf8_bytes();
-          salted.append(*salt);
-          success = sha256(salted) == handshake->passHash;
+          success = HandshakeResponsePacket::password_digest(*password, connect->account, *salt) == handshake->passHash;
         }
         if (!success)
           return fail(Star::format("No such account '{}' or incorrect password", connect->account));

@@ -172,7 +172,6 @@ import star.effect_emitter;
 import star.projectile;
 
 import star.projectile_database;
-import star.sha256;
 import star.universe_client_lua_bindings;
 import star.celestial_database;
 
@@ -385,10 +384,8 @@ std::expected<std::optional<String>, StarException> UniverseClient::connect(Univ
       auto operation11 = m_root.logger().info("UniverseClient: Sending Handshake Response");
       if (!operation11)
         return std::unexpected(std::move(operation11.error()));
-      ByteArray passAccountSalt = (password + account).utf8_bytes();
-      passAccountSalt.append(challenge->passwordSalt);
-      ByteArray passHash = Star::sha256(passAccountSalt);
-      auto operation12 = connection.pushSingle(std::make_shared<HandshakeResponsePacket>(passHash));
+      auto operation12 = connection.pushSingle(std::make_shared<HandshakeResponsePacket>(
+          HandshakeResponsePacket::password_digest(password, account, challenge->passwordSalt)));
       if (!operation12)
         return std::unexpected(std::move(operation12.error()));
       auto operation13 = connection.sendAll(timeout);

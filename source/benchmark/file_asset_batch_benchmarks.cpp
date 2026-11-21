@@ -159,6 +159,38 @@ void asset_batch(benchmark::State& state, AssetKind kind, bool batch, bool diges
     });
 }
 
+void sha256_stream(benchmark::State& state) {
+  auto size = static_cast<std::size_t>(state.range(0));
+  auto fragment = static_cast<std::size_t>(state.range(1));
+  std::vector<char> input(size, 'x');
+  auto bytes = std::span<char const>(input);
+  std::array<char, 32> expected;
+  Star::sha256(bytes, expected);
+  auto hash = [&] {
+    Star::Sha256Hasher hasher;
+    auto remaining = bytes;
+    while (!remaining.empty()) {
+      auto chunk = remaining.first(std::min(fragment, remaining.size()));
+      hasher.push(chunk);
+      remaining = remaining.subspan(chunk.size());
+    }
+    std::array<char, 32> result;
+    hasher.compute(result);
+    return result;
+  };
+  if (hash() != expected) {
+    state.SkipWithError("Streamed SHA-256 differs from one-shot digest");
+    return;
+  }
+  for (auto _ : state) {
+    auto result = hash();
+    benchmark::DoNotOptimize(result);
+  }
+  state.SetBytesProcessed(state.iterations() * state.range(0));
+}
+
+BENCHMARK(sha256_stream)->Args({32, 32})->Args({1048576, 1048576})->Args({1048576, 17});
+
 BENCHMARK_CAPTURE(asset_batch, DirectoryScalarQueries, AssetKind::directory, false, false)->Arg(256)->Arg(4096);
 BENCHMARK_CAPTURE(asset_batch, DirectoryBatchQueries, AssetKind::directory, true, false)->Arg(256)->Arg(4096);
 BENCHMARK_CAPTURE(asset_batch, PackedScalarQueries, AssetKind::packed, false, false)->Arg(256)->Arg(4096);

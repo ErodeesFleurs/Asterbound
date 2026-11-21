@@ -293,6 +293,16 @@ values, insertion preserves the old end-relative stop: omit the oldest
 `1 - maxMessagePerEntity` previous bubbles, or all if there are fewer. The
 subsequent per-tick visibility filter still applies.
 
+### SHA-256 compatibility
+
+`ShaTest.*` checks independent digest vectors, chunk boundaries and hasher reuse.
+Repeated `compute()` returns the same digest; the next `push()`, even empty,
+starts a new message. The bit length uses all eight standard big-endian bytes.
+Digests of messages below 512 MiB remain compatible; at and above that size,
+old builds truncated the length. Persisted hash keys derived from such inputs
+may need rebuilding from the original keys. The handshake hashes the unchanged
+sequence of UTF-8 password bytes, UTF-8 account bytes and binary salt.
+
 ### Multidimensional storage
 
 `MultiArray` owns composed storage with last-index-contiguous layout. `extents()`

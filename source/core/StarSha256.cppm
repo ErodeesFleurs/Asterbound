@@ -2,43 +2,47 @@ module;
 import star.string;
 import star.byte_array;
 import std;
-import star.format;
-import star.encode;
 
 export module star.sha256;
 
 export namespace Star {
 
-typedef struct sha_state_struct {
-  std::uint32_t state[8], length, curlen;
-  std::uint8_t buf[64];
-} sha_state;
-
 class Sha256Hasher {
 public:
-  Sha256Hasher();
+  Sha256Hasher() = default;
 
+  // After compute(), any push (even an empty one) starts a new message.
   void push(std::span<char const> data);
   void push(String const& data);
   void push(ByteArray const& data);
 
-  // Produces 32 bytes
-  void compute(std::span<char, 32> hashDestination);
+  // Finalizes the digest once; subsequent reads produce the same 32 bytes.
+  void compute(std::span<char, 32> destination);
   ByteArray compute();
 
 private:
-  bool m_finished;
-  sha_state m_state;
+  struct State {
+    static constexpr std::array<std::uint32_t, 8> initial_words = {
+        0x6a09e667U, 0xbb67ae85U, 0x3c6ef372U, 0xa54ff53aU,
+        0x510e527fU, 0x9b05688cU, 0x1f83d9abU, 0x5be0cd19U};
+
+    std::array<std::uint32_t, 8> words = initial_words;
+    std::array<char, 64> buffer{};
+    std::uint64_t bit_length = 0;
+    bool finished = false;
+
+    std::size_t buffered_size() const noexcept {
+      return static_cast<std::size_t>((bit_length / 8) % buffer.size());
+    }
+    void compress(std::span<char const, 64> block);
+    void finish();
+  };
+
+  State m_state;
 };
 
-// Sha256 must, obviously, have 32 bytes available in the destination.
-void sha256(std::span<char const> source, std::span<char, 32> hashDestination);
-
+void sha256(std::span<char const> source, std::span<char, 32> destination);
 ByteArray sha256(std::span<char const> source);
-
-void sha256(ByteArray const& in, ByteArray& out);
-void sha256(String const& in, ByteArray& out);
-
 ByteArray sha256(ByteArray const& in);
 ByteArray sha256(String const& in);
 
@@ -46,221 +50,122 @@ ByteArray sha256(String const& in);
 
 namespace Star {
 
-// An implementation of the SHA-256 hash function, this is endian neutral
-// so should work just about anywhere.
-//
-// This code works much like the MD5 code provided by RSA. You sha_init()
-// a "sha_state" then sha_process() the bytes you want and sha_done() to get
-// the output.
-//
-// Revised Code:  Complies to SHA-256 standard now.
-//
-// Tom St Denis
+// SHA-256 compression, adapted from Tom St Denis's implementation.
+static constexpr std::array<std::uint32_t, 64> round_constants = {
+    0x428a2f98U, 0x71374491U, 0xb5c0fbcfU, 0xe9b5dba5U, 0x3956c25bU, 0x59f111f1U, 0x923f82a4U, 0xab1c5ed5U,
+    0xd807aa98U, 0x12835b01U, 0x243185beU, 0x550c7dc3U, 0x72be5d74U, 0x80deb1feU, 0x9bdc06a7U, 0xc19bf174U,
+    0xe49b69c1U, 0xefbe4786U, 0x0fc19dc6U, 0x240ca1ccU, 0x2de92c6fU, 0x4a7484aaU, 0x5cb0a9dcU, 0x76f988daU,
+    0x983e5152U, 0xa831c66dU, 0xb00327c8U, 0xbf597fc7U, 0xc6e00bf3U, 0xd5a79147U, 0x06ca6351U, 0x14292967U,
+    0x27b70a85U, 0x2e1b2138U, 0x4d2c6dfcU, 0x53380d13U, 0x650a7354U, 0x766a0abbU, 0x81c2c92eU, 0x92722c85U,
+    0xa2bfe8a1U, 0xa81a664bU, 0xc24b8b70U, 0xc76c51a3U, 0xd192e819U, 0xd6990624U, 0xf40e3585U, 0x106aa070U,
+    0x19a4c116U, 0x1e376c08U, 0x2748774cU, 0x34b0bcb5U, 0x391c0cb3U, 0x4ed8aa4aU, 0x5b9cca4fU, 0x682e6ff3U,
+    0x748f82eeU, 0x78a5636fU, 0x84c87814U, 0x8cc70208U, 0x90befffaU, 0xa4506cebU, 0xbef9a3f7U, 0xc67178f2U};
 
-// the K array
-static const std::uint32_t K[64] = {0x428a2f98U,
-    0x71374491U,
-    0xb5c0fbcfU,
-    0xe9b5dba5U,
-    0x3956c25bU,
-    0x59f111f1U,
-    0x923f82a4U,
-    0xab1c5ed5U,
-    0xd807aa98U,
-    0x12835b01U,
-    0x243185beU,
-    0x550c7dc3U,
-    0x72be5d74U,
-    0x80deb1feU,
-    0x9bdc06a7U,
-    0xc19bf174U,
-    0xe49b69c1U,
-    0xefbe4786U,
-    0x0fc19dc6U,
-    0x240ca1ccU,
-    0x2de92c6fU,
-    0x4a7484aaU,
-    0x5cb0a9dcU,
-    0x76f988daU,
-    0x983e5152U,
-    0xa831c66dU,
-    0xb00327c8U,
-    0xbf597fc7U,
-    0xc6e00bf3U,
-    0xd5a79147U,
-    0x06ca6351U,
-    0x14292967U,
-    0x27b70a85U,
-    0x2e1b2138U,
-    0x4d2c6dfcU,
-    0x53380d13U,
-    0x650a7354U,
-    0x766a0abbU,
-    0x81c2c92eU,
-    0x92722c85U,
-    0xa2bfe8a1U,
-    0xa81a664bU,
-    0xc24b8b70U,
-    0xc76c51a3U,
-    0xd192e819U,
-    0xd6990624U,
-    0xf40e3585U,
-    0x106aa070U,
-    0x19a4c116U,
-    0x1e376c08U,
-    0x2748774cU,
-    0x34b0bcb5U,
-    0x391c0cb3U,
-    0x4ed8aa4aU,
-    0x5b9cca4fU,
-    0x682e6ff3U,
-    0x748f82eeU,
-    0x78a5636fU,
-    0x84c87814U,
-    0x8cc70208U,
-    0x90befffaU,
-    0xa4506cebU,
-    0xbef9a3f7U,
-    0xc67178f2UL};
-
-// Various logical functions
-static constexpr std::uint32_t shaChoice(std::uint32_t x, std::uint32_t y, std::uint32_t z) noexcept {
+static constexpr std::uint32_t sha_choice(std::uint32_t x, std::uint32_t y, std::uint32_t z) noexcept {
   return (x & y) ^ (~x & z);
 }
 
-static constexpr std::uint32_t shaMajority(std::uint32_t x, std::uint32_t y, std::uint32_t z) noexcept {
+static constexpr std::uint32_t sha_majority(std::uint32_t x, std::uint32_t y, std::uint32_t z) noexcept {
   return (x & y) ^ (x & z) ^ (y & z);
 }
 
-static constexpr std::uint32_t shaSigma0(std::uint32_t x) noexcept {
+static constexpr std::uint32_t sha_sigma_0(std::uint32_t x) noexcept {
   return std::rotr(x, 2) ^ std::rotr(x, 13) ^ std::rotr(x, 22);
 }
 
-static constexpr std::uint32_t shaSigma1(std::uint32_t x) noexcept {
+static constexpr std::uint32_t sha_sigma_1(std::uint32_t x) noexcept {
   return std::rotr(x, 6) ^ std::rotr(x, 11) ^ std::rotr(x, 25);
 }
 
-static constexpr std::uint32_t shaGamma0(std::uint32_t x) noexcept {
+static constexpr std::uint32_t sha_gamma_0(std::uint32_t x) noexcept {
   return std::rotr(x, 7) ^ std::rotr(x, 18) ^ (x >> 3);
 }
 
-static constexpr std::uint32_t shaGamma1(std::uint32_t x) noexcept {
+static constexpr std::uint32_t sha_gamma_1(std::uint32_t x) noexcept {
   return std::rotr(x, 17) ^ std::rotr(x, 19) ^ (x >> 10);
 }
 
-// compress 512-bits
-static void sha_compress(sha_state& md) {
-  std::uint32_t S[8], W[64], t0, t1;
-  int i;
-
-  /* copy state into S */
-  for (i = 0; i < 8; i++)
-    S[i] = md.state[i];
-
-  /* copy the state into 512-bits into W[0..15] */
-  for (i = 0; i < 16; i++)
-    W[i] = (((std::uint32_t)md.buf[(4 * i) + 0]) << 24) | (((std::uint32_t)md.buf[(4 * i) + 1]) << 16)
-        | (((std::uint32_t)md.buf[(4 * i) + 2]) << 8) | (((std::uint32_t)md.buf[(4 * i) + 3]));
-
-  /* fill W[16..63] */
-  for (i = 16; i < 64; i++)
-    W[i] = shaGamma1(W[i - 2]) + W[i - 7] + shaGamma0(W[i - 15]) + W[i - 16];
-
-  /* Compress */
-  for (i = 0; i < 64; i++) {
-    t0 = S[7] + shaSigma1(S[4]) + shaChoice(S[4], S[5], S[6]) + K[i] + W[i];
-    t1 = shaSigma0(S[0]) + shaMajority(S[0], S[1], S[2]);
-    S[7] = S[6];
-    S[6] = S[5];
-    S[5] = S[4];
-    S[4] = S[3] + t0;
-    S[3] = S[2];
-    S[2] = S[1];
-    S[1] = S[0];
-    S[0] = t0 + t1;
+void Sha256Hasher::State::compress(std::span<char const, 64> block) {
+  auto bytes = std::as_bytes(block);
+  std::array<std::uint32_t, 64> schedule;
+  for (std::size_t i = 0; i < 16; ++i) {
+    auto offset = 4 * i;
+    schedule[i] = (std::to_integer<std::uint32_t>(bytes[offset]) << 24)
+        | (std::to_integer<std::uint32_t>(bytes[offset + 1]) << 16)
+        | (std::to_integer<std::uint32_t>(bytes[offset + 2]) << 8)
+        | std::to_integer<std::uint32_t>(bytes[offset + 3]);
   }
+  for (std::size_t i = 16; i < schedule.size(); ++i)
+    schedule[i] = sha_gamma_1(schedule[i - 2]) + schedule[i - 7] + sha_gamma_0(schedule[i - 15]) + schedule[i - 16];
 
-  /* feedback */
-  for (i = 0; i < 8; i++)
-    md.state[i] += S[i];
-}
-
-// init the SHA state
-static void sha_init(sha_state& md) {
-  md.curlen = md.length = 0;
-  md.state[0] = 0x6A09E667U;
-  md.state[1] = 0xBB67AE85U;
-  md.state[2] = 0x3C6EF372U;
-  md.state[3] = 0xA54FF53AU;
-  md.state[4] = 0x510E527FU;
-  md.state[5] = 0x9B05688CU;
-  md.state[6] = 0x1F83D9ABU;
-  md.state[7] = 0x5BE0CD19U;
-}
-
-static void sha_process(sha_state& md, std::uint8_t const* buf, int len) {
-  while (len--) {
-    /* copy byte */
-    md.buf[md.curlen++] = *buf++;
-
-    /* is 64 bytes full? */
-    if (md.curlen == 64) {
-      sha_compress(md);
-      md.length += 512;
-      md.curlen = 0;
-    }
+  auto [a, b, c, d, e, f, g, h] = words;
+  for (std::size_t i = 0; i < schedule.size(); ++i) {
+    auto t1 = h + sha_sigma_1(e) + sha_choice(e, f, g) + round_constants[i] + schedule[i];
+    auto t2 = sha_sigma_0(a) + sha_majority(a, b, c);
+    h = g;
+    g = f;
+    f = e;
+    e = d + t1;
+    d = c;
+    c = b;
+    b = a;
+    a = t1 + t2;
   }
-}
-
-static void sha_done(sha_state& md, std::uint8_t* hash) {
-  int i;
-
-  /* increase the length of the message */
-  md.length += md.curlen * 8;
-
-  /* append the '1' bit */
-  md.buf[md.curlen++] = 0x80;
-
-  /* if the length is currently above 56 bytes we append zeros then compress.
-    Then we can fall back to padding zeros and length encoding like normal. */
-
-  if (md.curlen > 56) {
-    for (; md.curlen < 64;)
-      md.buf[md.curlen++] = 0;
-    sha_compress(md);
-    md.curlen = 0;
-  }
-
-  /* pad upto 56 bytes of zeroes */
-  for (; md.curlen < 56;)
-    md.buf[md.curlen++] = 0;
-
-  /* since all messages are under 2^32 bits we mark the top bits zero */
-  for (i = 56; i < 60; i++)
-    md.buf[i] = 0;
-
-  /* append length */
-  for (i = 60; i < 64; i++)
-    md.buf[i] = (md.length >> ((63 - i) * 8)) & 255;
-  sha_compress(md);
-
-  /* copy output */
-  for (i = 0; i < 32; i++)
-    hash[i] = (md.state[i >> 2] >> (((3 - i) & 3) << 3)) & 255;
-}
-
-Sha256Hasher::Sha256Hasher() {
-  m_finished = false;
-  sha_init(m_state);
+  words[0] += a;
+  words[1] += b;
+  words[2] += c;
+  words[3] += d;
+  words[4] += e;
+  words[5] += f;
+  words[6] += g;
+  words[7] += h;
 }
 
 void Sha256Hasher::push(std::span<char const> data) {
-  if (m_finished) {
-    sha_init(m_state);
-    m_finished = false;
+  if (m_state.finished) {
+    m_state.words = State::initial_words;
+    m_state.bit_length = 0;
+    m_state.finished = false;
   }
+  if (data.empty())
+    return;
 
-  sha_process(m_state, reinterpret_cast<std::uint8_t const*>(data.data()), data.size());
+  auto buffered = m_state.buffered_size();
+  m_state.bit_length += std::uint64_t{data.size()} * 8;
+  auto buffer = std::span(m_state.buffer);
+  if (buffered != 0) {
+    auto space = buffer.subspan(buffered);
+    auto count = std::min(space.size(), data.size());
+    std::ranges::copy(data.first(count), space.begin());
+    if (count != space.size())
+      return;
+    m_state.compress(buffer);
+    data = data.subspan(count);
+  }
+  while (data.size() >= buffer.size()) {
+    m_state.compress(data.first<64>());
+    data = data.subspan<64>();
+  }
+  std::ranges::copy(data, buffer.begin());
+}
+
+void Sha256Hasher::State::finish() {
+  if (finished)
+    return;
+
+  auto block = std::span(buffer);
+  auto used = buffered_size();
+  block[used++] = static_cast<char>(0x80);
+  if (used > 56) {
+    std::ranges::fill(block.subspan(used), '\0');
+    compress(block);
+    used = 0;
+  }
+  std::ranges::fill(block.first<56>().subspan(used), '\0');
+  for (std::size_t i = 0; i < 8; ++i)
+    block[63 - i] = static_cast<char>((bit_length >> (8 * i)) & 0xffU);
+  compress(block);
+  finished = true;
 }
 
 void Sha256Hasher::push(String const& data) {
@@ -272,38 +177,33 @@ void Sha256Hasher::push(ByteArray const& data) {
 }
 
 ByteArray Sha256Hasher::compute() {
-  ByteArray dest(32, 0);
-  sha_done(m_state, reinterpret_cast<std::uint8_t*>(dest.span().data()));
-  m_finished = true;
-  return dest;
+  ByteArray destination;
+  destination.resize(32);
+  compute(destination.span().first<32>());
+  return destination;
 }
 
-void Sha256Hasher::compute(std::span<char, 32> hashDestination) {
-  sha_done(m_state, reinterpret_cast<std::uint8_t*>(hashDestination.data()));
-  m_finished = true;
+void Sha256Hasher::compute(std::span<char, 32> destination) {
+  m_state.finish();
+  for (std::size_t i = 0; i < m_state.words.size(); ++i) {
+    auto word = m_state.words[i];
+    destination[4 * i] = static_cast<char>(word >> 24);
+    destination[4 * i + 1] = static_cast<char>((word >> 16) & 0xffU);
+    destination[4 * i + 2] = static_cast<char>((word >> 8) & 0xffU);
+    destination[4 * i + 3] = static_cast<char>(word & 0xffU);
+  }
 }
 
-void sha256(std::span<char const> source, std::span<char, 32> hashDestination) {
-  sha_state state;
-  sha_init(state);
-  sha_process(state, reinterpret_cast<std::uint8_t const*>(source.data()), source.size());
-  sha_done(state, reinterpret_cast<std::uint8_t*>(hashDestination.data()));
+void sha256(std::span<char const> source, std::span<char, 32> destination) {
+  Sha256Hasher hasher;
+  hasher.push(source);
+  hasher.compute(destination);
 }
 
 ByteArray sha256(std::span<char const> source) {
-  ByteArray dest(32, 0);
-  sha256(source, dest.span().first<32>());
-  return dest;
-}
-
-void sha256(ByteArray const& in, ByteArray& out) {
-  out.resize(32, 0);
-  sha256(in.span(), out.span().first<32>());
-}
-
-void sha256(String const& in, ByteArray& out) {
-  out.resize(32, 0);
-  sha256(std::span<char const>(in.utf8()), out.span().first<32>());
+  Sha256Hasher hasher;
+  hasher.push(source);
+  return hasher.compute();
 }
 
 ByteArray sha256(ByteArray const& in) {
