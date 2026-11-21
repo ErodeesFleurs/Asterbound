@@ -169,13 +169,13 @@ int main(int argc, char* argv[]) {
     auto nativeRuntime = NativeRuntime::create();
     if (!nativeRuntime)
       return std::unexpected(std::move(nativeRuntime.error()));
-    auto rootLoader = RootLoader::create({{}, {}, {}, LogLevel::Info, false, {}});
-    if (!rootLoader)
-      return std::unexpected(std::move(rootLoader.error()));
-    rootLoader->setSummary("Replaces embedded tilesets in Tiled JSON files with references to external tilesets. Assumes tilesets are available in the packed assets.");
-    rootLoader->addArgument("searchRoot", OptionParser::Required);
-    rootLoader->addArgument("tilesetsPath", OptionParser::Required);
-    auto initialized = rootLoader->commandInitOrDie(argc, argv);
+    auto root_loader = RootLoader::create({{}, {}, {}, LogLevel::Info, false, {}});
+    if (!root_loader)
+      return std::unexpected(std::move(root_loader.error()));
+    root_loader->set_summary("Replaces embedded tilesets in Tiled JSON files with references to external tilesets. Assumes tilesets are available in the packed assets.");
+    root_loader->add_argument("searchRoot", OptionParser::Required);
+    root_loader->add_argument("tilesetsPath", OptionParser::Required);
+    auto initialized = root_loader->command_init_or_die({argv, static_cast<std::size_t>(argc)});
     if (!initialized)
       return std::unexpected(std::move(initialized.error()));
     auto const& options = initialized->second;

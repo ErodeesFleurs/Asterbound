@@ -158,16 +158,16 @@ Json const AdditionalDefaultConfiguration = JsonObject{
     {"allowAssetsMismatch", true},
     {"serverOverrideAssetsDigest", Json()}};
 
-static std::expected<void, StarException> runServer(int argc, char** argv, bool& diagnosticReported) {
+static std::expected<void, StarException> run_server(std::span<char const* const> argv, bool& diagnostic_reported) {
   #if defined STAR_SYSTEM_WINDOWS
   unsigned long exceptionStackSize = 131072;
   SetThreadStackGuarantee(&exceptionStackSize);
   #endif
-  auto rootLoader = RootLoader::create({{}, AdditionalDefaultConfiguration, String("starbound_server.log"), LogLevel::Info, false, String("starbound_server.config")});
-  if (!rootLoader)
-    return std::unexpected(std::move(rootLoader.error()));
-  rootLoader->setVersionName("Server");
-  auto initialized = rootLoader->commandInitOrDie(argc, argv);
+  auto root_loader = RootLoader::create({{}, AdditionalDefaultConfiguration, String("starbound_server.log"), LogLevel::Info, false, String("starbound_server.config")});
+  if (!root_loader)
+    return std::unexpected(std::move(root_loader.error()));
+  root_loader->set_version_name("Server");
+  auto initialized = root_loader->command_init_or_die(argv);
   if (!initialized)
     return std::unexpected(std::move(initialized.error()));
   auto root = std::move(initialized->first);
@@ -188,9 +188,9 @@ static std::expected<void, StarException> runServer(int argc, char** argv, bool&
   if (!configuration)
     return std::unexpected(std::move(configuration.error()));
   {
-    auto versionLogged = root->logger().info("{}", rootLoader->getVersionString());
-    if (!versionLogged)
-      return std::unexpected(std::move(versionLogged.error()));
+    auto version_logged = root->logger().info("{}", root_loader->version_string());
+    if (!version_logged)
+      return std::unexpected(std::move(version_logged.error()));
     auto rateSetting = (*configuration)->get("updateRate");
     if (!rateSetting)
       return std::unexpected(std::move(rateSetting.error()));
@@ -335,19 +335,19 @@ static std::expected<void, StarException> runServer(int argc, char** argv, bool&
       EmergencyLog::error("{}", Star::exception_report(result.error()));
       EmergencyLog::error("Fatal server error logging failed: {}", Star::exception_report(logged.error()));
     }
-    diagnosticReported = true;
+    diagnostic_reported = true;
   }
   return result;
 }
 
 int main(int argc, char** argv) {
   auto nativeRuntime = NativeRuntime::create();
-  bool diagnosticReported = false;
-  auto result = nativeRuntime ? runServer(argc, argv, diagnosticReported)
+  bool diagnostic_reported = false;
+  auto result = nativeRuntime ? run_server({argv, static_cast<std::size_t>(argc)}, diagnostic_reported)
       : std::expected<void, StarException>(std::unexpected(std::move(nativeRuntime.error())));
   if (!result) {
     auto text = Star::exception_summary(result.error());
-    EmergencyLog::error("Fatal server error: {}", diagnosticReported ? text : Star::exception_report(result.error()));
+    EmergencyLog::error("Fatal server error: {}", diagnostic_reported ? text : Star::exception_report(result.error()));
     #if defined STAR_SYSTEM_WINDOWS
     auto wideText = stringToUtf16(text);
     MessageBoxW(nullptr, wideText ? wideText->get() : L"Server startup failed; diagnostic conversion failed. See the log.",

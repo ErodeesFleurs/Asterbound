@@ -82,35 +82,35 @@ import star.static_random;
 using namespace Star;
 
 [[nodiscard]]
-static std::expected<void, StarException> run(int argc, char** argv) {
+static std::expected<void, StarException> run(std::span<char const* const> argv) {
     auto nativeRuntime = NativeRuntime::create();
     if (!nativeRuntime)
       return std::unexpected(std::move(nativeRuntime.error()));
     auto loader = RootLoader::create({{}, {}, {}, LogLevel::Error, false, {}});
     if (!loader)
       return std::unexpected(std::move(loader.error()));
-    auto& rootLoader = *loader;
-    rootLoader.setSummary("Generate a WorldTemplate and output the data in it to an image");
-    auto coordinateParameter = rootLoader.addParameter("coordinate", "coordinate", OptionParser::Optional, "coordinate for the celestial world");
-    if (!coordinateParameter)
-      return std::unexpected(std::move(coordinateParameter.error()));
-    auto seedParameter = rootLoader.addParameter("coordseed", "seed", OptionParser::Optional, "seed to use when selecting a random celestial world coordinate");
-    if (!seedParameter)
-      return std::unexpected(std::move(seedParameter.error()));
-    auto sizeParameter = rootLoader.addParameter("size", "size", OptionParser::Optional, "x,y size of the region to be rendered");
-    if (!sizeParameter)
-      return std::unexpected(std::move(sizeParameter.error()));
-    auto weightingSwitch = rootLoader.addSwitch("weighting", "Output instead the region weighting at each point");
-    if (!weightingSwitch)
-      return std::unexpected(std::move(weightingSwitch.error()));
-    auto noiseSwitch = rootLoader.addSwitch("weightingblocknoise", "apply layout block noise before outputting weighting");
-    if (!noiseSwitch)
-      return std::unexpected(std::move(noiseSwitch.error()));
-    auto transitionSwitch = rootLoader.addSwitch("transition", "show biome transition regions");
-    if (!transitionSwitch)
-      return std::unexpected(std::move(transitionSwitch.error()));
+    auto& root_loader = *loader;
+    root_loader.set_summary("Generate a WorldTemplate and output the data in it to an image");
+    auto coordinate_parameter = root_loader.add_parameter("coordinate", "coordinate", OptionParser::Optional, "coordinate for the celestial world");
+    if (!coordinate_parameter)
+      return std::unexpected(std::move(coordinate_parameter.error()));
+    auto seed_parameter = root_loader.add_parameter("coordseed", "seed", OptionParser::Optional, "seed to use when selecting a random celestial world coordinate");
+    if (!seed_parameter)
+      return std::unexpected(std::move(seed_parameter.error()));
+    auto size_parameter = root_loader.add_parameter("size", "size", OptionParser::Optional, "x,y size of the region to be rendered");
+    if (!size_parameter)
+      return std::unexpected(std::move(size_parameter.error()));
+    auto weighting_switch = root_loader.add_switch("weighting", "Output instead the region weighting at each point");
+    if (!weighting_switch)
+      return std::unexpected(std::move(weighting_switch.error()));
+    auto noise_switch = root_loader.add_switch("weightingblocknoise", "apply layout block noise before outputting weighting");
+    if (!noise_switch)
+      return std::unexpected(std::move(noise_switch.error()));
+    auto transition_switch = root_loader.add_switch("transition", "show biome transition regions");
+    if (!transition_switch)
+      return std::unexpected(std::move(transition_switch.error()));
 
-    auto initialized = rootLoader.commandInitOrDie(argc, argv);
+    auto initialized = root_loader.command_init_or_die(argv);
     if (!initialized)
       return std::unexpected(std::move(initialized.error()));
     auto& [root, options] = *initialized;
@@ -119,16 +119,15 @@ static std::expected<void, StarException> run(int argc, char** argv) {
       return std::unexpected(std::move(celestialDatabase.error()));
 
     std::optional<CelestialCoordinate> coordinate;
-    if (auto coordinateOption = options.parameters.find_ref("coordinate");
-        coordinateOption && !coordinateOption->get().empty()) {
-      auto parsed = CelestialCoordinate::create(Json(coordinateOption->get()[0]));
+    if (auto coordinate_text = options.first_parameter("coordinate")) {
+      auto parsed = CelestialCoordinate::create(Json(coordinate_text->get()));
       if (!parsed)
         return std::unexpected(std::move(parsed.error()));
       coordinate = std::move(*parsed);
     } else {
       std::optional<std::uint64_t> seed;
-      if (auto seedOption = options.parameters.find_ref("coordseed"); seedOption && !seedOption->get().empty()) {
-        auto parsed = lexical_cast<std::uint64_t>(seedOption->get()[0]);
+      if (auto seed_text = options.first_parameter("coordseed")) {
+        auto parsed = lexical_cast<std::uint64_t>(seed_text->get());
         if (!parsed)
           return std::unexpected(std::move(parsed.error()));
         seed = *parsed;
@@ -149,8 +148,8 @@ static std::expected<void, StarException> run(int argc, char** argv) {
     auto& worldTemplate = **createdTemplate;
     auto size = worldTemplate.size();
 
-    if (auto sizeOption = options.parameters.find_ref("size"); sizeOption && !sizeOption->get().empty()) {
-      auto components = sizeOption->get()[0].split(",");
+    if (auto size_text = options.first_parameter("size")) {
+      auto components = size_text->get().split(",");
       if (!components)
         return std::unexpected(std::move(components.error()));
       auto widthText = components->at(0);
@@ -265,7 +264,7 @@ static std::expected<void, StarException> run(int argc, char** argv) {
 }
 
 int main(int argc, char** argv) {
-  auto result = run(argc, argv);
+  auto result = run({argv, static_cast<std::size_t>(argc)});
   if (!result) {
     if (auto written = Star::print(stderr, "exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
       return 1;

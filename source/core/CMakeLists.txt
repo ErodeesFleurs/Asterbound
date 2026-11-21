@@ -34,7 +34,7 @@ target_sources (star_modules PUBLIC FILE_SET CXX_MODULES
           StarIODeviceCallbacks.cppm StarCompression.cppm StarJsonPatch.cppm
           StarTickRateMonitor.cppm
           StarUuid.cppm StarHostAddress.cppm StarSocket.cppm StarTcp.cppm
-          StarWorkerPool.cppm StarOptionParser.cppm StarShellParser.cppm
+          StarWorkerPool.cppm StarOptionParser.cppm StarNumericOption.cppm StarShellParser.cppm
           StarJsonPath.cppm
           StarJsonParser.cppm StarJsonBuilder.cppm StarFormattedJson.cppm
           StarRpcPromise.cppm StarJsonRpc.cppm

@@ -24,6 +24,8 @@ using OptionParserException = StarError<OptionParserExceptionTag, StarException>
 // - 'switches' which are flags that do not have a value, like `-q` for quiet
 // - 'parameters' are flags with a value that follows, like `-mode full`
 // - 'arguments' are everything else, sorted positionally
+// The first standalone `--` ends flag recognition. A parameter consumes its
+// following token literally, even when that token is `--`.
 class OptionParser {
 public:
   enum RequirementMode {
@@ -36,47 +38,53 @@ public:
     OrderedSet<String> switches;
     StringMap<StringList> parameters;
     StringList arguments;
+
+    [[nodiscard]] std::optional<std::reference_wrapper<String const>> first_parameter(std::string_view name) const&;
+    void first_parameter(std::string_view) const&& = delete;
   };
 
-  void setCommandName(String commandName);
-  void setSummary(String summary);
-  void setAdditionalHelp(String help);
+  struct ParseResult {
+    Options options;
+    StringList errors;
+  };
 
-  std::expected<void, StarException> addSwitch(String const& flag, String description = {});
-  std::expected<void, StarException> addParameter(String const& flag, String argumentName, RequirementMode mode, String description = {});
-  void addArgument(String argumentName, RequirementMode mode, String description = {});
+  void set_command_name(String command_name);
+  void set_summary(String summary);
+  void set_additional_help(String help);
+
+  [[nodiscard]] std::expected<void, StarException> add_switch(String flag, String description = {});
+  [[nodiscard]] std::expected<void, StarException> add_parameter(String flag, String argument_name, RequirementMode mode, String description = {});
+  void add_argument(String argument_name, RequirementMode mode, String description = {});
 
   // Parse the given arguments into an options set, returns the options parsed
   // and a list of all the errors encountered while parsing.
-  std::expected<std::pair<Options, StringList>, StarException> parseOptions(StringList const& arguments) const;
+  [[nodiscard]] std::expected<ParseResult, StarException> parse_options(StringList const& arguments) const;
 
   // Print help text, checking writes and flushing the destination.
-  [[nodiscard]] std::expected<void, StarException> print_help(std::FILE* output) const;
+  [[nodiscard]] std::expected<void, StarException> print_help(std::FILE& output) const;
 
 private:
   struct Switch {
-    String flag;
     String description;
   };
 
   struct Parameter {
-    String flag;
-    String argument;
-    RequirementMode requirementMode;
+    String argument_name;
+    RequirementMode mode;
     String description;
   };
 
   struct Argument {
-    String argumentName;
-    RequirementMode requirementMode;
+    String argument_name;
+    RequirementMode mode;
     String description;
   };
 
   using Option = std::variant<Switch, Parameter>;
 
-  String m_commandName;
+  String m_command_name;
   String m_summary;
-  String m_additionalHelp;
+  String m_additional_help;
 
   OrderedHashMap<String, Option> m_options;
   List<Argument> m_arguments;

@@ -23,39 +23,39 @@ import star.byte_array;
 using namespace Star;
 
 [[nodiscard]]
-static std::expected<int, StarException> repack_btree(int argc, char** argv) {
+static std::expected<int, StarException> repack_btree(std::span<char const* const> argv) {
   Logger logger;
   auto startTime = std::chrono::steady_clock::now();
 
   auto parser = VersionOptionParser::create();
   if (!parser)
     return std::unexpected(std::move(parser.error()));
-  auto& optParse = *parser;
-  optParse.setVersionName("Btree Repacker");
-  optParse.setSummary("Repacks a Starbound BTree file to shrink its file size");
-  optParse.addArgument("input file path", OptionParser::Required, "Path to the BTree to be repacked");
-  optParse.addArgument("output filename", OptionParser::Optional, "Output BTree file");
+  auto& option_parser = *parser;
+  option_parser.set_version_name("Btree Repacker");
+  option_parser.set_summary("Repacks a Starbound BTree file to shrink its file size");
+  option_parser.add_argument("input file path", OptionParser::Required, "Path to the BTree to be repacked");
+  option_parser.add_argument("output filename", OptionParser::Optional, "Output BTree file");
 
-  auto parsed = optParse.commandParseOrDie(argc, argv);
+  auto parsed = option_parser.command_parse_or_die(argv);
   if (!parsed)
     return std::unexpected(std::move(parsed.error()));
   auto& opts = *parsed;
-  auto inputArgument = opts.arguments.at(0);
-  if (!inputArgument)
-    return std::unexpected(std::move(inputArgument.error()));
-  String bTreePath = inputArgument->get();
-  String outputFilename = opts.arguments.get(1, bTreePath + ".repack");
+  auto input_argument = opts.arguments.at(0);
+  if (!input_argument)
+    return std::unexpected(std::move(input_argument.error()));
+  auto const& b_tree_path = input_argument->get();
+  String output_filename = opts.arguments.size() > 1 ? std::move(opts.arguments[1]) : b_tree_path + ".repack";
 
-  auto outputDirectory = File::full_path(File::dir_name(outputFilename));
+  auto outputDirectory = File::full_path(File::dir_name(output_filename));
   if (!outputDirectory)
     return std::unexpected(std::move(outputDirectory.error()));
-  outputFilename = File::relative_to(*outputDirectory, File::base_name(outputFilename));
+  output_filename = File::relative_to(*outputDirectory, File::base_name(output_filename));
   // Open the old database.
   BTreeDatabase db(logger);
-  auto inputFile = File::open(bTreePath, IOMode::Read);
-  if (!inputFile)
-    return std::unexpected(std::move(inputFile.error()));
-  auto inputDevice = db.set_io_device(std::move(*inputFile));
+  auto input_file = File::open(b_tree_path, IOMode::Read);
+  if (!input_file)
+    return std::unexpected(std::move(input_file.error()));
+  auto inputDevice = db.set_io_device(std::move(*input_file));
   if (!inputDevice)
     return std::unexpected(std::move(inputDevice.error()));
   auto openedInput = db.open();
@@ -77,7 +77,7 @@ static std::expected<int, StarException> repack_btree(int argc, char** argv) {
   if (!autoCommit)
     return std::unexpected(std::move(autoCommit.error()));
 
-  auto outputFile = File::open(outputFilename, IOMode::ReadWrite | IOMode::Truncate);
+  auto outputFile = File::open(output_filename, IOMode::ReadWrite | IOMode::Truncate);
   if (!outputFile)
     return std::unexpected(std::move(outputFile.error()));
   auto outputDevice = newDb.set_io_device(std::move(*outputFile));
@@ -86,7 +86,7 @@ static std::expected<int, StarException> repack_btree(int argc, char** argv) {
   auto openedOutput = newDb.open();
   if (!openedOutput)
     return std::unexpected(std::move(openedOutput.error()));
-  if (auto written = Star::print("Repacking {}...\n", bTreePath); !written)
+  if (auto written = Star::print("Repacking {}...\n", b_tree_path); !written)
     return std::unexpected(std::move(written.error()));
 
   unsigned count = 0, overwritten = 0;
@@ -118,7 +118,7 @@ static std::expected<int, StarException> repack_btree(int argc, char** argv) {
   if (!closedOutput)
     return std::unexpected(std::move(closedOutput.error()));
 
-  if (auto written = Star::print("Repacked BTree to {} in {:.6f}s\n({} inserts, {} overwritten)\n", outputFilename, std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count(), count, overwritten); !written)
+  if (auto written = Star::print("Repacked BTree to {} in {:.6f}s\n({} inserts, {} overwritten)\n", output_filename, std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count(), count, overwritten); !written)
     return std::unexpected(std::move(written.error()));
   return 0;
 }
@@ -130,7 +130,7 @@ int main(int argc, char** argv) {
       return 1;
     return 1;
   }
-  auto result = repack_btree(argc, argv);
+  auto result = repack_btree({argv, static_cast<std::size_t>(argc)});
   if (!result) {
     if (auto written = Star::print(stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
       return 1;

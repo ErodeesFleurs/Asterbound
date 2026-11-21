@@ -11,13 +11,12 @@ import star.file;
 
 namespace Star {
 
-String VersionOptionParser::getVersionString() const {
-  String displayName = m_versionName ? *m_versionName : String();
-  return Star::format("Asterbound{} v{} for v{} ({}) Source ID: {}", displayName.empty() ? "" : Star::format(" {}", displayName), ProductVersionString, StarVersionString, StarArchitectureString, StarSourceIdentifierString);
+String VersionOptionParser::version_string() const {
+  return Star::format("Asterbound{}{} v{} for v{} ({}) Source ID: {}", m_version_name.empty() ? "" : " ", m_version_name, ProductVersionString, StarVersionString, StarArchitectureString, StarSourceIdentifierString);
 }
 
-void VersionOptionParser::setVersionName(String const& name) {
-  m_versionName = name;
+void VersionOptionParser::set_version_name(String name) {
+  m_version_name = std::move(name);
 }
 
 std::expected<VersionOptionParser, StarException> VersionOptionParser::create() {
@@ -29,31 +28,33 @@ std::expected<VersionOptionParser, StarException> VersionOptionParser::create() 
 }
 
 std::expected<void, StarException> VersionOptionParser::initialize() {
-  auto help = addSwitch("help", "Show help text");
+  auto help = add_switch("help", "Show help text");
   if (!help)
     return std::unexpected(std::move(help.error()));
-  return addSwitch("version", "Print version info");
+  return add_switch("version", "Print version info");
 }
 
-std::expected<VersionOptionParser::Options, StarException> VersionOptionParser::parseOrDie(StringList const& cmdLineArguments) const {
-  auto parsed = OptionParser::parseOptions(cmdLineArguments);
+std::expected<VersionOptionParser::Options, StarException> VersionOptionParser::parse_or_die(StringList const& cmd_line_arguments) const {
+  auto parsed = OptionParser::parse_options(cmd_line_arguments);
   if (!parsed)
     return std::unexpected(std::move(parsed.error()));
   auto& [options, errors] = *parsed;
+  bool const show_version = options.switches.contains("version");
+  bool const show_help = options.switches.contains("help");
 
-  if (options.switches.contains("version")) {
-    auto written = Star::print("{}\n", getVersionString());
+  if (show_version) {
+    auto written = Star::print("{}\n", version_string());
     if (!written)
       std::exit(1);
   }
 
-  if (options.switches.contains("help")) {
-    auto written = print_help(stdout);
+  if (show_help) {
+    auto written = print_help(*stdout);
     if (!written)
       std::exit(1);
   }
 
-  if (options.switches.contains("version") || options.switches.contains("help"))
+  if (show_version || show_help)
     std::exit(0);
 
   if (!errors.empty()) {
@@ -65,7 +66,7 @@ std::expected<VersionOptionParser::Options, StarException> VersionOptionParser::
     auto written = Star::print("\n");
     if (!written)
       std::exit(1);
-    written = print_help(stdout);
+    written = print_help(*stdout);
     if (!written)
       std::exit(1);
     std::exit(1);
@@ -74,13 +75,16 @@ std::expected<VersionOptionParser::Options, StarException> VersionOptionParser::
   return std::move(options);
 }
 
-std::expected<VersionOptionParser::Options, StarException> VersionOptionParser::commandParseOrDie(int argc, char** argv) {
-  setCommandName(File::base_name(String(std::string_view(argv[0]))));
+std::expected<VersionOptionParser::Options, StarException> VersionOptionParser::command_parse_or_die(std::span<char const* const> argv) {
+  if (argv.empty())
+    return parse_or_die({});
+  set_command_name(File::base_name(String(std::string_view(argv.front()))));
+  argv = argv.subspan(1);
   StringList arguments;
-  arguments.reserve(argc > 0 ? static_cast<std::size_t>(argc - 1) : 0);
-  for (int i = 1; i < argc; ++i)
-    arguments.push_back(String(std::string_view(argv[i])));
-  return parseOrDie(arguments);
+  arguments.reserve(argv.size());
+  for (auto argument : argv)
+    arguments.emplace_back(std::string_view(argument));
+  return parse_or_die(arguments);
 }
 
 }

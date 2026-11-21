@@ -25,10 +25,10 @@ int main(int argc, char** argv) {
     auto nativeRuntime = NativeRuntime::create();
     if (!nativeRuntime)
       return std::unexpected(std::move(nativeRuntime.error()));
-    auto rootLoader = RootLoader::create({{}, {}, {}, LogLevel::Error, false, {}});
-    if (!rootLoader)
-      return std::unexpected(std::move(rootLoader.error()));
-    auto initialized = rootLoader->commandInitOrDie(argc, argv);
+    auto root_loader = RootLoader::create({{}, {}, {}, LogLevel::Error, false, {}});
+    if (!root_loader)
+      return std::unexpected(std::move(root_loader.error()));
+    auto initialized = root_loader->command_init_or_die({argv, static_cast<std::size_t>(argc)});
     if (!initialized)
       return std::unexpected(std::move(initialized.error()));
     auto& root = initialized->first;

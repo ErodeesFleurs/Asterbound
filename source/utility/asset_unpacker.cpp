@@ -21,48 +21,48 @@ import star.native_runtime;
 using namespace Star;
 
 [[nodiscard]]
-static std::expected<int, StarException> unpackAssets(int argc, char** argv) {
+static std::expected<int, StarException> unpack_assets(std::span<char const* const> argv) {
   auto startTime = std::chrono::steady_clock::now();
 
   auto parser = VersionOptionParser::create();
   if (!parser)
     return std::unexpected(std::move(parser.error()));
-  auto& optParse = *parser;
-  optParse.setVersionName("Asset Unpacker");
-  optParse.setSummary("Unpacks a starbound .pak file into an asset folder");
-  auto verboseSwitch = optParse.addSwitch("v", "Verbose, list each file extracted");
-  if (!verboseSwitch)
-    return std::unexpected(std::move(verboseSwitch.error()));
-  optParse.addArgument("input pak path", OptionParser::Required, "Path to the .pak file to unpack");
-  optParse.addArgument("output folder", OptionParser::Required, "Output folder");
+  auto& option_parser = *parser;
+  option_parser.set_version_name("Asset Unpacker");
+  option_parser.set_summary("Unpacks a starbound .pak file into an asset folder");
+  auto verbose_switch = option_parser.add_switch("v", "Verbose, list each file extracted");
+  if (!verbose_switch)
+    return std::unexpected(std::move(verbose_switch.error()));
+  option_parser.add_argument("input pak path", OptionParser::Required, "Path to the .pak file to unpack");
+  option_parser.add_argument("output folder", OptionParser::Required, "Output folder");
 
-  auto parsed = optParse.commandParseOrDie(argc, argv);
+  auto parsed = option_parser.command_parse_or_die(argv);
   if (!parsed)
     return std::unexpected(std::move(parsed.error()));
   auto& opts = *parsed;
-  auto inputArgument = opts.arguments.at(0);
-  if (!inputArgument)
-    return std::unexpected(std::move(inputArgument.error()));
-  String inputFile = inputArgument->get();
-  auto outputArgument = opts.arguments.at(1);
-  if (!outputArgument)
-    return std::unexpected(std::move(outputArgument.error()));
-  String outputFolderPath = outputArgument->get();
+  auto input_argument = opts.arguments.at(0);
+  if (!input_argument)
+    return std::unexpected(std::move(input_argument.error()));
+  auto const& input_file = input_argument->get();
+  auto output_argument = opts.arguments.at(1);
+  if (!output_argument)
+    return std::unexpected(std::move(output_argument.error()));
+  auto const& output_folder_path = output_argument->get();
   bool verbose = opts.switches.contains("v");
 
-  auto assetsPack = PackedAssetSource::create(inputFile);
+  auto assetsPack = PackedAssetSource::create(input_file);
   if (!assetsPack)
     return std::unexpected(std::move(assetsPack.error()));
 
-  auto outputIsDirectory = File::is_directory(outputFolderPath);
+  auto outputIsDirectory = File::is_directory(output_folder_path);
   if (!outputIsDirectory)
     return std::unexpected(std::move(outputIsDirectory.error()));
   if (!*outputIsDirectory) {
-    auto madeDirectory = File::create_directory(outputFolderPath);
+    auto madeDirectory = File::create_directory(output_folder_path);
     if (!madeDirectory)
       return std::unexpected(std::move(madeDirectory.error()));
   }
-  auto changedDirectory = File::change_directory(outputFolderPath);
+  auto changedDirectory = File::change_directory(output_folder_path);
   if (!changedDirectory)
     return std::unexpected(std::move(changedDirectory.error()));
 
@@ -124,7 +124,7 @@ static std::expected<int, StarException> unpackAssets(int argc, char** argv) {
       return std::unexpected(std::move(written.error()));
   }
 
-  if (auto written = Star::print("Unpacked assets to {} in {}s\n", outputFolderPath, std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count()); !written)
+  if (auto written = Star::print("Unpacked assets to {} in {}s\n", output_folder_path, std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count()); !written)
     return std::unexpected(std::move(written.error()));
   return 0;
 }
@@ -136,7 +136,7 @@ int main(int argc, char** argv) {
       return 1;
     return 1;
   }
-  auto result = unpackAssets(argc, argv);
+  auto result = unpack_assets({argv, static_cast<std::size_t>(argc)});
   if (!result) {
     if (auto written = Star::print(stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
       return 1;

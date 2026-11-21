@@ -24,6 +24,14 @@ Run commands from the repository root.
 nix shell --inputs-from . nixpkgs#python3 nixpkgs#clang-tools --command scripts/format-source.sh --check
 ```
 
+### Command-line arguments
+
+Use `-name value` for parameters. A parameter consumes the next token even
+when it looks like a switch or is `--`. Otherwise, the first standalone `--`
+ends option recognition: every remaining token, including another `--`, is a
+positional argument. `-version` and `-help` take precedence over ordinary
+usage errors; when both are present, version information is printed first.
+
 ### Brand artwork
 
 Regenerate the ASCII A monogram, client/server ICO files, mod icon, installer

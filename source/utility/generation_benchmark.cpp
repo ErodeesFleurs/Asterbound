@@ -119,32 +119,32 @@ import star.world_server;
 
 import star.celestial_database;
 
-import star.lexical_cast;
+import star.numeric_option;
 using namespace Star;
 
 [[nodiscard]]
-static std::expected<void, StarException> run(int argc, char** argv) {
+static std::expected<void, StarException> run(std::span<char const* const> argv) {
     auto nativeRuntime = NativeRuntime::create();
     if (!nativeRuntime)
       return std::unexpected(std::move(nativeRuntime.error()));
     auto loader = RootLoader::create({{}, {}, {}, LogLevel::Error, false, {}});
     if (!loader)
       return std::unexpected(std::move(loader.error()));
-    auto& rootLoader = *loader;
-    auto coordinateParameter = rootLoader.addParameter("coordinate", "coordinate", OptionParser::Optional, "world coordinate to test");
-    if (!coordinateParameter)
-      return std::unexpected(std::move(coordinateParameter.error()));
-    auto regionsParameter = rootLoader.addParameter("regions", "regions", OptionParser::Optional, "number of regions to generate, default 1000");
-    if (!regionsParameter)
-      return std::unexpected(std::move(regionsParameter.error()));
-    auto regionSizeParameter = rootLoader.addParameter("regionsize", "size", OptionParser::Optional, "width / height of each generation region, default 10");
-    if (!regionSizeParameter)
-      return std::unexpected(std::move(regionSizeParameter.error()));
-    auto reportParameter = rootLoader.addParameter("reportevery", "report regions", OptionParser::Optional, "number of generation regions before each progress report, default 20");
-    if (!reportParameter)
-      return std::unexpected(std::move(reportParameter.error()));
+    auto& root_loader = *loader;
+    auto coordinate_parameter = root_loader.add_parameter("coordinate", "coordinate", OptionParser::Optional, "world coordinate to test");
+    if (!coordinate_parameter)
+      return std::unexpected(std::move(coordinate_parameter.error()));
+    auto regions_parameter = root_loader.add_parameter("regions", "regions", OptionParser::Optional, "number of regions to generate, default 1000");
+    if (!regions_parameter)
+      return std::unexpected(std::move(regions_parameter.error()));
+    auto region_size_parameter = root_loader.add_parameter("regionsize", "size", OptionParser::Optional, "width / height of each generation region, default 10");
+    if (!region_size_parameter)
+      return std::unexpected(std::move(region_size_parameter.error()));
+    auto report_parameter = root_loader.add_parameter("reportevery", "report regions", OptionParser::Optional, "number of generation regions before each progress report, default 20");
+    if (!report_parameter)
+      return std::unexpected(std::move(report_parameter.error()));
 
-    auto initialized = rootLoader.commandInitOrDie(argc, argv);
+    auto initialized = root_loader.command_init_or_die(argv);
     if (!initialized)
       return std::unexpected(std::move(initialized.error()));
     auto& [root, options] = *initialized;
@@ -162,11 +162,8 @@ static std::expected<void, StarException> run(int argc, char** argv) {
       return std::unexpected(std::move(celestialDatabase.error()));
 
     CelestialCoordinate coordinate;
-    if (auto coordinateOption = options.parameters.maybe("coordinate")) {
-      auto text = coordinateOption->first();
-      if (!text)
-        return std::unexpected(std::move(text.error()));
-      auto parsed = CelestialCoordinate::create(Json(text->get()));
+    if (auto coordinate_text = options.first_parameter("coordinate")) {
+      auto parsed = CelestialCoordinate::create(Json(coordinate_text->get()));
       if (!parsed)
         return std::unexpected(std::move(parsed.error()));
       coordinate = std::move(*parsed);
@@ -184,38 +181,15 @@ static std::expected<void, StarException> run(int argc, char** argv) {
       coordinate = **found;
     }
 
-    unsigned regionsToGenerate = 1000;
-    if (auto regionsOption = options.parameters.maybe("regions")) {
-      auto text = regionsOption->first();
-      if (!text)
-        return std::unexpected(std::move(text.error()));
-      auto parsed = lexical_cast<unsigned>(text->get());
-      if (!parsed)
-        return std::unexpected(std::move(parsed.error()));
-      regionsToGenerate = *parsed;
-    }
-
-    unsigned regionSize = 10;
-    if (auto regionSizeOption = options.parameters.maybe("regionsize")) {
-      auto text = regionSizeOption->first();
-      if (!text)
-        return std::unexpected(std::move(text.error()));
-      auto parsed = lexical_cast<unsigned>(text->get());
-      if (!parsed)
-        return std::unexpected(std::move(parsed.error()));
-      regionSize = *parsed;
-    }
-
-    unsigned reportEvery = 20;
-    if (auto reportEveryOption = options.parameters.maybe("reportevery")) {
-      auto text = reportEveryOption->first();
-      if (!text)
-        return std::unexpected(std::move(text.error()));
-      auto parsed = lexical_cast<unsigned>(text->get());
-      if (!parsed)
-        return std::unexpected(std::move(parsed.error()));
-      reportEvery = *parsed;
-    }
+    auto regions_to_generate = numeric_option(options, "regions", 1000u, EmptyParameterList::Reject);
+    if (!regions_to_generate)
+      return std::unexpected(std::move(regions_to_generate.error()));
+    auto region_size = numeric_option(options, "regionsize", 10u, EmptyParameterList::Reject);
+    if (!region_size)
+      return std::unexpected(std::move(region_size.error()));
+    auto report_every = numeric_option(options, "reportevery", 20u, EmptyParameterList::Reject);
+    if (!report_every)
+      return std::unexpected(std::move(report_every.error()));
 
     if (auto written = Star::print("testing generation on coordinate {}\n", coordinate); !written)
       return std::unexpected(std::move(written.error()));
@@ -244,12 +218,12 @@ static std::expected<void, StarException> run(int argc, char** argv) {
     auto start = std::chrono::steady_clock::now();
     auto lastReport = std::chrono::steady_clock::now();
 
-    if (auto written = Star::print("Starting world generation for {} regions\n", regionsToGenerate); !written)
+    if (auto written = Star::print("Starting world generation for {} regions\n", *regions_to_generate); !written)
       return std::unexpected(std::move(written.error()));
 
-    for (unsigned i = 0; i < regionsToGenerate; ++i) {
-      if (i != 0 && i % reportEvery == 0) {
-        float gps = reportEvery / std::chrono::duration<double>(std::chrono::steady_clock::now() - lastReport).count();
+    for (unsigned i = 0; i < *regions_to_generate; ++i) {
+      if (i != 0 && i % *report_every == 0) {
+        float gps = *report_every / std::chrono::duration<double>(std::chrono::steady_clock::now() - lastReport).count();
         lastReport = std::chrono::steady_clock::now();
         if (auto written = Star::print("[{}] {}s | Generatons Per Second: {}\n", i, std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count(), gps); !written)
           return std::unexpected(std::move(written.error()));
@@ -261,19 +235,19 @@ static std::expected<void, StarException> run(int argc, char** argv) {
       auto y = rand.uniform_int(0, worldSize[1]);
       if (!y)
         return std::unexpected(std::move(y.error()));
-      RectI region = RectI::withCenter(Vec2I(*x, *y), Vec2I::filled(regionSize));
+      RectI region = RectI::withCenter(Vec2I(*x, *y), Vec2I::filled(*region_size));
       auto generated = worldServer.generateRegion(region);
       if (!generated)
         return std::unexpected(std::move(generated.error()));
     }
 
-    if (auto written = Star::print("Finished generating {} regions with size {}x{} in world '{}' in {} seconds", regionsToGenerate, regionSize, regionSize, coordinate, std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count()); !written)
+    if (auto written = Star::print("Finished generating {} regions with size {}x{} in world '{}' in {} seconds", *regions_to_generate, *region_size, *region_size, coordinate, std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count()); !written)
       return std::unexpected(std::move(written.error()));
     return worldServer.close();
 }
 
 int main(int argc, char** argv) {
-  auto result = run(argc, argv);
+  auto result = run({argv, static_cast<std::size_t>(argc)});
   if (!result) {
     if (auto written = Star::print(stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
       return 1;

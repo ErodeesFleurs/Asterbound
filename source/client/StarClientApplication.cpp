@@ -398,12 +398,12 @@ std::expected<void, StarException> ClientApplication::startup(StringList const& 
   auto loader = RootLoader::create({std::move(*assetsSettings), std::move(*defaults), String("starbound.log"), LogLevel::Info, false, String("starbound.config")});
   if (!loader)
     return std::unexpected(std::move(loader.error()));
-  loader->setVersionName("Client");
-  auto initialized = loader->initOrDie(cmdLineArgs);
+  loader->set_version_name("Client");
+  auto initialized = loader->init_or_die(cmdLineArgs);
   if (!initialized)
     return std::unexpected(std::move(initialized.error()));
   m_root = std::move(initialized->first);
-  if (auto logged = m_root->logger().info("{}", loader->getVersionString()); !logged)
+  if (auto logged = m_root->logger().info("{}", loader->version_string()); !logged)
     return std::unexpected(std::move(logged.error()));
   #ifdef __clang__
   if (auto logged = m_root->logger().info("Compiled with Clang {}", __clang_version__); !logged)

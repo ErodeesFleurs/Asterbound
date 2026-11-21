@@ -117,33 +117,33 @@ import star.world_server;
 
 import star.celestial_database;
 
-import star.lexical_cast;
+import star.numeric_option;
 using namespace Star;
 
 [[nodiscard]]
-static std::expected<void, StarException> run(int argc, char** argv) {
+static std::expected<void, StarException> run(std::span<char const* const> argv) {
   auto nativeRuntime = NativeRuntime::create();
   if (!nativeRuntime)
     return std::unexpected(std::move(nativeRuntime.error()));
-  unsigned repetitions = 5;
-  unsigned reportEvery = 1;
-  String dungeonWorldName = "outpost";
+  constexpr unsigned default_repetitions = 5;
+  constexpr unsigned default_report_every = 1;
+  String const default_dungeon_world = "outpost";
 
   auto loader = RootLoader::create({{}, {}, {}, LogLevel::Error, false, {}});
   if (!loader)
     return std::unexpected(std::move(loader.error()));
-  auto& rootLoader = *loader;
-  auto worldParameter = rootLoader.addParameter("dungeonWorld", "dungeonWorld", OptionParser::Optional, Star::format("dungeonWorld to test, default is {}", dungeonWorldName));
-  if (!worldParameter)
-    return std::unexpected(std::move(worldParameter.error()));
-  auto repetitionsParameter = rootLoader.addParameter("repetitions", "repetitions", OptionParser::Optional, Star::format("number of times to generate, default {}", repetitions));
-  if (!repetitionsParameter)
-    return std::unexpected(std::move(repetitionsParameter.error()));
-  auto reportParameter = rootLoader.addParameter("reportevery", "report repetitions", OptionParser::Optional, Star::format("number of repetitions before each progress report, default {}", reportEvery));
-  if (!reportParameter)
-    return std::unexpected(std::move(reportParameter.error()));
+  auto& root_loader = *loader;
+  auto world_parameter = root_loader.add_parameter("dungeonWorld", "dungeonWorld", OptionParser::Optional, Star::format("dungeonWorld to test, default is {}", default_dungeon_world));
+  if (!world_parameter)
+    return std::unexpected(std::move(world_parameter.error()));
+  auto repetitions_parameter = root_loader.add_parameter("repetitions", "repetitions", OptionParser::Optional, Star::format("number of times to generate, default {}", default_repetitions));
+  if (!repetitions_parameter)
+    return std::unexpected(std::move(repetitions_parameter.error()));
+  auto report_parameter = root_loader.add_parameter("reportevery", "report repetitions", OptionParser::Optional, Star::format("number of repetitions before each progress report, default {}", default_report_every));
+  if (!report_parameter)
+    return std::unexpected(std::move(report_parameter.error()));
 
-  auto initialized = rootLoader.commandInitOrDie(argc, argv);
+  auto initialized = root_loader.command_init_or_die(argv);
   if (!initialized)
     return std::unexpected(std::move(initialized.error()));
   auto& [root, options] = *initialized;
@@ -156,45 +156,29 @@ static std::expected<void, StarException> run(int argc, char** argv) {
   if (auto written = Star::print(" done\n"); !written)
     return std::unexpected(std::move(written.error()));
 
-  if (auto repetitionsOption = options.parameters.maybe("repetitions")) {
-    auto text = repetitionsOption->first();
-    if (!text)
-      return std::unexpected(std::move(text.error()));
-    auto parsed = lexical_cast<unsigned>(text->get());
-    if (!parsed)
-      return std::unexpected(std::move(parsed.error()));
-    repetitions = *parsed;
-  }
-  if (auto reportEveryOption = options.parameters.maybe("reportevery")) {
-    auto text = reportEveryOption->first();
-    if (!text)
-      return std::unexpected(std::move(text.error()));
-    auto parsed = lexical_cast<unsigned>(text->get());
-    if (!parsed)
-      return std::unexpected(std::move(parsed.error()));
-    reportEvery = *parsed;
-  }
-  if (auto dungeonWorldOption = options.parameters.maybe("dungeonWorld")) {
-    auto text = dungeonWorldOption->first();
-    if (!text)
-      return std::unexpected(std::move(text.error()));
-    dungeonWorldName = text->get();
-  }
+  auto repetitions = numeric_option(options, "repetitions", default_repetitions, EmptyParameterList::Reject);
+  if (!repetitions)
+    return std::unexpected(std::move(repetitions.error()));
+  auto report_every = numeric_option(options, "reportevery", default_report_every, EmptyParameterList::Reject);
+  if (!report_every)
+    return std::unexpected(std::move(report_every.error()));
+  auto dungeon_world = options.first_parameter("dungeonWorld");
+  auto const& dungeon_world_name = dungeon_world ? dungeon_world->get() : default_dungeon_world;
 
   auto start = std::chrono::steady_clock::now();
   auto lastReport = std::chrono::steady_clock::now();
-  if (auto written = Star::print("testing {} generations of dungeonWorld {}\n", repetitions, dungeonWorldName); !written)
+  if (auto written = Star::print("testing {} generations of dungeonWorld {}\n", *repetitions, dungeon_world_name); !written)
     return std::unexpected(std::move(written.error()));
 
-  for (unsigned i = 0; i < repetitions; ++i) {
-    if (i > 0 && i % reportEvery == 0) {
-      float gps = reportEvery / std::chrono::duration<double>(std::chrono::steady_clock::now() - lastReport).count();
+  for (unsigned i = 0; i < *repetitions; ++i) {
+    if (i > 0 && i % *report_every == 0) {
+      float gps = *report_every / std::chrono::duration<double>(std::chrono::steady_clock::now() - lastReport).count();
       lastReport = std::chrono::steady_clock::now();
       if (auto written = Star::print("[{}] {}s | Generations Per Second: {}\n", i, std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count(), gps); !written)
         return std::unexpected(std::move(written.error()));
     }
 
-    auto worldParameters = generateFloatingDungeonWorldParameters(*root, dungeonWorldName);
+    auto worldParameters = generateFloatingDungeonWorldParameters(*root, dungeon_world_name);
     if (!worldParameters)
       return std::unexpected(std::move(worldParameters.error()));
     auto worldTemplate = WorldTemplate::create(*root, *worldParameters, SkyParameters(), 1234);
@@ -211,13 +195,13 @@ static std::expected<void, StarException> run(int argc, char** argv) {
       return std::unexpected(std::move(closed.error()));
   }
 
-  if (auto written = Star::print("Finished {} generations of dungeonWorld {} in {} seconds", repetitions, dungeonWorldName, std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count()); !written)
+  if (auto written = Star::print("Finished {} generations of dungeonWorld {} in {} seconds", *repetitions, dungeon_world_name, std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count()); !written)
     return std::unexpected(std::move(written.error()));
   return {};
 }
 
 int main(int argc, char** argv) {
-  auto result = run(argc, argv);
+  auto result = run({argv, static_cast<std::size_t>(argc)});
   if (!result) {
     if (auto written = Star::print(stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
       return 1;

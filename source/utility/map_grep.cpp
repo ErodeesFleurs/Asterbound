@@ -195,13 +195,13 @@ int main(int argc, char* argv[]) {
     auto nativeRuntime = NativeRuntime::create();
     if (!nativeRuntime)
       return std::unexpected(std::move(nativeRuntime.error()));
-    auto rootLoader = RootLoader::create({{}, {}, {}, LogLevel::Warn, false, {}});
-    if (!rootLoader)
-      return std::unexpected(std::move(rootLoader.error()));
-    rootLoader->setSummary("Search Tiled map files for specific materials or objects.");
-    rootLoader->addArgument("MaterialId|ObjectName|Property=Value", OptionParser::Required);
-    rootLoader->addArgument("JsonMapFile", OptionParser::Multiple);
-    auto initialized = rootLoader->commandInitOrDie(argc, argv);
+    auto root_loader = RootLoader::create({{}, {}, {}, LogLevel::Warn, false, {}});
+    if (!root_loader)
+      return std::unexpected(std::move(root_loader.error()));
+    root_loader->set_summary("Search Tiled map files for specific materials or objects.");
+    root_loader->add_argument("MaterialId|ObjectName|Property=Value", OptionParser::Required);
+    root_loader->add_argument("JsonMapFile", OptionParser::Multiple);
+    auto initialized = root_loader->command_init_or_die({argv, static_cast<std::size_t>(argc)});
     if (!initialized)
       return std::unexpected(std::move(initialized.error()));
     auto const& files = initialized->second.arguments;

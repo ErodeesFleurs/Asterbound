@@ -56,17 +56,17 @@ class RootLoader : public VersionOptionParser {
 public:
   struct Defaults {
     // Merged on top of the base assets settings hard-coded in RootLoader.
-    Json additionalAssetsSettings;
+    Json additional_assets_settings;
 
     // Merged on top of the base default configuration hard-coded in RootLoader.
-    Json additionalDefaultConfiguration;
+    Json additional_default_configuration;
 
     // Name of the log file that should be written, if any, relative to the
     // storage directory
-    std::optional<String> logFile;
+    std::optional<String> log_file;
 
     // The minimum log level to write to any log sink
-    LogLevel logLevel;
+    LogLevel log_level;
 
     // If true, doesn't write any logging to stdout, only to the log file if
     // given.
@@ -74,20 +74,20 @@ public:
 
     // If given, will write changed configuration to the given file within the
     // storage directory.
-    std::optional<String> runtimeConfigFile;
+    std::optional<String> runtime_config_file;
   };
 
   [[nodiscard]] static std::expected<RootLoader, StarException> create(Defaults defaults);
 
-  [[nodiscard]] std::expected<std::pair<Root::Settings, Options>, StarException> parseOrDie(StringList const& cmdLineArguments) const;
-  [[nodiscard]] std::expected<std::pair<std::unique_ptr<Root>, Options>, StarException> initOrDie(StringList const& cmdLineArguments) const;
+  [[nodiscard]] std::expected<std::pair<Root::Settings, Options>, StarException> parse_or_die(StringList const& cmd_line_arguments) const;
+  [[nodiscard]] std::expected<std::pair<std::unique_ptr<Root>, Options>, StarException> init_or_die(StringList const& cmd_line_arguments) const;
 
-  [[nodiscard]] std::expected<std::pair<Root::Settings, Options>, StarException> commandParseOrDie(int argc, char** argv);
-  [[nodiscard]] std::expected<std::pair<std::unique_ptr<Root>, Options>, StarException> commandInitOrDie(int argc, char** argv);
+  [[nodiscard]] std::expected<std::pair<Root::Settings, Options>, StarException> command_parse_or_die(std::span<char const* const> argv);
+  [[nodiscard]] std::expected<std::pair<std::unique_ptr<Root>, Options>, StarException> command_init_or_die(std::span<char const* const> argv);
 
 private:
   explicit RootLoader(Defaults defaults);
-  [[nodiscard]] std::expected<Root::Settings, StarException> rootSettingsForOptions(Options const& options) const;
+  [[nodiscard]] std::expected<Root::Settings, StarException> root_settings_for_options(Options const& options) const;
 
   Defaults m_defaults;
 };

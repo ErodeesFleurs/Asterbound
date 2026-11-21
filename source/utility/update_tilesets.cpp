@@ -405,11 +405,11 @@ int main(int argc, char** argv) {
     return 1;
   }
   auto run = [&]() -> std::expected<int, StarException> {
-    auto rootLoader = RootLoader::create({{}, {}, {}, LogLevel::Error, false, {}});
-    if (!rootLoader)
-      return std::unexpected(std::move(rootLoader.error()));
-    rootLoader->setSummary("Updates Tiled JSON tilesets in unpacked assets directories");
-    auto initialized = rootLoader->commandInitOrDie(argc, argv);
+    auto root_loader = RootLoader::create({{}, {}, {}, LogLevel::Error, false, {}});
+    if (!root_loader)
+      return std::unexpected(std::move(root_loader.error()));
+    root_loader->set_summary("Updates Tiled JSON tilesets in unpacked assets directories");
+    auto initialized = root_loader->command_init_or_die({argv, static_cast<std::size_t>(argc)});
     if (!initialized)
       return std::unexpected(std::move(initialized.error()));
     auto& root = initialized->first;

@@ -25,7 +25,7 @@ std::expected<int, StarException> countWords(String const& text) {
 }
 
 [[nodiscard]]
-std::expected<int, StarException> countFields(Json const& json, std::initializer_list<char const*> fields) {
+std::expected<int, StarException> count_fields(Json const& json, std::initializer_list<std::string_view> fields) {
   int count = 0;
   for (auto field : fields) {
     auto text = json.get_string(field, "");
@@ -80,11 +80,11 @@ int main(int argc, char** argv) {
     auto nativeRuntime = NativeRuntime::create();
     if (!nativeRuntime)
       return std::unexpected(std::move(nativeRuntime.error()));
-    auto rootLoader = RootLoader::create({{}, {}, {}, LogLevel::Error, false, {}});
-    if (!rootLoader)
-      return std::unexpected(std::move(rootLoader.error()));
-    rootLoader->setSummary("Calculate a (very approximate) word count of user-facing text in assets");
-    auto initialized = rootLoader->commandInitOrDie(argc, argv);
+    auto root_loader = RootLoader::create({{}, {}, {}, LogLevel::Error, false, {}});
+    if (!root_loader)
+      return std::unexpected(std::move(root_loader.error()));
+    root_loader->set_summary("Calculate a (very approximate) word count of user-facing text in assets");
+    auto initialized = root_loader->command_init_or_die({argv, static_cast<std::size_t>(argc)});
     if (!initialized)
       return std::unexpected(std::move(initialized.error()));
     auto& root = initialized->first;
@@ -132,17 +132,17 @@ int main(int argc, char** argv) {
       "tech", "item", "liqitem", "matitem", "miningtool", "flashlight", "wiretool", "beamaxe", "tillingtool", "painttool", "harvestingtool", "head", "chest", "legs", "back", "currencyitem", "consumable", "blueprint", "inspectiontool", "instrument", "thrownitem", "unlock", "activeitem", "augment"
     };
     for (auto const& itemFileType : itemFileTypes) {
-      auto counted = countWordsInType(itemFileType, [](Json const& json) { return countFields(json, {"shortdescription", "description"}); });
+      auto counted = countWordsInType(itemFileType, [](Json const& json) { return count_fields(json, {"shortdescription", "description"}); });
       if (!counted)
         return std::unexpected(std::move(counted.error()));
     }
     auto counted = countWordsInType("object", [](Json const& json) {
-      return countFields(json, {"shortdescription", "description", "apexDescription", "avianDescription", "glitchDescription", "floranDescription", "humanDescription", "hylotlDescription", "novakidDescription"});
+      return count_fields(json, {"shortdescription", "description", "apexDescription", "avianDescription", "glitchDescription", "floranDescription", "humanDescription", "hylotlDescription", "novakidDescription"});
     });
     if (!counted)
       return std::unexpected(std::move(counted.error()));
     counted = countWordsInType("codex", [](Json const& json) -> std::expected<int, StarException> {
-      auto count = countFields(json, {"title", "description"});
+      auto count = count_fields(json, {"title", "description"});
       if (!count)
         return std::unexpected(std::move(count.error()));
       auto pages = json.get_array("contentPages", JsonArray());
@@ -161,7 +161,7 @@ int main(int argc, char** argv) {
     });
     if (!counted)
       return std::unexpected(std::move(counted.error()));
-    counted = countWordsInType("monstertype", [](Json const& json) { return countFields(json, {"description"}); });
+    counted = countWordsInType("monstertype", [](Json const& json) { return count_fields(json, {"description"}); });
     if (!counted)
       return std::unexpected(std::move(counted.error()));
     counted = countWordsInType("radiomessages", [](Json const& json) -> std::expected<int, StarException> {
@@ -170,7 +170,7 @@ int main(int argc, char** argv) {
         return std::unexpected(std::move(messages.error()));
       int count = 0;
       for (auto const& message : *messages) {
-        auto words = countFields(message.second, {"text"});
+        auto words = count_fields(message.second, {"text"});
         if (!words)
           return std::unexpected(std::move(words.error()));
         count += *words;
@@ -197,7 +197,7 @@ int main(int argc, char** argv) {
     if (!counted)
       return std::unexpected(std::move(counted.error()));
     counted = countWordsInType("questtemplate", [](Json const& json) -> std::expected<int, StarException> {
-      auto count = countFields(json, {"title", "text", "completionText"});
+      auto count = count_fields(json, {"title", "text", "completionText"});
       if (!count)
         return std::unexpected(std::move(count.error()));
       auto config = json.get("scriptConfig", Json());
@@ -225,7 +225,7 @@ int main(int argc, char** argv) {
         return std::unexpected(std::move(entries.error()));
       int count = 0;
       for (auto const& entry : *entries) {
-        auto words = countFields(entry.second, {"description"});
+        auto words = count_fields(entry.second, {"description"});
         if (!words)
           return std::unexpected(std::move(words.error()));
         count += *words;
@@ -272,7 +272,7 @@ int main(int argc, char** argv) {
         return std::unexpected(std::move(entries.error()));
       int count = 0;
       for (auto const& entry : *entries) {
-        auto words = countFields(entry.second, {"buttonText", "repeatButtonText"});
+        auto words = count_fields(entry.second, {"buttonText", "repeatButtonText"});
         if (!words)
           return std::unexpected(std::move(words.error()));
         count += *words;
@@ -280,7 +280,7 @@ int main(int argc, char** argv) {
         if (!speech)
           return std::unexpected(std::move(speech.error()));
         if (*speech) {
-          auto speechWords = countFields(*speech, {"text"});
+          auto speechWords = count_fields(*speech, {"text"});
           if (!speechWords)
             return std::unexpected(std::move(speechWords.error()));
           count += *speechWords;
@@ -294,7 +294,7 @@ int main(int argc, char** argv) {
     if (!cockpit)
       return std::unexpected(std::move(cockpit.error()));
     int cockpitCount = 0;
-    for (auto field : {"visitableTypeDescription", "worldTypeDescription"}) {
+    for (std::string_view field : {"visitableTypeDescription", "worldTypeDescription"}) {
       auto descriptions = cockpit->get(field);
       if (!descriptions)
         return std::unexpected(std::move(descriptions.error()));

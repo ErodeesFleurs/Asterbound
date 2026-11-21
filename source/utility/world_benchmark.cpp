@@ -4,7 +4,7 @@ import star.output_proxy;
 import star.native_runtime;
 import star.file;
 import star.xx_hash;
-import star.lexical_cast;
+import star.numeric_option;
 import star.logging;
 import star.string;
 import star.ordered_map;
@@ -119,53 +119,41 @@ import star.world_template;
 
 using namespace Star;
 
-template <typename T>
 [[nodiscard]]
-static std::expected<T, StarException> numericOption(OptionParser::Options const& options, String const& name, T fallback) {
-  auto values = options.parameters.find_ref(name);
-  if (!values)
-    return fallback;
-  auto text = values->get().first();
-  if (!text)
-    return std::unexpected(std::move(text.error()));
-  return lexical_cast<T>(text->get());
-}
-
-[[nodiscard]]
-static std::expected<void, StarException> run(int argc, char** argv) {
+static std::expected<void, StarException> run(std::span<char const* const> argv) {
   auto nativeRuntime = NativeRuntime::create();
   if (!nativeRuntime)
     return std::unexpected(std::move(nativeRuntime.error()));
   auto loader = RootLoader::create({{}, {}, {}, LogLevel::Error, false, {}});
   if (!loader)
     return std::unexpected(std::move(loader.error()));
-  auto& rootLoader = *loader;
-  rootLoader.addArgument("dungeon", OptionParser::Required, "name of the dungeon to spawn in the world to benchmark");
-  auto seedParameter = rootLoader.addParameter("seed", "seed", OptionParser::Optional, "world seed used to create the WorldTemplate");
-  if (!seedParameter)
-    return std::unexpected(std::move(seedParameter.error()));
-  auto stepsParameter = rootLoader.addParameter("steps", "steps", OptionParser::Optional, "number of steps to run the world for, defaults to 5,000");
-  if (!stepsParameter)
-    return std::unexpected(std::move(stepsParameter.error()));
-  auto timesParameter = rootLoader.addParameter("times", "times", OptionParser::Optional, "how many times to perform the run, defaults to once");
-  if (!timesParameter)
-    return std::unexpected(std::move(timesParameter.error()));
-  auto signalParameter = rootLoader.addParameter("signalevery", "signal steps", OptionParser::Optional, "number of steps to wait between scanning and signaling all entities to stay alive, default 120");
-  if (!signalParameter)
-    return std::unexpected(std::move(signalParameter.error()));
-  auto reportParameter = rootLoader.addParameter("reportevery", "report steps", OptionParser::Optional, "number of steps between each progress report, default 0 (do not report progress)");
-  if (!reportParameter)
-    return std::unexpected(std::move(reportParameter.error()));
-  auto fidelityParameter = rootLoader.addParameter("fidelity", "server fidelity", OptionParser::Optional, "fidelity to run the server with, default high");
-  if (!fidelityParameter)
-    return std::unexpected(std::move(fidelityParameter.error()));
-  auto profilingSwitch = rootLoader.addSwitch("profiling", "whether to use lua profiling, prints the profile with info logging");
-  if (!profilingSwitch)
-    return std::unexpected(std::move(profilingSwitch.error()));
-  auto unsafeSwitch = rootLoader.addSwitch("unsafe", "enables unsafe lua libraries");
-  if (!unsafeSwitch)
-    return std::unexpected(std::move(unsafeSwitch.error()));
-  auto initialized = rootLoader.commandInitOrDie(argc, argv);
+  auto& root_loader = *loader;
+  root_loader.add_argument("dungeon", OptionParser::Required, "name of the dungeon to spawn in the world to benchmark");
+  auto seed_parameter = root_loader.add_parameter("seed", "seed", OptionParser::Optional, "world seed used to create the WorldTemplate");
+  if (!seed_parameter)
+    return std::unexpected(std::move(seed_parameter.error()));
+  auto steps_parameter = root_loader.add_parameter("steps", "steps", OptionParser::Optional, "number of steps to run the world for, defaults to 5,000");
+  if (!steps_parameter)
+    return std::unexpected(std::move(steps_parameter.error()));
+  auto times_parameter = root_loader.add_parameter("times", "times", OptionParser::Optional, "how many times to perform the run, defaults to once");
+  if (!times_parameter)
+    return std::unexpected(std::move(times_parameter.error()));
+  auto signal_parameter = root_loader.add_parameter("signalevery", "signal steps", OptionParser::Optional, "number of steps to wait between scanning and signaling all entities to stay alive, default 120");
+  if (!signal_parameter)
+    return std::unexpected(std::move(signal_parameter.error()));
+  auto report_parameter = root_loader.add_parameter("reportevery", "report steps", OptionParser::Optional, "number of steps between each progress report, default 0 (do not report progress)");
+  if (!report_parameter)
+    return std::unexpected(std::move(report_parameter.error()));
+  auto fidelity_parameter = root_loader.add_parameter("fidelity", "server fidelity", OptionParser::Optional, "fidelity to run the server with, default high");
+  if (!fidelity_parameter)
+    return std::unexpected(std::move(fidelity_parameter.error()));
+  auto profiling_switch = root_loader.add_switch("profiling", "whether to use lua profiling, prints the profile with info logging");
+  if (!profiling_switch)
+    return std::unexpected(std::move(profiling_switch.error()));
+  auto unsafe_switch = root_loader.add_switch("unsafe", "enables unsafe lua libraries");
+  if (!unsafe_switch)
+    return std::unexpected(std::move(unsafe_switch.error()));
+  auto initialized = root_loader.command_init_or_die(argv);
   if (!initialized)
     return std::unexpected(std::move(initialized.error()));
   auto& [root, options] = *initialized;
@@ -181,24 +169,24 @@ static std::expected<void, StarException> run(int argc, char** argv) {
   auto dungeonArgument = options.arguments.first();
   if (!dungeonArgument)
     return std::unexpected(std::move(dungeonArgument.error()));
-  String dungeon = dungeonArgument->get();
+  auto const& dungeon = dungeonArgument->get();
   auto worldParameters = generateFloatingDungeonWorldParameters(*root, dungeon);
   if (!worldParameters)
     return std::unexpected(std::move(worldParameters.error()));
-  auto worldSeed = numericOption<std::uint64_t>(options, "seed", root->random().next_u64());
-  if (!worldSeed)
-    return std::unexpected(std::move(worldSeed.error()));
-  auto worldTemplate = WorldTemplate::create(*root, *worldParameters, SkyParameters(), *worldSeed);
+  auto world_seed = numeric_option<std::uint64_t>(options, "seed", root->random().next_u64(), EmptyParameterList::Reject);
+  if (!world_seed)
+    return std::unexpected(std::move(world_seed.error()));
+  auto worldTemplate = WorldTemplate::create(*root, *worldParameters, SkyParameters(), *world_seed);
   if (!worldTemplate)
     return std::unexpected(std::move(worldTemplate.error()));
 
   auto configuration = root->configuration();
   if (!configuration)
     return std::unexpected(std::move(configuration.error()));
-  auto fidelity = options.parameters.maybe("fidelity").and_then([](StringList const& p) { return p.front_value(); });
-  auto configuredFidelity = (*configuration)->set("serverFidelity", fidelity.value_or("high"));
-  if (!configuredFidelity)
-    return std::unexpected(std::move(configuredFidelity.error()));
+  auto fidelity = options.first_parameter("fidelity");
+  auto configured_fidelity = (*configuration)->set("serverFidelity", fidelity ? Json(fidelity->get()) : Json("high"));
+  if (!configured_fidelity)
+    return std::unexpected(std::move(configured_fidelity.error()));
   if (options.switches.contains("unsafe")) {
     auto configured = (*configuration)->set("safeScripts", false);
     if (!configured)
@@ -213,18 +201,18 @@ static std::expected<void, StarException> run(int argc, char** argv) {
       return std::unexpected(std::move(interval.error()));
   }
 
-  auto times = numericOption<std::uint64_t>(options, "times", 1);
+  auto times = numeric_option<std::uint64_t>(options, "times", 1, EmptyParameterList::Reject);
   if (!times)
     return std::unexpected(std::move(times.error()));
-  auto steps = numericOption<std::uint64_t>(options, "steps", 5000);
+  auto steps = numeric_option<std::uint64_t>(options, "steps", 5000, EmptyParameterList::Reject);
   if (!steps)
     return std::unexpected(std::move(steps.error()));
-  auto signalEvery = numericOption<std::uint64_t>(options, "signalevery", 120);
-  if (!signalEvery)
-    return std::unexpected(std::move(signalEvery.error()));
-  auto reportEvery = numericOption<std::uint64_t>(options, "reportevery", 0);
-  if (!reportEvery)
-    return std::unexpected(std::move(reportEvery.error()));
+  auto signal_every = numeric_option<std::uint64_t>(options, "signalevery", 120, EmptyParameterList::Reject);
+  if (!signal_every)
+    return std::unexpected(std::move(signal_every.error()));
+  auto report_every = numeric_option<std::uint64_t>(options, "reportevery", 0, EmptyParameterList::Reject);
+  if (!report_every)
+    return std::unexpected(std::move(report_every.error()));
 
   std::chrono::duration<double> sumTime = std::chrono::duration<double>::zero();
   for (std::uint64_t i = 0; i < *times; ++i) {
@@ -242,7 +230,7 @@ static std::expected<void, StarException> run(int argc, char** argv) {
     auto lastReport = std::chrono::steady_clock::now();
     std::uint64_t entityCount = 0;
     for (std::uint64_t j = 0; j < *steps; ++j) {
-      if (j % *signalEvery == 0) {
+      if (j % *signal_every == 0) {
         entityCount = 0;
         auto signaled = worldServer.forEachEntity(RectF(Vec2F(), Vec2F(worldServer.geometry().size())), [&](auto const& entity) -> std::expected<void, StarException> {
             ++entityCount;
@@ -255,8 +243,8 @@ static std::expected<void, StarException> run(int argc, char** argv) {
           return std::unexpected(std::move(signaled.error()));
       }
 
-      if (*reportEvery != 0 && j % *reportEvery == 0) {
-        float fps = *reportEvery / std::chrono::duration<double>(std::chrono::steady_clock::now() - lastReport).count();
+      if (*report_every != 0 && j % *report_every == 0) {
+        float fps = *report_every / std::chrono::duration<double>(std::chrono::steady_clock::now() - lastReport).count();
         lastReport = std::chrono::steady_clock::now();
         if (auto written = Star::print("[{}] {}s | FPS: {} | Entities: {}\n", j, std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count(), fps, entityCount); !written)
           return std::unexpected(std::move(written.error()));
@@ -267,7 +255,7 @@ static std::expected<void, StarException> run(int argc, char** argv) {
     }
     std::chrono::duration<double> totalTime = std::chrono::steady_clock::now() - start;
     if (auto written = Star::print("Finished run of running dungeon world '{}' with seed {} for {} steps in {} seconds, average FPS: {}\n",
-          dungeon, *worldSeed, *steps, totalTime.count(), *steps / totalTime.count()); !written)
+          dungeon, *world_seed, *steps, totalTime.count(), *steps / totalTime.count()); !written)
       return std::unexpected(std::move(written.error()));
     sumTime += totalTime;
     auto closed = worldServer.close();
@@ -283,7 +271,7 @@ static std::expected<void, StarException> run(int argc, char** argv) {
 }
 
 int main(int argc, char** argv) {
-  auto result = run(argc, argv);
+  auto result = run({argv, static_cast<std::size_t>(argc)});
   if (!result) {
     if (auto written = Star::print(stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
       return 1;

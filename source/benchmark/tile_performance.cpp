@@ -540,7 +540,7 @@ int main(int argc, char** argv) {
     (void)Star::print(stderr, "{}\n", loader.error().what());
     return 1;
   }
-  auto parsed = loader->commandParseOrDie(argc, argv);
+  auto parsed = loader->command_parse_or_die({argv, static_cast<std::size_t>(argc)});
   if (!parsed) {
     (void)Star::print(stderr, "{}\n", parsed.error().what());
     return 1;

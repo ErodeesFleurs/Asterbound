@@ -4,6 +4,7 @@ import star.output_proxy;
 import star.native_runtime;
 import star.file;
 import star.lexical_cast;
+import star.numeric_option;
 import star.image;
 import star.string;
 import star.ordered_map;
@@ -43,57 +44,45 @@ import star.vector;
 import star.math_common;
 using namespace Star;
 
-template <typename T>
 [[nodiscard]]
-static std::expected<T, StarException> numericOption(OptionParser::Options const& options, String const& name, T fallback) {
-  auto values = options.parameters.find_ref(name);
-  if (!values || values->get().empty())
-    return fallback;
-  return lexical_cast<T>(values->get()[0]);
-}
-
-[[nodiscard]]
-static std::expected<void, StarException> run(int argc, char** argv) {
+static std::expected<void, StarException> run(std::span<char const* const> argv) {
   auto nativeRuntime = NativeRuntime::create();
   if (!nativeRuntime)
     return std::unexpected(std::move(nativeRuntime.error()));
   auto loader = RootLoader::create({{}, {}, {}, LogLevel::Error, false, {}});
   if (!loader)
     return std::unexpected(std::move(loader.error()));
-  auto& rootLoader = *loader;
-  rootLoader.setSummary("Generate a heatmap image visualizing the output of a given terrain selector");
+  auto& root_loader = *loader;
+  root_loader.set_summary("Generate a heatmap image visualizing the output of a given terrain selector");
 
-  auto selectorParameter = rootLoader.addParameter("selector", "selector", OptionParser::Required, "name of the terrain selector to be rendered");
-  if (!selectorParameter)
-    return std::unexpected(std::move(selectorParameter.error()));
-  auto sizeParameter = rootLoader.addParameter("size", "size", OptionParser::Required, "x,y size of the region to be rendered");
-  if (!sizeParameter)
-    return std::unexpected(std::move(sizeParameter.error()));
-  auto seedParameter = rootLoader.addParameter("seed", "seed", OptionParser::Optional, "seed value for the selector");
-  if (!seedParameter)
-    return std::unexpected(std::move(seedParameter.error()));
-  auto commonalityParameter = rootLoader.addParameter("commonality", "commonality", OptionParser::Optional, "commonality value for the selector (default 1)");
-  if (!commonalityParameter)
-    return std::unexpected(std::move(commonalityParameter.error()));
-  auto scaleParameter = rootLoader.addParameter("scale", "scale", OptionParser::Optional, "maximum distance from 0 for color range");
-  if (!scaleParameter)
-    return std::unexpected(std::move(scaleParameter.error()));
-  auto modeParameter = rootLoader.addParameter("mode", "mode", OptionParser::Optional, "color mode: heatmap, terrain");
-  if (!modeParameter)
-    return std::unexpected(std::move(modeParameter.error()));
+  auto selector_parameter = root_loader.add_parameter("selector", "selector", OptionParser::Required, "name of the terrain selector to be rendered");
+  if (!selector_parameter)
+    return std::unexpected(std::move(selector_parameter.error()));
+  auto size_parameter = root_loader.add_parameter("size", "size", OptionParser::Required, "x,y size of the region to be rendered");
+  if (!size_parameter)
+    return std::unexpected(std::move(size_parameter.error()));
+  auto seed_parameter = root_loader.add_parameter("seed", "seed", OptionParser::Optional, "seed value for the selector");
+  if (!seed_parameter)
+    return std::unexpected(std::move(seed_parameter.error()));
+  auto commonality_parameter = root_loader.add_parameter("commonality", "commonality", OptionParser::Optional, "commonality value for the selector (default 1)");
+  if (!commonality_parameter)
+    return std::unexpected(std::move(commonality_parameter.error()));
+  auto scale_parameter = root_loader.add_parameter("scale", "scale", OptionParser::Optional, "maximum distance from 0 for color range");
+  if (!scale_parameter)
+    return std::unexpected(std::move(scale_parameter.error()));
+  auto mode_parameter = root_loader.add_parameter("mode", "mode", OptionParser::Optional, "color mode: heatmap, terrain");
+  if (!mode_parameter)
+    return std::unexpected(std::move(mode_parameter.error()));
 
-  auto initialized = rootLoader.commandInitOrDie(argc, argv);
+  auto initialized = root_loader.command_init_or_die(argv);
   if (!initialized)
     return std::unexpected(std::move(initialized.error()));
   auto& [root, options] = *initialized;
 
-  auto sizeValues = options.parameters.get("size");
-  if (!sizeValues)
-    return std::unexpected(std::move(sizeValues.error()));
-  auto sizeText = sizeValues->get().first();
-  if (!sizeText)
-    return std::unexpected(std::move(sizeText.error()));
-  auto components = sizeText->get().split(",");
+  auto size_text = options.first_parameter("size");
+  if (!size_text)
+    return std::unexpected(OptionParserException("Missing required parameter '-size'"));
+  auto components = size_text->get().split(",");
   if (!components)
     return std::unexpected(std::move(components.error()));
   auto widthText = components->at(0);
@@ -110,22 +99,23 @@ static std::expected<void, StarException> run(int argc, char** argv) {
     return std::unexpected(std::move(height.error()));
   Vec2U size(*width, *height);
 
-  auto seed = numericOption<std::uint64_t>(options, "seed", root->random().next_u64());
+  auto seed = numeric_option<std::uint64_t>(options, "seed", root->random().next_u64(), EmptyParameterList::UseFallback);
   if (!seed)
     return std::unexpected(std::move(seed.error()));
-  auto commonality = numericOption<float>(options, "commonality", 1.0f);
+  auto commonality = numeric_option<float>(options, "commonality", 1.0f, EmptyParameterList::UseFallback);
   if (!commonality)
     return std::unexpected(std::move(commonality.error()));
-  auto requestedScale = numericOption<float>(options, "scale", 1.0f);
-  if (!requestedScale)
-    return std::unexpected(std::move(requestedScale.error()));
-  float scale = *requestedScale;
-  auto scaleValues = options.parameters.find_ref("scale");
-  bool autoScale = !scaleValues || scaleValues->get().empty();
+  auto scale_text = options.first_parameter("scale");
+  float scale = 1.0f;
+  if (scale_text) {
+    auto parsed = lexical_cast<float>(scale_text->get());
+    if (!parsed)
+      return std::unexpected(std::move(parsed.error()));
+    scale = *parsed;
+  }
 
-  String mode = "heatmap";
-  if (auto modeValues = options.parameters.find_ref("mode"); modeValues && !modeValues->get().empty())
-    mode = modeValues->get()[0];
+  auto mode_text = options.first_parameter("mode");
+  std::string_view mode = mode_text ? std::string_view(mode_text->get().utf8()) : "heatmap";
 
   auto selectorParameters = TerrainSelectorParameters::create(JsonObject{
       {"worldWidth", size[0]},
@@ -138,13 +128,10 @@ static std::expected<void, StarException> run(int argc, char** argv) {
   auto terrainDatabase = root->terrainDatabase();
   if (!terrainDatabase)
     return std::unexpected(std::move(terrainDatabase.error()));
-  auto selectorValues = options.parameters.get("selector");
-  if (!selectorValues)
-    return std::unexpected(std::move(selectorValues.error()));
-  auto selectorName = selectorValues->get().first();
-  if (!selectorName)
-    return std::unexpected(std::move(selectorName.error()));
-  auto selector = (*terrainDatabase)->createNamedSelector(selectorName->get(), *selectorParameters);
+  auto selector_name = options.first_parameter("selector");
+  if (!selector_name)
+    return std::unexpected(OptionParserException("Missing required parameter '-selector'"));
+  auto selector = (*terrainDatabase)->createNamedSelector(selector_name->get(), *selectorParameters);
   if (!selector)
     return std::unexpected(std::move(selector.error()));
 
@@ -155,7 +142,7 @@ static std::expected<void, StarException> run(int argc, char** argv) {
       if (!value)
         return std::unexpected(std::move(value.error()));
       terrainResult(x, y) = *value;
-      if (autoScale)
+      if (!scale_text)
         scale = std::max(scale, std::abs(*value));
     }
   }
@@ -193,7 +180,7 @@ static std::expected<void, StarException> run(int argc, char** argv) {
 }
 
 int main(int argc, char** argv) {
-  auto result = run(argc, argv);
+  auto result = run({argv, static_cast<std::size_t>(argc)});
   if (!result) {
     if (auto written = Star::print(stderr, "exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
       return 1;
