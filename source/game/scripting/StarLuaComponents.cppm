@@ -204,8 +204,8 @@ private:
   };
   [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> handle_thread_message(ThreadMessage const& message);
   LuaBaseComponent& m_host;
-  Periodic m_updatePeriodic;
-  mutable float m_lastDt;
+  Periodic m_update_periodic;
+  mutable float m_last_dt;
   List<ThreadMessage> m_threadMessages;
   mutable std::recursive_mutex m_threadMessageMutex;
   struct ThreadMessageHandler {
@@ -375,7 +375,7 @@ template <typename Ret, typename... V>
       }
       if (error)
         return std::unexpected(std::move(*error));
-      if (!m_updatePeriodic.tick())
+      if (!m_update_periodic.tick())
         return std::optional<Ret>{};
       if (auto cleaned = m_host.clean_threads(); !cleaned)
         return std::unexpected(std::move(cleaned.error()));

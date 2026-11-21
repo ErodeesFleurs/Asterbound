@@ -1,9 +1,6 @@
 module;
 
 import std;
-import star.format;
-import star.math_common;
-import star.random;
 
 namespace Star {
 
@@ -12,106 +9,43 @@ namespace Star {
 // every other call, and so forth.
 class Periodic {
 public:
-  Periodic()
-    : Periodic(1) {}
+  constexpr Periodic(unsigned step_count = 1) noexcept : m_step_count(step_count) {}
 
-  Periodic(unsigned everyXSteps)
-    : m_counter(0), m_everyXSteps(everyXSteps) {}
-
-  unsigned stepCount() const {
-    return m_everyXSteps;
+  [[nodiscard]] constexpr unsigned step_count() const noexcept {
+    return m_step_count;
   }
 
-  void setStepCount(unsigned everyXSteps) {
-    m_everyXSteps = everyXSteps;
-    if (everyXSteps != 0)
-      m_counter = std::clamp<unsigned>(m_counter, 0, m_everyXSteps - 1);
-    else
-      m_counter = 0;
+  constexpr void set_step_count(unsigned step_count) noexcept {
+    m_step_count = step_count;
+    m_remaining = step_count ? std::min(m_remaining, step_count - 1) : 0;
   }
 
   // Will the next tick() return true?
-  bool ready() const {
-    return m_everyXSteps != 0 && m_counter == 0;
+  [[nodiscard]] constexpr bool ready() const noexcept {
+    return m_step_count != 0 && m_remaining == 0;
   }
 
-  bool tick() {
-    if (m_everyXSteps == 0)
-      return false;
-
-    if (m_counter == 0) {
-      m_counter = m_everyXSteps - 1;
-      return true;
-    } else {
-      --m_counter;
+  constexpr bool tick() noexcept {
+    if (m_remaining != 0) {
+      --m_remaining;
       return false;
     }
+    if (m_step_count == 0)
+      return false;
+    m_remaining = m_step_count - 1;
+    return true;
   }
 
   template <typename Function>
-  void tick(Function&& function) {
+    requires std::invocable<Function&>
+  constexpr void tick(Function&& function) noexcept(std::is_nothrow_invocable_v<Function&>) {
     if (tick())
-      function();
+      std::invoke(function);
   }
 
 private:
-  unsigned m_counter;
-  unsigned m_everyXSteps;
-};
-
-// Perform some action with a given period over an amount of some value (like
-// time) with optional randomness.
-class RatePeriodic {
-public:
-  explicit RatePeriodic(RandomService& random)
-    : m_random(random), m_period(1), m_noise(0), m_counter(1 + random.uniform_float() * 0), m_elapsed(0.0) {}
-
-  [[nodiscard]] static std::expected<RatePeriodic, StarException> create(RandomService& random, double period, double noise = 0) {
-    auto draw = random.uniform_float(-noise, noise);
-    if (!draw)
-      return std::unexpected(std::move(draw.error()));
-    return RatePeriodic(random, period, noise, period + *draw);
-  }
-
-  double period() const {
-    return m_period;
-  }
-
-  double noise() const {
-    return m_noise;
-  }
-
-  template <typename Function>
-  [[nodiscard]] std::expected<void, StarException> update(double amount, Function&& function) {
-    double subAmount = std::min(amount, m_counter);
-    m_counter -= subAmount;
-    amount -= subAmount;
-    m_elapsed += subAmount;
-
-    if (m_counter <= 0.0) {
-      auto draw = m_random.get().uniform_float(-m_noise, m_noise);
-      if (!draw)
-        return std::unexpected(std::move(draw.error()));
-      m_counter = m_period + *draw;
-      auto result = function(m_elapsed);
-      if (!result)
-        return std::unexpected(std::move(result.error()));
-      m_elapsed = 0.0;
-      if (amount > 0.0)
-        return update(amount, std::forward<Function>(function));
-    }
-    return {};
-  }
-
-private:
-  RatePeriodic(RandomService& random, double period, double noise, double counter)
-    : m_random(random), m_period(period), m_noise(noise), m_counter(counter), m_elapsed(0.0) {}
-
-  std::reference_wrapper<RandomService> m_random;
-  double m_period;
-  double m_noise;
-  double m_counter;
-  double m_elapsed;
+  unsigned m_remaining = 0;
+  unsigned m_step_count;
 };
 
 }
@@ -120,5 +54,4 @@ export module star.periodic;
 
 export namespace Star {
   using ::Star::Periodic;
-  using ::Star::RatePeriodic;
 }

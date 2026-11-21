@@ -1018,14 +1018,17 @@ std::expected<void, StarException> readObjectLighting(Root& root, Json const& co
     auto maximum = config.get_float("flickerMaxIntensity", 0.0);
     if (!maximum)
       return std::unexpected(std::move(maximum.error()));
-    auto periodVariance = config.get_float("flickerPeriodVariance", 0.0);
-    if (!periodVariance)
-      return std::unexpected(std::move(periodVariance.error()));
-    auto intensityVariance = config.get_float("flickerIntensityVariance", 0.0);
-    if (!intensityVariance)
-      return std::unexpected(std::move(intensityVariance.error()));
-    object.lightFlickering =
-      PeriodicFunction<float>(root.presentationRandom(), *period, *minimum, *maximum, *periodVariance, *intensityVariance);
+    auto period_variance = config.get_float("flickerPeriodVariance", 0.0);
+    if (!period_variance)
+      return std::unexpected(std::move(period_variance.error()));
+    auto intensity_variance = config.get_float("flickerIntensityVariance", 0.0);
+    if (!intensity_variance)
+      return std::unexpected(std::move(intensity_variance.error()));
+    auto flicker = PeriodicFunction<float>::create(root.presentationRandom(), *period, *minimum, *maximum,
+        *period_variance, *intensity_variance);
+    if (!flicker)
+      return std::unexpected(ObjectException("Invalid object light flicker settings", std::move(flicker.error())));
+    object.lightFlickering = std::move(*flicker);
   }
   return {};
 }

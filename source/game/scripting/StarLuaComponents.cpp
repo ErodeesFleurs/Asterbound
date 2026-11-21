@@ -567,9 +567,7 @@ std::expected<void, StarException> LuaScriptStorage::finish_shutdown(std::expect
   return shutdown;
 }
 
-LuaScriptUpdate::LuaScriptUpdate(LuaBaseComponent& host) : m_host(host), m_lastDt(host.root().timing().timestep * host.root().timing().timescale) {
-  m_updatePeriodic.setStepCount(1);
-}
+LuaScriptUpdate::LuaScriptUpdate(LuaBaseComponent& host) : m_host(host), m_last_dt(host.root().timing().timestep * host.root().timing().timescale) {}
 
 void LuaScriptUpdate::destroy() {
   // Child threads must stop before the parent-message queue is destroyed.
@@ -599,18 +597,18 @@ void LuaScriptUpdate::destroy() {
   return {};
 }
 
-unsigned LuaScriptUpdate::update_delta() const { return m_updatePeriodic.stepCount(); }
+unsigned LuaScriptUpdate::update_delta() const { return m_update_periodic.step_count(); }
 
 float LuaScriptUpdate::update_dt(float dt) const {
-  m_lastDt = dt;
-  return m_updatePeriodic.stepCount() * dt;
+  m_last_dt = dt;
+  return m_update_periodic.step_count() * dt;
 }
 
-float LuaScriptUpdate::update_dt() const { return m_updatePeriodic.stepCount() * m_lastDt; }
+float LuaScriptUpdate::update_dt() const { return m_update_periodic.step_count() * m_last_dt; }
 
-void LuaScriptUpdate::set_update_delta(unsigned delta) { m_updatePeriodic.setStepCount(delta); }
+void LuaScriptUpdate::set_update_delta(unsigned delta) { m_update_periodic.set_step_count(delta); }
 
-bool LuaScriptUpdate::update_ready() const { return m_updatePeriodic.ready(); }
+bool LuaScriptUpdate::update_ready() const { return m_update_periodic.ready(); }
 
 RpcPromise<Json> LuaScriptUpdate::thread_pass_message(String const& thread, String const& message, JsonArray const& args) {
   auto pair = RpcPromise<Json>::make_pair();

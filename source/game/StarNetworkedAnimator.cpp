@@ -718,11 +718,15 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
       if (!minimum) return std::unexpected(std::move(minimum.error()));
       auto maximum = lightConfig.get_float("flickerMaxIntensity", 0.0);
       if (!maximum) return std::unexpected(std::move(maximum.error()));
-      auto periodVariance = lightConfig.get_float("flickerPeriodVariance", 0.0);
-      if (!periodVariance) return std::unexpected(std::move(periodVariance.error()));
-      auto intensityVariance = lightConfig.get_float("flickerIntensityVariance", 0.0);
-      if (!intensityVariance) return std::unexpected(std::move(intensityVariance.error()));
-      light.flicker = PeriodicFunction<float>(root.random(), *period, *minimum, *maximum, *periodVariance, *intensityVariance);
+      auto period_variance = lightConfig.get_float("flickerPeriodVariance", 0.0);
+      if (!period_variance) return std::unexpected(std::move(period_variance.error()));
+      auto intensity_variance = lightConfig.get_float("flickerIntensityVariance", 0.0);
+      if (!intensity_variance) return std::unexpected(std::move(intensity_variance.error()));
+      auto flicker = PeriodicFunction<float>::create(root.random(), *period, *minimum, *maximum, *period_variance, *intensity_variance);
+      if (!flicker)
+        return std::unexpected(NetworkedAnimatorException(Star::format("Invalid flicker settings for animator light '{}'", pair.first),
+            std::move(flicker.error())));
+      light.flicker = std::move(*flicker);
     }
     auto angle = lightConfig.get_float("pointAngle", 0.0f);
     if (!angle) return std::unexpected(std::move(angle.error()));

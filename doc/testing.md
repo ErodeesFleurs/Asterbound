@@ -372,6 +372,14 @@ Reuse `File/BTree/StageRollback` and `File/BTree/Commit` for matched timings;
 pressure separately: the corrected capacity bound can increase misses compared
 with the former unbounded insertion path.
 
+### Periodic scheduling
+
+`PeriodicTest.*` checks tick cadence and phase preservation when the interval changes.
+`PeriodicFunctionTest.*` checks that a large delta advances light flicker by only
+one half-cycle and that invalid durations fail before consuming random draws.
+Use `AssetsTest.ObjectCursorPreviewColdAndWarmCachesPreserveGameplayRandom` for
+the installed-asset path and its gameplay/presentation random stream separation.
+
 ### Random stream compatibility
 
 `RandomSource` and synchronized `RandomService` use snake_case C++ APIs; Lua's

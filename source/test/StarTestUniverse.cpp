@@ -505,8 +505,8 @@ TestUniverse::waitForWorldReady(std::int64_t timeoutMilliseconds) {
 
         auto settled = [&](Observation& observation, double period) {
           observation.present = true;
-          // LuaScriptUpdate::updateDt() is stepCount * lastDt, not elapsed
-          // wall time. Periodic(0) deliberately disables updates; otherwise
+          // LuaScriptUpdate::update_dt() is the tick interval times the last
+          // tick duration, not wall time. Periodic(0) disables updates; otherwise
           // wait a full observed scheduling period after first seeing it.
           if (dt <= 0 || step == observation.firstStep
               || (period > 0 && step - observation.firstStep < std::ceil(period / dt)))

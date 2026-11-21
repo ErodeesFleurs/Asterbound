@@ -1,87 +1,107 @@
 module;
 
 import std;
+import star.format;
+import star.math_common;
 import star.random;
 
 namespace Star {
+
+namespace PeriodicFunctionDetail {
+  template <typename T> void implicit_result(T);
+
+  template <typename Operator, typename Float>
+  concept weight_operator = requires(Operator& op, Float const& time, std::invoke_result_t<Operator&, Float>& weights) {
+    op(Float(time));
+    implicit_result<Float>(time * weights[0] + time * weights[1]);
+  };
+}
 
 // Repeating, periodic function with optional period and magnitude variance.
 // Each cycle of the function will randomize the min and max values of the
 // function by the magnitude variance, and the period by the period variance.
 // Can approximate a randomized sin wave, triangle wave, square wave, etc based
 // on the weight operator provided to the value method.
-template <typename Float>
+template <finite_classifiable Float>
 class PeriodicFunction {
 public:
-  explicit PeriodicFunction(RandomService& random);
-  PeriodicFunction(
-      RandomService& random, Float period, Float min = 0, Float max = 1, Float periodVariance = 0, Float magnitudeVariance = 0);
+  explicit PeriodicFunction(RandomService& random)
+    : PeriodicFunction(random, HalfCycle{Float{0.5}, 0}, 0, 1, 0) {}
 
-  void update(Float delta);
+  // Keep unchecked floating-point inputs behind references: the optimized
+  // by-value ABI may assume they are finite before validation runs.
+  [[nodiscard]] static std::expected<PeriodicFunction, StarException> create(RandomService& random, Float const& period,
+      Float const& min = 0, Float const& max = 1, Float const& period_variance = 0, Float const& magnitude_variance = 0);
 
-  template <typename WeightOperator>
-  Float value(WeightOperator weightOperator) const;
+  void update(Float delta) {
+    m_timer -= delta;
+
+    // Advance only once, even when delta spans multiple cycles.
+    if (m_timer <= 0) {
+      m_source = m_target;
+      m_target = sample(m_target_mode ? m_max : m_min, m_magnitude_variance);
+      m_target_mode = !m_target_mode;
+      m_timer_max = sample(m_half_cycle.period, m_half_cycle.variance);
+      m_timer = std::max(Float{0}, m_timer + m_timer_max);
+    }
+  }
+
+  template <typename WeightOperator> requires PeriodicFunctionDetail::weight_operator<WeightOperator, Float>
+  Float value(WeightOperator&& weight_operator) const {
+    // Time counts down from the full sampled duration to zero.
+    auto&& weights = weight_operator(m_timer / m_timer_max);
+    return m_target * weights[0] + m_source * weights[1];
+  }
 
 private:
+  struct HalfCycle {
+    Float period;
+    Float variance;
+  };
+
+  PeriodicFunction(RandomService& random, HalfCycle half_cycle, Float min, Float max, Float magnitude_variance)
+    : m_random(random), m_half_cycle(half_cycle), m_min(min), m_max(max), m_magnitude_variance(magnitude_variance),
+      m_timer_max(half_cycle.period), m_source(sample(max, magnitude_variance)), m_target(sample(min, magnitude_variance)) {}
+
+  Float sample(Float center, Float variance) {
+#ifdef __clang__
+#pragma clang fp reassociate(off)
+#endif
+    return center + (m_random.get().uniform_float() * 2 - 1) * variance;
+  }
+
   std::reference_wrapper<RandomService> m_random;
-  Float m_halfPeriod;
+  HalfCycle m_half_cycle;
   Float m_min;
   Float m_max;
-  Float m_halfPeriodVariance;
-  Float m_magnitudeVariance;
-
-  Float m_timerMax;
-  Float m_timer;
+  Float m_magnitude_variance;
+  Float m_timer_max;
+  Float m_timer = 0;
   Float m_source;
   Float m_target;
-  bool m_targetMode;
+  bool m_target_mode = true;
 };
 
-template <typename Float>
-PeriodicFunction<Float>::PeriodicFunction(RandomService& random)
-  : PeriodicFunction(random, 1, 0, 1, 0, 0) {}
+// Validate exactly the rounded endpoints the sampler can reach. In particular,
+// halving period and variance separately may round them to the same value.
+#pragma float_control(precise, on, push)
+template <finite_classifiable Float>
+std::expected<PeriodicFunction<Float>, StarException> PeriodicFunction<Float>::create(
+    RandomService& random, Float const& period, Float const& min, Float const& max, Float const& period_variance, Float const& magnitude_variance) {
+  auto finite = classify_finite(period, min, max, period_variance, magnitude_variance);
+  if (!std::ranges::all_of(finite, std::identity{}))
+    return std::unexpected(MathException("Periodic function parameters must be finite"));
+  if (period <= 0 || period_variance < 0 || magnitude_variance < 0 || max < min)
+    return std::unexpected(MathException("Periodic function requires a positive period, nonnegative variances and ordered magnitudes"));
 
-template <typename Float>
-PeriodicFunction<Float>::PeriodicFunction(
-    RandomService& random, Float period, Float min, Float max, Float periodVariance, Float magnitudeVariance)
-  : m_random(random) {
-  m_halfPeriod = period / 2;
-  m_min = min;
-  m_max = max;
-  m_halfPeriodVariance = periodVariance / 2;
-  m_magnitudeVariance = magnitudeVariance;
-
-  m_timerMax = m_halfPeriod;
-  m_timer = 0;
-  m_source = m_max + (random.uniform_float() * 2 - 1) * m_magnitudeVariance;
-  m_target = m_min + (random.uniform_float() * 2 - 1) * m_magnitudeVariance;
-  m_targetMode = true;
+  HalfCycle half_cycle{period / 2, period_variance / 2};
+  Float shortest = half_cycle.period - half_cycle.variance;
+  auto bounds = classify_finite(half_cycle.period + half_cycle.variance, min - magnitude_variance, max + magnitude_variance);
+  if (shortest <= 0 || !std::ranges::all_of(bounds, std::identity{}))
+    return std::unexpected(MathException("Periodic function sampled half-periods must be positive and all sample bounds finite"));
+  return PeriodicFunction(random, half_cycle, min, max, magnitude_variance);
 }
-
-template <typename Float>
-void PeriodicFunction<Float>::update(Float delta) {
-  m_timer -= delta;
-
-  // Only bring the timer forward once, rather than doing this in a loop.  This
-  // makes the function behave somewhat differently than it would for deltas
-  // which are greater than the period, but it avoids infinite looping
-  if (m_timer <= 0.0f) {
-    m_source = m_target;
-    m_target = (m_targetMode ? m_max : m_min) + (m_random.get().uniform_float() * 2 - 1) * m_magnitudeVariance;
-    m_targetMode = !m_targetMode;
-    m_timerMax = m_halfPeriod + (m_random.get().uniform_float() * 2 - 1) * m_halfPeriodVariance;
-    m_timer = std::max(0.0f, m_timer + m_timerMax);
-  }
-}
-
-template <typename Float>
-template <typename WeightOperator>
-Float PeriodicFunction<Float>::value(WeightOperator weightOperator) const {
-  // This is inverted, m_timer goes from m_timerMax to 0 as the value should go
-  // from m_source to m_target
-  auto wvec = weightOperator(m_timer / m_timerMax);
-  return m_target * wvec[0] + m_source * wvec[1];
-}
+#pragma float_control(pop)
 
 }
 
