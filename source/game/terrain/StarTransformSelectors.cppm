@@ -104,42 +104,42 @@ std::expected<std::shared_ptr<DisplacementSelector>, StarException> Displacement
     Json const& config, TerrainSelectorParameters const& parameters, TerrainDatabase const& database) {
   auto result = std::make_shared<DisplacementSelector>(ConstructionKey{}, config, parameters);
   RandomSource random(parameters.seed);
-  auto readFunction = [&](char axis) -> std::expected<PerlinF, StarException> {
+  auto read_function = [&](char axis) -> std::expected<PerlinF, StarException> {
     auto key = [axis](std::string_view suffix) { return Star::format("{}{}", axis, suffix); };
     auto name = config.get_string(key("Type"));
     if (!name)
       return std::unexpected(std::move(name.error()));
-    auto type = enum_value<PerlinTypeNames>(StringView(*name));
+    auto type = enum_value<perlin_type_names>(StringView(*name));
     if (!type)
       return std::unexpected(std::move(type.error()));
-    auto octaves = config.get_float(key("Octaves"));
+    auto octaves = config.get_double(key("Octaves"));
     if (!octaves)
       return std::unexpected(std::move(octaves.error()));
-    auto freq = config.get_float(key("Freq"));
+    auto freq = config.get_double(key("Freq"));
     if (!freq)
       return std::unexpected(std::move(freq.error()));
-    auto amp = config.get_float(key("Amp"));
+    auto amp = config.get_double(key("Amp"));
     if (!amp)
       return std::unexpected(std::move(amp.error()));
-    auto bias = config.get_float(key("Bias"), 0.0f);
+    auto bias = config.get_double(key("Bias"), 0.0);
     if (!bias)
       return std::unexpected(std::move(bias.error()));
-    auto alpha = config.get_float(key("Alpha"), 2.0f);
+    auto alpha = config.get_double(key("Alpha"), 2.0);
     if (!alpha)
       return std::unexpected(std::move(alpha.error()));
-    auto beta = config.get_float(key("Beta"), 2.0f);
+    auto beta = config.get_double(key("Beta"), 2.0);
     if (!beta)
       return std::unexpected(std::move(beta.error()));
-    return PerlinF(*type, *octaves, *freq, *amp, *bias, *alpha, *beta, random.next_u64());
+    return PerlinF::create(*type, *octaves, *freq, *amp, *bias, *alpha, *beta, random.next_u64());
   };
-  auto xFunction = readFunction('x');
-  if (!xFunction)
-    return std::unexpected(std::move(xFunction.error()));
-  result->xDisplacementFunction = std::move(*xFunction);
-  auto yFunction = readFunction('y');
-  if (!yFunction)
-    return std::unexpected(std::move(yFunction.error()));
-  result->yDisplacementFunction = std::move(*yFunction);
+  auto x_function = read_function('x');
+  if (!x_function)
+    return std::unexpected(std::move(x_function.error()));
+  result->xDisplacementFunction = std::move(*x_function);
+  auto y_function = read_function('y');
+  if (!y_function)
+    return std::unexpected(std::move(y_function.error()));
+  result->yDisplacementFunction = std::move(*y_function);
   auto xXInfluence = config.get_float("xXInfluence", 1.0f);
   if (!xXInfluence)
     return std::unexpected(std::move(xXInfluence.error()));

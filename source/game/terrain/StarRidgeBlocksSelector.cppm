@@ -25,12 +25,7 @@ public:
 
   float commonality;
 
-  float amplitude;
-  float frequency;
   float bias;
-
-  float noiseAmplitude;
-  float noiseFrequency;
 
   PerlinF ridgePerlin1;
   PerlinF ridgePerlin2;
@@ -46,30 +41,32 @@ std::string_view const RidgeBlocksSelector::Name = "ridgeblocks";
 std::expected<std::shared_ptr<RidgeBlocksSelector>, StarException> RidgeBlocksSelector::create(Json const& config, TerrainSelectorParameters const& parameters) {
   auto result = std::make_shared<RidgeBlocksSelector>(ConstructionKey{}, config, parameters);
   result->commonality = parameters.commonality;
-  auto amplitude = config.get_float("amplitude");
+  auto amplitude = config.get_double("amplitude");
   if (!amplitude)
     return std::unexpected(std::move(amplitude.error()));
-  result->amplitude = *amplitude;
-  auto frequency = config.get_float("frequency");
+  auto frequency = config.get_double("frequency");
   if (!frequency)
     return std::unexpected(std::move(frequency.error()));
-  result->frequency = *frequency;
   auto bias = config.get_float("bias");
   if (!bias)
     return std::unexpected(std::move(bias.error()));
   result->bias = *bias;
-  auto noiseAmplitude = config.get_float("noiseAmplitude");
-  if (!noiseAmplitude)
-    return std::unexpected(std::move(noiseAmplitude.error()));
-  result->noiseAmplitude = *noiseAmplitude;
-  auto noiseFrequency = config.get_float("noiseFrequency");
-  if (!noiseFrequency)
-    return std::unexpected(std::move(noiseFrequency.error()));
-  result->noiseFrequency = *noiseFrequency;
+  auto noise_amplitude = config.get_double("noiseAmplitude");
+  if (!noise_amplitude)
+    return std::unexpected(std::move(noise_amplitude.error()));
+  auto noise_frequency = config.get_double("noiseFrequency");
+  if (!noise_frequency)
+    return std::unexpected(std::move(noise_frequency.error()));
   RandomSource random(parameters.seed);
-  result->ridgePerlin1 = PerlinF(PerlinType::RidgedMulti, 2, *frequency, *amplitude, 0, 2.0f, 2.0f, random.next_u64());
-  result->ridgePerlin2 = PerlinF(PerlinType::RidgedMulti, 2, *frequency, *amplitude, 0, 2.0f, 2.0f, random.next_u64());
-  result->noisePerlin = PerlinF(1, *noiseFrequency, *noiseAmplitude, 0, 1.0f, 2.0f, random.next_u64());
+  auto ridge = PerlinF::make_parameters(PerlinType::RidgedMulti, 2, *frequency, *amplitude, 0, 2, 2);
+  if (!ridge)
+    return std::unexpected(std::move(ridge.error()));
+  result->ridgePerlin1 = PerlinF(*ridge, random.next_u64());
+  result->ridgePerlin2 = PerlinF(*ridge, random.next_u64());
+  auto noise = PerlinF::create(PerlinType::Perlin, 1, *noise_frequency, *noise_amplitude, 0, 1, 2, random.next_u64());
+  if (!noise)
+    return std::unexpected(std::move(noise.error()));
+  result->noisePerlin = std::move(*noise);
   return result;
 }
 

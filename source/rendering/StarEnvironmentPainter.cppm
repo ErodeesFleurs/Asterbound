@@ -75,8 +75,10 @@ class WorldCamera;
 class Root;
 
 class EnvironmentPainter {
+  struct ConstructionKey { explicit ConstructionKey() = default; };
 public:
   [[nodiscard]] static std::expected<std::shared_ptr<EnvironmentPainter>, StarException> create(Root& root, std::shared_ptr<Renderer> renderer);
+  EnvironmentPainter(ConstructionKey, Root& root, std::shared_ptr<Renderer> renderer, PerlinF&& ray_perlin);
 
   void update(float dt);
 
@@ -92,7 +94,6 @@ public:
   void cleanup(std::int64_t textureTimeout);
 
 private:
-  EnvironmentPainter(Root& root, std::shared_ptr<Renderer> renderer);
   static float const SunriseTime;
   static float const SunsetTime;
   static float const SunFadeRate;

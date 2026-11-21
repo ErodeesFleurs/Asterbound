@@ -170,33 +170,21 @@ Json WorldRegion::toJson() const {
 }
 
 std::expected<WorldLayout::BlockNoise, StarException> WorldLayout::BlockNoise::build(Json const& config, std::uint64_t seed) {
-  BlockNoise blockNoise;
-  auto horizontal_noise = config.get("horizontalNoise");
-  if (!horizontal_noise)
-    return std::unexpected(std::move(horizontal_noise.error()));
-  auto blockNoisehorizontalNoisePerlin =
-    PerlinF::create((*horizontal_noise), static_random_u64(seed, "HorizontalNoise"));
-  if (!blockNoisehorizontalNoisePerlin) return std::unexpected(std::move(blockNoisehorizontalNoisePerlin.error()));
-  blockNoise.horizontalNoise = std::move(*blockNoisehorizontalNoisePerlin);
-  auto vertical_noise = config.get("verticalNoise");
-  if (!vertical_noise)
-    return std::unexpected(std::move(vertical_noise.error()));
-  auto blockNoiseverticalNoisePerlin = PerlinF::create((*vertical_noise), static_random_u64(seed, "VerticalNoise"));
-  if (!blockNoiseverticalNoisePerlin) return std::unexpected(std::move(blockNoiseverticalNoisePerlin.error()));
-  blockNoise.verticalNoise = std::move(*blockNoiseverticalNoisePerlin);
-  auto x_noise = config.get("noise");
-  if (!x_noise)
-    return std::unexpected(std::move(x_noise.error()));
-  auto blockNoisexNoisePerlin = PerlinF::create((*x_noise), static_random_u64(seed, "XNoise"));
-  if (!blockNoisexNoisePerlin) return std::unexpected(std::move(blockNoisexNoisePerlin.error()));
-  blockNoise.xNoise = std::move(*blockNoisexNoisePerlin);
-  auto y_noise = config.get("noise");
-  if (!y_noise)
-    return std::unexpected(std::move(y_noise.error()));
-  auto blockNoiseyNoisePerlin = PerlinF::create((*y_noise), static_random_u64(seed, "yNoise"));
-  if (!blockNoiseyNoisePerlin) return std::unexpected(std::move(blockNoiseyNoisePerlin.error()));
-  blockNoise.yNoise = std::move(*blockNoiseyNoisePerlin);
-  return blockNoise;
+  BlockNoise result;
+  auto read_seeded = [&](String const& key, std::uint64_t noise_seed) {
+    return config.get(key).and_then([noise_seed](Json const& value) { return PerlinF::create(value, noise_seed); });
+  };
+  auto horizontal = read_seeded("horizontalNoise", static_random_u64(seed, "HorizontalNoise"));
+  if (!horizontal) return std::unexpected(std::move(horizontal.error()));
+  result.horizontalNoise = std::move(*horizontal);
+  auto vertical = read_seeded("verticalNoise", static_random_u64(seed, "VerticalNoise"));
+  if (!vertical) return std::unexpected(std::move(vertical.error()));
+  result.verticalNoise = std::move(*vertical);
+  auto axes = config.get("noise").and_then(PerlinF::parse_parameters);
+  if (!axes) return std::unexpected(std::move(axes.error()));
+  result.xNoise = PerlinF(*axes, static_random_u64(seed, "XNoise"));
+  result.yNoise = PerlinF(*axes, static_random_u64(seed, "yNoise"));
+  return result;
 }
 
 WorldLayout::BlockNoise::BlockNoise() = default;
@@ -227,15 +215,16 @@ std::expected<WorldLayout::BlockNoise, StarException> WorldLayout::BlockNoise::c
 }
 
 std::expected<Json, StarException> WorldLayout::BlockNoise::toJson() const {
-  auto horizontalNoiseJson = horizontalNoise.toJson();
-  if (!horizontalNoiseJson) return std::unexpected(std::move(horizontalNoiseJson.error()));
-  auto verticalNoiseJson = verticalNoise.toJson();
-  if (!verticalNoiseJson) return std::unexpected(std::move(verticalNoiseJson.error()));
-  auto xNoiseJson = xNoise.toJson();
-  if (!xNoiseJson) return std::unexpected(std::move(xNoiseJson.error()));
-  auto yNoiseJson = yNoise.toJson();
-  if (!yNoiseJson) return std::unexpected(std::move(yNoiseJson.error()));
-  return JsonObject{{"horizontalNoise", std::move(*horizontalNoiseJson)}, {"verticalNoise", std::move(*verticalNoiseJson)}, {"xNoise", std::move(*xNoiseJson)}, {"yNoise", std::move(*yNoiseJson)}};
+  auto horizontal = horizontalNoise.to_json();
+  if (!horizontal) return std::unexpected(std::move(horizontal.error()));
+  auto vertical = verticalNoise.to_json();
+  if (!vertical) return std::unexpected(std::move(vertical.error()));
+  auto x = xNoise.to_json();
+  if (!x) return std::unexpected(std::move(x.error()));
+  auto y = yNoise.to_json();
+  if (!y) return std::unexpected(std::move(y.error()));
+  return JsonObject{{"horizontalNoise", std::move(*horizontal)}, {"verticalNoise", std::move(*vertical)},
+                    {"xNoise", std::move(*x)}, {"yNoise", std::move(*y)}};
 }
 
 std::expected<Vec2I, StarException> WorldLayout::BlockNoise::apply(Vec2I const& input, Vec2U const& worldSize) const {
@@ -692,7 +681,7 @@ std::expected<Json, StarException> WorldLayout::toJson() const {
   }
   Json blendNoise;
   if (m_blendNoise) {
-    auto stored = m_blendNoise->toJson();
+    auto stored = m_blendNoise->to_json();
     if (!stored) return std::unexpected(std::move(stored.error()));
     blendNoise = std::move(*stored);
   }

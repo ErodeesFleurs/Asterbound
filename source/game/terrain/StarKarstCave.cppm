@@ -35,10 +35,10 @@ public:
 
 private:
   struct LayerPerlins {
-    PerlinF caveDecision;
-    PerlinF layerHeightVariation;
-    PerlinF caveHeightVariation;
-    PerlinF caveFloorVariation;
+    PerlinF cave_decision;
+    PerlinF layer_height;
+    PerlinF cave_height;
+    PerlinF cave_floor;
   };
 
   struct Sector {
@@ -58,7 +58,7 @@ private:
     float m_maxValue = 0;
   };
 
-  [[nodiscard]] std::expected<std::reference_wrapper<LayerPerlins const>, StarException> layerPerlins(int y) const;
+  [[nodiscard]] std::expected<std::reference_wrapper<LayerPerlins const>, StarException> layer_perlins(int y) const;
 
   int m_sectorSize;
   int m_layerResolution;
@@ -66,15 +66,15 @@ private:
   int m_bufferHeight;
   float m_caveTaperPoint;
 
-  Json m_caveDecisionPerlinConfig;
-  Json m_layerHeightVariationPerlinConfig;
-  Json m_caveHeightVariationPerlinConfig;
-  Json m_caveFloorVariationPerlinConfig;
+  PerlinF::Parameters cave_decision_parameters;
+  PerlinF::Parameters layer_height_parameters;
+  PerlinF::Parameters cave_height_parameters;
+  PerlinF::Parameters cave_floor_parameters;
 
   int m_worldWidth;
   std::uint64_t m_seed;
 
-  mutable HashLruCache<int, LayerPerlins> m_layerPerlinsCache;
+  mutable HashLruCache<int, LayerPerlins> layer_cache;
   mutable HashLruCache<Vec2I, Sector> m_sectorCache;
 };
 
@@ -109,29 +109,40 @@ std::expected<std::shared_ptr<KarstCaveSelector>, StarException> KarstCaveSelect
   auto caveDecision = config.get("caveDecision");
   if (!caveDecision)
     return std::unexpected(std::move(caveDecision.error()));
-  result->m_caveDecisionPerlinConfig = std::move(*caveDecision);
   auto layerHeight = config.get("layerHeightVariation");
   if (!layerHeight)
     return std::unexpected(std::move(layerHeight.error()));
-  result->m_layerHeightVariationPerlinConfig = std::move(*layerHeight);
   auto caveHeight = config.get("caveHeightVariation");
   if (!caveHeight)
     return std::unexpected(std::move(caveHeight.error()));
-  result->m_caveHeightVariationPerlinConfig = std::move(*caveHeight);
   auto caveFloor = config.get("caveFloorVariation");
   if (!caveFloor)
     return std::unexpected(std::move(caveFloor.error()));
-  result->m_caveFloorVariationPerlinConfig = std::move(*caveFloor);
   result->m_worldWidth = parameters.worldWidth;
   result->m_seed = parameters.seed;
   auto layerCacheSize = config.get_uint("layerPerlinsCacheSize", 16);
   if (!layerCacheSize)
     return std::unexpected(std::move(layerCacheSize.error()));
-  result->m_layerPerlinsCache.set_capacity(*layerCacheSize);
+  result->layer_cache.set_capacity(*layerCacheSize);
   auto sectorCacheSize = config.get_uint("sectorCacheSize", 16);
   if (!sectorCacheSize)
     return std::unexpected(std::move(sectorCacheSize.error()));
   result->m_sectorCache.set_capacity(*sectorCacheSize);
+
+  // Check the selector's own fields first, as before. Only the layer seed
+  // changes on a cache miss; the four noise recipes belong to the selector.
+  auto decision_parameters = PerlinF::parse_parameters(*caveDecision);
+  if (!decision_parameters) return std::unexpected(std::move(decision_parameters.error()));
+  result->cave_decision_parameters = *decision_parameters;
+  auto layer_parameters = PerlinF::parse_parameters(*layerHeight);
+  if (!layer_parameters) return std::unexpected(std::move(layer_parameters.error()));
+  result->layer_height_parameters = *layer_parameters;
+  auto height_parameters = PerlinF::parse_parameters(*caveHeight);
+  if (!height_parameters) return std::unexpected(std::move(height_parameters.error()));
+  result->cave_height_parameters = *height_parameters;
+  auto floor_parameters = PerlinF::parse_parameters(*caveFloor);
+  if (!floor_parameters) return std::unexpected(std::move(floor_parameters.error()));
+  result->cave_floor_parameters = *floor_parameters;
   return result;
 }
 
@@ -153,10 +164,10 @@ std::expected<KarstCaveSelector::Sector, StarException> KarstCaveSelector::Secto
     float layerChance = parent.m_layerDensity * parent.m_layerResolution;
     // determine whether this layer has caves
     if (y % parent.m_layerResolution == 0 && static_random_float(parent.m_seed, y) <= layerChance) {
-      auto perlins = parent.layerPerlins(y);
+      auto perlins = parent.layer_perlins(y);
       if (!perlins)
         return std::unexpected(std::move(perlins.error()));
-      LayerPerlins const& layerPerlins = perlins->get();
+      LayerPerlins const& layer = perlins->get();
 
       // carve out cave layer
       for (int x = sector[0]; x < sector[0] + parent.m_sectorSize; x++) {
@@ -166,7 +177,7 @@ std::expected<KarstCaveSelector::Sector, StarException> KarstCaveSelector::Secto
         float noiseY = (std::sin(noiseAngle) * parent.m_worldWidth) / (2 * std::numbers::pi);
 
         // determine where caves be at
-        auto caveDecision = layerPerlins.caveDecision.get(noiseX, noiseY);
+        auto caveDecision = layer.cave_decision.get(noiseX, noiseY);
         if (!caveDecision)
           return std::unexpected(std::move(caveDecision.error()));
         float isThereACaveHere = *caveDecision;
@@ -175,15 +186,15 @@ std::expected<KarstCaveSelector::Sector, StarException> KarstCaveSelector::Secto
               ? std::sin((0.5 * std::numbers::pi * isThereACaveHere) / parent.m_caveTaperPoint)
               : 1.0f;
 
-          auto layerHeight = layerPerlins.layerHeightVariation.get(noiseX, noiseY);
+          auto layerHeight = layer.layer_height.get(noiseX, noiseY);
           if (!layerHeight)
             return std::unexpected(std::move(layerHeight.error()));
           int baseY = y + *layerHeight;
-          auto caveHeight = layerPerlins.caveHeightVariation.get(noiseX, noiseY);
+          auto caveHeight = layer.cave_height.get(noiseX, noiseY);
           if (!caveHeight)
             return std::unexpected(std::move(caveHeight.error()));
           int ceilingY = baseY + *caveHeight * taperFactor;
-          auto caveFloor = layerPerlins.caveFloorVariation.get(noiseX, noiseY);
+          auto caveFloor = layer.cave_floor.get(noiseX, noiseY);
           if (!caveFloor)
             return std::unexpected(std::move(caveFloor.error()));
           int floorY = baseY + *caveFloor * taperFactor;
@@ -224,27 +235,13 @@ void KarstCaveSelector::Sector::set(int x, int y, float value) {
   values[(x - sector[0]) + parent.get().m_sectorSize * (y - sector[1])] = value;
 }
 
-std::expected<std::reference_wrapper<KarstCaveSelector::LayerPerlins const>, StarException> KarstCaveSelector::layerPerlins(int y) const {
-  auto result = m_layerPerlinsCache.get(y, [this](int y) -> std::expected<LayerPerlins, StarException> {
-    auto decision = PerlinF::create(m_caveDecisionPerlinConfig, static_random_u64(y, m_seed, "CaveDecision"));
-    if (!decision)
-      return std::unexpected(std::move(decision.error()));
-    auto layerHeight =
-      PerlinF::create(m_layerHeightVariationPerlinConfig, static_random_u64(y, m_seed, "LayerHeightVariation"));
-    if (!layerHeight)
-      return std::unexpected(std::move(layerHeight.error()));
-    auto caveHeight =
-      PerlinF::create(m_caveHeightVariationPerlinConfig, static_random_u64(y, m_seed, "CaveHeightVariation"));
-    if (!caveHeight)
-      return std::unexpected(std::move(caveHeight.error()));
-    auto caveFloor =
-      PerlinF::create(m_caveFloorVariationPerlinConfig, static_random_u64(y, m_seed, "CaveFloorVariation"));
-    if (!caveFloor)
-      return std::unexpected(std::move(caveFloor.error()));
-    return LayerPerlins{.caveDecision = std::move(*decision),
-                        .layerHeightVariation = std::move(*layerHeight),
-                        .caveHeightVariation = std::move(*caveHeight),
-                        .caveFloorVariation = std::move(*caveFloor)};
+std::expected<std::reference_wrapper<KarstCaveSelector::LayerPerlins const>, StarException> KarstCaveSelector::layer_perlins(int y) const {
+  auto result = layer_cache.get(y, [this](int layer) {
+    return LayerPerlins{
+      .cave_decision = PerlinF(cave_decision_parameters, static_random_u64(layer, m_seed, "CaveDecision")),
+      .layer_height = PerlinF(layer_height_parameters, static_random_u64(layer, m_seed, "LayerHeightVariation")),
+      .cave_height = PerlinF(cave_height_parameters, static_random_u64(layer, m_seed, "CaveHeightVariation")),
+      .cave_floor = PerlinF(cave_floor_parameters, static_random_u64(layer, m_seed, "CaveFloorVariation"))};
   });
   if (!result)
     return std::unexpected(std::move(result.error()));

@@ -23,734 +23,439 @@ enum class PerlinType {
   Billow,
   RidgedMulti
 };
-inline constexpr auto PerlinTypeNames = sorted_enum_names(std::array{
+inline constexpr auto perlin_type_names = sorted_enum_names(std::array{
   std::pair{PerlinType::Uninitialized, std::string_view("uninitialized")},
   std::pair{PerlinType::Perlin, std::string_view("perlin")},
   std::pair{PerlinType::Billow, std::string_view("billow")},
   std::pair{PerlinType::RidgedMulti, std::string_view("ridgedMulti")},
 });
-static_assert(valid_enum_names<PerlinTypeNames>());
+static_assert(valid_enum_names<perlin_type_names>());
 
-inline constexpr int PerlinSampleSize = 512;
-
-template <typename Float>
+template <finite_classifiable Float>
 class Perlin {
 public:
-  // Default constructed perlin noise is uninitialized and cannot be queried.
-  Perlin();
+  static constexpr int sample_size = 512;
 
-  Perlin(unsigned octaves, Float freq, Float amp, Float bias, Float alpha, Float beta, std::uint64_t seed);
-  Perlin(PerlinType type, unsigned octaves, Float freq, Float amp, Float bias, Float alpha, Float beta, std::uint64_t seed);
+  // Parsed independently of the seed so immutable configurations can be reused.
+  class Parameters {
+    friend class Perlin;
+  public:
+    Parameters() = default;
+  private:
+    PerlinType type = PerlinType::Uninitialized;
+    unsigned octaves = 0;
+    Float frequency = 0;
+    Float amplitude = 0;
+    Float bias = 0;
+    Float alpha = 0;
+    Float beta = 0;
+    Float offset = 0;
+    Float gain = 0;
+  };
+
+  Perlin() = default;
+  Perlin(Parameters const& parameters, std::uint64_t seed);
+  [[nodiscard]] static std::expected<Parameters, StarException> parse_parameters(Json const& config);
+  [[nodiscard]] static std::expected<Perlin, StarException> create(PerlinType type, double const& octaves,
+      double const& frequency, double const& amplitude, double const& bias, double const& alpha, double const& beta,
+      std::uint64_t seed);
   [[nodiscard]] static std::expected<Perlin, StarException> create(Json const& config, std::uint64_t seed);
-  [[nodiscard]] static std::expected<Perlin, StarException> create(Json const& json);
+  [[nodiscard]] static std::expected<Perlin, StarException> create(Json const& config);
 
-  Perlin(Perlin const& perlin);
-  Perlin(Perlin&& perlin);
+  [[nodiscard]] static std::expected<Parameters, StarException> make_parameters(PerlinType type, double const& octaves,
+      double const& frequency, double const& amplitude, double const& bias, double const& alpha, double const& beta,
+      double const& offset = 1, double const& gain = 2);
 
-  Perlin& operator=(Perlin const& perlin);
-  Perlin& operator=(Perlin&& perlin);
+  Perlin(Perlin const& other);
+  Perlin(Perlin&& other) noexcept;
+  Perlin& operator=(Perlin const& other);
+  Perlin& operator=(Perlin&& other) noexcept;
+  [[nodiscard]] std::expected<Float, StarException> get(Float const& x) const;
+  [[nodiscard]] std::expected<Float, StarException> get(Float const& x, Float const& y) const;
+  [[nodiscard]] std::expected<Float, StarException> get(Float const& x, Float const& y, Float const& z) const;
 
-  [[nodiscard]] std::expected<Float, StarException> get(Float x) const;
-  [[nodiscard]] std::expected<Float, StarException> get(Float x, Float y) const;
-  [[nodiscard]] std::expected<Float, StarException> get(Float x, Float y, Float z) const;
+  PerlinType type() const noexcept { return m_parameters.type; }
+  unsigned octaves() const noexcept { return m_parameters.octaves; }
+  Float frequency() const noexcept { return m_parameters.frequency; }
+  Float amplitude() const noexcept { return m_parameters.amplitude; }
+  Float bias() const noexcept { return m_parameters.bias; }
+  Float alpha() const noexcept { return m_parameters.alpha; }
+  Float beta() const noexcept { return m_parameters.beta; }
 
-  PerlinType type() const;
-
-  unsigned octaves() const;
-  Float frequency() const;
-  Float amplitude() const;
-  Float bias() const;
-  Float alpha() const;
-  Float beta() const;
-
-  [[nodiscard]] std::expected<Json, StarException> toJson() const;
+  [[nodiscard]] std::expected<Json, StarException> to_json() const;
 
 private:
+  struct LatticeAxis {
+    int lo, hi;
+    Float near_offset, far_offset;
+  };
+
   static Float s_curve(Float t);
-  static void setup(Float v, int& b0, int& b1, Float& r0, Float& r1);
+  static LatticeAxis lattice_axis(Float const& coordinate);
+  Float noise(std::array<LatticeAxis, 1> const& axes) const;
+  Float noise(std::array<LatticeAxis, 2> const& axes) const;
+  Float noise(std::array<LatticeAxis, 3> const& axes) const;
 
-  static Float at2(std::span<Float const, 2> q, Float rx, Float ry);
-  static Float at3(std::span<Float const, 3> q, Float rx, Float ry, Float rz);
+  // Only permutation and 3D gradients are indexed by the sum of two lattice indices.
+  struct Tables {
+    std::array<int, 2 * sample_size> p;
+    std::array<Float, sample_size> g1;
+    std::array<std::array<Float, 2>, sample_size> g2;
+    std::array<std::array<Float, 3>, 2 * sample_size> g3;
+  };
 
-  Float noise1(Float arg) const;
-  Float noise2(std::span<Float const, 2> vec) const;
-  Float noise3(std::span<Float const, 3> vec) const;
+  static std::unique_ptr<Tables> make_tables(std::uint64_t seed);
 
-  void normalize2(std::span<Float, 2> v) const;
-  void normalize3(std::span<Float, 3> v) const;
+  template <std::size_t dimension> requires (dimension >= 1 && dimension <= 3)
+  std::expected<Float, StarException> sample(std::array<Float, dimension> const& point) const;
 
-  void init(std::uint64_t seed);
+  template <PerlinType mode, std::size_t dimension> requires (dimension >= 1 && dimension <= 3)
+  std::expected<Float, StarException> sample_octaves(std::array<Float, dimension> point) const;
 
-  Float perlin(Float x) const;
-  Float perlin(Float x, Float y) const;
-  Float perlin(Float x, Float y, Float z) const;
-
-  Float ridgedMulti(Float x) const;
-  Float ridgedMulti(Float x, Float y) const;
-  Float ridgedMulti(Float x, Float y, Float z) const;
-
-  Float billow(Float x) const;
-  Float billow(Float x, Float y) const;
-  Float billow(Float x, Float y, Float z) const;
-
-  PerlinType m_type;
-  std::uint64_t m_seed;
-
-  int m_octaves;
-  Float m_frequency;
-  Float m_amplitude;
-  Float m_bias;
-  Float m_alpha;
-  Float m_beta;
-
-  // Only used for RidgedMulti
-  Float m_offset;
-  Float m_gain;
-
-  std::unique_ptr<int[]> p;
-  std::unique_ptr<Float[][3]> g3;
-  std::unique_ptr<Float[][2]> g2;
-  std::unique_ptr<Float[]> g1;
+  Parameters m_parameters;
+  std::uint64_t m_seed = 0;
+  std::unique_ptr<Tables> m_tables;
 };
 
 using PerlinF = Perlin<float>;
 using PerlinD = Perlin<double>;
 
-template <typename Float>
+template <finite_classifiable Float>
 Float Perlin<Float>::s_curve(Float t) {
   return t * t * (3.0 - 2.0 * t);
 }
 
-template <typename Float>
-void Perlin<Float>::setup(Float v, int& b0, int& b1, Float& r0, Float& r1) {
-  int iv = std::floor(v);
-  Float fv = v - iv;
+// Range-test before floor-to-int conversion, including NaN under fast-math.
+#pragma float_control(precise, on, push)
 
-  b0 = iv & (PerlinSampleSize - 1);
-  b1 = (iv + 1) & (PerlinSampleSize - 1);
-  r0 = fv;
-  r1 = fv - 1.0;
+template <finite_classifiable Float>
+auto Perlin<Float>::lattice_axis(Float const& coordinate) -> LatticeAxis {
+  Float value = coordinate;
+  constexpr Float lower = std::numeric_limits<int>::min();
+  if (!(value >= lower && value < -lower)) [[unlikely]] {
+    if (!is_finite(value))
+      return {-1, 0, 0, 0};
+    value = std::fmod(value, Float(sample_size));
+  }
+  int cell = static_cast<int>(std::floor(value));
+  Float offset = value - cell;
+  int lo = cell & (sample_size - 1);
+  return {lo, (lo + 1) & (sample_size - 1), offset, Float(offset - 1.0)};
+}
+#pragma float_control(pop)
+
+template <finite_classifiable Float>
+Perlin<Float>::Perlin(Parameters const& parameters, std::uint64_t seed)
+  : m_parameters(parameters), m_seed(parameters.type == PerlinType::Uninitialized ? 0 : seed),
+    m_tables(parameters.type == PerlinType::Uninitialized ? nullptr : make_tables(seed)) {}
+
+template <finite_classifiable Float>
+auto Perlin<Float>::make_parameters(PerlinType type, double const& octaves,
+    double const& frequency, double const& amplitude, double const& bias, double const& alpha, double const& beta,
+    double const& offset, double const& gain) -> std::expected<Parameters, StarException> {
+  auto finite = classify_finite(octaves, frequency, amplitude, bias, alpha, beta, offset, gain);
+  if (std::ranges::find(finite, false) != finite.end())
+    return std::unexpected(PerlinException("Perlin parameters must be finite"));
+  // Existing JSON and selector inputs truncate nonnegative fractional octaves.
+  if (octaves < 0 || octaves >= static_cast<double>(std::numeric_limits<int>::max()) + 1)
+    return std::unexpected(PerlinException("Perlin octave count is out of range"));
+  if constexpr (std::same_as<Float, float>) {
+    constexpr double limit = std::numeric_limits<Float>::max();
+    if (std::abs(frequency) > limit || std::abs(amplitude) > limit || std::abs(bias) > limit ||
+        std::abs(alpha) > limit || std::abs(beta) > limit || std::abs(offset) > limit || std::abs(gain) > limit)
+      return std::unexpected(PerlinException("Perlin parameter exceeds the scalar range"));
+  }
+  Parameters result;
+  switch (type) {
+    case PerlinType::Uninitialized:
+      return result;
+    case PerlinType::Perlin:
+    case PerlinType::Billow:
+    case PerlinType::RidgedMulti:
+      break;
+    default:
+      return std::unexpected(PerlinException("Unknown Perlin type"));
+  }
+  result.type = type;
+  result.octaves = static_cast<unsigned>(octaves);
+  result.frequency = static_cast<Float>(frequency);
+  result.amplitude = static_cast<Float>(amplitude);
+  result.bias = static_cast<Float>(bias);
+  result.alpha = static_cast<Float>(alpha);
+  result.beta = static_cast<Float>(beta);
+  result.offset = static_cast<Float>(offset);
+  result.gain = static_cast<Float>(gain);
+  if (result.octaves > 1 && result.alpha == 0)
+    return std::unexpected(PerlinException("Multiple Perlin octaves require a nonzero alpha"));
+  return result;
 }
 
-template <typename Float>
-Float Perlin<Float>::at2(std::span<Float const, 2> q, Float rx, Float ry) {
-  return rx * q[0] + ry * q[1];
-}
-
-template <typename Float>
-Float Perlin<Float>::at3(std::span<Float const, 3> q, Float rx, Float ry, Float rz) {
-  return rx * q[0] + ry * q[1] + rz * q[2];
-}
-
-template <typename Float>
-Perlin<Float>::Perlin() {
-  m_type = PerlinType::Uninitialized;
-  m_alpha = 0;
-  m_amplitude = 0;
-  m_frequency = 0;
-  m_seed = 0;
-  m_gain = 0;
-  m_beta = 0;
-  m_offset = 0;
-  m_bias = 0;
-  m_octaves = 0;
-}
-
-template <typename Float>
-Perlin<Float>::Perlin(unsigned octaves, Float freq, Float amp, Float bias, Float alpha, Float beta, std::uint64_t seed) {
-  m_type = PerlinType::Perlin;
-  m_seed = seed;
-
-  m_octaves = octaves;
-  m_frequency = freq;
-  m_amplitude = amp;
-  m_bias = bias;
-  m_alpha = alpha;
-  m_beta = beta;
-
-  // TODO: These ought to be configurable
-  m_offset = 1.0;
-  m_gain = 2.0;
-
-  init(m_seed);
-}
-
-template <typename Float>
-Perlin<Float>::Perlin(PerlinType type, unsigned octaves, Float freq, Float amp, Float bias, Float alpha, Float beta, std::uint64_t seed) {
-  m_type = type;
-  m_seed = seed;
-
-  m_octaves = octaves;
-  m_frequency = freq;
-  m_amplitude = amp;
-  m_bias = bias;
-  m_alpha = alpha;
-  m_beta = beta;
-
-  // TODO: These ought to be configurable
-  m_offset = 1.0;
-  m_gain = 2.0;
-
-  init(m_seed);
-}
-
-template <typename Float>
-std::expected<Perlin<Float>, StarException> Perlin<Float>::create(Json const& config, std::uint64_t seed) {
-  auto seeded = config.set("seed", seed);
-  if (!seeded)
-    return std::unexpected(std::move(seeded.error()));
-  return create(*seeded);
-}
-
-template <typename Float>
-std::expected<Perlin<Float>, StarException> Perlin<Float>::create(Json const& json) {
-  auto seed = json.get_uint("seed");
-  if (!seed) return std::unexpected(std::move(seed.error()));
-  auto octaves = json.get_int("octaves", 1);
+template <finite_classifiable Float>
+auto Perlin<Float>::parse_parameters(Json const& config) -> std::expected<Parameters, StarException> {
+  auto octaves = config.get_double("octaves", 1);
   if (!octaves) return std::unexpected(std::move(octaves.error()));
-  auto frequency = json.get_double("frequency", 1.0);
+  auto frequency = config.get_double("frequency", 1);
   if (!frequency) return std::unexpected(std::move(frequency.error()));
-  auto amplitude = json.get_double("amplitude", 1.0);
+  auto amplitude = config.get_double("amplitude", 1);
   if (!amplitude) return std::unexpected(std::move(amplitude.error()));
-  auto bias = json.get_double("bias", 0.0);
+  auto bias = config.get_double("bias", 0);
   if (!bias) return std::unexpected(std::move(bias.error()));
-  auto alpha = json.get_double("alpha", 2.0);
+  auto alpha = config.get_double("alpha", 2);
   if (!alpha) return std::unexpected(std::move(alpha.error()));
-  auto beta = json.get_double("beta", 2.0);
+  auto beta = config.get_double("beta", 2);
   if (!beta) return std::unexpected(std::move(beta.error()));
-  auto offset = json.get_double("offset", 1.0);
+  auto offset = config.get_double("offset", 1);
   if (!offset) return std::unexpected(std::move(offset.error()));
-  auto gain = json.get_double("gain", 2.0);
+  auto gain = config.get_double("gain", 2);
   if (!gain) return std::unexpected(std::move(gain.error()));
-  auto typeName = json.get_string("type");
-  if (!typeName) return std::unexpected(std::move(typeName.error()));
-  auto type = enum_value<PerlinTypeNames>(StringView(*typeName));
+  auto type_name = config.get_string("type");
+  if (!type_name) return std::unexpected(std::move(type_name.error()));
+  auto type = enum_value<perlin_type_names>(StringView(*type_name));
   if (!type) return std::unexpected(std::move(type.error()));
-  Perlin perlin;
-  perlin.m_seed = *seed;
-  perlin.m_octaves = *octaves;
-  perlin.m_frequency = *frequency;
-  perlin.m_amplitude = *amplitude;
-  perlin.m_bias = *bias;
-  perlin.m_alpha = *alpha;
-  perlin.m_beta = *beta;
-  perlin.m_offset = *offset;
-  perlin.m_gain = *gain;
-  perlin.m_type = *type;
-  perlin.init(perlin.m_seed);
-  return perlin;
+  return make_parameters(*type, *octaves, *frequency, *amplitude, *bias, *alpha, *beta, *offset, *gain);
 }
 
-template <typename Float>
-Perlin<Float>::Perlin(Perlin const& perlin) {
-  *this = perlin;
+template <finite_classifiable Float>
+std::expected<Perlin<Float>, StarException> Perlin<Float>::create(PerlinType type, double const& octaves,
+    double const& frequency, double const& amplitude, double const& bias, double const& alpha, double const& beta,
+    std::uint64_t seed) {
+  auto parameters = make_parameters(type, octaves, frequency, amplitude, bias, alpha, beta, 1, 2);
+  if (!parameters) return std::unexpected(std::move(parameters.error()));
+  return std::expected<Perlin, StarException>(std::in_place, *parameters, seed);
 }
 
-template <typename Float>
-Perlin<Float>::Perlin(Perlin&& perlin) {
-  *this = std::move(perlin);
+template <finite_classifiable Float>
+std::expected<Perlin<Float>, StarException> Perlin<Float>::create(Json const& config, std::uint64_t seed) {
+  auto parameters = parse_parameters(config);
+  if (!parameters) return std::unexpected(std::move(parameters.error()));
+  return std::expected<Perlin, StarException>(std::in_place, *parameters, seed);
 }
 
-template <typename Float>
-Perlin<Float>& Perlin<Float>::operator=(Perlin const& perlin) {
-  if (perlin.m_type == PerlinType::Uninitialized) {
-    m_type = PerlinType::Uninitialized;
-    p.reset();
-    g3.reset();
-    g2.reset();
-    g1.reset();
+template <finite_classifiable Float>
+std::expected<Perlin<Float>, StarException> Perlin<Float>::create(Json const& config) {
+  auto seed = config.get_uint("seed");
+  if (!seed) return std::unexpected(std::move(seed.error()));
+  return create(config, *seed);
+}
 
-  } else if (this != &perlin) {
-    m_type = perlin.m_type;
-    m_seed = perlin.m_seed;
-    m_octaves = perlin.m_octaves;
-    m_frequency = perlin.m_frequency;
-    m_amplitude = perlin.m_amplitude;
-    m_bias = perlin.m_bias;
-    m_alpha = perlin.m_alpha;
-    m_beta = perlin.m_beta;
-    m_offset = perlin.m_offset;
-    m_gain = perlin.m_gain;
+template <finite_classifiable Float>
+Perlin<Float>::Perlin(Perlin const& other)
+  : m_parameters(other.m_parameters), m_seed(other.m_seed),
+    m_tables(other.m_tables ? std::make_unique<Tables>(*other.m_tables) : nullptr) {}
 
-    p.reset(new int[PerlinSampleSize + PerlinSampleSize + 2]);
-    g3.reset(new Float[PerlinSampleSize + PerlinSampleSize + 2][3]);
-    g2.reset(new Float[PerlinSampleSize + PerlinSampleSize + 2][2]);
-    g1.reset(new Float[PerlinSampleSize + PerlinSampleSize + 2]);
+template <finite_classifiable Float>
+Perlin<Float>::Perlin(Perlin&& other) noexcept
+  : m_parameters(std::exchange(other.m_parameters, Parameters{})), m_seed(std::exchange(other.m_seed, 0)),
+    m_tables(std::move(other.m_tables)) {}
 
-    std::memcpy(p.get(), perlin.p.get(), (PerlinSampleSize + PerlinSampleSize + 2) * sizeof(int));
-    std::memcpy(g3.get(), perlin.g3.get(), (PerlinSampleSize + PerlinSampleSize + 2) * sizeof(Float) * 3);
-    std::memcpy(g2.get(), perlin.g2.get(), (PerlinSampleSize + PerlinSampleSize + 2) * sizeof(Float) * 2);
-    std::memcpy(g1.get(), perlin.g1.get(), (PerlinSampleSize + PerlinSampleSize + 2) * sizeof(Float));
+template <finite_classifiable Float>
+Perlin<Float>& Perlin<Float>::operator=(Perlin const& other) {
+  if (this != &other) {
+    if (!other.m_tables)
+      m_tables.reset();
+    else if (m_tables)
+      *m_tables = *other.m_tables;
+    else
+      m_tables = std::make_unique<Tables>(*other.m_tables);
+    m_parameters = other.m_parameters;
+    m_seed = other.m_seed;
   }
-
   return *this;
 }
 
-template <typename Float>
-Perlin<Float>& Perlin<Float>::operator=(Perlin&& perlin) {
-  m_type = perlin.m_type;
-  m_seed = perlin.m_seed;
-  m_octaves = perlin.m_octaves;
-  m_frequency = perlin.m_frequency;
-  m_amplitude = perlin.m_amplitude;
-  m_bias = perlin.m_bias;
-  m_alpha = perlin.m_alpha;
-  m_beta = perlin.m_beta;
-  m_offset = perlin.m_offset;
-  m_gain = perlin.m_gain;
-
-  p = std::move(perlin.p);
-  g3 = std::move(perlin.g3);
-  g2 = std::move(perlin.g2);
-  g1 = std::move(perlin.g1);
-
+template <finite_classifiable Float>
+Perlin<Float>& Perlin<Float>::operator=(Perlin&& other) noexcept {
+  if (this != &other) {
+    m_parameters = std::exchange(other.m_parameters, Parameters{});
+    m_seed = std::exchange(other.m_seed, 0);
+    m_tables = std::move(other.m_tables);
+  }
   return *this;
 }
 
-template <typename Float>
-std::expected<Float, StarException> Perlin<Float>::get(Float x) const {
-  switch (m_type) {
-    case PerlinType::Perlin:
-      return perlin(x);
-    case PerlinType::Billow:
-      return billow(x);
-    case PerlinType::RidgedMulti:
-      return ridgedMulti(x);
-    default:
-      return std::unexpected(PerlinException("::get called on uninitialized Perlin"));
+template <finite_classifiable Float>
+std::expected<Float, StarException> Perlin<Float>::get(Float const& x) const {
+  return sample(std::array{x});
+}
+
+template <finite_classifiable Float>
+std::expected<Float, StarException> Perlin<Float>::get(Float const& x, Float const& y) const {
+  return sample(std::array{x, y});
+}
+
+template <finite_classifiable Float>
+std::expected<Float, StarException> Perlin<Float>::get(Float const& x, Float const& y, Float const& z) const {
+  return sample(std::array{x, y, z});
+}
+
+template <finite_classifiable Float>
+template <std::size_t dimension> requires (dimension >= 1 && dimension <= 3)
+std::expected<Float, StarException> Perlin<Float>::sample(std::array<Float, dimension> const& point) const {
+  switch (m_parameters.type) {
+    case PerlinType::Perlin: return sample_octaves<PerlinType::Perlin>(point);
+    case PerlinType::Billow: return sample_octaves<PerlinType::Billow>(point);
+    case PerlinType::RidgedMulti: return sample_octaves<PerlinType::RidgedMulti>(point);
+    default: return std::unexpected(PerlinException("::get called on uninitialized Perlin"));
   }
 }
 
-template <typename Float>
-std::expected<Float, StarException> Perlin<Float>::get(Float x, Float y) const {
-  switch (m_type) {
-    case PerlinType::Perlin:
-      return perlin(x, y);
-    case PerlinType::Billow:
-      return billow(x, y);
-    case PerlinType::RidgedMulti:
-      return ridgedMulti(x, y);
-    default:
-      return std::unexpected(PerlinException("::get called on uninitialized Perlin"));
-  }
-}
-
-template <typename Float>
-std::expected<Float, StarException> Perlin<Float>::get(Float x, Float y, Float z) const {
-  switch (m_type) {
-    case PerlinType::Perlin:
-      return perlin(x, y, z);
-    case PerlinType::Billow:
-      return billow(x, y, z);
-    case PerlinType::RidgedMulti:
-      return ridgedMulti(x, y, z);
-    default:
-      return std::unexpected(PerlinException("::get called on uninitialized Perlin"));
-  }
-}
-
-template <typename Float>
-PerlinType Perlin<Float>::type() const {
-  return m_type;
-}
-
-template <typename Float>
-unsigned Perlin<Float>::octaves() const {
-  return m_octaves;
-}
-
-template <typename Float>
-Float Perlin<Float>::frequency() const {
-  return m_frequency;
-}
-
-template <typename Float>
-Float Perlin<Float>::amplitude() const {
-  return m_amplitude;
-}
-
-template <typename Float>
-Float Perlin<Float>::bias() const {
-  return m_bias;
-}
-
-template <typename Float>
-Float Perlin<Float>::alpha() const {
-  return m_alpha;
-}
-
-template <typename Float>
-Float Perlin<Float>::beta() const {
-  return m_beta;
-}
-
-template <typename Float>
-std::expected<Json, StarException> Perlin<Float>::toJson() const {
-  auto type = enum_name<PerlinTypeNames>(m_type);
+template <finite_classifiable Float>
+std::expected<Json, StarException> Perlin<Float>::to_json() const {
+  auto type = enum_name<perlin_type_names>(m_parameters.type);
   if (!type) return std::unexpected(std::move(type.error()));
   return JsonObject{
     {"seed", m_seed},
-    {"octaves", m_octaves},
-    {"frequency", m_frequency},
-    {"amplitude", m_amplitude},
-    {"bias", m_bias},
-    {"alpha", m_alpha},
-    {"beta", m_beta},
-    {"offset", m_offset},
-    {"gain", m_gain},
+    {"octaves", m_parameters.octaves},
+    {"frequency", m_parameters.frequency},
+    {"amplitude", m_parameters.amplitude},
+    {"bias", m_parameters.bias},
+    {"alpha", m_parameters.alpha},
+    {"beta", m_parameters.beta},
+    {"offset", m_parameters.offset},
+    {"gain", m_parameters.gain},
     {"type", String(*type)}
   };
 }
 
-template <typename Float>
-inline Float Perlin<Float>::noise1(Float arg) const {
-  int bx0, bx1;
-  Float rx0, rx1, sx, u, v;
-
-  setup(arg, bx0, bx1, rx0, rx1);
-
-  sx = s_curve(rx0);
-  u = rx0 * g1[p[bx0]];
-  v = rx1 * g1[p[bx1]];
-
-  return (lerp(sx, u, v));
+template <finite_classifiable Float>
+Float Perlin<Float>::noise(std::array<LatticeAxis, 1> const& axes) const {
+  auto const& x = axes[0];
+  auto const& t = *m_tables;
+  Float u = x.near_offset * t.g1[t.p[x.lo]];
+  Float v = x.far_offset * t.g1[t.p[x.hi]];
+  return lerp(s_curve(x.near_offset), u, v);
 }
 
-template <typename Float>
-inline Float Perlin<Float>::noise2(std::span<Float const, 2> vec) const {
-  int bx0, bx1, by0, by1, b00, b10, b01, b11;
-  Float rx0, rx1, ry0, ry1, sx, sy, a, b, u, v;
-  int i, j;
-
-  setup(vec[0], bx0, bx1, rx0, rx1);
-  setup(vec[1], by0, by1, ry0, ry1);
-
-  i = p[bx0];
-  j = p[bx1];
-
-  b00 = p[i + by0];
-  b10 = p[j + by0];
-  b01 = p[i + by1];
-  b11 = p[j + by1];
-
-  sx = s_curve(rx0);
-  sy = s_curve(ry0);
-
-  u = at2(g2[b00], rx0, ry0);
-  v = at2(g2[b10], rx1, ry0);
-  a = lerp(sx, u, v);
-
-  u = at2(g2[b01], rx0, ry1);
-  v = at2(g2[b11], rx1, ry1);
-  b = lerp(sx, u, v);
-
-  return lerp(sy, a, b);
-}
-
-template <typename Float>
-inline Float Perlin<Float>::noise3(std::span<Float const, 3> vec) const {
-  int bx0, bx1, by0, by1, bz0, bz1, b00, b10, b01, b11;
-  Float rx0, rx1, ry0, ry1, rz0, rz1, sx, sy, sz, a, b, c, d, u, v;
-  int i, j;
-
-  setup(vec[0], bx0, bx1, rx0, rx1);
-  setup(vec[1], by0, by1, ry0, ry1);
-  setup(vec[2], bz0, bz1, rz0, rz1);
-
-  i = p[bx0];
-  j = p[bx1];
-
-  b00 = p[i + by0];
-  b10 = p[j + by0];
-  b01 = p[i + by1];
-  b11 = p[j + by1];
-
-  sx = s_curve(rx0);
-  sy = s_curve(ry0);
-  sz = s_curve(rz0);
-
-  u = at3(g3[b00 + bz0], rx0, ry0, rz0);
-  v = at3(g3[b10 + bz0], rx1, ry0, rz0);
-  a = lerp(sx, u, v);
-
-  u = at3(g3[b01 + bz0], rx0, ry1, rz0);
-  v = at3(g3[b11 + bz0], rx1, ry1, rz0);
-  b = lerp(sx, u, v);
-
-  c = lerp(sy, a, b);
-
-  u = at3(g3[b00 + bz1], rx0, ry0, rz1);
-  v = at3(g3[b10 + bz1], rx1, ry0, rz1);
-  a = lerp(sx, u, v);
-
-  u = at3(g3[b01 + bz1], rx0, ry1, rz1);
-  v = at3(g3[b11 + bz1], rx1, ry1, rz1);
-  b = lerp(sx, u, v);
-
-  d = lerp(sy, a, b);
-
-  return lerp(sz, c, d);
-}
-
-template <typename Float>
-void Perlin<Float>::normalize2(std::span<Float, 2> v) const {
-  Float s;
-
-  s = std::sqrt(v[0] * v[0] + v[1] * v[1]);
-  if (s == 0.0f) {
-    v[0] = 1.0f;
-    v[1] = 0.0f;
+template <finite_classifiable Float>
+Float Perlin<Float>::noise(std::array<LatticeAxis, 2> const& axes) const {
+  auto const& [x, y] = axes;
+  auto const& t = *m_tables;
+  int i = t.p[x.lo], j = t.p[x.hi];
+  Float sx = s_curve(x.near_offset);
+  auto row = [&](int by, Float ry) {
+    auto const& g = t.g2[t.p[i + by]];
+    auto const& h = t.g2[t.p[j + by]];
+    Float u = x.near_offset * g[0] + ry * g[1];
+    Float v = x.far_offset * h[0] + ry * h[1];
+    return lerp(sx, u, v);
+  };
+  Float lower = row(y.lo, y.near_offset), upper = row(y.hi, y.far_offset);
+  if constexpr (std::same_as<Float, double>) {
+    // Preserve the legacy double kernel's grouping of the final cubic blend.
+    Float delta = upper - lower;
+    {
+#pragma clang fp reassociate(off)
+      Float t = y.near_offset;
+      return lower + (t * (3.0 - 2.0 * t)) * (t * delta);
+    }
   } else {
-    v[0] = v[0] / s;
-    v[1] = v[1] / s;
+    return lerp(s_curve(y.near_offset), lower, upper);
   }
 }
 
-template <typename Float>
-void Perlin<Float>::normalize3(std::span<Float, 3> v) const {
-  Float s;
-
-  s = std::sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
-  if (s == 0.0f) {
-    v[0] = 1.0f;
-    v[1] = 0.0f;
-    v[2] = 0.0f;
-  } else {
-    v[0] = v[0] / s;
-    v[1] = v[1] / s;
-    v[2] = v[2] / s;
-  }
+template <finite_classifiable Float>
+Float Perlin<Float>::noise(std::array<LatticeAxis, 3> const& axes) const {
+  auto const& [x, y, z] = axes;
+  auto const& t = *m_tables;
+  int i = t.p[x.lo], j = t.p[x.hi];
+  int b00 = t.p[i + y.lo], b10 = t.p[j + y.lo];
+  int b01 = t.p[i + y.hi], b11 = t.p[j + y.hi];
+  Float sx = s_curve(x.near_offset), sy = s_curve(y.near_offset);
+  auto plane = [&]<bool far>(int bz, Float rz) {
+    auto row = [&]<bool first>(int left, int right, Float ry) {
+      auto const& g = t.g3[left + bz];
+      auto const& h = t.g3[right + bz];
+      Float u = x.near_offset * g[0] + ry * g[1] + rz * g[2];
+      if constexpr (std::same_as<Float, float> && far && first) {
+        // This corner's legacy float dot difference added y and z separately.
+#pragma clang fp reassociate(off)
+        return u + sx * (((x.far_offset * h[0] - u) + ry * h[1]) + rz * h[2]);
+      } else {
+        Float v = x.far_offset * h[0] + ry * h[1] + rz * h[2];
+        return lerp(sx, u, v);
+      }
+    };
+    return lerp(sy, row.template operator()<true>(b00, b10, y.near_offset),
+        row.template operator()<false>(b01, b11, y.far_offset));
+  };
+  return lerp(s_curve(z.near_offset), plane.template operator()<false>(z.lo, z.near_offset),
+      plane.template operator()<true>(z.hi, z.far_offset));
 }
 
-template <typename Float>
-void Perlin<Float>::init(std::uint64_t seed) {
-  RandomSource randomSource(seed);
-
-  p.reset(new int[PerlinSampleSize + PerlinSampleSize + 2]);
-  g3.reset(new Float[PerlinSampleSize + PerlinSampleSize + 2][3]);
-  g2.reset(new Float[PerlinSampleSize + PerlinSampleSize + 2][2]);
-  g1.reset(new Float[PerlinSampleSize + PerlinSampleSize + 2]);
-
-  int i, j, k;
-
-  for (i = 0; i < PerlinSampleSize; i++) {
-    p[i] = i;
-    g1[i] = (Float)(static_cast<std::int64_t>(randomSource.uniform_uint(PerlinSampleSize * 2)) - PerlinSampleSize) / PerlinSampleSize;
-
-    for (j = 0; j < 2; j++)
-      g2[i][j] = (Float)(static_cast<std::int64_t>(randomSource.uniform_uint(PerlinSampleSize * 2)) - PerlinSampleSize) / PerlinSampleSize;
-    normalize2(g2[i]);
-
-    for (j = 0; j < 3; j++)
-      g3[i][j] = (Float)(static_cast<std::int64_t>(randomSource.uniform_uint(PerlinSampleSize * 2)) - PerlinSampleSize) / PerlinSampleSize;
-    normalize3(g3[i]);
+template <finite_classifiable Float>
+auto Perlin<Float>::make_tables(std::uint64_t seed) -> std::unique_ptr<Tables> {
+  auto tables = std::make_unique_for_overwrite<Tables>();
+  RandomSource random(seed);
+  auto component = [&] {
+    return static_cast<Float>(static_cast<std::int64_t>(random.uniform_uint(2 * sample_size)) - sample_size) / sample_size;
+  };
+  auto normalize = []<std::size_t size>(std::array<Float, size>& gradient) requires (size == 2 || size == 3) {
+    Float squared = gradient[0] * gradient[0] + gradient[1] * gradient[1];
+    if constexpr (size == 3)
+      squared += gradient[2] * gradient[2];
+    Float length = std::sqrt(squared);
+    if (length == 0) {
+      gradient.fill(0);
+      gradient[0] = 1;
+    } else {
+      for (Float& value : gradient)
+        value /= length;
+    }
+  };
+  for (int i = 0; i < sample_size; ++i) {
+    tables->p[i] = i;
+    tables->g1[i] = component();
+    for (Float& value : tables->g2[i])
+      value = component();
+    normalize(tables->g2[i]);
+    for (Float& value : tables->g3[i])
+      value = component();
+    normalize(tables->g3[i]);
   }
-
-  while (--i) {
-    k = p[i];
-    p[i] = p[j = randomSource.uniform_uint(PerlinSampleSize - 1)];
-    p[j] = k;
-  }
-
-  for (i = 0; i < PerlinSampleSize + 2; i++) {
-    p[PerlinSampleSize + i] = p[i];
-    g1[PerlinSampleSize + i] = g1[i];
-    for (j = 0; j < 2; j++)
-      g2[PerlinSampleSize + i][j] = g2[i][j];
-    for (j = 0; j < 3; j++)
-      g3[PerlinSampleSize + i][j] = g3[i][j];
-  }
+  // The full-range draws (not Fisher–Yates) are part of the seed format.
+  for (int i = sample_size - 1; i > 0; --i)
+    std::swap(tables->p[i], tables->p[random.uniform_uint(sample_size - 1)]);
+  std::copy_n(tables->p.begin(), sample_size, tables->p.begin() + sample_size);
+  std::copy_n(tables->g3.begin(), sample_size, tables->g3.begin() + sample_size);
+  return tables;
 }
 
-template <typename Float>
-inline Float Perlin<Float>::perlin(Float x) const {
-  int i;
-  Float val, sum = 0;
-  Float p, scale = 1;
-
-  p = x * m_frequency;
-  for (i = 0; i < m_octaves; i++) {
-    val = noise1(p);
-    sum += val / scale;
-    scale *= m_alpha;
-    p *= m_beta;
+template <finite_classifiable Float>
+template <PerlinType mode, std::size_t dimension> requires (dimension >= 1 && dimension <= 3)
+std::expected<Float, StarException> Perlin<Float>::sample_octaves(std::array<Float, dimension> point) const {
+  Float sum = 0, scale = 1, weight = 1;
+  Float factor = m_parameters.frequency;
+  for (unsigned octave = 0; octave < m_parameters.octaves; ++octave) {
+    std::array<LatticeAxis, dimension> axes;
+    for (std::size_t axis = 0; axis < dimension; ++axis) {
+      {
+        // This product may be nonfinite; never give it fast-math assumptions.
+#pragma float_control(precise, on)
+        point[axis] *= factor;
+      }
+      axes[axis] = lattice_axis(point[axis]);
+      if (axes[axis].lo < 0) [[unlikely]]
+        return std::unexpected(PerlinException("Nonfinite Perlin sampling coordinate"));
+    }
+    Float value = noise(axes);
+    if constexpr (mode == PerlinType::Billow) {
+      value = 2.0 * std::fabs(value) - 1.0;
+    } else if constexpr (mode == PerlinType::RidgedMulti) {
+      value = m_parameters.offset - std::fabs(value);
+      value *= value;
+      value *= weight;
+      weight = std::clamp<Float>(value * m_parameters.gain, 0.0, 1.0);
+    }
+    sum += value / scale;
+    scale *= m_parameters.alpha;
+    factor = m_parameters.beta;
   }
-  return sum * m_amplitude + m_bias;
-}
-
-template <typename Float>
-inline Float Perlin<Float>::perlin(Float x, Float y) const {
-  int i;
-  Float val, sum = 0;
-  Float p[2], scale = 1;
-
-  p[0] = x * m_frequency;
-  p[1] = y * m_frequency;
-  for (i = 0; i < m_octaves; i++) {
-    val = noise2(p);
-    sum += val / scale;
-    scale *= m_alpha;
-    p[0] *= m_beta;
-    p[1] *= m_beta;
-  }
-  return sum * m_amplitude + m_bias;
-}
-
-template <typename Float>
-inline Float Perlin<Float>::perlin(Float x, Float y, Float z) const {
-  int i;
-  Float val, sum = 0;
-  Float p[3], scale = 1;
-
-  p[0] = x * m_frequency;
-  p[1] = y * m_frequency;
-  p[2] = z * m_frequency;
-  for (i = 0; i < m_octaves; i++) {
-    val = noise3(p);
-    sum += val / scale;
-    scale *= m_alpha;
-    p[0] *= m_beta;
-    p[1] *= m_beta;
-    p[2] *= m_beta;
-  }
-
-  return sum * m_amplitude + m_bias;
-}
-
-template <typename Float>
-inline Float Perlin<Float>::ridgedMulti(Float x) const {
-  Float val, sum = 0;
-  Float scale = 1;
-  Float weight = 1.0;
-
-  x *= m_frequency;
-  for (int i = 0; i < m_octaves; ++i) {
-    val = noise1(x);
-
-    val = m_offset - std::fabs(val);
-    val *= val;
-    val *= weight;
-
-    weight = std::clamp<Float>(val * m_gain, 0.0, 1.0);
-
-    sum += val / scale;
-    scale *= m_alpha;
-    x *= m_beta;
-  }
-
-  return ((sum * 1.25) - 1.0) * m_amplitude + m_bias;
-}
-
-template <typename Float>
-inline Float Perlin<Float>::ridgedMulti(Float x, Float y) const {
-  Float val, sum = 0;
-  Float p[2], scale = 1;
-  Float weight = 1.0;
-
-  p[0] = x * m_frequency;
-  p[1] = y * m_frequency;
-  for (int i = 0; i < m_octaves; ++i) {
-    val = noise2(p);
-
-    val = m_offset - std::fabs(val);
-    val *= val;
-    val *= weight;
-
-    weight = std::clamp<Float>(val * m_gain, 0.0, 1.0);
-
-    sum += val / scale;
-    scale *= m_alpha;
-    p[0] *= m_beta;
-    p[1] *= m_beta;
-  }
-
-  return ((sum * 1.25) - 1.0) * m_amplitude + m_bias;
-}
-
-template <typename Float>
-inline Float Perlin<Float>::ridgedMulti(Float x, Float y, Float z) const {
-  Float val, sum = 0;
-  Float p[3], scale = 1;
-  Float weight = 1.0;
-
-  p[0] = x * m_frequency;
-  p[1] = y * m_frequency;
-  p[2] = z * m_frequency;
-  for (int i = 0; i < m_octaves; ++i) {
-    val = noise3(p);
-
-    val = m_offset - std::fabs(val);
-    val *= val;
-    val *= weight;
-
-    weight = std::clamp<Float>(val * m_gain, 0.0, 1.0);
-
-    sum += val / scale;
-    scale *= m_alpha;
-    p[0] *= m_beta;
-    p[1] *= m_beta;
-    p[2] *= m_beta;
-  }
-
-  return ((sum * 1.25) - 1.0) * m_amplitude + m_bias;
-}
-
-template <typename Float>
-inline Float Perlin<Float>::billow(Float x) const {
-  Float val, sum = 0;
-  Float p, scale = 1;
-
-  p = x * m_frequency;
-  for (int i = 0; i < m_octaves; i++) {
-    val = noise1(p);
-    val = 2.0 * std::fabs(val) - 1.0;
-
-    sum += val / scale;
-    scale *= m_alpha;
-    p *= m_beta;
-  }
-  return (sum + 0.5) * m_amplitude + m_bias;
-}
-
-template <typename Float>
-inline Float Perlin<Float>::billow(Float x, Float y) const {
-  Float val, sum = 0;
-  Float p[2], scale = 1;
-
-  p[0] = x * m_frequency;
-  p[1] = y * m_frequency;
-  for (int i = 0; i < m_octaves; i++) {
-    val = noise2(p);
-    val = 2.0 * std::fabs(val) - 1.0;
-
-    sum += val / scale;
-    scale *= m_alpha;
-    p[0] *= m_beta;
-    p[1] *= m_beta;
-  }
-  return (sum + 0.5) * m_amplitude + m_bias;
-}
-
-template <typename Float>
-inline Float Perlin<Float>::billow(Float x, Float y, Float z) const {
-  Float val, sum = 0;
-  Float p[3], scale = 1;
-
-  p[0] = x * m_frequency;
-  p[1] = y * m_frequency;
-  p[2] = z * m_frequency;
-  for (int i = 0; i < m_octaves; i++) {
-    val = noise3(p);
-    val = 2.0 * std::fabs(val) - 1.0;
-
-    sum += val / scale;
-    scale *= m_alpha;
-    p[0] *= m_beta;
-    p[1] *= m_beta;
-    p[2] *= m_beta;
-  }
-
-  return (sum + 0.5) * m_amplitude + m_bias;
+  if constexpr (mode == PerlinType::Billow)
+    return (sum + 0.5) * m_parameters.amplitude + m_parameters.bias;
+  else if constexpr (mode == PerlinType::RidgedMulti)
+    return ((sum * 1.25) - 1.0) * m_parameters.amplitude + m_parameters.bias;
+  else
+    return sum * m_parameters.amplitude + m_parameters.bias;
 }
 
 }
@@ -761,8 +466,7 @@ export namespace Star {
   using ::Star::PerlinExceptionTag;
   using ::Star::PerlinException;
   using ::Star::PerlinType;
-  using ::Star::PerlinTypeNames;
-  using ::Star::PerlinSampleSize;
+  using ::Star::perlin_type_names;
   using ::Star::Perlin;
   using ::Star::PerlinF;
   using ::Star::PerlinD;

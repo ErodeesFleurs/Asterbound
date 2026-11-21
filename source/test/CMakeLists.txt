@@ -60,6 +60,7 @@ set (star_core_tests_SOURCES
       ordered_set_test.cpp
       periodic_test.cpp
       poly_test.cpp
+      perlin_test.cpp
       random_test.cpp
       random_point_test.cpp
       rect_test.cpp

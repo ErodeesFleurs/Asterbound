@@ -379,40 +379,65 @@ std::expected<BiomeItemDistribution, StarException> BiomeItemDistribution::creat
         result.m_randomItems.push_back(std::move(**item));
     }
   } else if (result.m_distribution == DistributionType::Periodic) {
-    auto octaves = settings->get_int("octaves", 1);
+    auto octaves = settings->get_double("octaves", 1);
     if (!octaves) return std::unexpected(std::move(octaves.error()));
-    auto alpha = settings->get_float("alpha", 2.0);
+    auto alpha = settings->get_double("alpha", 2.0);
     if (!alpha) return std::unexpected(std::move(alpha.error()));
-    auto beta = settings->get_float("beta", 2.0);
+    auto beta = settings->get_double("beta", 2.0);
     if (!beta) return std::unexpected(std::move(beta.error()));
-    auto modulusVariance = settings->get_float("modulusVariance", 0.0);
-    if (!modulusVariance) return std::unexpected(std::move(modulusVariance.error()));
-    auto densityPeriod = settings->get_float("densityPeriod", 10);
-    if (!densityPeriod) return std::unexpected(std::move(densityPeriod.error()));
-    auto densityOffset = settings->get_float("densityOffset", 2.0);
-    if (!densityOffset) return std::unexpected(std::move(densityOffset.error()));
-    auto typePeriod = settings->get_float("typePeriod", 10);
-    if (!typePeriod) return std::unexpected(std::move(typePeriod.error()));
+    // The legacy formulas round these inputs to float before multiplying the
+    // variance or taking the reciprocal. Keep that first rounding.
+    auto read_scalar = [&](String const& key, double fallback) -> std::expected<float, StarException> {
+      auto value = settings->get_double(key, fallback);
+      if (!value) return std::unexpected(std::move(value.error()));
+      if (!is_finite(*value) || std::abs(*value) > std::numeric_limits<float>::max())
+        return std::unexpected(BiomeException::format("{} is outside the float range", key));
+      return static_cast<float>(*value);
+    };
+    auto modulus_variance = read_scalar("modulusVariance", 0.0);
+    if (!modulus_variance) return std::unexpected(std::move(modulus_variance.error()));
+    auto density_period = read_scalar("densityPeriod", 10);
+    if (!density_period) return std::unexpected(std::move(density_period.error()));
+    auto density_offset = settings->get_double("densityOffset", 2.0);
+    if (!density_offset) return std::unexpected(std::move(density_offset.error()));
+    auto type_period = read_scalar("typePeriod", 10);
+    if (!type_period) return std::unexpected(std::move(type_period.error()));
     {
       auto value = settings->get_int("modulus", 1);
       if (!value) return std::unexpected(std::move(value.error()));
-      result.m_modulus = std::move(*value);
+      if (!std::in_range<int>(*value) || *value == std::numeric_limits<int>::min() || *value == 0)
+        return std::unexpected(BiomeException("Invalid periodic biome modulus"));
+      result.m_modulus = static_cast<int>(*value);
     }
     {
       auto value = rand.uniform_int(-result.m_modulus, result.m_modulus);
       if (!value) return std::unexpected(std::move(value.error()));
       result.m_modulusOffset = std::move(*value);
     }
-    result.m_densityFunction = PerlinF(static_cast<unsigned>(*octaves), 1.0f / *densityPeriod, 1.0, *densityOffset,
-                                       *alpha, *beta, rand.next_u64());
-    result.m_modulusDistortion = PerlinF(static_cast<unsigned>(*octaves), 1.0f / result.m_modulus, *modulusVariance,
-                                         *modulusVariance * 2, *alpha, *beta, rand.next_u64());
+    if (*density_period == 0)
+      return std::unexpected(BiomeException("Periodic biome densityPeriod must be nonzero"));
+    auto density = PerlinF::create(PerlinType::Perlin, *octaves, 1.0f / *density_period, 1.0, *density_offset,
+                                   *alpha, *beta, rand.next_u64());
+    if (!density) return std::unexpected(std::move(density.error()));
+    result.m_densityFunction = std::move(*density);
+    auto distortion = PerlinF::create(PerlinType::Perlin, *octaves, 1.0f / result.m_modulus, *modulus_variance,
+                                      static_cast<double>(*modulus_variance) * 2, *alpha, *beta, rand.next_u64());
+    if (!distortion) return std::unexpected(std::move(distortion.error()));
+    result.m_modulusDistortion = std::move(*distortion);
+    std::optional<PerlinF::Parameters> weight_parameters;
     for (int i = 0; i < *variants; ++i) {
       auto item = createItem(root, config, rand, biomeHueShift);
       if (!item) return std::unexpected(std::move(item.error()));
       if (*item) {
-        PerlinF weight(static_cast<unsigned>(*octaves), 1.0f / *typePeriod, 1.0, 0.0, *alpha, *beta, rand.next_u64());
-        result.m_weightedItems.push_back({std::move(**item), weight});
+        if (!weight_parameters) {
+          if (*type_period == 0)
+            return std::unexpected(BiomeException("Periodic biome typePeriod must be nonzero"));
+          auto parameters = PerlinF::make_parameters(PerlinType::Perlin, *octaves, 1.0f / *type_period, 1.0, 0.0, *alpha, *beta);
+          if (!parameters) return std::unexpected(std::move(parameters.error()));
+          weight_parameters.emplace(*parameters);
+        }
+        result.m_weightedItems.emplace_back(std::piecewise_construct, std::forward_as_tuple(std::move(**item)),
+                                            std::forward_as_tuple(*weight_parameters, rand.next_u64()));
       }
     }
   }
@@ -470,12 +495,16 @@ std::expected<BiomeItemDistribution, StarException> BiomeItemDistribution::creat
   {
     auto value = store.get_int("modulus");
     if (!value) return std::unexpected(std::move(value.error()));
-    result.m_modulus = std::move(*value);
+    if (!std::in_range<int>(*value) || (result.m_distribution == DistributionType::Periodic && *value == 0))
+      return std::unexpected(BiomeException("Invalid stored biome modulus"));
+    result.m_modulus = static_cast<int>(*value);
   }
   {
     auto value = store.get_int("modulusOffset");
     if (!value) return std::unexpected(std::move(value.error()));
-    result.m_modulusOffset = std::move(*value);
+    if (!std::in_range<int>(*value))
+      return std::unexpected(BiomeException("Stored biome modulusOffset is outside the int range"));
+    result.m_modulusOffset = static_cast<int>(*value);
   }
   auto weightedItems = store.get_array("weightedItems");
   if (!weightedItems) return std::unexpected(std::move(weightedItems.error()));
@@ -488,7 +517,7 @@ std::expected<BiomeItemDistribution, StarException> BiomeItemDistribution::creat
     if (!weightConfig) return std::unexpected(std::move(weightConfig.error()));
     auto weight = PerlinF::create(*weightConfig);
     if (!weight) return std::unexpected(std::move(weight.error()));
-    result.m_weightedItems.push_back({std::move(*item), std::move(*weight)});
+    result.m_weightedItems.emplace_back(std::move(*item), std::move(*weight));
   }
   return result;
 }
@@ -504,15 +533,15 @@ std::expected<Json, StarException> BiomeItemDistribution::toJson() const {
     if (!json) return std::unexpected(std::move(json.error()));
     randomItems.push_back(std::move(*json));
   }
-  auto density = m_densityFunction.toJson();
+  auto density = m_densityFunction.to_json();
   if (!density) return std::unexpected(std::move(density.error()));
-  auto distortion = m_modulusDistortion.toJson();
+  auto distortion = m_modulusDistortion.to_json();
   if (!distortion) return std::unexpected(std::move(distortion.error()));
   JsonArray weightedItems;
   for (auto const& pair : m_weightedItems) {
     auto item = variantFromBiomeItem(pair.first);
     if (!item) return std::unexpected(std::move(item.error()));
-    auto weight = pair.second.toJson();
+    auto weight = pair.second.to_json();
     if (!weight) return std::unexpected(std::move(weight.error()));
     weightedItems.push_back(JsonArray{std::move(*item), std::move(*weight)});
   }

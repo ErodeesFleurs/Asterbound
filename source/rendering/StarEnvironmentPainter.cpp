@@ -96,14 +96,16 @@ float const EnvironmentPainter::RayUnscaledAlphaVariance = 2.0943f;
 float const EnvironmentPainter::RayMinUnscaledAlpha = 1;
 Vec3B const EnvironmentPainter::RayColor = Vec3B(255, 255, 200);
 
-EnvironmentPainter::EnvironmentPainter(Root& root, std::shared_ptr<Renderer> renderer)
-  : m_root(root), m_renderer(std::move(renderer)), m_timer(0),
-    m_rayPerlin(1, RayPerlinFrequency, RayPerlinAmplitude, 0, 2.0f, 2.0f, root.presentationRandom().next_u64()) {}
+EnvironmentPainter::EnvironmentPainter(ConstructionKey, Root& root, std::shared_ptr<Renderer> renderer, PerlinF&& ray_perlin)
+  : m_root(root), m_renderer(std::move(renderer)), m_timer(0), m_rayPerlin(std::move(ray_perlin)) {}
 
 std::expected<std::shared_ptr<EnvironmentPainter>, StarException> EnvironmentPainter::create(Root& root, std::shared_ptr<Renderer> renderer) {
   auto textureGroup = renderer->createTextureGroup(TextureGroupSize::Large);
   if (!textureGroup) return std::unexpected(std::move(textureGroup.error()));
-  auto painter = std::shared_ptr<EnvironmentPainter>(new EnvironmentPainter(root, std::move(renderer)));
+  auto ray_perlin = PerlinF::create(PerlinType::Perlin, 1, RayPerlinFrequency, RayPerlinAmplitude, 0, 2, 2,
+                                   root.presentationRandom().next_u64());
+  if (!ray_perlin) return std::unexpected(std::move(ray_perlin.error()));
+  auto painter = std::make_shared<EnvironmentPainter>(ConstructionKey{}, root, std::move(renderer), std::move(*ray_perlin));
   painter->m_textureGroup = std::make_shared<AssetTextureGroup>(root, std::move(*textureGroup));
   return painter;
 }

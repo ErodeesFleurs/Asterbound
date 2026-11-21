@@ -507,6 +507,21 @@ The 128-entry move round trip includes both move construction and move assignmen
 the right-conflict case also checks the returned left iterator. The Perlin rows
 measure a four-entry enum table and are not a proxy for moving a large map.
 
+### Perlin noise
+
+Run `core_tests --gtest_filter='PerlinTest.*'` in the optimized native build.
+The suite checks empty and moved-from objects, explicit seed overrides, parsed
+parameter reuse, fractional and zero octaves, and invalid narrowing. Runtime
+IEEE bit patterns exercise nonfinite coordinate and parameter checks under
+fast-math. Large finite coordinates must match their 512-cell periodic images;
+coordinates overflowing only after an octave step must return an error.
+
+For the asset-facing path run
+`game_tests --gtest_filter='TerrainDatabaseTest.UnknownNamesAndSeededNamedSelectorsPreserveSampling'`
+with the normal game-test assets. Named-versus-direct agreement alone does not
+prove seed compatibility: compare fixed-seed 1D/2D/3D sample bits for all three
+modes against a pre-change build on the same target with the same FP flags.
+
 ### ID allocation
 
 Use `core_tests --gtest_filter='IdMapTest.*:NetElements.*DynamicGroup*'` for inclusive
