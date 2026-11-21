@@ -308,9 +308,9 @@ std::expected<void, StarException> GuiContext::drawQuad(AssetPath const& texName
     return std::unexpected(std::move(texture.error()));
   target->get().immediatePrimitives().emplace_back(std::in_place_type_t<RenderQuad>(), *texture,
       screenCoords.min(), texCoords.min(),
-      Vec2F(screenCoords.xMax(), screenCoords.yMin()), Vec2F(texCoords.xMax(), texCoords.yMin()),
+      Vec2F(screenCoords.x_max(), screenCoords.y_min()), Vec2F(texCoords.x_max(), texCoords.y_min()),
       screenCoords.max(), texCoords.max(),
-      Vec2F(screenCoords.xMin(), screenCoords.yMax()), Vec2F(texCoords.xMin(), texCoords.yMax()),
+      Vec2F(screenCoords.x_min(), screenCoords.y_max()), Vec2F(texCoords.x_min(), texCoords.y_max()),
       color, 0.0f);
   return {};
 }
@@ -410,10 +410,10 @@ std::expected<void, StarException> GuiContext::drawImageStretchSet(ImageStretchS
   unsigned axis = horizontal ? 0 : 1;
   int offset = beginSize[axis];
   int length = std::max(0, static_cast<int>(screenPos.size()[axis]) - offset - static_cast<int>(endSize[axis]));
-  RectF begin = RectF::withSize(screenPos.min(), horizontal ? Vec2F(offset, screenPos.height()) : Vec2F(screenPos.width(), offset));
-  RectF inner = RectF::withSize(screenPos.min() + (horizontal ? Vec2F(offset, 0) : Vec2F(0, offset)),
+  RectF begin = RectF::with_size(screenPos.min(), horizontal ? Vec2F(offset, screenPos.height()) : Vec2F(screenPos.width(), offset));
+  RectF inner = RectF::with_size(screenPos.min() + (horizontal ? Vec2F(offset, 0) : Vec2F(0, offset)),
       horizontal ? Vec2F(length, screenPos.height()) : Vec2F(screenPos.width(), length));
-  RectF end = RectF::withSize(screenPos.min() + (horizontal ? Vec2F(offset + length, 0) : Vec2F(0, offset + length)),
+  RectF end = RectF::with_size(screenPos.min() + (horizontal ? Vec2F(offset + length, 0) : Vec2F(0, offset + length)),
       horizontal ? Vec2F(endSize[0], screenPos.height()) : Vec2F(screenPos.width(), endSize[1]));
   if (!imageSet.begin.empty()) {
     auto drawn = drawInterfaceQuad(imageSet.begin, RectF(Vec2F(), beginSize), begin, color);
@@ -430,10 +430,10 @@ std::expected<void, StarException> GuiContext::drawImageStretchSet(ImageStretchS
     int position = 0;
     while (position < length) {
       float partLength = std::min(static_cast<float>(length - position), texSize[axis]);
-      RectF partial = horizontal ? RectF::withSize(Vec2F(), Vec2F(partLength, texSize[1]))
-          : RectF::withSize(Vec2F(0, std::max(0.0f, texSize[1] - (length - position))), Vec2F(texSize[0], partLength));
+      RectF partial = horizontal ? RectF::with_size(Vec2F(), Vec2F(partLength, texSize[1]))
+          : RectF::with_size(Vec2F(0, std::max(0.0f, texSize[1] - (length - position))), Vec2F(texSize[0], partLength));
       auto drawn = drawInterfaceQuad(imageSet.inner, partial,
-          RectF::withSize(inner.min() + (horizontal ? Vec2F(position, 0) : Vec2F(0, position)), partial.size()), color);
+          RectF::with_size(inner.min() + (horizontal ? Vec2F(position, 0) : Vec2F(0, position)), partial.size()), color);
       if (!drawn)
         return std::unexpected(std::move(drawn.error()));
       position += partLength;

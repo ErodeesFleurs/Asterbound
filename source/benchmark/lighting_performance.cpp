@@ -141,8 +141,8 @@ std::expected<std::shared_ptr<LightingFixture>, StarException> prepareLighting(R
 std::expected<void, StarException> gatherReference(LightingFixture const& fixture,
                                                    CellularLightingCalculator& calculator) {
   auto region = calculator.calculationRegion();
-  for (int x = region.xMin(); x < region.xMax(); ++x) {
-    for (int y = region.yMin(); y < region.yMax(); ++y) {
+  for (int x = region.x_min(); x < region.x_max(); ++x) {
+    for (int y = region.y_min(); y < region.y_max(); ++y) {
       Vec2I position{x, y};
       if (y < 0 || y >= static_cast<int>(fixture.tiles.size()[1]) || !fixture.tiles.tileLoaded(position))
         continue;
@@ -168,8 +168,8 @@ void addFixtureLights(CellularLightingCalculator& calculator, RectI const& query
   // Fractional positions, beams, hybrid lights and sources just outside the
   // query exercise the production border/obstacle paths as well as interiors.
   for (unsigned i = 0; i < 20; ++i) {
-    Vec2F position{query.xMin() - 2.25f + (i * 37 % (query.width() + 4)),
-                   query.yMin() - 1.5f + (i * 23 % (query.height() + 4))};
+    Vec2F position{query.x_min() - 2.25f + (i * 37 % (query.width() + 4)),
+                   query.y_min() - 1.5f + (i * 23 % (query.height() + 4))};
     Vec3F color{0.21f + (i % 3) * 0.31f, 0.17f + (i % 5) * 0.14f, 0.11f + (i % 7) * 0.11f};
     if (sourceKind == 0 || (sourceKind == 2 && i % 3 == 0))
       calculator.addSpreadLight(position, color);
@@ -207,7 +207,7 @@ void lightingBenchmark(benchmark::State& state, PerformanceBenchmarkSession& ses
     return;
   }
   WorkerPool& workers = caller ? fixture.callerWorkers : rootWorkers->get();
-  RectI query = RectI::withSize(edge ? Vec2I{-12, -6} : Vec2I{73, 51},
+  RectI query = RectI::with_size(edge ? Vec2I{-12, -6} : Vec2I{73, 51},
                                 Vec2I{static_cast<int>(state.range(0)), static_cast<int>(state.range(1))});
   CellularLightingCalculator calculator(monochrome);
   auto configured = calculator.setParameters(fixture.parameters);

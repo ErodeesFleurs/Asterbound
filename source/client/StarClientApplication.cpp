@@ -1067,7 +1067,7 @@ std::expected<void, StarException> ClientApplication::render() {
       m_preparedCamera = PresentedCamera{camera, worldClient, m_player, playerEpoch, renderEpoch};
       
       auto size = Vec2F(renderer->screenSize());
-      auto quad = renderFlatRect(RectF::withSize(size / -2, size), Vec4B::filled(0), 0.0f);
+      auto quad = renderFlatRect(RectF::with_size(size / -2, size), Vec4B::filled(0), 0.0f);
       for (auto& layer : m_postProcessLayers) {
         if (!layer.group || layer.group->get().enabled) {
           for (unsigned i = 0; i < layer.passes; i++) {

@@ -173,7 +173,7 @@ public:
   explicit PresentationLifecycleEntity(Root& root) : Entity(root) {}
   EntityType entityType() const override { return EntityType::Stagehand; }
   Vec2F position() const override { return {1024, 1024}; }
-  RectF metaBoundBox() const override { return RectF::withSize({}, {1, 1}); }
+  RectF metaBoundBox() const override { return RectF::with_size({}, {1, 1}); }
   ClientEntityMode clientEntityMode() const override { return ClientEntityMode::ClientMasterAllowed; }
   std::expected<void, StarException> init(World& world, EntityId id, EntityMode) override {
     // Insert as a local slave so this behavioral fixture is not serialized to

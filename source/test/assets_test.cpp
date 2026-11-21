@@ -283,7 +283,7 @@ const GameTestRegistration objectCursorPreviewRandomIsolation(
     auto closeWorld = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
     (*world)->setSpawningEnabled(false);
     Vec2I const position(1024, 1024);
-    ASSERT_TRUE((*world)->generateRegion(RectI::withSize(position - Vec2I(64, 64), Vec2I(128, 128))));
+    ASSERT_TRUE((*world)->generateRegion(RectI::with_size(position - Vec2I(64, 64), Vec2I(128, 128))));
 
     // There is no UniverseServer or world thread. Finish world/database setup
     // before seeding, and use a fresh database so the first preview really

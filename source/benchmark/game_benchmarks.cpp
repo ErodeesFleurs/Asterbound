@@ -93,7 +93,7 @@ std::expected<Fixture, StarException> prepare_fixture(Root& root, std::shared_pt
                                                       unsigned steps, unsigned budget) {
   world->setSpawningEnabled(false);
   world->setTileProtectionEnabled(false);
-  auto generated = world->generateRegion(RectI::withSize(Vec2I(1016, 1016), Vec2I(56, 24)));
+  auto generated = world->generateRegion(RectI::with_size(Vec2I(1016, 1016), Vec2I(56, 24)));
   if (!generated)
     return std::unexpected(std::move(generated.error()));
   for (auto dungeon : {NoDungeonId, ConstructionDungeonId}) {

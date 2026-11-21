@@ -135,8 +135,8 @@ void gatherTileOracle(CellularLightingCalculator& calculator, ClientTileSectorAr
                       MaterialDatabase const& materials, LiquidsDatabase const& liquids, Vec3F const& environment,
                       float underground) {
   auto region = calculator.calculationRegion();
-  for (int x = region.xMin(); x < region.xMax(); ++x) {
-    for (int y = region.yMin(); y < region.yMax(); ++y) {
+  for (int x = region.x_min(); x < region.x_max(); ++x) {
+    for (int y = region.y_min(); y < region.y_max(); ++y) {
       Vec2I position{x, y};
       if (y < 0 || y >= static_cast<int>(tiles.size()[1]) || !tiles.tileLoaded(position))
         continue;
@@ -380,8 +380,8 @@ const GameTestRegistration
         auto populate = [&](CellularLightingCalculator& calculator) {
           calculator.begin(query);
           auto region = calculator.calculationRegion();
-          for (int x = region.xMin(); x < region.xMax(); ++x)
-            for (int y = region.yMin(); y < region.yMax(); ++y) {
+          for (int x = region.x_min(); x < region.x_max(); ++x)
+            for (int y = region.y_min(); y < region.y_max(); ++y) {
               float value = ((x * 7 + y * 11 + iteration) % 17) * 0.125f;
               calculator.setCellIndex(calculator.baseIndexFor({x, y}),
                   Vec3F(value, value * 0.6f, value * 0.2f), (x + y) % 3 == 0);
@@ -528,8 +528,8 @@ const GameTestRegistration
       ASSERT_TRUE(calculator.setMonochrome(monochrome));
       calculator.begin(query);
       auto region = calculator.calculationRegion();
-      for (int x = region.xMin(); x < region.xMax(); ++x) {
-        for (int y = region.yMin(); y < region.yMax(); ++y)
+      for (int x = region.x_min(); x < region.x_max(); ++x) {
+        for (int y = region.y_min(); y < region.y_max(); ++y)
           calculator.setCellIndex(calculator.baseIndexFor({x, y}), {0.3f, 0.5f, 0.7f}, (x + y) % 3 == 0);
       }
       addBoundaryLights(calculator, query);

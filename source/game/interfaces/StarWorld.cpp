@@ -177,7 +177,7 @@ std::expected<std::shared_ptr<Entity>, StarException> World::closestEntityInSigh
 
 std::expected<bool, StarException> World::pointCollision(Vec2F const& point, CollisionSet const& collisionSet) const {
   bool collided = false;
-  auto scanned = forEachCollisionBlock(RectI::withCenter(Vec2I(point), {3, 3}), [&](CollisionBlock const& block) -> std::expected<void, StarException> {
+  auto scanned = forEachCollisionBlock(RectI::with_center(Vec2I(point), {3, 3}), [&](CollisionBlock const& block) -> std::expected<void, StarException> {
     if (collided || !isColliding(block.kind, collisionSet))
       return {};
     if (block.poly.contains(point))
@@ -194,7 +194,7 @@ std::expected<std::optional<std::pair<Vec2F, std::optional<Vec2F>>>, StarExcepti
   std::optional<PolyF> intersectPoly;
   std::optional<PolyF::LineIntersectResult> closestIntersection;
 
-  auto scanned = forEachCollisionBlock(RectI::integral(RectF::boundBoxOf(line.min(), line.max()).padded(1)), [&](CollisionBlock const& block) -> std::expected<void, StarException> {
+  auto scanned = forEachCollisionBlock(RectI::integral(RectF::bound_box_of(line.min(), line.max()).padded(1)), [&](CollisionBlock const& block) -> std::expected<void, StarException> {
       if (block.poly.empty() || !isColliding(block.kind, collisionSet))
         return {};
 

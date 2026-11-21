@@ -61,7 +61,7 @@ std::function<Vec2F(float, Vec2F, Vec2F)> WorldGeometry::lerpFunction(std::optio
 }
 
 std::expected<StaticList<RectF, 2>, StarException> WorldGeometry::splitRect(RectF const& bbox) const {
-  if (bbox.isNull() || m_size[0] == 0)
+  if (bbox.is_null() || m_size[0] == 0)
     return StaticList<RectF, 2>::create({bbox});
 
   Vec2F minWrap = xwrap(bbox.min());
@@ -69,14 +69,14 @@ std::expected<StaticList<RectF, 2>, StarException> WorldGeometry::splitRect(Rect
 
   // This does not work for ranges greater than m_size[0] wide!
   if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((bbox.xMax() - bbox.xMin() <= static_cast<float>(m_size[0])));
+    Star::star_assert_failed((bbox.x_max() - bbox.x_min() <= static_cast<float>(m_size[0])));
   }
 
   // Since min is wrapped, we're only checking to see if max is on the other
   // side of the wrap point
-  if (bboxWrap.xMax() > m_size[0]) {
-    return StaticList<RectF, 2>::create({RectF(bboxWrap.xMin(), bboxWrap.yMin(), m_size[0], bboxWrap.yMax()),
-        RectF(0, bboxWrap.yMin(), bboxWrap.xMax() - m_size[0], bboxWrap.yMax())});
+  if (bboxWrap.x_max() > m_size[0]) {
+    return StaticList<RectF, 2>::create({RectF(bboxWrap.x_min(), bboxWrap.y_min(), m_size[0], bboxWrap.y_max()),
+        RectF(0, bboxWrap.y_min(), bboxWrap.x_max() - m_size[0], bboxWrap.y_max())});
   } else {
     return StaticList<RectF, 2>::create({bboxWrap});
   }
@@ -88,7 +88,7 @@ std::expected<StaticList<RectF, 2>, StarException> WorldGeometry::splitRect(Rect
 }
 
 std::expected<StaticList<RectI, 2>, StarException> WorldGeometry::splitRect(RectI const bbox) const {
-  if (bbox.isNull() || m_size[0] == 0)
+  if (bbox.is_null() || m_size[0] == 0)
     return StaticList<RectI, 2>::create({bbox});
 
   Vec2I minWrap = xwrap(bbox.min());
@@ -96,14 +96,14 @@ std::expected<StaticList<RectI, 2>, StarException> WorldGeometry::splitRect(Rect
 
   // This does not work for ranges greater than m_size[0] wide!
   if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((bbox.xMax() - bbox.xMin() <= static_cast<int>(m_size[0])));
+    Star::star_assert_failed((bbox.x_max() - bbox.x_min() <= static_cast<int>(m_size[0])));
   }
 
   // Since min is wrapped, we're only checking to see if max is on the other
   // side of the wrap point
-  if (bboxWrap.xMax() > static_cast<int>(m_size[0])) {
-    return StaticList<RectI, 2>::create({RectI(bboxWrap.xMin(), bboxWrap.yMin(), m_size[0], bboxWrap.yMax()),
-        RectI(0, bboxWrap.yMin(), bboxWrap.xMax() - m_size[0], bboxWrap.yMax())});
+  if (bboxWrap.x_max() > static_cast<int>(m_size[0])) {
+    return StaticList<RectI, 2>::create({RectI(bboxWrap.x_min(), bboxWrap.y_min(), m_size[0], bboxWrap.y_max()),
+        RectI(0, bboxWrap.y_min(), bboxWrap.x_max() - m_size[0], bboxWrap.y_max())});
   } else {
     return StaticList<RectI, 2>::create({bboxWrap});
   }
@@ -277,7 +277,7 @@ std::expected<bool, StarException> WorldGeometry::rectIntersectsRect(RectF const
 }
 
 RectF WorldGeometry::rectOverlap(RectF const& rect1, RectF const& rect2) const {
-  return rect1.overlap(RectF::withSize(nearestTo(rect1.min(), rect2.min()), rect2.size()));
+  return rect1.overlap(RectF::with_size(nearestTo(rect1.min(), rect2.min()), rect2.size()));
 }
 
 std::expected<bool, StarException> WorldGeometry::polyContains(PolyF const& poly, Vec2F const& pos) const {
@@ -396,16 +396,16 @@ Vec2F WorldGeometry::nearestCoordInBox(RectF const& box, Vec2F const& pos) const
   RectF t(box);
   auto offset = t.center();
   auto r = diff(pos, offset);
-  t.setCenter({});
-  return t.nearestCoordTo(r) + offset;
+  t.set_center({});
+  return t.nearest_coord_to(r) + offset;
 }
 
 Vec2F WorldGeometry::diffToNearestCoordInBox(RectF const& box, Vec2F const& pos) const {
   RectF t(box);
   auto offset = t.center();
   auto r = diff(pos, offset);
-  t.setCenter({});
-  auto coord = t.nearestCoordTo(r) + offset;
+  t.set_center({});
+  auto coord = t.nearest_coord_to(r) + offset;
   return diff(pos, coord);
 }
 

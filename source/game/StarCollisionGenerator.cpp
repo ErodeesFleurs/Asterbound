@@ -14,7 +14,7 @@ namespace Star {
 void CollisionGenerator::init(CollisionKindAccessor accessor) { m_accessor = std::move(accessor); }
 
 std::expected<List<CollisionBlock>, StarException> CollisionGenerator::getBlocks(RectI const& region) const {
-  if (region.isNull())
+  if (region.is_null())
     return List<CollisionBlock>{};
 
   List<CollisionBlock> list;
@@ -28,10 +28,10 @@ std::expected<List<CollisionBlock>, StarException> CollisionGenerator::getBlocks
 }
 
 void CollisionGenerator::getBlocksPlatforms(List<CollisionBlock>& list, RectI const& region, CollisionKind kind) const {
-  int xMin = region.xMin();
-  int xMax = region.xMax();
-  int yMin = region.yMin();
-  int yMax = region.yMax();
+  int xMin = region.x_min();
+  int xMax = region.x_max();
+  int yMin = region.y_min();
+  int yMax = region.y_max();
 
   for (int x = xMin; x < xMax; ++x) {
     for (int y = yMin; y < yMax; ++y) {
@@ -161,10 +161,10 @@ void CollisionGenerator::getBlocksMarchingSquares(List<CollisionBlock>& list, Re
     list.push_back(std::move(block));
   };
 
-  int xMin = region.xMin();
-  int xMax = region.xMax();
-  int yMin = region.yMin();
-  int yMax = region.yMax();
+  int xMin = region.x_min();
+  int xMax = region.x_max();
+  int yMin = region.y_min();
+  int yMax = region.y_max();
 
   for (int x = xMin; x < xMax; ++x) {
     for (int y = yMin; y < yMax; ++y) {
@@ -221,10 +221,10 @@ void CollisionGenerator::getBlocksMarchingSquares(List<CollisionBlock>& list, Re
 }
 
 std::expected<void, StarException> CollisionGenerator::populateCollisionBuffer(RectI const& region) const {
-  int xmin = region.xMin() - BlockInfluenceRadius;
-  int ymin = region.yMin() - BlockInfluenceRadius;
-  int xmax = region.xMax() + BlockInfluenceRadius;
-  int ymax = region.yMax() + BlockInfluenceRadius;
+  int xmin = region.x_min() - BlockInfluenceRadius;
+  int ymin = region.y_min() - BlockInfluenceRadius;
+  int xmax = region.x_max() + BlockInfluenceRadius;
+  int ymax = region.y_max() + BlockInfluenceRadius;
 
   if (!m_accessor) return std::unexpected(StarException("CollisionGenerator not initialized"));
   auto resized = m_collisionBuffer.set_size(xmax - xmin, ymax - ymin);

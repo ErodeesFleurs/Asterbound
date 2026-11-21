@@ -934,10 +934,10 @@ std::expected<String, StarException> ClientCommandProcessor::render(String const
 
     for (auto&& frame : frames) {
       RectU& box = frame.second.first;
-      box.setXMin((box.xMin() / frameSize[0]) * imageSize[0]);
-      box.setYMin(((sheet->height() - box.yMin() - box.height()) / frameSize[1]) * imageSize[1]);
-      box.setXMax(box.xMin() + imageSize[0]);
-      box.setYMax(box.yMin() + imageSize[1]);
+      box.set_x_min((box.x_min() / frameSize[0]) * imageSize[0]);
+      box.set_y_min(((sheet->height() - box.y_min() - box.height()) / frameSize[1]) * imageSize[1]);
+      box.set_x_max(box.x_min() + imageSize[0]);
+      box.set_y_max(box.y_min() + imageSize[1]);
     }
 
     if (frameSize != imageSize) {

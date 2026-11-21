@@ -150,12 +150,12 @@ std::expected<void, StarException> FallingBlocksAgent::update() {
 }
 
 void FallingBlocksAgent::visitLocation(Vec2I const& location) {
-  visitRegion(RectI::withSize(location, Vec2I(1, 1)));
+  visitRegion(RectI::with_size(location, Vec2I(1, 1)));
 }
 
 void FallingBlocksAgent::visitRegion(RectI const& region) {
-  for (int x = region.xMin() - 1; x <= region.xMax(); ++x) {
-    for (int y = region.yMin(); y <= region.yMax(); ++y) 
+  for (int x = region.x_min() - 1; x <= region.x_max(); ++x) {
+    for (int y = region.y_min(); y <= region.y_max(); ++y) 
       m_pending.add({x, y});
   }
 }

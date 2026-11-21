@@ -1442,7 +1442,7 @@ const GameTestRegistration simultaneousRoots("RootTest", "SimultaneousRoots", []
 
 [[nodiscard]] std::expected<void, StarException> placeIsolationMaterial(
     WorldServer& world, Vec2I const& position, MaterialId material, bool collides) {
-  auto generated = world.generateRegion(RectI::withSize(position - Vec2I(4, 4), Vec2I(9, 9)));
+  auto generated = world.generateRegion(RectI::with_size(position - Vec2I(4, 4), Vec2I(9, 9)));
   if (!generated) return std::unexpected(std::move(generated.error()));
   world.setTileProtectionEnabled(false);
   auto tile = world.modifyServerTile(position, true);

@@ -235,7 +235,7 @@ static std::expected<void, StarException> run(std::span<char const* const> argv)
       auto y = rand.uniform_int(0, worldSize[1]);
       if (!y)
         return std::unexpected(std::move(y.error()));
-      RectI region = RectI::withCenter(Vec2I(*x, *y), Vec2I::filled(*region_size));
+      RectI region = RectI::with_center(Vec2I(*x, *y), Vec2I::filled(*region_size));
       auto generated = worldServer.generateRegion(region);
       if (!generated)
         return std::unexpected(std::move(generated.error()));

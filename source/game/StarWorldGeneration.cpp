@@ -617,7 +617,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::setBackgroundMaterial(
 std::expected<void, StarException> DungeonGeneratorWorld::placeObject(Vec2I const& pos, String const& objectName, Star::Direction direction, Json const& parameters) {
   auto& generationRoot = m_worldServer.root();
   {
-    auto operationResult1 = m_worldServer.signalRegion(RectI::withSize(pos, {1, 1}));
+    auto operationResult1 = m_worldServer.signalRegion(RectI::with_size(pos, {1, 1}));
     if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
   }
   auto autoobjectDatabaseResult1 = generationRoot.objectDatabase();
@@ -643,7 +643,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::placeObject(Vec2I cons
 std::expected<void, StarException> DungeonGeneratorWorld::placeVehicle(Vec2F const& pos, String const& vehicleName, Json const& parameters) {
   auto& generationRoot = m_worldServer.root();
   {
-    auto operationResult1 = m_worldServer.signalRegion(RectI::withSize(Vec2I(pos), {1, 1}));
+    auto operationResult1 = m_worldServer.signalRegion(RectI::with_size(Vec2I(pos), {1, 1}));
     if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
   }
   auto autovehicleDatabaseResult1 = generationRoot.vehicleDatabase();
@@ -683,7 +683,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::placeBiomeTree(Vec2I c
   if (!biomeCheckedResult1) return std::unexpected(std::move(biomeCheckedResult1.error()));
   if (auto biome = std::move((*biomeCheckedResult1))) {
     {
-      auto operationResult1 = m_worldServer.signalRegion(RectI::withSize(pos, {1, 1}));
+      auto operationResult1 = m_worldServer.signalRegion(RectI::with_size(pos, {1, 1}));
       if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
     }
     auto seed = worldTemplate->seedFor(pos[0], pos[1]);
@@ -838,7 +838,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::placeBiomeItems(Vec2I 
   auto& generationRoot = m_worldServer.root();
   auto const& worldTemplate = m_worldServer.worldTemplate();
   {
-    auto operationResult1 = m_worldServer.signalRegion(RectI::withSize(pos, {1, 1}));
+    auto operationResult1 = m_worldServer.signalRegion(RectI::with_size(pos, {1, 1}));
     if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
   }
   std::sort(potentialItems.begin(), potentialItems.end(), std::less<BiomeItemPlacement>());
@@ -1301,8 +1301,8 @@ std::expected<bool, StarException> SpawnerWorld::spawningProhibited(RectF const&
   RectI region = RectI::integral(area);
 
   // Don't spawn the entity if its region overlaps with a dungeon
-  for (int x = region.xMin(); x < region.xMax(); ++x) {
-    for (int y = region.yMin(); y < region.yMax(); ++y) {
+  for (int x = region.x_min(); x < region.x_max(); ++x) {
+    for (int y = region.y_min(); y < region.y_max(); ++y) {
       auto autoconsttileResult1 = m_worldServer.getServerTile({x, y});
       if (!autoconsttileResult1) return std::unexpected(std::move(autoconsttileResult1.error()));
       auto const& tile = std::move(autoconsttileResult1->get());
@@ -1557,8 +1557,8 @@ std::expected<void, StarException> WorldGenerator::prepareTiles(WorldStorage& wo
   // Generate sector.
   auto tileArray = worldStorage.tileArray();
   RectI sectorRegion = tileArray->sectorRegion(sector);
-  for (int x = sectorRegion.xMin(); x < sectorRegion.xMax(); ++x) {
-    for (int y = sectorRegion.yMin(); y < sectorRegion.yMax(); ++y) {
+  for (int x = sectorRegion.x_min(); x < sectorRegion.x_max(); ++x) {
+    for (int y = sectorRegion.y_min(); y < sectorRegion.y_max(); ++y) {
       Vec2I pos(x, y);
       auto tile = tileArray->modifyTile(pos);
       if constexpr (Star::DebugEnabled) {
@@ -1646,8 +1646,8 @@ std::expected<void, StarException> WorldGenerator::generateMicroDungeons(WorldSt
     std::size_t queueOrder;
   };
   List<PlacementEntry> placementQueue;
-  for (int x = sectorTiles.xMin(); x < sectorTiles.xMax(); ++x) {
-    for (int y = sectorTiles.yMin(); y < sectorTiles.yMax(); ++y) {
+  for (int x = sectorTiles.x_min(); x < sectorTiles.x_max(); ++x) {
+    for (int y = sectorTiles.y_min(); y < sectorTiles.y_max(); ++y) {
       auto autopotentialResult1 = worldTemplate->potentialBiomeItemsAt(x, y);
       if (!autopotentialResult1) return std::unexpected(std::move(autopotentialResult1.error()));
       auto potential = std::move((*autopotentialResult1));
@@ -1772,13 +1772,13 @@ std::expected<void, StarException> WorldGenerator::generateCaveLiquid(WorldStora
 
   Set<Vec2I> badNodes;
 
-  for (int i = bounds.xMin(); i <= bounds.xMax(); i++) {
-    badNodes.add({i, bounds.yMin()});
-    badNodes.add({i, bounds.yMax()});
+  for (int i = bounds.x_min(); i <= bounds.x_max(); i++) {
+    badNodes.add({i, bounds.y_min()});
+    badNodes.add({i, bounds.y_max()});
   }
-  for (int i = bounds.yMin(); i <= bounds.yMax(); i++) {
-    badNodes.add({bounds.xMin(), i});
-    badNodes.add({bounds.xMax(), i});
+  for (int i = bounds.y_min(); i <= bounds.y_max(); i++) {
+    badNodes.add({bounds.x_min(), i});
+    badNodes.add({bounds.x_max(), i});
   }
 
   Set<Vec2I> candidateNodes;
@@ -1908,8 +1908,8 @@ std::expected<void, StarException> WorldGenerator::prepareSector(WorldStorage& w
   auto tileArray = worldStorage.tileArray();
   RectI sectorTiles = tileArray->sectorRegion(sector);
 
-  for (int x = sectorTiles.xMin(); x < sectorTiles.xMax(); ++x) {
-    for (int y = sectorTiles.yMin(); y < sectorTiles.yMax(); ++y) {
+  for (int x = sectorTiles.x_min(); x < sectorTiles.x_max(); ++x) {
+    for (int y = sectorTiles.y_min(); y < sectorTiles.y_max(); ++y) {
       Vec2I position(x, y);
       auto tile = tileArray->modifyTile(position);
       if constexpr (Star::DebugEnabled) {
@@ -1957,8 +1957,8 @@ std::expected<void, StarException> WorldGenerator::prepareSector(WorldStorage& w
   }
 
   List<BiomeItemPlacement> placementQueue;
-  for (int x = sectorTiles.xMin(); x < sectorTiles.xMax(); ++x) {
-    for (int y = sectorTiles.yMin(); y < sectorTiles.yMax(); ++y) {
+  for (int x = sectorTiles.x_min(); x < sectorTiles.x_max(); ++x) {
+    for (int y = sectorTiles.y_min(); y < sectorTiles.y_max(); ++y) {
       auto tile = tileArray->tile(Vec2I(x, y));
       if (tile.dungeonId == NoDungeonId) {
         auto autopotentialResult1 = worldTemplate->potentialBiomeItemsAt(x, y);
@@ -2041,8 +2041,8 @@ std::expected<void, StarException> WorldGenerator::prepareSector(WorldStorage& w
     }
   }
 
-  for (int x = sectorTiles.xMin(); x < sectorTiles.xMax(); ++x) {
-    for (int y = sectorTiles.yMin(); y < sectorTiles.yMax(); ++y) {
+  for (int x = sectorTiles.x_min(); x < sectorTiles.x_max(); ++x) {
+    for (int y = sectorTiles.y_min(); y < sectorTiles.y_max(); ++y) {
       if (auto tile = worldStorage.tileArray()->modifyTile({x, y}))
         tile->get().collisionCacheDirty = true;
     }
@@ -2059,8 +2059,8 @@ std::expected<void, StarException> WorldGenerator::prepareSectorBiomeBlocks(Worl
   auto materialDatabase = std::move((*automaterialDatabaseResult1));
   RectI sectorTiles = tileArray->sectorRegion(sector);
 
-  for (int x = sectorTiles.xMin(); x < sectorTiles.xMax(); ++x) {
-    for (int y = sectorTiles.yMin(); y < sectorTiles.yMax(); ++y) {
+  for (int x = sectorTiles.x_min(); x < sectorTiles.x_max(); ++x) {
+    for (int y = sectorTiles.y_min(); y < sectorTiles.y_max(); ++y) {
       Vec2I position(x, y);
       auto tile = tileArray->modifyTile(position);
       {
@@ -2166,8 +2166,8 @@ std::expected<void, StarException> WorldGenerator::reapplyBiome(WorldStorage& wo
 
   List<Vec2I> biomeItemTiles;
 
-  for (int x = sectorTiles.xMin(); x < sectorTiles.xMax(); ++x) {
-    for (int y = sectorTiles.yMin(); y < sectorTiles.yMax(); ++y) {
+  for (int x = sectorTiles.x_min(); x < sectorTiles.x_max(); ++x) {
+    for (int y = sectorTiles.y_min(); y < sectorTiles.y_max(); ++y) {
       Vec2I position(x, y);
       auto ServerTiletileResult1 = m_worldServer.modifyServerTile(position);
       if (!ServerTiletileResult1) return std::unexpected(std::move(ServerTiletileResult1.error()));

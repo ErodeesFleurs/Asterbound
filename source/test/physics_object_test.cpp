@@ -169,7 +169,7 @@ const GameTestRegistration
         auto added = entities.addEntity(object);
         ASSERT_TRUE(added) << added.error().what();
         auto expectQuery = [&](Vec2F localPoint, bool present) {
-          auto found = entities.entityQuery(RectF::withSize(position + localPoint, Vec2F(0.25f, 0.25f)));
+          auto found = entities.entityQuery(RectF::with_size(position + localPoint, Vec2F(0.25f, 0.25f)));
           ASSERT_TRUE(found) << found.error().what();
           EXPECT_EQ(found->size(), present ? 1u : 0u);
           if (present && !found->empty())

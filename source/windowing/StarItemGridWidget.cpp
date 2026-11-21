@@ -370,7 +370,7 @@ std::expected<void, StarException> ItemGridWidget::showDurability(bool show) {
 }
 
 RectI ItemGridWidget::getScissorRect() const {
-  return RectI::withSize(screenPosition() - m_scissorExtra, size() + m_scissorExtra);
+  return RectI::with_size(screenPosition() - m_scissorExtra, size() + m_scissorExtra);
 }
 
 std::expected<void, StarException> ItemGridWidget::renderImpl() {

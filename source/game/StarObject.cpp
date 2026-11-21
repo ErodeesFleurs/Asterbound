@@ -1971,7 +1971,7 @@ std::expected<LuaCallbacks, StarException> Object::makeObjectCallbacks() {
     return std::unexpected(std::move(currentWorldResult.error()));
   auto& currentWorld = currentWorldResult->get();
   if (auto entity = currentWorld.entity(entityId))
-    return !entity->collisionArea().overlap(volume().bounding_box()).isEmpty();
+    return !entity->collisionArea().overlap(volume().bounding_box()).is_empty();
   return false;
 });
   if (!operation25)
@@ -2243,7 +2243,7 @@ std::expected<List<DamageNotification>, StarException> Object::applyDamage(Damag
 RectF Object::interactiveBoundBox() const {
   if (auto orientation = currentOrientation()) {
     auto rect = RectF(orientation->boundBox);
-    rect.setMax(Vec2F(orientation->boundBox.xMax() + 1, orientation->boundBox.yMax() + 1));
+    rect.set_max(Vec2F(orientation->boundBox.x_max() + 1, orientation->boundBox.y_max() + 1));
     return rect;
   } else {
     return RectF::null();

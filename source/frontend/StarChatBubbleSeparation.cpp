@@ -11,19 +11,19 @@ import star.algorithm;
 namespace Star {
 
 bool compareLeft(RectF const& a, RectF const& b) {
-  return a.xMin() < b.xMin();
+  return a.x_min() < b.x_min();
 }
 
 bool compareRight(RectF const& a, RectF const& b) {
-  return a.xMax() > b.xMax();
+  return a.x_max() > b.x_max();
 }
 
 bool compareOverlapLeft(RectF const& newBox, RectF const& fixedBox) {
-  return newBox.xMax() < fixedBox.xMin();
+  return newBox.x_max() < fixedBox.x_min();
 }
 
 bool compareOverlapRight(RectF const& newBox, RectF const& fixedBox) {
-  return newBox.xMin() > fixedBox.xMax();
+  return newBox.x_min() > fixedBox.x_max();
 }
 
 template <typename Compare>
@@ -84,8 +84,8 @@ RectF separateBubble(List<RectF> const& sortedLeftEdges, List<RectF> const& sort
     //SpatialLogger::log_poly("screen", PolyF(box), { 255, 0, 0, 255 });
     //SpatialLogger::log_poly("screen", PolyF(overlapBoundBox), { 0, 0, 255, 255 });
     auto height = box.height();
-    box.setYMin(overlapBoundBox.yMax());
-    box.setYMax(box.yMin() + height);
+    box.set_y_min(overlapBoundBox.y_max());
+    box.set_y_max(box.y_min() + height);
   }
 
   outLeftEdges.push_back(box);

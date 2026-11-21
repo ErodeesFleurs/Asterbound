@@ -197,10 +197,10 @@ std::expected<std::optional<bool>, StarException> PathFinder::explore(std::optio
     bool slope_down = false;
     bool slope_up = false;
     Vec2F forward_ground_pos =
-      direction > 0 ? Vec2F(bounds.xMax(), bounds.yMin()) : Vec2F(bounds.xMin(), bounds.yMin());
-    Vec2F back_ground_pos = direction < 0 ? Vec2F(bounds.xMax(), bounds.yMin()) : Vec2F(bounds.xMin(), bounds.yMin());
+      direction > 0 ? Vec2F(bounds.x_max(), bounds.y_min()) : Vec2F(bounds.x_min(), bounds.y_min());
+    Vec2F back_ground_pos = direction < 0 ? Vec2F(bounds.x_max(), bounds.y_min()) : Vec2F(bounds.x_min(), bounds.y_min());
     RectI tile_bounds = RectI::integral(bounds);
-    RectI ground_rect(Vec2I(tile_bounds.xMin(), tile_bounds.yMin() - 1), Vec2I(tile_bounds.xMax(), tile_bounds.yMin()));
+    RectI ground_rect(Vec2I(tile_bounds.x_min(), tile_bounds.y_min() - 1), Vec2I(tile_bounds.x_max(), tile_bounds.y_min()));
     auto collision_scan = m_world.get().forEachCollisionBlock(
       ground_rect.padded(1),
       [&, &world = m_world.get()](CollisionBlock const& block) -> std::expected<void, StarException> {
@@ -275,7 +275,7 @@ std::expected<std::optional<bool>, StarException> PathFinder::explore(std::optio
       if (!m_movement_params.standingPoly)
         return std::unexpected(MovementControllerException("PathFinder requires standingPoly for walking"));
       bounds = standing_bounds();
-      float back = direction > 0 ? bounds.xMin() : bounds.xMax();
+      float back = direction > 0 ? bounds.x_min() : bounds.x_max();
       forward[0] -= (1 - std::fmod(std::abs(back), 1.0f)) * direction;
       if (walk_speed)
         add_node(Node{forward, Vec2F{std::copysign(*walk_speed, direction), 0.0f}});
@@ -587,8 +587,8 @@ std::expected<std::optional<bool>, StarException> PathFinder::explore(std::optio
     auto bounds = bound_box(pos, bound_kind);
     if (!bounds) return std::unexpected(std::move(bounds.error()));
     RectI integral_bounds = RectI::integral(*bounds);
-    RectI ground_rect(Vec2I(integral_bounds.xMin(), integral_bounds.yMin() - 1),
-                      Vec2I(integral_bounds.xMax(), integral_bounds.yMin()));
+    RectI ground_rect(Vec2I(integral_bounds.x_min(), integral_bounds.y_min() - 1),
+                      Vec2I(integral_bounds.x_max(), integral_bounds.y_min()));
     auto inside_object = m_world.get().rectTileCollision(integral_bounds, collision_dynamic);
     if (!inside_object)
       return std::unexpected(std::move(inside_object.error()));
@@ -637,7 +637,7 @@ std::expected<std::optional<bool>, StarException> PathFinder::explore(std::optio
     auto box = bound_box(pos, bound_kind);
     if (!box) return std::unexpected(std::move(box.error()));
     RectI bounds = RectI::integral(*box);
-    return RectI(Vec2I(bounds.xMin(), bounds.yMin() - 1), Vec2I(bounds.xMax(), bounds.yMin()));
+    return RectI(Vec2I(bounds.x_min(), bounds.y_min() - 1), Vec2I(bounds.x_max(), bounds.y_min()));
   }
 
   RectF PathFinder::standing_bounds() const {
@@ -656,7 +656,7 @@ std::expected<std::optional<bool>, StarException> PathFinder::explore(std::optio
         return std::unexpected(MovementControllerException("PathFinder requires standingPoly or boundBox"));
       bounds = standing_bounds();
     }
-    float bottom = bounds.yMin();
+    float bottom = bounds.y_min();
     float x = std::round(pos[0] / node_granularity) * node_granularity;
     float y = std::round((pos[1] + bottom) / node_granularity) * node_granularity - bottom;
     return Vec2F(x, y);

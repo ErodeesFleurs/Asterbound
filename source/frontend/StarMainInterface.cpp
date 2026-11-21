@@ -1874,7 +1874,7 @@ std::expected<void, StarException> MainInterface::render() {
   auto size = context().windowSize();
   if (!size)
     return std::unexpected(std::move(size.error()));
-  RectI screenRect = RectI::withSize(Vec2I(), Vec2I(*size));
+  RectI screenRect = RectI::with_size(Vec2I(), Vec2I(*size));
   for (auto&& pair : m_canvases) {
     pair.second->setPosition(Vec2I());
     auto canvasSize = pair.second->ignoreInterfaceScale() ? context().windowSize() : context().windowInterfaceSize();
@@ -2103,7 +2103,7 @@ std::expected<void, StarException> MainInterface::renderDebug() {
         if (!size) return std::unexpected(std::move(size.error()));
         m_debugTextRect.combine(size->padded(m_config->debugBackgroundPad));
       }
-      if (!m_debugTextRect.isNull()) {
+      if (!m_debugTextRect.is_null()) {
         auto renderer = context().renderer();
         if (!renderer) return std::unexpected(std::move(renderer.error()));
         RenderQuad& quad = std::get<RenderQuad>(renderer->get().immediatePrimitives()
@@ -2226,7 +2226,7 @@ std::expected<void, StarException> MainInterface::renderCursor() {
     if (!width) return std::unexpected(std::move(width.error()));
     auto height = windowHeight();
     if (!height) return std::unexpected(std::move(height.error()));
-    return m_cursorItem->render(RectI::withSize({}, {static_cast<int>(*width), static_cast<int>(*height)}));
+    return m_cursorItem->render(RectI::with_size({}, {static_cast<int>(*width), static_cast<int>(*height)}));
   };
   auto drawn = drawItem();
   auto reset = context().resetInterfaceScissorRect();

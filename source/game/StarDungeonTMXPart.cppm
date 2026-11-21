@@ -69,10 +69,10 @@ namespace Dungeon {
     [[nodiscard]] std::expected<std::reference_wrapper<Tiled::Tile const>, StarException> getTile(std::shared_ptr<TMXTilesets> const& tilesets, Vec2I pos) const;
 
     unsigned width() const {
-      return m_rect.xMax() - m_rect.xMin() + 1;
+      return m_rect.x_max() - m_rect.x_min() + 1;
     }
     unsigned height() const {
-      return m_rect.yMax() - m_rect.yMin() + 1;
+      return m_rect.y_max() - m_rect.y_min() + 1;
     }
 
     RectI const& rect() const {

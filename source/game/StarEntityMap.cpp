@@ -117,7 +117,7 @@ std::expected<void, StarException> EntityMap::addEntity(std::shared_ptr<Entity> 
   if (m_spatialMap.contains(entityId))
     return std::unexpected(EntityMapException::format("Duplicate entity id '{}' in EntityMap::addEntity", entityId));
 
-  if (boundBox.isNegative() || boundBox.width() > MaximumEntityBoundBox || boundBox.height() > MaximumEntityBoundBox) {
+  if (boundBox.is_negative() || boundBox.width() > MaximumEntityBoundBox || boundBox.height() > MaximumEntityBoundBox) {
     return std::unexpected(EntityMapException::format("Entity id: {} type: {} bound box is negative or beyond the "
                                                       "maximum entity bound box size in EntityMap::addEntity",
                                                       entity->entityId(), static_cast<int>(entity->entityType())));
@@ -162,7 +162,7 @@ std::expected<void, StarException> EntityMap::updateAllEntities(EntityCallback c
     auto position = entity->position();
     auto boundBox = entity->metaBoundBox();
 
-    if (boundBox.isNegative() || boundBox.width() > MaximumEntityBoundBox || boundBox.height() > MaximumEntityBoundBox) {
+    if (boundBox.is_negative() || boundBox.width() > MaximumEntityBoundBox || boundBox.height() > MaximumEntityBoundBox) {
       return std::unexpected(EntityMapException::format("Entity id: {} type: {} bound box is negative or beyond the "
                                                         "maximum entity bound box size in EntityMap::addEntity",
                                                         entity->entityId(), static_cast<int>(entity->entityType())));
@@ -250,7 +250,7 @@ std::expected<List<std::shared_ptr<Entity>>, StarException> EntityMap::entityQue
 }
 
 std::expected<List<std::shared_ptr<Entity>>, StarException> EntityMap::entitiesAt(Vec2F const& pos, EntityFilter const& filter) const {
-  auto entityList = entityQuery(RectF::withCenter(pos, {0, 0}), filter);
+  auto entityList = entityQuery(RectF::with_center(pos, {0, 0}), filter);
   if (!entityList) return std::unexpected(std::move(entityList.error()));
   sort_by_key(*entityList, [&](std::shared_ptr<Entity> const& entity) -> float {
     return vmag_squared(entity->position() - pos);
@@ -284,7 +284,7 @@ std::expected<void, StarException> EntityMap::forEachEntity(RectF const& boundBo
 std::expected<void, StarException> EntityMap::forEachEntityLine(Vec2F const& begin, Vec2F const& end, EntityCallback const& callback) const {
   if (!callback)
     return std::unexpected(EntityMapException("Missing EntityMap::forEachEntityLine callback"));
-  return forEachEntity(RectF::boundBoxOf(begin, end), [&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
+  return forEachEntity(RectF::bound_box_of(begin, end), [&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
     auto intersects = m_geometry.lineIntersectsRect({begin, end}, entity->metaBoundBox().translated(entity->position()));
     if (!intersects) return std::unexpected(std::move(intersects.error()));
     if (*intersects)
@@ -367,7 +367,7 @@ std::expected<std::shared_ptr<Entity>, StarException> EntityMap::findEntity(Rect
 std::expected<std::shared_ptr<Entity>, StarException> EntityMap::findEntityLine(Vec2F const& begin, Vec2F const& end, EntityFilter const& filter) const {
   if (!filter)
     return std::unexpected(EntityMapException("Missing EntityMap::findEntityLine filter"));
-  return findEntity(RectF::boundBoxOf(begin, end), [&](std::shared_ptr<Entity> const& entity) -> std::expected<bool, StarException> {
+  return findEntity(RectF::bound_box_of(begin, end), [&](std::shared_ptr<Entity> const& entity) -> std::expected<bool, StarException> {
     auto intersects = m_geometry.lineIntersectsRect({begin, end}, entity->metaBoundBox().translated(entity->position()));
     if (!intersects) return std::unexpected(std::move(intersects.error()));
     if (*intersects) return filter(entity);
@@ -436,7 +436,7 @@ std::expected<std::shared_ptr<Entity>, StarException> EntityMap::closestEntity(V
   return closest;
 }
 std::expected<std::shared_ptr<InteractiveEntity>, StarException> EntityMap::interactiveEntityNear(Vec2F const& pos, float maxRadius) const {
-  auto rect = RectF::withCenter(pos, Vec2F::filled(maxRadius));
+  auto rect = RectF::with_center(pos, Vec2F::filled(maxRadius));
   std::shared_ptr<InteractiveEntity> interactiveEntity;
   double bestDistance = maxRadius + 100;
   double bestCenterDistance = maxRadius + 100;
@@ -505,7 +505,7 @@ std::expected<bool, StarException> EntityMap::spaceIsOccupied(RectF const& rect,
     auto rects = m_geometry.splitRect(entity->collisionArea(), entity->position());
     if (!rects) return std::unexpected(std::move(rects.error()));
     for (RectF const& c : *rects) {
-      if (!c.isNull() && rect.intersects(c))
+      if (!c.is_null() && rect.intersects(c))
         return true;
     }
   }

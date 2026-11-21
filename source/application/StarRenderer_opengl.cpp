@@ -832,7 +832,7 @@ std::expected<void, StarException> OpenGlRenderer::setScissorRect(std::optional<
   auto applyScissor = [](std::optional<RectI> const& rect) {
     if (rect) {
       glEnable(GL_SCISSOR_TEST);
-      glScissor(rect->xMin(), rect->yMin(), rect->width(), rect->height());
+      glScissor(rect->x_min(), rect->y_min(), rect->width(), rect->height());
     } else {
       glDisable(GL_SCISSOR_TEST);
     }

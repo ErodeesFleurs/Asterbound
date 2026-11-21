@@ -149,7 +149,7 @@ std::expected<RadialForceRegion, StarException> RadialForceRegion::fromJson(Json
 }
 
 RectF RadialForceRegion::boundBox() const {
-  return RectF::withCenter(center, Vec2F::filled(outerRadius));
+  return RectF::with_center(center, Vec2F::filled(outerRadius));
 }
 
 void RadialForceRegion::translate(Vec2F const& pos) {

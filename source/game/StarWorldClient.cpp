@@ -978,7 +978,7 @@ void WorldClient::setClientWindow(RectI window) {
 }
 
 void WorldClient::centerClientWindowOnPlayer(Vec2U const& windowSize) {
-  setClientWindow(RectI::withCenter(Vec2I::floor(m_mainPlayer->position()), Vec2I(windowSize)));
+  setClientWindow(RectI::with_center(Vec2I::floor(m_mainPlayer->position()), Vec2I(windowSize)));
 }
 
 void WorldClient::centerClientWindowOnPlayer() {
@@ -1712,7 +1712,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
         return std::unexpected(std::move(result112.error()));
       m_centralStructure = (std::move(*result112));
     } else if (auto tileArrayUpdate = as<TileArrayUpdatePacket>(packet)) {
-      RectI tileRegion = RectI::withSize(tileArrayUpdate->min, Vec2I(tileArrayUpdate->array.extents()));
+      RectI tileRegion = RectI::with_size(tileArrayUpdate->min, Vec2I(tileArrayUpdate->array.extents()));
       
       // NOTE: We're creating client side sectors on tileArrayUpdate here, and
       // at no other time, and this is sort of a big assumption that
@@ -1727,9 +1727,9 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
         }
       }
       
-      for (int x = tileRegion.xMin(); x < tileRegion.xMax(); ++x) {
-        for (int y = tileRegion.yMin(); y < tileRegion.yMax(); ++y) {
-          auto result114 = readNetTile({x, y}, tileArrayUpdate->array(x - tileRegion.xMin(), y - tileRegion.yMin()), false);
+      for (int x = tileRegion.x_min(); x < tileRegion.x_max(); ++x) {
+        for (int y = tileRegion.y_min(); y < tileRegion.y_max(); ++y) {
+          auto result114 = readNetTile({x, y}, tileArrayUpdate->array(x - tileRegion.x_min(), y - tileRegion.y_min()), false);
           if (!result114)
             return std::unexpected(std::move(result114.error()));
         }
@@ -1765,7 +1765,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
               p.foregroundHueShift.reset();
               if (p.collision) {
                 p.collision.reset();
-                dirtyCollision(RectI::withSize(modification.first, { 1, 1 }));
+                dirtyCollision(RectI::with_size(modification.first, { 1, 1 }));
               }
             } else {
               p.background.reset();
@@ -2136,10 +2136,10 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     float expiry = std::chrono::duration<float, std::milli>(float((now - pair.second.time).count())) / expireTime;
     auto center = Vec2F(pair.first) + Vec2F::filled(0.5f);
     auto size = Vec2F::filled(0.875f - expiry * 0.875f);
-    auto poly = PolyF(RectF::withCenter(center, size));
+    auto poly = PolyF(RectF::with_center(center, size));
     self.root().spatialLogger().log_poly("world", poly, Color::Cyan.mix(Color::Red, expiry).to_rgba());
     if (expiry >= 1.0f) {
-      self.dirtyCollision(RectI::withSize(pair.first, { 1, 1 }));
+      self.dirtyCollision(RectI::with_size(pair.first, { 1, 1 }));
       return true;
     } else {
       return false;
@@ -2249,7 +2249,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     RectI weatherParticleRegion = particleRegion;
     
     std::optional<String> weatherDomain = m_weatherDomain;
-    if (clientWindow.isEmpty()) {
+    if (clientWindow.is_empty()) {
       weatherParticleRegion = {};
     } else {
       auto result162 = m_worldTemplate->weatherLayerAt(Vec2I::floor(m_clientState->windowCenter()));
@@ -2257,8 +2257,8 @@ std::expected<void, StarException> WorldClient::update(float dt) {
         return std::unexpected(std::move(result162.error()));
       if (auto layer = (std::move(*result162))) {
         weatherDomain = layer->get().domain;
-        weatherParticleRegion = RectI(weatherParticleRegion.xMin(), std::max(weatherParticleRegion.yMin(), layer->get().minHeight),
-            weatherParticleRegion.xMax(), std::min(weatherParticleRegion.yMax(), layer->get().maxHeight));
+        weatherParticleRegion = RectI(weatherParticleRegion.x_min(), std::max(weatherParticleRegion.y_min(), layer->get().minHeight),
+            weatherParticleRegion.x_max(), std::min(weatherParticleRegion.y_max(), layer->get().maxHeight));
       } else {
         weatherParticleRegion = {};
       }
@@ -3177,13 +3177,13 @@ std::expected<void, StarException> gatherClientLightingTiles(CellularLightingCal
   RectI region = calculator.calculationRegion();
   int worldWidth = static_cast<int>(tiles.size()[0]);
   int worldHeight = static_cast<int>(tiles.size()[1]);
-  int gatheredRows = std::clamp(region.yMax(), 0, worldHeight) - std::clamp(region.yMin(), 0, worldHeight);
+  int gatheredRows = std::clamp(region.y_max(), 0, worldHeight) - std::clamp(region.y_min(), 0, worldHeight);
   // Real-asset gather measurements put small clipped regions below the useful
   // parallel grain. Keep the larger/interior cases on their existing workers.
   constexpr std::int64_t CallerGatherCellLimit = 12 * 1024;
   bool useCaller = static_cast<std::int64_t>(region.width()) * gatheredRows <= CallerGatherCellLimit;
-  if (region.width() < worldWidth && region.xMin() >= -worldWidth
-      && static_cast<std::int64_t>(region.xMax()) <= 2 * static_cast<std::int64_t>(worldWidth)) {
+  if (region.width() < worldWidth && region.x_min() >= -worldWidth
+      && static_cast<std::int64_t>(region.x_max()) <= 2 * static_cast<std::int64_t>(worldWidth)) {
     if (useCaller)
       return tiles.tileEvalColumns(region, gatherColumn);
     return tiles.tileEvalColumnsParallel(workers, region, gatherColumn);
@@ -3192,10 +3192,10 @@ std::expected<void, StarException> gatherClientLightingTiles(CellularLightingCal
   // Whole-world tile traversal deduplicates wrapped x coordinates. Lighting
   // instead needs every image in its unwrapped calculation region, including
   // the configured border around large viewports and small worlds.
-  for (int destinationX = region.xMin(); destinationX < region.xMax();) {
+  for (int destinationX = region.x_min(); destinationX < region.x_max();) {
     int sourceX = positive_mod<int>(destinationX, worldWidth);
-    int stripWidth = std::min(region.xMax() - destinationX, worldWidth - sourceX);
-    RectI strip(sourceX, region.yMin(), sourceX + stripWidth, region.yMax());
+    int stripWidth = std::min(region.x_max() - destinationX, worldWidth - sourceX);
+    RectI strip(sourceX, region.y_min(), sourceX + stripWidth, region.y_max());
     auto gatherStrip = [&](Vec2I const& pos, std::span<ClientTile const> column) -> std::expected<void, StarException> {
       return gatherColumn({destinationX + (pos[0] - sourceX), pos[1]}, column);
     };
@@ -3752,7 +3752,7 @@ std::expected<std::optional<String>, StarException> WorldClient::currentWeatherD
   }
   
   auto window = m_clientState->window();
-  if (window.isEmpty()) {
+  if (window.is_empty()) {
     return m_weatherDomain;
   }
   {
@@ -3917,7 +3917,7 @@ std::expected<bool, StarException> WorldClient::readNetTile(Vec2I const& pos, Ne
       (std::move(*result301)) && tile->get().collision != CollisionKind::Dynamic;
   
   if (updateCollision) {
-    dirtyCollision(RectI::withSize(pos, {1, 1}));
+    dirtyCollision(RectI::with_size(pos, {1, 1}));
   }
   
   return true;
@@ -3928,8 +3928,8 @@ void WorldClient::dirtyCollision(RectI const& region) {
     return;
 
   auto dirtyRegion = region.padded(CollisionGenerator::BlockInfluenceRadius);
-  for (int x = dirtyRegion.xMin(); x < dirtyRegion.xMax(); ++x) {
-    for (int y = dirtyRegion.yMin(); y < dirtyRegion.yMax(); ++y) {
+  for (int x = dirtyRegion.x_min(); x < dirtyRegion.x_max(); ++x) {
+    for (int y = dirtyRegion.y_min(); y < dirtyRegion.y_max(); ++y) {
       if (auto tile = m_tileArray->modifyTile({x, y}))
         tile->get().collisionCacheDirty = true;
     }
@@ -3942,8 +3942,8 @@ std::expected<void, StarException> WorldClient::freshenCollision(RectI const& re
   }
   
   RectI freshenRegion = RectI::null();
-  for (int x = region.xMin(); x < region.xMax(); ++x) {
-    for (int y = region.yMin(); y < region.yMax(); ++y) {
+  for (int x = region.x_min(); x < region.x_max(); ++x) {
+    for (int y = region.y_min(); y < region.y_max(); ++y) {
       if (auto tile = m_tileArray->modifyTile({x, y})) {
         if (tile->get().collisionCacheDirty) {
           freshenRegion.combine(RectI(x, y, x + 1, y + 1));
@@ -3952,9 +3952,9 @@ std::expected<void, StarException> WorldClient::freshenCollision(RectI const& re
     }
   }
   
-  if (!freshenRegion.isNull()) {
-    for (int x = freshenRegion.xMin(); x < freshenRegion.xMax(); ++x) {
-      for (int y = freshenRegion.yMin(); y < freshenRegion.yMax(); ++y) {
+  if (!freshenRegion.is_null()) {
+    for (int x = freshenRegion.x_min(); x < freshenRegion.x_max(); ++x) {
+      for (int y = freshenRegion.y_min(); y < freshenRegion.y_max(); ++y) {
         if (auto tile = m_tileArray->modifyTile({x, y})) {
           tile->get().collisionCacheDirty = false;
           tile->get().collisionCache.clear();
@@ -4381,7 +4381,7 @@ bool WorldClient::DamageNumberKey::operator<(DamageNumberKey const& other) const
 
 std::expected<void, StarException> WorldClient::renderCollisionDebug() {
   RectI clientWindow = m_clientState->window();
-  if (clientWindow.isEmpty()) {
+  if (clientWindow.is_empty()) {
     return {};
   }
 
@@ -4469,7 +4469,7 @@ std::expected<void, StarException> WorldClient::informTilePrediction(Vec2I const
           return std::unexpected(std::move(result317.error()));
         p.collision = (std::move(*result317));
       }
-      dirtyCollision(RectI::withSize(pos, { 1, 1 }));
+      dirtyCollision(RectI::with_size(pos, { 1, 1 }));
     } else {
       p.background = placeMaterial.material;
       p.backgroundHueShift = placeMaterial.materialHueShift;

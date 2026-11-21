@@ -158,7 +158,7 @@ std::expected<void, StarException> ImageWidget::setMinSize(Vec2I const& size) {
 }
 
 RectI ImageWidget::screenBoundRect() const {
-  RectI base = RectI::withSize(screenPosition(), size());
+  RectI base = RectI::with_size(screenPosition(), size());
   if (m_centered) {
     base.translate(-Vec2I::floor(size() / 2));
   }

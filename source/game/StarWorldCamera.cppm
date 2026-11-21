@@ -123,14 +123,14 @@ inline RectF WorldCamera::worldScreenRect() const {
   // screen dimensions in world space
   float w = static_cast<float>(m_screenSize[0]) / (TilePixels * m_renderPixelRatio);
   float h = static_cast<float>(m_screenSize[1]) / (TilePixels * m_renderPixelRatio);
-  return RectF::withSize(Vec2F(m_worldCenter[0] - w / 2, m_worldCenter[1] - h / 2), Vec2F(w, h));
+  return RectF::with_size(Vec2F(m_worldCenter[0] - w / 2, m_worldCenter[1] - h / 2), Vec2F(w, h));
 }
 
 inline RectI WorldCamera::worldTileRect() const {
   RectF screen = worldScreenRect();
   Vec2I min = Vec2I::floor(screen.min());
   Vec2I size = Vec2I::ceil(Vec2F(m_screenSize) / (TilePixels * m_renderPixelRatio) + (screen.min() - Vec2F(min)));
-  return RectI::withSize(min, size);
+  return RectI::with_size(min, size);
 }
 
 inline Vec2F WorldCamera::tileMinScreen() const {

@@ -197,7 +197,7 @@ std::expected<RectU, StarException> ImageMetadataDatabase::nonEmptyRegion(AssetP
   auto const bytes_per_pixel = pixels.bytes_per_pixel();
   if (bytes_per_pixel == 3) {
     if (pixels.width() != 0 && pixels.height() != 0)
-      region = RectU::withSize(Vec2U(), pixels.size());
+      region = RectU::with_size(Vec2U(), pixels.size());
   } else if (bytes_per_pixel == 4) {
     auto const image_data = pixels.data();
     unsigned min_x = pixels.width(), min_y = pixels.height();
@@ -219,7 +219,7 @@ std::expected<RectU, StarException> ImageMetadataDatabase::nonEmptyRegion(AssetP
     // Float-format traversal deliberately retains its legacy implicit alpha.
     pixels.for_each_pixel([&region](unsigned x, unsigned y, Vec4B const& pixel) {
       if (pixel[3] > 0)
-        region.combine(RectU::withSize({x, y}, {1, 1}));
+        region.combine(RectU::with_size({x, y}, {1, 1}));
     });
   }
 
@@ -374,9 +374,9 @@ std::expected<Vec2U, StarException> ImageMetadataDatabase::calculateImageSize(As
     }
 
     void operator()(CropImageOperation const& cio) {
-      if (cio.subset.isEmpty() || cio.subset.xMin() < 0 || cio.subset.yMin() < 0
-          || static_cast<unsigned>(cio.subset.xMax()) > imageSize[0]
-          || static_cast<unsigned>(cio.subset.yMax()) > imageSize[1]) {
+      if (cio.subset.is_empty() || cio.subset.x_min() < 0 || cio.subset.y_min() < 0
+          || static_cast<unsigned>(cio.subset.x_max()) > imageSize[0]
+          || static_cast<unsigned>(cio.subset.y_max()) > imageSize[1]) {
         hasError = true;
       } else {
         imageSize = Vec2U(cio.subset.size());

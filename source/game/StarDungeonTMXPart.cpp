@@ -73,8 +73,8 @@ std::expected<bool, StarException> TMXMap::forEachTile(TileCallback const& callb
 }
 
 std::expected<bool, StarException> TMXTileLayer::forEachTile(TMXMap const& map, TileCallback const& callback) const {
-  for (int y = m_rect.yMin(); y <= m_rect.yMax(); ++y) {
-    for (int x = m_rect.xMin(); x <= m_rect.xMax(); ++x) {
+  for (int y = m_rect.y_min(); y <= m_rect.y_max(); ++y) {
+    for (int x = m_rect.x_min(); x <= m_rect.x_max(); ++x) {
       auto tile = getTile(map.tilesets(), Vec2I(x, y));
       if (!tile) return std::unexpected(std::move(tile.error()));
       if (!callback) return std::unexpected(DungeonException("Empty dungeon tile callback"));
@@ -299,8 +299,8 @@ std::expected<std::shared_ptr<TMXMap>, StarException> TMXMap::create(Root& root,
 
 std::expected<std::reference_wrapper<Tiled::Tile const>, StarException> TMXTileLayer::getTile(std::shared_ptr<TMXTilesets> const& tilesets, Vec2I pos) const {
   if (!m_rect.contains(pos)) return std::cref(tilesets->nullTile());
-  int dx = pos.x() - m_rect.xMin();
-  int dy = pos.y() - m_rect.yMin();
+  int dx = pos.x() - m_rect.x_min();
+  int dy = pos.y() - m_rect.y_min();
   return tilesets->getTile(m_tileData[dx + dy * width()], m_layer);
 }
 

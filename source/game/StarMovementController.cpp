@@ -485,7 +485,7 @@ bool MovementController::atWorldLimit(bool bottomOnly) const {
   if (m_world) {
     if (!collisionPoly().empty()) {
       auto bounds = collisionBoundBox();
-      return bounds.yMin() <= 0 || (!bottomOnly && bounds.yMax() >= m_world->get().geometry().height());
+      return bounds.y_min() <= 0 || (!bottomOnly && bounds.y_max() >= m_world->get().geometry().height());
     } else {
       return yPosition() <= 0 || (!bottomOnly && yPosition() >= m_world->get().geometry().height());
     }
@@ -1024,7 +1024,7 @@ std::expected<void, StarException> MovementController::updateLiquidPercentage() 
   RectF boundBox = body.bounding_box();
 
   LiquidLevel cll;
-  if (boundBox.isEmpty())
+  if (boundBox.is_empty())
     cll = worldRef.liquidLevel(Vec2I::floor(pos));
   else {
     auto liquid = worldRef.liquidLevel(boundBox);
@@ -1209,7 +1209,7 @@ MovementController::CollisionResult MovementController::collisionMove(List<Colli
 
         for (std::size_t i = 0; i < cp.poly.sides(); ++i) {
           auto side = cp.poly.side(i);
-          RectF sideBounds = RectF::boundBoxOf(side.min(), side.max());
+          RectF sideBounds = RectF::bound_box_of(side.min(), side.max());
           float thisSideHorizontalOverlap = sideBounds.overlap(touchingBounds).width();
 
           if (thisSideHorizontalOverlap > maxSideHorizontalOverlap) {

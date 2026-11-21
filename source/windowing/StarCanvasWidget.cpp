@@ -320,9 +320,9 @@ std::expected<void, StarException> CanvasWidget::renderImage(Vec2F const& render
 
   RectF screenCoords;
   if (m_ignoreInterfaceScale)
-    screenCoords = RectF::withSize(renderingOffset + pos, texSize * scale);
+    screenCoords = RectF::with_size(renderingOffset + pos, texSize * scale);
   else
-    screenCoords = RectF::withSize(renderingOffset * context.interfaceScale() + pos * context.interfaceScale(), texSize * scale * context.interfaceScale());
+    screenCoords = RectF::with_size(renderingOffset * context.interfaceScale() + pos * context.interfaceScale(), texSize * scale * context.interfaceScale());
 
   return context.drawQuad(texName, screenCoords, color);
 }
@@ -355,17 +355,17 @@ std::expected<void, StarException> CanvasWidget::renderTiledImage(Vec2F const& r
     for (int y = 0; y < textureCount[1]; ++y) {
       Vec2F screenPos =
         screenLowerLeft + texScaledSize.piecewise_multiply({static_cast<float>(x), static_cast<float>(y)});
-      RectF screenRect = RectF::withSize(screenPos, texScaledSize);
+      RectF screenRect = RectF::with_size(screenPos, texScaledSize);
 
       RectF limitedScreenRect;
-      limitedScreenRect.setXMin(std::max(screenRect.xMin(), screenCoords.xMin()));
-      limitedScreenRect.setYMin(std::max(screenRect.yMin(), screenCoords.yMin()));
-      limitedScreenRect.setXMax(std::min(screenRect.xMax(), screenCoords.xMax()));
-      limitedScreenRect.setYMax(std::min(screenRect.yMax(), screenCoords.yMax()));
+      limitedScreenRect.set_x_min(std::max(screenRect.x_min(), screenCoords.x_min()));
+      limitedScreenRect.set_y_min(std::max(screenRect.y_min(), screenCoords.y_min()));
+      limitedScreenRect.set_x_max(std::min(screenRect.x_max(), screenCoords.x_max()));
+      limitedScreenRect.set_y_max(std::min(screenRect.y_max(), screenCoords.y_max()));
 
       RectF limitedTexRect = limitedScreenRect.translated(-screenPos).scaled(1 / textureScale);
 
-      if (limitedScreenRect.isEmpty())
+      if (limitedScreenRect.is_empty())
         continue;
 
       auto result = m_ignoreInterfaceScale

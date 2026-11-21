@@ -1230,7 +1230,7 @@ piece.spaces = Set<Vec2I>::from(
 
   m_spaces = spaces.values();
 
-  m_boundBox = RectI::boundBoxOfPoints(m_spaces);
+  m_boundBox = RectI::bound_box_of_points(m_spaces);
 
   for (auto space : m_spaces) {
     if (space[1] == 0) {
@@ -1244,7 +1244,7 @@ piece.spaces = Set<Vec2I>::from(
 }
 
 void Plant::calcBoundBox() {
-  RectF boundBox = RectF::boundBoxOfPoints(m_spaces);
+  RectF boundBox = RectF::bound_box_of_points(m_spaces);
   // Plants are allowed to visibly occupy one outside space from the spaces
   // they take up.
   m_metaBoundBox = RectF(boundBox.min() - Vec2F(1, 1), boundBox.max() + Vec2F(2, 2));

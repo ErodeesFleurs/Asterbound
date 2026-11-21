@@ -491,7 +491,7 @@ std::expected<WorldStructure, StarException> WorldServer::setCentralStructure(Wo
     return std::unexpected(std::move(result16.error()));
   auto materialDatabase = std::move(*result16);
   for (auto const& foregroundBlock : m_centralStructure.foregroundBlocks()) {
-    auto result17 = generateRegion(RectI::withSize(foregroundBlock.position, {1, 1}));
+    auto result17 = generateRegion(RectI::with_size(foregroundBlock.position, {1, 1}));
     if (!result17)
       return std::unexpected(std::move(result17.error()));
     if (auto tile = m_tileArray->modifyTile(foregroundBlock.position)) {
@@ -507,7 +507,7 @@ std::expected<WorldStructure, StarException> WorldServer::setCentralStructure(Wo
         auto result19 = queueTileUpdates(foregroundBlock.position);
         if (!result19)
           return std::unexpected(std::move(result19.error()));
-        auto result20 = dirtyCollision(RectI::withSize(foregroundBlock.position, {1, 1}));
+        auto result20 = dirtyCollision(RectI::with_size(foregroundBlock.position, {1, 1}));
         if (!result20)
           return std::unexpected(std::move(result20.error()));
       }
@@ -515,7 +515,7 @@ std::expected<WorldStructure, StarException> WorldServer::setCentralStructure(Wo
   }
 
   for (auto const& backgroundBlock : m_centralStructure.backgroundBlocks()) {
-    auto result21 = generateRegion(RectI::withSize(backgroundBlock.position, {1, 1}));
+    auto result21 = generateRegion(RectI::with_size(backgroundBlock.position, {1, 1}));
     if (!result21)
       return std::unexpected(std::move(result21.error()));
     if (auto tile = m_tileArray->modifyTile(backgroundBlock.position)) {
@@ -536,7 +536,7 @@ std::expected<WorldStructure, StarException> WorldServer::setCentralStructure(Wo
     return std::unexpected(std::move(result23.error()));
   auto objectDatabase = std::move(*result23);
   for (auto structureObject : m_centralStructure.objects()) {
-    auto result24 = generateRegion(RectI::withSize(structureObject.position, {1, 1}));
+    auto result24 = generateRegion(RectI::with_size(structureObject.position, {1, 1}));
     if (!result24)
       return std::unexpected(std::move(result24.error()));
     auto result25 = objectDatabase->createForPlacement(*this, structureObject.name, structureObject.position, structureObject.direction, structureObject.parameters);
@@ -566,7 +566,7 @@ WorldStructure const& WorldServer::centralStructure() const {
 std::expected<void, StarException> WorldServer::removeCentralStructure() {
   for (auto const& structureObject : m_centralStructure.objects()) {
     if (!structureObject.residual) {
-      auto result28 = generateRegion(RectI::withSize(structureObject.position, {1, 1}));
+      auto result28 = generateRegion(RectI::with_size(structureObject.position, {1, 1}));
       if (!result28)
         return std::unexpected(std::move(result28.error()));
       auto result29 = atTile<Object>(structureObject.position);
@@ -591,7 +591,7 @@ std::expected<void, StarException> WorldServer::removeCentralStructure() {
 
   for (auto const& backgroundBlock : m_centralStructure.backgroundBlocks()) {
     if (!backgroundBlock.residual) {
-      auto result33 = generateRegion(RectI::withSize(backgroundBlock.position, {1, 1}));
+      auto result33 = generateRegion(RectI::with_size(backgroundBlock.position, {1, 1}));
       if (!result33)
         return std::unexpected(std::move(result33.error()));
       if (auto tile = m_tileArray->modifyTile(backgroundBlock.position)) {
@@ -608,7 +608,7 @@ std::expected<void, StarException> WorldServer::removeCentralStructure() {
 
   for (auto const& foregroundBlock : m_centralStructure.foregroundBlocks()) {
     if (!foregroundBlock.residual) {
-      auto result35 = generateRegion(RectI::withSize(foregroundBlock.position, {1, 1}));
+      auto result35 = generateRegion(RectI::with_size(foregroundBlock.position, {1, 1}));
       if (!result35)
         return std::unexpected(std::move(result35.error()));
       if (auto tile = m_tileArray->modifyTile(foregroundBlock.position)) {
@@ -616,7 +616,7 @@ std::expected<void, StarException> WorldServer::removeCentralStructure() {
           tile->get().foreground = EmptyMaterialId;
           tile->get().foregroundMod = NoModId;
           tile->get().updateCollision(CollisionKind::None);
-          auto result36 = dirtyCollision(RectI::withSize(foregroundBlock.position, {1, 1}));
+          auto result36 = dirtyCollision(RectI::with_size(foregroundBlock.position, {1, 1}));
           if (!result36)
             return std::unexpected(std::move(result36.error()));
           auto result37 = queueTileUpdates(foregroundBlock.position);
@@ -1682,15 +1682,15 @@ std::expected<void, StarException> WorldServer::update(float dt) {
   List<RectI> clientMonitoringRegions;
   for (auto const& pair : m_clientInfo) {
     auto window = pair.second->clientState->window();
-    if (!window.isEmpty()) {
+    if (!window.is_empty()) {
       auto result168 = m_worldTemplate->weatherLayerAt(Vec2I::floor(pair.second->clientState->windowCenter()));
       if (!result168)
         return std::unexpected(std::move(result168.error()));
       if (auto layer = std::move(*result168)) {
         if (layer->get().domain) {
-          auto clippedWindow = RectI(window.xMin(), std::max(window.yMin(), layer->get().minHeight),
-              window.xMax(), std::min(window.yMax(), layer->get().maxHeight));
-          if (!clippedWindow.isEmpty())
+          auto clippedWindow = RectI(window.x_min(), std::max(window.y_min(), layer->get().minHeight),
+              window.x_max(), std::min(window.y_max(), layer->get().maxHeight));
+          if (!clippedWindow.is_empty())
             weatherClientWindows[*layer->get().domain].push_back(clippedWindow);
         }
       }
@@ -2237,7 +2237,7 @@ std::expected<TileModificationList, StarException> WorldServer::replaceTiles(Til
   failures.append_range(std::move(*result233));
 
   for (auto pair : success) {
-    auto result234 = checkEntityBreaks(RectF::withSize(Vec2F(pair.first), Vec2F(1, 1)));
+    auto result234 = checkEntityBreaks(RectF::with_size(Vec2F(pair.first), Vec2F(1, 1)));
     if (!result234)
       return std::unexpected(std::move(result234.error()));
     m_liquidEngine->visitLocation(pair.first);
@@ -2802,8 +2802,8 @@ void WorldServer::setTileProtectionEnabled(bool enabled) {
 }
 
 std::expected<void, StarException> WorldServer::setDungeonId(RectI const& tileArea, DungeonId dungeonId) {
-  for (int x = tileArea.xMin(); x < tileArea.xMax(); ++x) {
-    for (int y = tileArea.yMin(); y < tileArea.yMax(); ++y) {
+  for (int x = tileArea.x_min(); x < tileArea.x_max(); ++x) {
+    for (int y = tileArea.y_min(); y < tileArea.y_max(); ++y) {
       auto pos = Vec2I{x, y};
       if (auto tile = m_tileArray->modifyTile(pos)) {
         tile->get().dungeonId = dungeonId;
@@ -3164,7 +3164,7 @@ std::expected<TileModificationList, StarException> WorldServer::doApplyTileModif
       tile->get().dungeonId = ConstructionDungeonId;
 
       if (updateNeighbors) {
-        auto result341 = checkEntityBreaks(RectF::withSize(Vec2F(pos), Vec2F(1, 1)));
+        auto result341 = checkEntityBreaks(RectF::with_size(Vec2F(pos), Vec2F(1, 1)));
         if (!result341)
           return std::unexpected(std::move(result341.error()));
         m_liquidEngine->visitLocation(pos);
@@ -3172,7 +3172,7 @@ std::expected<TileModificationList, StarException> WorldServer::doApplyTileModif
       }
 
       if (placeMaterial.layer == TileLayer::Foreground) {
-        auto result342 = dirtyCollision(RectI::withSize(pos, {1, 1}));
+        auto result342 = dirtyCollision(RectI::with_size(pos, {1, 1}));
         if (!result342)
           return std::unexpected(std::move(result342.error()));
       }
@@ -3334,7 +3334,7 @@ std::expected<void, StarException> WorldServer::updateTileEntityTiles(std::share
       if (updatedCollision) {
         m_liquidEngine->visitLocation(pos);
         m_fallingBlocksAgent->visitLocation(pos);
-        auto result356 = dirtyCollision(RectI::withSize(pos, { 1, 1 }));
+        auto result356 = dirtyCollision(RectI::with_size(pos, { 1, 1 }));
         if (!result356)
           return std::unexpected(std::move(result356.error()));
       }
@@ -3374,7 +3374,7 @@ std::expected<void, StarException> WorldServer::updateTileEntityTiles(std::share
       if (updatedCollision) {
         m_liquidEngine->visitLocation(pos);
         m_fallingBlocksAgent->visitLocation(pos);
-        auto result359 = dirtyCollision(RectI::withSize(pos, { 1, 1 }));
+        auto result359 = dirtyCollision(RectI::with_size(pos, { 1, 1 }));
         if (!result359)
           return std::unexpected(std::move(result359.error()));
       }
@@ -3471,7 +3471,7 @@ std::expected<RpcPromise<Vec2I>, StarException> WorldServer::enqueuePlacement(Li
 
 std::expected<std::reference_wrapper<ServerTile const>, StarException> WorldServer::getServerTile(Vec2I const& position, bool withSignal) {
   if (withSignal) {
-    auto result368 = signalRegion(RectI::withSize(position, {1, 1}));
+    auto result368 = signalRegion(RectI::with_size(position, {1, 1}));
     if (!result368)
       return std::unexpected(std::move(result368.error()));
   }
@@ -3481,14 +3481,14 @@ std::expected<std::reference_wrapper<ServerTile const>, StarException> WorldServ
 
 std::expected<std::optional<std::reference_wrapper<ServerTile>>, StarException> WorldServer::modifyServerTile(Vec2I const& position, bool withSignal) {
   if (withSignal) {
-    auto result369 = signalRegion(RectI::withSize(position, {1, 1}));
+    auto result369 = signalRegion(RectI::with_size(position, {1, 1}));
     if (!result369)
       return std::unexpected(std::move(result369.error()));
   }
 
   auto tile = m_tileArray->modifyTile(position);
   if (tile) {
-    auto result370 = dirtyCollision(RectI::withSize(position, {1, 1}));
+    auto result370 = dirtyCollision(RectI::with_size(position, {1, 1}));
     if (!result370)
       return std::unexpected(std::move(result370.error()));
     m_liquidEngine->visitLocation(position);
@@ -3642,7 +3642,7 @@ std::expected<List<ItemDescriptor>, StarException> WorldServer::destroyBlock(Til
       tile->get().foregroundHueShift = 0;
       tile->get().foregroundMod = NoModId;
       tile->get().updateCollision(CollisionKind::None);
-      auto result389 = dirtyCollision(RectI::withSize(pos, {1, 1}));
+      auto result389 = dirtyCollision(RectI::with_size(pos, {1, 1}));
       if (!result389)
         return std::unexpected(std::move(result389.error()));
     }
@@ -3662,7 +3662,7 @@ std::expected<List<ItemDescriptor>, StarException> WorldServer::destroyBlock(Til
   tile->get().dungeonId = DestroyedBlockDungeonId;
 
   if (updateNeighbors) {
-    auto result391 = checkEntityBreaks(RectF::withSize(Vec2F(pos), Vec2F(1, 1)));
+    auto result391 = checkEntityBreaks(RectF::with_size(Vec2F(pos), Vec2F(1, 1)));
     if (!result391)
       return std::unexpected(std::move(result391.error()));
     m_liquidEngine->visitLocation(pos);
@@ -3688,7 +3688,7 @@ std::expected<void, StarException> WorldServer::queueUpdatePackets(ConnectionId 
 
   std::optional<String> weatherDomain;
   auto clientWindow = clientInfo->clientState->window();
-  if (clientWindow.isEmpty()) {
+  if (clientWindow.is_empty()) {
     weatherDomain = clientInfo->weatherDomain;
   } else {
     auto result395 = m_worldTemplate->weatherLayerAt(Vec2I::floor(clientInfo->clientState->windowCenter()));
@@ -3737,9 +3737,9 @@ std::expected<void, StarException> WorldServer::queueUpdatePackets(ConnectionId 
       auto resized = tileArrayUpdate->array.set_size(Vec2S(sectorTiles.width(), sectorTiles.height()));
       if (!resized)
         return std::unexpected(std::move(resized.error()));
-      for (int x = sectorTiles.xMin(); x < sectorTiles.xMax(); ++x) {
-        for (int y = sectorTiles.yMin(); y < sectorTiles.yMax(); ++y) {
-          auto result400 = writeNetTile({x, y}, tileArrayUpdate->array(x - sectorTiles.xMin(), y - sectorTiles.yMin()));
+      for (int x = sectorTiles.x_min(); x < sectorTiles.x_max(); ++x) {
+        for (int y = sectorTiles.y_min(); y < sectorTiles.y_max(); ++y) {
+          auto result400 = writeNetTile({x, y}, tileArrayUpdate->array(x - sectorTiles.x_min(), y - sectorTiles.y_min()));
           if (!result400)
             return std::unexpected(std::move(result400.error()));
         }
@@ -4096,8 +4096,8 @@ std::expected<void, StarException> WorldServer::writeNetTile(Vec2I const& pos, N
 
 std::expected<void, StarException> WorldServer::dirtyCollision(RectI const& region) {
   auto dirtyRegion = region.padded(CollisionGenerator::BlockInfluenceRadius);
-  for (int x = dirtyRegion.xMin(); x < dirtyRegion.xMax(); ++x) {
-    for (int y = dirtyRegion.yMin(); y < dirtyRegion.yMax(); ++y) {
+  for (int x = dirtyRegion.x_min(); x < dirtyRegion.x_max(); ++x) {
+    for (int y = dirtyRegion.y_min(); y < dirtyRegion.y_max(); ++y) {
       if (auto tile = m_tileArray->modifyTile({x, y}))
         tile->get().collisionCacheDirty = true;
     }
@@ -4107,8 +4107,8 @@ std::expected<void, StarException> WorldServer::dirtyCollision(RectI const& regi
 
 std::expected<void, StarException> WorldServer::freshenCollision(RectI const& region) {
   RectI freshenRegion = RectI::null();
-  for (int x = region.xMin(); x < region.xMax(); ++x) {
-    for (int y = region.yMin(); y < region.yMax(); ++y) {
+  for (int x = region.x_min(); x < region.x_max(); ++x) {
+    for (int y = region.y_min(); y < region.y_max(); ++y) {
       if (auto tile = m_tileArray->modifyTile({x, y})) {
         if (tile->get().collisionCacheDirty)
           freshenRegion.combine(RectI(x, y, x + 1, y + 1));
@@ -4116,9 +4116,9 @@ std::expected<void, StarException> WorldServer::freshenCollision(RectI const& re
     }
   }
 
-  if (!freshenRegion.isNull()) {
-    for (int x = freshenRegion.xMin(); x < freshenRegion.xMax(); ++x) {
-      for (int y = freshenRegion.yMin(); y < freshenRegion.yMax(); ++y) {
+  if (!freshenRegion.is_null()) {
+    for (int x = freshenRegion.x_min(); x < freshenRegion.x_max(); ++x) {
+      for (int y = freshenRegion.y_min(); y < freshenRegion.y_max(); ++y) {
         if (auto tile = m_tileArray->modifyTile({x, y})) {
           tile->get().collisionCacheDirty = false;
           tile->get().collisionCache.clear();
@@ -4509,7 +4509,7 @@ std::expected<Vec2F, StarException> WorldServer::findPlayerStart(std::optional<V
         auto result475 = rectTileCollision(RectI::integral(spawnRect), collideWithAnything);
         if (!result475)
           return std::unexpected(std::move(result475.error()));
-        if (!std::move(*result475) && spawnRect.yMax() < m_geometry.height())
+        if (!std::move(*result475) && spawnRect.y_max() < m_geometry.height())
           return pos;
 
         ++pos[1];
@@ -4548,7 +4548,7 @@ std::expected<Vec2F, StarException> WorldServer::findPlayerSpaceStart(float targ
   for (int t = 0; t < maximumTries; ++t) {
     Vec2F testPos = m_geometry.limit(
       basePos + Vec2F::with_angle(this->root().random().uniform_float() * 2 * std::numbers::pi, t * distanceIncrement));
-    RectF testRect = RectF::withCenter(testPos, testRectSize);
+    RectF testRect = RectF::with_center(testPos, testRectSize);
     auto result481 = generateRegion(RectI::integral(testRect));
     if (!result481)
       return std::unexpected(std::move(result481.error()));

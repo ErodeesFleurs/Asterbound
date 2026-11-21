@@ -471,7 +471,7 @@ std::expected<void, StarException> Cinematic::render() {
   Vec2F screenWindowSize = Vec2F(vWidth * m_drawableScale, vHeight * m_drawableScale);
   m_drawableScale = std::min(m_windowSize[0] / vWidth, m_windowSize[1] / vHeight);
   m_drawableTranslation = Vec2F(0.5f * (m_windowSize[0] - vWidth * m_drawableScale), 0.5f * (m_windowSize[1] - vHeight * m_drawableScale));
-  m_scissorRect = RectI::withSize(Vec2I::floor((m_windowSize / 2) - (screenWindowSize / 2)), Vec2I::ceil(screenWindowSize));
+  m_scissorRect = RectI::with_size(Vec2I::floor((m_windowSize / 2) - (screenWindowSize / 2)), Vec2I::ceil(screenWindowSize));
 
   updateCamera(m_timer.time());
 
@@ -486,17 +486,17 @@ std::expected<void, StarException> Cinematic::render() {
   if (m_backgroundColor) {
     Vec4B backgroundColor = *m_backgroundColor;
     backgroundColor[3] *= fadeFactor;
-    renderer.render(renderFlatRect(RectF::withSize(Vec2F(0, 0), m_windowSize), backgroundColor, 0.0f));
+    renderer.render(renderFlatRect(RectF::with_size(Vec2F(0, 0), m_windowSize), backgroundColor, 0.0f));
   }
 
   if (m_letterbox && !m_backgroundColor) {
     Vec4B letterboxColor = Vec4B(0, 0, 0, 255 * fadeFactor);
     if (m_windowSize[0] / vWidth > m_windowSize[1] / vHeight) {
-      renderer.render(renderFlatRect(RectF(0, 0, m_scissorRect.xMin(), m_windowSize[1]), letterboxColor, 0.0f));
-      renderer.render(renderFlatRect(RectF(m_scissorRect.xMax(), 0, m_windowSize[0], m_windowSize[1]), letterboxColor, 0.0f));
+      renderer.render(renderFlatRect(RectF(0, 0, m_scissorRect.x_min(), m_windowSize[1]), letterboxColor, 0.0f));
+      renderer.render(renderFlatRect(RectF(m_scissorRect.x_max(), 0, m_windowSize[0], m_windowSize[1]), letterboxColor, 0.0f));
     } else {
-      renderer.render(renderFlatRect(RectF(0, 0, m_windowSize[0], m_scissorRect.yMin()), letterboxColor, 0.0f));
-      renderer.render(renderFlatRect(RectF(0, m_scissorRect.yMax(), m_windowSize[0], m_windowSize[1]), letterboxColor, 0.0f));
+      renderer.render(renderFlatRect(RectF(0, 0, m_windowSize[0], m_scissorRect.y_min()), letterboxColor, 0.0f));
+      renderer.render(renderFlatRect(RectF(0, m_scissorRect.y_max(), m_windowSize[0], m_windowSize[1]), letterboxColor, 0.0f));
     }
   }
 
@@ -658,16 +658,16 @@ std::expected<void, StarException> Cinematic::drawDrawable(Drawable const& drawa
     Vec2F screenTranslation = drawable.position * drawableScale + drawableTranslation;
 
     Vec2F lowerLeft =
-        imagePart.transformation.transform_point(Vec2F(imageRect.xMin(), imageRect.yMin())) * drawableScale
+        imagePart.transformation.transform_point(Vec2F(imageRect.x_min(), imageRect.y_min())) * drawableScale
         + screenTranslation;
     Vec2F lowerRight =
-        imagePart.transformation.transform_point(Vec2F(imageRect.xMax(), imageRect.yMin())) * drawableScale
+        imagePart.transformation.transform_point(Vec2F(imageRect.x_max(), imageRect.y_min())) * drawableScale
         + screenTranslation;
     Vec2F upperRight =
-        imagePart.transformation.transform_point(Vec2F(imageRect.xMax(), imageRect.yMax())) * drawableScale
+        imagePart.transformation.transform_point(Vec2F(imageRect.x_max(), imageRect.y_max())) * drawableScale
         + screenTranslation;
     Vec2F upperLeft =
-        imagePart.transformation.transform_point(Vec2F(imageRect.xMin(), imageRect.yMax())) * drawableScale
+        imagePart.transformation.transform_point(Vec2F(imageRect.x_min(), imageRect.y_max())) * drawableScale
         + screenTranslation;
 
     Vec4B drawableColor = drawable.color.to_rgba();

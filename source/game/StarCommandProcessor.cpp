@@ -430,7 +430,7 @@ std::expected<String, StarException> CommandProcessor::warpRandom(ConnectionId c
     return false;
   };
   while (!target) {
-    RectI region = RectI::withSize(Vec2I(m_root.random().next_i32(), m_root.random().next_i32()), size);
+    RectI region = RectI::with_size(Vec2I(m_root.random().next_i32(), m_root.random().next_i32()), size);
     while (true) {
       auto loaded = celestialDatabase->scanRegionFullyLoaded(region);
       if (!loaded) return std::unexpected(std::move(loaded.error()));
@@ -627,7 +627,7 @@ std::expected<String, StarException> CommandProcessor::setDungeonId(ConnectionId
     auto done = m_universe.executeForClient(connectionId, [dungeonId](WorldServer& world, std::shared_ptr<Player> const& player) -> std::expected<void, StarException> {
         auto aimPosition = player->aimPosition();
         if (!aimPosition) return std::unexpected(std::move(aimPosition.error()));
-        return world.setDungeonId(RectI::withSize(Vec2I((*aimPosition)), Vec2I(1, 1)), dungeonId);
+        return world.setDungeonId(RectI::with_size(Vec2I((*aimPosition)), Vec2I(1, 1)), dungeonId);
       });
 
     if (!done) return std::unexpected(std::move(done.error()));
@@ -1074,7 +1074,7 @@ std::expected<String, StarException> CommandProcessor::clearStagehand(Connection
       [&](WorldServer& world, std::shared_ptr<Player> player) -> std::expected<void, StarException> {
         auto aimPosition = player->aimPosition();
         if (!aimPosition) return std::unexpected(std::move(aimPosition.error()));
-        auto queryRect = RectF::withCenter((*aimPosition), Vec2F{2, 2});
+        auto queryRect = RectF::with_center((*aimPosition), Vec2F{2, 2});
         auto stagehands = world.query<Stagehand>(queryRect);
         if (!stagehands) return std::unexpected(std::move(stagehands.error()));
         for (auto const& stagehand : *stagehands) {
@@ -1370,7 +1370,7 @@ std::expected<String, StarException> CommandProcessor::entityEval(ConnectionId c
       [&lua, &message](WorldServer& world, std::shared_ptr<Player> const& player) -> std::expected<void, StarException> {
         auto aimPosition = player->aimPosition();
         if (!aimPosition) return std::unexpected(std::move(aimPosition.error()));
-        auto queryRect = RectF::withCenter((*aimPosition), Vec2F{2, 2});
+        auto queryRect = RectF::with_center((*aimPosition), Vec2F{2, 2});
         auto query = world.query<ScriptedEntity>(queryRect);
         if (!query) return std::unexpected(std::move(query.error()));
         auto entities = std::move(*query);

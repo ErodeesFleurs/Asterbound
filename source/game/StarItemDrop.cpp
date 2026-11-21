@@ -492,7 +492,7 @@ std::expected<void, StarException> ItemDrop::update(float dt, std::uint64_t) {
         return std::unexpected(std::move(takeable.error()));
       if (*takeable && m_mode.get() == Mode::Available && root().random().uniform_float() < m_combineChance) {
         auto found = world.findEntity(
-          RectF::withCenter(position(), Vec2F::filled(m_combineRadius)),
+          RectF::with_center(position(), Vec2F::filled(m_combineRadius)),
           [&](std::shared_ptr<Entity> const& entity) -> std::expected<bool, StarException> {
             auto closeDropRef = as_ref<ItemDrop>(*entity);
             if (!closeDropRef)
@@ -855,8 +855,8 @@ std::expected<void, StarException> ItemDrop::updateTaken(bool master) {
     if (overhead) {
       targetPosition += m_overheadOffset;
       auto rect = owningEntity->collisionArea();
-      if (!rect.isNull())
-        targetPosition[1] += rect.yMax() + 1.5f;
+      if (!rect.is_null())
+        targetPosition[1] += rect.y_max() + 1.5f;
       else
         targetPosition[1] += 1.5f;
     }

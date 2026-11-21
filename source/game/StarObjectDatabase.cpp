@@ -475,7 +475,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
       }
       orientation->spaces = spaceScanSpaces.values();
     }
-    orientation->boundBox = RectI::boundBoxOfPoints(orientation->spaces);
+    orientation->boundBox = RectI::bound_box_of_points(orientation->spaces);
     auto metaBoxResult = orientationSettings.opt("metaBoundBox");
     if (!metaBoxResult)
       return std::unexpected(std::move(metaBoxResult.error()));
@@ -518,22 +518,22 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
       auto anchorType = std::move(*anchorTypeResult);
       if (anchorType == "left") {
         for (auto space : orientation->spaces) {
-          if (space[0] == orientation->boundBox.xMin())
+          if (space[0] == orientation->boundBox.x_min())
             orientation->anchors.push_back({TileLayer::Foreground, space + Vec2I(-1, 0), tilled, soil, anchorMaterial});
         }
       } else if (anchorType == "bottom") {
         for (auto space : orientation->spaces) {
-          if (space[1] == orientation->boundBox.yMin())
+          if (space[1] == orientation->boundBox.y_min())
             orientation->anchors.push_back({TileLayer::Foreground, space + Vec2I(0, -1), tilled, soil, anchorMaterial});
         }
       } else if (anchorType == "right") {
         for (auto space : orientation->spaces) {
-          if (space[0] == orientation->boundBox.xMax())
+          if (space[0] == orientation->boundBox.x_max())
             orientation->anchors.push_back({TileLayer::Foreground, space + Vec2I(1, 0), tilled, soil, anchorMaterial});
         }
       } else if (anchorType == "top") {
         for (auto space : orientation->spaces) {
-          if (space[1] == orientation->boundBox.yMax())
+          if (space[1] == orientation->boundBox.y_max())
             orientation->anchors.push_back({TileLayer::Foreground, space + Vec2I(0, 1), tilled, soil, anchorMaterial});
         }
       } else if (anchorType == "background") {
@@ -630,7 +630,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
         }
       } else {
         for (auto const& space : orientation->spaces) {
-          if (collisionType == "solid" || space[1] == orientation->boundBox.yMax())
+          if (collisionType == "solid" || space[1] == orientation->boundBox.y_max())
             orientation->materialSpaces.push_back({space, material});
         }
       }

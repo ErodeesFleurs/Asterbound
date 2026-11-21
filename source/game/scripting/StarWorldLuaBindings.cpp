@@ -546,7 +546,7 @@ namespace LuaBindings {
         // Collision area queries either query based on the collision area if
         // that's given, or as a fallback the regular bound box.
         auto collisionArea = entity->collisionArea();
-        if (collisionArea.isNull())
+        if (collisionArea.is_null())
           collisionArea = entity->metaBoundBox();
         collisionArea.translate(position);
 
@@ -2501,7 +2501,7 @@ namespace LuaBindings {
   std::expected<List<std::pair<Vec2I, LiquidLevel>>, StarException> WorldEnvironmentCallbacks::liquidAlongLine(World& world, Vec2F const& start, Vec2F const& end) {
     List<std::pair<Vec2I, LiquidLevel>> levels;
     auto traversed = forBlocksAlongLine<float>(start, world.geometry().diff(end, start), [&](int x, int y) -> std::expected<bool, StarException> {
-        auto liquidLevelResult = world.liquidLevel(RectF::withSize(Vec2F(x, y), Vec2F(1, 1)));
+        auto liquidLevelResult = world.liquidLevel(RectF::with_size(Vec2F(x, y), Vec2F(1, 1)));
         if (!liquidLevelResult)
           return std::unexpected(std::move(liquidLevelResult.error()));
         auto liquidLevel = std::move(*liquidLevelResult);

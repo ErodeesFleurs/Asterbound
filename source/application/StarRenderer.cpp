@@ -88,9 +88,9 @@ RenderQuad::RenderQuad(TexturePtr tex, Vec2F minPosition, float textureScale, Ve
 RenderQuad::RenderQuad(TexturePtr tex, RectF const& screenCoords, Vec4B color, float param1) : texture(std::move(tex)) {
   Vec2F size = Vec2F(texture->size());
   a = { screenCoords.min(), { 0, 0 }, color, param1 };
-  b = { { screenCoords.xMax(), screenCoords.yMin(), }, { size[0], 0.f }, color, param1 };
+  b = { { screenCoords.x_max(), screenCoords.y_min(), }, { size[0], 0.f }, color, param1 };
   c = { screenCoords.max(), size, color, param1};
-  d = { { screenCoords.xMin(), screenCoords.yMax(), }, { 0.f, size[1] }, color, param1 };
+  d = { { screenCoords.x_min(), screenCoords.y_max(), }, { 0.f, size[1] }, color, param1 };
 }
 
 RenderQuad::RenderQuad(TexturePtr tex, Vec2F posA, Vec2F uvA, Vec2F posB, Vec2F uvB, Vec2F posC, Vec2F uvC, Vec2F posD, Vec2F uvD, Vec4B color, float param1) : texture(std::move(tex)) {
@@ -105,9 +105,9 @@ RenderQuad::RenderQuad(TexturePtr tex, RenderVertex vA, RenderVertex vB, RenderV
 
 RenderQuad::RenderQuad(RectF const& rect, Vec4B color, float param1)
   : a{ rect.min(), {}, color, param1 }
-  , b{ { rect.xMax(), rect.yMin()}, {}, color, param1 }
+  , b{ { rect.x_max(), rect.y_min()}, {}, color, param1 }
   , c{ rect.max(), {}, color, param1 }
-  , d{ { rect.xMin() ,rect.yMax() }, {}, color, param1 } {};
+  , d{ { rect.x_min() ,rect.y_max() }, {}, color, param1 } {};
 
 
 RenderPoly::RenderPoly(List<Vec2F> const& verts, Vec4B color, float param1) {

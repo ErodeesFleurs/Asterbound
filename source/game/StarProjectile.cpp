@@ -491,7 +491,7 @@ if (!result925) return std::unexpected(std::move(result925.error()));
     }
     addDamageSource(damagePoly);
   } else if (!useDamageLine) {
-    addDamageSource(PolyF(RectF::withCenter(Vec2F(), Vec2F::filled(MinimumDamageLineDelta))));
+    addDamageSource(PolyF(RectF::with_center(Vec2F(), Vec2F::filled(MinimumDamageLineDelta))));
   }
 
   return res;

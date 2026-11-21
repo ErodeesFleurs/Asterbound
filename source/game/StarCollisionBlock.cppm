@@ -140,7 +140,7 @@ inline CollisionBlock CollisionBlock::nullBlock(Vec2I const& space) {
     Vec2F(space) + Vec2F(1, 1),
     Vec2F(space) + Vec2F(0, 1)
   };
-  block.polyBounds = RectF::withSize(Vec2F(space), Vec2F(1, 1));
+  block.polyBounds = RectF::with_size(Vec2F(space), Vec2F(1, 1));
   return block;
 }
 

@@ -1157,8 +1157,8 @@ namespace Dungeon {
                                                  std::optional<int> terrainSurfaceSpaceExtends)
       : m_root(root), m_facade(std::move(facade)), m_terrainMarkingSurfaceLevel(terrainMarkingSurfaceLevel),
         m_terrainSurfaceSpaceExtends(terrainSurfaceSpaceExtends) {
-    m_currentBounds.setMin(Vec2I{std::numeric_limits<std::int32_t>::max(), std::numeric_limits<std::int32_t>::max()});
-    m_currentBounds.setMax(Vec2I{std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::min()});
+    m_currentBounds.set_min(Vec2I{std::numeric_limits<std::int32_t>::max(), std::numeric_limits<std::int32_t>::max()});
+    m_currentBounds.set_max(Vec2I{std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::min()});
   }
 
   Vec2I DungeonGeneratorWriter::wrapPosition(Vec2I const& pos) const {
@@ -1316,11 +1316,11 @@ namespace Dungeon {
       m_localWires.push_back(entries.second);
     m_openLocalWires.clear();
 
-    if (m_currentBounds.xMin() > m_currentBounds.xMax())
+    if (m_currentBounds.x_min() > m_currentBounds.x_max())
       return;
     m_boundingBoxes.push_back(m_currentBounds);
-    m_currentBounds.setMin(Vec2I{std::numeric_limits<std::int32_t>::max(), std::numeric_limits<std::int32_t>::max()});
-    m_currentBounds.setMax(Vec2I{std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::min()});
+    m_currentBounds.set_min(Vec2I{std::numeric_limits<std::int32_t>::max(), std::numeric_limits<std::int32_t>::max()});
+    m_currentBounds.set_max(Vec2I{std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::min()});
   }
 
   std::expected<void, StarException> DungeonGeneratorWriter::flushLiquid() {
@@ -1389,22 +1389,22 @@ namespace Dungeon {
       if (m_terrainMarkingSurfaceLevel) {
         // Mark the regions of the dungeon above the dungeon surface as needing
         // space, and the regions below the surface as needing terrain
-        if (bb.yMin() < *m_terrainMarkingSurfaceLevel) {
+        if (bb.y_min() < *m_terrainMarkingSurfaceLevel) {
           RectI lower = bb;
-          lower.setYMax(std::min(lower.yMax(), *m_terrainMarkingSurfaceLevel));
-          terrainBlendingVertexes.push_back(Vec2F(lower.xMin(), lower.yMin()));
-          terrainBlendingVertexes.push_back(Vec2F(lower.xMax(), lower.yMin()));
-          terrainBlendingVertexes.push_back(Vec2F(lower.xMin(), lower.yMax()));
-          terrainBlendingVertexes.push_back(Vec2F(lower.xMax(), lower.yMax()));
+          lower.set_y_max(std::min(lower.y_max(), *m_terrainMarkingSurfaceLevel));
+          terrainBlendingVertexes.push_back(Vec2F(lower.x_min(), lower.y_min()));
+          terrainBlendingVertexes.push_back(Vec2F(lower.x_max(), lower.y_min()));
+          terrainBlendingVertexes.push_back(Vec2F(lower.x_min(), lower.y_max()));
+          terrainBlendingVertexes.push_back(Vec2F(lower.x_max(), lower.y_max()));
         }
 
-        if (bb.yMax() > *m_terrainMarkingSurfaceLevel) {
+        if (bb.y_max() > *m_terrainMarkingSurfaceLevel) {
           RectI upper = bb;
-          upper.setYMin(std::max(upper.yMin(), *m_terrainMarkingSurfaceLevel));
-          spaceBlendingVertexes.push_back(Vec2F(upper.xMin(), upper.yMin()));
-          spaceBlendingVertexes.push_back(Vec2F(upper.xMax(), upper.yMin()));
-          spaceBlendingVertexes.push_back(Vec2F(upper.xMin(), upper.yMax() + m_terrainSurfaceSpaceExtends.value_or(0)));
-          spaceBlendingVertexes.push_back(Vec2F(upper.xMax(), upper.yMax() + m_terrainSurfaceSpaceExtends.value_or(0)));
+          upper.set_y_min(std::max(upper.y_min(), *m_terrainMarkingSurfaceLevel));
+          spaceBlendingVertexes.push_back(Vec2F(upper.x_min(), upper.y_min()));
+          spaceBlendingVertexes.push_back(Vec2F(upper.x_max(), upper.y_min()));
+          spaceBlendingVertexes.push_back(Vec2F(upper.x_min(), upper.y_max() + m_terrainSurfaceSpaceExtends.value_or(0)));
+          spaceBlendingVertexes.push_back(Vec2F(upper.x_max(), upper.y_max() + m_terrainSurfaceSpaceExtends.value_or(0)));
         }
       }
     }
@@ -1486,8 +1486,8 @@ namespace Dungeon {
   }
 
   void DungeonGeneratorWriter::reset() {
-    m_currentBounds.setMin(Vec2I{std::numeric_limits<std::int32_t>::max(), std::numeric_limits<std::int32_t>::max()});
-    m_currentBounds.setMax(Vec2I{std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::min()});
+    m_currentBounds.set_min(Vec2I{std::numeric_limits<std::int32_t>::max(), std::numeric_limits<std::int32_t>::max()});
+    m_currentBounds.set_max(Vec2I{std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::min()});
 
     m_pendingLiquids.clear();
     m_foregroundMaterial.clear();
@@ -1752,7 +1752,7 @@ std::expected<std::pair<List<RectI>, Set<Vec2I>>, StarException> DungeonGenerato
           return false;
         });
       if (!cleared) return std::unexpected(std::move(cleared.error()));
-      auto partBounds = RectI::withSize(placePos, Vec2I(part.size()));
+      auto partBounds = RectI::with_size(placePos, Vec2I(part.size()));
       if (auto result = writer.clearTileEntities(partBounds, clearTileEntityPositions, part.clearAnchoredObjects()); !result) return std::unexpected(std::move(result.error()));
 
       if (part.markDungeonId())

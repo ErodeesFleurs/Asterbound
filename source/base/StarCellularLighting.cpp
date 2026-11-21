@@ -245,7 +245,7 @@ std::expected<void, StarException> CellularLightIntensityCalculator::setParamete
 
 void CellularLightIntensityCalculator::begin(Vec2F const& queryPosition) {
   m_queryPosition = queryPosition;
-  m_queryRegion = RectI::withSize(Vec2I::floor(queryPosition - Vec2F::filled(0.5f)), Vec2I(2, 2));
+  m_queryRegion = RectI::with_size(Vec2I::floor(queryPosition - Vec2F::filled(0.5f)), Vec2I(2, 2));
   m_calculationRegion = RectI(m_queryRegion).padded(static_cast<int>(m_lightArray.borderCells()));
 
   m_lightArray.begin(m_calculationRegion.width(), m_calculationRegion.height());
@@ -260,7 +260,7 @@ void CellularLightIntensityCalculator::setCell(Vec2I const& position, Cell const
 }
 
 void CellularLightIntensityCalculator::setCellColumn(Vec2I const& position, std::span<Cell const> cells) {
-  std::size_t baseIndex = (position[0] - m_calculationRegion.xMin()) * m_calculationRegion.height() + position[1] - m_calculationRegion.yMin();
+  std::size_t baseIndex = (position[0] - m_calculationRegion.x_min()) * m_calculationRegion.height() + position[1] - m_calculationRegion.y_min();
   for (std::size_t i = 0; i < cells.size(); ++i)
     m_lightArray.cellAtIndex(baseIndex + i) = cells[i];
 }
@@ -294,8 +294,8 @@ float CellularLightIntensityCalculator::calculate() {
   float ul = m_lightArray.getLight(arrayMin[0], arrayMin[1] + 1);
   float ur = m_lightArray.getLight(arrayMin[0] + 1, arrayMin[1] + 1);
 
-  float xl = m_queryPosition[0] - 0.5f - m_queryRegion.xMin();
-  float yl = m_queryPosition[1] - 0.5f - m_queryRegion.yMin();
+  float xl = m_queryPosition[0] - 0.5f - m_queryRegion.x_min();
+  float yl = m_queryPosition[1] - 0.5f - m_queryRegion.y_min();
 
   return lerp(yl, lerp(xl, ll, lr), lerp(xl, ul, ur));
 }

@@ -164,10 +164,10 @@ std::expected<RectU, StarException> json_to_rectu(Json const& v) {
     return static_cast<std::uint64_t>(*value);
   }, json_to_vec2u, "jsonToRectU");
 }
-Json json_from_rectd(RectD const& r) { return JsonArray{r.xMin(), r.yMin(), r.xMax(), r.yMax()}; }
-Json json_from_rectf(RectF const& r) { return JsonArray{r.xMin(), r.yMin(), r.xMax(), r.yMax()}; }
-Json json_from_recti(RectI const& r) { return JsonArray{r.xMin(), r.yMin(), r.xMax(), r.yMax()}; }
-Json json_from_rectu(RectU const& r) { return JsonArray{r.xMin(), r.yMin(), r.xMax(), r.yMax()}; }
+Json json_from_rectd(RectD const& r) { return JsonArray{r.x_min(), r.y_min(), r.x_max(), r.y_max()}; }
+Json json_from_rectf(RectF const& r) { return JsonArray{r.x_min(), r.y_min(), r.x_max(), r.y_max()}; }
+Json json_from_recti(RectI const& r) { return JsonArray{r.x_min(), r.y_min(), r.x_max(), r.y_max()}; }
+Json json_from_rectu(RectU const& r) { return JsonArray{r.x_min(), r.y_min(), r.x_max(), r.y_max()}; }
 
 std::expected<Color, StarException> json_to_color(Json const& v) {
   if (v.type() == Json::Type::Array) {

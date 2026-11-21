@@ -53,8 +53,8 @@ struct WorldServerTestAccess {
     auto sectors = world.m_tileArray->loadedSectors();
     for (auto const& sector : sectors) {
       auto region = world.m_tileArray->sectorRegion(sector);
-      for (int x = region.xMin(); x < region.xMax(); ++x) {
-        for (int y = region.yMin(); y < region.yMax(); ++y) {
+      for (int x = region.x_min(); x < region.x_max(); ++x) {
+        for (int y = region.y_min(); y < region.y_max(); ++y) {
           auto const& liquid = world.m_tileArray->tile(Vec2I(x, y)).liquid;
           if (liquid.liquid != EmptyLiquidId || liquid.level != 0.0f || liquid.source)
             return std::unexpected(StarException("Snapshot liquid seed would discard generated liquid"));
@@ -292,7 +292,7 @@ std::expected<void, StarException> moveSnapshotWindow(SnapshotFixture& fixture, 
   // Four heavily overlapping groups. The distant window forces real visibility
   // exits/re-entry; presence entities remain monitored outside the camera.
   int offset = phase % 2 ? 512 : 0;
-  client.state->setWindow(RectI::withSize(Vec2I(960 + offset + int(client.id % 4) * 8, 960), Vec2I(128, 96)));
+  client.state->setWindow(RectI::with_size(Vec2I(960 + offset + int(client.id % 4) * 8, 960), Vec2I(128, 96)));
   auto delta = client.state->writeDelta();
   if (!delta)
     return std::unexpected(std::move(delta.error()));

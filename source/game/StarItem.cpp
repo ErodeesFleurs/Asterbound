@@ -393,7 +393,7 @@ std::expected<void, StarException> Item::setIconDrawables(List<Drawable> drawabl
   auto boundBox = Drawable::boundBoxAll(**metadata, drawables, true);
   if (!boundBox)
     return std::unexpected(std::move(boundBox.error()));
-  if (!boundBox->isEmpty()) {
+  if (!boundBox->is_empty()) {
     for (auto& drawable : drawables)
       drawable.translate(-boundBox->center());
     float zoom = 16.0f / std::max(boundBox->width(), boundBox->height());
@@ -417,7 +417,7 @@ std::expected<void, StarException> Item::setSecondaryIconDrawables(std::optional
   auto boundBox = Drawable::boundBoxAll(**metadata, *drawables, true);
   if (!boundBox)
     return std::unexpected(std::move(boundBox.error()));
-  if (!boundBox->isEmpty()) {
+  if (!boundBox->is_empty()) {
     for (auto& drawable : *drawables)
       drawable.translate(-boundBox->center());
     float zoom = 16.0f / std::max(boundBox->width(), boundBox->height());

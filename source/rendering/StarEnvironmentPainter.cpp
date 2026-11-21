@@ -140,7 +140,7 @@ std::expected<void, StarException> EnvironmentPainter::renderStars(float pixelRa
   if (!screenBufferResult) return std::unexpected(std::move(screenBufferResult.error()));
   float screenBuffer = *screenBufferResult;
 
-  PolyF field = PolyF(RectF::withSize(viewMin, Vec2F(viewSize)).padded(screenBuffer));
+  PolyF field = PolyF(RectF::with_size(viewMin, Vec2F(viewSize)).padded(screenBuffer));
   field.rotate(-sky.starRotation, Vec2F(sky.starOffset));
 
   Mat3F transform = Mat3F::identity();
@@ -162,7 +162,7 @@ std::expected<void, StarException> EnvironmentPainter::renderStars(float pixelRa
     });
   if (!stars) return std::unexpected(std::move(stars.error()));
 
-  RectF viewRect = RectF::withSize(Vec2F(), viewSize).padded(screenBuffer);
+  RectF viewRect = RectF::with_size(Vec2F(), viewSize).padded(screenBuffer);
 
   auto& primitives = m_renderer->immediatePrimitives();
 
@@ -228,7 +228,7 @@ std::expected<void, StarException> EnvironmentPainter::renderDebrisFields(float 
       biggest = biggest.piecewise_max((*texture)->size());
     }
     float screenBuffer = std::ceil((float)biggest.max() * (float)std::numbers::sqrt2);
-    PolyD field = PolyD(RectD::withSize(viewMin + velocityOffset, Vec2D(viewSize)).padded(screenBuffer));
+    PolyD field = PolyD(RectD::with_size(viewMin + velocityOffset, Vec2D(viewSize)).padded(screenBuffer));
     auto angularJson = debrisField.query("angularVelocityRange");
     if (!angularJson) return std::unexpected(std::move(angularJson.error()));
     auto angularRange = json_to_vec2f(*angularJson);
@@ -295,7 +295,7 @@ std::expected<void, StarException> EnvironmentPainter::renderPlanetHorizon(float
     Vec2F layerPosition = center;
     if (leftHalf)
       layerPosition[0] -= textureSize[0] * planetPixelRatio;
-    auto rect = RectF::withSize(layerPosition, textureSize * planetPixelRatio);
+    auto rect = RectF::with_size(layerPosition, textureSize * planetPixelRatio);
     PolyF image = PolyF(rect);
     image.rotate(planetHorizon.rotation, center);
 
@@ -431,9 +431,9 @@ std::expected<void, StarException> EnvironmentPainter::renderParallaxLayers(
 
         Vec2F anchorPoint(pixelTileLeft, pixelTileBottom);
 
-        RectF subImage = RectF::withSize(Vec2F(), parallaxSize);
+        RectF subImage = RectF::with_size(Vec2F(), parallaxSize);
         if (tileLimitTop != top && y + 1 > tileLimitTop)
-          subImage.setYMin(parallaxSize[1] * (1.0f - fractional_part(tileLimitTop)));
+          subImage.set_y_min(parallaxSize[1] * (1.0f - fractional_part(tileLimitTop)));
         if (tileLimitBottom != bottom && y < tileLimitBottom)
           anchorPoint[1] += fractional_part(tileLimitBottom) * parallaxPixels[1];
 
@@ -450,12 +450,12 @@ std::expected<void, StarException> EnvironmentPainter::renderParallaxLayers(
           auto texture = m_textureGroup->tryTexture(withDirectives);
           if (!texture) return std::unexpected(std::move(texture.error()));
           if (*texture) {
-            RectF drawRect = RectF::withSize(anchorPoint, subImage.size() * camera.pixelRatio());
+            RectF drawRect = RectF::with_size(anchorPoint, subImage.size() * camera.pixelRatio());
             primitives.emplace_back(std::in_place_type_t<RenderQuad>(), std::move(*texture),
                 RenderVertex{drawRect.min(), subImage.min(), drawColor, lightMapMultiplier},
-                RenderVertex{{drawRect.xMax(), drawRect.yMin()}, {subImage.xMax(), subImage.yMin()}, drawColor, lightMapMultiplier},
+                RenderVertex{{drawRect.x_max(), drawRect.y_min()}, {subImage.x_max(), subImage.y_min()}, drawColor, lightMapMultiplier},
                 RenderVertex{drawRect.max(), subImage.max(), drawColor, lightMapMultiplier},
-                RenderVertex{{drawRect.xMin(), drawRect.yMax()}, {subImage.xMin(), subImage.yMax()}, drawColor, lightMapMultiplier});
+                RenderVertex{{drawRect.x_min(), drawRect.y_max()}, {subImage.x_min(), subImage.y_max()}, drawColor, lightMapMultiplier});
           }
         }
       }
@@ -576,14 +576,14 @@ std::expected<void, StarException> EnvironmentPainter::drawOrbiter(float pixelRa
   Vec2F texSize = Vec2F(texture->size());
 
   Mat3F renderMatrix = Mat3F::rotation(orbiter.angle, position);
-  RectF renderRect = RectF::withCenter(position, texSize * orbiter.scale * pixelRatio);
+  RectF renderRect = RectF::with_center(position, texSize * orbiter.scale * pixelRatio);
   Vec4B renderColor = Vec4B(255, 255, 255, 255 * alpha);
 
   m_renderer->immediatePrimitives().emplace_back(std::in_place_type_t<RenderQuad>(), std::move(texture),
       renderMatrix.transform_point(renderRect.min()), Vec2F(0, 0),
-      renderMatrix.transform_point(Vec2F{renderRect.xMax(), renderRect.yMin()}), Vec2F(texSize[0], 0),
+      renderMatrix.transform_point(Vec2F{renderRect.x_max(), renderRect.y_min()}), Vec2F(texSize[0], 0),
       renderMatrix.transform_point(renderRect.max()), Vec2F(texSize[0], texSize[1]),
-      renderMatrix.transform_point(Vec2F{renderRect.xMin(), renderRect.yMax()}), Vec2F(0, texSize[1]),
+      renderMatrix.transform_point(Vec2F{renderRect.x_min(), renderRect.y_max()}), Vec2F(0, texSize[1]),
     renderColor, 0.0f);
   return {};
 }

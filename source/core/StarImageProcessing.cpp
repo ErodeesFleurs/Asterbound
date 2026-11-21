@@ -297,7 +297,7 @@ String image_operation_to_string(ImageOperation const& operation) {
     else if (op->get().mode == ScaleImageOperation::Bicubic)
       return Star::format("scalebicubic={}", op->get().scale);
   } else if (auto op = (std::holds_alternative<CropImageOperation>(operation) ? std::optional{std::cref(std::get<CropImageOperation>(operation))} : std::nullopt)) {
-    return Star::format("crop={};{};{};{}", op->get().subset.xMin(), op->get().subset.xMax(), op->get().subset.yMin(), op->get().subset.yMax());
+    return Star::format("crop={};{};{};{}", op->get().subset.x_min(), op->get().subset.x_max(), op->get().subset.y_min(), op->get().subset.y_max());
   } else if (auto op = (std::holds_alternative<FlipImageOperation>(operation) ? std::optional{std::cref(std::get<FlipImageOperation>(operation))} : std::nullopt)) {
     if (op->get().mode == FlipImageOperation::FlipX)
       return "flipx";

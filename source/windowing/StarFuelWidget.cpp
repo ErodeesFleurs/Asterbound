@@ -99,8 +99,8 @@ std::expected<void, StarException> FuelWidget::renderImpl() {
   auto texture = context().textureSize("/interface/fuel/fuelgauge.png");
   if (!texture) return std::unexpected(std::move(texture.error()));
   Vec2F textureSize(*texture);
-  RectF entireTex = RectF::withSize({}, textureSize);
-  RectF entirePosition = RectF::withSize(Vec2F(screenPosition()), textureSize);
+  RectF entireTex = RectF::with_size({}, textureSize);
+  RectF entirePosition = RectF::with_size(Vec2F(screenPosition()), textureSize);
   Vec2F textPosition = entirePosition.center();
 
   float fuel = 1;

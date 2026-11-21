@@ -2042,9 +2042,9 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
         Particle particle = config.creator();
         particle.position += config.offset;
 
-        if (!offsetRegion.isNull()) {
-          particle.position[0] += m_root.get().random().uniform_float() * offsetRegion.width() + offsetRegion.xMin();
-          particle.position[1] += m_root.get().random().uniform_float() * offsetRegion.height() + offsetRegion.yMin();
+        if (!offsetRegion.is_null()) {
+          particle.position[0] += m_root.get().random().uniform_float() * offsetRegion.width() + offsetRegion.x_min();
+          particle.position[1] += m_root.get().random().uniform_float() * offsetRegion.height() + offsetRegion.y_min();
         }
 
         float speed = particle.velocity.magnitude();

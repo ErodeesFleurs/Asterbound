@@ -1650,10 +1650,10 @@ Result<void> VulkanRenderer::State::draw(std::shared_ptr<Geometry> const& geomet
     vkCmdSetViewport(frame.command, 0, 1, &viewport);
     VkRect2D clip{{0, 0}, {target.color->size[0], target.color->size[1]}};
     if (scissor) {
-      auto left = std::clamp(scissor->xMin(), 0, static_cast<int>(target.color->size[0]));
-      auto bottom = std::clamp(scissor->yMin(), 0, static_cast<int>(target.color->size[1]));
-      auto right = std::clamp(scissor->xMax(), left, static_cast<int>(target.color->size[0]));
-      auto top = std::clamp(scissor->yMax(), bottom, static_cast<int>(target.color->size[1]));
+      auto left = std::clamp(scissor->x_min(), 0, static_cast<int>(target.color->size[0]));
+      auto bottom = std::clamp(scissor->y_min(), 0, static_cast<int>(target.color->size[1]));
+      auto right = std::clamp(scissor->x_max(), left, static_cast<int>(target.color->size[0]));
+      auto top = std::clamp(scissor->y_max(), bottom, static_cast<int>(target.color->size[1]));
       clip = {{left, bottom}, {static_cast<unsigned>(right - left), static_cast<unsigned>(top - bottom)}};
     }
     vkCmdSetScissor(frame.command, 0, 1, &clip);

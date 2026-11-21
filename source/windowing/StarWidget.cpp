@@ -131,7 +131,7 @@ std::expected<bool, StarException> Widget::setupDrawRegion(RectI const& region) 
     scissorRect = noScissor();
   }
   m_drawingArea = scissorRect.limited(region);
-  if (m_drawingArea.isEmpty())
+  if (m_drawingArea.is_empty())
     return false;
 
   auto scissor = m_context.setInterfaceScissorRect(m_drawingArea);
@@ -177,7 +177,7 @@ void Widget::setSize(Vec2I const& size) {
 }
 
 RectI Widget::relativeBoundRect() const {
-  return RectI::withSize(relativePosition(), size());
+  return RectI::with_size(relativePosition(), size());
 }
 
 RectI Widget::screenBoundRect() const {
@@ -248,7 +248,7 @@ bool Widget::inMember(Vec2I const& position) const {
   if (m_mouseTransparent)
     return false;
 
-  if (!m_drawingArea.isNull() && !m_drawingArea.contains(Vec2I::floor(position)))
+  if (!m_drawingArea.is_null() && !m_drawingArea.contains(Vec2I::floor(position)))
     return false;
 
   if (m_container) {

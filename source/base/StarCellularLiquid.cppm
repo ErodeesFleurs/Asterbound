@@ -246,8 +246,8 @@ void LiquidCellEngine<LiquidId>::visitLocation(Vec2I const& p) {
 
 template <typename LiquidId>
 void LiquidCellEngine<LiquidId>::visitRegion(RectI const& region) {
-  for (int x = region.xMin(); x < region.xMax(); ++x) {
-    for (int y = region.yMin(); y < region.yMax(); ++y)
+  for (int x = region.x_min(); x < region.x_max(); ++x) {
+    for (int y = region.y_min(); y < region.y_max(); ++y)
       m_nextActiveCells.add({x, y});
   }
 }

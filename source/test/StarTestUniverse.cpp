@@ -496,7 +496,7 @@ TestUniverse::waitForWorldReady(std::int64_t timeoutMilliseconds) {
         // A rendered player does not imply its surrounding sectors have
         // finished activation/generation (and thus instantiated their NPCs).
         auto active =
-          world.regionActive(RectI::withCenter(Vec2I::floor(player->position()), Vec2I(m_clientWindowSize)));
+          world.regionActive(RectI::with_center(Vec2I::floor(player->position()), Vec2I(m_clientWindowSize)));
         if (!active)
           return std::unexpected(std::move(active.error()));
         schedulesReady = *active && step > ready.firstServerStep;

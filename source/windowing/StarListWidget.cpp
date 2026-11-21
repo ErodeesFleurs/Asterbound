@@ -83,9 +83,9 @@ std::expected<std::shared_ptr<ListWidget>, StarException> ListWidget::create(Gui
 
 RectI ListWidget::relativeBoundRect() const {
   if (m_fillDown)
-    return RectI::withSize(relativePosition() - Vec2I(0, size()[1]), size());
+    return RectI::with_size(relativePosition() - Vec2I(0, size()[1]), size());
   else
-    return RectI::withSize(relativePosition(), size());
+    return RectI::with_size(relativePosition(), size());
 }
 
 void ListWidget::setCallback(WidgetCallbackFunc callback) {

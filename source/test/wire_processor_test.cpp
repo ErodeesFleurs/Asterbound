@@ -60,7 +60,7 @@ void exerciseNetwork(GameTest& fixture, bool cycle) {
   auto close = make_scope_exit([&] { EXPECT_TRUE(world->close()); });
   world->setSpawningEnabled(false);
   ASSERT_TRUE(world->setFidelity(WorldServerFidelity::High));
-  ASSERT_TRUE(world->generateRegion(RectI::withSize(Vec2I(992, 992), Vec2I(128, 64))));
+  ASSERT_TRUE(world->generateRegion(RectI::with_size(Vec2I(992, 992), Vec2I(128, 64))));
   world->setTileProtectionEnabled(false);
   // A real background wall supplies attachment surfaces for the installed
   // wiring object. Both factory validation and Object::init choose orientation.

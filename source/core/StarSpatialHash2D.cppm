@@ -208,13 +208,13 @@ std::expected<void, StarException> SpatialHash2D<KeyT, ScalarT, ValueT, IntT, Al
   SmallList<Entry const*, 32> foundEntries;
 
   for (Rect const& rect : rects) {
-    if (rect.isNull())
+    if (rect.is_null())
       continue;
 
     auto sectorResult = getSectors(rect);
 
-    for (IntT x = sectorResult.xMin(); x < sectorResult.xMax(); ++x) {
-      for (IntT y = sectorResult.yMin(); y < sectorResult.yMax(); ++y) {
+    for (IntT x = sectorResult.x_min(); x < sectorResult.x_max(); ++x) {
+      for (IntT y = sectorResult.y_min(); y < sectorResult.y_max(); ++y) {
         auto i = m_sectorMap.find(Sector{x, y});
         if (i != m_sectorMap.end()) {
           for (auto e : i->second) {
@@ -312,21 +312,21 @@ void SpatialHash2D<KeyT, ScalarT, ValueT, IntT, AllocatorBlockSize>::setSectorSi
 template <typename KeyT, typename ScalarT, typename ValueT, typename IntT, std::size_t AllocatorBlockSize>
 typename SpatialHash2D<KeyT, ScalarT, ValueT, IntT, AllocatorBlockSize>::SectorRange SpatialHash2D<KeyT, ScalarT, ValueT, IntT, AllocatorBlockSize>::getSectors(Rect const& r) const {
   return SectorRange(
-      std::floor(r.xMin() / m_sectorSize),
-      std::floor(r.yMin() / m_sectorSize),
-      std::ceil(r.xMax() / m_sectorSize),
-      std::ceil(r.yMax() / m_sectorSize));
+      std::floor(r.x_min() / m_sectorSize),
+      std::floor(r.y_min() / m_sectorSize),
+      std::ceil(r.x_max() / m_sectorSize),
+      std::ceil(r.y_max() / m_sectorSize));
 }
 
 template <typename KeyT, typename ScalarT, typename ValueT, typename IntT, std::size_t AllocatorBlockSize>
 void SpatialHash2D<KeyT, ScalarT, ValueT, IntT, AllocatorBlockSize>::addSpatial(Entry const& entry) {
   for (Rect const& rect : entry.rects) {
-    if (rect.isNull())
+    if (rect.is_null())
       continue;
 
     auto sectorResult = getSectors(rect);
-    for (IntT x = sectorResult.xMin(); x < sectorResult.xMax(); ++x) {
-      for (IntT y = sectorResult.yMin(); y < sectorResult.yMax(); ++y) {
+    for (IntT x = sectorResult.x_min(); x < sectorResult.x_max(); ++x) {
+      for (IntT y = sectorResult.y_min(); y < sectorResult.y_max(); ++y) {
         m_sectorMap[Sector{x, y}].add(&entry);
       }
     }
@@ -336,12 +336,12 @@ void SpatialHash2D<KeyT, ScalarT, ValueT, IntT, AllocatorBlockSize>::addSpatial(
 template <typename KeyT, typename ScalarT, typename ValueT, typename IntT, std::size_t AllocatorBlockSize>
 void SpatialHash2D<KeyT, ScalarT, ValueT, IntT, AllocatorBlockSize>::removeSpatial(Entry const& entry) {
   for (Rect const& rect : entry.rects) {
-    if (rect.isNull())
+    if (rect.is_null())
       continue;
 
     auto sectorResult = getSectors(rect);
-    for (IntT x = sectorResult.xMin(); x < sectorResult.xMax(); ++x) {
-      for (IntT y = sectorResult.yMin(); y < sectorResult.yMax(); ++y) {
+    for (IntT x = sectorResult.x_min(); x < sectorResult.x_max(); ++x) {
+      for (IntT y = sectorResult.y_min(); y < sectorResult.y_max(); ++y) {
         auto i = m_sectorMap.find(Sector{x, y});
         if (i != m_sectorMap.end()) {
           i->second.remove(&entry);

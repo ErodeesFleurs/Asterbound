@@ -195,7 +195,7 @@ private:
 };
 
 inline std::size_t CellularLightingCalculator::baseIndexFor(Vec2I const& position) {
-  return (position[0] - m_calculationRegion.xMin()) * m_calculationRegion.height() + position[1] - m_calculationRegion.yMin();
+  return (position[0] - m_calculationRegion.x_min()) * m_calculationRegion.height() + position[1] - m_calculationRegion.y_min();
 }
 
 inline void CellularLightingCalculator::setCellIndex(std::size_t cellIndex, Vec3F const& light, bool obstacle) {

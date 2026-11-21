@@ -5161,9 +5161,9 @@ const GameTestRegistration mainbarGeometry("LuaMainBar", "PhysicalPolygonTransfo
         polygon.scale(scale, origin);
         auto bounds = polygon.bounding_box();
         for (Vec2F point : {bounds.center(), bounds.min(), bounds.max(),
-            Vec2F{bounds.xMin(), bounds.center().y()}, Vec2F{bounds.xMax(), bounds.center().y()},
-            Vec2F{bounds.center().x(), bounds.yMin()}, Vec2F{bounds.center().x(), bounds.yMax()},
-            Vec2F{bounds.xMin() - 0.25f, bounds.center().y()}, Vec2F{bounds.xMax() + 0.25f, bounds.center().y()}}) {
+            Vec2F{bounds.x_min(), bounds.center().y()}, Vec2F{bounds.x_max(), bounds.center().y()},
+            Vec2F{bounds.center().x(), bounds.y_min()}, Vec2F{bounds.center().x(), bounds.y_max()},
+            Vec2F{bounds.x_min() - 0.25f, bounds.center().y()}, Vec2F{bounds.x_max() + 0.25f, bounds.center().y()}}) {
           auto hit = script->eval<bool>(Star::format(
               "return mainbarPresentation.contains(layout.polygons.{}, {{{},{}}})", name, point[0], point[1]));
           ASSERT_TRUE(hit) << hit.error().what();

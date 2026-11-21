@@ -34,7 +34,7 @@ const GameTestRegistration movementTerrainContactPreservesPositionAndVelocity(
     world->setSpawningEnabled(false);
     world->setTileProtectionEnabled(false);
     Vec2I origin(1024, 1024);
-    ASSERT_TRUE(world->generateRegion(RectI::withSize(origin - Vec2I(16, 16), Vec2I(40, 40))));
+    ASSERT_TRUE(world->generateRegion(RectI::with_size(origin - Vec2I(16, 16), Vec2I(40, 40))));
     ASSERT_TRUE(world->setDungeonGravity(NoDungeonId, 60.0f));
     // Material placement marks constructed tiles with ConstructionDungeonId.
     // gravity() rounds the final position, so the corner can sample the wall

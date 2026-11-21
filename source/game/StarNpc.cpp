@@ -2324,7 +2324,7 @@ std::expected<StringSet, StarException> Npc::turnInQuests() const {
 
 std::expected<Vec2F, StarException> Npc::questIndicatorPosition() const {
   Vec2F pos = position() + m_questIndicatorOffset;
-  pos[1] += interactiveBoundBox().yMax();
+  pos[1] += interactiveBoundBox().y_max();
   return pos;
 }
 

@@ -892,7 +892,7 @@ std::expected<std::reference_wrapper<List<Drawable> const>, StarException> Mater
       auto boundBox = Drawable::boundBoxAll(**metadata, drawables, true);
       if (!boundBox)
         return std::unexpected(std::move(boundBox.error()));
-      if (!boundBox->isEmpty()) {
+      if (!boundBox->is_empty()) {
         for (auto& drawable : drawables)
           drawable.translate(-boundBox->center());
       }

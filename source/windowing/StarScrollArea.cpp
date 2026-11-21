@@ -156,7 +156,7 @@ std::expected<void, StarException> ScrollThumb::renderImpl() {
 
   if (workingSet.fullyPopulated()) {
     return context().drawImageStretchSet(workingSet,
-        RectF::withSize(Vec2F(screenPosition()), Vec2F(size())),
+        RectF::with_size(Vec2F(screenPosition()), Vec2F(size())),
         m_direction);
   }
   return {};
@@ -464,7 +464,7 @@ RectI ScrollArea::contentBoundRect() const {
       continue;
     res.combine(child->relativeBoundRect());
   }
-  res.setMax({res.max()[0], res.max()[1] + 1});
+  res.set_max({res.max()[0], res.max()[1] + 1});
   return res;
 }
 
@@ -598,9 +598,9 @@ std::expected<void, StarException> ScrollArea::drawChildren() {
   RectI innerDrawingArea = m_drawingArea;
 
   if (horizontalScroll())
-    innerDrawingArea.setYMin(ScrollAreaBorder);
+    innerDrawingArea.set_y_min(ScrollAreaBorder);
   if (verticalScroll())
-    innerDrawingArea.setXMax(innerDrawingArea.xMax() - ScrollAreaBorder);
+    innerDrawingArea.set_x_max(innerDrawingArea.x_max() - ScrollAreaBorder);
 
   auto contentBoundRect = ScrollArea::contentBoundRect();
   auto contentOffset = contentBoundRect.min();

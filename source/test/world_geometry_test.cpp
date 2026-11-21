@@ -30,7 +30,7 @@ TEST(WorldGeometryTest, All) {
 
   EXPECT_EQ(geom.lineIntersectsPoly(lineA3, shapeA3), true);
 
-  RectF shapeA3R = RectF::withSize({-10, -10}, {20, 20});
+  RectF shapeA3R = RectF::with_size({-10, -10}, {20, 20});
 
   EXPECT_EQ(geom.lineIntersectsRect(lineA3, shapeA3R), true);
 

@@ -437,7 +437,7 @@ const GameTestRegistration fixedCoordinateGenerationIsDeterministic(
 
     // Find a real planet: the celestial generator places systems sparsely, and a
     // hand picked coordinate is most likely empty.
-    auto systems = (*celestialDatabase)->scanSystems(RectI::withSize(Vec2I(0, 0), Vec2I(32, 32)));
+    auto systems = (*celestialDatabase)->scanSystems(RectI::with_size(Vec2I(0, 0), Vec2I(32, 32)));
     ASSERT_TRUE(systems) << systems.error().what();
     ASSERT_FALSE(systems->empty());
     std::optional<CelestialCoordinate> coordinate;
@@ -661,7 +661,7 @@ const GameTestRegistration delayedExplosionOutlivesProjectile("ProjectileActions
   auto world = *worldResult;
   auto closeWorld = make_scope_exit([&]() { EXPECT_TRUE(world->close()); });
   Vec2I tilePosition(1024, 1024);
-  ASSERT_TRUE(world->generateRegion(RectI::withSize(tilePosition - Vec2I(4, 4), Vec2I(9, 9))));
+  ASSERT_TRUE(world->generateRegion(RectI::with_size(tilePosition - Vec2I(4, 4), Vec2I(9, 9))));
   world->setTileProtectionEnabled(false);
   auto materialDatabase = root.materialDatabase();
   ASSERT_TRUE(materialDatabase) << materialDatabase.error().what();
@@ -717,7 +717,7 @@ const GameTestRegistration firstContactTriggersCollisionActionOnce("ProjectileAc
   world->setSpawningEnabled(false);
   world->setTileProtectionEnabled(false);
   Vec2I ground(1024, 1024);
-  ASSERT_TRUE(world->generateRegion(RectI::withSize(ground - Vec2I(4, 4), Vec2I(9, 9))));
+  ASSERT_TRUE(world->generateRegion(RectI::with_size(ground - Vec2I(4, 4), Vec2I(9, 9))));
   auto materials = root.materialDatabase();
   ASSERT_TRUE(materials) << materials.error().what();
   auto dirt = (*materials)->materialId("dirt");

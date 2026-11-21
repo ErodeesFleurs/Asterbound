@@ -151,7 +151,7 @@ std::expected<String, StarException> MaterialRenderProfile::pieceImage(String co
   if (!variants) return std::unexpected(std::move(variants.error()));
   auto rect = variants->get().wrap(variant);
   if (!rect) return std::unexpected(std::move(rect.error()));
-  return Star::format("{}?crop={};{};{};{}", texture, rect->get().xMin(), rect->get().yMin(), rect->get().xMax(), rect->get().yMax());
+  return Star::format("{}?crop={};{};{};{}", texture, rect->get().x_min(), rect->get().y_min(), rect->get().x_max(), rect->get().y_max());
 }
 
 std::expected<std::reference_wrapper<std::pair<String, Vec2F> const>, StarException> MaterialRenderProfile::damageImage(float damageLevel, TileDamageType damageType) const {
@@ -297,13 +297,13 @@ std::expected<MaterialRenderProfile, StarException> parseMaterialRenderProfile(I
     auto imageSize = imageMetadata.imageSize(piece->texture);
     if (!imageSize) return std::unexpected(std::move(imageSize.error()));
     auto imageHeight = (*imageSize)[1];
-    auto flip = [imageHeight](RectF const& rect) { return RectF::withSize(Vec2F(rect.xMin(), imageHeight - rect.yMax()), rect.size()); };
+    auto flip = [imageHeight](RectF const& rect) { return RectF::with_size(Vec2F(rect.x_min(), imageHeight - rect.y_max()), rect.size()); };
     for (unsigned v = 0; v < *variants; ++v) {
       auto i = DefaultMaterialColorVariant;
-      auto rect = RectF::withSize(*position + *variantStride * v, *size);
+      auto rect = RectF::with_size(*position + *variantStride * v, *size);
       piece->variants[i].push_back(flip(rect));
       for (MaterialColorVariant c = 0; c != profile.colorVariants; ++c) {
-        auto rect = RectF::withSize(*position + *variantStride * v + *colorStride * ++i, *size);
+        auto rect = RectF::with_size(*position + *variantStride * v + *colorStride * ++i, *size);
         piece->variants[i].push_back(flip(rect));
       }
     }

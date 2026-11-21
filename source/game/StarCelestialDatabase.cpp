@@ -90,13 +90,13 @@ Vec2I CelestialDatabase::chunkIndexFor(Vec2I const& systemXY) const {
 }
 
 List<Vec2I> CelestialDatabase::chunkIndexesFor(RectI const& region) const {
-  if (region.isEmpty())
+  if (region.is_empty())
     return {};
 
   List<Vec2I> chunkLocations;
   RectI chunkRegion(chunkIndexFor(region.min()), chunkIndexFor(region.max() - Vec2I(1, 1)));
-  for (int x = chunkRegion.xMin(); x <= chunkRegion.xMax(); ++x) {
-    for (int y = chunkRegion.yMin(); y <= chunkRegion.yMax(); ++y)
+  for (int x = chunkRegion.x_min(); x <= chunkRegion.x_max(); ++x) {
+    for (int y = chunkRegion.y_min(); y <= chunkRegion.y_max(); ++y)
       chunkLocations.push_back({x, y});
   }
   return chunkLocations;
@@ -567,13 +567,13 @@ std::expected<std::optional<CelestialCoordinate>, StarException> CelestialMaster
     random.seed(*seed);
   for (unsigned i = 0; i < tries; ++i) {
     auto range = xyRange();
-    auto x = random.uniform_int(range.xMin(), range.xMax());
+    auto x = random.uniform_int(range.x_min(), range.x_max());
     if (!x)
       return std::unexpected(std::move(x.error()));
-    auto y = random.uniform_int(range.yMin(), range.yMax());
+    auto y = random.uniform_int(range.y_min(), range.y_max());
     if (!y)
       return std::unexpected(std::move(y.error()));
-    auto systems = scanSystems(RectI::withCenter(Vec2I(*x, *y), Vec2I::filled(trySpatialRange)));
+    auto systems = scanSystems(RectI::with_center(Vec2I(*x, *y), Vec2I::filled(trySpatialRange)));
     if (!systems)
       return std::unexpected(std::move(systems.error()));
     for (auto const& system : *systems) {
@@ -966,8 +966,8 @@ std::expected<CelestialChunk, StarException> CelestialMasterDatabase::produceChu
     return chunk;
   RandomSource random(static_random_u64(chunkIndex[0], chunkIndex[1], "ChunkIndexMix"));
   List<Vec3I> locations;
-  for (int x = region.xMin(); x < region.xMax(); ++x) {
-    for (int y = region.yMin(); y < region.yMax(); ++y) {
+  for (int x = region.x_min(); x < region.x_max(); ++x) {
+    for (int y = region.y_min(); y < region.y_max(); ++y) {
       if (random.uniform_float() < m_generationInformation.systemProbability) {
         auto z = random.next_i32() % (m_baseInformation.zCoordRange[1] - m_baseInformation.zCoordRange[0])
             + m_baseInformation.zCoordRange[0];
@@ -1229,7 +1229,7 @@ std::expected<void, StarException> CelestialSlaveDatabase::signalSystem(Celestia
       m_pendingSystemRequests[system.location()] = Timer();
     return {};
   }
-  return signalRegion(RectI::withSize(system.location().vec2(), {1, 1}));
+  return signalRegion(RectI::with_size(system.location().vec2(), {1, 1}));
 }
 
 List<CelestialRequest> CelestialSlaveDatabase::pullRequests() {
@@ -1300,7 +1300,7 @@ std::expected<std::optional<CelestialParameters>, StarException> CelestialSlaveD
   std::unique_lock locker(m_mutex, std::defer_lock);
   lock_with_diagnostics(locker);
   auto signaled = coordinate.isSystem()
-      ? signalRegion(RectI::withSize(coordinate.location().vec2(), {1, 1})) : signalSystem(coordinate);
+      ? signalRegion(RectI::with_size(coordinate.location().vec2(), {1, 1})) : signalSystem(coordinate);
   if (!signaled)
     return std::unexpected(std::move(signaled.error()));
   auto chunk = m_chunkCache.find_ref(chunkIndexFor(coordinate));

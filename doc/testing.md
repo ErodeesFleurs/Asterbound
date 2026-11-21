@@ -403,6 +403,18 @@ area. For movement changes run the existing `performance_benchmarks` with
 labels between builds before comparing timings. One iteration is 64 moves;
 these workloads do not measure clipping or hull construction.
 
+For rectangle changes run `RectTest.*` and the real-asset
+`WeatherTest.CompleteStateRestoresAfterLocalClear`. Rectangle subtraction emits
+left, right, bottom and top strips, omitting empty strips. Keep them inside the
+original viewport: the weather client uses their areas and iteration order to
+sample particle positions. A boolean line hit alone does not establish edge
+intersection parity; also compare the first hit and its contact flags.
+Integer centers retain truncation toward zero. `with_center` places the same
+integer half-size on either side, so an odd requested size rounds down.
+`set_aspect` and `make_cube` report failure without partially updating integer
+bounds. Use `intersects` when a yes/no answer is sufficient: a directed
+integer `intersection` requires a signed type wide enough for the displacement.
+
 ### Periodic scheduling
 
 `PeriodicTest.*` checks tick cadence and phase preservation when the interval changes.

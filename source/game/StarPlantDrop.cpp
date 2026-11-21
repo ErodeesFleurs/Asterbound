@@ -192,9 +192,9 @@ if (!result362) return std::unexpected(std::move(result362.error()));
     m_pieces.push_back(pdp);
   }
 
-  if (fullBounds.isNull())
+  if (fullBounds.is_null())
     fullBounds = RectF(position, position);
-  if (stemBounds.isNull())
+  if (stemBounds.is_null())
     stemBounds = RectF(position, position);
 
   m_boundingBox = fullBounds;
@@ -322,7 +322,7 @@ std::expected<void, StarException> PlantDrop::init(World& world, EntityId entity
 if (!result337) return std::unexpected(std::move(result337.error()));
   m_movementController->init(world);
 
-  PolyF collisionPoly = PolyF(RectF::withCenter(m_collisionRect.center(), m_collisionRect.size() / 2.0f));
+  PolyF collisionPoly = PolyF(RectF::with_center(m_collisionRect.center(), m_collisionRect.size() / 2.0f));
   MovementParameters parameters;
   parameters.collisionPoly = collisionPoly;
   parameters.ignorePlatformCollision = true;
@@ -384,7 +384,7 @@ auto rotationAcceleration = 0.01f * std::move(*result308) * std::copysign(1.0f, 
     m_presentationRotationTravel = m_rotationRate * dt;
     m_movementController->rotate(m_rotationRate);
 
-    PolyF collisionPoly = PolyF(RectF::withCenter(m_collisionRect.center(), m_collisionRect.size() / 2.0f));
+    PolyF collisionPoly = PolyF(RectF::with_center(m_collisionRect.center(), m_collisionRect.size() / 2.0f));
 
     if (m_time > 0) {
       MovementParameters parameters;

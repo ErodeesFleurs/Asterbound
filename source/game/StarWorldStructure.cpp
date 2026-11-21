@@ -80,7 +80,7 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
     auto autoimageSizeResult1 = imgMetadata->imageSize(overlay.image);
     if (!autoimageSizeResult1) return std::unexpected(std::move(autoimageSizeResult1.error()));
     auto imageSize = std::move((*autoimageSizeResult1));
-    result.m_region.combine(RectI::withSize(Vec2I::floor(overlay.min), Vec2I::ceil(Vec2F(imageSize) / TilePixels)));
+    result.m_region.combine(RectI::with_size(Vec2I::floor(overlay.min), Vec2I::ceil(Vec2F(imageSize) / TilePixels)));
   }
   auto autoforegroundOverlaysResult1 = settings.get_array("foregroundOverlays", JsonArray());
   if (!autoforegroundOverlaysResult1) return std::unexpected(std::move(autoforegroundOverlaysResult1.error()));
@@ -103,7 +103,7 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
     auto autoimageSizeResult1 = imgMetadata->imageSize(overlay.image);
     if (!autoimageSizeResult1) return std::unexpected(std::move(autoimageSizeResult1.error()));
     auto imageSize = std::move((*autoimageSizeResult1));
-    result.m_region.combine(RectI::withSize(Vec2I::floor(overlay.min), Vec2I::ceil(Vec2F(imageSize) / TilePixels)));
+    result.m_region.combine(RectI::with_size(Vec2I::floor(overlay.min), Vec2I::ceil(Vec2F(imageSize) / TilePixels)));
   }
   auto autoblockPositionResult1 = settings.get_array("blocksPosition", JsonArray{0, 0});
   if (!autoblockPositionResult1) return std::unexpected(std::move(autoblockPositionResult1.error()));
@@ -520,7 +520,7 @@ void WorldStructure::setAnchorPosition(Vec2I const& anchorPosition) {
 }
 
 void WorldStructure::translate(Vec2I const& distance) {
-  if (!m_region.isNull())
+  if (!m_region.is_null())
     m_region.translate(distance);
 
   m_anchorPosition += distance;

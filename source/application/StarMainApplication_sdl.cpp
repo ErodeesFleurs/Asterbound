@@ -2008,8 +2008,8 @@ private:
       m_textInputArea = std::move(*state.textInputArea);
       if (m_textInputArea) {
         auto const& [r, cursor] = *m_textInputArea;
-        SDL_Rect rect{.x = r.xMin(),
-                      .y = static_cast<int>(m_windowSize.y()) - r.yMax(),
+        SDL_Rect rect{.x = r.x_min(),
+                      .y = static_cast<int>(m_windowSize.y()) - r.y_max(),
                       .w = r.width(),
                       .h = r.height()};
         SDL_SetTextInputArea(m_sdlWindow.get(), &rect, cursor);
@@ -2069,7 +2069,7 @@ private:
             false},// Nearest scaling fucks up and clips half off the edges, work around this with border+crop for now.
           ScaleImageOperation{ScaleImageOperation::Mode::Nearest, Vec2F::filled(scale)},
           CropImageOperation{
-            RectI::withSize(Vec2I::filled(std::ceilf(static_cast<float>(scale) / 2)), Vec2I(imageSize))}};
+            RectI::with_size(Vec2I::filled(std::ceilf(static_cast<float>(scale) / 2)), Vec2I(imageSize))}};
       else
         operations = { FlipImageOperation{ FlipImageOperation::Mode::FlipY } };
 

@@ -439,7 +439,7 @@ std::expected<WireConnector::SwingResult, StarException> WirePane::swing(WorldGe
         auto offset = entity->nodePosition(node);
         if (!offset) return std::unexpected(std::move(offset.error()));
         Vec2F center = centerOfTile(entity->tilePosition() + *offset);
-        auto nodeBounds = RectF::withSize(center - m_nodeSize / 2.0f, m_nodeSize);
+        auto nodeBounds = RectF::with_size(center - m_nodeSize / 2.0f, m_nodeSize);
         auto contains = geometry.rectContains(nodeBounds, pos);
         if (!contains) return std::unexpected(std::move(contains.error()));
         if (!*contains) continue;

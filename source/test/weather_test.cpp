@@ -113,6 +113,18 @@ const GameTestRegistration weatherCompleteStateRestoresAfterLocalClear("WeatherT
   ASSERT_TRUE((*client)->update(0));
   EXPECT_FALSE((*client)->statusEffects().empty());
 
+  // Narrow the viewport while exposing strips above and below the old one.
+  // Rain must not be emitted across the old viewport's wider x range.
+  (void)(*client)->pullNewParticles();
+  (*client)->setVisibleRegion({40, 50, 60, 250});
+  ASSERT_TRUE((*client)->update(0));
+  auto particles = (*client)->pullNewParticles();
+  ASSERT_FALSE(particles.empty());
+  for (auto const& particle : particles) {
+    EXPECT_GE(particle.position[0], 40);
+    EXPECT_LE(particle.position[0], 60);
+  }
+
   ASSERT_TRUE((*client)->clear());
   EXPECT_TRUE((*client)->statusEffects().empty());
 

@@ -369,8 +369,8 @@ bool TextureAtlasSet<AtlasTextureHandle>::TextureEntry::expired() const {
 
 template <typename AtlasTextureHandle>
 void TextureAtlasSet<AtlasTextureHandle>::setAtlasRegionUsed(TextureAtlas& textureAtlas, RectU const& region, bool used) const {
-  for (unsigned y = region.yMin(); y < region.yMax(); ++y) {
-    for (unsigned x = region.xMin(); x < region.xMax(); ++x) {
+  for (unsigned y = region.y_min(); y < region.y_max(); ++y) {
+    for (unsigned x = region.x_min(); x < region.x_max(); ++x) {
       auto& val = textureAtlas.usedCells[y * m_atlasNumCells + x];
       bool oldVal = val;
       val = used;
@@ -448,14 +448,14 @@ template <typename AtlasTextureHandle>
   auto copied = copyAtlasPixels(atlas.atlasTexture, Vec2U(fitCellX * m_atlasCellSize, fitCellY * m_atlasCellSize), image);
   if (!copied)
     return std::unexpected(std::move(copied.error()));
-  setAtlasRegionUsed(atlas, RectU::withSize({fitCellX, fitCellY}, {(unsigned)numCellsX, (unsigned)numCellsY}), true);
+  setAtlasRegionUsed(atlas, RectU::with_size({fitCellX, fitCellY}, {(unsigned)numCellsX, (unsigned)numCellsY}), true);
 
   AtlasPlacement atlasPlacement{std::ref(atlas), borderPixels, {}, {}};
-  atlasPlacement.occupiedCells = RectU::withSize(Vec2U(fitCellX, fitCellY), Vec2U(numCellsX, numCellsY));
+  atlasPlacement.occupiedCells = RectU::with_size(Vec2U(fitCellX, fitCellY), Vec2U(numCellsX, numCellsY));
   if (borderPixels)
-    atlasPlacement.textureCoords = RectU::withSize(Vec2U(fitCellX * m_atlasCellSize + 1, fitCellY * m_atlasCellSize + 1), imageSize - Vec2U(2, 2));
+    atlasPlacement.textureCoords = RectU::with_size(Vec2U(fitCellX * m_atlasCellSize + 1, fitCellY * m_atlasCellSize + 1), imageSize - Vec2U(2, 2));
   else
-    atlasPlacement.textureCoords = RectU::withSize(Vec2U(fitCellX * m_atlasCellSize, fitCellY * m_atlasCellSize), imageSize);
+    atlasPlacement.textureCoords = RectU::with_size(Vec2U(fitCellX * m_atlasCellSize, fitCellY * m_atlasCellSize), imageSize);
   return atlasPlacement;
 }
 

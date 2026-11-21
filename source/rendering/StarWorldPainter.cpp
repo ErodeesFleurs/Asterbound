@@ -346,7 +346,7 @@ std::expected<void, StarException> WorldPainter::render(WorldRenderData& renderD
 
   auto dimLevel = std::round(renderData.dimLevel * 255);
   if (dimLevel != 0)
-    m_renderer->render(renderFlatRect(RectF::withSize({}, Vec2F(m_camera.screenSize())), Vec4B(renderData.dimColor, dimLevel), 0.0f));
+    m_renderer->render(renderFlatRect(RectF::with_size({}, Vec2F(m_camera.screenSize())), Vec4B(renderData.dimColor, dimLevel), 0.0f));
 
   auto timeoutJson = m_assets->json("/rendering.config:textureTimeout");
   if (!timeoutJson) return std::unexpected(std::move(timeoutJson.error()));
@@ -374,7 +374,7 @@ std::expected<void, StarException> WorldPainter::renderParticles(WorldRenderData
   if (!paddingJson) return std::unexpected(std::move(paddingJson.error()));
   auto padding = paddingJson->to_int();
   if (!padding) return std::unexpected(std::move(padding.error()));
-  const RectF particleRenderWindow = RectF::withSize(Vec2F(), Vec2F(m_camera.screenSize())).padded(*padding);
+  const RectF particleRenderWindow = RectF::with_size(Vec2F(), Vec2F(m_camera.screenSize())).padded(*padding);
 
   for (Particle const& particle : renderData.particles) {
     if (layer != particle.layer)
@@ -527,7 +527,7 @@ std::expected<void, StarException> WorldPainter::drawDrawable(Drawable const& dr
   if (!bounds) return std::unexpected(std::move(bounds.error()));
   RectF screenBounds((bounds->min() - drawable.position) * scale + position,
       (bounds->max() - drawable.position) * scale + position);
-  if (RectF::withSize(Vec2F(), Vec2F(m_camera.screenSize())).intersects(screenBounds))
+  if (RectF::with_size(Vec2F(), Vec2F(m_camera.screenSize())).intersects(screenBounds))
     return m_drawablePainter->drawDrawableProjected(drawable, position, scale, m_camera.pixelRatio());
   if (drawable.isImage() && m_preloadRandom.uniform_float() < m_preloadTextureChance) {
     auto image = m_assets->tryImage(drawable.imagePart().image);

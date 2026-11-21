@@ -307,8 +307,8 @@ std::expected<void, StarException> ServerWeather::spawnWeatherProjectiles(float 
     // padding, splitting at the world wrap boundary.
     List<std::pair<Vec2I, int>> baseSpawnRegions;
     for (auto const& clientRegion : m_clientVisibleRegions) {
-      Vec2I baseRegion = {clientRegion.xMin() - projectileConfig.spawnHorizontalPad, clientRegion.xMax() + projectileConfig.spawnHorizontalPad};
-      int height = clientRegion.yMax();
+      Vec2I baseRegion = {clientRegion.x_min() - projectileConfig.spawnHorizontalPad, clientRegion.x_max() + projectileConfig.spawnHorizontalPad};
+      int height = clientRegion.y_max();
       auto regions = m_worldGeometry.splitXRegion(baseRegion);
       if (!regions) return std::unexpected(std::move(regions.error()));
       for (auto const& region : *regions)
@@ -378,7 +378,7 @@ std::expected<void, StarException> ServerWeather::spawnWeatherProjectiles(float 
         count = std::ceil(count);
 
       for (int i = 0; i < count; ++i) {
-        Vec2F position = {m_root.get().random().uniform_float() * spawnRect.width() + spawnRect.xMin(), m_root.get().random().uniform_float() * spawnRect.height() + spawnRect.yMin()};
+        Vec2F position = {m_root.get().random().uniform_float() * spawnRect.width() + spawnRect.x_min(), m_root.get().random().uniform_float() * spawnRect.height() + spawnRect.y_min()};
 
         if (position[1] > m_undergroundLevel) {
           if (m_weatherEffectsActiveQuery) {
@@ -478,7 +478,7 @@ void ClientWeather::setVisibleRegion(RectI visibleRegion) {
 std::expected<void, StarException> ClientWeather::update(double dt) {
   m_currentTime += dt;
   if (m_currentWeatherIndex == NPos) m_currentWeatherType = {};
-  else if (m_visibleRegion == RectI() || m_visibleRegion.yMax() > m_undergroundLevel) {
+  else if (m_visibleRegion == RectI() || m_visibleRegion.y_max() > m_undergroundLevel) {
     auto biomes = m_root.get().biomeDatabase();
     if (!biomes) return std::unexpected(std::move(biomes.error()));
     auto name = m_weatherPool.item(m_currentWeatherIndex);
@@ -564,8 +564,8 @@ std::expected<void, StarException> ClientWeather::spawnWeatherParticles(RectF ne
 
       for (int i = 0; i < count; ++i) {
         auto newParticle = particleConfig.particle;
-        float x = m_root.get().random().uniform_float() * renderZone.width() + renderZone.xMin();
-        float y = m_root.get().random().uniform_float() * renderZone.height() + renderZone.yMin();
+        float x = m_root.get().random().uniform_float() * renderZone.width() + renderZone.x_min();
+        float y = m_root.get().random().uniform_float() * renderZone.height() + renderZone.y_min();
         newParticle.position += m_worldGeometry.xwrap(Vec2F(x, y));
         newParticle.velocity = targetVelocity;
         if (y > m_undergroundLevel) {

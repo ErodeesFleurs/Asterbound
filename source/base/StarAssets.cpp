@@ -1519,7 +1519,7 @@ std::expected<FramesSpecification, StarException> Assets::parseFramesSpecificati
       if (!parsedRect)
         return std::unexpected(std::move(parsedRect.error()));
       RectU rect(*parsedRect);
-      if (rect.isEmpty())
+      if (rect.is_empty())
         return std::unexpected(AssetException(Star::format("Empty rect in frame specification in image {} frame {}", spec.framesFile, pair.first)));
       spec.frames[pair.first] = rect;
     }
@@ -1578,14 +1578,14 @@ std::expected<FramesSpecification, StarException> Assets::parseFramesSpecificati
           if (!name)
             return std::unexpected(std::move(name.error()));
           if (!name->empty())
-            spec.frames[*name] = RectU::withSize(Vec2U(begin[0] + x * size[0], begin[1] + y * size[1]), size);
+            spec.frames[*name] = RectU::with_size(Vec2U(begin[0] + x * size[0], begin[1] + y * size[1]), size);
         }
       }
     } else {
       for (std::size_t y = 0; y < dimensions[1]; ++y)
         for (std::size_t x = 0; x < dimensions[0]; ++x)
           spec.frames[Star::to_string(y * dimensions[0] + x)] =
-            RectU::withSize(Vec2U(begin[0] + x * size[0], begin[1] + y * size[1]), size);
+            RectU::with_size(Vec2U(begin[0] + x * size[0], begin[1] + y * size[1]), size);
     }
   }
   auto aliasesConfig = frameConfig.opt("aliases");
@@ -2338,7 +2338,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadIma
       return std::unexpected(AssetException(
         Star::format("No such frame {} in frames spec {}", *path.m_sub_path, source.frames->framesFile)));
     return unlockDuring([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
-      auto image = source.image->sub_image(Vec2U(frame->get().xMin(), source.image->height() - frame->get().yMax()),
+      auto image = source.image->sub_image(Vec2U(frame->get().x_min(), source.image->height() - frame->get().y_max()),
                                            frame->get().size());
       if (!image)
         return std::unexpected(std::move(image.error()));

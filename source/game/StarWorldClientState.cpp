@@ -77,12 +77,12 @@ WorldClientState::WorldClientState() {
 }
 
 RectI WorldClientState::window() const {
-  return RectI::withSize(Vec2I(m_windowXMin.get(), m_windowYMin.get()), Vec2I(m_windowWidth.get(), m_windowHeight.get()));
+  return RectI::with_size(Vec2I(m_windowXMin.get(), m_windowYMin.get()), Vec2I(m_windowWidth.get(), m_windowHeight.get()));
 }
 
 void WorldClientState::setWindow(RectI const& window) {
-  m_windowXMin.set(window.xMin());
-  m_windowYMin.set(window.yMin());
+  m_windowXMin.set(window.x_min());
+  m_windowYMin.set(window.y_min());
   m_windowWidth.set(window.width());
   m_windowHeight.set(window.height());
 }
@@ -118,7 +118,7 @@ List<RectI> WorldClientState::monitoringRegions(std::function<std::optional<Rect
   if (auto playerBounds = entityBounds(m_playerId.get())) {
     // add an extra region the size of the window centered on the player's position to prevent nearby sectors
     // being unloaded due to camera panning or centering on other entities
-    regions.push_back(RectI::withCenter(playerBounds->center(), windowRegion.size()));
+    regions.push_back(RectI::with_center(playerBounds->center(), windowRegion.size()));
   }
 
   for (auto entityId : m_clientPresenceEntities.get()) {

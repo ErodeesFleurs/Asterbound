@@ -102,10 +102,10 @@ auto Random2dPointGenerator<PointData, DataType>::generate(Poly const& area, Poi
       return std::unexpected(StarException("Point generator sector coordinate is outside int64 range"));
     return static_cast<std::int64_t>(rounded);
   };
-  auto x_min = sector_coordinate(bound.xMin(), false);
-  auto y_min = sector_coordinate(bound.yMin(), false);
-  auto x_max = sector_coordinate(bound.xMax(), true);
-  auto y_max = sector_coordinate(bound.yMax(), true);
+  auto x_min = sector_coordinate(bound.x_min(), false);
+  auto y_min = sector_coordinate(bound.y_min(), false);
+  auto x_max = sector_coordinate(bound.x_max(), true);
+  auto y_max = sector_coordinate(bound.y_max(), true);
   if (!x_min) return std::unexpected(std::move(x_min.error()));
   if (!y_min) return std::unexpected(std::move(y_min.error()));
   if (!x_max) return std::unexpected(std::move(x_max.error()));
@@ -152,7 +152,7 @@ auto Random2dPointGenerator<PointData, DataType>::generate(Poly const& area, Poi
   // Break before incrementing inclusive endpoints, including INT64_MAX.
   for (std::int64_t x = *x_min;;) {
     for (std::int64_t y = *y_min;;) {
-      auto sector = Rect::withSize({static_cast<DataType>(x) * cell_size_, static_cast<DataType>(y) * cell_size_}, Point::filled(cell_size_));
+      auto sector = Rect::with_size({static_cast<DataType>(x) * cell_size_, static_cast<DataType>(y) * cell_size_}, Point::filled(cell_size_));
       if (area.intersects_rect(sector)) {
         auto points = cache_.get(Sector(x, y), [&](Sector const&) -> std::expected<PointSet, StarException> {
           PointSet sector_points;

@@ -1566,7 +1566,7 @@ bool Monster::isInteractive() const {
 
 std::expected<Vec2F, StarException> Monster::questIndicatorPosition() const {
   Vec2F pos = position() + m_questIndicatorOffset;
-  pos[1] += collisionArea().yMax();
+  pos[1] += collisionArea().y_max();
   return pos;
 }
 

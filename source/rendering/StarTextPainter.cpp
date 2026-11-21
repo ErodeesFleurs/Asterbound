@@ -598,7 +598,7 @@ std::expected<RectF, StarException> TextPainter::doRenderText(StringView s, Text
     pos[1] += (height - m_renderSettings.fontSize) / 2;
 
   auto layout = [&](MeasureOnly measure) -> std::expected<RectF, StarException> {
-    RectF bounds = RectF::withSize(pos, Vec2F());
+    RectF bounds = RectF::with_size(pos, Vec2F());
     for (auto line : lines) {
       auto result = doRenderLine(line, {pos, position.hAnchor, position.vAnchor, {}, {}}, measure, charLimit);
       if (!result)
@@ -643,7 +643,7 @@ std::expected<RectF, StarException> TextPainter::doRenderLine(StringView text, T
     pos.hAnchor = HorizontalAnchor::LeftAnchor;
   }
 
-  RectF bounds = RectF::withSize(pos.pos, Vec2F());
+  RectF bounds = RectF::with_size(pos.pos, Vec2F());
   Text::TextCallback textCallback = [&](StringView text) -> std::expected<bool, StarException> {
     Utf8Cursor cursor(text.utf8());
     while (!cursor.at_end()) {
@@ -746,7 +746,7 @@ std::expected<RectF, StarException> TextPainter::doRenderGlyph(String::Char c, T
     append(output, glyph->get(), pos, m_renderSettings.color);
   }
 
-  return RectF::withSize(pos, {static_cast<float>(width), static_cast<int>(m_renderSettings.fontSize)});
+  return RectF::with_size(pos, {static_cast<float>(width), static_cast<int>(m_renderSettings.fontSize)});
 }
 
 void TextPainter::renderPrimitives() {

@@ -1453,7 +1453,7 @@ std::expected<void, StarException> ActorMovementController::doSetAnchorState(std
 
   if (!entityAnchor && prevAnchor && prevAnchor->exitBottomPosition) {
     auto boundBox = MovementController::localBoundBox();
-    Vec2F bottomMid = {boundBox.center()[0], boundBox.yMin()};
+    Vec2F bottomMid = {boundBox.center()[0], boundBox.y_min()};
     setPosition(*prevAnchor->exitBottomPosition - bottomMid);
   }
 
@@ -1856,8 +1856,8 @@ std::expected<bool, StarException> PathController::on_ground(ActorMovementContro
                                                              Vec2F const& position,
                                                              CollisionSet const& collision_set) const {
   auto bounds = RectI::integral(movement_controller.localBoundBox().translated(position));
-  Vec2I min = Vec2I(bounds.xMin(), bounds.yMin() - 1);
-  Vec2I max = Vec2I(bounds.xMax(), bounds.yMin());
+  Vec2I min = Vec2I(bounds.x_min(), bounds.y_min() - 1);
+  Vec2I max = Vec2I(bounds.x_max(), bounds.y_min());
   return m_world.get().rectTileCollision(RectI(min, max), collision_set);
 }
 }

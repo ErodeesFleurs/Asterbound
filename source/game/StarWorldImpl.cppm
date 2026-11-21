@@ -271,7 +271,7 @@ namespace WorldImpl {
   template <typename TileSectorArray>
   [[nodiscard]]
   inline std::expected<LiquidLevel, StarException> liquidLevel(std::shared_ptr<TileSectorArray> const& tileSectorArray, RectF const& region) {
-    if (region.isEmpty())
+    if (region.is_empty())
       return LiquidLevel();
 
     RectI sampleRect = RectI::integral(region);
@@ -323,12 +323,12 @@ namespace WorldImpl {
       return res;
 
     for (auto tileIt = res.begin(); tileIt != res.end();) {
-      auto tileRect = RectF::withSize(Vec2F(worldGeometry.xwrap(*tileIt)), Vec2F::filled(1.0f));
+      auto tileRect = RectF::with_size(Vec2F(worldGeometry.xwrap(*tileIt)), Vec2F::filled(1.0f));
       Line2F line{worldGeometry.xwrap(begin), worldGeometry.xwrap(end)};
       auto lineSet = worldGeometry.splitLine(line);
       if (!lineSet)
         return std::unexpected(std::move(lineSet.error()));
-      if (std::ranges::any_of(*lineSet, [&](Line2F const& line) { return tileRect.edgeIntersection(line).glances; }))
+      if (std::ranges::any_of(*lineSet, [&](Line2F const& line) { return tileRect.edge_intersection(line).glances; }))
         tileIt = res.erase(tileIt);
       else
         ++tileIt;
@@ -435,7 +435,7 @@ namespace WorldImpl {
           return false;
       }
       if (!allowEntityOverlap) {
-        auto occupied = entityMap->spaceIsOccupied(RectF::withSize(Vec2F(pos), Vec2F(0.999f, 0.999f)));
+        auto occupied = entityMap->spaceIsOccupied(RectF::with_size(Vec2F(pos), Vec2F(0.999f, 0.999f)));
         if (!occupied)
           return std::unexpected(std::move(occupied.error()));
         if (*occupied)
@@ -479,7 +479,7 @@ namespace WorldImpl {
         return false;
     }
     if (!allowEntityOverlap) {
-      auto occupied = entityMap->spaceIsOccupied(RectF::withSize(Vec2F(pos), Vec2F(0.999f, 0.999f)));
+      auto occupied = entityMap->spaceIsOccupied(RectF::with_size(Vec2F(pos), Vec2F(0.999f, 0.999f)));
       if (!occupied)
         return std::unexpected(std::move(occupied.error()));
       if (*occupied)
@@ -779,27 +779,27 @@ namespace WorldImpl {
       if (!*intersects)
         return false;
 
-      auto collision = lineTileCollision(geometry, tileSectorArray, sourcePosition, entityBounds.nearestCoordTo(sourcePosition), DefaultCollisionSet);
+      auto collision = lineTileCollision(geometry, tileSectorArray, sourcePosition, entityBounds.nearest_coord_to(sourcePosition), DefaultCollisionSet);
       if (!collision)
         return std::unexpected(std::move(collision.error()));
       if (!*collision)
         return true;
-      collision = lineTileCollision(geometry, tileSectorArray, sourcePosition, Vec2F(entityBounds.xMin(), entityBounds.yMin()), DefaultCollisionSet);
+      collision = lineTileCollision(geometry, tileSectorArray, sourcePosition, Vec2F(entityBounds.x_min(), entityBounds.y_min()), DefaultCollisionSet);
       if (!collision)
         return std::unexpected(std::move(collision.error()));
       if (!*collision)
         return true;
-      collision = lineTileCollision(geometry, tileSectorArray, sourcePosition, Vec2F(entityBounds.xMin(), entityBounds.yMax()), DefaultCollisionSet);
+      collision = lineTileCollision(geometry, tileSectorArray, sourcePosition, Vec2F(entityBounds.x_min(), entityBounds.y_max()), DefaultCollisionSet);
       if (!collision)
         return std::unexpected(std::move(collision.error()));
       if (!*collision)
         return true;
-      collision = lineTileCollision(geometry, tileSectorArray, sourcePosition, Vec2F(entityBounds.xMax(), entityBounds.yMax()), DefaultCollisionSet);
+      collision = lineTileCollision(geometry, tileSectorArray, sourcePosition, Vec2F(entityBounds.x_max(), entityBounds.y_max()), DefaultCollisionSet);
       if (!collision)
         return std::unexpected(std::move(collision.error()));
       if (!*collision)
         return true;
-      collision = lineTileCollision(geometry, tileSectorArray, sourcePosition, Vec2F(entityBounds.xMax(), entityBounds.yMin()), DefaultCollisionSet);
+      collision = lineTileCollision(geometry, tileSectorArray, sourcePosition, Vec2F(entityBounds.x_max(), entityBounds.y_min()), DefaultCollisionSet);
       if (!collision)
         return std::unexpected(std::move(collision.error()));
       return !*collision;

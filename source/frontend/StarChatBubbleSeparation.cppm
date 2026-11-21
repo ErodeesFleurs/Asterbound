@@ -126,7 +126,7 @@ void BubbleSeparator<T>::setMovementThreshold(float movementThreshold) {
 
 template <typename T>
 void BubbleSeparator<T>::addBubble(Vec2F position, RectF boundBox, T contents, unsigned margin) {
-  boundBox.setYMax(boundBox.yMax() + margin);
+  boundBox.set_y_max(boundBox.y_max() + margin);
   RectF separated = separateBubble(m_sortedLeftEdges, m_sortedRightEdges, m_sortedLeftEdges, m_sortedRightEdges, boundBox);
   Vec2F separatedOffset = separated.min() - boundBox.min();
   Bubble bubble = {.contents = std::move(contents),
@@ -170,7 +170,7 @@ template <typename T>
   for (auto& bubble : m_bubbles) {
     leftEdges.remove(bubble.separatedBox);
     rightEdges.remove(bubble.separatedBox);
-    RectF boundBox = RectF::withCenter(bubble.idealDestination, bubble.boundBox.size());
+    RectF boundBox = RectF::with_center(bubble.idealDestination, bubble.boundBox.size());
     RectF separated = separateBubble(leftEdges, rightEdges, m_sortedLeftEdges, m_sortedRightEdges, boundBox);
     leftEdges.insert_sorted(bubble.separatedBox, compareLeft);
     rightEdges.insert_sorted(bubble.separatedBox, compareRight);

@@ -326,10 +326,10 @@ std::expected<std::optional<Vec2I>, StarException> WorldTemplate::findSensiblePl
   for (int i = 0; i < *tries; ++i) {
     auto searchRegion = this->root().random().sample_ref(playerStartSearchRegions);
     if (!searchRegion) return std::unexpected(std::move(searchRegion.error()));
-    auto randomX = this->root().random().uniform_int(searchRegion->get().xMin(), searchRegion->get().xMax());
+    auto randomX = this->root().random().uniform_int(searchRegion->get().x_min(), searchRegion->get().x_max());
     if (!randomX) return std::unexpected(std::move(randomX.error()));
     int x = *randomX;
-    for (int y = searchRegion->get().yMax() - 1; y >= searchRegion->get().yMin(); --y) {
+    for (int y = searchRegion->get().y_max() - 1; y >= searchRegion->get().y_min(); --y) {
       auto block = getBlockInfo(x, y);
       if (!block) return std::unexpected(std::move(block.error()));
       if (!block->terrain) continue;
@@ -553,8 +553,8 @@ std::expected<bool, StarException> WorldTemplate::isOutside(int x, int y) const 
 }
 
 std::expected<bool, StarException> WorldTemplate::isOutside(RectI const& region) const {
-  for (int x = region.xMin(); x < region.xMax(); ++x) {
-    for (int y = region.yMin(); y < region.yMax(); ++y) {
+  for (int x = region.x_min(); x < region.x_max(); ++x) {
+    for (int y = region.y_min(); y < region.y_max(); ++y) {
       auto block = getBlockInfo(m_geometry.xwrap(x), y);
       if (!block) return std::unexpected(std::move(block.error()));
       if (block->terrain) return false;

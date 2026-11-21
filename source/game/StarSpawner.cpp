@@ -295,8 +295,8 @@ std::expected<List<Vec2I>, StarException> Spawner::cellIndexesForRange(RectF con
   if (!ranges) return std::unexpected(std::move(ranges.error()));
   for (auto const& srange : *ranges) {
     auto indexes = RectI::integral(RectF(srange).scaled(1.0f / m_spawnCellSize));
-    for (int x = indexes.xMin(); x < indexes.xMax(); ++x) {
-      for (int y = indexes.yMin(); y < indexes.yMax(); ++y)
+    for (int x = indexes.x_min(); x < indexes.x_max(); ++x) {
+      for (int y = indexes.y_min(); y < indexes.y_max(); ++y)
         cellIndexes.push_back({x, y});
     }
   }
@@ -305,7 +305,7 @@ std::expected<List<Vec2I>, StarException> Spawner::cellIndexesForRange(RectF con
 }
 
 RectF Spawner::cellRegion(Vec2I const& cellIndex) const {
-  return RectF::withSize(Vec2F(cellIndex) * m_spawnCellSize, Vec2F::filled(m_spawnCellSize));
+  return RectF::with_size(Vec2F(cellIndex) * m_spawnCellSize, Vec2F::filled(m_spawnCellSize));
 }
 
 std::expected<std::optional<SpawnParameters>, StarException> Spawner::spawnParametersForCell(Vec2I const& cellIndex) const {
@@ -316,9 +316,9 @@ std::expected<std::optional<SpawnParameters>, StarException> Spawner::spawnParam
   unsigned liquidCount = 0;
   unsigned exposedCount = 0;
 
-  auto region = RectI::withSize(cellIndex * m_spawnCellSize, Vec2I::filled(m_spawnCellSize));
-  for (int x = region.xMin(); x < region.xMax(); ++x) {
-    for (int y = region.yMin(); y < region.yMax(); ++y) {
+  auto region = RectI::with_size(cellIndex * m_spawnCellSize, Vec2I::filled(m_spawnCellSize));
+  for (int x = region.x_min(); x < region.x_max(); ++x) {
+    for (int y = region.y_min(); y < region.y_max(); ++y) {
       // Only empty blocks count towards spawn totals
       auto collision = m_facade->collision({x, y});
       if (!collision) return std::unexpected(std::move(collision.error()));
@@ -415,7 +415,7 @@ std::expected<std::optional<Vec2F>, StarException> Spawner::adjustSpawnRegion(Re
       return true;
 
     if (spawnParameters.areas.contains(SpawnParameters::Area::Surface)) {
-      Vec2F startCheck = {region.center()[0], region.yMin()};
+      Vec2F startCheck = {region.center()[0], region.y_min()};
       for (int sd = 0; sd <= self.m_spawnSurfaceCheckDistance; ++sd) {
         auto collision = self.m_facade->collision(Vec2I::floor(startCheck - Vec2F(0, sd)));
         if (!collision) return std::unexpected(std::move(collision.error()));
@@ -424,7 +424,7 @@ std::expected<std::optional<Vec2F>, StarException> Spawner::adjustSpawnRegion(Re
       }
 
     } else if (spawnParameters.areas.contains(SpawnParameters::Area::Ceiling)) {
-      Vec2F startCheck = {region.center()[0], region.yMax()};
+      Vec2F startCheck = {region.center()[0], region.y_max()};
       for (int cd = 0; cd <= self.m_spawnCeilingCheckDistance; ++cd) {
         auto collision = self.m_facade->collision(Vec2I::floor(startCheck + Vec2F(0, cd)));
         if (!collision) return std::unexpected(std::move(collision.error()));
@@ -437,8 +437,8 @@ std::expected<std::optional<Vec2F>, StarException> Spawner::adjustSpawnRegion(Re
   };
 
   List<Vec2F> tryPositions;
-  for (float x = spawnRegion.xMin(); x <= spawnRegion.xMax(); x += m_spawnCheckResolution) {
-    for (float y = spawnRegion.yMin(); y <= spawnRegion.yMax(); y += m_spawnCheckResolution)
+  for (float x = spawnRegion.x_min(); x <= spawnRegion.x_max(); x += m_spawnCheckResolution) {
+    for (float y = spawnRegion.y_min(); y <= spawnRegion.y_max(); y += m_spawnCheckResolution)
       tryPositions.push_back({x, y});
   }
 

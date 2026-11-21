@@ -433,7 +433,7 @@ std::expected<InspectionTool::InspectionResult, StarException> InspectionTool::i
   if (!itemWorld)
     return std::unexpected(std::move(itemWorld.error()));
   WorldGeometry geometry = itemWorld->get().geometry();
-  auto candidates = itemWorld->get().query<InspectableEntity>(RectF::withCenter(position, Vec2F()), [&](std::shared_ptr<InspectableEntity> const& entity) -> std::expected<bool, StarException> {
+  auto candidates = itemWorld->get().query<InspectableEntity>(RectF::with_center(position, Vec2F()), [&](std::shared_ptr<InspectableEntity> const& entity) -> std::expected<bool, StarException> {
     if (entity->entityType() == EntityType::Object)
       return false;
     auto contained = geometry.rectContains(entity->metaBoundBox().translated(entity->position()), position);

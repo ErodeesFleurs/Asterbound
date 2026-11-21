@@ -209,8 +209,8 @@ std::expected<void, StarException> Stagehand::update(float dt, std::uint64_t) {
     auto boundBox = metaBoundBox().translated(position());
     this->root().spatialLogger().log_poly("world", PolyF(boundBox), {0, 255, 255, 255});
     this->root().spatialLogger().log_line("world", boundBox.min(), boundBox.max(), {0, 255, 255, 255});
-    this->root().spatialLogger().log_line("world", {boundBox.xMin(), boundBox.yMax()},
-                                          {boundBox.xMax(), boundBox.yMin()}, {0, 255, 255, 255});
+    this->root().spatialLogger().log_line("world", {boundBox.x_min(), boundBox.y_max()},
+                                          {boundBox.x_max(), boundBox.y_min()}, {0, 255, 255, 255});
   }
   return {};
 }

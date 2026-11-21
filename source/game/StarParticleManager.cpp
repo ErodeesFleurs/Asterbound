@@ -115,13 +115,13 @@ std::expected<void, StarException> ParticleManager::update(float dt, RectF const
 
     if (particle.collidesForeground && tiletype == TileType::Colliding) {
       RectF colRect;
-      colRect.setXMax(std::ceil(particle.position[0]));
-      colRect.setXMin(std::floor(particle.position[0]));
-      colRect.setYMax(std::ceil(particle.position[1]));
-      colRect.setYMin(std::floor(particle.position[1]));
+      colRect.set_x_max(std::ceil(particle.position[0]));
+      colRect.set_x_min(std::floor(particle.position[0]));
+      colRect.set_y_max(std::ceil(particle.position[1]));
+      colRect.set_y_min(std::floor(particle.position[1]));
       Line2F colLine(particle.position, particle.position - particle.velocity);
 
-      auto collisionPosition = colRect.edgeIntersection(colLine).point;
+      auto collisionPosition = colRect.edge_intersection(colLine).point;
       if (particle.position[0] > colRect.center()[0])
         collisionPosition[0] += 0.1f;
       else if (particle.position[0] < colRect.center()[0])

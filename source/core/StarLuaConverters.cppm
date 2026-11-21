@@ -115,9 +115,9 @@ struct LuaConverter<Matrix3<T>> {
 template <typename T>
 struct LuaConverter<Rect<T>> {
   [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, Rect<T> const& v) {
-    if (v.isNull())
+    if (v.is_null())
       return stack.push(LuaNil);
-    return stack.push_array(Vector<T, 4>(v.xMin(), v.yMin(), v.xMax(), v.yMax()));
+    return stack.push_array(Vector<T, 4>(v.x_min(), v.y_min(), v.x_max(), v.y_max()));
   }
 
   [[nodiscard]] static std::expected<std::optional<Rect<T>>, StarException> to(LuaStackValue v) {

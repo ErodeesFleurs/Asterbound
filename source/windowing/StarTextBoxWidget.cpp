@@ -194,7 +194,7 @@ std::expected<void, StarException> TextBoxWidget::renderImpl() {
       return std::unexpected(std::move(fullWidth.error()));
     float anchorOffset = m_hAnchor == HorizontalAnchor::RightAnchor ? *fullWidth :
         m_hAnchor == HorizontalAnchor::HMidAnchor ? std::floor(*fullWidth / 2.0f) : 0;
-    auto highlighted = context().drawInterfaceQuad(RectF::withSize(pos + Vec2F(*prefixWidth - anchorOffset, 0),
+    auto highlighted = context().drawInterfaceQuad(RectF::with_size(pos + Vec2F(*prefixWidth - anchorOffset, 0),
         Vec2F(*selectionWidth, m_textStyle.fontSize)), Vec4B(70, 100, 180, 160));
     if (!highlighted)
       return std::unexpected(std::move(highlighted.error()));

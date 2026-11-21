@@ -176,7 +176,7 @@ std::expected<std::shared_ptr<TilePainter>, StarException> TilePainter::create(R
 }
 
 std::expected<void, StarException> TilePainter::adjustLighting(WorldRenderData& renderData) const {
-  RectI lightRange = RectI::withSize(renderData.lightMinPosition, Vec2I(renderData.lightMap.size()));
+  RectI lightRange = RectI::with_size(renderData.lightMinPosition, Vec2I(renderData.lightMap.size()));
   return forEachRenderTile(renderData, lightRange, [&](Vec2I const& pos, RenderTile const& tile) -> std::expected<void, StarException> {
       // Only adjust lighting for tiles with liquid above the draw threshold
       float drawLevel = liquidDrawLevel(byte_to_float(tile.liquidLevel));
@@ -216,8 +216,8 @@ std::expected<void, StarException> TilePainter::setup(WorldCamera const& camera,
   // storage between frames instead of allocating two lists on every cache hit.
   auto prepared = [&]() -> std::expected<void, StarException> {
     std::size_t i = 0;
-    for (int x = chunkRange.xMin(); x < chunkRange.xMax(); ++x) {
-      for (int y = chunkRange.yMin(); y < chunkRange.yMax(); ++y) {
+    for (int x = chunkRange.x_min(); x < chunkRange.x_max(); ++x) {
+      for (int y = chunkRange.y_min(); y < chunkRange.y_max(); ++y) {
         std::size_t index = i++;
         auto hashes = chunkHashes(renderData, {x, y});
         if (!hashes)
@@ -295,7 +295,7 @@ TilePainter::chunkHashes(WorldRenderData const& renderData, Vec2I chunkIndex) {
   auto liquidBuffer = m_liquidHashBuffer.span();
   std::size_t terrainOffset = 0;
   std::size_t liquidOffset = 0;
-  RectI tileRange = RectI::withSize(chunkIndex * RenderChunkSize, Vec2I::filled(RenderChunkSize)).padded(MaterialRenderProfileMaxNeighborDistance);
+  RectI tileRange = RectI::with_size(chunkIndex * RenderChunkSize, Vec2I::filled(RenderChunkSize)).padded(MaterialRenderProfileMaxNeighborDistance);
   auto traversed = forEachRenderTile(
     renderData, tileRange, [&](Vec2I const&, RenderTile const& tile) -> std::expected<void, StarException> {
       // Preserve terrain bytes and traversal order exactly. Both fixed-capacity
@@ -354,9 +354,9 @@ TilePainter::getTerrainChunk(WorldRenderData& renderData, Vec2I chunkIndex, Chun
       // across tiles/layers without retaining piece owners beyond this miss.
       MaterialPieceResultList pieces;
 
-      RectI tileRange = RectI::withSize(chunkIndex * RenderChunkSize, Vec2I::filled(RenderChunkSize));
-      for (int x = tileRange.xMin(); x < tileRange.xMax(); ++x) {
-        for (int y = tileRange.yMin(); y < tileRange.yMax(); ++y) {
+      RectI tileRange = RectI::with_size(chunkIndex * RenderChunkSize, Vec2I::filled(RenderChunkSize));
+      for (int x = tileRange.x_min(); x < tileRange.x_max(); ++x) {
+        for (int y = tileRange.y_min(); y < tileRange.y_max(); ++y) {
           auto foreground = produceTerrainPrimitives(terrainPrimitives[TerrainLayer::Foreground], pieces, TerrainLayer::Foreground, {x, y}, renderData, *assets, *materialDatabase);
           if (!foreground)
             return std::unexpected(std::move(foreground.error()));
@@ -398,9 +398,9 @@ TilePainter::getLiquidChunk(WorldRenderData& renderData, Vec2I chunkIndex, Chunk
   auto cached = m_liquidChunkCache.get(chunkKey, [&](auto const&) -> std::expected<std::shared_ptr<LiquidChunk const>, StarException> {
       HashMap<LiquidId, List<RenderPrimitive>> liquidPrimitives;
 
-      RectI tileRange = RectI::withSize(chunkIndex * RenderChunkSize, Vec2I::filled(RenderChunkSize));
-      for (int x = tileRange.xMin(); x < tileRange.xMax(); ++x) {
-        for (int y = tileRange.yMin(); y < tileRange.yMax(); ++y) {
+      RectI tileRange = RectI::with_size(chunkIndex * RenderChunkSize, Vec2I::filled(RenderChunkSize));
+      for (int x = tileRange.x_min(); x < tileRange.x_max(); ++x) {
+        for (int y = tileRange.y_min(); y < tileRange.y_max(); ++y) {
           auto produced = produceLiquidPrimitives(liquidPrimitives, {x, y}, renderData);
           if (!produced)
             return std::unexpected(std::move(produced.error()));
@@ -532,16 +532,16 @@ std::expected<bool, StarException> TilePainter::produceTerrainPrimitives(HashMap
       if (!selectedCoords)
         return std::unexpected(std::move(selectedCoords.error()));
       RectF const& textureCoords = selectedCoords->get();
-      RectF worldCoords = RectF::withSize(piecePair.second / TilePixels + Vec2F(pos), textureCoords.size() / TilePixels);
+      RectF worldCoords = RectF::with_size(piecePair.second / TilePixels + Vec2F(pos), textureCoords.size() / TilePixels);
       quadList.emplace_back(std::in_place_type_t<RenderQuad>(), std::move(*texture),
           worldCoords  .min(),
           textureCoords.min(),
-          Vec2F(  worldCoords.xMax(),   worldCoords.yMin()),
-          Vec2F(textureCoords.xMax(), textureCoords.yMin()),
+          Vec2F(  worldCoords.x_max(),   worldCoords.y_min()),
+          Vec2F(textureCoords.x_max(), textureCoords.y_min()),
           worldCoords  .max(),
           textureCoords.max(),
-          Vec2F(  worldCoords.xMin(),   worldCoords.yMax()),
-          Vec2F(textureCoords.xMin(), textureCoords.yMax()),
+          Vec2F(  worldCoords.x_min(),   worldCoords.y_max()),
+          Vec2F(textureCoords.x_min(), textureCoords.y_max()),
           color, 1.0f);
     }
   }
@@ -575,12 +575,12 @@ std::expected<bool, StarException> TilePainter::produceTerrainPrimitives(HashMap
       if (!selectedCoords)
         return std::unexpected(std::move(selectedCoords.error()));
       RectF const& textureCoords = selectedCoords->get();
-      RectF worldCoords = RectF::withSize(piecePair.second / TilePixels + Vec2F(pos), textureCoords.size() / TilePixels);
+      RectF worldCoords = RectF::with_size(piecePair.second / TilePixels + Vec2F(pos), textureCoords.size() / TilePixels);
       quadList.emplace_back(std::in_place_type_t<RenderQuad>(), std::move(*texture),
           worldCoords.min(), textureCoords.min(),
-          Vec2F(worldCoords.xMax(), worldCoords.yMin()), Vec2F(textureCoords.xMax(), textureCoords.yMin()),
+          Vec2F(worldCoords.x_max(), worldCoords.y_min()), Vec2F(textureCoords.x_max(), textureCoords.y_min()),
           worldCoords.max(), textureCoords.max(),
-          Vec2F(worldCoords.xMin(), worldCoords.yMax()), Vec2F(textureCoords.xMin(), textureCoords.yMax()),
+          Vec2F(worldCoords.x_min(), worldCoords.y_max()), Vec2F(textureCoords.x_min(), textureCoords.y_max()),
         color, 1.0f);
     }
   }
@@ -603,14 +603,14 @@ std::expected<bool, StarException> TilePainter::produceTerrainPrimitives(HashMap
     TexturePtr texture = cached->get();
 
     Vec2F textureSize(texture->size());
-    RectF textureCoords = RectF::withSize(Vec2F(), textureSize);
-    RectF worldCoords = RectF::withSize(crackingImage->get().second / TilePixels + Vec2F(pos), textureCoords.size() / TilePixels);
+    RectF textureCoords = RectF::with_size(Vec2F(), textureSize);
+    RectF worldCoords = RectF::with_size(crackingImage->get().second / TilePixels + Vec2F(pos), textureCoords.size() / TilePixels);
 
     quadList.emplace_back(std::in_place_type_t<RenderQuad>(), std::move(texture),
         worldCoords.min(), textureCoords.min(),
-        Vec2F(worldCoords.xMax(), worldCoords.yMin()), Vec2F(textureCoords.xMax(), textureCoords.yMin()),
+        Vec2F(worldCoords.x_max(), worldCoords.y_min()), Vec2F(textureCoords.x_max(), textureCoords.y_min()),
         worldCoords.max(), textureCoords.max(),
-        Vec2F(worldCoords.xMin(), worldCoords.yMax()), Vec2F(textureCoords.xMin(), textureCoords.yMax()),
+        Vec2F(worldCoords.x_min(), worldCoords.y_max()), Vec2F(textureCoords.x_min(), textureCoords.y_max()),
       color, 1.0f);
   }
 
@@ -629,9 +629,9 @@ std::expected<void, StarException> TilePainter::produceLiquidPrimitives(HashMap<
 
   RectF worldRect;
   if (tileBottom.foreground == EmptyMaterialId && bottomDrawLevel < 1.0f)
-    worldRect = RectF::withSize(Vec2F(pos), Vec2F::filled(1.0f)).expanded(drawLevel);
+    worldRect = RectF::with_size(Vec2F(pos), Vec2F::filled(1.0f)).expanded(drawLevel);
   else
-    worldRect = RectF::withSize(Vec2F(pos), Vec2F(1.0f, drawLevel));
+    worldRect = RectF::with_size(Vec2F(pos), Vec2F(1.0f, drawLevel));
 
   auto texRect = worldRect.scaled(TilePixels);
 
@@ -640,9 +640,9 @@ std::expected<void, StarException> TilePainter::produceLiquidPrimitives(HashMap<
     return std::unexpected(std::move(liquid.error()));
   primitives[tile.liquidId].emplace_back(std::in_place_type_t<RenderQuad>(), liquid->get().texture,
       worldRect.min(), texRect.min(),
-      Vec2F(worldRect.xMax(), worldRect.yMin()), Vec2F(texRect.xMax(), texRect.yMin()),
+      Vec2F(worldRect.x_max(), worldRect.y_min()), Vec2F(texRect.x_max(), texRect.y_min()),
       worldRect.max(), texRect.max(),
-      Vec2F(worldRect.xMin(), worldRect.yMax()), Vec2F(texRect.xMin(), texRect.yMax()),
+      Vec2F(worldRect.x_min(), worldRect.y_max()), Vec2F(texRect.x_min(), texRect.y_max()),
     liquid->get().color, 1.0f);
   return {};
 }

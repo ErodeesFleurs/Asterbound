@@ -322,24 +322,24 @@ std::expected<RectF, StarException> Drawable::boundBox(ImageMetadataDatabase con
       auto nonEmptyRegion = imageMetadata.nonEmptyRegion(image.image);
       if (!nonEmptyRegion)
         return std::unexpected(std::move(nonEmptyRegion.error()));
-      if (!nonEmptyRegion->isNull())
+      if (!nonEmptyRegion->is_null())
         imageRegion = RectF(*nonEmptyRegion);
     } else {
       auto size = imageMetadata.imageSize(image.image);
       if (!size)
         return std::unexpected(std::move(size.error()));
-      imageRegion = RectF::withSize(Vec2F(), Vec2F(*size));
+      imageRegion = RectF::with_size(Vec2F(), Vec2F(*size));
     }
 
-    if (!imageRegion.isNull()) {
-      boundBox.combine(image.transformation.transform_point(Vec2F(imageRegion.xMin(), imageRegion.yMin())));
-      boundBox.combine(image.transformation.transform_point(Vec2F(imageRegion.xMax(), imageRegion.yMin())));
-      boundBox.combine(image.transformation.transform_point(Vec2F(imageRegion.xMin(), imageRegion.yMax())));
-      boundBox.combine(image.transformation.transform_point(Vec2F(imageRegion.xMax(), imageRegion.yMax())));
+    if (!imageRegion.is_null()) {
+      boundBox.combine(image.transformation.transform_point(Vec2F(imageRegion.x_min(), imageRegion.y_min())));
+      boundBox.combine(image.transformation.transform_point(Vec2F(imageRegion.x_max(), imageRegion.y_min())));
+      boundBox.combine(image.transformation.transform_point(Vec2F(imageRegion.x_min(), imageRegion.y_max())));
+      boundBox.combine(image.transformation.transform_point(Vec2F(imageRegion.x_max(), imageRegion.y_max())));
     }
   }
 
-  if (!boundBox.isNull())
+  if (!boundBox.is_null())
     boundBox.translate(position);
 
   return boundBox;

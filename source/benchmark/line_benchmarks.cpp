@@ -4,6 +4,7 @@
 import std;
 import star.format;
 import star.line;
+import star.rect;
 import star.benchmark_runner;
 import star.vector;
 
@@ -290,6 +291,35 @@ void register_intersection(std::string_view type, std::string_view geometry) {
 }
 
 template <line_benchmark_real T> void register_family(std::string_view type) {
+  benchmark::RegisterBenchmark(std::format("Rect/{}/EdgeIntersection", type).c_str(), [](benchmark::State& state) {
+    Star::Rect<T> box(0, 0, 8, 8);
+    Star::Line<T, 2> line({-4, 4}, {12, 4});
+    auto hit = box.edge_intersection(line);
+    if (!require(state, hit.intersects && hit.t == T(0.25) && !hit.glances && !hit.coincides
+            && hit.point == Star::Vector<T, 2>(0, 4)))
+      return;
+    for (auto _ : state) {
+      benchmark::DoNotOptimize(box);
+      benchmark::DoNotOptimize(line);
+      auto result = box.edge_intersection(line);
+      benchmark::DoNotOptimize(result);
+    }
+  });
+  benchmark::RegisterBenchmark(std::format("Rect/{}/SubtractInterior", type).c_str(), [](benchmark::State& state) {
+    Star::Rect<T> box(0, 0, 8, 8), cut(2, 2, 6, 6);
+    auto pieces = box.subtract(cut);
+    if (!require(state, pieces.size() == 4 && pieces[0] == Star::Rect<T>(0, 0, 2, 8)
+            && pieces[1] == Star::Rect<T>(6, 0, 8, 8) && pieces[2] == Star::Rect<T>(2, 0, 6, 2)
+            && pieces[3] == Star::Rect<T>(2, 6, 6, 8)))
+      return;
+    for (auto _ : state) {
+      benchmark::DoNotOptimize(box);
+      benchmark::DoNotOptimize(cut);
+      auto result = box.subtract(cut);
+      benchmark::DoNotOptimize(result.data());
+      benchmark::ClobberMemory();
+    }
+  });
   register_intersection<T, intersection_family::nonparallel_finite>(type, "NonparallelFinite");
   register_intersection<T, intersection_family::nonparallel_infinite>(type, "NonparallelInfinite");
   register_intersection<T, intersection_family::parallel_mixed>(type, "ParallelFiniteInfinite");

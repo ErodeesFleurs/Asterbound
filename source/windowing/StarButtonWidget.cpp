@@ -554,9 +554,9 @@ void ButtonWidget::setInvisible(bool invisible) {
 
 RectI ButtonWidget::getScissorRect() const {
   if (m_pressed || (m_checked && !m_hasCheckedImages)) {
-    return RectI::withSize(screenPosition() + m_pressedOffset, size());
+    return RectI::with_size(screenPosition() + m_pressedOffset, size());
   }
-  return RectI::withSize(screenPosition(), size());
+  return RectI::with_size(screenPosition(), size());
 }
 
 std::expected<void, StarException> ButtonWidget::drawButtonPart(String const& image, Vec2F const& position) {

@@ -88,16 +88,16 @@ void VerticalLayout::updateLayout() {
 
   auto bounds = contentBoundRect();
 
-  int verticalPos = m_fillDown ? bounds.yMax() : bounds.yMin();
+  int verticalPos = m_fillDown ? bounds.y_max() : bounds.y_min();
   for (auto const& child : std::views::reverse(m_members)) {
     auto childSize = child->size();
 
     Vec2I targetPosition;
 
     if (m_horizontalAnchor == HorizontalAnchor::LeftAnchor)
-      targetPosition[0] = bounds.xMin();
+      targetPosition[0] = bounds.x_min();
     else if (m_horizontalAnchor == HorizontalAnchor::RightAnchor)
-      targetPosition[0] = bounds.xMax() - childSize[0];
+      targetPosition[0] = bounds.x_max() - childSize[0];
     else if (m_horizontalAnchor == HorizontalAnchor::HMidAnchor)
       targetPosition[0] = -childSize[0] / 2;
 
@@ -159,7 +159,7 @@ RectI VerticalLayout::contentBoundRect() const {
   else if (m_verticalAnchor == VerticalAnchor::VMidAnchor)
     min[1] -= m_size[1] / 2;
 
-  return RectI::withSize(min, m_size);
+  return RectI::with_size(min, m_size);
 }
 
 }

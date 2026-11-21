@@ -694,7 +694,7 @@ std::expected<RectF, StarException> ChatBubbleManager::bubbleImageRect(Vec2F scr
   if (!metadata) return std::unexpected(std::move(metadata.error()));
   auto size = (*metadata)->imageSize(std::get<0>(image));
   if (!size) return std::unexpected(std::move(size.error()));
-  return RectF::withSize(screenPos + std::get<1>(image) * pixelRatio, Vec2F(*size) * pixelRatio);
+  return RectF::with_size(screenPos + std::get<1>(image) * pixelRatio, Vec2F(*size) * pixelRatio);
 }
 
 std::expected<void, StarException> ChatBubbleManager::drawBubbleImage(Vec2F screenPos, BubbleImage const& image, float pixelRatio, int alpha) {
