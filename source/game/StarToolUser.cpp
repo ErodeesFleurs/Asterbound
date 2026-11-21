@@ -554,10 +554,7 @@ void ToolUser::setupHumanoidHandItemPose(Humanoid& humanoid) const {
 }
 
 [[nodiscard]] std::expected<Vec2F, StarException> ToolUser::armPosition(Humanoid const& humanoid, ToolHand hand, Direction facingDirection, float armAngle, Vec2F offset) const {
-  if (hand == ToolHand::Primary)
-    return humanoid.primaryArmPosition(facingDirection, armAngle, offset);
-  else
-    return humanoid.altArmPosition(facingDirection, armAngle, offset);
+  return humanoid.arm_position(hand, facingDirection, armAngle, offset);
 }
 
 [[nodiscard]] std::expected<Vec2F, StarException> ToolUser::handOffset(Humanoid const& humanoid, ToolHand hand, Direction direction) const {

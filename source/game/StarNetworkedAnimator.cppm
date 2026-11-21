@@ -132,7 +132,7 @@ public:
     [[nodiscard]] std::expected<Json, StarException> stateNextProperty(String const& stateType, String const& propertyName) const;
     [[nodiscard]] std::expected<Json, StarException> partProperty(String const& partName, String const& propertyName, std::optional<String> stateType = {}, std::optional<String> state = {}, std::optional<int> frame = {}) const;
     [[nodiscard]] std::expected<Json, StarException> partNextProperty(String const & partName, String const & propertyName) const;
-    [[nodiscard]] std::expected<Mat3F, StarException> groupTransformation(StringList const& transformationGroups) const;
+    [[nodiscard]] std::expected<Mat3F, StarException> group_transformation(std::span<String const> groups) const;
     [[nodiscard]] std::expected<Mat3F, StarException> partTransformation(String const& partName) const;
     [[nodiscard]] std::expected<Mat3F, StarException> finalPartTransformation(String const& partName) const;
     [[nodiscard]] std::expected<std::optional<Vec2F>, StarException> partPoint(String const& partName, String const& propertyName) const;
@@ -193,7 +193,7 @@ public:
   // all parts in the NetworkedAnimator.
   Mat3F globalTransformation() const;
   // The transformation applied from the given set of transformation groups
-  [[nodiscard]] std::expected<Mat3F, StarException> groupTransformation(StringList const& transformationGroups) const;
+  [[nodiscard]] std::expected<Mat3F, StarException> group_transformation(std::span<String const> groups) const;
   // The transformation that is applied to the given part NOT including the
   // global transformation
   [[nodiscard]] std::expected<Mat3F, StarException> partTransformation(String const& partName) const;
@@ -330,7 +330,7 @@ private:
   [[nodiscard]] std::expected<Json, StarException> queryStateNextProperty(String const& stateType, String const& propertyName, Sample const* sample) const;
   [[nodiscard]] std::expected<Json, StarException> queryPartProperty(String const& partName, String const& propertyName, std::optional<String> stateType, std::optional<String> state, std::optional<int> frame, Sample const* sample) const;
   [[nodiscard]] std::expected<Json, StarException> queryPartNextProperty(String const & partName, String const & propertyName, Sample const* sample) const;
-  [[nodiscard]] std::expected<Mat3F, StarException> queryGroupTransformation(StringList const& transformationGroups, Sample const* sample) const;
+  [[nodiscard]] std::expected<Mat3F, StarException> query_group_transformation(std::span<String const> groups, std::optional<std::reference_wrapper<Sample const>> sample) const;
   [[nodiscard]] std::expected<Mat3F, StarException> queryPartTransformation(String const& partName, Sample const* sample) const;
   [[nodiscard]] std::expected<Mat3F, StarException> queryFinalPartTransformation(String const& partName, Sample const* sample) const;
   [[nodiscard]] std::expected<std::optional<Vec2F>, StarException> queryPartPoint(String const& partName, String const& propertyName, Sample const* sample) const;

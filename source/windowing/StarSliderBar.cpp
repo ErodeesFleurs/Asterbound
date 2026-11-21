@@ -64,7 +64,6 @@ import star.gui_reader;
 import star.image_metadata_database;
 
 import star.math_common;
-import star.pythonic;
 namespace Star {
 
 SliderBarWidget::SliderBarWidget(GuiContext& context)

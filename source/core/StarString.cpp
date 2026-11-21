@@ -454,11 +454,52 @@ std::expected<std::size_t, StarException> String::find_last(String const& patter
 std::expected<std::size_t, StarException> String::find_first_of(String const& chars, std::size_t pos) const { return StringView(*this).find_first_of(chars, pos); }
 std::expected<std::size_t, StarException> String::find_first_not_of(String const& chars, std::size_t pos) const { return StringView(*this).find_first_not_of(chars, pos); }
 std::expected<std::size_t, StarException> String::find_next_boundary(std::size_t index, bool backwards) const { return StringView(*this).find_next_boundary(index, backwards); }
-std::expected<String, StarException> String::slice(SliceIndex a, SliceIndex b, int step) const {
-  auto wide = wide_string();
-  if (!wide) return std::unexpected(std::move(wide.error()));
-  auto sliced = Star::slice(*wide, a, b, step);
-  return create(std::u32string_view(sliced));
+std::expected<String, StarException> String::slice(std::optional<int> start, std::optional<int> stop, int step) const {
+  auto length = size();
+  if (!length) return std::unexpected(std::move(length.error()));
+  auto plan = normalize_slice(*length, start, stop, step);
+  if (!plan.count) return String{};
+
+  if (*length == m_string.size()) {
+    if (step == 1) return String(std::string_view(m_string).substr(plan.start, plan.count));
+    std::string result;
+    result.reserve(plan.count);
+    auto index = plan.start;
+    for (auto remaining = plan.count; ; ) {
+      result.push_back(m_string[index]);
+      if (--remaining == 0) break;
+      index = plan.reverse ? index - plan.stride : index + plan.stride;
+    }
+    return String(std::move(result));
+  }
+
+  // Every prefix boundary below belongs to the already validated input.
+  auto boundary = [&](std::size_t index) {
+    if (index <= *length - index)
+      return std::ranges::next(const_iterator::end(m_string.begin()), static_cast<std::ptrdiff_t>(index));
+    return std::ranges::prev(end(), static_cast<std::ptrdiff_t>(*length - index));
+  };
+  auto current = boundary(plan.start);
+  if (step == 1) {
+    auto stop_index = plan.start + plan.count;
+    auto last = *length - stop_index < plan.count
+        ? boundary(stop_index) : std::ranges::next(current, static_cast<std::ptrdiff_t>(plan.count));
+    return String(std::string(current.base(), last.base()));
+  }
+
+  std::string result;
+  result.reserve(plan.count);
+  auto remaining = plan.count;
+  for (;;) {
+    auto next = std::ranges::next(current);
+    result.append(current.base(), next.base());
+    if (--remaining == 0) break;
+    if (plan.reverse)
+      current = std::ranges::prev(current, static_cast<std::ptrdiff_t>(plan.stride));
+    else
+      current = std::ranges::next(next, static_cast<std::ptrdiff_t>(plan.stride - 1));
+  }
+  return String(std::move(result));
 }
 void String::append(String const& s) { m_string.append(s.m_string); }
 void String::append(std::string const& s) { m_string.append(s); }
@@ -628,7 +669,9 @@ String StringList::join(String const& separator) const {
   for (auto it = begin(); it != end(); ++it) { if (it != begin()) result.append(separator); result.append(*it); }
   return result;
 }
-std::expected<StringList, StarException> StringList::slice(SliceIndex a, SliceIndex b, int step) const { return Star::slice(*this, a, b, step); }
+StringList StringList::slice(std::optional<int> start, std::optional<int> stop, int step) const {
+  return Star::slice(*this, start, stop, step);
+}
 StringList StringList::sorted() const { StringList result = *this; result.sort(); return result; }
 void write_text(TextBuffer& output, StringList const& list) {
   output.push_back('(');

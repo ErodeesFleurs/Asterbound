@@ -39,7 +39,6 @@ import star.root;
 import star.text_painter;
 
 import star.math_common;
-import star.pythonic;
 namespace Star {
 
 std::expected<void, StarException> TextPainter::apply_measurement_commands(MeasurementFonts& fonts,

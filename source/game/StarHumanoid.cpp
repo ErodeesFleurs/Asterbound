@@ -3262,243 +3262,75 @@ if (!checked561) return std::unexpected(std::move(checked561.error()));
 std::expected<Vec2F, StarException> Humanoid::primaryHandPosition(Vec2F const& offset) const {
   auto checked568 = primaryHandOffset(m_facingDirection);
 if (!checked568) return std::unexpected(std::move(checked568.error()));
-auto checked569 = primaryArmPosition(m_facingDirection, m_primaryHand.angle, std::move(*checked568) + offset);
-if (!checked569) return std::unexpected(std::move(checked569.error()));
-return std::move(*checked569);
+return arm_position(ToolHand::Primary, m_facingDirection, m_primaryHand.angle, *checked568 + offset);
 }
 
 std::expected<Vec2F, StarException> Humanoid::altHandPosition(Vec2F const& offset) const {
   auto checked570 = altHandOffset(m_facingDirection);
 if (!checked570) return std::unexpected(std::move(checked570.error()));
-auto checked571 = altArmPosition(m_facingDirection, m_altHand.angle, std::move(*checked570) + offset);
-if (!checked571) return std::unexpected(std::move(checked571.error()));
-return std::move(*checked571);
+return arm_position(ToolHand::Alt, m_facingDirection, m_altHand.angle, *checked570 + offset);
 }
 
-std::expected<Vec2F, StarException> Humanoid::primaryArmPosition(Direction facingDirection, float armAngle, Vec2F const& offset) const {
-  if (m_useAnimation){
-    // does the animator being configurable overcomplicate some things? yeah probably
-    Vec2F rotationCenter;
-    String anchor;
-    StringList transformationGroups;
-    String rotationTransformGroup;
-    if (facingDirection == Direction::Left || m_twoHanded) {
-      rotationTransformGroup = "frontArmRotation";
-      auto checked572 = m_networkedAnimator->hasState("frontArm", m_primaryHand.frontFrame);
-if (!checked572) return std::unexpected(std::move(checked572.error()));
-auto state = std::move(*checked572) ? m_primaryHand.frontFrame : "rotation";
-      // make sure we ge the properties for the arm rotation state
-      auto checked573 = m_networkedAnimator->partProperty(m_frontArmRotationPoint.first,m_frontArmRotationPoint.second,{"frontArm"},state,1);
-if (!checked573) return std::unexpected(std::move(checked573.error()));
-auto checked574 = json_to_vec2f(std::move(*checked573));
-if (!checked574) return std::unexpected(std::move(checked574.error()));
-rotationCenter = std::move(*checked574);
-      auto checked575 = m_networkedAnimator->partProperty(m_frontArmRotationPoint.first, "anchorPart", {"frontArm"},state,1);
-if (!checked575) return std::unexpected(std::move(checked575.error()));
-auto checked576 = std::move(*checked575).to_string();
-if (!checked576) return std::unexpected(std::move(checked576.error()));
-anchor = std::move(*checked576);
-      auto checked577 = m_networkedAnimator->partProperty(m_frontArmRotationPoint.first, "transformationGroups", {"frontArm"},state,1);
-if (!checked577) return std::unexpected(std::move(checked577.error()));
-auto checked578 = json_to_string_list(std::move(*checked577));
-if (!checked578) return std::unexpected(std::move(checked578.error()));
-transformationGroups = std::move(*checked578);
-    } else {
-      rotationTransformGroup = "backArmRotation";
-      auto checked579 = m_networkedAnimator->hasState("backArm", m_primaryHand.backFrame);
-if (!checked579) return std::unexpected(std::move(checked579.error()));
-auto state = std::move(*checked579) ? m_primaryHand.backFrame : "rotation";
-      // make sure we ge the properties for the arm rotation state
-      auto checked580 = m_networkedAnimator->partProperty(m_backArmRotationPoint.first,m_backArmRotationPoint.second,{"backArm"},state,1);
-if (!checked580) return std::unexpected(std::move(checked580.error()));
-auto checked581 = json_to_vec2f(std::move(*checked580));
-if (!checked581) return std::unexpected(std::move(checked581.error()));
-rotationCenter = std::move(*checked581);
-      auto checked582 = m_networkedAnimator->partProperty(m_backArmRotationPoint.first, "anchorPart", {"backArm"},state,1);
-if (!checked582) return std::unexpected(std::move(checked582.error()));
-auto checked583 = std::move(*checked582).to_string();
-if (!checked583) return std::unexpected(std::move(checked583.error()));
-anchor = std::move(*checked583);
-      auto checked584 = m_networkedAnimator->partProperty(m_backArmRotationPoint.first, "transformationGroups", {"backArm"},state,1);
-if (!checked584) return std::unexpected(std::move(checked584.error()));
-auto checked585 = json_to_string_list(std::move(*checked584));
-if (!checked585) return std::unexpected(std::move(checked585.error()));
-transformationGroups = std::move(*checked585);
+std::expected<Vec2F, StarException> Humanoid::arm_position(ToolHand hand, Direction facing_direction, float arm_angle, Vec2F const& offset) const {
+  bool front = hand == ToolHand::Primary ? (facing_direction == Direction::Left || m_twoHanded)
+                                        : facing_direction == Direction::Right;
+  Vec2F position;
+  if (m_useAnimation) {
+    auto const& animator = *m_networkedAnimator;
+    auto const& rotation_point = front ? m_frontArmRotationPoint : m_backArmRotationPoint;
+    String arm_type = front ? String("frontArm") : String("backArm");
+    std::optional<String> state = front ? m_primaryHand.frontFrame : m_primaryHand.backFrame;
+    auto has_state = animator.hasState(arm_type, state);
+    if (!has_state) return std::unexpected(std::move(has_state.error()));
+    if (!*has_state)
+      state.emplace("rotation");
+    auto property = [&](String const& key) {
+      return animator.partProperty(rotation_point.first, key, arm_type, state, 1);
+    };
+    auto center_json = property(rotation_point.second);
+    if (!center_json) return std::unexpected(std::move(center_json.error()));
+    auto center = json_to_vec2f(*center_json);
+    if (!center) return std::unexpected(std::move(center.error()));
+    auto anchor_json = property("anchorPart");
+    if (!anchor_json) return std::unexpected(std::move(anchor_json.error()));
+    auto anchor = anchor_json->to_string();
+    if (!anchor) return std::unexpected(std::move(anchor.error()));
+    auto groups_json = property("transformationGroups");
+    if (!groups_json) return std::unexpected(std::move(groups_json.error()));
+    auto group_names = json_to_string_list(*groups_json);
+    if (!group_names) return std::unexpected(std::move(group_names.error()));
+
+    // Replace only the first named arm rotation; without it, use the authored chain unchanged.
+    std::span<String const> groups(*group_names);
+    std::string_view rotation_group = front ? "frontArmRotation" : "backArmRotation";
+    auto marker = std::find(groups.begin(), groups.end(), rotation_group);
+    auto index = static_cast<std::size_t>(marker - groups.begin());
+    auto transform = animator.group_transformation(groups.first(index));
+    if (!transform) return std::unexpected(std::move(transform.error()));
+    if (marker != groups.end()) {
+      transform->rotate(arm_angle, *center);
+      auto suffix = groups.subspan(index + 1);
+      if (!suffix.empty()) {
+        auto after = animator.group_transformation(suffix);
+        if (!after) return std::unexpected(std::move(after.error()));
+        *transform = *after * *transform;
+      }
     }
-    // and now, we do the group transformations for the part, but where it would do the rotation, we do some finagling to do it here instead of
-    // using the rotation stored in the animator
-    // now I DOUBT people will be doing crazy things using the animation transformation properties on the arm rotation parts themselves
-    // but rather parts that the arms are parented to with anchors, so I'm not accounting for that here
-    auto mat = Mat3F::identity();
-    auto i = transformationGroups.index_of(rotationTransformGroup);
-    if (i != NPos) {
-      if (i > 0)
-        {
-auto checked586 = transformationGroups.slice(0, i-1);
-if (!checked586) return std::unexpected(std::move(checked586.error()));
-auto checked587 = m_networkedAnimator->groupTransformation(std::move(*checked586));
-if (!checked587) return std::unexpected(std::move(checked587.error()));
-mat = std::move(*checked587);
-}
-      auto rotated = Mat3F::identity();
-      rotated.rotate(armAngle, rotationCenter);
-      mat = rotated * mat;
-      if (i < (transformationGroups.size() -1))
-        {
-auto checked588 = transformationGroups.slice(i+1, transformationGroups.size() -1);
-if (!checked588) return std::unexpected(std::move(checked588.error()));
-auto checked589 = m_networkedAnimator->groupTransformation(std::move(*checked588));
-if (!checked589) return std::unexpected(std::move(checked589.error()));
-mat = std::move(*checked589) * mat;
-}
-    } else {
-      auto checked590 = m_networkedAnimator->groupTransformation(transformationGroups);
-if (!checked590) return std::unexpected(std::move(checked590.error()));
-mat = std::move(*checked590);
-    }
-    auto checked591 = m_networkedAnimator->partTransformation(anchor);
-if (!checked591) return std::unexpected(std::move(checked591.error()));
-mat = std::move(*checked591) * mat;
-    auto position = mat.transform_point(offset + rotationCenter);
-    if (facingDirection == Direction::Left)
-      position[0] *= -1;
-    return position;
-  }
-
-  auto checked592 = getBobYOffset(1.f);
-if (!checked592) return std::unexpected(std::move(checked592.error()));
-float bobYOffset = std::move(*checked592);
-
-  if (m_primaryHand.holdingItem) {
-    Vec2F rotationCenter;
-    if (facingDirection == Direction::Left || m_twoHanded)
-      rotationCenter = m_frontArmRotationCenter + Vec2F(0, bobYOffset);
-    else
-      rotationCenter = m_backArmRotationCenter + Vec2F(0, bobYOffset) + m_backArmOffset;
-
-    Vec2F position = offset.rotate(armAngle) + rotationCenter;
-
-    if (facingDirection == Direction::Left)
-      position[0] *= -1;
-
-    return position;
+    auto parent = animator.partTransformation(*anchor);
+    if (!parent) return std::unexpected(std::move(parent.error()));
+    position = (*parent * *transform).transform_point(offset + *center);
   } else {
-    // TODO: non-aiming item holding not supported yet
-    return Vec2F();
+    auto bob = getBobYOffset(1.f);
+    if (!bob) return std::unexpected(std::move(bob.error()));
+    if (!getHand(hand).holdingItem)
+      return Vec2F();
+    auto center = front ? m_frontArmRotationCenter + Vec2F(0, *bob)
+                        : m_backArmRotationCenter + Vec2F(0, *bob) + m_backArmOffset;
+    position = offset.rotate(arm_angle) + center;
   }
-}
-
-std::expected<Vec2F, StarException> Humanoid::altArmPosition(Direction facingDirection, float armAngle, Vec2F const& offset) const {
-  if (m_useAnimation){
-    // does the animator being configurable overcomplicate some things? yeah probably
-    Vec2F rotationCenter;
-    String anchor;
-    StringList transformationGroups;
-    String rotationTransformGroup;
-    if (facingDirection == Direction::Right) {
-      rotationTransformGroup = "frontArmRotation";
-      auto checked593 = m_networkedAnimator->hasState("frontArm", m_primaryHand.frontFrame);
-if (!checked593) return std::unexpected(std::move(checked593.error()));
-auto state = std::move(*checked593) ? m_primaryHand.frontFrame : "rotation";
-      // make sure we ge the properties for the arm rotation state
-      auto checked594 = m_networkedAnimator->partProperty(m_frontArmRotationPoint.first,m_frontArmRotationPoint.second,{"frontArm"},state,1);
-if (!checked594) return std::unexpected(std::move(checked594.error()));
-auto checked595 = json_to_vec2f(std::move(*checked594));
-if (!checked595) return std::unexpected(std::move(checked595.error()));
-rotationCenter = std::move(*checked595);
-      auto checked596 = m_networkedAnimator->partProperty(m_frontArmRotationPoint.first, "anchorPart", {"frontArm"},state,1);
-if (!checked596) return std::unexpected(std::move(checked596.error()));
-auto checked597 = std::move(*checked596).to_string();
-if (!checked597) return std::unexpected(std::move(checked597.error()));
-anchor = std::move(*checked597);
-      auto checked598 = m_networkedAnimator->partProperty(m_frontArmRotationPoint.first, "transformationGroups", {"frontArm"},state,1);
-if (!checked598) return std::unexpected(std::move(checked598.error()));
-auto checked599 = json_to_string_list(std::move(*checked598));
-if (!checked599) return std::unexpected(std::move(checked599.error()));
-transformationGroups = std::move(*checked599);
-    } else {
-      rotationTransformGroup = "backArmRotation";
-      auto checked600 = m_networkedAnimator->hasState("backArm", m_primaryHand.backFrame);
-if (!checked600) return std::unexpected(std::move(checked600.error()));
-auto state = std::move(*checked600) ? m_primaryHand.backFrame : "rotation";
-      // make sure we ge the properties for the arm rotation state
-      auto checked601 = m_networkedAnimator->partProperty(m_backArmRotationPoint.first,m_backArmRotationPoint.second,{"backArm"},state,1);
-if (!checked601) return std::unexpected(std::move(checked601.error()));
-auto checked602 = json_to_vec2f(std::move(*checked601));
-if (!checked602) return std::unexpected(std::move(checked602.error()));
-rotationCenter = std::move(*checked602);
-      auto checked603 = m_networkedAnimator->partProperty(m_backArmRotationPoint.first, "anchorPart", {"backArm"},state,1);
-if (!checked603) return std::unexpected(std::move(checked603.error()));
-auto checked604 = std::move(*checked603).to_string();
-if (!checked604) return std::unexpected(std::move(checked604.error()));
-anchor = std::move(*checked604);
-      auto checked605 = m_networkedAnimator->partProperty(m_backArmRotationPoint.first, "transformationGroups", {"backArm"},state,1);
-if (!checked605) return std::unexpected(std::move(checked605.error()));
-auto checked606 = json_to_string_list(std::move(*checked605));
-if (!checked606) return std::unexpected(std::move(checked606.error()));
-transformationGroups = std::move(*checked606);
-    }
-    // and now, we do the group transformations for the part, but where it would do the rotation, we do some finagling to do it here instead of
-    // using the rotation stored in the animator
-    // now I DOUBT people will be doing crazy things using the animation transformation properties on the arm rotation parts themselves
-    // but rather parts that the arms are parented to with anchors, so I'm not accounting for that here
-    auto mat = Mat3F::identity();
-    auto i = transformationGroups.index_of(rotationTransformGroup);
-    if (i != NPos) {
-      if (i > 0)
-        {
-auto checked607 = transformationGroups.slice(0, i-1);
-if (!checked607) return std::unexpected(std::move(checked607.error()));
-auto checked608 = m_networkedAnimator->groupTransformation(std::move(*checked607));
-if (!checked608) return std::unexpected(std::move(checked608.error()));
-mat = std::move(*checked608);
-}
-      auto rotated = Mat3F::identity();
-      rotated.rotate(armAngle, rotationCenter);
-      mat = rotated * mat;
-      if (i < (transformationGroups.size() -1))
-        {
-auto checked609 = transformationGroups.slice(i+1, transformationGroups.size() -1);
-if (!checked609) return std::unexpected(std::move(checked609.error()));
-auto checked610 = m_networkedAnimator->groupTransformation(std::move(*checked609));
-if (!checked610) return std::unexpected(std::move(checked610.error()));
-mat = std::move(*checked610) * mat;
-}
-    } else {
-      auto checked611 = m_networkedAnimator->groupTransformation(transformationGroups);
-if (!checked611) return std::unexpected(std::move(checked611.error()));
-mat = std::move(*checked611);
-    }
-    auto checked612 = m_networkedAnimator->partTransformation(anchor);
-if (!checked612) return std::unexpected(std::move(checked612.error()));
-mat = std::move(*checked612) * mat;
-    auto position = mat.transform_point(offset + rotationCenter);
-    if (facingDirection == Direction::Left)
-      position[0] *= -1;
-    return position;
-  }
-
-  auto checked613 = getBobYOffset(1.f);
-if (!checked613) return std::unexpected(std::move(checked613.error()));
-float bobYOffset = std::move(*checked613);
-
-  if (m_altHand.holdingItem) {
-    Vec2F rotationCenter;
-    if (facingDirection == Direction::Right)
-      rotationCenter = m_frontArmRotationCenter + Vec2F(0, bobYOffset);
-    else
-      rotationCenter = m_backArmRotationCenter + Vec2F(0, bobYOffset) + m_backArmOffset;
-
-    Vec2F position = Vec2F(offset).rotate(armAngle) + rotationCenter;
-
-    if (facingDirection == Direction::Left)
-      position[0] *= -1;
-
-    return position;
-  } else {
-    // TODO: non-aiming item holding not supported yet
-    return Vec2F();
-  }
+  if (facing_direction == Direction::Left)
+    position[0] *= -1;
+  return position;
 }
 
 std::expected<Vec2F, StarException> Humanoid::primaryHandOffset(Direction facingDirection) const {

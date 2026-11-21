@@ -184,7 +184,7 @@ const GameTestRegistration
     HumanoidIdentity identity;
     ASSERT_TRUE((*humanoid)->setIdentity(identity));
     auto database = fixture.root().itemDatabase();
-    ASSERT_TRUE(database);
+    ASSERT_TRUE(database) << database.error().what();
     auto names = (*database)->allItems();
     std::sort(names.begin(), names.end());
     String chestName;
@@ -1004,6 +1004,69 @@ const GameTestRegistration hiddenLoopingPresentationAudio(
     (*loop)->stop();
   });
 
+const GameTestRegistration arm_rotation_group_order(
+  "HumanoidRenderTest", "ArmRotationPreservesGroupsOnBothSides", [](GameTest& fixture) {
+    auto assets = fixture.root().assets();
+    ASSERT_TRUE(assets);
+    auto base = (*assets)->json("/humanoid.config");
+    ASSERT_TRUE(base) << base.error().what();
+    auto animation = Json::parse(R"({
+      "version":1,
+      "transformationGroups":{"before":{},"after":{},"frontArmRotation":{},"backArmRotation":{}},
+      "animatedParts":{
+        "stateTypes":{
+          "frontArm":{"default":"rotation","states":{"rotation":{},"plain":{},"broken":{}}},
+          "backArm":{"default":"rotation","states":{"rotation":{}}}
+        },
+        "parts":{
+          "anchor":{"properties":{"offset":[5,7]}},
+          "frontArm":{"properties":{"anchorPart":"anchor","rotationCenter":[1,2]},
+            "partStates":{"frontArm":{
+              "rotation":{"properties":{"transformationGroups":["before","frontArmRotation","after"]}},
+              "plain":{"properties":{"transformationGroups":["before","after"]}},
+              "broken":{"properties":{"transformationGroups":["before","frontArmRotation","missing"]}}
+            }}},
+          "backArm":{"properties":{"anchorPart":"anchor","rotationCenter":[-1,1]},
+            "partStates":{"backArm":{
+              "rotation":{"properties":{"transformationGroups":["before","backArmRotation","after"]}}
+            }}}
+        }
+      }
+    })");
+    ASSERT_TRUE(animation) << animation.error().what();
+    auto config = base->set("animation", *animation);
+    ASSERT_TRUE(config) << config.error().what();
+    auto made = Humanoid::create(fixture.root(), *config);
+    ASSERT_TRUE(made) << made.error().what();
+    auto& humanoid = **made;
+    auto animator = humanoid.networkedAnimator();
+    ASSERT_TRUE(animator);
+    ASSERT_TRUE(animator->get().translateTransformationGroup("before", {2, 3}));
+    ASSERT_TRUE(animator->get().scaleTransformationGroup("after", Vec2F(2, 3)));
+    // The supplied angle replaces each arm's stored transform rather than composing with it.
+    ASSERT_TRUE(animator->get().translateTransformationGroup("frontArmRotation", {100, 0}));
+    ASSERT_TRUE(animator->get().translateTransformationGroup("backArmRotation", {0, 100}));
+
+    constexpr float angle = std::numbers::pi_v<float> / 2;
+    auto expect_position = [&](ToolHand hand, Direction facing, Vec2F expected) {
+      auto actual = humanoid.arm_position(hand, facing, angle, {3, 4});
+      ASSERT_TRUE(actual) << actual.error().what();
+      EXPECT_NEAR((*actual)[0], expected[0], 1e-5f);
+      EXPECT_NEAR((*actual)[1], expected[1], 1e-5f);
+    };
+    // Offset + pre-translation gives (5,7) relative to either center.
+    // Quarter-turn to (-7,5), restore the center, scale, translate by anchor, then mirror.
+    expect_position(ToolHand::Primary, Direction::Left, {7, 28});
+    expect_position(ToolHand::Alt, Direction::Right, {-7, 28});
+    expect_position(ToolHand::Primary, Direction::Right, {-11, 25});
+    expect_position(ToolHand::Alt, Direction::Left, {11, 25});
+
+    humanoid.setHandFrameOverrides(ToolHand::Primary, "rotation", "plain");
+    expect_position(ToolHand::Alt, Direction::Right, {17, 34}); // No rotation marker.
+    humanoid.setHandFrameOverrides(ToolHand::Primary, "rotation", "broken");
+    EXPECT_FALSE(humanoid.arm_position(ToolHand::Alt, Direction::Right, angle, {3, 4}));
+  });
+
 const GameTestRegistration authoredAnimationGroupSampling(
   "HumanoidRenderTest", "SampledGroupCurvesRespectDiscreteAndInterpolatedFrames", [](GameTest& fixture) {
     auto config = Json::parse(R"({
@@ -1026,6 +1089,7 @@ const GameTestRegistration authoredAnimationGroupSampling(
     auto& animator = **made;
     ASSERT_TRUE(animator.update(.4f, {}));
     ASSERT_TRUE(animator.update(.2f, {}));
+    std::array const smooth_groups{String("smooth")};
     for (float alpha : {.25f, .75f, .25f}) {
       auto sample = animator.sample(alpha);
       auto opposite = animator.sample(1.f - alpha);
@@ -1039,11 +1103,11 @@ const GameTestRegistration authoredAnimationGroupSampling(
       ASSERT_TRUE(discrete);
       ASSERT_TRUE(*discrete);
       EXPECT_FLOAT_EQ((**discrete)[0], alpha < .5f ? 0 : 8);
-      auto smooth = sample.groupTransformation({"smooth"});
+      auto smooth = sample.group_transformation(smooth_groups);
       ASSERT_TRUE(smooth);
       EXPECT_NEAR(smooth->transform_point(Vec2F{})[0], 7.2f, 1e-5f);
     }
-    auto logical = animator.groupTransformation({"discrete"});
+    auto logical = animator.group_transformation(std::array{String("discrete")});
     ASSERT_TRUE(logical);
     EXPECT_FLOAT_EQ(logical->transform_point(Vec2F{})[0], 8);
     auto timer = animator.stateTimer("body");

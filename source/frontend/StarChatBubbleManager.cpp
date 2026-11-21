@@ -612,14 +612,21 @@ std::expected<void, StarException> ChatBubbleManager::addChatActions(List<ChatAc
                        .bubbleText = std::move(bubbleTexts),
                        .onscreen = false,
                        .instance = {}};
-      List<BubbleState<Bubble>> oldBubbles = m_bubbles.filtered([&sayAction](BubbleState<Bubble> const&, Bubble const& bubble) {
+      auto old_bubbles = m_bubbles.filtered([&sayAction](BubbleState<Bubble> const&, Bubble const& bubble) {
           return bubble.entity == sayAction.entity;
         });
       m_bubbles.filter([&sayAction](BubbleState<Bubble> const&, Bubble const& bubble) { return bubble.entity != sayAction.entity; });
       m_bubbles.addBubble(pos, boundBox, std::move(bubble), m_interBubbleMargin * pixelRatio);
-      oldBubbles.sort([](BubbleState<Bubble> const& a, BubbleState<Bubble> const& b) { return a.contents.age < b.contents.age; });
-      for (auto& bubble : oldBubbles.slice(0, m_maxMessagePerEntity - 1))
-        m_bubbles.addBubble(bubble.idealDestination, bubble.boundBox, bubble.contents, 0);
+      // A nonpositive limit historically used a negative slice stop, relative to the end.
+      auto stop = static_cast<std::int64_t>(m_maxMessagePerEntity) - 1;
+      auto size = old_bubbles.size();
+      auto keep = stop < 0 ? size - std::min(size, static_cast<std::size_t>(-stop))
+                           : std::min(size, static_cast<std::size_t>(stop));
+      if (keep != 0) {
+        old_bubbles.sort([](BubbleState<Bubble> const& a, BubbleState<Bubble> const& b) { return a.contents.age < b.contents.age; });
+        for (auto& previous : std::span(old_bubbles).first(keep))
+          m_bubbles.addBubble(previous.idealDestination, previous.boundBox, std::move(previous.contents), 0);
+      }
 
     } else if (std::holds_alternative<PortraitChatAction>(action)) {
       auto const& portraitAction = std::get<PortraitChatAction>(action);

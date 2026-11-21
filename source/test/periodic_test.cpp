@@ -111,11 +111,27 @@ TEST(PeriodicFunctionTest, LargeDeltaAdvancesOneHalfCycle) {
   EXPECT_EQ(random.next_u32(), reference.next_u32());
 }
 
+TEST(PeriodicFunctionTest, ZeroLengthHalfCycleReachesTargetWithoutResampling) {
+  // With this seed the fourth draw (first sampled duration) is exactly zero.
+  RandomService random(1765881573), reference(1765881573);
+  auto wave = PeriodicFunction<float>::create(random, 0.4f, 0.5f, 0.85f, 0.4f);
+  ASSERT_TRUE(wave);
+  for (int i = 0; i < 3; ++i)
+    (void)reference.uniform_float();
+  ASSERT_EQ(reference.uniform_float(), 0.0f);
+  wave->update(0.0f);
+  float phase = -1;
+  auto weights = [&](float t) { phase = t; return std::array{1.0f - t, t}; };
+  EXPECT_FLOAT_EQ(wave->value(weights), 0.85f);
+  EXPECT_EQ(phase, 0.0f);
+  EXPECT_EQ(random.next_u32(), reference.next_u32());
+}
+
 TEST(PeriodicFunctionTest, InvalidDurationDoesNotAdvanceRandomStream) {
   RandomService random(167), reference(167);
   using Wave = PeriodicFunction<float>;
   EXPECT_FALSE(Wave::create(random, 0.0f));
-  EXPECT_FALSE(Wave::create(random, 1.0f, 0.0f, 1.0f, 1.0f));
+  EXPECT_FALSE(Wave::create(random, 1.0f, 0.0f, 1.0f, -0.25f));
   // Materialize the IEEE input at runtime; a fast-math call to infinity()
   // need not even store the value in the caller's argument slot.
   for (auto bits : {0x7f800000u, 0xff800000u, 0x7fc00001u}) {

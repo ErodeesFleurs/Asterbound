@@ -12,7 +12,6 @@ import star.map;
 import star.set;
 import star.unicode;
 
-import star.pythonic;
 namespace Star {
 
 class StringList;
@@ -197,7 +196,9 @@ public:
   // scanning a string
   [[nodiscard]] std::expected<std::size_t, StarException> find_next_boundary(std::size_t index, bool backwards = false) const;
 
-  [[nodiscard]] std::expected<String, StarException> slice(SliceIndex a = SliceIndex(), SliceIndex b = SliceIndex(), int i = 1) const;
+  // Slice by codepoint, validating even bytes outside the selected range.
+  [[nodiscard]] std::expected<String, StarException> slice(std::optional<int> start = std::nullopt,
+      std::optional<int> stop = std::nullopt, int step = 1) const;
 
   void append(String const& s);
   void append(std::string const& s);
@@ -374,7 +375,8 @@ public:
   [[nodiscard]] std::expected<StringList, StarException> trim_all(String const& chars = "") const;
   String join(String const& separator = "") const;
 
-  [[nodiscard]] std::expected<StringList, StarException> slice(SliceIndex a = SliceIndex(), SliceIndex b = SliceIndex(), int i = 1) const;
+  [[nodiscard]] StringList slice(std::optional<int> start = std::nullopt,
+      std::optional<int> stop = std::nullopt, int step = 1) const;
 
   template <typename Comparator>
     requires requires(List<String>& list, Comparator&& compare) { list.sort(std::forward<Comparator>(compare)); }

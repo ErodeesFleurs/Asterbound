@@ -90,7 +90,6 @@ import star.entity_map;
 import star.world;
 
 import star.line;
-import star.pythonic;
 namespace Star {
 
 namespace WorldImpl {

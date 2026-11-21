@@ -618,7 +618,9 @@ public:
     requires sequence_source<Container const&, Element>
   static List from(Container const& c);
 
-  List slice(SliceIndex a = SliceIndex(), SliceIndex b = SliceIndex(), int i = 1) const;
+  [[nodiscard]] List slice(std::optional<int> start = std::nullopt, std::optional<int> stop = std::nullopt,
+                           int step = 1) const
+    requires slice_result<List, List>;
 
   template <typename Comparator>
     requires sequence_comparator<Comparator&, reference, reference>
@@ -1153,7 +1155,9 @@ public:
 
 
   [[nodiscard]]
-  std::expected<StaticList, StarException> slice(SliceIndex a = SliceIndex(), SliceIndex b = SliceIndex(), int i = 1) const;
+  std::expected<StaticList, StarException> slice(std::optional<int> start = std::nullopt,
+                                                std::optional<int> stop = std::nullopt, int step = 1) const
+    requires slice_result<StaticList, StaticList>;
 
   template <typename Comparator>
     requires sequence_comparator<Comparator&, reference, reference>
@@ -1657,7 +1661,9 @@ public:
     requires sequence_source<Container const&, Element>
   static SmallList from(Container const& c);
 
-  SmallList slice(SliceIndex a = SliceIndex(), SliceIndex b = SliceIndex(), int i = 1) const;
+  [[nodiscard]] SmallList slice(std::optional<int> start = std::nullopt, std::optional<int> stop = std::nullopt,
+                                int step = 1) const
+    requires slice_result<SmallList, SmallList>;
 
   template <typename Comparator>
     requires sequence_comparator<Comparator&, reference, reference>
@@ -2168,7 +2174,9 @@ public:
     requires sequence_source<Container const&, Element>
   static Deque from(Container const& c);
 
-  Deque slice(SliceIndex a = SliceIndex(), SliceIndex b = SliceIndex(), int i = 1) const;
+  [[nodiscard]] Deque slice(std::optional<int> start = std::nullopt, std::optional<int> stop = std::nullopt,
+                            int step = 1) const
+    requires slice_result<Deque, Deque>;
 
   template <typename Comparator>
     requires sequence_comparator<Comparator&, reference, reference>
@@ -3017,8 +3025,17 @@ List<Element, Allocator> List<Element, Allocator>::from(Container const& c) {
 }
 
 template <typename Element, typename Allocator>
-auto List<Element, Allocator>::slice(SliceIndex a, SliceIndex b, int i) const -> List {
-  return Star::slice(*this, a, b, i);
+auto List<Element, Allocator>::slice(std::optional<int> start, std::optional<int> stop, int step) const -> List
+  requires slice_result<List, List>
+{
+  if (step == 1) {
+    auto plan = normalize_slice(size(), start, stop, step);
+    if (plan.count == 0)
+      return {};
+    auto first = begin() + static_cast<difference_type>(plan.start);
+    return List(first, first + static_cast<difference_type>(plan.count));
+  }
+  return Star::slice(*this, start, stop, step);
 }
 
 template <typename Element, typename Allocator>
@@ -3102,8 +3119,11 @@ auto StaticList<Element, MaxSize>::create(std::size_t size, Element const& value
 }
 
 template <typename Element, std::size_t MaxSize>
-auto StaticList<Element, MaxSize>::slice(SliceIndex a, SliceIndex b, int i) const -> std::expected<StaticList, StarException> {
-  return Star::slice(*this, a, b, i);
+auto StaticList<Element, MaxSize>::slice(std::optional<int> start, std::optional<int> stop, int step) const
+    -> std::expected<StaticList, StarException>
+  requires slice_result<StaticList, StaticList>
+{
+  return Star::slice(*this, start, stop, step);
 }
 
 template <typename Element, std::size_t MaxSize>
@@ -3153,8 +3173,10 @@ SmallList<Element, MaxStackSize> SmallList<Element, MaxStackSize>::from(Containe
 }
 
 template <typename Element, std::size_t MaxStackSize>
-auto SmallList<Element, MaxStackSize>::slice(SliceIndex a, SliceIndex b, int i) const -> SmallList {
-  return Star::slice(*this, a, b, i);
+auto SmallList<Element, MaxStackSize>::slice(std::optional<int> start, std::optional<int> stop, int step) const -> SmallList
+  requires slice_result<SmallList, SmallList>
+{
+  return Star::slice(*this, start, stop, step);
 }
 
 template <typename Element, std::size_t MaxStackSize>
@@ -3204,8 +3226,10 @@ Deque<Element, Allocator> Deque<Element, Allocator>::from(Container const& c) {
 }
 
 template <typename Element, typename Allocator>
-Deque<Element, Allocator> Deque<Element, Allocator>::slice(SliceIndex a, SliceIndex b, int i) const {
-  return Star::slice(*this, a, b, i);
+auto Deque<Element, Allocator>::slice(std::optional<int> start, std::optional<int> stop, int step) const -> Deque
+  requires slice_result<Deque, Deque>
+{
+  return Star::slice(*this, start, stop, step);
 }
 
 template <typename Element, typename Allocator>

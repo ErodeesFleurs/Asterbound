@@ -44,7 +44,6 @@ import star.particle;
 import star.weather_types;
 
 import star.byte_array;
-import star.pythonic;
 namespace Star {
 
 CelestialParameters::CelestialParameters() : m_seed(0) {}

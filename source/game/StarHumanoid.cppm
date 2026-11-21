@@ -315,8 +315,7 @@ public:
   // Finds the arm position in world space if the humanoid was facing the given
   // direction and applying the given arm angle.  The offset given is from the
   // rotation center of the arm.
-  [[nodiscard]] std::expected<Vec2F, StarException> primaryArmPosition(Direction facingDirection, float armAngle, Vec2F const& offset) const;
-  [[nodiscard]] std::expected<Vec2F, StarException> altArmPosition(Direction facingDirection, float armAngle, Vec2F const& offset) const;
+  [[nodiscard]] std::expected<Vec2F, StarException> arm_position(ToolHand hand, Direction facing_direction, float arm_angle, Vec2F const& offset) const;
 
   // Gives the offset of the hand from the arm rotation center
   [[nodiscard]] std::expected<Vec2F, StarException> primaryHandOffset(Direction facingDirection) const;

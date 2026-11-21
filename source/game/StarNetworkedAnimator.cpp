@@ -292,12 +292,12 @@ std::expected<Json, StarException> NetworkedAnimator::Sample::partNextProperty(S
   return m_animator.queryPartNextProperty(partName, propertyName, this);
 }
 
-std::expected<Mat3F, StarException> NetworkedAnimator::groupTransformation(StringList const& transformationGroups) const {
-  return queryGroupTransformation(transformationGroups, nullptr);
+std::expected<Mat3F, StarException> NetworkedAnimator::group_transformation(std::span<String const> groups) const {
+  return query_group_transformation(groups, std::nullopt);
 }
 
-std::expected<Mat3F, StarException> NetworkedAnimator::Sample::groupTransformation(StringList const& transformationGroups) const {
-  return m_animator.queryGroupTransformation(transformationGroups, this);
+std::expected<Mat3F, StarException> NetworkedAnimator::Sample::group_transformation(std::span<String const> groups) const {
+  return m_animator.query_group_transformation(groups, std::cref(*this));
 }
 
 std::expected<Mat3F, StarException> NetworkedAnimator::partTransformation(String const& partName) const {
@@ -1007,15 +1007,15 @@ std::expected<Mat3F, StarException> NetworkedAnimator::animationGroupTransformat
   return base;
 }
 
-std::expected<Mat3F, StarException> NetworkedAnimator::queryGroupTransformation(StringList const& transformationGroups, Sample const* sample) const {
+std::expected<Mat3F, StarException> NetworkedAnimator::query_group_transformation(std::span<String const> groups, std::optional<std::reference_wrapper<Sample const>> sample) const {
   auto mat = Mat3F::identity();
-  for (auto const& tg : transformationGroups) {
-    auto group = m_transformationGroups.get(tg);
+  for (auto const& name : groups) {
+    auto group = m_transformationGroups.get(name);
     if (!group) return std::unexpected(std::move(group.error()));
     auto const& value = group->get();
-    auto cache = sample ? &sample->m_presentation->groups[value.presentationIndex] : nullptr;
+    auto cache = sample ? &sample->get().m_presentation->groups[value.presentationIndex] : nullptr;
     if (cache && cache->animationDirty) {
-      auto sampled = animationGroupTransformation(tg, value, value.animationBaseTransform, sample);
+      auto sampled = animationGroupTransformation(name, value, value.animationBaseTransform, &sample->get());
       if (!sampled) return std::unexpected(std::move(sampled.error()));
       cache->animationTransform = *sampled;
       cache->animationDirty = false;
@@ -1048,7 +1048,7 @@ std::expected<Mat3F, StarException> NetworkedAnimator::queryPartTransformation(S
   transformation = part.animationAffineTransform() * transformation;
   auto groups = json_to_string_list(part.properties.value("transformationGroups", JsonArray()));
   if (!groups) return std::unexpected(std::move(groups.error()));
-  auto group = queryGroupTransformation(*groups, sample);
+  auto group = sample ? sample->group_transformation(*groups) : group_transformation(*groups);
   if (!group) return std::unexpected(std::move(group.error()));
   transformation = *group * transformation;
   auto rotationName = part.properties.value("rotationGroup").opt_string();
@@ -1831,7 +1831,7 @@ std::expected<List<LightSource>, StarException> NetworkedAnimator::queryLightSou
       if (!anchor) return std::unexpected(std::move(anchor.error()));
       transformation = *anchor;
     }
-    auto group = queryGroupTransformation(pair.second.transformationGroups, sample);
+    auto group = sample ? sample->group_transformation(pair.second.transformationGroups) : group_transformation(pair.second.transformationGroups);
     if (!group) return std::unexpected(std::move(group.error()));
     transformation = *group * transformation;
     position = transformation.transform_point(position);
@@ -2072,7 +2072,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
         if (!anchor) return std::unexpected(std::move(anchor.error()));
         transformation = *anchor;
       }
-      auto group = groupTransformation(pair.second.transformationGroups);
+      auto group = group_transformation(pair.second.transformationGroups);
       if (!group) return std::unexpected(std::move(group.error()));
       transformation = *group * transformation;
 

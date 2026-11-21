@@ -41,7 +41,8 @@ public:
       m_source = m_target;
       m_target = sample(m_target_mode ? m_max : m_min, m_magnitude_variance);
       m_target_mode = !m_target_mode;
-      m_timer_max = sample(m_half_cycle.period, m_half_cycle.variance);
+      // Stock flickering lights may have variance larger than the period.
+      m_timer_max = std::max(Float{0}, sample(m_half_cycle.period, m_half_cycle.variance));
       m_timer = std::max(Float{0}, m_timer + m_timer_max);
     }
   }
@@ -49,7 +50,8 @@ public:
   template <typename WeightOperator> requires PeriodicFunctionDetail::weight_operator<WeightOperator, Float>
   Float value(WeightOperator&& weight_operator) const {
     // Time counts down from the full sampled duration to zero.
-    auto&& weights = weight_operator(m_timer / m_timer_max);
+    // A sampled zero-duration half-cycle is already at its target.
+    auto&& weights = weight_operator(m_timer_max == 0 ? Float{0} : m_timer / m_timer_max);
     return m_target * weights[0] + m_source * weights[1];
   }
 
@@ -82,8 +84,7 @@ private:
   bool m_target_mode = true;
 };
 
-// Validate exactly the rounded endpoints the sampler can reach. In particular,
-// halving period and variance separately may round them to the same value.
+// Check the rounded half-period and the largest reachable sample before drawing.
 #pragma float_control(precise, on, push)
 template <finite_classifiable Float>
 std::expected<PeriodicFunction<Float>, StarException> PeriodicFunction<Float>::create(
@@ -95,10 +96,9 @@ std::expected<PeriodicFunction<Float>, StarException> PeriodicFunction<Float>::c
     return std::unexpected(MathException("Periodic function requires a positive period, nonnegative variances and ordered magnitudes"));
 
   HalfCycle half_cycle{period / 2, period_variance / 2};
-  Float shortest = half_cycle.period - half_cycle.variance;
   auto bounds = classify_finite(half_cycle.period + half_cycle.variance, min - magnitude_variance, max + magnitude_variance);
-  if (shortest <= 0 || !std::ranges::all_of(bounds, std::identity{}))
-    return std::unexpected(MathException("Periodic function sampled half-periods must be positive and all sample bounds finite"));
+  if (half_cycle.period <= 0 || !std::ranges::all_of(bounds, std::identity{}))
+    return std::unexpected(MathException("Periodic function requires a representable half-period and finite sample bounds"));
   return PeriodicFunction(random, half_cycle, min, max, magnitude_variance);
 }
 #pragma float_control(pop)

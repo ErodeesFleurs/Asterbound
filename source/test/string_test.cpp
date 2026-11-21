@@ -352,6 +352,42 @@ TEST(StringTest, prepend) {
   EXPECT_EQ(s, "bfoo");
 }
 
+TEST(StringTest, SliceCopiesCodepointRangesIncludingNul) {
+  using namespace std::string_view_literals;
+  String text("A水\0🌙z"sv);
+  EXPECT_EQ(text.slice(), text);
+  EXPECT_EQ(text.slice(1, -1), String("水\0🌙"sv));
+  EXPECT_EQ(text.slice(-2), String("🌙z"));
+  EXPECT_EQ(text.slice(1, 4, 2), String("水🌙"));
+  EXPECT_EQ(text.slice(std::nullopt, std::nullopt, -1), String("z🌙\0水A"sv));
+  EXPECT_EQ(text.slice(-1, 0, -2), String("z\0"sv));
+  EXPECT_EQ(text.slice(2, 2), String{});
+  EXPECT_EQ(text.slice(0, std::nullopt, 0), String{});
+  EXPECT_EQ(String{}.slice(std::nullopt, std::nullopt, -1), String{});
+  String surrogate("\xed\xa0\x80");
+  EXPECT_EQ(surrogate.slice(), surrogate);
+}
+
+TEST(StringTest, SliceValidatesMalformedSuffixEvenForEmptyResults) {
+  String malformed("水!\xf0\x9f");
+  auto expect_unicode_error = [](std::expected<String, StarException> const& result) {
+    ASSERT_FALSE(result);
+    EXPECT_TRUE(result.error().is<UnicodeException>());
+  };
+  expect_unicode_error(malformed.slice(0, 1));
+  expect_unicode_error(malformed.slice(1, 1));
+  expect_unicode_error(malformed.slice(0, 1, 0));
+  expect_unicode_error(malformed.slice(1, std::nullopt, -1));
+}
+
+TEST(StringTest, StringListSliceReturnsAnIndependentList) {
+  StringList words{"one", "水", "three"};
+  static_assert(std::same_as<decltype(words.slice()), StringList>);
+  auto reversed = words.slice(std::nullopt, std::nullopt, -1);
+  words.clear();
+  EXPECT_EQ(reversed, (StringList{"three", "水", "one"}));
+}
+
 TEST(StringTest, utf8) {
   std::string_view utf8String = "This is a [日本語] Unicode String. (日本語)";
   EXPECT_EQ(utf8_length(utf8String), 37u);

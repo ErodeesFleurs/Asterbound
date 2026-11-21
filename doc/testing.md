@@ -271,6 +271,28 @@ See [native output rules](development.md#logging-and-native-process-output).
   Keep low-rank bound collection separate from weight evaluation and retain
   the local fast-math inlining/reassociation boundaries.
 
+### Python-style slicing
+
+Run `ListSlice.*` in `core_tests` for owned results, extreme signed bounds,
+full-width virtual input sizes, and ordered failure during bounded appends.
+Check reverse slices with an omitted stop (`std::nullopt`) separately from an
+explicit `-1`; a zero stride returns an empty result. For `String::slice`,
+check codepoint selection rather than byte offsets, including embedded NUL and
+malformed UTF-8 in an unselected suffix. `StringList::slice` owns its elements
+and has no encoding failure to report.
+
+For matched CPU timings, use `list_benchmarks --benchmark_filter=SliceCopy`
+and `string_benchmarks --benchmark_filter=SliceMiddle`. The former measures
+owned lists at unit and stride-three steps; the latter selects five middle
+codepoints from ASCII, mixed UTF-8 and embedded-NUL inputs.
+
+For a chat-bubble regression, send successive messages from the same entity.
+The new bubble is inserted first, followed by the youngest previous bubbles.
+With `maxMessagePerEntity` set to one, none are reinserted. For zero or negative
+values, insertion preserves the old end-relative stop: omit the oldest
+`1 - maxMessagePerEntity` previous bubbles, or all if there are fewer. The
+subsequent per-tick visibility filter still applies.
+
 ### Multidimensional storage
 
 `MultiArray` owns composed storage with last-index-contiguous layout. `extents()`
@@ -385,7 +407,10 @@ these workloads do not measure clipping or hull construction.
 
 `PeriodicTest.*` checks tick cadence and phase preservation when the interval changes.
 `PeriodicFunctionTest.*` checks that a large delta advances light flicker by only
-one half-cycle and that invalid durations fail before consuming random draws.
+one half-cycle and that invalid parameters fail before consuming random draws.
+Stock lamps can specify period variance equal to or greater than the period.
+A nonpositive sampled duration reaches its target immediately, without division
+by zero or a replacement draw.
 Use `AssetsTest.ObjectCursorPreviewColdAndWarmCachesPreserveGameplayRandom` for
 the installed-asset path and its gameplay/presentation random stream separation.
 

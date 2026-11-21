@@ -10,7 +10,7 @@ namespace {
 using Star::String;
 using Star::StringList;
 enum class operation { replace_dense, replace_missing, replace_sparse, rsplit, rsplit_any, split_any,
-                       join, join_with, lower, upper, rot13, at, substr, erase, trim };
+                       join, join_with, lower, upper, rot13, at, substr, slice, erase, trim };
 
 struct fixture {
   String source;
@@ -54,6 +54,10 @@ auto evaluate(fixture const& f) {
   else if constexpr (Op == operation::rot13) return f.source.rot13();
   else if constexpr (Op == operation::at) return f.source.at(f.codepoints / 2);
   else if constexpr (Op == operation::substr) return f.source.substr(f.codepoints / 2, 5);
+  else if constexpr (Op == operation::slice) {
+    auto start = static_cast<int>(f.codepoints / 2);
+    return f.source.slice(start, start + 5);
+  }
   else if constexpr (Op == operation::erase) {
     String copy(f.source);
     auto result = copy.erase(f.codepoints / 2, 5);
@@ -109,7 +113,7 @@ bool validate(fixture const& f) {
       auto wide = f.source.wide_string();
       if (!wide) return false;
       if constexpr (Op == operation::at) return *output == (*wide)[f.codepoints / 2];
-      else if constexpr (Op == operation::substr) {
+      else if constexpr (Op == operation::substr || Op == operation::slice) {
         auto expected = String::create(std::u32string_view(*wide).substr(f.codepoints / 2, 5));
         return expected && *output == *expected;
       } else {
@@ -165,6 +169,7 @@ int main(int argc, char** argv) {
     register_operation<operation::rot13>("Rot13");
     register_operation<operation::at>("AtMiddle");
     register_operation<operation::substr>("SubstringMiddle");
+    register_operation<operation::slice>("SliceMiddle");
     register_operation<operation::erase>("EraseMiddle");
     register_operation<operation::trim>("Trim");
     return 0;

@@ -100,7 +100,6 @@ import star.celestial_database;
 import star.byte_array;
 import star.static_random;
 import star.algorithm;
-import star.pythonic;
 namespace Star {
 
 SystemWorldServer::SystemWorldServer(Root& root, std::shared_ptr<Clock const> universeClock, std::shared_ptr<CelestialDatabase> celestialDatabase)
