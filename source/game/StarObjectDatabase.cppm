@@ -239,7 +239,7 @@ public:
 
   [[nodiscard]] std::expected<std::shared_ptr<Object>, StarException> createObject(String const& objectName, Json const& objectParameters = JsonObject()) const;
   [[nodiscard]] std::expected<std::shared_ptr<Object>, StarException> diskLoadObject(Json const& diskStore) const;
-  [[nodiscard]] std::expected<std::shared_ptr<Object>, StarException> netLoadObject(ByteArray const& netStore, NetCompatibilityRules rules = {}) const;
+  [[nodiscard]] std::expected<std::shared_ptr<Object>, StarException> net_load_object(ByteArray const& net_store, NetCompatibilityRules rules = {}) const;
 
   [[nodiscard]] std::expected<bool, StarException> canPlaceObject(World const& world, Vec2I const& position, String const& objectName) const;
   // If the object is placeable in the given position, creates the given object

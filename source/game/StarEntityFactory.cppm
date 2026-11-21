@@ -40,8 +40,8 @@ class EntityFactory {
 public:
   [[nodiscard]] static std::expected<std::shared_ptr<EntityFactory>, StarException> create(Root& root);
 
-  [[nodiscard]] std::expected<ByteArray, StarException> netStoreEntity(std::shared_ptr<Entity> const& entity, NetCompatibilityRules rules = {}) const;
-  [[nodiscard]] std::expected<std::shared_ptr<Entity>, StarException> netLoadEntity(EntityType type, ByteArray const& netStore, NetCompatibilityRules rules = {}) const;
+  [[nodiscard]] std::expected<ByteArray, StarException> net_store_entity(std::shared_ptr<Entity> const& entity, NetCompatibilityRules rules = {}) const;
+  [[nodiscard]] std::expected<std::shared_ptr<Entity>, StarException> net_load_entity(EntityType type, ByteArray const& net_store, NetCompatibilityRules rules = {}) const;
 
   [[nodiscard]] std::expected<Json, StarException> diskStoreEntity(std::shared_ptr<Entity> const& entity) const;
   [[nodiscard]] std::expected<std::shared_ptr<Entity>, StarException> diskLoadEntity(EntityType type, Json const& diskStore) const;

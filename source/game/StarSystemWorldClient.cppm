@@ -120,8 +120,8 @@ public:
   List<std::shared_ptr<Packet>> pullOutgoingPackets();
 private:
   SystemWorldClient(Root& root, std::shared_ptr<Clock const> universeClock, std::shared_ptr<CelestialDatabase> celestialDatabase, std::shared_ptr<PlayerUniverseMap> universeMap);
-  [[nodiscard]] std::expected<std::shared_ptr<SystemObject>, StarException> netLoadObject(ByteArray netStore);
-  [[nodiscard]] std::expected<std::shared_ptr<SystemClientShip>, StarException> netLoadShip(ByteArray netStore);
+  [[nodiscard]] std::expected<std::shared_ptr<SystemObject>, StarException> net_load_object(ByteArray net_store);
+  [[nodiscard]] std::expected<std::shared_ptr<SystemClientShip>, StarException> net_load_ship(ByteArray net_store);
 
   // m_ship can be a null pointer, indicating that the system is not initialized
   std::shared_ptr<SystemClientShip> m_ship;

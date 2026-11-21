@@ -220,34 +220,34 @@ PlayerInventory::PlayerInventory(Root& root, Json inventoryConfig, Json currenci
   for (auto slot : *EquipmentSlotNames) {
     auto& element = m_equipmentNetState[slot.first];
     if (slot.first > EquipmentSlot::BackCosmetic)
-      element.setCompatibilityVersion(9);
-    auto added = addNetElement(element);
+      element.set_compatibility_version(9);
+    auto added = add_net_element(element);
     if (!added) return std::unexpected(std::move(added.error()));
   }
 
   for (auto& bag : m_bagsNetState) {
     for (auto& element : bag.second) {
-      auto added = addNetElement(element);
+      auto added = add_net_element(element);
       if (!added) return std::unexpected(std::move(added.error()));
     }
   }
   for (std::reference_wrapper<NetElement> element : {std::ref<NetElement>(m_swapSlotNetState), std::ref<NetElement>(m_trashSlotNetState),
       std::ref<NetElement>(m_currenciesNetState), std::ref<NetElement>(m_customBarGroupNetState)}) {
-    auto added = addNetElement(element.get());
+    auto added = add_net_element(element.get());
     if (!added) return std::unexpected(std::move(added.error()));
   }
   auto netStateResized = m_customBarNetState.resize(customBarGroups, customBarIndexes);
   if (!netStateResized) return std::unexpected(std::move(netStateResized.error()));
   for (std::size_t i = 0; i < customBarGroups; ++i) {
     for (std::size_t j = 0; j < customBarIndexes; ++j) {
-      auto added = addNetElement(m_customBarNetState(i, j));
+      auto added = add_net_element(m_customBarNetState(i, j));
       if (!added) return std::unexpected(std::move(added.error()));
     }
   }
-  auto selected = addNetElement(m_selectedActionBarNetState);
+  auto selected = add_net_element(m_selectedActionBarNetState);
   if (!selected) return std::unexpected(std::move(selected.error()));
   for (auto item : {EssentialItem::BeamAxe, EssentialItem::WireTool, EssentialItem::PaintTool, EssentialItem::InspectionTool}) {
-    auto added = addNetElement(m_essentialNetState[item]);
+    auto added = add_net_element(m_essentialNetState[item]);
     if (!added) return std::unexpected(std::move(added.error()));
   }
 
@@ -1324,22 +1324,22 @@ void PlayerInventory::setPlayer(std::optional<std::reference_wrapper<Player>> pl
   return std::cref(*m_blankInventory);
 }
 
-[[nodiscard]] std::expected<void, StarException> PlayerInventory::netStore(DataStream& ds, NetCompatibilityRules rules) const {
+[[nodiscard]] std::expected<void, StarException> PlayerInventory::net_store(DataStream& ds, NetCompatibilityRules rules) const {
   if (m_player && !m_player->get().isMaster() && !rules.is_admin()) {
     auto blank = blankInventory();
     if (!blank) return std::unexpected(std::move(blank.error()));
-    return blank->get().netStore(ds, rules);
+    return blank->get().net_store(ds, rules);
   }
-  return NetElementSyncGroup::netStore(ds, rules);
+  return NetElementSyncGroup::net_store(ds, rules);
 }
 
-[[nodiscard]] std::expected<bool, StarException> PlayerInventory::writeNetDelta(DataStream& ds, std::uint64_t version, NetCompatibilityRules rules) const {
+[[nodiscard]] std::expected<bool, StarException> PlayerInventory::write_net_delta(DataStream& ds, std::uint64_t version, NetCompatibilityRules rules) const {
   if (m_player && !m_player->get().isMaster() && !rules.is_admin()) {
     auto blank = blankInventory();
     if (!blank) return std::unexpected(std::move(blank.error()));
-    return blank->get().writeNetDelta(ds, version, rules);
+    return blank->get().write_net_delta(ds, version, rules);
   }
-  return NetElementSyncGroup::writeNetDelta(ds, version, rules);
+  return NetElementSyncGroup::write_net_delta(ds, version, rules);
 }
 
 [[nodiscard]] std::expected<bool, StarException> PlayerInventory::checkInventoryFilter(std::shared_ptr<Item> const& items, String const& filterName) const {
@@ -1495,11 +1495,11 @@ void PlayerInventory::swapCustomBarLinks(InventorySlot a, InventorySlot b) {
   return {};
 }
 
-[[nodiscard]] std::expected<void, StarException> PlayerInventory::netElementsNeedLoad(bool) {
+[[nodiscard]] std::expected<void, StarException> PlayerInventory::net_elements_need_load(bool) {
   auto database = m_root.itemDatabase();
   if (!database) return std::unexpected(std::move(database.error()));
   auto load = [&](NetElementData<ItemDescriptor>& state, std::shared_ptr<Item>& item) -> std::expected<void, StarException> {
-    if (state.pullUpdated()) {
+    if (state.pull_updated()) {
       auto result = (*database)->loadItem(state.get(), item);
       if (!result) return std::unexpected(std::move(result.error()));
     }
@@ -1533,7 +1533,7 @@ void PlayerInventory::swapCustomBarLinks(InventorySlot a, InventorySlot b) {
   return cleanup();
 }
 
-[[nodiscard]] std::expected<void, StarException> PlayerInventory::netElementsNeedStore() {
+[[nodiscard]] std::expected<void, StarException> PlayerInventory::net_elements_need_store() {
   auto cleaned = cleanup();
   if (!cleaned) return std::unexpected(std::move(cleaned.error()));
   for (auto& entry : m_equipmentNetState) entry.second.set(itemSafeDescriptor(m_equipment.value(entry.first)));

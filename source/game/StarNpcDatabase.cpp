@@ -973,8 +973,8 @@ std::expected<std::shared_ptr<Npc>, StarException> NpcDatabase::diskLoadNpc(Json
   return npc;
 }
 
-std::expected<std::shared_ptr<Npc>, StarException> NpcDatabase::netLoadNpc(ByteArray const& netStore, NetCompatibilityRules rules) const {
-  auto result206 = readNpcVariant(netStore, rules);
+std::expected<std::shared_ptr<Npc>, StarException> NpcDatabase::net_load_npc(ByteArray const& net_store, NetCompatibilityRules rules) const {
+  auto result206 = readNpcVariant(net_store, rules);
 if (!result206) return std::unexpected(std::move(result206.error()));
 return Npc::create(m_root, std::move(*result206));
 }

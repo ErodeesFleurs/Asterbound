@@ -134,8 +134,8 @@ std::expected<float, StarException> ProjectileDatabase::gravityMultiplier(String
   return config->get()->movementSettings.get_float("gravityMultiplier", 1);
 }
 
-std::expected<std::shared_ptr<Projectile>, StarException> ProjectileDatabase::netLoadProjectile(ByteArray const& netStore, NetCompatibilityRules rules) const {
-  DataStreamReader ds(netStore.span());
+std::expected<std::shared_ptr<Projectile>, StarException> ProjectileDatabase::net_load_projectile(ByteArray const& net_store, NetCompatibilityRules rules) const {
+  DataStreamReader ds(net_store.span());
   ds.set_stream_compatibility_version(rules);
   auto typeName = ds.read<String>();
   if (!typeName) return std::unexpected(std::move(typeName.error()));

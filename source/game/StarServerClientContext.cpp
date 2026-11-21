@@ -257,7 +257,7 @@ std::expected<void, StarException> ServerClientContext::initialize() {
   for (auto element : std::initializer_list<std::reference_wrapper<NetElement>>{
       m_orbitWarpActionNetState, m_playerWorldIdNetState, m_isAdminNetState,
       m_teamNetState, m_shipUpgrades, m_shipCoordinate}) {
-    auto added = m_netGroup.addNetElement(element);
+    auto added = m_netGroup.add_net_element(element);
     if (!added)
       return std::unexpected(std::move(added.error()));
   }
@@ -426,7 +426,7 @@ std::expected<ByteArray, StarException> ServerClientContext::writeUpdate() {
       return std::unexpected(std::move(serialized.error()));
     shipChunksUpdate = std::move(*serialized);
   }
-  auto netState = m_netGroup.writeNetState(m_netVersion, m_netRules);
+  auto netState = m_netGroup.write_net_state(m_netVersion, m_netRules);
   if (!netState)
     return std::unexpected(std::move(netState.error()));
   auto& [netGroupUpdate, version] = *netState;

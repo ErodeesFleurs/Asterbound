@@ -123,7 +123,7 @@ public:
   [[nodiscard]] static std::expected<std::shared_ptr<Monster>, StarException> create(Root& rootContext, Json const& diskStore);
 
   [[nodiscard]] std::expected<Json, StarException> diskStore() const;
-  [[nodiscard]] std::expected<ByteArray, StarException> netStore(NetCompatibilityRules rules = {});
+  [[nodiscard]] std::expected<ByteArray, StarException> net_store(NetCompatibilityRules rules = {});
 
   EntityType entityType() const override;
   ClientEntityMode clientEntityMode() const override;
@@ -141,8 +141,8 @@ public:
 
   RectF collisionArea() const override;
 
-  [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> writeNetState(std::uint64_t fromVersion = 0, NetCompatibilityRules rules = {}) override;
-  [[nodiscard]] std::expected<void, StarException> readNetState(ByteArray data, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
+  [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> write_net_state(std::uint64_t fromVersion = 0, NetCompatibilityRules rules = {}) override;
+  [[nodiscard]] std::expected<void, StarException> read_net_state(ByteArray data, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
 
   [[nodiscard]] std::expected<void, StarException> enableInterpolation(float extrapolationHint) override;
   [[nodiscard]] std::expected<void, StarException> disableInterpolation() override;

@@ -86,12 +86,12 @@ public:
   [[nodiscard]]
   static std::expected<std::shared_ptr<ItemDrop>, StarException> create(Root& rootContext, Json const& diskStore);
   [[nodiscard]]
-  static std::expected<std::shared_ptr<ItemDrop>, StarException> create(Root& rootContext, ByteArray netStore, NetCompatibilityRules rules = {});
+  static std::expected<std::shared_ptr<ItemDrop>, StarException> create(Root& rootContext, ByteArray net_store, NetCompatibilityRules rules = {});
 
   [[nodiscard]]
   std::expected<Json, StarException> diskStore() const;
   [[nodiscard]]
-  std::expected<ByteArray, StarException> netStore(NetCompatibilityRules rules = {}) const;
+  std::expected<ByteArray, StarException> net_store(NetCompatibilityRules rules = {}) const;
 
   EntityType entityType() const override;
 
@@ -106,9 +106,9 @@ public:
   std::expected<String, StarException> description() const override;
 
   [[nodiscard]]
-  std::expected<std::pair<ByteArray, std::uint64_t>, StarException> writeNetState(std::uint64_t fromVersion = 0, NetCompatibilityRules rules = {}) override;
+  std::expected<std::pair<ByteArray, std::uint64_t>, StarException> write_net_state(std::uint64_t fromVersion = 0, NetCompatibilityRules rules = {}) override;
   [[nodiscard]]
-  std::expected<void, StarException> readNetState(ByteArray data, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
+  std::expected<void, StarException> read_net_state(ByteArray data, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
 
   [[nodiscard]]
   std::expected<void, StarException> enableInterpolation(float extrapolationHint = 0.0f) override;

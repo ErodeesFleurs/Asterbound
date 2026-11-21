@@ -146,7 +146,7 @@ std::expected<void, StarException> ClientContext::initialize() {
   for (auto element : std::initializer_list<std::reference_wrapper<NetElement>>{
       m_orbitWarpActionNetState, m_playerWorldIdNetState, m_isAdminNetState,
       m_teamNetState, m_shipUpgrades, m_shipCoordinate}) {
-    auto added = m_netGroup.addNetElement(element);
+    auto added = m_netGroup.add_net_element(element);
     if (!added)
       return std::unexpected(std::move(added.error()));
   }
@@ -227,7 +227,7 @@ std::expected<void, StarException> ClientContext::read_update(ByteArray data) {
   auto netData = ds.read<ByteArray>();
   if (!netData)
     return std::unexpected(std::move(netData.error()));
-  return m_netGroup.readNetState(std::move(*netData), 0.0f, m_netCompatibilityRules);
+  return m_netGroup.read_net_state(std::move(*netData), 0.0f, m_netCompatibilityRules);
 }
 
 std::expected<ByteArray, StarException> ClientContext::write_update() {

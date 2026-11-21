@@ -67,11 +67,11 @@ std::expected<void, StarException> Entity::uninit() {
   return {};
 }
 
-std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Entity::writeNetState(std::uint64_t, NetCompatibilityRules) {
+std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Entity::write_net_state(std::uint64_t, NetCompatibilityRules) {
   return std::pair<ByteArray, std::uint64_t>{ByteArray(), 0};
 }
 
-std::expected<void, StarException> Entity::readNetState(ByteArray, float, NetCompatibilityRules) { return {}; }
+std::expected<void, StarException> Entity::read_net_state(ByteArray, float, NetCompatibilityRules) { return {}; }
 
 std::expected<void, StarException> Entity::enableInterpolation(float) { return {}; }
 

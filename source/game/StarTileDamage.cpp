@@ -309,19 +309,19 @@ void TileDamageStatus::updateDamageEffectPercentage() {
 }
 
 EntityTileDamageStatus::EntityTileDamageStatus() {
-  m_damagePercentage.setFixedPointBase(0.001f);
-  m_damageEffectTimeFactor.setFixedPointBase(0.001f);
-  m_damagePercentage.setInterpolator(lerp<float, float>);
-  m_damageEffectTimeFactor.setInterpolator(lerp<float, float>);
+  m_damagePercentage.set_fixed_point_base(0.001f);
+  m_damageEffectTimeFactor.set_fixed_point_base(0.001f);
+  m_damagePercentage.set_interpolator(lerp<float, float>);
+  m_damageEffectTimeFactor.set_interpolator(lerp<float, float>);
 
 }
 
 std::expected<std::shared_ptr<EntityTileDamageStatus>, StarException> EntityTileDamageStatus::create() {
   auto status = std::shared_ptr<EntityTileDamageStatus>(new EntityTileDamageStatus());
-  if (auto result = status->addNetElement(status->m_damagePercentage); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = status->addNetElement(status->m_damageEffectTimeFactor); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = status->addNetElement(status->m_damageHarvested); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = status->addNetElement(status->m_damageType); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = status->add_net_element(status->m_damagePercentage); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = status->add_net_element(status->m_damageEffectTimeFactor); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = status->add_net_element(status->m_damageHarvested); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = status->add_net_element(status->m_damageType); !result) return std::unexpected(std::move(result.error()));
   return status;
 }
 

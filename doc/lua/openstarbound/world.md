@@ -74,7 +74,7 @@ For `format = "disk"`, `data` is the existing `VersionedJson` object:
 For `format = "net"`, `data` contains `encoding = "base64"`,
 `compatibilityVersion`, `netStore`, `netState` and `netStateVersion`.
 The two byte strings use base64; `netState` is a full state record suitable
-for the existing native `readNetState` path. Snapshotting does not advance
+for the native `read_net_state` path. Snapshotting does not advance
 the source entity's replication version or consume pending updates.
 
 `complete` describes an authoritative single-entity persistence snapshot,

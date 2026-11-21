@@ -63,9 +63,9 @@ public:
   [[nodiscard]] static std::expected<std::shared_ptr<PlantDrop>, StarException> create(Root& rootContext, List<Plant::PlantPiece> pieces, Vec2F const& position, Vec2F const& strikeVector, String const& description,
       bool upsideDown, Json stemConfig, Json foliageConfig, Json saplingConfig,
       bool master, float random);
-  [[nodiscard]] static std::expected<std::shared_ptr<PlantDrop>, StarException> create(Root& rootContext, ByteArray const& netStore, NetCompatibilityRules rules = {});
+  [[nodiscard]] static std::expected<std::shared_ptr<PlantDrop>, StarException> create(Root& rootContext, ByteArray const& net_store, NetCompatibilityRules rules = {});
 
-  [[nodiscard]] std::expected<ByteArray, StarException> netStore(NetCompatibilityRules rules = {});
+  [[nodiscard]] std::expected<ByteArray, StarException> net_store(NetCompatibilityRules rules = {});
 
   EntityType entityType() const override;
 
@@ -74,9 +74,9 @@ public:
 
   [[nodiscard]] std::expected<String, StarException> description() const override;
 
-  [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> writeNetState(std::uint64_t fromVersion = 0, NetCompatibilityRules rules = {}) override;
+  [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> write_net_state(std::uint64_t fromVersion = 0, NetCompatibilityRules rules = {}) override;
   [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> snapshot_net_state(NetCompatibilityRules rules = {}) const;
-  [[nodiscard]] std::expected<void, StarException> readNetState(ByteArray data, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
+  [[nodiscard]] std::expected<void, StarException> read_net_state(ByteArray data, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
 
   [[nodiscard]] std::expected<void, StarException> enableInterpolation(float extrapolationHint = 0.0f) override;
   [[nodiscard]] std::expected<void, StarException> disableInterpolation() override;
@@ -103,7 +103,7 @@ public:
 
 private:
   PlantDrop(Root& rootContext);
-  [[nodiscard]] std::expected<void, StarException> initialize(ByteArray const& netStore, NetCompatibilityRules rules);
+  [[nodiscard]] std::expected<void, StarException> initialize(ByteArray const& net_store, NetCompatibilityRules rules);
   [[nodiscard]] std::expected<void, StarException> initialize(List<Plant::PlantPiece> pieces, Vec2F const& position, Vec2F const& strikeVector, String const& description,
     bool upsideDown, Json stemConfig, Json foliageConfig, Json saplingConfig, bool master, float random);
 

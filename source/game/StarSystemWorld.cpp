@@ -756,10 +756,10 @@ std::expected<std::shared_ptr<SystemObject>, StarException> SystemObject::create
 
 std::expected<void, StarException> SystemObject::init() {
   m_shouldDestroy = false;
-  m_xPosition.setInterpolator(lerp<float, float>);
-  m_yPosition.setInterpolator(lerp<float, float>);
+  m_xPosition.set_interpolator(lerp<float, float>);
+  m_yPosition.set_interpolator(lerp<float, float>);
   for (NetElement& element : std::initializer_list<std::reference_wrapper<NetElement>>{m_xPosition, m_yPosition, m_orbit}) {
-    auto added = m_netGroup.addNetElement(element);
+    auto added = m_netGroup.add_net_element(element);
     if (!added)
       return std::unexpected(std::move(added.error()));
   }
@@ -820,7 +820,7 @@ std::optional<CelestialOrbit> SystemObject::orbit() const {
 }
 
 std::expected<void, StarException> SystemObject::clientUpdate(float dt) {
-  return m_netGroup.tickNetInterpolation(dt);
+  return m_netGroup.tick_net_interpolation(dt);
 }
 
 std::expected<void, StarException> SystemObject::serverUpdate(SystemWorldServer& system, float dt) {
@@ -867,15 +867,15 @@ std::expected<void, StarException> SystemObject::serverUpdate(SystemWorldServer&
   return {};
 }
 
-std::expected<std::pair<ByteArray, std::uint64_t>, StarException> SystemObject::writeNetState(std::uint64_t fromVersion, NetCompatibilityRules rules) {
-  return m_netGroup.writeNetState(fromVersion, rules);
+std::expected<std::pair<ByteArray, std::uint64_t>, StarException> SystemObject::write_net_state(std::uint64_t fromVersion, NetCompatibilityRules rules) {
+  return m_netGroup.write_net_state(fromVersion, rules);
 }
 
-std::expected<void, StarException> SystemObject::readNetState(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
-  return m_netGroup.readNetState(std::move(data), interpolationTime, rules);
+std::expected<void, StarException> SystemObject::read_net_state(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
+  return m_netGroup.read_net_state(std::move(data), interpolationTime, rules);
 }
 
-std::expected<ByteArray, StarException> SystemObject::netStore() const {
+std::expected<ByteArray, StarException> SystemObject::net_store() const {
   DataStreamBuffer ds;
   auto field0 = ds.write(m_uuid);
   if (!field0)
@@ -947,19 +947,19 @@ std::expected<void, StarException> SystemClientShip::initialize(SystemWorld& sys
   m_config = ClientShipConfig{*orbitDistance, *departTime, *spaceDepartTime};
   m_speed = speed;
   // Do not interpolate locations: stale identities can refer to removed objects.
-  auto locationAdded = m_netGroup.addNetElement(m_systemLocation, false);
+  auto locationAdded = m_netGroup.add_net_element(m_systemLocation, false);
   if (!locationAdded)
     return std::unexpected(std::move(locationAdded.error()));
   for (NetElement& element : std::initializer_list<std::reference_wrapper<NetElement>>{m_destination, m_xPosition, m_yPosition}) {
-    auto added = m_netGroup.addNetElement(element);
+    auto added = m_netGroup.add_net_element(element);
     if (!added)
       return std::unexpected(std::move(added.error()));
   }
-  auto enabled = m_netGroup.enableNetInterpolation();
+  auto enabled = m_netGroup.enable_net_interpolation();
   if (!enabled)
     return std::unexpected(std::move(enabled.error()));
-  m_xPosition.setInterpolator(lerp<float, float>);
-  m_yPosition.setInterpolator(lerp<float, float>);
+  m_xPosition.set_interpolator(lerp<float, float>);
+  m_yPosition.set_interpolator(lerp<float, float>);
   return {};
 }
 
@@ -999,7 +999,7 @@ bool SystemClientShip::flying() const {
 }
 
 std::expected<void, StarException> SystemClientShip::clientUpdate(float dt) {
-  return m_netGroup.tickNetInterpolation(dt);
+  return m_netGroup.tick_net_interpolation(dt);
 }
 
 std::expected<void, StarException> SystemClientShip::serverUpdate(SystemWorld& system, float dt) {
@@ -1070,15 +1070,15 @@ std::expected<void, StarException> SystemClientShip::serverUpdate(SystemWorld& s
   return {};
 }
 
-std::expected<std::pair<ByteArray, std::uint64_t>, StarException> SystemClientShip::writeNetState(std::uint64_t fromVersion, NetCompatibilityRules rules) {
-  return m_netGroup.writeNetState(fromVersion, rules);
+std::expected<std::pair<ByteArray, std::uint64_t>, StarException> SystemClientShip::write_net_state(std::uint64_t fromVersion, NetCompatibilityRules rules) {
+  return m_netGroup.write_net_state(fromVersion, rules);
 }
 
-std::expected<void, StarException> SystemClientShip::readNetState(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
-  return m_netGroup.readNetState(std::move(data), interpolationTime, rules);
+std::expected<void, StarException> SystemClientShip::read_net_state(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
+  return m_netGroup.read_net_state(std::move(data), interpolationTime, rules);
 }
 
-std::expected<ByteArray, StarException> SystemClientShip::netStore() const {
+std::expected<ByteArray, StarException> SystemClientShip::net_store() const {
   DataStreamBuffer ds;
   auto field0 = ds.write(m_uuid);
   if (!field0)

@@ -610,7 +610,7 @@ std::expected<void, StarException> WorldClient::resendEntity(EntityId entityId) 
   if (!fromVersion)
     return std::unexpected(std::move(fromVersion.error()));
   auto netRules = m_clientState->netCompatibilityRules();
-  auto state = entity->writeNetState(*fromVersion, netRules);
+  auto state = entity->write_net_state(*fromVersion, netRules);
   if (!state)
     return std::unexpected(std::move(state.error()));
   m_outgoingPackets.push_back(
@@ -665,7 +665,7 @@ std::expected<void, StarException> WorldClient::removeEntity(EntityId entityId, 
 
   if (auto version = m_masterEntitiesNetVersion.try_extract_value(entity->entityId())) {
     auto netRules = m_clientState->netCompatibilityRules();
-    auto state = entity->writeNetState(*version, netRules);
+    auto state = entity->write_net_state(*version, netRules);
     if (!state)
       return std::unexpected(std::move(state.error()));
     ByteArray finalNetState = std::move(state->first);
@@ -1629,11 +1629,11 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
       }
       
       auto netRules = m_clientState->netCompatibilityRules();
-      auto result100 = entityFactory->netLoadEntity(entityCreate->entityType, entityCreate->storeData, netRules);
+      auto result100 = entityFactory->net_load_entity(entityCreate->entityType, entityCreate->storeData, netRules);
       if (!result100)
         return std::unexpected(std::move(result100.error()));
       auto entity = (std::move(*result100));
-      auto result101 = entity->readNetState(entityCreate->firstNetState, 0.0f, netRules);
+      auto result101 = entity->read_net_state(entityCreate->firstNetState, 0.0f, netRules);
       if (!result101)
         return std::unexpected(std::move(result101.error()));
       auto result102 = entity->init(*this, entityCreate->entityId, EntityMode::Slave);
@@ -1668,7 +1668,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
                 if (Star::DebugEnabled) {
                   Star::star_assert_failed((entity->isSlave()));
                 }
-                auto result105 = entity->readNetState(entityUpdateSet->deltas.value(entityId), interpolationLeadTime, self.m_clientState->netCompatibilityRules());
+                auto result105 = entity->read_net_state(entityUpdateSet->deltas.value(entityId), interpolationLeadTime, self.m_clientState->netCompatibilityRules());
                 if (!result105)
                   return std::unexpected(std::move(result105.error()));
               }
@@ -1678,7 +1678,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
         return std::unexpected(std::move(result106.error()));
     } else if (auto entityDestroy = as<EntityDestroyPacket>(packet)) {
       if (auto entity = m_entityMap->entity(entityDestroy->entityId)) {
-        auto result107 = entity->readNetState(entityDestroy->finalNetState, m_interpolationTracker.interpolationLeadTime(), m_clientState->netCompatibilityRules());
+        auto result107 = entity->read_net_state(entityDestroy->finalNetState, m_interpolationTracker.interpolationLeadTime(), m_clientState->netCompatibilityRules());
         if (!result107)
           return std::unexpected(std::move(result107.error()));
         
@@ -2040,7 +2040,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
         return std::unexpected(std::move(result147.error()));
       m_worldTemplate->setWorldLayout((std::move(*result147)));
     } else if (auto worldParametersUpdate = as<WorldParametersUpdatePacket>(packet)) {
-      auto result148 = netLoadVisitableWorldParameters(worldParametersUpdate->parametersData);
+      auto result148 = net_load_visitable_world_parameters(worldParametersUpdate->parametersData);
       if (!result148)
         return std::unexpected(std::move(result148.error()));
       auto result149 = m_worldTemplate->setWorldParameters((std::move(*result148)));
@@ -2690,10 +2690,10 @@ std::expected<void, StarException> WorldClient::addEntity(std::shared_ptr<Entity
   if (!factory)
     return std::unexpected(std::move(factory.error()));
   auto rules = m_clientState->netCompatibilityRules();
-  auto store = (*factory)->netStoreEntity(entity, rules);
+  auto store = (*factory)->net_store_entity(entity, rules);
   if (!store)
     return std::unexpected(std::move(store.error()));
-  auto state = entity->writeNetState(0, rules);
+  auto state = entity->write_net_state(0, rules);
   if (!state)
     return std::unexpected(std::move(state.error()));
   m_outgoingPackets.push_back(
@@ -2880,7 +2880,7 @@ std::expected<void, StarException> WorldClient::queueUpdatePackets(bool sendEnti
     auto result210 = m_entityMap->forAllEntities(
       [&, &self = *this](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
         if (auto version = self.m_masterEntitiesNetVersion.find_ref(entity->entityId())) {
-          auto result209 = entity->writeNetState(version->get(), netRules);
+          auto result209 = entity->write_net_state(version->get(), netRules);
           if (!result209)
             return std::unexpected(std::move(result209.error()));
           auto updateAndVersion = (std::move(*result209));
@@ -3717,7 +3717,7 @@ std::expected<void, StarException> WorldClient::notifyEntityCreate(std::shared_p
   if (entity->isMaster() && !m_masterEntitiesNetVersion.contains(entity->entityId())) {
     // Server was unaware of this entity until now
     auto netRules = m_clientState->netCompatibilityRules();
-    auto result293 = entity->writeNetState(0, netRules);
+    auto result293 = entity->write_net_state(0, netRules);
     if (!result293)
       return std::unexpected(std::move(result293.error()));
     auto firstNetState = (std::move(*result293));
@@ -3725,7 +3725,7 @@ std::expected<void, StarException> WorldClient::notifyEntityCreate(std::shared_p
     auto result294 = this->root().entityFactory();
     if (!result294)
       return std::unexpected(std::move(result294.error()));
-    auto result295 = (std::move(*result294))->netStoreEntity(entity, netRules);
+    auto result295 = (std::move(*result294))->net_store_entity(entity, netRules);
     if (!result295)
       return std::unexpected(std::move(result295.error()));
     m_outgoingPackets.push_back(std::make_shared<EntityCreatePacket>(

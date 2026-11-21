@@ -49,7 +49,7 @@ namespace Star {
 
 std::expected<std::shared_ptr<EffectEmitter>, StarException> EffectEmitter::create(Root& root) {
   auto emitter = std::shared_ptr<EffectEmitter>(new EffectEmitter(root));
-  auto registered = emitter->addNetElement(emitter->m_activeSources);
+  auto registered = emitter->add_net_element(emitter->m_activeSources);
   if (!registered)
     return std::unexpected(std::move(registered.error()));
   return emitter;

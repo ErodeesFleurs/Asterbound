@@ -471,8 +471,8 @@ private:
   [[nodiscard]] std::expected<void, StarException> setupNetStates();
   [[nodiscard]] std::expected<void, StarException> loadConfig(Json config, String relativePath);
 
-  [[nodiscard]] std::expected<void, StarException> netElementsNeedLoad(bool full) override;
-  [[nodiscard]] std::expected<void, StarException> netElementsNeedStore() override;
+  [[nodiscard]] std::expected<void, StarException> net_elements_need_load(bool full) override;
+  [[nodiscard]] std::expected<void, StarException> net_elements_need_store() override;
 
   [[nodiscard]] std::expected<Json, StarException> mergeIncludes(Root& root, Json config, Json includes, String relativePath);
   [[nodiscard]] std::expected<Mat3F, StarException> animationGroupTransformation(String const& name, TransformationGroup const& group, Mat3F const& base, Sample const* sample = nullptr) const;

@@ -894,8 +894,8 @@ std::expected<std::shared_ptr<Object>, StarException> ObjectDatabase::diskLoadOb
     });
 }
 
-std::expected<std::shared_ptr<Object>, StarException> ObjectDatabase::netLoadObject(ByteArray const& netStore, NetCompatibilityRules rules) const {
-  DataStreamReader ds(netStore.span());
+std::expected<std::shared_ptr<Object>, StarException> ObjectDatabase::net_load_object(ByteArray const& net_store, NetCompatibilityRules rules) const {
+  DataStreamReader ds(net_store.span());
   ds.set_stream_compatibility_version(rules);
   auto name = ds.read<String>();
   if (!name)

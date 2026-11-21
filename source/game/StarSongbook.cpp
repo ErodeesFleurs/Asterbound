@@ -90,7 +90,7 @@ std::expected<std::shared_ptr<Songbook>, StarException> Songbook::create(Root& r
       songbook->m_songNetState, songbook->m_timeSourceEpochNetState,
       songbook->m_timeSourceNetState, songbook->m_activeNetState,
       songbook->m_instrumentNetState}) {
-    auto added = songbook->addNetElement(element);
+    auto added = songbook->add_net_element(element);
     if (!added)
       return std::unexpected(std::move(added.error()));
   }
@@ -960,8 +960,8 @@ double Songbook::fundamentalFrequency(double p) {
 
 double Songbook::fundamentalPitch(double f) { return 69.0 + 12 * std::log2(f / 440.0); }
 
-std::expected<void, StarException> Songbook::netElementsNeedLoad(bool) {
-  if (m_songNetState.pullUpdated()) {
+std::expected<void, StarException> Songbook::net_elements_need_load(bool) {
+  if (m_songNetState.pull_updated()) {
     m_song = m_songNetState.get();
     m_timeSourceEpoch = m_timeSourceEpochNetState.get();
     m_epochUpdated = true;
@@ -976,7 +976,7 @@ std::expected<void, StarException> Songbook::netElementsNeedLoad(bool) {
   return {};
 }
 
-std::expected<void, StarException> Songbook::netElementsNeedStore() {
+std::expected<void, StarException> Songbook::net_elements_need_store() {
   if (m_serverMode)
     return {};
   if (m_dataChanged) {

@@ -387,60 +387,60 @@ auto movementParameters = std::move(*result1087);
   auto result1088 = m_movementController->resetParameters(movementParameters);
 if (!result1088) return std::unexpected(std::move(result1088.error()));
 
-  auto result1089 = m_netGroup.addNetElement(m_interactive);
+  auto result1089 = m_netGroup.add_net_element(m_interactive);
 if (!result1089) return std::unexpected(std::move(result1089.error()));
-  auto result1090 = m_netGroup.addNetElement(*m_movementController);
+  auto result1090 = m_netGroup.add_net_element(*m_movementController);
 if (!result1090) return std::unexpected(std::move(result1090.error()));
-  auto result1091 = m_netGroup.addNetElement(*m_networkedAnimator);
+  auto result1091 = m_netGroup.add_net_element(*m_networkedAnimator);
 if (!result1091) return std::unexpected(std::move(result1091.error()));
-  auto result1092 = m_netGroup.addNetElement(m_damageTeam);
+  auto result1092 = m_netGroup.add_net_element(m_damageTeam);
 if (!result1092) return std::unexpected(std::move(result1092.error()));
 
 m_loungePositions.sort_by_key();
 for (auto& p : m_loungePositions) {
-  auto result1093 = m_netGroup.addNetElement(p.second.enabled);
+  auto result1093 = m_netGroup.add_net_element(p.second.enabled);
   if (!result1093)
     return std::unexpected(std::move(result1093.error()));
-  auto result1094 = m_netGroup.addNetElement(p.second.orientation);
+  auto result1094 = m_netGroup.add_net_element(p.second.orientation);
   if (!result1094)
     return std::unexpected(std::move(result1094.error()));
-  auto result1095 = m_netGroup.addNetElement(p.second.emote);
+  auto result1095 = m_netGroup.add_net_element(p.second.emote);
   if (!result1095)
     return std::unexpected(std::move(result1095.error()));
-  auto result1096 = m_netGroup.addNetElement(p.second.dance);
+  auto result1096 = m_netGroup.add_net_element(p.second.dance);
   if (!result1096)
     return std::unexpected(std::move(result1096.error()));
-  auto result1097 = m_netGroup.addNetElement(p.second.directives);
+  auto result1097 = m_netGroup.add_net_element(p.second.directives);
   if (!result1097)
     return std::unexpected(std::move(result1097.error()));
-  auto result1098 = m_netGroup.addNetElement(p.second.statusEffects);
+  auto result1098 = m_netGroup.add_net_element(p.second.statusEffects);
   if (!result1098)
     return std::unexpected(std::move(result1098.error()));
 }
 
 m_movingCollisions.sort_by_key();
 for (auto& p : m_movingCollisions) {
-  auto result1099 = m_netGroup.addNetElement(p.second.enabled);
+  auto result1099 = m_netGroup.add_net_element(p.second.enabled);
   if (!result1099)
     return std::unexpected(std::move(result1099.error()));
 }
 
 m_forceRegions.sort_by_key();
 for (auto& p : m_forceRegions) {
-  auto result1100 = m_netGroup.addNetElement(p.second.enabled);
+  auto result1100 = m_netGroup.add_net_element(p.second.enabled);
   if (!result1100)
     return std::unexpected(std::move(result1100.error()));
 }
 
 m_damageSources.sort_by_key();
 for (auto& p : m_damageSources) {
-  auto result1101 = m_netGroup.addNetElement(p.second.enabled);
+  auto result1101 = m_netGroup.add_net_element(p.second.enabled);
   if (!result1101)
     return std::unexpected(std::move(result1101.error()));
 }
 
   // don't interpolate scripted animation parameters
-  auto result1102 = m_netGroup.addNetElement(m_scriptedAnimationParameters, false);
+  auto result1102 = m_netGroup.add_net_element(m_scriptedAnimationParameters, false);
 if (!result1102) return std::unexpected(std::move(result1102.error()));
   return {};
 }
@@ -634,24 +634,24 @@ Vec2F Vehicle::velocity() const {
   return m_movementController->velocity();
 }
 
-std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Vehicle::writeNetState(std::uint64_t fromVersion, NetCompatibilityRules rules) {
-  auto result1229 = m_netGroup.writeNetState(fromVersion, rules);
+std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Vehicle::write_net_state(std::uint64_t fromVersion, NetCompatibilityRules rules) {
+  auto result1229 = m_netGroup.write_net_state(fromVersion, rules);
 if (!result1229) return std::unexpected(std::move(result1229.error()));
 return std::move(*result1229);
 }
 
-std::expected<void, StarException> Vehicle::readNetState(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
-  return m_netGroup.readNetState(std::move(data), interpolationTime, rules);
+std::expected<void, StarException> Vehicle::read_net_state(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
+  return m_netGroup.read_net_state(std::move(data), interpolationTime, rules);
 }
 
 std::expected<void, StarException> Vehicle::enableInterpolation(float extrapolationHint) {
-  auto result1227 = m_netGroup.enableNetInterpolation(extrapolationHint);
+  auto result1227 = m_netGroup.enable_net_interpolation(extrapolationHint);
 if (!result1227) return std::unexpected(std::move(result1227.error()));
   return {};
 }
 
 std::expected<void, StarException> Vehicle::disableInterpolation() {
-  auto result1226 = m_netGroup.disableNetInterpolation();
+  auto result1226 = m_netGroup.disable_net_interpolation();
 if (!result1226) return std::unexpected(std::move(result1226.error()));
   return {};
 }
@@ -689,7 +689,7 @@ if (!result1205) return std::unexpected(std::move(result1205.error()));
       }
     }
   } else {
-    auto result1206 = m_netGroup.tickNetInterpolation(dt);
+    auto result1206 = m_netGroup.tick_net_interpolation(dt);
 if (!result1206) return std::unexpected(std::move(result1206.error()));
 
     auto result1207 = m_movementController->tickSlave(dt);

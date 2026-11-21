@@ -138,9 +138,9 @@ std::expected<std::shared_ptr<PlantDrop>, StarException> PlantDrop::create(Root&
 
 std::expected<void, StarException> PlantDrop::initialize(List<Plant::PlantPiece> pieces, Vec2F const& position, Vec2F const& strikeVector, String const& description,
     bool upsideDown, Json stemConfig, Json foliageConfig, Json saplingConfig, bool master, float random) {
-  auto result361 = m_netGroup.addNetElement(*m_movementController);
+  auto result361 = m_netGroup.add_net_element(*m_movementController);
 if (!result361) return std::unexpected(std::move(result361.error()));
-  auto result362 = m_netGroup.addNetElement(m_spawnedDrops);
+  auto result362 = m_netGroup.add_net_element(m_spawnedDrops);
 if (!result362) return std::unexpected(std::move(result362.error()));
 
   m_stemConfig = std::move(stemConfig);
@@ -205,7 +205,7 @@ if (!result362) return std::unexpected(std::move(result362.error()));
   return {};
 }
 
-std::expected<std::shared_ptr<PlantDrop>, StarException> PlantDrop::create(Root& rootContext, ByteArray const& netStore, NetCompatibilityRules rules) {
+std::expected<std::shared_ptr<PlantDrop>, StarException> PlantDrop::create(Root& rootContext, ByteArray const& net_store, NetCompatibilityRules rules) {
   struct MakeShared final : PlantDrop {
     explicit MakeShared(Root& root) : Entity(root), PlantDrop(root) {}
   };
@@ -213,17 +213,17 @@ std::expected<std::shared_ptr<PlantDrop>, StarException> PlantDrop::create(Root&
   auto controller = MovementController::create(rootContext);
   if (!controller) return std::unexpected(std::move(controller.error()));
   entity->m_movementController = std::move(*controller);
-  if (auto result = entity->initialize(netStore, rules); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = entity->initialize(net_store, rules); !result) return std::unexpected(std::move(result.error()));
   return entity;
 }
 
-std::expected<void, StarException> PlantDrop::initialize(ByteArray const& netStore, NetCompatibilityRules rules) {
-  auto result349 = m_netGroup.addNetElement(*m_movementController);
+std::expected<void, StarException> PlantDrop::initialize(ByteArray const& net_store, NetCompatibilityRules rules) {
+  auto result349 = m_netGroup.add_net_element(*m_movementController);
 if (!result349) return std::unexpected(std::move(result349.error()));
-  auto result350 = m_netGroup.addNetElement(m_spawnedDrops);
+  auto result350 = m_netGroup.add_net_element(m_spawnedDrops);
 if (!result350) return std::unexpected(std::move(result350.error()));
 
-DataStreamReader ds(netStore.span());
+DataStreamReader ds(net_store.span());
 ds.set_stream_compatibility_version(rules);
 auto stream351 = (ds >> m_time);
 if (!stream351) return std::unexpected(std::move(stream351.error()));
@@ -269,7 +269,7 @@ if (!stream360) return std::unexpected(std::move(stream360.error()));
   return {};
 }
 
-std::expected<ByteArray, StarException> PlantDrop::netStore(NetCompatibilityRules) {
+std::expected<ByteArray, StarException> PlantDrop::net_store(NetCompatibilityRules) {
   DataStreamBuffer ds;
   auto stream339 = (ds << m_time);
 if (!stream339) return std::unexpected(std::move(stream339.error()));
@@ -491,7 +491,7 @@ for (auto const& drop : option) {
       }
     }
   } else {
-    auto result334 = m_netGroup.tickNetInterpolation(dt);
+    auto result334 = m_netGroup.tick_net_interpolation(dt);
 if (!result334) return std::unexpected(std::move(result334.error()));
 
     if (m_spawnedDropEffects && !m_spawnedDrops.get())
@@ -715,8 +715,8 @@ MovementController& PlantDrop::movementController() {
   return *m_movementController;
 }
 
-std::expected<std::pair<ByteArray, std::uint64_t>, StarException> PlantDrop::writeNetState(std::uint64_t fromVersion, NetCompatibilityRules rules) {
-  auto result283 = m_netGroup.writeNetState(fromVersion, rules);
+std::expected<std::pair<ByteArray, std::uint64_t>, StarException> PlantDrop::write_net_state(std::uint64_t fromVersion, NetCompatibilityRules rules) {
+  auto result283 = m_netGroup.write_net_state(fromVersion, rules);
 if (!result283) return std::unexpected(std::move(result283.error()));
 return std::move(*result283);
 }
@@ -725,18 +725,18 @@ std::expected<std::pair<ByteArray, std::uint64_t>, StarException> PlantDrop::sna
   return m_netGroup.snapshot_net_state(rules);
 }
 
-std::expected<void, StarException> PlantDrop::readNetState(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
-  return m_netGroup.readNetState(std::move(data), interpolationTime, rules);
+std::expected<void, StarException> PlantDrop::read_net_state(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
+  return m_netGroup.read_net_state(std::move(data), interpolationTime, rules);
 }
 
 std::expected<void, StarException> PlantDrop::enableInterpolation(float extrapolationHint) {
-  auto result281 = m_netGroup.enableNetInterpolation(extrapolationHint);
+  auto result281 = m_netGroup.enable_net_interpolation(extrapolationHint);
 if (!result281) return std::unexpected(std::move(result281.error()));
   return {};
 }
 
 std::expected<void, StarException> PlantDrop::disableInterpolation() {
-  auto result280 = m_netGroup.disableNetInterpolation();
+  auto result280 = m_netGroup.disable_net_interpolation();
 if (!result280) return std::unexpected(std::move(result280.error()));
   return {};
 }

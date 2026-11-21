@@ -138,21 +138,21 @@ std::expected<std::shared_ptr<PhysicsObject>, StarException> PhysicsObject::crea
   }
   object->m_physicsForces.sort_by_key();
   for (auto& pair : object->m_physicsForces) {
-    auto operation2 = object->m_netGroup.addNetElement(pair.second.enabled);
+    auto operation2 = object->m_netGroup.add_net_element(pair.second.enabled);
     if (!operation2)
       return std::unexpected(std::move(operation2.error()));
   }
   object->m_physicsCollisions.sort_by_key();
   for (auto& pair : object->m_physicsCollisions) {
-    auto operation3 = object->m_netGroup.addNetElement(pair.second.xPosition);
+    auto operation3 = object->m_netGroup.add_net_element(pair.second.xPosition);
     if (!operation3)
       return std::unexpected(std::move(operation3.error()));
-    auto operation4 = object->m_netGroup.addNetElement(pair.second.yPosition);
+    auto operation4 = object->m_netGroup.add_net_element(pair.second.yPosition);
     if (!operation4)
       return std::unexpected(std::move(operation4.error()));
-    pair.second.xPosition.setInterpolator(lerp<float, float>);
-    pair.second.yPosition.setInterpolator(lerp<float, float>);
-    auto operation5 = object->m_netGroup.addNetElement(pair.second.enabled);
+    pair.second.xPosition.set_interpolator(lerp<float, float>);
+    pair.second.yPosition.set_interpolator(lerp<float, float>);
+    auto operation5 = object->m_netGroup.add_net_element(pair.second.enabled);
     if (!operation5)
       return std::unexpected(std::move(operation5.error()));
   }
@@ -160,11 +160,11 @@ std::expected<std::shared_ptr<PhysicsObject>, StarException> PhysicsObject::crea
 }
 
 std::expected<void, StarException> PhysicsObject::enableInterpolation(float extrapolationHint) {
-  return m_netGroup.enableNetInterpolation(extrapolationHint);
+  return m_netGroup.enable_net_interpolation(extrapolationHint);
 }
 
 std::expected<void, StarException> PhysicsObject::disableInterpolation() {
-  return m_netGroup.disableNetInterpolation();
+  return m_netGroup.disable_net_interpolation();
 }
 
 std::expected<void, StarException> PhysicsObject::init(World& world, EntityId entityId, EntityMode mode) {
@@ -231,7 +231,7 @@ std::expected<void, StarException> PhysicsObject::update(float dt, std::uint64_t
   if (!operation10)
     return std::unexpected(std::move(operation10.error()));
   if (isSlave())
-    return m_netGroup.tickNetInterpolation(dt);
+    return m_netGroup.tick_net_interpolation(dt);
   return {};
 }
 

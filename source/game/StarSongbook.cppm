@@ -83,8 +83,8 @@ private:
   static double fundamentalFrequency(double p);
   static double fundamentalPitch(double p);
 
-  [[nodiscard]] std::expected<void, StarException> netElementsNeedLoad(bool full) override;
-  [[nodiscard]] std::expected<void, StarException> netElementsNeedStore() override;
+  [[nodiscard]] std::expected<void, StarException> net_elements_need_load(bool full) override;
+  [[nodiscard]] std::expected<void, StarException> net_elements_need_store() override;
 
   Root& m_root;
   SongbookSynchronization& m_synchronization;

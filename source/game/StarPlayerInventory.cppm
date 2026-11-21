@@ -221,8 +221,8 @@ public:
   // Empty network state with this inventory's original bag and action-bar schema.
   [[nodiscard]] std::expected<std::reference_wrapper<PlayerInventory const>, StarException> blankInventory() const;
 
-  [[nodiscard]] std::expected<void, StarException> netStore(DataStream& ds, NetCompatibilityRules rules = {}) const override;
-  [[nodiscard]] std::expected<bool, StarException> writeNetDelta(DataStream& ds, std::uint64_t fromVersion, NetCompatibilityRules rules = {}) const override;
+  [[nodiscard]] std::expected<void, StarException> net_store(DataStream& ds, NetCompatibilityRules rules = {}) const override;
+  [[nodiscard]] std::expected<bool, StarException> write_net_delta(DataStream& ds, std::uint64_t fromVersion, NetCompatibilityRules rules = {}) const override;
 
 private:
   using CustomBarLink = std::pair<std::optional<InventorySlot>, std::optional<InventorySlot>>;
@@ -242,8 +242,8 @@ private:
   void swapCustomBarLinks(InventorySlot a, InventorySlot b);
   [[nodiscard]] std::expected<void, StarException> autoAddToCustomBar(InventorySlot slot);
 
-  [[nodiscard]] std::expected<void, StarException> netElementsNeedLoad(bool full) override;
-  [[nodiscard]] std::expected<void, StarException> netElementsNeedStore() override;
+  [[nodiscard]] std::expected<void, StarException> net_elements_need_load(bool full) override;
+  [[nodiscard]] std::expected<void, StarException> net_elements_need_store() override;
 
   // Borrowed for this inventory's lifetime; resource lookups remain reload-aware.
   Root& m_root;

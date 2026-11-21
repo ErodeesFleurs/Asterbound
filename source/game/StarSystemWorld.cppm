@@ -190,10 +190,10 @@ public:
   [[nodiscard]] std::expected<void, StarException> clientUpdate(float dt);
   [[nodiscard]] std::expected<void, StarException> serverUpdate(SystemWorldServer& system, float dt);
 
-  [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> writeNetState(std::uint64_t fromVersion, NetCompatibilityRules rules = {});
-  [[nodiscard]] std::expected<void, StarException> readNetState(ByteArray data, float interpolationTime, NetCompatibilityRules rules = {});
+  [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> write_net_state(std::uint64_t fromVersion, NetCompatibilityRules rules = {});
+  [[nodiscard]] std::expected<void, StarException> read_net_state(ByteArray data, float interpolationTime, NetCompatibilityRules rules = {});
 
-  [[nodiscard]] std::expected<ByteArray, StarException> netStore() const;
+  [[nodiscard]] std::expected<ByteArray, StarException> net_store() const;
   [[nodiscard]] std::expected<Json, StarException> diskStore() const;
 private:
   SystemObject(Root& root, SystemObjectConfig config, Uuid uuid, Vec2F const& position, double spawnTime, JsonObject parameters);
@@ -234,10 +234,10 @@ public:
   [[nodiscard]] std::expected<void, StarException> clientUpdate(float dt);
   [[nodiscard]] std::expected<void, StarException> serverUpdate(SystemWorld& system, float dt);
 
-  [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> writeNetState(std::uint64_t fromVersion, NetCompatibilityRules rules = {});
-  [[nodiscard]] std::expected<void, StarException> readNetState(ByteArray data, float interpolationTime, NetCompatibilityRules rules = {});
+  [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> write_net_state(std::uint64_t fromVersion, NetCompatibilityRules rules = {});
+  [[nodiscard]] std::expected<void, StarException> read_net_state(ByteArray data, float interpolationTime, NetCompatibilityRules rules = {});
 
-  [[nodiscard]] std::expected<ByteArray, StarException> netStore() const;
+  [[nodiscard]] std::expected<ByteArray, StarException> net_store() const;
 private:
   explicit SystemClientShip(Uuid uuid);
   [[nodiscard]] std::expected<void, StarException> initialize(SystemWorld& system, float speed, SystemLocation const& position);

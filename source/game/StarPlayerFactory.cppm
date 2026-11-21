@@ -100,7 +100,7 @@ public:
 
   [[nodiscard]] std::expected<std::shared_ptr<Player>, StarException> create() const;
   [[nodiscard]] std::expected<std::shared_ptr<Player>, StarException> diskLoadPlayer(Json const& diskStore) const;
-  [[nodiscard]] std::expected<std::shared_ptr<Player>, StarException> netLoadPlayer(ByteArray const& netStore, NetCompatibilityRules rules = {}) const;
+  [[nodiscard]] std::expected<std::shared_ptr<Player>, StarException> net_load_player(ByteArray const& net_store, NetCompatibilityRules rules = {}) const;
 
 private:
   explicit PlayerFactory(Root& root);

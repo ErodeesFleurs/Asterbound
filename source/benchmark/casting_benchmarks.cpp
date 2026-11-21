@@ -577,8 +577,8 @@ template <production_operation Operation> void measure_production(benchmark::Sta
       } else {
         auto const& group = static_cast<Star::NetElementGroup const&>(*nets[i]);
         if (!require(state,
-                     nets[i].use_count() == 1 && !group.netVersion() && !group.netInterpolationEnabled()
-                       && group.netExtrapolationHint() == 0))
+                     nets[i].use_count() == 1 && !group.net_version() && !group.net_interpolation_enabled()
+                       && group.net_extrapolation_hint() == 0))
           return false;
       }
       for (std::size_t j = 0; j != bytes[i].size(); ++j)

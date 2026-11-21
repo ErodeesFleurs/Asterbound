@@ -249,9 +249,9 @@ const GameTestRegistration transientMovementAnimation(
           EXPECT_TRUE(remote->uninit());
     });
     for (std::size_t i = 0; i != remotes.size(); ++i) {
-      auto store = player.netStore(rules[i]);
+      auto store = player.net_store(rules[i]);
       ASSERT_TRUE(store);
-      auto remote = setup.factory->netLoadPlayer(*store, rules[i]);
+      auto remote = setup.factory->net_load_player(*store, rules[i]);
       ASSERT_TRUE(remote) << remote.error().what();
       remotes[i] = *remote;
       ASSERT_TRUE(remotes[i]->init(*setup.world, 101 + i, EntityMode::Slave));
@@ -261,10 +261,10 @@ const GameTestRegistration transientMovementAnimation(
     auto sync = [&](Humanoid::State state, Direction networkDirection, bool full = false) {
       for (std::size_t i = 0; i != remotes.size(); ++i) {
         SCOPED_TRACE(rules[i].version());
-        auto packet = player.writeNetState(full ? 0 : versions[i], rules[i]);
+        auto packet = player.write_net_state(full ? 0 : versions[i], rules[i]);
         ASSERT_TRUE(packet);
         versions[i] = packet->second;
-        ASSERT_TRUE(remotes[i]->readNetState(packet->first, 0.f, rules[i]));
+        ASSERT_TRUE(remotes[i]->read_net_state(packet->first, 0.f, rules[i]));
         ASSERT_TRUE(remotes[i]->update(dt, step));
         EXPECT_EQ(remotes[i]->humanoid()->state(), state);
         EXPECT_EQ(remotes[i]->humanoid()->facingDirection(), player.humanoid()->facingDirection());
@@ -367,10 +367,10 @@ const GameTestRegistration transientMovementAnimation(
     ASSERT_TRUE(player.teleportOut());
     // A higher-priority state can start between update and packet generation.
     for (std::size_t i = 0; i != remotes.size(); ++i) {
-      auto packet = player.writeNetState(versions[i], rules[i]);
+      auto packet = player.write_net_state(versions[i], rules[i]);
       ASSERT_TRUE(packet);
       versions[i] = packet->second;
-      ASSERT_TRUE(remotes[i]->readNetState(packet->first, 0.f, rules[i]));
+      ASSERT_TRUE(remotes[i]->read_net_state(packet->first, 0.f, rules[i]));
       EXPECT_TRUE(remotes[i]->isTeleporting());
       EXPECT_EQ(remotes[i]->movementController().movingDirection(), movement.movingDirection());
     }

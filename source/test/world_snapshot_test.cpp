@@ -986,9 +986,9 @@ const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
             EXPECT_TRUE(stepSeen);
             EXPECT_FALSE(updateSetSeen);
             EXPECT_FALSE(visible[i].contains(entityCreate->entityId));
-            auto entity = (*factory)->netLoadEntity(entityCreate->entityType, entityCreate->storeData, rules);
+            auto entity = (*factory)->net_load_entity(entityCreate->entityType, entityCreate->storeData, rules);
             ASSERT_TRUE(entity) << entity.error().what();
-            ASSERT_TRUE((*entity)->readNetState(entityCreate->firstNetState, 0.0f, rules));
+            ASSERT_TRUE((*entity)->read_net_state(entityCreate->firstNetState, 0.0f, rules));
             visible[i][entityCreate->entityId] = *entity;
             targetCreated |= entityCreate->entityId == (*target)->entityId();
           } else if (auto entityDestroy = as<EntityDestroyPacket>(packet)) {
@@ -1000,7 +1000,7 @@ const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
             for (auto const& [id, delta] : update->deltas) {
               auto entity = visible[i].get(id);
               ASSERT_TRUE(entity) << entity.error().what();
-              ASSERT_TRUE(entity->get()->readNetState(delta, 0.0f, rules));
+              ASSERT_TRUE(entity->get()->read_net_state(delta, 0.0f, rules));
             }
           }
         }

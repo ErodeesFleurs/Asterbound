@@ -131,19 +131,19 @@ std::expected<std::shared_ptr<ContainerObject>, StarException> ContainerObject::
     return std::unexpected(std::move(slotsResult.error()));
   auto slots = std::move(*slotsResult);
   object->m_items = std::make_shared<ItemBag>(rootContext, slots);
-  auto operation2 = object->m_netGroup.addNetElement(object->m_opened);
+  auto operation2 = object->m_netGroup.add_net_element(object->m_opened);
   if (!operation2)
     return std::unexpected(std::move(operation2.error()));
-  auto operation3 = object->m_netGroup.addNetElement(object->m_crafting);
+  auto operation3 = object->m_netGroup.add_net_element(object->m_crafting);
   if (!operation3)
     return std::unexpected(std::move(operation3.error()));
-  auto operation4 = object->m_netGroup.addNetElement(object->m_craftingProgress);
+  auto operation4 = object->m_netGroup.add_net_element(object->m_craftingProgress);
   if (!operation4)
     return std::unexpected(std::move(operation4.error()));
-  auto operation5 = object->m_netGroup.addNetElement(object->m_itemsNetState);
+  auto operation5 = object->m_netGroup.add_net_element(object->m_itemsNetState);
   if (!operation5)
     return std::unexpected(std::move(operation5.error()));
-  object->m_craftingProgress.setInterpolator(lerp<float, float>);
+  object->m_craftingProgress.set_interpolator(lerp<float, float>);
   return object;
 }
 
@@ -1152,7 +1152,7 @@ std::expected<void, StarException> ContainerObject::getNetStates(bool initial) {
   auto operation1 = Object::getNetStates(initial);
   if (!operation1)
     return std::unexpected(std::move(operation1.error()));
-  if (m_itemsNetState.pullUpdated()) {
+  if (m_itemsNetState.pull_updated()) {
     DataStreamReader ds(m_itemsNetState.get().span());
     auto operation2 = m_items->read(ds);
     if (!operation2)

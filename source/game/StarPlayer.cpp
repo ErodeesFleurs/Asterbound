@@ -571,133 +571,133 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
   setKeepAlive(true);
 
   {
-    if (auto result = m_netGroup.addNetElement(m_stateNetState); !result)
+    if (auto result = m_netGroup.add_net_element(m_stateNetState); !result)
       return std::unexpected(std::move(result.error()));
   }
   {
-    if (auto result = m_netGroup.addNetElement(m_shiftingNetState); !result)
+    if (auto result = m_netGroup.add_net_element(m_shiftingNetState); !result)
       return std::unexpected(std::move(result.error()));
   }
   {
-    if (auto result = m_netGroup.addNetElement(m_xAimPositionNetState); !result)
+    if (auto result = m_netGroup.add_net_element(m_xAimPositionNetState); !result)
       return std::unexpected(std::move(result.error()));
   }
   {
-    if (auto result = m_netGroup.addNetElement(m_yAimPositionNetState); !result)
+    if (auto result = m_netGroup.add_net_element(m_yAimPositionNetState); !result)
       return std::unexpected(std::move(result.error()));
   }
   {
-    if (auto result = m_netGroup.addNetElement(m_identityNetState); !result)
+    if (auto result = m_netGroup.add_net_element(m_identityNetState); !result)
       return std::unexpected(std::move(result.error()));
   }
   {
-    if (auto result = m_netGroup.addNetElement(m_teamNetState); !result)
+    if (auto result = m_netGroup.add_net_element(m_teamNetState); !result)
       return std::unexpected(std::move(result.error()));
   }
   {
-    if (auto result = m_netGroup.addNetElement(m_landedNetState); !result)
+    if (auto result = m_netGroup.add_net_element(m_landedNetState); !result)
       return std::unexpected(std::move(result.error()));
   }
   {
-    if (auto result = m_netGroup.addNetElement(m_chatMessageNetState); !result)
+    if (auto result = m_netGroup.add_net_element(m_chatMessageNetState); !result)
       return std::unexpected(std::move(result.error()));
   }
   {
-    if (auto result = m_netGroup.addNetElement(m_newChatMessageNetState); !result)
+    if (auto result = m_netGroup.add_net_element(m_newChatMessageNetState); !result)
       return std::unexpected(std::move(result.error()));
   }
   {
-    if (auto result = m_netGroup.addNetElement(m_emoteNetState); !result)
+    if (auto result = m_netGroup.add_net_element(m_emoteNetState); !result)
       return std::unexpected(std::move(result.error()));
   }
 
-  m_xAimPositionNetState.setFixedPointBase(0.003125);
-  m_yAimPositionNetState.setFixedPointBase(0.003125);
-  m_yAimPositionNetState.setInterpolator(lerp<float, float>);
+  m_xAimPositionNetState.set_fixed_point_base(0.003125);
+  m_yAimPositionNetState.set_fixed_point_base(0.003125);
+  m_yAimPositionNetState.set_interpolator(lerp<float, float>);
 
   {
-    if (auto result = m_netGroup.addNetElement(*m_inventory); !result)
+    if (auto result = m_netGroup.add_net_element(*m_inventory); !result)
       return std::unexpected(std::move(result.error()));
   }
   {
-    if (auto result = m_netGroup.addNetElement(*m_tools); !result)
+    if (auto result = m_netGroup.add_net_element(*m_tools); !result)
       return std::unexpected(std::move(result.error()));
   }
   {
-    if (auto result = m_netGroup.addNetElement(*m_armor); !result)
+    if (auto result = m_netGroup.add_net_element(*m_armor); !result)
       return std::unexpected(std::move(result.error()));
   }
   {
-    if (auto result = m_netGroup.addNetElement(*m_songbook); !result)
+    if (auto result = m_netGroup.add_net_element(*m_songbook); !result)
       return std::unexpected(std::move(result.error()));
   }
   {
-    if (auto result = m_netGroup.addNetElement(*m_movementController); !result)
+    if (auto result = m_netGroup.add_net_element(*m_movementController); !result)
       return std::unexpected(std::move(result.error()));
   }
   {
-    if (auto result = m_netGroup.addNetElement(*m_effectEmitter); !result)
+    if (auto result = m_netGroup.add_net_element(*m_effectEmitter); !result)
       return std::unexpected(std::move(result.error()));
   }
   {
-    if (auto result = m_netGroup.addNetElement(*m_effectsAnimator); !result)
+    if (auto result = m_netGroup.add_net_element(*m_effectsAnimator); !result)
       return std::unexpected(std::move(result.error()));
   }
   {
-    if (auto result = m_netGroup.addNetElement(*m_statusController); !result)
+    if (auto result = m_netGroup.add_net_element(*m_statusController); !result)
       return std::unexpected(std::move(result.error()));
   }
   {
-    if (auto result = m_netGroup.addNetElement(*m_techController); !result)
-      return std::unexpected(std::move(result.error()));
-  }
-
-  m_netHumanoid.setCompatibilityVersion(10);
-  {
-    if (auto result = m_netGroup.addNetElement(m_netHumanoid); !result)
-      return std::unexpected(std::move(result.error()));
-  }
-  m_refreshedHumanoidParameters.setCompatibilityVersion(10);
-  {
-    if (auto result = m_netGroup.addNetElement(m_refreshedHumanoidParameters); !result)
+    if (auto result = m_netGroup.add_net_element(*m_techController); !result)
       return std::unexpected(std::move(result.error()));
   }
 
-  m_scriptedAnimationParameters.setCompatibilityVersion(10);
+  m_netHumanoid.set_compatibility_version(10);
   {
-    if (auto result = m_netGroup.addNetElement(m_scriptedAnimationParameters); !result)
+    if (auto result = m_netGroup.add_net_element(m_netHumanoid); !result)
+      return std::unexpected(std::move(result.error()));
+  }
+  m_refreshedHumanoidParameters.set_compatibility_version(10);
+  {
+    if (auto result = m_netGroup.add_net_element(m_refreshedHumanoidParameters); !result)
       return std::unexpected(std::move(result.error()));
   }
 
-  m_deathParticleBurst.setCompatibilityVersion(10);
+  m_scriptedAnimationParameters.set_compatibility_version(10);
   {
-    if (auto result = m_netGroup.addNetElement(m_deathParticleBurst); !result)
+    if (auto result = m_netGroup.add_net_element(m_scriptedAnimationParameters); !result)
       return std::unexpected(std::move(result.error()));
   }
 
-  m_humanoidDanceNetState.setCompatibilityVersion(13);
+  m_deathParticleBurst.set_compatibility_version(10);
   {
-    if (auto result = m_netGroup.addNetElement(m_humanoidDanceNetState); !result)
+    if (auto result = m_netGroup.add_net_element(m_deathParticleBurst); !result)
       return std::unexpected(std::move(result.error()));
   }
 
-  m_netGroup.setNeedsLoadCallback([this](bool initial) { return getNetStates(initial); });
-  m_netGroup.setNeedsStoreCallback([this]() { return setNetStates(); });
+  m_humanoidDanceNetState.set_compatibility_version(13);
+  {
+    if (auto result = m_netGroup.add_net_element(m_humanoidDanceNetState); !result)
+      return std::unexpected(std::move(result.error()));
+  }
+
+  m_netGroup.set_needs_load_callback([this](bool initial) { return getNetStates(initial); });
+  m_netGroup.set_needs_store_callback([this]() { return setNetStates(); });
   return {};
 }
 
-std::expected<std::shared_ptr<Player>, StarException> Player::create(Root& rootOwner, std::shared_ptr<PlayerConfig> config, ByteArray const& netStore, NetCompatibilityRules rules) {
+std::expected<std::shared_ptr<Player>, StarException> Player::create(Root& rootOwner, std::shared_ptr<PlayerConfig> config, ByteArray const& net_store, NetCompatibilityRules rules) {
   auto player = create(rootOwner, std::move(config));
   if (!player)
     return std::unexpected(std::move(player.error()));
-  auto loaded = (*player)->netLoad(netStore, rules);
+  auto loaded = (*player)->net_load(net_store, rules);
   if (!loaded)
     return std::unexpected(std::move(loaded.error()));
   return player;
 }
 
-std::expected<void, StarException> Player::netLoad(ByteArray const& netStore, NetCompatibilityRules rules) {
-  DataStreamReader ds(netStore.span());
+std::expected<void, StarException> Player::net_load(ByteArray const& net_store, NetCompatibilityRules rules) {
+  DataStreamReader ds(net_store.span());
   ds.set_stream_compatibility_version(rules);
   auto idResult = ds.read<String>();
   if (!idResult)
@@ -731,8 +731,8 @@ std::expected<void, StarException> Player::installHumanoid() {
   if (!currentResult)
     return std::unexpected(std::move(currentResult.error()));
   auto current = std::move(*currentResult);
-  m_netHumanoid.clearNetElements();
-  if (auto result = m_netHumanoid.addNetElement(current); !result)
+  m_netHumanoid.clear_net_elements();
+  if (auto result = m_netHumanoid.add_net_element(current); !result)
     return std::unexpected(std::move(result.error()));
   m_currentNetHumanoid = std::move(current);
   return {};
@@ -1119,7 +1119,7 @@ std::expected<void, StarException> Player::init(World& world, EntityId entityId,
     if (auto result = recover_lua_script_error(m_scriptedAnimator.init(world)); !result)
       return std::unexpected(std::move(result.error()));
   }
-  m_xAimPositionNetState.setInterpolator(world.geometry().xLerpFunction());
+  m_xAimPositionNetState.set_interpolator(world.geometry().xLerpFunction());
   if (auto result = refreshEquipment(); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = updateHumanoidDirectives(); !result)
@@ -2221,7 +2221,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
 
   } else {
     {
-      if (auto result = m_netGroup.tickNetInterpolation(dt); !result)
+      if (auto result = m_netGroup.tick_net_interpolation(dt); !result)
         return std::unexpected(std::move(result.error()));
     }
     {
@@ -3437,20 +3437,20 @@ Direction Player::facingDirection() const {
   return m_movementController->facingDirection();
 }
 
-std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Player::writeNetState(std::uint64_t fromVersion, NetCompatibilityRules rules) {
-  return m_netGroup.writeNetState(fromVersion, rules);
+std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Player::write_net_state(std::uint64_t fromVersion, NetCompatibilityRules rules) {
+  return m_netGroup.write_net_state(fromVersion, rules);
 }
 
-std::expected<void, StarException> Player::readNetState(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
-  return m_netGroup.readNetState(std::move(data), interpolationTime, rules);
+std::expected<void, StarException> Player::read_net_state(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
+  return m_netGroup.read_net_state(std::move(data), interpolationTime, rules);
 }
 
 std::expected<void, StarException> Player::enableInterpolation(float) {
-  return m_netGroup.enableNetInterpolation();
+  return m_netGroup.enable_net_interpolation();
 }
 
 std::expected<void, StarException> Player::disableInterpolation() {
-  return m_netGroup.disableNetInterpolation();
+  return m_netGroup.disable_net_interpolation();
 }
 
 std::expected<void, StarException> Player::processControls() {
@@ -3885,7 +3885,7 @@ std::expected<bool, StarException> Player::inToolRange(Vec2F const& aimPos) cons
 }
 
 std::expected<void, StarException> Player::getNetStates(bool initial) {
-  auto elements = m_netHumanoid.netElements();
+  auto elements = m_netHumanoid.net_elements();
   auto elementsLastResult = elements.last();
   if (!elementsLastResult)
     return std::unexpected(std::move(elementsLastResult.error()));
@@ -3895,7 +3895,7 @@ std::expected<void, StarException> Player::getNetStates(bool initial) {
   m_shifting = m_shiftingNetState.get();
   m_aimPosition[0] = m_xAimPositionNetState.get();
   m_aimPosition[1] = m_yAimPositionNetState.get();
-  if (m_identityNetState.pullUpdated() && !initial) {
+  if (m_identityNetState.pull_updated() && !initial) {
     auto newIdentity = m_identityNetState.get();
     if (m_identity.species == newIdentity.species && m_identity.imagePath == newIdentity.imagePath) {
       if (auto result = humanoid()->setIdentity(newIdentity); !result)
@@ -3903,14 +3903,14 @@ std::expected<void, StarException> Player::getNetStates(bool initial) {
     }
     m_identity = std::move(newIdentity);
   }
-  if (m_refreshedHumanoidParameters.pullOccurred() && !initial) {
+  if (m_refreshedHumanoidParameters.pull_occurred() && !initial) {
     if (auto result = refreshHumanoidParameters(); !result)
       return std::unexpected(std::move(result.error()));
   }
   setTeam(m_teamNetState.get());
-  if (m_landedNetState.pullOccurred() && !initial)
+  if (m_landedNetState.pull_occurred() && !initial)
     m_landingNoisePending = true;
-  if (m_newChatMessageNetState.pullOccurred() && !initial) {
+  if (m_newChatMessageNetState.pull_occurred() && !initial) {
     m_chatMessage = m_chatMessageNetState.get();
     m_chatMessageUpdated = true;
     m_pendingChatActions.push_back(SayChatAction{entityId(), m_chatMessage, m_movementController->position()});
@@ -4684,7 +4684,7 @@ std::expected<Json, StarException> Player::diskStore() {
   };
 }
 
-std::expected<ByteArray, StarException> Player::netStore(NetCompatibilityRules rules) {
+std::expected<ByteArray, StarException> Player::net_store(NetCompatibilityRules rules) {
   DataStreamBuffer ds;
   ds.set_stream_compatibility_version(rules);
   auto id = uniqueId();

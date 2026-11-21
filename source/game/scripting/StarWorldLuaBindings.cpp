@@ -3189,11 +3189,11 @@ namespace LuaBindings {
     JsonArray warnings;
     if (transient) {
       NetCompatibilityRules rules;
-      auto store = (*factory)->netStoreEntity(entity, rules);
+      auto store = (*factory)->net_store_entity(entity, rules);
       if (!store)
         return std::unexpected(std::move(store.error()));
       // These types keep their live state directly in NetElements. Unlike
-      // writeNetState(0), this read does not advance their replication version.
+      // write_net_state(0), this read does not advance their replication version.
       auto state = [&]() -> std::expected<std::pair<ByteArray, std::uint64_t>, StarException> {
         if (auto projectile = as<Projectile>(entity))
           return projectile->snapshot_net_state(rules);
@@ -3208,7 +3208,7 @@ namespace LuaBindings {
         {"netStore", base64_encode(*store)}, {"netState", base64_encode(state->first)},
         {"netStateVersion", state->second}
       };
-      warnings.push_back("Network reconstruction record, not a persistent save. netState is a full readNetState record; netStateVersion is observational, not a continuation token.");
+      warnings.push_back("Network reconstruction record, not a persistent save. netState is a full read_net_state record; netStateVersion is observational, not a continuation token.");
     } else {
       // The existing dispatcher includes Player::diskStore on replicas too.
       // Keep its errors (including live Lua storage conversion errors) intact.

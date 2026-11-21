@@ -27,18 +27,18 @@ public:
   using mapped_type = typename BaseMap::mapped_type;
   using value_type = typename BaseMap::value_type;
 
-  void initNetVersion(std::optional<std::reference_wrapper<NetElementVersion const>> version = std::nullopt) override;
+  void init_net_version(std::optional<std::reference_wrapper<NetElementVersion const>> version = std::nullopt) override;
 
-  [[nodiscard]] std::expected<void, StarException> enableNetInterpolation(float extrapolationHint = 0.0f) override;
-  [[nodiscard]] std::expected<void, StarException> disableNetInterpolation() override;
-  [[nodiscard]] std::expected<void, StarException> tickNetInterpolation(float dt) override;
+  [[nodiscard]] std::expected<void, StarException> enable_net_interpolation(float extrapolation_hint = 0.0f) override;
+  [[nodiscard]] std::expected<void, StarException> disable_net_interpolation() override;
+  [[nodiscard]] std::expected<void, StarException> tick_net_interpolation(float dt) override;
 
-  [[nodiscard]] std::expected<void, StarException> netStore(DataStream& ds, NetCompatibilityRules rules = {}) const override;
-  [[nodiscard]] std::expected<void, StarException> netLoad(DataStream& ds, NetCompatibilityRules rules) override;
+  [[nodiscard]] std::expected<void, StarException> net_store(DataStream& ds, NetCompatibilityRules rules = {}) const override;
+  [[nodiscard]] std::expected<void, StarException> net_load(DataStream& ds, NetCompatibilityRules rules) override;
 
   bool should_write_delta(std::uint64_t from_version, NetCompatibilityRules rules = {}) const;
-  [[nodiscard]] std::expected<bool, StarException> writeNetDelta(DataStream& ds, std::uint64_t fromVersion, NetCompatibilityRules rules = {}) const override;
-  [[nodiscard]] std::expected<void, StarException> readNetDelta(DataStream& ds, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
+  [[nodiscard]] std::expected<bool, StarException> write_net_delta(DataStream& ds, std::uint64_t from_version, NetCompatibilityRules rules = {}) const override;
+  [[nodiscard]] std::expected<void, StarException> read_net_delta(DataStream& ds, float interpolation_time = 0.0f, NetCompatibilityRules rules = {}) override;
 
   [[nodiscard]] std::expected<std::reference_wrapper<mapped_type const>, StarException> get(key_type const& key) const;
   std::optional<std::reference_wrapper<mapped_type const>> find_ref(key_type const& key) const;
@@ -75,17 +75,17 @@ public:
 
   void clear();
 
-  BaseMap const& baseMap() const;
+  BaseMap const& base_map() const;
   void reset(BaseMap values);
-  bool pullUpdated();
+  bool pull_updated();
 
   // Sets this map to contain the same keys / values as the given map.  All
   // values in this map not found in the given map are removed.  (Same as
   // reset, but with arbitrary map type).
   template <typename MapType>
-  void setContents(MapType const& values);
+  void set_contents(MapType const& values);
 
-  std::uint64_t changeDataLastVersion() const;
+  std::uint64_t change_data_last_version() const;
 
 private:
   // If a delta is written from further back than this many steps, the delta
@@ -103,22 +103,22 @@ private:
 
   using ElementChange = std::variant<SetChange, RemoveChange, ClearChange>;
 
-  [[nodiscard]] static std::expected<void, StarException> writeSetChange(DataStream& ds, key_type const& key,
+  [[nodiscard]] static std::expected<void, StarException> write_set_change(DataStream& ds, key_type const& key,
                                                                          mapped_type const& value);
-  [[nodiscard]] static std::expected<void, StarException> writeChange(DataStream& ds, ElementChange const& change);
-  [[nodiscard]] static std::expected<ElementChange, StarException> readChange(DataStream& ds);
+  [[nodiscard]] static std::expected<void, StarException> write_change(DataStream& ds, ElementChange const& change);
+  [[nodiscard]] static std::expected<ElementChange, StarException> read_change(DataStream& ds);
 
-  void addChangeData(ElementChange change);
+  void add_change_data(ElementChange change);
 
-  void addPendingChangeData(ElementChange change, float interpolationTime);
-  void applyChange(ElementChange change);
+  void add_pending_change_data(ElementChange change, float interpolation_time);
+  void apply_change(ElementChange change);
 
-  Deque<std::pair<std::uint64_t, ElementChange>> m_changeData;
-  Deque<std::pair<float, ElementChange>> m_pendingChangeData;
-  std::optional<std::reference_wrapper<NetElementVersion const>> m_netVersion = std::nullopt;
-  std::uint64_t m_changeDataLastVersion = 0;
+  Deque<std::pair<std::uint64_t, ElementChange>> m_change_data;
+  Deque<std::pair<float, ElementChange>> m_pending_change_data;
+  std::optional<std::reference_wrapper<NetElementVersion const>> m_net_version = std::nullopt;
+  std::uint64_t m_change_data_last_version = 0;
   bool m_updated = false;
-  bool m_interpolationEnabled = false;
+  bool m_interpolation_enabled = false;
 };
 
 template <typename Key, typename Value>
@@ -128,83 +128,83 @@ template <typename Key, typename Value>
 using NetElementHashMap = NetElementMapWrapper<HashMap<Key, Value>>;
 
 template <typename BaseMap>
-void NetElementMapWrapper<BaseMap>::initNetVersion(std::optional<std::reference_wrapper<NetElementVersion const>> version) {
-  m_netVersion = version;
+void NetElementMapWrapper<BaseMap>::init_net_version(std::optional<std::reference_wrapper<NetElementVersion const>> version) {
+  m_net_version = version;
 
-  m_changeData.clear();
-  m_changeDataLastVersion = 0;
+  m_change_data.clear();
+  m_change_data_last_version = 0;
 
-  for (auto& change : std::exchange(m_pendingChangeData, {}))
-    applyChange(std::move(change.second));
+  for (auto& change : std::exchange(m_pending_change_data, {}))
+    apply_change(std::move(change.second));
 
-  addChangeData(ClearChange());
+  add_change_data(ClearChange());
   for (auto const& p : *this)
-    addChangeData(SetChange{p.first, p.second});
+    add_change_data(SetChange{p.first, p.second});
 }
 
 template <typename BaseMap>
-[[nodiscard]] std::expected<void, StarException> NetElementMapWrapper<BaseMap>::enableNetInterpolation(float) {
-  m_interpolationEnabled = true;
+[[nodiscard]] std::expected<void, StarException> NetElementMapWrapper<BaseMap>::enable_net_interpolation(float) {
+  m_interpolation_enabled = true;
   return {};
 }
 
 template <typename BaseMap>
-[[nodiscard]] std::expected<void, StarException> NetElementMapWrapper<BaseMap>::disableNetInterpolation() {
-  m_interpolationEnabled = false;
-  for (auto& change : std::exchange(m_pendingChangeData, {}))
-    applyChange(std::move(change.second));
+[[nodiscard]] std::expected<void, StarException> NetElementMapWrapper<BaseMap>::disable_net_interpolation() {
+  m_interpolation_enabled = false;
+  for (auto& change : std::exchange(m_pending_change_data, {}))
+    apply_change(std::move(change.second));
   return {};
 }
 
 template <typename BaseMap>
-[[nodiscard]] std::expected<void, StarException> NetElementMapWrapper<BaseMap>::tickNetInterpolation(float dt) {
-  for (auto& p : m_pendingChangeData)
+[[nodiscard]] std::expected<void, StarException> NetElementMapWrapper<BaseMap>::tick_net_interpolation(float dt) {
+  for (auto& p : m_pending_change_data)
     p.first -= dt;
 
-  while (!m_pendingChangeData.empty() && m_pendingChangeData.front().first <= 0.0f) {
-    applyChange(std::move(m_pendingChangeData.front().second));
-    m_pendingChangeData.pop_front();
+  while (!m_pending_change_data.empty() && m_pending_change_data.front().first <= 0.0f) {
+    apply_change(std::move(m_pending_change_data.front().second));
+    m_pending_change_data.pop_front();
   }
   return {};
 }
 
 template <typename BaseMap>
-[[nodiscard]] std::expected<void, StarException> NetElementMapWrapper<BaseMap>::netStore(DataStream& ds, NetCompatibilityRules rules) const {
-  if (!checkWithRules(rules)) return {};
+[[nodiscard]] std::expected<void, StarException> NetElementMapWrapper<BaseMap>::net_store(DataStream& ds, NetCompatibilityRules rules) const {
+  if (!check_with_rules(rules)) return {};
   {
-    auto result = ds.write_vlq_u(BaseMap::size() + m_pendingChangeData.size());
+    auto result = ds.write_vlq_u(BaseMap::size() + m_pending_change_data.size());
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
   for (auto const& pair : *this) {
-    auto result = writeSetChange(ds, pair.first, pair.second);
+    auto result = write_set_change(ds, pair.first, pair.second);
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
 
-  for (auto const& p : m_pendingChangeData)
-    { auto result = writeChange(ds, p.second); if (!result) return std::unexpected(std::move(result.error())); }
+  for (auto const& p : m_pending_change_data)
+    { auto result = write_change(ds, p.second); if (!result) return std::unexpected(std::move(result.error())); }
   return {};
 }
 
 template <typename BaseMap>
-[[nodiscard]] std::expected<void, StarException> NetElementMapWrapper<BaseMap>::netLoad(DataStream& ds, NetCompatibilityRules rules) {
-  if (!checkWithRules(rules)) return {};
-  m_changeData.clear();
-  m_changeDataLastVersion = m_netVersion ? m_netVersion->get().current() : 0;
-  m_pendingChangeData.clear();
+[[nodiscard]] std::expected<void, StarException> NetElementMapWrapper<BaseMap>::net_load(DataStream& ds, NetCompatibilityRules rules) {
+  if (!check_with_rules(rules)) return {};
+  m_change_data.clear();
+  m_change_data_last_version = m_net_version ? m_net_version->get().current() : 0;
+  m_pending_change_data.clear();
   BaseMap::clear();
 
-  addChangeData(ClearChange());
+  add_change_data(ClearChange());
 
-  auto countResult = ds.read_vlq_u();
-  if (!countResult) return std::unexpected(std::move(countResult.error()));
-  std::uint64_t count = *countResult;
+  auto count_result = ds.read_vlq_u();
+  if (!count_result) return std::unexpected(std::move(count_result.error()));
+  std::uint64_t count = *count_result;
   for (std::uint64_t i = 0; i < count; ++i) {
-    auto change = readChange(ds);
+    auto change = read_change(ds);
     if (!change) return std::unexpected(std::move(change.error()));
-    addChangeData(*change);
-    applyChange(std::move(*change));
+    add_change_data(*change);
+    apply_change(std::move(*change));
   }
 
   m_updated = true;
@@ -213,31 +213,31 @@ template <typename BaseMap>
 
 template <typename BaseMap>
 bool NetElementMapWrapper<BaseMap>::should_write_delta(std::uint64_t from_version, NetCompatibilityRules rules) const {
-  return checkWithRules(rules) && (from_version < m_changeDataLastVersion ||
-      (!m_changeData.empty() && m_changeData.back().first >= from_version));
+  return check_with_rules(rules) && (from_version < m_change_data_last_version ||
+      (!m_change_data.empty() && m_change_data.back().first >= from_version));
 }
 
 template <typename BaseMap>
-[[nodiscard]] std::expected<bool, StarException> NetElementMapWrapper<BaseMap>::writeNetDelta(DataStream& ds, std::uint64_t fromVersion, NetCompatibilityRules rules) const {
-  if (!should_write_delta(fromVersion, rules)) return false;
+[[nodiscard]] std::expected<bool, StarException> NetElementMapWrapper<BaseMap>::write_net_delta(DataStream& ds, std::uint64_t from_version, NetCompatibilityRules rules) const {
+  if (!should_write_delta(from_version, rules)) return false;
 
-  if (fromVersion < m_changeDataLastVersion) {
+  if (from_version < m_change_data_last_version) {
     {
       auto result = ds.write_vlq_u(1);
       if (!result)
         return std::unexpected(std::move(result.error()));
     }
-    { auto result = netStore(ds, rules); if (!result) return std::unexpected(std::move(result.error())); }
+    { auto result = net_store(ds, rules); if (!result) return std::unexpected(std::move(result.error())); }
 
   } else {
-    for (auto const& p : m_changeData) {
-      if (p.first >= fromVersion) {
+    for (auto const& p : m_change_data) {
+      if (p.first >= from_version) {
         {
           auto result = ds.write_vlq_u(2);
           if (!result)
             return std::unexpected(std::move(result.error()));
         }
-        { auto result = writeChange(ds, p.second); if (!result) return std::unexpected(std::move(result.error())); }
+        { auto result = write_change(ds, p.second); if (!result) return std::unexpected(std::move(result.error())); }
       }
     }
   }
@@ -248,27 +248,27 @@ template <typename BaseMap>
 }
 
 template <typename BaseMap>
-[[nodiscard]] std::expected<void, StarException> NetElementMapWrapper<BaseMap>::readNetDelta(DataStream& ds, float interpolationTime, NetCompatibilityRules rules) {
-  if (!checkWithRules(rules)) return {};
+[[nodiscard]] std::expected<void, StarException> NetElementMapWrapper<BaseMap>::read_net_delta(DataStream& ds, float interpolation_time, NetCompatibilityRules rules) {
+  if (!check_with_rules(rules)) return {};
   while (true) {
-    auto codeResult = ds.read_vlq_u();
-    if (!codeResult) return std::unexpected(std::move(codeResult.error()));
-    std::uint64_t code = *codeResult;
+    auto code_result = ds.read_vlq_u();
+    if (!code_result) return std::unexpected(std::move(code_result.error()));
+    std::uint64_t code = *code_result;
     if (code == 0) {
       break;
     } else if (code == 1) {
-      { auto result = netLoad(ds, rules); if (!result) return std::unexpected(std::move(result.error())); }
+      { auto result = net_load(ds, rules); if (!result) return std::unexpected(std::move(result.error())); }
     } else if (code == 2) {
-      auto change = readChange(ds);
+      auto change = read_change(ds);
       if (!change) return std::unexpected(std::move(change.error()));
-      addChangeData(*change);
+      add_change_data(*change);
 
-      if (m_interpolationEnabled && interpolationTime > 0.0f)
-        addPendingChangeData(std::move(*change), interpolationTime);
+      if (m_interpolation_enabled && interpolation_time > 0.0f)
+        add_pending_change_data(std::move(*change), interpolation_time);
       else
-        applyChange(std::move(*change));
+        apply_change(std::move(*change));
     } else {
-      return std::unexpected(IOException("Improper delta code received in NetElementMapWrapper::readNetDelta"));
+      return std::unexpected(IOException("Improper delta code received in NetElementMapWrapper::read_net_delta"));
     }
   }
   return {};
@@ -299,7 +299,7 @@ template <typename BaseMap>
 auto NetElementMapWrapper<BaseMap>::insert(value_type v) -> std::pair<const_iterator, bool> {
   auto res = BaseMap::insert(v);
   if (res.second) {
-    addChangeData(SetChange{std::move(v.first), std::move(v.second)});
+    add_change_data(SetChange{std::move(v.first), std::move(v.second)});
     m_updated = true;
   }
   return res;
@@ -323,12 +323,12 @@ void NetElementMapWrapper<BaseMap>::set(key_type k, mapped_type v) {
   auto i = BaseMap::find(k);
   if (i != BaseMap::end()) {
     if (!(i->second == v)) {
-      addChangeData(SetChange{std::move(k), v});
+      add_change_data(SetChange{std::move(k), v});
       i->second = std::move(v);
       m_updated = true;
     }
   } else {
-    addChangeData(SetChange{k, v});
+    add_change_data(SetChange{k, v});
     BaseMap::insert(value_type(std::move(k), std::move(v)));
     m_updated = true;
   }
@@ -338,10 +338,10 @@ template <typename BaseMap>
 void NetElementMapWrapper<BaseMap>::push(key_type k, mapped_type v) {
   auto i = BaseMap::find(k);
   if (i != BaseMap::end()) {
-    addChangeData(SetChange(std::move(k), v));
+    add_change_data(SetChange(std::move(k), v));
     i->second = std::move(v);
   } else {
-    addChangeData(SetChange(k, v));
+    add_change_data(SetChange(k, v));
     BaseMap::insert(value_type(std::move(k), std::move(v)));
   }
   m_updated = true;
@@ -359,7 +359,7 @@ bool NetElementMapWrapper<BaseMap>::remove(key_type const& k) {
 
 template <typename BaseMap>
 auto NetElementMapWrapper<BaseMap>::erase(const_iterator i) -> const_iterator {
-  addChangeData(RemoveChange(i->first));
+  add_change_data(RemoveChange(i->first));
   m_updated = true;
   return BaseMap::erase(i);
 }
@@ -388,14 +388,14 @@ auto NetElementMapWrapper<BaseMap>::try_extract_value(key_type const& k) -> std:
 template <typename BaseMap>
 void NetElementMapWrapper<BaseMap>::clear() {
   if (!empty()) {
-    addChangeData(ClearChange());
+    add_change_data(ClearChange());
     m_updated = true;
     BaseMap::clear();
   }
 }
 
 template <typename BaseMap>
-BaseMap const& NetElementMapWrapper<BaseMap>::baseMap() const {
+BaseMap const& NetElementMapWrapper<BaseMap>::base_map() const {
   return *this;
 }
 
@@ -403,7 +403,7 @@ template <typename BaseMap>
 void NetElementMapWrapper<BaseMap>::reset(BaseMap values) {
   for (auto const& p : *this) {
     if (!values.contains(p.first)) {
-      addChangeData(RemoveChange{p.first});
+      add_change_data(RemoveChange{p.first});
       m_updated = true;
     }
   }
@@ -411,7 +411,7 @@ void NetElementMapWrapper<BaseMap>::reset(BaseMap values) {
   for (auto const& p : values) {
     auto v = find_ref(p.first);
     if (!v || !(v->get() == p.second)) {
-      addChangeData(SetChange{p.first, p.second});
+      add_change_data(SetChange{p.first, p.second});
       m_updated = true;
     }
   }
@@ -420,24 +420,24 @@ void NetElementMapWrapper<BaseMap>::reset(BaseMap values) {
 }
 
 template <typename BaseMap>
-bool NetElementMapWrapper<BaseMap>::pullUpdated() {
+bool NetElementMapWrapper<BaseMap>::pull_updated() {
   return std::exchange(m_updated, false);
 }
 
 template <typename BaseMap>
 template <typename MapType>
-void NetElementMapWrapper<BaseMap>::setContents(MapType const& values) {
+void NetElementMapWrapper<BaseMap>::set_contents(MapType const& values) {
   reset(BaseMap::from(values));
 }
 
 template <typename BaseMap>
-std::uint64_t NetElementMapWrapper<BaseMap>::changeDataLastVersion() const {
-  return m_changeDataLastVersion;
+std::uint64_t NetElementMapWrapper<BaseMap>::change_data_last_version() const {
+  return m_change_data_last_version;
 }
 
 template <typename BaseMap>
 [[nodiscard]] std::expected<void, StarException>
-NetElementMapWrapper<BaseMap>::writeSetChange(DataStream& ds, key_type const& key, mapped_type const& value) {
+NetElementMapWrapper<BaseMap>::write_set_change(DataStream& ds, key_type const& key, mapped_type const& value) {
   {
     auto result = ds.write<std::uint8_t>(0);
     if (!result)
@@ -452,10 +452,10 @@ NetElementMapWrapper<BaseMap>::writeSetChange(DataStream& ds, key_type const& ke
 }
 
 template <typename BaseMap>
-[[nodiscard]] std::expected<void, StarException> NetElementMapWrapper<BaseMap>::writeChange(DataStream& ds, ElementChange const& change) {
+[[nodiscard]] std::expected<void, StarException> NetElementMapWrapper<BaseMap>::write_change(DataStream& ds, ElementChange const& change) {
   if (std::holds_alternative<SetChange>(change)) {
     auto const& set = std::get<SetChange>(change);
-    return writeSetChange(ds, set.key, set.value);
+    return write_set_change(ds, set.key, set.value);
   } else if (std::holds_alternative<RemoveChange>(change)) {
     { auto result = ds.write<std::uint8_t>(1); if (!result) return std::unexpected(std::move(result.error())); }
     { auto result = ds.write(std::get<RemoveChange>(change).key); if (!result) return std::unexpected(std::move(result.error())); }
@@ -466,7 +466,7 @@ template <typename BaseMap>
 }
 
 template <typename BaseMap>
-[[nodiscard]] auto NetElementMapWrapper<BaseMap>::readChange(DataStream& ds) -> std::expected<ElementChange, StarException> {
+[[nodiscard]] auto NetElementMapWrapper<BaseMap>::read_change(DataStream& ds) -> std::expected<ElementChange, StarException> {
   auto type = ds.read<std::uint8_t>();
   if (!type) return std::unexpected(std::move(type.error()));
   if (*type == 0) {
@@ -481,35 +481,35 @@ template <typename BaseMap>
   } else if (*type == 2) {
     return ClearChange();
   }
-  return std::unexpected(IOException("Improper type code received in NetElementMapWrapper::readChange"));
+  return std::unexpected(IOException("Improper type code received in NetElementMapWrapper::read_change"));
 }
 
 template <typename BaseMap>
-void NetElementMapWrapper<BaseMap>::addChangeData(ElementChange change) {
-  std::uint64_t currentVersion = m_netVersion ? m_netVersion->get().current() : 0;
+void NetElementMapWrapper<BaseMap>::add_change_data(ElementChange change) {
+  std::uint64_t current_version = m_net_version ? m_net_version->get().current() : 0;
   if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((m_changeData.empty() || m_changeData.back().first <= currentVersion));
+    Star::star_assert_failed((m_change_data.empty() || m_change_data.back().first <= current_version));
   }
 
-  m_changeData.push_back({currentVersion, std::move(change)});
+  m_change_data.push_back({current_version, std::move(change)});
 
-  m_changeDataLastVersion =
-    std::max<std::int64_t>(static_cast<std::int64_t>(currentVersion) - MaxChangeDataVersions, 0);
-  while (!m_changeData.empty() && m_changeData.front().first < m_changeDataLastVersion)
-    m_changeData.pop_front();
+  m_change_data_last_version =
+    std::max<std::int64_t>(static_cast<std::int64_t>(current_version) - MaxChangeDataVersions, 0);
+  while (!m_change_data.empty() && m_change_data.front().first < m_change_data_last_version)
+    m_change_data.pop_front();
 }
 
 template <typename BaseMap>
-void NetElementMapWrapper<BaseMap>::addPendingChangeData(ElementChange change, float interpolationTime) {
-  if (!m_pendingChangeData.empty() && interpolationTime < m_pendingChangeData.back().first) {
-    for (auto& change : std::exchange(m_pendingChangeData, {}))
-      applyChange(std::move(change.second));
+void NetElementMapWrapper<BaseMap>::add_pending_change_data(ElementChange change, float interpolation_time) {
+  if (!m_pending_change_data.empty() && interpolation_time < m_pending_change_data.back().first) {
+    for (auto& change : std::exchange(m_pending_change_data, {}))
+      apply_change(std::move(change.second));
   }
-  m_pendingChangeData.push_back({interpolationTime, std::move(change)});
+  m_pending_change_data.push_back({interpolation_time, std::move(change)});
 }
 
 template <typename BaseMap>
-void NetElementMapWrapper<BaseMap>::applyChange(ElementChange change) {
+void NetElementMapWrapper<BaseMap>::apply_change(ElementChange change) {
   if (std::holds_alternative<SetChange>(change))
     BaseMap::set(std::move(std::get<SetChange>(change).key), std::move(std::get<SetChange>(change).value));
   else if (std::holds_alternative<RemoveChange>(change))

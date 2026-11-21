@@ -500,8 +500,8 @@ std::expected<std::shared_ptr<Monster>, StarException> MonsterDatabase::diskLoad
   return monster;
 }
 
-std::expected<std::shared_ptr<Monster>, StarException> MonsterDatabase::netLoadMonster(ByteArray const& netStore, NetCompatibilityRules rules) const {
-  auto result68 = readMonsterVariant(netStore, rules);
+std::expected<std::shared_ptr<Monster>, StarException> MonsterDatabase::net_load_monster(ByteArray const& net_store, NetCompatibilityRules rules) const {
+  auto result68 = readMonsterVariant(net_store, rules);
 if (!result68) return std::unexpected(std::move(result68.error()));
 return Monster::create(m_root, std::move(*result68));
 }

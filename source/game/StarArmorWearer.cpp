@@ -129,8 +129,8 @@ std::expected<std::shared_ptr<ArmorWearer>, StarException> ArmorWearer::create(R
     auto& armor = wearer->m_armors[i];
     armor.isCosmetic = i >= 4;
     if (i >= 8)
-      armor.netState.setCompatibilityVersion(9);
-    auto added = wearer->addNetElement(armor.netState);
+      armor.netState.set_compatibility_version(9);
+    auto added = wearer->add_net_element(armor.netState);
     if (!added)
       return std::unexpected(std::move(added.error()));
   }
@@ -466,12 +466,12 @@ ItemDescriptor ArmorWearer::cosmeticItemDescriptor(std::uint8_t slot) const {
   return {};
 }
 
-std::expected<void, StarException> ArmorWearer::netElementsNeedLoad(bool) {
+std::expected<void, StarException> ArmorWearer::net_elements_need_load(bool) {
   auto itemDatabase = m_root.itemDatabase();
   if (!itemDatabase)
     return std::unexpected(std::move(itemDatabase.error()));
   for (auto& armor : m_armors) {
-    if (armor.netState.pullUpdated()) {
+    if (armor.netState.pull_updated()) {
       auto loaded = (*itemDatabase)->loadItem(armor.netState.get(), armor.item);
       if (!loaded)
         return std::unexpected(std::move(loaded.error()));
@@ -481,7 +481,7 @@ std::expected<void, StarException> ArmorWearer::netElementsNeedLoad(bool) {
   return {};
 }
 
-std::expected<void, StarException> ArmorWearer::netElementsNeedStore() {
+std::expected<void, StarException> ArmorWearer::net_elements_need_store() {
   for (auto& armor : m_armors) {
     if (armor.needsStore) {
       armor.netState.set(armor.visible ? itemSafeDescriptor(armor.item) : ItemDescriptor());

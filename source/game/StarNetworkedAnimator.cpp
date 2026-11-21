@@ -2098,7 +2098,7 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
         }
       }
 
-      auto bursts = pair.second.burstEvent.pullOccurrences();
+      auto bursts = pair.second.burstEvent.pull_occurrences();
       for (std::uint64_t i = 0; i < bursts; ++i)
         numEmissionCycles += pair.second.burstCount.get();
 
@@ -2239,114 +2239,114 @@ Mat3F NetworkedAnimator::TransformationGroup::animationAffineTransform() const {
 }
 
 std::expected<void, StarException> NetworkedAnimator::setupNetStates() {
-  clearNetElements();
+  clear_net_elements();
 
-  if (auto registered = addNetElement(m_processingDirectives); !registered) return std::unexpected(std::move(registered.error()));
-  if (auto registered = addNetElement(m_zoom); !registered) return std::unexpected(std::move(registered.error()));
-  if (auto registered = addNetElement(m_flipped); !registered) return std::unexpected(std::move(registered.error()));
-  if (auto registered = addNetElement(m_flippedRelativeCenterLine); !registered) return std::unexpected(std::move(registered.error()));
+  if (auto registered = add_net_element(m_processingDirectives); !registered) return std::unexpected(std::move(registered.error()));
+  if (auto registered = add_net_element(m_zoom); !registered) return std::unexpected(std::move(registered.error()));
+  if (auto registered = add_net_element(m_flipped); !registered) return std::unexpected(std::move(registered.error()));
+  if (auto registered = add_net_element(m_flippedRelativeCenterLine); !registered) return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = addNetElement(m_animationRate); !registered) return std::unexpected(std::move(registered.error()));
-  m_animationRate.setInterpolator(lerp<float, float>);
+  if (auto registered = add_net_element(m_animationRate); !registered) return std::unexpected(std::move(registered.error()));
+  m_animationRate.set_interpolator(lerp<float, float>);
 
-  if (auto registered = addNetElement(m_globalTags); !registered) return std::unexpected(std::move(registered.error()));
+  if (auto registered = add_net_element(m_globalTags); !registered) return std::unexpected(std::move(registered.error()));
 
   auto partNames = m_animatedParts.partNames();
   partNames.sort();
   for (auto const& part : partNames)
-    if (auto registered = addNetElement(m_partTags[part]); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(m_partTags[part]); !registered) return std::unexpected(std::move(registered.error()));
 
   for (auto& pair : m_stateInfo) {
-    pair.second.reverse.setCompatibilityVersion(10);
-    if (auto registered = addNetElement(pair.second.reverse); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = addNetElement(pair.second.stateIndex); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = addNetElement(pair.second.startedEvent); !registered) return std::unexpected(std::move(registered.error()));
+    pair.second.reverse.set_compatibility_version(10);
+    if (auto registered = add_net_element(pair.second.reverse); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.stateIndex); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.startedEvent); !registered) return std::unexpected(std::move(registered.error()));
   }
 
   for (auto& pair : m_transformationGroups) {
-    if (auto registered = addNetElement(pair.second.xTranslation); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = addNetElement(pair.second.yTranslation); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = addNetElement(pair.second.xScale); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = addNetElement(pair.second.yScale); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = addNetElement(pair.second.xShear); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = addNetElement(pair.second.yShear); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.xTranslation); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.yTranslation); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.xScale); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.yScale); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.xShear); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.yShear); !registered) return std::unexpected(std::move(registered.error()));
 
     if (pair.second.interpolated) {
-      pair.second.xTranslation.setInterpolator(lerp<float, float>);
-      pair.second.yTranslation.setInterpolator(lerp<float, float>);
-      pair.second.xScale.setInterpolator(lerp<float, float>);
-      pair.second.yScale.setInterpolator(lerp<float, float>);
-      pair.second.xShear.setInterpolator(angle_lerp<float, float>);
-      pair.second.yShear.setInterpolator(angle_lerp<float, float>);
+      pair.second.xTranslation.set_interpolator(lerp<float, float>);
+      pair.second.yTranslation.set_interpolator(lerp<float, float>);
+      pair.second.xScale.set_interpolator(lerp<float, float>);
+      pair.second.yScale.set_interpolator(lerp<float, float>);
+      pair.second.xShear.set_interpolator(angle_lerp<float, float>);
+      pair.second.yShear.set_interpolator(angle_lerp<float, float>);
     }
   }
 
   for (auto& pair : m_rotationGroups) {
-    if (auto registered = addNetElement(pair.second.targetAngle); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = addNetElement(pair.second.netImmediateEvent); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.targetAngle); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.netImmediateEvent); !registered) return std::unexpected(std::move(registered.error()));
   }
 
   for (auto& pair : m_particleEmitters) {
-    if (auto registered = addNetElement(pair.second.emissionRate); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = addNetElement(pair.second.burstCount); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = addNetElement(pair.second.randomSelectCount); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = addNetElement(pair.second.offsetRegion); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = addNetElement(pair.second.active); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = addNetElement(pair.second.burstEvent); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.emissionRate); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.burstCount); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.randomSelectCount); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.offsetRegion); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.active); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.burstEvent); !registered) return std::unexpected(std::move(registered.error()));
 
-    pair.second.burstEvent.setIgnoreOccurrencesOnNetLoad(true);
+    pair.second.burstEvent.set_ignore_occurrences_on_net_load(true);
   }
 
   for (auto& pair : m_lights) {
-    if (auto registered = addNetElement(pair.second.active); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = addNetElement(pair.second.xPosition); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = addNetElement(pair.second.yPosition); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = addNetElement(pair.second.color); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = addNetElement(pair.second.pointAngle); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.active); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.xPosition); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.yPosition); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.color); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.pointAngle); !registered) return std::unexpected(std::move(registered.error()));
 
-    pair.second.xPosition.setFixedPointBase(0.0125f);
-    pair.second.yPosition.setFixedPointBase(0.0125f);
-    pair.second.pointAngle.setFixedPointBase(0.01f);
+    pair.second.xPosition.set_fixed_point_base(0.0125f);
+    pair.second.yPosition.set_fixed_point_base(0.0125f);
+    pair.second.pointAngle.set_fixed_point_base(0.01f);
 
-    pair.second.xPosition.setInterpolator(lerp<float, float>);
-    pair.second.yPosition.setInterpolator(lerp<float, float>);
-    pair.second.pointAngle.setInterpolator(angle_lerp<float, float>);
+    pair.second.xPosition.set_interpolator(lerp<float, float>);
+    pair.second.yPosition.set_interpolator(lerp<float, float>);
+    pair.second.pointAngle.set_interpolator(angle_lerp<float, float>);
   }
 
   for (auto& pair : m_sounds) {
-    if (auto registered = addNetElement(pair.second.soundPool); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = addNetElement(pair.second.xPosition); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = addNetElement(pair.second.yPosition); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = addNetElement(pair.second.volumeTarget); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = addNetElement(pair.second.volumeRampTime); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = addNetElement(pair.second.pitchMultiplierTarget); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = addNetElement(pair.second.pitchMultiplierRampTime); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = addNetElement(pair.second.loops); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = addNetElement(pair.second.signals); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.soundPool); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.xPosition); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.yPosition); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.volumeTarget); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.volumeRampTime); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.pitchMultiplierTarget); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.pitchMultiplierRampTime); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.loops); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.signals); !registered) return std::unexpected(std::move(registered.error()));
 
-    pair.second.xPosition.setFixedPointBase(0.0125f);
-    pair.second.yPosition.setFixedPointBase(0.0125f);
+    pair.second.xPosition.set_fixed_point_base(0.0125f);
+    pair.second.yPosition.set_fixed_point_base(0.0125f);
 
-    pair.second.xPosition.setInterpolator(lerp<float, float>);
-    pair.second.yPosition.setInterpolator(lerp<float, float>);
+    pair.second.xPosition.set_interpolator(lerp<float, float>);
+    pair.second.yPosition.set_interpolator(lerp<float, float>);
   }
 
   for (auto& pair : m_effects)
-    if (auto registered = addNetElement(pair.second.enabled); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.enabled); !registered) return std::unexpected(std::move(registered.error()));
 
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::netElementsNeedLoad(bool initial) {
+std::expected<void, StarException> NetworkedAnimator::net_elements_need_load(bool initial) {
   for (auto& pair : m_stateInfo) {
-    if (pair.second.startedEvent.pullOccurred() || initial) {
+    if (pair.second.startedEvent.pull_occurred() || initial) {
       auto changed = m_animatedParts.setActiveStateIndex(pair.first, pair.second.stateIndex.get(), true, pair.second.reverse.get());
       if (!changed) return std::unexpected(std::move(changed.error()));
     }
   }
 
   for (auto& pair : m_rotationGroups) {
-    if (pair.second.netImmediateEvent.pullOccurred() || initial) {
+    if (pair.second.netImmediateEvent.pull_occurred() || initial) {
       pair.second.currentAngle = pair.second.targetAngle.get();
       pair.second.previousAngle = pair.second.currentAngle;
     }
@@ -2354,7 +2354,7 @@ std::expected<void, StarException> NetworkedAnimator::netElementsNeedLoad(bool i
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::netElementsNeedStore() {
+std::expected<void, StarException> NetworkedAnimator::net_elements_need_store() {
   for (auto& pair : m_stateInfo) {
     if (pair.second.wasUpdated || (version() < 1)) {
       pair.second.wasUpdated = false;

@@ -331,7 +331,7 @@ std::expected<Json, StarException> ItemDrop::diskStore() const {
   });
 }
 
-std::expected<ByteArray, StarException> ItemDrop::netStore(NetCompatibilityRules rules) const {
+std::expected<ByteArray, StarException> ItemDrop::net_store(NetCompatibilityRules rules) const {
   DataStreamBuffer ds;
   ds.set_stream_compatibility_version(rules);
   if (auto written = ds.write(itemSafeDescriptor(m_item)); !written)
@@ -437,24 +437,24 @@ std::expected<String, StarException> ItemDrop::description() const {
   return m_item->description();
 }
 
-std::expected<std::pair<ByteArray, std::uint64_t>, StarException> ItemDrop::writeNetState(std::uint64_t fromVersion, NetCompatibilityRules rules) {
-  return m_netGroup.writeNetState(fromVersion, rules);
+std::expected<std::pair<ByteArray, std::uint64_t>, StarException> ItemDrop::write_net_state(std::uint64_t fromVersion, NetCompatibilityRules rules) {
+  return m_netGroup.write_net_state(fromVersion, rules);
 }
 
-std::expected<void, StarException> ItemDrop::readNetState(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
-  return m_netGroup.readNetState(std::move(data), interpolationTime, rules);
+std::expected<void, StarException> ItemDrop::read_net_state(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
+  return m_netGroup.read_net_state(std::move(data), interpolationTime, rules);
 }
 
 std::expected<void, StarException> ItemDrop::enableInterpolation(float extrapolationHint) {
-  if (auto enabled = m_netGroup.enableNetInterpolation(extrapolationHint); !enabled)
+  if (auto enabled = m_netGroup.enable_net_interpolation(extrapolationHint); !enabled)
     return std::unexpected(std::move(enabled.error()));
-  if (auto disabled = m_mode.disableNetInterpolation(); !disabled)
+  if (auto disabled = m_mode.disable_net_interpolation(); !disabled)
     return std::unexpected(std::move(disabled.error()));
-  return m_owningEntity.disableNetInterpolation();
+  return m_owningEntity.disable_net_interpolation();
 }
 
 std::expected<void, StarException> ItemDrop::disableInterpolation() {
-  return m_netGroup.disableNetInterpolation();
+  return m_netGroup.disable_net_interpolation();
 }
 
 Vec2F ItemDrop::position() const {
@@ -556,7 +556,7 @@ std::expected<void, StarException> ItemDrop::update(float dt, std::uint64_t) {
       m_ageItemsTimer.setElapsedTime(0.0);
     }
   } else {
-    if (m_itemDescriptor.pullUpdated()) {
+    if (m_itemDescriptor.pull_updated()) {
       auto database = root().itemDatabase();
       if (!database)
         return std::unexpected(std::move(database.error()));
@@ -566,7 +566,7 @@ std::expected<void, StarException> ItemDrop::update(float dt, std::uint64_t) {
       if (!m_item)
         return std::unexpected(ItemException("Item drop network state contains no item"));
     }
-    if (auto ticked = m_netGroup.tickNetInterpolation(dt); !ticked)
+    if (auto ticked = m_netGroup.tick_net_interpolation(dt); !ticked)
       return std::unexpected(std::move(ticked.error()));
     if (m_owningEntity.get() != NullEntityId) {
       if (m_dropAge.elapsedTime() > 1.0f) {
@@ -793,13 +793,13 @@ std::expected<void, StarException> ItemDrop::initialize() {
     m_boundBox = RectF{-0.499, -0.499, 0.499, 0.499};
   if (auto applied = m_movementController->applyParameters(*parameters); !applied)
     return std::unexpected(std::move(applied.error()));
-  if (auto added = m_netGroup.addNetElement(m_mode); !added)
+  if (auto added = m_netGroup.add_net_element(m_mode); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = m_netGroup.addNetElement(m_owningEntity); !added)
+  if (auto added = m_netGroup.add_net_element(m_owningEntity); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = m_netGroup.addNetElement(*m_movementController); !added)
+  if (auto added = m_netGroup.add_net_element(*m_movementController); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = m_netGroup.addNetElement(m_itemDescriptor); !added)
+  if (auto added = m_netGroup.add_net_element(m_itemDescriptor); !added)
     return std::unexpected(std::move(added.error()));
   auto loadFloat = [&](String const& key, float& target) -> std::expected<void, StarException> {
     auto value = m_config.get_float(key);

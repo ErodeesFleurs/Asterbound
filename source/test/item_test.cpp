@@ -804,7 +804,7 @@ const GameTestRegistration inventory_delta_visibility(
     ASSERT_TRUE(source);
     (*source)->setPlayer(std::ref(**player));
     NetCompatibilityRules privileged(OpenProtocolVersion, true);
-    auto initial = (*source)->writeNetState(0, privileged);
+    auto initial = (*source)->write_net_state(0, privileged);
     ASSERT_TRUE(initial);
     auto item = inventoryTestItem(**database, "perfectlygenericitem", 2);
     ASSERT_TRUE(item);
@@ -815,14 +815,14 @@ const GameTestRegistration inventory_delta_visibility(
     for (bool admin : {admin_first, !admin_first}) {
       NetCompatibilityRules rules(OpenProtocolVersion, admin);
       if (!deltas.contains(rules)) {
-        auto delta = (*source)->writeNetState(initial->second, rules);
+        auto delta = (*source)->write_net_state(initial->second, rules);
         ASSERT_TRUE(delta);
         deltas[rules] = std::move(delta->first);
       }
       auto observer = NetElementTop<PlayerInventory>::create(root);
       ASSERT_TRUE(observer);
-      ASSERT_TRUE((*observer)->readNetState(initial->first, 0.0f, rules));
-      ASSERT_TRUE((*observer)->readNetState(deltas[rules], 0.0f, rules));
+      ASSERT_TRUE((*observer)->read_net_state(initial->first, 0.0f, rules));
+      ASSERT_TRUE((*observer)->read_net_state(deltas[rules], 0.0f, rules));
       auto received = (*observer)->swapSlotItem();
       EXPECT_EQ(received ? received->count() : 0u, admin ? 2u : 0u);
     }
@@ -852,9 +852,9 @@ const GameTestRegistration inventoryMutableTraversalAndNetworkNormalizeConsumpti
   }
   ASSERT_TRUE(master.setCustomBarPrimarySlot(0, InventorySlot(bagSlot)));
 
-  auto initial = master.writeNetState();
+  auto initial = master.write_net_state();
   ASSERT_TRUE(initial);
-  ASSERT_TRUE(slave.readNetState(initial->first));
+  ASSERT_TRUE(slave.read_net_state(initial->first));
   {
     auto current = slave.itemsAt(bagSlot);
     ASSERT_TRUE(current);
@@ -876,9 +876,9 @@ const GameTestRegistration inventoryMutableTraversalAndNetworkNormalizeConsumpti
   auto masterItems = master.allItems();
   ASSERT_TRUE(masterItems);
   EXPECT_TRUE(masterItems->empty());
-  auto delta = master.writeNetState(initial->second);
+  auto delta = master.write_net_state(initial->second);
   ASSERT_TRUE(delta);
-  ASSERT_TRUE(slave.readNetState(delta->first));
+  ASSERT_TRUE(slave.read_net_state(delta->first));
   auto slaveItems = slave.allItems();
   ASSERT_TRUE(slaveItems);
   EXPECT_TRUE(slaveItems->empty());
@@ -891,16 +891,16 @@ const GameTestRegistration inventoryMutableTraversalAndNetworkNormalizeConsumpti
     ASSERT_TRUE(swap);
     ASSERT_EQ(master.setItem(SwapSlot(), std::move(*swap)), true);
   }
-  auto liveSwap = master.writeNetState(delta->second);
+  auto liveSwap = master.write_net_state(delta->second);
   ASSERT_TRUE(liveSwap);
-  ASSERT_TRUE(slave.readNetState(liveSwap->first));
+  ASSERT_TRUE(slave.read_net_state(liveSwap->first));
   EXPECT_TRUE(slave.swapSlotItem());
   auto swapAlias = master.swapSlotItem();
   ASSERT_TRUE(swapAlias);
   ASSERT_TRUE(swapAlias->consume(1));
-  auto emptySwap = master.writeNetState(liveSwap->second);
+  auto emptySwap = master.write_net_state(liveSwap->second);
   ASSERT_TRUE(emptySwap);
-  ASSERT_TRUE(slave.readNetState(emptySwap->first));
+  ASSERT_TRUE(slave.read_net_state(emptySwap->first));
   EXPECT_FALSE(slave.swapSlotItem());
   EXPECT_EQ(swapAlias.use_count(), 1);
 

@@ -158,15 +158,15 @@ std::expected<std::shared_ptr<ActiveItem>, StarException> ActiveItem::create(Roo
       item->m_armAngle, item->m_facingDirection, item->m_damageSources,
       item->m_itemDamageSources, item->m_shieldPolys, item->m_itemShieldPolys,
       item->m_forceRegions, item->m_itemForceRegions}) {
-    auto added = item->addNetElement(element);
+    auto added = item->add_net_element(element);
     if (!added)
       return std::unexpected(std::move(added.error()));
   }
-  auto parametersAdded = item->addNetElement(item->m_scriptedAnimationParameters, false);
+  auto parametersAdded = item->add_net_element(item->m_scriptedAnimationParameters, false);
   if (!parametersAdded)
     return std::unexpected(std::move(parametersAdded.error()));
   item->m_holdingItem.set(true);
-  item->m_armAngle.setFixedPointBase(0.01f);
+  item->m_armAngle.set_fixed_point_base(0.01f);
   return item;
 }
 

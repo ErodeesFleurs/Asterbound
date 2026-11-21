@@ -127,7 +127,7 @@ std::expected<std::shared_ptr<Vehicle>, StarException> VehicleDatabase::create(S
   return Vehicle::create(m_root, configPair->get().second, configPair->get().first, extraConfig);
 }
 
-std::expected<ByteArray, StarException> VehicleDatabase::netStore(std::shared_ptr<Vehicle> const& vehicle, NetCompatibilityRules rules) const {
+std::expected<ByteArray, StarException> VehicleDatabase::net_store(std::shared_ptr<Vehicle> const& vehicle, NetCompatibilityRules rules) const {
   DataStreamBuffer ds;
   ds.set_stream_compatibility_version(rules);
   auto name = vehicle->baseConfig().get_string("name");
@@ -140,8 +140,8 @@ std::expected<ByteArray, StarException> VehicleDatabase::netStore(std::shared_pt
   return ds.take_data();
 }
 
-std::expected<std::shared_ptr<Vehicle>, StarException> VehicleDatabase::netLoad(ByteArray const& netStore, NetCompatibilityRules rules) const {
-  DataStreamReader ds(netStore.span());
+std::expected<std::shared_ptr<Vehicle>, StarException> VehicleDatabase::net_load(ByteArray const& net_store, NetCompatibilityRules rules) const {
+  DataStreamReader ds(net_store.span());
   ds.set_stream_compatibility_version(rules);
   auto name = ds.read<String>();
   if (!name)

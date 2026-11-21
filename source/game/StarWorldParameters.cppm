@@ -220,8 +220,8 @@ struct FloatingDungeonWorldParameters : VisitableWorldParameters {
 [[nodiscard]] std::expected<Json, StarException> diskStoreVisitableWorldParameters(std::shared_ptr<VisitableWorldParameters const> const& parameters);
 [[nodiscard]] std::expected<std::shared_ptr<VisitableWorldParameters>, StarException> diskLoadVisitableWorldParameters(Json const& store);
 
-[[nodiscard]] std::expected<ByteArray, StarException> netStoreVisitableWorldParameters(std::shared_ptr<VisitableWorldParameters const> const& parameters);
-[[nodiscard]] std::expected<std::shared_ptr<VisitableWorldParameters>, StarException> netLoadVisitableWorldParameters(ByteArray data);
+[[nodiscard]] std::expected<ByteArray, StarException> net_store_visitable_world_parameters(std::shared_ptr<VisitableWorldParameters const> const& parameters);
+[[nodiscard]] std::expected<std::shared_ptr<VisitableWorldParameters>, StarException> net_load_visitable_world_parameters(ByteArray data);
 
 [[nodiscard]] std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> generateTerrestrialWorldParameters(Root& root, String const& typeName, String const& sizeName, std::uint64_t seed);
 [[nodiscard]] std::expected<std::shared_ptr<AsteroidsWorldParameters>, StarException> generateAsteroidsWorldParameters(Root& root, std::uint64_t seed);
@@ -240,8 +240,8 @@ export namespace Star {
   using ::Star::WorldEdgeForceRegionTypeNames;
   using ::Star::diskStoreVisitableWorldParameters;
   using ::Star::diskLoadVisitableWorldParameters;
-  using ::Star::netStoreVisitableWorldParameters;
-  using ::Star::netLoadVisitableWorldParameters;
+  using ::Star::net_store_visitable_world_parameters;
+  using ::Star::net_load_visitable_world_parameters;
   using ::Star::generateTerrestrialWorldParameters;
   using ::Star::generateAsteroidsWorldParameters;
   using ::Star::generateFloatingDungeonWorldParameters;

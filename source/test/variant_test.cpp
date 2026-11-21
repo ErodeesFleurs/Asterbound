@@ -288,10 +288,10 @@ TEST(VariantSerialization, MonostateAndDuplicateAlternativeBytes) {
 
 TEST(VariantSerialization, DynamicGroupResetHasNoPayload) {
   NetElementDynamicGroup<NetElementGroup> master;
-  master.initNetVersion();
+  master.init_net_version();
 
   DataStreamBuffer stream;
-  auto written = master.writeNetDelta(stream, 0);
+  auto written = master.write_net_delta(stream, 0);
   ASSERT_TRUE(written);
   ASSERT_TRUE(*written);
   // Delta flag, change code, reset alternative, terminator: no marker payload.
@@ -302,12 +302,12 @@ TEST(VariantSerialization, DynamicGroupResetHasNoPayload) {
   ASSERT_TRUE(stream.write<std::uint8_t>(0x5a));
 
   NetElementDynamicGroup<NetElementGroup> slave;
-  auto added = slave.addNetElement(std::make_shared<NetElementGroup>());
+  auto added = slave.add_net_element(std::make_shared<NetElementGroup>());
   ASSERT_TRUE(added);
-  ASSERT_FALSE(slave.netElementIds().empty());
+  ASSERT_FALSE(slave.net_element_ids().empty());
   ASSERT_TRUE(stream.seek(0));
-  ASSERT_TRUE(slave.readNetDelta(stream));
-  EXPECT_TRUE(slave.netElementIds().empty());
+  ASSERT_TRUE(slave.read_net_delta(stream));
+  EXPECT_TRUE(slave.net_element_ids().empty());
   auto sentinel = stream.read<std::uint8_t>();
   ASSERT_TRUE(sentinel);
   EXPECT_EQ(*sentinel, 0x5a);

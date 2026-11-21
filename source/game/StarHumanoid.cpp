@@ -4056,15 +4056,15 @@ std::expected<std::shared_ptr<NetHumanoid>, StarException> NetHumanoid::create(R
   return wrapper;
 }
 
-std::expected<void, StarException> NetHumanoid::netStore(DataStream& ds, NetCompatibilityRules rules) const {
-  if (!checkWithRules(rules)) return {};
-  auto fields = ds << m_humanoid->identity() << m_humanoidParameters.baseMap() << m_config;
+std::expected<void, StarException> NetHumanoid::net_store(DataStream& ds, NetCompatibilityRules rules) const {
+  if (!check_with_rules(rules)) return {};
+  auto fields = ds << m_humanoid->identity() << m_humanoidParameters.base_map() << m_config;
   if (!fields) return std::unexpected(std::move(fields.error()));
-  return NetElementSyncGroup::netStore(ds, rules);
+  return NetElementSyncGroup::net_store(ds, rules);
 }
 
-std::expected<void, StarException> NetHumanoid::netLoad(DataStream& ds, NetCompatibilityRules rules) {
-  if (!checkWithRules(rules)) return {};
+std::expected<void, StarException> NetHumanoid::net_load(DataStream& ds, NetCompatibilityRules rules) {
+  if (!check_with_rules(rules)) return {};
   HumanoidIdentity identity;
   JsonObject parameters;
   Json config;
@@ -4077,16 +4077,16 @@ std::expected<void, StarException> NetHumanoid::netLoad(DataStream& ds, NetCompa
   m_humanoid = std::move(*humanoid);
   auto elements = setupNetElements();
   if (!elements) return std::unexpected(std::move(elements.error()));
-  return NetElementSyncGroup::netLoad(ds, rules);
+  return NetElementSyncGroup::net_load(ds, rules);
 }
 
-std::expected<void, StarException> NetHumanoid::netElementsNeedLoad(bool) {
+std::expected<void, StarException> NetHumanoid::net_elements_need_load(bool) {
   return {};
 }
 
-std::expected<void, StarException> NetHumanoid::netElementsNeedStore() {
-  if (m_humanoidParameters.pullUpdated())
-    return m_humanoid->setHumanoidParameters(m_humanoidParameters.baseMap());
+std::expected<void, StarException> NetHumanoid::net_elements_need_store() {
+  if (m_humanoidParameters.pull_updated())
+    return m_humanoid->setHumanoidParameters(m_humanoidParameters.base_map());
   return {};
 }
 
@@ -4095,7 +4095,7 @@ std::shared_ptr<Humanoid> NetHumanoid::humanoid() {
 }
 
 JsonObject NetHumanoid::humanoidParameters() {
-  return m_humanoidParameters.baseMap();
+  return m_humanoidParameters.base_map();
 }
 
 std::expected<void, StarException> NetHumanoid::setHumanoidParameters(JsonObject parameters) {
@@ -4104,9 +4104,9 @@ std::expected<void, StarException> NetHumanoid::setHumanoidParameters(JsonObject
 }
 
 std::expected<void, StarException> NetHumanoid::setupNetElements() {
-  clearNetElements();
-  auto animator = addNetElement(m_humanoid->networkedAnimator()->get());
+  clear_net_elements();
+  auto animator = add_net_element(m_humanoid->networkedAnimator()->get());
   if (!animator) return std::unexpected(std::move(animator.error()));
-  return addNetElement(m_humanoidParameters);
+  return add_net_element(m_humanoidParameters);
 }
 }

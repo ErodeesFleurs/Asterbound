@@ -328,7 +328,7 @@ return JsonObject{
   };
 }
 
-std::expected<ByteArray, StarException> Monster::netStore(NetCompatibilityRules rules) {
+std::expected<ByteArray, StarException> Monster::net_store(NetCompatibilityRules rules) {
   auto result42 = this->root().monsterDatabase();
 if (!result42) return std::unexpected(std::move(result42.error()));
 return std::move(*result42)->writeMonsterVariant(m_monsterVariant, rules);
@@ -526,23 +526,23 @@ Vec2F Monster::velocity() const {
   return m_movementController->velocity();
 }
 
-std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Monster::writeNetState(std::uint64_t fromVersion, NetCompatibilityRules rules) {
-  return m_netGroup.writeNetState(fromVersion, rules);
+std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Monster::write_net_state(std::uint64_t fromVersion, NetCompatibilityRules rules) {
+  return m_netGroup.write_net_state(fromVersion, rules);
 }
 
-std::expected<void, StarException> Monster::readNetState(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
-  return m_netGroup.readNetState(std::move(data), interpolationTime, rules);
+std::expected<void, StarException> Monster::read_net_state(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
+  return m_netGroup.read_net_state(std::move(data), interpolationTime, rules);
 }
 
 std::expected<void, StarException> Monster::enableInterpolation(float extrapolationHint) {
-  auto result89 = m_netGroup.enableNetInterpolation(extrapolationHint);
+  auto result89 = m_netGroup.enable_net_interpolation(extrapolationHint);
 if (!result89) return std::unexpected(std::move(result89.error()));
 
   return {};
 }
 
 std::expected<void, StarException> Monster::disableInterpolation() {
-  auto result90 = m_netGroup.disableNetInterpolation();
+  auto result90 = m_netGroup.disable_net_interpolation();
 if (!result90) return std::unexpected(std::move(result90.error()));
 
   return {};
@@ -944,7 +944,7 @@ if (!result144) return std::unexpected(std::move(result144.error()));
 if (!result145) return std::unexpected(std::move(result145.error()));
 
   } else {
-    auto result146 = m_netGroup.tickNetInterpolation(dt);
+    auto result146 = m_netGroup.tick_net_interpolation(dt);
 if (!result146) return std::unexpected(std::move(result146.error()));
 
 
@@ -1309,89 +1309,89 @@ std::expected<void, StarException> Monster::addChatMessage(String const& message
 }
 
 std::expected<void, StarException> Monster::setupNetStates() {
-  auto result212 = m_netGroup.addNetElement(m_uniqueIdNetState);
+  auto result212 = m_netGroup.add_net_element(m_uniqueIdNetState);
 if (!result212) return std::unexpected(std::move(result212.error()));
 
-  auto result213 = m_netGroup.addNetElement(m_teamNetState);
+  auto result213 = m_netGroup.add_net_element(m_teamNetState);
 if (!result213) return std::unexpected(std::move(result213.error()));
 
-  auto result214 = m_netGroup.addNetElement(m_monsterLevelNetState);
+  auto result214 = m_netGroup.add_net_element(m_monsterLevelNetState);
 if (!result214) return std::unexpected(std::move(result214.error()));
 
-  auto result215 = m_netGroup.addNetElement(m_damageOnTouchNetState);
+  auto result215 = m_netGroup.add_net_element(m_damageOnTouchNetState);
 if (!result215) return std::unexpected(std::move(result215.error()));
 
-  auto result216 = m_netGroup.addNetElement(m_damageSources);
+  auto result216 = m_netGroup.add_net_element(m_damageSources);
 if (!result216) return std::unexpected(std::move(result216.error()));
 
-  auto result217 = m_netGroup.addNetElement(m_aggressiveNetState);
+  auto result217 = m_netGroup.add_net_element(m_aggressiveNetState);
 if (!result217) return std::unexpected(std::move(result217.error()));
 
-  auto result218 = m_netGroup.addNetElement(m_knockedOutNetState);
+  auto result218 = m_netGroup.add_net_element(m_knockedOutNetState);
 if (!result218) return std::unexpected(std::move(result218.error()));
 
-  auto result219 = m_netGroup.addNetElement(m_deathParticleBurstNetState);
+  auto result219 = m_netGroup.add_net_element(m_deathParticleBurstNetState);
 if (!result219) return std::unexpected(std::move(result219.error()));
 
-  auto result220 = m_netGroup.addNetElement(m_deathSoundNetState);
+  auto result220 = m_netGroup.add_net_element(m_deathSoundNetState);
 if (!result220) return std::unexpected(std::move(result220.error()));
 
-  auto result221 = m_netGroup.addNetElement(m_activeSkillNameNetState);
+  auto result221 = m_netGroup.add_net_element(m_activeSkillNameNetState);
 if (!result221) return std::unexpected(std::move(result221.error()));
 
-  auto result222 = m_netGroup.addNetElement(m_name);
+  auto result222 = m_netGroup.add_net_element(m_name);
 if (!result222) return std::unexpected(std::move(result222.error()));
 
-  auto result223 = m_netGroup.addNetElement(m_displayNametag);
+  auto result223 = m_netGroup.add_net_element(m_displayNametag);
 if (!result223) return std::unexpected(std::move(result223.error()));
 
-  auto result224 = m_netGroup.addNetElement(m_dropPoolNetState);
+  auto result224 = m_netGroup.add_net_element(m_dropPoolNetState);
 if (!result224) return std::unexpected(std::move(result224.error()));
 
-  auto result225 = m_netGroup.addNetElement(m_physicsForces);
+  auto result225 = m_netGroup.add_net_element(m_physicsForces);
 if (!result225) return std::unexpected(std::move(result225.error()));
 
 
-  auto result226 = m_netGroup.addNetElement(*m_networkedAnimator);
+  auto result226 = m_netGroup.add_net_element(*m_networkedAnimator);
 if (!result226) return std::unexpected(std::move(result226.error()));
 
-  auto result227 = m_netGroup.addNetElement(*m_movementController);
+  auto result227 = m_netGroup.add_net_element(*m_movementController);
 if (!result227) return std::unexpected(std::move(result227.error()));
 
-  auto result228 = m_netGroup.addNetElement(*m_statusController);
+  auto result228 = m_netGroup.add_net_element(*m_statusController);
 if (!result228) return std::unexpected(std::move(result228.error()));
 
-  auto result229 = m_netGroup.addNetElement(*m_effectEmitter);
+  auto result229 = m_netGroup.add_net_element(*m_effectEmitter);
 if (!result229) return std::unexpected(std::move(result229.error()));
 
 
-  auto result230 = m_netGroup.addNetElement(m_newChatMessageEvent);
+  auto result230 = m_netGroup.add_net_element(m_newChatMessageEvent);
 if (!result230) return std::unexpected(std::move(result230.error()));
 
-  auto result231 = m_netGroup.addNetElement(m_chatMessage);
+  auto result231 = m_netGroup.add_net_element(m_chatMessage);
 if (!result231) return std::unexpected(std::move(result231.error()));
 
-  auto result232 = m_netGroup.addNetElement(m_chatPortrait);
+  auto result232 = m_netGroup.add_net_element(m_chatPortrait);
 if (!result232) return std::unexpected(std::move(result232.error()));
 
 
-  auto result233 = m_netGroup.addNetElement(m_damageBar);
+  auto result233 = m_netGroup.add_net_element(m_damageBar);
 if (!result233) return std::unexpected(std::move(result233.error()));
 
-  auto result234 = m_netGroup.addNetElement(m_interactive);
+  auto result234 = m_netGroup.add_net_element(m_interactive);
 if (!result234) return std::unexpected(std::move(result234.error()));
 
 
     // don't interpolate scripted animation parameters or animationdamageparts
-  auto result235 = m_netGroup.addNetElement(m_animationDamageParts, false);
+  auto result235 = m_netGroup.add_net_element(m_animationDamageParts, false);
 if (!result235) return std::unexpected(std::move(result235.error()));
 
-  auto result236 = m_netGroup.addNetElement(m_scriptedAnimationParameters, false);
+  auto result236 = m_netGroup.add_net_element(m_scriptedAnimationParameters, false);
 if (!result236) return std::unexpected(std::move(result236.error()));
 
 
-  m_netGroup.setNeedsLoadCallback([this](bool initial) { return getNetStates(initial); });
-  m_netGroup.setNeedsStoreCallback([this] { return setNetStates(); });
+  m_netGroup.set_needs_load_callback([this](bool initial) { return getNetStates(initial); });
+  m_netGroup.set_needs_store_callback([this] { return setNetStates(); });
   return {};
 }
 
@@ -1416,16 +1416,16 @@ std::expected<void, StarException> Monster::getNetStates(bool initial) {
   m_damageOnTouch = m_damageOnTouchNetState.get();
   m_aggressive = m_aggressiveNetState.get();
   m_knockedOut = m_knockedOutNetState.get();
-  if (m_deathParticleBurstNetState.pullUpdated())
+  if (m_deathParticleBurstNetState.pull_updated())
     m_deathParticleBurst = m_deathParticleBurstNetState.get();
-  if (m_deathSoundNetState.pullUpdated())
+  if (m_deathSoundNetState.pull_updated())
     m_deathSound = m_deathSoundNetState.get();
-  if (m_activeSkillNameNetState.pullUpdated())
+  if (m_activeSkillNameNetState.pull_updated())
     m_activeSkillName = m_activeSkillNameNetState.get();
-  if (m_dropPoolNetState.pullUpdated())
+  if (m_dropPoolNetState.pull_updated())
     m_dropPool = m_dropPoolNetState.get();
 
-  if (m_newChatMessageEvent.pullOccurred() && !initial) {
+  if (m_newChatMessageEvent.pull_occurred() && !initial) {
     if (m_chatPortrait.get().empty())
       {
   auto result237 = mouthPosition();

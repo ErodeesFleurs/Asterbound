@@ -63,7 +63,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, CelestialPlanet const& planet) {
-  auto bytes = planet.planetParameters.netStore();
+  auto bytes = planet.planetParameters.net_store();
   if (!bytes)
     return std::unexpected(std::move(bytes.error()));
   auto parameters = ds.write(*bytes);
@@ -75,7 +75,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
       auto writtenOrbit = stream.write(orbit);
       if (!writtenOrbit)
         return std::unexpected(std::move(writtenOrbit.error()));
-      auto bytes = parameters.netStore();
+      auto bytes = parameters.net_store();
       if (!bytes)
         return std::unexpected(std::move(bytes.error()));
       return stream.write(*bytes);
@@ -289,7 +289,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
                              auto writtenLocation = stream.write(location);
                              if (!writtenLocation)
                                return std::unexpected(std::move(writtenLocation.error()));
-                             auto bytes = parameters.netStore();
+                             auto bytes = parameters.net_store();
                              if (!bytes)
                                return std::unexpected(std::move(bytes.error()));
                              return stream.write(*bytes);

@@ -792,7 +792,7 @@ return JsonObject{
   };
 }
 
-std::expected<ByteArray, StarException> Plant::netStore(NetCompatibilityRules rules) const {
+std::expected<ByteArray, StarException> Plant::net_store(NetCompatibilityRules rules) const {
   DataStreamBuffer ds;
   ds.set_stream_compatibility_version(rules);
   auto result638 = ds.viwrite(m_tilePosition[0]);
@@ -815,7 +815,7 @@ if (!result645) return std::unexpected(std::move(result645.error()));
 if (!result646) return std::unexpected(std::move(result646.error()));
   auto result647 = ds.write(m_fallsWhenDead);
 if (!result647) return std::unexpected(std::move(result647.error()));
-  auto result648 = m_tileDamageStatus->netStore(ds, rules);
+  auto result648 = m_tileDamageStatus->net_store(ds, rules);
 if (!result648) return std::unexpected(std::move(result648.error()));
   auto result649 = writePieces();
 if (!result649) return std::unexpected(std::move(result649.error()));
@@ -1018,7 +1018,7 @@ if (!result420) return std::unexpected(std::move(result420.error()));
   return {};
 }
 
-std::expected<std::shared_ptr<Plant>, StarException> Plant::create(Root& rootContext, ByteArray const& netStore, NetCompatibilityRules rules) {
+std::expected<std::shared_ptr<Plant>, StarException> Plant::create(Root& rootContext, ByteArray const& net_store, NetCompatibilityRules rules) {
   struct MakeShared final : Plant {
     explicit MakeShared(Root& root) : Entity(root), Plant(root) {}
   };
@@ -1026,11 +1026,11 @@ std::expected<std::shared_ptr<Plant>, StarException> Plant::create(Root& rootCon
   auto damageStatus = EntityTileDamageStatus::create();
   if (!damageStatus) return std::unexpected(std::move(damageStatus.error()));
   entity->m_tileDamageStatus = std::move(*damageStatus);
-  if (auto result = entity->initialize(netStore, rules); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = entity->initialize(net_store, rules); !result) return std::unexpected(std::move(result.error()));
   return entity;
 }
 
-std::expected<void, StarException> Plant::initialize(ByteArray const& netStore, NetCompatibilityRules rules) {
+std::expected<void, StarException> Plant::initialize(ByteArray const& net_store, NetCompatibilityRules rules) {
   m_broken = false;
   m_tilePosition = Vec2I();
   m_ceiling = false;
@@ -1040,7 +1040,7 @@ std::expected<void, StarException> Plant::initialize(ByteArray const& netStore, 
   m_fallsWhenDead = false;
   m_piecesUpdated = true;
 
-  DataStreamReader ds(netStore.span());
+  DataStreamReader ds(net_store.span());
   ds.set_stream_compatibility_version(rules);
   auto result392 = ds.viread(m_tilePosition[0]);
 if (!result392) return std::unexpected(std::move(result392.error()));
@@ -1062,7 +1062,7 @@ if (!result399) return std::unexpected(std::move(result399.error()));
 if (!result400) return std::unexpected(std::move(result400.error()));
   auto result401 = ds.read(m_fallsWhenDead);
 if (!result401) return std::unexpected(std::move(result401.error()));
-  auto result402 = m_tileDamageStatus->netLoad(ds, rules);
+  auto result402 = m_tileDamageStatus->net_load(ds, rules);
 if (!result402) return std::unexpected(std::move(result402.error()));
   auto result403 = ds.read<ByteArray>();
 if (!result403) return std::unexpected(std::move(result403.error()));
@@ -1102,14 +1102,14 @@ if (!result636) return std::unexpected(std::move(result636.error()));
   return {};
 }
 
-std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Plant::writeNetState(std::uint64_t fromVersion, NetCompatibilityRules rules) {
-  auto result634 = m_netGroup.writeNetState(fromVersion, rules);
+std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Plant::write_net_state(std::uint64_t fromVersion, NetCompatibilityRules rules) {
+  auto result634 = m_netGroup.write_net_state(fromVersion, rules);
 if (!result634) return std::unexpected(std::move(result634.error()));
 return std::move(*result634);
 }
 
-std::expected<void, StarException> Plant::readNetState(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
-  return m_netGroup.readNetState(std::move(data), interpolationTime, rules);
+std::expected<void, StarException> Plant::read_net_state(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
+  return m_netGroup.read_net_state(std::move(data), interpolationTime, rules);
 }
 
 std::expected<void, StarException> Plant::enableInterpolation(float extrapolationHint) {
@@ -1117,14 +1117,14 @@ std::expected<void, StarException> Plant::enableInterpolation(float extrapolatio
   // generate PlantDrops so that they match when the PlantDrops appear.
   if (m_fallsWhenDead)
     {
-auto result632 = m_netGroup.enableNetInterpolation(extrapolationHint);
+auto result632 = m_netGroup.enable_net_interpolation(extrapolationHint);
 if (!result632) return std::unexpected(std::move(result632.error()));
 }
   return {};
 }
 
 std::expected<void, StarException> Plant::disableInterpolation() {
-  auto result631 = m_netGroup.disableNetInterpolation();
+  auto result631 = m_netGroup.disable_net_interpolation();
 if (!result631) return std::unexpected(std::move(result631.error()));
   return {};
 }
@@ -1282,7 +1282,7 @@ m_windLevel = std::move(*result622);
       m_windLevel += damageEffectPercentage * 20;
     }
 
-    auto result623 = m_netGroup.tickNetInterpolation(dt);
+    auto result623 = m_netGroup.tick_net_interpolation(dt);
 if (!result623) return std::unexpected(std::move(result623.error()));
   }
   return {};
@@ -1565,24 +1565,24 @@ if (!result595) return std::unexpected(std::move(result595.error()));
 }
 
 std::expected<void, StarException> Plant::setupNetStates() {
-  auto result590 = m_netGroup.addNetElement(*m_tileDamageStatus);
+  auto result590 = m_netGroup.add_net_element(*m_tileDamageStatus);
 if (!result590) return std::unexpected(std::move(result590.error()));
-  auto result591 = m_netGroup.addNetElement(m_piecesNetState);
+  auto result591 = m_netGroup.add_net_element(m_piecesNetState);
 if (!result591) return std::unexpected(std::move(result591.error()));
-  auto result592 = m_netGroup.addNetElement(m_tileDamageXNetState);
+  auto result592 = m_netGroup.add_net_element(m_tileDamageXNetState);
 if (!result592) return std::unexpected(std::move(result592.error()));
-  auto result593 = m_netGroup.addNetElement(m_tileDamageYNetState);
+  auto result593 = m_netGroup.add_net_element(m_tileDamageYNetState);
 if (!result593) return std::unexpected(std::move(result593.error()));
-  auto result594 = m_netGroup.addNetElement(m_tileDamageEventNetState);
+  auto result594 = m_netGroup.add_net_element(m_tileDamageEventNetState);
 if (!result594) return std::unexpected(std::move(result594.error()));
 
-m_netGroup.setNeedsStoreCallback([this]() { return setNetStates(); });
-m_netGroup.setNeedsLoadCallback([this](bool) { return getNetStates(); });
+m_netGroup.set_needs_store_callback([this]() { return setNetStates(); });
+m_netGroup.set_needs_load_callback([this](bool) { return getNetStates(); });
 return {};
 }
 
 std::expected<void, StarException> Plant::getNetStates() {
-  if (m_piecesNetState.pullUpdated()) {
+  if (m_piecesNetState.pull_updated()) {
     auto result589 = readPieces(m_piecesNetState.get());
 if (!result589) return std::unexpected(std::move(result589.error()));
     m_piecesUpdated = true;
@@ -1590,7 +1590,7 @@ if (!result589) return std::unexpected(std::move(result589.error()));
 
   m_tileDamageX = m_tileDamageXNetState.get();
   m_tileDamageY = m_tileDamageYNetState.get();
-  if (m_tileDamageEventNetState.pullOccurred()) {
+  if (m_tileDamageEventNetState.pull_occurred()) {
     m_tileDamageEvent = true;
     m_tileDamageEventTrigger = true;
   }

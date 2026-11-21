@@ -15,12 +15,12 @@ std::uint64_t NetElementVersion::increment() {
   return ++m_version;
 }
 
-std::expected<void, StarException> NetElement::enableNetInterpolation(float) { return {}; }
+std::expected<void, StarException> NetElement::enable_net_interpolation(float) { return {}; }
 
-std::expected<void, StarException> NetElement::disableNetInterpolation() { return {}; }
+std::expected<void, StarException> NetElement::disable_net_interpolation() { return {}; }
 
-std::expected<void, StarException> NetElement::tickNetInterpolation(float) { return {}; }
+std::expected<void, StarException> NetElement::tick_net_interpolation(float) { return {}; }
 
-std::expected<void, StarException> NetElement::blankNetDelta(float) { return {}; }
+std::expected<void, StarException> NetElement::blank_net_delta(float) { return {}; }
 
 }

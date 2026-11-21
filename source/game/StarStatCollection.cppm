@@ -74,8 +74,8 @@ private:
   };
 
   StatCollection() = default;
-  [[nodiscard]] std::expected<void, StarException> netElementsNeedLoad(bool full) override;
-  [[nodiscard]] std::expected<void, StarException> netElementsNeedStore() override;
+  [[nodiscard]] std::expected<void, StarException> net_elements_need_load(bool full) override;
+  [[nodiscard]] std::expected<void, StarException> net_elements_need_store() override;
 
   StatSet m_stats;
   // Config-only reset defaults: initialValue is absolute; initialPercentage is

@@ -242,7 +242,7 @@ std::expected<bool, StarException> SystemWorldClient::handleIncomingPacket(std::
       auto ship = m_ship && entry.first == m_ship->uuid() ? m_ship : getShip(entry.first);
       if (!ship)
         return std::unexpected(StarPacketException::format("System update references missing ship {}", entry.first.hex()));
-      auto updated = ship->readNetState(entry.second, SystemWorldTimestep);
+      auto updated = ship->read_net_state(entry.second, SystemWorldTimestep);
       if (!updated)
         return std::unexpected(std::move(updated.error()));
     }
@@ -250,12 +250,12 @@ std::expected<bool, StarException> SystemWorldClient::handleIncomingPacket(std::
       auto object = getObject(entry.first);
       if (!object)
         return std::unexpected(StarPacketException::format("System update references missing object {}", entry.first.hex()));
-      auto updated = object->readNetState(entry.second, SystemWorldTimestep);
+      auto updated = object->read_net_state(entry.second, SystemWorldTimestep);
       if (!updated)
         return std::unexpected(std::move(updated.error()));
     }
   } else if (auto created = as<SystemObjectCreatePacket>(packet)) {
-    auto object = netLoadObject(created->objectStore);
+    auto object = net_load_object(created->objectStore);
     if (!object)
       return std::unexpected(std::move(object.error()));
     auto uuid = (*object)->uuid();
@@ -266,7 +266,7 @@ std::expected<bool, StarException> SystemWorldClient::handleIncomingPacket(std::
     if (!removed)
       return std::unexpected(std::move(removed.error()));
   } else if (auto created = as<SystemShipCreatePacket>(packet)) {
-    auto ship = netLoadShip(created->shipStore);
+    auto ship = net_load_ship(created->shipStore);
     if (!ship)
       return std::unexpected(std::move(ship.error()));
     auto uuid = (*ship)->uuid();
@@ -278,14 +278,14 @@ std::expected<bool, StarException> SystemWorldClient::handleIncomingPacket(std::
     m_clientShips.clear();
     m_location = started->location;
     for (auto const& store : started->objectStores) {
-      auto object = netLoadObject(store);
+      auto object = net_load_object(store);
       if (!object)
         return std::unexpected(std::move(object.error()));
       auto uuid = (*object)->uuid();
       m_objects.set(uuid, std::move(*object));
     }
     for (auto const& store : started->shipStores) {
-      auto ship = netLoadShip(store);
+      auto ship = net_load_ship(store);
       if (!ship)
         return std::unexpected(std::move(ship.error()));
       auto uuid = (*ship)->uuid();
@@ -309,8 +309,8 @@ std::expected<bool, StarException> SystemWorldClient::handleIncomingPacket(std::
 
 List<std::shared_ptr<Packet>> SystemWorldClient::pullOutgoingPackets() { return std::exchange(m_outgoingPackets, {}); }
 
-std::expected<std::shared_ptr<SystemObject>, StarException> SystemWorldClient::netLoadObject(ByteArray netStore) {
-  DataStreamBuffer ds(std::move(netStore));
+std::expected<std::shared_ptr<SystemObject>, StarException> SystemWorldClient::net_load_object(ByteArray net_store) {
+  DataStreamBuffer ds(std::move(net_store));
   auto uuid = ds.read<Uuid>();
   if (!uuid)
     return std::unexpected(std::move(uuid.error()));
@@ -329,8 +329,8 @@ std::expected<std::shared_ptr<SystemObject>, StarException> SystemWorldClient::n
   return SystemObject::create(root(), std::move(*config), std::move(*uuid), *position, std::move(*parameters));
 }
 
-std::expected<std::shared_ptr<SystemClientShip>, StarException> SystemWorldClient::netLoadShip(ByteArray netStore) {
-  DataStreamBuffer ds(std::move(netStore));
+std::expected<std::shared_ptr<SystemClientShip>, StarException> SystemWorldClient::net_load_ship(ByteArray net_store) {
+  DataStreamBuffer ds(std::move(net_store));
   auto uuid = ds.read<Uuid>();
   if (!uuid)
     return std::unexpected(std::move(uuid.error()));

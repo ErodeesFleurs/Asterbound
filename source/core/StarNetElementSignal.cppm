@@ -18,19 +18,19 @@ namespace Star {
 template <typename Signal>
 class NetElementSignal : public NetElement {
 public:
-  NetElementSignal(std::size_t maxSignalQueue = 32);
+  NetElementSignal(std::size_t max_signal_queue = 32);
 
-  void initNetVersion(std::optional<std::reference_wrapper<NetElementVersion const>> version = std::nullopt) override;
+  void init_net_version(std::optional<std::reference_wrapper<NetElementVersion const>> version = std::nullopt) override;
 
-  [[nodiscard]] std::expected<void, StarException> netStore(DataStream& ds, NetCompatibilityRules rules = {}) const override;
-  [[nodiscard]] std::expected<void, StarException> netLoad(DataStream& ds, NetCompatibilityRules rules) override;
+  [[nodiscard]] std::expected<void, StarException> net_store(DataStream& ds, NetCompatibilityRules rules = {}) const override;
+  [[nodiscard]] std::expected<void, StarException> net_load(DataStream& ds, NetCompatibilityRules rules) override;
 
-  [[nodiscard]] std::expected<void, StarException> enableNetInterpolation(float extrapolationHint = 0.0f) override;
-  [[nodiscard]] std::expected<void, StarException> disableNetInterpolation() override;
-  [[nodiscard]] std::expected<void, StarException> tickNetInterpolation(float dt) override;
+  [[nodiscard]] std::expected<void, StarException> enable_net_interpolation(float extrapolation_hint = 0.0f) override;
+  [[nodiscard]] std::expected<void, StarException> disable_net_interpolation() override;
+  [[nodiscard]] std::expected<void, StarException> tick_net_interpolation(float dt) override;
 
-  [[nodiscard]] std::expected<bool, StarException> writeNetDelta(DataStream& ds, std::uint64_t fromVersion, NetCompatibilityRules rules = {}) const override;
-  [[nodiscard]] std::expected<void, StarException> readNetDelta(DataStream& ds, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
+  [[nodiscard]] std::expected<bool, StarException> write_net_delta(DataStream& ds, std::uint64_t from_version, NetCompatibilityRules rules = {}) const override;
+  [[nodiscard]] std::expected<void, StarException> read_net_delta(DataStream& ds, float interpolation_time = 0.0f, NetCompatibilityRules rules = {}) override;
 
   void send(Signal signal);
   List<Signal> receive();
@@ -42,77 +42,77 @@ private:
     bool received;
   };
 
-  std::size_t m_maxSignalQueue;
-  std::optional<std::reference_wrapper<NetElementVersion const>> m_netVersion = std::nullopt;
-  bool m_netInterpolationEnabled = false;
+  std::size_t m_max_signal_queue;
+  std::optional<std::reference_wrapper<NetElementVersion const>> m_net_version = std::nullopt;
+  bool m_net_interpolation_enabled = false;
   Deque<SignalEntry> m_signals;
-  Deque<std::pair<float, Signal>> m_pendingSignals;
+  Deque<std::pair<float, Signal>> m_pending_signals;
 };
 
 template <typename Signal>
-NetElementSignal<Signal>::NetElementSignal(std::size_t maxSignalQueue) {
-  m_maxSignalQueue = maxSignalQueue;
+NetElementSignal<Signal>::NetElementSignal(std::size_t max_signal_queue) {
+  m_max_signal_queue = max_signal_queue;
 }
 
 template <typename Signal>
-void NetElementSignal<Signal>::initNetVersion(std::optional<std::reference_wrapper<NetElementVersion const>> version) {
-  m_netVersion = version;
+void NetElementSignal<Signal>::init_net_version(std::optional<std::reference_wrapper<NetElementVersion const>> version) {
+  m_net_version = version;
   m_signals.clear();
 }
 
 template <typename Signal>
-[[nodiscard]] std::expected<void, StarException> NetElementSignal<Signal>::netStore(DataStream&, NetCompatibilityRules) const { return {}; }
+[[nodiscard]] std::expected<void, StarException> NetElementSignal<Signal>::net_store(DataStream&, NetCompatibilityRules) const { return {}; }
 
 template <typename Signal>
-[[nodiscard]] std::expected<void, StarException> NetElementSignal<Signal>::netLoad(DataStream&, NetCompatibilityRules) {
+[[nodiscard]] std::expected<void, StarException> NetElementSignal<Signal>::net_load(DataStream&, NetCompatibilityRules) {
   return {};
 }
 
 template <typename Signal>
-[[nodiscard]] std::expected<void, StarException> NetElementSignal<Signal>::enableNetInterpolation(float) {
-  m_netInterpolationEnabled = true;
+[[nodiscard]] std::expected<void, StarException> NetElementSignal<Signal>::enable_net_interpolation(float) {
+  m_net_interpolation_enabled = true;
   return {};
 }
 
 template <typename Signal>
-[[nodiscard]] std::expected<void, StarException> NetElementSignal<Signal>::disableNetInterpolation() {
-  m_netInterpolationEnabled = false;
-  for (auto& p : std::exchange(m_pendingSignals, {}))
+[[nodiscard]] std::expected<void, StarException> NetElementSignal<Signal>::disable_net_interpolation() {
+  m_net_interpolation_enabled = false;
+  for (auto& p : std::exchange(m_pending_signals, {}))
     send(std::move(p.second));
   return {};
 }
 
 template <typename Signal>
-[[nodiscard]] std::expected<void, StarException> NetElementSignal<Signal>::tickNetInterpolation(float dt) {
-  for (auto& p : m_pendingSignals)
+[[nodiscard]] std::expected<void, StarException> NetElementSignal<Signal>::tick_net_interpolation(float dt) {
+  for (auto& p : m_pending_signals)
     p.first -= dt;
 
-  while (!m_pendingSignals.empty() && m_pendingSignals.front().first <= 0.0f) {
-    send(std::move(m_pendingSignals.front().second));
-    m_pendingSignals.pop_front();
+  while (!m_pending_signals.empty() && m_pending_signals.front().first <= 0.0f) {
+    send(std::move(m_pending_signals.front().second));
+    m_pending_signals.pop_front();
   }
   return {};
 }
 
 template <typename Signal>
-[[nodiscard]] std::expected<bool, StarException> NetElementSignal<Signal>::writeNetDelta(DataStream& ds, std::uint64_t fromVersion, NetCompatibilityRules rules) const {
-  if (!checkWithRules(rules)) return false;
-  std::size_t numToWrite = 0;
+[[nodiscard]] std::expected<bool, StarException> NetElementSignal<Signal>::write_net_delta(DataStream& ds, std::uint64_t from_version, NetCompatibilityRules rules) const {
+  if (!check_with_rules(rules)) return false;
+  std::size_t num_to_write = 0;
   for (auto const& p : m_signals) {
-    if (p.version >= fromVersion)
-      ++numToWrite;
+    if (p.version >= from_version)
+      ++num_to_write;
   }
-  if (numToWrite == 0)
+  if (num_to_write == 0)
     return false;
 
   {
-    auto result = ds.write_vlq_u(numToWrite);
+    auto result = ds.write_vlq_u(num_to_write);
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
 
   for (auto const& p : m_signals) {
-    if (p.version >= fromVersion)
+    if (p.version >= from_version)
       { auto result = ds.write(p.signal); if (!result) return std::unexpected(std::move(result.error())); }
   }
 
@@ -120,20 +120,20 @@ template <typename Signal>
 }
 
 template <typename Signal>
-[[nodiscard]] std::expected<void, StarException> NetElementSignal<Signal>::readNetDelta(DataStream& ds, float interpolationTime, NetCompatibilityRules rules) {
-  if (!checkWithRules(rules)) return {};
+[[nodiscard]] std::expected<void, StarException> NetElementSignal<Signal>::read_net_delta(DataStream& ds, float interpolation_time, NetCompatibilityRules rules) {
+  if (!check_with_rules(rules)) return {};
   auto count = ds.read_vlq_u();
   if (!count) return std::unexpected(std::move(count.error()));
-  std::size_t numToRead = *count;
-  for (std::size_t i = 0; i < numToRead; ++i) {
+  std::size_t num_to_read = *count;
+  for (std::size_t i = 0; i < num_to_read; ++i) {
     Signal s;
     { auto result = ds.read(s); if (!result) return std::unexpected(std::move(result.error())); }
-    if (m_netInterpolationEnabled && interpolationTime > 0.0f) {
-      if (!m_pendingSignals.empty() && m_pendingSignals.back().first > interpolationTime) {
-        for (auto& p : std::exchange(m_pendingSignals, {}))
+    if (m_net_interpolation_enabled && interpolation_time > 0.0f) {
+      if (!m_pending_signals.empty() && m_pending_signals.back().first > interpolation_time) {
+        for (auto& p : std::exchange(m_pending_signals, {}))
           send(std::move(p.second));
       }
-      m_pendingSignals.push_back({interpolationTime, std::move(s)});
+      m_pending_signals.push_back({interpolation_time, std::move(s)});
     } else {
       send(std::move(s));
     }
@@ -143,8 +143,8 @@ template <typename Signal>
 
 template <typename Signal>
 void NetElementSignal<Signal>::send(Signal signal) {
-  m_signals.emplace_back(m_netVersion ? m_netVersion->get().current() : 0, std::move(signal), false);
-  while (m_signals.size() > m_maxSignalQueue)
+  m_signals.emplace_back(m_net_version ? m_net_version->get().current() : 0, std::move(signal), false);
+  while (m_signals.size() > m_max_signal_queue)
     m_signals.pop_front();
 }
 

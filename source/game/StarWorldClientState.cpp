@@ -49,22 +49,22 @@ std::expected<std::shared_ptr<WorldClientState>, StarException> WorldClientState
   auto state = std::shared_ptr<WorldClientState>(new WorldClientState());
   state->m_windowMonitoringBorder = *windowBorder;
   state->m_presenceEntityMonitoringBorder = *presenceBorder;
-  auto registered = state->m_netGroup.addNetElement(state->m_windowXMin);
+  auto registered = state->m_netGroup.add_net_element(state->m_windowXMin);
   if (!registered)
     return std::unexpected(std::move(registered.error()));
-  registered = state->m_netGroup.addNetElement(state->m_windowYMin);
+  registered = state->m_netGroup.add_net_element(state->m_windowYMin);
   if (!registered)
     return std::unexpected(std::move(registered.error()));
-  registered = state->m_netGroup.addNetElement(state->m_windowWidth);
+  registered = state->m_netGroup.add_net_element(state->m_windowWidth);
   if (!registered)
     return std::unexpected(std::move(registered.error()));
-  registered = state->m_netGroup.addNetElement(state->m_windowHeight);
+  registered = state->m_netGroup.add_net_element(state->m_windowHeight);
   if (!registered)
     return std::unexpected(std::move(registered.error()));
-  registered = state->m_netGroup.addNetElement(state->m_playerId);
+  registered = state->m_netGroup.add_net_element(state->m_playerId);
   if (!registered)
     return std::unexpected(std::move(registered.error()));
-  registered = state->m_netGroup.addNetElement(state->m_clientPresenceEntities);
+  registered = state->m_netGroup.add_net_element(state->m_clientPresenceEntities);
   if (!registered)
     return std::unexpected(std::move(registered.error()));
   return state;
@@ -130,7 +130,7 @@ List<RectI> WorldClientState::monitoringRegions(std::function<std::optional<Rect
 }
 
 std::expected<ByteArray, StarException> WorldClientState::writeDelta() {
-  auto state = m_netGroup.writeNetState(m_netVersion, m_netCompatibilityRules);
+  auto state = m_netGroup.write_net_state(m_netVersion, m_netCompatibilityRules);
   if (!state)
     return std::unexpected(std::move(state.error()));
   m_netVersion = state->second;
@@ -138,7 +138,7 @@ std::expected<ByteArray, StarException> WorldClientState::writeDelta() {
 }
 
 std::expected<void, StarException> WorldClientState::readDelta(ByteArray delta) {
-  return m_netGroup.readNetState(std::move(delta), 0.0f, m_netCompatibilityRules);
+  return m_netGroup.read_net_state(std::move(delta), 0.0f, m_netCompatibilityRules);
 }
 
 void WorldClientState::setNetCompatibilityRules(NetCompatibilityRules netCompatibilityRules) {

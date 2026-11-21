@@ -263,8 +263,8 @@ std::expected<std::shared_ptr<Player>, StarException> PlayerFactory::diskLoadPla
   return std::move(*player);
 }
 
-std::expected<std::shared_ptr<Player>, StarException> PlayerFactory::netLoadPlayer(ByteArray const& netStore, NetCompatibilityRules rules) const {
-  return Player::create(m_root, m_config, netStore, rules);
+std::expected<std::shared_ptr<Player>, StarException> PlayerFactory::net_load_player(ByteArray const& net_store, NetCompatibilityRules rules) const {
+  return Player::create(m_root, m_config, net_store, rules);
 }
 
 }

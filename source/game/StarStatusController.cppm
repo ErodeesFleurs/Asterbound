@@ -61,10 +61,10 @@ class ActorMovementController;
 
 class StatusPropertyMap final : public NetElementHashMap<String, Json> {
 public:
-  [[nodiscard]] std::expected<void, StarException> netStore(DataStream& ds, NetCompatibilityRules rules) const override;
-  [[nodiscard]] std::expected<void, StarException> netLoad(DataStream& ds, NetCompatibilityRules rules) override;
-  [[nodiscard]] std::expected<bool, StarException> writeNetDelta(DataStream& ds, std::uint64_t from_version, NetCompatibilityRules rules) const override;
-  [[nodiscard]] std::expected<void, StarException> readNetDelta(DataStream& ds, float interpolation_time, NetCompatibilityRules rules) override;
+  [[nodiscard]] std::expected<void, StarException> net_store(DataStream& ds, NetCompatibilityRules rules) const override;
+  [[nodiscard]] std::expected<void, StarException> net_load(DataStream& ds, NetCompatibilityRules rules) override;
+  [[nodiscard]] std::expected<bool, StarException> write_net_delta(DataStream& ds, std::uint64_t from_version, NetCompatibilityRules rules) const override;
+  [[nodiscard]] std::expected<void, StarException> read_net_delta(DataStream& ds, float interpolation_time, NetCompatibilityRules rules) override;
 };
 
 class StatusController : public NetElement {
@@ -154,18 +154,18 @@ public:
   [[nodiscard]] std::expected<void, StarException> init(Entity& parentEntity, ActorMovementController& movementController);
   [[nodiscard]] std::expected<void, StarException> uninit();
 
-  void initNetVersion(std::optional<std::reference_wrapper<NetElementVersion const>> version = std::nullopt) override;
+  void init_net_version(std::optional<std::reference_wrapper<NetElementVersion const>> version = std::nullopt) override;
 
-  [[nodiscard]] std::expected<void, StarException> netStore(DataStream& ds, NetCompatibilityRules rules = {}) const override;
-  [[nodiscard]] std::expected<void, StarException> netLoad(DataStream& ds, NetCompatibilityRules rules) override;
+  [[nodiscard]] std::expected<void, StarException> net_store(DataStream& ds, NetCompatibilityRules rules = {}) const override;
+  [[nodiscard]] std::expected<void, StarException> net_load(DataStream& ds, NetCompatibilityRules rules) override;
 
-  [[nodiscard]] std::expected<void, StarException> enableNetInterpolation(float extrapolationHint = 0.0f) override;
-  [[nodiscard]] std::expected<void, StarException> disableNetInterpolation() override;
-  [[nodiscard]] std::expected<void, StarException> tickNetInterpolation(float dt) override;
+  [[nodiscard]] std::expected<void, StarException> enable_net_interpolation(float extrapolationHint = 0.0f) override;
+  [[nodiscard]] std::expected<void, StarException> disable_net_interpolation() override;
+  [[nodiscard]] std::expected<void, StarException> tick_net_interpolation(float dt) override;
 
-  [[nodiscard]] std::expected<bool, StarException> writeNetDelta(DataStream& ds, std::uint64_t fromVersion, NetCompatibilityRules rules = {}) const override;
-  [[nodiscard]] std::expected<void, StarException> readNetDelta(DataStream& ds, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
-  [[nodiscard]] std::expected<void, StarException> blankNetDelta(float interpolationTime) override;
+  [[nodiscard]] std::expected<bool, StarException> write_net_delta(DataStream& ds, std::uint64_t fromVersion, NetCompatibilityRules rules = {}) const override;
+  [[nodiscard]] std::expected<void, StarException> read_net_delta(DataStream& ds, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
+  [[nodiscard]] std::expected<void, StarException> blank_net_delta(float interpolationTime) override;
 
   [[nodiscard]] std::expected<void, StarException> tickMaster(float dt);
   [[nodiscard]] std::expected<void, StarException> tickSlave(float dt);
@@ -192,18 +192,18 @@ private:
     explicit EffectAnimator(Root& root);
     [[nodiscard]] static std::expected<std::shared_ptr<EffectAnimator>, StarException> create(Root& root, std::optional<String> animationConfig = {});
 
-    void initNetVersion(std::optional<std::reference_wrapper<NetElementVersion const>> version = std::nullopt) override;
+    void init_net_version(std::optional<std::reference_wrapper<NetElementVersion const>> version = std::nullopt) override;
 
-    [[nodiscard]] std::expected<void, StarException> netStore(DataStream& ds, NetCompatibilityRules rules = {}) const override;
-    [[nodiscard]] std::expected<void, StarException> netLoad(DataStream& ds, NetCompatibilityRules rules) override;
+    [[nodiscard]] std::expected<void, StarException> net_store(DataStream& ds, NetCompatibilityRules rules = {}) const override;
+    [[nodiscard]] std::expected<void, StarException> net_load(DataStream& ds, NetCompatibilityRules rules) override;
 
-    [[nodiscard]] std::expected<void, StarException> enableNetInterpolation(float extrapolationHint = 0.0f) override;
-    [[nodiscard]] std::expected<void, StarException> disableNetInterpolation() override;
-    [[nodiscard]] std::expected<void, StarException> tickNetInterpolation(float dt) override;
+    [[nodiscard]] std::expected<void, StarException> enable_net_interpolation(float extrapolationHint = 0.0f) override;
+    [[nodiscard]] std::expected<void, StarException> disable_net_interpolation() override;
+    [[nodiscard]] std::expected<void, StarException> tick_net_interpolation(float dt) override;
 
-    [[nodiscard]] std::expected<bool, StarException> writeNetDelta(DataStream& ds, std::uint64_t fromVersion, NetCompatibilityRules rules = {}) const override;
-    [[nodiscard]] std::expected<void, StarException> readNetDelta(DataStream& ds, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
-    [[nodiscard]] std::expected<void, StarException> blankNetDelta(float interpolationTime) override;
+    [[nodiscard]] std::expected<bool, StarException> write_net_delta(DataStream& ds, std::uint64_t fromVersion, NetCompatibilityRules rules = {}) const override;
+    [[nodiscard]] std::expected<void, StarException> read_net_delta(DataStream& ds, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
+    [[nodiscard]] std::expected<void, StarException> blank_net_delta(float interpolationTime) override;
 
     Root& m_root;
     std::optional<String> animationConfig;
@@ -216,8 +216,8 @@ private:
     UniqueEffectMetadata();
     [[nodiscard]] static std::expected<std::shared_ptr<UniqueEffectMetadata>, StarException> create(UniqueStatusEffect effect = {}, std::optional<float> duration = {}, std::optional<EntityId> sourceEntityId = {});
 
-    [[nodiscard]] std::expected<void, StarException> netElementsNeedLoad(bool full) override;
-    [[nodiscard]] std::expected<void, StarException> netElementsNeedStore() override;
+    [[nodiscard]] std::expected<void, StarException> net_elements_need_load(bool full) override;
+    [[nodiscard]] std::expected<void, StarException> net_elements_need_store() override;
 
     UniqueStatusEffect effect;
     std::optional<float> duration;

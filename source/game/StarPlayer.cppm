@@ -156,7 +156,7 @@ public:
 
   [[nodiscard]] static std::expected<std::shared_ptr<Player>, StarException> create(Root& root, std::shared_ptr<PlayerConfig> config);
   [[nodiscard]] static std::expected<std::shared_ptr<Player>, StarException> create(Root& root, std::shared_ptr<PlayerConfig> config, Uuid uuid);
-  [[nodiscard]] static std::expected<std::shared_ptr<Player>, StarException> create(Root& root, std::shared_ptr<PlayerConfig> config, ByteArray const& netStore, NetCompatibilityRules rules = {});
+  [[nodiscard]] static std::expected<std::shared_ptr<Player>, StarException> create(Root& root, std::shared_ptr<PlayerConfig> config, ByteArray const& net_store, NetCompatibilityRules rules = {});
   [[nodiscard]] static std::expected<std::shared_ptr<Player>, StarException> create(Root& root, std::shared_ptr<PlayerConfig> config, Json const& diskStore);
 
   [[nodiscard]] std::expected<void, StarException> diskLoad(Json const& diskStore);
@@ -176,7 +176,7 @@ public:
   std::shared_ptr<QuestManager> questManager() const;
 
   [[nodiscard]] std::expected<Json, StarException> diskStore();
-  [[nodiscard]] std::expected<ByteArray, StarException> netStore(NetCompatibilityRules rules = {});
+  [[nodiscard]] std::expected<ByteArray, StarException> net_store(NetCompatibilityRules rules = {});
 
   EntityType entityType() const override;
   ClientEntityMode clientEntityMode() const override;
@@ -202,8 +202,8 @@ public:
   // relative to current position
   RectF collisionArea() const override;
 
-  [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> writeNetState(std::uint64_t fromVersion = 0, NetCompatibilityRules rules = {}) override;
-  [[nodiscard]] std::expected<void, StarException> readNetState(ByteArray data, float interpolationStep = 0.0f, NetCompatibilityRules rules = {}) override;
+  [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> write_net_state(std::uint64_t fromVersion = 0, NetCompatibilityRules rules = {}) override;
+  [[nodiscard]] std::expected<void, StarException> read_net_state(ByteArray data, float interpolationStep = 0.0f, NetCompatibilityRules rules = {}) override;
 
   [[nodiscard]] std::expected<void, StarException> enableInterpolation(float extrapolationHint = 0.0f) override;
   [[nodiscard]] std::expected<void, StarException> disableInterpolation() override;
@@ -613,7 +613,7 @@ public:
 private:
   explicit Player(Root& root);
   [[nodiscard]] std::expected<void, StarException> initialize(std::shared_ptr<PlayerConfig> config, Uuid uuid);
-  [[nodiscard]] std::expected<void, StarException> netLoad(ByteArray const& store, NetCompatibilityRules rules);
+  [[nodiscard]] std::expected<void, StarException> net_load(ByteArray const& store, NetCompatibilityRules rules);
   [[nodiscard]] std::expected<void, StarException> installHumanoid();
   using GenericScriptComponent = LuaActorScript;
 

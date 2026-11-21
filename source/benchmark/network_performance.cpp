@@ -255,10 +255,10 @@ std::expected<void, StarException> consumeSnapshot(Root& root, SnapshotFixture& 
       if (updateSetSeen || client.entities.contains(create->entityId))
         return std::unexpected(
           StarException("Entity creation did not precede update sets or duplicated a visible entity"));
-      auto entity = (*factory)->netLoadEntity(create->entityType, create->storeData, client.rules);
+      auto entity = (*factory)->net_load_entity(create->entityType, create->storeData, client.rules);
       if (!entity)
         return std::unexpected(std::move(entity.error()));
-      auto read = (*entity)->readNetState(create->firstNetState, 0.0f, client.rules);
+      auto read = (*entity)->read_net_state(create->firstNetState, 0.0f, client.rules);
       if (!read)
         return std::unexpected(std::move(read.error()));
       client.entities.emplace(create->entityId, std::move(*entity));
@@ -269,7 +269,7 @@ std::expected<void, StarException> consumeSnapshot(Root& root, SnapshotFixture& 
         auto entity = client.entities.find(id);
         if (entity == client.entities.end())
           return std::unexpected(StarException("Entity delta arrived before creation"));
-        auto read = entity->second->readNetState(delta, 0.0f, client.rules);
+        auto read = entity->second->read_net_state(delta, 0.0f, client.rules);
         if (!read)
           return std::unexpected(std::move(read.error()));
         ++fixture.deltas;

@@ -69,33 +69,33 @@ namespace Star {
 Sky::Sky(Root& root) : m_root(root) {
   m_netInit = false;
 
-  m_netGroup.setNeedsLoadCallback([this](bool) { return readNetStates(); });
-  m_netGroup.setNeedsStoreCallback([this]() { return writeNetStates(); });
+  m_netGroup.set_needs_load_callback([this](bool) { return readNetStates(); });
+  m_netGroup.set_needs_store_callback([this]() { return writeNetStates(); });
 }
 
 std::expected<std::shared_ptr<Sky>, StarException> Sky::create(Root& root) {
   auto sky = std::shared_ptr<Sky>(new Sky(root));
   auto settings = sky->skyParametersUpdated();
   if (!settings) return std::unexpected(std::move(settings.error()));
-  auto element0 = sky->m_netGroup.addNetElement(sky->m_skyParametersNetState);
+  auto element0 = sky->m_netGroup.add_net_element(sky->m_skyParametersNetState);
   if (!element0) return std::unexpected(std::move(element0.error()));
-  auto element1 = sky->m_netGroup.addNetElement(sky->m_skyTypeNetState);
+  auto element1 = sky->m_netGroup.add_net_element(sky->m_skyTypeNetState);
   if (!element1) return std::unexpected(std::move(element1.error()));
-  auto element2 = sky->m_netGroup.addNetElement(sky->m_timeNetState);
+  auto element2 = sky->m_netGroup.add_net_element(sky->m_timeNetState);
   if (!element2) return std::unexpected(std::move(element2.error()));
-  auto element3 = sky->m_netGroup.addNetElement(sky->m_flyingTypeNetState);
+  auto element3 = sky->m_netGroup.add_net_element(sky->m_flyingTypeNetState);
   if (!element3) return std::unexpected(std::move(element3.error()));
-  auto element4 = sky->m_netGroup.addNetElement(sky->m_enterHyperspaceNetState);
+  auto element4 = sky->m_netGroup.add_net_element(sky->m_enterHyperspaceNetState);
   if (!element4) return std::unexpected(std::move(element4.error()));
-  auto element5 = sky->m_netGroup.addNetElement(sky->m_startInWarpNetState);
+  auto element5 = sky->m_netGroup.add_net_element(sky->m_startInWarpNetState);
   if (!element5) return std::unexpected(std::move(element5.error()));
-  auto element6 = sky->m_netGroup.addNetElement(sky->m_worldMoveNetState);
+  auto element6 = sky->m_netGroup.add_net_element(sky->m_worldMoveNetState);
   if (!element6) return std::unexpected(std::move(element6.error()));
-  auto element7 = sky->m_netGroup.addNetElement(sky->m_starMoveNetState);
+  auto element7 = sky->m_netGroup.add_net_element(sky->m_starMoveNetState);
   if (!element7) return std::unexpected(std::move(element7.error()));
-  auto element8 = sky->m_netGroup.addNetElement(sky->m_warpPhaseNetState);
+  auto element8 = sky->m_netGroup.add_net_element(sky->m_warpPhaseNetState);
   if (!element8) return std::unexpected(std::move(element8.error()));
-  auto element9 = sky->m_netGroup.addNetElement(sky->m_flyingTimerNetState);
+  auto element9 = sky->m_netGroup.add_net_element(sky->m_flyingTimerNetState);
   if (!element9) return std::unexpected(std::move(element9.error()));
   return sky;
 }
@@ -139,11 +139,11 @@ std::expected<void, StarException> Sky::jumpTo(SkyParameters skyParameters) {
 }
 
 std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Sky::writeUpdate(std::uint64_t fromVersion, NetCompatibilityRules rules) {
-  return m_netGroup.writeNetState(fromVersion, rules);
+  return m_netGroup.write_net_state(fromVersion, rules);
 }
 
 std::expected<void, StarException> Sky::readUpdate(ByteArray data, NetCompatibilityRules rules) {
-  return m_netGroup.readNetState(std::move(data), 0.0f, rules);
+  return m_netGroup.read_net_state(std::move(data), 0.0f, rules);
 }
 
 std::expected<void, StarException> Sky::stateUpdate() {
@@ -672,7 +672,7 @@ std::expected<void, StarException> Sky::writeNetStates() {
 
 std::expected<void, StarException> Sky::readNetStates() {
   resetPresentation();
-  if (m_skyParametersNetState.pullUpdated()) {
+  if (m_skyParametersNetState.pull_updated()) {
     auto json = DataStreamBuffer::deserialize<Json>(m_skyParametersNetState.get().span());
     if (!json) return std::unexpected(std::move(json.error()));
     auto parameters = SkyParameters::create(*json);

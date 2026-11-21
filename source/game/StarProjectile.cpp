@@ -179,7 +179,7 @@ setTeam(std::move(*result666));
   return {};
 }
 
-std::expected<ByteArray, StarException> Projectile::netStore(NetCompatibilityRules rules) const {
+std::expected<ByteArray, StarException> Projectile::net_store(NetCompatibilityRules rules) const {
   DataStreamBuffer ds;
   ds.set_stream_compatibility_version(rules);
 
@@ -360,8 +360,8 @@ Vec2F Projectile::velocity() const {
   return m_movementController->velocity();
 }
 
-std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Projectile::writeNetState(std::uint64_t fromVersion, NetCompatibilityRules rules) {
-  auto result939 = m_netGroup.writeNetState(fromVersion, rules);
+std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Projectile::write_net_state(std::uint64_t fromVersion, NetCompatibilityRules rules) {
+  auto result939 = m_netGroup.write_net_state(fromVersion, rules);
 if (!result939) return std::unexpected(std::move(result939.error()));
 return std::move(*result939);
 }
@@ -370,18 +370,18 @@ std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Projectile::sn
   return m_netGroup.snapshot_net_state(rules);
 }
 
-std::expected<void, StarException> Projectile::readNetState(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
-  return m_netGroup.readNetState(std::move(data), interpolationTime, rules);
+std::expected<void, StarException> Projectile::read_net_state(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
+  return m_netGroup.read_net_state(std::move(data), interpolationTime, rules);
 }
 
 std::expected<void, StarException> Projectile::enableInterpolation(float extrapolationHint) {
-  auto result937 = m_netGroup.enableNetInterpolation(extrapolationHint);
+  auto result937 = m_netGroup.enable_net_interpolation(extrapolationHint);
 if (!result937) return std::unexpected(std::move(result937.error()));
   return {};
 }
 
 std::expected<void, StarException> Projectile::disableInterpolation() {
-  auto result936 = m_netGroup.disableNetInterpolation();
+  auto result936 = m_netGroup.disable_net_interpolation();
 if (!result936) return std::unexpected(std::move(result936.error()));
   return {};
 }
@@ -627,7 +627,7 @@ auto liquid = result911->get().liquidLevel(Vec2I::floor(position()));
       }
     }
   } else {
-    auto result912 = m_netGroup.tickNetInterpolation(dt);
+    auto result912 = m_netGroup.tick_net_interpolation(dt);
 if (!result912) return std::unexpected(std::move(result912.error()));
     auto result913 = m_movementController->tickSlave(dt);
 if (!result913) return std::unexpected(std::move(result913.error()));
@@ -1597,7 +1597,7 @@ std::expected<void, StarException> Projectile::tickShared(float dt) {
   auto result719 = m_effectEmitter->tick(dt, *entityMode());
 if (!result719) return std::unexpected(std::move(result719.error()));
 
-  if (m_collisionEvent.pullOccurred()) {
+  if (m_collisionEvent.pull_occurred()) {
     auto result720 = m_parameters.get_array("actionOnCollide", m_config->actionOnCollide);
 if (!result720) return std::unexpected(std::move(result720.error()));
 for (auto const& action : std::move(*result720))
@@ -1777,22 +1777,22 @@ forceConfig.enabled.set(std::move(*result713));
   m_physicsForces.sort_by_key();
   for (auto& p : m_physicsForces)
     {
-auto result714 = m_netGroup.addNetElement(p.second.enabled);
+auto result714 = m_netGroup.add_net_element(p.second.enabled);
 if (!result714) return std::unexpected(std::move(result714.error()));
 }
 
 m_physicsCollisions.sort_by_key();
 for (auto& p : m_physicsCollisions) {
-  auto result715 = m_netGroup.addNetElement(p.second.enabled);
+  auto result715 = m_netGroup.add_net_element(p.second.enabled);
   if (!result715)
     return std::unexpected(std::move(result715.error()));
 }
 
-  auto result716 = m_netGroup.addNetElement(m_collisionEvent);
+  auto result716 = m_netGroup.add_net_element(m_collisionEvent);
 if (!result716) return std::unexpected(std::move(result716.error()));
-  auto result717 = m_netGroup.addNetElement(*m_movementController);
+  auto result717 = m_netGroup.add_net_element(*m_movementController);
 if (!result717) return std::unexpected(std::move(result717.error()));
-  auto result718 = m_netGroup.addNetElement(*m_effectEmitter);
+  auto result718 = m_netGroup.add_net_element(*m_effectEmitter);
 if (!result718) return std::unexpected(std::move(result718.error()));
   return {};
 }

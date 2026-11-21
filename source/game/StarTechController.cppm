@@ -130,18 +130,18 @@ private:
     TechAnimator(Root& root);
     [[nodiscard]] static std::expected<std::shared_ptr<TechAnimator>, StarException> create(Root& root, std::optional<String> animationConfig = {});
 
-    void initNetVersion(std::optional<std::reference_wrapper<NetElementVersion const>> version = std::nullopt) override;
+    void init_net_version(std::optional<std::reference_wrapper<NetElementVersion const>> version = std::nullopt) override;
 
-    [[nodiscard]] std::expected<void, StarException> netStore(DataStream& ds, NetCompatibilityRules rules = {}) const override;
-    [[nodiscard]] std::expected<void, StarException> netLoad(DataStream& ds, NetCompatibilityRules rules) override;
+    [[nodiscard]] std::expected<void, StarException> net_store(DataStream& ds, NetCompatibilityRules rules = {}) const override;
+    [[nodiscard]] std::expected<void, StarException> net_load(DataStream& ds, NetCompatibilityRules rules) override;
 
-    [[nodiscard]] std::expected<void, StarException> enableNetInterpolation(float extrapolationHint = 0.0f) override;
-    [[nodiscard]] std::expected<void, StarException> disableNetInterpolation() override;
-    [[nodiscard]] std::expected<void, StarException> tickNetInterpolation(float dt) override;
+    [[nodiscard]] std::expected<void, StarException> enable_net_interpolation(float extrapolationHint = 0.0f) override;
+    [[nodiscard]] std::expected<void, StarException> disable_net_interpolation() override;
+    [[nodiscard]] std::expected<void, StarException> tick_net_interpolation(float dt) override;
 
-    [[nodiscard]] std::expected<bool, StarException> writeNetDelta(DataStream& ds, std::uint64_t fromVersion, NetCompatibilityRules rules = {}) const override;
-    [[nodiscard]] std::expected<void, StarException> readNetDelta(DataStream& ds, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
-    [[nodiscard]] std::expected<void, StarException> blankNetDelta(float interpolationTime) override;
+    [[nodiscard]] std::expected<bool, StarException> write_net_delta(DataStream& ds, std::uint64_t fromVersion, NetCompatibilityRules rules = {}) const override;
+    [[nodiscard]] std::expected<void, StarException> read_net_delta(DataStream& ds, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
+    [[nodiscard]] std::expected<void, StarException> blank_net_delta(float interpolationTime) override;
 
     // If setting invisible, stops all playing audio
     void setVisible(bool visible);

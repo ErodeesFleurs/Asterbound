@@ -77,16 +77,16 @@ std::expected<std::shared_ptr<StatCollection>, StarException> StatCollection::cr
     }
   }
 
-  auto modifiers = collection->addNetElement(collection->m_statModifiersNetState);
+  auto modifiers = collection->add_net_element(collection->m_statModifiersNetState);
   if (!modifiers) return std::unexpected(std::move(modifiers.error()));
   // Sort resource names alphabetically to ensure the same order on master and slaves.
   auto resourceNames = collection->m_stats.resourceNames();
   std::ranges::sort(resourceNames);
   for (auto const& resource : resourceNames) {
     auto& resourceNetState = collection->m_resourceValuesNetStates[resource];
-    auto valueAdded = collection->addNetElement(resourceNetState);
+    auto valueAdded = collection->add_net_element(resourceNetState);
     if (!valueAdded) return std::unexpected(std::move(valueAdded.error()));
-    auto lockAdded = collection->addNetElement(collection->m_resourceLockedNetStates[resource]);
+    auto lockAdded = collection->add_net_element(collection->m_resourceLockedNetStates[resource]);
     if (!lockAdded) return std::unexpected(std::move(lockAdded.error()));
   }
   return collection;
@@ -218,8 +218,8 @@ void StatCollection::tickSlave(float) {
   m_stats.update(0.0f);
 }
 
-std::expected<void, StarException> StatCollection::netElementsNeedLoad(bool) {
-  if (m_statModifiersNetState.pullUpdated()) {
+std::expected<void, StarException> StatCollection::net_elements_need_load(bool) {
+  if (m_statModifiersNetState.pull_updated()) {
     StatModifierGroupMap all_modifiers;
     for (auto const& [id, modifiers] : m_statModifiersNetState) {
       auto added = all_modifiers.try_emplace(id, modifiers);
@@ -238,8 +238,8 @@ std::expected<void, StarException> StatCollection::netElementsNeedLoad(bool) {
   return {};
 }
 
-std::expected<void, StarException> StatCollection::netElementsNeedStore() {
-  m_statModifiersNetState.setContents(m_stats.allStatModifierGroups());
+std::expected<void, StarException> StatCollection::net_elements_need_store() {
+  m_statModifiersNetState.set_contents(m_stats.allStatModifierGroups());
   for (auto& pair : m_resourceValuesNetStates)
     pair.second.set(m_stats.resourceValue(pair.first));
   for (auto& pair : m_resourceLockedNetStates) {

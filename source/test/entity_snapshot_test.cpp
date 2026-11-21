@@ -144,9 +144,9 @@ const GameTestRegistration replicaPlayerSnapshot("EntitySnapshot", "RemotePlayer
   auto originalDisk = (*player)->diskStore();
   ASSERT_TRUE(originalDisk) << originalDisk.error().what();
   NetCompatibilityRules rules;
-  auto store = (*player)->netStore(rules);
+  auto store = (*player)->net_store(rules);
   ASSERT_TRUE(store) << store.error().what();
-  auto state = (*player)->writeNetState(0, rules);
+  auto state = (*player)->write_net_state(0, rules);
   ASSERT_TRUE(state) << state.error().what();
   auto joined = setup.world->addClient(MinClientConnectionId, SpawnTargetPosition(Vec2F(1024, 1024)), true, false, rules);
   ASSERT_TRUE(joined) << joined.error().what();
@@ -207,7 +207,7 @@ const GameTestRegistration transientSnapshots("EntitySnapshot", "TransientStateR
   auto initialized = setup.init(fixture.root());
   ASSERT_TRUE(initialized) << initialized.error().what();
   // Projectile::init deliberately clears a source that is absent from its
-  // world. Keep a real source alive so the netStore assertion is meaningful.
+  // world. Keep a real source alive so the net_store assertion is meaningful.
   auto sourceDescriptor = ItemDescriptor::create("dirtmaterial", 1);
   ASSERT_TRUE(sourceDescriptor) << sourceDescriptor.error().what();
   auto source = ItemDrop::createRandomizedDrop(fixture.root(), *sourceDescriptor, Vec2F(1024, 1024));
@@ -234,7 +234,7 @@ const GameTestRegistration transientSnapshots("EntitySnapshot", "TransientStateR
   for (std::shared_ptr<Entity> const& entity : {std::shared_ptr<Entity>(*projectile), std::shared_ptr<Entity>(*plantDrop)}) {
     SCOPED_TRACE(static_cast<unsigned>(entity->entityType()));
     ASSERT_TRUE(setup.world->addEntity(entity));
-    auto baseline = entity->writeNetState(0, rules);
+    auto baseline = entity->write_net_state(0, rules);
     ASSERT_TRUE(baseline) << baseline.error().what();
     auto result = snapshot(setup, entity->entityId());
     ASSERT_TRUE(result) << result.error().what();
@@ -254,16 +254,16 @@ const GameTestRegistration transientSnapshots("EntitySnapshot", "TransientStateR
     ASSERT_FALSE(state->empty());
     auto decodedState = base64_decode(state->utf8());
     EXPECT_EQ(decodedState, baseline->first);
-    auto restored = (*factory)->netLoadEntity(entity->entityType(), base64_decode(store->utf8()), rules);
+    auto restored = (*factory)->net_load_entity(entity->entityType(), base64_decode(store->utf8()), rules);
     ASSERT_TRUE(restored) << restored.error().what();
-    ASSERT_TRUE((*restored)->readNetState(decodedState, 0.f, rules));
+    ASSERT_TRUE((*restored)->read_net_state(decodedState, 0.f, rules));
     EXPECT_EQ((*restored)->position(), entity->position());
     if (auto restoredProjectile = as<Projectile>(*restored))
       EXPECT_EQ(restoredProjectile->sourceEntity(), 4242);
     else
       EXPECT_EQ((*restored)->description(), String("Snapshot plant piece"));
     EXPECT_EQ(snapshot(setup, entity->entityId()), *result);
-    auto noChange = entity->writeNetState(baseline->second, rules);
+    auto noChange = entity->write_net_state(baseline->second, rules);
     ASSERT_TRUE(noChange) << noChange.error().what();
     EXPECT_TRUE(noChange->first.empty());
     EXPECT_EQ(noChange->second, baseline->second);
@@ -278,14 +278,14 @@ const GameTestRegistration transientSnapshots("EntitySnapshot", "TransientStateR
     EXPECT_EQ(movedData->get_uint("netStateVersion"), baseline->second);
     auto movedState = movedData->get_string("netState");
     ASSERT_TRUE(movedState);
-    ASSERT_TRUE((*restored)->readNetState(base64_decode(movedState->utf8()), 0.f, rules));
+    ASSERT_TRUE((*restored)->read_net_state(base64_decode(movedState->utf8()), 0.f, rules));
     EXPECT_EQ((*restored)->position(), entity->position());
-    auto delta = entity->writeNetState(baseline->second, rules);
+    auto delta = entity->write_net_state(baseline->second, rules);
     ASSERT_TRUE(delta) << delta.error().what();
     EXPECT_FALSE(delta->first.empty());
     EXPECT_EQ(delta->second, baseline->second + 1);
-    ASSERT_TRUE((*restored)->readNetState(baseline->first, 0.f, rules));
-    ASSERT_TRUE((*restored)->readNetState(delta->first, 0.f, rules));
+    ASSERT_TRUE((*restored)->read_net_state(baseline->first, 0.f, rules));
+    ASSERT_TRUE((*restored)->read_net_state(delta->first, 0.f, rules));
     EXPECT_EQ((*restored)->position(), entity->position());
   }
 });

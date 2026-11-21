@@ -96,23 +96,23 @@ ServerWeather::ServerWeather(Root& root) : m_root(root) {
 std::expected<std::shared_ptr<ServerWeather>, StarException> ServerWeather::create(Root& root) {
   auto result = std::shared_ptr<ServerWeather>(new ServerWeather(root));
   {
-    auto added = result->m_netGroup.addNetElement(result->m_weatherPoolNetState);
+    auto added = result->m_netGroup.add_net_element(result->m_weatherPoolNetState);
     if (!added) return std::unexpected(std::move(added.error()));
   }
   {
-    auto added = result->m_netGroup.addNetElement(result->m_undergroundLevelNetState);
+    auto added = result->m_netGroup.add_net_element(result->m_undergroundLevelNetState);
     if (!added) return std::unexpected(std::move(added.error()));
   }
   {
-    auto added = result->m_netGroup.addNetElement(result->m_currentWeatherIndexNetState);
+    auto added = result->m_netGroup.add_net_element(result->m_currentWeatherIndexNetState);
     if (!added) return std::unexpected(std::move(added.error()));
   }
   {
-    auto added = result->m_netGroup.addNetElement(result->m_currentWeatherIntensityNetState);
+    auto added = result->m_netGroup.add_net_element(result->m_currentWeatherIntensityNetState);
     if (!added) return std::unexpected(std::move(added.error()));
   }
   {
-    auto added = result->m_netGroup.addNetElement(result->m_currentWindNetState);
+    auto added = result->m_netGroup.add_net_element(result->m_currentWindNetState);
     if (!added) return std::unexpected(std::move(added.error()));
   }
   return result;
@@ -149,7 +149,7 @@ void ServerWeather::setClientVisibleRegions(List<RectI> regions) {
 std::expected<std::pair<ByteArray, std::uint64_t>, StarException> ServerWeather::writeUpdate(std::uint64_t fromVersion, NetCompatibilityRules rules) {
   auto states = setNetStates();
   if (!states) return std::unexpected(std::move(states.error()));
-  return m_netGroup.writeNetState(fromVersion, rules);
+  return m_netGroup.write_net_state(fromVersion, rules);
 }
 
 std::expected<void, StarException> ServerWeather::update(double dt) {
@@ -423,23 +423,23 @@ ClientWeather::ClientWeather(Root& root) : m_root(root) {
 std::expected<std::shared_ptr<ClientWeather>, StarException> ClientWeather::create(Root& root) {
   auto result = std::shared_ptr<ClientWeather>(new ClientWeather(root));
   {
-    auto added = result->m_netGroup.addNetElement(result->m_weatherPoolNetState);
+    auto added = result->m_netGroup.add_net_element(result->m_weatherPoolNetState);
     if (!added) return std::unexpected(std::move(added.error()));
   }
   {
-    auto added = result->m_netGroup.addNetElement(result->m_undergroundLevelNetState);
+    auto added = result->m_netGroup.add_net_element(result->m_undergroundLevelNetState);
     if (!added) return std::unexpected(std::move(added.error()));
   }
   {
-    auto added = result->m_netGroup.addNetElement(result->m_currentWeatherIndexNetState);
+    auto added = result->m_netGroup.add_net_element(result->m_currentWeatherIndexNetState);
     if (!added) return std::unexpected(std::move(added.error()));
   }
   {
-    auto added = result->m_netGroup.addNetElement(result->m_currentWeatherIntensityNetState);
+    auto added = result->m_netGroup.add_net_element(result->m_currentWeatherIntensityNetState);
     if (!added) return std::unexpected(std::move(added.error()));
   }
   {
-    auto added = result->m_netGroup.addNetElement(result->m_currentWindNetState);
+    auto added = result->m_netGroup.add_net_element(result->m_currentWindNetState);
     if (!added) return std::unexpected(std::move(added.error()));
   }
   return result;
@@ -453,7 +453,7 @@ void ClientWeather::setup(WorldGeometry worldGeometry, WeatherEffectsActiveQuery
 
 std::expected<void, StarException> ClientWeather::readUpdate(ByteArray data, NetCompatibilityRules rules) {
   if (!data.empty()) {
-    auto read = m_netGroup.readNetState(std::move(data), 0.0f, rules);
+    auto read = m_netGroup.read_net_state(std::move(data), 0.0f, rules);
     if (!read) return std::unexpected(std::move(read.error()));
     return getNetStates();
   }
@@ -529,7 +529,7 @@ std::optional<String> ClientWeather::weatherParallax() const {
 }
 
 std::expected<void, StarException> ClientWeather::getNetStates() {
-  if (m_weatherPoolNetState.pullUpdated()) {
+  if (m_weatherPoolNetState.pull_updated()) {
     auto items = DataStreamBuffer::deserialize_container<WeatherPool::container_type>(m_weatherPoolNetState.get().span());
     if (!items) return std::unexpected(std::move(items.error()));
     auto pool = WeatherPool::from_range(std::move(*items));

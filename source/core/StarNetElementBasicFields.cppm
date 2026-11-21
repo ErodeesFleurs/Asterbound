@@ -33,8 +33,8 @@ public:
   // Always updates the value and marks it as updated.
   void push(T value);
 
-  // Has this field been updated since the last call to pullUpdated?
-  bool pullUpdated();
+  // Has this field been updated since the last call to pull_updated?
+  bool pull_updated();
 
   // Update the value in place.  The mutator will be called as bool
   // mutator(T&), return true to signal that the value was updated.
@@ -42,23 +42,23 @@ public:
     requires net_field_mutator<Mutator, T>
   void update(Mutator&& mutator);
 
-  void initNetVersion(std::optional<std::reference_wrapper<NetElementVersion const>> version = std::nullopt) override;
+  void init_net_version(std::optional<std::reference_wrapper<NetElementVersion const>> version = std::nullopt) override;
 
   // Values are never interpolated, but they will be delayed for the given
-  // interpolationTime.
-  [[nodiscard]] std::expected<void, StarException> enableNetInterpolation(float extrapolationHint = 0.0f) override;
-  [[nodiscard]] std::expected<void, StarException> disableNetInterpolation() override;
-  [[nodiscard]] std::expected<void, StarException> tickNetInterpolation(float dt) override;
+  // interpolation_time.
+  [[nodiscard]] std::expected<void, StarException> enable_net_interpolation(float extrapolation_hint = 0.0f) override;
+  [[nodiscard]] std::expected<void, StarException> disable_net_interpolation() override;
+  [[nodiscard]] std::expected<void, StarException> tick_net_interpolation(float dt) override;
 
-  [[nodiscard]] std::expected<void, StarException> netStore(DataStream& ds, NetCompatibilityRules rules = {}) const override;
-  [[nodiscard]] std::expected<void, StarException> netLoad(DataStream& ds, NetCompatibilityRules rules) override;
+  [[nodiscard]] std::expected<void, StarException> net_store(DataStream& ds, NetCompatibilityRules rules = {}) const override;
+  [[nodiscard]] std::expected<void, StarException> net_load(DataStream& ds, NetCompatibilityRules rules) override;
 
-  [[nodiscard]] std::expected<bool, StarException> writeNetDelta(DataStream& ds, std::uint64_t fromVersion, NetCompatibilityRules rules = {}) const override;
-  [[nodiscard]] std::expected<void, StarException> readNetDelta(DataStream& ds, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
+  [[nodiscard]] std::expected<bool, StarException> write_net_delta(DataStream& ds, std::uint64_t from_version, NetCompatibilityRules rules = {}) const override;
+  [[nodiscard]] std::expected<void, StarException> read_net_delta(DataStream& ds, float interpolation_time = 0.0f, NetCompatibilityRules rules = {}) override;
 
 protected:
-  [[nodiscard]] virtual std::expected<void, StarException> readData(DataStream& ds, T& t) const = 0;
-  [[nodiscard]] virtual std::expected<void, StarException> writeData(DataStream& ds, T const& t) const = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> read_data(DataStream& ds, T& t) const = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> write_data(DataStream& ds, T const& t) const = 0;
 
   virtual void updated();
 
@@ -66,18 +66,18 @@ private:
   T const& wire_value() const &;
   void mark_local_update();
 
-  std::optional<std::reference_wrapper<NetElementVersion const>> m_netVersion = std::nullopt;
-  std::uint64_t m_latestUpdateVersion = 0;
+  std::optional<std::reference_wrapper<NetElementVersion const>> m_net_version = std::nullopt;
+  std::uint64_t m_latest_update_version = 0;
   T m_value = T();
   bool m_updated = false;
-  std::optional<Deque<std::pair<float, T>>> m_pendingInterpolatedValues;
+  std::optional<Deque<std::pair<float, T>>> m_pending_interpolated_values;
 };
 
 template <typename T>
 class NetElementIntegral : public NetElementBasicField<T> {
 protected:
-  [[nodiscard]] std::expected<void, StarException> readData(DataStream& ds, T& v) const override;
-  [[nodiscard]] std::expected<void, StarException> writeData(DataStream& ds, T const& v) const override;
+  [[nodiscard]] std::expected<void, StarException> read_data(DataStream& ds, T& v) const override;
+  [[nodiscard]] std::expected<void, StarException> write_data(DataStream& ds, T const& v) const override;
 };
 
 using NetElementInt = NetElementIntegral<std::int64_t>;
@@ -87,21 +87,21 @@ using NetElementUInt = NetElementIntegral<std::uint64_t>;
 // size_t values are NOT clamped when setting.
 class NetElementSize : public NetElementBasicField<std::size_t> {
 protected:
-  [[nodiscard]] std::expected<void, StarException> readData(DataStream& ds, std::size_t& v) const override;
-  [[nodiscard]] std::expected<void, StarException> writeData(DataStream& ds, std::size_t const& v) const override;
+  [[nodiscard]] std::expected<void, StarException> read_data(DataStream& ds, std::size_t& v) const override;
+  [[nodiscard]] std::expected<void, StarException> write_data(DataStream& ds, std::size_t const& v) const override;
 };
 
 class NetElementBool : public NetElementBasicField<bool> {
 protected:
-  [[nodiscard]] std::expected<void, StarException> readData(DataStream& ds, bool& v) const override;
-  [[nodiscard]] std::expected<void, StarException> writeData(DataStream& ds, bool const& v) const override;
+  [[nodiscard]] std::expected<void, StarException> read_data(DataStream& ds, bool& v) const override;
+  [[nodiscard]] std::expected<void, StarException> write_data(DataStream& ds, bool const& v) const override;
 };
 
 template <typename Enum>
 class NetElementEnum : public NetElementBasicField<Enum> {
 protected:
-  [[nodiscard]] std::expected<void, StarException> readData(DataStream& ds, Enum& v) const override;
-  [[nodiscard]] std::expected<void, StarException> writeData(DataStream& ds, Enum const& v) const override;
+  [[nodiscard]] std::expected<void, StarException> read_data(DataStream& ds, Enum& v) const override;
+  [[nodiscard]] std::expected<void, StarException> write_data(DataStream& ds, Enum const& v) const override;
 };
 
 // Wraps a uint64_t to give a simple event stream.  Every trigger is an
@@ -112,17 +112,17 @@ public:
   void trigger();
 
   // Returns the number of times this event has been triggered since the last
-  // pullOccurrences call.
-  std::uint64_t pullOccurrences();
+  // pull_occurrences call.
+  std::uint64_t pull_occurrences();
 
   // Pulls whether this event occurred at all, ignoring the number
-  bool pullOccurred();
+  bool pull_occurred();
 
   // Ignore all the existing ocurrences
-  void ignoreOccurrences();
-  void setIgnoreOccurrencesOnNetLoad(bool ignoreOccurrencesOnNetLoad);
+  void ignore_occurrences();
+  void set_ignore_occurrences_on_net_load(bool ignore_occurrences_on_net_load);
 
-  [[nodiscard]] std::expected<void, StarException> netLoad(DataStream& ds, NetCompatibilityRules rules) override;
+  [[nodiscard]] std::expected<void, StarException> net_load(DataStream& ds, NetCompatibilityRules rules) override;
 
 protected:
   void updated() override;
@@ -133,8 +133,8 @@ private:
   using NetElementUInt::push;
   using NetElementUInt::update;
 
-  std::uint64_t m_pulledOccurrences = 0;
-  bool m_ignoreOccurrencesOnNetLoad = false;
+  std::uint64_t m_pulled_occurrences = 0;
+  bool m_ignore_occurrences_on_net_load = false;
 };
 
 template <typename T>
@@ -149,10 +149,10 @@ template <net_field_value T>
   requires (stream_readable<T> && stream_writable<T>)
 class NetElementData : public NetElementBasicField<T> {
 protected:
-  [[nodiscard]] std::expected<void, StarException> readData(DataStream& ds, T& v) const override {
+  [[nodiscard]] std::expected<void, StarException> read_data(DataStream& ds, T& v) const override {
     return ds.read(v);
   }
-  [[nodiscard]] std::expected<void, StarException> writeData(DataStream& ds, T const& v) const override {
+  [[nodiscard]] std::expected<void, StarException> write_data(DataStream& ds, T const& v) const override {
     return ds.write(v);
   }
 };
@@ -165,11 +165,11 @@ public:
     : m_reader(std::move(reader)), m_writer(std::move(writer)) {}
 
 protected:
-  [[nodiscard]] std::expected<void, StarException> readData(DataStream& ds, T& v) const override {
+  [[nodiscard]] std::expected<void, StarException> read_data(DataStream& ds, T& v) const override {
     if (!m_reader) return std::unexpected(StarException("Missing NetElementData reader"));
     return m_reader(ds, v);
   }
-  [[nodiscard]] std::expected<void, StarException> writeData(DataStream& ds, T const& v) const override {
+  [[nodiscard]] std::expected<void, StarException> write_data(DataStream& ds, T const& v) const override {
     if (!m_writer) return std::unexpected(StarException("Missing NetElementData writer"));
     return m_writer(ds, v);
   }
@@ -189,8 +189,8 @@ T const& NetElementBasicField<T>::get() const {
 
 template <typename T>
 T const& NetElementBasicField<T>::wire_value() const & {
-  return m_pendingInterpolatedValues && !m_pendingInterpolatedValues->empty()
-      ? m_pendingInterpolatedValues->back().second : m_value;
+  return m_pending_interpolated_values && !m_pending_interpolated_values->empty()
+      ? m_pending_interpolated_values->back().second : m_value;
 }
 
 template <typename T>
@@ -208,13 +208,13 @@ void NetElementBasicField<T>::push(T value) {
 template <typename T>
 void NetElementBasicField<T>::mark_local_update() {
   updated();
-  m_latestUpdateVersion = m_netVersion ? m_netVersion->get().current() : 0;
-  if (m_pendingInterpolatedValues)
-    m_pendingInterpolatedValues->clear();
+  m_latest_update_version = m_net_version ? m_net_version->get().current() : 0;
+  if (m_pending_interpolated_values)
+    m_pending_interpolated_values->clear();
 }
 
 template <typename T>
-bool NetElementBasicField<T>::pullUpdated() {
+bool NetElementBasicField<T>::pull_updated() {
   return std::exchange(m_updated, false);
 }
 
@@ -227,36 +227,36 @@ void NetElementBasicField<T>::update(Mutator&& mutator) {
 }
 
 template <typename T>
-void NetElementBasicField<T>::initNetVersion(std::optional<std::reference_wrapper<NetElementVersion const>> version) {
-  m_netVersion = version;
-  m_latestUpdateVersion = 0;
+void NetElementBasicField<T>::init_net_version(std::optional<std::reference_wrapper<NetElementVersion const>> version) {
+  m_net_version = version;
+  m_latest_update_version = 0;
 }
 
 template <typename T>
-[[nodiscard]] std::expected<void, StarException> NetElementBasicField<T>::enableNetInterpolation(float) {
-  if (!m_pendingInterpolatedValues)
-    m_pendingInterpolatedValues.emplace();
+[[nodiscard]] std::expected<void, StarException> NetElementBasicField<T>::enable_net_interpolation(float) {
+  if (!m_pending_interpolated_values)
+    m_pending_interpolated_values.emplace();
   return {};
 }
 
 template <typename T>
-[[nodiscard]] std::expected<void, StarException> NetElementBasicField<T>::disableNetInterpolation() {
-  if (m_pendingInterpolatedValues) {
-    if (!m_pendingInterpolatedValues->empty())
-      m_value = std::move(m_pendingInterpolatedValues->back().second);
-    m_pendingInterpolatedValues.reset();
+[[nodiscard]] std::expected<void, StarException> NetElementBasicField<T>::disable_net_interpolation() {
+  if (m_pending_interpolated_values) {
+    if (!m_pending_interpolated_values->empty())
+      m_value = std::move(m_pending_interpolated_values->back().second);
+    m_pending_interpolated_values.reset();
   }
   return {};
 }
 
 template <typename T>
-[[nodiscard]] std::expected<void, StarException> NetElementBasicField<T>::tickNetInterpolation(float dt) {
-  if (m_pendingInterpolatedValues) {
-    for (auto& p : *m_pendingInterpolatedValues)
+[[nodiscard]] std::expected<void, StarException> NetElementBasicField<T>::tick_net_interpolation(float dt) {
+  if (m_pending_interpolated_values) {
+    for (auto& p : *m_pending_interpolated_values)
       p.first -= dt;
-    while (!m_pendingInterpolatedValues->empty() && m_pendingInterpolatedValues->front().first <= 0.0f) {
-      m_value = std::move(m_pendingInterpolatedValues->front().second);
-      m_pendingInterpolatedValues->pop_front();
+    while (!m_pending_interpolated_values->empty() && m_pending_interpolated_values->front().first <= 0.0f) {
+      m_value = std::move(m_pending_interpolated_values->front().second);
+      m_pending_interpolated_values->pop_front();
       updated();
     }
   }
@@ -264,49 +264,49 @@ template <typename T>
 }
 
 template <typename T>
-[[nodiscard]] std::expected<void, StarException> NetElementBasicField<T>::netStore(DataStream& ds, NetCompatibilityRules rules) const {
-  if (!checkWithRules(rules)) return {};
-  return writeData(ds, wire_value());
+[[nodiscard]] std::expected<void, StarException> NetElementBasicField<T>::net_store(DataStream& ds, NetCompatibilityRules rules) const {
+  if (!check_with_rules(rules)) return {};
+  return write_data(ds, wire_value());
 }
 
 template <typename T>
-[[nodiscard]] std::expected<void, StarException> NetElementBasicField<T>::netLoad(DataStream& ds, NetCompatibilityRules rules) {
-  if (!checkWithRules(rules)) return {};
-  { auto result = readData(ds, m_value); if (!result) return std::unexpected(std::move(result.error())); }
-  m_latestUpdateVersion = m_netVersion ? m_netVersion->get().current() : 0;
+[[nodiscard]] std::expected<void, StarException> NetElementBasicField<T>::net_load(DataStream& ds, NetCompatibilityRules rules) {
+  if (!check_with_rules(rules)) return {};
+  { auto result = read_data(ds, m_value); if (!result) return std::unexpected(std::move(result.error())); }
+  m_latest_update_version = m_net_version ? m_net_version->get().current() : 0;
   updated();
-  if (m_pendingInterpolatedValues)
-    m_pendingInterpolatedValues->clear();
+  if (m_pending_interpolated_values)
+    m_pending_interpolated_values->clear();
   return {};
 }
 
 template <typename T>
-[[nodiscard]] std::expected<bool, StarException> NetElementBasicField<T>::writeNetDelta(DataStream& ds, std::uint64_t fromVersion, NetCompatibilityRules rules) const {
-  if (!checkWithRules(rules)) return false;
-  if (m_latestUpdateVersion < fromVersion)
+[[nodiscard]] std::expected<bool, StarException> NetElementBasicField<T>::write_net_delta(DataStream& ds, std::uint64_t from_version, NetCompatibilityRules rules) const {
+  if (!check_with_rules(rules)) return false;
+  if (m_latest_update_version < from_version)
     return false;
 
-  auto result = writeData(ds, wire_value());
+  auto result = write_data(ds, wire_value());
   if (!result) return std::unexpected(std::move(result.error()));
 
   return true;
 }
 
 template <typename T>
-[[nodiscard]] std::expected<void, StarException> NetElementBasicField<T>::readNetDelta(DataStream& ds, float interpolationTime, NetCompatibilityRules rules) {
-  if (!checkWithRules(rules)) return {};
+[[nodiscard]] std::expected<void, StarException> NetElementBasicField<T>::read_net_delta(DataStream& ds, float interpolation_time, NetCompatibilityRules rules) {
+  if (!check_with_rules(rules)) return {};
   T t;
-  { auto result = readData(ds, t); if (!result) return std::unexpected(std::move(result.error())); }
-  m_latestUpdateVersion = m_netVersion ? m_netVersion->get().current() : 0;
+  { auto result = read_data(ds, t); if (!result) return std::unexpected(std::move(result.error())); }
+  m_latest_update_version = m_net_version ? m_net_version->get().current() : 0;
   // A non-forward step replaces the visible value and cancels queued steps.
-  if (m_pendingInterpolatedValues && interpolationTime > 0.0f
-      && (m_pendingInterpolatedValues->empty() || interpolationTime >= m_pendingInterpolatedValues->back().first)) {
-    m_pendingInterpolatedValues->emplace_back(interpolationTime, std::move(t));
+  if (m_pending_interpolated_values && interpolation_time > 0.0f
+      && (m_pending_interpolated_values->empty() || interpolation_time >= m_pending_interpolated_values->back().first)) {
+    m_pending_interpolated_values->emplace_back(interpolation_time, std::move(t));
     return {};
   }
   m_value = std::move(t);
-  if (m_pendingInterpolatedValues)
-    m_pendingInterpolatedValues->clear();
+  if (m_pending_interpolated_values)
+    m_pending_interpolated_values->clear();
   updated();
   return {};
 }
@@ -317,7 +317,7 @@ void NetElementBasicField<T>::updated() {
 }
 
 template <typename T>
-[[nodiscard]] std::expected<void, StarException> NetElementIntegral<T>::readData(DataStream& ds, T& v) const {
+[[nodiscard]] std::expected<void, StarException> NetElementIntegral<T>::read_data(DataStream& ds, T& v) const {
   if constexpr (sizeof(T) == 1) {
     return ds.read(v);
   } else if constexpr (std::is_unsigned_v<T>) {
@@ -333,14 +333,14 @@ template <typename T>
 }
 
 template <typename T>
-[[nodiscard]] std::expected<void, StarException> NetElementIntegral<T>::writeData(DataStream& ds, T const& v) const {
+[[nodiscard]] std::expected<void, StarException> NetElementIntegral<T>::write_data(DataStream& ds, T const& v) const {
   if constexpr (sizeof(T) == 1) return ds.write(v);
   else if constexpr (std::is_unsigned_v<T>) return ds.vuwrite(v);
   else return ds.viwrite(v);
 }
 
 template <typename Enum>
-[[nodiscard]] std::expected<void, StarException> NetElementEnum<Enum>::readData(DataStream& ds, Enum& v) const {
+[[nodiscard]] std::expected<void, StarException> NetElementEnum<Enum>::read_data(DataStream& ds, Enum& v) const {
   if constexpr (sizeof(Enum) == 1) return ds.read(v);
   else {
     auto result = ds.read_vlq_i();
@@ -351,7 +351,7 @@ template <typename Enum>
 }
 
 template <typename Enum>
-[[nodiscard]] std::expected<void, StarException> NetElementEnum<Enum>::writeData(DataStream& ds, Enum const& v) const {
+[[nodiscard]] std::expected<void, StarException> NetElementEnum<Enum>::write_data(DataStream& ds, Enum const& v) const {
   if constexpr (sizeof(Enum) == 1) return ds.write(v);
   else
     return ds.viwrite(static_cast<std::int64_t>(v));

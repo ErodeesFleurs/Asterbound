@@ -145,10 +145,10 @@ TechController::TechController(Root& root) : m_root(root), m_techAnimators([&roo
   m_moveSpecial3 = false;
 
 
-  m_xParentOffset.setFixedPointBase(0.003125);
-  m_yParentOffset.setFixedPointBase(0.003125);
-  m_xParentOffset.setInterpolator(lerp<float, float>);
-  m_yParentOffset.setInterpolator(lerp<float, float>);
+  m_xParentOffset.set_fixed_point_base(0.003125);
+  m_yParentOffset.set_fixed_point_base(0.003125);
+  m_xParentOffset.set_interpolator(lerp<float, float>);
+  m_yParentOffset.set_interpolator(lerp<float, float>);
 }
 
 std::expected<std::shared_ptr<TechController>, StarException> TechController::create(Root& root) {
@@ -157,7 +157,7 @@ std::expected<std::shared_ptr<TechController>, StarException> TechController::cr
       std::ref<NetElement>(controller->m_parentState), std::ref<NetElement>(controller->m_parentDirectives),
       std::ref<NetElement>(controller->m_xParentOffset), std::ref<NetElement>(controller->m_yParentOffset),
       std::ref<NetElement>(controller->m_parentHidden), std::ref<NetElement>(controller->m_toolUsageSuppressed)}) {
-    auto added = controller->addNetElement(element.get());
+    auto added = controller->add_net_element(element.get());
     if (!added)
       return std::unexpected(std::move(added.error()));
   }
@@ -403,7 +403,7 @@ bool TechController::parentHidden() const {
 std::expected<List<Drawable>, StarException> TechController::backDrawables(float interpolation) {
   List<Drawable> drawables;
 
-  for (auto const& animator : m_techAnimators.netElements()) {
+  for (auto const& animator : m_techAnimators.net_elements()) {
     if (animator->isVisible()) {
       auto sample = animator->animator->sample(interpolation);
       auto pieces = sample.drawablesWithZLevel(m_movementController->get().position());
@@ -422,7 +422,7 @@ std::expected<List<Drawable>, StarException> TechController::backDrawables(float
 std::expected<List<Drawable>, StarException> TechController::frontDrawables(float interpolation) {
   List<Drawable> drawables;
 
-  for (auto const& animator : m_techAnimators.netElements()) {
+  for (auto const& animator : m_techAnimators.net_elements()) {
     if (animator->isVisible()) {
       auto sample = animator->animator->sample(interpolation);
       auto pieces = sample.drawablesWithZLevel(m_movementController->get().position());
@@ -441,7 +441,7 @@ std::expected<List<Drawable>, StarException> TechController::frontDrawables(floa
 std::expected<List<LightSource>, StarException> TechController::lightSources(float interpolation) const {
   List<LightSource> lightSources;
 
-  for (auto const& animator : m_techAnimators.netElements()) {
+  for (auto const& animator : m_techAnimators.net_elements()) {
     if (animator->isVisible()) {
       auto sample = animator->animator->sample(interpolation);
       auto lights = sample.lightSources(m_movementController->get().position());
@@ -457,7 +457,7 @@ std::expected<List<LightSource>, StarException> TechController::lightSources(flo
 List<std::shared_ptr<AudioInstance>> TechController::pullNewAudios() {
   List<std::shared_ptr<AudioInstance>> newAudios;
 
-  for (auto const& animator : m_techAnimators.netElements()) {
+  for (auto const& animator : m_techAnimators.net_elements()) {
     if (animator->isVisible())
       newAudios.append_range(animator->dynamicTarget.pullNewAudios());
     else
@@ -470,7 +470,7 @@ List<std::shared_ptr<AudioInstance>> TechController::pullNewAudios() {
 List<Particle> TechController::pullNewParticles() {
   List<Particle> newParticles;
 
-  for (auto const& animator : m_techAnimators.netElements()) {
+  for (auto const& animator : m_techAnimators.net_elements()) {
     if (animator->isVisible())
       newParticles.append_range(animator->dynamicTarget.pullNewParticles());
     else
@@ -500,28 +500,28 @@ std::expected<std::shared_ptr<TechController::TechAnimator>, StarException> Tech
     return std::unexpected(std::move(animator.error()));
   result->animationConfig = std::move(config);
   result->animator = std::move(*animator);
-  if (auto added = result->netGroup.addNetElement(*result->animator); !added)
+  if (auto added = result->netGroup.add_net_element(*result->animator); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = result->netGroup.addNetElement(result->visible); !added)
+  if (auto added = result->netGroup.add_net_element(result->visible); !added)
     return std::unexpected(std::move(added.error()));
   return result;
 }
 
-void TechController::TechAnimator::initNetVersion(std::optional<std::reference_wrapper<NetElementVersion const>> version) {
-  netGroup.initNetVersion(version);
+void TechController::TechAnimator::init_net_version(std::optional<std::reference_wrapper<NetElementVersion const>> version) {
+  netGroup.init_net_version(version);
 }
 
-std::expected<void, StarException> TechController::TechAnimator::netStore(DataStream& ds, NetCompatibilityRules rules) const {
-  if (!checkWithRules(rules))
+std::expected<void, StarException> TechController::TechAnimator::net_store(DataStream& ds, NetCompatibilityRules rules) const {
+  if (!check_with_rules(rules))
     return {};
   auto written = ds << animationConfig;
   if (!written)
     return std::unexpected(std::move(written.error()));
-  return netGroup.netStore(ds, rules);
+  return netGroup.net_store(ds, rules);
 }
 
-std::expected<void, StarException> TechController::TechAnimator::netLoad(DataStream& ds, NetCompatibilityRules rules) {
-  if (!checkWithRules(rules))
+std::expected<void, StarException> TechController::TechAnimator::net_load(DataStream& ds, NetCompatibilityRules rules) {
+  if (!check_with_rules(rules))
     return {};
   std::optional<String> config;
   auto read = ds >> config;
@@ -530,38 +530,38 @@ std::expected<void, StarException> TechController::TechAnimator::netLoad(DataStr
   auto created = config ? NetworkedAnimator::create(m_root, *config) : NetworkedAnimator::create(m_root);
   if (!created)
     return std::unexpected(std::move(created.error()));
-  netGroup.clearNetElements();
+  netGroup.clear_net_elements();
   animationConfig = std::move(config);
   animator = std::move(*created);
-  if (auto added = netGroup.addNetElement(*animator); !added)
+  if (auto added = netGroup.add_net_element(*animator); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = netGroup.addNetElement(visible); !added)
+  if (auto added = netGroup.add_net_element(visible); !added)
     return std::unexpected(std::move(added.error()));
-  return netGroup.netLoad(ds, rules);
+  return netGroup.net_load(ds, rules);
 }
 
-std::expected<void, StarException> TechController::TechAnimator::enableNetInterpolation(float extrapolationHint) {
-  return netGroup.enableNetInterpolation(extrapolationHint);
+std::expected<void, StarException> TechController::TechAnimator::enable_net_interpolation(float extrapolationHint) {
+  return netGroup.enable_net_interpolation(extrapolationHint);
 }
 
-std::expected<void, StarException> TechController::TechAnimator::disableNetInterpolation() {
-  return netGroup.disableNetInterpolation();
+std::expected<void, StarException> TechController::TechAnimator::disable_net_interpolation() {
+  return netGroup.disable_net_interpolation();
 }
 
-std::expected<void, StarException> TechController::TechAnimator::tickNetInterpolation(float dt) {
-  return netGroup.tickNetInterpolation(dt);
+std::expected<void, StarException> TechController::TechAnimator::tick_net_interpolation(float dt) {
+  return netGroup.tick_net_interpolation(dt);
 }
 
-std::expected<bool, StarException> TechController::TechAnimator::writeNetDelta(DataStream& ds, std::uint64_t fromVersion, NetCompatibilityRules rules) const {
-  return netGroup.writeNetDelta(ds, fromVersion, rules);
+std::expected<bool, StarException> TechController::TechAnimator::write_net_delta(DataStream& ds, std::uint64_t fromVersion, NetCompatibilityRules rules) const {
+  return netGroup.write_net_delta(ds, fromVersion, rules);
 }
 
-std::expected<void, StarException> TechController::TechAnimator::readNetDelta(DataStream& ds, float interpolationTime, NetCompatibilityRules rules) {
-  return netGroup.readNetDelta(ds, interpolationTime, rules);
+std::expected<void, StarException> TechController::TechAnimator::read_net_delta(DataStream& ds, float interpolationTime, NetCompatibilityRules rules) {
+  return netGroup.read_net_delta(ds, interpolationTime, rules);
 }
 
-std::expected<void, StarException> TechController::TechAnimator::blankNetDelta(float interpolationTime) {
-  return netGroup.blankNetDelta(interpolationTime);
+std::expected<void, StarException> TechController::TechAnimator::blank_net_delta(float interpolationTime) {
+  return netGroup.blank_net_delta(interpolationTime);
 }
 
 void TechController::TechAnimator::setVisible(bool visible) {
@@ -588,7 +588,7 @@ std::expected<void, StarException> TechController::setupTechModules(List<std::tu
   if (unloadError)
     return std::unexpected(std::move(*unloadError));
   m_techModules.clear();
-  m_techAnimators.clearNetElements();
+  m_techAnimators.clear_net_elements();
   auto techDatabase = m_root.techDatabase();
   if (!techDatabase)
     return std::unexpected(std::move(techDatabase.error()));
@@ -625,7 +625,7 @@ std::expected<void, StarException> TechController::setupTechModules(List<std::tu
       return std::unexpected(std::move(installed.error()));
     if (auto stored = module.scriptComponent.set_script_storage(std::get<1>(moduleInit)); !stored)
       return std::unexpected(std::move(stored.error()));
-    auto added = m_techAnimators.addNetElement(std::move(*moduleAnimator));
+    auto added = m_techAnimators.add_net_element(std::move(*moduleAnimator));
     if (!added)
       return std::unexpected(std::move(added.error()));
     module.animatorId = *added;
@@ -667,7 +667,7 @@ std::expected<void, StarException> TechController::initializeModules() {
         return std::unexpected(std::move(result.error()));
       if (auto result = add("entity", LuaBindings::makeEntityCallbacks(m_parentEntity->get())); !result)
         return std::unexpected(std::move(result.error()));
-      auto animator = m_techAnimators.getNetElement(module.animatorId);
+      auto animator = m_techAnimators.get_net_element(module.animatorId);
       if (!animator)
         return std::unexpected(std::move(animator.error()));
       if (auto result = add("animator", LuaBindings::makeNetworkedAnimatorCallbacks(*(*animator)->animator)); !result)
@@ -714,7 +714,7 @@ void TechController::resetMoves() {
 
 std::expected<void, StarException> TechController::updateAnimators(float dt) {
   for (auto const& module : m_techModules) {
-    auto animator = m_techAnimators.getNetElement(module.animatorId);
+    auto animator = m_techAnimators.get_net_element(module.animatorId);
     if (!animator)
       return std::unexpected(std::move(animator.error()));
     (*animator)->setVisible(module.visible);
@@ -722,7 +722,7 @@ std::expected<void, StarException> TechController::updateAnimators(float dt) {
   auto world = m_parentEntity->get().world();
   if (!world)
     return std::unexpected(std::move(world.error()));
-  for (auto const& animator : m_techAnimators.netElements()) {
+  for (auto const& animator : m_techAnimators.net_elements()) {
     auto dynamicTarget = world->get().isServer() || !animator->isVisible()
         ? std::optional<std::reference_wrapper<NetworkedAnimator::DynamicTarget>>{} : std::optional{std::ref(animator->dynamicTarget)};
     auto updated = animator->animator->update(dt, dynamicTarget);

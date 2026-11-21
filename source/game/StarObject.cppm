@@ -101,7 +101,7 @@ public:
   [[nodiscard]] static std::expected<std::shared_ptr<Object>, StarException> create(Root& rootContext, std::shared_ptr<ObjectConfig const> config, Json const& parameters = JsonObject());
 
   [[nodiscard]] std::expected<Json, StarException> diskStore() const;
-  [[nodiscard]] std::expected<ByteArray, StarException> netStore(NetCompatibilityRules rules = {});
+  [[nodiscard]] std::expected<ByteArray, StarException> net_store(NetCompatibilityRules rules = {});
 
   EntityType entityType() const override;
   ClientEntityMode clientEntityMode() const override;
@@ -113,8 +113,8 @@ public:
   RectF metaBoundBox() const override;
 
   [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException>
-  writeNetState(std::uint64_t fromVersion = 0, NetCompatibilityRules rules = {}) override;
-  [[nodiscard]] std::expected<void, StarException> readNetState(ByteArray data, float interpolationTime = 0.0f,
+  write_net_state(std::uint64_t fromVersion = 0, NetCompatibilityRules rules = {}) override;
+  [[nodiscard]] std::expected<void, StarException> read_net_state(ByteArray data, float interpolationTime = 0.0f,
                                                                 NetCompatibilityRules rules = {}) override;
 
   [[nodiscard]] std::expected<String, StarException> name() const override;

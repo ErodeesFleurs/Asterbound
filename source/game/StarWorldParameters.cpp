@@ -1160,7 +1160,7 @@ std::expected<std::shared_ptr<VisitableWorldParameters>, StarException> diskLoad
   return std::unexpected(StarException("No such WorldParametersType"));
 }
 
-std::expected<ByteArray, StarException> netStoreVisitableWorldParameters(std::shared_ptr<VisitableWorldParameters const> const& parameters) {
+std::expected<ByteArray, StarException> net_store_visitable_world_parameters(std::shared_ptr<VisitableWorldParameters const> const& parameters) {
   if (!parameters)
     return {};
 
@@ -1172,7 +1172,7 @@ std::expected<ByteArray, StarException> netStoreVisitableWorldParameters(std::sh
   return ds.take_data();
 }
 
-std::expected<std::shared_ptr<VisitableWorldParameters>, StarException> netLoadVisitableWorldParameters(ByteArray data) {
+std::expected<std::shared_ptr<VisitableWorldParameters>, StarException> net_load_visitable_world_parameters(ByteArray data) {
   if (data.empty())
     return {};
 

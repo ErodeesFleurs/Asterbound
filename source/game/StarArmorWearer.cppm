@@ -86,8 +86,8 @@ public:
 private:
   explicit ArmorWearer(Root& root);
   Root& m_root;
-  [[nodiscard]] std::expected<void, StarException> netElementsNeedLoad(bool full) override;
-  [[nodiscard]] std::expected<void, StarException> netElementsNeedStore() override;
+  [[nodiscard]] std::expected<void, StarException> net_elements_need_load(bool full) override;
+  [[nodiscard]] std::expected<void, StarException> net_elements_need_store() override;
 
   struct Armor {
     std::shared_ptr<ArmorItem> item;

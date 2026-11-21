@@ -163,7 +163,7 @@ public:
   // whatever world they're spawned in.
   [[nodiscard]] std::expected<std::shared_ptr<Monster>, StarException> createMonster(MonsterVariant monsterVariant, std::optional<float> level = {}, Json uniqueParameters = {}) const;
   [[nodiscard]] std::expected<std::shared_ptr<Monster>, StarException> diskLoadMonster(Json const& diskStore) const;
-  [[nodiscard]] std::expected<std::shared_ptr<Monster>, StarException> netLoadMonster(ByteArray const& netStore, NetCompatibilityRules rules = {}) const;
+  [[nodiscard]] std::expected<std::shared_ptr<Monster>, StarException> net_load_monster(ByteArray const& net_store, NetCompatibilityRules rules = {}) const;
 
   [[nodiscard]] std::expected<List<Drawable>, StarException> monsterPortrait(MonsterVariant const& variant) const;
 

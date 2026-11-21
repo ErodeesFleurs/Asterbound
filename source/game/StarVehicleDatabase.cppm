@@ -25,8 +25,8 @@ public:
 
   [[nodiscard]] std::expected<std::shared_ptr<Vehicle>, StarException> create(String const& vehicleName, Json const& extraConfig = Json()) const;
 
-  [[nodiscard]] std::expected<ByteArray, StarException> netStore(std::shared_ptr<Vehicle> const& vehicle, NetCompatibilityRules rules) const;
-  [[nodiscard]] std::expected<std::shared_ptr<Vehicle>, StarException> netLoad(ByteArray const& netStore, NetCompatibilityRules rules) const;
+  [[nodiscard]] std::expected<ByteArray, StarException> net_store(std::shared_ptr<Vehicle> const& vehicle, NetCompatibilityRules rules) const;
+  [[nodiscard]] std::expected<std::shared_ptr<Vehicle>, StarException> net_load(ByteArray const& net_store, NetCompatibilityRules rules) const;
 
   [[nodiscard]] std::expected<Json, StarException> diskStore(std::shared_ptr<Vehicle> const& vehicle) const;
   [[nodiscard]] std::expected<std::shared_ptr<Vehicle>, StarException> diskLoad(Json const& diskStore) const;

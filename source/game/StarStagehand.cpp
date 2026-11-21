@@ -61,9 +61,9 @@ std::expected<std::shared_ptr<Stagehand>, StarException> Stagehand::create(Root&
     explicit MakeShared(Root& root) : Entity(root), Stagehand(root) {}
   };
   auto stagehand = std::make_shared<MakeShared>(rootContext);
-  if (auto result = stagehand->m_netGroup.addNetElement(stagehand->m_xPosition); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = stagehand->m_netGroup.addNetElement(stagehand->m_yPosition); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = stagehand->m_netGroup.addNetElement(stagehand->m_uniqueIdNetState); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = stagehand->m_netGroup.add_net_element(stagehand->m_xPosition); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = stagehand->m_netGroup.add_net_element(stagehand->m_yPosition); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = stagehand->m_netGroup.add_net_element(stagehand->m_uniqueIdNetState); !result) return std::unexpected(std::move(result.error()));
   auto uniqueId = config.opt_string("uniqueId");
   if (!uniqueId)
     return std::unexpected(std::move(uniqueId.error()));
@@ -73,17 +73,17 @@ std::expected<std::shared_ptr<Stagehand>, StarException> Stagehand::create(Root&
   return stagehand;
 }
 
-std::expected<std::shared_ptr<Stagehand>, StarException> Stagehand::create(Root& rootContext, ByteArray const& netStore, NetCompatibilityRules) {
-  auto config = DataStreamBuffer::deserialize<Json>(netStore.span());
+std::expected<std::shared_ptr<Stagehand>, StarException> Stagehand::create(Root& rootContext, ByteArray const& net_store, NetCompatibilityRules) {
+  auto config = DataStreamBuffer::deserialize<Json>(net_store.span());
   if (!config)
     return std::unexpected(std::move(config.error()));
   struct MakeShared final : Stagehand {
     explicit MakeShared(Root& root) : Entity(root), Stagehand(root) {}
   };
   auto stagehand = std::make_shared<MakeShared>(rootContext);
-  if (auto result = stagehand->m_netGroup.addNetElement(stagehand->m_xPosition); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = stagehand->m_netGroup.addNetElement(stagehand->m_yPosition); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = stagehand->m_netGroup.addNetElement(stagehand->m_uniqueIdNetState); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = stagehand->m_netGroup.add_net_element(stagehand->m_xPosition); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = stagehand->m_netGroup.add_net_element(stagehand->m_yPosition); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = stagehand->m_netGroup.add_net_element(stagehand->m_uniqueIdNetState); !result) return std::unexpected(std::move(result.error()));
   if (auto result = stagehand->readConfig(std::move(*config)); !result)
     return std::unexpected(std::move(result.error()));
   return stagehand;
@@ -102,7 +102,7 @@ std::expected<Json, StarException> Stagehand::diskStore() const {
   return saveData->set("scriptStorage", std::move(*storage));
 }
 
-std::expected<ByteArray, StarException> Stagehand::netStore(NetCompatibilityRules) {
+std::expected<ByteArray, StarException> Stagehand::net_store(NetCompatibilityRules) {
   return DataStreamBuffer::serialize(m_config);
 }
 
@@ -180,12 +180,12 @@ RectF Stagehand::metaBoundBox() const {
   return m_boundBox;
 }
 
-std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Stagehand::writeNetState(std::uint64_t fromVersion, NetCompatibilityRules rules) {
-  return m_netGroup.writeNetState(fromVersion, rules);
+std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Stagehand::write_net_state(std::uint64_t fromVersion, NetCompatibilityRules rules) {
+  return m_netGroup.write_net_state(fromVersion, rules);
 }
 
-std::expected<void, StarException> Stagehand::readNetState(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
-  return m_netGroup.readNetState(std::move(data), interpolationTime, rules);
+std::expected<void, StarException> Stagehand::read_net_state(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
+  return m_netGroup.read_net_state(std::move(data), interpolationTime, rules);
 }
 
 std::expected<String, StarException> Stagehand::name() const {
@@ -235,12 +235,12 @@ Stagehand::Stagehand(Root& rootContext) : Entity(rootContext), m_scriptComponent
   setPersistent(true);
 
 
-  m_netGroup.setNeedsLoadCallback([&self = *this](bool) -> std::expected<void, StarException> {
+  m_netGroup.set_needs_load_callback([&self = *this](bool) -> std::expected<void, StarException> {
       self.setUniqueId(self.m_uniqueIdNetState.get());
       return {};
     });
 
-  m_netGroup.setNeedsStoreCallback([&self = *this]() -> std::expected<void, StarException> {
+  m_netGroup.set_needs_store_callback([&self = *this]() -> std::expected<void, StarException> {
       self.m_uniqueIdNetState.set(self.uniqueId());
       return {};
     });

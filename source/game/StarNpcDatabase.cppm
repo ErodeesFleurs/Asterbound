@@ -109,7 +109,7 @@ public:
 
   [[nodiscard]] std::expected<std::shared_ptr<Npc>, StarException> createNpc(NpcVariant const& npcVariant) const;
   [[nodiscard]] std::expected<std::shared_ptr<Npc>, StarException> diskLoadNpc(Json const& diskStore) const;
-  [[nodiscard]] std::expected<std::shared_ptr<Npc>, StarException> netLoadNpc(ByteArray const& netStore, NetCompatibilityRules rules = {}) const;
+  [[nodiscard]] std::expected<std::shared_ptr<Npc>, StarException> net_load_npc(ByteArray const& net_store, NetCompatibilityRules rules = {}) const;
 
   [[nodiscard]] std::expected<List<Drawable>, StarException> npcPortrait(NpcVariant const& npcVariant, PortraitMode mode, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog = std::nullopt) const;
 

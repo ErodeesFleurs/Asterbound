@@ -147,10 +147,10 @@ import star.math_common;
 import star.algorithm;
 namespace Star {
 
-std::expected<std::shared_ptr<Npc>, StarException> Npc::create(Root& rootContext, ByteArray const& netStore, NetCompatibilityRules rules) {
+std::expected<std::shared_ptr<Npc>, StarException> Npc::create(Root& rootContext, ByteArray const& net_store, NetCompatibilityRules rules) {
   auto database = rootContext.npcDatabase();
   if (!database) return std::unexpected(std::move(database.error()));
-  auto variant = (*database)->readNpcVariant(netStore, rules);
+  auto variant = (*database)->readNpcVariant(net_store, rules);
   if (!variant) return std::unexpected(std::move(variant.error()));
   return create(rootContext, *variant);
 }
@@ -169,7 +169,7 @@ std::expected<void, StarException> Npc::initialize(NpcVariant const& npcVariant)
 
   auto result1 = NetHumanoid::create(this->root(), npcVariant.humanoidIdentity, npcVariant.humanoidParameters, npcVariant.uniqueHumanoidConfig ? npcVariant.humanoidConfig : Json());
 if (!result1) return std::unexpected(std::move(result1.error()));
-auto result2 = m_netHumanoid.addNetElement(std::move(*result1));
+auto result2 = m_netHumanoid.add_net_element(std::move(*result1));
 if (!result2) return std::unexpected(std::move(result2.error()));
 
   m_disableWornArmor.set(npcVariant.disableWornArmor);
@@ -461,7 +461,7 @@ return JsonObject{
   };
 }
 
-std::expected<ByteArray, StarException> Npc::netStore(NetCompatibilityRules rules) {
+std::expected<ByteArray, StarException> Npc::net_store(NetCompatibilityRules rules) {
   auto result79 = this->root().npcDatabase();
 if (!result79) return std::unexpected(std::move(result79.error()));
 return std::move(*result79)->writeNpcVariant(m_npcVariant, rules);
@@ -662,14 +662,14 @@ if (!result132) return std::unexpected(std::move(result132.error()));
 }
 
 std::expected<void, StarException> Npc::enableInterpolation(float extrapolationHint) {
-  auto result133 = m_netGroup.enableNetInterpolation(extrapolationHint);
+  auto result133 = m_netGroup.enable_net_interpolation(extrapolationHint);
 if (!result133) return std::unexpected(std::move(result133.error()));
 
   return {};
 }
 
 std::expected<void, StarException> Npc::disableInterpolation() {
-  auto result134 = m_netGroup.disableNetInterpolation();
+  auto result134 = m_netGroup.disable_net_interpolation();
 if (!result134) return std::unexpected(std::move(result134.error()));
 
   return {};
@@ -772,7 +772,7 @@ RectF Npc::collisionArea() const {
   return m_movementController->collisionPoly().boundBox();
 }
 
-std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Npc::writeNetState(std::uint64_t fromVersion, NetCompatibilityRules rules) {
+std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Npc::write_net_state(std::uint64_t fromVersion, NetCompatibilityRules rules) {
   // client-side npcs error nearby vanilla NPC scripts because callScriptedEntity
   // for now, scrungle the collision poly to avoid their queries. hacky :(
   {
@@ -787,7 +787,7 @@ std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Npc::writeNetS
         if (*mode == EntityMode::Master && connectionForEntity(entityId()) != ServerConnectionId) {
           PolyF poly = m_movementController->collisionPoly();
           m_movementController->setCollisionPoly({ { 0.0f, -3.402823466e+38F }});
-          auto result = m_netGroup.writeNetState(fromVersion, rules);
+          auto result = m_netGroup.write_net_state(fromVersion, rules);
           m_movementController->setCollisionPoly(poly);
           return result;
         }
@@ -795,11 +795,11 @@ std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Npc::writeNetS
     }
 }
 
-  return m_netGroup.writeNetState(fromVersion, rules);
+  return m_netGroup.write_net_state(fromVersion, rules);
 }
 
-std::expected<void, StarException> Npc::readNetState(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
-  return m_netGroup.readNetState(std::move(data), interpolationTime, rules);
+std::expected<void, StarException> Npc::read_net_state(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
+  return m_netGroup.read_net_state(std::move(data), interpolationTime, rules);
 }
 
 std::expected<String, StarException> Npc::description() const {
@@ -1161,7 +1161,7 @@ if (!result231) return std::unexpected(std::move(result231.error()));
 
 
   } else {
-    auto result232 = m_netGroup.tickNetInterpolation(dt);
+    auto result232 = m_netGroup.tick_net_interpolation(dt);
 if (!result232) return std::unexpected(std::move(result232.error()));
 
     auto result233 = m_movementController->tickSlave(dt);
@@ -2017,128 +2017,128 @@ if (!result433) return std::unexpected(std::move(result433.error()));
 }
 
 std::expected<void, StarException> Npc::setupNetStates() {
-  auto result434 = m_netGroup.addNetElement(m_xAimPosition);
+  auto result434 = m_netGroup.add_net_element(m_xAimPosition);
 if (!result434) return std::unexpected(std::move(result434.error()));
 
-  auto result435 = m_netGroup.addNetElement(m_yAimPosition);
+  auto result435 = m_netGroup.add_net_element(m_yAimPosition);
 if (!result435) return std::unexpected(std::move(result435.error()));
 
 
-  m_xAimPosition.setFixedPointBase(0.0625);
-  m_yAimPosition.setFixedPointBase(0.0625);
-  m_xAimPosition.setInterpolator(lerp<float, float>);
-  m_yAimPosition.setInterpolator(lerp<float, float>);
+  m_xAimPosition.set_fixed_point_base(0.0625);
+  m_yAimPosition.set_fixed_point_base(0.0625);
+  m_xAimPosition.set_interpolator(lerp<float, float>);
+  m_yAimPosition.set_interpolator(lerp<float, float>);
 
-  auto result436 = m_netGroup.addNetElement(m_uniqueIdNetState);
+  auto result436 = m_netGroup.add_net_element(m_uniqueIdNetState);
 if (!result436) return std::unexpected(std::move(result436.error()));
 
-  auto result437 = m_netGroup.addNetElement(m_teamNetState);
+  auto result437 = m_netGroup.add_net_element(m_teamNetState);
 if (!result437) return std::unexpected(std::move(result437.error()));
 
-  auto result438 = m_netGroup.addNetElement(m_humanoidStateNetState);
+  auto result438 = m_netGroup.add_net_element(m_humanoidStateNetState);
 if (!result438) return std::unexpected(std::move(result438.error()));
 
-  auto result439 = m_netGroup.addNetElement(m_humanoidEmoteStateNetState);
+  auto result439 = m_netGroup.add_net_element(m_humanoidEmoteStateNetState);
 if (!result439) return std::unexpected(std::move(result439.error()));
 
-  auto result440 = m_netGroup.addNetElement(m_humanoidDanceNetState);
+  auto result440 = m_netGroup.add_net_element(m_humanoidDanceNetState);
 if (!result440) return std::unexpected(std::move(result440.error()));
 
 
-  auto result441 = m_netGroup.addNetElement(m_newChatMessageEvent);
+  auto result441 = m_netGroup.add_net_element(m_newChatMessageEvent);
 if (!result441) return std::unexpected(std::move(result441.error()));
 
-  auto result442 = m_netGroup.addNetElement(m_chatMessage);
+  auto result442 = m_netGroup.add_net_element(m_chatMessage);
 if (!result442) return std::unexpected(std::move(result442.error()));
 
-  auto result443 = m_netGroup.addNetElement(m_chatPortrait);
+  auto result443 = m_netGroup.add_net_element(m_chatPortrait);
 if (!result443) return std::unexpected(std::move(result443.error()));
 
-  auto result444 = m_netGroup.addNetElement(m_chatConfig);
+  auto result444 = m_netGroup.add_net_element(m_chatConfig);
 if (!result444) return std::unexpected(std::move(result444.error()));
 
 
-  auto result445 = m_netGroup.addNetElement(m_statusText);
+  auto result445 = m_netGroup.add_net_element(m_statusText);
 if (!result445) return std::unexpected(std::move(result445.error()));
 
-  auto result446 = m_netGroup.addNetElement(m_displayNametag);
+  auto result446 = m_netGroup.add_net_element(m_displayNametag);
 if (!result446) return std::unexpected(std::move(result446.error()));
 
 
-  auto result447 = m_netGroup.addNetElement(m_isInteractive);
+  auto result447 = m_netGroup.add_net_element(m_isInteractive);
 if (!result447) return std::unexpected(std::move(result447.error()));
 
 
-  auto result448 = m_netGroup.addNetElement(m_offeredQuests);
+  auto result448 = m_netGroup.add_net_element(m_offeredQuests);
 if (!result448) return std::unexpected(std::move(result448.error()));
 
-  auto result449 = m_netGroup.addNetElement(m_turnInQuests);
+  auto result449 = m_netGroup.add_net_element(m_turnInQuests);
 if (!result449) return std::unexpected(std::move(result449.error()));
 
 
-  auto result450 = m_netGroup.addNetElement(m_shifting);
+  auto result450 = m_netGroup.add_net_element(m_shifting);
 if (!result450) return std::unexpected(std::move(result450.error()));
 
-  auto result451 = m_netGroup.addNetElement(m_damageOnTouch);
+  auto result451 = m_netGroup.add_net_element(m_damageOnTouch);
 if (!result451) return std::unexpected(std::move(result451.error()));
 
 
-  auto result452 = m_netGroup.addNetElement(m_disableWornArmor);
+  auto result452 = m_netGroup.add_net_element(m_disableWornArmor);
 if (!result452) return std::unexpected(std::move(result452.error()));
 
 
-  auto result453 = m_netGroup.addNetElement(m_deathParticleBurst);
+  auto result453 = m_netGroup.add_net_element(m_deathParticleBurst);
 if (!result453) return std::unexpected(std::move(result453.error()));
 
 
-  auto result454 = m_netGroup.addNetElement(m_dropPools);
+  auto result454 = m_netGroup.add_net_element(m_dropPools);
 if (!result454) return std::unexpected(std::move(result454.error()));
 
-  auto result455 = m_netGroup.addNetElement(m_aggressive);
+  auto result455 = m_netGroup.add_net_element(m_aggressive);
 if (!result455) return std::unexpected(std::move(result455.error()));
 
 
-  auto result456 = m_netGroup.addNetElement(*m_movementController);
+  auto result456 = m_netGroup.add_net_element(*m_movementController);
 if (!result456) return std::unexpected(std::move(result456.error()));
 
-  auto result457 = m_netGroup.addNetElement(*m_effectEmitter);
+  auto result457 = m_netGroup.add_net_element(*m_effectEmitter);
 if (!result457) return std::unexpected(std::move(result457.error()));
 
-  auto result458 = m_netGroup.addNetElement(*m_statusController);
+  auto result458 = m_netGroup.add_net_element(*m_statusController);
 if (!result458) return std::unexpected(std::move(result458.error()));
 
-  auto result459 = m_netGroup.addNetElement(*m_armor);
+  auto result459 = m_netGroup.add_net_element(*m_armor);
 if (!result459) return std::unexpected(std::move(result459.error()));
 
-  auto result460 = m_netGroup.addNetElement(*m_tools);
+  auto result460 = m_netGroup.add_net_element(*m_tools);
 if (!result460) return std::unexpected(std::move(result460.error()));
 
-  m_songbook->setCompatibilityVersion(6);
-  auto result461 = m_netGroup.addNetElement(*m_songbook);
+  m_songbook->set_compatibility_version(6);
+  auto result461 = m_netGroup.add_net_element(*m_songbook);
 if (!result461) return std::unexpected(std::move(result461.error()));
 
 
-  m_identityNetState.setCompatibilityVersion(10);
-  auto result462 = m_netGroup.addNetElement(m_identityNetState);
+  m_identityNetState.set_compatibility_version(10);
+  auto result462 = m_netGroup.add_net_element(m_identityNetState);
 if (!result462) return std::unexpected(std::move(result462.error()));
 
-  m_refreshedHumanoidParameters.setCompatibilityVersion(10);
-  auto result463 = m_netGroup.addNetElement(m_refreshedHumanoidParameters);
+  m_refreshedHumanoidParameters.set_compatibility_version(10);
+  auto result463 = m_netGroup.add_net_element(m_refreshedHumanoidParameters);
 if (!result463) return std::unexpected(std::move(result463.error()));
 
 
-  m_netHumanoid.setCompatibilityVersion(10);
-  auto result464 = m_netGroup.addNetElement(m_netHumanoid);
+  m_netHumanoid.set_compatibility_version(10);
+  auto result464 = m_netGroup.add_net_element(m_netHumanoid);
 if (!result464) return std::unexpected(std::move(result464.error()));
 
 
-  m_scriptedAnimationParameters.setCompatibilityVersion(10);
-  auto result465 = m_netGroup.addNetElement(m_scriptedAnimationParameters);
+  m_scriptedAnimationParameters.set_compatibility_version(10);
+  auto result465 = m_netGroup.add_net_element(m_scriptedAnimationParameters);
 if (!result465) return std::unexpected(std::move(result465.error()));
 
 
-  m_netGroup.setNeedsStoreCallback([this] { return setNetStates(); });
-  m_netGroup.setNeedsLoadCallback([this](bool initial) { return getNetStates(initial); });
+  m_netGroup.set_needs_store_callback([this] { return setNetStates(); });
+  m_netGroup.set_needs_load_callback([this](bool initial) { return getNetStates(initial); });
   return {};
 }
 
@@ -2181,7 +2181,7 @@ auto result474 = std::move(*result473)->setDance(m_humanoidDanceNetState.get());
 if (!result474) return std::unexpected(std::move(result474.error()));
 
 
-  if ((m_identityNetState.pullUpdated()) && !initial) {
+  if ((m_identityNetState.pull_updated()) && !initial) {
     auto newIdentity = m_identityNetState.get();
     if ((m_npcVariant.humanoidIdentity.species == newIdentity.species) && (m_npcVariant.humanoidIdentity.imagePath == newIdentity.imagePath)) {
       auto result475 = humanoid();
@@ -2192,13 +2192,13 @@ if (!result476) return std::unexpected(std::move(result476.error()));
     }
     m_npcVariant.humanoidIdentity = newIdentity;
   }
-  if (m_refreshedHumanoidParameters.pullOccurred() && !initial) {
+  if (m_refreshedHumanoidParameters.pull_occurred() && !initial) {
     auto result477 = refreshHumanoidParameters();
 if (!result477) return std::unexpected(std::move(result477.error()));
 
   }
 
-  if (m_newChatMessageEvent.pullOccurred() && !initial) {
+  if (m_newChatMessageEvent.pull_occurred() && !initial) {
     m_chatMessageUpdated = true;
     if (m_chatPortrait.get().empty())
       {
@@ -2683,7 +2683,7 @@ std::expected<void, StarException> Npc::setHumanoidParameter(String key, std::op
   else
     m_npcVariant.humanoidParameters.erase(key);
 
-  auto elements = m_netHumanoid.netElements();
+  auto elements = m_netHumanoid.net_elements();
   auto result526 = elements.last();
 if (!result526) return std::unexpected(std::move(result526.error()));
 auto result527 = result526->get()->setHumanoidParameters(m_npcVariant.humanoidParameters);
@@ -2699,7 +2699,7 @@ std::optional<Json> Npc::getHumanoidParameter(String key) {
 std::expected<void, StarException> Npc::setHumanoidParameters(JsonObject parameters) {
   m_npcVariant.humanoidParameters = std::move(parameters);
 
-  auto elements = m_netHumanoid.netElements();
+  auto elements = m_netHumanoid.net_elements();
   auto result528 = elements.last();
 if (!result528) return std::unexpected(std::move(result528.error()));
 auto result529 = result528->get()->setHumanoidParameters(m_npcVariant.humanoidParameters);
@@ -2862,13 +2862,13 @@ void Npc::setDescription(String const& description) {
 }
 
 std::expected<std::shared_ptr<Humanoid>, StarException> Npc::humanoid() {
-  auto elements = m_netHumanoid.netElements();
+  auto elements = m_netHumanoid.net_elements();
   auto last = elements.last();
   if (!last) return std::unexpected(std::move(last.error()));
   return last->get()->humanoid();
 }
 std::expected<std::shared_ptr<Humanoid>, StarException> Npc::humanoid() const {
-  auto elements = m_netHumanoid.netElements();
+  auto elements = m_netHumanoid.net_elements();
   auto last = elements.last();
   if (!last) return std::unexpected(std::move(last.error()));
   return last->get()->humanoid();
@@ -2885,17 +2885,17 @@ auto speciesDef = std::move(*result551);
   if (isMaster()) {
     m_refreshedHumanoidParameters.trigger();
     m_scriptedAnimationParameters.clear();
-    m_netHumanoid.clearNetElements();
+    m_netHumanoid.clear_net_elements();
     auto result552 = NetHumanoid::create(this->root(), m_npcVariant.humanoidIdentity, m_npcVariant.humanoidParameters, m_npcVariant.uniqueHumanoidConfig ? m_npcVariant.humanoidConfig : Json());
 if (!result552) return std::unexpected(std::move(result552.error()));
-auto result553 = m_netHumanoid.addNetElement(std::move(*result552));
+auto result553 = m_netHumanoid.add_net_element(std::move(*result552));
 if (!result553) return std::unexpected(std::move(result553.error()));
 
     auto result554 = humanoid();
 if (!result554) return std::unexpected(std::move(result554.error()));
 m_deathParticleBurst.set(std::move(*result554)->defaultDeathParticles());
   }else {
-    auto elements = m_netHumanoid.netElements();
+    auto elements = m_netHumanoid.net_elements();
     auto result555 = elements.last();
 if (!result555) return std::unexpected(std::move(result555.error()));
 m_npcVariant.humanoidParameters = result555->get()->humanoidParameters();

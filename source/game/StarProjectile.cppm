@@ -81,7 +81,7 @@ public:
   create(Root& rootContext, std::shared_ptr<ProjectileConfig> const& config, DataStream& netState,
          NetCompatibilityRules rules = {});
 
-  [[nodiscard]] std::expected<ByteArray, StarException> netStore(NetCompatibilityRules rules = {}) const;
+  [[nodiscard]] std::expected<ByteArray, StarException> net_store(NetCompatibilityRules rules = {}) const;
 
   EntityType entityType() const override;
 
@@ -101,9 +101,9 @@ public:
   ClientEntityMode clientEntityMode() const override;
   bool masterOnly() const override;
 
-  [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> writeNetState(std::uint64_t fromVersion = 0, NetCompatibilityRules rules = {}) override;
+  [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> write_net_state(std::uint64_t fromVersion = 0, NetCompatibilityRules rules = {}) override;
   [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> snapshot_net_state(NetCompatibilityRules rules = {}) const;
-  [[nodiscard]] std::expected<void, StarException> readNetState(ByteArray data, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
+  [[nodiscard]] std::expected<void, StarException> read_net_state(ByteArray data, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
 
   [[nodiscard]] std::expected<void, StarException> enableInterpolation(float extrapolationHint = 0.0f) override;
   [[nodiscard]] std::expected<void, StarException> disableInterpolation() override;

@@ -166,30 +166,30 @@ std::expected<std::shared_ptr<EntityFactory>, StarException> EntityFactory::crea
   return factory;
 }
 
-std::expected<ByteArray, StarException> EntityFactory::netStoreEntity(std::shared_ptr<Entity> const& entity, NetCompatibilityRules rules) const {
+std::expected<ByteArray, StarException> EntityFactory::net_store_entity(std::shared_ptr<Entity> const& entity, NetCompatibilityRules rules) const {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lock_with_diagnostics(locker);
 
   if (auto player = as<Player>(entity)) {
-    return player->netStore(rules);
+    return player->net_store(rules);
   } else if (auto monster = as<Monster>(entity)) {
-    return monster->netStore(rules);
+    return monster->net_store(rules);
   } else if (auto object = as<Object>(entity)) {
-    return object->netStore(rules);
+    return object->net_store(rules);
   } else if (auto plant = as<Plant>(entity)) {
-    return plant->netStore(rules);
+    return plant->net_store(rules);
   } else if (auto plantDrop = as<PlantDrop>(entity)) {
-    return plantDrop->netStore(rules);
+    return plantDrop->net_store(rules);
   } else if (auto projectile = as<Projectile>(entity)) {
-    return projectile->netStore(rules);
+    return projectile->net_store(rules);
   } else if (auto itemDrop = as<ItemDrop>(entity)) {
-    return itemDrop->netStore(rules);
+    return itemDrop->net_store(rules);
   } else if (auto npc = as<Npc>(entity)) {
-    return npc->netStore(rules);
+    return npc->net_store(rules);
   } else if (auto stagehand = as<Stagehand>(entity)) {
-    return stagehand->netStore(rules);
+    return stagehand->net_store(rules);
   } else if (auto vehicle = as<Vehicle>(entity)) {
-    return m_vehicleDatabase->netStore(vehicle, rules);
+    return m_vehicleDatabase->net_store(vehicle, rules);
   } else {
     if (!EntityTypeNames) return std::unexpected(EntityTypeNames.error());
     auto name = EntityTypeNames->get_right(entity->entityType());
@@ -198,30 +198,30 @@ std::expected<ByteArray, StarException> EntityFactory::netStoreEntity(std::share
   }
 }
 
-std::expected<std::shared_ptr<Entity>, StarException> EntityFactory::netLoadEntity(EntityType type, ByteArray const& netStore, NetCompatibilityRules rules) const {
+std::expected<std::shared_ptr<Entity>, StarException> EntityFactory::net_load_entity(EntityType type, ByteArray const& net_store, NetCompatibilityRules rules) const {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lock_with_diagnostics(locker);
 
   if (type == EntityType::Player) {
-    return m_playerFactory->netLoadPlayer(netStore, rules);
+    return m_playerFactory->net_load_player(net_store, rules);
   } else if (type == EntityType::Monster) {
-    return m_monsterDatabase->netLoadMonster(netStore, rules);
+    return m_monsterDatabase->net_load_monster(net_store, rules);
   } else if (type == EntityType::Object) {
-    return m_objectDatabase->netLoadObject(netStore, rules);
+    return m_objectDatabase->net_load_object(net_store, rules);
   } else if (type == EntityType::Plant) {
-    return Plant::create(m_root, netStore, rules);
+    return Plant::create(m_root, net_store, rules);
   } else if (type == EntityType::PlantDrop) {
-    return PlantDrop::create(m_root, netStore, rules);
+    return PlantDrop::create(m_root, net_store, rules);
   } else if (type == EntityType::Projectile) {
-    return m_projectileDatabase->netLoadProjectile(netStore, rules);
+    return m_projectileDatabase->net_load_projectile(net_store, rules);
   } else if (type == EntityType::ItemDrop) {
-    return ItemDrop::create(m_root, netStore, rules);
+    return ItemDrop::create(m_root, net_store, rules);
   } else if (type == EntityType::Npc) {
-    return m_npcDatabase->netLoadNpc(netStore, rules);
+    return m_npcDatabase->net_load_npc(net_store, rules);
   } else if (type == EntityType::Stagehand) {
-    return Stagehand::create(m_root, netStore, rules);
+    return Stagehand::create(m_root, net_store, rules);
   } else if (type == EntityType::Vehicle) {
-    return m_vehicleDatabase->netLoad(netStore, rules);
+    return m_vehicleDatabase->net_load(net_store, rules);
   } else {
     if (!EntityTypeNames) return std::unexpected(EntityTypeNames.error());
     auto name = EntityTypeNames->get_right(type);

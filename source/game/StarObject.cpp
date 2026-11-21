@@ -304,91 +304,91 @@ std::expected<void, StarException> Object::initialize(std::shared_ptr<ObjectConf
     return std::unexpected(std::move(uniqueIdResult.error()));
   auto uniqueId = std::move(*uniqueIdResult);
   setUniqueId(std::move(uniqueId));
-  auto operation2 = m_netGroup.addNetElement(m_parameters);
+  auto operation2 = m_netGroup.add_net_element(m_parameters);
   if (!operation2)
     return std::unexpected(std::move(operation2.error()));
-  auto operation3 = m_netGroup.addNetElement(m_uniqueIdNetState);
+  auto operation3 = m_netGroup.add_net_element(m_uniqueIdNetState);
   if (!operation3)
     return std::unexpected(std::move(operation3.error()));
-  auto operation4 = m_netGroup.addNetElement(m_interactive);
+  auto operation4 = m_netGroup.add_net_element(m_interactive);
   if (!operation4)
     return std::unexpected(std::move(operation4.error()));
-  auto operation5 = m_netGroup.addNetElement(m_materialSpaces);
+  auto operation5 = m_netGroup.add_net_element(m_materialSpaces);
   if (!operation5)
     return std::unexpected(std::move(operation5.error()));
-  auto operation6 = m_netGroup.addNetElement(m_xTilePosition);
+  auto operation6 = m_netGroup.add_net_element(m_xTilePosition);
   if (!operation6)
     return std::unexpected(std::move(operation6.error()));
-  auto operation7 = m_netGroup.addNetElement(m_yTilePosition);
+  auto operation7 = m_netGroup.add_net_element(m_yTilePosition);
   if (!operation7)
     return std::unexpected(std::move(operation7.error()));
-  auto operation8 = m_netGroup.addNetElement(m_direction);
+  auto operation8 = m_netGroup.add_net_element(m_direction);
   if (!operation8)
     return std::unexpected(std::move(operation8.error()));
-  auto operation9 = m_netGroup.addNetElement(m_health);
+  auto operation9 = m_netGroup.add_net_element(m_health);
   if (!operation9)
     return std::unexpected(std::move(operation9.error()));
-  auto operation10 = m_netGroup.addNetElement(m_orientationIndexNetState);
+  auto operation10 = m_netGroup.add_net_element(m_orientationIndexNetState);
   if (!operation10)
     return std::unexpected(std::move(operation10.error()));
-  auto operation11 = m_netGroup.addNetElement(m_netImageKeys);
+  auto operation11 = m_netGroup.add_net_element(m_netImageKeys);
   if (!operation11)
     return std::unexpected(std::move(operation11.error()));
-  auto operation12 = m_netGroup.addNetElement(m_soundEffectEnabled);
+  auto operation12 = m_netGroup.add_net_element(m_soundEffectEnabled);
   if (!operation12)
     return std::unexpected(std::move(operation12.error()));
-  auto operation13 = m_netGroup.addNetElement(m_lightSourceColor);
+  auto operation13 = m_netGroup.add_net_element(m_lightSourceColor);
   if (!operation13)
     return std::unexpected(std::move(operation13.error()));
-  auto operation14 = m_netGroup.addNetElement(m_newChatMessageEvent);
+  auto operation14 = m_netGroup.add_net_element(m_newChatMessageEvent);
   if (!operation14)
     return std::unexpected(std::move(operation14.error()));
-  auto operation15 = m_netGroup.addNetElement(m_chatMessage);
+  auto operation15 = m_netGroup.add_net_element(m_chatMessage);
   if (!operation15)
     return std::unexpected(std::move(operation15.error()));
-  auto operation16 = m_netGroup.addNetElement(m_chatPortrait);
+  auto operation16 = m_netGroup.add_net_element(m_chatPortrait);
   if (!operation16)
     return std::unexpected(std::move(operation16.error()));
-  auto operation17 = m_netGroup.addNetElement(m_chatConfig);
+  auto operation17 = m_netGroup.add_net_element(m_chatConfig);
   if (!operation17)
     return std::unexpected(std::move(operation17.error()));
   for (auto& node : m_inputNodes) {
-    auto operation18 = m_netGroup.addNetElement(node.connections);
+    auto operation18 = m_netGroup.add_net_element(node.connections);
     if (!operation18)
       return std::unexpected(std::move(operation18.error()));
-    auto operation19 = m_netGroup.addNetElement(node.state);
+    auto operation19 = m_netGroup.add_net_element(node.state);
     if (!operation19)
       return std::unexpected(std::move(operation19.error()));
   }
   for (auto& node : m_outputNodes) {
-    auto operation20 = m_netGroup.addNetElement(node.connections);
+    auto operation20 = m_netGroup.add_net_element(node.connections);
     if (!operation20)
       return std::unexpected(std::move(operation20.error()));
-    auto operation21 = m_netGroup.addNetElement(node.state);
+    auto operation21 = m_netGroup.add_net_element(node.state);
     if (!operation21)
       return std::unexpected(std::move(operation21.error()));
   }
-  auto operation22 = m_netGroup.addNetElement(m_offeredQuests);
+  auto operation22 = m_netGroup.add_net_element(m_offeredQuests);
   if (!operation22)
     return std::unexpected(std::move(operation22.error()));
-  auto operation23 = m_netGroup.addNetElement(m_turnInQuests);
+  auto operation23 = m_netGroup.add_net_element(m_turnInQuests);
   if (!operation23)
     return std::unexpected(std::move(operation23.error()));
-  auto operation24 = m_netGroup.addNetElement(m_damageSources);
+  auto operation24 = m_netGroup.add_net_element(m_damageSources);
   if (!operation24)
     return std::unexpected(std::move(operation24.error()));
   // Scripted animation parameters deliberately do not interpolate.
-  auto operation25 = m_netGroup.addNetElement(m_scriptedAnimationParameters, false);
+  auto operation25 = m_netGroup.add_net_element(m_scriptedAnimationParameters, false);
   if (!operation25)
     return std::unexpected(std::move(operation25.error()));
-  auto operation26 = m_netGroup.addNetElement(*m_tileDamageStatus);
+  auto operation26 = m_netGroup.add_net_element(*m_tileDamageStatus);
   if (!operation26)
     return std::unexpected(std::move(operation26.error()));
-  auto operation27 = m_netGroup.addNetElement(*m_networkedAnimator);
+  auto operation27 = m_netGroup.add_net_element(*m_networkedAnimator);
   if (!operation27)
     return std::unexpected(std::move(operation27.error()));
-  m_netGroup.setNeedsLoadCallback([this](bool initial) { return getNetStates(initial); });
-  m_netGroup.setNeedsStoreCallback([this]() { return setNetStates(); });
+  m_netGroup.set_needs_load_callback([this](bool initial) { return getNetStates(initial); });
+  m_netGroup.set_needs_store_callback([this]() { return setNetStates(); });
   auto modeConfigResult = configValue("clientEntityMode", "ClientSlaveOnly");
   if (!modeConfigResult)
     return std::unexpected(std::move(modeConfigResult.error()));
@@ -412,16 +412,16 @@ std::expected<Json, StarException> Object::diskStore() const {
   if (!storedResult)
     return std::unexpected(std::move(storedResult.error()));
   auto stored = std::move(*storedResult);
-  return stored.set_all({{"name", m_config->name}, {"parameters", m_parameters.baseMap()}});
+  return stored.set_all({{"name", m_config->name}, {"parameters", m_parameters.base_map()}});
 }
 
-std::expected<ByteArray, StarException> Object::netStore(NetCompatibilityRules rules) {
+std::expected<ByteArray, StarException> Object::net_store(NetCompatibilityRules rules) {
   DataStreamBuffer ds;
   ds.set_stream_compatibility_version(rules);
   auto operation28 = ds.write(m_config->name);
   if (!operation28)
     return std::unexpected(std::move(operation28.error()));
-  auto operation29 = ds.write<Json>(m_parameters.baseMap());
+  auto operation29 = ds.write<Json>(m_parameters.base_map());
   if (!operation29)
     return std::unexpected(std::move(operation29.error()));
   return ds.take_data();
@@ -757,12 +757,12 @@ RectF Object::metaBoundBox() const {
   }
 }
 
-std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Object::writeNetState(std::uint64_t fromVersion, NetCompatibilityRules rules) {
-  return m_netGroup.writeNetState(fromVersion, rules);
+std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Object::write_net_state(std::uint64_t fromVersion, NetCompatibilityRules rules) {
+  return m_netGroup.write_net_state(fromVersion, rules);
 }
 
-std::expected<void, StarException> Object::readNetState(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
-  return m_netGroup.readNetState(std::move(data), interpolationTime, rules);
+std::expected<void, StarException> Object::read_net_state(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
+  return m_netGroup.read_net_state(std::move(data), interpolationTime, rules);
 }
 
 Vec2I Object::tilePosition() const {
@@ -1120,7 +1120,7 @@ std::expected<void, StarException> Object::destroy(std::optional<std::reference_
             return std::unexpected(std::move(retainResult.error()));
           auto retain = std::move(*retainResult);
           if (retain.value_or(false)) {
-            auto parameters = m_parameters.baseMap();
+            auto parameters = m_parameters.base_map();
             parameters.remove("owner");
             auto storageResult = m_scriptComponent.get_script_storage();
             if (!storageResult)
@@ -1354,7 +1354,7 @@ std::expected<void, StarException> Object::getNetStates(bool initial) {
     if (!operation1)
       return std::unexpected(std::move(operation1.error()));
   }
-  if (m_newChatMessageEvent.pullOccurred() && !initial) {
+  if (m_newChatMessageEvent.pull_occurred() && !initial) {
     auto mouthResult = mouthPosition();
     if (!mouthResult)
       return std::unexpected(std::move(mouthResult.error()));
@@ -1365,8 +1365,8 @@ std::expected<void, StarException> Object::getNetStates(bool initial) {
       m_pendingChatActions.push_back(
         PortraitChatAction{entityId(), m_chatPortrait.get(), m_chatMessage.get(), mouth, m_chatConfig.get()});
   }
-  if (m_netImageKeys.pullUpdated()) {
-    m_imageKeys.merge(m_netImageKeys.baseMap(), true);
+  if (m_netImageKeys.pull_updated()) {
+    m_imageKeys.merge(m_netImageKeys.base_map(), true);
     m_orientationDrawablesCache.reset();
   }
   return {};
@@ -1419,9 +1419,9 @@ std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Object
 
 std::expected<Json, StarException> Object::configValue(String const& name, Json const& def) const {
   if (auto orientation = currentOrientation())
-    return json_merge_query_def(name, def, m_config->config, orientation->config, m_parameters.baseMap());
+    return json_merge_query_def(name, def, m_config->config, orientation->config, m_parameters.base_map());
   else
-    return json_merge_query_def(name, def, m_config->config, m_parameters.baseMap());
+    return json_merge_query_def(name, def, m_config->config, m_parameters.base_map());
 }
 
 std::shared_ptr<ObjectConfig const> Object::config() const {

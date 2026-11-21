@@ -142,7 +142,7 @@ public:
   [[nodiscard]] std::expected<float, StarException> gravityMultiplier(String const& type) const;
 
   [[nodiscard]] std::expected<std::shared_ptr<Projectile>, StarException> createProjectile(String const& type, Json const& parameters = JsonObject()) const;
-  [[nodiscard]] std::expected<std::shared_ptr<Projectile>, StarException> netLoadProjectile(ByteArray const& netStore, NetCompatibilityRules rules = {}) const;
+  [[nodiscard]] std::expected<std::shared_ptr<Projectile>, StarException> net_load_projectile(ByteArray const& net_store, NetCompatibilityRules rules = {}) const;
 
 private:
   explicit ProjectileDatabase(Root& root) : m_root(root) {}

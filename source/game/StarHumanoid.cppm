@@ -559,11 +559,11 @@ public:
   [[nodiscard]] static std::expected<std::shared_ptr<NetHumanoid>, StarException> create(Root& root);
   [[nodiscard]] static std::expected<std::shared_ptr<NetHumanoid>, StarException> create(Root& root, HumanoidIdentity identity, JsonObject parameters = JsonObject(), Json config = Json());
 
-  [[nodiscard]] std::expected<void, StarException> netStore(DataStream& ds, NetCompatibilityRules rules = {}) const override;
-  [[nodiscard]] std::expected<void, StarException> netLoad(DataStream& ds, NetCompatibilityRules rules) override;
+  [[nodiscard]] std::expected<void, StarException> net_store(DataStream& ds, NetCompatibilityRules rules = {}) const override;
+  [[nodiscard]] std::expected<void, StarException> net_load(DataStream& ds, NetCompatibilityRules rules) override;
 
-  [[nodiscard]] std::expected<void, StarException> netElementsNeedLoad(bool full) override;
-  [[nodiscard]] std::expected<void, StarException> netElementsNeedStore() override;
+  [[nodiscard]] std::expected<void, StarException> net_elements_need_load(bool full) override;
+  [[nodiscard]] std::expected<void, StarException> net_elements_need_store() override;
 
   std::shared_ptr<Humanoid> humanoid();
   [[nodiscard]] std::expected<void, StarException> setHumanoidParameters(JsonObject parameters);

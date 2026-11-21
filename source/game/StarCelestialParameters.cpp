@@ -110,16 +110,16 @@ std::expected<CelestialParameters, StarException> CelestialParameters::create(
   return result;
 }
 
-std::expected<CelestialParameters, StarException> CelestialParameters::create(ByteArray netStore) {
+std::expected<CelestialParameters, StarException> CelestialParameters::create(ByteArray net_store) {
   CelestialParameters result;
-  DataStreamBuffer ds(std::move(netStore));
+  DataStreamBuffer ds(std::move(net_store));
   auto fields = ds >> result.m_coordinate >> result.m_seed >> result.m_name >> result.m_parameters;
   if (!fields)
     return std::unexpected(std::move(fields.error()));
   auto bytes = ds.read<ByteArray>();
   if (!bytes)
     return std::unexpected(std::move(bytes.error()));
-  auto visitable = netLoadVisitableWorldParameters(*bytes);
+  auto visitable = net_load_visitable_world_parameters(*bytes);
   if (!visitable)
     return std::unexpected(std::move(visitable.error()));
   result.m_visitableParameters = std::move(*visitable);
@@ -168,12 +168,12 @@ std::expected<Json, StarException> CelestialParameters::diskStore() const {
       {"visitableParameters", std::move(*visitable)}};
 }
 
-std::expected<ByteArray, StarException> CelestialParameters::netStore() const {
+std::expected<ByteArray, StarException> CelestialParameters::net_store() const {
   DataStreamBuffer ds;
   auto fields = ds << m_coordinate << m_seed << m_name << m_parameters;
   if (!fields)
     return std::unexpected(std::move(fields.error()));
-  auto visitable = netStoreVisitableWorldParameters(m_visitableParameters);
+  auto visitable = net_store_visitable_world_parameters(m_visitableParameters);
   if (!visitable)
     return std::unexpected(std::move(visitable.error()));
   auto written = ds.write(*visitable);

@@ -35,10 +35,10 @@ public:
   CelestialParameters();
   [[nodiscard]] static std::expected<CelestialParameters, StarException> create(Root& root, CelestialCoordinate coordinate, std::uint64_t seed, String name, Json parameters);
   [[nodiscard]] static std::expected<CelestialParameters, StarException> create(Json const& diskStore);
-  [[nodiscard]] static std::expected<CelestialParameters, StarException> create(ByteArray netStore);
+  [[nodiscard]] static std::expected<CelestialParameters, StarException> create(ByteArray net_store);
 
   [[nodiscard]] std::expected<Json, StarException> diskStore() const;
-  [[nodiscard]] std::expected<ByteArray, StarException> netStore() const;
+  [[nodiscard]] std::expected<ByteArray, StarException> net_store() const;
 
   CelestialCoordinate coordinate() const;
   String name() const;

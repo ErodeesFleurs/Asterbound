@@ -303,19 +303,19 @@ MovementController::MovementController(Root& root) : m_root(root) {
   m_liquidPercentage = 0.0f;
   m_liquidId = EmptyLiquidId;
 
-  m_xPosition.setFixedPointBase(0.0125f);
-  m_yPosition.setFixedPointBase(0.0125f);
-  m_xVelocity.setFixedPointBase(0.00625f);
-  m_yVelocity.setFixedPointBase(0.00625f);
-  m_rotation.setFixedPointBase(0.01f);
-  m_xRelativeSurfaceMovingCollisionPosition.setFixedPointBase(0.0125f);
-  m_yRelativeSurfaceMovingCollisionPosition.setFixedPointBase(0.0125f);
+  m_xPosition.set_fixed_point_base(0.0125f);
+  m_yPosition.set_fixed_point_base(0.0125f);
+  m_xVelocity.set_fixed_point_base(0.00625f);
+  m_yVelocity.set_fixed_point_base(0.00625f);
+  m_rotation.set_fixed_point_base(0.01f);
+  m_xRelativeSurfaceMovingCollisionPosition.set_fixed_point_base(0.0125f);
+  m_yRelativeSurfaceMovingCollisionPosition.set_fixed_point_base(0.0125f);
 
-  m_xVelocity.setInterpolator(lerp<float, float>);
-  m_yVelocity.setInterpolator(lerp<float, float>);
-  m_rotation.setInterpolator(angle_lerp<float, float>);
-  m_xRelativeSurfaceMovingCollisionPosition.setInterpolator(lerp<float, float>);
-  m_yRelativeSurfaceMovingCollisionPosition.setInterpolator(lerp<float, float>);
+  m_xVelocity.set_interpolator(lerp<float, float>);
+  m_yVelocity.set_interpolator(lerp<float, float>);
+  m_rotation.set_interpolator(angle_lerp<float, float>);
+  m_xRelativeSurfaceMovingCollisionPosition.set_interpolator(lerp<float, float>);
+  m_yRelativeSurfaceMovingCollisionPosition.set_interpolator(lerp<float, float>);
 
   m_world.reset();
 }
@@ -328,23 +328,23 @@ std::expected<std::shared_ptr<MovementController>, StarException> MovementContro
 }
 
 std::expected<void, StarException> MovementController::initialize(MovementParameters const& parameters) {
-  if (auto result = addNetElement(m_collisionPoly); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = addNetElement(m_mass); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = addNetElement(m_xPosition); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = addNetElement(m_yPosition); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = addNetElement(m_xVelocity); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = addNetElement(m_yVelocity); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = addNetElement(m_rotation); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = addNetElement(m_colliding); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = addNetElement(m_collisionStuck); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = addNetElement(m_nullColliding); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = addNetElement(m_stickingDirection); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = addNetElement(m_onGround); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = addNetElement(m_zeroG); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_collisionPoly); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_mass); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_xPosition); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_yPosition); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_xVelocity); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_yVelocity); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_rotation); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_colliding); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_collisionStuck); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_nullColliding); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_stickingDirection); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_onGround); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_zeroG); !result) return std::unexpected(std::move(result.error()));
 
-  if (auto result = addNetElement(m_surfaceMovingCollision); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = addNetElement(m_xRelativeSurfaceMovingCollisionPosition); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = addNetElement(m_yRelativeSurfaceMovingCollisionPosition); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_surfaceMovingCollision); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_xRelativeSurfaceMovingCollisionPosition); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_yRelativeSurfaceMovingCollisionPosition); !result) return std::unexpected(std::move(result.error()));
 
   return resetParameters(parameters);
 }
@@ -1327,13 +1327,13 @@ std::expected<void, StarException> MovementController::updateParameters(Movement
 
 void MovementController::updatePositionInterpolators() {
   if (m_world)
-    m_xPosition.setInterpolator(m_world->get().geometry().xLerpFunction(m_parameters.discontinuityThreshold));
+    m_xPosition.set_interpolator(m_world->get().geometry().xLerpFunction(m_parameters.discontinuityThreshold));
   else
-    m_xPosition.setInterpolator(
+    m_xPosition.set_interpolator(
       [limit = m_parameters.discontinuityThreshold](float const& offset, float const& from, float const& to) {
         return lerp_with_limit<float, float>(limit, offset, from, to);
       });
-  m_yPosition.setInterpolator(
+  m_yPosition.set_interpolator(
     [limit = m_parameters.discontinuityThreshold](float const& offset, float const& from, float const& to) {
       return lerp_with_limit<float, float>(limit, offset, from, to);
     });
