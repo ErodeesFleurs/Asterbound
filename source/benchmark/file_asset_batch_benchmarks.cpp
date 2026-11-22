@@ -1,12 +1,17 @@
 #include <benchmark/benchmark.h>
 
 import std;
+import star.algorithm;
+import star.assets;
 import star.benchmark_asset_provider;
 import star.asset_source;
 import star.byte_array;
 import star.data_stream_devices;
 import star.format;
+import star.file;
 import star.io_device;
+import star.logging;
+import star.random;
 import star.sha256;
 import star.string;
 
@@ -151,6 +156,66 @@ void asset_batch(benchmark::State& state, AssetKind kind, bool batch, bool diges
           : "query primitive only; ordered per-entry results; fixture/readback/validation untimed; not whole digest");
     });
 }
+
+// Measure the real Assets factory, not a second implementation of its regex
+// loop. Fixture construction is excluded; index, digest and shutdown costs
+// are included for both versions.
+void repeated_digest_ignore(benchmark::State& state) {
+  Star::RandomService random{0x415353455453};
+  Star::Logger logger;
+  logger.remove_stdout_sink();
+  Star::LogMap log_map;
+  auto directory = Star::File::temporary_directory(random);
+  if (!directory) {
+    state.SkipWithError(directory.error().what());
+    return;
+  }
+  auto cleanup = Star::make_scope_exit([&] {
+    if (auto result = Star::File::remove_all(*directory); !result)
+      state.SkipWithError(result.error().what());
+  });
+  Star::Sha256Hasher oracle;
+  auto add_file = [&](Star::String const& name, Star::String const& content, bool included) {
+    auto result = Star::File::write_file(content, Star::File::relative_to(*directory, name));
+    if (result && included) {
+      auto size = Star::DataStreamBuffer::serialize(static_cast<Star::StreamOffset>(content.utf8().size()));
+      if (!size) return std::expected<void, Star::StarException>(std::unexpected(std::move(size.error())));
+      oracle.push("/" + name);
+      oracle.push(*size);
+    }
+    return result;
+  };
+  constexpr std::array<std::string_view, 4> extensions{"png", "object", "wav", "config"};
+  auto count = state.range(0);
+  for (std::int64_t i = 0; i < count; ++i) {
+    auto type = static_cast<std::size_t>(i % extensions.size());
+    auto name = Star::format("asset-{:05}.{}", i, extensions[type]);
+    if (auto added = add_file(name, "{}", type % 2 == 1); !added) {
+      state.SkipWithError(added.error().what());
+      return;
+    }
+  }
+  if (auto added = add_file("preload.config", "[]", true); !added) {
+    state.SkipWithError(added.error().what());
+    return;
+  }
+  auto expected = oracle.compute();
+  Star::Assets::Settings settings{};
+  settings.workerPoolSize = 1;
+  settings.digestIgnore = {R"(^/interface/)", R"(\.(png|frames)$)", R"(\.(ogg|wav)$)"};
+  Star::StringList sources{*directory};
+  for (auto _ : state) {
+    auto assets = Star::Assets::create(logger, random, log_map, settings, sources);
+    if (!assets || (*assets)->digest() != expected) {
+      state.SkipWithError(!assets ? assets.error().what() : "Filtered Assets digest differs from independent oracle");
+      break;
+    }
+  }
+  state.SetItemsProcessed(state.iterations() * (count + 1));
+  state.SetLabel("one directory, three ordered ignore regexes; complete Assets creation, digest check and teardown");
+}
+
+BENCHMARK(repeated_digest_ignore)->Arg(256)->Arg(2048)->UseRealTime();
 
 void sha256_stream(benchmark::State& state) {
   auto size = static_cast<std::size_t>(state.range(0));

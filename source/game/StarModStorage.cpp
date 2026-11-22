@@ -170,10 +170,10 @@ std::expected<std::string, StarException> serializeKey(String const& key, std::s
 
 std::expected<bool, StarException> storageFileExists(String const& filename) {
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
-  auto native = filename.wstring();
+  auto native = filename.to_wstring();
   if (!native)
     return std::unexpected(std::move(native.error()));
-  std::filesystem::path path(*native);
+  std::filesystem::path path(std::move(*native));
 #else
   std::filesystem::path path(filename.utf8());
 #endif

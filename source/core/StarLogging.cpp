@@ -287,7 +287,7 @@ void EmergencyLog::log(LogLevel, std::string_view message) {
     Star::format("Asterbound emergency output failed: {}\n{}", Star::exception_summary(emitted.error()), message);
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
   String text(std::move(diagnostic));
-  auto wide = text.wstring();
+  auto wide = text.to_wstring();
   if (wide) {
     OutputDebugStringW(wide->c_str());
     return;

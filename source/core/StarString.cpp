@@ -47,6 +47,42 @@ std::size_t byte_size_sum(std::size_t left, std::size_t right) {
   auto maximum = std::numeric_limits<std::size_t>::max();
   return right > maximum - left ? maximum : left + right;
 }
+
+// Both callers pass a nonempty unit and a positive repetition count.
+std::expected<String, StarException> repeat_bytes(std::string_view unit, std::size_t count,
+    std::string_view base = {}, bool pad_left = false) {
+  std::string output;
+  if (count > (output.max_size() - base.size()) / unit.size())
+    return std::unexpected(StringException("Repeated text exceeds string capacity"));
+  auto repeated_size = count * unit.size();
+  output.reserve(repeated_size + base.size());
+  if (!pad_left && !base.empty()) output.append(base);
+  if (unit.size() == 1) {
+    output.append(count, unit.front());
+  } else {
+    auto start = output.size();
+    output.append(unit);
+    for (auto filled = unit.size(); filled < repeated_size;) {
+      auto chunk = std::min(filled, repeated_size - filled);
+      output.append(output, start, chunk);
+      filled += chunk;
+    }
+  }
+  if (pad_left && !base.empty()) output.append(base);
+  return String(std::move(output));
+}
+
+std::expected<String, StarException> padded_string(String const& base, std::size_t target,
+    String const& filler, bool pad_left) {
+  auto fill_length = filler.size();
+  if (!fill_length) return std::unexpected(std::move(fill_length.error()));
+  if (*fill_length == 0) return base;
+  auto length = base.size();
+  if (!length) return std::unexpected(std::move(length.error()));
+  if (target <= *length) return base;
+  auto count = 1 + (target - *length - 1) / *fill_length;
+  return repeat_bytes(filler.utf8(), count, base.utf8(), pad_left);
+}
 }
 bool String::is_space(Char c) { return c == 0x20 || c == 9 || c == 10 || c == 13 || c == 0xfeff; }
 bool String::is_ascii_number(Char c) { return c >= '0' && c <= '9'; }
@@ -85,11 +121,24 @@ String::String(String const& s) = default;
 String::String(String&& s) noexcept = default;
 String::String(std::string const& s) : m_string(s) {}
 String::String(std::string&& s) noexcept : m_string(std::move(s)) {}
-std::expected<String, StarException> String::create(std::wstring const& text) {
+std::expected<String, StarException> String::from_wstring(std::wstring_view text) {
+  static_assert(sizeof(wchar_t) == 2 || sizeof(wchar_t) == 4);
   String result;
   result.reserve(text.size());
-  for (auto point : text) {
-    auto appended = result.append(static_cast<Char>(point));
+  for (std::size_t i = 0; i != text.size(); ++i) {
+    auto point = static_cast<Char>(text[i]);
+    if constexpr (sizeof(wchar_t) == 2) {
+      if (is_utf16_lead_surrogate(point)) {
+        if (++i == text.size())
+          return std::unexpected(UnicodeException("Missing UTF-16 trail surrogate"));
+        auto combined = utf32_from_utf16_surrogate_pair(point, static_cast<Char>(text[i]));
+        if (!combined) return std::unexpected(std::move(combined.error()));
+        point = *combined;
+      }
+    }
+    if (is_utf16_lead_surrogate(point) || is_utf16_trail_surrogate(point))
+      return std::unexpected(UnicodeException("Isolated surrogate in native wide string"));
+    auto appended = result.append(point);
     if (!appended) return std::unexpected(std::move(appended.error()));
   }
   return result;
@@ -106,10 +155,7 @@ std::expected<String, StarException> String::create(Char point, std::size_t coun
   char bytes[4];
   auto length = utf8_encode_char(bytes, point);
   if (!length) return std::unexpected(std::move(length.error()));
-  String result;
-  result.reserve(count);
-  for (std::size_t i = 0; i != count; ++i) result.append(std::string_view(bytes, *length));
-  return result;
+  return repeat_bytes(std::string_view(bytes, *length), count);
 }
 std::expected<String, StarException> String::create(Char point) { return create(point, 1); }
 std::string const& String::utf8() const & { return m_string; }
@@ -119,11 +165,24 @@ std::string String::take_utf8() { return std::exchange(m_string, {}); }
 ByteArray String::utf8_bytes() const { return ByteArray(std::span<char const>(m_string)); }
 char const* String::utf8_data() const & { return m_string.c_str(); }
 std::size_t String::utf8_size() const { return m_string.size(); }
-std::expected<std::wstring, StarException> String::wstring() const {
-  auto first = begin();
-  if (!first) return std::unexpected(std::move(first.error()));
+std::expected<std::wstring, StarException> String::to_wstring() const {
   std::wstring result;
-  for (auto it = *first; it != end(); ++it) result.push_back(static_cast<wchar_t>(*it));
+  result.reserve(m_string.size());
+  auto scanned = for_each_codepoint(m_string, [&](Char point, std::size_t, std::size_t) -> std::expected<void, StarException> {
+    if (is_utf16_lead_surrogate(point) || is_utf16_trail_surrogate(point))
+      return std::unexpected(UnicodeException("Surrogate is not a Unicode scalar value"));
+    if constexpr (sizeof(wchar_t) == 2) {
+      if (point >= 0x10000) {
+        point -= 0x10000;
+        result.push_back(static_cast<wchar_t>(0xd800 + (point >> 10)));
+        result.push_back(static_cast<wchar_t>(0xdc00 + (point & 0x3ff)));
+        return {};
+      }
+    }
+    result.push_back(static_cast<wchar_t>(point));
+    return {};
+  });
+  if (!scanned) return std::unexpected(std::move(scanned.error()));
   return result;
 }
 std::expected<String::WideString, StarException> String::wide_string() const {
@@ -350,102 +409,145 @@ std::expected<StringList, StarException> String::rsplit_any(String const& chars,
 }
 std::expected<StringList, StarException> String::split_lines(std::size_t maxSplit) const { return split_any("\r\n", maxSplit); }
 std::expected<StringList, StarException> String::split_whitespace(std::size_t maxSplit) const { return split_any("", maxSplit); }
+namespace {
+template <bool from_end>
+std::expected<String, StarException> extract_token(std::string& source, String const& delimiters) {
+  std::string_view bytes(source);
+  if constexpr (from_end) {
+    // A malformed source takes priority over any delimiter error, in reverse order.
+    auto validated = validate_reverse(bytes);
+    if (!validated) return std::unexpected(std::move(validated.error()));
+  }
+
+  // Positions follow the scan direction: leading delimiters, token, separators,
+  // then an untouched remainder. Do not mutate source while delimiters may alias it.
+  auto backwards = String::const_iterator::end(source.cend());
+  std::size_t position = from_end ? bytes.size() : 0;
+  auto const limit = from_end ? 0 : bytes.size();
+  std::size_t first = NPos, last = NPos, remainder = limit;
+  while (position != limit) {
+    auto before = position;
+    String::Char point;
+    if constexpr (from_end) {
+      --backwards;
+      point = *backwards;
+      position = static_cast<std::size_t>(backwards.base() - source.cbegin());
+    } else {
+      auto width = utf8_decode_char(bytes.substr(position), point);
+      if (!width) return std::unexpected(std::move(width.error()));
+      position += *width;
+    }
+    auto match = delimiters.has_char_or_whitespace(point);
+    if (!match) return std::unexpected(std::move(match.error()));
+    if (*match) {
+      if (first != NPos && last == NPos) last = before;
+    } else if (first == NPos) {
+      first = before;
+    } else if (last != NPos) {
+      remainder = before;
+      if constexpr (!from_end) {
+        // split_any stopped testing delimiters here, but still decoded the suffix.
+        auto validated = utf8_length(bytes.substr(position));
+        if (!validated) return std::unexpected(std::move(validated.error()));
+      }
+      break;
+    }
+  }
+
+  if (first == NPos) {
+    if constexpr (from_end) {
+      if (!source.empty()) return std::unexpected(OutOfRangeException("No token in String::rextract"));
+    }
+    return String();
+  }
+  if (last == NPos) last = limit;
+  if constexpr (from_end) std::swap(first, last);
+  if (remainder == limit) {
+    source.erase(last);
+    source.erase(0, first);
+    return String(std::exchange(source, {}));
+  }
+  String token(bytes.substr(first, last - first));
+  if constexpr (from_end) source.erase(remainder);
+  else source.erase(0, remainder);
+  return token;
+}
+}
 std::expected<String, StarException> String::extract(String const& chars) {
-  auto parts = split_any(chars, 1);
-  if (!parts) return std::unexpected(std::move(parts.error()));
-  if (parts->empty()) return String();
-  String result = std::move((*parts)[0]);
-  if (parts->size() == 1) clear(); else *this = std::move((*parts)[1]);
-  return result;
+  return extract_token<false>(m_string, chars);
 }
 std::expected<String, StarException> String::rextract(String const& chars) {
-  if (empty()) return String();
-  auto parts = rsplit_any(chars, 1);
-  if (!parts) return std::unexpected(std::move(parts.error()));
-  if (parts->empty()) return std::unexpected(OutOfRangeException("No token in String::rextract"));
-  if (parts->size() == 1) { clear(); return std::move((*parts)[0]); }
-  *this = std::move((*parts)[0]);
-  return std::move((*parts)[1]);
+  return extract_token<true>(m_string, chars);
 }
 std::expected<bool, StarException> String::has_char(Char point) const { return StringView(*this).has_char(point); }
 std::expected<bool, StarException> String::has_char_or_whitespace(Char point) const { return StringView(*this).has_char_or_whitespace(point); }
 std::expected<String, StarException> String::replace(String const& pattern, String const& value, CaseSensitivity cs) const {
   auto length = size();
   if (!length) return std::unexpected(std::move(length.error()));
-  auto patternLength = pattern.size();
-  if (!patternLength) return std::unexpected(std::move(patternLength.error()));
+  auto pattern_length = pattern.size();
+  if (!pattern_length) return std::unexpected(std::move(pattern_length.error()));
   if (pattern.empty()) return *this;
   String result;
   result.reserve(m_string.size());
-  std::size_t copied = 0;
-  if (cs == CaseSensitive) {
-    for (;;) {
-      auto found = m_string.find(pattern.m_string, copied);
+  std::string_view remaining(m_string);
+  for (;;) {
+    std::size_t found;
+    if (cs == CaseInsensitive) {
+      // Valid UTF-8 has a unique byte spelling, and our fold changes ASCII only.
+      auto match = std::ranges::search(remaining, pattern.m_string, [](unsigned char lhs, unsigned char rhs) {
+        return to_lower(lhs) == to_lower(rhs);
+      });
+      if (match.empty()) break;
+      found = static_cast<std::size_t>(match.begin() - remaining.begin());
+    } else {
+      found = remaining.find(pattern.m_string);
       if (found == NPos) break;
-      result.append(std::string_view(m_string).substr(copied, found - copied));
-      result.append(value);
-      copied = found + pattern.m_string.size();
     }
-  } else {
-    Utf8Cursor cursor(m_string);
-    while (!cursor.at_end()) {
-      auto candidate = cursor;
-      Utf8Cursor needle(pattern.m_string);
-      while (!candidate.at_end() && !needle.at_end()) {
-        auto point = candidate.read();
-        if (!point) return std::unexpected(std::move(point.error()));
-        auto expected = needle.read();
-        if (!expected) return std::unexpected(std::move(expected.error()));
-        if (!char_equal(*point, *expected, cs)) break;
-        auto moved = candidate.advance();
-        if (!moved) return std::unexpected(std::move(moved.error()));
-        auto needleMoved = needle.advance();
-        if (!needleMoved) return std::unexpected(std::move(needleMoved.error()));
-      }
-      if (needle.at_end()) {
-        result.append(std::string_view(m_string).substr(copied, cursor.offset() - copied));
-        result.append(value);
-        cursor = candidate;
-        copied = cursor.offset();
-      } else {
-        auto moved = cursor.advance();
-        if (!moved) return std::unexpected(std::move(moved.error()));
-      }
-    }
+    result.append(remaining.substr(0, found));
+    result.append(value);
+    remaining.remove_prefix(found + pattern.m_string.size());
   }
-  result.append(std::string_view(m_string).substr(copied));
+  result.append(remaining);
   return result;
 }
-std::expected<String, StarException> String::trim_end(String const& pattern) const {
-  auto first = begin();
-  if (!first) return std::unexpected(std::move(first.error()));
-  auto stop = end();
-  while (stop != *first) {
-    auto previous = stop; --previous;
-    auto match = pattern.has_char_or_whitespace(*previous);
-    if (!match) return std::unexpected(std::move(match.error()));
-    if (!*match) break;
-    stop = previous;
-  }
-  return String(std::string_view(m_string).substr(0, static_cast<std::size_t>(std::distance(m_string.begin(), stop.base()))));
-}
-std::expected<String, StarException> String::trim_begin(String const& pattern) const {
-  auto first = begin();
+namespace {
+enum class TrimEdges { Begin, End, Both };
+
+std::expected<String, StarException> trim_edges(String const& source, String const& pattern, TrimEdges edges) {
+  auto first = source.begin();
   if (!first) return std::unexpected(std::move(first.error()));
   auto start = *first;
-  while (start != end()) {
-    auto match = pattern.has_char_or_whitespace(*start);
-    if (!match) return std::unexpected(std::move(match.error()));
-    if (!*match) break;
-    ++start;
+  auto stop = source.end();
+  // trim() historically queries the suffix first. Membership in pattern is lazy.
+  if (edges != TrimEdges::Begin) {
+    while (stop != start) {
+      auto previous = stop;
+      --previous;
+      auto match = pattern.has_char_or_whitespace(*previous);
+      if (!match) return std::unexpected(std::move(match.error()));
+      if (!*match) break;
+      stop = previous;
+    }
   }
-  auto offset = static_cast<std::size_t>(std::distance(m_string.begin(), start.base()));
-  return String(std::string_view(m_string).substr(offset));
+  if (edges != TrimEdges::End) {
+    while (start != stop) {
+      auto match = pattern.has_char_or_whitespace(*start);
+      if (!match) return std::unexpected(std::move(match.error()));
+      if (!*match) break;
+      ++start;
+    }
+  }
+  return std::string_view(start.base(), stop.base());
+}
+}
+std::expected<String, StarException> String::trim_end(String const& pattern) const {
+  return trim_edges(*this, pattern, TrimEdges::End);
+}
+std::expected<String, StarException> String::trim_begin(String const& pattern) const {
+  return trim_edges(*this, pattern, TrimEdges::Begin);
 }
 std::expected<String, StarException> String::trim(String const& pattern) const {
-  auto result = trim_end(pattern);
-  if (!result) return std::unexpected(std::move(result.error()));
-  return result->trim_begin(pattern);
+  return trim_edges(*this, pattern, TrimEdges::Both);
 }
 std::expected<std::size_t, StarException> String::find(Char point, std::size_t pos, CaseSensitivity cs) const { return StringView(*this).find(point, pos, cs); }
 std::expected<std::size_t, StarException> String::find(String const& pattern, std::size_t pos, CaseSensitivity cs) const { return StringView(*this).find(pattern, pos, cs); }
@@ -533,12 +635,40 @@ std::expected<void, StarException> String::prepend(Char point) {
 std::expected<void, StarException> String::push_back(Char point) { return append(point); }
 std::expected<void, StarException> String::push_front(Char point) { return prepend(point); }
 std::expected<bool, StarException> String::contains(String const& pattern, CaseSensitivity cs) const { return StringView(*this).contains(pattern, cs); }
-std::expected<bool, StarException> String::regex_match(String const& pattern, bool full, bool caseSensitive) const {
-  re2::RE2::Options options;
-  options.set_case_sensitive(caseSensitive);
-  RE2 regex(pattern.utf8(), options);
-  if (!regex.ok()) return std::unexpected(StringException::format("Invalid regex pattern '{}': {}", pattern, regex.error()));
-  return full ? RE2::FullMatch(utf8(), regex) : RE2::PartialMatch(utf8(), regex);
+namespace {
+RE2::Options regex_options(bool case_sensitive) {
+  RE2::Options options;
+  options.set_case_sensitive(case_sensitive);
+  return options;
+}
+
+StarException regex_error(String const& pattern, RE2 const& regex) {
+  return StringException::format("Invalid regex pattern '{}': {}", pattern, regex.error());
+}
+
+bool matches_regex(String const& text, RE2 const& regex, bool full) {
+  return full ? RE2::FullMatch(text.utf8(), regex) : RE2::PartialMatch(text.utf8(), regex);
+}
+}
+
+CompiledRegex::CompiledRegex(std::unique_ptr<re2::RE2> program) : m_program(std::move(program)) {}
+CompiledRegex::CompiledRegex(CompiledRegex&&) noexcept = default;
+CompiledRegex::~CompiledRegex() = default;
+
+std::expected<CompiledRegex, StarException> CompiledRegex::compile(String const& pattern, bool case_sensitive) {
+  auto program = std::make_unique<RE2>(pattern.utf8(), regex_options(case_sensitive));
+  if (!program->ok()) return std::unexpected(regex_error(pattern, *program));
+  return CompiledRegex(std::move(program));
+}
+
+bool CompiledRegex::matches(String const& text, bool full) const {
+  return matches_regex(text, *m_program, full);
+}
+
+std::expected<bool, StarException> String::regex_match(String const& pattern, bool full, bool case_sensitive) const {
+  RE2 regex(pattern.utf8(), regex_options(case_sensitive));
+  if (!regex.ok()) return std::unexpected(regex_error(pattern, regex));
+  return matches_regex(*this, regex, full);
 }
 std::expected<int, StarException> String::compare(String const& other, CaseSensitivity cs) const {
   if (cs == CaseSensitive) return m_string.compare(other.m_string);
@@ -564,26 +694,10 @@ std::expected<void, StarException> String::erase(std::size_t pos, std::size_t co
   return {};
 }
 std::expected<String, StarException> String::pad_left(std::size_t target, String const& filler) const {
-  auto fillLength = filler.length();
-  if (!fillLength) return std::unexpected(std::move(fillLength.error()));
-  if (*fillLength == 0) return *this;
-  auto length = size();
-  if (!length) return std::unexpected(std::move(length.error()));
-  String result;
-  std::size_t added = 0;
-  while (added < target && *length < target - added) { result.append(filler); added += *fillLength; }
-  result.append(*this);
-  return result;
+  return padded_string(*this, target, filler, true);
 }
 std::expected<String, StarException> String::pad_right(std::size_t target, String const& filler) const {
-  auto fillLength = filler.length();
-  if (!fillLength) return std::unexpected(std::move(fillLength.error()));
-  if (*fillLength == 0) return *this;
-  auto length = size();
-  if (!length) return std::unexpected(std::move(length.error()));
-  String result = *this;
-  for (auto n = *length; n < target; n += *fillLength) result.append(filler);
-  return result;
+  return padded_string(*this, target, filler, false);
 }
 String& String::operator=(String const& s) = default;
 String& String::operator=(String&& s) noexcept = default;

@@ -673,6 +673,8 @@ private:
       return name.view();
     else if constexpr (std::same_as<Query, String> || std::same_as<Query, StringView>)
       return CaseInsensitiveStringView::create(std::string_view(name.utf8()));
+    else if constexpr (requires { bounded_array_text(name); })
+      return CaseInsensitiveStringView::create(name);
     else
       return CaseInsensitiveStringView::create(std::string_view(name));
   }

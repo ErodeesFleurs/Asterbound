@@ -993,13 +993,20 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
   // Retain a preparation error until all preceding metadata results have been
   // consumed. Group traversal must never determine the first reported error.
   auto prepared = [&]() -> std::expected<void, StarException> {
+    // Only the reached prefix is compiled: an earlier match can hide an invalid later pattern.
+    std::vector<CompiledRegex> ignore_patterns;
+    if (!digestPaths.empty())
+      ignore_patterns.reserve(m_settings.digestIgnore.size());
     for (auto const& assetPath : digestPaths) {
       bool digestFile = true;
-      for (auto const& pattern : m_settings.digestIgnore) {
-        auto matches = assetPath.regex_match(pattern, false, false);
-        if (!matches)
-          return std::unexpected(std::move(matches.error()));
-        if (*matches) {
+      for (std::size_t i = 0; i < m_settings.digestIgnore.size(); ++i) {
+        if (i == ignore_patterns.size()) {
+          auto pattern = CompiledRegex::compile(m_settings.digestIgnore[i], false);
+          if (!pattern)
+            return std::unexpected(std::move(pattern.error()));
+          ignore_patterns.push_back(std::move(*pattern));
+        }
+        if (ignore_patterns[i].matches(assetPath, false)) {
           digestFile = false;
           break;
         }

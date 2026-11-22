@@ -203,6 +203,101 @@ TEST(StringTest, extract) {
   EXPECT_EQ(test, "");
 }
 
+TEST(StringTest, TrimKeepsBinaryInteriorAndValidatesSourceBeforeLazyDelimiters) {
+  String source(std::string_view("日\0日a\0b日\0", 14));
+  String delimiters(std::string_view("\0日", 4));
+  EXPECT_EQ(source.trim(delimiters), String(std::string_view("a\0b", 3)));
+  EXPECT_EQ(source.trim_begin(delimiters), String(std::string_view("a\0b日\0", 7)));
+  EXPECT_EQ(source.trim_end(delimiters), String(std::string_view("日\0日a\0b", 10)));
+
+  String malformed_set(std::string_view("日\xc3", 4));
+  EXPECT_EQ(String("日日").trim(malformed_set), "");
+  EXPECT_EQ(String().trim(malformed_set), "");
+  auto missing = String("日a日").trim(malformed_set);
+  ASSERT_FALSE(missing);
+  EXPECT_TRUE(missing.error().is<UnicodeException>());
+
+  String malformed_source(std::string_view("a\xff", 2));
+  auto source_error = malformed_source.size();
+  auto result = malformed_source.trim(malformed_set);
+  ASSERT_FALSE(source_error);
+  ASSERT_FALSE(result);
+  EXPECT_STREQ(result.error().what(), source_error.error().what());
+}
+
+TEST(StringTest, ExtractionCommitsOnlyTokenAndRemainderInScanDirection) {
+  String delimiters(std::string_view("\0日", 4));
+  String original(std::string_view("\0日a日\0b日c\0", 15));
+  String source = original;
+  EXPECT_EQ(source.extract(delimiters), "a");
+  EXPECT_EQ(source, String(std::string_view("b日c\0", 6)));
+  EXPECT_EQ(source.rextract(delimiters), "c");
+  EXPECT_EQ(source, "b");
+  EXPECT_EQ(source.extract(delimiters), "b");
+  EXPECT_TRUE(source.empty());
+
+  source = original;
+  EXPECT_EQ(source.rextract(delimiters), "c");
+  EXPECT_EQ(source, String(std::string_view("\0日a日\0b", 10)));
+  String whitespace("\ufeff \tword\r\n");
+  EXPECT_EQ(whitespace.rextract(), "word");
+  EXPECT_TRUE(whitespace.empty());
+  EXPECT_EQ(whitespace.rextract(), "");
+}
+
+TEST(StringTest, ExtractionPreservesDelimiterOnlyOwnersIncludingSelfAliases) {
+  String all("日,日");
+  EXPECT_EQ(all.extract(all), "");
+  EXPECT_EQ(all, "日,日");
+  auto reverse = all.rextract(all);
+  ASSERT_FALSE(reverse);
+  EXPECT_TRUE(reverse.error().is<OutOfRangeException>());
+  EXPECT_EQ(all, "日,日");
+
+  String malformed_set(std::string_view("日,\xff", 5));
+  EXPECT_EQ(all.extract(malformed_set), "");
+  EXPECT_EQ(all, "日,日");
+  auto no_token = all.rextract(malformed_set);
+  ASSERT_FALSE(no_token);
+  EXPECT_TRUE(no_token.error().is<OutOfRangeException>());
+  EXPECT_EQ(all, "日,日");
+  String empty;
+  EXPECT_EQ(empty.extract(malformed_set), "");
+  EXPECT_EQ(empty.rextract(malformed_set), "");
+}
+
+TEST(StringTest, ExtractionRetainsDirectionalErrorPriorityWithoutMutatingSource) {
+  String malformed_set(std::string_view(",\xc0\x80", 3));
+  String original(std::string_view("x\xff\xc3!", 4));
+  String source = original;
+  auto delimiter_error = malformed_set.size();
+  auto reverse_error = original.reverse();
+  ASSERT_FALSE(delimiter_error);
+  ASSERT_FALSE(reverse_error);
+  auto forward = source.extract(malformed_set);
+  ASSERT_FALSE(forward);
+  EXPECT_STREQ(forward.error().what(), delimiter_error.error().what());
+  EXPECT_EQ(source, original);
+  auto reverse = source.rextract(malformed_set);
+  ASSERT_FALSE(reverse);
+  EXPECT_STREQ(reverse.error().what(), reverse_error.error().what());
+  EXPECT_EQ(source, original);
+
+  String late_error(std::string_view("a,b,\xff", 5));
+  auto invalid_remainder = late_error.extract(",");
+  ASSERT_FALSE(invalid_remainder);
+  EXPECT_TRUE(invalid_remainder.error().is<UnicodeException>());
+  EXPECT_EQ(late_error, String(std::string_view("a,b,\xff", 5)));
+}
+
+TEST(StringTest, FoldedReplaceKeepsSurrogateSpellingsAndRetriesPartialMatches) {
+  String source(std::string_view("AaA\xed\xa0\x80\0a", 8));
+  String needle(std::string_view("aA\xed\xa0\x80\0", 6));
+  EXPECT_EQ(source.replace(needle, source, String::CaseInsensitive),
+      String(std::string_view("AAaA\xed\xa0\x80\0aa", 10)));
+  EXPECT_EQ(source.replace(source, needle, String::CaseInsensitive), needle);
+}
+
 TEST(StringTest, reverse) {
   EXPECT_EQ(String("FooBar").reverse(), "raBooF");
   EXPECT_EQ(String("").reverse(), "");

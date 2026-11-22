@@ -2561,9 +2561,9 @@ std::expected<void, StarException> ClientApplication::updateCamera(float dt) {
 #if defined STAR_SYSTEM_WINDOWS
 
 int __stdcall WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
-  auto reportStartupFailure = [](std::string const& diagnostic) {
-    Star::EmergencyLog::log(Star::LogLevel::Error, diagnostic);
-    auto text = Star::String(diagnostic).wstring();
+  auto report_startup_failure = [](Star::String const& diagnostic) {
+    Star::EmergencyLog::log(Star::LogLevel::Error, diagnostic.utf8());
+    auto text = diagnostic.to_wstring();
     if (text) {
       MessageBoxW(nullptr, text->c_str(), L"Asterbound startup error", MB_OK | MB_ICONERROR);
       return;
@@ -2572,7 +2572,7 @@ int __stdcall WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     // Preserve the actual diagnostic even when its bytes are not valid UTF-8.
     std::wstring escaped = L"Startup failed. Diagnostic bytes (non-ASCII bytes escaped):\n";
     constexpr wchar_t digits[] = L"0123456789ABCDEF";
-    for (unsigned char byte : diagnostic) {
+    for (unsigned char byte : diagnostic.utf8()) {
       if ((byte >= 0x20 && byte < 0x7f) || byte == '\n' || byte == '\r' || byte == '\t') {
         escaped.push_back(static_cast<wchar_t>(byte));
       } else {
@@ -2586,28 +2586,28 @@ int __stdcall WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
   if (IsDebuggerPresent() && AllocConsole()) {
     if ((::_fileno(stdout) < 0 && !std::freopen("CONOUT$", "w", stdout))
         || (::_fileno(stderr) < 0 && !std::freopen("CONOUT$", "w", stderr))) {
-      reportStartupFailure("Could not attach the debugger console output");
+      report_startup_failure("Could not attach the debugger console output");
       return 1;
     }
   }
   auto nativeRuntime = Star::NativeRuntime::create(Star::NativeRuntime::StandardStreams::Optional);
   if (!nativeRuntime) {
-    reportStartupFailure(Star::format("Client native initialization failed: {}", Star::output_exception(Star::ExceptionDiagnostic(nativeRuntime.error()), true)));
+    report_startup_failure(Star::format("Client native initialization failed: {}", Star::output_exception(Star::ExceptionDiagnostic(nativeRuntime.error()), true)));
     return 1;
   }
   int nArgs;
   LPWSTR* argsList = CommandLineToArgvW(GetCommandLineW(), &nArgs);
   if (!argsList) {
     auto error = GetLastError();
-    reportStartupFailure(Star::format("Could not read Windows command line: Windows error {}", error));
+    report_startup_failure(Star::format("Could not read Windows command line: Windows error {}", error));
     return 1;
   }
   std::unique_ptr<void, decltype(&LocalFree)> argsOwner(argsList, &LocalFree);
   Star::StringList args;
   for (int i = 0; i < nArgs; ++i) {
-    auto arg = Star::String::create(argsList[i]);
+    auto arg = Star::String::from_wstring(argsList[i]);
     if (!arg) {
-      reportStartupFailure(Star::format("Invalid Windows command line: {}", Star::output_exception(Star::ExceptionDiagnostic(arg.error()), true)));
+      report_startup_failure(Star::format("Invalid Windows command line: {}", Star::output_exception(Star::ExceptionDiagnostic(arg.error()), true)));
       return 1;
     }
     args.push_back(std::move(*arg));

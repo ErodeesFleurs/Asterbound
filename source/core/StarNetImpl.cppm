@@ -15,9 +15,6 @@ module;
 #include <unistd.h>
 #endif
 import std;
-#ifdef STAR_SYSTEM_FAMILY_WINDOWS
-import star.string_windows;
-#endif
 import star.string;
 import star.format;
 import star.host_address;
@@ -41,7 +38,7 @@ namespace Star {
       nullptr, static_cast<DWORD>(error), 0, reinterpret_cast<LPWSTR>(static_cast<LPWSTR*>(std::out_ptr(buffer))), 0, nullptr);
   if (length == 0)
     return Star::format("{} - native error text unavailable (FormatMessageW error {})", error, ::GetLastError());
-  auto text = utf16ToString(std::wstring_view{buffer.get(), length});
+  auto text = String::from_wstring(std::wstring_view{buffer.get(), length});
   if (!text)
     return Star::format("{} - native error text conversion failed: {}", error, text.error().what());
   return Star::format("{} - {}", error, *text);

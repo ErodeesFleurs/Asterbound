@@ -8,9 +8,6 @@ module;
 import std;
 import star.format;
 import star.string;
-#ifdef STAR_SYSTEM_FAMILY_WINDOWS
-import star.string_windows;
-#endif
 
 module star.dynamic_lib;
 
@@ -45,10 +42,10 @@ std::expected<DynamicLib, StarException> DynamicLib::open(String const& path) {
   if (path.utf8().contains('\0'))
     return std::unexpected(DynamicLibException("Cannot load dynamic library: path contains an embedded NUL"));
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
-  auto wide_name = stringToUtf16(path);
+  auto wide_name = path.to_wstring();
   if (!wide_name)
     return std::unexpected(std::move(wide_name.error()));
-  auto handle = LoadLibraryW(wide_name->get());
+  auto handle = LoadLibraryW(wide_name->c_str());
   if (!handle) {
     auto status = GetLastError();
     return std::unexpected(DynamicLibException::format("Cannot load dynamic library '{}' (Windows error {})", path, status));

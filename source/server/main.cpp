@@ -18,9 +18,6 @@ import star.io_device;
 import star.byte_array;
 import star.data_stream_devices;
 
-#if defined STAR_SYSTEM_WINDOWS
-import star.string_windows;
-#endif
 import std;
 typedef struct ZSTD_CCtx_s ZSTD_CCtx;
 typedef struct ZSTD_DCtx_s ZSTD_DCtx;
@@ -345,8 +342,8 @@ int main(int argc, char** argv) {
     auto text = Star::exception_summary(result.error());
     EmergencyLog::error("Fatal server error: {}", diagnostic_reported ? text : Star::exception_report(result.error()));
     #if defined STAR_SYSTEM_WINDOWS
-    auto wideText = stringToUtf16(text);
-    MessageBoxW(nullptr, wideText ? wideText->get() : L"Server startup failed; diagnostic conversion failed. See the log.",
+    auto wide_text = String(std::move(text)).to_wstring();
+    MessageBoxW(nullptr, wide_text ? wide_text->c_str() : L"Server startup failed; diagnostic conversion failed. See the log.",
         L"Asterbound server error", MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
     #endif
     return 1;

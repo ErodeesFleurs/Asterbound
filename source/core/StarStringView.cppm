@@ -39,7 +39,7 @@ public:
 
   // These assume utf8 input
   template <std::size_t N>
-  StringView(char const (&s)[N]) : m_view(s) {}
+  StringView(char const (&s)[N]) : m_view(bounded_array_text(s)) {}
   StringView(std::string_view const& s);
   StringView(std::string_view&& s) noexcept;
   StringView(std::string const& s);
@@ -122,7 +122,7 @@ public:
 
   friend bool operator==(StringView s1, std::string_view s2);
   template <std::size_t N>
-  friend bool operator==(StringView s, char const (&text)[N]) { return s.m_view == std::string_view(text); }
+  friend bool operator==(StringView s, char const (&text)[N]) { return s.m_view == bounded_array_text(text); }
   friend bool operator==(StringView s1, std::string const& s2);
   friend bool operator==(StringView s1, String const& s2);
   friend bool operator==(StringView s1, StringView s2);

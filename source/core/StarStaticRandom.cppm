@@ -46,8 +46,7 @@ struct StaticRandomPack {
   }
 
   template <std::size_t N> void append(char const (&text)[N]) {
-    std::string_view view(text, N);
-    auto prefix = view.substr(0, view.find('\0'));
+    auto prefix = bounded_array_text(text);
     std::memcpy(bytes.data() + size, prefix.data(), prefix.size());
     size += prefix.size();
   }

@@ -650,6 +650,44 @@ const GameTestRegistration assetMetadataDigest(
     }
   });
 
+const GameTestRegistration digest_ignore_pattern_order(
+  "AssetsTest", "DigestIgnoreCompilesOnlyReachedCaseInsensitivePartialPatterns", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(*directory, "preload.config")));
+    ASSERT_TRUE(File::write_file(String("hello"), File::relative_to(*directory, "mixed.txt")));
+    Assets::Settings settings{};
+    settings.workerPoolSize = 1;
+    settings.digestIgnore = {"IXE", "LOAD", "[", "("};
+    auto build = [&] {
+      return Assets::create(fixture.root().logger(), fixture.root().random(), fixture.root().logMap(), settings,
+                            {*directory});
+    };
+    {
+      auto assets = build();
+      ASSERT_TRUE(assets) << assets.error().what();
+      EXPECT_EQ((*assets)->digest(), Sha256Hasher{}.compute());
+    }
+
+    // Only the new final path reaches an invalid pattern. Report the first one.
+    ASSERT_TRUE(File::write_file(String("extra"), File::relative_to(*directory, "zzz.txt")));
+    auto rejected = build();
+    ASSERT_FALSE(rejected);
+    auto first_error = String("/zzz.txt").regex_match("[", false, false);
+    ASSERT_FALSE(first_error);
+    EXPECT_TRUE(rejected.error().is<StringException>());
+    EXPECT_STREQ(rejected.error().what(), first_error.error().what());
+
+    settings.digestIgnore = {"IXE", "LOAD"};
+    auto assets = build();
+    ASSERT_TRUE(assets) << assets.error().what();
+    auto historical = AssetWorkerTestAccess::reader_digest(**assets);
+    ASSERT_TRUE(historical) << historical.error().what();
+    EXPECT_EQ((*assets)->digest(), *historical);
+    EXPECT_NE((*assets)->digest(), Sha256Hasher{}.compute());
+  });
+
 const GameTestRegistration assetBatchDigestPatchProviders(
   "AssetsTest", "BatchDigestMatchesReaderOracleWithInlineAndMemoryPatchProviders", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());

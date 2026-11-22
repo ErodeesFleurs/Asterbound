@@ -12,11 +12,20 @@ import star.map;
 import star.set;
 import star.unicode;
 
+namespace re2 { class RE2; }
+
 namespace Star {
 
 class StringList;
 class StringView;
 class String;
+
+// Character arrays use C-text semantics, but need not contain a terminator.
+template <std::size_t N>
+constexpr std::string_view bounded_array_text(char const (&text)[N]) noexcept {
+  std::string_view bytes(text, N);
+  return bytes.substr(0, bytes.find('\0'));
+}
 
 template <typename Lookup>
 concept string_tag_lookup = std::invocable<Lookup&, String const&>
@@ -42,6 +51,19 @@ struct StringExceptionTag {
   static constexpr std::string_view name() { return "StringException"; }
 };
 using StringException = StarError<StringExceptionTag, StarException>;
+
+// Owns a checked RE2 program independently of the pattern's lifetime.
+class CompiledRegex {
+public:
+  [[nodiscard]] static std::expected<CompiledRegex, StarException> compile(String const& pattern, bool case_sensitive);
+  CompiledRegex(CompiledRegex&&) noexcept;
+  ~CompiledRegex();
+  [[nodiscard]] bool matches(String const& text, bool full) const;
+
+private:
+  explicit CompiledRegex(std::unique_ptr<re2::RE2> program);
+  std::unique_ptr<re2::RE2> m_program;
+};
 
 // A Unicode string class, which is a basic UTF-8 aware wrapper around
 // std::string.  Provides methods for accessing UTF-32 "Char" type, which
@@ -98,11 +120,13 @@ public:
 
   // These assume utf8 input
   template <std::size_t N>
-  String(char const (&s)[N]) : m_string(s) {}
+  String(char const (&s)[N]) : m_string(bounded_array_text(s)) {}
   String(std::string const& s);
   String(std::string&& s) noexcept;
 
-  [[nodiscard]] static std::expected<String, StarException> create(std::wstring const& s);
+  // Native wide text is UTF-16 or UTF-32 according to wchar_t width. Both
+  // directions preserve bounded NULs and reject malformed text/non-scalars.
+  [[nodiscard]] static std::expected<String, StarException> from_wstring(std::wstring_view text);
   [[nodiscard]] static std::expected<String, StarException> create(std::u32string_view s);
   [[nodiscard]] static std::expected<String, StarException> create(Char c, std::size_t n);
   [[nodiscard]] static std::expected<String, StarException> create(Char c);
@@ -118,7 +142,7 @@ public:
   char const* utf8_data() const && = delete;
   std::size_t utf8_size() const;
 
-  [[nodiscard]] std::expected<std::wstring, StarException> wstring() const;
+  [[nodiscard]] std::expected<std::wstring, StarException> to_wstring() const;
   [[nodiscard]] std::expected<WideString, StarException> wide_string() const;
 
   [[nodiscard]] std::expected<const_iterator, StarException> begin() const &;
@@ -205,7 +229,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> append(std::u32string_view s);
   void append(std::string_view s);
   template <std::size_t N>
-  void append(char const (&s)[N]) { append(std::string_view(s)); }
+  void append(char const (&s)[N]) { append(bounded_array_text(s)); }
   [[nodiscard]] std::expected<void, StarException> append(Char c);
 
   void prepend(String const& s);
@@ -213,7 +237,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> prepend(std::u32string_view s);
   void prepend(std::string_view s);
   template <std::size_t N>
-  void prepend(char const (&s)[N]) { prepend(std::string_view(s)); }
+  void prepend(char const (&s)[N]) { prepend(bounded_array_text(s)); }
   [[nodiscard]] std::expected<void, StarException> prepend(Char c);
 
   [[nodiscard]] std::expected<void, StarException> push_back(Char c);
@@ -259,7 +283,7 @@ public:
   String& operator+=(std::string const& s);
   [[nodiscard]] std::expected<std::reference_wrapper<String>, StarException> operator+=(std::u32string_view s);
   template <std::size_t N>
-  String& operator+=(char const (&s)[N]) { append(std::string_view(s)); return *this; }
+  String& operator+=(char const (&s)[N]) { append(s); return *this; }
   [[nodiscard]] std::expected<std::reference_wrapper<String>, StarException> operator+=(Char c);
 
   friend bool operator==(String const& s1, String const& s2);
@@ -304,13 +328,13 @@ public:
   String& operator+=(std::string_view s);
 
   template <std::size_t N>
-  friend bool operator==(String const& s, char const (&text)[N]) { return s.m_string == std::string_view(text); }
+  friend bool operator==(String const& s, char const (&text)[N]) { return s.m_string == bounded_array_text(text); }
   template <std::size_t N>
-  friend std::strong_ordering operator<=>(String const& s, char const (&text)[N]) { return s.m_string <=> std::string_view(text); }
+  friend std::strong_ordering operator<=>(String const& s, char const (&text)[N]) { return s.m_string <=> bounded_array_text(text); }
   template <std::size_t N>
-  friend std::strong_ordering operator<=>(char const (&text)[N], String const& s) { return std::string_view(text) <=> s.m_string; }
+  friend std::strong_ordering operator<=>(char const (&text)[N], String const& s) { return bounded_array_text(text) <=> s.m_string; }
   template <std::size_t N>
-  friend String operator+(String s, char const (&text)[N]) { s.append(std::string_view(text)); return s; }
+  friend String operator+(String s, char const (&text)[N]) { s.append(text); return s; }
   template <std::size_t N>
   friend String operator+(char const (&text)[N], String const& s) { String result(text); result.append(s); return result; }
 
@@ -396,7 +420,7 @@ struct hash<String> {
     return pl_hash_bytes(std::span(s.data(), s.size()));
   }
   template <std::size_t N> constexpr std::size_t operator()(char const (&s)[N]) const noexcept {
-    return (*this)(std::string_view(s));
+    return (*this)(bounded_array_text(s));
   }
   constexpr std::size_t operator()(std::string const& s) const noexcept { return (*this)(std::string_view(s)); }
 };
@@ -411,6 +435,10 @@ public:
   [[nodiscard]] static std::expected<CaseInsensitiveStringView, StarException> create(String&&) = delete;
   [[nodiscard]] static std::expected<CaseInsensitiveStringView, StarException> create(String const&&) = delete;
   [[nodiscard]] static std::expected<CaseInsensitiveStringView, StarException> create(std::string_view bytes);
+  template <std::size_t N>
+  [[nodiscard]] static std::expected<CaseInsensitiveStringView, StarException> create(char const (&text)[N]) {
+    return create(bounded_array_text(text));
+  }
   template <typename Owner>
     requires std::same_as<std::remove_cvref_t<Owner>, std::string> && (!std::is_lvalue_reference_v<Owner>)
   [[nodiscard]] static std::expected<CaseInsensitiveStringView, StarException> create(Owner&&) = delete;
@@ -650,8 +678,10 @@ export namespace Star {
 
 
 export namespace Star {
+  using ::Star::bounded_array_text;
   using ::Star::StringExceptionTag;
   using ::Star::StringException;
+  using ::Star::CompiledRegex;
   using ::Star::string_tag_lookup;
   using ::Star::string_view_tag_lookup;
   using ::Star::string_tag_map;

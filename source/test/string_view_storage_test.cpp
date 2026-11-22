@@ -1,5 +1,6 @@
 import std;
 import star.memory;
+import star.bi_map;
 import star.string;
 import star.string_view;
 import star.unicode;
@@ -154,6 +155,51 @@ static_assert(can_make_cursor_end<std::string&>);
 static_assert(!can_make_cursor_end<std::string>);
 static_assert(!can_make_cursor_end<std::string const>);
 static_assert(can_make_cursor_end<std::string_view>);
+}
+
+TEST(StringViewStorageTest, ArrayInputsStopAtNulOrExtentAcrossStorageAndLookup) {
+  struct {
+    char text[3];
+    char trailer[2];
+  } storage{{'A', 'b', 'C'}, {'!', '\0'}};
+  char const terminated[] = {'A', 'b', 'C', '\0', 'X'};
+  auto check = []<std::size_t n>(char const (&text)[n]) {
+    String owned(text);
+    StringView view(text);
+    EXPECT_EQ(owned.utf8(), "AbC");
+    EXPECT_EQ(view.utf8(), "AbC");
+    EXPECT_TRUE(String("AbC") == text);
+    EXPECT_TRUE(text == StringView("AbC"));
+    EXPECT_TRUE((String("AbC") <=> text) == 0);
+    EXPECT_TRUE((text <=> String("AbC")) == 0);
+    EXPECT_EQ(hash<String>{}(text), hash<String>{}(std::string_view("AbC")));
+    EXPECT_EQ((String("<") + text).utf8(), "<AbC");
+    EXPECT_EQ((text + String(">")).utf8(), "AbC>");
+    String built("|");
+    built.prepend(text);
+    built.append(text);
+    built += text;
+    EXPECT_EQ(built.utf8(), "AbC|AbCAbC");
+    StringSet keys{"AbC"};
+    EXPECT_TRUE(keys.contains(text));
+    auto validated = CaseInsensitiveStringView::create(text);
+    ASSERT_TRUE(validated);
+    EXPECT_EQ(validated->utf8(), "AbC");
+    auto names = EnumMap<int>::create({{1, "abc"}});
+    ASSERT_TRUE(names);
+    auto found = names->get_left(text);
+    ASSERT_TRUE(found);
+    EXPECT_EQ(found->get(), 1);
+  };
+  check(storage.text);
+  check(terminated);
+  std::string_view sized(terminated, sizeof(terminated));
+  EXPECT_EQ(String(sized).utf8(), sized);
+  EXPECT_EQ(StringView(sized).utf8(), sized);
+  String binary;
+  binary.append(sized);
+  EXPECT_EQ(binary.utf8(), sized);
+  EXPECT_EQ(hash<String>{}(sized), hash<String>{}(binary));
 }
 
 TEST(StringViewStorageTest, CodepointValuesOutliveIteratorChangesAndDestruction) {

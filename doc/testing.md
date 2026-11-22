@@ -293,6 +293,20 @@ values, insertion preserves the old end-relative stop: omit the oldest
 `1 - maxMessagePerEntity` previous bubbles, or all if there are fewer. The
 subsequent per-tick visibility filter still applies.
 
+### String boundaries and asset patterns
+
+Character-array construction, comparison and hashing stop at the first NUL
+within the array; an unterminated array contributes all its bytes. Use a
+sized string view when embedded NUL is data. Test supplementary characters
+in both directions at the native wide-string boundary.
+
+Preserve lazy delimiter failures when checking trim and extraction, and
+leave the receiver unchanged on error. Digest-ignore patterns are observed
+in order; a later invalid pattern must not fail a path already ignored.
+Use `string_benchmarks` to compare `Extract`, `ReverseExtract`, `Trim`,
+`ReplaceInsensitiveHit`, `ReplaceInsensitiveMiss`, `PadLeft` and `PadRight`.
+Keep the small-input and long-input results separate.
+
 ### Bézier beam geometry
 
 Arc length is a sampled polyline length, not the endpoint distance. A closed

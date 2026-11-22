@@ -2,6 +2,7 @@ import std;
 import star.format;
 import star.string;
 import star.string_view;
+import star.unicode;
 
 #include "gtest/gtest.h"
 
@@ -53,6 +54,51 @@ struct contextual_tag_map {
 static_assert(string_tag_lookup<checked_tag_lookup>);
 static_assert(!string_tag_lookup<decltype([](String const&) { return 42; })>);
 static_assert(string_view_tag_lookup<decltype([](std::string_view key) { return String(key); })>);
+}
+
+TEST(StringContractTest, RepetitionChecksEncodedByteCapacityAfterValidatingThePoint) {
+  auto invalid_point = static_cast<String::Char>(0x110000);
+  auto empty = String::create(invalid_point, 0);
+  ASSERT_TRUE(empty);
+  EXPECT_TRUE(empty->empty());
+  auto invalid = String::create(invalid_point, std::numeric_limits<std::size_t>::max());
+  ASSERT_FALSE(invalid);
+  EXPECT_TRUE(invalid.error().is<UnicodeException>());
+  auto overflow = String::create(U'水', std::numeric_limits<std::size_t>::max() / 3 + 1);
+  ASSERT_FALSE(overflow);
+  EXPECT_TRUE(overflow.error().is<StringException>());
+  auto zeros = String::create(U'\0', 257);
+  ASSERT_TRUE(zeros);
+  EXPECT_EQ(zeros->utf8(), std::string(257, '\0'));
+  auto repeated = String::create(U'水', 5);
+  ASSERT_TRUE(repeated);
+  EXPECT_EQ(repeated->utf8(), "水水水水水");
+}
+
+TEST(StringContractTest, PaddingRepeatsWholeFillerAndPreservesValidationOrder) {
+  String base("é");
+  String filler(std::string_view("\0水", 4));
+  auto left = base.pad_left(4, filler);
+  auto right = base.pad_right(4, filler);
+  ASSERT_TRUE(left);
+  ASSERT_TRUE(right);
+  EXPECT_EQ(left->utf8(), std::string_view("\0水\0水é", 10));
+  EXPECT_EQ(right->utf8(), std::string_view("é\0水\0水", 10));
+  String invalid(std::string_view("\xff", 1));
+  for (auto pad : {&String::pad_left, &String::pad_right}) {
+    auto unchanged = (invalid.*pad)(9, "");
+    ASSERT_TRUE(unchanged);
+    EXPECT_EQ(*unchanged, invalid);
+    auto bad_filler = (base.*pad)(0, invalid);
+    ASSERT_FALSE(bad_filler);
+    EXPECT_TRUE(bad_filler.error().is<UnicodeException>());
+    auto bad_base = (invalid.*pad)(0, filler);
+    ASSERT_FALSE(bad_base);
+    EXPECT_TRUE(bad_base.error().is<UnicodeException>());
+    auto overflow = (base.*pad)(std::numeric_limits<std::size_t>::max(), filler);
+    ASSERT_FALSE(overflow);
+    EXPECT_TRUE(overflow.error().is<StringException>());
+  }
 }
 
 TEST(StringContractTest, JoiningDoesNotConvertLaterArgumentsAfterFirstError) {

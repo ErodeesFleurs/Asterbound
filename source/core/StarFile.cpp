@@ -7,19 +7,16 @@ import star.format;
 import std;
 import star.byte_array;
 import star.algorithm;
-#ifdef STAR_SYSTEM_FAMILY_WINDOWS
-import star.string_windows;
-#endif
 
 namespace Star {
 
 namespace {
 std::expected<std::filesystem::path, StarException> filesystem_path(String const& path) {
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
-    auto native = stringToUtf16(path);
+    auto native = path.to_wstring();
     if (!native)
       return std::unexpected(std::move(native.error()));
-    return std::filesystem::path(native->get());
+    return std::filesystem::path(std::move(*native));
 #else
     return std::filesystem::path(path.utf8_data());
 #endif
@@ -135,7 +132,7 @@ std::expected<String, StarException> File::current_directory() {
   if (error)
     return std::unexpected(IOException::format("could not get current directory: {}", error.message()));
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
-  return utf16ToString(path.c_str());
+  return String::from_wstring(path.native());
 #else
   return String(path.native());
 #endif

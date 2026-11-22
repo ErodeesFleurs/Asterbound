@@ -11,7 +11,8 @@ namespace {
 using Star::String;
 using Star::StringList;
 enum class operation { replace_dense, replace_missing, replace_sparse, rsplit, rsplit_any, split_any,
-                       join, join_with, lower, upper, rot13, at, substr, slice, erase, trim };
+                       join, join_with, lower, upper, rot13, at, substr, slice, erase, trim,
+                       replace_folded, extract, rextract, pad_left, pad_right };
 
 struct fixture {
   String source;
@@ -44,6 +45,16 @@ auto evaluate(fixture const& f) {
   if constexpr (Op == operation::replace_dense) return f.source.replace(f.token, "Q");
   else if constexpr (Op == operation::replace_missing) return f.source.replace("not-present", "Q");
   else if constexpr (Op == operation::replace_sparse) return f.source.replace("Za", "Q", String::CaseInsensitive);
+  else if constexpr (Op == operation::replace_folded) return f.source.replace("z,", "Q", String::CaseInsensitive);
+  else if constexpr (Op == operation::pad_left) return f.source.pad_left(f.codepoints + 129, "水.");
+  else if constexpr (Op == operation::pad_right) return f.source.pad_right(f.codepoints + 129, "水.");
+  else if constexpr (Op == operation::extract || Op == operation::rextract) {
+    String remainder = f.source;
+    auto token = Op == operation::extract ? remainder.extract(",") : remainder.rextract(",");
+    using Result = std::expected<std::pair<String, String>, Star::StarException>;
+    if (!token) return Result(std::unexpected(std::move(token.error())));
+    return Result(std::in_place, std::move(*token), std::move(remainder));
+  }
   else if constexpr (Op == operation::rsplit) return f.source.rsplit(String(","), 4);
   else if constexpr (Op == operation::rsplit_any) return f.source.rsplit_any(",", 4);
   else if constexpr (Op == operation::split_any) return f.source.split_any(",");
@@ -71,6 +82,10 @@ void escape(String const& text) {
   benchmark::DoNotOptimize(text.utf8().data());
   benchmark::DoNotOptimize(text.utf8().size());
 }
+void escape(std::pair<String, String> const& output) {
+  escape(output.first);
+  escape(output.second);
+}
 void escape(StringList const& parts) {
   for (auto const& part : parts) escape(part);
 }
@@ -83,6 +98,24 @@ bool validate(fixture const& f) {
   else {
     if (!output) return false;
     if constexpr (Op == operation::replace_dense) return output->utf8() == f.replaced;
+    else if constexpr (Op == operation::replace_folded) {
+      std::string expected;
+      for (auto const& token : f.parts) {
+        expected.append(token.utf8(), 0, token.utf8().size() - 1);
+        expected += 'Q';
+      }
+      return output->utf8() == expected;
+    } else if constexpr (Op == operation::pad_left || Op == operation::pad_right) {
+      std::string padding;
+      for (int i = 0; i < 65; ++i) padding += "水.";
+      if constexpr (Op == operation::pad_left) return output->utf8() == padding + f.source.utf8();
+      else return output->utf8() == f.source.utf8() + padding;
+    } else if constexpr (Op == operation::extract || Op == operation::rextract) {
+      auto source = std::string_view(f.source.utf8());
+      auto bytes = f.token.utf8().size();
+      auto remainder = Op == operation::extract ? source.substr(bytes + 1) : source.substr(0, source.size() - bytes - 2);
+      return output->first == f.token && output->second.utf8() == remainder;
+    }
     else if constexpr (Op == operation::replace_missing || Op == operation::replace_sparse)
       return *output == f.source;
     else if constexpr (Op == operation::rsplit || Op == operation::rsplit_any) {
@@ -201,6 +234,11 @@ int main(int argc, char** argv) {
     register_operation<operation::replace_dense>("ReplaceDense");
     register_operation<operation::replace_missing>("ReplaceMissing");
     register_operation<operation::replace_sparse>("ReplaceInsensitiveMiss");
+    register_operation<operation::replace_folded>("ReplaceInsensitiveHit");
+    register_operation<operation::extract>("Extract");
+    register_operation<operation::rextract>("ReverseExtract");
+    register_operation<operation::pad_left>("PadLeft");
+    register_operation<operation::pad_right>("PadRight");
     register_operation<operation::rsplit>("ReverseSplit");
     register_operation<operation::rsplit_any>("ReverseSplitAny");
     register_operation<operation::split_any>("SplitAny");

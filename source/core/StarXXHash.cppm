@@ -134,8 +134,7 @@ template <xx_hash_hasher Hasher> inline void hash_append(Hasher& hash, std::stri
 }
 
 template <xx_hash_hasher Hasher, std::size_t N> inline void hash_append(Hasher& hash, char const (&text)[N]) {
-  std::string_view view(text, N);
-  hash_append(hash, view.substr(0, view.find('\0')));
+  hash_append(hash, bounded_array_text(text));
 }
 
 template <xx_hash_hasher Hasher> inline void hash_append(Hasher& hash, std::string const& text) {

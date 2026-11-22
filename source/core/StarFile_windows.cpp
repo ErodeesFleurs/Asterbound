@@ -9,7 +9,6 @@ import star.random;
 import star.string;
 import star.byte_array;
 import star.encode;
-import star.string_windows;
 
 namespace Star {
 namespace {
@@ -47,7 +46,7 @@ std::expected<String, StarException> temporary_root() {
     return std::unexpected(IOException::format("Could not call GetTempPath: {}", GetLastError()));
   if (length >= MAX_PATH)
     return std::unexpected(IOException("GetTempPath exceeds path buffer"));
-  return utf16ToString(path);
+  return String::from_wstring(std::wstring_view(path, length));
 }
 
 bool missing_path_error(DWORD error) {
@@ -61,11 +60,11 @@ struct FindAttributes {
 
 // FindFirstFile (unlike GetFileAttributes) accepts wildcard patterns.
 std::expected<std::optional<FindAttributes>, StarException> find_attributes(String const& path, std::string_view kind) {
-  auto native = stringToUtf16(path);
+  auto native = path.to_wstring();
   if (!native)
     return std::unexpected(std::move(native.error()));
   WIN32_FIND_DATAW data;
-  auto handle = FindFirstFileW(native->get(), &data);
+  auto handle = FindFirstFileW(native->c_str(), &data);
   if (handle == INVALID_HANDLE_VALUE) {
     auto error = GetLastError();
     if (missing_path_error(error))
@@ -104,10 +103,10 @@ std::expected<bool, StarException> File::is_directory(String const& path) {
   auto bytes = path.utf8();
   while (bytes.size() > 1 && (bytes.back() == '\\' || bytes.back() == '/') && !(bytes.size() == 3 && bytes[1] == ':'))
     bytes.pop_back();
-  auto native = stringToUtf16(String(std::move(bytes)));
+  auto native = String(std::move(bytes)).to_wstring();
   if (!native)
     return std::unexpected(std::move(native.error()));
-  auto attributes = GetFileAttributesW(native->get());
+  auto attributes = GetFileAttributesW(native->c_str());
   if (attributes == INVALID_FILE_ATTRIBUTES) {
     auto error = GetLastError();
     if (missing_path_error(error))
@@ -124,10 +123,10 @@ std::expected<bool, StarException> File::is_symlink(String const& path) {
 }
 
 std::expected<StreamOffset, StarException> File::file_size(String const& path) {
-  auto native = stringToUtf16(path);
+  auto native = path.to_wstring();
   if (!native)
     return std::unexpected(std::move(native.error()));
-  auto handle = CreateFileW(native->get(), GENERIC_READ | FILE_READ_ATTRIBUTES,
+  auto handle = CreateFileW(native->c_str(), GENERIC_READ | FILE_READ_ATTRIBUTES,
                             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING,
                             FILE_FLAG_BACKUP_SEMANTICS, nullptr);
   if (handle == INVALID_HANDLE_VALUE)
@@ -149,25 +148,25 @@ std::expected<StreamOffset, StarException> File::file_size(String const& path) {
 
 // GetFullPathName is lexical on Windows and accepts paths that do not exist.
 std::expected<String, StarException> File::full_path(String const& path) {
-  auto native = stringToUtf16(path);
+  auto native = path.to_wstring();
   if (!native)
     return std::unexpected(std::move(native.error()));
   WCHAR buffer[MAX_PATH];
-  auto length = GetFullPathNameW(native->get(), MAX_PATH, buffer, nullptr);
+  auto length = GetFullPathNameW(native->c_str(), MAX_PATH, buffer, nullptr);
   if (!length)
     return std::unexpected(IOException::format("GetFullPathName failed on path '{}': {}", path, GetLastError()));
   if (length >= MAX_PATH)
     return std::unexpected(IOException::format("GetFullPathName exceeds path buffer on path '{}'", path));
-  return utf16ToString(buffer);
+  return String::from_wstring(std::wstring_view(buffer, length));
 }
 
 std::expected<List<std::pair<String, bool>>, StarException> File::directory_entries(String const& dir_name,
                                                                                     bool skip_dots) {
-  auto native = stringToUtf16(relative_to(dir_name, "*"));
+  auto native = relative_to(dir_name, "*").to_wstring();
   if (!native)
     return std::unexpected(std::move(native.error()));
   std::error_code error;
-  std::filesystem::path path(native->get());
+  std::filesystem::path path(std::move(*native));
   path.remove_filename();
   std::filesystem::directory_iterator entry(path, error);
   if (error)
@@ -181,7 +180,7 @@ std::expected<List<std::pair<String, bool>>, StarException> File::directory_entr
   for (std::filesystem::directory_iterator end; entry != end; entry.increment(error)) {
     if (error)
       return std::unexpected(IOException::format("directory_entries failed on dir '{}': {}", dir_name, error.message()));
-    auto name = utf16ToString(entry->path().filename().c_str());
+    auto name = String::from_wstring(entry->path().filename().native());
     if (!name)
       return std::unexpected(std::move(name.error()));
     // Keep Windows' directory-reparse-point classification, even for a broken link.
@@ -245,11 +244,11 @@ std::expected<std::shared_ptr<File>, StarException> File::temporary_file(RandomS
     auto name = temporary_file_name(random);
     if (!name)
       return std::unexpected(std::move(name.error()));
-    auto path = stringToUtf16(*name);
+    auto path = name->to_wstring();
     if (!path)
       return std::unexpected(std::move(path.error()));
     auto handle =
-      CreateFileW(path->get(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+      CreateFileW(path->c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                   nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (handle == INVALID_HANDLE_VALUE) {
       auto error = GetLastError();
@@ -270,10 +269,10 @@ std::expected<std::shared_ptr<File>, StarException> File::ephemeral_file(RandomS
   if (!file)
     return std::unexpected(std::move(file.error()));
   auto& name = (*file)->m_filename;
-  auto path = stringToUtf16(name);
+  auto path = name.to_wstring();
   if (!path)
     return std::unexpected(std::move(path.error()));
-  if (!DeleteFileW(path->get()))
+  if (!DeleteFileW(path->c_str()))
     return std::unexpected(
       IOException::format("Could not delete ephemeral file '{}': {}", name, GetLastError()));
   name = "";
@@ -286,10 +285,10 @@ std::expected<String, StarException> File::temporary_directory(RandomService& ra
     return std::unexpected(std::move(root.error()));
   for (;;) {
     auto directory = relative_to(*root, Star::format("starbound.tmpdir.{}", hex_encode(random.random_bytes(16))));
-    auto path = stringToUtf16(directory);
+    auto path = directory.to_wstring();
     if (!path)
       return std::unexpected(std::move(path.error()));
-    if (CreateDirectoryW(path->get(), nullptr))
+    if (CreateDirectoryW(path->c_str(), nullptr))
       return directory;
     auto error = GetLastError();
     if (error != ERROR_ALREADY_EXISTS && error != ERROR_FILE_EXISTS)
@@ -298,15 +297,15 @@ std::expected<String, StarException> File::temporary_directory(RandomService& ra
 }
 
 std::expected<void, StarException> File::rename(String const& source, String const& target) {
-  auto source_path = stringToUtf16(source);
+  auto source_path = source.to_wstring();
   if (!source_path)
     return std::unexpected(std::move(source_path.error()));
-  auto target_path = stringToUtf16(target);
+  auto target_path = target.to_wstring();
   if (!target_path)
     return std::unexpected(std::move(target_path.error()));
   // Do not move or remove the old target before the replacement succeeds.
   // Omitting COPY_ALLOWED also prevents a cross-volume copy/delete fallback.
-  if (!MoveFileExW(source_path->get(), target_path->get(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+  if (!MoveFileExW(source_path->c_str(), target_path->c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
     return std::unexpected(IOException::format("Rename error: {}", GetLastError()));
   return {};
 }
@@ -322,7 +321,7 @@ std::expected<File::NativeFileHandle, StarException>
 File::NativeFileHandle::open(String const& filename, IOMode mode, bool create, bool exclusive) {
   if (exclusive && !create)
     return std::unexpected(IOException("Exclusive file creation requires create mode"));
-  auto path = stringToUtf16(filename);
+  auto path = filename.to_wstring();
   if (!path)
     return std::unexpected(std::move(path.error()));
   DWORD access = 0;
@@ -333,7 +332,7 @@ File::NativeFileHandle::open(String const& filename, IOMode mode, bool create, b
   if (!access)
     return std::unexpected(IOException("Cannot open file with closed IO mode"));
   auto disposition = exclusive ? CREATE_NEW : create && mode & IOMode::Write ? OPEN_ALWAYS : OPEN_EXISTING;
-  auto file = CreateFileW(path->get(), access, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+  auto file = CreateFileW(path->c_str(), access, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
                           disposition, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (file == INVALID_HANDLE_VALUE)
     return std::unexpected(IOException::format("could not open file '{}' {}", filename, GetLastError()));

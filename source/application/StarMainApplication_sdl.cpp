@@ -151,7 +151,7 @@ static bool copyPngToClipboard(std::span<char const> buf) {
   drop.pt = {0, 0};
   drop.fNC = false;
   drop.fWide = true;
-  auto converted = path.wstring();
+  auto converted = path.to_wstring();
   if (!converted)
     return std::unexpected(std::move(converted.error()));
   auto& wide = *converted;
