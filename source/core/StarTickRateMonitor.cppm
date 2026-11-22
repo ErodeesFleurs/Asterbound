@@ -1,160 +1,61 @@
 module;
 import std;
-
 export module star.tick_rate_monitor;
 
 export namespace Star {
 
-// Monitors the rate at which 'tick()' is called in wall-clock seconds.
+// Positive, finite binary64 even under the production fast-math flags.
+[[nodiscard]] inline bool valid_tick_interval(double value) noexcept {
+  volatile std::uint64_t representation = std::bit_cast<std::uint64_t>(value);
+  auto bits = representation;
+  return bits != 0 && bits < 0x7ff0000000000000ULL;
+}
 class TickRateMonitor {
+  friend class TickRateApproacher;
+  using Seconds = std::chrono::duration<double>;
+  using TimePoint = std::chrono::time_point<std::chrono::steady_clock, Seconds>;
+  static TimePoint now() noexcept { return std::chrono::time_point_cast<Seconds>(std::chrono::steady_clock::now()); }
+  double window_seconds;
+  TimePoint last_tick;
+  double ticks = 0;
+
+  double remaining(TimePoint time) const noexcept {
+    if (time == last_tick) return ticks;
+    if (time < last_tick) return 0;
+    return std::max(0.0, ticks - (time - last_tick).count() * (ticks / window_seconds));
+  }
 public:
-  // 'window' controls the dropoff at which 'rate' will approach zero if tick
-  // is not called, measured in seconds.
-  TickRateMonitor(double window);
-
-  double window() const;
-
-  // Resets to a zero tick-rate state
-  void reset();
-
-  // Ticks the given number of times, returns the current rate.
-  double tick(unsigned count = 1);
-
-  // Returns the rate as of the *current* time, not the time of the last tick.
-  double rate() const;
-
-private:
-  std::chrono::duration<double> m_window;
-  // Retain absolute double-seconds quantization before subtracting tick times.
-  std::chrono::time_point<std::chrono::steady_clock, std::chrono::duration<double>> m_lastTick;
-  double m_ticks;
+  explicit TickRateMonitor(double window) noexcept : window_seconds(window), last_tick(now()) {}
+  [[nodiscard]] double window() const noexcept { return window_seconds; }
+  void reset() noexcept { ticks = 0; last_tick = now(); }
+  double tick(unsigned count = 1, TimePoint time = now()) noexcept {
+    ticks = remaining(time) + count;
+    last_tick = time;
+    return ticks / window_seconds;
+  }
+  [[nodiscard]] double rate(TimePoint time = now()) const noexcept { return remaining(time) / window_seconds; }
 };
 
-// Helps tick at as close as possible to a given tick rate
 class TickRateApproacher {
+  TickRateMonitor monitor;
+  double target_hz;
 public:
-  TickRateApproacher(double targetTickRate, double window);
-
-  // The TickRateMonitor window influences how long the TickRateApproacher will
-  // try and speed up or slow down the tick rate to match the target tick rate.
-  // It should be chosen so that it is not so short that the actual target rate
-  // drifts, but not too long so that the rate returns to normal quickly enough
-  // with outliers.
-  double window() const;
-  // Setting the window to a new value will reset the TickRateApproacher
-  void setWindow(double window);
-
-  double targetTickRate() const;
-  void setTargetTickRate(double targetTickRate);
-
-  // Resets such that the current tick rate is assumed to be perfectly at the
-  // target.
-  void reset();
-
-  double tick(unsigned count = 1);
-  double rate() const;
-
-  // How many ticks we currently should perform, so that if each tick happened
-  // instantly, we would be as close to the target tick rate as possible.  If
-  // we are ahead, may be negative.
-  double ticksBehind();
-
-  // The negative of ticksBehind, is positive for how many ticks ahead we
-  // currently are.
-  double ticksAhead();
-
-  // How much spare time we have until the tick rate will begin to be behind
-  // the target tick rate.
-  double spareTime();
-
-private:
-  TickRateMonitor m_tickRateMonitor;
-  double m_targetTickRate;
+  TickRateApproacher(double target_rate, double window) noexcept : monitor(window), target_hz(target_rate) {}
+  [[nodiscard]] double window() const noexcept { return monitor.window(); }
+  void set_window(double seconds) noexcept {
+    if (seconds == window()) return;
+    monitor.window_seconds = seconds;
+    reset();
+  }
+  [[nodiscard]] double target_rate() const noexcept { return target_hz; }
+  void set_target_rate(double rate) noexcept { target_hz = rate; }
+  void reset() noexcept {
+    monitor.last_tick = TickRateMonitor::now();
+    monitor.ticks = target_hz * window();
+  }
+  double tick(unsigned count = 1) noexcept { return monitor.tick(count); }
+  [[nodiscard]] double rate() const noexcept { return monitor.rate(); }
+  [[nodiscard]] double spare_time(double sampled_rate) const noexcept { return (sampled_rate - target_hz) * window() / target_hz; }
+  [[nodiscard]] double spare_time() const noexcept { return spare_time(rate()); }
 };
-
-}
-
-namespace Star {
-
-TickRateMonitor::TickRateMonitor(double window) : m_window(window) {
-  reset();
-}
-
-double TickRateMonitor::window() const {
-  return m_window.count();
-}
-
-void TickRateMonitor::reset() {
-  m_lastTick = std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now()) - m_window;
-  m_ticks = 0;
-}
-
-double TickRateMonitor::tick(unsigned count) {
-  auto currentTime = std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now());
-
-  if (m_lastTick > currentTime) {
-    m_lastTick = currentTime - m_window;
-    m_ticks = 0;
-  } else if (m_lastTick < currentTime) {
-    auto timePast = currentTime - m_lastTick;
-    double rate = m_ticks / m_window.count();
-    m_ticks = std::max(0.0, m_ticks - timePast.count() * rate);
-    m_lastTick = currentTime;
-  }
-
-  m_ticks += count;
-
-  return m_ticks / m_window.count();
-}
-
-double TickRateMonitor::rate() const {
-  return TickRateMonitor(*this).tick(0);
-}
-
-TickRateApproacher::TickRateApproacher(double targetTickRate, double window)
-  : m_tickRateMonitor(window), m_targetTickRate(targetTickRate) {}
-
-double TickRateApproacher::window() const {
-  return m_tickRateMonitor.window();
-}
-
-void TickRateApproacher::setWindow(double window) {
-  if (window != m_tickRateMonitor.window()) {
-    m_tickRateMonitor = TickRateMonitor(window);
-    tick(m_targetTickRate * window);
-  }
-}
-
-double TickRateApproacher::targetTickRate() const {
-  return m_targetTickRate;
-}
-
-void TickRateApproacher::setTargetTickRate(double targetTickRate) {
-  m_targetTickRate = targetTickRate;
-}
-
-void TickRateApproacher::reset() {
-  setWindow(window());
-}
-
-double TickRateApproacher::tick(unsigned count) {
-  return m_tickRateMonitor.tick(count);
-}
-
-double TickRateApproacher::rate() const {
-  return m_tickRateMonitor.rate();
-}
-
-double TickRateApproacher::ticksBehind() {
-  return (m_targetTickRate - m_tickRateMonitor.rate()) * window();
-}
-
-double TickRateApproacher::ticksAhead() {
-  return -ticksBehind();
-}
-
-double TickRateApproacher::spareTime() {
-  return ticksAhead() / m_targetTickRate;
-}
-
 }

@@ -1,4 +1,5 @@
 import std;
+import star.tick_rate_monitor;
 import star.periodic;
 import star.periodic_function;
 import star.random;
@@ -6,6 +7,28 @@ import star.random;
 #include "gtest/gtest.h"
 
 using namespace Star;
+
+TEST(TickRateTest, QueriesDoNotCommitDecay) {
+  using namespace std::chrono_literals;
+  auto start = std::chrono::steady_clock::time_point{};
+  TickRateMonitor monitor(1);
+  EXPECT_EQ(monitor.tick(3, start), 3);
+  EXPECT_EQ(monitor.tick(7, start), 10);
+  EXPECT_EQ(monitor.rate(start + 250ms), 7.5);
+  EXPECT_EQ(monitor.rate(start + 500ms), 5);
+  EXPECT_EQ(monitor.rate(start + 2s), 0);
+}
+
+TEST(TickRateTest, FractionalResetAndColdStart) {
+  TickRateApproacher monitor(0.015625, 32);
+  EXPECT_EQ(monitor.rate(), 0);
+  monitor.reset();
+  EXPECT_GT(monitor.rate(), 0);
+  EXPECT_DOUBLE_EQ(monitor.spare_time(0.03125), 32);
+  volatile std::uint64_t nan_bits = 0x7ff8000000000001ULL;
+  EXPECT_FALSE(valid_tick_interval(std::bit_cast<double>(std::uint64_t(nan_bits))));
+  EXPECT_FALSE(valid_tick_interval(-0.0));
+}
 
 TEST(PeriodicTest, All) {
   Periodic periodic(2);

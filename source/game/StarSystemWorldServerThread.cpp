@@ -173,13 +173,13 @@ std::expected<bool, StarException> SystemWorldServerThread::start() {
 
 std::expected<void, StarException> SystemWorldServerThread::run() {
   auto stopToken = m_stopSource.get_token();
-  TickRateApproacher tickApproacher(1.0 / SystemWorldTimestep, 0.5);
+  TickRateApproacher tick_approacher(1.0 / SystemWorldTimestep, 0.5);
   while (!stopToken.stop_requested()) {
-    m_systemWorld->root().logMap().set(Star::format("system_{}_update_rate", m_systemLocation), Star::format("{:4.2f}Hz", tickApproacher.rate()));
+    m_systemWorld->root().logMap().set(Star::format("system_{}_update_rate", m_systemLocation), Star::format("{:4.2f}Hz", tick_approacher.rate()));
     auto updated = update();
     if (!updated)
       return std::unexpected(std::move(updated.error()));
-    m_periodicStorage -= 1.0 / tickApproacher.rate();
+    m_periodicStorage -= 1.0 / tick_approacher.rate();
     if (m_triggerStorage || m_periodicStorage <= 0.0) {
       m_triggerStorage = false;
       m_periodicStorage = 300.0;
@@ -187,10 +187,10 @@ std::expected<void, StarException> SystemWorldServerThread::run() {
       if (!stored)
         return std::unexpected(std::move(stored.error()));
     }
-    tickApproacher.tick();
-    double spareTime = tickApproacher.spareTime();
-    if (spareTime > 0)
-      sleep_precise(static_cast<std::uint64_t>(std::floor(spareTime * 1000)));
+    auto sampled_rate = tick_approacher.tick();
+    double spare_time = tick_approacher.spare_time(sampled_rate);
+    if (spare_time > 0)
+      sleep_precise(static_cast<std::uint64_t>(std::floor(spare_time * 1000)));
   }
   return store();
 }

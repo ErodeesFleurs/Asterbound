@@ -48,6 +48,7 @@ std::expected<std::shared_ptr<ScriptableThread>, StarException> ScriptableThread
   auto tickRate = thread->m_parameters.get_float("tickRate", 60.0f);
   if (!tickRate)
     return std::unexpected(std::move(tickRate.error()));
+  if (!valid_tick_interval(*tickRate)) return std::unexpected(StarException("Invalid script tick rate"));
   thread->m_timestep = 1.0f / *tickRate;
   auto limit = thread->m_parameters.opt_uint("instructionLimit");
   if (!limit)
@@ -244,15 +245,21 @@ std::expected<void, StarException> ScriptableThread::run() {
     auto window = m_parameters.get_double("updateMeasureWindow", 0.5);
     if (!window)
       return std::unexpected(std::move(window.error()));
-    TickRateApproacher approacher(1.0f / m_timestep, *window);
+    double initial_step = m_timestep;
+    if (!valid_tick_interval(initial_step) || !valid_tick_interval(*window))
+      return std::unexpected(StarException("Invalid tick interval or measurement window"));
+    TickRateApproacher approacher(1.0 / initial_step, *window);
     while (!stopToken.stop_requested() && !m_errorOccurred) {
       if (m_logMapped)
         m_luaRoot->root().logMap().set(Star::format("lua_{}_update", m_name), Star::format("{:4.2f}Hz", approacher.rate()));
       if (auto updated = update(); !updated)
         return std::unexpected(std::move(updated.error()));
-      approacher.setTargetTickRate(1.0f / m_timestep);
-      approacher.tick();
-      std::int64_t spare = std::floor(approacher.spareTime() * 1000);
+      double current_step = m_timestep;
+      if (!valid_tick_interval(current_step))
+        return std::unexpected(StarException("Invalid tick interval or measurement window"));
+      approacher.set_target_rate(1.0 / current_step);
+      auto sampled_rate = approacher.tick();
+      std::int64_t spare = std::floor(approacher.spare_time(sampled_rate) * 1000);
       if (spare > 0) {
         std::unique_lock lock(m_sleepMutex);
         m_stopped.wait_for(lock, std::chrono::milliseconds(spare), [&] { return stopToken.stop_requested(); });

@@ -525,7 +525,10 @@ std::expected<void, StarException> WorldServerThread::runLoop(std::stop_token st
     return std::unexpected(std::move(storageIntervalConfig.error()));
   double storageInterval = *storageIntervalConfig / 1000.0;
   Timer storageTimer = Timer::withTime(storageInterval);
-  TickRateApproacher tickApproacher(1.0f / root.timing().serverTimestep, *updateMeasureWindow);
+  double initial_step = root.timing().serverTimestep;
+  if (!valid_tick_interval(initial_step) || !valid_tick_interval(*updateMeasureWindow))
+    return std::unexpected(StarException("Invalid tick interval or measurement window"));
+  TickRateApproacher tick_approacher(1.0 / initial_step, *updateMeasureWindow);
   double fidelityScore = 0.0;
   WorldServerFidelity automaticFidelity = WorldServerFidelity::Medium;
   while (!stopToken.stop_requested() && !m_errorOccurred) {
@@ -534,20 +537,23 @@ std::expected<void, StarException> WorldServerThread::runLoop(std::stop_token st
     if (!fidelityName)
       return std::unexpected(std::move(fidelityName.error()));
     root.logMap().set(Star::format("server_{}_fidelity", m_worldName), fidelityName->get());
-    root.logMap().set(Star::format("server_{}_update", m_worldName), Star::format("{:4.2f}Hz", tickApproacher.rate()));
+    root.logMap().set(Star::format("server_{}_update", m_worldName), Star::format("{:4.2f}Hz", tick_approacher.rate()));
     auto updated = update(fidelity);
     if (!updated)
       return std::unexpected(std::move(updated.error()));
-    tickApproacher.setTargetTickRate(1.0f / root.timing().serverTimestep);
-    tickApproacher.tick();
+    double current_step = root.timing().serverTimestep;
+    if (!valid_tick_interval(current_step))
+      return std::unexpected(StarException("Invalid tick interval or measurement window"));
+    tick_approacher.set_target_rate(1.0 / current_step);
+    tick_approacher.tick();
     if (storageTimer.timeUp()) {
       auto synced = sync();
       if (!synced)
         return std::unexpected(std::move(synced.error()));
       storageTimer.restart(storageInterval);
     }
-    double spareTime = tickApproacher.spareTime();
-    fidelityScore += spareTime;
+    double spare_time = tick_approacher.spare_time();
+    fidelityScore += spare_time;
     if (fidelityScore <= *fidelityDecrementScore) {
       if (automaticFidelity > WorldServerFidelity::Minimum)
         automaticFidelity = static_cast<WorldServerFidelity>(static_cast<int>(automaticFidelity) - 1);
@@ -558,7 +564,7 @@ std::expected<void, StarException> WorldServerThread::runLoop(std::stop_token st
         automaticFidelity = static_cast<WorldServerFidelity>(static_cast<int>(automaticFidelity) + 1);
       fidelityScore = 0.0;
     }
-    std::int64_t spare_milliseconds = std::floor(spareTime * 1000);
+    std::int64_t spare_milliseconds = std::floor(spare_time * 1000);
     if (spare_milliseconds > 0)
       Thread::sleep_precise(spare_milliseconds);
   }

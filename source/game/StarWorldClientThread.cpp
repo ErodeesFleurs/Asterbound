@@ -296,15 +296,21 @@ std::expected<void, StarException> WorldClientThread::runLoop(std::stop_token st
   if (!updateMeasureWindow)
     return std::unexpected(std::move(updateMeasureWindow.error()));
 
-  TickRateApproacher tickApproacher(1.0f / root.timing().timestep, *updateMeasureWindow);
+  double initial_step = root.timing().timestep;
+  if (!valid_tick_interval(initial_step) || !valid_tick_interval(*updateMeasureWindow))
+    return std::unexpected(StarException("Invalid tick interval or measurement window"));
+  TickRateApproacher tick_approacher(1.0 / initial_step, *updateMeasureWindow);
   while (!stopToken.stop_requested() && !m_errorOccurred) {
-    root.logMap().set(Star::format("client_{}_update", m_subWorldId), Star::format("{:4.2f}Hz", tickApproacher.rate()));
+    root.logMap().set(Star::format("client_{}_update", m_subWorldId), Star::format("{:4.2f}Hz", tick_approacher.rate()));
     auto updated = update();
     if (!updated)
       return std::unexpected(std::move(updated.error()));
-    tickApproacher.setTargetTickRate(1.0f / root.timing().timestep);
-    tickApproacher.tick();
-    std::int64_t spare_milliseconds = std::floor(tickApproacher.spareTime() * 1000);
+    double current_step = root.timing().timestep;
+    if (!valid_tick_interval(current_step))
+      return std::unexpected(StarException("Invalid tick interval or measurement window"));
+    tick_approacher.set_target_rate(1.0 / current_step);
+    auto sampled_rate = tick_approacher.tick();
+    std::int64_t spare_milliseconds = std::floor(tick_approacher.spare_time(sampled_rate) * 1000);
     if (spare_milliseconds > 0)
       Thread::sleep_precise(spare_milliseconds);
   }
