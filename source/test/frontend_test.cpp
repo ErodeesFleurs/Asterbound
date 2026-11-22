@@ -875,6 +875,25 @@ const GameTestRegistration textEditorUnicode("TextEditor", "CommittedUnicodeRepl
   EXPECT_EQ(editor.getCursorPosition(), 4);
 });
 
+const GameTestRegistration text_editor_word_navigation("TextEditor", "ControlArrowsCrossBomWhitespaceByCodepoint", [](GameTest& fixture) {
+  auto context = textEditorContext(fixture);
+  ASSERT_TRUE(context) << context.error().what();
+  auto created = textEditor(**context, "中a\ufeff🙂b");
+  ASSERT_TRUE(created) << created.error().what();
+  auto& editor = **created;
+  ASSERT_TRUE(editor.focus());
+  sendEditorEvent(editor, KeyDownEvent{Key::Home, KeyMod::NoMod});
+  for (int expected : {3, 5, 5}) {
+    sendEditorEvent(editor, KeyDownEvent{Key::Right, KeyMod::LCtrl});
+    EXPECT_EQ(editor.getCursorPosition(), expected);
+  }
+  // Backward navigation stops at the preceding word's end, before the separator.
+  for (int expected : {2, 0, 0}) {
+    sendEditorEvent(editor, KeyDownEvent{Key::Left, KeyMod::LCtrl});
+    EXPECT_EQ(editor.getCursorPosition(), expected);
+  }
+});
+
 const GameTestRegistration textEditorSelectionDelete("TextEditor", "RealShiftNavigationAndBothDeletionKeys", [](GameTest& fixture) {
   auto context = textEditorContext(fixture);
   ASSERT_TRUE(context) << context.error().what();

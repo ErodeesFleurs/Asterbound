@@ -307,6 +307,15 @@ Use `string_benchmarks` to compare `Extract`, `ReverseExtract`, `Trim`,
 `ReplaceInsensitiveHit`, `ReplaceInsensitiveMiss`, `PadLeft` and `PadRight`.
 Keep the small-input and long-input results separate.
 
+`StringView` borrows bytes even when its descriptor is copied. Search returns
+codepoint positions, whereas split callbacks receive byte offsets. A successful
+early match does not validate an unread suffix. Last-match searches must still
+observe later decoding errors. Exercise mixed text and malformed tails as well
+as ASCII when comparing search implementations.
+Run `string_benchmarks --benchmark_filter='^StringView/'` for isolated
+view operations; use text rendering and textbox navigation separately when
+checking whether the same changes affect user-visible behavior.
+
 ### Bézier beam geometry
 
 Arc length is a sampled polyline length, not the endpoint distance. A closed

@@ -1,9 +1,12 @@
+#include <version>
+
 import std;
 import star.memory;
 import star.bi_map;
 import star.string;
 import star.string_view;
 import star.unicode;
+import star.unique_function;
 import star.format;
 
 #include "gtest/gtest.h"
@@ -136,6 +139,17 @@ static_assert(split_view_callback<decltype([](StringView, std::size_t&&, std::si
     -> std::expected<void, StarException> { return {}; })>);
 static_assert(!split_view_callback<decltype([](StringView, std::size_t&, std::size_t&)
     -> std::expected<void, StarException> { return {}; })>);
+static_assert(std::is_trivially_copyable_v<StringView>);
+static_assert(std::is_nothrow_default_constructible_v<StringView>);
+static_assert(std::is_nothrow_constructible_v<StringView, std::string_view>);
+static_assert(std::is_nothrow_copy_constructible_v<StringView> && std::is_nothrow_move_constructible_v<StringView>);
+static_assert(std::is_nothrow_copy_assignable_v<StringView> && std::is_nothrow_move_assignable_v<StringView>);
+static_assert([] {
+  StringView original(std::string_view("a\0b", 3));
+  StringView copy;
+  copy = original;
+  return copy.take_utf8() == original.utf8() && copy.empty() && original.utf8_size() == 3;
+}());
 static_assert(std::same_as<decltype(std::declval<StringView const&>().utf8()), std::string_view>);
 static_assert(std::constructible_from<StringView, String&>);
 static_assert(std::constructible_from<StringView, String const&>);
@@ -418,6 +432,10 @@ TEST(StringViewStorageTest, SplitPreservesEmptyCallbackAndFirstErrorOrder) {
   using callback_type = std::expected<void, StarException>(StringView, std::size_t, std::size_t);
   callback_type* null_callback = nullptr;
   std::function<callback_type> empty_callback;
+  UniqueFunction<callback_type> empty_unique;
+#ifdef __cpp_lib_move_only_function
+  std::move_only_function<callback_type> empty_move_only;
+#endif
   for (bool any : {false, true}) {
     auto invoke = [&](StringView pattern, auto&& callback) {
       return any ? StringView("a,b,c").for_each_split_any(pattern, callback)
@@ -435,6 +453,16 @@ TEST(StringViewStorageTest, SplitPreservesEmptyCallbackAndFirstErrorOrder) {
     EXPECT_TRUE(invoke("", empty_callback));
     EXPECT_TRUE(invoke("", null_callback));
     EXPECT_TRUE(invoke("", nullptr));
+    auto missing_unique = invoke(",", empty_unique);
+    ASSERT_FALSE(missing_unique);
+    EXPECT_TRUE(missing_unique.error().is<StringException>());
+    EXPECT_TRUE(invoke("", empty_unique));
+#ifdef __cpp_lib_move_only_function
+    auto missing_move_only = invoke(",", empty_move_only);
+    ASSERT_FALSE(missing_move_only);
+    EXPECT_TRUE(missing_move_only.error().is<StringException>());
+    EXPECT_TRUE(invoke("", empty_move_only));
+#endif
 
     std::vector<std::string> visited;
     auto result = invoke(",", [state = std::make_unique<int>(0), &visited](StringView part, std::size_t, std::size_t) mutable -> std::expected<void, StarException> {
@@ -475,4 +503,92 @@ TEST(StringViewStorageTest, CursorSearchPreservesLazyShortCircuitAndFirstDecodeE
   auto search_error = invalid_source.find(invalid_pattern);
   ASSERT_FALSE(search_error);
   EXPECT_EQ(std::string(search_error.error().what()), std::string(pattern_error.error().what()));
+}
+
+TEST(StringViewStorageTest, SearchMatchesCodepointOracleAcrossAsciiRunsAndMixedBoundaries) {
+  using namespace std::literals;
+  struct Sample {
+    std::string_view bytes;
+    std::u32string_view points;
+  };
+  for (Sample source : {Sample{"", U""}, {"aAaAaBa\0A"sv, U"aAaAaBa\0A"sv},
+                        {"日aaAaé🙂A\0aAa\ufeff\v\f "sv, U"日aaAaé🙂A\0aAa\ufeff\v\f "sv}}) {
+    StringView view(source.bytes);
+    for (Sample needle : {Sample{"", U""}, {"a", U"a"}, {"Aa", U"Aa"}, {"aAa", U"aAa"},
+                          {"aaB", U"aaB"}, {"Aaé", U"Aaé"}, {"A\0a"sv, U"A\0a"sv},
+                          {"é🙂", U"é🙂"}, {"É", U"É"}, {" ", U" "}}) {
+      auto members = needle.points.empty() ? U" \t\r\n\ufeff"sv : needle.points;
+      for (std::size_t pos = 0; pos <= source.points.size() + 1; ++pos) {
+        EXPECT_EQ(view.find_first_of(needle.bytes, pos), source.points.find_first_of(members, pos));
+        EXPECT_EQ(view.find_first_not_of(needle.bytes, pos), source.points.find_first_not_of(members, pos));
+      }
+      for (auto cs : {String::CaseSensitivity::CaseSensitive, String::CaseSensitivity::CaseInsensitive}) {
+        std::u32string text(source.points), pattern(needle.points);
+        if (cs == String::CaseSensitivity::CaseInsensitive) {
+          auto fold = [](char32_t c) -> char32_t { return c >= U'A' && c <= U'Z' ? c + (U'a' - U'A') : c; };
+          std::ranges::transform(text, text.begin(), fold);
+          std::ranges::transform(pattern, pattern.begin(), fold);
+        }
+        EXPECT_EQ(view.find_last(needle.bytes, cs), pattern.empty() ? 0u : text.rfind(pattern));
+        if (pattern.size() == 1)
+          EXPECT_EQ(view.find_last(needle.points.front(), cs), text.rfind(pattern.front()));
+        for (std::size_t pos = 0; pos <= text.size() + 1; ++pos) {
+          EXPECT_EQ(view.find(needle.bytes, pos, cs), pattern.empty() ? 0u : text.find(pattern, pos));
+          if (pattern.size() == 1)
+            EXPECT_EQ(view.find(needle.points.front(), pos, cs), text.find(pattern.front(), pos));
+        }
+      }
+    }
+  }
+}
+
+TEST(StringViewStorageTest, MatchingAndMembershipRetainDistinctDecodeErrorPriority) {
+  StringView source("aaa\xff"), pattern("aaa\xc2");
+  auto source_error = Utf8Cursor("\xff").read();
+  auto pattern_error = Utf8Cursor("\xc2").read();
+  ASSERT_FALSE(source_error);
+  ASSERT_FALSE(pattern_error);
+  ASSERT_NE(std::string_view(source_error.error().what()), std::string_view(pattern_error.error().what()));
+  auto first = source.find(pattern);
+  auto last = source.find_last(pattern);
+  auto member = source.find_first_of(pattern, 3);
+  auto skipped = source.find(pattern, 4);
+  auto last_char = source.find_last(U'a');
+  auto folded = source.compare(pattern, String::CaseSensitivity::CaseInsensitive);
+  ASSERT_FALSE(first);
+  ASSERT_FALSE(last);
+  ASSERT_FALSE(member);
+  ASSERT_FALSE(skipped);
+  ASSERT_FALSE(last_char);
+  ASSERT_FALSE(folded);
+  EXPECT_STREQ(folded.error().what(), source_error.error().what());
+  EXPECT_STREQ(first.error().what(), pattern_error.error().what());
+  EXPECT_STREQ(last.error().what(), pattern_error.error().what());
+  EXPECT_STREQ(member.error().what(), source_error.error().what());
+  EXPECT_STREQ(skipped.error().what(), source_error.error().what());
+  EXPECT_STREQ(last_char.error().what(), source_error.error().what());
+  EXPECT_EQ(source.find("", NPos), 0u);
+  EXPECT_EQ(source.find_last(""), 0u);
+  EXPECT_EQ(StringView("aa").find(pattern), NPos);
+  EXPECT_EQ(StringView("aa").find_last(pattern), NPos);
+  EXPECT_EQ(StringView("ba\xff").find("ba"), 0u);
+  EXPECT_FALSE(StringView("ba\xff").find_last("ba"));
+}
+
+TEST(StringViewStorageTest, PrefixAndSuffixValidateTheirEntirePatternBeforeReadingSource) {
+  StringView source("a\xff"), pattern("b\xc2");
+  auto pattern_error = pattern.size();
+  ASSERT_FALSE(pattern_error);
+  auto prefix = source.starts_with(pattern);
+  auto suffix = source.ends_with(pattern);
+  ASSERT_FALSE(prefix);
+  ASSERT_FALSE(suffix);
+  EXPECT_STREQ(prefix.error().what(), pattern_error.error().what());
+  EXPECT_STREQ(suffix.error().what(), pattern_error.error().what());
+  EXPECT_EQ(source.starts_with("a"), true);
+  EXPECT_EQ(source.starts_with(""), true);
+  EXPECT_EQ(source.ends_with(""), true);
+  EXPECT_FALSE(source.ends_with("a"));
+  EXPECT_EQ(source.equals(source), true);
+  EXPECT_EQ(source.compare(pattern, String::CaseSensitivity::CaseInsensitive), -1);
 }

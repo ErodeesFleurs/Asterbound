@@ -1,4 +1,5 @@
 module;
+#include <version>
 
 import std;
 import star.memory;
@@ -6,6 +7,7 @@ import star.format;
 import star.string;
 import star.text_formatter;
 import star.unicode;
+import star.unique_function;
 
 import star.byte_array;
 namespace Star {
@@ -30,30 +32,24 @@ public:
 
   using CaseSensitivity = String::CaseSensitivity;
 
-  StringView();
-  StringView(StringView const& s);
-  StringView(StringView&& s) noexcept;
+  constexpr StringView() noexcept = default;
   StringView(String const& s);
   StringView(String&&) = delete;
   StringView(String const&&) = delete;
 
-  // These assume utf8 input
+  // Character arrays use bounded C-text semantics; sized views retain every byte.
   template <std::size_t N>
-  StringView(char const (&s)[N]) : m_view(bounded_array_text(s)) {}
-  StringView(std::string_view const& s);
-  StringView(std::string_view&& s) noexcept;
-  StringView(std::string const& s);
+  constexpr StringView(char const (&s)[N]) noexcept : m_view(bounded_array_text(s)) {}
+  constexpr StringView(std::string_view s) noexcept : m_view(s) {}
+  constexpr StringView(std::string const& s) noexcept : m_view(s) {}
   StringView(std::string&&) = delete;
   StringView(std::string const&&) = delete;
 
-
   // The descriptor is a value; its bytes remain borrowed from the owner.
-  std::string_view utf8() const;
-  std::string_view take_utf8();
+  constexpr std::string_view utf8() const noexcept { return m_view; }
+  constexpr std::string_view take_utf8() noexcept { return std::exchange(m_view, {}); }
   ByteArray utf8_bytes() const;
-  // Pointer to the viewed bytes; not necessarily null-terminated.
-  char const* utf8_data() const;
-  std::size_t utf8_size() const;
+  constexpr std::size_t utf8_size() const noexcept { return m_view.size(); }
 
   [[nodiscard]] std::expected<const_iterator, StarException> begin() const;
   const_iterator end() const;
@@ -61,7 +57,7 @@ public:
   [[nodiscard]] std::expected<std::size_t, StarException> size() const;
   [[nodiscard]] std::expected<std::size_t, StarException> length() const;
 
-  bool empty() const;
+  constexpr bool empty() const noexcept { return m_view.empty(); }
 
   [[nodiscard]] std::expected<Char, StarException> operator[](std::size_t index) const;
   [[nodiscard]] std::expected<Char, StarException> at(std::size_t i) const;
@@ -118,8 +114,6 @@ public:
 
   [[nodiscard]] std::expected<StringView, StarException> substr(std::size_t position, std::size_t n = NPos) const;
 
-  StringView& operator=(StringView s);
-
   friend bool operator==(StringView s1, std::string_view s2);
   template <std::size_t N>
   friend bool operator==(StringView s, char const (&text)[N]) { return s.m_view == bounded_array_text(text); }
@@ -139,10 +133,26 @@ private:
     else
       return true;
   }
-  template <class Result, class... Args>
-    requires split_view_callback<std::function<Result(Args...)>>
-  static bool split_callback_present(std::function<Result(Args...)> const& callback) {
+  template <class Signature>
+    requires split_view_callback<std::function<Signature>>
+  static bool split_callback_present(std::function<Signature> const& callback) {
     return static_cast<bool>(callback);
+  }
+  template <class Signature>
+    requires split_view_callback<UniqueFunction<Signature>>
+  static bool split_callback_present(UniqueFunction<Signature> const& callback) {
+    return static_cast<bool>(callback);
+  }
+#if defined(__cpp_lib_move_only_function)
+  template <class Signature>
+    requires split_view_callback<std::move_only_function<Signature>>
+  static bool split_callback_present(std::move_only_function<Signature> const& callback) {
+    return static_cast<bool>(callback);
+  }
+#endif
+  template <split_view_callback Callback>
+  static bool split_callback_present(std::reference_wrapper<Callback> callback) {
+    return split_callback_present(callback.get());
   }
   template <split_view_callback Callback>
   [[nodiscard]] std::expected<void, StarException> for_each_split_view(StringView pattern, Callback& callback, bool any) const {
@@ -160,13 +170,6 @@ private:
       start = stop + (any ? 1 : pattern.m_view.size());
     }
   }
-
-  [[nodiscard]] std::expected<int, StarException> compare(std::size_t selfOffset,
-      std::size_t selfLen,
-      StringView other,
-      std::size_t otherOffset,
-      std::size_t otherLen,
-      CaseSensitivity cs) const;
 
   std::string_view m_view;
 };

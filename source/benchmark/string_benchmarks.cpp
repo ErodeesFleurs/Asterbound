@@ -5,6 +5,7 @@ import std;
 import star.format;
 import star.benchmark_runner;
 import star.string;
+import star.string_view;
 import star.shell_parser;
 
 namespace {
@@ -223,10 +224,52 @@ void measure_shell_words(benchmark::State& state, std::string_view kind) {
   state.SetBytesProcessed(state.iterations() * static_cast<std::int64_t>(input.size()));
 }
 
+template <typename Search>
+  requires requires(Search const& search, Star::StringView const& text, Star::StringView const& needle) {
+    { search(text, needle) } -> std::same_as<std::expected<std::size_t, Star::StarException>>;
+  }
+void register_view_search(std::string_view name, std::string text, std::string needle,
+    std::size_t expected, Search search) {
+  benchmark::RegisterBenchmark(std::format("StringView/{}", name).c_str(),
+      [text = std::move(text), needle = std::move(needle), expected, search](benchmark::State& state) {
+    Star::StringView source(text), pattern(needle);
+    auto check = search(source, pattern);
+    if (!check || *check != expected) {
+      state.SkipWithError("StringView search returned the wrong codepoint position");
+      return;
+    }
+    for (auto _ : state) {
+      benchmark::ClobberMemory();
+      auto result = search(source, pattern);
+      benchmark::DoNotOptimize(result);
+    }
+  });
+}
+
+void register_view_searches() {
+  using Star::StringView;
+  auto find = [](StringView const& text, StringView const& needle) { return text.find(needle); };
+  auto member = [](StringView const& text, StringView const& needle) { return text.find_first_of(needle); };
+  auto last = [](StringView const& text, StringView const& needle) { return text.find_last(needle); };
+  register_view_search("ShortAsciiEarlyHit", "open tab", "pen", 1, find);
+  register_view_search("LongAsciiMiss", std::string(4096, 'a'), "xy", std::string::npos, find);
+  register_view_search("CommonPrefix", std::string(1024, 'a') + 'b', "aaaaaaaaaaaaaaab", 1009, find);
+  std::string mixed;
+  for (int i = 0; i < 128; ++i) mixed += "ab水";
+  register_view_search("MixedCaseFold", mixed + "πXYZ", "πxyz", 384,
+      [](StringView const& text, StringView const& needle) { return text.find(needle, 0, String::CaseInsensitive); });
+  register_view_search("SingletonMembership", std::string(1024, 'a') + '.', ".", 1024, member);
+  register_view_search("WhitespaceMembership", mixed + " ", "", 384, member);
+  register_view_search("LastSubstring", std::string(1024, 'a') + "aba", "aa", 1023, last);
+  register_view_search("LastCharacter", mixed + 'a', "", 384,
+      [](StringView const& text, StringView const&) { return text.find_last(U'a'); });
+}
+
 }
 
 int main(int argc, char** argv) {
   return Star::run_benchmarks(argc, argv, [](int) {
+    register_view_searches();
     for (auto kind : {"Short", "ManyArgs", "LongPath", "DenseEscapes"})
       benchmark::RegisterBenchmark(std::format("ShellWords/{}", kind).c_str(), [kind](benchmark::State& state) {
         measure_shell_words(state, kind);
