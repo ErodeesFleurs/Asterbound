@@ -65,11 +65,11 @@ struct EmbeddedFixture {
     if (!written)
       return std::unexpected(std::move(written.error()));
     Assets::Settings settings{};
-    settings.workerPoolSize = 1;
-    settings.assetTimeToLive = std::numeric_limits<float>::max();
-    settings.missingImage = {};
-    settings.missingAudio = {};
-    settings.allowRemoteAssets = allowRemote;
+    settings.worker_pool_size = 1;
+    settings.asset_time_to_live = std::numeric_limits<float>::max();
+    settings.missing_image = {};
+    settings.missing_audio = {};
+    settings.allow_remote_assets = allowRemote;
     auto sources = installedSources ? fixture.rootSettings().assetSources : StringList{};
     sources.push_back(directory);
     auto createdAssets = Assets::create(logger, random, logMap, settings, std::move(sources));
@@ -137,9 +137,9 @@ std::expected<Root::Settings, StarException> embeddedRootSettings(GameTest& fixt
   settings.logFile = {};
   settings.quiet = true;
   settings.includeUGC = false;
-  settings.assetsSettings.missingImage = {};
-  settings.assetsSettings.missingAudio = {};
-  settings.assetsSettings.assetTimeToLive = std::numeric_limits<float>::max();
+  settings.assetsSettings.missing_image = {};
+  settings.assetsSettings.missing_audio = {};
+  settings.assetsSettings.asset_time_to_live = std::numeric_limits<float>::max();
   settings.assetSources.push_back(directory);
   auto config = settings.defaultConfiguration.set_path("safe.allowRemoteAssets", allowRemote);
   if (!config)
@@ -243,7 +243,7 @@ const GameTestRegistration embeddedImages("EmbeddedAssetsTest", "ImageEmbeddingF
   auto loaded = setup.assets->image(*plain);
   ASSERT_TRUE(loaded) << loaded.error().what();
   expectPixels(**loaded, *image);
-  auto noFrames = setup.assets->imageFrames(*plain);
+  auto noFrames = setup.assets->image_frames(*plain);
   ASSERT_TRUE(noFrames) << noFrames.error().what();
   EXPECT_FALSE(*noFrames);
   auto png = setup.assets->bytes(*plain, true);
@@ -270,11 +270,11 @@ const GameTestRegistration embeddedImages("EmbeddedAssetsTest", "ImageEmbeddingF
     auto whole = setup.assets->image(*path);
     ASSERT_TRUE(whole) << whole.error().what();
     expectPixels(**whole, *image);
-    auto specification = setup.assets->imageFrames(*path);
+    auto specification = setup.assets->image_frames(*path);
     ASSERT_TRUE(specification) << specification.error().what();
     ASSERT_TRUE(*specification);
-    auto aliasRect = (*specification)->getRect("alias");
-    auto leftRect = (*specification)->getRect("left");
+    auto aliasRect = (*specification)->get_rect("alias");
+    auto leftRect = (*specification)->get_rect("left");
     ASSERT_TRUE(aliasRect);
     ASSERT_TRUE(leftRect);
     ASSERT_TRUE(*leftRect);
@@ -328,7 +328,7 @@ const GameTestRegistration embeddedAudioFont("EmbeddedAssetsTest", "EmbeddedWavA
   EXPECT_EQ(decoder->read(samples), 2u);
   EXPECT_EQ(samples, (std::array<std::int16_t, 2>{0x1234, -2}));
 
-  auto fonts = setup.assets->scanExtension("ttf");
+  auto fonts = setup.assets->scan_extension("ttf");
   ASSERT_TRUE(fonts) << fonts.error().what();
   ASSERT_FALSE(fonts->get().empty()) << "Installed legal assets must supply a TrueType font";
   // Sorting avoids depending on hash iteration order or a mod's override order.
@@ -499,7 +499,7 @@ const GameTestRegistration embeddedDisabled("EmbeddedAssetsTest", "SafeConfigura
   expectDenied(setup.assets->audio(*path));
   expectDenied(setup.assets->font(*path));
   // Even a doubly invalid path must not reach the layout or payload decoder.
-  auto disabled = setup.assets->openFile("/opensb_data;bin;!;extra");
+  auto disabled = setup.assets->open_file("/opensb_data;bin;!;extra");
   ASSERT_FALSE(disabled);
   EXPECT_TRUE(disabled.error().is<AssetException>());
   EXPECT_TRUE(std::string_view(disabled.error().what()).contains("safe.allowRemoteAssets"));

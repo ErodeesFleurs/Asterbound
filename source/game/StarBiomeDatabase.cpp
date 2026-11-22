@@ -76,9 +76,9 @@ std::expected<std::shared_ptr<BiomeDatabase>, StarException> BiomeDatabase::crea
   auto assets = root.assets();
   if (!assets) return std::unexpected(std::move(assets.error()));
   auto scanFiles = [&](String const& type, ConfigMap& map) -> std::expected<void, StarException> {
-    auto files = (*assets)->scanExtension(type);
+    auto files = (*assets)->scan_extension(type);
     if (!files) return std::unexpected(std::move(files.error()));
-    auto queued = (*assets)->queueJsons(files->get());
+    auto queued = (*assets)->queue_jsons(files->get());
     if (!queued) return std::unexpected(std::move(queued.error()));
     for (auto const& file : files->get()) {
       auto const& path = file.string();
@@ -97,7 +97,7 @@ std::expected<std::shared_ptr<BiomeDatabase>, StarException> BiomeDatabase::crea
         return {};
       };
       auto loaded = read_file();
-      if (!loaded) return std::unexpected((*assets)->withAssetContext(std::move(loaded.error()), path, "Loading biome or weather"));
+      if (!loaded) return std::unexpected((*assets)->with_asset_context(std::move(loaded.error()), path, "Loading biome or weather"));
     }
     return {};
   };
@@ -140,7 +140,7 @@ std::expected<WeatherPool, StarException> BiomeDatabase::biomeWeathers(String co
     if (!path) return std::unexpected(std::move(path.error()));
     auto assets = m_root.assets();
     if (!assets) return std::unexpected(std::move(assets.error()));
-    auto poolConfig = (*assets)->fetchJson(path->get());
+    auto poolConfig = (*assets)->fetch_json(path->get());
     if (!poolConfig) return std::unexpected(std::move(poolConfig.error()));
     return json_to_weighted_pool<String>(*poolConfig);
   }

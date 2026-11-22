@@ -338,7 +338,7 @@ if (!result1073) return std::unexpected(std::move(result1073.error()));
 auto assets = std::move(*result1073);
   auto result1074 = configValue("animation");
 if (!result1074) return std::unexpected(std::move(result1074.error()));
-auto result1075 = assets->fetchJson(std::move(*result1074), m_path);
+auto result1075 = assets->fetch_json(std::move(*result1074), m_path);
 if (!result1075) return std::unexpected(std::move(result1075.error()));
 auto animationConfig = std::move(*result1075);
   auto result1076 = configValue("animationCustom");

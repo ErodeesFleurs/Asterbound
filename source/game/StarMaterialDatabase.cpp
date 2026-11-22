@@ -101,14 +101,14 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
   };
   auto metaMaterials = loadMetaMaterials();
   if (!metaMaterials)
-    return std::unexpected(assets->withAssetContext(std::move(metaMaterials.error()), "/metamaterials.config", "Loading metamaterials"));
-  auto materials = assets->scanExtension("material");
+    return std::unexpected(assets->with_asset_context(std::move(metaMaterials.error()), "/metamaterials.config", "Loading metamaterials"));
+  auto materials = assets->scan_extension("material");
   if (!materials) return std::unexpected(std::move(materials.error()));
-  auto mods = assets->scanExtension("matmod");
+  auto mods = assets->scan_extension("matmod");
   if (!mods) return std::unexpected(std::move(mods.error()));
-  auto queuedMaterials = assets->queueJsons(materials->get());
+  auto queuedMaterials = assets->queue_jsons(materials->get());
   if (!queuedMaterials) return std::unexpected(std::move(queuedMaterials.error()));
-  auto queuedMods = assets->queueJsons(mods->get());
+  auto queuedMods = assets->queue_jsons(mods->get());
   if (!queuedMods) return std::unexpected(std::move(queuedMods.error()));
   for (auto const& path : materials->get()) {
     auto const& file = path.string();
@@ -228,7 +228,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
       if (!renderConfig)
         return std::unexpected(std::move(renderConfig.error()));
       if (*renderConfig) {
-        auto renderTemplate = assets->fetchJson(**renderConfig, file);
+        auto renderTemplate = assets->fetch_json(**renderConfig, file);
         if (!renderTemplate)
           return std::unexpected(std::move(renderTemplate.error()));
         auto parameters = config->get("renderParameters");
@@ -243,7 +243,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
       auto damageConfig = config->get("damageTable", "/tiles/defaultDamage.config");
       if (!damageConfig)
         return std::unexpected(std::move(damageConfig.error()));
-      auto damage = assets->fetchJson(*damageConfig);
+      auto damage = assets->fetch_json(*damageConfig);
       if (!damage)
         return std::unexpected(std::move(damage.error()));
       auto health = config->opt_float("health");
@@ -325,7 +325,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
       return {};
     };
     auto loaded = read_file();
-    if (!loaded) return std::unexpected(assets->withAssetContext(MaterialException(Star::format("Error loading material file {}", file), loaded.error()), file, "Loading material"));
+    if (!loaded) return std::unexpected(assets->with_asset_context(MaterialException(Star::format("Error loading material file {}", file), loaded.error()), file, "Loading material"));
   }
   for (auto const& path : mods->get()) {
     auto const& file = path.string();
@@ -423,7 +423,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
       if (!renderConfig)
         return std::unexpected(std::move(renderConfig.error()));
       if (*renderConfig) {
-        auto renderTemplate = assets->fetchJson(**renderConfig);
+        auto renderTemplate = assets->fetch_json(**renderConfig);
         if (!renderTemplate)
           return std::unexpected(std::move(renderTemplate.error()));
         auto parameters = config->get("renderParameters");
@@ -438,7 +438,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
       auto damageConfig = config->get("damageTable", "/tiles/defaultDamage.config");
       if (!damageConfig)
         return std::unexpected(std::move(damageConfig.error()));
-      auto damage = assets->fetchJson(*damageConfig);
+      auto damage = assets->fetch_json(*damageConfig);
       if (!damage)
         return std::unexpected(std::move(damage.error()));
       auto health = config->opt_float("health");
@@ -496,13 +496,13 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
       return {};
     };
     auto loaded = read_file();
-    if (!loaded) return std::unexpected(assets->withAssetContext(MaterialException(Star::format("Error loading mod file {}", file), loaded.error()), file, "Loading material mod"));
+    if (!loaded) return std::unexpected(assets->with_asset_context(MaterialException(Star::format("Error loading mod file {}", file), loaded.error()), file, "Loading material mod"));
   }
   auto footstepConfig = assets->json("/client.config:defaultFootstepSound");
-  if (!footstepConfig) return std::unexpected(assets->withAssetContext(std::move(footstepConfig.error()), "/client.config:defaultFootstepSound", "Loading default footstep sound"));
+  if (!footstepConfig) return std::unexpected(assets->with_asset_context(std::move(footstepConfig.error()), "/client.config:defaultFootstepSound", "Loading default footstep sound"));
   {
     auto value = footstepConfig->to_string();
-    if (!value) return std::unexpected(assets->withAssetContext(std::move(value.error()), "/client.config:defaultFootstepSound", "Loading default footstep sound"));
+    if (!value) return std::unexpected(assets->with_asset_context(std::move(value.error()), "/client.config:defaultFootstepSound", "Loading default footstep sound"));
     m_defaultFootstepSound = std::move(*value);
   }
   return {};

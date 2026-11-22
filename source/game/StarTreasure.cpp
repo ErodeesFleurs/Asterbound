@@ -95,15 +95,15 @@ std::expected<std::shared_ptr<TreasureDatabase>, StarException> TreasureDatabase
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto treasurePools = (*assets)->scanExtension("treasurepools");
+  auto treasurePools = (*assets)->scan_extension("treasurepools");
   if (!treasurePools)
     return std::unexpected(std::move(treasurePools.error()));
-  auto treasureChests = (*assets)->scanExtension("treasurechests");
+  auto treasureChests = (*assets)->scan_extension("treasurechests");
   if (!treasureChests)
     return std::unexpected(std::move(treasureChests.error()));
-  if (auto queued = (*assets)->queueJsons(treasurePools->get()); !queued)
+  if (auto queued = (*assets)->queue_jsons(treasurePools->get()); !queued)
     return std::unexpected(std::move(queued.error()));
-  if (auto queued = (*assets)->queueJsons(treasureChests->get()); !queued)
+  if (auto queued = (*assets)->queue_jsons(treasureChests->get()); !queued)
     return std::unexpected(std::move(queued.error()));
   auto parseEntry = [](Json const& entry) -> std::expected<TreasureEntry, StarException> {
     auto hasPool = entry.contains("pool");

@@ -318,7 +318,7 @@ std::expected<AudioFixture, StarException> prepare_audio(Root& root, bool ogg, s
     std::ranges::sort(*files);
     if (files->empty())
       return std::unexpected(StarException("Real /sfx/ Ogg fixture catalog is empty"));
-    auto device = (*assets)->openFile((*files)[0]);
+    auto device = (*assets)->open_file((*files)[0]);
     if (!device)
       return std::unexpected(std::move(device.error()));
     return Audio::create(std::move(*device), (*files)[0]);
@@ -749,10 +749,10 @@ std::expected<CacheFixture, StarException> prepareCache(BenchmarkSession& sessio
   auto settings = root.settings().assetsSettings;
   // Expiry is deterministic without sleeping or touching private cache state.
   // This independent real Assets instance is not serviced by Root maintenance.
-  settings.assetTimeToLive = -1.0f;
-  settings.missingImage.reset();
-  settings.missingAudio.reset();
-  auto assets = Assets::create(root.logger(), root.random(), root.logMap(), settings, (*rootAssets)->assetSources());
+  settings.asset_time_to_live = -1.0f;
+  settings.missing_image.reset();
+  settings.missing_audio.reset();
+  auto assets = Assets::create(root.logger(), root.random(), root.logMap(), settings, (*rootAssets)->asset_sources());
   if (!assets)
     return std::unexpected(std::move(assets.error()));
   CacheFixture fixture{std::move(*assets), {}, {}, {}, HashSeed};
@@ -772,7 +772,7 @@ std::expected<CacheFixture, StarException> prepareCache(BenchmarkSession& sessio
     fixture.images.emplace_back(path);
     fixture.paths.push_back(std::move(path));
   }
-  fixture.assets->clearCache();
+  fixture.assets->clear_cache();
   session.cacheFixtures.emplace(count, std::make_unique<CacheFixture>(fixture));
   return fixture;
 }
@@ -858,7 +858,7 @@ void assetsMixedCleanup(benchmark::State& state, BenchmarkSession& session) {
       handles.images[i].reset();
       handles.bytes[i].reset();
     }
-    fixture->assets->clearCache();
+    fixture->assets->clear_cache();
     auto loaded = cacheGetters(*fixture, handles);
     if (!loaded)
       return loaded;

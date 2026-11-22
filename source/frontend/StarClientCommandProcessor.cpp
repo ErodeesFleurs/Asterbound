@@ -908,7 +908,7 @@ std::expected<String, StarException> ClientCommandProcessor::render(String const
     AssetPath framePath = assetPath;
 
     StringMap<std::pair<RectU, std::shared_ptr<Image const>>> frames;
-    auto imageFrames = (*assets)->imageFrames(assetPath.m_base_path);
+    auto imageFrames = (*assets)->image_frames(assetPath.m_base_path);
     if (!imageFrames) return std::unexpected(std::move(imageFrames.error()));
     if (*imageFrames)
       for (auto const& pair : (*imageFrames)->frames)

@@ -111,7 +111,7 @@ std::expected<void, StarException> scanMaterials(Root& root, TilesetUpdater& upd
       return std::unexpected(std::move(path.error()));
     if (!*path)
       continue;
-    auto source = assets->assetSource(**path);
+    auto source = assets->asset_source(**path);
     if (!source)
       return std::unexpected(std::move(source.error()));
     auto renderProfile = materials->materialRenderProfile(*id);
@@ -320,7 +320,7 @@ std::expected<void, StarException> defineObjectOrientation(Root& root, TilesetUp
   if (orientationIndex != 0)
     tileName += "_orientation" + Star::to_string(orientationIndex);
   properties["//name"] = tileName;
-  auto source = assets->assetSource((*objectConfig)->path);
+  auto source = assets->asset_source((*objectConfig)->path);
   if (!source)
     return std::unexpected(std::move(source.error()));
   for (String const& tileset : *tilesets) {
@@ -372,7 +372,7 @@ std::expected<void, StarException> scanLiquids(Root& root, TilesetUpdater& updat
   for (auto const& liquid : (*liquids)->allLiquidSettings()) {
     auto image = std::make_shared<Image>(imageSize, PixelFormat::RGBA32);
     image->fill(liquid->liquidColor);
-    auto assetSource = (*assets)->assetSource(liquid->path);
+    auto assetSource = (*assets)->asset_source(liquid->path);
     if (!assetSource)
       return std::unexpected(std::move(assetSource.error()));
     JsonObject properties{{"liquid", liquid->name}, {"//name", liquid->name}};
@@ -416,7 +416,7 @@ int main(int argc, char** argv) {
     auto assets = root->assets();
     if (!assets)
       return std::unexpected(std::move(assets.error()));
-    for (String const& source : (*assets)->assetSources()) {
+    for (String const& source : (*assets)->asset_sources()) {
       auto logged = root->logger().info("Assets source: \"{}\"", source);
       if (!logged)
         return std::unexpected(std::move(logged.error()));

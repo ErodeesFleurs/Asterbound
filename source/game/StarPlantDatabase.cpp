@@ -242,16 +242,16 @@ std::expected<std::shared_ptr<PlantDatabase>, StarException> PlantDatabase::crea
   auto assets = root.assets();
   if (!assets) return std::unexpected(std::move(assets.error()));
   auto load = [&]() -> std::expected<void, StarException> {
-    auto stems = (*assets)->scanExtension("modularstem");
+    auto stems = (*assets)->scan_extension("modularstem");
     if (!stems) return std::unexpected(std::move(stems.error()));
-    auto foliages = (*assets)->scanExtension("modularfoliage");
+    auto foliages = (*assets)->scan_extension("modularfoliage");
     if (!foliages) return std::unexpected(std::move(foliages.error()));
-    auto grasses = (*assets)->scanExtension("grass");
+    auto grasses = (*assets)->scan_extension("grass");
     if (!grasses) return std::unexpected(std::move(grasses.error()));
-    auto bushes = (*assets)->scanExtension("bush");
+    auto bushes = (*assets)->scan_extension("bush");
     if (!bushes) return std::unexpected(std::move(bushes.error()));
     for (auto files : {*stems,*foliages,*grasses,*bushes})
-      if (auto queued = (*assets)->queueJsons(files.get()); !queued) return std::unexpected(std::move(queued.error()));
+      if (auto queued = (*assets)->queue_jsons(files.get()); !queued) return std::unexpected(std::move(queued.error()));
     auto read = [&](auto const& files, auto& configs) -> std::expected<void, StarException> {
       for (auto const& scannedFile : files) {
         String file = scannedFile.string();
@@ -266,7 +266,7 @@ std::expected<std::shared_ptr<PlantDatabase>, StarException> PlantDatabase::crea
           return {};
         }();
         if (!loaded)
-          return std::unexpected((*assets)->withAssetContext(std::move(loaded.error()), file, "Loading plant configuration"));
+          return std::unexpected((*assets)->with_asset_context(std::move(loaded.error()), file, "Loading plant configuration"));
       }
       return {};
     };

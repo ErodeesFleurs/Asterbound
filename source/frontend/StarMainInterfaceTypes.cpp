@@ -154,7 +154,7 @@ std::expected<std::unique_ptr<MainInterfaceConfig>, StarException> MainInterface
     config->debugBackgroundPad = std::move(*value);
   }
 
-  auto macros = (*assets)->scanExtension("macros");
+  auto macros = (*assets)->scan_extension("macros");
   if (!macros) return std::unexpected(std::move(macros.error()));
   for (auto const& path : macros->get()) {
     auto json = (*assets)->json(path.string());

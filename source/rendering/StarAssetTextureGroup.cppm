@@ -34,7 +34,7 @@ public:
   [[nodiscard]] std::expected<TexturePtr, StarException> loadTexture(AssetPath const& imagePath);
 
   // If the texture is loaded and ready, returns the texture pointer, otherwise
-  // queues the texture using Assets::tryImage and returns nullptr.
+  // queues the texture using Assets::try_image and returns nullptr.
   [[nodiscard]] std::expected<TexturePtr, StarException> tryTexture(AssetPath const& imagePath);
 
   // Has the texture been loaded?

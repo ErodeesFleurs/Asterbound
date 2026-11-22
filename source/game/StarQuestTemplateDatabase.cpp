@@ -139,9 +139,9 @@ std::expected<std::shared_ptr<QuestTemplate>, StarException> QuestTemplate::crea
 }
 std::expected<std::shared_ptr<QuestTemplateDatabase>, StarException> QuestTemplateDatabase::create(std::shared_ptr<Assets const> assets, Logger& logger) {
   auto database = std::shared_ptr<QuestTemplateDatabase>(new QuestTemplateDatabase(logger));
-  auto files = assets->scanExtension("questtemplate");
+  auto files = assets->scan_extension("questtemplate");
   if (!files) return std::unexpected(std::move(files.error()));
-  auto queued = assets->queueJsons(files->get());
+  auto queued = assets->queue_jsons(files->get());
   if (!queued) return std::unexpected(std::move(queued.error()));
   for (auto const& file : files->get()) {
     auto loaded = [&]() -> std::expected<void, StarException> {
@@ -154,7 +154,7 @@ std::expected<std::shared_ptr<QuestTemplateDatabase>, StarException> QuestTempla
     return {};
     }();
     if (!loaded)
-      return std::unexpected(assets->withAssetContext(std::move(loaded.error()), file.string(), "Loading quest template"));
+      return std::unexpected(assets->with_asset_context(std::move(loaded.error()), file.string(), "Loading quest template"));
   }
   return database;
 }

@@ -439,7 +439,7 @@ void projectileColdCatalogParse(benchmark::State& state, BenchmarkSession& sessi
     session.fail(state, assets.error());
     return;
   }
-  auto files = (*assets)->scanExtension("projectile");
+  auto files = (*assets)->scan_extension("projectile");
   if (!files) {
     session.fail(state, files.error());
     return;

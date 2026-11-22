@@ -275,19 +275,19 @@ std::expected<Vec2U, StarException> ImageMetadataDatabase::calculateImageSize(As
       return std::unexpected(std::move(image.error()));
     return (*image)->size();
   };
-  auto exists = (*assets)->assetExists(path.m_base_path);
+  auto exists = (*assets)->asset_exists(path.m_base_path);
   if (!exists)
     return std::unexpected(std::move(exists.error()));
   if (!*exists)
     return fallback();
   Vec2U imageSize;
   if (path.m_sub_path) {
-    auto frames = (*assets)->imageFrames(path.m_base_path);
+    auto frames = (*assets)->image_frames(path.m_base_path);
     if (!frames)
       return std::unexpected(std::move(frames.error()));
     if (!*frames)
       return fallback();
-    auto rect = (*frames)->getRect(*path.m_sub_path);
+    auto rect = (*frames)->get_rect(*path.m_sub_path);
     if (!rect)
       return std::unexpected(std::move(rect.error()));
     if (*rect)
@@ -303,7 +303,7 @@ std::expected<Vec2U, StarException> ImageMetadataDatabase::calculateImageSize(As
       imageSize = (*size)->get();
     } else {
       locker.unlock();
-      auto file = (*assets)->openFile(path.m_base_path);
+      auto file = (*assets)->open_file(path.m_base_path);
       if (!file)
         return std::unexpected(std::move(file.error()));
       auto png = Image::is_png(*file);

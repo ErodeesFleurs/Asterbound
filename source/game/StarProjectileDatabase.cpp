@@ -79,9 +79,9 @@ std::expected<std::shared_ptr<ProjectileDatabase>, StarException> ProjectileData
   auto database = std::make_shared<MakeShared>(root);
   auto assets = root.assets();
   if (!assets) return std::unexpected(std::move(assets.error()));
-  auto files = (*assets)->scanExtension("projectile");
+  auto files = (*assets)->scan_extension("projectile");
   if (!files) return std::unexpected(std::move(files.error()));
-  if (auto queued = (*assets)->queueJsons(files->get()); !queued) return std::unexpected(std::move(queued.error()));
+  if (auto queued = (*assets)->queue_jsons(files->get()); !queued) return std::unexpected(std::move(queued.error()));
   for (auto const& scannedFile : files->get()) {
     String file = scannedFile.string();
     auto config = database->readConfig(file);
@@ -93,7 +93,7 @@ std::expected<std::shared_ptr<ProjectileDatabase>, StarException> ProjectileData
       continue;
     }
     if (database->m_configs.contains((*config)->typeName)) {
-      auto error = (*assets)->withAssetContext(ProjectileDatabaseException::format("Duplicate projectile asset typeName {}. configfile {}", (*config)->typeName, file), file, "Loading projectile");
+      auto error = (*assets)->with_asset_context(ProjectileDatabaseException::format("Duplicate projectile asset typeName {}. configfile {}", (*config)->typeName, file), file, "Loading projectile");
       if (auto logged = root.logger().error_exception("Error loading projectile", ExceptionDiagnostic(error)); !logged)
         return std::unexpected(std::move(logged.error()));
     } else database->m_configs[(*config)->typeName] = std::move(*config);
@@ -180,7 +180,7 @@ if (!result79) return std::unexpected(std::move(result79.error()));
 JsonObject movementSettings = std::move(*result79);
   auto physicsPath = Star::format("/projectiles/physics.config:{}", physicsType);
   auto result80 = assets->json(physicsPath);
-if (!result80) return std::unexpected(assets->withAssetContext(std::move(result80.error()), physicsPath, "Loading projectile physics"));
+if (!result80) return std::unexpected(assets->with_asset_context(std::move(result80.error()), physicsPath, "Loading projectile physics"));
   projectileConfig->movementSettings = json_merge(std::move(*result80), movementSettings);
 
   auto result82 = config.get_float("speed", 50);
@@ -417,7 +417,7 @@ projectileConfig->statusEffectArea = std::move(*result146);
   return projectileConfig;
   }();
   if (!loaded)
-    return std::unexpected(assets->withAssetContext(std::move(loaded.error()), path, "Loading projectile"));
+    return std::unexpected(assets->with_asset_context(std::move(loaded.error()), path, "Loading projectile"));
   return loaded;
 }
 

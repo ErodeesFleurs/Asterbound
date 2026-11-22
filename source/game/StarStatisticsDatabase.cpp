@@ -39,12 +39,12 @@ std::expected<std::shared_ptr<StatisticsDatabase>, StarException> StatisticsData
 std::expected<void, StarException> StatisticsDatabase::load() {
   auto assets = m_root.assets();
   if (!assets) return std::unexpected(std::move(assets.error()));
-  auto eventFiles = (*assets)->scanExtension("event");
+  auto eventFiles = (*assets)->scan_extension("event");
   if (!eventFiles) return std::unexpected(std::move(eventFiles.error()));
-  if (auto result = (*assets)->queueJsons(eventFiles->get()); !result) return std::unexpected(std::move(result.error()));
-  auto achievementFiles = (*assets)->scanExtension("achievement");
+  if (auto result = (*assets)->queue_jsons(eventFiles->get()); !result) return std::unexpected(std::move(result.error()));
+  auto achievementFiles = (*assets)->scan_extension("achievement");
   if (!achievementFiles) return std::unexpected(std::move(achievementFiles.error()));
-  if (auto result = (*assets)->queueJsons(achievementFiles->get()); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = (*assets)->queue_jsons(achievementFiles->get()); !result) return std::unexpected(std::move(result.error()));
   for (auto const& path : eventFiles->get()) {
     auto const& file = path.string();
     std::expected<void, StarException> loggingResult;
@@ -63,7 +63,7 @@ std::expected<void, StarException> StatisticsDatabase::load() {
     if (!loaded) {
       if (auto result =
             m_root.logger().error_exception(Star::format("Error loading event file {}", file),
-                                            ExceptionDiagnostic((*assets)->withAssetContext(
+                                            ExceptionDiagnostic((*assets)->with_asset_context(
                                               std::move(loaded.error()), file, "Loading statistics event")));
           !result)
         return std::unexpected(std::move(result.error()));
@@ -94,7 +94,7 @@ std::expected<void, StarException> StatisticsDatabase::load() {
     if (!loaded) {
       if (auto result = m_root.logger().error_exception(
             Star::format("Error loading achievement file {}", file),
-            ExceptionDiagnostic((*assets)->withAssetContext(std::move(loaded.error()), file, "Loading achievement")));
+            ExceptionDiagnostic((*assets)->with_asset_context(std::move(loaded.error()), file, "Loading achievement")));
           !result)
         return std::unexpected(std::move(result.error()));
     }
@@ -151,7 +151,7 @@ std::expected<std::shared_ptr<StatEvent>, StarException> StatisticsDatabase::rea
     return std::make_shared<StatEvent>(StatEvent{std::move(*name), std::move(*scripts), std::move(*config)});
   }();
   if (!parsed)
-    return std::unexpected(assets.withAssetContext(std::move(parsed.error()), path, "Loading statistics event"));
+    return std::unexpected(assets.with_asset_context(std::move(parsed.error()), path, "Loading statistics event"));
   return parsed;
 }
 
@@ -172,7 +172,7 @@ std::expected<std::shared_ptr<Achievement>, StarException> StatisticsDatabase::r
     return std::make_shared<Achievement>(Achievement{std::move(*name), std::move(*triggers), std::move(*scripts), std::move(*config)});
   }();
   if (!parsed)
-    return std::unexpected(assets.withAssetContext(std::move(parsed.error()), path, "Loading achievement"));
+    return std::unexpected(assets.with_asset_context(std::move(parsed.error()), path, "Loading achievement"));
   return parsed;
 }
 

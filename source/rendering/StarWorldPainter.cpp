@@ -529,7 +529,7 @@ std::expected<void, StarException> WorldPainter::drawDrawable(Drawable const& dr
   if (RectF::with_size(Vec2F(), Vec2F(m_camera.screenSize())).intersects(screenBounds))
     return m_drawablePainter->drawDrawableProjected(drawable, position, scale, m_camera.pixelRatio());
   if (drawable.isImage() && m_preloadRandom.uniform_float() < m_preloadTextureChance) {
-    auto image = m_assets->tryImage(drawable.imagePart().image);
+    auto image = m_assets->try_image(drawable.imagePart().image);
     if (!image) return std::unexpected(std::move(image.error()));
   }
   return {};

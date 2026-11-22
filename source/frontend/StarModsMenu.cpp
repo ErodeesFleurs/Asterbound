@@ -92,13 +92,13 @@ std::expected<void, StarException> ModsMenu::init() {
   if (auto result = reader.construct(*layout, *this); !result)
     return std::unexpected(std::move(result.error()));
 
-  m_assetsSources = (*assets)->assetSources();
+  m_assetsSources = (*assets)->asset_sources();
   auto modList = requireChild<ListWidget>("mods.list");
   if (!modList)
     return std::unexpected(std::move(modList.error()));
   m_modList = std::move(*modList);
   for (auto const& assetsSource : m_assetsSources) {
-    auto metadata = (*assets)->assetSourceMetadata(assetsSource);
+    auto metadata = (*assets)->asset_source_metadata(assetsSource);
     if (!metadata)
       return std::unexpected(std::move(metadata.error()));
     auto listItem = m_modList->addItem();
@@ -184,7 +184,7 @@ std::expected<void, StarException> ModsMenu::update(float dt) {
     auto assets = context().root().assets();
     if (!assets)
       return std::unexpected(std::move(assets.error()));
-    auto metadata = (*assets)->assetSourceMetadata(source->get());
+    auto metadata = (*assets)->asset_source_metadata(source->get());
     if (!metadata)
       return std::unexpected(std::move(metadata.error()));
     auto name = bestModName(*metadata, source->get());
@@ -244,7 +244,7 @@ std::expected<void, StarException> ModsMenu::openLink() {
   auto assets = context().root().assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto metadata = (*assets)->assetSourceMetadata(source->get());
+  auto metadata = (*assets)->asset_source_metadata(source->get());
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
   auto link = metadata->value("link", "").to_string();

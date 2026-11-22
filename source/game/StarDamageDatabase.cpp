@@ -62,12 +62,12 @@ std::expected<std::shared_ptr<DamageDatabase>, StarException> DamageDatabase::cr
   };
   auto elementalTypes = loadElementalTypes();
   if (!elementalTypes)
-    return std::unexpected(assets->withAssetContext(std::move(elementalTypes.error()), "/damage/elementaltypes.config", "Loading elemental types"));
+    return std::unexpected(assets->with_asset_context(std::move(elementalTypes.error()), "/damage/elementaltypes.config", "Loading elemental types"));
 
-  auto files = assets->scanExtension("damage");
+  auto files = assets->scan_extension("damage");
   if (!files)
     return std::unexpected(std::move(files.error()));
-  auto queued = assets->queueJsons(files->get());
+  auto queued = assets->queue_jsons(files->get());
   if (!queued)
     return std::unexpected(std::move(queued.error()));
   for (auto const& file : files->get()) {
@@ -125,7 +125,7 @@ std::expected<std::shared_ptr<DamageDatabase>, StarException> DamageDatabase::cr
     };
     auto loaded = read_file();
     if (!loaded)
-      return std::unexpected(assets->withAssetContext(std::move(loaded.error()), path, "Loading damage kind"));
+      return std::unexpected(assets->with_asset_context(std::move(loaded.error()), path, "Loading damage kind"));
   }
   return database;
 }

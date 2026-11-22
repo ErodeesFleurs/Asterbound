@@ -29,13 +29,13 @@ namespace Star {
 
 std::expected<std::shared_ptr<CodexDatabase>, StarException> CodexDatabase::create(std::shared_ptr<Assets const> assets) {
   auto result = std::shared_ptr<CodexDatabase>(new CodexDatabase());
-  auto files = assets->scanExtension("codex");
+  auto files = assets->scan_extension("codex");
   if (!files)
     return std::unexpected(std::move(files.error()));
   auto codexConfig = assets->json("/codex.config");
   if (!codexConfig)
-    return std::unexpected(assets->withAssetContext(std::move(codexConfig.error()), "/codex.config", "Loading codex defaults"));
-  auto queued = assets->queueJsons(files->get());
+    return std::unexpected(assets->with_asset_context(std::move(codexConfig.error()), "/codex.config", "Loading codex defaults"));
+  auto queued = assets->queue_jsons(files->get());
   if (!queued)
     return std::unexpected(std::move(queued.error()));
   for (auto const& assetFile : files->get()) {
@@ -46,7 +46,7 @@ std::expected<std::shared_ptr<CodexDatabase>, StarException> CodexDatabase::crea
         return std::unexpected(std::move(codexJson.error()));
       auto defaultIcon = codexConfig->get_string("defaultIcon");
       if (!defaultIcon)
-        return std::unexpected(assets->withAssetContext(std::move(defaultIcon.error()), "/codex.config", "Loading codex defaults"));
+        return std::unexpected(assets->with_asset_context(std::move(defaultIcon.error()), "/codex.config", "Loading codex defaults"));
       auto icon = codexJson->get_string("icon", *defaultIcon);
       if (!icon)
         return std::unexpected(std::move(icon.error()));
@@ -61,7 +61,7 @@ std::expected<std::shared_ptr<CodexDatabase>, StarException> CodexDatabase::crea
       return codex;
     }();
     if (!loaded)
-      return std::unexpected(CodexDatabaseException(Star::format("Error reading codex config {}", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading codex")));
+      return std::unexpected(CodexDatabaseException(Star::format("Error reading codex config {}", file), assets->with_asset_context(std::move(loaded.error()), file, "Loading codex")));
     result->m_codexes[(*loaded)->id()] = std::move(*loaded);
   }
   return result;

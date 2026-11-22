@@ -1406,7 +1406,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
         auto result78 = this->root().assets();
         if (!result78)
           return std::unexpected(std::move(result78.error()));
-        auto result79 = (std::move(*result78))->assetExists(*weatherParallaxAsset);
+        auto result79 = (std::move(*result78))->asset_exists(*weatherParallaxAsset);
         if (!result79)
           return std::unexpected(std::move(result79.error()));
         condition80 = static_cast<bool>((std::move(*result79)));

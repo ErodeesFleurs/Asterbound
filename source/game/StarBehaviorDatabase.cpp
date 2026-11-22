@@ -121,9 +121,9 @@ BehaviorTree::BehaviorTree(String const& name, StringSet scripts, JsonObject con
 std::expected<std::shared_ptr<BehaviorDatabase>, StarException> BehaviorDatabase::create(std::shared_ptr<Assets const> assets) {
   auto database = std::shared_ptr<BehaviorDatabase>(new BehaviorDatabase());
   database->m_assets = assets;
-  auto files = assets->scanExtension("nodes");
+  auto files = assets->scan_extension("nodes");
   if (!files) return std::unexpected(std::move(files.error()));
-  auto queuedNodes = assets->queueJsons(files->get());
+  auto queuedNodes = assets->queue_jsons(files->get());
   if (!queuedNodes) return std::unexpected(std::move(queuedNodes.error()));
   for (auto const& fileKey : files->get()) {
     auto const& file = fileKey.string();
@@ -154,11 +154,11 @@ std::expected<std::shared_ptr<BehaviorDatabase>, StarException> BehaviorDatabase
       }
       return {};
     }();
-    if (!load) return std::unexpected(StarException(Star::format("Could not load nodes file '{}'", file), assets->withAssetContext(std::move(load.error()), file, "Loading behavior nodes")));
+    if (!load) return std::unexpected(StarException(Star::format("Could not load nodes file '{}'", file), assets->with_asset_context(std::move(load.error()), file, "Loading behavior nodes")));
   }
-  auto behaviors = assets->scanExtension("behavior");
+  auto behaviors = assets->scan_extension("behavior");
   if (!behaviors) return std::unexpected(std::move(behaviors.error()));
-  auto queuedBehaviors = assets->queueJsons(behaviors->get());
+  auto queuedBehaviors = assets->queue_jsons(behaviors->get());
   if (!queuedBehaviors) return std::unexpected(std::move(queuedBehaviors.error()));
   for (auto const& fileKey : behaviors->get()) {
     auto const& file = fileKey.string();
@@ -172,7 +172,7 @@ std::expected<std::shared_ptr<BehaviorDatabase>, StarException> BehaviorDatabase
       database->m_configPaths[*name] = file;
       return {};
     }();
-    if (!load) return std::unexpected(StarException(Star::format("Could not load behavior file '{}'", file), assets->withAssetContext(std::move(load.error()), file, "Loading behavior configuration")));
+    if (!load) return std::unexpected(StarException(Star::format("Could not load behavior file '{}'", file), assets->with_asset_context(std::move(load.error()), file, "Loading behavior configuration")));
   }
   for (auto const& pair : database->m_configs) {
     if (!database->m_behaviors.contains(pair.first)) {
@@ -196,7 +196,7 @@ std::expected<void, StarException> BehaviorDatabase::loadTree(String const& name
   auto tree = buildTree(*config, {});
   if (!tree) {
     if (auto path = m_configPaths.find_ref(name))
-      return std::unexpected(m_assets->withAssetContext(std::move(tree.error()), path->get(), "Building behavior tree"));
+      return std::unexpected(m_assets->with_asset_context(std::move(tree.error()), path->get(), "Building behavior tree"));
     return std::unexpected(std::move(tree.error()));
   }
   m_behaviors.set(name, *tree);
@@ -290,7 +290,7 @@ std::expected<std::shared_ptr<BehaviorNode const>, StarException> BehaviorDataba
     auto module = buildTree(*moduleConfig, parameters);
     if (!module) {
       if (auto path = m_configPaths.find_ref(*name))
-        return std::unexpected(m_assets->withAssetContext(std::move(module.error()), path->get(), "Building behavior tree"));
+        return std::unexpected(m_assets->with_asset_context(std::move(module.error()), path->get(), "Building behavior tree"));
       return std::unexpected(std::move(module.error()));
     }
     tree.scripts.insert_range((*module)->scripts);

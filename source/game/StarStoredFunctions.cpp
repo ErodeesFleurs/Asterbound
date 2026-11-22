@@ -150,22 +150,22 @@ std::expected<Json, StarException> StoredConfigFunction::get(double value) const
 
 std::expected<std::shared_ptr<FunctionDatabase>, StarException> FunctionDatabase::create(std::shared_ptr<Assets const> const& assets) {
   auto result = std::shared_ptr<FunctionDatabase>(new FunctionDatabase());
-  auto functions = assets->scanExtension("functions");
+  auto functions = assets->scan_extension("functions");
   if (!functions)
     return std::unexpected(std::move(functions.error()));
-  auto functions2 = assets->scanExtension("2functions");
+  auto functions2 = assets->scan_extension("2functions");
   if (!functions2)
     return std::unexpected(std::move(functions2.error()));
-  auto configFunctions = assets->scanExtension("configfunctions");
+  auto configFunctions = assets->scan_extension("configfunctions");
   if (!configFunctions)
     return std::unexpected(std::move(configFunctions.error()));
-  auto queuedFunctions = assets->queueJsons(functions->get());
+  auto queuedFunctions = assets->queue_jsons(functions->get());
   if (!queuedFunctions)
     return std::unexpected(std::move(queuedFunctions.error()));
-  auto queuedFunctions2 = assets->queueJsons(functions2->get());
+  auto queuedFunctions2 = assets->queue_jsons(functions2->get());
   if (!queuedFunctions2)
     return std::unexpected(std::move(queuedFunctions2.error()));
-  auto queuedConfigFunctions = assets->queueJsons(configFunctions->get());
+  auto queuedConfigFunctions = assets->queue_jsons(configFunctions->get());
   if (!queuedConfigFunctions)
     return std::unexpected(std::move(queuedConfigFunctions.error()));
   for (auto const& assetFile : functions->get()) {

@@ -960,7 +960,7 @@ const GameTestRegistration
     auto const& baseAssets = *assetResult;
     String humanPath;
     Json humanConfig;
-    auto speciesPaths = baseAssets->scanExtension("species");
+    auto speciesPaths = baseAssets->scan_extension("species");
     ASSERT_TRUE(speciesPaths);
     for (auto const& assetPath : speciesPaths->get()) {
       auto const& path = assetPath.string();
@@ -976,7 +976,7 @@ const GameTestRegistration
     }
     ASSERT_FALSE(humanPath.empty());
     Json npcConfig;
-    auto npcPaths = baseAssets->scanExtension("npctype");
+    auto npcPaths = baseAssets->scan_extension("npctype");
     ASSERT_TRUE(npcPaths);
     for (auto const& assetPath : npcPaths->get()) {
       auto const& path = assetPath.string();
@@ -1603,7 +1603,7 @@ const GameTestRegistration blueprintLearning(
                                  patchPath));
     auto assets = (*root)->assets();
     ASSERT_TRUE(assets);
-    (*assets)->hotReload();
+    (*assets)->hot_reload();
     auto silent = player.addBlueprint(*descriptor);
     ASSERT_TRUE(silent) << silent.error().what();
     EXPECT_FALSE(*silent);

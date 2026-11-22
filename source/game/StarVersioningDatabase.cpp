@@ -218,7 +218,7 @@ std::expected<void, StarException> VersioningDatabase::init() {
     return {};
   }();
   if (!configured)
-    return std::unexpected((*assets)->withAssetContext(std::move(configured.error()), "/versioning.config", "Loading versioning configuration"));
+    return std::unexpected((*assets)->with_asset_context(std::move(configured.error()), "/versioning.config", "Loading versioning configuration"));
   auto subConfigured = [&]() -> std::expected<void, StarException> {
     auto subVersions = (*assets)->json("/versioning/subVersioning.config");
     if (!subVersions) return std::unexpected(std::move(subVersions.error()));
@@ -236,7 +236,7 @@ std::expected<void, StarException> VersioningDatabase::init() {
     return {};
   }();
   if (!subConfigured)
-    return std::unexpected((*assets)->withAssetContext(std::move(subConfigured.error()), "/versioning/subVersioning.config", "Loading sub-versioning configuration"));
+    return std::unexpected((*assets)->with_asset_context(std::move(subConfigured.error()), "/versioning/subVersioning.config", "Loading sub-versioning configuration"));
   auto scripts = (*assets)->scan("/versioning/", ".lua");
   if (!scripts) return std::unexpected(std::move(scripts.error()));
   for (auto const& script : *scripts) {
@@ -273,7 +273,7 @@ std::expected<void, StarException> VersioningDatabase::init() {
       return {};
     }();
     if (!parse)
-      return std::unexpected(VersioningDatabaseException(Star::format("Error parsing version information from versioning script '{}'", script), (*assets)->withAssetContext(std::move(parse.error()), script, "Parsing versioning script filename")));
+      return std::unexpected(VersioningDatabaseException(Star::format("Error parsing version information from versioning script '{}'", script), (*assets)->with_asset_context(std::move(parse.error()), script, "Parsing versioning script filename")));
   }
   // Preserve the existing stable selection order for matching upgrades.
   auto order = [](VersionUpdateScript const& lhs, VersionUpdateScript const& rhs) {

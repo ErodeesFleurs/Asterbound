@@ -216,7 +216,7 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
   settings.assetSources.push_back(overlay);
   // Isolate explicit reload invalidation from maintenance-thread TTL eviction
   // while loading the real pak on slower test hosts.
-  settings.assetsSettings.assetTimeToLive = std::numeric_limits<float>::max();
+  settings.assetsSettings.asset_time_to_live = std::numeric_limits<float>::max();
   settings.storageDirectory = File::relative_to(directory, "storage");
   settings.runtimeConfigFile = String("root-isolation.config");
   settings.logDirectory = {};

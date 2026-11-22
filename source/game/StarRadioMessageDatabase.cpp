@@ -40,7 +40,7 @@ std::expected<std::shared_ptr<RadioMessageDatabase>, StarException> RadioMessage
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto files = (*assets)->scanExtension("radiomessages");
+  auto files = (*assets)->scan_extension("radiomessages");
   if (!files)
     return std::unexpected(std::move(files.error()));
   for (auto const& assetFile : files->get()) {
@@ -63,7 +63,7 @@ std::expected<std::shared_ptr<RadioMessageDatabase>, StarException> RadioMessage
       return {};
     }();
     if (!loaded)
-      return std::unexpected(RadioMessageDatabaseException(Star::format("Error loading radiomessages file {}", file), (*assets)->withAssetContext(std::move(loaded.error()), file, "Loading radio messages")));
+      return std::unexpected(RadioMessageDatabaseException(Star::format("Error loading radiomessages file {}", file), (*assets)->with_asset_context(std::move(loaded.error()), file, "Loading radio messages")));
   }
   return result;
 }
@@ -90,7 +90,7 @@ std::expected<RadioMessage, StarException> RadioMessageDatabase::createRadioMess
     return std::unexpected(std::move(assets.error()));
   auto defaults = (*assets)->json("/radiomessages.config:messageDefaults");
   if (!defaults)
-    return std::unexpected((*assets)->withAssetContext(std::move(defaults.error()), "/radiomessages.config", "Loading radio message defaults"));
+    return std::unexpected((*assets)->with_asset_context(std::move(defaults.error()), "/radiomessages.config", "Loading radio message defaults"));
   auto mergedConfig = json_merge(*defaults, config);
   RadioMessage message;
   auto configuredId = mergedConfig.get_string("messageId", "");

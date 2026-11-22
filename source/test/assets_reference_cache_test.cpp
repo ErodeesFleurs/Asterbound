@@ -23,10 +23,10 @@ using namespace Star;
 namespace {
 Assets::Settings referenceCacheSettings(std::uint64_t budget = 8, float referenceTtl = 300) {
   Assets::Settings settings{};
-  settings.assetTimeToLive = -1;
-  settings.workerPoolSize = 0;
-  settings.referenceImageTimeToLive = referenceTtl;
-  settings.referenceImagePixelBudget = budget;
+  settings.asset_time_to_live = -1;
+  settings.worker_pool_size = 0;
+  settings.reference_image_time_to_live = referenceTtl;
+  settings.reference_image_pixel_budget = budget;
   return settings;
 }
 
@@ -121,8 +121,8 @@ const GameTestRegistration assetsReferenceCacheExtensionCanBeDisabled(
     ASSERT_TRUE(writeReferenceCacheAssets(fixture, *directory));
     for (auto const& settings :
          std::array{referenceCacheSettings(0), referenceCacheSettings(4, -1), referenceCacheSettings(4, -2)}) {
-      SCOPED_TRACE(::testing::Message() << "budget=" << settings.referenceImagePixelBudget
-                                        << " reference TTL=" << settings.referenceImageTimeToLive);
+      SCOPED_TRACE(::testing::Message() << "budget=" << settings.reference_image_pixel_budget
+                                        << " reference TTL=" << settings.reference_image_time_to_live);
       auto assets = referenceCacheAssets(fixture, *directory, settings);
       ASSERT_TRUE(assets) << assets.error().what();
       std::weak_ptr<Image const> reference, result;
@@ -200,7 +200,7 @@ const GameTestRegistration assetsReferenceCacheClearDisregardsExtendedTtl(
     (*assets)->cleanup();
     EXPECT_TRUE(result.expired());
     ASSERT_FALSE(reference.expired());
-    (*assets)->clearCache();
+    (*assets)->clear_cache();
     EXPECT_TRUE(reference.expired());
   });
 
@@ -227,7 +227,7 @@ const GameTestRegistration assetsReferenceCacheExternalHandlesPersist(
       EXPECT_TRUE(result.expired());
       EXPECT_FALSE(ordinaryLifetime.expired());
       EXPECT_FALSE(referenceLifetime.expired());
-      (*assets)->clearCache();
+      (*assets)->clear_cache();
       auto ordinaryAgain = (*assets)->image("/ordinary.png");
       auto referenceAgain = (*assets)->image("/large.png");
       ASSERT_TRUE(ordinaryAgain) << ordinaryAgain.error().what();

@@ -123,7 +123,7 @@ std::expected<std::shared_ptr<ActiveItem>, StarException> ActiveItem::create(Roo
   auto animationValue = item->instanceValue("animation");
   if (!animationValue)
     return std::unexpected(std::move(animationValue.error()));
-  auto animationConfig = (*assets)->fetchJson(*animationValue, directory);
+  auto animationConfig = (*assets)->fetch_json(*animationValue, directory);
   if (!animationConfig)
     return std::unexpected(std::move(animationConfig.error()));
   auto custom = item->instanceValue("animationCustom");

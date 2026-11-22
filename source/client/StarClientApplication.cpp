@@ -1144,7 +1144,7 @@ std::expected<void, StarException> ClientApplication::renderReload() {
   auto renderer = Application::renderer();
   auto loadEffectConfig = [&](String const& name) -> std::expected<void, StarException> {
     String path = Star::format("/rendering/effects/{}.config", name);
-    auto exists = assets->assetExists(path);
+    auto exists = assets->asset_exists(path);
     if (!exists)
       return std::unexpected(std::move(exists.error()));
     if (!*exists) {

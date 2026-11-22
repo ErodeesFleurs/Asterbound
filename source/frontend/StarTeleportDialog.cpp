@@ -263,7 +263,7 @@ std::expected<void, StarException> TeleportDialog::initialize(Json config) {
   if (!layout) return std::unexpected(std::move(layout.error()));
   auto constructed = reader.construct(*layout, *this);
   if (!constructed) return std::unexpected(std::move(constructed.error()));
-  auto fetched = (*assets)->fetchJson(config);
+  auto fetched = (*assets)->fetch_json(config);
   if (!fetched) return std::unexpected(std::move(fetched.error()));
   config = std::move(*fetched);
   auto destList = fetchChild<ListWidget>("bookmarkList.bookmarkItemList");

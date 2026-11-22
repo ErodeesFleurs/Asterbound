@@ -47,19 +47,49 @@ import star.drawable;
 import star.rect;
 
 #include "gtest/gtest.h"
+#include "gtest/gtest-spi.h"
 
 import star.algorithm;
 namespace Star {
 struct AssetWorkerTestAccess {
+  static bool cached_frame_miss(Assets const& assets, String const& path) {
+    std::lock_guard lock(assets.m_assets_mutex);
+    auto file = assets.m_frame_files_by_image.find_ref(path);
+    return file && file->get().path.empty();
+  }
+
+  static List<Assets::AssetId> queued_ids(Assets const& assets) {
+    std::lock_guard lock(assets.m_assets_mutex);
+    return assets.m_queue.keys();
+  }
+
+  static auto take_worker_task(Assets& assets) {
+    std::lock_guard lock(assets.m_assets_mutex);
+    return assets.next_worker_task();
+  }
+
+  static std::expected<std::shared_ptr<Assets::AssetData>, StarException> decode_post(Assets& assets,
+      Assets::WorkerTask const& task) {
+    if (!task.post)
+      return std::unexpected(StarException("Expected an audio post-processing task"));
+    return assets.post_process_audio(*task.post);
+  }
+
+  static std::expected<bool, StarException> finish_post(Assets& assets, Assets::WorkerTask task,
+      std::expected<std::shared_ptr<Assets::AssetData>, StarException> processed) {
+    std::lock_guard lock(assets.m_assets_mutex);
+    return assets.publish_post(task.id, std::move(*task.post), std::move(processed));
+  }
+
   static std::expected<void, StarException> drain(Assets& assets) {
-    std::unique_lock lock(assets.m_assetsMutex);
-    if (!assets.m_assetsDone.wait_for(lock, std::chrono::seconds(60), [&] {
-          return assets.m_queue.empty() || assets.m_workerError || assets.m_workerStopSource.stop_requested();
+    std::unique_lock lock(assets.m_assets_mutex);
+    if (!assets.m_assets_done.wait_for(lock, std::chrono::seconds(60), [&] {
+          return assets.m_queue.empty() || assets.m_worker_error || assets.m_worker_stop_source.stop_requested();
         }))
       return std::unexpected(StarException("Asset queue regression did not drain"));
-    if (assets.m_workerError)
-      return std::unexpected(*assets.m_workerError);
-    if (assets.m_workerStopSource.stop_requested())
+    if (assets.m_worker_error)
+      return std::unexpected(*assets.m_worker_error);
+    if (assets.m_worker_stop_source.stop_requested())
       return std::unexpected(StarException("Asset queue stopped before draining"));
     return {};
   }
@@ -77,7 +107,7 @@ struct AssetWorkerTestAccess {
     paths.sort();
     for (auto const& path : paths) {
       bool ignored = false;
-      for (auto const& pattern : assets.m_settings.digestIgnore) {
+      for (auto const& pattern : assets.m_settings.digest_ignore) {
         auto matches = path.regex_match(pattern, false, false);
         if (!matches)
           return std::unexpected(std::move(matches.error()));
@@ -95,7 +125,7 @@ struct AssetWorkerTestAccess {
       if (!descriptor)
         return std::unexpected(std::move(descriptor.error()));
       digest.push(path);
-      auto device = descriptor->get().source->open(descriptor->get().sourceName);
+      auto device = descriptor->get().source->open(descriptor->get().source_name);
       if (!device)
         return std::unexpected(std::move(device.error()));
       auto size = (*device)->size();
@@ -105,7 +135,7 @@ struct AssetWorkerTestAccess {
       if (!bytes)
         return std::unexpected(std::move(bytes.error()));
       digest.push(*bytes);
-      for (auto const& patch : descriptor->get().patchSources) {
+      for (auto const& patch : descriptor->get().patch_sources) {
         auto patch_device = patch.second->open(AssetPath::remove_sub_path(patch.first));
         if (!patch_device)
           return std::unexpected(std::move(patch_device.error()));
@@ -242,6 +272,91 @@ const GameTestRegistration assetsAll("AssetsTest", "All", [](GameTest&) {
             "/foo/bar/thing:sub?directive");
 });
 
+static_assert(asset_path_range<StringList> && asset_path_range<CaseInsensitiveStringSet>);
+static_assert(asset_path_range<std::array<String, 2>> && !asset_path_range<std::vector<int>>);
+
+const GameTestRegistration assets_atomic_batch_queues("AssetsTest", "AtomicBatchQueues", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(*directory, "preload.config")));
+  // Zero workers: every published ID remains observable, including partial batches.
+  auto created = Assets::create(fixture.root().logger(), fixture.root().random(), fixture.root().logMap(),
+                                Assets::Settings{}, {*directory});
+  ASSERT_TRUE(created) << created.error().what();
+  auto& assets = **created;
+  ASSERT_TRUE(assets.queue_jsons(StringList{"/one.json:first", "/one.json:second"}));
+  ASSERT_TRUE(assets.queue_images(std::array<String, 2>{"/tile.png:frame?flipx", "/tile.png:frame?flipx"}));
+  auto audio = CaseInsensitiveString::create("/sound.ogg");
+  ASSERT_TRUE(audio);
+  ASSERT_TRUE(assets.queue_audios(CaseInsensitiveStringSet{*audio}));
+  List<Assets::AssetId> expected{{Assets::AssetType::Json, "/one.json"},
+                                 {Assets::AssetType::Image, "/tile.png:frame?flipx"},
+                                 {Assets::AssetType::Audio, "/sound.ogg"}};
+  ASSERT_EQ(AssetWorkerTestAccess::queued_ids(assets), expected);
+
+  EXPECT_FALSE(assets.queue_jsons(StringList{"/two.json", "/three.json?flipx"}));
+  EXPECT_FALSE(assets.queue_images(StringList{"/two.png", "relative.png"}));
+  EXPECT_FALSE(assets.queue_audios(StringList{"/two.ogg", "/bad.ogg:sub"}));
+  auto good = CaseInsensitiveString::create("/two.ogg");
+  auto bad = CaseInsensitiveString::create("/bad.ogg?flipx");
+  ASSERT_TRUE(good);
+  ASSERT_TRUE(bad);
+  EXPECT_FALSE(assets.queue_audios(CaseInsensitiveStringSet{*good, *bad}));
+  EXPECT_FALSE(assets.queue_audios(std::array{*good, *bad}));
+  EXPECT_EQ(AssetWorkerTestAccess::queued_ids(assets), expected);
+});
+
+const GameTestRegistration assets_filtered_scans("AssetsTest", "FilteredScanOrderAndErrors", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(*directory, "preload.config")));
+  for (auto const& name : StringList{"水One.item.JSON", "水Two.item.json", "水Three.ITEM.JSON", "else.item.json"})
+    ASSERT_TRUE(File::write_file(String("{}"), File::relative_to(*directory, name)));
+  auto created = Assets::create(fixture.root().logger(), fixture.root().random(), fixture.root().logMap(),
+                                Assets::Settings{}, {*directory});
+  ASSERT_TRUE(created) << created.error().what();
+  auto& assets = **created;
+  String prefix = "/水t";
+  for (auto const& suffix : StringList{".jSoN", ".itEM.json", ""}) {
+    // Independent candidate order: the extension index and file map need not agree.
+    StringList candidates;
+    if (suffix == ".jSoN") {
+      auto indexed = assets.scan_extension("json");
+      ASSERT_TRUE(indexed);
+      for (auto const& key : indexed->get())
+        candidates.push_back(key.string());
+    } else {
+      auto all = assets.scan("");
+      ASSERT_TRUE(all);
+      candidates = std::move(*all);
+    }
+    StringList expected;
+    for (auto const& path : candidates) {
+      auto tail = path.ends_with(suffix, String::CaseInsensitive);
+      auto head = path.starts_with(prefix, String::CaseInsensitive);
+      ASSERT_TRUE(tail && head);
+      if (*tail && *head)
+        expected.push_back(path);
+    }
+    ASSERT_EQ(expected.size(), 2u);
+    auto filtered = assets.scan(prefix, suffix);
+    ASSERT_TRUE(filtered) << filtered.error().what();
+    EXPECT_EQ(*filtered, expected);
+  }
+  String invalid(std::string_view("\xff", 1));
+  EXPECT_FALSE(assets.scan(invalid, ".json"));
+  EXPECT_FALSE(assets.scan(invalid, ".item.json"));
+  EXPECT_FALSE(assets.scan("/not-present", invalid));
+  EXPECT_FALSE(assets.scan("/not-present", "." + invalid));
+  for (auto const& suffix : StringList{".unknown", ".item.unknown"}) {
+    auto no_candidates = assets.scan(invalid, suffix);
+    ASSERT_TRUE(no_candidates);
+    EXPECT_TRUE(no_candidates->empty());
+  }
+});
+
 const GameTestRegistration objectCursorPreviewRandomIsolation(
   "AssetsTest", "ObjectCursorPreviewColdAndWarmCachesPreserveGameplayRandom", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
@@ -258,7 +373,7 @@ const GameTestRegistration objectCursorPreviewRandomIsolation(
     auto& root = **isolatedRoot;
     auto assets = root.assets();
     ASSERT_TRUE(assets) << assets.error().what();
-    auto files = (*assets)->scanExtension("object");
+    auto files = (*assets)->scan_extension("object");
     ASSERT_TRUE(files) << files.error().what();
     String objectName;
     for (auto const& path : files->get()) {
@@ -370,14 +485,14 @@ const GameTestRegistration
     expect_batch_matches_scalar(**source, requests);
 
     Assets::Settings settings{};
-    settings.workerPoolSize = 1;
+    settings.worker_pool_size = 1;
     auto assets =
       Assets::create(fixture.root().logger(), fixture.root().random(), fixture.root().logMap(), settings, {*directory});
     ASSERT_TRUE(assets) << assets.error().what();
     ASSERT_TRUE((*assets)->json("/mutable.json"));
     String replacement(R"({"recovered":42})");
     ASSERT_TRUE(File::write_file(replacement, path));
-    (*assets)->hotReload();
+    (*assets)->hot_reload();
     size = (*source)->file_size("/mutable.json");
     ASSERT_TRUE(size);
     EXPECT_EQ(*size, static_cast<StreamOffset>(replacement.utf8_size()));
@@ -406,7 +521,7 @@ const GameTestRegistration
     ASSERT_TRUE(size);
     EXPECT_EQ(*size, 2);
     expect_batch_matches_scalar(**source, requests);
-    (*assets)->hotReload();
+    (*assets)->hot_reload();
     EXPECT_TRUE((*assets)->json("/mutable.json"));
 
     MemoryAssetSource memory("metadata-test");
@@ -629,8 +744,8 @@ const GameTestRegistration assetMetadataDigest(
     for (auto const& [source_path, patch_path] :
          std::array{std::pair{original, patch_directory}, std::pair{packed_path, packed_patch_path}}) {
       Assets::Settings settings{};
-      settings.workerPoolSize = 1;
-      settings.digestIgnore = {"^/ignored\\.txt$"};
+      settings.worker_pool_size = 1;
+      settings.digest_ignore = {"^/ignored\\.txt$"};
       auto assets = Assets::create(fixture.root().logger(), fixture.root().random(), fixture.root().logMap(), settings,
                                    {source_path, patch_path});
       ASSERT_TRUE(assets) << assets.error().what();
@@ -658,8 +773,8 @@ const GameTestRegistration digest_ignore_pattern_order(
     ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(*directory, "preload.config")));
     ASSERT_TRUE(File::write_file(String("hello"), File::relative_to(*directory, "mixed.txt")));
     Assets::Settings settings{};
-    settings.workerPoolSize = 1;
-    settings.digestIgnore = {"IXE", "LOAD", "[", "("};
+    settings.worker_pool_size = 1;
+    settings.digest_ignore = {"IXE", "LOAD", "[", "("};
     auto build = [&] {
       return Assets::create(fixture.root().logger(), fixture.root().random(), fixture.root().logMap(), settings,
                             {*directory});
@@ -679,7 +794,7 @@ const GameTestRegistration digest_ignore_pattern_order(
     EXPECT_TRUE(rejected.error().is<StringException>());
     EXPECT_STREQ(rejected.error().what(), first_error.error().what());
 
-    settings.digestIgnore = {"IXE", "LOAD"};
+    settings.digest_ignore = {"IXE", "LOAD"};
     auto assets = build();
     ASSERT_TRUE(assets) << assets.error().what();
     auto historical = AssetWorkerTestAccess::reader_digest(**assets);
@@ -721,7 +836,7 @@ assets.add('/target.json.patch', '[{"op":"add","path":"/memory","value":9}]')
     for (auto const& [source_path, patch_path] :
          std::array{std::pair{original, patches}, std::pair{packed, packed_patches}}) {
       Assets::Settings settings{};
-      settings.workerPoolSize = 1;
+      settings.worker_pool_size = 1;
       auto assets = Assets::create(fixture.root().logger(), fixture.root().random(), fixture.root().logMap(), settings,
                                    {source_path, patch_path});
       ASSERT_TRUE(assets) << assets.error().what();
@@ -786,7 +901,7 @@ const GameTestRegistration assetBatchDigestErrorOrder(
         : (*second_source)->file_size(scenario == 0 ? String("/a.json.patch") : String("/b.json"));
       ASSERT_FALSE(expected_error);
       Assets::Settings settings{};
-      settings.workerPoolSize = 1;
+      settings.worker_pool_size = 1;
       auto assets = Assets::create(fixture.root().logger(), fixture.root().random(), fixture.root().logMap(), settings,
                                    {first_path, second_path});
       ASSERT_FALSE(assets);
@@ -1379,7 +1494,7 @@ const GameTestRegistration assetsWavSignaturesAndPcmSamples("AssetsTest", "WavSi
 const GameTestRegistration audioMixerGroupBindings("AssetsTest", "AudioMixerGroupLuaContract", [](GameTest& fixture) {
   auto assets = fixture.root().assets();
   ASSERT_TRUE(assets);
-  auto input = (*assets)->openFile("/sfx/interface/voice_on.ogg");
+  auto input = (*assets)->open_file("/sfx/interface/voice_on.ogg");
   ASSERT_TRUE(input);
   auto audio = Audio::create(*input, "mixer-group.ogg");
   ASSERT_TRUE(audio);
@@ -1426,7 +1541,7 @@ const GameTestRegistration audioMixerGroupBindings("AssetsTest", "AudioMixerGrou
 const GameTestRegistration assetsOggCloneLifetimes("AssetsTest", "OggCloneIndependentCursorsAndLifetime", [](GameTest& fixture) {
   auto assets = fixture.root().assets();
   ASSERT_TRUE(assets);
-  auto input = (*assets)->openFile("/sfx/interface/voice_on.ogg");
+  auto input = (*assets)->open_file("/sfx/interface/voice_on.ogg");
   ASSERT_TRUE(input);
   auto created = Audio::create(std::move(*input), "clone-lifetime.ogg");
   ASSERT_TRUE(created);
@@ -1501,8 +1616,8 @@ const GameTestRegistration
     auto tempDir = std::move(*directory);
     auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(tempDir)); });
     Assets::Settings settings{};
-    settings.workerPoolSize = 4;
-    settings.assetTimeToLive = 10;
+    settings.worker_pool_size = 4;
+    settings.asset_time_to_live = 10;
     // Fail after worker launch, including completed preload work followed by failure.
     Logger logger;
     for (unsigned attempt = 0; attempt < 4; ++attempt) {
@@ -1548,13 +1663,13 @@ const GameTestRegistration
     ASSERT_TRUE(bytes);
     ASSERT_TRUE(File::write_file(*bytes, File::relative_to(tempDir, "sample.png")));
     Assets::Settings settings{};
-    settings.workerPoolSize = 4;
-    settings.assetTimeToLive = 10;
+    settings.worker_pool_size = 4;
+    settings.asset_time_to_live = 10;
     for (unsigned attempt = 0; attempt < 16; ++attempt) {
       auto assets =
         Assets::create(fixture.root().logger(), fixture.root().random(), fixture.root().logMap(), settings, {tempDir});
       ASSERT_TRUE(assets);
-      ASSERT_TRUE((*assets)->queueImages(StringList{"/sample.png?flipx", "/sample.png?flipy", "/sample.png"}));
+      ASSERT_TRUE((*assets)->queue_images(StringList{"/sample.png?flipx", "/sample.png?flipy", "/sample.png"}));
     }
   });
 
@@ -1585,12 +1700,12 @@ const GameTestRegistration
       paths.push_back("/" + name);
     }
     Assets::Settings settings{};
-    settings.workerPoolSize = 4;
-    settings.assetTimeToLive = 600;
+    settings.worker_pool_size = 4;
+    settings.asset_time_to_live = 600;
     Logger logger;
     auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {*directory});
     ASSERT_TRUE(assets);
-    ASSERT_TRUE((*assets)->queueJsons(paths));
+    ASSERT_TRUE((*assets)->queue_jsons(paths));
     EXPECT_FALSE((*assets)->json("/broken.json"));
     for (unsigned i = 0; i != 32; ++i) {
       auto result = (*assets)->json(paths[i + 1]);
@@ -1636,8 +1751,8 @@ end
                                  File::relative_to(*directory, "shared.lua")));
     for (unsigned workerCount : {1u, 4u}) {
       Assets::Settings settings{};
-      settings.workerPoolSize = workerCount;
-      settings.assetTimeToLive = 600;
+      settings.worker_pool_size = workerCount;
+      settings.asset_time_to_live = 600;
       Logger logger;
       auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {*directory});
       ASSERT_TRUE(assets);
@@ -1646,7 +1761,7 @@ end
         StringList batch;
         for (unsigned i = begin; i < begin + 8; ++i)
           batch.push_back(paths[i]);
-        ASSERT_TRUE((*assets)->queueJsons(batch));
+        ASSERT_TRUE((*assets)->queue_jsons(batch));
         auto drained = AssetWorkerTestAccess::drain(**assets);
         ASSERT_TRUE(drained) << drained.error().what();
         for (unsigned i = begin; i < begin + 8; ++i) {
@@ -1772,6 +1887,261 @@ const GameTestRegistration invalidPngWriteThrows("ImageTest", "InvalidPngWriteTh
   EXPECT_TRUE(written.error().is<ImageException>());
 });
 
+namespace {
+struct PatchGate : LogSink {
+  std::binary_semaphore entered{0};
+  std::binary_semaphore resume{0};
+  std::expected<void, StarException> log(std::string_view message, LogLevel) override {
+    if (message == "epoch checkpoint") {
+      entered.release();
+      if (!resume.try_acquire_for(std::chrono::seconds(30)))
+        return std::unexpected(StarException("Reload test did not release the old Lua patch"));
+    }
+    return {};
+  }
+};
+}
+
+const GameTestRegistration negative_frame_file_cache(
+  "AssetsTest", "OnlyCatalogFrameMissesAreInterned", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(*directory, "preload.config")));
+    ASSERT_TRUE(File::write_file(String(""), File::relative_to(*directory, "catalog.png")));
+    Assets::Settings settings{};
+    auto assets = Assets::create(fixture.root().logger(), fixture.root().random(), fixture.root().logMap(), settings, {*directory});
+    ASSERT_TRUE(assets) << assets.error().what();
+    for (String const& path : {String("/catalog.png"), String("/missing.png"), String("/CATALOG.png")}) {
+      auto frames = (*assets)->image_frames(path);
+      ASSERT_TRUE(frames) << frames.error().what();
+      EXPECT_FALSE(*frames);
+    }
+    EXPECT_TRUE(AssetWorkerTestAccess::cached_frame_miss(**assets, "/catalog.png"));
+    EXPECT_FALSE(AssetWorkerTestAccess::cached_frame_miss(**assets, "/missing.png"));
+    EXPECT_FALSE(AssetWorkerTestAccess::cached_frame_miss(**assets, "/CATALOG.png"));
+    (*assets)->hot_reload(); // The catalog still names exactly the same files.
+    EXPECT_TRUE(AssetWorkerTestAccess::cached_frame_miss(**assets, "/catalog.png"));
+  });
+
+const GameTestRegistration reload_during_frame_patch(
+  "AssetsTest", "ReloadFencesFramePublicationAndRetriesTopLevelLookup", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto path = File::relative_to(*directory, "default.frames");
+    auto patch = File::relative_to(*directory, "default.frames.patch.lua");
+    ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(*directory, "preload.config")));
+    ASSERT_TRUE(File::write_file(String(R"({"frameList":{"old":[0,0,1,1]}})"), path));
+    ASSERT_TRUE(File::write_file(String(R"(function patch(data) sb.logInfo("epoch checkpoint") return data end)"), patch));
+    Logger logger;
+    logger.remove_stdout_sink();
+    auto gate = std::make_shared<PatchGate>();
+    logger.add_sink(gate);
+    Assets::Settings settings{};
+    auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {*directory});
+    ASSERT_TRUE(assets) << assets.error().what();
+    auto previous = std::async(std::launch::async, [&] { return (*assets)->image_frames("/a.png"); });
+    bool released = false;
+    auto release = make_scope_exit([&] { if (!released) gate->resume.release(); });
+    ASSERT_TRUE(gate->entered.try_acquire_for(std::chrono::seconds(30)));
+    logger.remove_sink(gate);
+    ASSERT_TRUE(File::remove(patch));
+    ASSERT_TRUE(File::write_file(String(R"({"frameList":{"new":[0,0,1,1]}})"), path));
+    (*assets)->hot_reload();
+    auto current = (*assets)->image_frames("/a.png");
+    ASSERT_TRUE(current && *current);
+    ASSERT_TRUE((*current)->frames.contains("new"));
+    gate->resume.release();
+    released = true;
+    auto retried = previous.get();
+    ASSERT_TRUE(retried && *retried);
+    EXPECT_EQ(*retried, *current);
+    auto cached = (*assets)->image_frames("/a.png");
+    ASSERT_TRUE(cached && *cached);
+    EXPECT_EQ(*cached, *current);
+  });
+
+const GameTestRegistration reload_during_lua_patch(
+  "AssetsTest", "ReloadFencesOldSuccessFailureAndNestedLuaReads", [](GameTest& fixture) {
+    for (bool worker : {false, true}) {
+      for (bool fail : {false, true}) {
+        SCOPED_TRACE(::testing::Message() << "worker=" << worker << ", old failure=" << fail);
+        auto directory = File::temporary_directory(fixture.root().random());
+        ASSERT_TRUE(directory);
+        auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+        auto target = File::relative_to(*directory, "target.json");
+        auto dependency = File::relative_to(*directory, "dependency.json");
+        auto patch = File::relative_to(*directory, "target.json.patch.lua");
+        ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(*directory, "preload.config")));
+        auto old_json = fail ? String(R"({"epoch":1,"fail":true})") : String(R"({"epoch":1,"fail":false})");
+        ASSERT_TRUE(File::write_file(old_json, target));
+        ASSERT_TRUE(File::write_file(String(R"({"value":1})"), dependency));
+        ASSERT_TRUE(File::write_file(String("{}"), File::relative_to(*directory, "fence.json")));
+        ASSERT_TRUE(File::write_file(String(R"(
+          function patch(data)
+            sb.logInfo("epoch checkpoint")
+            pcall(assets.json, "/dependency.json")
+            if data.fail then error("failure in old snapshot") end
+            return data
+          end
+        )"), patch));
+        Logger logger;
+        logger.remove_stdout_sink();
+        auto gate = std::make_shared<PatchGate>();
+        logger.add_sink(gate);
+        Assets::Settings settings{};
+        settings.worker_pool_size = worker ? 1 : 0;
+        auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {*directory});
+        ASSERT_TRUE(assets) << assets.error().what();
+        std::future<std::expected<Json, StarException>> previous;
+        if (worker) {
+          ASSERT_TRUE((*assets)->queue_jsons(StringList{"/target.json"}));
+        } else {
+          previous = std::async(std::launch::async, [&] { return (*assets)->json("/target.json"); });
+        }
+        bool released = false;
+        auto release = make_scope_exit([&] { if (!released) gate->resume.release(); });
+        ASSERT_TRUE(gate->entered.try_acquire_for(std::chrono::seconds(30)));
+        // No Lua or logging in the new read: the old callback still owns those locks.
+        logger.remove_sink(gate);
+        ASSERT_TRUE(File::remove(patch));
+        ASSERT_TRUE(File::write_file(String(R"({"epoch":2})"), target));
+        (*assets)->hot_reload();
+        auto current = (*assets)->json("/target.json");
+        ASSERT_TRUE(current) << current.error().what();
+        ASSERT_EQ(current->get_int("epoch"), 2);
+        if (worker)
+          ASSERT_TRUE((*assets)->queue_jsons(StringList{"/fence.json"}));
+        gate->resume.release();
+        released = true;
+        if (worker) {
+          // A single worker drains this fence only after returning from the old patch.
+          ASSERT_TRUE(AssetWorkerTestAccess::drain(**assets));
+        } else {
+          auto retried = previous.get();
+          ASSERT_TRUE(retried) << retried.error().what();
+          EXPECT_EQ(*retried, *current);
+        }
+        auto cached = (*assets)->json("/target.json");
+        ASSERT_TRUE(cached) << cached.error().what();
+        EXPECT_EQ(*cached, *current);
+        // An old task that acquired the new epoch would already have cached value 1.
+        ASSERT_TRUE(File::write_file(String(R"({"value":2})"), dependency));
+        auto nested = (*assets)->json("/dependency.json");
+        ASSERT_TRUE(nested) << nested.error().what();
+        EXPECT_EQ(nested->get_int("value"), 2);
+      }
+    }
+  });
+
+const GameTestRegistration reload_during_audio_post(
+  "AssetsTest", "AudioPostClaimIsExclusiveAndCannotRemoveNewPost", [](GameTest& fixture) {
+    auto source = fixture.root().assets();
+    ASSERT_TRUE(source);
+    auto ogg = (*source)->bytes("/sfx/interface/voice_on.ogg");
+    ASSERT_TRUE(ogg) << ogg.error().what();
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    ASSERT_TRUE(File::write_file(String(R"([{"type":"audio","path":"/test.ogg"}])"),
+        File::relative_to(*directory, "preload.config")));
+    ASSERT_TRUE(File::write_file(**ogg, File::relative_to(*directory, "test.ogg")));
+    Assets::Settings settings{};
+    // Drive production worker selection and decoding on two threads at known boundaries.
+    settings.worker_pool_size = 0;
+    settings.audio_decompress_limit = 600;
+    auto service = Assets::create(fixture.root().logger(), fixture.root().random(), fixture.root().logMap(),
+                                  settings, {*directory});
+    ASSERT_TRUE(service) << service.error().what();
+    auto& assets = **service;
+    {
+      auto preload = AssetWorkerTestAccess::take_worker_task(assets);
+      ASSERT_TRUE(preload);
+      auto pcm = AssetWorkerTestAccess::decode_post(assets, *preload);
+      ASSERT_TRUE(pcm) << pcm.error().what();
+      ASSERT_TRUE(AssetWorkerTestAccess::finish_post(assets, std::move(*preload), std::move(pcm)));
+      std::weak_ptr<Audio const> lifetime;
+      {
+        auto preloaded = assets.audio("/test.ogg");
+        ASSERT_TRUE(preloaded);
+        EXPECT_FALSE((*preloaded)->compressed());
+        lifetime = *preloaded;
+      }
+      assets.clear_cache();
+      EXPECT_FALSE(lifetime.expired()) << "Decompression discarded the preload persistence flag";
+    }
+    assets.hot_reload();
+    auto original = assets.audio("/test.ogg");
+    ASSERT_TRUE(original) << original.error().what();
+    ASSERT_TRUE((*original)->compressed());
+
+    std::binary_semaphore claimed{0}, resume{0};
+    auto first = std::async(std::launch::async, [&]() -> std::expected<bool, StarException> {
+      auto task = AssetWorkerTestAccess::take_worker_task(assets);
+      if (!task)
+        return std::unexpected(StarException("First worker did not receive an audio task"));
+      auto pcm = AssetWorkerTestAccess::decode_post(assets, *task);
+      claimed.release(); // Paused after real decompression, before publishing to the cache.
+      if (!resume.try_acquire_for(std::chrono::seconds(30)))
+        return std::unexpected(StarException("First worker was not resumed"));
+      if (!pcm)
+        return std::unexpected(std::move(pcm.error()));
+      return AssetWorkerTestAccess::finish_post(assets, std::move(*task), std::move(pcm));
+    });
+    bool released = false;
+    auto release = make_scope_exit([&] { if (!released) resume.release(); });
+    ASSERT_TRUE(claimed.try_acquire_for(std::chrono::seconds(30)));
+    // Worker two has no decompression to dispatch while worker one owns this post.
+    EXPECT_FALSE(AssetWorkerTestAccess::take_worker_task(assets));
+    auto readable = assets.audio("/test.ogg");
+    ASSERT_TRUE(readable);
+    EXPECT_EQ(*readable, *original);
+    assets.hot_reload();
+    auto replacement = assets.audio("/test.ogg");
+    ASSERT_TRUE(replacement) << replacement.error().what();
+    ASSERT_NE(*replacement, *original);
+    ASSERT_TRUE((*replacement)->compressed());
+    resume.release();
+    released = true;
+    auto finished = first.get();
+    ASSERT_TRUE(finished) << finished.error().what();
+    EXPECT_TRUE(*finished);
+    auto cached = assets.audio("/test.ogg");
+    ASSERT_TRUE(cached);
+    EXPECT_EQ(*cached, *replacement);
+    auto next = AssetWorkerTestAccess::take_worker_task(assets);
+    ASSERT_TRUE(next) << "Obsolete completion removed the new epoch's pending post";
+    auto pcm = AssetWorkerTestAccess::decode_post(assets, *next);
+    ASSERT_TRUE(pcm) << pcm.error().what();
+    auto posted = AssetWorkerTestAccess::finish_post(assets, std::move(*next), std::move(pcm));
+    ASSERT_TRUE(posted) << posted.error().what();
+    auto decoded = assets.audio("/test.ogg");
+    ASSERT_TRUE(decoded);
+    EXPECT_FALSE((*decoded)->compressed());
+    EXPECT_TRUE((*original)->compressed());
+    EXPECT_TRUE((*replacement)->compressed());
+    EXPECT_FALSE(AssetWorkerTestAccess::take_worker_task(assets));
+
+    assets.hot_reload();
+    auto compressed = assets.audio("/test.ogg");
+    ASSERT_TRUE(compressed);
+    auto failed = AssetWorkerTestAccess::take_worker_task(assets);
+    ASSERT_TRUE(failed);
+    std::expected<bool, StarException> fallback_post;
+    EXPECT_NONFATAL_FAILURE(
+        fallback_post = AssetWorkerTestAccess::finish_post(assets, std::move(*failed),
+            std::unexpected(AudioException("Test decoder failure"))),
+        "Error was logged: Error post-processing asset: /test.ogg: Resource error: Test decoder failure");
+    ASSERT_TRUE(fallback_post) << fallback_post.error().what();
+    EXPECT_TRUE(*fallback_post);
+    auto fallback = assets.audio("/test.ogg");
+    ASSERT_TRUE(fallback);
+    EXPECT_EQ(*fallback, *compressed);
+    EXPECT_TRUE((*fallback)->compressed());
+    EXPECT_FALSE(AssetWorkerTestAccess::take_worker_task(assets));
+  });
+
 const GameTestRegistration assetsFailureCacheReload(
   "AssetsTest", "QueuedFailureSurvivesCacheClearAndRecoversAfterReload", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
@@ -1782,12 +2152,12 @@ const GameTestRegistration assetsFailureCacheReload(
     ASSERT_TRUE(File::write_file(String("{ invalid json"), path));
     ASSERT_TRUE(File::write_file(String(R"({"following":17})"), File::relative_to(*directory, "following.json")));
     Assets::Settings settings{};
-    settings.workerPoolSize = 2;
-    settings.assetTimeToLive = 600;
+    settings.worker_pool_size = 2;
+    settings.asset_time_to_live = 600;
     Logger logger;
     auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {*directory});
     ASSERT_TRUE(assets);
-    ASSERT_TRUE((*assets)->queueJsons(StringList{"/failure.json"}));
+    ASSERT_TRUE((*assets)->queue_jsons(StringList{"/failure.json"}));
     ASSERT_TRUE(AssetWorkerTestAccess::drain(**assets));
     auto first = (*assets)->json("/failure.json");
     ASSERT_FALSE(first);
@@ -1795,8 +2165,8 @@ const GameTestRegistration assetsFailureCacheReload(
     EXPECT_EQ(first.error().diagnostic_summary()->asset, "/failure.json");
     auto reason = first.error().diagnostic_summary()->reason;
     ASSERT_TRUE(File::write_file(String(R"({"recovered":42})"), path));
-    (*assets)->clearCache();
-    ASSERT_TRUE((*assets)->queueJsons(StringList{"/failure.json", "/following.json"}));
+    (*assets)->clear_cache();
+    ASSERT_TRUE((*assets)->queue_jsons(StringList{"/failure.json", "/following.json"}));
     ASSERT_TRUE(AssetWorkerTestAccess::drain(**assets));
     auto following = (*assets)->json("/following.json");
     ASSERT_TRUE(following);
@@ -1804,8 +2174,8 @@ const GameTestRegistration assetsFailureCacheReload(
     auto cached = (*assets)->json("/failure.json");
     ASSERT_FALSE(cached);
     EXPECT_EQ(cached.error().diagnostic_summary()->reason, reason);
-    (*assets)->hotReload();
-    ASSERT_TRUE((*assets)->queueJsons(StringList{"/failure.json"}));
+    (*assets)->hot_reload();
+    ASSERT_TRUE((*assets)->queue_jsons(StringList{"/failure.json"}));
     ASSERT_TRUE(AssetWorkerTestAccess::drain(**assets));
     auto recovered = (*assets)->json("/failure.json");
     ASSERT_TRUE(recovered);
@@ -1838,7 +2208,7 @@ const GameTestRegistration recoverableDatabaseProvider(
     auto errors = std::make_shared<Errors>();
     logger.add_sink(errors);
     Assets::Settings settings{};
-    settings.workerPoolSize = 1;
+    settings.worker_pool_size = 1;
     auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {*directory});
     ASSERT_TRUE(assets);
     auto database = DanceDatabase::create(*assets, logger);

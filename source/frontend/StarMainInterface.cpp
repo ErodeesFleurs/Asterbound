@@ -1440,7 +1440,7 @@ std::expected<void, StarException> MainInterface::handleInteractAction(InteractA
     if (!*teleportAllowed)
       return {};
     TeleportBookmark currentLocation;
-    auto config = (*assets)->fetchJson(interactAction.data);
+    auto config = (*assets)->fetch_json(interactAction.data);
     if (!config)
       return std::unexpected(std::move(config.error()));
     auto canBookmark = config->get_bool("canBookmark", false);
@@ -1640,7 +1640,7 @@ std::expected<void, StarException> MainInterface::update(float dt) {
           if (!assets)
             return std::unexpected(std::move(assets.error()));
           Json definition;
-          auto fetched = (*assets)->fetchJson(std::move(*cinematic));
+          auto fetched = (*assets)->fetch_json(std::move(*cinematic));
           if (!fetched) {
             auto logged = context().root().logger().warn("MainInterface: failed to fetch cinematic: {}", fetched.error().what());
             if (!logged)

@@ -259,7 +259,7 @@ std::expected<LuaContext, StarException> LuaRoot::create_context(StringList cons
     for (auto const& path : scriptPaths) {
       if (AssetPath::is_remote(path))
         return std::unexpected(LuaException("Embedded assets cannot be loaded as scripts"));
-      auto exists = (*assets)->assetExists(path);
+      auto exists = (*assets)->asset_exists(path);
       if (!exists)
         return std::unexpected(std::move(exists.error()));
       if (*exists) {
@@ -333,13 +333,13 @@ LuaRoot::ScriptCache::script(LuaEngine& engine, String const& path, std::uint64_
   // Hot reload keeps the asset index stable; snapshots survive cache clearing
   // and are owned separately from Root by the engine's resolver.
   if (!sourceDiagnostics.contains(path)) {
-    auto descriptor = (*assets)->assetDescriptor(path);
+    auto descriptor = (*assets)->asset_descriptor(path);
     if (descriptor && *descriptor) {
-      auto sourcePath = (*assets)->assetSourcePath((*descriptor)->source);
+      auto sourcePath = (*assets)->asset_source_path((*descriptor)->source);
       auto pathRef = sourcePath
         ? std::optional<std::reference_wrapper<String const>>(std::cref(*sourcePath))
         : std::nullopt;
-      sourceDiagnostics.set(path, String(Assets::sourceDiagnostic(*(*descriptor)->source, pathRef)));
+      sourceDiagnostics.set(path, String(Assets::source_diagnostic(*(*descriptor)->source, pathRef)));
     }
   }
   auto bytes = (*assets)->bytes(path);

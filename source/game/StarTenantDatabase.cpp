@@ -43,10 +43,10 @@ std::expected<std::shared_ptr<TenantDatabase>, StarException> TenantDatabase::cr
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto files = (*assets)->scanExtension("tenant");
+  auto files = (*assets)->scan_extension("tenant");
   if (!files)
     return std::unexpected(std::move(files.error()));
-  auto queued = (*assets)->queueJsons(files->get());
+  auto queued = (*assets)->queue_jsons(files->get());
   if (!queued)
     return std::unexpected(std::move(queued.error()));
   for (auto const& assetFile : files->get()) {
@@ -60,7 +60,7 @@ std::expected<std::shared_ptr<TenantDatabase>, StarException> TenantDatabase::cr
     if (!name) {
       auto logged = root.logger().error_exception(
         Star::format("Error loading tenant file {}", file),
-        ExceptionDiagnostic((*assets)->withAssetContext(std::move(name.error()), file, "Loading tenant")));
+        ExceptionDiagnostic((*assets)->with_asset_context(std::move(name.error()), file, "Loading tenant")));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
       continue;
@@ -196,7 +196,7 @@ std::expected<std::shared_ptr<Tenant>, StarException> TenantDatabase::readTenant
     return std::make_shared<Tenant>(Tenant{*name, *priority, std::move(criteria), std::move(tenants), std::move(rent), *config});
   }();
   if (!parsed)
-    return std::unexpected(TenantException(Star::format("Error loading tenant '{}'", path), assets.withAssetContext(std::move(parsed.error()), path, "Loading tenant")));
+    return std::unexpected(TenantException(Star::format("Error loading tenant '{}'", path), assets.with_asset_context(std::move(parsed.error()), path, "Loading tenant")));
   return parsed;
 }
 

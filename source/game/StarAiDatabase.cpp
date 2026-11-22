@@ -55,23 +55,23 @@ std::expected<std::shared_ptr<AiDatabase>, StarException> AiDatabase::create(Roo
     return std::unexpected(std::move(assets.error()));
   auto config = (*assets)->json("/ai/ai.config");
   if (!config)
-    return std::unexpected((*assets)->withAssetContext(std::move(config.error()), "/ai/ai.config", "Loading AI configuration"));
-  auto missions = (*assets)->scanExtension("aimission");
+    return std::unexpected((*assets)->with_asset_context(std::move(config.error()), "/ai/ai.config", "Loading AI configuration"));
+  auto missions = (*assets)->scan_extension("aimission");
   if (!missions)
     return std::unexpected(std::move(missions.error()));
-  auto queued = (*assets)->queueJsons(missions->get());
+  auto queued = (*assets)->queue_jsons(missions->get());
   if (!queued)
     return std::unexpected(std::move(queued.error()));
   for (auto const& assetFile : missions->get()) {
     auto const& file = assetFile.string();
     auto missionConfig = (*assets)->json(file);
     if (!missionConfig)
-      return std::unexpected((*assets)->withAssetContext(std::move(missionConfig.error()), file, "Loading AI mission"));
+      return std::unexpected((*assets)->with_asset_context(std::move(missionConfig.error()), file, "Loading AI mission"));
     if (!*missionConfig)
       continue;
     auto mission = parseMission(*missionConfig);
     if (!mission)
-      return std::unexpected((*assets)->withAssetContext(std::move(mission.error()), file, "Loading AI mission"));
+      return std::unexpected((*assets)->with_asset_context(std::move(mission.error()), file, "Loading AI mission"));
     result->m_missions[mission->missionName] = std::move(*mission);
   }
   auto configured = [&]() -> std::expected<void, StarException> {
@@ -156,7 +156,7 @@ std::expected<std::shared_ptr<AiDatabase>, StarException> AiDatabase::create(Roo
     return {};
   }();
   if (!configured)
-    return std::unexpected((*assets)->withAssetContext(std::move(configured.error()), "/ai/ai.config", "Loading AI configuration"));
+    return std::unexpected((*assets)->with_asset_context(std::move(configured.error()), "/ai/ai.config", "Loading AI configuration"));
   return result;
 }
 

@@ -43,8 +43,8 @@ std::expected<std::shared_ptr<Rebuilder>, StarException> Rebuilder::create(Root&
     return std::unexpected(std::move(assets.error()));
   rebuilder->m_contexts = std::make_shared<List<LuaContext>>();
 
-  for (auto const& path : (*assets)->assetSources()) {
-    auto metadata = (*assets)->assetSourceMetadata(path);
+  for (auto const& path : (*assets)->asset_sources()) {
+    auto metadata = (*assets)->asset_source_metadata(path);
     if (!metadata)
       return std::unexpected(std::move(metadata.error()));
     auto scripts = metadata->maybe("errorHandlers");

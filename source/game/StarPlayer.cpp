@@ -413,7 +413,7 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
   auto landingVolume = std::move(*landingVolumeResult);
   m_landingVolume = landingVolume;
 
-  auto effectsConfigResult = assets->fetchJson(m_config->effectsAnimator);
+  auto effectsConfigResult = assets->fetch_json(m_config->effectsAnimator);
   if (!effectsConfigResult)
     return std::unexpected(std::move(effectsConfigResult.error()));
   auto effectsConfig = std::move(*effectsConfigResult);

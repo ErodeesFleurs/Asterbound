@@ -115,12 +115,12 @@ std::expected<void, StarException> BaseScriptPane::init(Json config, bool constr
     auto path = config.get_string("baseConfig");
     if (!path)
       return std::unexpected(std::move(path.error()));
-    auto baseConfig = (*assets)->fetchJson(*path);
+    auto baseConfig = (*assets)->fetch_json(*path);
     if (!baseConfig)
       return std::unexpected(std::move(baseConfig.error()));
     m_config = json_merge(*baseConfig, config);
   } else {
-    auto fetched = (*assets)->fetchJson(config);
+    auto fetched = (*assets)->fetch_json(config);
     if (!fetched)
       return std::unexpected(std::move(fetched.error()));
     m_config = std::move(*fetched);
@@ -149,7 +149,7 @@ std::expected<void, StarException> BaseScriptPane::init(Json config, bool constr
     auto gui = m_config.get("gui");
     if (!gui)
       return std::unexpected(std::move(gui.error()));
-    auto layout = (*assets)->fetchJson(*gui);
+    auto layout = (*assets)->fetch_json(*gui);
     if (!layout)
       return std::unexpected(std::move(layout.error()));
     return this->construct(std::move(*layout));

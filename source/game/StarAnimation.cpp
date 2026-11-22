@@ -60,7 +60,7 @@ std::expected<void, StarException> Animation::initialize(Json config, String con
   auto assets = m_root.get().assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto fetched = (*assets)->fetchJson(config);
+  auto fetched = (*assets)->fetch_json(config);
   if (!fetched)
     return std::unexpected(std::move(fetched.error()));
   config = std::move(*fetched);

@@ -75,11 +75,11 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::
   };
   auto engineParameters = loadEngineParameters();
   if (!engineParameters)
-    return std::unexpected(assets->withAssetContext(std::move(engineParameters.error()), "/liquids.config", "Loading liquid engine parameters"));
+    return std::unexpected(assets->with_asset_context(std::move(engineParameters.error()), "/liquids.config", "Loading liquid engine parameters"));
   result->m_liquidNames["empty"] = EmptyLiquidId;
-  auto liquids = assets->scanExtension("liquid");
+  auto liquids = assets->scan_extension("liquid");
   if (!liquids) return std::unexpected(std::move(liquids.error()));
-  auto queued = assets->queueJsons(liquids->get());
+  auto queued = assets->queue_jsons(liquids->get());
   if (!queued) return std::unexpected(std::move(queued.error()));
   for (auto const& path : liquids->get()) {
     auto const& file = path.string();
@@ -194,7 +194,7 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::
       return {};
     };
     auto loaded = read_file();
-    if (!loaded) return std::unexpected(assets->withAssetContext(LiquidException(Star::format("Error loading liquid file {}", file), loaded.error()), file, "Loading liquid"));
+    if (!loaded) return std::unexpected(assets->with_asset_context(LiquidException(Star::format("Error loading liquid file {}", file), loaded.error()), file, "Loading liquid"));
   }
   return result;
 }

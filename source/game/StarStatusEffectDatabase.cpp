@@ -31,9 +31,9 @@ namespace Star {
 
 std::expected<std::shared_ptr<StatusEffectDatabase>, StarException> StatusEffectDatabase::create(std::shared_ptr<Assets const> assets) {
   auto database = std::shared_ptr<StatusEffectDatabase>(new StatusEffectDatabase());
-  auto files = assets->scanExtension("statuseffect");
+  auto files = assets->scan_extension("statuseffect");
   if (!files) return std::unexpected(std::move(files.error()));
-  auto queued = assets->queueJsons(files->get());
+  auto queued = assets->queue_jsons(files->get());
   if (!queued) return std::unexpected(std::move(queued.error()));
   for (auto const& asset : files->get()) {
     auto const& file = asset.string();
@@ -49,7 +49,7 @@ std::expected<std::shared_ptr<StatusEffectDatabase>, StarException> StatusEffect
       return {};
     }();
     if (!loaded)
-      return std::unexpected(assets->withAssetContext(std::move(loaded.error()), file, "Loading status effect"));
+      return std::unexpected(assets->with_asset_context(std::move(loaded.error()), file, "Loading status effect"));
   }
   return database;
 }

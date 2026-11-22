@@ -234,7 +234,7 @@ std::expected<void, StarException> CraftingPane::initialize(std::shared_ptr<Worl
   auto jsonResult334 = assets->json("/interface/windowconfig/crafting.config:default");
   if (!jsonResult334)
     return std::unexpected(std::move(jsonResult334.error()));
-  auto fetchJsonResult335 = assets->fetchJson(baseConfig);
+  auto fetchJsonResult335 = assets->fetch_json(baseConfig);
   if (!fetchJsonResult335)
     return std::unexpected(std::move(fetchJsonResult335.error()));
   m_settings = json_merge(std::move(*jsonResult334), 

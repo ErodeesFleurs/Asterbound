@@ -201,8 +201,8 @@ void repeated_digest_ignore(benchmark::State& state) {
   }
   auto expected = oracle.compute();
   Star::Assets::Settings settings{};
-  settings.workerPoolSize = 1;
-  settings.digestIgnore = {R"(^/interface/)", R"(\.(png|frames)$)", R"(\.(ogg|wav)$)"};
+  settings.worker_pool_size = 1;
+  settings.digest_ignore = {R"(^/interface/)", R"(\.(png|frames)$)", R"(\.(ogg|wav)$)"};
   Star::StringList sources{*directory};
   for (auto _ : state) {
     auto assets = Star::Assets::create(logger, random, log_map, settings, sources);

@@ -115,7 +115,7 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
   auto matDb = std::move((*automatDbResult1));
   auto autoblockKeyJsonResult1 = settings.get("blockKey", JsonArray());
   if (!autoblockKeyJsonResult1) return std::unexpected(std::move(autoblockKeyJsonResult1.error()));
-  auto autoblockKeyJsonResult2 = assets->fetchJson((*autoblockKeyJsonResult1), configPath);
+  auto autoblockKeyJsonResult2 = assets->fetch_json((*autoblockKeyJsonResult1), configPath);
   if (!autoblockKeyJsonResult2) return std::unexpected(std::move(autoblockKeyJsonResult2.error()));
   auto blockKeyJson = std::move((*autoblockKeyJsonResult2));
   auto blockKeyConfigsResult = blockKeyJson.to_array();

@@ -222,8 +222,8 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
     if (!assets)
       return std::unexpected(std::move(assets.error()));
     if (modName) {
-      for (auto const& sourcePath : (*assets)->assetSources()) {
-        auto metadata = (*assets)->assetSourceMetadata(sourcePath);
+      for (auto const& sourcePath : (*assets)->asset_sources()) {
+        auto metadata = (*assets)->asset_source_metadata(sourcePath);
         if (!metadata)
           return std::unexpected(std::move(metadata.error()));
         if (auto name = metadata->find_ref("name"); name && name->get().is_type(Json::Type::String)) {
@@ -249,12 +249,12 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
     }
     if (!chunk.utf8().starts_with('/'))
       return std::unexpected(StarException("Mod storage is only available to scripts loaded from assets"));
-    auto descriptor = (*assets)->assetDescriptor(chunk);
+    auto descriptor = (*assets)->asset_descriptor(chunk);
     if (!descriptor)
       return std::unexpected(std::move(descriptor.error()));
     if (!*descriptor)
       return std::unexpected(StarException("Mod storage is only available to scripts loaded from assets"));
-    auto sourcePath = (*assets)->assetSourcePath((*descriptor)->source);
+    auto sourcePath = (*assets)->asset_source_path((*descriptor)->source);
     if (!sourcePath)
       return std::unexpected(StarException("Mod storage could not find the asset source of this script"));
     return root.modStorageId(**assets, *sourcePath);
@@ -485,7 +485,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
   if (auto r = callbacks.register_callback("assetsByExtension", [&root](String const& extension) -> std::expected<StringList, StarException> {
     auto assets = root.assets();
     if (!assets) return std::unexpected(std::move(assets.error()));
-    auto paths = (*assets)->scanExtension(extension);
+    auto paths = (*assets)->scan_extension(extension);
     if (!paths) return std::unexpected(std::move(paths.error()));
     StringList result;
     result.reserve(paths->get().size());
@@ -503,27 +503,27 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
   if (auto r = callbacks.register_callback("assetOrigin", [&root](String const& path) -> std::expected<std::optional<String>, StarException> {
     auto assets = root.assets();
     if (!assets) return std::unexpected(std::move(assets.error()));
-    auto descriptor = (*assets)->assetDescriptor(path);
+    auto descriptor = (*assets)->asset_descriptor(path);
     if (!descriptor) return std::unexpected(std::move(descriptor.error()));
     if (*descriptor)
-      return (*assets)->assetSourcePath((*descriptor)->source);
+      return (*assets)->asset_source_path((*descriptor)->source);
     return std::nullopt;
   }); !r) return std::unexpected(std::move(r.error()));
 
   if (auto r = callbacks.register_callback("assetPatches", [&root](LuaEngine& engine, String const& path) -> std::expected<std::optional<LuaTable>, StarException> {
     auto assets = root.assets();
     if (!assets) return std::unexpected(std::move(assets.error()));
-    auto descriptor = (*assets)->assetDescriptor(path);
+    auto descriptor = (*assets)->asset_descriptor(path);
     if (!descriptor) return std::unexpected(std::move(descriptor.error()));
     if (*descriptor) {
-      auto& patches = (*descriptor)->patchSources;
+      auto& patches = (*descriptor)->patch_sources;
       auto table = engine.create_table(patches.size(), 0);
       if (!table) return std::unexpected(std::move(table.error()));
       for (std::size_t i = 0; i != patches.size(); ++i) {
         auto& patch = patches[i];
         auto patchTable = engine.create_table(2, 0);
         if (!patchTable) return std::unexpected(std::move(patchTable.error()));
-        if (auto sourcePath = (*assets)->assetSourcePath(patch.second)) {
+        if (auto sourcePath = (*assets)->asset_source_path(patch.second)) {
           auto set = patchTable->set(1, *sourcePath);
           if (!set) return std::unexpected(std::move(set.error()));
         }
@@ -540,12 +540,12 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
   if (auto r = callbacks.register_callback("assetSourcePaths", [&root](LuaEngine& engine, std::optional<bool> withMetadata) -> std::expected<LuaTable, StarException> {
     auto assets = root.assets();
     if (!assets) return std::unexpected(std::move(assets.error()));
-    auto assetSources = (*assets)->assetSources();
+    auto assetSources = (*assets)->asset_sources();
     auto table = engine.create_table(assetSources.size(), 0);
     if (!table) return std::unexpected(std::move(table.error()));
     if (withMetadata.value_or(false)) {
       for (auto& assetSource : assetSources) {
-        auto metadata = (*assets)->assetSourceMetadata(assetSource);
+        auto metadata = (*assets)->asset_source_metadata(assetSource);
         if (!metadata) return std::unexpected(std::move(metadata.error()));
         auto set = table->set(assetSource, *metadata);
         if (!set) return std::unexpected(std::move(set.error()));
@@ -563,7 +563,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
   if (auto r = callbacks.register_callback("assetSourceMetadata", [&root](String const& assetSourcePath) -> std::expected<JsonObject, StarException> {
     auto assets = root.assets();
     if (!assets) return std::unexpected(std::move(assets.error()));
-    return (*assets)->assetSourceMetadata(assetSourcePath);
+    return (*assets)->asset_source_metadata(assetSourcePath);
   }); !r) return std::unexpected(std::move(r.error()));
 
   if (auto r = callbacks.register_callback("itemFile", [&root, itemCatalog](String const& itemName) -> std::expected<std::optional<String>, StarException> {
@@ -924,9 +924,9 @@ std::expected<Image, StarException> LuaBindings::RootCallbacks::assetImage(Root&
 std::expected<Json, StarException> LuaBindings::RootCallbacks::assetFrames(Root& root, String const& path) {
   auto assets = root.assets();
   if (!assets) return std::unexpected(std::move(assets.error()));
-  auto frames = (*assets)->imageFrames(path);
+  auto frames = (*assets)->image_frames(path);
   if (!frames) return std::unexpected(std::move(frames.error()));
-  if (*frames) return (*frames)->toJson();
+  if (*frames) return (*frames)->to_json();
   return Json();
 }
 

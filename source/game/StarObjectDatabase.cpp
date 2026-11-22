@@ -262,7 +262,7 @@ std::expected<Json, StarException> ObjectDatabase::parseTouchDamage(Root& root, 
     auto damagePath = AssetPath::relative_to(path, std::move(*damagePathResult));
     auto damage = assets->json(damagePath);
     if (!damage)
-      return std::unexpected(assets->withAssetContext(std::move(damage.error()), damagePath, "Loading object touch damage"));
+      return std::unexpected(assets->with_asset_context(std::move(damage.error()), damagePath, "Loading object touch damage"));
     return damage;
   }
   return touchDamage;
@@ -721,10 +721,10 @@ std::expected<std::shared_ptr<ObjectDatabase>, StarException> ObjectDatabase::cr
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto files = (*assets)->scanExtension("object");
+  auto files = (*assets)->scan_extension("object");
   if (!files)
     return std::unexpected(std::move(files.error()));
-  auto queued = (*assets)->queueJsons(files->get());
+  auto queued = (*assets)->queue_jsons(files->get());
   if (!queued)
     return std::unexpected(std::move(queued.error()));
   for (auto const& entry : files->get()) {
@@ -738,11 +738,11 @@ std::expected<std::shared_ptr<ObjectDatabase>, StarException> ObjectDatabase::cr
     if (!name) {
       auto logged = root.logger().error_exception(
         Star::format("Error loading object file {}", file),
-        ExceptionDiagnostic((*assets)->withAssetContext(std::move(name.error()), file, "Loading object")));
+        ExceptionDiagnostic((*assets)->with_asset_context(std::move(name.error()), file, "Loading object")));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
     } else if (database->m_paths.contains(*name)) {
-      auto error = (*assets)->withAssetContext(ObjectException::format("Object {} defined twice, second time from {}", *name, file), file, "Loading object");
+      auto error = (*assets)->with_asset_context(ObjectException::format("Object {} defined twice, second time from {}", *name, file), file, "Loading object");
       auto logged = root.logger().error_exception("Error loading object", ExceptionDiagnostic(error));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
@@ -813,7 +813,7 @@ std::expected<std::shared_ptr<Object>, StarException> ObjectDatabase::createObje
     auto assets = m_root.assets();
     if (!assets)
       return std::unexpected(std::move(assets.error()));
-    return std::unexpected((*assets)->withAssetContext(std::move(created.error()), (*config)->path, "Constructing object"));
+    return std::unexpected((*assets)->with_asset_context(std::move(created.error()), (*config)->path, "Constructing object"));
   }
   return created;
 }
@@ -1231,9 +1231,9 @@ std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::read
         return std::unexpected(std::move(sourcePath.error()));
       damageTablePath = std::move(*sourcePath);
     }
-    auto damageTable = assets->fetchJson(*damageTableSource);
+    auto damageTable = assets->fetch_json(*damageTableSource);
     if (!damageTable)
-      return std::unexpected(assets->withAssetContext(std::move(damageTable.error()), damageTablePath ? *damageTablePath : path, "Loading object damage table"));
+      return std::unexpected(assets->with_asset_context(std::move(damageTable.error()), damageTablePath ? *damageTablePath : path, "Loading object damage table"));
     auto damageHealth = config.opt_float("health");
     if (!damageHealth)
       return std::unexpected(std::move(damageHealth.error()));
@@ -1242,7 +1242,7 @@ std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::read
       return std::unexpected(std::move(harvestLevel.error()));
     auto tileDamage = TileDamageParameters::create(*assets, *damageTable, *damageHealth, *harvestLevel);
     if (!tileDamage)
-      return std::unexpected(assets->withAssetContext(std::move(tileDamage.error()), damageTablePath ? *damageTablePath : path, "Loading object damage table"));
+      return std::unexpected(assets->with_asset_context(std::move(tileDamage.error()), damageTablePath ? *damageTablePath : path, "Loading object damage table"));
     objectConfig->tileDamageParameters = std::move(*tileDamage);
     auto damageShakeMagnitudeResult = config.get_float("damageShakeMagnitude", 0.2f);
     if (!damageShakeMagnitudeResult)
@@ -1313,7 +1313,7 @@ std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::read
       auto animationPath = AssetPath::relative_to(path, *reference);
       auto animation = assets->json(animationPath);
       if (!animation)
-        return std::unexpected(assets->withAssetContext(std::move(animation.error()), animationPath, "Loading object animation"));
+        return std::unexpected(assets->with_asset_context(std::move(animation.error()), animationPath, "Loading object animation"));
       return animation;
     };
     auto field36Result = config.get("animation", Json());
@@ -1389,7 +1389,7 @@ std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::read
     return objectConfig;
   }();
   if (!result)
-    return std::unexpected(ObjectException(Star::format("Error loading object '{}'", path), assets->withAssetContext(std::move(result.error()), path, "Loading object configuration")));
+    return std::unexpected(ObjectException(Star::format("Error loading object '{}'", path), assets->with_asset_context(std::move(result.error()), path, "Loading object configuration")));
   return result;
 }
 

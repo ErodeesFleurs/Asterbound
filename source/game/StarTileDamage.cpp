@@ -131,7 +131,7 @@ std::expected<TileDamageParameters, StarException> TileDamageParameters::create(
   return result;
   }();
   if (!parsed && sourcePath)
-    return std::unexpected(assets.withAssetContext(std::move(parsed.error()), *sourcePath, "Loading tile damage parameters"));
+    return std::unexpected(assets.with_asset_context(std::move(parsed.error()), *sourcePath, "Loading tile damage parameters"));
   return parsed;
 }
 

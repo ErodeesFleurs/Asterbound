@@ -37,10 +37,10 @@ std::expected<std::shared_ptr<PatternedNameGenerator>, StarException> PatternedN
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto files = (*assets)->scanExtension("namesource");
+  auto files = (*assets)->scan_extension("namesource");
   if (!files)
     return std::unexpected(std::move(files.error()));
-  auto queued = (*assets)->queueJsons(files->get());
+  auto queued = (*assets)->queue_jsons(files->get());
   if (!queued)
     return std::unexpected(std::move(queued.error()));
   for (auto const& assetFile : files->get()) {

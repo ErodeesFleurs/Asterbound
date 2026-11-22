@@ -273,7 +273,7 @@ std::expected<void, StarException> TeamClient::update() {
     auto value = interfaceConfig->get(key);
     if (!value) {
       auto path = Star::format("/interface.config:{}", key);
-      auto error = (*assets)->withAssetContext(
+      auto error = (*assets)->with_asset_context(
           AssetException(Star::format("Could not read JSON value {}", path), value.error()), "/interface.config", "");
       auto summary = *error.diagnostic_summary();
       summary.kind = ExceptionSummaryKind::Resource;

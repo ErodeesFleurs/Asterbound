@@ -220,7 +220,7 @@ std::expected<void, StarException> MerchantPane::initialize(std::shared_ptr<Worl
   if (!getResult569)
     return std::unexpected(std::move(getResult569.error()));
   auto baseConfig = std::move(*getResult569);
-  auto fetchJsonResult570 = assets->fetchJson(baseConfig);
+  auto fetchJsonResult570 = assets->fetch_json(baseConfig);
   if (!fetchJsonResult570)
     return std::unexpected(std::move(fetchJsonResult570.error()));
   m_settings = json_merge(std::move(*fetchJsonResult570), settings);

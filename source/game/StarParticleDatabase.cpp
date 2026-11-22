@@ -69,10 +69,10 @@ std::expected<std::shared_ptr<ParticleDatabase>, StarException> ParticleDatabase
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto files = (*assets)->scanExtension("particle");
+  auto files = (*assets)->scan_extension("particle");
   if (!files)
     return std::unexpected(std::move(files.error()));
-  auto queued = (*assets)->queueJsons(files->get());
+  auto queued = (*assets)->queue_jsons(files->get());
   if (!queued)
     return std::unexpected(std::move(queued.error()));
   for (auto const& file : files->get()) {
@@ -89,7 +89,7 @@ std::expected<std::shared_ptr<ParticleDatabase>, StarException> ParticleDatabase
       return {};
     }();
     if (!loaded)
-      return std::unexpected((*assets)->withAssetContext(std::move(loaded.error()), file.string(), "Loading particle"));
+      return std::unexpected((*assets)->with_asset_context(std::move(loaded.error()), file.string(), "Loading particle"));
   }
   return result;
 }

@@ -123,7 +123,7 @@ std::expected<void, StarException> CelestialMasterDatabase::init(std::optional<S
   auto const& assets = *assetsResult;
   auto configResult = assets->json("/celestial.config");
   if (!configResult)
-    return std::unexpected(assets->withAssetContext(std::move(configResult.error()), "/celestial.config", "Loading celestial configuration"));
+    return std::unexpected(assets->with_asset_context(std::move(configResult.error()), "/celestial.config", "Loading celestial configuration"));
   auto const& config = *configResult;
   auto configured = [&]() -> std::expected<void, StarException> {
     {
@@ -358,7 +358,7 @@ std::expected<void, StarException> CelestialMasterDatabase::init(std::optional<S
     return {};
   }();
   if (!configured)
-    return std::unexpected(assets->withAssetContext(std::move(configured.error()), "/celestial.config", "Loading celestial configuration"));
+    return std::unexpected(assets->with_asset_context(std::move(configured.error()), "/celestial.config", "Loading celestial configuration"));
   auto named = [&]() -> std::expected<void, StarException> {
     auto namesResult = assets->json("/celestial/names.config");
     if (!namesResult)
@@ -427,7 +427,7 @@ std::expected<void, StarException> CelestialMasterDatabase::init(std::optional<S
     return {};
   }();
   if (!named)
-    return std::unexpected(assets->withAssetContext(std::move(named.error()), "/celestial/names.config", "Loading celestial names"));
+    return std::unexpected(assets->with_asset_context(std::move(named.error()), "/celestial/names.config", "Loading celestial names"));
   if (databaseFile) {
     auto identified = m_database.set_content_identifier("Celestial2");
     if (!identified)
@@ -468,7 +468,7 @@ std::expected<void, StarException> CelestialMasterDatabase::init(std::optional<S
   {
     auto value = config.get_float("commitInterval");
     if (!value)
-      return std::unexpected(assets->withAssetContext(std::move(value.error()), "/celestial.config", "Loading celestial configuration"));
+      return std::unexpected(assets->with_asset_context(std::move(value.error()), "/celestial.config", "Loading celestial configuration"));
     m_commitInterval = std::move(*value);
   }
   m_commitTimer.restart(m_commitInterval);
@@ -1194,10 +1194,10 @@ std::expected<std::shared_ptr<CelestialSlaveDatabase>, StarException> CelestialS
     std::shared_ptr<Assets const> const& assets, RandomService& random, CelestialBaseInformation baseInformation) {
   auto config = assets->json("/celestial.config");
   if (!config)
-    return std::unexpected(assets->withAssetContext(std::move(config.error()), "/celestial.config", "Loading celestial configuration"));
+    return std::unexpected(assets->with_asset_context(std::move(config.error()), "/celestial.config", "Loading celestial configuration"));
   auto timeout = config->get_float("requestTimeout");
   if (!timeout)
-    return std::unexpected(assets->withAssetContext(std::move(timeout.error()), "/celestial.config", "Loading celestial configuration"));
+    return std::unexpected(assets->with_asset_context(std::move(timeout.error()), "/celestial.config", "Loading celestial configuration"));
   auto database = std::shared_ptr<CelestialSlaveDatabase>(new CelestialSlaveDatabase(random));
   database->m_baseInformation = std::move(baseInformation);
   database->m_requestTimeout = *timeout;

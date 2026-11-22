@@ -95,7 +95,7 @@ std::expected<TexturePtr, StarException> AssetTextureGroup::loadTexture(AssetPat
   if (!assetsResult)
     return std::unexpected(std::move(assetsResult.error()));
   auto assets = *assetsResult;
-  auto imageResult = tryTexture ? assets->tryImage(imagePath) : assets->image(imagePath);
+  auto imageResult = tryTexture ? assets->try_image(imagePath) : assets->image(imagePath);
   if (!imageResult)
     return std::unexpected(std::move(imageResult.error()));
   auto image = std::move(*imageResult);

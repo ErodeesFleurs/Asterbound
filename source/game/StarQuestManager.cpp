@@ -309,7 +309,7 @@ std::expected<Json, StarException> QuestManager::dialogCinema(std::uint64_t toke
     (**cinema).replace_tags(StringMap<String>{{"species", m_player->get().species()}, {"gender", String(*gender)}});
   auto assets = m_root.assets();
   if (!assets) return std::unexpected(std::move(assets.error()));
-  return (*assets)->fetchJson(path);
+  return (*assets)->fetch_json(path);
 }
 
 std::expected<bool, StarException> QuestManager::finishDialog(std::uint64_t token, String const& decision) {

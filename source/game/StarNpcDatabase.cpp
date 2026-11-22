@@ -135,10 +135,10 @@ std::expected<void, StarException> NpcDatabase::initialize() {
 if (!result1) return std::unexpected(std::move(result1.error()));
 auto assets = std::move(*result1);
 
-  auto result2 = assets->scanExtension("npctype");
+  auto result2 = assets->scan_extension("npctype");
 if (!result2) return std::unexpected(std::move(result2.error()));
 auto& files = result2->get();
-  auto result3 = assets->queueJsons(files);
+  auto result3 = assets->queue_jsons(files);
 if (!result3) return std::unexpected(std::move(result3.error()));
   for (auto const& assetFile : files) {
     auto const& file = assetFile.string();
@@ -158,7 +158,7 @@ String typeName = std::move(*result5);
       return {};
     }();
     if (!loaded)
-      return std::unexpected(NpcException(Star::format("Error loading npc type '{}'", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading NPC type")));
+      return std::unexpected(NpcException(Star::format("Error loading npc type '{}'", file), assets->with_asset_context(std::move(loaded.error()), file, "Loading NPC type")));
   }
   return {};
 }
@@ -294,7 +294,7 @@ identity.personality = std::move(*result38);
     return {};
     }();
     if (!humanoidLoaded)
-      return std::unexpected((*result32)->withAssetContext(std::move(humanoidLoaded.error()), *result33, "Loading NPC humanoid configuration"));
+      return std::unexpected((*result32)->with_asset_context(std::move(humanoidLoaded.error()), *result33, "Loading NPC humanoid configuration"));
   } else {
     auto result39 = speciesDefinition->humanoidConfig();
 if (!result39) return std::unexpected(std::move(result39.error()));
@@ -638,7 +638,7 @@ variant.uniqueHumanoidConfig = std::move(*result121);
   auto result123 = config.get_string("humanoidConfig");
   if (!result123) return std::unexpected(std::move(result123.error()));
   auto result124 = (*result122)->json(*result123);
-  if (!result124) return std::unexpected((*result122)->withAssetContext(std::move(result124.error()), *result123, "Loading NPC humanoid configuration"));
+  if (!result124) return std::unexpected((*result122)->with_asset_context(std::move(result124.error()), *result123, "Loading NPC humanoid configuration"));
   variant.humanoidConfig = std::move(*result124);
 }
   else
@@ -831,7 +831,7 @@ variant.uniqueHumanoidConfig = std::move(*result172);
   auto result174 = config.get_string("humanoidConfig");
   if (!result174) return std::unexpected(std::move(result174.error()));
   auto result175 = (*result173)->json(*result174);
-  if (!result175) return std::unexpected((*result173)->withAssetContext(std::move(result175.error()), *result174, "Loading NPC humanoid configuration"));
+  if (!result175) return std::unexpected((*result173)->with_asset_context(std::move(result175.error()), *result174, "Loading NPC humanoid configuration"));
   variant.humanoidConfig = std::move(*result175);
 }
   else

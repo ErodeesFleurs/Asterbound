@@ -85,9 +85,9 @@ std::expected<std::shared_ptr<SpeciesDatabase>, StarException> SpeciesDatabase::
   result->m_luaRoot = std::move(*luaRoot);
   auto assets = root.assets();
   if (!assets) return std::unexpected(std::move(assets.error()));
-  auto files = (*assets)->scanExtension("species");
+  auto files = (*assets)->scan_extension("species");
   if (!files) return std::unexpected(std::move(files.error()));
-  auto queued = (*assets)->queueJsons(files->get());
+  auto queued = (*assets)->queue_jsons(files->get());
   if (!queued) return std::unexpected(std::move(queued.error()));
   for (auto const& file : files->get()) {
     auto loaded = [&]() -> std::expected<void, StarException> {
@@ -103,7 +103,7 @@ std::expected<std::shared_ptr<SpeciesDatabase>, StarException> SpeciesDatabase::
     return {};
     }();
     if (!loaded)
-      return std::unexpected((*assets)->withAssetContext(std::move(loaded.error()), file.string(), "Loading species"));
+      return std::unexpected((*assets)->with_asset_context(std::move(loaded.error()), file.string(), "Loading species"));
   }
   return result;
 }
@@ -406,7 +406,7 @@ std::expected<void, StarException> SpeciesDefinition::init(Json const& config) {
   if (!personalitiesLoaded) {
     auto assets = m_root.assets();
     if (!assets) return std::unexpected(std::move(personalitiesLoaded.error()));
-    return std::unexpected((*assets)->withAssetContext(std::move(personalitiesLoaded.error()), m_humanoidConfig, "Loading species humanoid personalities"));
+    return std::unexpected((*assets)->with_asset_context(std::move(personalitiesLoaded.error()), m_humanoidConfig, "Loading species humanoid personalities"));
   }
   auto effects = config.get_array("statusEffects", {});
   if (!effects) return std::unexpected(std::move(effects.error()));
@@ -531,7 +531,7 @@ std::expected<Json, StarException> SpeciesDefinition::humanoidConfig() const {
   auto assets = m_root.assets();
   if (!assets) return std::unexpected(std::move(assets.error()));
   auto config = (*assets)->json(m_humanoidConfig);
-  if (!config) return std::unexpected((*assets)->withAssetContext(std::move(config.error()), m_humanoidConfig, "Loading species humanoid configuration"));
+  if (!config) return std::unexpected((*assets)->with_asset_context(std::move(config.error()), m_humanoidConfig, "Loading species humanoid configuration"));
   return json_merge(*config, m_humanoidOverrides);
 }
 

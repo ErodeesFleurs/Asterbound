@@ -33,7 +33,7 @@ using namespace Star;
 const GameTestRegistration speciesGenderCoverage("SpeciesTest", "NameGenAndOuchNoisesMustCoverEveryGender", [](GameTest& fixture) {
   auto assets = fixture.root().assets();
   ASSERT_TRUE(assets);
-  auto speciesFiles = (*assets)->scanExtension("species");
+  auto speciesFiles = (*assets)->scan_extension("species");
   ASSERT_TRUE(speciesFiles);
   ASSERT_FALSE(speciesFiles->get().empty());
 

@@ -50,10 +50,10 @@ std::expected<std::shared_ptr<StagehandDatabase>, StarException> StagehandDataba
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto files = (*assets)->scanExtension("stagehand");
+  auto files = (*assets)->scan_extension("stagehand");
   if (!files)
     return std::unexpected(std::move(files.error()));
-  if (auto queued = (*assets)->queueJsons(files->get()); !queued)
+  if (auto queued = (*assets)->queue_jsons(files->get()); !queued)
     return std::unexpected(std::move(queued.error()));
   for (auto const& scannedFile : files->get()) {
     String file = scannedFile.string();
@@ -70,7 +70,7 @@ std::expected<std::shared_ptr<StagehandDatabase>, StarException> StagehandDataba
       return {};
     }();
     if (!load)
-      return std::unexpected(StagehandDatabaseException(Star::format("Error loading stagehand type '{}'", file), (*assets)->withAssetContext(std::move(load.error()), file, "Loading stagehand type")));
+      return std::unexpected(StagehandDatabaseException(Star::format("Error loading stagehand type '{}'", file), (*assets)->with_asset_context(std::move(load.error()), file, "Loading stagehand type")));
   }
   return database;
 }

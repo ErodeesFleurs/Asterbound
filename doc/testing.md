@@ -704,6 +704,20 @@ These are dispatch costs, not full asset reload times.
   script/raw permissions. Keep the bundled-version guard active: regenerate
   CMake build metadata after `version.json` changes rather than changing asset
   markers or bypassing checks to make stale binaries pass.
+- Compare `Assets/NarrowPngScan`, `Assets/QueueImageList` and `Assets/QueueImageSet`
+  for catalog filtering and batch enqueue costs. `Assets/SharedDefaultFrames`
+  reports the number of distinct decoded specifications as well as wall time.
+  `Assets/ReferenceBudgetCleanup` checks the number of surviving references;
+  `Assets/IdleWorkerDispatch` separates an idle queue from a queue containing
+  in-flight work. Keep worker count, fixtures and build flags matched.
+- `Assets::queue_jsons`, `queue_images` and `queue_audios` validate a whole
+  input range before enqueuing any item. JSON requests preload the base file;
+  audio paths accept neither a subpath nor image directives. The snake_case
+  names are C++ APIs; Lua callback names and asset metadata keys are unchanged.
+- `hot_reload()` discards decoded results, not the source catalog or objects
+  already held by readers. An old worker must not publish either a success
+  or an error into the new cache. Short audio remains readable while one worker
+  decompresses it; a decompression failure retains the compressed original.
 
 ### Images, gameplay and frontend lifecycles
 

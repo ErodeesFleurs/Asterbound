@@ -92,10 +92,10 @@ std::expected<std::shared_ptr<TerrainDatabase>, StarException> TerrainDatabase::
 
   // The extension determines the selector type; retain scan and seed order.
   auto scanFiles = [&](String const& type, bool composed) -> std::expected<void, StarException> {
-    auto files = assets->scanExtension(type);
+    auto files = assets->scan_extension(type);
     if (!files)
       return std::unexpected(std::move(files.error()));
-    auto queued = assets->queueJsons(files->get());
+    auto queued = assets->queue_jsons(files->get());
     if (!queued)
       return std::unexpected(std::move(queued.error()));
     for (auto const& path : files->get()) {
@@ -119,7 +119,7 @@ std::expected<std::shared_ptr<TerrainDatabase>, StarException> TerrainDatabase::
         return {};
       }();
       if (!loaded)
-        return std::unexpected(assets->withAssetContext(std::move(loaded.error()), path.string(), "Loading terrain configuration"));
+        return std::unexpected(assets->with_asset_context(std::move(loaded.error()), path.string(), "Loading terrain configuration"));
     }
     return {};
   };

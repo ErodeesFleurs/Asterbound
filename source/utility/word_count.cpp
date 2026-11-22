@@ -95,7 +95,7 @@ int main(int argc, char** argv) {
     using CountFunction = std::function<std::expected<int, StarException>(Json const&)>;
     using FilterFunction = std::function<std::expected<bool, StarException>(String const&)>;
     auto countWordsInType = [&](String const& type, CountFunction countFunction, std::optional<FilterFunction> filterFunction = {}, std::optional<String> wordCountKey = {}) -> std::expected<void, StarException> {
-      auto scanned = (*assets)->scanExtension(type);
+      auto scanned = (*assets)->scan_extension(type);
       if (!scanned)
         return std::unexpected(std::move(scanned.error()));
       StringList files;
@@ -110,7 +110,7 @@ int main(int argc, char** argv) {
         }
         files.push_back(path);
       }
-      auto queued = (*assets)->queueJsons(files);
+      auto queued = (*assets)->queue_jsons(files);
       if (!queued)
         return std::unexpected(std::move(queued.error()));
       for (auto const& path : files) {

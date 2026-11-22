@@ -39,8 +39,8 @@ std::expected<void, StarException> writeJsonPatchFixture(String const& directory
 std::expected<std::shared_ptr<Assets>, StarException> patchTestAssets(GameTest& fixture, String const& directory,
                                                                       Logger& logger) {
   Assets::Settings settings{};
-  settings.workerPoolSize = 1;
-  settings.assetTimeToLive = 600;
+  settings.worker_pool_size = 1;
+  settings.asset_time_to_live = 600;
   return Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {directory});
 }
 
@@ -122,6 +122,106 @@ std::expected<void, StarException> writePatchProvider(String const& directory,
   return {};
 }
 }// namespace
+
+const GameTestRegistration shared_frame_files(
+  "AssetsTest", "UnpatchedFrameFilesShareAndParseErrorsRemainRetryable", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto base = File::relative_to(*directory, "base");
+    ASSERT_TRUE(writePatchProvider(base, {{"preload.config", "[]"}, {"default.frames", "{}"},
+                                        {"broken.frames", "{broken"}, {"unique.frames", "{}"}}));
+    Logger logger;
+    auto assets = patchTestAssets(fixture, base, logger);
+    ASSERT_TRUE(assets) << assets.error().what();
+    auto first = (*assets)->image_frames("/first.png");
+    ASSERT_TRUE(first && *first);
+    EXPECT_EQ((*first)->frames_file, "/default.frames");
+    // A different image in a descendant directory must not re-read the same file.
+    ASSERT_TRUE(File::write_file(String("{broken"), File::relative_to(base, "default.frames")));
+    auto sibling = (*assets)->image_frames("/nested/second.png");
+    ASSERT_TRUE(sibling && *sibling);
+    EXPECT_EQ(*first, *sibling);
+    auto unique = (*assets)->image_frames("/nested/unique.png");
+    ASSERT_TRUE(unique && *unique);
+    EXPECT_EQ((*unique)->frames_file, "/unique.frames");
+    EXPECT_NE(*unique, *first);
+    EXPECT_FALSE((*assets)->image_frames("/broken.png"));
+    ASSERT_TRUE(File::write_file(String("{}"), File::relative_to(base, "broken.frames")));
+    auto repaired = (*assets)->image_frames("/broken.png");
+    ASSERT_TRUE(repaired && *repaired);
+    EXPECT_EQ((*repaired)->frames_file, "/broken.frames");
+    (*assets)->hot_reload();
+    EXPECT_FALSE((*assets)->image_frames("/first.png"));
+    ASSERT_TRUE(File::write_file(String("{}"), File::relative_to(base, "default.frames")));
+    auto reloaded = (*assets)->image_frames("/first.png");
+    ASSERT_TRUE(reloaded && *reloaded);
+    EXPECT_NE(*reloaded, *first);
+  });
+
+const GameTestRegistration stateful_frame_files(
+  "AssetsTest", "StatefulFramePatchesKeepPerImageExecutionAndRequestSpelling", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto base = File::relative_to(*directory, "base");
+    ASSERT_TRUE(writePatchProvider(base, {{"preload.config", "[]"}, {"default.frames", "{}"},
+      {"default.frames.patch.lua", R"(
+        local calls = 0
+        function patch(data, path)
+          calls = calls + 1
+          data.frameList = {[path .. calls] = {0, 0, 1, 1}}
+          return data
+        end
+      )"}}));
+    Logger logger;
+    auto assets = patchTestAssets(fixture, base, logger);
+    ASSERT_TRUE(assets) << assets.error().what();
+    auto first = (*assets)->image_frames("/a.png");
+    auto again = (*assets)->image_frames("/a.png");
+    auto second = (*assets)->image_frames("/b.png");
+    auto mixed = (*assets)->image_frames("/DEFAULT.png");
+    ASSERT_TRUE(first && *first && again && *again && second && *second && mixed && *mixed);
+    EXPECT_EQ(*first, *again);
+    EXPECT_TRUE((*first)->frames.contains("/default.frames1"));
+    EXPECT_TRUE((*second)->frames.contains("/default.frames2"));
+    EXPECT_TRUE((*mixed)->frames.contains("/DEFAULT.frames3"));
+  });
+
+const GameTestRegistration catalog_frame_files(
+  "AssetsTest", "LoadScriptsInvalidatePositiveNegativeAndPatchedFrameSelections", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto base = File::relative_to(*directory, "base");
+    ASSERT_TRUE(writePatchProvider(base, {{"preload.config", "[]"}, {"a.frames", "{}"}, {"b.png", ""},
+      {"_metadata", R"({"scripts":{"onLoad":["/prepare.lua"],"postLoad":["/check.lua"]}})"},
+      {"prepare.lua", R"(
+        assert(assets.frames("/b.png") == nil)
+        assert(assets.frames("/a.png").file == "/a.frames")
+        assets.add("/extra.patch", '{"frameList":{"patched":[0,0,1,1]}}')
+        assert(assets.patch("/a.frames", "/extra.patch"))
+        assert(assets.frames("/a.png").frames.patched)
+        assets.add("/extra.patch", '{"frameList":{"overwritten":[0,0,1,1]}}')
+        local updated = assets.frames("/a.png")
+        assert(updated.frames.overwritten and not updated.frames.patched)
+        assert(assets.erase("/A.frames"))
+        assert(assets.frames("/a.png") == nil)
+        assets.add("/default.frames", '{}')
+        assets.add("/on-load-ok.json", 'true')
+      )"},
+      {"check.lua", R"(
+        assert(assets.frames("/a.png").file == "/default.frames")
+        assert(assets.frames("/b.png").file == "/default.frames")
+        assets.add("/post-load-ok.json", 'true')
+      )"}}));
+    Logger logger;
+    auto assets = patchTestAssets(fixture, base, logger);
+    ASSERT_TRUE(assets) << assets.error().what();
+    // A failing Lua assertion aborts its group but does not fail Assets::create.
+    EXPECT_EQ((*assets)->asset_exists("/on-load-ok.json"), true);
+    EXPECT_EQ((*assets)->asset_exists("/post-load-ok.json"), true);
+  });
 
 const GameTestRegistration assetsRemovedLooseJsonPatches(
   "AssetsPatchReadTest", "RemovedLooseJsonPatchesKeepBaseAndLaterPatch", [](GameTest& fixture) {
@@ -365,15 +465,15 @@ const GameTestRegistration assetsLuaPatchProvider(
                                      File::relative_to(*target, "caller.json.patch.lua")));
         Logger logger;
         Assets::Settings settings{};
-        settings.workerPoolSize = 1;
-        settings.assetTimeToLive = 600;
+        settings.worker_pool_size = 1;
+        settings.asset_time_to_live = 600;
         auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings,
                                      {*target, *failing, *shadow});
         ASSERT_TRUE(assets) << assets.error().what();
-        auto descriptor = (*assets)->assetDescriptor(patchPath);
+        auto descriptor = (*assets)->asset_descriptor(patchPath);
         ASSERT_TRUE(descriptor);
         ASSERT_TRUE(*descriptor);
-        auto indexedSource = (*assets)->assetSourcePath((*descriptor)->source);
+        auto indexedSource = (*assets)->asset_source_path((*descriptor)->source);
         ASSERT_TRUE(indexedSource);
         EXPECT_EQ(*indexedSource, *shadow);
         auto checkFailure = [&](auto const& loaded) {
@@ -503,8 +603,8 @@ const GameTestRegistration assetsSourceSpecificPatchReplacement(
     }));
     Logger logger;
     Assets::Settings settings{};
-    settings.workerPoolSize = 1;
-    settings.assetTimeToLive = 600;
+    settings.worker_pool_size = 1;
+    settings.asset_time_to_live = 600;
     auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings,
         {base, original, shadow, repair});
     ASSERT_TRUE(assets) << assets.error().what();
@@ -543,7 +643,7 @@ const GameTestRegistration assetsReplacePreviouslyFailedPatch(
     }));
     Logger logger;
     Assets::Settings settings{};
-    settings.workerPoolSize = 1;
+    settings.worker_pool_size = 1;
     auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {base, repair});
     ASSERT_TRUE(assets) << assets.error().what();
     auto observed = (*assets)->json("/same-context.json");
@@ -578,14 +678,14 @@ const GameTestRegistration assetsReplacementPatchProvider(
     }));
     Logger logger;
     Assets::Settings settings{};
-    settings.workerPoolSize = 1;
+    settings.worker_pool_size = 1;
     auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings,
         {base, replacement, shadow});
     ASSERT_TRUE(assets) << assets.error().what();
-    auto origin = (*assets)->assetDescriptor("/replacement.lua");
+    auto origin = (*assets)->asset_descriptor("/replacement.lua");
     ASSERT_TRUE(origin);
     ASSERT_TRUE(*origin);
-    EXPECT_EQ((*assets)->assetSourcePath((*origin)->source), std::optional<String>(shadow));
+    EXPECT_EQ((*assets)->asset_source_path((*origin)->source), std::optional<String>(shadow));
     auto loaded = (*assets)->json("/target.json");
     ASSERT_FALSE(loaded);
     auto const& summary = loaded.error().diagnostic_summary();
@@ -629,7 +729,7 @@ const GameTestRegistration assetsSourceBytesReadFailure(
     }));
     Logger logger;
     Assets::Settings settings{};
-    settings.workerPoolSize = 1;
+    settings.worker_pool_size = 1;
     auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {original, shadow});
     ASSERT_TRUE(assets) << assets.error().what();
     ASSERT_TRUE(File::remove(File::relative_to(original, "raw.txt")));
@@ -694,7 +794,7 @@ const GameTestRegistration assetsRetargetSourceSpecificPatch(
     }));
     Logger logger;
     Assets::Settings settings{};
-    settings.workerPoolSize = 1;
+    settings.worker_pool_size = 1;
     auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings,
         {base, original, foreign, repair});
     ASSERT_TRUE(assets) << assets.error().what();
@@ -769,7 +869,7 @@ const GameTestRegistration assetsLoadScriptReplacement(
     }));
     Logger logger;
     Assets::Settings settings{};
-    settings.workerPoolSize = 1;
+    settings.worker_pool_size = 1;
     auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings,
         {original, shadow, repair});
     ASSERT_TRUE(assets) << assets.error().what();
@@ -839,7 +939,7 @@ const GameTestRegistration assetsLoadScriptReplacementProvider(
       auto errors = std::make_shared<Errors>();
       logger.add_sink(errors);
       Assets::Settings settings{};
-      settings.workerPoolSize = 1;
+      settings.worker_pool_size = 1;
       auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings,
           {original, replacement, shadow});
       ASSERT_TRUE(assets) << assets.error().what();
@@ -851,7 +951,7 @@ const GameTestRegistration assetsLoadScriptReplacementProvider(
       if (!syntax)
         EXPECT_NE(errors->messages.find("held_load_replacement_failure"), std::string::npos);
       for (String const& path : {String("/unexecuted-original.json"), String("/skipped.json")}) {
-        auto exists = (*assets)->assetExists(path);
+        auto exists = (*assets)->asset_exists(path);
         ASSERT_TRUE(exists);
         EXPECT_FALSE(*exists);
       }
@@ -899,7 +999,7 @@ const GameTestRegistration assetsPackedSourceBytes(
     auto built = PackedAssetSource::build(**source, packed, {}, {});
     ASSERT_TRUE(built) << built.error().what();
     Assets::Settings settings{};
-    settings.workerPoolSize = 1;
+    settings.worker_pool_size = 1;
     auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {packed, shadow});
     ASSERT_TRUE(assets) << assets.error().what();
     auto observed = (*assets)->json("/packed-observed.json");
@@ -967,7 +1067,7 @@ const GameTestRegistration guardedCollectionRepairs(
           File::relative_to(repair, Star::format("scripts/asterbound/compat/collection_{}.config", group))));
     Logger logger;
     Assets::Settings settings{};
-    settings.workerPoolSize = 1;
+    settings.worker_pool_size = 1;
     auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings,
         {known, future, foreign, repair});
     ASSERT_TRUE(assets) << assets.error().what();

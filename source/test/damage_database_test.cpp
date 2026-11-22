@@ -45,8 +45,8 @@ damageFixture(GameTest& fixture, String const& directory, std::initializer_list<
       return std::unexpected(std::move(written.error()));
   }
   Assets::Settings settings{};
-  settings.workerPoolSize = 1;
-  settings.assetTimeToLive = 10;
+  settings.worker_pool_size = 1;
+  settings.asset_time_to_live = 10;
   Logger logger;
   auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {directory});
   if (!assets)

@@ -1244,7 +1244,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
         String checkPath = AssetPath::split(path).m_base_path;
         if (checkPath.empty())
           return false;
-        return (*assets)->assetExists(checkPath);
+        return (*assets)->asset_exists(checkPath);
       };
 
       bool messageRejected = false;

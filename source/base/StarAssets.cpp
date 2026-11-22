@@ -49,15 +49,61 @@ import star.byte_array;
 import star.vector;
 namespace Star {
 
+namespace {
+// A patch can re-enter Assets while the asset mutex is released, and even
+// enter another service. Keep the task chain on the stack, not the heap.
+struct LoadEpochScope {
+  using Link = std::optional<std::reference_wrapper<LoadEpochScope const>>;
+  static inline constinit thread_local Link active;
+
+  LoadEpochScope(Assets const& owner, std::uint64_t epoch)
+    : service(owner), epoch(epoch), previous(active) {
+    active.emplace(std::cref(*this));
+  }
+  LoadEpochScope(LoadEpochScope const&) = delete;
+  LoadEpochScope& operator=(LoadEpochScope const&) = delete;
+  ~LoadEpochScope() { active = previous; }
+
+  Assets const& service;
+  std::uint64_t const epoch;
+  Link const previous;
+};
+
+std::unexpected<StarException> superseded_load() {
+  return std::unexpected<StarException>(AssetException("Asset loading superseded by reload"));
+}
+}
+
+std::uint64_t Assets::current_load_epoch() const {
+  for (auto scope = LoadEpochScope::active; scope; scope = scope->get().previous)
+    if (std::addressof(scope->get().service) == this)
+      return scope->get().epoch;
+  return m_load_epoch;
+}
+
+template <typename T>
+concept cached_asset_data = std::same_as<T, Assets::JsonData>
+  || std::same_as<T, Assets::ImageData>
+  || std::same_as<T, Assets::AudioData>
+  || std::same_as<T, Assets::FontData>
+  || std::same_as<T, Assets::BytesData>;
+
+template <cached_asset_data T>
+static std::optional<std::reference_wrapper<T>> cached_data_ref(Assets::AssetData& data) noexcept {
+  if (data.type != T::kind)
+    return std::nullopt;
+  return std::ref(static_cast<T&>(data));
+}
+
 // An empty diagnostic means the base path is valid.
-static std::optional<std::string_view> validateBasePath(std::string_view const& basePath) {
-  if (basePath.empty() || basePath[0] != '/')
+static std::optional<std::string_view> validate_base_path(std::string_view const& base_path) {
+  if (base_path.empty() || base_path[0] != '/')
     return "Path '<path>' must be absolute";
 
   bool first = true;
   bool slashed = true;
   bool dotted = false;
-  for (auto c : basePath) {
+  for (auto c : base_path) {
     if (c == '/') {
       if (!first) {
         if (slashed)
@@ -87,17 +133,17 @@ static std::optional<std::string_view> validateBasePath(std::string_view const& 
   return std::nullopt;
 }
 
-[[nodiscard]] static std::expected<void, StarException> validatePath(AssetPath const& components, bool canContainSubPath, bool canContainDirectives) {
-  if (auto error = validateBasePath(components.m_base_path.utf8())) {
+[[nodiscard]] static std::expected<void, StarException> validate_path(AssetPath const& components, bool can_contain_sub_path, bool can_contain_directives) {
+  if (auto error = validate_base_path(components.m_base_path.utf8())) {
     std::array<std::pair<std::string_view, std::string_view>, 1> tags{{{"path", components.m_base_path.utf8()}}};
     auto text = Star::format_tags(*error, tags);
     if (!text)
       return std::unexpected(std::move(text.error()));
     return std::unexpected(AssetException(std::move(*text)));
   }
-  if (!canContainSubPath && components.m_sub_path)
+  if (!can_contain_sub_path && components.m_sub_path)
     return std::unexpected(AssetException::format("Path '{}' cannot contain sub-path", components));
-  if (!canContainDirectives && !components.m_directives.empty())
+  if (!can_contain_directives && !components.m_directives.empty())
     return std::unexpected(AssetException::format("Path '{}' cannot contain directives", components));
   return {};
 }
@@ -113,7 +159,7 @@ static std::expected<EmbeddedData, StarException> read_embedded(String const& pa
 
 // Only a confirmed vanished directory entry is optional. A dangling symlink,
 // permission failure, corrupt package or unreadable existing file stays an error.
-static std::expected<std::optional<ByteArray>, StarException> readPatch(AssetSource& source, String const& path,
+static std::expected<std::optional<ByteArray>, StarException> read_patch(AssetSource& source, String const& path,
                                                                         Logger& logger) {
   auto bytes = source.read(path);
   if (bytes)
@@ -137,9 +183,9 @@ static std::expected<std::optional<ByteArray>, StarException> readPatch(AssetSou
   return std::unexpected(std::move(bytes.error()));
 }
 
-std::string Assets::sourceDiagnostic(AssetSource const& source,
-    std::optional<std::reference_wrapper<String const>> sourcePath) {
-  auto result = sourcePath ? Star::format("asset source '{}'", sourcePath->get()) : std::string("unregistered asset source");
+std::string Assets::source_diagnostic(AssetSource const& source,
+    std::optional<std::reference_wrapper<String const>> source_path) {
+  auto result = source_path ? Star::format("asset source '{}'", source_path->get()) : std::string("unregistered asset source");
   auto const& metadata = source.metadata();
   for (String const& key : {String("friendlyName"), String("name")}) {
     if (auto value = metadata.find_ref(key)) {
@@ -152,30 +198,30 @@ std::string Assets::sourceDiagnostic(AssetSource const& source,
   return result;
 }
 
-StarException Assets::withAssetContext(StarException error, String const& path, std::string_view operation) const {
+StarException Assets::with_asset_context(StarException error, String const& path, std::string_view operation) const {
   auto const& current = *error.diagnostic_summary();
-  bool addAsset = current.asset.empty();
-  bool addOperation = current.operation.empty() && !operation.empty();
-  bool addProvider = current.assetProvider.empty() && (addAsset || current.asset == path.utf8());
-  if (!addAsset && !addOperation && !addProvider)
+  bool add_asset = current.asset.empty();
+  bool add_operation = current.operation.empty() && !operation.empty();
+  bool add_provider = current.assetProvider.empty() && (add_asset || current.asset == path.utf8());
+  if (!add_asset && !add_operation && !add_provider)
     return error;
   std::string provider;
-  if (addProvider) {
-    auto descriptor = assetDescriptor(path);
+  if (add_provider) {
+    auto descriptor = asset_descriptor(path);
     if (descriptor && *descriptor) {
-      auto sourcePath = assetSourcePath((*descriptor)->source);
-      provider = sourceDiagnostic(*(*descriptor)->source,
-          sourcePath ? std::optional<std::reference_wrapper<String const>>(std::cref(*sourcePath)) : std::nullopt);
+      auto source_path = asset_source_path((*descriptor)->source);
+      provider = source_diagnostic(*(*descriptor)->source,
+          source_path ? std::optional<std::reference_wrapper<String const>>(std::cref(*source_path)) : std::nullopt);
     }
   }
-  if (!addAsset && !addOperation && provider.empty())
+  if (!add_asset && !add_operation && provider.empty())
     return error;
   auto summary = current;
-  if (addAsset)
+  if (add_asset)
     summary.asset = path.utf8();
-  if (addOperation)
+  if (add_operation)
     summary.operation = operation;
-  if (addAsset || !provider.empty()) {
+  if (add_asset || !provider.empty()) {
     auto context = provider.empty() ? Star::format("{} '{}'", operation, path)
         : Star::format("{} '{}' from {}", operation, path, provider);
     error = std::move(error).with_context(std::move(context));
@@ -186,7 +232,7 @@ StarException Assets::withAssetContext(StarException error, String const& path, 
 }
 
 
-static void addSummarySource(ExceptionSummary& summary, std::string_view source, std::string_view provider) {
+static void add_summary_source(ExceptionSummary& summary, std::string_view source, std::string_view provider) {
   for (auto& location : summary.locations) {
     if (location.source == source && (location.provider.empty() || location.provider == provider)) {
       if (location.provider.empty())
@@ -197,7 +243,7 @@ static void addSummarySource(ExceptionSummary& summary, std::string_view source,
   summary.locations.push_back({std::string(source), -1, std::string(provider)});
 }
 
-static StarException resourceFailure(StarException error, String const& path) {
+static StarException resource_failure(StarException error, String const& path) {
   auto const& current = *error.diagnostic_summary();
   if (current.kind != ExceptionSummaryKind::Native && !current.asset.empty())
     return error;
@@ -209,45 +255,45 @@ static StarException resourceFailure(StarException error, String const& path) {
   return std::move(error).with_summary(std::move(summary));
 }
 
-static StarException scriptSourceFailure(StarException error, String const& path, std::string const& provider) {
-  if (std::ranges::any_of(error.diagnostic_summary()->locations, [&](auto const& location) {
+static StarException script_source_failure(StarException error, String const& path, std::string const& provider) {
+  if (std::ranges::any_of(error.diagnostic_summary()->locations, [&](ExceptionSummary::Location const& location) {
         return location.source == path.utf8() && location.provider == provider;
       }))
     return error;
   auto summary = *error.diagnostic_summary();
-  addSummarySource(summary, path.utf8(), provider);
+  add_summary_source(summary, path.utf8(), provider);
   return std::move(error).with_summary(std::move(summary));
 }
 
-static StarException luaPatchFailure(StarException error, String const& targetPath, String const& patchPath,
-    AssetSource const& source, std::optional<std::reference_wrapper<String const>> sourcePath) {
-  auto provider = Assets::sourceDiagnostic(source, sourcePath);
+static StarException lua_patch_failure(StarException error, String const& target_path, String const& patch_path,
+    AssetSource const& source, std::optional<std::reference_wrapper<String const>> source_path) {
+  auto provider = Assets::source_diagnostic(source, source_path);
   auto const& current = *error.diagnostic_summary();
-  auto patchBasePath = AssetPath::remove_sub_path(patchPath);
-  bool changeKind = current.kind != ExceptionSummaryKind::PatchSyntax && current.kind != ExceptionSummaryKind::PatchRuntime;
-  bool changePatch = current.patch.empty();
-  bool changeSource = std::ranges::none_of(current.locations, [&](auto const& location) {
-    return location.source == patchBasePath.utf8() && location.provider == provider;
+  auto patch_base_path = AssetPath::remove_sub_path(patch_path);
+  bool change_kind = current.kind != ExceptionSummaryKind::PatchSyntax && current.kind != ExceptionSummaryKind::PatchRuntime;
+  bool change_patch = current.patch.empty();
+  bool change_source = std::ranges::none_of(current.locations, [&](ExceptionSummary::Location const& location) {
+    return location.source == patch_base_path.utf8() && location.provider == provider;
   });
-  if (changeKind || changePatch || changeSource) {
+  if (change_kind || change_patch || change_source) {
     auto summary = current;
-    if (changeKind)
+    if (change_kind)
       summary.kind = current.kind == ExceptionSummaryKind::ScriptSyntax
         ? ExceptionSummaryKind::PatchSyntax : ExceptionSummaryKind::PatchRuntime;
-    if (changePatch) {
-      summary.asset = targetPath.utf8();
-      summary.patch = patchPath.utf8();
+    if (change_patch) {
+      summary.asset = target_path.utf8();
+      summary.patch = patch_path.utf8();
       summary.patchProvider = provider;
     }
-    if (changeSource)
-      addSummarySource(summary, patchBasePath.utf8(), provider);
+    if (change_source)
+      add_summary_source(summary, patch_base_path.utf8(), provider);
     error = std::move(error).with_summary(std::move(summary));
   }
   return std::move(error).with_context(
-      Star::format("Lua patch provider: target '{}', patch '{}', {}", targetPath, patchPath, provider));
+      Star::format("Lua patch provider: target '{}', patch '{}', {}", target_path, patch_path, provider));
 }
 
-std::expected<std::optional<RectU>, StarException> FramesSpecification::getRect(String const& frame) const {
+std::expected<std::optional<RectU>, StarException> FramesSpecification::get_rect(String const& frame) const {
   if (auto alias = aliases.find_ref(frame)) {
     if (auto rect = frames.find_ref(alias->get()))
       return std::optional<RectU>(rect->get());
@@ -257,37 +303,37 @@ std::expected<std::optional<RectU>, StarException> FramesSpecification::getRect(
   }
 }
 
-std::expected<Json, StarException> FramesSpecification::toJson() const {
-  auto aliasJson = json_from_map(aliases);
-  if (!aliasJson)
-    return std::unexpected(std::move(aliasJson.error()));
-  auto frameJson = json_from_map_v(frames, json_from_rectu);
-  if (!frameJson)
-    return std::unexpected(std::move(frameJson.error()));
-  return JsonObject{{"aliases", std::move(*aliasJson)}, {"frames", std::move(*frameJson)}, {"file", framesFile}};
+std::expected<Json, StarException> FramesSpecification::to_json() const {
+  auto alias_json = json_from_map(aliases);
+  if (!alias_json)
+    return std::unexpected(std::move(alias_json.error()));
+  auto frame_json = json_from_map_v(frames, json_from_rectu);
+  if (!frame_json)
+    return std::unexpected(std::move(frame_json.error()));
+  return JsonObject{{"aliases", std::move(*alias_json)}, {"frames", std::move(*frame_json)}, {"file", frames_file}};
 }
 
 Assets::Assets(Logger& logger) : m_logger(logger) {}
 
-std::expected<std::shared_ptr<Assets>, StarException> Assets::create(Logger& logger, RandomService& random, LogMap& logMap, Settings settings, StringList assetSources) {
+std::expected<std::shared_ptr<Assets>, StarException> Assets::create(Logger& logger, RandomService& random, LogMap& log_map, Settings settings, StringList asset_sources) {
   auto assets = std::shared_ptr<Assets>(new Assets(logger));
-  auto initialized = assets->initialize(random, logMap, std::move(settings), std::move(assetSources));
+  auto initialized = assets->initialize(random, log_map, std::move(settings), std::move(asset_sources));
   if (!initialized)
     return std::unexpected(std::move(initialized.error()));
   return assets;
 }
 
-std::expected<void, StarException> Assets::initialize(RandomService& random, LogMap& logMap, Settings settings, StringList assetSources) {
-  constexpr std::string_view AssetsPatchSuffix = ".patch";
-  constexpr std::string_view AssetsPatchListSuffix = ".patchlist";
-  constexpr std::string_view AssetsLuaPatchSuffix = ".patch.lua";
+std::expected<void, StarException> Assets::initialize(RandomService& random, LogMap& log_map, Settings settings, StringList asset_sources) {
+  constexpr std::string_view assets_patch_suffix = ".patch";
+  constexpr std::string_view assets_patch_list_suffix = ".patchlist";
+  constexpr std::string_view assets_lua_patch_suffix = ".patch.lua";
 
-  auto fontLibrary = FontLibrary::create();
-  if (!fontLibrary)
-    return std::unexpected(std::move(fontLibrary.error()));
-  m_fontLibrary.emplace(std::move(*fontLibrary));
+  auto font_library = FontLibrary::create();
+  if (!font_library)
+    return std::unexpected(std::move(font_library.error()));
+  m_font_library.emplace(std::move(*font_library));
   m_settings = std::move(settings);
-  m_assetSources = std::move(assetSources);
+  m_asset_sources = std::move(asset_sources);
 
   auto created_lua_engine = LuaEngine::create();
   if (!created_lua_engine)
@@ -309,10 +355,10 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     return m_lua_engine->set_global(name, std::move(*table));
   };
 
-  auto makeBaseAssetCallbacks = [this]() -> std::expected<LuaCallbacks, StarException> {
+  auto make_base_asset_callbacks = [this]() -> std::expected<LuaCallbacks, StarException> {
     LuaCallbacks callbacks;
     auto registered = callbacks.register_callback("byExtension", [this](String const& extension) -> std::expected<StringSet, StarException> {
-      auto paths = scanExtension(extension);
+      auto paths = scan_extension(extension);
       if (!paths)
         return std::unexpected(std::move(paths.error()));
       StringSet result;
@@ -326,28 +372,28 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     registered = callbacks.register_callback("json", [this](String const& path) { return json(path); });
     if (!registered)
       return std::unexpected(std::move(registered.error()));
-    registered = callbacks.register_callback("exists", [this](String const& path) { return assetExists(path); });
+    registered = callbacks.register_callback("exists", [this](String const& path) { return asset_exists(path); });
     if (!registered)
       return std::unexpected(std::move(registered.error()));
 
-    registered = callbacks.register_callback("sourcePaths", [this](LuaEngine& engine, std::optional<bool> withMetaData) -> std::expected<LuaTable, StarException> {
-      auto assetSources = this->assetSources();
-      auto table = engine.create_table(assetSources.size(), 0);
+    registered = callbacks.register_callback("sourcePaths", [this](LuaEngine& engine, std::optional<bool> with_meta_data) -> std::expected<LuaTable, StarException> {
+      auto asset_sources = this->asset_sources();
+      auto table = engine.create_table(asset_sources.size(), 0);
       if (!table)
         return std::unexpected(std::move(table.error()));
-      if (withMetaData.value_or(false)) {
-        for (auto const& assetSource : assetSources) {
-          auto metadata = this->assetSourceMetadata(assetSource);
+      if (with_meta_data.value_or(false)) {
+        for (auto const& asset_source : asset_sources) {
+          auto metadata = this->asset_source_metadata(asset_source);
           if (!metadata)
             return std::unexpected(std::move(metadata.error()));
-          auto set = table->set(assetSource, std::move(*metadata));
+          auto set = table->set(asset_source, std::move(*metadata));
           if (!set)
             return std::unexpected(std::move(set.error()));
         }
       } else {
         std::size_t i = 0;
-        for (auto const& assetSource : assetSources) {
-          auto set = table->set(++i, assetSource);
+        for (auto const& asset_source : asset_sources) {
+          auto set = table->set(++i, asset_source);
           if (!set)
             return std::unexpected(std::move(set.error()));
         }
@@ -358,48 +404,48 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
       return std::unexpected(std::move(registered.error()));
 
     registered =
-      callbacks.register_callback("sourceMetadata", [this](String const& sourcePath) -> std::optional<JsonObject> {
-        if (auto assetSource = m_assetSourcePaths.find_right_ref(sourcePath))
-          return assetSource->get()->metadata();
+      callbacks.register_callback("sourceMetadata", [this](String const& source_path) -> std::optional<JsonObject> {
+        if (auto asset_source = m_asset_source_paths.find_right_ref(source_path))
+          return asset_source->get()->metadata();
         return {};
       });
     if (!registered)
       return std::unexpected(std::move(registered.error()));
 
     registered = callbacks.register_callback("origin", [this](String const& path) -> std::expected<std::optional<String>, StarException> {
-      auto descriptor = this->assetDescriptor(path);
+      auto descriptor = this->asset_descriptor(path);
       if (!descriptor)
         return std::unexpected(std::move(descriptor.error()));
       if (*descriptor)
-        return this->assetSourcePath((*descriptor)->source);
+        return this->asset_source_path((*descriptor)->source);
       return std::optional<String>{};
     });
     if (!registered)
       return std::unexpected(std::move(registered.error()));
 
-    registered = callbacks.register_callback("bytes", [this](String const& path, std::optional<bool> allowRemote) -> std::expected<String, StarException> {
-      auto assetBytes = bytes(path, allowRemote.value_or(false));
-      if (!assetBytes)
-        return std::unexpected(std::move(assetBytes.error()));
-      return String(std::string_view((*assetBytes)->begin(), (*assetBytes)->end()));
+    registered = callbacks.register_callback("bytes", [this](String const& path, std::optional<bool> allow_remote) -> std::expected<String, StarException> {
+      auto asset_bytes = bytes(path, allow_remote.value_or(false));
+      if (!asset_bytes)
+        return std::unexpected(std::move(asset_bytes.error()));
+      return String(std::string_view((*asset_bytes)->begin(), (*asset_bytes)->end()));
     });
     if (!registered)
       return std::unexpected(std::move(registered.error()));
 
     registered = callbacks.register_callback(
-      "sourceBytes", [this](String const& sourcePath, String const& path) -> std::expected<String, StarException> {
-        auto source = m_assetSourcePaths.find_right_ref(sourcePath);
+      "sourceBytes", [this](String const& source_path, String const& path) -> std::expected<String, StarException> {
+        auto source = m_asset_source_paths.find_right_ref(source_path);
         if (!source)
           return std::unexpected(
-            AssetException::format("Cannot read asset '{}' from unknown asset source '{}'", path, sourcePath));
+            AssetException::format("Cannot read asset '{}' from unknown asset source '{}'", path, source_path));
         // DirectoryAssetSource::read also accepts unindexed filesystem-relative paths.
         // Only expose paths actually enumerated by this provider, including shadowed assets.
         if (!source->get()->contains(path))
           return std::unexpected(AssetException::format("Asset '{}' is not indexed in {}", path,
-                                                        sourceDiagnostic(*source->get(), std::cref(sourcePath))));
+                                                        source_diagnostic(*source->get(), std::cref(source_path))));
         auto data = source->get()->read(path);
         if (!data) {
-          auto provider = sourceDiagnostic(*source->get(), std::cref(sourcePath));
+          auto provider = source_diagnostic(*source->get(), std::cref(source_path));
           auto error = std::move(data.error()).with_context(Star::format("Reading asset '{}' from {}", path, provider));
           auto summary = *error.diagnostic_summary();
           summary.kind = ExceptionSummaryKind::Resource;
@@ -414,22 +460,22 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
       return std::unexpected(std::move(registered.error()));
 
     registered = callbacks.register_callback("image", [this](String const& path) -> std::expected<Image, StarException> {
-      auto assetImage = image(path);
-      if (!assetImage)
-        return std::unexpected(std::move(assetImage.error()));
-      if ((*assetImage)->bytes_per_pixel() == 3)
-        return (*assetImage)->convert(PixelFormat::RGBA32);
-      return **assetImage;
+      auto asset_image = image(path);
+      if (!asset_image)
+        return std::unexpected(std::move(asset_image.error()));
+      if ((*asset_image)->bytes_per_pixel() == 3)
+        return (*asset_image)->convert(PixelFormat::RGBA32);
+      return **asset_image;
     });
     if (!registered)
       return std::unexpected(std::move(registered.error()));
 
     registered = callbacks.register_callback("frames", [this](String const& path) -> std::expected<Json, StarException> {
-      auto frames = imageFrames(path);
+      auto frames = image_frames(path);
       if (!frames)
         return std::unexpected(std::move(frames.error()));
       if (*frames)
-        return (*frames)->toJson();
+        return (*frames)->to_json();
       return Json();
     });
     if (!registered)
@@ -443,18 +489,18 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     return callbacks;
   };
 
-  auto utilityCallbacks = LuaBindings::make_utility_callbacks(random, m_logger, logMap);
-  if (!utilityCallbacks)
-    return std::unexpected(std::move(utilityCallbacks.error()));
-  auto pushedUtility = push_global_context("sb", *utilityCallbacks);
-  if (!pushedUtility)
-    return std::unexpected(std::move(pushedUtility.error()));
-  auto baseCallbacks = makeBaseAssetCallbacks();
-  if (!baseCallbacks)
-    return std::unexpected(std::move(baseCallbacks.error()));
-  auto pushedAssets = push_global_context("assets", *baseCallbacks);
-  if (!pushedAssets)
-    return std::unexpected(std::move(pushedAssets.error()));
+  auto utility_callbacks = LuaBindings::make_utility_callbacks(random, m_logger, log_map);
+  if (!utility_callbacks)
+    return std::unexpected(std::move(utility_callbacks.error()));
+  auto pushed_utility = push_global_context("sb", *utility_callbacks);
+  if (!pushed_utility)
+    return std::unexpected(std::move(pushed_utility.error()));
+  auto base_callbacks = make_base_asset_callbacks();
+  if (!base_callbacks)
+    return std::unexpected(std::move(base_callbacks.error()));
+  auto pushed_assets = push_global_context("assets", *base_callbacks);
+  if (!pushed_assets)
+    return std::unexpected(std::move(pushed_assets.error()));
 
   struct LoadScriptReference {
     std::shared_ptr<AssetSource> source;
@@ -472,176 +518,207 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     bool active = true;
   };
   // Callbacks retain their state even if a script retains a function past its group.
-  auto loadScriptState = std::make_shared<LoadScriptState>();
+  auto load_script_state = std::make_shared<LoadScriptState>();
 
-  auto decorateLuaContext = [&](LuaContext& context, std::shared_ptr<MemoryAssetSource> newFiles) -> std::expected<void, StarException> {
-    if (!newFiles)
+  auto decorate_lua_context = [&](LuaContext& context, std::shared_ptr<MemoryAssetSource> new_files) -> std::expected<void, StarException> {
+    if (!new_files)
       return {};
     // Re-add the assets callbacks with the load-script mutation functions.
     auto removed = context.remove("assets");
     if (!removed)
       return std::unexpected(std::move(removed.error()));
-    auto callbacks = makeBaseAssetCallbacks();
+    auto callbacks = make_base_asset_callbacks();
     if (!callbacks)
       return std::unexpected(std::move(callbacks.error()));
-    auto registered = callbacks->register_callback("add", [newFiles](LuaEngine& engine, String const& path, LuaValue const& data) -> std::expected<void, StarException> {
+    // A staged file is invisible until its group finishes, except when it has
+    // already been attached as a patch to an indexed descriptor.
+    auto set_staged_file = [this, new_files]<typename T>(String const& path, T&& contents) -> std::expected<void, StarException>
+      requires (std::same_as<std::remove_cvref_t<T>, Image> || std::same_as<std::remove_cvref_t<T>, ByteArray>) {
+      if (new_files->contains(path)) {
+        bool changed = false;
+        for (auto const& [image, file] : m_frame_files_by_image) {
+          if (file.shareable || file.path.empty())
+            continue;
+          auto key = CaseInsensitiveStringView::create(file.path);
+          if (!key)
+            return std::unexpected(std::move(key.error()));
+          auto descriptor = m_files.find_ref(*key);
+          if (descriptor && std::ranges::any_of(descriptor->get().patch_sources, [&](std::pair<String, std::shared_ptr<AssetSource>> const& patch) {
+                return patch.second == new_files && patch.first == path;
+              })) {
+            m_patched_frames_by_image.remove(image);
+            changed = true;
+          }
+        }
+        if (changed) {
+          m_assets_cache.clear();
+          m_asset_errors.clear();
+        }
+      }
+      new_files->set(path, std::forward<T>(contents));
+      return {};
+    };
+    auto registered = callbacks->register_callback("add", [set_staged_file](LuaEngine& engine, String const& path, LuaValue const& data) -> std::expected<void, StarException> {
       auto str = engine.lua_maybe_to<String>(data);
       if (!str)
         return std::unexpected(std::move(str.error()));
-      if (*str) {
-        newFiles->set(path, (*str)->utf8_bytes());
-        return {};
-      }
+      if (*str)
+        return set_staged_file(path, (*str)->utf8_bytes());
       auto image = engine.lua_maybe_to<Image>(data);
       if (!image)
         return std::unexpected(std::move(image.error()));
-      if (*image) {
-        newFiles->set(path, std::move(**image));
-        return {};
-      }
+      if (*image)
+        return set_staged_file(path, std::move(**image));
       auto json = engine.lua_to<Json>(data);
       if (!json)
         return std::unexpected(std::move(json.error()));
       auto text = json->repr();
       if (!text)
         return std::unexpected(std::move(text.error()));
-      newFiles->set(path, text->utf8_bytes());
-      return {};
+      return set_staged_file(path, text->utf8_bytes());
     });
     if (!registered)
       return std::unexpected(std::move(registered.error()));
 
-    registered = callbacks->register_callback("patch", [this, newFiles](String const& path, String const& patchPath) -> std::expected<bool, StarException> {
-      if (newFiles->contains(path)) {
-        auto image = newFiles->image(path);
+    registered = callbacks->register_callback("patch", [this, new_files, set_staged_file](String const& path, String const& patch_path) -> std::expected<bool, StarException> {
+      if (new_files->contains(path)) {
+        auto image = new_files->image(path);
         if (!image)
           return std::unexpected(std::move(image.error()));
-        std::shared_ptr<AssetSource> patchSource;
-        if (newFiles->contains(patchPath)) {
-          patchSource = newFiles;
+        std::shared_ptr<AssetSource> patch_source;
+        if (new_files->contains(patch_path)) {
+          patch_source = new_files;
         } else {
-          auto patchKey = CaseInsensitiveStringView::create(patchPath);
-          if (!patchKey)
-            return std::unexpected(std::move(patchKey.error()));
-          if (auto asset = m_files.find_ref(*patchKey))
-            patchSource = asset->get().source;
+          auto patch_key = CaseInsensitiveStringView::create(patch_path);
+          if (!patch_key)
+            return std::unexpected(std::move(patch_key.error()));
+          if (auto asset = m_files.find_ref(*patch_key))
+            patch_source = asset->get().source;
         }
-        if (!patchSource)
+        if (!patch_source)
           return false;
         if (*image) {
-          auto patched = applyImagePatches(*image, path, {std::make_pair(patchPath, patchSource)});
+          auto patched = apply_image_patches(*image, path, {std::make_pair(patch_path, patch_source)});
           if (!patched)
             return std::unexpected(std::move(patched.error()));
-          newFiles->set(path, **patched);
+          if (auto stored = set_staged_file(path, **patched); !stored)
+            return std::unexpected(std::move(stored.error()));
         } else {
-          auto file = newFiles->read(path);
+          auto file = new_files->read(path);
           if (!file)
             return std::unexpected(std::move(file.error()));
           auto json = input_utf8_json(file->begin(), file->end(), JsonParseType::Top);
           if (!json)
             return std::unexpected(std::move(json.error()));
-          auto patched = applyJsonPatches(*json, path, {std::make_pair(patchPath, patchSource)});
+          auto patched = apply_json_patches(*json, path, {std::make_pair(patch_path, patch_source)});
           if (!patched)
             return std::unexpected(std::move(patched.error()));
           auto text = patched->repr();
           if (!text)
             return std::unexpected(std::move(text.error()));
-          newFiles->set(path, text->utf8_bytes());
+          if (auto stored = set_staged_file(path, text->utf8_bytes()); !stored)
+            return std::unexpected(std::move(stored.error()));
         }
         return true;
       }
-      auto pathKey = CaseInsensitiveStringView::create(path);
-      if (!pathKey)
-        return std::unexpected(std::move(pathKey.error()));
-      if (auto file = m_files.find_ref(*pathKey)) {
-        if (newFiles->contains(patchPath)) {
-          file->get().patchSources.push_back(std::make_pair(patchPath, newFiles));
-          return true;
-        }
-        auto patchKey = CaseInsensitiveStringView::create(patchPath);
-        if (!patchKey)
-          return std::unexpected(std::move(patchKey.error()));
-        if (auto asset = m_files.find_ref(*patchKey)) {
-          file->get().patchSources.push_back(std::make_pair(patchPath, asset->get().source));
-          return true;
-        }
+      auto path_key = CaseInsensitiveStringView::create(path);
+      if (!path_key)
+        return std::unexpected(std::move(path_key.error()));
+      auto file = m_files.find_ref(*path_key);
+      if (!file)
+        return false;
+      std::shared_ptr<AssetSource> patch_source;
+      if (new_files->contains(patch_path)) {
+        patch_source = new_files;
+      } else {
+        auto patch_key = CaseInsensitiveStringView::create(patch_path);
+        if (!patch_key)
+          return std::unexpected(std::move(patch_key.error()));
+        auto asset = m_files.find_ref(*patch_key);
+        if (!asset)
+          return false;
+        patch_source = asset->get().source;
       }
-      return false;
+      if (auto invalidated = invalidate_frame_file(path); !invalidated)
+        return std::unexpected(std::move(invalidated.error()));
+      file->get().patch_sources.emplace_back(patch_path, std::move(patch_source));
+      return true;
     });
     if (!registered)
       return std::unexpected(std::move(registered.error()));
 
     registered = callbacks->register_callback(
       "patchReplace",
-      [this, newFiles](String const& target, String const& originalPatchPath, String const& sourcePath,
-                       String const& replacementPatchPath,
-                       std::optional<String> const& replacementTarget) -> std::expected<bool, StarException> {
-        auto originalSource = m_assetSourcePaths.find_right_ref(sourcePath);
-        if (!originalSource)
+      [this, new_files](String const& target, String const& original_patch_path, String const& source_path,
+                       String const& replacement_patch_path,
+                       std::optional<String> const& replacement_target) -> std::expected<bool, StarException> {
+        auto original_source = m_asset_source_paths.find_right_ref(source_path);
+        if (!original_source)
           return false;
-        auto targetKey = CaseInsensitiveStringView::create(target);
-        if (!targetKey)
-          return std::unexpected(std::move(targetKey.error()));
-        auto file = m_files.find_ref(*targetKey);
+        auto target_key = CaseInsensitiveStringView::create(target);
+        if (!target_key)
+          return std::unexpected(std::move(target_key.error()));
+        auto file = m_files.find_ref(*target_key);
         if (!file)
           return false;
-        auto matches = [&](auto const& patch) {
-          return patch.first == originalPatchPath && patch.second == originalSource->get();
+        using PatchSource = std::pair<String, std::shared_ptr<AssetSource>>;
+        auto matches = [&](PatchSource const& patch) {
+          return patch.first == original_patch_path && patch.second == original_source->get();
         };
-        if (!std::ranges::any_of(file->get().patchSources, matches))
+        if (!std::ranges::any_of(file->get().patch_sources, matches))
           return false;
-        auto* destination = std::addressof(file->get());
-        if (replacementTarget) {
-          auto destinationKey = CaseInsensitiveStringView::create(*replacementTarget);
-          if (!destinationKey)
-            return std::unexpected(std::move(destinationKey.error()));
-          auto descriptor = m_files.find_ref(*destinationKey);
+        auto destination = *file;
+        if (replacement_target) {
+          auto destination_key = CaseInsensitiveStringView::create(*replacement_target);
+          if (!destination_key)
+            return std::unexpected(std::move(destination_key.error()));
+          auto descriptor = m_files.find_ref(*destination_key);
           if (!descriptor)
             return false;
-          destination = std::addressof(descriptor->get());
+          destination = *descriptor;
         }
-        std::pair<String, std::shared_ptr<AssetSource>> replacement{replacementPatchPath, newFiles};
-        if (!newFiles->contains(replacementPatchPath)) {
-          auto replacementKey = CaseInsensitiveStringView::create(replacementPatchPath);
-          if (!replacementKey)
-            return std::unexpected(std::move(replacementKey.error()));
-          auto descriptor = m_files.find_ref(*replacementKey);
+        PatchSource replacement{replacement_patch_path, new_files};
+        if (!new_files->contains(replacement_patch_path)) {
+          auto replacement_key = CaseInsensitiveStringView::create(replacement_patch_path);
+          if (!replacement_key)
+            return std::unexpected(std::move(replacement_key.error()));
+          auto descriptor = m_files.find_ref(*replacement_key);
           if (!descriptor)
             return false;
-          replacement = {descriptor->get().sourceName, descriptor->get().source};
+          replacement = {descriptor->get().source_name, descriptor->get().source};
         }
-        if (destination == std::addressof(file->get())) {
-          for (auto& patch : file->get().patchSources) {
+        if (std::addressof(destination.get()) == std::addressof(file->get())) {
+          for (auto& patch : file->get().patch_sources) {
             if (matches(patch))
               patch = replacement;
           }
         } else {
-          for (auto const& patch : file->get().patchSources) {
+          for (auto const& patch : file->get().patch_sources) {
             if (matches(patch))
-              destination->patchSources.push_back(replacement);
+              destination.get().patch_sources.push_back(replacement);
           }
-          file->get().patchSources.filter([&](auto const& patch) { return !matches(patch); });
+          file->get().patch_sources.filter(std::not_fn(matches));
         }
         // As at the load-script group boundary, dependent assets may already be
         // cached. Invalidate immediately so this same context observes the repair.
         // A previously failed target must also be allowed to load its new patches.
-        m_framesSpecifications.clear();
-        m_assetsCache.clear();
-        m_assetErrors.clear();
+        clear_frame_catalog_cache();
+        m_assets_cache.clear();
+        m_asset_errors.clear();
         return true;
       });
     if (!registered)
       return std::unexpected(std::move(registered.error()));
 
-    registered = callbacks->register_callback("loadScriptReplace", [this, newFiles, loadScriptState](
-        String const& sourcePath, String const& originalScriptPath, String const& replacementScriptPath) -> std::expected<bool, StarException> {
-      if (!loadScriptState->active)
+    registered = callbacks->register_callback("loadScriptReplace", [this, new_files, load_script_state](
+        String const& source_path, String const& original_script_path, String const& replacement_script_path) -> std::expected<bool, StarException> {
+      if (!load_script_state->active)
         return false;
-      auto originalSource = m_assetSourcePaths.find_right_ref(sourcePath);
-      if (!originalSource || !originalSource->get()->contains(originalScriptPath))
+      auto original_source = m_asset_source_paths.find_right_ref(source_path);
+      if (!original_source || !original_source->get()->contains(original_script_path))
         return false;
-      LoadScriptReference original{.source = originalSource->get(), .path = originalScriptPath};
-      if (loadScriptState->unavailable.contains(original))
+      LoadScriptReference original{.source = original_source->get(), .path = original_script_path};
+      if (load_script_state->unavailable.contains(original))
         return false;
       auto metadata = original.source->metadata();
       auto scripts = metadata.find_ref("scripts");
@@ -657,48 +734,50 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
             auto text = path.to_string();
             if (!text)
               return std::unexpected(std::move(text.error()));
-            declared = declared || *text == originalScriptPath;
+            declared = declared || *text == original_script_path;
           }
         }
       }
       if (!declared)
         return false;
-      LoadScriptReference replacement{.source = newFiles, .path = replacementScriptPath};
-      if (!newFiles->contains(replacementScriptPath)) {
-        auto replacementKey = CaseInsensitiveStringView::create(replacementScriptPath);
-        if (!replacementKey)
-          return std::unexpected(std::move(replacementKey.error()));
-        auto descriptor = m_files.find_ref(*replacementKey);
+      LoadScriptReference replacement{.source = new_files, .path = replacement_script_path};
+      if (!new_files->contains(replacement_script_path)) {
+        auto replacement_key = CaseInsensitiveStringView::create(replacement_script_path);
+        if (!replacement_key)
+          return std::unexpected(std::move(replacement_key.error()));
+        auto descriptor = m_files.find_ref(*replacement_key);
         if (!descriptor)
           return false;
-        replacement = {.source = descriptor->get().source, .path = descriptor->get().sourceName};
+        replacement = {.source = descriptor->get().source, .path = descriptor->get().source_name};
       }
-      for (auto& entry : loadScriptState->replacements) {
+      for (auto& entry : load_script_state->replacements) {
         if (entry.original == original) {
           entry.replacement = std::move(replacement);
           return true;
         }
       }
-      loadScriptState->replacements.push_back({.original = std::move(original), .replacement = std::move(replacement)});
+      load_script_state->replacements.push_back({.original = std::move(original), .replacement = std::move(replacement)});
       return true;
     });
     if (!registered)
       return std::unexpected(std::move(registered.error()));
 
     registered = callbacks->register_callback("erase", [this](String const& path) -> std::expected<bool, StarException> {
-      auto pathKey = CaseInsensitiveStringView::create(path);
-      if (!pathKey)
-        return std::unexpected(std::move(pathKey.error()));
-      auto file = m_files.find(*pathKey);
+      auto path_key = CaseInsensitiveStringView::create(path);
+      if (!path_key)
+        return std::unexpected(std::move(path_key.error()));
+      auto file = m_files.find(*path_key);
       bool erased = file != m_files.end();
       if (erased) {
+        if (auto invalidated = invalidate_frame_file(path); !invalidated)
+          return std::unexpected(std::move(invalidated.error()));
         m_files.erase(file);
         auto extension = AssetPath::extension(path);
-        auto extensionKey = CaseInsensitiveStringView::create(extension);
-        if (!extensionKey)
-          return std::unexpected(std::move(extensionKey.error()));
-        if (auto paths = m_filesByExtension.find_ref(*extensionKey)) {
-          auto indexed = paths->get().find(*pathKey);
+        auto extension_key = CaseInsensitiveStringView::create(extension);
+        if (!extension_key)
+          return std::unexpected(std::move(extension_key.error()));
+        if (auto paths = m_files_by_extension.find_ref(*extension_key)) {
+          auto indexed = paths->get().find(*path_key);
           if (indexed != paths->get().end())
             paths->get().erase(indexed);
         }
@@ -710,100 +789,100 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     return context.set_callbacks("assets", *callbacks);
   };
 
-  auto addSource = [&](String const& sourcePath, std::shared_ptr<AssetSource> source) -> std::expected<void, StarException> {
-    auto added = m_assetSourcePaths.add(sourcePath, source);
+  auto add_source = [&](String const& source_path, std::shared_ptr<AssetSource> source) -> std::expected<void, StarException> {
+    auto added = m_asset_source_paths.add(source_path, source);
     if (!added)
       return std::unexpected(std::move(added.error()));
 
     for (auto const& filename : source->assetPaths()) {
-      auto filenameKey = CaseInsensitiveString::create(filename);
-      if (!filenameKey)
-        return std::unexpected(std::move(filenameKey.error()));
-      auto indexPatch = [&](std::size_t suffixSize) -> std::expected<void, StarException> {
+      auto filename_key = CaseInsensitiveString::create(filename);
+      if (!filename_key)
+        return std::unexpected(std::move(filename_key.error()));
+      auto index_patch = [&](std::size_t suffix_size) -> std::expected<void, StarException> {
         auto size = filename.size();
         if (!size)
           return std::unexpected(std::move(size.error()));
-        auto targetPatchFile = filename.substr(0, *size - suffixSize);
-        if (!targetPatchFile)
-          return std::unexpected(std::move(targetPatchFile.error()));
-        auto targetKey = CaseInsensitiveStringView::create(*targetPatchFile);
-        if (!targetKey)
-          return std::unexpected(std::move(targetKey.error()));
-        if (auto p = m_files.find_ref(*targetKey))
-          p->get().patchSources.push_back({filename, source});
+        auto target_patch_file = filename.substr(0, *size - suffix_size);
+        if (!target_patch_file)
+          return std::unexpected(std::move(target_patch_file.error()));
+        auto target_key = CaseInsensitiveStringView::create(*target_patch_file);
+        if (!target_key)
+          return std::unexpected(std::move(target_key.error()));
+        if (auto p = m_files.find_ref(*target_key))
+          p->get().patch_sources.push_back({filename, source});
         return {};
       };
-      auto containsPatch = filename.contains(AssetsPatchSuffix, String::CaseInsensitive);
-      if (!containsPatch)
-        return std::unexpected(std::move(containsPatch.error()));
-      if (*containsPatch) {
-        auto endsPatch = filename.ends_with(AssetsPatchSuffix, String::CaseInsensitive);
-        if (!endsPatch)
-          return std::unexpected(std::move(endsPatch.error()));
-        if (*endsPatch) {
-          auto indexed = indexPatch(AssetsPatchSuffix.size());
+      auto contains_patch = filename.contains(assets_patch_suffix, String::CaseInsensitive);
+      if (!contains_patch)
+        return std::unexpected(std::move(contains_patch.error()));
+      if (*contains_patch) {
+        auto ends_patch = filename.ends_with(assets_patch_suffix, String::CaseInsensitive);
+        if (!ends_patch)
+          return std::unexpected(std::move(ends_patch.error()));
+        if (*ends_patch) {
+          auto indexed = index_patch(assets_patch_suffix.size());
           if (!indexed)
             return std::unexpected(std::move(indexed.error()));
         } else {
-          auto endsLuaPatch = filename.ends_with(AssetsLuaPatchSuffix, String::CaseInsensitive);
-          if (!endsLuaPatch)
-            return std::unexpected(std::move(endsLuaPatch.error()));
-          if (*endsLuaPatch) {
-            auto indexed = indexPatch(AssetsLuaPatchSuffix.size());
+          auto ends_lua_patch = filename.ends_with(assets_lua_patch_suffix, String::CaseInsensitive);
+          if (!ends_lua_patch)
+            return std::unexpected(std::move(ends_lua_patch.error()));
+          if (*ends_lua_patch) {
+            auto indexed = index_patch(assets_lua_patch_suffix.size());
             if (!indexed)
               return std::unexpected(std::move(indexed.error()));
           } else {
-            auto endsPatchList = filename.ends_with(AssetsPatchListSuffix, String::CaseInsensitive);
-            if (!endsPatchList)
-              return std::unexpected(std::move(endsPatchList.error()));
-            if (*endsPatchList) {
+            auto ends_patch_list = filename.ends_with(assets_patch_list_suffix, String::CaseInsensitive);
+            if (!ends_patch_list)
+              return std::unexpected(std::move(ends_patch_list.error()));
+            if (*ends_patch_list) {
               auto stream = source->read(filename);
               if (!stream)
                 return std::unexpected(std::move(stream.error()));
-              auto patchList = input_utf8_json(stream->begin(), stream->end(), JsonParseType::Top);
-              if (!patchList)
-                return std::unexpected(std::move(patchList.error()));
-              auto patchPairs = patchList->iterate_array();
-              if (!patchPairs)
-                return std::unexpected(std::move(patchPairs.error()));
-              std::size_t patchIndex = 0;
-              for (auto const& patchPair : *patchPairs) {
-                auto patches = patchPair.get_array("patches");
+              auto patch_list = input_utf8_json(stream->begin(), stream->end(), JsonParseType::Top);
+              if (!patch_list)
+                return std::unexpected(std::move(patch_list.error()));
+              auto patch_pairs = patch_list->iterate_array();
+              if (!patch_pairs)
+                return std::unexpected(std::move(patch_pairs.error()));
+              std::size_t patch_index = 0;
+              for (auto const& patch_pair : *patch_pairs) {
+                auto patches = patch_pair.get_array("patches");
                 if (!patches)
                   return std::unexpected(std::move(patches.error()));
-                auto paths = patchPair.get_array("paths");
+                auto paths = patch_pair.get_array("paths");
                 if (!paths)
                   return std::unexpected(std::move(paths.error()));
                 for (auto const& path : *paths) {
-                  auto targetPath = path.to_string();
-                  if (!targetPath)
-                    return std::unexpected(std::move(targetPath.error()));
-                  auto targetKey = CaseInsensitiveStringView::create(*targetPath);
-                  if (!targetKey)
-                    return std::unexpected(std::move(targetKey.error()));
-                  if (auto p = m_files.find_ref(*targetKey)) {
+                  auto target_path = path.to_string();
+                  if (!target_path)
+                    return std::unexpected(std::move(target_path.error()));
+                  auto target_key = CaseInsensitiveStringView::create(*target_path);
+                  if (!target_key)
+                    return std::unexpected(std::move(target_key.error()));
+                  if (auto p = m_files.find_ref(*target_key)) {
                     for (std::size_t i = 0; i != patches->size(); ++i) {
                       auto const& patch = (*patches)[i];
                       if (patch.is_type(Json::Type::String)) {
-                        auto patchPath = patch.to_string();
-                        if (!patchPath)
-                          return std::unexpected(std::move(patchPath.error()));
-                        p->get().patchSources.push_back({std::move(*patchPath), source});
+                        auto patch_path = patch.to_string();
+                        if (!patch_path)
+                          return std::unexpected(std::move(patch_path.error()));
+                        p->get().patch_sources.push_back({std::move(*patch_path), source});
                       } else {
-                        p->get().patchSources.push_back({Star::format("{}:[{}].patches[{}]", filename, patchIndex, i), source});
+                        p->get().patch_sources.push_back({Star::format("{}:[{}].patches[{}]", filename, patch_index, i), source});
                       }
                     }
                   }
                 }
-                ++patchIndex;
+                ++patch_index;
               }
             } else {
               for (int i = 0; i < 10; ++i) {
-                auto endsNumberedPatch = filename.ends_with(String(AssetsPatchSuffix) + Star::to_string(i), String::CaseInsensitive);
-                if (!endsNumberedPatch)
-                  return std::unexpected(std::move(endsNumberedPatch.error()));
-                if (*endsNumberedPatch) {
-                  auto indexed = indexPatch(AssetsPatchSuffix.size() + 1);
+                auto ends_numbered_patch = filename.ends_with(String(assets_patch_suffix) + Star::to_string(i), String::CaseInsensitive);
+                if (!ends_numbered_patch)
+                  return std::unexpected(std::move(ends_numbered_patch.error()));
+                if (*ends_numbered_patch) {
+                  auto indexed = index_patch(assets_patch_suffix.size() + 1);
                   if (!indexed)
                     return std::unexpected(std::move(indexed.error()));
                   break;
@@ -814,159 +893,159 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
         }
       }
 
-      auto& descriptor = m_files[*filenameKey];
-      descriptor.sourceName = filename;
+      auto& descriptor = m_files[*filename_key];
+      descriptor.source_name = filename;
       descriptor.source = source;
       auto extension = AssetPath::extension(filename).to_lower();
       if (!extension)
         return std::unexpected(std::move(extension.error()));
-      auto extensionKey = CaseInsensitiveString::create(std::move(*extension));
-      if (!extensionKey)
-        return std::unexpected(std::move(extensionKey.error()));
-      m_filesByExtension[*extensionKey].insert(std::move(*filenameKey));
+      auto extension_key = CaseInsensitiveString::create(std::move(*extension));
+      if (!extension_key)
+        return std::unexpected(std::move(extension_key.error()));
+      m_files_by_extension[*extension_key].insert(std::move(*filename_key));
     }
     return {};
   };
 
-  auto runLoadScripts = [&](String const& groupName, String const& sourcePath, std::shared_ptr<AssetSource> source) -> std::expected<void, StarException> {
+  auto run_load_scripts = [&](String const& group_name, String const& source_path, std::shared_ptr<AssetSource> source) -> std::expected<void, StarException> {
     auto metadata = source->metadata();
     if (auto scripts = metadata.find_ref("scripts")) {
-      auto scriptGroup = scripts->get().opt_array(groupName);
-      if (!scriptGroup)
-        return std::unexpected(std::move(scriptGroup.error()));
-      if (*scriptGroup) {
-        auto sourceName = metadata.value("name", File::base_name(sourcePath)).repr();
-        if (!sourceName)
-          return std::unexpected(std::move(sourceName.error()));
-        auto memoryName = Star::format("{}::{}", *sourceName, groupName);
-        JsonObject memoryMetadata{{"name", memoryName}};
-        auto memoryAssets = std::make_shared<MemoryAssetSource>(memoryName, memoryMetadata);
+      auto script_group = scripts->get().opt_array(group_name);
+      if (!script_group)
+        return std::unexpected(std::move(script_group.error()));
+      if (*script_group) {
+        auto source_name = metadata.value("name", File::base_name(source_path)).repr();
+        if (!source_name)
+          return std::unexpected(std::move(source_name.error()));
+        auto memory_name = Star::format("{}::{}", *source_name, group_name);
+        JsonObject memory_metadata{{"name", memory_name}};
+        auto memory_assets = std::make_shared<MemoryAssetSource>(memory_name, memory_metadata);
         auto now = std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now());
-        auto scriptGroupText = Json(**scriptGroup).repr();
-        if (!scriptGroupText)
-          return std::unexpected(std::move(scriptGroupText.error()));
-        auto logged = m_logger.info("Running {} scripts {}", groupName, *scriptGroupText);
+        auto script_group_text = Json(**script_group).repr();
+        if (!script_group_text)
+          return std::unexpected(std::move(script_group_text.error()));
+        auto logged = m_logger.info("Running {} scripts {}", group_name, *script_group_text);
         if (!logged)
           return std::unexpected(std::move(logged.error()));
-        auto runScripts = [&]() -> std::expected<void, StarException> {
+        auto run_scripts = [&]() -> std::expected<void, StarException> {
           auto context = m_lua_engine->create_context();
           if (!context)
             return std::unexpected(std::move(context.error()));
-          auto decorated = decorateLuaContext(*context, memoryAssets);
+          auto decorated = decorate_lua_context(*context, memory_assets);
           if (!decorated)
             return std::unexpected(std::move(decorated.error()));
-          for (auto const& jPath : **scriptGroup) {
-            auto path = jPath.to_string();
+          for (auto const& j_path : **script_group) {
+            auto path = j_path.to_string();
             if (!path)
               return std::unexpected(std::move(path.error()));
             LoadScriptReference selected{.source = source, .path = *path};
-            loadScriptState->unavailable.push_back(selected);
-            for (auto const& entry : loadScriptState->replacements) {
+            load_script_state->unavailable.push_back(selected);
+            for (auto const& entry : load_script_state->replacements) {
               if (entry.original == selected) {
                 selected = entry.replacement;
                 break;
               }
             }
-            auto provider = sourceDiagnostic(*selected.source, m_assetSourcePaths.find_left_ref(selected.source));
+            auto provider = source_diagnostic(*selected.source, m_asset_source_paths.find_left_ref(selected.source));
             auto script = selected.source->read(selected.path);
             if (!script)
-              return std::unexpected(scriptSourceFailure(std::move(script.error()), selected.path, provider));
+              return std::unexpected(script_source_failure(std::move(script.error()), selected.path, provider));
             auto loaded = context->load(script->span(), selected.path);
             if (!loaded)
-              return std::unexpected(scriptSourceFailure(std::move(loaded.error()), selected.path, provider));
+              return std::unexpected(script_source_failure(std::move(loaded.error()), selected.path, provider));
           }
           return {};
         };
-        auto ran = runScripts();
+        auto ran = run_scripts();
         // A failed script closes the rest of its group too; those declarations
         // will not be executed later and must not report a successful replacement.
-        for (auto const& jPath : **scriptGroup) {
-          auto path = jPath.to_string();
+        for (auto const& j_path : **script_group) {
+          auto path = j_path.to_string();
           if (!path)
             return std::unexpected(std::move(path.error()));
           LoadScriptReference closed{.source = source, .path = std::move(*path)};
-          if (!loadScriptState->unavailable.contains(closed))
-            loadScriptState->unavailable.push_back(std::move(closed));
+          if (!load_script_state->unavailable.contains(closed))
+            load_script_state->unavailable.push_back(std::move(closed));
         }
         if (!ran) {
           if (!ran.error().is<LuaException>())
             return std::unexpected(std::move(ran.error()));
           auto summary = *ran.error().diagnostic_summary();
           if (summary.operation.empty())
-            summary.operation = Star::format("Running {} scripts", groupName);
+            summary.operation = Star::format("Running {} scripts", group_name);
           ran.error() = std::move(ran.error()).with_summary(std::move(summary));
-          logged = m_logger.error_exception(Star::format("Exception while running {} scripts from {}", groupName,
-                                                         sourceDiagnostic(*source, std::cref(sourcePath))),
+          logged = m_logger.error_exception(Star::format("Exception while running {} scripts from {}", group_name,
+                                                         source_diagnostic(*source, std::cref(source_path))),
                                             ExceptionDiagnostic(ran.error()));
           if (!logged)
             return std::unexpected(std::move(logged.error()));
         }
         logged = m_logger.info("Took {} seconds to run {} scripts {}",
             (std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now()) - now).count(),
-            groupName, *scriptGroupText);
+            group_name, *script_group_text);
         if (!logged)
           return std::unexpected(std::move(logged.error()));
-        if (!memoryAssets->empty()) {
-          auto added = addSource(Star::format("{}::{}", sourcePath, groupName), memoryAssets);
+        if (!memory_assets->empty()) {
+          auto added = add_source(Star::format("{}::{}", source_path, group_name), memory_assets);
           if (!added)
             return std::unexpected(std::move(added.error()));
         }
       }
     }
     // Load scripts may have populated caches for assets they subsequently changed.
-    m_framesSpecifications.clear();
-    m_assetsCache.clear();
+    clear_frame_catalog_cache();
+    m_assets_cache.clear();
     return {};
   };
 
   List<std::pair<String, std::shared_ptr<AssetSource>>> sources;
-  for (auto const& sourcePath : m_assetSources) {
-    auto logged = m_logger.info("Loading assets from: '{}'", sourcePath);
+  for (auto const& source_path : m_asset_sources) {
+    auto logged = m_logger.info("Loading assets from: '{}'", source_path);
     if (!logged)
       return std::unexpected(std::move(logged.error()));
     std::shared_ptr<AssetSource> source;
-    auto isDirectory = File::is_directory(sourcePath);
-    if (!isDirectory)
-      return std::unexpected(std::move(isDirectory.error()));
-    if (*isDirectory) {
-      auto created = DirectoryAssetSource::create(m_logger, sourcePath, m_settings.pathIgnore);
+    auto is_directory = File::is_directory(source_path);
+    if (!is_directory)
+      return std::unexpected(std::move(is_directory.error()));
+    if (*is_directory) {
+      auto created = DirectoryAssetSource::create(m_logger, source_path, m_settings.path_ignore);
       if (!created)
         return std::unexpected(std::move(created.error()));
       source = std::move(*created);
     } else {
-      auto created = PackedAssetSource::create(sourcePath);
+      auto created = PackedAssetSource::create(source_path);
       if (!created)
         return std::unexpected(std::move(created.error()));
       source = std::move(*created);
     }
-    auto added = addSource(sourcePath, source);
+    auto added = add_source(source_path, source);
     if (!added)
       return std::unexpected(std::move(added.error()));
-    sources.push_back(std::make_pair(sourcePath, source));
-    auto loaded = runLoadScripts("onLoad", sourcePath, source);
+    sources.push_back(std::make_pair(source_path, source));
+    auto loaded = run_load_scripts("onLoad", source_path, source);
     if (!loaded)
       return std::unexpected(std::move(loaded.error()));
   }
   for (auto const& pair : sources) {
-    auto loaded = runLoadScripts("postLoad", pair.first, pair.second);
+    auto loaded = run_load_scripts("postLoad", pair.first, pair.second);
     if (!loaded)
       return std::unexpected(std::move(loaded.error()));
   }
 
-  loadScriptState->active = false;
+  load_script_state->active = false;
 
   Sha256Hasher digest;
-  StringList digestPaths;
-  digestPaths.reserve(m_files.size());
+  StringList digest_paths;
+  digest_paths.reserve(m_files.size());
   for (auto const& entry : m_files) {
     auto lower = entry.first.string().to_lower();
     if (!lower)
       return std::unexpected(std::move(lower.error()));
-    digestPaths.push_back(std::move(*lower));
+    digest_paths.push_back(std::move(*lower));
   }
-  digestPaths.sort();
+  digest_paths.sort();
   struct SizeGroup {
-    std::shared_ptr<AssetSource> source;
+    std::reference_wrapper<AssetSource> source;
     std::vector<std::reference_wrapper<String const>> paths;
     std::vector<std::expected<StreamOffset, StarException>> sizes;
   };
@@ -975,19 +1054,19 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     std::size_t group;
     std::size_t index;
   };
-  std::vector<SizeGroup> sizeGroups;
-  std::unordered_map<AssetSource*, std::size_t> sourceGroups;
-  std::vector<DigestEntry> digestEntries;
-  digestEntries.reserve(digestPaths.size());
+  std::vector<SizeGroup> size_groups;
+  std::unordered_map<std::shared_ptr<AssetSource>, std::size_t> source_groups;
+  std::vector<DigestEntry> digest_entries;
+  digest_entries.reserve(digest_paths.size());
   // Patch subpaths need owned stripped names; deque keeps borrows stable.
-  std::deque<String> patchNames;
+  std::deque<String> patch_names;
   auto add_size = [&](std::shared_ptr<AssetSource> const& source, String const& path,
-                      std::optional<std::reference_wrapper<String const>> digestPath = {}) {
-    auto [group, inserted] = sourceGroups.try_emplace(source.get(), sizeGroups.size());
+                      std::optional<std::reference_wrapper<String const>> digest_path = {}) {
+    auto [group, inserted] = source_groups.try_emplace(source, size_groups.size());
     if (inserted)
-      sizeGroups.push_back({source, {}, {}});
-    auto& requests = sizeGroups[group->second].paths;
-    digestEntries.push_back({digestPath, group->second, requests.size()});
+      size_groups.push_back({*source, {}, {}});
+    auto& requests = size_groups[group->second].paths;
+    digest_entries.push_back({digest_path, group->second, requests.size()});
     requests.emplace_back(path);
   };
   // Retain a preparation error until all preceding metadata results have been
@@ -995,48 +1074,48 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
   auto prepared = [&]() -> std::expected<void, StarException> {
     // Only the reached prefix is compiled: an earlier match can hide an invalid later pattern.
     std::vector<CompiledRegex> ignore_patterns;
-    if (!digestPaths.empty())
-      ignore_patterns.reserve(m_settings.digestIgnore.size());
-    for (auto const& assetPath : digestPaths) {
-      bool digestFile = true;
-      for (std::size_t i = 0; i < m_settings.digestIgnore.size(); ++i) {
+    if (!digest_paths.empty())
+      ignore_patterns.reserve(m_settings.digest_ignore.size());
+    for (auto const& asset_path : digest_paths) {
+      bool digest_file = true;
+      for (std::size_t i = 0; i < m_settings.digest_ignore.size(); ++i) {
         if (i == ignore_patterns.size()) {
-          auto pattern = CompiledRegex::compile(m_settings.digestIgnore[i], false);
+          auto pattern = CompiledRegex::compile(m_settings.digest_ignore[i], false);
           if (!pattern)
             return std::unexpected(std::move(pattern.error()));
           ignore_patterns.push_back(std::move(*pattern));
         }
-        if (ignore_patterns[i].matches(assetPath, false)) {
-          digestFile = false;
+        if (ignore_patterns[i].matches(asset_path, false)) {
+          digest_file = false;
           break;
         }
       }
-      auto assetKey = CaseInsensitiveStringView::create(assetPath);
-      if (!assetKey)
-        return std::unexpected(std::move(assetKey.error()));
-      auto descriptor = m_files.get(*assetKey);
+      auto asset_key = CaseInsensitiveStringView::create(asset_path);
+      if (!asset_key)
+        return std::unexpected(std::move(asset_key.error()));
+      auto descriptor = m_files.get(*asset_key);
       if (!descriptor)
         return std::unexpected(std::move(descriptor.error()));
-      if (digestFile) {
-        add_size(descriptor->get().source, descriptor->get().sourceName, std::cref(assetPath));
-        for (auto const& pair : descriptor->get().patchSources) {
+      if (digest_file) {
+        add_size(descriptor->get().source, descriptor->get().source_name, std::cref(asset_path));
+        for (auto const& pair : descriptor->get().patch_sources) {
           if (pair.first.utf8().find_first_of(":?") == std::string::npos) {
             add_size(pair.second, pair.first);
           } else {
-            patchNames.push_back(AssetPath::remove_sub_path(pair.first));
-            add_size(pair.second, patchNames.back());
+            patch_names.push_back(AssetPath::remove_sub_path(pair.first));
+            add_size(pair.second, patch_names.back());
           }
         }
       }
     }
     return {};
   }();
-  for (auto& group : sizeGroups)
-    group.sizes = group.source->file_sizes(group.paths);
-  for (auto const& entry : digestEntries) {
+  for (auto& group : size_groups)
+    group.sizes = group.source.get().file_sizes(group.paths);
+  for (auto const& entry : digest_entries) {
     if (entry.path)
       digest.push(entry.path->get());
-    auto& size = sizeGroups[entry.group].sizes[entry.index];
+    auto& size = size_groups[entry.group].sizes[entry.index];
     if (!size)
       return std::unexpected(std::move(size.error()));
     auto serialized = DataStreamBuffer::serialize(*size);
@@ -1050,13 +1129,13 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
 
   // The owning factory destroys this object on failure, stopping and joining
   // all workers while their mutexes, Lua engine, and asset sources are alive.
-  m_workerThreads.reserve(m_settings.workerPoolSize);
-  m_workerStopSource = std::stop_source{};
-  for (unsigned i = 0; i < m_settings.workerPoolSize; ++i) {
-    auto worker = Thread::invoke("Assets::workerMain", std::mem_fn(&Assets::workerMain), std::ref(*this), m_workerStopSource.get_token());
+  m_worker_threads.reserve(m_settings.worker_pool_size);
+  m_worker_stop_source = std::stop_source{};
+  for (unsigned i = 0; i < m_settings.worker_pool_size; ++i) {
+    auto worker = Thread::invoke("Assets::workerMain", std::mem_fn(&Assets::worker_main), std::ref(*this), m_worker_stop_source.get_token());
     if (!worker)
       return std::unexpected(std::move(worker.error()));
-    m_workerThreads.push_back(std::move(*worker));
+    m_worker_threads.push_back(std::move(*worker));
   }
 
   // preload.config contains files which will be loaded and then told to persist.
@@ -1066,49 +1145,48 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
   auto logged = m_logger.info("Preloading assets");
   if (!logged)
     return std::unexpected(std::move(logged.error()));
-  auto preloadScripts = preload->iterate_array();
-  if (!preloadScripts)
-    return std::unexpected(std::move(preloadScripts.error()));
-  constexpr std::array<std::pair<std::string_view, AssetType>, 5> assetTypes{{
+  auto preload_scripts = preload->iterate_array();
+  if (!preload_scripts)
+    return std::unexpected(std::move(preload_scripts.error()));
+  constexpr std::array<std::pair<std::string_view, AssetType>, 5> asset_types{{
       {"json", AssetType::Json},
       {"image", AssetType::Image},
       {"audio", AssetType::Audio},
       {"font", AssetType::Font},
       {"bytes", AssetType::Bytes}
   }};
-  for (auto const& script : *preloadScripts) {
-    auto typeName = script.get_string("type");
-    if (!typeName)
-      return std::unexpected(std::move(typeName.error()));
-    auto lowerTypeName = typeName->to_lower();
-    if (!lowerTypeName)
-      return std::unexpected(std::move(lowerTypeName.error()));
+  for (auto const& script : *preload_scripts) {
+    auto type_name = script.get_string("type");
+    if (!type_name)
+      return std::unexpected(std::move(type_name.error()));
+    auto lower_type_name = type_name->to_lower();
+    if (!lower_type_name)
+      return std::unexpected(std::move(lower_type_name.error()));
     std::optional<AssetType> type;
-    for (auto const& [name, candidate] : assetTypes) {
-      if (lowerTypeName->utf8() == name) {
+    for (auto const& [name, candidate] : asset_types) {
+      if (lower_type_name->utf8() == name) {
         type = candidate;
         break;
       }
     }
     if (!type)
-      return std::unexpected(AssetException::format("Unknown asset type '{}' in preload.config", *typeName));
+      return std::unexpected(AssetException::format("Unknown asset type '{}' in preload.config", *type_name));
     auto path = script.get_string("path");
     if (!path)
       return std::unexpected(std::move(path.error()));
     auto components = AssetPath::split(*path);
-    auto validated = validatePath(components, *type == AssetType::Json || *type == AssetType::Image, *type == AssetType::Image);
+    auto validated = validate_path(components, *type == AssetType::Json || *type == AssetType::Image, *type == AssetType::Image);
     if (!validated)
       return std::unexpected(std::move(validated.error()));
-    auto asset = getAsset(AssetId{.type = *type, .path = std::move(components)});
+    auto asset = get_asset(AssetId{.type = *type, .path = std::move(components)}, true);
     if (!asset)
       return std::unexpected(std::move(asset.error()));
-    (*asset)->forcePersist = true;
   }
   return {};
 }
 
 Assets::~Assets() {
-  if (auto result = stopWorkers(); !result) {
+  if (auto result = stop_workers(); !result) {
     if (auto logged =
           m_logger.error_exception("Asset worker failed during shutdown", ExceptionDiagnostic(result.error()));
         !logged) {
@@ -1118,74 +1196,79 @@ Assets::~Assets() {
   }
 }
 
-std::expected<void, StarException> Assets::stopWorkers() {
+std::expected<void, StarException> Assets::stop_workers() {
   {
-    std::lock_guard locker(m_assetsMutex);
-    m_workerStopSource.request_stop();
-    m_assetsQueued.notify_all();
-    m_assetsDone.notify_all();
+    std::lock_guard locker(m_assets_mutex);
+    m_worker_stop_source.request_stop();
+    m_assets_queued.notify_all();
+    m_assets_done.notify_all();
   }
   std::optional<StarException> error;
-  for (auto& worker : m_workerThreads) {
+  for (auto& worker : m_worker_threads) {
     auto result = worker.finish();
     if (!result && !error)
       error = std::move(result.error());
   }
-  m_workerThreads.clear();
+  m_worker_threads.clear();
   if (error)
     return std::unexpected(std::move(*error));
   return {};
 }
 
-void Assets::hotReload() const {
-  std::lock_guard assetsLocker(m_assetsMutex);
-  m_assetsCache.clear();
-  m_assetErrors.clear();
+void Assets::hot_reload() const {
+  std::lock_guard lock(m_assets_mutex);
+  ++m_load_epoch;
+  m_assets_cache.clear();
+  m_asset_errors.clear();
   m_queue.clear();
-  m_framesSpecifications.clear();
+  // The source index is unchanged; only parsed contents become stale.
+  m_frames_by_file.clear();
+  m_patched_frames_by_image.clear();
+  m_assets_done.notify_all();
+  m_assets_queued.notify_all();
 }
 
-StringList Assets::assetSources() const {
-  std::lock_guard assetsLocker(m_assetsMutex);
-  return m_assetSources;
+StringList Assets::asset_sources() const {
+  std::lock_guard assets_locker(m_assets_mutex);
+  return m_asset_sources;
 }
 
-std::expected<JsonObject, StarException> Assets::assetSourceMetadata(String const& sourceName) const {
-  std::lock_guard assetsLocker(m_assetsMutex);
-  auto source = m_assetSourcePaths.get_right(sourceName);
+std::expected<JsonObject, StarException> Assets::asset_source_metadata(String const& source_name) const {
+  std::lock_guard assets_locker(m_assets_mutex);
+  auto source = m_asset_source_paths.get_right(source_name);
   if (!source)
     return std::unexpected(std::move(source.error()));
   return source->get()->metadata();
 }
 
 ByteArray Assets::digest() const {
-  std::lock_guard assetsLocker(m_assetsMutex);
+  std::lock_guard assets_locker(m_assets_mutex);
   return m_digest;
 }
 
-std::expected<bool, StarException> Assets::assetExists(String const& path) const {
+std::expected<bool, StarException> Assets::asset_exists(String const& path) const {
   auto key = CaseInsensitiveStringView::create(path);
   if (!key)
     return std::unexpected(std::move(key.error()));
-  std::lock_guard assetsLocker(m_assetsMutex);
+  std::lock_guard assets_locker(m_assets_mutex);
   return m_files.contains(*key);
 }
 
-std::expected<std::optional<Assets::AssetFileDescriptor>, StarException> Assets::assetDescriptor(String const& path) const {
+std::expected<std::optional<Assets::AssetFileDescriptor>, StarException> Assets::asset_descriptor(String const& path) const {
   auto key = CaseInsensitiveStringView::create(path);
   if (!key)
     return std::unexpected(std::move(key.error()));
-  std::lock_guard assetsLocker(m_assetsMutex);
+  std::lock_guard assets_locker(m_assets_mutex);
   return m_files.maybe(*key);
 }
 
-std::expected<String, StarException> Assets::assetSource(String const& path) const {
+std::expected<String, StarException> Assets::asset_source(String const& path) const {
   auto key = CaseInsensitiveStringView::create(path);
   if (!key)
     return std::unexpected(std::move(key.error()));
-  std::lock_guard assetsLocker(m_assetsMutex);
+  std::lock_guard assets_locker(m_assets_mutex);
   if (auto p = m_files.find_ref(*key)) {
-    auto source = m_assetSourcePaths.get_left(p->get().source);
+    auto source = m_asset_source_paths.get_left(p->get().source);
     if (!source)
       return std::unexpected(std::move(source.error()));
     return source->get();
@@ -1193,77 +1276,91 @@ std::expected<String, StarException> Assets::assetSource(String const& path) con
   return std::unexpected(AssetException(Star::format("No such asset '{}'", path)));
 }
 
-std::optional<String> Assets::assetSourcePath(std::shared_ptr<AssetSource> const& source) const {
-  std::lock_guard assetsLocker(m_assetsMutex);
-  return m_assetSourcePaths.maybe_left(source);
+std::optional<String> Assets::asset_source_path(std::shared_ptr<AssetSource> const& source) const {
+  std::lock_guard assets_locker(m_assets_mutex);
+  return m_asset_source_paths.maybe_left(source);
 }
 
 std::expected<StringList, StarException> Assets::scan(String const& suffix) const {
-  auto suffixBytes = std::string_view(suffix.utf8());
-  if (suffixBytes.starts_with(".") && suffixBytes.find('.', 1) == std::string_view::npos) {
-    auto extension = scanExtension(suffix);
-    if (!extension)
-      return std::unexpected(std::move(extension.error()));
-    StringList result;
-    result.reserve(extension->get().size());
-    for (auto const& key : extension->get())
-      result.push_back(key.string());
-    return result;
-  }
-  StringList result;
-  for (auto const& fileEntry : m_files) {
-    auto const& path = fileEntry.first.string();
-    if (suffix.empty()) {
-      result.push_back(path);
-      continue;
-    }
-    auto match = path.ends_with(suffix, String::CaseInsensitive);
-    if (!match)
-      return std::unexpected(std::move(match.error()));
-    if (*match)
-      result.push_back(path);
-  }
-  return result;
+  return scan(String{}, suffix);
 }
 
 std::expected<StringList, StarException> Assets::scan(String const& prefix, String const& suffix) const {
-  auto candidates = scan(suffix);
-  if (!candidates)
-    return std::unexpected(std::move(candidates.error()));
+  // Index keys are validated UTF-8. String's case-insensitive prefix/suffix
+  // comparisons fold ASCII bytes only; validate the query once, not per key.
+  auto equal_byte = [](unsigned char lhs, unsigned char rhs) {
+    return String::char_equal(lhs, rhs, String::CaseInsensitive);
+  };
+  auto prefix_bytes = std::string_view(prefix.utf8());
+  auto suffix_bytes = std::string_view(suffix.utf8());
+  bool prefix_checked = prefix_bytes.empty();
   StringList result;
-  for (auto const& file : *candidates) {
-    auto match = file.starts_with(prefix, String::CaseInsensitive);
-    if (!match)
-      return std::unexpected(std::move(match.error()));
-    if (*match)
-      result.push_back(file);
+  auto append_candidate = [&](String const& path) -> std::expected<void, StarException> {
+    // A malformed prefix was never examined when the suffix had no hits.
+    if (!prefix_checked) {
+      if (auto valid = prefix.size(); !valid)
+        return std::unexpected(std::move(valid.error()));
+      prefix_checked = true;
+    }
+    if (prefix_bytes.empty() || std::ranges::equal(std::string_view(path.utf8()).substr(0, prefix_bytes.size()),
+                                                  prefix_bytes, equal_byte))
+      result.push_back(path);
+    return {};
+  };
+
+  if (suffix_bytes.starts_with('.') && suffix_bytes.find('.', 1) == std::string_view::npos) {
+    auto extension = scan_extension(suffix);
+    if (!extension)
+      return std::unexpected(std::move(extension.error()));
+    if (prefix_bytes.empty())
+      result.reserve(extension->get().size());
+    for (auto const& key : extension->get()) {
+      if (auto appended = append_candidate(key.string()); !appended)
+        return std::unexpected(std::move(appended.error()));
+    }
+  } else {
+    if (!suffix_bytes.empty() && !m_files.empty()) {
+      if (auto valid = suffix.size(); !valid)
+        return std::unexpected(std::move(valid.error()));
+    }
+    if (suffix_bytes.empty() && prefix_bytes.empty())
+      result.reserve(m_files.size());
+    for (auto const& file : m_files) {
+      auto const& path = file.first.string();
+      auto bytes = std::string_view(path.utf8());
+      if (!suffix_bytes.empty() && (bytes.size() < suffix_bytes.size()
+          || !std::ranges::equal(bytes.substr(bytes.size() - suffix_bytes.size()), suffix_bytes, equal_byte)))
+        continue;
+      if (auto appended = append_candidate(path); !appended)
+        return std::unexpected(std::move(appended.error()));
+    }
   }
   return result;
 }
 
-const CaseInsensitiveStringSet NullExtensionScan;
+const CaseInsensitiveStringSet empty_extension_scan;
 
-std::expected<std::reference_wrapper<CaseInsensitiveStringSet const>, StarException> Assets::scanExtension(String const& extension) const {
+std::expected<std::reference_wrapper<CaseInsensitiveStringSet const>, StarException> Assets::scan_extension(String const& extension) const {
   auto bytes = std::string_view(extension.utf8());
   // The extension separator is ASCII; stripping it never splits a UTF8 scalar.
   auto key = CaseInsensitiveStringView::create(bytes.starts_with(".") ? bytes.substr(1) : bytes);
   if (!key)
     return std::unexpected(std::move(key.error()));
-  auto find = m_filesByExtension.find(*key);
-  return std::cref(find != m_filesByExtension.end() ? find->second : NullExtensionScan);
+  auto found = m_files_by_extension.find(*key);
+  return std::cref(found != m_files_by_extension.end() ? found->second : empty_extension_scan);
 }
 
 std::expected<Json, StarException> Assets::json(String const& path) const {
   auto components = AssetPath::split(path);
-  if (auto valid = validatePath(components, true, false); !valid)
+  if (auto valid = validate_path(components, true, false); !valid)
     return std::unexpected(std::move(valid.error()));
-  auto data = getAsset(AssetId{.type = AssetType::Json, .path = std::move(components)});
+  auto data = get_asset(AssetId{.type = AssetType::Json, .path = std::move(components)});
   if (!data)
     return std::unexpected(std::move(data.error()));
-  return as_ref<JsonData>(**data)->get().json;
+  return cached_data_ref<JsonData>(**data)->get().json;
 }
 
-std::expected<Json, StarException> Assets::fetchJson(Json const& v, String const& dir) const {
+std::expected<Json, StarException> Assets::fetch_json(Json const& v, String const& dir) const {
   if (!v.is_type(Json::Type::String))
     return v;
   auto path = v.to_string();
@@ -1272,209 +1369,146 @@ std::expected<Json, StarException> Assets::fetchJson(Json const& v, String const
   return json(AssetPath::relative_to(dir, *path));
 }
 
-std::expected<void, StarException> Assets::queueJsons(StringList const& paths) const {
-  List<AssetId> ids;
-  for (auto const& path : paths) {
-    auto components = AssetPath::split(path);
-    if (auto valid = validatePath(components, true, false); !valid)
-      return std::unexpected(std::move(valid.error()));
-    ids.push_back({.type = AssetType::Json, .path = {std::move(components.m_base_path), {}, {}}});
-  }
-  queueAssets(ids);
-  return {};
-}
-
-std::expected<void, StarException> Assets::queueJsons(CaseInsensitiveStringSet const& paths) const {
-  std::lock_guard assetsLocker(m_assetsMutex);
-  for (auto const& path : paths) {
-    auto components = AssetPath::split(path.string());
-    if (auto valid = validatePath(components, true, false); !valid)
-      return std::unexpected(std::move(valid.error()));
-    if (queueAsset({.type = AssetType::Json, .path = {std::move(components.m_base_path), {}, {}}}))
-      m_assetsQueued.notify_one();
-  }
-  return {};
+std::expected<Assets::AssetId, StarException> Assets::prepare_queued_asset(AssetType type, String const& path) {
+  auto components = AssetPath::split(path);
+  if (auto valid = validate_path(components, type != AssetType::Audio, type == AssetType::Image); !valid)
+    return std::unexpected(std::move(valid.error()));
+  if (type == AssetType::Json)
+    return AssetId{.type = type, .path = {std::move(components.m_base_path), {}, {}}};
+  return AssetId{.type = type, .path = std::move(components)};
 }
 
 std::expected<std::shared_ptr<Image const>, StarException> Assets::image(AssetPath const& path) const {
-  auto data = getAsset({.type = AssetType::Image, .path = path});
+  auto data = get_asset({.type = AssetType::Image, .path = path});
   if (!data)
     return std::unexpected(std::move(data.error()));
-  return as_ref<ImageData>(**data)->get().image;
+  return cached_data_ref<ImageData>(**data)->get().image;
 }
 
-std::expected<void, StarException> Assets::queueImages(StringList const& paths) const {
-  List<AssetId> ids;
-  for (auto const& path : paths) {
-    auto components = AssetPath::split(path);
-    if (auto valid = validatePath(components, true, true); !valid)
-      return std::unexpected(std::move(valid.error()));
-    ids.push_back({.type = AssetType::Image, .path = std::move(components)});
-  }
-  queueAssets(ids);
-  return {};
-}
-
-std::expected<void, StarException> Assets::queueImages(CaseInsensitiveStringSet const& paths) const {
-  std::lock_guard assetsLocker(m_assetsMutex);
-  for (auto const& path : paths) {
-    auto components = AssetPath::split(path.string());
-    if (auto valid = validatePath(components, true, true); !valid)
-      return std::unexpected(std::move(valid.error()));
-    if (queueAsset({.type = AssetType::Image, .path = std::move(components)}))
-      m_assetsQueued.notify_one();
-  }
-  return {};
-}
-
-std::expected<std::shared_ptr<Image const>, StarException> Assets::tryImage(AssetPath const& path) const {
-  auto data = tryAsset({.type = AssetType::Image, .path = path});
+std::expected<std::shared_ptr<Image const>, StarException> Assets::try_image(AssetPath const& path) const {
+  auto data = try_asset({.type = AssetType::Image, .path = path});
   if (!data)
     return std::unexpected(std::move(data.error()));
   if (*data)
-    return as_ref<ImageData>(**data)->get().image;
+    return cached_data_ref<ImageData>(**data)->get().image;
   return std::shared_ptr<Image const>{};
 }
 
-std::expected<std::shared_ptr<FramesSpecification const>, StarException> Assets::imageFrames(String const& path) const {
+std::expected<std::shared_ptr<FramesSpecification const>, StarException> Assets::image_frames(String const& path) const {
   auto components = AssetPath::split(path);
-  if (auto valid = validatePath(components, false, false); !valid)
+  if (auto valid = validate_path(components, false, false); !valid)
     return std::unexpected(std::move(valid.error()));
   if (AssetPath::is_embedded(components.m_base_path)) {
-    auto image = getAsset({.type = AssetType::Image, .path = std::move(components)});
+    auto image = get_asset({.type = AssetType::Image, .path = std::move(components)});
     if (!image)
       return std::unexpected(std::move(image.error()));
-    return as_ref<ImageData>(**image)->get().frames;
+    return cached_data_ref<ImageData>(**image)->get().frames;
   }
-  std::unique_lock assetsLocker(m_assetsMutex);
-  return bestFramesSpecification(path);
+  std::unique_lock assets_locker(m_assets_mutex);
+  return best_frames_specification(path);
 }
 
 std::expected<std::shared_ptr<Audio const>, StarException> Assets::audio(String const& path) const {
   auto components = AssetPath::split(path);
-  if (auto valid = validatePath(components, false, false); !valid)
+  if (auto valid = validate_path(components, false, false); !valid)
     return std::unexpected(std::move(valid.error()));
-  auto data = getAsset({.type = AssetType::Audio, .path = std::move(components)});
+  auto data = get_asset({.type = AssetType::Audio, .path = std::move(components)});
   if (!data)
     return std::unexpected(std::move(data.error()));
-  return as_ref<AudioData>(**data)->get().audio;
+  return cached_data_ref<AudioData>(**data)->get().audio;
 }
 
-std::expected<void, StarException> Assets::queueAudios(StringList const& paths) const {
-  List<AssetId> ids;
-  for (auto const& path : paths) {
-    auto components = AssetPath::split(path);
-    if (auto valid = validatePath(components, false, false); !valid)
-      return std::unexpected(std::move(valid.error()));
-    ids.push_back({.type = AssetType::Audio, .path = std::move(components)});
-  }
-  queueAssets(ids);
-  return {};
-}
-
-std::expected<void, StarException> Assets::queueAudios(CaseInsensitiveStringSet const& paths) const {
-  std::lock_guard assetsLocker(m_assetsMutex);
-  for (auto const& path : paths) {
-    auto components = AssetPath::split(path.string());
-    if (auto valid = validatePath(components, false, true); !valid)
-      return std::unexpected(std::move(valid.error()));
-    if (queueAsset({.type = AssetType::Audio, .path = std::move(components)}))
-      m_assetsQueued.notify_one();
-  }
-  return {};
-}
-
-std::expected<std::shared_ptr<Audio const>, StarException> Assets::tryAudio(String const& path) const {
+std::expected<std::shared_ptr<Audio const>, StarException> Assets::try_audio(String const& path) const {
   auto components = AssetPath::split(path);
-  if (auto valid = validatePath(components, false, false); !valid)
+  if (auto valid = validate_path(components, false, false); !valid)
     return std::unexpected(std::move(valid.error()));
-  auto data = tryAsset({.type = AssetType::Audio, .path = std::move(components)});
+  auto data = try_asset({.type = AssetType::Audio, .path = std::move(components)});
   if (!data)
     return std::unexpected(std::move(data.error()));
   if (*data)
-    return as_ref<AudioData>(**data)->get().audio;
+    return cached_data_ref<AudioData>(**data)->get().audio;
   return std::shared_ptr<Audio const>{};
 }
 
 std::expected<std::shared_ptr<Font const>, StarException> Assets::font(String const& path) const {
   auto components = AssetPath::split(path);
-  if (auto valid = validatePath(components, false, false); !valid)
+  if (auto valid = validate_path(components, false, false); !valid)
     return std::unexpected(std::move(valid.error()));
-  auto data = getAsset({.type = AssetType::Font, .path = std::move(components)});
+  auto data = get_asset({.type = AssetType::Font, .path = std::move(components)});
   if (!data)
     return std::unexpected(std::move(data.error()));
-  return as_ref<FontData>(**data)->get().font;
+  return cached_data_ref<FontData>(**data)->get().font;
 }
 
-std::expected<std::shared_ptr<ByteArray const>, StarException> Assets::bytes(String const& path, bool allowRemote) const {
+std::expected<std::shared_ptr<ByteArray const>, StarException> Assets::bytes(String const& path, bool allow_remote) const {
   auto components = AssetPath::split(path);
-  if (AssetPath::is_remote(components.m_base_path) && !allowRemote)
+  if (AssetPath::is_remote(components.m_base_path) && !allow_remote)
     return std::unexpected(AssetException("Reading embedded bytes requires explicit allowRemote permission"));
-  if (auto valid = validatePath(components, false, false); !valid)
+  if (auto valid = validate_path(components, false, false); !valid)
     return std::unexpected(std::move(valid.error()));
-  auto data = getAsset({.type = AssetType::Bytes, .path = std::move(components)});
+  auto data = get_asset({.type = AssetType::Bytes, .path = std::move(components)});
   if (!data)
     return std::unexpected(std::move(data.error()));
-  return as_ref<BytesData>(**data)->get().bytes;
+  return cached_data_ref<BytesData>(**data)->get().bytes;
 }
 
-std::expected<std::shared_ptr<IODevice>, StarException> Assets::openFile(String const& path) const {
+std::expected<std::shared_ptr<IODevice>, StarException> Assets::open_file(String const& path) const {
   return open(path);
 }
 
-void Assets::clearCache() {
-  std::lock_guard assetsLocker(m_assetsMutex);
+void Assets::clear_cache() {
+  std::lock_guard assets_locker(m_assets_mutex);
 
   // Clear all assets that are not queued or broken.
-  for (auto it = m_assetsCache.begin(); it != m_assetsCache.end();) {
+  for (auto it = m_assets_cache.begin(); it != m_assets_cache.end();) {
     auto const& pair = *it;
     // Don't clean up queued, persistent, or broken assets.
-    if (pair.second && !pair.second->shouldPersist() && !m_queue.contains(pair.first))
-      it = m_assetsCache.erase(it);
+    if (pair.second && !pair.second->should_persist() && !m_queue.contains(pair.first))
+      it = m_assets_cache.erase(it);
     else
       ++it;
   }
 }
 
 void Assets::cleanup() {
-  std::lock_guard assetsLocker(m_assetsMutex);
+  std::lock_guard lock(m_assets_mutex);
 
   auto time = std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now());
-  HashSet<AssetData const*> keepLonger;
-  if (m_settings.referenceImageTimeToLive > m_settings.assetTimeToLive && m_settings.referenceImagePixelBudget != 0) {
-    std::vector<ImageData const*> references;
-    for (auto const& entry : m_assetsCache) {
+  if (m_settings.reference_image_time_to_live > m_settings.asset_time_to_live && m_settings.reference_image_pixel_budget != 0) {
+    std::vector<std::reference_wrapper<ImageData>> references;
+    for (auto const& entry : m_assets_cache) {
       if (entry.first.type == AssetType::Image && entry.second) {
-        auto const& image = as_ref<ImageData>(*entry.second)->get();
-        if (image.isReference && image.image)
-          references.push_back(&image);
+        auto& image = cached_data_ref<ImageData>(*entry.second)->get();
+        image.extended_ttl = false;
+        if (image.is_reference && image.image)
+          references.emplace_back(image);
       }
     }
     std::sort(references.begin(), references.end(),
-              [](ImageData const* a, ImageData const* b) { return a->time > b->time; });
+              [](ImageData const& lhs, ImageData const& rhs) { return lhs.time > rhs.time; });
     std::uint64_t pixels = 0;
-    for (auto image : references) {
-      auto size = std::uint64_t(image->image->width()) * image->image->height();
-      if (size > m_settings.referenceImagePixelBudget - pixels)
+    for (ImageData& image : references) {
+      auto size = std::uint64_t(image.image->width()) * image.image->height();
+      if (size > m_settings.reference_image_pixel_budget - pixels)
         continue;
       pixels += size;
-      keepLonger.add(image);
+      image.extended_ttl = true;
     }
   }
 
-  for (auto it = m_assetsCache.begin(); it != m_assetsCache.end();) {
+  for (auto it = m_assets_cache.begin(); it != m_assets_cache.end();) {
     auto const& pair = *it;
     // Don't clean up broken assets or queued assets.
     if (pair.second && !m_queue.contains(pair.first)) {
-      auto liveTime = time - pair.second->time;
-      auto timeToLive = std::chrono::duration<float>(
-        keepLonger.contains(pair.second.get()) ? m_settings.referenceImageTimeToLive : m_settings.assetTimeToLive);
-      if (liveTime > timeToLive) {
+      auto live_time = time - pair.second->time;
+      auto time_to_live = std::chrono::duration<float>(
+        pair.second->extended_ttl ? m_settings.reference_image_time_to_live : m_settings.asset_time_to_live);
+      if (live_time > time_to_live) {
         // If the asset should persist, just refresh the access time.
-        if (pair.second->shouldPersist())
+        if (pair.second->should_persist())
           pair.second->time = time;
         else {
-          it = m_assetsCache.erase(it);
+          it = m_assets_cache.erase(it);
           continue;
         }
       }
@@ -1483,101 +1517,101 @@ void Assets::cleanup() {
   }
 }
 
-bool Assets::AssetId::operator==(AssetId const& assetId) const {
-  return std::tie(type, path) == std::tie(assetId.type, assetId.path);
+bool Assets::AssetId::operator==(AssetId const& asset_id) const {
+  return std::tie(type, path) == std::tie(asset_id.type, asset_id.path);
 }
 
 std::size_t Assets::AssetIdHash::operator()(AssetId const& id) const {
   return hash_of(id.type, id.path.m_base_path, id.path.m_sub_path, id.path.m_directives);
 }
 
-bool Assets::JsonData::shouldPersist() const {
-  return forcePersist || !json.unique();
+bool Assets::JsonData::should_persist() const {
+  return force_persist || !json.unique();
 }
 
-bool Assets::ImageData::shouldPersist() const {
-  return forcePersist || (!alias && image.use_count() != 1);
+bool Assets::ImageData::should_persist() const {
+  return force_persist || (!alias && image.use_count() != 1);
 }
 
-bool Assets::AudioData::shouldPersist() const {
-  return forcePersist || audio.use_count() != 1;
+bool Assets::AudioData::should_persist() const {
+  return force_persist || audio.use_count() != 1;
 }
 
-bool Assets::FontData::shouldPersist() const {
-  return forcePersist || font.use_count() != 1 || font->shares_backing_buffer();
+bool Assets::FontData::should_persist() const {
+  return force_persist || font.use_count() != 1 || font->shares_backing_buffer();
 }
 
-bool Assets::BytesData::shouldPersist() const {
-  return forcePersist || bytes.use_count() != 1;
+bool Assets::BytesData::should_persist() const {
+  return force_persist || bytes.use_count() != 1;
 }
 
-std::expected<FramesSpecification, StarException> Assets::parseFramesSpecification(Json const& frameConfig, String path) {
+std::expected<FramesSpecification, StarException> Assets::parse_frames_specification(Json const& frame_config, String path) {
   FramesSpecification spec;
-  spec.framesFile = std::move(path);
-  auto frameList = frameConfig.find("frameList");
-  if (!frameList)
-    return std::unexpected(std::move(frameList.error()));
-  if (*frameList) {
-    auto list = (*frameList)->get().iterate_object();
+  spec.frames_file = std::move(path);
+  auto frame_list = frame_config.find("frameList");
+  if (!frame_list)
+    return std::unexpected(std::move(frame_list.error()));
+  if (*frame_list) {
+    auto list = (*frame_list)->get().iterate_object();
     if (!list)
       return std::unexpected(std::move(list.error()));
     for (auto const& pair : *list) {
-      auto parsedRect = json_to_recti(pair.second);
-      if (!parsedRect)
-        return std::unexpected(std::move(parsedRect.error()));
-      RectU rect(*parsedRect);
+      auto parsed_rect = json_to_recti(pair.second);
+      if (!parsed_rect)
+        return std::unexpected(std::move(parsed_rect.error()));
+      RectU rect(*parsed_rect);
       if (rect.is_empty())
-        return std::unexpected(AssetException(Star::format("Empty rect in frame specification in image {} frame {}", spec.framesFile, pair.first)));
+        return std::unexpected(AssetException(Star::format("Empty rect in frame specification in image {} frame {}", spec.frames_file, pair.first)));
       spec.frames[pair.first] = rect;
     }
   }
-  auto frameGrid = frameConfig.find("frameGrid");
-  if (!frameGrid)
-    return std::unexpected(std::move(frameGrid.error()));
-  if (*frameGrid) {
-    auto gridResult = (*frameGrid)->get().object_ptr();
-    if (!gridResult)
-      return std::unexpected(std::move(gridResult.error()));
-    auto const& grid = **gridResult;
-    Vec2I beginValue{};
-    auto beginResult = grid.find_ref("begin");
-    if (beginResult) {
-      auto parsedBegin = json_to_vec2i(beginResult->get());
-      if (!parsedBegin)
-        return std::unexpected(std::move(parsedBegin.error()));
-      beginValue = *parsedBegin;
+  auto frame_grid = frame_config.find("frameGrid");
+  if (!frame_grid)
+    return std::unexpected(std::move(frame_grid.error()));
+  if (*frame_grid) {
+    auto grid_result = (*frame_grid)->get().object_ptr();
+    if (!grid_result)
+      return std::unexpected(std::move(grid_result.error()));
+    auto const& grid = **grid_result;
+    Vec2I begin_value{};
+    auto begin_result = grid.find_ref("begin");
+    if (begin_result) {
+      auto parsed_begin = json_to_vec2i(begin_result->get());
+      if (!parsed_begin)
+        return std::unexpected(std::move(parsed_begin.error()));
+      begin_value = *parsed_begin;
     }
-    auto sizeConfig = grid.get("size");
-    if (!sizeConfig)
-      return std::unexpected(std::move(sizeConfig.error()));
-    auto sizeResult = json_to_vec2i(sizeConfig->get());
-    if (!sizeResult)
-      return std::unexpected(std::move(sizeResult.error()));
-    auto dimensionsConfig = grid.get("dimensions");
-    if (!dimensionsConfig)
-      return std::unexpected(std::move(dimensionsConfig.error()));
-    auto dimensionsResult = json_to_vec2i(dimensionsConfig->get());
-    if (!dimensionsResult)
-      return std::unexpected(std::move(dimensionsResult.error()));
-    Vec2U begin(beginValue), size(*sizeResult), dimensions(*dimensionsResult);
+    auto size_config = grid.get("size");
+    if (!size_config)
+      return std::unexpected(std::move(size_config.error()));
+    auto size_result = json_to_vec2i(size_config->get());
+    if (!size_result)
+      return std::unexpected(std::move(size_result.error()));
+    auto dimensions_config = grid.get("dimensions");
+    if (!dimensions_config)
+      return std::unexpected(std::move(dimensions_config.error()));
+    auto dimensions_result = json_to_vec2i(dimensions_config->get());
+    if (!dimensions_result)
+      return std::unexpected(std::move(dimensions_result.error()));
+    Vec2U begin(begin_value), size(*size_result), dimensions(*dimensions_result);
     if (dimensions[0] == 0 || dimensions[1] == 0)
-      return std::unexpected(AssetException(Star::format("Image {} \"dimensions\" in frameGrid cannot be zero", spec.framesFile)));
-    if (auto namesConfig = grid.find_ref("names")) {
-      auto names = namesConfig->get().array_ptr();
+      return std::unexpected(AssetException(Star::format("Image {} \"dimensions\" in frameGrid cannot be zero", spec.frames_file)));
+    if (auto names_config = grid.find_ref("names")) {
+      auto names = names_config->get().array_ptr();
       if (!names)
         return std::unexpected(std::move(names.error()));
       for (std::size_t y = 0; y < (*names)->size(); ++y) {
         if (y >= dimensions[1])
-          return std::unexpected(AssetException(Star::format("Image {} row {} is out of bounds for y-dimension {}", spec.framesFile, y + 1, dimensions[1])));
-        auto const& rowConfig = (**names)[y];
-        if (rowConfig.is_null())
+          return std::unexpected(AssetException(Star::format("Image {} row {} is out of bounds for y-dimension {}", spec.frames_file, y + 1, dimensions[1])));
+        auto const& row_config = (**names)[y];
+        if (row_config.is_null())
           continue;
-        auto row = rowConfig.array_ptr();
+        auto row = row_config.array_ptr();
         if (!row)
           return std::unexpected(std::move(row.error()));
         for (std::size_t x = 0; x < (*row)->size(); ++x) {
           if (x >= dimensions[0])
-            return std::unexpected(AssetException(Star::format("Image {} column {} is out of bounds for x-dimension {}", spec.framesFile, x + 1, dimensions[0])));
+            return std::unexpected(AssetException(Star::format("Image {} column {} is out of bounds for x-dimension {}", spec.frames_file, x + 1, dimensions[0])));
           auto const& frame = (**row)[x];
           if (frame.is_null())
             continue;
@@ -1595,18 +1629,18 @@ std::expected<FramesSpecification, StarException> Assets::parseFramesSpecificati
             RectU::with_size(Vec2U(begin[0] + x * size[0], begin[1] + y * size[1]), size);
     }
   }
-  auto aliasesConfig = frameConfig.opt("aliases");
-  if (!aliasesConfig)
-    return std::unexpected(std::move(aliasesConfig.error()));
-  if (*aliasesConfig) {
-    auto aliases = (**aliasesConfig).to_object();
+  auto aliases_config = frame_config.opt("aliases");
+  if (!aliases_config)
+    return std::unexpected(std::move(aliases_config.error()));
+  if (*aliases_config) {
+    auto aliases = (**aliases_config).to_object();
     if (!aliases)
       return std::unexpected(std::move(aliases.error()));
     for (auto const& pair : *aliases) {
-      auto parsedValue = pair.second.to_string();
-      if (!parsedValue)
-        return std::unexpected(std::move(parsedValue.error()));
-      String value = std::move(*parsedValue);
+      auto parsed_value = pair.second.to_string();
+      if (!parsed_value)
+        return std::unexpected(std::move(parsed_value.error()));
+      String value = std::move(*parsed_value);
       for (std::size_t i = 0; i <= aliases->size(); ++i) {
         auto alias = aliases->find_ref(value);
         if (!alias)
@@ -1626,123 +1660,126 @@ std::expected<FramesSpecification, StarException> Assets::parseFramesSpecificati
   return spec;
 }
 
-void Assets::queueAssets(List<AssetId> const& assetIds) const {
-  std::lock_guard assetsLocker(m_assetsMutex);
-
+std::expected<void, StarException> Assets::publish_queued_assets(std::span<AssetId> ids) const {
   std::size_t queued = 0;
-  for (auto const& id : assetIds)
-    queued += queueAsset(id);
-  if (queued == 1)
-    m_assetsQueued.notify_one();
-  else if (queued > 1)
-    m_assetsQueued.notify_all();
-}
-
-bool Assets::queueAsset(AssetId const& assetId) const {
-  auto i = m_assetsCache.find(assetId);
-  if (i != m_assetsCache.end()) {
-    if (i->second)
-      freshen(i->second);
-  } else if (!m_assetErrors.contains(assetId)) {
-    auto j = m_queue.find(assetId);
-    if (j == m_queue.end()) {
-      m_queue[assetId] = QueuePriority::Load;
-      return true;
+  {
+    std::lock_guard lock(m_assets_mutex);
+    if (current_load_epoch() != m_load_epoch)
+      return superseded_load();
+    for (auto& id : ids) {
+      if (auto cached = m_assets_cache.find_ref(id)) {
+        if (cached->get())
+          freshen(cached->get());
+      } else if (!m_asset_errors.contains(id)) {
+        queued += m_queue.try_emplace(std::move(id), QueuePriority::Load).second;
+      }
     }
   }
-  return false;
+  if (queued == 1)
+    m_assets_queued.notify_one();
+  else if (queued > 1)
+    m_assets_queued.notify_all();
+  return {};
 }
 
-std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::tryAsset(AssetId const& id) const {
-  std::lock_guard assetsLocker(m_assetsMutex);
-  if (m_workerError)
-    return std::unexpected(*m_workerError);
-  if (m_workerStopSource.stop_requested())
+std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::try_asset(AssetId const& id) const {
+  std::lock_guard assets_locker(m_assets_mutex);
+  if (current_load_epoch() != m_load_epoch)
+    return superseded_load();
+  if (m_worker_error)
+    return std::unexpected(*m_worker_error);
+  if (m_worker_stop_source.stop_requested())
     return std::unexpected(AssetException("Asset loading stopped"));
-  if (auto error = m_assetErrors.find_ref(id))
+  if (auto error = m_asset_errors.find_ref(id))
     return std::unexpected(error->get());
-  if (auto cached = m_assetsCache.find_ref(id)) {
+  if (auto cached = m_assets_cache.find_ref(id)) {
     if (cached->get())
       freshen(cached->get());
     return cached->get();
   }
   if (!m_queue.contains(id)) {
     m_queue[id] = QueuePriority::Load;
-    m_assetsQueued.notify_one();
+    m_assets_queued.notify_one();
   }
   return std::shared_ptr<AssetData>{};
 }
 
-std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::getAsset(AssetId const& id) const {
-  std::unique_lock assetsLocker(m_assetsMutex);
+std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::get_asset(AssetId const& id, bool persist) const {
+  std::unique_lock assets_locker(m_assets_mutex);
   while (true) {
-    if (m_workerError)
-      return std::unexpected(*m_workerError);
-    if (m_workerStopSource.stop_requested())
+    if (current_load_epoch() != m_load_epoch)
+      return superseded_load();
+    if (m_worker_error)
+      return std::unexpected(*m_worker_error);
+    if (m_worker_stop_source.stop_requested())
       return std::unexpected(AssetException("Asset loading stopped"));
-    if (auto error = m_assetErrors.find_ref(id))
+    if (auto error = m_asset_errors.find_ref(id))
       return std::unexpected(error->get());
-    if (auto cached = m_assetsCache.find_ref(id)) {
+    if (auto cached = m_assets_cache.find_ref(id)) {
       if (cached->get()) {
+        if (persist)
+          cached->get()->force_persist = true;
         freshen(cached->get());
         return cached->get();
       }
       return std::unexpected(AssetException::format("Error loading asset {}", id.path));
     }
-    auto worked = doLoad(id);
+    auto worked = do_load(id);
     if (!worked)
       return std::unexpected(std::move(worked.error()));
-    if (!*worked && !m_workerStopSource.stop_requested())
-      m_assetsDone.wait(assetsLocker);
+    if (!*worked && !m_worker_stop_source.stop_requested())
+      m_assets_done.wait(assets_locker);
   }
 }
 
-std::expected<void, StarException> Assets::workerMain(std::stop_token stopToken) {
+std::optional<Assets::WorkerTask> Assets::next_worker_task() const {
+  auto post = m_queue.end();
+  for (auto it = m_queue.begin(); it != m_queue.end(); ++it) {
+    if (it->second == QueuePriority::Load)
+      return WorkerTask{it->first, {}}; // load_asset claims it under the same lock.
+    if (it->second == QueuePriority::PostProcess)
+      post = it;
+  }
+  if (post == m_queue.end())
+    return {};
+  post->second = QueuePriority::Working;
+  return WorkerTask{post->first, PostTask{m_load_epoch, m_assets_cache.value(post->first)}};
+}
+
+std::expected<void, StarException> Assets::worker_main(std::stop_token stop_token) {
   while (true) {
-    std::unique_lock assetsLocker(m_assetsMutex);
-    if (stopToken.stop_requested())
+    std::unique_lock assets_locker(m_assets_mutex);
+    if (stop_token.stop_requested())
       break;
 
-    AssetId assetId;
-    QueuePriority queuePriority = QueuePriority::None;
-
-    // Find the highest priority queue entry
-    for (auto const& pair : m_queue) {
-      if (pair.second == QueuePriority::Load || pair.second == QueuePriority::PostProcess) {
-        assetId = pair.first;
-        queuePriority = pair.second;
-        if (pair.second == QueuePriority::Load)
-          break;
-      }
-    }
-
-    if (queuePriority != QueuePriority::Load && queuePriority != QueuePriority::PostProcess) {
+    auto task = next_worker_task();
+    if (!task) {
       // Only one worker collects a fully drained load burst. In particular,
       // queued Working entries still need the shared Lua VM, not an idle GC.
-      if (m_queue.empty() && m_luaGcPending) {
-        m_luaGcPending = false;
-        assetsLocker.unlock();
+      if (m_queue.empty() && m_lua_gc_pending) {
+        m_lua_gc_pending = false;
+        assets_locker.unlock();
         std::expected<void, StarException> collected;
         {
-          std::unique_lock luaLocker(m_luaMutex, std::defer_lock);
-          lock_with_diagnostics(luaLocker);
+          std::unique_lock lua_locker(m_lua_mutex, std::defer_lock);
+          lock_with_diagnostics(lua_locker);
           collected = m_lua_engine->collect_garbage();
         }
-        assetsLocker.lock();
+        assets_locker.lock();
         if (!collected) {
-          if (!m_workerError)
-            m_workerError = collected.error();
-          m_workerStopSource.request_stop();
-          m_assetsQueued.notify_all();
-          m_assetsDone.notify_all();
+          if (!m_worker_error)
+            m_worker_error = collected.error();
+          m_worker_stop_source.request_stop();
+          m_assets_queued.notify_all();
+          m_assets_done.notify_all();
           return std::unexpected(std::move(collected.error()));
         }
       }
       // Queueing and shutdown can happen while the asset mutex is released.
-      m_assetsQueued.wait(assetsLocker, [&] {
-        if (stopToken.stop_requested())
+      m_assets_queued.wait(assets_locker, [&] {
+        if (stop_token.stop_requested())
           return true;
-        if (m_queue.empty() && m_luaGcPending)
+        if (m_queue.empty() && m_lua_gc_pending)
           return true;
         for (auto const& entry : m_queue)
           if (entry.second == QueuePriority::Load || entry.second == QueuePriority::PostProcess)
@@ -1752,94 +1789,169 @@ std::expected<void, StarException> Assets::workerMain(std::stop_token stopToken)
       continue;
     }
 
-    auto worked = queuePriority == QueuePriority::PostProcess ? doPost(assetId) : doLoad(assetId);
+    std::expected<bool, StarException> worked;
+    if (task->post) {
+      assets_locker.unlock();
+      auto processed = post_process_audio(*task->post);
+      assets_locker.lock();
+      worked = publish_post(task->id, std::move(*task->post), std::move(processed));
+    } else {
+      worked = do_load(task->id);
+    }
     if (!worked) {
-      if (!m_workerError)
-        m_workerError = worked.error();
-      m_workerStopSource.request_stop();
-      m_assetsQueued.notify_all();
-      m_assetsDone.notify_all();
+      if (!m_worker_error)
+        m_worker_error = worked.error();
+      m_worker_stop_source.request_stop();
+      m_assets_queued.notify_all();
+      m_assets_done.notify_all();
       return std::unexpected(std::move(worked.error()));
     }
-    if (!*worked && !stopToken.stop_requested()) {
+    if (!*worked && !stop_token.stop_requested()) {
       // We are blocking on some sort of busy asset, so need to wait on
       // something to complete here, rather than spinning and burning cpu.
-      m_assetsDone.wait(assetsLocker);
+      m_assets_done.wait(assets_locker);
       continue;
     }
 
     // After processing an asset, unlock the main asset mutex and yield so we
     // don't starve other threads.
-    assetsLocker.unlock();
+    assets_locker.unlock();
     std::this_thread::yield();
   }
   return {};
 }
 
-template <typename Function>
-[[nodiscard]] decltype(auto) Assets::unlockDuring(Function f) const {
+template <typename Function> requires std::invocable<Function&>
+[[nodiscard]] auto Assets::unlock_during(Function&& function) const {
   // Borrow the caller's ownership: checked callbacks return before we restore
   // the mutex, including on failure, so its guard never outlives an unlocked mutex.
-  m_assetsMutex.unlock();
-  auto result = f();
-  m_assetsMutex.lock();
+  m_assets_mutex.unlock();
+  auto result = std::invoke(function);
+  m_assets_mutex.lock();
   return result;
 }
 
-std::expected<std::shared_ptr<FramesSpecification const>, StarException> Assets::bestFramesSpecification(String const& image) const {
-  if (auto cached = m_framesSpecifications.find_ref(image))
-    return cached->get();
-  String framesFile;
-  if (auto cached = m_bestFramesFiles.find_ref(image)) {
-    framesFile = cached->get();
-  } else {
-    String searchPath = AssetPath::directory(image);
-    auto filename = AssetPath::filename(image);
-    auto filenameBytes = std::string_view(filename.utf8());
-    String filePrefix(filenameBytes.substr(0, filenameBytes.rfind('.')));
-    while (!searchPath.empty()) {
-      auto candidate = searchPath + filePrefix + ".frames";
-      auto candidateKey = CaseInsensitiveStringView::create(candidate);
-      if (!candidateKey)
-        return std::unexpected(std::move(candidateKey.error()));
-      if (!m_files.contains(*candidateKey)) {
-        candidate = searchPath + "default.frames";
-        candidateKey = CaseInsensitiveStringView::create(candidate);
-        if (!candidateKey)
-          return std::unexpected(std::move(candidateKey.error()));
-      }
-      if (m_files.contains(*candidateKey)) {
-        framesFile = std::move(candidate);
-        m_bestFramesFiles[image] = framesFile;
-        break;
-      }
-      auto directory = std::string_view(searchPath.utf8());
-      // searchPath ends in an ASCII slash. Ascend without decoding filenames.
-      directory.remove_suffix(1);
-      auto slash = directory.rfind('/');
-      searchPath = slash == std::string_view::npos ? String{} : String(directory.substr(0, slash + 1));
+std::expected<void, StarException> Assets::invalidate_frame_file(String const& path) const {
+  auto is_frames = path.ends_with(".frames", String::CaseInsensitive);
+  if (!is_frames)
+    return std::unexpected(std::move(is_frames.error()));
+  if (!*is_frames)
+    return {};
+  // Load scripts can attach a patch or erase an indexed frame file and query
+  // it again in the same group. Leave unrelated stateful patch results alone.
+  for (auto it = m_frame_files_by_image.begin(); it != m_frame_files_by_image.end();) {
+    auto matches = it->second.path.equals_ignore_case(path);
+    if (!matches)
+      return std::unexpected(std::move(matches.error()));
+    if (*matches) {
+      m_frames_by_file.remove(it->second.path);
+      m_patched_frames_by_image.remove(it->first);
+      it = m_frame_files_by_image.erase(it);
+    } else {
+      ++it;
     }
-    if (framesFile.empty())
-      return std::shared_ptr<FramesSpecification const>{};
   }
-  auto parsed = unlockDuring([&]() -> std::expected<std::shared_ptr<FramesSpecification const>, StarException> {
-    auto config = readJson(framesFile);
-    if (!config)
-      return std::unexpected(std::move(config.error()));
-    auto spec = parseFramesSpecification(*config, framesFile);
-    if (!spec)
-      return std::unexpected(std::move(spec.error()));
-    return std::make_shared<FramesSpecification>(std::move(*spec));
-  });
-  if (!parsed)
-    return std::unexpected(std::move(parsed.error()));
-  m_framesSpecifications[image] = *parsed;
-  return std::move(*parsed);
+  // Decoded images (and errors for their sub-frames) also depend on the spec.
+  m_assets_cache.clear();
+  m_asset_errors.clear();
+  return {};
+}
+
+void Assets::clear_frame_catalog_cache() const {
+  m_frame_files_by_image.clear();
+  m_frames_by_file.clear();
+  m_patched_frames_by_image.clear();
+}
+
+std::expected<Assets::FrameFile, StarException> Assets::find_frame_file(String const& image) const {
+  auto path = std::string_view(image.utf8());
+  auto slash = path.rfind('/');
+  if (slash == std::string_view::npos)
+    return FrameFile{};
+  auto directory = path.substr(0, slash + 1);
+  auto filename = path.substr(slash + 1);
+  auto stem = filename.substr(0, filename.rfind('.'));
+  constexpr std::string_view fallback = "default", extension = ".frames";
+  std::string candidate;
+  candidate.reserve(directory.size() + std::max(stem.size(), fallback.size()) + extension.size());
+  while (!directory.empty()) {
+    for (auto name : {stem, fallback}) {
+      candidate.assign(directory).append(name).append(extension);
+      auto key = CaseInsensitiveStringView::create(std::string_view(candidate));
+      if (!key)
+        return std::unexpected(std::move(key.error()));
+      if (auto file = m_files.find_ref(*key)) {
+        // Even JSON patches can load external, Lua-patched assets. Only an
+        // unpatched file is independent of patch state and request spelling.
+        if (file->get().patch_sources.empty())
+          return FrameFile{.path = file->get().source_name, .shareable = true};
+        return FrameFile{.path = String(std::move(candidate))};
+      }
+      if (stem == fallback)
+        break;
+    }
+    directory.remove_suffix(1);
+    auto parent = directory.rfind('/');
+    directory = parent == std::string_view::npos ? std::string_view{} : directory.substr(0, parent + 1);
+  }
+  return FrameFile{};
+}
+
+std::expected<std::shared_ptr<FramesSpecification const>, StarException> Assets::best_frames_specification(String const& image) const {
+  for (;;) {
+    if (current_load_epoch() != m_load_epoch)
+      return superseded_load();
+    auto selected = m_frame_files_by_image.find(image);
+    if (selected == m_frame_files_by_image.end()) {
+      auto found = find_frame_file(image);
+      if (!found)
+        return std::unexpected(std::move(found.error()));
+      if (found->path.empty()) {
+        // A frames query need not name a catalog image. Do not intern
+        // arbitrary missing names (or spelling variants) indefinitely.
+        auto key = CaseInsensitiveStringView::create(image);
+        if (!key)
+          return std::unexpected(std::move(key.error()));
+        auto file = m_files.find_ref(*key);
+        if (!file || file->get().source_name != image)
+          return std::shared_ptr<FramesSpecification const>{};
+      }
+      selected = m_frame_files_by_image.try_emplace(image, std::move(*found)).first;
+    }
+    auto const& file = selected->second;
+    if (file.path.empty())
+      return std::shared_ptr<FramesSpecification const>{};
+    auto& cache = file.shareable ? m_frames_by_file : m_patched_frames_by_image;
+    if (auto cached = cache.find_ref(file.shareable ? file.path : image))
+      return cached->get();
+
+    // Do not borrow a map entry across unlock: another image can rehash it.
+    String frames_file = file.path;
+    bool shareable = file.shareable;
+    LoadEpochScope task(*this, m_load_epoch);
+    auto parsed = unlock_during([&]() -> std::expected<std::shared_ptr<FramesSpecification const>, StarException> {
+      auto config = read_json(frames_file);
+      if (!config)
+        return std::unexpected(std::move(config.error()));
+      auto spec = parse_frames_specification(*config, frames_file);
+      if (!spec)
+        return std::unexpected(std::move(spec.error()));
+      return std::make_shared<FramesSpecification>(std::move(*spec));
+    });
+    if (task.epoch != m_load_epoch)
+      continue; // Drop stale success or failure; only top-level lookups may retry.
+    if (!parsed)
+      return std::unexpected(std::move(parsed.error()));
+    if (shareable)
+      return cache.try_emplace(std::move(frames_file), std::move(*parsed)).first->second;
+    cache[image] = *parsed;
+    return std::move(*parsed);
+  }
 }
 
 std::expected<std::shared_ptr<IODevice>, StarException> Assets::open(String const& path) const {
   if (AssetPath::is_embedded(path)) {
-    auto data = read_embedded(path, m_settings.allowRemoteAssets, DecodeMode::RawBytes);
+    auto data = read_embedded(path, m_settings.allow_remote_assets, DecodeMode::RawBytes);
     if (!data)
       return std::unexpected(std::move(data.error()));
     return std::make_shared<Buffer>(std::move(data->bytes));
@@ -1848,13 +1960,13 @@ std::expected<std::shared_ptr<IODevice>, StarException> Assets::open(String cons
   if (!key)
     return std::unexpected(std::move(key.error()));
   if (auto p = m_files.find_ref(*key))
-    return p->get().source->open(p->get().sourceName);
+    return p->get().source->open(p->get().source_name);
   return std::unexpected(AssetException(Star::format("No such asset '{}'", path)));
 }
 
 std::expected<ByteArray, StarException> Assets::read(String const& path) const {
   if (AssetPath::is_embedded(path)) {
-    auto data = read_embedded(path, m_settings.allowRemoteAssets, DecodeMode::RawBytes);
+    auto data = read_embedded(path, m_settings.allow_remote_assets, DecodeMode::RawBytes);
     if (!data)
       return std::unexpected(std::move(data.error()));
     return std::move(data->bytes);
@@ -1863,11 +1975,11 @@ std::expected<ByteArray, StarException> Assets::read(String const& path) const {
   if (!key)
     return std::unexpected(std::move(key.error()));
   if (auto p = m_files.find_ref(*key))
-    return p->get().source->read(p->get().sourceName);
+    return p->get().source->read(p->get().source_name);
   return std::unexpected(AssetException(Star::format("No such asset '{}'", path)));
 }
 
-std::expected<std::shared_ptr<Image const>, StarException> Assets::readImage(String const& path) const {
+std::expected<std::shared_ptr<Image const>, StarException> Assets::read_image(String const& path) const {
   auto key = CaseInsensitiveStringView::create(path);
   if (!key)
     return std::unexpected(std::move(key.error()));
@@ -1875,14 +1987,14 @@ std::expected<std::shared_ptr<Image const>, StarException> Assets::readImage(Str
   if (!file)
     return std::unexpected(AssetException(Star::format("No such asset '{}'", path)));
   std::shared_ptr<Image const> image;
-  if (auto memorySource = as_ref<MemoryAssetSource>(*file->get().source)) {
-    auto stored = memorySource->get().image(file->get().sourceName);
+  if (auto memory_source = as_ref<MemoryAssetSource>(*file->get().source)) {
+    auto stored = memory_source->get().image(file->get().source_name);
     if (!stored)
       return std::unexpected(std::move(stored.error()));
     image = std::move(*stored);
   }
   if (!image) {
-    auto device = file->get().source->open(file->get().sourceName);
+    auto device = file->get().source->open(file->get().source_name);
     if (!device)
       return std::unexpected(std::move(device.error()));
     auto decoded = Image::read_png(m_logger, std::move(*device));
@@ -1890,83 +2002,83 @@ std::expected<std::shared_ptr<Image const>, StarException> Assets::readImage(Str
       return std::unexpected(std::move(decoded.error()));
     image = std::make_shared<Image>(std::move(*decoded));
   }
-  if (!file->get().patchSources.empty())
-    return applyImagePatches(std::move(image), path, file->get().patchSources);
+  if (!file->get().patch_sources.empty())
+    return apply_image_patches(std::move(image), path, file->get().patch_sources);
   return image;
 }
 
-std::expected<std::shared_ptr<Image const>, StarException> Assets::applyImagePatches(std::shared_ptr<Image const> image, String const& path, List<std::pair<String, std::shared_ptr<AssetSource>>> patches) const {
-  std::unique_lock luaLocker(m_luaMutex, std::defer_lock);
-  lock_with_diagnostics(luaLocker);
-  auto imageUserData = m_lua_engine->create_userdata(*image);
-  if (!imageUserData)
-    return std::unexpected(std::move(imageUserData.error()));
-  LuaValue result = std::move(*imageUserData);
-  luaLocker.unlock();
+std::expected<std::shared_ptr<Image const>, StarException> Assets::apply_image_patches(std::shared_ptr<Image const> image, String const& path, List<std::pair<String, std::shared_ptr<AssetSource>>> patches) const {
+  std::unique_lock lua_locker(m_lua_mutex, std::defer_lock);
+  lock_with_diagnostics(lua_locker);
+  auto image_user_data = m_lua_engine->create_userdata(*image);
+  if (!image_user_data)
+    return std::unexpected(std::move(image_user_data.error()));
+  LuaValue result = std::move(*image_user_data);
+  lua_locker.unlock();
   for (auto const& pair : patches) {
-    auto& patchPath = pair.first;
-    auto& patchSource = pair.second;
-    auto patchStream = readPatch(*patchSource, patchPath, m_logger);
-    if (!patchStream)
-      return std::unexpected(std::move(patchStream.error()));
-    if (!*patchStream)
+    auto& patch_path = pair.first;
+    auto& patch_source = pair.second;
+    auto patch_stream = read_patch(*patch_source, patch_path, m_logger);
+    if (!patch_stream)
+      return std::unexpected(std::move(patch_stream.error()));
+    if (!*patch_stream)
       continue;
-    auto isLua = patchPath.ends_with(".lua");
-    if (!isLua)
-      return std::unexpected(std::move(isLua.error()));
-    if (*isLua) {
-      PatchContextKey contextKey{.source = std::ref(*patchSource), .path = patchPath};
-      lock_with_diagnostics(luaLocker);
-      std::shared_ptr<LuaContext>& context = m_patchContexts[contextKey];
+    auto is_lua = patch_path.ends_with(".lua");
+    if (!is_lua)
+      return std::unexpected(std::move(is_lua.error()));
+    if (*is_lua) {
+      PatchContextKey context_key{.source = std::ref(*patch_source), .path = patch_path};
+      lock_with_diagnostics(lua_locker);
+      std::shared_ptr<LuaContext>& context = m_patch_contexts[context_key];
       if (!context) {
-        auto createdContext = m_lua_engine->create_context();
-        if (!createdContext)
-          return std::unexpected(std::move(createdContext.error()));
-        auto newContext = std::make_shared<LuaContext>(std::move(*createdContext));
-        auto loaded = newContext->load((**patchStream).span(), patchPath);
+        auto created_context = m_lua_engine->create_context();
+        if (!created_context)
+          return std::unexpected(std::move(created_context.error()));
+        auto new_context = std::make_shared<LuaContext>(std::move(*created_context));
+        auto loaded = new_context->load((**patch_stream).span(), patch_path);
         if (!loaded)
-          return std::unexpected(luaPatchFailure(std::move(loaded.error()), path, patchPath, *patchSource,
-                                                 m_assetSourcePaths.find_left_ref(patchSource)));
-        context = std::move(newContext);
+          return std::unexpected(lua_patch_failure(std::move(loaded.error()), path, patch_path, *patch_source,
+                                                 m_asset_source_paths.find_left_ref(patch_source)));
+        context = std::move(new_context);
       }
-      auto newResult = context->invoke_path<LuaValue>("patch", result, path);
-      if (!newResult)
-        return std::unexpected(luaPatchFailure(std::move(newResult.error()), path, patchPath, *patchSource,
-                                               m_assetSourcePaths.find_left_ref(patchSource)));
-      if (!std::holds_alternative<LuaNilType>(*newResult)) {
-        if (std::holds_alternative<LuaUserData>(*newResult)) {
-          auto isImage = std::get<LuaUserData>(*newResult).is<Image>();
-          if (!isImage)
-            return std::unexpected(std::move(isImage.error()));
-          if (*isImage) {
-            result = std::move(*newResult);
+      auto new_result = context->invoke_path<LuaValue>("patch", result, path);
+      if (!new_result)
+        return std::unexpected(lua_patch_failure(std::move(new_result.error()), path, patch_path, *patch_source,
+                                               m_asset_source_paths.find_left_ref(patch_source)));
+      if (!std::holds_alternative<LuaNilType>(*new_result)) {
+        if (std::holds_alternative<LuaUserData>(*new_result)) {
+          auto is_image = std::get<LuaUserData>(*new_result).is<Image>();
+          if (!is_image)
+            return std::unexpected(std::move(is_image.error()));
+          if (*is_image) {
+            result = std::move(*new_result);
           } else {
-            auto logged = m_logger.warn("Patch '{}' for image '{}' returned a non-Image userdata value, ignoring", patchPath, path);
+            auto logged = m_logger.warn("Patch '{}' for image '{}' returned a non-Image userdata value, ignoring", patch_path, path);
             if (!logged)
               return std::unexpected(std::move(logged.error()));
           }
         } else {
-          auto logged = m_logger.warn("Patch '{}' for image '{}' returned a non-Image value, ignoring", patchPath, path);
+          auto logged = m_logger.warn("Patch '{}' for image '{}' returned a non-Image value, ignoring", patch_path, path);
           if (!logged)
             return std::unexpected(std::move(logged.error()));
         }
       }
-      luaLocker.unlock();
+      lua_locker.unlock();
     } else {
-      auto logged = m_logger.warn("Patch '{}' for image '{}' isn't a Lua script, ignoring", patchPath, path);
+      auto logged = m_logger.warn("Patch '{}' for image '{}' isn't a Lua script, ignoring", patch_path, path);
       if (!logged)
         return std::unexpected(std::move(logged.error()));
     }
   }
-  auto resultImage = std::get<LuaUserData>(result).get<Image>();
-  if (!resultImage)
-    return std::unexpected(std::move(resultImage.error()));
-  return std::make_shared<Image>(std::move(resultImage->get()));
+  auto result_image = std::get<LuaUserData>(result).get<Image>();
+  if (!result_image)
+    return std::unexpected(std::move(result_image.error()));
+  return std::make_shared<Image>(std::move(result_image->get()));
 }
 
-std::expected<void, StarException> Assets::reportPatchRejection(String const& path,
+std::expected<void, StarException> Assets::report_patch_rejection(String const& path,
     std::shared_ptr<AssetSource> const& source, StarException const& error) const {
-  auto provider = sourceDiagnostic(*source, m_assetSourcePaths.find_left_ref(source));
+  auto provider = source_diagnostic(*source, m_asset_source_paths.find_left_ref(source));
   if (error.is<JsonPatchTestFail>())
     return m_logger.log_exception(LogLevel::Debug,
                                   Star::format("Patch test failure from file {} in {}", path, provider),
@@ -1975,66 +2087,66 @@ std::expected<void, StarException> Assets::reportPatchRejection(String const& pa
                                   ExceptionDiagnostic(error));
 }
 
-std::expected<Json, StarException> Assets::checkPatchArray(String const& path,
+std::expected<Json, StarException> Assets::check_patch_array(String const& path,
                                                            std::shared_ptr<AssetSource> const& source,
-                                                           Json const result, JsonArray const& patchData,
+                                                           Json const result, JsonArray const& patch_data,
                                                            std::optional<Json> const external) const {
-  auto externalRef = external.value_or(Json{});
-  auto newResult = result;
-  for (auto const& patch : patchData) {
+  auto external_ref = external.value_or(Json{});
+  auto new_result = result;
+  for (auto const& patch : patch_data) {
     switch (patch.type()) {
       case Json::Type::Array: { // Nested groups commit only if the whole group succeeds.
-        auto patchData = patch.array_ptr();
-        if (!patchData)
-          return std::unexpected(std::move(patchData.error()));
-        auto patched = checkPatchArray(path, source, newResult, **patchData, externalRef);
+        auto patch_data = patch.array_ptr();
+        if (!patch_data)
+          return std::unexpected(std::move(patch_data.error()));
+        auto patched = check_patch_array(path, source, new_result, **patch_data, external_ref);
         if (patched) {
-          newResult = std::move(*patched);
+          new_result = std::move(*patched);
         } else {
           auto const& error = patched.error();
           if (!error.is<JsonPatchTestFail>() && !error.is<JsonPatchException>())
             return std::unexpected(std::move(patched.error()));
-          auto logged = reportPatchRejection(path, source, error);
+          auto logged = report_patch_rejection(path, source, error);
           if (!logged)
             return std::unexpected(std::move(logged.error()));
         }
         break;
       }
       case Json::Type::Object: {
-        auto patched = JsonPatching::apply_operation(newResult, patch);
+        auto patched = JsonPatching::apply_operation(new_result, patch);
         if (!patched)
           return std::unexpected(std::move(patched.error()));
-        newResult = std::move(*patched);
+        new_result = std::move(*patched);
         break;
       }
       case Json::Type::String: {
-        auto referencePath = patch.to_string();
-        if (!referencePath)
-          return std::unexpected(std::move(referencePath.error()));
-        auto reference = json(*referencePath);
+        auto reference_path = patch.to_string();
+        if (!reference_path)
+          return std::unexpected(std::move(reference_path.error()));
+        auto reference = json(*reference_path);
         if (!reference)
-          return std::unexpected(JsonPatchTestFail(Star::format("Unable to load reference asset: {}", *referencePath), reference.error()));
-        externalRef = std::move(*reference);
+          return std::unexpected(JsonPatchTestFail(Star::format("Unable to load reference asset: {}", *reference_path), reference.error()));
+        external_ref = std::move(*reference);
         break;
       }
       default:
         return std::unexpected(JsonPatchException(Star::format("Patch data is wrong type: {}", Json::type_name(patch.type()))));
     }
   }
-  return newResult;
+  return new_result;
 }
 
-std::expected<Json, StarException> Assets::readJson(String const& path) const {
+std::expected<Json, StarException> Assets::read_json(String const& path) const {
   if (AssetPath::is_embedded(path)) {
-    auto data = read_embedded(path, m_settings.allowRemoteAssets);
+    auto data = read_embedded(path, m_settings.allow_remote_assets);
     if (!data)
       return std::unexpected(std::move(data.error()));
     return embedded_data_to_json(*data);
   }
-  auto streamData = read(path);
-  if (!streamData)
-    return std::unexpected(std::move(streamData.error()));
-  auto parsed = input_utf8_json(streamData->begin(), streamData->end(), JsonParseType::Top);
+  auto stream_data = read(path);
+  if (!stream_data)
+    return std::unexpected(std::move(stream_data.error()));
+  auto parsed = input_utf8_json(stream_data->begin(), stream_data->end(), JsonParseType::Top);
   if (!parsed)
     return std::unexpected(JsonParsingException(Star::format("Cannot parse json file: {}", path), parsed.error()));
   auto key = CaseInsensitiveStringView::create(path);
@@ -2043,85 +2155,85 @@ std::expected<Json, StarException> Assets::readJson(String const& path) const {
   auto file = m_files.get(*key);
   if (!file)
     return std::unexpected(JsonParsingException(Star::format("Cannot parse json file: {}", path), file.error()));
-  auto patched = applyJsonPatches(*parsed, path, file->get().patchSources);
+  auto patched = apply_json_patches(*parsed, path, file->get().patch_sources);
   if (!patched)
     return std::unexpected(JsonParsingException(Star::format("Cannot parse json file: {}", path), patched.error()));
   return std::move(*patched);
 }
 
-std::expected<Json, StarException> Assets::applyJsonPatches(Json const& input, String const& path, List<std::pair<String, std::shared_ptr<AssetSource>>> patches) const {
+std::expected<Json, StarException> Assets::apply_json_patches(Json const& input, String const& path, List<std::pair<String, std::shared_ptr<AssetSource>>> patches) const {
   Json result = input;
   for (auto const& pair : patches) {
-    auto patchAssetPath = AssetPath::split(pair.first);
-    auto& patchBasePath = patchAssetPath.m_base_path;
-    auto& patchSource = pair.second;
-    auto patchStream = readPatch(*patchSource, patchBasePath, m_logger);
-    if (!patchStream)
-      return std::unexpected(std::move(patchStream.error()));
-    if (!*patchStream)
+    auto patch_asset_path = AssetPath::split(pair.first);
+    auto& patch_base_path = patch_asset_path.m_base_path;
+    auto& patch_source = pair.second;
+    auto patch_stream = read_patch(*patch_source, patch_base_path, m_logger);
+    if (!patch_stream)
+      return std::unexpected(std::move(patch_stream.error()));
+    if (!*patch_stream)
       continue;
-    auto isLua = patchBasePath.ends_with(".lua");
-    if (!isLua)
-      return std::unexpected(std::move(isLua.error()));
-    if (*isLua) {
-      PatchContextKey contextKey{.source = std::ref(*patchSource), .path = patchBasePath};
-      std::unique_lock luaLocker(m_luaMutex, std::defer_lock);
-      lock_with_diagnostics(luaLocker);
-      std::shared_ptr<LuaContext>& context = m_patchContexts[contextKey];
+    auto is_lua = patch_base_path.ends_with(".lua");
+    if (!is_lua)
+      return std::unexpected(std::move(is_lua.error()));
+    if (*is_lua) {
+      PatchContextKey context_key{.source = std::ref(*patch_source), .path = patch_base_path};
+      std::unique_lock lua_locker(m_lua_mutex, std::defer_lock);
+      lock_with_diagnostics(lua_locker);
+      std::shared_ptr<LuaContext>& context = m_patch_contexts[context_key];
       if (!context) {
-        auto createdContext = m_lua_engine->create_context();
-        if (!createdContext)
-          return std::unexpected(std::move(createdContext.error()));
-        auto newContext = std::make_shared<LuaContext>(std::move(*createdContext));
-        auto loaded = newContext->load((**patchStream).span(), patchBasePath);
+        auto created_context = m_lua_engine->create_context();
+        if (!created_context)
+          return std::unexpected(std::move(created_context.error()));
+        auto new_context = std::make_shared<LuaContext>(std::move(*created_context));
+        auto loaded = new_context->load((**patch_stream).span(), patch_base_path);
         if (!loaded)
-          return std::unexpected(luaPatchFailure(std::move(loaded.error()), path, pair.first, *patchSource,
-                                                 m_assetSourcePaths.find_left_ref(patchSource)));
-        context = std::move(newContext);
+          return std::unexpected(lua_patch_failure(std::move(loaded.error()), path, pair.first, *patch_source,
+                                                 m_asset_source_paths.find_left_ref(patch_source)));
+        context = std::move(new_context);
       }
-      auto newResult = context->invoke_path<Json>("patch", result, path);
-      if (!newResult)
-        return std::unexpected(luaPatchFailure(std::move(newResult.error()), path, pair.first, *patchSource,
-                                               m_assetSourcePaths.find_left_ref(patchSource)));
-      if (*newResult)
-        result = std::move(*newResult);
+      auto new_result = context->invoke_path<Json>("patch", result, path);
+      if (!new_result)
+        return std::unexpected(lua_patch_failure(std::move(new_result.error()), path, pair.first, *patch_source,
+                                               m_asset_source_paths.find_left_ref(patch_source)));
+      if (*new_result)
+        result = std::move(*new_result);
     } else {
-      auto applyPatch = [&]() -> std::expected<void, StarException> {
-        auto& bytes = **patchStream;
-        auto patchJson = input_utf8_json(bytes.begin(), bytes.end(), JsonParseType::Top);
-        if (!patchJson)
-          return std::unexpected(std::move(patchJson.error()));
-        if (patchAssetPath.m_sub_path) {
-          auto selected = patchJson->query(*patchAssetPath.m_sub_path);
+      auto apply_patch = [&]() -> std::expected<void, StarException> {
+        auto& bytes = **patch_stream;
+        auto patch_json = input_utf8_json(bytes.begin(), bytes.end(), JsonParseType::Top);
+        if (!patch_json)
+          return std::unexpected(std::move(patch_json.error()));
+        if (patch_asset_path.m_sub_path) {
+          auto selected = patch_json->query(*patch_asset_path.m_sub_path);
           if (!selected)
             return std::unexpected(std::move(selected.error()));
-          *patchJson = std::move(*selected);
+          *patch_json = std::move(*selected);
         }
-        if (patchJson->is_type(Json::Type::Array)) {
-          auto patchData = patchJson->array_ptr();
-          if (!patchData)
-            return std::unexpected(std::move(patchData.error()));
-          auto patched = checkPatchArray(pair.first, patchSource, result, **patchData, {});
+        if (patch_json->is_type(Json::Type::Array)) {
+          auto patch_data = patch_json->array_ptr();
+          if (!patch_data)
+            return std::unexpected(std::move(patch_data.error()));
+          auto patched = check_patch_array(pair.first, patch_source, result, **patch_data, {});
           if (patched) {
             result = std::move(*patched);
           } else {
             auto const& error = patched.error();
             if (!error.is<JsonPatchTestFail>() && !error.is<JsonPatchException>())
               return std::unexpected(std::move(patched.error()));
-            auto logged = reportPatchRejection(pair.first, patchSource, error);
+            auto logged = report_patch_rejection(pair.first, patch_source, error);
             if (!logged)
               return std::unexpected(std::move(logged.error()));
           }
-        } else if (patchJson->is_type(Json::Type::Object)) {
-          result = json_merge_nulling(result, *patchJson);
+        } else if (patch_json->is_type(Json::Type::Object)) {
+          result = json_merge_nulling(result, *patch_json);
         }
         return {};
       };
-      auto applied = applyPatch();
+      auto applied = apply_patch();
       if (!applied) {
         return std::unexpected(
-          JsonParsingException(Star::format("Cannot parse json patch file '{}' from {}", patchBasePath,
-                                    sourceDiagnostic(*patchSource, m_assetSourcePaths.find_left_ref(patchSource))),
+          JsonParsingException(Star::format("Cannot parse json patch file '{}' from {}", patch_base_path,
+                                    source_diagnostic(*patch_source, m_asset_source_paths.find_left_ref(patch_source))),
                                applied.error()));
       }
     }
@@ -2129,8 +2241,11 @@ std::expected<Json, StarException> Assets::applyJsonPatches(Json const& input, S
   return result;
 }
 
-std::expected<bool, StarException> Assets::doLoad(AssetId const& id) const {
-  auto loaded = loadAsset(id);
+std::expected<bool, StarException> Assets::do_load(AssetId const& id) const {
+  auto const epoch = m_load_epoch;
+  auto loaded = load_asset(id);
+  if (epoch != m_load_epoch)
+    return true; // Recheck the new epoch instead of waiting for or logging an obsolete task.
   if (loaded)
     return static_cast<bool>(*loaded);
   auto logged =
@@ -2140,132 +2255,136 @@ std::expected<bool, StarException> Assets::doLoad(AssetId const& id) const {
   return true;
 }
 
-std::expected<bool, StarException> Assets::doPost(AssetId const& id) const {
-  auto asset = m_assetsCache.value(id);
-  std::optional<StarException> logError;
-  if (id.type == AssetType::Audio && asset) {
-    auto processed = postProcessAudio(asset);
-    if (processed) {
-      asset = std::move(*processed);
-    } else {
-      processed.error() = resourceFailure(std::move(processed.error()), id.path.m_base_path);
-      if (auto logged = m_logger.error_exception(Star::format("Error post-processing asset: {}", id.path),
-                                                 ExceptionDiagnostic(processed.error()));
-          !logged)
-        logError = std::move(logged.error());
-    }
+std::expected<bool, StarException> Assets::publish_post(AssetId const& id, PostTask task,
+    std::expected<std::shared_ptr<AssetData>, StarException> processed) const {
+  if (task.epoch != m_load_epoch)
+    return true;
+
+  // Optional decompression failure retains the readable compressed original.
+  std::expected<void, StarException> logged;
+  if (!processed) {
+    auto error = resource_failure(std::move(processed.error()), id.path.m_base_path);
+    logged = m_logger.error_exception(Star::format("Error post-processing asset: {}", id.path), ExceptionDiagnostic(error));
+  } else {
+    (*processed)->force_persist = task.original->force_persist;
+    task.original = std::move(*processed);
   }
-  // Optional decompression failure retains the original compressed audio.
+  task.original->needs_post_processing = false;
+  freshen(task.original);
+  m_assets_cache[id] = std::move(task.original);
   m_queue.remove(id);
-  if (asset) {
-    asset->needsPostProcessing = false;
-    m_assetsCache[id] = asset;
-    freshen(asset);
-    m_assetsDone.notify_all();
-  }
-  if (m_queue.empty() && m_luaGcPending)
-    m_assetsQueued.notify_one();
-  if (logError)
-    return std::unexpected(std::move(*logError));
+  m_assets_done.notify_all();
+  if (m_queue.empty() && m_lua_gc_pending)
+    m_assets_queued.notify_one();
+  if (!logged)
+    return std::unexpected(std::move(logged.error()));
   return true;
 }
 
-void Assets::publishAssetFailure(AssetId const& id, StarException const& error) const {
+void Assets::publish_asset_failure(AssetId const& id, StarException const& error) const {
   m_queue.remove(id);
-  m_assetsCache[id] = {};
-  m_assetErrors.set(id, error);
-  m_assetsDone.notify_all();
-  if (m_queue.empty() && m_luaGcPending)
-    m_assetsQueued.notify_one();
+  m_assets_cache[id] = {};
+  m_asset_errors.set(id, error);
+  m_assets_done.notify_all();
+  if (m_queue.empty() && m_lua_gc_pending)
+    m_assets_queued.notify_one();
 }
 
-std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadAsset(AssetId const& id) const {
-  if (auto error = m_assetErrors.find_ref(id))
+std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::load_asset(AssetId const& id) const {
+  if (current_load_epoch() != m_load_epoch)
+    return superseded_load();
+  if (auto error = m_asset_errors.find_ref(id))
     return std::unexpected(error->get());
-  if (auto asset = m_assetsCache.value(id))
+  if (auto asset = m_assets_cache.value(id))
     return asset;
   if (m_queue.value(id, QueuePriority::None) == QueuePriority::Working)
     return std::shared_ptr<AssetData>{};
-  m_luaGcPending = true;
+  LoadEpochScope task(*this, m_load_epoch);
+  m_lua_gc_pending = true;
   m_queue[id] = QueuePriority::Working;
   auto loaded = [&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
     switch (id.type) {
-      case AssetType::Json: return loadJson(id.path);
-      case AssetType::Image: return loadImage(id.path);
-      case AssetType::Audio: return loadAudio(id.path);
-      case AssetType::Font: return loadFont(id.path);
-      case AssetType::Bytes: return loadBytes(id.path);
+      case AssetType::Json: return load_json(id.path);
+      case AssetType::Image: return load_image(id.path);
+      case AssetType::Audio: return load_audio(id.path);
+      case AssetType::Font: return load_font(id.path);
+      case AssetType::Bytes: return load_bytes(id.path);
     }
     return std::unexpected(AssetException("Unrecognized asset type"));
   }();
+  if (task.epoch != m_load_epoch)
+    return superseded_load();
   if (!loaded) {
-    loaded.error() = resourceFailure(std::move(loaded.error()), id.path.m_base_path);
-    if (id.type == AssetType::Image && m_settings.missingImage) {
+    loaded.error() = resource_failure(std::move(loaded.error()), id.path.m_base_path);
+    if (id.type == AssetType::Image && m_settings.missing_image) {
       auto logged =
         m_logger.error_exception(Star::format("Could not load image asset '{}', using placeholder default.", id.path),
                                  ExceptionDiagnostic(loaded.error()));
       if (logged) {
-        loaded = loadImage({*m_settings.missingImage, {}, {}});
+        loaded = load_image({*m_settings.missing_image, {}, {}});
         if (!loaded)
-          loaded.error() = resourceFailure(std::move(loaded.error()), *m_settings.missingImage);
+          loaded.error() = resource_failure(std::move(loaded.error()), *m_settings.missing_image);
       } else {
         loaded = std::unexpected(std::move(logged.error()));
       }
-    } else if (id.type == AssetType::Audio && m_settings.missingAudio) {
+    } else if (id.type == AssetType::Audio && m_settings.missing_audio) {
       auto logged =
         m_logger.error_exception(Star::format("Could not load audio asset '{}', using placeholder default.", id.path),
                                  ExceptionDiagnostic(loaded.error()));
       if (logged) {
-        loaded = loadAudio({*m_settings.missingAudio, {}, {}});
+        loaded = load_audio({*m_settings.missing_audio, {}, {}});
         if (!loaded)
-          loaded.error() = resourceFailure(std::move(loaded.error()), *m_settings.missingAudio);
+          loaded.error() = resource_failure(std::move(loaded.error()), *m_settings.missing_audio);
       } else {
         loaded = std::unexpected(std::move(logged.error()));
       }
     }
+    if (task.epoch != m_load_epoch) // The placeholder load may also have unlocked.
+      return superseded_load();
   }
   if (!loaded) {
-    publishAssetFailure(id, loaded.error());
+    publish_asset_failure(id, loaded.error());
     return std::unexpected(std::move(loaded.error()));
   }
   auto asset = std::move(*loaded);
   if (asset) {
-    if (asset->needsPostProcessing)
+    if (asset->needs_post_processing) {
       m_queue[id] = QueuePriority::PostProcess;
-    else
+      m_assets_queued.notify_one();
+    } else
       m_queue.remove(id);
-    m_assetsCache[id] = asset;
-    m_assetsDone.notify_all();
+    m_assets_cache[id] = asset;
+    m_assets_done.notify_all();
     freshen(asset);
-    if (m_queue.empty() && m_luaGcPending)
-      m_assetsQueued.notify_one();
+    if (m_queue.empty() && m_lua_gc_pending)
+      m_assets_queued.notify_one();
   } else {
     m_queue[id] = QueuePriority::Load;
-    m_assetsQueued.notify_one();
+    m_assets_queued.notify_one();
     if (auto moved = m_queue.move_to_back(id); !moved) {
-      publishAssetFailure(id, moved.error());
+      publish_asset_failure(id, moved.error());
       return std::unexpected(std::move(moved.error()));
     }
   }
   return asset;
 }
 
-std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadJson(AssetPath const& path) const {
+std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::load_json(AssetPath const& path) const {
   if (path.m_sub_path) {
-    auto top = loadAsset({.type = AssetType::Json, .path = {path.m_base_path, {}, {}}});
+    auto top = load_asset({.type = AssetType::Json, .path = {path.m_base_path, {}, {}}});
     if (!top)
       return std::unexpected(std::move(top.error()));
     if (!*top)
       return std::shared_ptr<AssetData>{};
-    auto value = as_ref<JsonData>(**top)->get().json.query(*path.m_sub_path);
+    auto value = cached_data_ref<JsonData>(**top)->get().json.query(*path.m_sub_path);
     if (!value)
       return std::unexpected(AssetException(Star::format("Could not read JSON value {}", path), value.error()));
     auto data = std::make_shared<JsonData>();
     data->json = std::move(*value);
     return data;
   }
-  return unlockDuring([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
-    auto value = readJson(path.m_base_path);
+  return unlock_during([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
+    auto value = read_json(path.m_base_path);
     if (!value)
       return std::unexpected(AssetException(Star::format("Could not read JSON asset {}", path), value.error()));
     auto data = std::make_shared<JsonData>();
@@ -2274,37 +2393,37 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadJso
   });
 }
 
-std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadImage(AssetPath const& path) const {
-  if (auto valid = validatePath(path, true, true); !valid)
+std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::load_image(AssetPath const& path) const {
+  if (auto valid = validate_path(path, true, true); !valid)
     return std::unexpected(std::move(valid.error()));
   if (!path.m_directives.empty()) {
-    auto loaded = loadAsset({.type = AssetType::Image, .path = {path.m_base_path, path.m_sub_path, {}}});
+    auto loaded = load_asset({.type = AssetType::Image, .path = {path.m_base_path, path.m_sub_path, {}}});
     if (!loaded)
       return std::unexpected(std::move(loaded.error()));
     if (!*loaded)
       return std::shared_ptr<AssetData>{};
     // Keep loaded owning the wrapper throughout the unlocked image operation.
-    auto& source = as_ref<ImageData>(**loaded)->get();
+    auto& source = cached_data_ref<ImageData>(**loaded)->get();
     StringMap<std::shared_ptr<Image const>> references;
-    StringList referencePaths;
+    StringList reference_paths;
     for (auto const& directives : path.m_directives.list())
       for (auto const& operation : directives.operations())
-        add_image_operation_references(operation, referencePaths);
-    for (auto const& ref : referencePaths) {
+        add_image_operation_references(operation, reference_paths);
+    for (auto const& ref : reference_paths) {
       auto components = AssetPath::split(ref);
-      if (auto valid = validatePath(components, true, false); !valid)
+      if (auto valid = validate_path(components, true, false); !valid)
         return std::unexpected(std::move(valid.error()));
-      auto reference = loadAsset({.type = AssetType::Image, .path = std::move(components)});
+      auto reference = load_asset({.type = AssetType::Image, .path = std::move(components)});
       if (!reference)
         return std::unexpected(std::move(reference.error()));
       if (!*reference)
         return std::shared_ptr<AssetData>{};
-      auto& image = as_ref<ImageData>(**reference)->get();
-      image.isReference = true;
+      auto& image = cached_data_ref<ImageData>(**reference)->get();
+      image.is_reference = true;
       freshen(*reference);
       references[ref] = image.image;
     }
-    return unlockDuring([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
+    return unlock_during([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
       auto image = path.m_directives.apply_new_image(
         *source.image,
         [&](String const& ref) -> std::expected<std::optional<std::reference_wrapper<Image const>>, StarException> {
@@ -2320,31 +2439,31 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadIma
     });
   }
   if (path.m_sub_path) {
-    auto loaded = loadAsset({.type = AssetType::Image, .path = {path.m_base_path, {}, {}}});
+    auto loaded = load_asset({.type = AssetType::Image, .path = {path.m_base_path, {}, {}}});
     if (!loaded)
       return std::unexpected(std::move(loaded.error()));
     if (!*loaded)
       return std::shared_ptr<AssetData>{};
-    auto& source = as_ref<ImageData>(**loaded)->get();
+    auto& source = cached_data_ref<ImageData>(**loaded)->get();
     if (!source.frames)
       return std::unexpected(AssetException::format(
         "No associated frames file found for image '{}' while resolving image frame '{}'", path.m_base_path, path));
     if (auto alias = source.frames->aliases.find_ref(*path.m_sub_path)) {
-      auto target = loadAsset({.type = AssetType::Image, .path = {path.m_base_path, alias->get(), path.m_directives}});
+      auto target = load_asset({.type = AssetType::Image, .path = {path.m_base_path, alias->get(), path.m_directives}});
       if (!target)
         return std::unexpected(std::move(target.error()));
       if (!*target)
         return std::shared_ptr<AssetData>{};
       auto data = std::make_shared<ImageData>();
-      data->image = as_ref<ImageData>(**target)->get().image;
+      data->image = cached_data_ref<ImageData>(**target)->get().image;
       data->alias = true;
       return data;
     }
     auto frame = source.frames->frames.find_ref(*path.m_sub_path);
     if (!frame)
       return std::unexpected(AssetException(
-        Star::format("No such frame {} in frames spec {}", *path.m_sub_path, source.frames->framesFile)));
-    return unlockDuring([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
+        Star::format("No such frame {} in frames spec {}", *path.m_sub_path, source.frames->frames_file)));
+    return unlock_during([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
       auto image = source.image->sub_image(Vec2U(frame->get().x_min(), source.image->height() - frame->get().y_max()),
                                            frame->get().size());
       if (!image)
@@ -2355,8 +2474,8 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadIma
     });
   }
   if (AssetPath::is_embedded(path.m_base_path)) {
-    return unlockDuring([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
-      auto embedded = read_embedded(path.m_base_path, m_settings.allowRemoteAssets);
+    return unlock_during([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
+      auto embedded = read_embedded(path.m_base_path, m_settings.allow_remote_assets);
       if (!embedded)
         return std::unexpected(std::move(embedded.error()));
       if (embedded->type != EmbeddedAssetType::Binary && embedded->type != EmbeddedAssetType::Image)
@@ -2386,7 +2505,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadIma
         frame_config = std::move(*frames);
       } else if (std::holds_alternative<EmbeddedFramesPath>(embedded->frame_source)) {
         frame_name = "<embedded frames>";
-        auto frames = read_embedded(std::get<EmbeddedFramesPath>(embedded->frame_source).path, m_settings.allowRemoteAssets);
+        auto frames = read_embedded(std::get<EmbeddedFramesPath>(embedded->frame_source).path, m_settings.allow_remote_assets);
         if (!frames)
           return std::unexpected(std::move(frames.error()));
         auto config = embedded_data_to_json(*frames);
@@ -2395,7 +2514,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadIma
         frame_config = std::move(*config);
       }
       if (frame_config) {
-        auto frames = parseFramesSpecification(*frame_config, std::move(frame_name));
+        auto frames = parse_frames_specification(*frame_config, std::move(frame_name));
         if (!frames)
           return std::unexpected(std::move(frames.error()));
         data->frames = std::make_shared<FramesSpecification>(std::move(*frames));
@@ -2403,10 +2522,10 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadIma
       return data;
     });
   }
-  auto image = unlockDuring([&]() { return readImage(path.m_base_path); });
+  auto image = unlock_during([&]() { return read_image(path.m_base_path); });
   if (!image)
     return std::unexpected(std::move(image.error()));
-  auto frames = bestFramesSpecification(path.m_base_path);
+  auto frames = best_frames_specification(path.m_base_path);
   if (!frames)
     return std::unexpected(std::move(frames.error()));
   auto data = std::make_shared<ImageData>();
@@ -2415,12 +2534,12 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadIma
   return data;
 }
 
-std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadAudio(AssetPath const& path) const {
-  return unlockDuring([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
+std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::load_audio(AssetPath const& path) const {
+  return unlock_during([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
     auto device = [&]() -> std::expected<std::shared_ptr<IODevice>, StarException> {
       if (!AssetPath::is_embedded(path.m_base_path))
         return open(path.m_base_path);
-      auto embedded = read_embedded(path.m_base_path, m_settings.allowRemoteAssets);
+      auto embedded = read_embedded(path.m_base_path, m_settings.allow_remote_assets);
       if (!embedded)
         return std::unexpected(std::move(embedded.error()));
       if (embedded->type != EmbeddedAssetType::Binary)
@@ -2434,17 +2553,17 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadAud
       return std::unexpected(std::move(audio.error()));
     auto data = std::make_shared<AudioData>();
     data->audio = std::make_shared<Audio>(std::move(*audio));
-    data->needsPostProcessing = data->audio->compressed();
+    data->needs_post_processing = data->audio->compressed();
     return data;
   });
 }
 
-std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadFont(AssetPath const& path) const {
-  return unlockDuring([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
+std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::load_font(AssetPath const& path) const {
+  return unlock_during([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
     auto bytes = [&]() -> std::expected<ByteArray, StarException> {
       if (!AssetPath::is_embedded(path.m_base_path))
         return read(path.m_base_path);
-      auto embedded = read_embedded(path.m_base_path, m_settings.allowRemoteAssets);
+      auto embedded = read_embedded(path.m_base_path, m_settings.allow_remote_assets);
       if (!embedded)
         return std::unexpected(std::move(embedded.error()));
       if (embedded->type != EmbeddedAssetType::Binary)
@@ -2453,7 +2572,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadFon
     }();
     if (!bytes)
       return std::unexpected(std::move(bytes.error()));
-    auto font = Font::load(*m_fontLibrary, std::make_shared<ByteArray>(std::move(*bytes)));
+    auto font = Font::load(*m_font_library, std::make_shared<ByteArray>(std::move(*bytes)));
     if (!font)
       return std::unexpected(std::move(font.error()));
     auto data = std::make_shared<FontData>();
@@ -2462,8 +2581,8 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadFon
   });
 }
 
-std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadBytes(AssetPath const& path) const {
-  return unlockDuring([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
+std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::load_bytes(AssetPath const& path) const {
+  return unlock_during([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
     auto bytes = read(path.m_base_path);
     if (!bytes)
       return std::unexpected(std::move(bytes.error()));
@@ -2473,25 +2592,24 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::loadByt
   });
 }
 
-std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::postProcessAudio(std::shared_ptr<AssetData> const& original) const {
-  return unlockDuring([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
-    auto audioData = as_ref<AudioData>(*original);
-    if (!audioData)
-      return std::shared_ptr<AssetData>{};
-    auto duration = audioData->get().audio->total_time();
-    if (!duration)
-      return std::unexpected(std::move(duration.error()));
-    if (*duration >= m_settings.audioDecompressLimit)
-      return original;
-    auto audio = audioData->get().audio->clone();
-    if (!audio)
-      return std::unexpected(std::move(audio.error()));
-    if (auto decompressed = audio->uncompress(); !decompressed)
-      return std::unexpected(std::move(decompressed.error()));
-    auto data = std::make_shared<AudioData>();
-    data->audio = std::make_shared<Audio>(std::move(*audio));
-    return data;
-  });
+std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::post_process_audio(PostTask const& task) const {
+  LoadEpochScope scope(*this, task.epoch);
+  auto audio_data = cached_data_ref<AudioData>(*task.original);
+  if (!audio_data)
+    return std::unexpected(AssetException("Expected cached audio for post-processing"));
+  auto duration = audio_data->get().audio->total_time();
+  if (!duration)
+    return std::unexpected(std::move(duration.error()));
+  if (*duration >= m_settings.audio_decompress_limit)
+    return task.original;
+  auto audio = audio_data->get().audio->clone();
+  if (!audio)
+    return std::unexpected(std::move(audio.error()));
+  if (auto decompressed = audio->uncompress(); !decompressed)
+    return std::unexpected(std::move(decompressed.error()));
+  auto data = std::make_shared<AudioData>();
+  data->audio = std::make_shared<Audio>(std::move(*audio));
+  return data;
 }
 
 void Assets::freshen(std::shared_ptr<AssetData> const& asset) const {

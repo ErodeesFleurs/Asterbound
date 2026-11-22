@@ -167,7 +167,7 @@ Json SpawnProfile::toJson() const {
 std::expected<SpawnProfile, StarException> constructSpawnProfile(Assets const& assets, Json const& config, std::uint64_t seed) {
   SpawnProfile result;
   auto commonGroups = assets.json("/spawning.config:spawnGroups");
-  if (!commonGroups) return std::unexpected(assets.withAssetContext(std::move(commonGroups.error()), "/spawning.config:spawnGroups", "Loading common spawn groups"));
+  if (!commonGroups) return std::unexpected(assets.with_asset_context(std::move(commonGroups.error()), "/spawning.config:spawnGroups", "Loading common spawn groups"));
   auto groups = config.get_array("groups", JsonArray());
   if (!groups) return std::unexpected(std::move(groups.error()));
   for (auto const& group : *groups) {
@@ -178,14 +178,14 @@ std::expected<SpawnProfile, StarException> constructSpawnProfile(Assets const& a
       auto name = poolConfig->to_string();
       if (!name) return std::unexpected(std::move(name.error()));
       auto common = commonGroups->get(*name);
-      if (!common) return std::unexpected(assets.withAssetContext(std::move(common.error()), "/spawning.config:spawnGroups", "Loading common spawn group"));
+      if (!common) return std::unexpected(assets.with_asset_context(std::move(common.error()), "/spawning.config:spawnGroups", "Loading common spawn group"));
       poolConfig = std::move(common);
       commonPool = true;
     }
     auto pool = json_to_weighted_pool<String>(*poolConfig);
     if (!pool) {
       if (commonPool)
-        return std::unexpected(assets.withAssetContext(std::move(pool.error()), "/spawning.config:spawnGroups", "Loading common spawn group"));
+        return std::unexpected(assets.with_asset_context(std::move(pool.error()), "/spawning.config:spawnGroups", "Loading common spawn group"));
       return std::unexpected(std::move(pool.error()));
     }
     auto count = group.get_uint("select");
@@ -200,9 +200,9 @@ std::expected<SpawnProfile, StarException> constructSpawnProfile(Assets const& a
 
 std::expected<std::shared_ptr<SpawnTypeDatabase>, StarException> SpawnTypeDatabase::create(std::shared_ptr<Assets const> const& assets) {
   auto result = std::shared_ptr<SpawnTypeDatabase>(new SpawnTypeDatabase());
-  auto files = assets->scanExtension("spawntypes");
+  auto files = assets->scan_extension("spawntypes");
   if (!files) return std::unexpected(std::move(files.error()));
-  auto queued = assets->queueJsons(files->get());
+  auto queued = assets->queue_jsons(files->get());
   if (!queued) return std::unexpected(std::move(queued.error()));
   std::uint64_t seedMix = 0;
   for (auto const& path : files->get()) {
@@ -231,7 +231,7 @@ std::expected<std::shared_ptr<SpawnTypeDatabase>, StarException> SpawnTypeDataba
     };
     auto loaded = read_file();
     if (!loaded)
-      return std::unexpected(SpawnTypeDatabaseException(Star::format("Error reading spawnType config file {}", file), assets->withAssetContext(std::move(loaded.error()), file, "Loading spawn types")));
+      return std::unexpected(SpawnTypeDatabaseException(Star::format("Error reading spawnType config file {}", file), assets->with_asset_context(std::move(loaded.error()), file, "Loading spawn types")));
   }
   return result;
 }

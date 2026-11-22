@@ -491,7 +491,7 @@ std::expected<void, StarException> TextPainter::reloadFonts() {
   if (!emoji_name)
     return std::unexpected(std::move(emoji_name.error()));
   for (auto extension : std::array<std::string_view, 2>{"ttf", "woff2"}) {
-    auto paths = assets.scanExtension(extension);
+    auto paths = assets.scan_extension(extension);
     if (!paths)
       return std::unexpected(std::move(paths.error()));
     for (auto const& key : paths->get()) {

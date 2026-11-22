@@ -92,10 +92,10 @@ std::expected<std::shared_ptr<VehicleDatabase>, StarException> VehicleDatabase::
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto files = (*assets)->scanExtension("vehicle");
+  auto files = (*assets)->scan_extension("vehicle");
   if (!files)
     return std::unexpected(std::move(files.error()));
-  if (auto queued = (*assets)->queueJsons(files->get()); !queued)
+  if (auto queued = (*assets)->queue_jsons(files->get()); !queued)
     return std::unexpected(std::move(queued.error()));
   for (auto const& scannedFile : files->get()) {
     String file = scannedFile.string();
@@ -114,7 +114,7 @@ std::expected<std::shared_ptr<VehicleDatabase>, StarException> VehicleDatabase::
       return {};
     }();
     if (!load)
-      return std::unexpected(VehicleDatabaseException(Star::format("Error loading vehicle '{}'", file), (*assets)->withAssetContext(std::move(load.error()), file, "Loading vehicle")));
+      return std::unexpected(VehicleDatabaseException(Star::format("Error loading vehicle '{}'", file), (*assets)->with_asset_context(std::move(load.error()), file, "Loading vehicle")));
   }
   return database;
 }

@@ -660,7 +660,7 @@ std::expected<void, StarException> Input::reload() {
   m_bindCategories.clear();
   auto assets = m_root.assets();
   if (!assets) return std::unexpected(std::move(assets.error()));
-  auto paths = (*assets)->scanExtension("binds");
+  auto paths = (*assets)->scan_extension("binds");
   if (!paths) return std::unexpected(std::move(paths.error()));
   for (auto const& bindPath : paths->get()) {
     auto json = (*assets)->json(bindPath.string());

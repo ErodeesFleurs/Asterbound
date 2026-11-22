@@ -555,7 +555,7 @@ std::expected<void, StarException> Root::fullyLoad() {
   {
     std::lock_guard locker(m_assetsMutex);
     if (m_assets)
-      m_assets->clearCache();
+      m_assets->clear_cache();
   }
   return {};
 }
@@ -568,7 +568,7 @@ std::expected<void, StarException> Root::hotReload() {
   auto loaded = assets();
   if (!loaded)
     return std::unexpected(std::move(loaded.error()));
-  (*loaded)->hotReload();
+  (*loaded)->hot_reload();
   return m_reload_listeners.trigger();
 }
 
@@ -600,7 +600,7 @@ std::expected<std::shared_ptr<Assets const>, StarException> Root::assets() {
       if (!assetSources)
         return std::unexpected(std::move(assetSources.error()));
       auto settings = m_settings.assetsSettings;
-      settings.allowRemoteAssets = settings.allowRemoteAssets && allowRemote;
+      settings.allow_remote_assets = settings.allow_remote_assets && allowRemote;
       auto loaded = Assets::create(m_logger, m_random, m_logMap, std::move(settings), std::move(*assetSources));
       if (!loaded)
         return std::unexpected(std::move(loaded.error()));
@@ -631,8 +631,8 @@ std::expected<String, StarException> Root::modStorageId(Assets const& assets, St
   // suffix cannot take another loaded source's real metadata name.
   std::vector<std::pair<String, String>> sources;
   std::unordered_set<std::string> naturalNames;
-  for (auto const& path : assets.assetSources()) {
-    auto metadata = assets.assetSourceMetadata(path);
+  for (auto const& path : assets.asset_sources()) {
+    auto metadata = assets.asset_source_metadata(path);
     if (!metadata)
       return std::unexpected(std::move(metadata.error()));
     String name = File::base_name(path);

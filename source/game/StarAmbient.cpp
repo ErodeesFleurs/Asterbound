@@ -159,7 +159,7 @@ std::expected<std::shared_ptr<AudioInstance>, StarException> AmbientManager::upd
       }
     }
     if (!m_currentTrackName.empty()) {
-      auto audio = (*assets)->tryAudio(m_currentTrackName);
+      auto audio = (*assets)->try_audio(m_currentTrackName);
       if (!audio)
         return std::unexpected(std::move(audio.error()));
       if (*audio) {
@@ -223,7 +223,7 @@ std::expected<std::shared_ptr<AudioInstance>, StarException> AmbientManager::upd
       return std::unexpected(std::move(track.error()));
     m_weatherTrackName = std::move(*track);
     if (!m_weatherTrackName.empty()) {
-      auto audio = (*assets)->tryAudio(m_weatherTrackName);
+      auto audio = (*assets)->try_audio(m_weatherTrackName);
       if (!audio)
         return std::unexpected(std::move(audio.error()));
       if (*audio) {

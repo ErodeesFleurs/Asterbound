@@ -34,10 +34,10 @@ extern std::expected<EnumMap<TechType>, StarException> const TechTypeNames = Enu
 
 std::expected<std::shared_ptr<TechDatabase>, StarException> TechDatabase::create(std::shared_ptr<Assets const> assets) {
   auto result = std::shared_ptr<TechDatabase>(new TechDatabase());
-  auto files = assets->scanExtension("tech");
+  auto files = assets->scan_extension("tech");
   if (!files)
     return std::unexpected(std::move(files.error()));
-  auto queued = assets->queueJsons(files->get());
+  auto queued = assets->queue_jsons(files->get());
   if (!queued)
     return std::unexpected(std::move(queued.error()));
   for (auto const& assetFile : files->get()) {
@@ -55,7 +55,7 @@ std::expected<std::shared_ptr<TechDatabase>, StarException> TechDatabase::create
       return {};
     }();
     if (!loaded)
-      return std::unexpected(assets->withAssetContext(std::move(loaded.error()), file, "Loading tech"));
+      return std::unexpected(assets->with_asset_context(std::move(loaded.error()), file, "Loading tech"));
   }
   return result;
 }

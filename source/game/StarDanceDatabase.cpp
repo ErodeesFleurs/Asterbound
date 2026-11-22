@@ -29,7 +29,7 @@ namespace Star {
 
 std::expected<std::shared_ptr<DanceDatabase>, StarException> DanceDatabase::create(std::shared_ptr<Assets const> assets, Logger& logger) {
   auto database = std::shared_ptr<DanceDatabase>(new DanceDatabase(logger));
-  auto files = assets->scanExtension("dance");
+  auto files = assets->scan_extension("dance");
   if (!files)
     return std::unexpected(std::move(files.error()));
   for (auto const& file : files->get()) {
@@ -153,7 +153,7 @@ std::expected<std::shared_ptr<Dance>, StarException> DanceDatabase::readDance(As
   return dance;
   }();
   if (!loaded)
-    return std::unexpected(assets.withAssetContext(std::move(loaded.error()), path, "Loading dance"));
+    return std::unexpected(assets.with_asset_context(std::move(loaded.error()), path, "Loading dance"));
   return loaded;
 }
 
