@@ -277,7 +277,7 @@ std::expected<void, StarException> NameplatePainter::update(float dt, std::share
       auto color = entity->nametagColor();
       if (!color) return std::unexpected(std::move(color.error()));
       nametag.color = *color;
-      auto fullyOnScreen = world->geometry().rectContains(camera.worldScreenRect(), entity->position());
+      auto fullyOnScreen = world->geometry().rect_contains(camera.worldScreenRect(), entity->position());
       if (!fullyOnScreen) return std::unexpected(std::move(fullyOnScreen.error()));
       if (inspectionMode) nametag.opacity = approach(1.0f, nametag.opacity, m_inspectOpacityRate);
       else if (*fullyOnScreen) nametag.opacity = approach(0.0f, nametag.opacity, m_opacityRate);

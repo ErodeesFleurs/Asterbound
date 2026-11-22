@@ -81,7 +81,7 @@ std::expected<void, StarException> ParticleManager::update(float dt, RectF const
   if (!m_tileSectorArray)
     return {};
 
-  auto cullRects = m_worldGeometry.splitRect(cullRegion);
+  auto cullRects = m_worldGeometry.split_rect(cullRegion);
   if (!cullRects)
     return std::unexpected(std::move(cullRects.error()));
 

@@ -308,7 +308,7 @@ std::expected<void, StarException> ServerWeather::spawnWeatherProjectiles(float 
     for (auto const& clientRegion : m_clientVisibleRegions) {
       Vec2I baseRegion = {clientRegion.x_min() - projectileConfig.spawnHorizontalPad, clientRegion.x_max() + projectileConfig.spawnHorizontalPad};
       int height = clientRegion.y_max();
-      auto regions = m_worldGeometry.splitXRegion(baseRegion);
+      auto regions = m_worldGeometry.split_x_region(baseRegion);
       if (!regions) return std::unexpected(std::move(regions.error()));
       for (auto const& region : *regions)
         baseSpawnRegions.push_back({region, height});
@@ -547,8 +547,8 @@ std::expected<void, StarException> ClientWeather::spawnWeatherParticles(RectF ne
 
   for (auto const& particleConfig : m_currentWeatherType->particles) {
     // Move client region to same wrap region as newClientRegion
-    RectF visibleRegion(m_worldGeometry.nearestTo(newClientRegion.min(), m_lastParticleVisibleRegion.min()),
-        m_worldGeometry.nearestTo(newClientRegion.max(), m_lastParticleVisibleRegion.max()));
+    RectF visibleRegion(m_worldGeometry.nearest_to(newClientRegion.min(), m_lastParticleVisibleRegion.min()),
+        m_worldGeometry.nearest_to(newClientRegion.max(), m_lastParticleVisibleRegion.max()));
 
     Vec2F targetVelocity = particleConfig.particle.velocity + Vec2F(wind(), 0);
     float angleChange = Vec2F::angle_between_2(Vec2F(0, 1), targetVelocity);

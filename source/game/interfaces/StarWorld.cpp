@@ -198,7 +198,7 @@ std::expected<std::optional<std::pair<Vec2F, std::optional<Vec2F>>>, StarExcepti
       if (block.poly.empty() || !isColliding(block.kind, collisionSet))
         return {};
 
-      Vec2F nearMin = geometry.nearestTo(block.poly.center(), line.min());
+      Vec2F nearMin = geometry.nearest_to(block.poly.center(), line.min());
       auto intersection = block.poly.line_intersection(Line2F(nearMin, nearMin + line.diff()));
       if (intersection && (!closestIntersection || intersection->along < closestIntersection->along)) {
         intersectPoly = block.poly;
@@ -228,7 +228,7 @@ std::expected<bool, StarException> World::polyCollision(PolyF const& poly, Colli
         return {};
 
       Vec2F center = block.poly.center();
-      Vec2F newCenter = geometry.nearestTo(polyCenter, center);
+      Vec2F newCenter = geometry.nearest_to(polyCenter, center);
       translatedPoly = block.poly;
       translatedPoly.translate(newCenter - center);
       if (poly.intersects(translatedPoly))

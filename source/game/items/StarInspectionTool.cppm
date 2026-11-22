@@ -435,7 +435,7 @@ std::expected<InspectionTool::InspectionResult, StarException> InspectionTool::i
   auto candidates = itemWorld->get().query<InspectableEntity>(RectF::with_center(position, Vec2F()), [&](std::shared_ptr<InspectableEntity> const& entity) -> std::expected<bool, StarException> {
     if (entity->entityType() == EntityType::Object)
       return false;
-    auto contained = geometry.rectContains(entity->metaBoundBox().translated(entity->position()), position);
+    auto contained = geometry.rect_contains(entity->metaBoundBox().translated(entity->position()), position);
     if (!contained)
       return std::unexpected(std::move(contained.error()));
     if (!*contained)
@@ -445,7 +445,7 @@ std::expected<InspectionTool::InspectionResult, StarException> InspectionTool::i
       return std::unexpected(std::move(hitPoly.error()));
     if (!*hitPoly)
       return false;
-    return geometry.polyContains(**hitPoly, position);
+    return geometry.poly_contains(**hitPoly, position);
   });
   if (!candidates)
     return std::unexpected(std::move(candidates.error()));

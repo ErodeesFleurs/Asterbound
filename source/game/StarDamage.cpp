@@ -212,9 +212,9 @@ std::expected<Json, StarException> DamageSource::toJson() const {
 
 std::expected<bool, StarException> DamageSource::intersectsWithPoly(WorldGeometry const& geometry, PolyF const& targetPoly) const {
   if (std::holds_alternative<PolyF>(damageArea))
-    return geometry.polyIntersectsPoly(std::get<PolyF>(damageArea), targetPoly);
+    return geometry.poly_intersects_poly(std::get<PolyF>(damageArea), targetPoly);
   else if (std::holds_alternative<Line2F>(damageArea))
-    return geometry.lineIntersectsPoly(std::get<Line2F>(damageArea), targetPoly);
+    return geometry.line_intersects_poly(std::get<Line2F>(damageArea), targetPoly);
   else
     return false;
 }

@@ -512,7 +512,7 @@ if (auto hitPoly = std::move(*result918)) {
 if (!result919) return std::unexpected(std::move(result919.error()));
 auto geometry = result919->get().geometry();
           Vec2F checkVec = m_movementController->velocity().normalized() * 5;
-          Vec2F nearMin = geometry.nearestTo(hitPoly->center(), m_movementController->position() - checkVec);
+          Vec2F nearMin = geometry.nearest_to(hitPoly->center(), m_movementController->position() - checkVec);
           if (auto intersection = hitPoly->line_intersection(Line2F(nearMin, nearMin + checkVec * 2)))
             m_movementController->setPosition(intersection->point);
         }

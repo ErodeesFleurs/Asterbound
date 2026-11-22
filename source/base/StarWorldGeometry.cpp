@@ -4,270 +4,273 @@ import star.list;
 import star.poly;
 import star.world_geometry;
 
-import star.array;
 import star.vector;
 import star.line;
 import star.rect;
 import star.math_common;
-import star.algorithm;
+
 namespace Star {
 
-std::function<float(float, float)> WorldGeometry::xDiffFunction() const {
-  if (m_size[0] == 0) {
+std::function<float(float, float)> WorldGeometry::x_diff_function() const {
+  if (width() == 0) {
     return [](float x1, float x2) -> float { return x1 - x2; };
   } else {
-    unsigned xsize = m_size[0];
-    return [xsize](float x1, float x2) -> float { return wrap_difference<float>(x1, x2, xsize); };
+    unsigned world_width = width();
+    return [world_width](float x1, float x2) -> float { return wrap_difference<float>(x1, x2, world_width); };
   }
 }
 
-std::function<Vec2F(Vec2F, Vec2F)> WorldGeometry::diffFunction() const {
-  if (m_size[0] == 0) {
+std::function<Vec2F(Vec2F, Vec2F)> WorldGeometry::diff_function() const {
+  if (width() == 0) {
     return [](Vec2F const& a, Vec2F const& b) -> Vec2F { return a - b; };
   } else {
-    unsigned xsize = m_size[0];
-    return [xsize](Vec2F const& a, Vec2F const& b) -> Vec2F {
-      return Vec2F(wrap_difference<float>(a[0], b[0], xsize), a[1] - b[1]);
+    unsigned world_width = width();
+    return [world_width](Vec2F const& a, Vec2F const& b) -> Vec2F {
+      return Vec2F(wrap_difference<float>(a[0], b[0], world_width), a[1] - b[1]);
     };
   }
 }
 
-std::function<float(float, float, float)> WorldGeometry::xLerpFunction(std::optional<float> discontinuityThreshold) const {
-  if (m_size[0] == 0) {
+std::function<float(float, float, float)> WorldGeometry::x_lerp_function(std::optional<float> discontinuity_threshold) const {
+  if (width() == 0) {
     return [](float, float min, float) -> float { return min; };
   } else {
-    unsigned xsize = m_size[0];
-    return [discontinuityThreshold, xsize](float offset, float min, float max) -> float {
-      float distance = wrap_difference<float>(max, min, xsize);
-      if (discontinuityThreshold && std::abs(distance) > *discontinuityThreshold)
+    unsigned world_width = width();
+    return [discontinuity_threshold, world_width](float offset, float min, float max) -> float {
+      float distance = wrap_difference<float>(max, min, world_width);
+      if (discontinuity_threshold && std::abs(distance) > *discontinuity_threshold)
         return min + distance;
       return min + offset * distance;
     };
   }
 }
 
-std::function<Vec2F(float, Vec2F, Vec2F)> WorldGeometry::lerpFunction(std::optional<float> discontinuityThreshold) const {
-  if (m_size[0] == 0) {
+std::function<Vec2F(float, Vec2F, Vec2F)> WorldGeometry::lerp_function(std::optional<float> discontinuity_threshold) const {
+  if (width() == 0) {
     return [](float, Vec2F const& min, Vec2F const&) -> Vec2F { return min; };
   } else {
-    unsigned xsize = m_size[0];
-    return [discontinuityThreshold, xsize](float offset, Vec2F const& min, Vec2F const& max) -> Vec2F {
-      Vec2F distance = Vec2F(wrap_difference<float>(max[0], min[0], xsize), max[1] - min[1]);
-      if (discontinuityThreshold && distance.magnitude() > *discontinuityThreshold)
+    unsigned world_width = width();
+    return [discontinuity_threshold, world_width](float offset, Vec2F const& min, Vec2F const& max) -> Vec2F {
+      Vec2F distance = Vec2F(wrap_difference<float>(max[0], min[0], world_width), max[1] - min[1]);
+      if (discontinuity_threshold && distance.magnitude() > *discontinuity_threshold)
         return min + distance;
       return min + offset * distance;
     };
   }
 }
 
-std::expected<StaticList<RectF, 2>, StarException> WorldGeometry::splitRect(RectF const& bbox) const {
-  if (bbox.is_null() || m_size[0] == 0)
-    return StaticList<RectF, 2>::create({bbox});
+namespace {
 
-  Vec2F minWrap = xwrap(bbox.min());
-  RectF bboxWrap = RectF(minWrap, minWrap + bbox.size());
+template <typename T>
+concept interval_coordinate = std::same_as<T, int> || std::same_as<T, float>;
 
-  // This does not work for ranges greater than m_size[0] wide!
+enum class IntervalSource { Rectangle, Region };
+
+template <IntervalSource Source, interval_coordinate T, std::invocable<T, T> MakePiece>
+auto split_x_interval(WorldGeometry const& geometry, T min, T max, MakePiece make_piece)
+    -> std::expected<StaticList<std::invoke_result_t<MakePiece, T, T>, 2>, StarException> {
+  using Pieces = StaticList<std::invoke_result_t<MakePiece, T, T>, 2>;
+  using Wide = std::conditional_t<std::same_as<T, int>, std::int64_t, float>;
+  Wide width = geometry.width();
+  if (width == 0)
+    return Pieces::create({make_piece(min, max)});
+
+  Wide length = static_cast<Wide>(max) - min;
   if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((bbox.x_max() - bbox.x_min() <= static_cast<float>(m_size[0])));
+    if constexpr (Source == IntervalSource::Region)
+      Star::star_assert_failed((max >= min));
+    Star::star_assert_failed((length <= width));
   }
+  Wide start;
+  if constexpr (std::same_as<T, int>)
+    start = geometry.index(min);
+  else
+    start = geometry.xwrap(min);
 
-  // Since min is wrapped, we're only checking to see if max is on the other
-  // side of the wrap point
-  if (bboxWrap.x_max() > m_size[0]) {
-    return StaticList<RectF, 2>::create({RectF(bboxWrap.x_min(), bboxWrap.y_min(), m_size[0], bboxWrap.y_max()),
-        RectF(0, bboxWrap.y_min(), bboxWrap.x_max() - m_size[0], bboxWrap.y_max())});
-  } else {
-    return StaticList<RectF, 2>::create({bboxWrap});
+  // Rectangles translate their size; floating-point regions historically add
+  // the old end before subtracting the old start. Keep both rounding orders.
+  Wide end;
+  if constexpr (Source == IntervalSource::Region && std::same_as<T, float>)
+    end = start + max - min;
+  else
+    end = start + length;
+
+  bool crosses = end > width;
+  if (crosses)
+    end -= width;
+  if constexpr (std::same_as<T, int>) {
+    if (!std::in_range<int>(start) || !std::in_range<int>(end) || (crosses && !std::in_range<int>(width)))
+      return std::unexpected(OutOfRangeException("Wrapped interval boundary is outside the integer coordinate range"));
   }
+  if (crosses)
+    return Pieces::create({make_piece(static_cast<T>(start), static_cast<T>(width)), make_piece(T{}, static_cast<T>(end))});
+  return Pieces::create({make_piece(static_cast<T>(start), static_cast<T>(end))});
 }
 
-std::expected<StaticList<RectF, 2>, StarException> WorldGeometry::splitRect(RectF bbox, Vec2F const& position) const {
+template <interval_coordinate T>
+auto split_rectangle(WorldGeometry const& geometry, Rect<T> const& box)
+    -> std::expected<StaticList<Rect<T>, 2>, StarException> {
+  if (box.is_null() || geometry.width() == 0)
+    return StaticList<Rect<T>, 2>::create({box});
+  T top = box.y_max();
+  if constexpr (std::same_as<T, float>)
+    top = box.y_min() + (top - box.y_min());
+  return split_x_interval<IntervalSource::Rectangle>(geometry, box.x_min(), box.x_max(),
+      [&](T min, T max) { return Rect<T>(min, box.y_min(), max, top); });
+}
+
+}
+
+std::expected<StaticList<RectF, 2>, StarException> WorldGeometry::split_rect(RectF const& bbox) const {
+  return split_rectangle(*this, bbox);
+}
+
+std::expected<StaticList<RectF, 2>, StarException> WorldGeometry::split_rect(RectF bbox, Vec2F const& position) const {
   bbox.translate(position);
-  return splitRect(bbox);
+  return split_rect(bbox);
 }
 
-std::expected<StaticList<RectI, 2>, StarException> WorldGeometry::splitRect(RectI const bbox) const {
-  if (bbox.is_null() || m_size[0] == 0)
-    return StaticList<RectI, 2>::create({bbox});
-
-  Vec2I minWrap = xwrap(bbox.min());
-  RectI bboxWrap = RectI(minWrap, minWrap + bbox.size());
-
-  // This does not work for ranges greater than m_size[0] wide!
-  if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((bbox.x_max() - bbox.x_min() <= static_cast<int>(m_size[0])));
-  }
-
-  // Since min is wrapped, we're only checking to see if max is on the other
-  // side of the wrap point
-  if (bboxWrap.x_max() > static_cast<int>(m_size[0])) {
-    return StaticList<RectI, 2>::create({RectI(bboxWrap.x_min(), bboxWrap.y_min(), m_size[0], bboxWrap.y_max()),
-        RectI(0, bboxWrap.y_min(), bboxWrap.x_max() - m_size[0], bboxWrap.y_max())});
-  } else {
-    return StaticList<RectI, 2>::create({bboxWrap});
-  }
+std::expected<StaticList<RectI, 2>, StarException> WorldGeometry::split_rect(RectI bbox) const {
+  return split_rectangle(*this, bbox);
 }
 
-std::expected<StaticList<Line2F, 2>, StarException> WorldGeometry::splitLine(Line2F line, bool preserveDirection) const {
-  if (m_size[0] == 0)
+std::expected<StaticList<Line2F, 2>, StarException> WorldGeometry::split_line(Line2F line, bool preserve_direction) const {
+  if (width() == 0)
     return StaticList<Line2F, 2>::create({line});
 
-  bool swapDirection = line.make_positive() && preserveDirection;
-  Vec2F minWrap = xwrap(line.min());
-
-  // diff is safe because we're looking for the line gnostic diff
-  Line2F lineWrap = Line2F(minWrap, minWrap + line.diff());
-
-  // Since min is wrapped, we're only checking to see if max is on the other
-  // side of the wrap point
-  if (lineWrap.max()[0] > m_size[0]) {
-    Vec2F intersection = lineWrap.intersection(Line2F(Vec2F(m_size[0], 0), Vec2F(m_size)), true).point;
-    if (swapDirection)
-      return StaticList<Line2F, 2>::create({Line2F(lineWrap.max() - Vec2F(m_size[0], 0), Vec2F(0, intersection[1])),
-          Line2F(Vec2F(m_size[0], intersection[1]), lineWrap.min())});
-    else
-      return StaticList<Line2F, 2>::create({Line2F(lineWrap.min(), Vec2F(m_size[0], intersection[1])),
-          Line2F(Vec2F(0, intersection[1]), lineWrap.max() - Vec2F(m_size[0], 0))});
-  } else {
-    if (swapDirection)
-      lineWrap.reverse();
-    return StaticList<Line2F, 2>::create({lineWrap});
+  bool swap_direction = line.make_positive() && preserve_direction;
+  Vec2F wrapped_min = xwrap(line.min());
+  Line2F wrapped_line(wrapped_min, wrapped_min + line.diff());
+  float world_width = static_cast<float>(width());
+  if (wrapped_line.max()[0] > world_width) {
+    Vec2F intersection = wrapped_line.intersection(Line2F(Vec2F(world_width, 0), Vec2F(size())), true).point;
+    Vec2F end = wrapped_line.max() - Vec2F(world_width, 0);
+    Vec2F left(0, intersection[1]);
+    Vec2F right(world_width, intersection[1]);
+    if (swap_direction)
+      return StaticList<Line2F, 2>::create({Line2F(end, left), Line2F(right, wrapped_min)});
+    return StaticList<Line2F, 2>::create({Line2F(wrapped_min, right), Line2F(left, end)});
   }
+  if (swap_direction)
+    wrapped_line.reverse();
+  return StaticList<Line2F, 2>::create({wrapped_line});
 }
 
-std::expected<StaticList<Line2F, 2>, StarException> WorldGeometry::splitLine(Line2F line, Vec2F const& position, bool preserveDirection) const {
+std::expected<StaticList<Line2F, 2>, StarException> WorldGeometry::split_line(Line2F line, Vec2F const& position, bool preserve_direction) const {
   line.translate(position);
-  return splitLine(line, preserveDirection);
+  return split_line(line, preserve_direction);
 }
 
-std::expected<StaticList<PolyF, 2>, StarException> WorldGeometry::splitPoly(PolyF const& poly) const {
-  if (poly.empty() || m_size[0] == 0)
-    return StaticList<PolyF, 2>::create({poly});
+namespace {
 
-  Array<PolyF, 2> res;
-  bool polySelect = false;
+using PolygonStorage = std::array<PolyF, 2>;
 
-  Line2F worldBoundRight = {Vec2F(m_size[0], 0), Vec2F(m_size[0], 1)};
-  Line2F worldBoundLeft = {Vec2F(0, 0), Vec2F(0, 1)};
+// Empty span means no translation or splitting was needed. Only the caller
+// requesting an owning result needs to copy (or move) that original polygon.
+std::span<PolyF> split_polygon(PolyF const& poly, float width, PolygonStorage& storage) {
+  if (width == 0)
+    return {};
+  auto const& vertices = poly.vertices();
+  auto outside = std::ranges::find_if(vertices, [width](Vec2F const& v) { return v[0] < 0 || v[0] > width; });
+  if (outside == vertices.end())
+    return {};
 
-  for (unsigned i = 0; i < poly.sides(); i++) {
-    Line2F segment = poly.side(i);
-    if ((segment.min()[0] < 0) ^ (segment.max()[0] < 0)) {
-      Vec2F worldCorrect = {static_cast<float>(m_size[0]), 0};
-      Vec2F intersect = segment.intersection(worldBoundLeft, true).point;
-      if (segment.min()[0] < 0) {
-        res[polySelect].add(segment.min() + worldCorrect);
-        res[polySelect].add(Vec2F(m_size[0], intersect[1]));
-        polySelect = !polySelect;
-        res[polySelect].add(Vec2F(0, intersect[1]));
+  // The edge entering the first outside vertex may cross the seam. All
+  // earlier edges are canonical; copy that prefix instead of scanning it again.
+  auto first_edge = outside == vertices.begin() ? outside : std::prev(outside);
+  auto& prefix = storage[0].vertices();
+  prefix.insert(prefix.end(), vertices.begin(), first_edge);
+  bool selected = false;
+  Vec2F shift(width, 0);
+  for (std::size_t i = first_edge - vertices.begin(); i < vertices.size(); ++i) {
+    Line2F edge = poly.side(i);
+    auto const& start = edge.min();
+    float end_x = edge.max()[0];
+    bool left = (start[0] < 0) != (end_x < 0);
+    bool right = (start[0] > width) != (end_x > width);
+    if (left || right) {
+      float seam = left ? 0 : width;
+      float other = left ? width : 0;
+      bool starts_outside = left ? start[0] < 0 : start[0] > width;
+      float y = edge.intersection(Line2F({seam, 0}, {seam, 1}), true).point[1];
+      if (starts_outside) {
+        storage[selected].add(left ? start + shift : start - shift);
+        std::swap(seam, other);
       } else {
-        res[polySelect].add(segment.min());
-        res[polySelect].add(Vec2F(0, intersect[1]));
-        polySelect = !polySelect;
-        res[polySelect].add(Vec2F(m_size[0], intersect[1]));
+        storage[selected].add(start);
       }
-    } else if ((segment.min()[0] > m_size[0]) ^ (segment.max()[0] > m_size[0])) {
-      Vec2F worldCorrect = {static_cast<float>(m_size[0]), 0};
-      Vec2F intersect = segment.intersection(worldBoundRight, true).point;
-      if (segment.min()[0] > m_size[0]) {
-        res[polySelect].add(segment.min() - worldCorrect);
-        res[polySelect].add(Vec2F(0, intersect[1]));
-        polySelect = !polySelect;
-        res[polySelect].add(Vec2F(m_size[0], intersect[1]));
-      } else {
-        res[polySelect].add(segment.min());
-        res[polySelect].add(Vec2F(m_size[0], intersect[1]));
-        polySelect = !polySelect;
-        res[polySelect].add(Vec2F(0, intersect[1]));
-      }
+      storage[selected].add({seam, y});
+      selected = !selected;
+      storage[selected].add({other, y});
+    } else if (start[0] < 0) {
+      storage[selected].add(start + shift);
+    } else if (start[0] > width) {
+      storage[selected].add(start - shift);
     } else {
-      if (segment.min()[0] < 0) {
-        res[polySelect].add(segment.min() + Vec2F(static_cast<float>(m_size[0]), 0));
-      } else if (segment.min()[0] > m_size[0]) {
-        res[polySelect].add(segment.min() - Vec2F(static_cast<float>(m_size[0]), 0));
-      } else {
-        res[polySelect].add(segment.min());
-      }
+      storage[selected].add(start);
     }
   }
-
-  if (res[1].empty())
-    return StaticList<PolyF, 2>::create({res[0]});
-  if (res[0].empty())
-    return StaticList<PolyF, 2>::create({res[1]});
-  else
-    return StaticList<PolyF, 2>::create({res[0], res[1]});
+  return std::span(storage).first(storage[1].empty() ? 1 : 2);
 }
 
-std::expected<StaticList<PolyF, 2>, StarException> WorldGeometry::splitPoly(PolyF poly, Vec2F const& position) const {
+std::span<PolyF const> polygon_parts(PolyF const& poly, float width, PolygonStorage& storage) {
+  auto parts = split_polygon(poly, width, storage);
+  if (parts.empty())
+    return {std::addressof(poly), 1};
+  return parts;
+}
+
+template <typename Poly>
+  requires std::same_as<std::remove_cvref_t<Poly>, PolyF>
+std::expected<StaticList<PolyF, 2>, StarException> split_owned_polygon(Poly&& poly, float width) {
+  PolygonStorage storage;
+  auto parts = split_polygon(poly, width, storage);
+  if (!parts.empty())
+    return StaticList<PolyF, 2>::create(std::make_move_iterator(parts.begin()), std::make_move_iterator(parts.end()));
+  StaticList<PolyF, 2> result;
+  if (auto added = result.push_back(std::forward<Poly>(poly)); !added)
+    return std::unexpected(std::move(added.error()));
+  return result;
+}
+
+}
+
+std::expected<StaticList<PolyF, 2>, StarException> WorldGeometry::split_poly(PolyF const& poly) const {
+  return split_owned_polygon(poly, width());
+}
+
+std::expected<StaticList<PolyF, 2>, StarException> WorldGeometry::split_poly(PolyF poly, Vec2F const& position) const {
   poly.translate(position);
-  return splitPoly(poly);
+  return split_owned_polygon(std::move(poly), width());
 }
 
-std::expected<StaticList<Vec2I, 2>, StarException> WorldGeometry::splitXRegion(Vec2I const& xRegion) const {
-  if (m_size[0] == 0)
-    return StaticList<Vec2I, 2>::create({xRegion});
-
-  if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((xRegion[1] >= xRegion[0]));
-  }
-
-  // This does not work for ranges greater than m_size[0] wide!
-  if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((xRegion[1] - xRegion[0] <= static_cast<int>(m_size[0])));
-  }
-
-  int x1 = xwrap(xRegion[0]);
-  int x2 = x1 + xRegion[1] - xRegion[0];
-
-  if (x2 > static_cast<int>(m_size[0])) {
-    return StaticList<Vec2I, 2>::create({Vec2I(x1, m_size[0]), Vec2I(0.0f, x2 - m_size[0])});
-  } else {
-    return StaticList<Vec2I, 2>::create({Vec2I(x1, x2)});
-  }
+std::expected<StaticList<Vec2I, 2>, StarException> WorldGeometry::split_x_region(Vec2I const& x_region) const {
+  return split_x_interval<IntervalSource::Region>(*this, x_region[0], x_region[1],
+      [](int min, int max) { return Vec2I(min, max); });
 }
 
-std::expected<StaticList<Vec2F, 2>, StarException> WorldGeometry::splitXRegion(Vec2F const& xRegion) const {
-  if (m_size[0] == 0)
-    return StaticList<Vec2F, 2>::create({xRegion});
-
-  if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((xRegion[1] >= xRegion[0]));
-  }
-
-  // This does not work for ranges greater than m_size[0] wide!
-  if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((xRegion[1] - xRegion[0] <= static_cast<float>(m_size[0])));
-  }
-
-  float x1 = xwrap(xRegion[0]);
-  float x2 = x1 + xRegion[1] - xRegion[0];
-
-  if (x2 > m_size[0]) {
-    return StaticList<Vec2F, 2>::create({Vec2F(x1, m_size[0]), Vec2F(0.0f, x2 - m_size[0])});
-  } else {
-    return StaticList<Vec2F, 2>::create({Vec2F(x1, x2)});
-  }
+std::expected<StaticList<Vec2F, 2>, StarException> WorldGeometry::split_x_region(Vec2F const& x_region) const {
+  return split_x_interval<IntervalSource::Region>(*this, x_region[0], x_region[1],
+      [](float min, float max) { return Vec2F(min, max); });
 }
 
-std::expected<bool, StarException> WorldGeometry::rectContains(RectF const& rect, Vec2F const& pos) const {
-  auto wpos = xwrap(pos);
-  auto pieces = splitRect(rect);
+std::expected<bool, StarException> WorldGeometry::rect_contains(RectF const& rect, Vec2F const& pos) const {
+  auto wrapped_pos = xwrap(pos);
+  auto pieces = split_rect(rect);
   if (!pieces) return std::unexpected(std::move(pieces.error()));
   for (auto const& r : *pieces) {
-    if (r.contains(wpos))
+    if (r.contains(wrapped_pos))
       return true;
   }
   return false;
 }
 
-std::expected<bool, StarException> WorldGeometry::rectIntersectsRect(RectF const& rect1, RectF const& rect2) const {
-  auto first = splitRect(rect1);
+std::expected<bool, StarException> WorldGeometry::rect_intersects_rect(RectF const& rect1, RectF const& rect2) const {
+  auto first = split_rect(rect1);
   if (!first) return std::unexpected(std::move(first.error()));
+  auto second = split_rect(rect2);
+  if (!second) return std::unexpected(std::move(second.error()));
   for (auto const& r1 : *first) {
-    auto second = splitRect(rect2);
-    if (!second) return std::unexpected(std::move(second.error()));
     for (auto const& r2 : *second) {
       if (r1.intersects(r2))
         return true;
@@ -276,72 +279,53 @@ std::expected<bool, StarException> WorldGeometry::rectIntersectsRect(RectF const
   return false;
 }
 
-RectF WorldGeometry::rectOverlap(RectF const& rect1, RectF const& rect2) const {
-  return rect1.overlap(RectF::with_size(nearestTo(rect1.min(), rect2.min()), rect2.size()));
+RectF WorldGeometry::rect_overlap(RectF const& rect1, RectF const& rect2) const {
+  return rect1.overlap(RectF::with_size(nearest_to(rect1.min(), rect2.min()), rect2.size()));
 }
 
-std::expected<bool, StarException> WorldGeometry::polyContains(PolyF const& poly, Vec2F const& pos) const {
-  auto wpos = xwrap(pos);
-  auto pieces = splitPoly(poly);
-  if (!pieces) return std::unexpected(std::move(pieces.error()));
-  for (auto const& p : *pieces) {
-    if (p.contains(wpos))
+std::expected<bool, StarException> WorldGeometry::poly_contains(PolyF const& poly, Vec2F const& pos) const {
+  auto wrapped_pos = xwrap(pos);
+  PolygonStorage storage;
+  for (auto const& p : polygon_parts(poly, width(), storage)) {
+    if (p.contains(wrapped_pos))
       return true;
   }
   return false;
 }
 
-std::expected<float, StarException> WorldGeometry::polyOverlapArea(PolyF const& poly1, PolyF const& poly2) const {
+std::expected<float, StarException> WorldGeometry::poly_overlap_area(PolyF const& poly1, PolyF const& poly2) const {
   float area = 0.0f;
-  auto first = splitPoly(poly1);
-  if (!first) return std::unexpected(std::move(first.error()));
-  for (auto const& p1 : *first) {
-    auto second = splitPoly(poly2);
-    if (!second) return std::unexpected(std::move(second.error()));
-    for (auto const& p2 : *second)
+  PolygonStorage first_storage, second_storage;
+  auto first = polygon_parts(poly1, width(), first_storage);
+  auto second = polygon_parts(poly2, width(), second_storage);
+  for (auto const& p1 : first) {
+    for (auto const& p2 : second)
       area += PolyF::clip(p1, p2).signed_area();
   }
   return area;
 }
 
-std::expected<bool, StarException> WorldGeometry::lineIntersectsRect(Line2F const& line, RectF const& rect) const {
-  auto lines = splitLine(line, false);
+std::expected<bool, StarException> WorldGeometry::line_intersects_rect(Line2F const& line, RectF const& rect) const {
+  auto lines = split_line(line, false);
   if (!lines) return std::unexpected(std::move(lines.error()));
-  for (auto l : *lines) {
-    auto boxes = splitRect(rect);
-    if (!boxes) return std::unexpected(std::move(boxes.error()));
-    for (auto box : *boxes) {
-      if (box.intersects(l)) {
+  auto boxes = split_rect(rect);
+  if (!boxes) return std::unexpected(std::move(boxes.error()));
+  for (auto const& l : *lines) {
+    for (auto const& box : *boxes) {
+      if (box.intersects(l))
         return true;
-      }
     }
   }
   return false;
 }
 
-std::expected<bool, StarException> WorldGeometry::lineIntersectsPoly(Line2F const& line, PolyF const& poly) const {
-  auto lines = splitLine(line, false);
+std::expected<bool, StarException> WorldGeometry::line_intersects_poly(Line2F const& line, PolyF const& poly) const {
+  auto lines = split_line(line, false);
   if (!lines) return std::unexpected(std::move(lines.error()));
-  for (auto a : *lines) {
-    auto polys = splitPoly(poly);
-    if (!polys) return std::unexpected(std::move(polys.error()));
-    for (auto const& b : *polys) {
-      if (b.intersects(a)) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
-std::expected<bool, StarException> WorldGeometry::polyIntersectsPoly(PolyF const& polyA, PolyF const& polyB) const {
-  auto first = splitPoly(polyA);
-  if (!first) return std::unexpected(std::move(first.error()));
-  for (auto const& a : *first) {
-    auto second = splitPoly(polyB);
-    if (!second) return std::unexpected(std::move(second.error()));
-    for (auto const& b : *second) {
+  PolygonStorage storage;
+  auto polys = polygon_parts(poly, width(), storage);
+  for (auto const& a : *lines) {
+    for (auto const& b : polys) {
       if (b.intersects(a))
         return true;
     }
@@ -350,11 +334,36 @@ std::expected<bool, StarException> WorldGeometry::polyIntersectsPoly(PolyF const
   return false;
 }
 
-std::expected<bool, StarException> WorldGeometry::rectIntersectsCircle(RectF const& rect, Vec2F const& center, float radius) const {
+std::expected<bool, StarException> WorldGeometry::poly_intersects_poly(PolyF const& poly_a, PolyF const& poly_b) const {
+  PolygonStorage first_storage, second_storage;
+  auto first = polygon_parts(poly_a, width(), first_storage);
+  auto second = polygon_parts(poly_b, width(), second_storage);
+  for (auto const& a : first) {
+    for (auto const& b : second) {
+      if (b.intersects(a))
+        return true;
+    }
+  }
+
+  return false;
+}
+
+std::expected<bool, StarException> WorldGeometry::rect_intersects_circle(RectF const& rect, Vec2F const& center, float radius) const {
   if (rect.contains(center))
     return true;
+  // A wrapped copy of the center may be inside without hitting any edge.
+  // Unlike splitting the rectangle, this also handles a full period or more.
+  if (width() != 0 && center[1] >= rect.y_min() && center[1] <= rect.y_max()) {
+    double extent = static_cast<double>(rect.x_max()) - rect.x_min();
+    double period = static_cast<float>(width());
+    if (extent >= period)
+      return true;
+    double offset = static_cast<double>(xwrap(center[0])) - xwrap(rect.x_min());
+    if ((offset < 0 ? offset + period : offset) <= extent)
+      return true;
+  }
   for (auto const& e : rect.edges()) {
-    auto intersects = lineIntersectsCircle(e, center, radius);
+    auto intersects = line_intersects_circle(e, center, radius);
     if (!intersects) return std::unexpected(std::move(intersects.error()));
     if (*intersects)
       return true;
@@ -362,23 +371,23 @@ std::expected<bool, StarException> WorldGeometry::rectIntersectsCircle(RectF con
   return false;
 }
 
-std::expected<bool, StarException> WorldGeometry::lineIntersectsCircle(Line2F const& line, Vec2F const& center, float radius) const {
-  auto lines = splitLine(line, false);
+std::expected<bool, StarException> WorldGeometry::line_intersects_circle(Line2F const& line, Vec2F const& center, float radius) const {
+  auto lines = split_line(line, false);
   if (!lines) return std::unexpected(std::move(lines.error()));
-  for (auto const& sline : *lines) {
-    if (sline.distance_to(nearestTo(sline.center(), center)) <= radius)
+  for (auto const& segment : *lines) {
+    if (segment.distance_to(nearest_to(segment.center(), center)) <= radius)
       return true;
   }
   return false;
 }
 
-std::expected<std::optional<Vec2F>, StarException> WorldGeometry::lineIntersectsPolyAt(Line2F const& line, PolyF const& poly) const {
-  auto lines = splitLine(line, true);
+std::expected<std::optional<Vec2F>, StarException> WorldGeometry::line_intersects_poly_at(Line2F const& line, PolyF const& poly) const {
+  auto lines = split_line(line, true);
   if (!lines) return std::unexpected(std::move(lines.error()));
-  for (auto a : *lines) {
-    auto polys = splitPoly(poly);
-    if (!polys) return std::unexpected(std::move(polys.error()));
-    for (auto const& b : *polys) {
+  PolygonStorage storage;
+  auto polys = polygon_parts(poly, width(), storage);
+  for (auto const& a : *lines) {
+    for (auto const& b : polys) {
       if (auto intersection = b.line_intersection(a))
         return intersection->point;
     }
@@ -387,26 +396,20 @@ std::expected<std::optional<Vec2F>, StarException> WorldGeometry::lineIntersects
   return {};
 }
 
-float WorldGeometry::polyDistance(PolyF const& poly, Vec2F const& point) const {
-  auto spoint = nearestTo(poly.center(), point);
-  return poly.distance(spoint);
+float WorldGeometry::poly_distance(PolyF const& poly, Vec2F const& point) const {
+  return poly.distance(nearest_to(poly.center(), point));
 }
 
-Vec2F WorldGeometry::nearestCoordInBox(RectF const& box, Vec2F const& pos) const {
-  RectF t(box);
-  auto offset = t.center();
-  auto r = diff(pos, offset);
-  t.set_center({});
-  return t.nearest_coord_to(r) + offset;
+Vec2F WorldGeometry::nearest_coord_in_box(RectF const& box, Vec2F const& pos) const {
+  RectF centered(box);
+  auto offset = centered.center();
+  auto relative = diff(pos, offset);
+  centered.set_center({});
+  return centered.nearest_coord_to(relative) + offset;
 }
 
-Vec2F WorldGeometry::diffToNearestCoordInBox(RectF const& box, Vec2F const& pos) const {
-  RectF t(box);
-  auto offset = t.center();
-  auto r = diff(pos, offset);
-  t.set_center({});
-  auto coord = t.nearest_coord_to(r) + offset;
-  return diff(pos, coord);
+Vec2F WorldGeometry::diff_to_nearest_coord_in_box(RectF const& box, Vec2F const& pos) const {
+  return diff(pos, nearest_coord_in_box(box, pos));
 }
 
 }

@@ -912,7 +912,7 @@ std::expected<void, StarException> MovementController::forEachMovingCollision(Re
       if (auto mc = *collisionResult) {
         if (mc->categoryFilter.check(m_parameters.physicsEffectCategories.value_or(StringSet{}))) {
           PolyF poly = std::move(mc->collision);
-          poly.translate(geometry.nearestTo(region.min(), mc->position));
+          poly.translate(geometry.nearest_to(region.min(), mc->position));
           RectF polyBounds = poly.bounding_box();
 
           if (region.intersects(polyBounds)) {
@@ -947,7 +947,7 @@ std::expected<void, StarException> MovementController::updateForceRegions(float)
           continue;
 
         auto boundsCheck = std::visit([geometry, myBounds = controller.collisionBoundBox()](auto& fr) {
-            return geometry.rectIntersectsRect(myBounds, fr.boundBox());
+            return geometry.rect_intersects_rect(myBounds, fr.boundBox());
           }, force);
         if (!boundsCheck) return std::unexpected(std::move(boundsCheck.error()));
         if (!*boundsCheck)
@@ -956,7 +956,7 @@ std::expected<void, StarException> MovementController::updateForceRegions(float)
         controller.m_appliedForceRegion = true;
         if (std::holds_alternative<DirectionalForceRegion>(force)) {
           auto const& directionalForceRegion = std::get<DirectionalForceRegion>(force);
-          auto overlap = geometry.polyOverlapArea(directionalForceRegion.region, body);
+          auto overlap = geometry.poly_overlap_area(directionalForceRegion.region, body);
           if (!overlap) return std::unexpected(std::move(overlap.error()));
           float forceEffect = *overlap / body.signed_area();
           if (directionalForceRegion.xTargetVelocity)
@@ -979,7 +979,7 @@ std::expected<void, StarException> MovementController::updateForceRegions(float)
           }
         } else if (std::holds_alternative<GradientForceRegion>(force)) {
           auto const& gradientForceRegion = std::get<GradientForceRegion>(force);
-          auto overlap = geometry.polyOverlapArea(gradientForceRegion.region, body);
+          auto overlap = geometry.poly_overlap_area(gradientForceRegion.region, body);
           if (!overlap) return std::unexpected(std::move(overlap.error()));
           float overlapFactor = *overlap / body.signed_area();
 
@@ -1326,7 +1326,7 @@ std::expected<void, StarException> MovementController::updateParameters(Movement
 
 void MovementController::updatePositionInterpolators() {
   if (m_world)
-    m_xPosition.set_interpolator(m_world->get().geometry().xLerpFunction(m_parameters.discontinuityThreshold));
+    m_xPosition.set_interpolator(m_world->get().geometry().x_lerp_function(m_parameters.discontinuityThreshold));
   else
     m_xPosition.set_interpolator(
       [limit = m_parameters.discontinuityThreshold](float const& offset, float const& from, float const& to) {
@@ -1363,7 +1363,7 @@ std::expected<void, StarException> MovementController::queryCollisions(RectF con
       if (block.kind != CollisionKind::None && !block.poly.empty()) {
         RectF polyBounds = block.polyBounds;
         Vec2F basePosition = block.poly.vertex(0);
-        Vec2F nearTranslation = geometry.nearestTo(region.min(), basePosition) - basePosition;
+        Vec2F nearTranslation = geometry.nearest_to(region.min(), basePosition) - basePosition;
         polyBounds.translate(nearTranslation);
 
         if (region.intersects(polyBounds)) {

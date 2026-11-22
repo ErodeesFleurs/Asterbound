@@ -354,7 +354,7 @@ std::expected<void, StarException> ChatBubbleManager::update(float dt, std::shar
         bubbleState.resetPresentation();
         bubble.presentationEpoch = entity->presentationEpoch();
       }
-      auto onscreen = m_camera.worldGeometry().rectIntersectsRect(m_camera.worldScreenRect(), entity->metaBoundBox().translated(entity->position()));
+      auto onscreen = m_camera.worldGeometry().rect_intersects_rect(m_camera.worldScreenRect(), entity->metaBoundBox().translated(entity->position()));
       if (!onscreen) return std::unexpected(std::move(onscreen.error()));
       bubble.onscreen = *onscreen;
       auto mouth = entity->mouthPosition();
@@ -372,7 +372,7 @@ std::expected<void, StarException> ChatBubbleManager::update(float dt, std::shar
         continue;
       if (!portraitBubble.instance)
         portraitBubble.instance = entity;
-      auto onscreen = m_camera.worldGeometry().rectIntersectsRect(m_camera.worldScreenRect(), entity->metaBoundBox().translated(entity->position()));
+      auto onscreen = m_camera.worldGeometry().rect_intersects_rect(m_camera.worldScreenRect(), entity->metaBoundBox().translated(entity->position()));
       if (!onscreen) return std::unexpected(std::move(onscreen.error()));
       portraitBubble.onscreen = *onscreen;
       if (auto chatter = as<ChattyEntity>(entity)) {

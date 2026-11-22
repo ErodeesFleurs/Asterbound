@@ -501,6 +501,14 @@ area. For movement changes run the existing `performance_benchmarks` with
 labels between builds before comparing timings. One iteration is 64 moves;
 these workloads do not measure clipping or hull construction.
 
+`WorldGeometryTest.*` covers wrapped circle containment, directed polygon
+hits and integer limits. An interval ending exactly on the seam has one
+piece. Signed coordinate queries saturate only when their result does not
+fit `int`; unsigned tile indices retain the full wrapped coordinate. Checked
+integer splits reject unrepresentable endpoints rather than saturating them.
+`GridRay/LoadedTileQuery` and `GridRay/MultiGlance` exercise consumers, not
+isolated polygon splitting.
+
 For rectangle changes run `RectTest.*` and the real-asset
 `WeatherTest.CompleteStateRestoresAfterLocalClear`. Rectangle subtraction emits
 left, right, bottom and top strips, omitting empty strips. Keep them inside the

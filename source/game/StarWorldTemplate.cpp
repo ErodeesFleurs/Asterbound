@@ -944,12 +944,12 @@ std::expected<std::pair<float, float>, StarException> WorldTemplate::customTerra
   float totalWeight = 0.0f;
 
   for (auto const& region : m_customTerrainRegions) {
-    auto contains = m_geometry.rectContains(region.regionBounds.padded(m_customTerrainBlendSize), Vec2F(x, y));
+    auto contains = m_geometry.rect_contains(region.regionBounds.padded(m_customTerrainBlendSize), Vec2F(x, y));
     if (!contains) return std::unexpected(std::move(contains.error()));
     if (!*contains)
       continue;
 
-    float distance = m_geometry.polyDistance(region.region, Vec2F(x, y));
+    float distance = m_geometry.poly_distance(region.region, Vec2F(x, y));
     if (distance >= m_customTerrainBlendSize)
       continue;
 

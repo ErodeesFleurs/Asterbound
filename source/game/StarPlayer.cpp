@@ -1117,7 +1117,7 @@ std::expected<void, StarException> Player::init(World& world, EntityId entityId,
     if (auto result = recover_lua_script_error(m_scriptedAnimator.init(world)); !result)
       return std::unexpected(std::move(result.error()));
   }
-  m_xAimPositionNetState.set_interpolator(world.geometry().xLerpFunction());
+  m_xAimPositionNetState.set_interpolator(world.geometry().x_lerp_function());
   if (auto result = refreshEquipment(); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = updateHumanoidDirectives(); !result)

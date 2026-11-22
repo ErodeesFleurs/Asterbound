@@ -58,7 +58,7 @@ void WorldCamera::updateRenderPosition(Vec2F position, bool force) {
   // coordinate bounds, and that the top and bototm of the screen are not
   // outside of the y coordinate bounds.
   m_worldCenter = m_worldGeometry.xwrap(position);
-  if (!m_worldGeometry.isNull())
+  if (!m_worldGeometry.is_null())
     m_worldCenter[1] =
       clamp(m_worldCenter[1], static_cast<float>(m_screenSize[1]) / (TilePixels * m_renderPixelRatio * 2),
             m_worldGeometry.height() - static_cast<float>(m_screenSize[1]) / (TilePixels * m_renderPixelRatio * 2));

@@ -106,7 +106,7 @@ inline Vec2F WorldCamera::centerWorldPosition() const {
 }
 
 inline Vec2F WorldCamera::worldToScreen(Vec2F worldCoord) const {
-  Vec2F wrappedCoord = m_worldGeometry.nearestTo(Vec2F(m_worldCenter), worldCoord);
+  Vec2F wrappedCoord = m_worldGeometry.nearest_to(Vec2F(m_worldCenter), worldCoord);
   return Vec2F((wrappedCoord[0] - m_worldCenter[0]) * (TilePixels * m_renderPixelRatio)
                  + static_cast<float>(m_screenSize[0]) / 2.0,
                (wrappedCoord[1] - m_worldCenter[1]) * (TilePixels * m_renderPixelRatio)

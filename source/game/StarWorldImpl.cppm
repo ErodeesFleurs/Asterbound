@@ -314,7 +314,7 @@ namespace WorldImpl {
       return candidates;
 
     // The limit applies to candidates, not to the surviving non-glancing hits.
-    auto segments = geometry.splitLine(Line2F{geometry.xwrap(begin), geometry.xwrap(end)});
+    auto segments = geometry.split_line(Line2F{geometry.xwrap(begin), geometry.xwrap(end)});
     if (!segments)
       return std::unexpected(std::move(segments.error()));
     auto tail = std::ranges::remove_if(candidates, [&geometry, &segments](Vec2I const& tile) {
@@ -682,7 +682,7 @@ namespace WorldImpl {
       if (!lights)
         return std::unexpected(std::move(lights.error()));
       for (auto const& light : *lights) {
-        Vec2F position = worldGeometry.nearestTo(Vec2F(lighting.calculation_region().min()), light.position);
+        Vec2F position = worldGeometry.nearest_to(Vec2F(lighting.calculation_region().min()), light.position);
         if (light.type == LightType::Spread)
           lighting.add_spread_light(position, light.color.sum() / 3.0f);
         else
@@ -705,7 +705,7 @@ namespace WorldImpl {
           return std::unexpected(std::move(inRange.error()));
         if (*inRange)
           return std::move(*entity);
-      } else if (geometry.diffToNearestCoordInBox((*entity)->interactiveBoundBox().translated((*entity)->position()), sourcePosition).magnitude() <= maxRange) {
+      } else if (geometry.diff_to_nearest_coord_in_box((*entity)->interactiveBoundBox().translated((*entity)->position()), sourcePosition).magnitude() <= maxRange) {
         return std::move(*entity);
       }
     }
@@ -758,12 +758,12 @@ namespace WorldImpl {
       }
     } else if (auto interactive_entity = prefer_interactive ? as_ref<InteractiveEntity>(*entity) : std::nullopt) {
       auto entity_bounds = interactive_entity->get().interactiveBoundBox().translated(entity->position());
-      auto contains = geometry.rectContains(entity_bounds, source_position);
+      auto contains = geometry.rect_contains(entity_bounds, source_position);
       if (!contains)
         return std::unexpected(std::move(contains.error()));
       if (*contains)
         return true;
-      auto intersects = geometry.rectIntersectsCircle(entity_bounds, source_position, max_range);
+      auto intersects = geometry.rect_intersects_circle(entity_bounds, source_position, max_range);
       if (!intersects)
         return std::unexpected(std::move(intersects.error()));
       if (!*intersects)

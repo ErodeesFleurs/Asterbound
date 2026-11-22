@@ -290,7 +290,7 @@ Vec2I Spawner::cellIndexForPosition(Vec2F const& position) const {
 
 std::expected<List<Vec2I>, StarException> Spawner::cellIndexesForRange(RectF const& range) const {
   List<Vec2I> cellIndexes;
-  auto ranges = m_facade->geometry().splitRect(range);
+  auto ranges = m_facade->geometry().split_rect(range);
   if (!ranges) return std::unexpected(std::move(ranges.error()));
   for (auto const& srange : *ranges) {
     auto indexes = RectI::integral(RectF(srange).scaled(1.0f / m_spawnCellSize));
@@ -517,7 +517,7 @@ std::expected<void, StarException> Spawner::debugShowSpawnCells() {
   Star::erase_if(m_debugSpawnInfo, [&cells = m_activeSpawnCells](auto&& p) { return !cells.contains(p.first); });
   auto visible = [&facade = *m_facade](RectF const& region) -> std::expected<bool, StarException> {
     for (auto const& window : facade.clientWindows()) {
-      auto intersects = facade.geometry().rectIntersectsRect(window, region);
+      auto intersects = facade.geometry().rect_intersects_rect(window, region);
       if (!intersects) return std::unexpected(std::move(intersects.error()));
       if (*intersects) return true;
     }

@@ -693,7 +693,7 @@ std::expected<void, StarException> StatusController::tickMaster(float dt) {
           if (auto effectEntity = as<StatusEffectEntity>(entity)) {
             auto area = effectEntity->statusEffectArea();
             area.translate(effectEntity->position());
-            auto intersects = world.get().geometry().polyIntersectsPoly(area, collisionBody);
+            auto intersects = world.get().geometry().poly_intersects_poly(area, collisionBody);
             if (!intersects) return std::unexpected(std::move(intersects.error()));
             if (*intersects) {
               auto effects = effectEntity->statusEffects();

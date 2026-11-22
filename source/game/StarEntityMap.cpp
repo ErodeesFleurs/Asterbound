@@ -76,7 +76,7 @@ std::expected<StaticList<RectF, 2>, StarException> split_entity_bounds(WorldGeom
   auto width = static_cast<float>(geometry.width());
   if (width != 0 && rect.width() >= width)
     return StaticList<RectF, 2>::create({RectF(0, rect.y_min(), width, rect.y_max())});
-  return geometry.splitRect(rect);
+  return geometry.split_rect(rect);
 }
 
 // A closed rectangle ending at the world width also contains x=0 (and
@@ -101,7 +101,7 @@ std::expected<StaticList<Line2F, 2>, StarException> split_query_line(WorldGeomet
   auto finite = classify_finite(begin[0], begin[1], end[0], end[1]);
   if (!std::ranges::all_of(finite, std::identity{}))
     return std::unexpected(EntityMapException("Invalid spatial line"));
-  return geometry.splitLine({begin, end}, false);
+  return geometry.split_line({begin, end}, false);
 }
 
 std::expected<bool, StarException> line_hits_entity(WorldGeometry const& geometry,
@@ -531,7 +531,7 @@ std::expected<std::shared_ptr<InteractiveEntity>, StarException> EntityMap::inte
           }
         } else {
           auto box = ie.interactiveBoundBox().translated(entity->position());
-          auto dist = m_geometry.diffToNearestCoordInBox(box, pos).magnitude();
+          auto dist = m_geometry.diff_to_nearest_coord_in_box(box, pos).magnitude();
           auto centerDist = m_geometry.diff(box.center(), pos).magnitude();
           if ((dist < bestDistance) || ((dist == bestDistance) && (centerDist < bestCenterDistance))) {
             interactiveEntity = std::shared_ptr<InteractiveEntity>(entity, std::addressof(ie));

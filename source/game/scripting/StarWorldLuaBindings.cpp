@@ -539,7 +539,7 @@ namespace LuaBindings {
         // If using MetaBoundBox, the regular line / box query methods already
         // enforce collision with MetaBoundBox
         if (radiusQuery)
-          return geometry.rectIntersectsCircle(
+          return geometry.rect_intersects_circle(
               entity->metaBoundBox().translated(position), radiusQuery->first, radiusQuery->second);
       } else if (boundMode == EntityBoundMode::CollisionArea) {
         // Collision area queries either query based on the collision area if
@@ -550,20 +550,20 @@ namespace LuaBindings {
         collisionArea.translate(position);
 
         if (lineQuery)
-          return geometry.lineIntersectsRect(*lineQuery, collisionArea);
+          return geometry.line_intersects_rect(*lineQuery, collisionArea);
         if (polyQuery)
-          return geometry.polyIntersectsPoly(*polyQuery, PolyF(collisionArea));
+          return geometry.poly_intersects_poly(*polyQuery, PolyF(collisionArea));
         if (rectQuery)
-          return geometry.rectIntersectsRect(*rectQuery, collisionArea);
+          return geometry.rect_intersects_rect(*rectQuery, collisionArea);
         if (radiusQuery)
-          return geometry.rectIntersectsCircle(collisionArea, radiusQuery->first, radiusQuery->second);
+          return geometry.rect_intersects_circle(collisionArea, radiusQuery->first, radiusQuery->second);
       } else if (boundMode == EntityBoundMode::Position) {
         if (lineQuery)
-          return geometry.lineIntersectsRect(*lineQuery, RectF(position, position));
+          return geometry.line_intersects_rect(*lineQuery, RectF(position, position));
         if (polyQuery)
-          return geometry.polyContains(*polyQuery, position);
+          return geometry.poly_contains(*polyQuery, position);
         if (rectQuery)
-          return geometry.rectContains(*rectQuery, position);
+          return geometry.rect_contains(*rectQuery, position);
         if (radiusQuery)
           return geometry.diff(radiusQuery->first, position).magnitude() <= radiusQuery->second;
       }
@@ -2296,7 +2296,7 @@ namespace LuaBindings {
   }
 
   std::expected<bool, StarException> WorldGeometryCallbacks::polyContains(World& world, PolyF const& poly, Vec2F const& pos) {
-    return world.geometry().polyContains(poly, pos);
+    return world.geometry().poly_contains(poly, pos);
   }
 
   std::expected<LuaValue, StarException> WorldGeometryCallbacks::xwrap(World& world, LuaEngine& engine, LuaValue const& positionOrX) {
@@ -2322,7 +2322,7 @@ namespace LuaBindings {
       else
         sourcePosition[0] = std::get<float>(sourcePositionOrX);
 
-      return engine.lua_from<Vec2F>(world.geometry().nearestTo(sourcePosition, targetPosition));
+      return engine.lua_from<Vec2F>(world.geometry().nearest_to(sourcePosition, targetPosition));
 
     } else {
       float targetX = std::get<float>(targetPositionOrX);
@@ -2332,7 +2332,7 @@ namespace LuaBindings {
       else
         sourceX = std::get<float>(sourcePositionOrX);
 
-      return LuaFloat(world.geometry().nearestTo(sourceX, targetX));
+      return LuaFloat(world.geometry().nearest_to(sourceX, targetX));
     }
   }
 

@@ -18,20 +18,21 @@ class WorldGeometry {
 public:
   // A null WorldGeometry will have diff / wrap methods etc be the normal
   // euclidean variety.
-  WorldGeometry();
+  WorldGeometry() = default;
   WorldGeometry(unsigned width, unsigned height);
   WorldGeometry(Vec2U const& size);
 
-  bool isNull() const;
+  bool is_null() const;
 
-  bool operator==(WorldGeometry const& other) const;
-  bool operator!=(WorldGeometry const& other) const;
+  bool operator==(WorldGeometry const&) const = default;
 
   unsigned width() const;
   unsigned height() const;
   Vec2U size() const;
 
-  // Wrap given point back into world space by wrapping x
+  // Nonfallible int results are saturated to [INT_MIN, INT_MAX] only after
+  // computing the result (including Euclidean differences at width zero).
+  // Wrap the given x coordinate back into world space.
   int xwrap(int x) const;
   float xwrap(float x) const;
   // Only wraps x component.
@@ -44,20 +45,21 @@ public:
   // Wraps and clamps position
   Vec2F limit(Vec2F const& pos) const;
 
-  bool crossesWrap(float xMin, float xMax) const;
+  bool crosses_wrap(float x_min, float x_max) const;
 
-  // Do these two inexes point to the same location
+  // Do these two indices point to the same location?
   bool equal(Vec2I const& p1, Vec2I const& p2) const;
 
-  // Same as wrap, returns unsigned type.
+  // Exact unsigned wrapped x, even when xwrap(int) saturates. At width zero,
+  // this is the ordinary conversion to unsigned.
   unsigned index(int x) const;
   Vec2U index(Vec2I const& i) const;
 
-  // returns right only distance from x2 to x1 (or x1 - x2).  Always positive.
+  // Rightward distance from x2 to x1, or signed Euclidean difference at width zero.
   int pdiff(int x1, int x2) const;
 
-  // Shortest difference between two given points.  Always returns diff on the
-  // "side" that x1 is on.
+  // Shortest displacement; an exact half-period retains the sign of the
+  // difference between the two canonical (wrapped) coordinates.
   float diff(float x1, float x2) const;
   int diff(int x1, int x2) const;
 
@@ -68,66 +70,80 @@ public:
   // Midpoint of the shortest line connecting two points.
   Vec2F midpoint(Vec2F const& p1, Vec2F const& p2) const;
 
-  std::function<float(float, float)> xDiffFunction() const;
-  std::function<Vec2F(Vec2F, Vec2F)> diffFunction() const;
-  std::function<float(float, float, float)> xLerpFunction(std::optional<float> discontinuityThreshold = {}) const;
-  std::function<Vec2F(float, Vec2F, Vec2F)> lerpFunction(std::optional<float> discontinuityThreshold = {}) const;
+  // Callables own their configuration and can outlive this geometry.
+  // With zero width, lerp returns the start regardless of offset.
+  std::function<float(float, float)> x_diff_function() const;
+  std::function<Vec2F(Vec2F, Vec2F)> diff_function() const;
+  std::function<float(float, float, float)> x_lerp_function(std::optional<float> discontinuity_threshold = {}) const;
+  std::function<Vec2F(float, Vec2F, Vec2F)> lerp_function(std::optional<float> discontinuity_threshold = {}) const;
 
-  // Wrapping functions are not guaranteed to work for objects larger than
-  // worldWidth / 2.  Bad things can happen.
+  // Objects wider than half the world may not have an unambiguous shortest image.
 
-  // Split the given Rect across world boundaries.
-  [[nodiscard]] std::expected<StaticList<RectF, 2>, StarException> splitRect(RectF const& bbox) const;
+  // Split the given Rect across world boundaries. Integer splits report an
+  // error if a required endpoint cannot be represented; they never saturate.
+  [[nodiscard]] std::expected<StaticList<RectF, 2>, StarException> split_rect(RectF const& bbox) const;
   // Split the given Rect after translating it by position.
-  [[nodiscard]] std::expected<StaticList<RectF, 2>, StarException> splitRect(RectF bbox, Vec2F const& position) const;
+  [[nodiscard]] std::expected<StaticList<RectF, 2>, StarException> split_rect(RectF bbox, Vec2F const& position) const;
 
-  [[nodiscard]] std::expected<StaticList<RectI, 2>, StarException> splitRect(RectI bbox) const;
+  [[nodiscard]] std::expected<StaticList<RectI, 2>, StarException> split_rect(RectI bbox) const;
 
   // Same but for Line
-  [[nodiscard]] std::expected<StaticList<Line2F, 2>, StarException> splitLine(Line2F line, bool preserveDirection = false) const;
-  [[nodiscard]] std::expected<StaticList<Line2F, 2>, StarException> splitLine(Line2F line, Vec2F const& position, bool preserveDirection = false) const;
+  [[nodiscard]] std::expected<StaticList<Line2F, 2>, StarException> split_line(Line2F line, bool preserve_direction = false) const;
+  [[nodiscard]] std::expected<StaticList<Line2F, 2>, StarException> split_line(Line2F line, Vec2F const& position, bool preserve_direction = false) const;
 
   // Same but for Poly
-  [[nodiscard]] std::expected<StaticList<PolyF, 2>, StarException> splitPoly(PolyF const& poly) const;
-  [[nodiscard]] std::expected<StaticList<PolyF, 2>, StarException> splitPoly(PolyF poly, Vec2F const& position) const;
+  [[nodiscard]] std::expected<StaticList<PolyF, 2>, StarException> split_poly(PolyF const& poly) const;
+  [[nodiscard]] std::expected<StaticList<PolyF, 2>, StarException> split_poly(PolyF poly, Vec2F const& position) const;
 
   // Split a horizontal region of the world across the world wrap point.
-  [[nodiscard]] std::expected<StaticList<Vec2I, 2>, StarException> splitXRegion(Vec2I const& xRegion) const;
-  [[nodiscard]] std::expected<StaticList<Vec2F, 2>, StarException> splitXRegion(Vec2F const& xRegion) const;
+  [[nodiscard]] std::expected<StaticList<Vec2I, 2>, StarException> split_x_region(Vec2I const& x_region) const;
+  [[nodiscard]] std::expected<StaticList<Vec2F, 2>, StarException> split_x_region(Vec2F const& x_region) const;
 
-  [[nodiscard]] std::expected<bool, StarException> rectContains(RectF const& rect1, Vec2F const& pos) const;
-  [[nodiscard]] std::expected<bool, StarException> rectIntersectsRect(RectF const& rect1, RectF const& rect2) const;
-  RectF rectOverlap(RectF const& rect1, RectF const& rect2) const;
-  [[nodiscard]] std::expected<bool, StarException> polyContains(PolyF const& poly, Vec2F const& pos) const;
-  [[nodiscard]] std::expected<float, StarException> polyOverlapArea(PolyF const& poly1, PolyF const& poly2) const;
+  [[nodiscard]] std::expected<bool, StarException> rect_contains(RectF const& rect1, Vec2F const& pos) const;
+  [[nodiscard]] std::expected<bool, StarException> rect_intersects_rect(RectF const& rect1, RectF const& rect2) const;
+  RectF rect_overlap(RectF const& rect1, RectF const& rect2) const;
+  [[nodiscard]] std::expected<bool, StarException> poly_contains(PolyF const& poly, Vec2F const& pos) const;
+  [[nodiscard]] std::expected<float, StarException> poly_overlap_area(PolyF const& poly1, PolyF const& poly2) const;
 
-  [[nodiscard]] std::expected<bool, StarException> lineIntersectsRect(Line2F const& line, RectF const& rect) const;
-  [[nodiscard]] std::expected<bool, StarException> lineIntersectsPoly(Line2F const& line, PolyF const& poly) const;
-  [[nodiscard]] std::expected<bool, StarException> polyIntersectsPoly(PolyF const& poly1, PolyF const& poly2) const;
+  [[nodiscard]] std::expected<bool, StarException> line_intersects_rect(Line2F const& line, RectF const& rect) const;
+  [[nodiscard]] std::expected<bool, StarException> line_intersects_poly(Line2F const& line, PolyF const& poly) const;
+  [[nodiscard]] std::expected<bool, StarException> poly_intersects_poly(PolyF const& poly1, PolyF const& poly2) const;
 
-  [[nodiscard]] std::expected<bool, StarException> rectIntersectsCircle(RectF const& rect, Vec2F const& center, float radius) const;
-  [[nodiscard]] std::expected<bool, StarException> lineIntersectsCircle(Line2F const& line, Vec2F const& center, float radius) const;
+  [[nodiscard]] std::expected<bool, StarException> rect_intersects_circle(RectF const& rect, Vec2F const& center, float radius) const;
+  [[nodiscard]] std::expected<bool, StarException> line_intersects_circle(Line2F const& line, Vec2F const& center, float radius) const;
 
-  [[nodiscard]] std::expected<std::optional<Vec2F>, StarException> lineIntersectsPolyAt(Line2F const& line, PolyF const& poly) const;
+  [[nodiscard]] std::expected<std::optional<Vec2F>, StarException> line_intersects_poly_at(Line2F const& line, PolyF const& poly) const;
 
   // Returns the distance from a point to any part of the given poly
-  float polyDistance(PolyF const& poly, Vec2F const& point) const;
+  float poly_distance(PolyF const& poly, Vec2F const& point) const;
 
   // Produces a point that is on the same "side" of the world as the source point.
-  int nearestTo(int source, int target) const;
-  float nearestTo(float source, float target) const;
-  Vec2I nearestTo(Vec2I const& source, Vec2I const& target) const;
-  Vec2F nearestTo(Vec2F const& source, Vec2F const& target) const;
+  int nearest_to(int source, int target) const;
+  float nearest_to(float source, float target) const;
+  Vec2I nearest_to(Vec2I const& source, Vec2I const& target) const;
+  Vec2F nearest_to(Vec2F const& source, Vec2F const& target) const;
 
-  Vec2F nearestCoordInBox(RectF const& box, Vec2F const& pos) const;
-  Vec2F diffToNearestCoordInBox(RectF const& box, Vec2F const& pos) const;
+  Vec2F nearest_coord_in_box(RectF const& box, Vec2F const& pos) const;
+  Vec2F diff_to_nearest_coord_in_box(RectF const& box, Vec2F const& pos) const;
 
 private:
+  static int saturate_int(std::int64_t value) {
+    return static_cast<int>(std::clamp<std::int64_t>(value,
+        std::numeric_limits<int>::min(), std::numeric_limits<int>::max()));
+  }
+
+  // Nonzero period; value is a coordinate or a difference of two int coordinates.
+  // For negative values, count backwards from period - 1. Both magnitudes
+  // then fit in unsigned and do not require a wide division.
+  static unsigned wrapped_index(std::int64_t value, unsigned period) {
+    unsigned offset = static_cast<unsigned>(value < 0 ? -1 - value : value);
+    if (offset >= period)
+      offset %= period;
+    return value < 0 ? period - 1 - offset : offset;
+  }
+
   Vec2U m_size;
 };
-
-inline WorldGeometry::WorldGeometry()
-  : m_size(Vec2U()) {}
 
 inline WorldGeometry::WorldGeometry(unsigned width, unsigned height)
   : m_size(width, height) {}
@@ -135,16 +151,8 @@ inline WorldGeometry::WorldGeometry(unsigned width, unsigned height)
 inline WorldGeometry::WorldGeometry(Vec2U const& size)
   : m_size(size) {}
 
-inline bool WorldGeometry::isNull() const {
+inline bool WorldGeometry::is_null() const {
   return m_size == Vec2U();
-}
-
-inline bool WorldGeometry::operator==(WorldGeometry const& other) const {
-  return m_size == other.m_size;
-}
-
-inline bool WorldGeometry::operator!=(WorldGeometry const& other) const {
-  return m_size != other.m_size;
 }
 
 inline unsigned WorldGeometry::width() const {
@@ -160,10 +168,9 @@ inline Vec2U WorldGeometry::size() const {
 }
 
 inline int WorldGeometry::xwrap(int x) const {
-  if (m_size[0] == 0)
+  if (width() == 0)
     return x;
-  else
-    return positive_mod<int>(x, m_size[0]);
+  return saturate_int(wrapped_index(x, width()));
 }
 
 inline float WorldGeometry::xwrap(float x) const {
@@ -189,25 +196,27 @@ inline Vec2F WorldGeometry::limit(Vec2F const& pos) const {
   return {xwrap(pos[0]), yclamp(pos[1])};
 }
 
-inline bool WorldGeometry::crossesWrap(float xMin, float xMax) const {
-  return xwrap(xMax) < xwrap(xMin);
+inline bool WorldGeometry::crosses_wrap(float x_min, float x_max) const {
+  return xwrap(x_max) < xwrap(x_min);
 }
 
 inline bool WorldGeometry::equal(Vec2I const& p1, Vec2I const& p2) const {
   return index(p1) == index(p2);
 }
 
-inline unsigned WorldGeometry::index(int x) const { return static_cast<unsigned>(xwrap(x)); }
+inline unsigned WorldGeometry::index(int x) const {
+  return width() ? wrapped_index(x, width()) : static_cast<unsigned>(x);
+}
 
 inline Vec2U WorldGeometry::index(Vec2I const& i) const {
-  return Vec2U(xwrap(i[0]), i[1]);
+  return {index(i[0]), static_cast<unsigned>(i[1])};
 }
 
 inline int WorldGeometry::pdiff(int x1, int x2) const {
-  if (m_size[0] == 0)
-    return x1 - x2;
-  else
-    return positive_mod<int>(x1 - x2, m_size[0]);
+  auto delta = static_cast<std::int64_t>(x1) - x2;
+  if (width() == 0)
+    return saturate_int(delta);
+  return saturate_int(wrapped_index(delta, width()));
 }
 
 inline float WorldGeometry::diff(float x1, float x2) const {
@@ -218,46 +227,49 @@ inline float WorldGeometry::diff(float x1, float x2) const {
 }
 
 inline int WorldGeometry::diff(int x1, int x2) const {
-  if (m_size[0] == 0)
-    return x1 - x2;
-  else
-    return wrap_difference<int>(x1, x2, m_size[0]);
+  auto delta = static_cast<std::int64_t>(x1) - x2;
+  if (width() == 0)
+    return saturate_int(delta);
+  // No reduction is necessary strictly inside half a turn. At a tie, reduce
+  // both coordinates first: shifting just one endpoint may reverse the sign.
+  if (2 * std::abs(delta) < width())
+    return static_cast<int>(delta);
+  if (width() <= std::numeric_limits<int>::max())
+    return wrap_difference(x1, x2, static_cast<int>(width()));
+  return static_cast<int>(wrap_difference<std::int64_t>(x1, x2, width()));
 }
 
 inline Vec2F WorldGeometry::diff(Vec2F const& p1, Vec2F const& p2) const {
-  float xdiff = diff(p1[0], p2[0]);
-  return {xdiff, p1[1] - p2[1]};
+  return {diff(p1[0], p2[0]), p1[1] - p2[1]};
 }
 
 inline Vec2I WorldGeometry::diff(Vec2I const& p1, Vec2I const& p2) const {
-  int xdiff = diff(p1[0], p2[0]);
-  return {xdiff, p1[1] - p2[1]};
+  return {diff(p1[0], p2[0]), saturate_int(static_cast<std::int64_t>(p1[1]) - p2[1])};
 }
 
 inline Vec2F WorldGeometry::midpoint(Vec2F const& p1, Vec2F const& p2) const {
   return xwrap(diff(p1, p2) / 2 + p2);
 }
 
-inline int WorldGeometry::nearestTo(int source, int target) const {
-  if (std::abs(target - source) < static_cast<int>((m_size[0] / 2)))
+inline int WorldGeometry::nearest_to(int source, int target) const {
+  if (width() == 0)
     return target;
-  else
-    return diff(target, source) + source;
+  return saturate_int(static_cast<std::int64_t>(source) + diff(target, source));
 }
 
-inline float WorldGeometry::nearestTo(float source, float target) const {
+inline float WorldGeometry::nearest_to(float source, float target) const {
   if (std::abs(target - source) < static_cast<float>((m_size[0] / 2)))
     return target;
   else
     return diff(target, source) + source;
 }
 
-inline Vec2I WorldGeometry::nearestTo(Vec2I const& source, Vec2I const& target) const {
-  return Vec2I(nearestTo(source[0], target[0]), target[1]);
+inline Vec2I WorldGeometry::nearest_to(Vec2I const& source, Vec2I const& target) const {
+  return Vec2I(nearest_to(source[0], target[0]), target[1]);
 }
 
-inline Vec2F WorldGeometry::nearestTo(Vec2F const& source, Vec2F const& target) const {
-  return Vec2F(nearestTo(source[0], target[0]), target[1]);
+inline Vec2F WorldGeometry::nearest_to(Vec2F const& source, Vec2F const& target) const {
+  return Vec2F(nearest_to(source[0], target[0]), target[1]);
 }
 
 }

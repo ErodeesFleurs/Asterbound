@@ -1698,7 +1698,7 @@ std::expected<void, StarException> WorldServer::update(float dt) {
     if (!result169)
       return std::unexpected(std::move(result169.error()));
     for (auto const& region : std::move(*result169)) {
-      auto result170 = m_geometry.splitRect(region);
+      auto result170 = m_geometry.split_rect(region);
       if (!result170)
         return std::unexpected(std::move(result170.error()));
       client_monitoring_regions.append_range(std::move(*result170));
@@ -4700,7 +4700,7 @@ std::expected<bool, StarException> WorldServer::isVisibleToPlayer(RectF const& r
     if (!result510)
       return std::unexpected(std::move(result510.error()));
     for (auto const& playerRegion : std::move(*result510)) {
-      auto result511 = m_geometry.rectIntersectsRect(RectF(playerRegion), region);
+      auto result511 = m_geometry.rect_intersects_rect(RectF(playerRegion), region);
       if (!result511)
         return std::unexpected(std::move(result511.error()));
       if (std::move(*result511))
