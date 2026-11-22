@@ -293,6 +293,20 @@ values, insertion preserves the old end-relative stop: omit the oldest
 `1 - maxMessagePerEntity` previous bubbles, or all if there are fewer. The
 subsequent per-tick visibility filter still applies.
 
+### Process signal handling
+
+`SignalHandler::create()` allows one successful registration per process.
+Destruction restores the previous dispositions but does not start a new
+registration generation: a late native callback must never interrupt a new
+owner. `interrupted()` is sticky and is false on a moved-from handle.
+
+Exercise signal disposition changes in a child process, not the test runner.
+Distinguish graceful interrupt handling (sticky observation, normal shutdown)
+from fatal diagnostics (bounded child lifetime and platform-specific exit
+status). A successful Windows build alone does not test console dispatch,
+dump writing or unattended exit. Measure shutdown latency at the application
+polling boundary rather than timing a single atomic load.
+
 ### Command words
 
 `split_shell_words` produces owning arguments, not POSIX shell syntax. Quoted

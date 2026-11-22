@@ -176,13 +176,9 @@ static std::expected<void, StarException> run_server(std::span<char const* const
   if (!loaded)
     return std::unexpected(std::move(loaded.error()));
 
-  SignalHandler signalHandler;
-  auto fatalSignals = signalHandler.setHandleFatal(true);
-  if (!fatalSignals)
-    return std::unexpected(std::move(fatalSignals.error()));
-  auto interrupts = signalHandler.setHandleInterrupt(true);
-  if (!interrupts)
-    return std::unexpected(std::move(interrupts.error()));
+  auto signal_handler = SignalHandler::create();
+  if (!signal_handler)
+    return std::unexpected(std::move(signal_handler.error()));
 
   auto configuration = root->configuration();
   if (!configuration)
@@ -283,7 +279,7 @@ static std::expected<void, StarException> run_server(std::span<char const* const
     }
 
     while (server->is_running()) {
-      if (signalHandler.interruptCaught()) {
+      if (signal_handler->interrupted()) {
         auto interruptLogged = root->logger().info("Interrupt caught!");
         if (!interruptLogged)
           return std::unexpected(std::move(interruptLogged.error()));

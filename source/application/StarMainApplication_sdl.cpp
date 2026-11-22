@@ -569,10 +569,10 @@ public:
     if (!nativeBase)
       return std::unexpected(std::move(nativeBase.error()));
 
-    if (auto result = m_signalHandler.setHandleInterrupt(true); !result)
-      return std::unexpected(std::move(result.error()));
-    if (auto result = m_signalHandler.setHandleFatal(true); !result)
-      return std::unexpected(std::move(result.error()));
+    auto signal_handler = SignalHandler::create();
+    if (!signal_handler)
+      return std::unexpected(std::move(signal_handler.error()));
+    m_signal_handler.emplace(std::move(*signal_handler));
 
     EmergencyLog::info("Application: startup...");
     if (auto result = m_application->startup(cmdLineArgs); !result)
@@ -1274,7 +1274,7 @@ private:
           m_dispatcher.wake();
           prepared = true;
         }
-        if (m_signalHandler.interruptCaught())
+        if (m_signal_handler->interrupted())
           m_quitRequested = true;
         auto throttleStart = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
         if (!m_quitRequested) {
@@ -1380,6 +1380,8 @@ private:
         result = std::unexpected(std::move(restored.error()));
       m_nativeContextScope.reset();
     }
+    // Restore any SDL-installed dispositions while SDL is still initialized.
+    m_signal_handler.reset();
     if (std::exchange(m_sdlInitialized, false))
       SDL_Quit();
     return result;
@@ -2177,7 +2179,7 @@ private:
     #endif
   }
 
-  SignalHandler m_signalHandler;
+  std::optional<SignalHandler> m_signal_handler;
 
   FixedScheduler m_scheduler;
   float m_renderInterpolation = 1.0f;

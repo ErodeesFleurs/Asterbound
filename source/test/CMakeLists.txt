@@ -87,6 +87,11 @@ set (star_core_tests_SOURCES
 add_executable (core_tests
   $<TARGET_OBJECTS:star_extern> $<TARGET_OBJECTS:star_core>
   ${star_core_tests_SOURCES})
+if(UNIX)
+  target_sources(core_tests PRIVATE signal_handler_test.cpp)
+elseif(WIN32)
+  target_sources(core_tests PRIVATE signal_handler_windows_test.cpp)
+endif()
 add_dependencies(core_tests star_dynamic_lib_fixture)
 target_compile_definitions(core_tests PRIVATE STAR_DYNAMIC_LIB_FIXTURE="$<TARGET_FILE:star_dynamic_lib_fixture>")
 set_property(SOURCE font_bitmap_test.cpp APPEND PROPERTY COMPILE_DEFINITIONS

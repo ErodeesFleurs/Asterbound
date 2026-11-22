@@ -7,6 +7,7 @@ import star.format;
 import star.text_formatter;
 import star.native_runtime;
 import star.native_stack;
+import star.windows_dump;
 
 
 namespace Star {
@@ -16,6 +17,10 @@ namespace Star {
 struct DbgHelpLock {
   void lock() {
     AcquireSRWLockExclusive(&nativeLock);
+  }
+
+  bool try_lock() noexcept {
+    return TryAcquireSRWLockExclusive(&nativeLock);
   }
 
   void unlock() {
@@ -28,6 +33,21 @@ static_assert(std::is_trivially_destructible_v<DbgHelpLock>);
 static constinit DbgHelpLock g_dbgHelpLock;
 // Protected by g_dbgHelpLock; overlapping explicit owners share one session.
 static constinit std::size_t g_diagnosticsOwners = 0;
+
+bool try_write_minidump(DWORD thread_id, EXCEPTION_POINTERS& exception) noexcept {
+  // The interrupted thread could itself hold this lock. Never wait on it.
+  std::unique_lock lock(g_dbgHelpLock, std::try_to_lock);
+  if (!lock)
+    return false;
+  auto file = CreateFileW(L"starbound.dmp", GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS,
+      FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (file == INVALID_HANDLE_VALUE)
+    return false;
+  MINIDUMP_EXCEPTION_INFORMATION info{thread_id, &exception, FALSE};
+  auto written = MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), file, MiniDumpNormal,
+      &info, nullptr, nullptr);
+  return CloseHandle(file) && written;
+}
 
 std::expected<std::unique_ptr<NativeRuntime>, StarException> NativeRuntime::create(StandardStreams streams) {
   if (streams == StandardStreams::Optional) {
