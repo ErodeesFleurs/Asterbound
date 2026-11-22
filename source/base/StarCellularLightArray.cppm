@@ -8,40 +8,59 @@ import star.vector;
 import star.math_common;
 namespace Star {
 
-// Operations for simple scalar lighting.
+// Scalar and RGB are the two point-kernel instantiations provided by this module.
 struct ScalarLightTraits {
   using Value = float;
 
-  static float spread(float source, float dest, float drop);
-  static float subtract(float value, float drop);
-  static float multiply(float v1, float v2);
-
-  static float maxIntensity(float value);
-  static float minIntensity(float value);
-
-  static float max(float v1, float v2);
+  static float subtract(float value, float drop) { return std::max(value - drop, 0.0f); }
+  static float max_intensity(float value) { return value; }
+  static float max(float left, float right) { return std::max(left, right); }
 };
 
-// Operations for 3 component (colored) lighting.  Spread and subtract are
-// applied proportionally, so that color ratios stay the same, to prevent hues
-// changing as light spreads.
 struct ColoredLightTraits {
   using Value = Vec3F;
 
-  static Vec3F spread(Vec3F const& source, Vec3F const& dest, float drop);
   static Vec3F subtract(Vec3F value, float drop);
-  static Vec3F multiply(Vec3F value, float drop);
-
-  static float maxIntensity(Vec3F const& value);
-  static float minIntensity(Vec3F const& value);
-
-  static Vec3F max(Vec3F const& v1, Vec3F const& v2);
+  static float max_intensity(Vec3F const& value) { return value.max(); }
+  static Vec3F max(Vec3F const& left, Vec3F const& right) { return vmax(left, right); }
 };
 
-template <typename LightTraits>
+template <typename Traits>
+concept light_traits = std::same_as<Traits, ScalarLightTraits> || std::same_as<Traits, ColoredLightTraits>;
+
+// Only validated parameter sets can be applied. The direct array API and both
+// JSON calculators consequently share the same range and conversion rules.
+class LightParameters {
+public:
+  [[nodiscard]] static std::expected<LightParameters, StarException> create(std::int64_t passes,
+      float spread_air, float spread_obstacle, float point_air, float point_obstacle, float boost, bool additive);
+
+private:
+  template <light_traits> friend class CellularLightArray;
+  LightParameters() = default;
+  unsigned spread_passes = 0;
+  float spread_max_air = 1.0f;
+  float spread_max_obstacle = 1.0f;
+  float point_max_air = 1.0f;
+  float point_max_obstacle = 1.0f;
+  float spread_drop_air = 1.0f;
+  float spread_drop_obstacle = 1.0f;
+  float spread_drop_air_diag = std::numbers::sqrt2;
+  float spread_drop_obstacle_diag = std::numbers::sqrt2;
+  float point_obstacle_boost = 0.0f;
+  bool point_additive = false;
+  std::size_t spread_border = 1;
+  std::size_t border = 1;
+};
+
+template <light_traits LightTraits>
 class CellularLightArray {
 public:
   using LightValue = typename LightTraits::Value;
+
+  CellularLightArray() = default;
+  CellularLightArray(CellularLightArray&&) noexcept = default;
+  CellularLightArray& operator=(CellularLightArray&&) noexcept = default;
 
   struct Cell {
     LightValue light;
@@ -57,123 +76,69 @@ public:
     Vec2F position;
     LightValue value;
     float beam;
-    float beamAngle;
-    float beamAmbience;
-    bool asSpread;
+    float beam_angle;
+    float beam_ambience;
+    bool as_spread;
   };
 
-  void setParameters(unsigned spreadPasses, float spreadMaxAir, float spreadMaxObstacle,
-      float pointMaxAir, float pointMaxObstacle, float pointObstacleBoost, bool pointAdditive);
+  void set_parameters(LightParameters const& parameters) { m_parameters = parameters; }
 
   // The border around the target lighting array where initial lighting / light
   // source data is required.  Based on parameters.
-  std::size_t borderCells() const;
+  std::size_t border_cells() const { return m_parameters.border; }
 
-  // Begin a new calculation, setting internal storage to new width and height
-  // (if these are the same as last time this is cheap).  Always clears all
-  // existing light and collision data.
-  void begin(std::size_t newWidth, std::size_t newHeight);
+  // Retain capacity across shape changes. A rejected size leaves the current frame intact.
+  [[nodiscard]] std::expected<void, StarException> begin(std::size_t width, std::size_t height);
 
   // Position is in index space, spread lights will have no effect if they are
   // outside of the array.  Integer points are assumed to be on the corners of
   // the grid (not the center)
-  void addSpreadLight(SpreadLight const& spreadLight);
-  void addPointLight(PointLight const& pointLight);
+  void add_spread_light(SpreadLight const& spread_light);
+  void add_point_light(PointLight const& point_light);
 
   // Directly set the lighting values for this position.
-  void setLight(std::size_t x, std::size_t y, LightValue const& light);
+  void set_light(std::size_t x, std::size_t y, LightValue const& light);
 
   // Get current light value.  Call after calling calculate() to pull final
   // data out.
-  LightValue getLight(std::size_t x, std::size_t y) const;
+  LightValue get_light(std::size_t x, std::size_t y) const;
 
   // Set obstacle values for this position
-  void setObstacle(std::size_t x, std::size_t y, bool obstacle);
-  bool getObstacle(std::size_t x, std::size_t y) const;
+  void set_obstacle(std::size_t x, std::size_t y, bool obstacle);
+  bool get_obstacle(std::size_t x, std::size_t y) const;
 
   Cell const& cell(std::size_t x, std::size_t y) const;
   Cell& cell(std::size_t x, std::size_t y);
 
-  Cell const& cellAtIndex(std::size_t index) const;
-  Cell& cellAtIndex(std::size_t index);
+  Cell const& cell_at_index(std::size_t index) const;
+  Cell& cell_at_index(std::size_t index);
 
-  // Calculate lighting in the given sub-rect, in order to properly do spread
-  // lighting, and initial lighting must be given for the ambient border this
-  // given rect, and the array size must be at least that large.  xMax / yMax
-  // are not inclusive, the range is [xMin, xMax) and [yMin, yMax).
-  void calculate(std::size_t xMin, std::size_t yMin, std::size_t xMax, std::size_t yMax);
+  // Calculate within the half-open rectangle clipped to the grid. Supply
+  // initial light and obstacle data for its ambient border as well.
+  void calculate(std::size_t x_min, std::size_t y_min, std::size_t x_max, std::size_t y_max);
 
 private:
   // Set 4 points based on interpolated light position and free space
   // attenuation.
-  void setSpreadLightingPoints();
+  void set_spread_lighting_points();
 
   // Spreads light out in an octagonal based cellular automata
-  void calculateLightSpread(std::size_t xmin, std::size_t ymin, std::size_t xmax, std::size_t ymax);
+  void calculate_light_spread(std::size_t xmin, std::size_t ymin, std::size_t xmax, std::size_t ymax);
 
   // Loops through each light and adds light strength based on distance and
   // obstacle attenuation.  Calculates within the given sub-rect
-  void calculatePointLighting(std::size_t xmin, std::size_t ymin, std::size_t xmax, std::size_t ymax);
+  void calculate_point_lighting(std::size_t xmin, std::size_t ymin, std::size_t xmax, std::size_t ymax);
 
-  // Run Xiaolin Wu's anti-aliased line drawing algorithm from start to end,
-  // summing each block that would be drawn to to produce an attenuation.  Not
-  // circularized.
-  float lineAttenuation(Vec2F const& start, Vec2F const& end, float perObstacleAttenuation, float maxAttenuation);
-
-  std::size_t m_width;
-  std::size_t m_height;
-  std::unique_ptr<Cell[]> m_cells;
-  List<SpreadLight> m_spreadLights;
-  List<PointLight> m_pointLights;
-
-  unsigned m_spreadPasses;
-  float m_spreadMaxAir;
-  float m_spreadMaxObstacle;
-  float m_pointMaxAir;
-  float m_pointMaxObstacle;
-  float m_pointObstacleBoost;
-  bool m_pointAdditive;
+  std::size_t m_width = 0;
+  std::size_t m_height = 0;
+  std::vector<Cell> m_cells;
+  List<SpreadLight> m_spread_lights;
+  List<PointLight> m_point_lights;
+  LightParameters m_parameters;
 };
 
 using ColoredCellularLightArray = CellularLightArray<ColoredLightTraits>;
 using ScalarCellularLightArray = CellularLightArray<ScalarLightTraits>;
-
-inline float ScalarLightTraits::spread(float source, float dest, float drop) {
-  return std::max(source - drop, dest);
-}
-
-inline float ScalarLightTraits::subtract(float c, float drop) {
-  return std::max(c - drop, 0.0f);
-}
-
-inline float ScalarLightTraits::multiply(float v1, float v2) {
-  return v1 * v2;
-}
-
-inline float ScalarLightTraits::maxIntensity(float value) {
-  return value;
-}
-
-inline float ScalarLightTraits::minIntensity(float value) {
-  return value;
-}
-
-inline float ScalarLightTraits::max(float v1, float v2) {
-  return std::max(v1, v2);
-}
-
-inline Vec3F ColoredLightTraits::spread(Vec3F const& source, Vec3F const& dest, float drop) {
-  float maxChannel = std::max(source[0], std::max(source[1], source[2]));
-  if (maxChannel <= 0.0f)
-    return dest;
-
-  drop /= maxChannel;
-  return Vec3F(
-      std::max(source[0] - source[0] * drop, dest[0]),
-      std::max(source[1] - source[1] * drop, dest[1]),
-      std::max(source[2] - source[2] * drop, dest[2])
-    );
-}
 
 inline Vec3F ColoredLightTraits::subtract(Vec3F c, float drop) {
   float max = std::max(std::max(c[0], c[1]), c[2]);
@@ -190,89 +155,86 @@ inline Vec3F ColoredLightTraits::subtract(Vec3F c, float drop) {
   return c;
 }
 
-inline Vec3F ColoredLightTraits::multiply(Vec3F c, float drop) {
-  return c * drop;
+inline std::expected<LightParameters, StarException> LightParameters::create(std::int64_t passes,
+    float spread_air, float spread_obstacle, float point_air, float point_obstacle, float boost, bool additive) {
+  if (!std::in_range<unsigned>(passes))
+    return std::unexpected(StarException("Light spread passes must be representable as unsigned"));
+  auto finite = classify_finite(spread_air, spread_obstacle, point_air, point_obstacle, boost);
+  if (!std::ranges::all_of(finite, std::identity{}) || spread_air <= 0 || spread_obstacle <= 0
+      || point_air <= 0 || point_obstacle <= 0 || boost < 0)
+    return std::unexpected(StarException("Lighting requires finite positive distances and a finite nonnegative obstacle boost"));
+
+  double border = std::ceil(static_cast<double>(std::max(spread_air, point_air)));
+  if (border > std::numeric_limits<int>::max())
+    return std::unexpected(StarException("Light border exceeds the coordinate range"));
+
+  LightParameters result;
+  result.spread_passes = static_cast<unsigned>(passes);
+  result.spread_max_air = spread_air;
+  result.spread_max_obstacle = spread_obstacle;
+  result.point_max_air = point_air;
+  result.point_max_obstacle = point_obstacle;
+  result.spread_drop_air = 1.0f / spread_air;
+  result.spread_drop_obstacle = 1.0f / spread_obstacle;
+  result.spread_drop_air_diag = result.spread_drop_air * std::numbers::sqrt2;
+  result.spread_drop_obstacle_diag = result.spread_drop_obstacle * std::numbers::sqrt2;
+  float point_drop_air = 1.0f / point_air;
+  float point_drop_obstacle = 1.0f / point_obstacle;
+  if (!std::ranges::all_of(classify_finite(result.spread_drop_air_diag, result.spread_drop_obstacle_diag,
+          point_drop_air, point_drop_obstacle), std::identity{}))
+    return std::unexpected(StarException("Light attenuation exceeds the floating-point range"));
+  result.point_obstacle_boost = boost;
+  result.point_additive = additive;
+  result.spread_border = static_cast<std::size_t>(std::ceil(spread_air));
+  result.border = static_cast<std::size_t>(border);
+  return result;
 }
 
-inline float ColoredLightTraits::maxIntensity(Vec3F const& value) {
-  return value.max();
+template <light_traits LightTraits>
+std::expected<void, StarException> CellularLightArray<LightTraits>::begin(std::size_t width, std::size_t height) {
+  if (!width || !height || !std::in_range<int>(width) || !std::in_range<int>(height)
+      || width > m_cells.max_size() / height)
+    return std::unexpected(StarException("Invalid cellular lighting dimensions"));
+
+  m_cells.assign(width * height, Cell{});
+  m_width = width;
+  m_height = height;
+  m_spread_lights.clear();
+  m_point_lights.clear();
+  return {};
 }
 
-inline float ColoredLightTraits::minIntensity(Vec3F const& value) {
-  return value.min();
+template <light_traits LightTraits>
+void CellularLightArray<LightTraits>::add_spread_light(SpreadLight const& spread_light) {
+  m_spread_lights.push_back(spread_light);
 }
 
-inline Vec3F ColoredLightTraits::max(Vec3F const& v1, Vec3F const& v2) {
-  return vmax(v1, v2);
+template <light_traits LightTraits>
+void CellularLightArray<LightTraits>::add_point_light(PointLight const& point_light) {
+  m_point_lights.push_back(point_light);
 }
 
-template <typename LightTraits>
-void CellularLightArray<LightTraits>::setParameters(unsigned spreadPasses, float spreadMaxAir, float spreadMaxObstacle,
-    float pointMaxAir, float pointMaxObstacle, float pointObstacleBoost, bool pointAdditive) {
-  m_spreadPasses = spreadPasses;
-  m_spreadMaxAir = spreadMaxAir;
-  m_spreadMaxObstacle = spreadMaxObstacle;
-  m_pointMaxAir = pointMaxAir;
-  m_pointMaxObstacle = pointMaxObstacle;
-  m_pointObstacleBoost = pointObstacleBoost;
-  m_pointAdditive = pointAdditive;
+template <light_traits LightTraits>
+void CellularLightArray<LightTraits>::set_light(std::size_t x, std::size_t y, LightValue const& light_value) {
+  cell(x, y).light = light_value;
 }
 
-template <typename LightTraits>
-std::size_t CellularLightArray<LightTraits>::borderCells() const {
-  return static_cast<std::size_t>(std::ceil(std::max(0.0f, std::max(m_spreadMaxAir, m_pointMaxAir))));
-}
-
-template <typename LightTraits>
-void CellularLightArray<LightTraits>::begin(std::size_t newWidth, std::size_t newHeight) {
-  m_spreadLights.clear();
-  m_pointLights.clear();
-  if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((newWidth > 0 && newHeight > 0));
-  }
-
-  if (!m_cells || newWidth != m_width || newHeight != m_height) {
-    m_width = newWidth;
-    m_height = newHeight;
-
-    m_cells.reset(new Cell[m_width * m_height]());
-
-  } else {
-    std::ranges::fill(std::span{m_cells.get(), m_width * m_height}, Cell{LightValue{}, false});
-  }
-}
-
-template <typename LightTraits>
-void CellularLightArray<LightTraits>::addSpreadLight(SpreadLight const& spreadLight) {
-  m_spreadLights.push_back(spreadLight);
-}
-
-template <typename LightTraits>
-void CellularLightArray<LightTraits>::addPointLight(PointLight const& pointLight) {
-  m_pointLights.push_back(pointLight);
-}
-
-template <typename LightTraits>
-void CellularLightArray<LightTraits>::setLight(std::size_t x, std::size_t y, LightValue const& lightValue) {
-  cell(x, y).light = lightValue;
-}
-
-template <typename LightTraits>
-void CellularLightArray<LightTraits>::setObstacle(std::size_t x, std::size_t y, bool obstacle) {
+template <light_traits LightTraits>
+void CellularLightArray<LightTraits>::set_obstacle(std::size_t x, std::size_t y, bool obstacle) {
   cell(x, y).obstacle = obstacle;
 }
 
-template <typename LightTraits>
-auto CellularLightArray<LightTraits>::getLight(std::size_t x, std::size_t y) const -> LightValue {
+template <light_traits LightTraits>
+auto CellularLightArray<LightTraits>::get_light(std::size_t x, std::size_t y) const -> LightValue {
   return cell(x, y).light;
 }
 
-template <typename LightTraits>
-bool CellularLightArray<LightTraits>::getObstacle(std::size_t x, std::size_t y) const {
+template <light_traits LightTraits>
+bool CellularLightArray<LightTraits>::get_obstacle(std::size_t x, std::size_t y) const {
   return cell(x, y).obstacle;
 }
 
-template <typename LightTraits>
+template <light_traits LightTraits>
 auto CellularLightArray<LightTraits>::cell(std::size_t x, std::size_t y) const -> Cell const & {
   if constexpr (Star::DebugEnabled) {
     Star::star_assert_failed((x < m_width && y < m_height));
@@ -280,7 +242,7 @@ auto CellularLightArray<LightTraits>::cell(std::size_t x, std::size_t y) const -
   return m_cells[x * m_height + y];
 }
 
-template <typename LightTraits>
+template <light_traits LightTraits>
 auto CellularLightArray<LightTraits>::cell(std::size_t x, std::size_t y) -> Cell & {
   if constexpr (Star::DebugEnabled) {
     Star::star_assert_failed((x < m_width && y < m_height));
@@ -288,284 +250,141 @@ auto CellularLightArray<LightTraits>::cell(std::size_t x, std::size_t y) -> Cell
   return m_cells[x * m_height + y];
 }
 
-template <typename LightTraits>
-auto CellularLightArray<LightTraits>::cellAtIndex(std::size_t index) const -> Cell const & {
+template <light_traits LightTraits>
+auto CellularLightArray<LightTraits>::cell_at_index(std::size_t index) const -> Cell const & {
   if constexpr (Star::DebugEnabled) {
     Star::star_assert_failed((index < m_width * m_height));
   }
   return m_cells[index];
 }
 
-template <typename LightTraits>
-auto CellularLightArray<LightTraits>::cellAtIndex(std::size_t index) -> Cell & {
+template <light_traits LightTraits>
+auto CellularLightArray<LightTraits>::cell_at_index(std::size_t index) -> Cell & {
   if constexpr (Star::DebugEnabled) {
     Star::star_assert_failed((index < m_width * m_height));
   }
   return m_cells[index];
 }
 
-template <typename LightTraits>
-void CellularLightArray<LightTraits>::calculate(std::size_t xMin, std::size_t yMin, std::size_t xMax, std::size_t yMax) {
-  setSpreadLightingPoints();
-  calculateLightSpread(xMin, yMin, xMax, yMax);
-  calculatePointLighting(xMin, yMin, xMax, yMax);
+template <light_traits LightTraits>
+void CellularLightArray<LightTraits>::calculate(std::size_t x_min, std::size_t y_min, std::size_t x_max, std::size_t y_max) {
+  x_max = std::min(x_max, m_width);
+  y_max = std::min(y_max, m_height);
+  if (m_cells.empty() || x_min >= x_max || y_min >= y_max)
+    return;
+  set_spread_lighting_points();
+  calculate_light_spread(x_min, y_min, x_max, y_max);
+  calculate_point_lighting(x_min, y_min, x_max, y_max);
 }
 
-template <typename LightTraits>
-void CellularLightArray<LightTraits>::setSpreadLightingPoints() {
-  for (SpreadLight const& light : m_spreadLights) {
-    // - 0.5f to correct for lights being on the grid corners and not center
-    int minX = std::floor(light.position[0] - 0.5f);
-    int minY = std::floor(light.position[1] - 0.5f);
-    int maxX = minX + 1;
-    int maxY = minY + 1;
-
-    float xdist = light.position[0] - minX - 0.5f;
-    float ydist = light.position[1] - minY - 0.5f;
-
-    // Pick falloff here based on closest block obstacle value (probably not
-    // best)
-    Vec2I pos(light.position.floor());
-    float oneBlockAtt;
-    if (pos[0] >= 0 && pos[0] < static_cast<int>(m_width) && pos[1] >= 0 && pos[1] < static_cast<int>(m_height)
-        && getObstacle(pos[0], pos[1]))
-      oneBlockAtt = 1.0f / m_spreadMaxObstacle;
-    else
-      oneBlockAtt = 1.0f / m_spreadMaxAir;
-
-    // "pre fall-off" a 2x2 area of blocks to smooth out floating point
-    // positions using the cellular algorithm
-
-    if (minX >= 0 && minX < static_cast<int>(m_width) && minY >= 0 && minY < static_cast<int>(m_height))
-      setLight(minX, minY, LightTraits::max(getLight(minX, minY), LightTraits::subtract(light.value, oneBlockAtt * (2.0f - (1.0f - xdist) - (1.0f - ydist)))));
-
-    if (minX >= 0 && minX < static_cast<int>(m_width) && maxY >= 0 && maxY < static_cast<int>(m_height))
-      setLight(minX, maxY, LightTraits::max(getLight(minX, maxY), LightTraits::subtract(light.value, oneBlockAtt * (2.0f - (1.0f - xdist) - (ydist)))));
-
-    if (maxX >= 0 && maxX < static_cast<int>(m_width) && minY >= 0 && minY < static_cast<int>(m_height))
-      setLight(maxX, minY, LightTraits::max(getLight(maxX, minY), LightTraits::subtract(light.value, oneBlockAtt * (2.0f - (xdist) - (1.0f - ydist)))));
-
-    if (maxX >= 0 && maxX < static_cast<int>(m_width) && maxY >= 0 && maxY < static_cast<int>(m_height))
-      setLight(maxX, maxY, LightTraits::max(getLight(maxX, maxY), LightTraits::subtract(light.value, oneBlockAtt * (2.0f - (xdist) - (ydist)))));
+template <light_traits LightTraits>
+void CellularLightArray<LightTraits>::set_spread_lighting_points() {
+  for (SpreadLight const& light : m_spread_lights) {
+    // Retain the original float subtraction/floor near half-cell boundaries.
+    // Check the bounded footprint before converting to int (including remote sources).
+    auto const& position = light.position;
+    auto finite = classify_finite(position[0], position[1]);
+    if (!finite[0] || !finite[1])
+      continue;
+    float base_x = std::floor(position[0] - 0.5f);
+    float base_y = std::floor(position[1] - 0.5f);
+    if (base_x < -1 || base_y < -1 || static_cast<double>(base_x) >= m_width
+        || static_cast<double>(base_y) >= m_height)
+      continue;
+    int min_x = static_cast<int>(base_x);
+    int min_y = static_cast<int>(base_y);
+    float xdist = position[0] - min_x - 0.5f;
+    float ydist = position[1] - min_y - 0.5f;
+    int nearest_x = static_cast<int>(std::floor(position[0]));
+    int nearest_y = static_cast<int>(std::floor(position[1]));
+    auto inside = [&](int x, int y) {
+      return static_cast<unsigned>(x) < m_width && static_cast<unsigned>(y) < m_height;
+    };
+    float attenuation = inside(nearest_x, nearest_y) && get_obstacle(nearest_x, nearest_y)
+        ? m_parameters.spread_drop_obstacle : m_parameters.spread_drop_air;
+    auto seed = [&](int x, int y, float xweight, float yweight) {
+      if (inside(x, y)) {
+        auto& dest = cell(x, y).light;
+        dest = LightTraits::max(dest, LightTraits::subtract(light.value, attenuation * (2.0f - xweight - yweight)));
+      }
+    };
+    seed(min_x, min_y, 1.0f - xdist, 1.0f - ydist);
+    seed(min_x, min_y + 1, 1.0f - xdist, ydist);
+    seed(min_x + 1, min_y, xdist, 1.0f - ydist);
+    seed(min_x + 1, min_y + 1, xdist, ydist);
   }
 }
 
-template <typename LightTraits>
-void CellularLightArray<LightTraits>::calculateLightSpread(std::size_t xMin, std::size_t yMin, std::size_t xMax, std::size_t yMax) {
-  if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed((m_width > 0 && m_height > 0));
-  }
+template <light_traits LightTraits>
+void CellularLightArray<LightTraits>::calculate_light_spread(std::size_t x_min, std::size_t y_min, std::size_t x_max, std::size_t y_max) {
+  if (!m_parameters.spread_passes)
+    return;
+  auto border = m_parameters.spread_border;
+  x_min -= std::min(x_min, border);
+  y_min -= std::min(y_min, border);
+  x_max += std::min(m_width - x_max, border);
+  y_max += std::min(m_height - y_max, border);
+  if (x_max - x_min < 3 || y_max - y_min < 3)
+    return;
 
-  float dropoffAir = 1.0f / m_spreadMaxAir;
-  float dropoffObstacle = 1.0f / m_spreadMaxObstacle;
-  float dropoffAirDiag = 1.0f / m_spreadMaxAir * std::numbers::sqrt2;
-  float dropoffObstacleDiag = 1.0f / m_spreadMaxObstacle * std::numbers::sqrt2;
-
-  // enlarge x/y min/max taking into ambient spread of light
-  xMin = xMin - std::min(xMin, static_cast<std::size_t>(std::ceil(m_spreadMaxAir)));
-  yMin = yMin - std::min(yMin, static_cast<std::size_t>(std::ceil(m_spreadMaxAir)));
-  xMax = std::min(m_width, xMax + static_cast<std::size_t>(std::ceil(m_spreadMaxAir)));
-  yMax = std::min(m_height, yMax + static_cast<std::size_t>(std::ceil(m_spreadMaxAir)));
-
-  auto propagate = [&](Cell const& source, Cell& straightA, Cell& straightB, Cell& diagonalA, Cell& diagonalB) {
-    float straightDropoff = source.obstacle ? dropoffObstacle : dropoffAir;
-    float diagonalDropoff = source.obstacle ? dropoffObstacleDiag : dropoffAirDiag;
+  float air = m_parameters.spread_drop_air;
+  float obstacle = m_parameters.spread_drop_obstacle;
+  float air_diag = m_parameters.spread_drop_air_diag;
+  float obstacle_diag = m_parameters.spread_drop_obstacle_diag;
+  auto propagate = [=](Cell const& source, Cell& straight_a, Cell& straight_b, Cell& diagonal_a, Cell& diagonal_b) {
+    float straight_drop = source.obstacle ? obstacle : air;
+    float diagonal_drop = source.obstacle ? obstacle_diag : air_diag;
+    auto combine = [&](LightValue const& straight, LightValue const& diagonal) {
+      straight_a.light = LightTraits::max(straight, straight_a.light);
+      straight_b.light = LightTraits::max(straight, straight_b.light);
+      diagonal_a.light = LightTraits::max(diagonal, diagonal_a.light);
+      diagonal_b.light = LightTraits::max(diagonal, diagonal_b.light);
+    };
     if constexpr (std::same_as<LightTraits, ScalarLightTraits>) {
-      auto straightLight = source.light - straightDropoff;
-      auto diagonalLight = source.light - diagonalDropoff;
-      straightA.light = LightTraits::max(straightLight, straightA.light);
-      straightB.light = LightTraits::max(straightLight, straightB.light);
-      diagonalA.light = LightTraits::max(diagonalLight, diagonalA.light);
-      diagonalB.light = LightTraits::max(diagonalLight, diagonalB.light);
+      combine(source.light - straight_drop, source.light - diagonal_drop);
     } else {
-      straightA.light = LightTraits::spread(source.light, straightA.light, straightDropoff);
-      straightB.light = LightTraits::spread(source.light, straightB.light, straightDropoff);
-      diagonalA.light = LightTraits::spread(source.light, diagonalA.light, diagonalDropoff);
-      diagonalB.light = LightTraits::spread(source.light, diagonalB.light, diagonalDropoff);
+      auto const& color = source.light;
+      float peak = std::max(color[0], std::max(color[1], color[2]));
+      if (peak <= 0.0f)
+        return;
+      // Spread divides first, then subtracts channel * drop. Point subtraction
+      // multiplies first and clamps at zero; those are not interchangeable.
+      auto candidate = [&](float drop) {
+        drop /= peak;
+        return Vec3F(color[0] - color[0] * drop, color[1] - color[1] * drop, color[2] - color[2] * drop);
+      };
+      combine(candidate(straight_drop), candidate(diagonal_drop));
     }
   };
 
-  for (unsigned p = 0; p < m_spreadPasses; ++p) {
-    // Spread right and up and diag up right / diag down right
-    for (std::size_t x = xMin + 1; x < xMax - 1; ++x) {
-      std::size_t xCellOffset = x * m_height;
-      std::size_t xRightCellOffset = (x + 1) * m_height;
-
-      for (std::size_t y = yMin + 1; y < yMax - 1; ++y) {
-        auto cell = cellAtIndex(xCellOffset + y);
-        auto& cellRight = cellAtIndex(xRightCellOffset + y);
-        auto& cellUp = cellAtIndex(xCellOffset + y + 1);
-        auto& cellRightUp = cellAtIndex(xRightCellOffset + y + 1);
-        auto& cellRightDown = cellAtIndex(xRightCellOffset + y - 1);
-
-        propagate(cell, cellRight, cellUp, cellRightUp, cellRightDown);
-      }
+  // The clipped rectangle has an interior and its one-cell halo. Slice
+  // columns once, rather than checking five full-grid offsets at every cell.
+  auto height = y_max - y_min;
+  auto column = [&](std::size_t x) {
+    return std::span{m_cells}.subspan(x * m_height + y_min, height);
+  };
+  auto sweep_column = [&]<bool reverse>(std::size_t x) {
+    auto source = column(x);
+    auto target = column(reverse ? x - 1 : x + 1);
+    auto spread = [&](std::size_t y) {
+      auto ahead = reverse ? y - 1 : y + 1;
+      auto behind = reverse ? y + 1 : y - 1;
+      propagate(source[y], target[y], source[ahead], target[ahead], target[behind]);
+    };
+    if constexpr (reverse) {
+      for (std::size_t y = height - 2; y != 0; --y)
+        spread(y);
+    } else {
+      for (std::size_t y = 1; y < height - 1; ++y)
+        spread(y);
     }
-
-    // Spread left and down and diag up left / diag down left
-    for (std::size_t x = xMax - 2; x > xMin; --x) {
-      std::size_t xCellOffset = x * m_height;
-      std::size_t xLeftCellOffset = (x - 1) * m_height;
-
-      for (std::size_t y = yMax - 2; y > yMin; --y) {
-        auto cell = cellAtIndex(xCellOffset + y);
-        auto& cellLeft = cellAtIndex(xLeftCellOffset + y);
-        auto& cellDown = cellAtIndex(xCellOffset + y - 1);
-        auto& cellLeftUp = cellAtIndex(xLeftCellOffset + y + 1);
-        auto& cellLeftDown = cellAtIndex(xLeftCellOffset + y - 1);
-
-        propagate(cell, cellLeft, cellDown, cellLeftUp, cellLeftDown);
-      }
-    }
+  };
+  for (unsigned p = 0; p < m_parameters.spread_passes; ++p) {
+    for (std::size_t x = x_min + 1; x < x_max - 1; ++x)
+      sweep_column.template operator()<false>(x);
+    for (std::size_t x = x_max - 2; x > x_min; --x)
+      sweep_column.template operator()<true>(x);
   }
-}
-
-template <typename LightTraits>
-float CellularLightArray<LightTraits>::lineAttenuation(Vec2F const& start, Vec2F const& end,
-    float perObstacleAttenuation, float maxAttenuation) {
-  // Run Xiaolin Wu's line algorithm from start to end, summing over colliding
-  // blocks using perObstacleAttenuation.
-  // Ray coordinates already require a finite, int-representable floor for
-  // indexing. Truncation plus the negative-fraction correction gives that
-  // same integer without a floor/floorf library call in every ray step.
-  auto integerPart = [](auto value) {
-    int whole = static_cast<int>(value);
-    return whole - static_cast<int>(value < static_cast<decltype(value)>(whole));
-  };
-  auto fractionalPart = [&](auto value) -> decltype(value) {
-    return value - integerPart(value);
-  };
-  auto reverseFractionalPart = [&](auto value) -> decltype(value) {
-    return 1.0 - fractionalPart(value);
-  };
-  float obstacleAttenuation = 0.0;
-
-  // Apply correction because integer coordinates are lower left corner.
-  float x1 = start[0] - 0.5;
-  float y1 = start[1] - 0.5;
-  float x2 = end[0] - 0.5;
-  float y2 = end[1] - 0.5;
-
-  float dx = x2 - x1;
-  float dy = y2 - y1;
-
-  if (std::fabs(dx) < std::fabs(dy)) {
-    if (y2 < y1) {
-      std::swap(y1, y2);
-      std::swap(x1, x2);
-    }
-
-    float gradient = dx / dy;
-
-    // first end point
-    float yend = std::round(y1);
-    float xend = x1 + gradient * (yend - y1);
-    float ygap = reverseFractionalPart(y1 + 0.5);
-    int ypxl1 = yend;
-    int xpxl1 = integerPart(xend);
-
-    if (cell(xpxl1, ypxl1).obstacle)
-      obstacleAttenuation += reverseFractionalPart(xend) * ygap * perObstacleAttenuation;
-
-    if (cell(xpxl1 + 1, ypxl1).obstacle)
-      obstacleAttenuation += fractionalPart(xend) * ygap * perObstacleAttenuation;
-
-    if (obstacleAttenuation >= maxAttenuation)
-      return maxAttenuation;
-
-    float interx = xend + gradient;
-
-    // second end point
-    yend = std::round(y2);
-    xend = x2 + gradient * (yend - y2);
-    ygap = fractionalPart(y2 + 0.5);
-    int ypxl2 = yend;
-    int xpxl2 = integerPart(xend);
-
-    if (cell(xpxl2, ypxl2).obstacle)
-      obstacleAttenuation += reverseFractionalPart(xend) * ygap * perObstacleAttenuation;
-
-    if (cell(xpxl2 + 1, ypxl2).obstacle)
-      obstacleAttenuation += fractionalPart(xend) * ygap * perObstacleAttenuation;
-
-    if (obstacleAttenuation >= maxAttenuation)
-      return maxAttenuation;
-
-    for (int y = ypxl1 + 1; y < ypxl2; ++y) {
-      int interxIpart = integerPart(interx);
-      float interxFpart = interx - interxIpart;
-      float interxRFpart = 1.0 - interxFpart;
-
-      if (cell(interxIpart, y).obstacle)
-        obstacleAttenuation += interxRFpart * perObstacleAttenuation;
-      if (cell(interxIpart + 1, y).obstacle)
-        obstacleAttenuation += interxFpart * perObstacleAttenuation;
-
-      if (obstacleAttenuation >= maxAttenuation)
-        return maxAttenuation;
-
-      interx += gradient;
-    }
-  } else {
-    if (x2 < x1) {
-      std::swap(x1, x2);
-      std::swap(y1, y2);
-    }
-
-    float gradient = dy / dx;
-
-    // first end point
-    float xend = std::round(x1);
-    float yend = y1 + gradient * (xend - x1);
-    float xgap = reverseFractionalPart(x1 + 0.5);
-    int xpxl1 = xend;
-    int ypxl1 = integerPart(yend);
-
-    if (cell(xpxl1, ypxl1).obstacle)
-      obstacleAttenuation += reverseFractionalPart(yend) * xgap * perObstacleAttenuation;
-
-    if (cell(xpxl1, ypxl1 + 1).obstacle)
-      obstacleAttenuation += fractionalPart(yend) * xgap * perObstacleAttenuation;
-
-    if (obstacleAttenuation >= maxAttenuation)
-      return maxAttenuation;
-
-    float intery = yend + gradient;
-
-    // second end point
-    xend = std::round(x2);
-    yend = y2 + gradient * (xend - x2);
-    xgap = fractionalPart(x2 + 0.5);
-    int xpxl2 = xend;
-    int ypxl2 = integerPart(yend);
-
-    if (cell(xpxl2, ypxl2).obstacle)
-      obstacleAttenuation += reverseFractionalPart(yend) * xgap * perObstacleAttenuation;
-
-    if (cell(xpxl2, ypxl2 + 1).obstacle)
-      obstacleAttenuation += fractionalPart(yend) * xgap * perObstacleAttenuation;
-
-    if (obstacleAttenuation >= maxAttenuation)
-      return maxAttenuation;
-
-    for (int x = xpxl1 + 1; x < xpxl2; ++x) {
-      int interyIpart = integerPart(intery);
-      float interyFpart = intery - interyIpart;
-      float interyRFpart = 1.0 - interyFpart;
-
-      if (cell(x, interyIpart).obstacle)
-        obstacleAttenuation += interyRFpart * perObstacleAttenuation;
-      if (cell(x, interyIpart + 1).obstacle)
-        obstacleAttenuation += interyFpart * perObstacleAttenuation;
-
-      if (obstacleAttenuation >= maxAttenuation)
-        return maxAttenuation;
-
-      intery += gradient;
-    }
-  }
-
-  return std::min(obstacleAttenuation, maxAttenuation);
 }
 
 }
@@ -575,6 +394,8 @@ export module star.cellular_light_array;
 export namespace Star {
   using ::Star::ScalarLightTraits;
   using ::Star::ColoredLightTraits;
+  using ::Star::light_traits;
+  using ::Star::LightParameters;
   using ::Star::CellularLightArray;
   using ::Star::ColoredCellularLightArray;
   using ::Star::ScalarCellularLightArray;

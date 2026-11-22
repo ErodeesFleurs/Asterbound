@@ -2891,7 +2891,7 @@ std::expected<void, StarException> WorldServer::init(bool firstTime) {
   auto result310 = assets->json("/lighting.config:intensity");
   if (!result310)
     return std::unexpected(std::move(result310.error()));
-  auto result311 = m_lightIntensityCalculator.setParameters(std::move(*result310));
+  auto result311 = m_lightIntensityCalculator.set_parameters(std::move(*result310));
   if (!result311)
     return std::unexpected(std::move(result311.error()));
 

@@ -3154,7 +3154,7 @@ std::expected<void, StarException> gatherClientLightingTiles(CellularLightingCal
                                                              Vec3F const& environmentLight, float undergroundLevel) {
   // Each column is guaranteed to be no larger than the sector size.
   auto gatherColumn = [&](Vec2I const& pos, std::span<ClientTile const> column) -> std::expected<void, StarException> {
-    std::size_t baseIndex = calculator.baseIndexFor(pos);
+    std::size_t baseIndex = calculator.base_index_for(pos);
     for (std::size_t y = 0; y < column.size(); ++y) {
       auto& tile = column[y];
       Vec3F light;
@@ -3168,12 +3168,12 @@ std::expected<void, StarException> gatherClientLightingTiles(CellularLightingCal
         if (tile.backgroundLightTransparent && pos[1] + y > undergroundLevel)
           light += environmentLight;
       }
-      calculator.setCellIndex(baseIndex + y, light, !tile.foregroundLightTransparent);
+      calculator.set_cell_index(baseIndex + y, light, !tile.foregroundLightTransparent);
     }
     return {};
   };
 
-  RectI region = calculator.calculationRegion();
+  RectI region = calculator.calculation_region();
   int worldWidth = static_cast<int>(tiles.size()[0]);
   int worldHeight = static_cast<int>(tiles.size()[1]);
   int gatheredRows = std::clamp(region.y_max(), 0, worldHeight) - std::clamp(region.y_min(), 0, worldHeight);
@@ -3272,13 +3272,14 @@ std::expected<void, StarException> WorldClient::lightingCalc() {
   auto result245 = (std::move(*result244)).set("pointAdditive", newLighting);
   if (!result245)
     return std::unexpected(std::move(result245.error()));
-  auto result246 = m_lightingCalculator.setParameters((std::move(*result245)));
+  auto result246 = m_lightingCalculator.set_parameters((std::move(*result245)));
   if (!result246)
     return std::unexpected(std::move(result246.error()));
-  auto result247 = m_lightingCalculator.setMonochrome(monochrome);
+  auto result247 = m_lightingCalculator.set_monochrome(monochrome);
   if (!result247)
     return std::unexpected(std::move(result247.error()));
-  m_lightingCalculator.begin(lightRange);
+  auto begun = m_lightingCalculator.begin(lightRange);
+  if (!begun) return std::unexpected(std::move(begun.error()));
   auto result248 = lightingTileGather();
   if (!result248)
     return std::unexpected(std::move(result248.error()));
@@ -3286,7 +3287,7 @@ std::expected<void, StarException> WorldClient::lightingCalc() {
   auto prepEnd = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
   prepLocker.unlock();
   
-  Vec2I regionMin = m_lightingCalculator.calculationRegion().min();
+  Vec2I regionMin = m_lightingCalculator.calculation_region().min();
   auto resolvePosition = [&, &self = *this](Vec2F const& pos) -> Vec2F {
     float xFloor = std::floor(pos[0]);
     float xOffset =
@@ -3297,25 +3298,25 @@ std::expected<void, StarException> WorldClient::lightingCalc() {
   for (auto const& light : lights) {
     Vec2F position = resolvePosition(light.position);
     if (light.type == LightType::Spread) {
-      m_lightingCalculator.addSpreadLight(position, light.color);
+      m_lightingCalculator.add_spread_light(position, light.color);
     } else {
       if (light.type == LightType::PointAsSpread) {
         if (!newLighting) {
-          m_lightingCalculator.addSpreadLight(position, light.color);
+          m_lightingCalculator.add_spread_light(position, light.color);
         } else {
           // hybrid (used for auto-converted object lights) - 85% spread, 15% point (* .15 is applied in the calculation code)
-          m_lightingCalculator.addSpreadLight(position, light.color * 0.85f);
-          m_lightingCalculator.addPointLight(position, light.color, light.pointBeam, light.beamAngle, light.beamAmbience, true);
+          m_lightingCalculator.add_spread_light(position, light.color * 0.85f);
+          m_lightingCalculator.add_point_light(position, light.color, light.pointBeam, light.beamAngle, light.beamAmbience, true);
         }
       } else {
-        m_lightingCalculator.addPointLight(position, light.color, light.pointBeam, light.beamAngle, light.beamAmbience);
+        m_lightingCalculator.add_point_light(position, light.color, light.pointBeam, light.beamAngle, light.beamAmbience);
       }
     }
   }
   
   for (auto const& lightPair : particleLights) {
     Vec2F position = resolvePosition(lightPair.first);
-    m_lightingCalculator.addSpreadLight(position, lightPair.second);
+    m_lightingCalculator.add_spread_light(position, lightPair.second);
   }
   
   auto result249 = m_lightingCalculator.calculate(m_pendingLightMap);
@@ -3472,19 +3473,19 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
     auto result267 = (std::move(*result266)).to_bool();
     if (!result267)
       return std::unexpected(std::move(result267.error()));
-    auto result268 = m_lightingCalculator.setMonochrome((std::move(*result267)));
+    auto result268 = m_lightingCalculator.set_monochrome((std::move(*result267)));
     if (!result268)
       return std::unexpected(std::move(result268.error()));
     auto result269 = assets->json("/lighting.config:lighting");
     if (!result269)
       return std::unexpected(std::move(result269.error()));
-    auto result270 = m_lightingCalculator.setParameters((std::move(*result269)));
+    auto result270 = m_lightingCalculator.set_parameters((std::move(*result269)));
     if (!result270)
       return std::unexpected(std::move(result270.error()));
     auto result271 = assets->json("/lighting.config:intensity");
     if (!result271)
       return std::unexpected(std::move(result271.error()));
-    auto result272 = m_lightIntensityCalculator.setParameters((std::move(*result271)));
+    auto result272 = m_lightIntensityCalculator.set_parameters((std::move(*result271)));
     if (!result272)
       return std::unexpected(std::move(result272.error()));
     

@@ -641,12 +641,13 @@ namespace WorldImpl {
     if (!liquidsDatabase)
       return std::unexpected(std::move(liquidsDatabase.error()));
 
-    lighting.begin(pos);
+    auto begun = lighting.begin(pos);
+    if (!begun) return std::unexpected(std::move(begun.error()));
 
     // Each column in tile_eval_columns is guaranteed to be no larger than the
     // sector size.
     CellularLightIntensityCalculator::Cell lightingCellColumn[WorldSectorSize];
-    auto evaluated = tileSectorArray->tile_eval_columns(lighting.calculationRegion(), [&](Vec2I const& pos, std::span<typename TileSectorArray::Tile> column) -> std::expected<void, StarException> {
+    auto evaluated = tileSectorArray->tile_eval_columns(lighting.calculation_region(), [&](Vec2I const& pos, std::span<typename TileSectorArray::Tile> column) -> std::expected<void, StarException> {
         for (std::size_t y = 0; y < column.size(); ++y) {
           auto& tile = column[y];
           auto& cell = lightingCellColumn[y];
@@ -667,13 +668,13 @@ namespace WorldImpl {
               cell.light += environmentLight.sum() / 3.0f;
           }
         }
-        lighting.setCellColumn(pos, std::span(lightingCellColumn).first(column.size()));
+        lighting.set_cell_column(pos, std::span(lightingCellColumn).first(column.size()));
         return {};
       });
 
     if (!evaluated)
       return std::unexpected(std::move(evaluated.error()));
-    auto entities = entityMap->entityQuery(RectF(lighting.calculationRegion()));
+    auto entities = entityMap->entityQuery(RectF(lighting.calculation_region()));
     if (!entities)
       return std::unexpected(std::move(entities.error()));
     for (auto const& entity : *entities) {
@@ -681,11 +682,11 @@ namespace WorldImpl {
       if (!lights)
         return std::unexpected(std::move(lights.error()));
       for (auto const& light : *lights) {
-        Vec2F position = worldGeometry.nearestTo(Vec2F(lighting.calculationRegion().min()), light.position);
+        Vec2F position = worldGeometry.nearestTo(Vec2F(lighting.calculation_region().min()), light.position);
         if (light.type == LightType::Spread)
-          lighting.addSpreadLight(position, light.color.sum() / 3.0f);
+          lighting.add_spread_light(position, light.color.sum() / 3.0f);
         else
-          lighting.addPointLight(position, light.color.sum() / 3.0f, light.pointBeam, light.beamAngle, light.beamAmbience);
+          lighting.add_point_light(position, light.color.sum() / 3.0f, light.pointBeam, light.beamAngle, light.beamAmbience);
       }
     }
 

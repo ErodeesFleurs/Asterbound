@@ -141,7 +141,7 @@ std::expected<std::shared_ptr<LightingFixture>, StarException> prepareLighting(R
 // out-of-world cells retain begin()'s zero values rather than gathering defaults.
 std::expected<void, StarException> gatherReference(LightingFixture const& fixture,
                                                    CellularLightingCalculator& calculator) {
-  auto region = calculator.calculationRegion();
+  auto region = calculator.calculation_region();
   for (int x = region.x_min(); x < region.x_max(); ++x) {
     for (int y = region.y_min(); y < region.y_max(); ++y) {
       Vec2I position{x, y};
@@ -159,7 +159,7 @@ std::expected<void, StarException> gatherReference(LightingFixture const& fixtur
         if (tile.backgroundLightTransparent && y > fixture.underground)
           light += fixture.environment;
       }
-      calculator.setCellIndex(calculator.baseIndexFor(position), light, !tile.foregroundLightTransparent);
+      calculator.set_cell_index(calculator.base_index_for(position), light, !tile.foregroundLightTransparent);
     }
   }
   return {};
@@ -173,12 +173,12 @@ void addFixtureLights(CellularLightingCalculator& calculator, RectI const& query
                    query.y_min() - 1.5f + (i * 23 % (query.height() + 4))};
     Vec3F color{0.21f + (i % 3) * 0.31f, 0.17f + (i % 5) * 0.14f, 0.11f + (i % 7) * 0.11f};
     if (sourceKind == 0 || (sourceKind == 2 && i % 3 == 0))
-      calculator.addSpreadLight(position, color);
+      calculator.add_spread_light(position, color);
     else if (sourceKind == 2 && i % 3 == 2) {
-      calculator.addSpreadLight(position, color * 0.85f);
-      calculator.addPointLight(position, color, 0.7f, i * 0.37f, 0.15f, true);
+      calculator.add_spread_light(position, color * 0.85f);
+      calculator.add_point_light(position, color, 0.7f, i * 0.37f, 0.15f, true);
     } else
-      calculator.addPointLight(position, color, i % 2 == 0 ? 0.0f : 1.4f, i * 0.37f, 0.1f);
+      calculator.add_point_light(position, color, i % 2 == 0 ? 0.0f : 1.4f, i * 0.37f, 0.1f);
   }
 }
 
@@ -211,12 +211,15 @@ void lightingBenchmark(benchmark::State& state, PerformanceBenchmarkSession& ses
   RectI query = RectI::with_size(edge ? Vec2I{-12, -6} : Vec2I{73, 51},
                                 Vec2I{static_cast<int>(state.range(0)), static_cast<int>(state.range(1))});
   CellularLightingCalculator calculator(monochrome);
-  auto configured = calculator.setParameters(fixture.parameters);
+  auto configured = calculator.set_parameters(fixture.parameters);
   if (!configured) {
     session.fail(state, configured.error());
     return;
   }
-  calculator.begin(query);
+  if (auto begun = calculator.begin(query); !begun) {
+    session.fail(state, begun.error());
+    return;
+  }
   auto referenceGathered = gatherReference(fixture, calculator);
   if (!referenceGathered) {
     session.fail(state, referenceGathered.error());
@@ -236,12 +239,15 @@ void lightingBenchmark(benchmark::State& state, PerformanceBenchmarkSession& ses
     return gatherClientLightingTiles(calculator, fixture.tiles, workers, *fixture.materials, *fixture.liquids,
                                      fixture.environment, fixture.underground);
   };
-  auto calculationRegion = calculator.calculationRegion();
+  auto calculationRegion = calculator.calculation_region();
   state.counters["gather_cells"] = calculationRegion.width() * calculationRegion.height();
   for (auto _ : state) {
     (void)_;
     state.PauseTiming();
-    calculator.begin(query);
+    if (auto begun = calculator.begin(query); !begun) {
+      session.fail(state, begun.error());
+      return;
+    }
     if (work == LightingWork::Propagate) {
       auto gathered = gather();
       if (!gathered) {

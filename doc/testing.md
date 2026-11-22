@@ -692,6 +692,14 @@ tracker polls from trigger-and-consume pairs. Each dispatch iteration calls 64
 live listeners; the retained case also keeps 256 cancelled targets and handles alive.
 These are dispatch costs, not full asset reload times.
 
+### Cellular lighting
+
+Use `Lighting/Propagate/` to isolate propagation and `Lighting/GatherAndPropagate/`
+to include input gathering. Compare scalar and RGB separately for spread-only,
+point-only and mixed scenes. Wu rays use fractional obstacle coverage rather
+than grid traversal; samples outside the array contribute no obstruction.
+Retained mutable cell references may change obstacles between calculations.
+
 ### Grid line traversal
 
 `BlocksAlongLine.*` checks visitation order, not just the set of cells. Both

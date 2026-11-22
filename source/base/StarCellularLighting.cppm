@@ -131,24 +131,24 @@ public:
 
   using Cell = ColoredCellularLightArray::Cell;
 
-  [[nodiscard]] std::expected<void, StarException> setMonochrome(bool monochrome);
+  [[nodiscard]] std::expected<void, StarException> set_monochrome(bool monochrome);
 
-  [[nodiscard]] std::expected<void, StarException> setParameters(Json const& config);
+  [[nodiscard]] std::expected<void, StarException> set_parameters(Json const& config);
 
   // Call 'begin' to start a calculation for the given region
-  void begin(RectI const& queryRegion);
+  [[nodiscard]] std::expected<void, StarException> begin(RectI const& query_region);
 
   // Once begin is called, this will return the region that could possibly
   // affect the target calculation region.  All lighting values should be set
   // for the given calculation region before calling 'calculate'.
-  RectI calculationRegion() const;
+  RectI calculation_region() const;
 
-  std::size_t baseIndexFor(Vec2I const& position);
+  std::size_t base_index_for(Vec2I const& position);
 
-  void setCellIndex(std::size_t cellIndex, Vec3F const& light, bool obstacle);
+  void set_cell_index(std::size_t cell_index, Vec3F const& light, bool obstacle);
 
-  void addSpreadLight(Vec2F const& position, Vec3F const& light);
-  void addPointLight(Vec2F const& position, Vec3F const& light, float beam, float beamAngle, float beamAmbience, bool asSpread = false);
+  void add_spread_light(Vec2F const& position, Vec3F const& light);
+  void add_point_light(Vec2F const& position, Vec3F const& light, float beam, float beam_angle, float beam_ambience, bool as_spread = false);
 
   // Finish the calculation, and put the resulting color data in the given
   // output image.  The image will be reset to the size of the region given in
@@ -157,13 +157,14 @@ public:
   // Same as above, but the color data in a float buffer instead.
   [[nodiscard]] std::expected<void, StarException> calculate(Lightmap& output);
 
-  void setupImage(Image& image, PixelFormat format = PixelFormat::RGB24) const;
+  void setup_image(Image& image, PixelFormat format = PixelFormat::RGB24) const;
 private:
-  Json m_config;
+  std::optional<LightParameters> m_parameters;
+  std::optional<float> m_brightness_limit;
   using LightArray = std::variant<ColoredCellularLightArray, ScalarCellularLightArray>;
   LightArray m_light_array;
-  RectI m_queryRegion;
-  RectI m_calculationRegion;
+  RectI m_query_region;
+  RectI m_calculation_region;
 };
 
 // Produce light intensity values using the same algorithm as
@@ -173,42 +174,42 @@ class CellularLightIntensityCalculator {
 public:
   using Cell = ScalarCellularLightArray::Cell;
 
-  [[nodiscard]] std::expected<void, StarException> setParameters(Json const& config);
+  [[nodiscard]] std::expected<void, StarException> set_parameters(Json const& config);
 
-  void begin(Vec2F const& queryPosition);
+  [[nodiscard]] std::expected<void, StarException> begin(Vec2F const& query_position);
 
-  RectI calculationRegion() const;
+  RectI calculation_region() const;
 
-  void setCell(Vec2I const& position, Cell const& cell);
-  void setCellColumn(Vec2I const& position, std::span<Cell const> cells);
+  void set_cell(Vec2I const& position, Cell const& cell);
+  void set_cell_column(Vec2I const& position, std::span<Cell const> cells);
 
-  void addSpreadLight(Vec2F const& position, float light);
-  void addPointLight(Vec2F const& position, float light, float beam, float beamAngle, float beamAmbience);
+  void add_spread_light(Vec2F const& position, float light);
+  void add_point_light(Vec2F const& position, float light, float beam, float beam_angle, float beam_ambience);
 
   float calculate();
 
 private:
-  ScalarCellularLightArray m_lightArray;
-  Vec2F m_queryPosition;
-  RectI m_queryRegion;;
-  RectI m_calculationRegion;
+  ScalarCellularLightArray m_light_array;
+  Vec2F m_query_position;
+  RectI m_query_region;
+  RectI m_calculation_region;
 };
 
-inline std::size_t CellularLightingCalculator::baseIndexFor(Vec2I const& position) {
-  return (position[0] - m_calculationRegion.x_min()) * m_calculationRegion.height() + position[1] - m_calculationRegion.y_min();
+inline std::size_t CellularLightingCalculator::base_index_for(Vec2I const& position) {
+  return std::size_t(position[0] - m_calculation_region.x_min()) * m_calculation_region.height() + (position[1] - m_calculation_region.y_min());
 }
 
-inline void CellularLightingCalculator::setCellIndex(std::size_t cellIndex, Vec3F const& light, bool obstacle) {
+inline void CellularLightingCalculator::set_cell_index(std::size_t cell_index, Vec3F const& light, bool obstacle) {
   if (std::holds_alternative<ScalarCellularLightArray>(m_light_array)) {
 #if defined(__clang__)
 #pragma clang fp reassociate(off)
 #endif
     // Preserve the channel grouping and reciprocal used by the native monochrome gather.
     float intensity = ((light[0] + light[2]) + light[1]) * (1.0f / 3.0f);
-    std::get<ScalarCellularLightArray>(m_light_array).cellAtIndex(cellIndex) =
+    std::get<ScalarCellularLightArray>(m_light_array).cell_at_index(cell_index) =
       ScalarCellularLightArray::Cell{.light = intensity, .obstacle = obstacle};
   } else {
-    std::get<ColoredCellularLightArray>(m_light_array).cellAtIndex(cellIndex) =
+    std::get<ColoredCellularLightArray>(m_light_array).cell_at_index(cell_index) =
       ColoredCellularLightArray::Cell{.light = light, .obstacle = obstacle};
   }
 }
