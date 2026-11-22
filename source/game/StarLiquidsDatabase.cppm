@@ -53,7 +53,7 @@ public:
   [[nodiscard]]
   static std::expected<std::shared_ptr<LiquidsDatabase>, StarException> create(std::shared_ptr<Assets const> const& assets, std::shared_ptr<MaterialDatabase const> const& materialDatabase);
 
-  LiquidCellEngineParameters liquidEngineParameters() const;
+  LiquidCellEngineParameters liquid_engine_parameters() const;
   float backgroundDrain() const;
 
   StringList liquidNames() const;
@@ -86,7 +86,7 @@ public:
 
 private:
   LiquidsDatabase() = default;
-  LiquidCellEngineParameters m_liquidEngineParameters;
+  LiquidCellEngineParameters m_liquid_engine_parameters;
   float m_backgroundDrain;
   List<std::shared_ptr<LiquidSettings const>> m_settings;
   StringMap<LiquidId> m_liquidNames;

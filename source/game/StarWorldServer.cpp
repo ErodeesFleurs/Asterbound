@@ -1678,7 +1678,7 @@ std::expected<void, StarException> WorldServer::update(float dt) {
     return std::unexpected(std::move(result167.error()));
 
   StringMap<List<RectI>> weatherClientWindows;
-  List<RectI> clientMonitoringRegions;
+  List<RectI> client_monitoring_regions;
   for (auto const& pair : m_clientInfo) {
     auto window = pair.second->clientState->window();
     if (!window.is_empty()) {
@@ -1701,7 +1701,7 @@ std::expected<void, StarException> WorldServer::update(float dt) {
       auto result170 = m_geometry.splitRect(region);
       if (!result170)
         return std::unexpected(std::move(result170.error()));
-      clientMonitoringRegions.append_range(std::move(*result170));
+      client_monitoring_regions.append_range(std::move(*result170));
     }
   }
 
@@ -1724,9 +1724,9 @@ std::expected<void, StarException> WorldServer::update(float dt) {
     auto result174 = processingLimit(ProcessingLimit::Liquid);
     if (!result174)
       return std::unexpected(std::move(result174.error()));
-    m_liquidEngine->setProcessingLimit(std::move(*result174));
-    m_liquidEngine->setNoProcessingLimitRegions(clientMonitoringRegions);
-    auto result175 = m_liquidEngine->update();
+    m_liquid_engine->set_processing_limit(std::move(*result174));
+    m_liquid_engine->set_no_processing_limit_regions(std::move(client_monitoring_regions));
+    auto result175 = m_liquid_engine->update();
     if (!result175)
       return std::unexpected(std::move(result175.error()));
   }
@@ -1859,7 +1859,7 @@ std::expected<void, StarException> WorldServer::update(float dt) {
 
   this->root().logMap().set(Star::format("server_{}_entities", m_worldId), Star::format("{} in {} sectors", m_entityMap->size(), m_tileArray->loaded_sector_count()));
   this->root().logMap().set(Star::format("server_{}_time", m_worldId), Star::format("age = {:4.2f}, day = {:4.2f}/{:4.2f}s", epochTime(), timeOfDay(), dayLength()));
-  this->root().logMap().set(Star::format("server_{}_active_liquid", m_worldId), m_liquidEngine->activeCells());
+  this->root().logMap().set(Star::format("server_{}_active_liquid", m_worldId), m_liquid_engine->active_cells());
   this->root().logMap().set(Star::format("server_{}_lua_mem", m_worldId), m_luaRoot->lua_memory_usage());
   return {};
 }
@@ -2066,12 +2066,12 @@ std::expected<LiquidLevel, StarException> WorldServer::liquidLevel(RectF const& 
 }
 
 std::expected<void, StarException> WorldServer::activateLiquidRegion(RectI const& region) {
-  m_liquidEngine->visitRegion(region);
+  m_liquid_engine->visit_region(region);
   return {};
 }
 
 std::expected<void, StarException> WorldServer::activateLiquidLocation(Vec2I const& location) {
-  m_liquidEngine->visitLocation(location);
+  m_liquid_engine->visit_location(location);
   return {};
 }
 
@@ -2230,7 +2230,7 @@ std::expected<TileModificationList, StarException> WorldServer::replaceTiles(Til
     auto result234 = checkEntityBreaks(RectF::with_size(Vec2F(pair.first), Vec2F(1, 1)));
     if (!result234)
       return std::unexpected(std::move(result234.error()));
-    m_liquidEngine->visitLocation(pair.first);
+    m_liquid_engine->visit_location(pair.first);
     m_fallingBlocksAgent->visitLocation(pair.first);
   }
 
@@ -2459,7 +2459,7 @@ std::expected<ItemDescriptor, StarException> WorldServer::collectLiquid(List<Vec
         if (pair.second->activeSectors.contains(m_tileArray->sector_for(pos)))
           pair.second->pendingLiquidUpdates.add(pos);
       }
-      m_liquidEngine->visitLocation(pos);
+      m_liquid_engine->visit_location(pos);
     }
   }
 
@@ -2914,13 +2914,13 @@ std::expected<void, StarException> WorldServer::init(bool firstTime) {
     return std::unexpected(std::move(result314.error()));
   m_tileEntityBreakCheckTimer = GameTimer(std::move(*result314));
 
-  auto liquidSeed = root.random().next_u64();
-  auto liquidWorld = LiquidWorld::create(*this);
-  if (!liquidWorld)
-    return std::unexpected(std::move(liquidWorld.error()));
-  m_liquidEngine = std::make_shared<LiquidCellEngine<LiquidId>>(liquidSeed, liquidsDatabase->liquidEngineParameters(), std::move(*liquidWorld));
-  for (auto const& liquidSettings : liquidsDatabase->allLiquidSettings())
-    m_liquidEngine->setLiquidTickDelta(liquidSettings->id, liquidSettings->tickDelta);
+  auto liquid_seed = root.random().next_u64();
+  auto liquid_world = LiquidWorld::create(*this);
+  if (!liquid_world)
+    return std::unexpected(std::move(liquid_world.error()));
+  m_liquid_engine = std::make_shared<LiquidCellEngine<LiquidId>>(liquid_seed, liquidsDatabase->liquid_engine_parameters(), std::move(*liquid_world));
+  for (auto const& liquid_settings : liquidsDatabase->allLiquidSettings())
+    m_liquid_engine->set_liquid_tick_delta(liquid_settings->id, liquid_settings->tickDelta);
 
   auto fallingBlocksWorld = FallingBlocksWorld::create(*this);
   if (!fallingBlocksWorld)
@@ -3157,7 +3157,7 @@ std::expected<TileModificationList, StarException> WorldServer::doApplyTileModif
         auto result341 = checkEntityBreaks(RectF::with_size(Vec2F(pos), Vec2F(1, 1)));
         if (!result341)
           return std::unexpected(std::move(result341.error()));
-        m_liquidEngine->visitLocation(pos);
+        m_liquid_engine->visit_location(pos);
         m_fallingBlocksAgent->visitLocation(pos);
       }
 
@@ -3201,7 +3201,7 @@ std::expected<TileModificationList, StarException> WorldServer::doApplyTileModif
         }
       }
 
-      m_liquidEngine->visitLocation(pos);
+      m_liquid_engine->visit_location(pos);
       auto result347 = queueTileUpdates(pos);
       if (!result347)
         return std::unexpected(std::move(result347.error()));
@@ -3255,7 +3255,7 @@ std::expected<TileModificationList, StarException> WorldServer::doApplyTileModif
       auto result354 = modifyLiquid(pos, plpacket.liquid, plpacket.liquidLevel, true);
       if (!result354)
         return std::unexpected(std::move(result354.error()));
-      m_liquidEngine->visitLocation(pos);
+      m_liquid_engine->visit_location(pos);
       m_fallingBlocksAgent->visitLocation(pos);
     }
 
@@ -3322,7 +3322,7 @@ std::expected<void, StarException> WorldServer::updateTileEntityTiles(std::share
       if (tile->get().updateObjectCollision(CollisionKind::None))
         updatedTile = updatedCollision = true;
       if (updatedCollision) {
-        m_liquidEngine->visitLocation(pos);
+        m_liquid_engine->visit_location(pos);
         m_fallingBlocksAgent->visitLocation(pos);
         auto result356 = dirtyCollision(RectI::with_size(pos, { 1, 1 }));
         if (!result356)
@@ -3362,7 +3362,7 @@ std::expected<void, StarException> WorldServer::updateTileEntityTiles(std::share
         updatedTile |= updatedCollision = tile->get().updateObjectCollision(std::move(*result358));
       }
       if (updatedCollision) {
-        m_liquidEngine->visitLocation(pos);
+        m_liquid_engine->visit_location(pos);
         m_fallingBlocksAgent->visitLocation(pos);
         auto result359 = dirtyCollision(RectI::with_size(pos, { 1, 1 }));
         if (!result359)
@@ -3481,7 +3481,7 @@ std::expected<std::optional<std::reference_wrapper<ServerTile>>, StarException> 
     auto result370 = dirtyCollision(RectI::with_size(position, {1, 1}));
     if (!result370)
       return std::unexpected(std::move(result370.error()));
-    m_liquidEngine->visitLocation(position);
+    m_liquid_engine->visit_location(position);
     auto result371 = queueTileUpdates(position);
     if (!result371)
       return std::unexpected(std::move(result371.error()));
@@ -3527,7 +3527,7 @@ std::expected<void, StarException> WorldServer::modifyLiquid(Vec2I const& pos, L
       auto result376 = setLiquid(pos, liquid, quantity, tile->get().liquid.pressure);
       if (!result376)
         return std::unexpected(std::move(result376.error()));
-      m_liquidEngine->visitLocation(pos);
+      m_liquid_engine->visit_location(pos);
     }
   }
   return {};
@@ -3655,7 +3655,7 @@ std::expected<List<ItemDescriptor>, StarException> WorldServer::destroyBlock(Til
     auto result391 = checkEntityBreaks(RectF::with_size(Vec2F(pos), Vec2F(1, 1)));
     if (!result391)
       return std::unexpected(std::move(result391.error()));
-    m_liquidEngine->visitLocation(pos);
+    m_liquid_engine->visit_location(pos);
     m_fallingBlocksAgent->visitLocation(pos);
   }
   auto result392 = queueTileUpdates(pos);

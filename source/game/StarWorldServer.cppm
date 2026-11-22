@@ -542,7 +542,7 @@ private:
   GameTimer m_entityUpdateTimer;
   GameTimer m_tileEntityBreakCheckTimer;
 
-  std::shared_ptr<LiquidCellEngine<LiquidId>> m_liquidEngine;
+  std::shared_ptr<LiquidCellEngine<LiquidId>> m_liquid_engine;
   std::shared_ptr<FallingBlocksAgent> m_fallingBlocksAgent;
   std::shared_ptr<Spawner> m_spawner;
 

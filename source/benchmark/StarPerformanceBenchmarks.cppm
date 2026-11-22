@@ -27,7 +27,7 @@ registerLightingPerformanceBenchmarks(PerformanceBenchmarkSession& session);
 [[nodiscard]] std::expected<void, StarException>
 registerNetworkPerformanceBenchmarks(PerformanceBenchmarkSession& session);
 [[nodiscard]] std::expected<void, StarException>
-registerLiquidPerformanceBenchmarks(PerformanceBenchmarkSession& session);
+register_liquid_performance_benchmarks(PerformanceBenchmarkSession& session);
 [[nodiscard]] std::expected<void, StarException>
 registerAssetsPerformanceBenchmarks(PerformanceBenchmarkSession& session);
 
@@ -40,6 +40,6 @@ using ::Star::PerformanceBenchmarkSession;
 using ::Star::registerAssetsPerformanceBenchmarks;
 using ::Star::registerCollisionPerformanceBenchmarks;
 using ::Star::registerLightingPerformanceBenchmarks;
-using ::Star::registerLiquidPerformanceBenchmarks;
+using ::Star::register_liquid_performance_benchmarks;
 using ::Star::registerNetworkPerformanceBenchmarks;
 }// namespace Star

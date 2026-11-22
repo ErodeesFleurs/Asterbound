@@ -1092,6 +1092,15 @@ outputs and real Assets/metadata/Lua bindings in private storage.
 Allocation/copy/hash counters explain work, not latency. Report allocation bytes
 separately; microbenchmark results alone do not establish frame-rate gains.
 
+`performance_benchmarks --benchmark_filter='^Liquid/'` times one solver update;
+basin construction, activation warmup and result checks are outside the timed
+region. Compare `digest_hi`, `digest_lo`, mass and active counts **between
+builds**: each executable derives its own reference. The digest includes
+per-cell liquid, level and pressure bits, active membership and callback order.
+Use `LiquidEngine.*` for failure recovery, especially the `read_write_trace`
+property for activation reads and the subsequent flow-write order. Flow writes
+can commit a prefix before a world callback fails; an update is not atomic.
+
 ## Runtime performance evidence
 
 Use the [simulation/rendering architecture](engine-notes.md#independent-simulation-and-rendering)

@@ -95,18 +95,18 @@ class LiquidWorld : public CellularLiquidWorld<LiquidId> {
 public:
   [[nodiscard]] static std::expected<std::shared_ptr<LiquidWorld>, StarException> create(WorldServer& world);
 
-  Vec2I uniqueLocation(Vec2I const& location) const override;
+  Vec2I unique_location(Vec2I const& location) const override;
   [[nodiscard]] std::expected<CellularLiquidCell<LiquidId>, StarException> cell(Vec2I const& location) const override;
-  [[nodiscard]] std::expected<float, StarException> drainLevel(Vec2I const& location) const override;
-  [[nodiscard]] std::expected<void, StarException> setFlow(Vec2I const& location, CellularLiquidFlowCell<LiquidId> const& flow) override;
-  [[nodiscard]] std::expected<void, StarException> liquidInteraction(Vec2I const& a, LiquidId aLiquid, Vec2I const& b, LiquidId bLiquid) override;
-  [[nodiscard]] std::expected<void, StarException> liquidCollision(Vec2I const& pos, LiquidId liquid, Vec2I const& blockPos) override;
+  [[nodiscard]] std::expected<float, StarException> drain_level(Vec2I const& location) const override;
+  [[nodiscard]] std::expected<void, StarException> set_flow(Vec2I const& location, CellularLiquidFlowCell<LiquidId> const& flow) override;
+  [[nodiscard]] std::expected<void, StarException> liquid_interaction(Vec2I const& a, LiquidId a_liquid, Vec2I const& b, LiquidId b_liquid) override;
+  [[nodiscard]] std::expected<void, StarException> liquid_collision(Vec2I const& pos, LiquidId liquid, Vec2I const& block_pos) override;
 
 private:
-  explicit LiquidWorld(WorldServer& world) : m_worldServer(world) {}
-  WorldServer& m_worldServer;
-  std::shared_ptr<LiquidsDatabase const> m_liquidsDatabase;
-  std::shared_ptr<MaterialDatabase const> m_materialDatabase;
+  explicit LiquidWorld(WorldServer& world) : m_world_server(world) {}
+  WorldServer& m_world_server;
+  std::shared_ptr<LiquidsDatabase const> m_liquids_database;
+  std::shared_ptr<MaterialDatabase const> m_material_database;
 };
 
 class FallingBlocksWorld : public FallingBlocksFacade {

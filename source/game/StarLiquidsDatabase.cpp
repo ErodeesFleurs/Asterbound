@@ -43,28 +43,29 @@ namespace Star {
 LiquidSettings::LiquidSettings() : id(EmptyLiquidId) {}
 
 std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::create(std::shared_ptr<Assets const> const& assets, std::shared_ptr<MaterialDatabase const> const& materialDatabase) {
-  auto result = std::shared_ptr<LiquidsDatabase>(new LiquidsDatabase());
-  auto loadEngineParameters = [&]() -> std::expected<void, StarException> {
+  struct MakeShared final : LiquidsDatabase {};
+  auto result = std::make_shared<MakeShared>();
+  auto load_engine_parameters = [&]() -> std::expected<void, StarException> {
     auto config = assets->json("/liquids.config");
     if (!config) return std::unexpected(std::move(config.error()));
     auto engine = config->get("liquidEngineParameters");
     if (!engine) return std::unexpected(std::move(engine.error()));
     constexpr std::pair<std::string_view, float LiquidCellEngineParameters::*> fields[] = {
-      {"lateralMoveFactor", &LiquidCellEngineParameters::lateralMoveFactor},
-      {"spreadOverfillUpFactor", &LiquidCellEngineParameters::spreadOverfillUpFactor},
-      {"spreadOverfillLateralFactor", &LiquidCellEngineParameters::spreadOverfillLateralFactor},
-      {"spreadOverfillDownFactor", &LiquidCellEngineParameters::spreadOverfillDownFactor},
-      {"pressureEqualizeFactor", &LiquidCellEngineParameters::pressureEqualizeFactor},
-      {"pressureMoveFactor", &LiquidCellEngineParameters::pressureMoveFactor},
-      {"maximumPressureLevelImbalance", &LiquidCellEngineParameters::maximumPressureLevelImbalance},
-      {"minimumLivenPressureChange", &LiquidCellEngineParameters::minimumLivenPressureChange},
-      {"minimumLivenLevelChange", &LiquidCellEngineParameters::minimumLivenLevelChange},
-      {"minimumLiquidLevel", &LiquidCellEngineParameters::minimumLiquidLevel},
-      {"interactTransformationLevel", &LiquidCellEngineParameters::interactTransformationLevel}};
+      {"lateralMoveFactor", &LiquidCellEngineParameters::lateral_move_factor},
+      {"spreadOverfillUpFactor", &LiquidCellEngineParameters::spread_overfill_up_factor},
+      {"spreadOverfillLateralFactor", &LiquidCellEngineParameters::spread_overfill_lateral_factor},
+      {"spreadOverfillDownFactor", &LiquidCellEngineParameters::spread_overfill_down_factor},
+      {"pressureEqualizeFactor", &LiquidCellEngineParameters::pressure_equalize_factor},
+      {"pressureMoveFactor", &LiquidCellEngineParameters::pressure_move_factor},
+      {"maximumPressureLevelImbalance", &LiquidCellEngineParameters::maximum_pressure_level_imbalance},
+      {"minimumLivenPressureChange", &LiquidCellEngineParameters::minimum_liven_pressure_change},
+      {"minimumLivenLevelChange", &LiquidCellEngineParameters::minimum_liven_level_change},
+      {"minimumLiquidLevel", &LiquidCellEngineParameters::minimum_liquid_level},
+      {"interactTransformationLevel", &LiquidCellEngineParameters::interact_transformation_level}};
     for (auto const& [name, member] : fields) {
       auto value = engine->get_float(name);
       if (!value) return std::unexpected(std::move(value.error()));
-      result->m_liquidEngineParameters.*member = *value;
+      result->m_liquid_engine_parameters.*member = *value;
     }
     {
       auto value = config->get_float("backgroundDrain");
@@ -73,9 +74,9 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::
     }
     return {};
   };
-  auto engineParameters = loadEngineParameters();
-  if (!engineParameters)
-    return std::unexpected(assets->with_asset_context(std::move(engineParameters.error()), "/liquids.config", "Loading liquid engine parameters"));
+  auto engine_parameters = load_engine_parameters();
+  if (!engine_parameters)
+    return std::unexpected(assets->with_asset_context(std::move(engine_parameters.error()), "/liquids.config", "Loading liquid engine parameters"));
   result->m_liquidNames["empty"] = EmptyLiquidId;
   auto liquids = assets->scan_extension("liquid");
   if (!liquids) return std::unexpected(std::move(liquids.error()));
@@ -199,8 +200,8 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::
   return result;
 }
 
-LiquidCellEngineParameters LiquidsDatabase::liquidEngineParameters() const {
-  return m_liquidEngineParameters;
+LiquidCellEngineParameters LiquidsDatabase::liquid_engine_parameters() const {
+  return m_liquid_engine_parameters;
 }
 
 StringList LiquidsDatabase::liquidNames() const {

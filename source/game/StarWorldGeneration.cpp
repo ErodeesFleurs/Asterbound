@@ -217,209 +217,150 @@ static int const PlantAdjustmentLimit = 2;
 
 
 std::expected<std::shared_ptr<LiquidWorld>, StarException> LiquidWorld::create(WorldServer& world) {
-  auto result = std::shared_ptr<LiquidWorld>(new LiquidWorld(world));
+  struct MakeShared final : LiquidWorld {
+    explicit MakeShared(WorldServer& world) : LiquidWorld(world) {}
+  };
   auto liquids = world.root().liquidsDatabase();
   if (!liquids) return std::unexpected(std::move(liquids.error()));
-  result->m_liquidsDatabase = std::move(*liquids);
   auto materials = world.root().materialDatabase();
   if (!materials) return std::unexpected(std::move(materials.error()));
-  result->m_materialDatabase = std::move(*materials);
+  auto result = std::make_shared<MakeShared>(world);
+  result->m_liquids_database = std::move(*liquids);
+  result->m_material_database = std::move(*materials);
   return result;
 }
 
-Vec2I LiquidWorld::uniqueLocation(Vec2I const& location) const {
-  return m_worldServer.geometry().xwrap(location);
+Vec2I LiquidWorld::unique_location(Vec2I const& location) const {
+  return m_world_server.geometry().xwrap(location);
 }
 
-std::expected<float, StarException> LiquidWorld::drainLevel(Vec2I const& location) const {
-  auto const& worldTemplate = m_worldServer.worldTemplate();
-  if (location[1] > worldTemplate->undergroundLevel()) {
-    auto autoconsttileResult1 = m_worldServer.getServerTile(location);
-    if (!autoconsttileResult1) return std::unexpected(std::move(autoconsttileResult1.error()));
-    auto const& tile = std::move(autoconsttileResult1->get());
-    if (auto condition75 = [&]() -> std::expected<bool, StarException> {
-            auto conditionResult1 = m_materialDatabase->blocksLiquidFlow(tile.background);
-      if (!conditionResult1) return std::unexpected(std::move(conditionResult1.error()));
-      auto condition = std::move(!(*conditionResult1));
-      return static_cast<bool>(condition);
-    }(); !condition75)
-      return std::unexpected(std::move(condition75.error()));
-    else if (*condition75) {
-      auto autoconstbelowTileResult1 = m_worldServer.getServerTile(location + Vec2I(0, -1));
-      if (!autoconstbelowTileResult1) return std::unexpected(std::move(autoconstbelowTileResult1.error()));
-      auto const& belowTile = std::move(autoconstbelowTileResult1->get());
-      if (auto condition74 = [&]() -> std::expected<bool, StarException> {
-        return [&]() -> std::expected<bool, StarException> {
-          auto left = [&]() -> std::expected<bool, StarException> {             auto conditionResult1 = m_materialDatabase->blocksLiquidFlow(belowTile.background);
-            if (!conditionResult1) return std::unexpected(std::move(conditionResult1.error()));
-            auto condition = std::move((*conditionResult1));
-            return static_cast<bool>(condition); }();
-          if (!left) return std::unexpected(std::move(left.error()));
-          if (*left) return true;
-          return [&]() -> std::expected<bool, StarException> {
-            auto left = [&]() -> std::expected<bool, StarException> {               auto conditionResult1 = m_materialDatabase->blocksLiquidFlow(belowTile.foreground);
-              if (!conditionResult1) return std::unexpected(std::move(conditionResult1.error()));
-              auto condition = std::move((*conditionResult1));
-              return static_cast<bool>(condition); }();
-            if (!left) return std::unexpected(std::move(left.error()));
-            if (*left) return true;
-                        auto condition = std::move(belowTile.liquid.source);
-            return static_cast<bool>(condition);
-          }();
-        }();
-      }(); !condition74)
-        return std::unexpected(std::move(condition74.error()));
-      else if (*condition74)
-        return m_liquidsDatabase->backgroundDrain();
-    }
-  }
-  return 0.0f;
+std::expected<float, StarException> LiquidWorld::drain_level(Vec2I const& location) const {
+  auto world_template = m_world_server.worldTemplate();
+  if (!(location[1] > world_template->undergroundLevel()))
+    return 0.0f;
+  auto tile = m_world_server.getServerTile(location);
+  if (!tile) return std::unexpected(std::move(tile.error()));
+  auto blocked = m_material_database->blocksLiquidFlow(tile->get().background);
+  if (!blocked) return std::unexpected(std::move(blocked.error()));
+  if (*blocked) return 0.0f;
+
+  auto below = m_world_server.getServerTile(location + Vec2I(0, -1));
+  if (!below) return std::unexpected(std::move(below.error()));
+  auto const& below_tile = below->get();
+  auto background_blocks = m_material_database->blocksLiquidFlow(below_tile.background);
+  if (!background_blocks) return std::unexpected(std::move(background_blocks.error()));
+  if (*background_blocks) return m_liquids_database->backgroundDrain();
+  auto foreground_blocks = m_material_database->blocksLiquidFlow(below_tile.foreground);
+  if (!foreground_blocks) return std::unexpected(std::move(foreground_blocks.error()));
+  return *foreground_blocks || below_tile.liquid.source ? m_liquids_database->backgroundDrain() : 0.0f;
 }
 
 std::expected<CellularLiquidCell<LiquidId>, StarException> LiquidWorld::cell(Vec2I const& location) const {
-  auto autoconsttileResult1 = m_worldServer.getServerTile(location);
-  if (!autoconsttileResult1) return std::unexpected(std::move(autoconsttileResult1.error()));
-  auto const& tile = std::move(autoconsttileResult1->get());
-  if (auto condition76 = [&]() -> std::expected<bool, StarException> {
-        auto conditionResult1 = m_materialDatabase->blocksLiquidFlow(tile.foreground);
-    if (!conditionResult1) return std::unexpected(std::move(conditionResult1.error()));
-    auto condition = std::move((*conditionResult1));
-    return static_cast<bool>(condition);
-  }(); !condition76)
-    return std::unexpected(std::move(condition76.error()));
-  else if (*condition76) {
-    return CellularLiquidCollisionCell();
-  } else {
-    if (tile.liquid.source)
-      return CellularLiquidSourceCell<LiquidId>{.liquid = tile.liquid.liquid, .pressure = tile.liquid.pressure};
-    else if (tile.liquid.liquid != EmptyLiquidId)
-      return CellularLiquidFlowCell<LiquidId>{.liquid = tile.liquid.liquid,
-                                              .level = tile.liquid.level,
-                                              .pressure = tile.liquid.pressure};
-    else
-      return CellularLiquidFlowCell<LiquidId>{.liquid = {}, .level = 0.0f, .pressure = 0.0f};
-  }
+  auto result = m_world_server.getServerTile(location);
+  if (!result) return std::unexpected(std::move(result.error()));
+  auto const& tile = result->get();
+  auto blocked = m_material_database->blocksLiquidFlow(tile.foreground);
+  if (!blocked) return std::unexpected(std::move(blocked.error()));
+  if (*blocked) return CellularLiquidCollisionCell{};
+  if (tile.liquid.source)
+    return CellularLiquidSourceCell<LiquidId>{.liquid = tile.liquid.liquid, .pressure = tile.liquid.pressure};
+  if (tile.liquid.liquid != EmptyLiquidId)
+    return CellularLiquidFlowCell<LiquidId>{.liquid = tile.liquid.liquid,
+                                           .level = tile.liquid.level,
+                                           .pressure = tile.liquid.pressure};
+  return CellularLiquidFlowCell<LiquidId>{};
 }
 
-std::expected<void, StarException> LiquidWorld::setFlow(Vec2I const& location, CellularLiquidFlowCell<LiquidId> const& flow) {
-  if (flow.liquid) {
-    {
-      auto operationResult1 = m_worldServer.setLiquid(location, *flow.liquid, flow.level, flow.pressure);
-      if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-    }
-    auto autoconsttileResult1 = m_worldServer.getServerTile(location);
-    if (!autoconsttileResult1) return std::unexpected(std::move(autoconsttileResult1.error()));
-    auto const& tile = std::move(autoconsttileResult1->get());
-    if (auto materialInteraction = m_materialDatabase->liquidMaterialInteraction(*flow.liquid, tile.background)) {
-      if (!materialInteraction->topOnly && tile.liquid.level >= materialInteraction->consumeLiquid) {
-        auto modifyTileCheckedResult1 = m_worldServer.modifyServerTile(location);
-        if (!modifyTileCheckedResult1) return std::unexpected(std::move(modifyTileCheckedResult1.error()));
-        if (auto modifyTile = std::move((*modifyTileCheckedResult1))) {
-          modifyTile->get().liquid.take(materialInteraction->consumeLiquid);
-          modifyTile->get().background = materialInteraction->transformTo;
-          {
-            auto operationResult1 = m_worldServer.activateLiquidLocation(location);
-            if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-          }
-        }
-      }
-    }
-    if (auto modInteraction = m_materialDatabase->liquidModInteraction(*flow.liquid, tile.backgroundMod)) {
-      if (!modInteraction->topOnly && tile.liquid.level >= modInteraction->consumeLiquid) {
-        auto modifyTileCheckedResult1 = m_worldServer.modifyServerTile(location);
-        if (!modifyTileCheckedResult1) return std::unexpected(std::move(modifyTileCheckedResult1.error()));
-        if (auto modifyTile = std::move((*modifyTileCheckedResult1))) {
-          modifyTile->get().liquid.take(modInteraction->consumeLiquid);
-          modifyTile->get().backgroundMod = modInteraction->transformTo;
-          {
-            auto operationResult1 = m_worldServer.activateLiquidLocation(location);
-            if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-          }
-        }
-      }
-    }
-  } else {
-    {
-      auto operationResult1 = m_worldServer.setLiquid(location, EmptyLiquidId, 0.0f, 0.0f);
-      if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
+std::expected<void, StarException> LiquidWorld::set_flow(Vec2I const& location, CellularLiquidFlowCell<LiquidId> const& flow) {
+  if (!flow.liquid)
+    return m_world_server.setLiquid(location, EmptyLiquidId, 0.0f, 0.0f);
+  auto written = m_world_server.setLiquid(location, *flow.liquid, flow.level, flow.pressure);
+  if (!written) return std::unexpected(std::move(written.error()));
+  auto result = m_world_server.getServerTile(location);
+  if (!result) return std::unexpected(std::move(result.error()));
+  auto const& tile = result->get();
+  if (auto interaction = m_material_database->liquidMaterialInteraction(*flow.liquid, tile.background);
+      interaction && !interaction->topOnly && tile.liquid.level >= interaction->consumeLiquid) {
+    auto modified = m_world_server.modifyServerTile(location);
+    if (!modified) return std::unexpected(std::move(modified.error()));
+    if (*modified) {
+      auto& target = (*modified)->get();
+      target.liquid.take(interaction->consumeLiquid);
+      target.background = interaction->transformTo;
+      auto activated = m_world_server.activateLiquidLocation(location);
+      if (!activated) return std::unexpected(std::move(activated.error()));
     }
   }
-
+  if (auto interaction = m_material_database->liquidModInteraction(*flow.liquid, tile.backgroundMod);
+      interaction && !interaction->topOnly && tile.liquid.level >= interaction->consumeLiquid) {
+    auto modified = m_world_server.modifyServerTile(location);
+    if (!modified) return std::unexpected(std::move(modified.error()));
+    if (*modified) {
+      auto& target = (*modified)->get();
+      target.liquid.take(interaction->consumeLiquid);
+      target.backgroundMod = interaction->transformTo;
+      return m_world_server.activateLiquidLocation(location);
+    }
+  }
   return {};
 }
 
-std::expected<void, StarException> LiquidWorld::liquidInteraction(Vec2I const& a, LiquidId aLiquid, Vec2I const& b, LiquidId bLiquid) {
+std::expected<void, StarException> LiquidWorld::liquid_interaction(Vec2I const& a, LiquidId a_liquid, Vec2I const& b, LiquidId b_liquid) {
   auto handle_interaction = [this](Vec2I const& target, LiquidId current, LiquidId other) -> std::expected<void, StarException> {
-    auto interaction = m_liquidsDatabase->interact(current, other);
+    auto interaction = m_liquids_database->interact(current, other);
     if (!interaction)
       return {};
     if (auto material = interaction->maybe_left_ref()) {
-      auto placed = m_worldServer.modifyTile(target, PlaceMaterial{.layer = TileLayer::Foreground,
+      auto placed = m_world_server.modifyTile(target, PlaceMaterial{.layer = TileLayer::Foreground,
                                                                    .material = material->get(),
                                                                    .materialHueShift = 0}, false);
       if (!placed)
         return std::unexpected(std::move(placed.error()));
       return {};
     }
-    auto level = m_worldServer.liquidLevel(target).level;
-    return m_worldServer.setLiquid(target, interaction->right_ref(), level, level);
+    auto level = m_world_server.liquidLevel(target).level;
+    return m_world_server.setLiquid(target, interaction->right_ref(), level, level);
   };
-  if (auto result = handle_interaction(a, aLiquid, bLiquid); !result)
+  if (auto result = handle_interaction(a, a_liquid, b_liquid); !result)
     return std::unexpected(std::move(result.error()));
-  return handle_interaction(b, bLiquid, aLiquid);
+  return handle_interaction(b, b_liquid, a_liquid);
 }
 
-std::expected<void, StarException> LiquidWorld::liquidCollision(Vec2I const& liquidPos, LiquidId liquidId, Vec2I const& blockPos) {
-  auto autoconstblockTileResult1 = m_worldServer.getServerTile(blockPos);
-  if (!autoconstblockTileResult1) return std::unexpected(std::move(autoconstblockTileResult1.error()));
-  auto const& blockTile = std::move(autoconstblockTileResult1->get());
-
-  if (auto materialInteraction = m_materialDatabase->liquidMaterialInteraction(liquidId, blockTile.foreground)) {
-    if ((!materialInteraction->topOnly || liquidPos[1] > blockPos[1]) && m_worldServer.liquidLevel(liquidPos).level >= materialInteraction->consumeLiquid) {
-      auto automodifyLiquidTileResult1 = m_worldServer.modifyServerTile(liquidPos);
-      if (!automodifyLiquidTileResult1) return std::unexpected(std::move(automodifyLiquidTileResult1.error()));
-      auto modifyLiquidTile = std::move((*automodifyLiquidTileResult1));
-      auto automodifyBlockTileResult1 = m_worldServer.modifyServerTile(blockPos);
-      if (!automodifyBlockTileResult1) return std::unexpected(std::move(automodifyBlockTileResult1.error()));
-      auto modifyBlockTile = std::move((*automodifyBlockTileResult1));
-      if (modifyLiquidTile && modifyBlockTile) {
-        modifyLiquidTile->get().liquid.take(materialInteraction->consumeLiquid);
-        modifyBlockTile->get().foreground = materialInteraction->transformTo;
-        if (auto condition77 = [&]() -> std::expected<bool, StarException> {
-                    auto conditionResult1 = m_materialDatabase->isMultiColor(materialInteraction->transformTo);
-          if (!conditionResult1) return std::unexpected(std::move(conditionResult1.error()));
-          auto condition = std::move(!(*conditionResult1));
-          return static_cast<bool>(condition);
-        }(); !condition77)
-          return std::unexpected(std::move(condition77.error()));
-        else if (*condition77)
-          modifyBlockTile->get().foregroundColorVariant = DefaultMaterialColorVariant;
-        {
-          auto operationResult1 = m_worldServer.activateLiquidLocation(liquidPos);
-          if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-        }
-      }
+std::expected<void, StarException> LiquidWorld::liquid_collision(Vec2I const& liquid_pos, LiquidId liquid_id, Vec2I const& block_pos) {
+  auto result = m_world_server.getServerTile(block_pos);
+  if (!result) return std::unexpected(std::move(result.error()));
+  auto const& block = result->get();
+  if (auto interaction = m_material_database->liquidMaterialInteraction(liquid_id, block.foreground);
+      interaction && (!interaction->topOnly || liquid_pos[1] > block_pos[1])
+      && m_world_server.liquidLevel(liquid_pos).level >= interaction->consumeLiquid) {
+    auto liquid_tile = m_world_server.modifyServerTile(liquid_pos);
+    if (!liquid_tile) return std::unexpected(std::move(liquid_tile.error()));
+    auto block_tile = m_world_server.modifyServerTile(block_pos);
+    if (!block_tile) return std::unexpected(std::move(block_tile.error()));
+    if (*liquid_tile && *block_tile) {
+      (*liquid_tile)->get().liquid.take(interaction->consumeLiquid);
+      auto& target = (*block_tile)->get();
+      target.foreground = interaction->transformTo;
+      auto multicolor = m_material_database->isMultiColor(interaction->transformTo);
+      if (!multicolor) return std::unexpected(std::move(multicolor.error()));
+      if (!*multicolor) target.foregroundColorVariant = DefaultMaterialColorVariant;
+      auto activated = m_world_server.activateLiquidLocation(liquid_pos);
+      if (!activated) return std::unexpected(std::move(activated.error()));
     }
   }
-  if (auto modInteraction = m_materialDatabase->liquidModInteraction(liquidId, blockTile.foregroundMod)) {
-    if ((!modInteraction->topOnly || liquidPos[1] > blockPos[1]) && m_worldServer.liquidLevel(liquidPos).level >= modInteraction->consumeLiquid) {
-      auto automodifyLiquidTileResult1 = m_worldServer.modifyServerTile(liquidPos);
-      if (!automodifyLiquidTileResult1) return std::unexpected(std::move(automodifyLiquidTileResult1.error()));
-      auto modifyLiquidTile = std::move((*automodifyLiquidTileResult1));
-      auto automodifyBlockTileResult1 = m_worldServer.modifyServerTile(blockPos);
-      if (!automodifyBlockTileResult1) return std::unexpected(std::move(automodifyBlockTileResult1.error()));
-      auto modifyBlockTile = std::move((*automodifyBlockTileResult1));
-      if (modifyLiquidTile && modifyBlockTile) {
-        modifyLiquidTile->get().liquid.take(modInteraction->consumeLiquid);
-        modifyBlockTile->get().foregroundMod = modInteraction->transformTo;
-        {
-          auto operationResult1 = m_worldServer.activateLiquidLocation(liquidPos);
-          if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-        }
-      }
+  if (auto interaction = m_material_database->liquidModInteraction(liquid_id, block.foregroundMod);
+      interaction && (!interaction->topOnly || liquid_pos[1] > block_pos[1])
+      && m_world_server.liquidLevel(liquid_pos).level >= interaction->consumeLiquid) {
+    auto liquid_tile = m_world_server.modifyServerTile(liquid_pos);
+    if (!liquid_tile) return std::unexpected(std::move(liquid_tile.error()));
+    auto block_tile = m_world_server.modifyServerTile(block_pos);
+    if (!block_tile) return std::unexpected(std::move(block_tile.error()));
+    if (*liquid_tile && *block_tile) {
+      (*liquid_tile)->get().liquid.take(interaction->consumeLiquid);
+      (*block_tile)->get().foregroundMod = interaction->transformTo;
+      return m_world_server.activateLiquidLocation(liquid_pos);
     }
   }
-
   return {};
 }
 

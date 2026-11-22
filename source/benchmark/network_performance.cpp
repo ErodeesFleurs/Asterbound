@@ -43,12 +43,12 @@ import star.world_tiles;
 namespace Star {
 
 struct WorldServerTestAccess {
-  static std::expected<void, StarException> seedSnapshotLiquidEngine(Root& root, WorldServer& world,
+  static std::expected<void, StarException> seed_snapshot_liquid_engine(Root& root, WorldServer& world,
                                                                      std::uint64_t seed) {
     // A newly created blank world has generated sectors but has never run
     // simulation. Check both scheduled liquid work and the actual tile data:
-    // activeCells() alone does not include pending generation-region visits.
-    if (!world.m_liquidEngine || world.m_currentStep != 0 || world.m_liquidEngine->activeCells() != 0)
+    // active_cells() alone does not include pending generation-region visits.
+    if (!world.m_liquid_engine || world.m_currentStep != 0 || world.m_liquid_engine->active_cells() != 0)
       return std::unexpected(StarException("Snapshot liquid seed requires a world without active simulation"));
     auto sectors = world.m_tileArray->loaded_sectors();
     for (auto const& sector : sectors) {
@@ -64,18 +64,18 @@ struct WorldServerTestAccess {
     auto database = root.liquidsDatabase();
     if (!database)
       return std::unexpected(std::move(database.error()));
-    auto liquidWorld = LiquidWorld::create(world);
-    if (!liquidWorld)
-      return std::unexpected(std::move(liquidWorld.error()));
-    auto engine = std::make_shared<LiquidCellEngine<LiquidId>>(seed, (*database)->liquidEngineParameters(),
-                                                               std::move(*liquidWorld));
+    auto liquid_world = LiquidWorld::create(world);
+    if (!liquid_world)
+      return std::unexpected(std::move(liquid_world.error()));
+    auto engine = std::make_shared<LiquidCellEngine<LiquidId>>(seed, (*database)->liquid_engine_parameters(),
+                                                               std::move(*liquid_world));
     for (auto const& settings : (*database)->allLiquidSettings())
-      engine->setLiquidTickDelta(settings->id, settings->tickDelta);
+      engine->set_liquid_tick_delta(settings->id, settings->tickDelta);
     // World generation schedules visits even for empty sectors. Replay those
     // visits so replacing the empty engine does not remove the queued scan.
     for (auto const& sector : sectors)
-      engine->visitRegion(world.m_tileArray->sector_region(sector));
-    world.m_liquidEngine = std::move(engine);
+      engine->visit_region(world.m_tileArray->sector_region(sector));
+    world.m_liquid_engine = std::move(engine);
     return {};
   }
 };
@@ -325,9 +325,9 @@ std::expected<SnapshotFixture, StarException> prepareSnapshotFixture(Root& root,
     if (fixture.world)
       (void)fixture.world->close();
   });
-  auto seededLiquid = WorldServerTestAccess::seedSnapshotLiquidEngine(root, *fixture.world, 0x4e45544c49515549ull);
-  if (!seededLiquid)
-    return std::unexpected(std::move(seededLiquid.error()));
+  auto seeded_liquid = WorldServerTestAccess::seed_snapshot_liquid_engine(root, *fixture.world, 0x4e45544c49515549ull);
+  if (!seeded_liquid)
+    return std::unexpected(std::move(seeded_liquid.error()));
   fixture.world->setSpawningEnabled(false);
   fixture.world->setTileProtectionEnabled(false);
   auto fidelity = fixture.world->setFidelity(WorldServerFidelity::High);

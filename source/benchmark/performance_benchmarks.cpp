@@ -65,7 +65,7 @@ int main(int argc, char** argv) {
   auto registered = Star::registerCollisionPerformanceBenchmarks(session)
                       .and_then([&] { return Star::registerLightingPerformanceBenchmarks(session); })
                       .and_then([&] { return Star::registerNetworkPerformanceBenchmarks(session); })
-                      .and_then([&] { return Star::registerLiquidPerformanceBenchmarks(session); })
+                      .and_then([&] { return Star::register_liquid_performance_benchmarks(session); })
                       .and_then([&] { return Star::registerAssetsPerformanceBenchmarks(session); });
   if (!registered) {
     if (!Star::print(stderr, "{}\n", registered.error().what()))
