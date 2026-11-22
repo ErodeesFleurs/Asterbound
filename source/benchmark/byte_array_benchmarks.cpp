@@ -11,7 +11,7 @@ import star.format;
 import star.benchmark_runner;
 import star.string;
 import star.zstd_compression;
-#include "byte_fingerprint.hpp"
+import star.benchmark_byte_fingerprint;
 
 namespace {
 using Star::ByteArray;

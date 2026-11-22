@@ -1,6 +1,12 @@
-#pragma once
+module;
 
-namespace BenchmarkFixtures {
+#include <benchmark/benchmark.h>
+
+export module star.benchmark_flat_hash;
+
+import std;
+
+export namespace BenchmarkFixtures {
 
 template <class Map, class Entries>
 concept emplace_entry_range = std::ranges::input_range<Entries const>

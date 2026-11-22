@@ -6,7 +6,7 @@ endif()
 
 add_library(star_benchmark_runner STATIC)
 target_sources(star_benchmark_runner PUBLIC FILE_SET CXX_MODULES
-  FILES StarBenchmarkRunner.cppm)
+  FILES StarBenchmarkRunner.cppm StarBenchmarkByteFingerprint.cppm StarBenchmarkFlatHash.cppm)
 target_link_libraries(star_benchmark_runner PUBLIC
   benchmark::benchmark star_base_modules star_build_config)
 set_target_properties(star_benchmark_runner PROPERTIES CXX_SCAN_FOR_MODULES ON)
@@ -58,6 +58,7 @@ target_link_libraries(byte_array_benchmarks PRIVATE
   $<IF:$<TARGET_EXISTS:zstd::libzstd_shared>,zstd::libzstd_shared,zstd::libzstd_static>)
 target_sources(file_benchmarks PRIVATE
   file_asset_benchmarks.cpp file_asset_batch_benchmarks.cpp file_commit_benchmarks.cpp)
+target_sources(file_benchmarks PRIVATE FILE_SET CXX_MODULES FILES StarBenchmarkAssetProvider.cppm)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR MINGW)
   star_add_core_benchmark(allocator_benchmarks)
   if(CMAKE_SIZEOF_VOID_P EQUAL 4)

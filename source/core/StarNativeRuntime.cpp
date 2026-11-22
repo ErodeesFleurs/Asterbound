@@ -1,7 +1,6 @@
 #include <errno.h>
 #include <stdio.h>
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
-#include "StarWindowsCrt.hpp"
 #include <io.h>
 #include <windows.h>
 #else
@@ -14,6 +13,7 @@ import star.native_runtime;
 import star.format;
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
 import star.algorithm;
+import star.windows_crt;
 #endif
 
 namespace Star {

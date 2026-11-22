@@ -1,6 +1,8 @@
-#pragma once
+export module star.benchmark_byte_fingerprint;
 
-namespace BenchmarkFixtures {
+import std;
+
+export namespace BenchmarkFixtures {
 
 inline std::uint64_t fingerprint(std::span<std::byte const> bytes) {
   std::uint64_t hash = 14695981039346656037ull;

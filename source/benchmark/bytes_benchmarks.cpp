@@ -5,7 +5,7 @@ import std;
 import star.bytes;
 import star.format;
 import star.benchmark_runner;
-#include "byte_fingerprint.hpp"
+import star.benchmark_byte_fingerprint;
 
 namespace {
 using Star::ByteOrder;

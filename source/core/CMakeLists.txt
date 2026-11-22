@@ -125,6 +125,7 @@ if (STAR_SYSTEM_FAMILY_UNIX)
       StarException_unix.cpp StarFile_unix.cpp StarThread_unix.cpp)
 elseif (STAR_SYSTEM_FAMILY_WINDOWS)
   target_sources (star_modules PUBLIC FILE_SET CXX_MODULES FILES StarString_windows.cppm StarWindowsDump.cppm)
+  target_sources (star_modules PRIVATE FILE_SET windows_crt TYPE CXX_MODULES FILES StarWindowsCrt.cppm)
   target_sources (star_modules PRIVATE StarLockFile_windows.cpp StarTime_windows.cpp
       StarException_windows.cpp StarFile_windows.cpp StarString_windows.cpp StarThread_windows.cpp)
 endif ()

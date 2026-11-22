@@ -8,7 +8,7 @@ import star.format;
 import star.hash;
 import star.benchmark_runner;
 import star.string;
-#include "flat_hash_fixture.hpp"
+import star.benchmark_flat_hash;
 
 // Private before-build adaptation changes only these two flat module imports
 // and this alias. Keep the consumer, fixtures and validators identical.

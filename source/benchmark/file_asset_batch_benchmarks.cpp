@@ -1,21 +1,14 @@
 #include <benchmark/benchmark.h>
 
 import std;
-import star.algorithm;
+import star.benchmark_asset_provider;
 import star.asset_source;
 import star.byte_array;
 import star.data_stream_devices;
-import star.directory_asset_source;
-import star.file;
 import star.format;
 import star.io_device;
-import star.logging;
-import star.memory_asset_source;
-import star.packed_asset_source;
-import star.random;
 import star.sha256;
 import star.string;
-#include "asset_provider_fixture.hpp"
 
 namespace {
 

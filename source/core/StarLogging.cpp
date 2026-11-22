@@ -1,7 +1,7 @@
 #include <stdio.h>
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
-#include "StarWindowsCrt.hpp"
 #include <windows.h>
+import star.windows_crt;
 #else
 #include <syslog.h>
 #endif

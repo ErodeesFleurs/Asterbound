@@ -19,7 +19,7 @@ import star.packed_asset_source;
 import star.random;
 import star.string;
 import star.uuid;
-#include "byte_fingerprint.hpp"
+import star.benchmark_byte_fingerprint;
 
 namespace {
 constexpr std::size_t batch_size = 64;

@@ -16,7 +16,7 @@ import star.static_random;
 import star.string;
 import star.string_view;
 import star.xx_hash;
-#include "flat_hash_fixture.hpp"
+import star.benchmark_flat_hash;
 
 namespace {
 

@@ -1,4 +1,4 @@
-#pragma once
+module;
 
 #include <stdlib.h>
 
@@ -7,3 +7,7 @@
 extern "C" _CRTIMP _invalid_parameter_handler __cdecl
 _set_thread_local_invalid_parameter_handler(_invalid_parameter_handler);
 #endif
+
+export module star.windows_crt;
+
+export using ::_set_thread_local_invalid_parameter_handler;

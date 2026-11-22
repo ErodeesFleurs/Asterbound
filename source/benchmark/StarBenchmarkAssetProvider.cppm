@@ -1,7 +1,23 @@
-#pragma once
+module;
 
-// Import the provider modules before including this fixture-only support.
-namespace BenchmarkFixtures {
+#include <benchmark/benchmark.h>
+
+export module star.benchmark_asset_provider;
+
+import std;
+import star.algorithm;
+import star.asset_source;
+import star.byte_array;
+import star.directory_asset_source;
+import star.file;
+import star.format;
+import star.logging;
+import star.memory_asset_source;
+import star.packed_asset_source;
+import star.random;
+import star.string;
+
+export namespace BenchmarkFixtures {
 
 enum class AssetKind { directory, packed, memory };
 

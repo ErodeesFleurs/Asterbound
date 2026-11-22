@@ -17,6 +17,7 @@ Run commands from the repository root.
 ## Tooling
 
 - C++ uses named modules, `import std;` and `std::expected`, without RTTI or exceptions. Use fresh build trees after compiler, ABI or sanitizer changes; supported toolchains are in the build guide.
+- Shared benchmark fixtures are imported from `star.benchmark_*` modules; the asset-provider fixture is private to `file_benchmarks`. Windows core implementations import `star.windows_crt` for the thread-local invalid-parameter handler instead of redeclaring the CRT function.
 - Configure clangd with `nix develop -c bash scripts/ide/configure-clangd.sh`, its generated `build/clangd/compile_commands.json` and clangd 23's `--experimental-modules-support`.
 - Check changed C++/module lines with the pinned formatter; use `--apply` to format or `--base <commit>` for a branch comparison:
 
