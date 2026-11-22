@@ -14,6 +14,11 @@ struct AnimatedPartSetExceptionTag {
 };
 using AnimatedPartSetException = StarError<AnimatedPartSetExceptionTag, StarException>;
 
+template <typename Visitor, typename Value>
+concept animation_visitor = requires(Visitor& visitor, String const& name, Value const& value) {
+  { std::invoke(visitor, name, value) } -> std::same_as<std::expected<void, StarException>>;
+};
+
 // Defines a "animated" data set constructed in such a way that it is very
 // useful for doing generic animations with lots of additional animation data.
 // It is made up of two concepts, "states" and "parts".
@@ -49,37 +54,38 @@ using AnimatedPartSetException = StarError<AnimatedPartSetExceptionTag, StarExce
 class AnimatedPartSet {
 public:
   struct ActiveStateInformation {
-    String stateTypeName;
-    String stateName;
+    String state_type_name;
+    String state_name;
     float timer = 0;
     unsigned frame = 0;
-    float frameProgress = 0;
+    float frame_progress = 0;
     JsonObject properties;
     bool reverse = false;
-    unsigned nextFrame = 0;
-    JsonObject nextProperties;
+    unsigned next_frame = 0;
+    JsonObject next_properties;
   };
 
-  struct ActivePartInformation {
-    String partName;
+  struct AffinePose {
+    Mat3F animation_affine_transform() const;
+    void set_animation_affine_transform(Mat3F const& matrix);
+
+    float x_translation_animation = 0;
+    float y_translation_animation = 0;
+    float x_scale_animation = 1;
+    float y_scale_animation = 1;
+    float x_shear_animation = 0;
+    float y_shear_animation = 0;
+  };
+
+  struct ActivePartInformation : AffinePose {
+    String part_name;
     // If a state match is found, this will be set.
-    std::optional<ActiveStateInformation> activeState;
+    std::optional<ActiveStateInformation> active_state;
     JsonObject properties;
-    JsonObject nextProperties;
-
-    Mat3F animationAffineTransform() const;
-    void setAnimationAffineTransform(Mat3F const& matrix);
-    void setAnimationAffineTransform(Mat3F const& mat1, Mat3F const& mat2, float progress);
-
-    float xTranslationAnimation = 0;
-    float yTranslationAnimation = 0;
-    float xScaleAnimation = 1;
-    float yScaleAnimation = 1;
-    float xShearAnimation = 0;
-    float yShearAnimation = 0;
+    JsonObject next_properties;
   };
 
-    enum AnimationMode {
+  enum AnimationMode {
     End,
     Loop,
     Transition
@@ -88,42 +94,42 @@ public:
   struct State {
     unsigned frames;
     float cycle;
-    AnimationMode animationMode;
-    String transitionState;
-    JsonObject stateProperties;
-    JsonObject stateFrameProperties;
+    AnimationMode animation_mode;
+    String transition_state;
+    JsonObject state_properties;
+    JsonObject state_frame_properties;
   };
 
   struct StateType {
     float priority;
     bool enabled;
-    String defaultState;
-    JsonObject stateTypeProperties;
+    String default_state;
+    JsonObject state_type_properties;
     OrderedHashMap<String, std::shared_ptr<State const>> states;
 
     // Lazily refreshed frame information; state changes still require nonconst access.
-    mutable ActiveStateInformation activeState;
-    std::optional<std::reference_wrapper<State const>> activeStateReference;
-    mutable bool activeStateDirty;
-    float previousTimer = 0;
-    float timerAdvance = 0;
-    mutable std::size_t presentationIndex = 0;
+    mutable ActiveStateInformation active_state;
+    std::shared_ptr<State const> active_state_reference;
+    mutable bool active_state_dirty;
+    float previous_timer = 0;
+    float timer_advance = 0;
+    std::size_t presentation_index = 0;
   };
 
   struct PartState {
-    JsonObject partStateProperties;
-    JsonObject partStateFrameProperties;
+    JsonObject part_state_properties;
+    JsonObject part_state_frame_properties;
   };
 
   struct Part {
-    JsonObject partProperties;
-    StringMap<StringMap<PartState>> partStates;
+    JsonObject part_properties;
+    StringMap<StringMap<PartState>> part_states;
 
     // Derived from part properties and the currently active state.
-    mutable ActivePartInformation activePart;
-    mutable bool activePartDirty;
-    mutable std::size_t presentationIndex = 0;
-    mutable Mat3F activePartBaseTransform = Mat3F::identity();
+    mutable ActivePartInformation active_part;
+    mutable bool active_part_dirty = true;
+    mutable std::size_t presentation_index = std::numeric_limits<std::size_t>::max();
+    mutable AffinePose active_part_base_pose;
   };
 
   // Reusable derived data owned by one visual view, never by logical state.
@@ -132,27 +138,33 @@ public:
       ActiveStateInformation state;
       bool dirty = true;
       bool initialized = false;
-      std::shared_ptr<State const> propertyState;
-      unsigned propertyFrame = 0;
-      unsigned propertyNextFrame = 0;
+      std::shared_ptr<State const> override_state;
+      std::shared_ptr<State const> property_state;
+      unsigned property_frame = 0;
+      unsigned property_next_frame = 0;
+    };
+    struct TransformEndpoints {
+      AffinePose base;
+      AffinePose current;
+      std::optional<AffinePose> next;
     };
     struct PartCache {
       ActivePartInformation part;
       bool dirty = true;
       // Keys describe discrete sources only; timing and affine interpolation
       // are refreshed whenever this sample is prepared.
-      Part const* definition = nullptr;
-      PartState const* stateDefinition = nullptr;
-      State const* state = nullptr;
+      TransformEndpoints transforms;
+      std::shared_ptr<State const> state;
       unsigned frame = 0;
-      unsigned nextFrame = 0;
-      bool propertiesValid = false;
+      unsigned next_frame = 0;
+      bool properties_valid = false;
     };
     float interpolation = 1;
     std::vector<StateCache> states;
     std::vector<PartCache> parts;
     std::shared_ptr<JsonObject const> configuration;
-    std::uint8_t animatorVersion = 0;
+    std::uint8_t animator_version = 0;
+    std::uint64_t owner_id = 0;
   };
 
   AnimatedPartSet();
@@ -160,86 +172,156 @@ public:
   AnimatedPartSet(AnimatedPartSet&&) = default;
   AnimatedPartSet& operator=(AnimatedPartSet const& other);
   AnimatedPartSet& operator=(AnimatedPartSet&& other);
-  [[nodiscard]] static std::expected<AnimatedPartSet, StarException> create(Json config, std::uint8_t animatorVersion);
+  [[nodiscard]] static std::expected<AnimatedPartSet, StarException> create(Json config, std::uint8_t animator_version);
 
   // Reuses a view's storage and initializes it from the current logical endpoints.
-  void prepareSample(Sample& sample, float interpolation) const;
-  [[nodiscard]] std::expected<bool, StarException> setPresentationState(String const& stateTypeName, String const& stateName, bool alwaysStart, bool reverse, Sample& sample) const;
+  void prepare_sample(Sample& sample, float interpolation) const;
+  [[nodiscard]] std::expected<bool, StarException> set_presentation_state(String const& state_type_name, String const& state_name, bool always_start, bool reverse, Sample& sample) const;
 
   // Returns the available state types.
-  StringList stateTypes() const;
+  StringList state_types() const;
 
   // If a state type is disabled, no parts will match against it even
   // if they have entries for that state type.
-  [[nodiscard]] std::expected<void, StarException> setStateTypeEnabled(String const& stateTypeName, bool enabled);
-  [[nodiscard]] std::expected<void, StarException> setEnabledStateTypes(StringList const& stateTypeNames);
-  [[nodiscard]] std::expected<bool, StarException> stateTypeEnabled(String const& stateTypeName) const;
+  [[nodiscard]] std::expected<void, StarException> set_state_type_enabled(String const& state_type_name, bool enabled);
+  [[nodiscard]] std::expected<void, StarException> set_enabled_state_types(StringList const& state_type_names);
+  [[nodiscard]] std::expected<bool, StarException> state_type_enabled(String const& state_type_name) const;
 
   // Returns the available states for the given state type.
-  [[nodiscard]] std::expected<StringList, StarException> states(String const& stateTypeName) const;
+  [[nodiscard]] std::expected<StringList, StarException> states(String const& state_type_name) const;
 
-  StringList partNames() const;
+  StringList part_names() const;
 
   // Sets the active state for this state type.  If the state is different than
   // the previously set state, will start the new states animation off at the
-  // beginning.  If alwaysStart is true, then starts the state animation off at
+  // beginning.  If always_start is true, then starts the state animation off at
   // the beginning even if no state change has occurred.  Returns true if a
   // state animation reset was done.
-  [[nodiscard]] std::expected<bool, StarException> setActiveState(String const& stateTypeName, String const& stateName, bool alwaysStart = false, bool reverse = false);
+  [[nodiscard]] std::expected<bool, StarException> set_active_state(String const& state_type_name, String const& state_name, bool always_start = false, bool reverse = false);
 
   // Restart this given state type's timer off at the beginning.
-  [[nodiscard]] std::expected<void, StarException> restartState(String const& stateTypeName);
+  [[nodiscard]] std::expected<void, StarException> restart_state(String const& state_type_name);
 
-  [[nodiscard]] std::expected<std::reference_wrapper<ActiveStateInformation const>, StarException> activeState(String const& stateTypeName, Sample* sample = nullptr) const;
-  [[nodiscard]] std::expected<std::reference_wrapper<ActivePartInformation const>, StarException> activePart(String const& partName, Sample* sample = nullptr) const;
-  // The part must belong to this set, as returned by constParts().
-  [[nodiscard]] std::expected<std::reference_wrapper<ActivePartInformation const>, StarException> activePart(Part const& part, Sample* sample = nullptr) const;
-  [[nodiscard]] std::expected<std::reference_wrapper<State const>, StarException> getState(String const& stateTypeName, String const& stateName) const;
+  [[nodiscard]] std::expected<std::reference_wrapper<ActiveStateInformation const>, StarException> active_state(String const& state_type_name) const;
+  [[nodiscard]] std::expected<std::reference_wrapper<ActiveStateInformation const>, StarException> active_state(String const& state_type_name, Sample& sample) const;
+  [[nodiscard]] std::expected<std::reference_wrapper<ActivePartInformation const>, StarException> active_part(String const& part_name) const;
+  [[nodiscard]] std::expected<std::reference_wrapper<ActivePartInformation const>, StarException> active_part(String const& part_name, Sample& sample) const;
+  // The part must belong to this set, as returned by const_parts().
+  [[nodiscard]] std::expected<std::reference_wrapper<ActivePartInformation const>, StarException> active_part(Part const& part) const;
+  [[nodiscard]] std::expected<std::reference_wrapper<ActivePartInformation const>, StarException> active_part(Part const& part, Sample& sample) const;
+  [[nodiscard]] std::expected<std::reference_wrapper<State const>, StarException> get_state(String const& state_type_name, String const& state_name) const;
 
-  StringMap<Part> const& constParts() const;
+  StringMap<Part> const& const_parts() const;
   StringMap<Part>& parts();
+
+  [[nodiscard]] std::expected<void, StarException> for_each_active_state(std::nullptr_t) const {
+    return std::unexpected(AnimatedPartSetException("Empty active-state callback"));
+  }
+  [[nodiscard]] std::expected<void, StarException> for_each_active_state(std::nullptr_t, Sample&) const {
+    return std::unexpected(AnimatedPartSetException("Empty active-state callback"));
+  }
 
   // Function will be given the name of each state type, and the
   // ActiveStateInformation for the active state for that state type.
-  [[nodiscard]] std::expected<void, StarException> forEachActiveState(std::function<std::expected<void, StarException>(String const&, ActiveStateInformation const&)> callback, Sample* sample = nullptr) const;
+  template <typename Visitor> requires animation_visitor<Visitor, ActiveStateInformation>
+  [[nodiscard]] std::expected<void, StarException> for_each_active_state(Visitor&& visitor) const {
+    return visit_states(visitor, std::nullopt);
+  }
+  template <typename Visitor> requires animation_visitor<Visitor, ActiveStateInformation>
+  [[nodiscard]] std::expected<void, StarException> for_each_active_state(Visitor&& visitor, Sample& sample) const {
+    return visit_states(visitor, std::ref(sample));
+  }
+
+  [[nodiscard]] std::expected<void, StarException> for_each_active_part(std::nullptr_t) const {
+    return std::unexpected(AnimatedPartSetException("Empty active-part callback"));
+  }
+  [[nodiscard]] std::expected<void, StarException> for_each_active_part(std::nullptr_t, Sample&) const {
+    return std::unexpected(AnimatedPartSetException("Empty active-part callback"));
+  }
 
   // Function will be given the name of each part, and the
   // ActivePartInformation for the active part.
-  [[nodiscard]] std::expected<void, StarException> forEachActivePart(std::function<std::expected<void, StarException>(String const&, ActivePartInformation const&)> callback, Sample* sample = nullptr) const;
+  template <typename Visitor> requires animation_visitor<Visitor, ActivePartInformation>
+  [[nodiscard]] std::expected<void, StarException> for_each_active_part(Visitor&& visitor) const {
+    return visit_parts(visitor, std::nullopt);
+  }
+  template <typename Visitor> requires animation_visitor<Visitor, ActivePartInformation>
+  [[nodiscard]] std::expected<void, StarException> for_each_active_part(Visitor&& visitor, Sample& sample) const {
+    return visit_parts(visitor, std::ref(sample));
+  }
 
   // Useful for serializing state changes.  Since each set of states for a
   // state type is ordered, it is possible to simply serialize and deserialize
   // the state index for that state type.
-  [[nodiscard]] std::expected<std::size_t, StarException> activeStateIndex(String const& stateTypeName) const;
-  [[nodiscard]] std::expected<bool, StarException> activeStateReverse(String const& stateTypeName) const;
-  [[nodiscard]] std::expected<bool, StarException> setActiveStateIndex(String const& stateTypeName, std::size_t stateIndex, bool alwaysStart = false, bool reverse = false);
+  [[nodiscard]] std::expected<std::size_t, StarException> active_state_index(String const& state_type_name) const;
+  [[nodiscard]] std::expected<bool, StarException> active_state_reverse(String const& state_type_name) const;
+  [[nodiscard]] std::expected<bool, StarException> set_active_state_index(String const& state_type_name, std::size_t state_index, bool always_start = false, bool reverse = false);
 
   // Animate each state type forward 'dt' time, and either change state frames
   // or transition to new states, depending on the config.
   [[nodiscard]] std::expected<void, StarException> update(float dt);
 
   // Pushes all the animations into their final state
-  [[nodiscard]] std::expected<void, StarException> finishAnimations();
+  [[nodiscard]] std::expected<void, StarException> finish_animations();
 
   std::uint8_t version() const;
 
-  [[nodiscard]] std::expected<Json, StarException> getStateFrameProperty(String const& stateType, String const& propertyName, String state, int frame) const;
-  [[nodiscard]] std::expected<Json, StarException> getPartStateFrameProperty(String const& partName, String const& propertyName, String const& stateType, String state, int frame) const;
+  [[nodiscard]] std::expected<Json, StarException> get_state_frame_property(String const& state_type, String const& property_name, String const& state, int frame) const;
+  [[nodiscard]] std::expected<Json, StarException> get_part_state_frame_property(String const& part_name, String const& property_name, String const& state_type, String const& state, int frame) const;
 
 private:
-  [[nodiscard]] static std::expected<AnimationMode, StarException> stringToAnimationMode(String const& string);
+  struct SampleIdentity {
+    SampleIdentity();
+    SampleIdentity(SampleIdentity const&) : SampleIdentity() {}
+    std::uint64_t value;
+  };
+  SampleIdentity m_sample_identity;
+  bool sample_prepared(Sample const& sample) const;
+  [[nodiscard]] std::expected<std::reference_wrapper<ActiveStateInformation const>, StarException> resolve_state(StateType const& entry, std::optional<std::reference_wrapper<Sample>> sample) const;
+  [[nodiscard]] std::expected<std::reference_wrapper<ActivePartInformation const>, StarException> resolve_part(Part const& entry, std::optional<std::reference_wrapper<Sample>> sample) const;
 
-  [[nodiscard]] std::expected<void, StarException> freshenActiveState(StateType const& stateType, Sample* sample = nullptr) const;
-  [[nodiscard]] std::expected<void, StarException> freshenActivePart(Part const& part, Sample* sample = nullptr) const;
+  template <typename Visitor> requires animation_visitor<Visitor, ActiveStateInformation>
+  [[nodiscard]] std::expected<void, StarException> visit_states(Visitor& visitor, std::optional<std::reference_wrapper<Sample>> sample) const {
+    if constexpr (requires { static_cast<bool>(visitor); }) {
+      if (!static_cast<bool>(visitor)) return std::unexpected(AnimatedPartSetException("Empty active-state callback"));
+    }
+    if (sample && !sample_prepared(sample->get())) return std::unexpected(AnimatedPartSetException("Unprepared animation sample"));
+    for (auto const& [name, entry] : m_state_types) {
+      auto active = resolve_state(entry, sample);
+      if (!active) return std::unexpected(std::move(active.error()));
+      auto called = std::invoke(visitor, name, active->get());
+      if (!called) return std::unexpected(std::move(called.error()));
+    }
+    return {};
+  }
 
-  OrderedHashMap<String, StateType> m_stateTypes;
+  template <typename Visitor> requires animation_visitor<Visitor, ActivePartInformation>
+  [[nodiscard]] std::expected<void, StarException> visit_parts(Visitor& visitor, std::optional<std::reference_wrapper<Sample>> sample) const {
+    if constexpr (requires { static_cast<bool>(visitor); }) {
+      if (!static_cast<bool>(visitor)) return std::unexpected(AnimatedPartSetException("Empty active-part callback"));
+    }
+    if (sample && !sample_prepared(sample->get())) return std::unexpected(AnimatedPartSetException("Unprepared animation sample"));
+    for (auto const& [name, entry] : m_parts) {
+      auto active = resolve_part(entry, sample);
+      if (!active) return std::unexpected(std::move(active.error()));
+      auto called = std::invoke(visitor, name, active->get());
+      if (!called) return std::unexpected(std::move(called.error()));
+    }
+    return {};
+  }
+  [[nodiscard]] static std::expected<AnimationMode, StarException> string_to_animation_mode(String const& string);
+
+  [[nodiscard]] std::expected<void, StarException> freshen_active_state(StateType const& state_type, std::optional<std::reference_wrapper<Sample>> sample) const;
+  [[nodiscard]] std::expected<void, StarException> freshen_active_part(Part const& part, std::optional<std::reference_wrapper<Sample>> sample) const;
+
+  OrderedHashMap<String, StateType> m_state_types;
   StringMap<Part> m_parts;
 
-  std::uint8_t m_animatorVersion = 0;
+  std::uint8_t m_animator_version = 0;
   // Retain the immutable input for sample identity without allocating an ID.
-  std::shared_ptr<JsonObject const> m_sampleConfiguration;
+  std::shared_ptr<JsonObject const> m_sample_configuration;
   // A retained reference to the map survives assignment; exposure is sticky.
-  bool m_mutablePartsExposed = false;
+  bool m_mutable_parts_exposed = false;
 };
 
 }

@@ -826,27 +826,27 @@ const GameTestRegistration assetsConstAnimationCachesRefreshFramesAndParts("Asse
   auto animation = std::move(*created);
   ASSERT_TRUE(animation.update(0.75f));
   AnimatedPartSet const frozen = animation;
-  auto partResult = frozen.activePart("body");
+  auto partResult = frozen.active_part("body");
   ASSERT_TRUE(partResult);
   auto const& part = partResult->get();
-  ASSERT_TRUE(part.activeState);
-  EXPECT_EQ(part.activeState->frame, 1u);
+  ASSERT_TRUE(part.active_state);
+  EXPECT_EQ(part.active_state->frame, 1u);
   auto partFrame = part.properties.get("partFrame");
   ASSERT_TRUE(partFrame);
   auto partFrameValue = partFrame->get().to_int();
   ASSERT_TRUE(partFrameValue);
   EXPECT_EQ(*partFrameValue, 40);
-  auto nextPartFrame = part.nextProperties.get("partFrame");
+  auto nextPartFrame = part.next_properties.get("partFrame");
   ASSERT_TRUE(nextPartFrame);
   auto nextPartFrameValue = nextPartFrame->get().to_int();
   ASSERT_TRUE(nextPartFrameValue);
   EXPECT_EQ(*nextPartFrameValue, 30);
-  auto stateResult = frozen.activeState("movement");
+  auto stateResult = frozen.active_state("movement");
   ASSERT_TRUE(stateResult);
   auto const& state = stateResult->get();
   EXPECT_EQ(state.frame, 1u);
-  EXPECT_EQ(state.nextFrame, 0u);
-  EXPECT_FLOAT_EQ(state.frameProgress, 0.5f);
+  EXPECT_EQ(state.next_frame, 0u);
+  EXPECT_FLOAT_EQ(state.frame_progress, 0.5f);
   auto stateFrame = state.properties.get("stateFrame");
   ASSERT_TRUE(stateFrame);
   auto stateFrameValue = stateFrame->get().to_int();
@@ -855,14 +855,14 @@ const GameTestRegistration assetsConstAnimationCachesRefreshFramesAndParts("Asse
 
   AnimatedPartSet const callbackCopy = animation;
   unsigned stateCount = 0;
-  ASSERT_TRUE(callbackCopy.forEachActiveState([&](String const& name, auto const& active) -> std::expected<void, StarException> {
+  ASSERT_TRUE(callbackCopy.for_each_active_state([&](String const& name, auto const& active) -> std::expected<void, StarException> {
     EXPECT_EQ(name, "movement");
     EXPECT_EQ(active.frame, 1u);
     ++stateCount;
     return {};
   }));
   unsigned partCount = 0;
-  ASSERT_TRUE(callbackCopy.forEachActivePart([&](String const& name, auto const& active) -> std::expected<void, StarException> {
+  ASSERT_TRUE(callbackCopy.for_each_active_part([&](String const& name, auto const& active) -> std::expected<void, StarException> {
     EXPECT_EQ(name, "body");
     auto frame = active.properties.get("partFrame");
     if (!frame)
@@ -879,19 +879,19 @@ const GameTestRegistration assetsConstAnimationCachesRefreshFramesAndParts("Asse
 
   auto writablePart = animation.parts().get("body");
   ASSERT_TRUE(writablePart);
-  writablePart->get().partProperties["base"] = false;
-  writablePart->get().activePartDirty = true;
-  auto updatedPart = animation.activePart("body");
+  writablePart->get().part_properties["base"] = false;
+  writablePart->get().active_part_dirty = true;
+  auto updatedPart = animation.active_part("body");
   ASSERT_TRUE(updatedPart);
   auto base = updatedPart->get().properties.get("base");
   ASSERT_TRUE(base);
   auto baseValue = base->get().to_bool();
   ASSERT_TRUE(baseValue);
   EXPECT_FALSE(*baseValue);
-  ASSERT_TRUE(animation.setStateTypeEnabled("movement", false));
-  auto disabledPart = animation.activePart("body");
+  ASSERT_TRUE(animation.set_state_type_enabled("movement", false));
+  auto disabledPart = animation.active_part("body");
   ASSERT_TRUE(disabledPart);
-  EXPECT_FALSE(disabledPart->get().activeState);
+  EXPECT_FALSE(disabledPart->get().active_state);
 });
 
 const GameTestRegistration
@@ -900,34 +900,34 @@ const GameTestRegistration
     ASSERT_TRUE(config);
     auto animation = AnimatedPartSet::create(*config, 1);
     ASSERT_TRUE(animation);
-    auto part = animation->activePart("body");
+    auto part = animation->active_part("body");
     ASSERT_TRUE(part);
-    EXPECT_FLOAT_EQ(part->get().xScaleAnimation, 2);
-    EXPECT_FLOAT_EQ(part->get().yScaleAnimation, 3);
-    EXPECT_FLOAT_EQ(part->get().xTranslationAnimation, 0);
-    EXPECT_FLOAT_EQ(part->get().yTranslationAnimation, 0);
+    EXPECT_FLOAT_EQ(part->get().x_scale_animation, 2);
+    EXPECT_FLOAT_EQ(part->get().y_scale_animation, 3);
+    EXPECT_FLOAT_EQ(part->get().x_translation_animation, 0);
+    EXPECT_FLOAT_EQ(part->get().y_translation_animation, 0);
     auto definition = animation->parts().get("body");
     ASSERT_TRUE(definition);
-    definition->get().partProperties["transforms"] =
+    definition->get().part_properties["transforms"] =
       JsonArray{JsonArray{"reset"}, JsonArray{"scale", JsonArray{2, 3}, JsonArray{1, 2}}};
-    definition->get().partProperties["scalingCenter"] = JsonArray{"unused invalid coordinate"};
-    definition->get().activePartDirty = true;
-    auto explicitCenter = animation->activePart("body");
+    definition->get().part_properties["scalingCenter"] = JsonArray{"unused invalid coordinate"};
+    definition->get().active_part_dirty = true;
+    auto explicitCenter = animation->active_part("body");
     ASSERT_TRUE(explicitCenter);
-    EXPECT_FLOAT_EQ(explicitCenter->get().xTranslationAnimation, -1);
-    EXPECT_FLOAT_EQ(explicitCenter->get().yTranslationAnimation, -4);
+    EXPECT_FLOAT_EQ(explicitCenter->get().x_translation_animation, -1);
+    EXPECT_FLOAT_EQ(explicitCenter->get().y_translation_animation, -4);
     // A supplied default's array type is still checked before using an explicit center.
-    definition->get().partProperties["scalingCenter"] = 7;
-    definition->get().activePartDirty = true;
-    auto invalidDefault = animation->activePart("body");
+    definition->get().part_properties["scalingCenter"] = 7;
+    definition->get().active_part_dirty = true;
+    auto invalidDefault = animation->active_part("body");
     ASSERT_FALSE(invalidDefault);
     EXPECT_TRUE(invalidDefault.error().is<JsonException>());
-    definition->get().partProperties["scalingCenter"] = JsonArray{0, 0};
-    definition->get().activePartDirty = true;
-    auto recovered = animation->activePart("body");
+    definition->get().part_properties["scalingCenter"] = JsonArray{0, 0};
+    definition->get().active_part_dirty = true;
+    auto recovered = animation->active_part("body");
     ASSERT_TRUE(recovered);
-    EXPECT_FLOAT_EQ(recovered->get().xTranslationAnimation, -1);
-    EXPECT_FLOAT_EQ(recovered->get().yTranslationAnimation, -4);
+    EXPECT_FLOAT_EQ(recovered->get().x_translation_animation, -1);
+    EXPECT_FLOAT_EQ(recovered->get().y_translation_animation, -4);
   });
 
 const GameTestRegistration assetsSampleDiscreteProperties(
@@ -975,33 +975,33 @@ const GameTestRegistration assetsSampleDiscreteProperties(
     AnimatedPartSet::Sample early;
     AnimatedPartSet::Sample late;
     auto check = [&](AnimatedPartSet::Sample& sample, unsigned frame, String const& value, String const& next, float translation) {
-      auto result = animation->activePart("body", &sample);
+      auto result = animation->active_part("body", sample);
       ASSERT_TRUE(result);
       auto const& part = result->get();
-      ASSERT_TRUE(part.activeState);
-      EXPECT_EQ(part.activeState->frame, frame);
+      ASSERT_TRUE(part.active_state);
+      EXPECT_EQ(part.active_state->frame, frame);
       auto currentValue = part.properties.get("value");
-      auto nextValue = part.nextProperties.get("value");
+      auto nextValue = part.next_properties.get("value");
       ASSERT_TRUE(currentValue);
       ASSERT_TRUE(nextValue);
       EXPECT_EQ(currentValue->get(), Json(value));
       EXPECT_EQ(nextValue->get(), Json(next));
-      EXPECT_NEAR(part.xTranslationAnimation, translation, 0.0001f);
+      EXPECT_NEAR(part.x_translation_animation, translation, 0.0001f);
       auto base = part.properties.get("baseOnly");
       ASSERT_TRUE(base);
       EXPECT_EQ(base->get(), Json(true));
     };
-    animation->prepareSample(early, 0.25f);
-    animation->prepareSample(late, 0.75f);
+    animation->prepare_sample(early, 0.25f);
+    animation->prepare_sample(late, 0.75f);
     check(early, 0, "part0", "part1", 2);
     check(late, 0, "part0", "part1", 6);
     check(early, 0, "part0", "part1", 2);
-    animation->prepareSample(early, 0.5f);
+    animation->prepare_sample(early, 0.5f);
     check(early, 0, "part0", "part1", 4);
-    auto state = animation->activeState("movement", &early);
+    auto state = animation->active_state("movement", early);
     ASSERT_TRUE(state);
     auto stateValue = state->get().properties.get("value");
-    auto nextStateValue = state->get().nextProperties.get("value");
+    auto nextStateValue = state->get().next_properties.get("value");
     ASSERT_TRUE(stateValue);
     ASSERT_TRUE(nextStateValue);
     EXPECT_EQ(stateValue->get(), Json("state0"));
@@ -1010,40 +1010,40 @@ const GameTestRegistration assetsSampleDiscreteProperties(
     ASSERT_TRUE(typeOnly);
     EXPECT_EQ(typeOnly->get(), Json(true));
 
-    ASSERT_TRUE(animation->setPresentationState("movement", "idle", false, false, early));
+    ASSERT_TRUE(animation->set_presentation_state("movement", "idle", false, false, early));
     check(early, 0, "idlePart", "idlePart", 0);
     check(late, 0, "part0", "part1", 6);
-    auto logical = animation->activeState("movement");
+    auto logical = animation->active_state("movement");
     ASSERT_TRUE(logical);
-    EXPECT_EQ(logical->get().stateName, "walk");
-    animation->prepareSample(early, 0.5f);
+    EXPECT_EQ(logical->get().state_name, "walk");
+    animation->prepare_sample(early, 0.5f);
     check(early, 0, "part0", "part1", 4);
 
     ASSERT_TRUE(animation->update(0.4f));
-    animation->prepareSample(early, 0.5f);
+    animation->prepare_sample(early, 0.5f);
     check(early, 1, "part1", "part0", 8);
-    ASSERT_TRUE(animation->setActiveState("movement", "walk", true, true));
+    ASSERT_TRUE(animation->set_active_state("movement", "walk", true, true));
     ASSERT_TRUE(animation->update(0.4f));
-    animation->prepareSample(early, 0.25f);
+    animation->prepare_sample(early, 0.25f);
     check(early, 1, "part1", "part0", 8);
-    animation->prepareSample(early, 0.75f);
+    animation->prepare_sample(early, 0.75f);
     check(early, 1, "part1", "part0", 4);
-    auto reversed = animation->activePart("body", &early);
+    auto reversed = animation->active_part("body", early);
     ASSERT_TRUE(reversed);
-    EXPECT_TRUE(reversed->get().activeState->reverse);
+    EXPECT_TRUE(reversed->get().active_state->reverse);
 
-    ASSERT_TRUE(animation->setStateTypeEnabled("overlay", true));
-    animation->prepareSample(early, 0.5f);
+    ASSERT_TRUE(animation->set_state_type_enabled("overlay", true));
+    animation->prepare_sample(early, 0.5f);
     check(early, 0, "overlay", "overlay", 0);
-    ASSERT_TRUE(animation->setPresentationState("overlay", "invalid", false, false, early));
-    auto invalid = animation->activePart("body", &early);
+    ASSERT_TRUE(animation->set_presentation_state("overlay", "invalid", false, false, early));
+    auto invalid = animation->active_part("body", early);
     ASSERT_FALSE(invalid);
     EXPECT_TRUE(invalid.error().is<JsonException>());
     // Preparing again discards the local override, including its failed cache.
-    animation->prepareSample(early, 0.5f);
+    animation->prepare_sample(early, 0.5f);
     check(early, 0, "overlay", "overlay", 0);
-    ASSERT_TRUE(animation->setStateTypeEnabled("overlay", false));
-    animation->prepareSample(early, 0.5f);
+    ASSERT_TRUE(animation->set_state_type_enabled("overlay", false));
+    animation->prepare_sample(early, 0.5f);
     check(early, 1, "part1", "part0", 6);
   });
 
@@ -1061,8 +1061,8 @@ const GameTestRegistration assetsSampleRetainedMutableDefinitions(
     ASSERT_TRUE(other);
     AnimatedPartSet::Sample sample;
     auto check = [&](AnimatedPartSet& owner, int expected) {
-      owner.prepareSample(sample, 0.5f);
-      auto result = owner.activePart("body", &sample);
+      owner.prepare_sample(sample, 0.5f);
+      auto result = owner.active_part("body", sample);
       ASSERT_TRUE(result);
       auto value = result->get().properties.get("value");
       ASSERT_TRUE(value);
@@ -1074,31 +1074,31 @@ const GameTestRegistration assetsSampleRetainedMutableDefinitions(
     auto& retainedParts = animation->parts();
     auto definition = retainedParts.get("body");
     ASSERT_TRUE(definition);
-    definition->get().partProperties["value"] = 2;
-    definition->get().activePartDirty = true;
+    definition->get().part_properties["value"] = 2;
+    definition->get().active_part_dirty = true;
     check(*animation, 2);
     // No further parts() call: a reference escaped before the previous prepare.
-    definition->get().partProperties["value"] = 3;
-    definition->get().partProperties["scalingCenter"] = 7;
-    definition->get().activePartDirty = true;
-    animation->prepareSample(sample, 0.5f);
-    auto invalid = animation->activePart("body", &sample);
+    definition->get().part_properties["value"] = 3;
+    definition->get().part_properties["scalingCenter"] = 7;
+    definition->get().active_part_dirty = true;
+    animation->prepare_sample(sample, 0.5f);
+    auto invalid = animation->active_part("body", sample);
     ASSERT_FALSE(invalid);
     EXPECT_TRUE(invalid.error().is<JsonException>());
-    definition->get().partProperties["scalingCenter"] = JsonArray{0, 0};
-    definition->get().activePartDirty = true;
+    definition->get().part_properties["scalingCenter"] = JsonArray{0, 0};
+    definition->get().active_part_dirty = true;
     // A failed query remains retryable even without preparing again.
-    auto recovered = animation->activePart("body", &sample);
+    auto recovered = animation->active_part("body", sample);
     ASSERT_TRUE(recovered);
     auto recoveredValue = recovered->get().properties.get("value");
     ASSERT_TRUE(recoveredValue);
     EXPECT_EQ(recoveredValue->get(), Json(3));
-    EXPECT_FLOAT_EQ(recovered->get().xScaleAnimation, 2);
+    EXPECT_FLOAT_EQ(recovered->get().x_scale_animation, 2);
     check(*animation, 3);
     AnimatedPartSet copy = *animation;
     check(copy, 3);
-    definition->get().partProperties["value"] = 4;
-    definition->get().activePartDirty = true;
+    definition->get().part_properties["value"] = 4;
+    definition->get().active_part_dirty = true;
     check(*animation, 4);
     check(copy, 3);
 
@@ -1108,8 +1108,8 @@ const GameTestRegistration assetsSampleRetainedMutableDefinitions(
     check(*animation, 9);
     auto replacement = retainedParts.get("body");
     ASSERT_TRUE(replacement);
-    replacement->get().partProperties["value"] = 10;
-    replacement->get().activePartDirty = true;
+    replacement->get().part_properties["value"] = 10;
+    replacement->get().active_part_dirty = true;
     check(*animation, 10);
     auto fresh = AnimatedPartSet::create(*otherConfig, 1);
     ASSERT_TRUE(fresh);
@@ -1117,11 +1117,108 @@ const GameTestRegistration assetsSampleRetainedMutableDefinitions(
     check(*animation, 9);
     replacement = retainedParts.get("body");
     ASSERT_TRUE(replacement);
-    replacement->get().partProperties["value"] = 11;
-    replacement->get().activePartDirty = true;
+    replacement->get().part_properties["value"] = 11;
+    replacement->get().active_part_dirty = true;
     check(*animation, 11);
     check(*other, 9);
   });
+
+const GameTestRegistration assets_animation_enabled_names("AssetsTest", "AnimationEnabledNamesAreAtomic", [](GameTest&) {
+  auto config = Json::parse(R"({"stateTypes":{
+    "base":{"default":"on","states":{"on":{}}},
+    "overlay":{"enabled":false,"default":"on","states":{"on":{}}}
+  }})");
+  ASSERT_TRUE(config);
+  auto set = AnimatedPartSet::create(*config, 1);
+  ASSERT_TRUE(set);
+  EXPECT_FALSE(set->set_enabled_state_types({"overlay", "missing"}));
+  auto base = set->state_type_enabled("base");
+  auto overlay = set->state_type_enabled("overlay");
+  ASSERT_TRUE(base);
+  ASSERT_TRUE(overlay);
+  EXPECT_TRUE(*base);
+  EXPECT_FALSE(*overlay);
+});
+
+const GameTestRegistration assets_animation_transition_ring("AssetsTest", "AnimationFinishRejectsTransitionRing", [](GameTest&) {
+  auto config = Json::parse(R"({"stateTypes":{"movement":{"default":"start","states":{
+    "start":{"mode":"transition","transition":"a"},"a":{"mode":"transition","transition":"b"},
+    "b":{"mode":"transition","transition":"a"},"done":{"mode":"end"}
+  }}}})");
+  ASSERT_TRUE(config);
+  auto set = AnimatedPartSet::create(*config, 1);
+  ASSERT_TRUE(set);
+  auto finish = set->finish_animations();
+  ASSERT_FALSE(finish);
+  EXPECT_TRUE(finish.error().is<AnimatedPartSetException>());
+  ASSERT_TRUE(set->set_active_state("movement", "done"));
+  EXPECT_TRUE(set->finish_animations());
+});
+
+const GameTestRegistration assets_animation_duration_limits("AssetsTest", "AnimationRejectsInvalidFrameAndCycleBounds", [](GameTest&) {
+  auto create = [](Json frames, Json cycle, String const& mode) {
+    JsonObject state{{"frames", std::move(frames)}, {"cycle", std::move(cycle)}, {"mode", mode}};
+    JsonObject type{{"default", "idle"}, {"states", JsonObject{{"idle", std::move(state)}}}};
+    return AnimatedPartSet::create(JsonObject{{"stateTypes", JsonObject{{"movement", std::move(type)}}}}, 1);
+  };
+  EXPECT_FALSE(create(0, 1, "end"));
+  EXPECT_FALSE(create(-1, 1, "end"));
+  EXPECT_FALSE(create(std::int64_t{2147483648}, 1, "end"));
+  EXPECT_FALSE(create(2, 0, "end"));
+  EXPECT_FALSE(create(1, 0, "loop"));
+  EXPECT_FALSE(create(1, -1, "end"));
+  // A fast-math caller need not materialize literal infinity or NaN arguments.
+  for (auto bits : {0x7ff0000000000000ULL, 0x7ff8000000000001ULL}) {
+    volatile std::uint64_t input = bits;
+    Json cycle(std::bit_cast<double>(static_cast<std::uint64_t>(input)));
+    auto stored = cycle.to_double();
+    ASSERT_TRUE(stored);
+    ASSERT_EQ(std::bit_cast<std::uint64_t>(*stored), bits);
+    EXPECT_FALSE(create(1, std::move(cycle), "end"));
+  }
+  auto set = create(1, 0, "end");
+  ASSERT_TRUE(set);
+  ASSERT_TRUE(set->update(1));
+  AnimatedPartSet::Sample sample;
+  set->prepare_sample(sample, 0.5f);
+  auto frame = set->active_state("movement", sample);
+  ASSERT_TRUE(frame);
+  EXPECT_EQ(frame->get().frame, 0u);
+  EXPECT_FLOAT_EQ(frame->get().frame_progress, 0.f);
+});
+
+const GameTestRegistration assets_animation_sample_validation("AssetsTest", "AnimationSampleErrorsAreRecoverable", [](GameTest&) {
+  auto config = Json::parse(R"({"stateTypes":{"movement":{"default":"idle","states":{"idle":{}}}},"parts":{"body":{}}})");
+  auto other_config = Json::parse(R"({"stateTypes":{"color":{"default":"on","states":{"on":{}}}},"parts":{"head":{}}})");
+  ASSERT_TRUE(config);
+  ASSERT_TRUE(other_config);
+  auto set = AnimatedPartSet::create(*config, 1);
+  auto other = AnimatedPartSet::create(*other_config, 1);
+  ASSERT_TRUE(set);
+  ASSERT_TRUE(other);
+  AnimatedPartSet::Sample sample;
+  EXPECT_FALSE(set->active_state("movement", sample));
+  EXPECT_FALSE(set->active_part("body", sample));
+  EXPECT_FALSE(set->set_presentation_state("movement", "idle", true, false, sample));
+  other->prepare_sample(sample, 1);
+  EXPECT_FALSE(set->active_part("body", sample));
+  EXPECT_FALSE(set->active_state("movement", sample));
+  set->prepare_sample(sample, 1);
+  EXPECT_TRUE(set->active_part("body", sample));
+  EXPECT_TRUE(set->active_state("movement", sample));
+  auto copy = *set;
+  EXPECT_FALSE(copy.active_state("movement", sample));
+  unsigned visits = 0;
+  auto visit = [&](String const&, auto const&) -> std::expected<void, StarException> {
+    ++visits;
+    return {};
+  };
+  EXPECT_FALSE(copy.for_each_active_part(visit, sample));
+  EXPECT_EQ(visits, 0u);
+  copy.prepare_sample(sample, 1);
+  EXPECT_TRUE(copy.for_each_active_part(visit, sample));
+  EXPECT_EQ(visits, 1u);
+});
 
 const GameTestRegistration assetsSampleDeferredFrameValidation(
   "AssetsTest", "SampleOnlyValidatesTransformFramesWhenConsumed", [](GameTest&) {
@@ -1139,36 +1236,36 @@ const GameTestRegistration assetsSampleDeferredFrameValidation(
     ASSERT_TRUE(animation);
     ASSERT_TRUE(animation->update(1.25f));
     AnimatedPartSet::Sample sample;
-    animation->prepareSample(sample, 1);
-    auto currentOnly = animation->activePart("body", &sample);
+    animation->prepare_sample(sample, 1);
+    auto currentOnly = animation->active_part("body", sample);
     ASSERT_TRUE(currentOnly);
-    EXPECT_FLOAT_EQ(currentOnly->get().xTranslationAnimation, 10);
-    animation->prepareSample(sample, 1);
-    ASSERT_TRUE(animation->activePart("body", &sample));
+    EXPECT_FLOAT_EQ(currentOnly->get().x_translation_animation, 10);
+    animation->prepare_sample(sample, 1);
+    ASSERT_TRUE(animation->active_part("body", sample));
     auto definition = animation->parts().get("body");
     ASSERT_TRUE(definition);
-    definition->get().partProperties["interpolated"] = true;
-    definition->get().activePartDirty = true;
-    animation->prepareSample(sample, 1);
-    auto invalidNext = animation->activePart("body", &sample);
+    definition->get().part_properties["interpolated"] = true;
+    definition->get().active_part_dirty = true;
+    animation->prepare_sample(sample, 1);
+    auto invalidNext = animation->active_part("body", sample);
     ASSERT_FALSE(invalidNext);
     EXPECT_TRUE(invalidNext.error().is<JsonException>());
-    definition->get().partProperties["interpolated"] = false;
-    definition->get().activePartDirty = true;
-    auto recovered = animation->activePart("body", &sample);
+    definition->get().part_properties["interpolated"] = false;
+    definition->get().active_part_dirty = true;
+    auto recovered = animation->active_part("body", sample);
     ASSERT_TRUE(recovered);
-    EXPECT_FLOAT_EQ(recovered->get().xTranslationAnimation, 10);
+    EXPECT_FLOAT_EQ(recovered->get().x_translation_animation, 10);
     ASSERT_TRUE(animation->update(1));
-    animation->prepareSample(sample, 1);
-    auto invalidCurrent = animation->activePart("body", &sample);
+    animation->prepare_sample(sample, 1);
+    auto invalidCurrent = animation->active_part("body", sample);
     ASSERT_FALSE(invalidCurrent);
     EXPECT_TRUE(invalidCurrent.error().is<JsonException>());
-    ASSERT_TRUE(animation->setStateTypeEnabled("movement", false));
-    animation->prepareSample(sample, 1);
-    auto unused = animation->activePart("body", &sample);
+    ASSERT_TRUE(animation->set_state_type_enabled("movement", false));
+    animation->prepare_sample(sample, 1);
+    auto unused = animation->active_part("body", sample);
     ASSERT_TRUE(unused);
-    EXPECT_FALSE(unused->get().activeState);
-    EXPECT_FLOAT_EQ(unused->get().xTranslationAnimation, 0);
+    EXPECT_FALSE(unused->get().active_state);
+    EXPECT_FLOAT_EQ(unused->get().x_translation_animation, 0);
   });
 
 const GameTestRegistration effectSourceParticleCache(

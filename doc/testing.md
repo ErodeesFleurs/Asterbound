@@ -730,6 +730,11 @@ These are dispatch costs, not full asset reload times.
   lighting and state/error boundaries. Presentation checks retain wrapped and
   repeatable sampling, tick-owned effects and gameplay-RNG isolation. Frontend
   matrices use fresh real panes; dedicated reload cases check live continuity.
+- Animation state definitions use positive frame counts. A zero cycle denotes
+  a static, single-frame `end` state, as in the bundled humanoid configuration.
+  Finishing a cyclic transition chain reports an error; advancing a tick may
+  still follow one transition in that chain. An unknown name in a batch of
+  enabled state types must leave both the selection and cached parts unchanged.
 - Spawn checks advance the real client until sectors and observed entity/script
   schedules are ready, acknowledge a post-update world message, then inspect
   rendered images. Use bounded readiness timeouts, not fixed frame counts; keep
