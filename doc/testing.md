@@ -704,6 +704,20 @@ These are dispatch costs, not full asset reload times.
   script/raw permissions. Keep the bundled-version guard active: regenerate
   CMake build metadata after `version.json` changes rather than changing asset
   markers or bypassing checks to make stale binaries pass.
+- Source readers have independent cursors. A memory reader and its clones
+  retain the payload from `open`, even after replacement or erasure. Both memory
+  and packed readers interpret `seek(n, IOSeek::End)` as `size() - n`, clamped
+  to the entry bounds. Absolute seeks outside the entry fail without moving.
+- `for_each_path` borrows each path for the synchronous call and stops on the
+  visitor's first error. Do not mutate the source inside a visitor. Use
+  `asset_paths()` when paths must survive mutation, and copy `metadata()` if it
+  must outlive the source. Packing replaces the destination only after the
+  staged contents and index have been written successfully.
+- `file_benchmarks --benchmark_filter='enumerate_paths|directory_scan'` measures
+  three providers walking 4096 paths and directory-source construction over
+  2048 entries. These workloads measure traversal and indexing, not payload I/O.
+  For peak packer memory, run the actual CLI on an input with a large single
+  file and compare the resulting archive and extracted bytes as well as RSS.
 - Compare `Assets/NarrowPngScan`, `Assets/QueueImageList` and `Assets/QueueImageSet`
   for catalog filtering and batch enqueue costs. `Assets/SharedDefaultFrames`
   reports the number of distinct decoded specifications as well as wall time.

@@ -222,7 +222,7 @@ std::expected<void, StarException> ModUploader::loadDirectoryImpl() {
   if (!source)
     return std::unexpected(std::move(source.error()));
 
-  auto metadata = (*source)->metadata();
+  auto const& metadata = (*source)->metadata();
   std::array<String, 7> fields;
   std::array<std::string_view, 7> keys = {"name", "friendlyName", "author", "version", "description", "tags", "steamContentId"};
   for (std::size_t i = 0; i < keys.size(); ++i) {
@@ -315,7 +315,7 @@ std::expected<void, StarException> ModUploader::writeMetadataImpl() {
       tags.push_back(pair.first);
   }
   setMetadata("tags", tags.join("|"));
-  return m_assetSource->setMetadata(std::move(metadata));
+  return m_assetSource->set_metadata(std::move(metadata));
 }
 
 std::expected<void, StarException> ModUploader::savePreview(QImage const& preview) {
@@ -342,7 +342,7 @@ std::expected<void, StarException> ModUploader::resetModIdImpl() {
     return {};
   auto metadata = m_assetSource->metadata();
   metadata.remove("steamContentId");
-  auto written = m_assetSource->setMetadata(std::move(metadata));
+  auto written = m_assetSource->set_metadata(std::move(metadata));
   if (!written)
     return std::unexpected(std::move(written.error()));
   m_modIdLabel->setText("");
@@ -373,7 +373,7 @@ void ModUploader::uploadToSteam() {
 std::expected<void, StarException> ModUploader::uploadToSteamImpl(QProgressDialog& progress) {
   if (!SteamAPI_SteamUGC() || !SteamAPI_SteamUtils())
     return std::unexpected(StarException("Cannot upload: Steam is unavailable. Make sure Steam is running and online."));
-  if (m_assetSource->assetPaths().empty())
+  if (m_assetSource->size() == 0)
     return std::unexpected(StarException("Cannot upload, mod has no content"));
 
   m_steamItemCreateResult.reset();
@@ -417,7 +417,7 @@ std::expected<void, StarException> ModUploader::uploadToSteamImpl(QProgressDialo
     String modUrl = Star::format("https://steamcommunity.com/sharedfiles/filedetails/?id={}", modIdString);
     metadata.set("steamContentId", modIdString);
     metadata.set("link", modUrl);
-    auto written = m_assetSource->setMetadata(std::move(metadata));
+    auto written = m_assetSource->set_metadata(std::move(metadata));
     if (!written)
       return std::unexpected(std::move(written.error()));
     m_modIdLabel->setText(toQString(String(Star::format("<a href=\"{}\">{}</a>", modUrl, modIdString))));
@@ -431,15 +431,15 @@ std::expected<void, StarException> ModUploader::uploadToSteamImpl(QProgressDialo
     return std::unexpected(std::move(temporary.error()));
   String steamUploadDir = std::move(*temporary);
   auto upload = [&]() -> std::expected<void, StarException> {
-    auto progressCallback = [&progress](std::size_t i, std::size_t total, String, String assetPath) -> std::expected<void, StarException> {
-      progress.setLabelText(toQString(String(Star::format("Packing '{}'", assetPath))));
+    auto progress_callback = [&progress](std::size_t i, std::size_t total, String const&, String const& asset_path) -> std::expected<void, StarException> {
+      progress.setLabelText(toQString(String(Star::format("Packing '{}'", asset_path))));
       progress.setMaximum(static_cast<int>(std::min(total, static_cast<std::size_t>(std::numeric_limits<int>::max()))));
       progress.setValue(static_cast<int>(std::min(i, static_cast<std::size_t>(std::numeric_limits<int>::max()))));
       QApplication::processEvents();
       return {};
     };
     auto packed =
-      PackedAssetSource::build(*m_assetSource, File::relative_to(steamUploadDir, "contents.pak"), {}, progressCallback);
+      PackedAssetSource::build(*m_assetSource, File::relative_to(steamUploadDir, "contents.pak"), {}, progress_callback);
     if (!packed)
       return std::unexpected(std::move(packed.error()));
     if (m_closing)

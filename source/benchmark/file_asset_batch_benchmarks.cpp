@@ -7,6 +7,7 @@ import star.benchmark_asset_provider;
 import star.asset_source;
 import star.byte_array;
 import star.data_stream_devices;
+import star.directory_asset_source;
 import star.format;
 import star.file;
 import star.io_device;
@@ -33,7 +34,7 @@ SizeResults scalar_size_query(Star::AssetSource& source, SizeRequests paths) {
 }
 
 std::expected<Star::ByteArray, Star::StarException> whole_metadata_digest(Star::AssetSource& source, bool batch) {
-  auto paths = source.assetPaths();
+  auto paths = source.asset_paths();
   for (auto& path : paths) {
     auto lower = path.to_lower();
     if (!lower)
@@ -64,6 +65,41 @@ std::expected<Star::ByteArray, Star::StarException> whole_metadata_digest(Star::
 }
 
 using BenchmarkFixtures::AssetKind;
+
+void enumerate_paths(benchmark::State& state, AssetKind kind) {
+  auto count = static_cast<std::size_t>(state.range(0));
+  BenchmarkFixtures::with_asset_provider(state, kind, count, "enumeration", "Wrong path count",
+    [&](auto const& source, auto const& paths, auto const&) {
+      // Commutative because providers need not enumerate in the same order.
+      auto fingerprint = [](Star::String const& path) {
+        std::size_t hash = 0;
+        for (unsigned char byte : path.utf8())
+          hash = hash * 31 + byte;
+        return hash;
+      };
+      std::size_t expected = 0;
+      for (auto const& path : paths)
+        expected += fingerprint(path);
+      for (auto _ : state) {
+        std::size_t total = 0, seen = 0;
+        auto visit = [&](Star::String const& path) -> std::expected<void, Star::StarException> {
+          total += fingerprint(path);
+          ++seen;
+          return {};
+        };
+        auto result = source->for_each_path(visit);
+        if (!result || total != expected || seen != count) {
+          state.SkipWithError(!result ? result.error().what() : "Wrong path enumeration");
+          break;
+        }
+      }
+      state.SetItemsProcessed(state.iterations() * count);
+    });
+}
+
+BENCHMARK_CAPTURE(enumerate_paths, Directory, AssetKind::directory)->Arg(4096)->UseRealTime();
+BENCHMARK_CAPTURE(enumerate_paths, Packed, AssetKind::packed)->Arg(4096)->UseRealTime();
+BENCHMARK_CAPTURE(enumerate_paths, Memory, AssetKind::memory)->Arg(4096)->UseRealTime();
 
 void asset_batch(benchmark::State& state, AssetKind kind, bool batch, bool digest_workload) {
   auto count = static_cast<std::size_t>(state.range(0));
@@ -160,7 +196,7 @@ void asset_batch(benchmark::State& state, AssetKind kind, bool batch, bool diges
 // Measure the real Assets factory, not a second implementation of its regex
 // loop. Fixture construction is excluded; index, digest and shutdown costs
 // are included for both versions.
-void repeated_digest_ignore(benchmark::State& state) {
+void filtered_directory(benchmark::State& state, bool scan_only) {
   Star::RandomService random{0x415353455453};
   Star::Logger logger;
   logger.remove_stdout_sink();
@@ -200,6 +236,19 @@ void repeated_digest_ignore(benchmark::State& state) {
     return;
   }
   auto expected = oracle.compute();
+  if (scan_only) {
+    Star::StringList patterns{R"(^/interface/)", R"(\.(png|frames)$)", R"(\.(ogg|wav)$)"};
+    for (auto _ : state) {
+      auto index = Star::DirectoryAssetSource::create(logger, *directory, patterns);
+      if (!index || !(*index)->contains("/preload.config") || (*index)->contains("/asset-00000.png") ||
+          !(*index)->contains("/asset-00001.object")) {
+        state.SkipWithError(!index ? index.error().what() : "Incorrect filtered index");
+        break;
+      }
+    }
+    state.SetItemsProcessed(state.iterations() * (count + 1));
+    return;
+  }
   Star::Assets::Settings settings{};
   settings.worker_pool_size = 1;
   settings.digest_ignore = {R"(^/interface/)", R"(\.(png|frames)$)", R"(\.(ogg|wav)$)"};
@@ -215,7 +264,10 @@ void repeated_digest_ignore(benchmark::State& state) {
   state.SetLabel("one directory, three ordered ignore regexes; complete Assets creation, digest check and teardown");
 }
 
+void repeated_digest_ignore(benchmark::State& state) { filtered_directory(state, false); }
+void directory_scan(benchmark::State& state) { filtered_directory(state, true); }
 BENCHMARK(repeated_digest_ignore)->Arg(256)->Arg(2048)->UseRealTime();
+BENCHMARK(directory_scan)->Arg(2048)->UseRealTime();
 
 void sha256_stream(benchmark::State& state) {
   auto size = static_cast<std::size_t>(state.range(0));

@@ -27,7 +27,7 @@ import star.logging;
 import star.random;
 import star.font;
 import star.audio;
-import star.casting;
+
 import star.lexical_cast;
 import star.data_stream_devices;
 import star.lua;
@@ -165,19 +165,11 @@ static std::expected<std::optional<ByteArray>, StarException> read_patch(AssetSo
   if (bytes)
     return std::optional<ByteArray>(std::move(*bytes));
   if (bytes.error().is<IOException>()) {
-    if (auto directory = as_ref<DirectoryAssetSource>(source)) {
-      auto filesystem = directory->get().toFilesystem(path);
-      if (filesystem) {
-        std::error_code error;
-        auto status = std::filesystem::symlink_status(std::filesystem::path(filesystem->utf8()), error);
-        if (status.type() == std::filesystem::file_type::not_found
-            && (!error || error == std::errc::no_such_file_or_directory)) {
-          auto logged = logger.warn("Skipping vanished patch '{}' ({})", path, *filesystem);
-          if (!logged)
-            return std::unexpected(std::move(logged.error()));
-          return std::nullopt;
-        }
-      }
+    if (auto filesystem = source.missing_file_path(path)) {
+      auto logged = logger.warn("Skipping vanished patch '{}' ({})", path, *filesystem);
+      if (!logged)
+        return std::unexpected(std::move(logged.error()));
+      return std::nullopt;
     }
   }
   return std::unexpected(std::move(bytes.error()));
@@ -720,7 +712,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
       LoadScriptReference original{.source = original_source->get(), .path = original_script_path};
       if (load_script_state->unavailable.contains(original))
         return false;
-      auto metadata = original.source->metadata();
+      auto const& metadata = original.source->metadata();
       auto scripts = metadata.find_ref("scripts");
       if (!scripts)
         return false;
@@ -794,7 +786,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     if (!added)
       return std::unexpected(std::move(added.error()));
 
-    for (auto const& filename : source->assetPaths()) {
+    return source->for_each_path([&](String const& filename) -> std::expected<void, StarException> {
       auto filename_key = CaseInsensitiveString::create(filename);
       if (!filename_key)
         return std::unexpected(std::move(filename_key.error()));
@@ -903,12 +895,12 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
       if (!extension_key)
         return std::unexpected(std::move(extension_key.error()));
       m_files_by_extension[*extension_key].insert(std::move(*filename_key));
-    }
-    return {};
+      return {};
+    });
   };
 
   auto run_load_scripts = [&](String const& group_name, String const& source_path, std::shared_ptr<AssetSource> source) -> std::expected<void, StarException> {
-    auto metadata = source->metadata();
+    auto const& metadata = source->metadata();
     if (auto scripts = metadata.find_ref("scripts")) {
       auto script_group = scripts->get().opt_array(group_name);
       if (!script_group)
@@ -1986,13 +1978,10 @@ std::expected<std::shared_ptr<Image const>, StarException> Assets::read_image(St
   auto file = m_files.find_ref(*key);
   if (!file)
     return std::unexpected(AssetException(Star::format("No such asset '{}'", path)));
-  std::shared_ptr<Image const> image;
-  if (auto memory_source = as_ref<MemoryAssetSource>(*file->get().source)) {
-    auto stored = memory_source->get().image(file->get().source_name);
-    if (!stored)
-      return std::unexpected(std::move(stored.error()));
-    image = std::move(*stored);
-  }
+  auto stored = file->get().source->image(file->get().source_name);
+  if (!stored)
+    return std::unexpected(std::move(stored.error()));
+  auto image = std::move(*stored);
   if (!image) {
     auto device = file->get().source->open(file->get().source_name);
     if (!device)

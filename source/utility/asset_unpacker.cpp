@@ -21,7 +21,7 @@ using namespace Star;
 
 [[nodiscard]]
 static std::expected<int, StarException> unpack_assets(std::span<char const* const> argv) {
-  auto startTime = std::chrono::steady_clock::now();
+  auto start_time = std::chrono::steady_clock::now();
 
   auto parser = VersionOptionParser::create();
   if (!parser)
@@ -49,28 +49,27 @@ static std::expected<int, StarException> unpack_assets(std::span<char const* con
   auto const& output_folder_path = output_argument->get();
   bool verbose = opts.switches.contains("v");
 
-  auto assetsPack = PackedAssetSource::create(input_file);
-  if (!assetsPack)
-    return std::unexpected(std::move(assetsPack.error()));
+  auto assets_pack = PackedAssetSource::create(input_file);
+  if (!assets_pack)
+    return std::unexpected(std::move(assets_pack.error()));
 
-  auto outputIsDirectory = File::is_directory(output_folder_path);
-  if (!outputIsDirectory)
-    return std::unexpected(std::move(outputIsDirectory.error()));
-  if (!*outputIsDirectory) {
-    auto madeDirectory = File::create_directory(output_folder_path);
-    if (!madeDirectory)
-      return std::unexpected(std::move(madeDirectory.error()));
+  auto output_is_directory = File::is_directory(output_folder_path);
+  if (!output_is_directory)
+    return std::unexpected(std::move(output_is_directory.error()));
+  if (!*output_is_directory) {
+    auto made_directory = File::create_directory(output_folder_path);
+    if (!made_directory)
+      return std::unexpected(std::move(made_directory.error()));
   }
-  auto changedDirectory = File::change_directory(output_folder_path);
-  if (!changedDirectory)
-    return std::unexpected(std::move(changedDirectory.error()));
+  auto changed_directory = File::change_directory(output_folder_path);
+  if (!changed_directory)
+    return std::unexpected(std::move(changed_directory.error()));
 
-  auto allFiles = (*assetsPack)->assetPaths();
-  for (auto const& file : allFiles) {
-    auto extractEntry = [&]() -> std::expected<void, StarException> {
+  auto visited = (*assets_pack)->for_each_path([&](String const& file) -> std::expected<void, StarException> {
+    auto extract_entry = [&]() -> std::expected<void, StarException> {
       // The index of a pak is untrusted input, so an entry must not be able to
       // escape the output folder when it is used as a path below.
-      bool unsafeName = file.empty();
+      bool unsafe_name = file.empty();
       auto components = file.split('/');
       if (!components)
         return std::unexpected(std::move(components.error()));
@@ -79,30 +78,30 @@ static std::expected<int, StarException> unpack_assets(std::span<char const* con
         if (!backslash)
           return std::unexpected(std::move(backslash.error()));
         if (component == ".." || *backslash != NPos)
-          unsafeName = true;
+          unsafe_name = true;
       }
-      if (unsafeName) {
+      if (unsafe_name) {
         return Star::print(stderr, "Skipping entry with unsafe path: {}\n", file);
       }
 
-      auto fileData = (*assetsPack)->read(file);
-      if (!fileData)
-        return std::unexpected(std::move(fileData.error()));
-      auto relativePath = "." + file;
-      auto relativeDir = File::dir_name(relativePath);
-      auto madeDirectory = File::create_directories(relativeDir);
-      if (!madeDirectory)
-        return std::unexpected(std::move(madeDirectory.error()));
-      auto written = File::write_file(*fileData, relativePath);
+      auto file_data = (*assets_pack)->read(file);
+      if (!file_data)
+        return std::unexpected(std::move(file_data.error()));
+      auto relative_path = "." + file;
+      auto relative_dir = File::dir_name(relative_path);
+      auto made_directory = File::create_directories(relative_dir);
+      if (!made_directory)
+        return std::unexpected(std::move(made_directory.error()));
+      auto written = File::write_file(*file_data, relative_path);
       if (!written)
         return std::unexpected(std::move(written.error()));
       if (verbose) {
-        if (auto written = Star::print("Extracting file '{}' to the output directory as '{}'\n", file, relativePath); !written)
+        if (auto written = Star::print("Extracting file '{}' to the output directory as '{}'\n", file, relative_path); !written)
           return std::unexpected(std::move(written.error()));
       }
       return {};
     };
-    auto extracted = extractEntry();
+    auto extracted = extract_entry();
     if (!extracted) {
       if (!extracted.error().is<AssetSourceException>())
         return std::unexpected(std::move(extracted.error()));
@@ -111,11 +110,14 @@ static std::expected<int, StarException> unpack_assets(std::span<char const* con
       if (auto written = Star::print(stderr, "Reason: {}\n", Star::output_exception(ExceptionDiagnostic(extracted.error()), false)); !written)
         return std::unexpected(std::move(written.error()));
     }
-  }
+    return {};
+  });
+  if (!visited)
+    return std::unexpected(std::move(visited.error()));
 
-  auto metadata = (*assetsPack)->metadata();
+  auto const& metadata = (*assets_pack)->metadata();
   if (!metadata.empty()) {
-    auto printed = Json(std::move(metadata)).print_json(2);
+    auto printed = Json(metadata).print_json(2);
     if (!printed)
       return std::unexpected(std::move(printed.error()));
     auto written = File::write_file(*printed, "_metadata");
@@ -123,15 +125,15 @@ static std::expected<int, StarException> unpack_assets(std::span<char const* con
       return std::unexpected(std::move(written.error()));
   }
 
-  if (auto written = Star::print("Unpacked assets to {} in {}s\n", output_folder_path, std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count()); !written)
+  if (auto written = Star::print("Unpacked assets to {} in {}s\n", output_folder_path, std::chrono::duration<double>(std::chrono::steady_clock::now() - start_time).count()); !written)
     return std::unexpected(std::move(written.error()));
   return 0;
 }
 
 int main(int argc, char** argv) {
-  auto nativeRuntime = NativeRuntime::create();
-  if (!nativeRuntime) {
-    if (auto written = Star::print(stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(nativeRuntime.error()), true)); !written)
+  auto native_runtime = NativeRuntime::create();
+  if (!native_runtime) {
+    if (auto written = Star::print(stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(native_runtime.error()), true)); !written)
       return 1;
     return 1;
   }

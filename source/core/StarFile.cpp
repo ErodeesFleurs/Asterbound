@@ -274,6 +274,14 @@ std::expected<void, StarException> File::write_file(String const& data, String c
 
 std::expected<void, StarException> File::overwrite_file_with_rename(std::span<char const> data, String const& filename,
                                                                     String const& new_suffix) {
+  auto produce = [data](IODevice& stage) { return stage.write_full(data); };
+  return write_file_with_rename(filename, std::cref(produce), new_suffix);
+}
+
+std::expected<void, StarException> File::write_file_with_rename(String const& filename,
+    std::function<std::expected<void, StarException>(IODevice&)> const& produce, String const& new_suffix) {
+  if (!produce)
+    return std::unexpected(IOException("Missing staging file writer"));
   File staging(filename + new_suffix);
   auto const& new_file = staging.m_filename;
   auto acquired = NativeFileHandle::open(new_file, IOMode::Write, true, true);
@@ -296,7 +304,7 @@ std::expected<void, StarException> File::overwrite_file_with_rename(std::span<ch
         std::_Exit(1);
     }
   });
-  auto written = staging.write_full(data);
+  auto written = produce(staging);
   if (!written)
     return std::unexpected(std::move(written.error()));
   auto synced = staging.sync();

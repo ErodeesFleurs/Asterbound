@@ -1,6 +1,5 @@
 module;
 import std;
-import star.memory;
 import star.format;
 import star.json;
 import star.byte_array;
@@ -10,31 +9,32 @@ import star.io_device;
 import star.asset_source;
 import star.string;
 import star.directory_asset_source;
-import star.ordered_set;
 import star.data_stream_devices;
 import star.data_stream_extra;
-import star.math_common;
-import star.type_identity;
 
 export module star.packed_asset_source;
 
 export namespace Star {
-class PackedAssetSource : public AssetSource {
+class PackedAssetSource final : public AssetSource {
+  struct ConstructionKey { explicit ConstructionKey() = default; };
+
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<PackedAssetSource, AssetSource>(this, key);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<PackedAssetSource>(); }
-  using BuildProgressCallback = std::function<std::expected<void, StarException>(std::size_t, std::size_t, String, String)>;
+  explicit PackedAssetSource(ConstructionKey, std::shared_ptr<File> file) : m_packed_file(std::move(file)) {}
+  using BuildProgressCallback = std::function<std::expected<void, StarException>(
+      std::size_t, std::size_t, String const&, String const&)>;
 
-  // Build a packed file, sorting specified extensions before all others and
-  // sorting names case-insensitively within each extension group.
-  [[nodiscard]] static std::expected<void, StarException> build(DirectoryAssetSource& directorySource, String const& targetPackedFile,
-      StringList const& extensionSorting = {}, BuildProgressCallback progressCallback = {});
-  [[nodiscard]] static std::expected<std::shared_ptr<PackedAssetSource>, StarException> create(String const& packedFileName);
+  // Capture each input's extent when opened. Progress is reported after its
+  // complete payload has been copied and the input closed, before the next input.
+  // Pre-replacement errors preserve the destination. A directory-sync error
+  // on Unix is reported after the completed replacement is already visible.
+  [[nodiscard]] static std::expected<void, StarException> build(DirectoryAssetSource const& directory_source,
+      String const& target, StringList const& extension_sorting = {}, BuildProgressCallback const& progress = {});
+  [[nodiscard]] static std::expected<std::shared_ptr<PackedAssetSource>, StarException> create(String const& filename);
 
-  JsonObject metadata() const override;
-  StringList assetPaths() const override;
+  JsonObject const& metadata() const & override { return m_metadata; }
+  JsonObject const& metadata() const && = delete;
+  std::size_t size() const override { return m_index.size(); }
+  StringList asset_paths() const override { return m_index.keys(); }
   bool contains(String const& path) const override;
   [[nodiscard]] std::expected<StreamOffset, StarException> file_size(String const& path) override;
   [[nodiscard]] std::vector<std::expected<StreamOffset, StarException>>
@@ -43,168 +43,186 @@ public:
   [[nodiscard]] std::expected<ByteArray, StarException> read(String const& path) override;
 
 private:
-  PackedAssetSource() = default;
-  std::shared_ptr<File> m_packedFile;
+  struct AssetExtent {
+    StreamOffset offset;
+    StreamOffset size;
+  };
+  using BackingSize = std::expected<StreamOffset, StarException>;
+  [[nodiscard]] std::expected<AssetExtent, StarException> checked_extent(String const& path,
+      std::optional<std::reference_wrapper<BackingSize const>> batch_size = {}) const;
+  [[nodiscard]] std::expected<void, StarException> visit_paths(PathVisitor const& visit) const override;
+
+  std::shared_ptr<File> m_packed_file;
   JsonObject m_metadata;
   OrderedHashMap<String, std::pair<std::uint64_t, std::uint64_t>> m_index;
 };
 }
 
 namespace Star {
-std::expected<void, StarException> PackedAssetSource::build(DirectoryAssetSource& directorySource,
-    String const& targetPackedFile, StringList const& extensionSorting, BuildProgressCallback progressCallback) {
-  auto opened = File::open(targetPackedFile, IOMode::ReadWrite | IOMode::Truncate);
-  if (!opened)
-    return std::unexpected(std::move(opened.error()));
-  auto file = std::move(*opened);
-  DataStreamIODevice ds(*file);
-  auto magic = ds.write_data(std::span("SBAsset6", 8));
-  if (!magic)
-    return std::unexpected(std::move(magic.error()));
-  auto skipped = ds.seek(8, IOSeek::Relative);
-  if (!skipped)
-    return std::unexpected(std::move(skipped.error()));
-  StringMap<std::pair<std::uint64_t, std::uint64_t>> index;
-  OrderedHashSet<String> extensionOrdering;
-  for (auto const& str : extensionSorting) {
-    auto folded = str.to_lower();
+namespace {
+constexpr std::string_view packed_magic = "SBAsset6";
+constexpr std::string_view index_magic = "INDEX";
+constexpr std::uint64_t payload_start = packed_magic.size() + sizeof(std::uint64_t);
+
+std::expected<void, StarException> write_packed_assets(IODevice& stage, DirectoryAssetSource const& source,
+    StringList const& extension_sorting, PackedAssetSource::BuildProgressCallback const& progress) {
+  DataStreamIODevice stream(stage);
+  if (auto result = stream.write_data(std::span(packed_magic)); !result)
+    return result;
+  if (auto result = stream.write(std::uint64_t{}); !result)
+    return result;
+
+  std::map<std::string, std::size_t, std::less<>> extension_order;
+  for (auto const& extension : extension_sorting) {
+    auto folded = extension.to_lower();
     if (!folded)
       return std::unexpected(std::move(folded.error()));
-    extensionOrdering.add(std::move(*folded));
+    extension_order.try_emplace(std::move(*folded).utf8(), extension_order.size());
   }
-
   struct Entry {
     String path;
-    std::size_t extensionOrder;
-    String foldedPath;
+    std::size_t order;
+    String folded_path;
   };
-  auto assetPaths = directorySource.assetPaths();
   std::vector<Entry> entries;
-  entries.reserve(assetPaths.size());
-  for (auto const& path : assetPaths) {
-    String extension;
-    auto lastDot = path.find_last(".");
-    if (!lastDot)
-      return std::unexpected(std::move(lastDot.error()));
-    if (*lastDot != NPos) {
-      auto suffix = path.substr(*lastDot + 1);
-      if (!suffix)
-        return std::unexpected(std::move(suffix.error()));
-      extension = std::move(*suffix);
-    }
-    auto foldedExtension = extension.to_lower();
-    if (!foldedExtension)
-      return std::unexpected(std::move(foldedExtension.error()));
-    auto order = extensionOrdering.index_of(*foldedExtension);
-    auto foldedPath = path.to_lower();
-    if (!foldedPath)
-      return std::unexpected(std::move(foldedPath.error()));
-    entries.push_back({.path = path,
-                       .extensionOrder = order ? *order : extensionOrdering.size(),
-                       .foldedPath = std::move(*foldedPath)});
+  auto paths = source.path_view();
+  entries.reserve(paths.size());
+  for (auto const& path : paths) {
+    auto folded = path.to_lower();
+    if (!folded)
+      return std::unexpected(std::move(folded.error()));
+    std::string_view text = folded->utf8();
+    auto dot = text.rfind('.');
+    auto extension = dot == text.npos ? std::string_view{} : text.substr(dot + 1);
+    auto found = extension_order.find(extension);
+    entries.push_back({path, found == extension_order.end() ? extension_order.size() : found->second,
+                       std::move(*folded)});
   }
   std::sort(entries.begin(), entries.end(), [](Entry const& a, Entry const& b) {
-    return std::tie(a.extensionOrder, a.foldedPath) < std::tie(b.extensionOrder, b.foldedPath);
+    return std::tie(a.order, a.folded_path) < std::tie(b.order, b.folded_path);
   });
+
+  // Keep the original map type and insertion order for byte-compatible index encoding.
+  StringMap<std::pair<std::uint64_t, std::uint64_t>> index;
+  std::uint64_t offset = payload_start;
+  std::array<char, 64 * 1024> buffer;
   for (std::size_t i = 0; i < entries.size(); ++i) {
-    auto const& assetPath = entries[i].path;
-    auto contents = directorySource.read(assetPath);
-    if (!contents)
-      return std::unexpected(std::move(contents.error()));
-    if (progressCallback) {
-      auto filesystem = directorySource.toFilesystem(assetPath);
-      if (!filesystem)
-        return std::unexpected(std::move(filesystem.error()));
-      auto reported = progressCallback(i, entries.size(), std::move(*filesystem), assetPath);
-      if (!reported)
-        return std::unexpected(std::move(reported.error()));
+    auto& asset_path = entries[i].path;
+    auto filename = source.to_filesystem(asset_path);
+    if (!filename)
+      return std::unexpected(std::move(filename.error()));
+    File input(std::move(*filename));
+    if (auto result = input.open(IOMode::Read); !result)
+      return result;
+    auto length = input.size();
+    if (!length)
+      return std::unexpected(std::move(length.error()));
+    if (*length < 0 || static_cast<std::uint64_t>(*length) > std::numeric_limits<StreamOffset>::max() - offset)
+      return std::unexpected(AssetSourceException::format("Packed asset '{}' exceeds the representable file extent", asset_path));
+    for (auto remaining = *length; remaining > 0;) {
+      auto chunk = std::span(buffer).first(static_cast<std::size_t>(std::min<StreamOffset>(remaining, buffer.size())));
+      if (auto result = input.read_full(chunk); !result)
+        return result;
+      if (auto result = stream.write_data(chunk); !result)
+        return result;
+      remaining -= static_cast<StreamOffset>(chunk.size());
     }
-    auto position = ds.pos();
-    if (!position)
-      return std::unexpected(std::move(position.error()));
-    auto added = index.add(assetPath, {static_cast<std::uint64_t>(*position), contents->size()});
+    if (auto result = input.close(); !result)
+      return result;
+    if (progress) {
+      if (auto result = progress(i, entries.size(), input.file_name(), asset_path); !result)
+        return result;
+    }
+    auto size = static_cast<std::uint64_t>(*length);
+    auto added = index.add(std::move(asset_path), {offset, size});
     if (!added)
       return std::unexpected(std::move(added.error()));
-    auto written = ds.write_bytes(*contents);
-    if (!written)
-      return std::unexpected(std::move(written.error()));
+    offset += size;
   }
-  auto indexPosition = ds.pos();
-  if (!indexPosition)
-    return std::unexpected(std::move(indexPosition.error()));
-  std::uint64_t indexStart = *indexPosition;
-  auto header = ds.write_data(std::span("INDEX", 5));
-  if (!header)
-    return std::unexpected(std::move(header.error()));
-  auto metadata = ds.write(directorySource.metadata());
-  if (!metadata)
-    return std::unexpected(std::move(metadata.error()));
-  auto writtenIndex = ds.write(index);
-  if (!writtenIndex)
-    return std::unexpected(std::move(writtenIndex.error()));
-  auto rewound = ds.seek(8);
-  if (!rewound)
-    return std::unexpected(std::move(rewound.error()));
-  auto pointer = ds.write(indexStart);
-  if (!pointer)
-    return std::unexpected(std::move(pointer.error()));
-  return file->close();
+  if (auto result = stream.write_data(std::span(index_magic)); !result)
+    return result;
+  if (auto result = stream.write(source.metadata()); !result)
+    return result;
+  if (auto result = stream.write(index); !result)
+    return result;
+  if (auto result = stage.seek(packed_magic.size()); !result)
+    return result;
+  return stream.write(offset);
+}
+}
+
+std::expected<void, StarException> PackedAssetSource::build(DirectoryAssetSource const& directory_source,
+    String const& target, StringList const& extension_sorting, BuildProgressCallback const& progress) {
+  auto produce = [&](IODevice& stage) { return write_packed_assets(stage, directory_source, extension_sorting, progress); };
+  return File::write_file_with_rename(target, std::cref(produce));
 }
 
 std::expected<std::shared_ptr<PackedAssetSource>, StarException> PackedAssetSource::create(String const& filename) {
   auto opened = File::open(filename, IOMode::Read);
   if (!opened)
     return std::unexpected(std::move(opened.error()));
-  auto source = std::shared_ptr<PackedAssetSource>(new PackedAssetSource());
-  source->m_packedFile = std::move(*opened);
-  DataStreamIODevice ds(*source->m_packedFile);
-  auto magic = ds.read_bytes(8);
-  if (!magic)
-    return std::unexpected(std::move(magic.error()));
-  if (*magic != ByteArray(std::span("SBAsset6", 8)))
+  auto source = std::make_shared<PackedAssetSource>(ConstructionKey{}, std::move(*opened));
+  DataStreamIODevice stream(*source->m_packed_file);
+  std::array<char, packed_magic.size()> magic;
+  if (auto result = stream.read_data(magic); !result)
+    return std::unexpected(std::move(result.error()));
+  if (!std::ranges::equal(magic, packed_magic))
     return std::unexpected(AssetSourceException("Packed assets file format unrecognized!"));
-  auto indexStart = ds.read<std::uint64_t>();
-  if (!indexStart)
-    return std::unexpected(std::move(indexStart.error()));
-  auto fileSize = source->m_packedFile->size();
-  if (!fileSize)
-    return std::unexpected(std::move(fileSize.error()));
-  if (*fileSize < 21 || *indexStart < 16 || *indexStart > static_cast<std::uint64_t>(*fileSize - 5))
+  auto index_start = stream.read<std::uint64_t>();
+  if (!index_start)
+    return std::unexpected(std::move(index_start.error()));
+  auto file_size = source->m_packed_file->size();
+  if (!file_size)
+    return std::unexpected(std::move(file_size.error()));
+  if (*file_size < static_cast<StreamOffset>(payload_start + index_magic.size()) || *index_start < payload_start
+      || *index_start > static_cast<std::uint64_t>(*file_size) - index_magic.size())
     return std::unexpected(AssetSourceException("Packed assets index pointer is out of range"));
-  auto sought = ds.seek(static_cast<StreamOffset>(*indexStart));
-  if (!sought)
-    return std::unexpected(std::move(sought.error()));
-  auto header = ds.read_bytes(5);
-  if (!header)
-    return std::unexpected(std::move(header.error()));
-  if (*header != ByteArray(std::span("INDEX", 5)))
+  if (auto result = source->m_packed_file->seek(static_cast<StreamOffset>(*index_start)); !result)
+    return std::unexpected(std::move(result.error()));
+  std::array<char, index_magic.size()> header;
+  if (auto result = stream.read_data(header); !result)
+    return std::unexpected(std::move(result.error()));
+  if (!std::ranges::equal(header, index_magic))
     return std::unexpected(AssetSourceException("No index header found!"));
-  auto metadata = ds.read(source->m_metadata);
+  auto metadata = stream.read(source->m_metadata);
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
-  auto index = ds.read(source->m_index);
+  auto index = stream.read(source->m_index);
   if (!index)
     return std::unexpected(std::move(index.error()));
   return source;
 }
 
-JsonObject PackedAssetSource::metadata() const { return m_metadata; }
-StringList PackedAssetSource::assetPaths() const { return m_index.keys(); }
+std::expected<void, StarException> PackedAssetSource::visit_paths(PathVisitor const& visit) const {
+  for (auto const& entry : m_index)
+    if (auto result = visit(entry.first); !result)
+      return result;
+  return {};
+}
+
 bool PackedAssetSource::contains(String const& path) const { return m_index.contains(path); }
 
-std::expected<StreamOffset, StarException> PackedAssetSource::file_size(String const& path) {
+std::expected<PackedAssetSource::AssetExtent, StarException> PackedAssetSource::checked_extent(String const& path,
+    std::optional<std::reference_wrapper<BackingSize const>> batch_size) const {
   auto entry = m_index.find_ref(path);
   if (!entry)
     return std::unexpected(
       AssetSourceException::format("Requested file '{}' does not exist in the packed assets file", path));
-  auto fileSize = m_packedFile->size();
-  if (!fileSize)
-    return std::unexpected(std::move(fileSize.error()));
-  if (*fileSize < 0 || entry->get().first > static_cast<std::uint64_t>(*fileSize)
-      || entry->get().second > static_cast<std::uint64_t>(*fileSize) - entry->get().first)
-    return std::unexpected(
-      AssetSourceException::format("Requested file '{}' has an out of range size in the packed assets file", path));
-  return static_cast<StreamOffset>(entry->get().second);
+  auto validate = [&](BackingSize const& backing_size) -> std::expected<AssetExtent, StarException> {
+    if (!backing_size)
+      return std::unexpected(backing_size.error());
+    auto [offset, size] = entry->get();
+    if (*backing_size < 0 || offset > static_cast<std::uint64_t>(*backing_size)
+        || size > static_cast<std::uint64_t>(*backing_size) - offset)
+      return std::unexpected(
+        AssetSourceException::format("Requested file '{}' has an out of range size in the packed assets file", path));
+    return AssetExtent{static_cast<StreamOffset>(offset), static_cast<StreamOffset>(size)};
+  };
+  return batch_size ? validate(batch_size->get()) : validate(m_packed_file->size());
+}
+
+std::expected<StreamOffset, StarException> PackedAssetSource::file_size(String const& path) {
+  return checked_extent(path).transform([](AssetExtent extent) { return extent.size; });
 }
 
 std::vector<std::expected<StreamOffset, StarException>>
@@ -213,94 +231,61 @@ PackedAssetSource::file_sizes(std::span<std::reference_wrapper<String const> con
   sizes.reserve(paths.size());
   if (paths.empty())
     return sizes;
-  auto extent = m_packedFile->size();
-  for (auto path : paths) {
-    auto entry = m_index.find_ref(path.get());
-    // Preserve scalar membership-before-extent error precedence for each entry.
-    if (!entry) {
-      sizes.emplace_back(std::unexpected(
-        AssetSourceException::format("Requested file '{}' does not exist in the packed assets file", path.get())));
-    } else if (!extent) {
-      sizes.emplace_back(std::unexpected(extent.error()));
-    } else if (*extent < 0 || entry->get().first > static_cast<std::uint64_t>(*extent)
-               || entry->get().second > static_cast<std::uint64_t>(*extent) - entry->get().first) {
-      sizes.emplace_back(std::unexpected(AssetSourceException::format(
-        "Requested file '{}' has an out of range size in the packed assets file", path.get())));
-    } else {
-      sizes.emplace_back(static_cast<StreamOffset>(entry->get().second));
-    }
-  }
+  auto extent = m_packed_file->size();
+  for (auto path : paths)
+    sizes.push_back(checked_extent(path.get(), std::cref(extent)).transform([](AssetExtent asset) { return asset.size; }));
   return sizes;
 }
 
 std::expected<std::shared_ptr<IODevice>, StarException> PackedAssetSource::open(String const& path) {
   struct AssetReader : public IODevice {
-    AssetReader(std::shared_ptr<File> file, String path, StreamOffset offset, StreamOffset size)
-      : file(std::move(file)), path(std::move(path)), fileOffset(offset), assetSize(size) {
+    AssetReader(std::shared_ptr<File> file, String path, StreamOffset offset, BoundedReadCursor cursor)
+      : file(std::move(file)), path(std::move(path)), offset(offset), cursor(cursor) {
       set_mode(IOMode::Read);
     }
     [[nodiscard]] std::expected<std::size_t, StarException> read(std::span<char> data) override {
-      auto len = std::min<std::uint64_t>(data.size(), assetSize - assetPos);
-      auto result = file->read_full_absolute(fileOffset + assetPos, data.first(len));
+      auto len = cursor.available(data.size());
+      auto result = file->read_full_absolute(offset + cursor.pos(), data.first(len));
       if (!result)
         return std::unexpected(std::move(result.error()));
-      assetPos += len;
+      cursor.advance(len);
       return len;
     }
     [[nodiscard]] std::expected<std::size_t, StarException> write(std::span<char const>) override {
       return std::unexpected(IOException("Assets IODevices are read-only"));
     }
-    [[nodiscard]] std::expected<StreamOffset, StarException> size() override { return assetSize; }
-    [[nodiscard]] std::expected<StreamOffset, StarException> pos() override { return assetPos; }
+    [[nodiscard]] std::expected<StreamOffset, StarException> size() override { return cursor.size(); }
+    [[nodiscard]] std::expected<StreamOffset, StarException> pos() override { return cursor.pos(); }
     [[nodiscard]] std::expected<String, StarException> device_name() const override {
       auto name = file->device_name();
       if (!name)
         return std::unexpected(std::move(name.error()));
       return Star::format("{}:{}", *name, path);
     }
-    [[nodiscard]] std::expected<bool, StarException> at_end() override { return assetPos >= assetSize; }
+    [[nodiscard]] std::expected<bool, StarException> at_end() override { return cursor.at_end(); }
     [[nodiscard]] std::expected<void, StarException> seek(StreamOffset p, IOSeek mode) override {
-      if (mode == IOSeek::Absolute) {
-        if (p < 0 || p > assetSize)
-          return std::unexpected(IOException("Asset seek position is out of range"));
-        assetPos = p;
-      } else if (mode == IOSeek::Relative) {
-        if (p < -assetPos) assetPos = 0;
-        else if (p > assetSize - assetPos) assetPos = assetSize;
-        else assetPos += p;
-      } else {
-        if (p > assetSize) assetPos = 0;
-        else if (p < 0) assetPos = assetSize;
-        else assetPos = assetSize - p;
-      }
-      return {};
+      return cursor.seek(p, mode);
     }
     [[nodiscard]] std::expected<std::shared_ptr<IODevice>, StarException> clone() override {
-      auto cloned = std::make_shared<AssetReader>(file, path, fileOffset, assetSize);
-      cloned->assetPos = assetPos;
-      return cloned;
+      return std::make_shared<AssetReader>(file, path, offset, cursor);
     }
     std::shared_ptr<File> file;
     String path;
-    StreamOffset fileOffset;
-    StreamOffset assetSize;
-    StreamOffset assetPos = 0;
+    StreamOffset offset;
+    BoundedReadCursor cursor;
   };
-  auto size = file_size(path);
-  if (!size)
-    return std::unexpected(std::move(size.error()));
-  auto entry = m_index.find_ref(path);
-  return std::make_shared<AssetReader>(m_packedFile, path, static_cast<StreamOffset>(entry->get().first), *size);
+  auto extent = checked_extent(path);
+  if (!extent)
+    return std::unexpected(std::move(extent.error()));
+  return std::make_shared<AssetReader>(m_packed_file, path, extent->offset, BoundedReadCursor(extent->size));
 }
 
 std::expected<ByteArray, StarException> PackedAssetSource::read(String const& path) {
-  auto size = file_size(path);
-  if (!size)
-    return std::unexpected(std::move(size.error()));
-  if (static_cast<std::uint64_t>(*size) > std::numeric_limits<std::size_t>::max())
+  auto extent = checked_extent(path);
+  if (!extent)
+    return std::unexpected(std::move(extent.error()));
+  if (static_cast<std::uint64_t>(extent->size) > ByteArray::max_size())
     return std::unexpected(AssetSourceException::format("Requested file '{}' is too large to read", path));
-  auto entry = m_index.find_ref(path);
-  return m_packedFile->read_bytes_absolute(static_cast<StreamOffset>(entry->get().first),
-                                           static_cast<std::size_t>(*size));
+  return m_packed_file->read_bytes_absolute(extent->offset, static_cast<std::size_t>(extent->size));
 }
 }

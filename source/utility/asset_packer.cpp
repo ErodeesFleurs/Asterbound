@@ -23,7 +23,7 @@ using namespace Star;
 [[nodiscard]]
 static std::expected<int, StarException> pack_assets(std::span<char const* const> argv) {
   Logger logger;
-  auto startTime = std::chrono::steady_clock::now();
+  auto start_time = std::chrono::steady_clock::now();
 
   auto parser = VersionOptionParser::create();
   if (!parser)
@@ -56,97 +56,96 @@ static std::expected<int, StarException> pack_assets(std::span<char const* const
     return std::unexpected(std::move(output_argument.error()));
   String output_filename = std::move(output_argument->get());
 
-  StringList ignoreFiles;
-  StringList extensionOrdering;
+  StringList ignore_files;
+  StringList extension_ordering;
   if (auto config_argument = opts.first_parameter("c")) {
     auto const& config_file = config_argument->get();
-    auto configFileContents = File::read_file_string(config_file);
-    if (!configFileContents) {
-      if (!configFileContents.error().is<IOException>())
-        return std::unexpected(std::move(configFileContents.error()));
+    auto config_file_contents = File::read_file_string(config_file);
+    if (!config_file_contents) {
+      if (!config_file_contents.error().is<IOException>())
+        return std::unexpected(std::move(config_file_contents.error()));
       if (auto written = Star::print(stderr, "Could not open specified configFile: {}\n", config_file); !written)
         return std::unexpected(std::move(written.error()));
-      if (auto written = Star::print(stderr, "For the following reason: {}\n", Star::output_exception(ExceptionDiagnostic(configFileContents.error()), false)); !written)
+      if (auto written = Star::print(stderr, "For the following reason: {}\n", Star::output_exception(ExceptionDiagnostic(config_file_contents.error()), false)); !written)
         return std::unexpected(std::move(written.error()));
       return 1;
     }
 
-    auto configFileJson = Json::parse_json(*configFileContents);
-    if (!configFileJson) {
-      if (!configFileJson.error().is<JsonParsingException>())
-        return std::unexpected(std::move(configFileJson.error()));
+    auto config_file_json = Json::parse_json(*config_file_contents);
+    if (!config_file_json) {
+      if (!config_file_json.error().is<JsonParsingException>())
+        return std::unexpected(std::move(config_file_json.error()));
       if (auto written = Star::print(stderr, "Could not parse the specified configFile: {}\n", config_file); !written)
         return std::unexpected(std::move(written.error()));
-      if (auto written = Star::print(stderr, "For the following reason: {}\n", Star::output_exception(ExceptionDiagnostic(configFileJson.error()), false)); !written)
+      if (auto written = Star::print(stderr, "For the following reason: {}\n", Star::output_exception(ExceptionDiagnostic(config_file_json.error()), false)); !written)
         return std::unexpected(std::move(written.error()));
       return 1;
     }
 
-    auto readConfig = [&]() -> std::expected<void, StarException> {
-      auto globalIgnore = configFileJson->get("globalIgnore", JsonArray());
-      if (!globalIgnore)
-        return std::unexpected(std::move(globalIgnore.error()));
-      auto globalPatterns = json_to_string_list(*globalIgnore);
-      if (!globalPatterns)
-        return std::unexpected(std::move(globalPatterns.error()));
-      ignoreFiles = std::move(*globalPatterns);
+    auto read_config = [&]() -> std::expected<void, StarException> {
+      auto global_ignore = config_file_json->get("globalIgnore", JsonArray());
+      if (!global_ignore)
+        return std::unexpected(std::move(global_ignore.error()));
+      auto global_patterns = json_to_string_list(*global_ignore);
+      if (!global_patterns)
+        return std::unexpected(std::move(global_patterns.error()));
+      ignore_files = std::move(*global_patterns);
       if (opts.switches.contains("s")) {
-        auto serverIgnore = configFileJson->get("serverIgnore", JsonArray());
-        if (!serverIgnore)
-          return std::unexpected(std::move(serverIgnore.error()));
-        auto serverPatterns = json_to_string_list(*serverIgnore);
-        if (!serverPatterns)
-          return std::unexpected(std::move(serverPatterns.error()));
-        ignoreFiles.append_range(std::move(*serverPatterns));
+        auto server_ignore = config_file_json->get("serverIgnore", JsonArray());
+        if (!server_ignore)
+          return std::unexpected(std::move(server_ignore.error()));
+        auto server_patterns = json_to_string_list(*server_ignore);
+        if (!server_patterns)
+          return std::unexpected(std::move(server_patterns.error()));
+        ignore_files.append_range(std::move(*server_patterns));
       }
-      auto ordering = configFileJson->get("extensionOrdering", JsonArray());
+      auto ordering = config_file_json->get("extensionOrdering", JsonArray());
       if (!ordering)
         return std::unexpected(std::move(ordering.error()));
       auto extensions = json_to_string_list(*ordering);
       if (!extensions)
         return std::unexpected(std::move(extensions.error()));
-      extensionOrdering = std::move(*extensions);
+      extension_ordering = std::move(*extensions);
       return {};
     };
-    auto configRead = readConfig();
-    if (!configRead) {
-      if (!configRead.error().is<JsonException>())
-        return std::unexpected(std::move(configRead.error()));
+    auto config_read = read_config();
+    if (!config_read) {
+      if (!config_read.error().is<JsonException>())
+        return std::unexpected(std::move(config_read.error()));
       if (auto written = Star::print(stderr, "Could not read the asset_packer config file {}\n", config_file); !written)
         return std::unexpected(std::move(written.error()));
-      if (auto written = Star::print(stderr, "{}\n", Star::output_exception(ExceptionDiagnostic(configRead.error()), false)); !written)
+      if (auto written = Star::print(stderr, "{}\n", Star::output_exception(ExceptionDiagnostic(config_read.error()), false)); !written)
         return std::unexpected(std::move(written.error()));
       return 1;
     }
   }
 
-  bool verbose = opts.switches.contains("v");
-  auto progressCallback = [verbose](std::size_t, std::size_t, String filePath, String assetPath) -> std::expected<void, StarException> {
-    if (verbose)
-      return Star::print("Adding file '{}' to the target pak as '{}'\n", filePath, assetPath);
-    return {};
-  };
+  PackedAssetSource::BuildProgressCallback progress_callback;
+  if (opts.switches.contains("v"))
+    progress_callback = [](std::size_t, std::size_t, String const& file_path, String const& asset_path) {
+      return Star::print("Adding file '{}' to the target pak as '{}'\n", file_path, asset_path);
+    };
 
-  auto outputDirectory = File::full_path(File::dir_name(output_filename));
-  if (!outputDirectory)
-    return std::unexpected(std::move(outputDirectory.error()));
-  output_filename = File::relative_to(*outputDirectory, File::base_name(output_filename));
-  auto directorySource = DirectoryAssetSource::create(logger, assets_folder_path, ignoreFiles);
-  if (!directorySource)
-    return std::unexpected(std::move(directorySource.error()));
-  auto built = PackedAssetSource::build(**directorySource, output_filename, extensionOrdering, progressCallback);
+  auto output_directory = File::full_path(File::dir_name(output_filename));
+  if (!output_directory)
+    return std::unexpected(std::move(output_directory.error()));
+  output_filename = File::relative_to(*output_directory, File::base_name(output_filename));
+  auto directory_source = DirectoryAssetSource::create(logger, assets_folder_path, ignore_files);
+  if (!directory_source)
+    return std::unexpected(std::move(directory_source.error()));
+  auto built = PackedAssetSource::build(**directory_source, output_filename, extension_ordering, progress_callback);
   if (!built)
     return std::unexpected(std::move(built.error()));
 
-  if (auto written = Star::print("Output packed assets to {} in {}s\n", output_filename, std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count()); !written)
+  if (auto written = Star::print("Output packed assets to {} in {}s\n", output_filename, std::chrono::duration<double>(std::chrono::steady_clock::now() - start_time).count()); !written)
     return std::unexpected(std::move(written.error()));
   return 0;
 }
 
 int main(int argc, char** argv) {
-  auto nativeRuntime = NativeRuntime::create();
-  if (!nativeRuntime) {
-    if (auto written = Star::print(stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(nativeRuntime.error()), true)); !written)
+  auto native_runtime = NativeRuntime::create();
+  if (!native_runtime) {
+    if (auto written = Star::print(stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(native_runtime.error()), true)); !written)
       return 1;
     return 1;
   }

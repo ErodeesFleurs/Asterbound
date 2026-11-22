@@ -115,6 +115,11 @@ public:
   [[nodiscard]] static std::expected<void, StarException>
   overwrite_file_with_rename(String const& data, String const& filename, String const& new_suffix = ".new");
 
+  // The producer borrows the seekable write device. It must leave it open;
+  // returning an error discards the stage without replacing the destination.
+  [[nodiscard]] static std::expected<void, StarException> write_file_with_rename(String const& filename,
+      std::function<std::expected<void, StarException>(IODevice&)> const& produce, String const& new_suffix = ".new");
+
   [[nodiscard]] static std::expected<void, StarException>
   backup_file_in_sequence(String const& initial_file, String const& target_file, unsigned maximum_backups,
                           String const& backup_extension_prefix = ".");

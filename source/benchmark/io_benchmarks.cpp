@@ -182,7 +182,7 @@ void uuid_read(benchmark::State& state) {
   account(state, batch_size, Star::uuid_size, fingerprint(bytes.span()), "owning fixed UUID results");
 }
 
-enum class file_operation { write, directory, packed };
+enum class file_operation { write, directory, packed, packed_open_read };
 
 void file_io(benchmark::State& state, file_operation operation) {
   auto random = Star::RandomService::create();
@@ -216,7 +216,7 @@ void file_io(benchmark::State& state, file_operation operation) {
       return;
     }
     source = *directory;
-    if (operation == file_operation::packed) {
+    if (operation != file_operation::directory) {
       auto packed_path = Star::File::relative_to(*temporary, "fixture.pak");
       auto built = Star::PackedAssetSource::build(**directory, packed_path);
       if (!built) {
@@ -232,12 +232,24 @@ void file_io(benchmark::State& state, file_operation operation) {
     }
   }
   Star::ByteArray output;
+  if (operation == file_operation::packed_open_read)
+    output.resize(bytes.size());
   for (auto _ : state) {
     (void)_;
     if (operation == file_operation::write) {
       auto result = Star::File::write_file(bytes, path);
       if (!result) {
         state.SkipWithError(result.error().what());
+        break;
+      }
+    } else if (operation == file_operation::packed_open_read) {
+      auto reader = source->open("/payload.bin");
+      if (!reader) {
+        state.SkipWithError(reader.error().what());
+        break;
+      }
+      if (auto read = (*reader)->read_full(output.span()); !read) {
+        state.SkipWithError(read.error().what());
         break;
       }
     } else {
@@ -273,6 +285,7 @@ void functions_vlq(benchmark::State& state) { vlq_read(state, stream_kind::funct
 void write_file(benchmark::State& state) { file_io(state, file_operation::write); }
 void directory_read(benchmark::State& state) { file_io(state, file_operation::directory); }
 void packed_read(benchmark::State& state) { file_io(state, file_operation::packed); }
+void packed_open_read(benchmark::State& state) { file_io(state, file_operation::packed_open_read); }
 
 BENCHMARK(deserialize_string)->Name("IO/DeserializeString")->Arg(64)->Arg(4096)->Arg(65536);
 BENCHMARK(external_vlq)->Name("IO/VlqExternal")->Arg(1)->Arg(5)->Arg(10);
@@ -282,6 +295,7 @@ BENCHMARK(uuid_read)->Name("IO/UuidRead");
 BENCHMARK(write_file)->Name("IO/WriteFile")->Arg(0)->Arg(64)->Arg(4096);
 BENCHMARK(directory_read)->Name("IO/DirectoryRead")->Arg(0)->Arg(64)->Arg(4096)->Arg(65536);
 BENCHMARK(packed_read)->Name("IO/PackedRead")->Arg(0)->Arg(64)->Arg(4096)->Arg(65536);
+BENCHMARK(packed_open_read)->Name("IO/PackedOpenRead")->Arg(64)->Arg(65536)->UseRealTime();
 
 }// namespace
 

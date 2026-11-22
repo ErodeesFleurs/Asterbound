@@ -424,6 +424,139 @@ const GameTestRegistration objectCursorPreviewRandomIsolation(
     }
   });
 
+const GameTestRegistration directory_ignore_order(
+  "AssetsTest", "DirectoryIgnoreCompilesOnlyReachedCaseInsensitivePartialPatterns", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto branch = File::relative_to(*directory, "branch");
+    ASSERT_TRUE(File::create_directory(branch));
+    StringList patterns{"^/branch$", "IXE", "[", "("};
+    auto build = [&] { return DirectoryAssetSource::create(fixture.root().logger(), *directory, patterns); };
+    auto empty = build();
+    ASSERT_TRUE(empty) << empty.error().what();
+    EXPECT_EQ((*empty)->size(), 0u);
+
+    ASSERT_TRUE(File::write_file(String("x"), File::relative_to(branch, "mixed.txt")));
+    auto masked = build();
+    ASSERT_TRUE(masked) << masked.error().what();
+    EXPECT_EQ((*masked)->size(), 0u);
+    // A directory matching the first pattern must still be descended into.
+    ASSERT_TRUE(File::write_file(String("y"), File::relative_to(branch, "keep.txt")));
+    auto rejected = build();
+    ASSERT_FALSE(rejected);
+    auto expected_error = String("/branch/keep.txt").regex_match("[", false, false);
+    ASSERT_FALSE(expected_error);
+    EXPECT_TRUE(rejected.error().is<StringException>());
+    EXPECT_STREQ(rejected.error().what(), expected_error.error().what());
+
+    // Built-in metadata exclusions run after user patterns, not before them.
+    ASSERT_TRUE(File::remove(File::relative_to(branch, "keep.txt")));
+    ASSERT_TRUE(File::write_file(String("{}"), File::relative_to(*directory, "_metadata")));
+    auto metadata_rejected = build();
+    ASSERT_FALSE(metadata_rejected);
+    EXPECT_STREQ(metadata_rejected.error().what(), expected_error.error().what());
+  });
+
+const GameTestRegistration directory_index_and_metadata(
+  "AssetsTest", "DirectoryBorrowsSortedPathsAndUpdatesPreferredMetadataFile", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto preferred = File::relative_to(*directory, "_metadata");
+    auto fallback = File::relative_to(*directory, ".metadata");
+    ASSERT_TRUE(File::write_file(String(R"({"version":1})"), preferred));
+    ASSERT_TRUE(File::write_file(String(R"({"version":0})"), fallback));
+    ASSERT_TRUE(File::write_file(String("last"), File::relative_to(*directory, "z")));
+    ASSERT_TRUE(File::write_file(String("first"), File::relative_to(*directory, "a")));
+    auto created = DirectoryAssetSource::create(fixture.root().logger(), *directory);
+    ASSERT_TRUE(created) << created.error().what();
+    auto& source = **created;
+    AssetSource const& base = source;
+    static_assert(std::same_as<decltype(base.metadata()), JsonObject const&>);
+    static_assert(std::same_as<decltype(source.path_view()), std::span<String const>>);
+
+    auto const& metadata = base.metadata();
+    EXPECT_EQ(metadata, (JsonObject{{"version", 1}}));
+    auto paths = source.path_view();
+    ASSERT_EQ(base.size(), 2u);
+    ASSERT_EQ(paths.size(), base.size());
+    EXPECT_EQ(paths[0], "/a");
+    EXPECT_EQ(paths[1], "/z");
+    auto snapshot = base.asset_paths();
+    ASSERT_EQ(snapshot, (StringList{"/a", "/z"}));
+    snapshot.clear();
+    std::size_t visited = 0;
+    auto visit = base.for_each_path([&](String const& path) -> std::expected<void, StarException> {
+      EXPECT_LT(visited, paths.size());
+      if (visited < paths.size())
+        EXPECT_EQ(std::addressof(path), std::addressof(paths[visited]));
+      ++visited;
+      return {};
+    });
+    ASSERT_TRUE(visit) << visit.error().what();
+    EXPECT_EQ(visited, paths.size());
+
+    ASSERT_TRUE(source.set_metadata({{"version", 2}}));
+    EXPECT_EQ(metadata, (JsonObject{{"version", 2}}));
+    auto updated = DirectoryAssetSource::create(fixture.root().logger(), *directory);
+    ASSERT_TRUE(updated) << updated.error().what();
+    EXPECT_EQ((*updated)->metadata(), metadata);
+    ASSERT_TRUE(source.set_metadata({}));
+    auto remaining = DirectoryAssetSource::create(fixture.root().logger(), *directory);
+    ASSERT_TRUE(remaining) << remaining.error().what();
+    EXPECT_EQ((*remaining)->metadata(), (JsonObject{{"version", 0}}));
+    EXPECT_EQ(source.missing_file_path("/_metadata"), std::optional<String>(preferred));
+    EXPECT_FALSE(source.missing_file_path("/.metadata"));
+    EXPECT_FALSE(source.missing_file_path("relative"));
+  });
+
+const GameTestRegistration directory_ancestor_warnings(
+  "AssetsTest", "DirectoryCyclesWarnForEachLexicalAliasAndPropagateLoggingFailure", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto real = File::relative_to(*directory, "real");
+    auto deep = File::relative_to(real, "deep");
+    ASSERT_TRUE(File::create_directory(real));
+    ASSERT_TRUE(File::create_directory(deep));
+    ASSERT_TRUE(File::write_file(String("payload"), File::relative_to(deep, "leaf")));
+    std::error_code ec;
+    std::filesystem::create_directory_symlink(fsPath(real), fsPath(File::relative_to(deep, "back")), ec);
+    if (ec)
+      GTEST_SKIP() << "cannot create directory symlinks here: " << ec.message();
+    std::filesystem::create_directory_symlink(fsPath(real), fsPath(File::relative_to(*directory, "alias")), ec);
+    ASSERT_FALSE(ec) << ec.message();
+
+    struct Warnings : LogSink {
+      std::expected<void, StarException> log(std::string_view message, LogLevel level) override {
+        EXPECT_EQ(level, LogLevel::Warn);
+        messages.emplace_back(message);
+        if (fail)
+          return std::unexpected(IOException("Directory warning could not be written"));
+        return {};
+      }
+      std::vector<std::string> messages;
+      bool fail = false;
+    };
+    Logger logger;
+    logger.remove_stdout_sink();
+    auto warnings = std::make_shared<Warnings>();
+    logger.add_sink(warnings);
+    auto source = DirectoryAssetSource::create(logger, *directory);
+    ASSERT_TRUE(source) << source.error().what();
+    EXPECT_EQ((*source)->asset_paths(), (StringList{"/alias/deep/leaf", "/real/deep/leaf"}));
+    ASSERT_EQ(warnings->messages.size(), 2u);
+    for (std::string_view path : {"/alias/deep/back", "/real/deep/back"})
+      EXPECT_EQ(std::ranges::count_if(warnings->messages, [&](auto const& warning) { return warning.contains(path); }), 1);
+    warnings->messages.clear();
+    warnings->fail = true;
+    auto failed = DirectoryAssetSource::create(logger, *directory);
+    ASSERT_FALSE(failed);
+    EXPECT_TRUE(failed.error().is<IOException>());
+    EXPECT_EQ(warnings->messages.size(), 1u);
+  });
+
 const GameTestRegistration assetsSymlinkLoopIsNotFollowed("AssetsTest", "SymlinkLoopIsNotFollowed", [](GameTest& fixture) {
   // A link back to an ancestor must not make asset scanning fail with ELOOP.
   auto directory = File::temporary_directory(fixture.root().random());
@@ -445,7 +578,7 @@ const GameTestRegistration assetsSymlinkLoopIsNotFollowed("AssetsTest", "Symlink
 
   auto source = DirectoryAssetSource::create(fixture.root().logger(), tempDir);
   ASSERT_TRUE(source);
-  auto paths = (*source)->assetPaths();
+  auto paths = (*source)->asset_paths();
   auto real = paths.contains("/real/asset.txt");
   ASSERT_TRUE(real);
   EXPECT_TRUE(*real);
@@ -535,7 +668,19 @@ const GameTestRegistration
     EXPECT_EQ(*image_size, 24);
     std::array<String, 4> memory_requests{"/bytes", "/missing", "/image", "/bytes"};
     expect_batch_matches_scalar(memory, memory_requests);
-    for (auto const& asset_path : memory.assetPaths()) {
+    auto snapshot = memory.asset_paths();
+    std::size_t visited = 0;
+    auto stop_after_first = [&, token = std::make_unique<int>(7)](String const& path) -> std::expected<void, StarException> {
+      EXPECT_EQ(path, snapshot.front());
+      EXPECT_EQ(*token, 7);
+      ++visited;
+      return std::unexpected(AssetSourceException("stop enumerating"));
+    };
+    auto stopped = memory.for_each_path(stop_after_first);
+    ASSERT_FALSE(stopped);
+    EXPECT_TRUE(stopped.error().is<AssetSourceException>());
+    EXPECT_EQ(visited, 1u);
+    for (auto const& asset_path : snapshot) {
       auto reader = memory.open(asset_path);
       ASSERT_TRUE(reader);
       auto reader_size = (*reader)->size();
@@ -552,6 +697,134 @@ const GameTestRegistration
     ASSERT_TRUE(memory.erase("/bytes"));
     EXPECT_FALSE(memory.file_size("/bytes"));
     expect_batch_matches_scalar(memory, memory_requests);
+  });
+
+const GameTestRegistration packed_streamed_build(
+  "AssetsTest", "PackedBuildStreamsExactBytesInProgressOrderBeforeReplacement", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto input = File::relative_to(*directory, "input");
+    ASSERT_TRUE(File::create_directory(input));
+    ByteArray large;
+    large.resize(145123);
+    for (std::size_t i = 0; i < large.size(); ++i)
+      large.span()[i] = static_cast<char>(i % 251);
+    auto first = File::relative_to(input, "Mixed.TXT");
+    auto second = File::relative_to(input, "A.bin");
+    ASSERT_TRUE(File::write_file(large, first));
+    ASSERT_TRUE(File::write_file(std::span("a\0b", 3), second));
+    ASSERT_TRUE(File::write_file(ByteArray{}, File::relative_to(input, "empty")));
+    ASSERT_TRUE(File::write_file(String(R"({"name":"archive"})"), File::relative_to(input, "_metadata")));
+    auto source = DirectoryAssetSource::create(fixture.root().logger(), input);
+    ASSERT_TRUE(source);
+    auto target = File::relative_to(*directory, "target.pak");
+    ASSERT_TRUE(File::write_file(String("previous"), target));
+    StringList visited;
+    auto progress = [&](std::size_t i, std::size_t total, String const& filename, String const& path)
+        -> std::expected<void, StarException> {
+      EXPECT_EQ(i, visited.size());
+      EXPECT_EQ(total, 3u);
+      visited.push_back(path);
+      EXPECT_EQ((*source)->to_filesystem(path), filename);
+      EXPECT_EQ(File::read_file_string(target), String("previous"));
+      if (i == 0)
+        return File::write_file(String("changed after capture"), filename);
+      return {};
+    };
+    ASSERT_TRUE(PackedAssetSource::build(**source, target, {"TXT", "txt", "bIN"}, progress));
+    EXPECT_EQ(visited, (StringList{"/Mixed.TXT", "/A.bin", "/empty"}));
+
+    // Independent construction of the legacy header, raw payloads and map.
+    DataStreamBuffer expected;
+    std::uint64_t next = 16 + large.size();
+    ASSERT_TRUE(expected.write_data(std::span("SBAsset6", 8)));
+    ASSERT_TRUE(expected.write(next + 3));
+    ASSERT_TRUE(expected.write_data(large.span()));
+    ASSERT_TRUE(expected.write_data(std::span("a\0b", 3)));
+    ASSERT_TRUE(expected.write_data(std::span("INDEX", 5)));
+    ASSERT_TRUE(expected.write((*source)->metadata()));
+    StringMap<std::pair<std::uint64_t, std::uint64_t>> index;
+    ASSERT_TRUE(index.add("/Mixed.TXT", {16, large.size()}));
+    ASSERT_TRUE(index.add("/A.bin", {next, 3}));
+    ASSERT_TRUE(index.add("/empty", {next + 3, 0}));
+    ASSERT_TRUE(expected.write(index));
+    EXPECT_EQ(File::read_file(target), expected.data());
+    auto packed = PackedAssetSource::create(target);
+    ASSERT_TRUE(packed);
+    EXPECT_EQ((*packed)->read("/Mixed.TXT"), large);
+    EXPECT_EQ((*packed)->read("/empty"), ByteArray{});
+    StringList enumerated;
+    ASSERT_TRUE((*packed)->for_each_path([&](String const& path) -> std::expected<void, StarException> {
+      enumerated.push_back(path);
+      return {};
+    }));
+    EXPECT_EQ(enumerated, (*packed)->asset_paths());
+    EXPECT_EQ((*packed)->size(), enumerated.size());
+
+    auto reader = (*packed)->open("/Mixed.TXT");
+    ASSERT_TRUE(reader);
+    ASSERT_TRUE((*reader)->seek(2, IOSeek::End));
+    auto start = static_cast<StreamOffset>(large.size() - 2);
+    EXPECT_EQ((*reader)->pos(), start);
+    EXPECT_FALSE((*reader)->seek(-1));
+    EXPECT_EQ((*reader)->pos(), start);
+    auto writable = File::open(target, IOMode::ReadWrite);
+    ASSERT_TRUE(writable);
+    ASSERT_TRUE((*writable)->resize(next - 1));
+    std::array<char, 2> tail;
+    EXPECT_FALSE((*reader)->read(tail));
+    EXPECT_EQ((*reader)->pos(), start);
+    ASSERT_TRUE((*writable)->close());
+  });
+
+const GameTestRegistration packed_build_rollback(
+  "AssetsTest", "PackedBuildDiscardsOnlyItsStageOnCallbackAndInputErrors", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto input = File::relative_to(*directory, "input");
+    ASSERT_TRUE(File::create_directory(input));
+    auto a = File::relative_to(input, "a");
+    auto b = File::relative_to(input, "b");
+    ASSERT_TRUE(File::write_file(String("old"), a));
+    ASSERT_TRUE(File::write_file(String("two"), b));
+    auto source = DirectoryAssetSource::create(fixture.root().logger(), input);
+    ASSERT_TRUE(source);
+    auto target = File::relative_to(*directory, "target.pak");
+    auto stage = target + ".new";
+    ASSERT_TRUE(PackedAssetSource::build(**source, target));
+    auto original = File::read_file(target);
+    ASSERT_TRUE(original);
+    ASSERT_TRUE(File::write_file(String("replacement"), a));
+    std::size_t calls = 0;
+    auto stop = [&](std::size_t, std::size_t, String const&, String const& path) -> std::expected<void, StarException> {
+      ++calls;
+      EXPECT_EQ(path, "/a");
+      return std::unexpected(AssetSourceException("stop packing"));
+    };
+    auto failed = PackedAssetSource::build(**source, target, {}, stop);
+    ASSERT_FALSE(failed);
+    EXPECT_TRUE(failed.error().is<AssetSourceException>());
+    EXPECT_EQ(calls, 1u);
+    EXPECT_EQ(File::read_file(target), *original);
+    EXPECT_EQ(File::exists(stage), false);
+
+    ASSERT_TRUE(File::write_file(String("not ours"), stage));
+    EXPECT_FALSE(PackedAssetSource::build(**source, target, {}, stop));
+    EXPECT_EQ(calls, 1u);
+    EXPECT_EQ(File::read_file_string(stage), String("not ours"));
+    EXPECT_EQ(File::read_file(target), *original);
+    ASSERT_TRUE(File::remove(stage));
+
+    ASSERT_TRUE(File::remove(b));
+    EXPECT_FALSE(PackedAssetSource::build(**source, target));
+    EXPECT_EQ(File::read_file(target), *original);
+    EXPECT_EQ(File::exists(stage), false);
+    ASSERT_TRUE(File::remove(target));
+    EXPECT_FALSE(PackedAssetSource::build(**source, target));
+    EXPECT_EQ(File::exists(target), false);
+    EXPECT_EQ(File::exists(stage), false);
   });
 
 const GameTestRegistration packedMetadataLengths(
@@ -2220,4 +2493,107 @@ const GameTestRegistration recoverableDatabaseProvider(
     auto recovered = (*database)->getDance("broken");
     ASSERT_TRUE(recovered);
     EXPECT_EQ((*recovered)->name, "assetmissing");
+  });
+
+const GameTestRegistration memory_reader_lifetime(
+  "AssetsTest", "MemoryReadersPinBytesAndPixelsAcrossReplacementAndDestruction", [](GameTest&) {
+    auto const original = ByteArray::from_string(std::string_view("A\0\x80\xff" "xy", 6));
+    for (bool use_image : {false, true}) {
+      SCOPED_TRACE(use_image ? "image" : "bytes");
+      std::shared_ptr<IODevice> reader;
+      std::shared_ptr<IODevice> clone;
+      std::shared_ptr<IODevice> latest;
+      auto const replacement = use_image ? ByteArray::from_string("new") : ByteArray(3, 0);
+      {
+        MemoryAssetSource source("pinned");
+        if (use_image) {
+          Image pixels(2, 1, PixelFormat::RGB24);
+          std::ranges::copy(std::as_bytes(original.span()), std::as_writable_bytes(pixels.data()).begin());
+          source.set("/entry", pixels);
+          std::ranges::fill(pixels.data(), 0);
+        } else {
+          source.set("/entry", original);
+        }
+        auto bytes = source.read("/entry");
+        ASSERT_TRUE(bytes);
+        EXPECT_EQ(*bytes, original);
+        auto opened = source.open("/entry");
+        ASSERT_TRUE(opened);
+        reader = std::move(*opened);
+        ASSERT_TRUE(reader->seek(2));
+        auto copied = reader->clone();
+        ASSERT_TRUE(copied);
+        clone = std::move(*copied);
+
+        for (unsigned i = 0; i != 64; ++i)
+          source.set(Star::format("/other-{}", i), ByteArray{});
+        if (use_image)
+          source.set("/entry", replacement);
+        else
+          source.set("/entry", Image(1, 1, PixelFormat::RGB24));
+        auto reopened = source.open("/entry");
+        ASSERT_TRUE(reopened);
+        latest = std::move(*reopened);
+        // Leave the new image in its source until destruction; explicitly erase the new bytes.
+        if (use_image) {
+          ASSERT_TRUE(source.erase("/entry"));
+          EXPECT_FALSE(source.open("/entry"));
+        }
+      }
+      auto new_bytes = latest->read_bytes(replacement.size());
+      ASSERT_TRUE(new_bytes);
+      EXPECT_EQ(*new_bytes, replacement);
+      auto tail = reader->read_bytes(4);
+      ASSERT_TRUE(tail);
+      EXPECT_EQ(*tail, original.substr(2, 4));
+      reader.reset();
+      auto cloned_tail = clone->read_bytes(4);
+      ASSERT_TRUE(cloned_tail);
+      EXPECT_EQ(*cloned_tail, original.substr(2, 4));
+      ASSERT_TRUE(clone->seek(0));
+      auto all = clone->read_bytes(6);
+      ASSERT_TRUE(all);
+      EXPECT_EQ(*all, original);
+    }
+  });
+
+const GameTestRegistration memory_reader_seeks(
+  "AssetsTest", "MemoryReaderSeeksClampFromCorrectOriginAndLeaveFailedAbsoluteUnchanged", [](GameTest&) {
+    MemoryAssetSource source("seek");
+    source.set("/entry", ByteArray::from_string("012345"));
+    auto stream = source.open("/entry");
+    ASSERT_TRUE(stream);
+    auto& reader = **stream;
+    ASSERT_TRUE(reader.seek(2));
+    ASSERT_TRUE(reader.seek(1, IOSeek::End));
+    EXPECT_EQ(reader.pos(), 5);
+    EXPECT_FALSE(reader.seek(-1));
+    EXPECT_FALSE(reader.seek(7));
+    EXPECT_EQ(reader.pos(), 5);
+    std::array<char, 3> buffer{'!', '!', '!'};
+    EXPECT_EQ(reader.read(buffer), 1u);
+    EXPECT_EQ((std::array<char, 3>{'5', '!', '!'}), buffer);
+    EXPECT_EQ(reader.at_end(), true);
+    EXPECT_EQ(reader.read(buffer), 0u);
+
+    constexpr auto low = std::numeric_limits<StreamOffset>::min();
+    constexpr auto high = std::numeric_limits<StreamOffset>::max();
+    ASSERT_TRUE(reader.seek(low, IOSeek::Relative));
+    EXPECT_EQ(reader.pos(), 0);
+    EXPECT_EQ(reader.read({}), 0u);
+    EXPECT_EQ(reader.pos(), 0);
+    ASSERT_TRUE(reader.seek(high, IOSeek::Relative));
+    EXPECT_EQ(reader.pos(), 6);
+    ASSERT_TRUE(reader.seek(high, IOSeek::End));
+    EXPECT_EQ(reader.pos(), 0);
+    ASSERT_TRUE(reader.seek(low, IOSeek::End));
+    EXPECT_EQ(reader.pos(), 6);
+
+    source.set("/empty", ByteArray{});
+    auto empty = source.open("/empty");
+    ASSERT_TRUE(empty);
+    ASSERT_TRUE((*empty)->seek(0, IOSeek::End));
+    EXPECT_EQ((*empty)->at_end(), true);
+    EXPECT_EQ((*empty)->read(buffer), 0u);
+    EXPECT_FALSE((*empty)->seek(1));
   });

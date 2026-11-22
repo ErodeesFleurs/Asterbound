@@ -3,57 +3,55 @@ import std;
 import star.format;
 import star.byte_array;
 
-import star.list;
 import star.json;
 import star.io_device;
 import star.asset_source;
 import star.string;
-import star.type_identity;
 
 namespace Star {
 
 class Logger;
 
 class DirectoryAssetSource : public AssetSource {
+  struct ConstructionKey { explicit ConstructionKey() = default; };
+
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<DirectoryAssetSource, AssetSource>(this, key);
-  }
+  DirectoryAssetSource(ConstructionKey, String base_directory);
+  DirectoryAssetSource(DirectoryAssetSource const&) = delete;
+  DirectoryAssetSource& operator=(DirectoryAssetSource const&) = delete;
 
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<DirectoryAssetSource>(); }
-
-  // Any file that forms an asset path that matches any of the patterns in
-  // 'ignorePatterns' is ignored.
+  // Ignore matching files, not directories. Patterns are reached in declaration order.
   [[nodiscard]] static std::expected<std::shared_ptr<DirectoryAssetSource>, StarException> create(
-      Logger& logger, String const& baseDirectory, StringList const& ignorePatterns = {});
+      Logger& logger, String base_directory, StringList const& ignore_patterns = {});
 
-  JsonObject metadata() const override;
-  StringList assetPaths() const override;
+  JsonObject const& metadata() const & override;
+  JsonObject const& metadata() const && = delete;
+  std::size_t size() const override;
+  StringList asset_paths() const override;
+  // The scanned path index stays fixed throughout this source's lifetime.
+  std::span<String const> path_view() const &;
+  std::span<String const> path_view() const && = delete;
   bool contains(String const& path) const override;
   [[nodiscard]] std::expected<StreamOffset, StarException> file_size(String const& path) override;
+  std::optional<String> missing_file_path(String const& path) const override;
 
   [[nodiscard]] std::expected<std::shared_ptr<IODevice>, StarException> open(String const& path) override;
   [[nodiscard]] std::expected<ByteArray, StarException> read(String const& path) override;
 
   // Converts an asset path to the path on the filesystem
-  [[nodiscard]] std::expected<String, StarException> toFilesystem(String const& path) const;
+  [[nodiscard]] std::expected<String, StarException> to_filesystem(String const& path) const;
 
   // Update metadata file or add a new one.
-  [[nodiscard]] std::expected<void, StarException> setMetadata(JsonObject metadata);
+  [[nodiscard]] std::expected<void, StarException> set_metadata(JsonObject metadata);
 
 private:
-  DirectoryAssetSource(Logger& logger, String const& baseDirectory, StringList const& ignorePatterns);
-  // 'ancestorDirectories' holds the filesystem path of every directory on the
-  // current recursion chain, so that a symlink leading back into one of them is
-  // skipped instead of being followed until the operating system errors out.
-  [[nodiscard]] std::expected<void, StarException> scanAll(String const& assetDirectory, StringList& output, List<String> const& ancestorDirectories) const;
+  [[nodiscard]] std::expected<void, StarException> visit_paths(PathVisitor const& visit) const override;
+  [[nodiscard]] std::expected<void, StarException> scan(Logger& logger, StringList const& ignore_patterns);
 
-  Logger& m_logger;
-  String m_baseDirectory;
-  List<String> m_ignorePatterns;
-  std::optional<String> m_metadataFile;
+  String m_base_directory;
+  bool m_uses_dot_metadata = false;
   JsonObject m_metadata;
-  StringList m_assetPaths;
+  StringList m_asset_paths;
 };
 
 }

@@ -973,7 +973,7 @@ std::expected<StringList, StarException> Root::scanForAssetSources(StringList co
     if (!source)
       return false;
 
-    auto metadata = source->metadata();
+    auto const& metadata = source->metadata();
 
     auto assetSource = std::make_shared<AssetSource>();
     assetSource->path = sourcePath;

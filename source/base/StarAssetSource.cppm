@@ -6,7 +6,6 @@ import star.string;
 import star.format;
 import star.json;
 import star.io_device;
-import star.type_identity;
 
 namespace Star {
 
@@ -15,6 +14,44 @@ struct AssetSourceExceptionTag {
 };
 using AssetSourceException = StarError<AssetSourceExceptionTag, StarException>;
 
+class Image;
+
+// Shared cursor for read-only slices. End offsets count backwards from size.
+class BoundedReadCursor {
+public:
+  explicit BoundedReadCursor(StreamOffset size) : m_size(size) {}
+
+  StreamOffset size() const noexcept { return m_size; }
+  StreamOffset pos() const noexcept { return m_position; }
+  bool at_end() const noexcept { return m_position == m_size; }
+  std::size_t available(std::size_t request) const noexcept {
+    return std::min<std::uint64_t>(request, m_size - m_position);
+  }
+  // The caller advances only after successfully reading at most available(request).
+  void advance(std::size_t consumed) noexcept { m_position += static_cast<StreamOffset>(consumed); }
+  [[nodiscard]] std::expected<void, StarException> seek(StreamOffset offset, IOSeek mode) {
+    if (mode == IOSeek::Absolute) {
+      if (offset < 0 || offset > m_size)
+        return std::unexpected(IOException("Asset seek position is out of range"));
+      m_position = offset;
+    } else if (mode == IOSeek::Relative) {
+      m_position += std::clamp(offset, -m_position, m_size - m_position);
+    } else {
+      m_position = m_size - std::clamp<StreamOffset>(offset, 0, m_size);
+    }
+    return {};
+  }
+
+private:
+  StreamOffset m_size;
+  StreamOffset m_position = 0;
+};
+
+template <typename Visitor>
+concept asset_path_visitor = requires(Visitor& visit, String const& path) {
+  { std::invoke(visit, path) } -> std::same_as<std::expected<void, StarException>>;
+};
+
 // An asset source could be a directory on a filesystem, where assets are
 // pulled directly from files, or a single pak-like file containing all assets,
 // where assets are pulled from the correct region of the pak-like file.
@@ -22,15 +59,30 @@ class AssetSource {
 public:
   virtual ~AssetSource() = default;
 
-  virtual void const* query_type(TypeKey key) const noexcept { return query_type_of<AssetSource>(this, key); }
-
-  virtual std::string_view dynamic_type_name() const noexcept { return Star::type_name<AssetSource>(); }
+  // Synchronous invocation; borrowed paths cannot be retained past the call.
+  using PathVisitor = std::function<std::expected<void, StarException>(String const&)>;
 
   // An asset source can have arbitrary metadata attached.
-  virtual JsonObject metadata() const = 0;
+  virtual JsonObject const& metadata() const & = 0;
+  JsonObject const& metadata() const && = delete;
 
-  // Should return all the available assets in this source
-  virtual StringList assetPaths() const = 0;
+  // The snapshot survives source mutation; the visitor must not mutate the source.
+  virtual StringList asset_paths() const = 0;
+  virtual std::size_t size() const = 0;
+  template <asset_path_visitor Visitor>
+  [[nodiscard]] std::expected<void, StarException> for_each_path(Visitor&& visit) const {
+    if constexpr (std::same_as<std::remove_cvref_t<Visitor>, PathVisitor> || std::is_pointer_v<std::remove_reference_t<Visitor>>)
+      if (!visit)
+        return std::unexpected(AssetSourceException("Empty asset path visitor"));
+    return visit_paths(std::ref(visit));
+  }
+
+  // Optional provider capabilities. A null image falls back to stream decoding.
+  [[nodiscard]] virtual std::expected<std::shared_ptr<Image const>, StarException> image(String const&) {
+    return std::shared_ptr<Image const>{};
+  }
+  // Only confirmed vanished loose files may be ignored by the patch loader.
+  virtual std::optional<String> missing_file_path(String const&) const { return {}; }
 
   // Exact, case-sensitive membership in this source's enumerated asset index.
   // Does not probe the filesystem or copy the asset path collection.
@@ -57,6 +109,8 @@ public:
 
   // Read the entirety of the given path into a buffer.
   [[nodiscard]] virtual std::expected<ByteArray, StarException> read(String const& path) = 0;
+private:
+  virtual std::expected<void, StarException> visit_paths(PathVisitor const& visit) const = 0;
 };
 
 }
@@ -67,4 +121,6 @@ export namespace Star {
   using ::Star::AssetSourceExceptionTag;
   using ::Star::AssetSourceException;
   using ::Star::AssetSource;
+  using ::Star::BoundedReadCursor;
+  using ::Star::asset_path_visitor;
 }

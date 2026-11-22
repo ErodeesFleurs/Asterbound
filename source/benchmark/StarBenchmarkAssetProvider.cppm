@@ -99,7 +99,7 @@ void with_asset_provider(benchmark::State& state, AssetKind kind, std::size_t co
     }
     source = std::move(*packed);
   }
-  if (source->assetPaths().size() != count) {
+  if (source->size() != count) {
     state.SkipWithError(std::string(index_error).c_str());
     return;
   }
