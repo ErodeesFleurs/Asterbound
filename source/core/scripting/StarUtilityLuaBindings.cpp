@@ -310,14 +310,14 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUtilityCallbacks(Ran
     return std::unexpected(std::move(result.error()));
 
   if (auto result = callbacks.register_callback("millisecondsSinceEpoch",
-      []() { return Time::millisecondsSinceEpoch(); }); !result)
+      []() { return Time::milliseconds_since_epoch(); }); !result)
     return std::unexpected(std::move(result.error()));
 
   if (auto result = callbacks.register_callback("monotonicMilliseconds",
-      []() { return Time::monotonicMilliseconds(); }); !result)
+      []() { return Time::monotonic_milliseconds(); }); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback("monotonicTime",
-      []() { return Time::monotonicTime(); }); !result)
+      []() { return Time::monotonic_time(); }); !result)
     return std::unexpected(std::move(result.error()));
 
   if (auto result = callbacks.register_callback("makePromise",

@@ -8,12 +8,12 @@ namespace Star {
 namespace Time {
 
 // Implemented by the platform adapter; calendar conversion can fail.
-std::expected<std::tm, StarException> localCalendarTime(std::time_t time);
+std::expected<std::tm, StarException> local_calendar_time(std::time_t time);
 
 std::expected<std::chrono::local_time<std::chrono::milliseconds>, StarException>
-localTime(std::chrono::system_clock::time_point time) {
-  auto wholeSeconds = std::chrono::floor<std::chrono::seconds>(time);
-  auto calendar = localCalendarTime(std::chrono::system_clock::to_time_t(wholeSeconds));
+local_time(std::chrono::system_clock::time_point time) {
+  auto whole_seconds = std::chrono::floor<std::chrono::seconds>(time);
+  auto calendar = local_calendar_time(std::chrono::system_clock::to_time_t(whole_seconds));
   if (!calendar)
     return std::unexpected(std::move(calendar.error()));
   auto date = std::chrono::year(calendar->tm_year + 1900)
@@ -22,216 +22,164 @@ localTime(std::chrono::system_clock::time_point time) {
       + std::chrono::hours(calendar->tm_hour)
       + std::chrono::minutes(calendar->tm_min)
       + std::chrono::seconds(calendar->tm_sec)
-      + std::chrono::duration_cast<std::chrono::milliseconds>(time - wholeSeconds);
+      + std::chrono::duration_cast<std::chrono::milliseconds>(time - whole_seconds);
 }
 
-double timeSinceEpoch() {
+double time_since_epoch() {
   return std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
 }
 
-std::int64_t millisecondsSinceEpoch() {
+std::int64_t milliseconds_since_epoch() {
   auto elapsed = std::chrono::system_clock::now().time_since_epoch();
   return std::chrono::duration_cast<std::chrono::milliseconds>(elapsed + std::chrono::microseconds(500)).count();
 }
 
-double monotonicTime() {
+double monotonic_time() {
   return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
-std::int64_t monotonicMilliseconds() {
+std::int64_t monotonic_milliseconds() {
   auto elapsed = std::chrono::steady_clock::now().time_since_epoch();
   return std::chrono::duration_cast<std::chrono::milliseconds>(elapsed + std::chrono::microseconds(500)).count();
 }
 
 
-String printDuration(double time) {
-  String hours;
-  String minutes;
-  String seconds;
-  String milliseconds;
-
-  if (time >= 3600) {
-    int numHours = static_cast<int>(time) / 3600;
-    hours = Star::format("{} hour{}", numHours, numHours == 1 ? "" : "s");
-  }
-  if (time >= 60) {
-    int numMinutes = static_cast<int>((time / 60)) % 60;
-    minutes = Star::format("{} minute{}", numMinutes, numMinutes == 1 ? "" : "s");
-  }
-  if (time >= 1) {
-    int numSeconds = static_cast<int>(time) % 60;
-    seconds = Star::format("{} second{}", numSeconds, numSeconds == 1 ? "" : "s");
-  }
-
-  int numMilliseconds = std::round(std::fmod(time, 1.0) * 1000);
-  milliseconds = Star::format("{} millisecond{}", numMilliseconds, numMilliseconds == 1 ? "" : "s");
-
-  String result;
-  for (auto component : {std::cref(hours), std::cref(minutes), std::cref(seconds), std::cref(milliseconds)}) {
-    if (component.get().empty())
-      continue;
-    if (!result.empty())
-      result += ", ";
-    result += component.get();
-  }
-  return result;
+String print_duration(double seconds) {
+  auto bits = std::bit_cast<std::uint64_t>(seconds);
+  auto magnitude = bits & 0x7fffffffffffffffULL;
+  // Compare the representation: fast-math may assume floating operands are finite.
+  if (magnitude >= std::bit_cast<std::uint64_t>(0x1p64 / 1000.0))
+    return String("duration out of range");
+  auto total = static_cast<std::uint64_t>(std::round(std::bit_cast<double>(magnitude) * 1000));
+  std::string result;
+  if ((bits >> 63) && total) result += '-';
+  auto append = [&](std::uint64_t value, std::string_view unit) {
+    std::format_to(std::back_inserter(result), "{} {}{}", value, unit, value == 1 ? "" : "s");
+  };
+  if (total >= 3600000) { append(total / 3600000, "hour"); result += ", "; }
+  if (total >= 60000) { append(total / 60000 % 60, "minute"); result += ", "; }
+  if (total >= 1000) { append(total / 1000 % 60, "second"); result += ", "; }
+  append(total % 1000, "millisecond");
+  return String(std::move(result));
 }
 
 
 }
 
-Clock::Clock() : Clock(true) {}
-
-Clock::Clock(bool start) {
-  m_elapsed = std::chrono::steady_clock::duration::zero();
-  m_running = false;
-  if (start)
-    Clock::start();
+Clock::Clock(bool start) : Clock(Duration::zero(), start) {}
+Clock::Clock(Duration initial, bool start) : elapsed(initial) {
+  if (start) started_at = std::chrono::steady_clock::now();
 }
-
-Clock::Clock(Clock const& clock) {
-  operator=(clock);
+std::unique_lock<std::mutex> Clock::acquire() const {
+  std::unique_lock lock(mutex, std::defer_lock);
+  lock_with_diagnostics(lock);
+  return lock;
 }
-
-Clock& Clock::operator=(Clock const& clock) {
-  m_elapsed = clock.m_elapsed;
-  m_lastUpdate = clock.m_lastUpdate;
-  m_running = clock.m_running;
-
+Clock::Clock(Clock const& other) {
+  auto lock = other.acquire();
+  elapsed = other.elapsed;
+  started_at = other.started_at;
+}
+Clock& Clock::operator=(Clock const& other) {
+  if (this != &other) {
+    std::scoped_lock lock(mutex, other.mutex);
+    elapsed = other.elapsed;
+    started_at = other.started_at;
+  }
   return *this;
 }
-
-void Clock::reset() {
-  std::unique_lock locker(m_mutex, std::defer_lock);
-  lock_with_diagnostics(locker);
-  updateElapsed();
-  m_elapsed = std::chrono::steady_clock::duration::zero();
+Clock::Duration Clock::current_elapsed() const {
+  return started_at ? elapsed + (std::chrono::steady_clock::now() - *started_at) : elapsed;
 }
-
+void Clock::set_elapsed(Duration value) {
+  elapsed = value;
+  if (started_at) started_at = std::chrono::steady_clock::now();
+}
+Clock::Duration Clock::settle() {
+  if (started_at) {
+    auto now = std::chrono::steady_clock::now();
+    elapsed += now - *started_at;
+    started_at = now;
+  }
+  return elapsed;
+}
+void Clock::restart_elapsed(Duration value) {
+  auto lock = acquire();
+  elapsed = value;
+  started_at = std::chrono::steady_clock::now();
+}
+void Clock::reset() { set_milliseconds(0); }
 void Clock::stop() {
-  std::unique_lock locker(m_mutex, std::defer_lock);
-  lock_with_diagnostics(locker);
-  m_lastUpdate.reset();
-  m_running = false;
+  auto lock = acquire();
+  elapsed = current_elapsed();
+  started_at.reset();
 }
-
 void Clock::start() {
-  std::unique_lock locker(m_mutex, std::defer_lock);
-  lock_with_diagnostics(locker);
-  m_running = true;
-  updateElapsed();
+  auto lock = acquire();
+  if (!started_at) started_at = std::chrono::steady_clock::now();
 }
-
 bool Clock::running() const {
-  std::unique_lock locker(m_mutex, std::defer_lock);
-  lock_with_diagnostics(locker);
-  return m_running;
+  auto lock = acquire();
+  return started_at.has_value();
 }
-
 double Clock::time() const {
-  std::unique_lock locker(m_mutex, std::defer_lock);
-  lock_with_diagnostics(locker);
-  updateElapsed();
-  return std::chrono::duration<double>(m_elapsed).count();
+  auto lock = acquire();
+  return std::chrono::duration<double>(current_elapsed()).count();
 }
-
+static std::int64_t rounded_milliseconds(std::chrono::steady_clock::duration value) {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(value + std::chrono::microseconds(500)).count();
+}
 std::int64_t Clock::milliseconds() const {
-  std::unique_lock locker(m_mutex, std::defer_lock);
-  lock_with_diagnostics(locker);
-  updateElapsed();
-  return std::chrono::duration_cast<std::chrono::milliseconds>(m_elapsed + std::chrono::microseconds(500)).count();
+  auto lock = acquire();
+  return rounded_milliseconds(current_elapsed());
 }
-
-void Clock::setTime(double time) {
-  std::unique_lock locker(m_mutex, std::defer_lock);
-  lock_with_diagnostics(locker);
-  updateElapsed();
-  auto ticks = std::chrono::duration<double, std::chrono::steady_clock::period>(std::chrono::duration<double>(time));
-  m_elapsed = std::chrono::steady_clock::duration(
-      static_cast<std::chrono::steady_clock::rep>(std::round(ticks.count())));
+static std::chrono::steady_clock::duration clock_duration(double seconds) {
+  using Duration = std::chrono::steady_clock::duration;
+  auto ticks = std::chrono::duration<double, Duration::period>(std::chrono::duration<double>(seconds));
+  return Duration(static_cast<Duration::rep>(std::round(ticks.count())));
 }
-
-void Clock::setMilliseconds(std::int64_t millis) {
-  std::unique_lock locker(m_mutex, std::defer_lock);
-  lock_with_diagnostics(locker);
-  updateElapsed();
-  m_elapsed = std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::milliseconds(millis));
+void Clock::set_time(double seconds) {
+  auto lock = acquire();
+  set_elapsed(clock_duration(seconds));
 }
-
-void Clock::adjustTime(double timeAdjustment) {
-  std::unique_lock locker(m_mutex, std::defer_lock);
-  lock_with_diagnostics(locker);
-  setTime(std::max<double>(0.0, time() + timeAdjustment));
+void Clock::set_milliseconds(std::int64_t millis) {
+  auto lock = acquire();
+  set_elapsed(std::chrono::milliseconds(millis));
 }
-
-void Clock::adjustMilliseconds(std::int64_t millisAdjustment) {
-  std::unique_lock locker(m_mutex, std::defer_lock);
-  lock_with_diagnostics(locker);
-  setMilliseconds(milliseconds() + millisAdjustment);
+void Clock::adjust_time(double delta) {
+  auto lock = acquire();
+  elapsed = clock_duration(std::max(0.0, std::chrono::duration<double>(settle()).count() + delta));
 }
-
-void Clock::updateElapsed() const {
-  if (!m_running)
-    return;
-
-  auto currentTime = std::chrono::steady_clock::now();
-
-  if (m_lastUpdate)
-    m_elapsed += currentTime - *m_lastUpdate;
-
-  m_lastUpdate = currentTime;
+void Clock::adjust_milliseconds(std::int64_t delta) {
+  auto lock = acquire();
+  elapsed = std::chrono::milliseconds(rounded_milliseconds(settle()) + delta);
 }
-
-Timer Timer::withTime(double timeLeft, bool start) {
-  Timer timer;
-  timer.setTime(-timeLeft);
-  if (start)
-    timer.start();
-  return timer;
+Timer Timer::with_time(double seconds, bool start) {
+  return Timer(clock_duration(-seconds), start);
 }
-
-Timer Timer::withMilliseconds(std::int64_t millis, bool start) {
-  Timer timer;
-  timer.setMilliseconds(-millis);
-  if (start)
-    timer.start();
-  return timer;
+Timer Timer::with_milliseconds(std::int64_t millis, bool start) {
+  return Timer(std::chrono::milliseconds(-millis), start);
 }
+Timer::Timer() : Clock(false) {}
+Timer::Timer(Duration initial, bool start) : Clock(initial, start) {}
+void Timer::restart(double seconds) { restart_elapsed(clock_duration(-seconds)); }
+void Timer::restart_with_milliseconds(std::int64_t millis) { restart_elapsed(std::chrono::milliseconds(-millis)); }
 
-Timer::Timer() : Clock(false) {
-  setTime(0.0);
-}
-
-Timer::Timer(Timer const& timer) = default;
-
-Timer& Timer::operator=(Timer const& timer) = default;
-
-void Timer::restart(double timeLeft) {
-  Clock::setTime(-timeLeft);
-  Clock::start();
-}
-
-void Timer::restartWithMilliseconds(std::int64_t millisecondsLeft) {
-  Clock::setMilliseconds(-millisecondsLeft);
-  Clock::start();
-}
-
-double Timer::timeLeft(bool negative) const {
-  double timeLeft = -Clock::time();
+double Timer::time_left(bool negative) const {
+  double time_left = -Clock::time();
   if (!negative)
-    timeLeft = std::max(0.0, timeLeft);
-  return timeLeft;
+    time_left = std::max(0.0, time_left);
+  return time_left;
 }
 
-std::int64_t Timer::millisecondsLeft(bool negative) const {
-  std::int64_t millisLeft = -Clock::milliseconds();
-  if (!negative)
-    millisLeft = std::max<std::int64_t>(0, millisLeft);
-  return millisLeft;
+std::int64_t Timer::milliseconds_left(bool negative) const {
+  auto left = -Clock::milliseconds();
+  return negative ? left : std::max<std::int64_t>(0, left);
 }
 
-bool Timer::timeUp() const {
-  return Clock::time() >= 0.0;
+bool Timer::time_up() const {
+  auto lock = acquire();
+  return current_elapsed() >= Duration::zero();
 }
 
 }

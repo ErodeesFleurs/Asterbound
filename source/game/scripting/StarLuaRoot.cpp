@@ -186,7 +186,7 @@ std::expected<void, StarException> LuaRoot::shutdown() {
     if (auto result = File::create_directory(m_storageDirectory); !result)
       return std::unexpected(std::move(result.error()));
   }
-  auto timestamp = Time::localTime(std::chrono::system_clock::now());
+  auto timestamp = Time::local_time(std::chrono::system_clock::now());
   if (!timestamp)
     return std::unexpected(std::move(timestamp.error()));
   auto wholeSeconds = std::chrono::floor<std::chrono::seconds>(*timestamp);

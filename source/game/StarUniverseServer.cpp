@@ -2661,7 +2661,7 @@ std::expected<void, StarException> UniverseServer::loadSettings() {
         return std::unexpected(std::move(time.error()));
       m_universeSettings = std::move(*settings);
       m_universeClock = std::make_shared<Clock>();
-      m_universeClock->setTime(*time);
+      m_universeClock->set_time(*time);
       return {};
     }();
     if (!loaded) {
@@ -2670,7 +2670,7 @@ std::expected<void, StarException> UniverseServer::loadSettings() {
                                             ExceptionDiagnostic(loaded.error()));
           !logged)
         return std::unexpected(std::move(logged.error()));
-      if (auto renamed = File::rename(file, Star::format("{}.{}.fail", file, Time::millisecondsSinceEpoch())); !renamed)
+      if (auto renamed = File::rename(file, Star::format("{}.{}.fail", file, Time::milliseconds_since_epoch())); !renamed)
         return std::unexpected(std::move(renamed.error()));
       if (auto result = defaults(); !result)
         return std::unexpected(std::move(result.error()));
@@ -2861,7 +2861,7 @@ std::expected<void, StarException> UniverseServer::loadTempWorldIndex() {
                                                         ExceptionDiagnostic(loaded.error()));
           !logged)
         return std::unexpected(std::move(logged.error()));
-      if (auto renamed = File::rename(storageFile, Star::format("{}.{}.fail", storageFile, Time::millisecondsSinceEpoch())); !renamed)
+      if (auto renamed = File::rename(storageFile, Star::format("{}.{}.fail", storageFile, Time::milliseconds_since_epoch())); !renamed)
         return std::unexpected(std::move(renamed.error()));
     }
   }
@@ -3648,7 +3648,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
               ExceptionDiagnostic(loaded.error()));
             !logged)
           return std::unexpected(std::move(logged.error()));
-        if (auto renamed = File::rename(path, Star::format("{}.{}.fail", path, Time::millisecondsSinceEpoch())); !renamed)
+        if (auto renamed = File::rename(path, Star::format("{}.{}.fail", path, Time::milliseconds_since_epoch())); !renamed)
           return std::unexpected(std::move(renamed.error()));
       }
     }
@@ -4279,7 +4279,7 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
         return std::unexpected(std::move(set.error()));
       if (auto set = ship->setProperty("ship.fuelEfficiency", upgrades.fuelEfficiency); !set)
         return std::unexpected(std::move(set.error()));
-      if (auto set = ship->setProperty("ship.epoch", Time::timeSinceEpoch()); !set)
+      if (auto set = ship->setProperty("ship.epoch", Time::time_since_epoch()); !set)
         return std::unexpected(std::move(set.error()));
     }
     auto clock = std::make_shared<Clock>();
@@ -4287,13 +4287,13 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
     if (!epoch)
       return std::unexpected(std::move(epoch.error()));
     if (!epoch->can_convert(Json::Type::Float)) {
-      if (auto set = ship->setProperty("ship.epoch", Time::timeSinceEpoch()); !set)
+      if (auto set = ship->setProperty("ship.epoch", Time::time_since_epoch()); !set)
         return std::unexpected(std::move(set.error()));
     } else {
       auto time = epoch->to_double();
       if (!time)
         return std::unexpected(std::move(time.error()));
-      clock->setTime(Time::timeSinceEpoch() - *time);
+      clock->set_time(Time::time_since_epoch() - *time);
     }
     ship->setUniverseSettings(m_universeSettings);
     ship->setReferenceClock(clock);
@@ -4343,7 +4343,7 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
               ExceptionDiagnostic(loaded.error()));
             !logged)
           return std::unexpected(std::move(logged.error()));
-        if (auto renamed = File::rename(path, Star::format("{}.{}.fail", path, Time::millisecondsSinceEpoch())); !renamed)
+        if (auto renamed = File::rename(path, Star::format("{}.{}.fail", path, Time::milliseconds_since_epoch())); !renamed)
           return std::unexpected(std::move(renamed.error()));
       }
     }
@@ -4513,7 +4513,7 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
                 ExceptionDiagnostic(loaded.error()));
               !logged)
             return std::unexpected(std::move(logged.error()));
-          if (auto renamed = File::rename(path, Star::format("{}.{}.fail", path, Time::millisecondsSinceEpoch())); !renamed)
+          if (auto renamed = File::rename(path, Star::format("{}.{}.fail", path, Time::milliseconds_since_epoch())); !renamed)
             return std::unexpected(std::move(renamed.error()));
         }
       }
@@ -4715,13 +4715,13 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
       if (!epoch)
         return std::unexpected(std::move(epoch.error()));
       if (!epoch->can_convert(Json::Type::Float)) {
-        if (auto set = world->setProperty("customWorld.epoch", Time::timeSinceEpoch()); !set)
+        if (auto set = world->setProperty("customWorld.epoch", Time::time_since_epoch()); !set)
           return std::unexpected(std::move(set.error()));
       } else {
         auto time = epoch->to_double();
         if (!time)
           return std::unexpected(std::move(time.error()));
-        clock->setTime(Time::timeSinceEpoch() - *time);
+        clock->set_time(Time::time_since_epoch() - *time);
       }
       world->setUniverseSettings(m_universeSettings);
       world->setReferenceClock(clock);
@@ -4851,7 +4851,7 @@ std::expected<std::shared_ptr<SystemWorldServerThread>, StarException> UniverseS
               ExceptionDiagnostic(loaded.error()));
             !logged)
           return std::unexpected(std::move(logged.error()));
-        if (auto renamed = File::rename(path, Star::format("{}.{}.fail", path, Time::millisecondsSinceEpoch())); !renamed)
+        if (auto renamed = File::rename(path, Star::format("{}.{}.fail", path, Time::milliseconds_since_epoch())); !renamed)
           return std::unexpected(std::move(renamed.error()));
       }
     }

@@ -254,7 +254,7 @@ std::expected<void, StarException> Mixer::read(std::span<std::int16_t> out_buffe
     }
   }
 
-  auto const sample_start_time = Time::millisecondsSinceEpoch();
+  auto const sample_start_time = Time::milliseconds_since_epoch();
   // Wall-clock scheduling and all ramps continue while global speed is zero.
   long double const sample_end_time =
     sample_start_time + std::floor(static_cast<long double>(frame_count) * 1000 / m_sample_rate);

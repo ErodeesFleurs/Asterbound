@@ -1729,7 +1729,7 @@ std::expected<void, StarException> UniverseClient::handlePackets(List<std::share
       } else if (auto chat = as<ChatReceivePacket>(packet)) {
         m_pendingMessages.push_back(chat->receivedMessage);
       } else if (auto time = as<UniverseTimeUpdatePacket>(packet)) {
-        m_universeClock->setTime(time->universeTime);
+        m_universeClock->set_time(time->universeTime);
       } else if (auto disconnect = as<ServerDisconnectPacket>(packet)) {
         auto operation76 = reset();
         if (!operation76)

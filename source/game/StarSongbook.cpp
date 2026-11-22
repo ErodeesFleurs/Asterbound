@@ -189,7 +189,7 @@ std::expected<void, StarException> Songbook::update(EntityMode mode, World& worl
   if (m_serverMode)
     return {};
 
-  m_globalNowDelta = world.epochTime() * 1000 - Time::millisecondsSinceEpoch();
+  m_globalNowDelta = world.epochTime() * 1000 - Time::milliseconds_since_epoch();
   if (m_epochUpdated) {
     m_epochUpdated = false;
     m_timeSourceEpoch -= m_globalNowDelta;
@@ -237,8 +237,8 @@ std::expected<void, StarException> Songbook::playback() {
     stop();
     return {};
   }
-  m_timeSourceInstance->keepalive = Time::millisecondsSinceEpoch();
-  auto now = (Time::millisecondsSinceEpoch() - m_timeSourceInstance->epoch) / 1000.0;
+  m_timeSourceInstance->keepalive = Time::milliseconds_since_epoch();
+  auto now = (Time::milliseconds_since_epoch() - m_timeSourceInstance->epoch) / 1000.0;
   if (!m_heldNotes.empty()) {
     for (auto& note : m_heldNotes)
       note.audio->set_position(m_position);
@@ -903,7 +903,7 @@ void Songbook::play(Json const& song, String const& timeSource) {
 
   {
     m_epochUpdated = false;
-    m_timeSourceEpoch = Time::millisecondsSinceEpoch();
+    m_timeSourceEpoch = Time::milliseconds_since_epoch();
     std::lock_guard lock(m_synchronization.mutex);
     if (!m_synchronization.timeSources.contains(m_timeSource)) {
       m_timeSourceInstance = std::make_shared<TimeSource>();
@@ -912,7 +912,7 @@ void Songbook::play(Json const& song, String const& timeSource) {
       m_timeSourceInstance->keepalive = m_timeSourceEpoch;
     } else {
       m_timeSourceInstance = m_synchronization.timeSources[m_timeSource];
-      if ((Time::millisecondsSinceEpoch() - m_timeSourceInstance->keepalive) > 5000) {
+      if ((Time::milliseconds_since_epoch() - m_timeSourceInstance->keepalive) > 5000) {
         m_timeSourceInstance->epoch = m_timeSourceEpoch;
         m_timeSourceInstance->keepalive = m_timeSourceEpoch;
       }
@@ -933,7 +933,7 @@ bool Songbook::instrumentPlaying() const {
   if (!active())
     return false;
   if (m_timeSourceInstance) {
-    auto now = (Time::millisecondsSinceEpoch() - m_timeSourceInstance->epoch) / 1000.0;
+    auto now = (Time::milliseconds_since_epoch() - m_timeSourceInstance->epoch) / 1000.0;
     for (auto const& n : m_heldNotes) {
       if ((n.start <= now) && (now <= n.end))
         return true;

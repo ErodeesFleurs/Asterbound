@@ -35,6 +35,30 @@ import star.logging;
 import star.host_address;
 import star.net_impl;
 import star.listener;
+import star.time;
+
+namespace {
+void adjust_running(benchmark::State& state) {
+  Star::Clock clock;
+  for (auto _ : state)
+    clock.adjust_time(0.001);
+}
+void read_stopped(benchmark::State& state) {
+  Star::Clock clock(false);
+  for (auto _ : state) {
+    auto elapsed = clock.milliseconds();
+    benchmark::DoNotOptimize(elapsed);
+  }
+}
+void restart_timer(benchmark::State& state) {
+  Star::Timer timer;
+  for (auto _ : state)
+    timer.restart(1.0);
+}
+BENCHMARK(adjust_running)->Name("Clock/AdjustRunning");
+BENCHMARK(read_stopped)->Name("Clock/ReadStopped");
+BENCHMARK(restart_timer)->Name("Clock/RestartTimer");
+}
 
 namespace ListenerBenchmarks {
 using namespace Star;

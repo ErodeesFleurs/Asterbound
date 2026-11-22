@@ -524,7 +524,7 @@ std::expected<void, StarException> WorldServerThread::runLoop(std::stop_token st
   if (!storageIntervalConfig)
     return std::unexpected(std::move(storageIntervalConfig.error()));
   double storageInterval = *storageIntervalConfig / 1000.0;
-  Timer storageTimer = Timer::withTime(storageInterval);
+  Timer storageTimer = Timer::with_time(storageInterval);
   double initial_step = root.timing().serverTimestep;
   if (!valid_tick_interval(initial_step) || !valid_tick_interval(*updateMeasureWindow))
     return std::unexpected(StarException("Invalid tick interval or measurement window"));
@@ -546,7 +546,7 @@ std::expected<void, StarException> WorldServerThread::runLoop(std::stop_token st
       return std::unexpected(StarException("Invalid tick interval or measurement window"));
     tick_approacher.set_target_rate(1.0 / current_step);
     tick_approacher.tick();
-    if (storageTimer.timeUp()) {
+    if (storageTimer.time_up()) {
       auto synced = sync();
       if (!synced)
         return std::unexpected(std::move(synced.error()));

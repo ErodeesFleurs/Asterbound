@@ -626,7 +626,7 @@ std::expected<String, StarException> ClientCommandProcessor::clearScannedObjects
 }
 
 std::expected<String, StarException> ClientCommandProcessor::playTime() {
-  return Star::format("Total play time: {}", Time::printDuration(m_universeClient->mainPlayer()->log()->playTime()));
+  return Star::format("Total play time: {}", Time::print_duration(m_universeClient->mainPlayer()->log()->playTime()));
 }
 
 std::expected<String, StarException> ClientCommandProcessor::deathCount() {

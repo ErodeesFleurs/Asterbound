@@ -449,7 +449,7 @@ std::expected<void, StarException> CelestialMasterDatabase::init(std::optional<S
       auto closed = m_database.close();
       if (!closed)
         return std::unexpected(std::move(closed.error()));
-      auto renamed = File::rename(*databaseFile, Star::format("{}.{}.fail", *databaseFile, Time::millisecondsSinceEpoch()));
+      auto renamed = File::rename(*databaseFile, Star::format("{}.{}.fail", *databaseFile, Time::milliseconds_since_epoch()));
       if (!renamed)
         return std::unexpected(std::move(renamed.error()));
       auto replacement = File::open(*databaseFile, IOMode::ReadWrite);
@@ -512,7 +512,7 @@ std::expected<void, StarException> CelestialMasterDatabase::cleanupAndCommit() {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lock_with_diagnostics(locker);
   m_chunkCache.cleanup();
-  if (m_database.is_open() && m_commitTimer.timeUp()) {
+  if (m_database.is_open() && m_commitTimer.time_up()) {
     auto committed = m_database.commit();
     if (!committed)
       return std::unexpected(std::move(committed.error()));
@@ -1244,7 +1244,7 @@ List<CelestialRequest> CelestialSlaveDatabase::pullRequests() {
       requests.push_back(make_left(pair.first));
       pair.second.restart(m_requestTimeout);
       ++chunkIt;
-    } else if (pair.second.timeUp()) {
+    } else if (pair.second.time_up()) {
       chunkIt = m_pendingChunkRequests.erase(chunkIt);
     } else {
       ++chunkIt;
@@ -1257,7 +1257,7 @@ List<CelestialRequest> CelestialSlaveDatabase::pullRequests() {
       requests.push_back(make_right(pair.first));
       pair.second.restart(m_requestTimeout);
       ++systemIt;
-    } else if (pair.second.timeUp()) {
+    } else if (pair.second.time_up()) {
       systemIt = m_pendingSystemRequests.erase(systemIt);
     } else {
       ++systemIt;

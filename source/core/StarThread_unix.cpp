@@ -55,19 +55,28 @@ std::expected<void, StarException> NativeThread::join_native() {
   return {};
 }
 
-void lock_with_diagnostics(std::unique_lock<std::recursive_mutex>& lock) {
+template <typename Mutex>
+concept diagnostic_mutex = std::same_as<Mutex, std::mutex> || std::same_as<Mutex, std::recursive_mutex>;
+
+template <diagnostic_mutex Mutex>
+static void lock_native(std::unique_lock<Mutex>& lock) {
 #ifndef STAR_SYSTEM_MACOS
   timespec deadline;
   clock_gettime(CLOCK_REALTIME, &deadline);
   deadline.tv_sec += 15;
   auto& mutex = *lock.mutex();
   if (pthread_mutex_timedlock(mutex.native_handle(), &deadline) == 0) {
-    lock = std::unique_lock<std::recursive_mutex>(mutex, std::adopt_lock);
+    lock = std::unique_lock<Mutex>(mutex, std::adopt_lock);
     return;
   }
-  Star::print_stack("Recursive mutex lock is taking too long");
+  Star::print_stack("Mutex lock is taking too long");
 #endif
   lock.lock();
+}
+
+void lock_with_diagnostics(std::unique_lock<std::recursive_mutex>& lock) { lock_native(lock); }
+void lock_with_diagnostics(std::unique_lock<std::mutex>& lock) {
+  if (!lock.try_lock()) lock_native(lock);
 }
 
 void Thread::sleep_tail(std::chrono::steady_clock::duration remaining) {

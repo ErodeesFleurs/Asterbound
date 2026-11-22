@@ -1094,3 +1094,10 @@ visible Unicode length across a removed command, and rejection of an oversized
 font without partially updating the style. Rendering additionally recognizes
 ASCII ESC; `StringTest.EscapeProcessingPreservesBinaryFragmentsAndFirstCallbackError`
 checks both command prefixes and failure propagation.
+
+`ClockTest.*` checks freezing an unread interval on stop, cross-assignment,
+countdown clipping and legacy signed millisecond rounding. Duration display
+rounds once before splitting into hours, minutes, seconds and milliseconds;
+hours can exceed 24. Compare `core_benchmarks --benchmark_filter='^Clock/'` on
+the same CPU for running adjustment, stopped reads and timer restart. These
+measure uncontended operations, not scheduler latency.

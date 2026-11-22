@@ -169,6 +169,7 @@ ThreadFunction<void>::operator bool() const noexcept { return !is_finished(); }
 String ThreadFunction<void>::name() const { return m_impl ? m_impl->name : String(); }
 
 #ifdef STAR_SYSTEM_WINDOWS
+void lock_with_diagnostics(std::unique_lock<std::mutex>& lock) { lock.lock(); }
 void lock_with_diagnostics(std::unique_lock<std::recursive_mutex>& lock) {
   lock.lock();
 }

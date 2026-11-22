@@ -1627,7 +1627,7 @@ std::expected<bool, StarException> ClientApplication::activateSessionPlayer() {
   if (auto activated = m_universeClient->setMainPlayer(m_player); !activated)
     return std::unexpected(std::move(activated.error()));
   m_cinematicOverlay->setPlayer(m_player);
-  m_timeSinceJoin = static_cast<std::int64_t>(Time::millisecondsSinceEpoch()) / 1000;
+  m_timeSinceJoin = static_cast<std::int64_t>(Time::milliseconds_since_epoch()) / 1000;
   return true;
 }
 

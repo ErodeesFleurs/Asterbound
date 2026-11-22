@@ -323,8 +323,8 @@ std::expected<void, StarException> WirePane::renderImpl() {
   auto entities = m_worldClient->query<WireEntity>(RectF(m_worldClient->clientWindow()));
   if (!entities) return std::unexpected(std::move(entities.error()));
   auto badWire =
-    Color::rgb_f(0.6f + static_cast<float>(std::sin(Time::monotonicTime() * std::numbers::pi * 2.0)) * 0.4f, 0.0f, 0.0f);
-  float phase = 0.5f + 0.5f * std::sin(static_cast<double>(Time::monotonicMilliseconds()) / 100.0);
+    Color::rgb_f(0.6f + static_cast<float>(std::sin(Time::monotonic_time() * std::numbers::pi * 2.0)) * 0.4f, 0.0f, 0.0f);
+  float phase = 0.5f + 0.5f * std::sin(static_cast<double>(Time::monotonic_milliseconds()) / 100.0);
   auto drawLineColor = Color::Red.mix(Color::White, phase);
   for (auto const& entity : *entities) {
     for (auto direction : {WireDirection::Input, WireDirection::Output}) {

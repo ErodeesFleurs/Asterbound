@@ -910,7 +910,7 @@ Cinematic::PanelValues Cinematic::determinePanelValues(std::shared_ptr<Panel> pa
 }
 
 void Cinematic::setTime(float timecode) {
-  m_timer.setTime(timecode + m_backgroundFadeTime);
+  m_timer.set_time(timecode + m_backgroundFadeTime);
 }
 
 void Cinematic::stop() {

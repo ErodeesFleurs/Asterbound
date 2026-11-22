@@ -486,7 +486,7 @@ std::expected<String, StarException> CommandProcessor::timewarp(ConnectionId con
     else if (time < 0.0 && (arguments.size() < 2 || arguments[1] != "please"))
       return "Great Scott! We can't go back in time!";
 
-    m_universe.universeClock()->adjustTime(time);
+    m_universe.universeClock()->adjust_time(time);
     return time > 0.0 ? String("It's just a jump to the left...") : String("And then a step to the right...");
   
   }();

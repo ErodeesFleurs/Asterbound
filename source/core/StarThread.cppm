@@ -167,6 +167,7 @@ private:
 // Acquire an unlocked standard guard, retaining the native long-wait stack
 // diagnostic on platforms that previously provided it.
 void lock_with_diagnostics(std::unique_lock<std::recursive_mutex>& lock);
+void lock_with_diagnostics(std::unique_lock<std::mutex>& lock);
 
 class ReadersWriterMutex {
   // Multiple acquisitions are possible while no writer waits. A queued writer
