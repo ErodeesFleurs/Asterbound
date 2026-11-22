@@ -45,7 +45,7 @@ int main(int argc, char** argv) {
     auto context = (*engine)->create_context();
     if (!context)
       return std::unexpected(std::move(context.error()));
-    auto utilityCallbacks = LuaBindings::makeUtilityCallbacks(root->random(), root->logger(), root->logMap());
+    auto utilityCallbacks = LuaBindings::make_utility_callbacks(root->random(), root->logger(), root->logMap());
     if (!utilityCallbacks)
       return std::unexpected(std::move(utilityCallbacks.error()));
     auto registered = context->set_callbacks("sb", *utilityCallbacks);

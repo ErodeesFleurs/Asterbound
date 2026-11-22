@@ -16,6 +16,7 @@ import star.logging;
 import star.rpc_promise;
 import star.lua_converters;
 import star.string;
+import star.unicode;
 import star.string_view;
 import star.lexical_cast;
 import star.vector;
@@ -39,8 +40,12 @@ namespace Star {
 }
 #pragma float_control(pop)
 
+static double static_random_unit(std::uint64_t hash) {
+  return (hash & 0x7fffffffffffffff) / 9223372036854775808.0;
+}
+
 static double interpolate_static_random_double(double min, double max, std::uint64_t hash) {
-  auto unit = (hash & 0x7fffffffffffffff) / 9223372036854775808.0;
+  auto unit = static_random_unit(hash);
   auto width = max - min;
   return is_finite(width) ? unit * width + min : interpolate_static_random_double_overflow(min, max, unit);
 }
@@ -119,13 +124,13 @@ struct LuaUserDataMethods<PerlinF> {
     LuaMethods<PerlinF> methods;
 
     auto result = methods.register_method("get",
-        [](PerlinF& perlinF, float x, std::optional<float> y, std::optional<float> z) {
+        [](PerlinF& perlin, float x, std::optional<float> y, std::optional<float> z) {
           if (y && z)
-            return perlinF.get(x, *y, *z);
+            return perlin.get(x, *y, *z);
           else if (y)
-            return perlinF.get(x, *y);
+            return perlin.get(x, *y);
           else
-            return perlinF.get(x);
+            return perlin.get(x);
         });
     if (!result)
       return std::unexpected(std::move(result.error()));
@@ -134,53 +139,97 @@ struct LuaUserDataMethods<PerlinF> {
   }
 };
 
-std::expected<String, StarException> LuaBindings::formatLua(String const& string, List<LuaValue> const& args) {
-  auto argsIt = args.begin();
-  auto argsEnd = args.end();
-  auto popArg = [&argsIt, &argsEnd]() -> LuaValue {
-    if (argsIt == argsEnd)
-      return LuaNil;
-    return *argsIt++;
-  };
-
-  auto begin = string.begin();
-  if (!begin)
-    return std::unexpected(std::move(begin.error()));
-  auto stringIt = *begin;
-  auto stringEnd = string.end();
-
-  String result;
-
-  while (stringIt != stringEnd) {
-    if (*stringIt == '%') {
-      auto next = stringIt;
-      ++next;
-
-      if (next == stringEnd)
-        return std::unexpected(StarException("No specifier following '%'"));
-      else if (*next == '%')
-        result += "%";
-      else if (*next == 's') {
-        auto text = UtilityCallbacks::print(popArg());
-        if (!text)
-          return std::unexpected(std::move(text.error()));
-        result += *text;
-      } else {
-        return std::unexpected(StarException::format("Improper lua log format specifier {}", (char)*next));
-      }
-      ++next;
-      stringIt = next;
+std::expected<String, StarException> LuaBindings::format_lua(String const& format, std::span<LuaValue const> args) {
+  if (auto valid = format.size(); !valid) return std::unexpected(std::move(valid.error()));
+  std::string_view rest = format.utf8();
+  auto pos = rest.find('%');
+  if (pos == rest.npos) return format;
+  std::string output;
+  output.reserve(rest.size());
+  while (pos != rest.npos) {
+    output.append(rest.substr(0, pos));
+    rest.remove_prefix(pos + 1);
+    if (rest.empty()) return std::unexpected(StarException("No specifier following '%'"));
+    if (rest.front() == '%') output.push_back('%');
+    else if (rest.front() == 's') {
+      auto text = print_lua_value(args.empty() ? LuaNil : args.front());
+      if (!text) return std::unexpected(std::move(text.error()));
+      output.append(text->utf8());
+      if (!args.empty()) args = args.subspan(1);
     } else {
-      auto appended = result.append(*stringIt++);
-      if (!appended)
-        return std::unexpected(std::move(appended.error()));
+      auto point = Utf8Cursor(rest).read();
+      if (!point) return std::unexpected(std::move(point.error()));
+      return std::unexpected(StarException::format("Improper lua log format specifier {}", static_cast<char>(*point)));
     }
+    rest.remove_prefix(1);
+    pos = rest.find('%');
   }
-
-  return result;
+  output.append(rest);
+  return String(std::move(output));
 }
 
-std::expected<LuaCallbacks, StarException> LuaBindings::makeUtilityCallbacks(RandomService& random, Logger& logger, LogMap& logMap) {
+namespace {
+std::expected<void, StarException> log_message(Logger& logger, LogLevel level, String const& str, LuaVariadic<LuaValue> const& args) {
+  auto text = LuaBindings::format_lua(str, args);
+  if (!text)
+    return std::unexpected(std::move(text.error()));
+  auto logged = logger.log(level, std::string_view(text->utf8()).substr(0, text->utf8().find('\0')));
+  if (!logged)
+    return std::unexpected(LuaHostError(ExceptionDiagnostic(logged.error())));
+  return {};
+}
+
+std::expected<void, StarException> set_log_map(LogMap& log_map, String const& key, String const& value, LuaVariadic<LuaValue> const& args) {
+  auto text = LuaBindings::format_lua(value, args);
+  if (!text)
+    return std::unexpected(std::move(text.error()));
+  log_map.set_value(key, std::move(*text));
+  return {};
+}
+
+std::expected<LuaValue, StarException> interpolate_sin_ease(LuaEngine& engine, double offset, LuaValue const& value1, LuaValue const& value2) {
+  auto first_number = engine.lua_maybe_to<double>(value1);
+  if (!first_number)
+    return std::unexpected(std::move(first_number.error()));
+  if (*first_number) {
+    auto second_number = engine.lua_to<double>(value2);
+    if (!second_number)
+      return std::unexpected(std::move(second_number.error()));
+    return engine.lua_from(sin_ease(offset, **first_number, *second_number));
+  }
+
+  auto first_vector = engine.lua_to<Vec2F>(value1);
+  if (!first_vector)
+    return std::unexpected(std::move(first_vector.error()));
+  auto second_vector = engine.lua_to<Vec2F>(value2);
+  if (!second_vector)
+    return std::unexpected(std::move(second_vector.error()));
+  return engine.lua_from<Vec2F>(sin_ease(offset, *first_vector, *second_vector));
+}
+
+std::expected<std::uint64_t, StarException> hash_lua_values(LuaVariadic<LuaValue> const& values) {
+    XXHash64 hash;
+
+    for (auto const& value : values) {
+      if (std::holds_alternative<LuaBoolean>(value))
+        hash_append(hash, std::get<LuaBoolean>(value));
+      else if (std::holds_alternative<LuaInt>(value))
+        hash_append(hash, std::get<LuaInt>(value));
+      else if (std::holds_alternative<LuaFloat>(value))
+        hash_append(hash, std::get<LuaFloat>(value));
+      else if (std::holds_alternative<LuaString>(value)) {
+        auto text = std::get<LuaString>(value).view().utf8();
+        hash_append(hash, text.substr(0, text.find('\0')));
+      }
+      else
+        return std::unexpected(LuaException("Unhashable lua type passed to staticRandomXX binding"));
+    }
+
+    return hash.digest();
+}
+} // namespace
+
+std::expected<LuaCallbacks, StarException> LuaBindings::make_utility_callbacks(RandomService& random, Logger& logger, LogMap& log_map) {
   LuaCallbacks callbacks;
   if (auto result = callbacks.register_callback("buildInfo", []() -> Json {
         return JsonObject{{"version", base_game_version}, {"architecture", target_architecture},
@@ -190,37 +239,36 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUtilityCallbacks(Ran
     return std::unexpected(std::move(result.error()));
 
   if (auto result = callbacks.register_callback("nrand", [&random](std::optional<double> const& stdev, std::optional<double> const& mean) {
-        return UtilityCallbacks::nrand(random, stdev, mean);
+        return random.normal_double(stdev.value_or(1.0), mean.value_or(0));
       }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.register_callback("makeUuid", [&random]() { return UtilityCallbacks::makeUuid(random); }); !result)
+  if (auto result = callbacks.register_callback("makeUuid", [&random]() { return Uuid(random).hex(); }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.register_callback("logInfo", [&logger](String const& str, LuaVariadic<LuaValue> const& args) { return UtilityCallbacks::logInfo(logger, str, args); }); !result)
+  if (auto result = callbacks.register_callback("logInfo", [&logger](String const& str, LuaVariadic<LuaValue> const& args) { return log_message(logger, LogLevel::Info, str, args); }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.register_callback("logWarn", [&logger](String const& str, LuaVariadic<LuaValue> const& args) { return UtilityCallbacks::logWarn(logger, str, args); }); !result)
+  if (auto result = callbacks.register_callback("logWarn", [&logger](String const& str, LuaVariadic<LuaValue> const& args) { return log_message(logger, LogLevel::Warn, str, args); }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.register_callback("logError", [&logger](String const& str, LuaVariadic<LuaValue> const& args) { return UtilityCallbacks::logError(logger, str, args); }); !result)
+  if (auto result = callbacks.register_callback("logError", [&logger](String const& str, LuaVariadic<LuaValue> const& args) { return log_message(logger, LogLevel::Error, str, args); }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.register_callback("setLogMap", [&logMap](String const& key, String const& value, LuaVariadic<LuaValue> const& args) {
-        return UtilityCallbacks::setLogMap(logMap, key, value, args);
+  if (auto result = callbacks.register_callback("setLogMap", [&log_map](String const& key, String const& value, LuaVariadic<LuaValue> const& args) {
+        return set_log_map(log_map, key, value, args);
       }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.register_callback("parseJson", UtilityCallbacks::parseJson); !result)
+  if (auto result = callbacks.register_callback("parseJson", [](String const& text) { return Json::parse(text); }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.register_callback("printJson", UtilityCallbacks::printJson); !result)
+  if (auto result = callbacks.register_callback("printJson", [](Json const& value, std::optional<int> pretty) { return value.repr(pretty.value_or(0)); }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.register_callback("print", UtilityCallbacks::print); !result)
+  if (auto result = callbacks.register_callback("print", print_lua_value); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.register_callback("interpolateSinEase", UtilityCallbacks::interpolateSinEase); !result)
+  if (auto result = callbacks.register_callback("interpolateSinEase", interpolate_sin_ease); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.register_callback("replaceTags", UtilityCallbacks::replace_tags); !result)
+  if (auto result = callbacks.register_callback("replaceTags", [](String const& text, StringMap<String> const& tags) { return text.replace_tags(tags); }); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback("formatTags", [](String const& text, StringMap<String> const& tags) -> std::expected<String, StarException> {
-        std::vector<std::pair<std::string_view, std::string_view>> bindings;
-        bindings.reserve(tags.size());
-        for (auto const& entry : tags)
-          bindings.emplace_back(entry.first.utf8(), entry.second.utf8());
-        auto formatted = Star::format_tags(text.utf8(), bindings);
+        auto formatted = Star::format_tags(text.utf8(), [&tags](std::string_view name) -> std::optional<std::string_view> {
+          if (auto found = tags.find_ref(name)) return found->get().utf8();
+          return {};
+        });
         if (!formatted)
           return std::unexpected(std::move(formatted.error()));
         return String(std::move(*formatted));
@@ -244,30 +292,9 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUtilityCallbacks(Ran
   if (auto result = callbacks.copy_callback("parseJson", "jsonFromString"); !result) // SE compat
     return std::unexpected(std::move(result.error()));
 
-  auto hash64LuaValues = [](LuaVariadic<LuaValue> const& values) -> std::expected<std::uint64_t, StarException> {
-    XXHash64 hash;
-
-    for (auto const& value : values) {
-      if (std::holds_alternative<LuaBoolean>(value))
-        hash_append(hash, std::get<LuaBoolean>(value));
-      else if (std::holds_alternative<LuaInt>(value))
-        hash_append(hash, std::get<LuaInt>(value));
-      else if (std::holds_alternative<LuaFloat>(value))
-        hash_append(hash, std::get<LuaFloat>(value));
-      else if (std::holds_alternative<LuaString>(value)) {
-        auto text = std::get<LuaString>(value).view().utf8();
-        hash_append(hash, text.substr(0, text.find('\0')));
-      }
-      else
-        return std::unexpected(LuaException("Unhashable lua type passed to staticRandomXX binding"));
-    }
-
-    return hash.digest();
-  };
-
   if (auto result = callbacks.register_callback("staticRandomI32",
-      [hash64LuaValues](LuaVariadic<LuaValue> const& hashValues) -> std::expected<std::int32_t, StarException> {
-        auto hash = hash64LuaValues(hashValues);
+      [](LuaVariadic<LuaValue> const& hash_values) -> std::expected<std::int32_t, StarException> {
+        auto hash = hash_lua_values(hash_values);
         if (!hash)
           return std::unexpected(std::move(hash.error()));
         return (std::int32_t)*hash;
@@ -275,10 +302,10 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUtilityCallbacks(Ran
     return std::unexpected(std::move(result.error()));
 
   if (auto result = callbacks.register_callback("staticRandomI32Range",
-      [hash64LuaValues](std::int32_t min, std::int32_t max, LuaVariadic<LuaValue> const& hashValues) -> std::expected<std::int32_t, StarException> {
+      [](std::int32_t min, std::int32_t max, LuaVariadic<LuaValue> const& hash_values) -> std::expected<std::int32_t, StarException> {
         if (max < min)
           return std::unexpected(LuaException("Maximum bound in staticRandomI32Range must be >= minimum bound!"));
-        auto hash = hash64LuaValues(hashValues);
+        auto hash = hash_lua_values(hash_values);
         if (!hash)
           return std::unexpected(std::move(hash.error()));
         auto width = static_cast<std::uint32_t>(max) - static_cast<std::uint32_t>(min);
@@ -288,21 +315,21 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUtilityCallbacks(Ran
     return std::unexpected(std::move(result.error()));
 
   if (auto result = callbacks.register_callback("staticRandomDouble",
-      [hash64LuaValues](LuaVariadic<LuaValue> const& hashValues) -> std::expected<double, StarException> {
-        auto hash = hash64LuaValues(hashValues);
+      [](LuaVariadic<LuaValue> const& hash_values) -> std::expected<double, StarException> {
+        auto hash = hash_lua_values(hash_values);
         if (!hash)
           return std::unexpected(std::move(hash.error()));
-        return (*hash & 0x7fffffffffffffff) / 9223372036854775808.0;
+        return static_random_unit(*hash);
       }); !result)
     return std::unexpected(std::move(result.error()));
 
   if (auto result = callbacks.register_callback("staticRandomDoubleRange",
-      [hash64LuaValues](double min, double max, LuaVariadic<LuaValue> const& hashValues) -> std::expected<double, StarException> {
+      [](double min, double max, LuaVariadic<LuaValue> const& hash_values) -> std::expected<double, StarException> {
         if (max < min)
           return std::unexpected(LuaException("Maximum bound in staticRandomDoubleRange must be >= minimum bound!"));
         if (!is_finite(min) || !is_finite(max))
           return std::unexpected(LuaException("Bounds in staticRandomDoubleRange must be finite!"));
-        auto hash = hash64LuaValues(hashValues);
+        auto hash = hash_lua_values(hash_values);
         if (!hash)
           return std::unexpected(std::move(hash.error()));
         return interpolate_static_random_double(min, max, *hash);
@@ -360,88 +387,6 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUtilityCallbacks(Ran
     return std::unexpected(std::move(result.error()));
 
   return callbacks;
-}
-
-std::expected<double, StarException> LuaBindings::UtilityCallbacks::nrand(RandomService& random, std::optional<double> const& stdev, std::optional<double> const& mean) {
-  return random.normal_double(stdev.value_or(1.0), mean.value_or(0));
-}
-
-String LuaBindings::UtilityCallbacks::makeUuid(RandomService& random) {
-  return Uuid(random).hex();
-}
-
-std::expected<void, StarException> LuaBindings::UtilityCallbacks::logInfo(Logger& logger, String const& str, LuaVariadic<LuaValue> const& args) {
-  auto text = formatLua(str, args);
-  if (!text)
-    return std::unexpected(std::move(text.error()));
-  auto logged = logger.log(LogLevel::Info, std::string_view(text->utf8()).substr(0, text->utf8().find('\0')));
-  if (!logged)
-    return std::unexpected(LuaHostError(ExceptionDiagnostic(logged.error())));
-  return {};
-}
-
-std::expected<void, StarException> LuaBindings::UtilityCallbacks::logWarn(Logger& logger, String const& str, LuaVariadic<LuaValue> const& args) {
-  auto text = formatLua(str, args);
-  if (!text)
-    return std::unexpected(std::move(text.error()));
-  auto logged = logger.log(LogLevel::Warn, std::string_view(text->utf8()).substr(0, text->utf8().find('\0')));
-  if (!logged)
-    return std::unexpected(LuaHostError(ExceptionDiagnostic(logged.error())));
-  return {};
-}
-
-std::expected<void, StarException> LuaBindings::UtilityCallbacks::logError(Logger& logger, String const& str, LuaVariadic<LuaValue> const& args) {
-  auto text = formatLua(str, args);
-  if (!text)
-    return std::unexpected(std::move(text.error()));
-  auto logged = logger.log(LogLevel::Error, std::string_view(text->utf8()).substr(0, text->utf8().find('\0')));
-  if (!logged)
-    return std::unexpected(LuaHostError(ExceptionDiagnostic(logged.error())));
-  return {};
-}
-
-std::expected<void, StarException> LuaBindings::UtilityCallbacks::setLogMap(LogMap& logMap, String const& key, String const& value, LuaVariadic<LuaValue> const& args) {
-  auto text = formatLua(value, args);
-  if (!text)
-    return std::unexpected(std::move(text.error()));
-  logMap.set_value(key, *text);
-  return {};
-}
-
-std::expected<Json, StarException> LuaBindings::UtilityCallbacks::parseJson(String const& str) {
-  return Json::parse(str);
-}
-
-std::expected<String, StarException> LuaBindings::UtilityCallbacks::printJson(Json const& arg, std::optional<int> pretty) {
-  return arg.repr(pretty.value_or(0));
-}
-
-std::expected<String, StarException> LuaBindings::UtilityCallbacks::print(LuaValue const& value) {
-  return Star::print_lua_value(value);
-}
-
-std::expected<LuaValue, StarException> LuaBindings::UtilityCallbacks::interpolateSinEase(LuaEngine& engine, double offset, LuaValue const& value1, LuaValue const& value2) {
-  auto floatValue1 = engine.lua_maybe_to<double>(value1);
-  if (!floatValue1)
-    return std::unexpected(std::move(floatValue1.error()));
-  if (*floatValue1) {
-    auto floatValue2 = engine.lua_to<double>(value2);
-    if (!floatValue2)
-      return std::unexpected(std::move(floatValue2.error()));
-    return engine.lua_from(sin_ease(offset, **floatValue1, *floatValue2));
-  }
-
-  auto vectorValue1 = engine.lua_to<Vec2F>(value1);
-  if (!vectorValue1)
-    return std::unexpected(std::move(vectorValue1.error()));
-  auto vectorValue2 = engine.lua_to<Vec2F>(value2);
-  if (!vectorValue2)
-    return std::unexpected(std::move(vectorValue2.error()));
-  return engine.lua_from<Vec2F>(sin_ease(offset, *vectorValue1, *vectorValue2));
-}
-
-String LuaBindings::UtilityCallbacks::replace_tags(String const& str, StringMap<String> const& tags) {
-  return str.replace_tags(tags);
 }
 
 }

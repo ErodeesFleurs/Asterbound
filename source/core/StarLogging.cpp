@@ -315,6 +315,11 @@ void LogMap::set_value(String const& key, String const& value) {
   m_values.insert_or_assign(key, value);
 }
 
+void LogMap::set_value(String const& key, String&& value) {
+  std::lock_guard lock(m_mutex);
+  m_values.insert_or_assign(key, std::move(value));
+}
+
 Map<String, String> LogMap::snapshot() const {
   std::lock_guard lock(m_mutex);
   return Map<String, String>::from(m_values);

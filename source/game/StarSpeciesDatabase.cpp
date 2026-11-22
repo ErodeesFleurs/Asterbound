@@ -139,7 +139,7 @@ std::expected<Json, StarException> SpeciesDatabase::humanoidConfig(HumanoidIdent
     if (!rootCallbacks) return std::unexpected(std::move(rootCallbacks.error()));
     auto installed = context->set_callbacks("root", *rootCallbacks);
     if (!installed) return std::unexpected(std::move(installed.error()));
-    auto utility = LuaBindings::makeUtilityCallbacks(m_root.random(), m_root.logger(), m_root.logMap());
+    auto utility = LuaBindings::make_utility_callbacks(m_root.random(), m_root.logger(), m_root.logMap());
     if (!utility) return std::unexpected(std::move(utility.error()));
     installed = context->set_callbacks("sb", *utility);
     if (!installed) return std::unexpected(std::move(installed.error()));
@@ -182,7 +182,7 @@ std::expected<CharacterCreationResult, StarException> SpeciesDatabase::createHum
     if (!callbacks) return std::unexpected(std::move(callbacks.error()));
     auto installed = context->set_callbacks("root", *callbacks);
     if (!installed) return std::unexpected(std::move(installed.error()));
-    auto utility = LuaBindings::makeUtilityCallbacks(m_root.random(), m_root.logger(), m_root.logMap());
+    auto utility = LuaBindings::make_utility_callbacks(m_root.random(), m_root.logger(), m_root.logMap());
     if (!utility) return std::unexpected(std::move(utility.error()));
     installed = context->set_callbacks("sb", *utility);
     if (!installed) return std::unexpected(std::move(installed.error()));

@@ -364,7 +364,7 @@ std::expected<ItemDatabase::ItemConfig, StarException> ItemDatabase::itemConfig(
     auto setRoot = context->set_callbacks("root", *rootCallbacks);
     if (!setRoot)
       return std::unexpected(std::move(setRoot.error()));
-    auto utilityCallbacks = LuaBindings::makeUtilityCallbacks(m_root.random(), m_root.logger(), m_root.logMap());
+    auto utilityCallbacks = LuaBindings::make_utility_callbacks(m_root.random(), m_root.logger(), m_root.logMap());
     if (!utilityCallbacks)
       return std::unexpected(std::move(utilityCallbacks.error()));
     auto setUtility = context->set_callbacks("sb", *utilityCallbacks);

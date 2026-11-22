@@ -3055,7 +3055,7 @@ namespace LuaBindings {
     if (!formatResult)
       return std::unexpected(std::move(formatResult.error()));
     auto format = std::move(*formatResult);
-    auto textResult = formatLua(format, slice<List<LuaValue>>(args, 1, args.size() - 2));
+    auto textResult = format_lua(format, std::span<LuaValue const>(args).subspan(1, args.size() - 3));
     if (!textResult)
       return std::unexpected(std::move(textResult.error()));
     auto text = std::move(*textResult);

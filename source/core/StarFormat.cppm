@@ -483,9 +483,13 @@ using FormatException = StarError<FormatExceptionTag, StarException>;
 
 // Tags are UTF-8 byte sequences; values are copied verbatim, including NULs.
 // A doubled '<' is literal. Bindings use the first matching name.
-[[nodiscard]] inline std::expected<std::string, StarException> format_tags(
-    std::string_view text,
-    std::span<std::pair<std::string_view, std::string_view> const> tags) {
+template <typename Lookup>
+concept tag_lookup = requires(Lookup& lookup, std::string_view key) {
+  { lookup(key) } -> std::same_as<std::optional<std::string_view>>;
+};
+
+template <tag_lookup Lookup>
+[[nodiscard]] std::expected<std::string, StarException> format_tags(std::string_view text, Lookup&& lookup) {
   std::string output;
   output.reserve(text.size());
   std::size_t position = 0;
@@ -507,14 +511,22 @@ using FormatException = StarError<FormatExceptionTag, StarException>;
     auto name = text.substr(open + 1, close - open - 1);
     if (name.empty())
       return std::unexpected(FormatException("Empty template tag"));
-    auto binding = std::find_if(tags.begin(), tags.end(),
-        [name](auto const& entry) { return entry.first == name; });
-    if (binding == tags.end())
+    auto binding = lookup(name);
+    if (!binding)
       return std::unexpected(FormatException::format("Unknown template tag '{}'", name));
-    output.append(binding->second);
+    output.append(*binding);
     position = close + 1;
   }
   return output;
+}
+
+[[nodiscard]] inline std::expected<std::string, StarException> format_tags(
+    std::string_view text, std::span<std::pair<std::string_view, std::string_view> const> tags) {
+  return format_tags(text, [tags](std::string_view name) -> std::optional<std::string_view> {
+    for (auto const& [key, value] : tags)
+      if (key == name) return value;
+    return {};
+  });
 }
 
 namespace format_detail {
@@ -644,5 +656,6 @@ using ::Star::print;
 using ::Star::println;
 using ::Star::flush;
 using ::Star::to_string;
+using ::Star::tag_lookup;
 using ::Star::format_tags;
 }

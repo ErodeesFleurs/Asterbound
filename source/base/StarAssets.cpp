@@ -443,7 +443,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     return callbacks;
   };
 
-  auto utilityCallbacks = LuaBindings::makeUtilityCallbacks(random, m_logger, logMap);
+  auto utilityCallbacks = LuaBindings::make_utility_callbacks(random, m_logger, logMap);
   if (!utilityCallbacks)
     return std::unexpected(std::move(utilityCallbacks.error()));
   auto pushedUtility = push_global_context("sb", *utilityCallbacks);

@@ -1113,3 +1113,10 @@ reads return `NPos` without changing the destination on failure. Ordinary
 streams accept noncanonical and wrapping encodings; PathEmbed's binary JSON
 validator rejects overflow. `io_benchmarks --benchmark_filter='^IO/Vlq'`
 compares external, owning and callback readers for 1-, 5- and 10-byte values.
+
+`core_benchmarks --benchmark_filter='^Lua/Utility'` times calls through a
+registered Lua `sb` table: `/0` logs 360 literal bytes, `/1` formats four
+integers, and `/2` resolves two tags from a 64-entry Lua table. Context setup
+and callback registration are outside the timed loop; Lua argument conversion
+is included. Both logging cases include the default stdout sink; redirect its
+output identically when comparing builds.

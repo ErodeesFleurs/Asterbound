@@ -68,7 +68,7 @@ std::expected<std::shared_ptr<Rebuilder>, StarException> Rebuilder::create(Root&
       auto setRoot = context->set_callbacks("root", *rootCallbacks);
       if (!setRoot)
         return std::unexpected(std::move(setRoot.error()));
-      auto utilityCallbacks = LuaBindings::makeUtilityCallbacks(root.random(), root.logger(), root.logMap());
+      auto utilityCallbacks = LuaBindings::make_utility_callbacks(root.random(), root.logger(), root.logMap());
       if (!utilityCallbacks)
         return std::unexpected(std::move(utilityCallbacks.error()));
       auto setUtility = context->set_callbacks("sb", *utilityCallbacks);

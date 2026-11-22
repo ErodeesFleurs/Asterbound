@@ -135,12 +135,22 @@ TEST(LuaTest, ColorCodecDistinguishesMalformedColorAndUnicodeFailures) {
   EXPECT_EQ(context->eval<Color>("return '#1234'"), Color::rgba(0x11, 0x22, 0x33, 0x44));
 }
 
+TEST(LuaTest, UtilityFormattingKeepsBinaryLiteralsAndValidatesWholeInput) {
+  std::array<LuaValue, 1> args{LuaInt(42)};
+  auto text = LuaBindings::format_lua(String(std::string("a\0b", 3) + "%% %s:%s"), args);
+  ASSERT_TRUE(text);
+  EXPECT_EQ(text->utf8(), std::string("a\0b% 42:nil", 11));
+  EXPECT_FALSE(LuaBindings::format_lua("%", {}));
+  EXPECT_FALSE(LuaBindings::format_lua("%q", {}));
+  EXPECT_FALSE(LuaBindings::format_lua(String(std::string("literal\xff")), {}));
+}
+
 TEST(LuaTest, RandomCallbacksPreserveNamesAndPropagateCheckedFailures) {
   RandomService random(31415926);
   RandomSource untouched(31415926);
   Logger logger;
   LogMap logMap;
-  auto callbacks = LuaBindings::makeUtilityCallbacks(random, logger, logMap);
+  auto callbacks = LuaBindings::make_utility_callbacks(random, logger, logMap);
   ASSERT_TRUE(callbacks) << callbacks.error().what();
   auto engine = LuaEngine::create();
   ASSERT_TRUE(engine);

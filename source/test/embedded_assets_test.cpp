@@ -84,7 +84,7 @@ struct EmbeddedFixture {
     if (!context)
       return std::unexpected(std::move(context.error()));
     lua.emplace(std::move(*context));
-    auto utilities = LuaBindings::makeUtilityCallbacks(random, logger, logMap);
+    auto utilities = LuaBindings::make_utility_callbacks(random, logger, logMap);
     if (!utilities)
       return std::unexpected(std::move(utilities.error()));
     return lua->set_callbacks("sb", *utilities);
@@ -156,7 +156,7 @@ std::expected<std::shared_ptr<LuaRoot>, StarException> embeddedRootLua(Root& roo
   if (!callbacks)
     return std::unexpected(std::move(callbacks.error()));
   (*lua)->add_callbacks("root", *callbacks);
-  auto utilities = LuaBindings::makeUtilityCallbacks(root.random(), root.logger(), root.logMap());
+  auto utilities = LuaBindings::make_utility_callbacks(root.random(), root.logger(), root.logMap());
   if (!utilities)
     return std::unexpected(std::move(utilities.error()));
   (*lua)->add_callbacks("sb", *utilities);

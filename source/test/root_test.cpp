@@ -259,7 +259,7 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
   if (!callbacks) return std::unexpected(std::move(callbacks.error()));
   (*lua)->add_callbacks("root", *callbacks);
   if (utilities) {
-    auto utilityCallbacks = LuaBindings::makeUtilityCallbacks(root.random(), root.logger(), root.logMap());
+    auto utilityCallbacks = LuaBindings::make_utility_callbacks(root.random(), root.logger(), root.logMap());
     if (!utilityCallbacks) return std::unexpected(std::move(utilityCallbacks.error()));
     (*lua)->add_callbacks("sb", *utilityCallbacks);
   }

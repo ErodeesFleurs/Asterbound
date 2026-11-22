@@ -36,6 +36,8 @@ import star.host_address;
 import star.net_impl;
 import star.listener;
 import star.time;
+import star.utility_lua_bindings;
+import star.random;
 
 namespace {
 void adjust_running(benchmark::State& state) {
@@ -1792,6 +1794,31 @@ void install_callback_group(benchmark::State& state) {
     require(state, *result == 18, "Installed group lost callable state");
 }
 
+void utility_calls(benchmark::State& state) {
+  RandomService random(42);
+  Logger logger;
+  LogMap log_map;
+  auto context = makeContext();
+  auto callbacks = LuaBindings::make_utility_callbacks(random, logger, log_map);
+  if (!checked(state, context) || !checked(state, callbacks) || !checked(state, context->set_callbacks("sb", *callbacks))) return;
+  auto loaded = context->load(R"LUA(
+    local text = string.rep("abcdef", 60)
+    local tags = {}
+    for i=1,64 do tags["key"..i] = "value"..i end
+    function plain() sb.logInfo(text) end
+    function formatted() sb.logInfo("%s/%s/%s/%s", 1, 2, 3, 4) end
+    function tagged() return sb.formatTags("<key1>/<key64>", tags) end
+  )LUA");
+  if (!checked(state, loaded)) return;
+  auto fn = context->get<LuaFunction>(state.range(0) == 0 ? "plain" : state.range(0) == 1 ? "formatted" : "tagged");
+  if (!checked(state, fn)) return;
+  for (auto _ : state) {
+    auto result = fn->invoke<LuaValue>();
+    if (!checked(state, result)) return;
+    benchmark::DoNotOptimize(result);
+  }
+}
+BENCHMARK(utility_calls)->Name("Lua/Utility")->Arg(0)->Arg(1)->Arg(2);
 BENCHMARK(read_path_string)->Name("Lua/Path/ReadNestedBinaryString");
 BENCHMARK(install_callback_group)->Name("Lua/Bindings/Replace16Callbacks");
 BENCHMARK_TEMPLATE(BM_Invoke, false)->Name("Lua/Invoke/Direct");

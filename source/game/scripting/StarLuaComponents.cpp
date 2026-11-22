@@ -313,7 +313,7 @@ std::expected<void, StarException> LuaBaseComponent::context_setup() {
       return std::unexpected(std::move(result.error()));
   }
   if (!has_callbacks("sb")) {
-    auto callbacks = LuaBindings::makeUtilityCallbacks(m_root.random(), m_root.logger(), m_root.logMap());
+    auto callbacks = LuaBindings::make_utility_callbacks(m_root.random(), m_root.logger(), m_root.logMap());
     if (!callbacks)
       return std::unexpected(std::move(callbacks.error()));
     if (auto result = add_callbacks("sb", std::move(*callbacks)); !result)

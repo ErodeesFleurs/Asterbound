@@ -188,6 +188,7 @@ class LogMap {
 public:
   [[nodiscard]] String get_value(String const& key) const;
   void set_value(String const& key, String const& value);
+  void set_value(String const& key, String&& value);
 
   template <typename T>
     requires format_argument<T>
