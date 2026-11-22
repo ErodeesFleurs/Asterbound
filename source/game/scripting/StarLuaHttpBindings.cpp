@@ -97,7 +97,7 @@ struct LuaHttpSession::Impl {
     auto config = root.configuration();
     if (!config)
       return std::unexpected(std::move(config.error()));
-    auto sites = (*config)->getPath(path);
+    auto sites = (*config)->get_path(path);
     if (!sites)
       return std::unexpected(std::move(sites.error()));
     std::shared_ptr<JsonArray const> snapshot;
@@ -127,7 +127,7 @@ struct LuaHttpSession::Impl {
       return false;
     auto updated = snapshot ? *snapshot : JsonArray{};
     updated.push_back(domain);
-    auto saved = (*config)->setPath(path, Json(std::move(updated)));
+    auto saved = (*config)->set_path(path, Json(std::move(updated)));
     if (!saved)
       return std::unexpected(std::move(saved.error()));
     return true;

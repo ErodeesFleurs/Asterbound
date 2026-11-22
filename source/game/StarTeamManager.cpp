@@ -55,13 +55,13 @@ std::expected<std::shared_ptr<TeamManager>, StarException> TeamManager::create(R
   if (!sizeJson) return std::unexpected(std::move(sizeJson.error()));
   auto size = sizeJson->to_uint();
   if (!size) return std::unexpected(std::move(size.error()));
-  auto timeoutJson = (*config)->getPath("teamInvitationTimeout", Json(600.0));
-  if (!timeoutJson) return std::unexpected(std::move(timeoutJson.error()));
-  auto timeout = timeoutJson->to_double();
+  auto timeout_json = (*config)->get_path("teamInvitationTimeout", Json(600.0));
+  if (!timeout_json) return std::unexpected(std::move(timeout_json.error()));
+  auto timeout = timeout_json->to_double();
   if (!timeout) return std::unexpected(std::move(timeout.error()));
-  auto secureJson = (*config)->getPath("security.secureTeams");
-  if (!secureJson) return std::unexpected(std::move(secureJson.error()));
-  auto secure = secureJson->opt_bool();
+  auto secure_json = (*config)->get_path("security.secureTeams");
+  if (!secure_json) return std::unexpected(std::move(secure_json.error()));
+  auto secure = secure_json->opt_bool();
   if (!secure) return std::unexpected(std::move(secure.error()));
   return std::shared_ptr<TeamManager>(new TeamManager(root, *size, *timeout, secure->value_or(true)));
 }

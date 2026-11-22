@@ -295,7 +295,7 @@ std::expected<void, StarException> Root::initialize() {
 
         {
           std::lock_guard locker(m_configurationMutex);
-          auto written = writeConfig();
+          auto written = write_config();
           if (!written)
             return std::unexpected(std::move(written.error()));
         }
@@ -329,7 +329,7 @@ Root::~Root() {
 
   m_reload_listeners.clear();
 
-  if (auto written = writeConfig(); !written)
+  if (auto written = write_config(); !written)
     EmergencyLog::error("Root: Could not write configuration during shutdown: {}", Star::output_exception(written.error(), true));
 
   m_modStorage.reset();
@@ -415,7 +415,7 @@ std::expected<void, StarException> Root::reload() {
     std::lock_guard configurationLock(m_configurationMutex);
     std::lock_guard assetsLock(m_assetsMutex);
 
-    auto written = writeConfig();
+    auto written = write_config();
     if (!written)
       return std::unexpected(std::move(written.error()));
 
@@ -459,6 +459,7 @@ std::expected<void, StarException> Root::reload() {
     m_collectionDatabase.reset();
     m_assets.reset();
     m_configuration.reset();
+    m_saved_config_revision.reset();
   }
 
   return m_reload_listeners.trigger();
@@ -587,7 +588,7 @@ std::expected<std::shared_ptr<Assets const>, StarException> Root::assets() {
   auto config = configuration();
   if (!config)
     return std::unexpected(std::move(config.error()));
-  auto configured = (*config)->getPath("safe.allowRemoteAssets", true);
+  auto configured = (*config)->get_path("safe.allowRemoteAssets", true);
   if (!configured)
     return std::unexpected(std::move(configured.error()));
   auto allowed = configured->to_bool();
@@ -1127,21 +1128,24 @@ std::expected<StringList, StarException> Root::scanForAssetSources(StringList co
   return sourcePaths;
 }
 
-std::expected<void, StarException> Root::writeConfig() {
-  if (m_configuration) {
-    auto currentConfig = m_configuration->currentConfiguration();
-    if (m_lastRuntimeConfig != currentConfig) {
-      if (m_runtimeConfigFile) {
-        auto logged = m_logger.info("Root: Writing runtime configuration to '{}'", *m_runtimeConfigFile);
-        if (!logged) return std::unexpected(std::move(logged.error()));
-        auto contents = m_configuration->printConfiguration();
-        if (!contents) return std::unexpected(std::move(contents.error()));
-        auto written = File::overwrite_file_with_rename(*contents, *m_runtimeConfigFile);
-        if (!written) return std::unexpected(std::move(written.error()));
-      }
-      m_lastRuntimeConfig = std::move(currentConfig);
+std::expected<void, StarException> Root::write_config() {
+  if (!m_configuration)
+    return {};
+  auto snapshot = m_configuration->snapshot();
+  if (m_saved_config_revision == snapshot.revision)
+    return {};
+  if (m_last_runtime_config != snapshot.value) {
+    if (m_runtimeConfigFile) {
+      auto logged = m_logger.info("Root: Writing runtime configuration to '{}'", *m_runtimeConfigFile);
+      if (!logged) return std::unexpected(std::move(logged.error()));
+      auto contents = snapshot.value.print_json(2, true);
+      if (!contents) return std::unexpected(std::move(contents.error()));
+      auto written = File::overwrite_file_with_rename(*contents, *m_runtimeConfigFile);
+      if (!written) return std::unexpected(std::move(written.error()));
     }
+    m_last_runtime_config = std::move(snapshot.value);
   }
+  m_saved_config_revision = snapshot.revision;
   return {};
 }
 

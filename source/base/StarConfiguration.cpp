@@ -1,72 +1,72 @@
 import std;
 import star.format;
 import star.json;
+import star.json_path;
+import star.unicode;
 import star.string;
 import star.configuration;
 
 namespace Star {
 
-Configuration::Configuration(Json defaultConfiguration, Json currentConfiguration)
-    : m_defaultConfig(std::move(defaultConfiguration)), m_currentConfig(std::move(currentConfiguration)) {}
+Configuration::Configuration(Json default_configuration, Json current_configuration)
+    : m_defaults(std::move(default_configuration)), m_current{std::move(current_configuration)} {}
 
-Json Configuration::defaultConfiguration() const {
-  return m_defaultConfig;
+Json Configuration::current_configuration() const {
+  std::lock_guard locker(m_mutex);
+  return m_current.value;
 }
 
-Json Configuration::currentConfiguration() const {
+ConfigurationSnapshot Configuration::snapshot() const {
   std::lock_guard locker(m_mutex);
-  return m_currentConfig;
-}
-
-std::expected<String, StarException> Configuration::printConfiguration() const {
-  std::lock_guard locker(m_mutex);
-  return m_currentConfig.print_json(2, true);
+  return m_current;
 }
 
 std::expected<Json, StarException> Configuration::get(String const& key, Json def) const {
   std::lock_guard locker(m_mutex);
-  return m_currentConfig.get(key, std::move(def));
+  return m_current.value.get(key, std::move(def));
 }
 
-std::expected<Json, StarException> Configuration::getPath(String const& path, Json def) const {
+std::expected<Json, StarException> Configuration::get_path(String const& path, Json def) const {
   std::lock_guard locker(m_mutex);
-  return m_currentConfig.query(path, std::move(def));
+  return m_current.value.query(path, std::move(def));
 }
 
-std::expected<Json, StarException> Configuration::getDefault(String const& key) const {
-  std::lock_guard locker(m_mutex);
-  return m_defaultConfig.get(key, {});
-}
-
-std::expected<Json, StarException> Configuration::getDefaultPath(String const& path) const {
-  std::lock_guard locker(m_mutex);
-  return m_defaultConfig.query(path, {});
+std::expected<Json, StarException> Configuration::get_default(String const& key) const {
+  return m_defaults.get(key, {});
 }
 
 std::expected<void, StarException> Configuration::set(String const& key, Json const& value) {
-  std::lock_guard locker(m_mutex);
   if (key == "configurationVersion")
     return std::unexpected(ConfigurationException("cannot set configurationVersion"));
 
-  auto updated = value ? m_currentConfig.set(key, value) : m_currentConfig.erase(key);
+  std::lock_guard locker(m_mutex);
+  auto updated = value ? m_current.value.set(key, value) : m_current.value.erase(key);
   if (!updated)
     return std::unexpected(std::move(updated.error()));
-  m_currentConfig = std::move(*updated);
+  m_current.value = std::move(*updated);
+  ++m_current.revision;
   return {};
 }
 
-std::expected<void, StarException> Configuration::setPath(String const& path, Json const& value) {
-  std::lock_guard locker(m_mutex);
-  auto components = path.split_any("[].");
-  if (!components)
-    return std::unexpected(std::move(components.error()));
-  if (!components->empty() && (*components)[0] == "configurationVersion")
-    return std::unexpected(ConfigurationException("cannot set configurationVersion"));
+std::expected<void, StarException> Configuration::set_path(String const& path, Json const& value) {
+  if (path.empty())
+    return std::unexpected(ConfigurationException("cannot replace or erase the configuration root"));
 
-  auto updated = value ? m_currentConfig.set_path(path, value) : m_currentConfig.erase_path(path);
+  auto parse_component = [](String& component, String const& query, Utf8Cursor& cursor)
+      -> std::expected<JsonPath::TypeHint, StarException> {
+    bool first = cursor.offset() == 0;
+    auto parsed = JsonPath::parse_query_path(component, query, cursor);
+    if (parsed && first && component == "configurationVersion")
+      return std::unexpected(ConfigurationException("cannot set configurationVersion"));
+    return parsed;
+  };
+  std::lock_guard locker(m_mutex);
+  auto updated = value ? JsonPath::path_set(m_current.value, parse_component, path, value)
+                       : JsonPath::path_remove(m_current.value, parse_component, path);
   if (!updated)
     return std::unexpected(std::move(updated.error()));
-  m_currentConfig = std::move(*updated);
+  m_current.value = std::move(*updated);
+  ++m_current.revision;
   return {};
 }
 

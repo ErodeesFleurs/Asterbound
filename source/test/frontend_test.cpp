@@ -5255,5 +5255,15 @@ const GameTestRegistration
     ASSERT_TRUE(main_mixer.read(output, output.size()));
     EXPECT_EQ(output, (std::array<std::int16_t, 8>{}));
     EXPECT_FALSE((*instance)->finished());
+
+    // Muted groups do not decode their settings; unmuting must see the live value.
+    ASSERT_TRUE((*configuration)->set("musicVol", Json("invalid")));
+    ASSERT_TRUE((*configuration)->set("instrumentVol", Json("invalid")));
+    EXPECT_TRUE(main_mixer.update(0, true, true));
+    EXPECT_FALSE(main_mixer.update(0, true, false));
+    ASSERT_TRUE((*configuration)->set("musicVol", Json(100)));
+    EXPECT_FALSE(main_mixer.update(0));
+    ASSERT_TRUE((*configuration)->set("instrumentVol", Json(100)));
+    EXPECT_TRUE(main_mixer.update(0));
   });
 }

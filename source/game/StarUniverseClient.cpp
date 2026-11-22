@@ -1145,10 +1145,10 @@ std::expected<void, StarException> UniverseClient::restartLua() {
   if (!configurationResult)
     return std::unexpected(std::move(configurationResult.error()));
   auto configuration = std::move(*configurationResult);
-  auto enableResult = configuration->getPath("safe.enableImGui");
-  if (!enableResult)
-    return std::unexpected(std::move(enableResult.error()));
-  auto enable = std::move(*enableResult);
+  auto enable_result = configuration->get_path("safe.enableImGui");
+  if (!enable_result)
+    return std::unexpected(std::move(enable_result.error()));
+  auto enable = std::move(*enable_result);
   if (enable) {
     auto enabledResult = enable.to_bool();
     if (!enabledResult)

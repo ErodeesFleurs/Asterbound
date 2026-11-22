@@ -161,6 +161,10 @@ Sets a configuration value in `/storage/starbound.config`.
 
 Sets a configuration value in `/storage/starbound.config` by path.
 
+An empty path cannot replace or erase the configuration document. The
+`configurationVersion` key and its descendants are read-only. A JSON null
+requests deletion; `false` and `0` are stored as values.
+
 *Both setters will error if you try to set `safeScripts`, as that can break Starbound's sandbox.*
 
 ---

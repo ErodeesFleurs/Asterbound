@@ -737,7 +737,7 @@ std::expected<bool, StarException> WorldServer::addClient(ConnectionId clientId,
     auto result54 = this->root().configuration();
     if (!result54)
       return std::unexpected(std::move(result54.error()));
-    auto result55 = std::move(*result54)->getPath("compatibility.customDungeonWorld");
+    auto result55 = std::move(*result54)->get_path("compatibility.customDungeonWorld");
     if (!result55)
       return std::unexpected(std::move(result55.error()));
     auto result56 = std::move(*result55).opt_bool();

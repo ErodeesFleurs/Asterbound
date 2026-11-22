@@ -514,8 +514,9 @@ std::expected<void, StarException> GraphicsMenu::initConfig() {
   auto configuration = context().root().configuration();
   if (!configuration)
     return std::unexpected(std::move(configuration.error()));
+  auto settings = (*configuration)->current_configuration();
   for (auto const& key : ConfigKeys) {
-    auto value = (*configuration)->get(key);
+    auto value = settings.get(key, {});
     if (!value)
       return std::unexpected(std::move(value.error()));
     m_localChanges.set(key, std::move(*value));
@@ -777,18 +778,19 @@ std::expected<void, StarException> GraphicsMenu::applyWindowSettings() {
   auto configuration = context().root().configuration();
   if (!configuration)
     return std::unexpected(std::move(configuration.error()));
-  auto getBool = [&](String const& key) -> std::expected<bool, StarException> {
-    auto value = (*configuration)->get(key);
+  auto settings = (*configuration)->current_configuration();
+  auto get_bool = [&](String const& key) -> std::expected<bool, StarException> {
+    auto value = settings.get(key, {});
     if (!value)
       return std::unexpected(std::move(value.error()));
     return value->to_bool();
   };
   auto appController = context().applicationController();
-  auto fullscreen = getBool("fullscreen");
+  auto fullscreen = get_bool("fullscreen");
   if (!fullscreen)
     return std::unexpected(std::move(fullscreen.error()));
   if (*fullscreen) {
-    auto value = (*configuration)->get("fullscreenResolution");
+    auto value = settings.get("fullscreenResolution", {});
     if (!value)
       return std::unexpected(std::move(value.error()));
     auto resolution = json_to_vec2u(*value);
@@ -796,18 +798,18 @@ std::expected<void, StarException> GraphicsMenu::applyWindowSettings() {
       return std::unexpected(std::move(resolution.error()));
     return appController->setFullscreenWindow(*resolution);
   }
-  auto borderless = getBool("borderless");
+  auto borderless = get_bool("borderless");
   if (!borderless)
     return std::unexpected(std::move(borderless.error()));
   if (*borderless)
     return appController->setBorderlessWindow();
-  auto maximized = getBool("maximized");
+  auto maximized = get_bool("maximized");
   if (!maximized)
     return std::unexpected(std::move(maximized.error()));
   if (*maximized) {
     appController->setMaximizedWindow();
   } else {
-    auto value = (*configuration)->get("windowedResolution");
+    auto value = settings.get("windowedResolution", {});
     if (!value)
       return std::unexpected(std::move(value.error()));
     auto resolution = json_to_vec2u(*value);

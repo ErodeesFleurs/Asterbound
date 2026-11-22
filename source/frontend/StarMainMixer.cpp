@@ -40,13 +40,14 @@ std::expected<void, StarException> MainMixer::update(float dt, bool mute_sfx, bo
   if (!assets) return std::unexpected(std::move(assets.error()));
   auto configuration = m_root.get().configuration();
   if (!configuration) return std::unexpected(std::move(configuration.error()));
+  auto volume_settings = (*configuration)->current_configuration();
 
   std::array<std::optional<float>, 3> current_settings{};
   auto read_volume_setting = [&](std::size_t setting_index,
                                  String const& setting_name) -> std::expected<float, StarException> {
     if (current_settings[setting_index])
       return *current_settings[setting_index];
-    auto setting = (*configuration)->get(setting_name);
+    auto setting = volume_settings.get(setting_name, {});
     if (!setting)
       return std::unexpected(std::move(setting.error()));
     auto raw_volume = setting->to_float();

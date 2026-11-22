@@ -350,13 +350,13 @@ std::expected<void, StarException> Input::BindEntry::updated() {
     if (auto r = (*config)->set(InputBindingConfigRoot, JsonObject()); !r) return std::unexpected(std::move(r.error()));
   }
   String path = Star::format("{}.{}", InputBindingConfigRoot, category.get().id);
-  auto category = (*config)->getPath(path);
+  auto category = (*config)->get_path(path);
   if (!category) return std::unexpected(std::move(category.error()));
   if (!category->is_type(Json::Type::Object)) {
-    if (auto r = (*config)->setPath(path, JsonObject{{id, std::move(array)}}); !r) return std::unexpected(std::move(r.error()));
+    if (auto r = (*config)->set_path(path, JsonObject{{id, std::move(array)}}); !r) return std::unexpected(std::move(r.error()));
   } else {
     path = Star::format("{}.{}", path, id);
-    if (auto r = (*config)->setPath(path, array); !r) return std::unexpected(std::move(r.error()));
+    if (auto r = (*config)->set_path(path, array); !r) return std::unexpected(std::move(r.error()));
   }
   owner.rebuildMappings();
   return {};

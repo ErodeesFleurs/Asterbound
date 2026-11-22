@@ -804,7 +804,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
     if (*title) return std::unexpected(ConfigurationException(Star::format("cannot get {}", path)));
     auto configuration = root.configuration();
     if (!configuration) return std::unexpected(std::move(configuration.error()));
-    return (*configuration)->getPath(path);
+    return (*configuration)->get_path(path);
   }); !r) return std::unexpected(std::move(r.error()));
 
   if (auto r = callbacks.register_callback("setConfigurationPath", [&root](String const& path, Json const& value) -> std::expected<void, StarException> {
@@ -818,7 +818,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
       return std::unexpected(ConfigurationException(Star::format("cannot set {}", path)));
     auto configuration = root.configuration();
     if (!configuration) return std::unexpected(std::move(configuration.error()));
-    return (*configuration)->setPath(path, value);
+    return (*configuration)->set_path(path, value);
   }); !r) return std::unexpected(std::move(r.error()));
 
   if (auto r = callbacks.register_callback("speciesConfig", [&root](String const& species) -> std::expected<Json, StarException> {

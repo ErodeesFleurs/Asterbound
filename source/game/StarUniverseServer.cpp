@@ -287,10 +287,10 @@ std::expected<void, StarException> UniverseServer::initialize() {
     return std::unexpected(std::move(connections.error()));
   m_connectionServer = std::move(*connections);
   m_pause = std::make_shared<std::atomic<bool>>(false);
-  auto secureConfig = configuration->getPath("security.secureWarps");
-  if (!secureConfig)
-    return std::unexpected(std::move(secureConfig.error()));
-  auto secureWarps = secureConfig->opt_bool();
+  auto secure_config = configuration->get_path("security.secureWarps");
+  if (!secure_config)
+    return std::unexpected(std::move(secure_config.error()));
+  auto secureWarps = secure_config->opt_bool();
   if (!secureWarps)
     return std::unexpected(std::move(secureWarps.error()));
   m_secureWarps = secureWarps->value_or(true);

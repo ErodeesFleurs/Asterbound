@@ -1479,7 +1479,7 @@ void PlayerInventory::swapCustomBarLinks(InventorySlot a, InventorySlot b) {
 [[nodiscard]] std::expected<void, StarException> PlayerInventory::autoAddToCustomBar(InventorySlot slot) {
   auto configuration = m_root.configuration();
   if (!configuration) return std::unexpected(std::move(configuration.error()));
-  auto config = (*configuration)->getPath("inventory.pickupToActionBar");
+  auto config = (*configuration)->get_path("inventory.pickupToActionBar");
   if (!config) return std::unexpected(std::move(config.error()));
   auto enabled = config->to_bool();
   if (!enabled) return std::unexpected(std::move(enabled.error()));

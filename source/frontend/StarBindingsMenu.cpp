@@ -138,7 +138,9 @@ std::expected<std::shared_ptr<BindingsMenu>, StarException> BindingsMenu::create
       }); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = gameBinds.register_callback("defaults", [&guiContext] {
-        return guiContext.root().configuration().and_then([](auto const& config) { return config->getDefault("bindings"); });
+        return guiContext.root().configuration().and_then([](std::shared_ptr<Configuration> const& config) {
+          return config->get_default("bindings");
+        });
       }); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = gameBinds.register_callback("set", [&guiContext](Json const& bindings) {

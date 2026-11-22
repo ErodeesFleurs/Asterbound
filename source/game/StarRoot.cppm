@@ -225,7 +225,7 @@ private:
   [[nodiscard]] std::expected<std::shared_ptr<T>, StarException> loadMemberFunction(std::shared_ptr<T>& ptr, std::mutex& mutex, std::string_view name, std::function<std::expected<std::shared_ptr<T>, StarException>()> loadFunction);
 
   // m_configurationMutex must be held when calling.
-  [[nodiscard]] std::expected<void, StarException> writeConfig();
+  [[nodiscard]] std::expected<void, StarException> write_config();
 
   // Services outlive the resource catalogs and all work borrowing them.
   Logger m_logger;
@@ -256,7 +256,8 @@ private:
 
   ListenerGroup m_reload_listeners;
 
-  Json m_lastRuntimeConfig;
+  Json m_last_runtime_config;
+  std::optional<std::uint64_t> m_saved_config_revision;
   std::optional<String> m_runtimeConfigFile;
 
   ThreadFunction<void> m_maintenanceThread;

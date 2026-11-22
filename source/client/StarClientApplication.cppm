@@ -37,7 +37,6 @@ class MainInterface;
 class UniverseServer;
 class LuaHttpSession;
 class LuaCallbacks;
-class Configuration;
 class WorldClient;
 
 class ClientApplication : public Application {
@@ -99,7 +98,7 @@ private:
   };
 
   [[nodiscard]] std::expected<void, StarException> renderReload();
-  [[nodiscard]] std::expected<void, StarException> applyRenderSettings(Configuration const& configuration);
+  [[nodiscard]] std::expected<void, StarException> apply_render_settings(Json const& settings);
 
   [[nodiscard]] std::expected<void, StarException> changeState(MainAppState newState);
   [[nodiscard]] std::expected<void, StarException> prepareStateCinematic(MainAppState newState);

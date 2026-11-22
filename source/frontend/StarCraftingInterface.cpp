@@ -309,12 +309,12 @@ std::expected<void, StarException> CraftingPane::initialize(std::shared_ptr<Worl
 });
 
   reader.registerCallback("btnFilterHaveMaterials", [this](Widget&)  -> std::expected<void, StarException> {
-      auto configurationResult346 = context().root().configuration();
-      if (!configurationResult346)
-        return std::unexpected(std::move(configurationResult346.error()));
-      auto setPathResult347 = std::move(*configurationResult346)->setPath("crafting.filterHaveMaterials", m_filterHaveMaterials->isChecked());
-      if (!setPathResult347)
-        return std::unexpected(std::move(setPathResult347.error()));
+      auto configuration = context().root().configuration();
+      if (!configuration)
+        return std::unexpected(std::move(configuration.error()));
+      auto saved = (*configuration)->set_path("crafting.filterHaveMaterials", m_filterHaveMaterials->isChecked());
+      if (!saved)
+        return std::unexpected(std::move(saved.error()));
       auto updateAvailableRecipesResult348 = updateAvailableRecipes();
       if (!updateAvailableRecipesResult348)
         return std::unexpected(std::move(updateAvailableRecipesResult348.error()));
@@ -415,16 +415,16 @@ std::expected<void, StarException> CraftingPane::initialize(std::shared_ptr<Worl
   m_filterHaveMaterials = std::move(*fetchChildResult365);
   if (m_filterHaveMaterials)
     {
-      auto configurationResult366 = context().root().configuration();
-      if (!configurationResult366)
-        return std::unexpected(std::move(configurationResult366.error()));
-      auto getPathResult367 = std::move(*configurationResult366)->getPath("crafting.filterHaveMaterials");
-      if (!getPathResult367)
-        return std::unexpected(std::move(getPathResult367.error()));
-      auto toBoolResult368 = std::move(*getPathResult367).to_bool();
-      if (!toBoolResult368)
-        return std::unexpected(std::move(toBoolResult368.error()));
-      m_filterHaveMaterials->setChecked(std::move(*toBoolResult368));
+      auto configuration = context().root().configuration();
+      if (!configuration)
+        return std::unexpected(std::move(configuration.error()));
+      auto filter = (*configuration)->get_path("crafting.filterHaveMaterials");
+      if (!filter)
+        return std::unexpected(std::move(filter.error()));
+      auto checked = filter->to_bool();
+      if (!checked)
+        return std::unexpected(std::move(checked.error()));
+      m_filterHaveMaterials->setChecked(*checked);
     }
 
   auto fetchChildResult369 = fetchChild<ButtonWidget>("btnCraft");

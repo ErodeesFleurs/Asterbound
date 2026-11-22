@@ -95,6 +95,66 @@ public:
   }
 };
 
+TEST(ConfigurationTest, ProtectsOnlyTheParsedVersionRoot) {
+  Json initial = JsonObject{
+    {"configurationVersion", JsonObject{{"client", 1}}},
+    {"nested", JsonObject{}}
+  };
+  Configuration config(initial, initial);
+  EXPECT_EQ(config.get_path(""), initial);
+  EXPECT_FALSE(config.set("configurationVersion", {}));
+  for (String const& path : {String(""), String("configurationVersion"), String("configurationVersion.client")}) {
+    SCOPED_TRACE(path.utf8());
+    EXPECT_FALSE(config.set_path(path, 2));
+    EXPECT_FALSE(config.set_path(path, {}));
+  }
+  for (String const& path : {String(".nested"), String("nested..field"), String("nested[not-an-index]")}) {
+    auto expected_error = initial.set_path(path, 2);
+    ASSERT_FALSE(expected_error);
+    auto result = config.set_path(path, 2);
+    ASSERT_FALSE(result);
+    EXPECT_STREQ(result.error().what(), expected_error.error().what());
+  }
+  EXPECT_EQ(config.snapshot().revision, 0u);
+  EXPECT_EQ(config.current_configuration(), initial);
+
+  ASSERT_TRUE(config.set_path("configurationVersion]extra", false));
+  EXPECT_EQ(config.get("configurationVersion]extra"), Json(false));
+  ASSERT_TRUE(config.set_path("nested.configurationVersion", 0));
+  EXPECT_EQ(config.get_path("nested.configurationVersion"), Json(0));
+  ASSERT_TRUE(config.set("configurationVersion.client", 2));
+  EXPECT_EQ(config.get_path("configurationVersion.client"), Json(1));
+  EXPECT_EQ(config.get("configurationVersion.client"), Json(2));
+  ASSERT_TRUE(config.set("", 3));
+  EXPECT_EQ(config.get(""), Json(3));
+  ASSERT_TRUE(config.set("", {}));
+  EXPECT_EQ(config.get("", 4), Json(4));
+}
+
+TEST(ConfigurationTest, RetainsSnapshotsAndCommitsOnlySuccessfulWrites) {
+  Json initial = JsonObject{{"nullable", Json{}}, {"items", JsonArray{1}}};
+  Configuration config(initial, initial);
+  auto original = config.snapshot();
+  EXPECT_EQ(config.get("nullable", 2), Json{});
+  EXPECT_EQ(config.get_path("nullable", 2), Json{});
+  EXPECT_EQ(config.get("missing", 2), Json(2));
+  EXPECT_EQ(config.get_path("items[9]", 2), Json(2));
+
+  ASSERT_TRUE(config.set_path("items[0]", 0));
+  auto changed = config.snapshot();
+  EXPECT_EQ(changed.revision, original.revision + 1);
+  EXPECT_EQ(changed.value.query("items[0]"), Json(0));
+  ASSERT_TRUE(config.set_path("items[0]", {}));
+  ASSERT_TRUE(config.set("missing", {}));
+  EXPECT_FALSE(config.set_path("missing", {}));
+  auto after_erases = config.snapshot();
+  EXPECT_EQ(after_erases.revision, changed.revision + 2);
+  EXPECT_EQ(after_erases.value.get("items"), Json(JsonArray{}));
+  EXPECT_EQ(changed.value.query("items[0]"), Json(0));
+  EXPECT_EQ(original.value, initial);
+  EXPECT_EQ(config.get_default("items"), Json(JsonArray{1}));
+}
+
 const GameTestRegistration warp_target_wire("WarpTargetTest", "LegacyWireAndJson", [](GameTest&) {
   // WorldId monostate, SpawnTarget alternative byte, then big-endian payload.
   auto check = [](SpawnTarget const& target, std::string_view hex) {
@@ -425,6 +485,42 @@ const GameTestRegistration signed_broadcast_lifecycle("RootTest", "SignedBroadca
 });
 
 
+const GameTestRegistration lua_configuration_paths("RootTest", "LuaConfigurationPaths", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory) << directory.error().what();
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto settings = isolationSettings(fixture.rootSettings(), *directory, "lua-paths");
+  ASSERT_TRUE(settings) << settings.error().what();
+  auto root = Root::create(std::move(*settings));
+  ASSERT_TRUE(root) << root.error().what();
+  auto lua = isolationLua(**root);
+  ASSERT_TRUE(lua) << lua.error().what();
+  auto context = (*lua)->create_context(StringList{});
+  ASSERT_TRUE(context) << context.error().what();
+  auto configuration = (*root)->configuration();
+  ASSERT_TRUE(configuration) << configuration.error().what();
+  auto version = (*configuration)->get("configurationVersion");
+  ASSERT_TRUE(version) << version.error().what();
+  auto exercised = context->eval(R"LUA(
+    assert(not pcall(root.getConfigurationPath, ""))
+    assert(not pcall(root.getConfigurationPath, "title.multiPlayerAccount"))
+    assert(not pcall(root.setConfigurationPath, "safe.luaHttp.enabled", true))
+    for _, path in ipairs({"", "configurationVersion", "configurationVersion.client"}) do
+      assert(not pcall(root.setConfigurationPath, path, 0))
+      assert(not pcall(root.setConfigurationPath, path, nil))
+    end
+    local key = "configurationVersion]extra"
+    root.setConfigurationPath(key, false)
+    assert(root.getConfiguration(key) == false)
+    root.setConfiguration(key, 0)
+    assert(root.getConfigurationPath(key) == 0)
+    root.setConfigurationPath(key, nil)
+    assert(root.getConfiguration(key) == nil)
+  )LUA");
+  ASSERT_TRUE(exercised) << exercised.error().what();
+  EXPECT_EQ((*configuration)->get("configurationVersion"), *version);
+});
+
 const GameTestRegistration strictLuaTags("RootTest", "StrictLuaTagFormatting", [](GameTest& fixture) {
   auto lua = isolationLua(fixture.root(), true);
   ASSERT_TRUE(lua) << lua.error().what();
@@ -460,7 +556,7 @@ const GameTestRegistration lua_http_cancellation("RootTest", "LuaHttpCancellatio
   ASSERT_TRUE(root) << root.error().what();
   auto configuration = (*root)->configuration();
   ASSERT_TRUE(configuration) << configuration.error().what();
-  ASSERT_TRUE((*configuration)->setPath("safe.luaHttp.trustedSites", JsonArray{}));
+  ASSERT_TRUE((*configuration)->set_path("safe.luaHttp.trustedSites", JsonArray{}));
   auto session = std::make_shared<LuaHttpSession>(**root);
   auto callbacks = LuaBindings::make_http_callbacks(session, true);
   ASSERT_TRUE(callbacks) << callbacks.error().what();
@@ -580,7 +676,7 @@ const GameTestRegistration lua_http_cancellation("RootTest", "LuaHttpCancellatio
   ASSERT_TRUE(session->resolve_approval(stop_pending->id, true, true));
   ASSERT_TRUE(session->poll());
   ASSERT_TRUE(lua("assert(stop_pending:cancelled() and http.get(url):cancelled() and first:cancelled())"));
-  EXPECT_EQ((*configuration)->getPath("safe.luaHttp.trustedSites"), Json(JsonArray{}));
+  EXPECT_EQ((*configuration)->get_path("safe.luaHttp.trustedSites"), Json(JsonArray{}));
   // After joining, a stale approval cannot have left a connection in the backlog.
   auto unexpected_connection = (*listener)->accept((*root)->logger());
   ASSERT_TRUE(unexpected_connection) << unexpected_connection.error().what();
@@ -592,9 +688,9 @@ const GameTestRegistration lua_http_cancellation("RootTest", "LuaHttpCancellatio
   ASSERT_TRUE(context->set_path("http", LuaNil));
   ASSERT_TRUE(context->set_callbacks("http", *live_callbacks));
   ASSERT_TRUE(session->set_approval_available(true));
-  ASSERT_TRUE((*configuration)->setPath("safe.luaHttp.trustedSites", JsonArray{"Known.Example"}));
+  ASSERT_TRUE((*configuration)->set_path("safe.luaHttp.trustedSites", JsonArray{"Known.Example"}));
   ASSERT_TRUE(lua("assert(http.isTrusted('known.example') and http.isTrusted('KNOWN.EXAMPLE'))"));
-  ASSERT_TRUE((*configuration)->setPath("safe.luaHttp.trustedSites", JsonArray{}));
+  ASSERT_TRUE((*configuration)->set_path("safe.luaHttp.trustedSites", JsonArray{}));
   ASSERT_TRUE(lua("assert(not http.isTrusted('KNOWN.EXAMPLE'))"));
   auto accept_request = [&](std::string_view method = "GET", std::string_view body = {}, std::string_view expected_header = {})
       -> std::expected<std::shared_ptr<TcpSocket>, StarException> {
@@ -673,7 +769,7 @@ const GameTestRegistration lua_http_cancellation("RootTest", "LuaHttpCancellatio
   ASSERT_EQ(current->domain, String("127.0.0.1"));
   ASSERT_TRUE(session->resolve_approval(current->id, true, true));
   ASSERT_TRUE(lua("assert(http.isTrusted('127.0.0.1'))"));
-  ASSERT_EQ((*configuration)->getPath("safe.luaHttp.trustedSites"), Json(JsonArray{"127.0.0.1"}));
+  ASSERT_EQ((*configuration)->get_path("safe.luaHttp.trustedSites"), Json(JsonArray{"127.0.0.1"}));
   auto active = accept_request();
   ASSERT_TRUE(active) << active.error().what();
   (*engine)->set_promise_lifetime({});
