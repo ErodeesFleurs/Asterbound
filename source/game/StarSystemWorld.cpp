@@ -183,7 +183,7 @@ std::expected<SystemLocation, StarException> jsonToSystemLocation(Json const& js
       auto uuidString = value->to_string();
       if (!uuidString)
         return std::unexpected(std::move(uuidString.error()));
-      auto uuid = Uuid::create(*uuidString);
+      auto uuid = Uuid::from_hex((*uuidString).utf8());
       if (!uuid)
         return std::unexpected(std::move(uuid.error()));
       return SystemLocation(std::move(*uuid));
@@ -714,7 +714,7 @@ std::expected<std::shared_ptr<SystemObject>, StarException> SystemObject::create
   auto uuidText = diskStore.get_string("uuid");
   if (!uuidText)
     return std::unexpected(std::move(uuidText.error()));
-  auto uuid = Uuid::create(*uuidText);
+  auto uuid = Uuid::from_hex((*uuidText).utf8());
   if (!uuid)
     return std::unexpected(std::move(uuid.error()));
   object->m_uuid = std::move(*uuid);

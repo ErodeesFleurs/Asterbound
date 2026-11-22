@@ -4196,7 +4196,7 @@ std::expected<Uuid, StarException> Player::uuid() const {
   auto id = uniqueId();
   if (!id)
     return std::unexpected(PlayerException("Player has no unique id"));
-  return Uuid::create(*id);
+  return Uuid::from_hex((*id).utf8());
 }
 
 PlayerMode Player::modeType() const {

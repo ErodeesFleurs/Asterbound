@@ -49,7 +49,7 @@ template<> [[nodiscard]] std::expected<OrbitTarget, StarException> jsonToBookmar
     auto text = json.to_string();
     if (!text)
       return std::unexpected(std::move(text.error()));
-    auto uuid = Uuid::create(*text);
+    auto uuid = Uuid::from_hex((*text).utf8());
     if (!uuid)
       return std::unexpected(std::move(uuid.error()));
     return OrbitTarget(std::move(*uuid));
@@ -124,7 +124,7 @@ std::expected<PlayerUniverseMap, StarException> PlayerUniverseMap::create(Json c
     return std::unexpected(std::move(maps.error()));
   if (*maps) {
     for (auto const& pair : **maps) {
-      auto uuid = Uuid::create(pair.first);
+      auto uuid = Uuid::from_hex((pair.first).utf8());
       if (!uuid)
         return std::unexpected(std::move(uuid.error()));
       auto map = UniverseMap::fromJson(pair.second);
@@ -363,7 +363,7 @@ std::expected<PlayerUniverseMap::SystemMap, StarException> PlayerUniverseMap::Sy
     auto parameters = pair.second.get_object("parameters", {});
     if (!parameters)
       return std::unexpected(std::move(parameters.error()));
-    auto uuid = Uuid::create(pair.first);
+    auto uuid = Uuid::from_hex((pair.first).utf8());
     if (!uuid)
       return std::unexpected(std::move(uuid.error()));
     map.mappedObjects.set(std::move(*uuid), MappedObject{std::move(*typeName), std::move(*orbit), std::move(*parameters)});

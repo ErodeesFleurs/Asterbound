@@ -432,7 +432,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeCelestialCallbacks(R
       }); !registration)
       return std::unexpected(std::move(registration.error()));
     if (auto registration = callbacks.register_callback("objectType", [systemWorld](String const& uuid) -> std::expected<std::optional<String>, StarException> {
-    auto id = Uuid::create(uuid);
+    auto id = Uuid::from_hex((uuid).utf8());
     if (!id)
       return std::unexpected(std::move(id.error()));
     if (auto object = systemWorld->getObject(*id))
@@ -441,7 +441,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeCelestialCallbacks(R
   }); !registration)
       return std::unexpected(std::move(registration.error()));
     if (auto registration = callbacks.register_callback("objectParameters", [systemWorld](String const& uuid) -> std::expected<Json, StarException> {
-    auto id = Uuid::create(uuid);
+    auto id = Uuid::from_hex((uuid).utf8());
     if (!id)
       return std::unexpected(std::move(id.error()));
     if (auto object = systemWorld->getObject(*id))
@@ -450,7 +450,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeCelestialCallbacks(R
   }); !registration)
       return std::unexpected(std::move(registration.error()));
     if (auto registration = callbacks.register_callback("objectWarpActionWorld", [systemWorld](String const& uuid) -> std::expected<std::optional<String>, StarException> {
-    auto id = Uuid::create(uuid);
+    auto id = Uuid::from_hex((uuid).utf8());
     if (!id)
       return std::unexpected(std::move(id.error()));
     auto action = systemWorld->objectWarpAction(*id);
@@ -463,7 +463,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeCelestialCallbacks(R
   }); !registration)
       return std::unexpected(std::move(registration.error()));
     if (auto registration = callbacks.register_callback("objectOrbit", [systemWorld](String const& uuid) -> std::expected<Json, StarException> {
-    auto id = Uuid::create(uuid);
+    auto id = Uuid::from_hex((uuid).utf8());
     if (!id)
       return std::unexpected(std::move(id.error()));
     if (auto object = systemWorld->getObject(*id))
@@ -472,7 +472,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeCelestialCallbacks(R
   }); !registration)
       return std::unexpected(std::move(registration.error()));
     if (auto registration = callbacks.register_callback("objectPosition", [systemWorld](String const& uuid) -> std::expected<std::optional<Vec2F>, StarException> {
-    auto id = Uuid::create(uuid);
+    auto id = Uuid::from_hex((uuid).utf8());
     if (!id)
       return std::unexpected(std::move(id.error()));
     if (auto object = systemWorld->getObject(*id))
@@ -487,7 +487,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeCelestialCallbacks(R
     if (auto registration = callbacks.register_callback("systemSpawnObject", [systemWorld](String const& typeName, std::optional<Vec2F> const& position, std::optional<String> uuidHex, std::optional<JsonObject> parameters) -> std::expected<String, StarException> {
     std::optional<Uuid> uuid;
     if (uuidHex) {
-      auto parsed = Uuid::create(*uuidHex);
+      auto parsed = Uuid::from_hex((*uuidHex).utf8());
       if (!parsed)
         return std::unexpected(std::move(parsed.error()));
       uuid = *parsed;
@@ -501,7 +501,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeCelestialCallbacks(R
       }); !registration)
       return std::unexpected(std::move(registration.error()));
     if (auto registration = callbacks.register_callback("playerShipPosition", [systemWorld](String const& uuid) -> std::expected<std::optional<Vec2F>, StarException> {
-    auto id = Uuid::create(uuid);
+    auto id = Uuid::from_hex((uuid).utf8());
     if (!id)
       return std::unexpected(std::move(id.error()));
     if (auto ship = systemWorld->getShip(*id))

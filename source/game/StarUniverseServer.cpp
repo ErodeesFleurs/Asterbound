@@ -2964,7 +2964,7 @@ std::expected<std::optional<String>, StarException> UniverseServer::isBannedUser
     auto text = ban.get_string("uuid");
     if (!text)
       return std::unexpected(std::move(text.error()));
-    auto uuid = Uuid::create(*text);
+    auto uuid = Uuid::from_hex((*text).utf8());
     if (!uuid)
       return std::unexpected(std::move(uuid.error()));
     if (*uuid == playerUuid) {

@@ -1630,7 +1630,7 @@ std::expected<void, StarException> EntityMessagePacket::readJson(Json const& jso
   auto uuidString = json.get_string("uuid");
   if (!uuidString)
     return std::unexpected(std::move(uuidString.error()));
-  auto decodedUuid = Uuid::create(*uuidString);
+  auto decodedUuid = Uuid::from_hex((*uuidString).utf8());
   if (!decodedUuid)
     return std::unexpected(std::move(decodedUuid.error()));
   uuid = std::move(*decodedUuid);
@@ -2233,7 +2233,7 @@ std::expected<void, StarException> UniverseMessage::readJson(Json const& json) {
   auto uuidString = json.get_string("uuid");
   if (!uuidString)
     return std::unexpected(std::move(uuidString.error()));
-  auto decodedUuid = Uuid::create(*uuidString);
+  auto decodedUuid = Uuid::from_hex((*uuidString).utf8());
   if (!decodedUuid)
     return std::unexpected(std::move(decodedUuid.error()));
   uuid = std::move(*decodedUuid);

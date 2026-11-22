@@ -1487,7 +1487,7 @@ const GameTestRegistration universeConnectionsStartupFailureJoinsEveryPreviously
 namespace {
 
 template <typename ResponsePacket> void messageResponseWireCompatibility() {
-  auto uuid = Uuid::create("00112233445566778899aabbccddeeff");
+  auto uuid = Uuid::from_hex("00112233445566778899aabbccddeeff");
   ASSERT_TRUE(uuid);
 
   ResponsePacket defaultPacket;
@@ -1531,7 +1531,7 @@ template <typename ResponsePacket> void messageResponseWireCompatibility() {
 }
 
 template <typename ResponsePacket> void messageResponseUnknownTags() {
-  auto uuid = Uuid::create("00112233445566778899aabbccddeeff");
+  auto uuid = Uuid::from_hex("00112233445566778899aabbccddeeff");
   ASSERT_TRUE(uuid);
   std::array<std::expected<Json, String>, 3> previousResponses{
     std::unexpected(String{}), std::unexpected(String("previous error")), Json("previous success")};
@@ -1562,7 +1562,7 @@ template <typename ResponsePacket> void messageResponseUnknownTags() {
 }
 
 template <typename ResponsePacket> void messageResponseDecodeFailures() {
-  auto uuid = Uuid::create("00112233445566778899aabbccddeeff");
+  auto uuid = Uuid::from_hex("00112233445566778899aabbccddeeff");
   ASSERT_TRUE(uuid);
   std::array<std::expected<Json, String>, 2> responses{std::unexpected(String("new error")),
                                                        Json(JsonObject{{"new", JsonArray{1, 2, 3}}})};

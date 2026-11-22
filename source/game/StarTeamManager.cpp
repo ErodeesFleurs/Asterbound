@@ -277,14 +277,14 @@ std::expected<Json, StarException> TeamManager::fetchTeamStatus(Json const& argu
   lock_with_diagnostics(lock);
   auto playerUuidText = arguments.get_string("playerUuid");
   if (!playerUuidText) return std::unexpected(std::move(playerUuidText.error()));
-  auto playerUuidResult = Uuid::create(*playerUuidText);
+  auto playerUuidResult = Uuid::from_hex((*playerUuidText).utf8());
   if (!playerUuidResult) return std::unexpected(std::move(playerUuidResult.error()));
   auto playerUuid = *playerUuidResult;
 
   auto callerHexResult = arguments.opt_string("_callerUuid");
   if (!callerHexResult) return std::unexpected(std::move(callerHexResult.error()));
   if (auto callerHex = *callerHexResult) {
-    auto callerResult = Uuid::create(*callerHex);
+    auto callerResult = Uuid::from_hex((*callerHex).utf8());
     if (!callerResult) return std::unexpected(std::move(callerResult.error()));
     auto callerUuid = *callerResult;
     if (m_secureTeams && callerUuid != playerUuid) {
@@ -341,14 +341,14 @@ std::expected<Json, StarException> TeamManager::updateStatus(Json const& argumen
   lock_with_diagnostics(lock);
   auto playerUuidText = arguments.get_string("playerUuid");
   if (!playerUuidText) return std::unexpected(std::move(playerUuidText.error()));
-  auto playerUuidResult = Uuid::create(*playerUuidText);
+  auto playerUuidResult = Uuid::from_hex((*playerUuidText).utf8());
   if (!playerUuidResult) return std::unexpected(std::move(playerUuidResult.error()));
   auto playerUuid = *playerUuidResult;
 
   auto callerHexResult = arguments.opt_string("_callerUuid");
   if (!callerHexResult) return std::unexpected(std::move(callerHexResult.error()));
   if (auto callerHex = *callerHexResult) {
-    auto callerResult = Uuid::create(*callerHex);
+    auto callerResult = Uuid::from_hex((*callerHex).utf8());
     if (!callerResult) return std::unexpected(std::move(callerResult.error()));
     auto callerUuid = *callerResult;
     if (m_secureTeams && callerUuid != playerUuid) {
@@ -438,14 +438,14 @@ std::expected<Json, StarException> TeamManager::invite(Json const& arguments) {
 
   auto inviterUuidText = arguments.get_string("inviterUuid");
   if (!inviterUuidText) return std::unexpected(std::move(inviterUuidText.error()));
-  auto inviterUuidResult = Uuid::create(*inviterUuidText);
+  auto inviterUuidResult = Uuid::from_hex((*inviterUuidText).utf8());
   if (!inviterUuidResult) return std::unexpected(std::move(inviterUuidResult.error()));
   auto inviterUuid = *inviterUuidResult;
 
   auto callerHexResult = arguments.opt_string("_callerUuid");
   if (!callerHexResult) return std::unexpected(std::move(callerHexResult.error()));
   if (auto callerHex = *callerHexResult) {
-    auto callerResult = Uuid::create(*callerHex);
+    auto callerResult = Uuid::from_hex((*callerHex).utf8());
     if (!callerResult) return std::unexpected(std::move(callerResult.error()));
     auto callerUuid = *callerResult;
     if (m_secureTeams && callerUuid != inviterUuid) {
@@ -484,14 +484,14 @@ std::expected<Json, StarException> TeamManager::pollInvitation(Json const& argum
   lock_with_diagnostics(lock);
   auto playerUuidText = arguments.get_string("playerUuid");
   if (!playerUuidText) return std::unexpected(std::move(playerUuidText.error()));
-  auto playerUuidResult = Uuid::create(*playerUuidText);
+  auto playerUuidResult = Uuid::from_hex((*playerUuidText).utf8());
   if (!playerUuidResult) return std::unexpected(std::move(playerUuidResult.error()));
   auto playerUuid = *playerUuidResult;
 
   auto callerHexResult = arguments.opt_string("_callerUuid");
   if (!callerHexResult) return std::unexpected(std::move(callerHexResult.error()));
   if (auto callerHex = *callerHexResult) {
-    auto callerResult = Uuid::create(*callerHex);
+    auto callerResult = Uuid::from_hex((*callerHex).utf8());
     if (!callerResult) return std::unexpected(std::move(callerResult.error()));
     auto callerUuid = *callerResult;
     if (m_secureTeams && callerUuid != playerUuid) {
@@ -521,19 +521,19 @@ std::expected<Json, StarException> TeamManager::acceptInvitation(Json const& arg
   lock_with_diagnostics(lock);
   auto inviterUuidText = arguments.get_string("inviterUuid");
   if (!inviterUuidText) return std::unexpected(std::move(inviterUuidText.error()));
-  auto inviterUuidResult = Uuid::create(*inviterUuidText);
+  auto inviterUuidResult = Uuid::from_hex((*inviterUuidText).utf8());
   if (!inviterUuidResult) return std::unexpected(std::move(inviterUuidResult.error()));
   auto inviterUuid = *inviterUuidResult;
   auto inviteeUuidText = arguments.get_string("inviteeUuid");
   if (!inviteeUuidText) return std::unexpected(std::move(inviteeUuidText.error()));
-  auto inviteeUuidResult = Uuid::create(*inviteeUuidText);
+  auto inviteeUuidResult = Uuid::from_hex((*inviteeUuidText).utf8());
   if (!inviteeUuidResult) return std::unexpected(std::move(inviteeUuidResult.error()));
   auto inviteeUuid = *inviteeUuidResult;
 
   auto callerHexResult = arguments.opt_string("_callerUuid");
   if (!callerHexResult) return std::unexpected(std::move(callerHexResult.error()));
   if (auto callerHex = *callerHexResult) {
-    auto callerResult = Uuid::create(*callerHex);
+    auto callerResult = Uuid::from_hex((*callerHex).utf8());
     if (!callerResult) return std::unexpected(std::move(callerResult.error()));
     auto callerUuid = *callerResult;
     if (m_secureTeams && callerUuid != inviteeUuid) {
@@ -574,19 +574,19 @@ std::expected<Json, StarException> TeamManager::removeFromTeam(Json const& argum
   lock_with_diagnostics(lock);
   auto playerUuidText = arguments.get_string("playerUuid");
   if (!playerUuidText) return std::unexpected(std::move(playerUuidText.error()));
-  auto playerUuidResult = Uuid::create(*playerUuidText);
+  auto playerUuidResult = Uuid::from_hex((*playerUuidText).utf8());
   if (!playerUuidResult) return std::unexpected(std::move(playerUuidResult.error()));
   auto playerUuid = *playerUuidResult;
   auto teamUuidText = arguments.get_string("teamUuid");
   if (!teamUuidText) return std::unexpected(std::move(teamUuidText.error()));
-  auto teamUuidResult = Uuid::create(*teamUuidText);
+  auto teamUuidResult = Uuid::from_hex((*teamUuidText).utf8());
   if (!teamUuidResult) return std::unexpected(std::move(teamUuidResult.error()));
   auto teamUuid = *teamUuidResult;
 
   auto callerHexResult = arguments.opt_string("_callerUuid");
   if (!callerHexResult) return std::unexpected(std::move(callerHexResult.error()));
   if (auto callerHex = *callerHexResult) {
-    auto callerResult = Uuid::create(*callerHex);
+    auto callerResult = Uuid::from_hex((*callerHex).utf8());
     if (!callerResult) return std::unexpected(std::move(callerResult.error()));
     auto callerUuid = *callerResult;
     if (m_secureTeams && callerUuid != playerUuid) {
@@ -607,12 +607,12 @@ std::expected<Json, StarException> TeamManager::makeLeader(Json const& arguments
   lock_with_diagnostics(lock);
   auto playerUuidText = arguments.get_string("playerUuid");
   if (!playerUuidText) return std::unexpected(std::move(playerUuidText.error()));
-  auto playerUuidResult = Uuid::create(*playerUuidText);
+  auto playerUuidResult = Uuid::from_hex((*playerUuidText).utf8());
   if (!playerUuidResult) return std::unexpected(std::move(playerUuidResult.error()));
   auto playerUuid = *playerUuidResult;
   auto teamUuidText = arguments.get_string("teamUuid");
   if (!teamUuidText) return std::unexpected(std::move(teamUuidText.error()));
-  auto teamUuidResult = Uuid::create(*teamUuidText);
+  auto teamUuidResult = Uuid::from_hex((*teamUuidText).utf8());
   if (!teamUuidResult) return std::unexpected(std::move(teamUuidResult.error()));
   auto teamUuid = *teamUuidResult;
 
@@ -624,7 +624,7 @@ std::expected<Json, StarException> TeamManager::makeLeader(Json const& arguments
   auto callerHexResult = arguments.opt_string("_callerUuid");
   if (!callerHexResult) return std::unexpected(std::move(callerHexResult.error()));
   if (auto callerHex = *callerHexResult) {
-    auto callerResult = Uuid::create(*callerHex);
+    auto callerResult = Uuid::from_hex((*callerHex).utf8());
     if (!callerResult) return std::unexpected(std::move(callerResult.error()));
     auto callerUuid = *callerResult;
     if (m_secureTeams && callerUuid != team.leaderUuid) {

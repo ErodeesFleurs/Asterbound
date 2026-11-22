@@ -147,7 +147,7 @@ void vlq_read(benchmark::State& state, stream_kind kind) {
 }
 
 void uuid_read(benchmark::State& state) {
-  auto bytes = fixture(batch_size * Star::UuidSize);
+  auto bytes = fixture(batch_size * Star::uuid_size);
   Star::DataStreamReader stream(bytes.span());
   std::vector<Star::Uuid> output(batch_size, Star::Uuid::nil());
   for (auto _ : state) {
@@ -172,14 +172,14 @@ void uuid_read(benchmark::State& state) {
       break;
     state.PauseTiming();
     for (std::size_t i = 0; i != batch_size; ++i)
-      valid &= std::ranges::equal(output[i].span(), bytes.span().subspan(i * Star::UuidSize, Star::UuidSize));
+      valid &= std::ranges::equal(output[i].span(), bytes.span().subspan(i * Star::uuid_size, Star::uuid_size));
     auto position = stream.pos();
     valid &= position && *position == bytes.size();
     state.ResumeTiming();
     if (!require(state, valid))
       break;
   }
-  account(state, batch_size, Star::UuidSize, fingerprint(bytes.span()), "owning fixed UUID results");
+  account(state, batch_size, Star::uuid_size, fingerprint(bytes.span()), "owning fixed UUID results");
 }
 
 enum class file_operation { write, directory, packed };

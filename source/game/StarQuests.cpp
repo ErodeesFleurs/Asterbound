@@ -340,7 +340,7 @@ std::expected<std::shared_ptr<Quest>, StarException> Quest::create(Root& root, J
   auto uuidString = store->opt_string("serverUuid");
   if (!uuidString) return std::unexpected(std::move(uuidString.error()));
   if (*uuidString) {
-    auto uuid = Uuid::create(**uuidString);
+    auto uuid = Uuid::from_hex((**uuidString).utf8());
     if (!uuid) return std::unexpected(std::move(uuid.error()));
     quest->m_serverUuid = std::move(*uuid);
   }
@@ -978,7 +978,7 @@ std::expected<LuaCallbacks, StarException> Quest::makeQuestCallbacks(Player& pla
   if (auto r = callbacks.register_callback("serverUuid", [&quest = *this]() { return quest.serverUuid().transform(std::mem_fn(&Uuid::hex)); }); !r)
     return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.register_callback("setServerUuid", [&quest = *this](String const& value) -> std::expected<void, StarException> {
-    auto uuid = Uuid::create(value);
+    auto uuid = Uuid::from_hex((value).utf8());
     if (!uuid) return std::unexpected(std::move(uuid.error()));
     quest.setServerUuid(std::move(*uuid));
     return {};

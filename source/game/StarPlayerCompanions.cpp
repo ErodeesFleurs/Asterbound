@@ -120,7 +120,7 @@ std::expected<Uuid, StarException> Companion::podUuid() const {
   auto text = m_json.get_string("podUuid");
   if (!text)
     return std::unexpected(std::move(text.error()));
-  return Uuid::create(*text);
+  return Uuid::from_hex((*text).utf8());
 }
 
 std::expected<std::optional<String>, StarException> Companion::name() const {

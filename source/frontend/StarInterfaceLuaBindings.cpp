@@ -298,7 +298,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeInterfaceCallbacks(M
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     std::optional<Uuid> target;
     if (member) {
-      auto parsed = Uuid::create(*member);
+      auto parsed = Uuid::from_hex((*member).utf8());
       if (!parsed) return std::unexpected(std::move(parsed.error()));
       target = *parsed;
     }

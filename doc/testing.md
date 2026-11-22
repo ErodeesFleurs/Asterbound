@@ -1101,3 +1101,8 @@ rounds once before splitting into hours, minutes, seconds and milliseconds;
 hours can exceed 24. Compare `core_benchmarks --benchmark_filter='^Clock/'` on
 the same CPU for running adjustment, stopped reads and timer restart. These
 measure uncontended operations, not scheduler latency.
+
+`UuidTest.*` checks the legacy permissive hex policy and native `char`
+ordering. `DataStreamTest.*Uuid*` checks truncated reads and container codecs.
+Use `io_benchmarks --benchmark_filter=IO/UuidRead` for fixed-size wire reads;
+it does not measure text parsing or hash-table lookups.

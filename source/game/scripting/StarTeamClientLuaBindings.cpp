@@ -22,7 +22,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeTeamClientCallbacks(
   if (auto result = callbacks.register_callback("invitePlayer", [&teamClient](String const& name) { return teamClient.invitePlayer(name); }); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback("acceptInvitation", [&teamClient](String const& inviterUuid) -> std::expected<void, StarException> {
-      auto uuid = Uuid::create(inviterUuid);
+      auto uuid = Uuid::from_hex((inviterUuid).utf8());
       if (!uuid) return std::unexpected(std::move(uuid.error()));
       return teamClient.acceptInvitation(*uuid);
     }); !result)
@@ -39,7 +39,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeTeamClientCallbacks(
   if (auto result = callbacks.register_callback("members", [&teamClient] { return teamClient.memberStatus(); }); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback("memberPortrait", [&teamClient](String const& playerUuid, std::optional<std::uint64_t> knownRevision) -> std::expected<std::optional<Json>, StarException> {
-      auto uuid = Uuid::create(playerUuid);
+      auto uuid = Uuid::from_hex((playerUuid).utf8());
       if (!uuid) return std::unexpected(std::move(uuid.error()));
       return teamClient.memberPortrait(*uuid, knownRevision);
     }); !result)
@@ -47,7 +47,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeTeamClientCallbacks(
 
   if (auto result = callbacks.register_callback("isTeamLeader", [&teamClient](std::optional<String> const& playerUuid) -> std::expected<bool, StarException> {
       if (playerUuid) {
-        auto uuid = Uuid::create(*playerUuid);
+        auto uuid = Uuid::from_hex((*playerUuid).utf8());
         if (!uuid)
           return std::unexpected(std::move(uuid.error()));
         return teamClient.isTeamLeader(*uuid);
@@ -63,14 +63,14 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeTeamClientCallbacks(
     }); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback("makeLeader", [&teamClient](String const& playerUuid) -> std::expected<void, StarException> {
-      auto uuid = Uuid::create(playerUuid);
+      auto uuid = Uuid::from_hex((playerUuid).utf8());
       if (!uuid)
         return std::unexpected(std::move(uuid.error()));
       return teamClient.makeLeader(*uuid);
     }); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback("removeFromTeam", [&teamClient](String const& playerUuid) -> std::expected<void, StarException> {
-      auto uuid = Uuid::create(playerUuid);
+      auto uuid = Uuid::from_hex((playerUuid).utf8());
       if (!uuid)
         return std::unexpected(std::move(uuid.error()));
       return teamClient.removeFromTeam(*uuid);

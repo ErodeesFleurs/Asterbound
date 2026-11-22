@@ -1227,7 +1227,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     if (!created) return std::unexpected(std::move(created.error()));
     auto followUp = std::move(*created);
     if (serverUuid) {
-      auto uuid = Uuid::create(*serverUuid);
+      auto uuid = Uuid::from_hex((*serverUuid).utf8());
     if (!uuid) return std::unexpected(std::move(uuid.error()));
     followUp->setServerUuid(*uuid);
     }

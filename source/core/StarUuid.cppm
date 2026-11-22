@@ -16,7 +16,7 @@ struct UuidExceptionTag {
 };
 using UuidException = StarError<UuidExceptionTag, StarException>;
 
-inline constexpr std::size_t UuidSize = 16;
+inline constexpr std::size_t uuid_size = 16;
 
 class Uuid;
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, Uuid& uuid);
@@ -27,34 +27,29 @@ template <>
 struct HasStreamReadFactory<Uuid> : std::true_type {};
 class Uuid {
 public:
-  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, Uuid& uuid);
-  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, Uuid const& uuid);
-  friend struct hash<Uuid>;
+  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream&, Uuid&);
+  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream&, Uuid const&);
   friend std::expected<Uuid, StarException> DataStream::read<Uuid>();
 
   // An explicitly unfilled identity for wire staging, never identity generation.
   static Uuid nil() { return Uuid(NilTag{}); }
 
   explicit Uuid(RandomService& random);
-  [[nodiscard]] static std::expected<Uuid, StarException> create(ByteArray const& bytes);
-  [[nodiscard]] static std::expected<Uuid, StarException> create(String const& hex);
+  [[nodiscard]] static std::expected<Uuid, StarException> from_bytes(std::span<char const> bytes);
+  [[nodiscard]] static std::expected<Uuid, StarException> from_hex(std::string_view hex);
 
-  std::span<char const> span() const;
-  ByteArray bytes() const;
+  std::span<char const, uuid_size> span() const & { return std::span<char const, uuid_size>(storage); }
+  std::span<char const, uuid_size> span() const && = delete;
   String hex() const;
 
-  bool operator==(Uuid const& u) const;
-  bool operator!=(Uuid const& u) const;
-  bool operator<(Uuid const& u) const;
-  bool operator<=(Uuid const& u) const;
-  bool operator>(Uuid const& u) const;
-  bool operator>=(Uuid const& u) const;
+  bool operator==(Uuid const&) const = default;
+  std::weak_ordering operator<=>(Uuid const&) const = default;
 
 private:
   struct NilTag {};
-  explicit Uuid(NilTag) : m_data() {}
+  explicit Uuid(NilTag) : storage() {}
 
-  Array<char, UuidSize> m_data;
+  Array<char, uuid_size> storage;
 };
 
 template <>
@@ -89,6 +84,6 @@ namespace Star {
 export namespace Star {
   using ::Star::UuidExceptionTag;
   using ::Star::UuidException;
-  using ::Star::UuidSize;
+  using ::Star::uuid_size;
   using ::Star::Uuid;
 }

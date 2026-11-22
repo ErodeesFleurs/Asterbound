@@ -1649,7 +1649,7 @@ std::expected<std::optional<ConnectionId>, StarException> CommandProcessor::play
   if (*uuidPrefix) {
     auto text = player.substr(UUIDPrefix.size());
     if (!text) return std::unexpected(std::move(text.error()));
-    auto uuid = Uuid::create(*text);
+    auto uuid = Uuid::from_hex((*text).utf8());
     if (uuid) return universe.clientForUuid(*uuid);
     if (!uuid.error().is<UuidException>()) return std::unexpected(std::move(uuid.error()));
   } else {

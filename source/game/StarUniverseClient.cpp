@@ -1389,8 +1389,8 @@ std::expected<bool, StarException> UniverseClient::switchPlayer(String const& na
   auto uuid = std::move(*uuidResult);
   if (uuid)
     return switchPlayer(*uuid);
-  if (name.utf8_size() == UuidSize * 2) {
-    auto parsedResult = Uuid::create(name);
+  if (name.utf8_size() == uuid_size * 2) {
+    auto parsedResult = Uuid::from_hex((name).utf8());
     if (!parsedResult)
       return std::unexpected(std::move(parsedResult.error()));
     auto parsed = std::move(*parsedResult);

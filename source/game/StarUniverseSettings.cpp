@@ -67,7 +67,7 @@ std::expected<std::shared_ptr<UniverseSettings>, StarException> UniverseSettings
   auto uuidText = json.get_string("uuid");
   if (!uuidText)
     return std::unexpected(std::move(uuidText.error()));
-  auto uuid = Uuid::create(*uuidText);
+  auto uuid = Uuid::from_hex((*uuidText).utf8());
   if (!uuid)
     return std::unexpected(std::move(uuid.error()));
   auto flagData = json.get("flags");

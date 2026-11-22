@@ -546,33 +546,43 @@ TEST(DataStreamTest, MultiArrayRejectsOverflowingDimensionsAndRecovers) {
   EXPECT_EQ(array(0, 1), 0x7b);
 }
 
+template <typename T>
+concept borrows_uuid_bytes = requires(T&& id) { std::forward<T>(id).span(); };
+static_assert(borrows_uuid_bytes<Uuid const&> && !borrows_uuid_bytes<Uuid>);
+
+TEST(UuidTest, HighByteOrderMatchesCharOrder) {
+  auto high = Uuid::from_hex("80000000000000000000000000000000");
+  ASSERT_TRUE(high);
+  EXPECT_EQ(*high < Uuid::nil(), std::numeric_limits<char>::is_signed);
+}
+
 TEST(UuidTest, HexParsingPreservesPermissiveNibblesOddTailAndLengthErrors) {
   std::array<unsigned char, 16> const expected{
       0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
       0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef};
   for (std::string_view text : {"0123456789abcdef0123456789abcdef", "0123456789ABCDEF0123456789ABCDEFf"}) {
-    auto decoded = Uuid::create(String(text));
+    auto decoded = Uuid::from_hex(text);
     ASSERT_TRUE(decoded);
     for (std::size_t i = 0; i < expected.size(); ++i)
       EXPECT_EQ(static_cast<unsigned char>(decoded->span()[i]), expected[i]);
   }
   std::string invalid(32, 'g');
-  EXPECT_EQ(Uuid::create(String(std::string_view(invalid))), Uuid::nil());
+  EXPECT_EQ(Uuid::from_hex(invalid), Uuid::nil());
   invalid[0] = '\0';
-  EXPECT_EQ(Uuid::create(String(std::string_view(invalid))), Uuid::nil());
+  EXPECT_EQ(Uuid::from_hex(invalid), Uuid::nil());
   for (std::size_t length : {0u, 1u, 30u, 31u, 34u, 35u}) {
-    auto rejected = Uuid::create(String(std::string(length, '0')));
+    auto rejected = Uuid::from_hex(std::string(length, '0'));
     ASSERT_FALSE(rejected);
     EXPECT_TRUE(rejected.error().is<UuidException>());
   }
-  EXPECT_EQ(Uuid::create(String("00000000000000000000000000000000")), Uuid::nil());
+  EXPECT_EQ(Uuid::from_hex("00000000000000000000000000000000"), Uuid::nil());
 }
 
 TEST(DataStreamTest, UuidTruncatedReadsKeepIdentityAndConsumeAvailablePrefix) {
   std::array<char, 17> bytes;
   for (std::size_t i = 0; i < bytes.size(); ++i)
     bytes[i] = static_cast<char>(i + 1);
-  auto identity = Uuid::create(ByteArray(std::span<char const>(bytes).first(16)));
+  auto identity = Uuid::from_bytes(std::span<char const>(bytes).first(16));
   ASSERT_TRUE(identity);
   for (std::size_t length = 0; length < 16; ++length) {
     SCOPED_TRACE(length);
@@ -597,7 +607,7 @@ TEST(DataStreamTest, UuidTruncatedReadsKeepIdentityAndConsumeAvailablePrefix) {
 }
 
 TEST(DataStreamTest, NonDefaultUuidPayloadsDecodeThroughContainersPointersAndOptional) {
-  auto identity = Uuid::create(String("00112233445566778899aabbccddeeff"));
+  auto identity = Uuid::from_hex("00112233445566778899aabbccddeeff");
   ASSERT_TRUE(identity);
   List<Uuid> sequence{*identity};
   auto encoded = DataStreamBuffer::serialize(sequence);

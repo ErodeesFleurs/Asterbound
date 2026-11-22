@@ -293,7 +293,7 @@ std::expected<void, StarException> TeamClient::update() {
         if (response.is_null() || self.m_hasPendingInvitation) return {};
         auto uuidText = response.get_string("inviterUuid");
         if (!uuidText) return std::unexpected(std::move(uuidText.error()));
-        auto uuid = Uuid::create(*uuidText);
+        auto uuid = Uuid::from_hex((*uuidText).utf8());
         if (!uuid) return std::unexpected(std::move(uuid.error()));
         auto name = response.get_string("inviterName");
         if (!name) return std::unexpected(std::move(name.error()));
@@ -340,7 +340,7 @@ std::expected<void, StarException> TeamClient::pullFullUpdate() {
     auto previousTeam = self.m_teamUuid;
     self.m_teamUuid.reset();
     if (*teamText) {
-      auto team = Uuid::create(**teamText);
+      auto team = Uuid::from_hex((**teamText).utf8());
       if (!team) return std::unexpected(std::move(team.error()));
       self.m_teamUuid = *team;
     }
@@ -349,7 +349,7 @@ std::expected<void, StarException> TeamClient::pullFullUpdate() {
     if (self.m_teamUuid) {
       auto leaderText = response.get_string("leader");
       if (!leaderText) return std::unexpected(std::move(leaderText.error()));
-      auto leader = Uuid::create(*leaderText);
+      auto leader = Uuid::from_hex((*leaderText).utf8());
       if (!leader) return std::unexpected(std::move(leader.error()));
       self.m_teamLeader = *leader;
       auto previousMembers = std::exchange(self.m_members, {});
@@ -360,7 +360,7 @@ std::expected<void, StarException> TeamClient::pullFullUpdate() {
         if (!name) return std::unexpected(std::move(name.error()));
         auto uuidText = m.get_string("uuid");
         if (!uuidText) return std::unexpected(std::move(uuidText.error()));
-        auto uuid = Uuid::create(*uuidText);
+        auto uuid = Uuid::from_hex((*uuidText).utf8());
         if (!uuid) return std::unexpected(std::move(uuid.error()));
         auto entity = m.get_int("entity");
         if (!entity) return std::unexpected(std::move(entity.error()));

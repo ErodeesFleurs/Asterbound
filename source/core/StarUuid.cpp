@@ -11,66 +11,36 @@ import star.encode;
 namespace Star {
 
 Uuid::Uuid(RandomService& random) {
-  random.fill_bytes({m_data.data(), UuidSize});
+  random.fill_bytes(storage);
 }
 
-std::expected<Uuid, StarException> Uuid::create(ByteArray const& bytes) {
-  if (bytes.size() != UuidSize)
-    return std::unexpected(UuidException(Star::format("Size mismatch in reading Uuid from ByteArray: {} vs {}", bytes.size(), UuidSize)));
+std::expected<Uuid, StarException> Uuid::from_bytes(std::span<char const> bytes) {
+  if (bytes.size() != uuid_size)
+    return std::unexpected(UuidException(Star::format("Size mismatch in reading Uuid from bytes: {} vs {}", bytes.size(), uuid_size)));
   auto uuid = nil();
-  bytes.copy_to({uuid.m_data.data(), UuidSize});
+  std::ranges::copy(bytes, uuid.storage.begin());
   return uuid;
 }
 
-std::expected<Uuid, StarException> Uuid::create(String const& hex) {
-  auto size = hex.utf8_size() / 2;
-  if (size != UuidSize)
-    return std::unexpected(UuidException(Star::format("Size mismatch in reading Uuid from hex: {} vs {}", size, UuidSize)));
+std::expected<Uuid, StarException> Uuid::from_hex(std::string_view hex) {
+  auto size = hex.size() / 2;
+  if (size != uuid_size)
+    return std::unexpected(UuidException(Star::format("Size mismatch in reading Uuid from hex: {} vs {}", size, uuid_size)));
   auto uuid = nil();
-  (void)hex_decode(std::span<char const>(hex.utf8()), std::span(uuid.m_data));
+  (void)hex_decode(std::span<char const>(hex), std::span(uuid.storage));
   return uuid;
 }
 
-std::span<char const> Uuid::span() const {
-  return {m_data.data(), UuidSize};
-}
-
-ByteArray Uuid::bytes() const {
-  return ByteArray(span());
-}
 
 String Uuid::hex() const {
   return hex_encode(span());
 }
 
-bool Uuid::operator==(Uuid const& u) const {
-  return m_data == u.m_data;
-}
-
-bool Uuid::operator!=(Uuid const& u) const {
-  return m_data != u.m_data;
-}
-
-bool Uuid::operator<(Uuid const& u) const {
-  return m_data < u.m_data;
-}
-
-bool Uuid::operator<=(Uuid const& u) const {
-  return m_data <= u.m_data;
-}
-
-bool Uuid::operator>(Uuid const& u) const {
-  return m_data > u.m_data;
-}
-
-bool Uuid::operator>=(Uuid const& u) const {
-  return m_data >= u.m_data;
-}
 
 std::size_t hash<Uuid>::operator()(Uuid const& u) const {
   std::size_t hashval = 0;
-  for (std::size_t i = 0; i < UuidSize; ++i)
-    hash_combine(hashval, u.span()[i]);
+  for (char byte : u.span())
+    hash_combine(hashval, byte);
   return hashval;
 }
 
@@ -85,7 +55,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
 template <>
 std::expected<Uuid, StarException> DataStream::read<Uuid>() {
   auto uuid = Uuid::nil();
-  auto result = read_data({uuid.m_data.data(), UuidSize});
+  auto result = read_data(uuid.storage);
   if (!result)
     return std::unexpected(std::move(result.error()));
   return uuid;

@@ -195,7 +195,7 @@ std::expected<void, StarException> PlayerStorage::initialize(String const& stora
         auto uuidText = json->content.get_string("uuid");
         if (!uuidText)
           return std::unexpected(std::move(uuidText.error()));
-        auto uuid = Uuid::create(*uuidText);
+        auto uuid = Uuid::from_hex((*uuidText).utf8());
         if (!uuid)
           return std::unexpected(std::move(uuid.error()));
         auto parts = file.first.rsplit('.', 1);
@@ -292,7 +292,7 @@ std::expected<void, StarException> PlayerStorage::initialize(String const& stora
         auto text = jUuid.to_string();
         if (!text)
           return std::unexpected(std::move(text.error()));
-        auto uuid = Uuid::create(*text);
+        auto uuid = Uuid::from_hex((*text).utf8());
         if (!uuid)
           return std::unexpected(std::move(uuid.error()));
         auto entry = m_savedPlayersCache.find(*uuid);

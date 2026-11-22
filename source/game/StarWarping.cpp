@@ -196,7 +196,7 @@ std::expected<WorldId, StarException> parseWorldId(String const& printedId) {
       return std::unexpected(StarException::format("Wrong number of parts in InstanceWorldId"));
     InstanceWorldId result{(*rest)[0], {}, {}};
     if (rest->size() > 1 && !(*rest)[1].empty() && (*rest)[1] != "-") {
-      auto uuid = Uuid::create((*rest)[1]);
+      auto uuid = Uuid::from_hex(((*rest)[1]).utf8());
       if (!uuid)
         return std::unexpected(std::move(uuid.error()));
       result.uuid = std::move(*uuid);
@@ -216,7 +216,7 @@ std::expected<WorldId, StarException> parseWorldId(String const& printedId) {
       return std::unexpected(std::move(coordinate.error()));
     return CelestialWorldId(std::move(*coordinate));
   } else if (*kind == Kind::Ship) {
-    auto uuid = Uuid::create(body);
+    auto uuid = Uuid::from_hex((body).utf8());
     if (!uuid)
       return std::unexpected(std::move(uuid.error()));
     return ClientShipWorldId(std::move(*uuid));
@@ -228,7 +228,7 @@ std::expected<WorldId, StarException> parseWorldId(String const& printedId) {
       return std::unexpected(std::move(rest.error()));
     if (rest->size() != 2)
       return std::unexpected(StarException::format("Wrong number of parts in ClientCustomWorldId"));
-    auto uuid = Uuid::create((*rest)[0]);
+    auto uuid = Uuid::from_hex(((*rest)[0]).utf8());
     if (!uuid)
       return std::unexpected(std::move(uuid.error()));
     return ClientCustomWorldId(std::move(*uuid), (*rest)[1]);
@@ -363,7 +363,7 @@ std::expected<WarpAction, StarException> parseWarpAction(String const& warpStrin
       return std::unexpected(std::move(parts.error()));
     if (parts->size() != 2)
       return std::unexpected(StarException("Missing player warp UUID"));
-    auto uuid = Uuid::create((*parts)[1]);
+    auto uuid = Uuid::from_hex(((*parts)[1]).utf8());
     if (!uuid)
       return std::unexpected(std::move(uuid.error()));
     return WarpToPlayer(std::move(*uuid));
