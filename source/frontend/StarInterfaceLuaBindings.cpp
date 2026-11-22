@@ -176,7 +176,6 @@ import star.world_client_thread;
 import star.universe;
 // TODO: make this more thread safe
 import star.universe_client;
-import star.shell_parser;
 import star.lua_root;
 import star.cinematic;
 import star.portrait_entity;

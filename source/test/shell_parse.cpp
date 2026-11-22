@@ -1,9 +1,6 @@
 import std;
 import star.string;
-import star.byte_array;
-import star.encode;
-import star.bytes;
-import star.format;
+import star.unicode;
 import star.shell_parser;
 import star.option_parser;
 import star.numeric_option;
@@ -14,106 +11,93 @@ import star.ordered_set;
 
 #include "gtest/gtest.h"
 
-TEST(ShellParser, Simple) {
-  Star::ShellParser parser;
-  auto result1 = parser.tokenize("The first test.");
-  ASSERT_TRUE(result1);
-  auto tokenSet1 = (*result1);
+namespace {
+void expect_words(Star::String const& command, Star::StringList const& expected) {
+  SCOPED_TRACE(command.utf8());
+  auto words = Star::split_shell_words(command);
+  ASSERT_TRUE(words);
+  EXPECT_EQ(*words, expected);
+}
+}
 
-  ASSERT_EQ(tokenSet1.size(), 3u);
-  EXPECT_EQ(tokenSet1[0].token, "The");
-  EXPECT_EQ(tokenSet1[1].token, "first");
-  EXPECT_EQ(tokenSet1[2].token, "test.");
+TEST(ShellParser, Simple) {
+  expect_words("The first test.", {"The", "first", "test."});
 }
 
 TEST(ShellParser, DirectUnicode) {
-  Star::ShellParser parser;
-  auto result2 = parser.tokenize("Unicode Symbols: ❤ ☀ ☆ ☂ ☻ ♞ ☯ ☭ ☢ € → ☎ ❄ ♫ ✂ ▷ ✇ ♎ ⇧ ☮ ♻ ⌘ ⌛ ☘");
-  ASSERT_TRUE(result2);
-  auto tokenSet2 = (*result2);
+  expect_words("Unicode Symbols: ❤ ☀ ☆ ☂ ☻ ♞ ☯ ☭ ☢ € → ☎ ❄ ♫ ✂ ▷ ✇ ♎ ⇧ ☮ ♻ ⌘ ⌛ ☘",
+      {"Unicode", "Symbols:", "❤", "☀", "☆", "☂", "☻", "♞", "☯", "☭", "☢", "€", "→", "☎", "❄",
+          "♫", "✂", "▷", "✇", "♎", "⇧", "☮", "♻", "⌘", "⌛", "☘"});
+}
 
-  ASSERT_EQ(tokenSet2.size(), 26u);
-  EXPECT_EQ(tokenSet2[0].token, "Unicode");
-  EXPECT_EQ(tokenSet2[1].token, "Symbols:");
-  EXPECT_EQ(tokenSet2[10].token, "☢");
+TEST(ShellParser, EmptyArgumentsAndSeparators) {
+  expect_words("", {});
+  expect_words(" \t\r\n\uFEFF ", {});
+  expect_words("  a\uFEFFb \t c  ", {"a", "b", "c"});
+  expect_words("'' \"\" x ''", {"", "", "x", ""});
+  expect_words(R"(''""   )", {""});
+  expect_words("a\vb\fc '\uFEFF' \\\uFEFF", {"a\vb\fc", "\uFEFF", "\uFEFF"});
 }
 
 TEST(ShellParser, SimpleQuotes) {
-  Star::ShellParser parser;
-  auto result3 = parser.tokenize("\"This is a test\" 'This is another test'");
-  ASSERT_TRUE(result3);
-  auto tokenSet3 = (*result3);
-
-  ASSERT_EQ(tokenSet3.size(), 2u);
-  EXPECT_EQ(tokenSet3[0].token, "This is a test");
-  EXPECT_EQ(tokenSet3[1].token, "This is another test");
+  expect_words(R"("This is a test" 'This is another test')", {"This is a test", "This is another test"});
 }
 
 TEST(ShellParser, ComplexQuotes) {
-  Star::ShellParser parser;
-  auto result4 = parser.tokenize("\"'asdf' 'asdf asdf'\" '\"omg\" omg omg'");
-  ASSERT_TRUE(result4);
-  auto tokenSet4 = (*result4);
-
-  ASSERT_EQ(tokenSet4.size(), 2u);
-  EXPECT_EQ(tokenSet4[0].token, "'asdf' 'asdf asdf'");
-  EXPECT_EQ(tokenSet4[1].token, "\"omg\" omg omg");
+  expect_words(R"("'asdf' 'asdf asdf'" '"omg" omg omg')", {"'asdf' 'asdf asdf'", R"("omg" omg omg)"});
 }
 
 TEST(ShellParser, SpacelessQuotes) {
-  Star::ShellParser parser;
-  auto result5 = parser.tokenize("\"asdf\"asdf asdf");
-  ASSERT_TRUE(result5);
-  auto tokenSet5 = (*result5);
+  expect_words(R"("asdf"asdf 'asdf'asdf asdf)", {"asdfasdf", "asdfasdf", "asdf"});
+  expect_words(R"(a""b x'y z'"!")", {"ab", "xy z!"});
+}
 
-  ASSERT_EQ(tokenSet5.size(), 2u);
-  EXPECT_EQ(tokenSet5[0].token, "asdfasdf");
-  EXPECT_EQ(tokenSet5[1].token, "asdf");
-
-  auto result6 = parser.tokenize("'asdf'asdf asdf");
-  ASSERT_TRUE(result6);
-  auto tokenSet6 = (*result6);
-
-  ASSERT_EQ(tokenSet6.size(), 2u);
-  EXPECT_EQ(tokenSet6[0].token, "asdfasdf");
-  EXPECT_EQ(tokenSet6[1].token, "asdf");
+TEST(ShellParser, UnmatchedQuotesExtendToEnd) {
+  expect_words("one 'two three", {"one", "two three"});
+  expect_words("one \"", {"one", ""});
 }
 
 TEST(ShellParser, EscapedSpaces) {
-  Star::ShellParser parser;
-  auto result7 = parser.tokenize("This\\ is\\ a test");
-  ASSERT_TRUE(result7);
-  auto tokenSet7 = (*result7);
+  expect_words(R"(This\ is\ a test)", {"This is a", "test"});
+}
 
-  ASSERT_EQ(tokenSet7.size(), 2u);
-  EXPECT_EQ(tokenSet7[0].token, "This is a");
-  EXPECT_EQ(tokenSet7[1].token, "test");
+TEST(ShellParser, EscapesInsideAndOutsideQuotes) {
+  expect_words(R"('\n\t\r\b\v\f\a' \\ \" \' \q \水 end\)", {"\n\t\r\b\v\f\a", "\\", "\"", "'", "q", "水", "end\\"});
+}
+
+TEST(ShellParser, EmbeddedNulIsData) {
+  using namespace std::string_view_literals;
+  expect_words(Star::String("a\0b \\0 \\u0000z end"sv),
+      {Star::String("a\0b"sv), Star::String("\0"sv), Star::String("\0z"sv), "end"});
 }
 
 TEST(ShellParser, EscapedUnicode) {
-  Star::ShellParser parser;
-  auto result8 = parser.tokenize("This is a unicode codepoint: \\u2603");
-  ASSERT_TRUE(result8);
-  auto tokenSet8 = (*result8);
+  expect_words(R"(This is a unicode codepoint: \u2603)", {"This", "is", "a", "unicode", "codepoint:", "☃"});
+  expect_words(R"(\u)", {"u"});
+  expect_words(R"(\u2603\u2603\u2603 \u2603)", {"☃☃☃", "☃"});
+  expect_words(R"(\u0020 \u0027 \u005c)", {" ", "'", "\\"});
+}
 
-  ASSERT_EQ(tokenSet8.size(), 6u);
-  EXPECT_EQ(tokenSet8[0].token, "This");
-  EXPECT_EQ(tokenSet8[5].token, "☃");
+TEST(ShellParser, MalformedEscapesPreserveTheFollowingInput) {
+  expect_words(R"(\u12 next \u123)", {"�", "next", "�"});
+  expect_words(R"("a\u12" 'b\u3' \u0'c d')", {"a�", "b�", "�c d"});
+  expect_words(R"(\u12\u2603 \u123水 \u0ａBC \ug)", {"�☃", "�水", "�ａBC", "�g"});
+}
 
-  auto result9 = parser.tokenize("\\u");
-  ASSERT_TRUE(result9);
-  auto tokenSet9 = (*result9);
+TEST(ShellParser, EscapedSurrogatesRequireAnAdjacentPair) {
+  expect_words(R"(\ud83D\uDE00 \udbff\udfff)", {"😀", "\U0010FFFF"});
+  expect_words(R"(\uDC00 \uD800x \uD800)", {"�", "�x", "�"});
+  expect_words(R"(\uD800\u2603 \uD800\uD83D\uDE00)", {"�☃", "�😀"});
+  expect_words(R"(\uD800\u12 next)", {"��", "next"});
+}
 
-  ASSERT_EQ(tokenSet9.size(), 1u);
-  EXPECT_EQ(tokenSet9[0].token, "u");
-
-  auto result10 = parser.tokenize("\\u2603\\u2603\\u2603 \\u2603");
-  ASSERT_TRUE(result10);
-  auto tokenSet10 = (*result10);
-
-  ASSERT_EQ(tokenSet10.size(), 2u);
-  EXPECT_EQ(tokenSet10[0].token, "☃☃☃");
-  EXPECT_EQ(tokenSet10[1].token, "☃");
+TEST(ShellParser, InvalidUtf8PropagatesTheUnicodeError) {
+  using namespace std::string_view_literals;
+  for (auto bytes : {"\xff"sv, "valid \"unterminated \xc2"sv, "\\u12\x80"sv, "nul\0\xff"sv}) {
+    auto words = Star::split_shell_words(Star::String(bytes));
+    ASSERT_FALSE(words);
+    EXPECT_TRUE(words.error().is<Star::UnicodeException>());
+  }
 }
 
 TEST(OptionParser, ConsumesParameterValueBeforeRecognizingFlags) {

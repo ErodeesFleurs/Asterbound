@@ -5,6 +5,7 @@ import std;
 import star.format;
 import star.benchmark_runner;
 import star.string;
+import star.shell_parser;
 
 namespace {
 using Star::String;
@@ -152,10 +153,51 @@ void register_operation(char const* name) {
   }
 }
 
+void measure_shell_words(benchmark::State& state, std::string_view kind) {
+  std::string input;
+  StringList expected;
+  if (kind == "Short") {
+    input = "warp home";
+    expected = {"warp", "home"};
+  } else if (kind == "ManyArgs") {
+    for (int index = 0; index < 96; ++index) {
+      input += " arg";
+      expected.emplace_back("arg");
+    }
+  } else if (kind == "LongPath") {
+    for (int index = 0; index < 128; ++index)
+      input += "/assets";
+    expected.emplace_back(input);
+  } else {
+    std::string decoded;
+    for (int index = 0; index < 64; ++index) {
+      input += R"(a\n\t\\)";
+      decoded += "a\n\t\\";
+    }
+    expected.emplace_back(decoded);
+  }
+  String command(input);
+  auto parse = [&] { return Star::split_shell_words(command); };
+  auto check = parse();
+  if (!check || *check != expected) {
+    state.SkipWithError("shell words differ from expected");
+    return;
+  }
+  for (auto _ : state) {
+    auto words = parse();
+    benchmark::DoNotOptimize(words);
+  }
+  state.SetBytesProcessed(state.iterations() * static_cast<std::int64_t>(input.size()));
+}
+
 }
 
 int main(int argc, char** argv) {
   return Star::run_benchmarks(argc, argv, [](int) {
+    for (auto kind : {"Short", "ManyArgs", "LongPath", "DenseEscapes"})
+      benchmark::RegisterBenchmark(std::format("ShellWords/{}", kind).c_str(), [kind](benchmark::State& state) {
+        measure_shell_words(state, kind);
+      });
     register_operation<operation::replace_dense>("ReplaceDense");
     register_operation<operation::replace_missing>("ReplaceMissing");
     register_operation<operation::replace_sparse>("ReplaceInsensitiveMiss");

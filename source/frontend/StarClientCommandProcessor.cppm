@@ -29,7 +29,6 @@ import star.casting;
 import star.listener;
 import star.ordered_map;
 
-import star.shell_parser;
 import star.lua_components;
 import star.lua_root;
 
@@ -138,7 +137,6 @@ private:
   std::optional<std::reference_wrapper<MainInterfacePaneManager>> m_paneManager;
   StringMap<StringList> m_macroCommands;
   HashMap<Uuid,RpcPromise<Json>> m_commandPromises;
-  ShellParser m_parser;
   bool m_debugDisplayEnabled = false;
   bool m_debugHudEnabled = true;
   bool m_fixedCameraEnabled = false;

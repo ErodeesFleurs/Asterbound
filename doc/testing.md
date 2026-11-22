@@ -293,6 +293,14 @@ values, insertion preserves the old end-relative stop: omit the oldest
 `1 - maxMessagePerEntity` previous bubbles, or all if there are fewer. The
 subsequent per-tick visibility filter still applies.
 
+### Command words
+
+`split_shell_words` produces owning arguments, not POSIX shell syntax. Quoted
+and unquoted segments concatenate; `""` is one empty argument, while a run
+of separators contributes none. An unmatched quote extends to end of input.
+Backslashes introduce escapes even inside single quotes. `ShellParser.*`
+exercises client/server argument boundaries independently of command dispatch.
+
 ### SHA-256 compatibility
 
 `ShaTest.*` checks independent digest vectors, chunk boundaries and hasher reuse.

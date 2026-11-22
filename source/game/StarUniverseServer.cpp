@@ -130,7 +130,6 @@ import star.universe_settings;
 import star.asset_source;
 import star.assets;
 import star.chat_processor;
-import star.shell_parser;
 import star.lua_root;
 import star.configuration;
 import star.root;

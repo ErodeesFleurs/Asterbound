@@ -10,7 +10,6 @@ import star.byte_array;
 import star.encode;
 import star.bytes;
 import star.format;
-import star.shell_parser;
 import star.lua_components;
 import star.lua_root;
 
@@ -85,7 +84,6 @@ private:
 
   Root& m_root;
   UniverseServer& m_universe;
-  ShellParser m_parser;
 
   // CommandProcessor can be accessed from multiple threads.
   // To avoid issues of thread unsafe accesses where an rcon command might be handled while a universe server script context is running, CommandProcessor instances have their own lua root instead.

@@ -436,7 +436,7 @@ std::expected<String, StarException> ClientCommandProcessor::gravity() {
 }
 
 std::expected<String, StarException> ClientCommandProcessor::debug(String const& argumentsString) {
-  auto parsed = m_parser.tokenizeToStringList(argumentsString);
+  auto parsed = split_shell_words(argumentsString);
   if (!parsed) return std::unexpected(std::move(parsed.error()));
   bool hud = false;
   if (!parsed->empty()) {
@@ -474,7 +474,7 @@ std::expected<String, StarException> ClientCommandProcessor::asyncLighting() {
 }
 
 std::expected<String, StarException> ClientCommandProcessor::setGravity(String const& argumentsString) {
-  auto arguments = m_parser.tokenizeToStringList(argumentsString);
+  auto arguments = split_shell_words(argumentsString);
   if (!arguments) return std::unexpected(std::move(arguments.error()));
   auto allowed = adminCommandAllowed();
   if (!allowed) return std::unexpected(std::move(allowed.error()));
@@ -514,7 +514,7 @@ std::expected<String, StarException> ClientCommandProcessor::monochromeLighting(
 }
 
 std::expected<String, StarException> ClientCommandProcessor::radioMessage(String const& argumentsString) {
-  auto arguments = m_parser.tokenizeToStringList(argumentsString);
+  auto arguments = split_shell_words(argumentsString);
   if (!arguments) return std::unexpected(std::move(arguments.error()));
   auto allowed = adminCommandAllowed();
   if (!allowed) return std::unexpected(std::move(allowed.error()));
@@ -542,7 +542,7 @@ std::expected<String, StarException> ClientCommandProcessor::clearCinematics() {
 }
 
 std::expected<String, StarException> ClientCommandProcessor::startQuest(String const& argumentsString) {
-  auto arguments = m_parser.tokenizeToStringList(argumentsString);
+  auto arguments = split_shell_words(argumentsString);
   if (!arguments) return std::unexpected(std::move(arguments.error()));
   auto allowed = adminCommandAllowed();
   if (!allowed) return std::unexpected(std::move(allowed.error()));
@@ -563,7 +563,7 @@ std::expected<String, StarException> ClientCommandProcessor::startQuest(String c
 }
 
 std::expected<String, StarException> ClientCommandProcessor::completeQuest(String const& argumentsString) {
-  auto arguments = m_parser.tokenizeToStringList(argumentsString);
+  auto arguments = split_shell_words(argumentsString);
   if (!arguments) return std::unexpected(std::move(arguments.error()));
   auto allowed = adminCommandAllowed();
   if (!allowed) return std::unexpected(std::move(allowed.error()));
@@ -577,7 +577,7 @@ std::expected<String, StarException> ClientCommandProcessor::completeQuest(Strin
 }
 
 std::expected<String, StarException> ClientCommandProcessor::failQuest(String const& argumentsString) {
-  auto arguments = m_parser.tokenizeToStringList(argumentsString);
+  auto arguments = split_shell_words(argumentsString);
   if (!arguments) return std::unexpected(std::move(arguments.error()));
   auto allowed = adminCommandAllowed();
   if (!allowed) return std::unexpected(std::move(allowed.error()));
@@ -591,7 +591,7 @@ std::expected<String, StarException> ClientCommandProcessor::failQuest(String co
 }
 
 std::expected<String, StarException> ClientCommandProcessor::previewNewQuest(String const& argumentsString) {
-  auto arguments = m_parser.tokenizeToStringList(argumentsString);
+  auto arguments = split_shell_words(argumentsString);
   if (!arguments) return std::unexpected(std::move(arguments.error()));
   auto allowed = adminCommandAllowed();
   if (!allowed) return std::unexpected(std::move(allowed.error()));
@@ -600,7 +600,7 @@ std::expected<String, StarException> ClientCommandProcessor::previewNewQuest(Str
 }
 
 std::expected<String, StarException> ClientCommandProcessor::previewQuestComplete(String const& argumentsString) {
-  auto arguments = m_parser.tokenizeToStringList(argumentsString);
+  auto arguments = split_shell_words(argumentsString);
   if (!arguments) return std::unexpected(std::move(arguments.error()));
   auto allowed = adminCommandAllowed();
   if (!allowed) return std::unexpected(std::move(allowed.error()));
@@ -609,7 +609,7 @@ std::expected<String, StarException> ClientCommandProcessor::previewQuestComplet
 }
 
 std::expected<String, StarException> ClientCommandProcessor::previewQuestFailed(String const& argumentsString) {
-  auto arguments = m_parser.tokenizeToStringList(argumentsString);
+  auto arguments = split_shell_words(argumentsString);
   if (!arguments) return std::unexpected(std::move(arguments.error()));
   auto allowed = adminCommandAllowed();
   if (!allowed) return std::unexpected(std::move(allowed.error()));
@@ -635,7 +635,7 @@ std::expected<String, StarException> ClientCommandProcessor::deathCount() {
 }
 
 std::expected<String, StarException> ClientCommandProcessor::cinema(String const& argumentsString) {
-  auto arguments = m_parser.tokenizeToStringList(argumentsString);
+  auto arguments = split_shell_words(argumentsString);
   if (!arguments) return std::unexpected(std::move(arguments.error()));
   auto allowed = adminCommandAllowed();
   if (!allowed) return std::unexpected(std::move(allowed.error()));
@@ -681,7 +681,7 @@ std::expected<String, StarException> ClientCommandProcessor::resetAchievements()
 }
 
 std::expected<String, StarException> ClientCommandProcessor::statistic(String const& argumentsString) {
-  auto arguments = m_parser.tokenizeToStringList(argumentsString);
+  auto arguments = split_shell_words(argumentsString);
   if (!arguments) return std::unexpected(std::move(arguments.error()));
   auto allowed = adminCommandAllowed();
   if (!allowed) return std::unexpected(std::move(allowed.error()));
@@ -697,7 +697,7 @@ std::expected<String, StarException> ClientCommandProcessor::statistic(String co
 }
 
 std::expected<String, StarException> ClientCommandProcessor::giveEssentialItem(String const& argumentsString) {
-  auto arguments = m_parser.tokenizeToStringList(argumentsString);
+  auto arguments = split_shell_words(argumentsString);
   if (!arguments) return std::unexpected(std::move(arguments.error()));
   auto allowed = adminCommandAllowed();
   if (!allowed) return std::unexpected(std::move(allowed.error()));
@@ -720,7 +720,7 @@ std::expected<String, StarException> ClientCommandProcessor::giveEssentialItem(S
 }
 
 std::expected<String, StarException> ClientCommandProcessor::makeTechAvailable(String const& argumentsString) {
-  auto arguments = m_parser.tokenizeToStringList(argumentsString);
+  auto arguments = split_shell_words(argumentsString);
   if (!arguments) return std::unexpected(std::move(arguments.error()));
   auto allowed = adminCommandAllowed();
   if (!allowed) return std::unexpected(std::move(allowed.error()));
@@ -731,7 +731,7 @@ std::expected<String, StarException> ClientCommandProcessor::makeTechAvailable(S
 }
 
 std::expected<String, StarException> ClientCommandProcessor::enableTech(String const& argumentsString) {
-  auto arguments = m_parser.tokenizeToStringList(argumentsString);
+  auto arguments = split_shell_words(argumentsString);
   if (!arguments) return std::unexpected(std::move(arguments.error()));
   auto allowed = adminCommandAllowed();
   if (!allowed) return std::unexpected(std::move(allowed.error()));
@@ -744,7 +744,7 @@ std::expected<String, StarException> ClientCommandProcessor::enableTech(String c
 }
 
 std::expected<String, StarException> ClientCommandProcessor::upgradeShip(String const& argumentsString) {
-  auto arguments = m_parser.tokenizeToStringList(argumentsString);
+  auto arguments = split_shell_words(argumentsString);
   if (!arguments) return std::unexpected(std::move(arguments.error()));
   auto allowed = adminCommandAllowed();
   if (!allowed) return std::unexpected(std::move(allowed.error()));
@@ -758,7 +758,7 @@ std::expected<String, StarException> ClientCommandProcessor::upgradeShip(String 
 }
 
 std::expected<String, StarException> ClientCommandProcessor::swap(String const& argumentsString) {
-  auto arguments = m_parser.tokenizeToStringList(argumentsString);
+  auto arguments = split_shell_words(argumentsString);
   if (!arguments) return std::unexpected(std::move(arguments.error()));
   if (arguments->empty()) {
     if (!m_paneManager) return std::unexpected(StarException("Command processor is detached from its interface"));
@@ -772,7 +772,7 @@ std::expected<String, StarException> ClientCommandProcessor::swap(String const& 
 }
 
 std::expected<String, StarException> ClientCommandProcessor::respawnInWorld(String const& argumentsString) {
-  auto arguments = m_parser.tokenizeToStringList(argumentsString);
+  auto arguments = split_shell_words(argumentsString);
   if (!arguments) return std::unexpected(std::move(arguments.error()));
   auto worldClient = m_universeClient->worldClient();
   if (arguments->empty())
@@ -799,7 +799,7 @@ std::expected<String, StarException> ClientCommandProcessor::render(String const
   String outputName = "render";
   auto player = m_universeClient->mainPlayer();
   if (player && path.utf8_size() < 100) {
-    auto parsedArgs = m_parser.tokenizeToStringList(path);
+    auto parsedArgs = split_shell_words(path);
     if (!parsedArgs) return std::unexpected(std::move(parsedArgs.error()));
     auto& args = *parsedArgs;
     auto lowered = args.front_value().value_or(String{}).to_lower();

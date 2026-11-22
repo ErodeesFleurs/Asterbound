@@ -263,7 +263,7 @@ std::expected<ServerCommandResult, StarException> CommandProcessor::userCommand(
 }
 
 std::expected<String, StarException> CommandProcessor::help(ConnectionId connectionId, String const& argumentString) {
-  auto parsedArguments = m_parser.tokenizeToStringList(argumentString);
+  auto parsedArguments = split_shell_words(argumentString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
   auto arguments = std::move(*parsedArguments);
   auto assetsResult = m_root.assets();
@@ -311,7 +311,7 @@ std::expected<String, StarException> CommandProcessor::help(ConnectionId connect
 std::expected<String, StarException> CommandProcessor::admin(ConnectionId connectionId, String const& argumentString) {
   auto config = m_root.configuration();
   if (!config) return std::unexpected(std::move(config.error()));
-  auto arguments = m_parser.tokenizeToStringList(argumentString);
+  auto arguments = split_shell_words(argumentString);
   if (!arguments) return std::unexpected(std::move(arguments.error()));
   ConnectionId targetClientId = connectionId;
   if (!arguments->empty()) {
@@ -471,7 +471,7 @@ std::expected<String, StarException> CommandProcessor::timewarp(ConnectionId con
   if (!adminCheckError) return std::unexpected(std::move(adminCheckError.error()));
   if (*adminCheckError) return **adminCheckError;
 
-  auto parsedArguments = m_parser.tokenizeToStringList(argumentsString);
+  auto parsedArguments = split_shell_words(argumentsString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
   auto arguments = std::move(*parsedArguments);
   if (arguments.empty())
@@ -504,7 +504,7 @@ std::expected<String, StarException> CommandProcessor::timescale(ConnectionId co
   if (!adminCheckError) return std::unexpected(std::move(adminCheckError.error()));
   if (*adminCheckError) return **adminCheckError;
 
-  auto parsedArguments = m_parser.tokenizeToStringList(argumentsString);
+  auto parsedArguments = split_shell_words(argumentsString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
   auto arguments = std::move(*parsedArguments);
 
@@ -524,7 +524,7 @@ std::expected<String, StarException> CommandProcessor::tickrate(ConnectionId con
   if (!adminCheckError) return std::unexpected(std::move(adminCheckError.error()));
   if (*adminCheckError) return **adminCheckError;
 
-  auto parsedArguments = m_parser.tokenizeToStringList(argumentsString);
+  auto parsedArguments = split_shell_words(argumentsString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
   auto arguments = std::move(*parsedArguments);
 
@@ -543,7 +543,7 @@ std::expected<String, StarException> CommandProcessor::setTileProtection(Connect
   if (!adminCheckError) return std::unexpected(std::move(adminCheckError.error()));
   if (*adminCheckError) return **adminCheckError;
 
-  auto parsedArguments = m_parser.tokenizeToStringList(argumentString);
+  auto parsedArguments = split_shell_words(argumentString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
   auto arguments = std::move(*parsedArguments);
 
@@ -613,7 +613,7 @@ std::expected<String, StarException> CommandProcessor::setDungeonId(ConnectionId
   if (!adminCheckError) return std::unexpected(std::move(adminCheckError.error()));
   if (*adminCheckError) return **adminCheckError;
 
-  auto parsedArguments = m_parser.tokenizeToStringList(argumentString);
+  auto parsedArguments = split_shell_words(argumentString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
   auto arguments = std::move(*parsedArguments);
   if (arguments.empty())
@@ -664,7 +664,7 @@ std::expected<String, StarException> CommandProcessor::spawnItem(ConnectionId co
   if (!adminCheckError) return std::unexpected(std::move(adminCheckError.error()));
   if (*adminCheckError) return **adminCheckError;
 
-  auto parsedArguments = m_parser.tokenizeToStringList(argumentString);
+  auto parsedArguments = split_shell_words(argumentString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
   auto arguments = std::move(*parsedArguments);
 
@@ -757,7 +757,7 @@ std::expected<String, StarException> CommandProcessor::spawnTreasure(ConnectionI
   if (!adminCheckError) return std::unexpected(std::move(adminCheckError.error()));
   if (*adminCheckError) return **adminCheckError;
 
-  auto parsedArguments = m_parser.tokenizeToStringList(argumentString);
+  auto parsedArguments = split_shell_words(argumentString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
   auto arguments = std::move(*parsedArguments);
 
@@ -833,7 +833,7 @@ std::expected<String, StarException> CommandProcessor::spawnMonster(ConnectionId
 
   StringList arguments;
   auto result = [&]() -> std::expected<String, StarException> {
-    auto parsedArguments = m_parser.tokenizeToStringList(argumentString);
+    auto parsedArguments = split_shell_words(argumentString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
   arguments = std::move(*parsedArguments);
   auto requiredArgument = arguments.at(0);
@@ -898,7 +898,7 @@ std::expected<String, StarException> CommandProcessor::spawnNpc(ConnectionId con
   if (!adminCheckError) return std::unexpected(std::move(adminCheckError.error()));
   if (*adminCheckError) return **adminCheckError;
 
-  auto parsedArguments = m_parser.tokenizeToStringList(argumentString);
+  auto parsedArguments = split_shell_words(argumentString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
   auto arguments = std::move(*parsedArguments);
 
@@ -968,7 +968,7 @@ std::expected<String, StarException> CommandProcessor::spawnVehicle(ConnectionId
     auto vehicleDatabaseResult = m_root.vehicleDatabase();
     if (!vehicleDatabaseResult) return std::unexpected(std::move(vehicleDatabaseResult.error()));
     auto vehicleDatabase = std::move(*vehicleDatabaseResult);
-    auto parsedArguments = m_parser.tokenizeToStringList(argumentString);
+    auto parsedArguments = split_shell_words(argumentString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
   auto arguments = std::move(*parsedArguments);
   auto requiredArgument = arguments.at(0);
@@ -1019,7 +1019,7 @@ std::expected<String, StarException> CommandProcessor::spawnStagehand(Connection
 
   StringList arguments;
   auto result = [&]() -> std::expected<String, StarException> {
-    auto parsedArguments = m_parser.tokenizeToStringList(argumentString);
+    auto parsedArguments = split_shell_words(argumentString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
   arguments = std::move(*parsedArguments);
   auto requiredArgument = arguments.at(0);
@@ -1095,7 +1095,7 @@ std::expected<String, StarException> CommandProcessor::spawnLiquid(ConnectionId 
 
   StringList arguments;
   auto result = [&]() -> std::expected<String, StarException> {
-    auto parsedArguments = m_parser.tokenizeToStringList(argumentString);
+    auto parsedArguments = split_shell_words(argumentString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
   arguments = std::move(*parsedArguments);
   auto requiredArgument = arguments.at(0);
@@ -1149,7 +1149,7 @@ std::expected<String, StarException> CommandProcessor::kick(ConnectionId connect
   if (!adminCheckError) return std::unexpected(std::move(adminCheckError.error()));
   if (*adminCheckError) return **adminCheckError;
 
-  auto parsedArguments = m_parser.tokenizeToStringList(argumentString);
+  auto parsedArguments = split_shell_words(argumentString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
   auto arguments = std::move(*parsedArguments);
 
@@ -1183,7 +1183,7 @@ std::expected<String, StarException> CommandProcessor::ban(ConnectionId connecti
   if (!adminCheckError) return std::unexpected(std::move(adminCheckError.error()));
   if (*adminCheckError) return **adminCheckError;
 
-  auto parsedArguments = m_parser.tokenizeToStringList(argumentString);
+  auto parsedArguments = split_shell_words(argumentString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
   auto arguments = std::move(*parsedArguments);
 
@@ -1241,7 +1241,7 @@ std::expected<String, StarException> CommandProcessor::unbanIp(ConnectionId conn
   if (!adminCheckError) return std::unexpected(std::move(adminCheckError.error()));
   if (*adminCheckError) return **adminCheckError;
 
-  auto parsedArguments = m_parser.tokenizeToStringList(argumentString);
+  auto parsedArguments = split_shell_words(argumentString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
   auto arguments = std::move(*parsedArguments);
 
@@ -1262,7 +1262,7 @@ std::expected<String, StarException> CommandProcessor::unbanUuid(ConnectionId co
   if (!adminCheckError) return std::unexpected(std::move(adminCheckError.error()));
   if (*adminCheckError) return **adminCheckError;
 
-  auto parsedArguments = m_parser.tokenizeToStringList(argumentString);
+  auto parsedArguments = split_shell_words(argumentString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
   auto arguments = std::move(*parsedArguments);
 
@@ -1300,7 +1300,7 @@ std::expected<String, StarException> CommandProcessor::list(ConnectionId connect
 std::expected<String, StarException> CommandProcessor::clientCoordinate(ConnectionId connectionId, String const& argumentString) {
   ConnectionId targetClientId = connectionId;
   String targetLabel = "Your";
-  auto parsedArguments = m_parser.tokenizeToStringList(argumentString);
+  auto parsedArguments = split_shell_words(argumentString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
   auto arguments = std::move(*parsedArguments);
   auto permission = adminCheck(connectionId, "find other players");
@@ -1430,7 +1430,7 @@ std::expected<String, StarException> CommandProcessor::placeDungeon(ConnectionId
   if (!adminCheckError) return std::unexpected(std::move(adminCheckError.error()));
   if (*adminCheckError) return **adminCheckError;
 
-  auto parsedArguments = m_parser.tokenizeToStringList(argumentString);
+  auto parsedArguments = split_shell_words(argumentString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
   auto arguments = std::move(*parsedArguments);
   auto requiredArgument = arguments.at(0);
@@ -1470,7 +1470,7 @@ std::expected<String, StarException> CommandProcessor::setUniverseFlag(Connectio
   if (!adminCheckError) return std::unexpected(std::move(adminCheckError.error()));
   if (*adminCheckError) return **adminCheckError;
 
-  auto parsedArguments = m_parser.tokenizeToStringList(argumentString);
+  auto parsedArguments = split_shell_words(argumentString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
   auto arguments = std::move(*parsedArguments);
   auto requiredArgument = arguments.at(0);
@@ -1496,7 +1496,7 @@ std::expected<String, StarException> CommandProcessor::addBiomeRegion(Connection
   if (!adminCheckError) return std::unexpected(std::move(adminCheckError.error()));
   if (*adminCheckError) return **adminCheckError;
 
-  auto parsedArguments = m_parser.tokenizeToStringList(argumentString);
+  auto parsedArguments = split_shell_words(argumentString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
   auto arguments = std::move(*parsedArguments);
   auto requiredArgument = arguments.at(1);
@@ -1527,7 +1527,7 @@ std::expected<String, StarException> CommandProcessor::expandBiomeRegion(Connect
   if (!adminCheckError) return std::unexpected(std::move(adminCheckError.error()));
   if (*adminCheckError) return **adminCheckError;
 
-  auto parsedArguments = m_parser.tokenizeToStringList(argumentString);
+  auto parsedArguments = split_shell_words(argumentString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
   auto arguments = std::move(*parsedArguments);
   auto requiredArgument = arguments.at(0);
@@ -1553,7 +1553,7 @@ std::expected<String, StarException> CommandProcessor::updatePlanetType(Connecti
   if (!adminCheckError) return std::unexpected(std::move(adminCheckError.error()));
   if (*adminCheckError) return **adminCheckError;
 
-  auto parsedArguments = m_parser.tokenizeToStringList(argumentString);
+  auto parsedArguments = split_shell_words(argumentString);
   if (!parsedArguments) return std::unexpected(std::move(parsedArguments.error()));
   auto arguments = std::move(*parsedArguments);
   auto requiredArgument = arguments.at(2);
@@ -1575,7 +1575,7 @@ std::expected<String, StarException> CommandProcessor::setWeather(ConnectionId c
   auto permission = adminCheck(connectionId, "set weather");
   if (!permission) return std::unexpected(std::move(permission.error()));
   if (*permission) return **permission;
-  auto parsed = m_parser.tokenizeToStringList(argumentString);
+  auto parsed = split_shell_words(argumentString);
   if (!parsed) return std::unexpected(std::move(parsed.error()));
   auto arguments = std::move(*parsed);
   if (arguments.empty()) {
@@ -1733,7 +1733,7 @@ std::expected<ServerCommandResult, StarException> CommandProcessor::handleComman
     if (!response) return std::unexpected(std::move(response.error()));
     return ServerCommandResult(std::move(*response));
   }
-  auto arguments = m_parser.tokenizeToStringList(argumentString);
+  auto arguments = split_shell_words(argumentString);
   if (!arguments) return std::unexpected(std::move(arguments.error()));
   auto invoked = recover_lua_script_error(m_scriptComponent.invoke<std::variant<RpcPromise<Json>, LuaValue>>("command", command, connectionId, json_from_string_list(*arguments)));
   if (!invoked) return std::unexpected(std::move(invoked.error()));

@@ -210,7 +210,6 @@ import star.confirmation_dialog;
 import star.join_request_dialog;
 import star.game_timers;
 import star.pane_manager;
-import star.shell_parser;
 import star.cinematic;
 import star.client_command_processor;
 
