@@ -160,10 +160,10 @@ void CanvasWidget::drawTriangles(List<std::tuple<Vec2F, Vec2F, Vec2F>> const& tr
 
 void CanvasWidget::drawText(String s, TextPositioning position, unsigned fontSize, Vec4B const& color, FontMode mode, float lineSpacing, String font, String processingDirectives) {
   TextStyle style;
-  style.fontSize = fontSize;
+  style.font_size = fontSize;
   style.color = color;
   style.shadow = fontModeToColor(mode).to_rgba();
-  style.lineSpacing = lineSpacing;
+  style.line_spacing = lineSpacing;
   style.font = std::move(font);
   style.directives = processingDirectives;
   m_renderOps.push_back(std::make_tuple(std::move(s), std::move(position), std::move(style)));

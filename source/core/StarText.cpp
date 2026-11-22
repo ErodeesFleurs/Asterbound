@@ -12,7 +12,6 @@ import star.data_stream;
 import star.thread;
 import star.directives;
 import star.text;
-#include <re2/re2.h>
 
 namespace Star {
 
@@ -23,97 +22,93 @@ std::expected<TextStyle, StarException> TextStyle::create(Json const& config) {
     if (!font) return std::unexpected(std::move(font.error()));
     result.font = std::move(*font);
   } else {
-    auto loaded = result.loadJson(config);
+    auto loaded = result.load_json(config);
     if (!loaded) return std::unexpected(std::move(loaded.error()));
   }
   return result;
 }
-std::expected<std::reference_wrapper<TextStyle>, StarException> TextStyle::loadJson(Json const& config) {
-  if (!config) return std::ref(*this);
-  auto spacing = config.get_float("lineSpacing", lineSpacing);
+std::expected<void, StarException> TextStyle::load_json(Json const& config) {
+  if (!config) return {};
+  auto spacing = config.get_float("lineSpacing", line_spacing);
   if (!spacing) return std::unexpected(std::move(spacing.error()));
-  lineSpacing = *spacing;
-  auto jColor = config.opt("color");
-  if (!jColor) return std::unexpected(std::move(jColor.error()));
-  if (*jColor) {
-    auto converted = json_to_color(**jColor);
+  auto color_json = config.opt("color");
+  if (!color_json) return std::unexpected(std::move(color_json.error()));
+  auto next_color = color;
+  if (*color_json) {
+    auto converted = json_to_color(**color_json);
     if (!converted) return std::unexpected(std::move(converted.error()));
-    color = converted->to_rgba();
+    next_color = converted->to_rgba();
   }
-  auto jShadow = config.opt("shadow");
-  if (!jShadow) return std::unexpected(std::move(jShadow.error()));
-  if (*jShadow) {
-    auto converted = json_to_color(**jShadow);
+  auto shadow_json = config.opt("shadow");
+  if (!shadow_json) return std::unexpected(std::move(shadow_json.error()));
+  auto next_shadow = shadow;
+  if (*shadow_json) {
+    auto converted = json_to_color(**shadow_json);
     if (!converted) return std::unexpected(std::move(converted.error()));
-    shadow = converted->to_rgba();
+    next_shadow = converted->to_rgba();
   }
-  auto size = config.get_uint("fontSize", fontSize);
+  auto size = config.get_uint("fontSize", font_size);
   if (!size) return std::unexpected(std::move(size.error()));
-  fontSize = *size;
-  auto jFont = config.opt_string("font");
-  if (!jFont) return std::unexpected(std::move(jFont.error()));
-  if (*jFont) font = std::move(**jFont);
-  auto jDirectives = config.opt_string("directives");
-  if (!jDirectives) return std::unexpected(std::move(jDirectives.error()));
-  if (*jDirectives) directives = **jDirectives;
-  auto jBackDirectives = config.opt_string("backDirectives");
-  if (!jBackDirectives) return std::unexpected(std::move(jBackDirectives.error()));
-  if (*jBackDirectives) backDirectives = **jBackDirectives;
-  return std::ref(*this);
+  if (!std::in_range<unsigned>(*size)) return std::unexpected(StarException("fontSize out of range"));
+  auto font_json = config.opt_string("font");
+  if (!font_json) return std::unexpected(std::move(font_json.error()));
+  auto directives_json = config.opt_string("directives");
+  if (!directives_json) return std::unexpected(std::move(directives_json.error()));
+  auto back_directives_json = config.opt_string("backDirectives");
+  if (!back_directives_json) return std::unexpected(std::move(back_directives_json.error()));
+  line_spacing = *spacing;
+  font_size = static_cast<unsigned>(*size);
+  color = next_color;
+  shadow = next_shadow;
+  if (*font_json) font = std::move(**font_json);
+  if (*directives_json) directives = **directives_json;
+  if (*back_directives_json) back_directives = **back_directives_json;
+  return {};
 }
 
 namespace Text {
-  static RE2 stripEscapeRegex = Star::format("\\{:c}[^;{:c}]*{:c}", CmdEsc, CmdEsc, EndEsc);
-  String stripEscapeCodes(String const& s) {
-    if (s.empty())
-      return s;
-    std::string result = s.utf8();
-    RE2::GlobalReplace(&result, stripEscapeRegex, "");
+  std::optional<CommandRange> find_next_command(std::string_view text, std::size_t offset, bool allow_esc) {
+    auto starts = allow_esc ? std::string_view("^\x1b") : std::string_view("^");
+    auto delimiters = allow_esc ? std::string_view("^\x1b;") : std::string_view("^;");
+    auto begin = text.find_first_of(starts, offset);
+    while (begin != text.npos) {
+      auto next = text.find_first_of(delimiters, begin + 1);
+      if (next == text.npos) break;
+      if (text[next] != ';') { begin = next; continue; }
+      // The historical stripping regex consumes Unicode scalars, not invalid bytes.
+      if (allow_esc || StringView(text.substr(begin + 1, next - begin - 1)).size()) return CommandRange{begin, next + 1};
+      begin = text.find('^', next + 1);
+    }
+    return {};
+  }
+
+  String strip_escape_codes(String const& input) {
+    std::string_view text = input.utf8();
+    auto range = find_next_command(text, 0, false);
+    if (!range) return input;
+    std::string result;
+    result.reserve(text.size() - (range->end - range->begin));
+    do {
+      result.append(text.substr(0, range->begin));
+      text.remove_prefix(range->end);
+      range = find_next_command(text, 0, false);
+    } while (range);
+    result.append(text);
     return String(std::move(result));
   }
 
-  std::expected<bool, StarException> processText(StringView text, TextCallback textFunc, CommandsCallback commandsFunc, bool includeCommandSides) {
-    std::string_view str = text.utf8();
-    std::size_t start = 0;
-    while (true) {
-      std::size_t escape = str.find_first_of(AllEsc, start);
-      start = 0;
-      if (escape != NPos) {
-        escape = str.find_first_not_of(AllEsc, escape) - 1; // jump to the last ^
-        std::size_t end = str.find_first_of(AllEscEnd, escape + 1);
-        if (end != NPos) {
-          if (str[end] != EndEsc) {
-            start = end;
-            continue;
-          }
-          if (escape) {
-            if (!textFunc) return std::unexpected(StarException("Text callback is empty"));
-            auto result = textFunc(str.substr(0, escape));
-            if (!result) return std::unexpected(std::move(result.error()));
-            if (!*result) return false;
-          }
-          if (commandsFunc) {
-            StringView commands = includeCommandSides
-              ? str.substr(escape, end - escape + 1)
-              : str.substr(escape + 1, end - escape - 1);
-            if (!commands.empty()) {
-              auto result = commandsFunc(commands);
-              if (!result) return std::unexpected(std::move(result.error()));
-              if (!*result) return false;
-            }
-          }
-          str = str.substr(end + 1);
-          continue;
-        }
-      }
-
-      if (!str.empty()) {
-        if (!textFunc) return std::unexpected(StarException("Text callback is empty"));
-        return textFunc(str);
-      }
-
-      return true;
+  std::expected<std::size_t, StarException> visible_length(String const& input) {
+    std::string_view text = input.utf8();
+    std::size_t count = 0;
+    while (auto range = find_next_command(text, 0, false)) {
+      auto size = StringView(text.substr(0, range->begin)).size();
+      if (!size) return strip_escape_codes(input).size(); // deletion can join split UTF-8 bytes
+      count += *size;
+      text.remove_prefix(range->end);
     }
+    auto tail = StringView(text).size();
+    if (!tail) return std::unexpected(std::move(tail.error()));
+    return count + *tail;
   }
 }
 

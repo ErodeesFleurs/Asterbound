@@ -149,9 +149,9 @@ std::expected<TextStyle, StarException> canvasTextStyle(Json const& sizeOrStyle,
   if (!size)
     return std::unexpected(std::move(size.error()));
   TextStyle style;
-  style.fontSize = *size;
+  style.font_size = *size;
   style.color = color.value_or(Color::White).to_rgba();
-  style.lineSpacing = spacing.value_or(DefaultLineSpacing);
+  style.line_spacing = spacing.value_or(default_line_spacing);
   style.font = font.value_or("");
   style.directives = directives.value_or("");
   return style;

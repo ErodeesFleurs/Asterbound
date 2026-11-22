@@ -2081,7 +2081,7 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
     if (p2pNetworkingService) {
       auto getActivityDetail = [&](String const& tag) -> std::expected<String, StarException> {
         if (tag == "playerName")
-          return m_player->name().transform([](String name) { return Text::stripEscapeCodes(name); });
+          return m_player->name().transform([](String name) { return Text::strip_escape_codes(name); });
         if (tag == "playerHealth")
           return Star::to_string(m_player->health());
         if (tag == "playerMaxHealth")
@@ -2107,7 +2107,7 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
           auto worldName = worldTemplate->worldName();
           if (worldName.empty())
             return "In World";
-          return Text::stripEscapeCodes(worldName);
+          return Text::strip_escape_codes(worldName);
         }
         return "";
       };

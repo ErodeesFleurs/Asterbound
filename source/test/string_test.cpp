@@ -1245,12 +1245,24 @@ TEST(StringTest, JoinedAccumulatorRetainsExistingEmptyAndInvalidByteBoundaries) 
   EXPECT_FALSE(String::join_with("/", "b", malformed));
 }
 
+TEST(TextTest, CommandBoundariesAndStyleRollback) {
+  String mixed(std::string("a^^red;中\x1breset;^"));
+  EXPECT_EQ(Text::strip_escape_codes(mixed), String("a^中\x1breset;^"));
+  EXPECT_EQ(Text::visible_length(mixed), 11u);
+  String split(std::string("\xc3^red;\xa9"));
+  EXPECT_EQ(Text::visible_length(split), 1u);
+  TextStyle style;
+  auto original = style.line_spacing;
+  EXPECT_FALSE(style.load_json(JsonObject{{"lineSpacing", 3}, {"fontSize", std::uint64_t{1} << 40}}));
+  EXPECT_EQ(style.line_spacing, original);
+}
+
 TEST(StringTest, EscapeProcessingPreservesBinaryFragmentsAndFirstCallbackError) {
   constexpr char input[] = "a;\0^red;b\x1breset;c";
   StringView text(std::string_view(input, sizeof(input) - 1));
   std::vector<std::string> fragments;
   std::vector<std::string> commands;
-  auto processed = Text::processText(
+  auto processed = Text::process_text(
     text,
     [&](StringView part) -> std::expected<bool, StarException> {
       fragments.emplace_back(part.utf8());
@@ -1267,7 +1279,7 @@ TEST(StringTest, EscapeProcessingPreservesBinaryFragmentsAndFirstCallbackError) 
 
   fragments.clear();
   commands.clear();
-  auto failed = Text::processText(
+  auto failed = Text::process_text(
     text,
     [&](StringView part) -> std::expected<bool, StarException> {
       fragments.emplace_back(part.utf8());

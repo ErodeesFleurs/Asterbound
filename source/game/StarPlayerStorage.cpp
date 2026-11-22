@@ -334,7 +334,7 @@ std::optional<Uuid> PlayerStorage::playerUuidAt(std::size_t index) {
 }
 
 std::expected<std::optional<Uuid>, StarException> PlayerStorage::playerUuidByName(String const& name, std::optional<Uuid> except) {
-  auto cleanMatch = Text::stripEscapeCodes(name).to_lower();
+  auto cleanMatch = Text::strip_escape_codes(name).to_lower();
   if (!cleanMatch)
     return std::unexpected(std::move(cleanMatch.error()));
   std::optional<Uuid> uuid;
@@ -349,7 +349,7 @@ std::expected<std::optional<Uuid>, StarException> PlayerStorage::playerUuidByNam
       return std::unexpected(std::move(playerName.error()));
     if (!*playerName)
       continue;
-    auto cleanName = Text::stripEscapeCodes(**playerName).to_lower();
+    auto cleanName = Text::strip_escape_codes(**playerName).to_lower();
     if (!cleanName)
       return std::unexpected(std::move(cleanName.error()));
     auto len = cleanName->size();
@@ -364,7 +364,7 @@ std::expected<std::optional<Uuid>, StarException> PlayerStorage::playerUuidByNam
 }
 
 std::expected<List<Uuid>, StarException> PlayerStorage::playerUuidListByName(String const& name, std::optional<Uuid> except) {
-  auto cleanMatch = Text::stripEscapeCodes(name).to_lower();
+  auto cleanMatch = Text::strip_escape_codes(name).to_lower();
   if (!cleanMatch)
     return std::unexpected(std::move(cleanMatch.error()));
   List<Uuid> list;
@@ -378,7 +378,7 @@ std::expected<List<Uuid>, StarException> PlayerStorage::playerUuidListByName(Str
       return std::unexpected(std::move(playerName.error()));
     if (!*playerName)
       continue;
-    auto cleanName = Text::stripEscapeCodes(**playerName).to_lower();
+    auto cleanName = Text::strip_escape_codes(**playerName).to_lower();
     if (!cleanName)
       return std::unexpected(std::move(cleanName.error()));
     if (cleanMatch->empty() || cleanName->utf8().rfind(cleanMatch->utf8()) != NPos)
@@ -417,7 +417,7 @@ std::expected<Json, StarException> PlayerStorage::savePlayer(std::shared_ptr<Pla
     auto playerName = player->name();
     if (!playerName)
       return std::unexpected(std::move(playerName.error()));
-    auto logged = m_root.logger().debug("Saved player {} to {}", Text::stripEscapeCodes(*playerName), fileName);
+    auto logged = m_root.logger().debug("Saved player {} to {}", Text::strip_escape_codes(*playerName), fileName);
     if (!logged)
       return std::unexpected(std::move(logged.error()));
   }

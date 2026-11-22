@@ -1785,9 +1785,9 @@ std::expected<void, StarException> MainInterface::update(float dt) {
         ChatReceivedMessage message = {
           {MessageContext::World},
           ServerConnectionId,
-          Text::stripEscapeCodes(name),
-          Text::stripEscapeCodes(portraitAction.text),
-          Text::stripEscapeCodes(*portrait)};
+          Text::strip_escape_codes(name),
+          Text::strip_escape_codes(portraitAction.text),
+          Text::strip_escape_codes(*portrait)};
         auto added = addChatMessages({message}, false);
         if (!added)
           return std::unexpected(std::move(added.error()));
@@ -2096,7 +2096,7 @@ std::expected<void, StarException> MainInterface::renderDebug() {
       formatted.reserve(log_map_values.size());
       int counter = 0;
       for (auto const& pair : log_map_values) {
-        TextPositioning positioning = {Vec2F(m_config->debugOffset[0], *height - m_config->debugOffset[1] - m_config->textStyle.fontSize * interfaceScale() * counter++)};
+        TextPositioning positioning = {Vec2F(m_config->debugOffset[0], *height - m_config->debugOffset[1] - m_config->textStyle.font_size * interfaceScale() * counter++)};
         String& text = formatted.emplace_back(Star::format("{}^lightgray;:^green,set; {}", pair.first, pair.second));
         auto size = context().determineTextSize(text, positioning);
         if (!size) return std::unexpected(std::move(size.error()));
@@ -2111,7 +2111,7 @@ std::expected<void, StarException> MainInterface::renderDebug() {
       }
       m_debugTextRect = RectF::null();
       for (std::size_t index = 0; index != formatted.size(); ++index) {
-        TextPositioning positioning = {Vec2F(m_config->debugOffset[0], *height - m_config->debugOffset[1] - m_config->textStyle.fontSize * interfaceScale() * index)};
+        TextPositioning positioning = {Vec2F(m_config->debugOffset[0], *height - m_config->debugOffset[1] - m_config->textStyle.font_size * interfaceScale() * index)};
         if (auto r = context().renderText(formatted[index], positioning); !r) return std::unexpected(std::move(r.error()));
       }
     }

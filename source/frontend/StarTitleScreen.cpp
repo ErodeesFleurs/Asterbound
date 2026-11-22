@@ -304,7 +304,7 @@ std::expected<void, StarException> TitleScreen::initialize(std::shared_ptr<Unive
   if (!name)
     return std::unexpected(std::move(name.error()));
   if (*name) {
-    if (auto r = m_guiContext.root().logger().info("Title world is {} @ CelestialWorld:{}", Text::stripEscapeCodes(**name), **randomWorld); !r)
+    if (auto r = m_guiContext.root().logger().info("Title world is {} @ CelestialWorld:{}", Text::strip_escape_codes(**name), **randomWorld); !r)
       return std::unexpected(std::move(r.error()));
   }
   auto skyParameters = SkyParameters::create(m_guiContext.root(), **randomWorld, m_celestialDatabase);

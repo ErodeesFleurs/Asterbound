@@ -1088,3 +1088,9 @@ floating-point flags. `WarpTargetTest.LegacyWireAndJson` checks fixed wire bytes
 for spawn targets and empty inventory markers, JSON round trips, and preservation
 of the destination on truncated warp input. To measure the cost of converting an
 owning entity name to JSON, filter `game_benchmarks` to `^Warp/LongEntityTargetToJson$`.
+
+`TextTest.CommandBoundariesAndStyleRollback` covers caret-only stripping,
+visible Unicode length across a removed command, and rejection of an oversized
+font without partially updating the style. Rendering additionally recognizes
+ASCII ESC; `StringTest.EscapeProcessingPreservesBinaryFragmentsAndFirstCallbackError`
+checks both command prefixes and failure propagation.

@@ -502,7 +502,7 @@ void ButtonWidget::setText(String const& text) {
 }
 
 void ButtonWidget::setFontSize(int size) {
-  m_textStyle.fontSize = size;
+  m_textStyle.font_size = size;
 }
 
 void ButtonWidget::setFontDirectives(String directives) {

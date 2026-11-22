@@ -681,8 +681,8 @@ const GameTestRegistration measurement_fonts("TextPainter", "MeasurementCommands
     ASSERT_TRUE(painter) << painter.error().what();
     TextStyle style;
     style.font = "hobo";
-    style.fontSize = 32;
-    style.backDirectives = String("?border=1;ff0000");
+    style.font_size = 32;
+    style.back_directives = String("?border=1;ff0000");
     auto active = (*painter)->setTextStyle(style);
     ASSERT_TRUE(active);
     ASSERT_TRUE((*painter)->applyCommands("set"));
@@ -719,14 +719,14 @@ const GameTestRegistration text_directive_aliases(
     ASSERT_TRUE(painter) << painter.error().what();
     TextStyle style;
     style.directives = String("?border=1;ff0000");
-    style.backDirectives = String("?outline=2;00ff00");
+    style.back_directives = String("?outline=2;00ff00");
     TextStyle alias = style;
     auto const& front_entries = style.directives.entries();
-    auto const& back_entries = style.backDirectives.entries();
+    auto const& back_entries = style.back_directives.entries();
     ASSERT_FALSE(front_entries.empty());
     ASSERT_FALSE(back_entries.empty());
     auto const& front = style.directives.entry_operation(front_entries.back());
-    auto const& back = style.backDirectives.entry_operation(back_entries.back());
+    auto const& back = style.back_directives.entry_operation(back_entries.back());
     ASSERT_TRUE(std::holds_alternative<BorderImageOperation>(front));
     ASSERT_TRUE(std::holds_alternative<BorderImageOperation>(back));
     EXPECT_FALSE(std::get<BorderImageOperation>(front).includeTransparent);
@@ -739,7 +739,7 @@ const GameTestRegistration text_directive_aliases(
     auto measured = (*painter)->determineTextSize("Aliased style", TextPositioning{});
     ASSERT_TRUE(measured) << measured.error().what();
     for (auto const& candidate : {std::cref(style), std::cref(alias), std::cref(applied->get())}) {
-      for (auto const& directives : {std::cref(candidate.get().directives), std::cref(candidate.get().backDirectives)}) {
+      for (auto const& directives : {std::cref(candidate.get().directives), std::cref(candidate.get().back_directives)}) {
         for (auto const& entry : directives.get().entries()) {
           auto const& operation = directives.get().entry_operation(entry);
           if (std::holds_alternative<BorderImageOperation>(operation))
@@ -754,7 +754,7 @@ const GameTestRegistration text_directive_aliases(
 
     ASSERT_TRUE((*painter)->setProcessingDirectives("?border=3;0000ff"));
     ASSERT_TRUE((*painter)->setProcessingDirectives("?outline=4;ffffff", true));
-    for (auto const& directives : {std::cref(applied->get().directives), std::cref(applied->get().backDirectives)}) {
+    for (auto const& directives : {std::cref(applied->get().directives), std::cref(applied->get().back_directives)}) {
       auto const& entry = directives.get().entries().back();
       auto const& operation = directives.get().entry_operation(entry);
       ASSERT_TRUE(std::holds_alternative<BorderImageOperation>(operation));

@@ -68,10 +68,10 @@ std::expected<std::shared_ptr<FuelWidget>, StarException> FuelWidget::create(Gui
   if (!fontJson) return std::unexpected(std::move(fontJson.error()));
   auto fontSize = fontJson->to_int();
   if (!fontSize) return std::unexpected(std::move(fontSize.error()));
-  widget->m_textStyle.fontSize = *fontSize;
+  widget->m_textStyle.font_size = *fontSize;
   auto styleJson = (*assets)->json("/interface.config:textStyle");
   if (!styleJson) return std::unexpected(std::move(styleJson.error()));
-  auto style = widget->m_textStyle.loadJson(*styleJson);
+  auto style = widget->m_textStyle.load_json(*styleJson);
   if (!style) return std::unexpected(std::move(style.error()));
   return widget;
 }

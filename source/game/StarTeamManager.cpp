@@ -431,7 +431,7 @@ std::expected<Json, StarException> TeamManager::invite(Json const& arguments) {
   lock_with_diagnostics(lock);
   auto inviteeText = arguments.get_string("inviteeName");
   if (!inviteeText) return std::unexpected(std::move(inviteeText.error()));
-  auto inviteeName = Text::stripEscapeCodes(*inviteeText);
+  auto inviteeName = Text::strip_escape_codes(*inviteeText);
 
   if (inviteeName.empty())
     return Json("inviteeNotFound");
@@ -457,7 +457,7 @@ std::expected<Json, StarException> TeamManager::invite(Json const& arguments) {
 
   JsonArray invited;
   for (auto&& entry : m_connectedPlayers) {
-    auto matches = Text::stripEscapeCodes(entry.first).starts_with(inviteeName, String::CaseInsensitive);
+    auto matches = Text::strip_escape_codes(entry.first).starts_with(inviteeName, String::CaseInsensitive);
     if (!matches) return std::unexpected(std::move(matches.error()));
     if (!*matches) continue;
 

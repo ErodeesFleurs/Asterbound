@@ -174,7 +174,7 @@ std::expected<void, StarException> ChatBubbleManager::initialize() {
   m_textStyle.color = color->to_rgba();
   auto styleJson = config->get("textStyle");
   if (!styleJson) return std::unexpected(std::move(styleJson.error()));
-  auto style = m_textStyle.loadJson(*styleJson);
+  auto style = m_textStyle.load_json(*styleJson);
   if (!style) return std::unexpected(std::move(style.error()));
   {
     auto json = config->get("textPadding");
@@ -507,15 +507,15 @@ std::expected<void, StarException> ChatBubbleManager::addChatActions(List<ChatAc
       position = sayAction.position;
 
       TextStyle textStyle = m_textStyle;
-      auto fontSize = config.get_uint("fontSize", textStyle.fontSize);
+      auto fontSize = config.get_uint("fontSize", textStyle.font_size);
       if (!fontSize)
         return std::unexpected(std::move(fontSize.error()));
-      textStyle.fontSize = *fontSize;
-      auto jColor = config.opt("color");
-      if (!jColor)
-        return std::unexpected(std::move(jColor.error()));
-      if (*jColor) {
-        auto color = json_to_color(**jColor);
+      textStyle.font_size = *fontSize;
+      auto color_json = config.opt("color");
+      if (!color_json)
+        return std::unexpected(std::move(color_json.error()));
+      if (*color_json) {
+        auto color = json_to_color(**color_json);
         if (!color)
           return std::unexpected(std::move(color.error()));
         textStyle.color = color->to_rgba();
@@ -523,7 +523,7 @@ std::expected<void, StarException> ChatBubbleManager::addChatActions(List<ChatAc
       auto styleJson = config.get("style", Json());
       if (!styleJson)
         return std::unexpected(std::move(styleJson.error()));
-      auto loadedStyle = textStyle.loadJson(*styleJson);
+      auto loadedStyle = textStyle.load_json(*styleJson);
       if (!loadedStyle)
         return std::unexpected(std::move(loadedStyle.error()));
       // Size the bubble using the same final style and wrap width as drawing.

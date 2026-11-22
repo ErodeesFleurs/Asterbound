@@ -276,10 +276,10 @@ std::expected<void, StarException> Cinematic::loadDefinition(Json const& definit
         return std::unexpected(std::move(color.error()));
       panel->textStyle.color = *color;
     }
-    auto fontSize = panelDefinition.get_uint("fontSize", panel->textStyle.fontSize);
+    auto fontSize = panelDefinition.get_uint("fontSize", panel->textStyle.font_size);
     if (!fontSize)
       return std::unexpected(std::move(fontSize.error()));
-    panel->textStyle.fontSize = *fontSize;
+    panel->textStyle.font_size = *fontSize;
     auto avatar = panelDefinition.get_string("avatar", "");
     if (!avatar)
       return std::unexpected(std::move(avatar.error()));
@@ -571,7 +571,7 @@ std::expected<void, StarException> Cinematic::render() {
         auto style = textPainter.setTextStyle(panel->textStyle);
         if (!style)
           return std::unexpected(std::move(style.error()));
-        textPainter.setFontSize(std::floor(panel->textStyle.fontSize * drawableScale));
+        textPainter.setFontSize(std::floor(panel->textStyle.font_size * drawableScale));
         auto fontColor = panel->textStyle.color;
         fontColor[3] *= values.alpha;
         textPainter.setFontColor(fontColor);

@@ -16,39 +16,53 @@ namespace Star {
 
 class Json;
 
-inline constexpr unsigned DefaultFontSize = 8;
-inline constexpr float DefaultLineSpacing = 1.3f;
+inline constexpr unsigned default_font_size = 8;
+inline constexpr float default_line_spacing = 1.3f;
 
 struct TextStyle {
-  float lineSpacing = DefaultLineSpacing;
+  float line_spacing = default_line_spacing;
   Vec4B color = Vec4B::filled(255);
   Vec4B shadow = Vec4B::filled(0);
-  unsigned fontSize = DefaultFontSize;
+  unsigned font_size = default_font_size;
   String font = "";
   Directives directives;
-  Directives backDirectives;
+  Directives back_directives;
 
   TextStyle() = default;
   [[nodiscard]] static std::expected<TextStyle, StarException> create(Json const& config);
-  [[nodiscard]] std::expected<std::reference_wrapper<TextStyle>, StarException> loadJson(Json const& config);
+  [[nodiscard]] std::expected<void, StarException> load_json(Json const& config);
 };
 
 namespace Text {
-  inline constexpr unsigned char StartEsc = '\x1b';
-  inline constexpr unsigned char EndEsc = ';';
-  inline constexpr unsigned char CmdEsc = '^';
-  inline constexpr unsigned char SpecialCharLimit = ' ';
-  inline constexpr std::array<char, 3> EscapeCharacters{static_cast<char>(CmdEsc), static_cast<char>(StartEsc),
-                                                        static_cast<char>(EndEsc)};
-  inline constexpr std::string_view AllEsc{EscapeCharacters.data(), 2};
-  inline constexpr std::string_view AllEscEnd{EscapeCharacters.data(), EscapeCharacters.size()};
+  struct CommandRange { std::size_t begin, end; };
+  std::optional<CommandRange> find_next_command(std::string_view text, std::size_t offset, bool allow_esc);
+  String strip_escape_codes(String const& text);
+  std::expected<std::size_t, StarException> visible_length(String const& text);
 
-  String stripEscapeCodes(String const& s);
-  inline bool isEscapeCode(Utf32Type c) { return c == CmdEsc || c == StartEsc; }
+  template <typename Visitor>
+  concept text_visitor = requires(Visitor& visit, StringView part) {
+    { visit(part) } -> std::same_as<std::expected<bool, StarException>>;
+  };
 
-  using TextCallback = std::function<std::expected<bool, StarException>(StringView text)>;
-  using CommandsCallback = std::function<std::expected<bool, StarException>(StringView commands)>;
-  [[nodiscard]] std::expected<bool, StarException> processText(StringView text, TextCallback textFunc, CommandsCallback commandsFunc = CommandsCallback(), bool includeCommandSides = false);
+  template <text_visitor TextVisitor, text_visitor CommandVisitor>
+  std::expected<bool, StarException> process_text(StringView input, TextVisitor&& visit_text, CommandVisitor&& visit_command, bool include_sides = false) {
+    auto text = input.utf8();
+    while (auto range = find_next_command(text, 0, true)) {
+      if (range->begin) {
+        auto result = visit_text(StringView(text.substr(0, range->begin)));
+        if (!result || !*result) return result;
+      }
+      auto command = text.substr(range->begin, range->end - range->begin);
+      if (!include_sides) command = command.substr(1, command.size() - 2);
+      if (!command.empty()) {
+        auto result = visit_command(StringView(command));
+        if (!result || !*result) return result;
+      }
+      text.remove_prefix(range->end);
+    }
+    if (!text.empty()) return visit_text(StringView(text));
+    return true;
+  }
 }
 
 }
@@ -56,21 +70,16 @@ namespace Text {
 export module star.text;
 
 export namespace Star {
-  using ::Star::DefaultFontSize;
-  using ::Star::DefaultLineSpacing;
+  using ::Star::default_font_size;
+  using ::Star::default_line_spacing;
   using ::Star::TextStyle;
 }
 
 export namespace Star::Text {
-  using ::Star::Text::StartEsc;
-  using ::Star::Text::EndEsc;
-  using ::Star::Text::CmdEsc;
-  using ::Star::Text::SpecialCharLimit;
-  using ::Star::Text::AllEsc;
-  using ::Star::Text::AllEscEnd;
-  using ::Star::Text::stripEscapeCodes;
-  using ::Star::Text::isEscapeCode;
-  using ::Star::Text::TextCallback;
-  using ::Star::Text::CommandsCallback;
-  using ::Star::Text::processText;
+  using ::Star::Text::CommandRange;
+  using ::Star::Text::find_next_command;
+  using ::Star::Text::strip_escape_codes;
+  using ::Star::Text::visible_length;
+  using ::Star::Text::text_visitor;
+  using ::Star::Text::process_text;
 }

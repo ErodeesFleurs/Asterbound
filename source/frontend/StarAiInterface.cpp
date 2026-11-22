@@ -694,7 +694,7 @@ std::expected<void, StarException> AiInterface::setFaceAnimation(String const& n
 std::expected<void, StarException> AiInterface::setCurrentSpeech(String const& textWidget, AiSpeech speech) {
   auto widget = findChild<LabelWidget>(textWidget);
   if (!widget) return std::unexpected(std::move(widget.error()));
-  auto length = Text::stripEscapeCodes(speech.text).size();
+  auto length = Text::visible_length(speech.text);
   if (!length) return std::unexpected(std::move(length.error()));
   auto result = (*widget)->setText("");
   if (!result) return std::unexpected(std::move(result.error()));

@@ -115,7 +115,7 @@ std::expected<void, StarException> TextBoxWidget::initialize() {
   if (!style)
     return std::unexpected(std::move(style.error()));
   m_textStyle = std::move(*style);
-  setSize({m_maxWidth + 6, m_textStyle.fontSize + 2});
+  setSize({m_maxWidth + 6, m_textStyle.font_size + 2});
   auto horizontalJson = config->get("textboxCursorHorizontal");
   if (!horizontalJson)
     return std::unexpected(std::move(horizontalJson.error()));
@@ -195,7 +195,7 @@ std::expected<void, StarException> TextBoxWidget::renderImpl() {
     float anchorOffset = m_hAnchor == HorizontalAnchor::RightAnchor ? *fullWidth :
         m_hAnchor == HorizontalAnchor::HMidAnchor ? std::floor(*fullWidth / 2.0f) : 0;
     auto highlighted = context().drawInterfaceQuad(RectF::with_size(pos + Vec2F(*prefixWidth - anchorOffset, 0),
-        Vec2F(*selectionWidth, m_textStyle.fontSize)), Vec4B(70, 100, 180, 160));
+        Vec2F(*selectionWidth, m_textStyle.font_size)), Vec4B(70, 100, 180, 160));
     if (!highlighted)
       return std::unexpected(std::move(highlighted.error()));
   }
@@ -211,7 +211,7 @@ std::expected<void, StarException> TextBoxWidget::renderImpl() {
   if (*focused) {
     float cc = 0.6f + 0.4f * std::sin(static_cast<double>(std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)).time_since_epoch().count()) / 300.0);
     auto cursorColor = Color::rgb_f(cc, cc, cc).to_rgba();
-    float fontSize = m_textStyle.fontSize;
+    float fontSize = m_textStyle.font_size;
     auto vertical = context().drawInterfaceLine(
         pos + Vec2F(cursorOffset, fontSize * m_cursorVert[0]),
         pos + Vec2F(cursorOffset, fontSize * m_cursorVert[1]), cursorColor);
@@ -403,7 +403,7 @@ void TextBoxWidget::setDirectives(String const& directives) {
 }
 
 void TextBoxWidget::setFontSize(int fontSize) {
-  m_textStyle.fontSize = fontSize;
+  m_textStyle.font_size = fontSize;
 }
 
 void TextBoxWidget::setFont(String const& font) {
@@ -412,7 +412,7 @@ void TextBoxWidget::setFont(String const& font) {
 
 void TextBoxWidget::setMaxWidth(int maxWidth) {
   m_maxWidth = maxWidth;
-  setSize({m_maxWidth + 6, m_textStyle.fontSize + 2});
+  setSize({m_maxWidth + 6, m_textStyle.font_size + 2});
 }
 
 void TextBoxWidget::setOverfillMode(bool overtype) {

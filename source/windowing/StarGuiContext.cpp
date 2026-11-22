@@ -548,7 +548,7 @@ std::expected<std::reference_wrapper<TextStyle>, StarException> GuiContext::setT
   auto style = painter->get().setTextStyle(textStyle);
   if (!style)
     return std::unexpected(std::move(style.error()));
-  style->get().fontSize *= pixelRatio;
+  style->get().font_size *= pixelRatio;
   return *style;
 }
 
@@ -572,7 +572,7 @@ std::expected<void, StarException> GuiContext::setLineSpacing(float lineSpacing)
 }
 
 std::expected<void, StarException> GuiContext::setDefaultLineSpacing() {
-  return setLineSpacing(DefaultLineSpacing);
+  return setLineSpacing(default_line_spacing);
 }
 
 std::expected<int, StarException> GuiContext::stringWidth(String const& s) {

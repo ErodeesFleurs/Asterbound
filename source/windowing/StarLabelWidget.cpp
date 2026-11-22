@@ -72,7 +72,7 @@ std::expected<std::shared_ptr<LabelWidget>, StarException> LabelWidget::create(G
   if (!style) return std::unexpected(std::move(style.error()));
   widget->m_style = std::move(*style);
   widget->m_style.color = color.to_rgba();
-  if (lineSpacing) widget->m_style.lineSpacing = *lineSpacing;
+  if (lineSpacing) widget->m_style.line_spacing = *lineSpacing;
   auto result = widget->setText(std::move(text));
   if (!result) return std::unexpected(std::move(result.error()));
   return widget;
@@ -92,7 +92,7 @@ std::expected<void, StarException> LabelWidget::setText(String newText) {
 }
 
 std::expected<void, StarException> LabelWidget::setFontSize(int fontSize) {
-  m_style.fontSize = fontSize;
+  m_style.font_size = fontSize;
   return updateTextRegion();
 }
 
@@ -121,7 +121,7 @@ std::expected<void, StarException> LabelWidget::setWrapWidth(std::optional<unsig
 }
 
 std::expected<void, StarException> LabelWidget::setLineSpacing(std::optional<float> lineSpacing) {
-  m_style.lineSpacing = lineSpacing.value_or(DefaultLineSpacing);
+  m_style.line_spacing = lineSpacing.value_or(default_line_spacing);
   return updateTextRegion();
 }
 
