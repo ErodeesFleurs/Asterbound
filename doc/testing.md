@@ -293,6 +293,19 @@ values, insertion preserves the old end-relative stop: omit the oldest
 `1 - maxMessagePerEntity` previous bubbles, or all if there are fewer. The
 subsequent per-tick visibility filter still applies.
 
+### Bézier beam geometry
+
+Arc length is a sampled polyline length, not the endpoint distance. A closed
+curve with distinct interior controls is a useful regression: its chord is
+zero but its length is positive. Check a nonzero subinterval on a straight
+line independently, and check the range transition on the real paint tool.
+Display segments use uniform curve parameters; detached particles use length
+fractions. Extra display calls must not advance simulation randomness.
+Run `Spline.*` for independent curve and inverse checks. The spline fixture
+in `math_common_benchmarks` compares point sampling, changing-frame length
+and batches of inverse queries. Report the length error alongside timings:
+the former endpoint-distance implementation did not compute equivalent work.
+
 ### Spatial entity queries
 
 Compare spatial-index membership against an exhaustive closed-box intersection

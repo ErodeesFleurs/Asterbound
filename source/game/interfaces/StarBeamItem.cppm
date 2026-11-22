@@ -4,76 +4,14 @@ import star.format;
 import star.type_identity;
 import star.set;
 import star.json;
-import star.id_map;
 import star.vector;
 import star.spline;
 import star.game_types;
 import star.string;
-import star.data_stream;
 import star.color;
 import star.list;
-import star.image_processing;
-import star.hash;
-import star.string_view;
-import star.thread;
-import star.directives;
-import star.asset_path;
-import star.casting;
-import star.strong_typedef;
-import star.bi_map;
-import star.rpc_promise;
-import star.a_star;
-
-
 import star.drawable;
-
 import star.non_rotated_drawables_item;
-
-import star.damage_types;
-import star.world_geometry;
-import star.status_types;
-import star.damage;
-
-import star.light_source;
-
-import star.entity;
-import star.animation;
-import star.particle;
-import star.interaction_types;
-
-
-import star.tile_damage;
-
-import star.item_descriptor;
-import star.celestial_coordinate;
-import star.quest_descriptor;
-
-import star.interactive_entity;
-import star.collision_block;
-
-import star.tile_entity;
-import star.tile_modification;
-import star.lua_root;
-
-import star.force_regions;
-
-import star.world;
-
-import star.physics_entity;
-import star.movement_controller;
-import star.platformer_astar_types;
-
-import star.anchorable_entity;
-
-import star.game_timers;
-import star.actor_movement_controller;
-
-import star.mobile_entity;
-
-import star.actor_entity;
-
-import star.tool_user_entity;
-
 import star.tool_user_item;
 
 namespace Star {
@@ -163,9 +101,10 @@ protected:
   bool m_beamCanPlace = true;
   Color m_lastUpdateColor;
 
-  CSplineF m_beamCurve;
-
 private:
+  CSplineF m_beam_curve;
+  SplineArcLengthTable<float, 100> m_beam_arc;
+  float m_target_distance = 0;
   std::reference_wrapper<Root> m_beamRoot;
 };
 

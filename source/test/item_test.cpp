@@ -63,12 +63,13 @@ import star.light_source;
 
 import star.beam_item;
 import star.active_item;
-import star.casting;
 import star.client_context;
 import star.entity_rendering;
 import star.fireable_item;
 import star.game_types;
 import star.particle;
+import star.line;
+import star.tools;
 import star.tool_user;
 import star.uuid;
 import star.vector;
@@ -1229,12 +1230,24 @@ const GameTestRegistration
     auto uninitTools = make_scope_exit([&] { EXPECT_TRUE((*tools)->uninit()); });
     auto database = root.itemDatabase();
     ASSERT_TRUE(database);
-    auto item = inventoryTestItem(**database, "painttool");
+    auto paint = (*database)->itemConfig("painttool", JsonObject{});
+    ASSERT_TRUE(paint);
+    // Keep the genuine asset and item implementation; make the cubic overshoot
+    // its endpoint, and remove display noise so its geometry is observable.
+    auto config = paint->config.set_all(JsonObject{
+      {"nearControlPointElasticity", 1}, {"farControlPointElasticity", 1},
+      {"nearControlPointDistance", 3}, {"targetSegmentRun", 1},
+      {"minBeamLines", 1}, {"maxBeamLines", 1}, {"maxBeamJitter", 0},
+      {"minBeamTrans", 0}, {"maxBeamTrans", 1}, {"beamTransDev", 0}});
+    ASSERT_TRUE(config);
+    auto item = PaintingBeamTool::create(root, *config, paint->directory, paint->parameters);
     ASSERT_TRUE(item);
-    auto beam = as<BeamItem>(item->get());
-    ASSERT_TRUE(beam);
-    auto fireable = as<FireableItem>(item->get());
-    ASSERT_TRUE(fireable);
+    BeamItem& beam = **item;
+    auto point_at = [](Vec2F const& start, Vec2F const& end, float t) {
+      float u = 1 - t;
+      // Independent Bernstein form for controls {start, 3*(end-start), end, end}.
+      return start * (u * u * u) + (end - start) * (9 * u * u * t) + end * ((3 * u + t) * t * t);
+    };
 
     struct Events : NullRenderCallback {
       std::vector<std::tuple<Vec2F, Vec2F, Color>> particles;
@@ -1252,16 +1265,38 @@ const GameTestRegistration
       SCOPED_TRACE(displayCalls);
       ASSERT_TRUE((*tools)->setItems({}, {}));
       ASSERT_TRUE((*tools)->setItems(*item, {}));
-      beam->setRange(8);
-      player.aim(origin + Vec2F(2, 0));
+      constexpr float range = 25;
+      beam.setRange(range);
+      player.aim(origin + Vec2F(5, 0));
       // Equipping deliberately triggers the real item's cooldown. Advance
       // fixed ticks through it before requiring a visible painting beam.
-      unsigned equipTicks = (unsigned)std::ceil(fireable->cooldownTime() / dt) + 1;
+      unsigned equipTicks = (unsigned)std::ceil((*item)->cooldownTime() / dt) + 1;
       for (unsigned i = 0; i != equipTicks; ++i)
         ASSERT_TRUE((*tools)->tick(dt, false, {}));
-      auto warm = beam->nonRotatedDrawables();
+      auto warm = beam.nonRotatedDrawables();
       ASSERT_TRUE(warm);
       ASSERT_FALSE(warm->empty());
+      auto first = std::find_if(warm->begin(), warm->end(), [](Drawable const& d) { return d.isLine(); });
+      ASSERT_NE(first, warm->end());
+      auto const start = first->linePart().line.min();
+      auto const end = centerOfTile(origin + Vec2F(5, 0)) - player.position();
+      float length = 0;
+      Vec2F previous = start;
+      for (int i = 1; i <= 512; ++i) {
+        auto point = point_at(start, end, static_cast<float>(i) / 512);
+        length += (point - previous).magnitude();
+        previous = point;
+      }
+      auto opacity = beam.getAppropriateOpacity();
+      ASSERT_TRUE(opacity);
+      EXPECT_NEAR(*opacity, 1 - length / range, .002f);
+      // Three stripes per segment, no jitter. The first display vertex is
+      // uniformly spaced in parameter even though the cubic doubles back.
+      auto const stripes = std::distance(first, warm->end());
+      ASSERT_EQ(stripes % 3, 0);
+      ASSERT_GT(stripes, 3);
+      auto const vertex = point_at(start, end, 1.f / static_cast<float>(stripes / 3 + 1));
+      EXPECT_LT((first->linePart().line.max() - vertex).magnitude(), .001f);
       ASSERT_TRUE(player.collectRenderEvents(discard));
 
       // This private Root has no UniverseServer/background simulation threads.
@@ -1269,7 +1304,7 @@ const GameTestRegistration
       root.random().seed(seed);
       RandomSource untouched(seed);
       for (unsigned i = 0; i != displayCalls; ++i) {
-        auto sampled = beam->nonRotatedDrawables();
+        auto sampled = beam.nonRotatedDrawables();
         ASSERT_TRUE(sampled);
         EXPECT_FALSE(sampled->empty());
       }
@@ -1278,8 +1313,13 @@ const GameTestRegistration
       // Changing input is not itself a beam tick. Display sampling must neither
       // observe the future transition nor enqueue its leftovers.
       player.aim(origin + Vec2F(20, 0));
+      auto const far_end = centerOfTile(origin + Vec2F(20, 0)) - player.position();
+      ASSERT_LT(far_end.magnitude(), range);
+      auto hand = player.handPosition(ToolHand::Primary, (beam.firePosition() - beam.handPosition()) / TilePixels);
+      ASSERT_TRUE(hand);
+      ASSERT_LT((far_end - *hand).magnitude(), range); // the chord alone would stay in range
       for (unsigned i = 0; i != displayCalls; ++i) {
-        auto sampled = beam->nonRotatedDrawables();
+        auto sampled = beam.nonRotatedDrawables();
         ASSERT_TRUE(sampled);
         EXPECT_FALSE(sampled->empty());
       }
@@ -1290,16 +1330,25 @@ const GameTestRegistration
 
       ASSERT_TRUE((*tools)->tick(dt, false, {}));
       for (unsigned i = 0; i != displayCalls; ++i) {
-        auto sampled = beam->nonRotatedDrawables();
+        auto sampled = beam.nonRotatedDrawables();
         ASSERT_TRUE(sampled);
         EXPECT_TRUE(sampled->empty());
       }
       ASSERT_TRUE(player.collectRenderEvents(events));
-      ASSERT_FALSE(events.particles.empty());
+      ASSERT_GT(events.particles.size(), 4u);
+      // At targetSegmentRun=1 the broken beam deposits approximately two
+      // particles per tile of arc. Chords may shorten across the turnaround.
+      auto previous_particle = player.position() + *hand;
+      float furthest_x = previous_particle[0];
       for (auto const& particle : events.particles) {
-        EXPECT_GT(std::get<0>(particle)[0], origin[0] - 8);
-        EXPECT_GT(std::get<0>(particle)[1], origin[1] - 8);
+        auto const& point = std::get<0>(particle);
+        EXPECT_LE((point - previous_particle).magnitude(), .53f);
+        furthest_x = std::max(furthest_x, point[0]);
+        previous_particle = point;
       }
+      EXPECT_NEAR((std::get<0>(events.particles.front()) - (player.position() + *hand)).magnitude(), .5f, .03f);
+      EXPECT_GT(furthest_x, player.position()[0] + far_end[0] + 4);
+      EXPECT_NEAR((previous_particle - (player.position() + far_end)).magnitude(), 1.f, .05f);
       auto count = events.particles.size();
       ASSERT_TRUE(player.collectRenderEvents(events));
       EXPECT_EQ(events.particles.size(), count);

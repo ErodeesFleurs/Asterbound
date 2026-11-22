@@ -2,6 +2,7 @@ import std;
 import star.math_common;
 import star.interpolation;
 import star.vector;
+import star.spline;
 import star.matrix3;
 import star.format;
 
@@ -979,4 +980,205 @@ TEST(Matrix3, UncheckedGeometryRetainsLongDoublePrecision) {
     EXPECT_GT(std::fabs(rotation[1][0] - std::sin(rounded_angle)), 2 * epsilon);
     EXPECT_GT(std::fabs(identity.transform_angle(angle) - rounded_angle), 4 * epsilon);
   }
+}
+
+namespace {
+
+// Neither point offers magnitude() or conversion to Vector. One does not
+// even offer subtraction: evaluating a position must not need a derivative.
+template <bool Subtract>
+struct SplineCoordinate {
+  double value;
+  explicit SplineCoordinate(double value) : value(value) {}
+  friend SplineCoordinate operator*(SplineCoordinate p, double s) { return SplineCoordinate(p.value * s); }
+  friend SplineCoordinate operator+(SplineCoordinate a, SplineCoordinate b) { return SplineCoordinate(a.value + b.value); }
+  friend SplineCoordinate operator-(SplineCoordinate a, SplineCoordinate b) requires Subtract {
+    return SplineCoordinate(a.value - b.value);
+  }
+};
+
+template <typename Scalar>
+concept has_scalar_spline = requires { typename Spline<Scalar, 2, 3>; };
+
+template <typename Curve>
+concept has_spline_derivative = requires(Curve const& curve) { curve.derivative_at(0.5); };
+
+template <typename Curve>
+concept has_spline_length = requires(Curve const& curve) { curve.length(); };
+
+template <typename Curve, std::size_t N>
+concept has_spline_table = requires(Curve const& curve) { curve.template arc_length_table<N>(); };
+
+template <typename Curve>
+concept can_borrow_temporary_origin = requires(Curve&& curve) { std::move(curve).origin(); };
+
+template <typename Curve>
+concept can_borrow_temporary_dest = requires(Curve&& curve) { std::move(curve).dest(); };
+
+template <typename Curve>
+concept can_borrow_temporary_control = requires(Curve&& curve) { std::move(curve)[0]; };
+
+template <finite_classifiable Scalar, std::unsigned_integral Bits>
+  requires (sizeof(Scalar) == sizeof(Bits))
+void expect_spline_parameter_policy(std::initializer_list<Bits> patterns) {
+  using Point = Vector<Scalar, 2>;
+  Spline<Scalar, 2, 2> curve(Point(2, 1), Point(3, 3), Point(6, 1));
+  auto table = curve.template arc_length_table<4>();
+  EXPECT_EQ(curve.point_at(Scalar(-1)), Point(2, 1));
+  EXPECT_EQ(curve.point_at(Scalar(2)), Point(6, 1));
+  EXPECT_EQ(curve.derivative_at(Scalar(-1)), Point(2, 4));
+  EXPECT_EQ(curve.derivative_at(Scalar(2)), Point(6, -4));
+  EXPECT_EQ(table.parameter_at_length_fraction(Scalar(-1)), 0);
+  EXPECT_EQ(table.parameter_at_length_fraction(Scalar(2)), 1);
+
+  for (Bits pattern : patterns) {
+    volatile Bits input = pattern;
+    Bits bits = input;
+    SCOPED_TRACE(std::format("{}-bit parameter 0x{:x}", std::numeric_limits<Bits>::digits, bits));
+    auto value = std::bit_cast<Scalar>(bits);
+    EXPECT_EQ(curve.point_at(value), Point(2, 1));
+    EXPECT_EQ(curve.derivative_at(value), Point(2, 4));
+    EXPECT_EQ(curve.length(value, Scalar(1)), 0);
+    EXPECT_EQ(curve.length(Scalar(0), value), 0);
+    EXPECT_EQ(table.parameter_at_length_fraction(value), 0);
+  }
+}
+
+}
+
+TEST(Spline, QuadraticPointDerivativeAndPolylineHaveIndependentOracles) {
+  // P(t) = (2t, 4t(1-t)). Its speed is 2 sqrt(1 + (2-4t)^2).
+  Spline<double, 2, 2> curve(Vec2D(0, 0), Vec2D(1, 2), Vec2D(2, 0));
+  EXPECT_EQ(curve.point_at(0.25), Vec2D(0.5, 0.75));
+  EXPECT_EQ(curve.derivative_at(0.25), Vec2D(2, 2));
+  EXPECT_EQ(curve.derivative_at(1), Vec2D(2, -4));
+  EXPECT_EQ(curve.length(0, 1, 0), 0);
+  EXPECT_EQ(curve.length(0, 1, 1), 2);
+  EXPECT_NEAR(curve.length(0, 1, 2), 2 * std::sqrt(2.0), 1e-14);
+  EXPECT_NEAR(curve.length(0, 1, 4), 2 * (std::hypot(0.5, 0.75) + std::hypot(0.5, 0.25)), 1e-14);
+  EXPECT_NEAR(curve.length(0, 1, 256), std::sqrt(5.0) + std::asinh(2.0) / 2, 1e-5);
+  EXPECT_EQ(curve.length(0, 1, 1), 2);
+}
+
+TEST(Spline, ClosedCurveMeasuresTravelInBothDirections) {
+  Spline<double, 2, 2> retrace(Vec2D(3, 4), Vec2D(7, 4), Vec2D(3, 4));
+  EXPECT_EQ(retrace.length(0, 1, 1), 0);
+  EXPECT_EQ(retrace.length(0, 1, 2), 4);
+  EXPECT_DOUBLE_EQ(retrace.length(), 4);
+  EXPECT_EQ(retrace.length(0.25, 0.75, 2), 1);
+}
+
+TEST(Spline, StraightIntervalsStartAndEndAtTheirSpecifiedParameters) {
+  Spline<double, 2, 1> line(Vec2D(8, 10), Vec2D(14, 18));
+  for (auto subdivisions : {1u, 2u, 8u}) {
+    EXPECT_DOUBLE_EQ(line.length(0.25, 0.75, subdivisions), 5);
+    EXPECT_EQ(line.length(0.75, 0.75, subdivisions), 0);
+    EXPECT_EQ(line.length(0.75, 0.25, subdivisions), 0);
+  }
+  EXPECT_EQ(line.length(-0.25, 0.5), 0);
+  EXPECT_EQ(line.length(0.5, 1.25), 0);
+}
+
+TEST(Spline, DegreeZeroAndRepeatedControls) {
+  Spline<double, 2, 0> single(Vec2D(5, -7));
+  EXPECT_EQ(single.point_at(0.25), Vec2D(5, -7));
+  EXPECT_EQ(single.derivative_at(0.25), Vec2D(0, 0));
+  EXPECT_EQ(single.length(), 0);
+
+  Spline<double, 2, 3> constant(Vec2D(5, -7), Vec2D(5, -7), Vec2D(5, -7), Vec2D(5, -7));
+  auto flat = constant.arc_length_table();
+  EXPECT_EQ(constant.length(), 0);
+  EXPECT_EQ(flat.total_length(), 0);
+  EXPECT_EQ(flat.parameter_at_length_fraction(0), 0);
+  EXPECT_EQ(flat.parameter_at_length_fraction(0.5), 0);
+  EXPECT_EQ(flat.parameter_at_length_fraction(1), 1);
+
+  // Geometrically straight, but x(t) = 16t²: length fractions are NOT t.
+  Spline<double, 2, 2> square(Vec2D(0, 0), Vec2D(0, 0), Vec2D(16, 0));
+  auto table = square.arc_length_table<4>();
+  EXPECT_EQ(square.derivative_at(0), Vec2D(0, 0));
+  EXPECT_EQ(table.total_length(), 16);
+  EXPECT_EQ(table.parameter_at_length_fraction(0.25), 0.5);
+  EXPECT_EQ(table.parameter_at_length_fraction(6.5 / 16), 0.625);
+}
+
+TEST(Spline, InverseSelectsFirstPlateauSampleAndBracketsAllFractions) {
+  // x(t) = (8t-3)². Four chords visit 9,1,1,9,25; cumulative lengths
+  // 0,8,8,16,32 include a true interior plateau with nonconstant controls.
+  Spline<double, 2, 2> curve(Vec2D(9, 0), Vec2D(-15, 0), Vec2D(25, 0));
+  auto table = curve.arc_length_table<4>();
+  EXPECT_EQ(table.total_length(), 32);
+  std::size_t cursor = 0;
+  for (int i = 0; i <= 128; ++i) {
+    double fraction = i / 128.0;
+    double expected = fraction <= 0.25 ? fraction
+        : fraction <= 0.5 ? fraction + 0.25 : 0.5 + 0.5 * fraction;
+    EXPECT_EQ(table.parameter_at_length_fraction(fraction), expected);
+    EXPECT_EQ(table.parameter_at_length_fraction(fraction, cursor), expected);
+  }
+}
+
+TEST(Spline, RetainedControlEditsAffectCurveButNotEarlierLengthSnapshot) {
+  Spline<double, 2, 2> curve(Vec2D(0, 0), Vec2D(0, 0), Vec2D(4, 0));
+  auto& control = curve[1];
+  auto& end = curve.dest();
+  auto saved = curve.arc_length_table<2>();
+  EXPECT_EQ(curve.point_at(0.5), Vec2D(1, 0));
+  EXPECT_EQ(curve.length(0, 1, 2), 4);
+  control = Vec2D(4, 0);
+  end = Vec2D(0, 0);
+  EXPECT_EQ(curve.point_at(0.5), Vec2D(2, 0));
+  EXPECT_EQ(curve.derivative_at(1), Vec2D(-8, 0));
+  auto current = curve.arc_length_table<2>();
+  EXPECT_EQ(current.parameter_at_length_fraction(0.25), 0.25);
+  EXPECT_EQ(saved.parameter_at_length_fraction(0.25), 0.5);
+  curve.origin() = Vec2D(4, 0);
+  end = Vec2D(4, 0);
+  EXPECT_EQ(curve.length(0, 1, 2), 0);
+  EXPECT_EQ(curve.arc_length_table<2>().total_length(), 0);
+  EXPECT_EQ(saved.total_length(), 4);
+  EXPECT_EQ(current.total_length(), 4);
+}
+
+TEST(Spline, DoubleParametersDoNotRoundThroughFloat) {
+  double t = 0.5 + 0x1p-40;
+  Spline<double, 2, 1> line(Vec2D(0, 0), Vec2D(1, 0));
+  EXPECT_EQ(line.point_at(t), Vec2D(t, 0));
+  EXPECT_EQ(line.length(0.5, t, 1), 0x1p-40);
+  auto table = line.arc_length_table<4>();
+  static_assert(std::same_as<decltype(table.parameter_at_length_fraction(t)), double>);
+  EXPECT_EQ(table.parameter_at_length_fraction(t), t);
+  Spline<double, 2, 2> quadratic(Vec2D(0, 0), Vec2D(0.5, 0), Vec2D(1, 1));
+  EXPECT_EQ(quadratic.derivative_at(t), Vec2D(1, 2 * t));
+}
+
+TEST(Spline, ParameterPolicyAppliesUnderProductionFloatingPointFlags) {
+  expect_spline_parameter_policy<float>({0x7f800000u, 0xff800000u, 0x7fc00001u, 0xffc00001u});
+  expect_spline_parameter_policy<double>(
+      {0x7ff0000000000000ull, 0xfff0000000000000ull, 0x7ff8000000000001ull, 0xfff8000000000001ull});
+}
+
+TEST(Spline, OperationsRequireOnlyTheirOwnPointAlgebra) {
+  using Blend = SplineCoordinate<false>;
+  using BlendCurve = Spline<double, 1, 2, Blend>;
+  static_assert(std::constructible_from<BlendCurve, Blend, Blend, Blend>);
+  static_assert(!std::constructible_from<BlendCurve, Blend, Blend>);
+  static_assert(!std::constructible_from<BlendCurve, Blend, Blend, Blend, Blend>);
+  static_assert(!std::constructible_from<BlendCurve, Blend, NotNumeric, Blend>);
+  static_assert(!has_spline_derivative<BlendCurve> && !has_spline_length<BlendCurve>);
+  static_assert(!has_spline_table<BlendCurve, 4>);
+  BlendCurve blend(Blend(1), Blend(2), Blend(6));
+  EXPECT_EQ(blend.point_at(0.25).value, 1.6875);
+
+  using Control = SplineCoordinate<true>;
+  using CustomCurve = Spline<double, 1, 2, Control>;
+  static_assert(has_spline_derivative<CustomCurve> && !has_spline_length<CustomCurve>);
+  CustomCurve custom(Control(1), Control(2), Control(6));
+  EXPECT_EQ(custom.derivative_at(0.25).value, 3.5);
+
+  static_assert(has_scalar_spline<float> && has_scalar_spline<double>);
+  static_assert(!has_scalar_spline<int> && !has_scalar_spline<long double>);
+  static_assert(has_spline_table<CSplineF, 1> && !has_spline_table<CSplineF, 0>);
+  static_assert(!can_borrow_temporary_control<CSplineF> && !can_borrow_temporary_origin<CSplineF>
+      && !can_borrow_temporary_dest<CSplineF>);
 }

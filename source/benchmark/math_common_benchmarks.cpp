@@ -304,11 +304,14 @@ void register_type(std::string_view type) {
 
 }// namespace
 
+void register_spline_benchmarks();
+
 // The native main/Google Benchmark ABI is the only pointer boundary.
 int main(int argc, char** argv) {
   return Star::run_benchmarks(argc, argv, [](int) {
     register_type<float>("Float");
     register_type<double>("Double");
+    register_spline_benchmarks();
     benchmark::RegisterBenchmark("MathCommon/Int64/ModuloAndWrap", integer_wrap)->Arg(1)->Arg(64);
     benchmark::RegisterBenchmark("MathCommon/Byte/Quantization", byte_quantization)->Arg(1)->Arg(64);
     return 0;

@@ -1,73 +1,29 @@
 import star.json;
 import star.json_extra;
-import star.id_map;
 import star.vector;
 import star.math_common;
 import star.spline;
 import star.game_types;
 import star.string;
-import star.data_stream;
 import star.color;
 import star.list;
 import star.image_processing;
-import star.hash;
-import star.string_view;
-import star.thread;
-import star.directives;
 import star.asset_path;
-import star.casting;
-import star.strong_typedef;
-import star.bi_map;
-import star.rpc_promise;
-import star.a_star;
 import star.random;
-import star.ordered_map;
-import star.io_device;
-import star.ref_ptr;
-import star.logging;
-import star.listener;
 import std;
 import star.format;
-import star.version;
 import star.set;
 
 import star.drawable;
-import star.non_rotated_drawables_item;
-import star.damage_types;
 import star.world_geometry;
-import star.status_types;
-import star.damage;
-import star.light_source;
 import star.entity;
-import star.animation;
 import star.particle;
-import star.interaction_types;
-import star.tile_damage;
-import star.item_descriptor;
-import star.celestial_coordinate;
-import star.quest_descriptor;
-import star.interactive_entity;
-import star.collision_block;
-import star.tile_entity;
-import star.tile_modification;
-import star.lua_root;
-import star.force_regions;
 import star.world;
-import star.physics_entity;
-import star.movement_controller;
-import star.platformer_astar_types;
-import star.anchorable_entity;
-import star.game_timers;
-import star.actor_movement_controller;
-import star.mobile_entity;
-import star.actor_entity;
 import star.tool_user_entity;
 import star.tool_user_item;
 import star.beam_item;
-import star.asset_source;
 import star.assets;
 import star.root_base;
-import star.configuration;
 import star.root;
 import star.item;
 
@@ -181,7 +137,9 @@ std::expected<void, StarException> BeamItem::init(ToolUserEntity& owner, ToolHan
   auto initialized = ToolUserItem::init(owner, hand);
   if (!initialized)
     return std::unexpected(std::move(initialized.error()));
-  m_beamCurve = CSplineF();
+  m_beam_curve = {};
+  m_beam_arc = {};
+  m_target_distance = 0;
   m_inRangeLastUpdate = false;
   m_beamInRange = false;
   m_beamCanPlace = true;
@@ -199,42 +157,50 @@ std::expected<void, StarException> BeamItem::init(ToolUserEntity& owner, ToolHan
 std::expected<void, StarException> BeamItem::update(float, FireMode, bool, HashSet<MoveControlType> const&) {
   if (!initialized())
     return std::unexpected(ItemException("BeamItem::update: Beam Gun not init'd properly, or user not recognized as Tool User."));
-  auto itemOwner = owner();
-  if (!itemOwner)
-    return std::unexpected(std::move(itemOwner.error()));
-  auto itemHand = hand();
-  if (!itemHand)
-    return std::unexpected(std::move(itemHand.error()));
-  auto itemWorld = world();
-  if (!itemWorld)
-    return std::unexpected(std::move(itemWorld.error()));
-  auto position = itemOwner->get().handPosition(*itemHand, (m_firePosition - m_handPosition) / TilePixels);
-  if (!position)
-    return std::unexpected(std::move(position.error()));
-  m_beamCurve.origin() = *position;
-  auto aimPosition = itemOwner->get().aimPosition();
-  if (!aimPosition)
-    return std::unexpected(std::move(aimPosition.error()));
-  if (m_endType == EndType::TileGroup)
-    m_beamCurve.dest() = itemWorld->get().geometry().diff(aimPosition->round(), itemOwner->get().position());
-  else if (m_endType == EndType::Wire)
-    m_beamCurve.dest() = itemWorld->get().geometry().diff(*aimPosition, itemOwner->get().position());
-  else
-    m_beamCurve.dest() = itemWorld->get().geometry().diff(centerOfTile(*aimPosition), itemOwner->get().position());
+  auto item_owner = owner();
+  if (!item_owner)
+    return std::unexpected(std::move(item_owner.error()));
+  auto item_hand = hand();
+  if (!item_hand)
+    return std::unexpected(std::move(item_hand.error()));
+  auto item_world = world();
+  if (!item_world)
+    return std::unexpected(std::move(item_world.error()));
+  auto& user = item_owner->get();
+  auto origin = user.handPosition(*item_hand, (m_firePosition - m_handPosition) / TilePixels);
+  if (!origin)
+    return std::unexpected(std::move(origin.error()));
+  auto aim = user.aimPosition();
+  if (!aim)
+    return std::unexpected(std::move(aim.error()));
+  auto const endpoint = m_endType == EndType::TileGroup ? aim->round()
+      : m_endType == EndType::Wire ? *aim : centerOfTile(*aim);
+  auto const owner_position = user.position();
+  auto const dest = item_world->get().geometry().diff(endpoint, owner_position);
+  // The separate owner-to-target range check uses the unwrapped world coordinates.
+  m_target_distance = (endpoint - owner_position).magnitude();
 
-  if (m_beamCurve.dest().magnitude_squared() < m_beamCurve.origin().magnitude_squared())
-    m_beamCurve[2] = m_beamCurve.dest();
-  else
-    m_beamCurve[2] = m_beamCurve[2] + (m_beamCurve.dest() - m_beamCurve[2]) * m_farControlPointElasticity;
+  Vec2F far_control, near_control;
+  if (dest.magnitude_squared() < origin->magnitude_squared()) {
+    far_control = dest;
+    near_control = *origin;
+  } else {
+    auto const& far = m_beam_curve[2];
+    far_control = far + (dest - far) * m_farControlPointElasticity;
+    auto const desired = (dest - *origin) * m_nearControlPointDistance;
+    auto const& near = m_beam_curve[1];
+    near_control = user.facingDirection() != getAngleSide(near.angle()).second
+        ? desired : near + (desired - near) * m_nearControlPointElasticity;
+  }
 
-  Vec2F desiredNearControlPoint = (m_beamCurve.dest() - m_beamCurve.origin()) * m_nearControlPointDistance;
-
-  if (m_beamCurve.dest().magnitude_squared() < m_beamCurve.origin().magnitude_squared())
-    m_beamCurve[1] = m_beamCurve.origin();
-  else if (itemOwner->get().facingDirection() != getAngleSide(m_beamCurve[1].angle()).second)
-    m_beamCurve[1] = desiredNearControlPoint;
-  else
-    m_beamCurve[1] = m_beamCurve[1] + (desiredNearControlPoint - m_beamCurve[1]) * m_nearControlPointElasticity;
+  if (*origin != m_beam_curve.origin() || dest != m_beam_curve.dest()
+      || near_control != m_beam_curve[1] || far_control != m_beam_curve[2]) {
+    m_beam_curve.origin() = *origin;
+    m_beam_curve.dest() = dest;
+    m_beam_curve[1] = near_control;
+    m_beam_curve[2] = far_control;
+    m_beam_curve.sample_arc_lengths(m_beam_arc);
+  }
   return {};
 }
 
@@ -245,22 +211,8 @@ std::expected<void, StarException> BeamItem::updateBeamEffects(bool visible) {
     return {};
   }
 
-  auto itemOwner = owner();
-  if (!itemOwner)
-    return std::unexpected(std::move(itemOwner.error()));
-  auto aimPosition = itemOwner->get().aimPosition();
-  if (!aimPosition)
-    return std::unexpected(std::move(aimPosition.error()));
-  Vec2F endPoint;
-  if (m_endType == EndType::TileGroup)
-    endPoint = aimPosition->round();
-  else if (m_endType == EndType::Wire)
-    endPoint = *aimPosition;
-  else
-    endPoint = centerOfTile(*aimPosition);
-
-  float curveLen = m_beamCurve.length();
-  m_beamInRange = (endPoint - itemOwner->get().position()).magnitude() <= m_range && curveLen <= m_range;
+  float const curve_length = m_beam_arc.total_length();
+  m_beamInRange = m_target_distance <= m_range && curve_length <= m_range;
   if (m_beamInRange) {
     auto canPlace = beamCanPlace();
     if (!canPlace)
@@ -275,13 +227,22 @@ std::expected<void, StarException> BeamItem::updateBeamEffects(bool visible) {
   if (!std::exchange(m_inRangeLastUpdate, false))
     return {};
 
+  auto item_owner = owner();
+  if (!item_owner)
+    return std::unexpected(std::move(item_owner.error()));
+  auto const owner_position = item_owner->get().position();
+  float const segment_run = curve_length * m_targetSegmentRun * 2;
+  int const end = static_cast<int>(segment_run - .5);
+  float const divisions = static_cast<float>(static_cast<int>(segment_run + .5));
+  std::size_t cursor = 0;
   List<Particle> beamLeftovers;
-  for (auto i = 1; i < static_cast<int>(curveLen * m_targetSegmentRun * 2 - .5); i++) {
-    float pos = static_cast<float>(i) / static_cast<float>(static_cast<int>(curveLen * m_targetSegmentRun * 2 + .5));
-    float curveLoc = m_beamCurve.arcLenPara(pos);
+  if (end > 1)
+    beamLeftovers.reserve(end - 1);
+  for (int i = 1; i < end; ++i) {
+    float const t = m_beam_arc.parameter_at_length_fraction(static_cast<float>(i) / divisions, cursor);
     Particle beamParticle;
     beamParticle.type = Particle::Type::Ember;
-    beamParticle.position = itemOwner->get().position() + m_beamCurve.pointAt(curveLoc);
+    beamParticle.position = owner_position + m_beam_curve.point_at(t);
     beamParticle.size = 1.0f;
     Color randomColor = m_lastUpdateColor;
     auto valueScale = beamRoot().random().uniform_float(1, 4);
@@ -303,7 +264,7 @@ std::expected<void, StarException> BeamItem::updateBeamEffects(bool visible) {
   }
   // Capture world positions at the producing tick, not at display sampling or
   // a later owner position.
-  return itemOwner->get().addParticles(beamLeftovers);
+  return item_owner->get().addParticles(beamLeftovers);
 }
 
 bool BeamItem::beamActive() const {
@@ -319,10 +280,10 @@ std::expected<List<Drawable>, StarException> BeamItem::nonRotatedDrawables() con
 }
 
 std::expected<float, StarException> BeamItem::getAngle(float angle) {
-  if (m_beamCurve.dest().magnitude_squared() < m_beamCurve.origin().magnitude_squared()
-      || m_beamCurve.origin() == m_beamCurve[1])
+  if (m_beam_curve.dest().magnitude_squared() < m_beam_curve.origin().magnitude_squared()
+      || m_beam_curve.origin() == m_beam_curve[1])
     return angle;
-  return getAngleSide(m_beamCurve[1].angle()).first;
+  return getAngleSide(m_beam_curve[1].angle()).first;
 }
 
 std::expected<List<Drawable>, StarException> BeamItem::drawables() const {
@@ -348,8 +309,7 @@ void BeamItem::setRange(float range) {
 }
 
 std::expected<float, StarException> BeamItem::getAppropriateOpacity() const {
-  float curveLen = m_beamCurve.length();
-  const float rangeEffect = (m_range - curveLen) / m_range;
+  const float rangeEffect = (m_range - m_beam_arc.total_length()) / m_range;
 
   auto projectOntoRange = [&](float min, float max) { return rangeEffect * (max - min) + min; };
   auto rangeRand = [&](float dev, float min, float max) -> std::expected<float, StarException> {
@@ -382,8 +342,8 @@ void BeamItem::setEnd(EndType type) {
 std::expected<List<Drawable>, StarException> BeamItem::beamDrawables() const {
   List<Drawable> res;
 
-  float curveLen = m_beamCurve.length();
-  const float rangeEffect = (m_range - curveLen) / m_range;
+  const float curve_length = m_beam_arc.total_length();
+  const float rangeEffect = (m_range - curve_length) / m_range;
 
   auto projectOntoRange = [&](float min, float max) { return rangeEffect * (max - min) + min; };
   auto rangeRand = [&](float dev, float min, float max) -> std::expected<float, StarException> {
@@ -410,7 +370,7 @@ std::expected<List<Drawable>, StarException> BeamItem::beamDrawables() const {
         auto metadata = beamRoot().imageMetadataDatabase();
         if (!metadata)
           return std::unexpected(std::move(metadata.error()));
-        auto ball = Drawable::makeImage(**metadata, endImage, 1.0f / TilePixels, true, m_beamCurve.dest());
+        auto ball = Drawable::makeImage(**metadata, endImage, 1.0f / TilePixels, true, m_beam_curve.dest());
         if (!ball)
           return std::unexpected(std::move(ball.error()));
         Color ballColor = Color::White;
@@ -422,6 +382,9 @@ std::expected<List<Drawable>, StarException> BeamItem::beamDrawables() const {
         res.push_back(std::move(*ball));
       }
 
+      float const segment_run = curve_length * m_targetSegmentRun;
+      int const end = static_cast<int>(segment_run - .5);
+      float const divisions = static_cast<float>(static_cast<int>(segment_run + .5));
       for (auto line = 0; line < numLines; line++) {
         auto width = rangeRand(m_beamWidthDev, m_minBeamWidth, m_maxBeamWidth);
         if (!width)
@@ -432,7 +395,7 @@ std::expected<List<Drawable>, StarException> BeamItem::beamDrawables() const {
           return std::unexpected(std::move(transparency.error()));
         float beamTransparency = *transparency;
         mainColor.set_alpha_f(mainColor.alpha_f() * beamTransparency);
-        Vec2F previousLoc = m_beamCurve.origin(); // lines meet at origin and dest.
+        Vec2F previousLoc = m_beam_curve.origin(); // lines meet at origin and dest.
         Color innerStripe = mainColor;
         innerStripe.set_value(1 - (1 - innerStripe.value()) / m_innerBrightnessScale);
         innerStripe.set_saturation(innerStripe.saturation() / m_innerBrightnessScale);
@@ -441,10 +404,9 @@ std::expected<List<Drawable>, StarException> BeamItem::beamDrawables() const {
         innerStripe.set_saturation(innerStripe.saturation() / m_innerBrightnessScale);
         Color const secondStripe = Color::rgba(innerStripe.to_rgba());
 
-        for (auto i = 1; i < static_cast<int>(curveLen * m_targetSegmentRun - .5); i++) {// one less than full length
-          float pos = static_cast<float>(i)
-            / static_cast<float>(
-                        static_cast<int>(curveLen * m_targetSegmentRun + .5));// project the discrete steps evenly
+        for (int i = 1; i < end; ++i) {
+          // The visible stripes are uniform in parameter, not in arc length.
+          float const pos = static_cast<float>(i) / divisions;
 
           auto jitterX = rangeRand(m_beamJitterDev, -m_maxBeamJitter, m_maxBeamJitter);
           if (!jitterX)
@@ -452,7 +414,7 @@ std::expected<List<Drawable>, StarException> BeamItem::beamDrawables() const {
           auto jitterY = rangeRand(m_beamJitterDev, -m_maxBeamJitter, m_maxBeamJitter);
           if (!jitterY)
             return std::unexpected(std::move(jitterY.error()));
-          Vec2F currentLoc = m_beamCurve.pointAt(pos) + Vec2F(*jitterX, *jitterY);
+          Vec2F currentLoc = m_beam_curve.point_at(pos) + Vec2F(*jitterX, *jitterY);
           res.push_back(
               Drawable::makeLine(Line2F(previousLoc, currentLoc), lineThickness, mainColor, Vec2F()));
           res.push_back(Drawable::makeLine(Line2F(previousLoc, currentLoc),
@@ -466,12 +428,12 @@ std::expected<List<Drawable>, StarException> BeamItem::beamDrawables() const {
           previousLoc = std::move(currentLoc);
         }
         res.push_back(Drawable::makeLine(
-            Line2F(previousLoc, m_beamCurve.dest()), lineThickness, mainColor, Vec2F()));
-        res.push_back(Drawable::makeLine(Line2F(previousLoc, m_beamCurve.dest()),
+            Line2F(previousLoc, m_beam_curve.dest()), lineThickness, mainColor, Vec2F()));
+        res.push_back(Drawable::makeLine(Line2F(previousLoc, m_beam_curve.dest()),
             lineThickness * m_firstStripeThickness,
             firstStripe,
             Vec2F()));
-        res.push_back(Drawable::makeLine(Line2F(previousLoc, m_beamCurve.dest()),
+        res.push_back(Drawable::makeLine(Line2F(previousLoc, m_beam_curve.dest()),
             lineThickness * m_secondStripeThickness,
             secondStripe,
             Vec2F()));
