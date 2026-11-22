@@ -2,50 +2,44 @@ module;
 
 import std;
 
-template <typename Type, typename Tag>
-struct StrongTypedefBuiltin {
-  Type t;
+namespace Star {
 
-  explicit StrongTypedefBuiltin(const Type t_)
-    : t(t_){}
+template <typename T>
+concept strong_scalar = std::same_as<T, std::remove_cv_t<T>> && (std::integral<T>
+    || ((std::same_as<T, float> || std::same_as<T, double>) && std::numeric_limits<T>::is_iec559));
 
-  StrongTypedefBuiltin()
-    : t(Type()) {}
+template <strong_scalar Scalar, typename Tag>
+struct StrongTypedef {
+  Scalar value{};
 
-  StrongTypedefBuiltin(const StrongTypedefBuiltin& t_)
-    : t(t_.t) {}
+  constexpr StrongTypedef() noexcept = default;
+  explicit constexpr StrongTypedef(Scalar initial) noexcept : value(initial) {}
 
-  StrongTypedefBuiltin& operator=(const StrongTypedefBuiltin& rhs) {
-    t = rhs.t;
-    return *this;
+  constexpr auto operator<=>(StrongTypedef const& rhs) const noexcept {
+    if constexpr (std::integral<Scalar>) {
+      return value <=> rhs.value;
+    } else {
+      // Compare IEEE representations so fast-math cannot assume away NaNs or signed zero.
+      using Bits = std::conditional_t<sizeof(Scalar) == 4, std::uint32_t, std::uint64_t>;
+      constexpr Bits sign = Bits{1} << (std::numeric_limits<Bits>::digits - 1);
+      constexpr Bits infinity = std::bit_cast<Bits>(std::numeric_limits<Scalar>::infinity());
+      auto key = [=](Bits bits) { return bits & sign ? ~bits + Bits{1} : bits | sign; };
+      auto a = std::bit_cast<Bits>(value);
+      auto b = std::bit_cast<Bits>(rhs.value);
+      if ((a & ~sign) > infinity || (b & ~sign) > infinity)
+        return std::partial_ordering::unordered;
+      return std::partial_ordering(key(a) <=> key(b));
+    }
   }
 
-  StrongTypedefBuiltin& operator=(Type const& rhs) {
-    t = rhs;
-    return *this;
-  }
-
-  operator const Type&() const {
-    return t;
-  }
-
-  operator Type&() {
-    return t;
-  }
-
-  bool operator==(StrongTypedefBuiltin const& rhs) const {
-    return t == rhs.t;
-  }
-
-  std::weak_ordering operator<=>(StrongTypedefBuiltin const& rhs) const {
-    if (t < rhs.t)
-      return std::weak_ordering::less;
-    if (rhs.t < t)
-      return std::weak_ordering::greater;
-    return std::weak_ordering::equivalent;
-  }
+  constexpr bool operator==(StrongTypedef const& rhs) const noexcept { return (*this <=> rhs) == 0; }
 };
+
+}
 
 export module star.strong_typedef;
 
-export using ::StrongTypedefBuiltin;
+export namespace Star {
+  using ::Star::strong_scalar;
+  using ::Star::StrongTypedef;
+}

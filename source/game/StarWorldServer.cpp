@@ -648,8 +648,8 @@ std::expected<bool, StarException> WorldServer::addClient(ConnectionId clientId,
   if (std::holds_alternative<SpawnTargetPosition>(spawnTarget)) {
     playerStart = std::get<SpawnTargetPosition>(spawnTarget);
   } else if (std::holds_alternative<SpawnTargetX>(spawnTarget)) {
-    auto targetX = std::get<SpawnTargetX>(spawnTarget);
-    auto result39 = findPlayerSpaceStart(targetX);
+    auto target_x = std::get<SpawnTargetX>(spawnTarget).value;
+    auto result39 = findPlayerSpaceStart(target_x);
     if (!result39)
       return std::unexpected(std::move(result39.error()));
     playerStart = std::move(*result39);

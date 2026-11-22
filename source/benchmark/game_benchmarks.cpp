@@ -18,6 +18,7 @@ import star.object_database;
 import star.projectile_database;
 import star.root;
 import star.root_loader;
+import star.warping;
 import star.string;
 import star.world_layout;
 import star.world_parameters;
@@ -811,6 +812,13 @@ int main(int argc, char** argv) {
     return 1;
   }
   BenchmarkSession session{**root};
+  benchmark::RegisterBenchmark("Warp/LongEntityTargetToJson", [](benchmark::State& state) {
+    SpawnTarget const target{SpawnTargetUniqueEntity(String(std::string(512, 'x')))};
+    for (auto _ : state) {
+      auto json = spawn_target_to_json(target);
+      benchmark::DoNotOptimize(json);
+    }
+  });
   benchmark::RegisterBenchmark("ObjectDatabase/ColdConfigParse_WarmAssets", [&](benchmark::State& state) {
     objectColdParse(state, session);
   })->Iterations(8)->UseRealTime()->Unit(benchmark::kMicrosecond);

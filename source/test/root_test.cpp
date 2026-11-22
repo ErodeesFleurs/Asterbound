@@ -78,6 +78,8 @@ import star.world_client;
 import star.warping;
 import star.data_stream_devices;
 import star.byte_array;
+import star.data_stream_extra;
+import star.encode;
 
 #include "gtest/gtest.h"
 
@@ -93,6 +95,39 @@ public:
     return {};
   }
 };
+
+const GameTestRegistration warp_target_wire("WarpTargetTest", "LegacyWireAndJson", [](GameTest&) {
+  // WorldId monostate, SpawnTarget alternative byte, then big-endian payload.
+  auto check = [](SpawnTarget const& target, std::string_view hex) {
+    WarpToWorld warp({}, target);
+    auto bytes = DataStreamBuffer::serialize(warp);
+    ASSERT_TRUE(bytes);
+    auto expected = hex_decode(hex);
+    EXPECT_EQ(*bytes, expected);
+    auto decoded = DataStreamBuffer::deserialize<WarpToWorld>(expected.span());
+    ASSERT_TRUE(decoded);
+    EXPECT_EQ(*decoded, warp);
+    auto json_target = spawn_target_from_json(spawn_target_to_json(target));
+    ASSERT_TRUE(json_target);
+    EXPECT_EQ(*json_target, target);
+  };
+  check({}, "0000");
+  check(SpawnTargetUniqueEntity(String("abc")), "000103616263");
+  check(SpawnTargetPosition(Vec2F(1, -2)), "00023f800000c0000000");
+  check(SpawnTargetX{1.5f}, "00033fc00000");
+
+  WarpToWorld retained({}, SpawnTargetX{-2.f});
+  auto truncated = hex_decode("00033fc0");
+  EXPECT_FALSE(DataStreamBuffer::deserialize(retained, truncated.span()));
+  EXPECT_EQ(retained.target, SpawnTarget(SpawnTargetX{-2.f}));
+
+  auto swap = DataStreamBuffer::serialize(InventorySlot(SwapSlot{}));
+  auto trash = DataStreamBuffer::serialize(InventorySlot(TrashSlot{}));
+  ASSERT_TRUE(swap);
+  ASSERT_TRUE(trash);
+  EXPECT_EQ(*swap, hex_decode("02"));
+  EXPECT_EQ(*trash, hex_decode("03"));
+});
 
 const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
   auto& root = fixture.root();

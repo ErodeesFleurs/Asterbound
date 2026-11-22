@@ -6,7 +6,7 @@ import star.string;
 import star.json;
 
 import star.bi_map;
-import star.strong_typedef;
+import star.data_stream;
 
 import star.algorithm;
 namespace Star {
@@ -37,80 +37,18 @@ extern std::expected<EnumMap<EquipmentSlot>, StarException> const EquipmentSlotN
 
 using BagSlot = std::pair<String, std::uint8_t>;
 
-// Keep native wrappers so SwapSlot can declare precise text ADL.
-template <typename BaseType> struct TrashSlotWrapper;
-  template <typename BaseType>
-  struct SwapSlotWrapper : BaseType {
-    using BaseType::BaseType;
+struct TrashSlot {
+  auto operator<=>(TrashSlot const&) const = default;
+  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, TrashSlot const&) { return std::ref(ds); }
+  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, TrashSlot&) { return std::ref(ds); }
+};
 
-    SwapSlotWrapper() : BaseType() {}
-
-    SwapSlotWrapper(SwapSlotWrapper const& nt) : BaseType(nt) {}
-
-    SwapSlotWrapper(SwapSlotWrapper&& nt) : BaseType(std::move(nt)) {}
-
-    explicit SwapSlotWrapper(BaseType const& bt) : BaseType(bt) {}
-
-    explicit SwapSlotWrapper(BaseType&& bt) : BaseType(std::move(bt)) {}
-
-    SwapSlotWrapper& operator=(SwapSlotWrapper const& rhs) {
-      BaseType::operator=(rhs);
-      return *this;
-    }
-
-    SwapSlotWrapper& operator=(SwapSlotWrapper&& rhs) {
-      BaseType::operator=(std::move(rhs));
-      return *this;
-    }
-
-    template <class Arg>
-    SwapSlotWrapper& operator=(Arg&& other) {
-      static_assert(std::is_base_of_v<BaseType, std::decay_t<Arg>> == false
-                      || std::is_same_v<SwapSlotWrapper, std::decay_t<Arg>>,
-                    "SwapSlot can not implicitly be assigned from std::monostate-derived classes or strong "
-                    "std::monostate typedefs");
-
-      BaseType::operator=(std::forward<Arg>(other));
-      return *this;
-    }
-    friend std::expected<void, StarException> write_text(TextBuffer& output,
-        std::variant<EquipmentSlot, BagSlot, SwapSlotWrapper<std::monostate>, TrashSlotWrapper<std::monostate>> const& slot);
-  };
-  using SwapSlot = SwapSlotWrapper<std::monostate>;
-  template <typename BaseType> struct TrashSlotWrapper : BaseType {
-    using BaseType::BaseType;
-
-    TrashSlotWrapper() : BaseType() {}
-
-    TrashSlotWrapper(TrashSlotWrapper const& nt) : BaseType(nt) {}
-
-    TrashSlotWrapper(TrashSlotWrapper&& nt) : BaseType(std::move(nt)) {}
-
-    explicit TrashSlotWrapper(BaseType const& bt) : BaseType(bt) {}
-
-    explicit TrashSlotWrapper(BaseType&& bt) : BaseType(std::move(bt)) {}
-
-    TrashSlotWrapper& operator=(TrashSlotWrapper const& rhs) {
-      BaseType::operator=(rhs);
-      return *this;
-    }
-
-    TrashSlotWrapper& operator=(TrashSlotWrapper&& rhs) {
-      BaseType::operator=(std::move(rhs));
-      return *this;
-    }
-
-    template <class Arg> TrashSlotWrapper& operator=(Arg&& other) {
-      static_assert(std::is_base_of_v<BaseType, std::decay_t<Arg>> == false
-                      || std::is_same_v<TrashSlotWrapper, std::decay_t<Arg>>,
-                    "TrashSlot can not implicitly be assigned from std::monostate-derived classes or strong "
-                    "std::monostate typedefs");
-
-      BaseType::operator=(std::forward<Arg>(other));
-      return *this;
-    }
-  };
-  using TrashSlot = TrashSlotWrapper<std::monostate>;
+struct SwapSlot {
+  auto operator<=>(SwapSlot const&) const = default;
+  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, SwapSlot const&) { return std::ref(ds); }
+  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, SwapSlot&) { return std::ref(ds); }
+  friend std::expected<void, StarException> write_text(TextBuffer&, std::variant<EquipmentSlot, BagSlot, SwapSlot, TrashSlot> const&);
+};
 
   // Any manageable location in the player inventory can be pointed to by an
   // InventorySlot
@@ -147,9 +85,7 @@ export namespace Star {
   using ::Star::EquipmentSlot;
   using ::Star::EquipmentSlotNames;
   using ::Star::BagSlot;
-  using ::Star::SwapSlotWrapper;
   using ::Star::SwapSlot;
-  using ::Star::TrashSlotWrapper;
   using ::Star::TrashSlot;
   using ::Star::InventorySlot;
   using ::Star::jsonToInventorySlot;

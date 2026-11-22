@@ -34,79 +34,20 @@ struct QuestItem {
 };
 
 // An item itemTag, indicating a set of possible items
-template <typename BaseType>
-struct QuestItemTagWrapper : BaseType {
-  using BaseType::BaseType;
-
-  QuestItemTagWrapper() : BaseType() {}
-
-  QuestItemTagWrapper(QuestItemTagWrapper const& nt) : BaseType(nt) {}
-
-  QuestItemTagWrapper(QuestItemTagWrapper&& nt) : BaseType(std::move(nt)) {}
-
-  explicit QuestItemTagWrapper(BaseType const& bt) : BaseType(bt) {}
-
-  explicit QuestItemTagWrapper(BaseType&& bt) : BaseType(std::move(bt)) {}
-
-  QuestItemTagWrapper& operator=(QuestItemTagWrapper const& rhs) {
-    BaseType::operator=(rhs);
-    return *this;
-  }
-
-  QuestItemTagWrapper& operator=(QuestItemTagWrapper&& rhs) {
-    BaseType::operator=(std::move(rhs));
-    return *this;
-  }
-
-  template <class Arg>
-  QuestItemTagWrapper& operator=(Arg&& other) {
-    static_assert(std::is_base_of_v<BaseType, std::decay_t<Arg>> == false
-                    || std::is_same_v<QuestItemTagWrapper, std::decay_t<Arg>>,
-                  "QuestItemTag can not implicitly be assigned from String-derived classes or strong String typedefs");
-
-    BaseType::operator=(std::forward<Arg>(other));
-    return *this;
-  }
+struct QuestItemTag : String {
+  using String::String;
+  QuestItemTag() = default;
+  explicit QuestItemTag(String const& value) : String(value) {}
+  explicit QuestItemTag(String&& value) : String(std::move(value)) {}
 };
-using QuestItemTag = QuestItemTagWrapper<String>;
 
 // A collection of items
-template <typename BaseType>
-struct QuestItemListWrapper : BaseType {
-  using BaseType::BaseType;
-
-  QuestItemListWrapper() : BaseType() {}
-
-  QuestItemListWrapper(QuestItemListWrapper const& nt) : BaseType(nt) {}
-
-  QuestItemListWrapper(QuestItemListWrapper&& nt) : BaseType(std::move(nt)) {}
-
-  explicit QuestItemListWrapper(BaseType const& bt) : BaseType(bt) {}
-
-  explicit QuestItemListWrapper(BaseType&& bt) : BaseType(std::move(bt)) {}
-
-  QuestItemListWrapper& operator=(QuestItemListWrapper const& rhs) {
-    BaseType::operator=(rhs);
-    return *this;
-  }
-
-  QuestItemListWrapper& operator=(QuestItemListWrapper&& rhs) {
-    BaseType::operator=(std::move(rhs));
-    return *this;
-  }
-
-  template <class Arg>
-  QuestItemListWrapper& operator=(Arg&& other) {
-    static_assert(std::is_base_of_v<BaseType, std::decay_t<Arg>> == false
-                    || std::is_same_v<QuestItemListWrapper, std::decay_t<Arg>>,
-                  "QuestItemList can not implicitly be assigned from List<ItemDescriptor>-derived classes or strong "
-                  "List<ItemDescriptor> typedefs");
-
-    BaseType::operator=(std::forward<Arg>(other));
-    return *this;
-  }
+struct QuestItemList : List<ItemDescriptor> {
+  using List<ItemDescriptor>::List;
+  QuestItemList() = default;
+  explicit QuestItemList(List<ItemDescriptor> const& value) : List<ItemDescriptor>(value) {}
+  explicit QuestItemList(List<ItemDescriptor>&& value) : List<ItemDescriptor>(std::move(value)) {}
 };
-using QuestItemList = QuestItemListWrapper<List<ItemDescriptor>>;
 
 // The uniqueId of a specific entity
 struct QuestEntity {
@@ -250,9 +191,7 @@ export module star.quest_descriptor;
 
 export namespace Star {
   using ::Star::QuestItem;
-  using ::Star::QuestItemTagWrapper;
   using ::Star::QuestItemTag;
-  using ::Star::QuestItemListWrapper;
   using ::Star::QuestItemList;
   using ::Star::QuestEntity;
   using ::Star::QuestLocation;

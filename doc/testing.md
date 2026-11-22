@@ -1082,3 +1082,9 @@ Private instrumentation, offscreen swaps and finer sampled coordinates do not
 prove physical-display pacing. Startup smoke, same-build unit tests and Linux
 measurements do not establish native GUI behavior elsewhere, cross-platform
 interoperability or compatibility with historical/future protocol versions.
+
+`StrongTypedefTest.FloatingOrder` checks tagged scalar comparison under the build's
+floating-point flags. `WarpTargetTest.LegacyWireAndJson` checks fixed wire bytes
+for spawn targets and empty inventory markers, JSON round trips, and preservation
+of the destination on truncated warp input. To measure the cost of converting an
+owning entity name to JSON, filter `game_benchmarks` to `^Warp/LongEntityTargetToJson$`.

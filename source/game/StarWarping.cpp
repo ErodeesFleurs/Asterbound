@@ -254,18 +254,18 @@ void write_text(TextBuffer& output, ClientCustomWorldId const& worldId) {
   append_text(output, worldId.name);
 }
 
-Json spawnTargetToJson(SpawnTarget spawnTarget) {
-  if (std::holds_alternative<SpawnTargetUniqueEntity>(spawnTarget))
-    return std::get<SpawnTargetUniqueEntity>(spawnTarget);
-  else if (std::holds_alternative<SpawnTargetPosition>(spawnTarget))
-    return json_from_vec2f(std::get<SpawnTargetPosition>(spawnTarget));
-  else if (std::holds_alternative<SpawnTargetX>(spawnTarget))
-    return Json(std::get<SpawnTargetX>(spawnTarget));
+Json spawn_target_to_json(SpawnTarget const& spawn_target) {
+  if (std::holds_alternative<SpawnTargetUniqueEntity>(spawn_target))
+    return std::get<SpawnTargetUniqueEntity>(spawn_target);
+  else if (std::holds_alternative<SpawnTargetPosition>(spawn_target))
+    return json_from_vec2f(std::get<SpawnTargetPosition>(spawn_target));
+  else if (std::holds_alternative<SpawnTargetX>(spawn_target))
+    return Json(std::get<SpawnTargetX>(spawn_target).value);
   else
     return Json();
 }
 
-std::expected<SpawnTarget, StarException> spawnTargetFromJson(Json v) {
+std::expected<SpawnTarget, StarException> spawn_target_from_json(Json const& v) {
   if (v.is_null()) {
     return SpawnTarget();
   } else if (v.is_type(Json::Type::String)) {
@@ -286,14 +286,14 @@ std::expected<SpawnTarget, StarException> spawnTargetFromJson(Json v) {
   }
 }
 
-String print_spawn_target(SpawnTarget spawnTarget) {
-  if (std::holds_alternative<SpawnTargetUniqueEntity>(spawnTarget))
-    return std::get<SpawnTargetUniqueEntity>(spawnTarget);
-  else if (std::holds_alternative<SpawnTargetPosition>(spawnTarget)) {
-    auto const& pos = std::get<SpawnTargetPosition>(spawnTarget);
+String print_spawn_target(SpawnTarget const& spawn_target) {
+  if (std::holds_alternative<SpawnTargetUniqueEntity>(spawn_target))
+    return std::get<SpawnTargetUniqueEntity>(spawn_target);
+  else if (std::holds_alternative<SpawnTargetPosition>(spawn_target)) {
+    auto const& pos = std::get<SpawnTargetPosition>(spawn_target);
     return Star::format("{}.{}", pos[0], pos[1]);
-  } else if (std::holds_alternative<SpawnTargetX>(spawnTarget))
-    return Star::to_string(std::get<SpawnTargetX>(spawnTarget).t);
+  } else if (std::holds_alternative<SpawnTargetX>(spawn_target))
+    return Star::to_string(std::get<SpawnTargetX>(spawn_target).value);
   else
     return "";
 }
@@ -314,7 +314,7 @@ std::expected<WarpToWorld, StarException> WarpToWorld::create(Json v) {
     auto targetJson = v.get("target");
     if (!targetJson)
       return std::unexpected(std::move(targetJson.error()));
-    auto target = spawnTargetFromJson(*targetJson);
+    auto target = spawn_target_from_json(*targetJson);
     if (!target)
       return std::unexpected(std::move(target.error()));
     result.world = std::move(*world);
@@ -335,7 +335,7 @@ std::expected<Json, StarException> WarpToWorld::toJson() const {
   auto printed = print_world_id(world);
   if (!printed)
     return std::unexpected(std::move(printed.error()));
-  return JsonObject{{"world", std::move(*printed)}, {"target", spawnTargetToJson(target)}};
+  return JsonObject{{"world", std::move(*printed)}, {"target", spawn_target_to_json(target)}};
 }
 
 std::expected<WarpAction, StarException> parseWarpAction(String const& warpString) {
@@ -462,7 +462,7 @@ std::expected<JsonObject, StarException> warpActionToJson(WarpAction const& warp
       {"worldId", std::move(*printed)}
     };
     if (!std::holds_alternative<std::monostate>(warpToWorld.target))
-      out.set("spawnTarget", spawnTargetToJson(warpToWorld.target));
+      out.set("spawnTarget", spawn_target_to_json(warpToWorld.target));
     return out;
   }
 

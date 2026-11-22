@@ -53,42 +53,9 @@ public:
   [[nodiscard]] std::expected<void, StarException> addPendingJoin(String connectionString);
 
 private:
-  template <typename BaseType>
-  struct JoinUnavailableWrapper : BaseType {
-    using BaseType::BaseType;
-
-    JoinUnavailableWrapper() : BaseType() {}
-
-    JoinUnavailableWrapper(JoinUnavailableWrapper const& nt) : BaseType(nt) {}
-
-    JoinUnavailableWrapper(JoinUnavailableWrapper&& nt) : BaseType(std::move(nt)) {}
-
-    explicit JoinUnavailableWrapper(BaseType const& bt) : BaseType(bt) {}
-
-    explicit JoinUnavailableWrapper(BaseType&& bt) : BaseType(std::move(bt)) {}
-
-    JoinUnavailableWrapper& operator=(JoinUnavailableWrapper const& rhs) {
-      BaseType::operator=(rhs);
-      return *this;
-    }
-
-    JoinUnavailableWrapper& operator=(JoinUnavailableWrapper&& rhs) {
-      BaseType::operator=(std::move(rhs));
-      return *this;
-    }
-
-    template <class Arg>
-    JoinUnavailableWrapper& operator=(Arg&& other) {
-      static_assert(std::is_base_of_v<BaseType, std::decay_t<Arg>> == false
-                      || std::is_same_v<JoinUnavailableWrapper, std::decay_t<Arg>>,
-                    "JoinUnavailable can not implicitly be assigned from std::monostate-derived classes or strong "
-                    "std::monostate typedefs");
-
-      BaseType::operator=(std::forward<Arg>(other));
-      return *this;
-    }
+  struct JoinUnavailable {
+    auto operator<=>(JoinUnavailable const&) const = default;
   };
-  using JoinUnavailable = JoinUnavailableWrapper<std::monostate>;
   struct JoinLocal {
     bool operator==(JoinLocal const& rhs) const { return capacity == rhs.capacity; };
     std::uint32_t capacity;

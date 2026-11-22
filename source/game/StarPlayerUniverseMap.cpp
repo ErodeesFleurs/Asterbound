@@ -64,7 +64,7 @@ template<> [[nodiscard]] std::expected<Json, StarException> jsonFromBookmarkTarg
   auto world = Star::print_world_id(target.first);
   if (!world)
     return std::unexpected(std::move(world.error()));
-  return JsonArray{std::move(*world), spawnTargetToJson(target.second)};
+  return JsonArray{std::move(*world), spawn_target_to_json(target.second)};
 }
 
 template<> [[nodiscard]] std::expected<TeleportTarget, StarException> jsonToBookmarkTarget<TeleportTarget>(Json const& target) {
@@ -80,7 +80,7 @@ template<> [[nodiscard]] std::expected<TeleportTarget, StarException> jsonToBook
   auto spawnJson = target.get(1);
   if (!spawnJson)
     return std::unexpected(std::move(spawnJson.error()));
-  auto spawn = spawnTargetFromJson(*spawnJson);
+  auto spawn = spawn_target_from_json(*spawnJson);
   if (!spawn)
     return std::unexpected(std::move(spawn.error()));
   return TeleportTarget(std::move(*world), std::move(*spawn));
