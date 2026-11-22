@@ -10,6 +10,10 @@ import star.rect;
 import star.vector;
 import star.list;
 import star.format;
+import star.blocks_along_line;
+import star.world_geometry;
+import star.world_impl;
+import star.world_tiles;
 
 namespace Star {
 
@@ -290,6 +294,56 @@ struct MovementCollisionBenchmarkAccess {
 };
 
 std::expected<void, StarException> registerCollisionPerformanceBenchmarks(PerformanceBenchmarkSession& session) {
+  for (bool stop : {false, true}) {
+    benchmark::RegisterBenchmark(stop ? "GridRay/FirstCellStop" : "GridRay/EmptyVisitorLong", [stop, &session](benchmark::State& state) {
+      Vec2F origin{0.25f, 0.75f};
+      Vec2F delta{511, 173};
+      for (auto _ : state) {
+        benchmark::DoNotOptimize(delta);
+        auto result = for_each_block_along_line(origin, delta, [stop](int, int) -> std::expected<bool, StarException> {
+          return !stop;
+        });
+        if (!result || *result == stop) {
+          session.fail(state, "Unexpected grid traversal completion");
+          break;
+        }
+      }
+    });
+  }
+  for (bool filter : {false, true}) {
+    benchmark::RegisterBenchmark(filter ? "GridRay/MultiGlance" : "GridRay/LoadedTileQuery", [filter, &session](benchmark::State& state) {
+      WorldGeometry geometry(512, 32);
+      ClientTile tile;
+      tile.collision = CollisionKind::Block;
+      auto tiles = std::make_shared<ClientTileSectorArray>(geometry.size(), tile);
+      Vec2F begin{3.25f, 4}, end{223.75f, 4};
+      for (int x = 3; x <= 223; ++x) {
+        auto sector = tiles->sector_for({x, 4});
+        if (!tiles->is_sector_loaded(sector))
+          tiles->load_default_sector(sector);
+        if (!filter && x != 223)
+          tiles->modify_tile({x, 4})->get().collision = CollisionKind::None;
+      }
+      CollisionSet kinds{CollisionKind::Block};
+      for (auto _ : state) {
+        benchmark::DoNotOptimize(end);
+        if (filter) {
+          auto result = WorldImpl::colliding_tiles_along_line(geometry, *tiles, begin, end, kinds, 221, false);
+          if (!result || result->size() > 2) {
+            session.fail(state, "Expected glancing tiles to be filtered");
+            break;
+          }
+          benchmark::DoNotOptimize(*result);
+        } else {
+          auto result = WorldImpl::line_tile_collision(geometry, *tiles, begin, end, kinds);
+          if (!result || !*result) {
+            session.fail(state, "Expected last loaded tile to block the ray");
+            break;
+          }
+        }
+      }
+    });
+  }
   for (auto& fixture : MovementCollisionBenchmarkAccess::fixtures()) {
     auto name = std::format("Collision/{}", fixture.name);
     benchmark::RegisterBenchmark(name.c_str(), [&session, fixture = std::move(fixture)](benchmark::State& state) {

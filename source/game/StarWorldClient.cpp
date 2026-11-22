@@ -806,7 +806,7 @@ std::expected<bool, StarException> WorldClient::lineTileCollision(Vec2F const& b
     return false;
   }
   
-  return WorldImpl::lineTileCollision(m_geometry, m_tileArray, begin, end, collisionSet);
+  return WorldImpl::line_tile_collision(m_geometry, *m_tileArray, begin, end, collisionSet);
 }
 
 std::expected<std::optional<std::pair<Vec2F, Vec2I>>, StarException> WorldClient::lineTileCollisionPoint(Vec2F const& begin, Vec2F const& end, CollisionSet const& collisionSet) const {
@@ -814,7 +814,7 @@ std::expected<std::optional<std::pair<Vec2F, Vec2I>>, StarException> WorldClient
     return {};
   }
   
-  return WorldImpl::lineTileCollisionPoint(m_geometry, m_tileArray, begin, end, collisionSet);
+  return WorldImpl::line_tile_collision_point(m_geometry, *m_tileArray, begin, end, collisionSet);
 }
 
 std::expected<List<Vec2I>, StarException> WorldClient::collidingTilesAlongLine(
@@ -823,7 +823,7 @@ std::expected<List<Vec2I>, StarException> WorldClient::collidingTilesAlongLine(
     return {};
   }
   
-  return WorldImpl::collidingTilesAlongLine(m_geometry, m_tileArray, begin, end, collisionSet, maxSize, includeEdges);
+  return WorldImpl::colliding_tiles_along_line(m_geometry, *m_tileArray, begin, end, collisionSet, maxSize, includeEdges);
 }
 
 std::expected<bool, StarException> WorldClient::rectTileCollision(RectI const& region, CollisionSet const& collisionSet) const {
@@ -3116,7 +3116,7 @@ std::expected<bool, StarException> WorldClient::canReachEntity(Vec2F const& posi
   if (!inWorld()) {
     return false;
   }
-  return WorldImpl::canReachEntity(m_geometry, m_tileArray, m_entityMap, position, radius, targetEntity, preferInteractive);
+  return WorldImpl::can_reach_entity(m_geometry, *m_tileArray, *m_entityMap, position, radius, targetEntity, preferInteractive);
 }
 
 std::expected<RpcPromise<InteractAction>, StarException> WorldClient::interact(InteractRequest const& request) {

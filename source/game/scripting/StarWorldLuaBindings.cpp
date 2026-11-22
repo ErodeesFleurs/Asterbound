@@ -269,13 +269,13 @@ namespace LuaBindings {
   namespace WorldCollisionCallbacks {
     [[nodiscard]] std::expected<bool, StarException> rectCollision(World& world, RectF const& arg1, std::optional<CollisionSet> const& arg2);
     [[nodiscard]] std::expected<bool, StarException> pointTileCollision(World& world, Vec2F const& arg1, std::optional<CollisionSet> const& arg2);
-    [[nodiscard]] std::expected<bool, StarException> lineTileCollision(World& world, Vec2F const& arg1, Vec2F const& arg2, std::optional<CollisionSet> const& arg3);
-    [[nodiscard]] std::expected<std::optional<std::pair<Vec2F, Vec2I>>, StarException> lineTileCollisionPoint(World& world, Vec2F const& start, Vec2F const& end, std::optional<CollisionSet> const& maybeCollisionSet);
+    [[nodiscard]] std::expected<bool, StarException> line_tile_collision(World& world, Vec2F const& begin, Vec2F const& end, std::optional<CollisionSet> const& collision_set);
+    [[nodiscard]] std::expected<std::optional<std::pair<Vec2F, Vec2I>>, StarException> line_tile_collision_point(World& world, Vec2F const& begin, Vec2F const& end, std::optional<CollisionSet> const& collision_set);
     [[nodiscard]] std::expected<bool, StarException> rectTileCollision(World& world, RectF const& arg1, std::optional<CollisionSet> const& arg2);
     [[nodiscard]] std::expected<bool, StarException> pointCollision(World& world, Vec2F const& point, std::optional<CollisionSet> const& collisionSet);
     [[nodiscard]] std::expected<LuaTupleReturn<std::optional<Vec2F>, std::optional<Vec2F>>, StarException> lineCollision(World& world, Vec2F const& start, Vec2F const& end, std::optional<CollisionSet> const& maybeCollisionSet);
     [[nodiscard]] std::expected<bool, StarException> polyCollision(World& world, PolyF const& arg1, std::optional<Vec2F> const& arg2, std::optional<CollisionSet> const& arg3);
-    [[nodiscard]] std::expected<List<Vec2I>, StarException> collisionBlocksAlongLine(World& world, Vec2F const& arg1, Vec2F const& arg2, std::optional<CollisionSet> const& arg3, std::optional<int> const& arg4);
+    [[nodiscard]] std::expected<List<Vec2I>, StarException> collision_blocks_along_line(World& world, Vec2F const& begin, Vec2F const& end, std::optional<CollisionSet> const& collision_set, std::optional<int> const& max_size);
     [[nodiscard]] std::expected<std::optional<Vec2F>, StarException> resolvePolyCollision(World& world, PolyF poly, Vec2F const& position, float maximumCorrection, std::optional<CollisionSet> const& collisionSet);
   }
 
@@ -372,7 +372,7 @@ namespace LuaBindings {
     [[nodiscard]] std::expected<bool, StarException> replaceMaterials(World& world, List<Vec2I> const& tilePositions, String const& layer, String const& materialName, std::optional<int> const& hueShift, bool enableDrops);
     [[nodiscard]] std::expected<bool, StarException> replaceMaterialArea(World& world, Vec2F center, float radius, String const& layer, String const& materialName, std::optional<int> const& hueShift, bool enableDrops);
     [[nodiscard]] std::expected<bool, StarException> placeMod(World& world, Vec2I const& arg1, String const& arg2, String const& arg3, std::optional<int> const& arg4, bool arg5);
-    [[nodiscard]] std::expected<List<std::pair<Vec2I, LiquidLevel>>, StarException> liquidAlongLine(World& world, Vec2F const& start, Vec2F const& end);
+    [[nodiscard]] std::expected<List<std::pair<Vec2I, LiquidLevel>>, StarException> liquid_along_line(World& world, Vec2F const& start, Vec2F const& end);
     [[nodiscard]] std::expected<bool, StarException> tileIsOccupied(World& world, Vec2I const& arg1, std::optional<bool> const& arg2, std::optional<bool> const& arg3);
     [[nodiscard]] std::expected<double, StarException> time(World& world);
     [[nodiscard]] std::expected<std::uint64_t, StarException> day(World& world);
@@ -2092,7 +2092,7 @@ namespace LuaBindings {
     if (auto result = callbacks.register_callback_with_signature<List<std::pair<Vec2I, LiquidLevel>>, Vec2F, Vec2F>(
           "liquidAlongLine",
           [&world](Vec2F const& start, Vec2F const& end) {
-            return WorldEnvironmentCallbacks::liquidAlongLine(world, start, end);
+            return WorldEnvironmentCallbacks::liquid_along_line(world, start, end);
           });
         !result)
       return std::unexpected(std::move(result.error()));
@@ -2219,7 +2219,7 @@ namespace LuaBindings {
     if (auto result = callbacks.register_callback_with_signature<bool, Vec2F, Vec2F, std::optional<CollisionSet>>(
           "lineTileCollision",
           [&world](Vec2F const& start, Vec2F const& end, std::optional<CollisionSet> const& kinds) {
-            return WorldCollisionCallbacks::lineTileCollision(world, start, end, kinds);
+            return WorldCollisionCallbacks::line_tile_collision(world, start, end, kinds);
           });
         !result)
       return std::unexpected(std::move(result.error()));
@@ -2227,7 +2227,7 @@ namespace LuaBindings {
                                                               std::optional<CollisionSet>>(
           "lineTileCollisionPoint",
           [&world](Vec2F const& start, Vec2F const& end, std::optional<CollisionSet> const& kinds) {
-            return WorldCollisionCallbacks::lineTileCollisionPoint(world, start, end, kinds);
+            return WorldCollisionCallbacks::line_tile_collision_point(world, start, end, kinds);
           });
         !result)
       return std::unexpected(std::move(result.error()));
@@ -2269,7 +2269,7 @@ namespace LuaBindings {
               "collisionBlocksAlongLine",
               [&world](Vec2F const& start, Vec2F const& end, std::optional<CollisionSet> const& kinds,
                        std::optional<int> const& limit) {
-                return WorldCollisionCallbacks::collisionBlocksAlongLine(world, start, end, kinds, limit);
+                return WorldCollisionCallbacks::collision_blocks_along_line(world, start, end, kinds, limit);
               });
         !result)
       return std::unexpected(std::move(result.error()));
@@ -2352,22 +2352,14 @@ namespace LuaBindings {
       return world.pointTileCollision(arg1);
   }
 
-  std::expected<bool, StarException> WorldCollisionCallbacks::lineTileCollision(
-      World& world, Vec2F const& arg1, Vec2F const& arg2, std::optional<CollisionSet> const& arg3) {
-    Vec2F const begin = arg1;
-    Vec2F const end = arg2;
-
-    if (arg3)
-      return world.lineTileCollision(begin, end, *arg3);
-    else
-      return world.lineTileCollision(begin, end);
+  std::expected<bool, StarException> WorldCollisionCallbacks::line_tile_collision(
+      World& world, Vec2F const& begin, Vec2F const& end, std::optional<CollisionSet> const& collision_set) {
+    return world.lineTileCollision(begin, end, collision_set ? *collision_set : DefaultCollisionSet);
   }
 
-  std::expected<std::optional<std::pair<Vec2F, Vec2I>>, StarException> WorldCollisionCallbacks::lineTileCollisionPoint(World& world, Vec2F const& begin, Vec2F const& end, std::optional<CollisionSet> const& collisionSet) {
-    if (collisionSet)
-      return world.lineTileCollisionPoint(begin, end, *collisionSet);
-    else
-      return world.lineTileCollisionPoint(begin, end);
+  std::expected<std::optional<std::pair<Vec2F, Vec2I>>, StarException> WorldCollisionCallbacks::line_tile_collision_point(
+      World& world, Vec2F const& begin, Vec2F const& end, std::optional<CollisionSet> const& collision_set) {
+    return world.lineTileCollisionPoint(begin, end, collision_set ? *collision_set : DefaultCollisionSet);
   }
 
   std::expected<bool, StarException> WorldCollisionCallbacks::rectTileCollision(World& world, RectF const& arg1, std::optional<CollisionSet> const& arg2) {
@@ -2413,14 +2405,9 @@ namespace LuaBindings {
       return world.polyCollision(body);
   }
 
-  std::expected<List<Vec2I>, StarException> WorldCollisionCallbacks::collisionBlocksAlongLine(
-      World& world, Vec2F const& arg1, Vec2F const& arg2, std::optional<CollisionSet> const& arg3, std::optional<int> const& arg4) {
-    Vec2F const begin = arg1;
-    Vec2F const end = arg2;
-
-    CollisionSet collisionSet = arg3.value_or(DefaultCollisionSet);
-    int const maxSize = arg4 ? *arg4 : -1;
-    return world.collidingTilesAlongLine(begin, end, collisionSet, maxSize);
+  std::expected<List<Vec2I>, StarException> WorldCollisionCallbacks::collision_blocks_along_line(
+      World& world, Vec2F const& begin, Vec2F const& end, std::optional<CollisionSet> const& collision_set, std::optional<int> const& max_size) {
+    return world.collidingTilesAlongLine(begin, end, collision_set ? *collision_set : DefaultCollisionSet, max_size.value_or(-1));
   }
 
   std::expected<std::optional<Vec2F>, StarException> WorldCollisionCallbacks::resolvePolyCollision(
@@ -2497,17 +2484,16 @@ namespace LuaBindings {
     return {};
   }
 
-  std::expected<List<std::pair<Vec2I, LiquidLevel>>, StarException> WorldEnvironmentCallbacks::liquidAlongLine(World& world, Vec2F const& start, Vec2F const& end) {
+  std::expected<List<std::pair<Vec2I, LiquidLevel>>, StarException> WorldEnvironmentCallbacks::liquid_along_line(World& world, Vec2F const& start, Vec2F const& end) {
     List<std::pair<Vec2I, LiquidLevel>> levels;
-    auto traversed = forBlocksAlongLine<float>(start, world.geometry().diff(end, start), [&](int x, int y) -> std::expected<bool, StarException> {
-        auto liquidLevelResult = world.liquidLevel(RectF::with_size(Vec2F(x, y), Vec2F(1, 1)));
-        if (!liquidLevelResult)
-          return std::unexpected(std::move(liquidLevelResult.error()));
-        auto liquidLevel = std::move(*liquidLevelResult);
-        if (liquidLevel.liquid != EmptyLiquidId)
-          levels.push_back(std::pair<Vec2I, LiquidLevel>(Vec2I(x, y), liquidLevel));
-        return true;
-      });
+    auto traversed = for_each_block_along_line(start, world.geometry().diff(end, start), [&world, &levels](int x, int y) -> std::expected<bool, StarException> {
+      auto level = world.liquidLevel(RectF::with_size(Vec2F(x, y), Vec2F(1, 1)));
+      if (!level)
+        return std::unexpected(std::move(level.error()));
+      if (level->liquid != EmptyLiquidId)
+        levels.emplace_back(Vec2I(x, y), std::move(*level));
+      return true;
+    });
     if (!traversed)
       return std::unexpected(std::move(traversed.error()));
     return levels;

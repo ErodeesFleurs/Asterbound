@@ -2036,24 +2036,15 @@ std::expected<bool, StarException> WorldServer::pointTileCollision(Vec2F const& 
 }
 
 std::expected<bool, StarException> WorldServer::lineTileCollision(Vec2F const& begin, Vec2F const& end, CollisionSet const& collisionSet) const {
-  auto result212 = WorldImpl::lineTileCollision(m_geometry, m_tileArray, begin, end, collisionSet);
-  if (!result212)
-    return std::unexpected(std::move(result212.error()));
-  return std::move(*result212);
+  return WorldImpl::line_tile_collision(m_geometry, *m_tileArray, begin, end, collisionSet);
 }
 
 std::expected<std::optional<std::pair<Vec2F, Vec2I>>, StarException> WorldServer::lineTileCollisionPoint(Vec2F const& begin, Vec2F const& end, CollisionSet const& collisionSet) const {
-  auto result213 = WorldImpl::lineTileCollisionPoint(m_geometry, m_tileArray, begin, end, collisionSet);
-  if (!result213)
-    return std::unexpected(std::move(result213.error()));
-  return std::move(*result213);
+  return WorldImpl::line_tile_collision_point(m_geometry, *m_tileArray, begin, end, collisionSet);
 }
 
 std::expected<List<Vec2I>, StarException> WorldServer::collidingTilesAlongLine(Vec2F const& begin, Vec2F const& end, CollisionSet const& collisionSet, int maxSize, bool includeEdges) const {
-  auto result214 = WorldImpl::collidingTilesAlongLine(m_geometry, m_tileArray, begin, end, collisionSet, maxSize, includeEdges);
-  if (!result214)
-    return std::unexpected(std::move(result214.error()));
-  return std::move(*result214);
+  return WorldImpl::colliding_tiles_along_line(m_geometry, *m_tileArray, begin, end, collisionSet, maxSize, includeEdges);
 }
 
 std::expected<bool, StarException> WorldServer::rectTileCollision(RectI const& region, CollisionSet const& collisionSet) const {
@@ -4760,10 +4751,7 @@ std::expected<std::shared_ptr<InteractiveEntity>, StarException> WorldServer::ge
 }
 
 std::expected<bool, StarException> WorldServer::canReachEntity(Vec2F const& position, float radius, EntityId targetEntity, bool preferInteractive) const {
-  auto result513 = WorldImpl::canReachEntity(m_geometry, m_tileArray, m_entityMap, position, radius, targetEntity, preferInteractive);
-  if (!result513)
-    return std::unexpected(std::move(result513.error()));
-  return std::move(*result513);
+  return WorldImpl::can_reach_entity(m_geometry, *m_tileArray, *m_entityMap, position, radius, targetEntity, preferInteractive);
 }
 
 std::expected<RpcPromise<InteractAction>, StarException> WorldServer::interact(InteractRequest const& request) {

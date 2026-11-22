@@ -12,6 +12,10 @@ import star.sector_array_2d;
 
 import star.worker_pool;
 import star.tile_sector_array;
+import star.collision_block;
+import star.world_geometry;
+import star.world_impl;
+import star.world_tiles;
 
 #include "gtest/gtest.h"
 
@@ -50,6 +54,59 @@ struct ReadColumns {
     return true;
   }
 };
+
+static_assert(WorldImpl::collision_tile_source<ClientTileSectorArray>);
+static_assert(WorldImpl::collision_tile_source<ServerTileSectorArray>);
+static_assert(!WorldImpl::collision_tile_source<TileSectorArray<int, 2>>);
+
+const GameTestRegistration wrapped_line_collisions("TileSectorArrayTest", "WrappedLineCollisions", [](GameTest&) {
+  WorldGeometry geometry(16, 16);
+  ClientTileSectorArray tiles(geometry.size());
+  tiles.load_default_sector({0, 0});
+  CollisionSet const solids{CollisionKind::Block};
+  for (Vec2I position : {Vec2I(0, 4), Vec2I(1, 4), Vec2I(6, 6), Vec2I(5, 6), Vec2I(4, 6), Vec2I(3, 6), Vec2I(5, 7)}) {
+    auto tile = tiles.modify_tile(position);
+    ASSERT_TRUE(tile);
+    tile->get().collision = CollisionKind::Block;
+  }
+
+  // Tile lookup wraps at the seam; the returned grid coordinates stay in traversal space.
+  Vec2F begin(14.5f, 4.5f), end(2.5f, 4.5f);
+  auto hits = WorldImpl::colliding_tiles_along_line(geometry, tiles, begin, end, solids, 8, true);
+  ASSERT_TRUE(hits);
+  EXPECT_EQ(*hits, (List<Vec2I>{{16, 4}, {17, 4}}));
+  auto forward = WorldImpl::line_tile_collision_point(geometry, tiles, begin, end, solids);
+  ASSERT_TRUE(forward && *forward);
+  EXPECT_EQ((*forward)->second, Vec2I(1, 0));
+  EXPECT_FLOAT_EQ((*forward)->first[0], 16.0f - 0.0001f);
+  EXPECT_FLOAT_EQ((*forward)->first[1], 4.5f);
+  auto reverse = WorldImpl::line_tile_collision_point(geometry, tiles, end, begin, solids);
+  ASSERT_TRUE(reverse && *reverse);
+  EXPECT_EQ((*reverse)->second, Vec2I(-1, 0));
+  EXPECT_FLOAT_EQ((*reverse)->first[0], 2.0f + 0.0001f);
+  EXPECT_FLOAT_EQ((*reverse)->first[1], 4.5f);
+
+  // Only the floored endpoint collides, even though the segment approaches its corner from above.
+  EXPECT_EQ(WorldImpl::line_tile_collision(geometry, tiles, {4.5f, 7.5f}, {5, 7}, solids), true);
+  EXPECT_EQ(WorldImpl::line_tile_collision(geometry, tiles, {4.5f, 7.5f}, {4.75f, 7.25f}, solids), false);
+
+  // Travelling left from x=6 only touches tile 6 at the starting boundary.
+  // Filtering before limiting would incorrectly admit tile 3 as a replacement.
+  begin = {6, 6.5f};
+  end = {2.5f, 6.5f};
+  auto candidates = WorldImpl::colliding_tiles_along_line(geometry, tiles, begin, end, solids, 3, true);
+  ASSERT_TRUE(candidates);
+  EXPECT_EQ(*candidates, (List<Vec2I>{{6, 6}, {5, 6}, {4, 6}}));
+  auto retained = WorldImpl::colliding_tiles_along_line(geometry, tiles, begin, end, solids, 3, false);
+  ASSERT_TRUE(retained);
+  EXPECT_EQ(*retained, (List<Vec2I>{{5, 6}, {4, 6}}));
+  auto glancing_only = WorldImpl::colliding_tiles_along_line(geometry, tiles, begin, end, solids, 1, false);
+  ASSERT_TRUE(glancing_only);
+  EXPECT_TRUE(glancing_only->empty());
+  auto no_candidates = WorldImpl::colliding_tiles_along_line(geometry, tiles, begin, end, solids, 0, false);
+  ASSERT_TRUE(no_candidates);
+  EXPECT_TRUE(no_candidates->empty());
+});
 
 const GameTestRegistration sector_traversal("TileSectorArrayTest", "SectorTraversal", [](GameTest&) {
   VisitGrid grid(2, 2);

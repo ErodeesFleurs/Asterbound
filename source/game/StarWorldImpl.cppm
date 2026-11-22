@@ -105,18 +105,10 @@ namespace WorldImpl {
   [[nodiscard]]
   std::expected<bool, StarException> rectTileCollision(std::shared_ptr<TileSectorArray> const& tileSectorArray, RectI const& region, CollisionSet const& collisionSet);
 
-  template <typename TileSectorArray>
-  [[nodiscard]]
-  std::expected<bool, StarException> lineTileCollision(WorldGeometry const& worldGeometry, std::shared_ptr<TileSectorArray> const& tileSectorArray, Vec2F const& begin, Vec2F const& end, CollisionSet const& collisionSet);
-
-  template <typename TileSectorArray>
-  [[nodiscard]]
-  std::expected<std::optional<std::pair<Vec2F, Vec2I>>, StarException> lineTileCollisionPoint(WorldGeometry const& worldGeometry, std::shared_ptr<TileSectorArray> const& tileSectorArray, Vec2F const& begin, Vec2F const& end, CollisionSet const& collisionSet);
-
-  template <typename TileSectorArray>
-  [[nodiscard]]
-  std::expected<List<Vec2I>, StarException> collidingTilesAlongLine(WorldGeometry const& worldGeometry, std::shared_ptr<TileSectorArray> const& tileSectorArray,
-      Vec2F const& begin, Vec2F const& end, CollisionSet const& collisionSet, std::size_t maxSize, bool includeEdges);
+  template <typename Tiles>
+  concept collision_tile_source = requires(Tiles const& tiles, Vec2I const& position, CollisionSet const& kinds) {
+    { tiles.tile(position).isColliding(kinds) } -> std::same_as<bool>;
+  };
 
   [[nodiscard]]
   inline std::expected<TileDamageParameters, StarException> tileDamageParameters(Root& root, WorldTile& tile, TileLayer layer, TileDamage const& tileDamage);
@@ -172,10 +164,6 @@ namespace WorldImpl {
   [[nodiscard]]
   std::expected<bool, StarException> isTileEntityInRange(WorldGeometry const& geometry, std::shared_ptr<EntityMap> const& entityMap,
       EntityId targetEntity, Vec2F const& sourcePosition, float maxRange);
-  template <typename TileSectorArray>
-  [[nodiscard]]
-  std::expected<bool, StarException> canReachEntity(WorldGeometry const& geometry, std::shared_ptr<TileSectorArray> const& tileSectorArray,
-      std::shared_ptr<EntityMap> const& entityMap, Vec2F const& sourcePosition, float maxRange, EntityId targetEntity, bool preferInteractive = true);
 
   template <typename TileSectorArray>
   [[nodiscard]]
@@ -204,66 +192,72 @@ namespace WorldImpl {
       });
   }
 
-  template <typename TileSectorArray>
+  template <collision_tile_source Tiles>
   [[nodiscard]]
-  std::expected<bool, StarException> lineTileCollision(WorldGeometry const& worldGeometry, std::shared_ptr<TileSectorArray> const& tileSectorArray,
-      Vec2F const& begin, Vec2F const& end, CollisionSet const& collisionSet) {
-    auto clear = forBlocksAlongLine<float>(begin, worldGeometry.diff(end, begin), [=](int x, int y) -> std::expected<bool, StarException> {
-        return !tileSectorArray->tile({x, y}).isColliding(collisionSet);
-      });
+  std::expected<bool, StarException> line_tile_collision_along_delta(Tiles const& tiles,
+      Vec2F const& begin, Vec2F const& delta, CollisionSet const& collision_set) {
+    auto clear = for_each_block_along_line(begin, delta, [&tiles, &collision_set](int x, int y) -> std::expected<bool, StarException> {
+      return !tiles.tile({x, y}).isColliding(collision_set);
+    });
     if (!clear)
       return std::unexpected(std::move(clear.error()));
     return !*clear;
   }
 
-  template <typename TileSectorArray>
+  template <collision_tile_source Tiles>
   [[nodiscard]]
-  std::expected<std::optional<std::pair<Vec2F, Vec2I>>, StarException> lineTileCollisionPoint(WorldGeometry const& worldGeometry, std::shared_ptr<TileSectorArray> const& tileSectorArray,
-      Vec2F const& begin, Vec2F const& end, CollisionSet const& collisionSet) {
-    std::optional<Vec2I> collidingBlock;
-    auto clear = forBlocksAlongLine<float>(begin, worldGeometry.diff(end, begin), [=, &collidingBlock](int x, int y) -> std::expected<bool, StarException> {
-        if (tileSectorArray->tile({x, y}).isColliding(collisionSet)) {
-          collidingBlock = Vec2I(x, y);
-          return false;
-        } else {
-          return true;
-        }
-      });
+  std::expected<bool, StarException> line_tile_collision(WorldGeometry const& geometry, Tiles const& tiles,
+      Vec2F const& begin, Vec2F const& end, CollisionSet const& collision_set) {
+    return line_tile_collision_along_delta(tiles, begin, geometry.diff(end, begin), collision_set);
+  }
+
+  template <collision_tile_source Tiles>
+  [[nodiscard]]
+  std::expected<std::optional<std::pair<Vec2F, Vec2I>>, StarException> line_tile_collision_point(WorldGeometry const& geometry,
+      Tiles const& tiles, Vec2F const& begin, Vec2F const& end, CollisionSet const& collision_set) {
+    Vec2I colliding_block;
+    auto delta = geometry.diff(end, begin);
+    auto clear = for_each_block_along_line(begin, delta, [&tiles, &collision_set, &colliding_block](int x, int y) -> std::expected<bool, StarException> {
+      if (!tiles.tile({x, y}).isColliding(collision_set))
+        return true;
+      colliding_block = Vec2I(x, y);
+      return false;
+    });
 
     if (!clear)
       return std::unexpected(std::move(clear.error()));
     if (*clear)
       return std::optional<std::pair<Vec2F, Vec2I>>{};
 
-    Vec2F direction = worldGeometry.diff(end, begin).normalized();
-    Vec2F blockPosition = Vec2F(*collidingBlock);
+    Vec2F direction = delta.normalized();
+    Vec2F block_position(colliding_block);
 
     // find the position of intersecting sides
-    if (direction[0] < 0) blockPosition[0] = blockPosition[0] + 1;
-    if (direction[1] < 0) blockPosition[1] = blockPosition[1] + 1;
-    Vec2F blockDistance = worldGeometry.diff(blockPosition, begin);
+    if (direction[0] < 0) ++block_position[0];
+    if (direction[1] < 0) ++block_position[1];
+    Vec2F block_distance = geometry.diff(block_position, begin);
 
     // exclude edges which are in the opposite direction of the line
-    if (direction[0] * blockDistance[0] < 0) blockDistance[0] = 0.0f;
-    if (direction[1] * blockDistance[1] < 0) blockDistance[1] = 0.0f;
+    if (direction[0] * block_distance[0] < 0) block_distance[0] = 0.0f;
+    if (direction[1] * block_distance[1] < 0) block_distance[1] = 0.0f;
 
     // line length per block in each axis, don't divide by 0
-    float deltaDistX = direction[0] == 0 ? 0.0f : 1.0f / std::abs(direction[0]);
-    float deltaDistY = direction[1] == 0 ? 0.0f : 1.0f / std::abs(direction[1]);
+    float delta_dist_x = direction[0] == 0 ? 0.0f : 1.0f / std::abs(direction[0]);
+    float delta_dist_y = direction[1] == 0 ? 0.0f : 1.0f / std::abs(direction[1]);
 
     // distance to each edge of the intersect
-    Vec2F intersectDist = Vec2F(std::abs(blockDistance[0]) * deltaDistX, std::abs(blockDistance[1]) * deltaDistY);
+    Vec2F intersect_dist(std::abs(block_distance[0]) * delta_dist_x, std::abs(block_distance[1]) * delta_dist_y);
 
-    Vec2I normal = Vec2I(intersectDist[0] > intersectDist[1] ? 1 : 0, intersectDist[1] > intersectDist[0] ? 1 : 0);
+    Vec2I normal(intersect_dist[0] > intersect_dist[1], intersect_dist[1] > intersect_dist[0]);
     normal[0] *= std::copysign(1.0f, direction[0]);
     normal[1] *= std::copysign(1.0f, direction[1]);
-    Vec2F position = begin + (direction * std::max(intersectDist[0], intersectDist[1]));
+    Vec2F position = begin + direction * std::max(intersect_dist[0], intersect_dist[1]);
     // HACK: Keeps the end position from being right on a tile border, making line check
     // *from* this end position from colliding with the first tile
-    if (intersectDist[0] > intersectDist[1])
-      position[0] = blockPosition[0] + (normal[0] * -0.0001f);
+    if (intersect_dist[0] > intersect_dist[1])
+      position[0] = block_position[0] + (normal[0] * -0.0001f);
     else
-      position[1] = blockPosition[1] + (normal[1] * -0.0001f);
+      position[1] = block_position[1] + (normal[1] * -0.0001f);
     return std::pair<Vec2F, Vec2I>(position, normal);
   }
 
@@ -303,36 +297,32 @@ namespace WorldImpl {
     return LiquidLevel(maximumLiquidId, totalLiquidLevel / totalSpace);
   }
 
-  template <typename TileSectorArray>
+  template <collision_tile_source Tiles>
   [[nodiscard]]
-  std::expected<List<Vec2I>, StarException> collidingTilesAlongLine(WorldGeometry const& worldGeometry, std::shared_ptr<TileSectorArray> const& tileSectorArray,
-      Vec2F const& begin, Vec2F const& end, CollisionSet const& collisionSet, std::size_t maxSize, bool includeEdges) {
-    List<Vec2I> res;
-    auto traversed = forBlocksAlongLine<float>(begin, worldGeometry.diff(end, begin), [&](int x, int y) -> std::expected<bool, StarException> {
-        if (res.size() >= maxSize)
-          return false;
-        if (tileSectorArray->tile({x, y}).isColliding(collisionSet))
-          res.push_back({x, y});
-        return true;
-      });
+  std::expected<List<Vec2I>, StarException> colliding_tiles_along_line(WorldGeometry const& geometry, Tiles const& tiles,
+      Vec2F const& begin, Vec2F const& end, CollisionSet const& collision_set, std::size_t max_size, bool include_edges) {
+    List<Vec2I> candidates;
+    auto traversed = for_each_block_along_line(begin, geometry.diff(end, begin),
+        [&tiles, &collision_set, &candidates, &max_size](int x, int y) -> std::expected<bool, StarException> {
+      if (candidates.size() < max_size && tiles.tile({x, y}).isColliding(collision_set))
+        candidates.emplace_back(x, y);
+      return candidates.size() < max_size;
+    });
     if (!traversed)
       return std::unexpected(std::move(traversed.error()));
+    if (include_edges || candidates.empty())
+      return candidates;
 
-    if (includeEdges)
-      return res;
-
-    for (auto tileIt = res.begin(); tileIt != res.end();) {
-      auto tileRect = RectF::with_size(Vec2F(worldGeometry.xwrap(*tileIt)), Vec2F::filled(1.0f));
-      Line2F line{worldGeometry.xwrap(begin), worldGeometry.xwrap(end)};
-      auto lineSet = worldGeometry.splitLine(line);
-      if (!lineSet)
-        return std::unexpected(std::move(lineSet.error()));
-      if (std::ranges::any_of(*lineSet, [&](Line2F const& line) { return tileRect.edge_intersection(line).glances; }))
-        tileIt = res.erase(tileIt);
-      else
-        ++tileIt;
-    }
-    return res;
+    // The limit applies to candidates, not to the surviving non-glancing hits.
+    auto segments = geometry.splitLine(Line2F{geometry.xwrap(begin), geometry.xwrap(end)});
+    if (!segments)
+      return std::unexpected(std::move(segments.error()));
+    auto tail = std::ranges::remove_if(candidates, [&geometry, &segments](Vec2I const& tile) {
+      auto bounds = RectF::with_size(Vec2F(geometry.xwrap(tile)), Vec2F::filled(1.0f));
+      return std::ranges::any_of(*segments, [&bounds](Line2F const& segment) { return bounds.edge_intersection(segment).glances; });
+    });
+    candidates.erase(tail.begin(), tail.end());
+    return candidates;
   }
 
   inline std::expected<TileDamageParameters, StarException> tileDamageParameters(Root& root, WorldTile& tile, TileLayer layer, TileDamage const& tileDamage) {
@@ -735,76 +725,77 @@ namespace WorldImpl {
     return false;
   }
 
-  template <typename TileSectorArray>
+  template <collision_tile_source Tiles>
   [[nodiscard]]
-  std::expected<bool, StarException> canReachEntity(WorldGeometry const& geometry, std::shared_ptr<TileSectorArray> const& tileSectorArray,
-      std::shared_ptr<EntityMap> const& entityMap, Vec2F const& sourcePosition, float maxRange, EntityId targetEntity, bool preferInteractive) {
-    auto entity = entityMap->entity(targetEntity);
+  std::expected<bool, StarException> can_reach_entity(WorldGeometry const& geometry, Tiles const& tiles,
+      EntityMap const& entity_map, Vec2F const& source_position, float max_range, EntityId target_entity, bool prefer_interactive = true) {
+    auto entity = entity_map.entity(target_entity);
     if (!entity)
       return false;
 
-    // exclude the final tile from the collision check since many targets will be collidable tile entities, e.g. doors
-    auto const canReachTile = [&](Vec2F const& end) -> std::expected<bool, StarException> {
-      Vec2I const& endTile = Vec2I::floor(end);
-      return forBlocksAlongLine<float>(sourcePosition, geometry.diff(end, sourcePosition), [=](int x, int y) -> std::expected<bool, StarException> {
-          Vec2I diff = geometry.diff(endTile, Vec2I(x, y));
-          if (diff[0] == 0 && diff[1] == 0)
-            return true;
-          return !tileSectorArray->tile({x, y}).isColliding(DefaultCollisionSet);
-        });
+    // Exclude the final tile: the target itself can be a collidable tile entity (e.g. a door).
+    auto can_reach_tile = [&geometry, &tiles, &source_position](Vec2F const& end, Vec2F const& delta) -> std::expected<bool, StarException> {
+      auto end_tile = Vec2I::floor(end);
+      return for_each_block_along_line(source_position, delta, [&geometry, &tiles, &end_tile](int x, int y) -> std::expected<bool, StarException> {
+        if (geometry.diff(end_tile, Vec2I(x, y)) == Vec2I(0, 0))
+          return true;
+        return !tiles.tile({x, y}).isColliding(DefaultCollisionSet);
+      });
     };
 
-    if (auto tileEntity = as_ref<TileEntity>(*entity)) {
-      for (auto space : preferInteractive ? tileEntity->get().interactiveSpaces() : tileEntity->get().spaces()) {
-        auto spacePosition = entity->position() + centerOfTile(space);
-        if (geometry.diff(spacePosition, sourcePosition).magnitude() <= maxRange) {
-          auto reachable = canReachTile(spacePosition);
+    if (auto tile_entity = as_ref<TileEntity>(*entity)) {
+      for (auto space : prefer_interactive ? tile_entity->get().interactiveSpaces() : tile_entity->get().spaces()) {
+        auto space_position = entity->position() + centerOfTile(space);
+        auto delta = geometry.diff(space_position, source_position);
+        if (delta.magnitude() <= max_range) {
+          auto reachable = can_reach_tile(space_position, delta);
           if (!reachable)
             return std::unexpected(std::move(reachable.error()));
           if (*reachable)
             return true;
         }
       }
-    } else if (auto interactiveEntity = preferInteractive ? as_ref<InteractiveEntity>(*entity) : std::nullopt) {
-      auto entityBounds = interactiveEntity->get().interactiveBoundBox().translated(entity->position());
-      auto contains = geometry.rectContains(entityBounds, sourcePosition);
+    } else if (auto interactive_entity = prefer_interactive ? as_ref<InteractiveEntity>(*entity) : std::nullopt) {
+      auto entity_bounds = interactive_entity->get().interactiveBoundBox().translated(entity->position());
+      auto contains = geometry.rectContains(entity_bounds, source_position);
       if (!contains)
         return std::unexpected(std::move(contains.error()));
       if (*contains)
         return true;
-      auto intersects = geometry.rectIntersectsCircle(entityBounds, sourcePosition, maxRange);
+      auto intersects = geometry.rectIntersectsCircle(entity_bounds, source_position, max_range);
       if (!intersects)
         return std::unexpected(std::move(intersects.error()));
       if (!*intersects)
         return false;
 
-      auto collision = lineTileCollision(geometry, tileSectorArray, sourcePosition, entityBounds.nearest_coord_to(sourcePosition), DefaultCollisionSet);
+      auto collision = line_tile_collision(geometry, tiles, source_position, entity_bounds.nearest_coord_to(source_position), DefaultCollisionSet);
       if (!collision)
         return std::unexpected(std::move(collision.error()));
       if (!*collision)
         return true;
-      collision = lineTileCollision(geometry, tileSectorArray, sourcePosition, Vec2F(entityBounds.x_min(), entityBounds.y_min()), DefaultCollisionSet);
+      collision = line_tile_collision(geometry, tiles, source_position, Vec2F(entity_bounds.x_min(), entity_bounds.y_min()), DefaultCollisionSet);
       if (!collision)
         return std::unexpected(std::move(collision.error()));
       if (!*collision)
         return true;
-      collision = lineTileCollision(geometry, tileSectorArray, sourcePosition, Vec2F(entityBounds.x_min(), entityBounds.y_max()), DefaultCollisionSet);
+      collision = line_tile_collision(geometry, tiles, source_position, Vec2F(entity_bounds.x_min(), entity_bounds.y_max()), DefaultCollisionSet);
       if (!collision)
         return std::unexpected(std::move(collision.error()));
       if (!*collision)
         return true;
-      collision = lineTileCollision(geometry, tileSectorArray, sourcePosition, Vec2F(entityBounds.x_max(), entityBounds.y_max()), DefaultCollisionSet);
+      collision = line_tile_collision(geometry, tiles, source_position, Vec2F(entity_bounds.x_max(), entity_bounds.y_max()), DefaultCollisionSet);
       if (!collision)
         return std::unexpected(std::move(collision.error()));
       if (!*collision)
         return true;
-      collision = lineTileCollision(geometry, tileSectorArray, sourcePosition, Vec2F(entityBounds.x_max(), entityBounds.y_min()), DefaultCollisionSet);
+      collision = line_tile_collision(geometry, tiles, source_position, Vec2F(entity_bounds.x_max(), entity_bounds.y_min()), DefaultCollisionSet);
       if (!collision)
         return std::unexpected(std::move(collision.error()));
       return !*collision;
     } else {
-      if (geometry.diff(entity->position(), sourcePosition).magnitude() <= maxRange) {
-        auto collision = lineTileCollision(geometry, tileSectorArray, sourcePosition, entity->position(), DefaultCollisionSet);
+      auto delta = geometry.diff(entity->position(), source_position);
+      if (delta.magnitude() <= max_range) {
+        auto collision = line_tile_collision_along_delta(tiles, source_position, delta, DefaultCollisionSet);
         if (!collision)
           return std::unexpected(std::move(collision.error()));
         return !*collision;
@@ -823,9 +814,10 @@ export namespace Star::WorldImpl {
   using ::Star::WorldImpl::tileIsOccupied;
   using ::Star::WorldImpl::tileCollisionKind;
   using ::Star::WorldImpl::rectTileCollision;
-  using ::Star::WorldImpl::lineTileCollision;
-  using ::Star::WorldImpl::lineTileCollisionPoint;
-  using ::Star::WorldImpl::collidingTilesAlongLine;
+  using ::Star::WorldImpl::collision_tile_source;
+  using ::Star::WorldImpl::line_tile_collision;
+  using ::Star::WorldImpl::line_tile_collision_point;
+  using ::Star::WorldImpl::colliding_tiles_along_line;
   using ::Star::WorldImpl::tileDamageParameters;
   using ::Star::WorldImpl::damageWouldDestroy;
   using ::Star::WorldImpl::canPlaceMaterial;
@@ -840,6 +832,6 @@ export namespace Star::WorldImpl {
   using ::Star::WorldImpl::lightLevel;
   using ::Star::WorldImpl::getInteractiveInRange;
   using ::Star::WorldImpl::isTileEntityInRange;
-  using ::Star::WorldImpl::canReachEntity;
+  using ::Star::WorldImpl::can_reach_entity;
   using ::Star::WorldImpl::liquidLevel;
 }

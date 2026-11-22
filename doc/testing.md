@@ -692,6 +692,14 @@ tracker polls from trigger-and-consume pairs. Each dispatch iteration calls 64
 live listeners; the retained case also keeps 256 cancelled targets and handles alive.
 These are dispatch costs, not full asset reload times.
 
+### Grid line traversal
+
+`BlocksAlongLine.*` checks visitation order, not just the set of cells. Both
+endpoints belong to their floored cells. A crossing through an interior corner
+steps diagonally without reporting the two cells touched only at that point.
+Visitor `false` means early termination, not an error. World collision queries
+apply the hit limit before excluding glancing contacts.
+
 ### Asset locators
 
 - `core_tests --gtest_filter='AssetPathTest.*:PathEmbedTest.*:ImageDirectivePipelineTest.*'`
