@@ -1106,3 +1106,10 @@ measure uncontended operations, not scheduler latency.
 ordering. `DataStreamTest.*Uuid*` checks truncated reads and container codecs.
 Use `io_benchmarks --benchmark_filter=IO/UuidRead` for fixed-size wire reads;
 it does not measure text parsing or hash-table lookups.
+
+`VlqTest.*` covers most-significant-group-first encoding, bounded input,
+signed extremes, cursor advancement and error propagation. Low-level span
+reads return `NPos` without changing the destination on failure. Ordinary
+streams accept noncanonical and wrapping encodings; PathEmbed's binary JSON
+validator rejects overflow. `io_benchmarks --benchmark_filter='^IO/Vlq'`
+compares external, owning and callback readers for 1-, 5- and 10-byte values.

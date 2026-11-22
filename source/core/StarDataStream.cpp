@@ -137,22 +137,21 @@ std::expected<std::reference_wrapper<DataStream>, StarException> DataStream::ope
 }
 
 std::expected<std::size_t, StarException> DataStream::write_vlq_u(std::uint64_t value) {
-  std::uint8_t bytes[10];
-  auto count = Star::writeVlqU(value, bytes);
-  auto result = write_data({reinterpret_cast<char const*>(bytes), count});
+  std::array<char, max_vlq_bytes> bytes;
+  auto count = Star::write_vlq_u(value, std::span(bytes));
+  auto result = write_data(std::span(bytes).first(count));
   if (!result) return std::unexpected(std::move(result.error()));
   return count;
 }
 std::expected<std::size_t, StarException> DataStream::write_vlq_i(std::int64_t value) {
-  auto encoded = value < 0 ? (std::uint64_t(-(value + 1)) << 1) | 1 : std::uint64_t(value) << 1;
-  return write_vlq_u(encoded);
+  return write_vlq_u(zigzag_encode(value));
 }
 std::expected<std::size_t, StarException> DataStream::write_vlq_s(std::size_t value) {
   return write_vlq_u(value == NPos ? 0 : std::uint64_t(value) + 1);
 }
 std::expected<std::size_t, StarException> DataStream::read_vlq_u(std::uint64_t& value) {
   std::uint64_t decoded = 0;
-  for (std::size_t i = 0; i < 10; ++i) {
+  for (std::size_t i = 0; i < max_vlq_bytes; ++i) {
     auto byte = read<std::uint8_t>();
     if (!byte) return std::unexpected(std::move(byte.error()));
     decoded = (decoded << 7) | std::uint64_t(*byte & 127);
@@ -167,7 +166,7 @@ std::expected<std::size_t, StarException> DataStream::read_vlq_i(std::int64_t& v
   std::uint64_t encoded;
   auto count = read_vlq_u(encoded);
   if (!count) return std::unexpected(std::move(count.error()));
-  value = encoded & 1 ? -std::int64_t(encoded >> 1) - 1 : std::int64_t(encoded >> 1);
+  value = zigzag_decode(encoded);
   return *count;
 }
 std::expected<std::size_t, StarException> DataStream::read_vlq_s(std::size_t& value) {

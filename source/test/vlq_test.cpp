@@ -14,28 +14,56 @@ import star.memory;
 using namespace Star;
 
 TEST(VlqTest, All) {
-  char buffer[10];
+  std::array<char, max_vlq_bytes> buffer;
   std::int64_t result;
 
-  EXPECT_EQ(writeVlqI(-1, buffer), 1u);
-  EXPECT_EQ(readVlqI(result, buffer), 1u);
+  EXPECT_EQ(write_vlq_i(-1, std::span(buffer)), 1u);
+  EXPECT_EQ(read_vlq_i(result, std::span(buffer)), 1u);
   EXPECT_EQ(result, -1);
 
-  EXPECT_EQ(writeVlqI(-65, buffer), 2u);
-  EXPECT_EQ(readVlqI(result, buffer), 2u);
+  EXPECT_EQ(write_vlq_i(-65, std::span(buffer)), 2u);
+  EXPECT_EQ(read_vlq_i(result, std::span(buffer)), 2u);
   EXPECT_EQ(result, -65);
 
-  EXPECT_EQ(writeVlqI(-64, buffer), 1u);
-  EXPECT_EQ(readVlqI(result, buffer), 1u);
+  EXPECT_EQ(write_vlq_i(-64, std::span(buffer)), 1u);
+  EXPECT_EQ(read_vlq_i(result, std::span(buffer)), 1u);
   EXPECT_EQ(result, -64);
 
-  EXPECT_EQ(writeVlqI((std::int64_t)1 << 63, buffer), 10u);
-  EXPECT_EQ(readVlqI(result, buffer), 10u);
-  EXPECT_EQ(result, (std::int64_t)1 << 63);
+  EXPECT_EQ(write_vlq_i(std::numeric_limits<std::int64_t>::min(), std::span(buffer)), 10u);
+  EXPECT_EQ(read_vlq_i(result, std::span(buffer)), 10u);
+  EXPECT_EQ(result, std::numeric_limits<std::int64_t>::min());
 
-  EXPECT_EQ(writeVlqI(0, buffer), 1u);
-  EXPECT_EQ(readVlqI(result, buffer), 1u);
+  EXPECT_EQ(write_vlq_i(0, std::span(buffer)), 1u);
+  EXPECT_EQ(read_vlq_i(result, std::span(buffer)), 1u);
   EXPECT_EQ(result, 0);
+}
+
+TEST(VlqTest, BoundedFailureRetainsBothDestinations) {
+  std::array<unsigned char, max_vlq_bytes + 1> input;
+  input.fill(0x81);
+  input.back() = 0;
+  for (std::size_t length = 0; length <= input.size(); ++length) {
+    auto bytes = std::span(input).first(length);
+    std::uint64_t u = 97;
+    std::int64_t i = -97;
+    EXPECT_EQ(read_vlq_u(u, bytes), NPos);
+    EXPECT_EQ(read_vlq_i(i, bytes), NPos);
+    EXPECT_EQ(u, 97u);
+    EXPECT_EQ(i, -97);
+  }
+}
+
+TEST(VlqTest, SignedExtremesMatchWireBytes) {
+  using Limits = std::numeric_limits<std::int64_t>;
+  for (auto value : {Limits::min(), Limits::max()}) {
+    std::array<unsigned char, max_vlq_bytes> expected;
+    expected.fill(0xff);
+    expected.front() = 0x81;
+    expected.back() = value == Limits::min() ? 0x7f : 0x7e;
+    std::array<unsigned char, max_vlq_bytes> encoded;
+    ASSERT_EQ(write_vlq_i(value, std::span(encoded)), expected.size());
+    EXPECT_EQ(encoded, expected);
+  }
 }
 
 TEST(VlqTest, UnsignedGroupBoundariesPreserveWireBytesAndFollowingByte) {
@@ -54,13 +82,13 @@ TEST(VlqTest, UnsignedGroupBoundariesPreserveWireBytesAndFollowingByte) {
     SCOPED_TRACE(test.value);
     std::array<unsigned char, 11> buffer;
     buffer.fill(0xa5);
-    auto written = writeVlqU(test.value, buffer.begin());
+    auto written = write_vlq_u(test.value, std::span(buffer).first<max_vlq_bytes>());
     ASSERT_EQ(written, test.bytes.size());
-    EXPECT_EQ(vlqUSize(test.value), test.bytes.size());
+    EXPECT_EQ(vlq_u_size(test.value), test.bytes.size());
     EXPECT_TRUE(std::equal(test.bytes.begin(), test.bytes.end(), buffer.begin()));
     EXPECT_EQ(buffer[written], 0xa5);
     std::uint64_t restored = 0;
-    EXPECT_EQ(readVlqU(restored, buffer.begin(), written), written);
+    EXPECT_EQ(read_vlq_u(restored, std::span(buffer).first(written)), written);
     EXPECT_EQ(restored, test.value);
   }
 }

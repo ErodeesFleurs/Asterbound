@@ -11,6 +11,7 @@ import star.json_builder;
 import star.json_parser;
 import star.data_stream_devices;
 import star.format;
+import star.vlq;
 
 namespace Star {
 namespace {
@@ -375,7 +376,7 @@ public:
 private:
   std::expected<std::uint64_t, StarException> vlq() {
     std::uint64_t value = 0;
-    for (unsigned i = 0; i < 10; ++i) {
+    for (std::size_t i = 0; i < max_vlq_bytes; ++i) {
       if (m_input.empty()) return invalid("truncated binary JSON VLQ");
       auto byte = static_cast<unsigned char>(m_input.front());
       m_input = m_input.subspan(1);

@@ -657,7 +657,7 @@ namespace Star {
   }
 
   std::uint32_t BTreeDatabase::LeafNode::element_size(Element const& element) {
-    return element.key.size() + vlqUSize(element.data.size()) + element.data.size();
+    return element.key.size() + vlq_u_size(element.data.size()) + element.data.size();
   }
 
   void BTreeDatabase::LeafNode::insert(std::size_t i, ByteArray k, ByteArray d) {
@@ -1352,7 +1352,7 @@ namespace Star {
   }
 
   std::uint32_t BTreeDatabase::data_size(ByteArray const& d) const {
-    return vlqUSize(d.size()) + d.size();
+    return vlq_u_size(d.size()) + d.size();
   }
 
   [[nodiscard]] auto BTreeDatabase::leaf_tail_blocks(BlockIndex leafPointer) -> std::expected<List<BlockIndex>, StarException> {

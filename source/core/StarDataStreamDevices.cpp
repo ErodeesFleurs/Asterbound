@@ -6,6 +6,8 @@ import star.buffer;
 
 import star.byte_array;
 import star.format;
+import star.vlq;
+import star.memory;
 namespace Star {
 
 std::expected<std::size_t, StarException> DataStreamReader::read_vlq_u(std::uint64_t& value) {
@@ -16,30 +18,21 @@ std::expected<std::size_t, StarException> DataStreamReader::read_vlq_u(std::uint
   if (!m_buffer.is_readable() || *position < 0 || std::uint64_t(*position) >= bytes.size())
     return DataStream::read_vlq_u(value);
   bytes = bytes.subspan(static_cast<std::size_t>(*position));
-  auto available = std::min<std::size_t>(bytes.size(), 10);
   std::uint64_t decoded = 0;
-  std::size_t consumed = 0;
-  bool complete = false;
-  for (; consumed < available;) {
-    auto byte = static_cast<std::uint8_t>(bytes[consumed++]);
-    decoded = (decoded << 7) | std::uint64_t(byte & 127);
-    if (!(byte & 128)) {
-      complete = true;
-      break;
-    }
-  }
+  auto count = Star::read_vlq_u(decoded, bytes);
+  auto consumed = count == NPos ? std::min(bytes.size(), max_vlq_bytes) : count;
   auto advanced = m_buffer.seek(static_cast<StreamOffset>(consumed), IOSeek::Relative);
   if (!advanced)
     return std::unexpected(std::move(advanced.error()));
-  if (complete) {
+  if (count != NPos) {
     value = decoded;
     return consumed;
   }
-  if (consumed == 10)
+  if (consumed == max_vlq_bytes)
     return std::unexpected(DataStreamException("Error reading VLQ encoded integer!"));
   // The old byte-wise path attempts the first missing byte and keeps its error.
-  char missing;
-  auto result = m_buffer.read_full({&missing, 1});
+  std::array<char, 1> missing;
+  auto result = m_buffer.read_full(missing);
   if (!result)
     return std::unexpected(std::move(result.error()));
   return std::unexpected(DataStreamException("Error reading VLQ encoded integer!"));
