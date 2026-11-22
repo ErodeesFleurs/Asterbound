@@ -17,7 +17,6 @@ import star.material_types;
 import star.math_common;
 import star.vector;
 import star.format;
-import star.version;
 import star.color;
 import star.string;
 import star.rect;

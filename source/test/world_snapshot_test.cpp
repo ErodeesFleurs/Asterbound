@@ -28,7 +28,6 @@ import star.io_device;
 import star.ref_ptr;
 import star.logging;
 import star.listener;
-import star.version;
 import star.id_map;
 import star.casting;
 import star.image;

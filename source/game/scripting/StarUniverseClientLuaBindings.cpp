@@ -35,7 +35,6 @@ import star.net_compatibility;
 import std;
 import star.format;
 import star.id_map;
-import star.version;
 import star.ordered_map;
 import star.casting;
 import star.set;

@@ -25,7 +25,6 @@ import star.directives;
 import star.asset_path;
 import star.ref_ptr;
 import star.listener;
-import star.version;
 
 import star.byte_array;
 import star.bytes;

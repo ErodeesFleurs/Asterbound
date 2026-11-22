@@ -16,7 +16,6 @@ import star.listener;
 import std;
 import star.format;
 import star.string;
-import star.version;
 import star.lua;
 import star.output_proxy;
 

@@ -30,7 +30,6 @@ import star.listener;
 import star.string;
 import star.map;
 import star.format;
-import star.version;
 
 import star.collision_block;
 import star.item_descriptor;

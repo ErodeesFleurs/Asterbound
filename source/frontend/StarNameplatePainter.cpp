@@ -29,7 +29,6 @@ import star.audio;
 import star.map;
 import star.image;
 import star.math_common;
-import star.version;
 import star.random;
 import star.weighted_pool;
 import star.rpc_promise;

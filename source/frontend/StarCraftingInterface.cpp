@@ -39,7 +39,6 @@ import star.map;
 import star.lexical_cast;
 import star.rpc_promise;
 import star.format;
-import star.version;
 import star.lua;
 import star.io_device;
 import star.ref_ptr;

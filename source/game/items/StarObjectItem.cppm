@@ -30,7 +30,6 @@ import star.ref_ptr;
 import star.listener;
 import std;
 import star.format;
-import star.version;
 import star.random;
 import star.periodic;
 import star.periodic_function;

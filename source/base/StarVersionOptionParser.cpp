@@ -12,7 +12,7 @@ import star.file;
 namespace Star {
 
 String VersionOptionParser::version_string() const {
-  return Star::format("Asterbound{}{} v{} for v{} ({}) Source ID: {}", m_version_name.empty() ? "" : " ", m_version_name, ProductVersionString, StarVersionString, StarArchitectureString, StarSourceIdentifierString);
+  return Star::format("Asterbound{}{} v{} for v{} ({}) Source ID: {}", m_version_name.empty() ? "" : " ", m_version_name, product_version, base_game_version, target_architecture, source_identifier);
 }
 
 void VersionOptionParser::set_version_name(String name) {

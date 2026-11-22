@@ -27,7 +27,6 @@ import star.listener;
 import std;
 import star.format;
 import star.output_proxy;
-import star.version;
 
 import star.drawable;
 import star.entity_rendering_types;

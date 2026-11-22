@@ -21,7 +21,6 @@ import star.listener;
 import std;
 import star.string;
 import star.format;
-import star.version;
 
 import star.asset_source;
 import star.assets;

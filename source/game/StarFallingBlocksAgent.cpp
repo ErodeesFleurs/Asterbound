@@ -23,7 +23,6 @@ import star.data_stream;
 import star.string_view;
 import star.directives;
 import star.asset_path;
-import star.version;
 import star.ordered_map;
 import star.io_device;
 import star.ref_ptr;

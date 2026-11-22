@@ -19,7 +19,6 @@ import star.casting;
 import star.ordered_set;
 import star.list;
 import star.string;
-import star.version;
 import star.rpc_promise;
 import star.bi_map;
 import star.random;

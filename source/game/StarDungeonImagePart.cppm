@@ -25,7 +25,6 @@ import star.optional;
 import star.string;
 import star.map;
 import star.format;
-import star.version;
 import star.casting;
 import star.image;
 

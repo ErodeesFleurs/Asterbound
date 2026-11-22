@@ -17,7 +17,6 @@ import star.thread;
 import star.listener;
 import std;
 import star.format;
-import star.version;
 import star.data_stream_extra;
 import star.audio;
 import star.list;

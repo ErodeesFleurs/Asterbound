@@ -28,7 +28,6 @@ import star.ref_ptr;
 import star.logging;
 import star.listener;
 import star.format;
-import star.version;
 import star.id_map;
 import star.rpc_promise;
 import star.lua;

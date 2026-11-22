@@ -23,7 +23,6 @@ import star.sector_array_2d;
 import star.random;
 import star.perlin;
 import star.weighted_pool;
-import star.version;
 
 
 import star.world_geometry;

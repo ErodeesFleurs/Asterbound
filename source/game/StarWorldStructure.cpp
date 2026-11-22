@@ -22,7 +22,6 @@ import std;
 import star.string;
 import star.map;
 import star.format;
-import star.version;
 import star.data_stream_extra;
 import star.image;
 

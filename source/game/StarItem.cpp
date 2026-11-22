@@ -20,7 +20,6 @@ import star.io_device;
 import star.ref_ptr;
 import star.listener;
 import std;
-import star.version;
 import star.random;
 import star.logging;
 

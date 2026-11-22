@@ -32,7 +32,6 @@ import star.io_device;
 import star.ref_ptr;
 import star.logging;
 import star.format;
-import star.version;
 import star.random;
 import star.weighted_pool;
 import star.ordered_set;

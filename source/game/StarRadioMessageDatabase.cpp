@@ -17,7 +17,6 @@ import std;
 import star.optional;
 import star.string;
 import star.format;
-import star.version;
 
 import star.asset_source;
 import star.assets;

@@ -36,7 +36,6 @@ import star.file;
 import star.logging;
 import star.time;
 import star.format;
-import star.version;
 import star.a_star;
 import star.audio;
 import star.map;

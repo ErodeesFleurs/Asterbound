@@ -18,7 +18,6 @@ import std;
 import star.string;
 import star.lua;
 import star.format;
-import star.version;
 import star.rpc_promise;
 
 import star.lua_components;

@@ -35,7 +35,6 @@ import star.ordered_set;
 import std;
 import star.format;
 import star.output_proxy;
-import star.version;
 import star.logging;
 import star.listener;
 

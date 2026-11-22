@@ -18,7 +18,6 @@ import star.logging;
 import star.listener;
 import std;
 import star.string;
-import star.version;
 import star.format;
 import star.optional;
 

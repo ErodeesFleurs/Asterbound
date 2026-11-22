@@ -37,7 +37,6 @@ import star.color;
 import star.asset_path;
 import star.image;
 import star.format;
-import star.version;
 import star.audio;
 import star.map;
 import star.net_compatibility;

@@ -20,7 +20,6 @@ import star.bi_map;
 import star.io_device;
 import star.ref_ptr;
 import star.logging;
-import star.version;
 import star.text;
 import star.listener;
 import star.game_types;

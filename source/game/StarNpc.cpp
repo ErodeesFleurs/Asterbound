@@ -45,7 +45,6 @@ import star.ref_ptr;
 import star.listener;
 import std;
 import star.format;
-import star.version;
 
 import star.npc;
 import star.lua_root;

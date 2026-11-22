@@ -20,7 +20,6 @@ import star.bi_map;
 import star.io_device;
 import star.ref_ptr;
 import star.logging;
-import star.version;
 import star.string;
 import star.text;
 import star.asset_path;

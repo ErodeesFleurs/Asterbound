@@ -33,7 +33,6 @@ import star.zstd_compression;
 import star.net_compatibility;
 import star.lua;
 import star.id_map;
-import star.version;
 import star.ordered_map;
 import star.casting;
 import star.set;

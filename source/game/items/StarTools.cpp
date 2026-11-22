@@ -32,7 +32,6 @@ import star.io_device;
 import star.ref_ptr;
 import star.logging;
 import star.listener;
-import star.version;
 import star.image;
 import star.math_common;
 import star.random;

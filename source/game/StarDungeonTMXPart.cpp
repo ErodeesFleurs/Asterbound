@@ -30,7 +30,6 @@ import star.listener;
 import std;
 import star.format;
 import star.optional;
-import star.version;
 import star.vector;
 import star.game_types;
 import star.casting;

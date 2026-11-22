@@ -408,6 +408,9 @@ Root [`version.json`](../version.json) is the shared version source:
 | `starboundVersion` | Base-game compatibility identifier, not the product version |
 
 A product-version change alone does not require a wire or asset-version change. See [protocol and resource compatibility](modding.md#asterbound-compatibility-identity).
+Each product component is decimal, in `0..65535`, without leading zeros except
+for `0` itself. `STAR_SOURCE_IDENTIFIER` overrides the Git revision; an archive
+without either reports `unknown`. The source ID is display metadata, not a wire version.
 
 Edit `assetVersion` only in `version.json`, then synchronize both checked-in `_metadata` files:
 
@@ -416,6 +419,9 @@ cmake -DASTERBOUND_SYNC_ASSET_VERSIONS=ON -P cmake/AsterboundVersion.cmake
 ```
 
 The command preserves metadata comments and formatting. Both `assets/asterbound` (`asterbound_base`) and `assets/asterbound-compat` (`asterbound_compat`) use this asset release number. Asterbound's asset series starts at `0.1.0.0`, independent of the former upstream main and compatibility versions. Product and asset versions remain independently controlled.
+Automatic synchronization refuses ambiguous `version` fields rather than rewriting
+nested metadata. It accepts asset identifiers consisting of letters, digits, `.`, `_`,
+`+` and `-`; metadata outside this patch format can be updated manually.
 
 `cmake -P cmake/AsterboundVersion.cmake` checks without writing. CMake configuration, CI source checks and all platform assembly scripts reject stale metadata. Changing either metadata file also triggers a CMake reconfiguration. The runtime's strict main-asset version check remains enabled for `asterbound_base`; network versions are unchanged.
 

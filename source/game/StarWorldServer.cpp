@@ -15,7 +15,6 @@ import star.list;
 import star.bi_map;
 import star.math_common;
 import star.format;
-import star.version;
 import star.data_stream;
 import star.logging;
 import star.data_stream_extra;

@@ -25,7 +25,6 @@ import star.logging;
 import star.listener;
 import std;
 import star.format;
-import star.version;
 import star.random;
 import star.weighted_pool;
 import star.periodic;

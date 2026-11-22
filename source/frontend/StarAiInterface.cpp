@@ -40,7 +40,6 @@ import star.json_rpc;
 import star.io_device;
 import star.ref_ptr;
 import star.logging;
-import star.version;
 import star.periodic_function;
 import star.weighted_pool;
 import star.byte_array;

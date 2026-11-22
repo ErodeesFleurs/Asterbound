@@ -18,7 +18,6 @@ import std;
 import star.string;
 import star.format;
 import star.output_proxy;
-import star.version;
 
 import star.asset_source;
 import star.assets;

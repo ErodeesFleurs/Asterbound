@@ -20,7 +20,6 @@ import star.ref_ptr;
 import star.listener;
 import star.format;
 import star.output_proxy;
-import star.version;
 import star.logging;
 
 import star.key_bindings;

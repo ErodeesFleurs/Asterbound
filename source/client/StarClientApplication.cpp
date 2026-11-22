@@ -16,7 +16,6 @@ import star.json;
 import star.json_extra;
 import star.thread;
 import star.time;
-import star.version;
 import star.file;
 import star.string;
 import star.byte_array;

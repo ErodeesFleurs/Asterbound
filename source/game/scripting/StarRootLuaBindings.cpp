@@ -42,7 +42,6 @@ import star.logging;
 import star.listener;
 import std;
 import star.format;
-import star.version;
 import star.periodic_function;
 import star.audio;
 import star.map;

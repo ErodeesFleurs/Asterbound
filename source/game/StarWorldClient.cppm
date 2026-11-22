@@ -11,7 +11,6 @@ import star.bi_map;
 import star.vector;
 import star.lua;
 import star.format;
-import star.version;
 import star.color;
 import star.string;
 import star.data_stream;

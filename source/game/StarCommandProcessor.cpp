@@ -25,7 +25,6 @@ import star.bytes;
 import star.format;
 import star.optional;
 import star.lexical_cast;
-import star.version;
 import star.weighted_pool;
 import star.parametric_function;
 import star.logging;

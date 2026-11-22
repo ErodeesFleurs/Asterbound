@@ -14,7 +14,6 @@ import star.option_parser;
 import std;
 import star.format;
 import star.output_proxy;
-import star.version;
 import star.version_option_parser;
 import star.logging;
 import star.native_runtime;

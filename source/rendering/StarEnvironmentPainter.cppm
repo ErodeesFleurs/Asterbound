@@ -16,7 +16,6 @@ import star.vector;
 import star.bi_map;
 import star.image;
 import star.game_types;
-import star.version;
 import star.string;
 import star.asset_path;
 import star.random;

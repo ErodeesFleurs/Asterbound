@@ -6,7 +6,17 @@ set (star_core_SOURCES
   )
 
 
-configure_file (StarVersion.cpp.in ${CMAKE_CURRENT_BINARY_DIR}/StarVersion.cpp)
+function(escape_version_literal output value)
+  string(REPLACE "\\" "\\\\" value "${value}")
+  string(REPLACE "\"" "\\\"" value "${value}")
+  string(REPLACE "\n" "\\n" value "${value}")
+  string(REPLACE "\r" "\\r" value "${value}")
+  set(${output} "${value}" PARENT_SCOPE)
+endfunction()
+escape_version_literal(escaped_source_identifier "${STAR_SOURCE_IDENTIFIER}")
+escape_version_literal(escaped_asset_version "${ASTERBOUND_ASSET_VERSION}")
+escape_version_literal(escaped_game_version "${STARBOUND_VERSION}")
+configure_file(StarVersion.cpp.in "${CMAKE_CURRENT_BINARY_DIR}/StarVersion.cpp" @ONLY)
 add_library (star_core OBJECT ${star_core_SOURCES})
 target_include_directories (star_core PRIVATE ${STAR_EXTERN_INCLUDES} ${STAR_CORE_INCLUDES})
 

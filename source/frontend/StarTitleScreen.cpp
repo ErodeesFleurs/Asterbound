@@ -34,7 +34,6 @@ import star.set;
 import star.audio;
 import star.map;
 import star.lua;
-import star.version;
 import star.image;
 import star.strong_typedef;
 import star.interpolation;

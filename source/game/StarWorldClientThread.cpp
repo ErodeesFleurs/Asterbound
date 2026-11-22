@@ -7,7 +7,6 @@ import star.list;
 import star.bi_map;
 import star.math_common;
 import star.format;
-import star.version;
 import star.color;
 import star.string;
 import star.data_stream;

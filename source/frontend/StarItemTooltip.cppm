@@ -36,7 +36,6 @@ import star.ordered_map;
 import star.io_device;
 import star.ref_ptr;
 import star.format;
-import star.version;
 import star.random;
 import star.periodic;
 import star.periodic_function;

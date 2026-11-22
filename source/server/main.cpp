@@ -50,7 +50,6 @@ import star.image;
 import star.map;
 import star.ref_ptr;
 import star.listener;
-import star.version;
 import star.ordered_set;
 
 import star.lua_root;

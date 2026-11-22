@@ -32,7 +32,6 @@ import star.logging;
 import star.listener;
 import std;
 import star.format;
-import star.version;
 import star.array;
 import star.ordered_set;
 import star.audio;

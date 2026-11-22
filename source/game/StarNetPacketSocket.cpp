@@ -12,7 +12,6 @@ import star.game_types;
 import star.math_common;
 import star.map;
 import star.format;
-import star.version;
 import star.ordered_map;
 import star.color;
 import star.random;

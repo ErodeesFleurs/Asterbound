@@ -32,7 +32,6 @@ import star.data_stream_devices;
 import star.btree_database;
 import star.ordered_set;
 import star.format;
-import star.version;
 import star.perlin;
 import star.weighted_pool;
 import std;

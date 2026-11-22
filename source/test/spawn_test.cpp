@@ -24,7 +24,6 @@ import star.file;
 import star.listener;
 import std;
 import star.format;
-import star.version;
 
 import star.celestial_coordinate;
 import star.warping;

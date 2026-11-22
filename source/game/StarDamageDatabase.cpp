@@ -19,7 +19,6 @@ import star.listener;
 import std;
 import star.string;
 import star.format;
-import star.version;
 
 import star.damage_types;
 import star.asset_source;

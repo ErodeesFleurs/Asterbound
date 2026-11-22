@@ -21,7 +21,6 @@ import star.string;
 import star.vector;
 import star.text;
 import star.format;
-import star.version;
 import star.casting;
 import star.strong_typedef;
 import star.listener;

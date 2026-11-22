@@ -24,7 +24,6 @@ import star.game_types;
 import star.set;
 import star.audio;
 import star.map;
-import star.version;
 
 import star.ordered_map;
 

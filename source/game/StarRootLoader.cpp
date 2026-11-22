@@ -6,7 +6,6 @@ import star.ordered_set;
 import std;
 import star.file;
 import star.format;
-import star.version;
 import star.bi_map;
 import star.thread;
 import star.io_device;

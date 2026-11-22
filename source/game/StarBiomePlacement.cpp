@@ -27,7 +27,6 @@ import std;
 import star.optional;
 import star.string;
 import star.format;
-import star.version;
 
 import star.damage_types;
 import star.world_geometry;

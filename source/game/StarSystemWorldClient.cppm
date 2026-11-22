@@ -21,7 +21,6 @@ import star.strong_typedef;
 import star.id_map;
 import star.string;
 import star.map;
-import star.version;
 import star.ordered_map;
 import star.casting;
 import star.net_compatibility;

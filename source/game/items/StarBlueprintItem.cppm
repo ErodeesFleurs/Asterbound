@@ -29,7 +29,6 @@ import star.ref_ptr;
 import star.logging;
 import star.listener;
 import std;
-import star.version;
 import star.ordered_set;
 import star.audio;
 import star.map;

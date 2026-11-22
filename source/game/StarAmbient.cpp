@@ -20,7 +20,6 @@ import star.logging;
 import star.listener;
 import std;
 import star.string;
-import star.version;
 import star.random;
 import star.game_types;
 

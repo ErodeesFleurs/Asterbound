@@ -18,7 +18,6 @@ import star.bi_map;
 import star.image;
 import star.poly;
 import star.game_types;
-import star.version;
 import star.string;
 import star.asset_path;
 import star.random;

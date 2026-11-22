@@ -30,7 +30,6 @@ import star.listener;
 import std;
 import star.set;
 import star.string;
-import star.version;
 
 import star.damage_types;
 import star.world_geometry;

@@ -29,7 +29,6 @@ import star.ordered_map;
 import star.io_device;
 import star.ref_ptr;
 import star.logging;
-import star.version;
 import star.strong_typedef;
 
 import star.drawable;

@@ -25,7 +25,6 @@ import star.string_view;
 import star.directives;
 import star.asset_path;
 import star.string;
-import star.version;
 import star.image;
 import star.ordered_map;
 import star.lru_cache;

@@ -30,7 +30,6 @@ import star.listener;
 import std;
 import star.lua;
 import star.format;
-import star.version;
 
 import star.drawable;
 import star.celestial_coordinate;

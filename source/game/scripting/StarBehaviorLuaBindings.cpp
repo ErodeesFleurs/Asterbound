@@ -18,7 +18,6 @@ import star.listener;
 import std;
 import star.format;
 import star.string;
-import star.version;
 
 
 // Match client include order for SIMD intrinsics used by xxhash.

@@ -17,7 +17,6 @@ import star.ordered_set;
 import star.list;
 import star.game_types;
 import star.string;
-import star.version;
 import star.rpc_promise;
 import star.random;
 import star.perlin;

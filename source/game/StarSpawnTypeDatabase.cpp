@@ -20,7 +20,6 @@ import star.time;
 import star.string;
 import star.set;
 import star.format;
-import star.version;
 import star.optional;
 
 import star.asset_source;

@@ -37,7 +37,6 @@ import star.logging;
 import star.io_device;
 import star.ref_ptr;
 import star.format;
-import star.version;
 import star.periodic_function;
 import star.image;
 import star.math_common;

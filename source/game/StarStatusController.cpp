@@ -37,7 +37,6 @@ import star.listener;
 import std;
 import star.optional;
 import star.lua;
-import star.version;
 
 import star.lua_components;
 import star.lua_actor_movement_component;

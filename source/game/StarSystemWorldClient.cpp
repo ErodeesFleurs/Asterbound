@@ -20,7 +20,6 @@ import star.asset_path;
 import star.strong_typedef;
 import star.id_map;
 import star.string;
-import star.version;
 import star.casting;
 import star.net_compatibility;
 import std;

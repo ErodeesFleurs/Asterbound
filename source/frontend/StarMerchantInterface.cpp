@@ -37,7 +37,6 @@ import star.lexical_cast;
 import star.image;
 import star.math_common;
 import star.format;
-import star.version;
 import star.weighted_pool;
 import star.net_compatibility;
 import star.worker_pool;

@@ -46,7 +46,6 @@ import star.logging;
 import star.listener;
 import star.format;
 import star.output_proxy;
-import star.version;
 import star.spline;
 import star.lua;
 import star.weighted_pool;

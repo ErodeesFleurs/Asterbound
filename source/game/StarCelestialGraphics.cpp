@@ -25,7 +25,6 @@ import star.listener;
 import std;
 import star.optional;
 import star.string;
-import star.version;
 
 import star.celestial_coordinate;
 import star.sky_types;

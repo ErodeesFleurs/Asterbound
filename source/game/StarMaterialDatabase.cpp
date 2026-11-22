@@ -21,7 +21,6 @@ import star.ref_ptr;
 import star.listener;
 import std;
 import star.string;
-import star.version;
 import star.logging;
 
 import star.collision_block;

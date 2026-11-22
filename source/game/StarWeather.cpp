@@ -11,7 +11,6 @@ import star.listener;
 import std;
 import star.format;
 import star.string;
-import star.version;
 import star.time;
 import star.id_map;
 import star.casting;

@@ -32,7 +32,6 @@ import std;
 import star.string;
 import star.optional;
 import star.format;
-import star.version;
 import star.math_common;
 import star.logging;
 import star.image;

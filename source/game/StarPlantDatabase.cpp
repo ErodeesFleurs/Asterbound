@@ -22,7 +22,6 @@ import star.listener;
 import std;
 import star.string;
 import star.format;
-import star.version;
 
 import star.tile_damage;
 import star.damage_types;

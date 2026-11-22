@@ -24,7 +24,6 @@ import star.listener;
 import star.string;
 import star.map;
 import star.format;
-import star.version;
 import star.id_map;
 import star.casting;
 import star.net_compatibility;

@@ -160,7 +160,7 @@ std::expected<bool, StarException> ServerQueryThread::processPacket(HostAddressW
                                       << A2S_ENV_LINUX// os
 #endif
                                       << serverPassworded() << A2S_VAC_OFF// secure
-                                      << StarVersionString << A2S_EDF_PORT// EDF
+                                      << base_game_version << A2S_EDF_PORT// EDF
                                       << m_serverPort;
     if (!response)
       return std::unexpected(std::move(response.error()));

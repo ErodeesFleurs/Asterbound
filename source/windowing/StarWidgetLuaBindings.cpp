@@ -40,7 +40,6 @@ import star.io_device;
 import star.ref_ptr;
 import star.logging;
 import star.format;
-import star.version;
 
 import star.lua_root;
 import star.lua_components;

@@ -13,7 +13,6 @@ import star.list;
 import star.bi_map;
 import star.math_common;
 import star.format;
-import star.version;
 import star.rect;
 import star.spatial_hash_2d;
 import star.casting;

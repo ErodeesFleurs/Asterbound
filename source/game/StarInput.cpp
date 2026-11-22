@@ -18,7 +18,6 @@ import star.logging;
 import std;
 import star.string;
 import star.format;
-import star.version;
 
 import star.input;
 import star.asset_source;

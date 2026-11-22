@@ -24,7 +24,6 @@ import star.set;
 import star.file;
 import star.lua;
 import star.format;
-import star.version;
 import star.casting;
 
 import star.lua_root;

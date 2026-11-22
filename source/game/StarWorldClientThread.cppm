@@ -7,7 +7,6 @@ import star.game_types;
 import star.image;
 import star.list;
 import star.bi_map;
-import star.version;
 import star.color;
 import star.string;
 import star.data_stream;

@@ -17,7 +17,6 @@ import star.material_types;
 import star.io_device;
 import star.lua;
 import star.format;
-import star.version;
 import star.string;
 import star.data_stream;
 import star.image_processing;

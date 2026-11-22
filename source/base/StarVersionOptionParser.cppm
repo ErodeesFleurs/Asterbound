@@ -6,7 +6,6 @@ import star.string;
 import star.ordered_map;
 import star.ordered_set;
 import star.option_parser;
-import star.version;
 
 namespace Star {
 

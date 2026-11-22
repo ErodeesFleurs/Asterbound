@@ -25,7 +25,6 @@ import star.listener;
 import std;
 import star.string;
 import star.format;
-import star.version;
 
 import star.sky_types;
 import star.animation;

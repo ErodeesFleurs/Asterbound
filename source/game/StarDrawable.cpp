@@ -23,7 +23,6 @@ import star.game_types;
 import star.logging;
 import star.listener;
 import std;
-import star.version;
 
 import star.drawable;
 

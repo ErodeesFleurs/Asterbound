@@ -35,7 +35,6 @@ import star.logging;
 import star.listener;
 import std;
 import star.format;
-import star.version;
 import star.parametric_function;
 import star.multi_array_interpolator;
 import star.multi_table;

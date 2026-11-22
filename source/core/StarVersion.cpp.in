@@ -3,10 +3,10 @@ import star.version;
 
 namespace Star {
 
-extern std::string_view const ProductVersionString = "@ASTERBOUND_VERSION@";
-extern std::string_view const BundledAssetsVersionString = "@ASTERBOUND_ASSET_VERSION@";
-extern std::string_view const StarVersionString = "@STARBOUND_VERSION@";
-extern std::string_view const StarSourceIdentifierString = "${STAR_SOURCE_IDENTIFIER}";
-extern std::string_view const StarArchitectureString = "${STAR_SYSTEM} ${STAR_ARCHITECTURE}";
+extern std::string_view const product_version = "@ASTERBOUND_VERSION@";
+extern std::string_view const bundled_assets_version = "@escaped_asset_version@";
+extern std::string_view const base_game_version = "@escaped_game_version@";
+extern std::string_view const source_identifier = "@escaped_source_identifier@";
+extern std::string_view const target_architecture = "@STAR_SYSTEM@ @STAR_ARCHITECTURE@";
 
 }

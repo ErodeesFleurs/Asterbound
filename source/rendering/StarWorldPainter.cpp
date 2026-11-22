@@ -36,7 +36,6 @@ import star.string;
 import star.text;
 import star.color;
 import star.asset_path;
-import star.version;
 import star.set;
 import star.worker_pool;
 

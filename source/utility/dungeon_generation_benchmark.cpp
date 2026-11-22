@@ -21,7 +21,6 @@ import star.asset_path;
 import star.string;
 import star.ordered_set;
 import star.format;
-import star.version;
 import star.io_device;
 import star.ref_ptr;
 import star.logging;

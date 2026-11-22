@@ -25,7 +25,6 @@ import star.string;
 import star.ordered_set;
 import std;
 import star.format;
-import star.version;
 import star.io_device;
 import star.ref_ptr;
 import star.logging;

@@ -21,7 +21,6 @@ import star.listener;
 import std;
 import star.format;
 import star.string;
-import star.version;
 
 import star.animation;
 import star.particle;

@@ -10,7 +10,6 @@ import star.string;
 import star.ordered_map;
 import star.ordered_set;
 import star.format;
-import star.version;
 import star.rect;
 import star.bi_map;
 import star.thread;

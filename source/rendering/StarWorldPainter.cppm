@@ -10,7 +10,6 @@ import star.list;
 import star.map;
 import star.bi_map;
 import star.vector;
-import star.version;
 import star.color;
 import star.string;
 import star.data_stream;

@@ -14,7 +14,6 @@ import star.asset_path;
 import star.ref_ptr;
 import star.logging;
 import star.listener;
-import star.version;
 import star.file;
 import star.id_map;
 import star.casting;

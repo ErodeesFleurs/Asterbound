@@ -27,7 +27,6 @@ import star.set;
 import star.audio;
 import star.map;
 import star.format;
-import star.version;
 
 import star.application;
 import star.statistics_service;

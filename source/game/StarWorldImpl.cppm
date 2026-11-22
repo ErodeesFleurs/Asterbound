@@ -15,7 +15,6 @@ import star.game_types;
 import star.material_types;
 import star.math_common;
 import star.vector;
-import star.version;
 import star.random;
 import star.perlin;
 import star.weighted_pool;

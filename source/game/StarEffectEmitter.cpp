@@ -9,7 +9,6 @@ import star.thread;
 import star.listener;
 import std;
 import star.format;
-import star.version;
 import star.audio;
 import star.list;
 import star.map;

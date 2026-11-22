@@ -27,7 +27,6 @@ import star.ordered_set;
 import star.string;
 import star.format;
 import star.output_proxy;
-import star.version;
 import star.rpc_promise;
 import star.random;
 import star.perlin;

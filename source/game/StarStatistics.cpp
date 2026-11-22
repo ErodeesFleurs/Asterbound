@@ -18,7 +18,6 @@ import std;
 import star.string;
 import star.lua;
 import star.format;
-import star.version;
 import star.file;
 import star.logging;
 import star.output_proxy;

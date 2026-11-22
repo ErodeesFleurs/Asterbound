@@ -25,7 +25,6 @@ import star.listener;
 import std;
 import star.format;
 import star.string;
-import star.version;
 import star.data_stream_extra;
 
 import star.damage_types;

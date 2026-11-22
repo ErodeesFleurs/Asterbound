@@ -47,7 +47,6 @@ import std;
 import star.memory;
 import star.format;
 import star.output_proxy;
-import star.version;
 import star.image;
 import star.worker_pool;
 import star.encode;

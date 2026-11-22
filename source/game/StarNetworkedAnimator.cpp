@@ -28,7 +28,6 @@ import star.logging;
 import star.listener;
 import std;
 import star.format;
-import star.version;
 import star.lexical_cast;
 import star.data_stream_extra;
 import star.game_types;

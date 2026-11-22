@@ -26,7 +26,6 @@ import star.casting;
 import star.ordered_set;
 import star.list;
 import star.bi_map;
-import star.version;
 import star.random;
 import star.perlin;
 import star.weighted_pool;

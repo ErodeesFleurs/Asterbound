@@ -30,7 +30,6 @@ import star.ref_ptr;
 import star.logging;
 import star.listener;
 import std;
-import star.version;
 import star.periodic_function;
 import star.audio;
 import star.map;

@@ -3494,7 +3494,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
       peer_version = *version;
     }
     if (*latest && peer_version < OpenProtocolVersion)
-      return fail(Star::format("OpenStarbound protocol {} or later is required.\nAsterbound v{}, Source ID: {}...", OpenProtocolVersion, ProductVersionString, StarSourceIdentifierString.substr(0, 8)));
+      return fail(Star::format("OpenStarbound protocol {} or later is required.\nAsterbound v{}, Source ID: {}...", OpenProtocolVersion, product_version, source_identifier.substr(0, 8)));
     if (!m_speciesShips.contains(connect->shipSpecies))
       return fail("Unknown ship species");
     if (!remoteAddress) {

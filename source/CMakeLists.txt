@@ -74,7 +74,11 @@ set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 if(NOT DEFINED STAR_SOURCE_IDENTIFIER)
   include(GetGitRevisionDescription)
   get_git_head_revision(STAR_GIT_REFSPEC STAR_GIT_HASHVAR)
-  set(STAR_SOURCE_IDENTIFIER "${STAR_GIT_HASHVAR}")
+  if(STAR_GIT_HASHVAR AND NOT STAR_GIT_HASHVAR MATCHES "-NOTFOUND$")
+    set(STAR_SOURCE_IDENTIFIER "${STAR_GIT_HASHVAR}")
+  else()
+    set(STAR_SOURCE_IDENTIFIER "unknown")
+  endif()
 endif()
 
 # Architecture identifier, like i386, x86_64 or ppc

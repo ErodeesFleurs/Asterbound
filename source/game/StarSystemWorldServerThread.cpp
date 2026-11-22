@@ -19,7 +19,6 @@ import star.id_map;
 import star.math_common;
 import star.string;
 import star.format;
-import star.version;
 import star.ordered_map;
 import star.casting;
 import star.net_compatibility;

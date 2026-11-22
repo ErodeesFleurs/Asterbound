@@ -24,7 +24,6 @@ import star.logging;
 import star.listener;
 import std;
 import star.format;
-import star.version;
 
 import star.lua_root;
 import star.animation;

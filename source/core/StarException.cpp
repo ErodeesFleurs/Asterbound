@@ -49,7 +49,7 @@ void fatal_error(std::string_view message, bool show_stack_trace) {
   TextBuffer output;
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
   std::format_to(std::back_inserter(output), "v{} ({})\nFatal Error: {}\n",
-      ProductVersionString, StarSourceIdentifierString, message);
+      product_version, source_identifier, message);
 #else
   std::format_to(std::back_inserter(output), "Fatal Error: {}", message);
   if (show_stack_trace)

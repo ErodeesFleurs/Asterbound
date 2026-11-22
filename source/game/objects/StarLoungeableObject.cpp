@@ -32,7 +32,6 @@ import star.logging;
 import star.listener;
 import std;
 import star.memory;
-import star.version;
 
 
 import star.lua_root;

@@ -23,7 +23,6 @@ import star.net_compatibility;
 import std;
 import star.id_map;
 import star.list;
-import star.version;
 import star.ordered_map;
 import star.rect;
 import star.casting;

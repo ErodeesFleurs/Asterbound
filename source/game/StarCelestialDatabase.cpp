@@ -38,7 +38,6 @@ import star.optional;
 import star.string;
 import star.map;
 import star.format;
-import star.version;
 
 import star.celestial_coordinate;
 import star.sky_types;

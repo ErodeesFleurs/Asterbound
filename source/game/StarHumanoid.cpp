@@ -29,7 +29,6 @@ import star.listener;
 import std;
 import star.optional;
 import star.format;
-import star.version;
 import star.data_stream_extra;
 import star.id_map;
 import star.strong_typedef;

@@ -8,7 +8,6 @@ import star.bi_map;
 import star.game_types;
 import star.vector;
 import star.map;
-import star.version;
 import star.color;
 import star.string;
 import star.data_stream;
