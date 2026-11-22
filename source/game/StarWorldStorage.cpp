@@ -1217,8 +1217,18 @@ std::expected<void, StarException> WorldStorage::loadSectorToLevel(Sector const&
           if (!operationResult2) return std::unexpected(std::move(operationResult2.error()));
         }
         {
-          auto operationResult1 = m_entityMap->addEntity(entity);
-          if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
+          auto indexed = m_entityMap->addEntity(entity);
+          if (!indexed) {
+            // initEntity registers tiles by id, not by object identity. If
+            // initialization reentered the world and the id is now in use,
+            // destructEntity could erase the other entity's tile record.
+            if (m_entityMap->entity(entity->entityId()))
+              return indexed;
+            auto cleaned = m_generatorFacade->destructEntity(*this, entity);
+            if (!cleaned)
+              return std::unexpected(std::move(indexed.error()).with_related(cleaned.error(), "Cleaning up rejected stored entity"));
+            return indexed;
+          }
         }
         if (auto uniqueId = entity->uniqueId()) {
           auto added = readUniques.add(*uniqueId, {sector, entity->position()});

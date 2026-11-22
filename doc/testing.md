@@ -293,6 +293,28 @@ values, insertion preserves the old end-relative stop: omit the oldest
 `1 - maxMessagePerEntity` previous bubbles, or all if there are fewer. The
 subsequent per-tick visibility filter still applies.
 
+### Spatial entity queries
+
+Compare spatial-index membership against an exhaustive closed-box intersection
+test, including points, lines, touching edges, negative coordinates and both
+pieces of an entity split at a world seam. A move within the same sector must
+update the exact bounds even if no bucket membership changes. Snapshot queries
+can invoke callbacks that insert or move entries: the original matches are
+visited at most once; removal during the callback is unsupported.
+Large representable boxes remain queryable even when materializing every
+covered sector would be impractical. Include moves between ordinary and
+oversized bounds and a sector-size rebuild in the same oracle comparison.
+Borrow entry references only from a live lvalue owner; deleting an entry
+invalidates its references. Owning value lists do not borrow index storage.
+
+Use `hash_benchmarks --benchmark_filter='^SpatialHash/'` for isolated queries
+and updates. Compare query counts as well as time: a baseline that misses an
+exact edge does less work and is not a throughput reference for correct hits.
+Run `SpatialHash2DTest.*` in the production floating-point build as well:
+rejection of infinities and NaNs must leave both the exact bounds and the
+secondary index unchanged. For the game path, also run
+`PhysicsObject.LocalBoundsAndWorldForcesAtLargeCoordinates` with real assets.
+
 ### Process signal handling
 
 `SignalHandler::create()` allows one successful registration per process.

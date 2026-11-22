@@ -69,6 +69,7 @@ set (star_core_tests_SOURCES
       set_test.cpp
       secure_random_test.cpp
       set_storage_test.cpp
+      spatial_hash_2d_test.cpp
       static_vector_test.cpp
       small_vector_test.cpp
       sha_test.cpp

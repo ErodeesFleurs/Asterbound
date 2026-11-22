@@ -44,7 +44,6 @@ using EntityMapException = StarError<EntityMapExceptionTag, StarException>;
 // entities is never safe to do from any callback function.
 class EntityMap {
 public:
-  static float const SpatialHashSectorSize;
   static int const MaximumEntityBoundBox;
 
   // beginIdSpace and endIdSpace is the *inclusive* range for new enittyIds.
@@ -140,6 +139,7 @@ public:
 
 private:
   using SpatialMap = SpatialHash2D<EntityId, float, std::shared_ptr<Entity>>;
+  using IndexedEntry = SpatialMap::EntryMap::value_type;
 
   WorldGeometry m_geometry;
 
@@ -150,7 +150,7 @@ private:
   EntityId m_beginIdSpace;
   EntityId m_endIdSpace;
 
-  List<std::reference_wrapper<SpatialMap::Entry const>> m_entrySortBuffer;
+  List<std::reference_wrapper<IndexedEntry const>> m_entry_sort_buffer;
 };
 
 template <typename EntityT>

@@ -562,12 +562,15 @@ template <byte_algorithm Algorithm> void register_byte_family(char const* algori
 
 }// namespace
 
+void register_spatial_hash_benchmarks();
+
 int main(int argc, char** argv) {
   return Star::run_benchmarks(argc, argv, [](int argc) {
     // Same deterministic runtime salt in before/after even if binary paths differ.
     // Its value crosses a compiler barrier before any fixture construction.
     runtime_salt = static_cast<std::uint64_t>(argc + 73);
     benchmark::DoNotOptimize(runtime_salt);
+    register_spatial_hash_benchmarks();
     register_byte_family<byte_algorithm::pl>("PL");
     register_byte_family<byte_algorithm::xx32>("XXH32");
     register_byte_family<byte_algorithm::xx64>("XXH64");
