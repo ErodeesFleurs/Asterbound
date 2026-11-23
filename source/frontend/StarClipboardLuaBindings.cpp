@@ -1,4 +1,5 @@
 module;
+#include <turbojpeg.h>
 import std;
 import star.json;
 import star.format;
@@ -35,7 +36,60 @@ import star.logging;
 
 module star.clipboard_lua_bindings;
 import star.byte_array;
+import star.vector;
+import star.image_scaling;
 namespace Star {
+namespace {
+
+std::optional<Image> decode_jpeg_thumbnail(std::string_view bytes) {
+  constexpr int maxPixels = 4 * 1024 * 1024;
+  constexpr int thumbnailEdge = 128;
+  if (bytes.empty() || bytes.size() > 2 * 1024 * 1024)
+    return {};
+
+  std::unique_ptr<void, decltype(&tj3Destroy)> decoder(tj3Init(TJINIT_DECOMPRESS), tj3Destroy);
+  auto handle = decoder.get();
+  auto source = reinterpret_cast<unsigned char const*>(bytes.data());
+  if (!handle || tj3Set(handle, TJPARAM_STOPONWARNING, 1) || tj3Set(handle, TJPARAM_SCANLIMIT, 100)
+      || tj3Set(handle, TJPARAM_MAXPIXELS, maxPixels) || tj3Set(handle, TJPARAM_MAXMEMORY, 64)
+      || tj3Set(handle, TJPARAM_SAVEMARKERS, 0) || tj3Set(handle, TJPARAM_BOTTOMUP, 1)
+      || tj3DecompressHeader(handle, source, bytes.size()))
+    return {};
+  int width = tj3Get(handle, TJPARAM_JPEGWIDTH), height = tj3Get(handle, TJPARAM_JPEGHEIGHT);
+  if (width <= 0 || height <= 0 || width > 4096 || height > 4096 || width * height > maxPixels)
+    return {};
+
+  // Decode larger lossy images at a reduced IDCT size, then resample only the
+  // residual difference. Round output dimensions from the original aspect ratio.
+  int longest = std::max(width, height);
+  tjscalingfactor scale{1, 1};
+  if (!tj3Get(handle, TJPARAM_LOSSLESS)) {
+    while (scale.denom < 8 && longest >= thumbnailEdge * scale.denom * 2)
+      scale.denom *= 2;
+    if (tj3SetScalingFactor(handle, scale))
+      return {};
+  }
+  Vec2U decodedSize(static_cast<unsigned>(TJSCALED(width, scale)), static_cast<unsigned>(TJSCALED(height, scale)));
+  // Image storage is bottom-up, matching the decoder's TJPARAM_BOTTOMUP.
+  auto image = Image::for_overwrite(decodedSize, PixelFormat::RGB24);
+  if (tj3Decompress8(handle, source, bytes.size(), image.span().data(), 0, TJPF_RGB))
+    return {};
+  if (longest > thumbnailEdge) {
+    auto edge = [longest](int extent) {
+      return static_cast<unsigned>(std::max(1, (extent * thumbnailEdge + longest / 2) / longest));
+    };
+    Vec2U target(edge(width), edge(height));
+    if (decodedSize != target) {
+      auto thumb = scale_bilinear(image, Vec2F(target).piecewise_divide(Vec2F(decodedSize)));
+      if (!thumb)
+        return {};
+      return std::move(*thumb);
+    }
+  }
+  return image;
+}
+
+}
 
 std::expected<LuaCallbacks, StarException> LuaBindings::makeClipboardCallbacks(Input& input, RootBase& root, Logger& logger, std::shared_ptr<ApplicationController> appController, bool alwaysAllow) {
   LuaCallbacks callbacks;
@@ -50,9 +104,18 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeClipboardCallbacks(I
     if (!available()) return {};
     return appController->getClipboard();
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.register_callback("getPng", [=]() -> std::optional<std::string> {
+  if (auto r = callbacks.register_callback("getImage", [=]() -> std::optional<std::string> {
     if (!available()) return {};
-    return appController->getClipboardPng();
+    auto data = appController->getClipboardImageBytes(ApplicationController::ClipboardImageFormat::Png);
+    if (data) return data;
+    return appController->getClipboardImageBytes(ApplicationController::ClipboardImageFormat::Jpeg);
+  }); !r) return std::unexpected(std::move(r.error()));
+  if (auto r = callbacks.register_callback("jpegToPng", [&logger](LuaEngine& engine, LuaString const& bytes) -> std::expected<LuaValue, StarException> {
+    auto image = decode_jpeg_thumbnail(bytes.view().utf8());
+    if (!image) return lua_nil;
+    auto buffer = std::make_shared<Buffer>();
+    if (!image->write_png(logger, buffer)) return lua_nil;
+    return engine.create_string(std::string_view(buffer->span().data(), buffer->data_size()));
   }); !r) return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.register_callback("getFileReference", [=]() -> std::optional<std::string> {
     if (!available()) return {};

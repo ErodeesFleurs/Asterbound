@@ -26,17 +26,28 @@ Returns the clipboard text when access is available, or `nil` otherwise.
 
 ---
 
-#### `Maybe<String>` clipboard.getPng()
+#### `Maybe<String>` clipboard.getImage()
 
-Reads binary `image/png` bytes from the system clipboard while focused and clipboard reads are authorized.
-Returns `nil` if unavailable or larger than 8 MiB. Does not decode images or open copied file paths.
+Reads the raw bytes offered as `image/png`, or `image/jpeg` if unavailable. Requires focus and clipboard
+read authorization; returns `nil` when neither is available within 8 MiB. Detect the format from bytes,
+not MIME: some applications publish JPEG under `image/png`. Does not open file references.
+
+---
+
+#### `Maybe<String>` clipboard.jpegToPng(`String` bytes)
+
+Converts JPEG bytes already held by the script to a PNG byte string. Does not read files or the
+clipboard and does not need clipboard permission. The input is limited to 2 MiB, 4096 pixels on
+either side and 4,194,304 pixels total. Raster dimensions are preserved up to 128×128; larger
+images are reduced proportionally. Returns `nil` for unsupported, malformed or truncated images
+or inputs outside the limits. EXIF and other metadata are not copied.
 
 ---
 
 #### `Maybe<String>` clipboard.getFileReference()
 
 Returns URI-list text from `text/uri-list` or `x-special/gnome-copied-files` (without the `copy`/`cut` line).
-Uses the same focus and read authorization as `getPng`. Ignores payloads larger than 16 KiB and returns `nil`
+Uses the same focus and read authorization as `getImage`. Ignores payloads larger than 16 KiB and returns `nil`
 if no supported list is available. References are not decoded, verified, or opened.
 
 ---

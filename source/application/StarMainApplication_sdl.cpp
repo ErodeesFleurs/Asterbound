@@ -1411,12 +1411,13 @@ private:
       });
     }
 
-    std::optional<std::string> getClipboardPng() override {
-      return parent.m_dispatcher.invoke([&]() -> std::optional<std::string> {
-        if (!parent.m_focused.load(std::memory_order_relaxed) || !SDL_HasClipboardData("image/png"))
+    std::optional<std::string> getClipboardImageBytes(ClipboardImageFormat format) override {
+      return parent.m_dispatcher.invoke([&, format]() -> std::optional<std::string> {
+        auto mime = format == ClipboardImageFormat::Png ? "image/png" : "image/jpeg";
+        if (!parent.m_focused.load(std::memory_order_relaxed) || !SDL_HasClipboardData(mime))
           return {};
         std::size_t size = 0;
-        std::unique_ptr<void, decltype(&SDL_free)> data(SDL_GetClipboardData("image/png", &size), &SDL_free);
+        std::unique_ptr<void, decltype(&SDL_free)> data(SDL_GetClipboardData(mime, &size), &SDL_free);
         if (!data || !size || size > 8 * 1024 * 1024)
           return {};
         return std::string(static_cast<char const*>(data.get()), size);

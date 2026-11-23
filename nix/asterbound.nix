@@ -13,6 +13,7 @@
   curl,
   dependencies,
   libpng,
+  libjpeg_turbo,
   freetype,
   libogg,
   libvorbis,
@@ -235,6 +236,7 @@ let
         cpptrace
       ]
       ++ lib.optionals guiSupport [
+        libjpeg_turbo
         patchedSdl3
         glew
         libGL
@@ -291,6 +293,7 @@ stdenv.mkDerivation {
     cpptrace
   ]
   ++ lib.optionals guiSupport [
+    libjpeg_turbo
     patchedSdl3
     glew
     libGL

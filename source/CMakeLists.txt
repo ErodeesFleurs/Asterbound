@@ -370,6 +370,7 @@ if(STAR_BUILD_GUI)
   add_library(star_client_dependencies INTERFACE)
 
   find_package(SDL3 CONFIG REQUIRED)
+  find_package(libjpeg-turbo 3.1 CONFIG REQUIRED)
   set(STAR_SDL_TARGET $<IF:$<TARGET_EXISTS:SDL3::SDL3>,SDL3::SDL3,SDL3::SDL3-static>)
   find_package(OpenGL REQUIRED)
   find_package(GLEW REQUIRED)
