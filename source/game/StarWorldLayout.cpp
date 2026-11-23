@@ -256,9 +256,8 @@ std::expected<WorldLayout, StarException> WorldLayout::buildTerrestrialLayout(Ro
   auto autoterrainDatabaseResult1 = root.terrainDatabase();
   if (!autoterrainDatabaseResult1) return std::unexpected(std::move(autoterrainDatabaseResult1.error()));
   auto terrainDatabase = std::move((*autoterrainDatabaseResult1));
-  auto autobiomeDatabaseResult1 = root.biomeDatabase();
-  if (!autobiomeDatabaseResult1) return std::unexpected(std::move(autobiomeDatabaseResult1.error()));
-  auto biomeDatabase = std::move((*autobiomeDatabaseResult1));
+  if (auto database = root.biome_database(); !database)
+    return std::unexpected(std::move(database.error()));
 
   RandomSource randSource(seed);
 
@@ -537,9 +536,9 @@ std::expected<WorldLayout, StarException> WorldLayout::buildFloatingDungeonLayou
   auto autoassetsResult1 = root.assets();
   if (!autoassetsResult1) return std::unexpected(std::move(autoassetsResult1.error()));
   auto assets = std::move((*autoassetsResult1));
-  auto autobiomeDatabaseResult1 = root.biomeDatabase();
-  if (!autobiomeDatabaseResult1) return std::unexpected(std::move(autobiomeDatabaseResult1.error()));
-  auto biomeDatabase = std::move((*autobiomeDatabaseResult1));
+  auto biome_database_result = root.biome_database();
+  if (!biome_database_result) return std::unexpected(std::move(biome_database_result.error()));
+  auto biome_database = std::move((*biome_database_result));
 
   RandomSource randSource(seed);
 
@@ -567,7 +566,7 @@ std::expected<WorldLayout, StarException> WorldLayout::buildFloatingDungeonLayou
     if (!added) return std::unexpected(std::move(added.error()));
   }
   if (floatingDungeonParameters.biome) {
-    auto sky = biomeDatabase->biomeSkyColoring(*floatingDungeonParameters.biome, seed);
+    auto sky = biome_database->biome_sky_coloring(*floatingDungeonParameters.biome, seed);
     if (!sky) return std::unexpected(std::move(sky.error()));
   } else {
     auto finalized = layout.finalize(Color::palette_black);
@@ -667,8 +666,9 @@ std::expected<Json, StarException> WorldLayout::toJson() const {
   auto terrainDatabase = std::move((*autoterrainDatabaseResult1));
 
   JsonArray biomes;
+  biomes.reserve(m_biomes.size());
   for (auto const& biome : m_biomes) {
-    auto stored = biome->toJson();
+    auto stored = biome->to_json();
     if (!stored) return std::unexpected(std::move(stored.error()));
     biomes.push_back(std::move(*stored));
   }
@@ -874,7 +874,7 @@ std::expected<String, StarException> WorldLayout::setLayerEnvironmentBiome(Vec2I
 
   auto biome = getBiome(targetBiomeIndex);
   if (!biome) return std::unexpected(std::move(biome.error()));
-  return biome->get()->baseName;
+  return biome->get()->base_name;
 }
 
 std::expected<void, StarException> WorldLayout::addBiomeRegion(
@@ -915,11 +915,11 @@ std::expected<void, StarException> WorldLayout::addBiomeRegion(
   newRegion.foregroundOreSelectorIndexes = targetRegion->foregroundOreSelectorIndexes;
   newRegion.backgroundOreSelectorIndexes = targetRegion->backgroundOreSelectorIndexes;
   newRegion.regionLiquids = targetRegion->regionLiquids;
-  auto autobiomeDatabaseResult1 = this->root().biomeDatabase();
-  if (!autobiomeDatabaseResult1) return std::unexpected(std::move(autobiomeDatabaseResult1.error()));
-  auto biomeDatabase = std::move((*autobiomeDatabaseResult1));
+  auto biome_database_result = this->root().biome_database();
+  if (!biome_database_result) return std::unexpected(std::move(biome_database_result.error()));
+  auto biome_database = std::move((*biome_database_result));
   auto generated_biome =
-    biomeDatabase->createBiome(biomeName, static_random_u64(seed, "BiomeSeed"), terrestrialLayer.layerBaseHeight,
+    biome_database->create_biome(biomeName, static_random_u64(seed, "BiomeSeed"), terrestrialLayer.layerBaseHeight,
                                terrestrialParameters.threatLevel);
   if (!generated_biome)
     return std::unexpected(std::move(generated_biome.error()));
@@ -940,7 +940,7 @@ std::expected<void, StarException> WorldLayout::addBiomeRegion(
   auto autoterrainDatabaseResult1 = this->root().terrainDatabase();
   if (!autoterrainDatabaseResult1) return std::unexpected(std::move(autoterrainDatabaseResult1.error()));
   auto terrainDatabase = std::move((*autoterrainDatabaseResult1));
-  for (std::size_t i = 0; i < newBiome->subBlocks.size(); ++i) {
+  for (std::size_t i = 0; i < newBiome->sub_blocks.size(); ++i) {
     auto selector_configuration = terrainDatabase->createNamedSelector(
       subBlockSelector, baseSelectorParameters.withSeed(static_random_u64(seed, i, "subBlocks")));
     if (!selector_configuration)
@@ -1193,9 +1193,9 @@ std::expected<WorldRegion, StarException> WorldLayout::buildRegion(std::uint64_t
   auto autoterrainDatabaseResult1 = this->root().terrainDatabase();
   if (!autoterrainDatabaseResult1) return std::unexpected(std::move(autoterrainDatabaseResult1.error()));
   auto terrainDatabase = std::move((*autoterrainDatabaseResult1));
-  auto autobiomeDatabaseResult1 = this->root().biomeDatabase();
-  if (!autobiomeDatabaseResult1) return std::unexpected(std::move(autobiomeDatabaseResult1.error()));
-  auto biomeDatabase = std::move((*autobiomeDatabaseResult1));
+  auto biome_database_result = this->root().biome_database();
+  if (!biome_database_result) return std::unexpected(std::move(biome_database_result.error()));
+  auto biome_database = std::move((*biome_database_result));
 
   WorldRegion region;
 
@@ -1227,14 +1227,14 @@ std::expected<WorldRegion, StarException> WorldLayout::buildRegion(std::uint64_t
 
   }
   if (regionParams.biomeName) {
-    auto biome_configuration = biomeDatabase->createBiome(*regionParams.biomeName, static_random_u64(seed, "BiomeSeed"),
+    auto biome_configuration = biome_database->create_biome(*regionParams.biomeName, static_random_u64(seed, "BiomeSeed"),
                                                           regionParams.baseHeight, regionParams.threatLevel);
     if (!biome_configuration)
       return std::unexpected(std::move(biome_configuration.error()));
     auto biome = std::move((*biome_configuration));
 
     if (regionParams.subBlockSelector) {
-      for (std::size_t i = 0; i < biome->subBlocks.size(); ++i) {
+      for (std::size_t i = 0; i < biome->sub_blocks.size(); ++i) {
         auto selector_configuration = terrainDatabase->createNamedSelector(
           *regionParams.subBlockSelector, terrainSelectorParameters.withSeed(static_random_u64(seed, i, "subBlocks")));
         if (!selector_configuration)

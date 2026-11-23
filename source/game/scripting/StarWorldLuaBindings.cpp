@@ -911,8 +911,8 @@ namespace LuaBindings {
             return std::unexpected(std::move(biomeResult.error()));
           auto biome = std::move(*biomeResult);
           if (biome) {
-          List<MaterialId> blocks = {biome->mainBlock};
-          blocks.append_range(biome->subBlocks);
+          List<MaterialId> blocks = {biome->main_block};
+          blocks.append_range(biome->sub_blocks);
           return blocks;
           }
         }
@@ -950,7 +950,7 @@ namespace LuaBindings {
             return std::unexpected(std::move(biomeResult.error()));
           auto biome = std::move(*biomeResult);
           if (biome) {
-          return biome->toJson();
+          return biome->to_json();
           }
         }
         return {};

@@ -1203,9 +1203,9 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
   auto autoliquidsDatabaseResult1 = root.liquidsDatabase();
   if (!autoliquidsDatabaseResult1) return std::unexpected(std::move(autoliquidsDatabaseResult1.error()));
   auto liquidsDatabase = std::move((*autoliquidsDatabaseResult1));
-  auto autobiomeDatabaseResult1 = root.biomeDatabase();
-  if (!autobiomeDatabaseResult1) return std::unexpected(std::move(autobiomeDatabaseResult1.error()));
-  auto biomeDatabase = std::move((*autobiomeDatabaseResult1));
+  auto biome_database_result = root.biome_database();
+  if (!biome_database_result) return std::unexpected(std::move(biome_database_result.error()));
+  auto biome_database = std::move((*biome_database_result));
   auto autoterrestrialConfigResult1 = assets->json("/terrestrial_worlds.config");
   if (!autoterrestrialConfigResult1) return std::unexpected(std::move(autoterrestrialConfigResult1.error()));
   auto terrestrialConfig = std::move((*autoterrestrialConfigResult1));
@@ -1566,10 +1566,10 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
   if (!gravity_value)
     return std::unexpected(std::move(gravity_value.error()));
   parameters->gravity = *gravity_value;
-  auto parametersairlessResult1 = biomeDatabase->biomeIsAirless(primaryBiome);
+  auto parametersairlessResult1 = biome_database->biome_is_airless(primaryBiome);
   if (!parametersairlessResult1) return std::unexpected(std::move(parametersairlessResult1.error()));
   parameters->airless = std::move((*parametersairlessResult1));
-  auto parametersenvironmentStatusEffectsResult1 = biomeDatabase->biomeStatusEffects(primaryBiome);
+  auto parametersenvironmentStatusEffectsResult1 = biome_database->biome_status_effects(primaryBiome);
   if (!parametersenvironmentStatusEffectsResult1) return std::unexpected(std::move(parametersenvironmentStatusEffectsResult1.error()));
   parameters->environmentStatusEffects = std::move((*parametersenvironmentStatusEffectsResult1));
   auto parametersoverrideTechJson = config.opt("overrideTech");
@@ -1605,18 +1605,18 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
   if (!edge_region)
     return std::unexpected(std::move(edge_region.error()));
   parameters->worldEdgeForceRegions = edge_region->get();
-  auto parametersweatherPoolResult1 = biomeDatabase->biomeWeathers(primaryBiome, seed, threatLevel);
+  auto parametersweatherPoolResult1 = biome_database->biome_weathers(primaryBiome, seed, threatLevel);
   if (!parametersweatherPoolResult1) return std::unexpected(std::move(parametersweatherPoolResult1.error()));
   parameters->weatherPool = std::move((*parametersweatherPoolResult1));
   parameters->primaryBiome = std::move(primaryBiome);
   parameters->sizeName = std::move(sizeName);
-  auto parametershueShiftResult1 = biomeDatabase->biomeHueShift(parameters->primaryBiome, surfaceBiomeSeed);
+  auto parametershueShiftResult1 = biome_database->biome_hue_shift(parameters->primaryBiome, surfaceBiomeSeed);
   if (!parametershueShiftResult1) return std::unexpected(std::move(parametershueShiftResult1.error()));
   parameters->hueShift = std::move((*parametershueShiftResult1));
   parameters->primarySurfaceLiquid = std::move(surfaceLayer.primaryRegion.oceanLiquid != EmptyLiquidId
       ? surfaceLayer.primaryRegion.oceanLiquid
       : surfaceLayer.primaryRegion.caveLiquid);
-  auto parametersskyColoringResult1 = biomeDatabase->biomeSkyColoring(parameters->primaryBiome, seed);
+  auto parametersskyColoringResult1 = biome_database->biome_sky_coloring(parameters->primaryBiome, seed);
   if (!parametersskyColoringResult1) return std::unexpected(std::move(parametersskyColoringResult1.error()));
   parameters->skyColoring = std::move((*parametersskyColoringResult1));
   auto day_length_value = static_random_float_range(dayLengthRange[0], dayLengthRange[1], seed, "DayLength");

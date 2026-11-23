@@ -2658,23 +2658,23 @@ std::expected<void, StarException> WorldServer::setPlanetType(String const& plan
       newTerrestrialParameters->typeName = planetType;
       newTerrestrialParameters->primaryBiome = primaryBiomeName;
 
-      auto result283 = this->root().biomeDatabase();
+      auto result283 = this->root().biome_database();
       if (!result283)
         return std::unexpected(std::move(result283.error()));
-      auto biomeDatabase = std::move(*result283);
-      auto result284 = biomeDatabase->biomeWeathers(primaryBiomeName, m_worldTemplate->worldSeed(), m_worldTemplate->threatLevel());
+      auto biome_database = std::move(*result283);
+      auto result284 = biome_database->biome_weathers(primaryBiomeName, m_worldTemplate->worldSeed(), m_worldTemplate->threatLevel());
       if (!result284)
         return std::unexpected(std::move(result284.error()));
       auto newWeatherPool = std::move(*result284);
       newTerrestrialParameters->weatherPool = newWeatherPool;
 
-      auto result285 = biomeDatabase->biomeSkyColoring(primaryBiomeName, m_worldTemplate->worldSeed());
+      auto result285 = biome_database->biome_sky_coloring(primaryBiomeName, m_worldTemplate->worldSeed());
       if (!result285)
         return std::unexpected(std::move(result285.error()));
       auto newSkyColors = std::move(*result285);
       newTerrestrialParameters->skyColoring = newSkyColors;
 
-      auto result286 = biomeDatabase->biomeIsAirless(primaryBiomeName);
+      auto result286 = biome_database->biome_is_airless(primaryBiomeName);
       if (!result286)
         return std::unexpected(std::move(result286.error()));
       newTerrestrialParameters->airless = std::move(*result286);

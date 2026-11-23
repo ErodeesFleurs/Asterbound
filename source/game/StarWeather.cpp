@@ -180,12 +180,12 @@ std::expected<void, StarException> ServerWeather::update(double dt) {
       m_currentWeatherIndex = m_weatherPool.select_index(m_root.get().random());
       if (m_currentWeatherIndex == npos) m_currentWeatherType = {};
       else {
-        auto biomes = m_root.get().biomeDatabase();
+        auto biomes = m_root.get().biome_database();
         if (!biomes) return std::unexpected(std::move(biomes.error()));
         auto name = m_weatherPool.item(m_currentWeatherIndex);
         if (!name) return std::unexpected(std::move(name.error()));
         {
-          auto value = (*biomes)->weatherType(name->get());
+          auto value = (*biomes)->weather_type(name->get());
           if (!value) return std::unexpected(std::move(value.error()));
           m_currentWeatherType = std::move(*value);
         }
@@ -253,12 +253,12 @@ std::expected<void, StarException> ServerWeather::setWeatherIndex(std::size_t we
     m_currentWind = 0.0f;
   } else {
     m_currentWeatherIndex = weatherIndex;
-    auto biomes = m_root.get().biomeDatabase();
+    auto biomes = m_root.get().biome_database();
     if (!biomes) return std::unexpected(std::move(biomes.error()));
     auto name = m_weatherPool.item(m_currentWeatherIndex);
     if (!name) return std::unexpected(std::move(name.error()));
     {
-      auto value = (*biomes)->weatherType(name->get());
+      auto value = (*biomes)->weather_type(name->get());
       if (!value) return std::unexpected(std::move(value.error()));
       m_currentWeatherType = std::move(*value);
     }
@@ -478,12 +478,12 @@ std::expected<void, StarException> ClientWeather::update(double dt) {
   m_currentTime += dt;
   if (m_currentWeatherIndex == npos) m_currentWeatherType = {};
   else if (m_visibleRegion == RectI() || m_visibleRegion.y_max() > m_undergroundLevel) {
-    auto biomes = m_root.get().biomeDatabase();
+    auto biomes = m_root.get().biome_database();
     if (!biomes) return std::unexpected(std::move(biomes.error()));
     auto name = m_weatherPool.item(m_currentWeatherIndex);
     if (!name) return std::unexpected(std::move(name.error()));
     {
-      auto value = (*biomes)->weatherType(name->get());
+      auto value = (*biomes)->weather_type(name->get());
       if (!value) return std::unexpected(std::move(value.error()));
       m_currentWeatherType = std::move(*value);
     }

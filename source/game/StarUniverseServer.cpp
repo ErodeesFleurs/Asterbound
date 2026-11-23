@@ -808,10 +808,10 @@ std::expected<bool, StarException> UniverseServer::updatePlanetType(CelestialCoo
     return false;
   auto replacement = std::make_shared<TerrestrialWorldParameters>(*terrestrial);
   replacement->typeName = newType;
-  auto database = m_root.biomeDatabase();
+  auto database = m_root.biome_database();
   if (!database)
     return std::unexpected(std::move(database.error()));
-  auto weather = (*database)->biomeWeathers(weatherBiome, (*parameters)->seed(), terrestrial->threatLevel);
+  auto weather = (*database)->biome_weathers(weatherBiome, (*parameters)->seed(), terrestrial->threatLevel);
   if (!weather)
     return std::unexpected(std::move(weather.error()));
   replacement->weatherPool = std::move(*weather);

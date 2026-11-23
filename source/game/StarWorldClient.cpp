@@ -1350,14 +1350,13 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
     return std::unexpected(std::move(result75.error()));
   renderData.skyRenderData = (std::move(*result75));
   
-  auto result76 = mainEnvironmentBiome();
-  if (!result76)
-    return std::unexpected(std::move(result76.error()));
-  auto environmentBiome = (std::move(*result76));
-  
-  
-  if (environmentBiome) {
-    setParallax(environmentBiome->parallax);
+  auto biome_result = mainEnvironmentBiome();
+  if (!biome_result)
+    return std::unexpected(std::move(biome_result.error()));
+  auto const& environment_biome = *biome_result;
+
+  if (environment_biome) {
+    setParallax(environment_biome->parallax);
   }
   
   if (m_currentParallax) {
@@ -1381,41 +1380,41 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
   auto result77 = currentWeatherDomain();
   if (!result77)
     return std::unexpected(std::move(result77.error()));
-  auto weatherParallaxAsset = (std::move(*result77)) == m_weatherDomain ? m_weather->weatherParallax() : std::optional<String>();
-  if (weatherParallaxAsset != m_weatherParallaxAsset || environmentBiome != m_weatherParallaxBiome) {
-    m_weatherParallaxAsset = weatherParallaxAsset;
-    m_weatherParallaxBiome = environmentBiome;
+  auto weather_parallax_asset = *result77 == m_weatherDomain ? m_weather->weatherParallax() : std::optional<String>();
+  if (weather_parallax_asset != m_weatherParallaxAsset || environment_biome != m_weatherParallaxBiome) {
+    m_weatherParallaxAsset = weather_parallax_asset;
+    m_weatherParallaxBiome = environment_biome;
     m_weatherParallax.reset();
     
     {
-      bool condition80 = static_cast<bool>(weatherParallaxAsset);
+      bool condition80 = static_cast<bool>(weather_parallax_asset);
       if (condition80) {
         auto result78 = this->root().assets();
         if (!result78)
           return std::unexpected(std::move(result78.error()));
-        auto result79 = (std::move(*result78))->asset_exists(*weatherParallaxAsset);
+        auto result79 = (std::move(*result78))->asset_exists(*weather_parallax_asset);
         if (!result79)
           return std::unexpected(std::move(result79.error()));
         condition80 = static_cast<bool>((std::move(*result79)));
       }
       if (condition80) {
-        if (environmentBiome && environmentBiome->parallax) {
-          auto result81 = environmentBiome->parallax->createOverlay(*weatherParallaxAsset);
+        if (environment_biome && environment_biome->parallax) {
+          auto result81 = environment_biome->parallax->createOverlay(*weather_parallax_asset);
           if (!result81)
             return std::unexpected(std::move(result81.error()));
           m_weatherParallax = (std::move(*result81));
         } else {
-          float hueShift = environmentBiome ? environmentBiome->hueShift : 0.0f;
-          std::optional<TreeVariant> treeVariant;
-          if (environmentBiome) {
-            treeVariant = environmentBiome->surfacePlaceables.firstTreeType();
+          float hue_shift = environment_biome ? environment_biome->hue_shift : 0.0f;
+          std::optional<TreeVariant> tree_variant;
+          if (environment_biome) {
+            if (auto tree = environment_biome->surface_placeables.first_tree())
+              tree_variant.emplace(tree->get()); // The parallax retains its own variant.
           }
-          
-          auto result82 = Parallax::create(this->root(), *weatherParallaxAsset,
-                      m_worldTemplate->worldSeed(), m_worldTemplate->surfaceLevel(), hueShift, std::move(treeVariant));
-          if (!result82)
-            return std::unexpected(std::move(result82.error()));
-          m_weatherParallax = (std::move(*result82));
+          auto overlay = Parallax::create(this->root(), *weather_parallax_asset,
+              m_worldTemplate->worldSeed(), m_worldTemplate->surfaceLevel(), hue_shift, std::move(tree_variant));
+          if (!overlay)
+            return std::unexpected(std::move(overlay.error()));
+          m_weatherParallax = std::move(*overlay);
         }
         auto result83 = m_weatherParallax->fadeToSkyColor(m_sky->mainSkyColor());
         if (!result83)

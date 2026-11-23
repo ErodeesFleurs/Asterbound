@@ -3,97 +3,61 @@ import std;
 import star.format;
 import star.string;
 import star.json;
-import star.bi_map;
-import star.random;
-import star.perlin;
-import star.weighted_pool;
-import star.id_map;
-import star.set;
-import star.casting;
-import star.data_stream;
-import star.game_types;
 import star.material_types;
 import star.list;
-import star.image_processing;
-import star.hash;
-import star.string_view;
-import star.thread;
-import star.directives;
-import star.asset_path;
-import star.strong_typedef;
-
-
-import star.damage_types;
-import star.world_geometry;
-import star.status_types;
-import star.damage;
-import star.light_source;
-import star.entity;
-import star.interaction_types;
-import star.item_descriptor;
-import star.celestial_coordinate;
-import star.quest_descriptor;
-import star.interactive_entity;
-import star.collision_block;
-import star.tile_entity;
-import star.tile_damage;
-import star.inspectable_entity;
-import star.plant;
-import star.plant_database;
 import star.biome_placement;
 
 import star.spawn_type_database;
 
 namespace Star {
 
+struct TreeVariant;
 struct AmbientNoisesDescription;
 class Parallax;
 class Assets;
 class Root;
 
 struct BiomePlaceables {
-  BiomePlaceables();
   [[nodiscard]]
   static std::expected<BiomePlaceables, StarException> create(Assets const& assets, Json const& json);
 
   [[nodiscard]]
-  std::expected<Json, StarException> toJson() const;
+  std::expected<Json, StarException> to_json() const;
 
-  // If any of the item distributions contain trees, this returns the first
-  // tree type.
-  std::optional<TreeVariant> firstTreeType() const;
+  // Borrows the first tree in distribution order.
+  [[nodiscard]] std::optional<std::reference_wrapper<TreeVariant const>> first_tree() const &;
+  std::optional<std::reference_wrapper<TreeVariant const>> first_tree() const && = delete;
 
-  ModId grassMod;
-  float grassModDensity;
-  ModId ceilingGrassMod;
-  float ceilingGrassModDensity;
+  ModId grass_mod = NoModId;
+  float grass_mod_density = 0;
+  ModId ceiling_grass_mod = NoModId;
+  float ceiling_grass_mod_density = 0;
 
-  List<BiomeItemDistribution> itemDistributions;
+  List<BiomeItemDistribution> item_distributions;
 };
 
 struct Biome {
-  Biome();
   [[nodiscard]]
   static std::expected<Biome, StarException> create(Root& root, Json const& store);
 
   [[nodiscard]]
-  std::expected<Json, StarException> toJson() const;
+  std::expected<Json, StarException> to_json() const;
 
-  String baseName;
+  String base_name;
   String description;
 
-  MaterialId mainBlock;
-  List<MaterialId> subBlocks;
+  MaterialId main_block = EmptyMaterialId;
+  List<MaterialId> sub_blocks;
   // Pairs the ore type with the commonality multiplier.
   List<std::pair<ModId, float>> ores;
 
-  float hueShift;
-  MaterialHue materialHueShift;
+  float hue_shift = 0;
+  MaterialHue material_hue_shift = 0;
 
-  BiomePlaceables surfacePlaceables;
-  BiomePlaceables undergroundPlaceables;
+  BiomePlaceables surface_placeables;
+  BiomePlaceables underground_placeables;
 
-  SpawnProfile spawnProfile;
+  SpawnProfile spawn_profile;
 
   std::shared_ptr<Parallax> parallax;
 

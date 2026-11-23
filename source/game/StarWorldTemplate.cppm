@@ -124,15 +124,15 @@ public:
   struct PotentialBiomeItems {
     // Potential items that would spawn at the given block assuming it is at
     // the surface.
-    List<BiomeItemPlacement> surfaceBiomeItems;
+    List<BiomeItemPlacement> surface_biome_items;
     // ... Or on a cave surface.
-    List<BiomeItemPlacement> caveSurfaceBiomeItems;
+    List<BiomeItemPlacement> cave_surface_biome_items;
     // ... Or on a cave ceiling.
-    List<BiomeItemPlacement> caveCeilingBiomeItems;
+    List<BiomeItemPlacement> cave_ceiling_biome_items;
     // ... Or on a cave background wall.
-    List<BiomeItemPlacement> caveBackgroundBiomeItems;
+    List<BiomeItemPlacement> cave_background_biome_items;
     // ... Or in the ocean
-    List<BiomeItemPlacement> oceanItems;
+    List<BiomeItemPlacement> ocean_items;
   };
 
   // Creates a blank world with the given size
@@ -227,11 +227,11 @@ public:
   [[nodiscard]] std::expected<std::optional<std::reference_wrapper<WeatherLayer const>>, StarException> weatherLayerAt(Vec2I const& position) const;
 
   // Return potential items that would spawn at the given block.
-  [[nodiscard]] std::expected<void, StarException> addPotentialBiomeItems(int x, int y, PotentialBiomeItems& items, List<BiomeItemDistribution> const& distributions, BiomePlacementArea area, std::optional<BiomePlacementMode> mode = {}) const;
-  [[nodiscard]] std::expected<PotentialBiomeItems, StarException> potentialBiomeItemsAt(int x, int y) const;
+  [[nodiscard]] std::expected<void, StarException> add_potential_biome_items(int x, int y, PotentialBiomeItems& items, List<BiomeItemDistribution> const& distributions, BiomePlacementArea area, std::optional<BiomePlacementMode> mode = {}) const;
+  [[nodiscard]] std::expected<PotentialBiomeItems, StarException> potential_biome_items_at(int x, int y) const;
 
   // Return only the potential items that can spawn at the given block.
-  [[nodiscard]] std::expected<List<BiomeItemPlacement>, StarException> validBiomeItems(int x, int y, PotentialBiomeItems potentialBiomeItems) const;
+  [[nodiscard]] std::expected<List<BiomeItemPlacement>, StarException> valid_biome_items(int x, int y, PotentialBiomeItems potential_biome_items) const;
 
   [[nodiscard]] std::expected<float, StarException> gravity() const;
   float threatLevel() const;

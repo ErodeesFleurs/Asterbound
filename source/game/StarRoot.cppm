@@ -174,7 +174,7 @@ public:
   [[nodiscard]] std::expected<std::shared_ptr<ItemDatabase const>, StarException> itemDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<MaterialDatabase const>, StarException> materialDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<TerrainDatabase const>, StarException> terrainDatabase();
-  [[nodiscard]] std::expected<std::shared_ptr<BiomeDatabase const>, StarException> biomeDatabase();
+  [[nodiscard]] std::expected<std::shared_ptr<BiomeDatabase const>, StarException> biome_database();
   [[nodiscard]] std::expected<std::shared_ptr<LiquidsDatabase const>, StarException> liquidsDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<StatusEffectDatabase const>, StarException> statusEffectDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<DamageDatabase const>, StarException> damageDatabase();
@@ -310,8 +310,8 @@ private:
   std::shared_ptr<TerrainDatabase> m_terrainDatabase;
   std::mutex m_terrainDatabaseMutex;
 
-  std::shared_ptr<BiomeDatabase> m_biomeDatabase;
-  std::mutex m_biomeDatabaseMutex;
+  std::shared_ptr<BiomeDatabase> m_biome_database;
+  std::mutex m_biome_database_mutex;
 
   std::shared_ptr<LiquidsDatabase> m_liquidsDatabase;
   std::mutex m_liquidsDatabaseMutex;

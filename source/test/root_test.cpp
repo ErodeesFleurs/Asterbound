@@ -214,7 +214,7 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
     ASSERT_NO_FATAL_FAILURE(expectCatalog("itemDatabase", root.itemDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("materialDatabase", root.materialDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("terrainDatabase", root.terrainDatabase()));
-    ASSERT_NO_FATAL_FAILURE(expectCatalog("biomeDatabase", root.biomeDatabase()));
+    ASSERT_NO_FATAL_FAILURE(expectCatalog("biome_database", root.biome_database()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("liquidsDatabase", root.liquidsDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("statusEffectDatabase", root.statusEffectDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("damageDatabase", root.damageDatabase()));

@@ -672,18 +672,18 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
     return std::move(variant->movementSettings);
   }); !r) return std::unexpected(std::move(r.error()));
 
-  if (auto r = callbacks.register_callback("createBiome", [&root](String const& biomeName, std::uint64_t seed, float verticalMidPoint, float threatLevel) -> std::expected<Json, StarException> {
-    auto database = root.biomeDatabase();
+  if (auto r = callbacks.register_callback("createBiome", [&root](String const& biome_name, std::uint64_t seed, float vertical_mid_point, float threat_level) -> std::expected<Json, StarException> {
+    auto database = root.biome_database();
     if (!database) {
       if (database.error().is<BiomeException>()) return Json();
       return std::unexpected(std::move(database.error()));
     }
-    auto biome = (*database)->createBiome(biomeName, seed, verticalMidPoint, threatLevel);
+    auto biome = (*database)->create_biome(biome_name, seed, vertical_mid_point, threat_level);
     if (!biome) {
       if (biome.error().is<BiomeException>()) return Json();
       return std::unexpected(std::move(biome.error()));
     }
-    auto json = (*biome)->toJson();
+    auto json = (*biome)->to_json();
     if (!json && json.error().is<BiomeException>()) return Json();
     return json;
   }); !r) return std::unexpected(std::move(r.error()));
@@ -885,10 +885,10 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
     return (*database)->monsterConfig(typeName);
   }); !r) return std::unexpected(std::move(r.error()));
 
-  if (auto r = callbacks.register_callback("biomeConfig", [&root](String const& typeName) -> std::expected<Json, StarException> {
-    auto database = root.biomeDatabase();
+  if (auto r = callbacks.register_callback("biomeConfig", [&root](String const& type_name) -> std::expected<Json, StarException> {
+    auto database = root.biome_database();
     if (!database) return std::unexpected(std::move(database.error()));
-    return (*database)->biomeConfig(typeName);
+    return (*database)->biome_config(type_name);
   }); !r) return std::unexpected(std::move(r.error()));
 
   if (auto r = callbacks.register_callback("treeFoliageConfig", [&root](String const& typeName) -> std::expected<Json, StarException> {

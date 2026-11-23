@@ -148,12 +148,12 @@ const GameTestRegistration weatherDomainExplicitLayerWeatherCreatesIndependentDo
 });
 
 const GameTestRegistration weatherDomainWeatherPropertyPresenceIsDistinctFromOmission("WeatherDomainTest", "WeatherPropertyPresenceIsDistinctFromOmission", [](GameTest& fixture) {
-  auto biomes = fixture.root().biomeDatabase();
+  auto biomes = fixture.root().biome_database();
   ASSERT_TRUE(biomes);
-  auto garden = (*biomes)->biomeHasWeather("garden");
+  auto garden = (*biomes)->biome_has_weather("garden");
   ASSERT_TRUE(garden);
   EXPECT_TRUE(*garden);
-  auto atmosphere = (*biomes)->biomeHasWeather("atmosphere");
+  auto atmosphere = (*biomes)->biome_has_weather("atmosphere");
   ASSERT_TRUE(atmosphere);
   EXPECT_FALSE(*atmosphere);
 });

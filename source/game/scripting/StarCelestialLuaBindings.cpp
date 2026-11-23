@@ -209,12 +209,12 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeCelestialCallbacks(R
     auto visitableParameters = (*parameters)->visitableParameters();
     if (!visitableParameters)
       return {};
-    auto biomeDatabase = root.biomeDatabase();
-    if (!biomeDatabase)
-      return std::unexpected(std::move(biomeDatabase.error()));
+    auto biome_database = root.biome_database();
+    if (!biome_database)
+      return std::unexpected(std::move(biome_database.error()));
     StringSet planetOres;
     auto addOres = [&](String const& biomeName) -> std::expected<void, StarException> {
-      auto ores = (*biomeDatabase)->biomeOres(biomeName, threatLevel);
+      auto ores = (*biome_database)->biome_ores(biomeName, threatLevel);
       if (!ores)
         return std::unexpected(std::move(ores.error()));
       planetOres.insert_range(*ores);

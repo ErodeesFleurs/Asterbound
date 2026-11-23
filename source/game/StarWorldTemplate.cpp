@@ -537,17 +537,17 @@ std::expected<WorldTemplate::BlockInfo, StarException> WorldTemplate::blockBiome
   auto threshold = m_templateConfig.get_float("biomeTransitionThreshold", 0);
   if (!threshold) return std::unexpected(std::move(threshold.error()));
   blockInfo.biomeTransition = transition->get().weight < *threshold;
-  auto biomeResult = biome(blockInfo.blockBiomeIndex);
-  if (!biomeResult) return std::unexpected(std::move(biomeResult.error()));
-  if (auto const& blockBiome = *biomeResult) {
+  auto biome_result = biome(blockInfo.blockBiomeIndex);
+  if (!biome_result) return std::unexpected(std::move(biome_result.error()));
+  if (auto const& block_biome = *biome_result) {
     if (!blockInfo.foregroundCave) {
-      blockInfo.foreground = blockBiome->mainBlock;
+      blockInfo.foreground = block_biome->main_block;
       blockInfo.background = blockInfo.foreground;
     } else if (!blockInfo.backgroundCave) {
-      blockInfo.background = blockBiome->mainBlock;
+      blockInfo.background = block_biome->main_block;
     }
     if (!primaryBlockWeighting.region.get().subBlockSelectorIndexes.empty()) {
-      for (std::size_t i = 0; i < blockBiome->subBlocks.size(); ++i) {
+      for (std::size_t i = 0; i < block_biome->sub_blocks.size(); ++i) {
         auto index = primaryBlockWeighting.region.get().subBlockSelectorIndexes.at(i);
         if (!index) return std::unexpected(std::move(index.error()));
         auto selector = m_layout->getTerrainSelector(index->get());
@@ -556,10 +556,10 @@ std::expected<WorldTemplate::BlockInfo, StarException> WorldTemplate::blockBiome
         if (!value) return std::unexpected(std::move(value.error()));
         if (*value > 0.0f) {
           if (!blockInfo.foregroundCave) {
-            blockInfo.foreground = blockBiome->subBlocks[i];
+            blockInfo.foreground = block_biome->sub_blocks[i];
             blockInfo.background = blockInfo.foreground;
           } else if (!blockInfo.backgroundCave) {
-            blockInfo.background = blockBiome->subBlocks[i];
+            blockInfo.background = block_biome->sub_blocks[i];
           }
           break;
         }
@@ -620,8 +620,8 @@ std::expected<std::shared_ptr<Biome const>, StarException> WorldTemplate::enviro
 std::expected<MaterialHue, StarException> WorldTemplate::biomeMaterialHueShift(BiomeIndex biomeIndex, MaterialId material) const {
   auto result = biome(biomeIndex);
   if (!result) return std::unexpected(std::move(result.error()));
-  if (*result && material == (*result)->mainBlock)
-    return (*result)->materialHueShift;
+  if (*result && material == (*result)->main_block)
+    return (*result)->material_hue_shift;
   return MaterialHue();
 }
 
@@ -629,9 +629,9 @@ std::expected<MaterialHue, StarException> WorldTemplate::biomeModHueShift(BiomeI
   auto result = biome(biomeIndex);
   if (!result) return std::unexpected(std::move(result.error()));
   if (auto const& biome = *result) {
-    if (mod == biome->surfacePlaceables.grassMod || mod == biome->surfacePlaceables.ceilingGrassMod
-        || mod == biome->undergroundPlaceables.grassMod || mod == biome->undergroundPlaceables.ceilingGrassMod)
-      return biome->materialHueShift;
+    if (mod == biome->surface_placeables.grass_mod || mod == biome->surface_placeables.ceiling_grass_mod
+        || mod == biome->underground_placeables.grass_mod || mod == biome->underground_placeables.ceiling_grass_mod)
+      return biome->material_hue_shift;
   }
   return MaterialHue();
 }
@@ -692,98 +692,82 @@ bool WorldTemplate::breathable(int, int) const {
   return true;
 }
 
-std::expected<void, StarException> WorldTemplate::addPotentialBiomeItems(int x, int y, PotentialBiomeItems& items, List<BiomeItemDistribution> const& distributions, BiomePlacementArea area, std::optional<BiomePlacementMode> mode) const {
-  for (auto const& itemDistribution : distributions) {
-    auto placeMode = mode.value_or(itemDistribution.mode());
-
+std::expected<void, StarException> WorldTemplate::add_potential_biome_items(int x, int y, PotentialBiomeItems& items, List<BiomeItemDistribution> const& distributions, BiomePlacementArea area, std::optional<BiomePlacementMode> mode) const {
+  auto destination = [&](BiomePlacementMode placement_mode) -> std::optional<std::reference_wrapper<List<BiomeItemPlacement>>> {
     if (area == BiomePlacementArea::Surface) {
-      if (placeMode == itemDistribution.mode() && placeMode == BiomePlacementMode::Floor) {
-        auto itemToPlace = itemDistribution.itemToPlace(x, y);
-        if (!itemToPlace) return std::unexpected(std::move(itemToPlace.error()));
-        if (*itemToPlace)
-          items.surfaceBiomeItems.push_back(std::move(**itemToPlace));
-      }
-      if (placeMode == itemDistribution.mode() && placeMode == BiomePlacementMode::Ocean) {
-        auto itemToPlace = itemDistribution.itemToPlace(x, y);
-        if (!itemToPlace) return std::unexpected(std::move(itemToPlace.error()));
-        if (*itemToPlace)
-          items.oceanItems.push_back(std::move(**itemToPlace));
-      }
+      if (placement_mode == BiomePlacementMode::Floor) return items.surface_biome_items;
+      if (placement_mode == BiomePlacementMode::Ocean) return items.ocean_items;
     } else if (area == BiomePlacementArea::Underground) {
-      if (placeMode == itemDistribution.mode() && placeMode == BiomePlacementMode::Floor) {
-        auto itemToPlace = itemDistribution.itemToPlace(x, y);
-        if (!itemToPlace) return std::unexpected(std::move(itemToPlace.error()));
-        if (*itemToPlace)
-          items.caveSurfaceBiomeItems.push_back(std::move(**itemToPlace));
-      }
-      if (placeMode == itemDistribution.mode() && placeMode == BiomePlacementMode::Ceiling) {
-        auto itemToPlace = itemDistribution.itemToPlace(x, y);
-        if (!itemToPlace) return std::unexpected(std::move(itemToPlace.error()));
-        if (*itemToPlace)
-          items.caveCeilingBiomeItems.push_back(std::move(**itemToPlace));
-      }
-      if (placeMode == itemDistribution.mode() && placeMode == BiomePlacementMode::Background) {
-        auto itemToPlace = itemDistribution.itemToPlace(x, y);
-        if (!itemToPlace) return std::unexpected(std::move(itemToPlace.error()));
-        if (*itemToPlace)
-          items.caveBackgroundBiomeItems.push_back(std::move(**itemToPlace));
-      }
+      if (placement_mode == BiomePlacementMode::Floor) return items.cave_surface_biome_items;
+      if (placement_mode == BiomePlacementMode::Ceiling) return items.cave_ceiling_biome_items;
+      if (placement_mode == BiomePlacementMode::Background) return items.cave_background_biome_items;
     }
+    return std::nullopt;
+  };
+
+  for (auto const& distribution : distributions) {
+    auto placement_mode = distribution.mode();
+    if (mode && placement_mode != *mode) continue;
+    auto target = destination(placement_mode);
+    if (!target) continue;
+    auto placement = distribution.item_to_place(x, y);
+    if (!placement) return std::unexpected(std::move(placement.error()));
+    if (*placement) target->get().push_back(std::move(**placement));
   }
   return {};
 }
 
 
-std::expected<WorldTemplate::PotentialBiomeItems, StarException> WorldTemplate::potentialBiomeItemsAt(int x, int y) const {
+std::expected<WorldTemplate::PotentialBiomeItems, StarException> WorldTemplate::potential_biome_items_at(int x, int y) const {
   if (!m_layout || y <= 0 || y >= static_cast<int>(m_geometry.height()) - 1)
     return {};
   x = m_geometry.xwrap(x);
 
-  auto blockBiome = [&worldTemplate = *this](int x, int y) -> std::expected<std::optional<std::reference_wrapper<Biome const>>, StarException> {
-    auto index = worldTemplate.blockBiomeIndex(worldTemplate.m_geometry.xwrap(x), y);
+  auto block_biome = [this, x](int sample_y) -> std::expected<std::optional<std::reference_wrapper<Biome const>>, StarException> {
+    auto index = blockBiomeIndex(x, sample_y);
     if (!index) return std::unexpected(std::move(index.error()));
     if (*index == NullBiomeIndex) return std::nullopt;
-    auto biome = worldTemplate.m_layout->getBiome(*index);
+    auto biome = m_layout->getBiome(*index);
     if (!biome) return std::unexpected(std::move(biome.error()));
     return optional_ref(biome->get());
   };
 
-  auto lowerBlockBiome = blockBiome(x, y - 1);
-  if (!lowerBlockBiome) return std::unexpected(std::move(lowerBlockBiome.error()));
-  auto upperBlockBiome = blockBiome(x, y + 1);
-  if (!upperBlockBiome) return std::unexpected(std::move(upperBlockBiome.error()));
-  auto thisBlockBiome = blockBiome(x, y);
-  if (!thisBlockBiome) return std::unexpected(std::move(thisBlockBiome.error()));
+  auto lower_block_biome = block_biome(y - 1);
+  if (!lower_block_biome) return std::unexpected(std::move(lower_block_biome.error()));
+  auto upper_block_biome = block_biome(y + 1);
+  if (!upper_block_biome) return std::unexpected(std::move(upper_block_biome.error()));
+  auto this_block_biome = block_biome(y);
+  if (!this_block_biome) return std::unexpected(std::move(this_block_biome.error()));
 
-  PotentialBiomeItems potentialBiomeItems;
+  PotentialBiomeItems potential_biome_items;
   // surface floor, surface ocean
-  if (*lowerBlockBiome) {
-    auto added = addPotentialBiomeItems(x, y, potentialBiomeItems, (*lowerBlockBiome)->get().surfacePlaceables.itemDistributions, BiomePlacementArea::Surface, BiomePlacementMode::Floor);
+  if (*lower_block_biome) {
+    auto added = add_potential_biome_items(x, y, potential_biome_items, (*lower_block_biome)->get().surface_placeables.item_distributions, BiomePlacementArea::Surface, BiomePlacementMode::Floor);
     if (!added) return std::unexpected(std::move(added.error()));
   }
-  if (*thisBlockBiome) {
-    auto added = addPotentialBiomeItems(x, y, potentialBiomeItems, (*thisBlockBiome)->get().surfacePlaceables.itemDistributions, BiomePlacementArea::Surface, BiomePlacementMode::Ocean);
+  if (*this_block_biome) {
+    auto added = add_potential_biome_items(x, y, potential_biome_items, (*this_block_biome)->get().surface_placeables.item_distributions, BiomePlacementArea::Surface, BiomePlacementMode::Ocean);
     if (!added) return std::unexpected(std::move(added.error()));
   }
 
   // underground floor, ceiling, background
-  if (*lowerBlockBiome) {
-    auto added = addPotentialBiomeItems(x, y, potentialBiomeItems, (*lowerBlockBiome)->get().undergroundPlaceables.itemDistributions, BiomePlacementArea::Underground, BiomePlacementMode::Floor);
+  if (*lower_block_biome) {
+    auto added = add_potential_biome_items(x, y, potential_biome_items, (*lower_block_biome)->get().underground_placeables.item_distributions, BiomePlacementArea::Underground, BiomePlacementMode::Floor);
     if (!added) return std::unexpected(std::move(added.error()));
   }
-  if (*upperBlockBiome) {
-    auto added = addPotentialBiomeItems(x, y, potentialBiomeItems, (*upperBlockBiome)->get().undergroundPlaceables.itemDistributions, BiomePlacementArea::Underground, BiomePlacementMode::Ceiling);
+  if (*upper_block_biome) {
+    auto added = add_potential_biome_items(x, y, potential_biome_items, (*upper_block_biome)->get().underground_placeables.item_distributions, BiomePlacementArea::Underground, BiomePlacementMode::Ceiling);
     if (!added) return std::unexpected(std::move(added.error()));
   }
-  if (*thisBlockBiome) {
-    auto added = addPotentialBiomeItems(x, y, potentialBiomeItems, (*thisBlockBiome)->get().undergroundPlaceables.itemDistributions, BiomePlacementArea::Underground, BiomePlacementMode::Background);
+  if (*this_block_biome) {
+    auto added = add_potential_biome_items(x, y, potential_biome_items, (*this_block_biome)->get().underground_placeables.item_distributions, BiomePlacementArea::Underground, BiomePlacementMode::Background);
     if (!added) return std::unexpected(std::move(added.error()));
   }
 
-  return potentialBiomeItems;
+  return potential_biome_items;
 }
 
-std::expected<List<BiomeItemPlacement>, StarException> WorldTemplate::validBiomeItems(int x, int y, PotentialBiomeItems potentialBiomeItems) const {
+std::expected<List<BiomeItemPlacement>, StarException> WorldTemplate::valid_biome_items(int x, int y, PotentialBiomeItems potential_biome_items) const {
   if (y <= 0 || y >= static_cast<int>(m_geometry.height()) - 1)
     return {};
 
@@ -794,29 +778,29 @@ std::expected<List<BiomeItemPlacement>, StarException> WorldTemplate::validBiome
 
   if (block->biomeTransition)
     return {};
-  List<BiomeItemPlacement> biomeItems;
+  List<BiomeItemPlacement> biome_items;
 
-  auto blockAbove = getBlockInfo(x, y + 1);
-  if (!blockAbove) return std::unexpected(std::move(blockAbove.error()));
-  auto blockBelow = getBlockInfo(x, y - 1);
-  if (!blockBelow) return std::unexpected(std::move(blockBelow.error()));
+  auto block_above = getBlockInfo(x, y + 1);
+  if (!block_above) return std::unexpected(std::move(block_above.error()));
+  auto block_below = getBlockInfo(x, y - 1);
+  if (!block_below) return std::unexpected(std::move(block_below.error()));
 
-  if (!blockBelow->biomeTransition && blockBelow->terrain && !block->terrain && !blockBelow->foregroundCave)
-    biomeItems.append_range(std::move(potentialBiomeItems.surfaceBiomeItems));
+  if (!block_below->biomeTransition && block_below->terrain && !block->terrain && !block_below->foregroundCave)
+    biome_items.append_range(std::move(potential_biome_items.surface_biome_items));
 
-  if (!blockBelow->biomeTransition && blockBelow->terrain && block->terrain && !blockBelow->foregroundCave && block->foregroundCave)
-    biomeItems.append_range(std::move(potentialBiomeItems.caveSurfaceBiomeItems));
+  if (!block_below->biomeTransition && block_below->terrain && block->terrain && !block_below->foregroundCave && block->foregroundCave)
+    biome_items.append_range(std::move(potential_biome_items.cave_surface_biome_items));
 
-  if (!blockAbove->biomeTransition && blockAbove->terrain && block->terrain && !blockAbove->foregroundCave && block->foregroundCave)
-    biomeItems.append_range(std::move(potentialBiomeItems.caveCeilingBiomeItems));
+  if (!block_above->biomeTransition && block_above->terrain && block->terrain && !block_above->foregroundCave && block->foregroundCave)
+    biome_items.append_range(std::move(potential_biome_items.cave_ceiling_biome_items));
 
   if (block->terrain && block->foregroundCave && !block->backgroundCave)
-    biomeItems.append_range(std::move(potentialBiomeItems.caveBackgroundBiomeItems));
+    biome_items.append_range(std::move(potential_biome_items.cave_background_biome_items));
 
   if (block->oceanLiquid != EmptyLiquidId && y == block->oceanLiquidLevel)
-    biomeItems.append_range(std::move(potentialBiomeItems.oceanItems));
+    biome_items.append_range(std::move(potential_biome_items.ocean_items));
 
-  return biomeItems;
+  return biome_items;
 }
 
 std::expected<float, StarException> WorldTemplate::gravity() const {
@@ -903,8 +887,8 @@ std::expected<void, StarException> WorldTemplate::setupWeatherDomains() {
                                 .pool = terrestrial->weatherPool,
                                 .effectsMinHeight = terrestrial->surfaceLayer.layerMinHeight});
 
-    auto biomeDatabase = this->root().biomeDatabase();
-    if (!biomeDatabase) return std::unexpected(std::move(biomeDatabase.error()));
+    auto biome_database = this->root().biome_database();
+    if (!biome_database) return std::unexpected(std::move(biome_database.error()));
     for (std::size_t i = 0; i < definitions.size(); ++i) {
       auto const& definition = definitions[i];
       int minHeight = definition.layer.get().layerMinHeight;
@@ -915,11 +899,11 @@ std::expected<void, StarException> WorldTemplate::setupWeatherDomains() {
       if (definition.name == "surface") {
         domain = String("surface");
       } else {
-        auto hasWeather = (*biomeDatabase)->biomeHasWeather(definition.layer.get().primaryRegion.biome);
-        if (!hasWeather) return std::unexpected(std::move(hasWeather.error()));
-        if (*hasWeather) {
+        auto has_weather = (*biome_database)->biome_has_weather(definition.layer.get().primaryRegion.biome);
+        if (!has_weather) return std::unexpected(std::move(has_weather.error()));
+        if (*has_weather) {
           domain = definition.name;
-          auto pool = (*biomeDatabase)->biomeWeathers(definition.layer.get().primaryRegion.biome, m_seed, threatLevel());
+          auto pool = (*biome_database)->biome_weathers(definition.layer.get().primaryRegion.biome, m_seed, threatLevel());
           if (!pool) return std::unexpected(std::move(pool.error()));
           m_weatherDomains.push_back(
             {.name = definition.name, .pool = std::move(*pool), .effectsMinHeight = minHeight});
@@ -1112,14 +1096,14 @@ std::expected<WorldTemplate::BlockInfo, StarException> WorldTemplate::getBlockIn
       }
 
       if (blockInfo.terrain) {
-        auto biomeResult = worldTemplate.biome(blockInfo.blockBiomeIndex);
-        if (!biomeResult) return std::unexpected(std::move(biomeResult.error()));
-        if (auto const& blockBiome = *biomeResult) {
+        auto biome_result = worldTemplate.biome(blockInfo.blockBiomeIndex);
+        if (!biome_result) return std::unexpected(std::move(biome_result.error()));
+        if (auto const& block_biome = *biome_result) {
           if (!blockInfo.foregroundCave) {
-            blockInfo.foreground = blockBiome->mainBlock;
+            blockInfo.foreground = block_biome->main_block;
             blockInfo.background = blockInfo.foreground;
           } else if (!blockInfo.backgroundCave) {
-            blockInfo.background = blockBiome->mainBlock;
+            blockInfo.background = block_biome->main_block;
           }
 
           // subBlock, foregroundOre, and backgroundOre selectors can be empty
@@ -1127,7 +1111,7 @@ std::expected<WorldTemplate::BlockInfo, StarException> WorldTemplate::getBlockIn
           // correct count
 
           if (!primaryBlockWeighting.region.get().subBlockSelectorIndexes.empty()) {
-            for (std::size_t i = 0; i < blockBiome->subBlocks.size(); ++i) {
+            for (std::size_t i = 0; i < block_biome->sub_blocks.size(); ++i) {
               auto index = primaryBlockWeighting.region.get().subBlockSelectorIndexes.at(i);
               if (!index) return std::unexpected(std::move(index.error()));
               auto selectorResult = worldTemplate.m_layout->getTerrainSelector(index->get());
@@ -1137,10 +1121,10 @@ std::expected<WorldTemplate::BlockInfo, StarException> WorldTemplate::getBlockIn
               if (!select) return std::unexpected(std::move(select.error()));
               if (*select > 0.0f) {
                 if (!blockInfo.foregroundCave) {
-                  blockInfo.foreground = blockBiome->subBlocks[i];
+                  blockInfo.foreground = block_biome->sub_blocks[i];
                   blockInfo.background = blockInfo.foreground;
                 } else if (!blockInfo.backgroundCave) {
-                  blockInfo.background = blockBiome->subBlocks[i];
+                  blockInfo.background = block_biome->sub_blocks[i];
                 }
 
                 break;
@@ -1149,7 +1133,7 @@ std::expected<WorldTemplate::BlockInfo, StarException> WorldTemplate::getBlockIn
           }
 
           if (!blockInfo.foregroundCave && !primaryBlockWeighting.region.get().foregroundOreSelectorIndexes.empty()) {
-            for (std::size_t i = 0; i < blockBiome->ores.size(); ++i) {
+            for (std::size_t i = 0; i < block_biome->ores.size(); ++i) {
               auto index = primaryBlockWeighting.region.get().foregroundOreSelectorIndexes.at(i);
               if (!index) return std::unexpected(std::move(index.error()));
               auto selectorResult = worldTemplate.m_layout->getTerrainSelector(index->get());
@@ -1158,14 +1142,14 @@ std::expected<WorldTemplate::BlockInfo, StarException> WorldTemplate::getBlockIn
               auto select = selector->get(x, y);
               if (!select) return std::unexpected(std::move(select.error()));
               if (*select > 0.0f) {
-                blockInfo.foregroundMod = blockBiome->ores[i].first;
+                blockInfo.foregroundMod = block_biome->ores[i].first;
                 break;
               }
             }
           }
 
           if (!blockInfo.backgroundCave && !primaryBlockWeighting.region.get().backgroundOreSelectorIndexes.empty()) {
-            for (std::size_t i = 0; i < blockBiome->ores.size(); ++i) {
+            for (std::size_t i = 0; i < block_biome->ores.size(); ++i) {
               auto index = primaryBlockWeighting.region.get().backgroundOreSelectorIndexes.at(i);
               if (!index) return std::unexpected(std::move(index.error()));
               auto selectorResult = worldTemplate.m_layout->getTerrainSelector(index->get());
@@ -1174,7 +1158,7 @@ std::expected<WorldTemplate::BlockInfo, StarException> WorldTemplate::getBlockIn
               auto select = selector->get(x, y);
               if (!select) return std::unexpected(std::move(select.error()));
               if (*select > 0.0f) {
-                blockInfo.backgroundMod = blockBiome->ores[i].first;
+                blockInfo.backgroundMod = block_biome->ores[i].first;
                 break;
               }
             }

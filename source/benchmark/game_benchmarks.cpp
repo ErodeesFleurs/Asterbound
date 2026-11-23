@@ -2,6 +2,9 @@
 #include <benchmark/benchmark.h>
 
 import std;
+import star.biome;
+import star.biome_placement;
+import star.plant_database;
 import star.behavior_database;
 import star.behavior_state;
 import star.assets;
@@ -820,6 +823,80 @@ int main(int argc, char** argv) {
     return 1;
   }
   BenchmarkSession session{**root};
+  for (std::string_view scenario : {"FirstTree", "Build16", "Sample128", "RandomSample128"}) {
+    benchmark::RegisterBenchmark(std::string("Game/Biome/").append(scenario).c_str(), [&, scenario](benchmark::State& state) {
+      auto plants = session.root.plantDatabase();
+      if (!plants) return session.fail(state, plants.error());
+      auto stems = (*plants)->treeStemNames();
+      if (!stems) return session.fail(state, stems.error());
+      auto leaves = (*plants)->treeFoliageNames();
+      std::ranges::sort(*stems);
+      std::ranges::sort(leaves);
+      if (stems->empty()) return session.fail(state, "No tree stems");
+      JsonArray stem_names, leaf_names{""};
+      for (auto const& stem : *stems | std::views::take(8)) stem_names.emplace_back(stem);
+      for (auto const& leaf : leaves | std::views::take(8)) leaf_names.emplace_back(leaf);
+      bool const random = scenario == "RandomSample128";
+      Json config = JsonObject{{"type", "tree"}, {"variants", 16}, {"treeStemList", std::move(stem_names)},
+          {"treeFoliageList", std::move(leaf_names)}, {"treeStemHueShiftMax", 90}, {"treeFoliageHueShiftMax", 60},
+          {"distribution", random ? JsonObject{{"type", "random"}, {"blockProbability", 0.375}}
+                                  : JsonObject{{"type", "periodic"}, {"modulus", 3}, {"modulusVariance", 0.5}}}};
+      constexpr std::uint64_t seed = 0xfedcba9876543210ULL;
+      auto built = BiomeItemDistribution::create(session.root, config, seed);
+      if (!built) return session.fail(state, built.error());
+      BiomePlaceables placeables;
+      placeables.item_distributions.push_back(std::move(*built));
+      auto const& distribution = placeables.item_distributions.front();
+      std::uint64_t hash = 14695981039346656037ull;
+      auto mix = [&](std::uint32_t value) { hash = (hash ^ value) * 1099511628211ull; };
+      auto mix_tree = [&](TreeVariant const& tree) {
+        for (auto const& name : {std::cref(tree.stemName), std::cref(tree.foliageName)}) {
+          for (unsigned char c : name.get().utf8()) mix(c);
+          mix(256);
+        }
+        mix(std::bit_cast<std::uint32_t>(tree.stemHueShift));
+        mix(std::bit_cast<std::uint32_t>(tree.foliageHueShift));
+      };
+      auto store = distribution.to_json();
+      if (!store) return session.fail(state, store.error());
+      auto candidates = store->get_array(random ? String("randomItems") : String("weightedItems"));
+      if (!candidates) return session.fail(state, candidates.error());
+      auto assets = session.root.assets();
+      if (!assets) return session.fail(state, assets.error());
+      for (auto const& entry : *candidates) {
+        auto payload = random ? std::expected<Json, StarException>(entry) : entry.get(0);
+        if (!payload) return session.fail(state, payload.error());
+        auto item = variant_to_biome_item(**assets, *payload);
+        if (!item) return session.fail(state, item.error());
+        auto const& trees = std::get<TreePair>(*item);
+        mix_tree(trees.first);
+        mix_tree(trees.second);
+      }
+      for (int x = -64; x < 64; ++x) {
+        auto item = distribution.item_at(x, 17);
+        if (!item) return session.fail(state, item.error());
+        mix(item->has_value());
+        if (*item) mix_tree(std::get<TreePair>((*item)->get()).first);
+      }
+      state.SetLabel(std::to_string(hash));
+      for (auto _ : state) {
+        if (scenario == "FirstTree") {
+          auto first = placeables.first_tree();
+          benchmark::DoNotOptimize(first);
+        } else if (scenario == "Build16") {
+          auto result = BiomeItemDistribution::create(session.root, config, seed);
+          if (!result) return session.fail(state, result.error());
+          benchmark::DoNotOptimize(*result);
+        } else {
+          for (int x = -64; x < 64; ++x) {
+            auto result = distribution.item_at(x, 17);
+            if (!result) return session.fail(state, result.error());
+            benchmark::DoNotOptimize(*result);
+          }
+        }
+      }
+    });
+  }
   for (std::string_view scenario : {"WideEarlyExit", "Notify32", "Resume"}) {
     benchmark::RegisterBenchmark(std::string("Game/Behavior/").append(scenario).c_str(), [&, scenario](benchmark::State& state) {
       auto lua = LuaRoot::create(session.root);

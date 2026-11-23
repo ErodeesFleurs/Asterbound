@@ -372,7 +372,7 @@ std::expected<void, StarException> Root::reload() {
 
     // Biome database depends on liquids, materials, and stored function
     // databases.
-    std::lock_guard biomeDatabaseLock(m_biomeDatabaseMutex);
+    std::lock_guard biome_database_lock(m_biome_database_mutex);
 
     // Dungeon definitions database depends on the material and liquids database
     std::lock_guard dungeonDefinitionsLock(m_dungeonDefinitionsMutex);
@@ -430,7 +430,7 @@ std::expected<void, StarException> Root::reload() {
     m_monsterDatabase.reset();
     m_plantDatabase.reset();
     m_projectileDatabase.reset();
-    m_biomeDatabase.reset();
+    m_biome_database.reset();
     m_dungeonDefinitions.reset();
     m_tilesetDatabase.reset();
     m_statisticsDatabase.reset();
@@ -531,7 +531,7 @@ std::expected<void, StarException> Root::fullyLoad() {
   add(&Root::vehicleDatabase);
   add(&Root::playerFactory);
   add(&Root::entityFactory);
-  add(&Root::biomeDatabase);
+  add(&Root::biome_database);
   add(&Root::liquidsDatabase);
   add(&Root::dungeonDefinitions);
   add(&Root::tilesetDatabase);
@@ -796,8 +796,8 @@ std::expected<std::shared_ptr<TerrainDatabase const>, StarException> Root::terra
   });
 }
 
-std::expected<std::shared_ptr<BiomeDatabase const>, StarException> Root::biomeDatabase() {
-  return loadMember(m_biomeDatabase, m_biomeDatabaseMutex, "BiomeDatabase", *this);
+std::expected<std::shared_ptr<BiomeDatabase const>, StarException> Root::biome_database() {
+  return loadMember(m_biome_database, m_biome_database_mutex, "BiomeDatabase", *this);
 }
 
 std::expected<std::shared_ptr<LiquidsDatabase const>, StarException> Root::liquidsDatabase() {

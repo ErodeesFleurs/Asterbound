@@ -157,7 +157,7 @@ public:
 
 private:
   [[nodiscard]] std::expected<void, StarException> placePlant(std::shared_ptr<Plant> const& plant, Vec2I const& position);
-  [[nodiscard]] std::expected<void, StarException> placeBiomeItems(Vec2I const& pos, List<BiomeItemPlacement>& potentialItems);
+  [[nodiscard]] std::expected<void, StarException> place_biome_items(Vec2I const& pos, List<BiomeItemPlacement>& potential_items);
 
   WorldServer& m_worldServer;
   bool m_markForActivation;
@@ -218,7 +218,7 @@ private:
 
   [[nodiscard]] std::expected<void, StarException> placeBiomeGrass(WorldStorage& worldStorage, ServerTile& tile, Vec2I const& position);
 
-  [[nodiscard]] std::expected<void, StarException> reapplyBiome(WorldStorage& worldStorage, Sector const& sector);
+  [[nodiscard]] std::expected<void, StarException> reapply_biome(WorldStorage& world_storage, Sector const& sector);
 
   [[nodiscard]] std::expected<Set<Vec2I>, StarException> caveLiquidSeeds(WorldStorage& worldStorage, Sector const& sector);
   Map<Vec2I, float> determineLiquidLevel(Set<Vec2I> const& spots, Set<Vec2I> const& filled);
