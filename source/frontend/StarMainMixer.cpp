@@ -106,7 +106,7 @@ std::expected<void, StarException> MainMixer::update(float dt, bool mute_sfx, bo
         return std::unexpected(std::move(played.error()));
     }
 
-    for (auto const& audio_instance : current_world->pullPendingMusic()) {
+    for (auto const& audio_instance : current_world->pull_pending_music()) {
       audio_instance->set_mixer_group(MixerGroup::Music);
       auto played = m_mixer->play(audio_instance);
       if (!played)

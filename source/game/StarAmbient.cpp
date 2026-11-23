@@ -34,33 +34,34 @@ import star.ambient;
 
 namespace Star {
 
-AmbientTrackGroup::AmbientTrackGroup() {
-  tracks = {};
-}
-
 AmbientTrackGroup::AmbientTrackGroup(StringList tracks) : tracks(std::move(tracks)) {}
 
 std::expected<AmbientTrackGroup, StarException> AmbientTrackGroup::create(Json const& config, String const& directory) {
-  auto trackConfig = config.get("tracks", JsonArray());
-  if (!trackConfig)
-    return std::unexpected(std::move(trackConfig.error()));
-  auto values = json_to_string_list(*trackConfig);
+  auto track_config = config.find("tracks");
+  if (!track_config)
+    return std::unexpected(std::move(track_config.error()));
+  AmbientTrackGroup group;
+  if (!*track_config)
+    return group;
+  auto values = (*track_config)->get().array_ptr();
   if (!values)
     return std::unexpected(std::move(values.error()));
-  AmbientTrackGroup group;
-  for (auto const& track : *values)
-    group.tracks.push_back(AssetPath::relative_to(directory, track));
+  group.tracks.reserve((*values)->size());
+  for (auto const& value : **values) {
+    auto track = value.string_ptr();
+    if (!track)
+      return std::unexpected(std::move(track.error()));
+    group.tracks.push_back(AssetPath::relative_to(directory, **track));
+  }
   return group;
 }
 
-Json AmbientTrackGroup::toJson() const {
+Json AmbientTrackGroup::to_json() const {
   return JsonObject{{"tracks", json_from_string_list(tracks)}};
 }
 
-AmbientNoisesDescription::AmbientNoisesDescription() = default;
-
 AmbientNoisesDescription::AmbientNoisesDescription(AmbientTrackGroup day, AmbientTrackGroup night, int loops)
-  : daySounds(std::move(day)), nightSounds(std::move(night)), trackLoops(loops) {}
+  : day_sounds(std::move(day)), night_sounds(std::move(night)), track_loops(loops) {}
 
 std::expected<AmbientNoisesDescription, StarException> AmbientNoisesDescription::create(Json const& config, String const& directory) {
   AmbientNoisesDescription result;
@@ -71,7 +72,7 @@ std::expected<AmbientNoisesDescription, StarException> AmbientNoisesDescription:
     auto sounds = AmbientTrackGroup::create(**day, directory);
     if (!sounds)
       return std::unexpected(std::move(sounds.error()));
-    result.daySounds = std::move(*sounds);
+    result.day_sounds = std::move(*sounds);
   }
   auto night = config.opt("night");
   if (!night)
@@ -80,161 +81,137 @@ std::expected<AmbientNoisesDescription, StarException> AmbientNoisesDescription:
     auto sounds = AmbientTrackGroup::create(**night, directory);
     if (!sounds)
       return std::unexpected(std::move(sounds.error()));
-    result.nightSounds = std::move(*sounds);
+    result.night_sounds = std::move(*sounds);
   }
   auto loops = config.opt_int("loops");
   if (!loops)
     return std::unexpected(std::move(loops.error()));
   if (*loops)
-    result.trackLoops = **loops;
+    result.track_loops = **loops;
   return result;
 }
 
-Json AmbientNoisesDescription::toJson() const {
-  return JsonObject{{"day", daySounds.toJson()}, {"night", nightSounds.toJson()}, {"loops", trackLoops}};
+Json AmbientNoisesDescription::to_json() const {
+  return JsonObject{{"day", day_sounds.to_json()}, {"night", night_sounds.to_json()}, {"loops", track_loops}};
 }
 
 AmbientManager::AmbientManager(Root& root) : m_root(root) {}
 
 AmbientManager::~AmbientManager() {
-  cancelAll();
+  cancel_all();
 }
 
-void AmbientManager::setTrackSwitchGrace(float grace) {
-  m_trackSwitchGrace = std::chrono::duration<float>(grace);
+void AmbientManager::set_track_switch_grace(float grace) {
+  m_track_switch_grace = std::chrono::duration<float>(grace);
 }
 
-void AmbientManager::setTrackFadeInTime(float fadeInTime) {
-  m_trackFadeInTime = fadeInTime;
+void AmbientManager::set_track_fade_in_time(float fade_in_time) {
+  m_track_fade_in_time = fade_in_time;
 }
 
-std::expected<std::shared_ptr<AudioInstance>, StarException> AmbientManager::updateAmbient(std::shared_ptr<AmbientNoisesDescription> current, bool dayTime) {
-  auto assets = m_root.assets();
-  if (!assets)
-    return std::unexpected(std::move(assets.error()));
-
-  if (m_currentTrack) {
-    if (m_currentTrack->finished())
-      m_currentTrack = {};
-  }
-  StringList tracks;
+std::expected<std::shared_ptr<AudioInstance>, StarException> AmbientManager::update_ambient(std::shared_ptr<AmbientNoisesDescription const> const& current, bool day_time) {
+  std::span<String const> tracks;
   if (current)
-    tracks = dayTime ? current->daySounds.tracks : current->nightSounds.tracks;
+    tracks = day_time ? current->day_sounds.tracks : current->night_sounds.tracks;
 
-  if (m_currentTrack) {
-    bool switchTrack = m_currentTrack->finished();
-    if (!switchTrack) {
-      auto present = tracks.contains(m_currentTrackName);
-      if (!present)
-        return std::unexpected(std::move(present.error()));
-      switchTrack = !*present;
-    }
-    if (switchTrack) {
-      if (m_trackSwitchGrace <= std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now()) - m_trackGraceTimestamp) {
-        m_currentTrack->stop(m_trackFadeInTime);
-        m_currentTrack = {};
-      }
+  if (m_current_track) {
+    if (m_current_track->finished()) {
+      m_current_track.reset();
     } else {
-      m_trackGraceTimestamp = std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now());
+      auto now = std::chrono::steady_clock::now();
+      if (std::ranges::contains(tracks, m_current_track_name))
+        m_track_grace_timestamp = now;
+      else if (now - m_track_grace_timestamp >= m_track_switch_grace)
+        stop_ambient(m_track_fade_in_time);
     }
   }
-  if (!m_currentTrack) {
-    m_currentTrackName = "";
-    if (!tracks.empty()) {
-      while ((m_recentTracks.size() / 2) >= tracks.size()) {
-        auto removed = m_recentTracks.pop_front_checked();
-        if (!removed)
-          return std::unexpected(std::move(removed.error()));
-      }
-      while (true) {
-        auto track = m_root.random().sample_value(tracks);
-        if (!track)
-          return std::unexpected(std::move(track.error()));
-        m_currentTrackName = std::move(*track);
-        if (m_currentTrackName.empty() || !m_recentTracks.contains(m_currentTrackName))
-          break;
-        auto removed = m_recentTracks.pop_front_checked();
-        if (!removed)
-          return std::unexpected(std::move(removed.error()));
-      }
+  if (!m_current_track && !tracks.empty()) {
+    while (m_recent_tracks.size() / 2 >= tracks.size()) {
+      auto removed = m_recent_tracks.pop_front_checked();
+      if (!removed)
+        return std::unexpected(std::move(removed.error()));
     }
-    if (!m_currentTrackName.empty()) {
-      auto audio = (*assets)->try_audio(m_currentTrackName);
+    while (true) {
+      auto sampled = m_root.random().sample_ref(tracks);
+      if (!sampled)
+        return std::unexpected(std::move(sampled.error()));
+      auto const& track = sampled->get();
+      if (track.empty())
+        break;
+      if (m_recent_tracks.contains(track)) {
+        auto removed = m_recent_tracks.pop_front_checked();
+        if (!removed)
+          return std::unexpected(std::move(removed.error()));
+        continue;
+      }
+      auto assets = m_root.assets();
+      if (!assets)
+        return std::unexpected(std::move(assets.error()));
+      auto audio = (*assets)->try_audio(track);
       if (!audio)
         return std::unexpected(std::move(audio.error()));
-      if (*audio) {
-        m_recentTracks.push_back(m_currentTrackName);
-        auto instance = AudioInstance::create(**audio);
-        if (!instance)
-          return std::unexpected(std::move(instance.error()));
-        m_currentTrack = std::move(*instance);
-        m_currentTrack->set_loops(current ? current->trackLoops : -1);
-        // Slowly fade the music track in
-        m_currentTrack->set_volume(0.0f);
-        m_currentTrack->set_volume(m_volume, m_trackFadeInTime);
-        m_delay = 0;
-        m_duration = 0;
-        m_volumeChanged = false;
-        return m_currentTrack;
-      }
+      if (!*audio)
+        break;
+      m_recent_tracks.push_back(track);
+      auto instance = AudioInstance::create(**audio);
+      if (!instance)
+        return std::unexpected(std::move(instance.error()));
+      m_current_track = std::move(*instance);
+      m_current_track_name = track;
+      m_current_track->set_loops(current->track_loops);
+      m_current_track->set_volume(0.0f);
+      m_current_track->set_volume(m_volume, m_track_fade_in_time);
+      m_delay = 0;
+      m_duration = 0;
+      m_volume_changed = false;
+      return m_current_track;
     }
   }
-  if (m_volumeChanged) {
+  if (m_volume_changed) {
     if (m_delay > 0)
       m_delay -= m_root.timing().time_step;
     else {
-      m_volumeChanged = false;
-      if (m_currentTrack) {
-        m_currentTrack->set_volume(m_volume, m_duration);
-      }
+      m_volume_changed = false;
+      if (m_current_track)
+        m_current_track->set_volume(m_volume, m_duration);
     }
   }
 
   return {};
 }
 
-std::expected<std::shared_ptr<AudioInstance>, StarException> AmbientManager::updateWeather(std::shared_ptr<WeatherNoisesDescription> current) {
-  auto assets = m_root.assets();
-  if (!assets)
-    return std::unexpected(std::move(assets.error()));
-
-  if (m_weatherTrack) {
-    if (m_weatherTrack->finished())
-      m_weatherTrack = {};
-  }
-
-  StringList tracks;
-  if (current)
-    tracks = current->tracks;
-
-  if (m_weatherTrack) {
-    auto present = tracks.contains(m_weatherTrackName);
-    if (!present)
-      return std::unexpected(std::move(present.error()));
-    if (!*present) {
-      m_weatherTrack->stop(10.0f);
-      m_weatherTrack = {};
+std::expected<std::shared_ptr<AudioInstance>, StarException> AmbientManager::update_weather(std::span<String const> tracks) {
+  if (m_weather_track) {
+    if (m_weather_track->finished()) {
+      m_weather_track.reset();
+    } else if (!std::ranges::contains(tracks, m_weather_track_name)) {
+      m_weather_track->stop(10.0f);
+      m_weather_track.reset();
     }
   }
 
-  if (!m_weatherTrack) {
-    auto track = m_root.random().sample_value(tracks);
-    if (!track)
-      return std::unexpected(std::move(track.error()));
-    m_weatherTrackName = std::move(*track);
-    if (!m_weatherTrackName.empty()) {
-      auto audio = (*assets)->try_audio(m_weatherTrackName);
+  if (!m_weather_track && !tracks.empty()) {
+    auto sampled = m_root.random().sample_ref(tracks);
+    if (!sampled)
+      return std::unexpected(std::move(sampled.error()));
+    auto const& track = sampled->get();
+    if (!track.empty()) {
+      auto assets = m_root.assets();
+      if (!assets)
+        return std::unexpected(std::move(assets.error()));
+      auto audio = (*assets)->try_audio(track);
       if (!audio)
         return std::unexpected(std::move(audio.error()));
       if (*audio) {
         auto instance = AudioInstance::create(**audio);
         if (!instance)
           return std::unexpected(std::move(instance.error()));
-        m_weatherTrack = std::move(*instance);
-        m_weatherTrack->set_loops(-1);
-        m_weatherTrack->set_volume(0.0f);
-        m_weatherTrack->set_volume(1, m_trackFadeInTime);
-        return m_weatherTrack;
+        m_weather_track = std::move(*instance);
+        m_weather_track_name = track;
+        m_weather_track->set_loops(-1);
+        m_weather_track->set_volume(0.0f);
+        m_weather_track->set_volume(1, m_track_fade_in_time);
+        return m_weather_track;
       }
     }
   }
@@ -242,24 +219,28 @@ std::expected<std::shared_ptr<AudioInstance>, StarException> AmbientManager::upd
   return {};
 }
 
-void AmbientManager::cancelAll() {
-  if (m_weatherTrack) {
-    m_weatherTrack->stop();
-    m_weatherTrack = {};
-  }
-  if (m_currentTrack) {
-    m_currentTrack->stop();
-    m_currentTrack = {};
+void AmbientManager::stop_ambient(float fade_time) {
+  if (m_current_track) {
+    m_current_track->stop(fade_time);
+    m_current_track.reset();
   }
 }
 
-void AmbientManager::setVolume(float volume, float delay, float duration) {
+void AmbientManager::cancel_all() {
+  if (m_weather_track) {
+    m_weather_track->stop();
+    m_weather_track.reset();
+  }
+  stop_ambient(0.0f);
+}
+
+void AmbientManager::set_volume(float volume, float delay, float duration) {
   if (m_volume == volume)
     return;
   m_volume = volume;
   m_delay = delay;
   m_duration = duration;
-  m_volumeChanged = true;
+  m_volume_changed = true;
 }
 
 }

@@ -515,9 +515,9 @@ std::expected<std::optional<String>, StarException> ClientWeather::activeWeather
   return name->get();
 }
 
-StringList ClientWeather::weatherTrackOptions() const {
+std::span<String const> ClientWeather::weather_track_options() const {
   if (m_currentWeatherType)
-    return m_currentWeatherType->weatherNoises;
+    return m_currentWeatherType->weather_noises;
   return {};
 }
 

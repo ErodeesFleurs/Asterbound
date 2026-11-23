@@ -58,7 +58,7 @@ struct WeatherType {
 
   float maximumWind;
   Vec2F duration;
-  StringList weatherNoises;
+  StringList weather_noises;
 
   // Resolved from local assets and intentionally excluded from legacy binary serialization.
   std::optional<String> parallax;

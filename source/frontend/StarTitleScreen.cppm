@@ -113,7 +113,7 @@ public:
   // the multiplayer menu, the skip connection is forgotten.
   [[nodiscard]] std::expected<void, StarException> goToMultiPlayerSelectCharacter(bool skipConnection);
 
-  void stopMusic();
+  void stop_music();
 
   std::shared_ptr<Player> currentlySelectedPlayer() const;
 
@@ -190,9 +190,9 @@ private:
 
   std::shared_ptr<Sky> m_skyBackdrop;
 
-  std::shared_ptr<AmbientNoisesDescription> m_musicTrack;
-  std::shared_ptr<AudioInstance> m_currentMusicTrack;
-  AmbientManager m_musicTrackManager;
+  std::shared_ptr<AmbientNoisesDescription const> m_music_track;
+  std::shared_ptr<AudioInstance> m_current_music_track;
+  AmbientManager m_music_track_manager;
 };
 
 }

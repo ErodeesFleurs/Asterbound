@@ -211,10 +211,10 @@ struct FloatingDungeonWorldParameters : VisitableWorldParameters {
   String primaryDungeon;
   Color ambientLightLevel;
   std::optional<String> biome;
-  std::optional<String> dayMusicTrack;
-  std::optional<String> nightMusicTrack;
-  std::optional<String> dayAmbientNoises;
-  std::optional<String> nightAmbientNoises;
+  std::optional<String> day_music_track;
+  std::optional<String> night_music_track;
+  std::optional<String> day_ambient_noises;
+  std::optional<String> night_ambient_noises;
 };
 
 [[nodiscard]] std::expected<Json, StarException> diskStoreVisitableWorldParameters(std::shared_ptr<VisitableWorldParameters const> const& parameters);

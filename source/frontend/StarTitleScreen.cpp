@@ -224,7 +224,7 @@ namespace Star {
 TitleScreen::TitleScreen(GuiContext& context, std::shared_ptr<PlayerStorage> playerStorage, std::shared_ptr<Mixer> mixer)
   : m_guiContext(context), m_titleState(TitleState::Quit), m_playerStorage(std::move(playerStorage)),
     m_skipMultiPlayerConnection(false), m_forceLegacy(false), m_mixer(std::move(mixer)),
-    m_musicTrackManager(context.root()) {}
+    m_music_track_manager(context.root()) {}
 
 TitleScreen::~TitleScreen() {
   if (auto r = close(); !r)
@@ -313,16 +313,15 @@ std::expected<void, StarException> TitleScreen::initialize(std::shared_ptr<Unive
   if (!sky)
     return std::unexpected(std::move(sky.error()));
   m_skyBackdrop = std::move(*sky);
-  auto musicConfig = (*assets)->json("/interface/windowconfig/title.config:music");
-  if (!musicConfig)
-    return std::unexpected(std::move(musicConfig.error()));
-  auto musicObject = musicConfig->to_object();
-  if (!musicObject)
-    return std::unexpected(std::move(musicObject.error()));
-  auto music = AmbientNoisesDescription::create(*musicObject, "/");
+  auto music_config = (*assets)->json("/interface/windowconfig/title.config:music");
+  if (!music_config)
+    return std::unexpected(std::move(music_config.error()));
+  if (auto object = music_config->object_ptr(); !object)
+    return std::unexpected(std::move(object.error()));
+  auto music = AmbientNoisesDescription::create(*music_config, "/");
   if (!music)
     return std::unexpected(std::move(music.error()));
-  m_musicTrack = std::make_shared<AmbientNoisesDescription>(std::move(*music));
+  m_music_track = std::make_shared<AmbientNoisesDescription const>(std::move(*music));
   if (auto r = initMainMenu(); !r) return std::unexpected(std::move(r.error()));
   if (auto r = initCharSelectionMenu(); !r) return std::unexpected(std::move(r.error()));
   if (auto r = initCharCreationMenu(); !r) return std::unexpected(std::move(r.error()));
@@ -417,14 +416,14 @@ std::expected<void, StarException> TitleScreen::update(float dt) {
   if (auto r = m_paneManager->update(dt); !r) return std::unexpected(std::move(r.error()));
   if (auto r = recover_lua_script_error(m_scriptComponent->update(dt)); !r) return std::unexpected(std::move(r.error()));
   if (!finishedState()) {
-    auto audioSample = m_musicTrackManager.updateAmbient(m_musicTrack, m_skyBackdrop->isDayTime());
-    if (!audioSample)
-      return std::unexpected(std::move(audioSample.error()));
-    if (*audioSample) {
-      m_currentMusicTrack = *audioSample;
-      (*audioSample)->set_mixer_group(MixerGroup::Music);
-      (*audioSample)->set_loops(0);
-      if (auto r = m_mixer->play(*audioSample); !r) return std::unexpected(std::move(r.error()));
+    auto sample = m_music_track_manager.update_ambient(m_music_track, m_skyBackdrop->isDayTime());
+    if (!sample)
+      return std::unexpected(std::move(sample.error()));
+    if (*sample) {
+      m_current_music_track = std::move(*sample);
+      m_current_music_track->set_mixer_group(MixerGroup::Music);
+      m_current_music_track->set_loops(0);
+      if (auto r = m_mixer->play(m_current_music_track); !r) return std::unexpected(std::move(r.error()));
     }
   }
   return {};
@@ -455,8 +454,8 @@ bool TitleScreen::finishedState() const {
 
 std::expected<void, StarException> TitleScreen::resetState() {
   if (auto r = switchState(TitleState::Main); !r) return std::unexpected(std::move(r.error()));
-  if (m_currentMusicTrack)
-    m_currentMusicTrack->set_volume(1.0f, 4.0f);
+  if (m_current_music_track)
+    m_current_music_track->set_volume(1.0f, 4.0f);
   return {};
 }
 
@@ -465,9 +464,9 @@ std::expected<void, StarException> TitleScreen::goToMultiPlayerSelectCharacter(b
   return switchState(TitleState::MultiPlayerSelectCharacter);
 }
 
-void TitleScreen::stopMusic() {
-  if (m_currentMusicTrack)
-    m_currentMusicTrack->stop(8.0f);
+void TitleScreen::stop_music() {
+  if (m_current_music_track)
+    m_current_music_track->stop(8.0f);
 }
 
 std::shared_ptr<Player> TitleScreen::currentlySelectedPlayer() const {
@@ -903,7 +902,7 @@ std::expected<void, StarException> TitleScreen::switchState(TitleState titleStat
     }
   }
   if (titleState == TitleState::Quit)
-    m_musicTrackManager.cancelAll();
+    m_music_track_manager.cancel_all();
   return {};
 }
 

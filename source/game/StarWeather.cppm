@@ -149,7 +149,8 @@ public:
   StringList statusEffects() const;
 
   List<Particle> pullNewParticles();
-  StringList weatherTrackOptions() const;
+  // Borrowed until the next weather update or clear; consume synchronously.
+  [[nodiscard]] std::span<String const> weather_track_options() const;
   std::optional<String> weatherParallax() const;
   
   [[nodiscard]]

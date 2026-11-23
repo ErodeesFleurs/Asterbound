@@ -214,8 +214,8 @@ public:
   [[nodiscard]] std::expected<MaterialHue, StarException> biomeMaterialHueShift(BiomeIndex biomeIndex, MaterialId material) const;
   [[nodiscard]] std::expected<MaterialHue, StarException> biomeModHueShift(BiomeIndex biomeIndex, ModId mod) const;
 
-  [[nodiscard]] std::expected<std::shared_ptr<AmbientNoisesDescription>, StarException> ambientNoises(int x, int y) const;
-  [[nodiscard]] std::expected<std::shared_ptr<AmbientNoisesDescription>, StarException> musicTrack(int x, int y) const;
+  [[nodiscard]] std::expected<std::shared_ptr<AmbientNoisesDescription const>, StarException> ambient_noises(int x, int y) const;
+  [[nodiscard]] std::expected<std::shared_ptr<AmbientNoisesDescription const>, StarException> music_track(int x, int y) const;
 
   StringList environmentStatusEffects(int x, int y) const;
   bool breathable(int x, int y) const;
@@ -249,6 +249,7 @@ private:
   WorldTemplate(Root& root);
 
   [[nodiscard]] std::expected<void, StarException> initialize();
+  void install_world_parameters(std::shared_ptr<VisitableWorldParameters const> parameters);
   [[nodiscard]] std::expected<void, StarException> determineWorldName();
   [[nodiscard]] std::expected<void, StarException> setupWeatherDomains();
 
@@ -263,6 +264,8 @@ private:
 
   std::optional<CelestialParameters> m_celestialParameters;
   std::shared_ptr<VisitableWorldParameters const> m_worldParameters;
+  std::shared_ptr<AmbientNoisesDescription const> m_ambient_override;
+  std::shared_ptr<AmbientNoisesDescription const> m_music_override;
   SkyParameters m_skyParameters;
   std::uint64_t m_seed;
   WorldGeometry m_geometry;

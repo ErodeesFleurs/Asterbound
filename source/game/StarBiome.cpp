@@ -193,19 +193,19 @@ std::expected<Biome, StarException> Biome::create(Root& root, Json const& store)
       result.parallax = std::move(*value);
     }
   }
-  auto ambientNoisesConfig = store.opt("ambientNoises");
-  if (!ambientNoisesConfig) return std::unexpected(std::move(ambientNoisesConfig.error()));
-  if (*ambientNoisesConfig) {
-    auto description = AmbientNoisesDescription::create(**ambientNoisesConfig);
+  auto ambient_noises_config = store.opt("ambientNoises");
+  if (!ambient_noises_config) return std::unexpected(std::move(ambient_noises_config.error()));
+  if (*ambient_noises_config) {
+    auto description = AmbientNoisesDescription::create(**ambient_noises_config);
     if (!description) return std::unexpected(std::move(description.error()));
-    result.ambientNoises = std::make_shared<AmbientNoisesDescription>(std::move(*description));
+    result.ambient_noises = std::make_shared<AmbientNoisesDescription const>(std::move(*description));
   }
-  auto musicTrackConfig = store.opt("musicTrack");
-  if (!musicTrackConfig) return std::unexpected(std::move(musicTrackConfig.error()));
-  if (*musicTrackConfig) {
-    auto description = AmbientNoisesDescription::create(**musicTrackConfig);
+  auto music_track_config = store.opt("musicTrack");
+  if (!music_track_config) return std::unexpected(std::move(music_track_config.error()));
+  if (*music_track_config) {
+    auto description = AmbientNoisesDescription::create(**music_track_config);
     if (!description) return std::unexpected(std::move(description.error()));
-    result.musicTrack = std::make_shared<AmbientNoisesDescription>(std::move(*description));
+    result.music_track = std::make_shared<AmbientNoisesDescription const>(std::move(*description));
   }
   return result;
 }
@@ -228,8 +228,8 @@ std::expected<Json, StarException> Biome::toJson() const {
       {"ores", ores.transformed([](std::pair<ModId, float> const& p) -> Json { return JsonArray{p.first, p.second}; })},
       {"hueShift", hueShift}, {"materialHueShift", materialHueShift}, {"surfacePlaceables", std::move(*surface)},
       {"undergroundPlaceables", std::move(*underground)}, {"spawnProfile", spawnProfile.toJson()},
-      {"parallax", std::move(parallaxStore)}, {"ambientNoises", ambientNoises ? ambientNoises->toJson() : Json()},
-      {"musicTrack", musicTrack ? musicTrack->toJson() : Json()}};
+      {"parallax", std::move(parallaxStore)}, {"ambientNoises", ambient_noises ? ambient_noises->to_json() : Json()},
+      {"musicTrack", music_track ? music_track->to_json() : Json()}};
 }
 
 }

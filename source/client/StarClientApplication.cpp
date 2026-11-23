@@ -1714,7 +1714,7 @@ std::expected<bool, StarException> ClientApplication::connectSinglePlayer() {
 }
 
 std::expected<void, StarException> ClientApplication::prepareSessionInterface() {
-  m_titleScreen->stopMusic();
+  m_titleScreen->stop_music();
   if (auto restarted = m_universeClient->restartLua(); !restarted)
     return restarted;
   auto createdInterface = MainInterface::create(*m_guiContext, m_universeClient, m_worldPainter, m_cinematicOverlay);

@@ -97,8 +97,8 @@ struct Biome {
 
   std::shared_ptr<Parallax> parallax;
 
-  std::shared_ptr<AmbientNoisesDescription> ambientNoises;
-  std::shared_ptr<AmbientNoisesDescription> musicTrack;
+  std::shared_ptr<AmbientNoisesDescription const> ambient_noises;
+  std::shared_ptr<AmbientNoisesDescription const> music_track;
 };
 
 }

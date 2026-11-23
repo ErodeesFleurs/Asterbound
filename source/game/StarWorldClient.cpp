@@ -219,7 +219,7 @@ const float WorldClient::DropDist = 6.0f;
 WorldClient::WorldClient(Root& root, UniverseClient& universe)
   : World(root), m_currentStep(0), m_currentTime(0), m_pendingLightReady(false),
     m_subWorldId(main_client_world_id), m_worldDimLevel(0), m_latency(0),
-    m_ambientSounds(root), m_musicTrack(root), m_altMusicTrack(root),
+    m_ambient_sounds(root), m_music_track(root), m_alt_music_track(root),
     m_broadcast_public_key(std::string(root.identity().public_key().begin(), root.identity().public_key().end())),
     m_universe(universe) {}
 
@@ -363,14 +363,14 @@ std::expected<void, StarException> WorldClient::initialize(std::shared_ptr<Playe
   auto result20 = (std::move(*result19)).to_float();
   if (!result20)
     return std::unexpected(std::move(result20.error()));
-  m_ambientSounds.setTrackFadeInTime((std::move(*result20)));
+  m_ambient_sounds.set_track_fade_in_time(*result20);
   auto result21 = assets->json("/interface.config:ambientTrackSwitchGrace");
   if (!result21)
     return std::unexpected(std::move(result21.error()));
   auto result22 = (std::move(*result21)).to_float();
   if (!result22)
     return std::unexpected(std::move(result22.error()));
-  m_ambientSounds.setTrackSwitchGrace((std::move(*result22)));
+  m_ambient_sounds.set_track_switch_grace(*result22);
   
   auto result23 = assets->json("/interface.config:musicTrackSwitchGrace");
   if (!result23)
@@ -378,31 +378,17 @@ std::expected<void, StarException> WorldClient::initialize(std::shared_ptr<Playe
   auto result24 = (std::move(*result23)).to_float();
   if (!result24)
     return std::unexpected(std::move(result24.error()));
-  m_musicTrack.setTrackSwitchGrace((std::move(*result24)));
+  m_music_track.set_track_switch_grace(*result24);
   auto result25 = assets->json("/interface.config:musicTrackFadeInTime");
   if (!result25)
     return std::unexpected(std::move(result25.error()));
   auto result26 = (std::move(*result25)).to_float();
   if (!result26)
     return std::unexpected(std::move(result26.error()));
-  m_musicTrack.setTrackFadeInTime((std::move(*result26)));
-  
-  auto result27 = assets->json("/interface.config:musicTrackFadeInTime");
-  if (!result27)
-    return std::unexpected(std::move(result27.error()));
-  auto result28 = (std::move(*result27)).to_float();
-  if (!result28)
-    return std::unexpected(std::move(result28.error()));
-  m_altMusicTrack.setTrackFadeInTime((std::move(*result28)));
-  auto result29 = assets->json("/interface.config:musicTrackFadeInTime");
-  if (!result29)
-    return std::unexpected(std::move(result29.error()));
-  auto result30 = (std::move(*result29)).to_float();
-  if (!result30)
-    return std::unexpected(std::move(result30.error()));
-  m_altMusicTrack.setTrackSwitchGrace((std::move(*result30)));
-  m_altMusicTrack.setVolume(0, 0, 0);
-  m_altMusicActive = false;
+  m_music_track.set_track_fade_in_time(*result26);
+  m_alt_music_track.set_track_fade_in_time(*result26);
+  // Alternate tracks historically use the fade-in interval as their switch grace.
+  m_alt_music_track.set_track_switch_grace(*result26);
   
   m_pendingLightReady = false;
   
@@ -1521,7 +1507,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
 
 List<std::shared_ptr<AudioInstance>> WorldClient::pullPendingAudio() { return std::exchange(m_samples, {}); }
 
-List<std::shared_ptr<AudioInstance>> WorldClient::pullPendingMusic() { return std::exchange(m_music, {}); }
+List<std::shared_ptr<AudioInstance>> WorldClient::pull_pending_music() { return std::exchange(m_music, {}); }
 
 void WorldClient::dimWorld() {
   m_worldDimTimer.reset();
@@ -2309,10 +2295,11 @@ std::expected<void, StarException> WorldClient::update(float dt) {
       return std::unexpected(std::move(flickerSample.error()));
     m_inspectionFlickerMultiplier = *flickerSample;
     double parallaxEpoch = m_sky->epochTime();
-    auto weatherDomain = currentWeatherDomain();
-    if (!weatherDomain)
-      return std::unexpected(std::move(weatherDomain.error()));
-    float parallaxWind = *weatherDomain == m_weatherDomain ? m_weather->wind() : 0.0f;
+    auto weather_domain = currentWeatherDomain();
+    if (!weather_domain)
+      return std::unexpected(std::move(weather_domain.error()));
+    bool const weather_in_domain = *weather_domain == m_weatherDomain;
+    float parallaxWind = weather_in_domain ? m_weather->wind() : 0.0f;
     m_parallaxWindTime.update(parallaxEpoch, parallaxWind);
     if (!m_mainPlayer->isDead()) {
       // Clear m_requestedDrops every so often in case of entity id reuse or
@@ -2425,27 +2412,25 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     if (!events)
       return std::unexpected(std::move(events.error()));
     
+    auto const track_position = environment_biome_track_position();
+    bool const day_time = m_sky->isDayTime();
     {
-      auto result178 = currentAmbientNoises();
-      if (!result178)
-        return std::unexpected(std::move(result178.error()));
-      auto result179 = m_ambientSounds.updateAmbient((std::move(*result178)), m_sky->isDayTime());
-      if (!result179)
-        return std::unexpected(std::move(result179.error()));
-      if (auto audioSample = (std::move(*result179))) {
-        m_samples.push_back(audioSample);
-      }
+      auto ambient = m_worldTemplate->ambient_noises(track_position[0], track_position[1]);
+      if (!ambient)
+        return std::unexpected(std::move(ambient.error()));
+      auto sample = m_ambient_sounds.update_ambient(*ambient, day_time);
+      if (!sample)
+        return std::unexpected(std::move(sample.error()));
+      if (*sample)
+        m_samples.push_back(std::move(*sample));
     }
     {
-      auto result180 = currentWeatherNoises();
-      if (!result180)
-        return std::unexpected(std::move(result180.error()));
-      auto result181 = m_ambientSounds.updateWeather((std::move(*result180)));
-      if (!result181)
-        return std::unexpected(std::move(result181.error()));
-      if (auto audioSample = (std::move(*result181))) {
-        m_samples.push_back(audioSample);
-      }
+      auto tracks = weather_in_domain ? m_weather->weather_track_options() : std::span<String const>{};
+      auto sample = m_ambient_sounds.update_weather(tracks);
+      if (!sample)
+        return std::unexpected(std::move(sample.error()));
+      if (*sample)
+        m_samples.push_back(std::move(*sample));
     }
     
     if (inSpace()) {
@@ -2454,61 +2439,57 @@ std::expected<void, StarException> WorldClient::update(float dt) {
         return std::unexpected(std::move(result182.error()));
       m_samples.append_range((std::move(*result182)));
 
-      if (m_spaceSound && m_spaceSound->finished()) {
-        m_spaceSound = {};
-        m_activeSpaceSound = "";
+      if (m_space_sound && m_space_sound->finished()) {
+        m_space_sound.reset();
+        m_active_space_sound = "";
       }
       
-      auto result183 = m_sky->ambientNoise();
-      if (!result183)
-        return std::unexpected(std::move(result183.error()));
-      auto skyAmbientNoise = (std::move(*result183));
-      if (skyAmbientNoise != m_activeSpaceSound) {
-        if (m_spaceSound) {
-          m_spaceSound->stop(skyAmbientNoise == "" ? 3.0 : 0.0);
+      auto sky_ambient_noise = m_sky->ambientNoise();
+      if (!sky_ambient_noise)
+        return std::unexpected(std::move(sky_ambient_noise.error()));
+      if (*sky_ambient_noise != m_active_space_sound) {
+        if (m_space_sound) {
+          m_space_sound->stop(sky_ambient_noise->empty() ? 3.0f : 0.0f);
         } else {
-          m_activeSpaceSound = skyAmbientNoise;
-          if (!m_activeSpaceSound.empty()) {
-            auto result184 = assets->audio(m_activeSpaceSound);
-            if (!result184)
-              return std::unexpected(std::move(result184.error()));
-            auto result185 = AudioInstance::create(*(std::move(*result184)));
-            if (!result185)
-              return std::unexpected(std::move(result185.error()));
-            m_spaceSound = (std::move(*result185));
-            m_samples.push_back(m_spaceSound);
+          m_active_space_sound = std::move(*sky_ambient_noise);
+          if (!m_active_space_sound.empty()) {
+            auto audio = assets->audio(m_active_space_sound);
+            if (!audio)
+              return std::unexpected(std::move(audio.error()));
+            auto instance = AudioInstance::create(**audio);
+            if (!instance)
+              return std::unexpected(std::move(instance.error()));
+            m_space_sound = std::move(*instance);
+            m_samples.push_back(m_space_sound);
           }
         }
       }
     }
     
-    if (auto newAltMusic = m_mainPlayer->pullPendingAltMusic()) {
-      if (newAltMusic->first) {
-        playAltMusic(newAltMusic->first->first, newAltMusic->second, newAltMusic->first->second);
-      } else {
-        stopAltMusic(newAltMusic->second);
-      }
+    if (auto request = m_mainPlayer->pull_pending_alt_music()) {
+      if (request->tracks)
+        play_alt_music(std::move(*request->tracks), request->fade_time, request->loops);
+      else
+        stop_alt_music(request->fade_time);
+    }
+    
+    if (m_alt_music_description) {
+      auto sample = m_alt_music_track.update_ambient(m_alt_music_description, true);
+      if (!sample)
+        return std::unexpected(std::move(sample.error()));
+      if (*sample)
+        m_music.push_back(std::move(*sample));
     }
     
     {
-      auto result186 = m_altMusicTrack.updateAmbient(currentAltMusicTrack(), true);
-      if (!result186)
-        return std::unexpected(std::move(result186.error()));
-      if (auto audioSample = (std::move(*result186))) {
-        m_music.push_back(audioSample);
-      }
-    }
-    
-    {
-      auto result187 = currentMusicTrack();
-      if (!result187)
-        return std::unexpected(std::move(result187.error()));
-      auto result188 = m_musicTrack.updateAmbient((std::move(*result187)), m_sky->isDayTime());
-      if (!result188)
-        return std::unexpected(std::move(result188.error()));
-      if (auto audioSample = (std::move(*result188))) {
-        m_music.push_back(audioSample);
-      }
+      auto music = m_worldTemplate->music_track(track_position[0], track_position[1]);
+      if (!music)
+        return std::unexpected(std::move(music.error()));
+      auto sample = m_music_track.update_ambient(*music, day_time);
+      if (!sample)
+        return std::unexpected(std::move(sample.error()));
+      if (*sample)
+        m_music.push_back(std::move(*sample));
     }
   }
   
@@ -3666,17 +3647,18 @@ std::expected<void, StarException> WorldClient::clearWorld() {
 
   if (m_clientState)
     m_clientState->reset();
-  m_ambientSounds.cancelAll();
-  m_musicTrack.cancelAll();
-  m_musicTrack.setVolume(1, 0, 0);
-  m_altMusicTrack.cancelAll();
-  m_altMusicTrack.setVolume(0, 0, 0);
-  m_altMusicActive = false;
+  m_ambient_sounds.cancel_all();
+  m_music_track.cancel_all();
+  m_music_track.set_volume(1, 0, 0);
+  m_alt_music_track.cancel_all();
+  m_alt_music_description.reset();
+  m_music.clear();
 
-  if (m_spaceSound) {
-    m_spaceSound->stop();
-    m_spaceSound = {};
+  if (m_space_sound) {
+    m_space_sound->stop();
+    m_space_sound.reset();
   }
+  m_active_space_sound = "";
 
   for (auto&& response : std::exchange(m_entityMessageResponses, {}))
     remember(response.second.cancel("Client world closed"));
@@ -3739,7 +3721,7 @@ List<EntityId> WorldClient::entityIds() const {
   return m_entityMap->entityIds();
 }
 
-Vec2I WorldClient::environmentBiomeTrackPosition() const {
+Vec2I WorldClient::environment_biome_track_position() const {
   if (!inWorld())
     return {};
 
@@ -3767,69 +3749,19 @@ std::expected<std::optional<String>, StarException> WorldClient::currentWeatherD
   return {};
 }
 
-std::expected<std::shared_ptr<AmbientNoisesDescription>, StarException> WorldClient::currentAmbientNoises() const {
-  if (!inWorld()) {
-    return {};
-  }
-  
-  Vec2I pos = environmentBiomeTrackPosition();
-  return m_worldTemplate->ambientNoises(pos[0], pos[1]);
+void WorldClient::play_alt_music(StringList tracks, float fade_time, int loops) {
+  if (!m_alt_music_description)
+    m_music_track.set_volume(0.0f, 0.0f, fade_time);
+  m_alt_music_description = std::make_shared<AmbientNoisesDescription const>(
+      AmbientTrackGroup(std::move(tracks)), AmbientTrackGroup{}, loops);
 }
 
-std::expected<std::shared_ptr<WeatherNoisesDescription>, StarException> WorldClient::currentWeatherNoises() const {
-  if (!inWorld()) {
-    return {};
-  }
-  
-  {
-    auto result297 = currentWeatherDomain();
-    if (!result297)
-      return std::unexpected(std::move(result297.error()));
-    if ((std::move(*result297)) != m_weatherDomain) {
-      return {};
-    }
-  }
-  
-  auto trackOptions = m_weather->weatherTrackOptions();
-  if (trackOptions.empty()) {
-    return {};
-  } else {
-    return std::make_shared<WeatherNoisesDescription>(std::move(trackOptions));
-  }
-}
-
-std::expected<std::shared_ptr<AmbientNoisesDescription>, StarException> WorldClient::currentMusicTrack() const {
-  if (!inWorld()) {
-    return {};
-  }
-  
-  Vec2I pos = environmentBiomeTrackPosition();
-  return m_worldTemplate->musicTrack(pos[0], pos[1]);
-}
-
-std::shared_ptr<AmbientNoisesDescription> WorldClient::currentAltMusicTrack() const {
-  if (!inWorld())
-    return {};
-
-  return m_altMusicTrackDescription;
-}
-
-void WorldClient::playAltMusic(StringList const& newTracks, float fadeTime, int loops) {
-  auto newTrackGroup = AmbientTrackGroup(newTracks);
-  m_altMusicTrackDescription = std::make_shared<AmbientNoisesDescription>(AmbientTrackGroup(newTracks), AmbientTrackGroup(), loops);
-  if (!m_altMusicActive) {
-    m_musicTrack.setVolume(0.0, 0.0, fadeTime);
-    m_altMusicTrack.setVolume(1.0, 0.0, fadeTime);
-    m_altMusicActive = true;
-  }
-}
-
-void WorldClient::stopAltMusic(float fadeTime) {
-  if (m_altMusicActive) {
-    m_musicTrack.setVolume(1.0, 0.0, fadeTime);
-    m_altMusicTrack.setVolume(0.0, 0.0, fadeTime);
-    m_altMusicActive = false;
-  }
+void WorldClient::stop_alt_music(float fade_time) {
+  if (!m_alt_music_description)
+    return;
+  m_alt_music_description.reset();
+  m_alt_music_track.stop_ambient(fade_time);
+  m_music_track.set_volume(1.0f, 0.0f, fade_time);
 }
 
 std::expected<std::shared_ptr<Biome const>, StarException> WorldClient::mainEnvironmentBiome() const {
@@ -3837,7 +3769,7 @@ std::expected<std::shared_ptr<Biome const>, StarException> WorldClient::mainEnvi
     return {};
   }
   
-  Vec2I pos = environmentBiomeTrackPosition();
+  Vec2I pos = environment_biome_track_position();
   return m_worldTemplate->environmentBiome(pos[0], pos[1]);
 }
 

@@ -73,6 +73,10 @@ import star.casting;
 import star.entity;
 import star.net_packets;
 import star.test_universe;
+import star.universe_client;
+import star.message_types;
+import star.uuid;
+import star.mixer;
 import star.world_client;
 import star.warping;
 import star.data_stream_devices;
@@ -357,6 +361,69 @@ const GameTestRegistration secure_identity("RootTest", "SecureIdentityStability"
   ASSERT_TRUE(root.reload());
   EXPECT_EQ(root.identity().public_key(), public_key);
   EXPECT_EQ(root.identity().sign(std::span<char const>(message)), signature);
+});
+
+const GameTestRegistration alt_music_lifecycle("WorldClientTest", "AltMusicStopAndWorldChange", [](GameTest& fixture) {
+  auto& root = fixture.root();
+  auto universe = TestUniverse::create(root, {100, 100});
+  ASSERT_TRUE(universe) << universe.error().what();
+  auto close = make_scope_exit([&] { EXPECT_TRUE((*universe)->close()); });
+  auto player = (*universe)->client()->mainPlayer();
+  auto uuid = player->uuid();
+  ASSERT_TRUE(uuid) << uuid.error().what();
+  ASSERT_TRUE((*universe)->warpPlayer(ClientShipWorldId(*uuid)));
+  ASSERT_TRUE((*universe)->client()->playerOnOwnShip());
+  auto world = (*universe)->worldClient();
+  ASSERT_TRUE(world);
+
+  String const path = "/sfx/interface/voice_on.ogg";
+  auto assets = root.assets();
+  ASSERT_TRUE(assets) << assets.error().what();
+  // update_ambient uses nonblocking asset reads. Keep the real clip loaded.
+  auto clip = (*assets)->audio(path);
+  ASSERT_TRUE(clip) << clip.error().what();
+  constexpr int alt_loops = 1234;
+  JsonArray const play_args{JsonArray{path}, 0, alt_loops};
+  auto take_alt_voice = [&]() -> std::shared_ptr<AudioInstance> {
+    for (auto& voice : world->pull_pending_music()) {
+      if (voice->loops() == alt_loops)
+        return std::move(voice);
+    }
+    return {};
+  };
+  ASSERT_TRUE(player->receiveMessage(server_connection_id, "playAltMusic", play_args));
+  ASSERT_TRUE(world->update(1.0f / 60.0f));
+  auto first = take_alt_voice();
+  ASSERT_TRUE(first);
+
+  Mixer mixer(root.logger(), 8000, 1);
+  ASSERT_TRUE(mixer.play(first));
+  first->set_volume(1.0f); // Start the measured fade at full gain.
+  ASSERT_TRUE(player->receiveMessage(server_connection_id, "stopAltMusic", {0.25}));
+  ASSERT_TRUE(world->update(1.0f / 60.0f));
+  EXPECT_FALSE(take_alt_voice());
+  std::array<std::int16_t, 1000> samples{};
+  ASSERT_TRUE(mixer.read(samples, samples.size()));
+  EXPECT_FALSE(first->finished());
+  ASSERT_TRUE(mixer.read(samples, samples.size()));
+  EXPECT_TRUE(first->finished());
+  ASSERT_TRUE(world->update(1.0f / 60.0f));
+  EXPECT_FALSE(take_alt_voice()) << "The finished alternate track must not restart";
+
+  ASSERT_TRUE(player->receiveMessage(server_connection_id, "playAltMusic", play_args));
+  ASSERT_TRUE(world->update(1.0f / 60.0f));
+  auto second = take_alt_voice();
+  ASSERT_TRUE(second);
+  ASSERT_TRUE(mixer.play(second));
+  second->set_volume(1.0f);
+  auto destination = InstanceWorldId("outpost");
+  ASSERT_TRUE((*universe)->warpPlayer(destination));
+  ASSERT_EQ((*universe)->currentPlayerWorld(), WorldId(destination));
+  ASSERT_EQ(world, (*universe)->worldClient());
+  ASSERT_TRUE(mixer.read(samples, samples.size()));
+  EXPECT_TRUE(second->finished()) << "World reset must cancel the active voice";
+  ASSERT_TRUE(world->update(1.0f / 60.0f));
+  EXPECT_FALSE(take_alt_voice()) << "The new world must not inherit the old playlist";
 });
 
 const GameTestRegistration signed_broadcast_lifecycle("RootTest", "SignedBroadcastPublicationAndKeyReplacement", [](GameTest& fixture) {

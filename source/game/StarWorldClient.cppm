@@ -338,7 +338,7 @@ public:
   Vec2F renderPosition(EntityId entityId, PresentationContext presentation) const;
   void resetPresentation();
   List<std::shared_ptr<AudioInstance>> pullPendingAudio();
-  List<std::shared_ptr<AudioInstance>> pullPendingMusic();
+  List<std::shared_ptr<AudioInstance>> pull_pending_music();
 
   [[nodiscard]] std::expected<bool, StarException> playerCanReachEntity(EntityId entityId, bool preferInteractive = true) const;
 
@@ -451,15 +451,11 @@ private:
 
   [[nodiscard]] std::expected<void, StarException> sparkDamagedBlocks();
 
-  Vec2I environmentBiomeTrackPosition() const;
+  Vec2I environment_biome_track_position() const;
   [[nodiscard]] std::expected<std::optional<String>, StarException> currentWeatherDomain() const;
-  [[nodiscard]] std::expected<std::shared_ptr<AmbientNoisesDescription>, StarException> currentAmbientNoises() const;
-  [[nodiscard]] std::expected<std::shared_ptr<WeatherNoisesDescription>, StarException> currentWeatherNoises() const;
-  [[nodiscard]] std::expected<std::shared_ptr<AmbientNoisesDescription>, StarException> currentMusicTrack() const;
-  std::shared_ptr<AmbientNoisesDescription> currentAltMusicTrack() const;
 
-  void playAltMusic(StringList const& newTracks, float fadeTime, int loops = -1);
-  void stopAltMusic(float fadeTime);
+  void play_alt_music(StringList tracks, float fade_time, int loops);
+  void stop_alt_music(float fade_time);
 
   [[nodiscard]] std::expected<std::shared_ptr<Biome const>, StarException> mainEnvironmentBiome() const;
 
@@ -584,20 +580,19 @@ private:
 
   HashSet<Vec2I> m_damagedBlocks;
 
-  AmbientManager m_ambientSounds;
-  AmbientManager m_musicTrack;
-  AmbientManager m_altMusicTrack;
+  AmbientManager m_ambient_sounds;
+  AmbientManager m_music_track;
+  AmbientManager m_alt_music_track;
 
   List<std::pair<float, WorldAction>> m_timers;
 
   Map<DamageNumberKey, DamageNumber> m_damageNumbers;
   std::chrono::duration<float> m_damageNotificationBatchDuration;
 
-  std::shared_ptr<AudioInstance> m_spaceSound;
-  String m_activeSpaceSound;
+  std::shared_ptr<AudioInstance> m_space_sound;
+  String m_active_space_sound;
 
-  std::shared_ptr<AmbientNoisesDescription> m_altMusicTrackDescription;
-  bool m_altMusicActive = false;
+  std::shared_ptr<AmbientNoisesDescription const> m_alt_music_description;
 
   int m_modifiedTilePredictionTimeout;
   HashMap<Vec2I, PredictedTile> m_predictedTiles;

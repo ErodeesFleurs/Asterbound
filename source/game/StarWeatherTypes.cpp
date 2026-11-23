@@ -108,11 +108,11 @@ std::expected<WeatherType, StarException> WeatherType::create(Root& root, Json c
   auto duration = json_to_vec2f(*durationConfig);
   if (!duration) return std::unexpected(std::move(duration.error()));
   result.duration = *duration;
-  auto noisesConfig = config.get("weatherNoises", JsonArray());
-  if (!noisesConfig) return std::unexpected(std::move(noisesConfig.error()));
-  auto noises = json_to_string_list(*noisesConfig);
+  auto noises_config = config.get("weatherNoises", JsonArray());
+  if (!noises_config) return std::unexpected(std::move(noises_config.error()));
+  auto noises = json_to_string_list(*noises_config);
   if (!noises) return std::unexpected(std::move(noises.error()));
-  result.weatherNoises = std::move(*noises);
+  result.weather_noises = std::move(*noises);
   auto effectsConfig = config.get("statusEffects", JsonArray());
   if (!effectsConfig) return std::unexpected(std::move(effectsConfig.error()));
   auto effects = json_to_string_list(*effectsConfig);
@@ -146,7 +146,7 @@ std::expected<Json, StarException> WeatherType::toJson() const {
                                            {"spawnHorizontalPad", pc.spawnHorizontalPad},
                                            {"windAffectAmount", pc.windAffectAmount}});
   return JsonObject{{"name", name}, {"particles", std::move(particleConfigs)}, {"projectiles", std::move(projectileConfigs)},
-      {"maximumWind", maximumWind}, {"duration", json_from_vec2f(duration)}, {"weatherNoises", json_from_string_list(weatherNoises)},
+      {"maximumWind", maximumWind}, {"duration", json_from_vec2f(duration)}, {"weatherNoises", json_from_string_list(weather_noises)},
       {"statusEffects", json_from_string_list(statusEffects)}, {"parallax", parallax ? Json(*parallax) : Json()}};
 }
 
@@ -172,7 +172,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
                         return {};
                       });
   if (!projectiles) return std::unexpected(std::move(projectiles.error()));
-  auto result = ds >> weatherType.maximumWind >> weatherType.duration >> weatherType.weatherNoises >> weatherType.statusEffects;
+  auto result = ds >> weatherType.maximumWind >> weatherType.duration >> weatherType.weather_noises >> weatherType.statusEffects;
   if (!result) return std::unexpected(std::move(result.error()));
   return std::ref(ds);
 }
@@ -199,7 +199,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
       return {};
     });
   if (!projectiles) return std::unexpected(std::move(projectiles.error()));
-  auto result = ds << weatherType.maximumWind << weatherType.duration << weatherType.weatherNoises << weatherType.statusEffects;
+  auto result = ds << weatherType.maximumWind << weatherType.duration << weatherType.weather_noises << weatherType.statusEffects;
   if (!result) return std::unexpected(std::move(result.error()));
   return std::ref(ds);
 }

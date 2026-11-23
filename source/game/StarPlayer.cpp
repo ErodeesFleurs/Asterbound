@@ -1167,6 +1167,7 @@ std::expected<void, StarException> Player::uninit() {
   m_controlMovementState.reset();
   m_movementAnimationState.reset();
   m_movementController->set_network_moving_direction({});
+  m_pending_alt_music.reset();
   remember(Entity::uninit());
   if (error)
     return std::unexpected(std::move(*error));
@@ -1781,45 +1782,37 @@ MessageResponseResult Player::receiveMessage(ConnectionId fromConnection, String
     if (auto result = setPendingCinematic(args[0], unique); !result)
       return std::unexpected(std::move(result.error()));
   } else if (message == "playAltMusic" && !args.empty()) {
-    float fadeTime = 0;
+    AltMusicRequest request;
     if (args.size() > 1) {
-      auto valueResult = args[1].to_float();
-      if (!valueResult)
-        return std::unexpected(std::move(valueResult.error()));
-      auto value = std::move(*valueResult);
-      fadeTime = value;
+      auto fade_time = args[1].to_float();
+      if (!fade_time)
+        return std::unexpected(std::move(fade_time.error()));
+      request.fade_time = *fade_time;
     }
-    int loops = -1;
     if (args.size() > 2) {
-      auto valueResult = args[2].to_int();
-      if (!valueResult)
-        return std::unexpected(std::move(valueResult.error()));
-      auto value = std::move(*valueResult);
-      loops = value;
+      auto loops = args[2].to_int();
+      if (!loops)
+        return std::unexpected(std::move(loops.error()));
+      request.loops = *loops;
     }
-    StringList tracks;
     if (args[0].can_convert(Json::Type::Array)) {
-      auto arrayResult = args[0].to_array();
-      if (!arrayResult)
-        return std::unexpected(std::move(arrayResult.error()));
-      auto array = std::move(*arrayResult);
-      auto valuesResult = json_to_string_list(array);
-      if (!valuesResult)
-        return std::unexpected(std::move(valuesResult.error()));
-      auto values = std::move(*valuesResult);
-      tracks = std::move(values);
+      auto tracks = json_to_string_list(args[0]);
+      if (!tracks)
+        return std::unexpected(std::move(tracks.error()));
+      request.tracks = std::move(*tracks);
+    } else {
+      request.tracks.emplace();
     }
-    m_pendingAltMusic = std::pair<std::optional<std::pair<StringList, int>>, float>(std::make_pair(std::move(tracks), loops), fadeTime);
+    m_pending_alt_music = std::move(request);
   } else if (message == "stopAltMusic") {
-    float fadeTime = 0;
+    AltMusicRequest request;
     if (!args.empty()) {
-      auto valueResult = args[0].to_float();
-      if (!valueResult)
-        return std::unexpected(std::move(valueResult.error()));
-      auto value = std::move(*valueResult);
-      fadeTime = value;
+      auto fade_time = args[0].to_float();
+      if (!fade_time)
+        return std::unexpected(std::move(fade_time.error()));
+      request.fade_time = *fade_time;
     }
-    m_pendingAltMusic = std::pair<std::optional<std::pair<StringList, int>>, float>({}, fadeTime);
+    m_pending_alt_music = std::move(request);
   } else if (message == "recordEvent") {
     auto eventJsonResult = args.at(0);
     if (!eventJsonResult)
@@ -4983,8 +4976,8 @@ std::expected<void, StarException> Player::setInCinematic(bool inCinematic) {
   return {};
 }
 
-std::optional<std::pair<std::optional<std::pair<StringList, int>>, float>> Player::pullPendingAltMusic() {
-  return std::exchange(m_pendingAltMusic, {});
+std::optional<Player::AltMusicRequest> Player::pull_pending_alt_music() {
+  return std::exchange(m_pending_alt_music, {});
 }
 
 std::optional<PlayerWarpRequest> Player::pullPendingWarp() { return std::exchange(m_pendingWarp, {}); }

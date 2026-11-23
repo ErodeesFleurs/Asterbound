@@ -8,6 +8,9 @@ import star.file;
 import star.format;
 import star.json;
 import star.ai_types;
+import star.ambient;
+import star.world_template;
+import star.sky_parameters;
 import star.list;
 import star.logging;
 import star.lua;
@@ -813,6 +816,48 @@ int main(int argc, char** argv) {
     return 1;
   }
   BenchmarkSession session{**root};
+  benchmark::RegisterBenchmark("Game/Ambient/StablePlayback16", [&](benchmark::State& state) {
+    AmbientManager manager(session.root);
+    auto description = std::make_shared<AmbientNoisesDescription>();
+    for (int i = 0; i < 16; ++i)
+      description->day_sounds.tracks.push_back("/sfx/interface/voice_on.ogg");
+    auto assets = session.root.assets();
+    if (!assets) return session.fail(state, assets.error());
+    auto loaded = (*assets)->audio("/sfx/interface/voice_on.ogg");
+    if (!loaded) return session.fail(state, loaded.error());
+    auto initial = manager.update_ambient(description, true);
+    if (!initial || !*initial) return session.fail(state, "Ambient fixture did not start");
+    for (auto _ : state) {
+      auto next = manager.update_ambient(description, true);
+      if (!next || *next) return session.fail(state, "Stable ambient unexpectedly changed");
+      benchmark::DoNotOptimize(next);
+    }
+  });
+  benchmark::RegisterBenchmark("Game/Ambient/NoWeather", [&](benchmark::State& state) {
+    AmbientManager manager(session.root);
+    for (auto _ : state) {
+      auto next = manager.update_weather({});
+      if (!next || *next) return session.fail(state, "Unexpected weather track");
+      benchmark::DoNotOptimize(next);
+    }
+  });
+  benchmark::RegisterBenchmark("Game/Ambient/FloatingOverrides", [&](benchmark::State& state) {
+    auto parameters = std::make_shared<FloatingDungeonWorldParameters>();
+    parameters->worldSize = {256, 256};
+    parameters->day_ambient_noises = "/sfx/interface/voice_on.ogg";
+    parameters->night_music_track = "/music/arctic-constellation1.ogg";
+    auto world = WorldTemplate::create(session.root, parameters->worldSize);
+    if (!world) return session.fail(state, world.error());
+    auto configured = (*world)->setWorldParameters(parameters);
+    if (!configured) return session.fail(state, configured.error());
+    for (auto _ : state) {
+      auto ambient = (*world)->ambient_noises(128, 128);
+      auto music = (*world)->music_track(128, 128);
+      if (!ambient || !*ambient || !music || !*music) return session.fail(state, "Missing floating override");
+      benchmark::DoNotOptimize(ambient);
+      benchmark::DoNotOptimize(music);
+    }
+  });
   benchmark::RegisterBenchmark("Game/AiState/ReadMissionLists", [](benchmark::State& state) {
     JsonArray missions;
     for (unsigned i = 0; i < 64; ++i)

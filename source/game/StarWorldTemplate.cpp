@@ -102,7 +102,7 @@ std::expected<std::shared_ptr<WorldTemplate>, StarException> WorldTemplate::crea
   if (!*parameters)
     return std::unexpected(StarException("Celestial parameters for constructing WorldTemplate not found!"));
   result->m_celestialParameters = std::move(*parameters);
-  result->m_worldParameters = result->m_celestialParameters->visitableParameters();
+  result->install_world_parameters(result->m_celestialParameters->visitableParameters());
   if (!result->m_worldParameters)
     return std::unexpected(StarException("Cannot create WorldTemplate from non-visitable world"));
   auto sky = SkyParameters::create(root, celestialCoordinate, celestialDatabase);
@@ -136,7 +136,7 @@ std::expected<std::shared_ptr<WorldTemplate>, StarException> WorldTemplate::crea
   if (!initialized) return std::unexpected(std::move(initialized.error()));
   if (!worldParameters)
     return std::unexpected(StarException("Cannot create WorldTemplate from non-visitable world"));
-  result->m_worldParameters = worldParameters;
+  result->install_world_parameters(worldParameters);
   result->m_skyParameters = skyParameters;
   result->m_seed = seed;
   result->m_geometry = WorldGeometry(worldParameters->worldSize);
@@ -175,7 +175,7 @@ std::expected<std::shared_ptr<WorldTemplate>, StarException> WorldTemplate::crea
   if (!parametersJson) return std::unexpected(std::move(parametersJson.error()));
   auto parameters = diskLoadVisitableWorldParameters(*parametersJson);
   if (!parameters) return std::unexpected(std::move(parameters.error()));
-  result->m_worldParameters = std::move(*parameters);
+  result->install_world_parameters(std::move(*parameters));
   auto skyJson = store.get("skyParameters");
   if (!skyJson) return std::unexpected(std::move(skyJson.error()));
   auto sky = SkyParameters::create(*skyJson);
@@ -261,8 +261,32 @@ std::shared_ptr<WorldLayout> WorldTemplate::worldLayout() const {
   return m_layout;
 }
 
+void WorldTemplate::install_world_parameters(std::shared_ptr<VisitableWorldParameters const> parameters) {
+  m_worldParameters = std::move(parameters);
+  auto floating = as<FloatingDungeonWorldParameters>(m_worldParameters);
+  if (!floating) {
+    m_ambient_override.reset();
+    m_music_override.reset();
+    return;
+  }
+
+  auto make_override = [](std::optional<String> const& day, std::optional<String> const& night)
+      -> std::shared_ptr<AmbientNoisesDescription const> {
+    if (!day && !night)
+      return {};
+    auto description = std::make_shared<AmbientNoisesDescription>();
+    if (day)
+      description->day_sounds.tracks.push_back(*day);
+    if (night)
+      description->night_sounds.tracks.push_back(*night);
+    return description;
+  };
+  m_ambient_override = make_override(floating->day_ambient_noises, floating->night_ambient_noises);
+  m_music_override = make_override(floating->day_music_track, floating->night_music_track);
+}
+
 std::expected<void, StarException> WorldTemplate::setWorldParameters(std::shared_ptr<VisitableWorldParameters> newParameters) {
-  m_worldParameters = std::exchange(newParameters, {});
+  install_world_parameters(std::move(newParameters));
   return setupWeatherDomains();
 }
 
@@ -638,39 +662,21 @@ std::expected<std::optional<std::reference_wrapper<WorldTemplate::WeatherLayer c
   return std::nullopt;
 }
 
-std::expected<std::shared_ptr<AmbientNoisesDescription>, StarException> WorldTemplate::ambientNoises(int x, int y) const {
-  if (auto floatingDungeonParameters = as<FloatingDungeonWorldParameters>(m_worldParameters)) {
-    if (floatingDungeonParameters->dayAmbientNoises || floatingDungeonParameters->nightAmbientNoises) {
-      auto dayTracks = floatingDungeonParameters->dayAmbientNoises
-          ? AmbientTrackGroup(StringList{*floatingDungeonParameters->dayAmbientNoises})
-          : AmbientTrackGroup();
-      auto nightTracks = floatingDungeonParameters->nightAmbientNoises
-          ? AmbientTrackGroup(StringList{*floatingDungeonParameters->nightAmbientNoises})
-          : AmbientTrackGroup();
-      return std::make_shared<AmbientNoisesDescription>(dayTracks, nightTracks);
-    }
-  }
+std::expected<std::shared_ptr<AmbientNoisesDescription const>, StarException> WorldTemplate::ambient_noises(int x, int y) const {
+  if (m_ambient_override)
+    return m_ambient_override;
   auto biome = environmentBiome(x, y);
   if (!biome) return std::unexpected(std::move(biome.error()));
-  if (*biome) return (*biome)->ambientNoises;
+  if (*biome) return (*biome)->ambient_noises;
   return {};
 }
 
-std::expected<std::shared_ptr<AmbientNoisesDescription>, StarException> WorldTemplate::musicTrack(int x, int y) const {
-  if (auto floatingDungeonParameters = as<FloatingDungeonWorldParameters>(m_worldParameters)) {
-    if (floatingDungeonParameters->dayMusicTrack || floatingDungeonParameters->nightMusicTrack) {
-      auto dayTracks = floatingDungeonParameters->dayMusicTrack
-          ? AmbientTrackGroup(StringList{*floatingDungeonParameters->dayMusicTrack})
-          : AmbientTrackGroup();
-      auto nightTracks = floatingDungeonParameters->nightMusicTrack
-          ? AmbientTrackGroup(StringList{*floatingDungeonParameters->nightMusicTrack})
-          : AmbientTrackGroup();
-      return std::make_shared<AmbientNoisesDescription>(dayTracks, nightTracks);
-    }
-  }
+std::expected<std::shared_ptr<AmbientNoisesDescription const>, StarException> WorldTemplate::music_track(int x, int y) const {
+  if (m_music_override)
+    return m_music_override;
   auto biome = environmentBiome(x, y);
   if (!biome) return std::unexpected(std::move(biome.error()));
-  if (*biome) return (*biome)->musicTrack;
+  if (*biome) return (*biome)->music_track;
   return {};
 }
 

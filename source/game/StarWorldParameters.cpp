@@ -992,18 +992,18 @@ std::expected<std::shared_ptr<FloatingDungeonWorldParameters>, StarException> Fl
   auto ambientLightLevelValue2 = json_to_color((*ambientLightLevelValue1));
   if (!ambientLightLevelValue2) return std::unexpected(std::move(ambientLightLevelValue2.error()));
   result->ambientLightLevel = (*ambientLightLevelValue2);
-  auto dayMusicTrackValue1 = store.opt_string("dayMusicTrack");
-  if (!dayMusicTrackValue1) return std::unexpected(std::move(dayMusicTrackValue1.error()));
-  result->dayMusicTrack = (*dayMusicTrackValue1);
-  auto nightMusicTrackValue1 = store.opt_string("nightMusicTrack");
-  if (!nightMusicTrackValue1) return std::unexpected(std::move(nightMusicTrackValue1.error()));
-  result->nightMusicTrack = (*nightMusicTrackValue1);
-  auto dayAmbientNoisesValue1 = store.opt_string("dayAmbientNoises");
-  if (!dayAmbientNoisesValue1) return std::unexpected(std::move(dayAmbientNoisesValue1.error()));
-  result->dayAmbientNoises = (*dayAmbientNoisesValue1);
-  auto nightAmbientNoisesValue1 = store.opt_string("nightAmbientNoises");
-  if (!nightAmbientNoisesValue1) return std::unexpected(std::move(nightAmbientNoisesValue1.error()));
-  result->nightAmbientNoises = (*nightAmbientNoisesValue1);
+  auto day_music = store.opt_string("dayMusicTrack");
+  if (!day_music) return std::unexpected(std::move(day_music.error()));
+  result->day_music_track = std::move(*day_music);
+  auto night_music = store.opt_string("nightMusicTrack");
+  if (!night_music) return std::unexpected(std::move(night_music.error()));
+  result->night_music_track = std::move(*night_music);
+  auto day_ambient = store.opt_string("dayAmbientNoises");
+  if (!day_ambient) return std::unexpected(std::move(day_ambient.error()));
+  result->day_ambient_noises = std::move(*day_ambient);
+  auto night_ambient = store.opt_string("nightAmbientNoises");
+  if (!night_ambient) return std::unexpected(std::move(night_ambient.error()));
+  result->night_ambient_noises = std::move(*night_ambient);
   return result;
 }
 
@@ -1020,10 +1020,10 @@ std::expected<Json, StarException> FloatingDungeonWorldParameters::store() const
                                   {"primaryDungeon", primaryDungeon},
                                   {"biome", json_from_optional(biome)},
                                   {"ambientLightLevel", json_from_color(ambientLightLevel)},
-                                  {"dayMusicTrack", json_from_optional(dayMusicTrack)},
-                                  {"nightMusicTrack", json_from_optional(nightMusicTrack)},
-                                  {"dayAmbientNoises", json_from_optional(dayAmbientNoises)},
-                                  {"nightAmbientNoises", json_from_optional(nightAmbientNoises)}});
+                                  {"dayMusicTrack", json_from_optional(day_music_track)},
+                                  {"nightMusicTrack", json_from_optional(night_music_track)},
+                                  {"dayAmbientNoises", json_from_optional(day_ambient_noises)},
+                                  {"nightAmbientNoises", json_from_optional(night_ambient_noises)}});
 }
 
 std::expected<void, StarException> FloatingDungeonWorldParameters::read(DataStream& ds) {
@@ -1059,19 +1059,19 @@ std::expected<void, StarException> FloatingDungeonWorldParameters::read(DataStre
     if (!result) return std::unexpected(std::move(result.error()));
   }
   {
-    auto result = ds >> dayMusicTrack;
+    auto result = ds >> day_music_track;
     if (!result) return std::unexpected(std::move(result.error()));
   }
   {
-    auto result = ds >> nightMusicTrack;
+    auto result = ds >> night_music_track;
     if (!result) return std::unexpected(std::move(result.error()));
   }
   {
-    auto result = ds >> dayAmbientNoises;
+    auto result = ds >> day_ambient_noises;
     if (!result) return std::unexpected(std::move(result.error()));
   }
   {
-    auto result = ds >> nightAmbientNoises;
+    auto result = ds >> night_ambient_noises;
     if (!result) return std::unexpected(std::move(result.error()));
   }
   return {};
@@ -1110,19 +1110,19 @@ std::expected<void, StarException> FloatingDungeonWorldParameters::write(DataStr
     if (!result) return std::unexpected(std::move(result.error()));
   }
   {
-    auto result = ds << dayMusicTrack;
+    auto result = ds << day_music_track;
     if (!result) return std::unexpected(std::move(result.error()));
   }
   {
-    auto result = ds << nightMusicTrack;
+    auto result = ds << night_music_track;
     if (!result) return std::unexpected(std::move(result.error()));
   }
   {
-    auto result = ds << dayAmbientNoises;
+    auto result = ds << day_ambient_noises;
     if (!result) return std::unexpected(std::move(result.error()));
   }
   {
-    auto result = ds << nightAmbientNoises;
+    auto result = ds << night_ambient_noises;
     if (!result) return std::unexpected(std::move(result.error()));
   }
   return {};
@@ -1852,42 +1852,29 @@ std::expected<std::shared_ptr<FloatingDungeonWorldParameters>, StarException> ge
   auto parametersambientLightLevelResult2 = json_to_color((*parametersambientLightLevelResult1));
   if (!parametersambientLightLevelResult2) return std::unexpected(std::move(parametersambientLightLevelResult2.error()));
   parameters->ambientLightLevel = std::move((*parametersambientLightLevelResult2));
-  auto autohasmusicTrackResult1 = worldConfig.contains("musicTrack");
-  if (!autohasmusicTrackResult1) return std::unexpected(std::move(autohasmusicTrackResult1.error()));
-  auto hasmusicTrack = std::move((*autohasmusicTrackResult1));
-  if (hasmusicTrack) {
-    auto parametersdayMusicTrackResult1 = worldConfig.opt_string("musicTrack");
-    if (!parametersdayMusicTrackResult1) return std::unexpected(std::move(parametersdayMusicTrackResult1.error()));
-    parameters->dayMusicTrack = std::move((*parametersdayMusicTrackResult1));
-    auto parametersnightMusicTrackResult1 = worldConfig.opt_string("musicTrack");
-    if (!parametersnightMusicTrackResult1) return std::unexpected(std::move(parametersnightMusicTrackResult1.error()));
-    parameters->nightMusicTrack = std::move((*parametersnightMusicTrackResult1));
-  } else {
-    auto parametersdayMusicTrackResult1 = worldConfig.opt_string("dayMusicTrack");
-    if (!parametersdayMusicTrackResult1) return std::unexpected(std::move(parametersdayMusicTrackResult1.error()));
-    parameters->dayMusicTrack = std::move((*parametersdayMusicTrackResult1));
-    auto parametersnightMusicTrackResult1 = worldConfig.opt_string("nightMusicTrack");
-    if (!parametersnightMusicTrackResult1) return std::unexpected(std::move(parametersnightMusicTrackResult1.error()));
-    parameters->nightMusicTrack = std::move((*parametersnightMusicTrackResult1));
-  }
-  auto autohasambientNoisesResult1 = worldConfig.contains("ambientNoises");
-  if (!autohasambientNoisesResult1) return std::unexpected(std::move(autohasambientNoisesResult1.error()));
-  auto hasambientNoises = std::move((*autohasambientNoisesResult1));
-  if (hasambientNoises) {
-    auto parametersdayAmbientNoisesResult1 = worldConfig.opt_string("ambientNoises");
-    if (!parametersdayAmbientNoisesResult1) return std::unexpected(std::move(parametersdayAmbientNoisesResult1.error()));
-    parameters->dayAmbientNoises = std::move((*parametersdayAmbientNoisesResult1));
-    auto parametersnightAmbientNoisesResult1 = worldConfig.opt_string("ambientNoises");
-    if (!parametersnightAmbientNoisesResult1) return std::unexpected(std::move(parametersnightAmbientNoisesResult1.error()));
-    parameters->nightAmbientNoises = std::move((*parametersnightAmbientNoisesResult1));
-  } else {
-    auto parametersdayAmbientNoisesResult1 = worldConfig.opt_string("dayAmbientNoises");
-    if (!parametersdayAmbientNoisesResult1) return std::unexpected(std::move(parametersdayAmbientNoisesResult1.error()));
-    parameters->dayAmbientNoises = std::move((*parametersdayAmbientNoisesResult1));
-    auto parametersnightAmbientNoisesResult1 = worldConfig.opt_string("nightAmbientNoises");
-    if (!parametersnightAmbientNoisesResult1) return std::unexpected(std::move(parametersnightAmbientNoisesResult1.error()));
-    parameters->nightAmbientNoises = std::move((*parametersnightAmbientNoisesResult1));
-  }
+  auto read_tracks = [&config = worldConfig](String const& all_key, String const& day_key, String const& night_key,
+      std::optional<String>& day, std::optional<String>& night) -> std::expected<void, StarException> {
+    auto has_shared = config.contains(all_key);
+    if (!has_shared) return std::unexpected(std::move(has_shared.error()));
+    if (*has_shared) {
+      auto shared = config.opt_string(all_key);
+      if (!shared) return std::unexpected(std::move(shared.error()));
+      day = *shared;
+      night = std::move(*shared);
+    } else {
+      auto day_track = config.opt_string(day_key);
+      if (!day_track) return std::unexpected(std::move(day_track.error()));
+      day = std::move(*day_track);
+      auto night_track = config.opt_string(night_key);
+      if (!night_track) return std::unexpected(std::move(night_track.error()));
+      night = std::move(*night_track);
+    }
+    return {};
+  };
+  auto music = read_tracks("musicTrack", "dayMusicTrack", "nightMusicTrack", parameters->day_music_track, parameters->night_music_track);
+  if (!music) return std::unexpected(std::move(music.error()));
+  auto ambient = read_tracks("ambientNoises", "dayAmbientNoises", "nightAmbientNoises", parameters->day_ambient_noises, parameters->night_ambient_noises);
+  if (!ambient) return std::unexpected(std::move(ambient.error()));
 
   return parameters;
 }

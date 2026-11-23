@@ -12,62 +12,60 @@ class AudioInstance;
 class Root;
 
 struct AmbientTrackGroup {
-  AmbientTrackGroup();
+  AmbientTrackGroup() = default;
   AmbientTrackGroup(StringList tracks);
   [[nodiscard]] static std::expected<AmbientTrackGroup, StarException> create(Json const& config, String const& directory = "");
 
-  Json toJson() const;
+  Json to_json() const;
 
   StringList tracks;
 };
 
 // represents the ambient sounds data for a biome
 struct AmbientNoisesDescription {
-  AmbientNoisesDescription();
+  AmbientNoisesDescription() = default;
   AmbientNoisesDescription(AmbientTrackGroup day, AmbientTrackGroup night, int loops = -1);
   [[nodiscard]] static std::expected<AmbientNoisesDescription, StarException> create(Json const& config, String const& directory = "");
 
-  Json toJson() const;
+  Json to_json() const;
 
-  AmbientTrackGroup daySounds;
-  AmbientTrackGroup nightSounds;
-  int trackLoops = -1;
+  AmbientTrackGroup day_sounds;
+  AmbientTrackGroup night_sounds;
+  int track_loops = -1;
 };
-
-using WeatherNoisesDescription = AmbientTrackGroup;
 
 // manages the running ambient sounds
 class AmbientManager {
 public:
   explicit AmbientManager(Root& root);
 
-  // Automatically calls cancelAll();
   ~AmbientManager();
 
-  void setTrackSwitchGrace(float grace);
-  void setTrackFadeInTime(float fadeInTime);
+  void set_track_switch_grace(float grace);
+  void set_track_fade_in_time(float fade_in_time);
 
   // Returns a new AudioInstance if a new ambient sound is to be started.
-  [[nodiscard]] std::expected<std::shared_ptr<AudioInstance>, StarException> updateAmbient(std::shared_ptr<AmbientNoisesDescription> current, bool dayTime = false);
-  [[nodiscard]] std::expected<std::shared_ptr<AudioInstance>, StarException> updateWeather(std::shared_ptr<WeatherNoisesDescription> current);
-  void cancelAll();
+  [[nodiscard]] std::expected<std::shared_ptr<AudioInstance>, StarException> update_ambient(std::shared_ptr<AmbientNoisesDescription const> const& current, bool day_time = false);
+  [[nodiscard]] std::expected<std::shared_ptr<AudioInstance>, StarException> update_weather(std::span<String const> tracks);
+  void stop_ambient(float fade_time);
+  void cancel_all();
 
-  void setVolume(float volume, float delay, float duration);
+  void set_volume(float volume, float delay, float duration);
 
 private:
   Root& m_root;
-  std::shared_ptr<AudioInstance> m_currentTrack;
-  std::shared_ptr<AudioInstance> m_weatherTrack;
-  String m_currentTrackName;
-  String m_weatherTrackName;
-  float m_trackFadeInTime = 0.0f;
-  std::chrono::duration<float> m_trackSwitchGrace{};
-  std::chrono::time_point<std::chrono::steady_clock, std::chrono::duration<double>> m_trackGraceTimestamp{};
-  Deque<String> m_recentTracks;
+  std::shared_ptr<AudioInstance> m_current_track;
+  std::shared_ptr<AudioInstance> m_weather_track;
+  String m_current_track_name;
+  String m_weather_track_name;
+  float m_track_fade_in_time = 0.0f;
+  std::chrono::duration<float> m_track_switch_grace{};
+  std::chrono::steady_clock::time_point m_track_grace_timestamp{};
+  Deque<String> m_recent_tracks;
   float m_volume = 1.0f;
   float m_delay = 0.0f;
   float m_duration = 0.0f;
-  bool m_volumeChanged = false;
+  bool m_volume_changed = false;
 };
 
 }
@@ -79,5 +77,4 @@ export namespace Star {
   using ::Star::AmbientTrackGroup;
   using ::Star::AmbientNoisesDescription;
   using ::Star::AmbientManager;
-  using ::Star::WeatherNoisesDescription;
 }

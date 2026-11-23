@@ -564,7 +564,12 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> setInCinematic(bool inCinematic);
 
-  std::optional<std::pair<std::optional<std::pair<StringList, int>>, float>> pullPendingAltMusic();
+  struct AltMusicRequest {
+    std::optional<StringList> tracks; // A disengaged list requests a stop.
+    float fade_time = 0;
+    int loops = -1;
+  };
+  std::optional<AltMusicRequest> pull_pending_alt_music();
 
   std::optional<PlayerWarpRequest> pullPendingWarp();
   void setPendingWarp(String const& action, std::optional<String> const& animation = {}, bool deploy = false);
@@ -757,7 +762,7 @@ private:
   List<std::pair<GameTimer, RadioMessage>> m_delayedRadioMessages;
   Deque<RadioMessage> m_pendingRadioMessages;
   std::optional<Json> m_pendingCinematic;
-  std::optional<std::pair<std::optional<std::pair<StringList, int>>, float>> m_pendingAltMusic;
+  std::optional<AltMusicRequest> m_pending_alt_music;
   std::optional<PlayerWarpRequest> m_pendingWarp;
   Deque<std::pair<Json, RpcPromiseKeeper<Json>>> m_pendingConfirmations;
 

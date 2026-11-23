@@ -409,19 +409,19 @@ std::expected<std::shared_ptr<Biome>, StarException> BiomeDatabase::createBiome(
         biome->parallax = std::move(*value);
       }
     }
-    auto musicTrackConfig = parameters.opt_object("musicTrack");
-    if (!musicTrackConfig) return std::unexpected(std::move(musicTrackConfig.error()));
-    if (*musicTrackConfig) {
-      auto description = AmbientNoisesDescription::create(**musicTrackConfig, config->get().path);
+    auto music_track_config = parameters.opt_object("musicTrack");
+    if (!music_track_config) return std::unexpected(std::move(music_track_config.error()));
+    if (*music_track_config) {
+      auto description = AmbientNoisesDescription::create(**music_track_config, config->get().path);
       if (!description) return std::unexpected(std::move(description.error()));
-      biome->musicTrack = std::make_shared<AmbientNoisesDescription>(std::move(*description));
+      biome->music_track = std::make_shared<AmbientNoisesDescription const>(std::move(*description));
     }
-    auto ambientNoisesConfig = parameters.opt_object("ambientNoises");
-    if (!ambientNoisesConfig) return std::unexpected(std::move(ambientNoisesConfig.error()));
-    if (*ambientNoisesConfig) {
-      auto description = AmbientNoisesDescription::create(**ambientNoisesConfig, config->get().path);
+    auto ambient_noises_config = parameters.opt_object("ambientNoises");
+    if (!ambient_noises_config) return std::unexpected(std::move(ambient_noises_config.error()));
+    if (*ambient_noises_config) {
+      auto description = AmbientNoisesDescription::create(**ambient_noises_config, config->get().path);
       if (!description) return std::unexpected(std::move(description.error()));
-      biome->ambientNoises = std::make_shared<AmbientNoisesDescription>(std::move(*description));
+      biome->ambient_noises = std::make_shared<AmbientNoisesDescription const>(std::move(*description));
     }
     auto spawnConfig = parameters.opt_object("spawnProfile");
     if (!spawnConfig) return std::unexpected(std::move(spawnConfig.error()));
