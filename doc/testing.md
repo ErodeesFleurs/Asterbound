@@ -358,6 +358,9 @@ Destruction restores the previous dispositions but does not start a new
 registration generation: a late native callback must never interrupt a new
 owner. `interrupted()` is sticky and is false on a moved-from handle.
 
+Darwin's `<signal.h>` defines `sigemptyset`, `sigaddset` and `sigismember`
+as expression macros. Call them without a leading `::` in portable code and tests.
+
 Exercise signal disposition changes in a child process, not the test runner.
 Distinguish graceful interrupt handling (sticky observation, normal shutdown)
 from fatal diagnostics (bounded child lifetime and platform-specific exit

@@ -22,10 +22,10 @@ void previous_handler(int signal_number) noexcept {
 
 bool unblock_signals() {
   sigset_t mask;
-  if (::sigemptyset(&mask) != 0)
+  if (sigemptyset(&mask) != 0)
     return false;
   for (int signal_number : handled_signals)
-    if (::sigaddset(&mask, signal_number) != 0)
+    if (sigaddset(&mask, signal_number) != 0)
       return false;
   return ::pthread_sigmask(SIG_UNBLOCK, &mask, nullptr) == 0;
 }
@@ -34,7 +34,7 @@ int exercise_owner() {
   struct sigaction original{};
   original.sa_handler = previous_handler;
   original.sa_flags = SA_RESTART;
-  if (!unblock_signals() || ::sigemptyset(&original.sa_mask) != 0 || ::sigaddset(&original.sa_mask, SIGUSR1) != 0)
+  if (!unblock_signals() || sigemptyset(&original.sa_mask) != 0 || sigaddset(&original.sa_mask, SIGUSR1) != 0)
     return 1;
   for (int signal_number : handled_signals)
     if (::sigaction(signal_number, &original, nullptr) != 0)
@@ -62,7 +62,7 @@ int exercise_owner() {
   for (int signal_number : handled_signals) {
     struct sigaction restored{};
     if (::sigaction(signal_number, nullptr, &restored) != 0 || restored.sa_handler != previous_handler
-        || !(restored.sa_flags & SA_RESTART) || ::sigismember(&restored.sa_mask, SIGUSR1) != 1)
+        || !(restored.sa_flags & SA_RESTART) || sigismember(&restored.sa_mask, SIGUSR1) != 1)
       return 7;
     if (::raise(signal_number) != 0 || restored_signal != signal_number)
       return 8;

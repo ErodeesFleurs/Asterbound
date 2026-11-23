@@ -175,7 +175,7 @@ struct SignalHandler::Impl {
 
   [[nodiscard]] std::expected<void, StarException> install() {
     struct sigaction action{};
-    if (::sigemptyset(&action.sa_mask) != 0)
+    if (sigemptyset(&action.sa_mask) != 0)
       return std::unexpected(StarException("Could not initialize signal handler"));
     for (auto& registration : registrations) {
       action.sa_handler = registration.signal_number == SIGINT ? handle_interrupt : handle_fatal;
