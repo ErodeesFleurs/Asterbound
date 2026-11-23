@@ -161,6 +161,7 @@ target_sources (star_game_module_interfaces PUBLIC FILE_SET CXX_MODULES FILES
     StarStatistics.cppm
     StarPlayerCompanions.cppm
     StarPlayerDeployment.cppm
+    StarContextNetState.cppm
     StarClientContext.cppm
     StarServerClientContext.cppm
     StarPlayerFactory.cppm
@@ -346,6 +347,7 @@ add_library (star_game_modules STATIC
     StarStatistics.cpp
     StarPlayerCompanions.cpp
     StarPlayerDeployment.cpp
+    StarContextNetState.cpp
     StarClientContext.cpp
     StarServerClientContext.cpp
     StarPlayerFactory.cpp

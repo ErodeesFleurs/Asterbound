@@ -307,7 +307,7 @@ std::expected<void, StarException> AiInterface::dismissed() {
 }
 
 std::expected<void, StarException> AiInterface::show_status() {
-  auto speech = m_ai_database->ship_status(m_client->clientContext()->shipUpgrades().shipLevel);
+  auto speech = m_ai_database->ship_status(m_client->client_context()->ship_level());
   if (!speech) return std::unexpected(std::move(speech.error()));
   m_current_page = AiPages::StatusPage;
   auto result = set_current_speech("shipStatusText", std::move(*speech));

@@ -473,7 +473,7 @@ struct ClientConnectPacket : PacketBase<PacketType::ClientConnect> {
 
   ClientConnectPacket();
   ClientConnectPacket(ByteArray assetsDigest, bool allowAssetsMismatch, Uuid playerUuid, String playerName,
-      String shipSpecies, WorldChunks shipChunks, ShipUpgrades shipUpgrades, bool introComplete,
+      String shipSpecies, WorldChunks shipChunks, ShipUpgrades ship_upgrades, bool introComplete,
       String account, Json info = {});
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
@@ -485,7 +485,7 @@ struct ClientConnectPacket : PacketBase<PacketType::ClientConnect> {
   String playerName;
   String shipSpecies;
   WorldChunks shipChunks;
-  ShipUpgrades shipUpgrades;
+  ShipUpgrades ship_upgrades;
   bool introComplete;
   String account;
   Json info;
@@ -594,12 +594,12 @@ struct ClientContextUpdatePacket : PacketBase<PacketType::ClientContextUpdate> {
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ClientContextUpdatePacket>(); }
 
   ClientContextUpdatePacket();
-  ClientContextUpdatePacket(ByteArray updateData);
+  ClientContextUpdatePacket(ByteArray update_data);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  ByteArray updateData;
+  ByteArray update_data;
 };
 
 // Sent when a client should initialize themselves on a new world

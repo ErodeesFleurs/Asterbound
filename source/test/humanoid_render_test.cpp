@@ -89,11 +89,11 @@ struct PlayerWorldContext {
     auto uuid = player->uuid();
     if (!uuid)
       return std::unexpected(std::move(uuid.error()));
-    auto connected = ClientContext::create(root, Uuid(root.random()), *uuid);
+    auto connected = ClientContext::create(root.logger(), Uuid(root.random()), *uuid, 1, {});
     if (!connected)
       return std::unexpected(std::move(connected.error()));
     client = std::move(*connected);
-    player->setClientContext(client);
+    player->set_client_context(client);
     if (auto entered = player->init(*world, 100, EntityMode::Master); !entered)
       return std::unexpected(std::move(entered.error()));
     initialized = true;

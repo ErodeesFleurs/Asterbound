@@ -700,7 +700,7 @@ std::expected<void, StarException> MainInterface::synchronizeUiSession() {
   auto world = m_client->worldClient();
   auto team = m_client->teamClient();
   auto luaRoot = m_client->luaRoot();
-  auto worldId = m_client->clientContext() ? m_client->clientContext()->playerWorldId() : WorldId{};
+  auto worldId = m_client->client_context() ? m_client->client_context()->player_world_id() : WorldId{};
   bool inWorld = world && world->inWorld();
   auto generation = luaRoot->generation();
   // /swap disk-loads another character into the existing Player allocation.
@@ -1450,7 +1450,7 @@ std::expected<void, StarException> MainInterface::handleInteractAction(InteractA
         if (auto uniqueEntityId = entity->uniqueId()) {
           auto worldTemplate = world->currentTemplate();
           String icon, planetName;
-          auto playerWorld = m_client->playerWorld();
+          auto playerWorld = m_client->player_world();
           if (std::holds_alternative<ClientShipWorldId>(playerWorld)) {
             icon = "ship";
             planetName = "Player Ship";

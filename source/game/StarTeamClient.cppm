@@ -47,7 +47,7 @@ public:
     std::uint64_t portraitRevision = 0;
   };
 
-  TeamClient(Root& root, std::shared_ptr<Player> mainPlayer, std::shared_ptr<ClientContext> clientContext);
+  TeamClient(Root& root, std::shared_ptr<Player> mainPlayer, std::shared_ptr<ClientContext> client_context);
 
   [[nodiscard]] std::expected<void, StarException> invitePlayer(String const& playerName);
   [[nodiscard]] std::expected<void, StarException> acceptInvitation(Uuid const& inviterUuid);
@@ -90,7 +90,7 @@ private:
 
   Root& m_root;
   std::shared_ptr<Player> m_mainPlayer;
-  std::shared_ptr<ClientContext> m_clientContext;
+  std::shared_ptr<ClientContext> m_client_context;
   std::optional<Uuid> m_teamUuid;
 
   Uuid m_teamLeader;

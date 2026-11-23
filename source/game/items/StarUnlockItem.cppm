@@ -199,9 +199,9 @@ std::expected<void, StarException> UnlockItem::fireTriggered() {
       return std::unexpected(std::move(shouldConsume.error()));
     if (*shouldConsume && !consume(1))
       return {};
-    if (auto clientContext = player->get().clientContext()) {
+    if (auto client_context = player->get().client_context()) {
       if (m_shipUpgrade) {
-        auto applied = player->get().applyShipUpgrades(JsonObject{{"shipLevel", *m_shipUpgrade}});
+        auto applied = player->get().apply_ship_upgrades(JsonObject{{"shipLevel", *m_shipUpgrade}});
         if (!applied)
           return std::unexpected(std::move(applied.error()));
       }

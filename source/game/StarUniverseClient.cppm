@@ -187,12 +187,12 @@ public:
 
   std::shared_ptr<CelestialDatabase> celestial_database() override;
 
-  CelestialCoordinate shipCoordinate() const;
+  CelestialCoordinate ship_coordinate() const;
 
   bool playerOnOwnShip() const;
   [[nodiscard]] std::expected<bool, StarException> playerIsOriginal() const;
 
-  WorldId playerWorld() const;
+  WorldId player_world() const;
   bool isAdmin() const;
   // If the player is in a multi person team returns the team uuid, or if the
   // player is by themselves returns the player uuid.
@@ -225,8 +225,8 @@ public:
   ReloadPlayerCallback& playerReloadCallback();
 
   std::shared_ptr<Clock const> universeClock() const;
-  std::shared_ptr<JsonRpcInterface> rpcInterface() const;
-  std::shared_ptr<ClientContext> clientContext() const;
+  std::shared_ptr<JsonRpcInterface> rpc_interface() const;
+  std::shared_ptr<ClientContext> client_context() const;
   std::shared_ptr<TeamClient> teamClient() const;
   std::shared_ptr<QuestManager> questManager() const;
   std::shared_ptr<PlayerStorage> playerStorage() const;
@@ -263,6 +263,7 @@ private:
   void setPause(bool pause);
 
   [[nodiscard]] std::expected<void, StarException> handlePackets(List<std::shared_ptr<Packet>> const& packets);
+  [[nodiscard]] std::expected<void, StarException> persist_context_updates(ClientContext& client_context);
   [[nodiscard]] std::expected<void, StarException> reset();
   
   Root& m_root;
@@ -283,7 +284,8 @@ private:
   std::optional<ServerInfo> m_serverInfo;
 
   std::shared_ptr<CelestialSlaveDatabase> m_celestial_database;
-  std::shared_ptr<ClientContext> m_clientContext;
+  std::shared_ptr<ClientContext> m_client_context;
+  std::shared_ptr<ClientContext> m_unsaved_context;
   std::shared_ptr<TeamClient> m_teamClient;
 
   std::shared_ptr<QuestManager> m_questManager;

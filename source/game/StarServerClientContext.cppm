@@ -1,241 +1,197 @@
 module;
-import star.format;
-import star.xx_hash;
-import star.json;
-import star.net_compatibility;
+import std;
 import star.byte_array;
-import star.thread;
-import star.data_stream;
-import star.json_rpc;
-import star.rpc_promise;
+import star.celestial_coordinate;
+import star.context_net_state;
+import star.damage_types;
+import star.format;
 import star.game_types;
-import star.string;
-import star.strong_typedef;
-import star.bi_map;
-import star.id_map;
-import star.set;
-import star.btree;
-import star.ordered_map;
-import star.lru_cache;
-import star.data_stream_devices;
-import star.btree_database;
-import star.casting;
-import star.ordered_set;
+import star.host_address;
+import star.json;
+import star.json_rpc;
 import star.list;
 import star.map;
-import star.random;
-import star.perlin;
-import star.weighted_pool;
-import std;
-import star.worker_pool;
-
-import star.sector_array_2d;
-import star.color;
-import star.image_processing;
-import star.hash;
-import star.string_view;
-import star.directives;
-import star.asset_path;
-
-
-import star.uuid;
-import star.damage_types;
-import star.host_address;
-import star.celestial_coordinate;
-import star.warping;
+import star.net_compatibility;
 import star.player_types;
-import star.world_geometry;
-import star.status_types;
-import star.damage;
-import star.light_source;
-import star.entity;
-import star.collision_block;
-import star.liquid_types;
-import star.tile_damage;
-import star.tile_sector_array;
-import star.animation;
-import star.particle;
-import star.weather_types;
-import star.sky_types;
-import star.force_regions;
-import star.world_parameters;
-import star.celestial_parameters;
-import star.world_layout;
-import star.collision_generator;
-import star.world_tiles;
-import star.interaction_types;
-import star.item_descriptor;
-import star.quest_descriptor;
-import star.interactive_entity;
-import star.tile_entity;
-import star.inspectable_entity;
-import star.plant;
-import star.plant_database;
-import star.biome_placement;
-import star.lua_root;
-import star.versioning_database;
-import star.world_storage;
-import star.sky_parameters;
+import star.rpc_promise;
+import star.string;
 import star.system_world;
-
-import star.net_element_basic_fields;
-import star.net_element_system;
+import star.uuid;
+import star.warping;
+import star.world_storage;
 
 namespace Star {
 
 class WorldServerThread;
 class SystemWorldServerThread;
 class Root;
+struct ClientContextUpdatePacket;
+
+template <typename Sink>
+concept context_update_sink = requires(Sink& enqueue, std::shared_ptr<ClientContextUpdatePacket> const& packet) {
+  { std::invoke(enqueue, packet) } -> std::same_as<std::expected<void, StarException>>;
+};
 
 class ServerClientContext {
-public:
-  [[nodiscard]] static std::expected<std::shared_ptr<ServerClientContext>, StarException> create(Root& root, ConnectionId clientId, std::optional<HostAddress> remoteAddress, NetCompatibilityRules netRules, Uuid playerUuid,
-      String playerName, String shipSpecies, bool canBecomeAdmin, WorldChunks initialShipChunks, StringSet validShipSpecies, String account);
+  struct ConstructionToken {
+    explicit ConstructionToken() = default;
+  };
 
-  ConnectionId clientId() const;
-  std::optional<HostAddress> const& remoteAddress() const;
-  Uuid const& playerUuid() const;
-  String const& playerName() const;
-  String const& shipSpecies() const;
-  bool canBecomeAdmin() const;
-  NetCompatibilityRules netRules() const;
-  String descriptiveName() const;
+public:
+  [[nodiscard]] static std::expected<std::shared_ptr<ServerClientContext>, StarException> create(Root& root, ConnectionId client_id, std::optional<HostAddress> remote_address, NetCompatibilityRules net_rules, Uuid player_uuid,
+      String player_name, String ship_species, bool can_become_admin, WorldChunks initial_ship_chunks, StringSet valid_ship_species, String account);
+  ServerClientContext(ConstructionToken, Root& root, ConnectionId client_id, std::optional<HostAddress> remote_address, NetCompatibilityRules net_rules, Uuid player_uuid,
+      String player_name, String ship_species, bool can_become_admin, WorldChunks initial_ship_chunks, StringSet valid_ship_species, String account);
+
+  ConnectionId client_id() const;
+  std::optional<HostAddress> const& remote_address() const;
+  Uuid const& player_uuid() const;
+  String const& player_name() const;
+  String ship_species() const;
+  bool can_become_admin() const;
+  NetCompatibilityRules net_rules() const;
+  String descriptive_name() const;
   String const& account() const;
 
   // Register additional rpc methods from other server side services.
-  [[nodiscard]] std::expected<void, StarException> registerRpcHandlers(JsonRpcHandlers const& rpcHandlers);
+  [[nodiscard]] std::expected<void, StarException> register_rpc_handlers(JsonRpcHandlers const& rpc_handlers);
 
   // The coordinate for the world which the *player's* ship is currently
   // orbiting, if it is currently orbiting a world.
-  CelestialCoordinate shipCoordinate() const;
-  void setShipCoordinate(CelestialCoordinate shipCoordinate);
+  CelestialCoordinate ship_coordinate() const;
+  void set_ship_coordinate(CelestialCoordinate coordinate);
 
-  SystemLocation shipLocation() const;
-  void setShipLocation(SystemLocation location);
+  SystemLocation ship_location() const;
+  void set_ship_location(SystemLocation location);
 
   // Warp action and warp mode to the planet the player is currently orbiting
   // valid when the player is on any ship world orbiting a location
-  std::optional<std::pair<WarpAction, WarpMode>> orbitWarpAction() const;
-  void setOrbitWarpAction(std::optional<std::pair<WarpAction, WarpMode>> warpAction);
+  std::optional<std::pair<WarpAction, WarpMode>> orbit_warp_action() const;
+  void set_orbit_warp_action(std::optional<std::pair<WarpAction, WarpMode>> warp_action);
 
-  bool isAdmin() const;
-  void setAdmin(bool admin);
+  bool is_admin() const;
+  void set_admin(bool admin);
 
-  bool serverDebug() const;
-  void setServerDebug(bool serverDebug);
+  bool server_debug() const;
+  void set_server_debug(bool server_debug);
 
   EntityDamageTeam team() const;
-  void setTeam(EntityDamageTeam team);
+  void set_team(EntityDamageTeam team);
 
-  ShipUpgrades shipUpgrades() const;
-  void setShipUpgrades(ShipUpgrades shipUpgrades);
-  void setShipSpecies(String shipSpecies);
+  ShipUpgrades ship_upgrades() const;
+  float ship_speed() const;
+  void set_ship_upgrades(ShipUpgrades upgrades);
+  void set_ship_species(String species);
 
-  WorldChunks shipChunks() const;
-  void updateShipChunks(WorldChunks newShipChunks);
+  WorldChunks ship_chunks() const;
+  void update_ship_chunks(WorldChunks new_ship_chunks);
 
+  [[nodiscard]] std::expected<void, StarException> read_update(ByteArray const& data);
+  // Synchronous local enqueue. The sink must not reenter send_update; failure
+  // means the queue did not accept the packet, not that socket I/O failed.
+  template <context_update_sink Sink>
+  [[nodiscard]] std::expected<void, StarException> send_update(Sink&& enqueue) {
+    std::lock_guard lock(m_send_mutex);
+    auto flush = [&]() -> std::expected<void, StarException> {
+      if (m_staged_update) {
+        if (auto sent = std::invoke(enqueue, std::as_const(m_staged_update)); !sent)
+          return sent;
+        m_staged_update.reset();
+      }
+      return {};
+    };
+    if (auto retried = flush(); !retried)
+      return retried;
+    // A final send must include changes accumulated since the failed enqueue.
+    if (auto staged = stage_update(); !staged)
+      return staged;
+    return flush();
+  }
 
-  [[nodiscard]] std::expected<void, StarException> readUpdate(ByteArray data);
-  [[nodiscard]] std::expected<ByteArray, StarException> writeUpdate();
+  void set_player_world(std::shared_ptr<WorldServerThread> world_thread);
+  std::shared_ptr<WorldServerThread> player_world() const;
+  WorldId player_world_id() const;
+  void clear_player_world();
 
-  void setPlayerWorld(std::shared_ptr<WorldServerThread> worldThread);
-  std::shared_ptr<WorldServerThread> playerWorld() const;
-  WorldId playerWorldId() const;
-  void clearPlayerWorld();
+  void set_sub_world(ClientSubWorldId sub_world_id, std::shared_ptr<WorldServerThread> world_thread);
+  std::shared_ptr<WorldServerThread> sub_world(ClientSubWorldId sub_world_id) const;
+  bool has_sub_world(ClientSubWorldId sub_world_id) const;
+  void clear_sub_world(ClientSubWorldId sub_world_id);
+  List<ClientSubWorldId> sub_worlds() const;
 
-  void setSubWorld(ClientSubWorldId subWorldId, std::shared_ptr<WorldServerThread> worldThread);
-  std::shared_ptr<WorldServerThread> subWorld(ClientSubWorldId subWorldId) const;
-  bool hasSubWorld(ClientSubWorldId subWorldId) const;
-  void clearSubWorld(ClientSubWorldId subWorldId);
-  List<ClientSubWorldId> subWorlds() const;
+  void set_system_world(std::shared_ptr<SystemWorldServerThread> system_world_thread);
+  std::shared_ptr<SystemWorldServerThread> system_world() const;
+  void clear_system_world();
 
-  void setSystemWorld(std::shared_ptr<SystemWorldServerThread> systemWorldThread);
-  std::shared_ptr<SystemWorldServerThread> systemWorld() const;
-  void clearSystemWorld();
+  WarpToWorld player_return_warp() const;
+  void set_player_return_warp(WarpToWorld warp);
 
-  WarpToWorld playerReturnWarp() const;
-  void setPlayerReturnWarp(WarpToWorld warp);
+  WarpToWorld player_revive_warp() const;
+  void set_player_revive_warp(WarpToWorld warp);
 
-  WarpToWorld playerReviveWarp() const;
-  void setPlayerReviveWarp(WarpToWorld warp);
-  
-  [[nodiscard]] std::expected<void, StarException> customWorldRequested(String name, RpcPromiseKeeper<WorldChunks> promise);
-  [[nodiscard]] std::expected<void, StarException> customWorldReceived(String name, WorldChunks chunks);
-  [[nodiscard]] std::expected<void, StarException> failWorldRequests();
-  
-  std::optional<WorldChunks> customWorldChunks(String name) const;
-  void updateCustomWorldChunks(String name, WorldChunks newWorldChunks);
-  void setCustomWorldActive(String name, bool active);
-  List<String> customWorlds() const;
-  
-  [[nodiscard]] std::expected<void, StarException> cleanInactiveCustomWorlds();
+  [[nodiscard]] std::expected<void, StarException> custom_world_requested(String name, RpcPromiseKeeper<WorldChunks> promise);
+  [[nodiscard]] std::expected<void, StarException> custom_world_received(String name, WorldChunks chunks);
+  [[nodiscard]] std::expected<void, StarException> fail_world_requests();
 
-  // Store and load the data for this client that should be persisted on the
-  // server, such as celestial log data, admin state, team, and current ship
-  // location, and warp history.  Does not store ship data or ship upgrades.
-  [[nodiscard]] std::expected<void, StarException> loadServerData(Json const& store);
-  [[nodiscard]] std::expected<Json, StarException> storeServerData();
+  std::optional<WorldChunks> custom_world_chunks(String const& name) const;
+  void update_custom_world_chunks(String name, WorldChunks new_world_chunks);
+  void set_custom_world_active(String const& name, bool active);
+  List<String> custom_worlds() const;
 
-  std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> creationTime() const;
+  [[nodiscard]] std::expected<void, StarException> clean_inactive_custom_worlds();
+
+  // Server-side persistence excludes ship chunks and upgrades, which belong to the player.
+  [[nodiscard]] std::expected<void, StarException> load_server_data(Json const& store);
+  [[nodiscard]] std::expected<Json, StarException> store_server_data() const;
+
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> creation_time() const;
 
 private:
-  ServerClientContext(Root& root, ConnectionId clientId, std::optional<HostAddress> remoteAddress, NetCompatibilityRules netRules, Uuid playerUuid,
-      String playerName, String shipSpecies, bool canBecomeAdmin, WorldChunks initialShipChunks, StringSet validShipSpecies, String account);
   [[nodiscard]] std::expected<void, StarException> initialize();
+  [[nodiscard]] std::expected<void, StarException> stage_update();
+
   struct CustomWorld {
     WorldChunks chunks;
-    WorldChunks chunksUpdate;
-    
-    bool active;
-    
-    CustomWorld(WorldChunks initialChunks);
-    CustomWorld();
+    WorldChunks chunks_update;
+    bool active = false;
   };
-  
+
   Root& m_root;
-  ConnectionId const m_clientId;
-  std::optional<HostAddress> const m_remoteAddress;
-  NetCompatibilityRules m_netRules;
-  Uuid const m_playerUuid;
-  String const m_playerName;
+  ConnectionId const m_client_id;
+  std::optional<HostAddress> const m_remote_address;
+  NetCompatibilityRules const m_net_rules;
+  Uuid const m_player_uuid;
+  String const m_player_name;
   String const m_account;
-  String m_shipSpecies;
-  // The species the server has ship worlds for; the client may set its own
-  // ship species through the 'ship.setShipSpecies' rpc, so it is validated
-  // against this.
-  StringSet m_validShipSpecies;
-  bool const m_canBecomeAdmin;
-  
-  bool m_serverDebug = false;
+  String m_ship_species;
+  StringSet const m_valid_ship_species;
+  bool const m_can_become_admin;
+  bool m_server_debug = false;
 
-  mutable std::recursive_mutex m_mutex;
+  mutable std::mutex m_mutex;
+  WorldChunks m_ship_chunks;
+  WorldChunks m_ship_chunks_update;
+  SystemLocation m_ship_system_location;
 
-  WorldChunks m_shipChunks;
-  WorldChunks m_shipChunksUpdate;
-
-  SystemLocation m_shipSystemLocation;
+  std::recursive_mutex m_rpc_mutex;
   JsonRpc m_rpc;
-  std::shared_ptr<WorldServerThread> m_worldThread;
-  WarpToWorld m_returnWarp;
-  WarpToWorld m_reviveWarp;
-  
-  HashMap<ClientSubWorldId, std::shared_ptr<WorldServerThread>> m_subWorldThreads;
+  std::mutex m_send_mutex;
+  ByteArray m_pending_rpc;
+  std::shared_ptr<ClientContextUpdatePacket> m_staged_update;
 
-  std::shared_ptr<SystemWorldServerThread> m_systemWorldThread;
+  std::shared_ptr<WorldServerThread> m_world_thread;
+  WarpToWorld m_return_warp;
+  WarpToWorld m_revive_warp;
+  HashMap<ClientSubWorldId, std::shared_ptr<WorldServerThread>> m_sub_world_threads;
+  std::shared_ptr<SystemWorldServerThread> m_system_world_thread;
 
-  NetElementTopGroup m_netGroup;
-  std::uint64_t m_netVersion = 0;
-  std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> m_creationTime;
-  
-  StringMap<RpcPromiseKeeper<WorldChunks>> m_worldRequests;
-  StringMap<CustomWorld> m_customWorlds;
-
-  NetElementData<std::optional<std::pair<WarpAction, WarpMode>>> m_orbitWarpActionNetState;
-  NetElementData<WorldId> m_playerWorldIdNetState;
-  NetElementBool m_isAdminNetState;
-  NetElementData<EntityDamageTeam> m_teamNetState;
-  NetElementData<ShipUpgrades> m_shipUpgrades;
-  NetElementData<CelestialCoordinate> m_shipCoordinate;
+  ContextNetState m_net_state;
+  std::uint64_t m_net_version = 0;
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> const m_creation_time =
+      std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
+  StringMap<RpcPromiseKeeper<WorldChunks>> m_world_requests;
+  StringMap<CustomWorld> m_custom_worlds;
+  bool m_custom_chunks_dirty = false;
 };
 
 }

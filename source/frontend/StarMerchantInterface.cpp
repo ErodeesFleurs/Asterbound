@@ -681,7 +681,7 @@ std::expected<void, StarException> MerchantPane::buildItemList() {
         if (!optUIntResult647)
           return std::unexpected(std::move(optUIntResult647.error()));
         if (auto prerequisite = std::move(*optUIntResult647)) {
-          if (m_player->shipUpgrades().shipLevel < *prerequisite)
+          if (m_player->ship_upgrades().ship_level < *prerequisite)
             return false;
         }
       }
@@ -691,7 +691,7 @@ std::expected<void, StarException> MerchantPane::buildItemList() {
         if (!optUIntResult648)
           return std::unexpected(std::move(optUIntResult648.error()));
         if (auto maxLevel = std::move(*optUIntResult648)) {
-          if (m_player->shipUpgrades().shipLevel > *maxLevel)
+          if (m_player->ship_upgrades().ship_level > *maxLevel)
             return false;
         }
       }

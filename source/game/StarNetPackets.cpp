@@ -682,16 +682,16 @@ std::expected<Json, StarException> ServerInfoPacket::write_json() const {
 ClientConnectPacket::ClientConnectPacket() : playerUuid(unfilledPacketUuid()) {}
 
 ClientConnectPacket::ClientConnectPacket(ByteArray assetsDigest, bool allowAssetsMismatch, Uuid playerUuid,
-    String playerName, String shipSpecies, WorldChunks shipChunks, ShipUpgrades shipUpgrades,
+    String playerName, String shipSpecies, WorldChunks shipChunks, ShipUpgrades ship_upgrades,
     bool introComplete, String account, Json info)
   : assetsDigest(std::move(assetsDigest)), allowAssetsMismatch(allowAssetsMismatch), playerUuid(std::move(playerUuid)),
     playerName(std::move(playerName)), shipSpecies(std::move(shipSpecies)), shipChunks(std::move(shipChunks)),
-    shipUpgrades(std::move(shipUpgrades)), introComplete(std::move(introComplete)), account(std::move(account)), info(std::move(info)) {}
+    ship_upgrades(std::move(ship_upgrades)), introComplete(std::move(introComplete)), account(std::move(account)), info(std::move(info)) {}
 
 
 std::expected<void, StarException> ClientConnectPacket::read(DataStream& ds) {
   {
-    auto fields = std::tie(assetsDigest, allowAssetsMismatch, playerUuid, playerName, shipSpecies, shipChunks, shipUpgrades, introComplete, account);
+    auto fields = std::tie(assetsDigest, allowAssetsMismatch, playerUuid, playerName, shipSpecies, shipChunks, ship_upgrades, introComplete, account);
     auto result = ds.read(fields);
     if (!result)
       return std::unexpected(std::move(result.error()));
@@ -707,7 +707,7 @@ std::expected<void, StarException> ClientConnectPacket::read(DataStream& ds) {
 
 std::expected<void, StarException> ClientConnectPacket::write(DataStream& ds) const {
   {
-    auto fields = std::tie(assetsDigest, allowAssetsMismatch, playerUuid, playerName, shipSpecies, shipChunks, shipUpgrades, introComplete, account);
+    auto fields = std::tie(assetsDigest, allowAssetsMismatch, playerUuid, playerName, shipSpecies, shipChunks, ship_upgrades, introComplete, account);
     auto result = ds.write(fields);
     if (!result)
       return std::unexpected(std::move(result.error()));
@@ -860,14 +860,14 @@ std::expected<void, StarException> CelestialRequestPacket::write(DataStream& ds)
 
 ClientContextUpdatePacket::ClientContextUpdatePacket() = default;
 
-ClientContextUpdatePacket::ClientContextUpdatePacket(ByteArray updateData) : updateData(std::move(updateData)) {}
+ClientContextUpdatePacket::ClientContextUpdatePacket(ByteArray update_data) : update_data(std::move(update_data)) {}
 
 std::expected<void, StarException> ClientContextUpdatePacket::read(DataStream& ds) {
-  return ds.read(updateData);
+  return ds.read(update_data);
 }
 
 std::expected<void, StarException> ClientContextUpdatePacket::write(DataStream& ds) const {
-  return ds.write(updateData);
+  return ds.write(update_data);
 }
 
 WorldStartPacket::WorldStartPacket() : clientId(), localInterpolationMode() {}

@@ -1,252 +1,197 @@
-import star.net_element;
-import star.format;
-import star.json_extra;
-import star.json;
-import star.xx_hash;
-import star.json_rpc;
-import star.game_types;
-import star.data_stream;
-import star.strong_typedef;
-import star.id_map;
-import star.set;
-import star.btree;
-import star.ordered_map;
-import star.lru_cache;
-import star.data_stream_devices;
-import star.thread;
-import star.btree_database;
-import star.casting;
-import star.ordered_set;
-import star.list;
-import star.string;
-import star.rpc_promise;
-import star.bi_map;
-import star.random;
-import star.perlin;
-import star.weighted_pool;
 import std;
-import star.worker_pool;
-
-import star.sector_array_2d;
-import star.color;
-import star.image_processing;
-import star.hash;
-import star.string_view;
-import star.directives;
-import star.asset_path;
-import star.data_stream_extra;
-
-import star.lua_root;
-import star.damage_types;
+import star.algorithm;
+import star.byte_array;
 import star.celestial_coordinate;
+import star.client_context;
+import star.context_net_state;
+import star.damage_types;
+import star.data_stream;
+import star.data_stream_devices;
+import star.format;
+import star.game_types;
+import star.json_rpc;
+import star.logging;
+import star.net_compatibility;
+import star.player_types;
+import star.string;
 import star.uuid;
 import star.warping;
-import star.world_geometry;
-import star.status_types;
-import star.damage;
-import star.light_source;
-import star.entity;
-import star.collision_block;
-import star.liquid_types;
-import star.tile_damage;
-import star.tile_sector_array;
-import star.animation;
-import star.particle;
-import star.weather_types;
-import star.sky_types;
-import star.force_regions;
-import star.world_parameters;
-import star.celestial_parameters;
-import star.world_layout;
-import star.collision_generator;
-import star.world_tiles;
-import star.interaction_types;
-import star.item_descriptor;
-import star.quest_descriptor;
-import star.interactive_entity;
-import star.tile_entity;
-import star.inspectable_entity;
-import star.plant;
-import star.plant_database;
-import star.biome_placement;
-import star.versioning_database;
 import star.world_storage;
-import star.player_types;
 
-import star.client_context;
-import star.root;
-
-import star.net_compatibility;
-import star.byte_array;
-import star.algorithm;
 namespace Star {
 
-std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ShipUpgrades& upgrades) {
-  auto level = ds.read(upgrades.shipLevel);
-  if (!level)
-    return std::unexpected(std::move(level.error()));
-  auto fuel = ds.read(upgrades.maxFuel);
-  if (!fuel)
-    return std::unexpected(std::move(fuel.error()));
-  auto crew = ds.read(upgrades.crewSize);
-  if (!crew)
-    return std::unexpected(std::move(crew.error()));
-  auto efficiency = ds.read(upgrades.fuelEfficiency);
-  if (!efficiency)
-    return std::unexpected(std::move(efficiency.error()));
-  auto speed = ds.read(upgrades.shipSpeed);
-  if (!speed)
-    return std::unexpected(std::move(speed.error()));
-  auto capabilities = ds.read(upgrades.capabilities);
-  if (!capabilities)
-    return std::unexpected(std::move(capabilities.error()));
-  return std::ref(ds);
+namespace {
+
+// All subframes borrow the packet. Validate the length against the actual
+// remaining input before advancing or allocating storage for a decoded value.
+std::expected<std::span<char const>, StarException> read_frame(DataStreamReader& stream) {
+  auto size = stream.read_vlq_u();
+  if (!size)
+    return std::unexpected(std::move(size.error()));
+  auto pos = stream.pos();
+  if (!pos)
+    return std::unexpected(std::move(pos.error()));
+  auto rest = stream.span().subspan(*pos);
+  if (*size > rest.size())
+    return std::unexpected(DataStreamException("Truncated client context frame"));
+  auto frame = rest.first(static_cast<std::size_t>(*size));
+  if (auto advanced = stream.seek(*pos + frame.size()); !advanced)
+    return std::unexpected(std::move(advanced.error()));
+  return frame;
 }
 
-std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, ShipUpgrades const& upgrades) {
-  auto level = ds.write(upgrades.shipLevel);
-  if (!level)
-    return std::unexpected(std::move(level.error()));
-  auto fuel = ds.write(upgrades.maxFuel);
-  if (!fuel)
-    return std::unexpected(std::move(fuel.error()));
-  auto crew = ds.write(upgrades.crewSize);
-  if (!crew)
-    return std::unexpected(std::move(crew.error()));
-  auto efficiency = ds.write(upgrades.fuelEfficiency);
-  if (!efficiency)
-    return std::unexpected(std::move(efficiency.error()));
-  auto speed = ds.write(upgrades.shipSpeed);
-  if (!speed)
-    return std::unexpected(std::move(speed.error()));
-  auto capabilities = ds.write(upgrades.capabilities);
-  if (!capabilities)
-    return std::unexpected(std::move(capabilities.error()));
-  return std::ref(ds);
+std::expected<void, StarException> require_end(DataStreamReader& stream) {
+  auto end = stream.at_end();
+  if (!end)
+    return std::unexpected(std::move(end.error()));
+  if (!*end)
+    return std::unexpected(DataStreamException("Trailing bytes in client context update"));
+  return {};
 }
 
-ClientContext::ClientContext(Root& root, Uuid serverUuid, Uuid playerUuid)
-  : m_root(root), m_serverUuid(root.random()), m_playerUuid(root.random()) {
-  m_serverUuid = std::move(serverUuid);
-  m_playerUuid = std::move(playerUuid);
-  m_rpc = std::make_shared<JsonRpc>(m_root.logger());
+std::expected<void, StarException> read_chunks(std::span<char const> frame, WorldChunks& chunks) {
+  DataStreamReader stream(frame);
+  auto decoded = stream.read_map_container(chunks, [&](DataStream&, ByteArray& key, std::optional<ByteArray>& value)
+      -> std::expected<void, StarException> {
+    auto key_bytes = read_frame(stream);
+    if (!key_bytes)
+      return std::unexpected(std::move(key_bytes.error()));
+    auto present = stream.read<bool>();
+    if (!present)
+      return std::unexpected(std::move(present.error()));
+    if (*present) {
+      auto bytes = read_frame(stream);
+      if (!bytes)
+        return std::unexpected(std::move(bytes.error()));
+      value.emplace(*bytes);
+    }
+    key = ByteArray(*key_bytes);
+    return {};
+  });
+  if (!decoded)
+    return decoded;
+  return require_end(stream);
+}
+
+void merge_chunks(WorldChunks& pending, WorldChunks&& decoded) {
+  if (decoded.empty())
+    return;
+  if (pending.empty()) {
+    pending = std::move(decoded);
+    return;
+  }
+  for (auto&& [key, value] : decoded)
+    pending.insert_or_assign(key, std::move(value));
+}
 
 }
 
-std::expected<std::shared_ptr<ClientContext>, StarException> ClientContext::create(Root& root, Uuid serverUuid, Uuid playerUuid) {
-  auto context = std::shared_ptr<ClientContext>(new ClientContext(root, std::move(serverUuid), std::move(playerUuid)));
-  auto initialized = context->initialize();
-  if (!initialized)
+ClientContext::ClientContext(ConstructionKey, Logger& logger, Uuid server_uuid, Uuid player_uuid,
+    ConnectionId connection_id, NetCompatibilityRules rules)
+  : m_server_uuid(std::move(server_uuid)), m_player_uuid(std::move(player_uuid)),
+    m_connection_id(connection_id), m_net_compatibility_rules(rules), m_rpc(std::make_shared<JsonRpc>(logger)) {}
+
+std::expected<std::shared_ptr<ClientContext>, StarException> ClientContext::create(
+    Logger& logger, Uuid server_uuid, Uuid player_uuid, ConnectionId connection_id, NetCompatibilityRules rules) {
+  auto context = std::make_shared<ClientContext>(ConstructionKey{}, logger,
+      std::move(server_uuid), std::move(player_uuid), connection_id, rules);
+  if (auto initialized = context->m_staged_state.initialize(); !initialized)
     return std::unexpected(std::move(initialized.error()));
   return context;
 }
 
-std::expected<void, StarException> ClientContext::initialize() {
-  for (auto element : std::initializer_list<std::reference_wrapper<NetElement>>{
-      m_orbitWarpActionNetState, m_playerWorldIdNetState, m_isAdminNetState,
-      m_teamNetState, m_shipUpgrades, m_shipCoordinate}) {
-    auto added = m_netGroup.add_net_element(element);
-    if (!added)
-      return std::unexpected(std::move(added.error()));
+Uuid ClientContext::server_uuid() const { return m_server_uuid; }
+Uuid ClientContext::player_uuid() const { return m_player_uuid; }
+ConnectionId ClientContext::connection_id() const { return m_connection_id; }
+NetCompatibilityRules ClientContext::net_compatibility_rules() const { return m_net_compatibility_rules; }
+
+CelestialCoordinate ClientContext::ship_coordinate() const { return m_net_state.ship_coordinate.get(); }
+std::optional<std::pair<WarpAction, WarpMode>> ClientContext::orbit_warp_action() const {
+  return m_net_state.orbit_warp_action.get();
+}
+WorldId ClientContext::player_world_id() const { return m_net_state.player_world_id.get(); }
+bool ClientContext::is_admin() const { return m_net_state.is_admin.get(); }
+EntityDamageTeam ClientContext::team() const { return m_net_state.team.get(); }
+ShipUpgrades const& ClientContext::ship_upgrades() const { return m_net_state.ship_upgrades.get(); }
+unsigned ClientContext::ship_level() const { return ship_upgrades().ship_level; }
+bool ClientContext::has_ship_capability(String const& capability) const {
+  return ship_upgrades().capabilities.contains(capability);
+}
+std::shared_ptr<JsonRpcInterface> ClientContext::rpc_interface() const { return m_rpc; }
+
+WorldChunks const& ClientContext::pending_ship_updates() const { return m_pending_ship_updates; }
+StringMap<WorldChunks> const& ClientContext::pending_custom_world_updates() const {
+  return m_pending_custom_world_updates;
+}
+void ClientContext::acknowledge_ship_updates() { m_pending_ship_updates.clear(); }
+void ClientContext::acknowledge_custom_world_updates(String const& world) { m_pending_custom_world_updates.erase(world); }
+
+std::expected<void, StarException> ClientContext::read_update(std::span<char const> data) {
+  if (data.empty())
+    return {};
+  if (m_dispatching_rpc)
+    return std::unexpected(DataStreamException("Cannot apply another context update from its RPC callback"));
+  DataStreamReader stream(data);
+  stream.set_stream_compatibility_version(m_net_compatibility_rules);
+  auto rpc_frame = read_frame(stream);
+  if (!rpc_frame)
+    return std::unexpected(std::move(rpc_frame.error()));
+  auto ship_frame = read_frame(stream);
+  if (!ship_frame)
+    return std::unexpected(std::move(ship_frame.error()));
+  WorldChunks ship_updates;
+  if (!ship_frame->empty()) {
+    if (auto decoded = read_chunks(*ship_frame, ship_updates); !decoded)
+      return decoded;
+  }
+
+  StringMap<WorldChunks> custom_updates;
+  if (m_net_compatibility_rules.version() >= 15) {
+    auto decoded = stream.read_map_container(custom_updates, [&](DataStream&, String& name, WorldChunks& chunks)
+        -> std::expected<void, StarException> {
+      auto world_name = read_frame(stream);
+      if (!world_name)
+        return std::unexpected(std::move(world_name.error()));
+      auto frame = read_frame(stream);
+      if (!frame)
+        return std::unexpected(std::move(frame.error()));
+      name = String(std::string_view(*world_name));
+      return read_chunks(*frame, chunks);
+    });
+    if (!decoded)
+      return decoded;
+  }
+
+  auto net_frame = read_frame(stream);
+  if (!net_frame)
+    return std::unexpected(std::move(net_frame.error()));
+  if (auto end = require_end(stream); !end)
+    return end;
+  if (!net_frame->empty()) {
+    if (auto staged = m_staged_state.stage_update(*net_frame, m_net_compatibility_rules); !staged)
+      return staged;
+  }
+
+  // Do not dispatch even the first RPC until all frame boundaries, actual
+  // chunks and net fields are known good. RPC side effects cannot be undone.
+  if (!rpc_frame->empty()) {
+    m_dispatching_rpc = true;
+    auto finished = make_scope_exit([this] { m_dispatching_rpc = false; });
+    if (auto received = m_rpc->receive(*rpc_frame); !received)
+      return received;
+  }
+  if (!net_frame->empty())
+    m_staged_state.publish_to(m_net_state);
+  merge_chunks(m_pending_ship_updates, std::move(ship_updates));
+  if (m_pending_custom_world_updates.empty()) {
+    m_pending_custom_world_updates = std::move(custom_updates);
+  } else {
+    for (auto&& [name, chunks] : custom_updates)
+      merge_chunks(m_pending_custom_world_updates[name], std::move(chunks));
   }
   return {};
 }
 
-Uuid ClientContext::serverUuid() const {
-  return m_serverUuid;
-}
-
-Uuid ClientContext::playerUuid() const {
-  return m_playerUuid;
-}
-
-CelestialCoordinate ClientContext::shipCoordinate() const {
-  return m_shipCoordinate.get();
-}
-
-std::optional<std::pair<WarpAction, WarpMode>> ClientContext::orbitWarpAction() const {
-  return m_orbitWarpActionNetState.get();
-}
-
-WorldId ClientContext::playerWorldId() const {
-  return m_playerWorldIdNetState.get();
-}
-
-bool ClientContext::isAdmin() const {
-  return m_isAdminNetState.get();
-}
-
-EntityDamageTeam ClientContext::team() const {
-  return m_teamNetState.get();
-}
-
-std::shared_ptr<JsonRpcInterface> ClientContext::rpcInterface() const {
-  return m_rpc;
-}
-
-WorldChunks ClientContext::newShipUpdates() { return std::exchange(m_newShipUpdates, {}); }
-
-StringMap<WorldChunks> ClientContext::newCustomWorldUpdates() { return std::exchange(m_newCustomWorldUpdates, {}); }
-
-ShipUpgrades ClientContext::shipUpgrades() const {
-  return m_shipUpgrades.get();
-}
-
-std::expected<void, StarException> ClientContext::read_update(ByteArray data) {
-  if (data.empty())
-    return {};
-  DataStreamBuffer ds(std::move(data));
-  ds.set_stream_compatibility_version(m_netCompatibilityRules);
-  auto rpcData = ds.read<ByteArray>();
-  if (!rpcData)
-    return std::unexpected(std::move(rpcData.error()));
-  auto received = m_rpc->receive(*rpcData);
-  if (!received)
-    return std::unexpected(std::move(received.error()));
-  auto shipUpdates = ds.read<ByteArray>();
-  if (!shipUpdates)
-    return std::unexpected(std::move(shipUpdates.error()));
-  if (!shipUpdates->empty()) {
-    auto decoded = DataStreamBuffer::deserialize<WorldChunks>(shipUpdates->span());
-    if (!decoded)
-      return std::unexpected(std::move(decoded.error()));
-    m_newShipUpdates.merge(*decoded, true);
-  }
-  if (m_netCompatibilityRules.version() >= 15) {
-    auto customWorldUpdates = ds.read<StringMap<ByteArray>>();
-    if (!customWorldUpdates)
-      return std::unexpected(std::move(customWorldUpdates.error()));
-    for (auto&& p : *customWorldUpdates) {
-      auto decoded = DataStreamBuffer::deserialize<WorldChunks>(p.second.span());
-      if (!decoded)
-        return std::unexpected(std::move(decoded.error()));
-      m_newCustomWorldUpdates[p.first].merge(*decoded, true);
-    }
-  }
-  auto netData = ds.read<ByteArray>();
-  if (!netData)
-    return std::unexpected(std::move(netData.error()));
-  return m_netGroup.read_net_state(std::move(*netData), 0.0f, m_netCompatibilityRules);
-}
-
-std::expected<ByteArray, StarException> ClientContext::write_update() {
-  return m_rpc->send();
-}
-
-void ClientContext::setConnectionId(ConnectionId connectionId) {
-  m_connectionId = connectionId;
-}
-
-ConnectionId ClientContext::connectionId() const {
-  return m_connectionId;
-}
-
-void ClientContext::setNetCompatibilityRules(NetCompatibilityRules netCompatibilityRules) {
-  m_netCompatibilityRules = netCompatibilityRules;
-}
-
-NetCompatibilityRules ClientContext::netCompatibilityRules() const {
-  return m_netCompatibilityRules;
-}
+std::expected<ByteArray, StarException> ClientContext::write_update() { return m_rpc->send(); }
 
 }

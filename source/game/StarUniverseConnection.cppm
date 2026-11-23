@@ -154,6 +154,9 @@ public:
   List<UniverseConnection> removeAllConnections();
 
   [[nodiscard]] std::expected<void, StarException> sendPackets(ConnectionId clientId, List<std::shared_ptr<Packet>> packets);
+  // Success transfers the packet to this live connection's ordered local
+  // queue. Socket transmission is asynchronous and cannot undo acceptance.
+  [[nodiscard]] std::expected<void, StarException> enqueue_packet(ConnectionId client_id, std::shared_ptr<Packet> packet);
 
   // Get total packets processed across all worker threads
   std::uint64_t totalPacketsProcessed() const;

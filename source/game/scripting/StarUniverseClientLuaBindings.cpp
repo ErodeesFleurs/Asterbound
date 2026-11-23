@@ -245,14 +245,14 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseClientThread
   if (auto registration = callbacks.register_callback("connectionId", [&universe]()  -> std::expected<ConnectionId, StarException> {
     if (!universe.isConnected())
       return std::unexpected(StarException("Universe is not connected"));
-    return universe.clientContext()->connectionId();
+    return universe.client_context()->connection_id();
   }); !registration)
       return std::unexpected(std::move(registration.error()));
   
   if (auto registration = callbacks.register_callback("clientUuid", [&universe]()  -> std::expected<String, StarException> {
     if (!universe.isConnected())
       return std::unexpected(StarException("Universe is not connected"));
-    return universe.clientContext()->playerUuid().hex();
+    return universe.client_context()->player_uuid().hex();
   }); !registration)
       return std::unexpected(std::move(registration.error()));
   

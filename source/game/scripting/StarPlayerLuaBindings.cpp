@@ -861,16 +861,16 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("shipUpgrades", [&player]() -> std::expected<Json, StarException> {
-    return player.shipUpgrades().toJson();
+    return player.ship_upgrades().to_json();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("upgradeShip", [&player](Json const& upgrades) -> std::expected<void, StarException> {
-    return player.applyShipUpgrades(upgrades);
+    return player.apply_ship_upgrades(upgrades);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("setUniverseFlag", [&player](String const& flagName) -> std::expected<void, StarException> {
-    auto invoked = player.clientContext()->rpcInterface()->invoke_remote("universe.setFlag", flagName);
+    auto invoked = player.client_context()->rpc_interface()->invoke_remote("universe.setFlag", flagName);
     if (!invoked) return std::unexpected(std::move(invoked.error()));
     return {};
   }); !registered)
@@ -1391,7 +1391,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   if (auto registered = callbacks.register_callback("questLogEntries", [&player](bool completed) -> Json {
     auto manager = player.questManager();
     auto quests = completed ? manager->listCompletedQuests() : manager->listActiveQuests();
-    auto playerWorld = player.clientContext() ? player.clientContext()->playerWorldId() : WorldId{};
+    auto playerWorld = player.client_context() ? player.client_context()->player_world_id() : WorldId{};
     JsonArray entries;
     entries.reserve(quests.size());
     for (auto const& quest : quests) {
@@ -1563,12 +1563,12 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("worldId", [&player]() -> std::expected<String, StarException> {
-    return Star::print_world_id(player.clientContext()->playerWorldId());
+    return Star::print_world_id(player.client_context()->player_world_id());
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("serverUuid", [&player]() -> std::expected<String, StarException> {
-    return player.clientContext()->serverUuid().hex();
+    return player.client_context()->server_uuid().hex();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 

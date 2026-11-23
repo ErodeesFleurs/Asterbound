@@ -2100,7 +2100,7 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
         if (tag == "playerYPos")
           return Star::to_string(std::round(m_player->position().y()));
         if (tag == "worldName") {
-          if (std::holds_alternative<ClientShipWorldId>(m_universeClient->clientContext()->playerWorldId()))
+          if (std::holds_alternative<ClientShipWorldId>(m_universeClient->client_context()->player_world_id()))
             return "Player Ship";
           auto worldTemplate = worldClient ? worldClient->currentTemplate() : nullptr;
           if (!worldTemplate)

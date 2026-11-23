@@ -453,12 +453,12 @@ void json_round_trip(benchmark::State& state) {
     auto request = client.send();
     if (!request)
       return std::unexpected(std::move(request.error()));
-    if (auto delivered = server.receive(*request); !delivered)
+    if (auto delivered = server.receive(request->span()); !delivered)
       return std::unexpected(std::move(delivered.error()));
     auto response = server.send();
     if (!response)
       return std::unexpected(std::move(response.error()));
-    if (auto delivered = client.receive(*response); !delivered)
+    if (auto delivered = client.receive(response->span()); !delivered)
       return std::unexpected(std::move(delivered.error()));
     return promise;
   }, arguments);

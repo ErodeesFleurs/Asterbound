@@ -95,18 +95,29 @@ import star.byte_array;
 import star.algorithm;
 namespace Star {
 
-WorldChunks WorldStorage::getWorldChunksUpdate(WorldChunks const& oldChunks, WorldChunks const& newChunks) {
+WorldChunks WorldStorage::get_world_chunks_update(WorldChunks const& old_chunks, WorldChunks const& new_chunks) {
   WorldChunks update;
-  for (auto const& p : oldChunks) {
-    if (!newChunks.contains(p.first))
-      update[p.first] = {};
-  }
-
-  for (auto const& p : newChunks) {
-    if (oldChunks.value(p.first) != p.second)
-      update[p.first] = p.second;
-  }
+  accumulate_world_chunks_update(update, old_chunks, new_chunks);
   return update;
+}
+
+bool WorldStorage::accumulate_world_chunks_update(WorldChunks& pending, WorldChunks const& old_chunks, WorldChunks const& new_chunks) {
+  bool changed = false;
+  for (auto const& key : old_chunks.key_view()) {
+    if (!new_chunks.contains(key)) {
+      pending.insert_or_assign(key, std::nullopt);
+      changed = true;
+    }
+  }
+  for (auto const& [key, bytes] : new_chunks) {
+    auto previous = old_chunks.find(key);
+    // A tombstone for a previously absent key is redundant; an empty payload is not.
+    if (previous == old_chunks.end() ? bytes.has_value() : previous->second != bytes) {
+      pending.insert_or_assign(key, bytes);
+      changed = true;
+    }
+  }
+  return changed;
 }
 
 std::expected<void, StarException> WorldStorage::applyWorldChunksUpdateToFile(Logger& logger, String const& file, WorldChunks const& update) {

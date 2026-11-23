@@ -1384,7 +1384,7 @@ const GameTestRegistration universeConnectionsTcpCompressedBackpressureRetainsAn
       auto packet = convert<ClientContextUpdatePacket>(*incoming);
       if (!packet)
         return std::unexpected(std::move(packet.error()));
-      if ((*packet)->updateData != nextPayload(receiveState))
+      if ((*packet)->update_data != nextPayload(receiveState))
         return false;
     }
     return true;
@@ -1442,6 +1442,7 @@ const GameTestRegistration universeConnectionsShardCallbacksReenterAndRemovalRet
   ASSERT_EQ(queuedClient.sendAll(0), true);
   ASSERT_EQ(queued.receiveAny(0), true);
   ASSERT_TRUE((*server)->addConnection(4, std::move(queued)));
+  ASSERT_TRUE((*server)->enqueue_packet(4, std::make_shared<ProtocolRequestPacket>(49)));
   auto returned = (*server)->removeConnection(4);
   ASSERT_TRUE(returned) << returned.error().what();
   ASSERT_EQ(returned->receiveAny(0), true);
@@ -1449,6 +1450,8 @@ const GameTestRegistration universeConnectionsShardCallbacksReenterAndRemovalRet
   ASSERT_EQ(returned->sendAll(0), true);
   ASSERT_EQ(queuedClient.receiveAny(0), true);
   EXPECT_EQ(connectionTestVersion(queuedClient), 46u);
+  EXPECT_EQ(connectionTestVersion(queuedClient), 49u);
+  EXPECT_FALSE((*server)->enqueue_packet(4, std::make_shared<ProtocolRequestPacket>(50)));
 
   // Another shard continues while the first shard is in its reentrant callback.
   auto otherPair = LocalPacketSocket::openPair();

@@ -2,6 +2,14 @@
 #include <benchmark/benchmark.h>
 
 import std;
+import star.byte_array;
+import star.client_context;
+import star.net_compatibility;
+import star.net_packets;
+import star.player_types;
+import star.server_client_context;
+import star.uuid;
+import star.world_storage;
 import star.chat_processor;
 import star.chat_types;
 import star.message_types;
@@ -831,6 +839,69 @@ int main(int argc, char** argv) {
     return 1;
   }
   BenchmarkSession session{**root};
+  for (bool changed : {false, true}) {
+    benchmark::RegisterBenchmark(changed ? "Game/ClientContext/DiffChange4Of128" : "Game/ClientContext/DiffUnchanged128",
+        [&, changed](benchmark::State& state) {
+      WorldChunks previous;
+      for (unsigned i = 0; i != 128; ++i)
+        previous[ByteArray::from_string(std::to_string(i))] = ByteArray(16384, static_cast<char>(i));
+      WorldChunks current = previous;
+      if (changed) {
+        for (unsigned i = 0; i != 4; ++i)
+          current[ByteArray::from_string(std::to_string(i * 32))]->span().back() ^= 1;
+      }
+      for (auto _ : state) {
+        auto delta = WorldStorage::get_world_chunks_update(previous, current);
+        if (delta.size() != (changed ? 4u : 0u)) return session.fail(state, "Incorrect world chunk delta");
+        benchmark::DoNotOptimize(delta);
+      }
+    });
+  }
+  for (bool idle : {true, false}) {
+    benchmark::RegisterBenchmark(idle ? "Game/ClientContext/Idle128Worlds" : "Game/ClientContext/HasCapability",
+        [&, idle](benchmark::State& state) {
+      auto const rules = NetCompatibilityRules(15u);
+      auto server = ServerClientContext::create(session.root, 1, {}, rules, Uuid::nil(), "benchmark", "human", false, {}, {}, {});
+      if (!server) return session.fail(state, server.error());
+      ShipUpgrades upgrades;
+      for (unsigned i = 0; i != 16; ++i)
+        upgrades.capabilities.add(Star::format("capability-{}", i));
+      upgrades.capabilities.add("teleport");
+      (*server)->set_ship_upgrades(std::move(upgrades));
+      if (idle) {
+        for (unsigned i = 0; i != 128; ++i) {
+          auto added = (*server)->custom_world_received(Star::format("world-{}", i), {});
+          if (!added) return session.fail(state, added.error());
+        }
+      }
+      std::shared_ptr<ClientContextUpdatePacket> initial;
+      auto sent = (*server)->send_update([&](std::shared_ptr<ClientContextUpdatePacket> const& packet) -> std::expected<void, StarException> {
+        initial = packet;
+        return {};
+      });
+      if (!sent) return session.fail(state, sent.error());
+      if (!initial) return session.fail(state, "Missing initial context update");
+      if (idle) {
+        for (auto _ : state) {
+          auto update = (*server)->send_update([](std::shared_ptr<ClientContextUpdatePacket> const&) -> std::expected<void, StarException> {
+            return std::unexpected(StarException("Unexpected idle update"));
+          });
+          if (!update) return session.fail(state, update.error());
+        }
+      } else {
+        auto client = ClientContext::create(session.root.logger(), Uuid::nil(), Uuid::nil(), 1, rules);
+        if (!client) return session.fail(state, client.error());
+        auto received = (*client)->read_update(initial->update_data.span());
+        if (!received) return session.fail(state, received.error());
+        String const ability("teleport");
+        for (auto _ : state) {
+          bool found = (*client)->has_ship_capability(ability);
+          if (!found) return session.fail(state, "Missing replicated capability");
+          benchmark::DoNotOptimize(found);
+        }
+      }
+    });
+  }
   for (std::string_view scenario : {"BroadcastDrain32", "ChannelChurn32", "PollPending64"}) {
     benchmark::RegisterBenchmark(std::string("Game/Chat/").append(scenario).c_str(), [&, scenario](benchmark::State& state) {
       ChatProcessor processor;

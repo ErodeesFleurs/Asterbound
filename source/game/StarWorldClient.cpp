@@ -3371,9 +3371,6 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
     m_entityUpdateTimer = GameTimer(m_interpolationTracker.entityUpdateDelta());
     
     m_clientId = startPacket.clientId;
-    if (!m_headless) {
-      m_mainPlayer->clientContext()->setConnectionId(startPacket.clientId);
-    }
     auto result257 = connection_entity_space(startPacket.clientId);
     if (!result257)
       return std::unexpected(std::move(result257.error()));
@@ -3559,6 +3556,11 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
 }
 
 std::expected<void, StarException> WorldClient::initWorld(WorldStartPacket const& startPacket) {
+  if (!m_headless) {
+    auto const context = m_mainPlayer->client_context();
+    if (!context || context->connection_id() != startPacket.clientId)
+      return std::unexpected(WorldClientException("WorldStart client ID does not match ConnectSuccess"));
+  }
   auto initialized = initializeWorld(startPacket);
   if (!initialized) {
     auto cleared = clearWorld();

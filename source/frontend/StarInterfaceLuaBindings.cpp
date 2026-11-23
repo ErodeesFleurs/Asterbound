@@ -374,7 +374,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::make_chat_callbacks(Main
   }); !r) return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.register_callback("addMessage", [&client, &main_interface, lifetime](String const& text, std::optional<Json> config) -> std::expected<void, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
-    ChatReceivedMessage message{{MessageContext::Mode::CommandResult}, client.clientContext()->connectionId(), "", text};
+    ChatReceivedMessage message{{MessageContext::Mode::CommandResult}, client.client_context()->connection_id(), "", text};
     bool show_pane = true;
     if (config) {
       auto mode = config->opt_string("mode");

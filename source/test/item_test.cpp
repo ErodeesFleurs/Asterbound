@@ -1214,9 +1214,9 @@ const GameTestRegistration
     ASSERT_TRUE(player.finalizeCreation());
     auto uuid = player.uuid();
     ASSERT_TRUE(uuid);
-    auto context = ClientContext::create(root, Uuid(root.random()), *uuid);
+    auto context = ClientContext::create(root.logger(), Uuid(root.random()), *uuid, 1, {});
     ASSERT_TRUE(context);
-    player.setClientContext(*context);
+    player.set_client_context(*context);
     Entity& entity = player;
     ASSERT_TRUE(entity.init(**world, 100, EntityMode::Master));
     auto uninitPlayer = make_scope_exit([&] { EXPECT_TRUE(entity.uninit()); });
@@ -1429,9 +1429,9 @@ function uninit() visit("uninit") end
     ASSERT_TRUE(player.finalizeCreation());
     auto uuid = player.uuid();
     ASSERT_TRUE(uuid);
-    auto context = ClientContext::create(root, Uuid(root.random()), *uuid);
+    auto context = ClientContext::create(root.logger(), Uuid(root.random()), *uuid, 1, {});
     ASSERT_TRUE(context);
-    player.setClientContext(*context);
+    player.set_client_context(*context);
     Entity& entity = player;
     ASSERT_TRUE(entity.init(**world, 100, EntityMode::Master));
     auto uninitPlayer = make_scope_exit([&] { EXPECT_TRUE(entity.uninit()); });

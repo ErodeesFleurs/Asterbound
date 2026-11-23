@@ -44,7 +44,7 @@ public:
 
   bool has_pending() const;
   [[nodiscard]] std::expected<ByteArray, StarException> send();
-  [[nodiscard]] std::expected<void, StarException> receive(ByteArray const& inbuffer);
+  [[nodiscard]] std::expected<void, StarException> receive(std::span<char const> bytes);
 
 private:
   struct RegisteredHandler {

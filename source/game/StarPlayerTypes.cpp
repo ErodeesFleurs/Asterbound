@@ -6,6 +6,8 @@ import star.json_extra;
 import star.bi_map;
 import star.either;
 import star.player_types;
+import star.data_stream;
+import star.data_stream_extra;
 
 import star.algorithm;
 namespace Star {
@@ -63,95 +65,100 @@ std::expected<PlayerModeConfig, StarException> PlayerModeConfig::create(Json con
   return result;
 }
 
-ShipUpgrades::ShipUpgrades()
-  : shipLevel(0), maxFuel(0), crewSize(0), fuelEfficiency(1.0f), shipSpeed(0) {}
+static std::expected<void, StarException> add_ship_capabilities(StringSet& target, Json const& config) {
+  auto entry = config.find("capabilities");
+  if (!entry)
+    return std::unexpected(std::move(entry.error()));
+  if (*entry) {
+    auto capabilities = json_to_string_list((*entry)->get());
+    if (!capabilities)
+      return std::unexpected(std::move(capabilities.error()));
+    for (auto& capability : *capabilities)
+      target.insert(std::move(capability));
+  }
+  return {};
+}
 
-std::expected<ShipUpgrades, StarException> ShipUpgrades::create(Json config) {
+std::expected<ShipUpgrades, StarException> ShipUpgrades::create(Json const& config) {
   if (config.is_null())
-    config = JsonObject();
+    return ShipUpgrades();
   ShipUpgrades result;
   auto level = config.get_uint("shipLevel", 0);
   if (!level)
     return std::unexpected(std::move(level.error()));
-  result.shipLevel = *level;
+  result.ship_level = *level;
   auto fuel = config.get_uint("maxFuel", 0);
   if (!fuel)
     return std::unexpected(std::move(fuel.error()));
-  result.maxFuel = *fuel;
+  result.max_fuel = *fuel;
   auto crew = config.get_uint("crewSize", 0);
   if (!crew)
     return std::unexpected(std::move(crew.error()));
-  result.crewSize = *crew;
+  result.crew_size = *crew;
   auto efficiency = config.get_float("fuelEfficiency", 1.0f);
   if (!efficiency)
     return std::unexpected(std::move(efficiency.error()));
-  result.fuelEfficiency = *efficiency;
+  result.fuel_efficiency = *efficiency;
   auto speed = config.get_uint("shipSpeed", 0);
   if (!speed)
     return std::unexpected(std::move(speed.error()));
-  result.shipSpeed = *speed;
-  auto capabilitiesJson = config.get("capabilities", JsonArray{});
-  if (!capabilitiesJson)
-    return std::unexpected(std::move(capabilitiesJson.error()));
-  auto capabilities = json_to_string_list(*capabilitiesJson);
-  if (!capabilities)
-    return std::unexpected(std::move(capabilities.error()));
-  result.capabilities.insert_range(*capabilities);
+  result.ship_speed = *speed;
+  if (auto added = add_ship_capabilities(result.capabilities, config); !added)
+    return std::unexpected(std::move(added.error()));
   return result;
 }
 
-Json ShipUpgrades::toJson() const {
-  JsonArray capabilitiesJson;
-  capabilitiesJson.reserve(capabilities.size());
+Json ShipUpgrades::to_json() const {
+  JsonArray capabilities_json;
+  capabilities_json.reserve(capabilities.size());
   for (auto const& capability : capabilities)
-    capabilitiesJson.push_back(capability);
-  return JsonObject{{"shipLevel", shipLevel},
-      {"maxFuel", maxFuel},
-      {"crewSize", crewSize},
-      {"fuelEfficiency", fuelEfficiency},
-      {"shipSpeed", shipSpeed},
-      {"capabilities", std::move(capabilitiesJson)}};
+    capabilities_json.push_back(capability);
+  return JsonObject{{"shipLevel", ship_level},
+      {"maxFuel", max_fuel},
+      {"crewSize", crew_size},
+      {"fuelEfficiency", fuel_efficiency},
+      {"shipSpeed", ship_speed},
+      {"capabilities", std::move(capabilities_json)}};
 }
 
 std::expected<std::reference_wrapper<ShipUpgrades>, StarException> ShipUpgrades::apply(Json const& upgrades) {
   auto level = upgrades.opt_uint("shipLevel");
   if (!level)
     return std::unexpected(std::move(level.error()));
-  shipLevel = std::max(shipLevel, static_cast<unsigned>(level->value_or(shipLevel)));
   auto fuel = upgrades.opt_uint("maxFuel");
   if (!fuel)
     return std::unexpected(std::move(fuel.error()));
-  maxFuel = fuel->value_or(maxFuel);
   auto crew = upgrades.opt_uint("crewSize");
   if (!crew)
     return std::unexpected(std::move(crew.error()));
-  crewSize = std::max(crewSize, static_cast<unsigned>(crew->value_or(crewSize)));
   auto efficiency = upgrades.opt_float("fuelEfficiency");
   if (!efficiency)
     return std::unexpected(std::move(efficiency.error()));
-  fuelEfficiency = efficiency->value_or(fuelEfficiency);
   auto speed = upgrades.opt_float("shipSpeed");
   if (!speed)
     return std::unexpected(std::move(speed.error()));
-  shipSpeed = speed->value_or(shipSpeed);
-  auto hasCapabilities = upgrades.contains("capabilities");
-  if (!hasCapabilities)
-    return std::unexpected(std::move(hasCapabilities.error()));
-  if (*hasCapabilities) {
-    auto json = upgrades.get("capabilities", JsonArray{});
-    if (!json)
-      return std::unexpected(std::move(json.error()));
-    auto additional = json_to_string_list(*json);
-    if (!additional)
-      return std::unexpected(std::move(additional.error()));
-    capabilities.insert_range(*additional);
-  }
+  if (auto added = add_ship_capabilities(capabilities, upgrades); !added)
+    return std::unexpected(std::move(added.error()));
+  ship_level = std::max(ship_level, static_cast<unsigned>(level->value_or(ship_level)));
+  max_fuel = fuel->value_or(max_fuel);
+  crew_size = std::max(crew_size, static_cast<unsigned>(crew->value_or(crew_size)));
+  fuel_efficiency = efficiency->value_or(fuel_efficiency);
+  ship_speed = speed->value_or(ship_speed);
   return std::ref(*this);
 }
 
-bool ShipUpgrades::operator==(ShipUpgrades const& rhs) const {
-  return std::tie(shipLevel, maxFuel, crewSize, fuelEfficiency, shipSpeed, capabilities)
-      == std::tie(rhs.shipLevel, rhs.maxFuel, rhs.crewSize, rhs.fuelEfficiency, rhs.shipSpeed, rhs.capabilities);
+std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ShipUpgrades& upgrades) {
+  ShipUpgrades decoded;
+  auto result = ds >> decoded.ship_level >> decoded.max_fuel >> decoded.crew_size
+      >> decoded.fuel_efficiency >> decoded.ship_speed >> decoded.capabilities;
+  if (result)
+    upgrades = std::move(decoded);
+  return result;
+}
+
+std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, ShipUpgrades const& upgrades) {
+  return ds << upgrades.ship_level << upgrades.max_fuel << upgrades.crew_size
+      << upgrades.fuel_efficiency << upgrades.ship_speed << upgrades.capabilities;
 }
 
 }

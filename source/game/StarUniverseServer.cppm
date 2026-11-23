@@ -287,10 +287,10 @@ private:
   [[nodiscard]] std::expected<void, StarException> processUniverseFlags();
   [[nodiscard]] std::expected<void, StarException> send_pending_chat();
   [[nodiscard]] std::expected<void, StarException> updateTeams();
-  [[nodiscard]] std::expected<void, StarException> updateShips();
+  [[nodiscard]] std::expected<void, StarException> update_ships();
   [[nodiscard]] std::expected<void, StarException> sendClockUpdates();
-  [[nodiscard]] std::expected<void, StarException> sendClientContextUpdate(std::shared_ptr<ServerClientContext> clientContext);
-  [[nodiscard]] std::expected<void, StarException> sendClientContextUpdates();
+  [[nodiscard]] std::expected<void, StarException> send_client_context_update(ServerClientContext& client);
+  [[nodiscard]] std::expected<void, StarException> send_client_context_updates();
   [[nodiscard]] std::expected<void, StarException> kickErroredPlayers();
   [[nodiscard]] std::expected<void, StarException> reapConnections();
   [[nodiscard]] std::expected<void, StarException> processPlanetTypeChanges();

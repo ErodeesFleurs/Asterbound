@@ -288,13 +288,15 @@ std::expected<std::unique_ptr<TestUniverse>, StarException> TestUniverse::create
   if (!uuid)
     return std::unexpected(std::move(uuid.error()));
   auto id = fixture->m_server->clientForUuid(*uuid);
-  auto context = fixture->m_client->clientContext();
+  auto context = fixture->m_client->client_context();
   if (!id || !context)
     return std::unexpected(TestUniverseException("Missing peer after local handshake"));
+  if (context->connection_id() != *id)
+    return std::unexpected(TestUniverseException("Handshake published a different client ID before WorldStart"));
   auto server_version = fixture->m_server->clientConnectionVersion(*id);
   if (!server_version)
     return std::unexpected(std::move(server_version.error()));
-  auto client_version = context->netCompatibilityRules().version();
+  auto client_version = context->net_compatibility_rules().version();
   auto expected_version = force_legacy ? legacy_version : open_protocol_version;
   if (*server_version != expected_version || client_version != expected_version)
     return std::unexpected(TestUniverseException::format("Local handshake expected {}, got client {} and server {}",
@@ -343,15 +345,15 @@ std::expected<void, StarException> TestUniverse::warpPlayer(WorldId worldId) {
   // handshake, and both the warp call and the caller's expectations read it, so
   // let the client settle first.
   auto connectStart = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
-  while (!m_client->clientContext() && std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) - connectStart < std::chrono::milliseconds(60000)) {
+  while (!m_client->client_context() && std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) - connectStart < std::chrono::milliseconds(60000)) {
     auto updated = m_client->update(0.016f);
     if (!updated)
       return std::unexpected(std::move(updated.error()));
-    if (!m_client->clientContext())
+    if (!m_client->client_context())
       std::this_thread::sleep_for(std::chrono::milliseconds(16));
   }
 
-  if (!m_client->clientContext())
+  if (!m_client->client_context())
     return std::unexpected(StarException("Timed out waiting for the test universe login handshake"));
   auto warped = m_client->warpPlayer(WarpToWorld(worldId), true);
   if (!warped)
@@ -363,11 +365,11 @@ std::expected<void, StarException> TestUniverse::warpPlayer(WorldId worldId) {
   // build several times that, so the runner's per-case timeout
   // (ASTERBOUND_TEST_TIMEOUT) is the practical limit.
   auto startTime = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
-  while (m_mainPlayer->isTeleporting() || std::holds_alternative<std::monostate>(m_client->playerWorld())) {
+  while (m_mainPlayer->isTeleporting() || std::holds_alternative<std::monostate>(m_client->player_world())) {
     auto updated = m_client->update(0.016f);
     if (!updated)
       return std::unexpected(std::move(updated.error()));
-    if (!m_mainPlayer->isTeleporting() && !std::holds_alternative<std::monostate>(m_client->playerWorld()))
+    if (!m_mainPlayer->isTeleporting() && !std::holds_alternative<std::monostate>(m_client->player_world()))
       break;
     if (std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) - startTime > std::chrono::milliseconds(300000))
       return std::unexpected(StarException("Timed out waiting for the test player to finish warping"));
@@ -377,8 +379,8 @@ std::expected<void, StarException> TestUniverse::warpPlayer(WorldId worldId) {
 }
 
 WorldId TestUniverse::currentPlayerWorld() const {
-  if (auto clientContext = m_client->clientContext())
-    return clientContext->playerWorldId();
+  if (auto client_context = m_client->client_context())
+    return client_context->player_world_id();
 
   return {};
 }
@@ -418,7 +420,7 @@ std::expected<List<Drawable>, StarException> TestUniverse::currentClientDrawable
 
 std::expected<TestUniverse::ReadyWorld, StarException>
 TestUniverse::waitForWorldReady(std::int64_t timeoutMilliseconds) {
-  if (!m_client || !m_server || !m_client->clientContext())
+  if (!m_client || !m_server || !m_client->client_context())
     return std::unexpected(TestUniverseException("Cannot wait for a closed or disconnected test universe"));
 
   struct Observation {
@@ -430,7 +432,7 @@ TestUniverse::waitForWorldReady(std::int64_t timeoutMilliseconds) {
   ReadyWorld ready{{}, 0, 0, 0, 0};
   std::optional<RpcPromise<Json>> barrier;
   auto worldId = currentPlayerWorld();
-  auto connectionId = m_client->clientContext()->connectionId();
+  auto connectionId = m_client->client_context()->connection_id();
   auto start = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
   auto timeout = std::chrono::milliseconds(timeoutMilliseconds);
   bool sampled = false;

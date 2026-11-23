@@ -387,9 +387,9 @@ TEST(JsonRpcTest, RemoteFailureStillFulfillsNull) {
   EXPECT_EQ(requests[0].get_string("handler"), "remote");
   auto id = requests[0].get("id");
   ASSERT_TRUE(id);
-  DataStreamBuffer failBuffer;
-  ASSERT_TRUE(failBuffer.write_container(List<Json>{JsonObject{{"command", "fail"}, {"id", *id}}}));
-  ASSERT_TRUE(sender.receive(failBuffer.take_data()));
+  DataStreamBuffer fail_buffer;
+  ASSERT_TRUE(fail_buffer.write_container(List<Json>{JsonObject{{"command", "fail"}, {"id", *id}}}));
+  ASSERT_TRUE(sender.receive(fail_buffer.span()));
   EXPECT_EQ(response->finished(), true);
   EXPECT_EQ(response->succeeded(), true);
   EXPECT_EQ(response->failed(), false);
@@ -412,11 +412,11 @@ TEST(JsonRpcTest, SuccessfulTransportPreservesStructuredResult) {
   ASSERT_TRUE(response);
   auto request = sender.send();
   ASSERT_TRUE(request);
-  ASSERT_TRUE(receiver.receive(*request));
+  ASSERT_TRUE(receiver.receive(request->span()));
   EXPECT_EQ(response->finished(), false);
   auto reply = receiver.send();
   ASSERT_TRUE(reply);
-  ASSERT_TRUE(sender.receive(*reply));
+  ASSERT_TRUE(sender.receive(reply->span()));
   EXPECT_EQ(response->succeeded(), true);
   auto result = response->result();
   ASSERT_TRUE(result);
@@ -447,17 +447,17 @@ TEST(JsonRpcTest, TruncatedContainerDoesNotDispatchItsCompleteFirstRequest) {
   auto truncated = *request;
   truncated.resize(truncated.size() - 1);
 
-  EXPECT_FALSE(receiver.receive(truncated));
+  EXPECT_FALSE(receiver.receive(truncated.span()));
   EXPECT_EQ(calls, 0);
   EXPECT_FALSE(receiver.has_pending());
   EXPECT_EQ(firstResponse->finished(), false);
   EXPECT_EQ(secondResponse->finished(), false);
 
-  ASSERT_TRUE(receiver.receive(*request));
+  ASSERT_TRUE(receiver.receive(request->span()));
   EXPECT_EQ(calls, 2);
   auto reply = receiver.send();
   ASSERT_TRUE(reply);
-  ASSERT_TRUE(sender.receive(*reply));
+  ASSERT_TRUE(sender.receive(reply->span()));
   auto firstResult = firstResponse->result();
   ASSERT_TRUE(firstResult);
   EXPECT_EQ(*firstResult, std::optional<Json>{firstArguments});
@@ -488,10 +488,10 @@ TEST(JsonRpcTest, HandlerRegistrationPreservesActiveCallableState) {
     ASSERT_TRUE(response);
     auto request = sender.send();
     ASSERT_TRUE(request);
-    ASSERT_TRUE(receiver.receive(*request));
+    ASSERT_TRUE(receiver.receive(request->span()));
     auto reply = receiver.send();
     ASSERT_TRUE(reply);
-    ASSERT_TRUE(sender.receive(*reply));
+    ASSERT_TRUE(sender.receive(reply->span()));
     auto result = response->result();
     ASSERT_TRUE(result);
     EXPECT_EQ(*result, std::optional<Json>{Json(expected)});
@@ -501,10 +501,10 @@ TEST(JsonRpcTest, HandlerRegistrationPreservesActiveCallableState) {
   ASSERT_TRUE(response);
   auto request = sender.send();
   ASSERT_TRUE(request);
-  ASSERT_TRUE(receiver.receive(*request));
+  ASSERT_TRUE(receiver.receive(request->span()));
   auto reply = receiver.send();
   ASSERT_TRUE(reply);
-  ASSERT_TRUE(sender.receive(*reply));
+  ASSERT_TRUE(sender.receive(reply->span()));
   auto result = response->result();
   ASSERT_TRUE(result);
   EXPECT_EQ(*result, std::optional<Json>{Json(255)});
@@ -526,12 +526,12 @@ TEST(JsonRpcTest, MalformedResponseLeavesKeeperForValidReply) {
 
   DataStreamBuffer malformed;
   ASSERT_TRUE(malformed.write_container(List<Json>{JsonObject{{"command", "response"}, {"id", *id}}}));
-  ASSERT_TRUE(sender.receive(malformed.take_data()));
+  ASSERT_TRUE(sender.receive(malformed.span()));
   EXPECT_EQ(response->finished(), false);
 
   DataStreamBuffer valid;
   ASSERT_TRUE(valid.write_container(List<Json>{JsonObject{{"command", "response"}, {"id", *id}, {"result", 42}}}));
-  ASSERT_TRUE(sender.receive(valid.take_data()));
+  ASSERT_TRUE(sender.receive(valid.span()));
   auto result = response->result();
   ASSERT_TRUE(result);
   EXPECT_EQ(*result, std::optional<Json>{Json(42)});
@@ -559,12 +559,12 @@ TEST(JsonRpcTest, ErasingAnActiveHandlerKeepsItsClosureAliveUntilReturn) {
     ASSERT_TRUE(response);
     auto request = sender.send();
     ASSERT_TRUE(request);
-    ASSERT_TRUE(receiver.receive(*request));
+    ASSERT_TRUE(receiver.receive(request->span()));
     EXPECT_TRUE(lifetime.expired());
     EXPECT_FALSE(receiver.remove_handler("erase"));
     auto reply = receiver.send();
     ASSERT_TRUE(reply);
-    ASSERT_TRUE(sender.receive(*reply));
+    ASSERT_TRUE(sender.receive(reply->span()));
     auto result = response->result();
     ASSERT_TRUE(result);
     EXPECT_EQ(*result, std::optional<Json>{Json(true)});
@@ -583,10 +583,10 @@ TEST(JsonRpcTest, EndpointCopiesKeepIndependentCallableState) {
   ASSERT_TRUE(sender.invoke_remote("count", Json{}));
   auto request = sender.send();
   ASSERT_TRUE(request);
-  ASSERT_TRUE(receiver.receive(*request));
+  ASSERT_TRUE(receiver.receive(request->span()));
   JsonRpc copy = receiver;
-  ASSERT_TRUE(copy.receive(*request));
-  ASSERT_TRUE(receiver.receive(*request));
+  ASSERT_TRUE(copy.receive(request->span()));
+  ASSERT_TRUE(receiver.receive(request->span()));
   EXPECT_EQ(visits, (std::vector<int>{1, 2, 2}));
 }
 

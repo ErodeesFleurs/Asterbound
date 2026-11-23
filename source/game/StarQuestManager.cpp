@@ -97,7 +97,7 @@ std::expected<void, StarException> QuestManager::init(Player& player, World& wor
   m_trackOnWorldQuests = true;
   if (m_trackedQuestId) {
     if (auto quest = m_quests.find_ref(*m_trackedQuestId)) {
-      if (quest->get()->hideCrossServer() && quest->get()->serverUuid() && *quest->get()->serverUuid() != m_player->get().clientContext()->serverUuid()) m_trackedQuestId.reset();
+      if (quest->get()->hideCrossServer() && quest->get()->serverUuid() && *quest->get()->serverUuid() != m_player->get().client_context()->server_uuid()) m_trackedQuestId.reset();
     }
   }
   return {};
@@ -139,7 +139,7 @@ std::expected<bool, StarException> QuestManager::canStart(QuestArcDescriptor con
         return false;
     for (auto const& prerequisite : (*config)->prerequisiteQuests) if (!hasCompleted(prerequisite)) return false;
     for (auto const& item : (*config)->requiredItems) if (!m_player->get().inventory()->hasItem(item)) return false;
-    if ((*config)->requiredShipLevel && m_player->get().shipUpgrades().shipLevel < *(*config)->requiredShipLevel) return false;
+    if ((*config)->requiredShipLevel && m_player->get().ship_upgrades().ship_level < *(*config)->requiredShipLevel) return false;
   }
   return true;
 }
@@ -490,11 +490,11 @@ std::expected<void, StarException> QuestManager::update(float dt) {
       auto quest = getQuest(*m_onWorldQuestId);
       if (!quest) return std::unexpected(std::move(quest.error()));
       auto world = (*quest)->worldId();
-      if (!world || m_player->get().clientContext()->playerWorldId() != *world) active = false;
+      if (!world || m_player->get().client_context()->player_world_id() != *world) active = false;
     }
     if (!active) m_onWorldQuestId.reset();
   } else if (m_trackOnWorldQuests && m_client) {
-    auto playerWorld = m_client->get().clientContext()->playerWorldId();
+    auto playerWorld = m_client->get().client_context()->player_world_id();
     auto trackedWorld = currentQuest().and_then([](std::shared_ptr<Quest> const& quest) { return quest->worldId(); });
     if (!trackedWorld || playerWorld != *trackedWorld) {
       for (auto const& quest : listActiveQuests()) {
@@ -548,6 +548,6 @@ void QuestManager::setMostRecentQuestCurrent() {
 }
 bool QuestManager::questValidOnServer(std::shared_ptr<Quest> const& q) const {
   return !(q->hideCrossServer() && q->serverUuid()
-      && (!m_player || *q->serverUuid() != m_player->get().clientContext()->serverUuid()));
+      && (!m_player || *q->serverUuid() != m_player->get().client_context()->server_uuid()));
 }
 }

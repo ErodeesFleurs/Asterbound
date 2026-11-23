@@ -775,11 +775,11 @@ std::expected<void, StarException> Player::diskLoad(Json const& diskStore) {
   if (!shipResult)
     return std::unexpected(std::move(shipResult.error()));
   auto ship = std::move(*shipResult);
-  auto shipUpgradesResult = ShipUpgrades::create(ship);
-  if (!shipUpgradesResult)
-    return std::unexpected(std::move(shipUpgradesResult.error()));
-  auto shipUpgrades = std::move(*shipUpgradesResult);
-  m_shipUpgrades = std::move(shipUpgrades);
+  auto ship_upgrades_result = ShipUpgrades::create(ship);
+  if (!ship_upgrades_result)
+    return std::unexpected(std::move(ship_upgrades_result.error()));
+  auto ship_upgrades = std::move(*ship_upgrades_result);
+  m_ship_upgrades = std::move(ship_upgrades);
   auto blueprintsJsonResult = diskStore.get("blueprints");
   if (!blueprintsJsonResult)
     return std::unexpected(std::move(blueprintsJsonResult.error()));
@@ -798,8 +798,8 @@ std::expected<void, StarException> Player::diskLoad(Json const& diskStore) {
     return std::unexpected(std::move(universeMapResult.error()));
   auto universeMap = std::move(*universeMapResult);
   m_universeMap = std::make_shared<PlayerUniverseMap>(std::move(universeMap));
-  if (m_clientContext)
-    m_universeMap->setServerUuid(m_clientContext->serverUuid());
+  if (m_client_context)
+    m_universeMap->setServerUuid(m_client_context->server_uuid());
   auto codexesJsonResult = diskStore.get("codexes");
   if (!codexesJsonResult)
     return std::unexpected(std::move(codexesJsonResult.error()));
@@ -973,14 +973,14 @@ std::expected<void, StarException> Player::diskLoad(Json const& diskStore) {
   return {};
 }
 
-std::shared_ptr<ClientContext> Player::clientContext() const {
-  return m_clientContext;
+std::shared_ptr<ClientContext> Player::client_context() const {
+  return m_client_context;
 }
 
-void Player::setClientContext(std::shared_ptr<ClientContext> clientContext) {
-  m_clientContext = std::move(clientContext);
-  if (m_clientContext && m_universeMap)
-    m_universeMap->setServerUuid(m_clientContext->serverUuid());
+void Player::set_client_context(std::shared_ptr<ClientContext> client_context) {
+  m_client_context = std::move(client_context);
+  if (m_client_context && m_universeMap)
+    m_universeMap->setServerUuid(m_client_context->server_uuid());
 }
 
 std::shared_ptr<Statistics> Player::statistics() const {
@@ -2886,7 +2886,7 @@ std::expected<void, StarException> Player::refreshArmor() {
   if (isSlave())
     return {};
 
-  bool shouldSetArmorSecrets = m_clientContext && m_clientContext->netCompatibilityRules().version() < 9;
+  bool shouldSetArmorSecrets = m_client_context && m_client_context->net_compatibility_rules().version() < 9;
   for (std::uint8_t i = 0; i != 20; ++i) {
     auto slot = static_cast<EquipmentSlot>(i);
     auto item = m_inventory->equipment(slot);
@@ -3156,8 +3156,8 @@ std::expected<void, StarException> Player::interactWithEntity(std::shared_ptr<In
       if (!questResult)
         return std::unexpected(std::move(questResult.error()));
       auto quest = std::move(*questResult);
-      quest->setWorldId(clientContext()->playerWorldId());
-      quest->setServerUuid(clientContext()->serverUuid());
+      quest->setWorldId(client_context()->player_world_id());
+      quest->setServerUuid(client_context()->server_uuid());
       if (auto result = quest->setEntityParameter("questGiver", entity); !result)
         return std::unexpected(std::move(result.error()));
       return m_questManager->offer(quest);
@@ -3989,7 +3989,7 @@ std::expected<void, StarException> Player::setNetArmorSecret(EquipmentSlot slot,
 }
 
 std::expected<void, StarException> Player::setNetArmorSecrets(bool includeEmpty) {
-  if (m_clientContext && m_clientContext->netCompatibilityRules().version() < 9) {
+  if (m_client_context && m_client_context->net_compatibility_rules().version() < 9) {
     for (std::uint8_t i = 0; i != 12; ++i) {
       auto slot = EquipmentSlot(static_cast<std::uint8_t>(EquipmentSlot::Cosmetic1) + i);
       auto storedResult = m_inventory->itemsAt(slot);
@@ -4226,24 +4226,24 @@ PlayerModeConfig const& Player::mode_config() const & {
   return m_modeConfig;
 }
 
-ShipUpgrades Player::shipUpgrades() {
-  return m_shipUpgrades;
+ShipUpgrades const& Player::ship_upgrades() const & {
+  return m_ship_upgrades;
 }
 
-void Player::setShipUpgrades(ShipUpgrades shipUpgrades) {
-  m_shipUpgrades = std::move(shipUpgrades);
+void Player::set_ship_upgrades(ShipUpgrades const& ship_upgrades) {
+  if (m_ship_upgrades != ship_upgrades)
+    m_ship_upgrades = ship_upgrades;
 }
 
-std::expected<void, StarException> Player::applyShipUpgrades(Json const& upgrades) {
-  auto playerUuidResult = uuid();
-  if (!playerUuidResult)
-    return std::unexpected(std::move(playerUuidResult.error()));
-  auto playerUuid = std::move(*playerUuidResult);
-  if (m_clientContext->playerUuid() == playerUuid) {
-    if (auto result = m_clientContext->rpcInterface()->invoke_remote("ship.applyShipUpgrades", upgrades); !result)
+std::expected<void, StarException> Player::apply_ship_upgrades(Json const& upgrades) {
+  auto player_uuid = uuid();
+  if (!player_uuid)
+    return std::unexpected(std::move(player_uuid.error()));
+  if (m_client_context->player_uuid() == *player_uuid) {
+    if (auto result = m_client_context->rpc_interface()->invoke_remote("ship.applyShipUpgrades", upgrades); !result)
       return std::unexpected(std::move(result.error()));
   } else {
-    if (auto result = m_shipUpgrades.apply(upgrades); !result)
+    if (auto result = m_ship_upgrades.apply(upgrades); !result)
       return std::unexpected(std::move(result.error()));
   }
   return {};
@@ -4663,7 +4663,7 @@ std::expected<Json, StarException> Player::diskStore() {
   auto deployment = std::move(*deploymentResult);
   return JsonObject{
     {"uuid", *id}, {"description", m_description}, {"modeType", mode},
-    {"shipUpgrades", m_shipUpgrades.toJson()}, {"shipSpecies", !m_shipSpecies.empty() ? m_shipSpecies : m_identity.species},
+    {"shipUpgrades", m_ship_upgrades.to_json()}, {"shipSpecies", !m_shipSpecies.empty() ? m_shipSpecies : m_identity.species},
     {"blueprints", m_blueprints->toJson()}, {"universeMap", std::move(universeMap)}, {"codexes", m_codexes->toJson()},
     {"techs", std::move(techs)}, {"identity", std::move(identity)}, {"team", std::move(team)},
     {"inventory", std::move(inventory)}, {"movementController", std::move(movement)},

@@ -160,7 +160,9 @@ public:
   using Sector = ServerTileSectorArray::Sector;
   using TileArray = ServerTileSectorArray::Array;
 
-  static WorldChunks getWorldChunksUpdate(WorldChunks const& oldChunks, WorldChunks const& newChunks);
+  [[nodiscard]] static WorldChunks get_world_chunks_update(WorldChunks const& old_chunks, WorldChunks const& new_chunks);
+  // Overlay only changed entries onto pending; return whether this comparison emitted any.
+  static bool accumulate_world_chunks_update(WorldChunks& pending, WorldChunks const& old_chunks, WorldChunks const& new_chunks);
   [[nodiscard]] static std::expected<void, StarException> applyWorldChunksUpdateToFile(Logger& logger, String const& file, WorldChunks const& update);
   [[nodiscard]] static std::expected<WorldChunks, StarException> getWorldChunksFromFile(Logger& logger, String const& file);
 

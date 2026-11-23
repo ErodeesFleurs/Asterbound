@@ -252,6 +252,10 @@ set (star_game_tests_SOURCES
       celestial_value_test.cpp
       chat_routing_test.cpp
       chat_wire_test.cpp
+      context_client_test.cpp
+      context_layout_test.cpp
+      context_session_test.cpp
+      context_transport_test.cpp
       damage_database_test.cpp
       function_test.cpp
       humanoid_render_test.cpp

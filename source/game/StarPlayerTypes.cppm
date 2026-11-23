@@ -42,19 +42,19 @@ struct PlayerModeConfig {
 };
 
 struct ShipUpgrades {
-  explicit ShipUpgrades();
-  [[nodiscard]] static std::expected<ShipUpgrades, StarException> create(Json config);
-  Json toJson() const;
+  explicit ShipUpgrades() = default;
+  [[nodiscard]] static std::expected<ShipUpgrades, StarException> create(Json const& config);
+  Json to_json() const;
 
   [[nodiscard]] std::expected<std::reference_wrapper<ShipUpgrades>, StarException> apply(Json const& upgrades);
 
-  bool operator==(ShipUpgrades const& rhs) const;
+  bool operator==(ShipUpgrades const&) const = default;
 
-  unsigned shipLevel;
-  unsigned maxFuel;
-  unsigned crewSize;
-  float fuelEfficiency;
-  float shipSpeed;
+  unsigned ship_level = 0;
+  unsigned max_fuel = 0;
+  unsigned crew_size = 0;
+  float fuel_efficiency = 1.0f;
+  float ship_speed = 0;
   StringSet capabilities;
 };
 

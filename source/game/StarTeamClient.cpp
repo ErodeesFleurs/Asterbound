@@ -149,10 +149,10 @@ namespace Star {
 // update this in the rare case that backwards compat code has to be set up in TeamManager
 extern VersionNumber const TeamClientVersion = 1;
   
-TeamClient::TeamClient(Root& root, std::shared_ptr<Player> mainPlayer, std::shared_ptr<ClientContext> clientContext)
+TeamClient::TeamClient(Root& root, std::shared_ptr<Player> mainPlayer, std::shared_ptr<ClientContext> client_context)
   : m_root(root), m_teamLeader(root.random()), m_pendingInvitation(Uuid(root.random()), String()) {
   m_mainPlayer = std::move(mainPlayer);
-  m_clientContext = std::move(clientContext);
+  m_client_context = std::move(client_context);
 
   m_hasPendingInvitation = false;
   m_pollInvitationsTimer = {};
@@ -167,7 +167,7 @@ TeamClient::TeamClient(Root& root, std::shared_ptr<Player> mainPlayer, std::shar
 bool TeamClient::isTeamLeader() {
   if (!m_teamUuid)
     return false;
-  return m_teamLeader == m_clientContext->playerUuid();
+  return m_teamLeader == m_client_context->player_uuid();
 }
 
 bool TeamClient::isTeamLeader(Uuid const& playerUuid) {
@@ -182,7 +182,7 @@ std::expected<void, StarException> TeamClient::invitePlayer(String const& player
   if (playerName.empty()) return {};
   JsonObject request;
   request["inviteeName"] = playerName;
-  request["inviterUuid"] = m_clientContext->playerUuid().hex();
+  request["inviterUuid"] = m_client_context->player_uuid().hex();
   auto name = m_mainPlayer->name();
   if (!name) return std::unexpected(std::move(name.error()));
   request["inviterName"] = *name;
@@ -214,7 +214,7 @@ std::expected<void, StarException> TeamClient::invitePlayer(String const& player
 std::expected<void, StarException> TeamClient::acceptInvitation(Uuid const& inviterUuid) {
   JsonObject request;
   request["inviterUuid"] = inviterUuid.hex();
-  request["inviteeUuid"] = m_clientContext->playerUuid().hex();
+  request["inviteeUuid"] = m_client_context->player_uuid().hex();
   return invoke_remote("team.acceptInvitation", request, [&self = *this](Json) -> std::expected<void, StarException> { self.forceUpdate(); return {}; });
 }
 
@@ -236,7 +236,7 @@ std::expected<void, StarException> TeamClient::makeLeader(Uuid const& playerUuid
 std::expected<void, StarException> TeamClient::removeFromTeam(Uuid const& playerUuid) {
   if (!m_teamUuid)
     return {};
-  if (!isTeamLeader() && playerUuid != m_clientContext->playerUuid())
+  if (!isTeamLeader() && playerUuid != m_client_context->player_uuid())
     return {};
   JsonObject request;
   request["teamUuid"] = m_teamUuid->hex();
@@ -288,7 +288,7 @@ std::expected<void, StarException> TeamClient::update() {
     if (std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now()) - m_pollInvitationsTimer > std::chrono::duration<double>(*interval)) {
       m_pollInvitationsTimer = std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now());
       JsonObject request;
-      request["playerUuid"] = m_clientContext->playerUuid().hex();
+      request["playerUuid"] = m_client_context->player_uuid().hex();
       auto invoked = invoke_remote("team.pollInvitation", request, [&self = *this](Json response) -> std::expected<void, StarException> {
         if (response.is_null() || self.m_hasPendingInvitation) return {};
         auto uuidText = response.get_string("inviterUuid");
@@ -329,7 +329,7 @@ std::expected<void, StarException> TeamClient::pullFullUpdate() {
   if (m_fullUpdateRunning) return {};
   m_fullUpdateRunning = true;
   JsonObject request;
-  request["playerUuid"] = m_clientContext->playerUuid().hex();
+  request["playerUuid"] = m_client_context->player_uuid().hex();
   return invoke_remote("team.fetchTeamStatus", request, [&self = *this](Json response) -> std::expected<void, StarException> {
     self.m_fullUpdateRunning = false;
     auto version = response.opt_int("version");
@@ -456,10 +456,10 @@ JsonArray TeamClient::memberStatus() const {
                                 {"healthPercentage", member.healthPercentage},
                                 {"energyPercentage", member.energyPercentage},
                                 {"position", JsonArray{member.position[0], member.position[1]}},
-                                {"onWorld", member.world == m_clientContext->playerWorldId()},
+                                {"onWorld", member.world == m_client_context->player_world_id()},
                                 {"canTravel", member.warpMode != WarpMode::None},
                                 {"leader", member.uuid == m_teamLeader},
-                                {"self", member.uuid == m_clientContext->playerUuid()},
+                                {"self", member.uuid == m_client_context->player_uuid()},
                                 {"portraitRevision", member.portraitRevision}});
   }
   return result;
@@ -492,7 +492,7 @@ void TeamClient::forceUpdate() {
 
 std::expected<void, StarException> TeamClient::invoke_remote(String const& method, Json const& args,
     std::function<std::expected<void, StarException>(Json const&)> responseFunction) {
-  auto promise = m_clientContext->rpcInterface()->invoke_remote(method, args);
+  auto promise = m_client_context->rpc_interface()->invoke_remote(method, args);
   if (!promise) return std::unexpected(std::move(promise.error()));
   m_pendingResponses.push_back({std::move(*promise), std::move(responseFunction)});
   return {};
@@ -523,7 +523,7 @@ std::expected<void, StarException> TeamClient::handleRpcResponses() {
 
 std::expected<void, StarException> TeamClient::writePlayerData(JsonObject& request, std::shared_ptr<Player> player, bool fullWrite) const {
   request["version"] = TeamClientVersion;
-  request["playerUuid"] = m_clientContext->playerUuid().hex();
+  request["playerUuid"] = m_client_context->player_uuid().hex();
   request["entity"] = player->entityId();
   auto maximumHealth = player->maxHealth();
   if (!maximumHealth) return std::unexpected(std::move(maximumHealth.error()));
@@ -535,13 +535,13 @@ std::expected<void, StarException> TeamClient::writePlayerData(JsonObject& reque
   request["energy"] = *energy / *maximumEnergy;
   request["x"] = player->position()[0];
   request["y"] = player->position()[1];
-  auto world = Star::print_world_id(m_clientContext->playerWorldId());
+  auto world = Star::print_world_id(m_client_context->player_world_id());
   if (!world) return std::unexpected(std::move(world.error()));
   request["world"] = *world;
 
   WarpMode mode = WarpMode::None;
   if (player->log()->introComplete()) {
-    if (std::holds_alternative<CelestialWorldId>(m_clientContext->playerWorldId()))
+    if (std::holds_alternative<CelestialWorldId>(m_client_context->player_world_id()))
       mode = WarpMode::BeamOnly;
     else
       mode = player->isDeployed() ? WarpMode::DeployOnly : WarpMode::BeamOnly;

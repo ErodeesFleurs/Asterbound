@@ -165,8 +165,8 @@ public:
   std::optional<std::reference_wrapper<Input>> input() const override { return m_input; }
   void setInput(std::optional<std::reference_wrapper<Input>> input) { m_input = input; }
 
-  std::shared_ptr<ClientContext> clientContext() const;
-  void setClientContext(std::shared_ptr<ClientContext> clientContext);
+  std::shared_ptr<ClientContext> client_context() const;
+  void set_client_context(std::shared_ptr<ClientContext> client_context);
 
   std::shared_ptr<Statistics> statistics() const;
   void setStatistics(std::shared_ptr<Statistics> statistics);
@@ -399,9 +399,9 @@ public:
   PlayerModeConfig const& mode_config() const &;
   PlayerModeConfig const& mode_config() const && = delete;
 
-  ShipUpgrades shipUpgrades();
-  void setShipUpgrades(ShipUpgrades shipUpgrades);
-  [[nodiscard]] std::expected<void, StarException> applyShipUpgrades(Json const& upgrades);
+  ShipUpgrades const& ship_upgrades() const &;
+  void set_ship_upgrades(ShipUpgrades const& ship_upgrades);
+  [[nodiscard]] std::expected<void, StarException> apply_ship_upgrades(Json const& upgrades);
   void setShipSpecies(String species);
   String shipSpecies() const;
 
@@ -655,7 +655,7 @@ private:
 
   NetElementTopGroup m_netGroup;
 
-  std::shared_ptr<ClientContext> m_clientContext;
+  std::shared_ptr<ClientContext> m_client_context;
   std::shared_ptr<Statistics> m_statistics;
   std::shared_ptr<QuestManager> m_questManager;
 
@@ -711,7 +711,7 @@ private:
 
   PlayerMode m_modeType;
   PlayerModeConfig m_modeConfig;
-  ShipUpgrades m_shipUpgrades;
+  ShipUpgrades m_ship_upgrades;
   String m_shipSpecies;
 
   std::shared_ptr<ToolUser> m_tools;

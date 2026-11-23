@@ -332,7 +332,7 @@ std::expected<void, StarException> TeleportDialog::initialize(Json config) {
   if (!includeParty) return std::unexpected(std::move(includeParty.error()));
   if (*includeParty) {
     for (auto const& member : m_client->teamClient()->members()) {
-      if (member.uuid == m_client->clientContext()->playerUuid() || member.warpMode == WarpMode::None) continue;
+      if (member.uuid == m_client->client_context()->player_uuid() || member.warpMode == WarpMode::None) continue;
       auto entry = (*destList)->addItem();
       if (!entry) return std::unexpected(std::move(entry.error()));
       bool deploy = member.warpMode == WarpMode::DeployOnly;

@@ -537,6 +537,26 @@ List<UniverseConnection> UniverseConnectionServer::removeAllConnections() {
   return removedConnections;
 }
 
+std::expected<void, StarException> UniverseConnectionServer::enqueue_packet(ConnectionId client_id, std::shared_ptr<Packet> packet) {
+  if (!packet)
+    return std::unexpected(UniverseConnectionException("Cannot enqueue a null packet"));
+  std::unique_lock connections_lock(m_connectionsMutex);
+  if (m_stopSource.stop_requested())
+    return std::unexpected(UniverseConnectionException("Cannot enqueue a packet after network shutdown begins"));
+  auto connection = m_connections[client_id % m_numWorkerThreads].value(client_id);
+  if (!connection)
+    return std::unexpected(UniverseConnectionException::format("No such client '{}' in UniverseConnectionServer::enqueue_packet", client_id));
+  {
+    std::lock_guard lock(connection->mutex);
+    connections_lock.unlock();
+    if (!connection->packetSocket || !connection->packetSocket->isOpen())
+      return std::unexpected(UniverseConnectionException::format("Cannot enqueue a packet for closed client '{}'", client_id));
+    connection->sendQueue.push_back(std::move(packet));
+  }
+  m_workCondition.notify_all();
+  return {};
+}
+
 std::expected<void, StarException> UniverseConnectionServer::sendPackets(ConnectionId clientId, List<std::shared_ptr<Packet>> packets) {
   std::unique_lock connectionsLocker(m_connectionsMutex, std::defer_lock);
   lock_with_diagnostics(connectionsLocker);

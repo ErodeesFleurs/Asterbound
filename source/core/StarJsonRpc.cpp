@@ -67,13 +67,18 @@ std::expected<ByteArray, StarException> JsonRpc::send() {
   return buffer.take_data();
 }
 
-std::expected<void, StarException> JsonRpc::receive(ByteArray const& inbuffer) {
-  if (inbuffer.empty())
+std::expected<void, StarException> JsonRpc::receive(std::span<char const> bytes) {
+  if (bytes.empty())
     return {};
-  DataStreamReader buffer(inbuffer.span());
+  DataStreamReader buffer(bytes);
   List<Json> inbound;
   if (auto status = buffer.read_container(inbound); !status)
     return std::unexpected(std::move(status.error()));
+  auto end = buffer.at_end();
+  if (!end)
+    return std::unexpected(std::move(end.error()));
+  if (!*end)
+    return std::unexpected(JsonRpcException("Trailing bytes in RPC message batch"));
 
   for (auto const& request : inbound) {
     auto command = request.get_string("command");

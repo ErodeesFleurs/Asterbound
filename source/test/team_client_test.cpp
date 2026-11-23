@@ -90,21 +90,21 @@ const GameTestRegistration teamStatusSynchronization(
       return {};
     };
     ASSERT_TRUE(formTeam());
-    auto context = ClientContext::create(**root, Uuid((*root)->random()), *uuid);
+    auto context = ClientContext::create((*root)->logger(), Uuid((*root)->random()), *uuid, 1, {});
     ASSERT_TRUE(context);
     // ClientContext owns this concrete RPC implementation; transport remains real.
-    auto clientRpc = std::static_pointer_cast<JsonRpc>((*context)->rpcInterface());
+    auto clientRpc = std::static_pointer_cast<JsonRpc>((*context)->rpc_interface());
     Logger logger;
     logger.remove_stdout_sink();
     JsonRpc server(logger);
     ASSERT_TRUE(server.register_handlers(ownHandlers));
     TeamClient team(**root, *player, *context);
     auto exchange = [&](ByteArray const& packet) -> std::expected<void, StarException> {
-      if (auto received = server.receive(packet); !received)
+      if (auto received = server.receive(packet.span()); !received)
         return std::unexpected(std::move(received.error()));
       auto reply = server.send();
       if (!reply) return std::unexpected(std::move(reply.error()));
-      if (auto received = clientRpc->receive(*reply); !received)
+      if (auto received = clientRpc->receive(reply->span()); !received)
         return std::unexpected(std::move(received.error()));
       return team.update();
     };
@@ -187,7 +187,7 @@ const GameTestRegistration teamStatusSynchronization(
     ASSERT_TRUE(id);
     auto failure = DataStreamBuffer::serialize_container(List<Json>{JsonObject{{"command", "fail"}, {"id", *id}}});
     ASSERT_TRUE(failure);
-    ASSERT_TRUE(clientRpc->receive(*failure));
+    ASSERT_TRUE(clientRpc->receive(failure->span()));
     ASSERT_TRUE(team.update());
     auto retried = submit();
     ASSERT_TRUE(retried);
