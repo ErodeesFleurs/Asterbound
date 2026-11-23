@@ -5,43 +5,49 @@ import star.string;
 import star.list;
 import star.json;
 
-import star.data_stream;
-import star.uuid;
-
 namespace Star {
 
 class Root;
 
 class Codex;
-struct CodexEntry;
-class UniverseClient;
+
+struct CodexEntry {
+  std::shared_ptr<Codex const> codex;
+  bool read;
+};
+
+enum class CodexLearnResult { Learned, AlreadyKnown, NotFound };
 
 class PlayerCodexes {
 public:
-  using CodexEntry = std::pair<std::shared_ptr<Codex const>, bool>;
-
-  PlayerCodexes(Root& root);
+  explicit PlayerCodexes(Root& root);
+  PlayerCodexes(PlayerCodexes const&) = delete;
+  PlayerCodexes& operator=(PlayerCodexes const&) = delete;
   [[nodiscard]] static std::expected<std::shared_ptr<PlayerCodexes>, StarException> create(Root& root, Json const& json);
 
-  Json toJson() const;
+  Json to_json() const;
 
-  List<CodexEntry> codexes() const;
-  std::shared_ptr<Codex const> codex(String const& codexId) const;
+  // A player load may replace the domain even when UUID and revision are unchanged.
+  std::uint64_t domain_id() const { return m_domain_id; }
+  std::uint64_t revision() const { return m_revision; }
+  List<CodexEntry> entries() const;
+  std::shared_ptr<Codex const> find(String const& id) const;
+  bool contains(String const& id) const;
+  bool is_read(String const& id) const;
+  bool set_read(String const& id, bool read);
+  std::shared_ptr<Codex const> first_unread() const;
 
-  bool codexKnown(String const& codexId) const;
-  [[nodiscard]] std::expected<std::shared_ptr<Codex const>, StarException> learnCodex(String const& codexId, bool markRead = false);
-
-  bool codexRead(String const& codexId) const;
-  bool markCodexRead(String const& codexId);
-  bool markCodexUnread(String const& codexId);
-
-  [[nodiscard]] std::expected<void, StarException> learnInitialCodexes(String const& playerSpecies);
-
-  std::shared_ptr<Codex const> firstNewCodex() const;
+  [[nodiscard]] std::expected<CodexLearnResult, StarException> learn(String const& id, bool read = false);
+  [[nodiscard]] std::expected<void, StarException> learn_initial(String const& species);
 
 private:
+  CodexLearnResult insert(String const& id, std::shared_ptr<Codex const> codex, bool read);
+
   Root& m_root;
   StringMap<CodexEntry> m_codexes;
+  std::uint64_t const m_domain_id;
+  std::uint64_t m_revision = 0;
+  std::size_t m_unread_count = 0;
 };
 
 }
@@ -51,6 +57,6 @@ export module star.player_codexes;
 export namespace Star {
   using ::Star::Codex;
   using ::Star::CodexEntry;
-  using ::Star::UniverseClient;
+  using ::Star::CodexLearnResult;
   using ::Star::PlayerCodexes;
 }

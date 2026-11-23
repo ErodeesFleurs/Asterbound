@@ -2,12 +2,14 @@
 
 import std;
 import star.algorithm;
+import star.codex;
 import star.configuration;
 import star.file;
 import star.format;
 import star.game_test;
 import star.json;
 import star.player;
+import star.player_codexes;
 import star.player_factory;
 import star.player_storage;
 import star.root;
@@ -267,5 +269,88 @@ const GameTestRegistration
                EXPECT_EQ((*final_storage)->playerUuidAt(0), *second_uuid);
                EXPECT_FALSE((*final_storage)->maybeGetPlayerData(*first_uuid));
              });
+
+const GameTestRegistration codex_state("PlayerCodexes", "DefaultsSaveReadTransitionsAndPinnedCatalog", [](GameTest& fixture) {
+  auto temp = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(temp) << temp.error().what();
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*temp)); });
+  auto overlay = File::relative_to(*temp, "assets");
+  ASSERT_TRUE(File::create_directory(overlay));
+  auto first_path = File::relative_to(overlay, "test-z.codex");
+  ASSERT_TRUE(File::write_file(String(R"({"id":"test-z","title":"Zulu","contentPages":["original"]})"), first_path));
+  ASSERT_TRUE(File::write_file(String(R"({"id":"test-a","title":"Alpha","contentPages":[]})"),
+                               File::relative_to(overlay, "test-a.codex")));
+  ASSERT_TRUE(File::write_file(String(R"([
+    {"op":"add","path":"/defaultCodexes/testmixed","value":["test-a","test-absent","test-z","test-a"]},
+    {"op":"add","path":"/defaultCodexes/testknown","value":["test-z","test-a"]},
+    {"op":"add","path":"/defaultCodexes/testempty","value":[]},
+    {"op":"add","path":"/defaultCodexes/testinvalid","value":["test-z",false]}
+  ])"), File::relative_to(overlay, "player.config.patch")));
+  auto settings = fixture.rootSettings();
+  settings.assetSources.push_back(overlay);
+  settings.storageDirectory = File::relative_to(*temp, "storage");
+  settings.runtimeConfigFile = "domain.config";
+  settings.logDirectory = {};
+  settings.logFile = {};
+  settings.includeUGC = false;
+  auto root = Root::create(settings);
+  ASSERT_TRUE(root) << root.error().what();
+  PlayerCodexes domain(**root);
+  auto initial = domain.revision();
+  EXPECT_FALSE(domain.learn_initial("testinvalid"));
+  EXPECT_FALSE(domain.contains("test-z"));
+  EXPECT_EQ(domain.learn("test-absent"), CodexLearnResult::NotFound);
+  EXPECT_FALSE(domain.set_read("test-absent", false));
+  EXPECT_EQ(domain.revision(), initial);
+
+  ASSERT_EQ(domain.learn("test-z"), CodexLearnResult::Learned);
+  auto pinned = domain.find("test-z");
+  ASSERT_TRUE(pinned);
+  EXPECT_EQ(domain.learn("test-z", true), CodexLearnResult::AlreadyKnown);
+  ASSERT_TRUE(domain.learn_initial("testmixed"));
+  EXPECT_EQ(domain.revision(), initial + 2);
+  EXPECT_EQ(domain.first_unread(), pinned);
+  auto rows = domain.entries();
+  ASSERT_EQ(rows.size(), 2u);
+  EXPECT_EQ(rows[0].codex, pinned);
+  EXPECT_FALSE(rows[0].read);
+  EXPECT_TRUE(rows[1].read);
+  ASSERT_TRUE(domain.set_read("test-a", false));
+  EXPECT_EQ(domain.entries()[0].codex->id(), String("test-a"));
+  EXPECT_TRUE(rows[1].read); // The previous result is a snapshot.
+  EXPECT_TRUE(domain.set_read("test-z", true));
+  EXPECT_EQ(domain.first_unread(), domain.find("test-a"));
+  EXPECT_TRUE(domain.set_read("test-a", true));
+  EXPECT_FALSE(domain.set_read("test-a", true));
+  EXPECT_FALSE(domain.first_unread());
+  EXPECT_TRUE(domain.set_read("test-z", false));
+  EXPECT_EQ(domain.revision(), initial + 6);
+
+  Json saved = JsonObject{{"test-z", false}, {"test-a", true}};
+  EXPECT_EQ(domain.to_json(), saved);
+  auto with_missing = saved.set("test-absent", false);
+  ASSERT_TRUE(with_missing);
+  auto restored = PlayerCodexes::create(**root, *with_missing);
+  ASSERT_TRUE(restored) << restored.error().what();
+  EXPECT_NE((*restored)->domain_id(), domain.domain_id());
+  EXPECT_EQ((*restored)->to_json(), saved);
+  EXPECT_EQ((*restored)->first_unread(), pinned);
+  EXPECT_TRUE((*restored)->set_read("test-z", true));
+  EXPECT_FALSE((*restored)->first_unread());
+  EXPECT_FALSE(PlayerCodexes::create(**root, JsonObject{{"test-absent", 1}}));
+
+  // Even a broken replacement catalog cannot invalidate pinned books or make
+  // an empty/all-known default list depend on loading that catalog.
+  ASSERT_TRUE(File::write_file(String("{}"), first_path));
+  ASSERT_TRUE((*root)->reload());
+  EXPECT_TRUE(PlayerCodexes::create(**root, JsonObject{}));
+  EXPECT_TRUE(domain.learn_initial("testempty"));
+  EXPECT_TRUE(domain.learn_initial("testknown"));
+  EXPECT_EQ(domain.learn("test-z"), CodexLearnResult::AlreadyKnown);
+  EXPECT_FALSE(domain.learn("test-absent"));
+  EXPECT_EQ(domain.revision(), initial + 6);
+  EXPECT_EQ(domain.find("test-z"), pinned);
+  EXPECT_EQ(pinned->page(0), String("original"));
+});
 
 }// namespace

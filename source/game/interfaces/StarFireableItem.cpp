@@ -221,7 +221,7 @@ std::expected<void, StarException> FireableItem::endFire(FireMode mode, bool) {
     auto cooldown = triggerCooldown();
     if (!cooldown)
       return std::unexpected(std::move(cooldown.error()));
-    return fireTriggered();
+    return fire_triggered();
   }
   return {};
 }
@@ -327,7 +327,7 @@ std::expected<void, StarException> FireableItem::update(float dt, FireMode fireM
     if (m_fireWhenReady) {
       if (fireTimer() <= cooldownTime()) {
         m_fireWhenReady = false;
-        auto fired = fireTriggered();
+        auto fired = fire_triggered();
         if (!fired)
           return std::unexpected(std::move(fired.error()));
       }
@@ -443,7 +443,7 @@ std::expected<void, StarException> FireableItem::startTriggered() {
   return {};
 }
 
-std::expected<void, StarException> FireableItem::fireTriggered() {
+std::expected<void, StarException> FireableItem::fire_triggered() {
   if (m_scriptComponent) {
     auto invoked = recover_lua_script_error(m_scriptComponent->invoke("fireTriggered"));
     if (!invoked)

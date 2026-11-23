@@ -1,24 +1,17 @@
-import star.format;
 import std;
+import star.asset_path;
+import star.codex;
+import star.format;
 import star.string;
 import star.json;
 import star.json_extra;
 import star.list;
-import star.image_processing;
-import star.hash;
-import star.data_stream;
-import star.string_view;
-import star.thread;
-import star.directives;
-import star.asset_path;
-import star.codex;
 
 namespace Star {
 
-std::expected<std::shared_ptr<Codex>, StarException> Codex::create(Json const& config, String const& path) {
-  auto result = std::shared_ptr<Codex>(new Codex());
-  result->m_directory = AssetPath::directory(path);
-  result->m_filename = AssetPath::filename(path);
+std::expected<std::shared_ptr<Codex const>, StarException>
+Codex::create(Json const& config, String const& path, String const& default_icon) {
+  auto result = std::make_shared<Codex>(ConstructionKey{});
   auto id = config.get_string("id");
   if (!id)
     return std::unexpected(std::move(id.error()));
@@ -35,82 +28,35 @@ std::expected<std::shared_ptr<Codex>, StarException> Codex::create(Json const& c
   if (!description)
     return std::unexpected(std::move(description.error()));
   result->m_description = std::move(*description);
-  auto icon = config.get_string("icon");
+  auto icon = config.find("icon");
   if (!icon)
     return std::unexpected(std::move(icon.error()));
-  result->m_icon = std::move(*icon);
-  auto pages = config.get("contentPages").and_then([](Json const& value) { return value.iterate_array(); });
-  if (!pages)
-    return std::unexpected(std::move(pages.error()));
-  for (auto const& page : *pages) {
-    auto text = page.to_string();
+  result->m_directory = AssetPath::directory(path);
+  result->m_filename = AssetPath::filename(path);
+  if (*icon && !(*icon)->get().is_null()) {
+    auto text = (*icon)->get().string_ptr();
     if (!text)
       return std::unexpected(std::move(text.error()));
-    result->m_pages.push_back(std::move(*text));
+    result->m_icon = AssetPath::relative_to(result->m_directory, **text);
+  } else {
+    result->m_icon = AssetPath::relative_to(result->m_directory, default_icon);
   }
-  auto itemConfig = config.get("itemConfig", Json());
-  if (!itemConfig)
-    return std::unexpected(std::move(itemConfig.error()));
-  result->m_itemConfig = std::move(*itemConfig);
+  auto pages = config.get("contentPages").and_then(json_to_string_list);
+  if (!pages)
+    return std::unexpected(std::move(pages.error()));
+  result->m_pages = std::move(*pages);
+  auto item_config = config.get("itemConfig", Json());
+  if (!item_config)
+    return std::unexpected(std::move(item_config.error()));
+  result->m_item_config = std::move(*item_config);
   return result;
 }
 
-Json Codex::toJson() const {
-  auto result = JsonObject{
-      {"id", m_id},
-      {"species", m_species},
-      {"title", m_title},
-      {"description", m_description},
-      {"icon", m_icon},
-      {"contentPages", json_from_string_list(m_pages)},
-      {"itemConfig", m_itemConfig}};
-  return result;
-}
-
-String Codex::id() const {
-  return m_id;
-}
-
-String Codex::species() const {
-  return m_species;
-}
-
-String Codex::title() const {
-  return m_title;
-}
-
-String Codex::description() const {
-  return m_description;
-}
-
-String Codex::icon() const {
-  return m_icon;
-}
-
-String Codex::page(std::size_t pageNum) const {
-  if (pageNum < m_pages.size())
-    return m_pages[pageNum];
-  return "";
-}
-
-List<String> Codex::pages() const {
-  return m_pages;
-}
-
-std::size_t Codex::pageCount() const {
-  return m_pages.size();
-}
-
-Json Codex::itemConfig() const {
-  return m_itemConfig;
-}
-
-String Codex::directory() const {
-  return m_directory;
-}
-
-String Codex::filename() const {
-  return m_filename;
+String const& Codex::page(std::size_t index) const& {
+  if (index < m_pages.size())
+    return m_pages[index];
+  static String const empty;
+  return empty;
 }
 
 }

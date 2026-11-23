@@ -534,7 +534,7 @@ std::optional<Direction> ActiveItem::facingDirection() const {
 std::expected<List<Drawable>, StarException> ActiveItem::handDrawables(float interpolation) const {
   auto sample = m_itemAnimator->sample(interpolation);
   if (m_itemAnimator->constParts().empty()) {
-    auto drawables = Item::iconDrawables();
+    auto drawables = Item::icon_drawables();
     if (!drawables)
       return std::unexpected(std::move(drawables.error()));
     Drawable::scaleAll(*drawables, 1.0f / tile_pixels);

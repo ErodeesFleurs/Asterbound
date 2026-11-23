@@ -63,11 +63,14 @@ import star.light_source;
 import star.beam_item;
 import star.active_item;
 import star.client_context;
+import star.casting;
+import star.codex_item;
 import star.entity_rendering;
 import star.fireable_item;
 import star.game_types;
 import star.particle;
 import star.line;
+import star.player_codexes;
 import star.tools;
 import star.tool_user;
 import star.uuid;
@@ -1506,6 +1509,108 @@ function uninit() visit("uninit") end
     EXPECT_FALSE((*invalid)->init(player, ToolHand::Primary));
     EXPECT_TRUE((*invalid)->uninit());
     EXPECT_FALSE((*invalid)->initialized());
+  });
+
+const GameTestRegistration codex_item_messages(
+  "ItemTest", "CodexItemPreservesLearningStateOnHintFailure", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto overlay = File::relative_to(*directory, "assets");
+    ASSERT_TRUE(File::create_directory(overlay));
+    ASSERT_TRUE(File::write_file(String(R"({
+      "id":"codexhintfixture","title":"Codex hint fixture","icon":"/assetmissing.png","contentPages":[]
+    })"), File::relative_to(overlay, "hint.codex")));
+    auto patch_path = File::relative_to(overlay, "codex.config.patch");
+    ASSERT_TRUE(File::write_file(String(R"([
+      {"op":"replace","path":"/messages/learned","value":false},
+      {"op":"replace","path":"/messages/alreadyKnown","value":false}
+    ])"), patch_path));
+    auto settings = fixture.rootSettings();
+    settings.assetSources.push_back(overlay);
+    settings.storageDirectory = File::relative_to(*directory, "storage");
+    settings.runtimeConfigFile = {};
+    settings.logDirectory = {};
+    settings.logFile = {};
+    settings.includeUGC = false;
+    auto created_root = Root::create(std::move(settings));
+    ASSERT_TRUE(created_root);
+    auto& root = **created_root;
+    auto storage = File::ephemeral_file(root.random());
+    ASSERT_TRUE(storage);
+    auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
+    ASSERT_TRUE(world);
+    auto close = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
+    auto factory = root.playerFactory();
+    ASSERT_TRUE(factory);
+    auto created_player = (*factory)->create();
+    ASSERT_TRUE(created_player);
+    auto& player = **created_player;
+    ASSERT_TRUE(player.finalizeCreation());
+    auto uuid = player.uuid();
+    ASSERT_TRUE(uuid);
+    auto context = ClientContext::create(root.logger(), Uuid(root.random()), *uuid, 1, {});
+    ASSERT_TRUE(context);
+    player.set_client_context(*context);
+    Entity& entity = player;
+    ASSERT_TRUE(entity.init(**world, 100, EntityMode::Master));
+    auto uninit_player = make_scope_exit([&] { EXPECT_TRUE(entity.uninit()); });
+    auto database = root.itemDatabase();
+    ASSERT_TRUE(database);
+    auto item = inventoryTestItem(**database, "codexhintfixture-codex");
+    ASSERT_TRUE(item && *item);
+    auto book = as_ref<CodexItem>(**item);
+    ASSERT_TRUE(book);
+    ASSERT_TRUE(book->get().init(player, ToolHand::Primary));
+    auto uninit_item = make_scope_exit([&] { EXPECT_TRUE(book->get().uninit()); });
+    auto books = player.codexes();
+    String const id = "codexhintfixture";
+    ASSERT_FALSE(books->contains(id));
+    player.pullQueuedMessages();
+    auto initial = books->revision();
+    EXPECT_FALSE(book->get().fire_triggered());
+    EXPECT_FALSE(books->contains(id));
+    EXPECT_EQ(books->revision(), initial);
+    EXPECT_TRUE(player.pullQueuedMessages().empty());
+
+    auto assets = root.assets();
+    ASSERT_TRUE(assets);
+    ASSERT_TRUE(File::write_file(String(R"([
+      {"op":"replace","path":"/messages/learned","value":"Learned fixture"},
+      {"op":"replace","path":"/messages/alreadyKnown","value":false}
+    ])"), patch_path));
+    (*assets)->hot_reload();
+    ASSERT_TRUE(book->get().fire_triggered());
+    EXPECT_TRUE(books->contains(id));
+    EXPECT_FALSE(books->is_read(id));
+    EXPECT_EQ(player.pullQueuedMessages(), List<String>({"Learned fixture"}));
+    ASSERT_TRUE(books->set_read(id, true));
+    auto read_revision = books->revision();
+    EXPECT_FALSE(book->get().fire_triggered());
+    EXPECT_TRUE(books->is_read(id));
+    EXPECT_EQ(books->revision(), read_revision);
+    EXPECT_TRUE(player.pullQueuedMessages().empty());
+
+    ASSERT_TRUE(File::write_file(String(R"([
+      {"op":"replace","path":"/messages/learned","value":"Learned fixture"},
+      {"op":"replace","path":"/messages/alreadyKnown","value":"Known fixture"}
+    ])"), patch_path));
+    (*assets)->hot_reload();
+    ASSERT_TRUE(book->get().fire_triggered());
+    EXPECT_FALSE(books->is_read(id));
+    EXPECT_EQ(player.pullQueuedMessages(), List<String>({"Known fixture"}));
+    auto missing_item = inventoryTestItem(**database, "codexhintfixture-codex", 1,
+        JsonObject{{"codexId", "missing-codex-hint-fixture"}});
+    ASSERT_TRUE(missing_item && *missing_item);
+    auto missing = as_ref<CodexItem>(**missing_item);
+    ASSERT_TRUE(missing);
+    ASSERT_TRUE(missing->get().init(player, ToolHand::Alt));
+    auto uninit_missing = make_scope_exit([&] { EXPECT_TRUE(missing->get().uninit()); });
+    auto before_missing = books->revision();
+    ASSERT_TRUE(missing->get().fire_triggered());
+    EXPECT_FALSE(books->contains("missing-codex-hint-fixture"));
+    EXPECT_EQ(books->revision(), before_missing);
+    EXPECT_TRUE(player.pullQueuedMessages().empty());
   });
 
 const GameTestRegistration blueprintLearning(

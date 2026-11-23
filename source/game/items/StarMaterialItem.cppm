@@ -194,7 +194,7 @@ public:
   [[nodiscard]]
   std::expected<List<Drawable>, StarException> preview(std::optional<std::reference_wrapper<TileDrawer>> tileDrawer, std::shared_ptr<Player> const& viewer = {}) const override;
   [[nodiscard]]
-  std::expected<List<Drawable>, StarException> dropDrawables(std::optional<std::reference_wrapper<TileDrawer>> tileDrawer) const override;
+  std::expected<List<Drawable>, StarException> drop_drawables(std::optional<std::reference_wrapper<TileDrawer>> tileDrawer) const override;
   [[nodiscard]]
   std::expected<bool, StarException> beamCanPlace() const override;
 
@@ -283,7 +283,7 @@ std::expected<std::shared_ptr<MaterialItem>, StarException> MaterialItem::create
   if (!database)
     return std::unexpected(std::move(database.error()));
   if (item->materialHueShift() != MaterialHue()) {
-    auto drawables = item->iconDrawables();
+    auto drawables = item->icon_drawables();
     if (!drawables)
       return std::unexpected(std::move(drawables.error()));
     for (auto& drawable : *drawables) {
@@ -548,7 +548,7 @@ std::expected<List<Drawable>, StarException> MaterialItem::preview(std::optional
   return generatedPreview(tileDrawer).transform([](std::reference_wrapper<List<Drawable> const> drawables) { return drawables.get(); });
 }
 
-std::expected<List<Drawable>, StarException> MaterialItem::dropDrawables(std::optional<std::reference_wrapper<TileDrawer>> tileDrawer) const {
+std::expected<List<Drawable>, StarException> MaterialItem::drop_drawables(std::optional<std::reference_wrapper<TileDrawer>> tileDrawer) const {
   return generatedPreview(tileDrawer).transform([](std::reference_wrapper<List<Drawable> const> drawables) { return drawables.get(); });
 }
 
@@ -899,7 +899,7 @@ std::expected<std::reference_wrapper<List<Drawable> const>, StarException> Mater
       m_generatedPreviewCache.emplace(std::move(drawables));
     }
     else {
-      auto icons = iconDrawables();
+      auto icons = icon_drawables();
       if (!icons)
         return std::unexpected(std::move(icons.error()));
       m_generatedPreviewCache.emplace(std::move(*icons));

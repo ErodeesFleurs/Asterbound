@@ -106,13 +106,13 @@ public:
   std::uint64_t price() const;
 
   [[nodiscard]]
-  virtual std::expected<List<Drawable>, StarException> iconDrawables() const;
+  virtual std::expected<List<Drawable>, StarException> icon_drawables() const;
   [[nodiscard]]
   virtual std::expected<std::optional<List<Drawable>>, StarException> secondaryDrawables() const;
   virtual bool hasSecondaryDrawables() const;
 
   [[nodiscard]]
-  virtual std::expected<List<Drawable>, StarException> dropDrawables(std::optional<std::reference_wrapper<TileDrawer>> tileDrawer) const;
+  virtual std::expected<List<Drawable>, StarException> drop_drawables(std::optional<std::reference_wrapper<TileDrawer>> tileDrawer) const;
   String largeImage() const;
 
   String tooltipKind() const;

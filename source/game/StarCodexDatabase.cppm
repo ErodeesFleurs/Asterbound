@@ -3,7 +3,6 @@ module;
 import std;
 import star.string;
 import star.format;
-import star.json;
 
 namespace Star {
 class Assets;
@@ -15,15 +14,20 @@ struct CodexDatabaseExceptionTag {
 using CodexDatabaseException = StarError<CodexDatabaseExceptionTag, StarException>;
 
 class CodexDatabase {
-public:
-  [[nodiscard]] static std::expected<std::shared_ptr<CodexDatabase>, StarException> create(std::shared_ptr<Assets const> assets);
+  struct ConstructionKey { explicit ConstructionKey() = default; };
 
-  StringMap<std::shared_ptr<Codex const>> codexes() const;
-  std::shared_ptr<Codex const> codex(String const& codexId) const;
+public:
+  explicit CodexDatabase(ConstructionKey) {}
+  CodexDatabase(CodexDatabase const&) = delete;
+  CodexDatabase& operator=(CodexDatabase const&) = delete;
+  [[nodiscard]] static std::expected<std::shared_ptr<CodexDatabase>, StarException> create(Assets const& assets);
+
+  StringMap<std::shared_ptr<Codex const>> const& entries() const& { return m_entries; }
+  StringMap<std::shared_ptr<Codex const>> const& entries() const&& = delete;
+  std::shared_ptr<Codex const> find(String const& id) const;
 
 private:
-  CodexDatabase() = default;
-  StringMap<std::shared_ptr<Codex const>> m_codexes;
+  StringMap<std::shared_ptr<Codex const>> m_entries;
 };
 
 }

@@ -637,7 +637,7 @@ std::expected<void, StarException> ItemDrop::render(RenderCallback& renderCallba
         return std::unexpected(std::move(preview.error()));
       generated = preview->get();
     } else {
-      auto drawables = m_item->dropDrawables(renderCallback.tileDrawer());
+      auto drawables = m_item->drop_drawables(renderCallback.tileDrawer());
       if (!drawables)
         return std::unexpected(std::move(drawables.error()));
       generated = std::move(*drawables);

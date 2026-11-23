@@ -1,15 +1,17 @@
 local list = "scrollArea.bookList"
-local books, rows, speciesOptions, selectText
+local summaries, revision, domain, rows, book, speciesOptions, selectText
 local refreshing = false
 
-local function content(id)
-  if not id then return nil end
-  if books[id] == nil then books[id] = player.getCodex(id) or false end
-  return books[id] or nil
+local function syncSummaries()
+  local current, owner = player.codexRevision()
+  if revision == current and domain == owner then return false, false end
+  local replaced = domain ~= owner
+  summaries = player.getCodexSummaries()
+  revision, domain = current, owner
+  return true, replaced
 end
 
 local function pageText()
-  local book = content(storage.id)
   local count = book and #book.contentPages or 0
   storage.page = math.max(1, math.min(storage.page or 1, math.max(1, count)))
   widget.setText("pageText", book and (book.contentPages[storage.page] or "") or "")
@@ -20,52 +22,83 @@ local function pageText()
   widget.setButtonEnabled("nextButton", book ~= nil and storage.page < count)
 end
 
-local function refresh(force)
-  local entries = player.getCodexList()
-  local visible = {}
-  for _, entry in ipairs(entries) do
-    local book = content(entry.id)
-    if book and book.species == storage.species then visible[#visible + 1] = entry end
+local function selectRow()
+  local name
+  for _, entry in ipairs(rows) do
+    if entry.id == storage.selectedId then name = entry.rowName break end
   end
-  local changed = force or not rows or #rows ~= #visible
-  if not changed then
-    for index, entry in ipairs(visible) do
-      if entry.id ~= rows[index].id or entry.read ~= rows[index].read then changed = true break end
+  if widget.getListSelected(list) == name then return end
+  refreshing = true
+  if name then widget.setListSelected(list, name) else widget.clearListSelected(list) end
+  refreshing = false
+end
+
+local function renderRows()
+  local visible, changed = {}, not rows
+  for _, entry in ipairs(summaries) do
+    if entry.species == storage.species then
+      visible[#visible + 1] = entry
+      local old = rows and rows[#visible]
+      if not old or old.id ~= entry.id or old.title ~= entry.title or old.icon ~= entry.icon then
+        changed = true
+      end
     end
   end
-  if not changed then return end
+  if not changed and #visible == #rows then
+    selectRow()
+    return
+  end
+  rows = visible
   refreshing = true
   widget.clearListItems(list)
-  rows = visible
   for _, entry in ipairs(rows) do
     local name = widget.addListItem(list)
+    entry.rowName = name
     local row = list .. "." .. name
-    local book = content(entry.id)
     widget.setData(row, entry.id)
-    widget.setText(row .. ".bookName", book.title)
-    widget.setImage(row .. ".bookIcon", book.icon)
+    widget.setText(row .. ".bookName", entry.title)
+    widget.setImage(row .. ".bookIcon", entry.icon)
     if storage.selectedId == entry.id then widget.setListSelected(list, name) end
   end
   refreshing = false
 end
 
-function updateSpecies()
-  if refreshing then return end
-  local selected = widget.getSelectedData("speciesTabs")
-  local species = selected and selected.species or "other"
-  if storage.species ~= species then
-    storage.species, storage.id, storage.selectedId, storage.page = species, nil, nil, 1
-    pageText()
-  end
+local function setSpecies(species)
+  storage.species = species
   local text = selectText:gsub("<species>", function() return species end):lower()
   widget.setText("selectLabel", (text:gsub("%a+", function(word)
     return word:sub(1, 1):upper() .. word:sub(2)
   end)))
-  refresh(false)
+end
+
+local function selectedSpecies()
+  local selected = widget.getSelectedData("speciesTabs")
+  return selected and selected.species or "other"
+end
+
+local function chooseSpecies(species)
+  local option = speciesOptions[species]
+  if option ~= nil then
+    refreshing = true
+    widget.setSelectedOption("speciesTabs", option)
+    refreshing = false
+  end
+  setSpecies(selectedSpecies())
+end
+
+function updateSpecies()
+  if refreshing then return end
+  local species = selectedSpecies()
+  if storage.species == species then return end
+  book, storage.id, storage.selectedId, storage.page = nil, nil, nil, 1
+  setSpecies(species)
+  syncSummaries()
+  renderRows()
+  pageText()
 end
 
 function init()
-  books, rows, speciesOptions = {}, nil, {}
+  summaries, revision, domain, rows, book, speciesOptions = nil, nil, nil, nil, nil, {}
   local config = root.assetJson("/interface/windowconfig/codex.config")
   selectText = config.selectText
   -- Match ButtonGroup's auto-ID assignment while respecting modded explicit IDs.
@@ -76,24 +109,38 @@ function init()
     used[id], highest = true, math.max(highest or id, id)
     if button.data then speciesOptions[button.data.species] = id end
   end
-  updateSpecies()
-  pageText()
+  update()
 end
 
 function update()
-  refresh(false)
+  local changed, replaced = syncSummaries()
+  if not changed then return end
+  if replaced then
+    -- diskLoad can replace the library on the very same player. Only restore
+    -- the selected ID/page; never reuse the previous owner's parsed pages.
+    book = storage.id and player.getCodex(storage.id)
+    if not book then storage.id, storage.selectedId, storage.page = nil, nil, 1 end
+    chooseSpecies(book and book.species or storage.species)
+    pageText()
+  end
+  renderRows()
 end
 
 function showCodex(id)
-  if not player.isCodexKnown(id) then return false end
-  local book = content(id)
-  if not book then return false end
-  local option = speciesOptions[book.species]
-  if option ~= nil then widget.setSelectedOption("speciesTabs", option) end
-  updateSpecies()
-  storage.id, storage.selectedId, storage.page = id, id, 1
+  local _, owner = player.codexRevision()
+  local selected = domain == owner and book and book.id == id and book or player.getCodex(id)
+  if not selected then return false end
+
+  local previousSpecies = storage.species
+  if selected.species ~= previousSpecies then chooseSpecies(selected.species) end
+  book, storage.id, storage.selectedId, storage.page = selected, id, id, 1
   player.markCodexRead(id)
-  refresh(true)
+  local changed = syncSummaries()
+  if changed or previousSpecies ~= storage.species then
+    renderRows()
+  else
+    selectRow()
+  end
   pageText()
   return true
 end

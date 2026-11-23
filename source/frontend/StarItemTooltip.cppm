@@ -413,7 +413,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
               return std::unexpected(std::move(setDrawablesResult817.error()));
           }
         } else {
-          auto iconDrawablesResult818 = item->iconDrawables();
+          auto iconDrawablesResult818 = item->icon_drawables();
           if (!iconDrawablesResult818)
             return std::unexpected(std::move(iconDrawablesResult818.error()));
           auto drawables = std::move(*iconDrawablesResult818);

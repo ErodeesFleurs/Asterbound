@@ -37,6 +37,8 @@ import star.map;
 import star.material_database;
 import star.material_types;
 import star.rect;
+import star.codex;
+import star.codex_database;
 import star.tile_modification;
 import star.utility_lua_bindings;
 import star.vector;
@@ -230,7 +232,7 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
     ASSERT_NO_FATAL_FAILURE(expectCatalog("questTemplateDatabase", root.questTemplateDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("aiDatabase", root.ai_database()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("techDatabase", root.techDatabase()));
-    ASSERT_NO_FATAL_FAILURE(expectCatalog("codexDatabase", root.codexDatabase()));
+    ASSERT_NO_FATAL_FAILURE(expectCatalog("codexDatabase", root.codex_database()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("stagehandDatabase", root.stagehandDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("behavior_database", root.behavior_database()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("tenantDatabase", root.tenantDatabase()));
@@ -242,6 +244,48 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
   ASSERT_TRUE(root.reload());
 
   ASSERT_NO_FATAL_FAILURE(expectCatalogs("after reload"));
+});
+
+const GameTestRegistration codex_catalog("CodexCatalog", "EmptyDefaultsRelativeIconsAndDuplicateSource", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto path = [&](String const& name) { return File::relative_to(*directory, name); };
+  ASSERT_TRUE(File::create_directories(path("books")));
+  ASSERT_TRUE(File::write_file(String("[]"), path("preload.config")));
+  ASSERT_TRUE(File::write_file(String("{}"), path("codex.config")));
+  Logger logger;
+  auto load_catalog = [&]() -> std::expected<std::shared_ptr<CodexDatabase>, StarException> {
+    Assets::Settings settings{};
+    settings.worker_pool_size = 1;
+    auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {*directory});
+    if (!assets)
+      return std::unexpected(std::move(assets.error()));
+    return CodexDatabase::create(**assets);
+  };
+  auto empty = load_catalog();
+  ASSERT_TRUE(empty) << empty.error().what();
+  EXPECT_TRUE((*empty)->entries().empty());
+
+  String book(R"({"id":"sample","title":"Sample","contentPages":["one","two"]})");
+  ASSERT_TRUE(File::write_file(book, path("books/first.codex")));
+  auto missing_default = load_catalog();
+  ASSERT_FALSE(missing_default);
+  EXPECT_NE(std::string_view(missing_default.error().what()).find("/codex.config"), std::string_view::npos);
+  ASSERT_TRUE(File::write_file(String(R"({"defaultIcon":"images/book.png"})"), path("codex.config")));
+  auto catalog = load_catalog();
+  ASSERT_TRUE(catalog) << catalog.error().what();
+  auto held = (*catalog)->find("sample");
+  ASSERT_TRUE(held);
+  EXPECT_EQ(held->icon(), String("/books/images/book.png"));
+  EXPECT_EQ(held->page(1), String("two"));
+
+  ASSERT_TRUE(File::write_file(book, path("books/duplicate.codex")));
+  auto duplicate = load_catalog();
+  ASSERT_FALSE(duplicate);
+  auto message = std::string_view(duplicate.error().what());
+  EXPECT_NE(message.find("sample"), std::string_view::npos);
+  EXPECT_NE(message.find(".codex"), std::string_view::npos);
 });
 
 [[nodiscard]] std::expected<void, StarException> writeIsolationAssets(String const& overlay, String const& owner) {

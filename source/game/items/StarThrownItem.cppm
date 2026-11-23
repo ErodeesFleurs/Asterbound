@@ -104,7 +104,7 @@ public:
 
 protected:
   [[nodiscard]]
-  std::expected<void, StarException> fireTriggered() override;
+  std::expected<void, StarException> fire_triggered() override;
 
 private:
   explicit ThrownItem(Root& root) : Item(root) {}
@@ -161,10 +161,10 @@ std::expected<List<Drawable>, StarException> ThrownItem::drawables() const {
 }
 
 std::expected<List<Drawable>, StarException> ThrownItem::preview(std::optional<std::reference_wrapper<TileDrawer>>, std::shared_ptr<Player> const&) const {
-  return iconDrawables();
+  return icon_drawables();
 }
 
-std::expected<void, StarException> ThrownItem::fireTriggered() {
+std::expected<void, StarException> ThrownItem::fire_triggered() {
   if (!initialized())
     return std::unexpected(ItemException("Thrown item not init'd properly, or user not recognized as Tool User."));
   auto itemOwner = owner();
@@ -204,7 +204,7 @@ std::expected<void, StarException> ThrownItem::fireTriggered() {
     if (!added)
       return std::unexpected(std::move(added.error()));
   }
-  return FireableItem::fireTriggered();
+  return FireableItem::fire_triggered();
 }
 
 }

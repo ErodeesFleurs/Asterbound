@@ -3742,6 +3742,20 @@ const GameTestRegistration
     "id":"zzcodex-empty","title":"Empty","contentPages":[]
   })JSON"),
                                  File::relative_to(overlay, "interface/zzcodex-empty.codex")));
+    // Count calls through the production player bindings, without replacing
+    // either the returned books or the pane's native list and its callbacks.
+    ASSERT_TRUE(File::write_file(String(R"LUA(
+      local initialize = init
+      local lists, legacy, details = 0, 0, {}
+      function init()
+        local summaries, list, detail = player.getCodexSummaries, player.getCodexList, player.getCodex
+        player.getCodexSummaries = function() lists = lists + 1; return summaries() end
+        player.getCodexList = function() legacy = legacy + 1; return list() end
+        player.getCodex = function(id) details[#details + 1] = id; return detail(id) end
+        initialize()
+      end
+      function codexQueries() return {lists, legacy, details} end
+    )LUA"), File::relative_to(overlay, "observe-codex.lua")));
     auto createdRoot = createPrivateOverlayRoot(fixture.rootSettings(), *directory, overlay, "codex.config");
     ASSERT_TRUE(createdRoot) << createdRoot.error().what();
     auto& root = **createdRoot;
@@ -3760,16 +3774,18 @@ const GameTestRegistration
     auto player = (*factory)->create();
     ASSERT_TRUE(player) << player.error().what();
     auto domain = (*player)->codexes();
-    auto first = domain->learnCodex("zzcodex-one", false);
-    auto second = domain->learnCodex("zzcodex-two", false);
-    auto empty = domain->learnCodex("zzcodex-empty", true);
+    auto first = domain->learn("zzcodex-one");
+    auto second = domain->learn("zzcodex-two");
+    auto empty = domain->learn("zzcodex-empty", true);
     ASSERT_TRUE(first) << first.error().what();
     ASSERT_TRUE(second) << second.error().what();
     ASSERT_TRUE(empty) << empty.error().what();
-    ASSERT_TRUE(*first);
-    ASSERT_TRUE(*second);
-    ASSERT_TRUE(*empty);
-    EXPECT_EQ((*first)->icon(), String("/interface/codex/iconBook.png"));
+    ASSERT_EQ(*first, CodexLearnResult::Learned);
+    ASSERT_EQ(*second, CodexLearnResult::Learned);
+    ASSERT_EQ(*empty, CodexLearnResult::Learned);
+    auto first_book = domain->find("zzcodex-one");
+    ASSERT_TRUE(first_book);
+    EXPECT_EQ(first_book->icon(), String("/interface/codex/iconBook.png"));
     auto playerCallbacks = LuaBindings::makePlayerCallbacks(root, **player);
     ASSERT_TRUE(playerCallbacks) << playerCallbacks.error().what();
     auto assets = root.assets();
@@ -3779,6 +3795,7 @@ const GameTestRegistration
     auto paneConfig = config->to_object();
     ASSERT_TRUE(paneConfig) << paneConfig.error().what();
     paneConfig->set("gui", JsonObject{});
+    paneConfig->set("scripts", JsonArray{"/interface/asterbound/codex/codex.lua", "/observe-codex.lua"});
     auto createdPane = BaseScriptPane::create(**context, *paneConfig);
     ASSERT_TRUE(createdPane) << createdPane.error().what();
     auto pane = std::move(*createdPane);
@@ -3842,6 +3859,21 @@ const GameTestRegistration
     ASSERT_TRUE(rootCallbacks) << rootCallbacks.error().what();
     ASSERT_TRUE(controller->set_callbacks("root", *rootCallbacks));
     ASSERT_TRUE(controller->set_callbacks("player", *playerCallbacks));
+    auto compact = controller->eval<bool>(R"LUA(
+      local summaries, legacy = player.getCodexSummaries(), player.getCodexList()
+      if #summaries ~= #legacy then return false end
+      for i, row in ipairs(summaries) do
+        local old = legacy[i]
+        if old.id ~= row.id or old.read ~= row.read or old.title ~= nil or
+           row.contentPages ~= nil or row.description ~= nil or
+           type(row.title) ~= "string" or type(row.icon) ~= "string" or type(row.species) ~= "string" then
+          return false
+        end
+      end
+      return true
+    )LUA");
+    ASSERT_TRUE(compact) << compact.error().what();
+    EXPECT_TRUE(*compact);
     LuaCallbacks interface;
     ASSERT_TRUE(interface.register_callback("paneIdAvailable", &MainInterface::paneIdAvailable));
     ASSERT_TRUE(interface.register_callback(
@@ -3875,31 +3907,43 @@ const GameTestRegistration
     auto modal = InputOrderPane::create(**context, false);
     ASSERT_TRUE(modal) << modal.error().what();
     ASSERT_TRUE(panes.displayPane(PaneLayer::ModalWindow, *modal, {}));
-    auto pendingId = domain->firstNewCodex()->id();
+    auto pending_id = domain->first_unread()->id();
     ASSERT_TRUE(controller->eval<LuaValue>("CodexUnread.update(manager)"));
     EXPECT_FALSE(panes.isDisplayed(pane));
-    EXPECT_FALSE(domain->codexRead(pendingId));
+    EXPECT_FALSE(domain->is_read(pending_id));
     ASSERT_TRUE(panes.dismissPane(*modal));
     ASSERT_TRUE(controller->eval<LuaValue>("CodexUnread.update(manager)"));
     EXPECT_TRUE(panes.isDisplayed(pane));
-    EXPECT_TRUE(domain->codexRead(pendingId));
+    EXPECT_TRUE(domain->is_read(pending_id));
     ASSERT_TRUE((*list)->selectedWidget());
-    EXPECT_EQ((*list)->selectedWidget()->data(), Json(pendingId));
+    EXPECT_EQ((*list)->selectedWidget()->data(), Json(pending_id));
+    auto queries = pane->call("codexQueries");
+    ASSERT_TRUE(queries && *queries);
+    // Initial rows and the first read-state change each need one snapshot;
+    // no detail query for the other visible title or the hidden species.
+    EXPECT_EQ(**queries, (Json(JsonArray{2, 0, JsonArray{pending_id}})));
+    auto selected_row = (*list)->selectedWidget();
+    for (unsigned frame = 0; frame != 8; ++frame)
+      ASSERT_TRUE(pane->call("update"));
+    auto idle_queries = pane->call("codexQueries");
+    ASSERT_TRUE(idle_queries && *idle_queries);
+    EXPECT_EQ(**idle_queries, **queries);
+    EXPECT_EQ((*list)->selectedWidget(), selected_row);
     // Selecting either identical title must retain ID, even when marking it read
     // changes unread-first domain order and synchronously rebuilds the real list.
-    auto remainingId = domain->firstNewCodex()->id();
+    auto remaining_id = domain->first_unread()->id();
     ASSERT_EQ((*list)->listSize(), 2u);
-    EXPECT_EQ((*list)->itemAt(0)->data(), Json(remainingId));
+    EXPECT_EQ((*list)->itemAt(0)->data(), Json(remaining_id));
     ASSERT_TRUE((*list)->setSelected(0));
-    EXPECT_TRUE(domain->codexRead(remainingId));
+    EXPECT_TRUE(domain->is_read(remaining_id));
     ASSERT_TRUE((*list)->selectedWidget());
-    EXPECT_EQ((*list)->selectedWidget()->data(), Json(remainingId));
+    EXPECT_EQ((*list)->selectedWidget()->data(), Json(remaining_id));
     ASSERT_TRUE(pane->call("showCodex", {"zzcodex-one"}));
-    EXPECT_TRUE(domain->codexRead("zzcodex-one"));
+    EXPECT_TRUE(domain->is_read("zzcodex-one"));
     ASSERT_TRUE((*list)->selectedWidget());
     EXPECT_EQ((*list)->selectedWidget()->data(), Json("zzcodex-one"));
     ASSERT_TRUE(pane->call("showCodex", {"zzcodex-two"}));
-    EXPECT_TRUE(domain->codexRead("zzcodex-two"));
+    EXPECT_TRUE(domain->is_read("zzcodex-two"));
     EXPECT_EQ((*list)->selectedWidget()->data(), Json("zzcodex-two"));
     ASSERT_TRUE(pane->call("showCodex", {"zzcodex-one"}));
     ASSERT_TRUE(pane->call("nextButton", {}));
@@ -3944,9 +3988,9 @@ const GameTestRegistration
     // Known content is held by the native player domain, just like the old
     // reader, rather than replaced by a newer database generation on reload.
     EXPECT_EQ((*text)->getText(), String("Second β"));
-    EXPECT_TRUE(domain->codexRead("zzcodex-one"));
+    EXPECT_TRUE(domain->is_read("zzcodex-one"));
     // Compatibility API still returns title; the additive API returns identity.
-    EXPECT_TRUE(domain->markCodexUnread("zzcodex-two"));
+    EXPECT_TRUE(domain->set_read("zzcodex-two", false));
     auto stable = controller->eval<Json>(
       "return {player.getNewCodex(), player.getNewCodexId(), player.getCodex('missing') == nil}");
     ASSERT_TRUE(stable) << stable.error().what();
@@ -3954,8 +3998,40 @@ const GameTestRegistration
     ASSERT_TRUE(File::remove(File::relative_to(overlay, "interface/zzcodex-two.codex")));
     ASSERT_TRUE(root.reload());
     ASSERT_TRUE(controller->eval<LuaValue>("CodexUnread.update(manager)"));
-    EXPECT_TRUE(domain->codexRead("zzcodex-two"));
+    EXPECT_TRUE(domain->is_read("zzcodex-two"));
     EXPECT_EQ((*text)->getText(), String("Other book"));
+    ASSERT_TRUE(pane->call("showCodex", {"zzcodex-one"}));
+    ASSERT_TRUE(pane->call("nextButton"));
+    EXPECT_EQ((*text)->getText(), String("Second β"));
+    auto save = (*player)->diskStore();
+    ASSERT_TRUE(save) << save.error().what();
+    auto flags = save->get("codexes");
+    ASSERT_TRUE(flags);
+    auto without_empty = flags->erase("zzcodex-empty");
+    ASSERT_TRUE(without_empty);
+    auto first_save = save->set("codexes", std::move(*without_empty));
+    ASSERT_TRUE(first_save);
+    auto loaded = (*player)->diskLoad(*first_save);
+    ASSERT_TRUE(loaded) << loaded.error().what();
+    ASSERT_TRUE(pane->call("update"));
+    EXPECT_EQ((*text)->getText(), String("Reloaded only page"));
+    EXPECT_EQ((*pageNumber)->getText(), String("1 of 1"));
+    ASSERT_TRUE((*list)->selectedWidget());
+    EXPECT_EQ((*list)->selectedWidget()->data(), Json("zzcodex-one"));
+
+    // Same UUID, same initial revision, but the selected ID no longer exists.
+    auto replacement = (*player)->codexes();
+    auto without_book = flags->erase("zzcodex-one");
+    ASSERT_TRUE(without_book);
+    auto other_save = save->set("codexes", std::move(*without_book));
+    ASSERT_TRUE(other_save);
+    loaded = (*player)->diskLoad(*other_save);
+    ASSERT_TRUE(loaded) << loaded.error().what();
+    EXPECT_NE(replacement->domain_id(), (*player)->codexes()->domain_id());
+    EXPECT_EQ(replacement->revision(), (*player)->codexes()->revision());
+    ASSERT_TRUE(pane->call("update"));
+    EXPECT_EQ((*text)->getText(), String(""));
+    EXPECT_FALSE((*list)->selectedWidget());
     ASSERT_TRUE(panes.dismissAllPanes());
   });
 

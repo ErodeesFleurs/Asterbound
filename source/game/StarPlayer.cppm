@@ -342,7 +342,8 @@ public:
 
   std::shared_ptr<PlayerUniverseMap> universeMap() const;
 
-  std::shared_ptr<PlayerCodexes> codexes() const;
+  std::shared_ptr<PlayerCodexes> const& codexes() const&;
+  std::shared_ptr<PlayerCodexes> const& codexes() const&& = delete;
 
   std::shared_ptr<PlayerTech> techs() const;
   [[nodiscard]] std::expected<void, StarException> overrideTech(std::optional<StringList> const& techModules);

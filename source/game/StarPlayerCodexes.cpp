@@ -1,148 +1,157 @@
-import star.json;
-import star.json_extra;
-import star.data_stream;
-import star.ordered_map;
-import star.bi_map;
-import star.thread;
-import star.io_device;
-import star.list;
-import star.image_processing;
-import star.hash;
-import star.string_view;
-import star.directives;
-import star.asset_path;
-import star.ref_ptr;
-import star.logging;
-import star.listener;
 import std;
-import star.string;
 import star.format;
-
-import star.uuid;
-import star.codex;
-import star.asset_source;
+import star.string;
+import star.list;
+import star.json;
+import star.logging;
 import star.assets;
 import star.root_base;
-import star.configuration;
 import star.root;
-
+import star.codex;
 import star.codex_database;
 import star.player_codexes;
 
-import star.algorithm;
 namespace Star {
 
-PlayerCodexes::PlayerCodexes(Root& root) : m_root(root) {}
-
-std::expected<std::shared_ptr<PlayerCodexes>, StarException> PlayerCodexes::create(Root& root, Json const& json) {
-  auto playerCodexes = std::make_shared<PlayerCodexes>(root);
-  if (!json)
-    return playerCodexes;
-  auto database = root.codexDatabase();
-  if (!database)
-    return std::unexpected(std::move(database.error()));
-  auto entries = json.iterate_object();
-  if (!entries)
-    return std::unexpected(std::move(entries.error()));
-  for (auto const& entry : *entries) {
-    auto read = entry.second.to_bool();
-    if (!read)
-      return std::unexpected(std::move(read.error()));
-    if (auto codex = (*database)->codex(entry.first)) {
-      playerCodexes->m_codexes[entry.first] = CodexEntry{std::move(codex), *read};
-    } else {
-      auto logged = root.logger().debug("Failed to load missing codex '{}'", entry.first);
-      if (!logged)
-        return std::unexpected(std::move(logged.error()));
-    }
-  }
-  return playerCodexes;
+namespace {
+std::atomic<std::uint64_t> next_domain_id{1};
 }
 
-Json PlayerCodexes::toJson() const {
+PlayerCodexes::PlayerCodexes(Root& root)
+  : m_root(root), m_domain_id(next_domain_id.fetch_add(1, std::memory_order_relaxed)) {}
+
+std::expected<std::shared_ptr<PlayerCodexes>, StarException> PlayerCodexes::create(Root& root, Json const& json) {
+  auto domain = std::make_shared<PlayerCodexes>(root);
+  if (json.is_null())
+    return domain;
+  auto entries = json.object_ptr();
+  if (!entries)
+    return std::unexpected(std::move(entries.error()));
+  if ((*entries)->empty())
+    return domain;
+  auto database = root.codex_database();
+  if (!database)
+    return std::unexpected(std::move(database.error()));
+  for (auto const& [id, state] : **entries) {
+    auto read = state.to_bool();
+    if (!read)
+      return std::unexpected(std::move(read.error()));
+    if (auto codex = (*database)->find(id)) {
+      domain->insert(id, std::move(codex), *read);
+    } else if (auto logged = root.logger().debug("Failed to load missing codex '{}'", id); !logged) {
+      return std::unexpected(std::move(logged.error()));
+    }
+  }
+  return domain;
+}
+
+Json PlayerCodexes::to_json() const {
   JsonObject entries;
-  for (auto const& entry : m_codexes)
-    entries[entry.first] = entry.second.second;
+  for (auto const& [id, entry] : m_codexes)
+    entries.emplace(id, entry.read);
   return entries;
 }
 
-List<PlayerCodexes::CodexEntry> PlayerCodexes::codexes() const {
+List<CodexEntry> PlayerCodexes::entries() const {
   List<CodexEntry> result;
-  for (auto pair : m_codexes)
-    result.push_back(pair.second);
-  std::sort(result.begin(), result.end(),
-      [](CodexEntry const& left, CodexEntry const& right) -> bool {
-        return std::make_tuple(left.second, left.first->title()) < std::make_tuple(right.second, right.first->title());
-      });
+  result.reserve(m_codexes.size());
+  for (auto const& entry : m_codexes)
+    result.push_back(entry.second);
+  std::sort(result.begin(), result.end(), [](CodexEntry const& left, CodexEntry const& right) {
+    if (left.read != right.read)
+      return !left.read;
+    return left.codex->title() < right.codex->title();
+  });
   return result;
 }
 
-std::shared_ptr<Codex const> PlayerCodexes::codex(String const& codexId) const {
-  if (auto entry = m_codexes.find_ref(codexId))
-    return entry->get().first;
+std::shared_ptr<Codex const> PlayerCodexes::find(String const& id) const {
+  if (auto entry = m_codexes.find_ref(id))
+    return entry->get().codex;
   return {};
 }
 
-bool PlayerCodexes::codexKnown(String const& codexId) const {
-  return m_codexes.contains(codexId);
+bool PlayerCodexes::contains(String const& id) const {
+  return m_codexes.contains(id);
 }
 
-std::expected<std::shared_ptr<Codex const>, StarException> PlayerCodexes::learnCodex(String const& codexId, bool markRead) {
-  if (!codexKnown(codexId)) {
-    auto database = m_root.codexDatabase();
-    if (!database)
-      return std::unexpected(std::move(database.error()));
-    if (auto codex = (*database)->codex(codexId)) {
-      m_codexes[codexId] = CodexEntry{codex, markRead};
-      return codex;
-    }
-  }
-  return std::shared_ptr<Codex const>();
+CodexLearnResult PlayerCodexes::insert(String const& id, std::shared_ptr<Codex const> codex, bool read) {
+  if (!m_codexes.try_emplace(id, std::move(codex), read).second)
+    return CodexLearnResult::AlreadyKnown;
+  if (!read)
+    ++m_unread_count;
+  ++m_revision;
+  return CodexLearnResult::Learned;
 }
 
-bool PlayerCodexes::codexRead(String const& codexId) const {
-  auto entry = m_codexes.find_ref(codexId);
-  return entry && entry->get().second;
+std::expected<CodexLearnResult, StarException> PlayerCodexes::learn(String const& id, bool read) {
+  if (contains(id))
+    return CodexLearnResult::AlreadyKnown;
+  auto database = m_root.codex_database();
+  if (!database)
+    return std::unexpected(std::move(database.error()));
+  auto codex = (*database)->find(id);
+  if (!codex)
+    return CodexLearnResult::NotFound;
+  return insert(id, std::move(codex), read);
 }
 
-bool PlayerCodexes::markCodexRead(String const& codexId) {
-  if (codexKnown(codexId) && !codexRead(codexId)) {
-    m_codexes[codexId].second = true;
-    return true;
-  }
-  return false;
+bool PlayerCodexes::is_read(String const& id) const {
+  auto entry = m_codexes.find_ref(id);
+  return entry && entry->get().read;
 }
 
-bool PlayerCodexes::markCodexUnread(String const& codexId) {
-  if (codexKnown(codexId) && codexRead(codexId)) {
-    m_codexes[codexId].second = false;
-    return true;
-  }
-  return false;
+bool PlayerCodexes::set_read(String const& id, bool read) {
+  auto entry = m_codexes.find_ref(id);
+  if (!entry || entry->get().read == read)
+    return false;
+  entry->get().read = read;
+  if (read)
+    --m_unread_count;
+  else
+    ++m_unread_count;
+  ++m_revision;
+  return true;
 }
 
-std::expected<void, StarException> PlayerCodexes::learnInitialCodexes(String const& playerSpecies) {
+std::expected<void, StarException> PlayerCodexes::learn_initial(String const& species) {
   auto assets = m_root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto config = (*assets)->json(Star::format("/player.config:defaultCodexes.{}", playerSpecies));
+  auto config = (*assets)->json(Star::format("/player.config:defaultCodexes.{}", species));
   if (!config)
     return std::unexpected(std::move(config.error()));
-  auto codexes = json_to_string_list(*config);
-  if (!codexes)
-    return std::unexpected(std::move(codexes.error()));
-  for (auto const& codexId : *codexes) {
-    auto learned = learnCodex(codexId, true);
-    if (!learned)
-      return std::unexpected(std::move(learned.error()));
+  auto defaults = config->array_ptr();
+  if (!defaults)
+    return std::unexpected(std::move(defaults.error()));
+  // Validate the complete list before modifying this domain.
+  for (auto const& value : **defaults) {
+    if (!value.is_type(Json::Type::String))
+      return std::unexpected(value.to_string().error());
+  }
+  std::shared_ptr<CodexDatabase const> database;
+  for (auto const& value : **defaults) {
+    auto id = value.string_ptr();
+    if (contains(**id))
+      continue;
+    if (!database) {
+      auto loaded = m_root.codex_database();
+      if (!loaded)
+        return std::unexpected(std::move(loaded.error()));
+      database = std::move(*loaded);
+    }
+    if (auto codex = database->find(**id))
+      insert(**id, std::move(codex), true);
   }
   return {};
 }
 
-std::shared_ptr<Codex const> PlayerCodexes::firstNewCodex() const {
-  for (auto const& pair : m_codexes) {
-    if (!pair.second.second)
-      return pair.second.first;
+std::shared_ptr<Codex const> PlayerCodexes::first_unread() const {
+  if (m_unread_count == 0)
+    return {};
+  for (auto const& entry : m_codexes) {
+    if (!entry.second.read)
+      return entry.second.codex;
   }
   return {};
 }

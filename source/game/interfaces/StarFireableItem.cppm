@@ -142,7 +142,7 @@ protected:
   [[nodiscard]]
   virtual std::expected<void, StarException> startTriggered();
   [[nodiscard]]
-  virtual std::expected<void, StarException> fireTriggered();
+  virtual std::expected<void, StarException> fire_triggered();
 
   // firePosition translated by the hand in the owner's space
   [[nodiscard]]

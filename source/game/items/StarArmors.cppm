@@ -107,7 +107,7 @@ public:
   [[nodiscard]]
   std::expected<void, StarException> fire(FireMode mode, bool shifting, bool edgeTriggered) override;
   [[nodiscard]]
-  std::expected<void, StarException> fireTriggered() override;
+  std::expected<void, StarException> fire_triggered() override;
 
   virtual ArmorType armorType() const = 0;
 

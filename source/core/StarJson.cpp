@@ -1135,17 +1135,26 @@ std::expected<std::optional<std::reference_wrapper<Json const>>, StarException> 
   return map->find_ref(key);
 }
 
-Json json_merge(Json const& base, Json const& merger) {
-  if (base.type() == Json::Type::Object && merger.type() == Json::Type::Object) {
-    JsonObject merged = *std::get<std::shared_ptr<JsonObject const>>(base.m_data);
-    for (auto const& p : *std::get<std::shared_ptr<JsonObject const>>(merger.m_data)) {
-      auto res = merged.insert(p);
-      if (!res.second)
-        res.first->second = json_merge(res.first->second, p.second);
-    }
-    return merged;
+JsonObject Json::merged_object_members(Json const& merger) const {
+  JsonObject merged = *std::get<std::shared_ptr<JsonObject const>>(m_data);
+  for (auto const& [key, value] : *std::get<std::shared_ptr<JsonObject const>>(merger.m_data)) {
+    auto [entry, inserted] = merged.try_emplace(key, value);
+    if (!inserted)
+      entry->second = json_merge(entry->second, value);
   }
+  return merged;
+}
+
+Json json_merge(Json const& base, Json const& merger) {
+  if (base.type() == Json::Type::Object && merger.type() == Json::Type::Object)
+    return base.merged_object_members(merger);
   return merger.type() == Json::Type::Null ? base : merger;
+}
+
+std::expected<JsonObject, StarException> json_merge_object(Json const& base, Json const& merger) {
+  if (base.type() == Json::Type::Object && merger.type() == Json::Type::Object)
+    return base.merged_object_members(merger);
+  return (merger.is_null() ? base : merger).to_object();
 }
 
 Json json_merge_nulling(Json const& base, Json const& merger) {

@@ -296,7 +296,7 @@ std::expected<void, StarException> ItemSlotWidget::renderImpl() {
       auto result = context().drawInterfaceQuad(m_backing_image, Vec2F(screenPosition()));
       if (!result) return std::unexpected(std::move(result.error()));
     }
-    auto icons = m_item->iconDrawables();
+    auto icons = m_item->icon_drawables();
     if (!icons) return std::unexpected(std::move(icons.error()));
     if (m_showSecondaryIcon) {
       auto secondary = m_item->secondaryDrawables();

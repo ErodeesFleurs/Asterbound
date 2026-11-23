@@ -235,7 +235,7 @@ std::expected<std::shared_ptr<ItemDatabase>, StarException> ItemDatabase::create
   auto objects = database->addObjectItems();
   if (!objects)
     return std::unexpected(std::move(objects.error()));
-  auto codexes = database->addCodexes();
+  auto codexes = database->add_codexes();
   if (!codexes)
     return std::unexpected(std::move(codexes.error()));
   // Builders can query the complete base catalog without re-entering Root's
@@ -1138,56 +1138,60 @@ std::expected<void, StarException> ItemDatabase::addBlueprints() {
   return {};
 }
 
-std::expected<void, StarException> ItemDatabase::addCodexes() {
+std::expected<void, StarException> ItemDatabase::add_codexes() {
   auto assets = m_root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto codexConfig = (*assets)->json("/codex.config");
-  if (!codexConfig)
-    return std::unexpected((*assets)->with_asset_context(std::move(codexConfig.error()), "/codex.config", "Loading codex item defaults"));
-  auto codexDatabase = m_root.codexDatabase();
-  if (!codexDatabase)
-    return std::unexpected(std::move(codexDatabase.error()));
-  for (auto const& codexPair : (*codexDatabase)->codexes()) {
-    String codexItemName = Star::format("{}-codex", codexPair.second->id());
-    if (m_items.contains(codexItemName)) {
-      auto logged = m_root.logger().warn("Couldn't create codex item {} because an item with that name is already defined", codexItemName);
+  auto config = (*assets)->json("/codex.config");
+  if (!config)
+    return std::unexpected((*assets)->with_asset_context(std::move(config.error()), "/codex.config", "Loading codex item defaults"));
+  auto database = m_root.codex_database();
+  if (!database)
+    return std::unexpected(std::move(database.error()));
+
+  // Only non-conflicting books need the defaults; a failure is reported for each affected book.
+  std::optional<std::expected<Json, StarException>> defaults;
+  constexpr std::string_view suffix = "-codex";
+  for (auto const& [id, book] : (*database)->entries()) {
+    String name;
+    name.reserve(id.utf8().size() + suffix.size());
+    name.append(id);
+    name.append(suffix);
+    auto [entry, inserted] = m_items.try_emplace(std::move(name));
+    if (!inserted) {
+      auto logged = m_root.logger().warn("Couldn't create codex item {} because an item with that name is already defined", entry->first);
       if (!logged)
         return std::unexpected(std::move(logged.error()));
       continue;
     }
-    auto created = [&]() -> std::expected<void, StarException> {
-      ItemData data;
-      data.type = ItemType::Codex;
-      data.name = codexItemName;
-      data.friendlyName = codexPair.second->title();
-      data.directory = codexPair.second->directory();
-      data.filename = codexPair.second->filename();
-      auto defaults = codexConfig->get("defaultItemConfig");
-      if (!defaults)
-        return std::unexpected((*assets)->with_asset_context(std::move(defaults.error()), "/codex.config", "Loading codex item defaults"));
-      auto merged = json_merge(*defaults, codexPair.second->itemConfig()).to_object();
-      if (!merged)
-        return std::unexpected(std::move(merged.error()));
-      auto config = std::move(*merged);
-      config["itemName"] = codexItemName;
-      config["codexId"] = codexPair.second->id();
-      config["shortdescription"] = codexPair.second->title();
-      config["description"] = codexPair.second->description();
-      config["codexIcon"] = codexPair.second->icon();
-      data.customConfig = std::move(config);
-      m_items[codexItemName] = std::move(data);
-      return {};
-    }();
-    if (!created) {
+    if (!defaults) {
+      defaults.emplace(config->get("defaultItemConfig").transform_error([&](StarException error) {
+        return (*assets)->with_asset_context(std::move(error), "/codex.config", "Loading codex item defaults");
+      }));
+    }
+    auto merged = defaults->and_then([&](Json const& base) { return json_merge_object(base, book->item_config()); });
+    if (!merged) {
+      m_items.erase(entry);
       auto logged = m_root.logger().error_exception(
-        Star::format("Could not create item for codex {}", codexPair.second->id()),
-        ExceptionDiagnostic((*assets)->with_asset_context(std::move(created.error()),
-                                                        codexPair.second->directory() + codexPair.second->filename(),
-                                                        "Creating codex item")));
+          Star::format("Could not create item for codex {}", id),
+          ExceptionDiagnostic((*assets)->with_asset_context(std::move(merged.error()), book->directory() + book->filename(),
+                                                            "Creating codex item")));
       if (!logged)
         return std::unexpected(std::move(logged.error()));
+      continue;
     }
+    merged->insert_or_assign("itemName", entry->first);
+    merged->insert_or_assign("codexId", id);
+    merged->insert_or_assign("shortdescription", book->title());
+    merged->insert_or_assign("description", book->description());
+    merged->insert_or_assign("codexIcon", book->icon());
+    auto& data = entry->second;
+    data.type = ItemType::Codex;
+    data.name = entry->first;
+    data.friendlyName = book->title();
+    data.directory = book->directory();
+    data.filename = book->filename();
+    data.customConfig = std::move(*merged);
   }
   return {};
 }

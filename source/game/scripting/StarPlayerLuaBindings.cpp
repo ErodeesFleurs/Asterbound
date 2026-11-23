@@ -1781,73 +1781,92 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   // codex bindings
-  if (auto registered = callbacks.register_callback("isCodexKnown", [&player](String const& codexId) -> std::expected<bool, StarException> {
-    return player.codexes()->codexKnown(codexId);
+  if (auto registered = callbacks.register_callback("isCodexKnown", [&player](String const& id) {
+    return player.codexes()->contains(id);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.register_callback("isCodexRead", [&player](String const& codexId) -> std::expected<bool, StarException> {
-    return player.codexes()->codexRead(codexId);
+  if (auto registered = callbacks.register_callback("isCodexRead", [&player](String const& id) {
+    return player.codexes()->is_read(id);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.register_callback("markCodexRead", [&player](String const& codexId) -> std::expected<bool, StarException> {
-    return player.codexes()->markCodexRead(codexId);
+  if (auto registered = callbacks.register_callback("markCodexRead", [&player](String const& id) {
+    return player.codexes()->set_read(id, true);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.register_callback("markCodexUnread", [&player](String const& codexId) -> std::expected<bool, StarException> {
-    return player.codexes()->markCodexUnread(codexId);
+  if (auto registered = callbacks.register_callback("markCodexUnread", [&player](String const& id) {
+    return player.codexes()->set_read(id, false);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.register_callback("learnCodex", [&player](String const& codexId, std::optional<bool> markRead) -> std::expected<void, StarException> {
-    auto learned = player.codexes()->learnCodex(codexId, markRead.value_or(false));
+  if (auto registered = callbacks.register_callback("learnCodex", [&player](String const& id, std::optional<bool> mark_read) -> std::expected<void, StarException> {
+    auto learned = player.codexes()->learn(id, mark_read.value_or(false));
     if (!learned) return std::unexpected(std::move(learned.error()));
     return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("getCodexes", [&player]() -> std::expected<Json, StarException> {
-    return player.codexes()->toJson();
+    return player.codexes()->to_json();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("getCodex", [&player](String const& id) -> std::expected<Json, StarException> {
-    auto codex = player.codexes()->codex(id);
+    auto codex = player.codexes()->find(id);
     if (!codex) return Json();
-    JsonArray pages;
-    auto count = codex->pageCount();
-    pages.reserve(count);
-    for (std::size_t index = 0; index < count; ++index)
-      pages.push_back(codex->page(index));
     return JsonObject{{"id", codex->id()}, {"species", codex->species()},
         {"title", codex->title()}, {"description", codex->description()},
-        {"icon", codex->icon()}, {"contentPages", std::move(pages)}};
+        {"icon", codex->icon()}, {"contentPages", json_from_string_list(codex->pages())}};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("getCodexList", [&player]() -> std::expected<JsonArray, StarException> {
     JsonArray result;
-    auto entries = player.codexes()->codexes();
+    auto entries = player.codexes()->entries();
     result.reserve(entries.size());
     for (auto const& entry : entries)
-      result.push_back(JsonObject{{"id", entry.first->id()}, {"read", entry.second}});
+      result.push_back(JsonObject{{"id", entry.codex->id()}, {"read", entry.read}});
     return result;
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
+  if (auto registered = callbacks.register_callback("codexRevision", [&player] {
+    auto const& domain = player.codexes();
+    return LuaTupleReturn<std::uint64_t, std::uint64_t>{domain->revision(), domain->domain_id()};
+  }); !registered)
+    return std::unexpected(std::move(registered.error()));
+
+  if (auto registered = callbacks.register_callback("getCodexSummaries", [&player](LuaEngine& engine) -> std::expected<LuaTable, StarException> {
+    auto entries = player.codexes()->entries();
+    auto list = engine.create_table(static_cast<int>(entries.size()), 0);
+    if (!list) return std::unexpected(std::move(list.error()));
+    std::size_t index = 0;
+    for (auto const& [codex, read] : entries) {
+      auto row = engine.create_table(0, 5);
+      if (!row) return std::unexpected(std::move(row.error()));
+      if (auto r = row->set("id", codex->id()); !r) return std::unexpected(std::move(r.error()));
+      if (auto r = row->set("read", read); !r) return std::unexpected(std::move(r.error()));
+      if (auto r = row->set("title", codex->title()); !r) return std::unexpected(std::move(r.error()));
+      if (auto r = row->set("icon", codex->icon()); !r) return std::unexpected(std::move(r.error()));
+      if (auto r = row->set("species", codex->species()); !r) return std::unexpected(std::move(r.error()));
+      if (auto r = list->set(++index, std::move(*row)); !r) return std::unexpected(std::move(r.error()));
+    }
+    return list;
+  }); !registered)
+    return std::unexpected(std::move(registered.error()));
+
   if (auto registered = callbacks.register_callback("getNewCodexId", [&player]() -> std::expected<std::optional<String>, StarException> {
-    if (auto codex = player.codexes()->firstNewCodex())
+    if (auto codex = player.codexes()->first_unread())
       return codex->id();
     return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("getNewCodex", [&player]() -> std::expected<std::optional<String>, StarException> {
-    auto codexPtr = player.codexes()->firstNewCodex();
-    if (codexPtr)
-      return codexPtr->title();
+    if (auto codex = player.codexes()->first_unread())
+      return codex->title();
 
     return {};
   }); !registered)

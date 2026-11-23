@@ -76,8 +76,8 @@ namespace Star::LuaBindings::ItemCallbacks {
   [[nodiscard]] std::expected<String, StarException> rarityString(Item& item);
   std::size_t price(Item& item);
   [[nodiscard]] std::expected<unsigned, StarException> fuelAmount(Item& item);
-  [[nodiscard]] std::expected<Json, StarException> iconDrawables(Item& item);
-  [[nodiscard]] std::expected<Json, StarException> dropDrawables(Item& item);
+  [[nodiscard]] std::expected<Json, StarException> icon_drawables(Item& item);
+  [[nodiscard]] std::expected<Json, StarException> drop_drawables(Item& item);
   String largeImage(Item& item);
   String tooltipKind(Item& item);
   String category(Item& item);
@@ -153,11 +153,11 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeItemCallbacks(Item& 
       !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.register_callback_with_signature<Json>(
-        "iconDrawables", [&item]() { return ItemCallbacks::iconDrawables(item); });
+        "iconDrawables", [&item]() { return ItemCallbacks::icon_drawables(item); });
       !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.register_callback_with_signature<Json>(
-        "dropDrawables", [&item]() { return ItemCallbacks::dropDrawables(item); });
+        "dropDrawables", [&item]() { return ItemCallbacks::drop_drawables(item); });
       !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.register_callback_with_signature<String>(
@@ -330,8 +330,8 @@ std::expected<unsigned, StarException> LuaBindings::ItemCallbacks::fuelAmount(It
 //
 // @return List of tables containing the serialized icon drawables for this
 // item.
-std::expected<Json, StarException> LuaBindings::ItemCallbacks::iconDrawables(Item& item) {
-  auto drawables = item.iconDrawables();
+std::expected<Json, StarException> LuaBindings::ItemCallbacks::icon_drawables(Item& item) {
+  auto drawables = item.icon_drawables();
   if (!drawables)
     return std::unexpected(std::move(drawables.error()));
   return json_from_list<Drawable>(*drawables, [](Drawable const& drawable) { return drawable.toJson(); });
@@ -341,8 +341,8 @@ std::expected<Json, StarException> LuaBindings::ItemCallbacks::iconDrawables(Ite
 //
 // @return List of tables containing the serialized drop drawables for this
 // item.
-std::expected<Json, StarException> LuaBindings::ItemCallbacks::dropDrawables(Item& item) {
-  auto drawables = item.dropDrawables(std::nullopt);
+std::expected<Json, StarException> LuaBindings::ItemCallbacks::drop_drawables(Item& item) {
+  auto drawables = item.drop_drawables(std::nullopt);
   if (!drawables)
     return std::unexpected(std::move(drawables.error()));
   return json_from_list<Drawable>(*drawables, [](Drawable const& drawable) { return drawable.toJson(); });

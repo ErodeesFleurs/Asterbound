@@ -427,6 +427,15 @@ function player.getCodex(codexId) end
 ---@return {id:string, read:boolean}[]
 function player.getCodexList() end
 
+--- Compare both values: the revision changes on library edits; the library ID changes on replacement, even for the same player UUID.
+---@return integer revision
+---@return integer libraryId
+function player.codexRevision() end
+
+--- Same order as getCodexList(), including metadata for list display but no page text. Does not mark books read.
+---@return {id:string, read:boolean, species:string, title:string, icon:string}[]
+function player.getCodexSummaries() end
+
 --- Returns the native first unread book's stable ID, or nil; does not acknowledge it.
 ---@return string?
 function player.getNewCodexId() end

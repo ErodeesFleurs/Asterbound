@@ -1,79 +1,51 @@
-import star.json;
-import star.json_extra;
-import star.ordered_map;
-import star.bi_map;
-import star.thread;
-import star.io_device;
-import star.list;
-import star.image_processing;
-import star.hash;
-import star.data_stream;
-import star.string_view;
-import star.directives;
-import star.asset_path;
-import star.ref_ptr;
-import star.logging;
-import star.listener;
 import std;
-import star.optional;
-import star.string;
-import star.format;
-
-import star.codex;
-import star.asset_source;
 import star.assets;
-
+import star.codex;
 import star.codex_database;
+import star.format;
+import star.json;
+import star.string;
 
 namespace Star {
 
-std::expected<std::shared_ptr<CodexDatabase>, StarException> CodexDatabase::create(std::shared_ptr<Assets const> assets) {
-  auto result = std::shared_ptr<CodexDatabase>(new CodexDatabase());
-  auto files = assets->scan_extension("codex");
+std::expected<std::shared_ptr<CodexDatabase>, StarException> CodexDatabase::create(Assets const& assets) {
+  auto files = assets.scan_extension("codex");
   if (!files)
     return std::unexpected(std::move(files.error()));
-  auto codexConfig = assets->json("/codex.config");
-  if (!codexConfig)
-    return std::unexpected(assets->with_asset_context(std::move(codexConfig.error()), "/codex.config", "Loading codex defaults"));
-  auto queued = assets->queue_jsons(files->get());
+  auto config = assets.json("/codex.config");
+  if (!config)
+    return std::unexpected(assets.with_asset_context(std::move(config.error()), "/codex.config", "Loading codex defaults"));
+  auto result = std::make_shared<CodexDatabase>(ConstructionKey{});
+  if (files->get().empty())
+    return result;
+  auto queued = assets.queue_jsons(files->get());
   if (!queued)
     return std::unexpected(std::move(queued.error()));
-  for (auto const& assetFile : files->get()) {
-    auto const& file = assetFile.string();
-    auto loaded = [&]() -> std::expected<std::shared_ptr<Codex>, StarException> {
-      auto codexJson = assets->json(file);
-      if (!codexJson)
-        return std::unexpected(std::move(codexJson.error()));
-      auto defaultIcon = codexConfig->get_string("defaultIcon");
-      if (!defaultIcon)
-        return std::unexpected(assets->with_asset_context(std::move(defaultIcon.error()), "/codex.config", "Loading codex defaults"));
-      auto icon = codexJson->get_string("icon", *defaultIcon);
-      if (!icon)
-        return std::unexpected(std::move(icon.error()));
-      auto resolved = codexJson->set("icon", AssetPath::relative_to(AssetPath::directory(file), *icon));
-      if (!resolved)
-        return std::unexpected(std::move(resolved.error()));
-      auto codex = Codex::create(*resolved, file);
-      if (!codex)
-        return std::unexpected(std::move(codex.error()));
-      if (result->m_codexes.contains((*codex)->id()))
-        return std::unexpected(CodexDatabaseException::format("Duplicate codex named '{}', config file '{}'", (*codex)->id(), file));
-      return codex;
-    }();
-    if (!loaded)
-      return std::unexpected(CodexDatabaseException(Star::format("Error reading codex config {}", file), assets->with_asset_context(std::move(loaded.error()), file, "Loading codex")));
-    result->m_codexes[(*loaded)->id()] = std::move(*loaded);
+  auto default_icon = config->get("defaultIcon").and_then([](Json const& value) { return value.string_ptr(); });
+  result->m_entries.reserve(files->get().size());
+  for (auto const& asset_file : files->get()) {
+    auto const& file = asset_file.string();
+    auto file_error = [&](StarException error) {
+      return CodexDatabaseException(Star::format("Error reading codex config {}", file),
+                                    assets.with_asset_context(std::move(error), file, "Loading codex"));
+    };
+    auto book = assets.json(file).and_then([&](Json const& value) -> std::expected<std::shared_ptr<Codex const>, StarException> {
+      if (!default_icon)
+        return std::unexpected(assets.with_asset_context(std::move(default_icon.error()), "/codex.config", "Loading codex defaults"));
+      return Codex::create(value, file, **default_icon);
+    });
+    if (!book)
+      return std::unexpected(file_error(std::move(book.error())));
+    auto const& id = (*book)->id();
+    if (!result->m_entries.try_emplace(id, std::move(*book)).second)
+      return std::unexpected(file_error(CodexDatabaseException::format("Duplicate codex named '{}', config file '{}'", id, file)));
   }
   return result;
 }
 
-StringMap<std::shared_ptr<Codex const>> CodexDatabase::codexes() const {
-  return m_codexes;
-}
-
-std::shared_ptr<Codex const> CodexDatabase::codex(String const& codexId) const {
-  if (auto codex = m_codexes.find_ref(codexId))
-    return codex->get();
+std::shared_ptr<Codex const> CodexDatabase::find(String const& id) const {
+  if (auto book = m_entries.find_ref(id))
+    return book->get();
   return {};
 }
 

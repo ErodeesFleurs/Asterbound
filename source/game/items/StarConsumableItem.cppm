@@ -111,7 +111,7 @@ public:
   [[nodiscard]]
   std::expected<void, StarException> fire(FireMode mode, bool shifting, bool edgeTriggered) override;
   [[nodiscard]]
-  std::expected<void, StarException> fireTriggered() override;
+  std::expected<void, StarException> fire_triggered() override;
   [[nodiscard]]
   std::expected<void, StarException> uninit() override;
 
@@ -190,7 +190,7 @@ std::expected<std::shared_ptr<Item>, StarException> ConsumableItem::clone() cons
 }
 
 std::expected<List<Drawable>, StarException> ConsumableItem::drawables() const {
-  auto drawables = iconDrawables();
+  auto drawables = icon_drawables();
   if (!drawables)
     return std::unexpected(std::move(drawables.error()));
   Drawable::scaleAll(*drawables, 1.0f / tile_pixels);
@@ -229,7 +229,7 @@ std::expected<void, StarException> ConsumableItem::fire(FireMode mode, bool shif
   return {};
 }
 
-std::expected<void, StarException> ConsumableItem::fireTriggered() {
+std::expected<void, StarException> ConsumableItem::fire_triggered() {
   auto usable = canUse();
   if (!usable)
     return std::unexpected(std::move(usable.error()));
@@ -237,7 +237,7 @@ std::expected<void, StarException> ConsumableItem::fireTriggered() {
     auto triggered = triggerEffects();
     if (!triggered)
       return std::unexpected(std::move(triggered.error()));
-    return FireableItem::fireTriggered();
+    return FireableItem::fire_triggered();
   }
   return {};
 }

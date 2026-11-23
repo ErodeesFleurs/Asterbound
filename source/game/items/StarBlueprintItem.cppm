@@ -121,12 +121,12 @@ public:
   std::expected<List<Drawable>, StarException> drawables() const override;
 
   [[nodiscard]]
-  std::expected<void, StarException> fireTriggered() override;
+  std::expected<void, StarException> fire_triggered() override;
 
   [[nodiscard]]
-  std::expected<List<Drawable>, StarException> iconDrawables() const override;
+  std::expected<List<Drawable>, StarException> icon_drawables() const override;
   [[nodiscard]]
-  std::expected<List<Drawable>, StarException> dropDrawables(std::optional<std::reference_wrapper<TileDrawer>>) const override;
+  std::expected<List<Drawable>, StarException> drop_drawables(std::optional<std::reference_wrapper<TileDrawer>>) const override;
 
 private:
   explicit BlueprintItem(Root& root) : Item(root) {}
@@ -192,7 +192,7 @@ std::expected<List<Drawable>, StarException> BlueprintItem::drawables() const {
   return m_inHandDrawable;
 }
 
-std::expected<void, StarException> BlueprintItem::fireTriggered() {
+std::expected<void, StarException> BlueprintItem::fire_triggered() {
   if (count()) {
     auto itemOwner = owner();
     if (!itemOwner)
@@ -208,17 +208,17 @@ std::expected<void, StarException> BlueprintItem::fireTriggered() {
   return {};
 }
 
-std::expected<List<Drawable>, StarException> BlueprintItem::iconDrawables() const {
+std::expected<List<Drawable>, StarException> BlueprintItem::icon_drawables() const {
   List<Drawable> result;
   result.push_back(m_recipeIconUnderlay);
-  auto icons = Item::iconDrawables();
+  auto icons = Item::icon_drawables();
   if (!icons)
     return std::unexpected(std::move(icons.error()));
   result.append_range(std::move(*icons));
   return result;
 }
 
-std::expected<List<Drawable>, StarException> BlueprintItem::dropDrawables(std::optional<std::reference_wrapper<TileDrawer>>) const {
+std::expected<List<Drawable>, StarException> BlueprintItem::drop_drawables(std::optional<std::reference_wrapper<TileDrawer>>) const {
   return m_inHandDrawable;
 }
 

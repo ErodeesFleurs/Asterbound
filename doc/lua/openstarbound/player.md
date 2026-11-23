@@ -634,6 +634,18 @@ Returns known books as `{id, read}` entries in native reader order: unread befor
 
 ---
 
+#### `Integer`, `Integer` player.codexRevision()
+
+Returns `revision, libraryId` without listing or sorting any books. Within one library, learning a book or changing its read flag changes the revision; repeating the same operation does not. Replacing a player's library (for example, loading a save) changes `libraryId` even if the player UUID and revision match. Compare **both** values for equality; do not persist them in a save.
+
+---
+
+#### `Table[]` player.getCodexSummaries()
+
+Returns `{id, read, species, title, icon}` rows in the same order as `getCodexList()`. No page text is transferred or book marked read. A reader can poll `codexRevision()` and request fresh summaries only on change; call `getCodex(id)` for the displayed book. When `libraryId` changes, discard cached content even for a matching ID.
+
+---
+
 #### `String` player.getNewCodexId()
 
 Returns the stable ID of the native first unread codex, or `nil`. It uses the same unread choice as `getNewCodex`, without substituting its title. Call `markCodexRead` to acknowledge reading.

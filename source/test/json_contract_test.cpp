@@ -299,6 +299,25 @@ TEST(JsonContractTest, RecursiveMergeDistinguishesNullFromDeletion) {
   EXPECT_EQ(json_merge_nulling(base, patch), (JsonObject{{"nested", JsonObject{{"keep", 1}}}}));
 }
 
+TEST(JsonContractTest, WritableMergeMatchesImmutableMergeAndConversion) {
+  Json base = JsonObject{{"shared", JsonObject{{"keep", 1}, {"replace", 2}}}};
+  Json patch = JsonObject{{"shared", JsonObject{{"keep", Json()}, {"replace", 3}}}, {"added", true}};
+  for (Json const& left : {Json(), Json(1), base}) {
+    for (Json const& right : {Json(), Json(false), Json(JsonArray{}), patch}) {
+      auto expected = json_merge(left, right).to_object();
+      auto actual = json_merge_object(left, right);
+      ASSERT_EQ(actual.has_value(), expected.has_value());
+      if (expected) {
+        EXPECT_EQ(*actual, *expected);
+        actual->insert_or_assign("independent", true);
+        EXPECT_FALSE(expected->contains("independent"));
+      } else {
+        EXPECT_EQ(actual.error().what(), expected.error().what());
+      }
+    }
+  }
+}
+
 TEST(JsonContractTest, PartialMatchPreservesSharedObjectsAndArrayPatternDirection) {
   Json shared = JsonObject{{"value", std::numeric_limits<double>::quiet_NaN()}};
   Json snapshot = shared;

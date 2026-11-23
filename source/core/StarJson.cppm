@@ -304,9 +304,11 @@ public:
 
 private:
   friend Json json_merge(Json const& base, Json const& merger);
+  friend std::expected<JsonObject, StarException> json_merge_object(Json const& base, Json const& merger);
   friend Json json_merge_nulling(Json const& base, Json const& merger);
   friend bool json_partial_match(Json const& base, Json const& compare);
 
+  JsonObject merged_object_members(Json const& merger) const;
   std::expected<std::reference_wrapper<JsonArray const>, StarException> array_ref() const&;
 
   std::variant<std::monostate, double, bool, std::int64_t, std::shared_ptr<String const>,
@@ -340,6 +342,8 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
 // is the combination of both objects, but for each repeated key json_merge is
 // called recursively on both values to determine the result.
 Json json_merge(Json const& base, Json const& merger);
+// Equivalent to json_merge(base, merger).to_object(), but builds the writable result directly.
+[[nodiscard]] std::expected<JsonObject, StarException> json_merge_object(Json const& base, Json const& merger);
 // Same as above, but applies null mergers.
 Json json_merge_nulling(Json const& base, Json const& merger);
 
@@ -435,6 +439,7 @@ using ::Star::JsonArray;
 using ::Star::JsonException;
 using ::Star::JsonExceptionTag;
 using ::Star::json_merge;
+using ::Star::json_merge_object;
 using ::Star::json_merge_nulling;
 using ::Star::json_merge_query;
 using ::Star::json_merge_query_def;

@@ -414,6 +414,7 @@ add_library (star_game_modules STATIC
     objects/StarLoungeableObject.cpp
     objects/StarPhysicsObject.cpp
     items/StarActiveItem.cpp
+    items/StarCodexItem.cpp
     scripting/StarRootLuaBindings.cpp
     scripting/StarBehaviorLuaBindings.cpp
     StarDungeonTMXPart.cpp

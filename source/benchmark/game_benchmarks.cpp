@@ -62,6 +62,13 @@ import star.tile_modification;
 import star.vector;
 import star.world_server;
 import star.world_tiles;
+import star.codex;
+import star.codex_database;
+import star.item_database;
+import star.player;
+import star.player_codexes;
+import star.player_factory;
+import star.player_lua_bindings;
 
 using namespace Star;
 
@@ -798,6 +805,100 @@ void luaNestedProfileExport(benchmark::State& state, BenchmarkSession& session) 
   state.SetItemsProcessed(state.iterations());
 }
 
+enum class CodexProbe { StablePoll, AllRead, ChangedOrder };
+
+void benchmark_player_codexes(benchmark::State& state, BenchmarkSession& session, CodexProbe probe) {
+  auto catalog = session.root.codex_database();
+  if (!catalog) return session.fail(state, catalog.error());
+  auto ids = (*catalog)->entries().keys();
+  std::ranges::sort(ids);
+  if (ids.empty()) return session.fail(state, "Empty codex benchmark catalog");
+  auto factory = session.root.playerFactory();
+  if (!factory) return session.fail(state, factory.error());
+  auto player = (*factory)->create();
+  if (!player) return session.fail(state, player.error());
+  auto library = (*player)->codexes();
+  std::uint64_t fixture = 14695981039346656037ULL;
+  for (std::size_t i = 0; i < ids.size(); ++i) {
+    auto const& id = ids[i];
+    bool read = probe == CodexProbe::AllRead || i % 2 != 0;
+    auto learned = library->learn(id, read);
+    if (!learned) return session.fail(state, learned.error());
+    if (*learned == CodexLearnResult::NotFound) return session.fail(state, "Catalog codex was not found");
+    if (*learned == CodexLearnResult::AlreadyKnown) (void)library->set_read(id, read);
+    for (unsigned char byte : id.utf8()) fixture = (fixture ^ byte) * 1099511628211ULL;
+    fixture = (fixture ^ (256u + read)) * 1099511628211ULL;
+  }
+  auto const& initial = library->entries();
+  if (initial.size() != ids.size()) return session.fail(state, "Incomplete player codex fixture");
+  state.SetLabel(std::to_string(fixture));
+  state.counters["codices"] = static_cast<double>(ids.size());
+  if (probe == CodexProbe::StablePoll) {
+    // Time the pane's poll across the actual native/Lua boundary, not widget work.
+    auto lua = LuaRoot::create(session.root);
+    if (!lua) return session.fail(state, lua.error());
+    auto context = (*lua)->create_context();
+    if (!context) return session.fail(state, context.error());
+    auto callbacks = LuaBindings::makePlayerCallbacks(session.root, **player);
+    if (!callbacks) return session.fail(state, callbacks.error());
+    auto installed = context->set_callbacks("player", *callbacks);
+    if (!installed) return session.fail(state, installed.error());
+    auto poll = context->get_path<LuaFunction>("player.codexRevision");
+    if (!poll) return session.fail(state, poll.error());
+    for (auto _ : state) {
+      auto result = poll->invoke<LuaValue>();
+      if (!result) return session.fail(state, result.error());
+      benchmark::DoNotOptimize(*result);
+    }
+  } else if (probe == CodexProbe::AllRead) {
+    for (auto _ : state) {
+      auto unread = library->first_unread();
+      if (unread) return session.fail(state, "All-read library reported an unread codex");
+      benchmark::DoNotOptimize(unread);
+    }
+  } else {
+    // Alternate real state transitions; include sorted list retrieval, not Lua rendering.
+    bool read = false;
+    for (auto _ : state) {
+      read = !read;
+      if (!library->set_read(ids.front(), read))
+        return session.fail(state, "Expected a codex read-state transition");
+      auto const& ordered = library->entries();
+      benchmark::DoNotOptimize(ordered);
+    }
+  }
+}
+
+void benchmark_cold_codex_items(benchmark::State& state, BenchmarkSession& session) {
+  // One fresh Root per repetition; asset source indexing and object database setup are untimed.
+  // ItemDatabase construction includes normal items, recipes and blueprints, not just codex items.
+  auto root = Root::create(session.root.settings());
+  if (!root) return session.fail(state, root.error());
+  auto objects = (*root)->objectDatabase();
+  if (!objects) return session.fail(state, objects.error());
+  for (auto _ : state) {
+    auto catalog = (*root)->codex_database();
+    if (!catalog) return session.fail(state, catalog.error());
+    auto items = (*root)->itemDatabase();
+    if (!items) return session.fail(state, items.error());
+    benchmark::DoNotOptimize(*items);
+  }
+  auto catalog = (*root)->codex_database();
+  if (!catalog) return session.fail(state, catalog.error());
+  auto items = (*root)->itemDatabase();
+  if (!items) return session.fail(state, items.error());
+  auto const& entries = (*catalog)->entries();
+  std::size_t generated = 0;
+  for (auto const& [id, book] : entries) {
+    auto type = (*items)->itemType(Star::format("{}-codex", id));
+    if (!type) return session.fail(state, type.error());
+    generated += *type == ItemType::Codex;
+  }
+  if (!generated) return session.fail(state, "No generated codex items");
+  state.counters["codices"] = static_cast<double>(entries.size());
+  state.counters["codex_items"] = static_cast<double>(generated);
+}
+
 }
 
 int main(int argc, char** argv) {
@@ -839,6 +940,18 @@ int main(int argc, char** argv) {
     return 1;
   }
   BenchmarkSession session{**root};
+  benchmark::RegisterBenchmark("Game/Codex/StablePanePoll", [&](benchmark::State& state) {
+    benchmark_player_codexes(state, session, CodexProbe::StablePoll);
+  });
+  benchmark::RegisterBenchmark("Game/Codex/FirstUnreadAllRead", [&](benchmark::State& state) {
+    benchmark_player_codexes(state, session, CodexProbe::AllRead);
+  });
+  benchmark::RegisterBenchmark("Game/Codex/ChangedListOrder", [&](benchmark::State& state) {
+    benchmark_player_codexes(state, session, CodexProbe::ChangedOrder);
+  });
+  benchmark::RegisterBenchmark("Game/Codex/ColdCatalogAndItemDatabase", [&](benchmark::State& state) {
+    benchmark_cold_codex_items(state, session);
+  })->Iterations(1)->UseRealTime()->Unit(benchmark::kMillisecond);
   for (bool changed : {false, true}) {
     benchmark::RegisterBenchmark(changed ? "Game/ClientContext/DiffChange4Of128" : "Game/ClientContext/DiffUnchanged128",
         [&, changed](benchmark::State& state) {

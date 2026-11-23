@@ -237,7 +237,7 @@ std::expected<StringSet, StarException> ArmorItem::effectSources() const {
 }
 
 std::expected<List<Drawable>, StarException> ArmorItem::drawables() const {
-  auto drawables = iconDrawables();
+  auto drawables = icon_drawables();
   if (!drawables)
     return std::unexpected(std::move(drawables.error()));
   Drawable::scaleAll(*drawables, 1.0f / tile_pixels);
@@ -250,7 +250,7 @@ std::expected<float, StarException> ArmorItem::getAngle(float) {
 }
 
 std::expected<void, StarException> ArmorItem::fire(FireMode, bool, bool) { return {}; }
-std::expected<void, StarException> ArmorItem::fireTriggered() { return {}; }
+std::expected<void, StarException> ArmorItem::fire_triggered() { return {}; }
 
 List<String> const& ArmorItem::colorOptions() {
   return m_colorOptions;
@@ -295,7 +295,7 @@ std::optional<String> const& ArmorItem::techModule() const {
 
 
 std::expected<void, StarException> ArmorItem::refreshIconDrawables() {
-  auto drawables = iconDrawables();
+  auto drawables = icon_drawables();
   if (!drawables)
     return std::unexpected(std::move(drawables.error()));
   for (auto& drawable : *drawables) {

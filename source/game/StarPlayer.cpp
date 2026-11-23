@@ -800,15 +800,13 @@ std::expected<void, StarException> Player::diskLoad(Json const& diskStore) {
   m_universeMap = std::make_shared<PlayerUniverseMap>(std::move(universeMap));
   if (m_client_context)
     m_universeMap->setServerUuid(m_client_context->server_uuid());
-  auto codexesJsonResult = diskStore.get("codexes");
-  if (!codexesJsonResult)
-    return std::unexpected(std::move(codexesJsonResult.error()));
-  auto codexesJson = std::move(*codexesJsonResult);
-  auto codexesResult = PlayerCodexes::create(root(), codexesJson);
-  if (!codexesResult)
-    return std::unexpected(std::move(codexesResult.error()));
-  auto codexes = std::move(*codexesResult);
-  m_codexes = std::move(codexes);
+  auto codexes_json = diskStore.get("codexes");
+  if (!codexes_json)
+    return std::unexpected(std::move(codexes_json.error()));
+  auto codexes = PlayerCodexes::create(root(), *codexes_json);
+  if (!codexes)
+    return std::unexpected(std::move(codexes.error()));
+  m_codexes = std::move(*codexes);
   auto techsJsonResult = diskStore.get("techs");
   if (!techsJsonResult)
     return std::unexpected(std::move(techsJsonResult.error()));
@@ -927,7 +925,7 @@ std::expected<void, StarException> Player::diskLoad(Json const& diskStore) {
     return std::unexpected(std::move(result.error()));
   if (auto result = setNetArmorSecrets(true); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = m_codexes->learnInitialCodexes(species()); !result)
+  if (auto result = m_codexes->learn_initial(species()); !result)
     return std::unexpected(std::move(result.error()));
   auto ai_json = diskStore.find("aiState");
   if (!ai_json)
@@ -3044,7 +3042,7 @@ std::shared_ptr<PlayerUniverseMap> Player::universeMap() const {
   return m_universeMap;
 }
 
-std::shared_ptr<PlayerCodexes> Player::codexes() const {
+std::shared_ptr<PlayerCodexes> const& Player::codexes() const& {
   return m_codexes;
 }
 
@@ -4664,7 +4662,7 @@ std::expected<Json, StarException> Player::diskStore() {
   return JsonObject{
     {"uuid", *id}, {"description", m_description}, {"modeType", mode},
     {"shipUpgrades", m_ship_upgrades.to_json()}, {"shipSpecies", !m_shipSpecies.empty() ? m_shipSpecies : m_identity.species},
-    {"blueprints", m_blueprints->toJson()}, {"universeMap", std::move(universeMap)}, {"codexes", m_codexes->toJson()},
+    {"blueprints", m_blueprints->toJson()}, {"universeMap", std::move(universeMap)}, {"codexes", m_codexes->to_json()},
     {"techs", std::move(techs)}, {"identity", std::move(identity)}, {"team", std::move(team)},
     {"inventory", std::move(inventory)}, {"movementController", std::move(movement)},
     {"techController", std::move(techController)}, {"statusController", std::move(statusController)},

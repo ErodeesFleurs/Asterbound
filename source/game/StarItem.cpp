@@ -314,7 +314,7 @@ Rarity Item::rarity() const {
   return m_rarity;
 }
 
-std::expected<List<Drawable>, StarException> Item::iconDrawables() const {
+std::expected<List<Drawable>, StarException> Item::icon_drawables() const {
   return m_iconDrawables;
 }
 
@@ -326,8 +326,8 @@ bool Item::hasSecondaryDrawables() const {
   return m_secondaryIconDrawables.has_value();
 }
 
-std::expected<List<Drawable>, StarException> Item::dropDrawables(std::optional<std::reference_wrapper<TileDrawer>>) const {
-  auto drawables = iconDrawables();
+std::expected<List<Drawable>, StarException> Item::drop_drawables(std::optional<std::reference_wrapper<TileDrawer>>) const {
+  auto drawables = icon_drawables();
   if (!drawables)
     return std::unexpected(std::move(drawables.error()));
   Drawable::scaleAll(*drawables, 1.0f / tile_pixels);

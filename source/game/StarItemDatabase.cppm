@@ -261,7 +261,7 @@ private:
   [[nodiscard]]
   std::expected<void, StarException> addBlueprints();
   [[nodiscard]]
-  std::expected<void, StarException> addCodexes();
+  std::expected<void, StarException> add_codexes();
   Root& m_root;
 
   StringMap<ItemData> m_items;
