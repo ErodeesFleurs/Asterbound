@@ -33,6 +33,14 @@ Returns `nil` if unavailable or larger than 8 MiB. Does not decode images or ope
 
 ---
 
+#### `Maybe<String>` clipboard.getFileReference()
+
+Returns URI-list text from `text/uri-list` or `x-special/gnome-copied-files` (without the `copy`/`cut` line).
+Uses the same focus and read authorization as `getPng`. Ignores payloads larger than 16 KiB and returns `nil`
+if no supported list is available. References are not decoded, verified, or opened.
+
+---
+
 #### `bool` clipboard.setText(`String` text)
 
 Replaces the clipboard contents with the supplied UTF-8 text. Returns `false` if the game window is unfocused or the operation is

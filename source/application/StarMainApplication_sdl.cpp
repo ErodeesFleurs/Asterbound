@@ -1423,6 +1423,40 @@ private:
       });
     }
 
+    std::optional<std::string> getClipboardFileReference() override {
+      return parent.m_dispatcher.invoke([&]() -> std::optional<std::string> {
+        if (!parent.m_focused.load(std::memory_order_relaxed))
+          return {};
+        for (std::string_view mime : {"text/uri-list", "x-special/gnome-copied-files"}) {
+          if (!SDL_HasClipboardData(mime.data()))
+            continue;
+          std::size_t size = 0;
+          std::unique_ptr<void, decltype(&SDL_free)> data(SDL_GetClipboardData(mime.data(), &size), &SDL_free);
+          if (!data || !size || size > 16 * 1024)
+            continue;
+          std::string_view text(static_cast<char const*>(data.get()), size);
+          if (text.ends_with('\0'))
+            text.remove_suffix(1);
+          if (text.find('\0') != std::string_view::npos)
+            continue;
+          if (mime == "x-special/gnome-copied-files") {
+            auto newline = text.find('\n');
+            if (newline == std::string_view::npos)
+              continue;
+            auto operation = text.substr(0, newline);
+            if (operation.ends_with('\r'))
+              operation.remove_suffix(1);
+            if (operation != "copy" && operation != "cut")
+              continue;
+            text.remove_prefix(newline + 1);
+          }
+          if (!text.empty())
+            return std::string(text);
+        }
+        return {};
+      });
+    }
+
     bool setClipboard(String text) override {
       return parent.m_dispatcher.invoke([&]() -> bool {
         return SDL_SetClipboardText(text.utf8().c_str());

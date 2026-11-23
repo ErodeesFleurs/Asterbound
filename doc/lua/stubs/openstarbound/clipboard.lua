@@ -20,6 +20,10 @@ function clipboard.getText() end
 ---@return string?
 function clipboard.getPng() end
 
+--- Reads URI-list text while focused and authorized; ignores payloads over 16 KiB and never opens files.
+---@return string?
+function clipboard.getFileReference() end
+
 --- Replaces the clipboard contents with the supplied UTF-8 text. Returns `false` if the game window is unfocused or the operation is blocked. ---
 ---@param text string
 ---@return boolean

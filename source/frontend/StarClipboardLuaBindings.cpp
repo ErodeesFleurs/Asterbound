@@ -54,6 +54,10 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeClipboardCallbacks(I
     if (!available()) return {};
     return appController->getClipboardPng();
   }); !r) return std::unexpected(std::move(r.error()));
+  if (auto r = callbacks.register_callback("getFileReference", [=]() -> std::optional<std::string> {
+    if (!available()) return {};
+    return appController->getClipboardFileReference();
+  }); !r) return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.register_callback("setText", [=](String const& text) {
     return appController->isFocused() && appController->setClipboard(text);
   }); !r) return std::unexpected(std::move(r.error()));
