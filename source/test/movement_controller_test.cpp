@@ -17,8 +17,68 @@ import star.game_types;
 import star.poly;
 import star.rect;
 import star.vector;
+import star.actor_movement_controller;
+import star.data_stream_devices;
+import star.byte_array;
 
 using namespace Star;
+
+TEST(ActorMovementWire, LegacyParametersAndNestedJumpProfiles) {
+  // Presence bytes and big-endian payloads, independent of the current writer.
+  constexpr char legacy[] =
+    "\x01\x3f\x80\x00\x00"              // mass = 1
+    "\0\0\0\0\0\0\0\0\0\0"             // gravityMultiplier through speedLimit
+    "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0" // standingPoly through liquidForce
+    "\0\0\0\0\0\x01\x00\0\0\0"         // air: multiJump = false
+    "\0\0\0\0\0\0\0\0\x01\x01"         // liquid: collisionCancelled = true
+    "\0\0\0\0\0"                        // fallStatusSpeedMin through physicsEffectCategories
+    "\x01\x00\0\0\x01\x40\x00\x00\x00"; // collisionEnabled = false, pathExploreRate = 2
+  ByteArray bytes({legacy, sizeof(legacy) - 1});
+  DataStreamBuffer input(bytes);
+  ActorMovementParameters p;
+  p.groundMovementMinimumSustain = 3.0f;
+  p.groundMovementMaximumSustain = 4.0f;
+  p.groundMovementCheckDistance = 5.0f;
+  ASSERT_TRUE(input >> p);
+  EXPECT_EQ(p.mass, 1.0f);
+  EXPECT_EQ(p.airJumpProfile.multiJump, false);
+  EXPECT_EQ(p.liquidJumpProfile.collisionCancelled, true);
+  EXPECT_EQ(p.collisionEnabled, false);
+  EXPECT_EQ(p.pathExploreRate, 2.0f);
+  EXPECT_EQ(p.groundMovementMinimumSustain, 3.0f);
+  EXPECT_EQ(p.groundMovementMaximumSustain, 4.0f);
+  EXPECT_EQ(p.groundMovementCheckDistance, 5.0f);
+  DataStreamBuffer output;
+  ASSERT_TRUE(output << p);
+  EXPECT_EQ(output.data(), bytes);
+}
+
+TEST(ActorMovementWire, ModifierFlagOrderAndTruncatedPrefix) {
+  constexpr char legacy[] =
+    "\x3f\x80\0\0\x40\0\0\0\x40\x40\0\0\x40\x80\0\0\x40\xa0\0\0\x01\x00\x01\x00";
+  ByteArray bytes({legacy, sizeof(legacy) - 1});
+  DataStreamBuffer input(bytes);
+  ActorMovementModifiers m;
+  ASSERT_TRUE(input >> m);
+  EXPECT_EQ(m.groundMovementModifier, 1.0f);
+  EXPECT_EQ(m.liquidMovementModifier, 2.0f);
+  EXPECT_EQ(m.speedModifier, 3.0f);
+  EXPECT_EQ(m.airJumpModifier, 4.0f);
+  EXPECT_EQ(m.liquidJumpModifier, 5.0f);
+  EXPECT_TRUE(m.runningSuppressed);
+  EXPECT_FALSE(m.jumpingSuppressed);
+  EXPECT_TRUE(m.facingSuppressed);
+  EXPECT_FALSE(m.movementSuppressed);
+  DataStreamBuffer output;
+  ASSERT_TRUE(output << m);
+  EXPECT_EQ(output.data(), bytes);
+
+  DataStreamBuffer truncated(ByteArray({legacy, 8}));
+  m.liquidMovementModifier = m.liquidJumpModifier = -1.0f;
+  EXPECT_FALSE(truncated >> m);
+  EXPECT_EQ(m.liquidMovementModifier, 2.0f);
+  EXPECT_EQ(m.liquidJumpModifier, -1.0f);
+}
 
 // Exercise the real WorldServer collision query and tickMaster consumer rather
 // than a local solver or a fake World. The ephemeral storage cannot touch saves.

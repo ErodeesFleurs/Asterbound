@@ -155,32 +155,39 @@ ActorJumpProfile ActorJumpProfile::merge(ActorJumpProfile const& rhs) const {
   return merged;
 }
 
-std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ActorJumpProfile& movementParameters) {
-  if (auto result = ds.read(movementParameters.jumpSpeed); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.jumpControlForce); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.jumpInitialPercentage); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.jumpHoldTime); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.jumpTotalHoldTime); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.multiJump); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.reJumpDelay); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.autoJump); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.collisionCancelled); !result) return std::unexpected(std::move(result.error()));
+namespace {
+using ActorWireResult = std::expected<std::reference_wrapper<DataStream>, StarException>;
 
+template <bool Writing, typename... Fields>
+  requires ((Writing && (stream_writable<Fields> && ...)) || (!Writing && (stream_readable<Fields> && ...)))
+ActorWireResult transfer_fields(DataStream& ds, Fields&... fields) {
+  std::expected<void, StarException> result;
+  auto transfer = [&](auto& field) {
+    if constexpr (Writing)
+      result = ds.write(field);
+    else
+      result = ds.read(field);
+    return result.has_value();
+  };
+  if (!(transfer(fields) && ...))
+    return std::unexpected(std::move(result.error()));
   return std::ref(ds);
 }
 
-std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, ActorJumpProfile const& movementParameters) {
-  if (auto result = ds.write(movementParameters.jumpSpeed); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.jumpControlForce); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.jumpInitialPercentage); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.jumpHoldTime); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.jumpTotalHoldTime); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.multiJump); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.reJumpDelay); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.autoJump); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.collisionCancelled); !result) return std::unexpected(std::move(result.error()));
+template <typename T>
+  requires std::same_as<std::remove_const_t<T>, ActorJumpProfile>
+ActorWireResult transfer_jump_profile(DataStream& ds, T& p) {
+  return transfer_fields<std::is_const_v<T>>(ds, p.jumpSpeed, p.jumpControlForce, p.jumpInitialPercentage,
+    p.jumpHoldTime, p.jumpTotalHoldTime, p.multiJump, p.reJumpDelay, p.autoJump, p.collisionCancelled);
+}
+}
 
-  return std::ref(ds);
+ActorWireResult operator>>(DataStream& ds, ActorJumpProfile& profile) {
+  return transfer_jump_profile(ds, profile);
+}
+
+ActorWireResult operator<<(DataStream& ds, ActorJumpProfile const& profile) {
+  return transfer_jump_profile(ds, profile);
 }
 
 std::expected<ActorMovementParameters, StarException> ActorMovementParameters::sensibleDefaults(Root& root) {
@@ -484,90 +491,28 @@ ActorMovementParameters ActorMovementParameters::merge(ActorMovementParameters c
   return merged;
 }
 
-std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ActorMovementParameters& movementParameters) {
-  if (auto result = ds.read(movementParameters.mass); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.gravityMultiplier); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.liquidBuoyancy); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.airBuoyancy); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.bounceFactor); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.stopOnFirstBounce); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.enableSurfaceSlopeCorrection); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.slopeSlidingFactor); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.maxMovementPerStep); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.maximumCorrection); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.speedLimit); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.standingPoly); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.crouchingPoly); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.stickyCollision); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.stickyForce); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.walkSpeed); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.runSpeed); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.flySpeed); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.airFriction); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.liquidFriction); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.minimumLiquidPercentage); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.liquidImpedance); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.normalGroundFriction); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.ambulatingGroundFriction); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.groundForce); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.airForce); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.liquidForce); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.airJumpProfile); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.liquidJumpProfile); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.fallStatusSpeedMin); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.fallThroughSustainFrames); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.maximumPlatformCorrection); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.maximumPlatformCorrectionVelocityFactor); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.physicsEffectCategories); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.collisionEnabled); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.frictionEnabled); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.gravityEnabled); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.pathExploreRate); !result) return std::unexpected(std::move(result.error()));
-
-  return std::ref(ds);
+namespace {
+template <typename T>
+  requires std::same_as<std::remove_const_t<T>, ActorMovementParameters>
+ActorWireResult transfer_movement_parameters(DataStream& ds, T& p) {
+  // The three groundMovement sustain/distance settings are JSON-only.
+  return transfer_fields<std::is_const_v<T>>(ds, p.mass, p.gravityMultiplier, p.liquidBuoyancy, p.airBuoyancy,
+    p.bounceFactor, p.stopOnFirstBounce, p.enableSurfaceSlopeCorrection, p.slopeSlidingFactor, p.maxMovementPerStep,
+    p.maximumCorrection, p.speedLimit, p.standingPoly, p.crouchingPoly, p.stickyCollision, p.stickyForce,
+    p.walkSpeed, p.runSpeed, p.flySpeed, p.airFriction, p.liquidFriction, p.minimumLiquidPercentage,
+    p.liquidImpedance, p.normalGroundFriction, p.ambulatingGroundFriction, p.groundForce, p.airForce, p.liquidForce,
+    p.airJumpProfile, p.liquidJumpProfile, p.fallStatusSpeedMin, p.fallThroughSustainFrames,
+    p.maximumPlatformCorrection, p.maximumPlatformCorrectionVelocityFactor, p.physicsEffectCategories,
+    p.collisionEnabled, p.frictionEnabled, p.gravityEnabled, p.pathExploreRate);
+}
 }
 
-std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, ActorMovementParameters const& movementParameters) {
-  if (auto result = ds.write(movementParameters.mass); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.gravityMultiplier); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.liquidBuoyancy); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.airBuoyancy); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.bounceFactor); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.stopOnFirstBounce); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.enableSurfaceSlopeCorrection); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.slopeSlidingFactor); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.maxMovementPerStep); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.maximumCorrection); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.speedLimit); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.standingPoly); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.crouchingPoly); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.stickyCollision); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.stickyForce); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.walkSpeed); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.runSpeed); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.flySpeed); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.airFriction); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.liquidFriction); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.minimumLiquidPercentage); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.liquidImpedance); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.normalGroundFriction); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.ambulatingGroundFriction); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.groundForce); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.airForce); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.liquidForce); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.airJumpProfile); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.liquidJumpProfile); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.fallStatusSpeedMin); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.fallThroughSustainFrames); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.maximumPlatformCorrection); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.maximumPlatformCorrectionVelocityFactor); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.physicsEffectCategories); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.collisionEnabled); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.frictionEnabled); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.gravityEnabled); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.pathExploreRate); !result) return std::unexpected(std::move(result.error()));
+ActorWireResult operator>>(DataStream& ds, ActorMovementParameters& parameters) {
+  return transfer_movement_parameters(ds, parameters);
+}
 
-  return std::ref(ds);
+ActorWireResult operator<<(DataStream& ds, ActorMovementParameters const& parameters) {
+  return transfer_movement_parameters(ds, parameters);
 }
 
 ActorMovementModifiers::ActorMovementModifiers() {
@@ -647,32 +592,22 @@ ActorMovementModifiers ActorMovementModifiers::combine(ActorMovementModifiers co
   return res;
 }
 
-std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ActorMovementModifiers& movementModifiers) {
-  if (auto result = ds.read(movementModifiers.groundMovementModifier); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementModifiers.liquidMovementModifier); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementModifiers.speedModifier); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementModifiers.airJumpModifier); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementModifiers.liquidJumpModifier); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementModifiers.runningSuppressed); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementModifiers.jumpingSuppressed); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementModifiers.facingSuppressed); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementModifiers.movementSuppressed); !result) return std::unexpected(std::move(result.error()));
-
-  return std::ref(ds);
+namespace {
+template <typename T>
+  requires std::same_as<std::remove_const_t<T>, ActorMovementModifiers>
+ActorWireResult transfer_movement_modifiers(DataStream& ds, T& m) {
+  return transfer_fields<std::is_const_v<T>>(ds, m.groundMovementModifier, m.liquidMovementModifier,
+    m.speedModifier, m.airJumpModifier, m.liquidJumpModifier, m.runningSuppressed, m.jumpingSuppressed,
+    m.facingSuppressed, m.movementSuppressed);
+}
 }
 
-std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, ActorMovementModifiers const& movementModifiers) {
-  if (auto result = ds.write(movementModifiers.groundMovementModifier); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementModifiers.liquidMovementModifier); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementModifiers.speedModifier); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementModifiers.airJumpModifier); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementModifiers.liquidJumpModifier); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementModifiers.runningSuppressed); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementModifiers.jumpingSuppressed); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementModifiers.facingSuppressed); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementModifiers.movementSuppressed); !result) return std::unexpected(std::move(result.error()));
+ActorWireResult operator>>(DataStream& ds, ActorMovementModifiers& modifiers) {
+  return transfer_movement_modifiers(ds, modifiers);
+}
 
-  return std::ref(ds);
+ActorWireResult operator<<(DataStream& ds, ActorMovementModifiers const& modifiers) {
+  return transfer_movement_modifiers(ds, modifiers);
 }
 
 ActorMovementController::ActorMovementController(Root& root) : MovementController(root) {
