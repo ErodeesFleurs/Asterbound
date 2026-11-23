@@ -12,6 +12,7 @@ import star.logging;
 import star.data_stream;
 import star.bi_map;
 import star.game_types;
+import star.message_types;
 import star.random;
 import star.weighted_pool;
 import star.parametric_function;
@@ -1051,7 +1052,7 @@ void Monster::setPosition(Vec2F const& pos) {
   m_movementController->setPosition(pos);
 }
 
-std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Monster::receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) {
+MessageResponseResult Monster::receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) {
   auto result173 = world();
 if (!result173) return std::unexpected(std::move(result173.error()));
 auto result174 = recover_lua_script_error(m_scriptComponent.handle_message(message, result173->get().connection() == sendingConnection, args));

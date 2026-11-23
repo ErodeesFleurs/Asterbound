@@ -37,6 +37,7 @@ import star.lua_actor_movement_component;
 import star.tech_database;
 
 import star.game_types;
+import star.message_types;
 import star.net_element;
 import star.net_element_basic_fields;
 import star.net_element_float_fields;
@@ -121,7 +122,7 @@ public:
   List<std::shared_ptr<AudioInstance>> pullNewAudios();
   List<Particle> pullNewParticles();
 
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> receiveMessage(String const& message, bool localMessage, JsonArray const& args = {});
+  [[nodiscard]] MessageResponseResult receiveMessage(String const& message, bool localMessage, JsonArray const& args = {});
 
 private:
   explicit TechController(Root& root);

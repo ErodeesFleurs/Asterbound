@@ -13,6 +13,7 @@ import star.color;
 import star.vector;
 import star.thread;
 import star.game_types;
+import star.message_types;
 import star.material_types;
 import star.io_device;
 import star.lua;
@@ -207,7 +208,7 @@ public:
   [[nodiscard]] std::expected<List<std::shared_ptr<Packet>>, StarException> getOutgoingPackets(ConnectionId clientId);
   bool sendPacket(ConnectionId clientId, std::shared_ptr<Packet> const& packet);
 
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> receiveMessage(ConnectionId fromConnection, String const& message, JsonArray const& args);
+  [[nodiscard]] MessageResponseResult receiveMessage(ConnectionId fromConnection, String const& message, JsonArray const& args);
 
   [[nodiscard]] std::expected<void, StarException> startFlyingSky(bool enterHyperspace, bool startInWarp, Json settings = {});
   [[nodiscard]] std::expected<void, StarException> stopFlyingSkyAt(SkyParameters const& destination);

@@ -28,6 +28,7 @@ import star.world;
 import star.world_lua_bindings;
 import star.periodic;
 import star.game_types;
+import star.message_types;
 import star.uuid;
 import star.asset_source;
 import star.assets;
@@ -617,11 +618,11 @@ RpcPromise<Json> LuaScriptUpdate::thread_pass_message(String const& thread, Stri
   return pair.first;
 }
 
-[[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> LuaScriptUpdate::handle_thread_message(ThreadMessage const& message) {
+[[nodiscard]] MessageResponseResult LuaScriptUpdate::handle_thread_message(ThreadMessage const& message) {
   return m_host.execute<ChainableJsonMessageResponse>(
     message.message, "Exception while invoking Lua thread message handler",
     LuaBaseComponent::ErrorPolicy::DisableContext,
-    [&]() -> std::expected<std::optional<ChainableJsonMessageResponse>, StarException> {
+    [&]() -> MessageResponseResult {
       auto handler = m_threadMessageHandlers.find_ref(message.message);
       if (!handler || !handler->get().function)
         return std::optional<ChainableJsonMessageResponse>{};
@@ -784,10 +785,10 @@ std::expected<void, StarException> LuaScriptUpdate::finish_shutdown(std::expecte
   return m_host.add_callbacks("message", std::move(callbacks));
 }
 
-[[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> LuaScriptMessages::handle_message(String const& message, bool local, JsonArray const& args) {
+[[nodiscard]] MessageResponseResult LuaScriptMessages::handle_message(String const& message, bool local, JsonArray const& args) {
   return m_host.execute<ChainableJsonMessageResponse>(
     message, "Exception while invoking Lua message handler", LuaBaseComponent::ErrorPolicy::DisableContext,
-    [&]() -> std::expected<std::optional<ChainableJsonMessageResponse>, StarException> {
+    [&]() -> MessageResponseResult {
       auto handler = m_messageHandlers.find_ref(message);
       if (!handler || !handler->get().function || (handler->get().localOnly && !local))
         return std::optional<ChainableJsonMessageResponse>{};

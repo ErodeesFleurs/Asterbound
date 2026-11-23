@@ -9,6 +9,7 @@ import star.poly;
 import star.casting;
 import star.data_stream;
 import star.game_types;
+import star.message_types;
 import star.strong_typedef;
 import star.bi_map;
 import star.list;
@@ -823,7 +824,7 @@ List<Particle> StatusController::pullNewParticles() {
   return newParticles;
 }
 
-std::expected<std::optional<ChainableJsonMessageResponse>, StarException> StatusController::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
+MessageResponseResult StatusController::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
   auto result = m_primaryScript.handle_message(message, localMessage, args);
   if (!result) {
     if (!result.error().is<LuaScriptError>()) return std::unexpected(std::move(result.error()));

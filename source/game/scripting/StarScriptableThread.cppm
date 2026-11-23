@@ -9,6 +9,7 @@ import star.thread;
 import star.lua_root;
 import star.lua_components;
 import star.game_types;
+import star.message_types;
 import star.rpc_promise;
 
 namespace Star {
@@ -53,7 +54,7 @@ private:
   ScriptableThread(Json parameters, String name, LuaBaseComponent& parent);
   void request_stop();
   [[nodiscard]] std::expected<void, StarException> update();
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> receive_message(String const& message, JsonArray const& args);
+  [[nodiscard]] MessageResponseResult receive_message(String const& message, JsonArray const& args);
 
   std::mutex m_sleepMutex;
   std::condition_variable m_stopped;

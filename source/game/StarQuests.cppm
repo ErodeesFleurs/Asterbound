@@ -22,6 +22,7 @@ import star.drawable;
 import star.vector;
 import star.celestial_coordinate;
 import star.game_types;
+import star.message_types;
 import star.strong_typedef;
 import star.quest_descriptor;
 import star.lua_components;
@@ -67,7 +68,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> init(Player& player, World& world, std::optional<std::reference_wrapper<UniverseClient>> client);
   [[nodiscard]] std::expected<void, StarException> uninit();
 
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> receiveMessage(String const& message, bool localMessage, JsonArray const& args = {});
+  [[nodiscard]] MessageResponseResult receiveMessage(String const& message, bool localMessage, JsonArray const& args = {});
   [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> callScript(String const& func, LuaVariadic<LuaValue> const& args);
   [[nodiscard]] std::expected<void, StarException> update(float dt);
 

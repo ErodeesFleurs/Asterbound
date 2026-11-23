@@ -11,6 +11,7 @@ import star.strong_typedef;
 import star.data_stream;
 import star.id_map;
 import star.game_types;
+import star.message_types;
 import star.random;
 import star.periodic_function;
 import star.ordered_map;
@@ -176,7 +177,7 @@ public:
   List<std::shared_ptr<AudioInstance>> pullNewAudios();
   List<Particle> pullNewParticles();
 
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> receiveMessage(String const& message, bool localMessage, JsonArray const& args = {});
+  [[nodiscard]] MessageResponseResult receiveMessage(String const& message, bool localMessage, JsonArray const& args = {});
 
 private:
   explicit StatusController(Root& root);

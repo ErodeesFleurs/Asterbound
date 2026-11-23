@@ -14,6 +14,7 @@ import star.casting;
 import star.vector;
 import star.data_stream;
 import star.game_types;
+import star.message_types;
 import star.strong_typedef;
 import star.list;
 import star.rpc_promise;
@@ -122,7 +123,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> render(RenderCallback& renderCallback) override;
   [[nodiscard]] std::expected<void, StarException> renderLightSources(RenderCallback& renderCallback) override;
 
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) override;
+  [[nodiscard]] MessageResponseResult receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) override;
 
   [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> callScript(String const& func, LuaVariadic<LuaValue> const& args) override;
   [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> evalScript(String const& code) override;

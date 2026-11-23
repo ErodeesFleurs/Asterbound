@@ -9,6 +9,7 @@ import star.casting;
 import star.vector;
 import star.data_stream;
 import star.game_types;
+import star.message_types;
 import star.strong_typedef;
 import star.bi_map;
 import star.list;
@@ -58,7 +59,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> uninit();
 
   [[nodiscard]] std::expected<void, StarException> teleportOut();
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> receiveMessage(String const& message, bool localMessage, JsonArray const& args = {});
+  [[nodiscard]] MessageResponseResult receiveMessage(String const& message, bool localMessage, JsonArray const& args = {});
   [[nodiscard]] std::expected<void, StarException> update(float dt);
 
   [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& renderCallback, Vec2F const& position);

@@ -10,6 +10,7 @@ import star.random;
 import star.ttl_cache;
 import star.casting;
 import star.game_types;
+import star.message_types;
 import star.strong_typedef;
 import star.rpc_promise;
 import star.bi_map;
@@ -478,7 +479,7 @@ std::expected<void, StarException> ContainerObject::destroy(std::optional<std::r
   return {};
 }
 
-std::expected<std::optional<ChainableJsonMessageResponse>, StarException> ContainerObject::receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) {
+MessageResponseResult ContainerObject::receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) {
   auto databaseResult = root().itemDatabase();
   if (!databaseResult)
     return std::unexpected(std::move(databaseResult.error()));

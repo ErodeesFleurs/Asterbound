@@ -16,6 +16,7 @@ import star.list;
 import star.bi_map;
 import star.data_stream;
 import star.game_types;
+import star.message_types;
 import star.json_rpc;
 import star.strong_typedef;
 import star.vector;
@@ -1725,7 +1726,7 @@ std::expected<void, StarException> Player::dropItem() {
   return {};
 }
 
-std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Player::receiveMessage(ConnectionId fromConnection, String const& message, JsonArray const& args) {
+MessageResponseResult Player::receiveMessage(ConnectionId fromConnection, String const& message, JsonArray const& args) {
   auto currentWorldResult = world();
   if (!currentWorldResult)
     return std::unexpected(std::move(currentWorldResult.error()));

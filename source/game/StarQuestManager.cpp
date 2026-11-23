@@ -2,6 +2,7 @@ import std;
 import star.list;
 import star.vector;
 import star.game_types;
+import star.message_types;
 import star.bi_map;
 import star.json;
 import star.json_extra;
@@ -469,7 +470,7 @@ std::expected<StringSet, StarException> QuestManager::interestingObjects() {
   }
   return result;
 }
-std::expected<std::optional<ChainableJsonMessageResponse>, StarException> QuestManager::receiveMessage(String const& message, bool local, JsonArray const& args) {
+MessageResponseResult QuestManager::receiveMessage(String const& message, bool local, JsonArray const& args) {
   std::optional<ChainableJsonMessageResponse> result;
   for (auto const& quest : m_quests.values()) {
     auto response = quest->receiveMessage(message, local, args);

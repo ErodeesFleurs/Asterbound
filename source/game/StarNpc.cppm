@@ -9,6 +9,7 @@ import star.data_stream;
 import star.poly;
 import star.strong_typedef;
 import star.game_types;
+import star.message_types;
 import star.list;
 import star.rpc_promise;
 import star.vector;
@@ -216,7 +217,7 @@ public:
 
   [[nodiscard]] std::expected<List<LightSource>, StarException> lightSources() const override;
 
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) override;
+  [[nodiscard]] MessageResponseResult receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) override;
 
   [[nodiscard]] std::expected<Vec2F, StarException> armPosition(ToolHand hand, Direction facingDirection, float armAngle, Vec2F offset = {}) const override;
   [[nodiscard]] std::expected<Vec2F, StarException> handOffset(ToolHand hand, Direction facingDirection) const override;

@@ -4,6 +4,7 @@ import star.xx_hash;
 import star.json;
 import star.id_map;
 import star.game_types;
+import star.message_types;
 import star.material_types;
 import star.image;
 import star.list;
@@ -326,7 +327,7 @@ public:
   RectI clientWindow() const;
   WorldClientState& clientState();
 
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> receiveMessage(ConnectionId fromConnection, String const& message, JsonArray const& args);
+  [[nodiscard]] MessageResponseResult receiveMessage(ConnectionId fromConnection, String const& message, JsonArray const& args);
 
   std::shared_ptr<WorldClient::ScriptComponent> scriptContext(String const& contextName);
 

@@ -17,6 +17,7 @@ import star.lua;
 import star.vector;
 import star.data_stream;
 import star.game_types;
+import star.message_types;
 import star.audio;
 import star.thread;
 import star.list;
@@ -214,7 +215,7 @@ public:
   [[nodiscard]] std::expected<StringSet, StarException> turnInQuests() const override;
   [[nodiscard]] std::expected<Vec2F, StarException> questIndicatorPosition() const override;
 
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args = {}) override;
+  [[nodiscard]] MessageResponseResult receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args = {}) override;
 
   // Check, in order, the passed in object parameters, the config parameters,
   // and then the orientation parameters for the given key.  Returns 'def' if

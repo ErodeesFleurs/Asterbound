@@ -6,6 +6,7 @@ import star.json;
 import star.net_compatibility;
 import star.id_map;
 import star.game_types;
+import star.message_types;
 import star.string;
 import star.data_stream;
 import star.color;
@@ -106,7 +107,7 @@ public:
 
   void suppressItems(bool suppress);
 
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> receiveMessage(String const& message, bool localMessage, JsonArray const& args = {});
+  [[nodiscard]] MessageResponseResult receiveMessage(String const& message, bool localMessage, JsonArray const& args = {});
 
   [[nodiscard]] std::expected<float, StarException> beamGunRadius() const;
 

@@ -10,6 +10,7 @@ import star.casting;
 import star.data_stream;
 import star.bi_map;
 import star.game_types;
+import star.message_types;
 import star.set;
 import star.json_rpc;
 import star.string;
@@ -499,7 +500,7 @@ void Quest::detachPlayer() {
   m_world.reset();
   m_client.reset();
 }
-std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Quest::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
+MessageResponseResult Quest::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
   if (!m_inited) return std::optional<ChainableJsonMessageResponse>();
   return recover_lua_script_error(m_scriptComponent.handle_message(message, localMessage, args));
 }

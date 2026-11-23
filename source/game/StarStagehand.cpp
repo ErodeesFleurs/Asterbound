@@ -5,6 +5,7 @@ import star.casting;
 import star.vector;
 import star.data_stream;
 import star.game_types;
+import star.message_types;
 import star.poly;
 import star.strong_typedef;
 import star.bi_map;
@@ -335,7 +336,7 @@ std::expected<String, StarException> Stagehand::typeName() const {
   return m_config.get_string("type");
 }
 
-std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Stagehand::receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) {
+MessageResponseResult Stagehand::receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) {
   auto currentWorld = world();
   if (!currentWorld)
     return std::unexpected(std::move(currentWorld.error()));

@@ -6,6 +6,7 @@ import star.type_identity;
 import star.string;
 import star.rpc_promise;
 import star.game_types;
+import star.message_types;
 import star.data_stream;
 
 import star.uuid;
@@ -34,7 +35,7 @@ public:
   // Sends a universe message to the target universe's main universe script context.
   [[nodiscard]] virtual std::expected<RpcPromise<Json>, StarException> sendUniverseMessage(ConnectionId const& connectionId, String const& message, JsonArray const& args = {}) = 0;
 
-  [[nodiscard]] virtual std::expected<std::optional<ChainableJsonMessageResponse>, StarException> receiveMessage(String const& message, bool const& local, JsonArray const& args) = 0;
+  [[nodiscard]] virtual MessageResponseResult receiveMessage(String const& message, bool const& local, JsonArray const& args) = 0;
 };
 
 }

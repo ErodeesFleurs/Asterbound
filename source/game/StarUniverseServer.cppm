@@ -8,6 +8,7 @@ import star.string;
 import star.lock_file;
 import star.thread;
 import star.game_types;
+import star.message_types;
 import star.vector;
 import star.either;
 import star.data_stream;
@@ -249,7 +250,7 @@ public:
   
   [[nodiscard]] std::expected<RpcPromise<Json>, StarException> sendUniverseMessage(ConnectionId const& connectionId, String const& message, JsonArray const& args = {}) override;
   
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> receiveMessage(String const& message, bool const& local, JsonArray const& args) override;
+  [[nodiscard]] MessageResponseResult receiveMessage(String const& message, bool const& local, JsonArray const& args) override;
 
 protected:
   [[nodiscard]] std::expected<void, StarException> run() override;

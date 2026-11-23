@@ -12,6 +12,7 @@ import star.output_proxy;
 import star.thread;
 import star.listener;
 import star.game_types;
+import star.message_types;
 import star.list;
 import star.rpc_promise;
 import star.lua_root;
@@ -202,7 +203,7 @@ private:
     JsonArray args;
     RpcPromiseKeeper<Json> promise;
   };
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> handle_thread_message(ThreadMessage const& message);
+  [[nodiscard]] MessageResponseResult handle_thread_message(ThreadMessage const& message);
   LuaBaseComponent& m_host;
   Periodic m_update_periodic;
   mutable float m_last_dt;
@@ -234,7 +235,7 @@ public:
   explicit LuaScriptMessages(LuaBaseComponent& host) : m_host(host) {}
   LuaScriptMessages(LuaScriptMessages const&) = delete;
   LuaScriptMessages& operator=(LuaScriptMessages const&) = delete;
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> handle_message(String const& message, bool localMessage, JsonArray const& args = {});
+  [[nodiscard]] MessageResponseResult handle_message(String const& message, bool localMessage, JsonArray const& args = {});
   [[nodiscard]] std::expected<void, StarException> context_setup();
   void context_shutdown();
 private:
@@ -461,7 +462,7 @@ public:
   RpcPromise<Json> thread_pass_message(String const& thread, String const& message, JsonArray const& args) override {
     return m_update.thread_pass_message(thread, message, args);
   }
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> handle_message(String const& message, bool localMessage, JsonArray const& args = {}) {
+  [[nodiscard]] MessageResponseResult handle_message(String const& message, bool localMessage, JsonArray const& args = {}) {
     return m_messages.handle_message(message, localMessage, args);
   }
 protected:
@@ -556,7 +557,7 @@ public:
   RpcPromise<Json> thread_pass_message(String const& thread, String const& message, JsonArray const& args) override {
     return m_update.thread_pass_message(thread, message, args);
   }
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> handle_message(String const& message, bool localMessage, JsonArray const& args = {}) {
+  [[nodiscard]] MessageResponseResult handle_message(String const& message, bool localMessage, JsonArray const& args = {}) {
     return m_messages.handle_message(message, localMessage, args);
   }
 protected:
@@ -611,7 +612,7 @@ public:
   }
   [[nodiscard]] std::expected<JsonObject, StarException> get_script_storage() const { return m_storage.get_script_storage(); }
   [[nodiscard]] std::expected<void, StarException> set_script_storage(JsonObject storage) { return m_storage.set_script_storage(std::move(storage)); }
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> handle_message(String const& message, bool localMessage, JsonArray const& args = {}) {
+  [[nodiscard]] MessageResponseResult handle_message(String const& message, bool localMessage, JsonArray const& args = {}) {
     return m_messages.handle_message(message, localMessage, args);
   }
 protected:

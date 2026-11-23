@@ -16,6 +16,7 @@ import star.directives;
 import star.asset_path;
 import star.casting;
 import star.game_types;
+import star.message_types;
 import star.strong_typedef;
 import star.bi_map;
 import star.rpc_promise;
@@ -277,7 +278,7 @@ std::expected<void, StarException> PlayerCompanions::dismissCompanion(String con
   return {};
 }
 
-std::expected<std::optional<ChainableJsonMessageResponse>, StarException> PlayerCompanions::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
+MessageResponseResult PlayerCompanions::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
   return recover_lua_script_error(m_scriptComponent.handle_message(message, localMessage, args));
 }
 

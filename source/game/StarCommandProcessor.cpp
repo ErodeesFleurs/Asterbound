@@ -10,6 +10,7 @@ import star.random;
 import star.ttl_cache;
 import star.casting;
 import star.game_types;
+import star.message_types;
 import star.strong_typedef;
 import star.list;
 import star.rpc_promise;

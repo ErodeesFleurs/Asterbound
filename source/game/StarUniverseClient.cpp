@@ -3,6 +3,7 @@ import star.optional;
 import star.xx_hash;
 import star.json_extra;
 import star.game_types;
+import star.message_types;
 import star.vector;
 import star.color;
 import star.bi_map;
@@ -2053,7 +2054,7 @@ std::expected<RpcPromise<Json>, StarException> UniverseClient::sendUniverseMessa
   return pair.first;
 }
 
-std::expected<std::optional<ChainableJsonMessageResponse>, StarException> UniverseClient::receiveMessage(String const& message, bool const& local, JsonArray const& args) {
+MessageResponseResult UniverseClient::receiveMessage(String const& message, bool const& local, JsonArray const& args) {
   for (auto&& p : m_scriptContexts) {
     auto responseResult = recover_lua_script_error(p.second->handle_message(message, local, args));
     if (!responseResult)

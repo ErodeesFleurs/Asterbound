@@ -30,6 +30,7 @@ import star.string_view;
 import star.directives;
 import star.asset_path;
 import star.game_types;
+import star.message_types;
 import star.rpc_promise;
 import star.a_star;
 import star.lua;
@@ -181,7 +182,7 @@ public:
 
   void setPosition(Vec2F const& pos);
 
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) override;
+  [[nodiscard]] MessageResponseResult receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) override;
 
   [[nodiscard]] std::expected<float, StarException> maxHealth() const override;
   float health() const override;

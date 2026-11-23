@@ -1,18 +1,11 @@
 module;
 import star.format;
-import star.json;
-
-import star.string;
 import star.bi_map;
 import star.vector;
-import star.rpc_promise;
 import star.math_common;
 import std;
 
 namespace Star {
-
-using ServerCommandResult = std::variant<String, RpcPromise<String>>;
-using ChainableJsonMessageResponse = std::variant<Json, RpcPromise<Json>>;
 
 enum class Direction : std::uint8_t {
   Left,
@@ -234,8 +227,6 @@ enum class TileDamageResult {
 export module star.game_types;
 
 export namespace Star {
-  using ::Star::ServerCommandResult;
-  using ::Star::ChainableJsonMessageResponse;
   using ::Star::Direction;
   using ::Star::DirectionNames;
   using ::Star::operator-;

@@ -9,6 +9,7 @@ import star.json;
 import star.data_stream;
 import star.rpc_promise;
 import star.game_types;
+import star.message_types;
 import star.chat_types;
 import star.set;
 import star.thread;

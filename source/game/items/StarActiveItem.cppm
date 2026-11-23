@@ -9,6 +9,7 @@ import star.casting;
 import star.vector;
 import star.data_stream;
 import star.game_types;
+import star.message_types;
 import star.poly;
 import star.strong_typedef;
 import star.bi_map;
@@ -153,7 +154,7 @@ public:
 
   std::optional<String> cursor() const;
 
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> receiveMessage(String const& message, bool localMessage, JsonArray const& args = {});
+  [[nodiscard]] MessageResponseResult receiveMessage(String const& message, bool localMessage, JsonArray const& args = {});
 
   [[nodiscard]] std::expected<float, StarException> durabilityStatus() override;
 

@@ -4,6 +4,7 @@ import star.xx_hash;
 import star.json;
 import star.format;
 import star.game_types;
+import star.message_types;
 import star.string;
 import star.vector;
 import star.color;
@@ -251,7 +252,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> passMessage(Universe::Message&& message) override;
   [[nodiscard]] std::expected<RpcPromise<Json>, StarException> sendUniverseMessage(ConnectionId const& connectionId, String const& message, JsonArray const& args = {}) override;
   
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> receiveMessage(String const& message, bool const& local, JsonArray const& args) override;
+  [[nodiscard]] MessageResponseResult receiveMessage(String const& message, bool const& local, JsonArray const& args) override;
 
 private:
   explicit UniverseClient(Root& root);

@@ -12,6 +12,7 @@ import star.casting;
 import star.rpc_promise;
 import star.strong_typedef;
 import star.game_types;
+import star.message_types;
 import star.vector;
 import star.rect;
 import star.a_star;
@@ -286,7 +287,7 @@ public:
   Direction walkingDirection() const override;
   Direction facingDirection() const override;
 
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args = {}) override;
+  [[nodiscard]] MessageResponseResult receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args = {}) override;
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::uint64_t currentStep) override;
 

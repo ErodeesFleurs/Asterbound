@@ -16,6 +16,7 @@ import star.directives;
 import star.asset_path;
 import star.casting;
 import star.game_types;
+import star.message_types;
 import star.strong_typedef;
 import star.bi_map;
 import star.rpc_promise;
@@ -84,7 +85,7 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> dismissCompanion(String const& category, Uuid const& podUuid);
 
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> receiveMessage(String const& message, bool localMessage, JsonArray const& args = {});
+  [[nodiscard]] MessageResponseResult receiveMessage(String const& message, bool localMessage, JsonArray const& args = {});
   [[nodiscard]] std::expected<void, StarException> update(float dt);
 
 private:

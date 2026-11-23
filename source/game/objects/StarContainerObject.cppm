@@ -15,6 +15,7 @@ import star.rpc_promise;
 import star.data_stream;
 import star.bi_map;
 import star.game_types;
+import star.message_types;
 import star.periodic;
 import star.periodic_function;
 import star.set;
@@ -89,7 +90,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> destroy(std::optional<std::reference_wrapper<RenderCallback>> renderCallback) override;
   [[nodiscard]] std::expected<InteractAction, StarException> interact(InteractRequest const& request) override;
 
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) override;
+  [[nodiscard]] MessageResponseResult receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) override;
 
   [[nodiscard]] std::expected<Json, StarException> containerGuiConfig() const override;
   [[nodiscard]] std::expected<String, StarException> containerDescription() const override;

@@ -7,6 +7,7 @@ import star.casting;
 import star.vector;
 import star.data_stream;
 import star.game_types;
+import star.message_types;
 import star.strong_typedef;
 import star.bi_map;
 import star.lua;
@@ -93,7 +94,7 @@ public:
 
   [[nodiscard]] std::expected<Json, StarException> configValue(String const& name, Json const& def = Json()) const;
 
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) override;
+  [[nodiscard]] MessageResponseResult receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) override;
 
   using Entity::setUniqueId;
 

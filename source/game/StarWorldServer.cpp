@@ -9,6 +9,7 @@ import star.set;
 import star.map;
 import star.random;
 import star.game_types;
+import star.message_types;
 import star.material_types;
 import star.poly;
 import star.list;
@@ -1515,7 +1516,7 @@ bool WorldServer::sendPacket(ConnectionId clientId, std::shared_ptr<Packet> cons
   return false;
 }
 
-std::expected<std::optional<ChainableJsonMessageResponse>, StarException> WorldServer::receiveMessage(ConnectionId fromConnection, String const& message, JsonArray const& args) {
+MessageResponseResult WorldServer::receiveMessage(ConnectionId fromConnection, String const& message, JsonArray const& args) {
   std::optional<ChainableJsonMessageResponse> result;
   for (auto&& p : m_scriptContexts) {
     auto result149 = recover_lua_script_error(p.second->handle_message(message, fromConnection == ServerConnectionId, args));

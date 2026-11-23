@@ -12,6 +12,7 @@ import star.casting;
 import star.vector;
 import star.data_stream;
 import star.game_types;
+import star.message_types;
 import star.poly;
 import star.strong_typedef;
 import star.bi_map;
@@ -176,7 +177,7 @@ public:
   // to messages.  If the message is NOT handled, should return Nothing,
   // otherwise should return some Json value.
   // This will only ever be called on master entities.
-  [[nodiscard]] virtual std::expected<std::optional<ChainableJsonMessageResponse>, StarException> receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args);
+  [[nodiscard]] virtual MessageResponseResult receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args);
 
   [[nodiscard]] virtual std::expected<void, StarException> update(float dt, std::uint64_t currentStep);
 

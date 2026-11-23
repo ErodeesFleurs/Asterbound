@@ -14,6 +14,7 @@ import star.casting;
 import star.data_stream;
 import star.bi_map;
 import star.game_types;
+import star.message_types;
 import star.data_stream_extra;
 import star.strong_typedef;
 import star.rpc_promise;
@@ -2408,7 +2409,7 @@ lights.append_range(std::move(*result501));
 return lights;
 }
 
-std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Npc::receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) {
+MessageResponseResult Npc::receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) {
   auto result502 = world();
 if (!result502) return std::unexpected(std::move(result502.error()));
 auto result503 = recover_lua_script_error(m_scriptComponent.handle_message(message, result502->get().connection() == sendingConnection, args));

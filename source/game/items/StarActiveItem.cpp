@@ -5,6 +5,7 @@ import star.casting;
 import star.vector;
 import star.data_stream;
 import star.game_types;
+import star.message_types;
 import star.poly;
 import star.strong_typedef;
 import star.bi_map;
@@ -625,7 +626,7 @@ std::optional<String> ActiveItem::cursor() const {
   return m_cursor;
 }
 
-std::expected<std::optional<ChainableJsonMessageResponse>, StarException> ActiveItem::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
+MessageResponseResult ActiveItem::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
   return recover_lua_script_error(m_script.handle_message(message, localMessage, args));
 }
 

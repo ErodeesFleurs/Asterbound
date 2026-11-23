@@ -34,6 +34,7 @@ import star.string_view;
 import star.directives;
 import star.asset_path;
 import star.game_types;
+import star.message_types;
 import star.a_star;
 import star.ordered_set;
 
@@ -859,7 +860,7 @@ if (!result1181) return std::unexpected(std::move(result1181.error()));
   return {};
 }
 
-std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Vehicle::receiveMessage(ConnectionId connectionId, String const& message, JsonArray const& args) {
+MessageResponseResult Vehicle::receiveMessage(ConnectionId connectionId, String const& message, JsonArray const& args) {
   m_aliveMasterConnections[connectionId] = GameTimer(m_slaveControlTimeout);
   auto result1145 = message.equals_ignore_case("control_on");
 if (!result1145) return std::unexpected(std::move(result1145.error()));

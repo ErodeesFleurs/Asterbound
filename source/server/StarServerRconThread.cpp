@@ -7,6 +7,7 @@ import star.data_stream;
 import star.data_stream_devices;
 import star.format;
 import star.game_types;
+import star.message_types;
 import star.host_address;
 import star.logging;
 import star.output_proxy;

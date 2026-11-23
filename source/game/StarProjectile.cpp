@@ -9,6 +9,7 @@ import star.data_stream;
 import star.casting;
 import star.vector;
 import star.game_types;
+import star.message_types;
 import star.liquid_types;
 import star.material_types;
 import star.strong_typedef;
@@ -705,7 +706,7 @@ if (!result899) return std::unexpected(std::move(result899.error()));
   return {};
 }
 
-std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Projectile::receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) {
+MessageResponseResult Projectile::receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) {
   auto result896 = world();
 if (!result896) return std::unexpected(std::move(result896.error()));
 auto result897 = recover_lua_script_error(m_scriptComponent.handle_message(message, sendingConnection == result896->get().connection(), args));

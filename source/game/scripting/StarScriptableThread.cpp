@@ -9,6 +9,7 @@ import star.lua;
 import star.logging;
 import star.output_proxy;
 import star.game_types;
+import star.message_types;
 import star.format;
 import star.scriptable_thread;
 import star.lua_root;
@@ -312,7 +313,7 @@ std::expected<void, StarException> ScriptableThread::run() {
   return result;
 }
 
-std::expected<std::optional<ChainableJsonMessageResponse>, StarException> ScriptableThread::receive_message(String const& message, JsonArray const& args) {
+MessageResponseResult ScriptableThread::receive_message(String const& message, JsonArray const& args) {
   for (auto const& p : m_scriptContexts) {
     auto result = p.second->handle_message(message, true, args);
     if (!result) {

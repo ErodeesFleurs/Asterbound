@@ -10,6 +10,7 @@ import star.random;
 import star.ttl_cache;
 import star.casting;
 import star.game_types;
+import star.message_types;
 import star.material_types;
 import star.poly;
 import star.list;
@@ -2068,7 +2069,7 @@ List<std::shared_ptr<Packet>> WorldClient::getOutgoingPackets() {
   return std::move(m_outgoingPackets);
 }
 
-std::expected<std::optional<ChainableJsonMessageResponse>, StarException> WorldClient::receiveMessage(ConnectionId fromConnection, String const& message, JsonArray const& args) {
+MessageResponseResult WorldClient::receiveMessage(ConnectionId fromConnection, String const& message, JsonArray const& args) {
   m_expiryTimer.reset();
   if (!inWorld()) {
     // script contexts aren't active to handle this message

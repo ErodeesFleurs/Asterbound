@@ -5,6 +5,7 @@ import star.data_stream_devices;
 import star.format;
 import star.host_address;
 import star.game_types;
+import star.message_types;
 import star.map;
 import star.rpc_promise;
 import star.string;

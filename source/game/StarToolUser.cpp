@@ -3,6 +3,7 @@ import star.id_map;
 import star.data_stream;
 import star.bi_map;
 import star.game_types;
+import star.message_types;
 import star.strong_typedef;
 import star.vector;
 import star.color;
@@ -874,7 +875,7 @@ void ToolUser::suppressItems(bool suppress) {
   m_suppress.set(suppress);
 }
 
-[[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> ToolUser::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
+[[nodiscard]] MessageResponseResult ToolUser::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
   for (auto const& item : {m_primaryHandItem.get(), m_altHandItem.get()}) {
     if (auto active = as<ActiveItem>(item)) {
       auto result = active->receiveMessage(message, localMessage, args);

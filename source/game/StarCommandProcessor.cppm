@@ -5,6 +5,7 @@ import star.thread;
 import star.lua;
 import star.json;
 import star.game_types;
+import star.message_types;
 import star.string;
 import star.byte_array;
 import star.encode;

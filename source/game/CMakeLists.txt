@@ -12,6 +12,7 @@ set (star_game_SOURCES
 add_library (star_game_module_interfaces OBJECT)
 target_sources (star_game_module_interfaces PUBLIC FILE_SET CXX_MODULES FILES
     StarGameTypes.cppm
+    StarMessageTypes.cppm
     scripting/StarLuaRoot.cppm
     scripting/StarLuaComponents.cppm
     scripting/StarLuaGameConverters.cppm

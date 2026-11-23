@@ -9,6 +9,7 @@ import star.string;
 import star.rpc_promise;
 import star.json;
 import star.game_types;
+import star.message_types;
 import star.list;
 import star.vector;
 import star.platformer_astar_types;
@@ -317,7 +318,7 @@ public:
   }
   [[nodiscard]] std::expected<JsonObject, StarException> get_script_storage() const { return m_storage.get_script_storage(); }
   [[nodiscard]] std::expected<void, StarException> set_script_storage(JsonObject storage) { return m_storage.set_script_storage(std::move(storage)); }
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> handle_message(String const& message, bool localMessage, JsonArray const& args = {}) {
+  [[nodiscard]] MessageResponseResult handle_message(String const& message, bool localMessage, JsonArray const& args = {}) {
     return m_messages.handle_message(message, localMessage, args);
   }
   [[nodiscard]] std::expected<void, StarException> add_actor_movement_callbacks(ActorMovementController& controller) { return m_movement.add_actor_movement_callbacks(controller); }
@@ -390,7 +391,7 @@ public:
   }
   [[nodiscard]] std::expected<JsonObject, StarException> get_script_storage() const { return m_storage.get_script_storage(); }
   [[nodiscard]] std::expected<void, StarException> set_script_storage(JsonObject storage) { return m_storage.set_script_storage(std::move(storage)); }
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> handle_message(String const& message, bool localMessage, JsonArray const& args = {}) {
+  [[nodiscard]] MessageResponseResult handle_message(String const& message, bool localMessage, JsonArray const& args = {}) {
     return m_messages.handle_message(message, localMessage, args);
   }
   [[nodiscard]] std::expected<void, StarException> add_actor_movement_callbacks(ActorMovementController& controller) { return m_movement.add_actor_movement_callbacks(controller); }
@@ -460,7 +461,7 @@ public:
   RpcPromise<Json> thread_pass_message(String const& thread, String const& message, JsonArray const& args) override {
     return m_update.thread_pass_message(thread, message, args);
   }
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> handle_message(String const& message, bool localMessage, JsonArray const& args = {}) {
+  [[nodiscard]] MessageResponseResult handle_message(String const& message, bool localMessage, JsonArray const& args = {}) {
     return m_messages.handle_message(message, localMessage, args);
   }
   [[nodiscard]] std::expected<void, StarException> add_actor_movement_callbacks(ActorMovementController& controller) { return m_movement.add_actor_movement_callbacks(controller); }

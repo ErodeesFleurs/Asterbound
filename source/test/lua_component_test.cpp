@@ -14,6 +14,7 @@ import star.collision_block;
 import star.file;
 import star.game_test;
 import star.game_types;
+import star.message_types;
 import star.json;
 import star.input;
 import star.input_event;
@@ -66,12 +67,12 @@ static_assert(!std::is_move_constructible_v<LuaStoredEntityScript>);
 static_assert(!std::is_move_constructible_v<LuaActorScript>);
 static_assert(!std::is_move_constructible_v<LuaActionScript>);
 
-void expectNoResponse(std::expected<std::optional<ChainableJsonMessageResponse>, StarException> response) {
+void expectNoResponse(MessageResponseResult response) {
   ASSERT_TRUE(response) << response.error().what();
   EXPECT_FALSE(*response);
 }
 
-void expectResponse(std::expected<std::optional<ChainableJsonMessageResponse>, StarException> response, Json const& expected) {
+void expectResponse(MessageResponseResult response, Json const& expected) {
   ASSERT_TRUE(response) << response.error().what();
   ASSERT_TRUE(*response);
   ASSERT_TRUE(std::holds_alternative<Json>(**response));
@@ -79,7 +80,7 @@ void expectResponse(std::expected<std::optional<ChainableJsonMessageResponse>, S
 }
 
 std::expected<RpcPromise<Json>, std::string>
-promiseResponse(std::expected<std::optional<ChainableJsonMessageResponse>, StarException> response) {
+promiseResponse(MessageResponseResult response) {
   if (!response)
     return std::unexpected(std::string(response.error().what()));
   if (!*response)

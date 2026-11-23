@@ -14,6 +14,7 @@ import star.rpc_promise;
 import star.lexical_cast;
 import star.logging;
 import star.game_types;
+import star.message_types;
 import star.random;
 import star.weighted_pool;
 import star.interpolation;
@@ -1408,7 +1409,7 @@ std::expected<Vec2F, StarException> Object::questIndicatorPosition() const {
   return position();
 }
 
-std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Object::receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) {
+MessageResponseResult Object::receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) {
   auto currentWorldResult = world();
   if (!currentWorldResult)
     return std::unexpected(std::move(currentWorldResult.error()));

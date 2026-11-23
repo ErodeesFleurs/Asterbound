@@ -9,6 +9,7 @@ import star.ordered_map;
 import star.rect;
 import star.vector;
 import star.game_types;
+import star.message_types;
 import star.material_types;
 import star.color;
 import star.bi_map;
@@ -213,7 +214,7 @@ const GameTestRegistration worldMessageBatchDrainsAfterFailure(
     unsigned handled = 0;
     auto settled = settleWorldMessageBatch(messages,
         [&](String const&, JsonArray const&)
-            -> std::expected<std::optional<ChainableJsonMessageResponse>, StarException> {
+            -> MessageResponseResult {
           ++handled;
           if (handlerFailure && handled == 2)
             return std::unexpected(StarException("Injected world handler failure"));

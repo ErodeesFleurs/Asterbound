@@ -7,6 +7,7 @@ import star.id_map;
 import star.casting;
 import star.data_stream;
 import star.game_types;
+import star.message_types;
 import star.poly;
 import star.strong_typedef;
 import star.bi_map;
@@ -135,7 +136,7 @@ std::expected<bool, StarException> Entity::shouldDestroy() const {
 
 std::expected<void, StarException> Entity::destroy(std::optional<std::reference_wrapper<RenderCallback>>) { return {}; }
 
-std::expected<std::optional<ChainableJsonMessageResponse>, StarException> Entity::receiveMessage(ConnectionId, String const&, JsonArray const&) {
+MessageResponseResult Entity::receiveMessage(ConnectionId, String const&, JsonArray const&) {
   return {};
 }
 

@@ -13,6 +13,7 @@ import star.lua_game_converters;
 import star.lua_components;
 import star.world;
 import star.game_types;
+import star.message_types;
 import star.rpc_promise;
 import star.drawable;
 import star.entity_rendering_types;
@@ -246,7 +247,7 @@ public:
   }
   [[nodiscard]] std::expected<JsonObject, StarException> get_script_storage() const { return m_storage.get_script_storage(); }
   [[nodiscard]] std::expected<void, StarException> set_script_storage(JsonObject storage) { return m_storage.set_script_storage(std::move(storage)); }
-  [[nodiscard]] std::expected<std::optional<ChainableJsonMessageResponse>, StarException> handle_message(String const& message, bool localMessage, JsonArray const& args = {}) {
+  [[nodiscard]] MessageResponseResult handle_message(String const& message, bool localMessage, JsonArray const& args = {}) {
     return m_messages.handle_message(message, localMessage, args);
   }
   List<std::pair<Drawable, std::optional<EntityRenderLayer>>> const& drawables() { return m_animation.drawables(); }

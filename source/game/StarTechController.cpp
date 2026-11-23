@@ -13,6 +13,7 @@ import star.data_stream_extra;
 import star.casting;
 import star.vector;
 import star.game_types;
+import star.message_types;
 import star.strong_typedef;
 import star.bi_map;
 import star.lua;
@@ -478,7 +479,7 @@ List<Particle> TechController::pullNewParticles() {
   return newParticles;
 }
 
-std::expected<std::optional<ChainableJsonMessageResponse>, StarException> TechController::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
+MessageResponseResult TechController::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
   for (auto& module : m_techModules) {
     auto response = recover_lua_script_error(module.scriptComponent.handle_message(message, localMessage, args));
     if (!response)

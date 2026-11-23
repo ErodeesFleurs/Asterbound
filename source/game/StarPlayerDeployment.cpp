@@ -20,6 +20,7 @@ import star.string_view;
 import star.directives;
 import star.asset_path;
 import star.game_types;
+import star.message_types;
 import star.casting;
 import star.strong_typedef;
 import star.rpc_promise;
@@ -199,7 +200,7 @@ std::expected<void, StarException> PlayerDeployment::teleportOut() {
   return {};
 }
 
-std::expected<std::optional<ChainableJsonMessageResponse>, StarException> PlayerDeployment::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
+MessageResponseResult PlayerDeployment::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
   return recover_lua_script_error(m_scriptComponent.handle_message(message, localMessage, args));
 }
 
