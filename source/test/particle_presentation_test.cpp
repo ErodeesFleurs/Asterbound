@@ -5,6 +5,7 @@ import star.animation;
 import star.asset_path;
 import star.bi_map;
 import star.color;
+import star.drawable;
 import star.game_test;
 import star.json;
 import star.list;
@@ -276,7 +277,18 @@ const GameTestRegistration particleTrailSampling(
     EXPECT_EQ(manager.count(), 2u);
   });
 
-const GameTestRegistration animatedParticleSampling(
+void expect_frame_path(Animation const& animation, String const& path) {
+  auto drawable = animation.drawable(1);
+  ASSERT_TRUE(drawable) << drawable.error().what();
+  if (path.empty()) {
+    EXPECT_FALSE(drawable->isImage());
+  } else {
+    ASSERT_TRUE(drawable->isImage());
+    EXPECT_EQ(AssetPath::join(drawable->imagePart().image), path);
+  }
+}
+
+const GameTestRegistration animated_particle_sampling(
   "ParticlePresentation", "AnimationClockSamplesAreIndependentAndCrossLoopBoundaries", [](GameTest& fixture) {
     WorldGeometry geometry(100, 100);
     auto tiles = std::make_shared<ClientTileSectorArray>(geometry.size());
@@ -284,7 +296,7 @@ const GameTestRegistration animatedParticleSampling(
     auto particle = movingParticle();
     particle.type = Particle::Type::Animated;
     auto animation = Animation::create(fixture.root(), JsonObject{
-        {"mode", "LoopForever"}, {"animationCycle", 1.0}, {"frameNumber", 8}});
+        {"mode", "LoopForever"}, {"animationCycle", 1.0}, {"frameNumber", 8}, {"frames", "/sheet.png"}, {"centered", false}});
     ASSERT_TRUE(animation);
     particle.animation = std::move(*animation);
     manager.add(std::move(particle));
@@ -295,28 +307,173 @@ const GameTestRegistration animatedParticleSampling(
       manager.sampleParticles(alpha, samples);
       ASSERT_EQ(samples.size(), 1u);
       ASSERT_TRUE(samples[0].animation);
-      EXPECT_FLOAT_EQ(samples[0].animation->playbackState().timer, std::fmod(0.75f + alpha * 0.5f, 1.0f));
-      EXPECT_FLOAT_EQ(manager.particles()[0].animation->playbackState().timer, 0.25f);
-      EXPECT_FALSE(manager.particles()[0].animation->isComplete());
+      float phase = std::fmod(0.75f + alpha * 0.5f, 1.0f);
+      EXPECT_FLOAT_EQ(samples[0].animation->playback_state().timer, phase);
+      expect_frame_path(*samples[0].animation, "/sheet.png:" + String(std::to_string(static_cast<int>(phase * 8))));
+      EXPECT_FLOAT_EQ(manager.particles()[0].animation->playback_state().timer, 0.25f);
+      EXPECT_FALSE(manager.particles()[0].animation->is_complete());
+      expect_frame_path(*manager.particles()[0].animation, "/sheet.png:6");
     }
     manager.resetPresentation();
     manager.sampleParticles(0, samples);
-    EXPECT_FLOAT_EQ(samples[0].animation->playbackState().timer, 0.25f);
+    EXPECT_FLOAT_EQ(samples[0].animation->playback_state().timer, 0.25f);
 
     for (std::string_view mode : {"Stop", "EndAndDisappear"}) {
       auto finite = Animation::create(fixture.root(), JsonObject{
-          {"mode", String(mode)}, {"animationCycle", 1.0}, {"frameNumber", 8}});
+          {"mode", String(mode)}, {"animationCycle", 1.0}, {"frameNumber", 8}, {"frames", "/sheet.png"}, {"centered", false}});
       ASSERT_TRUE(finite);
-      auto previous = finite->playbackState();
+      auto previous = finite->playback_state();
       Animation display = *finite;
-      display.samplePlayback(previous, 1.25f);
-      EXPECT_TRUE(display.isComplete());
-      display.samplePlayback(previous, 0.25f);
-      EXPECT_FALSE(display.isComplete());
-      EXPECT_FLOAT_EQ(display.playbackState().timer, 0.25f);
-      EXPECT_FALSE(finite->isComplete());
-      EXPECT_FLOAT_EQ(finite->playbackState().timer, 0);
+      display.sample_playback(previous, 1.25f);
+      EXPECT_TRUE(display.is_complete());
+      expect_frame_path(display, mode == "Stop" ? String("/sheet.png:7") : String());
+      display.sample_playback(previous, 0.25f);
+      EXPECT_FALSE(display.is_complete());
+      EXPECT_FLOAT_EQ(display.playback_state().timer, 0.25f);
+      expect_frame_path(display, "/sheet.png:2");
+      EXPECT_FALSE(finite->is_complete());
+      EXPECT_FLOAT_EQ(finite->playback_state().timer, 0);
+      finite->update(1.25f);
+      EXPECT_TRUE(finite->is_complete());
+      expect_frame_path(*finite, mode == "Stop" ? String("/sheet.png:0") : String());
     }
+  });
+
+const GameTestRegistration animation_tag_paths(
+  "SpriteAnimation", "TagChangesAndSameFrameIndexOwnership", [](GameTest& fixture) {
+    auto& root = fixture.root();
+    auto tagged = Animation::create(root, JsonObject{
+        {"frames", "<image>:<index>.<unknown>"}, {"centered", false}, {"frameNumber", 4}}, "/ai/");
+    ASSERT_TRUE(tagged) << tagged.error().what();
+    auto start = tagged->playback_state();
+    expect_frame_path(*tagged, "/ai/<image>:0.<unknown>");
+    tagged->set_tag("image", "human.png");
+    tagged->set_tag("index", "idle");
+    expect_frame_path(*tagged, "/ai/human.png:idle.<unknown>");
+    tagged->sample_playback(start, 0.125f);
+    expect_frame_path(*tagged, "/ai/human.png:idle.<unknown>");
+    tagged->update(0);
+    expect_frame_path(*tagged, "/ai/human.png:0.<unknown>");
+    tagged->set_tag("image", "avian<index>.png");
+    expect_frame_path(*tagged, "/ai/avian<index>.png:0.<unknown>");
+    tagged->clear_tags();
+    expect_frame_path(*tagged, "/ai/<image>:<index>.<unknown>");
+    tagged->sample_playback(start, 0);
+    expect_frame_path(*tagged, "/ai/<image>:<index>.<unknown>");
+    tagged->update(0);
+    expect_frame_path(*tagged, "/ai/<image>:0.<unknown>");
+    tagged->set_tag("index", "overridden");
+    tagged->sample_playback(start, 0.25f);
+    expect_frame_path(*tagged, "/ai/<image>:1.<unknown>");
+    tagged->set_tag("index", "overridden");
+    tagged->reset();
+    expect_frame_path(*tagged, "/ai/<image>:0.<unknown>");
+
+    // A real vanilla frame: implicit suffixes always follow the playback
+    // number, not an override of the template's index tag.
+    auto implicit = Animation::create(root, JsonObject{
+        {"frames", "<image>"}, {"frameNumber", 2}}, "/animations/chatting/");
+    ASSERT_TRUE(implicit) << implicit.error().what();
+    implicit->set_tag("image", "menu.png");
+    implicit->set_tag("index", "manual");
+    implicit->sample_playback(implicit->playback_state(), 0.5f);
+    implicit->set_tag("index", "manual");
+    expect_frame_path(*implicit, "/animations/chatting/menu.png:1");
+    auto empty = Animation::create(root, JsonObject{}, "/ai/");
+    ASSERT_TRUE(empty);
+    empty->update(0.5f);
+    expect_frame_path(*empty, "");
+  });
+
+const GameTestRegistration animation_config_domains(
+  "SpriteAnimation", "InvalidFieldsFailBeforeVariantDraw", [](GameTest& fixture) {
+    auto& root = fixture.root();
+    ASSERT_TRUE(root.assets());
+    root.random().seed(2);
+    RandomSource oracle(2);
+    auto invalid = [&](JsonObject config, std::string_view field) {
+      auto animation = Animation::create(root, std::move(config));
+      ASSERT_FALSE(animation) << field;
+      EXPECT_TRUE(std::string_view(animation.error().what()).contains(field)) << animation.error().what();
+    };
+    // A fast-math caller need not materialize a constant NaN/Inf argument.
+    // Build the IEEE payload at runtime, before packing it into JSON.
+    volatile std::uint64_t nan_bits = 0x7ff8000000000001ull;
+    volatile std::uint64_t infinity_bits = 0x7ff0000000000000ull;
+    auto nan = std::bit_cast<double>(static_cast<std::uint64_t>(nan_bits));
+    auto infinity = std::bit_cast<double>(static_cast<std::uint64_t>(infinity_bits));
+    invalid({{"frameNumber", 0}}, "frameNumber");
+    invalid({{"frameNumber", -1}}, "frameNumber");
+    invalid({{"frameNumber", 2.5}}, "frameNumber");
+    invalid({{"frameNumber", std::int64_t{1} << 31}}, "frameNumber");
+    invalid({{"animationCycle", 0}}, "animationCycle");
+    invalid({{"animationCycle", -1}}, "animationCycle");
+    invalid({{"animationCycle", nan}}, "animationCycle");
+    invalid({{"animationCycle", infinity}}, "animationCycle");
+    invalid({{"animationCycle", std::numeric_limits<float>::denorm_min()}, {"frameNumber", 4}}, "animationCycle");
+    invalid({{"variants", std::numeric_limits<std::int64_t>::min()}}, "variants");
+    invalid({{"variants", 0}}, "variants");
+    invalid({{"variants", 1.5}}, "variants");
+    invalid({{"variants", std::numeric_limits<std::int64_t>::max()}, {"frameNumber", 2}}, "variants");
+    invalid({{"variants", 3}, {"frameNumber", 1 << 30}}, "variants");
+    invalid({{"loops", -1}}, "loops");
+    invalid({{"loops", infinity}}, "loops");
+    invalid({{"angle", infinity}}, "angle");
+    invalid({{"offset", JsonArray{0, nan}}}, "offset");
+    invalid({{"offset", JsonArray{std::numeric_limits<double>::max(), 0}}}, "offset");
+    invalid({{"animationCycle", std::numeric_limits<float>::max()}, {"loops", 2}}, "loops");
+    EXPECT_EQ(root.random().next_u64(), oracle.next_u64());
+  });
+
+const GameTestRegistration animation_frame_bounds(
+  "SpriteAnimation", "LargestVariantFrameResetAndFractionalLifetime", [](GameTest& fixture) {
+    auto& root = fixture.root();
+    ASSERT_TRUE(root.assets());
+    root.random().seed(2);
+    RandomSource oracle(2);
+    ASSERT_EQ(oracle.uniform_int(1), 1);
+    auto variant = Animation::create(root, JsonObject{{"frames", "/sheet.png"}, {"frameNumber", 1 << 30},
+        {"variants", 2}, {"mode", "Stop"}, {"loops", 0.5}, {"centered", false}});
+    ASSERT_TRUE(variant) << variant.error().what();
+    auto start = variant->playback_state();
+    expect_frame_path(*variant, "/sheet.png:0");
+    variant->update(0.5f);
+    EXPECT_TRUE(variant->is_complete());
+    expect_frame_path(*variant, "/sheet.png:1073741824");
+    variant->sample_playback(start, 0.5f);
+    expect_frame_path(*variant, "/sheet.png:2147483647");
+    variant->reset();
+    expect_frame_path(*variant, "/sheet.png:0");
+    variant->update(0);
+    expect_frame_path(*variant, "/sheet.png:1073741824");
+
+    ASSERT_EQ(oracle.uniform_int(0), 0);
+    auto zero = Animation::create(root, JsonObject{{"loops", 0}});
+    ASSERT_TRUE(zero);
+    EXPECT_FALSE(zero->is_complete());
+    zero->update(0);
+    EXPECT_TRUE(zero->is_complete());
+    EXPECT_EQ(root.random().next_u64(), oracle.next_u64());
+  });
+
+const GameTestRegistration animation_clock_limits(
+  "SpriteAnimation", "RepresentableFramesAndTimersSurviveIntermediateOverflow", [](GameTest& fixture) {
+    auto huge_sheet = Animation::create(fixture.root(), JsonObject{
+        {"animationCycle", 0x1.4p-118f}, {"frameNumber", std::numeric_limits<int>::max()},
+        {"frames", "/sheet.png"}, {"centered", false}});
+    ASSERT_TRUE(huge_sheet) << huge_sheet.error().what();
+    // Float frame duration rounds down to denorm_min. The raw quotient exceeds
+    // INT_MAX even though the sampled time is still inside the first cycle.
+    huge_sheet->sample_playback(huge_sheet->playback_state(), 0x1.2p-118f);
+    expect_frame_path(*huge_sheet, "/sheet.png:2147483646");
+
+    const float cycle = std::numeric_limits<float>::max();
+    const float step = cycle * 0.75f;
+    auto clock = Animation::create(fixture.root(), JsonObject{{"animationCycle", cycle}, {"mode", "LoopForever"}});
+    ASSERT_TRUE(clock) << clock.error().what();
+    clock->update(step);
+    clock->update(step);
+    EXPECT_FLOAT_EQ(clock->playback_state().timer, static_cast<float>(2.0 * step - cycle));
   });
 
 const GameTestRegistration particle_variance_draw_order(

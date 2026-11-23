@@ -110,24 +110,46 @@ Drawable Drawable::makePoly(PolyF poly, Color const& color, Vec2F const& positio
   return drawable;
 }
 
-std::expected<Drawable, StarException> Drawable::makeImage(ImageMetadataDatabase const& imageMetadata, AssetPath image, float pixelSize, bool centered, Vec2F const& position, Color const& color) {
-  Drawable drawable;
+static std::expected<Drawable, StarException> make_image_drawable(ImageMetadataDatabase const& image_metadata,
+    AssetPath&& image, float pixel_size, bool centered, Vec2F const& position, std::span<Directives const> processing, Color const& color) {
   Mat3F transformation = Mat3F::identity();
-  if (centered) {
-    auto size = imageMetadata.imageSize(image);
+  Vec2F original_size;
+  if (centered || !processing.empty()) {
+    auto size = image_metadata.imageSize(image);
     if (!size)
       return std::unexpected(std::move(size.error()));
-    transformation.translate(-Vec2F(*size) / 2);
+    original_size = Vec2F(*size);
+    if (centered)
+      transformation.translate(-original_size / 2);
   }
 
-  if (pixelSize != 1.0f)
-    transformation.scale(pixelSize);
+  if (pixel_size != 1.0f)
+    transformation.scale(pixel_size);
 
-  drawable.part = ImagePart{std::move(image), std::move(transformation)};
+  if (!processing.empty()) {
+    for (auto const& directives : processing)
+      image.directives += directives;
+    auto processed_size = image_metadata.imageSize(image);
+    if (!processed_size)
+      return std::unexpected(std::move(processed_size.error()));
+    transformation *= Mat3F::translation((original_size - Vec2F(*processed_size)) / 2);
+  }
+
+  Drawable drawable;
+  drawable.part = Drawable::ImagePart{std::move(image), std::move(transformation)};
   drawable.position = position;
   drawable.color = color;
 
   return drawable;
+}
+
+std::expected<Drawable, StarException> Drawable::makeImage(ImageMetadataDatabase const& imageMetadata, AssetPath image, float pixelSize, bool centered, Vec2F const& position, Color const& color) {
+  return make_image_drawable(imageMetadata, std::move(image), pixelSize, centered, position, {}, color);
+}
+
+std::expected<Drawable, StarException> Drawable::make_animation_image(ImageMetadataDatabase const& image_metadata,
+    AssetPath image, float pixel_size, bool centered, Vec2F const& position, DirectivesGroup const& processing, Color const& color) {
+  return make_image_drawable(image_metadata, std::move(image), pixel_size, centered, position, processing.list(), color);
 }
 
 Drawable::Drawable()

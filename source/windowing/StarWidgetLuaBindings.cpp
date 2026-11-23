@@ -969,7 +969,7 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     return withWidget<ItemSlotWidget>(parentWidget, name, [&](std::shared_ptr<ItemSlotWidget> slot) -> std::expected<void, StarException> {
       static auto const fields = std::array{std::pair{String("durability"), &ItemSlotWidget::showDurability},
           std::pair{String("count"), &ItemSlotWidget::showCount}, std::pair{String("secondaryIcon"), &ItemSlotWidget::showSecondaryIcon},
-          std::pair{String("highlight"), &ItemSlotWidget::setHighlightEnabled}};
+          std::pair{String("highlight"), &ItemSlotWidget::set_highlight_enabled}};
       for (auto const& [field, setter] : fields) {
         auto found = display.contains(field);
         if (!found) return std::unexpected(std::move(found.error()));

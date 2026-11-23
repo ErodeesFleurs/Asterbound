@@ -44,6 +44,8 @@ import star.object_database;
 import star.world_server;
 import star.game_types;
 import star.drawable;
+import star.image_metadata_database;
+import star.color;
 import star.rect;
 
 #include "gtest/gtest.h"
@@ -356,6 +358,29 @@ const GameTestRegistration assets_filtered_scans("AssetsTest", "FilteredScanOrde
     EXPECT_TRUE(no_candidates->empty());
   }
 });
+
+const GameTestRegistration animation_drawable_transform(
+  "AssetsTest", "AnimationImageMatchesCenteredDirectiveComposition", [](GameTest& fixture) {
+    auto metadata = fixture.root().imageMetadataDatabase();
+    ASSERT_TRUE(metadata) << metadata.error().what();
+    AssetPath const image("/humanoid/human/malebody.png?flipx");
+    DirectivesGroup const border(String("?border=3;ff0000"));
+    Vec2F const offset(2.25f, -7.5f);
+    auto color = Color::rgba(15, 92, 173, 201);
+    for (bool centered : {false, true}) {
+      auto expected = Drawable::makeImage(**metadata, image, 0.375f, centered, offset);
+      ASSERT_TRUE(expected) << expected.error().what();
+      auto applied = expected->imagePart().addDirectivesGroup(**metadata, border, true);
+      ASSERT_TRUE(applied) << applied.error().what();
+      expected->rotate(0.7f);
+      expected->color = color;
+
+      auto actual = Drawable::make_animation_image(**metadata, image, 0.375f, centered, offset, border, color);
+      ASSERT_TRUE(actual) << actual.error().what();
+      actual->rotate(0.7f);
+      EXPECT_EQ(*actual, *expected);
+    }
+  });
 
 const GameTestRegistration objectCursorPreviewRandomIsolation(
   "AssetsTest", "ObjectCursorPreviewColdAndWarmCachesPreserveGameplayRandom", [](GameTest& fixture) {

@@ -285,7 +285,7 @@ std::expected<void, StarException> ItemGridWidget::updateAllItemSlots() {
     auto slot = m_slots.at(i);
     if (!slot) return std::unexpected(std::move(slot.error()));
     (slot->get())->setItem(*item);
-    (slot->get())->setHighlightEnabled(!*item && m_highlightEmpty);
+    (slot->get())->set_highlight_enabled(!*item && m_highlightEmpty);
   }
   return {};
 }
@@ -306,7 +306,7 @@ std::expected<void, StarException> ItemGridWidget::updateItemState() {
 
 void ItemGridWidget::indicateChangedSlots() {
   for (auto i : m_changedSlots)
-    m_slots[i]->indicateNew();
+    m_slots[i]->indicate_new();
 }
 
 void ItemGridWidget::setHighlightEmpty(bool highlight) {

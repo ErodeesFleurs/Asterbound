@@ -8,6 +8,8 @@ import star.file;
 import star.format;
 import star.json;
 import star.ai_types;
+import star.animation;
+import star.drawable;
 import star.ambient;
 import star.world_template;
 import star.sky_parameters;
@@ -816,6 +818,30 @@ int main(int argc, char** argv) {
     return 1;
   }
   BenchmarkSession session{**root};
+  for (bool changing : {false, true}) {
+    benchmark::RegisterBenchmark(changing ? "Game/Sprite/AdvanceFrame" : "Game/Sprite/SameFrame", [&, changing](benchmark::State& state) {
+      auto animation = Animation::create(session.root, JsonObject{{"mode", "LoopForever"}, {"frameNumber", 8}, {"frames", "/sprite.png:<index>"}});
+      if (!animation) return session.fail(state, animation.error());
+      for (auto _ : state) {
+        animation->update(changing ? 0.125f : 0.0f);
+        benchmark::DoNotOptimize(*animation);
+      }
+    });
+  }
+  for (bool processed : {false, true}) {
+    benchmark::RegisterBenchmark(processed ? "Game/Sprite/CenteredBorder" : "Game/Sprite/TaggedDrawable", [&, processed](benchmark::State& state) {
+      auto animation = Animation::create(session.root, JsonObject{{"frames", "/<image>.png?multiply=ffffff0<index>"}, {"centered", processed}, {"processing", processed ? Json("?border=1;ffffffff") : Json("")}});
+      if (!animation) return session.fail(state, animation.error());
+      animation->set_tag("image", "assetmissing");
+      auto warm = animation->drawable(1.0f);
+      if (!warm) return session.fail(state, warm.error());
+      for (auto _ : state) {
+        auto frame = animation->drawable(1.0f);
+        if (!frame) return session.fail(state, frame.error());
+        benchmark::DoNotOptimize(*frame);
+      }
+    });
+  }
   benchmark::RegisterBenchmark("Game/Ambient/StablePlayback16", [&](benchmark::State& state) {
     AmbientManager manager(session.root);
     auto description = std::make_shared<AmbientNoisesDescription>();

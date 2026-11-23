@@ -156,63 +156,55 @@ import star.quest_manager;
 namespace Star {
 
 QuestIndicatorPainter::QuestIndicatorPainter(GuiContext& context, std::shared_ptr<UniverseClient> const& client)
-  : m_guiContext(context) {
-  m_client = client;
-}
+  : m_gui_context(context), m_client(client) {}
 
-[[nodiscard]] std::expected<std::shared_ptr<Animation>, StarException> indicatorAnimation(Root& root, String indicatorPath) {
+[[nodiscard]] static std::expected<Animation, StarException> load_indicator_animation(Root& root, String const& indicator_path) {
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto config = (*assets)->json(indicatorPath);
+  auto config = (*assets)->json(indicator_path);
   if (!config)
     return std::unexpected(std::move(config.error()));
-  auto animation = Animation::create(root, *config, indicatorPath);
-  if (!animation)
-    return std::unexpected(std::move(animation.error()));
-  return std::make_shared<Animation>(std::move(*animation));
+  return Animation::create(root, std::move(*config), indicator_path);
 }
 
 std::expected<void, StarException> QuestIndicatorPainter::update(float dt, std::shared_ptr<WorldClient> const& world, WorldCamera const& camera) {
-
-  auto& foundIndicators = m_foundIndicators;
-  foundIndicators.clear();
   auto entities = world->query<Entity>(camera.worldScreenRect());
   if (!entities)
     return std::unexpected(std::move(entities.error()));
+  for (auto& indicator : m_indicators | std::views::values)
+    indicator.seen = false;
   for (auto const& entity : *entities) {
     auto found = m_client->questManager()->getQuestIndicator(entity);
     if (!found)
       return std::unexpected(std::move(found.error()));
     if (!*found)
       continue;
-    auto const& indicator = **found;
-    foundIndicators.insert(entity->entityId());
-
-    if (auto currentIndicator = m_indicators.find_ref(entity->entityId())) {
-      currentIndicator->get().worldPosition = indicator.worldPosition;
-      if (currentIndicator->get().indicatorName == indicator.indicatorImage) {
-        currentIndicator->get().animation->update(dt);
-      } else {
-        auto animation = indicatorAnimation(m_guiContext.get().root(), indicator.indicatorImage);
-        if (!animation)
-          return std::unexpected(std::move(animation.error()));
-        currentIndicator->get().indicatorName = indicator.indicatorImage;
-        currentIndicator->get().animation = std::move(*animation);
+    auto& indicator = **found;
+    auto entity_id = entity->entityId();
+    auto current = m_indicators.find_ref(entity_id);
+    if (current) {
+      auto& entry = current->get();
+      entry.seen = true;
+      entry.world_position = indicator.worldPosition;
+      if (entry.indicator_name == indicator.indicatorImage) {
+        entry.animation.update(dt);
+        continue;
       }
+    }
+    auto animation = load_indicator_animation(m_gui_context.get().root(), indicator.indicatorImage);
+    if (!animation)
+      return std::unexpected(std::move(animation.error()));
+    if (current) {
+      current->get().indicator_name = std::move(indicator.indicatorImage);
+      current->get().animation = std::move(*animation);
     } else {
-      auto animation = indicatorAnimation(m_guiContext.get().root(), indicator.indicatorImage);
-      if (!animation)
-        return std::unexpected(std::move(animation.error()));
-      m_indicators[entity->entityId()] = Indicator{.entityId = entity->entityId(),
-                                                   .worldPosition = indicator.worldPosition,
-                                                   .indicatorName = indicator.indicatorImage,
-                                                   .animation = std::move(*animation)};
+      m_indicators.try_emplace(entity_id, indicator.worldPosition, std::move(indicator.indicatorImage), std::move(*animation));
     }
   }
 
   for (auto indicator = m_indicators.begin(); indicator != m_indicators.end();) {
-    if (!foundIndicators.contains(indicator->first))
+    if (!indicator->second.seen)
       indicator = m_indicators.erase(indicator);
     else
       ++indicator;
@@ -220,22 +212,18 @@ std::expected<void, StarException> QuestIndicatorPainter::update(float dt, std::
   return {};
 }
 
-std::expected<Drawable, StarException> QuestIndicatorPainter::Indicator::render(float pixelRatio) const {
-  return animation->drawable(pixelRatio);
-}
-
 std::expected<void, StarException> QuestIndicatorPainter::render(WorldClient const& world, WorldCamera const& camera, PresentationContext presentation) {
-  auto& context = m_guiContext.get();
+  auto& context = m_gui_context.get();
 
-  for (auto const& indicator : m_indicators | std::views::values) {
-    auto entity = world.entity(indicator.entityId);
+  for (auto const& [entity_id, indicator] : m_indicators) {
+    auto entity = world.entity(entity_id);
     if (!entity)
       continue;
-    auto drawable = indicator.render(camera.pixelRatio());
+    auto drawable = indicator.animation.drawable(camera.pixelRatio());
     if (!drawable)
       return std::unexpected(std::move(drawable.error()));
     drawable->fullbright = true;
-    auto position = indicator.worldPosition + world.geometry().diff(world.renderPosition(indicator.entityId, presentation), entity->position());
+    auto position = indicator.world_position + world.geometry().diff(world.renderPosition(entity_id, presentation), entity->position());
     auto drawn = context.drawDrawable(*drawable, camera.worldToScreen(position), 1, Vec4B(255, 255, 255, 255));
     if (!drawn)
       return std::unexpected(std::move(drawn.error()));

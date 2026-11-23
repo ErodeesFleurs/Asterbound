@@ -54,6 +54,7 @@ import star.progress_widget;
 import star.math_common;
 import star.item;
 import star.item_database;
+import star.item_slot_widget;
 import star.drawable;
 import star.cinematic;
 import star.world_server;
@@ -637,6 +638,60 @@ const GameTestRegistration keybindingSpecificity("KeyBindings", "MostSpecificMod
   ASSERT_TRUE(tied) << tied.error().what();
   EXPECT_EQ(tied->actions(KeyChord{Key::A, both}),
       (Set<InterfaceAction>{InterfaceAction::PlayerRight, InterfaceAction::PlayerUp}));
+});
+
+const GameTestRegistration item_slot_indicator("ItemSlotWidget", "NewIndicatorRequiresTriggerAndRestarts", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory) << directory.error().what();
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto overlay = File::relative_to(*directory, "assets");
+  ASSERT_TRUE(File::create_directory(overlay));
+  ASSERT_TRUE(File::create_directory(File::relative_to(overlay, "interface")));
+  // Exercise the real widget parser without requiring a GPU for its durability bar.
+  ASSERT_TRUE(File::write_file(String(R"({"config":{"durabilityBar":{"type":"progress","progressSet":{}}}})"),
+      File::relative_to(overlay, "interface/itemSlot.config")));
+  ASSERT_TRUE(File::write_file(String(R"({"newItemAnimation":"/slot-indicator.animation"})"),
+      File::relative_to(overlay, "interface.config.patch")));
+  auto animation_path = File::relative_to(overlay, "slot-indicator.animation");
+  ASSERT_TRUE(File::write_file(String(R"({"mode":"stop"})"), animation_path));
+  auto root = createPrivateOverlayRoot(fixture.rootSettings(), *directory, overlay, "slot.config");
+  ASSERT_TRUE(root) << root.error().what();
+  auto configuration = (*root)->configuration();
+  ASSERT_TRUE(configuration) << configuration.error().what();
+  ASSERT_TRUE((*configuration)->set("bindings", JsonObject{}));
+  auto context = GuiContext::create(**root, {}, {});
+  ASSERT_TRUE(context) << context.error().what();
+  auto items = (*root)->itemDatabase();
+  ASSERT_TRUE(items) << items.error().what();
+  auto item = (*items)->fromJson(JsonObject{{"name", "dirtmaterial"}, {"count", 1}, {"parameters", JsonObject{}}});
+  ASSERT_TRUE(item && *item);
+  auto slot = ItemSlotWidget::create(**context, *item, {});
+  ASSERT_TRUE(slot) << slot.error().what();
+  EXPECT_FALSE((*slot)->indicating_new());
+  (*slot)->indicate_new();
+  ASSERT_TRUE((*slot)->update(0.75f));
+  EXPECT_TRUE((*slot)->indicating_new());
+  (*slot)->indicate_new();
+  (*slot)->setItem({});
+  ASSERT_TRUE((*slot)->update(1.0f));
+  EXPECT_FALSE((*slot)->indicating_new());
+  (*slot)->setItem(*item);
+  ASSERT_TRUE((*slot)->update(0.5f));
+  EXPECT_TRUE((*slot)->indicating_new());
+  ASSERT_TRUE((*slot)->update(0.5f));
+  EXPECT_FALSE((*slot)->indicating_new());
+  (*slot)->indicate_new();
+  EXPECT_TRUE((*slot)->indicating_new());
+
+  ASSERT_TRUE(File::write_file(String(R"({"mode":"loopForever"})"), animation_path));
+  ASSERT_TRUE((*root)->reload());
+  auto looping = ItemSlotWidget::create(**context, *item, {});
+  ASSERT_TRUE(looping) << looping.error().what();
+  ASSERT_TRUE((*looping)->update(2.0f));
+  EXPECT_FALSE((*looping)->indicating_new());
+  (*looping)->indicate_new();
+  ASSERT_TRUE((*looping)->update(2.0f));
+  EXPECT_TRUE((*looping)->indicating_new());
 });
 
 const GameTestRegistration stack_page_visibility("StackWidget", "PageSelectionPreservesVisibleChild", [](GameTest& fixture) {

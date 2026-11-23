@@ -173,7 +173,7 @@ std::expected<Animation, StarException> AiDatabase::animation(String const& spec
   auto parameters = m_species_parameters.get(species);
   if (!parameters)
     return std::unexpected(std::move(parameters.error()));
-  animation.setTag("image", parameters->get().ai_frames);
+  animation.set_tag("image", parameters->get().ai_frames);
   return animation;
 }
 
@@ -182,14 +182,14 @@ std::expected<Animation, StarException> AiDatabase::static_animation(String cons
   auto parameters = m_species_parameters.get(species);
   if (!parameters)
     return std::unexpected(std::move(parameters.error()));
-  animation.setTag("image", parameters->get().static_frames);
-  animation.setColor(Color::rgba_f(1.0f, 1.0f, 1.0f, m_animation_config.static_opacity));
+  animation.set_tag("image", parameters->get().static_frames);
+  animation.set_color(Color::rgba_f(1.0f, 1.0f, 1.0f, m_animation_config.static_opacity));
   return animation;
 }
 
 Animation AiDatabase::scanline_animation() const {
   auto animation = m_animation_config.scanline_animation;
-  animation.setColor(Color::rgba_f(1.0f, 1.0f, 1.0f, m_animation_config.scanline_opacity));
+  animation.set_color(Color::rgba_f(1.0f, 1.0f, 1.0f, m_animation_config.scanline_opacity));
   return animation;
 }
 

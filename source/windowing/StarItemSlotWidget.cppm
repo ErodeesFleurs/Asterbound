@@ -53,16 +53,17 @@ namespace Star {
 
 class Item;
 
-inline constexpr float ItemIndicateNewTime = 1.5f;
-
 class ItemSlotWidget : public Widget {
+  struct ConstructionKey { explicit ConstructionKey() = default; };
 public:
   void query_type(TypeQuery& query) const noexcept override {
     query_type_of<ItemSlotWidget, Widget>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ItemSlotWidget>(); }
 
-  [[nodiscard]] static std::expected<std::shared_ptr<ItemSlotWidget>, StarException> create(GuiContext& context, std::shared_ptr<Item> const& item, String const& backingImage);
+  ItemSlotWidget(ConstructionKey, GuiContext& context, std::shared_ptr<Item> const& item, String const& backing_image,
+      Animation&& new_item_indicator, Animation&& highlight_animation);
+  [[nodiscard]] static std::expected<std::shared_ptr<ItemSlotWidget>, StarException> create(GuiContext& context, std::shared_ptr<Item> const& item, String const& backing_image);
 
   [[nodiscard]] std::expected<void, StarException> update(float dt) override;
   [[nodiscard]] std::expected<bool, StarException> sendEvent(InputEvent const& event) override;
@@ -82,18 +83,18 @@ public:
   void showLinkIndicator(bool showLinkIndicator);
   void showSecondaryIcon(bool show);
 
-  void indicateNew();
+  void indicate_new();
+  bool indicating_new() const noexcept;
 
-  void setHighlightEnabled(bool highlight);
+  void set_highlight_enabled(bool highlight);
 
 protected:
   [[nodiscard]] std::expected<void, StarException> renderImpl() override;
 
 private:
-  ItemSlotWidget(GuiContext& context, std::shared_ptr<Item> const& item, String const& backingImage, Animation newItemIndicator, Animation highlightAnimation);
   std::shared_ptr<Item> m_item;
 
-  String m_backingImage;
+  String m_backing_image;
   bool m_drawBackingImageWhenFull;
   bool m_drawBackingImageWhenEmpty;
   bool m_showDurability;
@@ -117,10 +118,11 @@ private:
 
   std::shared_ptr<ProgressWidget> m_durabilityBar;
 
-  Animation m_newItemIndicator;
+  bool m_new_item_indicator_active = false;
+  Animation m_new_item_indicator;
 
-  bool m_highlightEnabled;
-  Animation m_highlightAnimation;
+  bool m_highlight_enabled = false;
+  Animation m_highlight_animation;
 };
 
 }
@@ -130,5 +132,4 @@ export module star.item_slot_widget;
 export namespace Star {
   using ::Star::ItemSlotWidget;
   using ::Star::Item;
-  using ::Star::ItemIndicateNewTime;
 }

@@ -115,7 +115,7 @@ struct Particle {
   // Internally called by update() / collide() / destruct()
   void destructionUpdate();
 
-  [[nodiscard]] std::expected<void, StarException> initializeAnimation(Root& root);
+  [[nodiscard]] std::expected<void, StarException> initialize_animation(Root& root);
 
   Type type;
 

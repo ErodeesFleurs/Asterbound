@@ -4,6 +4,7 @@ import std;
 import star.string;
 import star.json;
 
+import star.asset_path;
 import star.color;
 import star.list;
 import star.image_processing;
@@ -28,58 +29,64 @@ public:
     bool completed;
   };
 
-  PlaybackState playbackState() const;
+  [[nodiscard]] PlaybackState playback_state() const;
   // Samples an owned display animation without advancing the source animation.
-  void samplePlayback(PlaybackState const& previous, float elapsed);
+  void sample_playback(PlaybackState const& previous, float elapsed);
 
   // config can be either a path to a config or a literal config.
   [[nodiscard]] static std::expected<Animation, StarException> create(Root& root, Json config = {}, String const& directory = {});
 
-  void setAngle(float angle);
+  void set_angle(float angle);
 
-  void setProcessing(DirectivesGroup processing);
+  void set_processing(DirectivesGroup processing);
 
-  void setColor(Color color);
+  void set_color(Color color);
 
-  void setTag(String tagName, String tagValue);
-  void clearTags();
+  void set_tag(String name, String value);
+  void clear_tags();
 
-  [[nodiscard]] std::expected<Drawable, StarException> drawable(float pixelSize) const;
+  [[nodiscard]] std::expected<Drawable, StarException> drawable(float pixel_size) const;
 
   void update(float dt);
 
-  bool isComplete() const;
+  [[nodiscard]] bool is_complete() const;
   void reset();
 
 private:
   explicit Animation(Root& root) : m_root(root) {}
-  [[nodiscard]] std::expected<void, StarException> initialize(Json config, String const& directory);
-  enum AnimationMode { Stop, EndAndDisappear, LoopForever };
-  inline static constexpr auto AnimationModeNames = sorted_enum_names(
-    std::to_array<std::pair<AnimationMode, std::string_view>>({{AnimationMode::Stop, "Stop"},
-                                                               {AnimationMode::EndAndDisappear, "EndAndDisappear"},
-                                                               {AnimationMode::LoopForever, "LoopForever"}}));
+  enum class Mode { Stop, EndAndDisappear, LoopForever };
+  inline static constexpr auto mode_names = sorted_enum_names(
+    std::to_array<std::pair<Mode, std::string_view>>({{Mode::Stop, "Stop"},
+                                                      {Mode::EndAndDisappear, "EndAndDisappear"},
+                                                      {Mode::LoopForever, "LoopForever"}}));
+  int frame_at(float timer) const;
+  float advance_timer(float timer, float elapsed) const;
+  void set_frame(int frame);
+  void refresh_image();
   std::reference_wrapper<Root> m_root;
 
-  AnimationMode m_mode;
-  String m_directory;
-  String m_base;
-  bool m_appendFrame;
-  int m_frameNumber;
-  float m_animationCycle;
-  float m_animationTime;
+  Mode m_mode;
+  int m_frame_count;
+  int m_variant_offset;
+  float m_cycle;
+  float m_frame_duration;
+  float m_duration;
   float m_angle;
   Vec2F m_offset;
   bool m_centered;
   DirectivesGroup m_processing;
   Color m_color;
-  int m_variantOffset;
 
-  StringMap<String> m_tagValues;
-  int m_frame;
-  float m_animationTimer;
-  float m_timeToLive;
-  bool m_completed;
+  // A plain numbered sheet needs only its base path and the current sub-path.
+  // Other paths retain the original template for non-recursive tag expansion.
+  String m_frame_template;
+  AssetPath m_image;
+  StringMap<String> m_tags;
+  bool m_append_frame = false;
+  bool m_automatic_index = true;
+  int m_frame = -1;
+  float m_timer = 0;
+  bool m_completed = false;
 };
 
 }

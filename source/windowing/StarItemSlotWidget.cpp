@@ -110,13 +110,14 @@ static String formatShortSize(std::uint64_t n) {
       return Star::format("{}.{:02d}{:c}", whole, frac / 10, suffix);
 }
 
-ItemSlotWidget::ItemSlotWidget(GuiContext& context, std::shared_ptr<Item> const& item, String const& backingImage, Animation newItemIndicator, Animation highlightAnimation)
-  : Widget(context), m_item(item), m_backingImage(backingImage), m_newItemIndicator(std::move(newItemIndicator)), m_highlightAnimation(std::move(highlightAnimation)) {
+ItemSlotWidget::ItemSlotWidget(ConstructionKey, GuiContext& context, std::shared_ptr<Item> const& item, String const& backing_image,
+    Animation&& new_item_indicator, Animation&& highlight_animation)
+  : Widget(context), m_item(item), m_backing_image(backing_image), m_new_item_indicator(std::move(new_item_indicator)),
+    m_highlight_animation(std::move(highlight_animation)) {
   m_drawBackingImageWhenFull = false;
   m_drawBackingImageWhenEmpty = true;
   m_progress = 1;
   m_countFontMode = FontMode::Normal;
-  m_highlightEnabled = false;
   m_showDurability = false;
   m_showCount = true;
   m_showRarity = true;
@@ -125,25 +126,20 @@ ItemSlotWidget::ItemSlotWidget(GuiContext& context, std::shared_ptr<Item> const&
   disableScissoring();
 }
 
-std::expected<std::shared_ptr<ItemSlotWidget>, StarException> ItemSlotWidget::create(GuiContext& context, std::shared_ptr<Item> const& item, String const& backingImage) {
+std::expected<std::shared_ptr<ItemSlotWidget>, StarException> ItemSlotWidget::create(GuiContext& context, std::shared_ptr<Item> const& item, String const& backing_image) {
   auto assets = context.root().assets();
   if (!assets) return std::unexpected(std::move(assets.error()));
   auto config = (*assets)->json("/interface.config");
   if (!config) return std::unexpected(std::move(config.error()));
-  auto newConfig = config->get("newItemAnimation");
-  if (!newConfig) return std::unexpected(std::move(newConfig.error()));
-  auto indicator = Animation::create(context.root(), *newConfig);
+  auto new_config = config->get("newItemAnimation");
+  if (!new_config) return std::unexpected(std::move(new_config.error()));
+  auto indicator = Animation::create(context.root(), std::move(*new_config));
   if (!indicator) return std::unexpected(std::move(indicator.error()));
-  auto cycle = newConfig->get_double("animationCycle");
-  if (!cycle) return std::unexpected(std::move(cycle.error()));
-  auto loops = newConfig->get_double("loops", 1.0f);
-  if (!loops) return std::unexpected(std::move(loops.error()));
-  indicator->update(*cycle * *loops);
-  auto highlightConfig = config->get("highlightAnimation");
-  if (!highlightConfig) return std::unexpected(std::move(highlightConfig.error()));
-  auto highlight = Animation::create(context.root(), *highlightConfig);
+  auto highlight_config = config->get("highlightAnimation");
+  if (!highlight_config) return std::unexpected(std::move(highlight_config.error()));
+  auto highlight = Animation::create(context.root(), std::move(*highlight_config));
   if (!highlight) return std::unexpected(std::move(highlight.error()));
-  auto widget = std::shared_ptr<ItemSlotWidget>(new ItemSlotWidget(context, item, backingImage, std::move(*indicator), std::move(*highlight)));
+  auto widget = std::make_shared<ItemSlotWidget>(ConstructionKey{}, context, item, backing_image, std::move(*indicator), std::move(*highlight));
   auto countJson = config->get("itemCountRightAnchor");
   if (!countJson) return std::unexpected(std::move(countJson.error()));
   auto count = json_to_vec2f(*countJson);
@@ -165,10 +161,10 @@ std::expected<std::shared_ptr<ItemSlotWidget>, StarException> ItemSlotWidget::cr
   if (!offset) return std::unexpected(std::move(offset.error()));
   widget->m_durabilityOffset = *offset;
   Vec2I backingSize;
-  if (!backingImage.empty()) {
+  if (!backing_image.empty()) {
     auto metadata = context.root().imageMetadataDatabase();
     if (!metadata) return std::unexpected(std::move(metadata.error()));
-    auto size = (*metadata)->imageSize(backingImage);
+    auto size = (*metadata)->imageSize(backing_image);
     if (!size) return std::unexpected(std::move(size.error()));
     backingSize = Vec2I(*size);
   }
@@ -189,10 +185,12 @@ std::expected<std::shared_ptr<ItemSlotWidget>, StarException> ItemSlotWidget::cr
 }
 
 std::expected<void, StarException> ItemSlotWidget::update(float dt) {
-  if (m_item)
-    m_newItemIndicator.update(dt);
-  if (m_highlightEnabled)
-    m_highlightAnimation.update(dt);
+  if (indicating_new()) {
+    m_new_item_indicator.update(dt);
+    m_new_item_indicator_active = !m_new_item_indicator.is_complete();
+  }
+  if (m_highlight_enabled)
+    m_highlight_animation.update(dt);
   return Widget::update(dt);
 }
 
@@ -273,14 +271,19 @@ void ItemSlotWidget::showSecondaryIcon(bool show) {
   m_showSecondaryIcon = show;
 }
 
-void ItemSlotWidget::indicateNew() {
-  m_newItemIndicator.reset();
+void ItemSlotWidget::indicate_new() {
+  m_new_item_indicator.reset();
+  m_new_item_indicator_active = true;
 }
 
-void ItemSlotWidget::setHighlightEnabled(bool highlight) {
-  if (!m_highlightEnabled && highlight)
-    m_highlightAnimation.reset();
-  m_highlightEnabled = highlight;
+bool ItemSlotWidget::indicating_new() const noexcept {
+  return m_item && m_new_item_indicator_active;
+}
+
+void ItemSlotWidget::set_highlight_enabled(bool highlight) {
+  if (!m_highlight_enabled && highlight)
+    m_highlight_animation.reset();
+  m_highlight_enabled = highlight;
 }
 
 std::expected<void, StarException> ItemSlotWidget::renderImpl() {
@@ -289,8 +292,8 @@ std::expected<void, StarException> ItemSlotWidget::renderImpl() {
     return slot.context().drawInterfaceQuad(AssetPath(String(Star::format("/interface/cooldown.png:{}", frame))), Vec2F(slot.screenPosition()));
   };
   if (m_item) {
-    if (m_drawBackingImageWhenFull && !m_backingImage.empty()) {
-      auto result = context().drawInterfaceQuad(m_backingImage, Vec2F(screenPosition()));
+    if (m_drawBackingImageWhenFull && !m_backing_image.empty()) {
+      auto result = context().drawInterfaceQuad(m_backing_image, Vec2F(screenPosition()));
       if (!result) return std::unexpected(std::move(result.error()));
     }
     auto icons = m_item->iconDrawables();
@@ -320,8 +323,8 @@ std::expected<void, StarException> ItemSlotWidget::renderImpl() {
       auto result = context().drawInterfaceDrawable(icon, Vec2F(screenPosition() + size() / 2));
       if (!result) return std::unexpected(std::move(result.error()));
     }
-    if (!m_newItemIndicator.isComplete()) {
-      auto drawable = m_newItemIndicator.drawable(1.0);
+    if (indicating_new()) {
+      auto drawable = m_new_item_indicator.drawable(1.0f);
       if (!drawable) return std::unexpected(std::move(drawable.error()));
       auto result = context().drawInterfaceDrawable(*drawable, Vec2F(screenPosition() + size() / 2), Color::palette_white.to_rgba());
       if (!result) return std::unexpected(std::move(result.error()));
@@ -349,14 +352,14 @@ std::expected<void, StarException> ItemSlotWidget::renderImpl() {
       if (!text) return std::unexpected(std::move(text.error()));
       if (!cleared) return std::unexpected(std::move(cleared.error()));
     }
-  } else if (m_drawBackingImageWhenEmpty && !m_backingImage.empty()) {
-    auto result = context().drawInterfaceQuad(m_backingImage, Vec2F(screenPosition()));
+  } else if (m_drawBackingImageWhenEmpty && !m_backing_image.empty()) {
+    auto result = context().drawInterfaceQuad(m_backing_image, Vec2F(screenPosition()));
     if (!result) return std::unexpected(std::move(result.error()));
     auto cooldown = drawCooldown();
     if (!cooldown) return std::unexpected(std::move(cooldown.error()));
   }
-  if (m_highlightEnabled) {
-    auto drawable = m_highlightAnimation.drawable(1.0);
+  if (m_highlight_enabled) {
+    auto drawable = m_highlight_animation.drawable(1.0f);
     if (!drawable) return std::unexpected(std::move(drawable.error()));
     auto result = context().drawInterfaceDrawable(*drawable, Vec2F(screenPosition() + size() / 2), Color::palette_white.to_rgba());
     if (!result) return std::unexpected(std::move(result.error()));

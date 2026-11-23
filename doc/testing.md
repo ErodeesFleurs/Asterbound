@@ -852,6 +852,7 @@ platform search benchmark nor its output fingerprint measures actor tick cost.
 | JSON | `./result/bin/json_benchmarks` | Parsing, preserved formatting, path updates and patches. |
 | SAIL saves | `game_benchmarks --benchmark_filter='^Game/AiState/'` | Decode two ordered mission lists with 64 names each from existing JSON; excludes parsing text and widget rendering. |
 | Ambient scheduling | `game_benchmarks --benchmark_filter='^Game/Ambient/'` | Stable playback with 16 playlist entries, an empty weather tick, and a pair of fixed floating-world override lookups. Excludes mixer callbacks and asset loading. |
+| Sprite animation | `game_benchmarks --benchmark_filter='^Game/Sprite/'` | Same-frame and next-frame clock updates, repeated tagged drawable construction, and centered border processing with warm image metadata. Excludes GPU submission. |
 | Asset locators | `./result/bin/core_benchmarks --benchmark_filter='^Core/AssetPath/'` | Byte parsing, canonical output, filename/extension, sub-path/directive edits and relative concatenation. |
 | Path search | `core_benchmarks --benchmark_filter='^Core/AStar/'`; `game_benchmarks --benchmark_filter='^Game/AStar/'` | Graph chains/branches, partial fallback and budgeted restart; real WorldServer walk/flight. |
 | Algorithms | `./result/bin/algorithm_benchmarks --benchmark_filter='Algorithm/'` | Ordinary/checked cached-key and stable sorting; held-key filtering. |

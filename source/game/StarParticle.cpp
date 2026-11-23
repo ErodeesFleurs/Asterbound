@@ -102,7 +102,7 @@ std::expected<Particle, StarException> Particle::create(Root& root, Json const& 
         return std::unexpected(std::move(directives.error()));
       particle.directives = std::move(*directives);
     }
-    auto initialized = particle.initializeAnimation(root);
+    auto initialized = particle.initialize_animation(root);
     if (!initialized)
       return std::unexpected(std::move(initialized.error()));
   }
@@ -375,7 +375,7 @@ std::expected<void, StarException> Particle::update(Root& root, float dt, Vec2F 
     destructionUpdate();
 
   if (type == Type::Animated) {
-    auto initialized = initializeAnimation(root);
+    auto initialized = initialize_animation(root);
     if (!initialized)
       return std::unexpected(std::move(initialized.error()));
     animation->update(dt);
@@ -389,7 +389,7 @@ bool Particle::dead() const {
 
 Particle::PresentationState Particle::presentationState() const {
   return {position, velocity, rotation, size, color, light, timeToLive, type, destructionSet,
-      animation ? std::optional(animation->playbackState()) : std::nullopt};
+      animation ? std::optional(animation->playback_state()) : std::nullopt};
 }
 
 void Particle::samplePresentation(Particle const& current, PresentationState const& previous,
@@ -436,7 +436,7 @@ void Particle::samplePresentation(Particle const& current, PresentationState con
     }
   }
   if (animation && previous.animation && sameState)
-    animation->samplePlayback(*previous.animation, timestep * alpha);
+    animation->sample_playback(*previous.animation, timestep * alpha);
 }
 
 void Particle::applyVariance(Root& root, Particle const& variance) {
@@ -493,13 +493,13 @@ void Particle::destructionUpdate() {
   }
 }
 
-std::expected<void, StarException> Particle::initializeAnimation(Root& root) {
+std::expected<void, StarException> Particle::initialize_animation(Root& root) {
   if (!animation) {
     auto created = Animation::create(root, AssetPath::remove_directives(string));
     if (!created)
       return std::unexpected(std::move(created.error()));
     animation = std::move(*created);
-    animation->setProcessing(directives);
+    animation->set_processing(directives);
   }
   return {};
 }
