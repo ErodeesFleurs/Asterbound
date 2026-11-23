@@ -394,7 +394,7 @@ std::expected<void, StarException> Root::reload() {
 
     // Databases that don't depend on anything other than assets
     std::lock_guard codexDatabaseLock(m_codexDatabaseMutex);
-    std::lock_guard behaviorDatabaseMutex(m_behaviorDatabaseMutex);
+    std::lock_guard behavior_database_lock(m_behavior_database_mutex);
     std::lock_guard techDatabaseLock(m_techDatabaseMutex);
     std::lock_guard ai_database_lock(m_ai_database_mutex);
     std::lock_guard questTemplateDatabaseLock(m_questTemplateDatabaseMutex);
@@ -441,7 +441,7 @@ std::expected<void, StarException> Root::reload() {
     m_statusEffectDatabase.reset();
     m_treasureDatabase.reset();
     m_codexDatabase.reset();
-    m_behaviorDatabase.reset();
+    m_behavior_database.reset();
     m_techDatabase.reset();
     m_ai_database.reset();
     m_questTemplateDatabase.reset();
@@ -498,7 +498,7 @@ std::expected<void, StarException> Root::fullyLoad() {
   add(&Root::assets);
   add(&Root::configuration);
   add(&Root::codexDatabase);
-  add(&Root::behaviorDatabase);
+  add(&Root::behavior_database);
   add(&Root::techDatabase);
   add(&Root::ai_database);
   add(&Root::questTemplateDatabase);
@@ -896,9 +896,9 @@ std::expected<std::shared_ptr<CodexDatabase const>, StarException> Root::codexDa
   });
 }
 
-std::expected<std::shared_ptr<BehaviorDatabase const>, StarException> Root::behaviorDatabase() {
-  return loadMemberFunction<BehaviorDatabase>(m_behaviorDatabase, m_behaviorDatabaseMutex, "BehaviorDatabase", [this] {
-    return assets().and_then([](auto const& a) { return BehaviorDatabase::create(a); });
+std::expected<std::shared_ptr<BehaviorDatabase const>, StarException> Root::behavior_database() {
+  return loadMemberFunction<BehaviorDatabase>(m_behavior_database, m_behavior_database_mutex, "BehaviorDatabase", [this] {
+    return assets().and_then([](std::shared_ptr<Assets const> assets) { return BehaviorDatabase::create(std::move(assets)); });
   });
 }
 

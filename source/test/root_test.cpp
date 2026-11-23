@@ -232,7 +232,7 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
     ASSERT_NO_FATAL_FAILURE(expectCatalog("techDatabase", root.techDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("codexDatabase", root.codexDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("stagehandDatabase", root.stagehandDatabase()));
-    ASSERT_NO_FATAL_FAILURE(expectCatalog("behaviorDatabase", root.behaviorDatabase()));
+    ASSERT_NO_FATAL_FAILURE(expectCatalog("behavior_database", root.behavior_database()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("tenantDatabase", root.tenantDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("danceDatabase", root.danceDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("spawnTypeDatabase", root.spawnTypeDatabase()));

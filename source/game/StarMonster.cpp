@@ -401,7 +401,7 @@ if (!result59) return std::unexpected(std::move(result59.error()));
 auto result60 = m_scriptComponent.add_callbacks("status", std::move(*result59));
 if (!result60) return std::unexpected(std::move(result60.error()));
 
-    auto result61 = LuaBindings::makeBehaviorCallbacks(this->root(), m_behaviors);
+    auto result61 = LuaBindings::make_behavior_callbacks(this->root(), m_behaviors);
 if (!result61) return std::unexpected(std::move(result61.error()));
 auto result62 = m_scriptComponent.add_callbacks("behavior", std::move(*result61));
 if (!result62) return std::unexpected(std::move(result62.error()));

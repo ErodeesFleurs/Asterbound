@@ -2,6 +2,8 @@
 #include <benchmark/benchmark.h>
 
 import std;
+import star.behavior_database;
+import star.behavior_state;
 import star.assets;
 import star.asset_path;
 import star.file;
@@ -818,6 +820,47 @@ int main(int argc, char** argv) {
     return 1;
   }
   BenchmarkSession session{**root};
+  for (std::string_view scenario : {"WideEarlyExit", "Notify32", "Resume"}) {
+    benchmark::RegisterBenchmark(std::string("Game/Behavior/").append(scenario).c_str(), [&, scenario](benchmark::State& state) {
+      auto lua = LuaRoot::create(session.root);
+      if (!lua) return session.fail(state, lua.error());
+      auto context = (*lua)->create_context();
+      if (!context) return session.fail(state, context.error());
+      std::string_view program = scenario == "Resume" ? "function probe() while true do coroutine.yield(nil) end end"
+          : scenario == "Notify32" ? "function probe() return true end" : "function probe() return false end";
+      auto loaded = context->load(String(program), "behavior_probe");
+      if (!loaded) return session.fail(state, loaded.error());
+      auto env = context->eval<LuaTable>("_ENV");
+      if (!env) return session.fail(state, env.error());
+      List<std::shared_ptr<BehaviorNode const>> children;
+      for (unsigned i = 0; i != 32; ++i) {
+        StringMap<NodeParameter> parameters;
+        parameters.set("input", {NodeParameterType::Number, String("source")});
+        children.push_back(std::make_shared<BehaviorNode>(ActionNode("probe", std::move(parameters), {})));
+      }
+      auto tree = std::make_shared<BehaviorTree>();
+      tree->root = std::make_shared<BehaviorNode>(CompositeNode(SequenceNode(std::move(children))));
+      tree->functions.add("probe");
+      auto behavior = BehaviorState::create(std::move(tree), *env);
+      if (!behavior) return session.fail(state, behavior.error());
+      auto warm = (*behavior)->run(1.f / 60);
+      if (!warm) return session.fail(state, warm.error());
+      auto expected = scenario == "Resume" ? NodeStatus::Running : scenario == "Notify32" ? NodeStatus::Success : NodeStatus::Failure;
+      if (*warm != expected) return session.fail(state, "Unexpected behavior node status");
+      auto board = (*behavior)->blackboard().lock();
+      String const key = "source";
+      for (auto _ : state) {
+        if (scenario == "Notify32") {
+          auto set = board->set(NodeParameterType::Number, key, LuaInt{42});
+          if (!set) return session.fail(state, set.error());
+        } else {
+          auto status = (*behavior)->run(1.f / 60);
+          if (!status) return session.fail(state, status.error());
+          if (*status != expected) return session.fail(state, "Behavior node status changed");
+        }
+      }
+    });
+  }
   for (bool changing : {false, true}) {
     benchmark::RegisterBenchmark(changing ? "Game/Sprite/AdvanceFrame" : "Game/Sprite/SameFrame", [&, changing](benchmark::State& state) {
       auto animation = Animation::create(session.root, JsonObject{{"mode", "LoopForever"}, {"frameNumber", 8}, {"frames", "/sprite.png:<index>"}});

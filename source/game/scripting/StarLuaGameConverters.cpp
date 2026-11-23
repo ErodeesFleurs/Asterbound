@@ -836,7 +836,7 @@ std::expected<LuaMethods<std::weak_ptr<BehaviorState>>, StarException> LuaUserDa
       auto state = behavior.lock();
       if (!state)
         return std::unexpected(StarException("Use of expired blackboard"));
-      return state->blackboardPtr();
+      return state->blackboard();
     });
   if (!blackboard)
     return std::unexpected(std::move(blackboard.error()));
@@ -871,30 +871,30 @@ std::expected<LuaMethods<std::weak_ptr<Blackboard>>, StarException> LuaUserDataM
       return std::unexpected(StarException("Use of expired blackboard"));
     return locked->set(type, key, value);
   };
-  auto getMethod = methods.register_method_with_signature<LuaValue, std::weak_ptr<Blackboard> const&, String, String>(
+  auto get_method = methods.register_method_with_signature<LuaValue, std::weak_ptr<Blackboard> const&, String, String>(
     "get",
     [get](std::weak_ptr<Blackboard> const& board, String const& type,
           String const& key) -> std::expected<LuaValue, StarException> {
-      auto converted = Star::enum_value<NodeParameterTypeNames>(type);
+      auto converted = Star::enum_value<node_parameter_type_names>(type);
       if (!converted)
         return std::unexpected(std::move(converted.error()));
       return get(board, *converted, key);
     });
-  if (!getMethod)
-    return std::unexpected(std::move(getMethod.error()));
-  auto setMethod =
+  if (!get_method)
+    return std::unexpected(std::move(get_method.error()));
+  auto set_method =
     methods.register_method_with_signature<void, std::weak_ptr<Blackboard> const&, String, String, LuaValue>(
       "set",
       [set](std::weak_ptr<Blackboard> const& board, String const& type, String const& key,
             LuaValue const& value) -> std::expected<void, StarException> {
-        auto converted = Star::enum_value<NodeParameterTypeNames>(type);
+        auto converted = Star::enum_value<node_parameter_type_names>(type);
         if (!converted)
           return std::unexpected(std::move(converted.error()));
         return set(board, *converted, key, value);
       });
-  if (!setMethod)
-    return std::unexpected(std::move(setMethod.error()));
-  static constexpr std::array<std::tuple<std::string_view, std::string_view, NodeParameterType>, 8> typedMethods{{
+  if (!set_method)
+    return std::unexpected(std::move(set_method.error()));
+  static constexpr std::array<std::tuple<std::string_view, std::string_view, NodeParameterType>, 8> typed_methods{{
       {"getEntity", "setEntity", NodeParameterType::Entity},
       {"getPosition", "setPosition", NodeParameterType::Position},
       {"getVec2", "setVec2", NodeParameterType::Vec2},
@@ -903,15 +903,15 @@ std::expected<LuaMethods<std::weak_ptr<Blackboard>>, StarException> LuaUserDataM
       {"getList", "setList", NodeParameterType::List},
       {"getTable", "setTable", NodeParameterType::Table},
       {"getString", "setString", NodeParameterType::String}}};
-  for (auto const& [getName, setName, type] : typedMethods) {
+  for (auto const& [get_name, set_name, type] : typed_methods) {
     auto getter = methods.register_method_with_signature<LuaValue, std::weak_ptr<Blackboard> const&, String>(
-        getName, [get, type](std::weak_ptr<Blackboard> const& board, String const& key) {
+        get_name, [get, type](std::weak_ptr<Blackboard> const& board, String const& key) {
           return get(board, type, key);
         });
     if (!getter)
       return std::unexpected(std::move(getter.error()));
     auto setter = methods.register_method_with_signature<void, std::weak_ptr<Blackboard> const&, String, LuaValue>(
-        setName, [set, type](std::weak_ptr<Blackboard> const& board, String const& key, LuaValue const& value) {
+        set_name, [set, type](std::weak_ptr<Blackboard> const& board, String const& key, LuaValue const& value) {
           return set(board, type, key, value);
         });
     if (!setter)

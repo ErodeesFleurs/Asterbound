@@ -15,6 +15,6 @@ class BehaviorState;
 export module star.behavior_lua_bindings;
 
 export namespace Star::LuaBindings {
-  [[nodiscard]] std::expected<LuaCallbacks, StarException> makeBehaviorCallbacks(Root& root, List<std::shared_ptr<BehaviorState>>& list);
+  [[nodiscard]] std::expected<LuaCallbacks, StarException> make_behavior_callbacks(Root& root, List<std::shared_ptr<BehaviorState>>& list);
 }
 

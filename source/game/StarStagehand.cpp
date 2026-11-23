@@ -128,10 +128,10 @@ std::expected<void, StarException> Stagehand::init(World& world, EntityId entity
         return std::unexpected(std::move(entityCallbacks.error()));
       if (auto result = self.m_scriptComponent.add_callbacks("entity", std::move(*entityCallbacks)); !result)
         return result;
-      auto behaviorCallbacks = LuaBindings::makeBehaviorCallbacks(self.root(), self.m_behaviors);
-      if (!behaviorCallbacks)
-        return std::unexpected(std::move(behaviorCallbacks.error()));
-      if (auto result = self.m_scriptComponent.add_callbacks("behavior", std::move(*behaviorCallbacks)); !result)
+      auto behavior_callbacks = LuaBindings::make_behavior_callbacks(self.root(), self.m_behaviors);
+      if (!behavior_callbacks)
+        return std::unexpected(std::move(behavior_callbacks.error()));
+      if (auto result = self.m_scriptComponent.add_callbacks("behavior", std::move(*behavior_callbacks)); !result)
         return result;
       return recover_lua_script_error(self.m_scriptComponent.init(world));
     }

@@ -193,7 +193,7 @@ public:
   [[nodiscard]] std::expected<std::shared_ptr<AiDatabase const>, StarException> ai_database();
   [[nodiscard]] std::expected<std::shared_ptr<TechDatabase const>, StarException> techDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<CodexDatabase const>, StarException> codexDatabase();
-  [[nodiscard]] std::expected<std::shared_ptr<BehaviorDatabase const>, StarException> behaviorDatabase();
+  [[nodiscard]] std::expected<std::shared_ptr<BehaviorDatabase const>, StarException> behavior_database();
   [[nodiscard]] std::expected<std::shared_ptr<TenantDatabase const>, StarException> tenantDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<DanceDatabase const>, StarException> danceDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<SpawnTypeDatabase const>, StarException> spawnTypeDatabase();
@@ -367,8 +367,8 @@ private:
   std::shared_ptr<CodexDatabase> m_codexDatabase;
   std::mutex m_codexDatabaseMutex;
 
-  std::shared_ptr<BehaviorDatabase> m_behaviorDatabase;
-  std::mutex m_behaviorDatabaseMutex;
+  std::shared_ptr<BehaviorDatabase> m_behavior_database;
+  std::mutex m_behavior_database_mutex;
 
   std::shared_ptr<TenantDatabase> m_tenantDatabase;
   std::mutex m_tenantDatabaseMutex;

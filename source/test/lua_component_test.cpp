@@ -5,7 +5,11 @@ import std;
 import star.format;
 import star.algorithm;
 import star.actor_movement_controller;
+import star.assets;
+import star.behavior_state;
 import star.behavior_database;
+import star.behavior_lua_bindings;
+import star.list;
 import star.chat_types;
 import star.configuration;
 import star.collection_database;
@@ -1726,6 +1730,204 @@ const GameTestRegistration
                                    EXPECT_FALSE(escaped->invoke<int>());
                                    EXPECT_EQ(calls, 0);
                                  });
+const GameTestRegistration behavior_lua("Behavior", "LuaFactoryUsesShippedCatalogAndSharedBlackboard", [](GameTest& fixture) {
+  auto lua = LuaRoot::create(fixture.root());
+  ASSERT_TRUE(lua);
+  auto context = (*lua)->create_context();
+  ASSERT_TRUE(context);
+  List<std::shared_ptr<BehaviorState>> states;
+  auto callbacks = LuaBindings::make_behavior_callbacks(fixture.root(), states);
+  ASSERT_TRUE(callbacks);
+  ASSERT_TRUE(context->set_callbacks("behavior", std::move(*callbacks)));
+  auto result = context->eval<bool>(R"(
+    local config = {name = "integration", root = {type = "Composite", name = "sequence", children = jarray()}}
+    local owner = behavior.behavior(config, {}, _ENV)
+    local borrowed = behavior.behavior(config, {}, _ENV, owner:blackboard())
+    owner:blackboard():setNumber("shared", 13)
+    return owner:run(0) and borrowed:run(0) and borrowed:blackboard():getNumber("shared") == 13
+  )");
+  ASSERT_TRUE(result) << result.error().what();
+  EXPECT_TRUE(*result);
+});
+
+const GameTestRegistration behavior_modules("Behavior", "ModuleCyclesAndEmptyComposites", [](GameTest& fixture) {
+  auto& root = fixture.root();
+  auto directory = File::temporary_directory(root.random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto put = [&](String const& name, String const& data) {
+    return File::write_file(data, File::relative_to(*directory, name));
+  };
+  ASSERT_TRUE(put("preload.config", "[]"));
+  ASSERT_TRUE(put("test.nodes", R"({"Sequence":{},"Randomize":{},"Dynamic":{}})"));
+  ASSERT_TRUE(put("a.behavior", R"({"name":"A","root":{"type":"Composite","name":"Sequence","children":[{"type":"Module","name":"B"},{"type":"Module","name":"B"}]}})"));
+  ASSERT_TRUE(put("b.behavior", R"({"name":"B","root":{"type":"Module","name":"A"}})"));
+  auto create = [&]() -> std::expected<std::shared_ptr<BehaviorDatabase>, StarException> {
+    Assets::Settings settings{};
+    settings.worker_pool_size = 1;
+    auto assets = Assets::create(root.logger(), root.random(), root.logMap(), settings, {*directory});
+    if (!assets) return std::unexpected(std::move(assets.error()));
+    return BehaviorDatabase::create(std::move(*assets));
+  };
+  auto cyclic = create();
+  ASSERT_FALSE(cyclic);
+  auto diagnostic = std::string(cyclic.error().what());
+  EXPECT_TRUE(diagnostic.contains("A -> B -> A") || diagnostic.contains("B -> A -> B")) << diagnostic;
+  ASSERT_TRUE(put("b.behavior", R"({"name":"B","root":{"type":"Composite","name":"Sequence","children":[]}})"));
+  auto database = create();
+  ASSERT_TRUE(database) << database.error().what();
+  EXPECT_TRUE((*database)->behavior_tree("A"));
+  for (String name : {String("Randomize"), String("Dynamic")}) {
+    EXPECT_FALSE((*database)->build_tree(JsonObject{{"name", "invalid"}, {"root", JsonObject{{"type", "Composite"}, {"name", name}}}}));
+  }
+});
+
+const GameTestRegistration behavior_subscriptions("Behavior", "FailedParameterBuildLeavesSharedBoardWritable", [](GameTest& fixture) {
+  auto lua = LuaRoot::create(fixture.root());
+  ASSERT_TRUE(lua);
+  auto context = (*lua)->create_context();
+  ASSERT_TRUE(context);
+  ASSERT_TRUE(context->load("function probe() return true end"));
+  auto env = context->eval<LuaTable>("_ENV");
+  ASSERT_TRUE(env);
+  auto board = std::make_shared<Blackboard>(*env);
+  StringMap<NodeParameter> parameters;
+  parameters.set("first", {NodeParameterType::Number, String("source")});
+  parameters.set("second", {NodeParameterType::Number, String("source")});
+  // Dict iteration order is not part of the contract. Fail after the first subscription.
+  std::next(parameters.begin())->second = {NodeParameterType::Vec2, Json(JsonArray{})};
+  auto tree = std::make_shared<BehaviorTree>();
+  tree->functions.add("probe");
+  tree->root = std::make_shared<BehaviorNode>(ActionNode("probe", std::move(parameters), {}));
+  auto state = BehaviorState::create(tree, *env, std::weak_ptr(board));
+  ASSERT_TRUE(state) << state.error().what();
+  EXPECT_FALSE((*state)->run(0));
+  auto written = board->set(NodeParameterType::Number, "source", LuaInt{42});
+  EXPECT_TRUE(written) << written.error().what();
+  EXPECT_EQ(board->get(NodeParameterType::Number, "source"), LuaValue(LuaInt{42}));
+});
+
+const GameTestRegistration behavior_notifications("Behavior", "ReentrantSubscriptionAndLastStateRelease", [](GameTest& fixture) {
+  auto lua = LuaRoot::create(fixture.root());
+  ASSERT_TRUE(lua);
+  auto context = (*lua)->create_context();
+  ASSERT_TRUE(context);
+  ASSERT_TRUE(context->load(R"(
+    deliveries = 0
+    function install_first(p, board, id)
+      first_id = id
+      setmetatable(p, {__newindex = function(t, k, v)
+        rawset(t, k, v)
+        assert(later:run(0))
+      end})
+      return true
+    end
+    function install_later(p, board, id)
+      assert(first_id ~= id)
+      assert(p.input == 41)
+      p.input = nil
+      setmetatable(p, {__newindex = function() deliveries = deliveries + 1 end})
+      return true
+    end
+  )"));
+  auto env = context->eval<LuaTable>("_ENV");
+  ASSERT_TRUE(env);
+  auto board = std::make_shared<Blackboard>(*env);
+  auto create = [&](String const& name) {
+    StringMap<NodeParameter> parameters;
+    parameters.set("input", {NodeParameterType::Number, String("source")});
+    auto tree = std::make_shared<BehaviorTree>();
+    tree->functions.add(name);
+    tree->root = std::make_shared<BehaviorNode>(ActionNode(name, std::move(parameters), {}));
+    return BehaviorState::create(std::move(tree), *env, std::weak_ptr(board));
+  };
+  auto first = create("install_first");
+  auto later = create("install_later");
+  ASSERT_TRUE(first);
+  ASSERT_TRUE(later);
+  ASSERT_TRUE(context->set("later", std::weak_ptr(*later)));
+  ASSERT_EQ((*first)->run(0), NodeStatus::Success);
+  ASSERT_TRUE(board->set(NodeParameterType::Number, "source", LuaInt{41}));
+  EXPECT_EQ(context->get<int>("deliveries"), 0);
+  ASSERT_TRUE(board->set(NodeParameterType::Number, "source", LuaInt{42}));
+  EXPECT_EQ(context->get<int>("deliveries"), 1);
+  later->reset();
+  ASSERT_TRUE(board->set(NodeParameterType::Number, "source", LuaInt{43}));
+  EXPECT_EQ(context->get<int>("deliveries"), 1);
+});
+
+const GameTestRegistration behavior_priority("Behavior", "DynamicPreemptionDropsLowerPriorityCoroutine", [](GameTest& fixture) {
+  auto lua = LuaRoot::create(fixture.root());
+  ASSERT_TRUE(lua);
+  auto context = (*lua)->create_context();
+  ASSERT_TRUE(context);
+  ASSERT_TRUE(context->load(R"(
+    starts, finishes = 0, 0
+    function high() return enabled == true end
+    function low()
+      starts = starts + 1
+      coroutine.yield(nil)
+      finishes = finishes + 1
+      return true
+    end
+  )"));
+  auto env = context->eval<LuaTable>("_ENV");
+  ASSERT_TRUE(env);
+  auto tree = std::make_shared<BehaviorTree>();
+  DynamicNode dynamic{{}};
+  for (String name : {String("high"), String("low")}) {
+    tree->functions.add(name);
+    dynamic.children.push_back(std::make_shared<BehaviorNode>(ActionNode(name, {}, {})));
+  }
+  tree->root = std::make_shared<BehaviorNode>(CompositeNode(std::move(dynamic)));
+  auto state = BehaviorState::create(tree, *env);
+  ASSERT_TRUE(state);
+  EXPECT_EQ((*state)->run(0), NodeStatus::Running);
+  ASSERT_TRUE(context->set("enabled", true));
+  EXPECT_EQ((*state)->run(0), NodeStatus::Success);
+  ASSERT_TRUE(context->set("enabled", false));
+  EXPECT_EQ((*state)->run(0), NodeStatus::Running);
+  EXPECT_EQ((*state)->run(0), NodeStatus::Success);
+  EXPECT_EQ(context->get<int>("starts"), 2);
+  EXPECT_EQ(context->get<int>("finishes"), 1);
+});
+
+const GameTestRegistration behavior_ephemeral("Behavior", "ExpiredOutputsSurviveFailedTickForCleanup", [](GameTest& fixture) {
+  auto lua = LuaRoot::create(fixture.root());
+  ASSERT_TRUE(lua);
+  auto context = (*lua)->create_context();
+  ASSERT_TRUE(context);
+  ASSERT_TRUE(context->load(R"(
+    function probe()
+      if mode == 1 then return true, {old=41, renewed=17} end
+      if mode == 2 then error("interrupted") end
+      return true
+    end
+  )"));
+  auto env = context->eval<LuaTable>("_ENV");
+  ASSERT_TRUE(env);
+  StringMap<NodeOutput> outputs;
+  outputs.set("old", NodeOutput{NodeParameterType::Number, String("old"), true});
+  outputs.set("renewed", NodeOutput{NodeParameterType::Number, String("renewed"), true});
+  auto tree = std::make_shared<BehaviorTree>();
+  tree->name = "temporary";
+  tree->functions.add("probe");
+  tree->root = std::make_shared<BehaviorNode>(ActionNode("probe", {}, std::move(outputs)));
+  auto state = BehaviorState::create(tree, *env);
+  ASSERT_TRUE(state) << state.error().what();
+  auto board = (*state)->blackboard().lock();
+  ASSERT_TRUE(board);
+  ASSERT_TRUE(context->set("mode", 1));
+  EXPECT_EQ((*state)->run(0), NodeStatus::Success);
+  EXPECT_EQ(board->get(NodeParameterType::Number, "old"), LuaValue(LuaInt{41}));
+  ASSERT_TRUE(context->set("mode", 2));
+  EXPECT_FALSE((*state)->run(0));
+  ASSERT_TRUE(context->set("mode", 3));
+  EXPECT_EQ((*state)->run(0), NodeStatus::Success);
+  EXPECT_EQ(board->get(NodeParameterType::Number, "old"), LuaValue(lua_nil));
+  EXPECT_EQ(board->get(NodeParameterType::Number, "renewed"), LuaValue(lua_nil));
+});
+
 const GameTestRegistration fixedEnumJsonBoundaries("GameEnumNames", "ChatAndBehaviorJsonBoundaries", [](GameTest&) {
   auto message = ChatReceivedMessage::create(JsonObject{{"context", JsonObject{{"mode", "rAdIoMeSsAgE"}}}});
   ASSERT_TRUE(message);
@@ -1747,29 +1949,29 @@ const GameTestRegistration fixedEnumJsonBoundaries("GameEnumNames", "ChatAndBeha
   message->context.mode = static_cast<MessageContext::Mode>(255);
   EXPECT_FALSE(message->toJson());
 
-  auto parameter = jsonToNodeParameter(JsonObject{{"type", "nUmBeR"}});
+  auto parameter = json_to_node_parameter(JsonObject{{"type", "nUmBeR"}});
   ASSERT_TRUE(parameter);
   EXPECT_EQ(parameter->first, NodeParameterType::Number);
   ASSERT_TRUE(std::holds_alternative<Json>(parameter->second));
   EXPECT_TRUE(std::get<Json>(parameter->second).is_null());
-  auto serialized = jsonFromNodeParameter(*parameter);
+  auto serialized = json_from_node_parameter(*parameter);
   ASSERT_TRUE(serialized);
   EXPECT_EQ(serialized->get_string("type"), "number");
-  auto output = jsonToNodeOutput(JsonObject{{"type", "BoOl"}, {"key", Json()}});
+  auto output = json_to_node_output(JsonObject{{"type", "BoOl"}, {"key", Json()}});
   ASSERT_TRUE(output);
-  EXPECT_EQ(output->first, NodeParameterType::Bool);
-  EXPECT_FALSE(output->second.first);
-  EXPECT_FALSE(output->second.second);
+  EXPECT_EQ(output->type, NodeParameterType::Bool);
+  EXPECT_FALSE(output->key);
+  EXPECT_FALSE(output->ephemeral);
   for (auto const& name :
        {String("unknown"), String(std::string("number\0", 7)), String(std::string(1, static_cast<char>(0xff)))}) {
-    EXPECT_FALSE(jsonToNodeParameter(JsonObject{{"type", name}}));
-    EXPECT_FALSE(jsonToNodeOutput(JsonObject{{"type", name}, {"key", Json()}}));
+    EXPECT_FALSE(json_to_node_parameter(JsonObject{{"type", name}}));
+    EXPECT_FALSE(json_to_node_output(JsonObject{{"type", name}, {"key", Json()}}));
   }
-  EXPECT_FALSE(jsonToNodeParameter(JsonObject{}));
+  EXPECT_FALSE(json_to_node_parameter(JsonObject{}));
   parameter->first = static_cast<NodeParameterType>(255);
-  EXPECT_FALSE(jsonFromNodeParameter(*parameter));
-  output->first = static_cast<NodeParameterType>(255);
-  EXPECT_FALSE(jsonFromNodeOutput(*output));
+  EXPECT_FALSE(json_from_node_parameter(*parameter));
+  output->type = static_cast<NodeParameterType>(255);
+  EXPECT_FALSE(json_from_node_output(*output));
 });
 
 const GameTestRegistration
