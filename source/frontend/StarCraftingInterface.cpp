@@ -446,7 +446,7 @@ std::expected<void, StarException> CraftingPane::initialize(std::shared_ptr<Worl
       spinCountDown->disable();
   }
 
-  m_displayedRecipe = NPos;
+  m_displayedRecipe = npos;
   auto updateAvailableRecipesResult372 = updateAvailableRecipes();
   if (!updateAvailableRecipesResult372)
     return std::unexpected(std::move(updateAvailableRecipesResult372.error()));
@@ -1010,12 +1010,12 @@ std::expected<void, StarException> CraftingPane::setupWidget(std::shared_ptr<Wid
     return std::unexpected(std::move(setTextResult459.error()));
 
   if (unavailable) {
-    itemName->setColor(Color::Gray);
+    itemName->setColor(Color::palette_gray);
     auto showResult460 = notcraftableoverlay->show();
     if (!showResult460)
       return std::unexpected(std::move(showResult460.error()));
   } else {
-    itemName->setColor(Color::White);
+    itemName->setColor(Color::palette_white);
     auto hideResult461 = notcraftableoverlay->hide();
     if (!hideResult461)
       return std::unexpected(std::move(hideResult461.error()));
@@ -1153,9 +1153,9 @@ std::expected<std::shared_ptr<Pane>, StarException> CraftingPane::setupTooltip(I
       if (!setTextResult488)
         return std::unexpected(std::move(setTextResult488.error()));
       if (availableCount < requiredCount)
-        countWidget->setColor(Color::Red);
+        countWidget->setColor(Color::palette_red);
       else
-        countWidget->setColor(Color::Green);
+        countWidget->setColor(Color::palette_green);
       auto fetchChildResult489 = widget->fetchChild<ItemSlotWidget>("itemIcon");
       if (!fetchChildResult489)
         return std::unexpected(std::move(fetchChildResult489.error()));
@@ -1335,7 +1335,7 @@ std::expected<void, StarException> CraftingPane::toggleCraft() {
 std::expected<void, StarException> CraftingPane::craft(int count) {
   auto& root = context().root();
 
-  if (m_guiList->selectedItem() != NPos) {
+  if (m_guiList->selectedItem() != npos) {
     auto recipeFromSelectedWidgetResult515 = recipeFromSelectedWidget();
     if (!recipeFromSelectedWidgetResult515)
       return std::unexpected(std::move(recipeFromSelectedWidgetResult515.error()));
@@ -1717,7 +1717,7 @@ std::expected<int, StarException> CraftingPane::maxCraft() {
     return std::unexpected(std::move(itemDatabaseResult564.error()));
   auto itemDb = std::move(*itemDatabaseResult564);
   int res = 0;
-  if (m_guiList->selectedItem() != NPos && m_guiList->selectedItem() < m_recipes.size()) {
+  if (m_guiList->selectedItem() != npos && m_guiList->selectedItem() < m_recipes.size()) {
     auto availableItemsResult565 = m_player->inventory()->availableItems();
     if (!availableItemsResult565)
       return std::unexpected(std::move(availableItemsResult565.error()));

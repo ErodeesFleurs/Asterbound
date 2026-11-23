@@ -221,8 +221,8 @@ bool Directives::equals(Directives const& other) const {
 }
 
 bool Directives::equals(String const& string) const {
-  auto directiveString = maybe_string();
-  return directiveString ? string == directiveString->get() : string.empty();
+  auto directive_string = maybe_string();
+  return directive_string ? string == directive_string->get() : string.empty();
 }
 
 bool Directives::operator==(Directives const& other) const {
@@ -371,7 +371,7 @@ collect_image_operations(DirectivesGroup const& group, List<std::reference_wrapp
 }
 
 std::expected<Image, StarException> DirectivesGroup::apply_new_image(Image const& image,
-                                                                     ImageReferenceCallback refCallback) const {
+                                                                     ImageReferenceCallback ref_callback) const {
   List<std::reference_wrapper<ImageOperation const>> operations;
   operations.reserve(m_count);
   auto collected = collect_image_operations(*this, operations);
@@ -387,7 +387,7 @@ std::expected<Image, StarException> DirectivesGroup::apply_new_image(Image const
             && std::uint64_t(max[0] - min[0]) * (max[1] - min[1]) < std::uint64_t(image.width()) * image.height()) {
           // Exactly the in-place optimizer's safe reorder, seeded from the
           // original source instead of first copying all of its pixels.
-          [[maybe_unused]] auto operationCallback = refCallback;
+          [[maybe_unused]] auto operation_callback = ref_callback;
           auto cropped = image.sub_image(Vec2U(min), Vec2U(crop.subset.size()));
           if (!cropped)
             return std::unexpected(std::move(cropped.error()));
@@ -414,7 +414,7 @@ std::expected<Image, StarException> DirectivesGroup::apply_new_image(Image const
   if (!result)
     result.emplace(image);
   auto applied = process_image_operations(std::span<std::reference_wrapper<ImageOperation const> const>(operations),
-                                          *result, std::move(refCallback));
+                                          *result, std::move(ref_callback));
   if (!applied)
     return std::unexpected(std::move(applied.error()));
   if (!collected)
@@ -423,14 +423,14 @@ std::expected<Image, StarException> DirectivesGroup::apply_new_image(Image const
 }
 
 std::expected<void, StarException> DirectivesGroup::apply_existing_image(Image& image,
-                                                                         ImageReferenceCallback refCallback) const {
+                                                                         ImageReferenceCallback ref_callback) const {
   List<std::reference_wrapper<ImageOperation const>> operations;
   operations.reserve(m_count);
   auto collected = collect_image_operations(*this, operations);
   // A later parse error must not hide an earlier execution error or discard
   // the successfully applied prefix of an existing-image operation.
   auto applied = process_image_operations(std::span<std::reference_wrapper<ImageOperation const> const>(operations),
-                                          image, std::move(refCallback));
+                                          image, std::move(ref_callback));
   if (!applied)
     return std::unexpected(std::move(applied.error()));
   return collected;
@@ -463,25 +463,25 @@ bool operator!=(DirectivesGroup const& a, DirectivesGroup const& b) {
   return !a.compare(b);
 }
 
-std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, DirectivesGroup& directivesGroup) {
+std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, DirectivesGroup& directives_group) {
   String string;
   auto read = ds.read(string);
   if (!read)
     return std::unexpected(std::move(read.error()));
-  directivesGroup = DirectivesGroup(std::move(string));
+  directives_group = DirectivesGroup(std::move(string));
   return std::ref(ds);
 }
 
-std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, DirectivesGroup const& directivesGroup) {
+std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, DirectivesGroup const& directives_group) {
   // The historical flattened string codec preserves ordinary bytes, but not
   // arbitrary child boundaries or prefixes used by structural group identity.
-  auto written = ds.write(directivesGroup.to_string());
+  auto written = ds.write(directives_group.to_string());
   if (!written)
     return std::unexpected(std::move(written.error()));
   return std::ref(ds);
 }
 
-std::size_t hash<DirectivesGroup>::operator()(DirectivesGroup const& s) const {
+std::size_t ValueHash<DirectivesGroup>::operator()(DirectivesGroup const& s) const {
   return s.hash();
 }
 

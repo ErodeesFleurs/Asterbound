@@ -2482,7 +2482,7 @@ bool Npc::isAdmin() const {
 }
 
 Color Npc::favoriteColor() const {
-  return Color::White;
+  return Color::palette_white;
 }
 
 std::expected<float, StarException> Npc::beamGunRadius() const {

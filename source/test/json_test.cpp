@@ -81,7 +81,7 @@ TEST(JsonTest, ColorErrorsRetainTypeAndValidParsingRecovers) {
   auto malformed = json_to_color(Json("#ggg"));
   ASSERT_FALSE(malformed);
   EXPECT_TRUE(malformed.error().is<ColorException>());
-  EXPECT_EQ(json_to_color(Json("RED")), Color::Red);
+  EXPECT_EQ(json_to_color(Json("RED")), Color::palette_red);
   EXPECT_EQ(json_to_color(Json("#1234")), Color::rgba(0x11, 0x22, 0x33, 0x44));
 }
 

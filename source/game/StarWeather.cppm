@@ -59,7 +59,7 @@ public:
   [[nodiscard]]
   std::expected<void, StarException> update(double dt);
 
-  // Immediately sets the active weather index. If the index is NPos or out of
+  // Immediately sets the active weather index. If the index is npos or out of
   // range, weather is cleared.  If force is true, weather will not automatically
   // change until setWeatherIndex/SetWeather is called again.
   [[nodiscard]]

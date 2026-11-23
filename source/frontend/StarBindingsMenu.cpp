@@ -97,7 +97,7 @@ std::expected<void, StarException> setGameBindings(GuiContext& context, Json con
         auto number = value->to_double();
         if (!number)
           return std::unexpected(std::move(number.error()));
-        if (*number != std::to_underlying(chord->key) || chord->key > KeyNames.back().first)
+        if (*number != std::to_underlying(chord->key) || chord->key > key_names.back().first)
           return std::unexpected(StarException::format("Invalid numeric key {} for {}", *number, name));
       }
     }

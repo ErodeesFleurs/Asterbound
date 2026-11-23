@@ -503,7 +503,7 @@ void measure_vector(benchmark::State& state) {
         return false;
       auto const& slot = holder.object;
       if (!slot || slot->size() != count || static_cast<std::size_t>(slot->end() - slot->begin()) != count
-          || reinterpret_cast<std::uintptr_t>(slot->begin()) % alignof(T) != 0)
+          || reinterpret_cast<std::uintptr_t>(std::to_address(slot->begin())) % alignof(T) != 0)
         return false;
       for (std::size_t i = 0; i != count; ++i) {
         auto expected = make_value<T>(number(Op == vector_operation::fill ? 0 : i));

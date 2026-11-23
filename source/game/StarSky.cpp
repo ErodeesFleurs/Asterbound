@@ -501,7 +501,7 @@ float Sky::skyAlpha() const {
 
 Color Sky::environmentLight() const {
   if (m_skyType == SkyType::Orbital || m_skyType == SkyType::Warp)
-    return Color::Black;
+    return Color::palette_black;
 
   if (auto value = m_skyParameters.skyColoring.maybe_left_ref()) {
     auto const& sky_coloring = value->get();
@@ -522,7 +522,7 @@ Color Sky::mainSkyColor() const {
   if (auto coloring = m_skyParameters.skyColoring.maybe_left_ref())
     return coloring->get().mainColor;
 
-  return Color::Black;
+  return Color::palette_black;
 }
 
 std::pair<Color, Color> Sky::skyRectColors() const {
@@ -553,11 +553,11 @@ std::pair<Color, Color> Sky::skyRectColors() const {
     return {topColor, bottomColor};
   }
 
-  return {Color::Clear, Color::Clear};
+  return {Color::palette_clear, Color::palette_clear};
 }
 
 Color Sky::skyFlashColor() const {
-  Color res = Color::White;
+  Color res = Color::palette_white;
   float duration = m_numericSettings.flashTimer;
   res.set_alpha_f(duration == 0.0f ? 0.0f : m_flashTimer / duration);
   return res;

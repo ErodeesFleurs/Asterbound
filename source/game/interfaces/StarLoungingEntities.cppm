@@ -46,8 +46,8 @@ enum class LoungeControl { Left, Right, Down, Up, Jump, PrimaryFire, AltFire, Sp
 extern std::expected<EnumMap<LoungeControl>, StarException> const LoungeControlNames;
 
 struct LoungeAnchor : EntityAnchor {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<LoungeAnchor, EntityAnchor>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<LoungeAnchor, EntityAnchor>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<LoungeAnchor>(); }
 
@@ -70,8 +70,8 @@ struct LoungeAnchor : EntityAnchor {
 // may be called on both the master and slave.
 class LoungeableEntity : public AnchorableEntity {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<LoungeableEntity, AnchorableEntity>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<LoungeableEntity, AnchorableEntity>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<LoungeableEntity>(); }
 
@@ -96,8 +96,8 @@ public:
 // in the same spot.
 class LoungingEntity : public virtual Entity {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<LoungingEntity, Entity>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<LoungingEntity, Entity>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<LoungingEntity>(); }
 

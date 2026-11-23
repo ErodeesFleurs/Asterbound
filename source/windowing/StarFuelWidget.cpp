@@ -139,9 +139,9 @@ std::expected<void, StarException> FuelWidget::renderImpl() {
   auto& guiContext = context();
   auto style = guiContext.setTextStyle(m_textStyle);
   if (!style) return std::unexpected(std::move(style.error()));
-  Color color = Color::White;
+  Color color = Color::palette_white;
   if (m_potential == 0 && m_fuelLevel == 0)
-    color = m_requested != 0 && m_requested == m_fuelLevel ? Color::Orange : Color::Red;
+    color = m_requested != 0 && m_requested == m_fuelLevel ? Color::palette_orange : Color::palette_red;
   auto font = guiContext.setFontColor(color.to_rgba());
   if (!font) return std::unexpected(std::move(font.error()));
   auto text = guiContext.renderInterfaceText(

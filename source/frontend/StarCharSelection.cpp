@@ -199,10 +199,10 @@ std::expected<bool, StarException> CharSelectionPane::sendEvent(InputEvent const
   if (m_visible) {
     if (std::holds_alternative<MouseWheelEvent>(event)) {
       if (inMember(*context().mousePosition(event))) {
-        if (std::get<MouseWheelEvent>(event).mouseWheel == MouseWheel::Down) {
+        if (std::get<MouseWheelEvent>(event).mouse_wheel == MouseWheel::Down) {
           if (auto result = shiftCharacters(1); !result)
             return std::unexpected(std::move(result.error()));
-        } else if (std::get<MouseWheelEvent>(event).mouseWheel == MouseWheel::Up) {
+        } else if (std::get<MouseWheelEvent>(event).mouse_wheel == MouseWheel::Up) {
           if (auto result = shiftCharacters(-1); !result)
             return std::unexpected(std::move(result.error()));
         }

@@ -237,11 +237,11 @@ ByteArray stored_frame(ByteArray const& payload, bool gzip) {
   append_little(static_cast<std::uint16_t>(~payload.size()), 2);
   frame.append(payload);
   if (gzip) {
-    auto crc = zng_crc32(0, reinterpret_cast<std::uint8_t const*>(payload.data()), payload.size());
+    auto crc = zng_crc32(0, reinterpret_cast<std::uint8_t const*>(payload.span().data()), payload.size());
     append_little(crc, 4);
     append_little(payload.size(), 4);
   } else {
-    auto adler = zng_adler32(1, reinterpret_cast<std::uint8_t const*>(payload.data()), payload.size());
+    auto adler = zng_adler32(1, reinterpret_cast<std::uint8_t const*>(payload.span().data()), payload.size());
     for (int shift = 24; shift >= 0; shift -= 8)
       frame.push_back(static_cast<char>(adler >> shift));
   }
@@ -262,7 +262,7 @@ std::expected<ByteArray, StarException> staged_deflate(ByteArray const& input, C
   if (status != Z_OK)
     return std::unexpected(IOException("Cannot initialize reference deflate"));
   owner.active = true;
-  stream.next_in = reinterpret_cast<std::uint8_t const*>(input.data());
+  stream.next_in = reinterpret_cast<std::uint8_t const*>(input.span().data());
   stream.avail_in = input.size();
   std::array<std::uint8_t, 32768> staging;
   ByteArray result;
@@ -486,7 +486,7 @@ TEST(CompressionTest, ZstdEmptyFrameAndLegacySentinelDecodeAsEmpty) {
   auto encoded = ZstdCompression::compress(ByteArray());
   ASSERT_TRUE(encoded) << encoded.error().what();
   ASSERT_FALSE(encoded->empty());
-  EXPECT_EQ(ZSTD_getFrameContentSize(encoded->data(), encoded->size()), 0u);
+  EXPECT_EQ(ZSTD_getFrameContentSize(encoded->span().data(), encoded->size()), 0u);
   auto decoded = ZstdCompression::decompress(*encoded, 0);
   ASSERT_TRUE(decoded) << decoded.error().what();
   EXPECT_TRUE(decoded->empty());

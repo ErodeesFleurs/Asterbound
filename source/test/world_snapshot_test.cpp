@@ -135,13 +135,13 @@ using namespace Star;
 TEST(PacketWire, PauseUsesStreamVersionThroughBaseInterface) {
   PausePacket original(true, 0.5f);
   Packet const& source = original;
-  for (auto version : {LegacyVersion, OpenProtocolVersion}) {
+  for (auto version : {legacy_version, open_protocol_version}) {
     DataStreamBuffer wire;
     wire.set_stream_compatibility_version(version);
     ASSERT_TRUE(source.write(wire));
     DataStreamBuffer expected;
     ASSERT_TRUE(expected.write(true));
-    if (version != LegacyVersion)
+    if (version != legacy_version)
       ASSERT_TRUE(expected.write(0.5f));
     ASSERT_EQ(wire.data(), expected.data());
 
@@ -150,7 +150,7 @@ TEST(PacketWire, PauseUsesStreamVersionThroughBaseInterface) {
     Packet& destination = decoded;
     ASSERT_TRUE(destination.read(wire));
     EXPECT_TRUE(decoded.pause);
-    EXPECT_EQ(decoded.timescale, version == LegacyVersion ? 1.0f : 0.5f);
+    EXPECT_EQ(decoded.timescale, version == legacy_version ? 1.0f : 0.5f);
     auto ended = wire.at_end();
     ASSERT_TRUE(ended);
     EXPECT_TRUE(*ended);
@@ -481,7 +481,7 @@ const GameTestRegistration fixedCoordinateGenerationIsDeterministic(
     ASSERT_TRUE(firstHash) << firstHash.error().what();
     auto secondHash = sampleWorld(**secondWorld, surfaceLevel);
     ASSERT_TRUE(secondHash) << secondHash.error().what();
-    auto reported = Star::print(stderr, "WorldSnapshot: {} hashes to 0x{:x}\n", coordinate->id(), *firstHash);
+    auto reported = Star::print(*stderr, "WorldSnapshot: {} hashes to 0x{:x}\n", coordinate->id(), *firstHash);
     ASSERT_TRUE(reported) << reported.error().what();
 
     EXPECT_EQ(*firstHash, *secondHash);
@@ -553,7 +553,7 @@ const GameTestRegistration shipWorldIsDeterministic("WorldSnapshot", "ShipWorldI
         ++nonEmptyTiles;
     }
   }
-  auto reported = Star::print(stderr, "WorldSnapshot: ship world hashes to 0x{:x}\n", firstHash);
+  auto reported = Star::print(*stderr, "WorldSnapshot: ship world hashes to 0x{:x}\n", firstHash);
   ASSERT_TRUE(reported) << reported.error().what();
 
   EXPECT_GT(nonEmptyTiles, 0u) << "the sampled region does not contain any ship structure";
@@ -850,7 +850,7 @@ const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
       auto state = WorldClientState::create(root);
       ASSERT_TRUE(state) << state.error().what();
       states[i] = *state;
-      NetCompatibilityRules rules(i ? LegacyVersion : OpenProtocolVersion);
+      NetCompatibilityRules rules(i ? legacy_version : open_protocol_version);
       states[i]->setNetCompatibilityRules(rules);
       states[i]->setClientPresenceEntities({(*anchor)->entityId()});
       auto added =
@@ -883,7 +883,7 @@ const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
       ASSERT_TRUE(world->setLiquid(Vec2I(1100, 1004), LiquidId(1), 0.5f + phase * 0.1f, 0.5f));
       ASSERT_TRUE(world->update(1.0f / 60.0f));
       for (unsigned i = 0; i < states.size(); ++i) {
-        NetCompatibilityRules rules(i ? LegacyVersion : OpenProtocolVersion);
+        NetCompatibilityRules rules(i ? legacy_version : open_protocol_version);
         auto packets = world->getOutgoingPackets(MinClientConnectionId + i);
         ASSERT_TRUE(packets) << packets.error().what();
         bool updateSetSeen = false;

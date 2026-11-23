@@ -17,7 +17,7 @@ bool WireConnection::operator==(WireConnection const& wireConnection) const {
   return std::tie(entityLocation, nodeIndex) == std::tie(wireConnection.entityLocation, wireConnection.nodeIndex);
 }
 
-std::size_t hash<WireConnection>::operator()(WireConnection const& wireConnection) const {
+std::size_t ValueHash<WireConnection>::operator()(WireConnection const& wireConnection) const {
   return hash_of(wireConnection.entityLocation, wireConnection.nodeIndex);
 }
 

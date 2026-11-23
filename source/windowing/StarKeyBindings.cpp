@@ -126,7 +126,7 @@ std::expected<KeyChord, StarException> inputDescriptorFromJson(Json const& json)
     auto name = value->to_string();
     if (!name)
       return std::unexpected(std::move(name.error()));
-    auto parsed = enum_value<KeyNames>(*name);
+    auto parsed = enum_value<key_names>(*name);
     if (!parsed)
       return std::unexpected(std::move(parsed.error()));
     key = *parsed;
@@ -152,7 +152,7 @@ std::expected<KeyChord, StarException> inputDescriptorFromJson(Json const& json)
     auto name = entry.to_string();
     if (!name)
       return std::unexpected(std::move(name.error()));
-    auto parsed = enum_value<KeyModNames>(*name);
+    auto parsed = enum_value<key_mod_names>(*name);
     if (!parsed)
       return std::unexpected(std::move(parsed.error()));
     mods |= *parsed;
@@ -162,11 +162,11 @@ std::expected<KeyChord, StarException> inputDescriptorFromJson(Json const& json)
 
 std::expected<Json, StarException> inputDescriptorToJson(KeyChord const& chord) {
   JsonArray modNames;
-  for (auto const& p : KeyModNames) {
+  for (auto const& p : key_mod_names) {
     if ((chord.mods & p.first) != KeyMod::NoMod)
       modNames.push_back(String(p.second));
   }
-  auto name = enum_name<KeyNames>(chord.key);
+  auto name = enum_name<key_names>(chord.key);
   if (!name)
     return std::unexpected(std::move(name.error()));
   return JsonObject{{"type", "key"}, {"value", String(*name)}, {"mods", modNames}};
@@ -174,11 +174,11 @@ std::expected<Json, StarException> inputDescriptorToJson(KeyChord const& chord) 
 
 std::expected<String, StarException> printInputDescriptor(KeyChord chord) {
   StringList modNames;
-  for (auto const& p : KeyModNames) {
+  for (auto const& p : key_mod_names) {
     if ((chord.mods & p.first) != KeyMod::NoMod)
       modNames.push_back(String(p.second));
   }
-  auto name = enum_name<KeyNames>(chord.key);
+  auto name = enum_name<key_names>(chord.key);
   if (!name)
     return std::unexpected(std::move(name.error()));
   return String::join_with(" + ", modNames.join(" + "), String(*name));

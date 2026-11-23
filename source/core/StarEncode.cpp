@@ -7,18 +7,18 @@ import star.encode;
 namespace Star {
 namespace {
 
-constexpr std::string_view HexChars = "0123456789abcdef";
-constexpr std::string_view Base64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-constexpr std::uint8_t InvalidBase64 = 0xff;
-constexpr auto Base64Values = [] {
+constexpr std::string_view hex_chars = "0123456789abcdef";
+constexpr std::string_view base64_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+constexpr std::uint8_t invalid_base64 = 0xff;
+constexpr auto base64_values = [] {
   std::array<std::uint8_t, 256> values;
-  values.fill(InvalidBase64);
-  for (std::size_t i = 0; i < Base64Chars.size(); ++i)
-    values[static_cast<unsigned char>(Base64Chars[i])] = static_cast<std::uint8_t>(i);
+  values.fill(invalid_base64);
+  for (std::size_t i = 0; i < base64_chars.size(); ++i)
+    values[static_cast<unsigned char>(base64_chars[i])] = static_cast<std::uint8_t>(i);
   return values;
 }();
 
-constexpr auto HexValues = [] {
+constexpr auto hex_values = [] {
   std::array<std::uint8_t, 256> values{};
   for (unsigned i = 0; i < 10; ++i)
     values['0' + i] = static_cast<std::uint8_t>(i);
@@ -30,7 +30,7 @@ constexpr auto HexValues = [] {
 }();
 
 constexpr unsigned hex_nibble(char value) {
-  return HexValues[static_cast<unsigned char>(value)];
+  return hex_values[static_cast<unsigned char>(value)];
 }
 
 constexpr std::optional<std::size_t> hex_encoded_size(std::size_t size, std::size_t limit) {
@@ -46,19 +46,19 @@ constexpr std::optional<std::size_t> base64_encoded_size(std::size_t size, std::
   return groups * 4;
 }
 
-constexpr auto SizeMax = std::numeric_limits<std::size_t>::max();
+constexpr auto size_max = std::numeric_limits<std::size_t>::max();
 static_assert(hex_encoded_size(0, 0) == 0);
-static_assert(hex_encoded_size(SizeMax / 2, SizeMax) == SizeMax - 1);
+static_assert(hex_encoded_size(size_max / 2, size_max) == size_max - 1);
 static_assert(base64_encoded_size(0, 0) == 0);
 static_assert(base64_encoded_size(1, 4) == 4);
 static_assert(base64_encoded_size(2, 4) == 4);
 static_assert(base64_encoded_size(3, 4) == 4);
-static_assert(base64_encoded_size((SizeMax / 4) * 3, SizeMax) == (SizeMax / 4) * 4);
+static_assert(base64_encoded_size((size_max / 4) * 3, size_max) == (size_max / 4) * 4);
 static_assert(!hex_encoded_size(1, 1));
-static_assert(!hex_encoded_size(SizeMax / 2 + 1, SizeMax));
+static_assert(!hex_encoded_size(size_max / 2 + 1, size_max));
 static_assert(!base64_encoded_size(1, 3));
-static_assert(!base64_encoded_size((SizeMax / 4) * 3 + 1, SizeMax));
-static_assert(!base64_encoded_size(SizeMax, SizeMax));
+static_assert(!base64_encoded_size((size_max / 4) * 3 + 1, size_max));
+static_assert(!base64_encoded_size(size_max, size_max));
 
 }
 
@@ -66,8 +66,8 @@ std::size_t hex_encode(std::span<char const> data, std::span<char> output) {
   auto count = std::min(data.size(), output.size() / 2);
   for (std::size_t i = 0; i < count; ++i) {
     auto byte = static_cast<unsigned char>(data[i]);
-    output[i * 2] = HexChars[byte >> 4];
-    output[i * 2 + 1] = HexChars[byte & 0x0f];
+    output[i * 2] = hex_chars[byte >> 4];
+    output[i * 2 + 1] = hex_chars[byte & 0x0f];
   }
   return count * 2;
 }
@@ -85,10 +85,10 @@ std::size_t base64_encode(std::span<char const> data, std::span<char> output) {
     auto a = static_cast<unsigned char>(data[0]);
     auto b = static_cast<unsigned char>(data[1]);
     auto c = static_cast<unsigned char>(data[2]);
-    output[0] = Base64Chars[a >> 2];
-    output[1] = Base64Chars[((a & 0x03) << 4) | (b >> 4)];
-    output[2] = Base64Chars[((b & 0x0f) << 2) | (c >> 6)];
-    output[3] = Base64Chars[c & 0x3f];
+    output[0] = base64_chars[a >> 2];
+    output[1] = base64_chars[((a & 0x03) << 4) | (b >> 4)];
+    output[2] = base64_chars[((b & 0x0f) << 2) | (c >> 6)];
+    output[3] = base64_chars[c & 0x3f];
     data = data.subspan(3);
     output = output.subspan(4);
     written += 4;
@@ -100,15 +100,15 @@ std::size_t base64_encode(std::span<char const> data, std::span<char> output) {
   // four characters: publish exactly the available encoded prefix, including padding.
   auto count = std::min(output.size(), std::size_t(4));
   auto a = static_cast<unsigned char>(data[0]);
-  output[0] = Base64Chars[a >> 2];
+  output[0] = base64_chars[a >> 2];
   if (count > 1) {
     auto b = data.size() > 1 ? static_cast<unsigned char>(data[1]) : 0u;
-    output[1] = Base64Chars[((a & 0x03) << 4) | (b >> 4)];
+    output[1] = base64_chars[((a & 0x03) << 4) | (b >> 4)];
     if (count > 2) {
       auto c = data.size() > 2 ? static_cast<unsigned char>(data[2]) : 0u;
-      output[2] = data.size() > 1 ? Base64Chars[((b & 0x0f) << 2) | (c >> 6)] : '=';
+      output[2] = data.size() > 1 ? base64_chars[((b & 0x0f) << 2) | (c >> 6)] : '=';
       if (count > 3)
-        output[3] = data.size() > 2 ? Base64Chars[c & 0x3f] : '=';
+        output[3] = data.size() > 2 ? base64_chars[c & 0x3f] : '=';
     }
   }
   return written + count;
@@ -117,11 +117,11 @@ std::size_t base64_encode(std::span<char const> data, std::span<char> output) {
 std::size_t base64_decode(std::span<char const> data, std::span<char> output) {
   std::size_t written = 0;
   while (data.size() >= 4 && output.size() >= 3) {
-    auto a = Base64Values[static_cast<unsigned char>(data[0])];
-    auto b = Base64Values[static_cast<unsigned char>(data[1])];
-    auto c = Base64Values[static_cast<unsigned char>(data[2])];
-    auto d = Base64Values[static_cast<unsigned char>(data[3])];
-    if ((a | b | c | d) == InvalidBase64)
+    auto a = base64_values[static_cast<unsigned char>(data[0])];
+    auto b = base64_values[static_cast<unsigned char>(data[1])];
+    auto c = base64_values[static_cast<unsigned char>(data[2])];
+    auto d = base64_values[static_cast<unsigned char>(data[3])];
+    if ((a | b | c | d) == invalid_base64)
       break;
     // Load the complete group before writing: same-start decoding is safe.
     output[0] = static_cast<char>((a << 2) | (b >> 4));
@@ -137,8 +137,8 @@ std::size_t base64_decode(std::span<char const> data, std::span<char> output) {
   std::array<std::uint8_t, 4> tail{};
   std::size_t accepted = 0;
   while (accepted < std::min(data.size(), tail.size())) {
-    auto value = Base64Values[static_cast<unsigned char>(data[accepted])];
-    if (value == InvalidBase64)
+    auto value = base64_values[static_cast<unsigned char>(data[accepted])];
+    if (value == invalid_base64)
       break;
     tail[accepted++] = value;
   }

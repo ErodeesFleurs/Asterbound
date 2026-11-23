@@ -15,12 +15,12 @@ int g_test1Count = 0;
 int g_test2Count = 0;
 
 struct Base : RefCounter {
-  void const* query_type(TypeKey key) const noexcept override { return query_type_of<Base, RefCounter>(this, key); }
+  void query_type(TypeQuery& query) const noexcept override { query_type_of<Base, RefCounter>(*this, query); }
   std::string_view dynamic_type_name() const noexcept override { return type_name<Base>(); }
 };
 
 struct Test1 : Base {
-  void const* query_type(TypeKey key) const noexcept override { return query_type_of<Test1, Base>(this, key); }
+  void query_type(TypeQuery& query) const noexcept override { query_type_of<Test1, Base>(*this, query); }
   std::string_view dynamic_type_name() const noexcept override { return type_name<Test1>(); }
   Test1() {
     ++g_test1Count;
@@ -32,7 +32,7 @@ struct Test1 : Base {
 };
 
 struct Test2 : Base {
-  void const* query_type(TypeKey key) const noexcept override { return query_type_of<Test2, Base>(this, key); }
+  void query_type(TypeQuery& query) const noexcept override { query_type_of<Test2, Base>(*this, query); }
   std::string_view dynamic_type_name() const noexcept override { return type_name<Test2>(); }
   Test2() {
     ++g_test2Count;
@@ -112,24 +112,24 @@ struct QueryCounter : RefCounter {
 };
 struct QueryLeft : virtual QueryCounter {
   int left = 17;
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<QueryLeft, RefCounter>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<QueryLeft, RefCounter>(*this, query);
   }
 };
 
 struct QueryRight : virtual QueryCounter {
   int right = 29;
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<QueryRight, RefCounter>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<QueryRight, RefCounter>(*this, query);
   }
 };
 
 struct QueryBoth : QueryLeft, QueryRight {
   explicit QueryBoth(bool& destroyed) : destroyed(destroyed) {}
   ~QueryBoth() { destroyed = true; }
-  void const* query_type(TypeKey key) const noexcept override {
+  void query_type(TypeQuery& query) const noexcept override {
     ++queries;
-    return query_type_of<QueryBoth, QueryLeft, QueryRight>(this, key);
+    query_type_of<QueryBoth, QueryLeft, QueryRight>(*this, query);
   }
   bool& destroyed;
 };
@@ -142,7 +142,7 @@ TEST(IntrusivePtr, VirtualCrossCastSharesObject) {
     auto right = as<QueryRight>(left);
     ASSERT_TRUE(right);
     EXPECT_EQ(29, right->right);
-    EXPECT_EQ(as<RefCounter>(left).get(), as<RefCounter>(right).get());
+    EXPECT_EQ(as<RefCounter>(left), as<RefCounter>(right));
     EXPECT_FALSE(as<Test2>(left));
     left.reset();
     EXPECT_FALSE(destroyed);
@@ -163,7 +163,7 @@ TEST(IntrusivePtr, AdjustedRvalueQueriesOnceAndTransfersWithoutCountChurn) {
   auto right = as<QueryRight>(std::move(left));
   ASSERT_TRUE(right);
   EXPECT_FALSE(left);
-  EXPECT_EQ(std::addressof(expected), right.get());
+  EXPECT_EQ(std::addressof(expected), std::addressof(*right));
   EXPECT_EQ(2, right->queries);
   EXPECT_EQ(1, right->retains);
   EXPECT_EQ(0, right->drops);
@@ -246,20 +246,20 @@ struct PlainDerived : PlainBase {};
 
 struct Root {
   virtual ~Root() = default;
-  virtual void const* query_type(TypeKey key) const noexcept { return query_type_of<Root>(this, key); }
+  virtual void query_type(TypeQuery& query) const noexcept { query_type_of<Root>(*this, query); }
   virtual std::string_view dynamic_type_name() const noexcept { return type_name<Root>(); }
   int value = 11;
 };
 struct Left : Root {
-  void const* query_type(TypeKey key) const noexcept override { return query_type_of<Left, Root>(this, key); }
+  void query_type(TypeQuery& query) const noexcept override { query_type_of<Left, Root>(*this, query); }
 };
 struct Right : Root {
-  void const* query_type(TypeKey key) const noexcept override { return query_type_of<Right, Root>(this, key); }
+  void query_type(TypeQuery& query) const noexcept override { query_type_of<Right, Root>(*this, query); }
   int right = 29;
 };
 struct Repeated : Left, Right {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<Repeated, Left, Right>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<Repeated, Left, Right>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return type_name<Repeated>(); }
 };
@@ -269,7 +269,7 @@ struct Missing : Root {};
 struct Tracked : RefCounter {
   explicit Tracked(int& destructions) : destructions(destructions) {}
   ~Tracked() override { ++destructions; }
-  void const* query_type(TypeKey key) const noexcept override { return query_type_of<Tracked, RefCounter>(this, key); }
+  void query_type(TypeQuery& query) const noexcept override { query_type_of<Tracked, RefCounter>(*this, query); }
   std::string_view dynamic_type_name() const noexcept override { return type_name<Tracked>(); }
   int value = 37;
   int& destructions;
@@ -307,14 +307,22 @@ static_assert(!std::constructible_from<RefPtr<RefCounter const>, Tracked const&&
 static_assert(!std::constructible_from<RefPtr<Tracked>, Tracked*>);
 
 template <typename Target, typename Source>
-concept pointer_cast_available = requires(Source* source) { as<Target>(source); };
+concept nullable_cast_available = requires(std::optional<std::reference_wrapper<Source>> source) { as_ref<Target>(source); };
 template <typename Target, typename Source>
 concept reference_cast_available = requires(Source& source) { as_ref<Target>(source); };
 template <typename Target, typename Source>
-concept pointer_convert_available = requires(Source* source) { convert<Target>(source); };
+concept nullable_convert_available = requires(std::optional<std::reference_wrapper<Source>> source) { convert_ref<Target>(source); };
 template <typename Target, typename Source>
 concept reference_convert_available = requires(Source& source) { convert_ref<Target>(source); };
 
+template <typename Target, typename Source>
+concept temporary_borrow_available = requires(Source&& value) { as_ref<Target>(std::move(value)); };
+template <typename Target, typename Source>
+concept temporary_checked_available = requires(Source&& value) { convert_ref<Target>(std::move(value)); };
+
+static_assert(!temporary_borrow_available<PlainBase, PlainDerived const>);
+static_assert(!temporary_checked_available<PlainBase, PlainDerived const>);
+static_assert(!cast_input<PlainBase, PlainDerived*>);
 static_assert(capability_queryable<Left>);
 static_assert(!capability_queryable<Plain>);
 static_assert(!capability_castable<Root, Plain>);
@@ -323,15 +331,16 @@ static_assert(capability_castable<PlainBase const, PlainDerived const>);
 static_assert(!capability_castable<PlainBase, PlainDerived const>);
 static_assert(capability_castable<Right const, Left const>);
 static_assert(!capability_castable<Right, Left const>);
-static_assert(!pointer_cast_available<Root, Plain>);
+static_assert(!nullable_cast_available<Root, Plain>);
 static_assert(!reference_cast_available<Root, Plain>);
-static_assert(!pointer_convert_available<Root, Plain>);
+static_assert(!nullable_convert_available<Root, Plain>);
 static_assert(!reference_convert_available<Root, Plain>);
-static_assert(pointer_cast_available<PlainBase, PlainDerived>);
+static_assert(nullable_cast_available<PlainBase, PlainDerived>);
 static_assert(reference_cast_available<PlainBase, PlainDerived>);
-static_assert(pointer_convert_available<PlainBase, PlainDerived>);
+static_assert(nullable_convert_available<PlainBase, PlainDerived>);
 static_assert(reference_convert_available<PlainBase, PlainDerived>);
-static_assert(std::same_as<decltype(as<PlainBase>(std::declval<PlainDerived const*>())), PlainBase const*>);
+static_assert(std::same_as<decltype(as_ref<PlainBase>(std::declval<std::optional<std::reference_wrapper<PlainDerived const>>>())),
+                           std::optional<std::reference_wrapper<PlainBase const>>>);
 static_assert(std::same_as<decltype(as_ref<Right>(std::declval<Left const&>())),
                            std::optional<std::reference_wrapper<Right const>>>);
 static_assert(
@@ -349,28 +358,50 @@ TEST(Casting, RepeatedBaseIsAmbiguousButStaticBranchUpcastWorks) {
   using namespace CastingRegression;
   Repeated object;
   EXPECT_NE(static_cast<Root*>(static_cast<Left*>(&object)), static_cast<Root*>(static_cast<Right*>(&object)));
-  EXPECT_EQ(nullptr, object.query_type(type_key<Root>()));
-  EXPECT_EQ(nullptr, as<Root>(&object));
-  EXPECT_EQ(static_cast<Root*>(static_cast<Left*>(&object)), as<Root>(static_cast<Left*>(&object)));
-  EXPECT_EQ(static_cast<Right*>(&object), as<Right>(static_cast<Left*>(&object)));
-  auto failure = convert<Root>(&object);
+  EXPECT_FALSE(query_type<Root>(object));
+  EXPECT_FALSE(as_ref<Root>(std::optional{std::ref(object)}));
+  auto left = std::optional{std::ref(static_cast<Left&>(object))};
+  auto root = as_ref<Root>(left);
+  auto right = as_ref<Right>(left);
+  ASSERT_TRUE(root);
+  ASSERT_TRUE(right);
+  EXPECT_EQ(std::addressof(static_cast<Root&>(left->get())), std::addressof(root->get()));
+  EXPECT_EQ(std::addressof(static_cast<Right&>(object)), std::addressof(right->get()));
+  auto failure = convert_ref<Root>(std::optional{std::ref(object)});
   ASSERT_FALSE(failure);
   EXPECT_TRUE(failure.error().is<PointerConvertException>());
+}
+
+TEST(Casting, AmbiguousChildDoesNotHideUniqueSibling) {
+  using namespace CastingRegression;
+  struct Single : Root {};
+  struct Composite : Repeated, Single {
+    void query_type(TypeQuery& query) const noexcept override {
+      query_type_of<Composite, Single, Repeated>(*this, query);
+    }
+  } composite;
+  auto found = query_type<Root>(composite);
+  ASSERT_TRUE(found);
+  EXPECT_EQ(std::addressof(static_cast<Root&>(static_cast<Single&>(composite))), std::addressof(found->get()));
 }
 
 TEST(Casting, PlainStaticConversionsNeedNoQueryProtocol) {
   using namespace CastingRegression;
   PlainDerived object;
-  EXPECT_EQ(static_cast<PlainBase*>(&object), as<PlainBase>(&object));
+  auto source = std::optional{std::ref(object)};
+  auto base = as_ref<PlainBase>(source);
+  ASSERT_TRUE(base);
+  EXPECT_EQ(std::addressof(static_cast<PlainBase&>(object)), std::addressof(base->get()));
   auto reference = convert_ref<PlainBase>(object);
   ASSERT_TRUE(reference);
   reference->get().value = 41;
   EXPECT_EQ(41, object.value);
-  auto pointer = convert<PlainBase>(&object);
-  ASSERT_TRUE(pointer);
-  EXPECT_EQ(static_cast<PlainBase*>(&object), *pointer);
-  PlainDerived* empty = nullptr;
-  auto failure = convert<PlainBase>(empty);
+  auto checked = convert_ref<PlainBase>(source);
+  ASSERT_TRUE(checked);
+  EXPECT_EQ(std::addressof(static_cast<PlainBase&>(object)), std::addressof(checked->get()));
+  source.reset();
+  EXPECT_FALSE(as_ref<PlainBase>(source));
+  auto failure = convert_ref<PlainBase>(source);
   ASSERT_FALSE(failure);
   EXPECT_TRUE(failure.error().is<PointerConvertException>());
 }
@@ -459,7 +490,7 @@ TEST(IntrusivePtr, ConstConversionsTransferAndKeepObjectAlive) {
     auto copied = convert<Tracked>(std::as_const(source));
     ASSERT_TRUE(copied);
     EXPECT_EQ(37, (*copied)->value);
-    EXPECT_EQ(source.get(), static_cast<RefCounter const*>(copied->get()));
+    EXPECT_EQ(source, *copied);
     EXPECT_FALSE(as<OtherTracked>(std::move(source)));
     ASSERT_TRUE(source);
     auto failure = convert<OtherTracked>(std::move(source));
@@ -469,7 +500,7 @@ TEST(IntrusivePtr, ConstConversionsTransferAndKeepObjectAlive) {
     auto transferred = as<Tracked>(std::move(source));
     ASSERT_TRUE(transferred);
     EXPECT_FALSE(source);
-    EXPECT_EQ(copied->get(), transferred.get());
+    EXPECT_EQ(*copied, transferred);
     transferred.reset();
     EXPECT_EQ(0, destructions);
   }
@@ -507,7 +538,8 @@ TEST(IntrusivePtr, SelfMoveAndSameAddressAdoptionConsumeExactlyOneCount) {
   RefPtr<Tracked> second(*owner);
   auto token = owner.detach();
   EXPECT_FALSE(owner);
-  ASSERT_EQ(second.get(), token.get());
+  ASSERT_TRUE(token);
+  ASSERT_EQ(std::addressof(*second), std::addressof(*token));
   second.adopt(std::move(token));
   EXPECT_FALSE(token);
   ASSERT_TRUE(second);
@@ -556,7 +588,7 @@ TEST(IntrusivePtr, UncountedBaseCanBeBorrowed) {
   EXPECT_TRUE(is<PlainBase>(owner));
   auto borrowed = as_ref<PlainBase>(*owner);
   ASSERT_TRUE(borrowed);
-  EXPECT_EQ(static_cast<PlainBase*>(owner.get()), std::addressof(borrowed->get()));
+  EXPECT_EQ(std::addressof(static_cast<PlainBase&>(*owner)), std::addressof(borrowed->get()));
 }
 
 namespace {
@@ -595,6 +627,11 @@ TEST(Casting, ArrayStaticBorrowAndElementOwnerPreserveStorage) {
   EXPECT_EQ(element.get(), owner.get());
   EXPECT_FALSE(element.owner_before(owner));
   EXPECT_FALSE(owner.owner_before(element));
+  auto erased = as<void>(owner);
+  ASSERT_TRUE(erased);
+  EXPECT_EQ(erased.get(), owner.get());
+  EXPECT_FALSE(erased.owner_before(owner));
+  EXPECT_FALSE(owner.owner_before(erased));
   auto checked = convert<int>(std::move(owner));
   ASSERT_TRUE(checked);
   EXPECT_FALSE(owner);

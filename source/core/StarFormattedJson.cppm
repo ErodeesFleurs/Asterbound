@@ -25,19 +25,19 @@ struct CommaElement;
 struct ValueElement {
   ValueElement(FormattedJson json);
 
-  std::shared_ptr<FormattedJson> m_value;
+  std::shared_ptr<FormattedJson> value;
 
   bool operator==(ValueElement const& v) const;
 };
 
 struct ObjectKeyElement {
-  String m_key;
+  String key;
 
   bool operator==(ObjectKeyElement const& v) const;
 };
 
 struct WhitespaceElement {
-  String m_whitespace;
+  String whitespace;
 
   bool operator==(WhitespaceElement const& v) const;
 };

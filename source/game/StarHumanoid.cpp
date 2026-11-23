@@ -1810,10 +1810,10 @@ void Humanoid::setHandFrameOverrides(ToolHand hand, StringView back, StringView 
   // some users stick directives in these?? better make sure they don't break with custom clothing
   std::size_t  backEnd =  back.utf8().find('?');
   std::size_t frontEnd = front.utf8().find('?');
-  Directives  backDirectives =  backEnd == NPos ? Directives() : Directives( back.utf8().substr( backEnd));
-  Directives frontDirectives = frontEnd == NPos ? Directives() : Directives(front.utf8().substr(frontEnd));
-  if ( backEnd != NPos)  back =  back.utf8().substr(0,  backEnd);
-  if (frontEnd != NPos) front = front.utf8().substr(0, frontEnd);
+  Directives  backDirectives =  backEnd == npos ? Directives() : Directives( back.utf8().substr( backEnd));
+  Directives frontDirectives = frontEnd == npos ? Directives() : Directives(front.utf8().substr(frontEnd));
+  if ( backEnd != npos)  back =  back.utf8().substr(0,  backEnd);
+  if (frontEnd != npos) front = front.utf8().substr(0, frontEnd);
   handInfo. backFrame = ! back.empty() ? std::move( back) : "rotation";
   handInfo.frontFrame = !front.empty() ? std::move(front) : "rotation";
   handInfo. backDirectives = ! backDirectives.empty() ? std::move( backDirectives) : Directives();
@@ -3824,7 +3824,7 @@ std::expected<std::pair<Vec2F, Directives>, StarException> Humanoid::extractScal
     auto string = directives.entry_string(entry);
     auto scaleNearest = string.starts_with("scalenearest");
     if (!scaleNearest) return std::unexpected(std::move(scaleNearest.error()));
-    if (*scaleNearest && string.utf8().find("skip") == NPos) {
+    if (*scaleNearest && string.utf8().find("skip") == npos) {
       auto const& operation = directives.entry_operation(entry);
       if (std::holds_alternative<ScaleImageOperation>(operation)) {
         auto const& op = std::get<ScaleImageOperation>(operation);

@@ -43,7 +43,7 @@
   # runs through `nix run .#sanitized-tests`.
   sanitizers ? false,
   # Build with the project's own assertions live.  RelWithAsserts leaves NDEBUG
-  # undefined, so starAssert and the DebugEnabled code paths actually execute in
+  # undefined, so starAssert and the debug_enabled code paths actually execute in
   # the checkPhase and in `nix run .#asserts-tests`; the shipped configurations
   # all define NDEBUG, so nothing else ever runs them.
   asserts ? false,
@@ -321,7 +321,7 @@ stdenv.mkDerivation {
 
   cmakeDir = "../source";
   # RelWithAsserts keeps optimization but omits NDEBUG, so starAssert and
-  # DebugEnabled remain live.
+  # debug_enabled remain live.
   cmakeBuildType = if asserts then "RelWithAsserts" else "RelWithDebInfo";
   # Installation is handled below, not by CMake's GNUInstallDirs/export rules.
   # Keep configure hooks and package isolation without passing unused install

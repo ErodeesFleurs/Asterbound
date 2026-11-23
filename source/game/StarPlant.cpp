@@ -1770,7 +1770,7 @@ if (!result583) return std::unexpected(std::move(result583.error()));
 }
 
 std::expected<Vec2I, StarException> Plant::baseDamagePosition(List<Vec2I> const& positions) const {
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((positions.size()));
   }
   auto result572 = positions.at(0);

@@ -259,11 +259,11 @@ constexpr Bound2<LocType, IndexType> get_bound2(LocType loc, IndexType extent, B
   if (bmode == BoundMode::Wrap) {
     loc = positive_mod<LocType>(loc, extent);
   } else {
-    LocType newLoc = std::clamp<LocType>(loc, 0, extent - 1);
+    LocType new_loc = std::clamp<LocType>(loc, 0, extent - 1);
     if (bmode == BoundMode::Extrapolate)
-      bound.offset += loc - newLoc;
+      bound.offset += loc - new_loc;
 
-    loc = newLoc;
+    loc = new_loc;
   }
 
   bound.i0 = IndexType(loc);
@@ -323,11 +323,11 @@ template <typename LocType, typename IndexType>
   if (bmode == BoundMode::Wrap) {
     loc = positive_mod<LocType>(loc, extent);
   } else {
-    LocType newLoc = std::clamp<LocType>(loc, 0, extent - 1);
+    LocType new_loc = std::clamp<LocType>(loc, 0, extent - 1);
     if (bmode == BoundMode::Extrapolate)
-      bound.offset += loc - newLoc;
+      bound.offset += loc - new_loc;
 
-    loc = newLoc;
+    loc = new_loc;
   }
 
   bound.i1 = IndexType(loc);
@@ -550,10 +550,10 @@ template <typename XContainer, typename YContainer, typename PositionType, typen
 constexpr typename YContainer::value_type parametric_interpolate2(XContainer const& xvals, YContainer const& yvals,
                                                                   PositionType const& position, WeightOp&& weight_op,
                                                                   BoundMode bmode) {
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((xvals.size() != 0));
   }
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((xvals.size() == yvals.size()));
   }
 
@@ -571,10 +571,10 @@ template <typename XContainer, typename YContainer, typename PositionType, typen
 constexpr typename YContainer::value_type parametric_interpolate4(XContainer const& xvals, YContainer const& yvals,
                                                                   PositionType const& position, WeightOp&& weight_op,
                                                                   BoundMode bmode) {
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((xvals.size() != 0));
   }
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((xvals.size() == yvals.size()));
   }
 

@@ -62,7 +62,7 @@ private:
 void write_text(TextBuffer& buffer, HostAddress const& address);
 
 template <>
-struct hash<HostAddress> {
+struct ValueHash<HostAddress> {
   constexpr std::size_t operator()(HostAddress const& address) const noexcept {
     PLHasher hasher;
     for (auto byte : address.bytes())
@@ -96,7 +96,7 @@ private:
 void write_text(TextBuffer& buffer, HostAddressWithPort const& address);
 
 template <>
-struct hash<HostAddressWithPort> {
+struct ValueHash<HostAddressWithPort> {
   std::size_t operator()(HostAddressWithPort const& endpoint) const noexcept {
     return hash_of(endpoint.address(), endpoint.port());
   }
@@ -108,9 +108,9 @@ export module star.host_address;
 
 export namespace Star {
   template <>
-  struct hash<HostAddress>;
+  struct ValueHash<HostAddress>;
   template <>
-  struct hash<HostAddressWithPort>;
+  struct ValueHash<HostAddressWithPort>;
 }
 
 

@@ -8,7 +8,7 @@ namespace Star {
 
 class DurabilityItem {
 public:
-  virtual void const* query_type(TypeKey key) const noexcept { return query_type_of<DurabilityItem>(this, key); }
+  virtual void query_type(TypeQuery& query) const noexcept { query_type_of<DurabilityItem>(*this, query); }
   virtual std::string_view dynamic_type_name() const noexcept { return Star::type_name<DurabilityItem>(); }
 
   virtual ~DurabilityItem() = default;

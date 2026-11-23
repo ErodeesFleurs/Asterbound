@@ -147,7 +147,7 @@ Warps a client to a given world.
 
 #### `unsigned` universe.clientOpenProtocolVersion(`ConnectionId` clientId)
 
-Returns the OpenProtocolVersion used for networking with the client.
+Returns the protocol version used for networking with the client.
 
 ---
 
@@ -197,7 +197,7 @@ Returns the client uuid. This is the uuid of the player the client joined with, 
 
 #### `unsigned` universe.serverOpenProtocolVersion()
 
-Returns the OpenProtocolVersion used for networking with the server.
+Returns the protocol version used for networking with the server.
 
 ---
 

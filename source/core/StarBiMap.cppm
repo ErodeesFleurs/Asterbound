@@ -363,7 +363,7 @@ private:
   Indices m_indices;
 };
 
-template <typename Left, typename Right, typename LeftHash = Star::hash<Left>, typename RightHash = Star::hash<Right>>
+template <typename Left, typename Right, typename LeftHash = Star::ValueHash<Left>, typename RightHash = Star::ValueHash<Right>>
 using BiHashMap = BiMap<Left, Right, StableHashMap<Left, BiMapLink<Right>, LeftHash>,
     StableHashMap<Right, BiMapLink<Left>, RightHash>>;
 

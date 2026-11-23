@@ -150,7 +150,7 @@ enum class Key : std::uint16_t {
   F23,
   F24
 };
-inline constexpr auto KeyNames = sorted_enum_names(std::to_array<std::pair<Key, std::string_view>>({
+inline constexpr auto key_names = sorted_enum_names(std::to_array<std::pair<Key, std::string_view>>({
   {Key::Backspace, "Backspace"},
   {Key::Tab, "Tab"},
   {Key::Clear, "Clear"},
@@ -291,7 +291,7 @@ inline constexpr auto KeyNames = sorted_enum_names(std::to_array<std::pair<Key, 
   {Key::Menu, "Menu"},
   {Key::Power, "Power"}
 }));
-static_assert(valid_enum_names<KeyNames>());
+static_assert(valid_enum_names<key_names>());
 
 enum class KeyMod : std::uint16_t {
   NoMod = 0x0000,
@@ -308,7 +308,7 @@ enum class KeyMod : std::uint16_t {
   AltGr = 0x4000,
   Scroll = 0x8000
 };
-inline constexpr auto KeyModNames = sorted_enum_names(std::to_array<std::pair<KeyMod, std::string_view>>({
+inline constexpr auto key_mod_names = sorted_enum_names(std::to_array<std::pair<KeyMod, std::string_view>>({
   {KeyMod::NoMod, "NoMod"},
   {KeyMod::LShift, "LShift"},
   {KeyMod::RShift, "RShift"},
@@ -322,7 +322,7 @@ inline constexpr auto KeyModNames = sorted_enum_names(std::to_array<std::pair<Ke
   {KeyMod::Caps, "Caps"},
   {KeyMod::AltGr, "AltGr"}
 }));
-static_assert(valid_enum_names<KeyModNames>());
+static_assert(valid_enum_names<key_mod_names>());
 
 KeyMod operator|(KeyMod a, KeyMod b);
 KeyMod operator&(KeyMod a, KeyMod b);
@@ -337,24 +337,24 @@ enum class MouseButton : std::uint8_t {
   FourthButton,
   FifthButton
 };
-inline constexpr auto MouseButtonNames = sorted_enum_names(std::to_array<std::pair<MouseButton, std::string_view>>({
+inline constexpr auto mouse_button_names = sorted_enum_names(std::to_array<std::pair<MouseButton, std::string_view>>({
   {MouseButton::Left, "MouseLeft"},
   {MouseButton::Middle, "MouseMiddle"},
   {MouseButton::Right, "MouseRight"},
   {MouseButton::FourthButton, "MouseFourth"},
   {MouseButton::FifthButton, "MouseFifth"}
 }));
-static_assert(valid_enum_names<MouseButtonNames>());
+static_assert(valid_enum_names<mouse_button_names>());
 
 enum class MouseWheel : std::uint8_t {
   Up,
   Down
 };
-inline constexpr auto MouseWheelNames = sorted_enum_names(std::to_array<std::pair<MouseWheel, std::string_view>>({
+inline constexpr auto mouse_wheel_names = sorted_enum_names(std::to_array<std::pair<MouseWheel, std::string_view>>({
   {MouseWheel::Up, "MouseWheelUp"},
   {MouseWheel::Down, "MouseWheelDown"}
 }));
-static_assert(valid_enum_names<MouseWheelNames>());
+static_assert(valid_enum_names<mouse_wheel_names>());
 
 using ControllerId = std::uint32_t;
 
@@ -367,7 +367,7 @@ enum class ControllerAxis : std::uint8_t {
   TriggerRight,
   Invalid = 255
 };
-inline constexpr auto ControllerAxisNames = sorted_enum_names(std::to_array<std::pair<ControllerAxis, std::string_view>>({
+inline constexpr auto controller_axis_names = sorted_enum_names(std::to_array<std::pair<ControllerAxis, std::string_view>>({
   {ControllerAxis::LeftX, "LeftX"},
   {ControllerAxis::LeftY, "LeftY"},
   {ControllerAxis::RightX, "RightX"},
@@ -375,7 +375,7 @@ inline constexpr auto ControllerAxisNames = sorted_enum_names(std::to_array<std:
   {ControllerAxis::TriggerLeft, "TriggerLeft"},
   {ControllerAxis::TriggerRight, "TriggerRight"},
 }));
-static_assert(valid_enum_names<ControllerAxisNames>());
+static_assert(valid_enum_names<controller_axis_names>());
 
 enum class ControllerButton : std::uint8_t {
   A,
@@ -401,7 +401,7 @@ enum class ControllerButton : std::uint8_t {
   Touchpad,
   Invalid = 255
 };
-inline constexpr auto ControllerButtonNames = sorted_enum_names(std::to_array<std::pair<ControllerButton, std::string_view>>({
+inline constexpr auto controller_button_names = sorted_enum_names(std::to_array<std::pair<ControllerButton, std::string_view>>({
   {ControllerButton::A, "A"},
   {ControllerButton::B, "B"},
   {ControllerButton::X, "X"},
@@ -425,7 +425,7 @@ inline constexpr auto ControllerButtonNames = sorted_enum_names(std::to_array<st
   {ControllerButton::Touchpad, "Touchpad"},
   {ControllerButton::Invalid, "Invalid"}
 }));
-static_assert(valid_enum_names<ControllerButtonNames>());
+static_assert(valid_enum_names<controller_button_names>());
 
 struct KeyDownEvent {
   Key key;
@@ -441,39 +441,39 @@ struct TextInputEvent {
 };
 
 struct MouseMoveEvent {
-  Vec2F mouseMove;
-  Vec2F mousePosition;
+  Vec2F mouse_move;
+  Vec2F mouse_position;
 };
 
 struct MouseButtonDownEvent {
-  MouseButton mouseButton;
-  Vec2F mousePosition;
+  MouseButton mouse_button;
+  Vec2F mouse_position;
 };
 
 struct MouseButtonUpEvent {
-  MouseButton mouseButton;
-  Vec2F mousePosition;
+  MouseButton mouse_button;
+  Vec2F mouse_position;
 };
 
 struct MouseWheelEvent {
-  MouseWheel mouseWheel;
-  Vec2F mousePosition;
+  MouseWheel mouse_wheel;
+  Vec2F mouse_position;
 };
 
 struct ControllerAxisEvent {
   ControllerId controller;
-  ControllerAxis controllerAxis;
-  float controllerAxisValue;
+  ControllerAxis controller_axis;
+  float controller_axis_value;
 };
 
 struct ControllerButtonDownEvent {
   ControllerId controller;
-  ControllerButton controllerButton;
+  ControllerButton controller_button;
 };
 
 struct ControllerButtonUpEvent {
   ControllerId controller;
-  ControllerButton controllerButton;
+  ControllerButton controller_button;
 };
 
 using InputEvent =
@@ -508,23 +508,23 @@ export module star.input_event;
 
 export namespace Star {
   using ::Star::Key;
-  using ::Star::KeyNames;
+  using ::Star::key_names;
   using ::Star::KeyMod;
-  using ::Star::KeyModNames;
+  using ::Star::key_mod_names;
   using ::Star::operator|;
   using ::Star::operator&;
   using ::Star::operator~;
   using ::Star::operator|=;
   using ::Star::operator&=;
   using ::Star::MouseButton;
-  using ::Star::MouseButtonNames;
+  using ::Star::mouse_button_names;
   using ::Star::MouseWheel;
-  using ::Star::MouseWheelNames;
+  using ::Star::mouse_wheel_names;
   using ::Star::ControllerId;
   using ::Star::ControllerAxis;
-  using ::Star::ControllerAxisNames;
+  using ::Star::controller_axis_names;
   using ::Star::ControllerButton;
-  using ::Star::ControllerButtonNames;
+  using ::Star::controller_button_names;
   using ::Star::KeyDownEvent;
   using ::Star::KeyUpEvent;
   using ::Star::TextInputEvent;

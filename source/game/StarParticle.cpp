@@ -38,8 +38,8 @@ Particle::Particle() {
   type = Type::Variance;
   size = 0;
   baseSize = 0;
-  color = Color::White;
-  light = Color::Clear;
+  color = Color::palette_white;
+  light = Color::palette_clear;
   fade = 0;
   fullbright = false;
   position = velocity = finalVelocity = approach = Vec2F();
@@ -69,7 +69,7 @@ std::expected<Particle, StarException> Particle::create(Root& root, Json const& 
   if (!type)
     return std::unexpected(std::move(type.error()));
   particle.type = *type;
-  particle.color = particle.type == Type::Variance ? Color::Clear : Color::White;
+  particle.color = particle.type == Type::Variance ? Color::palette_clear : Color::palette_white;
   auto size = config.get_float("size", particle.type == Type::Variance ? 0.0f : 1.0f);
   if (!size)
     return std::unexpected(std::move(size.error()));
@@ -94,7 +94,7 @@ std::expected<Particle, StarException> Particle::create(Root& root, Json const& 
     auto pathEnd = particle.string.find('?');
     if (!pathEnd)
       return std::unexpected(std::move(pathEnd.error()));
-    if (*pathEnd == NPos) {
+    if (*pathEnd == npos) {
       particle.directives.clear();
     } else {
       auto directives = particle.string.substr(*pathEnd);
@@ -366,7 +366,7 @@ std::expected<void, StarException> Particle::update(Root& root, float dt, Vec2F 
 
   rotation += angularVelocity * dt;
 
-  if (light != Color::Clear)
+  if (light != Color::palette_clear)
     light.fade(fade * dt);
 
   timeToLive -= dt;
@@ -481,7 +481,7 @@ void Particle::destructionUpdate() {
     } else if (destructionAction == DestructionAction::Image) {
       if (!destructionSet) {
         size = 1.0f;
-        color = Color::White;
+        color = Color::palette_white;
         type = Particle::Type::Textured;
         image = destructionImage;
         angularVelocity = 0.0f;

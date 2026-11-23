@@ -61,44 +61,44 @@ template <> struct hash<HashTestTypes::StandardValue> {
 }// namespace std
 
 namespace Star {
-template <> struct hash<HashTestTypes::Value> {
+template <> struct ValueHash<HashTestTypes::Value> {
   constexpr std::size_t operator()(HashTestTypes::Value const& value) const noexcept { return value.value; }
 };
-template <> struct hash<HashTestTypes::RvalueOnly> {
-  constexpr hash() noexcept = default;
-  hash(hash const&) = delete;
+template <> struct ValueHash<HashTestTypes::RvalueOnly> {
+  constexpr ValueHash() noexcept = default;
+  ValueHash(ValueHash const&) = delete;
   constexpr std::size_t operator()(HashTestTypes::RvalueOnly const& value) && noexcept { return value.value; }
 };
-template <> struct hash<HashTestTypes::LvalueOnly> {
+template <> struct ValueHash<HashTestTypes::LvalueOnly> {
   std::size_t operator()(HashTestTypes::LvalueOnly const&) & noexcept { return 1; }
 };
-template <> struct hash<HashTestTypes::Nondefault> {
-  hash() = delete;
+template <> struct ValueHash<HashTestTypes::Nondefault> {
+  ValueHash() = delete;
   std::size_t operator()(HashTestTypes::Nondefault const&) const noexcept { return 1; }
 };
-template <> struct hash<HashTestTypes::ReferenceValue&> {
+template <> struct ValueHash<HashTestTypes::ReferenceValue&> {
   constexpr std::size_t operator()(HashTestTypes::ReferenceValue& value) const noexcept { return value.value; }
 };
-template <> struct hash<HashTestTypes::ThrowingValue> {
+template <> struct ValueHash<HashTestTypes::ThrowingValue> {
   std::size_t operator()(HashTestTypes::ThrowingValue const&) const noexcept(false) { return 5; }
 };
-template <> struct hash<HashTestTypes::ThrowingConstruction> {
-  hash() noexcept(false) {}
+template <> struct ValueHash<HashTestTypes::ThrowingConstruction> {
+  ValueHash() noexcept(false) {}
   std::size_t operator()(HashTestTypes::ThrowingConstruction const&) const noexcept { return 5; }
 };
-template <> struct hash<HashTestTypes::ThrowingDestruction> {
-  ~hash() noexcept(false) {}
+template <> struct ValueHash<HashTestTypes::ThrowingDestruction> {
+  ~ValueHash() noexcept(false) {}
   std::size_t operator()(HashTestTypes::ThrowingDestruction const&) const noexcept { return 5; }
 };
-template <> struct hash<HashTestTypes::ConversionValue> {
+template <> struct ValueHash<HashTestTypes::ConversionValue> {
   HashTestTypes::ImplicitSize operator()(HashTestTypes::ConversionValue const&) const noexcept { return {}; }
 };
-template <> struct hash<HashTestTypes::ExplicitValue> {
+template <> struct ValueHash<HashTestTypes::ExplicitValue> {
   HashTestTypes::ExplicitSize operator()(HashTestTypes::ExplicitValue const&) const noexcept { return {}; }
 };
-template <> struct hash<HashTestTypes::TraceValue> {
-  hash() : id(++HashTestTypes::next_hasher) { HashTestTypes::trace.push_back(100 + id); }
-  ~hash() { HashTestTypes::trace.push_back(300 + id); }
+template <> struct ValueHash<HashTestTypes::TraceValue> {
+  ValueHash() : id(++HashTestTypes::next_hasher) { HashTestTypes::trace.push_back(100 + id); }
+  ~ValueHash() { HashTestTypes::trace.push_back(300 + id); }
   std::size_t operator()(HashTestTypes::TraceValue const& value) const {
     HashTestTypes::trace.push_back(200 + static_cast<int>(value.value));
     return value.value;
@@ -123,12 +123,12 @@ concept has_hash_of = requires(T const&... values) { Star::hash_of(values...); }
 
 static_assert(Star::hashable<Value>);
 static_assert(Star::hashable<RvalueOnly>);
-static_assert(!std::is_copy_constructible_v<Star::hash<RvalueOnly>>);
+static_assert(!std::is_copy_constructible_v<Star::ValueHash<RvalueOnly>>);
 static_assert(!Star::hashable<LvalueOnly>);
-static_assert(Star::hash_invocable<Star::hash<LvalueOnly>&, LvalueOnly const&>);
-static_assert(!Star::hash_invocable<Star::hash<LvalueOnly> const&, LvalueOnly const&>);
+static_assert(Star::hash_invocable<Star::ValueHash<LvalueOnly>&, LvalueOnly const&>);
+static_assert(!Star::hash_invocable<Star::ValueHash<LvalueOnly> const&, LvalueOnly const&>);
 static_assert(!Star::hashable<Nondefault>);
-static_assert(Star::hash_invocable<Star::hash<Nondefault> const&, Nondefault const&>);
+static_assert(Star::hash_invocable<Star::ValueHash<Nondefault> const&, Nondefault const&>);
 static_assert(!Star::hashable<ExplicitValue>);
 static_assert(Star::hashable<ConversionValue>);
 static_assert(!has_hash_of<>);
@@ -144,22 +144,22 @@ static_assert(noexcept(Star::hash_of(Value{1}, Value{2}, Value{3})));
 static_assert(!noexcept(Star::hash_of(ThrowingValue{})));
 static_assert(!noexcept(Star::hash_of(ThrowingConstruction{})));
 static_assert(!noexcept(Star::hash_of(ThrowingDestruction{})));
-static_assert(!noexcept(Star::hash<std::tuple<ThrowingConstruction>>{}({})));
-static_assert(!noexcept(Star::hash<std::tuple<ThrowingDestruction>>{}({})));
+static_assert(!noexcept(Star::ValueHash<std::tuple<ThrowingConstruction>>{}({})));
+static_assert(!noexcept(Star::ValueHash<std::tuple<ThrowingDestruction>>{}({})));
 static_assert(!noexcept(Star::hash_of(ConversionValue{})));
 static_assert(!noexcept(Star::hash_of(Value{1}, ConversionValue{}, Value{3})));
-static_assert(noexcept(Star::hash<std::optional<Value>>{}(std::optional<Value>{})));
-static_assert(!noexcept(Star::hash<std::optional<ConversionValue>>{}(std::optional<ConversionValue>{})));
-static_assert(!noexcept(Star::hash<std::pair<Value, ThrowingValue>>{}({})));
-static_assert(!noexcept(Star::hash<std::tuple<Value, ConversionValue>>{}({})));
+static_assert(noexcept(Star::ValueHash<std::optional<Value>>{}(std::optional<Value>{})));
+static_assert(!noexcept(Star::ValueHash<std::optional<ConversionValue>>{}(std::optional<ConversionValue>{})));
+static_assert(!noexcept(Star::ValueHash<std::pair<Value, ThrowingValue>>{}({})));
+static_assert(!noexcept(Star::ValueHash<std::tuple<Value, ConversionValue>>{}({})));
 static_assert(Star::hash_of(Value{1}, Value{2}, Value{3}) == combined(1, combined(2, 3)));
-static_assert(Star::hash<std::pair<Value, Value>>{}({Value{1}, Value{2}}) == combined(1, 2));
-static_assert(Star::hash<std::tuple<Value, Value, Value>>{}({Value{1}, Value{2}, Value{3}})
+static_assert(Star::ValueHash<std::pair<Value, Value>>{}({Value{1}, Value{2}}) == combined(1, 2));
+static_assert(Star::ValueHash<std::tuple<Value, Value, Value>>{}({Value{1}, Value{2}, Value{3}})
               == combined(1, combined(2, combined(3, 0))));
-static_assert(Star::hash<std::tuple<>>{}({}) == 0);
-static_assert(Star::hash<std::optional<Value>>{}(std::nullopt) == 0);
-static_assert(Star::hash<std::optional<Value>>{}(Value{11}) == 11);
-static_assert(Star::hash<std::tuple<RvalueOnly>>{}({RvalueOnly{9}}) == combined(9, 0));
+static_assert(Star::ValueHash<std::tuple<>>{}({}) == 0);
+static_assert(Star::ValueHash<std::optional<Value>>{}(std::nullopt) == 0);
+static_assert(Star::ValueHash<std::optional<Value>>{}(Value{11}) == 11);
+static_assert(Star::ValueHash<std::tuple<RvalueOnly>>{}({RvalueOnly{9}}) == combined(9, 0));
 static_assert(!Star::hashable<std::optional<RvalueOnly>>);
 static_assert(!Star::hashable<std::pair<RvalueOnly, Value>>);
 static_assert(Star::hashable<std::tuple<RvalueOnly>>);
@@ -173,45 +173,45 @@ static_assert(!Star::hashable<void>);
 static_assert(!Star::hashable<std::optional<Disabled>>);
 static_assert(!Star::hashable<std::pair<Value, Disabled>>);
 static_assert(!Star::hashable<std::tuple<Value, Disabled>>);
-static_assert(std::is_base_of_v<std::hash<Disabled>, Star::hash<Disabled>>);
-static_assert(!std::is_default_constructible_v<Star::hash<Disabled>>);
-static_assert(!std::is_default_constructible_v<Star::hash<std::optional<Disabled>>>);
-static_assert(std::is_base_of_v<std::hash<StandardValue>, Star::hash<StandardValue>>);
-static_assert(std::is_base_of_v<std::hash<Enum>, Star::hash<Enum>>);
-static_assert(std::is_base_of_v<std::hash<Enum>, Star::hash<Enum const>>);
+static_assert(std::is_base_of_v<std::hash<Disabled>, Star::ValueHash<Disabled>>);
+static_assert(!std::is_default_constructible_v<Star::ValueHash<Disabled>>);
+static_assert(!std::is_default_constructible_v<Star::ValueHash<std::optional<Disabled>>>);
+static_assert(std::is_base_of_v<std::hash<StandardValue>, Star::ValueHash<StandardValue>>);
+static_assert(std::is_base_of_v<std::hash<Enum>, Star::ValueHash<Enum>>);
+static_assert(std::is_base_of_v<std::hash<Enum>, Star::ValueHash<Enum const>>);
 static_assert(!std::is_default_constructible_v<std::hash<Enum const>>);
 static_assert(Star::hashable<Enum const>);
-static_assert(Star::hash<StandardValue>{}(StandardValue{4}) == 23);
+static_assert(Star::ValueHash<StandardValue>{}(StandardValue{4}) == 23);
 static_assert([] {
   Star::PLHasher hasher(3);
   hasher.put(static_cast<signed char>(-1));
   hasher.put(LvalueByte{});
   return hasher.hash() == (3 * std::size_t{101} + static_cast<std::size_t>(-1)) * 101 + 23;
 }());
-static_assert(Star::hash<Star::String>{}(std::string_view("a\0b", 3)) == (std::size_t{'a'} * 101) * 101 + 'b');
+static_assert(Star::ValueHash<Star::String>{}(std::string_view("a\0b", 3)) == (std::size_t{'a'} * 101) * 101 + 'b');
 }// namespace
 
 TEST(HashTest, CompoundHashesKeepDistinctAssociationAndTerminalZero) {
   EXPECT_EQ(Star::hash_of(Value{1}), 1u);
   EXPECT_EQ(Star::hash_of(Value{1}, Value{2}, Value{3}), combined(1, combined(2, 3)));
-  auto tuple_hash = Star::hash<std::tuple<Value, Value, Value>>{}({Value{1}, Value{2}, Value{3}});
+  auto tuple_hash = Star::ValueHash<std::tuple<Value, Value, Value>>{}({Value{1}, Value{2}, Value{3}});
   EXPECT_EQ(tuple_hash, combined(1, combined(2, combined(3, 0))));
   EXPECT_NE(tuple_hash, Star::hash_of(Value{1}, Value{2}, Value{3}));
-  EXPECT_EQ((Star::hash<std::pair<Value, Value>>{}({Value{1}, Value{2}})), combined(1, 2));
+  EXPECT_EQ((Star::ValueHash<std::pair<Value, Value>>{}({Value{1}, Value{2}})), combined(1, 2));
   ReferenceValue first{8}, second{13};
-  EXPECT_EQ((Star::hash<std::pair<ReferenceValue&, ReferenceValue&>>{}({first, second})), combined(8, 13));
-  EXPECT_EQ((Star::hash<std::tuple<ReferenceValue&>>{}({first})), combined(8, 0));
+  EXPECT_EQ((Star::ValueHash<std::pair<ReferenceValue&, ReferenceValue&>>{}({first, second})), combined(8, 13));
+  EXPECT_EQ((Star::ValueHash<std::tuple<ReferenceValue&>>{}({first})), combined(8, 0));
 }
 
 TEST(HashTest, HashResultsUseImplicitSizeConversions) {
   EXPECT_EQ(Star::hash_of(ConversionValue{}), 7u);
-  EXPECT_EQ(Star::hash<std::optional<ConversionValue>>{}(ConversionValue{}), 7u);
-  EXPECT_EQ((Star::hash<std::pair<Value, ConversionValue>>{}({Value{3}, {}})), combined(3, 7));
-  EXPECT_EQ((Star::hash<std::tuple<Value, ConversionValue>>{}({Value{3}, {}})), combined(3, combined(7, 0)));
+  EXPECT_EQ(Star::ValueHash<std::optional<ConversionValue>>{}(ConversionValue{}), 7u);
+  EXPECT_EQ((Star::ValueHash<std::pair<Value, ConversionValue>>{}({Value{3}, {}})), combined(3, 7));
+  EXPECT_EQ((Star::ValueHash<std::tuple<Value, ConversionValue>>{}({Value{3}, {}})), combined(3, combined(7, 0)));
 }
 
 TEST(HashTest, OptionalKeepsZeroIdentityAndDoesNotHashAnEmptyPayload) {
-  Star::hash<std::optional<TraceValue>> hasher;
+  Star::ValueHash<std::optional<TraceValue>> hasher;
   trace.clear();
   EXPECT_EQ(hasher(std::nullopt), 0u);
   EXPECT_TRUE(trace.empty());
@@ -224,7 +224,7 @@ TEST(HashTest, TupleAndHashOfDestroyTemporaryHashersBeforeEvaluatingTheTail) {
   trace.clear();
   next_hasher = 0;
   auto tuple_result =
-    Star::hash<std::tuple<TraceValue, TraceValue, TraceValue>>{}({TraceValue{1}, TraceValue{2}, TraceValue{3}});
+    Star::ValueHash<std::tuple<TraceValue, TraceValue, TraceValue>>{}({TraceValue{1}, TraceValue{2}, TraceValue{3}});
   EXPECT_EQ(trace, expected);
   EXPECT_EQ(tuple_result, combined(1, combined(2, combined(3, 0))));
   trace.clear();
@@ -235,7 +235,7 @@ TEST(HashTest, TupleAndHashOfDestroyTemporaryHashersBeforeEvaluatingTheTail) {
 }
 
 TEST(HashTest, PairHashesMembersFromLeftToRight) {
-  Star::hash<std::pair<TraceValue, TraceValue>> hasher;
+  Star::ValueHash<std::pair<TraceValue, TraceValue>> hasher;
   trace.clear();
   EXPECT_EQ(hasher({TraceValue{1}, TraceValue{2}}), combined(1, 2));
   EXPECT_EQ(trace, std::vector<int>({201, 202}));
@@ -251,24 +251,24 @@ TEST(HashTest, OwningAndBorrowedByteHashesPreserveSignedCharsAndEmbeddedNulls) {
   std::size_t expected = 0;
   for (char byte : bytes)
     expected = expected * 101 + static_cast<std::size_t>(byte);
-  Star::hash<Star::String> hasher;
+  Star::ValueHash<Star::String> hasher;
   EXPECT_EQ(hasher(view), expected);
   EXPECT_EQ(hasher(standard), expected);
   EXPECT_EQ(hasher(owning), expected);
   EXPECT_EQ(hasher(borrowed), expected);
-  EXPECT_EQ(Star::hash<Star::ByteArray>{}(array), expected);
+  EXPECT_EQ(Star::ValueHash<Star::ByteArray>{}(array), expected);
   EXPECT_EQ(hasher(std::string_view{}), 0u);
   EXPECT_EQ(hasher(Star::String{}), 0u);
-  EXPECT_EQ(Star::hash<Star::ByteArray>{}(Star::ByteArray{}), 0u);
+  EXPECT_EQ(Star::ValueHash<Star::ByteArray>{}(Star::ByteArray{}), 0u);
   // Literal adapters retain first-NUL semantics, while explicit views are bounded.
   EXPECT_EQ(hasher("a\0b"), hasher(std::string_view("a")));
   EXPECT_NE(hasher("a\0b"), hasher(std::string_view("a\0b", 3)));
 }
 
 TEST(HashTest, StandardHashAndEnumInheritancePreserveResults) {
-  EXPECT_EQ(Star::hash<StandardValue>{}(StandardValue{29}), std::hash<StandardValue>{}(StandardValue{29}));
-  EXPECT_EQ(Star::hash<Enum>{}(Enum::Value), std::hash<Enum>{}(Enum::Value));
-  EXPECT_EQ(Star::hash<Enum const>{}(Enum::Value), std::hash<Enum>{}(Enum::Value));
+  EXPECT_EQ(Star::ValueHash<StandardValue>{}(StandardValue{29}), std::hash<StandardValue>{}(StandardValue{29}));
+  EXPECT_EQ(Star::ValueHash<Enum>{}(Enum::Value), std::hash<Enum>{}(Enum::Value));
+  EXPECT_EQ(Star::ValueHash<Enum const>{}(Enum::Value), std::hash<Enum>{}(Enum::Value));
 }
 
 TEST(HashTest, StringHashCoversEveryUtf8Byte) {

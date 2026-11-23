@@ -12,11 +12,11 @@ namespace Star {
 template <typename T>
 concept line_scalar = (std::integral<T> || std::floating_point<T>) && !std::same_as<std::remove_cv_t<T>, bool>;
 
-template <line_scalar T, std::size_t N>
-  requires(N > 0)
+template <line_scalar T, std::size_t dimension_count>
+  requires(dimension_count > 0)
 class Line {
 public:
-  using VectorType = Vector<T, N>;
+  using VectorType = Vector<T, dimension_count>;
 
   struct IntersectResult {
     // Whether or not the two objects intersect
@@ -38,8 +38,8 @@ public:
   constexpr Line() = default;
 
   template <line_scalar T2>
-    requires std::constructible_from<VectorType, Vector<T2, N> const&>
-  explicit Line(Line<T2, N> const& line) : m_min(line.min()), m_max(line.max()) {}
+    requires std::constructible_from<VectorType, Vector<T2, dimension_count> const&>
+  explicit Line(Line<T2, dimension_count> const& line) : m_min(line.min()), m_max(line.max()) {}
 
   constexpr Line(VectorType const& a, VectorType const& b) : m_min(a), m_max(b) {}
 
@@ -48,7 +48,7 @@ public:
   T length() const { return diff().magnitude(); }
 
   T angle() const
-    requires(N == 2)
+    requires(dimension_count == 2)
   {
     return diff().angle();
   }
@@ -100,13 +100,13 @@ public:
   bool operator<(Line const& rhs) const { return std::tie(m_min, m_max) < std::tie(rhs.m_min, rhs.m_max); }
 
   IntersectResult intersection(Line const& other, bool infinite = false) const
-    requires(N == 2)
+    requires(dimension_count == 2)
   {
     return intersection_impl<true>(other, infinite);
   }
 
   bool intersects(Line const& other, bool infinite = false) const
-    requires(N == 2)
+    requires(dimension_count == 2)
   {
     return intersection_impl<false>(other, infinite);
   }
@@ -114,14 +114,14 @@ public:
   // Returns t value for closest point on the line.  t value is *not* clamped
   // from 0.0 to 1.0
   T line_projection(VectorType const& l2) const
-    requires(N == 2)
+    requires(dimension_count == 2)
   {
     VectorType d = diff();
     return ((l2[0] - min()[0]) * d[0] + (l2[1] - min()[1]) * d[1]) / d.magnitude_squared();
   }
 
   T distance_to(VectorType const& l, bool infinite = false) const
-    requires(N == 2)
+    requires(dimension_count == 2)
   {
     auto t = line_projection(l);
     if (!infinite)
@@ -129,17 +129,17 @@ public:
     return vmag(l - eval(t));
   }
 
-  void rotate(T angle, VectorType const& rotationCenter = VectorType())
-    requires(N == 2)
+  void rotate(T angle, VectorType const& rotation_center = VectorType())
+    requires(dimension_count == 2)
   {
-    auto rotMatrix = Mat3F::rotation(angle, rotationCenter);
-    min() = rotMatrix.transform_point(min());
-    max() = rotMatrix.transform_point(max());
+    auto rot_matrix = Mat3F::rotation(angle, rotation_center);
+    min() = rot_matrix.transform_point(min());
+    max() = rot_matrix.transform_point(max());
   }
 
   template <line_scalar T2>
   void transform(Matrix3<T2> const& transform)
-    requires(N == 2)
+    requires(dimension_count == 2)
   {
     min() = transform.transform_point(min());
     max() = transform.transform_point(max());
@@ -147,29 +147,29 @@ public:
 
   template <line_scalar T2>
   Line transformed(Matrix3<T2> const& transform) const
-    requires(N == 2)
+    requires(dimension_count == 2)
   {
     return Line(transform.transform_point(min()), transform.transform_point(max()));
   }
 
-  void flip_horizontal(T horizontalPos)
-    requires(N == 2)
+  void flip_horizontal(T horizontal_pos)
+    requires(dimension_count == 2)
   {
-    m_min[0] = horizontalPos + (horizontalPos - m_min[0]);
-    m_max[0] = horizontalPos + (horizontalPos - m_max[0]);
+    m_min[0] = horizontal_pos + (horizontal_pos - m_min[0]);
+    m_max[0] = horizontal_pos + (horizontal_pos - m_max[0]);
   }
 
-  void flip_vertical(T verticalPos)
-    requires(N == 2)
+  void flip_vertical(T vertical_pos)
+    requires(dimension_count == 2)
   {
-    m_min[1] = verticalPos + (verticalPos - m_min[1]);
-    m_max[1] = verticalPos + (verticalPos - m_max[1]);
+    m_min[1] = vertical_pos + (vertical_pos - m_min[1]);
+    m_max[1] = vertical_pos + (vertical_pos - m_max[1]);
   }
 
 private:
-  template <bool Full>
-  std::conditional_t<Full, IntersectResult, bool> intersection_impl(Line const& other, bool infinite) const
-    requires(N == 2)
+  template <bool full>
+  std::conditional_t<full, IntersectResult, bool> intersection_impl(Line const& other, bool infinite) const
+    requires(dimension_count == 2)
   {
     // Endpoint order is observable for coincident lines; do not normalize it here.
     auto const& a = m_min;
@@ -179,13 +179,13 @@ private:
     auto ab = diff();
     auto cd = other.diff();
     T denom = ab ^ cd;
-    [[maybe_unused]] std::conditional_t<Full, IntersectResult, bool> result;
+    [[maybe_unused]] std::conditional_t<full, IntersectResult, bool> result;
     if (near_zero(denom)) {
-      T xNumer = (a ^ b) * cd[0] - (c ^ d) * ab[0];
-      T yNumer = (a ^ b) * cd[1] - (c ^ d) * ab[1];
-      if (near_zero(xNumer) && near_zero(yNumer)) {
+      T x_numer = (a ^ b) * cd[0] - (c ^ d) * ab[0];
+      T y_numer = (a ^ b) * cd[1] - (c ^ d) * ab[1];
+      if (near_zero(x_numer) && near_zero(y_numer)) {
         bool hit = infinite || (a >= c && a <= d) || (c >= a && c <= b);
-        if constexpr (!Full) {
+        if constexpr (!full) {
           return hit;
         } else {
           result.intersects = hit;
@@ -208,7 +208,7 @@ private:
           result.glances = hit;
         }
       } else {
-        if constexpr (!Full) {
+        if constexpr (!full) {
           return false;
         } else {
           result.intersects = false;
@@ -222,7 +222,7 @@ private:
       T ta = ((c - a) ^ cd) / denom;
       T tb = ((c - a) ^ ab) / denom;
       bool hit = infinite || (ta >= 0 && ta <= 1.0 && tb >= 0 && tb <= 1.0);
-      if constexpr (!Full) {
+      if constexpr (!full) {
         return hit;
       } else {
         result.intersects = hit;
@@ -233,7 +233,7 @@ private:
           !infinite && hit && (near_zero(ta) || near_equal(ta, T{1}) || near_zero(tb) || near_equal(tb, T{1}));
       }
     }
-    if constexpr (Full)
+    if constexpr (full)
       return result;
   }
 
@@ -245,9 +245,9 @@ using Line2F = Line<float, 2>;
 using Line2D = Line<double, 2>;
 using Line2I = Line<int, 2>;
 
-template <line_scalar T, std::size_t N>
-  requires nonfallible_text_writable<Vector<T, N>>
-void write_text(TextBuffer& output, Line<T, N> const& line) {
+template <line_scalar T, std::size_t dimension_count>
+  requires nonfallible_text_writable<Vector<T, dimension_count>>
+void write_text(TextBuffer& output, Line<T, dimension_count> const& line) {
   output.push_back('[');
   append_text(output, line.min());
   output.append(", ");
@@ -255,14 +255,14 @@ void write_text(TextBuffer& output, Line<T, N> const& line) {
   output.push_back(']');
 }
 
-template <line_scalar T, std::size_t N> struct hash<Line<T, N>> {
-  std::size_t operator()(Line<T, N> const& line) const {
+template <line_scalar T, std::size_t dimension_count> struct ValueHash<Line<T, dimension_count>> {
+  std::size_t operator()(Line<T, dimension_count> const& line) const {
     std::size_t hashval = 0;
-    hash_combine(hashval, vectorHasher(line.min()));
-    hash_combine(hashval, vectorHasher(line.max()));
+    hash_combine(hashval, vector_hasher(line.min()));
+    hash_combine(hashval, vector_hasher(line.max()));
     return hashval;
   }
-  Star::hash<typename Line<T, N>::VectorType> vectorHasher;
+  Star::ValueHash<typename Line<T, dimension_count>::VectorType> vector_hasher;
 };
 
 }// namespace Star
@@ -270,15 +270,15 @@ template <line_scalar T, std::size_t N> struct hash<Line<T, N>> {
 export module star.line;
 
 export namespace Star {
-template <line_scalar T, std::size_t N> struct hash<Line<T, N>>;
+template <line_scalar T, std::size_t dimension_count> struct ValueHash<Line<T, dimension_count>>;
 }
 
-export template <Star::line_scalar T, std::size_t N>
-  requires Star::nonfallible_text_writable<Star::Vector<T, N>>
-struct std::formatter<Star::Line<T, N>> : Star::TextFormatter {};
+export template <Star::line_scalar T, std::size_t dimension_count>
+  requires Star::nonfallible_text_writable<Star::Vector<T, dimension_count>>
+struct std::formatter<Star::Line<T, dimension_count>> : Star::TextFormatter {};
 
 export namespace Star {
-using ::Star::hash;
+using ::Star::ValueHash;
 using ::Star::Line;
 using ::Star::Line2D;
 using ::Star::Line2F;

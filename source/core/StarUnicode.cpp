@@ -6,35 +6,35 @@ namespace Star {
 namespace unicode_detail {
 
 // Only public checked boundaries turn these codes into owning diagnostics.
-StarException decode_exception(decode_error error) {
+StarException decode_exception(DecodeError error) {
   switch (error) {
-    case decode_error::invalid_sequence: return UnicodeException("Invalid UTF-8 code unit sequence");
-    case decode_error::missing_trailing_units: return UnicodeException("UTF-8 string missing trailing code units");
-    case decode_error::invalid_codepoint: return UnicodeException("Invalid UTF-8 code point");
-    case decode_error::past_end: return UnicodeException("Cannot read past end of UTF-8 range");
-    case decode_error::none: std::unreachable();
+    case DecodeError::invalid_sequence: return UnicodeException("Invalid UTF-8 code unit sequence");
+    case DecodeError::missing_trailing_units: return UnicodeException("UTF-8 string missing trailing code units");
+    case DecodeError::invalid_codepoint: return UnicodeException("Invalid UTF-8 code point");
+    case DecodeError::past_end: return UnicodeException("Cannot read past end of UTF-8 range");
+    case DecodeError::none: std::unreachable();
   }
   std::unreachable();
 }
 }
 
-unicode_detail::decode_error Utf8Cursor::decode() const {
-  if (at_end()) return unicode_detail::decode_error::past_end;
-  if (m_width != 0) return unicode_detail::decode_error::none;
-  auto width = unicode_detail::decode_char(m_bytes.data() + m_offset, m_point, m_bytes.size() - m_offset);
+unicode_detail::DecodeError Utf8Cursor::decode() const {
+  if (at_end()) return unicode_detail::DecodeError::past_end;
+  if (m_width != 0) return unicode_detail::DecodeError::none;
+  auto width = unicode_detail::decode_char(m_bytes.substr(m_offset), m_point);
   if (!width) return width.error();
   m_width = *width;
-  return unicode_detail::decode_error::none;
+  return unicode_detail::DecodeError::none;
 }
 std::expected<Utf32Type, StarException> Utf8Cursor::read() const {
   auto error = decode();
-  if (error != unicode_detail::decode_error::none)
+  if (error != unicode_detail::DecodeError::none)
     return std::unexpected(unicode_detail::decode_exception(error));
   return m_point;
 }
 std::expected<void, StarException> Utf8Cursor::advance() {
   auto error = decode();
-  if (error != unicode_detail::decode_error::none)
+  if (error != unicode_detail::DecodeError::none)
     return std::unexpected(unicode_detail::decode_exception(error));
   m_offset += m_width;
   m_width = 0;
@@ -51,7 +51,7 @@ std::expected<void, StarException> Utf8Cursor::retreat() {
     while (offset != 0 && (static_cast<unsigned char>(m_bytes[offset]) & 0xc0) == 0x80) --offset;
   }
   Utf32Type point;
-  auto width = unicode_detail::decode_char(m_bytes.data() + offset, point, m_offset - offset);
+  auto width = unicode_detail::decode_char(m_bytes.substr(offset, m_offset - offset), point);
   if (!width) return std::unexpected(unicode_detail::decode_exception(width.error()));
   if (*width != m_offset - offset) return std::unexpected(UnicodeException("Invalid UTF-8 boundary"));
   m_offset = offset;
@@ -61,18 +61,12 @@ std::expected<void, StarException> Utf8Cursor::retreat() {
 }
 
 std::expected<std::size_t, StarException> utf8_decode_char(std::string_view bytes, Utf32Type& output) {
-  auto decoded = unicode_detail::decode_char(bytes.data(), output, bytes.size());
+  auto decoded = unicode_detail::decode_char(bytes, output);
   if (!decoded) return std::unexpected(unicode_detail::decode_exception(decoded.error()));
   return *decoded;
 }
 
-std::expected<std::size_t, StarException> utf8_decode_char(Utf8Type const* bytes, Utf32Type& output) {
-  auto decoded = unicode_detail::decode_char(bytes, output, 4, true);
-  if (!decoded) return std::unexpected(unicode_detail::decode_exception(decoded.error()));
-  return *decoded;
-}
-
-std::expected<std::size_t, StarException> utf8_length(std::string_view bytes) {
+std::expected<std::size_t, StarException> unicode_detail::byte_length(std::span<std::byte const> bytes) {
   std::size_t offset = 0;
   std::size_t length = 0;
   while (offset != bytes.size()) {
@@ -90,7 +84,7 @@ std::expected<std::size_t, StarException> utf8_length(std::string_view bytes) {
     }
     if (offset == bytes.size()) break;
     Utf32Type point;
-    auto decoded = unicode_detail::decode_char(bytes.data() + offset, point, bytes.size() - offset);
+    auto decoded = decode_char(bytes.subspan(offset), point);
     if (!decoded) return std::unexpected(unicode_detail::decode_exception(decoded.error()));
     offset += *decoded;
     ++length;
@@ -98,21 +92,8 @@ std::expected<std::size_t, StarException> utf8_length(std::string_view bytes) {
   return length;
 }
 
-std::expected<std::size_t, StarException> utf8_length(Utf8Type const* bytes) {
-  std::size_t length = 0;
-  // Never inspect bytes beyond a terminator, even inside a potential sequence.
-  while (*bytes != 0) {
-    if (static_cast<unsigned char>(*bytes) < 0x80) {
-      ++bytes;
-    } else {
-      Utf32Type point;
-      auto decoded = unicode_detail::decode_char(bytes, point, 4, true);
-      if (!decoded) return std::unexpected(unicode_detail::decode_exception(decoded.error()));
-      bytes += *decoded;
-    }
-    ++length;
-  }
-  return length;
+std::expected<std::size_t, StarException> utf8_length(std::string_view bytes) {
+  return unicode_detail::byte_length(std::as_bytes(std::span(bytes)));
 }
 
 std::expected<std::size_t, StarException> utf8_encode_char(std::span<Utf8Type> bytes, Utf32Type point) {

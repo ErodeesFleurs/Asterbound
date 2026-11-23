@@ -62,7 +62,7 @@ private:
 // readData may translate directly into increased latency.
 class PacketSocket {
 public:
-  virtual void const* query_type(TypeKey key) const noexcept { return query_type_of<PacketSocket>(this, key); }
+  virtual void query_type(TypeQuery& query) const noexcept { query_type_of<PacketSocket>(*this, query); }
   virtual std::string_view dynamic_type_name() const noexcept { return Star::type_name<PacketSocket>(); }
 
   virtual ~PacketSocket() = default;
@@ -105,8 +105,8 @@ private:
 
 class CompressedPacketSocket : public PacketSocket {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<CompressedPacketSocket, PacketSocket>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<CompressedPacketSocket, PacketSocket>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<CompressedPacketSocket>(); }
 
@@ -125,8 +125,8 @@ protected:
 // PacketSocket for local communication.
 class LocalPacketSocket : public PacketSocket {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<LocalPacketSocket, PacketSocket>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<LocalPacketSocket, PacketSocket>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<LocalPacketSocket>(); }
 
@@ -165,8 +165,8 @@ private:
 // Wraps a TCP socket into a PacketSocket.
 class TcpPacketSocket : public CompressedPacketSocket {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<TcpPacketSocket, CompressedPacketSocket>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<TcpPacketSocket, CompressedPacketSocket>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<TcpPacketSocket>(); }
 
@@ -205,8 +205,8 @@ private:
 // Wraps a P2PSocket into a PacketSocket
 class P2PPacketSocket : public CompressedPacketSocket {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<P2PPacketSocket, CompressedPacketSocket>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<P2PPacketSocket, CompressedPacketSocket>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<P2PPacketSocket>(); }
 

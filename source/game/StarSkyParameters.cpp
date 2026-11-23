@@ -51,7 +51,7 @@ import star.root;
 import star.static_random;
 namespace Star {
 
-SkyParameters::SkyParameters() : seed(), skyColoring(make_right(Color::Black)), settings(JsonObject()) {}
+SkyParameters::SkyParameters() : seed(), skyColoring(make_right(Color::palette_black)), settings(JsonObject()) {}
 
 std::expected<SkyParameters, StarException> SkyParameters::create(Root& root, CelestialCoordinate const& coordinate, std::shared_ptr<CelestialDatabase> const& celestialDatabase) {
   SkyParameters sky;
@@ -306,7 +306,7 @@ void SkyParameters::readVisitableParameters(std::shared_ptr<VisitableWorldParame
     } else if (auto floatingDungeonParameters = as<FloatingDungeonWorldParameters>(visitableParameters)) {
       skyColoring.set_right(floatingDungeonParameters->ambientLightLevel);
     } else {
-      skyColoring.set_right(Color::Black);
+      skyColoring.set_right(Color::palette_black);
     }
   }
 }

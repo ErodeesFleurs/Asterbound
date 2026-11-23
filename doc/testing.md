@@ -216,6 +216,11 @@ Prefer bounded representative cases and independent complete-result oracles over
 repeated matrices. Check error types and state/recovery; compare exact diagnostics
 only when wording or first-error selection is the contract.
 
+`MemoryTest.*` exercises move-only `MemoryAllocation` storage through its byte
+span: failed growth preserves the size and contents, and shrinking on a fresh
+thread uses that thread's allocator heap. The Lua allocator callback and global
+replacement new/delete operators retain their required pointer-based ABIs.
+
 `star_test_gtest` compiles the shared GoogleTest implementation once. Test mains,
 Root providers, syscall wrappers and SDK configuration stay executable-specific.
 Reuse fixtures/assertion sequences without collapsing distinct failures,
@@ -1178,7 +1183,7 @@ it does not measure text parsing or hash-table lookups.
 
 `VlqTest.*` covers most-significant-group-first encoding, bounded input,
 signed extremes, cursor advancement and error propagation. Low-level span
-reads return `NPos` without changing the destination on failure. Ordinary
+reads return `npos` without changing the destination on failure. Ordinary
 streams accept noncanonical and wrapping encodings; PathEmbed's binary JSON
 validator rejects overflow. `io_benchmarks --benchmark_filter='^IO/Vlq'`
 compares external, owning and callback readers for 1-, 5- and 10-byte values.

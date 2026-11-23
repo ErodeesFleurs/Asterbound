@@ -50,7 +50,7 @@ std::expected<Font::Face, StarException> Font::open_face(std::shared_ptr<FontLib
   FT_Face face{};
   {
     std::lock_guard lock(context->mutex);
-    if (FT_New_Memory_Face(context->library.get(), reinterpret_cast<FT_Byte const*>(bytes->data()),
+    if (FT_New_Memory_Face(context->library.get(), reinterpret_cast<FT_Byte const*>(bytes->span().data()),
             static_cast<FT_Long>(bytes->size()), 0, &face))
       return std::unexpected(FontException("Could not load font from buffer"));
   }
@@ -65,7 +65,7 @@ std::expected<std::shared_ptr<Font>, StarException> Font::load(FontLibrary const
 }
 
 std::expected<std::shared_ptr<Font>, StarException> Font::load(FontLibrary const& library, std::shared_ptr<ByteArray const> bytes, unsigned pixel_size) {
-  if (bytes && bytes->size() >= 4 && std::string_view(bytes->data(), 4) == "wOF2") {
+  if (bytes && std::string_view(bytes->span()).starts_with("wOF2")) {
     // Keep the decoded SFNT data shared by clones, rather than asking FreeType
     // to decompress the same WOFF2 font for every text painter.
     auto compressed = open_face(library.m_context, std::move(bytes));
@@ -78,7 +78,7 @@ std::expected<std::shared_ptr<Font>, StarException> Font::load(FontLibrary const
     auto decoded = std::make_shared<ByteArray>();
     decoded->resize(size);
     if (FT_Load_Sfnt_Table(compressed->get(), 0, 0,
-            reinterpret_cast<FT_Byte*>(decoded->data()), &size)
+            reinterpret_cast<FT_Byte*>(decoded->span().data()), &size)
         || size != decoded->size())
       return std::unexpected(FontException("Could not read decoded font data"));
     bytes = std::move(decoded);

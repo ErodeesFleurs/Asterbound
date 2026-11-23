@@ -104,8 +104,8 @@ export namespace Star {
 
 class ObjectItem : public Item, public FireableItem, public BeamItem {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<ObjectItem, Item, FireableItem, BeamItem>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<ObjectItem, Item, FireableItem, BeamItem>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ObjectItem>(); }
 

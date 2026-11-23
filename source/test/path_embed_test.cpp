@@ -370,7 +370,7 @@ TEST(PathEmbedTest, ZstandardUnknownSizeStreamsDecodeAndHugeDeclaredSizesFailEar
   ASSERT_TRUE(context);
   ASSERT_FALSE(ZSTD_isError(ZSTD_CCtx_setParameter(context.get(), ZSTD_c_contentSizeFlag, 0)));
   ByteArray compressed(128, '\0');
-  auto size = ZSTD_compress2(context.get(), compressed.data(), compressed.size(), "stream", 6);
+  auto size = ZSTD_compress2(context.get(), compressed.span().data(), compressed.size(), "stream", 6);
   ASSERT_FALSE(ZSTD_isError(size));
   compressed.resize(size);
   auto encoded = encoded_payload(compressed.span(), EmbeddedCompressionMethod::None);

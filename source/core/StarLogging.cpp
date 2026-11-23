@@ -198,8 +198,8 @@ std::expected<void, StarException> Logger::log_exception(LogLevel level, std::st
       return entry.level == level && entry.debug == debug && entry.operation == operation
           && other.kind == summary->kind && other.category == summary->category
           && other.reason == summary->reason && other.operation == summary->operation
-          && other.asset == summary->asset && other.assetProvider == summary->assetProvider
-          && other.patch == summary->patch && other.patchProvider == summary->patchProvider
+          && other.asset == summary->asset && other.asset_provider == summary->asset_provider
+          && other.patch == summary->patch && other.patch_provider == summary->patch_provider
           && std::ranges::equal(other.locations, summary->locations,
               [](ExceptionSummary::Location const& a, ExceptionSummary::Location const& b) {
                 return a.source == b.source && a.line == b.line && a.provider == b.provider;
@@ -275,7 +275,7 @@ void EmergencyLog::log(LogLevel, std::string_view message) {
       [](wchar_t const*, wchar_t const*, wchar_t const*, unsigned, std::uintptr_t) {});
     auto restore = make_scope_exit([previous] { ::_set_thread_local_invalid_parameter_handler(previous); });
 #endif
-    return Star::println(stderr, "{}", message);
+    return Star::println(*stderr, "{}", message);
   }();
   if (emitted)
     return;

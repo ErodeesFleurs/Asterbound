@@ -461,7 +461,7 @@ std::expected<void, StarException> WorldPainter::renderBars(WorldRenderData& ren
       auto fullBar = RectF({}, {m_entityBarSize.x() * bar.percentage, m_entityBarSize.y()});
       auto emptyBar = RectF({m_entityBarSize.x() * bar.percentage, 0.0f}, m_entityBarSize);
       auto fullColor = bar.color;
-      auto emptyColor = Color::Black;
+      auto emptyColor = Color::palette_black;
 
       if (auto result = drawDrawable(Drawable::makePoly(PolyF(emptyBar), emptyColor, position)); !result) return std::unexpected(std::move(result.error()));
       if (auto result = drawDrawable(Drawable::makePoly(PolyF(fullBar), fullColor, position)); !result) return std::unexpected(std::move(result.error()));

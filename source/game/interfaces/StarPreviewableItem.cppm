@@ -23,7 +23,7 @@ class TileDrawer;
 
 class PreviewableItem {
 public:
-  virtual void const* query_type(TypeKey key) const noexcept { return query_type_of<PreviewableItem>(this, key); }
+  virtual void query_type(TypeQuery& query) const noexcept { query_type_of<PreviewableItem>(*this, query); }
   virtual std::string_view dynamic_type_name() const noexcept { return Star::type_name<PreviewableItem>(); }
 
   virtual ~PreviewableItem() = default;

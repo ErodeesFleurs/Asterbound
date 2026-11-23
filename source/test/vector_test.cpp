@@ -713,7 +713,7 @@ TEST(VectorCompatibility, HashRetainsOrderedArrayCoordinateCombination) {
   Vec3I value(17, -3, 29);
   std::size_t expected = 0;
   for (int coordinate : {17, -3, 29})
-    hash_combine(expected, Star::hash<int>{}(coordinate));
-  EXPECT_EQ(Star::hash<Vec3I>{}(value), expected);
-  EXPECT_EQ(Star::hash<Vec3I>{}(value), (Star::hash<Array<int, 3>>{}(Array<int, 3>(17, -3, 29))));
+    hash_combine(expected, Star::ValueHash<int>{}(coordinate));
+  EXPECT_EQ(Star::ValueHash<Vec3I>{}(value), expected);
+  EXPECT_EQ(Star::ValueHash<Vec3I>{}(value), (Star::ValueHash<Array<int, 3>>{}(Array<int, 3>(17, -3, 29))));
 }

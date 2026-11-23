@@ -12,19 +12,19 @@ namespace Star {
 namespace vector_detail {
 // Keep SIMD registers out of Vector's storage and public interface. These
 // load/store boundaries can move to <simd> without changing coordinate layout.
-template <typename T, std::size_t N>
-concept simd_compatible = std::same_as<T, float> && N == 4;
+template <typename T, std::size_t dimension_count>
+concept simd_compatible = std::same_as<T, float> && dimension_count == 4;
 
 using float4 = float __attribute__((vector_size(16)));
 
-inline float4 load(float const* source) noexcept {
+inline float4 load(std::span<float const, 4> source) noexcept {
   float4 result;
-  std::memcpy(&result, source, sizeof(result));
+  std::memcpy(&result, source.data(), sizeof(result));
   return result;
 }
 
-inline void store(float* destination, float4 value) noexcept {
-  std::memcpy(destination, &value, sizeof(value));
+inline void store(std::span<float, 4> destination, float4 value) noexcept {
+  std::memcpy(destination.data(), &value, sizeof(value));
 }
 
 // A function parameter tests the implicit conversion used by initialization and
@@ -60,7 +60,7 @@ constexpr auto absolute(T const& value) noexcept(noexcept(abs(value))) -> declty
 // The old typed multiplies/divides converted their result to T before assignment.
 // Keep that conversion, while constraining the actual expression rather than an
 // unconstrained standard function object's declaration.
-template <typename T> struct multiply_as {
+template <typename T> struct MultiplyAs {
   constexpr T operator()(T const& a, T const& b) const noexcept(noexcept(accept<T>(a * b)))
     requires requires { accept<T>(a * b); }
   {
@@ -68,7 +68,7 @@ template <typename T> struct multiply_as {
   }
 };
 
-template <typename T> struct divide_as {
+template <typename T> struct DivideAs {
   constexpr T operator()(T const& a, T const& b) const noexcept(noexcept(accept<T>(a / b)))
     requires requires { accept<T>(a / b); }
   {
@@ -90,14 +90,14 @@ concept vector_combine = requires(Function& function, T const& left, T const& ri
 template <typename T>
 concept vector_less = requires(T const& left, T const& right) { vector_detail::accept<bool>(left < right); };
 
-template <typename T, std::size_t N> class Vector : public Array<T, N> {
-  using Storage = std::array<T, N>;
+template <typename T, std::size_t dimension_count> class Vector : public Array<T, dimension_count> {
+  using Storage = std::array<T, dimension_count>;
   static constexpr bool returnable = std::is_default_constructible_v<Storage> && std::is_move_constructible_v<Storage>;
   static constexpr bool nothrow_returnable =
     std::is_nothrow_default_constructible_v<Storage> && std::is_nothrow_move_constructible_v<Storage>;
 
 public:
-  using Base = Array<T, N>;
+  using Base = Array<T, dimension_count>;
 
   static constexpr Vector filled(T const& value) noexcept(nothrow_returnable
                                                           && noexcept(std::declval<Base&>().fill(value)))
@@ -109,34 +109,34 @@ public:
   }
 
   template <typename T2>
-  static constexpr Vector floor(Vector<T2, N> const& value)
+  static constexpr Vector floor(Vector<T2, dimension_count> const& value)
       noexcept(nothrow_returnable && requires(T& result, T2 const& source) { { result = std::floor(source) } noexcept; })
       requires (returnable && requires(T& result, T2 const& source) { result = std::floor(source); })
   {
     Vector result;
-    for (std::size_t i = 0; i < N; ++i)
+    for (std::size_t i = 0; i < dimension_count; ++i)
       result[i] = std::floor(value[i]);
     return result;
   }
 
   template <typename T2>
-  static constexpr Vector ceil(Vector<T2, N> const& value)
+  static constexpr Vector ceil(Vector<T2, dimension_count> const& value)
       noexcept(nothrow_returnable && requires(T& result, T2 const& source) { { result = std::ceil(source) } noexcept; })
       requires (returnable && requires(T& result, T2 const& source) { result = std::ceil(source); })
   {
     Vector result;
-    for (std::size_t i = 0; i < N; ++i)
+    for (std::size_t i = 0; i < dimension_count; ++i)
       result[i] = std::ceil(value[i]);
     return result;
   }
 
   template <typename T2>
-  static constexpr Vector round(Vector<T2, N> const& value)
+  static constexpr Vector round(Vector<T2, dimension_count> const& value)
       noexcept(nothrow_returnable && requires(T& result, T2 const& source) { { result = std::round(source) } noexcept; })
       requires (returnable && requires(T& result, T2 const& source) { result = std::round(source); })
   {
     Vector result;
-    for (std::size_t i = 0; i < N; ++i)
+    for (std::size_t i = 0; i < dimension_count; ++i)
       result[i] = std::round(value[i]);
     return result;
   }
@@ -144,12 +144,14 @@ public:
   template <typename Iterator>
   static constexpr Vector copy_from(Iterator input)
       noexcept(nothrow_returnable && std::is_nothrow_destructible_v<Iterator>
-          && (N == 0 || requires(Iterator& p, T* output) { { std::ranges::copy_n(std::move(p), N, output) } noexcept; }))
-      requires (returnable && (N == 0 || array_copy_iterator<T, Iterator>))
+          && (dimension_count == 0 || requires(Iterator& p, typename Base::iterator output) {
+            { std::ranges::copy_n(std::move(p), dimension_count, output) } noexcept;
+          }))
+      requires (returnable && (dimension_count == 0 || array_copy_iterator<T, Iterator>))
   {
     Vector result;
-    if constexpr (N != 0)
-      std::ranges::copy_n(std::move(input), N, result.begin());
+    if constexpr (dimension_count != 0)
+      std::ranges::copy_n(std::move(input), dimension_count, result.begin());
     return result;
   }
 
@@ -159,47 +161,47 @@ public:
   = default;
 
   explicit constexpr Vector(T const& first) noexcept(std::is_nothrow_constructible_v<Base, T const&>)
-    requires(N == 1 && std::is_constructible_v<Base, T const&>)
+    requires(dimension_count == 1 && std::is_constructible_v<Base, T const&>)
       : Base(first) {}
 
   template <typename... Rest>
   constexpr Vector(T const& first,
                    Rest const&... rest) noexcept(std::is_nothrow_constructible_v<Base, T const&, Rest const&...>)
-    requires(sizeof...(Rest) > 0 && sizeof...(Rest) + 1 == N && std::is_constructible_v<Base, T const&, Rest const&...>)
+    requires(sizeof...(Rest) > 0 && sizeof...(Rest) + 1 == dimension_count && std::is_constructible_v<Base, T const&, Rest const&...>)
       : Base(first, rest...) {}
 
   template <typename T2>
-  explicit constexpr Vector(Array<T2, N> const& value) noexcept(
-    std::is_nothrow_constructible_v<Base, Array<T2, N> const&>)
-    requires std::is_constructible_v<Base, Array<T2, N> const&>
+  explicit constexpr Vector(Array<T2, dimension_count> const& value) noexcept(
+    std::is_nothrow_constructible_v<Base, Array<T2, dimension_count> const&>)
+    requires std::is_constructible_v<Base, Array<T2, dimension_count> const&>
       : Base(value) {}
 
-  template <typename T2, std::size_t M, typename T3>
-  constexpr Vector(Array<T2, M> const& prefix, T3 const& last)
+  template <typename T2, std::size_t prefix_size, typename T3>
+  constexpr Vector(Array<T2, prefix_size> const& prefix, T3 const& last)
       noexcept(std::is_nothrow_default_constructible_v<Base>
-          && (M == 0 || requires(T& result, T2 const& value) { { result = value } noexcept; })
+          && (prefix_size == 0 || requires(T& result, T2 const& value) { { result = value } noexcept; })
           && requires(T& result) { { result = last } noexcept; })
-      requires (N > 0 && M == N - 1 && std::is_default_constructible_v<Base>
-          && (M == 0 || array_assignable<T, T2>) && array_assignable<T, T3>)
+      requires (dimension_count > 0 && prefix_size == dimension_count - 1 && std::is_default_constructible_v<Base>
+          && (prefix_size == 0 || array_assignable<T, T2>) && array_assignable<T, T3>)
   {
-    if constexpr (M != 0) {
-      for (std::size_t i = 0; i < M; ++i)
+    if constexpr (prefix_size != 0) {
+      for (std::size_t i = 0; i < prefix_size; ++i)
         (*this)[i] = prefix[i];
     }
-    (*this)[M] = last;
+    (*this)[prefix_size] = last;
   }
 
-  template <std::size_t N2>
-  constexpr Vector<T, N2> to_size() const
-      noexcept(std::is_nothrow_default_constructible_v<std::array<T, N2>>
-          && std::is_nothrow_move_constructible_v<std::array<T, N2>>
-          && (N == 0 || N2 == 0 || requires(T& result, T const& source) { { result = source } noexcept; }))
-      requires (std::is_default_constructible_v<std::array<T, N2>>
-          && std::is_move_constructible_v<std::array<T, N2>> && (N == 0 || N2 == 0 || array_assignable<T, T>))
+  template <std::size_t target_size>
+  constexpr Vector<T, target_size> to_size() const
+      noexcept(std::is_nothrow_default_constructible_v<std::array<T, target_size>>
+          && std::is_nothrow_move_constructible_v<std::array<T, target_size>>
+          && (dimension_count == 0 || target_size == 0 || requires(T& result, T const& source) { { result = source } noexcept; }))
+      requires (std::is_default_constructible_v<std::array<T, target_size>>
+          && std::is_move_constructible_v<std::array<T, target_size>> && (dimension_count == 0 || target_size == 0 || array_assignable<T, T>))
   {
-    Vector<T, N2> result;
-    if constexpr (N != 0 && N2 != 0) {
-      for (std::size_t i = 0; i < std::min(N, N2); ++i)
+    Vector<T, target_size> result;
+    if constexpr (dimension_count != 0 && target_size != 0) {
+      for (std::size_t i = 0; i < std::min(dimension_count, target_size); ++i)
         result[i] = (*this)[i];
     }
     return result;
@@ -230,23 +232,23 @@ public:
       requires (returnable && vector_combine<T, Function>)
   {
     Vector result;
-    for (std::size_t i = 0; i < N; ++i)
+    for (std::size_t i = 0; i < dimension_count; ++i)
       result[i] = std::invoke(function, (*this)[i], other[i]);
     return result;
   }
 
   constexpr Vector piecewise_multiply(Vector const& other) const
-    noexcept(noexcept(combine(other, vector_detail::multiply_as<T>{})))
-    requires requires { combine(other, vector_detail::multiply_as<T>{}); }
+    noexcept(noexcept(combine(other, vector_detail::MultiplyAs<T>{})))
+    requires requires { combine(other, vector_detail::MultiplyAs<T>{}); }
   {
-    return combine(other, vector_detail::multiply_as<T>{});
+    return combine(other, vector_detail::MultiplyAs<T>{});
   }
 
   constexpr Vector piecewise_divide(Vector const& other) const
-    noexcept(noexcept(combine(other, vector_detail::divide_as<T>{})))
-    requires requires { combine(other, vector_detail::divide_as<T>{}); }
+    noexcept(noexcept(combine(other, vector_detail::DivideAs<T>{})))
+    requires requires { combine(other, vector_detail::DivideAs<T>{}); }
   {
-    return combine(other, vector_detail::divide_as<T>{});
+    return combine(other, vector_detail::DivideAs<T>{});
   }
 
   constexpr Vector piecewise_min(Vector const& other) const
@@ -254,7 +256,7 @@ public:
       requires (returnable && vector_less<T> && array_assignable<T, T>)
   {
     Vector result;
-    for (std::size_t i = 0; i < N; ++i)
+    for (std::size_t i = 0; i < dimension_count; ++i)
       result[i] = std::min((*this)[i], other[i]);
     return result;
   }
@@ -264,7 +266,7 @@ public:
       requires (returnable && vector_less<T> && array_assignable<T, T>)
   {
     Vector result;
-    for (std::size_t i = 0; i < N; ++i)
+    for (std::size_t i = 0; i < dimension_count; ++i)
       result[i] = std::max((*this)[i], other[i]);
     return result;
   }
@@ -276,7 +278,7 @@ public:
       requires (returnable && vector_less<T> && array_assignable<T, T>)
   {
     Vector result;
-    for (std::size_t i = 0; i < N; ++i)
+    for (std::size_t i = 0; i < dimension_count; ++i)
       result[i] = std::max(std::min((*this)[i], upper[i]), lower[i]);
     return result;
   }
@@ -284,11 +286,11 @@ public:
   constexpr T min() const
       noexcept(std::is_nothrow_copy_constructible_v<T> && std::is_nothrow_move_constructible_v<T>
           && requires(T& result, T const& value) { { result = std::min(result, value) } noexcept; })
-      requires (N > 0 && std::is_copy_constructible_v<T> && std::is_move_constructible_v<T>
+      requires (dimension_count > 0 && std::is_copy_constructible_v<T> && std::is_move_constructible_v<T>
           && vector_less<T> && array_assignable<T, T>)
   {
     T result = (*this)[0];
-    for (std::size_t i = 1; i < N; ++i)
+    for (std::size_t i = 1; i < dimension_count; ++i)
       result = std::min(result, (*this)[i]);
     return result;
   }
@@ -296,11 +298,11 @@ public:
   constexpr T max() const
       noexcept(std::is_nothrow_copy_constructible_v<T> && std::is_nothrow_move_constructible_v<T>
           && requires(T& result, T const& value) { { result = std::max(result, value) } noexcept; })
-      requires (N > 0 && std::is_copy_constructible_v<T> && std::is_move_constructible_v<T>
+      requires (dimension_count > 0 && std::is_copy_constructible_v<T> && std::is_move_constructible_v<T>
           && vector_less<T> && array_assignable<T, T>)
   {
     T result = (*this)[0];
-    for (std::size_t i = 1; i < N; ++i)
+    for (std::size_t i = 1; i < dimension_count; ++i)
       result = std::max(result, (*this)[i]);
     return result;
   }
@@ -308,11 +310,11 @@ public:
   constexpr T sum() const
       noexcept(std::is_nothrow_copy_constructible_v<T> && std::is_nothrow_move_constructible_v<T>
           && requires(T& result, T const& value) { { result += value } noexcept; })
-      requires (N > 0 && std::is_copy_constructible_v<T> && std::is_move_constructible_v<T>
+      requires (dimension_count > 0 && std::is_copy_constructible_v<T> && std::is_move_constructible_v<T>
           && requires(T& result, T const& value) { result += value; })
   {
     T result = (*this)[0];
-    for (std::size_t i = 1; i < N; ++i)
+    for (std::size_t i = 1; i < dimension_count; ++i)
       result += (*this)[i];
     return result;
   }
@@ -320,11 +322,11 @@ public:
   constexpr T product() const
       noexcept(std::is_nothrow_copy_constructible_v<T> && std::is_nothrow_move_constructible_v<T>
           && requires(T& result, T const& value) { { result *= value } noexcept; })
-      requires (N > 0 && std::is_copy_constructible_v<T> && std::is_move_constructible_v<T>
+      requires (dimension_count > 0 && std::is_copy_constructible_v<T> && std::is_move_constructible_v<T>
           && requires(T& result, T const& value) { result *= value; })
   {
     T result = (*this)[0];
-    for (std::size_t i = 1; i < N; ++i)
+    for (std::size_t i = 1; i < dimension_count; ++i)
       result *= (*this)[i];
     return result;
   }
@@ -340,7 +342,7 @@ public:
       })
   {
     T result = 0;
-    for (std::size_t i = 0; i < N; ++i)
+    for (std::size_t i = 0; i < dimension_count; ++i)
       result += vector_detail::squared_value((*this)[i]);
     return result;
   }
@@ -420,7 +422,7 @@ public:
   })
     requires requires(T& value) { value = -value; }
   {
-    for (std::size_t i = 0; i < N; ++i)
+    for (std::size_t i = 0; i < dimension_count; ++i)
       (*this)[i] = -(*this)[i];
   }
 
@@ -446,7 +448,7 @@ public:
       requires (returnable && requires(T& result, T const& source) { result = vector_detail::absolute(source); })
   {
     Vector result;
-    for (std::size_t i = 0; i < N; ++i)
+    for (std::size_t i = 0; i < dimension_count; ++i)
       result[i] = vector_detail::absolute((*this)[i]);
     return result;
   }
@@ -478,7 +480,7 @@ public:
   })
     requires(vector_less<T> && array_assignable<T, T>)
   {
-    for (std::size_t i = 0; i < N; ++i)
+    for (std::size_t i = 0; i < dimension_count; ++i)
       (*this)[i] = std::max(lower, std::min(upper, (*this)[i]));
   }
 
@@ -496,22 +498,22 @@ public:
     requires(
       std::is_invocable_v<Function&, T const&>
       && std::is_object_v<std::remove_cvref_t<std::invoke_result_t<Function&, T const&>>>
-      && std::is_default_constructible_v<std::array<std::remove_cvref_t<std::invoke_result_t<Function&, T const&>>, N>>
-      && std::is_move_constructible_v<std::array<std::remove_cvref_t<std::invoke_result_t<Function&, T const&>>, N>>
+      && std::is_default_constructible_v<std::array<std::remove_cvref_t<std::invoke_result_t<Function&, T const&>>, dimension_count>>
+      && std::is_move_constructible_v<std::array<std::remove_cvref_t<std::invoke_result_t<Function&, T const&>>, dimension_count>>
       && requires(Function& function, T const& source,
                   std::remove_cvref_t<std::invoke_result_t<Function&, T const&>>&
                     result) { result = std::invoke(function, source); })
   constexpr auto transformed(Function&& function) const
     noexcept(std::is_nothrow_default_constructible_v<
-               std::array<std::remove_cvref_t<std::invoke_result_t<Function&, T const&>>, N>>
+               std::array<std::remove_cvref_t<std::invoke_result_t<Function&, T const&>>, dimension_count>>
              && std::is_nothrow_move_constructible_v<
-               std::array<std::remove_cvref_t<std::invoke_result_t<Function&, T const&>>, N>>
+               std::array<std::remove_cvref_t<std::invoke_result_t<Function&, T const&>>, dimension_count>>
              && requires(Function& f, T const& source,
                          std::remove_cvref_t<std::invoke_result_t<Function&, T const&>>& result) {
                   { result = std::invoke(f, source) } noexcept;
-                }) -> Vector<std::remove_cvref_t<std::invoke_result_t<Function&, T const&>>, N> {
-    Vector<std::remove_cvref_t<std::invoke_result_t<Function&, T const&>>, N> result;
-    for (std::size_t i = 0; i < N; ++i)
+                }) -> Vector<std::remove_cvref_t<std::invoke_result_t<Function&, T const&>>, dimension_count> {
+    Vector<std::remove_cvref_t<std::invoke_result_t<Function&, T const&>>, dimension_count> result;
+    for (std::size_t i = 0; i < dimension_count; ++i)
       result[i] = std::invoke(function, (*this)[i]);
     return result;
   }
@@ -519,10 +521,10 @@ public:
   constexpr Vector operator+(Vector const& other) const noexcept(noexcept(combine(other, std::plus<>{})))
     requires requires { combine(other, std::plus<>{}); }
   {
-    if constexpr (vector_detail::simd_compatible<T, N>) {
+    if constexpr (vector_detail::simd_compatible<T, dimension_count>) {
       if !consteval {
         Vector result;
-        vector_detail::store(result.data(), vector_detail::load(this->data()) + vector_detail::load(other.data()));
+        vector_detail::store(result.span(), vector_detail::load(this->span()) + vector_detail::load(other.span()));
         return result;
       }
     }
@@ -544,7 +546,7 @@ public:
       })
   {
     T result = 0;
-    for (std::size_t i = 0; i < N; ++i)
+    for (std::size_t i = 0; i < dimension_count; ++i)
       result += (*this)[i] * other[i];
     return result;
   }
@@ -555,7 +557,7 @@ public:
       requires (returnable && requires(T& result, T const& value, T& s) { result = value * s; })
   {
     Vector result;
-    for (std::size_t i = 0; i < N; ++i)
+    for (std::size_t i = 0; i < dimension_count; ++i)
       result[i] = (*this)[i] * scalar;
     return result;
   }
@@ -566,7 +568,7 @@ public:
       requires (returnable && requires(T& result, T const& value, T& s) { result = value / s; })
   {
     Vector result;
-    for (std::size_t i = 0; i < N; ++i)
+    for (std::size_t i = 0; i < dimension_count; ++i)
       result[i] = (*this)[i] / scalar;
     return result;
   }
@@ -598,13 +600,13 @@ public:
   // constexpr; integer-coordinate instantiations retain their legacy narrowing.
   static Vector with_angle(T angle, T magnitude = 1) noexcept(noexcept(Vector(std::cos(angle) * magnitude,
                                                                               std::sin(angle) * magnitude)))
-    requires(N == 2 && requires { Vector(std::cos(angle) * magnitude, std::sin(angle) * magnitude); })
+    requires(dimension_count == 2 && requires { Vector(std::cos(angle) * magnitude, std::sin(angle) * magnitude); })
   {
     return Vector(std::cos(angle) * magnitude, std::sin(angle) * magnitude);
   }
 
   T angle() const noexcept(noexcept(vector_detail::accept<T>(std::atan2((*this)[1], (*this)[0]))))
-    requires(N == 2 && requires(T const& value) { vector_detail::accept<T>(std::atan2(value, value)); })
+    requires(dimension_count == 2 && requires(T const& value) { vector_detail::accept<T>(std::atan2(value, value)); })
   {
     return std::atan2((*this)[1], (*this)[0]);
   }
@@ -612,7 +614,7 @@ public:
   static T
   angle_between_2(Vector const& first,
                   Vector const& second) noexcept(noexcept(vector_detail::accept<T>(second.angle() - first.angle())))
-    requires(N == 2 && requires { vector_detail::accept<T>(second.angle() - first.angle()); })
+    requires(dimension_count == 2 && requires { vector_detail::accept<T>(second.angle() - first.angle()); })
   {
     // This is deliberately the raw difference, not a principal atan2 angle.
     return second.angle() - first.angle();
@@ -620,7 +622,7 @@ public:
 
   static T angle_formed_by_2(Vector const& a, Vector const& b,
                              Vector const& c) noexcept(noexcept(angle_between_2(b - a, b - c)))
-    requires(N == 2 && requires { angle_between_2(b - a, b - c); })
+    requires(dimension_count == 2 && requires { angle_between_2(b - a, b - c); })
   {
     return angle_between_2(b - a, b - c);
   }
@@ -628,7 +630,7 @@ public:
   [[nodiscard]] static std::expected<T, StarException>
   angle_formed_by_2(Vector const& a, Vector const& b, Vector const& c,
                     std::function<std::expected<Vector, StarException>(Vector, Vector)> const& difference)
-    requires(N == 2 && std::is_copy_constructible_v<Storage> && requires { angle_between_2(a, b); })
+    requires(dimension_count == 2 && std::is_copy_constructible_v<Storage> && requires { angle_between_2(a, b); })
   {
     if (!difference)
       return std::unexpected(StarException("Vector::angle_formed_by_2 requires a difference function"));
@@ -647,7 +649,7 @@ public:
         { vector_detail::accept<T>(std::sin(angle)) } noexcept;
         { Vector(x * cosine - y * sine, x * sine + y * cosine) } noexcept;
       })
-      requires (N == 2 && requires(T& cosine, T& sine, T const& x, T const& y) {
+      requires (dimension_count == 2 && requires(T& cosine, T& sine, T const& x, T const& y) {
         vector_detail::accept<T>(std::cos(angle)); vector_detail::accept<T>(std::sin(angle));
         Vector(x * cosine - y * sine, x * sine + y * cosine);
       })
@@ -658,119 +660,119 @@ public:
   }
 
   constexpr Vector rot90() const noexcept(noexcept(Vector(-y(), x())))
-    requires(N == 2 && requires { Vector(-this->y(), this->x()); })
+    requires(dimension_count == 2 && requires { Vector(-this->y(), this->x()); })
   {
     return Vector(-y(), x());
   }
 
   Vector to_polar() const noexcept(noexcept(Vector(angle(), magnitude())))
-    requires(N == 2 && requires { Vector(angle(), magnitude()); })
+    requires(dimension_count == 2 && requires { Vector(angle(), magnitude()); })
   {
     return Vector(angle(), magnitude());
   }
 
   Vector to_cartesian() const
     noexcept(noexcept(Vector(std::cos((*this)[0]) * (*this)[1], std::sin((*this)[0]) * (*this)[1])))
-    requires(N == 2 && requires(T const& a, T const& r) { Vector(std::cos(a) * r, std::sin(a) * r); })
+    requires(dimension_count == 2 && requires(T const& a, T const& r) { Vector(std::cos(a) * r, std::sin(a) * r); })
   {
     return Vector(std::cos((*this)[0]) * (*this)[1], std::sin((*this)[0]) * (*this)[1]);
   }
 
   // Lvalues borrow read-only coordinates; temporaries return owning values.
   constexpr T const& x() const& noexcept
-    requires(N >= 2)
+    requires(dimension_count >= 2)
   {
     return (*this)[0];
   }
   constexpr T const& y() const& noexcept
-    requires(N >= 2)
+    requires(dimension_count >= 2)
   {
     return (*this)[1];
   }
   constexpr T const& z() const& noexcept
-    requires(N >= 3)
+    requires(dimension_count >= 3)
   {
     return (*this)[2];
   }
   constexpr T const& w() const& noexcept
-    requires(N >= 4)
+    requires(dimension_count >= 4)
   {
     return (*this)[3];
   }
 
   constexpr T x() && noexcept(std::is_nothrow_move_constructible_v<T>)
-    requires(N >= 2 && std::is_move_constructible_v<T>)
+    requires(dimension_count >= 2 && std::is_move_constructible_v<T>)
   {
     return T(std::move((*this)[0]));
   }
   constexpr T y() && noexcept(std::is_nothrow_move_constructible_v<T>)
-    requires(N >= 2 && std::is_move_constructible_v<T>)
+    requires(dimension_count >= 2 && std::is_move_constructible_v<T>)
   {
     return T(std::move((*this)[1]));
   }
   constexpr T z() && noexcept(std::is_nothrow_move_constructible_v<T>)
-    requires(N >= 3 && std::is_move_constructible_v<T>)
+    requires(dimension_count >= 3 && std::is_move_constructible_v<T>)
   {
     return T(std::move((*this)[2]));
   }
   constexpr T w() && noexcept(std::is_nothrow_move_constructible_v<T>)
-    requires(N >= 4 && std::is_move_constructible_v<T>)
+    requires(dimension_count >= 4 && std::is_move_constructible_v<T>)
   {
     return T(std::move((*this)[3]));
   }
 
   constexpr T x() const&& noexcept(std::is_nothrow_copy_constructible_v<T>)
-    requires(N >= 2 && std::is_copy_constructible_v<T>)
+    requires(dimension_count >= 2 && std::is_copy_constructible_v<T>)
   {
     return T((*this)[0]);
   }
   constexpr T y() const&& noexcept(std::is_nothrow_copy_constructible_v<T>)
-    requires(N >= 2 && std::is_copy_constructible_v<T>)
+    requires(dimension_count >= 2 && std::is_copy_constructible_v<T>)
   {
     return T((*this)[1]);
   }
   constexpr T z() const&& noexcept(std::is_nothrow_copy_constructible_v<T>)
-    requires(N >= 3 && std::is_copy_constructible_v<T>)
+    requires(dimension_count >= 3 && std::is_copy_constructible_v<T>)
   {
     return T((*this)[2]);
   }
   constexpr T w() const&& noexcept(std::is_nothrow_copy_constructible_v<T>)
-    requires(N >= 4 && std::is_copy_constructible_v<T>)
+    requires(dimension_count >= 4 && std::is_copy_constructible_v<T>)
   {
     return T((*this)[3]);
   }
 
   // A non-copyable temporary must not fall back to the borrowing const& overload.
   T x() const&&
-    requires(N >= 2 && !std::is_copy_constructible_v<T>)
+    requires(dimension_count >= 2 && !std::is_copy_constructible_v<T>)
   = delete;
   T y() const&&
-    requires(N >= 2 && !std::is_copy_constructible_v<T>)
+    requires(dimension_count >= 2 && !std::is_copy_constructible_v<T>)
   = delete;
   T z() const&&
-    requires(N >= 3 && !std::is_copy_constructible_v<T>)
+    requires(dimension_count >= 3 && !std::is_copy_constructible_v<T>)
   = delete;
   T w() const&&
-    requires(N >= 4 && !std::is_copy_constructible_v<T>)
+    requires(dimension_count >= 4 && !std::is_copy_constructible_v<T>)
   = delete;
 
   constexpr void set_x(T const& value) noexcept(noexcept((*this)[0] = value))
-    requires(N >= 2 && array_assignable<T, T>)
+    requires(dimension_count >= 2 && array_assignable<T, T>)
   {
     (*this)[0] = value;
   }
   constexpr void set_y(T const& value) noexcept(noexcept((*this)[1] = value))
-    requires(N >= 2 && array_assignable<T, T>)
+    requires(dimension_count >= 2 && array_assignable<T, T>)
   {
     (*this)[1] = value;
   }
   constexpr void set_z(T const& value) noexcept(noexcept((*this)[2] = value))
-    requires(N >= 3 && array_assignable<T, T>)
+    requires(dimension_count >= 3 && array_assignable<T, T>)
   {
     (*this)[2] = value;
   }
   constexpr void set_w(T const& value) noexcept(noexcept((*this)[3] = value))
-    requires(N >= 4 && array_assignable<T, T>)
+    requires(dimension_count >= 4 && array_assignable<T, T>)
   {
     (*this)[3] = value;
   }
@@ -780,7 +782,7 @@ public:
         { T(std::cos(theta)) } noexcept; { T(std::cos(psi)) } noexcept; { T(std::sin(psi)) } noexcept;
         { x *= cosine } noexcept; { y *= cosine } noexcept; { Vector(x, y, T(-std::sin(theta))) } noexcept;
       })
-      requires (N == 3 && requires(T& cosine, T& x, T& y) {
+      requires (dimension_count == 3 && requires(T& cosine, T& x, T& y) {
         T(std::cos(theta)); T(std::cos(psi)); T(std::sin(psi));
         x *= cosine; y *= cosine; Vector(x, y, T(-std::sin(theta)));
       })
@@ -795,7 +797,7 @@ public:
 
   static Vector from_angles_enu(T psi, T theta) noexcept(noexcept(from_angles(psi, theta))
                                                          && noexcept(std::declval<Vector const&>().ned_to_enu()))
-    requires(N == 3 && requires { from_angles(psi, theta).ned_to_enu(); })
+    requires(dimension_count == 3 && requires { from_angles(psi, theta).ned_to_enu(); })
   {
     Vector value = from_angles(psi, theta);
     return Vector(value.y(), value.x(), -value.z());
@@ -803,7 +805,7 @@ public:
 
   static constexpr T triple_scalar_product(Vector const& a, Vector const& b,
                                            Vector const& c) noexcept(noexcept(a * (b ^ c)))
-    requires(N == 3 && requires { a * (b ^ c); })
+    requires(dimension_count == 3 && requires { a * (b ^ c); })
   {
     return a * (b ^ c);
   }
@@ -811,7 +813,7 @@ public:
   static T angle(Vector const& first, Vector const& second) noexcept(
     noexcept(vector_detail::accept<T>(std::acos(std::min(first.normalized() * second.normalized(), T(1))))))
     requires(
-      N == 3 && vector_less<T>
+      dimension_count == 3 && vector_less<T>
       && requires { vector_detail::accept<T>(std::acos(std::min(first.normalized() * second.normalized(), T(1)))); })
   {
     return std::acos(std::min(first.normalized() * second.normalized(), T(1)));
@@ -822,7 +824,7 @@ public:
         { T(std::fabs(value)) } noexcept; { (T(std::fabs(value)) > 0.99999) ? true : false } noexcept;
         { vector_detail::accept<T>(0.0) } noexcept; { T(std::atan2(value, value)) } noexcept;
       })
-      requires (N == 3 && requires(T const& value) {
+      requires (dimension_count == 3 && requires(T const& value) {
         normalized(); T(std::fabs(value)); (T(std::fabs(value)) > 0.99999) ? true : false;
         vector_detail::accept<T>(0.0); T(std::atan2(value, value));
       })
@@ -841,7 +843,7 @@ public:
         { T(-std::numbers::pi / 2) } noexcept; { T(std::numbers::pi / 2) } noexcept;
         { vector_detail::accept<T>(std::asin(-value)) } noexcept;
       })
-      requires (N == 3 && requires(T const& value) {
+      requires (dimension_count == 3 && requires(T const& value) {
         normalized(); vector_detail::accept<T>(std::fabs(value));
         (value > 0.99999) ? true : false; (value > 0.0) ? true : false;
         T(-std::numbers::pi / 2); T(std::numbers::pi / 2); vector_detail::accept<T>(std::asin(-value));
@@ -863,7 +865,7 @@ public:
         { psi = std::atan2(value, value) } noexcept; { theta = std::asin(-value) } noexcept;
         { Vector<T, 2>(psi, theta) } noexcept;
       })
-      requires (N == 3 && std::is_default_constructible_v<T> && requires(T& psi, T& theta, T const& value) {
+      requires (dimension_count == 3 && std::is_default_constructible_v<T> && requires(T& psi, T& theta, T const& value) {
         normalized(); vector_detail::accept<T>(std::fabs(value));
         (value > 0.99999) ? true : false; (value > 0.0) ? true : false;
         psi = 0.0; theta = value > 0.0 ? -std::numbers::pi / 2 : std::numbers::pi / 2;
@@ -889,7 +891,7 @@ public:
         { (value > 0.99999) ? true : false } noexcept;
         { vector_detail::accept<T>(0.0) } noexcept; { vector_detail::accept<T>(std::atan2(value, value)) } noexcept;
       })
-      requires (N == 3 && requires(T const& value) {
+      requires (dimension_count == 3 && requires(T const& value) {
         normalized(); vector_detail::accept<T>(std::fabs(value)); (value > 0.99999) ? true : false;
         vector_detail::accept<T>(0.0); vector_detail::accept<T>(std::atan2(value, value));
       })
@@ -909,7 +911,7 @@ public:
         { vector_detail::accept<T>(-std::numbers::pi / 2) } noexcept;
         { vector_detail::accept<T>(std::asin(value)) } noexcept;
       })
-      requires (N == 3 && requires(T const& value) {
+      requires (dimension_count == 3 && requires(T const& value) {
         normalized(); vector_detail::accept<T>(std::fabs(value));
         (value > 0.99999) ? true : false; (value > 0.0) ? true : false;
         vector_detail::accept<T>(std::numbers::pi / 2); vector_detail::accept<T>(-std::numbers::pi / 2);
@@ -924,13 +926,13 @@ public:
   }
 
   constexpr Vector ned_to_enu() const noexcept(noexcept(Vector(y(), x(), -z())))
-    requires(N == 3 && requires { Vector(y(), x(), -z()); })
+    requires(dimension_count == 3 && requires { Vector(y(), x(), -z()); })
   {
     return Vector(y(), x(), -z());
   }
 
   constexpr Vector enu_to_ned() const noexcept(noexcept(ned_to_enu()))
-    requires(N == 3 && requires { ned_to_enu(); })
+    requires(dimension_count == 3 && requires { ned_to_enu(); })
   {
     return ned_to_enu();
   }
@@ -958,15 +960,15 @@ using Vec4D = Vector<double, 4>;
 using Vec4B = Vector<std::uint8_t, 4>;
 using Vec4S = Vector<std::size_t, 4>;
 
-template <typename T, std::size_t N>
-  requires (N == 0 || array_text_writable<T>)
-auto write_text(TextBuffer& output, Vector<T, N> const& vector) {
+template <typename T, std::size_t dimension_count>
+  requires (dimension_count == 0 || array_text_writable<T>)
+auto write_text(TextBuffer& output, Vector<T, dimension_count> const& vector) {
   output.push_back('(');
-  if constexpr (N == 0) {
+  if constexpr (dimension_count == 0) {
     output.push_back(')');
   } else {
     using Result = optional_diagnostic_result<T>;
-    for (std::size_t i = 0; i < N; ++i) {
+    for (std::size_t i = 0; i < dimension_count; ++i) {
       if constexpr (std::same_as<Result, void>) {
         append_text(output, optional_diagnostic_value(vector[i]));
       } else {
@@ -974,7 +976,7 @@ auto write_text(TextBuffer& output, Vector<T, N> const& vector) {
         if (!written)
           return Result(std::unexpected(std::move(written.error())));
       }
-      if (i != N - 1)
+      if (i != dimension_count - 1)
         output.append(", ");
     }
     output.push_back(')');
@@ -983,46 +985,46 @@ auto write_text(TextBuffer& output, Vector<T, N> const& vector) {
   }
 }
 
-template <typename T, std::size_t N>
-  requires requires(Vector<T, N>& vector, T& scalar) { vector * scalar; }
-constexpr Vector<T, N> operator*(T scalar, Vector<T, N> vector) noexcept(noexcept(vector * scalar)) {
+template <typename T, std::size_t dimension_count>
+  requires requires(Vector<T, dimension_count>& vector, T& scalar) { vector * scalar; }
+constexpr Vector<T, dimension_count> operator*(T scalar, Vector<T, dimension_count> vector) noexcept(noexcept(vector * scalar)) {
   return vector * scalar;
 }
 
-template <typename T, std::size_t N>
-  requires requires(Vector<T, N>& vector) { vector.normalized(); }
-Vector<T, N> vnorm(Vector<T, N> vector) noexcept(noexcept(vector.normalized())) {
+template <typename T, std::size_t dimension_count>
+  requires requires(Vector<T, dimension_count>& vector) { vector.normalized(); }
+Vector<T, dimension_count> vnorm(Vector<T, dimension_count> vector) noexcept(noexcept(vector.normalized())) {
   return vector.normalized();
 }
 
-template <typename T, std::size_t N>
-  requires requires(Vector<T, N> const& vector) { vector.magnitude(); }
-T vmag(Vector<T, N> const& vector) noexcept(noexcept(vector.magnitude())) {
+template <typename T, std::size_t dimension_count>
+  requires requires(Vector<T, dimension_count> const& vector) { vector.magnitude(); }
+T vmag(Vector<T, dimension_count> const& vector) noexcept(noexcept(vector.magnitude())) {
   return vector.magnitude();
 }
 
-template <typename T, std::size_t N>
-  requires requires(Vector<T, N> const& vector) { vector.magnitude_squared(); }
-constexpr T vmag_squared(Vector<T, N> const& vector) noexcept(noexcept(vector.magnitude_squared())) {
+template <typename T, std::size_t dimension_count>
+  requires requires(Vector<T, dimension_count> const& vector) { vector.magnitude_squared(); }
+constexpr T vmag_squared(Vector<T, dimension_count> const& vector) noexcept(noexcept(vector.magnitude_squared())) {
   return vector.magnitude_squared();
 }
 
-template <typename T, std::size_t N>
-  requires requires(Vector<T, N> const& a, Vector<T, N> const& b) { a.piecewise_min(b); }
-constexpr Vector<T, N> vmin(Vector<T, N> const& a, Vector<T, N> const& b) noexcept(noexcept(a.piecewise_min(b))) {
+template <typename T, std::size_t dimension_count>
+  requires requires(Vector<T, dimension_count> const& a, Vector<T, dimension_count> const& b) { a.piecewise_min(b); }
+constexpr Vector<T, dimension_count> vmin(Vector<T, dimension_count> const& a, Vector<T, dimension_count> const& b) noexcept(noexcept(a.piecewise_min(b))) {
   return a.piecewise_min(b);
 }
 
-template <typename T, std::size_t N>
-  requires requires(Vector<T, N> const& a, Vector<T, N> const& b) { a.piecewise_max(b); }
-constexpr Vector<T, N> vmax(Vector<T, N> const& a, Vector<T, N> const& b) noexcept(noexcept(a.piecewise_max(b))) {
+template <typename T, std::size_t dimension_count>
+  requires requires(Vector<T, dimension_count> const& a, Vector<T, dimension_count> const& b) { a.piecewise_max(b); }
+constexpr Vector<T, dimension_count> vmax(Vector<T, dimension_count> const& a, Vector<T, dimension_count> const& b) noexcept(noexcept(a.piecewise_max(b))) {
   return a.piecewise_max(b);
 }
 
-template <typename T, std::size_t N>
-  requires requires(Vector<T, N> const& a, Vector<T, N> const& b, Vector<T, N> const& c) { a.piecewise_clamp(b, c); }
-constexpr Vector<T, N> vclamp(Vector<T, N> const& a, Vector<T, N> const& lower,
-                              Vector<T, N> const& upper) noexcept(noexcept(a.piecewise_clamp(lower, upper))) {
+template <typename T, std::size_t dimension_count>
+  requires requires(Vector<T, dimension_count> const& a, Vector<T, dimension_count> const& b, Vector<T, dimension_count> const& c) { a.piecewise_clamp(b, c); }
+constexpr Vector<T, dimension_count> vclamp(Vector<T, dimension_count> const& a, Vector<T, dimension_count> const& lower,
+                              Vector<T, dimension_count> const& upper) noexcept(noexcept(a.piecewise_clamp(lower, upper))) {
   return a.piecewise_clamp(lower, upper);
 }
 
@@ -1061,14 +1063,14 @@ constexpr T operator^(Vector<T, 2> const& a,
   return a[0] * b[1] - a[1] * b[0];
 }
 
-template <typename T, std::size_t N> struct hash<Vector<T, N>> : hash<Array<T, N>> {};
+template <typename T, std::size_t dimension_count> struct ValueHash<Vector<T, dimension_count>> : ValueHash<Array<T, dimension_count>> {};
 }
 
 export module star.vector;
 
 export namespace Star {
-  template <typename T, std::size_t N>
-  struct hash<Vector<T, N>>;
+  template <typename T, std::size_t dimension_count>
+  struct ValueHash<Vector<T, dimension_count>>;
 }
 
 export namespace Star {
@@ -1105,5 +1107,5 @@ using ::Star::vnorm;
 using ::Star::write_text;
 using ::Star::operator*;
 using ::Star::operator^;
-using ::Star::hash;
+using ::Star::ValueHash;
 }

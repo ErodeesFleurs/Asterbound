@@ -129,13 +129,13 @@ TEST(WeightedPoolTest, EmptyAndZeroCountOperationsPreserveRandomStreamContracts)
   RandomSource source(71), expected(71);
   EXPECT_EQ(empty.select(source), 0);
   EXPECT_EQ(source.next_u64(), expected.next_u64());
-  EXPECT_EQ(empty.select_index(source), NPos);
+  EXPECT_EQ(empty.select_index(source), npos);
   (void)expected.uniform_double();
   EXPECT_EQ(source.next_u64(), expected.next_u64());
   RandomService service(81), service_expected(81);
   EXPECT_EQ(empty.select(service), 0);
   EXPECT_EQ(service.next_u64(), service_expected.next_u64());
-  EXPECT_EQ(empty.select_index(service), NPos);
+  EXPECT_EQ(empty.select_index(service), npos);
   (void)service_expected.uniform_double();
   EXPECT_EQ(service.next_u64(), service_expected.next_u64());
   EXPECT_TRUE(empty.select_unique(0, service).empty());

@@ -42,7 +42,7 @@ struct InstanceWorldId {
 };
 
 template <>
-struct hash<InstanceWorldId> {
+struct ValueHash<InstanceWorldId> {
   std::size_t operator()(InstanceWorldId const& id) const;
 };
 
@@ -64,7 +64,7 @@ struct ClientCustomWorldId {
 };
 
 template <>
-struct hash<ClientCustomWorldId> {
+struct ValueHash<ClientCustomWorldId> {
   std::size_t operator()(ClientCustomWorldId const& id) const;
 };
 
@@ -197,9 +197,9 @@ export namespace Star {
   template <>
   struct HasStreamReadFactory<WarpToPlayer>;
   template <>
-  struct hash<InstanceWorldId>;
+  struct ValueHash<InstanceWorldId>;
   template <>
-  struct hash<ClientCustomWorldId>;
+  struct ValueHash<ClientCustomWorldId>;
 }
 
 export extern "C++" {

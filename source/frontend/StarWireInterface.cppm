@@ -49,7 +49,7 @@ class Player;
 
 class WirePane : public Pane, public WireConnector {
 public:
-  void const* query_type(TypeKey key) const noexcept override { return query_type_of<WirePane, Pane>(this, key); }
+  void query_type(TypeQuery& query) const noexcept override { query_type_of<WirePane, Pane>(*this, query); }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<WirePane>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<WirePane>, StarException> create(GuiContext& guiContext, std::shared_ptr<WorldClient> worldClient, std::shared_ptr<Player> player, std::shared_ptr<WorldPainter> worldPainter);

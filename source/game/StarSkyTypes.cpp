@@ -32,17 +32,17 @@ extern std::expected<EnumMap<WarpPhase>, StarException> const WarpPhaseNames = E
     {WarpPhase::SpeedingUp, "speedingup"}});
 
 SkyColoring::SkyColoring() {
-  mainColor = Color::Clear;
+  mainColor = Color::palette_clear;
 
-  morningColors = {Color::Clear, Color::Clear};
-  dayColors = {Color::Clear, Color::Clear};
-  eveningColors = {Color::Clear, Color::Clear};
-  nightColors = {Color::Clear, Color::Clear};
+  morningColors = {Color::palette_clear, Color::palette_clear};
+  dayColors = {Color::palette_clear, Color::palette_clear};
+  eveningColors = {Color::palette_clear, Color::palette_clear};
+  nightColors = {Color::palette_clear, Color::palette_clear};
 
-  morningLightColor = Color::Clear;
-  dayLightColor = Color::Clear;
-  eveningLightColor = Color::Clear;
-  nightLightColor = Color::Clear;
+  morningLightColor = Color::palette_clear;
+  dayLightColor = Color::palette_clear;
+  eveningLightColor = Color::palette_clear;
+  nightLightColor = Color::palette_clear;
 }
 
 std::expected<SkyColoring, StarException> SkyColoring::create(Json const& variant) {

@@ -272,7 +272,7 @@ std::expected<void, StarException> MerchantPane::initialize(std::shared_ptr<Worl
 
   GuiReader reader(context());
   reader.registerCallback("spinCount.up", [this](Widget&)  -> std::expected<void, StarException> {
-      if (m_selectedIndex != NPos) {
+      if (m_selectedIndex != npos) {
         {
           auto maxBuyCountResult583 = maxBuyCount();
           if (!maxBuyCountResult583)
@@ -293,7 +293,7 @@ std::expected<void, StarException> MerchantPane::initialize(std::shared_ptr<Worl
 });
 
   reader.registerCallback("spinCount.down", [this](Widget&)  -> std::expected<void, StarException> {
-      if (m_selectedIndex != NPos) {
+      if (m_selectedIndex != npos) {
         if (m_buyCount > 1)
           m_buyCount--;
         else
@@ -764,12 +764,12 @@ std::expected<void, StarException> MerchantPane::setupWidget(std::shared_ptr<Wid
     return std::unexpected(std::move(fetchChildResult660.error()));
   auto unavailableoverlay = std::move(*fetchChildResult660);
   if (unavailable) {
-    itemName->setColor(Color::Gray);
+    itemName->setColor(Color::palette_gray);
     auto showResult661 = unavailableoverlay->show();
     if (!showResult661)
       return std::unexpected(std::move(showResult661.error()));
   } else {
-    itemName->setColor(Color::White);
+    itemName->setColor(Color::palette_white);
     auto hideResult662 = unavailableoverlay->hide();
     if (!hideResult662)
       return std::unexpected(std::move(hideResult662.error()));
@@ -790,7 +790,7 @@ std::expected<void, StarException> MerchantPane::updateSelection() {
   if (m_selectedIndex != m_itemGuiList->selectedItem()) {
     m_selectedIndex = m_itemGuiList->selectedItem();
 
-    if (m_selectedIndex != NPos) {
+    if (m_selectedIndex != npos) {
       auto itemConfig = m_itemList.get(m_selectedIndex);
       auto itemDatabaseResult665 = context().root().itemDatabase();
       if (!itemDatabaseResult665)
@@ -813,7 +813,7 @@ std::expected<void, StarException> MerchantPane::updateSelection() {
       if (!findChildResult670)
         return std::unexpected(std::move(findChildResult670.error()));
       std::move(*findChildResult670)->enable();
-      m_countTextBox->setColor(Color::White);
+      m_countTextBox->setColor(Color::palette_white);
       m_buyCount = 1;
     } else {
       auto findChildResult671 = findChild<ButtonWidget>("spinCount.up");
@@ -824,7 +824,7 @@ std::expected<void, StarException> MerchantPane::updateSelection() {
       if (!findChildResult672)
         return std::unexpected(std::move(findChildResult672.error()));
       std::move(*findChildResult672)->disable();
-      m_countTextBox->setColor(Color::Gray);
+      m_countTextBox->setColor(Color::palette_gray);
       m_buyCount = 0;
     }
 
@@ -850,16 +850,16 @@ std::expected<void, StarException> MerchantPane::updateBuyTotal() {
   if (!setTextResult675)
     return std::unexpected(std::move(setTextResult675.error()));
 
-  if (m_selectedIndex != NPos && m_buyCount > 0)
+  if (m_selectedIndex != npos && m_buyCount > 0)
     m_buyButton->enable();
   else
     m_buyButton->disable();
 
   if (m_buyTotal > static_cast<int>(m_player->inventory()->currency("money"))) {
-    m_buyTotalLabel->setColor(Color::Red);
+    m_buyTotalLabel->setColor(Color::palette_red);
     m_buyButton->disable();
   } else {
-    m_buyTotalLabel->setColor(Color::White);
+    m_buyTotalLabel->setColor(Color::palette_white);
   }
   return {};
 }
@@ -999,7 +999,7 @@ return {};
 }
 
 std::expected<void, StarException> MerchantPane::countTextChanged() {
-  if (m_selectedIndex == NPos) {
+  if (m_selectedIndex == npos) {
     m_buyCount = 0;
     auto countChangedResult699 = countChanged();
     if (!countChangedResult699)

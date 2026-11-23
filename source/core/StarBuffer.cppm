@@ -12,7 +12,7 @@ class Buffer : public IODevice {
 public:
   // Constructs buffer open ReadWrite
   Buffer();
-  Buffer(std::size_t initialSize);
+  Buffer(std::size_t initial_size);
   Buffer(ByteArray b);
   Buffer(Buffer const& buffer);
   Buffer(Buffer&& buffer);
@@ -25,9 +25,9 @@ public:
   [[nodiscard]] std::expected<std::size_t, StarException> read(std::span<char> data) override;
   [[nodiscard]] std::expected<std::size_t, StarException> write(std::span<char const> data) override;
 
-  [[nodiscard]] std::expected<std::size_t, StarException> read_absolute(StreamOffset readPosition,
+  [[nodiscard]] std::expected<std::size_t, StarException> read_absolute(StreamOffset read_position,
                                                                         std::span<char> data) override;
-  [[nodiscard]] std::expected<std::size_t, StarException> write_absolute(StreamOffset writePosition,
+  [[nodiscard]] std::expected<std::size_t, StarException> write_absolute(StreamOffset write_position,
                                                                          std::span<char const> data) override;
 
   [[nodiscard]] std::expected<void, StarException> open(IOMode mode) override;
@@ -45,9 +45,6 @@ public:
   // with its position reset to zero.
   ByteArray take_data();
 
-  // Returns a pointer to the beginning of the Buffer.
-  char* ptr();
-  char const* ptr() const;
   std::span<char> span() { return m_bytes.span(); }
   std::span<char const> span() const { return m_bytes.span(); }
 
@@ -60,15 +57,15 @@ public:
   bool empty() const;
 
   // Reset buffer with new contents, moves position to 0.
-  void reset(std::size_t newSize);
+  void reset(std::size_t new_size);
   void reset(ByteArray b);
 
   Buffer& operator=(Buffer const& buffer);
   Buffer& operator=(Buffer&& buffer);
 
 private:
-  [[nodiscard]] std::expected<std::size_t, StarException> doRead(std::size_t pos, std::span<char> data);
-  [[nodiscard]] std::expected<std::size_t, StarException> doWrite(std::size_t pos, std::span<char const> data);
+  [[nodiscard]] std::expected<std::size_t, StarException> do_read(std::size_t pos, std::span<char> data);
+  [[nodiscard]] std::expected<std::size_t, StarException> do_write(std::size_t pos, std::span<char const> data);
 
   std::size_t m_pos;
   ByteArray m_bytes;
@@ -81,7 +78,7 @@ public:
   ExternalBuffer();
   // Constructs a ReadOnly ExternalBuffer pointing to the given external data, which
   // must be valid for the lifetime of the ExternalBuffer.
-  ExternalBuffer(std::span<char const> externalData);
+  ExternalBuffer(std::span<char const> external_data);
 
   ExternalBuffer(ExternalBuffer const& buffer) = default;
   ExternalBuffer& operator=(ExternalBuffer const& buffer) = default;
@@ -93,9 +90,9 @@ public:
   [[nodiscard]] std::expected<std::size_t, StarException> read(std::span<char> data) override;
   [[nodiscard]] std::expected<std::size_t, StarException> write(std::span<char const> data) override;
 
-  [[nodiscard]] std::expected<std::size_t, StarException> read_absolute(StreamOffset readPosition,
+  [[nodiscard]] std::expected<std::size_t, StarException> read_absolute(StreamOffset read_position,
                                                                         std::span<char> data) override;
-  [[nodiscard]] std::expected<std::size_t, StarException> write_absolute(StreamOffset writePosition,
+  [[nodiscard]] std::expected<std::size_t, StarException> write_absolute(StreamOffset write_position,
                                                                          std::span<char const> data) override;
 
   [[nodiscard]] std::expected<String, StarException> device_name() const override;
@@ -104,8 +101,6 @@ public:
 
   [[nodiscard]] std::expected<std::shared_ptr<IODevice>, StarException> clone() override;
 
-  // Returns a pointer to the beginning of the Buffer.
-  char const* ptr() const;
   std::span<char const> span() const { return m_bytes; }
 
   // Same thing as size(), just size_t type (since this is in-memory)
@@ -117,10 +112,10 @@ public:
   operator bool() const;
 
   // Reset buffer with new contents, moves position to 0.
-  void reset(std::span<char const> externalData);
+  void reset(std::span<char const> external_data);
 
 private:
-  [[nodiscard]] std::expected<std::size_t, StarException> doRead(std::size_t pos, std::span<char> data);
+  [[nodiscard]] std::expected<std::size_t, StarException> do_read(std::size_t pos, std::span<char> data);
 
   std::size_t m_pos;
   std::span<char const> m_bytes;

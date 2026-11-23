@@ -37,12 +37,12 @@ namespace Star {
 template <> struct LuaConverter<BorrowedCrossStateProbe> {
   static std::expected<void, StarException> from(LuaStack source, BorrowedCrossStateProbe probe) {
     auto top = source.top();
-    if (!lua_checkstack(source.state(), 64))
+    if (!lua_checkstack(&source.state(), 64))
       return std::unexpected(LuaException("Cannot reserve probe stack"));
     for (int i = 0; i < 64; ++i)
-      lua_pushnil(source.state());
+      lua_pushnil(&source.state());
     auto result = probe.target.invoke_path<int>("consume", source.value(1));
-    lua_settop(source.state(), top);
+    lua_settop(&source.state(), top);
     if (!result)
       return std::unexpected(std::move(result.error()));
     return source.push(*result);
@@ -118,7 +118,7 @@ TEST(LuaTest, ColorCodecRetainsByteArraysCoercionAndOptionalAlpha) {
   auto extra = context->eval<Color>("return {1, 2, 3, 64, 99}");
   ASSERT_TRUE(extra);
   EXPECT_EQ(extra->to_rgba(), Vec4B(1, 2, 3, 64));
-  EXPECT_EQ(context->eval<Color>("return 'RED\\0ignored'"), Color::Red);
+  EXPECT_EQ(context->eval<Color>("return 'RED\\0ignored'"), Color::palette_red);
 }
 
 TEST(LuaTest, ColorCodecDistinguishesMalformedColorAndUnicodeFailures) {
@@ -223,7 +223,7 @@ TEST(LuaTest, MatrixCodecRetainsRowsAndRejectsIncompleteTables) {
 
 TEST(LuaTest, CheckedTextPreservesDiagnosticSpellings) {
   for (auto const& [value, expected] : List<std::pair<LuaValue, std::string_view>>{
-           {LuaValue(LuaNil), "nil"}, {LuaValue(LuaBoolean(true)), "true"},
+           {LuaValue(lua_nil), "nil"}, {LuaValue(LuaBoolean(true)), "true"},
            {LuaValue(LuaBoolean(false)), "false"}, {LuaValue(LuaInt(-42)), "-42"},
            {LuaValue(LuaFloat(1.23456789)), "1.23457"},
            {LuaValue(LuaFloat(-0.0)), "-0"}}) {
@@ -408,7 +408,7 @@ TEST(LuaTest, FunctionCallTest) {
     ASSERT_TRUE(callbackResult1);
     ASSERT_TRUE((luaContext.set("callback", *callbackResult1)));
 
-    auto callbackResult2 = luaEngine->create_function([]() { return "heyooo"; });
+    auto callbackResult2 = luaEngine->create_function([]() -> std::string_view { return "heyooo"; });
     ASSERT_TRUE(callbackResult2);
     ASSERT_TRUE((luaContext.set("emptyCallback", *callbackResult2)));
 
@@ -960,7 +960,7 @@ TEST(LuaTest, TypedPathReadsBorrowUntilAnOwnedResultIsRequested) {
   }
   auto owned = context->get_path<LuaFunction>("result.f");
   ASSERT_TRUE(owned);
-  ASSERT_TRUE(context->set_path("result", LuaNil));
+  ASSERT_TRUE(context->set_path("result", lua_nil));
   ASSERT_TRUE((*engine)->collect_garbage());
   EXPECT_EQ(owned->invoke<int>(), 37);
 }
@@ -2291,7 +2291,7 @@ TEST(LuaTest, GarbageCollection) {
     ASSERT_TRUE(context.set_path("ref", *userdata));
   }
   EXPECT_EQ(ptr.use_count(), 2);
-  ASSERT_TRUE((context.set_path("ref", LuaNil)));
+  ASSERT_TRUE((context.set_path("ref", lua_nil)));
   EXPECT_EQ(ptr.use_count(), 2);
   ASSERT_TRUE(engine->collect_garbage());
   EXPECT_EQ(ptr.use_count(), 1);

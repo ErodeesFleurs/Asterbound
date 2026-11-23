@@ -47,69 +47,59 @@ template <byte_order_value T> constexpr T to_little_endian(T value) noexcept {
 namespace Detail {
 template <std::unsigned_integral T>
   requires std::has_unique_object_representations_v<T>
-inline void reverse_bytes_copy_fixed(void* dest, void const* src) noexcept {
+inline void reverse_bytes_copy_fixed(std::span<std::byte, sizeof(T)> dest, std::span<std::byte const, sizeof(T)> src) noexcept {
   T value;
-  std::memcpy(&value, src, sizeof(value));
-  value = std::byteswap(value);
-  auto bytes = std::bit_cast<std::array<unsigned char, sizeof(T)>>(value);
-  std::ranges::copy(bytes, static_cast<unsigned char*>(dest));
+  std::memcpy(&value, src.data(), sizeof(value));
+  auto bytes = std::bit_cast<std::array<std::byte, sizeof(T)>>(std::byteswap(value));
+  std::ranges::copy(bytes, dest.begin());
 }
 }// namespace Detail
 
-inline void reverse_bytes(void* ptr, std::size_t len) noexcept {
-  switch (len) {
-  case 0:
-  case 1: return;
-  case 2: return Detail::reverse_bytes_copy_fixed<std::uint16_t>(ptr, ptr);
-  case 4: return Detail::reverse_bytes_copy_fixed<std::uint32_t>(ptr, ptr);
-  case 8: return Detail::reverse_bytes_copy_fixed<std::uint64_t>(ptr, ptr);
-  default: std::ranges::reverse(std::span{static_cast<unsigned char*>(ptr), len});
-  }
-}
-
-// Source and destination must be disjoint or identical. Both may be unaligned.
-inline void reverse_bytes_copy(void* dest, void const* src, std::size_t len) noexcept {
-  switch (len) {
+// Copy src.size() bytes. The destination must be large enough; the copied
+// ranges may be unaligned and must be either disjoint or identical.
+inline void reverse_bytes_copy(std::span<std::byte> dest, std::span<std::byte const> src) noexcept {
+  dest = dest.first(src.size());
+  switch (src.size()) {
   case 0: return;
-  case 2: return Detail::reverse_bytes_copy_fixed<std::uint16_t>(dest, src);
-  case 4: return Detail::reverse_bytes_copy_fixed<std::uint32_t>(dest, src);
-  case 8: return Detail::reverse_bytes_copy_fixed<std::uint64_t>(dest, src);
+  case 2: return Detail::reverse_bytes_copy_fixed<std::uint16_t>(dest.first<2>(), src.first<2>());
+  case 4: return Detail::reverse_bytes_copy_fixed<std::uint32_t>(dest.first<4>(), src.first<4>());
+  case 8: return Detail::reverse_bytes_copy_fixed<std::uint64_t>(dest.first<8>(), src.first<8>());
   default:
-    if (dest == src) {
-      std::ranges::reverse(std::span{static_cast<unsigned char*>(dest), len});
+    if (dest.data() == src.data()) {
+      std::ranges::reverse(dest);
       return;
     }
-    auto const* source = static_cast<unsigned char const*>(src);
-    auto* destination = static_cast<unsigned char*>(dest);
-    while (len >= sizeof(std::uint64_t)) {
-      len -= sizeof(std::uint64_t);
-      Detail::reverse_bytes_copy_fixed<std::uint64_t>(destination, source + len);
-      destination += sizeof(std::uint64_t);
+    constexpr auto width = sizeof(std::uint64_t);
+    while (src.size() >= width) {
+      Detail::reverse_bytes_copy_fixed<std::uint64_t>(dest.first<width>(), src.last<width>());
+      dest = dest.subspan(width);
+      src = src.first(src.size() - width);
     }
-    for (std::size_t i = 0; i < len; ++i)
-      destination[len - 1 - i] = source[i];
+    std::ranges::reverse_copy(src, dest.begin());
   }
 }
 
-inline void to_byte_order(ByteOrder order, void* ptr, std::size_t len) noexcept {
+inline void reverse_bytes(std::span<std::byte> bytes) noexcept {
+  reverse_bytes_copy(bytes, bytes);
+}
+
+inline void to_byte_order(ByteOrder order, std::span<std::byte> bytes) noexcept {
   if (order != ByteOrder::NoConversion && native_byte_order() != order)
-    reverse_bytes(ptr, len);
+    reverse_bytes(bytes);
 }
 
 // As with reverse_bytes_copy, only disjoint or identical ranges are supported.
-inline void to_byte_order(ByteOrder order, void* dest, void const* src, std::size_t len) noexcept {
-  if (len == 0)
-    return;
+inline void to_byte_order(ByteOrder order, std::span<std::byte> dest, std::span<std::byte const> src) noexcept {
   if (order != ByteOrder::NoConversion && native_byte_order() != order)
-    reverse_bytes_copy(dest, src, len);
-  else if (dest != src)
-    std::memcpy(dest, src, len);
+    reverse_bytes_copy(dest, src);
+  else if (!src.empty() && dest.data() != src.data())
+    std::ranges::copy(src, dest.first(src.size()).begin());
 }
 
-inline void from_byte_order(ByteOrder order, void* ptr, std::size_t len) noexcept { to_byte_order(order, ptr, len); }
+inline void from_byte_order(ByteOrder order, std::span<std::byte> bytes) noexcept { to_byte_order(order, bytes); }
 
-inline void from_byte_order(ByteOrder order, void* dest, void const* src, std::size_t len) noexcept {
-  to_byte_order(order, dest, src, len);
+inline void from_byte_order(ByteOrder order, std::span<std::byte> dest, std::span<std::byte const> src) noexcept {
+  to_byte_order(order, dest, src);
 }
 
 }// namespace Star

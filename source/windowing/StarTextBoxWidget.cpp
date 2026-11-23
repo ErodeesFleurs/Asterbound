@@ -223,7 +223,7 @@ std::expected<void, StarException> TextBoxWidget::renderImpl() {
       return std::unexpected(std::move(horizontal.error()));
   }
   if (m_drawBorder)
-    return context().drawInterfacePolyLines(PolyF(screenBoundRect()), Color::White.to_rgba());
+    return context().drawInterfacePolyLines(PolyF(screenBoundRect()), Color::palette_white.to_rgba());
   return {};
 }
 

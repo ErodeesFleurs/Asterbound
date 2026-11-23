@@ -24,8 +24,8 @@ static_assert(!borrows_temporary_json<Json const>);
 
 void expect_equivalent_key_lookup(Json const& stored, Json const& equivalent) {
   ASSERT_EQ(stored, equivalent);
-  EXPECT_EQ(Star::hash<Json>()(stored), Star::hash<Json>()(equivalent));
-  std::unordered_map<Json, int, Star::hash<Json>> values;
+  EXPECT_EQ(Star::ValueHash<Json>()(stored), Star::ValueHash<Json>()(equivalent));
+  std::unordered_map<Json, int, Star::ValueHash<Json>> values;
   values.emplace(stored, 42);
   auto found = values.find(equivalent);
   ASSERT_NE(found, values.end());
@@ -88,7 +88,7 @@ TEST(JsonContractTest, NumericHashKeepsLargeIntegersDistinctFromRoundedFloats) {
   EXPECT_NE(adjacent, rounded);
   EXPECT_NE(Json(std::numeric_limits<std::int64_t>::max()), Json(0x1p63));
 
-  std::unordered_map<Json, int, Star::hash<Json>> values;
+  std::unordered_map<Json, int, Star::ValueHash<Json>> values;
   values.emplace(exact, 1);
   values.emplace(adjacent, 2);
   values.emplace(Json(std::numeric_limits<std::int64_t>::max()), 3);
@@ -114,14 +114,14 @@ TEST(JsonContractTest, UnchangedNumericHashDomainsKeepNativeBytes) {
     char tag = 3;
     historical.push(std::span<char const>(&tag, 1));
     historical.push(std::span<char const>(reinterpret_cast<char const*>(&integer), sizeof(integer)));
-    EXPECT_EQ(Star::hash<Json>()(Json(integer)), historical.digest());
+    EXPECT_EQ(Star::ValueHash<Json>()(Json(integer)), historical.digest());
   }
   for (double floating : {0.5, -1.25, 0x1p63, std::numeric_limits<double>::denorm_min()}) {
     XXHash3 historical;
     char tag = 1;
     historical.push(std::span<char const>(&tag, 1));
     historical.push(std::span<char const>(reinterpret_cast<char const*>(&floating), sizeof(floating)));
-    EXPECT_EQ(Star::hash<Json>()(Json(floating)), historical.digest());
+    EXPECT_EQ(Star::ValueHash<Json>()(Json(floating)), historical.digest());
   }
 }
 
@@ -155,8 +155,8 @@ TEST(JsonContractTest, ObjectHashFastPathsPreserveHistoricalStreamAndEquivalentK
     expect_equivalent_key_lookup(entry.stored, entry.equivalent);
     XXHash3 historical;
     historical.push(std::span<char const>(entry.historical_bytes));
-    EXPECT_EQ(Star::hash<Json>()(entry.stored), historical.digest());
-    EXPECT_EQ(Star::hash<Json>()(entry.equivalent), historical.digest());
+    EXPECT_EQ(Star::ValueHash<Json>()(entry.stored), historical.digest());
+    EXPECT_EQ(Star::ValueHash<Json>()(entry.equivalent), historical.digest());
 
   }
 }

@@ -41,7 +41,7 @@ public:
 
   // Project UI capability lookup; successful queries return the adjusted
   // subobject address, independently of the Widget entry point.
-  virtual void const* query_type(TypeKey key) const noexcept { return query_type_of<Widget>(this, key); }
+  virtual void query_type(TypeQuery& query) const noexcept { query_type_of<Widget>(*this, query); }
   virtual std::string_view dynamic_type_name() const noexcept { return Star::type_name<Widget>(); }
 
   Widget(Widget const& copy) = delete;

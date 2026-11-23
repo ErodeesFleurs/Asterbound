@@ -88,7 +88,7 @@ std::expected<void, StarException> write_text(TextBuffer& output, ItemRecipe con
   return {};
 }
 
-std::size_t hash<ItemRecipe>::operator()(ItemRecipe const& v) const {
+std::size_t ValueHash<ItemRecipe>::operator()(ItemRecipe const& v) const {
   return hash_of(v.currencyInputs.keys(), v.currencyInputs.values(), v.inputs, v.output);
 }
 

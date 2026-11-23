@@ -56,7 +56,7 @@ std::expected<void, StarException> Blackboard::set(NodeParameterType type, Strin
 std::expected<LuaValue, StarException> Blackboard::get(NodeParameterType type, String const& key) const {
   auto board = m_board.get(type);
   if (!board) return std::unexpected(std::move(board.error()));
-  return board->get().maybe(key).value_or(LuaNil);
+  return board->get().maybe(key).value_or(lua_nil);
 }
 
 std::expected<LuaTable, StarException> Blackboard::parameters(StringMap<NodeParameter> const& parameters, std::uint64_t nodeId) {
@@ -129,7 +129,7 @@ Set<std::pair<NodeParameterType, String>> Blackboard::takeEphemerals() { return 
 std::expected<void, StarException> Blackboard::clearEphemerals(Set<std::pair<NodeParameterType, String>> ephemerals) {
   for (auto const& p : ephemerals) {
     if (!m_ephemeral.contains(p)) {
-      auto result = set(p.first, p.second, LuaNil);
+      auto result = set(p.first, p.second, lua_nil);
       if (!result) return std::unexpected(std::move(result.error()));
     }
   }
@@ -214,7 +214,7 @@ std::expected<NodeStatus, StarException> BehaviorState::runAction(ActionNode con
   auto id = reinterpret_cast<std::uint64_t>(&node);
   auto blackboard = board();
   if (!blackboard) return std::unexpected(std::move(blackboard.error()));
-  ActionReturn result(NodeStatus::Invalid, LuaNil);
+  ActionReturn result(NodeStatus::Invalid, lua_nil);
   if (!state) {
     auto parameters = (*blackboard)->parameters(node.parameters, id);
     if (!parameters) return std::unexpected(std::move(parameters.error()));
@@ -225,7 +225,7 @@ std::expected<NodeStatus, StarException> BehaviorState::runAction(ActionNode con
       if (!resumed.error().is<LuaException>()) return std::unexpected(std::move(resumed.error()));
       return std::unexpected(StarException(Star::format("Lua Exception caught running action node {} in behavior {}", node.name, m_tree->name), ExceptionDiagnostic(resumed.error())));
     }
-    result = resumed->value_or(ActionReturn(NodeStatus::Invalid, LuaNil));
+    result = resumed->value_or(ActionReturn(NodeStatus::Invalid, lua_nil));
     auto status = std::get<0>(result);
     if (status != NodeStatus::Success && status != NodeStatus::Failure) state.emplace(ActionState{*thread});
   } else {
@@ -235,7 +235,7 @@ std::expected<NodeStatus, StarException> BehaviorState::runAction(ActionNode con
       if (!resumed.error().is<LuaException>()) return std::unexpected(std::move(resumed.error()));
       return std::unexpected(StarException(Star::format("Lua Exception caught resuming action node {} in behavior {}", node.name, m_tree->name), ExceptionDiagnostic(resumed.error())));
     }
-    result = resumed->value_or(ActionReturn(NodeStatus::Invalid, LuaNil));
+    result = resumed->value_or(ActionReturn(NodeStatus::Invalid, lua_nil));
     auto status = std::get<0>(result);
     if (status == NodeStatus::Success || status == NodeStatus::Failure)
       m_threads.push_back(thread);

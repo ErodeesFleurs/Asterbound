@@ -48,17 +48,17 @@ struct LuaConverter<std::pair<T1, T2>> {
   }
 };
 
-template <typename T, std::size_t N>
-struct LuaConverter<Vector<T, N>> {
-  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, Vector<T, N> const& v) {
+template <typename T, std::size_t dimension_count>
+struct LuaConverter<Vector<T, dimension_count>> {
+  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, Vector<T, dimension_count> const& v) {
     return stack.push_array(v);
   }
 
-  [[nodiscard]] static std::expected<std::optional<Vector<T, N>>, StarException> to(LuaStackValue v) {
+  [[nodiscard]] static std::expected<std::optional<Vector<T, dimension_count>>, StarException> to(LuaStackValue v) {
     if (!v.is<LuaTable>())
       return std::nullopt;
-    Vector<T, N> vec;
-    for (std::size_t i = 0; i < N; ++i) {
+    Vector<T, dimension_count> vec;
+    for (std::size_t i = 0; i < dimension_count; ++i) {
       auto converted = v.template maybe_get<T>(i + 1);
       if (!converted)
         return std::unexpected(std::move(converted.error()));
@@ -75,11 +75,10 @@ template <typename T>
 struct LuaConverter<Matrix3<T>> {
   [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, Matrix3<T> const& m)
     requires(std::is_convertible_v<Vector<T, 3> const&, Vector<T, 3>>
-      && ((std::is_pointer_v<T> && std::is_convertible_v<T const&, std::string_view>)
-        || requires(LuaStack target, T const& value) {
-          { LuaConverter<std::decay_t<T>>::from(target, value) }
-            -> std::convertible_to<std::expected<void, StarException>>;
-        }))
+      && requires(LuaStack target, T const& value) {
+        { LuaConverter<std::remove_cvref_t<T>>::from(target, value) }
+          -> std::convertible_to<std::expected<void, StarException>>;
+      })
   {
     auto created = stack.create_table(3, 0);
     if (!created)
@@ -116,7 +115,7 @@ template <typename T>
 struct LuaConverter<Rect<T>> {
   [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, Rect<T> const& v) {
     if (v.is_null())
-      return stack.push(LuaNil);
+      return stack.push(lua_nil);
     return stack.push_array(Vector<T, 4>(v.x_min(), v.y_min(), v.x_max(), v.y_max()));
   }
 
@@ -148,19 +147,19 @@ struct LuaConverter<Polygon<T>> {
   }
 };
 
-template <typename T, std::size_t N>
-struct LuaConverter<Line<T, N>> {
-  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, Line<T, N> const& line) {
-    return LuaConverter<std::pair<Vector<T, N>, Vector<T, N>>>::from(stack, std::pair(line.min(), line.max()));
+template <typename T, std::size_t dimension_count>
+struct LuaConverter<Line<T, dimension_count>> {
+  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, Line<T, dimension_count> const& line) {
+    return LuaConverter<std::pair<Vector<T, dimension_count>, Vector<T, dimension_count>>>::from(stack, std::pair(line.min(), line.max()));
   }
 
-  [[nodiscard]] static std::expected<std::optional<Line<T, N>>, StarException> to(LuaStackValue v) {
-    auto endpoints = LuaConverter<std::pair<Vector<T, N>, Vector<T, N>>>::to(v);
+  [[nodiscard]] static std::expected<std::optional<Line<T, dimension_count>>, StarException> to(LuaStackValue v) {
+    auto endpoints = LuaConverter<std::pair<Vector<T, dimension_count>, Vector<T, dimension_count>>>::to(v);
     if (!endpoints)
       return std::unexpected(std::move(endpoints.error()));
     if (!*endpoints)
       return std::nullopt;
-    return Line<T, N>((**endpoints).first, (**endpoints).second);
+    return Line<T, dimension_count>((**endpoints).first, (**endpoints).second);
   }
 };
 
@@ -174,7 +173,7 @@ struct LuaConverter<std::variant<Types...>> {
     return std::visit(
       [stack](auto const& payload) mutable -> std::expected<void, StarException> {
         if constexpr (std::is_same_v<std::remove_cvref_t<decltype(payload)>, std::monostate>)
-          return stack.push(LuaNil);
+          return stack.push(lua_nil);
         else
           return stack.push(payload);
       },
@@ -185,28 +184,28 @@ struct LuaConverter<std::variant<Types...>> {
     return std::visit(
       [stack](auto& payload) mutable -> std::expected<void, StarException> {
         if constexpr (std::is_same_v<std::remove_cvref_t<decltype(payload)>, std::monostate>)
-          return stack.push(LuaNil);
+          return stack.push(lua_nil);
         else
           return stack.push(std::move(payload));
       },
       value);
   }
 
-  template <std::size_t Index = 0>
+  template <std::size_t index = 0>
   [[nodiscard]] static std::expected<std::optional<Value>, StarException> check_type_to(LuaStackValue v) {
-    using Type = std::variant_alternative_t<Index, Value>;
+    using Type = std::variant_alternative_t<index, Value>;
     if constexpr (std::is_same_v<Type, std::monostate>) {
       if (v.is<LuaNilType>())
-        return std::optional<Value>(std::in_place, std::in_place_index<Index>);
+        return std::optional<Value>(std::in_place, std::in_place_index<index>);
     } else {
       auto converted = v.template maybe_to<Type>();
       if (!converted)
         return std::unexpected(std::move(converted.error()));
       if (*converted)
-        return std::optional<Value>(std::in_place, std::in_place_index<Index>, std::move(**converted));
+        return std::optional<Value>(std::in_place, std::in_place_index<index>, std::move(**converted));
     }
-    if constexpr (Index + 1 < sizeof...(Types))
-      return check_type_to<Index + 1>(v);
+    if constexpr (index + 1 < sizeof...(Types))
+      return check_type_to<index + 1>(v);
     else
       return std::nullopt;
   }
@@ -338,16 +337,16 @@ export namespace Star {
 
   template <typename T1, typename T2>
   struct LuaConverter<std::pair<T1, T2>>;
-  template <typename T, std::size_t N>
-  struct LuaConverter<Vector<T, N>>;
+  template <typename T, std::size_t dimension_count>
+  struct LuaConverter<Vector<T, dimension_count>>;
   template <typename T>
   struct LuaConverter<Matrix3<T>>;
   template <typename T>
   struct LuaConverter<Rect<T>>;
   template <typename T>
   struct LuaConverter<Polygon<T>>;
-  template <typename T, std::size_t N>
-  struct LuaConverter<Line<T, N>>;
+  template <typename T, std::size_t dimension_count>
+  struct LuaConverter<Line<T, dimension_count>>;
   template <typename... Types>
   struct LuaConverter<std::variant<Types...>>;
   template <>

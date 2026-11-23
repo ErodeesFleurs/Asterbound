@@ -774,7 +774,7 @@ std::expected<void, StarException> WorldClient::forEachCollisionBlock(RectI cons
   return m_tileArray->tile_each(region, [iterator](Vec2I const& pos, ClientTile const& tile) -> std::expected<void, StarException> {
     if (tile.getCollision() == CollisionKind::Null)
       return iterator(CollisionBlock::nullBlock(pos));
-    if constexpr (Star::DebugEnabled)
+    if constexpr (Star::debug_enabled)
       Star::star_assert_failed((!tile.collisionCacheDirty));
     for (auto const& block : tile.collisionCache) {
       auto visited = iterator(block);
@@ -1103,7 +1103,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
       m_pendingLights = std::move(renderLightSources);
       m_pendingParticleLights.clear();
       for (auto const& particle : renderData.particles)
-        if (particle.light != Color::Clear)
+        if (particle.light != Color::palette_clear)
           m_pendingParticleLights.push_back({particle.position, particle.light.to_rgb_f()});
       m_pendingLightRange = window.padded(1);
       m_pendingLightReady = true;
@@ -1664,7 +1664,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
       auto result106 = m_entityMap->forAllEntities([&, &self = *this](std::shared_ptr<Entity> const& entity)  -> std::expected<void, StarException> {
               EntityId entityId = entity->entityId();
               if (connectionForEntity(entityId) == entityUpdateSet->forConnection) {
-                if (Star::DebugEnabled) {
+                if (Star::debug_enabled) {
                   Star::star_assert_failed((entity->isSlave()));
                 }
                 auto result105 = entity->read_net_state(entityUpdateSet->deltas.value(entityId), interpolationLeadTime, self.m_clientState->netCompatibilityRules());
@@ -2136,7 +2136,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     auto center = Vec2F(pair.first) + Vec2F::filled(0.5f);
     auto size = Vec2F::filled(0.875f - expiry * 0.875f);
     auto poly = PolyF(RectF::with_center(center, size));
-    self.root().spatialLogger().log_poly("world", poly, Color::Cyan.mix(Color::Red, expiry).to_rgba());
+    self.root().spatialLogger().log_poly("world", poly, Color::palette_cyan.mix(Color::palette_red, expiry).to_rgba());
     if (expiry >= 1.0f) {
       self.dirtyCollision(RectI::with_size(pair.first, { 1, 1 }));
       return true;

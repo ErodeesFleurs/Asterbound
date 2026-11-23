@@ -14,8 +14,8 @@ namespace Star {
 // synchronize with working data.
 class NetElementSyncGroup : public NetElementGroup {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<NetElementSyncGroup, NetElementGroup>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<NetElementSyncGroup, NetElementGroup>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<NetElementSyncGroup>(); }
 
@@ -47,8 +47,8 @@ private:
 // optional callback functions.
 class NetElementCallbackGroup : public NetElementSyncGroup {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<NetElementCallbackGroup, NetElementSyncGroup>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<NetElementCallbackGroup, NetElementSyncGroup>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<NetElementCallbackGroup>(); }
 

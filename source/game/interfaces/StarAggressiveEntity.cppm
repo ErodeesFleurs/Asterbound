@@ -22,8 +22,8 @@ namespace Star {
 
 class AggressiveEntity : public virtual Entity {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<AggressiveEntity, Entity>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<AggressiveEntity, Entity>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<AggressiveEntity>(); }
 

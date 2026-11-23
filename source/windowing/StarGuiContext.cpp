@@ -195,7 +195,7 @@ std::optional<Vec2F> eventMousePosition(InputEvent const& event) {
       using Event = std::remove_cvref_t<decltype(input)>;
       if constexpr (std::same_as<Event, MouseMoveEvent> || std::same_as<Event, MouseButtonDownEvent>
                     || std::same_as<Event, MouseButtonUpEvent> || std::same_as<Event, MouseWheelEvent>)
-        return input.mousePosition;
+        return input.mouse_position;
       else
         return {};
     },

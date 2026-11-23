@@ -50,7 +50,7 @@ struct VersionedJson;
 
 class CelestialDatabase {
 public:
-  virtual void const* query_type(TypeKey key) const noexcept { return query_type_of<CelestialDatabase>(this, key); }
+  virtual void query_type(TypeQuery& query) const noexcept { query_type_of<CelestialDatabase>(*this, query); }
   virtual std::string_view dynamic_type_name() const noexcept { return Star::type_name<CelestialDatabase>(); }
 
   virtual ~CelestialDatabase();
@@ -108,8 +108,8 @@ protected:
 
 class CelestialMasterDatabase : public CelestialDatabase {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<CelestialMasterDatabase, CelestialDatabase>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<CelestialMasterDatabase, CelestialDatabase>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<CelestialMasterDatabase>(); }
 
@@ -239,8 +239,8 @@ private:
 
 class CelestialSlaveDatabase : public CelestialDatabase {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<CelestialSlaveDatabase, CelestialDatabase>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<CelestialSlaveDatabase, CelestialDatabase>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<CelestialSlaveDatabase>(); }
 

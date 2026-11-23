@@ -32,10 +32,10 @@ concept weighted_pool_unique_item = weighted_pool_copyable_item<Item> && std::is
 namespace WeightedPoolDetail {
   using std::get;
 
-  template <std::size_t Index, typename Entry>
-    requires requires(Entry&& entry) { get<Index>(std::forward<Entry>(entry)); }
+  template <std::size_t index, typename Entry>
+    requires requires(Entry&& entry) { get<index>(std::forward<Entry>(entry)); }
   decltype(auto) entry_get(Entry&& entry) {
-    return get<Index>(std::forward<Entry>(entry));
+    return get<index>(std::forward<Entry>(entry));
   }
 
   // Keep the exponential race in log space: fast-math must not turn this
@@ -263,7 +263,7 @@ private:
 
   size_type select_target(double target) const {
     if (m_items.empty())
-      return NPos;
+      return npos;
     // Preserve the original normalized scan and final-index rounding fallback.
     double accumulated_weight = 0.0;
     for (size_type index = 0; index < m_items.size(); ++index) {

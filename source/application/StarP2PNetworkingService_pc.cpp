@@ -191,8 +191,8 @@ std::expected<void, StarException> Star::PcP2PNetworkingService::setActivityData
       activity.SetName("Asterbound");
       String activityTitle(title);
       String activityDetails(details);
-      activity.SetState(activityTitle.utf8_data());
-      activity.SetDetails(activityDetails.utf8_data());
+      activity.SetState(activityTitle.utf8().c_str());
+      activity.SetDetails(activityDetails.utf8().c_str());
       activity.GetTimestamps().SetStart(startTime);
       if (party) {
         auto& size = activity.GetParty().GetSize();
@@ -208,16 +208,16 @@ std::expected<void, StarException> Star::PcP2PNetworkingService::setActivityData
           String joinSecret = Star::format("connect:discord_{}_{}_{}", m_state->discordCurrentUser->GetId(), lobby->first, lobby->second);
           if (auto logged = m_state->logger.info("Setting Discord join secret as {}", joinSecret); !logged)
             return std::unexpected(std::move(logged.error()));
-          activity.GetSecrets().SetJoin(joinSecret.utf8_data());
+          activity.GetSecrets().SetJoin(joinSecret.utf8().c_str());
         }
       } else if (std::holds_alternative<HostAddressWithPort>(m_joinLocation)) {
         String address = Star::to_string(std::get<HostAddressWithPort>(m_joinLocation));
         String joinSecret = Star::format("connect:address_{}", address);
         if (auto logged = m_state->logger.info("Setting Discord join secret as {}", joinSecret); !logged)
           return std::unexpected(std::move(logged.error()));
-        activity.GetSecrets().SetJoin(joinSecret.utf8_data());
+        activity.GetSecrets().SetJoin(joinSecret.utf8().c_str());
       
-        activity.GetParty().SetId(address.utf8_data());
+        activity.GetParty().SetId(address.utf8().c_str());
       }
     
       m_discordForceUpdateActivity = false;
@@ -419,7 +419,7 @@ std::expected<bool, StarException> PcP2PNetworkingService::SteamP2PSocket::sendM
     return false;
 
   if (!SteamAPI_ISteamNetworking_SendP2PPacket(SteamAPI_SteamNetworking(), steamId.ConvertToUint64(),
-      message.data(), message.size(), k_EP2PSendReliable, 0))
+      message.span().data(), message.size(), k_EP2PSendReliable, 0))
     return std::unexpected(ApplicationException("SteamNetworking::SendP2PPacket unexpectedly returned false"));
   return true;
 }
@@ -525,7 +525,7 @@ std::expected<void, StarException> PcP2PNetworkingService::steamReceiveAll() {
   CSteamID messageRemoteUser;
   while (SteamAPI_ISteamNetworking_IsP2PPacketAvailable(SteamAPI_SteamNetworking(), &messageSize, 0)) {
     ByteArray data(messageSize, 0);
-    if (!SteamAPI_ISteamNetworking_ReadP2PPacket(SteamAPI_SteamNetworking(), data.data(), messageSize,
+    if (!SteamAPI_ISteamNetworking_ReadP2PPacket(SteamAPI_SteamNetworking(), data.span().data(), messageSize,
         &messageSize, &messageRemoteUser, 0))
       return std::unexpected(ApplicationException("SteamNetworking::ReadP2PPacket returned false"));
     data.resize(messageSize);
@@ -563,7 +563,7 @@ std::expected<bool, StarException> PcP2PNetworkingService::DiscordP2PSocket::sen
   if (!lifetime->service || mode != DiscordSocketMode::Connected)
     return false;
 
-  discord::Result res = state->discordCore->LobbyManager().SendNetworkMessage(lobbyId, remoteUserId, DiscordMainNetworkChannel, (std::uint8_t*)message.data(), message.size());
+  discord::Result res = state->discordCore->LobbyManager().SendNetworkMessage(lobbyId, remoteUserId, DiscordMainNetworkChannel, (std::uint8_t*)message.span().data(), message.size());
   if (res != discord::Result::Ok)
     return std::unexpected(ApplicationException::format("discord::Network::Send returned error (err {})", (int)res));
 
@@ -625,7 +625,7 @@ std::expected<std::unique_ptr<P2PSocket>, StarException> PcP2PNetworkingService:
   socket->lobbyId = lobbyId;
   m_discordOpenSockets.insert_or_assign(remoteUserId, std::ref(*socket));
 
-  m_state->discordCore->LobbyManager().ConnectLobby(lobbyId, lobbySecret.utf8_data(),
+  m_state->discordCore->LobbyManager().ConnectLobby(lobbyId, lobbySecret.utf8().c_str(),
     [lifetime = m_discordLifetime, &state = *m_state, remoteUserId, lobbyId,
      generation = socket->connectionGeneration](discord::Result res, discord::Lobby const&) {
       if (res != discord::Result::Ok)

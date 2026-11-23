@@ -1096,7 +1096,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::labelHandler(S
   auto text = config.get_string("value", "");
   if (!text)
     return std::unexpected(std::move(text.error()));
-  Color color = Color::White;
+  Color color = Color::palette_white;
   auto has1 = config.contains("color");
   if (!has1)
     return std::unexpected(std::move(has1.error()));

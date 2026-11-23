@@ -259,7 +259,7 @@ void file_io(benchmark::State& state, file_operation operation) {
         break;
       }
       output = std::move(*result);
-      benchmark::DoNotOptimize(output.data());
+      benchmark::DoNotOptimize(output.span().data());
     }
     benchmark::ClobberMemory();
     state.PauseTiming();

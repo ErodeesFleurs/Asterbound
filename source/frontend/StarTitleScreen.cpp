@@ -391,7 +391,7 @@ std::expected<void, StarException> TitleScreen::render(float interpolation) {
 
 std::expected<bool, StarException> TitleScreen::handleInputEvent(InputEvent const& event) {
   if (std::holds_alternative<MouseMoveEvent>(event))
-    m_cursorScreenPos = Vec2I(std::get<MouseMoveEvent>(event).mousePosition);
+    m_cursorScreenPos = Vec2I(std::get<MouseMoveEvent>(event).mouse_position);
   if (std::holds_alternative<KeyDownEvent>(event) && m_guiContext.actions(event).contains(InterfaceAction::TitleBack)) {
     if (m_paneManager->topPane({PaneLayer::ModalWindow}))
       return m_paneManager->sendInputEvent(event);
@@ -737,7 +737,7 @@ std::expected<void, StarException> TitleScreen::initMultiPlayerMenu() {
     auto list = m_serverSelectPane->fetchChild<ListWidget>("serverSelectArea.serverList");
     if (!list) return std::unexpected(std::move(list.error()));
     auto pos = (*list)->selectedItem();
-    auto updated = pos != NPos ? m_serverList.set(pos, serverData) : m_serverList.insert(0, serverData);
+    auto updated = pos != npos ? m_serverList.set(pos, serverData) : m_serverList.insert(0, serverData);
     if (!updated) return std::unexpected(std::move(updated.error()));
     m_serverList = std::move(*updated);
     if (auto r = populateServerList(**list); !r) return std::unexpected(std::move(r.error()));
@@ -751,7 +751,7 @@ std::expected<void, StarException> TitleScreen::initMultiPlayerMenu() {
   auto serverList = m_serverSelectPane->fetchChild<ListWidget>("serverSelectArea.serverList");
   if (!serverList) return std::unexpected(std::move(serverList.error()));
   (*serverList)->registerMemberCallback("delete", [this, list = *serverList](Widget&) -> std::expected<void, StarException> {
-    if (auto pos = list->selectedItem(); pos != NPos) {
+    if (auto pos = list->selectedItem(); pos != npos) {
       auto updated = m_serverList.erase(pos);
       if (!updated) return std::unexpected(std::move(updated.error()));
       m_serverList = std::move(*updated);

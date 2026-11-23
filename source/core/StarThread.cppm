@@ -38,7 +38,7 @@ concept thread_task_for = std::is_null_pointer_v<std::remove_cvref_t<Function>>
 
 class Thread {
 public:
-  virtual void const* query_type(TypeKey key) const noexcept { return query_type_of<Thread>(this, key); }
+  virtual void query_type(TypeQuery& query) const noexcept { query_type_of<Thread>(*this, query); }
   virtual std::string_view dynamic_type_name() const noexcept { return type_name<Thread>(); }
   // Wait against a monotonic deadline with a shorter, platform-specific tail.
   static void sleep_precise(std::uint64_t millis);

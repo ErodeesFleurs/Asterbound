@@ -75,7 +75,7 @@ namespace Dungeon {
       return Biome3MaterialId;
     if (variant == 4)
       return Biome4MaterialId;
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((variant == 5));
     }
     return Biome5MaterialId;
@@ -1137,7 +1137,7 @@ namespace Dungeon {
       return Vec2I(1, 0);
     if (m_direction == Direction::Up)
       return Vec2I(0, 1);
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((m_direction == Direction::Down));
     }
     return Vec2I(0, -1);

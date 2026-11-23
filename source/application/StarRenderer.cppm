@@ -123,7 +123,7 @@ class Texture : public RefCounter {
 public:
   ~Texture() override = default;
 
-  void const* query_type(TypeKey key) const noexcept override { return query_type_of<Texture, RefCounter>(this, key); }
+  void query_type(TypeQuery& query) const noexcept override { query_type_of<Texture, RefCounter>(*this, query); }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<Texture>(); }
 
   virtual Vec2U size() const = 0;
@@ -148,7 +148,7 @@ class RenderBuffer {
 public:
   virtual ~RenderBuffer() = default;
 
-  virtual void const* query_type(TypeKey key) const noexcept { return query_type_of<RenderBuffer>(this, key); }
+  virtual void query_type(TypeQuery& query) const noexcept { query_type_of<RenderBuffer>(*this, query); }
   virtual std::string_view dynamic_type_name() const noexcept { return Star::type_name<RenderBuffer>(); }
 
   // Transforms the given primitives into a form suitable for the underlying

@@ -46,7 +46,7 @@ public:
     const_iterator begin() const;
     const_iterator end() const;
 
-    std::shared_ptr<Container const> m_container;
+    std::shared_ptr<Container const> container;
   };
 
   enum class Type : std::uint8_t {
@@ -356,16 +356,16 @@ template <json_source... T>
 std::expected<Json, StarException> json_merge_query_def(String const& key, Json def, Json const& first, T const&... rest);
 
 template <>
-struct hash<Json> {
+struct ValueHash<Json> {
   std::size_t operator()(Json const& v) const;
 };
 
 template <json_container Container> auto Json::IteratorWrapper<Container>::begin() const -> const_iterator {
-  return m_container->begin();
+  return container->begin();
 }
 
 template <json_container Container> auto Json::IteratorWrapper<Container>::end() const -> const_iterator {
-  return m_container->end();
+  return container->end();
 }
 
 template <json_source... T> Json json_merge(Json const& base, Json const& merger, T const&... rest) {
@@ -421,12 +421,12 @@ export module star.json;
 
 export namespace Star {
   template <>
-  struct hash<Json>;
+  struct ValueHash<Json>;
 }
 
 
 export namespace Star {
-using ::Star::hash;
+using ::Star::ValueHash;
 using ::Star::Json;
 using ::Star::json_boolean;
 using ::Star::json_container;

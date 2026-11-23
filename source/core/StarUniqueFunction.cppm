@@ -27,7 +27,7 @@ concept unique_function_target = std::is_constructible_v<std::decay_t<Callable>,
     && (!std::is_reference_v<Result>
         || safe_reference_result<std::invoke_result_t<std::decay_t<Callable>&, Args...>, Result>);
 
-inline constexpr std::size_t unique_function_inline_size = 3 * sizeof(void*);
+inline constexpr std::size_t unique_function_inline_size = 3 * sizeof(std::nullptr_t);
 
 template <typename Value>
 concept unique_function_inline_slot = std::is_object_v<Value> && sizeof(Value) <= unique_function_inline_size

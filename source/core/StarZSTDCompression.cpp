@@ -26,7 +26,7 @@ bool overlaps(std::span<char const> input, std::span<char const> output) {
 
 // Input may borrow any part of the output allocation, including its spare tail.
 void stabilize(std::span<char const>& input, ByteArray const& output, ByteArray& snapshot) {
-  if (overlaps(input, {output.data(), output.capacity()})) {
+  if (overlaps(input, {output.span().data(), output.capacity()})) {
     snapshot = ByteArray(input);
     input = snapshot.span();
   }
@@ -53,13 +53,13 @@ std::expected<ByteArray, StarException> owning_result(Operation&& operation) {
 
 void ZstdContext::CompressionDeleter::operator()(ZSTD_CCtx* context) const noexcept {
   auto status = ZSTD_freeCCtx(context);
-  if (ZSTD_isError(status) && !Star::print(stderr, "Failed to free ZSTD compressor: {}\n", ZSTD_getErrorName(status)))
+  if (ZSTD_isError(status) && !Star::print(*stderr, "Failed to free ZSTD compressor: {}\n", ZSTD_getErrorName(status)))
     std::_Exit(1);
 }
 
 void ZstdContext::DecompressionDeleter::operator()(ZSTD_DCtx* context) const noexcept {
   auto status = ZSTD_freeDCtx(context);
-  if (ZSTD_isError(status) && !Star::print(stderr, "Failed to free ZSTD decompressor: {}\n", ZSTD_getErrorName(status)))
+  if (ZSTD_isError(status) && !Star::print(*stderr, "Failed to free ZSTD decompressor: {}\n", ZSTD_getErrorName(status)))
     std::_Exit(1);
 }
 
@@ -74,7 +74,7 @@ std::expected<void, StarException> ZstdContext::compress(std::span<char const> i
   if (bound > ByteArray::max_size())
     return std::unexpected(IOException("ZSTD compressed output size overflow"));
   m_scratch.resize(bound);
-  auto size = ZSTD_compressCCtx(m_compressor.get(), m_scratch.data(), bound, input.data(), input.size(), level);
+  auto size = ZSTD_compressCCtx(m_compressor.get(), m_scratch.span().data(), bound, input.data(), input.size(), level);
   if (ZSTD_isError(size))
     return std::unexpected(zstd_error("compression", size));
   m_scratch.resize(size);
@@ -101,7 +101,7 @@ std::expected<void, StarException> ZstdContext::decompress(std::span<char const>
   if (!m_decompressor)
     return std::unexpected(IOException("Cannot create ZSTD decompressor"));
   m_scratch.resize(size);
-  auto decoded = ZSTD_decompressDCtx(m_decompressor.get(), m_scratch.data(), size, input.data(), input.size());
+  auto decoded = ZSTD_decompressDCtx(m_decompressor.get(), m_scratch.span().data(), size, input.data(), input.size());
   if (ZSTD_isError(decoded))
     return std::unexpected(zstd_error("decompression", decoded));
   m_scratch.resize(decoded);
@@ -153,7 +153,7 @@ std::expected<void, StarException> CompressionStream::compress(std::span<char co
       return std::unexpected(IOException("ZSTD compressed output size overflow"));
     }
     output.reserve(written + chunk_size);
-    ZSTD_outBuffer destination{output.data() + written, chunk_size, 0};
+    ZSTD_outBuffer destination{output.spare_capacity().subspan(written - output.size()).data(), chunk_size, 0};
     auto previous_input = source.pos;
     auto status = ZSTD_compressStream2(m_context.get(), &destination, &source, ZSTD_e_flush);
     if (ZSTD_isError(status)) {
@@ -229,7 +229,7 @@ std::expected<void, StarException> DecompressionStream::decompress(std::span<cha
     std::span<char> tail = probe;
     if (chunk_size) {
       output.reserve(original_size + produced + chunk_size);
-      tail = {output.data() + original_size + produced, chunk_size};
+      tail = output.spare_capacity().subspan(produced, chunk_size);
     }
     auto decoded = decompress(input, tail);
     if (!decoded)

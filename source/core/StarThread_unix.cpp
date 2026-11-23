@@ -24,7 +24,7 @@ static void* run_thread(void* data) {
   auto& thread = *static_cast<NativeThread*>(data);
 #ifdef STAR_SYSTEM_MACOS
   char native_name[max_thread_name_length];
-  std::snprintf(native_name, sizeof(native_name), "%s", thread.name.utf8_data());
+  std::snprintf(native_name, sizeof(native_name), "%s", thread.name.utf8().c_str());
   pthread_setname_np(native_name);
 #endif
   thread.run_worker();
@@ -37,7 +37,7 @@ std::expected<void, StarException> NativeThread::launch_native() {
 
 #ifndef STAR_SYSTEM_MACOS
   char native_name[max_thread_name_length];
-  std::snprintf(native_name, sizeof(native_name), "%s", name.utf8_data());
+  std::snprintf(native_name, sizeof(native_name), "%s", name.utf8().c_str());
 #ifdef STAR_SYSTEM_FREEBSD
   pthread_set_name_np(m_handle, native_name);
 #elif defined(STAR_SYSTEM_NETBSD)

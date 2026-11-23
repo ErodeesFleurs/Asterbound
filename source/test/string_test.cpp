@@ -43,6 +43,10 @@ TEST(StringTest, PointerKeyDiagnosticsIdentifyThePointeeRatherThanTheWrapper) {
   EXPECT_NE(std::string_view(missing.error().what()).find(identity), std::string_view::npos);
   EXPECT_EQ(std::format("{}", List<std::nullptr_t>{nullptr}), "(nullptr)");
   EXPECT_EQ(std::format("{}", List<void*>{nullptr}), "(0)");
+  auto byte = std::make_unique<char>('x');
+  TextBuffer output;
+  append_text(output, byte);
+  EXPECT_EQ(output.view(), std::format("{}", static_cast<void const*>(byte.get())));
 }
 
 TEST(StringTest, SortedComparatorPreservesInputAndDuplicates) {
@@ -97,9 +101,9 @@ TEST(StringTest, substr) {
 
 TEST(StringTest, find) {
   EXPECT_EQ(String("xxFooxx").find("Foo"), 2u);
-  EXPECT_EQ(String("xxFooxx").find("foo"), NPos);
+  EXPECT_EQ(String("xxFooxx").find("foo"), npos);
   EXPECT_EQ(String("xxFooxx").find("foo", 0, String::CaseInsensitive), 2u);
-  EXPECT_EQ(String("xxFooxx").find("bar", 0, String::CaseInsensitive), NPos);
+  EXPECT_EQ(String("xxFooxx").find("bar", 0, String::CaseInsensitive), npos);
   EXPECT_EQ(String("BAR baz baf BAR").find("bar", 1, String::CaseInsensitive), 12u);
   EXPECT_EQ(String(std::string_view("\0asdf", 5)).find("df"), 3u);
 }
@@ -163,7 +167,7 @@ TEST(StringTest, SuffixByteComparisonRetainsCodepointsAndEagerErrors) {
   auto suffix_first = invalid_source.ends_with(invalid_suffix);
   ASSERT_FALSE(expected);
   ASSERT_FALSE(suffix_first);
-  EXPECT_STREQ(suffix_first.error().what(), expected.error().what());
+  EXPECT_EQ(suffix_first.error().what(), expected.error().what());
 }
 
 TEST(StringTest, starts_with) {
@@ -222,7 +226,7 @@ TEST(StringTest, TrimKeepsBinaryInteriorAndValidatesSourceBeforeLazyDelimiters) 
   auto result = malformed_source.trim(malformed_set);
   ASSERT_FALSE(source_error);
   ASSERT_FALSE(result);
-  EXPECT_STREQ(result.error().what(), source_error.error().what());
+  EXPECT_EQ(result.error().what(), source_error.error().what());
 }
 
 TEST(StringTest, ExtractionCommitsOnlyTokenAndRemainderInScanDirection) {
@@ -276,11 +280,11 @@ TEST(StringTest, ExtractionRetainsDirectionalErrorPriorityWithoutMutatingSource)
   ASSERT_FALSE(reverse_error);
   auto forward = source.extract(malformed_set);
   ASSERT_FALSE(forward);
-  EXPECT_STREQ(forward.error().what(), delimiter_error.error().what());
+  EXPECT_EQ(forward.error().what(), delimiter_error.error().what());
   EXPECT_EQ(source, original);
   auto reverse = source.rextract(malformed_set);
   ASSERT_FALSE(reverse);
-  EXPECT_STREQ(reverse.error().what(), reverse_error.error().what());
+  EXPECT_EQ(reverse.error().what(), reverse_error.error().what());
   EXPECT_EQ(source, original);
 
   String late_error(std::string_view("a,b,\xff", 5));
@@ -325,8 +329,8 @@ TEST(StringTest, CompileTimeFormattingPreservesByteLengths) {
 TEST(StringTest, CheckedConsoleOutputPreservesBinaryTextAndNewlines) {
   std::unique_ptr<std::FILE, decltype(&std::fclose)> file(std::tmpfile(), &std::fclose);
   ASSERT_TRUE(file);
-  ASSERT_TRUE(Star::print(file.get(), "{}:{:04x}", String(std::string_view("水\0x", 5)), 42));
-  ASSERT_TRUE(Star::println(file.get(), ":{}", 7));
+  ASSERT_TRUE(Star::print(*file, "{}:{:04x}", String(std::string_view("水\0x", 5)), 42));
+  ASSERT_TRUE(Star::println(*file, ":{}", 7));
   ASSERT_EQ(std::fseek(file.get(), 0, SEEK_SET), 0);
   std::array<char, 32> bytes;
   auto count = ::fread(bytes.data(), 1, bytes.size(), file.get());
@@ -338,12 +342,12 @@ TEST(StringTest, CheckedConsoleOutputPreservesBinaryTextAndNewlines) {
 TEST(StringTest, CheckedConsoleOutputReportsFlushFailureWithoutPoisoningLaterOutput) {
   std::unique_ptr<std::FILE, decltype(&std::fclose)> full(std::fopen("/dev/full", "w"), &std::fclose);
   ASSERT_TRUE(full);
-  auto failed = Star::print(full.get(), "{}", "buffered bytes");
+  auto failed = Star::print(*full, "{}", "buffered bytes");
   ASSERT_FALSE(failed);
   EXPECT_TRUE(failed.error().is<IOException>());
   std::unique_ptr<std::FILE, decltype(&std::fclose)> valid(std::tmpfile(), &std::fclose);
   ASSERT_TRUE(valid);
-  ASSERT_TRUE(Star::print(valid.get(), "{}", "recovered"));
+  ASSERT_TRUE(Star::print(*valid, "{}", "recovered"));
   ASSERT_EQ(std::fseek(valid.get(), 0, SEEK_SET), 0);
   std::array<char, 16> bytes;
   auto count = ::fread(bytes.data(), 1, bytes.size(), valid.get());
@@ -494,7 +498,7 @@ TEST(StringTest, utf8) {
   EXPECT_EQ("This is a [日本語] Unicode String. (日本語)", s1);
   EXPECT_EQ(s1.size(), 37u);
   EXPECT_EQ(s1.utf8().size(), 49u);
-  EXPECT_EQ(String(std::string_view(s1.utf8_data())), String(utf8String));
+  EXPECT_EQ(String(std::string_view(s1.utf8())), String(utf8String));
 
   EXPECT_EQ(String("abcdefghijkl").slice(1, 6, 2), String("bdf"));
   auto shorter = String("aa").compare("aaaa");
@@ -718,47 +722,47 @@ TEST(StringTest, FixedEnumNamesPreserveCaseInsensitiveLookupAndCanonicalNames) {
     }
   };
   roundTrip.operator()<log_level_names>();
-  roundTrip.operator()<KeyNames>();
-  roundTrip.operator()<KeyModNames>();
-  roundTrip.operator()<MouseButtonNames>();
-  roundTrip.operator()<MouseWheelNames>();
-  roundTrip.operator()<ControllerAxisNames>();
-  roundTrip.operator()<ControllerButtonNames>();
-  EXPECT_EQ(enum_value<KeyNames>("kEyPaD eNtEr"), Key::KeypadEnter);
-  EXPECT_EQ(enum_value<KeyModNames>("lMeTa"), KeyMod::LGui);
-  EXPECT_EQ(enum_name<KeyNames>(Key::Escape), "Esc");
-  EXPECT_EQ(enum_name<KeyNames>(Key::Delete), "Del");
-  EXPECT_EQ(enum_name<ControllerButtonNames>(ControllerButton::Invalid), "Invalid");
+  roundTrip.operator()<key_names>();
+  roundTrip.operator()<key_mod_names>();
+  roundTrip.operator()<mouse_button_names>();
+  roundTrip.operator()<mouse_wheel_names>();
+  roundTrip.operator()<controller_axis_names>();
+  roundTrip.operator()<controller_button_names>();
+  EXPECT_EQ(enum_value<key_names>("kEyPaD eNtEr"), Key::KeypadEnter);
+  EXPECT_EQ(enum_value<key_mod_names>("lMeTa"), KeyMod::LGui);
+  EXPECT_EQ(enum_name<key_names>(Key::Escape), "Esc");
+  EXPECT_EQ(enum_name<key_names>(Key::Delete), "Del");
+  EXPECT_EQ(enum_name<controller_button_names>(ControllerButton::Invalid), "Invalid");
 }
 
 TEST(StringTest, FixedEnumNamesDistinguishUnknownNamesInvalidUtf8AndSparseValues) {
   for (std::string_view text : {"", "Escape", "LMeta", "日本語", "K", "A "}) {
-    auto optional = maybe_enum_value<KeyNames>(text);
+    auto optional = maybe_enum_value<key_names>(text);
     ASSERT_TRUE(optional);
     EXPECT_FALSE(*optional);
-    auto required = enum_value<KeyNames>(text);
+    auto required = enum_value<key_names>(text);
     ASSERT_FALSE(required);
     EXPECT_TRUE(required.error().is<MapException>());
   }
-  auto embeddedNull = enum_value<KeyNames>(std::string_view("A\0", 2));
+  auto embeddedNull = enum_value<key_names>(std::string_view("A\0", 2));
   ASSERT_FALSE(embeddedNull);
   EXPECT_TRUE(embeddedNull.error().is<MapException>());
   for (std::string_view bytes : {std::string_view("\xff", 1), std::string_view("A\xff", 2),
       std::string_view("zzzz\xc3", 5), std::string_view("\xc3\xa9\xff", 3)}) {
-    auto optional = maybe_enum_value<KeyNames>(bytes);
+    auto optional = maybe_enum_value<key_names>(bytes);
     ASSERT_FALSE(optional);
     EXPECT_TRUE(optional.error().is<UnicodeException>());
     auto required = enum_value<log_level_names>(bytes);
     ASSERT_FALSE(required);
     EXPECT_TRUE(required.error().is<UnicodeException>());
   }
-  auto unknownKey = enum_name<KeyNames>(static_cast<Key>(65535));
+  auto unknownKey = enum_name<key_names>(static_cast<Key>(65535));
   ASSERT_FALSE(unknownKey);
   EXPECT_TRUE(unknownKey.error().is<MapException>());
-  auto unnamedModifier = enum_name<KeyModNames>(KeyMod::Scroll);
+  auto unnamedModifier = enum_name<key_mod_names>(KeyMod::Scroll);
   ASSERT_FALSE(unnamedModifier);
   EXPECT_TRUE(unnamedModifier.error().is<MapException>());
-  auto unnamedAxis = enum_name<ControllerAxisNames>(ControllerAxis::Invalid);
+  auto unnamedAxis = enum_name<controller_axis_names>(ControllerAxis::Invalid);
   ASSERT_FALSE(unnamedAxis);
   EXPECT_TRUE(unnamedAxis.error().is<MapException>());
   auto unknownLevel = enum_value<log_level_names>("warning");
@@ -768,14 +772,14 @@ TEST(StringTest, FixedEnumNamesDistinguishUnknownNamesInvalidUtf8AndSparseValues
 
 TEST(StringTest, FixedEnumNamesPreserveEnumSortedIterationAndText) {
   StringList modifiers;
-  for (auto const& [value, name] : KeyModNames)
+  for (auto const& [value, name] : key_mod_names)
     modifiers.push_back(String(name));
   EXPECT_EQ(modifiers, (StringList{"NoMod", "LShift", "RShift", "LCtrl", "RCtrl",
       "LAlt", "RAlt", "LMeta", "RMeta", "Num", "Caps", "AltGr"}));
   EXPECT_EQ(modifiers.join(" + "),
       "NoMod + LShift + RShift + LCtrl + RCtrl + LAlt + RAlt + LMeta + RMeta + Num + Caps + AltGr");
   StringList tail;
-  for (auto const& [value, name] : KeyNames)
+  for (auto const& [value, name] : key_names)
     if (value >= Key::NumLock)
       tail.push_back(String(name));
   EXPECT_EQ(tail, (StringList{"NumLock", "CapsLock", "ScrollLock", "RShift", "LShift",
@@ -823,6 +827,10 @@ TEST(StringTest, CompactUtf8FailuresPreserveOutputsAndCursorState) {
   EXPECT_EQ(utf8_length(std::string_view(nullptr, 0)), 0u);
   EXPECT_EQ(utf8_length("a\0b"), 1u);
   EXPECT_EQ(utf8_length(std::string_view("a\0b", 3)), 3u);
+  constexpr char without_terminator[]{'a', 'b'};
+  EXPECT_EQ(utf8_length(without_terminator), 2u);
+  constexpr char incomplete[]{static_cast<char>(0xe0)};
+  EXPECT_FALSE(utf8_decode_char(incomplete, point));
 
   point = U'Z';
   auto terminated = utf8_decode_char("\xe0\0\x80", point);
@@ -1022,11 +1030,11 @@ TEST(StringTest, EagerOwnerBoundariesRejectMalformedSuffixBeforeRangeErrors) {
     EXPECT_TRUE(result.error().template is<UnicodeException>());
   };
   expectUnicode(source.at(0));
-  expectUnicode(source.at(NPos));
+  expectUnicode(source.at(npos));
   expectUnicode(source.substr(0, 0));
-  expectUnicode(source.substr(NPos, 1));
+  expectUnicode(source.substr(npos, 1));
   expectUnicode(source.erase(0, 0));
-  expectUnicode(source.erase(NPos, 1));
+  expectUnicode(source.erase(npos, 1));
   expectUnicode(source.begin());
   expectUnicode(source.starts_with("a"));
   expectUnicode(source.starts_with('a'));
@@ -1049,8 +1057,8 @@ TEST(StringTest, ValidatingBoundariesKeepCodepointsBinaryBytesAndClamping) {
   EXPECT_EQ(source.at(2), U'\0');
   EXPECT_EQ(source.at(3), U'🙂');
   EXPECT_EQ(source.substr(1, 3), String(std::string_view("日\0🙂", 8)));
-  EXPECT_EQ(source.substr(2, NPos), String(std::string_view("\0🙂z", 6)));
-  EXPECT_EQ(source.substr(5, NPos), String());
+  EXPECT_EQ(source.substr(2, npos), String(std::string_view("\0🙂z", 6)));
+  EXPECT_EQ(source.substr(5, npos), String());
   EXPECT_EQ(source.substr(1, 0), String());
   auto outside = source.at(5);
   ASSERT_FALSE(outside);
@@ -1058,9 +1066,9 @@ TEST(StringTest, ValidatingBoundariesKeepCodepointsBinaryBytesAndClamping) {
   String erased = source;
   ASSERT_TRUE(erased.erase(1, 3));
   EXPECT_EQ(erased, "az");
-  ASSERT_TRUE(erased.erase(2, NPos));
+  ASSERT_TRUE(erased.erase(2, npos));
   EXPECT_EQ(erased, "az");
-  ASSERT_TRUE(source.erase(1, NPos));
+  ASSERT_TRUE(source.erase(1, npos));
   EXPECT_EQ(source, "a");
 }
 
@@ -1113,13 +1121,13 @@ TEST(StringTest, ReplaceValidatesSourceThenPatternButKeepsReplacementRaw) {
   for (auto sensitivity : {String::CaseSensitive, String::CaseInsensitive}) {
     auto emptyPattern = source.replace("", "x", sensitivity);
     ASSERT_FALSE(emptyPattern);
-    EXPECT_STREQ(emptyPattern.error().what(), sourceError.error().what());
+    EXPECT_EQ(emptyPattern.error().what(), sourceError.error().what());
     auto bothInvalid = source.replace(pattern, "x", sensitivity);
     ASSERT_FALSE(bothInvalid);
-    EXPECT_STREQ(bothInvalid.error().what(), sourceError.error().what());
+    EXPECT_EQ(bothInvalid.error().what(), sourceError.error().what());
     auto invalidPattern = String("z").replace(pattern, "x", sensitivity);
     ASSERT_FALSE(invalidPattern);
-    EXPECT_STREQ(invalidPattern.error().what(), patternError.error().what());
+    EXPECT_EQ(invalidPattern.error().what(), patternError.error().what());
     EXPECT_EQ(String("valid").replace("", source, sensitivity), "valid");
     EXPECT_EQ(String("aaa").replace("a", source, sensitivity),
         String(std::string_view("a\xff" "a\xff" "a\xff", 6)));
@@ -1134,7 +1142,7 @@ TEST(StringTest, BeginsWithValidatesNonemptyPatternBeforeTheCompleteSource) {
   for (auto sensitivity : {String::CaseSensitive, String::CaseInsensitive}) {
     auto result = source.starts_with(prefix, sensitivity);
     ASSERT_FALSE(result);
-    EXPECT_STREQ(result.error().what(), prefixError.error().what());
+    EXPECT_EQ(result.error().what(), prefixError.error().what());
     EXPECT_EQ(source.starts_with("", sensitivity), true);
     EXPECT_FALSE(source.starts_with("a", sensitivity));
     EXPECT_EQ(String(std::string_view("日A\0z", 6)).starts_with("日a", sensitivity),
@@ -1178,16 +1186,16 @@ TEST(StringTest, RightSplitPreservesValidationDirectionAndLazyDelimiterErrors) {
   auto patternError = badPattern.reverse();
   ASSERT_FALSE(sourceError);
   ASSERT_FALSE(patternError);
-  for (auto limit : {std::size_t(0), std::size_t(1), NPos}) {
+  for (auto limit : {std::size_t(0), std::size_t(1), npos}) {
     auto sourceFirst = badSource.rsplit(badPattern, limit);
     ASSERT_FALSE(sourceFirst);
-    EXPECT_STREQ(sourceFirst.error().what(), sourceError.error().what());
+    EXPECT_EQ(sourceFirst.error().what(), sourceError.error().what());
     auto patternSecond = String("").rsplit(badPattern, limit);
     ASSERT_FALSE(patternSecond);
-    EXPECT_STREQ(patternSecond.error().what(), patternError.error().what());
+    EXPECT_EQ(patternSecond.error().what(), patternError.error().what());
     auto anySourceFirst = badSource.rsplit_any(badPattern, limit);
     ASSERT_FALSE(anySourceFirst);
-    EXPECT_STREQ(anySourceFirst.error().what(), sourceError.error().what());
+    EXPECT_EQ(anySourceFirst.error().what(), sourceError.error().what());
   }
   // Empty input never queries the delimiter set; successful membership also
   // avoids observing the set's malformed suffix.

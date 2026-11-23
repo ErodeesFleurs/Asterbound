@@ -83,7 +83,7 @@ protected:
 using NetElementInt = NetElementIntegral<std::int64_t>;
 using NetElementUInt = NetElementIntegral<std::uint64_t>;
 
-// Properly encodes NPos no matter the platform width of size_t NetElement
+// Properly encodes npos no matter the platform width of size_t NetElement
 // size_t values are NOT clamped when setting.
 class NetElementSize : public NetElementBasicField<std::size_t> {
 protected:

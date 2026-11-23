@@ -30,7 +30,7 @@ std::uint64_t fingerprint_bytes(std::string_view bytes) {
 template <class Result>
 concept checked_result = requires(Result const& result) {
   { static_cast<bool>(result) } -> std::same_as<bool>;
-  { result.error().what() } -> std::convertible_to<char const*>;
+  { result.error().what() } -> std::same_as<std::string const&>;
 };
 template <checked_result Result>
 bool checked(benchmark::State& state, Result const& result) {

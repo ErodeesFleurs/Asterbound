@@ -218,7 +218,7 @@ namespace Dungeon {
 
   unsigned ImageTileset::colorAsInt(Vec4B color) const {
     if ((color[3] != 0) && (color[3] != 255)) {
-      if constexpr (Star::DebugEnabled) {
+      if constexpr (Star::debug_enabled) {
         Star::star_assert_failed((false));
       }
       return 0;

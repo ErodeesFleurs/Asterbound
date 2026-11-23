@@ -68,7 +68,7 @@ struct TabSetConfig {
 
 class TabSetWidget : public Widget {
 public:
-  void const* query_type(TypeKey key) const noexcept override { return query_type_of<TabSetWidget, Widget>(this, key); }
+  void query_type(TypeQuery& query) const noexcept override { query_type_of<TabSetWidget, Widget>(*this, query); }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<TabSetWidget>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<TabSetWidget>, StarException> create(GuiContext& context, TabSetConfig const& tabSetConfig);

@@ -20,11 +20,11 @@ std::expected<std::size_t, StarException> DataStreamReader::read_vlq_u(std::uint
   bytes = bytes.subspan(static_cast<std::size_t>(*position));
   std::uint64_t decoded = 0;
   auto count = Star::read_vlq_u(decoded, bytes);
-  auto consumed = count == NPos ? std::min(bytes.size(), max_vlq_bytes) : count;
+  auto consumed = count == npos ? std::min(bytes.size(), max_vlq_bytes) : count;
   auto advanced = m_buffer.seek(static_cast<StreamOffset>(consumed), IOSeek::Relative);
   if (!advanced)
     return std::unexpected(std::move(advanced.error()));
-  if (count != NPos) {
+  if (count != npos) {
     value = decoded;
     return consumed;
   }
@@ -89,9 +89,9 @@ DataStreamIODevice::DataStreamIODevice(IODevice& device)
 
 DataStreamBuffer::DataStreamBuffer() = default;
 
-DataStreamBuffer::DataStreamBuffer(std::size_t s)
+DataStreamBuffer::DataStreamBuffer(std::size_t initial_size)
   : DataStreamBuffer() {
-  reset(s);
+  reset(initial_size);
 }
 
 DataStreamBuffer::DataStreamBuffer(ByteArray b)
@@ -123,14 +123,6 @@ ByteArray const& DataStreamBuffer::data() const {
 
 ByteArray DataStreamBuffer::take_data() { return m_buffer.take_data(); }
 
-char* DataStreamBuffer::ptr() {
-  return m_buffer.ptr();
-}
-
-const char* DataStreamBuffer::ptr() const {
-  return m_buffer.ptr();
-}
-
 std::span<char> DataStreamBuffer::span() {
   return m_buffer.span();
 }
@@ -160,8 +152,8 @@ bool DataStreamBuffer::empty() const {
   return static_cast<std::size_t>(*result);
 }
 
-void DataStreamBuffer::reset(std::size_t newSize) {
-  m_buffer.reset(newSize);
+void DataStreamBuffer::reset(std::size_t new_size) {
+  m_buffer.reset(new_size);
 }
 
 void DataStreamBuffer::reset(ByteArray b) {
@@ -178,12 +170,8 @@ void DataStreamBuffer::reset(ByteArray b) {
 
 DataStreamExternalBuffer::DataStreamExternalBuffer() : m_buffer() {}
 
-DataStreamExternalBuffer::DataStreamExternalBuffer(std::span<char const> externalData) : DataStreamExternalBuffer() {
-  reset(externalData);
-}
-
-char const* DataStreamExternalBuffer::ptr() const {
-  return m_buffer.ptr();
+DataStreamExternalBuffer::DataStreamExternalBuffer(std::span<char const> external_data) : DataStreamExternalBuffer() {
+  reset(external_data);
 }
 
 std::span<char const> DataStreamExternalBuffer::span() const {
@@ -220,8 +208,8 @@ bool DataStreamExternalBuffer::empty() const {
   return m_buffer.data_size() - *result;
 }
 
-void DataStreamExternalBuffer::reset(std::span<char const> externalData) {
-  m_buffer.reset(externalData);
+void DataStreamExternalBuffer::reset(std::span<char const> external_data) {
+  m_buffer.reset(external_data);
 }
 
 [[nodiscard]] std::expected<void, StarException> DataStreamExternalBuffer::read_data(std::span<char> data) {

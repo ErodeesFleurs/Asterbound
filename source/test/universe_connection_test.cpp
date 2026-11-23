@@ -563,12 +563,12 @@ std::expected<void, StarException> wait_for_wire_progress(
 
 const GameTestRegistration handshake_version_range("UniverseConnections", "HandshakeVersionRange", [](GameTest&) {
   EXPECT_EQ(read_open_protocol_version(JsonObject{}, 1), 1u);
-  EXPECT_EQ(read_open_protocol_version(JsonObject{{"openProtocolVersion", Json()}}, LegacyVersion), LegacyVersion);
+  EXPECT_EQ(read_open_protocol_version(JsonObject{{"openProtocolVersion", Json()}}, legacy_version), legacy_version);
   auto read_version = [](Json version) {
     return read_open_protocol_version(JsonObject{{"openProtocolVersion", std::move(version)}}, 1);
   };
   constexpr auto max_version = std::numeric_limits<VersionNumber>::max();
-  EXPECT_EQ(read_version(0), LegacyVersion);
+  EXPECT_EQ(read_version(0), legacy_version);
   EXPECT_EQ(read_version(max_version), max_version);
   for (auto invalid : {std::int64_t(max_version) + 1, std::int64_t(-1)}) {
     auto version = read_version(invalid);
@@ -688,21 +688,21 @@ const GameTestRegistration log_map_broadcast("UniverseConnections", "LogMapBroad
 const GameTestRegistration universeConnectionsWorldUpdatePacketsTransferRvaluesAndCopyLvalues(
     "UniverseConnections", "WorldUpdatePacketsTransferRvaluesAndCopyLvalues", [](GameTest&) {
   ByteArray parameters(4096, 'p');
-  auto parametersAllocation = parameters.data();
+  auto parametersAllocation = parameters.span().data();
   WorldParametersUpdatePacket movedParameters(std::move(parameters));
-  EXPECT_EQ(movedParameters.parametersData.data(), parametersAllocation);
+  EXPECT_EQ(movedParameters.parametersData.span().data(), parametersAllocation);
   EXPECT_TRUE(parameters.empty());
   WorldParametersUpdatePacket copiedParameters(movedParameters.parametersData);
-  EXPECT_NE(copiedParameters.parametersData.data(), parametersAllocation);
+  EXPECT_NE(copiedParameters.parametersData.span().data(), parametersAllocation);
   EXPECT_EQ(copiedParameters.parametersData, movedParameters.parametersData);
 
   ByteArray delta(4096, 'd');
-  auto deltaAllocation = delta.data();
+  auto deltaAllocation = delta.span().data();
   WorldClientStateUpdatePacket movedDelta(std::move(delta));
-  EXPECT_EQ(movedDelta.worldClientStateDelta.data(), deltaAllocation);
+  EXPECT_EQ(movedDelta.worldClientStateDelta.span().data(), deltaAllocation);
   EXPECT_TRUE(delta.empty());
   WorldClientStateUpdatePacket copiedDelta(movedDelta.worldClientStateDelta);
-  EXPECT_NE(copiedDelta.worldClientStateDelta.data(), deltaAllocation);
+  EXPECT_NE(copiedDelta.worldClientStateDelta.span().data(), deltaAllocation);
   EXPECT_EQ(copiedDelta.worldClientStateDelta, movedDelta.worldClientStateDelta);
 });
 

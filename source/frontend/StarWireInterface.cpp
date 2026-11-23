@@ -324,7 +324,7 @@ std::expected<void, StarException> WirePane::renderImpl() {
   auto badWire =
     Color::rgb_f(0.6f + static_cast<float>(std::sin(Time::monotonic_time() * std::numbers::pi * 2.0)) * 0.4f, 0.0f, 0.0f);
   float phase = 0.5f + 0.5f * std::sin(static_cast<double>(Time::monotonic_milliseconds()) / 100.0);
-  auto drawLineColor = Color::Red.mix(Color::White, phase);
+  auto drawLineColor = Color::palette_red.mix(Color::palette_white, phase);
   for (auto const& entity : *entities) {
     for (auto direction : {WireDirection::Input, WireDirection::Output}) {
       for (std::size_t i = 0; i < entity->nodeCount(direction); ++i) {
@@ -337,7 +337,7 @@ std::expected<void, StarException> WirePane::renderImpl() {
         if (!icon) return std::unexpected(std::move(icon.error()));
         auto size = context().textureSize(*icon);
         if (!size) return std::unexpected(std::move(size.error()));
-        auto drawn = context().drawQuad(*icon, camera.worldToScreen(centerOfTile(position) - ((Vec2F(*size) / TilePixels) / 2.0f)), camera.pixelRatio(), Color::White.to_rgba());
+        auto drawn = context().drawQuad(*icon, camera.worldToScreen(centerOfTile(position) - ((Vec2F(*size) / TilePixels) / 2.0f)), camera.pixelRatio(), Color::palette_white.to_rgba());
         if (!drawn) return std::unexpected(std::move(drawn.error()));
       }
     }
@@ -356,14 +356,14 @@ std::expected<void, StarException> WirePane::renderImpl() {
         Vec2I tile = entity->tilePosition();
         Vec2I position = tile + *offset;
         Color wire = *color;
-        if (direction == WireDirection::Input) wire = wire.mix(Color::Black, 0.8f);
+        if (direction == WireDirection::Input) wire = wire.mix(Color::palette_black, 0.8f);
         else {
           auto state = entity->nodeState(node);
           if (!state) return std::unexpected(std::move(state.error()));
-          if (!*state) wire = wire.mix(Color::Black, 0.8f);
+          if (!*state) wire = wire.mix(Color::palette_black, 0.8f);
         }
         for (auto const& connection : *connections) {
-          if (direction == WireDirection::Input) wire = color->mix(Color::Black, 0.8f);
+          if (direction == WireDirection::Input) wire = color->mix(Color::palette_black, 0.8f);
           if (direction == WireDirection::Input)
             visitedConnections.add({{.entityLocation = tile, .nodeIndex = i}, connection});
           else if (visitedConnections.add({connection, {.entityLocation = tile, .nodeIndex = i}}))
@@ -384,7 +384,7 @@ std::expected<void, StarException> WirePane::renderImpl() {
                 auto state = source->nodeState(otherNode);
                 if (!state) return std::unexpected(std::move(state.error()));
                 wire = *otherColor;
-                if (!*state) wire = wire.mix(Color::Black, 0.8f);
+                if (!*state) wire = wire.mix(Color::palette_black, 0.8f);
               }
             } else wire = badWire;
           }
@@ -406,7 +406,7 @@ std::expected<void, StarException> WirePane::renderImpl() {
       auto color = source->nodeColor(node);
       if (!color) return std::unexpected(std::move(color.error()));
       sourcePosition += *offset;
-      drawLineColor = color->mix(Color::White, phase);
+      drawLineColor = color->mix(Color::palette_white, phase);
     }
     return renderWire(centerOfTile(sourcePosition), aimPos, drawLineColor);
   }

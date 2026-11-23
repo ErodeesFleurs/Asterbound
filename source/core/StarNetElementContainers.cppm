@@ -90,7 +90,7 @@ public:
 private:
   // If a delta is written from further back than this many steps, the delta
   // will fall back to a full serialization of the entire state.
-  static std::int64_t const MaxChangeDataVersions = 100;
+  static std::int64_t const max_change_data_versions = 100;
 
   struct SetChange {
     key_type key;
@@ -487,14 +487,14 @@ template <typename BaseMap>
 template <typename BaseMap>
 void NetElementMapWrapper<BaseMap>::add_change_data(ElementChange change) {
   std::uint64_t current_version = m_net_version ? m_net_version->get().current() : 0;
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((m_change_data.empty() || m_change_data.back().first <= current_version));
   }
 
   m_change_data.push_back({current_version, std::move(change)});
 
   m_change_data_last_version =
-    std::max<std::int64_t>(static_cast<std::int64_t>(current_version) - MaxChangeDataVersions, 0);
+    std::max<std::int64_t>(static_cast<std::int64_t>(current_version) - max_change_data_versions, 0);
   while (!m_change_data.empty() && m_change_data.front().first < m_change_data_last_version)
     m_change_data.pop_front();
 }

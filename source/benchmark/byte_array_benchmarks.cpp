@@ -32,7 +32,7 @@ bool require(benchmark::State& state, bool condition, char const* message) {
 template <class Result>
 concept checked_result = requires(Result const& result) {
   { static_cast<bool>(result) } -> std::same_as<bool>;
-  { result.error().what() } -> std::convertible_to<char const*>;
+  { result.error().what() } -> std::same_as<std::string const&>;
 };
 template <checked_result Result>
 bool checked(benchmark::State& state, Result const& result) {
@@ -100,7 +100,7 @@ void measure_bytes(benchmark::State& state) {
       if (!require(state, validation == expected_comparison, "comparison differs from independent fixture")) return;
       expected.assign(1, char(expected_comparison));
       // Both complete comparison operands belong to the fixture fingerprint.
-      bytes.append(other.data(), other.size());
+      bytes.append(std::string_view(other.span()));
     } else if constexpr (Operation == operation::borrowed_subspan) {
       if (!require(state, equal_bytes(validation, expected), "complete borrowed result differs")) return;
     } else if (!require(state, equal_bytes(validation.span(), expected), "complete owning result differs")) return;
@@ -113,7 +113,7 @@ void measure_bytes(benchmark::State& state) {
       auto output = evaluate();
       if constexpr (Operation == operation::compare_equal || Operation == operation::compare_unequal) benchmark::DoNotOptimize(output);
       else if constexpr (Operation == operation::borrowed_subspan) { benchmark::DoNotOptimize(output.data()); benchmark::DoNotOptimize(output.size()); }
-      else { benchmark::DoNotOptimize(output.data()); benchmark::DoNotOptimize(output.size()); }
+      else { benchmark::DoNotOptimize(output.span().data()); benchmark::DoNotOptimize(output.size()); }
       benchmark::ClobberMemory();
     }
   }
@@ -164,7 +164,7 @@ void measure_decode(benchmark::State& state, bool base64, bool permissive) {
     (void)_;
     for (std::size_t i = 0; i != batch_size; ++i) {
       auto output = evaluate();
-      benchmark::DoNotOptimize(output.data()); benchmark::DoNotOptimize(output.size());
+      benchmark::DoNotOptimize(output.span().data()); benchmark::DoNotOptimize(output.size());
       benchmark::ClobberMemory();
     }
   }
@@ -199,12 +199,12 @@ void measure_codec(benchmark::State& state, bool zstd, bool decompress) {
   } else {
     std::string decoded(golden.size(), '\0');
     if (zstd) {
-      auto size = ZSTD_decompress(decoded.data(), decoded.size(), validation->data(), validation->size());
+      auto size = ZSTD_decompress(decoded.data(), decoded.size(), validation->span().data(), validation->size());
       if (!require(state, !ZSTD_isError(size) && size == golden.size(), "independent zstd result validation failed")) return;
     } else {
       auto size = decoded.size();
       auto status = zng_uncompress(reinterpret_cast<unsigned char*>(decoded.data()), &size,
-          reinterpret_cast<unsigned char const*>(validation->data()), validation->size());
+          reinterpret_cast<unsigned char const*>(validation->span().data()), validation->size());
       if (!require(state, status == Z_OK && size == golden.size(), "independent zlib result validation failed")) return;
     }
     if (!require(state, decoded == golden, "complete compressed result does not decode to independent golden")) return;
@@ -217,7 +217,7 @@ void measure_codec(benchmark::State& state, bool zstd, bool decompress) {
     for (std::size_t i = 0; i != codec_batch_size; ++i) {
       auto output = evaluate();
       if (!checked(state, output)) return;
-      benchmark::DoNotOptimize(output->data()); benchmark::DoNotOptimize(output->size());
+      benchmark::DoNotOptimize(output->span().data()); benchmark::DoNotOptimize(output->size());
       benchmark::ClobberMemory();
     }
   }

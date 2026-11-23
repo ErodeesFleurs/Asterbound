@@ -2473,7 +2473,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
 
   if (isClient)
     root().spatialLogger().log_poly("world", m_movementController->collisionBody(),
-                                    isMaster() ? Color::Orange.to_rgba() : Color::Yellow.to_rgba());
+                                    isMaster() ? Color::palette_orange.to_rgba() : Color::palette_yellow.to_rgba());
   return {};
 }
 
@@ -4461,7 +4461,7 @@ void Player::queueItemPickupMessage(std::shared_ptr<Item> const& item) {
 }
 
 std::expected<void, StarException> Player::addChatMessage(String const& message, Json const& config) {
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((!isSlave()));
   }
   m_chatMessage = message;
@@ -4476,14 +4476,14 @@ std::expected<void, StarException> Player::addChatMessage(String const& message,
 }
 
 void Player::addEmote(HumanoidEmote const& emote, std::optional<float> emoteCooldown) {
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((!isSlave()));
   }
   m_emoteState = emote;
   m_emoteCooldownTimer = GameTimer(emoteCooldown.value_or(m_emoteCooldown));
 }
 std::expected<void, StarException> Player::setDance(std::optional<String> const& danceName) {
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((!isSlave()));
   }
   assert(!isSlave());
@@ -4546,7 +4546,7 @@ std::expected<void, StarException> Player::instrumentEquipped(String const& inst
 }
 
 std::expected<void, StarException> Player::interact(InteractAction const& action) {
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((!isSlave()));
   }
   m_pendingInteractActions.push_back(RpcPromise<InteractAction>::make_fulfilled(action));
@@ -4554,7 +4554,7 @@ std::expected<void, StarException> Player::interact(InteractAction const& action
 }
 
 std::expected<void, StarException> Player::addEffectEmitters(StringSet const& emitters) {
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((!isSlave()));
   }
   m_effectEmitter->addEffectSources("normal", emitters);

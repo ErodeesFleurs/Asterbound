@@ -113,7 +113,7 @@ TEST(ConfigurationTest, ProtectsOnlyTheParsedVersionRoot) {
     ASSERT_FALSE(expected_error);
     auto result = config.set_path(path, 2);
     ASSERT_FALSE(result);
-    EXPECT_STREQ(result.error().what(), expected_error.error().what());
+    EXPECT_EQ(result.error().what(), expected_error.error().what());
   }
   EXPECT_EQ(config.snapshot().revision, 0u);
   EXPECT_EQ(config.current_configuration(), initial);
@@ -685,7 +685,7 @@ const GameTestRegistration lua_http_cancellation("RootTest", "LuaHttpCancellatio
   session = std::make_shared<LuaHttpSession>(**root);
   auto live_callbacks = LuaBindings::make_http_callbacks(session, true);
   ASSERT_TRUE(live_callbacks) << live_callbacks.error().what();
-  ASSERT_TRUE(context->set_path("http", LuaNil));
+  ASSERT_TRUE(context->set_path("http", lua_nil));
   ASSERT_TRUE(context->set_callbacks("http", *live_callbacks));
   ASSERT_TRUE(session->set_approval_available(true));
   ASSERT_TRUE((*configuration)->set_path("safe.luaHttp.trustedSites", JsonArray{"Known.Example"}));

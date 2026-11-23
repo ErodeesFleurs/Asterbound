@@ -7,13 +7,11 @@ struct UnicodeExceptionTag { static constexpr std::string_view name() { return "
 using UnicodeException = StarError<UnicodeExceptionTag, StarException>;
 using Utf8Type = char;
 using Utf32Type = char32_t;
-inline constexpr long STAR_UTF32_REPLACEMENT_CHAR = 0x000000b7L;
+inline constexpr long utf32_replacement_char = 0x000000b7L;
 
-// Bounded inputs preserve embedded NUL; pointer-only inputs are NUL-terminated.
+// Views preserve embedded NULs. Character arrays use the terminated convention.
 [[nodiscard]] std::expected<std::size_t, StarException> utf8_length(std::string_view);
-[[nodiscard]] std::expected<std::size_t, StarException> utf8_length(Utf8Type const*);
 [[nodiscard]] std::expected<std::size_t, StarException> utf8_decode_char(std::string_view, Utf32Type&);
-[[nodiscard]] std::expected<std::size_t, StarException> utf8_decode_char(Utf8Type const*, Utf32Type&);
 [[nodiscard]] std::expected<std::size_t, StarException> utf8_encode_char(std::span<Utf8Type>, Utf32Type);
 [[nodiscard]] std::expected<Utf32Type, StarException> hex_string_to_utf32(std::string_view, std::optional<Utf32Type> previous = {});
 [[nodiscard]] std::expected<std::string, StarException> hex_string_from_utf32(Utf32Type);
@@ -23,7 +21,7 @@ constexpr bool is_utf16_trail_surrogate(Utf32Type point) noexcept { return point
 [[nodiscard]] std::expected<std::pair<Utf32Type, std::optional<Utf32Type>>, StarException> utf32_to_utf16_surrogate_pair(Utf32Type);
 
 namespace unicode_detail {
-enum class decode_error : unsigned char {
+enum class DecodeError : unsigned char {
   none,
   invalid_sequence,
   missing_trailing_units,
@@ -38,10 +36,13 @@ constexpr unsigned char byte_count(unsigned char first) noexcept {
 
 // Compact validation shared by bulk traversal and public checked boundaries.
 // Only a successful, nonempty decode modifies output.
-constexpr std::expected<unsigned char, decode_error> decode_char(
-    char const* bytes, Utf32Type& output, std::size_t remain, bool terminated = false) noexcept {
-  if (remain == 0 || (terminated && *bytes == 0)) return 0;
-  auto first = static_cast<unsigned char>(bytes[0]);
+template <typename View>
+  requires std::same_as<View, std::string_view> || std::same_as<View, std::span<std::byte const>>
+constexpr std::expected<unsigned char, DecodeError> decode_char(
+    View bytes, Utf32Type& output, bool terminated = false) noexcept {
+  if (bytes.empty()) return 0;
+  auto first = static_cast<unsigned char>(bytes.front());
+  if (terminated && first == 0) return 0;
   unsigned char count;
   std::uint32_t point;
   std::uint32_t minimum;
@@ -49,22 +50,24 @@ constexpr std::expected<unsigned char, decode_error> decode_char(
   else if ((first & 0xe0) == 0xc0) { count = 2; point = first & 0x1f; minimum = 0x80; }
   else if ((first & 0xf0) == 0xe0) { count = 3; point = first & 0x0f; minimum = 0x800; }
   else if ((first & 0xf8) == 0xf0) { count = 4; point = first & 7; minimum = 0x10000; }
-  else return std::unexpected(decode_error::invalid_sequence);
-  if (remain < count) return std::unexpected(decode_error::missing_trailing_units);
+  else return std::unexpected(DecodeError::invalid_sequence);
+  if (!terminated && bytes.size() < count) return std::unexpected(DecodeError::missing_trailing_units);
   for (unsigned i = 1; i != count; ++i) {
+    if (terminated && i == bytes.size()) return std::unexpected(DecodeError::missing_trailing_units);
     auto next = static_cast<unsigned char>(bytes[i]);
-    if (terminated && next == 0) return std::unexpected(decode_error::missing_trailing_units);
-    if ((next & 0xc0) != 0x80) return std::unexpected(decode_error::invalid_sequence);
+    if (terminated && next == 0) return std::unexpected(DecodeError::missing_trailing_units);
+    if ((next & 0xc0) != 0x80) return std::unexpected(DecodeError::invalid_sequence);
     point = (point << 6) | (next & 0x3f);
   }
   if (point < minimum || point > 0x10ffff)
-    return std::unexpected(decode_error::invalid_codepoint);
+    return std::unexpected(DecodeError::invalid_codepoint);
   output = static_cast<Utf32Type>(point);
   return count;
 }
 
 // Construct owning diagnostics only on failure, with normal cause/trace policy.
-StarException decode_exception(decode_error);
+StarException decode_exception(DecodeError);
+std::expected<std::size_t, StarException> byte_length(std::span<std::byte const> bytes);
 
 template <class Iterator>
 concept contiguous_byte_iterator = std::contiguous_iterator<Iterator>
@@ -73,6 +76,28 @@ concept contiguous_byte_iterator = std::contiguous_iterator<Iterator>
         || std::same_as<std::iter_value_t<Iterator>, signed char>
         || std::same_as<std::iter_value_t<Iterator>, unsigned char>
         || std::same_as<std::iter_value_t<Iterator>, char8_t>);
+}
+
+template <std::size_t extent>
+[[nodiscard]] std::expected<std::size_t, StarException> utf8_decode_char(
+    Utf8Type const (&bytes)[extent], Utf32Type& output) {
+  auto width = unicode_detail::decode_char(std::string_view(bytes, extent), output, true);
+  if (!width) return std::unexpected(unicode_detail::decode_exception(width.error()));
+  return *width;
+}
+
+template <std::size_t extent>
+[[nodiscard]] std::expected<std::size_t, StarException> utf8_length(Utf8Type const (&bytes)[extent]) {
+  std::string_view remaining(bytes, extent);
+  std::size_t count = 0;
+  while (!remaining.empty() && remaining.front() != 0) {
+    Utf32Type point;
+    auto width = unicode_detail::decode_char(remaining, point, true);
+    if (!width) return std::unexpected(unicode_detail::decode_exception(width.error()));
+    remaining.remove_prefix(*width);
+    ++count;
+  }
+  return count;
 }
 
 template <class Visitor>
@@ -90,7 +115,7 @@ template <class Visitor> requires codepoint_visitor<Visitor>
   std::size_t offset = 0;
   while (offset != bytes.size()) {
     Utf32Type point;
-    auto width = unicode_detail::decode_char(bytes.data() + offset, point, bytes.size() - offset);
+    auto width = unicode_detail::decode_char(bytes.substr(offset), point);
     if (!width) return std::unexpected(unicode_detail::decode_exception(width.error()));
     if constexpr (std::same_as<std::invoke_result_t<Visitor&, char32_t, std::size_t, std::size_t>, void>) {
       std::invoke(visitor, char32_t(point), std::size_t(offset), std::size_t(*width));
@@ -124,7 +149,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> advance();
   [[nodiscard]] std::expected<void, StarException> retreat();
 private:
-  [[nodiscard]] unicode_detail::decode_error decode() const;
+  [[nodiscard]] unicode_detail::DecodeError decode() const;
   std::string_view m_bytes;
   std::size_t m_offset = 0;
   mutable std::size_t m_width = 0;
@@ -169,8 +194,7 @@ public:
   [[nodiscard]] static std::expected<U8ToU32Iterator, StarException> create(BaseIterator first, BaseIterator last) {
     if constexpr (unicode_detail::contiguous_byte_iterator<BaseIterator>) {
       if (first != last) {
-        auto validated = utf8_length(std::string_view(
-            reinterpret_cast<char const*>(std::to_address(first)), static_cast<std::size_t>(last - first)));
+        auto validated = unicode_detail::byte_length(std::as_bytes(std::span(first, last)));
         if (!validated) return std::unexpected(std::move(validated.error()));
       }
     } else {
@@ -244,7 +268,7 @@ export namespace Star {
   using ::Star::UnicodeException;
   using ::Star::Utf8Type;
   using ::Star::Utf32Type;
-  using ::Star::STAR_UTF32_REPLACEMENT_CHAR;
+  using ::Star::utf32_replacement_char;
   using ::Star::utf8_length;
   using ::Star::utf8_decode_char;
   using ::Star::utf8_encode_char;
@@ -263,7 +287,8 @@ export namespace Star {
   using ::Star::for_each_codepoint;
 }
 export namespace Star::unicode_detail {
-  using ::Star::unicode_detail::decode_error;
+  using ::Star::unicode_detail::DecodeError;
+  using ::Star::unicode_detail::byte_length;
   using ::Star::unicode_detail::decode_char;
   using ::Star::unicode_detail::decode_exception;
 }

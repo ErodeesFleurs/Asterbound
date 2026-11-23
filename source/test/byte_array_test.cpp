@@ -74,7 +74,8 @@ template <class Owner>
 concept borrows_begin = requires(Owner&& owner) { std::forward<Owner>(owner).begin(); };
 static_assert(borrows_bytes<ByteArray&> && borrows_bytes<ByteArray const&>);
 static_assert(!borrows_bytes<ByteArray> && !borrows_bytes<ByteArray const>);
-static_assert(!borrows_data<ByteArray> && !borrows_data<ByteArray const>);
+static_assert(!borrows_data<ByteArray&> && !borrows_data<ByteArray const&>);
+static_assert(std::ranges::contiguous_range<ByteArray> && std::ranges::contiguous_range<ByteArray const>);
 static_assert(!borrows_at<ByteArray> && !borrows_begin<ByteArray>);
 static_assert(std::same_as<decltype(std::declval<ByteArray&>().span()), std::span<char>>);
 static_assert(std::same_as<decltype(std::declval<ByteArray const&>().span()), std::span<char const>>);
@@ -100,6 +101,23 @@ TEST(ByteArrayTest, AppendingSelfAndInteriorSpansPreservesBytesAcrossGrowth) {
       EXPECT_EQ(bytes, ByteArray::from_string(source + source.substr(3, count - 5)));
     }
   }
+}
+
+TEST(ByteArrayTest, ReservedTailCanBeInitializedAndAliasedAcrossReallocation) {
+  ByteArray bytes;
+  EXPECT_EQ(bytes.span().data(), nullptr);
+  bytes.reserve(8);
+  EXPECT_NE(bytes.span().data(), nullptr);
+  EXPECT_TRUE(bytes.empty());
+  auto tail = bytes.spare_capacity().last(3);
+  std::ranges::copy(std::string_view("xyz"), tail.begin());
+  bytes.write_from(tail, 8);
+  EXPECT_TRUE(std::ranges::equal(bytes.span().last(3), std::string_view("xyz")));
+  EXPECT_EQ(bytes.size(), 11u);
+  bytes.clear();
+  EXPECT_NE(bytes.span().data(), nullptr);
+  bytes.shrink_to_fit();
+  EXPECT_EQ(bytes.span().data(), nullptr);
 }
 
 TEST(ByteArrayTest, OverlappingWritesAndCopiesWorkInBothDirections) {
@@ -181,7 +199,7 @@ TEST(ByteArrayTest, CheckedAccessAndNullTerminatedFactoryPreserveBinaryBytes) {
   EXPECT_EQ(bytes, ByteArray(std::span<char const>("a\0b\0", 4)));
   auto element = bytes.at(2);
   ASSERT_TRUE(element);
-  EXPECT_EQ(&element->get(), bytes.data() + 2);
+  EXPECT_EQ(&element->get(), &bytes[2]);
   EXPECT_EQ(element->get(), 'b');
   auto invalid = bytes.at(bytes.size());
   ASSERT_FALSE(invalid);
@@ -190,7 +208,7 @@ TEST(ByteArrayTest, CheckedAccessAndNullTerminatedFactoryPreserveBinaryBytes) {
 }
 
 TEST(ByteArrayTest, CombineBorrowsMoveOnlyLvalueCallbackAndPreservesOperandOrder) {
-  struct callback {
+  struct Callback {
     std::unique_ptr<int> calls = std::make_unique<int>(0);
     char operator()(char&& smaller, char&& larger) & {
       ++*calls;

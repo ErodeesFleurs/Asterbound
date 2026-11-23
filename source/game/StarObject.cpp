@@ -110,7 +110,7 @@ import star.byte_array;
 import star.algorithm;
 namespace Star {
 
-Object::Object(Root& rootContext) : Entity(rootContext), m_scriptComponent(rootContext), m_scriptedAnimator(rootContext), m_animationTimer(0), m_currentFrame(-1), m_broken(false), m_unbreakable(false), m_orientationIndex(NPos), m_animationCenterLine(0), m_clientEntityMode(ClientEntityMode::ClientSlaveOnly) {}
+Object::Object(Root& rootContext) : Entity(rootContext), m_scriptComponent(rootContext), m_scriptedAnimator(rootContext), m_animationTimer(0), m_currentFrame(-1), m_broken(false), m_unbreakable(false), m_orientationIndex(npos), m_animationCenterLine(0), m_clientEntityMode(ClientEntityMode::ClientSlaveOnly) {}
 
 std::expected<std::shared_ptr<Object>, StarException> Object::create(Root& rootContext, std::shared_ptr<ObjectConfig const> config, Json const& parameters) {
   auto object = std::shared_ptr<Object>(new Object(rootContext));
@@ -439,7 +439,7 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
   if (!operation1)
     return std::unexpected(std::move(operation1.error()));
   auto initialized = [&]() -> std::expected<void, StarException> {
-    if (m_orientationIndex == NPos) {
+    if (m_orientationIndex == npos) {
       auto operation2 = updateOrientation();
       if (!operation2)
         return std::unexpected(std::move(operation2.error()));
@@ -460,10 +460,10 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
     auto color = std::move(*colorResult);
     auto colorName = color.take_utf8();
     auto colorEnd = colorName.find('?');
-    if (colorEnd != NPos) {
+    if (colorEnd != npos) {
       std::size_t suffixBegin = colorName.rfind('?');
       String colorDirectives;
-      std::string colorSuffix = suffixBegin == NPos ? "" : colorName.substr(suffixBegin);
+      std::string colorSuffix = suffixBegin == npos ? "" : colorName.substr(suffixBegin);
       if (colorSuffix.empty() && colorSuffix.rfind("?replace", 0) != 0)
         colorDirectives = colorName.substr(colorEnd);
       else
@@ -506,7 +506,7 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
       if (auto light = m_config->lightColors.find_ref(colorName)) {
         m_lightSourceColor.set(light->get());
       } else {
-        m_lightSourceColor.set(Color::Clear);
+        m_lightSourceColor.set(Color::palette_clear);
       }
       m_soundEffectEnabled.set(true);
       m_liquidCheckTimer = GameTimer(m_config->liquidCheckInterval);
@@ -930,7 +930,7 @@ std::expected<void, StarException> Object::render(RenderCallback& renderCallback
     auto operation5 = renderCallback.addDrawables(drawables, renderLayer());
     if (!operation5)
       return std::unexpected(std::move(operation5.error()));
-  } else if (m_orientationIndex != NPos) {
+  } else if (m_orientationIndex != npos) {
     auto drawablesResult = orientationDrawables(m_orientationIndex);
     if (!drawablesResult)
       return std::unexpected(std::move(drawablesResult.error()));
@@ -1290,7 +1290,7 @@ String Object::category() const {
 }
 
 std::shared_ptr<ObjectOrientation> Object::currentOrientation() const {
-  if (m_orientationIndex != NPos)
+  if (m_orientationIndex != npos)
     return getOrientations()[m_orientationIndex];
   else
     return {};
@@ -1327,7 +1327,7 @@ std::expected<List<Drawable>, StarException> Object::cursorHintDrawables() const
     auto drawable = std::move(*drawableResult);
     return List<Drawable>{std::move(drawable)};
   }
-  if (m_orientationIndex != NPos)
+  if (m_orientationIndex != npos)
     return orientationDrawables(m_orientationIndex);
   List<Drawable> result;
   auto const& orientations = getOrientations();
@@ -1790,7 +1790,7 @@ std::size_t Object::orientationIndex() const {
 }
 
 std::expected<void, StarException> Object::setOrientationIndex(std::size_t orientationIndex) {
-  if (orientationIndex != NPos && orientationIndex >= getOrientations().size())
+  if (orientationIndex != npos && orientationIndex >= getOrientations().size())
     return std::unexpected(ObjectException::format("Invalid orientation {} for object '{}'", orientationIndex, m_config->name));
   m_orientationIndex = orientationIndex;
   return {};
@@ -2366,7 +2366,7 @@ std::expected<void, StarException> Object::addChatMessage(String const& message,
 }
 
 std::expected<List<Drawable>, StarException> Object::orientationDrawables(std::size_t orientationIndex) const {
-  if (orientationIndex == NPos)
+  if (orientationIndex == npos)
     return List<Drawable>();
   auto orientationEntryResult = getOrientations().at(orientationIndex);
   if (!orientationEntryResult)
@@ -2381,7 +2381,7 @@ std::expected<List<Drawable>, StarException> Object::orientationDrawables(std::s
     for (auto const& layer : orientation->imageLayers) {
       Drawable drawable = layer;
       auto& imagePart = drawable.imagePart();
-      imagePart.image.m_directives.clear();
+      imagePart.image.directives.clear();
       String imagePath = AssetPath::join(imagePart.image);
       if ((m_colorDirectives || !m_colorSuffix.empty()) && m_imageKeys.contains("color")) {
         String& color = m_imageKeys.find("color")->second;
@@ -2396,26 +2396,26 @@ std::expected<List<Drawable>, StarException> Object::orientationDrawables(std::s
         String backup = std::move(color);
         color = std::move(baseColor);
         auto const& image = imagePath.utf8();
-        std::size_t suffix = NPos;
-        if (!m_colorSuffix.empty() && (suffix = image.rfind("<color>")) != NPos)
+        std::size_t suffix = npos;
+        if (!m_colorSuffix.empty() && (suffix = image.rfind("<color>")) != npos)
           imagePart.image = String(image.substr(0, (suffix += 7))).replace_tags(m_imageKeys, true, "default");
         else
           imagePart.image = imagePath.replace_tags(m_imageKeys, true, "default");
         color = std::move(backup);
-        imagePart.image.m_directives = layer.imagePart().image.m_directives;
+        imagePart.image.directives = layer.imagePart().image.directives;
         if (m_colorDirectives) {
           auto operation1 = imagePart.addDirectives(*metadata, m_colorDirectives);
           if (!operation1)
             return std::unexpected(std::move(operation1.error()));
         }
-        if (suffix != NPos) {
+        if (suffix != npos) {
           auto operation2 = imagePart.addDirectives(*metadata, m_colorSuffix + String(image.substr(suffix)).replace_tags(m_imageKeys, true, "default"));
           if (!operation2)
             return std::unexpected(std::move(operation2.error()));
         }
       } else {
         imagePart.image = imagePath.replace_tags(m_imageKeys, true, "default");
-        imagePart.image.m_directives = layer.imagePart().image.m_directives;
+        imagePart.image.directives = layer.imagePart().image.directives;
       }
       auto operation3 = imagePart.addDirectives(*metadata, m_directives);
       if (!operation3)
@@ -2565,7 +2565,7 @@ std::expected<Object::OutputNode, StarException> Object::OutputNode::create(Json
     return std::unexpected(std::move(positionResult.error()));
   auto position = std::move(*positionResult);
   node.position = position;
-  auto colorConfigResult = config.get("color", json_from_color(Color::Red));
+  auto colorConfigResult = config.get("color", json_from_color(Color::palette_red));
   if (!colorConfigResult)
     return std::unexpected(std::move(colorConfigResult.error()));
   auto colorConfig = std::move(*colorConfigResult);
@@ -2589,7 +2589,7 @@ std::expected<Object::InputNode, StarException> Object::InputNode::create(Json c
     return std::unexpected(std::move(positionResult.error()));
   auto position = std::move(*positionResult);
   node.position = position;
-  auto colorConfigResult = config.get("color", json_from_color(Color::Red));
+  auto colorConfigResult = config.get("color", json_from_color(Color::palette_red));
   if (!colorConfigResult)
     return std::unexpected(std::move(colorConfigResult.error()));
   auto colorConfig = std::move(*colorConfigResult);

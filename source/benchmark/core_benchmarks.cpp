@@ -259,13 +259,13 @@ void hash_address(benchmark::State& state) {
   std::size_t expected = 0;
   for (auto byte : ipv6)
     expected = expected * 101 + byte;
-  if (hash<HostAddress>{}(address) != expected) {
+  if (ValueHash<HostAddress>{}(address) != expected) {
     state.SkipWithError("Address hash differs from unsigned fixture");
     return;
   }
   for (auto _ : state) {
     benchmark::DoNotOptimize(address);
-    auto result = hash<HostAddress>{}(address);
+    auto result = ValueHash<HostAddress>{}(address);
     benchmark::DoNotOptimize(result);
   }
 }
@@ -757,7 +757,7 @@ void record_diagnostics() {
     auto print_outcome = [](char const* name, std::expected<std::optional<bool>, Star::StarException> const& status,
                             Search const& search) {
       if (!status) {
-        std::fprintf(stderr, "AStar diagnostic %s: error=%s\n", name, status.error().what());
+        std::fprintf(stderr, "AStar diagnostic %s: error=%s\n", name, status.error().what().c_str());
         return;
       }
       std::fprintf(stderr, "AStar diagnostic %s: status=%s; path=", name,
@@ -790,7 +790,7 @@ void record_diagnostics() {
                     pruned ? std::optional<double>(3.0) : std::nullopt);
       auto started = search.start(0, 3);
       if (!started)
-        std::fprintf(stderr, "AStar diagnostic start: error=%s\n", started.error().what());
+        std::fprintf(stderr, "AStar diagnostic start: error=%s\n", started.error().what().c_str());
       else
         print_outcome(pruned ? "pruned_rediscovery" : "cheaper_rediscovery", search.explore(), search);
     }
@@ -798,7 +798,7 @@ void record_diagnostics() {
     auto partial = make_search(partial_fixture);
     auto started = partial.start(0, partial_fixture.goal);
     if (!started)
-      std::fprintf(stderr, "AStar diagnostic start: error=%s\n", started.error().what());
+      std::fprintf(stderr, "AStar diagnostic start: error=%s\n", started.error().what().c_str());
     else {
       print_outcome("partial_first", partial.explore(), partial);
       print_outcome("partial_repeat", partial.explore(), partial);
@@ -1040,8 +1040,8 @@ bool validate(benchmark::State& state, std::vector<Fixture> const& fixtures, std
     auto result = execute<operation>(fixture);
     auto text = [&]() -> std::string {
       if constexpr (operation == Operation::Split || operation == Operation::Construct) {
-        if (result.m_base_path != fixture.m_base || !result.m_sub_path
-            || result.m_sub_path->utf8() != fixture.m_original_subpath)
+        if (result.base_path != fixture.m_base || !result.sub_path
+            || result.sub_path->utf8() != fixture.m_original_subpath)
           return {};
         return Star::AssetPath::join(result).utf8();
       } else if constexpr (operation == Operation::WriteText)
@@ -1436,8 +1436,8 @@ void BM_JsonSerialize(benchmark::State& state) {
   state.SetBytesProcessed(state.iterations() * bytes);
 }
 
-using FlatLookupMap = Star::HashMap<String, std::uint64_t, Star::hash<String>, std::equal_to<>>;
-using StandardLookupMap = std::unordered_map<String, std::uint64_t, Star::hash<String>, std::equal_to<>>;
+using FlatLookupMap = Star::HashMap<String, std::uint64_t, Star::ValueHash<String>, std::equal_to<>>;
+using StandardLookupMap = std::unordered_map<String, std::uint64_t, Star::ValueHash<String>, std::equal_to<>>;
 
 struct MapQueries {
   std::vector<String> hits;
@@ -1482,7 +1482,7 @@ void BM_MapLookup(benchmark::State& state) {
   }
   auto const& lookup = std::as_const(map);
   auto const& keys = Hit ? queries.hits : queries.misses;
-  state.SetLabel("Star::hash<String>/std::equal_to<>; reserve(count); prebuilt permuted String queries");
+  state.SetLabel("Star::ValueHash<String>/std::equal_to<>; reserve(count); prebuilt permuted String queries");
   for (auto _ : state) {
     (void)_;
     std::uint64_t checksum = 0;
@@ -1810,7 +1810,8 @@ void utility_calls(benchmark::State& state) {
     function tagged() return sb.formatTags("<key1>/<key64>", tags) end
   )LUA");
   if (!checked(state, loaded)) return;
-  auto fn = context->get<LuaFunction>(state.range(0) == 0 ? "plain" : state.range(0) == 1 ? "formatted" : "tagged");
+  std::string_view name = state.range(0) == 0 ? "plain" : state.range(0) == 1 ? "formatted" : "tagged";
+  auto fn = context->get<LuaFunction>(name);
   if (!checked(state, fn)) return;
   for (auto _ : state) {
     auto result = fn->invoke<LuaValue>();

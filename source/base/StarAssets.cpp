@@ -134,16 +134,16 @@ static std::optional<std::string_view> validate_base_path(std::string_view const
 }
 
 [[nodiscard]] static std::expected<void, StarException> validate_path(AssetPath const& components, bool can_contain_sub_path, bool can_contain_directives) {
-  if (auto error = validate_base_path(components.m_base_path.utf8())) {
-    std::array<std::pair<std::string_view, std::string_view>, 1> tags{{{"path", components.m_base_path.utf8()}}};
+  if (auto error = validate_base_path(components.base_path.utf8())) {
+    std::array<std::pair<std::string_view, std::string_view>, 1> tags{{{"path", components.base_path.utf8()}}};
     auto text = Star::format_tags(*error, tags);
     if (!text)
       return std::unexpected(std::move(text.error()));
     return std::unexpected(AssetException(std::move(*text)));
   }
-  if (!can_contain_sub_path && components.m_sub_path)
+  if (!can_contain_sub_path && components.sub_path)
     return std::unexpected(AssetException::format("Path '{}' cannot contain sub-path", components));
-  if (!can_contain_directives && !components.m_directives.empty())
+  if (!can_contain_directives && !components.directives.empty())
     return std::unexpected(AssetException::format("Path '{}' cannot contain directives", components));
   return {};
 }
@@ -194,7 +194,7 @@ StarException Assets::with_asset_context(StarException error, String const& path
   auto const& current = *error.diagnostic_summary();
   bool add_asset = current.asset.empty();
   bool add_operation = current.operation.empty() && !operation.empty();
-  bool add_provider = current.assetProvider.empty() && (add_asset || current.asset == path.utf8());
+  bool add_provider = current.asset_provider.empty() && (add_asset || current.asset == path.utf8());
   if (!add_asset && !add_operation && !add_provider)
     return error;
   std::string provider;
@@ -219,7 +219,7 @@ StarException Assets::with_asset_context(StarException error, String const& path
     error = std::move(error).with_context(std::move(context));
   }
   if (!provider.empty())
-    summary.assetProvider = std::move(provider);
+    summary.asset_provider = std::move(provider);
   return std::move(error).with_summary(std::move(summary));
 }
 
@@ -275,7 +275,7 @@ static StarException lua_patch_failure(StarException error, String const& target
     if (change_patch) {
       summary.asset = target_path.utf8();
       summary.patch = patch_path.utf8();
-      summary.patchProvider = provider;
+      summary.patch_provider = provider;
     }
     if (change_source)
       add_summary_source(summary, patch_base_path.utf8(), provider);
@@ -442,7 +442,7 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
           auto summary = *error.diagnostic_summary();
           summary.kind = ExceptionSummaryKind::Resource;
           summary.asset = path.utf8();
-          summary.assetProvider = std::move(provider);
+          summary.asset_provider = std::move(provider);
           summary.operation = "Reading source asset bytes";
           return std::unexpected(std::move(error).with_summary(std::move(summary)));
         }
@@ -1366,7 +1366,7 @@ std::expected<Assets::AssetId, StarException> Assets::prepare_queued_asset(Asset
   if (auto valid = validate_path(components, type != AssetType::Audio, type == AssetType::Image); !valid)
     return std::unexpected(std::move(valid.error()));
   if (type == AssetType::Json)
-    return AssetId{.type = type, .path = {std::move(components.m_base_path), {}, {}}};
+    return AssetId{.type = type, .path = {std::move(components.base_path), {}, {}}};
   return AssetId{.type = type, .path = std::move(components)};
 }
 
@@ -1390,7 +1390,7 @@ std::expected<std::shared_ptr<FramesSpecification const>, StarException> Assets:
   auto components = AssetPath::split(path);
   if (auto valid = validate_path(components, false, false); !valid)
     return std::unexpected(std::move(valid.error()));
-  if (AssetPath::is_embedded(components.m_base_path)) {
+  if (AssetPath::is_embedded(components.base_path)) {
     auto image = get_asset({.type = AssetType::Image, .path = std::move(components)});
     if (!image)
       return std::unexpected(std::move(image.error()));
@@ -1434,7 +1434,7 @@ std::expected<std::shared_ptr<Font const>, StarException> Assets::font(String co
 
 std::expected<std::shared_ptr<ByteArray const>, StarException> Assets::bytes(String const& path, bool allow_remote) const {
   auto components = AssetPath::split(path);
-  if (AssetPath::is_remote(components.m_base_path) && !allow_remote)
+  if (AssetPath::is_remote(components.base_path) && !allow_remote)
     return std::unexpected(AssetException("Reading embedded bytes requires explicit allowRemote permission"));
   if (auto valid = validate_path(components, false, false); !valid)
     return std::unexpected(std::move(valid.error()));
@@ -1514,7 +1514,7 @@ bool Assets::AssetId::operator==(AssetId const& asset_id) const {
 }
 
 std::size_t Assets::AssetIdHash::operator()(AssetId const& id) const {
-  return hash_of(id.type, id.path.m_base_path, id.path.m_sub_path, id.path.m_directives);
+  return hash_of(id.type, id.path.base_path, id.path.sub_path, id.path.directives);
 }
 
 bool Assets::JsonData::should_persist() const {
@@ -2154,7 +2154,7 @@ std::expected<Json, StarException> Assets::apply_json_patches(Json const& input,
   Json result = input;
   for (auto const& pair : patches) {
     auto patch_asset_path = AssetPath::split(pair.first);
-    auto& patch_base_path = patch_asset_path.m_base_path;
+    auto& patch_base_path = patch_asset_path.base_path;
     auto& patch_source = pair.second;
     auto patch_stream = read_patch(*patch_source, patch_base_path, m_logger);
     if (!patch_stream)
@@ -2192,8 +2192,8 @@ std::expected<Json, StarException> Assets::apply_json_patches(Json const& input,
         auto patch_json = input_utf8_json(bytes.begin(), bytes.end(), JsonParseType::Top);
         if (!patch_json)
           return std::unexpected(std::move(patch_json.error()));
-        if (patch_asset_path.m_sub_path) {
-          auto selected = patch_json->query(*patch_asset_path.m_sub_path);
+        if (patch_asset_path.sub_path) {
+          auto selected = patch_json->query(*patch_asset_path.sub_path);
           if (!selected)
             return std::unexpected(std::move(selected.error()));
           *patch_json = std::move(*selected);
@@ -2252,7 +2252,7 @@ std::expected<bool, StarException> Assets::publish_post(AssetId const& id, PostT
   // Optional decompression failure retains the readable compressed original.
   std::expected<void, StarException> logged;
   if (!processed) {
-    auto error = resource_failure(std::move(processed.error()), id.path.m_base_path);
+    auto error = resource_failure(std::move(processed.error()), id.path.base_path);
     logged = m_logger.error_exception(Star::format("Error post-processing asset: {}", id.path), ExceptionDiagnostic(error));
   } else {
     (*processed)->force_persist = task.original->force_persist;
@@ -2304,7 +2304,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::load_as
   if (task.epoch != m_load_epoch)
     return superseded_load();
   if (!loaded) {
-    loaded.error() = resource_failure(std::move(loaded.error()), id.path.m_base_path);
+    loaded.error() = resource_failure(std::move(loaded.error()), id.path.base_path);
     if (id.type == AssetType::Image && m_settings.missing_image) {
       auto logged =
         m_logger.error_exception(Star::format("Could not load image asset '{}', using placeholder default.", id.path),
@@ -2359,13 +2359,13 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::load_as
 }
 
 std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::load_json(AssetPath const& path) const {
-  if (path.m_sub_path) {
-    auto top = load_asset({.type = AssetType::Json, .path = {path.m_base_path, {}, {}}});
+  if (path.sub_path) {
+    auto top = load_asset({.type = AssetType::Json, .path = {path.base_path, {}, {}}});
     if (!top)
       return std::unexpected(std::move(top.error()));
     if (!*top)
       return std::shared_ptr<AssetData>{};
-    auto value = cached_data_ref<JsonData>(**top)->get().json.query(*path.m_sub_path);
+    auto value = cached_data_ref<JsonData>(**top)->get().json.query(*path.sub_path);
     if (!value)
       return std::unexpected(AssetException(Star::format("Could not read JSON value {}", path), value.error()));
     auto data = std::make_shared<JsonData>();
@@ -2373,7 +2373,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::load_js
     return data;
   }
   return unlock_during([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
-    auto value = read_json(path.m_base_path);
+    auto value = read_json(path.base_path);
     if (!value)
       return std::unexpected(AssetException(Star::format("Could not read JSON asset {}", path), value.error()));
     auto data = std::make_shared<JsonData>();
@@ -2385,8 +2385,8 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::load_js
 std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::load_image(AssetPath const& path) const {
   if (auto valid = validate_path(path, true, true); !valid)
     return std::unexpected(std::move(valid.error()));
-  if (!path.m_directives.empty()) {
-    auto loaded = load_asset({.type = AssetType::Image, .path = {path.m_base_path, path.m_sub_path, {}}});
+  if (!path.directives.empty()) {
+    auto loaded = load_asset({.type = AssetType::Image, .path = {path.base_path, path.sub_path, {}}});
     if (!loaded)
       return std::unexpected(std::move(loaded.error()));
     if (!*loaded)
@@ -2395,7 +2395,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::load_im
     auto& source = cached_data_ref<ImageData>(**loaded)->get();
     StringMap<std::shared_ptr<Image const>> references;
     StringList reference_paths;
-    for (auto const& directives : path.m_directives.list())
+    for (auto const& directives : path.directives.list())
       for (auto const& operation : directives.operations())
         add_image_operation_references(operation, reference_paths);
     for (auto const& ref : reference_paths) {
@@ -2413,7 +2413,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::load_im
       references[ref] = image.image;
     }
     return unlock_during([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
-      auto image = path.m_directives.apply_new_image(
+      auto image = path.directives.apply_new_image(
         *source.image,
         [&](String const& ref) -> std::expected<std::optional<std::reference_wrapper<Image const>>, StarException> {
           if (auto reference = references.find_ref(ref))
@@ -2427,8 +2427,8 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::load_im
       return data;
     });
   }
-  if (path.m_sub_path) {
-    auto loaded = load_asset({.type = AssetType::Image, .path = {path.m_base_path, {}, {}}});
+  if (path.sub_path) {
+    auto loaded = load_asset({.type = AssetType::Image, .path = {path.base_path, {}, {}}});
     if (!loaded)
       return std::unexpected(std::move(loaded.error()));
     if (!*loaded)
@@ -2436,9 +2436,9 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::load_im
     auto& source = cached_data_ref<ImageData>(**loaded)->get();
     if (!source.frames)
       return std::unexpected(AssetException::format(
-        "No associated frames file found for image '{}' while resolving image frame '{}'", path.m_base_path, path));
-    if (auto alias = source.frames->aliases.find_ref(*path.m_sub_path)) {
-      auto target = load_asset({.type = AssetType::Image, .path = {path.m_base_path, alias->get(), path.m_directives}});
+        "No associated frames file found for image '{}' while resolving image frame '{}'", path.base_path, path));
+    if (auto alias = source.frames->aliases.find_ref(*path.sub_path)) {
+      auto target = load_asset({.type = AssetType::Image, .path = {path.base_path, alias->get(), path.directives}});
       if (!target)
         return std::unexpected(std::move(target.error()));
       if (!*target)
@@ -2448,10 +2448,10 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::load_im
       data->alias = true;
       return data;
     }
-    auto frame = source.frames->frames.find_ref(*path.m_sub_path);
+    auto frame = source.frames->frames.find_ref(*path.sub_path);
     if (!frame)
       return std::unexpected(AssetException(
-        Star::format("No such frame {} in frames spec {}", *path.m_sub_path, source.frames->frames_file)));
+        Star::format("No such frame {} in frames spec {}", *path.sub_path, source.frames->frames_file)));
     return unlock_during([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
       auto image = source.image->sub_image(Vec2U(frame->get().x_min(), source.image->height() - frame->get().y_max()),
                                            frame->get().size());
@@ -2462,9 +2462,9 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::load_im
       return data;
     });
   }
-  if (AssetPath::is_embedded(path.m_base_path)) {
+  if (AssetPath::is_embedded(path.base_path)) {
     return unlock_during([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
-      auto embedded = read_embedded(path.m_base_path, m_settings.allow_remote_assets);
+      auto embedded = read_embedded(path.base_path, m_settings.allow_remote_assets);
       if (!embedded)
         return std::unexpected(std::move(embedded.error()));
       if (embedded->type != EmbeddedAssetType::Binary && embedded->type != EmbeddedAssetType::Image)
@@ -2511,10 +2511,10 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::load_im
       return data;
     });
   }
-  auto image = unlock_during([&]() { return read_image(path.m_base_path); });
+  auto image = unlock_during([&]() { return read_image(path.base_path); });
   if (!image)
     return std::unexpected(std::move(image.error()));
-  auto frames = best_frames_specification(path.m_base_path);
+  auto frames = best_frames_specification(path.base_path);
   if (!frames)
     return std::unexpected(std::move(frames.error()));
   auto data = std::make_shared<ImageData>();
@@ -2526,9 +2526,9 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::load_im
 std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::load_audio(AssetPath const& path) const {
   return unlock_during([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
     auto device = [&]() -> std::expected<std::shared_ptr<IODevice>, StarException> {
-      if (!AssetPath::is_embedded(path.m_base_path))
-        return open(path.m_base_path);
-      auto embedded = read_embedded(path.m_base_path, m_settings.allow_remote_assets);
+      if (!AssetPath::is_embedded(path.base_path))
+        return open(path.base_path);
+      auto embedded = read_embedded(path.base_path, m_settings.allow_remote_assets);
       if (!embedded)
         return std::unexpected(std::move(embedded.error()));
       if (embedded->type != EmbeddedAssetType::Binary)
@@ -2537,7 +2537,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::load_au
     }();
     if (!device)
       return std::unexpected(std::move(device.error()));
-    auto audio = Audio::create(std::move(*device), path.m_base_path);
+    auto audio = Audio::create(std::move(*device), path.base_path);
     if (!audio)
       return std::unexpected(std::move(audio.error()));
     auto data = std::make_shared<AudioData>();
@@ -2550,9 +2550,9 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::load_au
 std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::load_font(AssetPath const& path) const {
   return unlock_during([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
     auto bytes = [&]() -> std::expected<ByteArray, StarException> {
-      if (!AssetPath::is_embedded(path.m_base_path))
-        return read(path.m_base_path);
-      auto embedded = read_embedded(path.m_base_path, m_settings.allow_remote_assets);
+      if (!AssetPath::is_embedded(path.base_path))
+        return read(path.base_path);
+      auto embedded = read_embedded(path.base_path, m_settings.allow_remote_assets);
       if (!embedded)
         return std::unexpected(std::move(embedded.error()));
       if (embedded->type != EmbeddedAssetType::Binary)
@@ -2572,7 +2572,7 @@ std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::load_fo
 
 std::expected<std::shared_ptr<Assets::AssetData>, StarException> Assets::load_bytes(AssetPath const& path) const {
   return unlock_during([&]() -> std::expected<std::shared_ptr<AssetData>, StarException> {
-    auto bytes = read(path.m_base_path);
+    auto bytes = read(path.base_path);
     if (!bytes)
       return std::unexpected(std::move(bytes.error()));
     auto data = std::make_shared<BytesData>();

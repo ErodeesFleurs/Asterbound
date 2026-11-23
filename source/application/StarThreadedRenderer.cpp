@@ -205,7 +205,7 @@ struct ThreadedRendererState : std::enable_shared_from_this<ThreadedRendererStat
   static void copyImage(Image& destination, ImageView source) {
     if (destination.size() != source.size || destination.pixel_format() != source.format)
       destination.reset(source.size, source.format);
-    std::copy_n(source.data.begin(), destination.data().size(), destination.data().begin());
+    std::copy_n(source.data.begin(), destination.span().size(), destination.span().begin());
   }
   std::expected<TexturePtr, StarException> texture(Image const& image, TextureAddressing addressing, TextureFiltering filtering, ResourceId group = 0);
   std::expected<void, StarException> setBuffer(ResourceId resource, List<RenderPrimitive> const& primitives) {
@@ -252,8 +252,8 @@ struct ProxyTexture final : Texture {
   ProxyTexture(std::shared_ptr<ThreadedRendererState> state, ResourceId id, Vec2U size, TextureAddressing addressing, TextureFiltering filtering)
     : state(std::move(state)), resource(id), dimensions(size), address(addressing), filter(filtering) {}
   ~ProxyTexture() override { state->destroy(Operation::DeleteTexture, resource); }
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<ProxyTexture, Texture>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<ProxyTexture, Texture>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ProxyTexture>(); }
   Vec2U size() const override { return dimensions; }
@@ -280,8 +280,8 @@ struct ProxyGroup final : TextureGroup {
 struct ProxyBuffer final : RenderBuffer {
   ProxyBuffer(std::shared_ptr<ThreadedRendererState> state, ResourceId id) : state(std::move(state)), resource(id) {}
   ~ProxyBuffer() override { state->destroy(Operation::DeleteBuffer, resource); }
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<ProxyBuffer, RenderBuffer>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<ProxyBuffer, RenderBuffer>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ProxyBuffer>(); }
   std::expected<void, StarException> set(List<RenderPrimitive>& primitives) override {

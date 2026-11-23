@@ -1157,7 +1157,7 @@ std::expected<bool, StarException> MainInterface::handleInputEvent(InputEvent co
   auto& root = context().root();
   if (std::holds_alternative<MouseMoveEvent>(event)) {
     auto const& mouseMove = std::get<MouseMoveEvent>(event);
-    m_cursorScreenIPos = Vec2I::round(m_cursorScreenPos = mouseMove.mousePosition);
+    m_cursorScreenIPos = Vec2I::round(m_cursorScreenPos = mouseMove.mouse_position);
   }
   if (auto synchronized = synchronizeUiSession(); !synchronized)
     return std::unexpected(std::move(synchronized.error()));
@@ -1302,7 +1302,7 @@ std::expected<bool, StarException> MainInterface::handleInputEvent(InputEvent co
     return false;
   } else if (std::holds_alternative<MouseButtonDownEvent>(event)) {
     auto const& mouseDown = std::get<MouseButtonDownEvent>(event);
-    auto button = mouseDown.mouseButton;
+    auto button = mouseDown.mouse_button;
     if (button == MouseButton::Left)
       player->beginPrimaryFire();
     if (button == MouseButton::Right)
@@ -1311,11 +1311,11 @@ std::expected<bool, StarException> MainInterface::handleInputEvent(InputEvent co
       player->beginTrigger();
   } else if (std::holds_alternative<MouseButtonUpEvent>(event)) {
     auto const& mouseUp = std::get<MouseButtonUpEvent>(event);
-    if (mouseUp.mouseButton == MouseButton::Left)
+    if (mouseUp.mouse_button == MouseButton::Left)
       player->endPrimaryFire();
-    if (mouseUp.mouseButton == MouseButton::Right)
+    if (mouseUp.mouse_button == MouseButton::Right)
       player->endAltFire();
-    if (mouseUp.mouseButton == MouseButton::Middle)
+    if (mouseUp.mouse_button == MouseButton::Middle)
       player->endTrigger();
   }
   bool captured = false;

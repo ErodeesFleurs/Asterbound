@@ -8,9 +8,9 @@ import star.text_formatter;
 namespace Star {
 struct OutputProxy;
 #ifndef NDEBUG
-inline constexpr bool DebugEnabled = true;
+inline constexpr bool debug_enabled = true;
 #else
-inline constexpr bool DebugEnabled = false;
+inline constexpr bool debug_enabled = false;
 #endif
 
 // Formatting reads the same const lvalue arguments used by make_format_args.
@@ -119,9 +119,9 @@ struct ExceptionSummary {
   std::string operation;
   std::vector<Location> locations;
   std::string asset;
-  std::string assetProvider;
+  std::string asset_provider;
   std::string patch;
-  std::string patchProvider;
+  std::string patch_provider;
 };
 
 // Owning diagnostics remain valid after the originating error value is gone.
@@ -131,9 +131,9 @@ public:
   std::shared_ptr<ExceptionSummary const> const& diagnostic_summary() const& noexcept { return m_payload->summary; }
   std::shared_ptr<ExceptionSummary const> diagnostic_summary() const&& noexcept { return m_payload->summary; }
 
-  friend void print_exception(TextBuffer& buffer, ExceptionDiagnostic const& e, bool fullStacktrace);
-  friend std::string print_exception(ExceptionDiagnostic const& e, bool fullStacktrace);
-  friend OutputProxy output_exception(ExceptionDiagnostic const& e, bool fullStacktrace);
+  friend void print_exception(TextBuffer& buffer, ExceptionDiagnostic const& e, bool full_stacktrace);
+  friend std::string print_exception(ExceptionDiagnostic const& e, bool full_stacktrace);
+  friend OutputProxy output_exception(ExceptionDiagnostic const& e, bool full_stacktrace);
 
 private:
   friend class StarException;
@@ -160,7 +160,8 @@ public:
   StarException(std::string message, ExceptionDiagnostic cause) noexcept
     : StarException("StarException", std::move(message), std::move(cause)) {}
 
-  char const* what() const noexcept { return m_payload->rendered(false).c_str(); }
+  std::string const& what() const& noexcept { return m_payload->rendered(false); }
+  std::string what() const&& { return m_payload->rendered(false); }
 
   template <error_category Error> bool is() const noexcept { return m_payload->matcher(type_key<Error>()); }
 
@@ -299,14 +300,14 @@ private:
 inline ExceptionDiagnostic::ExceptionDiagnostic(StarException const& exception)
   : m_payload(exception.m_payload) {}
 
-inline void print_exception(TextBuffer& buffer, ExceptionDiagnostic const& e, bool fullStacktrace) {
-  buffer.append(e.m_payload->rendered(fullStacktrace));
+inline void print_exception(TextBuffer& buffer, ExceptionDiagnostic const& e, bool full_stacktrace) {
+  buffer.append(e.m_payload->rendered(full_stacktrace));
 }
 
-inline std::string print_exception(ExceptionDiagnostic const& e, bool fullStacktrace) {
-  return e.m_payload->rendered(fullStacktrace);
+inline std::string print_exception(ExceptionDiagnostic const& e, bool full_stacktrace) {
+  return e.m_payload->rendered(full_stacktrace);
 }
-OutputProxy output_exception(ExceptionDiagnostic const& e, bool fullStacktrace);
+OutputProxy output_exception(ExceptionDiagnostic const& e, bool full_stacktrace);
 
 inline void append_exception_summary(TextBuffer& buffer, std::shared_ptr<ExceptionSummary const> const& summary) {
   if (!summary) {
@@ -334,10 +335,10 @@ inline void append_exception_summary(TextBuffer& buffer, std::shared_ptr<Excepti
   append_field(": ", reason);
   append_field("\n  Operation: ", summary->operation);
   append_field("\n  Asset: ", summary->asset);
-  if (summary->assetProvider != summary->patchProvider)
-    append_field("\n  Asset provider: ", summary->assetProvider);
+  if (summary->asset_provider != summary->patch_provider)
+    append_field("\n  Asset provider: ", summary->asset_provider);
   append_field("\n  Patch: ", summary->patch);
-  append_field("\n  Patch provider: ", summary->patchProvider);
+  append_field("\n  Patch provider: ", summary->patch_provider);
   for (std::size_t i = 0; i < summary->locations.size(); ++i) {
     auto const& location = summary->locations[i];
     buffer.append(i == 0 ? "\n  Script: " : "\n  Called from: ");
@@ -346,8 +347,8 @@ inline void append_exception_summary(TextBuffer& buffer, std::shared_ptr<Excepti
       buffer.push_back(':');
       append_text(buffer, location.line);
     }
-    if (!location.provider.empty() && location.provider != summary->patchProvider
-        && location.provider != summary->assetProvider
+    if (!location.provider.empty() && location.provider != summary->patch_provider
+        && location.provider != summary->asset_provider
         && std::none_of(summary->locations.begin(), summary->locations.begin() + i,
             [&](auto const& previous) { return previous.provider == location.provider; })) {
       buffer.append("\n    Provider: ");
@@ -385,14 +386,14 @@ void fatal_error(std::string_view message, bool show_stack_trace);
 
 // The file and line of an assertion are a language construct now
 // (std::source_location) instead of __FILE__/__LINE__ stringification.
-// Callers guard this function with `if constexpr (Star::DebugEnabled)` so a
+// Callers guard this function with `if constexpr (Star::debug_enabled)` so a
 // release build never evaluates the assertion operand.
 // The condition is a forwarding reference, not a bool: it has to go through the
 // same contextual conversion the old macro's `if (COND)` performed, otherwise
 // types with an explicit operator bool (std::unique_ptr, for instance) stop
 // compiling.
 template <typename T>
-  requires (!DebugEnabled || requires(T& value) { value ? true : false; })
+  requires (!debug_enabled || requires(T& value) { value ? true : false; })
 inline void star_assert_failed(T&& condition, std::source_location location = std::source_location::current()) {
 #ifndef NDEBUG
   if (condition)
@@ -547,10 +548,10 @@ namespace format_detail {
 
   // The caller owns console_mutex through writing and flushing, so concurrent
   // messages cannot interleave and the original automatic flush is preserved.
-  [[nodiscard]] inline std::expected<void, StarException> write_console(std::FILE* file, std::string_view text) {
-    auto written = text.empty() ? 0 : std::fwrite(text.data(), 1, text.size(), file);
-    bool write_failed = written != text.size() || std::ferror(file);
-    auto flush_status = std::fflush(file);
+  [[nodiscard]] inline std::expected<void, StarException> write_console(std::FILE& file, std::string_view text) {
+    auto written = text.empty() ? 0 : std::fwrite(text.data(), 1, text.size(), &file);
+    bool write_failed = written != text.size() || std::ferror(&file);
+    auto flush_status = std::fflush(&file);
     if (write_failed)
       return std::unexpected(IOException("Failed to write console output"));
     if (flush_status != 0)
@@ -575,7 +576,7 @@ std::string format_checked(std::basic_format_string<Char, T...> fmt, T const&...
 
 template <typename... T>
   requires format_detail::console_format_arguments<T...>
-[[nodiscard]] std::expected<void, StarException> print(std::FILE* file, std::format_string<T...> fmt, T&&... args) {
+[[nodiscard]] std::expected<void, StarException> print(std::FILE& file, std::format_string<T...> fmt, T&&... args) {
   TextBuffer buffer;
   std::format_to(std::back_inserter(buffer), fmt, std::forward<T>(args)...);
   std::lock_guard lock(format_detail::console_mutex);
@@ -585,12 +586,12 @@ template <typename... T>
 template <typename... T>
   requires format_detail::console_format_arguments<T...>
 [[nodiscard]] std::expected<void, StarException> print(std::format_string<T...> fmt, T&&... args) {
-  return Star::print(stdout, fmt, std::forward<T>(args)...);
+  return Star::print(*stdout, fmt, std::forward<T>(args)...);
 }
 
 template <typename... T>
   requires format_detail::console_format_arguments<T...>
-[[nodiscard]] std::expected<void, StarException> println(std::FILE* file, std::format_string<T...> fmt, T&&... args) {
+[[nodiscard]] std::expected<void, StarException> println(std::FILE& file, std::format_string<T...> fmt, T&&... args) {
   TextBuffer buffer;
   std::format_to(std::back_inserter(buffer), fmt, std::forward<T>(args)...);
   buffer.push_back('\n');
@@ -601,18 +602,18 @@ template <typename... T>
 template <typename... T>
   requires format_detail::console_format_arguments<T...>
 [[nodiscard]] std::expected<void, StarException> println(std::format_string<T...> fmt, T&&... args) {
-  return Star::println(stdout, fmt, std::forward<T>(args)...);
+  return Star::println(*stdout, fmt, std::forward<T>(args)...);
 }
 
-[[nodiscard]] inline std::expected<void, StarException> flush(std::FILE* file) {
+[[nodiscard]] inline std::expected<void, StarException> flush(std::FILE& file) {
   std::lock_guard lock(format_detail::console_mutex);
-  if (std::fflush(file) != 0 || std::ferror(file))
+  if (std::fflush(&file) != 0 || std::ferror(&file))
     return std::unexpected(IOException("Failed to flush console output"));
   return {};
 }
 
 [[nodiscard]] inline std::expected<void, StarException> flush() {
-  return Star::flush(stdout);
+  return Star::flush(*stdout);
 }
 
 template <class Type>
@@ -627,7 +628,7 @@ export module star.format;
 
 export namespace Star {
 using ::Star::format_argument;
-using ::Star::DebugEnabled;
+using ::Star::debug_enabled;
 using ::Star::ExceptionDiagnostic;
 using ::Star::ExceptionSummaryKind;
 using ::Star::ExceptionSummary;

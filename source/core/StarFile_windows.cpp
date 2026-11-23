@@ -31,7 +31,7 @@ StarException cursor_operation_error(std::string_view operation, DWORD error,
                                      std::expected<void, StarException> const& restored) {
   auto primary = IOException::format("{} error {}", operation, error);
   if (!restored) {
-    auto logged = Star::print(stderr, "Error restoring file cursor after failed {}: {}\n", operation, restored.error().what());
+    auto logged = Star::print(*stderr, "Error restoring file cursor after failed {}: {}\n", operation, restored.error().what());
     if (!logged)
       return std::move(primary).with_context(Star::format("Could not report cursor restoration failure ({}): {}",
                                                          restored.error().what(), logged.error().what()));
@@ -312,7 +312,7 @@ std::expected<void, StarException> File::rename(String const& source, String con
 
 File::NativeFileHandle::~NativeFileHandle() noexcept {
   if (*this && !CloseHandle(native_handle(release()))) {
-    if (!Star::print(stderr, "Error closing file after failed acquisition: {}\n", GetLastError()))
+    if (!Star::print(*stderr, "Error closing file after failed acquisition: {}\n", GetLastError()))
       std::_Exit(1);
   }
 }

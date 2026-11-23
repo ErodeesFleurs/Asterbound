@@ -331,7 +331,7 @@ auto ItemBag::itemsFitWhere(std::optional<std::reference_wrapper<Item const>> it
     std::size_t slot = bestSlotAvailable(items->get(), false, [&](std::size_t i) {
       return !taken.contains(i);
     });
-    if (slot == NPos)
+    if (slot == npos)
       break;
     else {
       slots.push_back(slot);
@@ -354,7 +354,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemBag::addItems(std::share
 
   while (true) {
     std::size_t slot = bestSlotAvailable(*items, false);
-    if (slot == NPos)
+    if (slot == npos)
       return items;
 
     auto& storedItem = m_items[slot];
@@ -377,7 +377,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemBag::stackItems(std::sha
 
   while (true) {
     std::size_t slot = bestSlotAvailable(*items, true);
-    if (slot == NPos)
+    if (slot == npos)
       return items;
 
     auto& storedItem = m_items[slot];
@@ -486,7 +486,7 @@ std::size_t ItemBag::bestSlotAvailable(Item const& item, bool stacksOnly, std::f
     }
   }
 
-  return NPos;
+  return npos;
 }
 
 std::size_t ItemBag::bestSlotAvailable(Item const& item, bool stacksOnly) const {

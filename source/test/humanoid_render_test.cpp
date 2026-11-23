@@ -214,7 +214,7 @@ const GameTestRegistration
       ASSERT_TRUE(chest);
       ASSERT_EQ(chest->get().fullbright(), fullbright);
       ASSERT_TRUE((*humanoid)->setWearableFromChest(0, chest->get(), identity.gender));
-      auto sleeve = AssetPath::split(chest->get().backSleeveFrameset(identity.gender)).m_base_path;
+      auto sleeve = AssetPath::split(chest->get().backSleeveFrameset(identity.gender)).base_path;
       for (auto direction : {Direction::Left, Direction::Right}) {
         (*humanoid)->setFacingDirection(direction);
         for (bool holding : {false, true}) {
@@ -224,7 +224,7 @@ const GameTestRegistration
           ASSERT_TRUE(drawables) << drawables.error().what();
           unsigned sleeves = 0;
           for (auto const& drawable : *drawables) {
-            if (drawable.isImage() && drawable.imagePart().image.m_base_path == sleeve) {
+            if (drawable.isImage() && drawable.imagePart().image.base_path == sleeve) {
               ++sleeves;
               EXPECT_EQ(drawable.fullbright, fullbright)
                 << "holding=" << holding << ", armor fullbright=" << fullbright;
@@ -305,7 +305,7 @@ const GameTestRegistration transientMovementAnimation(
     std::uint64_t step = 0;
     constexpr float dt = 1.f / 60;
     auto tick = [&] { return player.update(dt, step++); };
-    std::array rules{NetCompatibilityRules(LegacyVersion), NetCompatibilityRules(OpenProtocolVersion)};
+    std::array rules{NetCompatibilityRules(legacy_version), NetCompatibilityRules(open_protocol_version)};
     std::array<std::shared_ptr<Player>, 2> remotes;
     std::array<std::uint64_t, 2> versions{};
     auto uninitRemotes = make_scope_exit([&] {
@@ -496,7 +496,7 @@ const GameTestRegistration refreshedMovementCycles(
               ASSERT_TRUE(drawables) << drawables.error().what();
               String renderedFrames;
               for (auto const& drawable : *drawables) {
-                if (drawable.isImage() && drawable.imagePart().image.m_sub_path)
+                if (drawable.isImage() && drawable.imagePart().image.sub_path)
                   renderedFrames += AssetPath::join(drawable.imagePart().image);
               }
               frames.insert(std::move(renderedFrames));
@@ -596,7 +596,7 @@ const GameTestRegistration animatorSemanticSampling(
     auto made = NetworkedAnimator::create(fixture.root(), *config);
     ASSERT_TRUE(made) << made.error().what();
     auto& animator = **made;
-    auto line = Drawable::makeLine(Line2F({0, 0}, {1, 0}), 1, Color::White);
+    auto line = Drawable::makeLine(Line2F({0, 0}, {1, 0}), 1, Color::palette_white);
     animator.setPartDrawables("body", {line});
     NetworkedAnimator::DynamicTarget events;
     ASSERT_TRUE(animator.update(.1f, std::ref(events)));
@@ -730,7 +730,7 @@ const GameTestRegistration sampledPartTransformOverrides(
     ASSERT_TRUE(made) << made.error().what();
     auto& animator = **made;
     ASSERT_TRUE(animator.update(0, {}));
-    auto line = Drawable::makeLine(Line2F({0, 0}, {1, 0}), 1, Color::White);
+    auto line = Drawable::makeLine(Line2F({0, 0}, {1, 0}), 1, Color::palette_white);
     animator.setPartDrawables("child", {line});
     auto expectVec = [](Vec2F const& actual, Vec2F const& expected) {
       EXPECT_NEAR(actual[0], expected[0], 1e-5f);

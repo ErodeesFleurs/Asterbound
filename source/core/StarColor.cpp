@@ -11,49 +11,49 @@ import star.unicode;
 import star.math_common;
 namespace Star {
 
-Color const Color::Red = Color::rgba(255, 73, 66, 255);
-Color const Color::Orange = Color::rgba(255, 180, 47, 255);
-Color const Color::Yellow = Color::rgba(255, 239, 30, 255);
-Color const Color::Green = Color::rgba(79, 230, 70, 255);
-Color const Color::Blue = Color::rgba(38, 96, 255, 255);
-Color const Color::Indigo = Color::rgba(75, 0, 130, 255);
-Color const Color::Violet = Color::rgba(160, 119, 255, 255);
-Color const Color::Black = Color::rgba(0, 0, 0, 255);
-Color const Color::White = Color::rgba(255, 255, 255, 255);
-Color const Color::Magenta = Color::rgba(221, 92, 249, 255);
-Color const Color::DarkMagenta = Color::rgba(142, 33, 144, 255);
-Color const Color::Cyan = Color::rgba(0, 220, 233, 255);
-Color const Color::DarkCyan = Color::rgba(0, 137, 165, 255);
-Color const Color::CornFlowerBlue = Color::rgba(100, 149, 237, 255);
-Color const Color::Gray = Color::rgba(160, 160, 160, 255);
-Color const Color::LightGray = Color::rgba(192, 192, 192, 255);
-Color const Color::DarkGray = Color::rgba(128, 128, 128, 255);
-Color const Color::DarkGreen = Color::rgba(0, 128, 0, 255);
-Color const Color::Pink = Color::rgba(255, 162, 187, 255);
-Color const Color::Clear = Color::rgba(0, 0, 0, 0);
+Color const Color::palette_red = Color::rgba(255, 73, 66, 255);
+Color const Color::palette_orange = Color::rgba(255, 180, 47, 255);
+Color const Color::palette_yellow = Color::rgba(255, 239, 30, 255);
+Color const Color::palette_green = Color::rgba(79, 230, 70, 255);
+Color const Color::palette_blue = Color::rgba(38, 96, 255, 255);
+Color const Color::palette_indigo = Color::rgba(75, 0, 130, 255);
+Color const Color::palette_violet = Color::rgba(160, 119, 255, 255);
+Color const Color::palette_black = Color::rgba(0, 0, 0, 255);
+Color const Color::palette_white = Color::rgba(255, 255, 255, 255);
+Color const Color::palette_magenta = Color::rgba(221, 92, 249, 255);
+Color const Color::palette_dark_magenta = Color::rgba(142, 33, 144, 255);
+Color const Color::palette_cyan = Color::rgba(0, 220, 233, 255);
+Color const Color::palette_dark_cyan = Color::rgba(0, 137, 165, 255);
+Color const Color::palette_cornflower_blue = Color::rgba(100, 149, 237, 255);
+Color const Color::palette_gray = Color::rgba(160, 160, 160, 255);
+Color const Color::palette_light_gray = Color::rgba(192, 192, 192, 255);
+Color const Color::palette_dark_gray = Color::rgba(128, 128, 128, 255);
+Color const Color::palette_dark_green = Color::rgba(0, 128, 0, 255);
+Color const Color::palette_pink = Color::rgba(255, 162, 187, 255);
+Color const Color::palette_clear = Color::rgba(0, 0, 0, 0);
 
 namespace {
-constexpr std::array<std::pair<std::string_view, std::reference_wrapper<Color const>>, 20> NamedPalette{{
-  {"red", std::cref(Color::Red)},
-  {"orange", std::cref(Color::Orange)},
-  {"yellow", std::cref(Color::Yellow)},
-  {"green", std::cref(Color::Green)},
-  {"blue", std::cref(Color::Blue)},
-  {"indigo", std::cref(Color::Indigo)},
-  {"violet", std::cref(Color::Violet)},
-  {"black", std::cref(Color::Black)},
-  {"white", std::cref(Color::White)},
-  {"magenta", std::cref(Color::Magenta)},
-  {"darkmagenta", std::cref(Color::DarkMagenta)},
-  {"cyan", std::cref(Color::Cyan)},
-  {"darkcyan", std::cref(Color::DarkCyan)},
-  {"cornflowerblue", std::cref(Color::CornFlowerBlue)},
-  {"gray", std::cref(Color::Gray)},
-  {"lightgray", std::cref(Color::LightGray)},
-  {"darkgray", std::cref(Color::DarkGray)},
-  {"darkgreen", std::cref(Color::DarkGreen)},
-  {"pink", std::cref(Color::Pink)},
-  {"clear", std::cref(Color::Clear)}
+constexpr std::array<std::pair<std::string_view, std::reference_wrapper<Color const>>, 20> named_palette{{
+  {"red", std::cref(Color::palette_red)},
+  {"orange", std::cref(Color::palette_orange)},
+  {"yellow", std::cref(Color::palette_yellow)},
+  {"green", std::cref(Color::palette_green)},
+  {"blue", std::cref(Color::palette_blue)},
+  {"indigo", std::cref(Color::palette_indigo)},
+  {"violet", std::cref(Color::palette_violet)},
+  {"black", std::cref(Color::palette_black)},
+  {"white", std::cref(Color::palette_white)},
+  {"magenta", std::cref(Color::palette_magenta)},
+  {"darkmagenta", std::cref(Color::palette_dark_magenta)},
+  {"cyan", std::cref(Color::palette_cyan)},
+  {"darkcyan", std::cref(Color::palette_dark_cyan)},
+  {"cornflowerblue", std::cref(Color::palette_cornflower_blue)},
+  {"gray", std::cref(Color::palette_gray)},
+  {"lightgray", std::cref(Color::palette_light_gray)},
+  {"darkgray", std::cref(Color::palette_dark_gray)},
+  {"darkgreen", std::cref(Color::palette_dark_green)},
+  {"pink", std::cref(Color::palette_pink)},
+  {"clear", std::cref(Color::palette_clear)}
 }};
 }
 
@@ -148,12 +148,12 @@ Color Color::hsva(float h, float s, float v, float a) {
   v = std::clamp(v, 0.0f, 1.0f);
   a = std::clamp(a, 0.0f, 1.0f);
 
-  Color retColor;
+  Color ret_color;
   if (s == 0.0f) {
-    retColor.set_red_f(v);
-    retColor.set_green_f(v);
-    retColor.set_blue_f(v);
-    retColor.set_alpha_f(a);
+    ret_color.set_red_f(v);
+    ret_color.set_green_f(v);
+    ret_color.set_blue_f(v);
+    ret_color.set_alpha_f(a);
   } else {
     float var_h, var_i, var_1, var_2, var_3, var_r, var_g, var_b;
 
@@ -199,12 +199,12 @@ Color Color::hsva(float h, float s, float v, float a) {
       var_b = var_2;
     }
 
-    retColor.set_red_f(var_r);
-    retColor.set_green_f(var_g);
-    retColor.set_blue_f(var_b);
-    retColor.set_alpha_f(a);
+    ret_color.set_red_f(var_r);
+    ret_color.set_green_f(var_g);
+    ret_color.set_blue_f(var_b);
+    ret_color.set_alpha_f(a);
   }
-  return retColor;
+  return ret_color;
 }
 
 Color Color::hsv(Vec3F const& c) {
@@ -233,7 +233,7 @@ std::expected<Color, StarException> Color::create(StringView name) {
   auto validated = for_each_codepoint(bytes, [](Utf32Type, std::size_t, std::size_t) {});
   if (!validated)
     return std::unexpected(std::move(validated.error()));
-  for (auto const& [key, color] : NamedPalette) {
+  for (auto const& [key, color] : named_palette) {
     if (bytes.size() != key.size())
       continue;
     bool matches = true;
@@ -340,7 +340,7 @@ Vec3F Color::to_rgb_f() const {
   return Vec3F(red_f(), green_f(), blue_f());
 }
 
-Vec4F const& Color::data() const & {
+Vec4F const& Color::rgba_channels() const & {
   return m_data;
 }
 

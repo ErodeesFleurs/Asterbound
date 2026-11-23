@@ -17,8 +17,8 @@ namespace Star {
 // must externally add elements of the correct type in the correct order.
 class NetElementGroup : public NetElement {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<NetElementGroup, NetElement>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<NetElementGroup, NetElement>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<NetElementGroup>(); }
 

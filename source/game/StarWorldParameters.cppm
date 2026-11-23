@@ -55,8 +55,8 @@ enum class WorldEdgeForceRegionType : std::uint8_t {
 extern std::expected<EnumMap<WorldEdgeForceRegionType>, StarException> const WorldEdgeForceRegionTypeNames;
 
 struct VisitableWorldParameters {
-  virtual void const* query_type(TypeKey key) const noexcept {
-    return query_type_of<VisitableWorldParameters>(this, key);
+  virtual void query_type(TypeQuery& query) const noexcept {
+    query_type_of<VisitableWorldParameters>(*this, query);
   }
   virtual std::string_view dynamic_type_name() const noexcept { return Star::type_name<VisitableWorldParameters>(); }
 
@@ -89,8 +89,8 @@ struct VisitableWorldParameters {
 };
 
 struct TerrestrialWorldParameters : VisitableWorldParameters {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<TerrestrialWorldParameters, VisitableWorldParameters>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<TerrestrialWorldParameters, VisitableWorldParameters>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<TerrestrialWorldParameters>(); }
 
@@ -165,8 +165,8 @@ struct TerrestrialWorldParameters : VisitableWorldParameters {
 };
 
 struct AsteroidsWorldParameters : VisitableWorldParameters {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<AsteroidsWorldParameters, VisitableWorldParameters>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<AsteroidsWorldParameters, VisitableWorldParameters>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<AsteroidsWorldParameters>(); }
 
@@ -188,8 +188,8 @@ struct AsteroidsWorldParameters : VisitableWorldParameters {
 };
 
 struct FloatingDungeonWorldParameters : VisitableWorldParameters {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<FloatingDungeonWorldParameters, VisitableWorldParameters>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<FloatingDungeonWorldParameters, VisitableWorldParameters>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override {
     return Star::type_name<FloatingDungeonWorldParameters>();

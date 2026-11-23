@@ -81,7 +81,7 @@ namespace Star {
 
 ServerWeather::ServerWeather(Root& root) : m_root(root) {
   m_undergroundLevel = 0.0f;
-  m_currentWeatherIndex = NPos;
+  m_currentWeatherIndex = npos;
   m_currentWeatherIntensity = 0.0f;
   m_currentWind = 0.0f;
   m_forceWeather = false;
@@ -125,7 +125,7 @@ void ServerWeather::setup(WeatherPool weatherPool, float undergroundLevel, World
   m_worldGeometry = worldGeometry;
   m_weatherEffectsActiveQuery = std::move(weatherEffectsActiveQuery);
 
-  m_currentWeatherIndex = NPos;
+  m_currentWeatherIndex = npos;
   m_currentWeatherType = {};
 
   m_currentTime = 0.0;
@@ -178,7 +178,7 @@ std::expected<void, StarException> ServerWeather::update(double dt) {
     if (!warmup) return std::unexpected(std::move(warmup.error()));
     if (m_currentTime >= m_nextWeatherChangeTime) {
       m_currentWeatherIndex = m_weatherPool.select_index(m_root.get().random());
-      if (m_currentWeatherIndex == NPos) m_currentWeatherType = {};
+      if (m_currentWeatherIndex == npos) m_currentWeatherType = {};
       else {
         auto biomes = m_root.get().biomeDatabase();
         if (!biomes) return std::unexpected(std::move(biomes.error()));
@@ -200,7 +200,7 @@ std::expected<void, StarException> ServerWeather::update(double dt) {
     m_currentWeatherIntensity = std::min(std::clamp((m_currentTime - m_lastWeatherChangeTime) / *warmup, 0.0, 1.0),
                                          std::clamp((m_nextWeatherChangeTime - m_currentTime) / *cooldown, 0.0, 1.0));
   } else {
-    m_currentWeatherIndex = NPos;
+    m_currentWeatherIndex = npos;
     m_currentWeatherType = {};
   }
   return {};
@@ -223,7 +223,7 @@ StringList ServerWeather::statusEffects() const {
 List<std::shared_ptr<Projectile>> ServerWeather::pullNewProjectiles() { return std::exchange(m_newProjectiles, {}); }
 
 std::expected<std::optional<String>, StarException> ServerWeather::activeWeather() const {
-  if (m_currentWeatherIndex == NPos) return std::optional<String>();
+  if (m_currentWeatherIndex == npos) return std::optional<String>();
   auto name = m_weatherPool.item(m_currentWeatherIndex);
   if (!name) return std::unexpected(std::move(name.error()));
   return name->get();
@@ -237,7 +237,7 @@ StringList ServerWeather::weatherList() const {
 }
 
 std::expected<void, StarException> ServerWeather::setWeather(String const& weatherName, bool force) {
-  std::size_t index = NPos;
+  std::size_t index = npos;
   for (std::size_t i = 0; i < m_weatherPool.size(); ++i) {
     if (m_weatherPool.items()[i].second == weatherName) { index = i; break; }
   }
@@ -246,8 +246,8 @@ std::expected<void, StarException> ServerWeather::setWeather(String const& weath
 
 std::expected<void, StarException> ServerWeather::setWeatherIndex(std::size_t weatherIndex, bool force) {
   m_forceWeather = force;
-  if (weatherIndex == NPos || weatherIndex >= m_weatherPool.size()) {
-    m_currentWeatherIndex = NPos;
+  if (weatherIndex == npos || weatherIndex >= m_weatherPool.size()) {
+    m_currentWeatherIndex = npos;
     m_currentWeatherType = {};
     m_currentWeatherIntensity = 0.0f;
     m_currentWind = 0.0f;
@@ -412,7 +412,7 @@ std::expected<void, StarException> ServerWeather::spawnWeatherProjectiles(float 
 
 ClientWeather::ClientWeather(Root& root) : m_root(root) {
   m_undergroundLevel = 0.0f;
-  m_currentWeatherIndex = NPos;
+  m_currentWeatherIndex = npos;
   m_currentWeatherIntensity = 0.0f;
   m_currentWind = 0.0f;
   m_currentTime = 0.0;
@@ -460,7 +460,7 @@ std::expected<void, StarException> ClientWeather::readUpdate(ByteArray data, Net
 }
 
 std::expected<void, StarException> ClientWeather::clear() {
-  m_currentWeatherIndex = NPos;
+  m_currentWeatherIndex = npos;
   m_currentWeatherType.reset();
   m_currentWeatherIntensity = 0.0f;
   m_currentWind = 0.0f;
@@ -476,7 +476,7 @@ void ClientWeather::setVisibleRegion(RectI visibleRegion) {
 
 std::expected<void, StarException> ClientWeather::update(double dt) {
   m_currentTime += dt;
-  if (m_currentWeatherIndex == NPos) m_currentWeatherType = {};
+  if (m_currentWeatherIndex == npos) m_currentWeatherType = {};
   else if (m_visibleRegion == RectI() || m_visibleRegion.y_max() > m_undergroundLevel) {
     auto biomes = m_root.get().biomeDatabase();
     if (!biomes) return std::unexpected(std::move(biomes.error()));
@@ -509,7 +509,7 @@ StringList ClientWeather::statusEffects() const {
 List<Particle> ClientWeather::pullNewParticles() { return std::exchange(m_particles, {}); }
 
 std::expected<std::optional<String>, StarException> ClientWeather::activeWeather() const {
-  if (m_currentWeatherIndex == NPos) return std::optional<String>();
+  if (m_currentWeatherIndex == npos) return std::optional<String>();
   auto name = m_weatherPool.item(m_currentWeatherIndex);
   if (!name) return std::unexpected(std::move(name.error()));
   return name->get();

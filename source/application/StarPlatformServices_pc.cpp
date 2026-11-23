@@ -310,7 +310,7 @@ std::expected<std::unique_ptr<PcPlatformServices>, StarException> PcPlatformServ
   if (services->m_state->discordAvailable) {
     if (auto logged = logger.debug("Registering Asterbound to Discord at path: {}", path); !logged)
       return std::unexpected(std::move(logged.error()));
-    auto registered = services->m_state->discordCore->ActivityManager().RegisterCommand(path.utf8_data());
+    auto registered = services->m_state->discordCore->ActivityManager().RegisterCommand(path.utf8().c_str());
     if (registered != discord::Result::Ok)
       return std::unexpected(ApplicationException::format("Could not register Discord launch command (err {})", (int)registered));
   }

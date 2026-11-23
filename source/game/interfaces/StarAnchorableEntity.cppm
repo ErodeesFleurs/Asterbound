@@ -24,7 +24,7 @@ namespace Star {
 
 struct EntityAnchor {
   virtual ~EntityAnchor() = default;
-  virtual void const* query_type(TypeKey key) const noexcept { return query_type_of<EntityAnchor>(this, key); }
+  virtual void query_type(TypeQuery& query) const noexcept { query_type_of<EntityAnchor>(*this, query); }
   virtual std::string_view dynamic_type_name() const noexcept { return Star::type_name<EntityAnchor>(); }
 
   Vec2F position;
@@ -49,8 +49,8 @@ struct EntityAnchorState {
 
 class AnchorableEntity : public virtual Entity {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<AnchorableEntity, Entity>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<AnchorableEntity, Entity>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<AnchorableEntity>(); }
 

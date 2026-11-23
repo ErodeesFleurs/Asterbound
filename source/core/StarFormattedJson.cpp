@@ -83,8 +83,8 @@ private:
         return std::unexpected(JsonException("Invalid FormattedJson object key outside object"));
       m_last_key = loc;
     } else if (std::holds_alternative<ValueElement>(elem)) {
-      auto const& value = std::get<ValueElement>(elem);
-      if (!value.m_value)
+      auto const& value = std::get<ValueElement>(elem).value;
+      if (!value)
         return std::unexpected(JsonException("Invalid empty FormattedJson value element"));
       if (m_last_key) {
         if (!m_object || *m_last_key >= m_result.m_elements.size())
@@ -92,16 +92,16 @@ private:
         auto const& key_element = m_result.m_elements[*m_last_key];
         if (!std::holds_alternative<ObjectKeyElement>(key_element))
           return std::unexpected(JsonException("Invalid FormattedJson object key element"));
-        auto const& key = std::get<ObjectKeyElement>(key_element);
+        auto const& key = std::get<ObjectKeyElement>(key_element).key;
         if (m_values)
-          std::get<JsonObject>(*m_values).insert_or_assign(key.m_key, value.m_value->to_json());
-        m_result.m_object_entry_locations.insert_or_assign(key.m_key, std::pair{*m_last_key, loc});
+          std::get<JsonObject>(*m_values).insert_or_assign(key, value->to_json());
+        m_result.m_object_entry_locations.insert_or_assign(key, std::pair{*m_last_key, loc});
         m_last_key.reset();
       } else {
         if (m_object)
           return std::unexpected(JsonException("Invalid FormattedJson array entry"));
         if (m_values)
-          std::get<JsonArray>(*m_values).push_back(value.m_value->to_json());
+          std::get<JsonArray>(*m_values).push_back(value->to_json());
         m_result.m_array_element_locations.push_back(loc);
       }
     }
@@ -149,13 +149,13 @@ public:
   static std::expected<void, StarException> to_json_stream(FormattedJson const& val, JsonStream& stream, bool sort);
 };
 
-ValueElement::ValueElement(FormattedJson json) : m_value(std::make_shared<FormattedJson>(std::move(json))) {}
+ValueElement::ValueElement(FormattedJson json) : value(std::make_shared<FormattedJson>(std::move(json))) {}
 
-bool ValueElement::operator==(ValueElement const& v) const { return *m_value == *v.m_value; }
+bool ValueElement::operator==(ValueElement const& v) const { return *value == *v.value; }
 
-bool ObjectKeyElement::operator==(ObjectKeyElement const& v) const { return m_key == v.m_key; }
+bool ObjectKeyElement::operator==(ObjectKeyElement const& v) const { return key == v.key; }
 
-bool WhitespaceElement::operator==(WhitespaceElement const& v) const { return m_whitespace == v.m_whitespace; }
+bool WhitespaceElement::operator==(WhitespaceElement const& v) const { return whitespace == v.whitespace; }
 
 bool ColonElement::operator==(ColonElement const&) const {
   return true;
@@ -332,10 +332,10 @@ std::expected<FormattedJson, StarException> FormattedJson::get(std::size_t index
 }
 
 struct WhitespaceStyle {
-  String m_before_key;
-  String m_before_colon;
-  String m_before_value;
-  String m_before_comma;
+  String before_key;
+  String before_colon;
+  String before_value;
+  String before_comma;
 };
 
 template <class Element>
@@ -350,7 +350,7 @@ FormattedJson::ElementLocation index_of(FormattedJson::ElementList const& elemen
     if (std::holds_alternative<ElementType>(elements[pos]))
       return pos;
   }
-  return NPos;
+  return npos;
 }
 
 template <formatted_json_element ElementType>
@@ -361,7 +361,7 @@ FormattedJson::ElementLocation last_index_of(FormattedJson::ElementList const& e
     if (std::holds_alternative<ElementType>(elements[pos]))
       return pos;
   }
-  return NPos;
+  return npos;
 }
 
 String concat_whitespace(FormattedJson::ElementList const& elements, FormattedJson::ElementLocation from,
@@ -369,7 +369,7 @@ String concat_whitespace(FormattedJson::ElementList const& elements, FormattedJs
   String whitespace;
   for (auto i = from; i < to; ++i) {
     if (std::holds_alternative<WhitespaceElement>(elements[i]))
-      whitespace += std::get<WhitespaceElement>(elements[i]).m_whitespace;
+      whitespace += std::get<WhitespaceElement>(elements[i]).whitespace;
   }
   return whitespace;
 }
@@ -380,10 +380,10 @@ std::expected<WhitespaceStyle, StarException> detect_whitespace(FormattedJson::E
 
   // Find a nearby value as a reference location to learn whitespace from.
   FormattedJson::ElementLocation value_loc = last_index_of<ValueElement>(elements, insert_loc);
-  if (value_loc == NPos)
+  if (value_loc == npos)
     value_loc = index_of<ValueElement>(elements, insert_loc);
 
-  if (value_loc == NPos) {
+  if (value_loc == npos) {
     // This object/array is empty. Pre-key/value whitespace will be the total of
     // the whitespace already present, plus some guessed indentation if it
     // contained a newline.
@@ -391,47 +391,47 @@ std::expected<WhitespaceStyle, StarException> detect_whitespace(FormattedJson::E
     auto newline = before_value.find('\n');
     if (!newline)
       return std::unexpected(std::move(newline.error()));
-    if (*newline != NPos)
+    if (*newline != npos)
       before_value += "  ";
     if (array)
-      return WhitespaceStyle{.m_before_key = "",
-                             .m_before_colon = "",
-                             .m_before_value = before_value,
-                             .m_before_comma = ""};
-    return WhitespaceStyle{.m_before_key = before_value,
-                           .m_before_colon = "",
-                           .m_before_value = "",
-                           .m_before_comma = ""};
+      return WhitespaceStyle{.before_key = "",
+                             .before_colon = "",
+                             .before_value = before_value,
+                             .before_comma = ""};
+    return WhitespaceStyle{.before_key = before_value,
+                           .before_colon = "",
+                           .before_value = "",
+                           .before_comma = ""};
   }
 
   FormattedJson::ElementLocation comma_loc = index_of<CommaElement>(elements, value_loc);
-  if (comma_loc != NPos) {
-    style.m_before_comma = concat_whitespace(elements, value_loc + 1, comma_loc);
+  if (comma_loc != npos) {
+    style.before_comma = concat_whitespace(elements, value_loc + 1, comma_loc);
   }
 
   FormattedJson::ElementLocation colon_loc = last_index_of<ColonElement>(elements, value_loc);
-  if constexpr (Star::DebugEnabled) {
-    Star::star_assert_failed(((colon_loc == NPos) == array));
+  if constexpr (Star::debug_enabled) {
+    Star::star_assert_failed(((colon_loc == npos) == array));
   }
-  if (colon_loc != NPos) {
-    style.m_before_value = concat_whitespace(elements, colon_loc + 1, value_loc);
+  if (colon_loc != npos) {
+    style.before_value = concat_whitespace(elements, colon_loc + 1, value_loc);
 
     FormattedJson::ElementLocation key_loc = last_index_of<ObjectKeyElement>(elements, colon_loc);
-    if constexpr (Star::DebugEnabled) {
-      Star::star_assert_failed((key_loc != NPos));
+    if constexpr (Star::debug_enabled) {
+      Star::star_assert_failed((key_loc != npos));
     }
-    style.m_before_colon = concat_whitespace(elements, key_loc + 1, colon_loc);
+    style.before_colon = concat_whitespace(elements, key_loc + 1, colon_loc);
 
     FormattedJson::ElementLocation prev_value_loc = last_index_of<ValueElement>(elements, key_loc);
-    if (prev_value_loc == NPos)
+    if (prev_value_loc == npos)
       prev_value_loc = 0;
-    style.m_before_key = concat_whitespace(elements, prev_value_loc, key_loc);
+    style.before_key = concat_whitespace(elements, prev_value_loc, key_loc);
 
   } else {
     FormattedJson::ElementLocation prev_value_loc = last_index_of<ValueElement>(elements, value_loc);
-    if (prev_value_loc == NPos)
+    if (prev_value_loc == npos)
       prev_value_loc = 0;
-    style.m_before_value = concat_whitespace(elements, prev_value_loc, value_loc);
+    style.before_value = concat_whitespace(elements, prev_value_loc, value_loc);
   }
 
   return style;
@@ -439,12 +439,12 @@ std::expected<WhitespaceStyle, StarException> detect_whitespace(FormattedJson::E
 
 String const& whitespace_before(WhitespaceStyle const& style, JsonElement const& element) {
   if (std::holds_alternative<ValueElement>(element))
-    return style.m_before_value;
+    return style.before_value;
   if (std::holds_alternative<ObjectKeyElement>(element))
-    return style.m_before_key;
+    return style.before_key;
   if (std::holds_alternative<ColonElement>(element))
-    return style.m_before_colon;
-  return style.m_before_comma;
+    return style.before_colon;
+  return style.before_comma;
 }
 
 void append_with_whitespace(FormattedJson::ElementList& result, WhitespaceStyle const& style,
@@ -460,11 +460,11 @@ insert_with_comma_and_formatting(FormattedJson::ElementList const& source, Forma
                                  bool array, std::initializer_list<JsonElement> elements) {
   // Resolve the original token boundary before constructing the replacement.
   at = last_index_of<ValueElement>(source, at);
-  if (at == NPos)
+  if (at == npos)
     at = 0;
   else
     at += 1;
-  bool empty = last_index_of<ValueElement>(source, source.size()) == NPos;
+  bool empty = last_index_of<ValueElement>(source, source.size()) == npos;
   bool append_comma = at == 0 && !empty;
   bool prepend_comma = !append_comma && !empty;
   auto style = detect_whitespace(source, at, array);
@@ -475,7 +475,7 @@ insert_with_comma_and_formatting(FormattedJson::ElementList const& source, Forma
   for (auto const& element : elements)
     inserted_count += !whitespace_before(*style, element).empty();
   if (!empty)
-    inserted_count += 1 + !style->m_before_comma.empty();
+    inserted_count += 1 + !style->before_comma.empty();
 
   FormattedJson::ElementList result;
   result.reserve(source.size() + inserted_count);
@@ -525,13 +525,13 @@ static FormattedJson::ElementList without_value(FormattedJson::ElementList const
   auto comma_loc = index_of<CommaElement>(elements, value_loc);
   std::size_t begin = prefix_loc;
   std::size_t end = value_loc + 1;
-  if (comma_loc != NPos) {
+  if (comma_loc != npos) {
     end = comma_loc + 1;
     while (end < elements.size() && std::holds_alternative<WhitespaceElement>(elements[end]))
       ++end;
   } else {
     comma_loc = last_index_of<CommaElement>(elements, prefix_loc);
-    begin = comma_loc == NPos ? 0 : comma_loc;
+    begin = comma_loc == npos ? 0 : comma_loc;
   }
   FormattedJson::ElementList result;
   result.reserve(elements.size() - (end - begin));
@@ -676,7 +676,7 @@ FormattedJson::get_formatted_json(ElementLocation loc) const {
     return std::unexpected(JsonException("FormattedJson element location out of range"));
   if (!std::holds_alternative<ValueElement>(m_elements[loc]))
     return std::unexpected(JsonException("Invalid FormattedJson value element"));
-  auto const& value = std::get<ValueElement>(m_elements[loc]).m_value;
+  auto const& value = std::get<ValueElement>(m_elements[loc]).value;
   if (!value)
     return std::unexpected(JsonException("Invalid FormattedJson value element"));
   return std::cref(*value);
@@ -818,7 +818,7 @@ std::expected<void, StarException> FormattedJsonBuilderStream::put_value(Json co
   if (!formatted)
     return std::unexpected(std::move(formatted.error()));
   if (formatting) {
-    if constexpr (DebugEnabled) {
+    if constexpr (debug_enabled) {
       auto parsed = Json::parse(*formatting);
       if (!parsed)
         return std::unexpected(std::move(parsed.error()));
@@ -849,15 +849,15 @@ std::expected<void, StarException> JsonStreamer<FormattedJson>::to_json_stream(F
   for (auto const& elem : val.elements()) {
     std::expected<void, StarException> written;
     if (std::holds_alternative<ObjectKeyElement>(elem)) {
-      written = stream.object_key_utf8(std::get<ObjectKeyElement>(elem).m_key.utf8());
+      written = stream.object_key_utf8(std::get<ObjectKeyElement>(elem).key.utf8());
     } else if (std::holds_alternative<WhitespaceElement>(elem)) {
-      written = stream.put_whitespace_utf8(std::get<WhitespaceElement>(elem).m_whitespace.utf8());
+      written = stream.put_whitespace_utf8(std::get<WhitespaceElement>(elem).whitespace.utf8());
     } else if (std::holds_alternative<ColonElement>(elem)) {
       written = stream.put_colon();
     } else if (std::holds_alternative<CommaElement>(elem)) {
       written = stream.put_comma();
     } else {
-      auto const& value = std::get<ValueElement>(elem).m_value;
+      auto const& value = std::get<ValueElement>(elem).value;
       if (!value)
         return std::unexpected(JsonException("Invalid empty FormattedJson value element"));
       written = to_json_stream(*value, stream, sort);
@@ -871,7 +871,7 @@ std::expected<void, StarException> JsonStreamer<FormattedJson>::to_json_stream(F
 std::expected<void, StarException> write_text(TextBuffer& output, JsonElement const& elem) {
   if (std::holds_alternative<ValueElement>(elem)) {
     output.append("ValueElement{");
-    auto const& value = std::get<ValueElement>(elem).m_value;
+    auto const& value = std::get<ValueElement>(elem).value;
     if (value)
       std::format_to(std::back_inserter(output), "{}", static_cast<void const*>(value.get()));
     else
@@ -879,11 +879,11 @@ std::expected<void, StarException> write_text(TextBuffer& output, JsonElement co
     output.push_back('}');
   } else if (std::holds_alternative<ObjectKeyElement>(elem)) {
     output.append("ObjectKeyElement{");
-    append_text(output, std::get<ObjectKeyElement>(elem).m_key);
+    append_text(output, std::get<ObjectKeyElement>(elem).key);
     output.push_back('}');
   } else if (std::holds_alternative<WhitespaceElement>(elem)) {
     output.append("WhitespaceElement{");
-    append_text(output, std::get<WhitespaceElement>(elem).m_whitespace);
+    append_text(output, std::get<WhitespaceElement>(elem).whitespace);
     output.push_back('}');
   } else if (std::holds_alternative<ColonElement>(elem)) {
     output.append("ColonElement{}");

@@ -21,11 +21,11 @@ concept displacement_scalar = std::floating_point<T> || (std::integral<T>
 }
 
 // Axis aligned box that can be used as a bounding volume.
-template <typename T, std::size_t N>
+template <typename T, std::size_t dimension_count>
 class Box {
 public:
-  using Coord = Vector<T, N>;
-  using Line = Star::Line<T, N>;
+  using Coord = Vector<T, dimension_count>;
+  using Line = Star::Line<T, dimension_count>;
   using LineIntersectResult = typename Line::IntersectResult;
 
   struct IntersectResult {
@@ -34,7 +34,7 @@ public:
     // Directed displacement along the selected axis. Integer differences can be
     // negative even for unsigned boxes, and can exceed a signed coordinate's range.
     using Scalar = std::conditional_t<std::integral<T>, std::intmax_t, T>;
-    Vector<Scalar, N> overlap;
+    Vector<Scalar, dimension_count> overlap;
     // Whether or not the intersection is touching only.  No overlap.
     bool glances;
   };
@@ -45,21 +45,21 @@ public:
   // Returns an integral aligned box that at least contains the given floating
   // point box.
   template <typename B>
-    requires requires(B const& b) { Vector<T, N>::floor(b.min()); Vector<T, N>::ceil(b.max()); }
+    requires requires(B const& b) { Vector<T, dimension_count>::floor(b.min()); Vector<T, dimension_count>::ceil(b.max()); }
   static Box integral(B const& box);
 
   // Returns an integral aligned box that is equal to the given box rounded to
   // the nearest whole number (does not necessarily contain the given box).
   template <typename B>
-    requires requires(B const& b) { Vector<T, N>::round(b.min()); Vector<T, N>::round(b.max()); }
+    requires requires(B const& b) { Vector<T, dimension_count>::round(b.min()); Vector<T, dimension_count>::round(b.max()); }
   static Box round(B const& box);
 
   template <typename... TN>
-    requires ((std::same_as<TN, Vector<T, N>> || std::same_as<TN, Box<T, N>>) && ...)
+    requires ((std::same_as<TN, Vector<T, dimension_count>> || std::same_as<TN, Box<T, dimension_count>>) && ...)
   static Box bound_box_of(TN const&... list);
 
   template <typename Collection>
-    requires std::ranges::input_range<Collection const> && std::constructible_from<Vector<T, N>, std::ranges::range_reference_t<Collection const>>
+    requires std::ranges::input_range<Collection const> && std::constructible_from<Vector<T, dimension_count>, std::ranges::range_reference_t<Collection const>>
   static Box bound_box_of_points(Collection const& collection);
 
   static Box with_size(Coord const& min, Coord const& size);
@@ -71,7 +71,7 @@ public:
   constexpr Box(Coord const& min, Coord const& max);
 
   template <typename T2>
-  explicit Box(Box<T2, N> const& b);
+  explicit Box(Box<T2, dimension_count> const& b);
 
   // Is equal to null()
   bool is_null() const;
@@ -113,8 +113,8 @@ public:
   // scale). Integral quotients truncate, as do half-extents in with_center.
   // Return false without mutation for reversed bounds, nonpositive components
   // or integer results that cannot be represented.
-  bool set_aspect(Coord const& aspect, bool shrink = false) requires (N > 0 && rect_detail::aspect_scalar<T>);
-  bool make_cube() requires (N > 0 && rect_detail::aspect_scalar<T>);
+  bool set_aspect(Coord const& aspect, bool shrink = false) requires (dimension_count > 0 && rect_detail::aspect_scalar<T>);
+  bool make_cube() requires (dimension_count > 0 && rect_detail::aspect_scalar<T>);
 
   Coord center() const;
   // Translate by the difference between c and center(). The integer endpoints
@@ -139,7 +139,7 @@ public:
 
   // Same integer representability preconditions as scalar expand().
   void expand(Coord const& factor);
-  Box expanded(Vector<T, N> const& factor) const;
+  Box expanded(Vector<T, dimension_count> const& factor) const;
 
   // Scale around origin.
   void scale(T factor);
@@ -147,7 +147,7 @@ public:
 
   // Scale around origin.
   void scale(Coord const& factor);
-  Box scaled(Vector<T, N> const& factor) const;
+  Box scaled(Vector<T, dimension_count> const& factor) const;
 
   // Increase all dimensions by a constant amount on all sides
   void pad(T amount);
@@ -155,7 +155,7 @@ public:
 
   // Increase all dimensions by a constant amount
   void pad(Coord const& amount);
-  Box padded(Vector<T, N> const& amount) const;
+  Box padded(Vector<T, dimension_count> const& amount) const;
 
   // Opposite of pad
   void trim(T amount);
@@ -163,7 +163,7 @@ public:
 
   // Opposite of pad
   void trim(Coord const& amount);
-  Box trimmed(Vector<T, N> const& amount) const;
+  Box trimmed(Vector<T, dimension_count> const& amount) const;
 
   // Flip around some dimension (may make box have negative volume)
   void flip(std::size_t dimension);
@@ -186,7 +186,7 @@ public:
 
   // Use intersects() for comparison-only queries, including integral coordinates
   // too wide for a directed difference in intmax_t.
-  IntersectResult intersection(Box const& b) const requires (N > 0 && rect_detail::displacement_scalar<T>);
+  IntersectResult intersection(Box const& b) const requires (dimension_count > 0 && rect_detail::displacement_scalar<T>);
   bool intersects(Box const& b, bool include_edges = true) const;
 
   bool contains(Coord const& p, bool include_edges = true) const;
@@ -214,44 +214,44 @@ public:
 
   // 2D Only
 
-  constexpr Box(T min_x, T min_y, T max_x, T max_y) requires (N == 2);
+  constexpr Box(T min_x, T min_y, T max_x, T max_y) requires (dimension_count == 2);
 
-  T x_min() const requires (N == 2);
-  T x_max() const requires (N == 2);
-  T y_min() const requires (N == 2);
-  T y_max() const requires (N == 2);
+  T x_min() const requires (dimension_count == 2);
+  T x_max() const requires (dimension_count == 2);
+  T y_min() const requires (dimension_count == 2);
+  T y_max() const requires (dimension_count == 2);
 
-  void set_x_min(T x_min) requires (N == 2);
-  void set_x_max(T x_max) requires (N == 2);
-  void set_y_min(T y_min) requires (N == 2);
-  void set_y_max(T y_max) requires (N == 2);
+  void set_x_min(T x_min) requires (dimension_count == 2);
+  void set_x_max(T x_max) requires (dimension_count == 2);
+  void set_y_min(T y_min) requires (dimension_count == 2);
+  void set_y_max(T y_max) requires (dimension_count == 2);
 
-  T width() const requires (N == 2);
-  T height() const requires (N == 2);
+  T width() const requires (dimension_count == 2);
+  T height() const requires (dimension_count == 2);
 
-  void translate(T x, T y) requires (N == 2);
-  void translate_to_include(T x, T y, T x_padding = 0, T y_padding = 0) requires (N == 2);
-  void scale(T x, T y) requires (N == 2);
-  void expand(T x, T y) requires (N == 2);
-  void flip_horizontal() requires (N == 2);
-  void flip_vertical() requires (N == 2);
+  void translate(T x, T y) requires (dimension_count == 2);
+  void translate_to_include(T x, T y, T x_padding = 0, T y_padding = 0) requires (dimension_count == 2);
+  void scale(T x, T y) requires (dimension_count == 2);
+  void expand(T x, T y) requires (dimension_count == 2);
+  void flip_horizontal() requires (dimension_count == 2);
+  void flip_vertical() requires (dimension_count == 2);
 
-  Array<Line, 4> edges() const requires (N == 2);
-  bool intersects(Line const& l) const requires (N == 2);
-  bool intersects_circle(Coord const& position, T radius) const requires (N == 2);
-  LineIntersectResult edge_intersection(Line const& l) const requires (N == 2);
+  Array<Line, 4> edges() const requires (dimension_count == 2);
+  bool intersects(Line const& l) const requires (dimension_count == 2);
+  bool intersects_circle(Coord const& position, T radius) const requires (dimension_count == 2);
+  LineIntersectResult edge_intersection(Line const& l) const requires (dimension_count == 2);
 
   // Regions in this rectangle but not in rect, ordered left, right, bottom, top.
-  SmallList<Box, 4> subtract(Box const& rect) const requires (N == 2);
+  SmallList<Box, 4> subtract(Box const& rect) const requires (dimension_count == 2);
 
 protected:
   Coord m_min;
   Coord m_max;
 };
 
-template <typename T, std::size_t N>
-  requires nonfallible_text_writable<Vector<T, N>>
-void write_text(TextBuffer& output, Box<T, N> const& box);
+template <typename T, std::size_t dimension_count>
+  requires nonfallible_text_writable<Vector<T, dimension_count>>
+void write_text(TextBuffer& output, Box<T, dimension_count> const& box);
 
 template<typename T>
 using Rect = Box<T, 2>;
@@ -261,166 +261,166 @@ using RectU = Rect<unsigned>;
 using RectF = Rect<float>;
 using RectD = Rect<double>;
 
-template <typename T, std::size_t N>
-Box<T, N> Box<T, N>::null() {
+template <typename T, std::size_t dimension_count>
+Box<T, dimension_count> Box<T, dimension_count>::null() {
   return Box(Coord::filled(std::numeric_limits<T>::max()), Coord::filled(std::numeric_limits<T>::lowest()));
 }
 
-template <typename T, std::size_t N>
-Box<T, N> Box<T, N>::inf() {
+template <typename T, std::size_t dimension_count>
+Box<T, dimension_count> Box<T, dimension_count>::inf() {
   return Box(Coord::filled(std::numeric_limits<T>::lowest()), Coord::filled(std::numeric_limits<T>::max()));
 }
 
-template <typename T, std::size_t N>
+template <typename T, std::size_t dimension_count>
 template <typename B>
-  requires requires(B const& b) { Vector<T, N>::floor(b.min()); Vector<T, N>::ceil(b.max()); }
-Box<T, N> Box<T, N>::integral(B const& box) {
+  requires requires(B const& b) { Vector<T, dimension_count>::floor(b.min()); Vector<T, dimension_count>::ceil(b.max()); }
+Box<T, dimension_count> Box<T, dimension_count>::integral(B const& box) {
   return Box(Coord::floor(box.min()), Coord::ceil(box.max()));
 }
 
-template <typename T, std::size_t N>
+template <typename T, std::size_t dimension_count>
 template <typename B>
-  requires requires(B const& b) { Vector<T, N>::round(b.min()); Vector<T, N>::round(b.max()); }
-Box<T, N> Box<T, N>::round(B const& box) {
+  requires requires(B const& b) { Vector<T, dimension_count>::round(b.min()); Vector<T, dimension_count>::round(b.max()); }
+Box<T, dimension_count> Box<T, dimension_count>::round(B const& box) {
   return Box(Coord::round(box.min()), Coord::round(box.max()));
 }
 
-template <typename T, std::size_t N>
+template <typename T, std::size_t dimension_count>
 template <typename... TN>
-  requires ((std::same_as<TN, Vector<T, N>> || std::same_as<TN, Box<T, N>>) && ...)
-Box<T, N> Box<T, N>::bound_box_of(TN const&... list) {
+  requires ((std::same_as<TN, Vector<T, dimension_count>> || std::same_as<TN, Box<T, dimension_count>>) && ...)
+Box<T, dimension_count> Box<T, dimension_count>::bound_box_of(TN const&... list) {
   Box b = null();
   (b.combine(list), ...);
   return b;
 }
 
-template <typename T, std::size_t N>
+template <typename T, std::size_t dimension_count>
 template <typename Collection>
-  requires std::ranges::input_range<Collection const> && std::constructible_from<Vector<T, N>, std::ranges::range_reference_t<Collection const>>
-Box<T, N> Box<T, N>::bound_box_of_points(Collection const& collection) {
+  requires std::ranges::input_range<Collection const> && std::constructible_from<Vector<T, dimension_count>, std::ranges::range_reference_t<Collection const>>
+Box<T, dimension_count> Box<T, dimension_count>::bound_box_of_points(Collection const& collection) {
   Box b = null();
   for (auto&& point : collection)
     b.combine(Coord(std::forward<decltype(point)>(point)));
   return b;
 }
 
-template <typename T, std::size_t N>
-Box<T, N> Box<T, N>::with_size(Coord const& min, Coord const& size) {
+template <typename T, std::size_t dimension_count>
+Box<T, dimension_count> Box<T, dimension_count>::with_size(Coord const& min, Coord const& size) {
   return Box(min, min + size);
 }
 
-template <typename T, std::size_t N>
-Box<T, N> Box<T, N>::with_center(Coord const& center, Coord const& size) {
+template <typename T, std::size_t dimension_count>
+Box<T, dimension_count> Box<T, dimension_count>::with_center(Coord const& center, Coord const& size) {
   auto half = size / 2;
   return Box(center - half, center + half);
 }
 
-template <typename T, std::size_t N>
-constexpr Box<T, N>::Box(Coord const& min, Coord const& max)
+template <typename T, std::size_t dimension_count>
+constexpr Box<T, dimension_count>::Box(Coord const& min, Coord const& max)
   : m_min(min), m_max(max) {}
 
-template <typename T, std::size_t N>
+template <typename T, std::size_t dimension_count>
 template <typename T2>
-Box<T, N>::Box(Box<T2, N> const& b)
+Box<T, dimension_count>::Box(Box<T2, dimension_count> const& b)
   : m_min(b.min()), m_max(b.max()) {}
 
-template <typename T, std::size_t N>
-bool Box<T, N>::is_null() const {
+template <typename T, std::size_t dimension_count>
+bool Box<T, dimension_count>::is_null() const {
   return m_min == Coord::filled(std::numeric_limits<T>::max())
       && m_max == Coord::filled(std::numeric_limits<T>::lowest());
 }
 
-template <typename T, std::size_t N>
-bool Box<T, N>::is_negative() const {
-  for (std::size_t i = 0; i < N; ++i) {
+template <typename T, std::size_t dimension_count>
+bool Box<T, dimension_count>::is_negative() const {
+  for (std::size_t i = 0; i < dimension_count; ++i) {
     if (m_max[i] < m_min[i])
       return true;
   }
   return false;
 }
 
-template <typename T, std::size_t N>
-bool Box<T, N>::is_empty() const {
-  for (std::size_t i = 0; i < N; ++i) {
+template <typename T, std::size_t dimension_count>
+bool Box<T, dimension_count>::is_empty() const {
+  for (std::size_t i = 0; i < dimension_count; ++i) {
     if (m_max[i] <= m_min[i])
       return true;
   }
   return false;
 }
 
-template <typename T, std::size_t N>
-void Box<T, N>::combine(Box const& box) {
+template <typename T, std::size_t dimension_count>
+void Box<T, dimension_count>::combine(Box const& box) {
   m_min = box.m_min.piecewise_min(m_min);
   m_max = box.m_max.piecewise_max(m_max);
 }
 
-template <typename T, std::size_t N>
-Box<T, N> Box<T, N>::combined(Box const& box) const {
+template <typename T, std::size_t dimension_count>
+Box<T, dimension_count> Box<T, dimension_count>::combined(Box const& box) const {
   auto b = *this;
   b.combine(box);
   return b;
 }
 
-template <typename T, std::size_t N>
-void Box<T, N>::combine(Coord const& point) {
+template <typename T, std::size_t dimension_count>
+void Box<T, dimension_count>::combine(Coord const& point) {
   m_min = m_min.piecewise_min(point);
   m_max = m_max.piecewise_max(point);
 }
 
-template <typename T, std::size_t N>
-Box<T, N> Box<T, N>::combined(Coord const& point) const {
+template <typename T, std::size_t dimension_count>
+Box<T, dimension_count> Box<T, dimension_count>::combined(Coord const& point) const {
   auto b = *this;
   b.combine(point);
   return b;
 }
 
-template <typename T, std::size_t N>
-void Box<T, N>::limit(Box const& box) {
+template <typename T, std::size_t dimension_count>
+void Box<T, dimension_count>::limit(Box const& box) {
   m_min = m_min.piecewise_max(box.m_min);
   m_max = m_max.piecewise_min(box.m_max);
 }
 
-template <typename T, std::size_t N>
-Box<T, N> Box<T, N>::limited(Box const& box) const {
+template <typename T, std::size_t dimension_count>
+Box<T, dimension_count> Box<T, dimension_count>::limited(Box const& box) const {
   auto b = *this;
   b.limit(box);
   return b;
 }
 
-template <typename T, std::size_t N>
-void Box<T, N>::make_positive() {
-  for (std::size_t i = 0; i < N; ++i) {
+template <typename T, std::size_t dimension_count>
+void Box<T, dimension_count>::make_positive() {
+  for (std::size_t i = 0; i < dimension_count; ++i) {
     if (m_max[i] < m_min[i])
       std::swap(m_max[i], m_min[i]);
   }
 }
 
-template <typename T, std::size_t N>
-void Box<T, N>::range_set_if_empty(Box const& b) {
-  for (std::size_t i = 0; i < N; ++i) {
+template <typename T, std::size_t dimension_count>
+void Box<T, dimension_count>::range_set_if_empty(Box const& b) {
+  for (std::size_t i = 0; i < dimension_count; ++i) {
     if (m_max[i] <= m_min[i])
       set_range(i, b.range(i));
   }
 }
 
-template <typename T, std::size_t N>
-bool Box<T, N>::make_cube() requires (N > 0 && rect_detail::aspect_scalar<T>) {
+template <typename T, std::size_t dimension_count>
+bool Box<T, dimension_count>::make_cube() requires (dimension_count > 0 && rect_detail::aspect_scalar<T>) {
   return set_aspect(Coord::filled(1));
 }
 
-template <typename T, std::size_t N>
-auto Box<T, N>::size() const -> Coord {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::size() const -> Coord {
   return m_max - m_min;
 }
 
-template <typename T, std::size_t N>
-T Box<T, N>::size(std::size_t dim) const {
+template <typename T, std::size_t dimension_count>
+T Box<T, dimension_count>::size(std::size_t dim) const {
   return m_max[dim] - m_min[dim];
 }
 
-template <typename T, std::size_t N>
-bool Box<T, N>::set_aspect(Coord const& aspect, bool shrink) requires (N > 0 && rect_detail::aspect_scalar<T>) {
-  for (std::size_t i = 0; i < N; ++i)
+template <typename T, std::size_t dimension_count>
+bool Box<T, dimension_count>::set_aspect(Coord const& aspect, bool shrink) requires (dimension_count > 0 && rect_detail::aspect_scalar<T>) {
+  for (std::size_t i = 0; i < dimension_count; ++i)
     if (!(aspect[i] > 0) || m_max[i] < m_min[i])
       return false;
 
@@ -429,14 +429,14 @@ bool Box<T, N>::set_aspect(Coord const& aspect, bool shrink) requires (N > 0 && 
     // difference still gives the exact width, even across zero.
     using U = std::make_unsigned_t<T>;
     U scale = shrink ? std::numeric_limits<U>::max() : U{};
-    for (std::size_t i = 0; i < N; ++i) {
+    for (std::size_t i = 0; i < dimension_count; ++i) {
       U width = static_cast<U>(m_max[i]) - static_cast<U>(m_min[i]);
       U ratio = width / static_cast<U>(aspect[i]);
       scale = shrink ? std::min(scale, ratio) : std::max(scale, ratio);
     }
     auto middle = center();
     Coord half;
-    for (std::size_t i = 0; i < N; ++i) {
+    for (std::size_t i = 0; i < dimension_count; ++i) {
       U component = static_cast<U>(aspect[i]);
       if (scale > std::numeric_limits<U>::max() / component)
         return false;
@@ -454,11 +454,11 @@ bool Box<T, N>::set_aspect(Coord const& aspect, bool shrink) requires (N > 0 && 
   return true;
 }
 
-template <typename T, std::size_t N>
-auto Box<T, N>::center() const -> Coord {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::center() const -> Coord {
   if constexpr (std::integral<T>) {
     Coord result;
-    for (std::size_t i = 0; i < N; ++i) {
+    for (std::size_t i = 0; i < dimension_count; ++i) {
       auto a = m_min[i], b = m_max[i];
       // Shared bits plus half the differing bits gives floor((a+b)/2)
       // without forming the sum. Correct negative odd sums toward zero.
@@ -474,12 +474,12 @@ auto Box<T, N>::center() const -> Coord {
   }
 }
 
-template <typename T, std::size_t N>
-void Box<T, N>::set_center(Coord const& c) {
+template <typename T, std::size_t dimension_count>
+void Box<T, dimension_count>::set_center(Coord const& c) {
   if constexpr (std::signed_integral<T>) {
     using U = std::make_unsigned_t<T>;
     auto middle = center();
-    for (std::size_t i = 0; i < N; ++i) {
+    for (std::size_t i = 0; i < dimension_count; ++i) {
       U delta = static_cast<U>(c[i]) - static_cast<U>(middle[i]);
       m_min[i] = static_cast<T>(static_cast<U>(m_min[i]) + delta);
       m_max[i] = static_cast<T>(static_cast<U>(m_max[i]) + delta);
@@ -489,23 +489,23 @@ void Box<T, N>::set_center(Coord const& c) {
   }
 }
 
-template <typename T, std::size_t N>
-void Box<T, N>::translate(Coord const& c) {
+template <typename T, std::size_t dimension_count>
+void Box<T, dimension_count>::translate(Coord const& c) {
   m_min += c;
   m_max += c;
 }
 
-template <typename T, std::size_t N>
-Box<T, N> Box<T, N>::translated(Coord const& c) const {
+template <typename T, std::size_t dimension_count>
+Box<T, dimension_count> Box<T, dimension_count>::translated(Coord const& c) const {
   auto b = *this;
   b.translate(c);
   return b;
 }
 
-template <typename T, std::size_t N>
-void Box<T, N>::translate_to_include(Coord const& coord, Coord const& padding) {
+template <typename T, std::size_t dimension_count>
+void Box<T, dimension_count>::translate_to_include(Coord const& coord, Coord const& padding) {
   Coord translation;
-  for (std::size_t i = 0; i < N; ++i) {
+  for (std::size_t i = 0; i < dimension_count; ++i) {
     if (coord[i] < m_min[i] + padding[i])
       translation[i] = coord[i] - m_min[i] - padding[i];
     else if (coord[i] > m_max[i] - padding[i])
@@ -514,178 +514,178 @@ void Box<T, N>::translate_to_include(Coord const& coord, Coord const& padding) {
   translate(translation);
 }
 
-template <typename T, std::size_t N>
-Vector<T, 2> Box<T, N>::range(std::size_t dim) const {
+template <typename T, std::size_t dimension_count>
+Vector<T, 2> Box<T, dimension_count>::range(std::size_t dim) const {
   return {m_min[dim], m_max[dim]};
 }
 
-template <typename T, std::size_t N>
-void Box<T, N>::set_range(std::size_t dim, Vector<T, 2> v) {
+template <typename T, std::size_t dimension_count>
+void Box<T, dimension_count>::set_range(std::size_t dim, Vector<T, 2> v) {
   m_min[dim] = v[0];
   m_max[dim] = v[1];
 }
 
-template <typename T, std::size_t N>
-void Box<T, N>::combine_range(std::size_t dim, Vector<T, 2> v) {
+template <typename T, std::size_t dimension_count>
+void Box<T, dimension_count>::combine_range(std::size_t dim, Vector<T, 2> v) {
   m_min[dim] = std::min(m_min[dim], v[0]);
   m_max[dim] = std::max(m_max[dim], v[1]);
 }
 
-template <typename T, std::size_t N>
-void Box<T, N>::limit_range(std::size_t dim, Vector<T, 2> v) {
+template <typename T, std::size_t dimension_count>
+void Box<T, dimension_count>::limit_range(std::size_t dim, Vector<T, 2> v) {
   m_min[dim] = std::max(m_min[dim], v[0]);
   m_max[dim] = std::min(m_max[dim], v[1]);
 }
 
-template <typename T, std::size_t N>
-void Box<T, N>::expand(T factor) {
+template <typename T, std::size_t dimension_count>
+void Box<T, dimension_count>::expand(T factor) {
   *this = expanded(factor);
 }
 
-template <typename T, std::size_t N>
-Box<T, N> Box<T, N>::expanded(T factor) const {
+template <typename T, std::size_t dimension_count>
+Box<T, dimension_count> Box<T, dimension_count>::expanded(T factor) const {
   return with_center(center(), size() * factor);
 }
 
-template <typename T, std::size_t N>
-void Box<T, N>::expand(Coord const& factor) {
+template <typename T, std::size_t dimension_count>
+void Box<T, dimension_count>::expand(Coord const& factor) {
   *this = expanded(factor);
 }
 
-template <typename T, std::size_t N>
-Box<T, N> Box<T, N>::expanded(Coord const& factor) const {
+template <typename T, std::size_t dimension_count>
+Box<T, dimension_count> Box<T, dimension_count>::expanded(Coord const& factor) const {
   return with_center(center(), size().piecewise_multiply(factor));
 }
 
-template <typename T, std::size_t N>
-void Box<T, N>::scale(T factor) {
-  for (std::size_t i = 0; i < N; ++i)
+template <typename T, std::size_t dimension_count>
+void Box<T, dimension_count>::scale(T factor) {
+  for (std::size_t i = 0; i < dimension_count; ++i)
     set_range(i, range(i) * factor);
 }
 
-template <typename T, std::size_t N>
-Box<T, N> Box<T, N>::scaled(T factor) const {
+template <typename T, std::size_t dimension_count>
+Box<T, dimension_count> Box<T, dimension_count>::scaled(T factor) const {
   auto b = *this;
   b.scale(factor);
   return b;
 }
 
-template <typename T, std::size_t N>
-void Box<T, N>::scale(Coord const& factor) {
-  for (std::size_t i = 0; i < N; ++i)
+template <typename T, std::size_t dimension_count>
+void Box<T, dimension_count>::scale(Coord const& factor) {
+  for (std::size_t i = 0; i < dimension_count; ++i)
     set_range(i, range(i) * factor[i]);
 }
 
-template <typename T, std::size_t N>
-Box<T, N> Box<T, N>::scaled(Coord const& factor) const {
+template <typename T, std::size_t dimension_count>
+Box<T, dimension_count> Box<T, dimension_count>::scaled(Coord const& factor) const {
   auto b = *this;
   b.scale(factor);
   return b;
 }
 
-template <typename T, std::size_t N>
-void Box<T, N>::pad(T amount) {
-  for (std::size_t i = 0; i < N; ++i) {
+template <typename T, std::size_t dimension_count>
+void Box<T, dimension_count>::pad(T amount) {
+  for (std::size_t i = 0; i < dimension_count; ++i) {
     m_min[i] -= amount;
     m_max[i] += amount;
   }
 }
 
-template <typename T, std::size_t N>
-Box<T, N> Box<T, N>::padded(T amount) const {
+template <typename T, std::size_t dimension_count>
+Box<T, dimension_count> Box<T, dimension_count>::padded(T amount) const {
   auto b = *this;
   b.pad(amount);
   return b;
 }
 
-template <typename T, std::size_t N>
-void Box<T, N>::pad(Coord const& amount) {
-  for (std::size_t i = 0; i < N; ++i) {
+template <typename T, std::size_t dimension_count>
+void Box<T, dimension_count>::pad(Coord const& amount) {
+  for (std::size_t i = 0; i < dimension_count; ++i) {
     m_min[i] -= amount[i];
     m_max[i] += amount[i];
   }
 }
 
-template <typename T, std::size_t N>
-Box<T, N> Box<T, N>::padded(Coord const& amount) const {
+template <typename T, std::size_t dimension_count>
+Box<T, dimension_count> Box<T, dimension_count>::padded(Coord const& amount) const {
   auto b = *this;
   b.pad(amount);
   return b;
 }
 
-template <typename T, std::size_t N>
-void Box<T, N>::trim(T amount) {
+template <typename T, std::size_t dimension_count>
+void Box<T, dimension_count>::trim(T amount) {
   pad(-amount);
 }
 
-template <typename T, std::size_t N>
-Box<T, N> Box<T, N>::trimmed(T amount) const {
+template <typename T, std::size_t dimension_count>
+Box<T, dimension_count> Box<T, dimension_count>::trimmed(T amount) const {
   auto b = *this;
   b.trim(amount);
   return b;
 }
 
-template <typename T, std::size_t N>
-void Box<T, N>::trim(Coord const& amount) {
+template <typename T, std::size_t dimension_count>
+void Box<T, dimension_count>::trim(Coord const& amount) {
   pad(-amount);
 }
 
-template <typename T, std::size_t N>
-Box<T, N> Box<T, N>::trimmed(Coord const& amount) const {
+template <typename T, std::size_t dimension_count>
+Box<T, dimension_count> Box<T, dimension_count>::trimmed(Coord const& amount) const {
   auto b = *this;
   b.trim(amount);
   return b;
 }
 
-template <typename T, std::size_t N>
-void Box<T, N>::flip(std::size_t dimension) {
+template <typename T, std::size_t dimension_count>
+void Box<T, dimension_count>::flip(std::size_t dimension) {
   std::swap(m_min[dimension], m_max[dimension]);
 }
 
-template <typename T, std::size_t N>
-Box<T, N> Box<T, N>::flipped(std::size_t dimension) const {
+template <typename T, std::size_t dimension_count>
+Box<T, dimension_count> Box<T, dimension_count>::flipped(std::size_t dimension) const {
   auto b = *this;
   b.flip(dimension);
   return b;
 }
 
-template <typename T, std::size_t N>
-auto Box<T, N>::normal(Coord const& coord) const -> Coord {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::normal(Coord const& coord) const -> Coord {
   return (coord - m_min).piecewise_divide(m_max - m_min);
 }
 
-template <typename T, std::size_t N>
-auto Box<T, N>::eval(Coord const& normalized_coord) const -> Coord {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::eval(Coord const& normalized_coord) const -> Coord {
   return normalized_coord.piecewise_multiply(m_max - m_min) + m_min;
 }
 
-template <typename T, std::size_t N>
-void Box<T, N>::set_min(Coord const& c) {
+template <typename T, std::size_t dimension_count>
+void Box<T, dimension_count>::set_min(Coord const& c) {
   m_min = c;
 }
 
-template <typename T, std::size_t N>
-void Box<T, N>::set_max(Coord const& c) {
+template <typename T, std::size_t dimension_count>
+void Box<T, dimension_count>::set_max(Coord const& c) {
   m_max = c;
 }
 
-template <typename T, std::size_t N>
-T Box<T, N>::volume() const {
+template <typename T, std::size_t dimension_count>
+T Box<T, dimension_count>::volume() const {
   return size().product();
 }
 
-template <typename T, std::size_t N>
-auto Box<T, N>::overlap(Box const& b) const -> Box {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::overlap(Box const& b) const -> Box {
   return limited(b);
 }
 
-template <typename T, std::size_t N>
-auto Box<T, N>::intersection(Box const& b) const -> IntersectResult requires (N > 0 && rect_detail::displacement_scalar<T>) {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::intersection(Box const& b) const -> IntersectResult requires (dimension_count > 0 && rect_detail::displacement_scalar<T>) {
   using D = typename IntersectResult::Scalar;
   D depth = static_cast<D>(m_max[0]) - static_cast<D>(b.m_min[0]);
   std::size_t axis = 0;
   bool negative = true;
-  for (std::size_t i = 0; i < N; ++i) {
+  for (std::size_t i = 0; i < dimension_count; ++i) {
     D left = static_cast<D>(m_max[i]) - static_cast<D>(b.m_min[i]);
     D right = static_cast<D>(b.m_max[i]) - static_cast<D>(m_min[i]);
     if (left < depth) {
@@ -705,9 +705,9 @@ auto Box<T, N>::intersection(Box const& b) const -> IntersectResult requires (N 
   return result;
 }
 
-template <typename T, std::size_t N>
-bool Box<T, N>::intersects(Box const& b, bool include_edges) const {
-  for (std::size_t i = 0; i < N; ++i) {
+template <typename T, std::size_t dimension_count>
+bool Box<T, dimension_count>::intersects(Box const& b, bool include_edges) const {
+  for (std::size_t i = 0; i < dimension_count; ++i) {
     if (include_edges) {
       if (m_max[i] < b.m_min[i] || b.m_max[i] < m_min[i])
         return false;
@@ -719,9 +719,9 @@ bool Box<T, N>::intersects(Box const& b, bool include_edges) const {
   return true;
 }
 
-template <typename T, std::size_t N>
-bool Box<T, N>::contains(Coord const& p, bool include_edges) const {
-  for (std::size_t i = 0; i < N; ++i) {
+template <typename T, std::size_t dimension_count>
+bool Box<T, dimension_count>::contains(Coord const& p, bool include_edges) const {
+  for (std::size_t i = 0; i < dimension_count; ++i) {
     if (include_edges) {
       if (p[i] < m_min[i] || p[i] > m_max[i])
         return false;
@@ -733,14 +733,14 @@ bool Box<T, N>::contains(Coord const& p, bool include_edges) const {
   return true;
 }
 
-template <typename T, std::size_t N>
-bool Box<T, N>::contains(Box const& b, bool include_edges) const {
+template <typename T, std::size_t dimension_count>
+bool Box<T, dimension_count>::contains(Box const& b, bool include_edges) const {
   return contains(b.min(), include_edges) && contains(b.max(), include_edges);
 }
 
-template <typename T, std::size_t N>
-bool Box<T, N>::belongs(Coord const& p) const {
-  for (std::size_t i = 0; i < N; ++i) {
+template <typename T, std::size_t dimension_count>
+bool Box<T, dimension_count>::belongs(Coord const& p) const {
+  for (std::size_t i = 0; i < dimension_count; ++i) {
     if (p[i] < m_min[i] || p[i] >= m_max[i])
       return false;
   }
@@ -748,9 +748,9 @@ bool Box<T, N>::belongs(Coord const& p) const {
   return true;
 }
 
-template <typename T, std::size_t N>
-bool Box<T, N>::contains_epsilon(Coord const& p, unsigned epsilons) const {
-  for (std::size_t i = 0; i < N; ++i) {
+template <typename T, std::size_t dimension_count>
+bool Box<T, dimension_count>::contains_epsilon(Coord const& p, unsigned epsilons) const {
+  for (std::size_t i = 0; i < dimension_count; ++i) {
     if (p[i] < m_min[i] || p[i] > m_max[i])
       return false;
     if (near_equal(p[i], m_min[i], epsilons) || near_equal(p[i], m_max[i], epsilons))
@@ -759,14 +759,14 @@ bool Box<T, N>::contains_epsilon(Coord const& p, unsigned epsilons) const {
   return true;
 }
 
-template <typename T, std::size_t N>
-bool Box<T, N>::contains_epsilon(Box const& b, unsigned epsilons) const {
+template <typename T, std::size_t dimension_count>
+bool Box<T, dimension_count>::contains_epsilon(Box const& b, unsigned epsilons) const {
   return contains_epsilon(b.min(), epsilons) && contains_epsilon(b.max(), epsilons);
 }
 
-template <typename T, std::size_t N>
-  requires nonfallible_text_writable<Vector<T, N>>
-void write_text(TextBuffer& output, Box<T, N> const& box) {
+template <typename T, std::size_t dimension_count>
+  requires nonfallible_text_writable<Vector<T, dimension_count>>
+void write_text(TextBuffer& output, Box<T, dimension_count> const& box) {
   output.append("Box{min:");
   append_text(output, box.min());
   output.append(" max:");
@@ -774,92 +774,92 @@ void write_text(TextBuffer& output, Box<T, N> const& box) {
   output.push_back('}');
 }
 
-template <typename T, std::size_t N>
-constexpr Box<T, N>::Box(T min_x, T min_y, T max_x, T max_y) requires (N == 2)
+template <typename T, std::size_t dimension_count>
+constexpr Box<T, dimension_count>::Box(T min_x, T min_y, T max_x, T max_y) requires (dimension_count == 2)
   : Box(Coord(min_x, min_y), Coord(max_x, max_y)) {}
 
-template <typename T, std::size_t N>
-auto Box<T, N>::x_min() const -> T requires (N == 2) {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::x_min() const -> T requires (dimension_count == 2) {
   return min()[0];
 }
 
-template <typename T, std::size_t N>
-auto Box<T, N>::x_max() const -> T requires (N == 2) {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::x_max() const -> T requires (dimension_count == 2) {
   return max()[0];
 }
 
-template <typename T, std::size_t N>
-auto Box<T, N>::y_min() const -> T requires (N == 2) {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::y_min() const -> T requires (dimension_count == 2) {
   return min()[1];
 }
 
-template <typename T, std::size_t N>
-auto Box<T, N>::y_max() const -> T requires (N == 2) {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::y_max() const -> T requires (dimension_count == 2) {
   return max()[1];
 }
 
-template <typename T, std::size_t N>
-auto Box<T, N>::set_x_min(T x_min) -> void requires (N == 2) {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::set_x_min(T x_min) -> void requires (dimension_count == 2) {
   m_min[0] = x_min;
 }
 
-template <typename T, std::size_t N>
-auto Box<T, N>::set_x_max(T x_max) -> void requires (N == 2) {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::set_x_max(T x_max) -> void requires (dimension_count == 2) {
   m_max[0] = x_max;
 }
 
-template <typename T, std::size_t N>
-auto Box<T, N>::set_y_min(T y_min) -> void requires (N == 2) {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::set_y_min(T y_min) -> void requires (dimension_count == 2) {
   m_min[1] = y_min;
 }
 
-template <typename T, std::size_t N>
-auto Box<T, N>::set_y_max(T y_max) -> void requires (N == 2) {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::set_y_max(T y_max) -> void requires (dimension_count == 2) {
   m_max[1] = y_max;
 }
 
-template <typename T, std::size_t N>
-auto Box<T, N>::width() const -> T requires (N == 2) {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::width() const -> T requires (dimension_count == 2) {
   return size(0);
 }
 
-template <typename T, std::size_t N>
-auto Box<T, N>::height() const -> T requires (N == 2) {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::height() const -> T requires (dimension_count == 2) {
   return size(1);
 }
 
-template <typename T, std::size_t N>
-auto Box<T, N>::translate(T x, T y) -> void requires (N == 2) {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::translate(T x, T y) -> void requires (dimension_count == 2) {
   translate(Coord(x, y));
 }
 
-template <typename T, std::size_t N>
-auto Box<T, N>::translate_to_include(T x, T y, T x_padding, T y_padding) -> void requires (N == 2) {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::translate_to_include(T x, T y, T x_padding, T y_padding) -> void requires (dimension_count == 2) {
   translate_to_include(Coord(x, y), Coord(x_padding, y_padding));
 }
 
-template <typename T, std::size_t N>
-auto Box<T, N>::scale(T x, T y) -> void requires (N == 2) {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::scale(T x, T y) -> void requires (dimension_count == 2) {
   scale(Coord(x, y));
 }
 
-template <typename T, std::size_t N>
-auto Box<T, N>::expand(T x, T y) -> void requires (N == 2) {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::expand(T x, T y) -> void requires (dimension_count == 2) {
   expand(Coord(x, y));
 }
 
-template <typename T, std::size_t N>
-auto Box<T, N>::flip_horizontal() -> void requires (N == 2) {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::flip_horizontal() -> void requires (dimension_count == 2) {
   flip(0);
 }
 
-template <typename T, std::size_t N>
-auto Box<T, N>::flip_vertical() -> void requires (N == 2) {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::flip_vertical() -> void requires (dimension_count == 2) {
   flip(1);
 }
 
-template <typename T, std::size_t N>
-auto Box<T, N>::edges() const -> Array<Line, 4> requires (N == 2) {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::edges() const -> Array<Line, 4> requires (dimension_count == 2) {
   Array<Line, 4> res;
   res[0] = {min(), {min()[0], max()[1]}};
   res[1] = {min(), {max()[0], min()[1]}};
@@ -868,8 +868,8 @@ auto Box<T, N>::edges() const -> Array<Line, 4> requires (N == 2) {
   return res;
 }
 
-template <typename T, std::size_t N>
-auto Box<T, N>::intersects(Line const& l) const -> bool requires (N == 2) {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::intersects(Line const& l) const -> bool requires (dimension_count == 2) {
   if (contains(l.min()) || contains(l.max()))
     return true;
 
@@ -880,8 +880,8 @@ auto Box<T, N>::intersects(Line const& l) const -> bool requires (N == 2) {
   return false;
 }
 
-template <typename T, std::size_t N>
-auto Box<T, N>::intersects_circle(Coord const& position, T radius) const -> bool requires (N == 2) {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::intersects_circle(Coord const& position, T radius) const -> bool requires (dimension_count == 2) {
   if (contains(position))
     return true;
   if (radius < T{})
@@ -915,8 +915,8 @@ auto Box<T, N>::intersects_circle(Coord const& position, T radius) const -> bool
 }
 
 // returns the closest intersection point (from l.min())
-template <typename T, std::size_t N>
-auto Box<T, N>::edge_intersection(Line const& l) const -> LineIntersectResult requires (N == 2) {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::edge_intersection(Line const& l) const -> LineIntersectResult requires (dimension_count == 2) {
   Array<LineIntersectResult, 4> candidates;
   std::size_t num_candidates = 0;
 
@@ -957,8 +957,8 @@ auto Box<T, N>::edge_intersection(Line const& l) const -> LineIntersectResult re
   return first;
 }
 
-template <typename T, std::size_t N>
-auto Box<T, N>::subtract(Box const& rect) const -> SmallList<Box, 4> requires (N == 2) {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::subtract(Box const& rect) const -> SmallList<Box, 4> requires (dimension_count == 2) {
   SmallList<Box, 4> regions;
   auto cut = overlap(rect);
   if (cut.is_empty()) {
@@ -980,10 +980,10 @@ auto Box<T, N>::subtract(Box const& rect) const -> SmallList<Box, 4> requires (N
   return regions;
 }
 
-template <typename T, std::size_t N>
-auto Box<T, N>::nearest_coord_to(Coord const& c) const -> Coord {
+template <typename T, std::size_t dimension_count>
+auto Box<T, dimension_count>::nearest_coord_to(Coord const& c) const -> Coord {
   Coord result = c;
-  for (std::size_t i = 0; i < N; ++i)
+  for (std::size_t i = 0; i < dimension_count; ++i)
     result[i] = clamp(result[i], m_min[i], m_max[i]);
   return result;
 }
@@ -992,9 +992,9 @@ auto Box<T, N>::nearest_coord_to(Coord const& c) const -> Coord {
 
 export module star.rect;
 
-export template <typename T, std::size_t N>
-  requires Star::nonfallible_text_writable<Star::Vector<T, N>>
-struct std::formatter<Star::Box<T, N>> : Star::TextFormatter {};
+export template <typename T, std::size_t dimension_count>
+  requires Star::nonfallible_text_writable<Star::Vector<T, dimension_count>>
+struct std::formatter<Star::Box<T, dimension_count>> : Star::TextFormatter {};
 
 export namespace Star {
   using ::Star::Box;

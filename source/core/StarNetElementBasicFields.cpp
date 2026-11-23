@@ -11,12 +11,12 @@ namespace Star {
 std::expected<void, StarException> NetElementSize::read_data(DataStream& ds, std::size_t& v) const {
   auto result = ds.read_vlq_u();
   if (!result) return std::unexpected(std::move(result.error()));
-  v = *result == 0 ? NPos : *result - 1;
+  v = *result == 0 ? npos : *result - 1;
   return {};
 }
 
 std::expected<void, StarException> NetElementSize::write_data(DataStream& ds, std::size_t const& v) const {
-  if (v == NPos)
+  if (v == npos)
     return ds.vuwrite(std::uint64_t{0});
   else
     return ds.vuwrite(v + 1);
@@ -36,7 +36,7 @@ void NetElementEvent::trigger() {
 
 std::uint64_t NetElementEvent::pull_occurrences() {
   std::uint64_t occurrences = get();
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((occurrences >= m_pulled_occurrences));
   }
   std::uint64_t unchecked = occurrences - m_pulled_occurrences;

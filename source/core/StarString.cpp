@@ -100,19 +100,19 @@ std::expected<String, StarException> String::join_with(String const& join, Strin
 std::expected<void, StarException> String::append_joined(String& accumulator, String const& join, String const& right) {
   if (accumulator.empty()) { accumulator = right; return {}; }
   if (right.empty()) return {};
-  auto leftJoined = accumulator.ends_with(join);
-  if (!leftJoined) return std::unexpected(std::move(leftJoined.error()));
-  auto rightJoined = right.starts_with(join);
-  if (!rightJoined) return std::unexpected(std::move(rightJoined.error()));
+  auto left_joined = accumulator.ends_with(join);
+  if (!left_joined) return std::unexpected(std::move(left_joined.error()));
+  auto right_joined = right.starts_with(join);
+  if (!right_joined) return std::unexpected(std::move(right_joined.error()));
   std::size_t skip = 0;
-  if (*leftJoined && *rightJoined) {
+  if (*left_joined && *right_joined) {
     // The old right.substr() eagerly validated right even for an empty join.
     auto validated = right.size();
     if (!validated) return std::unexpected(std::move(validated.error()));
     skip = join.utf8_size();
   }
-  bool insertJoin = !*leftJoined && !*rightJoined;
-  if (insertJoin) accumulator.append(join);
+  bool insert_join = !*left_joined && !*right_joined;
+  if (insert_join) accumulator.append(join);
   accumulator.append(std::string_view(right.m_string).substr(skip));
   return {};
 }
@@ -163,7 +163,6 @@ std::string String::utf8() && noexcept { return std::move(m_string); }
 std::string String::utf8() const && { return m_string; }
 std::string String::take_utf8() { return std::exchange(m_string, {}); }
 ByteArray String::utf8_bytes() const { return ByteArray(std::span<char const>(m_string)); }
-char const* String::utf8_data() const & { return m_string.c_str(); }
 std::size_t String::utf8_size() const { return m_string.size(); }
 std::expected<std::wstring, StarException> String::to_wstring() const {
   std::wstring result;
@@ -261,20 +260,20 @@ std::expected<String, StarException> String::title_case() const {
   if (!first) return std::unexpected(std::move(first.error()));
   String result;
   result.reserve(m_string.size());
-  bool capNext = true;
+  bool cap_next = true;
   for (auto it = *first; it != end(); ++it) {
-    auto appended = result.append(capNext ? to_upper(*it) : to_lower(*it));
+    auto appended = result.append(cap_next ? to_upper(*it) : to_lower(*it));
     if (!appended) return std::unexpected(std::move(appended.error()));
-    capNext = *it > std::numeric_limits<unsigned char>::max() || !std::isalpha(static_cast<unsigned char>(*it));
+    cap_next = *it > std::numeric_limits<unsigned char>::max() || !std::isalpha(static_cast<unsigned char>(*it));
   }
   return result;
 }
 std::expected<bool, StarException> String::ends_with(String const& suffix, CaseSensitivity cs) const { return StringView(*this).ends_with(suffix, cs); }
 std::expected<bool, StarException> String::ends_with(Char point, CaseSensitivity cs) const { return StringView(*this).ends_with(point, cs); }
 std::expected<bool, StarException> String::starts_with(String const& prefix, CaseSensitivity cs) const {
-  auto prefixLength = prefix.size();
-  if (!prefixLength) return std::unexpected(std::move(prefixLength.error()));
-  if (*prefixLength == 0) return true;
+  auto prefix_length = prefix.size();
+  if (!prefix_length) return std::unexpected(std::move(prefix_length.error()));
+  if (*prefix_length == 0) return true;
   auto length = size();
   if (!length) return std::unexpected(std::move(length.error()));
   if (prefix.m_string.size() > m_string.size()) return false;
@@ -309,48 +308,48 @@ std::expected<String, StarException> String::rot13() const {
   }
   return result;
 }
-std::expected<StringList, StarException> String::split(Char point, std::size_t maxSplit) const {
+std::expected<StringList, StarException> String::split(Char point, std::size_t max_split) const {
   auto pattern = create(point);
   if (!pattern) return std::unexpected(std::move(pattern.error()));
-  return split(*pattern, maxSplit);
+  return split(*pattern, max_split);
 }
-std::expected<StringList, StarException> String::split(String const& pattern, std::size_t maxSplit) const {
+std::expected<StringList, StarException> String::split(String const& pattern, std::size_t max_split) const {
   // This overload has always operated on byte patterns, including raw UTF-8.
   StringList result;
   if (pattern.empty()) return StringList(1, *this);
   std::size_t start = 0;
   for (;;) {
-    auto stop = result.size() == maxSplit ? NPos : m_string.find(pattern.m_string, start);
-    result.push_back(String(std::string_view(m_string).substr(start, stop == NPos ? NPos : stop - start)));
-    if (stop == NPos) return result;
+    auto stop = result.size() == max_split ? npos : m_string.find(pattern.m_string, start);
+    result.push_back(String(std::string_view(m_string).substr(start, stop == npos ? npos : stop - start)));
+    if (stop == npos) return result;
     start = stop + pattern.m_string.size();
   }
 }
-std::expected<StringList, StarException> String::rsplit(Char point, std::size_t maxSplit) const {
+std::expected<StringList, StarException> String::rsplit(Char point, std::size_t max_split) const {
   auto pattern = create(point);
   if (!pattern) return std::unexpected(std::move(pattern.error()));
-  return rsplit(*pattern, maxSplit);
+  return rsplit(*pattern, max_split);
 }
-std::expected<StringList, StarException> String::rsplit(String const& pattern, std::size_t maxSplit) const {
+std::expected<StringList, StarException> String::rsplit(String const& pattern, std::size_t max_split) const {
   auto validated = validate_reverse(m_string);
   if (!validated) return std::unexpected(std::move(validated.error()));
-  auto patternValidated = validate_reverse(pattern.m_string);
-  if (!patternValidated) return std::unexpected(std::move(patternValidated.error()));
+  auto pattern_validated = validate_reverse(pattern.m_string);
+  if (!pattern_validated) return std::unexpected(std::move(pattern_validated.error()));
   if (pattern.empty()) return StringList(1, *this);
   StringList result;
   std::size_t stop = m_string.size();
   for (;;) {
-    auto found = result.size() == maxSplit || stop < pattern.m_string.size()
-        ? NPos : m_string.rfind(pattern.m_string, stop - pattern.m_string.size());
-    auto start = found == NPos ? 0 : found + pattern.m_string.size();
+    auto found = result.size() == max_split || stop < pattern.m_string.size()
+        ? npos : m_string.rfind(pattern.m_string, stop - pattern.m_string.size());
+    auto start = found == npos ? 0 : found + pattern.m_string.size();
     result.push_back(String(std::string_view(m_string).substr(start, stop - start)));
-    if (found == NPos) break;
+    if (found == npos) break;
     stop = found;
   }
   std::reverse(result.begin(), result.end());
   return result;
 }
-std::expected<StringList, StarException> String::split_any(String const& chars, std::size_t maxSplit) const {
+std::expected<StringList, StarException> String::split_any(String const& chars, std::size_t max_split) const {
   Utf8Cursor cursor(m_string);
   StringList result;
   std::size_t start = 0;
@@ -367,7 +366,7 @@ std::expected<StringList, StarException> String::split_any(String const& chars, 
       if (start != cursor.offset())
         result.push_back(String(std::string_view(m_string).substr(start, cursor.offset() - start)));
     } else {
-      if (result.size() == maxSplit) done = true;
+      if (result.size() == max_split) done = true;
     }
     auto moved = cursor.advance(); if (!moved) return std::unexpected(std::move(moved.error()));
     if (delimiter) start = cursor.offset();
@@ -376,15 +375,15 @@ std::expected<StringList, StarException> String::split_any(String const& chars, 
     result.push_back(String(std::string_view(m_string).substr(start)));
   return result;
 }
-std::expected<StringList, StarException> String::rsplit_any(String const& chars, std::size_t maxSplit) const {
+std::expected<StringList, StarException> String::rsplit_any(String const& chars, std::size_t max_split) const {
   auto validated = validate_reverse(m_string);
   if (!validated) return std::unexpected(std::move(validated.error()));
   auto cursor = Utf8Cursor::end(m_string);
   StringList result;
-  std::size_t fieldEnd = m_string.size();
+  std::size_t field_end = m_string.size();
   bool done = false;
   while (cursor.offset() != 0) {
-    auto previousEnd = cursor.offset();
+    auto previous_end = cursor.offset();
     auto moved = cursor.retreat();
     if (!moved) return std::unexpected(std::move(moved.error()));
     auto point = cursor.read();
@@ -396,19 +395,19 @@ std::expected<StringList, StarException> String::rsplit_any(String const& chars,
       delimiter = *match;
     }
     if (delimiter) {
-      if (fieldEnd != previousEnd)
-        result.push_back(String(std::string_view(m_string).substr(previousEnd, fieldEnd - previousEnd)));
-      fieldEnd = cursor.offset();
-    } else if (result.size() == maxSplit) {
+      if (field_end != previous_end)
+        result.push_back(String(std::string_view(m_string).substr(previous_end, field_end - previous_end)));
+      field_end = cursor.offset();
+    } else if (result.size() == max_split) {
       done = true;
     }
   }
-  if (fieldEnd != 0) result.push_back(String(std::string_view(m_string).substr(0, fieldEnd)));
+  if (field_end != 0) result.push_back(String(std::string_view(m_string).substr(0, field_end)));
   std::reverse(result.begin(), result.end());
   return result;
 }
-std::expected<StringList, StarException> String::split_lines(std::size_t maxSplit) const { return split_any("\r\n", maxSplit); }
-std::expected<StringList, StarException> String::split_whitespace(std::size_t maxSplit) const { return split_any("", maxSplit); }
+std::expected<StringList, StarException> String::split_lines(std::size_t max_split) const { return split_any("\r\n", max_split); }
+std::expected<StringList, StarException> String::split_whitespace(std::size_t max_split) const { return split_any("", max_split); }
 namespace {
 template <bool from_end>
 std::expected<String, StarException> extract_token(std::string& source, String const& delimiters) {
@@ -424,7 +423,7 @@ std::expected<String, StarException> extract_token(std::string& source, String c
   auto backwards = String::const_iterator::end(source.cend());
   std::size_t position = from_end ? bytes.size() : 0;
   auto const limit = from_end ? 0 : bytes.size();
-  std::size_t first = NPos, last = NPos, remainder = limit;
+  std::size_t first = npos, last = npos, remainder = limit;
   while (position != limit) {
     auto before = position;
     String::Char point;
@@ -440,10 +439,10 @@ std::expected<String, StarException> extract_token(std::string& source, String c
     auto match = delimiters.has_char_or_whitespace(point);
     if (!match) return std::unexpected(std::move(match.error()));
     if (*match) {
-      if (first != NPos && last == NPos) last = before;
-    } else if (first == NPos) {
+      if (first != npos && last == npos) last = before;
+    } else if (first == npos) {
       first = before;
-    } else if (last != NPos) {
+    } else if (last != npos) {
       remainder = before;
       if constexpr (!from_end) {
         // split_any stopped testing delimiters here, but still decoded the suffix.
@@ -454,13 +453,13 @@ std::expected<String, StarException> extract_token(std::string& source, String c
     }
   }
 
-  if (first == NPos) {
+  if (first == npos) {
     if constexpr (from_end) {
       if (!source.empty()) return std::unexpected(OutOfRangeException("No token in String::rextract"));
     }
     return String();
   }
-  if (last == NPos) last = limit;
+  if (last == npos) last = limit;
   if constexpr (from_end) std::swap(first, last);
   if (remainder == limit) {
     source.erase(last);
@@ -479,7 +478,7 @@ std::expected<String, StarException> String::extract(String const& chars) {
 std::expected<String, StarException> String::rextract(String const& chars) {
   return extract_token<true>(m_string, chars);
 }
-std::expected<bool, StarException> String::has_char(Char point) const { return StringView(*this).has_char(point); }
+std::expected<bool, StarException> String::contains(Char point) const { return StringView(*this).contains(point); }
 std::expected<bool, StarException> String::has_char_or_whitespace(Char point) const { return StringView(*this).has_char_or_whitespace(point); }
 std::expected<String, StarException> String::replace(String const& pattern, String const& value, CaseSensitivity cs) const {
   auto length = size();
@@ -501,7 +500,7 @@ std::expected<String, StarException> String::replace(String const& pattern, Stri
       found = static_cast<std::size_t>(match.begin() - remaining.begin());
     } else {
       found = remaining.find(pattern.m_string);
-      if (found == NPos) break;
+      if (found == npos) break;
     }
     result.append(remaining.substr(0, found));
     result.append(value);
@@ -551,8 +550,8 @@ std::expected<String, StarException> String::trim(String const& pattern) const {
 }
 std::expected<std::size_t, StarException> String::find(Char point, std::size_t pos, CaseSensitivity cs) const { return StringView(*this).find(point, pos, cs); }
 std::expected<std::size_t, StarException> String::find(String const& pattern, std::size_t pos, CaseSensitivity cs) const { return StringView(*this).find(pattern, pos, cs); }
-std::expected<std::size_t, StarException> String::find_last(Char point, CaseSensitivity cs) const { return StringView(*this).find_last(point, cs); }
-std::expected<std::size_t, StarException> String::find_last(String const& pattern, CaseSensitivity cs) const { return StringView(*this).find_last(pattern, cs); }
+std::expected<std::size_t, StarException> String::rfind(Char point, CaseSensitivity cs) const { return StringView(*this).rfind(point, cs); }
+std::expected<std::size_t, StarException> String::rfind(String const& pattern, CaseSensitivity cs) const { return StringView(*this).rfind(pattern, cs); }
 std::expected<std::size_t, StarException> String::find_first_of(String const& chars, std::size_t pos) const { return StringView(*this).find_first_of(chars, pos); }
 std::expected<std::size_t, StarException> String::find_first_not_of(String const& chars, std::size_t pos) const { return StringView(*this).find_first_not_of(chars, pos); }
 std::expected<std::size_t, StarException> String::find_next_boundary(std::size_t index, bool backwards) const { return StringView(*this).find_next_boundary(index, backwards); }
@@ -798,7 +797,7 @@ void write_text(TextBuffer& output, StringList const& list) {
   }
   output.push_back(')');
 }
-std::size_t hash<StringList>::operator()(StringList const& list) const {
+std::size_t ValueHash<StringList>::operator()(StringList const& list) const {
   std::size_t hash = 0;
   for (auto const& text : list)
     hash_combine(hash, hash_of(text));

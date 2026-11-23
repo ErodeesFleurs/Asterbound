@@ -18,7 +18,7 @@ struct CellularLiquidCollisionCell {};
 
 template <typename T>
 concept liquid_id_type = std::copyable<T> && std::equality_comparable<T>
-    && hashable<T> && hash_invocable<hash<T> const&, T const&>;
+    && hashable<T> && hash_invocable<ValueHash<T> const&, T const&>;
 
 template <liquid_id_type LiquidId>
 struct CellularLiquidFlowCell {
@@ -131,11 +131,11 @@ private:
     explicit WorkingCells(std::size_t bucket_count) : cells(bucket_count, &storage) {}
 
     std::pmr::monotonic_buffer_resource storage;
-    std::pmr::unordered_map<Vec2I, std::optional<WorkingCell>, hash<Vec2I>> cells;
+    std::pmr::unordered_map<Vec2I, std::optional<WorkingCell>, ValueHash<Vec2I>> cells;
   };
 
-  using ActiveQueue = OrderedHashSet<Vec2I, hash<Vec2I>, std::equal_to<Vec2I>, BlockAllocator<Vec2I, 4096>>;
-  using ActiveQueues = StableHashMap<LiquidId, ActiveQueue, hash<LiquidId>, std::equal_to<LiquidId>,
+  using ActiveQueue = OrderedHashSet<Vec2I, ValueHash<Vec2I>, std::equal_to<Vec2I>, BlockAllocator<Vec2I, 4096>>;
+  using ActiveQueues = StableHashMap<LiquidId, ActiveQueue, ValueHash<LiquidId>, std::equal_to<LiquidId>,
       BlockAllocator<std::pair<LiquidId const, ActiveQueue>, 4096>>;
 
   [[nodiscard]] std::expected<void, StarException> setup();
@@ -171,7 +171,7 @@ private:
   std::shared_ptr<CellularLiquidWorld<LiquidId>> m_cell_world;
 
   ActiveQueues m_active_cells;
-  StableHashMap<LiquidId, unsigned, hash<LiquidId>, std::equal_to<LiquidId>,
+  StableHashMap<LiquidId, unsigned, ValueHash<LiquidId>, std::equal_to<LiquidId>,
       BlockAllocator<std::pair<LiquidId const, unsigned>, 4096>> m_liquid_tick_deltas;
   std::optional<unsigned> m_processing_limit;
   List<RectI> m_no_processing_limit_regions;
@@ -594,7 +594,7 @@ template <liquid_id_type LiquidId>
   // Callbacks may have replaced a cell. Read fresh ids, once per canonical
   // location, without keeping this phase's arena or physical state alive.
   std::pmr::monotonic_buffer_resource storage;
-  std::pmr::unordered_map<Vec2I, std::optional<LiquidId>, hash<Vec2I>> liquids(&storage);
+  std::pmr::unordered_map<Vec2I, std::optional<LiquidId>, ValueHash<Vec2I>> liquids(&storage);
   auto visit = [&](Vec2I const& p) -> std::expected<void, StarException> {
     auto position = m_cell_world->unique_location(p);
     auto [entry, inserted] = liquids.try_emplace(position);

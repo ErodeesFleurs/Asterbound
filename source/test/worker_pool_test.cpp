@@ -113,7 +113,7 @@ TEST(WorkerPoolTest, MoveOnlyTasksPublishResultsToAllWaiters) {
   ASSERT_FALSE(empty_finish);
   auto repeated_finish = empty.finish();
   ASSERT_FALSE(repeated_finish);
-  EXPECT_STREQ(repeated_finish.error().what(), empty_finish.error().what());
+  EXPECT_EQ(repeated_finish.error().what(), empty_finish.error().what());
   auto empty_producer = pool.add_producer<int>(UniqueFunction<std::expected<int, StarException>()>{});
   auto empty_value = empty_producer.get();
   ASSERT_FALSE(empty_value);
@@ -210,7 +210,7 @@ TEST(WorkerPoolTest, NullFunctionPointersPublishRepeatableErrorsAndDrainContinue
   EXPECT_FALSE(observer.wait(0));
   auto repeated_failure = observer.finish();
   ASSERT_FALSE(repeated_failure);
-  EXPECT_STREQ(failure.error().what(), repeated_failure.error().what());
+  EXPECT_EQ(failure.error().what(), repeated_failure.error().what());
   auto value = result.get();
   ASSERT_FALSE(value);
   auto const result_observer = result;
@@ -218,10 +218,10 @@ TEST(WorkerPoolTest, NullFunctionPointersPublishRepeatableErrorsAndDrainContinue
   EXPECT_FALSE(result_observer.poll());
   auto repeated_value = result_observer.get();
   ASSERT_FALSE(repeated_value);
-  EXPECT_STREQ(value.error().what(), repeated_value.error().what());
+  EXPECT_EQ(value.error().what(), repeated_value.error().what());
   auto checked = failed.poll();
   ASSERT_FALSE(checked);
-  EXPECT_STREQ(checked.error().what(), diagnostic.what());
+  EXPECT_EQ(checked.error().what(), diagnostic.what());
   EXPECT_EQ(recovery.poll(), true);
   ASSERT_TRUE(recovery.finish());
   EXPECT_EQ(observed, 1);

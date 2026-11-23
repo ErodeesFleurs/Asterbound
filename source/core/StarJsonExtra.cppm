@@ -150,15 +150,15 @@ namespace json_extra_detail {
     }
   }
 
-  template <typename T, std::size_t Size, typename Getter>
-  std::expected<Array<T, Size>, StarException> array(Json const& v, Getter getter, std::string_view name) {
+  template <typename T, std::size_t extent, typename Getter>
+  std::expected<Array<T, extent>, StarException> array(Json const& v, Getter getter, std::string_view name) {
     auto size = v.size();
     if (!size)
       return std::unexpected(std::move(size.error()));
-    if (*size != Size)
-      return std::unexpected(JsonException(Star::format("Json array not of size {} in {}", Size, name)));
-    Array<T, Size> result;
-    for (std::size_t i = 0; i < Size; ++i) {
+    if (*size != extent)
+      return std::unexpected(JsonException(Star::format("Json array not of size {} in {}", extent, name)));
+    Array<T, extent> result;
+    for (std::size_t i = 0; i < extent; ++i) {
       auto item = std::invoke(getter, v, i);
       if (!item)
         return std::unexpected(std::move(item.error()));
@@ -168,29 +168,29 @@ namespace json_extra_detail {
   }
 }
 
-template <std::size_t Size>
-std::expected<Array<unsigned, Size>, StarException> json_to_array_u(Json const& v) {
-  return json_extra_detail::array<unsigned, Size>(v, [](Json const& j, std::size_t i) { return j.get_uint(i); }, "jsonToArrayU");
+template <std::size_t extent>
+std::expected<Array<unsigned, extent>, StarException> json_to_array_u(Json const& v) {
+  return json_extra_detail::array<unsigned, extent>(v, [](Json const& j, std::size_t i) { return j.get_uint(i); }, "jsonToArrayU");
 }
-template <std::size_t Size>
-std::expected<Array<std::size_t, Size>, StarException> json_to_array_s(Json const& v) {
-  return json_extra_detail::array<std::size_t, Size>(v, [](Json const& j, std::size_t i) { return j.get_uint(i); }, "jsonToArrayS");
+template <std::size_t extent>
+std::expected<Array<std::size_t, extent>, StarException> json_to_array_s(Json const& v) {
+  return json_extra_detail::array<std::size_t, extent>(v, [](Json const& j, std::size_t i) { return j.get_uint(i); }, "jsonToArrayS");
 }
-template <std::size_t Size>
-std::expected<Array<int, Size>, StarException> json_to_array_i(Json const& v) {
-  return json_extra_detail::array<int, Size>(v, [](Json const& j, std::size_t i) { return j.get_int(i); }, "jsonToArrayI");
+template <std::size_t extent>
+std::expected<Array<int, extent>, StarException> json_to_array_i(Json const& v) {
+  return json_extra_detail::array<int, extent>(v, [](Json const& j, std::size_t i) { return j.get_int(i); }, "jsonToArrayI");
 }
-template <std::size_t Size>
-std::expected<Array<float, Size>, StarException> json_to_array_f(Json const& v) {
-  return json_extra_detail::array<float, Size>(v, [](Json const& j, std::size_t i) { return j.get_float(i); }, "jsonToArrayF");
+template <std::size_t extent>
+std::expected<Array<float, extent>, StarException> json_to_array_f(Json const& v) {
+  return json_extra_detail::array<float, extent>(v, [](Json const& j, std::size_t i) { return j.get_float(i); }, "jsonToArrayF");
 }
-template <std::size_t Size>
-std::expected<Array<double, Size>, StarException> json_to_array_d(Json const& v) {
-  return json_extra_detail::array<double, Size>(v, [](Json const& j, std::size_t i) { return j.get_double(i); }, "jsonToArrayD");
+template <std::size_t extent>
+std::expected<Array<double, extent>, StarException> json_to_array_d(Json const& v) {
+  return json_extra_detail::array<double, extent>(v, [](Json const& j, std::size_t i) { return j.get_double(i); }, "jsonToArrayD");
 }
-template <std::size_t Size>
-std::expected<Array<String, Size>, StarException> json_to_string_array(Json const& v) {
-  return json_extra_detail::array<String, Size>(v, [](Json const& j, std::size_t i) { return j.get_string(i); }, "jsonToStringArray");
+template <std::size_t extent>
+std::expected<Array<String, extent>, StarException> json_to_string_array(Json const& v) {
+  return json_extra_detail::array<String, extent>(v, [](Json const& j, std::size_t i) { return j.get_string(i); }, "jsonToStringArray");
 }
 
 template <typename Value, typename Converter>
@@ -204,7 +204,7 @@ std::expected<List<Value>, StarException> json_to_list(Json const& v, Converter&
   if (!entries)
     return std::unexpected(std::move(entries.error()));
   List<Value> result;
-  result.reserve(entries->m_container->size());
+  result.reserve(entries->container->size());
   for (auto const& entry : *entries) {
     auto converted = json_extra_detail::convert<Value>(converter, entry);
     if (!converted)

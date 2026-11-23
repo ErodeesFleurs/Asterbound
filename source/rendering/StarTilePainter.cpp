@@ -486,7 +486,7 @@ std::expected<bool, StarException> TilePainter::produceTerrainPrimitives(HashMap
         AssetPath texture = (hue == 0) ? piece->texture : Star::format("{}?hueshift={}", piece->texture, materialHueToDegrees(hue));
 
         if (directives)
-          texture.m_directives += directives->get();
+          texture.directives += directives->get();
 
         auto image = assets->image(texture);
         if (!image)

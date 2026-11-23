@@ -24,8 +24,8 @@ class ActorMovementController;
 // theres potentially more things shared that could be moved here
 class ActorEntity : public virtual MobileEntity {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<ActorEntity, MobileEntity>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<ActorEntity, MobileEntity>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ActorEntity>(); }
 

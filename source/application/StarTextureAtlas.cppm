@@ -26,7 +26,7 @@ template <typename AtlasTextureHandle>
 class TextureAtlasSet {
 public:
   struct Texture {
-    virtual void const* query_type(TypeKey key) const noexcept { return query_type_of<Texture>(this, key); }
+    virtual void query_type(TypeQuery& query) const noexcept { query_type_of<Texture>(*this, query); }
     virtual std::string_view dynamic_type_name() const noexcept { return Star::type_name<Texture>(); }
 
     virtual Vec2U imageSize() const = 0;
@@ -78,7 +78,7 @@ public:
   // re-adds it to the AtlasSet.  It does this up to textureCount textures,
   // until it finds a texture where re-adding it to the texture atlas simply
   // moves the texture into the same atlas, at which point it stops.
-  [[nodiscard]] std::expected<void, StarException> compressionPass(std::size_t textureCount = NPos);
+  [[nodiscard]] std::expected<void, StarException> compressionPass(std::size_t textureCount = npos);
 
   // The number of atlases that the AtlasSet will attempt to fit a texture in
   // before giving up and creating a new atlas.  Tries in order of least full
@@ -108,8 +108,8 @@ private:
   struct TextureEntry : Texture {
     virtual ~TextureEntry() = default;
 
-    void const* query_type(TypeKey key) const noexcept override {
-      return query_type_of<TextureEntry, Texture>(this, key);
+    void query_type(TypeQuery& query) const noexcept override {
+      query_type_of<TextureEntry, Texture>(*this, query);
     }
     std::string_view dynamic_type_name() const noexcept override { return Star::type_name<TextureEntry>(); }
 
@@ -375,13 +375,13 @@ void TextureAtlasSet<AtlasTextureHandle>::setAtlasRegionUsed(TextureAtlas& textu
       bool oldVal = val;
       val = used;
       if (oldVal && !val) {
-        if constexpr (Star::DebugEnabled) {
+        if constexpr (Star::debug_enabled) {
           Star::star_assert_failed((textureAtlas.usedCellCount != 0));
         }
         textureAtlas.usedCellCount -= 1;
       } else if (!oldVal && used) {
         textureAtlas.usedCellCount += 1;
-        if constexpr (Star::DebugEnabled) {
+        if constexpr (Star::debug_enabled) {
           Star::star_assert_failed((textureAtlas.usedCellCount <= square(m_atlasNumCells)));
         }
       }

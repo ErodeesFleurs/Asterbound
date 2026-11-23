@@ -399,7 +399,7 @@ std::expected<void, StarException> scanLiquids(Root& root, TilesetUpdater& updat
 int main(int argc, char** argv) {
   auto nativeRuntime = NativeRuntime::create();
   if (!nativeRuntime) {
-    if (auto written = Star::print(stderr, "exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(nativeRuntime.error()), true)); !written)
+    if (auto written = Star::print(*stderr, "exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(nativeRuntime.error()), true)); !written)
       return 1;
     return 1;
   }
@@ -440,7 +440,7 @@ int main(int argc, char** argv) {
   };
   auto result = run();
   if (!result) {
-    if (auto written = Star::print(stderr, "exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
+    if (auto written = Star::print(*stderr, "exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
       return 1;
     return 1;
   }

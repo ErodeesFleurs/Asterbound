@@ -623,7 +623,7 @@ std::expected<void, StarException> AiInterface::populateMissions() {
     result = addMission(missionName, true);
     if (!result) return std::unexpected(std::move(result.error()));
   }
-  return m_missionListWidget->setSelected(NPos);
+  return m_missionListWidget->setSelected(npos);
 }
 
 std::expected<void, StarException> AiInterface::startMission() {
@@ -656,7 +656,7 @@ std::expected<void, StarException> AiInterface::populateCrew() {
     result = (*label)->setText(name->value_or(m_defaultRecruitName));
     if (!result) return std::unexpected(std::move(result.error()));
   }
-  return m_crewListWidget->setSelected(NPos);
+  return m_crewListWidget->setSelected(npos);
 }
 
 std::expected<void, StarException> AiInterface::dismissRecruit() {

@@ -232,10 +232,10 @@ std::expected<void, StarException> BaseScriptPane::tick(float dt) {
   }
   for (auto const& p : m_canvasKeyCallbacks) {
     for (auto const& keyEvent : p.first->pullKeyEvents()) {
-      auto keyName = enum_name<KeyNames>(keyEvent.key);
+      auto keyName = enum_name<key_names>(keyEvent.key);
       if (!keyName)
         return std::unexpected(std::move(keyName.error()));
-      // KeyNames borrows whole static string literals; Lua copies their bytes.
+      // key_names borrows whole static string literals; Lua copies their bytes.
       auto result = recover_lua_script_error(m_script.invoke(p.second, static_cast<int>(keyEvent.key), keyEvent.keyDown, *keyName));
       if (!result)
         return std::unexpected(std::move(result.error()));
@@ -306,7 +306,7 @@ std::expected<std::shared_ptr<Pane>, StarException> BaseScriptPane::createToolti
   if (!authoredItem)
     return std::unexpected(std::move(authoredItem.error()));
   if (*authoredItem) {
-    if (**authoredItem == LuaNil)
+    if (**authoredItem == lua_nil)
       return std::shared_ptr<Pane>{};
     auto handle = std::get_if<LuaUserData>(&**authoredItem);
     if (!handle)
@@ -509,20 +509,20 @@ std::expected<Json, StarException> BaseScriptPane::inputJson(InputEvent const& e
     result.set("screenPosition", json_from_vec2i(position));
   }
   if (auto move = std::get_if<MouseMoveEvent>(&event))
-    result.set("physicalPosition", json_from_vec2f(move->mousePosition));
+    result.set("physicalPosition", json_from_vec2f(move->mouse_position));
   else if (auto down = std::get_if<MouseButtonDownEvent>(&event))
-    result.set("physicalPosition", json_from_vec2f(down->mousePosition));
+    result.set("physicalPosition", json_from_vec2f(down->mouse_position));
   else if (auto up = std::get_if<MouseButtonUpEvent>(&event))
-    result.set("physicalPosition", json_from_vec2f(up->mousePosition));
+    result.set("physicalPosition", json_from_vec2f(up->mouse_position));
   if (auto down = std::get_if<KeyDownEvent>(&event)) {
-    auto name = enum_name<KeyNames>(down->key);
+    auto name = enum_name<key_names>(down->key);
     if (!name)
       return std::unexpected(std::move(name.error()));
     result.set("type", "keyDown");
     result.set("key", String(*name));
     result.set("mods", static_cast<int>(down->mods));
   } else if (auto up = std::get_if<KeyUpEvent>(&event)) {
-    auto name = enum_name<KeyNames>(up->key);
+    auto name = enum_name<key_names>(up->key);
     if (!name)
       return std::unexpected(std::move(name.error()));
     result.set("type", "keyUp");
@@ -534,21 +534,21 @@ std::expected<Json, StarException> BaseScriptPane::inputJson(InputEvent const& e
     result.set("type", "move");
   } else if (auto down = std::get_if<MouseButtonDownEvent>(&event)) {
     result.set("type", "buttonDown");
-    result.set("button", static_cast<int>(down->mouseButton));
-    auto name = enum_name<MouseButtonNames>(down->mouseButton);
+    result.set("button", static_cast<int>(down->mouse_button));
+    auto name = enum_name<mouse_button_names>(down->mouse_button);
     if (!name)
       return std::unexpected(std::move(name.error()));
     result.set("buttonName", String(*name));
   } else if (auto up = std::get_if<MouseButtonUpEvent>(&event)) {
     result.set("type", "buttonUp");
-    result.set("button", static_cast<int>(up->mouseButton));
+    result.set("button", static_cast<int>(up->mouse_button));
   } else if (auto wheel = std::get_if<MouseWheelEvent>(&event)) {
     result.set("type", "wheel");
-    result.set("direction", wheel->mouseWheel == MouseWheel::Up ? 1 : -1);
+    result.set("direction", wheel->mouse_wheel == MouseWheel::Up ? 1 : -1);
   } else {
     result.set("type", "controller");
     if (auto down = std::get_if<ControllerButtonDownEvent>(&event)) {
-      auto name = enum_name<ControllerButtonNames>(down->controllerButton);
+      auto name = enum_name<controller_button_names>(down->controller_button);
       if (!name)
         return std::unexpected(std::move(name.error()));
       result.set("controllerButton", String(*name));

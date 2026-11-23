@@ -271,7 +271,7 @@ std::expected<bool, StarException> TextPainter::processWrapText(StringView text,
   unsigned lines = 0;
   auto lineStartIterator = iterator, splitIterator = end;
   unsigned linePixelWidth = 0, splitPixelWidth = 0;
-  std::size_t commandStart = NPos, commandEnd = NPos;
+  std::size_t commandStart = npos, commandEnd = npos;
   bool finished = true;
 
   auto slice = [&](std::size_t a, std::size_t b) -> StringView {
@@ -284,22 +284,22 @@ std::expected<bool, StarException> TextPainter::processWrapText(StringView text,
       return std::unexpected(std::move(decoded.error()));
     auto character = *decoded;
     finished = false; // assume at least one character if we get here
-    bool noMoreCommands = commandStart != NPos && commandEnd == NPos;
+    bool noMoreCommands = commandStart != npos && commandEnd == npos;
     if (!noMoreCommands && (character == '^' || character == '\x1b')) {
       std::size_t index = iterator;
-      if (commandStart == NPos) {
+      if (commandStart == npos) {
         auto range = Text::find_next_command(text.utf8(), index, true);
         commandStart = range ? range->begin : index;
-        commandEnd = range ? range->end - 1 : NPos;
+        commandEnd = range ? range->end - 1 : npos;
       }
-      if (commandStart == index && commandEnd != NPos) {
+      if (commandStart == index && commandEnd != npos) {
         if (auto changed = apply_measurement_commands(
               fonts, text.utf8().substr(commandStart + 1, commandEnd - commandStart - 1));
             !changed)
           return std::unexpected(std::move(changed.error()));
         iterator = cursorBase = commandEnd + 1;
         cursor = Utf8Cursor(std::string_view(text.utf8()).substr(cursorBase));
-        commandStart = commandEnd = NPos;
+        commandStart = commandEnd = npos;
         continue;
       }
     }
@@ -539,7 +539,7 @@ std::expected<void, StarException> TextPainter::applyCommands(StringView unsplit
         m_savedRenderSettings = m_renderSettings;
       } else if (command.starts_with("shadow")) {
         if (command.size() == 6) {
-          m_renderSettings.shadow = Color::Black.to_rgba();
+          m_renderSettings.shadow = Color::palette_black.to_rgba();
         } else if (command[6] == '=') {
           auto color = Color::create(StringView(command.substr(7)));
           if (!color)
@@ -547,7 +547,7 @@ std::expected<void, StarException> TextPainter::applyCommands(StringView unsplit
           m_renderSettings.shadow = color->to_rgba();
         }
       } else if (command == "noshadow") {
-        m_renderSettings.shadow = Color::Clear.to_rgba();
+        m_renderSettings.shadow = Color::palette_clear.to_rgba();
       } else if (command.starts_with("font=")) {
         return setFont(String(command.substr(5)));
       } else if (command.starts_with("directives=")) {

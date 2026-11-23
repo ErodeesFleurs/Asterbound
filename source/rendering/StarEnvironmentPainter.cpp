@@ -365,9 +365,9 @@ std::expected<void, StarException> EnvironmentPainter::renderParallaxLayers(
     auto firstTexture = layer.textures.first();
     if (!firstTexture) return std::unexpected(std::move(firstTexture.error()));
     AssetPath first = firstTexture->get();
-    first.m_directives += layer.directives;
+    first.directives += layer.directives;
     if (layer.frameNumber > 1)
-      first.m_sub_path.emplace("0");
+      first.sub_path.emplace("0");
     auto parallaxTexture = m_textureGroup->loadTexture(first);
     if (!parallaxTexture) return std::unexpected(std::move(parallaxTexture.error()));
     Vec2F parallaxSize = Vec2F((*parallaxTexture)->size());
@@ -438,13 +438,13 @@ std::expected<void, StarException> EnvironmentPainter::renderParallaxLayers(
 
         for (auto const& textureImage : layer.textures) {
           AssetPath withDirectives = textureImage;
-          withDirectives.m_directives += layer.directives;
+          withDirectives.directives += layer.directives;
           if (layer.frameNumber > 1) {
             float time_within_cycle = (float)std::fmod(sky.epochTime, (double)layer.animationCycle);
             float time_per_frame = layer.animationCycle / layer.frameNumber;
             float frame_number = time_within_cycle / time_per_frame;
             int frame = (layer.frameOffset + clamp<int>(frame_number, 0, layer.frameNumber - 1)) % layer.frameNumber;
-            withDirectives.m_sub_path.emplace(Star::to_string(frame));
+            withDirectives.sub_path.emplace(Star::to_string(frame));
           }
           auto texture = m_textureGroup->tryTexture(withDirectives);
           if (!texture) return std::unexpected(std::move(texture.error()));

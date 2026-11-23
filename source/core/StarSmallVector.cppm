@@ -2,7 +2,6 @@ module;
 import std;
 import star.format;
 import star.algorithm;
-import star.memory;
 
 namespace Star {
 
@@ -10,9 +9,9 @@ template <typename T>
 concept small_vector_value =
   std::is_object_v<T> && !std::is_array_v<T> && !std::is_const_v<T> && !std::is_volatile_v<T>;
 
-template <typename T, std::size_t Size>
+template <typename T, std::size_t size_limit>
 concept small_vector_capacity = small_vector_value<T> && requires { sizeof(T); }
-  && Size <= static_cast<std::size_t>(std::numeric_limits<std::ptrdiff_t>::max()) / sizeof(T);
+  && size_limit <= static_cast<std::size_t>(std::numeric_limits<std::ptrdiff_t>::max()) / sizeof(T);
 
 template <typename T, typename... Args>
 concept small_vector_constructible = small_vector_value<T> && std::constructible_from<T, Args...>;
@@ -31,8 +30,8 @@ concept small_vector_order = requires(T const& left, T const& right) { (left < r
 
 // Inline storage and a capacity-aware heap owner; no stored raw ownership or
 // borrowed cursor state. Iterators and data() retain their contiguous interface.
-template <small_vector_value Element, std::size_t MaxStackSize>
-  requires small_vector_capacity<Element, MaxStackSize>
+template <small_vector_value Element, std::size_t inline_capacity>
+  requires small_vector_capacity<Element, inline_capacity>
 class SmallVector {
 public:
   using value_type = Element;
@@ -40,8 +39,8 @@ public:
   using difference_type = std::ptrdiff_t;
   using reference = value_type&;
   using const_reference = value_type const&;
-  using iterator = value_type*;
-  using const_iterator = value_type const*;
+  using iterator = typename std::span<value_type>::iterator;
+  using const_iterator = typename std::span<value_type const>::iterator;
   using reverse_iterator = std::reverse_iterator<iterator>;
   using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
@@ -64,10 +63,10 @@ public:
     }
   }
 
-  template <small_vector_value OtherElement, std::size_t OtherSize>
-    requires small_vector_capacity<OtherElement, OtherSize>
+  template <small_vector_value OtherElement, std::size_t other_capacity>
+    requires small_vector_capacity<OtherElement, other_capacity>
     && small_vector_constructible<value_type, OtherElement const&>
-  SmallVector(SmallVector<OtherElement, OtherSize> const& other) : SmallVector(other.begin(), other.end()) {}
+  SmallVector(SmallVector<OtherElement, other_capacity> const& other) : SmallVector(other.begin(), other.end()) {}
 
   template <std::input_iterator Iterator, std::sentinel_for<Iterator> Sentinel>
     requires small_vector_constructible<value_type, std::iter_reference_t<Iterator>>
@@ -149,7 +148,7 @@ public:
 
   size_type size() const noexcept { return m_size; }
   bool empty() const noexcept { return m_size == 0; }
-  size_type capacity() const noexcept { return m_heap ? m_heap.get_deleter().capacity : MaxStackSize; }
+  size_type capacity() const noexcept { return m_heap ? m_heap.get_deleter().capacity : inline_capacity; }
   static constexpr size_type max_size() noexcept {
     return static_cast<size_type>(std::numeric_limits<difference_type>::max()) / sizeof(value_type);
   }
@@ -161,7 +160,7 @@ public:
     while (size() > count)
       discard_back();
     if constexpr (std::is_trivially_copy_constructible_v<value_type>) {
-      std::uninitialized_fill_n(end(), count - size(), value);
+      std::uninitialized_fill_n(data() + size(), count - size(), value);
       m_size = count;
     } else {
       while (size() < count)
@@ -199,20 +198,21 @@ public:
     return std::cref(data()[index]);
   }
   reference operator[](size_type index) {
-    if constexpr (DebugEnabled)
+    if constexpr (debug_enabled)
       star_assert_failed(index < size());
     return data()[index];
   }
   const_reference operator[](size_type index) const {
-    if constexpr (DebugEnabled)
+    if constexpr (debug_enabled)
       star_assert_failed(index < size());
     return data()[index];
   }
 
-  iterator begin() noexcept { return data(); }
-  const_iterator begin() const noexcept { return data(); }
-  iterator end() noexcept { return data() + size(); }
-  const_iterator end() const noexcept { return data() + size(); }
+  // Bound cursors by storage so that appending without reallocation preserves them.
+  iterator begin() noexcept { return std::span(data(), capacity()).begin(); }
+  const_iterator begin() const noexcept { return std::span(data(), capacity()).begin(); }
+  iterator end() noexcept { return begin() + size(); }
+  const_iterator end() const noexcept { return begin() + size(); }
   reverse_iterator rbegin() noexcept { return reverse_iterator(end()); }
   const_reverse_iterator rbegin() const noexcept { return const_reverse_iterator(end()); }
   reverse_iterator rend() noexcept { return reverse_iterator(begin()); }
@@ -281,7 +281,7 @@ public:
   void emplace_back(Args&&... args) {
     if (size() == capacity())
       reserve(checked_add(size(), 1));
-    std::construct_at(end(), std::forward<Args>(args)...);
+    std::construct_at(data() + size(), std::forward<Args>(args)...);
     ++m_size;
   }
 
@@ -297,7 +297,7 @@ public:
     for (size_type i = index; i < size() - 1; ++i)
       operator[](i) = std::move(operator[](i + 1));
     discard_back();
-    return position;
+    return begin() + index;
   }
   iterator erase(iterator first, iterator last)
     requires small_vector_relocatable<value_type>
@@ -311,7 +311,7 @@ public:
       operator[](start_index + i - end_index) = std::move(operator[](i));
     while (count--)
       discard_back();
-    return first;
+    return begin() + start_index;
   }
 
   bool operator==(SmallVector const& other) const
@@ -359,27 +359,16 @@ public:
   }
 
 private:
-  struct storage_deleter {
+  struct StorageDeleter {
     size_type capacity = 0;
     void operator()(value_type* allocation) const noexcept {
-      if constexpr (alignof(value_type) > alignof(std::max_align_t))
-        std::allocator<value_type>{}.deallocate(allocation, capacity);
-      else
-        Star::free(allocation, capacity * sizeof(value_type));
+      std::allocator<value_type>{}.deallocate(allocation, capacity);
     }
   };
-  using storage_owner = std::unique_ptr<value_type[], storage_deleter>;
+  using storage_owner = std::unique_ptr<value_type[], StorageDeleter>;
 
   static storage_owner allocate_storage(size_type capacity) {
-    if constexpr (alignof(value_type) > alignof(std::max_align_t)) {
-      return storage_owner(std::allocator<value_type>{}.allocate(capacity), storage_deleter{capacity});
-    } else {
-      storage_owner owner(static_cast<value_type*>(Star::malloc(capacity * sizeof(value_type))),
-                          storage_deleter{capacity});
-      if (!owner)
-        std::terminate();
-      return owner;
-    }
+    return storage_owner(std::allocator<value_type>{}.allocate(capacity), StorageDeleter{capacity});
   }
   static size_type checked_add(size_type size, size_type extra) {
     if (extra > max_size() - size)
@@ -395,12 +384,12 @@ private:
   }
   void discard_back() {
     --m_size;
-    std::destroy_at(end());
+    std::destroy_at(data() + size());
   }
 
   alignas(
-    value_type) std::array<std::byte, MaxStackSize ? MaxStackSize * sizeof(value_type) : alignof(value_type)> m_inline;
-  storage_owner m_heap{nullptr, storage_deleter{0}};
+    value_type) std::array<std::byte, inline_capacity ? inline_capacity * sizeof(value_type) : alignof(value_type)> m_inline;
+  storage_owner m_heap{nullptr, StorageDeleter{0}};
   size_type m_size = 0;
 };
 

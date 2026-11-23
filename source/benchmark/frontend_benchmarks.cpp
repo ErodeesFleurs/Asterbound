@@ -159,26 +159,26 @@ void resolveGameplayChords(benchmark::State& state, KeyBindings const& bindings)
 int main(int argc, char** argv) {
   auto nativeRuntime = NativeRuntime::create();
   if (!nativeRuntime) {
-    if (!Star::print(stderr, "{}\n", nativeRuntime.error().what()))
+    if (!Star::print(*stderr, "{}\n", nativeRuntime.error().what()))
       return 1;
     return 1;
   }
   Star::BenchmarkLifetime benchmark_lifetime(argc, argv);
   auto loader = RootLoader::create({{}, {}, {}, LogLevel::Error, true, {}});
   if (!loader) {
-    if (!Star::print(stderr, "{}\n", loader.error().what()))
+    if (!Star::print(*stderr, "{}\n", loader.error().what()))
       return 1;
     return 1;
   }
   auto parsed = loader->command_parse_or_die({argv, static_cast<std::size_t>(argc)});
   if (!parsed) {
-    if (!Star::print(stderr, "{}\n", parsed.error().what()))
+    if (!Star::print(*stderr, "{}\n", parsed.error().what()))
       return 1;
     return 1;
   }
   auto& settings = parsed->first;
   if (auto storage = requirePrivateStorage(settings.storageDirectory); !storage) {
-    if (!Star::print(stderr, "{}\n", storage.error().what()))
+    if (!Star::print(*stderr, "{}\n", storage.error().what()))
       return 1;
     return 1;
   }
@@ -186,18 +186,18 @@ int main(int argc, char** argv) {
   settings.logFile.reset();
   auto root = Root::create(std::move(settings));
   if (!root) {
-    if (!Star::print(stderr, "{}\n", root.error().what()))
+    if (!Star::print(*stderr, "{}\n", root.error().what()))
       return 1;
     return 1;
   }
   auto keysValid = keybindingPreflight(**root);
   if (!keysValid) {
-    if (!Star::print(stderr, "{}\n", keysValid.error().what()))
+    if (!Star::print(*stderr, "{}\n", keysValid.error().what()))
       return 1;
     return 1;
   }
   if (!*keysValid || !bubblePreflight()) {
-    if (!Star::print(stderr, "Frontend semantic preflight failed\n"))
+    if (!Star::print(*stderr, "Frontend semantic preflight failed\n"))
       return 1;
     return 1;
   }
@@ -218,13 +218,13 @@ int main(int argc, char** argv) {
     "EmoteHappy": [{"type":"key","value":"E","mods":["LShift","LAlt"]}]
   })JSON");
   if (!config) {
-    if (!Star::print(stderr, "{}\n", config.error().what()))
+    if (!Star::print(*stderr, "{}\n", config.error().what()))
       return 1;
     return 1;
   }
   auto bindings = KeyBindings::create(**root, *config);
   if (!bindings) {
-    if (!Star::print(stderr, "{}\n", bindings.error().what()))
+    if (!Star::print(*stderr, "{}\n", bindings.error().what()))
       return 1;
     return 1;
   }

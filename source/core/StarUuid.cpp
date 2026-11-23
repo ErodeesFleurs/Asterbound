@@ -37,7 +37,7 @@ String Uuid::hex() const {
 }
 
 
-std::size_t hash<Uuid>::operator()(Uuid const& u) const {
+std::size_t ValueHash<Uuid>::operator()(Uuid const& u) const {
   std::size_t hashval = 0;
   for (char byte : u.span())
     hash_combine(hashval, byte);

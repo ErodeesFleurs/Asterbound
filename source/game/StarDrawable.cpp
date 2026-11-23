@@ -43,7 +43,7 @@ std::expected<std::reference_wrapper<Drawable::ImagePart>, StarException> Drawab
       return std::unexpected(std::move(size.error()));
     oldSize = Vec2F(*size);
   }
-  image.m_directives += directives;
+  image.directives += directives;
   if (oldSize) {
     auto size = imageMetadata.imageSize(image);
     if (!size)
@@ -64,7 +64,7 @@ std::expected<std::reference_wrapper<Drawable::ImagePart>, StarException> Drawab
     oldSize = Vec2F(*size);
   }
   for (Directives const& directives : directivesGroup.list())
-    image.m_directives += directives;
+    image.directives += directives;
   if (oldSize) {
     auto size = imageMetadata.imageSize(image);
     if (!size)
@@ -82,7 +82,7 @@ std::expected<std::reference_wrapper<Drawable::ImagePart>, StarException> Drawab
       return std::unexpected(std::move(size.error()));
     oldSize = Vec2F(*size);
   }
-  image.m_directives.clear();
+  image.directives.clear();
   if (oldSize) {
     auto size = imageMetadata.imageSize(image);
     if (!size)
@@ -131,7 +131,7 @@ std::expected<Drawable, StarException> Drawable::makeImage(ImageMetadataDatabase
 }
 
 Drawable::Drawable()
-  : color(Color::White), fullbright(false) {}
+  : color(Color::palette_white), fullbright(false) {}
 
 std::expected<Drawable, StarException> Drawable::create(ImageMetadataDatabase const& imageMetadata, Json const& json) {
   Drawable drawable;

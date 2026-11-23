@@ -474,7 +474,7 @@ std::expected<void, StarException> OpenGlRenderer::loadEffectConfig(String const
     auto uniform = entry.second.get_string("uniform");
     if (!uniform) return std::unexpected(std::move(uniform.error()));
     EffectParameter parameter;
-    parameter.parameterUniform = glGetUniformLocation(program, uniform->utf8_data());
+    parameter.parameterUniform = glGetUniformLocation(program, uniform->utf8().c_str());
     if (parameter.parameterUniform == -1) {
       auto logged = m_logger.warn("OpenGL20 effect parameter '{}' in effect '{}' has no associated uniform, skipping", entry.first, name);
       if (!logged) return std::unexpected(std::move(logged.error()));
@@ -538,7 +538,7 @@ std::expected<void, StarException> OpenGlRenderer::loadEffectConfig(String const
     auto uniform = entry.second.get_string("textureUniform");
     if (!uniform) return std::unexpected(std::move(uniform.error()));
     EffectTexture texture;
-    texture.textureUniform = glGetUniformLocation(program, uniform->utf8_data());
+    texture.textureUniform = glGetUniformLocation(program, uniform->utf8().c_str());
     if (texture.textureUniform == -1) {
       auto logged = m_logger.warn("OpenGL20 effect parameter '{}' has no associated uniform, skipping", entry.first);
       if (!logged) return std::unexpected(std::move(logged.error()));
@@ -558,7 +558,7 @@ std::expected<void, StarException> OpenGlRenderer::loadEffectConfig(String const
     auto sizeUniform = entry.second.opt_string("textureSizeUniform");
     if (!sizeUniform) return std::unexpected(std::move(sizeUniform.error()));
     if (*sizeUniform) {
-      texture.textureSizeUniform = glGetUniformLocation(program, (**sizeUniform).utf8_data());
+      texture.textureSizeUniform = glGetUniformLocation(program, (**sizeUniform).utf8().c_str());
       if (texture.textureSizeUniform == -1) {
         auto logged = m_logger.warn("OpenGL20 effect parameter '{}' has textureSizeUniform '{}' with no associated uniform", entry.first, **sizeUniform);
         if (!logged) return std::unexpected(std::move(logged.error()));
@@ -1216,7 +1216,7 @@ std::expected<void, StarException> OpenGlRenderer::GlTextureAtlasSet::copyAtlasP
   else
     return std::unexpected(RendererException("Unsupported texture format in OpenGlRenderer::TextureGroup::copyAtlasPixels"));
 
-  glTexSubImage2D(GL_TEXTURE_2D, 0, bottomLeft[0], bottomLeft[1], image.width(), image.height(), format, GL_UNSIGNED_BYTE, image.data().data());
+  glTexSubImage2D(GL_TEXTURE_2D, 0, bottomLeft[0], bottomLeft[1], image.width(), image.height(), format, GL_UNSIGNED_BYTE, image.span().data());
   return checkGlError("atlas pixel upload");
 }
 
@@ -1289,7 +1289,7 @@ void OpenGlRenderer::GlGroupedTexture::incrementBufferUseCount() {
 }
 
 void OpenGlRenderer::GlGroupedTexture::decrementBufferUseCount() {
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((bufferUseCount != 0));
   }
   if (bufferUseCount == 1)
@@ -1893,7 +1893,7 @@ std::expected<void, StarException> OpenGlRenderer::switchGlFrameBuffer(RefPtr<Gl
 GLuint OpenGlRenderer::Effect::getAttribute(String const& name) {
   auto find = attributes.find(name);
   if (find == attributes.end()) {
-    GLuint attrib = glGetAttribLocation(program, name.utf8_data());
+    GLuint attrib = glGetAttribLocation(program, name.utf8().c_str());
     attributes[name] = attrib;
     return attrib;
   }
@@ -1903,7 +1903,7 @@ GLuint OpenGlRenderer::Effect::getAttribute(String const& name) {
 GLuint OpenGlRenderer::Effect::getUniform(String const& name) {
   auto find = uniforms.find(name);
   if (find == uniforms.end()) {
-    GLuint uniform = glGetUniformLocation(program, name.utf8_data());
+    GLuint uniform = glGetUniformLocation(program, name.utf8().c_str());
     uniforms[name] = uniform;
     return uniform;
   }

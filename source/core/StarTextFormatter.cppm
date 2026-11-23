@@ -81,23 +81,17 @@ concept scalar_enum_text_writable = std::is_enum_v<T> && requires(T const& value
 } && standard_text_writable<decltype(+std::declval<T const&>())>;
 
 template <typename T>
-concept raw_pointer_text_writable = std::is_pointer_v<T> && requires(T value) {
-  static_cast<void const volatile*>(value);
-};
+struct StandardSmartPointer : std::false_type {};
 
 template <typename T>
-struct standard_smart_pointer : std::false_type {};
-
-template <typename T>
-struct standard_smart_pointer<std::shared_ptr<T>> : std::true_type {};
+struct StandardSmartPointer<std::shared_ptr<T>> : std::true_type {};
 
 template <typename T, typename Deleter>
-struct standard_smart_pointer<std::unique_ptr<T, Deleter>> : std::true_type {};
+struct StandardSmartPointer<std::unique_ptr<T, Deleter>> : std::true_type {};
 
 template <typename T>
-concept smart_pointer_text_writable = standard_smart_pointer<std::remove_cvref_t<T>>::value
-    && requires(T const& value) { value.get(); }
-    && raw_pointer_text_writable<decltype(std::declval<T const&>().get())>;
+concept smart_pointer_text_writable = StandardSmartPointer<std::remove_cvref_t<T>>::value
+    && requires(T const& value) { static_cast<void const volatile*>(value.get()); };
 
 }
 
@@ -114,7 +108,7 @@ decltype(auto) append_text(TextBuffer& output, T const& value) {
 template <typename T>
   requires (!TextDetail::adl_text_writable<T>)
       && (TextDetail::standard_text_writable<T> || TextDetail::scalar_enum_text_writable<T>
-          || TextDetail::raw_pointer_text_writable<T> || TextDetail::smart_pointer_text_writable<T>)
+          || TextDetail::smart_pointer_text_writable<T>)
 void append_text(TextBuffer& output, T const& value) {
   using Value = std::remove_cvref_t<T>;
   if constexpr (std::same_as<Value, bool>) {
@@ -128,21 +122,19 @@ void append_text(TextBuffer& output, T const& value) {
   } else if constexpr (std::same_as<Value, std::nullptr_t>) {
     output.append("nullptr");
   } else if constexpr (TextDetail::smart_pointer_text_writable<Value>) {
-    append_text(output, value.get());
-  } else if constexpr (TextDetail::raw_pointer_text_writable<Value>
-      && (!std::same_as<Value, char*> && !std::same_as<Value, char const*>
-          && !std::same_as<Value, signed char*> && !std::same_as<Value, signed char const*>
-          && !std::same_as<Value, unsigned char*> && !std::same_as<Value, unsigned char const*>)) {
+    if (!value) {
+      output.push_back('0');
+    } else {
+      std::format_to(std::back_inserter(output), "{}",
+          const_cast<void const*>(static_cast<void const volatile*>(value.get())));
+    }
+  } else if constexpr (std::is_pointer_v<Value> && std::is_void_v<std::remove_pointer_t<Value>>) {
     if (!value)
       output.push_back('0');
     else
-      std::format_to(std::back_inserter(output), "{}",
-          const_cast<void const*>(static_cast<void const volatile*>(value)));
-  } else if constexpr (std::same_as<Value, signed char*> || std::same_as<Value, signed char const*>
-      || std::same_as<Value, unsigned char*> || std::same_as<Value, unsigned char const*>) {
-    output.append(reinterpret_cast<char const*>(value));
+      std::format_to(std::back_inserter(output), "{}", value);
   } else if constexpr (std::same_as<Value, std::string>
-      || std::same_as<Value, char*> || std::same_as<Value, char const*>) {
+      || (std::is_pointer_v<Value> && std::same_as<std::remove_const_t<std::remove_pointer_t<Value>>, char>)) {
     output.append(value);
   } else {
     std::format_to(std::back_inserter(output), "{}", value);
@@ -169,7 +161,7 @@ concept nonfallible_text_writer = TextDetail::adl_text_writable<T>
 // preserved without allocating a string for short project representations.
 struct TextFormatter {
   constexpr auto parse(std::format_parse_context& context) {
-    return m_string.parse(context);
+    return string_formatter.parse(context);
   }
 
   void set_debug_format() = delete;
@@ -179,11 +171,11 @@ struct TextFormatter {
   auto format(T const& value, Context& context) const -> typename Context::iterator {
     TextBuffer output;
     TextDetail::write_adl_text(output, value);
-    return m_string.format(output.view(), context);
+    return string_formatter.format(output.view(), context);
   }
 
 private:
-  std::formatter<std::string_view> m_string;
+  std::formatter<std::string_view> string_formatter;
 };
 
 }

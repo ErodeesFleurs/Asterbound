@@ -1132,7 +1132,7 @@ std::expected<void, StarException> ContainerObject::burnContainerContents() {
           auto count = std::min<std::uint64_t>((leftToFill + fuelSingle - 1) / fuelSingle, item->count());
           level = std::min(maxLevel, level + fuelSingle * count);
           auto consumed = item->consume(count);
-          if constexpr (Star::DebugEnabled) {
+          if constexpr (Star::debug_enabled) {
             Star::star_assert_failed((consumed));
           }
           ((void)(consumed));
@@ -1324,7 +1324,7 @@ std::expected<void, StarException> ContainerObject::tickCrafting(float dt) {
     for (auto const& input : m_goalRecipe.inputs) {
       bool consumed = m_items->consumeItems(input);
       ((void)(consumed));
-      if constexpr (Star::DebugEnabled) {
+      if constexpr (Star::debug_enabled) {
         Star::star_assert_failed((consumed));
       }
     }

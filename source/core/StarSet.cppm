@@ -33,7 +33,7 @@ concept set_erase_source = std::ranges::input_range<Range>
 template <typename Value>
 concept set_copyable_value = std::is_constructible_v<Value, Value const&>;
 
-template <typename Storage> struct set_storage_types {
+template <typename Storage> struct SetStorageTypes {
   using key_compare = void;
   using value_compare = void;
   using hasher = typename Storage::hasher;
@@ -42,7 +42,7 @@ template <typename Storage> struct set_storage_types {
 
 template <typename Storage>
   requires requires { typename Storage::key_compare; typename Storage::value_compare; }
-struct set_storage_types<Storage> {
+struct SetStorageTypes<Storage> {
   using key_compare = typename Storage::key_compare;
   using value_compare = typename Storage::value_compare;
   using hasher = void;
@@ -60,10 +60,10 @@ public:
   using size_type = typename Storage::size_type;
   using difference_type = typename Storage::difference_type;
   using allocator_type = typename Storage::allocator_type;
-  using key_compare = typename set_storage_types<Storage>::key_compare;
-  using value_compare = typename set_storage_types<Storage>::value_compare;
-  using hasher = typename set_storage_types<Storage>::hasher;
-  using key_equal = typename set_storage_types<Storage>::key_equal;
+  using key_compare = typename SetStorageTypes<Storage>::key_compare;
+  using value_compare = typename SetStorageTypes<Storage>::value_compare;
+  using hasher = typename SetStorageTypes<Storage>::hasher;
+  using key_equal = typename SetStorageTypes<Storage>::key_equal;
 
   BasicSet() = default;
   BasicSet(BasicSet const&)
@@ -470,9 +470,9 @@ private:
 
 template <typename Value, typename Compare = std::less<Value>, typename Allocator = std::allocator<Value>>
 using Set = BasicSet<std::set<Value, Compare, Allocator>>;
-template <typename Value, typename Hash = hash<Value>, typename Equals = std::equal_to<Value>, typename Allocator = std::allocator<Value>>
+template <typename Value, typename Hash = ValueHash<Value>, typename Equals = std::equal_to<Value>, typename Allocator = std::allocator<Value>>
 using HashSet = BasicSet<FlatHashSet<Value, Hash, Equals, Allocator>>;
-template <typename Value, typename Hash = hash<Value>, typename Equals = std::equal_to<Value>, typename Allocator = std::allocator<Value>>
+template <typename Value, typename Hash = ValueHash<Value>, typename Equals = std::equal_to<Value>, typename Allocator = std::allocator<Value>>
 using StableHashSet = BasicSet<std::unordered_set<Value, Hash, Equals, Allocator>>;
 
 template <typename Container>

@@ -104,11 +104,11 @@ template <byte_algorithm Algorithm, byte_owner Owner> void byte_hash(benchmark::
   auto hash_one = [&](std::size_t i) -> std::uint64_t {
     if constexpr (Algorithm == byte_algorithm::pl) {
       if constexpr (Owner == byte_owner::string)
-        return Star::hash<String>{}(strings[i]);
+        return Star::ValueHash<String>{}(strings[i]);
       else if constexpr (Owner == byte_owner::view)
-        return Star::hash<String>{}(StringView(std::string_view(input[i])));
+        return Star::ValueHash<String>{}(StringView(std::string_view(input[i])));
       else
-        return Star::hash<ByteArray>{}(arrays[i]);
+        return Star::ValueHash<ByteArray>{}(arrays[i]);
     } else {
       auto const& value = [&]() -> auto const& {
         if constexpr (Owner == byte_owner::string)
@@ -315,13 +315,13 @@ void json_hash(benchmark::State& state, bool nested, bool reverse) {
   if (!require(state, input.value == permutation.value && input.expected == permutation.expected,
                "independently built JSON order permutations differ")
       || !require(state,
-                  Star::hash<Json>{}(input.value) == expected && Star::hash<Json>{}(permutation.value) == expected,
+                  Star::ValueHash<Json>{}(input.value) == expected && Star::ValueHash<Json>{}(permutation.value) == expected,
                   "JSON hash differs from independent sorted-key byte stream"))
     return;
   // Equality-compatible numeric normalization remains a separate untimed check.
   if (!require(state,
-               Star::hash<Json>{}(Json(-0.0)) == Star::hash<Json>{}(Json(std::int64_t(0)))
-                 && Star::hash<Json>{}(Json(42.0)) == Star::hash<Json>{}(Json(std::int64_t(42))),
+               Star::ValueHash<Json>{}(Json(-0.0)) == Star::ValueHash<Json>{}(Json(std::int64_t(0)))
+                 && Star::ValueHash<Json>{}(Json(42.0)) == Star::ValueHash<Json>{}(Json(std::int64_t(42))),
                "JSON integral-double/signed-zero hash contract changed"))
     return;
   state.SetLabel("one hash per iteration; scratch allocations/destruction timed; immutable JSON lifetime untimed");
@@ -329,7 +329,7 @@ void json_hash(benchmark::State& state, bool nested, bool reverse) {
     (void)_;
     benchmark::ClobberMemory();
     benchmark::DoNotOptimize(input.value);
-    auto output = Star::hash<Json>{}(input.value);
+    auto output = Star::ValueHash<Json>{}(input.value);
     benchmark::DoNotOptimize(output);
   }
   state.SetItemsProcessed(state.iterations());

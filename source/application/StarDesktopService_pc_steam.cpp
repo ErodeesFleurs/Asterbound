@@ -25,7 +25,7 @@ SteamDesktopService::SteamDesktopService(std::shared_ptr<PcPlatformServicesState
   : m_state(std::move(state)) {}
 
 void SteamDesktopService::openUrl(String const& url) {
-  SteamAPI_ISteamFriends_ActivateGameOverlayToWebPage(SteamAPI_SteamFriends(), url.utf8_data(),
+  SteamAPI_ISteamFriends_ActivateGameOverlayToWebPage(SteamAPI_SteamFriends(), url.utf8().c_str(),
       k_EActivateGameOverlayToWebPageMode_Default);
 }
 

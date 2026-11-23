@@ -11,9 +11,9 @@ import star.asset_path;
 namespace Star {
 namespace {
 struct PathParts {
-  std::string_view m_base_path;
-  std::string_view m_sub_path;
-  std::string_view m_directives;
+  std::string_view base_path;
+  std::string_view sub_path;
+  std::string_view directives;
 };
 
 PathParts split_path(std::string_view path) {
@@ -24,11 +24,11 @@ PathParts split_path(std::string_view path) {
   if (path[boundary] == ':') {
     auto begin = boundary + 1;
     auto end = path.find('?', begin);
-    parts.m_sub_path = path.substr(begin, end == std::string_view::npos ? path.size() - begin : end - begin);
+    parts.sub_path = path.substr(begin, end == std::string_view::npos ? path.size() - begin : end - begin);
     boundary = end;
   }
   if (boundary != std::string_view::npos)
-    parts.m_directives = path.substr(boundary);
+    parts.directives = path.substr(boundary);
   return parts;
 }
 
@@ -52,11 +52,11 @@ concept asset_path_output = requires(Output& output, std::string_view bytes) {
 };
 
 template <asset_path_output Output> void append_suffix(Output& output, AssetPath const& path) {
-  if (path.m_sub_path) {
+  if (path.sub_path) {
     output.append(":");
-    output.append(path.m_sub_path->utf8());
+    output.append(path.sub_path->utf8());
   }
-  path.m_directives.for_each([&](Directives::Entry const& entry, Directives const& directives) {
+  path.directives.for_each([&](Directives::Entry const& entry, Directives const& directives) {
     output.append("?");
     output.append(directives.entry_string(entry).utf8());
   });
@@ -88,15 +88,15 @@ void append_normalized_directives(String& output, std::string_view directives) {
 String with_sub_path(std::string_view path, std::optional<std::string_view> sub_path) {
   auto parts = split_path(path);
   String result;
-  auto size = parts.m_base_path.size() + (sub_path ? 1 + sub_path->size() : 0);
-  for_each_directive(parts.m_directives, [&](std::string_view entry) { size += 1 + entry.size(); });
+  auto size = parts.base_path.size() + (sub_path ? 1 + sub_path->size() : 0);
+  for_each_directive(parts.directives, [&](std::string_view entry) { size += 1 + entry.size(); });
   result.reserve(size);
-  result.append(parts.m_base_path);
+  result.append(parts.base_path);
   if (sub_path) {
     result.append(":");
     result.append(*sub_path);
   }
-  append_normalized_directives(result, parts.m_directives);
+  append_normalized_directives(result, parts.directives);
   return result;
 }
 }// namespace
@@ -104,7 +104,7 @@ String with_sub_path(std::string_view path, std::optional<std::string_view> sub_
 AssetPath AssetPath::split(String const& path) { return AssetPath(std::string_view(path.utf8())); }
 
 String AssetPath::join(AssetPath const& path) {
-  String result = path.m_base_path;
+  String result = path.base_path;
   append_suffix(result, path);
   return result;
 }
@@ -171,47 +171,47 @@ String AssetPath::relative_to(String const& source_path, String const& given_pat
 }
 
 bool AssetPath::operator==(AssetPath const& other) const {
-  return std::tie(m_base_path, m_sub_path, m_directives)
-    == std::tie(other.m_base_path, other.m_sub_path, other.m_directives);
+  return std::tie(base_path, sub_path, directives)
+    == std::tie(other.base_path, other.sub_path, other.directives);
 }
 
 AssetPath::AssetPath(std::string_view path) {
   auto parts = split_path(path);
-  m_base_path = String(parts.m_base_path);
-  if (!parts.m_sub_path.empty())
-    m_sub_path.emplace(parts.m_sub_path);
-  if (!parts.m_directives.empty())
-    m_directives = String(parts.m_directives);
+  base_path = String(parts.base_path);
+  if (!parts.sub_path.empty())
+    sub_path.emplace(parts.sub_path);
+  if (!parts.directives.empty())
+    directives = String(parts.directives);
 }
 
 AssetPath::AssetPath(String const& path) : AssetPath(std::string_view(path.utf8())) {}
 
 AssetPath::AssetPath(AssetPath&& path) noexcept
-    : AssetPath(std::move(path.m_base_path), std::move(path.m_sub_path), std::move(path.m_directives)) {}
+    : AssetPath(std::move(path.base_path), std::move(path.sub_path), std::move(path.directives)) {}
 
 AssetPath& AssetPath::operator=(AssetPath&& path) noexcept {
   if (this != &path) {
-    m_base_path = std::move(path.m_base_path);
-    m_sub_path = std::exchange(path.m_sub_path, std::nullopt);
-    m_directives = std::move(path.m_directives);
+    base_path = std::move(path.base_path);
+    sub_path = std::exchange(path.sub_path, std::nullopt);
+    directives = std::move(path.directives);
   }
   return *this;
 }
 
 AssetPath::AssetPath(String&& base_path, std::optional<String>&& sub_path, DirectivesGroup&& directives) noexcept
-    : m_base_path(std::move(base_path)), m_sub_path(std::exchange(sub_path, std::nullopt)),
-      m_directives(std::move(directives)) {}
+    : base_path(std::move(base_path)), sub_path(std::exchange(sub_path, std::nullopt)),
+      directives(std::move(directives)) {}
 
 AssetPath::AssetPath(String const& base_path, std::optional<String> const& sub_path, DirectivesGroup const& directives)
-    : m_base_path(base_path), m_sub_path(sub_path), m_directives(directives) {}
+    : base_path(base_path), sub_path(sub_path), directives(directives) {}
 
 void write_text(TextBuffer& buffer, AssetPath const& path) {
-  buffer.append(path.m_base_path.utf8());
+  buffer.append(path.base_path.utf8());
   append_suffix(buffer, path);
 }
 
-std::size_t hash<AssetPath>::operator()(AssetPath const& path) const {
-  return hash_of(path.m_base_path, path.m_sub_path, path.m_directives);
+std::size_t ValueHash<AssetPath>::operator()(AssetPath const& path) const {
+  return hash_of(path.base_path, path.sub_path, path.directives);
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& stream, AssetPath& path) {

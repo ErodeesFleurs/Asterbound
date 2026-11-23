@@ -304,7 +304,7 @@ std::expected<std::optional<String>, StarException> UniverseClient::connect(Univ
     }
     if (!protocolResponse->allowed)
       return String(Star::format("Join failed! Server does not support connections with protocol version {}", StarProtocolVersion));
-    VersionNumber peer_version = LegacyVersion;
+    VersionNumber peer_version = legacy_version;
     bool legacyServer = forceLegacy || protocolResponse->compressionMode() != PacketCompressionMode::Enabled;
     auto socketResult = connection.packetSocket();
     if (!socketResult)
@@ -366,7 +366,7 @@ std::expected<std::optional<String>, StarException> UniverseClient::connect(Univ
     auto request = std::make_shared<ClientConnectPacket>(assets->digest(), allowAssetsMismatch, uuid, name,
         m_mainPlayer->shipSpecies(), std::move(shipData), m_mainPlayer->shipUpgrades(), m_mainPlayer->log()->introComplete(), account);
     if (!legacyServer)
-      request->info = JsonObject{{"brand", "Asterbound"}, {"openProtocolVersion", OpenProtocolVersion}};
+      request->info = JsonObject{{"brand", "Asterbound"}, {"openProtocolVersion", open_protocol_version}};
     auto operation8 = connection.pushSingle(std::move(request));
     if (!operation8)
       return std::unexpected(std::move(operation8.error()));

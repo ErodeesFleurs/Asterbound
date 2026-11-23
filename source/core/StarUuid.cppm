@@ -53,7 +53,7 @@ private:
 };
 
 template <>
-struct hash<Uuid> {
+struct ValueHash<Uuid> {
   std::size_t operator()(Uuid const& u) const;
 };
 
@@ -70,7 +70,7 @@ export namespace Star {
   template <>
   struct HasStreamReadFactory<Uuid>;
   template <>
-  struct hash<Uuid>;
+  struct ValueHash<Uuid>;
 }
 
 export extern "C++" {

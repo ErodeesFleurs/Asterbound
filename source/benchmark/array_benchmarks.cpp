@@ -149,7 +149,7 @@ void measure(benchmark::State& state, Factory&& factory, Expected const& expecte
     // a constant result and retain element stores and owning destructors.
     benchmark::ClobberMemory();
     auto result = factory();
-    benchmark::DoNotOptimize(result.data());
+    benchmark::DoNotOptimize(std::ranges::data(result));
     benchmark::ClobberMemory();
   }
   {

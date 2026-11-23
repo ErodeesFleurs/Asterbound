@@ -64,9 +64,9 @@ Result cold_raster(benchmark::State& state, PerformanceBenchmarkSession& session
   if (!last) return std::unexpected(std::move(last.error()));
   auto const& [last_image, last_offset, last_colored] = *last;
   if (image.size() != last_image.size() || last_colored != colored || last_offset != offset
-      || !std::ranges::equal(image.data(), last_image.data()))
+      || !std::ranges::equal(image.span(), last_image.span()))
     return std::unexpected(StarException("Uncached glyph raster changed after timing"));
-  auto bytes = image.data();
+  auto bytes = image.span();
   state.SetLabel(std::format("hobo W 24px; warm face, uncached FT raster + image lifetime; {}x{} offset={},{} pixels={:016x}",
       image.width(), image.height(), offset.x(), offset.y(), xx_hash3(std::span(reinterpret_cast<char const*>(bytes.data()), bytes.size()))));
   state.SetItemsProcessed(state.iterations());

@@ -640,33 +640,39 @@ TEST(ByteOrder, RawUnalignedBoundariesAndExactAlias) {
     auto reversed = source;
     for (size_t i = 0; i != length; ++i)
       reversed[i + 1] = source[length - i];
-    alignas(8) auto inPlace = source;
-    reverse_bytes(inPlace.data() + 1, length);
-    EXPECT_EQ(inPlace, reversed);
+    auto region = [length](auto& storage, size_t offset) {
+      return std::as_writable_bytes(std::span(storage)).subspan(offset, length);
+    };
+    auto input = std::as_bytes(std::span(source)).subspan(1, length);
+    alignas(8) auto in_place = source;
+    reverse_bytes(region(in_place, 1));
+    EXPECT_EQ(in_place, reversed);
     alignas(8) auto aliased = source;
-    reverse_bytes_copy(aliased.data() + 1, aliased.data() + 1, length);
+    auto alias = region(aliased, 1);
+    reverse_bytes_copy(alias, alias);
     EXPECT_EQ(aliased, reversed);
     alignas(8) std::array<unsigned char, 272> copied;
     copied.fill(0x5a);
     auto expected = copied;
     for (size_t i = 0; i != length; ++i)
       expected[i + 3] = source[length - i];
-    reverse_bytes_copy(copied.data() + 3, source.data() + 1, length);
+    reverse_bytes_copy(std::as_writable_bytes(std::span(copied)).subspan(3), input);
     EXPECT_EQ(copied, expected);
     for (auto order : {ByteOrder::NoConversion, ByteOrder::LittleEndian, ByteOrder::BigEndian}) {
       SCOPED_TRACE(static_cast<int>(order));
       auto const& converted = order == ByteOrder::NoConversion || order == native_byte_order() ? source : reversed;
       alignas(8) auto actual = source;
-      alignas(8) auto exactAlias = source;
+      alignas(8) auto exact_alias = source;
       copied.fill(0x5a);
       expected = copied;
       for (size_t i = 0; i != length; ++i)
         expected[i + 3] = converted[i + 1];
-      to_byte_order(order, actual.data() + 1, length);
-      to_byte_order(order, exactAlias.data() + 1, exactAlias.data() + 1, length);
-      to_byte_order(order, copied.data() + 3, source.data() + 1, length);
+      to_byte_order(order, region(actual, 1));
+      auto same = region(exact_alias, 1);
+      to_byte_order(order, same, same);
+      to_byte_order(order, std::as_writable_bytes(std::span(copied)).subspan(3), input);
       EXPECT_EQ(actual, converted);
-      EXPECT_EQ(exactAlias, converted);
+      EXPECT_EQ(exact_alias, converted);
       EXPECT_EQ(copied, expected);
     }
     for (size_t i = 0; i != length; ++i)
@@ -675,11 +681,11 @@ TEST(ByteOrder, RawUnalignedBoundariesAndExactAlias) {
     for (size_t i = length + 1; i != source.size(); ++i)
       EXPECT_EQ(source[i], 0xa5);
   }
-  reverse_bytes(nullptr, 0);
-  reverse_bytes_copy(nullptr, nullptr, 0);
+  reverse_bytes({});
+  reverse_bytes_copy({}, {});
   for (auto order : {ByteOrder::NoConversion, ByteOrder::LittleEndian, ByteOrder::BigEndian}) {
-    to_byte_order(order, nullptr, 0);
-    to_byte_order(order, nullptr, nullptr, 0);
+    to_byte_order(order, {});
+    to_byte_order(order, {}, {});
   }
 }
 

@@ -95,8 +95,8 @@ static std::expected<Image, StarException> nearest_window(Image const& src_image
   if (byte_format) {
     for (auto& column : columns)
       column *= bpp;
-    auto source = src_image.data();
-    auto destination = dest_image.data();
+    auto source = src_image.span();
+    auto destination = dest_image.span();
     std::size_t source_stride = static_cast<std::size_t>(src_size[0]) * bpp;
     std::size_t destination_stride = static_cast<std::size_t>(dest_size[0]) * bpp;
     for (unsigned y = 0; y < dest_size[1]; ++y) {
@@ -126,20 +126,20 @@ static std::expected<Image, StarException> nearest_window(Image const& src_image
   return dest_image;
 }
 
-template <std::size_t N>
-concept interpolation_samples = N == 2 || N == 4;
+template <std::size_t sample_count>
+concept interpolation_samples = sample_count == 2 || sample_count == 4;
 
-template <std::size_t N>
-  requires interpolation_samples<N>
-struct axis_samples {
-  std::array<std::size_t, N> indices;
+template <std::size_t sample_count>
+  requires interpolation_samples<sample_count>
+struct AxisSamples {
+  std::array<std::size_t, sample_count> indices;
   float fraction;
 };
 
-template <std::size_t N>
-  requires interpolation_samples<N>
-static axis_samples<N> interpolation_axis(float coordinate, bool zero_coordinate, unsigned extent) {
-  axis_samples<N> samples{};
+template <std::size_t sample_count>
+  requires interpolation_samples<sample_count>
+static AxisSamples<sample_count> interpolation_axis(float coordinate, bool zero_coordinate, unsigned extent) {
+  AxisSamples<sample_count> samples{};
   if (extent == 0)
     return samples;
   if (zero_coordinate)
@@ -147,13 +147,13 @@ static axis_samples<N> interpolation_axis(float coordinate, bool zero_coordinate
   // The old floor-to-int and subsequent +1/+3 must never overflow. Beyond
   // that range every tap lies past the edge, so use that edge with fraction0.
   if (!finite_nonnegative(coordinate)
-      || static_cast<double>(coordinate) > static_cast<double>(std::numeric_limits<int>::max() - (N - 1))) {
+      || static_cast<double>(coordinate) > static_cast<double>(std::numeric_limits<int>::max() - (sample_count - 1))) {
     samples.indices.fill(extent - 1);
     return samples;
   }
   auto integral = static_cast<unsigned>(std::floor(coordinate));
   samples.fraction = coordinate - static_cast<float>(integral);
-  for (std::size_t tap = 0; tap < N; ++tap)
+  for (std::size_t tap = 0; tap < sample_count; ++tap)
     samples.indices[tap] = std::min(static_cast<std::size_t>(integral) + tap, static_cast<std::size_t>(extent - 1));
   return samples;
 }
@@ -163,10 +163,10 @@ concept pixel_sampler = requires(Sampler& sample, std::size_t x, std::size_t y) 
   { sample(x, y) } -> std::same_as<Vec4F>;
 };
 
-template <std::size_t N, pixel_sampler Sampler>
-  requires interpolation_samples<N>
+template <std::size_t sample_count, pixel_sampler Sampler>
+  requires interpolation_samples<sample_count>
 static Vec4B interpolate_pixel(float x, float y, Sampler&& sample) {
-  if constexpr (N == 2) {
+  if constexpr (sample_count == 2) {
     // Keep the original association and byte truncation.
     return Vec4B(lerp(y, lerp(x, sample(0, 0), sample(1, 0)), lerp(x, sample(0, 1), sample(1, 1))));
   } else {
@@ -181,8 +181,8 @@ static Vec4B interpolate_pixel(float x, float y, Sampler&& sample) {
   }
 }
 
-template <std::size_t N>
-  requires interpolation_samples<N>
+template <std::size_t sample_count>
+  requires interpolation_samples<sample_count>
 static std::expected<Image, StarException> interpolated_window(Image const& src_image, Vec2F const& scale,
                                                                Vec2U const& offset, Vec2U const& dest_size) {
   auto bytes = Image::size_bytes(dest_size, src_image.pixel_format());
@@ -205,28 +205,28 @@ static std::expected<Image, StarException> interpolated_window(Image const& src_
   for (unsigned i = 0; i < coordinates.size(); ++i)
     coordinates[i] = vdiv(Vec2F(offset[0] + std::min(i, dest_size[0] - 1), offset[1] + std::min(i, dest_size[1] - 1)),
                           Vec2F(static_cast<float>(scale_x), static_cast<float>(scale_y)));
-  std::vector<axis_samples<N>> columns(dest_size[0]);
+  std::vector<AxisSamples<sample_count>> columns(dest_size[0]);
   for (unsigned x = 0; x < dest_size[0]; ++x)
-    columns[x] = interpolation_axis<N>(coordinates[x][0], scale[0] == 0.0f || offset[0] + x == 0, src_size[0]);
+    columns[x] = interpolation_axis<sample_count>(coordinates[x][0], scale[0] == 0.0f || offset[0] + x == 0, src_size[0]);
 
   if (byte_format) {
     for (auto& column : columns)
       for (auto& index : column.indices)
         index *= bpp;
-    auto source = src_image.data();
-    auto destination = dest_image.data();
+    auto source = src_image.span();
+    auto destination = dest_image.span();
     std::size_t source_stride = static_cast<std::size_t>(src_size[0]) * bpp;
     std::size_t destination_stride = static_cast<std::size_t>(dest_size[0]) * bpp;
     for (unsigned y = 0; y < dest_size[1]; ++y) {
-      auto vertical = interpolation_axis<N>(coordinates[y][1], scale[1] == 0.0f || offset[1] + y == 0, src_size[1]);
-      std::array<std::span<std::uint8_t const>, N> rows;
-      for (std::size_t tap = 0; tap < N; ++tap)
+      auto vertical = interpolation_axis<sample_count>(coordinates[y][1], scale[1] == 0.0f || offset[1] + y == 0, src_size[1]);
+      std::array<std::span<std::uint8_t const>, sample_count> rows;
+      for (std::size_t tap = 0; tap < sample_count; ++tap)
         rows[tap] = source.subspan(vertical.indices[tap] * source_stride, source_stride);
       auto output = destination.subspan(static_cast<std::size_t>(y) * destination_stride, destination_stride);
       auto destination_pixel = output.begin();
       for (unsigned x = 0; x < dest_size[0]; ++x) {
         auto const& column = columns[x];
-        auto pixel = interpolate_pixel<N>(column.fraction, vertical.fraction, [&](std::size_t sx, std::size_t sy) {
+        auto pixel = interpolate_pixel<sample_count>(column.fraction, vertical.fraction, [&](std::size_t sx, std::size_t sy) {
           auto p = std::next(rows[sy].begin(), column.indices[sx]);
           return Vec4F(p[0], p[1], p[2], bpp == 4 ? p[3] : 255);
         });
@@ -243,10 +243,10 @@ static std::expected<Image, StarException> interpolated_window(Image const& src_
 
   // Float pixels deliberately retain the old clamp()/byte-setter semantics.
   for (unsigned y = 0; y < dest_size[1]; ++y) {
-    auto vertical = interpolation_axis<N>(coordinates[y][1], scale[1] == 0.0f || offset[1] + y == 0, src_size[1]);
+    auto vertical = interpolation_axis<sample_count>(coordinates[y][1], scale[1] == 0.0f || offset[1] + y == 0, src_size[1]);
     for (unsigned x = 0; x < dest_size[0]; ++x) {
       auto const& column = columns[x];
-      auto pixel = interpolate_pixel<N>(column.fraction, vertical.fraction, [&](std::size_t sx, std::size_t sy) {
+      auto pixel = interpolate_pixel<sample_count>(column.fraction, vertical.fraction, [&](std::size_t sx, std::size_t sy) {
         return Vec4F(src_image.clamp(
           static_cast<int>(std::min(column.indices[sx], static_cast<std::size_t>(std::numeric_limits<int>::max()))),
           static_cast<int>(std::min(vertical.indices[sy], static_cast<std::size_t>(std::numeric_limits<int>::max())))));

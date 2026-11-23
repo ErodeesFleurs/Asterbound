@@ -213,7 +213,7 @@ auto write_text(TextBuffer& output, OrderedMapWrapper<Map, Key, Value, Allocator
 template <typename Key, typename Value, typename Compare = std::less<Key>, typename Allocator = std::allocator<std::pair<Key const, Value>>>
 using OrderedMap = OrderedMapWrapper<std::map, Key, Value, Allocator, Compare>;
 
-template <typename Key, typename Value, typename Hash = Star::hash<Key>, typename Equals = std::equal_to<Key>, typename Allocator = std::allocator<std::pair<Key const, Value>>>
+template <typename Key, typename Value, typename Hash = Star::ValueHash<Key>, typename Equals = std::equal_to<Key>, typename Allocator = std::allocator<std::pair<Key const, Value>>>
 using OrderedHashMap = OrderedMapWrapper<FlatHashMap, Key, Value, Allocator, Hash, Equals>;
 
 template <template <typename...> class Map, typename Key, typename Value, typename Allocator, typename... MapArgs>
@@ -412,10 +412,10 @@ template <template <typename...> class Map, typename Key, typename Value, typena
 bool OrderedMapWrapper<Map, Key, Value, Allocator, MapArgs...>::remove(key_type const& k) {
   auto i = m_map.find(k);
   if (i != m_map.end()) {
-    auto orderIt = i->second;
+    auto node = i->second;
     m_map.erase(i);
 
-    m_order.erase(orderIt);
+    m_order.erase(node);
     return true;
   } else {
     return false;
@@ -427,10 +427,10 @@ auto OrderedMapWrapper<Map, Key, Value, Allocator, MapArgs...>::extract_value(ke
   -> std::expected<mapped_type, StarException> {
   auto i = m_map.find(k);
   if (i != m_map.end()) {
-    auto orderIt = i->second;
-    std::expected<mapped_type, StarException> result(std::in_place, std::move(orderIt->second));
+    auto node = i->second;
+    std::expected<mapped_type, StarException> result(std::in_place, std::move(node->second));
     m_map.erase(i);
-    m_order.erase(orderIt);
+    m_order.erase(node);
     return result;
   } else {
     return std::unexpected(

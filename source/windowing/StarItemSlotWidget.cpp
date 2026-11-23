@@ -200,14 +200,14 @@ std::expected<bool, StarException> ItemSlotWidget::sendEvent(InputEvent const& e
   if (m_visible) {
     if (std::holds_alternative<MouseButtonDownEvent>(event)) {
       auto const& mouseButton = std::get<MouseButtonDownEvent>(event);
-      if (mouseButton.mouseButton == MouseButton::Left
-        || (m_rightClickCallback && mouseButton.mouseButton == MouseButton::Right)
-        || (m_middleClickCallback && mouseButton.mouseButton == MouseButton::Middle)) {
+      if (mouseButton.mouse_button == MouseButton::Left
+        || (m_rightClickCallback && mouseButton.mouse_button == MouseButton::Right)
+        || (m_middleClickCallback && mouseButton.mouse_button == MouseButton::Middle)) {
         Vec2I mousePos = *context().mousePosition(event);
         RectI itemArea = m_itemDraggableArea.translated(screenPosition());
         if (itemArea.contains(mousePos)) {
-          auto const& callback = mouseButton.mouseButton == MouseButton::Right ? m_rightClickCallback
-            : mouseButton.mouseButton == MouseButton::Middle ? m_middleClickCallback : m_callback;
+          auto const& callback = mouseButton.mouse_button == MouseButton::Right ? m_rightClickCallback
+            : mouseButton.mouse_button == MouseButton::Middle ? m_middleClickCallback : m_callback;
           if (!callback) return std::unexpected(GuiException("Item slot has no click callback"));
           auto result = callback(*this);
           if (!result) return std::unexpected(std::move(result.error()));
@@ -323,7 +323,7 @@ std::expected<void, StarException> ItemSlotWidget::renderImpl() {
     if (!m_newItemIndicator.isComplete()) {
       auto drawable = m_newItemIndicator.drawable(1.0);
       if (!drawable) return std::unexpected(std::move(drawable.error()));
-      auto result = context().drawInterfaceDrawable(*drawable, Vec2F(screenPosition() + size() / 2), Color::White.to_rgba());
+      auto result = context().drawInterfaceDrawable(*drawable, Vec2F(screenPosition() + size() / 2), Color::palette_white.to_rgba());
       if (!result) return std::unexpected(std::move(result.error()));
     }
     if (m_showDurability) {
@@ -358,7 +358,7 @@ std::expected<void, StarException> ItemSlotWidget::renderImpl() {
   if (m_highlightEnabled) {
     auto drawable = m_highlightAnimation.drawable(1.0);
     if (!drawable) return std::unexpected(std::move(drawable.error()));
-    auto result = context().drawInterfaceDrawable(*drawable, Vec2F(screenPosition() + size() / 2), Color::White.to_rgba());
+    auto result = context().drawInterfaceDrawable(*drawable, Vec2F(screenPosition() + size() / 2), Color::palette_white.to_rgba());
     if (!result) return std::unexpected(std::move(result.error()));
   }
   if (!m_item) return m_durabilityBar->hide();

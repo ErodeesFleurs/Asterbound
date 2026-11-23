@@ -330,7 +330,7 @@ private:
   // given sector was fully generated, and the total number of generation
   // levels increased.  If any sector's generation level is brought up at all,
   // it will also reset the TTL for that sector.
-  [[nodiscard]] std::expected<std::pair<bool, std::size_t>, StarException> generateSectorToLevel(Sector const& sector, SectorGenerationLevel targetGenerationLevel, std::size_t sectorGenerationLevelLimit = NPos);
+  [[nodiscard]] std::expected<std::pair<bool, std::size_t>, StarException> generateSectorToLevel(Sector const& sector, SectorGenerationLevel targetGenerationLevel, std::size_t sectorGenerationLevelLimit = npos);
 
   // Bring the sector up to the given load level, and all surrounding sectors
   // as appropriate.  If the load level is brought up, also resets the TTL.

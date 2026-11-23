@@ -243,7 +243,7 @@ std::expected<std::size_t, StarException> ObjectConfig::findValidOrientation(Wor
     if (matches)
       return i;
   }
-  return NPos;
+  return npos;
 }
 
 std::expected<Json, StarException> ObjectDatabase::parseTouchDamage(Root& root, String const& path, Json const& config) {
@@ -912,7 +912,7 @@ std::expected<bool, StarException> ObjectDatabase::canPlaceObject(World const& w
   auto orientation = (*config)->findValidOrientation(world, position, {});
   if (!orientation)
     return std::unexpected(std::move(orientation.error()));
-  return *orientation != NPos;
+  return *orientation != npos;
 }
 
 std::expected<std::shared_ptr<Object>, StarException> ObjectDatabase::createForPlacement(World const& world, String const& objectName, Vec2I const& position,
@@ -1430,13 +1430,13 @@ std::expected<List<Drawable>, StarException> ObjectDatabase::cursorHintDrawables
     if (!orientationIndexResult)
       return std::unexpected(std::move(orientationIndexResult.error()));
     auto orientationIndex = std::move(*orientationIndexResult);
-    if (orientationIndex == NPos) {
+    if (orientationIndex == npos) {
       // Retain the existing affinity fallback order for invalid placements.
       for (std::size_t i = 0; i < config->orientations.size(); ++i) {
         if (config->orientations[i]->directionAffinity == direction)
           orientationIndex = i;
       }
-      if (orientationIndex == NPos)
+      if (orientationIndex == npos)
         orientationIndex = 0;
     }
     auto orientationEntryResult = config->orientations.at(orientationIndex);

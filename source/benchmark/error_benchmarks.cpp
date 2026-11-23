@@ -27,7 +27,7 @@ void append_field(std::string& output, std::string_view field) {
 std::string summary_bytes(Star::ExceptionSummary const& summary) {
   std::string output = std::format("{};", static_cast<int>(summary.kind));
   for (auto const* field : {&summary.category, &summary.reason, &summary.operation,
-           &summary.asset, &summary.assetProvider, &summary.patch, &summary.patchProvider})
+           &summary.asset, &summary.asset_provider, &summary.patch, &summary.patch_provider})
     append_field(output, *field);
   output += std::format("{};", summary.locations.size());
   for (auto const& location : summary.locations) {
@@ -50,9 +50,9 @@ Star::ExceptionSummary replacement_summary() {
   summary.kind = Star::ExceptionSummaryKind::Resource;
   summary.operation = "load";
   summary.asset = "/fixture.asset";
-  summary.assetProvider = "base";
+  summary.asset_provider = "base";
   summary.patch = "/fixture.patch";
-  summary.patchProvider = "mod";
+  summary.patch_provider = "mod";
   summary.locations.push_back({"/fixture.lua", 17, "scripts"});
   summary.locations.push_back({"/caller.lua", 29, "scripts"});
   return summary;

@@ -14,8 +14,8 @@ class Root;
 
 class LuaExecutionScope final : public LuaExecutionHost {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<LuaExecutionScope, LuaExecutionHost>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<LuaExecutionScope, LuaExecutionHost>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return type_name<LuaExecutionScope>(); }
   explicit LuaExecutionScope(Root& root) : m_root(root) {}

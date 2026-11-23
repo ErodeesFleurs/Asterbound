@@ -30,7 +30,7 @@ template <dynamic_net_element Element>
 class NetElementDynamicGroup : public NetElement {
 public:
   using ElementId = std::uint32_t;
-  static ElementId const NullElementId = 0;
+  static ElementId const null_element_id = 0;
 
   NetElementDynamicGroup() requires std::default_initializable<Element>
     : m_create_element([]() -> std::expected<std::shared_ptr<Element>, StarException> { return std::make_shared<Element>(); }) {}
@@ -72,7 +72,7 @@ public:
 private:
   // If a delta is written from further back than this many versions, the delta
   // will fall back to a full serialization of the entire state.
-  static std::int64_t const MaxChangeDataVersions = 100;
+  static std::int64_t const max_change_data_versions = 100;
 
   using Reset = std::monostate;
   struct Remove {
@@ -223,7 +223,7 @@ template <dynamic_net_element Element>
   for (std::uint64_t i = 0; i < *count; ++i) {
     auto id = ds.read_vlq_u();
     if (!id) return std::unexpected(std::move(id.error()));
-    if (*id == NullElementId || *id > std::numeric_limits<ElementId>::max())
+    if (*id == null_element_id || *id > std::numeric_limits<ElementId>::max())
       return std::unexpected(IOException("Invalid dynamic net element id"));
     auto bytes = ds.read<ByteArray>();
     if (!bytes) return std::unexpected(std::move(bytes.error()));
@@ -321,7 +321,7 @@ template <dynamic_net_element Element>
         auto bytes = ds.read<ByteArray>();
         if (!bytes) return std::unexpected(std::move(bytes.error()));
         auto id = std::get<Add>(*change).id;
-        if (id == NullElementId)
+        if (id == null_element_id)
           return std::unexpected(IOException("Invalid dynamic net element id"));
         if (auto result = load_element(id, std::move(*bytes), rules); !result)
           return std::unexpected(std::move(result.error()));
@@ -362,14 +362,14 @@ template <dynamic_net_element Element>
 template <dynamic_net_element Element>
 void NetElementDynamicGroup<Element>::add_change_data(ElementChange change) {
   std::uint64_t current_version = m_net_version ? m_net_version->get().current() : 0;
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((m_change_data.empty() || m_change_data.back().first <= current_version));
   }
 
   m_change_data.push_back({current_version, std::move(change)});
 
   m_change_data_last_version =
-    std::max<std::int64_t>(static_cast<std::int64_t>(current_version) - MaxChangeDataVersions, 0);
+    std::max<std::int64_t>(static_cast<std::int64_t>(current_version) - max_change_data_versions, 0);
   while (!m_change_data.empty() && m_change_data.front().first < m_change_data_last_version)
     m_change_data.pop_front();
 }

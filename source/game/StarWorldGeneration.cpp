@@ -971,7 +971,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::setLiquid(Vec2I const&
   auto ServerTiletileResult1 = m_worldServer.modifyServerTile(pos);
   if (!ServerTiletileResult1) return std::unexpected(std::move(ServerTiletileResult1.error()));
   auto tile = std::move((*ServerTiletileResult1));
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((tile));
   }
   if (tile)
@@ -1501,7 +1501,7 @@ std::expected<void, StarException> WorldGenerator::prepareTiles(WorldStorage& wo
     for (int y = sectorRegion.y_min(); y < sectorRegion.y_max(); ++y) {
       Vec2I pos(x, y);
       auto tile = tileArray->modify_tile(pos);
-      if constexpr (Star::DebugEnabled) {
+      if constexpr (Star::debug_enabled) {
         Star::star_assert_failed((tile));
       }
       if (!tile)
@@ -1637,7 +1637,7 @@ std::expected<void, StarException> WorldGenerator::generateMicroDungeons(WorldSt
         return std::unexpected(std::move(selected_dungeon.error()));
       auto const& dungeonName = std::move(selected_dungeon->get());
       std::optional<DungeonId> dungeonId;
-      if constexpr (Star::DebugEnabled) {
+      if constexpr (Star::debug_enabled) {
         Star::star_assert_failed((!dungeonName.empty()));
       }
       auto generateResultCheckedResult1 = m_worldServer.threatLevel();
@@ -1731,7 +1731,7 @@ std::expected<void, StarException> WorldGenerator::generateCaveLiquid(WorldStora
     if (badNodes.contains(position))
       return {};
     auto tile = tileArray->tile(wrapCoords(position));
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((tile.foreground != NullMaterialId));
     }
     if (tile.foreground != EmptyMaterialId) {
@@ -1784,7 +1784,7 @@ std::expected<void, StarException> WorldGenerator::generateCaveLiquid(WorldStora
       return;
     visitedNodes.add(position);
     auto tile = tileArray->tile(wrapCoords(position));
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((tile.foreground != NullMaterialId));
     }
     if (tile.foreground != EmptyMaterialId)
@@ -1805,7 +1805,7 @@ std::expected<void, StarException> WorldGenerator::generateCaveLiquid(WorldStora
 
   auto solids = [&](Vec2I position) {
     auto tile = tileArray->tile(wrapCoords(position));
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((tile.foreground != NullMaterialId));
     }
     if (tile.foreground != EmptyMaterialId)
@@ -1824,7 +1824,7 @@ std::expected<void, StarException> WorldGenerator::generateCaveLiquid(WorldStora
   Map<Vec2I, float> drops = determineLiquidLevel(candidateNodes, solidSurroundings);
   for (auto iter = drops.begin(); iter != drops.end(); ++iter) {
     auto tile = tileArray->modify_tile(wrapCoords(iter->first));
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((tile));
     }
     if (!tile)
@@ -1852,12 +1852,12 @@ std::expected<void, StarException> WorldGenerator::prepareSector(WorldStorage& w
     for (int y = sectorTiles.y_min(); y < sectorTiles.y_max(); ++y) {
       Vec2I position(x, y);
       auto tile = tileArray->modify_tile(position);
-      if constexpr (Star::DebugEnabled) {
+      if constexpr (Star::debug_enabled) {
         Star::star_assert_failed((tile));
       }
       if (!tile)
         continue;
-      if constexpr (Star::DebugEnabled) {
+      if constexpr (Star::debug_enabled) {
         Star::star_assert_failed((tile->get().foreground != NullMaterialId));
       }
 
@@ -2112,7 +2112,7 @@ std::expected<void, StarException> WorldGenerator::reapplyBiome(WorldStorage& wo
       auto ServerTiletileResult1 = m_worldServer.modifyServerTile(position);
       if (!ServerTiletileResult1) return std::unexpected(std::move(ServerTiletileResult1.error()));
       auto tile = std::move((*ServerTiletileResult1));
-      if constexpr (Star::DebugEnabled) {
+      if constexpr (Star::debug_enabled) {
         Star::star_assert_failed((tile));
       }
       if (!tile)

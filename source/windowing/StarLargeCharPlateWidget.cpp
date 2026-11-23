@@ -199,7 +199,7 @@ std::expected<std::shared_ptr<LargeCharPlateWidget>, StarException> LargeCharPla
     if (!vName) return std::unexpected(std::move(vName.error()));
     auto v = VerticalAnchorNames->get_left(*vName);
     if (!v) return std::unexpected(std::move(v.error()));
-    auto label = LabelWidget::create(context, std::move(text), Color::White, h->get(), v->get());
+    auto label = LabelWidget::create(context, std::move(text), Color::palette_white, h->get(), v->get());
     if (!label) return std::unexpected(std::move(label.error()));
     (*label)->setPosition(offset);
     auto child = widget->addChild(childName, *label);

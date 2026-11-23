@@ -19,7 +19,7 @@ struct CloseModule {
   void operator()(HMODULE handle) const noexcept {
     if (!FreeLibrary(handle)) {
       auto status = GetLastError();
-      if (!Star::print(stderr, "Failed to unload dynamic library (Windows error {})\n", status))
+      if (!Star::print(*stderr, "Failed to unload dynamic library (Windows error {})\n", status))
         std::_Exit(1);
     }
   }
@@ -29,7 +29,7 @@ struct CloseModule {
   void operator()(void* handle) const noexcept {
     if (dlclose(handle)) {
       auto detail = dlerror();
-      if (!Star::print(stderr, "Failed to unload dynamic library: {}\n", detail ? detail : "no loader diagnostic"))
+      if (!Star::print(*stderr, "Failed to unload dynamic library: {}\n", detail ? detail : "no loader diagnostic"))
         std::_Exit(1);
     }
   }
@@ -51,7 +51,7 @@ std::expected<DynamicLib, StarException> DynamicLib::open(String const& path) {
     return std::unexpected(DynamicLibException::format("Cannot load dynamic library '{}' (Windows error {})", path, status));
   }
 #else
-  auto handle = dlopen(path.utf8_data(), RTLD_NOW);
+  auto handle = dlopen(path.utf8().c_str(), RTLD_NOW);
   if (!handle) {
     auto detail = dlerror();
     return std::unexpected(DynamicLibException::format("Cannot load dynamic library '{}': {}", path, detail ? detail : "no loader diagnostic"));
@@ -94,7 +94,7 @@ std::expected<std::shared_ptr<DynamicLib::ErasedFunction>, StarException> Dynami
   if (name.utf8().contains('\0'))
     return std::unexpected(DynamicLibException("Cannot find dynamic library symbol: name contains an embedded NUL"));
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
-  auto symbol = GetProcAddress(static_cast<HMODULE>(m_handle.get()), name.utf8_data());
+  auto symbol = GetProcAddress(static_cast<HMODULE>(m_handle.get()), name.utf8().c_str());
   if (!symbol) {
     auto status = GetLastError();
     return std::unexpected(DynamicLibException::format("Cannot find dynamic library symbol '{}' (Windows error {})", name, status));
@@ -103,7 +103,7 @@ std::expected<std::shared_ptr<DynamicLib::ErasedFunction>, StarException> Dynami
   // A null address is legal for dlsym. Distinguish a loader failure from a
   // successful resolution which cannot yield a callable function.
   dlerror();
-  auto symbol = dlsym(m_handle.get(), name.utf8_data());
+  auto symbol = dlsym(m_handle.get(), name.utf8().c_str());
   if (auto detail = dlerror())
     return std::unexpected(DynamicLibException::format("Cannot find dynamic library symbol '{}': {}", name, detail));
   if (!symbol)

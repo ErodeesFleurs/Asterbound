@@ -130,7 +130,7 @@ private:
   static std::uint64_t stackTransfer(std::optional<std::reference_wrapper<Item const>> to, std::optional<std::reference_wrapper<Item const>> from);
 
   // Returns the slot that contains the item already and has the *highest*
-  // stack count but not full, or an empty slot, or NPos for no room.
+  // stack count but not full, or an empty slot, or npos for no room.
   std::size_t bestSlotAvailable(Item const& item, bool stacksOnly, std::function<bool(std::size_t)> test) const;
   std::size_t bestSlotAvailable(Item const& item, bool stacksOnly) const;
 

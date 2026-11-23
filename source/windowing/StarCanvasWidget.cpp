@@ -204,7 +204,7 @@ std::expected<bool, StarException> CanvasWidget::sendEvent(InputEvent const& eve
     auto const& mouseButtonDown = std::get<MouseButtonDownEvent>(event);
     if (inMember(*context.mousePosition(event, interfaceScale)) && m_captureMouse) {
       m_clickEvents.push_back({.position = *context.mousePosition(event, interfaceScale) - screenPosition(),
-                               .button = mouseButtonDown.mouseButton,
+                               .button = mouseButtonDown.mouse_button,
                                .buttonDown = true});
       m_clickEvents.truncate_back(MaximumEventBuffer);
       return true;
@@ -213,7 +213,7 @@ std::expected<bool, StarException> CanvasWidget::sendEvent(InputEvent const& eve
     auto const& mouseButtonUp = std::get<MouseButtonUpEvent>(event);
     if (m_captureMouse) {
       m_clickEvents.push_back({.position = *context.mousePosition(event, interfaceScale) - screenPosition(),
-                               .button = mouseButtonUp.mouseButton,
+                               .button = mouseButtonUp.mouse_button,
                                .buttonDown = false});
       m_clickEvents.truncate_back(MaximumEventBuffer);
       return true;

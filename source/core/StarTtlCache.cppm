@@ -72,7 +72,7 @@ public:
 
   explicit TtlCacheBase(RandomService& random);
   TtlCacheBase(RandomService& random, std::chrono::milliseconds time_to_live,
-               std::chrono::milliseconds time_smear = std::chrono::milliseconds(1000), std::size_t capacity = NPos,
+               std::chrono::milliseconds time_smear = std::chrono::milliseconds(1000), std::size_t capacity = npos,
                bool ttl_update_enabled = true);
 
   std::chrono::milliseconds time_to_live() const;
@@ -83,7 +83,7 @@ public:
 
   // A finite capacity also enables least-recently-used eviction on get misses.
   std::size_t capacity() const;
-  void set_capacity(std::size_t capacity = NPos);
+  void set_capacity(std::size_t capacity = npos);
 
   std::size_t size() const;
 
@@ -151,13 +151,13 @@ private:
   // The owning service must outlive this cache.
   std::reference_wrapper<RandomService> m_random;
   LruCacheType m_cache;
-  std::chrono::milliseconds m_timeToLive;
+  std::chrono::milliseconds m_time_to_live;
   // Sampling retains the historical int endpoint conversion for random smear.
-  std::chrono::milliseconds m_timeSmear;
-  bool m_ttlUpdateEnabled;
+  std::chrono::milliseconds m_time_smear;
+  bool m_ttl_update_enabled;
   // A known bound never exceeds any retained timestamp; stale earlier bounds
   // are harmless. Absence is unknown (or empty), so cleanup must scan.
-  std::optional<ttl_timestamp> m_earliestTimestamp;
+  std::optional<ttl_timestamp> m_earliest_timestamp;
 };
 
 template <typename Key, ttl_cache_value Value, typename Compare = std::less<Key>,
@@ -165,14 +165,14 @@ template <typename Key, ttl_cache_value Value, typename Compare = std::less<Key>
   requires requires { typename LruCache<Key, ttl_entry<Value>, Compare, Allocator>; }
 using TtlCache = TtlCacheBase<LruCache<Key, ttl_entry<Value>, Compare, Allocator>>;
 
-template <typename Key, ttl_cache_value Value, typename Hash = Star::hash<Key>, typename Equals = std::equal_to<Key>,
+template <typename Key, ttl_cache_value Value, typename Hash = Star::ValueHash<Key>, typename Equals = std::equal_to<Key>,
           typename Allocator = BlockAllocator<std::pair<Key const, ttl_entry<Value>>, 1024>>
   requires requires { typename HashLruCache<Key, ttl_entry<Value>, Hash, Equals, Allocator>; }
 using HashTtlCache = TtlCacheBase<HashLruCache<Key, ttl_entry<Value>, Hash, Equals, Allocator>>;
 
 template <ttl_storage LruCacheType>
 TtlCacheBase<LruCacheType>::TtlCacheBase(RandomService& random)
-    : TtlCacheBase(random, std::chrono::milliseconds(10000), std::chrono::milliseconds(1000), NPos, true) {}
+    : TtlCacheBase(random, std::chrono::milliseconds(10000), std::chrono::milliseconds(1000), npos, true) {}
 
 template <ttl_storage LruCacheType>
 TtlCacheBase<LruCacheType>::TtlCacheBase(RandomService& random, std::chrono::milliseconds time_to_live,
@@ -180,31 +180,31 @@ TtlCacheBase<LruCacheType>::TtlCacheBase(RandomService& random, std::chrono::mil
                                          bool ttl_update_enabled)
     : m_random(random) {
   m_cache.set_capacity(capacity);
-  m_timeToLive = time_to_live;
-  m_timeSmear = time_smear;
-  m_ttlUpdateEnabled = ttl_update_enabled;
+  m_time_to_live = time_to_live;
+  m_time_smear = time_smear;
+  m_ttl_update_enabled = ttl_update_enabled;
 }
 
 template <ttl_storage LruCacheType> std::chrono::milliseconds TtlCacheBase<LruCacheType>::time_to_live() const {
-  return m_timeToLive;
+  return m_time_to_live;
 }
 
 template <ttl_storage LruCacheType>
 void TtlCacheBase<LruCacheType>::set_time_to_live(std::chrono::milliseconds time_to_live) {
-  m_timeToLive = time_to_live;
+  m_time_to_live = time_to_live;
 }
 
 template <ttl_storage LruCacheType> std::chrono::milliseconds TtlCacheBase<LruCacheType>::time_smear() const {
-  return m_timeSmear;
+  return m_time_smear;
 }
 
 template <ttl_storage LruCacheType>
 void TtlCacheBase<LruCacheType>::set_time_smear(std::chrono::milliseconds time_smear) {
-  m_timeSmear = time_smear;
+  m_time_smear = time_smear;
 }
 
 template <ttl_storage LruCacheType> bool TtlCacheBase<LruCacheType>::ttl_update_enabled() const {
-  return m_ttlUpdateEnabled;
+  return m_ttl_update_enabled;
 }
 
 template <ttl_storage LruCacheType> std::size_t TtlCacheBase<LruCacheType>::capacity() const {
@@ -235,15 +235,15 @@ auto TtlCacheBase<LruCacheType>::values() const -> List<mapped_type>
 }
 
 template <ttl_storage LruCacheType> void TtlCacheBase<LruCacheType>::set_ttl_update_enabled(bool enabled) {
-  m_ttlUpdateEnabled = enabled;
+  m_ttl_update_enabled = enabled;
 }
 
 template <ttl_storage LruCacheType>
 [[nodiscard]] auto TtlCacheBase<LruCacheType>::find_ref(key_type const& key)
   -> std::expected<std::optional<std::reference_wrapper<mapped_type>>, StarException> {
   if (auto entry = m_cache.find_ref(key)) {
-    if (m_ttlUpdateEnabled) {
-      auto smear = m_random.get().uniform_int(-static_cast<int>(m_timeSmear.count()), static_cast<int>(m_timeSmear.count()));
+    if (m_ttl_update_enabled) {
+      auto smear = m_random.get().uniform_int(-static_cast<int>(m_time_smear.count()), static_cast<int>(m_time_smear.count()));
       if (!smear)
         return std::unexpected(std::move(smear.error()));
       entry->get().first = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()
@@ -269,7 +269,7 @@ template <ttl_storage LruCacheType>
                                                                                               mapped_type value)
   requires ttl_assignable_storage<LruCacheType>
 {
-  auto smear = m_random.get().uniform_int(-static_cast<int>(m_timeSmear.count()), static_cast<int>(m_timeSmear.count()));
+  auto smear = m_random.get().uniform_int(-static_cast<int>(m_time_smear.count()), static_cast<int>(m_time_smear.count()));
   if (!smear)
     return std::unexpected(std::move(smear.error()));
   auto timestamp = std::chrono::time_point_cast<std::chrono::milliseconds>(
@@ -315,8 +315,8 @@ template <typename Producer>
   if (!result)
     return std::unexpected(std::move(result.error()));
   auto& entry = result->get();
-  if (entry.first == ttl_timestamp{} || m_ttlUpdateEnabled) {
-    auto smear = m_random.get().uniform_int(-static_cast<int>(m_timeSmear.count()), static_cast<int>(m_timeSmear.count()));
+  if (entry.first == ttl_timestamp{} || m_ttl_update_enabled) {
+    auto smear = m_random.get().uniform_int(-static_cast<int>(m_time_smear.count()), static_cast<int>(m_time_smear.count()));
     if (!smear) {
       // A miss has already inserted the zero timestamp, even on this error.
       track_timestamp(entry.first);
@@ -332,25 +332,25 @@ template <typename Producer>
 
 template <ttl_storage LruCacheType> void TtlCacheBase<LruCacheType>::clear() {
   m_cache.clear();
-  m_earliestTimestamp.reset();
+  m_earliest_timestamp.reset();
 }
 
 template <ttl_storage LruCacheType>
 void TtlCacheBase<LruCacheType>::track_timestamp(ttl_timestamp timestamp) {
-  if (m_earliestTimestamp) {
-    if (timestamp < *m_earliestTimestamp)
-      m_earliestTimestamp = timestamp;
+  if (m_earliest_timestamp) {
+    if (timestamp < *m_earliest_timestamp)
+      m_earliest_timestamp = timestamp;
   } else if (m_cache.size() == 1) {
     // An unknown nonempty store cannot be made known by observing just one
     // of several entries.
-    m_earliestTimestamp = timestamp;
+    m_earliest_timestamp = timestamp;
   }
 }
 
 template <ttl_storage LruCacheType> void TtlCacheBase<LruCacheType>::cleanup() {
   auto current_time = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()
                                                                               + std::chrono::microseconds(500));
-  if (m_earliestTimestamp && current_time - *m_earliestTimestamp <= m_timeToLive)
+  if (m_earliest_timestamp && current_time - *m_earliest_timestamp <= m_time_to_live)
     return;
   cleanup_at(current_time, [](key_type const&, mapped_type const&) { return false; });
 }
@@ -373,14 +373,14 @@ void TtlCacheBase<LruCacheType>::cleanup_at(ttl_timestamp current_time, Filter&&
     if (callback_present(refresh_filter) && std::invoke(refresh_filter, key, std::as_const(entry.second))) {
       entry.first = current_time;
     } else {
-      if (current_time - entry.first > m_timeToLive)
+      if (current_time - entry.first > m_time_to_live)
         return true;
     }
     if (!earliest_timestamp || entry.first < *earliest_timestamp)
       earliest_timestamp = entry.first;
     return false;
   });
-  m_earliestTimestamp = earliest_timestamp;
+  m_earliest_timestamp = earliest_timestamp;
 }
 }
 

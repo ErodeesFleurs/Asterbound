@@ -72,16 +72,16 @@ public:
   Image& operator=(Image const& image);
   Image& operator=(Image&& image) noexcept;
 
-  std::uint8_t bits_per_pixel() const noexcept { return Star::bits_per_pixel(m_pixelFormat); }
-  std::uint8_t bytes_per_pixel() const noexcept { return Star::bytes_per_pixel(m_pixelFormat); }
+  std::uint8_t bits_per_pixel() const noexcept { return Star::bits_per_pixel(m_pixel_format); }
+  std::uint8_t bytes_per_pixel() const noexcept { return Star::bytes_per_pixel(m_pixel_format); }
   unsigned width() const noexcept { return m_width; }
   unsigned height() const noexcept { return m_height; }
   Vec2U size() const noexcept { return {m_width, m_height}; }
   bool empty() const noexcept { return m_width == 0 || m_height == 0; }
-  PixelFormat pixel_format() const noexcept { return m_pixelFormat; }
+  PixelFormat pixel_format() const noexcept { return m_pixel_format; }
   std::size_t size_bytes() const noexcept { return std::size_t(m_width) * m_height * bytes_per_pixel(); }
-  std::span<std::uint8_t const> data() const noexcept { return {m_data.get(), size_bytes()}; }
-  std::span<std::uint8_t> data() noexcept { return {m_data.get(), size_bytes()}; }
+  std::span<std::uint8_t const> span() const noexcept { return {m_data.get(), size_bytes()}; }
+  std::span<std::uint8_t> span() noexcept { return {m_data.get(), size_bytes()}; }
 
   // Changed layouts are zeroed. An unchanged extent/format preserves pixels.
   void reset(Vec2U size, std::optional<PixelFormat> format = {});
@@ -145,58 +145,58 @@ public:
 private:
   void reallocate(Vec2U size, PixelFormat format, bool initialize);
 
-  template <bool Writable, typename Callback>
-    requires(Writable ? pixel_writer<Callback> : pixel_reader<Callback>)
-  static auto for_each_pixel_impl(std::conditional_t<Writable, Image, Image const>& image, Callback& callback);
+  template <bool writable, typename Callback>
+    requires(writable ? pixel_writer<Callback> : pixel_reader<Callback>)
+  static auto for_each_pixel_impl(std::conditional_t<writable, Image, Image const>& image, Callback& callback);
 
   std::unique_ptr<std::uint8_t[]> m_data;
   unsigned m_width;
   unsigned m_height;
-  PixelFormat m_pixelFormat;
+  PixelFormat m_pixel_format;
 };
 
 inline void Image::set32(unsigned x, unsigned y, Vec4B const& color) noexcept {
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed(m_data && x < m_width && y < m_height);
     Star::star_assert_failed(bytes_per_pixel() == 4);
   }
-  auto pixel = std::next(data().begin(), (std::size_t(y) * m_width + x) * 4);
+  auto pixel = std::next(span().begin(), (std::size_t(y) * m_width + x) * 4);
   for (unsigned channel = 0; channel != 4; ++channel)
     pixel[channel] = color[channel];
 }
 
 inline Vec4B Image::get32(unsigned x, unsigned y) const noexcept {
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed(m_data && x < m_width && y < m_height);
     Star::star_assert_failed(bytes_per_pixel() == 4);
   }
-  auto pixel = std::next(data().begin(), (std::size_t(y) * m_width + x) * 4);
+  auto pixel = std::next(span().begin(), (std::size_t(y) * m_width + x) * 4);
   return {pixel[0], pixel[1], pixel[2], pixel[3]};
 }
 
 inline void Image::set24(unsigned x, unsigned y, Vec3B const& color) noexcept {
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed(m_data && x < m_width && y < m_height);
     Star::star_assert_failed(bytes_per_pixel() == 3);
   }
-  auto pixel = std::next(data().begin(), (std::size_t(y) * m_width + x) * 3);
+  auto pixel = std::next(span().begin(), (std::size_t(y) * m_width + x) * 3);
   for (unsigned channel = 0; channel != 3; ++channel)
     pixel[channel] = color[channel];
 }
 
 inline Vec3B Image::get24(unsigned x, unsigned y) const noexcept {
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed(m_data && x < m_width && y < m_height);
     Star::star_assert_failed(bytes_per_pixel() == 3);
   }
-  auto pixel = std::next(data().begin(), (std::size_t(y) * m_width + x) * 3);
+  auto pixel = std::next(span().begin(), (std::size_t(y) * m_width + x) * 3);
   return {pixel[0], pixel[1], pixel[2]};
 }
 
-template <bool Writable, typename Callback>
-  requires(Writable ? pixel_writer<Callback> : pixel_reader<Callback>)
-auto Image::for_each_pixel_impl(std::conditional_t<Writable, Image, Image const>& image, Callback& callback) {
-  using Pixel = std::conditional_t<Writable, Vec4B&, Vec4B const&>;
+template <bool writable, typename Callback>
+  requires(writable ? pixel_writer<Callback> : pixel_reader<Callback>)
+auto Image::for_each_pixel_impl(std::conditional_t<writable, Image, Image const>& image, Callback& callback) {
+  using Pixel = std::conditional_t<writable, Vec4B&, Vec4B const&>;
   using Result = std::invoke_result_t<Callback&, unsigned, unsigned, Pixel>;
   for (unsigned y = 0; y < image.m_height; ++y) {
     for (unsigned x = 0; x < image.m_width; ++x) {
@@ -209,7 +209,7 @@ auto Image::for_each_pixel_impl(std::conditional_t<Writable, Image, Image const>
         if (!result)
           return Result(std::unexpected(std::move(result.error())));
       }
-      if constexpr (Writable) {
+      if constexpr (writable) {
         // Re-read storage after invoking user code, as the old traversal did.
         if (image.bytes_per_pixel() == 4)
           image.set32(x, y, pixel);

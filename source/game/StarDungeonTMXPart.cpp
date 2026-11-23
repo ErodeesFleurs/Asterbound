@@ -119,7 +119,7 @@ std::expected<bool, StarException> TMXObject::forEachTile(TMXMap const& map, Til
     }
     return false;
   }
-  if constexpr (Star::DebugEnabled)
+  if constexpr (Star::debug_enabled)
     Star::star_assert_failed((m_kind == ObjectKind::Polyline));
   for (Vec2I point : m_polyline) {
     Vec2I position(m_rect.min().x() + point.x(), map.height() - 1 - m_rect.min().y() - point.y());
@@ -182,7 +182,7 @@ std::expected<bool, StarException> TMXObject::forEachTileAt(Vec2I pos, TMXMap co
     if (!callback) return std::unexpected(DungeonException("Empty dungeon tile callback"));
     return callback(pos, tile());
   }
-  if constexpr (Star::DebugEnabled)
+  if constexpr (Star::debug_enabled)
     Star::star_assert_failed((m_kind == ObjectKind::Polyline));
   for (Vec2I point : m_polyline) {
     Vec2I pointPos(m_rect.min().x() + point.x(), map.height() - 1 - m_rect.min().y() - point.y());
@@ -306,9 +306,9 @@ std::expected<std::reference_wrapper<Tiled::Tile const>, StarException> TMXTileL
 [[nodiscard]] std::expected<String, StarException> tilesetAssetPath(String const& relativePath) {
   // Tiled can reference another package via parent paths; retain the suffix
   // beginning at the last known /tilesets/ segment.
-  auto i = relativePath.find_last("/tilesets/", String::CaseInsensitive);
+  auto i = relativePath.rfind("/tilesets/", String::CaseInsensitive);
   if (!i) return std::unexpected(std::move(i.error()));
-  if (*i == NPos) return relativePath;
+  if (*i == npos) return relativePath;
   return relativePath.slice(*i);
 }
 

@@ -13,8 +13,8 @@ struct MultiArrayExceptionTag {
 };
 using MultiArrayException = StarError<MultiArrayExceptionTag, StarException>;
 
-template <std::size_t Rank, typename... Dimensions>
-concept multi_array_dimensions = sizeof...(Dimensions) == Rank
+template <std::size_t rank, typename... Dimensions>
+concept multi_array_dimensions = sizeof...(Dimensions) == rank
     && ((std::integral<Dimensions> && !std::same_as<std::remove_cv_t<Dimensions>, bool>
          && std::convertible_to<Dimensions, std::size_t>) && ...);
 
@@ -30,16 +30,16 @@ concept multi_array_callback = requires(Op& op, Index& index, Reference&& elemen
 
 // Owning, last-axis-contiguous storage, matching std::layout_right. Element
 // references follow the storage's reference type, including vector<bool> proxies.
-template <typename ElementT, std::size_t RankN>
-  requires (RankN > 0)
+template <typename ElementT, std::size_t array_rank>
+  requires (array_rank > 0)
 class MultiArray {
 public:
   using Storage = List<ElementT>;
   using Element = ElementT;
-  static constexpr std::size_t Rank = RankN;
-  using IndexArray = Array<std::size_t, Rank>;
-  using SizeArray = Array<std::size_t, Rank>;
-  using Extents = std::dextents<std::size_t, Rank>;
+  static constexpr std::size_t rank = array_rank;
+  using IndexArray = Array<std::size_t, rank>;
+  using SizeArray = Array<std::size_t, rank>;
+  using Extents = std::dextents<std::size_t, rank>;
   using View = std::mdspan<Element, Extents, std::layout_right>;
   using ConstView = std::mdspan<Element const, Extents, std::layout_right>;
   using iterator = typename Storage::iterator;
@@ -78,7 +78,7 @@ public:
   }
 
   template <typename... Dimensions>
-    requires (multi_array_dimensions<Rank, Dimensions...>
+    requires (multi_array_dimensions<rank, Dimensions...>
         && std::is_default_constructible_v<Element>
         && std::is_move_constructible_v<Element>)
   explicit MultiArray(Dimensions... dimensions) {
@@ -127,7 +127,7 @@ public:
   }
 
   template <typename... Dimensions>
-    requires (multi_array_dimensions<Rank, Dimensions...>
+    requires (multi_array_dimensions<rank, Dimensions...>
         && std::is_default_constructible_v<Element>
         && std::is_move_constructible_v<Element>
         && (std::is_constructible_v<Element, const_reference>
@@ -167,7 +167,7 @@ public:
   }
 
   template <typename... Dimensions>
-    requires (multi_array_dimensions<Rank, Dimensions...>
+    requires (multi_array_dimensions<rank, Dimensions...>
         && std::is_default_constructible_v<Element>
         && std::is_move_constructible_v<Element>)
   [[nodiscard]] std::expected<void, StarException> set_size(Dimensions... dimensions) {
@@ -182,12 +182,12 @@ public:
   reference operator()(IndexArray const& index) { return m_data[linear_index(index)]; }
   const_reference operator()(IndexArray const& index) const { return m_data[linear_index(index)]; }
 
-  template <typename... Dimensions> requires multi_array_dimensions<Rank, Dimensions...>
+  template <typename... Dimensions> requires multi_array_dimensions<rank, Dimensions...>
   reference operator()(Dimensions... dimensions) {
     return (*this)(unchecked_dimensions(dimensions...));
   }
 
-  template <typename... Dimensions> requires multi_array_dimensions<Rank, Dimensions...>
+  template <typename... Dimensions> requires multi_array_dimensions<rank, Dimensions...>
   const_reference operator()(Dimensions... dimensions) const {
     return (*this)(unchecked_dimensions(dimensions...));
   }
@@ -210,7 +210,7 @@ public:
   void at(IndexArray const&) const && = delete;
 
   template <typename... Dimensions>
-    requires (multi_array_dimensions<Rank, Dimensions...> && std::same_as<reference, Element&>)
+    requires (multi_array_dimensions<rank, Dimensions...> && std::same_as<reference, Element&>)
   [[nodiscard]] std::expected<std::reference_wrapper<Element>, StarException> at(Dimensions... dimensions) & {
     auto index = checked_dimensions(dimensions...);
     if (!index)
@@ -219,7 +219,7 @@ public:
   }
 
   template <typename... Dimensions>
-    requires (multi_array_dimensions<Rank, Dimensions...> && std::same_as<const_reference, Element const&>)
+    requires (multi_array_dimensions<rank, Dimensions...> && std::same_as<const_reference, Element const&>)
   [[nodiscard]] std::expected<std::reference_wrapper<Element const>, StarException> at(Dimensions... dimensions) const & {
     auto index = checked_dimensions(dimensions...);
     if (!index)
@@ -227,9 +227,9 @@ public:
     return at(*index);
   }
 
-  template <typename... Dimensions> requires multi_array_dimensions<Rank, Dimensions...>
+  template <typename... Dimensions> requires multi_array_dimensions<rank, Dimensions...>
   void at(Dimensions...) && = delete;
-  template <typename... Dimensions> requires multi_array_dimensions<Rank, Dimensions...>
+  template <typename... Dimensions> requires multi_array_dimensions<rank, Dimensions...>
   void at(Dimensions...) const && = delete;
 
   [[nodiscard]] std::expected<void, StarException> set(IndexArray const& index, Element element)
@@ -258,7 +258,7 @@ public:
               || multi_array_assignable<reference, const_reference>)
           && multi_array_assignable<reference, Element&&>) {
     SizeArray shape;
-    for (std::size_t dim = 0; dim < Rank; ++dim) {
+    for (std::size_t dim = 0; dim < rank; ++dim) {
       if (index[dim] >= max_size())
         return std::unexpected(MultiArrayException("MultiArray::set_resize index exceeds max_size"));
       shape[dim] = std::max(m_shape[dim], index[dim] + 1);
@@ -274,7 +274,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> copy_from(MultiArray const& source)
       requires multi_array_assignable<reference, const_reference> {
     SizeArray widths;
-    for (std::size_t dim = 0; dim < Rank; ++dim)
+    for (std::size_t dim = 0; dim < rank; ++dim)
       widths[dim] = std::min(m_shape[dim], source.m_shape[dim]);
     return copy_region(source, IndexArray::filled(0), widths, IndexArray::filled(0));
   }
@@ -288,7 +288,7 @@ public:
     bool is_empty = false;
     bool identical = true;
     bool overlaps = true;
-    for (std::size_t dim = 0; dim < Rank; ++dim) {
+    for (std::size_t dim = 0; dim < rank; ++dim) {
       if (source_min[dim] > source_max[dim] || source_max[dim] > source.m_shape[dim]
           || target_min[dim] > m_shape[dim])
         return std::unexpected(MultiArrayException("MultiArray::copy_region bounds are invalid"));
@@ -321,8 +321,8 @@ public:
     requires (std::same_as<std::remove_cvref_t<Self>, MultiArray>
         && multi_array_callback<Op, IndexArray, decltype(std::declval<Self&>().m_data[std::size_t{}])>)
   void for_each(this Self&& self, IndexArray const& min, SizeArray const& widths, Op&& op) {
-    for (std::size_t dim = 0; dim < Rank; ++dim) {
-      if constexpr (Star::DebugEnabled)
+    for (std::size_t dim = 0; dim < rank; ++dim) {
+      if constexpr (Star::debug_enabled)
         Star::star_assert_failed(min[dim] <= self.m_shape[dim] && widths[dim] <= self.m_shape[dim] - min[dim]);
       if (widths[dim] == 0)
         return;
@@ -346,19 +346,19 @@ public:
   // Bounded non-owning borrows of real-reference storage (not bool proxies).
   // Keep the owner alive; reacquire after resize, clear, move or replacement.
   std::span<Element> elements() & requires std::same_as<reference, Element&> {
-    return std::span<Element>(m_data.data(), m_data.size());
+    return m_data;
   }
   std::span<Element const> elements() const & requires std::same_as<const_reference, Element const&> {
-    return std::span<Element const>(m_data.data(), m_data.size());
+    return m_data;
   }
   std::span<Element> elements() && = delete;
   std::span<Element const> elements() const && = delete;
 
   View view() & requires std::same_as<reference, Element&> {
-    return View(elements().data(), Extents(std::span<std::size_t const, Rank>(m_shape)));
+    return View(elements().data(), Extents(std::span<std::size_t const, rank>(m_shape)));
   }
   ConstView view() const & requires std::same_as<const_reference, Element const&> {
-    return ConstView(elements().data(), Extents(std::span<std::size_t const, Rank>(m_shape)));
+    return ConstView(elements().data(), Extents(std::span<std::size_t const, rank>(m_shape)));
   }
   View view() && = delete;
   ConstView view() const && = delete;
@@ -380,16 +380,16 @@ private:
     return true;
   }
 
-  template <typename... Dimensions> requires multi_array_dimensions<Rank, Dimensions...>
+  template <typename... Dimensions> requires multi_array_dimensions<rank, Dimensions...>
   static std::expected<SizeArray, StarException> checked_dimensions(Dimensions... dimensions) {
     if (!(dimension_representable(dimensions) && ...))
       return std::unexpected(MultiArrayException("MultiArray dimensions must be representable nonnegative integers"));
     return SizeArray{static_cast<std::size_t>(dimensions)...};
   }
 
-  template <typename... Dimensions> requires multi_array_dimensions<Rank, Dimensions...>
+  template <typename... Dimensions> requires multi_array_dimensions<rank, Dimensions...>
   static IndexArray unchecked_dimensions(Dimensions... dimensions) {
-    if constexpr (Star::DebugEnabled)
+    if constexpr (Star::debug_enabled)
       Star::star_assert_failed((dimension_representable(dimensions) && ...));
     return IndexArray{static_cast<std::size_t>(dimensions)...};
   }
@@ -414,7 +414,7 @@ private:
   }
 
   bool contains(IndexArray const& index) const {
-    for (std::size_t dim = 0; dim < Rank; ++dim)
+    for (std::size_t dim = 0; dim < rank; ++dim)
       if (index[dim] >= m_shape[dim])
         return false;
     return true;
@@ -422,8 +422,8 @@ private:
 
   std::size_t linear_index(IndexArray const& index) const {
     std::size_t offset = 0;
-    for (std::size_t dim = 0; dim < Rank; ++dim) {
-      if constexpr (Star::DebugEnabled)
+    for (std::size_t dim = 0; dim < rank; ++dim) {
+      if constexpr (Star::debug_enabled)
         Star::star_assert_failed(index[dim] < m_shape[dim]);
       offset = offset * m_shape[dim] + index[dim];
     }
@@ -433,8 +433,8 @@ private:
   // Only needed for nonempty shapes, whose checked cardinality bounds all strides.
   static SizeArray strides(SizeArray const& shape) {
     SizeArray result;
-    result[Rank - 1] = 1;
-    for (std::size_t dim = Rank - 1; dim != 0; --dim)
+    result[rank - 1] = 1;
+    for (std::size_t dim = rank - 1; dim != 0; --dim)
       result[dim - 1] = result[dim] * shape[dim];
     return result;
   }
@@ -451,7 +451,7 @@ private:
     bool linear = m_data.empty();
     if (!linear) {
       linear = true;
-      for (std::size_t dim = 1; dim < Rank; ++dim)
+      for (std::size_t dim = 1; dim < rank; ++dim)
         linear = linear && shape[dim] == m_shape[dim];
     }
     if (linear) {
@@ -478,12 +478,12 @@ private:
     return {};
   }
 
-  template <std::size_t Dimension, typename Append>
-    requires (Dimension < Rank && std::invocable<Append&, Storage&, std::size_t>)
+  template <std::size_t dimension, typename Append>
+    requires (dimension < rank && std::invocable<Append&, Storage&, std::size_t>)
   void resize_region_impl(Storage& data, SizeArray const& shape, SizeArray const& source_strides,
       Append& append, std::size_t source_offset, bool source_valid) const {
-    if constexpr (Dimension == Rank - 1) {
-      auto copied = source_valid ? std::min(shape[Dimension], m_shape[Dimension]) : 0;
+    if constexpr (dimension == rank - 1) {
+      auto copied = source_valid ? std::min(shape[dimension], m_shape[dimension]) : 0;
       if (copied != 0) {
         auto first = m_data.cbegin() + source_offset;
         if constexpr (std::is_constructible_v<Element, const_reference>
@@ -500,12 +500,12 @@ private:
           std::copy_n(first, copied, data.begin() + target_offset);
         }
       }
-      append(data, shape[Dimension] - copied);
+      append(data, shape[dimension] - copied);
     } else {
-      for (std::size_t i = 0; i < shape[Dimension]; ++i) {
-        bool valid = source_valid && i < m_shape[Dimension];
-        resize_region_impl<Dimension + 1>(data, shape, source_strides, append,
-            valid ? source_offset + i * source_strides[Dimension] : 0, valid);
+      for (std::size_t i = 0; i < shape[dimension]; ++i) {
+        bool valid = source_valid && i < m_shape[dimension];
+        resize_region_impl<dimension + 1>(data, shape, source_strides, append,
+            valid ? source_offset + i * source_strides[dimension] : 0, valid);
       }
     }
   }
@@ -514,7 +514,7 @@ private:
       SizeArray const& source_strides, SizeArray const& target_strides,
       std::size_t source_offset, std::size_t target_offset, std::size_t dim)
       requires multi_array_assignable<reference, const_reference> {
-    if (dim == Rank - 1) {
+    if (dim == rank - 1) {
       std::copy_n(source.m_data.cbegin() + source_offset, widths[dim], m_data.begin() + target_offset);
       return;
     }
@@ -527,29 +527,29 @@ private:
     }
   }
 
-  template <std::size_t Dimension, typename Self, typename Op>
-    requires (Dimension < Rank && (std::same_as<Self, MultiArray> || std::same_as<Self, MultiArray const>)
+  template <std::size_t dimension, typename Self, typename Op>
+    requires (dimension < rank && (std::same_as<Self, MultiArray> || std::same_as<Self, MultiArray const>)
         && multi_array_callback<Op, IndexArray, decltype(std::declval<Self&>().m_data[std::size_t{}])>)
   static void for_each_impl(Self& self, IndexArray const& min, SizeArray const& widths,
       SizeArray const& array_strides, Op& op, IndexArray& index, std::size_t offset) {
-    if constexpr (Dimension == Rank - 1) {
+    if constexpr (dimension == rank - 1) {
       auto element = self.m_data.begin() + offset;
-      for (std::size_t i = 0; i < widths[Dimension]; ++i, ++element) {
-        index[Dimension] = min[Dimension] + i;
+      for (std::size_t i = 0; i < widths[dimension]; ++i, ++element) {
+        index[dimension] = min[dimension] + i;
         std::invoke(op, index, *element);
       }
     } else {
-      for (std::size_t i = 0; i < widths[Dimension]; ++i) {
-        index[Dimension] = min[Dimension] + i;
-        for_each_impl<Dimension + 1>(self, min, widths, array_strides, op, index,
-            offset + i * array_strides[Dimension]);
+      for (std::size_t i = 0; i < widths[dimension]; ++i) {
+        index[dimension] = min[dimension] + i;
+        for_each_impl<dimension + 1>(self, min, widths, array_strides, op, index,
+            offset + i * array_strides[dimension]);
       }
     }
   }
 
   void sub_print(TextBuffer& output, IndexArray index, std::size_t dim) const
       requires std::same_as<optional_diagnostic_result<Element>, void> {
-    if (dim == Rank - 1) {
+    if (dim == rank - 1) {
       for (std::size_t i = 0; i < m_shape[dim]; ++i) {
         index[dim] = i;
         auto&& value = m_data[linear_index(index)];
@@ -586,9 +586,9 @@ using MultiArray4U = MultiArray<unsigned, 4>;
 using MultiArray4F = MultiArray<float, 4>;
 using MultiArray4D = MultiArray<double, 4>;
 
-template <typename Element, std::size_t Rank>
-  requires (Rank > 0 && std::same_as<optional_diagnostic_result<Element>, void>)
-void write_text(TextBuffer& output, MultiArray<Element, Rank> const& array) {
+template <typename Element, std::size_t rank>
+  requires (rank > 0 && std::same_as<optional_diagnostic_result<Element>, void>)
+void write_text(TextBuffer& output, MultiArray<Element, rank> const& array) {
   array.print(output);
 }
 
@@ -596,9 +596,9 @@ void write_text(TextBuffer& output, MultiArray<Element, Rank> const& array) {
 
 export module star.multi_array;
 
-export template <typename Element, std::size_t Rank>
-  requires (Rank > 0 && std::same_as<Star::optional_diagnostic_result<Element>, void>)
-struct std::formatter<Star::MultiArray<Element, Rank>> : Star::TextFormatter {};
+export template <typename Element, std::size_t rank>
+  requires (rank > 0 && std::same_as<Star::optional_diagnostic_result<Element>, void>)
+struct std::formatter<Star::MultiArray<Element, rank>> : Star::TextFormatter {};
 
 export namespace Star {
   using ::Star::MultiArrayExceptionTag;

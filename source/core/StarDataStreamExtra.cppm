@@ -81,11 +81,11 @@ struct DataStreamReadFunctor {
   return std::ref(ds);
 }
 
-template <typename ElementT, std::size_t SizeN>
+template <typename ElementT, std::size_t extent>
   requires(stream_writable<ElementT>)
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException>
-operator<<(DataStream& ds, Array<ElementT, SizeN> const& array) {
-  for (std::size_t i = 0; i < SizeN; ++i) {
+operator<<(DataStream& ds, Array<ElementT, extent> const& array) {
+  for (std::size_t i = 0; i < extent; ++i) {
     auto result = ds << array[i];
     if (!result)
       return result;
@@ -93,11 +93,11 @@ operator<<(DataStream& ds, Array<ElementT, SizeN> const& array) {
   return std::ref(ds);
 }
 
-template <typename ElementT, std::size_t SizeN>
+template <typename ElementT, std::size_t extent>
   requires(stream_readable<ElementT>)
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException>
-operator>>(DataStream& ds, Array<ElementT, SizeN>& array) {
-  for (std::size_t i = 0; i < SizeN; ++i) {
+operator>>(DataStream& ds, Array<ElementT, extent>& array) {
+  for (std::size_t i = 0; i < extent; ++i) {
     auto result = ds >> array[i];
     if (!result)
       return result;
@@ -105,15 +105,15 @@ operator>>(DataStream& ds, Array<ElementT, SizeN>& array) {
   return std::ref(ds);
 }
 
-template <typename ElementT, std::size_t RankN>
-  requires(RankN > 0 && stream_writable<ElementT>)
+template <typename ElementT, std::size_t rank>
+  requires(rank > 0 && stream_writable<ElementT>)
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException>
-operator<<(DataStream& ds, MultiArray<ElementT, RankN> const& array) {
+operator<<(DataStream& ds, MultiArray<ElementT, rank> const& array) {
   auto const& size = array.extents();
-  for (std::size_t i = 0; i < RankN; ++i) {
-    auto dimensionWritten = ds.write_vlq_u(size[i]);
-    if (!dimensionWritten)
-      return std::unexpected(std::move(dimensionWritten.error()));
+  for (std::size_t i = 0; i < rank; ++i) {
+    auto dimension_written = ds.write_vlq_u(size[i]);
+    if (!dimension_written)
+      return std::unexpected(std::move(dimension_written.error()));
   }
 
   std::size_t count = array.size();
@@ -126,17 +126,17 @@ operator<<(DataStream& ds, MultiArray<ElementT, RankN> const& array) {
   return std::ref(ds);
 }
 
-template <typename ElementT, std::size_t RankN>
-  requires(RankN > 0 && stream_readable<ElementT>
-      && requires(DataStream& stream, MultiArray<ElementT, RankN>& array,
-                  typename MultiArray<ElementT, RankN>::SizeArray const& shape) {
+template <typename ElementT, std::size_t rank>
+  requires(rank > 0 && stream_readable<ElementT>
+      && requires(DataStream& stream, MultiArray<ElementT, rank>& array,
+                  typename MultiArray<ElementT, rank>::SizeArray const& shape) {
         { array.set_size(shape) } -> std::same_as<std::expected<void, StarException>>;
         { stream >> array[0] } -> stream_result;
       })
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException>
-operator>>(DataStream& ds, MultiArray<ElementT, RankN>& array) {
-  typename MultiArray<ElementT, RankN>::SizeArray size;
-  for (std::size_t i = 0; i < RankN; ++i) {
+operator>>(DataStream& ds, MultiArray<ElementT, rank>& array) {
+  typename MultiArray<ElementT, rank>::SizeArray size;
+  for (std::size_t i = 0; i < rank; ++i) {
     auto dimension = ds.read_vlq_u();
     if (!dimension)
       return std::unexpected(std::move(dimension.error()));
@@ -309,17 +309,17 @@ template <typename DataT>
   return ds.read_container(poly.vertices()).transform([&ds] { return std::ref(ds); });
 }
 
-template <typename DataT, std::size_t Dimensions>
+template <typename DataT, std::size_t dimension_count>
   requires(stream_writable<DataT>)
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException>
-operator<<(DataStream& ds, Box<DataT, Dimensions> const& box) {
+operator<<(DataStream& ds, Box<DataT, dimension_count> const& box) {
   return ds << box.min() << box.max();
 }
 
-template <typename DataT, std::size_t Dimensions>
+template <typename DataT, std::size_t dimension_count>
   requires(stream_readable<DataT>)
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds,
-                                                                                          Box<DataT, Dimensions>& box) {
+                                                                                          Box<DataT, dimension_count>& box) {
   return ds >> box.min() >> box.max();
 }
 
@@ -342,22 +342,22 @@ template <typename DataT>
 // alternatives provide DataStream::read<T>() specializations.
 
 namespace detail {
-template <std::size_t Index = 0, typename... Types>
-  requires(Index < sizeof...(Types) && (stream_readable<Types> && ...))
+template <std::size_t index = 0, typename... Types>
+  requires(index < sizeof...(Types) && (stream_readable<Types> && ...))
 [[nodiscard]] std::expected<void, StarException> read_variant_payload(DataStream& ds, std::variant<Types...>& value,
-                                                                      std::uint8_t typeIndex) {
-  if (typeIndex == Index) {
-    using Type = std::variant_alternative_t<Index, std::variant<Types...>>;
+                                                                      std::uint8_t type_index) {
+  if (type_index == index) {
+    using Type = std::variant_alternative_t<index, std::variant<Types...>>;
     if constexpr (std::is_same_v<Type, std::monostate>) {
-      value.template emplace<Index>();
+      value.template emplace<index>();
     } else {
       auto payload = ds.read<Type>();
       if (!payload) return std::unexpected(std::move(payload.error()));
-      value.template emplace<Index>(std::move(*payload));
+      value.template emplace<index>(std::move(*payload));
     }
     return {};
-  } else if constexpr (Index + 1 < sizeof...(Types)) {
-    return read_variant_payload<Index + 1>(ds, value, typeIndex);
+  } else if constexpr (index + 1 < sizeof...(Types)) {
+    return read_variant_payload<index + 1>(ds, value, type_index);
   } else {
     return std::unexpected(DataStreamException("Invalid variant type index"));
   }
@@ -398,16 +398,16 @@ operator>>(DataStream& ds, std::variant<Types...>& value) {
 template <typename T, typename WriteFunction>
   requires(stream_callback<WriteFunction, T const&>)
 [[nodiscard]] std::expected<void, StarException> write_optional(DataStream& ds, std::optional<T> const& maybe,
-                                                                WriteFunction&& writeFunction) {
+                                                                WriteFunction&& write_function) {
   auto tag = ds.write<bool>(maybe.has_value());
   if (!tag) return std::unexpected(std::move(tag.error()));
   if (maybe) {
     if constexpr (!std::is_function_v<std::remove_reference_t<WriteFunction>>
-                  && requires { { writeFunction == nullptr } -> std::convertible_to<bool>; }) {
-      if (writeFunction == nullptr)
+                  && requires { { write_function == nullptr } -> std::convertible_to<bool>; }) {
+      if (write_function == nullptr)
         return std::unexpected(DataStreamException("Cannot invoke an empty optional writer"));
     }
-    auto result = writeFunction(ds, *maybe);
+    auto result = write_function(ds, *maybe);
     if (!result) return std::unexpected(std::move(result.error()));
   }
   return {};
@@ -417,18 +417,18 @@ template <typename T, typename ReadFunction>
   requires(requires { ::new T; } && stream_callback<ReadFunction, T&>
            && requires(std::optional<T>& value, T& payload) { value.emplace(std::move(payload)); })
 [[nodiscard]] std::expected<void, StarException> read_optional(DataStream& ds, std::optional<T>& maybe,
-                                                               ReadFunction&& readFunction) {
+                                                               ReadFunction&& read_function) {
   auto present = ds.read<bool>();
   if (!present)
     return std::unexpected(std::move(present.error()));
   if (*present) {
     if constexpr (!std::is_function_v<std::remove_reference_t<ReadFunction>>
-                  && requires { { readFunction == nullptr } -> std::convertible_to<bool>; }) {
-      if (readFunction == nullptr)
+                  && requires { { read_function == nullptr } -> std::convertible_to<bool>; }) {
+      if (read_function == nullptr)
         return std::unexpected(DataStreamException("Cannot invoke an empty optional reader"));
     }
     T payload;
-    auto decoded = readFunction(ds, payload);
+    auto decoded = read_function(ds, payload);
     if (!decoded)
       return std::unexpected(std::move(decoded.error()));
     maybe.emplace(std::move(payload));
@@ -498,17 +498,17 @@ template <typename Left, typename Right>
   return std::ref(ds);
 }
 
-template <typename DataT, std::size_t Dimensions>
+template <typename DataT, std::size_t dimension_count>
   requires(stream_writable<DataT>)
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException>
-operator<<(DataStream& ds, Line<DataT, Dimensions> const& line) {
+operator<<(DataStream& ds, Line<DataT, dimension_count> const& line) {
   return ds << line.min() << line.max();
 }
 
-template <typename DataT, std::size_t Dimensions>
+template <typename DataT, std::size_t dimension_count>
   requires(stream_readable<DataT>)
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException>
-operator>>(DataStream& ds, Line<DataT, Dimensions>& line) {
+operator>>(DataStream& ds, Line<DataT, dimension_count>& line) {
   return ds >> line.min() >> line.max();
 }
 
@@ -519,11 +519,11 @@ template <typename... T>
   return std::apply(
     [&ds] [[nodiscard]] (auto&... values) -> std::expected<std::reference_wrapper<DataStream>, StarException> {
       std::expected<std::reference_wrapper<DataStream>, StarException> status = std::ref(ds);
-      auto readOne = [&](auto& value) {
+      auto read_one = [&](auto& value) {
         if (status)
           status = ds >> value;
       };
-      (readOne(values), ...);
+      (read_one(values), ...);
       return status;
     },
     t);
@@ -536,11 +536,11 @@ template <typename... T>
   return std::apply(
     [&ds] [[nodiscard]] (auto const&... values) -> std::expected<std::reference_wrapper<DataStream>, StarException> {
       std::expected<std::reference_wrapper<DataStream>, StarException> status = std::ref(ds);
-      auto writeOne = [&](auto const& value) {
+      auto write_one = [&](auto const& value) {
         if (status)
           status = ds << value;
       };
-      (writeOne(values), ...);
+      (write_one(values), ...);
       return status;
     },
     t);

@@ -642,7 +642,7 @@ if (!result914) return std::unexpected(std::move(result914.error()));
   auto result915 = world();
   if (!result915) return std::unexpected(std::move(result915.error()));
   if (result915->get().isClient()) {
-    this->root().spatialLogger().log_poly("world", m_movementController->collisionBody(), Color::Red.to_rgba());
+    this->root().spatialLogger().log_poly("world", m_movementController->collisionBody(), Color::palette_red.to_rgba());
   }
   return {};
 }
@@ -1648,7 +1648,7 @@ m_powerMultiplier = std::move(*result684);
 if (!result685) return std::unexpected(std::move(result685.error()));
 String processing = std::move(*result685);
     auto begin = processing.utf8().find_first_of('?');
-    if (begin == NPos) {
+    if (begin == npos) {
       m_imageDirectives = "";
       m_imageSuffix = std::move(processing);
     }

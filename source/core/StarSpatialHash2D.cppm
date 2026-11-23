@@ -20,7 +20,7 @@ template <typename T>
 concept spatial_scalar = spatial_integer<T> || finite_classifiable<T>;
 
 template <typename T>
-concept spatial_key = hash_invocable<hash<T> const&, T const&>
+concept spatial_key = hash_invocable<ValueHash<T> const&, T const&>
     && requires(T const& a, T const& b) { { a == b } -> std::convertible_to<bool>; };
 
 template <typename Range, typename Rect>
@@ -77,7 +77,7 @@ public:
     Coverage coverage;
   };
 
-  using EntryMap = StableHashMap<Key, Entry, hash<Key>, std::equal_to<Key>,
+  using EntryMap = StableHashMap<Key, Entry, ValueHash<Key>, std::equal_to<Key>,
                                  BlockAllocator<std::pair<Key const, Entry>, block_size>>;
 
   [[nodiscard]] static std::expected<SpatialHash2D, StarException> create(Scalar const& sector_size) {

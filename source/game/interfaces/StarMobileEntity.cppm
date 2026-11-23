@@ -28,7 +28,7 @@ class ActorMovementController;
 // A base for 'mobile' entities, which all have a MovementController.
 class MobileEntity : public virtual Entity {
 public:
-  void const* query_type(TypeKey key) const noexcept override { return query_type_of<MobileEntity, Entity>(this, key); }
+  void query_type(TypeQuery& query) const noexcept override { query_type_of<MobileEntity, Entity>(*this, query); }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<MobileEntity>(); }
 
   virtual MovementController& movementController() = 0;

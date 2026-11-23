@@ -22,69 +22,72 @@ using cast_result_t = std::conditional_t<std::is_const_v<Source>, std::add_const
 template <typename Target, typename Source>
 concept capability_castable =
   cast_target<Target> && cast_source<Source> && (!std::is_const_v<Source> || std::is_const_v<Target>)
-  && (std::is_convertible_v<Source*, Target*> || (std::is_class_v<Target> && capability_queryable<Source>));
+  && (std::is_convertible_v<std::add_pointer_t<Source>, std::add_pointer_t<Target>>
+      || (std::is_class_v<Target> && capability_queryable<Source>));
 
 template <typename Target, typename Source>
 concept reference_castable = cast_target<Target> && cast_source<Source> && !std::is_void_v<Target>
   && capability_castable<cast_result_t<Target, Source>, Source>;
 
-// Raw addresses are confined to the erased protocol and standard pointer boundary.
 template <cast_target Target, cast_source Source>
-  requires capability_castable<Target, Source>
-Target* query_cast(Source* value) noexcept {
-  if (!value)
-    return nullptr;
-  if constexpr (std::is_convertible_v<Source*, Target*>) {
-    return value;
+  requires reference_castable<Target, Source>
+auto as_ref(Source& value) noexcept -> std::optional<std::reference_wrapper<cast_result_t<Target, Source>>> {
+  using Result = cast_result_t<Target, Source>;
+  if constexpr (std::is_convertible_v<std::add_pointer_t<Source>, std::add_pointer_t<Result>>) {
+    return std::reference_wrapper<Result>(static_cast<Result&>(value));
   } else {
-    auto result = static_cast<std::remove_const_t<Target> const*>(value->query_type(type_key<Target>()));
-    if constexpr (std::is_const_v<Target>)
-      return result;
-    else
-      return const_cast<Target*>(result);
+    if (auto adjusted = query_type<std::remove_cv_t<Target>>(value))
+      return std::reference_wrapper<Result>(const_cast<Result&>(adjusted->get()));
+    return std::nullopt;
   }
 }
 
 template <cast_target Target, cast_source Source>
-  requires capability_castable<cast_result_t<Target, Source>, Source>
-cast_result_t<Target, Source>* as(Source* value) noexcept {
-  return query_cast<cast_result_t<Target, Source>>(value);
+  requires reference_castable<Target, Source>
+void as_ref(Source const&&) = delete;
+
+template <cast_target Target, cast_source Source>
+  requires reference_castable<Target, Source>
+auto as_ref(std::optional<std::reference_wrapper<Source>> value) noexcept
+  -> std::optional<std::reference_wrapper<cast_result_t<Target, Source>>> {
+  return value ? as_ref<Target>(value->get()) : std::nullopt;
+}
+
+template <cast_target Target, typename Owner> auto alias_cast(Owner&& owner) noexcept {
+  using Source = typename std::remove_cvref_t<Owner>::element_type;
+  using Result = cast_result_t<Target, Source>;
+  using Alias = std::shared_ptr<Result>;
+  if (owner) {
+    if constexpr (std::is_convertible_v<std::add_pointer_t<Source>, std::add_pointer_t<Result>>) {
+      return Alias(std::forward<Owner>(owner), owner.get());
+    } else if (auto adjusted = as_ref<Target>(*owner.get())) {
+      return Alias(std::forward<Owner>(owner), std::addressof(adjusted->get()));
+    }
+  }
+  return Alias{};
 }
 
 template <cast_target Target, cast_source Source>
   requires capability_castable<cast_result_t<Target, Source>, typename std::shared_ptr<Source>::element_type>
 std::shared_ptr<cast_result_t<Target, Source>> as(std::shared_ptr<Source> const& owner) noexcept {
-  if (auto adjusted = as<Target>(owner.get()))
-    return std::shared_ptr<cast_result_t<Target, Source>>(owner, adjusted);
-  return {};
+  return alias_cast<Target>(owner);
 }
 
 template <cast_target Target, cast_source Source>
   requires capability_castable<cast_result_t<Target, Source>, typename std::shared_ptr<Source>::element_type>
 std::shared_ptr<cast_result_t<Target, Source>> as(std::shared_ptr<Source>&& owner) noexcept {
-  if (auto adjusted = as<Target>(owner.get()))
-    return std::shared_ptr<cast_result_t<Target, Source>>(std::move(owner), adjusted);
-  return {};
-}
-
-template <cast_target Target, cast_source Source>
-  requires reference_castable<Target, Source>
-auto as_ref(Source& value) noexcept -> std::optional<std::reference_wrapper<cast_result_t<Target, Source>>> {
-  if (auto adjusted = as<Target>(std::addressof(value)))
-    return std::ref(*adjusted);
-  return std::nullopt;
-}
-
-template <cast_target Target, cast_source Source>
-  requires capability_castable<cast_result_t<Target, Source>, Source>
-bool is(Source* value) noexcept {
-  return as<Target>(value) != nullptr;
+  return alias_cast<Target>(std::move(owner));
 }
 
 template <cast_target Target, cast_source Source>
   requires capability_castable<cast_result_t<Target, Source>, typename std::shared_ptr<Source>::element_type>
 bool is(std::shared_ptr<Source> const& owner) noexcept {
-  return is<Target>(owner.get());
+  using Element = typename std::shared_ptr<Source>::element_type;
+  using Result = cast_result_t<Target, Source>;
+  if constexpr (std::is_convertible_v<std::add_pointer_t<Element>, std::add_pointer_t<Result>>)
+    return static_cast<bool>(owner);
+  else
+    return owner && as_ref<Target>(*owner.get()).has_value();
 }
 
 template <typename Target, typename Ptr>
@@ -126,6 +129,19 @@ template <cast_target Target, cast_source Source>
   else
     return std::unexpected(
       PointerConvertException::format("Could not convert from {} to {}", type_name<Source>(), type_name<Result>()));
+}
+
+template <cast_target Target, cast_source Source>
+  requires reference_castable<Target, Source>
+void convert_ref(Source const&&) = delete;
+
+template <cast_target Target, cast_source Source>
+  requires reference_castable<Target, Source>
+[[nodiscard]] auto convert_ref(std::optional<std::reference_wrapper<Source>> value)
+  -> std::expected<std::reference_wrapper<cast_result_t<Target, Source>>, StarException> {
+  if (value)
+    return convert_ref<Target>(value->get());
+  return std::unexpected(PointerConvertException::format("Could not convert from nullptr to {}", type_name<Target>()));
 }
 }
 

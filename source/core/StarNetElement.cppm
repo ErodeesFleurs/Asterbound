@@ -22,7 +22,7 @@ private:
 // Primary interface for the composable network synchronizable element system.
 class NetElement {
 public:
-  virtual void const* query_type(TypeKey key) const noexcept { return query_type_of<NetElement>(this, key); }
+  virtual void query_type(TypeQuery& query) const noexcept { query_type_of<NetElement>(*this, query); }
   virtual std::string_view dynamic_type_name() const noexcept { return Star::type_name<NetElement>(); }
 
   virtual ~NetElement() = default;
@@ -66,7 +66,7 @@ public:
   void set_compatibility_version(VersionNumber version);
   bool check_with_rules(NetCompatibilityRules const& rules) const;
 private:
-  VersionNumber m_net_compatibility_version = AnyVersion;
+  VersionNumber m_net_compatibility_version = any_version;
 };
 
 inline VersionNumber NetElement::compatibility_version() const {
@@ -78,7 +78,7 @@ inline void NetElement::set_compatibility_version(VersionNumber version) {
 }
 
 inline bool NetElement::check_with_rules(NetCompatibilityRules const& rules) const {
-  if (m_net_compatibility_version != AnyVersion)
+  if (m_net_compatibility_version != any_version)
     return rules.version() >= m_net_compatibility_version;
   return true;
 }

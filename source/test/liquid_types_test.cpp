@@ -44,7 +44,7 @@ struct CustomLiquidId {
 }
 
 template <>
-struct Star::hash<CustomLiquidId> {
+struct Star::ValueHash<CustomLiquidId> {
   std::size_t operator()(CustomLiquidId const& id) const noexcept { return id.value; }
 };
 

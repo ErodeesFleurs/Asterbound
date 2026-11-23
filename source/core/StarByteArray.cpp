@@ -17,8 +17,8 @@ ByteArray ByteArray::from_string_with_null(std::string_view str) {
   ByteArray ba;
   ba.resize(checked_size_sum(str.size(), 1));
   if (!str.empty())
-    std::memcpy(ba.m_data, str.data(), str.size());
-  ba.m_data[str.size()] = 0;
+    std::memcpy(ba.span().data(), str.data(), str.size());
+  ba[str.size()] = 0;
   return ba;
 }
 
@@ -28,22 +28,14 @@ ByteArray ByteArray::with_reserve(std::size_t capacity) {
   return bytes;
 }
 
-ByteArray::ByteArray() {
-  m_data = nullptr;
-  m_capacity = 0;
-  m_size = 0;
+ByteArray::ByteArray(std::size_t size, char c) {
+  fill(size, c);
 }
 
-ByteArray::ByteArray(std::size_t dataSize, char c)
-  : ByteArray() {
-  fill(dataSize, c);
-}
-
-ByteArray::ByteArray(std::span<char const> data)
-  : ByteArray() {
+ByteArray::ByteArray(std::span<char const> data) {
   resize(data.size());
   if (!data.empty())
-    std::memcpy(m_data, data.data(), data.size());
+    std::memcpy(span().data(), data.data(), data.size());
 }
 
 ByteArray::ByteArray(ByteArray const& b)
@@ -51,19 +43,13 @@ ByteArray::ByteArray(ByteArray const& b)
 }
 
 ByteArray::ByteArray(ByteArray&& b) noexcept
-  : ByteArray() {
-  operator=(std::move(b));
-}
-
-ByteArray::~ByteArray() {
-  reset();
-}
+  : m_storage(std::move(b.m_storage)), m_size(std::exchange(b.m_size, 0)) {}
 
 ByteArray& ByteArray::operator=(ByteArray const& b) {
   if (&b != this) {
     resize(b.m_size);
     if (m_size != 0)
-      std::memcpy(m_data, b.m_data, m_size);
+      std::memcpy(span().data(), b.span().data(), m_size);
   }
 
   return *this;
@@ -71,10 +57,7 @@ ByteArray& ByteArray::operator=(ByteArray const& b) {
 
 ByteArray& ByteArray::operator=(ByteArray&& b) noexcept {
   if (&b != this) {
-    reset();
-
-    m_data = std::exchange(b.m_data, nullptr);
-    m_capacity = std::exchange(b.m_capacity, 0);
+    m_storage = std::move(b.m_storage);
     m_size = std::exchange(b.m_size, 0);
   }
 
@@ -82,70 +65,50 @@ ByteArray& ByteArray::operator=(ByteArray&& b) noexcept {
 }
 
 void ByteArray::reset() {
-  if (m_data) {
-    Star::free(m_data, m_capacity);
-    m_data = nullptr;
-    m_capacity = 0;
-    m_size = 0;
-  }
+  m_storage = {};
+  m_size = 0;
 }
 
-void ByteArray::reserve(std::size_t newCapacity) {
-  if (newCapacity > max_size())
+void ByteArray::reserve(std::size_t new_capacity) {
+  if (new_capacity <= capacity())
+    return;
+  if (new_capacity > max_size())
     Star::fatal_error("ByteArray capacity exceeds max_size", false);
-  if (newCapacity > m_capacity) {
-    if (!m_data) {
-      auto newMem = static_cast<char*>(Star::malloc(newCapacity));
-      if (!newMem)
-        Star::fatal_error("Could not allocate ByteArray capacity", false);
-      m_data = newMem;
-      m_capacity = newCapacity;
-    } else {
-      auto grown = m_capacity > max_size() / 2 ? max_size() : m_capacity * 2;
-      newCapacity = std::max({grown, newCapacity, static_cast<std::size_t>(8)});
-      auto newMem = static_cast<char*>(Star::realloc(m_data, newCapacity));
-      if (!newMem)
-        Star::fatal_error("Could not allocate ByteArray capacity", false);
-      m_data = newMem;
-      m_capacity = newCapacity;
-    }
+  if (capacity() != 0) {
+    auto grown = capacity() > max_size() / 2 ? max_size() : capacity() * 2;
+    new_capacity = std::max({grown, new_capacity, std::size_t{8}});
   }
+  if (!m_storage.resize(new_capacity))
+    Star::fatal_error("Could not allocate ByteArray capacity", false);
 }
 
 void ByteArray::shrink_to_fit() {
-  if (m_size == 0) {
-    reset();
-  } else if (m_capacity != m_size) {
-    auto memory = static_cast<char*>(Star::realloc(m_data, m_size));
-    if (!memory)
-      Star::fatal_error("Could not shrink ByteArray capacity", false);
-    m_data = memory;
-    m_capacity = m_size;
-  }
+  if (m_size != capacity() && !m_storage.resize(m_size))
+    Star::fatal_error("Could not shrink ByteArray capacity", false);
 }
 
 void ByteArray::resize(std::size_t size, char f) {
   if (m_size == size)
     return;
 
-  std::size_t oldSize = m_size;
+  std::size_t old_size = m_size;
   resize(size);
-  if (m_size > oldSize)
-    std::memset(m_data + oldSize, f, m_size - oldSize);
+  if (m_size > old_size)
+    std::memset(span().subspan(old_size).data(), f, m_size - old_size);
 }
 
 void ByteArray::fill(std::size_t s, char c) {
-  if (s != NPos)
+  if (s != npos)
     resize(s);
 
   if (m_size == 0)
     return;
 
-  std::memset(m_data, c, m_size);
+  std::memset(span().data(), c, m_size);
 }
 
 void ByteArray::fill(char c) {
-  fill(NPos, c);
+  fill(npos, c);
 }
 
 ByteArray ByteArray::substr(std::size_t b, std::size_t s) const {
@@ -165,7 +128,7 @@ void ByteArray::remove_prefix(std::size_t s) {
   if (s >= m_size) {
     clear();
   } else {
-    std::memmove(m_data, m_data + s, m_size - s);
+    std::memmove(span().data(), span().subspan(s).data(), m_size - s);
     resize(m_size - s);
   }
 }
@@ -181,14 +144,14 @@ std::size_t ByteArray::mismatch_index(const ByteArray& b) const {
   auto size = std::min(m_size, b.size());
   if (size == 0)
     return 0;
-  auto mismatch = std::mismatch(m_data, m_data + size, b.m_data);
-  return static_cast<std::size_t>(mismatch.first - m_data);
+  auto mismatch = std::mismatch(begin(), begin() + size, b.begin());
+  return static_cast<std::size_t>(mismatch.first - begin());
 }
 
 int ByteArray::compare(const ByteArray& b) const {
-  auto commonSize = std::min(m_size, b.m_size);
-  if (commonSize != 0) {
-    int comparison = std::memcmp(m_data, b.m_data, commonSize);
+  auto common_size = std::min(m_size, b.m_size);
+  if (common_size != 0) {
+    int comparison = std::memcmp(span().data(), b.span().data(), common_size);
     if (comparison != 0)
       return (comparison > 0) - (comparison < 0);
   }
@@ -208,17 +171,17 @@ ByteArray ByteArray::bit_xor(ByteArray const& rhs, bool extend) const {
 }
 
 void ByteArray::insert(std::size_t pos, char byte) {
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((pos <= m_size));
   }
   auto old_size = m_size;
   resize(checked_size_sum(old_size, 1));
-  std::memmove(m_data + pos + 1, m_data + pos, old_size - pos);
-  m_data[pos] = byte;
+  std::memmove(span().subspan(pos + 1).data(), span().subspan(pos).data(), old_size - pos);
+  (*this)[pos] = byte;
 }
 
 ByteArray::iterator ByteArray::insert(const_iterator pos, char byte) & {
-  std::size_t d = pos - begin();
+  auto d = static_cast<std::size_t>(pos - std::as_const(*this).begin());
   insert(d, byte);
   return begin() + d;
 }
@@ -229,7 +192,7 @@ bool ByteArray::operator<(const ByteArray& b) const {
 }
 
 bool ByteArray::operator==(const ByteArray& b) const {
-  return m_size == b.m_size && (m_size == 0 || std::memcmp(m_data, b.m_data, m_size) == 0);
+  return m_size == b.m_size && (m_size == 0 || std::memcmp(span().data(), b.span().data(), m_size) == 0);
 }
 
 bool ByteArray::operator!=(const ByteArray& b) const {

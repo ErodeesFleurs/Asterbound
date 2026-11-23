@@ -18,26 +18,26 @@ using ColorException = StarError<ColorExceptionTag, StarException>;
 class Color {
   // Floating-point operations require finite inputs.
 public:
-  static Color const Red;
-  static Color const Orange;
-  static Color const Yellow;
-  static Color const Green;
-  static Color const Blue;
-  static Color const Indigo;
-  static Color const Violet;
-  static Color const Black;
-  static Color const White;
-  static Color const Magenta;
-  static Color const DarkMagenta;
-  static Color const Cyan;
-  static Color const DarkCyan;
-  static Color const CornFlowerBlue;
-  static Color const Gray;
-  static Color const LightGray;
-  static Color const DarkGray;
-  static Color const DarkGreen;
-  static Color const Pink;
-  static Color const Clear;
+  static Color const palette_red;
+  static Color const palette_orange;
+  static Color const palette_yellow;
+  static Color const palette_green;
+  static Color const palette_blue;
+  static Color const palette_indigo;
+  static Color const palette_violet;
+  static Color const palette_black;
+  static Color const palette_white;
+  static Color const palette_magenta;
+  static Color const palette_dark_magenta;
+  static Color const palette_cyan;
+  static Color const palette_dark_cyan;
+  static Color const palette_cornflower_blue;
+  static Color const palette_gray;
+  static Color const palette_light_gray;
+  static Color const palette_dark_gray;
+  static Color const palette_dark_green;
+  static Color const palette_pink;
+  static Color const palette_clear;
 
   // Some useful conversion methods for dealing with Vec3 / Vec4 as colors
   static Vec3F rgb_bytes_to_float(Vec3B const& b);
@@ -110,8 +110,8 @@ public:
   Vec4F to_rgba_f() const;
   Vec3F to_rgb_f() const;
 
-  Vec4F const& data() const &;
-  Vec4F const& data() const && = delete;
+  Vec4F const& rgba_channels() const &;
+  Vec4F const& rgba_channels() const && = delete;
 
   Vec4F to_hsva() const;
 

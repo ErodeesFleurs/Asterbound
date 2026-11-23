@@ -413,7 +413,7 @@ const GameTestRegistration
     auto expectedWiring = Json(medium).get("wiringUpdate");
     ASSERT_FALSE(missingWiring);
     ASSERT_FALSE(expectedWiring);
-    EXPECT_STREQ(missingWiring.error().what(), expectedWiring.error().what());
+    EXPECT_EQ(missingWiring.error().what(), expectedWiring.error().what());
     EXPECT_EQ(world->currentStep(), 1u);
     EXPECT_EQ(triggered, 1u);// Earlier timer effects survive the scheduling failure.
 
@@ -424,7 +424,7 @@ const GameTestRegistration
     auto expectedLiquid = json_to_vec2u(Json("bad timing"));
     ASSERT_FALSE(malformedLiquid);
     ASSERT_FALSE(expectedLiquid);
-    EXPECT_STREQ(malformedLiquid.error().what(), expectedLiquid.error().what());
+    EXPECT_EQ(malformedLiquid.error().what(), expectedLiquid.error().what());
     EXPECT_EQ(world->currentStep(), 2u);
     EXPECT_EQ(triggered, 1u);
 
@@ -435,7 +435,7 @@ const GameTestRegistration
     auto expectedLimit = Json(false).opt_uint();
     ASSERT_FALSE(malformedLimit);
     ASSERT_FALSE(expectedLimit);
-    EXPECT_STREQ(malformedLimit.error().what(), expectedLimit.error().what());
+    EXPECT_EQ(malformedLimit.error().what(), expectedLimit.error().what());
     EXPECT_EQ(world->currentStep(), 3u);
 
     // On step 4 this liquid interval does not run: its invalid limit must not
@@ -447,7 +447,7 @@ const GameTestRegistration
     auto expectedFalling = Json(medium).get("fallingBlocksUpdate");
     ASSERT_FALSE(missingFalling);
     ASSERT_FALSE(expectedFalling);
-    EXPECT_STREQ(missingFalling.error().what(), expectedFalling.error().what());
+    EXPECT_EQ(missingFalling.error().what(), expectedFalling.error().what());
     EXPECT_EQ(world->currentStep(), 4u);
     EXPECT_EQ(triggered, 1u);
   });

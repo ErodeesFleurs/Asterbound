@@ -6,6 +6,9 @@ import star.format;
 
 using namespace Star;
 
+static_assert(std::ranges::contiguous_range<SmallVector<int, 0>>);
+static_assert(std::ranges::contiguous_range<SmallVector<int, 0> const>);
+
 TEST(SmallVectorTest, InsertErase) {
   typedef SmallVector<int, 2> SV;
   SV a = {1, 2, 3, 4};
@@ -182,6 +185,8 @@ TEST(SmallVectorTest, ZeroCapacityAndOveralignedStorage) {
   SmallVector<Value, 0> empty;
   EXPECT_NE(empty.data(), nullptr);
   EXPECT_TRUE(empty.empty());
+  EXPECT_EQ(empty.begin(), empty.end());
+  EXPECT_EQ(empty.erase(empty.begin(), empty.end()), empty.end());
   empty.emplace_back(42);
   EXPECT_EQ(reinterpret_cast<std::uintptr_t>(empty.data()) % alignof(Value), 0u);
   EXPECT_EQ(empty[0].value, 42);

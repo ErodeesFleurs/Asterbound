@@ -89,7 +89,7 @@ void register_workloads() {
     for (auto _ : state) {
       auto text = value.repr();
       if (!text) { state.SkipWithError(text.error().what()); break; }
-      benchmark::DoNotOptimize(text->utf8_data());
+      benchmark::DoNotOptimize(text->utf8().data());
       benchmark::DoNotOptimize(text->utf8_size());
     }
   });

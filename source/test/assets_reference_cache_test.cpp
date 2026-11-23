@@ -311,7 +311,7 @@ const GameTestRegistration fontClonesRetainIndependentFaces(
     auto after = first->render(U'\U0001F600');
     ASSERT_TRUE(after) << after.error().what();
     ASSERT_EQ(before->image.size(), after->image.size());
-    EXPECT_TRUE(std::ranges::equal(before->image.data(), after->image.data()));
+    EXPECT_TRUE(std::ranges::equal(before->image.span(), after->image.span()));
     EXPECT_EQ(before->offset, after->offset);
     EXPECT_EQ(before->colored, after->colored);
     EXPECT_EQ(first->height(), 24u);

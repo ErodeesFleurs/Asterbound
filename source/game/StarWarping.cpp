@@ -65,7 +65,7 @@ bool InstanceWorldId::operator<(InstanceWorldId const& rhs) const {
   return std::tie(instance, uuid, rhs.level) < std::tie(rhs.instance, rhs.uuid, rhs.level);
 }
 
-std::size_t hash<InstanceWorldId>::operator()(InstanceWorldId const& id) const {
+std::size_t ValueHash<InstanceWorldId>::operator()(InstanceWorldId const& id) const {
   return hash_of(id.instance, id.uuid, id.level);
 }
 
@@ -94,7 +94,7 @@ bool ClientCustomWorldId::operator<(ClientCustomWorldId const& rhs) const {
   return std::tie(uuid, name) < std::tie(rhs.uuid, rhs.name);
 }
 
-std::size_t hash<ClientCustomWorldId>::operator()(ClientCustomWorldId const& id) const {
+std::size_t ValueHash<ClientCustomWorldId>::operator()(ClientCustomWorldId const& id) const {
   return hash_of(id.uuid, id.name);
 }
 

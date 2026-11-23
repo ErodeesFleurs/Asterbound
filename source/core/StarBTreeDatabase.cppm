@@ -23,7 +23,7 @@ using DBException = StarError<DBExceptionTag, IOException>;
 
 class BTreeDatabase {
 public:
-  static constexpr std::uint32_t ContentIdentifierStringSize = 16;
+  static constexpr std::uint32_t content_identifier_string_size = 16;
 
   explicit BTreeDatabase(Logger& logger);
   BTreeDatabase(Logger& logger, String const& content_identifier, std::size_t key_size);
@@ -44,7 +44,7 @@ public:
   std::uint32_t key_size() const;
   [[nodiscard]] std::expected<void, StarException> set_key_size(std::uint32_t key_size);
 
-  // Must be no greater than ContentIdentifierStringSize large.  May not be
+  // Must be no greater than content_identifier_string_size large.  May not be
   // called when the database is opened.
   String content_identifier() const;
   [[nodiscard]] std::expected<void, StarException> set_content_identifier(String content_identifier);
@@ -107,28 +107,26 @@ public:
 
   // Commits pending changes and optionally closes the device.  A commit
   // failure leaves the database open so the caller can report it or roll back.
-  [[nodiscard]] std::expected<void, StarException> close(bool closeDevice = false);
+  [[nodiscard]] std::expected<void, StarException> close(bool close_device = false);
 
 private:
   using BlockIndex = std::uint32_t;
-  static BlockIndex const InvalidBlockIndex = static_cast<BlockIndex>(-1);
-  static std::uint32_t const HeaderSize = 512;
+  static BlockIndex const invalid_block_index = static_cast<BlockIndex>(-1);
+  static std::uint32_t const header_size = 512;
 
   // 8 byte magic file identifier
-  static std::array<char, 8> const VersionMagic;
-  static std::uint32_t const VersionMagicSize = 8;
+  static std::array<char, 8> const version_magic;
   // 2 byte leaf and index start markers.
-  static std::array<char, 2> const FreeIndexMagic;
-  static std::array<char, 2> const IndexMagic;
-  static std::array<char, 2> const LeafMagic;
-  // static uint32_t const BlockMagicSize = 2;
-  static std::size_t const BTreeRootSelectorBit = 32;
-  static std::size_t const BTreeRootInfoStart = 33;
-  static std::size_t const BTreeRootInfoSize = 17;
+  static std::array<char, 2> const free_index_magic;
+  static std::array<char, 2> const index_magic;
+  static std::array<char, 2> const leaf_magic;
+  static std::size_t const btree_root_selector_bit = 32;
+  static std::size_t const btree_root_info_start = 33;
+  static std::size_t const btree_root_info_size = 17;
 
   struct FreeIndexBlock {
-    BlockIndex nextFreeBlock;
-    List<BlockIndex> freeBlocks;
+    BlockIndex next_free_block;
+    List<BlockIndex> free_blocks;
   };
 
   struct IndexNode {
@@ -145,13 +143,13 @@ private:
     std::uint8_t index_level() const;
     void set_index_level(std::uint8_t index_level);
 
-    // count is number of elements to shift left *including* right's beginPointer
+    // count is number of elements to shift left *including* right's begin_pointer
     void shift_left(ByteArray const& mid, IndexNode& right, std::size_t count);
 
     // count is number of elements to shift right
     void shift_right(ByteArray const& mid, IndexNode& left, std::size_t count);
 
-    // i should be index of pointer that will be the new beginPointer of right
+    // i should be index of pointer that will be the new begin_pointer of right
     // node (cannot be 0).
     ByteArray split(IndexNode& right, std::size_t i);
 
@@ -163,12 +161,12 @@ private:
 
     BlockIndex self;
     std::uint8_t level;
-    std::optional<BlockIndex> beginPointer;
+    std::optional<BlockIndex> begin_pointer;
     ElementList pointers;
   };
 
   struct LeafNode {
-    std::size_t count() const;
+    std::size_t size() const;
     ByteArray const& key(std::size_t i) const;
     ByteArray const& data(std::size_t i) const;
 
@@ -210,9 +208,9 @@ private:
 
     Pointer root_pointer();
     bool root_is_leaf();
-    [[nodiscard]] std::expected<void, StarException> set_new_root(Pointer pointer, bool isLeaf);
+    [[nodiscard]] std::expected<void, StarException> set_new_root(Pointer pointer, bool is_leaf);
 
-    Index create_index(Pointer beginPointer);
+    Index create_index(Pointer begin_pointer);
     [[nodiscard]] std::expected<Index, StarException> load_index(Pointer pointer);
     bool index_needs_shift(Index const& index);
     bool index_shift(Index const& left, Key const& mid, Index const& right);
@@ -249,22 +247,22 @@ private:
     BTreeDatabase& parent;
   };
 
-  [[nodiscard]] std::expected<void, StarException> read_block(BlockIndex blockIndex, std::size_t blockOffset, std::span<char> block) const;
-  [[nodiscard]] std::expected<ByteArray, StarException> read_block(BlockIndex blockIndex) const;
-  [[nodiscard]] std::expected<void, StarException> update_block(BlockIndex blockIndex, ByteArray const& block);
-  [[nodiscard]] std::expected<void, StarException> update_block(BlockIndex blockIndex, ByteArray&& block);
+  [[nodiscard]] std::expected<void, StarException> read_block(BlockIndex block_index, std::size_t block_offset, std::span<char> block) const;
+  [[nodiscard]] std::expected<ByteArray, StarException> read_block(BlockIndex block_index) const;
+  [[nodiscard]] std::expected<void, StarException> update_block(BlockIndex block_index, ByteArray const& block);
+  [[nodiscard]] std::expected<void, StarException> update_block(BlockIndex block_index, ByteArray&& block);
 
-  [[nodiscard]] std::expected<void, StarException> raw_read_block(BlockIndex blockIndex, std::size_t blockOffset, std::span<char> block) const;
-  [[nodiscard]] std::expected<void, StarException> raw_write_block(BlockIndex blockIndex, std::size_t blockOffset, std::span<char const> block);
+  [[nodiscard]] std::expected<void, StarException> raw_read_block(BlockIndex block_index, std::size_t block_offset, std::span<char> block) const;
+  [[nodiscard]] std::expected<void, StarException> raw_write_block(BlockIndex block_index, std::size_t block_offset, std::span<char const> block);
 
-  [[nodiscard]] std::expected<FreeIndexBlock, StarException> read_free_index_block(BlockIndex blockIndex);
-  [[nodiscard]] std::expected<void, StarException> write_free_index_block(BlockIndex blockIndex, FreeIndexBlock indexBlock);
+  [[nodiscard]] std::expected<FreeIndexBlock, StarException> read_free_index_block(BlockIndex block_index);
+  [[nodiscard]] std::expected<void, StarException> write_free_index_block(BlockIndex block_index, FreeIndexBlock index_block);
 
   std::uint32_t leaf_size(std::shared_ptr<LeafNode> const& leaf) const;
   std::uint32_t max_index_pointers() const;
 
   std::uint32_t data_size(ByteArray const& d) const;
-  [[nodiscard]] std::expected<List<BlockIndex>, StarException> leaf_tail_blocks(BlockIndex leafPointer);
+  [[nodiscard]] std::expected<List<BlockIndex>, StarException> leaf_tail_blocks(BlockIndex leaf_pointer);
 
   void free_block(BlockIndex b);
   [[nodiscard]] std::expected<BlockIndex, StarException> reserve_block();
@@ -277,8 +275,8 @@ private:
   [[nodiscard]] std::expected<bool, StarException> try_flatten();
   [[nodiscard]] std::expected<bool, StarException> flatten_visitor(BTreeImpl::Index& index, BlockIndex& count);
 
-  [[nodiscard]] std::expected<void, StarException> check_if_open(std::string_view methodName, bool shouldBeOpen) const;
-  [[nodiscard]] std::expected<void, StarException> check_block_index(std::size_t blockIndex) const;
+  [[nodiscard]] std::expected<void, StarException> check_if_open(std::string_view method_name, bool should_be_open) const;
+  [[nodiscard]] std::expected<void, StarException> check_block_index(std::size_t block_index) const;
   [[nodiscard]] std::expected<void, StarException> check_key_size(ByteArray const& k) const;
   std::uint32_t max_free_index_length() const;
 
@@ -290,34 +288,34 @@ private:
   std::shared_ptr<IODevice> m_device;
   bool m_open;
 
-  std::uint32_t m_blockSize;
-  String m_contentIdentifier;
-  std::uint32_t m_keySize;
+  std::uint32_t m_block_size;
+  String m_content_identifier;
+  std::uint32_t m_key_size;
 
-  bool m_autoCommit;
+  bool m_auto_commit;
 
   // Reading values can mutate the index cache, so the index cache is kept
   // using a different lock.  It is only necessary to acquire this lock when
   // NOT holding the main writer lock. Cache settings take the main lock first,
   // then this lock, so setters cannot race writer-only cache mutations.
-  mutable SpinLock m_indexCacheSpinLock;
-  LruCache<BlockIndex, std::shared_ptr<IndexNode>> m_indexCache;
+  mutable SpinLock m_index_cache_spin_lock;
+  LruCache<BlockIndex, std::shared_ptr<IndexNode>> m_index_cache;
 
-  BlockIndex m_headFreeIndexBlock;
-  StreamOffset m_deviceSize;
+  BlockIndex m_head_free_index_block;
+  StreamOffset m_device_size;
   BlockIndex m_root;
-  bool m_rootIsLeaf;
-  bool m_usingAltRoot;
+  bool m_root_is_leaf;
+  bool m_using_alt_root;
 
   // Blocks that can be freely allocated and written to without violating
   // atomic consistency.
-  Set<BlockIndex> m_availableBlocks;
+  Set<BlockIndex> m_available_blocks;
 
   // Blocks that have been written in uncommitted portions of the tree.
   Set<BlockIndex> m_uncommitted;
 
   // Temporarily holds written data so that it can be rolled back.
-  mutable Map<BlockIndex, ByteArray> m_uncommittedWrites;
+  mutable Map<BlockIndex, ByteArray> m_uncommitted_writes;
 };
 
 // Version of BTreeDatabase that hashes keys with SHA-256 to produce a unique
@@ -341,7 +339,7 @@ public:
   [[nodiscard]] std::expected<bool, StarException> insert(String const& key, ByteArray const& value);
   [[nodiscard]] std::expected<bool, StarException> erase(String const& key);
 
-  using BTreeDatabase::ContentIdentifierStringSize;
+  using BTreeDatabase::content_identifier_string_size;
   using BTreeDatabase::block_size;
   using BTreeDatabase::set_block_size;
   using BTreeDatabase::content_identifier;

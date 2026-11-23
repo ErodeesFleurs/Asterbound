@@ -50,7 +50,7 @@ public:
 
     template <typename Self> requires std::is_lvalue_reference_v<Self&&>
     decltype(auto) operator()(this Self&& self, std::size_t x, std::size_t y) {
-      if constexpr (Star::DebugEnabled)
+      if constexpr (Star::debug_enabled)
         Star::star_assert_failed(x < sector_size && y < sector_size);
       return self.elements[x * sector_size + y];
     }

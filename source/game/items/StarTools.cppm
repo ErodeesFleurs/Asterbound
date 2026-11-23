@@ -81,8 +81,8 @@ class ToolUserEntity;
 
 class MiningTool : public Item, public SwingableItem, public DurabilityItem {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<MiningTool, Item, SwingableItem, DurabilityItem>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<MiningTool, Item, SwingableItem, DurabilityItem>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<MiningTool>(); }
 
@@ -133,8 +133,8 @@ private:
 
 class HarvestingTool : public Item, public SwingableItem {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<HarvestingTool, Item, SwingableItem>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<HarvestingTool, Item, SwingableItem>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<HarvestingTool>(); }
 
@@ -175,8 +175,8 @@ private:
 
 class WireTool : public Item, public FireableItem, public PointableItem, public BeamItem {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<WireTool, Item, FireableItem, PointableItem, BeamItem>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<WireTool, Item, FireableItem, PointableItem, BeamItem>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<WireTool>(); }
 
@@ -221,8 +221,8 @@ private:
 
 class BeamMiningTool : public Item, public FireableItem, public PreviewTileTool, public PointableItem, public BeamItem {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<BeamMiningTool, Item, FireableItem, PreviewTileTool, PointableItem, BeamItem>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<BeamMiningTool, Item, FireableItem, PreviewTileTool, PointableItem, BeamItem>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<BeamMiningTool>(); }
 
@@ -277,8 +277,8 @@ class PaintingBeamTool
     public PointableItem,
     public BeamItem {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<PaintingBeamTool, Item, FireableItem, PreviewTileTool, PointableItem, BeamItem>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<PaintingBeamTool, Item, FireableItem, PreviewTileTool, PointableItem, BeamItem>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<PaintingBeamTool>(); }
 

@@ -450,7 +450,7 @@ std::expected<void, StarException> OptionsMenu::syncGuiToConf() {
     return std::unexpected(std::move(headRotation.error()));
   m_headRotationButton->setChecked(headRotation->value_or(true));
   if (!context().applicationController()->p2pNetworkingService()) {
-    m_p2pJoinableLabel->setColor(Color::DarkGray);
+    m_p2pJoinableLabel->setColor(Color::palette_dark_gray);
     m_clientP2PJoinableButton->setEnabled(false);
     m_clientP2PJoinableButton->setChecked(false);
   }

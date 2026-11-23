@@ -548,8 +548,8 @@ const GameTestRegistration embeddedEscapedFrameNames(
       )LUA");
       ASSERT_TRUE(path) << path.error().what();
       AssetPath components;
-      components.m_base_path = *path;
-      components.m_sub_path = name;
+      components.base_path = *path;
+      components.sub_path = name;
       auto loaded = (*assets)->image(components);
       ASSERT_TRUE(loaded) << loaded.error().what();
       expectPixels(**loaded, *expected);

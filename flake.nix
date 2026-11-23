@@ -118,7 +118,7 @@
             stdenv = sanitizedDependencies.stdenv;
           };
           # RelWithAsserts build: no -DNDEBUG, so the project's own invariants
-          # (starAssert) and DebugEnabled paths are live while the tests run.
+          # (starAssert) and debug_enabled paths are live while the tests run.
           asserts = asterbound.override { asserts = true; };
           benchmarks = asterbound.override {
             guiSupport = false;

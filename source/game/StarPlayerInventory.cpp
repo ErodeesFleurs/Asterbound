@@ -537,7 +537,7 @@ bool PlayerInventory::consumeItems(ItemDescriptor const& descriptor, bool exactM
     if (quantity > 0) {
       auto res = pair.second->consumeItems(one.multiply(quantity), exactMatch);
       ((void)(res));
-      if constexpr (Star::DebugEnabled) {
+      if constexpr (Star::debug_enabled) {
         Star::star_assert_failed((res));
       }
       leftoverCount -= quantity;
@@ -554,14 +554,14 @@ bool PlayerInventory::consumeItems(ItemDescriptor const& descriptor, bool exactM
         auto res = p.second->consume(toConsume);
         normalizeItem(p.second);
         ((void)(res));
-        if constexpr (Star::DebugEnabled) {
+        if constexpr (Star::debug_enabled) {
           Star::star_assert_failed((res));
         }
 
         leftoverQuantity -= toConsume;
       }
     }
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((leftoverQuantity == 0));
     }
     leftoverCount -= quantity;
@@ -574,12 +574,12 @@ bool PlayerInventory::consumeItems(ItemDescriptor const& descriptor, bool exactM
       auto res = m_swapSlot->consume(toConsume);
       normalizeItem(m_swapSlot);
       ((void)(res));
-      if constexpr (Star::DebugEnabled) {
+      if constexpr (Star::debug_enabled) {
         Star::star_assert_failed((res));
       }
 
       quantity -= toConsume;
-      if constexpr (Star::DebugEnabled) {
+      if constexpr (Star::debug_enabled) {
         Star::star_assert_failed((quantity == 0));
       }
     }
@@ -593,19 +593,19 @@ bool PlayerInventory::consumeItems(ItemDescriptor const& descriptor, bool exactM
       auto res = m_trashSlot->consume(toConsume);
       normalizeItem(m_trashSlot);
       ((void)(res));
-      if constexpr (Star::DebugEnabled) {
+      if constexpr (Star::debug_enabled) {
         Star::star_assert_failed((res));
       }
 
       quantity -= toConsume;
-      if constexpr (Star::DebugEnabled) {
+      if constexpr (Star::debug_enabled) {
         Star::star_assert_failed((quantity == 0));
       }
     }
     leftoverCount -= std::min(leftoverCount, consumeFromTrash);
   }
 
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((leftoverCount == 0));
   }
   return true;

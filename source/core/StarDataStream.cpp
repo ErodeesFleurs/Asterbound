@@ -11,16 +11,16 @@ import star.byte_array;
 namespace Star {
 
 DataStream::DataStream()
-  : m_byteOrder(ByteOrder::BigEndian), m_nullTerminatedStrings(false),
-    m_streamCompatibilityVersion(OpenProtocolVersion) {}
-ByteOrder DataStream::byte_order() const { return m_byteOrder; }
-void DataStream::set_byte_order(ByteOrder order) { m_byteOrder = order; }
-bool DataStream::null_terminated_strings() const { return m_nullTerminatedStrings; }
-void DataStream::set_null_terminated_strings(bool enabled) { m_nullTerminatedStrings = enabled; }
-unsigned DataStream::stream_compatibility_version() const { return m_streamCompatibilityVersion; }
-void DataStream::set_stream_compatibility_version(unsigned version) { m_streamCompatibilityVersion = version; }
+  : m_byte_order(ByteOrder::BigEndian), m_null_terminated_strings(false),
+    m_stream_compatibility_version(open_protocol_version) {}
+ByteOrder DataStream::byte_order() const { return m_byte_order; }
+void DataStream::set_byte_order(ByteOrder order) { m_byte_order = order; }
+bool DataStream::null_terminated_strings() const { return m_null_terminated_strings; }
+void DataStream::set_null_terminated_strings(bool enabled) { m_null_terminated_strings = enabled; }
+unsigned DataStream::stream_compatibility_version() const { return m_stream_compatibility_version; }
+void DataStream::set_stream_compatibility_version(unsigned version) { m_stream_compatibility_version = version; }
 void DataStream::set_stream_compatibility_version(NetCompatibilityRules const& rules) {
-  m_streamCompatibilityVersion = rules.version();
+  m_stream_compatibility_version = rules.version();
 }
 
 std::expected<ByteArray, StarException> DataStream::read_bytes(std::size_t len) {
@@ -147,7 +147,7 @@ std::expected<std::size_t, StarException> DataStream::write_vlq_i(std::int64_t v
   return write_vlq_u(zigzag_encode(value));
 }
 std::expected<std::size_t, StarException> DataStream::write_vlq_s(std::size_t value) {
-  return write_vlq_u(value == NPos ? 0 : std::uint64_t(value) + 1);
+  return write_vlq_u(value == npos ? 0 : std::uint64_t(value) + 1);
 }
 std::expected<std::size_t, StarException> DataStream::read_vlq_u(std::uint64_t& value) {
   std::uint64_t decoded = 0;
@@ -173,7 +173,7 @@ std::expected<std::size_t, StarException> DataStream::read_vlq_s(std::size_t& va
   std::uint64_t encoded;
   auto count = read_vlq_u(encoded);
   if (!count) return std::unexpected(std::move(count.error()));
-  value = encoded ? std::size_t(encoded - 1) : NPos;
+  value = encoded ? std::size_t(encoded - 1) : npos;
   return *count;
 }
 std::expected<std::uint64_t, StarException> DataStream::read_vlq_u() {
@@ -219,7 +219,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> DataStream::ope
 }
 std::expected<std::reference_wrapper<DataStream>, StarException> DataStream::operator>>(std::string& value) {
   std::string decoded;
-  if (m_nullTerminatedStrings) {
+  if (m_null_terminated_strings) {
     for (;;) {
       auto byte = read<char>();
       if (!byte) return std::unexpected(std::move(byte.error()));
@@ -255,7 +255,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> DataStream::ope
   return std::ref(*this);
 }
 std::expected<void, StarException> DataStream::write_string_data(std::span<char const> data) {
-  if (m_nullTerminatedStrings) {
+  if (m_null_terminated_strings) {
     auto result = write_data(data);
     if (!result) return std::unexpected(std::move(result.error()));
     return write<std::uint8_t>(0);

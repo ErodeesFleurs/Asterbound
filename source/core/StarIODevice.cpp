@@ -77,10 +77,10 @@ std::expected<StreamOffset, StarException> IODevice::size() {
   return *length;
 }
 
-std::expected<std::size_t, StarException> IODevice::read_absolute(StreamOffset readPosition, std::span<char> data) {
+std::expected<std::size_t, StarException> IODevice::read_absolute(StreamOffset read_position, std::span<char> data) {
   auto stored = pos();
   if (!stored) return std::unexpected(std::move(stored.error()));
-  auto moved = seek(readPosition);
+  auto moved = seek(read_position);
   if (!moved) return std::unexpected(std::move(moved.error()));
   auto count = read(data);
   auto restored = seek(*stored);
@@ -89,11 +89,11 @@ std::expected<std::size_t, StarException> IODevice::read_absolute(StreamOffset r
   return *count;
 }
 
-std::expected<std::size_t, StarException> IODevice::write_absolute(StreamOffset writePosition,
+std::expected<std::size_t, StarException> IODevice::write_absolute(StreamOffset write_position,
                                                                    std::span<char const> data) {
   auto stored = pos();
   if (!stored) return std::unexpected(std::move(stored.error()));
-  auto moved = seek(writePosition);
+  auto moved = seek(write_position);
   if (!moved) return std::unexpected(std::move(moved.error()));
   auto count = write(data);
   auto restored = seek(*stored);

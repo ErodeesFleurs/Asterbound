@@ -440,10 +440,10 @@ namespace polygon_detail {
 
 // The order and signs of these axes are observable: equal depths keep the first
 // axis, and movement also uses the signed correction for directional contacts.
-template <polygon_coordinate T, std::size_t Extent, typename Visitor>
+template <polygon_coordinate T, std::size_t extent, typename Visitor>
   requires std::invocable<Visitor&, Vector<Determinant<T>, 2> const&, Determinant<T>>
     && std::same_as<std::invoke_result_t<Visitor&, Vector<Determinant<T>, 2> const&, Determinant<T>>, bool>
-bool visit_sat_projections(std::span<Vector<T, 2> const> left, std::span<Vector<T, 2> const, Extent> right, Visitor&& visit) {
+bool visit_sat_projections(std::span<Vector<T, 2> const> left, std::span<Vector<T, 2> const, extent> right, Visitor&& visit) {
   if (left.empty() || right.empty())
     return false;
 
@@ -489,8 +489,8 @@ bool visit_sat_projections(std::span<Vector<T, 2> const> left, std::span<Vector<
   return visit_edges(left, true) && visit_edges(right, false) && spans_plane;
 }
 
-template <polygon_coordinate T, std::size_t Extent>
-bool sat_intersects(std::span<Vector<T, 2> const> left, std::span<Vector<T, 2> const, Extent> right) {
+template <polygon_coordinate T, std::size_t extent>
+bool sat_intersects(std::span<Vector<T, 2> const> left, std::span<Vector<T, 2> const, extent> right) {
   return visit_sat_projections(left, right, [](Vector<Determinant<T>, 2> const&, Determinant<T> depth) {
     return depth > 0;
   });
@@ -498,10 +498,10 @@ bool sat_intersects(std::span<Vector<T, 2> const> left, std::span<Vector<T, 2> c
 
 // Inclusive segment contact, unlike strict SAT penetration. Keep collinear
 // endpoints in query order so that reversing a ray returns its new first hit.
-template <bool Locate, polygon_coordinate T>
-  requires (!Locate || std::floating_point<T>)
+template <bool locate, polygon_coordinate T>
+  requires (!locate || std::floating_point<T>)
 auto segment_contact(Line<T, 2> const& line, Line<T, 2> const& edge)
-    -> std::conditional_t<Locate, std::optional<T>, bool> {
+    -> std::conditional_t<locate, std::optional<T>, bool> {
   auto const& a = line.min();
   auto const& b = line.max();
   auto const& c = edge.min();
@@ -521,7 +521,7 @@ auto segment_contact(Line<T, 2> const& line, Line<T, 2> const& edge)
       for (std::size_t i = 0; i < 2; ++i)
         if (a[i] < std::min(c[i], d[i]) || a[i] > std::max(c[i], d[i]))
           return {};
-      if constexpr (Locate)
+      if constexpr (locate)
         return T{0};
       else
         return true;
@@ -530,7 +530,7 @@ auto segment_contact(Line<T, 2> const& line, Line<T, 2> const& edge)
     auto [low, high] = std::minmax(c[i], d[i]);
     if (std::max(a[i], b[i]) < low || std::min(a[i], b[i]) > high)
       return {};
-    if constexpr (Locate)
+    if constexpr (locate)
       return (std::clamp(a[i], low, high) - a[i]) / (b[i] - a[i]);
     else
       return true;
@@ -540,7 +540,7 @@ auto segment_contact(Line<T, 2> const& line, Line<T, 2> const& edge)
   auto b_side = orientation(c, d, b);
   if (same_side(a_side, b_side))
     return {};
-  if constexpr (Locate)
+  if constexpr (locate)
     return a_side / (a_side - b_side);
   else
     return true;

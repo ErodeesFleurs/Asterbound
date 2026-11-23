@@ -5,6 +5,9 @@ import std;
 
 using namespace Star;
 
+static_assert(std::ranges::contiguous_range<StaticVector<int, 0>>);
+static_assert(std::ranges::contiguous_range<StaticVector<int, 0> const>);
+
 TEST(StaticVectorTest, InsertErase) {
   typedef StaticVector<int, 64> SV;
   auto created = SV::create({1, 2, 3, 4});
@@ -189,7 +192,7 @@ TEST(StaticVectorTest, AlignedStorageAndZeroCapacity) {
   static_assert(sizeof(StaticVector<int, 2>) == sizeof(std::size_t) + 2 * sizeof(int));
   static_assert(sizeof(StaticVector<Value, 0>) == 2 * sizeof(Value));
   StaticVector<Value, 0> empty;
-  EXPECT_NE(empty.ptr(), nullptr);
+  EXPECT_NE(empty.data(), nullptr);
   EXPECT_EQ(empty.begin(), empty.end());
   auto rejected = empty.emplace_back(42);
   ASSERT_FALSE(rejected);
@@ -198,7 +201,7 @@ TEST(StaticVectorTest, AlignedStorageAndZeroCapacity) {
   StaticVector<Value, 2> values;
   ASSERT_TRUE(values.emplace_back(1));
   ASSERT_TRUE(values.emplace_back(2));
-  EXPECT_EQ(reinterpret_cast<std::uintptr_t>(values.ptr()) % alignof(Value), 0u);
+  EXPECT_EQ(reinterpret_cast<std::uintptr_t>(values.data()) % alignof(Value), 0u);
   EXPECT_EQ(values[0].value, 1);
   EXPECT_EQ(values[1].value, 2);
   values.clear();

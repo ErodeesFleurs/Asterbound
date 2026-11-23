@@ -217,7 +217,7 @@ enum class PacketCompressionMode : std::uint8_t {
 };
 
 struct Packet {
-  virtual void const* query_type(TypeKey key) const noexcept { return query_type_of<Packet>(this, key); }
+  virtual void query_type(TypeQuery& query) const noexcept { query_type_of<Packet>(*this, query); }
   virtual std::string_view dynamic_type_name() const noexcept { return Star::type_name<Packet>(); }
 
   virtual ~Packet();
@@ -243,8 +243,8 @@ struct Packet {
 
 template <PacketType PacketT>
 struct PacketBase : public Packet {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<PacketBase<PacketT>, Packet>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<PacketBase<PacketT>, Packet>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<PacketBase<PacketT>>(); }
 
@@ -254,8 +254,8 @@ struct PacketBase : public Packet {
 };
 
 struct ProtocolRequestPacket : PacketBase<PacketType::ProtocolRequest> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<ProtocolRequestPacket, PacketBase<PacketType::ProtocolRequest>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<ProtocolRequestPacket, PacketBase<PacketType::ProtocolRequest>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ProtocolRequestPacket>(); }
 
@@ -269,8 +269,8 @@ struct ProtocolRequestPacket : PacketBase<PacketType::ProtocolRequest> {
 };
 
 struct ProtocolResponsePacket : PacketBase<PacketType::ProtocolResponse> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<ProtocolResponsePacket, PacketBase<PacketType::ProtocolResponse>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<ProtocolResponsePacket, PacketBase<PacketType::ProtocolResponse>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ProtocolResponsePacket>(); }
 
@@ -285,8 +285,8 @@ struct ProtocolResponsePacket : PacketBase<PacketType::ProtocolResponse> {
 };
 
 struct ServerDisconnectPacket : PacketBase<PacketType::ServerDisconnect> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<ServerDisconnectPacket, PacketBase<PacketType::ServerDisconnect>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<ServerDisconnectPacket, PacketBase<PacketType::ServerDisconnect>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ServerDisconnectPacket>(); }
 
@@ -300,8 +300,8 @@ struct ServerDisconnectPacket : PacketBase<PacketType::ServerDisconnect> {
 };
 
 struct ConnectSuccessPacket : PacketBase<PacketType::ConnectSuccess> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<ConnectSuccessPacket, PacketBase<PacketType::ConnectSuccess>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<ConnectSuccessPacket, PacketBase<PacketType::ConnectSuccess>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ConnectSuccessPacket>(); }
 
@@ -317,8 +317,8 @@ struct ConnectSuccessPacket : PacketBase<PacketType::ConnectSuccess> {
 };
 
 struct ConnectFailurePacket : PacketBase<PacketType::ConnectFailure> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<ConnectFailurePacket, PacketBase<PacketType::ConnectFailure>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<ConnectFailurePacket, PacketBase<PacketType::ConnectFailure>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ConnectFailurePacket>(); }
 
@@ -332,8 +332,8 @@ struct ConnectFailurePacket : PacketBase<PacketType::ConnectFailure> {
 };
 
 struct HandshakeChallengePacket : PacketBase<PacketType::HandshakeChallenge> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<HandshakeChallengePacket, PacketBase<PacketType::HandshakeChallenge>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<HandshakeChallengePacket, PacketBase<PacketType::HandshakeChallenge>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<HandshakeChallengePacket>(); }
 
@@ -347,8 +347,8 @@ struct HandshakeChallengePacket : PacketBase<PacketType::HandshakeChallenge> {
 };
 
 struct ChatReceivePacket : PacketBase<PacketType::ChatReceive> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<ChatReceivePacket, PacketBase<PacketType::ChatReceive>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<ChatReceivePacket, PacketBase<PacketType::ChatReceive>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ChatReceivePacket>(); }
 
@@ -365,8 +365,8 @@ struct ChatReceivePacket : PacketBase<PacketType::ChatReceive> {
 };
 
 struct UniverseTimeUpdatePacket : PacketBase<PacketType::UniverseTimeUpdate> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<UniverseTimeUpdatePacket, PacketBase<PacketType::UniverseTimeUpdate>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<UniverseTimeUpdatePacket, PacketBase<PacketType::UniverseTimeUpdate>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<UniverseTimeUpdatePacket>(); }
 
@@ -381,8 +381,8 @@ struct UniverseTimeUpdatePacket : PacketBase<PacketType::UniverseTimeUpdate> {
 };
 
 struct CelestialResponsePacket : PacketBase<PacketType::CelestialResponse> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<CelestialResponsePacket, PacketBase<PacketType::CelestialResponse>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<CelestialResponsePacket, PacketBase<PacketType::CelestialResponse>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<CelestialResponsePacket>(); }
 
@@ -396,8 +396,8 @@ struct CelestialResponsePacket : PacketBase<PacketType::CelestialResponse> {
 };
 
 struct PlayerWarpResultPacket : PacketBase<PacketType::PlayerWarpResult> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<PlayerWarpResultPacket, PacketBase<PacketType::PlayerWarpResult>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<PlayerWarpResultPacket, PacketBase<PacketType::PlayerWarpResult>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<PlayerWarpResultPacket>(); }
 
@@ -413,8 +413,8 @@ struct PlayerWarpResultPacket : PacketBase<PacketType::PlayerWarpResult> {
 };
 
 struct PlanetTypeUpdatePacket : PacketBase<PacketType::PlanetTypeUpdate> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<PlanetTypeUpdatePacket, PacketBase<PacketType::PlanetTypeUpdate>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<PlanetTypeUpdatePacket, PacketBase<PacketType::PlanetTypeUpdate>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<PlanetTypeUpdatePacket>(); }
 
@@ -428,8 +428,8 @@ struct PlanetTypeUpdatePacket : PacketBase<PacketType::PlanetTypeUpdate> {
 };
 
 struct PausePacket : PacketBase<PacketType::Pause> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<PausePacket, PacketBase<PacketType::Pause>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<PausePacket, PacketBase<PacketType::Pause>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<PausePacket>(); }
 
@@ -447,8 +447,8 @@ struct PausePacket : PacketBase<PacketType::Pause> {
 };
 
 struct ServerInfoPacket : PacketBase<PacketType::ServerInfo> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<ServerInfoPacket, PacketBase<PacketType::ServerInfo>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<ServerInfoPacket, PacketBase<PacketType::ServerInfo>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ServerInfoPacket>(); }
 
@@ -466,8 +466,8 @@ struct ServerInfoPacket : PacketBase<PacketType::ServerInfo> {
 };
 
 struct ClientConnectPacket : PacketBase<PacketType::ClientConnect> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<ClientConnectPacket, PacketBase<PacketType::ClientConnect>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<ClientConnectPacket, PacketBase<PacketType::ClientConnect>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ClientConnectPacket>(); }
 
@@ -492,8 +492,8 @@ struct ClientConnectPacket : PacketBase<PacketType::ClientConnect> {
 };
 
 struct ClientDisconnectRequestPacket : PacketBase<PacketType::ClientDisconnectRequest> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<ClientDisconnectRequestPacket, PacketBase<PacketType::ClientDisconnectRequest>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<ClientDisconnectRequestPacket, PacketBase<PacketType::ClientDisconnectRequest>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override {
     return Star::type_name<ClientDisconnectRequestPacket>();
@@ -507,8 +507,8 @@ struct ClientDisconnectRequestPacket : PacketBase<PacketType::ClientDisconnectRe
 
 struct HandshakeResponsePacket : PacketBase<PacketType::HandshakeResponse> {
   [[nodiscard]] static ByteArray password_digest(String const& password, String const& account, ByteArray const& salt);
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<HandshakeResponsePacket, PacketBase<PacketType::HandshakeResponse>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<HandshakeResponsePacket, PacketBase<PacketType::HandshakeResponse>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<HandshakeResponsePacket>(); }
 
@@ -522,8 +522,8 @@ struct HandshakeResponsePacket : PacketBase<PacketType::HandshakeResponse> {
 };
 
 struct PlayerWarpPacket : PacketBase<PacketType::PlayerWarp> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<PlayerWarpPacket, PacketBase<PacketType::PlayerWarp>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<PlayerWarpPacket, PacketBase<PacketType::PlayerWarp>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<PlayerWarpPacket>(); }
 
@@ -538,8 +538,8 @@ struct PlayerWarpPacket : PacketBase<PacketType::PlayerWarp> {
 };
 
 struct FlyShipPacket : PacketBase<PacketType::FlyShip> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<FlyShipPacket, PacketBase<PacketType::FlyShip>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<FlyShipPacket, PacketBase<PacketType::FlyShip>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<FlyShipPacket>(); }
 
@@ -555,8 +555,8 @@ struct FlyShipPacket : PacketBase<PacketType::FlyShip> {
 };
 
 struct ChatSendPacket : PacketBase<PacketType::ChatSend> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<ChatSendPacket, PacketBase<PacketType::ChatSend>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<ChatSendPacket, PacketBase<PacketType::ChatSend>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ChatSendPacket>(); }
 
@@ -573,8 +573,8 @@ struct ChatSendPacket : PacketBase<PacketType::ChatSend> {
 };
 
 struct CelestialRequestPacket : PacketBase<PacketType::CelestialRequest> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<CelestialRequestPacket, PacketBase<PacketType::CelestialRequest>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<CelestialRequestPacket, PacketBase<PacketType::CelestialRequest>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<CelestialRequestPacket>(); }
 
@@ -588,8 +588,8 @@ struct CelestialRequestPacket : PacketBase<PacketType::CelestialRequest> {
 };
 
 struct ClientContextUpdatePacket : PacketBase<PacketType::ClientContextUpdate> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<ClientContextUpdatePacket, PacketBase<PacketType::ClientContextUpdate>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<ClientContextUpdatePacket, PacketBase<PacketType::ClientContextUpdate>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ClientContextUpdatePacket>(); }
 
@@ -604,8 +604,8 @@ struct ClientContextUpdatePacket : PacketBase<PacketType::ClientContextUpdate> {
 
 // Sent when a client should initialize themselves on a new world
 struct WorldStartPacket : PacketBase<PacketType::WorldStart> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<WorldStartPacket, PacketBase<PacketType::WorldStart>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<WorldStartPacket, PacketBase<PacketType::WorldStart>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<WorldStartPacket>(); }
 
@@ -630,8 +630,8 @@ struct WorldStartPacket : PacketBase<PacketType::WorldStart> {
 
 // Sent when a client is leaving a world
 struct WorldStopPacket : PacketBase<PacketType::WorldStop> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<WorldStopPacket, PacketBase<PacketType::WorldStop>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<WorldStopPacket, PacketBase<PacketType::WorldStop>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<WorldStopPacket>(); }
 
@@ -646,8 +646,8 @@ struct WorldStopPacket : PacketBase<PacketType::WorldStop> {
 
 // Sent when the region data for the client's current world changes
 struct WorldLayoutUpdatePacket : PacketBase<PacketType::WorldLayoutUpdate> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<WorldLayoutUpdatePacket, PacketBase<PacketType::WorldLayoutUpdate>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<WorldLayoutUpdatePacket, PacketBase<PacketType::WorldLayoutUpdate>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<WorldLayoutUpdatePacket>(); }
 
@@ -662,8 +662,8 @@ struct WorldLayoutUpdatePacket : PacketBase<PacketType::WorldLayoutUpdate> {
 
 // Sent when the environment status effect list for the client's current world changes
 struct WorldParametersUpdatePacket : PacketBase<PacketType::WorldParametersUpdate> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<WorldParametersUpdatePacket, PacketBase<PacketType::WorldParametersUpdate>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<WorldParametersUpdatePacket, PacketBase<PacketType::WorldParametersUpdate>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override {
     return Star::type_name<WorldParametersUpdatePacket>();
@@ -679,8 +679,8 @@ struct WorldParametersUpdatePacket : PacketBase<PacketType::WorldParametersUpdat
 };
 
 struct CentralStructureUpdatePacket : PacketBase<PacketType::CentralStructureUpdate> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<CentralStructureUpdatePacket, PacketBase<PacketType::CentralStructureUpdate>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<CentralStructureUpdatePacket, PacketBase<PacketType::CentralStructureUpdate>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override {
     return Star::type_name<CentralStructureUpdatePacket>();
@@ -696,8 +696,8 @@ struct CentralStructureUpdatePacket : PacketBase<PacketType::CentralStructureUpd
 };
 
 struct TileArrayUpdatePacket : PacketBase<PacketType::TileArrayUpdate> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<TileArrayUpdatePacket, PacketBase<PacketType::TileArrayUpdate>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<TileArrayUpdatePacket, PacketBase<PacketType::TileArrayUpdate>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<TileArrayUpdatePacket>(); }
 
@@ -713,8 +713,8 @@ struct TileArrayUpdatePacket : PacketBase<PacketType::TileArrayUpdate> {
 };
 
 struct TileUpdatePacket : PacketBase<PacketType::TileUpdate> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<TileUpdatePacket, PacketBase<PacketType::TileUpdate>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<TileUpdatePacket, PacketBase<PacketType::TileUpdate>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<TileUpdatePacket>(); }
 
@@ -727,8 +727,8 @@ struct TileUpdatePacket : PacketBase<PacketType::TileUpdate> {
 };
 
 struct TileLiquidUpdatePacket : PacketBase<PacketType::TileLiquidUpdate> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<TileLiquidUpdatePacket, PacketBase<PacketType::TileLiquidUpdate>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<TileLiquidUpdatePacket, PacketBase<PacketType::TileLiquidUpdate>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<TileLiquidUpdatePacket>(); }
 
@@ -743,8 +743,8 @@ struct TileLiquidUpdatePacket : PacketBase<PacketType::TileLiquidUpdate> {
 };
 
 struct TileDamageUpdatePacket : PacketBase<PacketType::TileDamageUpdate> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<TileDamageUpdatePacket, PacketBase<PacketType::TileDamageUpdate>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<TileDamageUpdatePacket, PacketBase<PacketType::TileDamageUpdate>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<TileDamageUpdatePacket>(); }
 
@@ -761,8 +761,8 @@ struct TileDamageUpdatePacket : PacketBase<PacketType::TileDamageUpdate> {
 };
 
 struct TileModificationFailurePacket : PacketBase<PacketType::TileModificationFailure> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<TileModificationFailurePacket, PacketBase<PacketType::TileModificationFailure>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<TileModificationFailurePacket, PacketBase<PacketType::TileModificationFailure>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override {
     return Star::type_name<TileModificationFailurePacket>();
@@ -778,8 +778,8 @@ struct TileModificationFailurePacket : PacketBase<PacketType::TileModificationFa
 };
 
 struct GiveItemPacket : PacketBase<PacketType::GiveItem> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<GiveItemPacket, PacketBase<PacketType::GiveItem>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<GiveItemPacket, PacketBase<PacketType::GiveItem>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<GiveItemPacket>(); }
 
@@ -796,8 +796,8 @@ struct GiveItemPacket : PacketBase<PacketType::GiveItem> {
 };
 
 struct EnvironmentUpdatePacket : PacketBase<PacketType::EnvironmentUpdate> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<EnvironmentUpdatePacket, PacketBase<PacketType::EnvironmentUpdate>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<EnvironmentUpdatePacket, PacketBase<PacketType::EnvironmentUpdate>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<EnvironmentUpdatePacket>(); }
 
@@ -812,8 +812,8 @@ struct EnvironmentUpdatePacket : PacketBase<PacketType::EnvironmentUpdate> {
 };
 
 struct UpdateTileProtectionPacket : PacketBase<PacketType::UpdateTileProtection> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<UpdateTileProtectionPacket, PacketBase<PacketType::UpdateTileProtection>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<UpdateTileProtectionPacket, PacketBase<PacketType::UpdateTileProtection>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<UpdateTileProtectionPacket>(); }
 
@@ -831,8 +831,8 @@ struct UpdateTileProtectionPacket : PacketBase<PacketType::UpdateTileProtection>
 };
 
 struct SetDungeonGravityPacket : PacketBase<PacketType::SetDungeonGravity> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<SetDungeonGravityPacket, PacketBase<PacketType::SetDungeonGravity>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<SetDungeonGravityPacket, PacketBase<PacketType::SetDungeonGravity>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<SetDungeonGravityPacket>(); }
 
@@ -850,8 +850,8 @@ struct SetDungeonGravityPacket : PacketBase<PacketType::SetDungeonGravity> {
 };
 
 struct SetDungeonBreathablePacket : PacketBase<PacketType::SetDungeonBreathable> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<SetDungeonBreathablePacket, PacketBase<PacketType::SetDungeonBreathable>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<SetDungeonBreathablePacket, PacketBase<PacketType::SetDungeonBreathable>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<SetDungeonBreathablePacket>(); }
 
@@ -869,8 +869,8 @@ struct SetDungeonBreathablePacket : PacketBase<PacketType::SetDungeonBreathable>
 };
 
 struct SetPlayerStartPacket : PacketBase<PacketType::SetPlayerStart> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<SetPlayerStartPacket, PacketBase<PacketType::SetPlayerStart>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<SetPlayerStartPacket, PacketBase<PacketType::SetPlayerStart>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<SetPlayerStartPacket>(); }
 
@@ -888,8 +888,8 @@ struct SetPlayerStartPacket : PacketBase<PacketType::SetPlayerStart> {
 };
 
 struct FindUniqueEntityResponsePacket : PacketBase<PacketType::FindUniqueEntityResponse> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<FindUniqueEntityResponsePacket, PacketBase<PacketType::FindUniqueEntityResponse>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<FindUniqueEntityResponsePacket, PacketBase<PacketType::FindUniqueEntityResponse>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override {
     return Star::type_name<FindUniqueEntityResponsePacket>();
@@ -906,8 +906,8 @@ struct FindUniqueEntityResponsePacket : PacketBase<PacketType::FindUniqueEntityR
 };
 
 struct PongPacket : PacketBase<PacketType::Pong> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<PongPacket, PacketBase<PacketType::Pong>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<PongPacket, PacketBase<PacketType::Pong>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<PongPacket>(); }
 
@@ -921,8 +921,8 @@ struct PongPacket : PacketBase<PacketType::Pong> {
 };
 
 struct ModifyTileListPacket : PacketBase<PacketType::ModifyTileList> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<ModifyTileListPacket, PacketBase<PacketType::ModifyTileList>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<ModifyTileListPacket, PacketBase<PacketType::ModifyTileList>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ModifyTileListPacket>(); }
 
@@ -937,8 +937,8 @@ struct ModifyTileListPacket : PacketBase<PacketType::ModifyTileList> {
 };
 
 struct ReplaceTileListPacket : PacketBase<PacketType::ReplaceTileList> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<ReplaceTileListPacket, PacketBase<PacketType::ReplaceTileList>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<ReplaceTileListPacket, PacketBase<PacketType::ReplaceTileList>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ReplaceTileListPacket>(); }
 
@@ -954,8 +954,8 @@ struct ReplaceTileListPacket : PacketBase<PacketType::ReplaceTileList> {
 };
 
 struct DamageTileGroupPacket : PacketBase<PacketType::DamageTileGroup> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<DamageTileGroupPacket, PacketBase<PacketType::DamageTileGroup>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<DamageTileGroupPacket, PacketBase<PacketType::DamageTileGroup>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<DamageTileGroupPacket>(); }
 
@@ -973,8 +973,8 @@ struct DamageTileGroupPacket : PacketBase<PacketType::DamageTileGroup> {
 };
 
 struct CollectLiquidPacket : PacketBase<PacketType::CollectLiquid> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<CollectLiquidPacket, PacketBase<PacketType::CollectLiquid>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<CollectLiquidPacket, PacketBase<PacketType::CollectLiquid>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<CollectLiquidPacket>(); }
 
@@ -989,8 +989,8 @@ struct CollectLiquidPacket : PacketBase<PacketType::CollectLiquid> {
 };
 
 struct RequestDropPacket : PacketBase<PacketType::RequestDrop> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<RequestDropPacket, PacketBase<PacketType::RequestDrop>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<RequestDropPacket, PacketBase<PacketType::RequestDrop>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<RequestDropPacket>(); }
 
@@ -1004,8 +1004,8 @@ struct RequestDropPacket : PacketBase<PacketType::RequestDrop> {
 };
 
 struct SpawnEntityPacket : PacketBase<PacketType::SpawnEntity> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<SpawnEntityPacket, PacketBase<PacketType::SpawnEntity>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<SpawnEntityPacket, PacketBase<PacketType::SpawnEntity>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<SpawnEntityPacket>(); }
 
@@ -1021,8 +1021,8 @@ struct SpawnEntityPacket : PacketBase<PacketType::SpawnEntity> {
 };
 
 struct ConnectWirePacket : PacketBase<PacketType::ConnectWire> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<ConnectWirePacket, PacketBase<PacketType::ConnectWire>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<ConnectWirePacket, PacketBase<PacketType::ConnectWire>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ConnectWirePacket>(); }
 
@@ -1037,8 +1037,8 @@ struct ConnectWirePacket : PacketBase<PacketType::ConnectWire> {
 };
 
 struct DisconnectAllWiresPacket : PacketBase<PacketType::DisconnectAllWires> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<DisconnectAllWiresPacket, PacketBase<PacketType::DisconnectAllWires>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<DisconnectAllWiresPacket, PacketBase<PacketType::DisconnectAllWires>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<DisconnectAllWiresPacket>(); }
 
@@ -1053,8 +1053,8 @@ struct DisconnectAllWiresPacket : PacketBase<PacketType::DisconnectAllWires> {
 };
 
 struct WorldClientStateUpdatePacket : PacketBase<PacketType::WorldClientStateUpdate> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<WorldClientStateUpdatePacket, PacketBase<PacketType::WorldClientStateUpdate>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<WorldClientStateUpdatePacket, PacketBase<PacketType::WorldClientStateUpdate>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override {
     return Star::type_name<WorldClientStateUpdatePacket>();
@@ -1070,8 +1070,8 @@ struct WorldClientStateUpdatePacket : PacketBase<PacketType::WorldClientStateUpd
 };
 
 struct FindUniqueEntityPacket : PacketBase<PacketType::FindUniqueEntity> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<FindUniqueEntityPacket, PacketBase<PacketType::FindUniqueEntity>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<FindUniqueEntityPacket, PacketBase<PacketType::FindUniqueEntity>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<FindUniqueEntityPacket>(); }
 
@@ -1085,8 +1085,8 @@ struct FindUniqueEntityPacket : PacketBase<PacketType::FindUniqueEntity> {
 };
 
 struct WorldStartAcknowledgePacket : PacketBase<PacketType::WorldStartAcknowledge> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<WorldStartAcknowledgePacket, PacketBase<PacketType::WorldStartAcknowledge>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<WorldStartAcknowledgePacket, PacketBase<PacketType::WorldStartAcknowledge>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override {
     return Star::type_name<WorldStartAcknowledgePacket>();
@@ -1099,8 +1099,8 @@ struct WorldStartAcknowledgePacket : PacketBase<PacketType::WorldStartAcknowledg
 };
 
 struct PingPacket : PacketBase<PacketType::Ping> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<PingPacket, PacketBase<PacketType::Ping>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<PingPacket, PacketBase<PacketType::Ping>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<PingPacket>(); }
 
@@ -1114,8 +1114,8 @@ struct PingPacket : PacketBase<PacketType::Ping> {
 };
 
 struct EntityCreatePacket : PacketBase<PacketType::EntityCreate> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<EntityCreatePacket, PacketBase<PacketType::EntityCreate>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<EntityCreatePacket, PacketBase<PacketType::EntityCreate>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<EntityCreatePacket>(); }
 
@@ -1135,8 +1135,8 @@ struct EntityCreatePacket : PacketBase<PacketType::EntityCreate> {
 // where they are master, any entities whose master is from that connection can
 // be assumed to have produced a blank delta.
 struct EntityUpdateSetPacket : PacketBase<PacketType::EntityUpdateSet> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<EntityUpdateSetPacket, PacketBase<PacketType::EntityUpdateSet>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<EntityUpdateSetPacket, PacketBase<PacketType::EntityUpdateSet>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<EntityUpdateSetPacket>(); }
 
@@ -1151,8 +1151,8 @@ struct EntityUpdateSetPacket : PacketBase<PacketType::EntityUpdateSet> {
 };
 
 struct EntityDestroyPacket : PacketBase<PacketType::EntityDestroy> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<EntityDestroyPacket, PacketBase<PacketType::EntityDestroy>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<EntityDestroyPacket, PacketBase<PacketType::EntityDestroy>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<EntityDestroyPacket>(); }
 
@@ -1170,8 +1170,8 @@ struct EntityDestroyPacket : PacketBase<PacketType::EntityDestroy> {
 };
 
 struct EntityInteractPacket : PacketBase<PacketType::EntityInteract> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<EntityInteractPacket, PacketBase<PacketType::EntityInteract>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<EntityInteractPacket, PacketBase<PacketType::EntityInteract>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<EntityInteractPacket>(); }
 
@@ -1186,8 +1186,8 @@ struct EntityInteractPacket : PacketBase<PacketType::EntityInteract> {
 };
 
 struct EntityInteractResultPacket : PacketBase<PacketType::EntityInteractResult> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<EntityInteractResultPacket, PacketBase<PacketType::EntityInteractResult>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<EntityInteractResultPacket, PacketBase<PacketType::EntityInteractResult>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<EntityInteractResultPacket>(); }
 
@@ -1203,8 +1203,8 @@ struct EntityInteractResultPacket : PacketBase<PacketType::EntityInteractResult>
 };
 
 struct HitRequestPacket : PacketBase<PacketType::HitRequest> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<HitRequestPacket, PacketBase<PacketType::HitRequest>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<HitRequestPacket, PacketBase<PacketType::HitRequest>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<HitRequestPacket>(); }
 
@@ -1218,8 +1218,8 @@ struct HitRequestPacket : PacketBase<PacketType::HitRequest> {
 };
 
 struct DamageRequestPacket : PacketBase<PacketType::DamageRequest> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<DamageRequestPacket, PacketBase<PacketType::DamageRequest>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<DamageRequestPacket, PacketBase<PacketType::DamageRequest>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<DamageRequestPacket>(); }
 
@@ -1233,8 +1233,8 @@ struct DamageRequestPacket : PacketBase<PacketType::DamageRequest> {
 };
 
 struct DamageNotificationPacket : PacketBase<PacketType::DamageNotification> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<DamageNotificationPacket, PacketBase<PacketType::DamageNotification>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<DamageNotificationPacket, PacketBase<PacketType::DamageNotification>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<DamageNotificationPacket>(); }
 
@@ -1248,8 +1248,8 @@ struct DamageNotificationPacket : PacketBase<PacketType::DamageNotification> {
 };
 
 struct EntityMessagePacket : PacketBase<PacketType::EntityMessage> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<EntityMessagePacket, PacketBase<PacketType::EntityMessage>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<EntityMessagePacket, PacketBase<PacketType::EntityMessage>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<EntityMessagePacket>(); }
 
@@ -1270,8 +1270,8 @@ struct EntityMessagePacket : PacketBase<PacketType::EntityMessage> {
 };
 
 struct EntityMessageResponsePacket : PacketBase<PacketType::EntityMessageResponse> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<EntityMessageResponsePacket, PacketBase<PacketType::EntityMessageResponse>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<EntityMessageResponsePacket, PacketBase<PacketType::EntityMessageResponse>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override {
     return Star::type_name<EntityMessageResponsePacket>();
@@ -1288,8 +1288,8 @@ struct EntityMessageResponsePacket : PacketBase<PacketType::EntityMessageRespons
 };
 
 struct UpdateWorldPropertiesPacket : PacketBase<PacketType::UpdateWorldProperties> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<UpdateWorldPropertiesPacket, PacketBase<PacketType::UpdateWorldProperties>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<UpdateWorldPropertiesPacket, PacketBase<PacketType::UpdateWorldProperties>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override {
     return Star::type_name<UpdateWorldPropertiesPacket>();
@@ -1308,8 +1308,8 @@ struct UpdateWorldPropertiesPacket : PacketBase<PacketType::UpdateWorldPropertie
 };
 
 struct StepUpdatePacket : PacketBase<PacketType::StepUpdate> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<StepUpdatePacket, PacketBase<PacketType::StepUpdate>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<StepUpdatePacket, PacketBase<PacketType::StepUpdate>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<StepUpdatePacket>(); }
 
@@ -1323,8 +1323,8 @@ struct StepUpdatePacket : PacketBase<PacketType::StepUpdate> {
 };
 
 struct SystemWorldStartPacket : PacketBase<PacketType::SystemWorldStart> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<SystemWorldStartPacket, PacketBase<PacketType::SystemWorldStart>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<SystemWorldStartPacket, PacketBase<PacketType::SystemWorldStart>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<SystemWorldStartPacket>(); }
 
@@ -1341,8 +1341,8 @@ struct SystemWorldStartPacket : PacketBase<PacketType::SystemWorldStart> {
 };
 
 struct SystemWorldUpdatePacket : PacketBase<PacketType::SystemWorldUpdate> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<SystemWorldUpdatePacket, PacketBase<PacketType::SystemWorldUpdate>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<SystemWorldUpdatePacket, PacketBase<PacketType::SystemWorldUpdate>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<SystemWorldUpdatePacket>(); }
 
@@ -1357,8 +1357,8 @@ struct SystemWorldUpdatePacket : PacketBase<PacketType::SystemWorldUpdate> {
 };
 
 struct SystemObjectCreatePacket : PacketBase<PacketType::SystemObjectCreate> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<SystemObjectCreatePacket, PacketBase<PacketType::SystemObjectCreate>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<SystemObjectCreatePacket, PacketBase<PacketType::SystemObjectCreate>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<SystemObjectCreatePacket>(); }
 
@@ -1372,8 +1372,8 @@ struct SystemObjectCreatePacket : PacketBase<PacketType::SystemObjectCreate> {
 };
 
 struct SystemObjectDestroyPacket : PacketBase<PacketType::SystemObjectDestroy> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<SystemObjectDestroyPacket, PacketBase<PacketType::SystemObjectDestroy>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<SystemObjectDestroyPacket, PacketBase<PacketType::SystemObjectDestroy>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<SystemObjectDestroyPacket>(); }
 
@@ -1387,8 +1387,8 @@ struct SystemObjectDestroyPacket : PacketBase<PacketType::SystemObjectDestroy> {
 };
 
 struct SystemShipCreatePacket : PacketBase<PacketType::SystemShipCreate> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<SystemShipCreatePacket, PacketBase<PacketType::SystemShipCreate>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<SystemShipCreatePacket, PacketBase<PacketType::SystemShipCreate>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<SystemShipCreatePacket>(); }
 
@@ -1402,8 +1402,8 @@ struct SystemShipCreatePacket : PacketBase<PacketType::SystemShipCreate> {
 };
 
 struct SystemShipDestroyPacket : PacketBase<PacketType::SystemShipDestroy> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<SystemShipDestroyPacket, PacketBase<PacketType::SystemShipDestroy>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<SystemShipDestroyPacket, PacketBase<PacketType::SystemShipDestroy>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<SystemShipDestroyPacket>(); }
 
@@ -1417,8 +1417,8 @@ struct SystemShipDestroyPacket : PacketBase<PacketType::SystemShipDestroy> {
 };
 
 struct SystemObjectSpawnPacket : PacketBase<PacketType::SystemObjectSpawn> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<SystemObjectSpawnPacket, PacketBase<PacketType::SystemObjectSpawn>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<SystemObjectSpawnPacket, PacketBase<PacketType::SystemObjectSpawn>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<SystemObjectSpawnPacket>(); }
 
@@ -1435,8 +1435,8 @@ struct SystemObjectSpawnPacket : PacketBase<PacketType::SystemObjectSpawn> {
 };
 
 struct UpdateWorldTemplatePacket : PacketBase<PacketType::UpdateWorldTemplate> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<UpdateWorldTemplatePacket, PacketBase<PacketType::UpdateWorldTemplate>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<UpdateWorldTemplatePacket, PacketBase<PacketType::UpdateWorldTemplate>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<UpdateWorldTemplatePacket>(); }
 
@@ -1450,8 +1450,8 @@ struct UpdateWorldTemplatePacket : PacketBase<PacketType::UpdateWorldTemplate> {
 };
 
 struct ClientCustomWorldRequest : PacketBase<PacketType::ClientCustomWorldRequest> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<ClientCustomWorldRequest, PacketBase<PacketType::ClientCustomWorldRequest>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<ClientCustomWorldRequest, PacketBase<PacketType::ClientCustomWorldRequest>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ClientCustomWorldRequest>(); }
 
@@ -1465,8 +1465,8 @@ struct ClientCustomWorldRequest : PacketBase<PacketType::ClientCustomWorldReques
 };
 
 struct ClientCustomWorldResponse : PacketBase<PacketType::ClientCustomWorldResponse> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<ClientCustomWorldResponse, PacketBase<PacketType::ClientCustomWorldResponse>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<ClientCustomWorldResponse, PacketBase<PacketType::ClientCustomWorldResponse>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ClientCustomWorldResponse>(); }
 
@@ -1481,8 +1481,8 @@ struct ClientCustomWorldResponse : PacketBase<PacketType::ClientCustomWorldRespo
 };
 
 struct ClientCustomWorldCreate : PacketBase<PacketType::ClientCustomWorldCreate> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<ClientCustomWorldCreate, PacketBase<PacketType::ClientCustomWorldCreate>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<ClientCustomWorldCreate, PacketBase<PacketType::ClientCustomWorldCreate>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ClientCustomWorldCreate>(); }
 
@@ -1498,8 +1498,8 @@ struct ClientCustomWorldCreate : PacketBase<PacketType::ClientCustomWorldCreate>
 
 // wrapper packet for client world threads
 struct ClientSubWorldPackets : PacketBase<PacketType::ClientSubWorldPackets> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<ClientSubWorldPackets, PacketBase<PacketType::ClientSubWorldPackets>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<ClientSubWorldPackets, PacketBase<PacketType::ClientSubWorldPackets>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ClientSubWorldPackets>(); }
 
@@ -1514,8 +1514,8 @@ struct ClientSubWorldPackets : PacketBase<PacketType::ClientSubWorldPackets> {
 };
 
 struct ClientSubWorldRequest : PacketBase<PacketType::ClientSubWorldRequest> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<ClientSubWorldRequest, PacketBase<PacketType::ClientSubWorldRequest>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<ClientSubWorldRequest, PacketBase<PacketType::ClientSubWorldRequest>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ClientSubWorldRequest>(); }
 
@@ -1530,8 +1530,8 @@ struct ClientSubWorldRequest : PacketBase<PacketType::ClientSubWorldRequest> {
 };
 
 struct ClientSubWorldReject : PacketBase<PacketType::ClientSubWorldReject> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<ClientSubWorldReject, PacketBase<PacketType::ClientSubWorldReject>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<ClientSubWorldReject, PacketBase<PacketType::ClientSubWorldReject>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ClientSubWorldReject>(); }
 
@@ -1545,8 +1545,8 @@ struct ClientSubWorldReject : PacketBase<PacketType::ClientSubWorldReject> {
 };
 
 struct NotifyWorldLoad : PacketBase<PacketType::NotifyWorldLoad> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<NotifyWorldLoad, PacketBase<PacketType::NotifyWorldLoad>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<NotifyWorldLoad, PacketBase<PacketType::NotifyWorldLoad>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<NotifyWorldLoad>(); }
 
@@ -1560,8 +1560,8 @@ struct NotifyWorldLoad : PacketBase<PacketType::NotifyWorldLoad> {
 };
 
 struct LogMapUpdate : PacketBase<PacketType::LogMapUpdate> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<LogMapUpdate, PacketBase<PacketType::LogMapUpdate>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<LogMapUpdate, PacketBase<PacketType::LogMapUpdate>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<LogMapUpdate>(); }
 
@@ -1575,8 +1575,8 @@ struct LogMapUpdate : PacketBase<PacketType::LogMapUpdate> {
 };
 
 struct UniverseMessage : PacketBase<PacketType::UniverseMessage> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<UniverseMessage, PacketBase<PacketType::UniverseMessage>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<UniverseMessage, PacketBase<PacketType::UniverseMessage>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<UniverseMessage>(); }
 
@@ -1597,8 +1597,8 @@ struct UniverseMessage : PacketBase<PacketType::UniverseMessage> {
 };
 
 struct UniverseMessageResponse : PacketBase<PacketType::UniverseMessageResponse> {
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<UniverseMessageResponse, PacketBase<PacketType::UniverseMessageResponse>>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<UniverseMessageResponse, PacketBase<PacketType::UniverseMessageResponse>>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<UniverseMessageResponse>(); }
 

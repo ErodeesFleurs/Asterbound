@@ -132,7 +132,7 @@ public:
       return m_point;
     if constexpr (std::contiguous_iterator<InputIterator> && std::same_as<std::iter_value_t<InputIterator>, char>) {
       auto decoded = utf8_decode_char(
-        std::string_view(std::to_address(m_current), static_cast<std::size_t>(m_end - m_current)), m_point);
+        std::string_view(m_current, m_end), m_point);
       if (!decoded)
         return std::unexpected(std::move(decoded.error()));
       m_width = *decoded;
@@ -173,7 +173,7 @@ public:
   {
     if (m_current == m_end)
       return {};
-    return std::string_view(std::to_address(m_current), static_cast<std::size_t>(m_end - m_current));
+    return std::string_view(m_current, m_end);
   }
 
   bool operator==(JsonUtf8InputIterator const& other) const { return m_current == other.m_current; }

@@ -54,8 +54,8 @@ Image patternedImage(Vec2U size, PixelFormat format) {
 void expectSameImage(Image const& actual, Image const& expected) {
   ASSERT_EQ(actual.size(), expected.size());
   ASSERT_EQ(actual.pixel_format(), expected.pixel_format());
-  ASSERT_EQ(actual.data().size(), expected.data().size());
-  EXPECT_TRUE(std::equal(actual.data().begin(), actual.data().end(), expected.data().begin()));
+  ASSERT_EQ(actual.span().size(), expected.span().size());
+  EXPECT_TRUE(std::equal(actual.span().begin(), actual.span().end(), expected.span().begin()));
 }
 
 void expectCroppedMatchesFull(Image const& source, Vec2F const& scale) {
@@ -166,7 +166,7 @@ TEST(ImageScalingTest, NearestEmptyAxesProduceZeroedMinimumDimensions) {
       ASSERT_TRUE(actual);
       EXPECT_EQ(actual->size(), Vec2U(size[0] == 0 ? 1 : 8, size[1] == 0 ? 1 : 5));
       EXPECT_EQ(actual->pixel_format(), format);
-      EXPECT_TRUE(std::all_of(actual->data().begin(), actual->data().end(), [](auto byte) { return byte == 0; }));
+      EXPECT_TRUE(std::all_of(actual->span().begin(), actual->span().end(), [](auto byte) { return byte == 0; }));
       if (actual->bytes_per_pixel() <= 4) {
         auto pixel = actual->get(0, 0);
         ASSERT_TRUE(pixel);
@@ -207,8 +207,8 @@ TEST(ImageScalingTest, NearestFloatFormatsRetainLegacyByteSetterBehavior) {
   for (auto format : {PixelFormat::RGB_F, PixelFormat::RGBA_F}) {
     Image source(3, 2, format);
     constexpr std::array<float, 4> pixel{0.125f, 0.25f, 0.75f, 0.5f};
-    for (std::size_t offset = 0; offset < source.data().size(); offset += source.bytes_per_pixel())
-      std::memcpy(source.data().data() + offset, pixel.data(), source.bytes_per_pixel());
+    for (std::size_t offset = 0; offset < source.span().size(); offset += source.bytes_per_pixel())
+      std::memcpy(source.span().data() + offset, pixel.data(), source.bytes_per_pixel());
     for (auto scale : {Vec2F(1, 1), Vec2F(2, 1.5f), Vec2F(0.5f, 0.75f)}) {
       auto expected = scalarNearest(source, scale);
       auto actual = scale_nearest(source, scale);
@@ -217,7 +217,7 @@ TEST(ImageScalingTest, NearestFloatFormatsRetainLegacyByteSetterBehavior) {
       expectSameImage(*actual, *expected);
       // Image::set(Vec4B) currently leaves float storage zeroed; copying the
       // raw float pixels here would silently introduce different semantics.
-      EXPECT_TRUE(std::all_of(actual->data().begin(), actual->data().end(), [](auto byte) { return byte == 0; }));
+      EXPECT_TRUE(std::all_of(actual->span().begin(), actual->span().end(), [](auto byte) { return byte == 0; }));
     }
   }
 }
@@ -260,8 +260,8 @@ TEST(ImageScalingTest, CroppedScalesRetainEmptyZeroAndFloatBehavior) {
       Image source(size, format);
       if (source.bytes_per_pixel() > 4) {
         constexpr std::array<float, 4> pixel{0.125f, 0.25f, 0.75f, 0.5f};
-        for (std::size_t offset = 0; offset < source.data().size(); offset += source.bytes_per_pixel())
-          std::memcpy(source.data().data() + offset, pixel.data(), source.bytes_per_pixel());
+        for (std::size_t offset = 0; offset < source.span().size(); offset += source.bytes_per_pixel())
+          std::memcpy(source.span().data() + offset, pixel.data(), source.bytes_per_pixel());
       } else {
         source = patternedImage(size, format);
       }

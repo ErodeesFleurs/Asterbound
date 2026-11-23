@@ -71,8 +71,8 @@ ButtonWidget::ButtonWidget(GuiContext& context) : Widget(context) {
   m_sustain = false;
   m_invisible = false;
   m_hTextAnchor = HorizontalAnchor::HMidAnchor;
-  m_fontColor = Color::White;
-  m_fontColorDisabled = Color::Gray;
+  m_fontColor = Color::palette_white;
+  m_fontColorDisabled = Color::palette_gray;
 
 }
 
@@ -211,7 +211,7 @@ std::expected<void, StarException> ButtonWidget::renderImpl() {
 
 std::expected<bool, StarException> ButtonWidget::sendEvent(InputEvent const& event) {
   if (m_visible && !m_disabled) {
-    if (std::holds_alternative<MouseButtonDownEvent>(event) && std::get<MouseButtonDownEvent>(event).mouseButton == MouseButton::Left) {
+    if (std::holds_alternative<MouseButtonDownEvent>(event) && std::get<MouseButtonDownEvent>(event).mouse_button == MouseButton::Left) {
       if (inMember(*context().mousePosition(event))) {
         if (!isPressed()) {
           auto soundResult = this->context().root().random().sample_value(m_clickSounds, "");

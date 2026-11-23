@@ -236,7 +236,7 @@ bool CellularLightArray<LightTraits>::get_obstacle(std::size_t x, std::size_t y)
 
 template <light_traits LightTraits>
 auto CellularLightArray<LightTraits>::cell(std::size_t x, std::size_t y) const -> Cell const & {
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((x < m_width && y < m_height));
   }
   return m_cells[x * m_height + y];
@@ -244,7 +244,7 @@ auto CellularLightArray<LightTraits>::cell(std::size_t x, std::size_t y) const -
 
 template <light_traits LightTraits>
 auto CellularLightArray<LightTraits>::cell(std::size_t x, std::size_t y) -> Cell & {
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((x < m_width && y < m_height));
   }
   return m_cells[x * m_height + y];
@@ -252,7 +252,7 @@ auto CellularLightArray<LightTraits>::cell(std::size_t x, std::size_t y) -> Cell
 
 template <light_traits LightTraits>
 auto CellularLightArray<LightTraits>::cell_at_index(std::size_t index) const -> Cell const & {
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((index < m_width * m_height));
   }
   return m_cells[index];
@@ -260,7 +260,7 @@ auto CellularLightArray<LightTraits>::cell_at_index(std::size_t index) const -> 
 
 template <light_traits LightTraits>
 auto CellularLightArray<LightTraits>::cell_at_index(std::size_t index) -> Cell & {
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((index < m_width * m_height));
   }
   return m_cells[index];

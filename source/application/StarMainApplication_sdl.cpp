@@ -636,7 +636,7 @@ public:
 #ifndef STAR_SYSTEM_MACOS
     windowFlags |= SDL_WINDOW_HIGH_PIXEL_DENSITY;
 #endif
-    m_sdlWindow.reset(SDL_CreateWindow(m_windowTitle.utf8_data(), m_windowSize[0], m_windowSize[1], windowFlags));
+    m_sdlWindow.reset(SDL_CreateWindow(m_windowTitle.utf8().c_str(), m_windowSize[0], m_windowSize[1], windowFlags));
     if (!m_sdlWindow)
       return std::unexpected(ApplicationException::format("Application: Could not create SDL Window: {}", SDL_GetError()));
     
@@ -676,7 +676,7 @@ public:
           w,
           h,
           sdlFmt,
-          flipped.data().data(),
+          flipped.span().data(),
           pitch
         ), SDL_DestroySurface);
 
@@ -1425,7 +1425,7 @@ private:
 
     bool setClipboard(String text) override {
       return parent.m_dispatcher.invoke([&]() -> bool {
-        return SDL_SetClipboardText(text.utf8_data());
+        return SDL_SetClipboardText(text.utf8().c_str());
       });
     }
 
@@ -1471,7 +1471,7 @@ private:
       parent.m_dispatcher.invoke([&]() {
         parent.m_windowTitle = std::move(title);
         if (parent.m_sdlWindow)
-          SDL_SetWindowTitle(parent.m_sdlWindow.get(), parent.m_windowTitle.utf8_data());
+          SDL_SetWindowTitle(parent.m_sdlWindow.get(), parent.m_windowTitle.utf8().c_str());
       });
     }
 
@@ -2100,7 +2100,7 @@ private:
       }
 
       entry->sdlSurface.reset(SDL_CreateSurfaceFrom(size[0], size[1], pixelFormat,
-                                                    const_cast<std::uint8_t*>(entry->image->data().data()),
+                                                    const_cast<std::uint8_t*>(entry->image->span().data()),
                                                     entry->image->bytes_per_pixel() * size[0]));
       if (!entry->sdlSurface)
         return std::unexpected(ApplicationException::format("Could not create cursor surface: {}", SDL_GetError()));
@@ -2123,11 +2123,11 @@ private:
     auto heldData = std::make_unique<StringMap<ByteArray>>(std::move(data));
     std::vector<const char*> types;
     for (auto&& entry : *heldData)
-      types.push_back(entry.first.utf8_data());
+      types.push_back(entry.first.utf8().c_str());
     auto request = [](void* userdata, const char* mime_type, std::size_t* size) -> const void* {
       if (auto entry = static_cast<StringMap<ByteArray>*>(userdata)->find_ref(String(std::string_view(mime_type)))) {
         *size = entry->get().size();
-        return entry->get().data();
+        return entry->get().span().data();
       }
       *size = 0;
       return NULL;
@@ -2151,7 +2151,7 @@ private:
       if (png)
         copyPngToClipboard(png->get().span());
       auto converted = image.convert(PixelFormat::RGBA32);
-      copyDibToClipboard(converted.data(), converted.width(), converted.height());
+      copyDibToClipboard(converted.span(), converted.width(), converted.height());
       return {};
     });
     #else

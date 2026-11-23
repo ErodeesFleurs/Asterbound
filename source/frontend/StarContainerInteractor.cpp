@@ -42,7 +42,7 @@ std::expected<void, StarException> ContainerInteractor::openContainer(std::share
   }
   m_openContainer = std::move(containerEntity);
   if (m_openContainer) {
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((m_openContainer->inWorld()));
     }
     auto opened = m_openContainer->containerOpen();

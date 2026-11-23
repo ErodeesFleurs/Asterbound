@@ -80,7 +80,7 @@ ProgressWidget::ProgressWidget(GuiContext& context, String const& background,
   m_progressLevel = 0;
   m_maxLevel = 1;
 
-  m_color = Color::White;
+  m_color = Color::palette_white;
 }
 
 std::expected<void, StarException> ProgressWidget::renderImpl() {

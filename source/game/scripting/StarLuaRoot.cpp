@@ -152,20 +152,20 @@ std::expected<void, StarException> LuaRoot::shutdown() {
   auto profile = engine->get_profile();
   if (profile.empty())
     return {};
-  profile.sort([](auto const& a, auto const& b) { return a.totalTime > b.totalTime; });
+  profile.sort([](auto const& a, auto const& b) { return a.total_time > b.total_time; });
   std::function<Json(LuaProfileEntry const&)> jsonFromProfileEntry = [&](LuaProfileEntry const& entry) -> Json {
     JsonObject value;
     value.set("function", entry.name.value_or("<function>"));
-    value.set("scope", entry.nameScope.value_or("?"));
-    value.set("source", Star::format("{}:{}", entry.source, entry.sourceLine));
-    value.set("self", entry.selfTime);
-    value.set("total", entry.totalTime);
+    value.set("scope", entry.name_scope.value_or("?"));
+    value.set("source", Star::format("{}:{}", entry.source, entry.source_line));
+    value.set("self", entry.self_time);
+    value.set("total", entry.total_time);
     // The detached engine and profile retain the entire call tree during export.
     std::vector<std::reference_wrapper<LuaProfileEntry const>> calls;
     calls.reserve(entry.calls.size());
     for (auto const& p : entry.calls)
       calls.push_back(std::cref(*p.second));
-    std::sort(calls.begin(), calls.end(), [](auto a, auto b) { return a.get().totalTime > b.get().totalTime; });
+    std::sort(calls.begin(), calls.end(), [](auto a, auto b) { return a.get().total_time > b.get().total_time; });
     JsonArray storedCalls;
     storedCalls.reserve(calls.size());
     std::ranges::transform(calls, std::back_inserter(storedCalls),
@@ -215,7 +215,7 @@ std::expected<LuaContext, StarException> LuaRoot::create_context(StringList cons
   auto cache = m_scriptCache;
   auto sourceDiagnostics = m_sourceDiagnostics;
   if (auto required = context.set_require_function(
-        [cache, sourceDiagnostics, revision = cache->revision(), loaded = HashSet<String, hash<String>, std::equal_to<>>{},
+        [cache, sourceDiagnostics, revision = cache->revision(), loaded = HashSet<String, ValueHash<String>, std::equal_to<>>{},
          loading = std::vector<String>{}](LuaStackValue environment,
                                           StringView module) mutable -> std::expected<void, StarException> {
           if (loaded.contains(module))

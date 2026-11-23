@@ -461,7 +461,7 @@ std::expected<void, StarException> append_embedded_data(std::string& output, std
     auto capacity = zng_compressBound(data.size());
     bytes.resize(capacity);
     std::size_t size = capacity;
-    auto status = zng_compress2(reinterpret_cast<std::uint8_t*>(bytes.data()), &size,
+    auto status = zng_compress2(reinterpret_cast<std::uint8_t*>(bytes.span().data()), &size,
         reinterpret_cast<std::uint8_t const*>(data.data()), data.size(), 5);
     if (status != Z_OK)
       return std::unexpected(StarException(Star::format("Embedded zlib compression error ({})", status)));
@@ -471,7 +471,7 @@ std::expected<void, StarException> append_embedded_data(std::string& output, std
     auto capacity = ZSTD_compressBound(data.size());
     if (ZSTD_isError(capacity)) return invalid("Zstandard compression bound failed");
     bytes.resize(capacity);
-    auto size = ZSTD_compress(bytes.data(), capacity, data.data(), data.size(), 0);
+    auto size = ZSTD_compress(bytes.span().data(), capacity, data.data(), data.size(), 0);
     if (ZSTD_isError(size))
       return std::unexpected(StarException(Star::format("Embedded Zstandard compression: {}", ZSTD_getErrorName(size))));
     bytes.resize(size);

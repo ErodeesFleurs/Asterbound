@@ -119,7 +119,7 @@ std::shared_ptr<ItemBag const> ItemGridWidget::bag() const {
 
 std::expected<std::shared_ptr<Item>, StarException> ItemGridWidget::itemAt(Vec2I const& position) const {
   auto pos = bagLocationAt(position);
-  if (pos != NPos && m_bag)
+  if (pos != npos && m_bag)
     return m_bag->at(pos);
 
   return std::shared_ptr<Item>{};
@@ -137,7 +137,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemGridWidget::selectedItem
 
 std::expected<std::shared_ptr<ItemSlotWidget>, StarException> ItemGridWidget::itemWidgetAt(Vec2I const& position) const {
   auto pos = bagLocationAt(position);
-  if (pos == NPos) return std::shared_ptr<ItemSlotWidget>{};
+  if (pos == npos) return std::shared_ptr<ItemSlotWidget>{};
   auto slot = m_slots.at(pos);
   if (!slot) return std::unexpected(std::move(slot.error()));
   return slot->get();
@@ -179,7 +179,7 @@ std::size_t ItemGridWidget::bagLocationAt(Vec2I const& position) const {
     }
   }
 
-  return NPos;
+  return npos;
 }
 
 std::expected<Vec2I, StarException> ItemGridWidget::positionOfSlot(std::size_t slotNumber) {
@@ -192,9 +192,9 @@ std::expected<bool, StarException> ItemGridWidget::sendEvent(InputEvent const& e
   if (m_visible) {
     if (std::holds_alternative<MouseButtonDownEvent>(event)) {
       auto const& mouseButton = std::get<MouseButtonDownEvent>(event);
-      if (mouseButton.mouseButton == MouseButton::Left
-        || (m_rightClickCallback && mouseButton.mouseButton == MouseButton::Right)
-        || (m_middleClickCallback && mouseButton.mouseButton == MouseButton::Middle)) {
+      if (mouseButton.mouse_button == MouseButton::Left
+        || (m_rightClickCallback && mouseButton.mouse_button == MouseButton::Right)
+        || (m_middleClickCallback && mouseButton.mouse_button == MouseButton::Middle)) {
         Vec2I mousePos = *context().mousePosition(event);
         for (std::size_t i = 0;
              i < (m_bag->size() - m_bagOffset) && i < static_cast<unsigned>(m_dimensions[0] * m_dimensions[1]); ++i) {
@@ -203,8 +203,8 @@ std::expected<bool, StarException> ItemGridWidget::sendEvent(InputEvent const& e
 
           if (bagItemArea.contains(mousePos)) {
             m_selectedIndex = i;
-            auto const& callback = mouseButton.mouseButton == MouseButton::Right ? m_rightClickCallback
-              : mouseButton.mouseButton == MouseButton::Middle ? m_middleClickCallback : m_callback;
+            auto const& callback = mouseButton.mouse_button == MouseButton::Right ? m_rightClickCallback
+              : mouseButton.mouse_button == MouseButton::Middle ? m_middleClickCallback : m_callback;
             if (!callback) return std::unexpected(GuiException("Item grid has no click callback"));
             auto result = callback(*this);
             if (!result) return std::unexpected(std::move(result.error()));

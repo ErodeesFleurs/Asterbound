@@ -135,7 +135,7 @@ constexpr T clamp(T const value, T const min, T const max)
 // Positive modulus is a precondition. The result is in [0, modulus).
 template <std::integral T>
 constexpr T positive_mod(T value, T modulus) {
-  if constexpr (Star::DebugEnabled)
+  if constexpr (Star::debug_enabled)
     Star::star_assert_failed((modulus > 0));
   T remainder = value % modulus;
   return remainder < 0 ? remainder + modulus : remainder;

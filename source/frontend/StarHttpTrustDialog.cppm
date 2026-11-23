@@ -13,8 +13,8 @@ export namespace Star {
 class HttpTrustDialog final : public Pane {
   struct ConstructionKey { explicit ConstructionKey() = default; };
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<HttpTrustDialog, Pane>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<HttpTrustDialog, Pane>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<HttpTrustDialog>(); }
 

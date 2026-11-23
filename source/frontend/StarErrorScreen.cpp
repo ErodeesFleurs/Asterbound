@@ -133,7 +133,7 @@ std::expected<void, StarException> ErrorScreen::render() {
 
 std::expected<bool, StarException> ErrorScreen::handleInputEvent(InputEvent const& event) {
   if (std::holds_alternative<MouseMoveEvent>(event))
-    m_cursorScreenPos = Vec2I(std::get<MouseMoveEvent>(event).mousePosition);
+    m_cursorScreenPos = Vec2I(std::get<MouseMoveEvent>(event).mouse_position);
 
   return m_paneManager->sendInputEvent(event);
 }

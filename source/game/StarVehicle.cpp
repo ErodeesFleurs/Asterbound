@@ -1265,7 +1265,7 @@ auto result997 = entitiesLoungingIn(std::move(*result996));
 if (!result997) return std::unexpected(std::move(result997.error()));
 auto entitiesIn = std::move(*result997);
       if (entitiesIn.empty())
-        return LuaNil;
+        return lua_nil;
       auto result998 = entitiesIn.first();
 if (!result998) return std::unexpected(std::move(result998.error()));
 return LuaInt(*result998);

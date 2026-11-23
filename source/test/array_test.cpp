@@ -29,10 +29,19 @@ struct explicit_integer {
 
 struct unrelated {};
 
+struct NestedArrayOwner {
+  struct Element { int value = 17; };
+  Array<Element, 2> entries;
+};
+static_assert(NestedArrayOwner{}.entries[1].value == 17);
+
 template <typename Destination, typename Source>
 concept cross_assignable = requires(Destination& destination, Source const& source) {
   { destination = source } -> std::same_as<Destination&>;
 };
+
+template <typename Owner>
+concept has_rvalue_span = requires(Owner&& owner) { std::move(owner).span(); };
 
 static_assert(std::default_initializable<Array<int, 4>>);
 static_assert(std::default_initializable<Array<non_default, 0>>);
@@ -57,8 +66,10 @@ static_assert(!std::is_copy_assignable_v<Array<std::unique_ptr<int>, 2>>);
 static_assert(std::copyable<Array<int, 2>>);
 static_assert(std::same_as<decltype(std::declval<Array<int, 2>&>().get<0>()), int&>);
 static_assert(std::same_as<decltype(std::declval<Array<int, 2> const&>().get<0>()), int const&>);
-static_assert(std::same_as<decltype(std::declval<Array<int, 2>&>().data()), int*>);
-static_assert(std::same_as<decltype(std::declval<Array<int, 2> const&>().data()), int const*>);
+static_assert(std::same_as<decltype(std::declval<Array<int, 2>&>().span()), std::span<int, 2>>);
+static_assert(std::same_as<decltype(std::declval<Array<int, 2> const&>().span()), std::span<int const, 2>>);
+static_assert(!has_rvalue_span<Array<int, 2>>);
+static_assert(!has_rvalue_span<Array<int, 2> const>);
 static_assert(std::ranges::contiguous_range<Array<int, 4>>);
 static_assert(std::ranges::contiguous_range<Array<int, 4> const>);
 static_assert(std::ranges::contiguous_range<Array<int, 0>>);
@@ -72,9 +83,9 @@ constexpr bool constexpr_default_and_access() {
     if (value != 0)
       return false;
   values.get<1>() = 17;
-  values.data()[3] = 29;
+  values.span()[3] = 29;
   auto const& immutable = values;
-  return immutable.get<1>() == 17 && immutable.data()[3] == 29 && values.data() == &values.get<0>();
+  return immutable.get<1>() == 17 && immutable.span()[3] == 29 && values.span().data() == &values.get<0>();
 }
 
 static_assert(constexpr_default_and_access());
@@ -85,7 +96,7 @@ constexpr void mutate_owned_arrays(Array<int, 4>& values, Array<int, 4>& replace
   values.front() = 5;
   values.back() = 8;
   values[1] = 6;
-  values.data()[2] = 7;
+  values.span()[2] = 7;
   for (auto& value : values)
     ++value;
   for (auto it = values.rbegin(); it != values.rend(); ++it)
@@ -100,7 +111,7 @@ constexpr bool constexpr_container_mutation() {
   mutate_owned_arrays(values, replacement);
   auto const& immutable = replacement;
   return values.front() == 3 && values.back() == 3 && immutable.front() == 12 && immutable.back() == 18
-    && *immutable.cbegin() == 12 && *immutable.crbegin() == 18 && immutable.data()[1] == 14 && immutable[2] == 16
+    && *immutable.cbegin() == 12 && *immutable.crbegin() == 18 && immutable.span()[1] == 14 && immutable[2] == 16
     && immutable.cend() - immutable.cbegin() == 4;
 }
 
@@ -247,7 +258,7 @@ TEST(ArrayAccess, CheckedBoundaryPreservesMutableAndConstReferences) {
   auto first = immutable.at(0);
   ASSERT_TRUE(first);
   static_assert(std::same_as<decltype(first), std::expected<std::reference_wrapper<int const>, StarException>>);
-  EXPECT_EQ(&first->get(), values.data());
+  EXPECT_EQ(&first->get(), values.span().data());
   auto boundary = values.at(values.size());
   auto far_boundary = immutable.at(std::numeric_limits<std::size_t>::max());
   ASSERT_FALSE(boundary);
@@ -259,11 +270,11 @@ TEST(ArrayAccess, CheckedBoundaryPreservesMutableAndConstReferences) {
 
 TEST(ArrayContainer, RangesAccessAndSwapMutateTheSameOwnedElements) {
   Array<int, 4> values;
-  int* identity = values.data();
+  auto original_storage = values.span();
   Array<int, 4> replacement;
   mutate_owned_arrays(values, replacement);
   EXPECT_EQ(replacement, (Array<int, 4>{12, 14, 16, 18}));
-  EXPECT_EQ(values.data(), identity);
+  EXPECT_EQ(values.span().data(), original_storage.data());
   EXPECT_EQ(values, (Array<int, 4>{3, 3, 3, 3}));
   auto const& immutable = replacement;
   EXPECT_EQ(std::vector<int>(immutable.cbegin(), immutable.cend()), (std::vector<int>{12, 14, 16, 18}));
@@ -277,6 +288,7 @@ TEST(ArrayZeroSize, HasNoElementsAndResizesWithoutReadingEmptyStorage) {
   EXPECT_TRUE(empty.empty());
   EXPECT_EQ(empty.begin(), empty.end());
   EXPECT_EQ(empty.size(), 0u);
+  EXPECT_TRUE(empty.span().empty());
   EXPECT_EQ(empty.cbegin(), empty.cend());
   EXPECT_EQ(empty.rbegin(), empty.rend());
   EXPECT_EQ(empty.crbegin(), empty.crend());

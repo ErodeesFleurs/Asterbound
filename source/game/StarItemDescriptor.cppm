@@ -72,7 +72,7 @@ public:
 
   friend std::expected<void, StarException> write_text(TextBuffer& output, ItemDescriptor const& descriptor);
 
-  friend struct hash<ItemDescriptor>;
+  friend struct ValueHash<ItemDescriptor>;
 
 private:
   friend class Item;
@@ -92,7 +92,7 @@ private:
 [[nodiscard]] std::expected<void, StarException> write_text(TextBuffer& output, ItemDescriptor const& descriptor);
 
 template <>
-struct hash<ItemDescriptor> {
+struct ValueHash<ItemDescriptor> {
   std::size_t operator()(ItemDescriptor const& v) const;
 };
 
@@ -102,7 +102,7 @@ export module star.item_descriptor;
 
 export namespace Star {
   template <>
-  struct hash<ItemDescriptor>;
+  struct ValueHash<ItemDescriptor>;
 }
 
 

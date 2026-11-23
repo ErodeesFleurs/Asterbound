@@ -121,7 +121,7 @@ std::expected<void, StarException> LuaConverter<InventorySlot>::from(LuaStack st
   } else if (std::holds_alternative<TrashSlot>(k)) {
     return stack.push("trash");
   }
-  return stack.push(LuaNil);
+  return stack.push(lua_nil);
 }
 
 std::expected<std::optional<InventorySlot>, StarException> LuaConverter<InventorySlot>::to(LuaStackValue v) {
@@ -655,7 +655,7 @@ std::expected<std::optional<Drawable>, StarException> LuaConverter<Drawable>::to
       return std::unexpected(std::move(readWidth.error()));
     if (!*readWidth)
       return std::nullopt;
-    drawable = Drawable::makeLine(std::move(*line), width, color.value_or(Color::White));
+    drawable = Drawable::makeLine(std::move(*line), width, color.value_or(Color::palette_white));
   } else {
     std::optional<PolyF> poly;
     auto readPoly = readFields(table, "poly", poly);
@@ -664,7 +664,7 @@ std::expected<std::optional<Drawable>, StarException> LuaConverter<Drawable>::to
     if (!*readPoly)
       return std::nullopt;
     if (poly) {
-      drawable = Drawable::makePoly(std::move(*poly), color.value_or(Color::White));
+      drawable = Drawable::makePoly(std::move(*poly), color.value_or(Color::palette_white));
     } else {
       std::optional<String> image;
       auto readImage = readFields(table, "image", image);
@@ -684,7 +684,7 @@ std::expected<std::optional<Drawable>, StarException> LuaConverter<Drawable>::to
       auto metadata = root->get().imageMetadataDatabase();
       if (!metadata)
         return std::unexpected(std::move(metadata.error()));
-      auto converted = Drawable::makeImage(**metadata, std::move(*image), 1.0f, !transformation && centered.value_or(true), Vec2F(), color.value_or(Color::White));
+      auto converted = Drawable::makeImage(**metadata, std::move(*image), 1.0f, !transformation && centered.value_or(true), Vec2F(), color.value_or(Color::palette_white));
       if (!converted)
         return std::unexpected(std::move(converted.error()));
       drawable = std::move(*converted);
@@ -848,7 +848,7 @@ std::expected<void, StarException> LuaConverter<NodeStatus>::from(LuaStack stack
     return stack.push(true);
   else if (status == NodeStatus::Failure)
     return stack.push(false);
-  return stack.push(LuaNil);
+  return stack.push(lua_nil);
 }
 
 std::expected<NodeStatus, StarException> LuaConverter<NodeStatus>::to(LuaStackValue v) {

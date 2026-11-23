@@ -64,9 +64,9 @@ static std::expected<int, StarException> pack_assets(std::span<char const* const
     if (!config_file_contents) {
       if (!config_file_contents.error().is<IOException>())
         return std::unexpected(std::move(config_file_contents.error()));
-      if (auto written = Star::print(stderr, "Could not open specified configFile: {}\n", config_file); !written)
+      if (auto written = Star::print(*stderr, "Could not open specified configFile: {}\n", config_file); !written)
         return std::unexpected(std::move(written.error()));
-      if (auto written = Star::print(stderr, "For the following reason: {}\n", Star::output_exception(ExceptionDiagnostic(config_file_contents.error()), false)); !written)
+      if (auto written = Star::print(*stderr, "For the following reason: {}\n", Star::output_exception(ExceptionDiagnostic(config_file_contents.error()), false)); !written)
         return std::unexpected(std::move(written.error()));
       return 1;
     }
@@ -75,9 +75,9 @@ static std::expected<int, StarException> pack_assets(std::span<char const* const
     if (!config_file_json) {
       if (!config_file_json.error().is<JsonParsingException>())
         return std::unexpected(std::move(config_file_json.error()));
-      if (auto written = Star::print(stderr, "Could not parse the specified configFile: {}\n", config_file); !written)
+      if (auto written = Star::print(*stderr, "Could not parse the specified configFile: {}\n", config_file); !written)
         return std::unexpected(std::move(written.error()));
-      if (auto written = Star::print(stderr, "For the following reason: {}\n", Star::output_exception(ExceptionDiagnostic(config_file_json.error()), false)); !written)
+      if (auto written = Star::print(*stderr, "For the following reason: {}\n", Star::output_exception(ExceptionDiagnostic(config_file_json.error()), false)); !written)
         return std::unexpected(std::move(written.error()));
       return 1;
     }
@@ -112,9 +112,9 @@ static std::expected<int, StarException> pack_assets(std::span<char const* const
     if (!config_read) {
       if (!config_read.error().is<JsonException>())
         return std::unexpected(std::move(config_read.error()));
-      if (auto written = Star::print(stderr, "Could not read the asset_packer config file {}\n", config_file); !written)
+      if (auto written = Star::print(*stderr, "Could not read the asset_packer config file {}\n", config_file); !written)
         return std::unexpected(std::move(written.error()));
-      if (auto written = Star::print(stderr, "{}\n", Star::output_exception(ExceptionDiagnostic(config_read.error()), false)); !written)
+      if (auto written = Star::print(*stderr, "{}\n", Star::output_exception(ExceptionDiagnostic(config_read.error()), false)); !written)
         return std::unexpected(std::move(written.error()));
       return 1;
     }
@@ -145,13 +145,13 @@ static std::expected<int, StarException> pack_assets(std::span<char const* const
 int main(int argc, char** argv) {
   auto native_runtime = NativeRuntime::create();
   if (!native_runtime) {
-    if (auto written = Star::print(stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(native_runtime.error()), true)); !written)
+    if (auto written = Star::print(*stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(native_runtime.error()), true)); !written)
       return 1;
     return 1;
   }
   auto result = pack_assets({argv, static_cast<std::size_t>(argc)});
   if (!result) {
-    if (auto written = Star::print(stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
+    if (auto written = Star::print(*stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
       return 1;
     return 1;
   }

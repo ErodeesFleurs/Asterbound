@@ -32,7 +32,7 @@ Particle movingParticle() {
   particle.size = particle.baseSize = 2;
   particle.timeToLive = 10;
   particle.angularVelocity = 8;
-  particle.light = Color::White;
+  particle.light = Color::palette_white;
   particle.fade = 0.2f;
   particle.collidesForeground = particle.collidesLiquid = false;
   return particle;
@@ -127,7 +127,7 @@ const GameTestRegistration particleSampling(
       float clamped = std::clamp(alpha, 0.0f, 1.0f);
       EXPECT_FLOAT_EQ(samples[0].position[0], 99.5f + clamped);
       EXPECT_FLOAT_EQ(samples[0].rotation, 4 * clamped);
-      EXPECT_EQ(samples[0].light, Color::White.mix(logicalLight, clamped));
+      EXPECT_EQ(samples[0].light, Color::palette_white.mix(logicalLight, clamped));
       EXPECT_EQ(samples.data(), allocation);
       EXPECT_EQ(samples.capacity(), capacity);
       EXPECT_EQ(manager.particles()[0].position, logicalPosition);

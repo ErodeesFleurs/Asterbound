@@ -316,14 +316,14 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> remove_first() {
     if (empty())
-      return std::unexpected(SetException("OrderedSet::removeFirst() called on empty OrderedSet"));
+      return std::unexpected(SetException("OrderedSet::remove_first() called on empty OrderedSet"));
     remove(*begin());
     return {};
   }
 
   [[nodiscard]] std::expected<void, StarException> remove_last() {
     if (empty())
-      return std::unexpected(SetException("OrderedSet::removeLast() called on empty OrderedSet"));
+      return std::unexpected(SetException("OrderedSet::remove_last() called on empty OrderedSet"));
     remove(*std::prev(end()));
     return {};
   }
@@ -332,7 +332,7 @@ public:
     requires (std::is_constructible_v<value_type, value_type&&> || std::is_constructible_v<value_type, value_type const&>)
   {
     if (empty())
-      return std::unexpected(SetException("OrderedSet::takeFirst() called on empty OrderedSet"));
+      return std::unexpected(SetException("OrderedSet::take_first() called on empty OrderedSet"));
     return take_node(m_order.begin());
   }
 
@@ -340,7 +340,7 @@ public:
     requires (std::is_constructible_v<value_type, value_type&&> || std::is_constructible_v<value_type, value_type const&>)
   {
     if (empty())
-      return std::unexpected(SetException("OrderedSet::takeLast() called on empty OrderedSet"));
+      return std::unexpected(SetException("OrderedSet::take_last() called on empty OrderedSet"));
     return take_node(std::prev(m_order.end()));
   }
 
@@ -533,7 +533,7 @@ private:
 template <typename Value, typename Compare = std::less<Value>, typename Allocator = std::allocator<Value>>
 using OrderedSet = OrderedSetWrapper<std::map, Value, Allocator, Compare>;
 
-template <typename Value, typename Hash = Star::hash<Value>, typename Equals = std::equal_to<Value>, typename Allocator = std::allocator<Value>>
+template <typename Value, typename Hash = Star::ValueHash<Value>, typename Equals = std::equal_to<Value>, typename Allocator = std::allocator<Value>>
 using OrderedHashSet = OrderedSetWrapper<FlatHashMap, Value, Allocator, Hash, Equals>;
 
 template <template <typename...> class Map, typename Value, typename Allocator, typename... Args>

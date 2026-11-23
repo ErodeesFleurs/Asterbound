@@ -369,7 +369,7 @@ std::expected<void, StarException> TcpPacketSocket::sendPackets(List<std::shared
 
       // Packets must read and write actual data, because this is used to
       // determine packet count
-      if constexpr (Star::DebugEnabled) {
+      if constexpr (Star::debug_enabled) {
         if (packetBuffer.empty())
           return std::unexpected(StarPacketException("Packet contains no serialized data"));
       }
@@ -597,7 +597,7 @@ std::expected<bool, StarException> TcpPacketSocket::readData() {
         auto chunk_size = std::min(std::size_t(32768), input_buffer_limit - committed);
         m_inputBuffer.reserve(committed + chunk_size);
         auto decoded = m_decompression_stream->decompress(m_compressed_input.span(),
-            std::span<char>(m_inputBuffer.data() + committed, chunk_size));
+            m_inputBuffer.spare_capacity().first(chunk_size));
         if (!decoded)
           return std::unexpected(std::move(decoded.error()));
         m_inputBuffer.resize(committed + decoded->produced);
@@ -725,7 +725,7 @@ std::expected<void, StarException> P2PPacketSocket::sendPackets(List<std::shared
 
       // Packets must read and write actual data, because this is used to
       // determine packet count
-      if constexpr (Star::DebugEnabled) {
+      if constexpr (Star::debug_enabled) {
         if (packetBuffer.empty())
           return std::unexpected(StarPacketException("Packet contains no serialized data"));
       }

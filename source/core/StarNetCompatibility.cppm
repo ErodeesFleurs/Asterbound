@@ -5,10 +5,10 @@ import star.version;
 
 namespace Star {
 
-inline constexpr VersionNumber OpenProtocolVersion = 18;
+inline constexpr VersionNumber open_protocol_version = 18;
 
-inline constexpr VersionNumber AnyVersion = 0xFFFFFFFF;
-inline constexpr VersionNumber LegacyVersion = 0;
+inline constexpr VersionNumber any_version = 0xFFFFFFFF;
+inline constexpr VersionNumber legacy_version = 0;
 
 class NetCompatibilityRules {
 public:
@@ -19,17 +19,17 @@ public:
 
   constexpr VersionNumber version() const { return m_version; }
   constexpr bool is_admin() const { return m_admin; }
-  constexpr bool is_legacy() const { return m_version == LegacyVersion; }
+  constexpr bool is_legacy() const { return m_version == legacy_version; }
 
   bool operator==(NetCompatibilityRules const&) const = default;
 
 private:
-  VersionNumber m_version = OpenProtocolVersion;
+  VersionNumber m_version = open_protocol_version;
   bool m_admin = false;
 };
 
 template <>
-struct hash<NetCompatibilityRules> {
+struct ValueHash<NetCompatibilityRules> {
   std::size_t operator()(NetCompatibilityRules const& rules) const {
     return (static_cast<std::size_t>(rules.version()) << 1) | rules.is_admin();
   }
@@ -41,14 +41,14 @@ export module star.net_compatibility;
 
 export namespace Star {
   template <>
-  struct hash<NetCompatibilityRules>;
+  struct ValueHash<NetCompatibilityRules>;
 }
 
 
 export namespace Star {
-  using ::Star::OpenProtocolVersion;
-  using ::Star::AnyVersion;
-  using ::Star::LegacyVersion;
+  using ::Star::open_protocol_version;
+  using ::Star::any_version;
+  using ::Star::legacy_version;
   using ::Star::NetCompatibilityRules;
-  using ::Star::hash;
+  using ::Star::ValueHash;
 }

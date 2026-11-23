@@ -113,7 +113,7 @@ std::expected<void, StarException> Animation::initialize(Json config, String con
   auto colorConfig = config.opt("color");
   if (!colorConfig)
     return std::unexpected(std::move(colorConfig.error()));
-  m_color = Color::White;
+  m_color = Color::palette_white;
   if (*colorConfig) {
     auto color = json_to_color(**colorConfig);
     if (!color)

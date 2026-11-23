@@ -16,8 +16,8 @@ using namespace Star;
 namespace {
 Image patterned_image(Vec2U size, PixelFormat format) {
   Image image(size, format);
-  for (std::size_t i = 0; i < image.data().size(); ++i)
-    image.data()[i] = static_cast<std::uint8_t>(i * 37 + 19);
+  for (std::size_t i = 0; i < image.span().size(); ++i)
+    image.span()[i] = static_cast<std::uint8_t>(i * 37 + 19);
   return image;
 }
 }// namespace
@@ -37,7 +37,7 @@ TEST(ImageStorageTest, LayoutUsesFullWidthArithmeticAndRejectsUnaddressableStora
   Image empty(Vec2U(0, UINT_MAX), PixelFormat::RGBA_F);
   EXPECT_TRUE(empty.empty());
   EXPECT_EQ(empty.size(), Vec2U(0, UINT_MAX));
-  EXPECT_TRUE(empty.data().empty());
+  EXPECT_TRUE(empty.span().empty());
 }
 
 TEST(ImageStorageTest, RectangleClippingDoesNotWrapUnsignedEndpoints) {
@@ -62,7 +62,7 @@ TEST(ImageStorageTest, CropsAndClippedCopiesPreserveRawChannelsAcrossByteFormats
     std::pair{PixelFormat::RGBA32, PixelFormat::RGB24}, std::pair{PixelFormat::BGRA32, PixelFormat::RGBA32}};
   for (auto [source_format, target_format] : formats) {
     Image source = patterned_image({5, 3}, source_format);
-    auto original = std::vector<std::uint8_t>(source.data().begin(), source.data().end());
+    auto original = std::vector<std::uint8_t>(source.span().begin(), source.span().end());
     unsigned from = source.bytes_per_pixel();
     auto cropped = source.sub_image({2, 1}, {3, 2});
     ASSERT_TRUE(cropped);
@@ -70,22 +70,22 @@ TEST(ImageStorageTest, CropsAndClippedCopiesPreserveRawChannelsAcrossByteFormats
     for (unsigned y = 0; y < 2; ++y)
       for (unsigned x = 0; x < 3; ++x)
         for (unsigned c = 0; c < from; ++c)
-          EXPECT_EQ(cropped->data()[(y * 3 + x) * from + c], original[((y + 1) * 5 + x + 2) * from + c]);
+          EXPECT_EQ(cropped->span()[(y * 3 + x) * from + c], original[((y + 1) * 5 + x + 2) * from + c]);
     Image target = Image::filled({4, 3}, {91, 92, 93, 94}, target_format);
-    auto expected = std::vector<std::uint8_t>(target.data().begin(), target.data().end());
+    auto expected = std::vector<std::uint8_t>(target.span().begin(), target.span().end());
     unsigned to = target.bytes_per_pixel();
     for (unsigned y = 0; y < 2; ++y)
       for (unsigned x = 0; x < 3; ++x)
         for (unsigned c = 0; c < to; ++c)
           expected[((y + 1) * 4 + x + 1) * to + c] = c < from ? original[(y * 5 + x) * from + c] : 255;
     ASSERT_TRUE(target.copy_into({1, 1}, source));
-    EXPECT_TRUE(std::ranges::equal(target.data(), expected));
+    EXPECT_TRUE(std::ranges::equal(target.span(), expected));
     Image converted = source.convert(target_format);
     EXPECT_EQ(converted.pixel_format(), target_format);
     for (std::size_t p = 0; p < 15; ++p)
       for (unsigned c = 0; c < to; ++c)
-        EXPECT_EQ(converted.data()[p * to + c], c < from ? original[p * from + c] : 255);
-    EXPECT_TRUE(std::ranges::equal(source.data(), original));
+        EXPECT_EQ(converted.span()[p * to + c], c < from ? original[p * from + c] : 255);
+    EXPECT_TRUE(std::ranges::equal(source.span(), original));
   }
 }
 
@@ -98,10 +98,10 @@ TEST(ImageStorageTest, AliasedPasteAndSourceOverRetainForwardFeedback) {
   EXPECT_EQ(paste.get32(2, 0), Vec4B(1, 0, 0, 255));
   Image vertical = patterned_image({2, 3}, PixelFormat::RGB24);
   std::array<std::uint8_t, 6> first_row;
-  std::copy_n(vertical.data().begin(), first_row.size(), first_row.begin());
+  std::copy_n(vertical.span().begin(), first_row.size(), first_row.begin());
   ASSERT_TRUE(vertical.copy_into({0, 1}, vertical));
   for (unsigned y = 1; y < 3; ++y)
-    EXPECT_TRUE(std::ranges::equal(vertical.data().subspan(y * first_row.size(), first_row.size()), first_row));
+    EXPECT_TRUE(std::ranges::equal(vertical.span().subspan(y * first_row.size(), first_row.size()), first_row));
   Image draw(3, 1);
   draw.set32(0, 0, {50, 0, 0, 128});
   draw.set32(1, 0, {100, 0, 0, 64});
@@ -118,19 +118,19 @@ TEST(ImageStorageTest, ResetAndFloatOwnershipPreserveTheirStorageContracts) {
   Image image = patterned_image({3, 2}, PixelFormat::RGB24);
   Image snapshot = image;
   image.reset({3, 2});
-  EXPECT_TRUE(std::ranges::equal(image.data(), snapshot.data()));
+  EXPECT_TRUE(std::ranges::equal(image.span(), snapshot.span()));
   image.reset({2, 3});
-  EXPECT_TRUE(std::ranges::all_of(image.data(), [](auto byte) { return byte == 0; }));
+  EXPECT_TRUE(std::ranges::all_of(image.span(), [](auto byte) { return byte == 0; }));
   Image floating({2, 1}, PixelFormat::RGBA_F);
   constexpr std::array<std::uint32_t, 8> bits{0x7fc00019, 0x80000000, 0x3f800000, 0,
                                               0xffc00123, 1,          0x7f800000, 0xff800000};
-  std::memcpy(floating.data().data(), bits.data(), sizeof(bits));
+  std::memcpy(floating.span().data(), bits.data(), sizeof(bits));
   Image copy = floating;
   Image assigned;
   assigned = floating;
-  floating.data()[0] ^= 0xff;
-  EXPECT_EQ(std::memcmp(copy.data().data(), bits.data(), sizeof(bits)), 0);
-  EXPECT_EQ(std::memcmp(assigned.data().data(), bits.data(), sizeof(bits)), 0);
+  floating.span()[0] ^= 0xff;
+  EXPECT_EQ(std::memcmp(copy.span().data(), bits.data(), sizeof(bits)), 0);
+  EXPECT_EQ(std::memcmp(assigned.span().data(), bits.data(), sizeof(bits)), 0);
 }
 
 TEST(ImageStorageTest, BorrowedMoveOnlyCallbacksCommitOnlySuccessfulPixels) {
@@ -186,13 +186,13 @@ TEST(ImageStorageTest, ScalingRejectsInvalidExtentsButAllowsSmallWindowsOfHugeOu
 
 TEST(ImageStorageTest, OverflowingBorderReportsAnOperationErrorWithoutChangingPixels) {
   Image source = Image::filled({2, 2}, {12, 34, 56, 78});
-  auto before = std::vector<std::uint8_t>(source.data().begin(), source.data().end());
+  auto before = std::vector<std::uint8_t>(source.span().begin(), source.span().end());
   auto result =
     process_image_operation(BorderImageOperation{UINT_MAX, {1, 2, 3, 4}, {5, 6, 7, 8}, false, true}, source);
   ASSERT_FALSE(result);
   EXPECT_TRUE(result.error().is<ImageOperationException>());
   EXPECT_EQ(source.size(), Vec2U(2, 2));
-  EXPECT_TRUE(std::ranges::equal(source.data(), before));
+  EXPECT_TRUE(std::ranges::equal(source.span(), before));
 }
 
 TEST(ImageStorageTest, PngUsesThreeRawChannelsForBgrStorageAndRejectsEmptyImages) {
@@ -206,7 +206,7 @@ TEST(ImageStorageTest, PngUsesThreeRawChannelsForBgrStorageAndRejectsEmptyImages
   ASSERT_TRUE(decoded);
   EXPECT_EQ(decoded->pixel_format(), PixelFormat::RGB24);
   EXPECT_EQ(decoded->size(), source.size());
-  EXPECT_TRUE(std::ranges::equal(decoded->data(), source.data()));
+  EXPECT_TRUE(std::ranges::equal(decoded->span(), source.span()));
   Image empty(Vec2U(0, UINT_MAX));
   EXPECT_FALSE(empty.write_png(logger, std::make_shared<Buffer>()));
 }

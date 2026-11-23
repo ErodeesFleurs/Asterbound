@@ -101,7 +101,7 @@ std::expected<HumanoidEmote, StarException> EmoteProcessor::detectEmotes(String 
   for (auto const& option : m_emoteBindings) {
     auto p = chatter.find(option.text);
     if (!p) return std::unexpected(std::move(p.error()));
-    if (*p == NPos)
+    if (*p == npos)
       continue;
     auto length = option.text.length();
     if (!length) return std::unexpected(std::move(length.error()));

@@ -450,17 +450,17 @@ std::expected<void, StarException> ModUploader::uploadToSteamImpl(QProgressDialo
     if (updateHandle == k_UGCUpdateHandleInvalid)
       return std::unexpected(StarException("Could not start Steam UGC item update"));
     auto title = toSString(m_titleEditor->text());
-    if (!SteamAPI_ISteamUGC_SetItemTitle(SteamAPI_SteamUGC(), updateHandle, title.utf8_data()))
+    if (!SteamAPI_ISteamUGC_SetItemTitle(SteamAPI_SteamUGC(), updateHandle, title.utf8().c_str()))
       return std::unexpected(StarException("Steam rejected the item title"));
     auto description = toSString(m_descriptionEditor->toPlainText());
-    if (!SteamAPI_ISteamUGC_SetItemDescription(SteamAPI_SteamUGC(), updateHandle, description.utf8_data()))
+    if (!SteamAPI_ISteamUGC_SetItemDescription(SteamAPI_SteamUGC(), updateHandle, description.utf8().c_str()))
       return std::unexpected(StarException("Steam rejected the item description"));
     if (!m_modPreview.isNull()) {
       auto preview_path = File::relative_to(*m_modDirectory, "_previewimage");
-      if (!SteamAPI_ISteamUGC_SetItemPreview(SteamAPI_SteamUGC(), updateHandle, preview_path.utf8_data()))
+      if (!SteamAPI_ISteamUGC_SetItemPreview(SteamAPI_SteamUGC(), updateHandle, preview_path.utf8().c_str()))
         return std::unexpected(StarException("Steam rejected the preview image"));
     }
-    if (!SteamAPI_ISteamUGC_SetItemContent(SteamAPI_SteamUGC(), updateHandle, steamUploadDir.utf8_data()))
+    if (!SteamAPI_ISteamUGC_SetItemContent(SteamAPI_SteamUGC(), updateHandle, steamUploadDir.utf8().c_str()))
       return std::unexpected(StarException("Steam rejected the packed mod content"));
 
     StringList tags;
@@ -470,7 +470,7 @@ std::expected<void, StarException> ModUploader::uploadToSteamImpl(QProgressDialo
     }
     List<char const*> tagStrings(tags.size(), nullptr);
     for (std::size_t i = 0; i < tags.size(); ++i)
-      tagStrings[i] = tags[i].utf8_data();
+      tagStrings[i] = tags[i].utf8().c_str();
     SteamParamStringArray_t itemTags = {tagStrings.data(), static_cast<std::int32_t>(tags.size())};
     if (!SteamAPI_ISteamUGC_SetItemTags(SteamAPI_SteamUGC(), updateHandle, &itemTags, false))
       return std::unexpected(StarException("Steam rejected the item tags"));

@@ -376,8 +376,8 @@ struct Fixture<Pool, Workload> {
   using Cache = std::conditional_t<Workload == Shape::Lru,
       Star::LruCache<Key, Value, std::less<Key>, Allocator>,
       std::conditional_t<Workload == Shape::HashLru,
-          Star::HashLruCache<Key, Value, Star::hash<Key>, std::equal_to<Key>, Allocator>,
-          Star::HashTtlCache<Key, Value, Star::hash<Key>, std::equal_to<Key>, TtlAllocator>>>;
+          Star::HashLruCache<Key, Value, Star::ValueHash<Key>, std::equal_to<Key>, Allocator>,
+          Star::HashTtlCache<Key, Value, Star::ValueHash<Key>, std::equal_to<Key>, TtlAllocator>>>;
 
   // Seeded local service, not process/global randomness. It outlives the TTL
   // cache. TTL is deliberately non-expiring: this measures node/cache churn,
@@ -428,7 +428,7 @@ struct Fixture<Pool, Workload> {
 template <bool Pool>
 struct Fixture<Pool, Shape::StatisticsPayload> {
   using Allocator = CacheAllocator<Pool, StatisticsPair>;
-  Star::HashLruCache<Star::String, StatisticsValue, Star::hash<Star::String>,
+  Star::HashLruCache<Star::String, StatisticsValue, Star::ValueHash<Star::String>,
       std::equal_to<Star::String>, Allocator> entries;
   std::span<Star::String const> queries;
   std::size_t capacity;

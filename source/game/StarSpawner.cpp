@@ -554,7 +554,7 @@ std::expected<void, StarException> Spawner::debugShowSpawnCells() {
         root().spatialLogger().log_text(
           "world", Star::format("Spawns: {} / {}", info.second.spawns, info.second.spawnAttempts),
           region.min() + Vec2F(0.5, 3.5),
-          (info.second.spawnAttempts > info.second.spawns) ? Color::Red.to_rgba() : Color::Green.to_rgba());
+          (info.second.spawnAttempts > info.second.spawns) ? Color::palette_red.to_rgba() : Color::palette_green.to_rgba());
     }
   }
   return {};

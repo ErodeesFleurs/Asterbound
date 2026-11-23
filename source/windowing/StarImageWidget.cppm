@@ -51,7 +51,7 @@ namespace Star {
 
 class ImageWidget : public Widget {
 public:
-  void const* query_type(TypeKey key) const noexcept override { return query_type_of<ImageWidget, Widget>(this, key); }
+  void query_type(TypeQuery& query) const noexcept override { query_type_of<ImageWidget, Widget>(*this, query); }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ImageWidget>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<ImageWidget>, StarException> create(GuiContext& context, String const& image = {});

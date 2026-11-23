@@ -63,12 +63,12 @@ std::expected<std::size_t, StarException> find_substring(std::string_view bytes,
     if (!skipped) return std::unexpected(std::move(skipped.error()));
     bytes.remove_prefix(cursor.offset());
   }
-  if (bytes.empty()) return NPos;
+  if (bytes.empty()) return npos;
   auto first = take_point(needle);
   if (!first) return std::unexpected(std::move(first.error()));
   auto lower = cs == String::CaseInsensitive ? String::to_lower(*first) : *first;
   auto upper = cs == String::CaseInsensitive ? String::to_upper(*first) : *first;
-  std::size_t found = NPos;
+  std::size_t found = npos;
   while (!bytes.empty()) {
     // An ASCII first-point miss consumes one byte and one codepoint. Stop at
     // the first candidate or high byte; an early hit need not scan the suffix.
@@ -109,7 +109,7 @@ std::expected<std::size_t, StarException> cursor_find_membership(std::string_vie
     } else if (singleton) {
       match = *point == static_cast<unsigned char>(set.front());
     } else {
-      auto result = pattern.has_char(*point);
+      auto result = pattern.contains(*point);
       if (!result) return std::unexpected(std::move(result.error()));
       match = *result;
     }
@@ -117,7 +117,7 @@ std::expected<std::size_t, StarException> cursor_find_membership(std::string_vie
     auto moved = cursor.advance(); if (!moved) return std::unexpected(std::move(moved.error()));
     ++position;
   }
-  return NPos;
+  return npos;
 }
 }
 
@@ -126,7 +126,7 @@ String::String(std::string_view s) : m_string(s) {}
 String& String::operator+=(StringView s) { m_string += s.utf8(); return *this; }
 String& String::operator+=(std::string_view s) { m_string += s; return *this; }
 StringView::StringView(String const& s) : m_view(s.utf8()) {}
-std::size_t hash<String>::operator()(StringView const& s) const { return (*this)(s.utf8()); }
+std::size_t ValueHash<String>::operator()(StringView const& s) const { return (*this)(s.utf8()); }
 
 ByteArray StringView::utf8_bytes() const { return ByteArray(std::span<char const>(m_view)); }
 std::expected<StringView::const_iterator, StarException> StringView::begin() const { return const_iterator::create(m_view.begin(), m_view.end()); }
@@ -170,9 +170,9 @@ std::expected<bool, StarException> StringView::starts_with(StringView prefix, Ca
   return matches_prefix(m_view, prefix.m_view, cs);
 }
 std::expected<bool, StarException> StringView::ends_with(StringView suffix, CaseSensitivity cs) const {
-  auto suffixLength = suffix.size();
-  if (!suffixLength) return std::unexpected(std::move(suffixLength.error()));
-  if (*suffixLength == 0) return true;
+  auto suffix_length = suffix.size();
+  if (!suffix_length) return std::unexpected(std::move(suffix_length.error()));
+  if (*suffix_length == 0) return true;
   auto length = size();
   if (!length) return std::unexpected(std::move(length.error()));
   if (suffix.m_view.size() > m_view.size()) return false;
@@ -206,13 +206,13 @@ std::expected<std::size_t, StarException> StringView::find(Char point, std::size
     auto moved = cursor.advance(); if (!moved) return std::unexpected(std::move(moved.error()));
     ++pos;
   }
-  return NPos;
+  return npos;
 }
 std::expected<std::size_t, StarException> StringView::find(StringView needle, std::size_t pos, CaseSensitivity cs) const {
   return find_substring(m_view, needle.m_view, pos, cs, false);
 }
-std::expected<std::size_t, StarException> StringView::find_last(Char point, CaseSensitivity cs) const {
-  std::size_t found = NPos, position = 0;
+std::expected<std::size_t, StarException> StringView::rfind(Char point, CaseSensitivity cs) const {
+  std::size_t found = npos, position = 0;
   auto scan = for_each_codepoint(m_view, [&](Utf32Type current, std::size_t, std::size_t) {
     if (String::char_equal(current, point, cs)) found = position;
     ++position;
@@ -220,17 +220,17 @@ std::expected<std::size_t, StarException> StringView::find_last(Char point, Case
   if (!scan) return std::unexpected(std::move(scan.error()));
   return found;
 }
-std::expected<std::size_t, StarException> StringView::find_last(StringView needle, CaseSensitivity cs) const {
+std::expected<std::size_t, StarException> StringView::rfind(StringView needle, CaseSensitivity cs) const {
   return find_substring(m_view, needle.m_view, 0, cs, true);
 }
-std::expected<bool, StarException> StringView::has_char(Char point) const {
+std::expected<bool, StarException> StringView::contains(Char point) const {
   auto result = find(point, 0, CaseSensitivity::CaseSensitive);
   if (!result) return std::unexpected(std::move(result.error()));
-  return *result != NPos;
+  return *result != npos;
 }
 std::expected<bool, StarException> StringView::has_char_or_whitespace(Char point) const {
   if (empty()) return String::is_space(point);
-  return has_char(point);
+  return contains(point);
 }
 std::expected<std::size_t, StarException> StringView::find_first_of(StringView pattern, std::size_t pos) const {
   return cursor_find_membership(m_view, pattern, pos, true);
@@ -260,7 +260,7 @@ std::expected<std::size_t, StarException> StringView::find_next_boundary(std::si
 std::expected<bool, StarException> StringView::contains(StringView needle, CaseSensitivity cs) const {
   auto result = find(needle, 0, cs);
   if (!result) return std::unexpected(std::move(result.error()));
-  return *result != NPos;
+  return *result != npos;
 }
 std::expected<StringView, StarException> StringView::substr(std::size_t position, std::size_t count) const {
   Utf8Cursor cursor(m_view);

@@ -527,7 +527,7 @@ std::expected<WorldLayout, StarException> WorldLayout::buildAsteroidsLayout(Root
   layout.m_playerStartSearchRegions.push_back(RectI(
     0, asteroidParameters.asteroidBottomLevel, asteroidParameters.worldSize[0], asteroidParameters.asteroidTopLevel));
 
-  auto finalized = layout.finalize(Color::Black);
+  auto finalized = layout.finalize(Color::palette_black);
   if (!finalized) return std::unexpected(std::move(finalized.error()));
 
   return layout;
@@ -570,7 +570,7 @@ std::expected<WorldLayout, StarException> WorldLayout::buildFloatingDungeonLayou
     auto sky = biomeDatabase->biomeSkyColoring(*floatingDungeonParameters.biome, seed);
     if (!sky) return std::unexpected(std::move(sky.error()));
   } else {
-    auto finalized = layout.finalize(Color::Black);
+    auto finalized = layout.finalize(Color::palette_black);
     if (!finalized) return std::unexpected(std::move(finalized.error()));
   }
 
@@ -1076,10 +1076,10 @@ std::expected<std::pair<WorldLayout::WorldLayer, List<RectI>>, StarException> Wo
 
     // this->root().logger().info("before expansion:\ntarget cells are: {}\nother cells are: {}", printRegionCells(targetCells), printRegionCells(otherCells));
 
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((targetCells.size() > 0));
     }
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((targetCells.size() < 3));
     }
 
@@ -1173,7 +1173,7 @@ std::expected<std::pair<WorldLayout::WorldLayer, List<RectI>>, StarException> Wo
 
 BiomeIndex WorldLayout::registerBiome(std::shared_ptr<Biome const> biome) {
   std::size_t foundIndex = m_biomes.index_of(biome);
-  if (foundIndex != NPos)
+  if (foundIndex != npos)
     return foundIndex + 1;
 
   m_biomes.push_back(std::move(biome));
@@ -1182,7 +1182,7 @@ BiomeIndex WorldLayout::registerBiome(std::shared_ptr<Biome const> biome) {
 
 TerrainSelectorIndex WorldLayout::registerTerrainSelector(std::shared_ptr<TerrainSelector const> terrainSelector) {
   std::size_t foundIndex = m_terrainSelectors.index_of(terrainSelector);
-  if (foundIndex != NPos)
+  if (foundIndex != npos)
     return foundIndex + 1;
 
   m_terrainSelectors.push_back(std::move(terrainSelector));

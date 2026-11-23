@@ -433,7 +433,7 @@ std::expected<void, StarException> ProtocolResponsePacket::write(DataStream& ds)
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
-  if (ds.stream_compatibility_version() != LegacyVersion)
+  if (ds.stream_compatibility_version() != legacy_version)
     {
       auto result = ds.write(info);
       if (!result)
@@ -589,7 +589,7 @@ std::expected<void, StarException> PausePacket::read(DataStream& ds) {
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
-  if (ds.stream_compatibility_version() != LegacyVersion)
+  if (ds.stream_compatibility_version() != legacy_version)
     {
       auto result = ds.read(timescale);
       if (!result)
@@ -606,7 +606,7 @@ std::expected<void, StarException> PausePacket::write(DataStream& ds) const {
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
-  if (ds.stream_compatibility_version() != LegacyVersion)
+  if (ds.stream_compatibility_version() != legacy_version)
     {
       auto result = ds.write(timescale);
       if (!result)
@@ -696,7 +696,7 @@ std::expected<void, StarException> ClientConnectPacket::read(DataStream& ds) {
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
-  if (ds.stream_compatibility_version() != LegacyVersion)
+  if (ds.stream_compatibility_version() != legacy_version)
     {
       auto result = ds.read(info);
       if (!result)
@@ -712,7 +712,7 @@ std::expected<void, StarException> ClientConnectPacket::write(DataStream& ds) co
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
-  if (ds.stream_compatibility_version() != LegacyVersion)
+  if (ds.stream_compatibility_version() != legacy_version)
     {
       auto result = ds.write(info);
       if (!result)
@@ -1422,7 +1422,7 @@ PingPacket::PingPacket() = default;
 PingPacket::PingPacket(std::int64_t time) : time(time) {}
 
 std::expected<void, StarException> PingPacket::read(DataStream& ds) {
-  if (ds.stream_compatibility_version() == LegacyVersion) {
+  if (ds.stream_compatibility_version() == legacy_version) {
     // Packets can't be empty, read the trash data
     {
       auto result = ds.read<bool>();
@@ -1441,7 +1441,7 @@ std::expected<void, StarException> PingPacket::read(DataStream& ds) {
 }
 
 std::expected<void, StarException> PingPacket::write(DataStream& ds) const {
-  if (ds.stream_compatibility_version() == LegacyVersion) {
+  if (ds.stream_compatibility_version() == legacy_version) {
     // Packets can't be empty, write some trash data
     {
       auto result = ds.write<bool>(false);
@@ -1871,7 +1871,7 @@ PongPacket::PongPacket(std::int64_t time) : time(time) {}
 
 
 std::expected<void, StarException> PongPacket::read(DataStream& ds) {
-  if (ds.stream_compatibility_version() == LegacyVersion) {
+  if (ds.stream_compatibility_version() == legacy_version) {
     // Packets can't be empty, read the trash data
     {
       auto result = ds.read<bool>();
@@ -1891,7 +1891,7 @@ std::expected<void, StarException> PongPacket::read(DataStream& ds) {
 }
 
 std::expected<void, StarException> PongPacket::write(DataStream& ds) const {
-  if (ds.stream_compatibility_version() == LegacyVersion) {
+  if (ds.stream_compatibility_version() == legacy_version) {
     // Packets can't be empty, write some trash data
     {
       auto result = ds.write<bool>(false);
@@ -1914,7 +1914,7 @@ StepUpdatePacket::StepUpdatePacket(double remoteTime) : remoteTime(remoteTime) {
 
 
 std::expected<void, StarException> StepUpdatePacket::read(DataStream& ds) {
-  if (ds.stream_compatibility_version() == LegacyVersion) {
+  if (ds.stream_compatibility_version() == legacy_version) {
     auto steps = ds.read_vlq_u();
     if (!steps)
       return std::unexpected(std::move(steps.error()));
@@ -1930,7 +1930,7 @@ std::expected<void, StarException> StepUpdatePacket::read(DataStream& ds) {
 }
 
 std::expected<void, StarException> StepUpdatePacket::write(DataStream& ds) const {
-  if (ds.stream_compatibility_version() == LegacyVersion) {
+  if (ds.stream_compatibility_version() == legacy_version) {
     {
       auto result = ds.write_vlq_u(static_cast<std::uint64_t>(std::round(remoteTime * 60.0)));
       if (!result)

@@ -123,10 +123,10 @@ TEST(HostAddress, ExactFormatAndUnsignedLegacyHashes) {
   EXPECT_EQ(std::format("{}", ep4), "128.255.1.254:65534");
   EXPECT_EQ(std::format("{}", v6), "2001:0db8:0000:0000:0000:0000:80ff:01fe");
   EXPECT_EQ(std::format("{}", ep6), "2001:0db8:0000:0000:0000:0000:80ff:01fe:65534");
-  EXPECT_EQ(hash<HostAddress>{}(v4), 0x0804010au);
-  EXPECT_EQ(hash<HostAddress>{}(v6), static_cast<std::size_t>(0x36fc49c0be26fcfcull));
-  EXPECT_EQ(hash<HostAddressWithPort>{}(ep4), static_cast<std::size_t>(0x9e38d67ec813ull));
-  EXPECT_EQ(hash<HostAddressWithPort>{}(ep6), static_cast<std::size_t>(0xfa2e69162ae4786aull));
+  EXPECT_EQ(ValueHash<HostAddress>{}(v4), 0x0804010au);
+  EXPECT_EQ(ValueHash<HostAddress>{}(v6), static_cast<std::size_t>(0x36fc49c0be26fcfcull));
+  EXPECT_EQ(ValueHash<HostAddressWithPort>{}(ep4), static_cast<std::size_t>(0x9e38d67ec813ull));
+  EXPECT_EQ(ValueHash<HostAddressWithPort>{}(ep6), static_cast<std::size_t>(0xfa2e69162ae4786aull));
   auto host = HostAddress::lookup(String(std::format("{}", v4)));
   ASSERT_TRUE(host);
   EXPECT_EQ(*host, v4);

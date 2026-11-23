@@ -29,8 +29,8 @@ Image directive_source(PixelFormat format = PixelFormat::RGBA32) {
 void expect_directive_image(Image const& actual, Image const& expected) {
   ASSERT_EQ(actual.size(), expected.size());
   ASSERT_EQ(actual.pixel_format(), expected.pixel_format());
-  ASSERT_EQ(actual.data().size(), expected.data().size());
-  EXPECT_TRUE(std::equal(actual.data().begin(), actual.data().end(), expected.data().begin()));
+  ASSERT_EQ(actual.span().size(), expected.span().size());
+  EXPECT_TRUE(std::equal(actual.span().begin(), actual.span().end(), expected.span().begin()));
 }
 
 std::expected<void, StarException> sequential_valid_group(DirectivesGroup const& group, Image& image) {
@@ -186,7 +186,7 @@ TEST(ImageDirectivePipelineTest, ExactTextAndStructuralBoundariesDefineIdentity)
   EXPECT_EQ(utf8.prefix().utf8(), "前缀");
   EXPECT_EQ(utf8.entry_string(utf8.entries()[1]).utf8(), "blendmult=/图像.png;1;2");
   EXPECT_EQ(utf8.entry_string(utf8.entries()[2]).utf8(), "flipy");
-  EXPECT_EQ(std::get<BlendImageOperation>(utf8.operations()[1]).blendImages[0], "/图像.png");
+  EXPECT_EQ(std::get<BlendImageOperation>(utf8.operations()[1]).blend_images[0], "/图像.png");
   EXPECT_EQ(Directives("?flipy").string(), "?flipy");
 
   DirectivesGroup split(String("?brightness=1"));
@@ -281,7 +281,7 @@ TEST(ImageDirectivePipelineTest, LongSharedOperationsPublishStableValuesAcrossTh
         for (std::size_t i = 1; i <= 96; ++i) {
           matches &= std::holds_alternative<BrightnessMultiplyImageOperation>(operations[i]);
           if (std::holds_alternative<BrightnessMultiplyImageOperation>(operations[i]))
-            matches &= std::abs(std::get<BrightnessMultiplyImageOperation>(operations[i]).brightnessMultiply - 1.01f) < 1e-6f;
+            matches &= std::abs(std::get<BrightnessMultiplyImageOperation>(operations[i]).brightness_multiply - 1.01f) < 1e-6f;
         }
       }
       valid[thread] = matches;

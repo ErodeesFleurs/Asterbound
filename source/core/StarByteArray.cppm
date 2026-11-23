@@ -2,6 +2,7 @@ module;
 import std;
 import star.text_formatter;
 import star.hash;
+import star.memory;
 
 import star.format;
 
@@ -20,30 +21,28 @@ concept byte_combiner = requires(Combiner& combine, char& output) {
 class ByteArray {
 public:
   using value_type = char;
-  using iterator = char*;
-  using const_iterator = char const*;
+  using iterator = std::span<char>::iterator;
+  using const_iterator = std::span<char const>::iterator;
 
   // Constructs bytes from text without or with a trailing NUL byte.
   static ByteArray from_string(std::string_view str);
   static ByteArray from_string_with_null(std::string_view str);
   static ByteArray with_reserve(std::size_t capacity);
 
-  ByteArray();
-  ByteArray(std::size_t dataSize, char c);
+  ByteArray() = default;
+  ByteArray(std::size_t size, char c);
   ByteArray(std::span<char const> data);
   ByteArray(ByteArray const& b);
   ByteArray(ByteArray&& b) noexcept;
-  ~ByteArray();
 
   ByteArray& operator=(ByteArray const& b);
   ByteArray& operator=(ByteArray&& b) noexcept;
 
-  char const* data() const & noexcept;
-  char* data() & noexcept;
-  char const* data() const && = delete;
-  std::span<char const> span() const & noexcept { return {m_data, m_size}; }
-  std::span<char> span() & noexcept { return {m_data, m_size}; }
+  std::span<char const> span() const & noexcept { return m_storage.span().first(m_size); }
+  std::span<char> span() & noexcept { return m_storage.span().first(m_size); }
   std::span<char const> span() const && = delete;
+  // Unpublished storage for codecs: initialize bytes before exposing them with resize().
+  std::span<char> spare_capacity() & noexcept { return m_storage.span().subspan(m_size); }
 
   std::size_t size() const;
   // Maximum size before realloc
@@ -111,8 +110,8 @@ public:
   iterator insert(const_iterator pos, char byte) &;
   iterator insert(const_iterator pos, char byte) && = delete;
 
-  char& operator[](std::size_t i);
-  char operator[](std::size_t i) const;
+  char& operator[](std::size_t i) &;
+  char operator[](std::size_t i) const &;
   [[nodiscard]] std::expected<std::reference_wrapper<char const>, StarException> at(std::size_t i) const &;
   std::expected<std::reference_wrapper<char const>, StarException> at(std::size_t) const && = delete;
 
@@ -127,13 +126,12 @@ private:
     return pos + count;
   }
 
-  char* m_data;
-  std::size_t m_capacity;
-  std::size_t m_size;
+  MemoryAllocation m_storage;
+  std::size_t m_size = 0;
 };
 
 template <>
-struct hash<ByteArray> {
+struct ValueHash<ByteArray> {
   std::size_t operator()(ByteArray const& b) const;
 };
 
@@ -144,7 +142,7 @@ inline void ByteArray::clear() {
 }
 
 inline void ByteArray::resize(std::size_t size) {
-  if (size > m_capacity)
+  if (size > capacity())
     reserve(size);
   m_size = size;
 }
@@ -158,21 +156,13 @@ inline void ByteArray::append(std::span<char const> data) {
 }
 
 inline void ByteArray::push_back(char byte) {
-  if (m_size == m_capacity)
+  if (m_size == capacity())
     reserve(checked_size_sum(m_size, 1));
-  m_data[m_size++] = byte;
+  m_storage.span()[m_size++] = byte;
 }
 
 inline bool ByteArray::empty() const {
   return m_size == 0;
-}
-
-inline char const* ByteArray::data() const & noexcept {
-  return m_data;
-}
-
-inline char* ByteArray::data() & noexcept {
-  return m_data;
 }
 
 inline std::size_t ByteArray::size() const {
@@ -180,7 +170,7 @@ inline std::size_t ByteArray::size() const {
 }
 
 inline std::size_t ByteArray::capacity() const {
-  return m_capacity;
+  return m_storage.size();
 }
 
 inline void ByteArray::copy_to(std::span<char> data) const {
@@ -188,7 +178,7 @@ inline void ByteArray::copy_to(std::span<char> data) const {
   if (len == 0)
     return;
 
-  std::memmove(data.data(), m_data, len);
+  std::memmove(data.data(), span().data(), len);
 }
 
 inline void ByteArray::copy_to(std::span<char> data, std::size_t pos) const {
@@ -197,7 +187,7 @@ inline void ByteArray::copy_to(std::span<char> data, std::size_t pos) const {
     return;
 
   len = std::min(m_size - pos, len);
-  std::memmove(data.data(), m_data + pos, len);
+  std::memmove(data.data(), span().subspan(pos).data(), len);
 }
 
 inline void ByteArray::write_from(std::span<char const> data, std::size_t pos) {
@@ -205,21 +195,20 @@ inline void ByteArray::write_from(std::span<char const> data, std::size_t pos) {
   if (count == 0)
     return;
   auto stop = checked_size_sum(pos, count);
-  auto source = data.data();
-  if (stop > m_capacity) {
+  if (stop > capacity()) {
     // Address arithmetic avoids subtracting pointers from unrelated objects.
     // Sources may also refer to initialized bytes in our reserved tail.
-    auto address = reinterpret_cast<std::uintptr_t>(source);
-    auto base = reinterpret_cast<std::uintptr_t>(m_data);
+    auto address = reinterpret_cast<std::uintptr_t>(data.data());
+    auto base = reinterpret_cast<std::uintptr_t>(m_storage.span().data());
     auto offset = address - base;
-    bool internal = m_data && address >= base && offset < m_capacity;
+    bool internal = address >= base && offset < capacity();
     resize(stop);
     if (internal)
-      source = m_data + offset;
+      data = m_storage.span().subspan(offset, count);
   } else if (stop > m_size) {
     m_size = stop;
   }
-  std::memmove(m_data + pos, source, count);
+  std::memmove(span().subspan(pos).data(), data.data(), count);
 }
 
 template <byte_combiner Combiner>
@@ -233,55 +222,55 @@ ByteArray ByteArray::combine(Combiner&& combine, ByteArray const& rhs, bool exte
   for (std::size_t i = 0; i < smaller.size(); ++i)
     result[i] = combine(char(smaller[i]), char(larger[i]));
   if (extend && larger.size() != smaller.size())
-    std::memcpy(result.m_data + smaller.size(), larger.data() + smaller.size(), larger.size() - smaller.size());
+    std::memcpy(result.span().subspan(smaller.size()).data(), larger.subspan(smaller.size()).data(), larger.size() - smaller.size());
   return result;
 }
 
 inline ByteArray::iterator ByteArray::begin() & noexcept {
-  return m_data;
+  return span().begin();
 }
 
 inline ByteArray::iterator ByteArray::end() & noexcept {
-  return m_data + m_size;
+  return span().end();
 }
 
 inline ByteArray::const_iterator ByteArray::begin() const & noexcept {
-  return m_data;
+  return span().begin();
 }
 
 inline ByteArray::const_iterator ByteArray::end() const & noexcept {
-  return m_data + m_size;
+  return span().end();
 }
 
-inline char& ByteArray::operator[](std::size_t i) {
-  if constexpr (Star::DebugEnabled) {
+inline char& ByteArray::operator[](std::size_t i) & {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((i < m_size));
   }
-  return m_data[i];
+  return m_storage.span()[i];
 }
 
-inline char ByteArray::operator[](std::size_t i) const {
-  if constexpr (Star::DebugEnabled) {
+inline char ByteArray::operator[](std::size_t i) const & {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((i < m_size));
   }
-  return m_data[i];
+  return m_storage.span()[i];
 }
 
 [[nodiscard]] inline std::expected<std::reference_wrapper<char const>, StarException> ByteArray::at(std::size_t i) const & {
   if (i >= m_size)
     return std::unexpected(OutOfRangeException(Star::format("Out of range in ByteArray::at({})", i)));
 
-  return std::cref(m_data[i]);
+  return std::cref(m_storage.span()[i]);
 }
 
-inline std::size_t hash<ByteArray>::operator()(ByteArray const& b) const { return pl_hash_bytes(b.span()); }
+inline std::size_t ValueHash<ByteArray>::operator()(ByteArray const& b) const { return pl_hash_bytes(b.span()); }
 }
 
 export module star.byte_array;
 
 export namespace Star {
   template <>
-  struct hash<ByteArray>;
+  struct ValueHash<ByteArray>;
 }
 
 
@@ -290,6 +279,6 @@ export template <> struct std::formatter<Star::ByteArray> : Star::TextFormatter 
 export namespace Star {
   using ::Star::ByteArray;
   using ::Star::byte_combiner;
-  using ::Star::hash;
+  using ::Star::ValueHash;
   using ::Star::write_text;
 }

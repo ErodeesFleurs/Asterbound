@@ -99,9 +99,9 @@ int repairAbsent(unsigned missing) {
   auto runtime = NativeRuntime::create(NativeRuntime::StandardStreams::Optional);
   if (!runtime)
     return 14;
-  if ((missing & 1) && !Star::print(stdout, "after repair\n"))
+  if ((missing & 1) && !Star::print(*stdout, "after repair\n"))
     return 15;
-  if ((missing & 2) && !Star::print(stderr, "after repair\n"))
+  if ((missing & 2) && !Star::print(*stderr, "after repair\n"))
     return 16;
   Logger logger;
   if (!logger.info("normal logger after repair"))
@@ -116,8 +116,8 @@ int inheritAbsent() {
   auto runtime = NativeRuntime::create();
   if (!runtime)
     return 21;
-  if (!checkedFailure(Star::print(stdout, "required CLI output"))
-      || !checkedFailure(Star::print(stderr, "required CLI diagnostic")))
+  if (!checkedFailure(Star::print(*stdout, "required CLI output"))
+      || !checkedFailure(Star::print(*stderr, "required CLI diagnostic")))
     return 22;
   Logger logger;
   if (!checkedFailure(logger.info("required CLI log")))
@@ -136,7 +136,7 @@ int redirectedFile() {
   if (!runtime)
     return 31;
   constexpr std::string_view payload("redirected\0stdout\n", 18);
-  if (!Star::print(stdout, "{}", payload) || !Star::print(stderr, "redirected stderr\n"))
+  if (!Star::print(*stdout, "{}", payload) || !Star::print(*stderr, "redirected stderr\n"))
     return 32;
   auto exactContents = [](FILE* file, std::string_view expected) {
     if (fseek(file, 0, SEEK_SET) != 0)
@@ -170,10 +170,10 @@ int redirectedPipe(unsigned missing) {
   if (!duplicateTo(pipeFds[1], descriptor(preserved)) || !removeOutput(absent))
     return 41;
   auto runtime = NativeRuntime::create(NativeRuntime::StandardStreams::Optional);
-  if (!runtime || !Star::print(absent, "discarded output\n"))
+  if (!runtime || !Star::print(*absent, "discarded output\n"))
     return 42;
   constexpr std::string_view payload("pipe\0bytes\n", 11);
-  if (!Star::print(preserved, "{}", payload))
+  if (!Star::print(*preserved, "{}", payload))
     return 43;
   // Close every writer before reading, so a missing/truncated write fails at
   // EOF rather than hanging a read waiting for bytes that will never arrive.
@@ -232,8 +232,8 @@ int configuredErrors(char const* device, char const* mode) {
   auto runtime = NativeRuntime::create(NativeRuntime::StandardStreams::Optional);
   if (!runtime)
     return 61;
-  if (!checkedFailure(Star::print(stdout, "must not be discarded"))
-      || !checkedFailure(Star::print(stderr, "must not be discarded")))
+  if (!checkedFailure(Star::print(*stdout, "must not be discarded"))
+      || !checkedFailure(Star::print(*stderr, "must not be discarded")))
     return 62;
   Logger logger;
   if (!checkedFailure(logger.error("normal logger must remain checked")))
@@ -241,14 +241,14 @@ int configuredErrors(char const* device, char const* mode) {
   // A diagnostic failure must return to the caller's error handling instead
   // of terminating before that code can choose its own outcome.
   EmergencyLog::error("original emergency diagnostic after checked failure");
-  if (!checkedFailure(Star::print(stderr, "still a real write error")))
+  if (!checkedFailure(Star::print(*stderr, "still a real write error")))
     return 64;
   return 0;
 }
 
 int emergencyWithoutStderr() {
   prepareChild();
-  if (!removeOutput(stderr) || !checkedFailure(Star::print(stderr, "missing stderr")))
+  if (!removeOutput(stderr) || !checkedFailure(Star::print(*stderr, "missing stderr")))
     return 70;
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
   _set_invalid_parameter_handler(nullptr);
@@ -258,7 +258,7 @@ int emergencyWithoutStderr() {
   prepareChild();
 #endif
   bool errorHandled = false;
-  auto result = Star::print(stderr, "caller handles this error");
+  auto result = Star::print(*stderr, "caller handles this error");
   if (checkedFailure(result)) {
     EmergencyLog::error("caller is reporting the original checked output failure");
     errorHandled = true;
@@ -303,7 +303,7 @@ TEST_F(NativeRuntimeStdioDeathTest, OptionalPreservesCrtOutputWhenNativeSlotIsUn
                   std::_Exit(95);
                 auto runtime = NativeRuntime::create(NativeRuntime::StandardStreams::Optional);
                 constexpr std::string_view marker = "CRT-only output\n";
-                if (!runtime || !Star::print(stdout, "{}", marker) || fseek(output.get(), 0, SEEK_SET) != 0)
+                if (!runtime || !Star::print(*stdout, "{}", marker) || fseek(output.get(), 0, SEEK_SET) != 0)
                   std::_Exit(96);
                 std::array<char, 32> bytes{};
                 auto count = fread(bytes.data(), 1, bytes.size(), output.get());

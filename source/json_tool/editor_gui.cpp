@@ -109,42 +109,42 @@ void JsonEditor::updatePreview(QString const& valueStr) {
   auto value = m_editFormat->toJson(valueStr.toStdString());
   if (!value) {
     if (!value.error().is<JsonException>() && !value.error().is<JsonParsingException>())
-      m_errorDialog->showMessage(value.error().what());
+      m_errorDialog->showMessage(QString::fromStdString(value.error().what()));
     return;
   }
   auto preview = addOrSet(false, m_path, m_currentJson, m_options.insertLocation, *value);
   if (!preview) {
     if (!preview.error().is<JsonException>() && !preview.error().is<JsonParsingException>())
-      m_errorDialog->showMessage(preview.error().what());
+      m_errorDialog->showMessage(QString::fromStdString(preview.error().what()));
     return;
   }
   auto repr = preview->repr();
   if (!repr) {
-    m_errorDialog->showMessage(repr.error().what());
+    m_errorDialog->showMessage(QString::fromStdString(repr.error().what()));
     return;
   }
-  m_jsonDocument->setPlainText(repr->utf8_data());
+  m_jsonDocument->setPlainText(repr->utf8().c_str());
 }
 
 bool JsonEditor::saveChanges() {
   auto value = m_editFormat->toJson(m_valueEditor->text().toStdString());
   if (!value) {
-    m_errorDialog->showMessage(value.error().what());
+    m_errorDialog->showMessage(QString::fromStdString(value.error().what()));
     return false;
   }
   auto updated = addOrSet(false, m_path, m_currentJson, m_options.insertLocation, *value);
   if (!updated) {
-    m_errorDialog->showMessage(updated.error().what());
+    m_errorDialog->showMessage(QString::fromStdString(updated.error().what()));
     return false;
   }
   auto repr = reprWithLineEnding(*updated);
   if (!repr) {
-    m_errorDialog->showMessage(repr.error().what());
+    m_errorDialog->showMessage(QString::fromStdString(repr.error().what()));
     return false;
   }
   auto saved = File::overwrite_file_with_rename(*repr, m_files[m_fileIndex]);
   if (!saved) {
-    m_errorDialog->showMessage(saved.error().what());
+    m_errorDialog->showMessage(QString::fromStdString(saved.error().what()));
     return false;
   }
   m_currentJson = std::move(*updated);
@@ -156,13 +156,13 @@ void JsonEditor::displayCurrentFile() {
 
   std::size_t progress = (m_fileIndex + 1) * 100 / m_files.size();
   String status = Star::format("Editing file {}/{} ({}%):    {}", m_fileIndex + 1, m_files.size(), progress, file);
-  m_statusLabel->setText(status.utf8_data());
+  m_statusLabel->setText(status.utf8().c_str());
 
   m_backButton->setEnabled(m_fileIndex != 0);
   m_nextButton->setText(m_fileIndex == m_files.size() - 1 ? "Done" : "Next »");
 
   auto const& document_path = m_path->path();
-  m_pathLabel->setText(document_path.utf8_data());
+  m_pathLabel->setText(document_path.utf8().c_str());
 
   m_imageLabel->setText("No preview");
   m_jsonDocument->setPlainText("");
@@ -180,14 +180,14 @@ void JsonEditor::displayCurrentFile() {
     if (!repr)
       return std::unexpected(std::move(repr.error()));
     m_currentJson = std::move(*parsed);
-    m_jsonDocument->setPlainText(repr->utf8_data());
+    m_jsonDocument->setPlainText(repr->utf8().c_str());
     updateValueEditor();
     updateImagePreview();
     return {};
   };
   auto loaded = load();
   if (!loaded)
-    m_errorDialog->showMessage(loaded.error().what());
+    m_errorDialog->showMessage(QString::fromStdString(loaded.error().what()));
 
   m_jsonPreview->moveCursor(QTextCursor::Start);
 
@@ -199,32 +199,32 @@ void JsonEditor::updateValueEditor() {
   auto value = m_path->get(m_currentJson);
   if (!value) {
     if (!value.error().is<JsonPath::TraversalException>()) {
-      m_errorDialog->showMessage(value.error().what());
+      m_errorDialog->showMessage(QString::fromStdString(value.error().what()));
       return;
     }
     value = m_editFormat->getDefault();
     if (!value) {
-      m_errorDialog->showMessage(value.error().what());
+      m_errorDialog->showMessage(QString::fromStdString(value.error().what()));
       return;
     }
   }
   auto text = m_editFormat->fromJson(*value);
   if (!text) {
-    m_errorDialog->showMessage(text.error().what());
+    m_errorDialog->showMessage(QString::fromStdString(text.error().what()));
     if (!text.error().is<JsonException>())
       return;
     auto fallback = m_editFormat->getDefault();
     if (!fallback) {
-      m_errorDialog->showMessage(fallback.error().what());
+      m_errorDialog->showMessage(QString::fromStdString(fallback.error().what()));
       return;
     }
     text = m_editFormat->fromJson(*fallback);
     if (!text) {
-      m_errorDialog->showMessage(text.error().what());
+      m_errorDialog->showMessage(QString::fromStdString(text.error().what()));
       return;
     }
   }
-  m_valueEditor->setText(text->utf8_data());
+  m_valueEditor->setText(text->utf8().c_str());
   m_valueEditor->setEnabled(true);
 }
 
@@ -235,21 +235,21 @@ void JsonEditor::updateImagePreview() {
     if (!value) {
       if (value.error().is<JsonPath::TraversalException>())
         continue;
-      m_errorDialog->showMessage(value.error().what());
+      m_errorDialog->showMessage(QString::fromStdString(value.error().what()));
       return;
     }
     auto image = value->to_json().to_string();
     if (!image) {
-      m_errorDialog->showMessage(image.error().what());
+      m_errorDialog->showMessage(QString::fromStdString(image.error().what()));
       return;
     }
     auto imageFile = image->extract(":");
     if (!imageFile) {
-      m_errorDialog->showMessage(imageFile.error().what());
+      m_errorDialog->showMessage(QString::fromStdString(imageFile.error().what()));
       return;
     }
     String imageName = File::relative_to(File::dir_name(file), *imageFile);
-    QPixmap pixmap = QPixmap(imageName.utf8_data()).scaledToWidth(ImagePreviewWidth);
+    QPixmap pixmap = QPixmap(imageName.utf8().c_str()).scaledToWidth(ImagePreviewWidth);
     if (pixmap.height() > ImagePreviewHeight)
       pixmap = pixmap.scaledToHeight(ImagePreviewHeight);
     m_imageLabel->setPixmap(pixmap);

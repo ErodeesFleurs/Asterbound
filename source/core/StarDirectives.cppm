@@ -31,8 +31,8 @@ public:
   Directives(String const& directives);
   Directives(String&& directives);
   Directives(std::string_view directives);
-  template <std::size_t Size>
-  Directives(char const (&directives)[Size]) : Directives(std::string_view(directives, Size - 1)) {}
+  template <std::size_t extent>
+  Directives(char const (&directives)[extent]) : Directives(std::string_view(directives, extent - 1)) {}
   Directives(Directives const& directives);
   Directives(Directives&& directives) noexcept;
   ~Directives();
@@ -40,9 +40,9 @@ public:
   Directives& operator=(String const& s);
   Directives& operator=(String&& s);
   Directives& operator=(std::string_view s);
-  template <std::size_t Size>
-  Directives& operator=(char const (&text)[Size]) {
-    return *this = std::string_view(text, Size - 1);
+  template <std::size_t extent>
+  Directives& operator=(char const (&text)[extent]) {
+    return *this = std::string_view(text, extent - 1);
   }
   Directives& operator=(Directives&& other) noexcept;
   Directives& operator=(Directives const& other);
@@ -130,7 +130,7 @@ concept abortable_directive_visitor =
 
 class DirectivesGroup {
 public:
-  friend struct hash<DirectivesGroup>;
+  friend struct ValueHash<DirectivesGroup>;
   DirectivesGroup();
   DirectivesGroup(String const& directives);
   DirectivesGroup(String&& directives);
@@ -156,9 +156,9 @@ public:
   template <abortable_directive_visitor Callback> [[nodiscard]] auto for_each_abortable(Callback&& callback) const;
 
   [[nodiscard]] std::expected<Image, StarException> apply_new_image(const Image& image,
-                                                                    ImageReferenceCallback refCallback = {}) const;
+                                                                    ImageReferenceCallback ref_callback = {}) const;
   [[nodiscard]] std::expected<void, StarException> apply_existing_image(Image& image,
-                                                                        ImageReferenceCallback refCallback = {}) const;
+                                                                        ImageReferenceCallback ref_callback = {}) const;
 
   std::size_t hash() const;
   List<Directives> const& list() const &;
@@ -181,7 +181,7 @@ private:
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, DirectivesGroup const& directives);
 
 template <>
-struct hash<DirectivesGroup> {
+struct ValueHash<DirectivesGroup> {
   std::size_t operator()(DirectivesGroup const& s) const;
 };
 
@@ -229,7 +229,7 @@ export module star.directives;
 
 export namespace Star {
   template <>
-  struct hash<DirectivesGroup>;
+  struct ValueHash<DirectivesGroup>;
 }
 
 export namespace Star {

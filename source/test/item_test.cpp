@@ -803,7 +803,7 @@ const GameTestRegistration inventory_delta_visibility(
     auto source = NetElementTop<PlayerInventory>::create(root);
     ASSERT_TRUE(source);
     (*source)->setPlayer(std::ref(**player));
-    NetCompatibilityRules privileged(OpenProtocolVersion, true);
+    NetCompatibilityRules privileged(open_protocol_version, true);
     auto initial = (*source)->write_net_state(0, privileged);
     ASSERT_TRUE(initial);
     auto item = inventoryTestItem(**database, "perfectlygenericitem", 2);
@@ -813,7 +813,7 @@ const GameTestRegistration inventory_delta_visibility(
     // One entity and one starting cursor: only recipient policy may differ.
     HashMap<NetCompatibilityRules, ByteArray> deltas;
     for (bool admin : {admin_first, !admin_first}) {
-      NetCompatibilityRules rules(OpenProtocolVersion, admin);
+      NetCompatibilityRules rules(open_protocol_version, admin);
       if (!deltas.contains(rules)) {
         auto delta = (*source)->write_net_state(initial->second, rules);
         ASSERT_TRUE(delta);

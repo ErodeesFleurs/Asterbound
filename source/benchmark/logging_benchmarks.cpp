@@ -308,7 +308,7 @@ void file_lines(benchmark::State& state, bool multiline) {
   if (!contents)
     state.SkipWithError(contents.error().what());
   else
-    require(state, valid_file(std::string_view(contents->data(), contents->size()), messages, state.iterations()));
+    require(state, valid_file(std::string_view(contents->span()), messages, state.iterations()));
   account(state, batch_size, batch_size * (messages[0].size() + 23),
           multiline ? "long multiline records; warm private temp file; no durability claim"
                     : "warm private temp file; complete timestamped lines; no durability claim");

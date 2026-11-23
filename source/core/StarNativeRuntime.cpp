@@ -19,12 +19,12 @@ import star.windows_crt;
 namespace Star {
 namespace {
 
-std::expected<void, StarException> prepare_optional_output(FILE* stream) {
-  auto name = stream == stdout ? "stdout" : "stderr";
+std::expected<void, StarException> prepare_optional_output(FILE& stream) {
+  std::string_view name = &stream == stdout ? "stdout" : "stderr";
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
-  auto slot = stream == stdout ? STD_OUTPUT_HANDLE : STD_ERROR_HANDLE;
+  auto slot = &stream == stdout ? STD_OUTPUT_HANDLE : STD_ERROR_HANDLE;
   auto inherited = GetStdHandle(slot);
-  auto descriptor = ::_fileno(stream);
+  auto descriptor = ::_fileno(&stream);
   if (descriptor >= 0 && inherited && inherited != INVALID_HANDLE_VALUE)
     return {};
   // A valid CRT redirection can outlive its Win32 standard-handle slot.
@@ -39,14 +39,14 @@ std::expected<void, StarException> prepare_optional_output(FILE* stream) {
       return {};
   }
 
-  if (!std::freopen("NUL", "w", stream))
+  if (!std::freopen("NUL", "w", &stream))
     return std::unexpected(IOException::format("Could not prepare optional {}: {}", name, std::strerror(errno)));
-  auto handle = reinterpret_cast<HANDLE>(::_get_osfhandle(::_fileno(stream)));
+  auto handle = reinterpret_cast<HANDLE>(::_get_osfhandle(::_fileno(&stream)));
   if (!SetStdHandle(slot, handle))
     return std::unexpected(
       IOException::format("Could not publish optional {}: Windows error {}", name, GetLastError()));
 #else
-  auto descriptor = ::fileno(stream);
+  auto descriptor = ::fileno(&stream);
   if (descriptor < 0)
     return std::unexpected(IOException::format("Could not inspect optional {}: {}", name, std::strerror(errno)));
   if (::fcntl(descriptor, F_GETFD) != -1)
@@ -69,7 +69,7 @@ std::expected<void, StarException> prepare_optional_output(FILE* stream) {
       return std::unexpected(
         IOException::format("Could not release optional {} descriptor: {}", name, std::strerror(errno)));
   }
-  std::clearerr(stream);
+  std::clearerr(&stream);
 #endif
   return {};
 }
@@ -77,10 +77,10 @@ std::expected<void, StarException> prepare_optional_output(FILE* stream) {
 }// namespace
 
 std::expected<void, StarException> NativeRuntime::prepare_standard_streams() {
-  auto output = prepare_optional_output(stdout);
+  auto output = prepare_optional_output(*stdout);
   if (!output)
     return std::unexpected(std::move(output.error()));
-  return prepare_optional_output(stderr);
+  return prepare_optional_output(*stderr);
 }
 
 }// namespace Star

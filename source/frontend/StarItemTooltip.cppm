@@ -616,7 +616,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
                     
                   }
               }
-              augmentLabel->setColor(Color::White);
+              augmentLabel->setColor(Color::palette_white);
             } else {
               auto setLabelResult859 = container->setLabel("augmentNameLabel", "NO AUGMENT INSERTED");
               if (!setLabelResult859)
@@ -633,7 +633,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
                     
                   }
               }
-              augmentLabel->setColor(Color::Gray);
+              augmentLabel->setColor(Color::palette_gray);
             }
           }
         }

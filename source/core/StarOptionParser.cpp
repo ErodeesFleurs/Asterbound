@@ -102,8 +102,8 @@ std::expected<OptionParser::ParseResult, StarException> OptionParser::parse_opti
     if (argument.mode == Required)
       ++minimum_arguments;
     if (argument.mode == Multiple)
-      maximum_arguments = NPos;
-    else if ((argument.mode == Optional || argument.mode == Required) && maximum_arguments != NPos)
+      maximum_arguments = npos;
+    else if ((argument.mode == Optional || argument.mode == Required) && maximum_arguments != npos)
       ++maximum_arguments;
   }
   if (options.arguments.size() < minimum_arguments)
@@ -167,7 +167,7 @@ std::expected<void, StarException> OptionParser::print_help(std::FILE& output) c
   }
   if (!m_additional_help.empty())
     std::format_to(out, "\n{}\n", m_additional_help);
-  return Star::print(&output, "{}", help.view());
+  return Star::print(output, "{}", help.view());
 }
 
 }

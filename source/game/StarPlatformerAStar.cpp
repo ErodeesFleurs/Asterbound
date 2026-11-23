@@ -568,7 +568,7 @@ std::expected<std::optional<bool>, StarException> PathFinder::explore(std::optio
       }
     }
 
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((velocity[1] != 0.0f));
     }
     if (auto result = func(Node{position, velocity}, false); !result) return std::unexpected(std::move(result.error()));

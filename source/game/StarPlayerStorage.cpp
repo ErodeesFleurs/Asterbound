@@ -380,7 +380,7 @@ std::expected<List<Uuid>, StarException> PlayerStorage::playerUuidListByName(Str
     auto cleanName = Text::strip_escape_codes(**playerName).to_lower();
     if (!cleanName)
       return std::unexpected(std::move(cleanName.error()));
-    if (cleanMatch->empty() || cleanName->utf8().rfind(cleanMatch->utf8()) != NPos)
+    if (cleanMatch->empty() || cleanName->utf8().rfind(cleanMatch->utf8()) != npos)
       list.push_back(cache.first);
   }
   return list;

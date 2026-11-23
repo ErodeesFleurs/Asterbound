@@ -13,8 +13,8 @@ namespace Star {
 // Implements DataStream using function objects as implementations of read/write.
 class DataStreamFunctions : public DataStream {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<DataStreamFunctions, DataStream>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<DataStreamFunctions, DataStream>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return type_name<DataStreamFunctions>(); }
   // Either callback can be unset; invoking that direction returns an error.
@@ -31,8 +31,8 @@ private:
 
 class DataStreamIODevice : public DataStream {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<DataStreamIODevice, DataStream>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<DataStreamIODevice, DataStream>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return type_name<DataStreamIODevice>(); }
   // Borrows the device for the entire adapter lifetime.
@@ -51,8 +51,8 @@ private:
 
 class DataStreamBuffer : public DataStream {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<DataStreamBuffer, DataStream>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<DataStreamBuffer, DataStream>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return type_name<DataStreamBuffer>(); }
   // Serialization owns its output; synchronous deserialization borrows its input.
@@ -71,7 +71,7 @@ public:
       stream.write_container(value, function);
     })
   [[nodiscard]] static std::expected<ByteArray, StarException> serialize_container(T const& t,
-                                                                                   WriteFunction writeFunction);
+                                                                                   WriteFunction write_function);
 
   template <typename T>
     requires(requires(DataStream& stream, T const& value) { stream.write_map_container(value); })
@@ -82,7 +82,7 @@ public:
       stream.write_map_container(value, function);
     })
   [[nodiscard]] static std::expected<ByteArray, StarException> serialize_map_container(T const& t,
-                                                                                       WriteFunction writeFunction);
+                                                                                       WriteFunction write_function);
 
   template <typename T>
     requires(requires(DataStream& stream, T& value) { stream.read(value); })
@@ -95,7 +95,7 @@ public:
   template <typename T, typename ReadFunction>
     requires(requires(DataStream& stream, T& value, ReadFunction& function) { stream.read_container(value, function); })
   [[nodiscard]] static std::expected<void, StarException> deserialize_container(T& t, std::span<char const> data,
-                                                                                ReadFunction readFunction);
+                                                                                ReadFunction read_function);
 
   template <typename T>
     requires(requires(DataStream& stream, T& value) { stream.read_map_container(value); })
@@ -106,7 +106,7 @@ public:
       stream.read_map_container(value, function);
     })
   [[nodiscard]] static std::expected<void, StarException> deserialize_map_container(T& t, std::span<char const> data,
-                                                                                    ReadFunction readFunction);
+                                                                                    ReadFunction read_function);
 
   template <typename T>
     requires(std::default_initializable<T> && requires(DataStream& stream, T& value) { stream.read(value); })
@@ -121,7 +121,7 @@ public:
              && requires(DataStream& stream, T& value,
                          ReadFunction& function) { stream.read_container(value, function); })
   [[nodiscard]] static std::expected<T, StarException> deserialize_container(std::span<char const> data,
-                                                                             ReadFunction readFunction);
+                                                                             ReadFunction read_function);
 
   template <typename T>
     requires(std::default_initializable<T>
@@ -133,10 +133,10 @@ public:
              && requires(DataStream& stream, T& value,
                          ReadFunction& function) { stream.read_map_container(value, function); })
   [[nodiscard]] static std::expected<T, StarException> deserialize_map_container(std::span<char const> data,
-                                                                                 ReadFunction readFunction);
+                                                                                 ReadFunction read_function);
 
   DataStreamBuffer();
-  DataStreamBuffer(std::size_t initialSize);
+  DataStreamBuffer(std::size_t initial_size);
   DataStreamBuffer(ByteArray b);
 
   // A stream owns its bytes and cursor; transfer explicitly rather than aliasing them.
@@ -154,9 +154,6 @@ public:
   ByteArray const& data() const;
   ByteArray take_data();
 
-  // Raw storage access is reserved for native adapters; business ranges use span().
-  char* ptr();
-  char const* ptr() const;
   std::span<char> span();
   std::span<char const> span() const;
 
@@ -168,7 +165,7 @@ public:
   [[nodiscard]] std::expected<std::size_t, StarException> pos();
 
   // Set new buffer.
-  void reset(std::size_t newSize);
+  void reset(std::size_t new_size);
   void reset(ByteArray b);
 
   [[nodiscard]] std::expected<void, StarException> read_data(std::span<char> data) override;
@@ -180,18 +177,16 @@ private:
 
 class DataStreamExternalBuffer : public DataStream {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<DataStreamExternalBuffer, DataStream>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<DataStreamExternalBuffer, DataStream>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return type_name<DataStreamExternalBuffer>(); }
   DataStreamExternalBuffer();
   // Borrows read-only storage; it must remain valid and unmoved until reset or destruction.
-  explicit DataStreamExternalBuffer(std::span<char const> externalData);
+  explicit DataStreamExternalBuffer(std::span<char const> external_data);
 
   DataStreamExternalBuffer(DataStreamExternalBuffer const& buffer) = default;
 
-  // Raw storage access is reserved for native adapters; business ranges use span().
-  char const* ptr() const;
   std::span<char const> span() const;
 
   std::size_t size() const;
@@ -202,7 +197,7 @@ public:
   [[nodiscard]] std::expected<std::size_t, StarException> pos();
   [[nodiscard]] std::expected<std::size_t, StarException> remaining();
 
-  void reset(std::span<char const> externalData);
+  void reset(std::span<char const> external_data);
 
   [[nodiscard]] std::expected<void, StarException> read_data(std::span<char> data) override;
   [[nodiscard]] std::expected<void, StarException> write_data(std::span<char const> data) override;
@@ -219,8 +214,8 @@ public:
   using DataStreamExternalBuffer::DataStreamExternalBuffer;
   using DataStreamExternalBuffer::read_vlq_u;
 
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<DataStreamReader, DataStreamExternalBuffer>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<DataStreamReader, DataStreamExternalBuffer>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return type_name<DataStreamReader>(); }
 
@@ -252,9 +247,9 @@ template <typename T, typename WriteFunction>
     stream.write_container(value, function);
   })
 [[nodiscard]] std::expected<ByteArray, StarException>
-DataStreamBuffer::serialize_container(T const& t, WriteFunction writeFunction) {
+DataStreamBuffer::serialize_container(T const& t, WriteFunction write_function) {
   DataStreamBuffer ds;
-  auto result = ds.write_container(t, writeFunction);
+  auto result = ds.write_container(t, write_function);
   if (!result)
     return std::unexpected(std::move(result.error()));
   return ds.take_data();
@@ -275,9 +270,9 @@ template <typename T, typename WriteFunction>
     stream.write_map_container(value, function);
   })
 [[nodiscard]] std::expected<ByteArray, StarException>
-DataStreamBuffer::serialize_map_container(T const& t, WriteFunction writeFunction) {
+DataStreamBuffer::serialize_map_container(T const& t, WriteFunction write_function) {
   DataStreamBuffer ds;
-  auto result = ds.write_map_container(t, writeFunction);
+  auto result = ds.write_map_container(t, write_function);
   if (!result)
     return std::unexpected(std::move(result.error()));
   return ds.take_data();
@@ -301,9 +296,9 @@ template <typename T>
 template <typename T, typename ReadFunction>
   requires(requires(DataStream& stream, T& value, ReadFunction& function) { stream.read_container(value, function); })
 [[nodiscard]] std::expected<void, StarException>
-DataStreamBuffer::deserialize_container(T& t, std::span<char const> data, ReadFunction readFunction) {
+DataStreamBuffer::deserialize_container(T& t, std::span<char const> data, ReadFunction read_function) {
   DataStreamReader ds(data);
-  return ds.read_container(t, readFunction);
+  return ds.read_container(t, read_function);
 }
 
 template <typename T>
@@ -319,9 +314,9 @@ template <typename T, typename ReadFunction>
     stream.read_map_container(value, function);
   })
 [[nodiscard]] std::expected<void, StarException>
-DataStreamBuffer::deserialize_map_container(T& t, std::span<char const> data, ReadFunction readFunction) {
+DataStreamBuffer::deserialize_map_container(T& t, std::span<char const> data, ReadFunction read_function) {
   DataStreamReader ds(data);
-  return ds.read_map_container(t, readFunction);
+  return ds.read_map_container(t, read_function);
 }
 
 template <typename T>
@@ -349,9 +344,9 @@ template <typename T, typename ReadFunction>
            && requires(DataStream& stream, T& value,
                        ReadFunction& function) { stream.read_container(value, function); })
 [[nodiscard]] std::expected<T, StarException> DataStreamBuffer::deserialize_container(std::span<char const> data,
-                                                                                      ReadFunction readFunction) {
+                                                                                      ReadFunction read_function) {
   T t;
-  auto result = deserialize_container(t, data, readFunction);
+  auto result = deserialize_container(t, data, read_function);
   if (!result)
     return std::unexpected(std::move(result.error()));
   return t;
@@ -373,9 +368,9 @@ template <typename T, typename ReadFunction>
            && requires(DataStream& stream, T& value,
                        ReadFunction& function) { stream.read_map_container(value, function); })
 [[nodiscard]] std::expected<T, StarException> DataStreamBuffer::deserialize_map_container(std::span<char const> data,
-                                                                                          ReadFunction readFunction) {
+                                                                                          ReadFunction read_function) {
   T t;
-  auto result = deserialize_map_container(t, data, readFunction);
+  auto result = deserialize_map_container(t, data, read_function);
   if (!result)
     return std::unexpected(std::move(result.error()));
   return t;

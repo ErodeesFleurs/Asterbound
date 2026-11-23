@@ -460,7 +460,7 @@ std::expected<void, StarException> WorldStorage::generateQueue(std::optional<std
 
       auto first = m_generationQueue.first_key();
       if (!first) return std::unexpected(std::move(first.error()));
-      auto autopResult1 = generateSectorToLevel(first->get(), SectorGenerationLevel::Complete, sectorGenerationLevelLimit.value_or(NPos));
+      auto autopResult1 = generateSectorToLevel(first->get(), SectorGenerationLevel::Complete, sectorGenerationLevelLimit.value_or(npos));
       if (!autopResult1) return std::unexpected(std::move(autopResult1.error()));
       auto p = std::move((*autopResult1));
 
@@ -908,7 +908,7 @@ std::expected<ByteArray, StarException> WorldStorage::writeTileSector(TileSector
     auto operationResult1 = ds.vuwrite(store.tileSerializationVersion);
     if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
   }
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((store.tiles));
   }
   for (std::size_t y = 0; y < WorldSectorSize; ++y) {

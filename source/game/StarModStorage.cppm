@@ -37,7 +37,7 @@ private:
     std::size_t size() const { return keyJson.size() + 1 + valueJson.size(); }
   };
   struct ModData {
-    std::unordered_map<String, Entry, hash<String>> entries;
+    std::unordered_map<String, Entry, ValueHash<String>> entries;
     String filename;
     // Complete compact object size, including braces, colons and commas.
     std::size_t bytes = 2;
@@ -54,7 +54,7 @@ private:
   String m_directory;
   std::mutex m_mutex;
   std::condition_variable m_condition;
-  std::unordered_map<String, ModData, hash<String>> m_mods;
+  std::unordered_map<String, ModData, ValueHash<String>> m_mods;
   std::optional<std::chrono::steady_clock::time_point> m_nextWrite;
   bool m_stop = false;
   // Declared last so joining always precedes destruction of borrowed state.

@@ -186,7 +186,7 @@ TEST(StringViewStorageTest, ArrayInputsStopAtNulOrExtentAcrossStorageAndLookup) 
     EXPECT_TRUE(text == StringView("AbC"));
     EXPECT_TRUE((String("AbC") <=> text) == 0);
     EXPECT_TRUE((text <=> String("AbC")) == 0);
-    EXPECT_EQ(hash<String>{}(text), hash<String>{}(std::string_view("AbC")));
+    EXPECT_EQ(ValueHash<String>{}(text), ValueHash<String>{}(std::string_view("AbC")));
     EXPECT_EQ((String("<") + text).utf8(), "<AbC");
     EXPECT_EQ((text + String(">")).utf8(), "AbC>");
     String built("|");
@@ -213,7 +213,7 @@ TEST(StringViewStorageTest, ArrayInputsStopAtNulOrExtentAcrossStorageAndLookup) 
   String binary;
   binary.append(sized);
   EXPECT_EQ(binary.utf8(), sized);
-  EXPECT_EQ(hash<String>{}(sized), hash<String>{}(binary));
+  EXPECT_EQ(ValueHash<String>{}(sized), ValueHash<String>{}(binary));
 }
 
 TEST(StringViewStorageTest, CodepointValuesOutliveIteratorChangesAndDestruction) {
@@ -270,7 +270,7 @@ TEST(StringViewStorageTest, ValueDescriptorSurvivesTemporaryViewWithLivingOwner)
 
   String string_owner(std::string_view("x\0日", 5));
   auto const& string_descriptor = StringView(string_owner).utf8();
-  EXPECT_EQ(string_descriptor.data(), string_owner.utf8_data());
+  EXPECT_EQ(string_descriptor.data(), string_owner.utf8().data());
   EXPECT_EQ(string_descriptor, std::string_view("x\0日", 5));
   StringView from_descriptor(std::string_view(owner.data(), owner.size()));
   EXPECT_EQ(from_descriptor.utf8(), descriptor);
@@ -420,8 +420,8 @@ TEST(StringViewStorageTest, SplitPassesIndependentValueMetadataToRvalueReference
   auto callback = [&records](StringView part, std::size_t&& offset, std::size_t&& count)
       -> std::expected<void, StarException> {
     records.push_back({std::string(part.utf8()), offset, count});
-    offset = NPos;
-    count = NPos;
+    offset = npos;
+    count = npos;
     return {};
   };
   ASSERT_TRUE(StringView("a|bc|").for_each_split("|", callback));
@@ -489,10 +489,10 @@ TEST(StringViewStorageTest, CursorSearchPreservesLazyShortCircuitAndFirstDecodeE
   auto absent = malformed.find(U'b');
   ASSERT_FALSE(absent);
   EXPECT_TRUE(absent.error().is<UnicodeException>());
-  auto last = malformed.find_last("a");
+  auto last = malformed.rfind("a");
   ASSERT_FALSE(last);
   EXPECT_TRUE(last.error().is<UnicodeException>());
-  EXPECT_EQ(StringView("a").find(std::string_view("b\xff", 2)), NPos);
+  EXPECT_EQ(StringView("a").find(std::string_view("b\xff", 2)), npos);
   EXPECT_EQ(StringView("a").find_first_of(std::string_view("a\xff", 2)), 0u);
 
   StringView invalid_source(std::string_view("\xff", 1));
@@ -529,9 +529,9 @@ TEST(StringViewStorageTest, SearchMatchesCodepointOracleAcrossAsciiRunsAndMixedB
           std::ranges::transform(text, text.begin(), fold);
           std::ranges::transform(pattern, pattern.begin(), fold);
         }
-        EXPECT_EQ(view.find_last(needle.bytes, cs), pattern.empty() ? 0u : text.rfind(pattern));
+        EXPECT_EQ(view.rfind(needle.bytes, cs), pattern.empty() ? 0u : text.rfind(pattern));
         if (pattern.size() == 1)
-          EXPECT_EQ(view.find_last(needle.points.front(), cs), text.rfind(pattern.front()));
+          EXPECT_EQ(view.rfind(needle.points.front(), cs), text.rfind(pattern.front()));
         for (std::size_t pos = 0; pos <= text.size() + 1; ++pos) {
           EXPECT_EQ(view.find(needle.bytes, pos, cs), pattern.empty() ? 0u : text.find(pattern, pos));
           if (pattern.size() == 1)
@@ -550,10 +550,10 @@ TEST(StringViewStorageTest, MatchingAndMembershipRetainDistinctDecodeErrorPriori
   ASSERT_FALSE(pattern_error);
   ASSERT_NE(std::string_view(source_error.error().what()), std::string_view(pattern_error.error().what()));
   auto first = source.find(pattern);
-  auto last = source.find_last(pattern);
+  auto last = source.rfind(pattern);
   auto member = source.find_first_of(pattern, 3);
   auto skipped = source.find(pattern, 4);
-  auto last_char = source.find_last(U'a');
+  auto last_char = source.rfind(U'a');
   auto folded = source.compare(pattern, String::CaseSensitivity::CaseInsensitive);
   ASSERT_FALSE(first);
   ASSERT_FALSE(last);
@@ -561,18 +561,18 @@ TEST(StringViewStorageTest, MatchingAndMembershipRetainDistinctDecodeErrorPriori
   ASSERT_FALSE(skipped);
   ASSERT_FALSE(last_char);
   ASSERT_FALSE(folded);
-  EXPECT_STREQ(folded.error().what(), source_error.error().what());
-  EXPECT_STREQ(first.error().what(), pattern_error.error().what());
-  EXPECT_STREQ(last.error().what(), pattern_error.error().what());
-  EXPECT_STREQ(member.error().what(), source_error.error().what());
-  EXPECT_STREQ(skipped.error().what(), source_error.error().what());
-  EXPECT_STREQ(last_char.error().what(), source_error.error().what());
-  EXPECT_EQ(source.find("", NPos), 0u);
-  EXPECT_EQ(source.find_last(""), 0u);
-  EXPECT_EQ(StringView("aa").find(pattern), NPos);
-  EXPECT_EQ(StringView("aa").find_last(pattern), NPos);
+  EXPECT_EQ(folded.error().what(), source_error.error().what());
+  EXPECT_EQ(first.error().what(), pattern_error.error().what());
+  EXPECT_EQ(last.error().what(), pattern_error.error().what());
+  EXPECT_EQ(member.error().what(), source_error.error().what());
+  EXPECT_EQ(skipped.error().what(), source_error.error().what());
+  EXPECT_EQ(last_char.error().what(), source_error.error().what());
+  EXPECT_EQ(source.find("", npos), 0u);
+  EXPECT_EQ(source.rfind(""), 0u);
+  EXPECT_EQ(StringView("aa").find(pattern), npos);
+  EXPECT_EQ(StringView("aa").rfind(pattern), npos);
   EXPECT_EQ(StringView("ba\xff").find("ba"), 0u);
-  EXPECT_FALSE(StringView("ba\xff").find_last("ba"));
+  EXPECT_FALSE(StringView("ba\xff").rfind("ba"));
 }
 
 TEST(StringViewStorageTest, PrefixAndSuffixValidateTheirEntirePatternBeforeReadingSource) {
@@ -583,8 +583,8 @@ TEST(StringViewStorageTest, PrefixAndSuffixValidateTheirEntirePatternBeforeReadi
   auto suffix = source.ends_with(pattern);
   ASSERT_FALSE(prefix);
   ASSERT_FALSE(suffix);
-  EXPECT_STREQ(prefix.error().what(), pattern_error.error().what());
-  EXPECT_STREQ(suffix.error().what(), pattern_error.error().what());
+  EXPECT_EQ(prefix.error().what(), pattern_error.error().what());
+  EXPECT_EQ(suffix.error().what(), pattern_error.error().what());
   EXPECT_EQ(source.starts_with("a"), true);
   EXPECT_EQ(source.starts_with(""), true);
   EXPECT_EQ(source.ends_with(""), true);

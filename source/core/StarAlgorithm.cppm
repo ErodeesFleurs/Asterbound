@@ -117,7 +117,7 @@ namespace AlgorithmDetail {
 
 // Immediate erase is intentional: callbacks can observe each destruction and
 // size change, and a checked failure leaves exactly the processed prefix.
-template <bool Keep, typename Container, typename Predicate>
+template <bool keep, typename Container, typename Predicate>
   requires algorithm_erase_target<Container, Predicate>
 [[nodiscard]] auto erase_matching(Container& container, Predicate&& predicate) {
   using invocation = std::remove_cvref_t<
@@ -139,7 +139,7 @@ template <bool Keep, typename Container, typename Predicate>
     } else {
       accepted = static_cast<bool>(decision);
     }
-    if (accepted != Keep)
+    if (accepted != keep)
       position = container.erase(position);
     else
       ++position;
@@ -214,7 +214,7 @@ namespace AlgorithmDetail {
 
 // Snapshot every key once, before reordering any values. Keys remain owned even
 // when getters return references; later getter calls can mutate their sources.
-template <bool Stable, typename Container, typename Getter>
+template <bool stable, typename Container, typename Getter>
   requires algorithm_key_sortable<Container, Getter>
 [[nodiscard]] auto sort_by_key(Container& container, Getter&& getter) {
   using invocation = std::remove_cvref_t<
@@ -248,7 +248,7 @@ template <bool Stable, typename Container, typename Getter>
   auto compare = [](entry_type const& left, entry_type const& right) {
     return static_cast<bool>(left.first < right.first);
   };
-  if constexpr (Stable)
+  if constexpr (stable)
     std::stable_sort(work.begin(), work.end(), compare);
   else
     std::sort(work.begin(), work.end(), compare);
@@ -437,77 +437,77 @@ struct FunctionSignature {
   using argument_types = std::tuple<Args...>;
   static constexpr std::size_t arity = sizeof...(Args);
 
-  template <std::size_t Index>
-    requires(Index < arity)
-  using argument_type = std::tuple_element_t<Index, argument_types>;
+  template <std::size_t index>
+    requires(index < arity)
+  using argument_type = std::tuple_element_t<index, argument_types>;
 };
 
-template <typename Return, typename... Args, bool Noexcept>
-struct FunctionTraits<Return(Args...) noexcept(Noexcept)> : FunctionSignature<Return, Args...> {};
+template <typename Return, typename... Args, bool is_noexcept>
+struct FunctionTraits<Return(Args...) noexcept(is_noexcept)> : FunctionSignature<Return, Args...> {};
 
-template <typename Return, typename... Args, bool Noexcept>
-struct FunctionTraits<Return (*)(Args...) noexcept(Noexcept)> : FunctionSignature<Return, Args...> {};
+template <typename Return, typename... Args, bool is_noexcept>
+struct FunctionTraits<Return (*)(Args...) noexcept(is_noexcept)> : FunctionSignature<Return, Args...> {};
 
 template <typename Return, typename... Args>
 struct FunctionTraits<std::function<Return(Args...)>> : FunctionSignature<Return, Args...> {};
 
-template <typename Owner, typename Return, typename... Args, bool Noexcept>
-struct FunctionTraits<Return (Owner::*)(Args...) noexcept(Noexcept)> : FunctionSignature<Return, Args...> {
+template <typename Owner, typename Return, typename... Args, bool is_noexcept>
+struct FunctionTraits<Return (Owner::*)(Args...) noexcept(is_noexcept)> : FunctionSignature<Return, Args...> {
   using owner_type = Owner&;
 };
 
-template <typename Owner, typename Return, typename... Args, bool Noexcept>
-struct FunctionTraits<Return (Owner::*)(Args...) const noexcept(Noexcept)> : FunctionSignature<Return, Args...> {
+template <typename Owner, typename Return, typename... Args, bool is_noexcept>
+struct FunctionTraits<Return (Owner::*)(Args...) const noexcept(is_noexcept)> : FunctionSignature<Return, Args...> {
   using owner_type = Owner const&;
 };
 
-template <typename Owner, typename Return, typename... Args, bool Noexcept>
-struct FunctionTraits<Return (Owner::*)(Args...) volatile noexcept(Noexcept)> : FunctionSignature<Return, Args...> {
+template <typename Owner, typename Return, typename... Args, bool is_noexcept>
+struct FunctionTraits<Return (Owner::*)(Args...) volatile noexcept(is_noexcept)> : FunctionSignature<Return, Args...> {
   using owner_type = Owner volatile&;
 };
 
-template <typename Owner, typename Return, typename... Args, bool Noexcept>
-struct FunctionTraits<Return (Owner::*)(Args...) const volatile noexcept(Noexcept)> : FunctionSignature<Return, Args...> {
+template <typename Owner, typename Return, typename... Args, bool is_noexcept>
+struct FunctionTraits<Return (Owner::*)(Args...) const volatile noexcept(is_noexcept)> : FunctionSignature<Return, Args...> {
   using owner_type = Owner const volatile&;
 };
 
-template <typename Owner, typename Return, typename... Args, bool Noexcept>
-struct FunctionTraits<Return (Owner::*)(Args...) & noexcept(Noexcept)> : FunctionSignature<Return, Args...> {
+template <typename Owner, typename Return, typename... Args, bool is_noexcept>
+struct FunctionTraits<Return (Owner::*)(Args...) & noexcept(is_noexcept)> : FunctionSignature<Return, Args...> {
   using owner_type = Owner&;
 };
 
-template <typename Owner, typename Return, typename... Args, bool Noexcept>
-struct FunctionTraits<Return (Owner::*)(Args...) const & noexcept(Noexcept)> : FunctionSignature<Return, Args...> {
+template <typename Owner, typename Return, typename... Args, bool is_noexcept>
+struct FunctionTraits<Return (Owner::*)(Args...) const & noexcept(is_noexcept)> : FunctionSignature<Return, Args...> {
   using owner_type = Owner const&;
 };
 
-template <typename Owner, typename Return, typename... Args, bool Noexcept>
-struct FunctionTraits<Return (Owner::*)(Args...) volatile & noexcept(Noexcept)> : FunctionSignature<Return, Args...> {
+template <typename Owner, typename Return, typename... Args, bool is_noexcept>
+struct FunctionTraits<Return (Owner::*)(Args...) volatile & noexcept(is_noexcept)> : FunctionSignature<Return, Args...> {
   using owner_type = Owner volatile&;
 };
 
-template <typename Owner, typename Return, typename... Args, bool Noexcept>
-struct FunctionTraits<Return (Owner::*)(Args...) const volatile & noexcept(Noexcept)> : FunctionSignature<Return, Args...> {
+template <typename Owner, typename Return, typename... Args, bool is_noexcept>
+struct FunctionTraits<Return (Owner::*)(Args...) const volatile & noexcept(is_noexcept)> : FunctionSignature<Return, Args...> {
   using owner_type = Owner const volatile&;
 };
 
-template <typename Owner, typename Return, typename... Args, bool Noexcept>
-struct FunctionTraits<Return (Owner::*)(Args...) && noexcept(Noexcept)> : FunctionSignature<Return, Args...> {
+template <typename Owner, typename Return, typename... Args, bool is_noexcept>
+struct FunctionTraits<Return (Owner::*)(Args...) && noexcept(is_noexcept)> : FunctionSignature<Return, Args...> {
   using owner_type = Owner&&;
 };
 
-template <typename Owner, typename Return, typename... Args, bool Noexcept>
-struct FunctionTraits<Return (Owner::*)(Args...) const && noexcept(Noexcept)> : FunctionSignature<Return, Args...> {
+template <typename Owner, typename Return, typename... Args, bool is_noexcept>
+struct FunctionTraits<Return (Owner::*)(Args...) const && noexcept(is_noexcept)> : FunctionSignature<Return, Args...> {
   using owner_type = Owner const&&;
 };
 
-template <typename Owner, typename Return, typename... Args, bool Noexcept>
-struct FunctionTraits<Return (Owner::*)(Args...) volatile && noexcept(Noexcept)> : FunctionSignature<Return, Args...> {
+template <typename Owner, typename Return, typename... Args, bool is_noexcept>
+struct FunctionTraits<Return (Owner::*)(Args...) volatile && noexcept(is_noexcept)> : FunctionSignature<Return, Args...> {
   using owner_type = Owner volatile&&;
 };
 
-template <typename Owner, typename Return, typename... Args, bool Noexcept>
-struct FunctionTraits<Return (Owner::*)(Args...) const volatile && noexcept(Noexcept)> : FunctionSignature<Return, Args...> {
+template <typename Owner, typename Return, typename... Args, bool is_noexcept>
+struct FunctionTraits<Return (Owner::*)(Args...) const volatile && noexcept(is_noexcept)> : FunctionSignature<Return, Args...> {
   using owner_type = Owner const volatile&&;
 };
 

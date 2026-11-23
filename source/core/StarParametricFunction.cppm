@@ -16,7 +16,7 @@ namespace ParametricDetail {
   template <typename> inline constexpr bool point_owner = false;
   template <typename T, typename A> inline constexpr bool point_owner<std::vector<T, A>> = true;
   template <typename T, typename A> inline constexpr bool point_owner<List<T, A>> = true;
-  template <typename T, std::size_t N> inline constexpr bool point_owner<std::array<T, N>> = true;
+  template <typename T, std::size_t extent> inline constexpr bool point_owner<std::array<T, extent>> = true;
 
   struct PointLess {
     template <typename A, typename B>

@@ -109,7 +109,7 @@ private:
   };
 
   struct GlTexture : public Texture {
-    void const* query_type(TypeKey key) const noexcept override { return query_type_of<GlTexture, Texture>(this, key); }
+    void query_type(TypeQuery& query) const noexcept override { query_type_of<GlTexture, Texture>(*this, query); }
     std::string_view dynamic_type_name() const noexcept override { return Star::type_name<GlTexture>(); }
 
     virtual GLuint glTextureId() const = 0;
@@ -118,8 +118,8 @@ private:
   };
 
   struct GlGroupedTexture : public GlTexture {
-    void const* query_type(TypeKey key) const noexcept override {
-      return query_type_of<GlGroupedTexture, GlTexture>(this, key);
+    void query_type(TypeQuery& query) const noexcept override {
+      query_type_of<GlGroupedTexture, GlTexture>(*this, query);
     }
     std::string_view dynamic_type_name() const noexcept override { return Star::type_name<GlGroupedTexture>(); }
 
@@ -142,8 +142,8 @@ private:
   };
 
   struct GlLoneTexture : public GlTexture {
-    void const* query_type(TypeKey key) const noexcept override {
-      return query_type_of<GlLoneTexture, GlTexture>(this, key);
+    void query_type(TypeQuery& query) const noexcept override {
+      query_type_of<GlLoneTexture, GlTexture>(*this, query);
     }
     std::string_view dynamic_type_name() const noexcept override { return Star::type_name<GlLoneTexture>(); }
 
@@ -182,8 +182,8 @@ private:
   };
 
   struct GlRenderBuffer : public RenderBuffer {
-    void const* query_type(TypeKey key) const noexcept override {
-      return query_type_of<GlRenderBuffer, RenderBuffer>(this, key);
+    void query_type(TypeQuery& query) const noexcept override {
+      query_type_of<GlRenderBuffer, RenderBuffer>(*this, query);
     }
     std::string_view dynamic_type_name() const noexcept override { return Star::type_name<GlRenderBuffer>(); }
 

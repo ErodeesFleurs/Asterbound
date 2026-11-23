@@ -41,7 +41,7 @@ struct ItemRecipe {
 };
 
 template <>
-struct hash<ItemRecipe> {
+struct ValueHash<ItemRecipe> {
   std::size_t operator()(ItemRecipe const& v) const;
 };
 
@@ -53,7 +53,7 @@ export module star.item_recipe;
 
 export namespace Star {
   template <>
-  struct hash<ItemRecipe>;
+  struct ValueHash<ItemRecipe>;
 }
 
 
@@ -62,6 +62,6 @@ export namespace Star {
   using ::Star::RecipeExceptionTag;
   using ::Star::RecipeException;
   using ::Star::ItemRecipe;
-  using ::Star::hash;
+  using ::Star::ValueHash;
   using ::Star::write_text;
 }

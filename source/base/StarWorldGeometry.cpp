@@ -76,7 +76,7 @@ auto split_x_interval(WorldGeometry const& geometry, T min, T max, MakePiece mak
     return Pieces::create({make_piece(min, max)});
 
   Wide length = static_cast<Wide>(max) - min;
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     if constexpr (Source == IntervalSource::Region)
       Star::star_assert_failed((max >= min));
     Star::star_assert_failed((length <= width));

@@ -37,7 +37,7 @@ TEST(NetElements, FilteredFloatDeltaLeavesValueAndCursorUntouched) {
   DataStreamBuffer wire;
   ASSERT_TRUE(wire.write(5.0f));
   ASSERT_TRUE(wire.seek(0));
-  ASSERT_TRUE(field.read_net_delta(wire, 0.0f, LegacyVersion));
+  ASSERT_TRUE(field.read_net_delta(wire, 0.0f, legacy_version));
   EXPECT_EQ(field.get(), 2.0f);
   EXPECT_EQ(wire.pos(), 0u);
   ASSERT_TRUE(field.read_net_delta(wire, 0.0f));
@@ -224,7 +224,7 @@ TEST(NetElements, DeltaSize) {
 }
 
 TEST(NetElements, GroupDeltaUsesCurrentlyVisibleFields) {
-  for (auto protocol : {LegacyVersion, OpenProtocolVersion + 1}) {
+  for (auto protocol : {legacy_version, open_protocol_version + 1}) {
     SCOPED_TRACE(protocol);
     NetCompatibilityRules rules(protocol);
     NetElementVersion version;
@@ -232,7 +232,7 @@ TEST(NetElements, GroupDeltaUsesCurrentlyVisibleFields) {
     NetElementGroup sender, receiver;
     sender.init_net_version(std::cref(version));
     auto set_visible = [&](std::size_t index, bool visible) {
-      auto minimum = visible ? AnyVersion : protocol + 1;
+      auto minimum = visible ? any_version : protocol + 1;
       sent[index].set_compatibility_version(minimum);
       received[index].set_compatibility_version(minimum);
     };
@@ -1368,15 +1368,15 @@ TEST(NetElements, DynamicGroupForwardsNestedFieldsWithPeerProtocol) {
   public:
     VersionedField() : NetElementCustomData(
         [](DataStream& stream, std::uint32_t& value) {
-          return stream.stream_compatibility_version() == LegacyVersion ? stream.cread<std::uint8_t>(value) : stream.read(value);
+          return stream.stream_compatibility_version() == legacy_version ? stream.cread<std::uint8_t>(value) : stream.read(value);
         },
         [](DataStream& stream, std::uint32_t const& value) {
-          return stream.stream_compatibility_version() == LegacyVersion ? stream.cwrite<std::uint8_t>(value) : stream.write(value);
+          return stream.stream_compatibility_version() == legacy_version ? stream.cwrite<std::uint8_t>(value) : stream.write(value);
         }) {}
   };
   static_assert(dynamic_net_element<VersionedField> && !dynamic_net_element<VersionedField const>);
   NetElementTop<NetElementDynamicGroup<VersionedField>> sender, relay, receiver;
-  NetCompatibilityRules legacy(LegacyVersion);
+  NetCompatibilityRules legacy(legacy_version);
 
   auto first = std::make_shared<VersionedField>();
   first->set(41);

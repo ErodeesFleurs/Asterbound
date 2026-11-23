@@ -16,27 +16,27 @@ namespace Star {
 // through entry-point teardown without a dynamically initialized global owner.
 struct DbgHelpLock {
   void lock() {
-    AcquireSRWLockExclusive(&nativeLock);
+    AcquireSRWLockExclusive(&native_lock);
   }
 
   bool try_lock() noexcept {
-    return TryAcquireSRWLockExclusive(&nativeLock);
+    return TryAcquireSRWLockExclusive(&native_lock);
   }
 
   void unlock() {
-    ReleaseSRWLockExclusive(&nativeLock);
+    ReleaseSRWLockExclusive(&native_lock);
   }
 
-  SRWLOCK nativeLock = SRWLOCK_INIT;
+  SRWLOCK native_lock = SRWLOCK_INIT;
 };
 static_assert(std::is_trivially_destructible_v<DbgHelpLock>);
-static constinit DbgHelpLock g_dbgHelpLock;
-// Protected by g_dbgHelpLock; overlapping explicit owners share one session.
-static constinit std::size_t g_diagnosticsOwners = 0;
+static constinit DbgHelpLock dbg_help_lock;
+// Protected by dbg_help_lock; overlapping explicit owners share one session.
+static constinit std::size_t diagnostics_owners = 0;
 
 bool try_write_minidump(DWORD thread_id, EXCEPTION_POINTERS& exception) noexcept {
   // The interrupted thread could itself hold this lock. Never wait on it.
-  std::unique_lock lock(g_dbgHelpLock, std::try_to_lock);
+  std::unique_lock lock(dbg_help_lock, std::try_to_lock);
   if (!lock)
     return false;
   auto file = CreateFileW(L"starbound.dmp", GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS,
@@ -49,49 +49,43 @@ bool try_write_minidump(DWORD thread_id, EXCEPTION_POINTERS& exception) noexcept
   return CloseHandle(file) && written;
 }
 
-std::expected<std::unique_ptr<NativeRuntime>, StarException> NativeRuntime::create(StandardStreams streams) {
+std::expected<NativeRuntime, StarException> NativeRuntime::create(StandardStreams streams) {
   if (streams == StandardStreams::Optional) {
     auto prepared = prepare_standard_streams();
     if (!prepared)
       return std::unexpected(std::move(prepared.error()));
   }
-  auto runtime = std::unique_ptr<NativeRuntime>(new NativeRuntime());
-  WSADATA wsaData;
-  auto status = WSAStartup(MAKEWORD(2, 2), &wsaData);
+  WSADATA wsa_data;
+  auto status = WSAStartup(MAKEWORD(2, 2), &wsa_data);
   if (status != 0)
     return std::unexpected(StarException(Star::format("WSAStartup failed: {}", status), false));
-  runtime->m_winsockInitialized = true;
 
-  DWORD symbolError = ERROR_SUCCESS;
-  bool initialized = true;
+  std::optional<DWORD> symbol_error;
   {
-    std::lock_guard lock(g_dbgHelpLock);
-    if (g_diagnosticsOwners == 0) {
+    std::lock_guard lock(dbg_help_lock);
+    if (diagnostics_owners == 0) {
       DWORD options = SymGetOptions();
       SymSetOptions(options | SYMOPT_LOAD_LINES);
-      if (!SymInitialize(GetCurrentProcess(), NULL, TRUE)) {
-        initialized = false;
-        symbolError = GetLastError();
-      }
+      if (!SymInitialize(GetCurrentProcess(), nullptr, TRUE))
+        symbol_error = GetLastError();
     }
-    if (initialized) {
-      ++g_diagnosticsOwners;
-      runtime->m_diagnosticsInitialized = true;
-    }
+    if (!symbol_error)
+      ++diagnostics_owners;
   }
-  if (!initialized)
-    return std::unexpected(StarException(Star::format("SymInitialize failed: {}", symbolError), false));
-  return runtime;
+  if (symbol_error) {
+    WSACleanup();
+    return std::unexpected(StarException(Star::format("SymInitialize failed: {}", *symbol_error), false));
+  }
+  return std::expected<NativeRuntime, StarException>(std::in_place, ConstructionKey{});
 }
 
 NativeRuntime::~NativeRuntime() {
   {
-    std::lock_guard lock(g_dbgHelpLock);
-    if (m_diagnosticsInitialized && --g_diagnosticsOwners == 0)
+    std::lock_guard lock(dbg_help_lock);
+    if (--diagnostics_owners == 0)
       SymCleanup(GetCurrentProcess());
   }
-  if (m_winsockInitialized)
-    WSACleanup();
+  WSACleanup();
 }
 
 
@@ -104,19 +98,19 @@ struct FreeModule {
 using ModuleReference = std::unique_ptr<std::remove_pointer_t<HMODULE>, FreeModule>;
 
 static ModuleReference reference_module(std::uintptr_t address) {
-  HMODULE module = nullptr;
+  ModuleReference module;
   if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
-          reinterpret_cast<LPCWSTR>(address), &module))
+          reinterpret_cast<LPCWSTR>(address), std::out_ptr(module)))
     return {};
-  return ModuleReference(module);
+  return module;
 }
 
 NativeStack::Module NativeStack::describe_module(std::uintptr_t base) {
-  auto const* dos = reinterpret_cast<IMAGE_DOS_HEADER const*>(base);
-  auto const* headers = reinterpret_cast<IMAGE_NT_HEADERS const*>(base + dos->e_lfanew);
+  auto const& dos = *reinterpret_cast<IMAGE_DOS_HEADER const*>(base);
+  auto const& headers = *reinterpret_cast<IMAGE_NT_HEADERS const*>(base + dos.e_lfanew);
   std::array<wchar_t, 32768> path;
   auto length = GetModuleFileNameW(reinterpret_cast<HMODULE>(base), path.data(), static_cast<DWORD>(path.size()));
-  return {base, headers->OptionalHeader.SizeOfImage, headers->FileHeader.TimeDateStamp,
+  return {base, headers.OptionalHeader.SizeOfImage, headers.FileHeader.TimeDateStamp,
       length && length < path.size() ? std::wstring(path.data(), length) : std::wstring()};
 }
 
@@ -180,9 +174,9 @@ void NativeStack::append_to(TextBuffer& output) const {
   HANDLE process = GetCurrentProcess();
   // A last module reference can run DLL teardown. Declare the DbgHelp guard
   // after current so the guard is gone when those references are released.
-  std::lock_guard lock(g_dbgHelpLock);
+  std::lock_guard lock(dbg_help_lock);
   for (std::size_t i = 0; i < m_modules.size(); ++i) {
-    if (!current[i].matches || g_diagnosticsOwners == 0) {
+    if (!current[i].matches || diagnostics_owners == 0) {
       current[i].matches = false;
       continue;
     }
@@ -215,12 +209,11 @@ void NativeStack::append_to(TextBuffer& output) const {
         file.remove_prefix(slash + 1);
       std::format_to(std::back_inserter(output), " ({}:{})", file, line.LineNumber);
     }
-    alignas(SYMBOL_INFO) std::array<std::byte, sizeof(SYMBOL_INFO) + MAX_SYM_NAME> buffer{};
-    auto* symbol = reinterpret_cast<SYMBOL_INFO*>(buffer.data());
-    symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
-    symbol->MaxNameLen = MAX_SYM_NAME;
-    if (SymFromAddr(process, frame.address, nullptr, symbol))
-      std::format_to(std::back_inserter(output), " {}", std::string_view(symbol->Name, symbol->NameLen));
+    SYMBOL_INFO_PACKAGE symbol{};
+    symbol.si.SizeOfStruct = sizeof(SYMBOL_INFO);
+    symbol.si.MaxNameLen = MAX_SYM_NAME;
+    if (SymFromAddr(process, frame.address, nullptr, &symbol.si))
+      std::format_to(std::back_inserter(output), " {}", std::string_view(symbol.si.Name, symbol.si.NameLen));
   }
   if (m_frames.size() == stack_limit)
     output.append("\n[Stack Output Limit Reached]");

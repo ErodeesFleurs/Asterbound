@@ -57,7 +57,7 @@ using WorldAction = std::function<std::expected<void, StarException>(World&)>;
 
 class World {
 public:
-  virtual void const* query_type(TypeKey key) const noexcept { return query_type_of<World>(this, key); }
+  virtual void query_type(TypeQuery& query) const noexcept { query_type_of<World>(*this, query); }
   virtual std::string_view dynamic_type_name() const noexcept { return Star::type_name<World>(); }
 
   explicit World(Root& root) : m_root(root) {}

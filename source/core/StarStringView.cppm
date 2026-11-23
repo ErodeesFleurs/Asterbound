@@ -38,8 +38,8 @@ public:
   StringView(String const&&) = delete;
 
   // Character arrays use bounded C-text semantics; sized views retain every byte.
-  template <std::size_t N>
-  constexpr StringView(char const (&s)[N]) noexcept : m_view(bounded_array_text(s)) {}
+  template <std::size_t extent>
+  constexpr StringView(char const (&s)[extent]) noexcept : m_view(bounded_array_text(s)) {}
   constexpr StringView(std::string_view s) noexcept : m_view(s) {}
   constexpr StringView(std::string const& s) noexcept : m_view(s) {}
   StringView(std::string&&) = delete;
@@ -86,15 +86,15 @@ public:
     return std::unexpected(StringException("Split callback is empty"));
   }
 
-  [[nodiscard]] std::expected<bool, StarException> has_char(Char c) const;
-  // Identical to has_char, except, if string is empty, tests if c is
+  [[nodiscard]] std::expected<bool, StarException> contains(Char c) const;
+  // Identical to contains, except, if string is empty, tests if c is
   // whitespace.
   [[nodiscard]] std::expected<bool, StarException> has_char_or_whitespace(Char c) const;
 
   [[nodiscard]] std::expected<std::size_t, StarException> find(Char c, std::size_t beg = 0, CaseSensitivity cs = CaseSensitivity::CaseSensitive) const;
   [[nodiscard]] std::expected<std::size_t, StarException> find(StringView s, std::size_t beg = 0, CaseSensitivity cs = CaseSensitivity::CaseSensitive) const;
-  [[nodiscard]] std::expected<std::size_t, StarException> find_last(Char c, CaseSensitivity cs = CaseSensitivity::CaseSensitive) const;
-  [[nodiscard]] std::expected<std::size_t, StarException> find_last(StringView s, CaseSensitivity cs = CaseSensitivity::CaseSensitive) const;
+  [[nodiscard]] std::expected<std::size_t, StarException> rfind(Char c, CaseSensitivity cs = CaseSensitivity::CaseSensitive) const;
+  [[nodiscard]] std::expected<std::size_t, StarException> rfind(StringView s, CaseSensitivity cs = CaseSensitivity::CaseSensitive) const;
 
   // If pattern is empty, finds first whitespace
   [[nodiscard]] std::expected<std::size_t, StarException> find_first_of(StringView chars = "", std::size_t beg = 0) const;
@@ -112,11 +112,11 @@ public:
   [[nodiscard]] std::expected<bool, StarException> equals(StringView s, CaseSensitivity cs = CaseSensitivity::CaseSensitive) const;
   [[nodiscard]] std::expected<bool, StarException> equals_ignore_case(StringView s) const;
 
-  [[nodiscard]] std::expected<StringView, StarException> substr(std::size_t position, std::size_t n = NPos) const;
+  [[nodiscard]] std::expected<StringView, StarException> substr(std::size_t position, std::size_t n = npos) const;
 
   friend bool operator==(StringView s1, std::string_view s2);
-  template <std::size_t N>
-  friend bool operator==(StringView s, char const (&text)[N]) { return s.m_view == bounded_array_text(text); }
+  template <std::size_t extent>
+  friend bool operator==(StringView s, char const (&text)[extent]) { return s.m_view == bounded_array_text(text); }
   friend bool operator==(StringView s1, std::string const& s2);
   friend bool operator==(StringView s1, String const& s2);
   friend bool operator==(StringView s1, StringView s2);
@@ -162,11 +162,11 @@ private:
     std::size_t start = 0;
     for (;;) {
       auto stop = any ? m_view.find_first_of(pattern.m_view, start) : m_view.find(pattern.m_view, start);
-      auto count = stop == NPos ? m_view.size() - start : stop - start;
+      auto count = stop == npos ? m_view.size() - start : stop - start;
       auto result = std::invoke(callback, StringView(m_view.substr(start, count)),
                                 std::size_t{start}, std::size_t{count});
       if (!result) return std::unexpected(std::move(result.error()));
-      if (stop == NPos) return {};
+      if (stop == npos) return {};
       start = stop + (any ? 1 : pattern.m_view.size());
     }
   }

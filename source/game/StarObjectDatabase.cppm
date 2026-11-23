@@ -150,7 +150,7 @@ struct ObjectOrientation {
 // by instance values at various levels. This whole system needs reevaluation.
 struct ObjectConfig {
   // Returns the index of the best valid orientation.  If no orientations are
-  // valid, returns NPos
+  // valid, returns npos
   [[nodiscard]] std::expected<std::size_t, StarException> findValidOrientation(World const& world, Vec2I const& position, std::optional<Direction> directionAffinity = std::optional<Direction>()) const;
 
   String path;

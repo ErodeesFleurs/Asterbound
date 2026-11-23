@@ -326,7 +326,7 @@ TEST(LockFileTest, ThreeProcessesKeepOneInodeAcrossHandoff) {
     ASSERT_TRUE(owner.reports('L'));
     // B opened A's inode before release. Even if A unlinks the name, B can
     // still lock its descriptor; C must not acquire a newly created inode.
-    int waiter = ::open(path.utf8_data(), O_RDONLY | O_CLOEXEC);
+    int waiter = ::open(path.utf8().c_str(), O_RDONLY | O_CLOEXEC);
     ASSERT_GE(waiter, 0);
     auto close_waiter = make_scope_exit([&] { ::close(waiter); });
     struct stat original{};
@@ -343,7 +343,7 @@ TEST(LockFileTest, ThreeProcessesKeepOneInodeAcrossHandoff) {
       LockFile fresh(path);
       EXPECT_EQ(fresh.lock(), false);
       struct stat named{};
-      ASSERT_EQ(::stat(path.utf8_data(), &named), 0);
+      ASSERT_EQ(::stat(path.utf8().c_str(), &named), 0);
       EXPECT_EQ(named.st_dev, original.st_dev);
       EXPECT_EQ(named.st_ino, original.st_ino);
     }));
@@ -435,7 +435,7 @@ void report_interrupt(int) {
 
 TEST(LockFileTest, BlockingFlockRetriesAfterRealSignalInterruption) {
   isolated_lock_scenario([](String const& path) {
-    int holder = ::open(path.utf8_data(), O_CREAT | O_RDWR | O_CLOEXEC, 0600);
+    int holder = ::open(path.utf8().c_str(), O_CREAT | O_RDWR | O_CLOEXEC, 0600);
     ASSERT_GE(holder, 0);
     auto close_holder = make_scope_exit([&] { ::close(holder); });
     ASSERT_EQ(::flock(holder, LOCK_EX | LOCK_NB), 0);
@@ -940,7 +940,7 @@ TEST(FileTest, CopyErrorsDoNotTruncateSourceOrExistingTarget) {
 
 #ifdef STAR_SYSTEM_LINUX
   auto alias = File::relative_to(*directory, "alias");
-  ASSERT_EQ(::link(source.utf8_data(), alias.utf8_data()), 0);
+  ASSERT_EQ(::link(source.utf8().c_str(), alias.utf8().c_str()), 0);
   EXPECT_FALSE(File::copy(source, alias));
   EXPECT_EQ(File::read_file_string(source), "source bytes");
 #endif
@@ -1151,28 +1151,27 @@ TEST(FileTest, RemoveDirectoryRecursiveHandlesSymlinkLoops) {
 
 TEST(FileTest, OggDeviceCallbacksReadAndSeek) {
   Buffer device(ByteArray::from_string("abcdef"));
-  auto adapterResult = IODeviceCallbacks::create(device);
-  ASSERT_TRUE(adapterResult);
-  auto adapter = std::move(*adapterResult);
-  ov_callbacks callbacks{};
-  adapter.setupOggCallbacks(callbacks);
+  auto adapter_result = IODeviceCallbacks::create(device);
+  ASSERT_TRUE(adapter_result);
+  auto adapter = std::move(*adapter_result);
+  auto callbacks = IODeviceCallbacks::callbacks();
 
   char output[4]{};
   EXPECT_EQ(callbacks.read_func(output, 2, 2, &adapter), 2u);
-  EXPECT_FALSE(adapter.takeError());
+  EXPECT_FALSE(adapter.take_error());
   EXPECT_EQ(ByteArray(std::span(output).first(4)), ByteArray::from_string("abcd"));
   EXPECT_EQ(callbacks.tell_func(&adapter), 4);
-  EXPECT_FALSE(adapter.takeError());
+  EXPECT_FALSE(adapter.take_error());
 
   EXPECT_EQ(callbacks.seek_func(&adapter, -2, SEEK_CUR), 0);
-  EXPECT_FALSE(adapter.takeError());
+  EXPECT_FALSE(adapter.take_error());
   EXPECT_EQ(callbacks.tell_func(&adapter), 2);
-  EXPECT_FALSE(adapter.takeError());
+  EXPECT_FALSE(adapter.take_error());
   EXPECT_EQ(callbacks.read_func(output, 2, 2, &adapter), 2u);
-  EXPECT_FALSE(adapter.takeError());
+  EXPECT_FALSE(adapter.take_error());
   EXPECT_EQ(ByteArray(std::span(output).first(4)), ByteArray::from_string("cdef"));
   EXPECT_EQ(callbacks.read_func(output, 2, 2, &adapter), 0u);
-  EXPECT_FALSE(adapter.takeError());
+  EXPECT_FALSE(adapter.take_error());
 }
 
 #if GTEST_HAS_DEATH_TEST && !defined(STAR_SYSTEM_FAMILY_WINDOWS)
@@ -1242,7 +1241,7 @@ TEST(FileTest, WholeReadsConsumeStreamsWhoseMetadataSizeIsZero) {
   ASSERT_TRUE(directory);
   auto cleanup = make_scope_exit([&]() { removeTree(*directory); });
   auto path = File::relative_to(*directory, "whole-read-pipe");
-  ASSERT_EQ(::mkfifo(path.utf8_data(), 0600), 0);
+  ASSERT_EQ(::mkfifo(path.utf8().c_str(), 0600), 0);
   std::string bytes(4096, '\0');
   for (std::size_t i = 0; i < bytes.size(); ++i)
     bytes[i] = static_cast<char>(i % 251);
@@ -1302,7 +1301,7 @@ TEST(FileTest, AppendSeekFailureReleasesDescriptor) {
   auto dir = std::move(*dirResult);
   auto cleanup = make_scope_exit([&]() { removeTree(dir); });
   auto path = File::relative_to(dir, "pipe");
-  ASSERT_EQ(::mkfifo(path.utf8_data(), 0600), 0);
+  ASSERT_EQ(::mkfifo(path.utf8().c_str(), 0600), 0);
   // Exception symbolization may cache ELF descriptors; only this FIFO is owned here.
   for (unsigned i = 0; i < 8; ++i) {
     auto opened = File::open(path, IOMode::ReadWrite | IOMode::Append);

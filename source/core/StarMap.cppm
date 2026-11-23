@@ -436,11 +436,11 @@ template <typename Key, typename Value, typename Compare = std::less<Key>,
           typename Allocator = std::allocator<std::pair<Key const, Value>>>
 using Map = BasicMap<std::map<Key, Value, Compare, Allocator>>;
 
-template <typename Key, typename Value, typename Hash = hash<Key>, typename Equals = std::equal_to<>,
+template <typename Key, typename Value, typename Hash = ValueHash<Key>, typename Equals = std::equal_to<>,
           typename Allocator = std::allocator<std::pair<Key const, Value>>>
 using HashMap = BasicMap<FlatHashMap<Key, Value, Hash, Equals, Allocator>>;
 
-template <typename Key, typename Value, typename Hash = hash<Key>, typename Equals = std::equal_to<>,
+template <typename Key, typename Value, typename Hash = ValueHash<Key>, typename Equals = std::equal_to<>,
           typename Allocator = std::allocator<std::pair<Key const, Value>>>
 using StableHashMap = BasicMap<std::unordered_map<Key, Value, Hash, Equals, Allocator>>;
 

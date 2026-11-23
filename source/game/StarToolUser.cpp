@@ -15,6 +15,7 @@ import star.thread;
 import star.directives;
 import star.asset_path;
 import star.casting;
+import star.optional;
 import star.audio;
 import star.map;
 import star.set;
@@ -340,7 +341,7 @@ ItemDescriptor ToolUser::altHandItemDescriptor() const {
     if (!drawablesResult) return std::unexpected(std::move(drawablesResult.error()));
     auto drawables = std::move(*drawablesResult);
 
-    Color opacityMask = Color::White;
+    Color opacityMask = Color::palette_white;
     auto opacity = item->getAppropriateOpacity();
     if (!opacity) return std::unexpected(std::move(opacity.error()));
     opacityMask.set_alpha_f(*opacity);
@@ -708,12 +709,12 @@ void ToolUser::setupHumanoidHandItemPose(Humanoid& humanoid) const {
       }
     }
   }
-  if (auto beam = as<BeamItem>(m_primaryHandItem.get().get())) {
-    auto updated = beam->updateBeamEffects(!m_suppress.get());
+  if (auto beam = as_ref<BeamItem>(optional_ref(m_primaryHandItem.get()))) {
+    auto updated = beam->get().updateBeamEffects(!m_suppress.get());
     if (!updated) return std::unexpected(std::move(updated.error()));
   }
-  if (auto beam = as<BeamItem>(m_altHandItem.get().get())) {
-    auto updated = beam->updateBeamEffects(!m_suppress.get() && !itemSafeTwoHanded(m_primaryHandItem.get()));
+  if (auto beam = as_ref<BeamItem>(optional_ref(m_altHandItem.get()))) {
+    auto updated = beam->get().updateBeamEffects(!m_suppress.get() && !itemSafeTwoHanded(m_primaryHandItem.get()));
     if (!updated) return std::unexpected(std::move(updated.error()));
   }
   return {};

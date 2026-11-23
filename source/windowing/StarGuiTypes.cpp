@@ -18,7 +18,7 @@ GuiDirection otherDirection(GuiDirection direction) {
     case GuiDirection::Vertical:
       return GuiDirection::Horizontal;
     default:
-      if constexpr (Star::DebugEnabled) {
+      if constexpr (Star::debug_enabled) {
         Star::star_assert_failed((false));
       }
       return static_cast<GuiDirection>(-1);

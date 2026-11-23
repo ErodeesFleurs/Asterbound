@@ -77,11 +77,11 @@ static std::expected<int, StarException> unpack_assets(std::span<char const* con
         auto backslash = component.find('\\');
         if (!backslash)
           return std::unexpected(std::move(backslash.error()));
-        if (component == ".." || *backslash != NPos)
+        if (component == ".." || *backslash != npos)
           unsafe_name = true;
       }
       if (unsafe_name) {
-        return Star::print(stderr, "Skipping entry with unsafe path: {}\n", file);
+        return Star::print(*stderr, "Skipping entry with unsafe path: {}\n", file);
       }
 
       auto file_data = (*assets_pack)->read(file);
@@ -105,9 +105,9 @@ static std::expected<int, StarException> unpack_assets(std::span<char const* con
     if (!extracted) {
       if (!extracted.error().is<AssetSourceException>())
         return std::unexpected(std::move(extracted.error()));
-      if (auto written = Star::print(stderr, "Could not open file: {}\n", file); !written)
+      if (auto written = Star::print(*stderr, "Could not open file: {}\n", file); !written)
         return std::unexpected(std::move(written.error()));
-      if (auto written = Star::print(stderr, "Reason: {}\n", Star::output_exception(ExceptionDiagnostic(extracted.error()), false)); !written)
+      if (auto written = Star::print(*stderr, "Reason: {}\n", Star::output_exception(ExceptionDiagnostic(extracted.error()), false)); !written)
         return std::unexpected(std::move(written.error()));
     }
     return {};
@@ -133,13 +133,13 @@ static std::expected<int, StarException> unpack_assets(std::span<char const* con
 int main(int argc, char** argv) {
   auto native_runtime = NativeRuntime::create();
   if (!native_runtime) {
-    if (auto written = Star::print(stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(native_runtime.error()), true)); !written)
+    if (auto written = Star::print(*stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(native_runtime.error()), true)); !written)
       return 1;
     return 1;
   }
   auto result = unpack_assets({argv, static_cast<std::size_t>(argc)});
   if (!result) {
-    if (auto written = Star::print(stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
+    if (auto written = Star::print(*stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
       return 1;
     return 1;
   }

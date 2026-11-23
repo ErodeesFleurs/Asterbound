@@ -5,43 +5,36 @@ import star.memory;
 
 TEST(MemoryTest, FailedReallocationPreservesOwnedBytes) {
   constexpr std::size_t size = 513;
-  auto data = static_cast<unsigned char*>(Star::malloc(size));
-  ASSERT_NE(data, nullptr);
+  Star::MemoryAllocation data;
+  ASSERT_TRUE(data.resize(size));
   for (std::size_t i = 0; i < size; ++i)
-    data[i] = static_cast<unsigned char>(i);
+    data.span()[i] = static_cast<char>(i);
 
-  auto replacement = Star::realloc(data, std::numeric_limits<std::size_t>::max());
-  EXPECT_EQ(replacement, nullptr);
-  if (replacement) {
-    Star::free(replacement);
-    return;
-  }
+  ASSERT_FALSE(data.resize(std::numeric_limits<std::size_t>::max()));
+  ASSERT_EQ(data.size(), size);
   for (std::size_t i = 0; i < size; ++i)
-    EXPECT_EQ(data[i], static_cast<unsigned char>(i));
-  Star::free(data, size);
+    EXPECT_EQ(data.span()[i], static_cast<char>(i));
 }
 
 TEST(MemoryTest, FirstAllocationOnFreshThreadCanShrinkTransferredBytes) {
   constexpr std::size_t size = 1024;
-  constexpr std::size_t resizedSize = 768;
-  auto data = static_cast<unsigned char*>(Star::malloc(size));
-  ASSERT_NE(data, nullptr);
+  constexpr std::size_t resized_size = 768;
+  Star::MemoryAllocation data;
+  ASSERT_TRUE(data.resize(size));
   for (std::size_t i = 0; i < size; ++i)
-    data[i] = static_cast<unsigned char>(i);
+    data.span()[i] = static_cast<char>(i);
 
-  unsigned char* resized = nullptr;
-  std::thread consumer([&] {
-    resized = static_cast<unsigned char*>(Star::realloc(data, resizedSize));
+  std::thread consumer([owned = std::move(data), &data]() mutable {
+    ASSERT_TRUE(owned.resize(resized_size));
+    data = std::move(owned);
+    EXPECT_TRUE(owned.span().empty());
   });
   consumer.join();
-  EXPECT_NE(resized, nullptr);
-  if (!resized) {
-    Star::free(data);
-    return;
-  }
-  for (std::size_t i = 0; i < resizedSize; ++i)
-    EXPECT_EQ(resized[i], static_cast<unsigned char>(i));
-  Star::free(resized);
+  ASSERT_EQ(data.size(), resized_size);
+  for (std::size_t i = 0; i < resized_size; ++i)
+    EXPECT_EQ(data.span()[i], static_cast<char>(i));
+  EXPECT_TRUE(data.resize(0));
+  EXPECT_TRUE(data.span().empty());
 }
 
 TEST(MemoryTest, LargeAlignedObjectsTransferAcrossThreads) {

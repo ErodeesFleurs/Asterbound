@@ -266,7 +266,7 @@ std::expected<bool, StarException> Pane::sendEvent(InputEvent const& event) {
         std::shared_ptr<Widget> child = getChildAt(mousePos);
         if (child->active() && child->interactive()) {
           if (buttonDown
-              && (buttonDown->mouseButton == MouseButton::Left || buttonDown->mouseButton == MouseButton::Right)) {
+              && (buttonDown->mouse_button == MouseButton::Left || buttonDown->mouse_button == MouseButton::Right)) {
             if (!newClickDown)
               newClickDown = child;
 

@@ -21,7 +21,8 @@ concept intrusive_counted = intrusive_value<T> && requires(T& value) {
 };
 
 template <typename From, typename To>
-concept intrusive_convertible = intrusive_value<From> && std::convertible_to<From*, To*> && intrusive_counted<To>;
+concept intrusive_convertible = intrusive_value<From>
+  && std::convertible_to<std::add_pointer_t<From>, std::add_pointer_t<To>> && intrusive_counted<To>;
 
 template <typename T, typename... Args>
 concept intrusive_constructible =
@@ -48,17 +49,17 @@ public:
     requires (std::is_lvalue_reference_v<U> && intrusive_convertible<std::remove_reference_t<U>, T>)
   explicit RefPtr(U&& value) noexcept : m_owner(std::addressof(value)) { ref_ptr_inc_ref(*m_owner); }
 
-  RefPtr(RefPtr const& other) noexcept { assign_retained(other.get()); }
+  RefPtr(RefPtr const& other) noexcept { assign_retained(other); }
   RefPtr(RefPtr&&) noexcept = default;
   template <intrusive_value U>
     requires (!std::same_as<U, T> && intrusive_convertible<U, T>)
-  RefPtr(RefPtr<U> const& other) noexcept { assign_retained(other.get()); }
+  RefPtr(RefPtr<U> const& other) noexcept { assign_retained(other); }
   template <intrusive_value U>
     requires (!std::same_as<U, T> && intrusive_convertible<U, T>)
   RefPtr(RefPtr<U>&& other) noexcept : m_owner(other.m_owner.release()) {}
 
   RefPtr& operator=(RefPtr const& other) noexcept {
-    assign_retained(other.get());
+    assign_retained(other);
     return *this;
   }
   RefPtr& operator=(RefPtr&& other) noexcept {
@@ -69,7 +70,7 @@ public:
   template <intrusive_value U>
     requires (!std::same_as<U, T> && intrusive_convertible<U, T>)
   RefPtr& operator=(RefPtr<U> const& other) noexcept {
-    assign_retained(other.get());
+    assign_retained(other);
     return *this;
   }
   template <intrusive_value U>
@@ -80,7 +81,12 @@ public:
   }
 
   void reset() noexcept { m_owner.reset(); }
-  void reset(T& value) noexcept requires intrusive_counted<T> { assign_retained(std::addressof(value)); }
+  void reset(T& value) noexcept requires intrusive_counted<T> {
+    if (m_owner.get() != std::addressof(value)) {
+      ref_ptr_inc_ref(value);
+      m_owner.reset(std::addressof(value));
+    }
+  }
   void reset(T&&) = delete;
 
   [[nodiscard]] DetachedRef<T> detach() noexcept { return DetachedRef<T>(std::move(*this)); }
@@ -90,8 +96,7 @@ public:
 
   void swap(RefPtr& other) noexcept { m_owner.swap(other.m_owner); }
   T& operator*() const noexcept { return *m_owner; }
-  T* operator->() const noexcept { return m_owner.get(); }
-  T* get() const noexcept { return m_owner.get(); }
+  auto const& operator->() const noexcept { return m_owner; }
   explicit operator bool() const noexcept { return static_cast<bool>(m_owner); }
 
 private:
@@ -100,12 +105,12 @@ private:
     requires intrusive_castable<Target, Source>
   friend RefPtr<cast_result_t<Target, Source>> as(RefPtr<Source>&& owner) noexcept;
 
-  void assign_retained(T* value) noexcept {
-    if (m_owner.get() != value) {
-      if (value)
-        ref_ptr_inc_ref(*value);
-      m_owner.reset(value);
-    }
+  template <intrusive_value U>
+  void assign_retained(RefPtr<U> const& other) noexcept {
+    if (other)
+      reset(*other);
+    else
+      reset();
   }
 
   std::unique_ptr<T, IntrusiveDeleter<T>> m_owner;
@@ -115,7 +120,7 @@ template <intrusive_value T> class DetachedRef {
 public:
   DetachedRef(DetachedRef&&) noexcept = default;
   DetachedRef& operator=(DetachedRef&&) noexcept = default;
-  T* get() const noexcept { return m_owner.get(); }
+  T& operator*() const noexcept { return *m_owner; }
   explicit operator bool() const noexcept { return static_cast<bool>(m_owner); }
 
 private:
@@ -125,45 +130,49 @@ private:
 };
 
 template <typename T, typename U>
-concept intrusive_comparable = intrusive_value<T> && intrusive_value<U> && requires(T* left, U* right) {
-  { left == right } -> std::same_as<bool>;
+concept intrusive_comparable = intrusive_value<T> && intrusive_value<U> && requires(T& left, U& right) {
+  { std::addressof(left) == std::addressof(right) } -> std::same_as<bool>;
 };
 
 template <intrusive_value T, intrusive_value U>
   requires intrusive_comparable<T, U>
 bool operator==(RefPtr<T> const& left, RefPtr<U> const& right) noexcept {
-  return left.get() == right.get();
+  return std::to_address(left) == std::to_address(right);
 }
-template <intrusive_value T> bool operator==(RefPtr<T> const& left, T* right) noexcept { return left.get() == right; }
-template <intrusive_value T> bool operator==(T* left, RefPtr<T> const& right) noexcept { return left == right.get(); }
 template <intrusive_value T, intrusive_value U>
-  requires requires(T* left, U* right) { std::less<>{}(left, right); }
+  requires requires(T& left, U& right) { std::less<>{}(std::addressof(left), std::addressof(right)); }
 bool operator<(RefPtr<T> const& left, RefPtr<U> const& right) noexcept {
-  return std::less<>{}(left.get(), right.get());
+  return std::less<>{}(std::to_address(left), std::to_address(right));
 }
 template <intrusive_value T> void swap(RefPtr<T>& left, RefPtr<T>& right) noexcept { left.swap(right); }
 
 template <cast_target Target, intrusive_value Source>
   requires capability_castable<cast_result_t<Target, Source>, Source>
 bool is(RefPtr<Source> const& owner) noexcept {
-  return is<Target>(owner.get());
+  if constexpr (std::is_void_v<Target>)
+    return static_cast<bool>(owner);
+  else
+    return owner && as_ref<Target>(*owner).has_value();
 }
 
 template <intrusive_value Target, intrusive_value Source>
   requires intrusive_castable<Target, Source>
 RefPtr<cast_result_t<Target, Source>> as(RefPtr<Source> const& owner) noexcept {
-  if (auto adjusted = as<Target>(owner.get()))
-    return RefPtr<cast_result_t<Target, Source>>(*adjusted);
+  if (owner)
+    if (auto adjusted = as_ref<Target>(*owner))
+      return RefPtr<cast_result_t<Target, Source>>(adjusted->get());
   return {};
 }
 
 template <intrusive_value Target, intrusive_value Source>
   requires intrusive_castable<Target, Source>
 RefPtr<cast_result_t<Target, Source>> as(RefPtr<Source>&& owner) noexcept {
-  if (auto adjusted = as<Target>(owner.get())) {
+  if (!owner)
+    return {};
+  if (auto adjusted = as_ref<Target>(*owner)) {
     RefPtr<cast_result_t<Target, Source>> result;
     (void)owner.m_owner.release();
-    result.m_owner.reset(adjusted);
+    result.m_owner.reset(std::addressof(adjusted->get()));
     return result;
   }
   return {};
@@ -175,8 +184,10 @@ RefPtr<T> make_ref(Args&&... args) {
   return RefPtr<T>(*new T(std::forward<Args>(args)...));
 }
 
-template <intrusive_value T> struct hash<RefPtr<T>> {
-  std::size_t operator()(RefPtr<T> const& value) const noexcept { return hash<T*>{}(value.get()); }
+template <intrusive_value T> struct ValueHash<RefPtr<T>> {
+  std::size_t operator()(RefPtr<T> const& value) const noexcept {
+    return Star::ValueHash<decltype(std::to_address(value))>{}(std::to_address(value));
+  }
 };
 
 class RefCounter {
@@ -189,7 +200,7 @@ public:
   friend void ref_ptr_inc_ref(RefCounter const& value) noexcept;
   friend void ref_ptr_dec_ref(RefCounter const& value) noexcept;
 
-  virtual void const* query_type(TypeKey key) const noexcept { return query_type_of<RefCounter>(this, key); }
+  virtual void query_type(TypeQuery& query) const noexcept { query_type_of<RefCounter>(*this, query); }
   virtual std::string_view dynamic_type_name() const noexcept { return type_name<RefCounter>(); }
 
 protected:
@@ -210,7 +221,7 @@ inline void ref_ptr_dec_ref(RefCounter const& value) noexcept {
 export module star.ref_ptr;
 
 export namespace Star {
-template <intrusive_value T> struct hash<RefPtr<T>>;
+template <intrusive_value T> struct ValueHash<RefPtr<T>>;
 }
 
 export namespace Star {
@@ -225,7 +236,7 @@ using ::Star::RefPtr;
 using ::Star::operator==;
 using ::Star::operator<;
 using ::Star::as;
-using ::Star::hash;
+using ::Star::ValueHash;
 using ::Star::is;
 using ::Star::make_ref;
 using ::Star::ref_ptr_dec_ref;

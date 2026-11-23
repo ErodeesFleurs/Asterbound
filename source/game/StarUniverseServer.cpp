@@ -3409,7 +3409,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
     if (!socket)
       return std::unexpected(std::move(socket.error()));
     if (legacyClient)
-      socket->get().setNetRules(LegacyVersion);
+      socket->get().setNetRules(legacy_version);
     auto response = std::make_shared<ProtocolResponsePacket>();
     response->setCompressionMode(PacketCompressionMode::Enabled);
     if (request->requestProtocolVersion != StarProtocolVersion) {
@@ -3442,7 +3442,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
       auto modeName = NetCompressionModeNames->get_right(mode);
       if (!modeName)
         return std::unexpected(std::move(modeName.error()));
-      response->info = JsonObject{{"compression", modeName->get()}, {"openProtocolVersion", OpenProtocolVersion}};
+      response->info = JsonObject{{"compression", modeName->get()}, {"openProtocolVersion", open_protocol_version}};
     }
     if (auto pushed = connection.pushSingle(response); !pushed)
       return std::unexpected(std::move(pushed.error()));
@@ -3486,15 +3486,15 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
     auto latest = settings->get_bool("requireLatestVersion", false);
     if (!latest)
       return std::unexpected(std::move(latest.error()));
-    VersionNumber peer_version = legacyClient ? LegacyVersion : 1;
+    VersionNumber peer_version = legacyClient ? legacy_version : 1;
     if (!legacyClient && (*latest || connect->info)) {
-      auto version = read_open_protocol_version(connect->info, *latest ? LegacyVersion : 1);
+      auto version = read_open_protocol_version(connect->info, *latest ? legacy_version : 1);
       if (!version)
         return std::unexpected(std::move(version.error()));
       peer_version = *version;
     }
-    if (*latest && peer_version < OpenProtocolVersion)
-      return fail(Star::format("OpenStarbound protocol {} or later is required.\nAsterbound v{}, Source ID: {}...", OpenProtocolVersion, product_version, source_identifier.substr(0, 8)));
+    if (*latest && peer_version < open_protocol_version)
+      return fail(Star::format("OpenStarbound protocol {} or later is required.\nAsterbound v{}, Source ID: {}...", open_protocol_version, product_version, source_identifier.substr(0, 8)));
     if (!m_speciesShips.contains(connect->shipSpecies))
       return fail("Unknown ship species");
     if (!remoteAddress) {
@@ -3595,7 +3595,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
       if (!legacy)
         return std::unexpected(std::move(legacy.error()));
       if (*legacy)
-        peer_version = LegacyVersion;
+        peer_version = legacy_version;
     }
     NetCompatibilityRules rules(peer_version, administrator);
     socket->get().setNetRules(rules);

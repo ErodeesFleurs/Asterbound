@@ -41,7 +41,7 @@ using ItemException = StarError<ItemExceptionTag, StarException>;
 
 class Item {
 public:
-  virtual void const* query_type(TypeKey key) const noexcept { return query_type_of<Item>(this, key); }
+  virtual void query_type(TypeQuery& query) const noexcept { query_type_of<Item>(*this, query); }
   virtual std::string_view dynamic_type_name() const noexcept { return Star::type_name<Item>(); }
 
   virtual ~Item();
@@ -91,7 +91,7 @@ public:
   // Take as many of this item as possible up to the given max (default is all)
   // and return the new set.  Implementation uses clone() method.
   [[nodiscard]]
-  std::expected<std::shared_ptr<Item>, StarException> take(std::uint64_t max = NPos);
+  std::expected<std::shared_ptr<Item>, StarException> take(std::uint64_t max = npos);
 
   // count() is 0
   bool empty() const;
@@ -208,7 +208,7 @@ private:
 
 class GenericItem : public Item {
 public:
-  void const* query_type(TypeKey key) const noexcept override { return query_type_of<GenericItem, Item>(this, key); }
+  void query_type(TypeQuery& query) const noexcept override { query_type_of<GenericItem, Item>(*this, query); }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<GenericItem>(); }
 
   [[nodiscard]]

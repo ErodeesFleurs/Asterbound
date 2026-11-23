@@ -24,7 +24,7 @@ using InputException = StarError<InputExceptionTag, StarException>;
 using InputVariant = std::variant<Key, MouseButton, ControllerButton>;
 
 template <>
-struct hash<InputVariant> {
+struct ValueHash<InputVariant> {
   std::size_t operator()(InputVariant const& v) const;
 };
 
@@ -253,7 +253,7 @@ export module star.input;
 
 export namespace Star {
   template <>
-  struct hash<InputVariant>;
+  struct ValueHash<InputVariant>;
 }
 
 

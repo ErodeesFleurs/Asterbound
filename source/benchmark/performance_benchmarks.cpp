@@ -30,26 +30,26 @@ std::expected<void, Star::StarException> requirePrivateStorage(Star::String cons
 int main(int argc, char** argv) {
   auto nativeRuntime = Star::NativeRuntime::create();
   if (!nativeRuntime) {
-    if (!Star::print(stderr, "{}\n", nativeRuntime.error().what()))
+    if (!Star::print(*stderr, "{}\n", nativeRuntime.error().what()))
       return 1;
     return 1;
   }
   Star::BenchmarkLifetime benchmark_lifetime(argc, argv);
   auto loader = Star::RootLoader::create({{}, {}, {}, Star::LogLevel::Error, true, {}});
   if (!loader) {
-    if (!Star::print(stderr, "{}\n", loader.error().what()))
+    if (!Star::print(*stderr, "{}\n", loader.error().what()))
       return 1;
     return 1;
   }
   auto parsed = loader->command_parse_or_die({argv, static_cast<std::size_t>(argc)});
   if (!parsed) {
-    if (!Star::print(stderr, "{}\n", parsed.error().what()))
+    if (!Star::print(*stderr, "{}\n", parsed.error().what()))
       return 1;
     return 1;
   }
   auto& settings = parsed->first;
   if (auto privateStorage = requirePrivateStorage(settings.storageDirectory); !privateStorage) {
-    if (!Star::print(stderr, "{}\n", privateStorage.error().what()))
+    if (!Star::print(*stderr, "{}\n", privateStorage.error().what()))
       return 1;
     return 1;
   }
@@ -57,7 +57,7 @@ int main(int argc, char** argv) {
   settings.logFile.reset();
   auto root = Star::Root::create(std::move(settings));
   if (!root) {
-    if (!Star::print(stderr, "{}\n", root.error().what()))
+    if (!Star::print(*stderr, "{}\n", root.error().what()))
       return 1;
     return 1;
   }
@@ -68,7 +68,7 @@ int main(int argc, char** argv) {
                       .and_then([&] { return Star::register_liquid_performance_benchmarks(session); })
                       .and_then([&] { return Star::registerAssetsPerformanceBenchmarks(session); });
   if (!registered) {
-    if (!Star::print(stderr, "{}\n", registered.error().what()))
+    if (!Star::print(*stderr, "{}\n", registered.error().what()))
       return 1;
     benchmark::ClearRegisteredBenchmarks();
     return 1;

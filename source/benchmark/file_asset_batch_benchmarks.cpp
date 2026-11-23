@@ -137,7 +137,7 @@ void asset_batch(benchmark::State& state, AssetKind kind, bool batch, bool diges
         reader_digest.push(*serialized);
       }
       auto expected_digest = reader_digest.compute();
-      auto validate_sizes = [&](SizeResults const& sizes) -> char const* {
+      auto validate_sizes = [&](SizeResults const& sizes) -> std::optional<std::string> {
         if (sizes.size() != count)
           return "Batch query returned an incorrect result count";
         for (std::size_t i = 0; i != count; ++i) {
@@ -146,12 +146,12 @@ void asset_batch(benchmark::State& state, AssetKind kind, bool batch, bool diges
           if (*sizes[i] != static_cast<Star::StreamOffset>(payloads[i].size()))
             return "Batch query returned an incorrect indexed length";
         }
-        return nullptr;
+        return {};
       };
       for (bool use_batch : {false, true}) {
         auto sizes = use_batch ? batch_size_query(*source, requests) : scalar_size_query(*source, requests);
         if (auto error = validate_sizes(sizes)) {
-          state.SkipWithError(error);
+          state.SkipWithError(*error);
           return;
         }
         auto digest = whole_metadata_digest(*source, use_batch);
@@ -178,7 +178,7 @@ void asset_batch(benchmark::State& state, AssetKind kind, bool batch, bool diges
           state.PauseTiming();
           auto error = validate_sizes(sizes);
           if (error)
-            state.SkipWithError(error);
+            state.SkipWithError(*error);
           state.ResumeTiming();
           if (error)
             break;

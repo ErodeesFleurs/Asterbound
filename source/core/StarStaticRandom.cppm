@@ -33,21 +33,22 @@ template <typename... Values> consteval std::size_t static_random_pack_capacity(
   return size;
 }
 
-template <std::size_t Capacity>
-  requires(Capacity <= 64)
+template <std::size_t capacity>
+  requires(capacity <= 64)
 struct StaticRandomPack {
-  std::array<char, Capacity> bytes;
+  std::array<char, capacity> bytes;
   std::size_t size = 0;
 
   template <hash_append_primitive_value Value> void append(Value const& value) {
     auto representation = hash_encode_primitive(value);
-    std::memcpy(bytes.data() + size, &representation, sizeof(representation));
+    std::ranges::copy(std::bit_cast<std::array<char, sizeof(representation)>>(representation),
+        std::span(bytes).subspan(size).begin());
     size += sizeof(representation);
   }
 
-  template <std::size_t N> void append(char const (&text)[N]) {
+  template <std::size_t size_n> void append(char const (&text)[size_n]) {
     auto prefix = bounded_array_text(text);
-    std::memcpy(bytes.data() + size, prefix.data(), prefix.size());
+    std::ranges::copy(prefix, std::span(bytes).subspan(size).begin());
     size += prefix.size();
   }
 };
@@ -60,7 +61,7 @@ std::uint32_t static_random_hash32(T const& value, TL const&... rest) {
     StaticRandomPack<capacity> pack;
     pack.append(value);
     (pack.append(rest), ...);
-    return xx_hash32(std::span<char const>(pack.bytes.data(), pack.size), 2938728349u);
+    return xx_hash32(std::span(pack.bytes).first(pack.size), 2938728349u);
   } else {
     XXHash32 hash(2938728349u);
     hash_append(hash, value);
@@ -77,7 +78,7 @@ std::uint64_t static_random_hash64(T const& value, TL const&... rest) {
     StaticRandomPack<capacity> pack;
     pack.append(value);
     (pack.append(rest), ...);
-    return xx_hash64(std::span<char const>(pack.bytes.data(), pack.size), 1997293021376312589);
+    return xx_hash64(std::span(pack.bytes).first(pack.size), 1997293021376312589);
   } else {
     XXHash64 hash(1997293021376312589);
     hash_append(hash, value);

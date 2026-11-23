@@ -126,7 +126,7 @@ StatusController::StatusController(Root& root)
   : m_root(root), m_uniqueEffectMetadata([] { return UniqueEffectMetadata::create(); }),
     m_effectAnimators([&root] { return EffectAnimator::create(root); }),
     m_primaryScript(root),
-    m_primaryAnimatorId(EffectAnimatorGroup::NullElementId) {}
+    m_primaryAnimatorId(EffectAnimatorGroup::null_element_id) {}
 
 std::expected<std::shared_ptr<StatusController>, StarException> StatusController::create(Root& root, Json const& config) {
   auto controller = std::shared_ptr<StatusController>(new StatusController(root));
@@ -1007,7 +1007,7 @@ std::expected<bool, StarException> StatusController::addUniqueEffect(UniqueStatu
   auto metadata = m_uniqueEffectMetadata.add_net_element(std::move(*createdMetadata));
   if (!metadata) { m_uniqueEffects.remove(effect); return std::unexpected(std::move(metadata.error())); }
   instance.metadataId = *metadata;
-  instance.animatorId = EffectAnimatorGroup::NullElementId;
+  instance.animatorId = EffectAnimatorGroup::null_element_id;
   if (instance.effectConfig.animationConfig) {
     auto animator = EffectAnimator::create(m_root, instance.effectConfig.animationConfig);
     if (!animator) {
@@ -1028,7 +1028,7 @@ std::expected<bool, StarException> StatusController::addUniqueEffect(UniqueStatu
     if (auto result = initUniqueEffectScript(instance); !result) {
       auto cleanup = uninitUniqueEffectScript(instance);
       m_uniqueEffectMetadata.remove_net_element(instance.metadataId);
-      if (instance.animatorId != EffectAnimatorGroup::NullElementId) m_effectAnimators.remove_net_element(instance.animatorId);
+      if (instance.animatorId != EffectAnimatorGroup::null_element_id) m_effectAnimators.remove_net_element(instance.animatorId);
       m_uniqueEffects.remove(effect);
       if (!cleanup) return std::unexpected(cleanup.error().with_context(result.error().what()));
       return std::unexpected(std::move(result.error()));
@@ -1043,7 +1043,7 @@ std::expected<void, StarException> StatusController::removeUniqueEffect(UniqueSt
   auto expired = instance->get().script.invoke("onExpire");
   auto uninitialized = uninitUniqueEffectScript(instance->get());
   m_uniqueEffectMetadata.remove_net_element(instance->get().metadataId);
-  if (instance->get().animatorId != EffectAnimatorGroup::NullElementId)
+  if (instance->get().animatorId != EffectAnimatorGroup::null_element_id)
     m_effectAnimators.remove_net_element(instance->get().animatorId);
   m_uniqueEffects.remove(effect);
   if (!expired && !expired.error().is<LuaScriptError>()) return std::unexpected(std::move(expired.error()));
@@ -1058,7 +1058,7 @@ std::expected<void, StarException> StatusController::initPrimaryScript() {
   auto entityCallbacks = LuaBindings::makeEntityCallbacks(m_parentEntity->get());
   if (!entityCallbacks) return std::unexpected(std::move(entityCallbacks.error()));
   if (auto result = m_primaryScript.add_callbacks("entity", std::move(*entityCallbacks)); !result) return std::unexpected(std::move(result.error()));
-  if (m_primaryAnimatorId != EffectAnimatorGroup::NullElementId) {
+  if (m_primaryAnimatorId != EffectAnimatorGroup::null_element_id) {
     auto animator = m_effectAnimators.get_net_element(m_primaryAnimatorId);
     if (!animator) return std::unexpected(std::move(animator.error()));
     auto callbacks = LuaBindings::makeNetworkedAnimatorCallbacks(*(*animator)->animator);
@@ -1100,7 +1100,7 @@ std::expected<void, StarException> StatusController::initUniqueEffectScript(Uniq
   auto entityCallbacks = LuaBindings::makeEntityCallbacks(m_parentEntity->get());
   if (!entityCallbacks) return std::unexpected(std::move(entityCallbacks.error()));
   if (auto result = uniqueEffect.script.add_callbacks("entity", std::move(*entityCallbacks)); !result) return std::unexpected(std::move(result.error()));
-  if (uniqueEffect.animatorId != EffectAnimatorGroup::NullElementId) {
+  if (uniqueEffect.animatorId != EffectAnimatorGroup::null_element_id) {
     auto animator = m_effectAnimators.get_net_element(uniqueEffect.animatorId);
     if (!animator) return std::unexpected(std::move(animator.error()));
     auto callbacks = LuaBindings::makeNetworkedAnimatorCallbacks(*(*animator)->animator);

@@ -121,15 +121,16 @@ template <scalar_value T, scalar_operation Operation> void measure_scalar(benchm
   account(state, sizeof(T));
 }
 
-template <raw_operation Operation> void convert_raw(ByteOrder order, void* dest, void const* src, std::size_t size) {
+template <raw_operation Operation>
+void convert_raw(ByteOrder order, std::span<std::byte> dest, std::span<std::byte const> src) {
   if constexpr (Operation == raw_operation::reverse)
-    Star::reverse_bytes(dest, size);
+    Star::reverse_bytes(dest);
   else if constexpr (Operation == raw_operation::reverse_copy)
-    Star::reverse_bytes_copy(dest, src, size);
+    Star::reverse_bytes_copy(dest, src);
   else if constexpr (Operation == raw_operation::to_mixed)
-    Star::to_byte_order(order, dest, size);
+    Star::to_byte_order(order, dest);
   else
-    Star::to_byte_order(order, dest, src, size);
+    Star::to_byte_order(order, dest, src);
 }
 
 template <std::size_t Size, raw_operation Operation> void measure_raw(benchmark::State& state) {
@@ -160,7 +161,8 @@ template <std::size_t Size, raw_operation Operation> void measure_raw(benchmark:
   };
   auto evaluate = [&] {
     for (std::size_t i = 0; i != batch_size; ++i)
-      convert_raw<Operation>(orders[i], output.data() + i * stride + 1, input.data() + i * stride + 1, Size);
+      convert_raw<Operation>(orders[i], std::span(output).subspan(i * stride + 1, Size),
+                             std::span(input).subspan(i * stride + 1, Size));
   };
   evaluate();
   auto expected = oracle(true);

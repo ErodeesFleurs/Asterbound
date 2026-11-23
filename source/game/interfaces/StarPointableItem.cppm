@@ -21,7 +21,7 @@ namespace Star {
 
 class PointableItem {
 public:
-  virtual void const* query_type(TypeKey key) const noexcept { return query_type_of<PointableItem>(this, key); }
+  virtual void query_type(TypeQuery& query) const noexcept { query_type_of<PointableItem>(*this, query); }
   virtual std::string_view dynamic_type_name() const noexcept { return Star::type_name<PointableItem>(); }
 
   virtual ~PointableItem() = default;

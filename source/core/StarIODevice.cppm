@@ -54,17 +54,17 @@ public:
   // current file position.  Default implementation stores the file position,
   // then seeks and calls read/write partial, then restores the file position,
   // and is not thread safe.
-  [[nodiscard]] virtual std::expected<std::size_t, StarException> read_absolute(StreamOffset readPosition,
+  [[nodiscard]] virtual std::expected<std::size_t, StarException> read_absolute(StreamOffset read_position,
                                                                                 std::span<char> data);
-  [[nodiscard]] virtual std::expected<std::size_t, StarException> write_absolute(StreamOffset writePosition,
+  [[nodiscard]] virtual std::expected<std::size_t, StarException> write_absolute(StreamOffset write_position,
                                                                                  std::span<char const> data);
 
   // Full operations report short transfers, including a distinct EOF error.
   [[nodiscard]] virtual std::expected<void, StarException> read_full(std::span<char> data);
   [[nodiscard]] virtual std::expected<void, StarException> write_full(std::span<char const> data);
-  [[nodiscard]] virtual std::expected<void, StarException> read_full_absolute(StreamOffset readPosition,
+  [[nodiscard]] virtual std::expected<void, StarException> read_full_absolute(StreamOffset read_position,
                                                                               std::span<char> data);
-  [[nodiscard]] virtual std::expected<void, StarException> write_full_absolute(StreamOffset writePosition,
+  [[nodiscard]] virtual std::expected<void, StarException> write_full_absolute(StreamOffset write_position,
                                                                                std::span<char const> data);
 
   // Default implementation only accepts the current mode.
@@ -99,7 +99,7 @@ public:
   [[nodiscard]] std::expected<ByteArray, StarException> read_bytes(std::size_t size);
   [[nodiscard]] std::expected<void, StarException> write_bytes(ByteArray const& p);
 
-  [[nodiscard]] std::expected<ByteArray, StarException> read_bytes_absolute(StreamOffset readPosition,
+  [[nodiscard]] std::expected<ByteArray, StarException> read_bytes_absolute(StreamOffset read_position,
                                                                             std::size_t size);
 
 protected:

@@ -63,10 +63,10 @@ void Tileset::defineTile(std::shared_ptr<::Star::Tile> const& tile) {
   // objects (which would cause the assertion failure below) it'd be harder to
   // check if a tile still exists in the database and should be exported
   // despite no longer belonging to the tileset.
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((m_source == tile->source));
   }
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((m_database->name() == tile->database));
   }
 

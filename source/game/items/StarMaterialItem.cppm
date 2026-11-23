@@ -169,9 +169,9 @@ export namespace Star {
 
 class MaterialItem : public Item, public FireableItem, public PreviewTileTool, public RenderableItem, public PreviewableItem, public BeamItem {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<MaterialItem, Item, FireableItem, PreviewTileTool, RenderableItem, PreviewableItem, BeamItem>(
-      this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<MaterialItem, Item, FireableItem, PreviewTileTool, RenderableItem, PreviewableItem, BeamItem>(
+      *this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<MaterialItem>(); }
 
@@ -499,7 +499,7 @@ std::expected<void, StarException> MaterialItem::render(RenderCallback& renderCa
                    .count()));
     float pulseA = 0.85 - pulse * 0.15f;
     float pulseB = 0.85 + pulse * 0.15f;
-    Color color = itemOwner->get().favoriteColor().mix(Color::White);
+    Color color = itemOwner->get().favoriteColor().mix(Color::palette_white);
     float alpha = color.alpha_f();
     color.set_alpha_f(alpha * pulseA * 0.95f);
     auto addIndicator = [&](String const& path) -> std::expected<void, StarException> {

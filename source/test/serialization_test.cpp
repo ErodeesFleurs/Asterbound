@@ -121,11 +121,11 @@ TEST(DataStreamTest, ColorRetainsFourFloatChannelsInBothByteOrders) {
 TEST(DataStreamTest, TruncatedColorLeavesDestinationUnchanged) {
   DataStreamBuffer stream(ByteArray({"\x3f\x80\x00\x00\x3f\x00\x00\x00\x00\x00\x00\x00\x3e\x80\x00", 15}));
   stream.set_byte_order(ByteOrder::BigEndian);
-  Color color = Color::Blue;
+  Color color = Color::palette_blue;
   auto decoded = stream >> color;
   ASSERT_FALSE(decoded);
   EXPECT_TRUE(decoded.error().is<EofException>());
-  EXPECT_EQ(color, Color::Blue);
+  EXPECT_EQ(color, Color::palette_blue);
 }
 
 TEST(DataStreamTest, MatrixTruncationKeepsCompletedRowPrefixAndReportsFailure) {
@@ -474,7 +474,7 @@ TEST(BufferTest, SelfSpanWriteKeepsZeroLengthModeAndArithmeticPrecedence) {
 TEST(DataStreamTest, ExternalSpanBorrowsSlicesAndResetRewinds) {
   std::array<char, 4> bytes{0x10, 0x20, 0x30, 0x40};
   DataStreamExternalBuffer stream{std::span<char const>(bytes).subspan(1, 2)};
-  EXPECT_EQ(stream.ptr(), bytes.data() + 1);
+  EXPECT_EQ(stream.span().data(), std::span(bytes).subspan(1).data());
   EXPECT_EQ(stream.size(), 2u);
   bytes[1] = 0x25;
   auto first = stream.read<std::uint8_t>();

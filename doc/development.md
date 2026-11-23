@@ -62,10 +62,15 @@ and the title screen at its configured image scale after changes.
 
 ## C++ implementation boundaries
 
-Use PascalCase for classes/structs and snake_case for functions/concepts. Compose
-owning standard containers; formatter/trait utility inheritance is intentional.
-Make ownership explicit, use optional reference wrappers for nullable borrows,
-and keep raw addresses at native/storage boundaries, not business interfaces.
+In `source/core`, use PascalCase for classes and structs, and snake_case for
+concepts, functions and variables (including constants). Struct fields have no
+`m_` prefix. Use standard-library names such as `size()` when the contracts match.
+Keep externally visible Lua names, configuration keys and wire encodings unchanged.
+Use spans for bounded ranges, references for required borrows and optional
+reference wrappers for nullable borrows. Confine raw addresses to the native
+ABI or standard-library operation that requires them; do not propagate them
+into engine interfaces. Compose owning standard containers; formatter and trait
+utility inheritance is intentional.
 Borrows must not cross destruction, mutation or reentry that can replace owners.
 Name checked results by their operation or payload, never numeric suffixes.
 Use `if (auto written = ...; !written)` for status-only checks; keep decoded
@@ -79,8 +84,8 @@ values in named locals and preserve first-error, ownership and transaction order
 ### Type identity and capability casts
 
 - Use `type_key`, `type_name`, `query_type`, `query_type_of` and `dynamic_type_name`. Keys normalize top-level cv/reference qualifiers and are process-local, not persistent/plugin ABI IDs. Identity/name functions accept all C++ types.
-- Capability graphs use `capability_queryable`, `capability_base` and `capability_graph`. Qualify base queries to avoid redispatch. Shared virtual bases merge; distinct matching subobjects are ambiguous. Removing redundant registrations must not remove inherited capabilities/bases.
-- `as_ref`/`convert_ref` borrow and preserve constness; `as`/`convert` preserve pointer/aliasing-owner semantics. Successful shared/intrusive rvalue casts transfer ownership; failure, including null stored-pointer aliases, leaves the source intact. Lvalue aliases retain their control block; weak aliases require successfully locked/cast owners.
+- Capability graphs use `capability_queryable`, `capability_base` and `capability_graph`. Forward `TypeQuery&` with `query_type_of<Derived, Bases...>(*this, query)`; use `query_type<T>(object)` for a direct, const-preserving capability borrow. Qualify base queries to avoid redispatch. Shared virtual bases merge; distinct matching subobjects are ambiguous. Removing redundant registrations must not remove inherited capabilities/bases.
+- `as_ref`/`convert_ref` accept an lvalue or a nullable `optional<reference_wrapper<T>>` and preserve constness; `as`/`convert` take owners and preserve adjusted aliasing semantics. Successful shared/intrusive rvalue casts transfer ownership; failure, including null stored-pointer aliases, leaves the source intact. Lvalue aliases retain their control block; weak aliases require successfully locked/cast owners.
 - `RefPtr<T>(T&)` retains a live object; `detach()` transfers one count into a move-only `DetachedRef`, and `adopt()` consumes it even when both owners refer to the same address. Dropping the token releases its count. Move assignment must detach before destroying the old target: the source may be a member of that target. `RefCounter` cannot be copied or moved; counts remain non-atomic and externally synchronized. Keep incomplete-type declarations and protected destruction through the counter.
 - Entity callbacks may retain aliases; reentrant `NetItem`/stream callbacks require fresh borrows afterward.
 
@@ -178,7 +183,7 @@ values in named locals and preserve first-error, ownership and transaction order
 
 ### Asset locators
 
-- `AssetPath` owns `m_base_path`, `m_sub_path` and `m_directives`. Parsing helpers
+- `AssetPath` owns `base_path`, `sub_path` and `directives`. Parsing helpers
   borrow byte views only during the call. The first `:` before `?` introduces a
   sub-path; later colons are ordinary bytes. Only `/` separates directories.
   Do not apply filesystem normalization or fold `..`.

@@ -176,7 +176,7 @@ namespace Dungeon {
 
   class Rule {
   public:
-    virtual void const* query_type(TypeKey key) const noexcept { return query_type_of<Rule>(this, key); }
+    virtual void query_type(TypeQuery& query) const noexcept { query_type_of<Rule>(*this, query); }
     virtual std::string_view dynamic_type_name() const noexcept { return Star::type_name<Rule>(); }
 
     [[nodiscard]] static std::expected<std::optional<std::shared_ptr<Rule const>>, StarException> parse(Root& root, Json const& rule);
@@ -203,8 +203,8 @@ namespace Dungeon {
 
   class WorldGenMustContainAirRule : public Rule {
   public:
-    void const* query_type(TypeKey key) const noexcept override {
-      return query_type_of<WorldGenMustContainAirRule, Rule>(this, key);
+    void query_type(TypeQuery& query) const noexcept override {
+      query_type_of<WorldGenMustContainAirRule, Rule>(*this, query);
     }
     std::string_view dynamic_type_name() const noexcept override {
       return Star::type_name<WorldGenMustContainAirRule>();
@@ -222,8 +222,8 @@ namespace Dungeon {
 
   class WorldGenMustContainSolidRule : public Rule {
   public:
-    void const* query_type(TypeKey key) const noexcept override {
-      return query_type_of<WorldGenMustContainSolidRule, Rule>(this, key);
+    void query_type(TypeQuery& query) const noexcept override {
+      query_type_of<WorldGenMustContainSolidRule, Rule>(*this, query);
     }
     std::string_view dynamic_type_name() const noexcept override {
       return Star::type_name<WorldGenMustContainSolidRule>();
@@ -241,8 +241,8 @@ namespace Dungeon {
 
   class WorldGenMustContainLiquidRule : public Rule {
   public:
-    void const* query_type(TypeKey key) const noexcept override {
-      return query_type_of<WorldGenMustContainLiquidRule, Rule>(this, key);
+    void query_type(TypeQuery& query) const noexcept override {
+      query_type_of<WorldGenMustContainLiquidRule, Rule>(*this, query);
     }
     std::string_view dynamic_type_name() const noexcept override {
       return Star::type_name<WorldGenMustContainLiquidRule>();
@@ -258,8 +258,8 @@ namespace Dungeon {
 
   class WorldGenMustNotContainLiquidRule : public Rule {
   public:
-    void const* query_type(TypeKey key) const noexcept override {
-      return query_type_of<WorldGenMustNotContainLiquidRule, Rule>(this, key);
+    void query_type(TypeQuery& query) const noexcept override {
+      query_type_of<WorldGenMustNotContainLiquidRule, Rule>(*this, query);
     }
     std::string_view dynamic_type_name() const noexcept override {
       return Star::type_name<WorldGenMustNotContainLiquidRule>();
@@ -273,8 +273,8 @@ namespace Dungeon {
 
   class AllowOverdrawingRule : public Rule {
   public:
-    void const* query_type(TypeKey key) const noexcept override {
-      return query_type_of<AllowOverdrawingRule, Rule>(this, key);
+    void query_type(TypeQuery& query) const noexcept override {
+      query_type_of<AllowOverdrawingRule, Rule>(*this, query);
     }
     std::string_view dynamic_type_name() const noexcept override { return Star::type_name<AllowOverdrawingRule>(); }
 
@@ -285,8 +285,8 @@ namespace Dungeon {
 
   class IgnorePartMaximumRule : public Rule {
   public:
-    void const* query_type(TypeKey key) const noexcept override {
-      return query_type_of<IgnorePartMaximumRule, Rule>(this, key);
+    void query_type(TypeQuery& query) const noexcept override {
+      query_type_of<IgnorePartMaximumRule, Rule>(*this, query);
     }
     std::string_view dynamic_type_name() const noexcept override { return Star::type_name<IgnorePartMaximumRule>(); }
 
@@ -297,8 +297,8 @@ namespace Dungeon {
 
   class MaxSpawnCountRule : public Rule {
   public:
-    void const* query_type(TypeKey key) const noexcept override {
-      return query_type_of<MaxSpawnCountRule, Rule>(this, key);
+    void query_type(TypeQuery& query) const noexcept override {
+      query_type_of<MaxSpawnCountRule, Rule>(*this, query);
     }
     std::string_view dynamic_type_name() const noexcept override { return Star::type_name<MaxSpawnCountRule>(); }
 
@@ -313,8 +313,8 @@ namespace Dungeon {
 
   class DoNotConnectToPartRule : public Rule {
   public:
-    void const* query_type(TypeKey key) const noexcept override {
-      return query_type_of<DoNotConnectToPartRule, Rule>(this, key);
+    void query_type(TypeQuery& query) const noexcept override {
+      query_type_of<DoNotConnectToPartRule, Rule>(*this, query);
     }
     std::string_view dynamic_type_name() const noexcept override { return Star::type_name<DoNotConnectToPartRule>(); }
 
@@ -329,8 +329,8 @@ namespace Dungeon {
 
   class DoNotCombineWithRule : public Rule {
   public:
-    void const* query_type(TypeKey key) const noexcept override {
-      return query_type_of<DoNotCombineWithRule, Rule>(this, key);
+    void query_type(TypeQuery& query) const noexcept override {
+      query_type_of<DoNotCombineWithRule, Rule>(*this, query);
     }
     std::string_view dynamic_type_name() const noexcept override { return Star::type_name<DoNotCombineWithRule>(); }
 

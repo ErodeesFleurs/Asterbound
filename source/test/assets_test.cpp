@@ -174,7 +174,7 @@ namespace {
       if (scalar)
         EXPECT_EQ(*batch[i], *scalar);
       else
-        EXPECT_STREQ(batch[i].error().what(), scalar.error().what());
+        EXPECT_EQ(batch[i].error().what(), scalar.error().what());
     }
     EXPECT_TRUE(source.file_sizes({}).empty());
   }
@@ -448,14 +448,14 @@ const GameTestRegistration directory_ignore_order(
     auto expected_error = String("/branch/keep.txt").regex_match("[", false, false);
     ASSERT_FALSE(expected_error);
     EXPECT_TRUE(rejected.error().is<StringException>());
-    EXPECT_STREQ(rejected.error().what(), expected_error.error().what());
+    EXPECT_EQ(rejected.error().what(), expected_error.error().what());
 
     // Built-in metadata exclusions run after user patterns, not before them.
     ASSERT_TRUE(File::remove(File::relative_to(branch, "keep.txt")));
     ASSERT_TRUE(File::write_file(String("{}"), File::relative_to(*directory, "_metadata")));
     auto metadata_rejected = build();
     ASSERT_FALSE(metadata_rejected);
-    EXPECT_STREQ(metadata_rejected.error().what(), expected_error.error().what());
+    EXPECT_EQ(metadata_rejected.error().what(), expected_error.error().what());
   });
 
 const GameTestRegistration directory_index_and_metadata(
@@ -1065,7 +1065,7 @@ const GameTestRegistration digest_ignore_pattern_order(
     auto first_error = String("/zzz.txt").regex_match("[", false, false);
     ASSERT_FALSE(first_error);
     EXPECT_TRUE(rejected.error().is<StringException>());
-    EXPECT_STREQ(rejected.error().what(), first_error.error().what());
+    EXPECT_EQ(rejected.error().what(), first_error.error().what());
 
     settings.digest_ignore = {"IXE", "LOAD"};
     auto assets = build();
@@ -1178,7 +1178,7 @@ const GameTestRegistration assetBatchDigestErrorOrder(
       auto assets = Assets::create(fixture.root().logger(), fixture.root().random(), fixture.root().logMap(), settings,
                                    {first_path, second_path});
       ASSERT_FALSE(assets);
-      EXPECT_STREQ(assets.error().what(), expected_error.error().what());
+      EXPECT_EQ(assets.error().what(), expected_error.error().what());
     }
   });
 
@@ -2508,9 +2508,9 @@ const GameTestRegistration memory_reader_lifetime(
         MemoryAssetSource source("pinned");
         if (use_image) {
           Image pixels(2, 1, PixelFormat::RGB24);
-          std::ranges::copy(std::as_bytes(original.span()), std::as_writable_bytes(pixels.data()).begin());
+          std::ranges::copy(std::as_bytes(original.span()), std::as_writable_bytes(pixels.span()).begin());
           source.set("/entry", pixels);
-          std::ranges::fill(pixels.data(), 0);
+          std::ranges::fill(pixels.span(), 0);
         } else {
           source.set("/entry", original);
         }

@@ -66,7 +66,7 @@ std::expected<CurlUrl, StarException> read_native_url(String const& url) {
   CurlUrl handle(curl_url());
   if (!handle)
     return std::unexpected(StarException("Could not allocate the HTTP URL parser"));
-  if (auto code = curl_url_set(handle.get(), CURLUPART_URL, url.utf8_data(), CURLU_DISALLOW_USER); code != CURLUE_OK)
+  if (auto code = curl_url_set(handle.get(), CURLUPART_URL, url.utf8().c_str(), CURLU_DISALLOW_USER); code != CURLUE_OK)
     return std::unexpected(StarException::format("Invalid HTTP URL: {}", curl_url_strerror(code)));
   return handle;
 }
@@ -143,7 +143,7 @@ std::expected<HttpUrl, StarException> parse_http_url(String const& url) {
   if (!host)
     return std::unexpected(std::move(host.error()));
   // Use the same canonical host spelling in the approved URL and in the key.
-  if (auto code = curl_url_set(handle->get(), CURLUPART_HOST, host->utf8_data(), 0); code != CURLUE_OK)
+  if (auto code = curl_url_set(handle->get(), CURLUPART_HOST, host->utf8().c_str(), 0); code != CURLUE_OK)
     return std::unexpected(StarException::format("Invalid HTTP host: {}", curl_url_strerror(code)));
   auto target = get_url_part(*handle, CURLUPART_URL, CURLU_GET_EMPTY);
   if (!target)

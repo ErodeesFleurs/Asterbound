@@ -530,31 +530,31 @@ std::expected<int, StarException> run_native_benchmarks(Root& root) {
 int main(int argc, char** argv) {
   auto native = Star::NativeRuntime::create();
   if (!native) {
-    if (!Star::print(stderr, "{}\n", native.error().what()))
+    if (!Star::print(*stderr, "{}\n", native.error().what()))
       return 1;
     return 1;
   }
   Star::BenchmarkLifetime benchmark_lifetime(argc, argv);
   auto loader = Star::RootLoader::create({{}, {}, {}, Star::LogLevel::Error, true, {}});
   if (!loader) {
-    (void)Star::print(stderr, "{}\n", loader.error().what());
+    (void)Star::print(*stderr, "{}\n", loader.error().what());
     return 1;
   }
   auto parsed = loader->command_parse_or_die({argv, static_cast<std::size_t>(argc)});
   if (!parsed) {
-    (void)Star::print(stderr, "{}\n", parsed.error().what());
+    (void)Star::print(*stderr, "{}\n", parsed.error().what());
     return 1;
   }
   auto& settings = parsed->first;
   for (std::string_view directory : {"player", "universe"}) {
     auto exists = Star::File::exists(Star::File::relative_to(settings.storageDirectory, directory));
     if (!exists) {
-      (void)Star::print(stderr, "{}\n", exists.error().what());
+      (void)Star::print(*stderr, "{}\n", exists.error().what());
       return 1;
     }
     if (*exists) {
       Star::StarException error("Tile benchmarks require private storage without player/universe saves");
-      (void)Star::print(stderr, "{}\n", error.what());
+      (void)Star::print(*stderr, "{}\n", error.what());
       return 1;
     }
   }
@@ -562,12 +562,12 @@ int main(int argc, char** argv) {
   settings.logFile.reset();
   auto root = Star::Root::create(std::move(settings));
   if (!root) {
-    (void)Star::print(stderr, "{}\n", root.error().what());
+    (void)Star::print(*stderr, "{}\n", root.error().what());
     return 1;
   }
   auto result = Star::run_native_benchmarks(**root);
   if (!result) {
-    (void)Star::print(stderr, "{}\n", result.error().what());
+    (void)Star::print(*stderr, "{}\n", result.error().what());
     return 1;
   }
   return *result;

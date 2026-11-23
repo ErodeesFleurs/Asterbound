@@ -222,7 +222,7 @@ const GameTestRegistration sector_parallel_drain("TileSectorArrayTest", "SectorP
   auto failed = run.get();
   ASSERT_TRUE(workers.finish());
   ASSERT_FALSE(failed);
-  EXPECT_STREQ(failed.error().what(), first_error.what());
+  EXPECT_EQ(failed.error().what(), first_error.what());
 });
 
 }

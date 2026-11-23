@@ -27,7 +27,7 @@ namespace Star {
 
 class ChattyEntity : public virtual Entity {
 public:
-  void const* query_type(TypeKey key) const noexcept override { return query_type_of<ChattyEntity, Entity>(this, key); }
+  void query_type(TypeQuery& query) const noexcept override { query_type_of<ChattyEntity, Entity>(*this, query); }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ChattyEntity>(); }
 
   [[nodiscard]] virtual std::expected<Vec2F, StarException> mouthPosition() const = 0;

@@ -557,7 +557,7 @@ TEST(FlatHashMap, BorrowedLookupPreservesBytesAndCaseRules) {
   StringView query(std::string_view(bytes).substr(1, key.utf8_size()));
   StringMap<int> values{{key, 7}};
   StableStringMap<int> stable{{key, 8}};
-  EXPECT_EQ(hash<String>{}(key), hash<String>{}(query));
+  EXPECT_EQ(ValueHash<String>{}(key), ValueHash<String>{}(query));
   auto value = values.get(query);
   ASSERT_TRUE(value);
   EXPECT_EQ(value->get(), 7);
@@ -580,7 +580,7 @@ TEST(FlatHashMap, BorrowedLookupPreservesBytesAndCaseRules) {
   auto insensitiveValue = insensitive.get(*insensitiveQuery);
   ASSERT_TRUE(insensitiveValue);
   EXPECT_EQ(insensitiveValue->get(), 10);
-  EXPECT_EQ(Color::create(StringView("RED")), Color::Red);
+  EXPECT_EQ(Color::create(StringView("RED")), Color::palette_red);
 }
 
 TEST(StringSet, BorrowedLookupPreservesFullByteExtent) {
@@ -883,9 +883,9 @@ static_assert(!set_container<std::set<int>>);
 static_assert(!set_container<OrderedSet<int>>);
 static_assert(!set_container<OrderedHashSet<int>>);
 static_assert(std::same_as<HashMap<int, int>::Storage,
-    FlatHashMap<int, int, hash<int>, std::equal_to<>, std::allocator<std::pair<int const, int>>>>);
+    FlatHashMap<int, int, ValueHash<int>, std::equal_to<>, std::allocator<std::pair<int const, int>>>>);
 static_assert(std::same_as<StableHashMap<int, int>::Storage,
-    std::unordered_map<int, int, hash<int>, std::equal_to<>, std::allocator<std::pair<int const, int>>>>);
+    std::unordered_map<int, int, ValueHash<int>, std::equal_to<>, std::allocator<std::pair<int const, int>>>>);
 static_assert(!std::derived_from<Map<int, int>, Map<int, int>::Storage>);
 static_assert(!std::derived_from<HashMap<int, int>, HashMap<int, int>::Storage>);
 static_assert(!std::derived_from<StableHashMap<int, int>, StableHashMap<int, int>::Storage>);
@@ -1007,7 +1007,7 @@ struct CompositionCompare {
 };
 struct CompositionHash {
   int salt = 0;
-  std::size_t operator()(int key) const { return hash<int>{}(key) ^ hash<int>{}(salt); }
+  std::size_t operator()(int key) const { return ValueHash<int>{}(key) ^ ValueHash<int>{}(salt); }
 };
 struct CompositionEqual {
   int identity = 0;
@@ -1088,7 +1088,7 @@ struct SetRecordLess {
   bool operator()(SetRecord const& a, SetRecord const& b) const { return a.key < b.key; }
 };
 struct SetRecordHash {
-  std::size_t operator()(SetRecord const& value) const { return hash<int>{}(value.key); }
+  std::size_t operator()(SetRecord const& value) const { return ValueHash<int>{}(value.key); }
 };
 struct SetRecordEqual {
   bool operator()(SetRecord const& a, SetRecord const& b) const { return a.key == b.key; }
@@ -1110,7 +1110,7 @@ struct OwnedIntLess {
   bool operator()(std::unique_ptr<int> const& a, std::unique_ptr<int> const& b) const { return *a < *b; }
 };
 struct OwnedIntHash {
-  std::size_t operator()(std::unique_ptr<int> const& value) const { return hash<int>{}(*value); }
+  std::size_t operator()(std::unique_ptr<int> const& value) const { return ValueHash<int>{}(*value); }
 };
 struct OwnedIntEqual {
   bool operator()(std::unique_ptr<int> const& a, std::unique_ptr<int> const& b) const { return *a == *b; }

@@ -181,7 +181,7 @@ static std::expected<void, StarException> run(std::span<char const* const> argv)
 int main(int argc, char** argv) {
   auto result = run({argv, static_cast<std::size_t>(argc)});
   if (!result) {
-    if (auto written = Star::print(stderr, "exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
+    if (auto written = Star::print(*stderr, "exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
       return 1;
     return 1;
   }

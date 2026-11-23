@@ -125,10 +125,10 @@ bool iterator_aliases(Sequence& sequence, Iterator const& iterator) {
     return false;
   if constexpr (std::ranges::contiguous_range<Sequence> && std::contiguous_iterator<Iterator>
                 && std::same_as<std::iter_value_t<Iterator>, typename Sequence::value_type>) {
-    std::less<typename Sequence::value_type const*> less;
-    auto pointer = std::to_address(iterator);
-    auto first = std::ranges::data(sequence);
-    return !less(pointer, first) && !less(first + sequence.size(), pointer);
+    auto elements = std::span(sequence);
+    std::less<> less;
+    return !less(std::to_address(iterator), std::to_address(elements.begin()))
+        && !less(std::to_address(elements.end()), std::to_address(iterator));
   } else if constexpr (std::same_as<Iterator, typename Sequence::iterator>
                        || std::same_as<Iterator, typename Sequence::const_iterator>) {
     for (auto position = sequence.begin(); position != sequence.end(); ++position)
@@ -148,8 +148,10 @@ bool iterator_aliases(Sequence& sequence, Iterator const& iterator) {
 
 template <sequence_alias_target Sequence, std::ranges::input_range Source>
 bool aliases(Sequence& sequence, Source& source) {
-  if (static_cast<void const*>(std::addressof(sequence)) == static_cast<void const*>(std::addressof(source)))
-    return true;
+  if constexpr (std::same_as<std::remove_cv_t<Sequence>, std::remove_cv_t<Source>>) {
+    if (std::addressof(sequence) == std::addressof(source))
+      return true;
+  }
   if constexpr (std::ranges::forward_range<Source>) {
     if (std::ranges::empty(source) || sequence.empty())
       return false;
@@ -157,14 +159,15 @@ bool aliases(Sequence& sequence, Source& source) {
                   && std::same_as<std::ranges::range_value_t<Source>, typename Sequence::value_type>
                   && std::is_lvalue_reference_v<typename Sequence::reference>) {
       // Contiguous data access does not evaluate an adaptor's payload projection.
-      auto pointer = std::ranges::data(source);
+      auto const& first = *std::ranges::data(source);
       if constexpr (std::ranges::contiguous_range<Sequence>) {
-        std::less<typename Sequence::value_type const*> less;
-        auto first = std::ranges::data(sequence);
-        return !less(pointer, first) && less(pointer, first + sequence.size());
+        auto elements = std::span(sequence);
+        std::less<> less;
+        return !less(std::addressof(first), std::to_address(elements.begin()))
+            && less(std::addressof(first), std::to_address(elements.end()));
       } else {
         for (auto& element : sequence)
-          if (std::addressof(element) == pointer)
+          if (std::addressof(element) == std::addressof(first))
             return true;
       }
     } else {
@@ -454,10 +457,10 @@ template <typename List>
 class ListHasher {
 public:
   std::size_t operator()(List const& l) const
-    requires hash_invocable<hash<typename List::value_type> const&, std::ranges::range_reference_t<List const>>;
+    requires hash_invocable<ValueHash<typename List::value_type> const&, std::ranges::range_reference_t<List const>>;
 
 private:
-  hash<typename List::value_type> elemHasher;
+  ValueHash<typename List::value_type> element_hasher;
 };
 
 template <typename Element, typename Allocator = std::allocator<Element>>
@@ -716,8 +719,8 @@ public:
     return std::optional<value_type>(std::in_place, std::move(e));
   }
 
-  void truncate_back(std::size_t maximumSize) {
-    while (m_storage.size() > maximumSize)
+  void truncate_back(std::size_t maximum_size) {
+    while (m_storage.size() > maximum_size)
       m_storage.erase(std::prev(m_storage.end()));
   }
 
@@ -837,16 +840,16 @@ public:
     requires sequence_equal<const_reference, value_type const&>
   {
     if (from >= m_storage.size())
-      return NPos;
+      return npos;
     auto end = m_storage.end();
     auto found = std::find(m_storage.begin() + static_cast<difference_type>(from), end, e);
-    return found == end ? NPos : static_cast<std::size_t>(std::distance(m_storage.begin(), found));
+    return found == end ? npos : static_cast<std::size_t>(std::distance(m_storage.begin(), found));
   }
 
-  std::size_t last_index_of(value_type const& e, std::size_t til = NPos) const
+  std::size_t last_index_of(value_type const& e, std::size_t til = npos) const
     requires sequence_equal<const_reference, value_type const&>
   {
-    std::size_t index = NPos;
+    std::size_t index = npos;
     std::size_t end = std::min(m_storage.size(), til);
     for (std::size_t i = 0; i < end; ++i) {
       if (operator[](i) == e)
@@ -872,14 +875,14 @@ public:
   }
 
   auto operator[](std::size_t n) const -> const_reference {
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((n < m_storage.size()));
     }
     return m_storage.operator[](n);
   }
 
   auto operator[](std::size_t n) -> reference {
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((n < m_storage.size()));
     }
     return m_storage.operator[](n);
@@ -928,21 +931,21 @@ public:
   }
 
   void erase_at(std::size_t i) {
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((i < m_storage.size()));
     }
     m_storage.erase(m_storage.begin() + i);
   }
 
   void erase_at(std::size_t b, std::size_t e) {
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((b < m_storage.size() && e <= m_storage.size()));
     }
     m_storage.erase(m_storage.begin() + b, m_storage.begin() + e);
   }
 
   auto insert_at(std::size_t pos, value_type e) -> AppendResult {
-    if constexpr (Star::DebugEnabled)
+    if constexpr (Star::debug_enabled)
       Star::star_assert_failed((pos <= m_storage.size()));
     m_storage.insert(m_storage.begin() + pos, std::move(e));
   }
@@ -950,7 +953,7 @@ public:
   template <typename Container>
     requires sequence_source<Container const&, value_type> && std::ranges::common_range<Container const>
   auto insert_range_at(std::size_t pos, Container const& list) -> AppendResult {
-    if constexpr (Star::DebugEnabled)
+    if constexpr (Star::debug_enabled)
       Star::star_assert_failed((pos <= m_storage.size()));
     return SequenceAlgorithms::insert_range_at(*this, pos, list);
   }
@@ -983,9 +986,9 @@ private:
   Storage m_storage;
 };
 
-template <typename Element, std::size_t MaxSize>
+template <typename Element, std::size_t fixed_capacity>
 class StaticList {
-  using Storage = StaticVector<Element, MaxSize>;
+  using Storage = StaticVector<Element, fixed_capacity>;
 
 public:
   using SequenceContainerTag = void;
@@ -1003,7 +1006,6 @@ public:
   StaticList() = default;
   StaticList(Storage const& storage) : m_storage(storage) {}
   StaticList(Storage&& storage) : m_storage(std::move(storage)) {}
-  static constexpr std::size_t MaximumSize = MaxSize;
 
   iterator begin() { return m_storage.begin(); }
   const_iterator begin() const { return m_storage.begin(); }
@@ -1111,11 +1113,11 @@ public:
   {
     m_storage.shrink_to_fit();
   }
-  static constexpr std::size_t capacity() noexcept { return MaxSize; }
-  static constexpr std::size_t max_size() noexcept { return MaxSize; }
+  static constexpr std::size_t capacity() noexcept { return fixed_capacity; }
+  static constexpr std::size_t max_size() noexcept { return fixed_capacity; }
   auto get_allocator() const requires requires(Storage const& storage) { storage.get_allocator(); } { return m_storage.get_allocator(); }
-  value_type* data() noexcept(noexcept(m_storage.ptr())) { return m_storage.ptr(); }
-  value_type const* data() const noexcept(noexcept(m_storage.ptr())) { return m_storage.ptr(); }
+  value_type* data() noexcept(noexcept(m_storage.data())) { return m_storage.data(); }
+  value_type const* data() const noexcept(noexcept(m_storage.data())) { return m_storage.data(); }
   void swap(StaticList& other) noexcept(std::is_nothrow_swappable_v<Storage>) { std::swap(m_storage, other.m_storage); }
   bool operator==(StaticList const& other) const { return m_storage == other.m_storage; }
   bool operator<(StaticList const& other) const { return m_storage < other.m_storage; }
@@ -1135,10 +1137,10 @@ public:
     requires sequence_source<Range, value_type>
   [[nodiscard]] static std::expected<StaticList, StarException> create(std::from_range_t, Range&& range) {
     if constexpr (std::ranges::sized_range<Range>) {
-      if (std::ranges::size(range) > MaxSize)
+      if (std::ranges::size(range) > fixed_capacity)
         return std::unexpected(StaticVectorSizeException("StaticList::create exceeds capacity"));
     } else if constexpr (std::ranges::forward_range<Range>) {
-      if (static_cast<std::size_t>(std::ranges::distance(range)) > MaxSize)
+      if (static_cast<std::size_t>(std::ranges::distance(range)) > fixed_capacity)
         return std::unexpected(StaticVectorSizeException("StaticList::create exceeds capacity"));
     }
     StaticList result;
@@ -1253,8 +1255,8 @@ public:
     return std::optional<value_type>(std::in_place, std::move(e));
   }
 
-  void truncate_back(std::size_t maximumSize) {
-    while (m_storage.size() > maximumSize)
+  void truncate_back(std::size_t maximum_size) {
+    while (m_storage.size() > maximum_size)
       m_storage.erase(std::prev(m_storage.end()));
   }
 
@@ -1377,16 +1379,16 @@ public:
     requires sequence_equal<const_reference, const_reference>
   {
     if (from >= m_storage.size())
-      return NPos;
+      return npos;
     auto end = m_storage.end();
     auto found = std::find(m_storage.begin() + static_cast<difference_type>(from), end, e);
-    return found == end ? NPos : static_cast<std::size_t>(std::distance(m_storage.begin(), found));
+    return found == end ? npos : static_cast<std::size_t>(std::distance(m_storage.begin(), found));
   }
 
-  std::size_t last_index_of(const_reference e, std::size_t til = NPos) const
+  std::size_t last_index_of(const_reference e, std::size_t til = npos) const
     requires sequence_equal<const_reference, const_reference>
   {
-    std::size_t index = NPos;
+    std::size_t index = npos;
     std::size_t end = std::min(m_storage.size(), til);
     for (std::size_t i = 0; i < end; ++i) {
       if (operator[](i) == e)
@@ -1412,14 +1414,14 @@ public:
   }
 
   auto operator[](std::size_t n) const -> const_reference {
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((n < m_storage.size()));
     }
     return m_storage.operator[](n);
   }
 
   auto operator[](std::size_t n) -> reference {
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((n < m_storage.size()));
     }
     return m_storage.operator[](n);
@@ -1468,21 +1470,21 @@ public:
   }
 
   void erase_at(std::size_t i) {
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((i < m_storage.size()));
     }
     m_storage.erase(m_storage.begin() + i);
   }
 
   void erase_at(std::size_t b, std::size_t e) {
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((b < m_storage.size() && e <= m_storage.size()));
     }
     m_storage.erase(m_storage.begin() + b, m_storage.begin() + e);
   }
 
   auto insert_at(std::size_t pos, value_type e) -> AppendResult {
-    if constexpr (Star::DebugEnabled)
+    if constexpr (Star::debug_enabled)
       Star::star_assert_failed((pos <= m_storage.size()));
     auto added = m_storage.insert(m_storage.begin() + pos, std::move(e));
     if (!added)
@@ -1493,7 +1495,7 @@ public:
   template <typename Container>
     requires sequence_source<Container const&, value_type> && std::ranges::common_range<Container const>
   auto insert_range_at(std::size_t pos, Container const& list) -> AppendResult {
-    if constexpr (Star::DebugEnabled)
+    if constexpr (Star::debug_enabled)
       Star::star_assert_failed((pos <= m_storage.size()));
     return SequenceAlgorithms::insert_range_at(*this, pos, list);
   }
@@ -1526,9 +1528,9 @@ private:
   Storage m_storage;
 };
 
-template <typename Element, std::size_t MaxStackSize>
+template <typename Element, std::size_t inline_capacity>
 class SmallList {
-  using Storage = SmallVector<Element, MaxStackSize>;
+  using Storage = SmallVector<Element, inline_capacity>;
 
 public:
   using SequenceContainerTag = void;
@@ -1759,8 +1761,8 @@ public:
     return std::optional<value_type>(std::in_place, std::move(e));
   }
 
-  void truncate_back(std::size_t maximumSize) {
-    while (m_storage.size() > maximumSize)
+  void truncate_back(std::size_t maximum_size) {
+    while (m_storage.size() > maximum_size)
       m_storage.erase(std::prev(m_storage.end()));
   }
 
@@ -1880,16 +1882,16 @@ public:
     requires sequence_equal<const_reference, const_reference>
   {
     if (from >= m_storage.size())
-      return NPos;
+      return npos;
     auto end = m_storage.end();
     auto found = std::find(m_storage.begin() + static_cast<difference_type>(from), end, e);
-    return found == end ? NPos : static_cast<std::size_t>(std::distance(m_storage.begin(), found));
+    return found == end ? npos : static_cast<std::size_t>(std::distance(m_storage.begin(), found));
   }
 
-  std::size_t last_index_of(const_reference e, std::size_t til = NPos) const
+  std::size_t last_index_of(const_reference e, std::size_t til = npos) const
     requires sequence_equal<const_reference, const_reference>
   {
-    std::size_t index = NPos;
+    std::size_t index = npos;
     std::size_t end = std::min(m_storage.size(), til);
     for (std::size_t i = 0; i < end; ++i) {
       if (operator[](i) == e)
@@ -1915,14 +1917,14 @@ public:
   }
 
   auto operator[](std::size_t n) const -> const_reference {
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((n < m_storage.size()));
     }
     return m_storage.operator[](n);
   }
 
   auto operator[](std::size_t n) -> reference {
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((n < m_storage.size()));
     }
     return m_storage.operator[](n);
@@ -1971,21 +1973,21 @@ public:
   }
 
   void erase_at(std::size_t i) {
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((i < m_storage.size()));
     }
     m_storage.erase(m_storage.begin() + i);
   }
 
   void erase_at(std::size_t b, std::size_t e) {
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((b < m_storage.size() && e <= m_storage.size()));
     }
     m_storage.erase(m_storage.begin() + b, m_storage.begin() + e);
   }
 
   auto insert_at(std::size_t pos, value_type e) -> AppendResult {
-    if constexpr (Star::DebugEnabled)
+    if constexpr (Star::debug_enabled)
       Star::star_assert_failed((pos <= m_storage.size()));
     m_storage.insert(m_storage.begin() + pos, std::move(e));
   }
@@ -1993,7 +1995,7 @@ public:
   template <typename Container>
     requires sequence_source<Container const&, value_type> && std::ranges::common_range<Container const>
   auto insert_range_at(std::size_t pos, Container const& list) -> AppendResult {
-    if constexpr (Star::DebugEnabled)
+    if constexpr (Star::debug_enabled)
       Star::star_assert_failed((pos <= m_storage.size()));
     return SequenceAlgorithms::insert_range_at(*this, pos, list);
   }
@@ -2272,8 +2274,8 @@ public:
     return std::optional<value_type>(std::in_place, std::move(e));
   }
 
-  void truncate_back(std::size_t maximumSize) {
-    while (m_storage.size() > maximumSize)
+  void truncate_back(std::size_t maximum_size) {
+    while (m_storage.size() > maximum_size)
       m_storage.erase(std::prev(m_storage.end()));
   }
 
@@ -2393,16 +2395,16 @@ public:
     requires sequence_equal<const_reference, const_reference>
   {
     if (from >= m_storage.size())
-      return NPos;
+      return npos;
     auto end = m_storage.end();
     auto found = std::find(m_storage.begin() + static_cast<difference_type>(from), end, e);
-    return found == end ? NPos : static_cast<std::size_t>(std::distance(m_storage.begin(), found));
+    return found == end ? npos : static_cast<std::size_t>(std::distance(m_storage.begin(), found));
   }
 
-  std::size_t last_index_of(const_reference e, std::size_t til = NPos) const
+  std::size_t last_index_of(const_reference e, std::size_t til = npos) const
     requires sequence_equal<const_reference, const_reference>
   {
-    std::size_t index = NPos;
+    std::size_t index = npos;
     std::size_t end = std::min(m_storage.size(), til);
     for (std::size_t i = 0; i < end; ++i) {
       if (operator[](i) == e)
@@ -2428,14 +2430,14 @@ public:
   }
 
   auto operator[](std::size_t n) const -> const_reference {
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((n < m_storage.size()));
     }
     return m_storage.operator[](n);
   }
 
   auto operator[](std::size_t n) -> reference {
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((n < m_storage.size()));
     }
     return m_storage.operator[](n);
@@ -2484,21 +2486,21 @@ public:
   }
 
   void erase_at(std::size_t i) {
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((i < m_storage.size()));
     }
     m_storage.erase(m_storage.begin() + i);
   }
 
   void erase_at(std::size_t b, std::size_t e) {
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((b < m_storage.size() && e <= m_storage.size()));
     }
     m_storage.erase(m_storage.begin() + b, m_storage.begin() + e);
   }
 
   auto insert_at(std::size_t pos, value_type e) -> AppendResult {
-    if constexpr (Star::DebugEnabled)
+    if constexpr (Star::debug_enabled)
       Star::star_assert_failed((pos <= m_storage.size()));
     m_storage.insert(m_storage.begin() + pos, std::move(e));
   }
@@ -2506,7 +2508,7 @@ public:
   template <typename Container>
     requires sequence_source<Container const&, value_type> && std::ranges::common_range<Container const>
   auto insert_range_at(std::size_t pos, Container const& list) -> AppendResult {
-    if constexpr (Star::DebugEnabled)
+    if constexpr (Star::debug_enabled)
       Star::star_assert_failed((pos <= m_storage.size()));
     return SequenceAlgorithms::insert_range_at(*this, pos, list);
   }
@@ -2572,8 +2574,8 @@ public:
     return e;
   }
 
-  void truncate_front(std::size_t maximumSize) {
-    while (m_storage.size() > maximumSize)
+  void truncate_front(std::size_t maximum_size) {
+    while (m_storage.size() > maximum_size)
       m_storage.pop_front();
   }
 
@@ -2873,8 +2875,8 @@ public:
     return std::optional<value_type>(std::in_place, std::move(e));
   }
 
-  void truncate_back(std::size_t maximumSize) {
-    while (m_storage.size() > maximumSize)
+  void truncate_back(std::size_t maximum_size) {
+    while (m_storage.size() > maximum_size)
       m_storage.erase(std::prev(m_storage.end()));
   }
 
@@ -2988,8 +2990,8 @@ public:
     return e;
   }
 
-  void truncate_front(std::size_t maximumSize) {
-    while (m_storage.size() > maximumSize)
+  void truncate_front(std::size_t maximum_size) {
+    while (m_storage.size() > maximum_size)
       m_storage.pop_front();
   }
 
@@ -3003,19 +3005,19 @@ private:
 };
 
 template <typename Element, typename Allocator>
-struct hash<List<Element, Allocator>> : public ListHasher<List<Element, Allocator>> {};
+struct ValueHash<List<Element, Allocator>> : public ListHasher<List<Element, Allocator>> {};
 
-template <typename Element, std::size_t MaxSize>
-struct hash<StaticList<Element, MaxSize>> : public ListHasher<StaticList<Element, MaxSize>> {};
+template <typename Element, std::size_t fixed_capacity>
+struct ValueHash<StaticList<Element, fixed_capacity>> : public ListHasher<StaticList<Element, fixed_capacity>> {};
 
-template <typename Element, std::size_t MaxStackSize>
-struct hash<SmallList<Element, MaxStackSize>> : public ListHasher<SmallList<Element, MaxStackSize>> {};
-
-template <typename Element, typename Allocator>
-struct hash<Deque<Element, Allocator>> : public ListHasher<Deque<Element, Allocator>> {};
+template <typename Element, std::size_t inline_capacity>
+struct ValueHash<SmallList<Element, inline_capacity>> : public ListHasher<SmallList<Element, inline_capacity>> {};
 
 template <typename Element, typename Allocator>
-struct hash<LinkedList<Element, Allocator>> : public ListHasher<LinkedList<Element, Allocator>> {};
+struct ValueHash<Deque<Element, Allocator>> : public ListHasher<Deque<Element, Allocator>> {};
+
+template <typename Element, typename Allocator>
+struct ValueHash<LinkedList<Element, Allocator>> : public ListHasher<LinkedList<Element, Allocator>> {};
 
 template <typename Element, typename Allocator>
 template <typename Container>
@@ -3077,22 +3079,22 @@ auto List<Element, Allocator>::transformed(Function&& function) const {
   return Star::transform<Output>(*this, std::forward<Function>(function));
 }
 
-template <typename Element, std::size_t MaxSize>
+template <typename Element, std::size_t fixed_capacity>
 template <typename Container>
   requires sequence_source<Container const&, Element>
-auto StaticList<Element, MaxSize>::from(Container const& c) -> std::expected<StaticList, StarException> {
+auto StaticList<Element, fixed_capacity>::from(Container const& c) -> std::expected<StaticList, StarException> {
   return create(std::from_range, c);
 }
 
-template <typename Element, std::size_t MaxSize>
+template <typename Element, std::size_t fixed_capacity>
 template <std::input_iterator Iterator, std::sentinel_for<Iterator> Sentinel>
   requires std::is_constructible_v<Element, std::iter_reference_t<Iterator>>
-auto StaticList<Element, MaxSize>::create(Iterator first, Sentinel last) -> std::expected<StaticList, StarException> {
+auto StaticList<Element, fixed_capacity>::create(Iterator first, Sentinel last) -> std::expected<StaticList, StarException> {
   if constexpr (std::sized_sentinel_for<Sentinel, Iterator>) {
-    if (static_cast<std::size_t>(last - first) > MaxSize)
+    if (static_cast<std::size_t>(last - first) > fixed_capacity)
       return std::unexpected(StaticVectorSizeException("StaticList::create exceeds capacity"));
   } else if constexpr (std::forward_iterator<Iterator>) {
-    if (static_cast<std::size_t>(std::ranges::distance(first, last)) > MaxSize)
+    if (static_cast<std::size_t>(std::ranges::distance(first, last)) > fixed_capacity)
       return std::unexpected(StaticVectorSizeException("StaticList::create exceeds capacity"));
   }
   StaticList result;
@@ -3104,13 +3106,13 @@ auto StaticList<Element, MaxSize>::create(Iterator first, Sentinel last) -> std:
   return result;
 }
 
-template <typename Element, std::size_t MaxSize>
-auto StaticList<Element, MaxSize>::create(std::initializer_list<Element> list) -> std::expected<StaticList, StarException> {
+template <typename Element, std::size_t fixed_capacity>
+auto StaticList<Element, fixed_capacity>::create(std::initializer_list<Element> list) -> std::expected<StaticList, StarException> {
   return create(list.begin(), list.end());
 }
 
-template <typename Element, std::size_t MaxSize>
-auto StaticList<Element, MaxSize>::create(std::size_t size, Element const& value) -> std::expected<StaticList, StarException> {
+template <typename Element, std::size_t fixed_capacity>
+auto StaticList<Element, fixed_capacity>::create(std::size_t size, Element const& value) -> std::expected<StaticList, StarException> {
   StaticList result;
   auto resized = result.resize(size, value);
   if (!resized)
@@ -3118,19 +3120,19 @@ auto StaticList<Element, MaxSize>::create(std::size_t size, Element const& value
   return result;
 }
 
-template <typename Element, std::size_t MaxSize>
-auto StaticList<Element, MaxSize>::slice(std::optional<int> start, std::optional<int> stop, int step) const
+template <typename Element, std::size_t fixed_capacity>
+auto StaticList<Element, fixed_capacity>::slice(std::optional<int> start, std::optional<int> stop, int step) const
     -> std::expected<StaticList, StarException>
   requires slice_result<StaticList, StaticList>
 {
   return Star::slice(*this, start, stop, step);
 }
 
-template <typename Element, std::size_t MaxSize>
+template <typename Element, std::size_t fixed_capacity>
 template <typename Comparator>
-  requires sequence_comparator<Comparator&, typename StaticList<Element, MaxSize>::reference,
-                               typename StaticList<Element, MaxSize>::reference>
-auto StaticList<Element, MaxSize>::sorted(Comparator&& comparator) const -> StaticList
+  requires sequence_comparator<Comparator&, typename StaticList<Element, fixed_capacity>::reference,
+                               typename StaticList<Element, fixed_capacity>::reference>
+auto StaticList<Element, fixed_capacity>::sorted(Comparator&& comparator) const -> StaticList
   requires std::is_constructible_v<value_type, const_reference>
 {
   StaticList list(*this);
@@ -3138,8 +3140,8 @@ auto StaticList<Element, MaxSize>::sorted(Comparator&& comparator) const -> Stat
   return list;
 }
 
-template <typename Element, std::size_t MaxSize>
-StaticList<Element, MaxSize> StaticList<Element, MaxSize>::sorted() const
+template <typename Element, std::size_t fixed_capacity>
+StaticList<Element, fixed_capacity> StaticList<Element, fixed_capacity>::sorted() const
   requires sequence_less<reference, reference> && std::is_constructible_v<value_type, const_reference>
 {
   StaticList list(*this);
@@ -3147,43 +3149,43 @@ StaticList<Element, MaxSize> StaticList<Element, MaxSize>::sorted() const
   return list;
 }
 
-template <typename Element, std::size_t MaxSize>
+template <typename Element, std::size_t fixed_capacity>
 template <typename Function>
-  requires sequence_mapping<Function&, typename StaticList<Element, MaxSize>::reference>
-auto StaticList<Element, MaxSize>::transformed(Function&& function) {
+  requires sequence_mapping<Function&, typename StaticList<Element, fixed_capacity>::reference>
+auto StaticList<Element, fixed_capacity>::transformed(Function&& function) {
   using Invocation = std::remove_cvref_t<std::invoke_result_t<Function&, reference>>;
-  using Output = StaticList<typename AlgorithmResultInfo<Invocation>::value_type, MaxSize>;
+  using Output = StaticList<typename AlgorithmResultInfo<Invocation>::value_type, fixed_capacity>;
   return Star::transform<Output>(*this, std::forward<Function>(function));
 }
 
-template <typename Element, std::size_t MaxSize>
+template <typename Element, std::size_t fixed_capacity>
 template <typename Function>
-  requires sequence_mapping<Function&, typename StaticList<Element, MaxSize>::const_reference>
-auto StaticList<Element, MaxSize>::transformed(Function&& function) const {
+  requires sequence_mapping<Function&, typename StaticList<Element, fixed_capacity>::const_reference>
+auto StaticList<Element, fixed_capacity>::transformed(Function&& function) const {
   using Invocation = std::remove_cvref_t<std::invoke_result_t<Function&, const_reference>>;
-  using Output = StaticList<typename AlgorithmResultInfo<Invocation>::value_type, MaxSize>;
+  using Output = StaticList<typename AlgorithmResultInfo<Invocation>::value_type, fixed_capacity>;
   return Star::transform<Output>(*this, std::forward<Function>(function));
 }
 
-template <typename Element, std::size_t MaxStackSize>
+template <typename Element, std::size_t inline_capacity>
 template <typename Container>
   requires sequence_source<Container const&, Element>
-SmallList<Element, MaxStackSize> SmallList<Element, MaxStackSize>::from(Container const& c) {
+SmallList<Element, inline_capacity> SmallList<Element, inline_capacity>::from(Container const& c) {
   return SmallList(std::from_range, c);
 }
 
-template <typename Element, std::size_t MaxStackSize>
-auto SmallList<Element, MaxStackSize>::slice(std::optional<int> start, std::optional<int> stop, int step) const -> SmallList
+template <typename Element, std::size_t inline_capacity>
+auto SmallList<Element, inline_capacity>::slice(std::optional<int> start, std::optional<int> stop, int step) const -> SmallList
   requires slice_result<SmallList, SmallList>
 {
   return Star::slice(*this, start, stop, step);
 }
 
-template <typename Element, std::size_t MaxStackSize>
+template <typename Element, std::size_t inline_capacity>
 template <typename Comparator>
-  requires sequence_comparator<Comparator&, typename SmallList<Element, MaxStackSize>::reference,
-                               typename SmallList<Element, MaxStackSize>::reference>
-auto SmallList<Element, MaxStackSize>::sorted(Comparator&& comparator) const -> SmallList
+  requires sequence_comparator<Comparator&, typename SmallList<Element, inline_capacity>::reference,
+                               typename SmallList<Element, inline_capacity>::reference>
+auto SmallList<Element, inline_capacity>::sorted(Comparator&& comparator) const -> SmallList
   requires std::is_constructible_v<value_type, const_reference>
 {
   SmallList list(*this);
@@ -3191,8 +3193,8 @@ auto SmallList<Element, MaxStackSize>::sorted(Comparator&& comparator) const -> 
   return list;
 }
 
-template <typename Element, std::size_t MaxStackSize>
-SmallList<Element, MaxStackSize> SmallList<Element, MaxStackSize>::sorted() const
+template <typename Element, std::size_t inline_capacity>
+SmallList<Element, inline_capacity> SmallList<Element, inline_capacity>::sorted() const
   requires sequence_less<reference, reference> && std::is_constructible_v<value_type, const_reference>
 {
   SmallList list(*this);
@@ -3200,21 +3202,21 @@ SmallList<Element, MaxStackSize> SmallList<Element, MaxStackSize>::sorted() cons
   return list;
 }
 
-template <typename Element, std::size_t MaxStackSize>
+template <typename Element, std::size_t inline_capacity>
 template <typename Function>
-  requires sequence_mapping<Function&, typename SmallList<Element, MaxStackSize>::reference>
-auto SmallList<Element, MaxStackSize>::transformed(Function&& function) {
+  requires sequence_mapping<Function&, typename SmallList<Element, inline_capacity>::reference>
+auto SmallList<Element, inline_capacity>::transformed(Function&& function) {
   using Invocation = std::remove_cvref_t<std::invoke_result_t<Function&, reference>>;
-  using Output = SmallList<typename AlgorithmResultInfo<Invocation>::value_type, MaxStackSize>;
+  using Output = SmallList<typename AlgorithmResultInfo<Invocation>::value_type, inline_capacity>;
   return Star::transform<Output>(*this, std::forward<Function>(function));
 }
 
-template <typename Element, std::size_t MaxStackSize>
+template <typename Element, std::size_t inline_capacity>
 template <typename Function>
-  requires sequence_mapping<Function&, typename SmallList<Element, MaxStackSize>::const_reference>
-auto SmallList<Element, MaxStackSize>::transformed(Function&& function) const {
+  requires sequence_mapping<Function&, typename SmallList<Element, inline_capacity>::const_reference>
+auto SmallList<Element, inline_capacity>::transformed(Function&& function) const {
   using Invocation = std::remove_cvref_t<std::invoke_result_t<Function&, const_reference>>;
-  using Output = SmallList<typename AlgorithmResultInfo<Invocation>::value_type, MaxStackSize>;
+  using Output = SmallList<typename AlgorithmResultInfo<Invocation>::value_type, inline_capacity>;
   return Star::transform<Output>(*this, std::forward<Function>(function));
 }
 
@@ -3382,11 +3384,11 @@ std::expected<void, StarException> write_text(TextBuffer& output, Sequence const
 template <typename List>
   requires sequence_container<List const>
 std::size_t ListHasher<List>::operator()(List const& l) const
-  requires hash_invocable<hash<typename List::value_type> const&, std::ranges::range_reference_t<List const>>
+  requires hash_invocable<ValueHash<typename List::value_type> const&, std::ranges::range_reference_t<List const>>
 {
   std::size_t h = 0;
   for (auto const& e : l)
-    hash_combine(h, elemHasher(e));
+    hash_combine(h, element_hasher(e));
   return h;
 }
 }
@@ -3395,28 +3397,28 @@ export module star.list;
 
 export namespace Star {
   template <typename Element, typename Allocator>
-  struct hash<List<Element, Allocator>>;
-  template <typename Element, std::size_t MaxStackSize>
-  struct hash<StaticList<Element, MaxStackSize>>;
-  template <typename Element, std::size_t MaxStackSize>
-  struct hash<SmallList<Element, MaxStackSize>>;
+  struct ValueHash<List<Element, Allocator>>;
+  template <typename Element, std::size_t inline_capacity>
+  struct ValueHash<StaticList<Element, inline_capacity>>;
+  template <typename Element, std::size_t inline_capacity>
+  struct ValueHash<SmallList<Element, inline_capacity>>;
   template <typename Element, typename Allocator>
-  struct hash<Deque<Element, Allocator>>;
+  struct ValueHash<Deque<Element, Allocator>>;
   template <typename Element, typename Allocator>
-  struct hash<LinkedList<Element, Allocator>>;
+  struct ValueHash<LinkedList<Element, Allocator>>;
 }
 
 export template <typename Element, typename Allocator>
   requires Star::nonfallible_text_writer<Star::List<Element, Allocator>>
 struct std::formatter<Star::List<Element, Allocator>> : Star::TextFormatter {};
 
-export template <typename Element, std::size_t Capacity>
-  requires Star::nonfallible_text_writer<Star::StaticList<Element, Capacity>>
-struct std::formatter<Star::StaticList<Element, Capacity>> : Star::TextFormatter {};
+export template <typename Element, std::size_t capacity>
+  requires Star::nonfallible_text_writer<Star::StaticList<Element, capacity>>
+struct std::formatter<Star::StaticList<Element, capacity>> : Star::TextFormatter {};
 
-export template <typename Element, std::size_t Capacity>
-  requires Star::nonfallible_text_writer<Star::SmallList<Element, Capacity>>
-struct std::formatter<Star::SmallList<Element, Capacity>> : Star::TextFormatter {};
+export template <typename Element, std::size_t capacity>
+  requires Star::nonfallible_text_writer<Star::SmallList<Element, capacity>>
+struct std::formatter<Star::SmallList<Element, capacity>> : Star::TextFormatter {};
 
 export template <typename Element, typename Allocator>
   requires Star::nonfallible_text_writer<Star::Deque<Element, Allocator>>
@@ -3436,5 +3438,5 @@ export namespace Star {
   using ::Star::Deque;
   using ::Star::LinkedList;
   using ::Star::write_text;
-  using ::Star::hash;
+  using ::Star::ValueHash;
 }

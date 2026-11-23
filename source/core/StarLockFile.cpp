@@ -8,7 +8,7 @@ namespace Star {
 namespace {
 void report_unlock_error(std::expected<void, StarException> result, std::string_view operation) {
   if (!result) {
-    if (auto written = Star::print(stderr, "Error unlocking file during {}: {}\n", operation, result.error().what()); !written)
+    if (auto written = Star::print(*stderr, "Error unlocking file during {}: {}\n", operation, result.error().what()); !written)
       std::_Exit(1);
   }
 }

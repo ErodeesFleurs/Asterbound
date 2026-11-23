@@ -729,8 +729,8 @@ const GameTestRegistration text_directive_aliases(
     auto const& back = style.back_directives.entry_operation(back_entries.back());
     ASSERT_TRUE(std::holds_alternative<BorderImageOperation>(front));
     ASSERT_TRUE(std::holds_alternative<BorderImageOperation>(back));
-    EXPECT_FALSE(std::get<BorderImageOperation>(front).includeTransparent);
-    EXPECT_FALSE(std::get<BorderImageOperation>(back).includeTransparent);
+    EXPECT_FALSE(std::get<BorderImageOperation>(front).include_transparent);
+    EXPECT_FALSE(std::get<BorderImageOperation>(back).include_transparent);
     Image before = Image::filled({2, 2}, {200, 100, 50, 128});
     ASSERT_TRUE(process_image_operation(front, before));
 
@@ -743,14 +743,14 @@ const GameTestRegistration text_directive_aliases(
         for (auto const& entry : directives.get().entries()) {
           auto const& operation = directives.get().entry_operation(entry);
           if (std::holds_alternative<BorderImageOperation>(operation))
-            EXPECT_FALSE(std::get<BorderImageOperation>(operation).includeTransparent);
+            EXPECT_FALSE(std::get<BorderImageOperation>(operation).include_transparent);
         }
       }
     }
     Image after = Image::filled({2, 2}, {200, 100, 50, 128});
     ASSERT_TRUE(process_image_operation(alias.directives.entry_operation(front_entries.back()), after));
     EXPECT_EQ(before.size(), after.size());
-    EXPECT_TRUE(std::ranges::equal(before.data(), after.data()));
+    EXPECT_TRUE(std::ranges::equal(before.span(), after.span()));
 
     ASSERT_TRUE((*painter)->setProcessingDirectives("?border=3;0000ff"));
     ASSERT_TRUE((*painter)->setProcessingDirectives("?outline=4;ffffff", true));
@@ -758,11 +758,11 @@ const GameTestRegistration text_directive_aliases(
       auto const& entry = directives.get().entries().back();
       auto const& operation = directives.get().entry_operation(entry);
       ASSERT_TRUE(std::holds_alternative<BorderImageOperation>(operation));
-      EXPECT_FALSE(std::get<BorderImageOperation>(operation).includeTransparent);
+      EXPECT_FALSE(std::get<BorderImageOperation>(operation).include_transparent);
     }
     EXPECT_TRUE(style.directives.equals(alias.directives));
-    EXPECT_FALSE(std::get<BorderImageOperation>(front).includeTransparent);
-    EXPECT_FALSE(std::get<BorderImageOperation>(back).includeTransparent);
+    EXPECT_FALSE(std::get<BorderImageOperation>(front).include_transparent);
+    EXPECT_FALSE(std::get<BorderImageOperation>(back).include_transparent);
   });
 
 

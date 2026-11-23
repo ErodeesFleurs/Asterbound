@@ -30,7 +30,7 @@ struct ZlibStream {
     if (active) {
       auto status = end();
       if (status != Z_OK) {
-        if (!Star::print(stderr, "Failed to end {} stream ({})\n", inflating ? "inflate" : "deflate", status))
+        if (!Star::print(*stderr, "Failed to end {} stream ({})\n", inflating ? "inflate" : "deflate", status))
           std::_Exit(1);
       }
     }
@@ -43,7 +43,7 @@ bool overlaps_output(std::span<char const> input, ByteArray const& output) {
   // Integer differences avoid unrelated-pointer comparisons and end-address
   // overflow, and include initialized input borrowed from the reserved tail.
   auto input_address = reinterpret_cast<std::uintptr_t>(input.data());
-  auto output_address = reinterpret_cast<std::uintptr_t>(output.data());
+  auto output_address = reinterpret_cast<std::uintptr_t>(output.span().data());
   return input_address >= output_address
       ? input_address - output_address < output.capacity()
       : output_address - input_address < input.size();
@@ -78,7 +78,7 @@ std::expected<void, StarException> inflate_data(std::span<char const> input, Byt
     // Keep call boundaries stable: failure publishes earlier accepted calls,
     // so changing the writable chunk would also change the error prefix.
     output.reserve(committed + codec_chunk_size);
-    stream.next_out = reinterpret_cast<std::uint8_t*>(output.data() + committed);
+    stream.next_out = reinterpret_cast<std::uint8_t*>(output.spare_capacity().data());
     stream.avail_out = codec_chunk_size;
     auto previous_input = stream.avail_in;
     status = zng_inflate(&stream, Z_NO_FLUSH);
@@ -136,7 +136,7 @@ std::expected<void, StarException> compress(std::span<char const> input, ByteArr
     if (output_chunk > ByteArray::max_size() - committed)
       return std::unexpected(IOException("Compressed output size overflow"));
     output.reserve(committed + output_chunk);
-    stream.next_out = reinterpret_cast<std::uint8_t*>(output.data() + committed);
+    stream.next_out = reinterpret_cast<std::uint8_t*>(output.spare_capacity().data());
     stream.avail_out = output_chunk;
     status = zng_deflate(&stream, consumed == input.size() ? Z_FINISH : Z_NO_FLUSH);
     if (status != Z_OK && status != Z_STREAM_END)

@@ -77,7 +77,7 @@ int run_benchmarks(int argc, char** argv, Preparation&& prepare, BenchmarkRunOpt
   auto runtime = NativeRuntime::create();
   if (!runtime) {
     if (options.report_runtime_error)
-      (void)Star::print(stderr, "{}\n", runtime.error().what());
+      (void)Star::print(*stderr, "{}\n", runtime.error().what());
     return 1;
   }
   if (auto result = std::invoke(prepare, argc); result != 0)

@@ -254,7 +254,7 @@ std::expected<bool, StarException> PatternedNameGenerator::isProfane(String cons
       auto found = match.find(word);
       if (!found)
         return std::unexpected(std::move(found.error()));
-      if (*found == NPos)
+      if (*found == npos)
         continue;
       if (*found == 0)
         return true;

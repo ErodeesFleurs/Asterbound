@@ -169,7 +169,7 @@ template <typename Key, cache_value Value, typename Compare = std::less<Key>,
   requires cache_compare<Compare, Key> && cache_allocator_for<Allocator, std::pair<Key const, Value>>
 using LruCache = LruCacheBase<OrderedMap<Key, Value, Compare, Allocator>>;
 
-template <typename Key, cache_value Value, typename Hash = Star::hash<Key>, typename Equals = std::equal_to<Key>,
+template <typename Key, cache_value Value, typename Hash = Star::ValueHash<Key>, typename Equals = std::equal_to<Key>,
           typename Allocator = BlockAllocator<std::pair<Key const, Value>, 1024>>
   requires cache_hash<Hash, Key> && cache_equal<Equals, Key>
   && cache_allocator_for<Allocator, std::pair<Key const, Value>>

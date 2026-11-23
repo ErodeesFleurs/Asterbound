@@ -145,7 +145,7 @@ FontTextureGroup::glyph_texture(std::shared_ptr<Font> const& font, String::Char 
         auto processed = [&]() -> std::expected<void, StarException> {
           if (policy == GlyphDirectivePolicy::Text && std::holds_alternative<BorderImageOperation>(operation)) {
             ImageOperation text_operation = std::get<BorderImageOperation>(operation);
-            std::get<BorderImageOperation>(text_operation).includeTransparent = true;
+            std::get<BorderImageOperation>(text_operation).include_transparent = true;
             return process_image_operation(text_operation, image);
           }
           return process_image_operation(operation, image);

@@ -220,7 +220,7 @@ Result<std::shared_ptr<GpuImage>> imageFromPixels(std::shared_ptr<Device> const&
 }
 struct Atlas;
 struct VkTexture : Texture {
-  void const* query_type(TypeKey key) const noexcept override { return query_type_of<VkTexture, Texture>(this, key); }
+  void query_type(TypeQuery& query) const noexcept override { query_type_of<VkTexture, Texture>(*this, query); }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<VkTexture>(); }
   Vec2U dimensions;
   Vec2U offset{0, 0};
@@ -303,7 +303,7 @@ struct Geometry {
   bool dirty = true;
 };
 struct VkRenderBuffer final : RenderBuffer {
-  void const* query_type(TypeKey key) const noexcept override { return query_type_of<VkRenderBuffer, RenderBuffer>(this, key); }
+  void query_type(TypeQuery& query) const noexcept override { query_type_of<VkRenderBuffer, RenderBuffer>(*this, query); }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<VkRenderBuffer>(); }
   std::shared_ptr<Device> device;
   TexturePtr white;
@@ -1152,7 +1152,7 @@ Result<VkShaderModule> compileShader(std::shared_ptr<Device> const& device, Stri
   shaderc_compile_options_set_target_env(compiler.options, shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_2);
   shaderc_compile_options_set_target_spirv(compiler.options, shaderc_spirv_version_1_5);
   shaderc_compile_options_set_source_language(compiler.options, shaderc_source_language_glsl);
-  compiler.result = shaderc_compile_into_spv(compiler.compiler, expanded.data(), expanded.size(), kind, name.utf8_data(), "main", compiler.options);
+  compiler.result = shaderc_compile_into_spv(compiler.compiler, expanded.data(), expanded.size(), kind, name.utf8().c_str(), "main", compiler.options);
   if (!compiler.result) return std::unexpected(RendererException::format("shaderc returned no result for '{}'", name));
   if (shaderc_result_get_compilation_status(compiler.result) != shaderc_compilation_status_success)
     return std::unexpected(RendererException::format("Vulkan shader '{}': {}", name, shaderc_result_get_error_message(compiler.result)));

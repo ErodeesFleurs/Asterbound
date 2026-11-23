@@ -681,7 +681,7 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
     }
     light.xPosition.set(lightPosition[0]);
     light.yPosition.set(lightPosition[1]);
-    Color color = Color::White;
+    Color color = Color::palette_white;
     auto colorConfig = lightConfig.opt("color");
     if (!colorConfig) return std::unexpected(std::move(colorConfig.error()));
     if (*colorConfig) {

@@ -587,7 +587,7 @@ std::expected<void, StarException> ClientApplication::applicationInit(std::share
     ImFontConfig config{};
     config.FontDataOwnedByAtlas = false;
     config.FontLoaderFlags = ImGuiFreeTypeLoaderFlags_ForceAutoHint;
-    io.Fonts->AddFontFromMemoryTTF(m_immediateFont.data(), m_immediateFont.size(),
+    io.Fonts->AddFontFromMemoryTTF(m_immediateFont.span().data(), m_immediateFont.size(),
       16, &config, io.Fonts->GetGlyphRangesDefault());
   }
   auto minScale = assets->json("/interface.config:minInterfaceScale").and_then([](Json j) { return j.to_float(); });
@@ -748,10 +748,10 @@ std::expected<void, StarException> ClientApplication::processInput(InputEvent co
       return keyEvent.key != keyUp.key;
     });
 
-    auto keyName = enum_name<KeyNames>(keyUp.key);
+    auto keyName = enum_name<key_names>(keyUp.key);
     if (!keyName)
       return std::unexpected(std::move(keyName.error()));
-    auto modKey = maybe_enum_value<KeyModNames>(*keyName);
+    auto modKey = maybe_enum_value<key_mod_names>(*keyName);
     if (!modKey)
       return std::unexpected(std::move(modKey.error()));
     if (*modKey)
@@ -761,14 +761,14 @@ std::expected<void, StarException> ClientApplication::processInput(InputEvent co
   }
   else if (std::holds_alternative<ControllerAxisEvent>(event)) {
     auto const& cAxis = std::get<ControllerAxisEvent>(event);
-    if (cAxis.controllerAxis == ControllerAxis::LeftX)
-      m_controllerLeftStick[0] = cAxis.controllerAxisValue;
-    else if (cAxis.controllerAxis == ControllerAxis::LeftY)
-      m_controllerLeftStick[1] = cAxis.controllerAxisValue;
-    else if (cAxis.controllerAxis == ControllerAxis::RightX)
-      m_controllerRightStick[0] = cAxis.controllerAxisValue;
-    else if (cAxis.controllerAxis == ControllerAxis::RightY)
-      m_controllerRightStick[1] = cAxis.controllerAxisValue;
+    if (cAxis.controller_axis == ControllerAxis::LeftX)
+      m_controllerLeftStick[0] = cAxis.controller_axis_value;
+    else if (cAxis.controller_axis == ControllerAxis::LeftY)
+      m_controllerLeftStick[1] = cAxis.controller_axis_value;
+    else if (cAxis.controller_axis == ControllerAxis::RightX)
+      m_controllerRightStick[0] = cAxis.controller_axis_value;
+    else if (cAxis.controller_axis == ControllerAxis::RightY)
+      m_controllerRightStick[1] = cAxis.controller_axis_value;
   }
 
   bool processed = false;
@@ -1160,7 +1160,7 @@ std::expected<void, StarException> ClientApplication::renderReload() {
     auto sourceFor = [&](Json const& value) -> std::expected<String, StarException> {
       auto shader = value.to_string();
       if (!shader) return std::unexpected(std::move(shader.error()));
-      auto multiline = shader->has_char('\n');
+      auto multiline = shader->contains('\n');
       if (!multiline) return std::unexpected(std::move(multiline.error()));
       if (!*multiline) {
         auto bytes = assets->bytes(AssetPath::relative_to(path, *shader));
@@ -2310,7 +2310,7 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
       if (!broadcastCallback) {
         broadcastCallback = [&](std::shared_ptr<Player> player, StringView broadcast) -> std::expected<bool, StarException> {
           auto view = broadcast.utf8();
-          if (view.rfind(VoiceBroadcastPrefix.utf8(), 0) != NPos) {
+          if (view.rfind(VoiceBroadcastPrefix.utf8(), 0) != npos) {
             auto entityId = player->entityId();
             auto speaker = m_voice->speaker(connectionForEntity(entityId));
             if (!speaker)

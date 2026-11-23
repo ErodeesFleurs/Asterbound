@@ -38,7 +38,7 @@ TEST(DynamicLibTest, SymbolOutlivesMovedAndDestroyedLibrary) {
     auto moved = std::move(*library);
     auto rejected = library->find<Transform>(transform_name);
     ASSERT_FALSE(rejected.has_value());
-    EXPECT_STRNE("", rejected.error().what());
+    EXPECT_NE("", rejected.error().what());
     auto valid = moved.find<Transform>(transform_name);
     ASSERT_TRUE(valid.has_value()) << valid.error().what();
     EXPECT_EQ((*valid)(4), 13);

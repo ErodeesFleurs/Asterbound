@@ -70,7 +70,7 @@ extern std::expected<EnumMap<EntityType>, StarException> const EntityTypeNames;
 
 class Entity {
 public:
-  virtual void const* query_type(TypeKey key) const noexcept { return query_type_of<Entity>(this, key); }
+  virtual void query_type(TypeQuery& query) const noexcept { query_type_of<Entity>(*this, query); }
   virtual std::string_view dynamic_type_name() const noexcept { return Star::type_name<Entity>(); }
 
   virtual ~Entity();

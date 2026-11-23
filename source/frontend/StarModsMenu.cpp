@@ -172,7 +172,7 @@ std::expected<void, StarException> ModsMenu::update(float dt) {
     return std::unexpected(std::move(result.error()));
 
   std::size_t selectedItem = m_modList->selectedItem();
-  if (selectedItem == NPos) {
+  if (selectedItem == npos) {
     for (auto label : {std::ref(*m_modName), std::ref(*m_modAuthor), std::ref(*m_modVersion), std::ref(*m_modPath), std::ref(*m_modDescription)}) {
       if (auto result = label.get().setText(""); !result)
         return std::unexpected(std::move(result.error()));
@@ -236,7 +236,7 @@ std::expected<String, StarException> ModsMenu::bestModName(JsonObject const& met
 
 std::expected<void, StarException> ModsMenu::openLink() {
   std::size_t selectedItem = m_modList->selectedItem();
-  if (selectedItem == NPos)
+  if (selectedItem == npos)
     return {};
   auto source = m_assetsSources.at(selectedItem);
   if (!source)

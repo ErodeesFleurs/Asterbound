@@ -14,8 +14,8 @@ concept either_payload = std::is_object_v<T> && !std::is_array_v<T> && std::dest
 
 // A tag owns the argument until it is consumed. Only the index is stored by
 // Either's variant, even when both sides have the same payload type.
-template <std::size_t Index, either_payload T>
-  requires (Index < 2)
+template <std::size_t index, either_payload T>
+  requires (index < 2)
 struct EitherTag {
   T value;
 };
@@ -62,8 +62,8 @@ concept either_lvalue = std::is_lvalue_reference_v<Self>;
 template <either_payload Left, either_payload Right>
 class Either {
   using Storage = std::variant<Left, Right>;
-  template <std::size_t Index>
-  using Side = std::variant_alternative_t<Index, Storage>;
+  template <std::size_t index>
+  using Side = std::variant_alternative_t<index, Storage>;
   static constexpr bool resets_source = either_resettable_payload<Left> || either_resettable_payload<Right>;
   static constexpr bool nothrow_reset = either_nothrow_reset<Left> && either_nothrow_reset<Right>;
   static constexpr bool trivial_move_assignment = !resets_source && std::is_trivially_move_assignable_v<Storage>;
@@ -91,21 +91,21 @@ public:
     return *this;
   }
 
-  template <std::size_t Index, typename T>
-    requires either_payload_from<Side<Index>, T const&>
-  constexpr Either(EitherTag<Index, T> const& tag)
-    : m_value(std::in_place_index<Index>, tag.value) {}
+  template <std::size_t index, typename T>
+    requires either_payload_from<Side<index>, T const&>
+  constexpr Either(EitherTag<index, T> const& tag)
+    : m_value(std::in_place_index<index>, tag.value) {}
 
-  template <std::size_t Index, typename T>
-    requires either_payload_from<Side<Index>, T>
-  constexpr Either(EitherTag<Index, T>&& tag)
-    : m_value(std::in_place_index<Index>, std::move(tag.value)) {}
+  template <std::size_t index, typename T>
+    requires either_payload_from<Side<index>, T>
+  constexpr Either(EitherTag<index, T>&& tag)
+    : m_value(std::in_place_index<index>, std::move(tag.value)) {}
 
   // Capture the tag first: it may itself be a member of the active payload.
-  template <std::size_t Index, typename T>
-    requires either_payload_from<Side<Index>, T>
-  constexpr Either& operator=(EitherTag<Index, T> tag) {
-    m_value.template emplace<Index>(std::move(tag.value));
+  template <std::size_t index, typename T>
+    requires either_payload_from<Side<index>, T>
+  constexpr Either& operator=(EitherTag<index, T> tag) {
+    m_value.template emplace<index>(std::move(tag.value));
     return *this;
   }
 
@@ -162,22 +162,22 @@ private:
         right_ref().reset();
   }
 
-  template <std::size_t Index, either_lvalue Self>
-    requires (Index < 2)
+  template <std::size_t index, either_lvalue Self>
+    requires (index < 2)
   static constexpr auto borrow(Self&& self) {
-    using Result = std::optional<decltype(std::ref(std::get<Index>(self.m_value)))>;
-    if (self.m_value.index() == Index)
-      return Result(std::ref(std::get<Index>(self.m_value)));
+    using Result = std::optional<decltype(std::ref(std::get<index>(self.m_value)))>;
+    if (self.m_value.index() == index)
+      return Result(std::ref(std::get<index>(self.m_value)));
     return Result{};
   }
 
-  template <std::size_t Index, either_lvalue Self>
-    requires (Index < 2)
+  template <std::size_t index, either_lvalue Self>
+    requires (index < 2)
   static auto checked(Self&& self) {
-    using Result = std::expected<decltype(std::ref(std::get<Index>(self.m_value))), StarException>;
-    if (auto ref = borrow<Index>(self))
+    using Result = std::expected<decltype(std::ref(std::get<index>(self.m_value))), StarException>;
+    if (auto ref = borrow<index>(self))
       return Result(*ref);
-    return Result(std::unexpect, EitherException(Index == 0
+    return Result(std::unexpect, EitherException(index == 0
         ? "Improper access of left side of Either" : "Improper access of right side of Either"));
   }
 

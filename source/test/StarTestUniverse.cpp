@@ -295,7 +295,7 @@ std::expected<std::unique_ptr<TestUniverse>, StarException> TestUniverse::create
   if (!server_version)
     return std::unexpected(std::move(server_version.error()));
   auto client_version = context->netCompatibilityRules().version();
-  auto expected_version = force_legacy ? LegacyVersion : OpenProtocolVersion;
+  auto expected_version = force_legacy ? legacy_version : open_protocol_version;
   if (*server_version != expected_version || client_version != expected_version)
     return std::unexpected(TestUniverseException::format("Local handshake expected {}, got client {} and server {}",
                                                          expected_version, client_version, *server_version));

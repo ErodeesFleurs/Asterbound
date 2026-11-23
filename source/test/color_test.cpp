@@ -12,14 +12,14 @@ using namespace Star;
 namespace {
 
 template <typename T>
-concept color_data_borrowable = requires(T&& color) {
-  { std::forward<T>(color).data() } -> std::same_as<Vec4F const&>;
+concept color_channels_borrowable = requires(T&& color) {
+  { std::forward<T>(color).rgba_channels() } -> std::same_as<Vec4F const&>;
 };
 
-static_assert(color_data_borrowable<Color&>);
-static_assert(color_data_borrowable<Color const&>);
-static_assert(!color_data_borrowable<Color>);
-static_assert(!color_data_borrowable<Color const>);
+static_assert(color_channels_borrowable<Color&>);
+static_assert(color_channels_borrowable<Color const&>);
+static_assert(!color_channels_borrowable<Color>);
+static_assert(!color_channels_borrowable<Color const>);
 
 }
 
@@ -293,7 +293,7 @@ TEST(ColorTest, ConstGammaConversionsPreserveAlphaAndSource) {
 
 TEST(ColorTest, DataBorrowsBoundedLvalueWhileRgbaFloatOwnsItsValue) {
   Color color = Color::rgba_f(0.25f, 0.5f, 0.75f, 1.0f);
-  Vec4F const& borrowed = std::as_const(color).data();
+  Vec4F const& borrowed = std::as_const(color).rgba_channels();
   Vec4F const owned = color.to_rgba_f();
   EXPECT_EQ(borrowed.size(), 4u);
   EXPECT_EQ(borrowed, Vec4F(0.25f, 0.5f, 0.75f, 1.0f));

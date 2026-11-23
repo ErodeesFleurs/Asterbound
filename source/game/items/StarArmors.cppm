@@ -82,8 +82,8 @@ extern std::expected<EnumMap<ArmorType>, StarException> const ArmorTypeNames;
 
 class ArmorItem : public Item, public EffectSourceItem, public SwingableItem {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<ArmorItem, Item, EffectSourceItem, SwingableItem>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<ArmorItem, Item, EffectSourceItem, SwingableItem>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ArmorItem>(); }
 
@@ -150,8 +150,8 @@ private:
 
 class HeadArmor : public ArmorItem, public PreviewableItem {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<HeadArmor, ArmorItem, PreviewableItem>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<HeadArmor, ArmorItem, PreviewableItem>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<HeadArmor>(); }
 
@@ -179,8 +179,8 @@ private:
 
 class ChestArmor : public ArmorItem, public PreviewableItem {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<ChestArmor, ArmorItem, PreviewableItem>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<ChestArmor, ArmorItem, PreviewableItem>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ChestArmor>(); }
 
@@ -217,8 +217,8 @@ private:
 
 class LegsArmor : public ArmorItem, public PreviewableItem {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<LegsArmor, ArmorItem, PreviewableItem>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<LegsArmor, ArmorItem, PreviewableItem>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<LegsArmor>(); }
 
@@ -245,8 +245,8 @@ private:
 
 class BackArmor : public ArmorItem, public PreviewableItem {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<BackArmor, ArmorItem, PreviewableItem>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<BackArmor, ArmorItem, PreviewableItem>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<BackArmor>(); }
 

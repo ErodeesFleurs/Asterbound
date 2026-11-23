@@ -74,8 +74,8 @@ class Root;
 
 class ContainerObject : public Object, public virtual ContainerEntity {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<ContainerObject, Object, ContainerEntity>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<ContainerObject, Object, ContainerEntity>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ContainerObject>(); }
 
@@ -110,7 +110,7 @@ public:
 
   [[nodiscard]] std::expected<RpcPromise<std::shared_ptr<Item>>, StarException> addItems(std::shared_ptr<Item> const& items) override;
   [[nodiscard]] std::expected<RpcPromise<std::shared_ptr<Item>>, StarException> putItems(std::size_t slot, std::shared_ptr<Item> const& items) override;
-  [[nodiscard]] std::expected<RpcPromise<std::shared_ptr<Item>>, StarException> takeItems(std::size_t slot, std::size_t count = NPos) override;
+  [[nodiscard]] std::expected<RpcPromise<std::shared_ptr<Item>>, StarException> takeItems(std::size_t slot, std::size_t count = npos) override;
   [[nodiscard]] std::expected<RpcPromise<std::shared_ptr<Item>>, StarException> swapItems(std::size_t slot, std::shared_ptr<Item> const& items, bool tryCombine = true) override;
   [[nodiscard]] std::expected<RpcPromise<std::shared_ptr<Item>>, StarException> applyAugment(std::size_t slot, std::shared_ptr<Item> const& augment) override;
   [[nodiscard]] std::expected<RpcPromise<bool>, StarException> consumeItems(ItemDescriptor const& descriptor) override;
@@ -133,7 +133,7 @@ private:
 
   [[nodiscard]] std::expected<std::shared_ptr<Item>, StarException> doAddItems(std::shared_ptr<Item> const& items);
   [[nodiscard]] std::expected<std::shared_ptr<Item>, StarException> doPutItems(std::size_t slot, std::shared_ptr<Item> const& items);
-  [[nodiscard]] std::expected<std::shared_ptr<Item>, StarException> doTakeItems(std::size_t slot, std::size_t count = NPos);
+  [[nodiscard]] std::expected<std::shared_ptr<Item>, StarException> doTakeItems(std::size_t slot, std::size_t count = npos);
   [[nodiscard]] std::expected<std::shared_ptr<Item>, StarException> doSwapItems(std::size_t slot, std::shared_ptr<Item> const& items, bool tryCombine = true);
   [[nodiscard]] std::expected<std::shared_ptr<Item>, StarException> doApplyAugment(std::size_t slot, std::shared_ptr<Item> const& augment);
   [[nodiscard]] std::expected<bool, StarException> doConsumeItems(ItemDescriptor const& descriptor);

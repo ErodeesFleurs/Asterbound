@@ -137,7 +137,7 @@ List<String> keyOrder(FormattedJson const& json) {
   List<String> keys;
   for (JsonElement const& elem : json.elements()) {
     if (std::holds_alternative<ObjectKeyElement>(elem))
-      keys.push_back(std::get<ObjectKeyElement>(elem).m_key);
+      keys.push_back(std::get<ObjectKeyElement>(elem).key);
   }
   return keys;
 }

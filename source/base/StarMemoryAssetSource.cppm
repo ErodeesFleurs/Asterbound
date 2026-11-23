@@ -95,7 +95,7 @@ auto MemoryAssetSource::checked_view(String const& path) const -> std::expected<
   auto const& owner = entry->get();
   auto bytes = std::holds_alternative<std::shared_ptr<ByteArray const>>(owner)
       ? std::as_bytes(std::get<std::shared_ptr<ByteArray const>>(owner)->span())
-      : std::as_bytes(std::get<std::shared_ptr<Image const>>(owner)->data());
+      : std::as_bytes(std::get<std::shared_ptr<Image const>>(owner)->span());
   if (!std::in_range<StreamOffset>(bytes.size()))
     return std::unexpected(AssetSourceException::format("Requested file '{}' is too large to open", path));
   return FileView{owner, bytes};

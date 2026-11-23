@@ -363,7 +363,7 @@ std::expected<SnapshotFixture, StarException> prepareSnapshotFixture(Root& root,
   fixture.clients.reserve(clientCount);
   for (unsigned i = 0; i < clientCount; ++i) {
     ConnectionId id = MinClientConnectionId + i;
-    NetCompatibilityRules rules(i % 2 ? LegacyVersion : OpenProtocolVersion);
+    NetCompatibilityRules rules(i % 2 ? legacy_version : open_protocol_version);
     auto added = fixture.world->addClient(id, SpawnTargetPosition(Vec2F(1024, 1024)), false, false, rules);
     if (!added)
       return std::unexpected(std::move(added.error()));

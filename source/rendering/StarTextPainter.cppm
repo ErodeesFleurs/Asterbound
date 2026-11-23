@@ -43,7 +43,7 @@ enum class FontMode : std::uint8_t {
 };
 
 inline Color const& fontModeToColor(FontMode mode) {
-  return mode == FontMode::Shadow ? Color::Black : Color::Clear;
+  return mode == FontMode::Shadow ? Color::palette_black : Color::palette_clear;
 }
 
 struct TextPositioning {

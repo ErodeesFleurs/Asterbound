@@ -41,7 +41,7 @@ struct WireConnection {
 };
 
 template <>
-struct hash<WireConnection> {
+struct ValueHash<WireConnection> {
   std::size_t operator()(WireConnection const& wireConnection) const;
 };
 
@@ -76,7 +76,7 @@ export module star.wiring;
 
 export namespace Star {
   template <>
-  struct hash<WireConnection>;
+  struct ValueHash<WireConnection>;
 }
 
 
@@ -87,5 +87,5 @@ export namespace Star {
   using ::Star::otherWireDirection;
   using ::Star::WireNode;
   using ::Star::WireConnection;
-  using ::Star::hash;
+  using ::Star::ValueHash;
 }

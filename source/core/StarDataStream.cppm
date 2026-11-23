@@ -49,12 +49,12 @@ concept stream_callback = requires(Function& function, DataStream& stream, Args.
   { function(stream, args...) } -> stream_result;
 };
 template <typename Pointer>
-concept stream_pointer = requires(Pointer& pointer, typename Pointer::element_type* element) {
+concept stream_pointer = requires(Pointer& pointer, typename Pointer::element_type& element) {
   typename Pointer::element_type;
   { static_cast<bool>(pointer) } -> std::same_as<bool>;
   *pointer;
   pointer.reset();
-  pointer.reset(element);
+  pointer.reset(std::addressof(element));
 };
 template <typename Container>
 concept stream_range = std::ranges::input_range<Container const> && requires(Container const& container) {
@@ -80,7 +80,7 @@ class DataStream {
 public:
   DataStream();
   virtual ~DataStream() = default;
-  virtual void const* query_type(TypeKey key) const noexcept { return query_type_of<DataStream>(this, key); }
+  virtual void query_type(TypeQuery& query) const noexcept { query_type_of<DataStream>(*this, query); }
   virtual std::string_view dynamic_type_name() const noexcept { return type_name<DataStream>(); }
 
   ByteOrder byte_order() const;
@@ -122,7 +122,7 @@ public:
   [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(float& d);
   [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(double& d);
 
-  // VLQ integers retain their on-wire 1..10-byte representation. S maps NPos to zero.
+  // VLQ integers retain their on-wire 1..10-byte representation. S maps npos to zero.
   [[nodiscard]] std::expected<std::size_t, StarException> write_vlq_u(std::uint64_t i);
   [[nodiscard]] std::expected<std::size_t, StarException> write_vlq_i(std::int64_t i);
   [[nodiscard]] std::expected<std::size_t, StarException> write_vlq_s(std::size_t i);
@@ -134,10 +134,10 @@ public:
   [[nodiscard]] std::expected<std::size_t, StarException> read_vlq_s();
 
   [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(std::string_view s);
-  template <std::size_t Size>
-    requires(Size > 0)
-  [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(char const (&text)[Size]) {
-    return *this << std::string_view(text, Size - 1);
+  template <std::size_t extent>
+    requires(extent > 0)
+  [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(char const (&text)[extent]) {
+    return *this << std::string_view(text, extent - 1);
   }
   [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(std::string const& s);
   [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(ByteArray const& d);
@@ -222,9 +222,9 @@ public:
 
 private:
   [[nodiscard]] std::expected<void, StarException> write_string_data(std::span<char const> data);
-  ByteOrder m_byteOrder;
-  bool m_nullTerminatedStrings;
-  unsigned m_streamCompatibilityVersion;
+  ByteOrder m_byte_order;
+  bool m_null_terminated_strings;
+  unsigned m_stream_compatibility_version;
 };
 
 namespace detail {
@@ -237,7 +237,7 @@ concept stream_element_decoder = requires(Container& container, Decode& decode, 
 template <typename Container, typename Function, typename Decode, typename Commit>
   requires stream_element_decoder<Container, Decode, Commit>
 std::expected<void, StarException> read_stream_elements(DataStream& stream, Container& container,
-                                                        Function const& function, char const* missing_callback,
+                                                        Function const& function, std::string_view missing_callback,
                                                         Decode decode, Commit commit) {
   container.clear();
   auto count = stream.read_vlq_u();
@@ -245,7 +245,7 @@ std::expected<void, StarException> read_stream_elements(DataStream& stream, Cont
     return std::unexpected(std::move(count.error()));
   if constexpr (requires { static_cast<bool>(function); }) {
     if (*count && !function)
-      return std::unexpected(DataStreamException(missing_callback));
+      return std::unexpected(DataStreamException(std::string(missing_callback)));
   }
   for (std::uint64_t i = 0; i < *count; ++i) {
     auto element = decode();

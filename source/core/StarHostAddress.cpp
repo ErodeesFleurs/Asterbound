@@ -52,10 +52,9 @@ std::expected<HostAddress, StarException> HostAddress::lookup(String const& addr
   hints.ai_protocol = IPPROTO_TCP;
   hints.ai_flags = AI_ADDRCONFIG;
 
-  addrinfo* head = nullptr;
-  if (int status = ::getaddrinfo(text.c_str(), nullptr, &hints, &head); status != 0)
+  std::unique_ptr<addrinfo, decltype([](addrinfo* list) { ::freeaddrinfo(list); })> results;
+  if (int status = ::getaddrinfo(text.c_str(), nullptr, &hints, std::out_ptr(results)); status != 0)
     return std::unexpected(NetworkException::format("Failed to determine address for '{}' (getaddrinfo status {})", address, status));
-  std::unique_ptr<addrinfo, decltype([](addrinfo* list) { ::freeaddrinfo(list); })> results(head);
   for (auto entry = results.get(); entry; entry = entry->ai_next) {
     if ((entry->ai_family != AF_INET && entry->ai_family != AF_INET6) || !entry->ai_addr
         || entry->ai_addrlen > sizeof(sockaddr_storage))

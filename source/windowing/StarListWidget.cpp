@@ -64,7 +64,7 @@ import star.image_widget;
 namespace Star {
 
 ListWidget::ListWidget(GuiContext& context) : Widget(context), m_reader(context),
-    m_selectedItem(NPos), m_fillDown(false), m_columns(1) {
+    m_selectedItem(npos), m_fillDown(false), m_columns(1) {
   updateSizeAndPosition();
 }
 
@@ -101,7 +101,7 @@ std::expected<bool, StarException> ListWidget::sendEvent(InputEvent const& event
       return std::unexpected(std::move(handled.error()));
     if (*handled || (std::holds_alternative<MouseButtonDownEvent>(event)
           && child->inMember(*context().mousePosition(event))
-          && std::get<MouseButtonDownEvent>(event).mouseButton == MouseButton::Left)) {
+          && std::get<MouseButtonDownEvent>(event).mouse_button == MouseButton::Left)) {
       auto selected = setSelected(i - 1);
       if (!selected)
         return std::unexpected(std::move(selected.error()));
@@ -177,7 +177,7 @@ std::expected<std::shared_ptr<Widget>, StarException> ListWidget::addItem(std::s
   if (!added)
     return std::unexpected(std::move(added.error()));
   updateSizeAndPosition();
-  if (m_selectedItem != NPos && at <= m_selectedItem) {
+  if (m_selectedItem != npos && at <= m_selectedItem) {
     auto selected = setSelected(m_selectedItem + 1);
     if (!selected)
       return std::unexpected(std::move(selected.error()));
@@ -241,7 +241,7 @@ std::expected<void, StarException> ListWidget::setBackground(std::size_t pos, St
 }
 
 std::expected<void, StarException> ListWidget::setEnabled(std::size_t pos, bool enabled) {
-  if (pos != NPos && pos < listSize()) {
+  if (pos != npos && pos < listSize()) {
     if (enabled) {
       m_disabledItems.remove(pos);
       return setBackground(pos, pos == m_selectedItem ? m_selectedBG : m_unselectedBG);
@@ -264,9 +264,9 @@ std::expected<void, StarException> ListWidget::setHovered(std::size_t pos, bool 
 }
 
 std::expected<void, StarException> ListWidget::setSelected(std::size_t pos) {
-  if (pos != NPos && pos >= listSize())
+  if (pos != npos && pos >= listSize())
     return std::unexpected(GuiException("List selection index out of range"));
-  if (m_selectedItem != NPos && m_selectedItem < listSize()) {
+  if (m_selectedItem != npos && m_selectedItem < listSize()) {
     auto background = setBackground(m_selectedItem, m_unselectedBG);
     if (!background)
       return std::unexpected(std::move(background.error()));
@@ -279,18 +279,18 @@ std::expected<void, StarException> ListWidget::setSelected(std::size_t pos) {
         return std::unexpected(std::move(called.error()));
     }
   }
-  if (m_selectedItem != NPos)
+  if (m_selectedItem != npos)
     return setBackground(m_selectedItem, m_selectedBG);
   return {};
 }
 
 std::expected<void, StarException> ListWidget::clearSelected() {
-  return setSelected(NPos);
+  return setSelected(npos);
 }
 
 std::expected<void, StarException> ListWidget::setSelectedWidget(std::shared_ptr<Widget> selected) {
   auto offset = itemPosition(selected);
-  if (offset == NPos)
+  if (offset == npos)
     return std::unexpected(GuiException("Attempted to select item not in list."));
   return setSelected(offset);
 }
@@ -315,10 +315,10 @@ std::expected<void, StarException> ListWidget::removeItem(std::size_t at) {
     return std::unexpected(GuiException("List removal index out of range"));
   removeChildAt(at);
   if (m_selectedItem == at) {
-    auto selected = setSelected(NPos);
+    auto selected = setSelected(npos);
     if (!selected)
       return std::unexpected(std::move(selected.error()));
-  } else if (m_selectedItem != NPos && m_selectedItem > at) {
+  } else if (m_selectedItem != npos && m_selectedItem > at) {
     auto selected = setSelected(m_selectedItem - 1);
     if (!selected)
       return std::unexpected(std::move(selected.error()));
@@ -329,13 +329,13 @@ std::expected<void, StarException> ListWidget::removeItem(std::size_t at) {
 
 std::expected<void, StarException> ListWidget::removeItem(std::shared_ptr<Widget> item) {
   auto offset = itemPosition(item);
-  if (offset == NPos)
+  if (offset == npos)
     return std::unexpected(GuiException("Attempted to remove item not in list."));
   return removeItem(offset);
 }
 
 std::expected<void, StarException> ListWidget::clear() {
-  auto selected = setSelected(NPos);
+  auto selected = setSelected(npos);
   if (!selected)
     return std::unexpected(std::move(selected.error()));
   removeAllChildren();
@@ -348,7 +348,7 @@ std::size_t ListWidget::selectedItem() const {
 }
 
 std::size_t ListWidget::itemPosition(std::shared_ptr<Widget> item) const {
-  std::size_t offset = NPos;
+  std::size_t offset = npos;
   for (std::size_t i = 0; i < m_members.size(); ++i) {
     if (m_members[i] == item) {
       offset = i;

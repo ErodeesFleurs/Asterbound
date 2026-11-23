@@ -70,7 +70,7 @@ void AudioInstance::set_range_multiplier(float range_multiplier) {
 }
 
 void AudioInstance::set_volume(float target_value, float ramp_time) {
-  if constexpr (Star::DebugEnabled)
+  if constexpr (Star::debug_enabled)
     Star::star_assert_failed((target_value >= 0));
   std::lock_guard locker(m_mutex);
   if (m_stopping)
@@ -84,7 +84,7 @@ void AudioInstance::set_volume(float target_value, float ramp_time) {
 }
 
 void AudioInstance::set_pitch_multiplier(float target_value, float ramp_time) {
-  if constexpr (Star::DebugEnabled)
+  if constexpr (Star::debug_enabled)
     Star::star_assert_failed((target_value >= 0));
   std::lock_guard locker(m_mutex);
   if (m_stopping)

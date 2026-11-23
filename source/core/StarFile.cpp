@@ -18,7 +18,7 @@ std::expected<std::filesystem::path, StarException> filesystem_path(String const
       return std::unexpected(std::move(native.error()));
     return std::filesystem::path(std::move(*native));
 #else
-    return std::filesystem::path(path.utf8_data());
+    return std::filesystem::path(path.utf8().c_str());
 #endif
 }
 
@@ -113,7 +113,7 @@ template <whole_file_buffer Buffer> std::expected<Buffer, StarException> read_fi
   auto closed = file.close();
   if (!contents) {
     if (!closed) {
-      if (auto written = Star::print(stderr, "Error closing file '{}' after failed read: {}\n", filename.utf8_data(),
+      if (auto written = Star::print(*stderr, "Error closing file '{}' after failed read: {}\n", filename.utf8().c_str(),
                    closed.error().what()); !written)
         return std::unexpected(std::move(contents.error()).with_context(
             Star::format("Could not report close failure ({}): {}", closed.error().what(), written.error().what())));
@@ -295,12 +295,12 @@ std::expected<void, StarException> File::write_file_with_rename(String const& fi
       return;
     auto closed = staging.close();
     if (!closed) {
-      if (auto written = Star::print(stderr, "Error closing staging file '{}': {}\n", new_file.utf8_data(), closed.error().what()); !written)
+      if (auto written = Star::print(*stderr, "Error closing staging file '{}': {}\n", new_file.utf8().c_str(), closed.error().what()); !written)
         std::_Exit(1);
     }
     auto removed = remove(new_file);
     if (!removed) {
-      if (auto written = Star::print(stderr, "Error removing staging file '{}': {}\n", new_file.utf8_data(), removed.error().what()); !written)
+      if (auto written = Star::print(*stderr, "Error removing staging file '{}': {}\n", new_file.utf8().c_str(), removed.error().what()); !written)
         std::_Exit(1);
     }
   });
@@ -374,7 +374,7 @@ File::~File() noexcept {
     return;
   auto result = m_file.close();
   if (!result) {
-    if (auto written = Star::print(stderr, "Error closing file '{}' during destruction: {}\n", m_filename.utf8_data(), result.error().what()); !written)
+    if (auto written = Star::print(*stderr, "Error closing file '{}' during destruction: {}\n", m_filename.utf8().c_str(), result.error().what()); !written)
       std::_Exit(1);
   }
 }

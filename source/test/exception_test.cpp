@@ -22,6 +22,8 @@ static_assert(!std::is_constructible_v<ExceptionDiagnostic, std::exception const
 static_assert(!std::is_constructible_v<StarException, std::string, std::exception const&>);
 static_assert(sizeof(StarException) == sizeof(std::shared_ptr<void const>));
 static_assert(sizeof(ExceptionDiagnostic) == sizeof(std::shared_ptr<void const>));
+static_assert(std::same_as<decltype(std::declval<StarException const&>().what()), std::string const&>);
+static_assert(std::same_as<decltype(std::declval<StarException const&&>().what()), std::string>);
 
 struct LogFormattingProbe {
   unsigned& calls;
@@ -886,7 +888,7 @@ TEST(ExceptionTest, AliasedRvalueSummaryKeepsOriginalDiagnosticsIndependent) {
   auto original = ExceptionDiagnostic(source);
   auto proxy = Star::output_exception(original, false);
   auto originalText = std::string(copy.what());
-  auto originalWhat = copy.what();
+  auto const& original_what = copy.what();
   auto summary = *source.diagnostic_summary();
   summary.reason = "independent-summary";
   summary.operation = "summary-operation";
@@ -895,7 +897,7 @@ TEST(ExceptionTest, AliasedRvalueSummaryKeepsOriginalDiagnosticsIndependent) {
   EXPECT_EQ(enriched.diagnostic_summary()->reason, "independent-summary");
   EXPECT_EQ(copy.diagnostic_summary()->reason, "unchanged-original-details");
   EXPECT_EQ(original.diagnostic_summary()->reason, "unchanged-original-details");
-  EXPECT_EQ(std::string(copy.what()), originalWhat);
+  EXPECT_EQ(std::addressof(copy.what()), std::addressof(original_what));
   EXPECT_EQ(Star::print_exception(enriched, true), originalText);
   EXPECT_EQ(std::format("{}", proxy), originalText);
 

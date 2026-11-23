@@ -250,7 +250,7 @@ void register_view_searches() {
   using Star::StringView;
   auto find = [](StringView const& text, StringView const& needle) { return text.find(needle); };
   auto member = [](StringView const& text, StringView const& needle) { return text.find_first_of(needle); };
-  auto last = [](StringView const& text, StringView const& needle) { return text.find_last(needle); };
+  auto last = [](StringView const& text, StringView const& needle) { return text.rfind(needle); };
   register_view_search("ShortAsciiEarlyHit", "open tab", "pen", 1, find);
   register_view_search("LongAsciiMiss", std::string(4096, 'a'), "xy", std::string::npos, find);
   register_view_search("CommonPrefix", std::string(1024, 'a') + 'b', "aaaaaaaaaaaaaaab", 1009, find);
@@ -262,7 +262,7 @@ void register_view_searches() {
   register_view_search("WhitespaceMembership", mixed + " ", "", 384, member);
   register_view_search("LastSubstring", std::string(1024, 'a') + "aba", "aa", 1023, last);
   register_view_search("LastCharacter", mixed + 'a', "", 384,
-      [](StringView const& text, StringView const&) { return text.find_last(U'a'); });
+      [](StringView const& text, StringView const&) { return text.rfind(U'a'); });
 }
 
 }

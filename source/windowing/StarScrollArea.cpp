@@ -561,7 +561,7 @@ std::expected<bool, StarException> ScrollArea::sendEvent(InputEvent const& event
 
   if (std::holds_alternative<MouseWheelEvent>(event)) {
     auto const& mouseWheel = std::get<MouseWheelEvent>(event);
-    if (mouseWheel.mouseWheel == MouseWheel::Up)
+    if (mouseWheel.mouse_wheel == MouseWheel::Up)
       scrollAreaBy({0, m_buttonAdvance * 3});
     else
       scrollAreaBy({0, -m_buttonAdvance * 3});

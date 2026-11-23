@@ -32,9 +32,9 @@ std::expected<std::size_t, StarException> buffer_seek_position(std::size_t curre
 
 Buffer::Buffer() : m_pos(0) { set_mode(IOMode::ReadWrite); }
 
-Buffer::Buffer(std::size_t initialSize)
+Buffer::Buffer(std::size_t initial_size)
   : Buffer() {
-  reset(initialSize);
+  reset(initial_size);
 }
 
 Buffer::Buffer(ByteArray b)
@@ -74,7 +74,7 @@ Buffer::Buffer(Buffer&& buffer)
 [[nodiscard]] std::expected<bool, StarException> Buffer::at_end() { return m_pos >= m_bytes.size(); }
 
 [[nodiscard]] std::expected<std::size_t, StarException> Buffer::read(std::span<char> data) {
-  auto result = doRead(m_pos, data);
+  auto result = do_read(m_pos, data);
   if (!result)
     return std::unexpected(std::move(result.error()));
   m_pos += *result;
@@ -82,25 +82,25 @@ Buffer::Buffer(Buffer&& buffer)
 }
 
 [[nodiscard]] std::expected<std::size_t, StarException> Buffer::write(std::span<char const> data) {
-  auto result = doWrite(m_pos, data);
+  auto result = do_write(m_pos, data);
   if (!result)
     return std::unexpected(std::move(result.error()));
   m_pos += *result;
   return *result;
 }
 
-[[nodiscard]] std::expected<std::size_t, StarException> Buffer::read_absolute(StreamOffset readPosition,
+[[nodiscard]] std::expected<std::size_t, StarException> Buffer::read_absolute(StreamOffset read_position,
                                                                               std::span<char> data) {
-  if (readPosition < 0 || !std::in_range<std::size_t>(readPosition))
+  if (read_position < 0 || !std::in_range<std::size_t>(read_position))
     return std::unexpected(IOException("Error, readPosition out of range"));
-  return doRead(static_cast<std::size_t>(readPosition), data);
+  return do_read(static_cast<std::size_t>(read_position), data);
 }
 
-[[nodiscard]] std::expected<std::size_t, StarException> Buffer::write_absolute(StreamOffset writePosition,
+[[nodiscard]] std::expected<std::size_t, StarException> Buffer::write_absolute(StreamOffset write_position,
                                                                                std::span<char const> data) {
-  if (writePosition < 0 || !std::in_range<std::size_t>(writePosition))
+  if (write_position < 0 || !std::in_range<std::size_t>(write_position))
     return std::unexpected(IOException("Error, writePosition out of range"));
-  return doWrite(static_cast<std::size_t>(writePosition), data);
+  return do_write(static_cast<std::size_t>(write_position), data);
 }
 
 [[nodiscard]] std::expected<void, StarException> Buffer::open(IOMode mode) {
@@ -113,7 +113,7 @@ Buffer::Buffer(Buffer&& buffer)
 }
 
 [[nodiscard]] std::expected<String, StarException> Buffer::device_name() const {
-  return Star::format("Buffer <{}>", (void*)this);
+  return Star::format("Buffer <{:#x}>", reinterpret_cast<std::uintptr_t>(this));
 }
 
 [[nodiscard]] std::expected<StreamOffset, StarException> Buffer::size() {
@@ -136,14 +136,6 @@ ByteArray Buffer::take_data() {
   return ret;
 }
 
-char* Buffer::ptr() {
-  return data().data();
-}
-
-char const* Buffer::ptr() const {
-  return m_bytes.data();
-}
-
 std::size_t Buffer::data_size() const { return m_bytes.size(); }
 
 void Buffer::reserve(std::size_t size) {
@@ -159,9 +151,9 @@ bool Buffer::empty() const {
   return m_bytes.empty();
 }
 
-void Buffer::reset(std::size_t newSize) {
+void Buffer::reset(std::size_t new_size) {
   m_pos = 0;
-  m_bytes.fill(newSize, 0);
+  m_bytes.fill(new_size, 0);
 }
 
 void Buffer::reset(ByteArray b) {
@@ -182,7 +174,7 @@ Buffer& Buffer::operator=(Buffer&& buffer) {
   return *this;
 }
 
-[[nodiscard]] std::expected<std::size_t, StarException> Buffer::doRead(std::size_t pos, std::span<char> data) {
+[[nodiscard]] std::expected<std::size_t, StarException> Buffer::do_read(std::size_t pos, std::span<char> data) {
   auto len = data.size();
   if (len == 0)
     return 0;
@@ -193,12 +185,12 @@ Buffer& Buffer::operator=(Buffer&& buffer) {
   if (pos >= m_bytes.size())
     return 0;
 
-  std::size_t l = std::min(m_bytes.size() - pos, len);
-  std::memcpy(data.data(), m_bytes.data() + pos, l);
-  return l;
+  auto source = m_bytes.span().subspan(pos, std::min(m_bytes.size() - pos, len));
+  std::ranges::copy(source, data.begin());
+  return source.size();
 }
 
-[[nodiscard]] std::expected<std::size_t, StarException> Buffer::doWrite(std::size_t pos, std::span<char const> data) {
+[[nodiscard]] std::expected<std::size_t, StarException> Buffer::do_write(std::size_t pos, std::span<char const> data) {
   auto len = data.size();
   if (len == 0)
     return 0;
@@ -215,8 +207,8 @@ Buffer& Buffer::operator=(Buffer&& buffer) {
 
 ExternalBuffer::ExternalBuffer() : m_pos(0), m_bytes() { set_mode(IOMode::Read); }
 
-ExternalBuffer::ExternalBuffer(std::span<char const> externalData) : ExternalBuffer() {
-  reset(externalData);
+ExternalBuffer::ExternalBuffer(std::span<char const> external_data) : ExternalBuffer() {
+  reset(external_data);
 }
 
 [[nodiscard]] std::expected<StreamOffset, StarException> ExternalBuffer::pos() {
@@ -234,7 +226,7 @@ ExternalBuffer::ExternalBuffer(std::span<char const> externalData) : ExternalBuf
 [[nodiscard]] std::expected<bool, StarException> ExternalBuffer::at_end() { return m_pos >= m_bytes.size(); }
 
 [[nodiscard]] std::expected<std::size_t, StarException> ExternalBuffer::read(std::span<char> data) {
-  auto result = doRead(m_pos, data);
+  auto result = do_read(m_pos, data);
   if (!result)
     return std::unexpected(std::move(result.error()));
   m_pos += *result;
@@ -245,11 +237,11 @@ ExternalBuffer::ExternalBuffer(std::span<char const> externalData) : ExternalBuf
   return std::unexpected(IOException("Error, ExternalBuffer is not writable"));
 }
 
-[[nodiscard]] std::expected<std::size_t, StarException> ExternalBuffer::read_absolute(StreamOffset readPosition,
+[[nodiscard]] std::expected<std::size_t, StarException> ExternalBuffer::read_absolute(StreamOffset read_position,
                                                                                       std::span<char> data) {
-  if (readPosition < 0 || !std::in_range<std::size_t>(readPosition))
+  if (read_position < 0 || !std::in_range<std::size_t>(read_position))
     return std::unexpected(IOException("Error, readPosition out of range"));
-  return doRead(static_cast<std::size_t>(readPosition), data);
+  return do_read(static_cast<std::size_t>(read_position), data);
 }
 
 [[nodiscard]] std::expected<std::size_t, StarException> ExternalBuffer::write_absolute(StreamOffset,
@@ -258,17 +250,13 @@ ExternalBuffer::ExternalBuffer(std::span<char const> externalData) : ExternalBuf
 }
 
 [[nodiscard]] std::expected<String, StarException> ExternalBuffer::device_name() const {
-  return Star::format("ExternalBuffer <{}>", (void*)this);
+  return Star::format("ExternalBuffer <{:#x}>", reinterpret_cast<std::uintptr_t>(this));
 }
 
 [[nodiscard]] std::expected<StreamOffset, StarException> ExternalBuffer::size() {
   if (!std::in_range<StreamOffset>(m_bytes.size()))
     return std::unexpected(IOException("Error, buffer size out of range"));
   return static_cast<StreamOffset>(m_bytes.size());
-}
-
-char const* ExternalBuffer::ptr() const {
-  return m_bytes.data();
 }
 
 std::size_t ExternalBuffer::data_size() const { return m_bytes.size(); }
@@ -281,9 +269,9 @@ ExternalBuffer::operator bool() const {
   return !m_bytes.empty();
 }
 
-void ExternalBuffer::reset(std::span<char const> externalData) {
+void ExternalBuffer::reset(std::span<char const> external_data) {
   m_pos = 0;
-  m_bytes = externalData;
+  m_bytes = external_data;
 }
 
 [[nodiscard]] std::expected<std::shared_ptr<IODevice>, StarException> Buffer::clone() {
@@ -297,7 +285,7 @@ void ExternalBuffer::reset(std::span<char const> externalData) {
   return std::make_shared<ExternalBuffer>(*this);
 }
 
-[[nodiscard]] std::expected<std::size_t, StarException> ExternalBuffer::doRead(std::size_t pos, std::span<char> data) {
+[[nodiscard]] std::expected<std::size_t, StarException> ExternalBuffer::do_read(std::size_t pos, std::span<char> data) {
   auto len = data.size();
   if (!is_readable())
     return std::unexpected(IOException("Error, read called on non-readable Buffer"));
@@ -307,9 +295,9 @@ void ExternalBuffer::reset(std::span<char const> externalData) {
   if (pos >= m_bytes.size())
     return 0;
 
-  std::size_t l = std::min(m_bytes.size() - pos, len);
-  std::memcpy(data.data(), m_bytes.data() + pos, l);
-  return l;
+  auto source = m_bytes.subspan(pos, std::min(m_bytes.size() - pos, len));
+  std::ranges::copy(source, data.begin());
+  return source.size();
 }
 
 }

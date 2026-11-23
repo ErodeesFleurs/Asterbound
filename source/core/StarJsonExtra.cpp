@@ -22,14 +22,14 @@ namespace Star {
 
 std::expected<std::size_t, StarException> json_to_size(Json const& v) {
   if (v.is_null())
-    return NPos;
+    return npos;
   if (!v.can_convert(Json::Type::Int))
     return std::unexpected(JsonException("Json not an int in jsonToSize"));
   return v.to_uint();
 }
 
 Json json_from_size(std::size_t s) {
-  return s == NPos ? Json() : Json(s);
+  return s == npos ? Json() : Json(s);
 }
 
 namespace {

@@ -29,14 +29,14 @@ Vec4B scalarHsv(Vec4B pixel, ImageOperation const& operation) {
   if (pixel[3] == 0)
     return pixel;
   if (std::holds_alternative<HueShiftImageOperation>(operation))
-    return Color::hue_shift_rgba(pixel, std::get<HueShiftImageOperation>(operation).hueShiftAmount);
+    return Color::hue_shift_rgba(pixel, std::get<HueShiftImageOperation>(operation).hue_shift_amount);
   Color color = Color::rgba(pixel);
   if (std::holds_alternative<SaturationShiftImageOperation>(operation))
     color.set_saturation(std::clamp(
-      color.saturation() + std::get<SaturationShiftImageOperation>(operation).saturationShiftAmount, 0.0f, 1.0f));
+      color.saturation() + std::get<SaturationShiftImageOperation>(operation).saturation_shift_amount, 0.0f, 1.0f));
   else
     color.set_value(
-      std::clamp(color.value() * std::get<BrightnessMultiplyImageOperation>(operation).brightnessMultiply, 0.0f, 1.0f));
+      std::clamp(color.value() * std::get<BrightnessMultiplyImageOperation>(operation).brightness_multiply, 0.0f, 1.0f));
   return color.to_rgba();
 }
 
@@ -45,13 +45,13 @@ void expectPixels(Image const& actual, Image const& expected) {
   EXPECT_EQ(actual.pixel_format(), expected.pixel_format());
   if (actual.size() != expected.size() || actual.pixel_format() != expected.pixel_format())
     return;
-  if (std::ranges::equal(actual.data(), expected.data()))
+  if (std::ranges::equal(actual.span(), expected.span()))
     return;
   ADD_FAILURE() << "image bytes differ";
   auto bytesPerPixel = actual.bytes_per_pixel();
   auto rowBytes = actual.width() * bytesPerPixel;
-  for (size_t offset = 0; offset < actual.data().size(); ++offset) {
-    EXPECT_EQ(actual.data()[offset], expected.data()[offset])
+  for (size_t offset = 0; offset < actual.span().size(); ++offset) {
+    EXPECT_EQ(actual.span()[offset], expected.span()[offset])
       << "pixel " << offset % rowBytes / bytesPerPixel << "," << offset / rowBytes << " channel byte "
       << offset % bytesPerPixel;
   }
@@ -161,12 +161,12 @@ TEST(ImageProcessingTest, ReplaceThresholdRunsTransparentKeysAndSingleStepChains
   Vec4B transparent(91, 47, 213, 0), hidden(1, 2, 3, 0);
   for (unsigned extraKeys : {0u, 200u}) {
     ColorReplaceImageOperation operation;
-    operation.colorReplaceMap[a] = b;
-    operation.colorReplaceMap[b] = c;
-    operation.colorReplaceMap[transparent] = hidden;
-    operation.colorReplaceMap[Vec4B(0, 0, 0, 0)] = hidden;
+    operation.color_replace_map[a] = b;
+    operation.color_replace_map[b] = c;
+    operation.color_replace_map[transparent] = hidden;
+    operation.color_replace_map[Vec4B(0, 0, 0, 0)] = hidden;
     for (unsigned i = 0; i < extraKeys; ++i)
-      operation.colorReplaceMap[Vec4B(i, 231, 17, 255)] = Vec4B(3, i, 71, 61);
+      operation.color_replace_map[Vec4B(i, 231, 17, 255)] = Vec4B(3, i, 71, 61);
     for (unsigned width : {0u, 1023u, 1024u, 2049u}) {
       for (auto format : {PixelFormat::RGBA32, PixelFormat::BGRA32, PixelFormat::RGB24, PixelFormat::BGR24}) {
         Image image(width, 1, format);
@@ -177,7 +177,7 @@ TEST(ImageProcessingTest, ReplaceThresholdRunsTransparentKeysAndSingleStepChains
                                          : format == PixelFormat::RGB24 ? PixelFormat::RGBA32
                                                                         : format);
         expected.for_each_pixel([&](unsigned, unsigned, Vec4B& pixel) {
-          if (auto replacement = operation.colorReplaceMap.maybe(pixel))
+          if (auto replacement = operation.color_replace_map.maybe(pixel))
             pixel = *replacement;
         });
         ASSERT_TRUE(process_image_operation(operation, image));
@@ -286,7 +286,7 @@ TEST(ImageProcessingTest, BlendErrorsPrecedeOverlapAndRetainReferenceOrder) {
   EXPECT_EQ(calls, 2u);
   EXPECT_NE(std::string_view(laterFailure.error().what()).find("later reference failure"), std::string_view::npos);
   expectPixels(image, unchanged);
-  operation.blendImages.clear();
+  operation.blend_images.clear();
   Image before = image;
   ASSERT_TRUE(process_image_operation(operation, image));
   expectPixels(image, before);
@@ -313,8 +313,8 @@ TEST(ImageProcessingTest, OptimizedDeterministicColorScaleCropChainsMatchSequent
         }
       }
       ColorReplaceImageOperation replace;
-      replace.colorReplaceMap[Vec4B(17, 31, 71, 0)] = Vec4B(61, 19, 13, 0);
-      replace.colorReplaceMap[Vec4B(61, 19, 13, 0)] = Vec4B(7, 11, 23, 127);
+      replace.color_replace_map[Vec4B(17, 31, 71, 0)] = Vec4B(61, 19, 13, 0);
+      replace.color_replace_map[Vec4B(61, 19, 13, 0)] = Vec4B(7, 11, 23, 127);
       List<ImageOperation> colors{HueShiftImageOperation{0.173f},
                                   SaturationShiftImageOperation{-0.31f},
                                   BrightnessMultiplyImageOperation{1.37f},
@@ -391,13 +391,13 @@ TEST(ImageProcessingTest, OptimizedInvalidCropsAndErrorsRetainSequentialPrefixMu
 TEST(ImageProcessingTest, DirtyReplaceSettledSubsetConsecutiveBlendsAndResetsMatchSequential) {
   Vec4B black(0, 0, 0, 0), red(255, 0, 0, 255), blue(0, 0, 255, 255), green(0, 255, 0, 255);
   ColorReplaceImageOperation settled, subset, expanded, overlap;
-  settled.colorReplaceMap[black] = red;
-  settled.colorReplaceMap[blue] = red;
-  subset.colorReplaceMap[black] = green;
-  expanded.colorReplaceMap[black] = green;
-  expanded.colorReplaceMap[red] = blue;
-  overlap.colorReplaceMap[black] = red;
-  overlap.colorReplaceMap[red] = blue;// Not settled: the second replace must still run globally.
+  settled.color_replace_map[black] = red;
+  settled.color_replace_map[blue] = red;
+  subset.color_replace_map[black] = green;
+  expanded.color_replace_map[black] = green;
+  expanded.color_replace_map[red] = blue;
+  overlap.color_replace_map[black] = red;
+  overlap.color_replace_map[red] = blue;// Not settled: the second replace must still run globally.
   Image zero = Image::filled(Vec2U(3, 2), black);
   Image one = Image::filled(Vec2U(4, 3), Vec4B(255, 255, 255, 255), PixelFormat::BGRA32);
   Image empty;
@@ -446,7 +446,7 @@ TEST(ImageProcessingTest, DirtyReplaceSettledSubsetConsecutiveBlendsAndResetsMat
 
 TEST(ImageProcessingTest, OptimizerDoesNotResolveReferencesPastEarlierErrors) {
   ColorReplaceImageOperation replace;
-  replace.colorReplaceMap[Vec4B(0, 0, 0, 0)] = Vec4B(17, 31, 71, 0);
+  replace.color_replace_map[Vec4B(0, 0, 0, 0)] = Vec4B(17, 31, 71, 0);
   Image reference = Image::filled(Vec2U(2, 2), Vec4B(0, 0, 0, 0));
   std::array<List<ImageOperation>, 5> chains{
     List<ImageOperation>{ErrorImageOperation{InjectedOperationFailure("first parse failure")},
@@ -499,7 +499,7 @@ TEST(ImageProcessingTest, OptimizerDoesNotResolveReferencesPastEarlierErrors) {
 
 TEST(ImageProcessingTest, OptimizedMissingCallbacksAndFailedDirtyBlendKeepPromotionAndPrefix) {
   ColorReplaceImageOperation replace;
-  replace.colorReplaceMap[Vec4B(0, 0, 0, 255)] = Vec4B(17, 31, 71, 113);
+  replace.color_replace_map[Vec4B(0, 0, 0, 255)] = Vec4B(17, 31, 71, 113);
   Image original = Image::filled(Vec2U(8, 5), Vec4B(0, 0, 0, 255), PixelFormat::RGB24);
   expectOptimizedOperations({BlendImageOperation{BlendImageOperation::Multiply, {"missing"}, Vec2I()},
                              ErrorImageOperation{InjectedOperationFailure("later parse failure")}},
@@ -515,7 +515,7 @@ TEST(ImageProcessingTest, OptimizedScaleCropPreservesFloatFormatScalarByteSetter
   for (auto format : {PixelFormat::RGB_F, PixelFormat::RGBA_F}) {
     Image original(3, 2, format);
     // Nonzero raw storage must not be copied by a byte-pixel nearest fast path.
-    std::fill(original.data().begin(), original.data().end(), std::uint8_t(0x3f));
+    std::fill(original.span().begin(), original.span().end(), std::uint8_t(0x3f));
     for (auto mode : {ScaleImageOperation::Nearest, ScaleImageOperation::Bilinear}) {
       expectOptimizedOperations({ScaleImageOperation{mode, Vec2F(2, 2)}, CropImageOperation{RectI(1, 1, 4, 3)}},
                                 original);
@@ -528,7 +528,7 @@ TEST(ImageProcessingTest, OptimizedScaleCropPreservesFloatFormatScalarByteSetter
 
 TEST(ImageProcessingTest, DirtyBlendRetainsPerOperationCallbackValueSemantics) {
   ColorReplaceImageOperation replace;
-  replace.colorReplaceMap[Vec4B(0, 0, 0, 0)] = Vec4B(17, 31, 71, 0);
+  replace.color_replace_map[Vec4B(0, 0, 0, 0)] = Vec4B(17, 31, 71, 0);
   Image reference = Image::filled(Vec2U(2, 2), Vec4B(0, 0, 0, 0));
   ImageReferenceCallback callback =
     [calls = 0u, &reference](

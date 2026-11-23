@@ -21,7 +21,7 @@ std::span<NetElementGroup::GroupEntry const> NetElementGroup::visible_bounds(Net
 }
 
 std::expected<void, StarException> NetElementGroup::add_net_element(NetElement& element, bool propagate_interpolation) {
-  if constexpr (Star::DebugEnabled) {
+  if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((!m_elements.any([&element](GroupEntry const& p) { return &p.first.get() == &element; })));
   }
 

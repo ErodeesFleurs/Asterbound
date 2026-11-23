@@ -294,7 +294,7 @@ std::expected<std::shared_ptr<WorldServer>, StarException> WorldServer::create(R
 
 WorldServer::~WorldServer() {
   if (auto result = close(); !result) {
-    if (auto written = Star::print(stderr, "Error closing world '{}' during destruction: {}\n", m_worldId.utf8_data(), result.error().what()); !written)
+    if (auto written = Star::print(*stderr, "Error closing world '{}' during destruction: {}\n", m_worldId.utf8().c_str(), result.error().what()); !written)
       std::_Exit(1);
   }
 }
@@ -1146,7 +1146,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       auto result102 = m_entityMap->forAllEntities([&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
         EntityId entityId = entity->entityId();
         if (connectionForEntity(entityId) == clientId) {
-          if constexpr (Star::DebugEnabled) {
+          if constexpr (Star::debug_enabled) {
             Star::star_assert_failed((entity->isSlave()));
           }
           auto result101 = entity->read_net_state(entityUpdateSet->deltas.value(entityId), interpolationLeadTime, clientInfo->clientState->netCompatibilityRules());
@@ -1241,7 +1241,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
         auto assets = world.root().assets();
         if (!assets)
           return std::unexpected(std::move(assets.error()));
-        String checkPath = AssetPath::split(path).m_base_path;
+        String checkPath = AssetPath::split(path).base_path;
         if (checkPath.empty())
           return false;
         return (*assets)->asset_exists(checkPath);
@@ -2011,7 +2011,7 @@ std::expected<void, StarException> WorldServer::forEachCollisionBlock(RectI cons
       if (!result209)
         return std::unexpected(std::move(result209.error()));
     } else {
-      if constexpr (Star::DebugEnabled) {
+      if constexpr (Star::debug_enabled) {
         Star::star_assert_failed((!tile.collisionCacheDirty));
       }
       for (auto const& block : tile.collisionCache) {

@@ -16,7 +16,7 @@ std::expected<bool, StarException> LockFile::lock(std::int64_t timeout_ms) {
   RetryWindow retry(timeout_ms);
   int fd;
   do {
-    fd = ::open(m_filename.utf8_data(), O_RDONLY | O_CREAT | O_CLOEXEC, 0644);
+    fd = ::open(m_filename.utf8().c_str(), O_RDONLY | O_CREAT | O_CLOEXEC, 0644);
   } while (fd < 0 && errno == EINTR && timeout_ms < 0);
   if (fd < 0)
     return std::unexpected(StarException::format("Could not open lock file {}, {}", m_filename, std::strerror(errno)));

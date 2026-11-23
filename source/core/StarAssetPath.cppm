@@ -25,7 +25,7 @@ struct AssetPath {
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, AssetPath& path);
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, AssetPath const& path);
   friend void write_text(TextBuffer& buffer, AssetPath const& rhs);
-  friend struct hash<AssetPath>;
+  friend struct ValueHash<AssetPath>;
   static AssetPath split(String const& path);
   static String join(AssetPath const& path);
   // Embedded payloads are byte-sensitive, not filesystem assets.
@@ -72,9 +72,9 @@ struct AssetPath {
   AssetPath(String const& path);
   AssetPath(String&& base_path, std::optional<String>&& sub_path, DirectivesGroup&& directives) noexcept;
   AssetPath(String const& base_path, std::optional<String> const& sub_path, DirectivesGroup const& directives);
-  String m_base_path;
-  std::optional<String> m_sub_path;
-  DirectivesGroup m_directives;
+  String base_path;
+  std::optional<String> sub_path;
+  DirectivesGroup directives;
 
   bool operator==(AssetPath const& rhs) const;
 };
@@ -85,7 +85,7 @@ struct AssetPath {
 void write_text(TextBuffer& buffer, AssetPath const& rhs);
 
 template <>
-struct hash<AssetPath> {
+struct ValueHash<AssetPath> {
   std::size_t operator()(AssetPath const& s) const;
 };
 
@@ -95,7 +95,7 @@ export module star.asset_path;
 
 export namespace Star {
   template <>
-  struct hash<AssetPath>;
+  struct ValueHash<AssetPath>;
 }
 
 

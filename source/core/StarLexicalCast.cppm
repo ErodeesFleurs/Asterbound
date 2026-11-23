@@ -99,8 +99,8 @@ template <lexical_detail::owning_lexical_target Type>
   return lexical_cast<Type>(s.utf8());
 }
 
-template <lexical_detail::lexical_target Type, std::size_t N>
-[[nodiscard]] bool try_lexical_cast(Type& result, char const (&text)[N]) {
+template <lexical_detail::lexical_target Type, std::size_t extent>
+[[nodiscard]] bool try_lexical_cast(Type& result, char const (&text)[extent]) {
   return try_lexical_cast<Type>(result, std::string_view(text));
 }
 
@@ -109,8 +109,8 @@ template <lexical_detail::lexical_target Type>
   return try_lexical_cast<Type>(result, std::string_view(text));
 }
 
-template <lexical_detail::owning_lexical_target Type, std::size_t N>
-[[nodiscard]] std::optional<Type> maybe_lexical_cast(char const (&text)[N]) {
+template <lexical_detail::owning_lexical_target Type, std::size_t extent>
+[[nodiscard]] std::optional<Type> maybe_lexical_cast(char const (&text)[extent]) {
   return maybe_lexical_cast<Type>(std::string_view(text));
 }
 
@@ -119,8 +119,8 @@ template <lexical_detail::owning_lexical_target Type>
   return maybe_lexical_cast<Type>(std::string_view(text));
 }
 
-template <lexical_detail::owning_lexical_target Type, std::size_t N>
-[[nodiscard]] std::expected<Type, StarException> lexical_cast(char const (&text)[N]) {
+template <lexical_detail::owning_lexical_target Type, std::size_t extent>
+[[nodiscard]] std::expected<Type, StarException> lexical_cast(char const (&text)[extent]) {
   return lexical_cast<Type>(std::string_view(text));
 }
 

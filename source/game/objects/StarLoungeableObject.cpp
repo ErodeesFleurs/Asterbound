@@ -188,7 +188,7 @@ std::expected<void, StarException> LoungeableObject::setOrientationIndex(std::si
   auto operation1 = Object::setOrientationIndex(orientationIndex);
   if (!operation1)
     return std::unexpected(std::move(operation1.error()));
-  if (orientationIndex != NPos) {
+  if (orientationIndex != npos) {
     auto positionConfigResult = configValue("sitPosition");
     if (!positionConfigResult)
       return std::unexpected(std::move(positionConfigResult.error()));

@@ -52,15 +52,15 @@ struct OutputProxy {
           PrintFunction(std::forward<Printer>(printer));
         }
   OutputProxy(Printer&& printer)
-    : m_print(std::forward<Printer>(printer)) {}
+    : print(std::forward<Printer>(printer)) {}
 
 private:
   friend void write_text(TextBuffer& buffer, OutputProxy const& proxy);
-  PrintFunction m_print;
+  PrintFunction print;
 };
 
 inline void write_text(TextBuffer& buffer, OutputProxy const& proxy) {
-  proxy.m_print(buffer);
+  proxy.print(buffer);
 }
 
 }

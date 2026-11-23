@@ -22,7 +22,7 @@ namespace {
 int open_descriptor(String const& path, int flags) {
   int fd;
   do {
-    fd = ::open(path.utf8_data(), flags, 0666);
+    fd = ::open(path.utf8().c_str(), flags, 0666);
   } while (fd < 0 && errno == EINTR);
   return fd;
 }
@@ -35,7 +35,7 @@ std::expected<std::optional<struct stat>, StarException> path_status(String cons
   struct stat status;
   int result;
   do {
-    result = follow_links ? ::stat(path.utf8_data(), &status) : ::lstat(path.utf8_data(), &status);
+    result = follow_links ? ::stat(path.utf8().c_str(), &status) : ::lstat(path.utf8().c_str(), &status);
   } while (result < 0 && errno == EINTR);
   if (result == 0)
     return status;
@@ -61,7 +61,7 @@ String File::convert_dir_separators(String const& path) {
 std::expected<List<std::pair<String, bool>>, StarException> File::directory_entries(String const& dir_name,
                                                                                     bool skip_dots) {
   std::error_code error;
-  std::filesystem::directory_iterator entry(std::filesystem::path(dir_name.utf8_data()), error);
+  std::filesystem::directory_iterator entry(std::filesystem::path(dir_name.utf8().c_str()), error);
   if (error)
     return std::unexpected(IOException::format("directory_entries failed on dir '{}': {}", dir_name, error.message()));
   List<std::pair<String, bool>> files;
@@ -97,7 +97,7 @@ String File::dir_name(String const& filename) {
 }
 
 String File::relative_to(String const& relative_to_path, String const& path) {
-  if (path.utf8_size() && path.utf8_data()[0] == '/')
+  if (path.utf8_size() && path.utf8()[0] == '/')
     return path;
   auto bytes = relative_to_path.utf8();
   while (!bytes.empty() && bytes.back() == '/')
@@ -109,7 +109,7 @@ String File::relative_to(String const& relative_to_path, String const& path) {
 
 std::expected<String, StarException> File::full_path(String const& filename) {
   std::error_code error;
-  auto path = std::filesystem::canonical(std::filesystem::path(filename.utf8_data()), error);
+  auto path = std::filesystem::canonical(std::filesystem::path(filename.utf8().c_str()), error);
   if (error)
     return std::unexpected(IOException::format("could not resolve file '{}': {}", filename, error.message()));
   return String(path.native());
@@ -142,11 +142,11 @@ std::expected<std::shared_ptr<File>, StarException> File::temporary_file(RandomS
 std::expected<std::shared_ptr<File>, StarException> File::ephemeral_file(RandomService&) {
   auto file = std::make_shared<File>();
   auto filename_template = relative_to(P_tmpdir, "starbound.tmpfile.XXXXXXXX");
-  auto path = ByteArray::from_string_with_null(filename_template.utf8_data());
-  NativeFileHandle handle(::mkstemp(path.data()));
+  auto path = ByteArray::from_string_with_null(filename_template.utf8().c_str());
+  NativeFileHandle handle(::mkstemp(path.span().data()));
   if (!handle)
     return std::unexpected(IOException::format("tmpfile error: {}", std::strerror(errno)));
-  if (::unlink(path.data()) < 0)
+  if (::unlink(path.span().data()) < 0)
     return std::unexpected(IOException::format("Could not remove mkstemp file when creating ephemeralFile: {}",
                                                std::strerror(errno)));
   file->m_file.reset(handle.release());
@@ -159,7 +159,7 @@ std::expected<String, StarException> File::temporary_directory(RandomService& ra
     auto directory = relative_to(P_tmpdir, Star::format("starbound.tmpdir.{}", hex_encode(random.random_bytes(16))));
     int result;
     do {
-      result = ::mkdir(directory.utf8_data(), 0777);
+      result = ::mkdir(directory.utf8().c_str(), 0777);
     } while (result < 0 && errno == EINTR);
     if (result == 0)
       return directory;
@@ -207,7 +207,7 @@ std::expected<StreamOffset, StarException> File::file_size(String const& path) {
   auto closed = handle.close();
   if (!size) {
     if (!closed) {
-      if (auto written = Star::print(stderr, "Error closing file '{}' after failed metadata query: {}\n", path.utf8_data(),
+      if (auto written = Star::print(*stderr, "Error closing file '{}' after failed metadata query: {}\n", path.utf8().c_str(),
                    closed.error().what()); !written)
         return std::unexpected(std::move(size.error()).with_context(
             Star::format("Could not report close failure ({}): {}", closed.error().what(), written.error().what())));
@@ -220,7 +220,7 @@ std::expected<StreamOffset, StarException> File::file_size(String const& path) {
 }
 
 std::expected<void, StarException> File::rename(String const& source, String const& target) {
-  if (std::rename(source.utf8_data(), target.utf8_data()) < 0)
+  if (std::rename(source.utf8().c_str(), target.utf8().c_str()) < 0)
     return std::unexpected(IOException::format("rename error: {}", std::strerror(errno)));
   return {};
 }
@@ -242,7 +242,7 @@ std::expected<void, StarException> File::sync_directory(String const& directory)
 File::NativeFileHandle::~NativeFileHandle() noexcept {
   if (*this && ::close(release()) < 0) {
     auto error = errno;
-    if (!Star::print(stderr, "Error closing file after failed acquisition: {}\n", std::strerror(error)))
+    if (!Star::print(*stderr, "Error closing file after failed acquisition: {}\n", std::strerror(error)))
       std::_Exit(1);
   }
 }

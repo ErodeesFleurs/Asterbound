@@ -6,7 +6,7 @@ import star.hash;
 
 namespace Star {
 
-template <typename Key, typename Hash = hash<Key>, typename Equals = std::equal_to<Key>, typename Allocator = std::allocator<Key>>
+template <typename Key, typename Hash = ValueHash<Key>, typename Equals = std::equal_to<Key>, typename Allocator = std::allocator<Key>>
 class FlatHashSet {
 public:
   using key_type = Key;
@@ -28,7 +28,10 @@ private:
   using Table = FlatHashTable<Key, Key, GetKey, Hash, Equals, Allocator>;
 
 public:
-  struct const_iterator {
+  struct ConstIterator;
+  using const_iterator = ConstIterator;
+
+  struct ConstIterator {
     using iterator_category = std::forward_iterator_tag;
     using iterator_concept = std::forward_iterator_tag;
     using value_type = Key;

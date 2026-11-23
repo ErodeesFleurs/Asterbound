@@ -25,25 +25,25 @@ concept multi_table_ordered_range = requires(typename Range::value_type const& l
 // n-variate data.  Access times involve a binary search over the domain of
 // each dimension, so is O(log(n)*m) where n is the size of the largest
 // dimension, and m is the table_rank.
-template <typename ElementT, typename PositionT, std::size_t RankN>
-  requires(RankN > 0)
+template <typename ElementT, typename PositionT, std::size_t table_rank>
+  requires(table_rank > 0)
 class MultiTable {
 public:
   using Element = ElementT;
   using Position = PositionT;
-  static std::size_t const Rank = RankN;
+  static constexpr std::size_t rank = table_rank;
 
-  using MultiArray = Star::MultiArray<ElementT, RankN>;
+  using MultiArray = Star::MultiArray<ElementT, table_rank>;
 
   using Interpolator2 = Star::MultiArrayInterpolator2<MultiArray, Position>;
   using Interpolator4 = Star::MultiArrayInterpolator4<MultiArray, Position>;
   using PiecewiseInterpolator = Star::MultiArrayPiecewiseInterpolator<MultiArray, Position>;
 
-  using PositionArray = Array<Position, Rank>;
+  using PositionArray = Array<Position, rank>;
   using SizeArray = typename MultiArray::SizeArray;
   using IndexArray = typename MultiArray::IndexArray;
   using Range = List<Position>;
-  using RangeArray = Array<Range, Rank>;
+  using RangeArray = Array<Range, rank>;
 
   MultiTable() = default;
   MultiTable(MultiTable const&) = default;
@@ -71,7 +71,7 @@ public:
           target = std::move(source);
         })
   {
-    if (dim >= Rank)
+    if (dim >= rank)
       return std::unexpected(MathException("MultiTable range dimension is out of bounds"));
     if (!std::is_sorted(range.begin(), range.end()))
       return std::unexpected(MathException("MultiTable ranges must be nondecreasing"));
@@ -92,7 +92,7 @@ public:
         })
   {
     SizeArray sizes;
-    for (std::size_t dim = 0; dim < Rank; ++dim) {
+    for (std::size_t dim = 0; dim < rank; ++dim) {
       if (!std::is_sorted(ranges[dim].begin(), ranges[dim].end()))
         return std::unexpected(MathException("MultiTable ranges must be nondecreasing"));
       sizes[dim] = ranges[dim].size();
@@ -112,7 +112,7 @@ public:
           target_data = std::move(source_data);
         })
   {
-    for (std::size_t dim = 0; dim < Rank; ++dim) {
+    for (std::size_t dim = 0; dim < rank; ++dim) {
       if (!std::is_sorted(ranges[dim].begin(), ranges[dim].end()))
         return std::unexpected(MathException("MultiTable ranges must be nondecreasing"));
       if (ranges[dim].size() != data.extent(dim))
@@ -197,14 +197,14 @@ public:
       piecewise.interpolate(array, coord);
     }
   {
-    for (std::size_t dim = 0; dim < Rank; ++dim) {
+    for (std::size_t dim = 0; dim < rank; ++dim) {
       if (m_ranges[dim].empty() || m_array.extent(dim) == 0)
         return std::unexpected(MathException("Cannot interpolate a MultiTable with an empty axis"));
     }
 
     if (m_interpolation_mode == InterpolationMode::HalfStep) {
-      PiecewiseInterpolator piecewiseInterpolator(StepWeightOperator<Position>(), m_bound_mode);
-      return piecewiseInterpolator.interpolate(m_array, to_index_space(coord));
+      PiecewiseInterpolator piecewise_interpolator(StepWeightOperator<Position>(), m_bound_mode);
+      return piecewise_interpolator.interpolate(m_array, to_index_space(coord));
 
     } else if (m_interpolation_mode == InterpolationMode::Linear) {
       Interpolator2 interpolator2(LinearWeightOperator<Position>(), m_bound_mode);
@@ -236,7 +236,7 @@ public:
   void eval(OpType&& op) {
     m_array.for_each([&](IndexArray const& index, auto&& element) {
       PositionArray point;
-      for (std::size_t dim = 0; dim < Rank; ++dim)
+      for (std::size_t dim = 0; dim < rank; ++dim)
         point[dim] = m_ranges[dim][index[dim]];
       element = std::invoke(op, point);
     });
@@ -244,10 +244,10 @@ public:
 
 private:
   PositionArray to_index_space(PositionArray const& coord) const {
-    PositionArray indexCoord;
-    for (std::size_t i = 0; i < Rank; ++i)
-      indexCoord[i] = inverse_linear_interpolate_lower(m_ranges[i].begin(), m_ranges[i].end(), coord[i]);
-    return indexCoord;
+    PositionArray index_coord;
+    for (std::size_t i = 0; i < rank; ++i)
+      index_coord[i] = inverse_linear_interpolate_lower(m_ranges[i].begin(), m_ranges[i].end(), coord[i]);
+    return index_coord;
   }
 
 

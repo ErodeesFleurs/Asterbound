@@ -11,7 +11,7 @@ export module star.io_device_callbacks;
 export namespace Star {
 
 // Native Vorbis callbacks return native sentinels. The owning C++ boundary must
-// consume takeError() after each codec call before interpreting codec statuses.
+// consume take_error() after each codec call before interpreting codec statuses.
 // Borrows its device; device and adapter addresses stay fixed until codec teardown.
 class IODeviceCallbacks {
 public:
@@ -21,14 +21,17 @@ public:
   IODeviceCallbacks(IODeviceCallbacks&&) = default;
   IODeviceCallbacks& operator=(IODeviceCallbacks&&) = default;
 
-  [[nodiscard]] std::optional<StarException> takeError();
+  [[nodiscard]] std::optional<StarException> take_error();
 
-  static std::size_t readFunc(void* ptr, std::size_t size, std::size_t nmemb, void* datasource);
-  static int seekFunc(void* datasource, ogg_int64_t offset, int whence);
-  static long int tellFunc(void* datasource);
-  void setupOggCallbacks(ov_callbacks& callbacks);
+  [[nodiscard]] static constexpr ov_callbacks callbacks() noexcept {
+    return {.read_func = read, .seek_func = seek, .close_func = nullptr, .tell_func = tell};
+  }
 
 private:
+  static std::size_t read(void* destination, std::size_t size, std::size_t count, void* source);
+  static int seek(void* source, ogg_int64_t offset, int whence);
+  static long tell(void* source);
+
   explicit IODeviceCallbacks(IODevice& device) : m_device(device) {}
   std::reference_wrapper<IODevice> m_device;
   std::optional<StarException> m_error;
@@ -46,29 +49,27 @@ std::expected<IODeviceCallbacks, StarException> IODeviceCallbacks::create(IODevi
   return IODeviceCallbacks(device);
 }
 
-std::optional<StarException> IODeviceCallbacks::takeError() {
-  auto error = std::move(m_error);
-  m_error.reset();
-  return error;
+std::optional<StarException> IODeviceCallbacks::take_error() {
+  return std::exchange(m_error, std::nullopt);
 }
 
-std::size_t IODeviceCallbacks::readFunc(void* ptr, std::size_t size, std::size_t nmemb, void* datasource) {
-  auto& state = *static_cast<IODeviceCallbacks*>(datasource);
-  if (state.m_error || !size || !nmemb) return 0;
-  if (nmemb > std::numeric_limits<std::size_t>::max() / size) {
+std::size_t IODeviceCallbacks::read(void* destination, std::size_t size, std::size_t count, void* source) {
+  auto& state = *static_cast<IODeviceCallbacks*>(source);
+  if (state.m_error || !size || !count) return 0;
+  if (count > std::numeric_limits<std::size_t>::max() / size) {
     state.m_error = IOException("Vorbis read request exceeds addressable size");
     return 0;
   }
-  auto count = state.m_device.get().read({static_cast<char*>(ptr), size * nmemb});
-  if (!count) {
-    state.m_error = std::move(count.error());
+  auto read = state.m_device.get().read({static_cast<char*>(destination), size * count});
+  if (!read) {
+    state.m_error = std::move(read.error());
     return 0;
   }
-  return *count / size;
+  return *read / size;
 }
 
-int IODeviceCallbacks::seekFunc(void* datasource, ogg_int64_t offset, int whence) {
-  auto& state = *static_cast<IODeviceCallbacks*>(datasource);
+int IODeviceCallbacks::seek(void* source, ogg_int64_t offset, int whence) {
+  auto& state = *static_cast<IODeviceCallbacks*>(source);
   if (state.m_error) return -1;
   if (whence < IOSeek::Absolute || whence > IOSeek::End) {
     state.m_error = IOException("Invalid Vorbis seek origin");
@@ -82,8 +83,8 @@ int IODeviceCallbacks::seekFunc(void* datasource, ogg_int64_t offset, int whence
   return 0;
 }
 
-long int IODeviceCallbacks::tellFunc(void* datasource) {
-  auto& state = *static_cast<IODeviceCallbacks*>(datasource);
+long IODeviceCallbacks::tell(void* source) {
+  auto& state = *static_cast<IODeviceCallbacks*>(source);
   if (state.m_error) return -1;
   auto position = state.m_device.get().pos();
   if (!position) {
@@ -95,13 +96,6 @@ long int IODeviceCallbacks::tellFunc(void* datasource) {
     return -1;
   }
   return static_cast<long>(*position);
-}
-
-void IODeviceCallbacks::setupOggCallbacks(ov_callbacks& callbacks) {
-  callbacks.read_func = readFunc;
-  callbacks.seek_func = seekFunc;
-  callbacks.tell_func = tellFunc;
-  callbacks.close_func = nullptr;
 }
 
 }

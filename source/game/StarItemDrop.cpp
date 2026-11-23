@@ -585,7 +585,7 @@ std::expected<void, StarException> ItemDrop::update(float dt, std::uint64_t) {
     if (!takeable)
       return std::unexpected(std::move(takeable.error()));
     root().spatialLogger().log_poly("world", m_movementController->collisionBody(),
-                                    (*takeable ? Color::Green : Color::Red).to_rgba());
+                                    (*takeable ? Color::palette_green : Color::palette_red).to_rgba());
   }
   return {};
 }
@@ -615,7 +615,7 @@ std::expected<void, StarException> ItemDrop::render(RenderCallback& renderCallba
       beamColor = Color::rgb(255, 255, 81);
       break;
     default:
-      beamColor = Color::White;
+      beamColor = Color::palette_white;
     }
 
     beamColor.set_alpha_f(0.8f);

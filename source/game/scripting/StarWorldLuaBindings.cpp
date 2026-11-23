@@ -3986,7 +3986,7 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
 
     auto materialId = world.material(Vec2I::floor(position), layer);
     if (materialId == NullMaterialId) {
-      return LuaNil;
+      return lua_nil;
     } else if (materialId == EmptyMaterialId) {
       return false;
     } else {
@@ -4025,7 +4025,7 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
       return engine.create_string(name);
     }
 
-    return LuaNil;
+    return lua_nil;
   }
 
   std::expected<float, StarException> WorldEnvironmentCallbacks::materialHueShift(World& world, Vec2F const& position, String const& layerName) {
@@ -4143,7 +4143,7 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
 
     std::string layerName = arg2.utf8();
     auto split = layerName.find_first_of('+');
-    if (split != NPos) {
+    if (split != npos) {
       auto overrideName = layerName.substr(split + 1);
       layerName = layerName.substr(0, split);
       if (overrideName == "empty" || overrideName == "none")
@@ -4194,7 +4194,7 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
 
     std::string layerName = layer.utf8();
     auto split = layerName.find_first_of('+');
-    if (split != NPos) {
+    if (split != npos) {
       auto overrideName = layerName.substr(split + 1);
       layerName = layerName.substr(0, split);
       if (overrideName == "empty" || overrideName == "none")

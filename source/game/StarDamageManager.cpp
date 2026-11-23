@@ -120,10 +120,10 @@ std::expected<void, StarException> DamageManager::update(float dt) {
 
       if (std::holds_alternative<PolyF>(damageSource.damageArea))
         self.m_world.get().root().spatialLogger().log_poly("world", std::get<PolyF>(damageSource.damageArea),
-                                                           Color::Orange.to_rgba());
+                                                           Color::palette_orange.to_rgba());
       else if (std::holds_alternative<Line2F>(damageSource.damageArea))
         self.m_world.get().root().spatialLogger().log_line("world", std::get<Line2F>(damageSource.damageArea),
-                                                           Color::Orange.to_rgba());
+                                                           Color::palette_orange.to_rgba());
 
       auto hits = self.queryHit(damageSource, causingEntity->entityId());
       if (!hits) return std::unexpected(std::move(hits.error()));
@@ -181,7 +181,7 @@ std::expected<void, StarException> DamageManager::pushRemoteHitRequest(RemoteHit
     return std::unexpected(StarException("RemoteDamageRequest routed to wrong DamageManager"));
 
   if (auto causingEntity = m_world.get().entity(remoteHitRequest.causingEntityId)) {
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((causingEntity->isMaster()));
     }
     return causingEntity->hitOther(remoteHitRequest.targetEntityId, remoteHitRequest.damageRequest);
@@ -194,7 +194,7 @@ std::expected<void, StarException> DamageManager::pushRemoteDamageRequest(Remote
     return std::unexpected(StarException("RemoteDamageRequest routed to wrong DamageManager"));
 
   if (auto targetEntity = m_world.get().entity(remoteDamageRequest.targetEntityId)) {
-    if constexpr (Star::DebugEnabled) {
+    if constexpr (Star::debug_enabled) {
       Star::star_assert_failed((targetEntity->isMaster()));
     }
     auto notifications = targetEntity->applyDamage(remoteDamageRequest.damageRequest);

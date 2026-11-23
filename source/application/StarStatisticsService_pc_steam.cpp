@@ -58,13 +58,13 @@ std::expected<bool, StarException> SteamStatisticsService::setStat(String const&
     auto converted = value.to_int();
     if (!converted)
       return std::unexpected(std::move(converted.error()));
-    return SteamAPI_ISteamUserStats_SetStatInt32(SteamAPI_SteamUserStats(), name.utf8_data(), (std::int32_t)*converted);
+    return SteamAPI_ISteamUserStats_SetStatInt32(SteamAPI_SteamUserStats(), name.utf8().c_str(), (std::int32_t)*converted);
   }
   if (type == "float") {
     auto converted = value.to_float();
     if (!converted)
       return std::unexpected(std::move(converted.error()));
-    return SteamAPI_ISteamUserStats_SetStatFloat(SteamAPI_SteamUserStats(), name.utf8_data(), *converted);
+    return SteamAPI_ISteamUserStats_SetStatFloat(SteamAPI_SteamUserStats(), name.utf8().c_str(), *converted);
   }
   return false;
 }
@@ -72,13 +72,13 @@ std::expected<bool, StarException> SteamStatisticsService::setStat(String const&
 Json SteamStatisticsService::getStat(String const& name, String const& type, Json def) const {
   if (type == "int") {
     std::int32_t intValue = 0;
-    if (SteamAPI_ISteamUserStats_GetStatInt32(SteamAPI_SteamUserStats(), name.utf8_data(), &intValue))
+    if (SteamAPI_ISteamUserStats_GetStatInt32(SteamAPI_SteamUserStats(), name.utf8().c_str(), &intValue))
       return Json(intValue);
   }
 
   if (type == "float") {
     float floatValue = 0.0f;
-    if (SteamAPI_ISteamUserStats_GetStatFloat(SteamAPI_SteamUserStats(), name.utf8_data(), &floatValue))
+    if (SteamAPI_ISteamUserStats_GetStatFloat(SteamAPI_SteamUserStats(), name.utf8().c_str(), &floatValue))
       return Json(floatValue);
   }
 
@@ -91,7 +91,7 @@ bool SteamStatisticsService::reportEvent(String const&, Json const&) {
 }
 
 std::expected<bool, StarException> SteamStatisticsService::unlockAchievement(String const& name) {
-  if (!SteamAPI_ISteamUserStats_SetAchievement(SteamAPI_SteamUserStats(), name.utf8_data())) {
+  if (!SteamAPI_ISteamUserStats_SetAchievement(SteamAPI_SteamUserStats(), name.utf8().c_str())) {
     auto logged = m_state->logger.error("Cannot set Steam achievement {}", name);
     if (!logged)
       return std::unexpected(std::move(logged.error()));
@@ -106,7 +106,7 @@ StringSet SteamStatisticsService::achievementsUnlocked() const {
     String achievement(std::string_view(SteamAPI_ISteamUserStats_GetAchievementName(SteamAPI_SteamUserStats(), i)));
 
     bool unlocked = false;
-    if (SteamAPI_ISteamUserStats_GetAchievement(SteamAPI_SteamUserStats(), achievement.utf8_data(), &unlocked) && unlocked) {
+    if (SteamAPI_ISteamUserStats_GetAchievement(SteamAPI_SteamUserStats(), achievement.utf8().c_str(), &unlocked) && unlocked) {
       achievements.add(achievement);
     }
   }

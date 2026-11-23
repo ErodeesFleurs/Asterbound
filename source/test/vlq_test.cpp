@@ -46,8 +46,8 @@ TEST(VlqTest, BoundedFailureRetainsBothDestinations) {
     auto bytes = std::span(input).first(length);
     std::uint64_t u = 97;
     std::int64_t i = -97;
-    EXPECT_EQ(read_vlq_u(u, bytes), NPos);
-    EXPECT_EQ(read_vlq_i(i, bytes), NPos);
+    EXPECT_EQ(read_vlq_u(u, bytes), npos);
+    EXPECT_EQ(read_vlq_i(i, bytes), npos);
     EXPECT_EQ(u, 97u);
     EXPECT_EQ(i, -97);
   }
@@ -170,14 +170,14 @@ TEST(VlqTest, StreamSignedExtremesAndNposUseContiguousBaseDispatch) {
   for (auto value : {std::numeric_limits<std::int64_t>::min(), std::int64_t(-1), std::int64_t(0),
                      std::numeric_limits<std::int64_t>::max()})
     ASSERT_TRUE(writer.write_vlq_i(value));
-  ASSERT_TRUE(writer.write_vlq_s(NPos));
+  ASSERT_TRUE(writer.write_vlq_s(npos));
   ASSERT_TRUE(writer.write_vlq_s(0));
   DataStreamReader reader(writer.span());
   DataStream& stream = reader;
   for (auto value : {std::numeric_limits<std::int64_t>::min(), std::int64_t(-1), std::int64_t(0),
                      std::numeric_limits<std::int64_t>::max()})
     EXPECT_EQ(stream.read_vlq_i(), value);
-  EXPECT_EQ(stream.read_vlq_s(), NPos);
+  EXPECT_EQ(stream.read_vlq_s(), npos);
   EXPECT_EQ(stream.read_vlq_s(), 0u);
 }
 

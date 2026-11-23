@@ -21,9 +21,9 @@ class StringView;
 class String;
 
 // Character arrays use C-text semantics, but need not contain a terminator.
-template <std::size_t N>
-constexpr std::string_view bounded_array_text(char const (&text)[N]) noexcept {
-  std::string_view bytes(text, N);
+template <std::size_t extent>
+constexpr std::string_view bounded_array_text(char const (&text)[extent]) noexcept {
+  std::string_view bytes(text, extent);
   return bytes.substr(0, bytes.find('\0'));
 }
 
@@ -119,8 +119,8 @@ public:
   String(String&& s) noexcept;
 
   // These assume utf8 input
-  template <std::size_t N>
-  String(char const (&s)[N]) : m_string(bounded_array_text(s)) {}
+  template <std::size_t extent>
+  String(char const (&s)[extent]) : m_string(bounded_array_text(s)) {}
   String(std::string const& s);
   String(std::string&& s) noexcept;
 
@@ -137,9 +137,6 @@ public:
   std::string utf8() const &&;
   std::string take_utf8();
   ByteArray utf8_bytes() const;
-  // Pointer to internal utf8 data, null-terminated.
-  char const* utf8_data() const &;
-  char const* utf8_data() const && = delete;
   std::size_t utf8_size() const;
 
   [[nodiscard]] std::expected<std::wstring, StarException> to_wstring() const;
@@ -172,21 +169,21 @@ public:
   [[nodiscard]] std::expected<String, StarException> reverse() const;
   [[nodiscard]] std::expected<String, StarException> rot13() const;
 
-  [[nodiscard]] std::expected<StringList, StarException> split(Char c, std::size_t maxSplit = NPos) const;
-  [[nodiscard]] std::expected<StringList, StarException> split(String const& pattern, std::size_t maxSplit = NPos) const;
-  [[nodiscard]] std::expected<StringList, StarException> rsplit(Char c, std::size_t maxSplit = NPos) const;
-  [[nodiscard]] std::expected<StringList, StarException> rsplit(String const& pattern, std::size_t maxSplit = NPos) const;
+  [[nodiscard]] std::expected<StringList, StarException> split(Char c, std::size_t max_split = npos) const;
+  [[nodiscard]] std::expected<StringList, StarException> split(String const& pattern, std::size_t max_split = npos) const;
+  [[nodiscard]] std::expected<StringList, StarException> rsplit(Char c, std::size_t max_split = npos) const;
+  [[nodiscard]] std::expected<StringList, StarException> rsplit(String const& pattern, std::size_t max_split = npos) const;
 
   // Splits on any number of contiguous instances of any of the given
   // characters.  Behaves differently than regular split in that leading and
   // trailing instances of the characters are also ignored, and in general no
   // empty strings will be in the resulting split list.  If chars is empty,
   // then splits on any whitespace.
-  [[nodiscard]] std::expected<StringList, StarException> split_any(String const& chars = "", std::size_t maxSplit = NPos) const;
-  [[nodiscard]] std::expected<StringList, StarException> rsplit_any(String const& chars = "", std::size_t maxSplit = NPos) const;
+  [[nodiscard]] std::expected<StringList, StarException> split_any(String const& chars = "", std::size_t max_split = npos) const;
+  [[nodiscard]] std::expected<StringList, StarException> rsplit_any(String const& chars = "", std::size_t max_split = npos) const;
 
-  [[nodiscard]] std::expected<StringList, StarException> split_lines(std::size_t maxSplit = NPos) const;
-  [[nodiscard]] std::expected<StringList, StarException> split_whitespace(std::size_t maxSplit = NPos) const;
+  [[nodiscard]] std::expected<StringList, StarException> split_lines(std::size_t max_split = npos) const;
+  [[nodiscard]] std::expected<StringList, StarException> split_whitespace(std::size_t max_split = npos) const;
 
   // Splits a string once based on the given characters (defaulting to
   // whitespace), and returns the first part.  This string is set to the
@@ -194,8 +191,8 @@ public:
   [[nodiscard]] std::expected<String, StarException> extract(String const& chars = "");
   [[nodiscard]] std::expected<String, StarException> rextract(String const& chars = "");
 
-  [[nodiscard]] std::expected<bool, StarException> has_char(Char c) const;
-  // Identical to has_char, except, if string is empty, tests if c is
+  [[nodiscard]] std::expected<bool, StarException> contains(Char c) const;
+  // Identical to contains, except, if string is empty, tests if c is
   // whitespace.
   [[nodiscard]] std::expected<bool, StarException> has_char_or_whitespace(Char c) const;
 
@@ -207,8 +204,8 @@ public:
 
   [[nodiscard]] std::expected<std::size_t, StarException> find(Char c, std::size_t beg = 0, CaseSensitivity cs = CaseSensitive) const;
   [[nodiscard]] std::expected<std::size_t, StarException> find(String const& s, std::size_t beg = 0, CaseSensitivity cs = CaseSensitive) const;
-  [[nodiscard]] std::expected<std::size_t, StarException> find_last(Char c, CaseSensitivity cs = CaseSensitive) const;
-  [[nodiscard]] std::expected<std::size_t, StarException> find_last(String const& s, CaseSensitivity cs = CaseSensitive) const;
+  [[nodiscard]] std::expected<std::size_t, StarException> rfind(Char c, CaseSensitivity cs = CaseSensitive) const;
+  [[nodiscard]] std::expected<std::size_t, StarException> rfind(String const& s, CaseSensitivity cs = CaseSensitive) const;
 
   // If pattern is empty, finds first whitespace
   [[nodiscard]] std::expected<std::size_t, StarException> find_first_of(String const& chars = "", std::size_t beg = 0) const;
@@ -228,30 +225,30 @@ public:
   void append(std::string const& s);
   [[nodiscard]] std::expected<void, StarException> append(std::u32string_view s);
   void append(std::string_view s);
-  template <std::size_t N>
-  void append(char const (&s)[N]) { append(bounded_array_text(s)); }
+  template <std::size_t extent>
+  void append(char const (&s)[extent]) { append(bounded_array_text(s)); }
   [[nodiscard]] std::expected<void, StarException> append(Char c);
 
   void prepend(String const& s);
   void prepend(std::string const& s);
   [[nodiscard]] std::expected<void, StarException> prepend(std::u32string_view s);
   void prepend(std::string_view s);
-  template <std::size_t N>
-  void prepend(char const (&s)[N]) { prepend(bounded_array_text(s)); }
+  template <std::size_t extent>
+  void prepend(char const (&s)[extent]) { prepend(bounded_array_text(s)); }
   [[nodiscard]] std::expected<void, StarException> prepend(Char c);
 
   [[nodiscard]] std::expected<void, StarException> push_back(Char c);
   [[nodiscard]] std::expected<void, StarException> push_front(Char c);
 
   [[nodiscard]] std::expected<bool, StarException> contains(String const& s, CaseSensitivity cs = CaseSensitive) const;
-  [[nodiscard]] std::expected<bool, StarException> regex_match(String const& regex, bool full = true, bool caseSensitive = true) const;
+  [[nodiscard]] std::expected<bool, StarException> regex_match(String const& regex, bool full = true, bool case_sensitive = true) const;
 
   [[nodiscard]] std::expected<int, StarException> compare(String const& s, CaseSensitivity cs = CaseSensitive) const;
   [[nodiscard]] std::expected<bool, StarException> equals(String const& s, CaseSensitivity cs = CaseSensitive) const;
   [[nodiscard]] std::expected<bool, StarException> equals_ignore_case(String const& s) const;
 
-  [[nodiscard]] std::expected<String, StarException> substr(std::size_t position, std::size_t n = NPos) const;
-  [[nodiscard]] std::expected<void, StarException> erase(std::size_t pos = 0, std::size_t n = NPos);
+  [[nodiscard]] std::expected<String, StarException> substr(std::size_t position, std::size_t n = npos) const;
+  [[nodiscard]] std::expected<void, StarException> erase(std::size_t pos = 0, std::size_t n = npos);
 
   [[nodiscard]] std::expected<String, StarException> pad_left(std::size_t size, String const& filler) const;
   [[nodiscard]] std::expected<String, StarException> pad_right(std::size_t size, String const& filler) const;
@@ -270,11 +267,11 @@ public:
   [[nodiscard]] auto lookup_tags_view(Lookup&& lookup) const;
 
   // Replace angle bracket tags in the string with values given by the tags
-  // map.  If replaceWithDefault is true, then values that are not found in the
-  // tags map are replace with the default string.  If replaceWithDefault is
+  // map.  If replace_with_default is true, then values that are not found in the
+  // tags map are replace with the default string.  If replace_with_default is
   // false, tags that are not found are not replaced at all.
   template <string_tag_map MapType>
-  String replace_tags(MapType const& tags, bool replaceWithDefault = false, String defaultValue = "") const;
+  String replace_tags(MapType const& tags, bool replace_with_default = false, String default_value = "") const;
 
   String& operator=(String const& s);
   String& operator=(String&& s) noexcept;
@@ -282,8 +279,8 @@ public:
   String& operator+=(String const& s);
   String& operator+=(std::string const& s);
   [[nodiscard]] std::expected<std::reference_wrapper<String>, StarException> operator+=(std::u32string_view s);
-  template <std::size_t N>
-  String& operator+=(char const (&s)[N]) { append(s); return *this; }
+  template <std::size_t extent>
+  String& operator+=(char const (&s)[extent]) { append(s); return *this; }
   [[nodiscard]] std::expected<std::reference_wrapper<String>, StarException> operator+=(Char c);
 
   friend bool operator==(String const& s1, String const& s2);
@@ -327,16 +324,16 @@ public:
   String& operator+=(StringView s);
   String& operator+=(std::string_view s);
 
-  template <std::size_t N>
-  friend bool operator==(String const& s, char const (&text)[N]) { return s.m_string == bounded_array_text(text); }
-  template <std::size_t N>
-  friend std::strong_ordering operator<=>(String const& s, char const (&text)[N]) { return s.m_string <=> bounded_array_text(text); }
-  template <std::size_t N>
-  friend std::strong_ordering operator<=>(char const (&text)[N], String const& s) { return bounded_array_text(text) <=> s.m_string; }
-  template <std::size_t N>
-  friend String operator+(String s, char const (&text)[N]) { s.append(text); return s; }
-  template <std::size_t N>
-  friend String operator+(char const (&text)[N], String const& s) { String result(text); result.append(s); return result; }
+  template <std::size_t extent>
+  friend bool operator==(String const& s, char const (&text)[extent]) { return s.m_string == bounded_array_text(text); }
+  template <std::size_t extent>
+  friend std::strong_ordering operator<=>(String const& s, char const (&text)[extent]) { return s.m_string <=> bounded_array_text(text); }
+  template <std::size_t extent>
+  friend std::strong_ordering operator<=>(char const (&text)[extent], String const& s) { return bounded_array_text(text) <=> s.m_string; }
+  template <std::size_t extent>
+  friend String operator+(String s, char const (&text)[extent]) { s.append(text); return s; }
+  template <std::size_t extent>
+  friend String operator+(char const (&text)[extent], String const& s) { String result(text); result.append(s); return result; }
 
 private:
   [[nodiscard]] static std::expected<void, StarException> append_joined(
@@ -412,14 +409,14 @@ public:
 void write_text(TextBuffer& output, StringList const& list);
 
 template <>
-struct hash<String> {
+struct ValueHash<String> {
   using is_transparent = void;
   std::size_t operator()(String const& s) const;
   std::size_t operator()(StringView const& s) const;
   constexpr std::size_t operator()(std::string_view s) const noexcept {
     return pl_hash_bytes(std::span(s.data(), s.size()));
   }
-  template <std::size_t N> constexpr std::size_t operator()(char const (&s)[N]) const noexcept {
+  template <std::size_t extent> constexpr std::size_t operator()(char const (&s)[extent]) const noexcept {
     return (*this)(bounded_array_text(s));
   }
   constexpr std::size_t operator()(std::string const& s) const noexcept { return (*this)(std::string_view(s)); }
@@ -435,8 +432,8 @@ public:
   [[nodiscard]] static std::expected<CaseInsensitiveStringView, StarException> create(String&&) = delete;
   [[nodiscard]] static std::expected<CaseInsensitiveStringView, StarException> create(String const&&) = delete;
   [[nodiscard]] static std::expected<CaseInsensitiveStringView, StarException> create(std::string_view bytes);
-  template <std::size_t N>
-  [[nodiscard]] static std::expected<CaseInsensitiveStringView, StarException> create(char const (&text)[N]) {
+  template <std::size_t extent>
+  [[nodiscard]] static std::expected<CaseInsensitiveStringView, StarException> create(char const (&text)[extent]) {
     return create(bounded_array_text(text));
   }
   template <typename Owner>
@@ -501,22 +498,22 @@ struct CaseInsensitiveStringCompare {
   bool operator()(CaseInsensitiveStringView const& lhs, CaseInsensitiveString const& rhs) const { return (*this)(lhs, rhs.view()); }
 };
 
-using StringSet = HashSet<String, hash<String>, std::equal_to<>>;
+using StringSet = HashSet<String, ValueHash<String>, std::equal_to<>>;
 
 using CaseInsensitiveStringSet =
   HashSet<CaseInsensitiveString, CaseInsensitiveStringHash, CaseInsensitiveStringCompare>;
 
-template <typename MappedT, typename HashT = hash<String>, typename ComparatorT = std::equal_to<>>
+template <typename MappedT, typename HashT = ValueHash<String>, typename ComparatorT = std::equal_to<>>
 using StringMap = HashMap<String, MappedT, HashT, ComparatorT>;
 
-template <typename MappedT, typename HashT = hash<String>, typename ComparatorT = std::equal_to<>>
+template <typename MappedT, typename HashT = ValueHash<String>, typename ComparatorT = std::equal_to<>>
 using StableStringMap = StableHashMap<String, MappedT, HashT, ComparatorT>;
 
 template <typename MappedT>
 using CaseInsensitiveStringMap = HashMap<CaseInsensitiveString, MappedT, CaseInsensitiveStringHash, CaseInsensitiveStringCompare>;
 
 template <>
-struct hash<StringList> {
+struct ValueHash<StringList> {
   std::size_t operator()(StringList const& s) const;
 };
 
@@ -546,12 +543,12 @@ template <string_tag_lookup Lookup>
   using Result = std::conditional_t<fallible, std::expected<String, StarException>, String>;
   // Tag delimiters and offsets are bytes, not codepoints.
 
-  std::string finalString;
+  std::string final_string;
 
   std::size_t start = 0;
   std::size_t size = m_string.size();
 
-  finalString.reserve(size);
+  final_string.reserve(size);
 
   String key;
 
@@ -559,28 +556,28 @@ template <string_tag_lookup Lookup>
     if (start >= size)
       break;
 
-    std::size_t beginTag = m_string.find("<", start);
-    std::size_t endTag = m_string.find(">", beginTag);
-    if (beginTag != NPos && endTag != NPos) {
-      key.m_string.append(m_string, beginTag + 1, endTag - beginTag - 1);
-      finalString.append(m_string, start, beginTag - start);
+    std::size_t begin_tag = m_string.find("<", start);
+    std::size_t end_tag = m_string.find(">", begin_tag);
+    if (begin_tag != npos && end_tag != npos) {
+      key.m_string.append(m_string, begin_tag + 1, end_tag - begin_tag - 1);
+      final_string.append(m_string, start, begin_tag - start);
       decltype(auto) replacement = std::invoke(lookup, key);
       if constexpr (fallible) {
         if (!replacement) return Result(std::unexpected(std::move(replacement.error())));
-        finalString += replacement->m_string;
+        final_string += replacement->m_string;
       } else {
-        finalString += replacement.m_string;
+        final_string += replacement.m_string;
       }
       key.m_string.clear();
-      start = endTag + 1;
+      start = end_tag + 1;
 
     } else {
-      finalString.append(m_string, start, std::string::npos);
+      final_string.append(m_string, start, std::string::npos);
       break;
     }
   }
 
-  return Result(String(std::move(finalString)));
+  return Result(String(std::move(final_string)));
 }
 
 template <string_view_tag_lookup Lookup>
@@ -588,7 +585,7 @@ template <string_view_tag_lookup Lookup>
   using Replacement = std::remove_cvref_t<std::invoke_result_t<Lookup&, std::string_view>>;
   constexpr bool fallible = std::same_as<Replacement, std::expected<String, StarException>>;
   using Result = std::conditional_t<fallible, std::expected<std::optional<String>, StarException>, std::optional<String>>;
-  std::string finalString;
+  std::string final_string;
   std::string_view view(utf8());
 
   std::size_t start = 0;
@@ -596,30 +593,30 @@ template <string_view_tag_lookup Lookup>
     if (start >= view.size())
       break;
 
-    std::size_t beginTag = view.find_first_of('<', start);
-    if (beginTag == NPos && !start)
+    std::size_t begin_tag = view.find_first_of('<', start);
+    if (begin_tag == npos && !start)
       return Result(std::optional<String>());
 
-    std::size_t endTag = view.find_first_of('>', beginTag);
-    if (beginTag != NPos && endTag != NPos) {
+    std::size_t end_tag = view.find_first_of('>', begin_tag);
+    if (begin_tag != npos && end_tag != npos) {
       if (!start)
-        finalString.reserve(view.size());
-      finalString.append(view.substr(start, beginTag - start));
-      decltype(auto) replacement = std::invoke(lookup, view.substr(beginTag + 1, endTag - beginTag - 1));
+        final_string.reserve(view.size());
+      final_string.append(view.substr(start, begin_tag - start));
+      decltype(auto) replacement = std::invoke(lookup, view.substr(begin_tag + 1, end_tag - begin_tag - 1));
       if constexpr (fallible) {
         if (!replacement) return Result(std::unexpected(std::move(replacement.error())));
-        finalString.append(replacement->utf8());
+        final_string.append(replacement->utf8());
       } else {
-        finalString.append(replacement.utf8());
+        final_string.append(replacement.utf8());
       }
-      start = endTag + 1;
+      start = end_tag + 1;
     } else {
-      finalString.append(view.substr(start));
+      final_string.append(view.substr(start));
       break;
     }
   }
 
-  return Result(std::optional<String>(String(std::move(finalString))));
+  return Result(std::optional<String>(String(std::move(final_string))));
 }
 
 template <string_view_tag_lookup Lookup>
@@ -636,12 +633,12 @@ template <string_view_tag_lookup Lookup>
 }
 
 template <string_tag_map MapType>
-String String::replace_tags(MapType const& tags, bool replaceWithDefault, String defaultValue) const {
+String String::replace_tags(MapType const& tags, bool replace_with_default, String default_value) const {
   return lookup_tags([&](String const& key) -> String {
     auto i = tags.find(key);
     if (i == tags.end()) {
-      if (replaceWithDefault)
-        return defaultValue;
+      if (replace_with_default)
+        return default_value;
       else
         return "<" + key + ">";
     } else {
@@ -650,7 +647,7 @@ String String::replace_tags(MapType const& tags, bool replaceWithDefault, String
   });
 }
 
-inline std::size_t hash<String>::operator()(String const& s) const { return (*this)(std::string_view(s.utf8())); }
+inline std::size_t ValueHash<String>::operator()(String const& s) const { return (*this)(std::string_view(s.utf8())); }
 
 template <typename Range>
   requires sequence_source<Range const&, String>
@@ -671,9 +668,9 @@ export module star.string;
 
 export namespace Star {
   template <>
-  struct hash<String>;
+  struct ValueHash<String>;
   template <>
-  struct hash<StringList>;
+  struct ValueHash<StringList>;
 }
 
 
@@ -697,7 +694,7 @@ export namespace Star {
   using ::Star::StringMap;
   using ::Star::StableStringMap;
   using ::Star::CaseInsensitiveStringMap;
-  using ::Star::hash;
+  using ::Star::ValueHash;
   using ::Star::write_text;
 }
 

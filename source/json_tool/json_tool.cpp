@@ -424,7 +424,7 @@ std::expected<std::optional<ParsedArgs>, StarException> parseArgs(int argc, char
       if (!exists)
         return std::unexpected(std::move(exists.error()));
       if (!*exists) {
-        if (auto written = Star::print(stderr, "File {} doesn't exist\n", arg); !written)
+        if (auto written = Star::print(*stderr, "File {} doesn't exist\n", arg); !written)
           return std::unexpected(std::move(written.error()));
         return {};
       }
@@ -444,27 +444,27 @@ std::expected<std::optional<ParsedArgs>, StarException> parseArgs(int argc, char
   }
   bool editing = std::holds_alternative<EditCommand>(parsed.command);
   if (editing && !anyFileInputs) {
-    if (auto written = Star::print(stderr, "Files to edit must be supplied when using --edit.\n"); !written)
+    if (auto written = Star::print(*stderr, "Files to edit must be supplied when using --edit.\n"); !written)
       return std::unexpected(std::move(written.error()));
     return {};
   }
   if (parsed.options.inPlace && !anyFileInputs) {
-    if (auto written = Star::print(stderr, "In-place writing (-i) can only be used with files specified on the command line.\n"); !written)
+    if (auto written = Star::print(*stderr, "In-place writing (-i) can only be used with files specified on the command line.\n"); !written)
       return std::unexpected(std::move(written.error()));
     return {};
   }
   if (parsed.options.inPlace && editing) {
-    if (auto written = Star::print(stderr, "Interactive edit (--edit) is always in-place. Explicitly specifying -i is not needed.\n"); !written)
+    if (auto written = Star::print(*stderr, "Interactive edit (--edit) is always in-place. Explicitly specifying -i is not needed.\n"); !written)
       return std::unexpected(std::move(written.error()));
     return {};
   }
   if (editing && anyNonFileInputs) {
-    if (auto written = Star::print(stderr, "Interactive edit (--edit) can only be used with file input sources.\n"); !written)
+    if (auto written = Star::print(*stderr, "Interactive edit (--edit) can only be used with file input sources.\n"); !written)
       return std::unexpected(std::move(written.error()));
     return {};
   }
   if (parsed.options.editFormat && !editing) {
-    if (auto written = Star::print(stderr, "--input can only be used with --edit.\n"); !written)
+    if (auto written = Star::print(*stderr, "--input can only be used with --edit.\n"); !written)
       return std::unexpected(std::move(written.error()));
     return {};
   }
@@ -493,30 +493,30 @@ std::expected<int, StarException> run(int argc, char** argv) {
     if (!parsed)
       return std::unexpected(std::move(parsed.error()));
     if (!*parsed) {
-      if (auto written = Star::print(stderr, "Usage: {} [--get <json-path>] (-j <json> | <json-file>*)\n", argv[0]); !written)
+      if (auto written = Star::print(*stderr, "Usage: {} [--get <json-path>] (-j <json> | <json-file>*)\n", argv[0]); !written)
         return std::unexpected(std::move(written.error()));
-      if (auto written = Star::print(stderr, 
+      if (auto written = Star::print(*stderr, 
           "Usage: {} --set <json-path> <json> [-i] [(--at (beginning|end) | --before <key> | --after <key>)] (-j "
           "<json> | <json-file>*)\n",
           argv[0]); !written)
         return std::unexpected(std::move(written.error()));
-      if (auto written = Star::print(stderr, 
+      if (auto written = Star::print(*stderr, 
           "Usage: {} --add <json-path> <json> [-i] [(--at (beginning|end) | --before <key> | --after <key>)] (-j "
           "<json> | <json-file>*)\n",
           argv[0]); !written)
         return std::unexpected(std::move(written.error()));
-      if (auto written = Star::print(stderr, 
+      if (auto written = Star::print(*stderr, 
           "Usage: {} --edit <json-path> [(--at (beginning|end) | --before <key> | --after <key>)] [--input "
           "(csv|json|string)] <json-file>+\n",
           argv[0]); !written)
         return std::unexpected(std::move(written.error()));
-      if (auto written = Star::print(stderr, "\n"); !written)
+      if (auto written = Star::print(*stderr, "\n"); !written)
         return std::unexpected(std::move(written.error()));
-      if (auto written = Star::print(stderr, "Example: {} --get /dialog/0/message guard.npctype\n", argv[0]); !written)
+      if (auto written = Star::print(*stderr, "Example: {} --get /dialog/0/message guard.npctype\n", argv[0]); !written)
         return std::unexpected(std::move(written.error()));
-      if (auto written = Star::print(stderr, "Example: {} --get 'foo[0]' -j '{{\"foo\":[0,1,2,3]}}'\n", argv[0]); !written)
+      if (auto written = Star::print(*stderr, "Example: {} --get 'foo[0]' -j '{{\"foo\":[0,1,2,3]}}'\n", argv[0]); !written)
         return std::unexpected(std::move(written.error()));
-      if (auto written = Star::print(stderr, "Example: {} --edit /tags --input csv --find ../assets/ .object\n", argv[0]); !written)
+      if (auto written = Star::print(*stderr, "Example: {} --edit /tags --input csv --find ../assets/ .object\n", argv[0]); !written)
         return std::unexpected(std::move(written.error()));
       return 1;
     }
@@ -549,7 +549,7 @@ std::expected<int, StarException> run(int argc, char** argv) {
 int main(int argc, char** argv) {
   auto nativeRuntime = NativeRuntime::create();
   if (!nativeRuntime) {
-    if (auto written = Star::print(stderr, "Error initializing native runtime: {}\n", Star::output_exception(ExceptionDiagnostic(nativeRuntime.error()), true)); !written)
+    if (auto written = Star::print(*stderr, "Error initializing native runtime: {}\n", Star::output_exception(ExceptionDiagnostic(nativeRuntime.error()), true)); !written)
       return 1;
     return 1;
   }
@@ -557,10 +557,10 @@ int main(int argc, char** argv) {
   if (result)
     return *result;
   if (result.error().is<JsonParsingException>() || result.error().is<JsonException>()) {
-    if (!Star::print(stderr, "{}\n", result.error().what()))
+    if (!Star::print(*stderr, "{}\n", result.error().what()))
       return 1;
   } else {
-    if (!Star::print(stderr, "Error: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)))
+    if (!Star::print(*stderr, "Error: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)))
       return 1;
   }
   return 1;

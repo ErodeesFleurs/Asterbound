@@ -68,8 +68,8 @@ namespace {
       return std::unexpected(std::move(read.error()));
     if (!restore)
       return std::unexpected(std::move(restore.error()));
-    return std::memcmp(signature.data(), "RIFF", 4) == 0
-        && std::memcmp(signature.data() + 8, "WAVE", 4) == 0;
+    auto header = std::string_view(signature);
+    return header.starts_with("RIFF") && header.substr(8) == "WAVE";
   }
 
   [[nodiscard]] std::expected<WaveData, StarException> parse_wav(std::shared_ptr<IODevice> device) {
@@ -80,7 +80,7 @@ namespace {
     auto read = device->read_full(signature);
     if (!read)
       return std::unexpected(std::move(read.error()));
-    if (std::memcmp(signature.data(), "RIFF", 4) != 0)
+    if (std::string_view(signature) != "RIFF")
       return std::unexpected(AudioException("Wav file has invalid RIFF magic bytes"));
     auto file_size = read_le_type<std::uint32_t>(*device);
     if (!file_size)
@@ -94,12 +94,12 @@ namespace {
     read = device->read_full(signature);
     if (!read)
       return std::unexpected(std::move(read.error()));
-    if (std::memcmp(signature.data(), "WAVE", 4) != 0)
+    if (std::string_view(signature) != "WAVE")
       return std::unexpected(AudioException("Wav file has invalid WAVE magic bytes"));
     read = device->read_full(signature);
     if (!read)
       return std::unexpected(std::move(read.error()));
-    if (std::memcmp(signature.data(), "fmt ", 4) != 0)
+    if (std::string_view(signature) != "fmt ")
       return std::unexpected(AudioException("Wav file fmt subchunk has invalid magic bytes"));
     auto fmt_size = read_le_type<std::uint32_t>(*device);
     if (!fmt_size)
@@ -141,7 +141,7 @@ namespace {
     read = device->read_full(signature);
     if (!read)
       return std::unexpected(std::move(read.error()));
-    if (std::memcmp(signature.data(), "data", 4) != 0)
+    if (std::string_view(signature) != "data")
       return std::unexpected(AudioException("Wav file data subchunk has invalid magic bytes"));
     auto data_size = read_le_type<std::uint32_t>(*device);
     if (!data_size)
@@ -159,8 +159,11 @@ namespace {
     auto bytes = device->read_bytes(*data_size);
     if (!bytes)
       return std::unexpected(std::move(bytes.error()));
-    for (std::size_t i = 0; i < bytes->size() / 2; ++i)
-      from_byte_order(ByteOrder::LittleEndian, bytes->span().data() + i * 2, 2);
+    if constexpr (std::endian::native == std::endian::big) {
+      auto pcm = bytes->span();
+      for (std::size_t i = 0; i < pcm.size(); i += 2)
+        std::swap(pcm[i], pcm[i + 1]);
+    }
     auto shared = std::make_shared<ByteArray>(std::move(*bytes));
     return WaveData{std::move(shared), *channels, *rate, *data_size, 0};
 #endif
@@ -245,7 +248,7 @@ public:
     if (!is_finite(time) || time < 0 || time > m_total_time)
       return std::unexpected(AudioException("Cannot seek ogg stream to an invalid time"));
     int result = ov_time_seek(&m_file, time);
-    if (auto error = m_callbacks->takeError())
+    if (auto error = m_callbacks->take_error())
       return std::unexpected(std::move(*error));
     if (result != 0)
       return std::unexpected(AudioException::format("Cannot seek ogg stream by time ({})", result));
@@ -256,7 +259,7 @@ public:
     if (sample > m_total_samples || sample > std::uint64_t(std::numeric_limits<ogg_int64_t>::max()))
       return std::unexpected(AudioException("Cannot seek ogg stream to an invalid sample"));
     int result = ov_pcm_seek(&m_file, static_cast<ogg_int64_t>(sample));
-    if (auto error = m_callbacks->takeError())
+    if (auto error = m_callbacks->take_error())
       return std::unexpected(std::move(*error));
     if (result != 0)
       return std::unexpected(AudioException::format("Cannot seek ogg stream by sample ({})", result));
@@ -265,7 +268,7 @@ public:
 
   [[nodiscard]] std::expected<double, StarException> current_time() const {
     double time = ov_time_tell(&m_file);
-    if (auto error = m_callbacks->takeError())
+    if (auto error = m_callbacks->take_error())
       return std::unexpected(std::move(*error));
     if (time < 0)
       return std::unexpected(AudioException::format("Cannot determine ogg stream time ({})", time));
@@ -274,7 +277,7 @@ public:
 
   [[nodiscard]] std::expected<std::uint64_t, StarException> current_sample() const {
     ogg_int64_t sample = ov_pcm_tell(&m_file);
-    if (auto error = m_callbacks->takeError())
+    if (auto error = m_callbacks->take_error())
       return std::unexpected(std::move(*error));
     if (sample < 0)
       return std::unexpected(AudioException::format("Cannot determine ogg stream sample ({})", sample));
@@ -295,7 +298,7 @@ public:
     do {
       count = ov_read(&m_file, reinterpret_cast<char*>(buffer.data()), bytes,
           std::endian::native == std::endian::big, 2, 1, &bitstream);
-      if (auto error = m_callbacks->takeError())
+      if (auto error = m_callbacks->take_error())
         return std::unexpected(std::move(*error));
     } while (count == OV_HOLE);
     if (count < 0)
@@ -320,29 +323,29 @@ private:
     if (!adapter)
       return std::unexpected(std::move(adapter.error()));
     m_callbacks.emplace(std::move(*adapter));
-    ov_callbacks callbacks{};
-    m_callbacks->setupOggCallbacks(callbacks);
-    int result = ov_open_callbacks(&*m_callbacks, &m_file, nullptr, 0, callbacks);
+    int result = ov_open_callbacks(&*m_callbacks, &m_file, nullptr, 0, IODeviceCallbacks::callbacks());
     m_open = result == 0;
-    if (auto error = m_callbacks->takeError())
+    if (auto error = m_callbacks->take_error())
       return std::unexpected(std::move(*error));
     if (result != 0)
       return std::unexpected(AudioException::format("File is not a valid ogg bitstream ({})", result));
-    auto* info = ov_info(&m_file, -1);
-    if (auto error = m_callbacks->takeError())
-      return std::unexpected(std::move(*error));
-    if (!info || info->channels <= 0 || info->rate <= 0 || std::uint64_t(info->rate) > std::numeric_limits<unsigned>::max())
-      return std::unexpected(AudioException("Ogg stream has invalid audio metadata"));
+    {
+      auto const* info = ov_info(&m_file, -1);
+      if (auto error = m_callbacks->take_error())
+        return std::unexpected(std::move(*error));
+      if (!info || info->channels <= 0 || info->rate <= 0 || !std::in_range<unsigned>(info->rate))
+        return std::unexpected(AudioException("Ogg stream has invalid audio metadata"));
+      m_channels = info->channels;
+      m_sample_rate = info->rate;
+    }
     auto samples = ov_pcm_total(&m_file, -1);
-    if (auto error = m_callbacks->takeError())
+    if (auto error = m_callbacks->take_error())
       return std::unexpected(std::move(*error));
     auto time = ov_time_total(&m_file, -1);
-    if (auto error = m_callbacks->takeError())
+    if (auto error = m_callbacks->take_error())
       return std::unexpected(std::move(*error));
     if (samples < 0 || !is_finite(time) || time < 0)
       return std::unexpected(AudioException("Cannot determine ogg stream duration"));
-    m_channels = info->channels;
-    m_sample_rate = info->rate;
     m_total_samples = samples;
     m_total_time = time;
     return {};
@@ -477,20 +480,23 @@ public:
     std::size_t requested = std::min(buffer.size(), remaining / 2) * 2;
     if (requested == 0)
       return 0;
-    auto read = m_data.stream->read({reinterpret_cast<char*>(buffer.data()), requested});
+    std::span bytes(reinterpret_cast<char*>(buffer.data()), requested);
+    auto read = m_data.stream->read(bytes);
     if (!read)
       return std::unexpected(std::move(read.error()));
     if (*read == 0)
       return std::unexpected(AudioException("PCM audio data is truncated"));
     if (*read % 2 != 0) {
-      auto tail = m_data.stream->read_full({reinterpret_cast<char*>(buffer.data()) + *read, 1});
+      auto tail = m_data.stream->read_full(bytes.subspan(*read, 1));
       if (!tail)
         return std::unexpected(std::move(tail.error()));
       ++*read;
     }
-    if (!m_data.bytes) {
-      for (std::size_t i = 0; i < *read / 2; ++i)
-        from_byte_order(ByteOrder::LittleEndian, reinterpret_cast<char*>(buffer.data()) + i * 2, 2);
+    if constexpr (std::endian::native == std::endian::big) {
+      if (!m_data.bytes) {
+        for (auto& sample : buffer.first(*read / 2))
+          sample = std::byteswap(sample);
+      }
     }
     return *read / 2;
 #else
@@ -724,7 +730,7 @@ std::expected<std::size_t, StarException> Audio::resample(unsigned destination_c
     for (unsigned channel = 1; channel < converted_channels; ++channel) {
       int sample = 0;
       for (unsigned index = 0; index < sample_count; ++index) {
-        if constexpr (Star::DebugEnabled) {
+        if constexpr (Star::debug_enabled) {
           Star::star_assert_failed((source_indices[index] + channel < source_buffer_size));
         }
         sample += source_buffer[source_indices[index] + channel];

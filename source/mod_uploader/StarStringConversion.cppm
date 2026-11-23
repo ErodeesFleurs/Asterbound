@@ -12,7 +12,7 @@ inline String toSString(QString const& str) {
 }
 
 inline QString toQString(String const& str) {
-  return QString::fromUtf8(str.utf8_data(), str.utf8_size());
+  return QString::fromUtf8(str.utf8().data(), str.utf8_size());
 }
 
 }

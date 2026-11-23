@@ -483,9 +483,9 @@ const GameTestRegistration assetsLuaPatchProvider(
           EXPECT_EQ(summary->kind, syntax ? ExceptionSummaryKind::PatchSyntax : ExceptionSummaryKind::PatchRuntime);
           EXPECT_EQ(summary->asset, targetPath.utf8());
           EXPECT_EQ(summary->patch, patchPath.utf8());
-          EXPECT_NE(summary->patchProvider.find(failing->utf8()), std::string::npos);
-          EXPECT_NE(summary->patchProvider.find("diagnostic_failure"), std::string::npos);
-          EXPECT_EQ(summary->patchProvider.find(shadow->utf8()), std::string::npos);
+          EXPECT_NE(summary->patch_provider.find(failing->utf8()), std::string::npos);
+          EXPECT_NE(summary->patch_provider.find("diagnostic_failure"), std::string::npos);
+          EXPECT_EQ(summary->patch_provider.find(shadow->utf8()), std::string::npos);
           if (!syntax)
             EXPECT_NE(summary->reason.find("provider_runtime_failure"), std::string::npos);
           std::size_t patchLocations = 0;
@@ -494,7 +494,7 @@ const GameTestRegistration assetsLuaPatchProvider(
               ++patchLocations;
               if (!syntax)
                 EXPECT_EQ(location.line, 1);
-              EXPECT_EQ(location.provider, summary->patchProvider);
+              EXPECT_EQ(location.provider, summary->patch_provider);
             }
           }
           EXPECT_EQ(patchLocations, 1u);
@@ -535,7 +535,7 @@ const GameTestRegistration assetsMissingResourceSummary(
     EXPECT_EQ(summary->asset, "/missing-summary.json");
     EXPECT_NE(summary->reason.find("/missing-summary.json"), std::string::npos);
     EXPECT_TRUE(summary->patch.empty());
-    EXPECT_TRUE(summary->patchProvider.empty());
+    EXPECT_TRUE(summary->patch_provider.empty());
   });
 
 const GameTestRegistration assetsSourceSpecificPatchReplacement(
@@ -694,9 +694,9 @@ const GameTestRegistration assetsReplacementPatchProvider(
     EXPECT_EQ(summary->asset, "/target.json");
     EXPECT_EQ(summary->patch, "/replacement.lua");
     EXPECT_NE(summary->reason.find("actual_replacement_failure"), std::string::npos);
-    EXPECT_NE(summary->patchProvider.find(replacement.utf8()), std::string::npos);
-    EXPECT_NE(summary->patchProvider.find("actual_replacement"), std::string::npos);
-    EXPECT_EQ(summary->patchProvider.find(shadow.utf8()), std::string::npos);
+    EXPECT_NE(summary->patch_provider.find(replacement.utf8()), std::string::npos);
+    EXPECT_NE(summary->patch_provider.find("actual_replacement"), std::string::npos);
+    EXPECT_EQ(summary->patch_provider.find(shadow.utf8()), std::string::npos);
     std::string_view diagnostic = loaded.error().what();
     EXPECT_NE(diagnostic.find("Actual replacement provider"), std::string_view::npos);
     EXPECT_EQ(diagnostic.find("Unexecuted replacement shadow"), std::string_view::npos);
@@ -738,9 +738,9 @@ const GameTestRegistration assetsSourceBytesReadFailure(
     auto const& summary = loaded.error().diagnostic_summary();
     ASSERT_TRUE(summary);
     EXPECT_EQ(summary->asset, "/caller.json");
-    EXPECT_NE(summary->assetProvider.find(original.utf8()), std::string::npos);
-    EXPECT_NE(summary->assetProvider.find("raw_original"), std::string::npos);
-    EXPECT_EQ(summary->assetProvider.find(shadow.utf8()), std::string::npos);
+    EXPECT_NE(summary->asset_provider.find(original.utf8()), std::string::npos);
+    EXPECT_NE(summary->asset_provider.find("raw_original"), std::string::npos);
+    EXPECT_EQ(summary->asset_provider.find(shadow.utf8()), std::string::npos);
     std::string_view diagnostic = loaded.error().what();
     EXPECT_NE(diagnostic.find("Raw original provider"), std::string_view::npos);
     EXPECT_NE(diagnostic.find("/raw.txt"), std::string_view::npos);

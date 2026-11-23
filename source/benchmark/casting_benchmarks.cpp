@@ -53,26 +53,24 @@ struct root : virtual ref_api::RefCounter {
     if (lives)
       ++lives->destroyed;
   }
-  void const* query_type(Star::TypeKey key) const noexcept override {
-    return identity_api::query_type_of<root, ref_api::RefCounter>(this, key);
+  void query_type(Star::TypeQuery& query) const noexcept override {
+    identity_api::query_type_of<root, ref_api::RefCounter>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return identity_api::type_name<root>(); }
 };
 
 template <class T>
-concept query_base = requires(T const& value, Star::TypeKey key) {
-  { value.query_type(key) } noexcept -> std::same_as<void const*>;
-};
+concept query_base = Star::capability_queryable<T>;
 
 template <unsigned Tag, query_base... Bases> struct node : Bases... {
-  void const* query_type(Star::TypeKey key) const noexcept override {
-    return identity_api::query_type_of<node, Bases...>(this, key);
+  void query_type(Star::TypeQuery& query) const noexcept override {
+    identity_api::query_type_of<node, Bases...>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return identity_api::type_name<node>(); }
 };
 template <unsigned Tag> struct virtual_branch : virtual root {
-  void const* query_type(Star::TypeKey key) const noexcept override {
-    return identity_api::query_type_of<virtual_branch, root>(this, key);
+  void query_type(Star::TypeQuery& query) const noexcept override {
+    identity_api::query_type_of<virtual_branch, root>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return identity_api::type_name<virtual_branch>(); }
 };
@@ -88,7 +86,7 @@ using absent = node<9, root>;
 using multi_child = node<10, multi>;
 
 enum class population { single_hit, deep_hit, multi_hit, mixed, virtual_diamond, nonvirtual_diamond };
-enum class operation { identity, static_upcast, query, pointer, borrowed, predicate, checked, checked_ref };
+enum class operation { identity, static_upcast, query, nullable_borrow, borrowed, predicate, checked, checked_ref };
 
 struct fixture {
   std::shared_ptr<lifetime> lives = std::make_shared<lifetime>();
@@ -208,6 +206,10 @@ template <query_base Target> std::uintptr_t expected_address(fixture const& data
   return 0;
 }
 
+template <typename T> std::uintptr_t borrow_address(std::optional<std::reference_wrapper<T>> value) {
+  return value ? reinterpret_cast<std::uintptr_t>(std::addressof(value->get())) : 0;
+}
+
 struct observation {
   std::uintptr_t address = 0;
   bool error = false;
@@ -230,23 +232,23 @@ void measure_borrow(benchmark::State& state, population family) {
       observation result;
       if constexpr (Operation == operation::identity || Operation == operation::static_upcast) {
         if constexpr (Operation == operation::identity)
-          result.address = reinterpret_cast<std::uintptr_t>(casting_api::as<root>(&source));
+          result.address = borrow_address(casting_api::as_ref<root>(source));
         else
-          result.address = reinterpret_cast<std::uintptr_t>(casting_api::as<ref_api::RefCounter>(&source));
+          result.address = borrow_address(casting_api::as_ref<ref_api::RefCounter>(source));
       } else if constexpr (Operation == operation::query) {
-        result.address = reinterpret_cast<std::uintptr_t>(source.query_type(identity_api::type_key<Target>()));
-      } else if constexpr (Operation == operation::pointer) {
-        result.address = reinterpret_cast<std::uintptr_t>(casting_api::as<Target>(&source));
+        result.address = borrow_address(identity_api::query_type<Target>(source));
+      } else if constexpr (Operation == operation::nullable_borrow) {
+        result.address = borrow_address(casting_api::as_ref<Target>(std::optional{std::ref(source)}));
       } else if constexpr (Operation == operation::predicate) {
-        result.address = casting_api::is<Target>(&source);
+        result.address = casting_api::is<Target>(data.owners[i]);
       } else if constexpr (Operation == operation::borrowed) {
         auto value = casting_api::as_ref<Target>(source);
         if (value)
           result.address = reinterpret_cast<std::uintptr_t>(std::addressof(value->get()));
       } else if constexpr (Operation == operation::checked) {
-        auto value = casting_api::convert<Target>(&source);
+        auto value = casting_api::convert_ref<Target>(std::optional{std::ref(source)});
         if (value)
-          result.address = reinterpret_cast<std::uintptr_t>(*value);
+          result.address = reinterpret_cast<std::uintptr_t>(std::addressof(value->get()));
         else {
           result.error = true;
           result.diagnostic = std::move(value.error());
@@ -329,7 +331,6 @@ void measure_borrow(benchmark::State& state, population family) {
 template <class Owner>
 concept root_owner = requires(Owner const& owner) {
   typename Owner::element_type;
-  { owner.get() } -> std::same_as<root*>;
   { *owner } -> std::same_as<root&>;
 };
 
@@ -411,7 +412,7 @@ template <bool Intrusive, bool Move, bool Hit, bool Checked = false> void measur
           return false;
       } else {
         if constexpr (Hit)
-          if (!require(state, adjusted_right[i] && output[i].get() == std::addressof(adjusted_right[i]->get())))
+          if (!require(state, adjusted_right[i] && std::addressof(*output[i]) == std::addressof(adjusted_right[i]->get())))
             return false;
       }
       if constexpr (!Move || !Hit)
@@ -544,20 +545,20 @@ template <production_operation Operation> void measure_production(benchmark::Sta
     for (std::size_t i = 0; i != batch_size; ++i) {
       if constexpr (Operation == production_operation::reader_base_query)
         output[i] =
-          reinterpret_cast<std::uintptr_t>(streams[i]->query_type(identity_api::type_key<Star::DataStream>()));
+          borrow_address(identity_api::query_type<Star::DataStream>(*streams[i]));
       else if constexpr (Operation == production_operation::reader_external)
-        output[i] = reinterpret_cast<std::uintptr_t>(casting_api::as<Star::DataStreamExternalBuffer>(streams[i].get()));
+        output[i] = borrow_address(casting_api::as_ref<Star::DataStreamExternalBuffer>(*streams[i]));
       else if constexpr (Operation == production_operation::reader_self
                          || Operation == production_operation::stream_mixed)
-        output[i] = reinterpret_cast<std::uintptr_t>(casting_api::as<Star::DataStreamReader>(streams[i].get()));
+        output[i] = borrow_address(casting_api::as_ref<Star::DataStreamReader>(*streams[i]));
       else if constexpr (Operation == production_operation::reader_miss)
-        output[i] = reinterpret_cast<std::uintptr_t>(casting_api::as<Star::DataStreamBuffer>(streams[i].get()));
+        output[i] = borrow_address(casting_api::as_ref<Star::DataStreamBuffer>(*streams[i]));
       else if constexpr (Operation == production_operation::net_sync)
-        output[i] = reinterpret_cast<std::uintptr_t>(casting_api::as<Star::NetElementSyncGroup>(nets[i].get()));
+        output[i] = borrow_address(casting_api::as_ref<Star::NetElementSyncGroup>(*nets[i]));
       else if constexpr (Operation == production_operation::net_callback)
-        output[i] = reinterpret_cast<std::uintptr_t>(casting_api::as<Star::NetElementCallbackGroup>(nets[i].get()));
+        output[i] = borrow_address(casting_api::as_ref<Star::NetElementCallbackGroup>(*nets[i]));
       else
-        output[i] = reinterpret_cast<std::uintptr_t>(casting_api::as<Star::DataStream>(nets[i].get()));
+        output[i] = borrow_address(casting_api::as_ref<Star::DataStream>(*nets[i]));
     }
   };
   auto validate = [&] {
@@ -690,22 +691,22 @@ void add_borrow(char const* name, population family) {
 void register_cases() {
   add_borrow<root, operation::identity>("Casting/Control/Identity", population::mixed);
   add_borrow<root, operation::static_upcast>("Casting/Control/StaticUpcast", population::mixed);
-  add_borrow<single, operation::pointer>("Casting/Single/PointerHit", population::single_hit);
-  add_borrow<absent, operation::pointer>("Casting/Single/PointerMiss", population::single_hit);
-  add_borrow<deep, operation::pointer>("Casting/Deep/PointerHit", population::deep_hit);
-  add_borrow<absent, operation::pointer>("Casting/Deep/PointerMiss", population::deep_hit);
-  add_borrow<right, operation::pointer>("Casting/Multi/AdjustedHit", population::multi_hit);
-  add_borrow<absent, operation::pointer>("Casting/Multi/PointerMiss", population::multi_hit);
+  add_borrow<single, operation::nullable_borrow>("Casting/Single/NullableBorrowHit", population::single_hit);
+  add_borrow<absent, operation::nullable_borrow>("Casting/Single/NullableBorrowMiss", population::single_hit);
+  add_borrow<deep, operation::nullable_borrow>("Casting/Deep/NullableBorrowHit", population::deep_hit);
+  add_borrow<absent, operation::nullable_borrow>("Casting/Deep/NullableBorrowMiss", population::deep_hit);
+  add_borrow<right, operation::nullable_borrow>("Casting/Multi/AdjustedHit", population::multi_hit);
+  add_borrow<absent, operation::nullable_borrow>("Casting/Multi/NullableBorrowMiss", population::multi_hit);
   add_borrow<root, operation::query>("Casting/Diamond/VirtualSameAddress", population::virtual_diamond);
   add_borrow<root, operation::query>("Casting/Diamond/NonvirtualAmbiguous", population::nonvirtual_diamond);
   add_borrow<single, operation::query>("Casting/Diamond/NonvirtualUniqueBranch", population::nonvirtual_diamond);
-  add_borrow<right, operation::pointer>("Casting/Mixed/Pointer", population::mixed);
+  add_borrow<right, operation::nullable_borrow>("Casting/Mixed/NullableBorrow", population::mixed);
   add_borrow<right, operation::borrowed>("Casting/Mixed/Borrowed", population::mixed);
   add_borrow<right, operation::predicate>("Casting/Mixed/Is", population::mixed);
-  add_borrow<right, operation::pointer, true>("Casting/Mixed/ConstPointer", population::mixed);
+  add_borrow<right, operation::nullable_borrow, true>("Casting/Mixed/ConstNullableBorrow", population::mixed);
   add_borrow<right, operation::borrowed, true>("Casting/Mixed/ConstBorrowed", population::mixed);
-  add_borrow<right, operation::checked>("Casting/Checked/PointerSuccess", population::multi_hit);
-  add_borrow<absent, operation::checked>("Casting/Checked/PointerFailureTypedError", population::single_hit);
+  add_borrow<right, operation::checked>("Casting/Checked/NullableBorrowSuccess", population::multi_hit);
+  add_borrow<absent, operation::checked>("Casting/Checked/NullableBorrowFailureTypedError", population::single_hit);
   add_borrow<right, operation::checked_ref>("Casting/Checked/ReferenceSuccess", population::multi_hit);
   add_borrow<absent, operation::checked_ref>("Casting/Checked/ReferenceFailureTypedError", population::single_hit);
   add_borrow<right, operation::checked_ref, true>("Casting/Checked/ConstReferenceSuccess", population::multi_hit);

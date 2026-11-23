@@ -84,10 +84,10 @@ TEST(AssetPathTest, SplitNormalizesEmptySubPathsAndDirectiveSeparators) {
   for (auto const& test_case : cases) {
     SCOPED_TRACE(std::string(test_case.m_path));
     auto const path = AssetPath::split(String(test_case.m_path));
-    EXPECT_EQ(path.m_base_path.utf8(), test_case.m_base_path);
-    ASSERT_EQ(path.m_sub_path.has_value(), test_case.m_sub_path.has_value());
+    EXPECT_EQ(path.base_path.utf8(), test_case.m_base_path);
+    ASSERT_EQ(path.sub_path.has_value(), test_case.m_sub_path.has_value());
     if (test_case.m_sub_path)
-      EXPECT_EQ(path.m_sub_path->utf8(), *test_case.m_sub_path);
+      EXPECT_EQ(path.sub_path->utf8(), *test_case.m_sub_path);
     EXPECT_EQ(AssetPath::join(path).utf8(), test_case.m_canonical);
     EXPECT_EQ(AssetPath::join(AssetPath(test_case.m_path)).utf8(), test_case.m_canonical);
   }
@@ -102,9 +102,9 @@ TEST(AssetPathTest, ViewConstructionOwnsOnlyTheSuppliedByteExtent) {
   auto const split = AssetPath::split(String(view));
   owner.assign(owner.size(), '#');
   EXPECT_EQ(path, split);
-  EXPECT_EQ(path.m_base_path.utf8(), "/é/a\0b.png"sv);
-  ASSERT_TRUE(path.m_sub_path);
-  EXPECT_EQ(path.m_sub_path->utf8(), "x\0y"sv);
+  EXPECT_EQ(path.base_path.utf8(), "/é/a\0b.png"sv);
+  ASSERT_TRUE(path.sub_path);
+  EXPECT_EQ(path.sub_path->utf8(), "x\0y"sv);
   EXPECT_EQ(AssetPath::join(path).utf8(), locator);
 }
 
@@ -120,7 +120,7 @@ TEST(AssetPathTest, SubPathEditsNormalizeExistingDirectivesButKeepReplacementRaw
   EXPECT_EQ(AssetPath::remove_sub_path("/a.png:"), "/a.png");
 
   AssetPath components("/a.png");
-  components.m_sub_path.emplace();
+  components.sub_path.emplace();
   EXPECT_EQ(AssetPath::join(components), "/a.png:");
   EXPECT_FALSE(components == AssetPath("/a.png"));
 }
@@ -178,19 +178,19 @@ TEST(AssetPathTest, EmbeddedRecognitionIsStrictAndIdentityIsByteSensitive) {
     EXPECT_FALSE(AssetPath::is_remote(String(path)));
   }
 
-  std::unordered_set<AssetPath, Star::hash<AssetPath>> paths;
+  std::unordered_set<AssetPath, Star::ValueHash<AssetPath>> paths;
   for (std::string_view locator : {"/opensb_data;text;AbC", "/opensb_data;text;aBc", "/A.png:x?flipx",
                                   "/a.png:x?flipx", "/a.png:X?flipx", "/a.png:x?FLIPX"}) {
     AssetPath const path(locator);
     AssetPath const copy = path;
     EXPECT_EQ(path, copy);
-    EXPECT_EQ(Star::hash<AssetPath>{}(path), Star::hash<AssetPath>{}(copy));
+    EXPECT_EQ(Star::ValueHash<AssetPath>{}(path), Star::ValueHash<AssetPath>{}(copy));
     EXPECT_TRUE(paths.insert(path).second);
     EXPECT_FALSE(paths.insert(copy).second);
   }
   AssetPath const no_sub_path("/a.png");
   AssetPath empty_sub_path = no_sub_path;
-  empty_sub_path.m_sub_path.emplace();
+  empty_sub_path.sub_path.emplace();
   EXPECT_TRUE(paths.insert(no_sub_path).second);
   EXPECT_TRUE(paths.insert(empty_sub_path).second);
 }
@@ -198,28 +198,28 @@ TEST(AssetPathTest, EmbeddedRecognitionIsStrictAndIdentityIsByteSensitive) {
 TEST(AssetPathTest, MovesResetSourceComponentsAndPreserveSelfAssignment) {
   AssetPath original("/a.png:frame?flipx?flipy");
   auto const expected = AssetPath::join(original);
-  auto const expected_hash = Star::hash<AssetPath>{}(original);
+  auto const expected_hash = Star::ValueHash<AssetPath>{}(original);
   AssetPath moved(std::move(original));
   EXPECT_EQ(AssetPath::join(moved), expected);
-  EXPECT_EQ(Star::hash<AssetPath>{}(moved), expected_hash);
-  EXPECT_FALSE(original.m_sub_path);
-  EXPECT_TRUE(original.m_directives.empty());
-  EXPECT_EQ(original.m_directives, DirectivesGroup{});
-  EXPECT_EQ(original.m_directives.hash(), DirectivesGroup{}.hash());
+  EXPECT_EQ(Star::ValueHash<AssetPath>{}(moved), expected_hash);
+  EXPECT_FALSE(original.sub_path);
+  EXPECT_TRUE(original.directives.empty());
+  EXPECT_EQ(original.directives, DirectivesGroup{});
+  EXPECT_EQ(original.directives.hash(), DirectivesGroup{}.hash());
 
   AssetPath assigned("/discard.png:discard?flipx");
   assigned = std::move(moved);
   EXPECT_EQ(AssetPath::join(assigned), expected);
-  EXPECT_FALSE(moved.m_sub_path);
-  EXPECT_EQ(moved.m_directives, DirectivesGroup{});
+  EXPECT_FALSE(moved.sub_path);
+  EXPECT_EQ(moved.directives, DirectivesGroup{});
   auto& same_path = assigned;
   assigned = std::move(same_path);
   EXPECT_EQ(AssetPath::join(assigned), expected);
-  EXPECT_EQ(Star::hash<AssetPath>{}(assigned), expected_hash);
+  EXPECT_EQ(Star::ValueHash<AssetPath>{}(assigned), expected_hash);
 
   assigned = AssetPath("/no-sub.png");
-  EXPECT_FALSE(assigned.m_sub_path);
-  EXPECT_TRUE(assigned.m_directives.empty());
+  EXPECT_FALSE(assigned.sub_path);
+  EXPECT_TRUE(assigned.directives.empty());
   original = AssetPath("/reused.png:next?flipy");
   EXPECT_EQ(AssetPath::join(original), "/reused.png:next?flipy");
 }
@@ -238,8 +238,8 @@ TEST(AssetPathTest, ComponentMoveConsumesOptionalAndDirectiveArguments) {
   std::optional<String> empty_sub_path(std::in_place);
   DirectivesGroup empty_directives;
   AssetPath const empty_path(std::move(empty_base), std::move(empty_sub_path), std::move(empty_directives));
-  ASSERT_TRUE(empty_path.m_sub_path);
-  EXPECT_TRUE(empty_path.m_sub_path->empty());
+  ASSERT_TRUE(empty_path.sub_path);
+  EXPECT_TRUE(empty_path.sub_path->empty());
   EXPECT_FALSE(empty_sub_path);
   EXPECT_EQ(AssetPath::join(empty_path), "/empty.png:");
 }
@@ -268,7 +268,7 @@ TEST(AssetPathTest, TruncatedWireLeavesEveryDestinationComponentUnchanged) {
   auto const wire = DataStreamBuffer::serialize(AssetPath("/replacement.png:new?flipx?flipy"));
   ASSERT_TRUE(wire);
   AssetPath const original("/original.png:old:frame?flipy");
-  auto const original_hash = Star::hash<AssetPath>{}(original);
+  auto const original_hash = Star::ValueHash<AssetPath>{}(original);
   for (std::size_t extent = 0; extent < wire->size(); ++extent) {
     SCOPED_TRACE(extent);
     AssetPath destination = original;
@@ -276,6 +276,6 @@ TEST(AssetPathTest, TruncatedWireLeavesEveryDestinationComponentUnchanged) {
     EXPECT_FALSE(read);
     EXPECT_EQ(destination, original);
     EXPECT_EQ(AssetPath::join(destination), "/original.png:old:frame?flipy");
-    EXPECT_EQ(Star::hash<AssetPath>{}(destination), original_hash);
+    EXPECT_EQ(Star::ValueHash<AssetPath>{}(destination), original_hash);
   }
 }

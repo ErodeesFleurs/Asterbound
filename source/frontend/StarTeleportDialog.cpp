@@ -378,14 +378,14 @@ std::expected<void, StarException> TeleportDialog::selectDestination() {
   if (!destList) return std::unexpected(std::move(destList.error()));
   auto button = fetchChild<ButtonWidget>("btnTeleport");
   if (!button) return std::unexpected(std::move(button.error()));
-  (*button)->setEnabled((*destList)->selectedItem() != NPos);
+  (*button)->setEnabled((*destList)->selectedItem() != npos);
   return {};
 }
 
 std::expected<void, StarException> TeleportDialog::teleport() {
   auto destList = fetchChild<ListWidget>("bookmarkList.bookmarkItemList");
   if (!destList) return std::unexpected(std::move(destList.error()));
-  if ((*destList)->selectedItem() != NPos) {
+  if ((*destList)->selectedItem() != npos) {
     auto destination = m_destinations.at((*destList)->selectedItem());
     if (!destination) return std::unexpected(std::move(destination.error()));
     auto& selected = destination->get();

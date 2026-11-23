@@ -168,7 +168,7 @@ std::expected<void, StarException> TabSetWidget::tabSelect(std::size_t page) {
 }
 
 std::size_t TabSetWidget::selectedTab() const {
-  return m_lastSelected.value_or(NPos);
+  return m_lastSelected.value_or(npos);
 }
 
 void TabSetWidget::setCallback(WidgetCallbackFunc callback) {

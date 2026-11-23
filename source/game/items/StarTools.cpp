@@ -1068,17 +1068,17 @@ std::expected<List<Drawable>, StarException> PaintingBeamTool::drawables() const
       auto directivesStart = color.find('?');
       if (!directivesStart)
         return std::unexpected(std::move(directivesStart.error()));
-      if (*directivesStart != NPos) {
+      if (*directivesStart != npos) {
         auto index = color.substr(0, *directivesStart);
         if (!index)
           return std::unexpected(std::move(index.error()));
         auto directives = color.substr(*directivesStart);
         if (!directives)
           return std::unexpected(std::move(directives.error()));
-        image.m_sub_path = image.m_sub_path.value_or("0") + *index;
-        image.m_directives += *directives;
+        image.sub_path = image.sub_path.value_or("0") + *index;
+        image.directives += *directives;
       } else {
-        image.m_sub_path = image.m_sub_path.value_or("0") + color;
+        image.sub_path = image.sub_path.value_or("0") + color;
       }
     }
   }
@@ -1107,7 +1107,7 @@ std::expected<List<PreviewTile>, StarException> PaintingBeamTool::previewTiles(b
   if (!worldResult)
     return std::unexpected(std::move(worldResult.error()));
   auto& worldp = worldResult->get();
-  Vec3B light = Color::White.to_rgb();
+  Vec3B light = Color::palette_white.to_rgb();
   bool inRange = ownerp.isAdmin();
   if (!inRange) {
     auto range = ownerp.inToolRange();

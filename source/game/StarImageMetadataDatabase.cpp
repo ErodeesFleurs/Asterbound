@@ -104,7 +104,7 @@ std::expected<List<Vec2I>, StarException> ImageMetadataDatabase::imageSpaces(Ass
   int imageWidth = (*image)->width();
   int imageHeight = (*image)->height();
   auto const bytes_per_pixel = (*image)->bytes_per_pixel();
-  auto const image_data = (*image)->data();
+  auto const image_data = (*image)->span();
 
   Vec2I min((position / TilePixels).floor());
   Vec2I max(((Vec2F(imageWidth, imageHeight) + position) / TilePixels).ceil());
@@ -198,7 +198,7 @@ std::expected<RectU, StarException> ImageMetadataDatabase::nonEmptyRegion(AssetP
     if (pixels.width() != 0 && pixels.height() != 0)
       region = RectU::with_size(Vec2U(), pixels.size());
   } else if (bytes_per_pixel == 4) {
-    auto const image_data = pixels.data();
+    auto const image_data = pixels.span();
     unsigned min_x = pixels.width(), min_y = pixels.height();
     unsigned max_x = 0, max_y = 0;
     std::size_t offset = 0;
@@ -242,10 +242,10 @@ void ImageMetadataDatabase::cleanup() const {
 }
 
 AssetPath ImageMetadataDatabase::filterProcessing(AssetPath const& path) {
-  AssetPath newPath = {path.m_base_path, path.m_sub_path, {}};
+  AssetPath newPath = {path.base_path, path.sub_path, {}};
 
   String filtered;
-  for (auto const& directives : path.m_directives.list()) {
+  for (auto const& directives : path.directives.list()) {
     auto parsed = directives.operations();
     for (auto const& entry : directives.entries()) {
       ImageOperation const& operation = parsed[entry.index];
@@ -261,7 +261,7 @@ AssetPath ImageMetadataDatabase::filterProcessing(AssetPath const& path) {
     }
   }
 
-  newPath.m_directives = std::move(filtered);
+  newPath.directives = std::move(filtered);
   return newPath;
 }
 
@@ -275,19 +275,19 @@ std::expected<Vec2U, StarException> ImageMetadataDatabase::calculateImageSize(As
       return std::unexpected(std::move(image.error()));
     return (*image)->size();
   };
-  auto exists = (*assets)->asset_exists(path.m_base_path);
+  auto exists = (*assets)->asset_exists(path.base_path);
   if (!exists)
     return std::unexpected(std::move(exists.error()));
   if (!*exists)
     return fallback();
   Vec2U imageSize;
-  if (path.m_sub_path) {
-    auto frames = (*assets)->image_frames(path.m_base_path);
+  if (path.sub_path) {
+    auto frames = (*assets)->image_frames(path.base_path);
     if (!frames)
       return std::unexpected(std::move(frames.error()));
     if (!*frames)
       return fallback();
-    auto rect = (*frames)->get_rect(*path.m_sub_path);
+    auto rect = (*frames)->get_rect(*path.sub_path);
     if (!rect)
       return std::unexpected(std::move(rect.error()));
     if (*rect)
@@ -296,14 +296,14 @@ std::expected<Vec2U, StarException> ImageMetadataDatabase::calculateImageSize(As
       return fallback();
   } else {
     std::unique_lock locker(m_mutex);
-    auto size = m_sizeCache.find_ref(path.m_base_path);
+    auto size = m_sizeCache.find_ref(path.base_path);
     if (!size)
       return std::unexpected(std::move(size.error()));
     if (*size) {
       imageSize = (*size)->get();
     } else {
       locker.unlock();
-      auto file = (*assets)->open_file(path.m_base_path);
+      auto file = (*assets)->open_file(path.base_path);
       if (!file)
         return std::unexpected(std::move(file.error()));
       auto png = Image::is_png(*file);
@@ -321,7 +321,7 @@ std::expected<Vec2U, StarException> ImageMetadataDatabase::calculateImageSize(As
         imageSize = *size;
       }
       locker.lock();
-      auto stored = m_sizeCache.insert_or_assign(path.m_base_path, imageSize);
+      auto stored = m_sizeCache.insert_or_assign(path.base_path, imageSize);
       if (!stored)
         return std::unexpected(std::move(stored.error()));
     }
@@ -388,7 +388,7 @@ std::expected<Vec2U, StarException> ImageMetadataDatabase::calculateImageSize(As
   OperationSizeAdjust osa(imageSize);
 
   bool complete = true;
-  for (auto const& directives : path.m_directives.list()) {
+  for (auto const& directives : path.directives.list()) {
     for (auto const& operation : directives.operations()) {
       std::visit(osa, operation);
       if (osa.hasError) {

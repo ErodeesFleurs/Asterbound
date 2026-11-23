@@ -152,7 +152,7 @@ std::expected<String, StarException> LuaBindings::format_lua(String const& forma
     if (rest.empty()) return std::unexpected(StarException("No specifier following '%'"));
     if (rest.front() == '%') output.push_back('%');
     else if (rest.front() == 's') {
-      auto text = print_lua_value(args.empty() ? LuaNil : args.front());
+      auto text = print_lua_value(args.empty() ? lua_nil : args.front());
       if (!text) return std::unexpected(std::move(text.error()));
       output.append(text->utf8());
       if (!args.empty()) args = args.subspan(1);

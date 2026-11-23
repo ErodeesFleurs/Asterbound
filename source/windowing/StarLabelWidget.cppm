@@ -50,11 +50,11 @@ namespace Star {
 
 class LabelWidget : public Widget {
 public:
-  void const* query_type(TypeKey key) const noexcept override { return query_type_of<LabelWidget, Widget>(this, key); }
+  void query_type(TypeQuery& query) const noexcept override { query_type_of<LabelWidget, Widget>(*this, query); }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<LabelWidget>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<LabelWidget>, StarException> create(GuiContext& context, String text = {},
-      Color const& color = Color::White,
+      Color const& color = Color::palette_white,
       HorizontalAnchor const& hAnchor = HorizontalAnchor::LeftAnchor,
       VerticalAnchor const& vAnchor = VerticalAnchor::BottomAnchor,
       std::optional<unsigned> wrapWidth = {},

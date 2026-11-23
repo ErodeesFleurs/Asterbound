@@ -204,7 +204,7 @@ ItemDescriptor::ItemDescriptor(String name, std::uint64_t count, Json parameters
 
 std::size_t ItemDescriptor::parametersHash() const {
   if (!m_parametersHash)
-    m_parametersHash = hash<Json>()(m_parameters);
+    m_parametersHash = ValueHash<Json>()(m_parameters);
   return *m_parametersHash;
 }
 
@@ -249,7 +249,7 @@ std::expected<void, StarException> write_text(TextBuffer& output, ItemDescriptor
   return {};
 }
 
-std::size_t hash<ItemDescriptor>::operator()(ItemDescriptor const& v) const {
+std::size_t ValueHash<ItemDescriptor>::operator()(ItemDescriptor const& v) const {
   return hash_of(v.m_name, v.m_count, v.m_parametersHash);
 }
 

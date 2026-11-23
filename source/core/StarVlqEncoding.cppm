@@ -53,14 +53,14 @@ template <typename Byte, std::size_t extent> requires vlq_byte<std::remove_const
       return i + 1;
     }
   }
-  return NPos;
+  return npos;
 }
 
 template <typename Byte, std::size_t extent> requires vlq_byte<std::remove_const_t<Byte>>
 [[nodiscard]] constexpr std::size_t read_vlq_i(std::int64_t& value, std::span<Byte, extent> input) noexcept {
   std::uint64_t encoded;
   auto count = read_vlq_u(encoded, input);
-  if (count != NPos) value = zigzag_decode(encoded);
+  if (count != npos) value = zigzag_decode(encoded);
   return count;
 }
 

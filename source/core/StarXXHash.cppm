@@ -86,7 +86,7 @@ template <hash_append_primitive_value Value> inline auto hash_encode_primitive(V
 template <xx_hash_hasher Hasher, hash_append_primitive_value Value>
 static inline void hash_append_primitive(Hasher& hash, Value const& value) {
   auto representation = hash_encode_primitive(value);
-  hash.push({reinterpret_cast<char const*>(&representation), sizeof(representation)});
+  hash.push(std::bit_cast<std::array<char, sizeof(representation)>>(representation));
 }
 
 template <xx_hash_hasher Hasher, typename Value>
@@ -133,7 +133,7 @@ template <xx_hash_hasher Hasher> inline void hash_append(Hasher& hash, std::stri
   hash.push(std::span<char const>(text));
 }
 
-template <xx_hash_hasher Hasher, std::size_t N> inline void hash_append(Hasher& hash, char const (&text)[N]) {
+template <xx_hash_hasher Hasher, std::size_t extent> inline void hash_append(Hasher& hash, char const (&text)[extent]) {
   hash_append(hash, bounded_array_text(text));
 }
 
@@ -146,13 +146,10 @@ template <xx_hash_hasher Hasher> inline void hash_append(Hasher& hash, String co
   hash.push(std::span<char const>(text.utf8()));
 }
 
-// XXH3 historically accepted C-string pointer variables through string_view.
-// Its new std::string overload must not make those calls ambiguous; arrays
-// still take the bounded adapter above. XXH32/64 retain their existing domain.
-template <typename Text>
-  requires(std::same_as<std::remove_cv_t<Text>, char*> || std::same_as<std::remove_cv_t<Text>, char const*>)
-inline void hash_append(XXHash3& hash, Text const& text) {
-  hash_append(hash, std::string_view(text));
+// Prefer string_view over constructing std::string for XXH3's historical
+// C-string inputs. Actual strings and bounded arrays still match exactly.
+inline void hash_append(XXHash3& hash, std::string_view text) {
+  hash_append<XXHash3>(hash, text);
 }
 
 // ADL customizations may return void or an arbitrary temporary whose

@@ -54,17 +54,17 @@ byte_image fixture(Vec2U size, PixelFormat format, unsigned salt = 0) {
 
 Image materialize(byte_image const& input) {
   Image result(input.size, input.format);
-  std::ranges::copy(input.bytes, result.data().begin());
+  std::ranges::copy(input.bytes, result.span().begin());
   return result;
 }
 
 byte_image snapshot(Image const& input) {
-  return {input.size(), input.pixel_format(), {input.data().begin(), input.data().end()}};
+  return {input.size(), input.pixel_format(), {input.span().begin(), input.span().end()}};
 }
 
 bool matches(Image const& actual, byte_image const& expected) {
   return actual.size() == expected.size && actual.pixel_format() == expected.format
-    && std::ranges::equal(actual.data(), expected.bytes);
+    && std::ranges::equal(actual.span(), expected.bytes);
 }
 
 std::uint64_t fingerprint(byte_image const& input) {
@@ -175,7 +175,7 @@ void measure_image(benchmark::State& state, Image output, Action action, std::op
       state.SkipWithError(result.error().what());
       break;
     }
-    benchmark::DoNotOptimize(output.data().data());
+    benchmark::DoNotOptimize(output.span().data());
     benchmark::ClobberMemory();
   }
   if (!require(state, matches(output, expected), "Complete output after timing differs from untimed result"))
@@ -607,7 +607,7 @@ void png_case(benchmark::State& state, bool decode, PixelFormat format) {
         state.SkipWithError(result.error().what());
         break;
       }
-      benchmark::DoNotOptimize(output->ptr());
+      benchmark::DoNotOptimize(output->span().data());
       benchmark::ClobberMemory();
     }
     if (!require(state, std::ranges::equal(output->span(), encoded->span()),
@@ -745,16 +745,16 @@ void measure_image_blend(benchmark::State& state, Star::BlendImageOperation::Ble
   auto side = static_cast<unsigned>(state.range(0));
   auto source_count = static_cast<std::size_t>(state.range(1));
   Star::Image original(side, side);
-  for (std::size_t i = 0; i < original.data().size(); ++i)
-    original.data()[i] = static_cast<std::uint8_t>((i * 29 + 17) % 256);
+  for (std::size_t i = 0; i < original.span().size(); ++i)
+    original.span()[i] = static_cast<std::uint8_t>((i * 29 + 17) % 256);
   std::array<Star::Image, 3> sources;
   std::array<Star::String, 3> names{"first", "second", "third"};
   Star::BlendImageOperation blend{mode, {}, {}};
   for (std::size_t i = 0; i < source_count; ++i) {
     sources[i] = Star::Image(side, side);
-    for (std::size_t j = 0; j < sources[i].data().size(); ++j)
-      sources[i].data()[j] = static_cast<std::uint8_t>((j * 37 + (i + 1) * 53) % 256);
-    blend.blendImages.push_back(names[i]);
+    for (std::size_t j = 0; j < sources[i].span().size(); ++j)
+      sources[i].span()[j] = static_cast<std::uint8_t>((j * 37 + (i + 1) * 53) % 256);
+    blend.blend_images.push_back(names[i]);
   }
   Star::ImageOperation operation = std::move(blend);
   Star::ImageReferenceCallback references =
@@ -765,18 +765,18 @@ void measure_image_blend(benchmark::State& state, Star::BlendImageOperation::Ble
         return std::optional{std::cref(sources[i])};
     return std::nullopt;
   };
-  std::vector<std::uint8_t> expected(original.data().size());
+  std::vector<std::uint8_t> expected(original.span().size());
   for (std::size_t i = 0; i < expected.size(); ++i) {
-    float value = original.data()[i] / 255.0f;
+    float value = original.span()[i] / 255.0f;
     for (std::size_t j = 0; j < source_count; ++j) {
-      float other = sources[j].data()[i] / 255.0f;
+      float other = sources[j].span()[i] / 255.0f;
       value = mode == Star::BlendImageOperation::Multiply ? value * other : 1.0f - (1.0f - value) * (1.0f - other);
     }
     expected[i] = static_cast<std::uint8_t>(std::clamp(value, 0.0f, 1.0f) * 255.0f);
   }
   Star::Image output = original;
   auto validate = [&] {
-    return std::ranges::equal(output.data(), expected);
+    return std::ranges::equal(output.span(), expected);
   };
   auto initial = Star::process_image_operation(operation, output, references);
   if (!initial) {
@@ -790,10 +790,10 @@ void measure_image_blend(benchmark::State& state, Star::BlendImageOperation::Ble
   for (auto _ : state) {
     (void)_;
     state.PauseTiming();
-    std::ranges::copy(original.data(), output.data().begin());
+    std::ranges::copy(original.span(), output.span().begin());
     state.ResumeTiming();
     auto result = Star::process_image_operation(operation, output, references);
-    benchmark::DoNotOptimize(output.data().data());
+    benchmark::DoNotOptimize(output.span().data());
     if (!result) {
       state.SkipWithError(result.error().what());
       return;
@@ -885,7 +885,7 @@ void register_rows() {
 int main(int argc, char** argv) {
   return Star::run_benchmarks(argc, argv, [](int) {
     if (!validate_boundaries()) {
-      if (!Star::print(stderr, "Image benchmark untimed byte/golden/error-boundary validator failed\n"))
+      if (!Star::print(*stderr, "Image benchmark untimed byte/golden/error-boundary validator failed\n"))
         return 1;
       return 1;
     }

@@ -109,8 +109,8 @@ export namespace Star {
 
 class CodexItem : public Item, public SwingableItem {
 public:
-  void const* query_type(TypeKey key) const noexcept override {
-    return query_type_of<CodexItem, Item, SwingableItem>(this, key);
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<CodexItem, Item, SwingableItem>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<CodexItem>(); }
 

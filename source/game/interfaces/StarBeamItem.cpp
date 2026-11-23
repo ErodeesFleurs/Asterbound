@@ -128,7 +128,7 @@ std::expected<void, StarException> BeamItem::initializeBeam(Json config) {
       return std::unexpected(std::move(value.error()));
     target.get() = *value;
   }
-  m_color = Color::White;
+  m_color = Color::palette_white;
   m_inRangeLastUpdate = false;
   return {};
 }
@@ -373,7 +373,7 @@ std::expected<List<Drawable>, StarException> BeamItem::beamDrawables() const {
         auto ball = Drawable::makeImage(**metadata, endImage, 1.0f / TilePixels, true, m_beam_curve.dest());
         if (!ball)
           return std::unexpected(std::move(ball.error()));
-        Color ballColor = Color::White;
+        Color ballColor = Color::palette_white;
         auto opacity = getAppropriateOpacity();
         if (!opacity)
           return std::unexpected(std::move(opacity.error()));
