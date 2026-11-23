@@ -166,7 +166,7 @@ std::expected<std::shared_ptr<CodexItem>, StarException> CodexItem::create(Root&
   if (!icon)
     return std::unexpected(std::move(icon.error()));
   item->m_iconDrawables = {std::move(*icon)};
-  auto worldDrawable = Drawable::makeImage(**metadata, *iconPath, 1.0f / TilePixels, true, Vec2F());
+  auto worldDrawable = Drawable::makeImage(**metadata, *iconPath, 1.0f / tile_pixels, true, Vec2F());
   if (!worldDrawable)
     return std::unexpected(std::move(worldDrawable.error()));
   item->m_worldDrawables = {std::move(*worldDrawable)};

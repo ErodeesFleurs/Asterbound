@@ -172,7 +172,7 @@ std::expected<bool, StarException> SystemWorldServerThread::start() {
 
 std::expected<void, StarException> SystemWorldServerThread::run() {
   auto stopToken = m_stopSource.get_token();
-  TickRateApproacher tick_approacher(1.0 / SystemWorldTimestep, 0.5);
+  TickRateApproacher tick_approacher(1.0 / system_world_time_step, 0.5);
   while (!stopToken.stop_requested()) {
     m_systemWorld->root().logMap().set(Star::format("system_{}_update_rate", m_systemLocation), Star::format("{:4.2f}Hz", tick_approacher.rate()));
     auto updated = update();
@@ -213,7 +213,7 @@ std::expected<void, StarException> SystemWorldServerThread::update() {
       return std::unexpected(std::move(acted.error()));
   }
   if (!m_pause || !*m_pause) {
-    auto updated = m_systemWorld->update(SystemWorldTimestep * m_systemWorld->root().timing().timescale);
+    auto updated = m_systemWorld->update(system_world_time_step * m_systemWorld->root().timing().time_scale);
     if (!updated)
       return std::unexpected(std::move(updated.error()));
   }

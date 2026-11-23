@@ -253,8 +253,8 @@ std::expected<Json, StarException> Tileset::getTilesetJson(String const& tileset
         {"properties", JsonObject{}},
         {"spacing", 0},
         {"tilecount", m_tiles.size()},
-        {"tileheight", TilePixels},
-        {"tilewidth", TilePixels},
+        {"tileheight", tile_pixels},
+        {"tilewidth", tile_pixels},
         {"tiles", JsonObject{}},
         {"tileproperties", JsonObject{}}};
   }

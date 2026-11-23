@@ -443,7 +443,7 @@ for (auto const& drop : option) {
   auto result321 = this->root().random().uniform_float(-0.2f, 0.2f);
   if (!result321)
     return std::unexpected(std::move(result321.error()));
-  Vec2F pos = Vec2F(plantPiece.offset + Vec2F(size) * .5f / TilePixels).rotate(m_movementController->rotation())
+  Vec2F pos = Vec2F(plantPiece.offset + Vec2F(size) * .5f / tile_pixels).rotate(m_movementController->rotation())
     + Vec2F(std::move(*result320), std::move(*result321));
   auto result322 = drop.get_string("item");
   if (!result322)
@@ -526,12 +526,12 @@ auto imgMetadata = std::move(*result298);
 
   auto result299 = imgMetadata->imageSize(piece.image);
 if (!result299) return std::unexpected(std::move(result299.error()));
-Vec2F imageSize = Vec2F(std::move(*result299)) / TilePixels;
+Vec2F imageSize = Vec2F(std::move(*result299)) / tile_pixels;
   auto result300 = particleConfig.get_float("density", 1);
 if (!result300) return std::unexpected(std::move(result300.error()));
 float density = (imageSize.x() * imageSize.y()) / std::move(*result300);
 
-  auto result301 = imgMetadata->imageSpaces(piece.image, piece.offset * TilePixels, Plant::PlantScanThreshold, piece.flip);
+  auto result301 = imgMetadata->imageSpaces(piece.image, piece.offset * tile_pixels, Plant::PlantScanThreshold, piece.flip);
 if (!result301) return std::unexpected(std::move(result301.error()));
 auto spaces = Set<Vec2I>::from(std::move(*result301));
   if (spaces.empty())
@@ -696,7 +696,7 @@ std::expected<void, StarException> PlantDrop::render(RenderCallback& renderCallb
     for (auto const& plantPiece : m_pieces) {
       auto result293 = this->root().imageMetadataDatabase();
 if (!result293) return std::unexpected(std::move(result293.error()));
-auto result1284 = Drawable::makeImage(*std::move(*result293), plantPiece.image, 1.0f / TilePixels, false, plantPiece.offset);
+auto result1284 = Drawable::makeImage(*std::move(*result293), plantPiece.image, 1.0f / tile_pixels, false, plantPiece.offset);
 if (!result1284) return std::unexpected(std::move(result1284.error()));
 auto drawable = std::move(*result1284);
       if (plantPiece.flip)

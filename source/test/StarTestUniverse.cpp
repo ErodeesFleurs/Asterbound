@@ -500,7 +500,7 @@ TestUniverse::waitForWorldReady(std::int64_t timeoutMilliseconds) {
           return std::unexpected(std::move(active.error()));
         schedulesReady = *active && step > ready.firstServerStep;
         expiryTime = world.expiryTime();
-        float dt = world.root().timing().serverTimestep * world.root().timing().timescale;
+        float dt = world.root().timing().server_time_step * world.root().timing().time_scale;
 
         auto settled = [&](Observation& observation, double period) {
           observation.present = true;

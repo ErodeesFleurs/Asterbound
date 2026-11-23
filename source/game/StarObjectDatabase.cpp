@@ -132,7 +132,7 @@ std::expected<ObjectOrientation::ParticleEmissionEntry, StarException> ObjectOri
     return std::unexpected(std::move(particleVarianceResult.error()));
   auto particleVariance = std::move(*particleVarianceResult);
   result.particleVariance = std::move(particleVariance);
-  auto originConfigResult = config.get("pixelOrigin", JsonArray{TilePixels / 2, TilePixels / 2});
+  auto originConfigResult = config.get("pixelOrigin", JsonArray{tile_pixels / 2, tile_pixels / 2});
   if (!originConfigResult)
     return std::unexpected(std::move(originConfigResult.error()));
   auto originConfig = std::move(*originConfigResult);
@@ -140,7 +140,7 @@ std::expected<ObjectOrientation::ParticleEmissionEntry, StarException> ObjectOri
   if (!originResult)
     return std::unexpected(std::move(originResult.error()));
   auto origin = std::move(*originResult);
-  result.particle.position += origin / TilePixels;
+  result.particle.position += origin / tile_pixels;
   auto placeInSpacesResult = config.get_bool("placeInSpaces", false);
   if (!placeInSpacesResult)
     return std::unexpected(std::move(placeInSpacesResult.error()));
@@ -381,7 +381,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
         if (!drawableResult)
           return std::unexpected(std::move(drawableResult.error()));
         auto drawable = std::move(*drawableResult);
-        drawable.scale(1.0f / TilePixels);
+        drawable.scale(1.0f / tile_pixels);
         orientation->imageLayers.push_back(std::move(drawable));
       }
     } else {
@@ -390,7 +390,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
         return std::unexpected(std::move(imageResult.error()));
       auto image = std::move(*imageResult);
       auto drawableResult =
-        Drawable::makeImage(*imageMetadata, AssetPath::relative_to(path, image), 1.0 / TilePixels, false, {});
+        Drawable::makeImage(*imageMetadata, AssetPath::relative_to(path, image), 1.0 / tile_pixels, false, {});
       if (!drawableResult)
         return std::unexpected(std::move(drawableResult.error()));
       auto drawable = std::move(*drawableResult);
@@ -423,7 +423,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
     if (!imagePositionResult)
       return std::unexpected(std::move(imagePositionResult.error()));
     auto imagePosition = std::move(*imagePositionResult);
-    orientation->imagePosition = imagePosition / TilePixels;
+    orientation->imagePosition = imagePosition / tile_pixels;
     auto framesResult = orientationSettings.get_int("frames", 1);
     if (!framesResult)
       return std::unexpected(std::move(framesResult.error()));
@@ -465,7 +465,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
           if (!thresholdResult)
             return std::unexpected(std::move(thresholdResult.error()));
           auto threshold = std::move(*thresholdResult);
-          auto scannedResult = imageMetadata->imageSpaces(image, imagePosition + (layer.position + layer.imagePart().transformation.transform_point(Vec2F())) * TilePixels, threshold, orientation->flipImages);
+          auto scannedResult = imageMetadata->imageSpaces(image, imagePosition + (layer.position + layer.imagePart().transformation.transform_point(Vec2F())) * tile_pixels, threshold, orientation->flipImages);
           if (!scannedResult)
             return std::unexpected(std::move(scannedResult.error()));
           auto scanned = std::move(*scannedResult);
@@ -576,7 +576,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
       if (!directionResult)
         return std::unexpected(std::move(directionResult.error()));
       auto direction = std::move(*directionResult);
-      auto affinityResult = enum_value<DirectionNames>(direction);
+      auto affinityResult = enum_value<direction_names>(direction);
       if (!affinityResult)
         return std::unexpected(std::move(affinityResult.error()));
       orientation->directionAffinity = *affinityResult;
@@ -1420,7 +1420,7 @@ std::expected<List<Drawable>, StarException> ObjectDatabase::cursorHintDrawables
       return std::unexpected(std::move(imagePositionResult.error()));
     auto imagePosition = std::move(*imagePositionResult);
     auto drawableResult = Drawable::makeImage(*imageMetadata, AssetPath::relative_to(config->path, *placementImage),
-                                              1.0 / TilePixels, false, Vec2F(position) + imagePosition / TilePixels);
+                                              1.0 / tile_pixels, false, Vec2F(position) + imagePosition / tile_pixels);
     if (!drawableResult)
       return std::unexpected(std::move(drawableResult.error()));
     auto drawable = std::move(*drawableResult);

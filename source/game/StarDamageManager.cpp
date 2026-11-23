@@ -45,10 +45,6 @@ import star.line;
 import star.algorithm;
 namespace Star {
 
-ConnectionId RemoteHitRequest::destinationConnection() const {
-  return connectionForEntity(causingEntityId);
-}
-
 std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, RemoteHitRequest const& hitRequest) {
   auto result = ds << hitRequest.causingEntityId << hitRequest.targetEntityId << hitRequest.damageRequest;
   if (!result) return std::unexpected(std::move(result.error()));
@@ -59,10 +55,6 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
   auto result = ds >> hitRequest.causingEntityId >> hitRequest.targetEntityId >> hitRequest.damageRequest;
   if (!result) return std::unexpected(std::move(result.error()));
   return std::ref(ds);
-}
-
-ConnectionId RemoteDamageRequest::destinationConnection() const {
-  return connectionForEntity(targetEntityId);
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, RemoteDamageRequest const& damageRequest) {
@@ -177,7 +169,7 @@ std::expected<void, StarException> DamageManager::update(float dt) {
 }
 
 std::expected<void, StarException> DamageManager::pushRemoteHitRequest(RemoteHitRequest const& remoteHitRequest) {
-  if (remoteHitRequest.destinationConnection() != m_connectionId)
+  if (remoteHitRequest.destination_connection() != m_connectionId)
     return std::unexpected(StarException("RemoteDamageRequest routed to wrong DamageManager"));
 
   if (auto causingEntity = m_world.get().entity(remoteHitRequest.causingEntityId)) {
@@ -190,7 +182,7 @@ std::expected<void, StarException> DamageManager::pushRemoteHitRequest(RemoteHit
 }
 
 std::expected<void, StarException> DamageManager::pushRemoteDamageRequest(RemoteDamageRequest const& remoteDamageRequest) {
-  if (remoteDamageRequest.destinationConnection() != m_connectionId)
+  if (remoteDamageRequest.destination_connection() != m_connectionId)
     return std::unexpected(StarException("RemoteDamageRequest routed to wrong DamageManager"));
 
   if (auto targetEntity = m_world.get().entity(remoteDamageRequest.targetEntityId)) {
@@ -292,30 +284,37 @@ bool DamageManager::isAuthoritative(std::shared_ptr<Entity> const& causingEntity
   // master-only entities whose interactions are always decided on the machine
   // they are residing on.
 
-  auto causingClient = connectionForEntity(causingEntity->entityId());
-  auto targetClient = connectionForEntity(targetEntity->entityId());
-
   if (causingEntity->masterOnly() || targetEntity->masterOnly())
     return true;
-  else if (causingClient == ServerConnectionId && targetClient == ServerConnectionId)
-    return m_connectionId == ServerConnectionId;
-  else if (causingClient != ServerConnectionId && targetClient != ServerConnectionId && causingClient != targetClient)
-    return m_connectionId == ServerConnectionId;
-  else if (targetClient == ServerConnectionId)
-    return causingClient == m_connectionId;
+  auto causing_owner = connection_for_entity(causingEntity->entityId());
+  auto target_owner = connection_for_entity(targetEntity->entityId());
+  if (!causing_owner || !target_owner)
+    return false;
+  if (*causing_owner == server_connection_id && *target_owner == server_connection_id)
+    return m_connectionId == server_connection_id;
+  else if (*causing_owner != server_connection_id && *target_owner != server_connection_id && *causing_owner != *target_owner)
+    return m_connectionId == server_connection_id;
+  else if (*target_owner == server_connection_id)
+    return *causing_owner == m_connectionId;
   else
-    return targetClient == m_connectionId;
+    return *target_owner == m_connectionId;
 }
 
 std::expected<void, StarException> DamageManager::addHitRequest(RemoteHitRequest const& remoteHitRequest) {
-  if (remoteHitRequest.destinationConnection() == m_connectionId)
+  auto owner = remoteHitRequest.destination_connection();
+  if (!owner)
+    return std::unexpected(StarException("Cannot route hit from an unowned entity"));
+  if (*owner == m_connectionId)
     return pushRemoteHitRequest(remoteHitRequest);
   m_pendingRemoteHitRequests.push_back(remoteHitRequest);
   return {};
 }
 
 std::expected<void, StarException> DamageManager::addDamageRequest(RemoteDamageRequest remoteDamageRequest) {
-  if (remoteDamageRequest.destinationConnection() == m_connectionId)
+  auto owner = remoteDamageRequest.destination_connection();
+  if (!owner)
+    return std::unexpected(StarException("Cannot route damage to an unowned entity"));
+  if (*owner == m_connectionId)
     return pushRemoteDamageRequest(std::move(remoteDamageRequest));
   m_pendingRemoteDamageRequests.push_back(std::move(remoteDamageRequest));
   return {};

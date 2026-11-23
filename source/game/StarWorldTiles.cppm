@@ -126,7 +126,7 @@ struct ServerTile : public WorldTile {
   // Do not serialize - calculated at runtime
   CollisionKind objectCollision;
 };
-using ServerTileSectorArray = TileSectorArray<ServerTile, WorldSectorSize>;
+using ServerTileSectorArray = TileSectorArray<ServerTile, world_sector_size>;
 
 struct ClientTile : public WorldTile {
   ClientTile();
@@ -141,7 +141,7 @@ struct ClientTile : public WorldTile {
 
   float gravity;
 };
-using ClientTileSectorArray = TileSectorArray<ClientTile, WorldSectorSize>;
+using ClientTileSectorArray = TileSectorArray<ClientTile, world_sector_size>;
 
 // Tile structure to transfer all data from client to server
 struct NetTile {
@@ -254,7 +254,7 @@ inline WorldTile::WorldTile()
     backgroundColorVariant(DefaultMaterialColorVariant),
     blockBiomeIndex(),
     environmentBiomeIndex(),
-    dungeonId(NoDungeonId) {}
+    dungeonId(no_dungeon_id) {}
 
 inline WorldTile::WorldTile(WorldTile const& worldTile) {
   *this = worldTile;
@@ -353,7 +353,7 @@ inline NetTile::NetTile()
     collision(),
     blockBiomeIndex(),
     environmentBiomeIndex(),
-    dungeonId(NoDungeonId) {}
+    dungeonId(no_dungeon_id) {}
 
 template <typename Hasher>
 inline void RenderTile::hashPushTerrain(Hasher& hasher) const {

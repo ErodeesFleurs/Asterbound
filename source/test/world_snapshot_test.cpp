@@ -593,21 +593,21 @@ const GameTestRegistration stoppedWorldRetainsClientsAndExportsRecoverableChunks
     auto threadResult = WorldServerThread::create(world, ClientShipWorldId(Uuid(fixture.root().random())));
     ASSERT_TRUE(threadResult) << threadResult.error().what();
     auto& thread = **threadResult;
-    auto added = thread.addClient(MinClientConnectionId, SpawnTargetPosition(Vec2F(1024, 1024)), true, false,
-                                  NetCompatibilityRules{}, MainClientWorldId);
+    auto added = thread.addClient(min_client_connection_id, SpawnTargetPosition(Vec2F(1024, 1024)), true, false,
+                                  NetCompatibilityRules{}, main_client_world_id);
     ASSERT_TRUE(added) << added.error().what();
     ASSERT_TRUE(*added);
     ASSERT_TRUE(thread.start());
     ASSERT_TRUE(thread.stop());
 
     // UniverseServer still needs this list to migrate players after joining.
-    ASSERT_TRUE(thread.hasClient(MinClientConnectionId));
+    ASSERT_TRUE(thread.hasClient(min_client_connection_id));
     EXPECT_EQ(thread.clients().size(), 1u);
     EXPECT_FALSE(thread.serverErrorOccurred());
     auto descriptor = ItemDescriptor::create("money", 7, Json());
     ASSERT_TRUE(descriptor) << descriptor.error().what();
     auto finalItem = std::make_shared<GiveItemPacket>(std::move(*descriptor));
-    auto sent = world->sendPacket(MinClientConnectionId, finalItem);
+    auto sent = world->sendPacket(min_client_connection_id, finalItem);
     ASSERT_TRUE(sent);
 
     // An asynchronous warp may wait for its destination.  Merely queueing it
@@ -615,7 +615,7 @@ const GameTestRegistration stoppedWorldRetainsClientsAndExportsRecoverableChunks
     auto waitingChunks = thread.readChunks();
     ASSERT_TRUE(waitingChunks) << waitingChunks.error().what();
     ASSERT_FALSE(waitingChunks->empty());
-    ASSERT_TRUE(thread.hasClient(MinClientConnectionId));
+    ASSERT_TRUE(thread.hasClient(min_client_connection_id));
     ASSERT_TRUE(storage->is_open());
 
     // Ship/custom-world snapshots are exported after stop, before final close.
@@ -624,7 +624,7 @@ const GameTestRegistration stoppedWorldRetainsClientsAndExportsRecoverableChunks
     ASSERT_TRUE(chunks) << chunks.error().what();
     ASSERT_FALSE(chunks->empty());
     ASSERT_FALSE(thread.serverErrorOccurred());
-    auto finalPackets = thread.removeClient(MinClientConnectionId);
+    auto finalPackets = thread.removeClient(min_client_connection_id);
     ASSERT_TRUE(finalPackets) << finalPackets.error().what();
     ASSERT_FALSE(finalPackets->empty());
     auto transport = LocalPacketSocket::openPair();
@@ -855,11 +855,11 @@ const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
       states[i]->setNetCompatibilityRules(rules);
       states[i]->setClientPresenceEntities({(*anchor)->entityId()});
       auto added =
-        world->addClient(MinClientConnectionId + i, SpawnTargetPosition(Vec2F(1024, 1024)), true, false, rules);
+        world->addClient(min_client_connection_id + i, SpawnTargetPosition(Vec2F(1024, 1024)), true, false, rules);
       ASSERT_TRUE(added) << added.error().what();
       ASSERT_TRUE(*added);
       ASSERT_TRUE(
-        world->handleIncomingPackets(MinClientConnectionId + i, {std::make_shared<WorldStartAcknowledgePacket>()}));
+        world->handleIncomingPackets(min_client_connection_id + i, {std::make_shared<WorldStartAcknowledgePacket>()}));
     }
     std::array<HashMap<EntityId, std::shared_ptr<Entity>>, 2> visible;
     std::array<HashMap<Vec2I, NetTile>, 2> clientTiles;
@@ -878,14 +878,14 @@ const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
         states[i]->setWindow(phase == 1 ? RectI(1472, 960, 1664, 1088) : RectI(960, 960, 1152, 1088));
         auto delta = states[i]->writeDelta();
         ASSERT_TRUE(delta) << delta.error().what();
-        ASSERT_TRUE(world->handleIncomingPackets(MinClientConnectionId + i,
+        ASSERT_TRUE(world->handleIncomingPackets(min_client_connection_id + i,
                                                  {std::make_shared<WorldClientStateUpdatePacket>(*delta)}));
       }
       ASSERT_TRUE(world->setLiquid(Vec2I(1100, 1004), LiquidId(1), 0.5f + phase * 0.1f, 0.5f));
       ASSERT_TRUE(world->update(1.0f / 60.0f));
       for (unsigned i = 0; i < states.size(); ++i) {
         NetCompatibilityRules rules(i ? legacy_version : open_protocol_version);
-        auto packets = world->getOutgoingPackets(MinClientConnectionId + i);
+        auto packets = world->getOutgoingPackets(min_client_connection_id + i);
         ASSERT_TRUE(packets) << packets.error().what();
         bool updateSetSeen = false;
         bool stepSeen = false;

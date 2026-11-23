@@ -70,7 +70,7 @@ std::expected<std::shared_ptr<WorldClientState>, StarException> WorldClientState
 }
 
 WorldClientState::WorldClientState() {
-  m_playerId.set(NullEntityId);
+  m_playerId.set(null_entity_id);
 
   m_netVersion = 0;
 }

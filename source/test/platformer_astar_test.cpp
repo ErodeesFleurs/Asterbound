@@ -45,8 +45,8 @@ template <platform_world_callback Callback> void with_platform_world(GameTest& f
   world->setTileProtectionEnabled(false);
   Vec2I origin(1024, 1024);
   ASSERT_TRUE(world->generateRegion(RectI::with_size(origin - Vec2I(20, 16), Vec2I(40, 40))));
-  ASSERT_TRUE(world->setDungeonGravity(NoDungeonId, 60.0f));
-  ASSERT_TRUE(world->setDungeonGravity(ConstructionDungeonId, 60.0f));
+  ASSERT_TRUE(world->setDungeonGravity(no_dungeon_id, 60.0f));
+  ASSERT_TRUE(world->setDungeonGravity(construction_dungeon_id, 60.0f));
   auto materials = root.materialDatabase();
   ASSERT_TRUE(materials) << materials.error().what();
   auto dirt = (*materials)->materialId("dirt");

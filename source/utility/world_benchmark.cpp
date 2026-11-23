@@ -245,7 +245,7 @@ static std::expected<void, StarException> run(std::span<String const> argv) {
         if (auto written = Star::print("[{}] {}s | FPS: {} | Entities: {}\n", j, std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count(), fps, entityCount); !written)
           return std::unexpected(std::move(written.error()));
       }
-      auto updated = worldServer.update(root->timing().serverTimestep * root->timing().timescale);
+      auto updated = worldServer.update(root->timing().server_time_step * root->timing().time_scale);
       if (!updated)
         return std::unexpected(std::move(updated.error()));
     }

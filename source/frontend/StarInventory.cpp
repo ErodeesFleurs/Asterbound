@@ -455,7 +455,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
                     return std::unexpected(std::move(setResult35.error()));
                   actionData = std::move(*setResult35);
                 }
-              InteractAction action(actionType, NullEntityId, actionData);
+              InteractAction action(actionType, null_entity_id, actionData);
               auto interactResult36 = m_player->interact(action);
               if (!interactResult36)
                 return std::unexpected(std::move(interactResult36.error()));

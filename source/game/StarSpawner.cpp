@@ -504,7 +504,7 @@ std::expected<void, StarException> Spawner::spawnInCell(Vec2I const& cell) {
           (*entity)->setKeepAlive(true);
           auto id = m_facade->spawnEntity(*entity);
           if (!id) return std::unexpected(std::move(id.error()));
-          if (*id != NullEntityId) m_spawnedEntities.add(*id);
+          if (*id != null_entity_id) m_spawnedEntities.add(*id);
           if (m_debug) m_debugSpawnInfo[cell].spawns++;
         }
       }

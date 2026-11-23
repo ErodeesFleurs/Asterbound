@@ -1398,7 +1398,7 @@ namespace LuaBindings {
             std::optional<std::uint64_t> knownRevision) -> std::expected<std::optional<LuaTable>, StarException> {
       auto entity = world.get<PortraitEntity>(id);
       if (!entity) return {};
-      auto mode = enum_value<PortraitModeNames>(modeName);
+      auto mode = enum_value<portrait_mode_names>(modeName);
       if (!mode) return std::unexpected(std::move(mode.error()));
       auto portrait = entity->portrait(*mode);
       if (!portrait) return std::unexpected(std::move(portrait.error()));
@@ -2074,7 +2074,7 @@ namespace LuaBindings {
     if (auto result = callbacks.register_callback(
           "radialTileQuery",
           [&world](Vec2F center, float radius, String layerName) -> std::expected<List<Vec2I>, StarException> {
-            auto layerPointerResult = enum_value<TileLayerNames>(layerName);
+            auto layerPointerResult = enum_value<tile_layer_names>(layerName);
             if (!layerPointerResult)
               return std::unexpected(std::move(layerPointerResult.error()));
             auto layerPointer = std::move(*layerPointerResult);
@@ -2755,7 +2755,7 @@ namespace LuaBindings {
       auto projectile = std::move(*projectileResult);
       projectile->setInitialPosition(spawnPosition);
       projectile->setInitialDirection(projectileDirection.value_or(Vec2F{}));
-      projectile->setSourceEntity(sourceEntityId.value_or(NullEntityId), trackSourceEntity);
+      projectile->setSourceEntity(sourceEntityId.value_or(null_entity_id), trackSourceEntity);
       if (auto operation = world.addEntity(projectile); !operation)
         return std::unexpected(std::move(operation.error()));
       return projectile->inWorld() ? std::optional<EntityId>(projectile->entityId()) : std::nullopt;
@@ -3325,7 +3325,7 @@ namespace LuaBindings {
       gender = npc->gender();
     if (!gender)
       return {};
-    auto namePointerResult = enum_name<GenderNames>(*gender);
+    auto namePointerResult = enum_name<gender_names>(*gender);
     if (!namePointerResult)
       return std::unexpected(std::move(namePointerResult.error()));
     auto namePointer = std::move(*namePointerResult);
@@ -3402,7 +3402,7 @@ namespace LuaBindings {
   std::expected<std::optional<List<Drawable>>, StarException>
   WorldEntityCallbacks::entityPortrait(World& world, EntityId entityId, String const& portraitMode) {
     if (auto entity = as<PortraitEntity>(world.entity(entityId))) {
-      auto modePointerResult = enum_value<PortraitModeNames>(portraitMode);
+      auto modePointerResult = enum_value<portrait_mode_names>(portraitMode);
       if (!modePointerResult)
         return std::unexpected(std::move(modePointerResult.error()));
       auto modePointer = std::move(*modePointerResult);

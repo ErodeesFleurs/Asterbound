@@ -190,7 +190,7 @@ static std::expected<void, StarException> run_server(std::span<String const> arg
       auto updateRate = rateSetting->to_float();
       if (!updateRate)
         return std::unexpected(std::move(updateRate.error()));
-      root->timing().serverTimestep = root->timing().timestep = 1.0f / *updateRate;
+      root->timing().server_time_step = root->timing().time_step = 1.0f / *updateRate;
       auto rateLogged = root->logger().info("Configured tick rate is {:4.2f}hz", *updateRate);
       if (!rateLogged)
         return std::unexpected(std::move(rateLogged.error()));

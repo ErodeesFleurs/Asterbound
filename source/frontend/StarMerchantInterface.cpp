@@ -459,7 +459,7 @@ std::expected<void, StarException> MerchantPane::dismissed() {
       
     }
 
-  if (m_sourceEntityId != NullEntityId)
+  if (m_sourceEntityId != null_entity_id)
     {
       auto sendEntityMessageResult614 = m_worldClient->sendEntityMessage(m_sourceEntityId, "onMerchantClosed");
       if (!sendEntityMessageResult614)
@@ -518,7 +518,7 @@ std::expected<void, StarException> MerchantPane::update(float dt) {
     return std::unexpected(std::move(updateResult622.error()));
 
   {
-    bool condition624 = static_cast<bool>(m_sourceEntityId != NullEntityId);
+    bool condition624 = static_cast<bool>(m_sourceEntityId != null_entity_id);
     if (condition624) {
       auto playerCanReachEntityResult623 = m_worldClient->playerCanReachEntity(m_sourceEntityId);
       if (!playerCanReachEntityResult623)
@@ -529,7 +529,7 @@ std::expected<void, StarException> MerchantPane::update(float dt) {
       dismiss();
   }
 
-  if (m_refreshTimer.wrapTick(context().root().timing().timestep)) {
+  if (m_refreshTimer.wrapTick(context().root().timing().time_step)) {
     for (std::size_t i = 0; i < m_itemList.size(); ++i) {
       auto itemConfig = m_itemList.get(i);
       auto itemWidget = m_itemGuiList->itemAt(i);
@@ -885,7 +885,7 @@ std::expected<void, StarException> MerchantPane::buy() {
     auto reportItem = std::move(*cloneResult678);
     reportItem->setCount(reportItem->count() * m_buyCount, true);
     auto buySummary = JsonObject{{"item", reportItem->descriptor().toJson()}, {"total", m_buyTotal}};
-    if (m_sourceEntityId != NullEntityId)
+    if (m_sourceEntityId != null_entity_id)
       {
         auto sendEntityMessageResult679 = m_worldClient->sendEntityMessage(m_sourceEntityId, "onBuy", {buySummary});
         if (!sendEntityMessageResult679)

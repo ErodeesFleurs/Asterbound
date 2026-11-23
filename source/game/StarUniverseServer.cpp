@@ -398,7 +398,7 @@ std::expected<void, StarException> UniverseServer::setPause(bool pause) {
   locker.unlock();
 
   for (auto& p : m_clients) {
-    if (auto result = m_connectionServer->sendPackets(p.first, {std::make_shared<PausePacket>(*m_pause, m_root.timing().timescale)}); !result)
+    if (auto result = m_connectionServer->sendPackets(p.first, {std::make_shared<PausePacket>(*m_pause, m_root.timing().time_scale)}); !result)
       return std::unexpected(std::move(result.error()));
   }
   return {};
@@ -406,16 +406,16 @@ std::expected<void, StarException> UniverseServer::setPause(bool pause) {
 
 std::expected<void, StarException> UniverseServer::setTimescale(float timescale) {
   std::shared_lock clientsLocker(m_clientsLock);
-  m_root.timing().timescale = timescale;
+  m_root.timing().time_scale = timescale;
   for (auto& p : m_clients) {
-    if (auto result = m_connectionServer->sendPackets(p.first, {std::make_shared<PausePacket>(*m_pause, m_root.timing().timescale)}); !result)
+    if (auto result = m_connectionServer->sendPackets(p.first, {std::make_shared<PausePacket>(*m_pause, m_root.timing().time_scale)}); !result)
       return std::unexpected(std::move(result.error()));
   }
   return {};
 }
 
 void UniverseServer::setTickRate(float tickRate) {
-  m_root.timing().serverTimestep = 1.0f / tickRate;
+  m_root.timing().server_time_step = 1.0f / tickRate;
 }
 
 std::expected<List<WorldId>, StarException> UniverseServer::activeWorlds() const {
@@ -1870,7 +1870,7 @@ std::expected<void, StarException> UniverseServer::warpPlayers() {
           return std::unexpected(std::move(logged.error()));
         if (auto toWorld = **created) {
           locker.unlock();
-          auto clientAdded = toWorld->addClient(mainToSubWorldConnectionId(clientId), SpawnTarget(), !clientContext->remoteAddress(), clientContext->canBecomeAdmin(), clientContext->netRules(), swid);
+          auto clientAdded = toWorld->addClient(main_to_sub_world_connection_id(clientId), SpawnTarget(), !clientContext->remoteAddress(), clientContext->canBecomeAdmin(), clientContext->netRules(), swid);
           lock_with_diagnostics(locker);
           if (!clientAdded)
             return std::unexpected(std::move(clientAdded.error()));
@@ -2406,10 +2406,10 @@ std::expected<void, StarException> UniverseServer::shutdownInactiveWorlds() {
           if (auto logged = m_root.logger().info("UniverseServer: World {} shutdown, kicking/removing {} players/subworlds", *name, world->clients().size()); !logged)
             return std::unexpected(std::move(logged.error()));
           for (auto clientId : world->clients()) {
-            if (clientId >= MinClientSubWorldConnectionId) {
+            if (clientId >= min_client_sub_world_connection_id) {
               // subworlds are immediately removed
               auto swid = world->clientSubWorld(clientId);
-              auto cid = subWorldToMainConnectionId(clientId);
+              auto cid = sub_world_to_main_connection_id(clientId);
               auto packets = world->removeClient(clientId);
               if (!packets) {
                 auto finalPackets = world->pullOutgoingPackets(clientId);
@@ -3070,7 +3070,7 @@ std::expected<void, StarException> UniverseServer::addCelestialRequests(Connecti
 std::expected<void, StarException> UniverseServer::worldUpdated(WorldServerThread& server) {
   for (auto clientId : server.clients()) {
     auto packets = server.pullOutgoingPackets(clientId);
-    auto target = clientId >= MinClientSubWorldConnectionId ? subWorldToMainConnectionId(clientId) : clientId;
+    auto target = clientId >= min_client_sub_world_connection_id ? sub_world_to_main_connection_id(clientId) : clientId;
     if (auto sent = m_connectionServer->sendPackets(target, std::move(packets)); !sent)
       return std::unexpected(std::move(sent.error()));
   }
@@ -3169,13 +3169,15 @@ std::expected<void, StarException> UniverseServer::packetsReceived(UniverseConne
 
           if (!blocked) {
             if (std::holds_alternative<EntityId>(entityMessage->entityId)) {
-              auto targetConnection = connectionForEntity(std::get<EntityId>(entityMessage->entityId));
-              if (targetConnection != clientId) {
+              auto target_owner = connection_for_entity(std::get<EntityId>(entityMessage->entityId));
+              if (!target_owner) {
+                blocked = true;
+              } else if (*target_owner != clientId) {
                 clientsLocker.lock();
                 bool isAdmin = clientContext->isAdmin();
                 clientsLocker.unlock();
                 if (!isAdmin) {
-                  if (auto logged = m_root.logger().warn("UniverseServer: Blocked warp entity message from non-admin client {} targeting entity owned by connection {}", clientId, targetConnection); !logged)
+                  if (auto logged = m_root.logger().warn("UniverseServer: Blocked warp entity message from non-admin client {} targeting entity owned by connection {}", clientId, *target_owner); !logged)
                     return std::unexpected(std::move(logged.error()));
                   blocked = true;
                 }
@@ -3223,7 +3225,7 @@ std::expected<void, StarException> UniverseServer::packetsReceived(UniverseConne
         locker.unlock();
       } else if (auto cwtRequest = as<ClientSubWorldRequest>(packet)) {
         if (auto currentWorld = clientContext->subWorld(cwtRequest->subWorldId)) {
-          auto removed = currentWorld->removeClient(mainToSubWorldConnectionId(clientId));
+          auto removed = currentWorld->removeClient(main_to_sub_world_connection_id(clientId));
           if (!removed)
             return std::unexpected(std::move(removed.error()));
           if (auto sent = m_connectionServer->sendPackets(clientId, std::move(*removed)); !sent)
@@ -3285,9 +3287,9 @@ std::expected<void, StarException> UniverseServer::packetsReceived(UniverseConne
         }
       } else if (auto cwtPackets = as<ClientSubWorldPackets>(packet)) {
         if (auto currentWorld = clientContext->subWorld(cwtPackets->subWorldId))
-          currentWorld->pushIncomingPackets(mainToSubWorldConnectionId(clientId), std::move(cwtPackets->packets));
+          currentWorld->pushIncomingPackets(main_to_sub_world_connection_id(clientId), std::move(cwtPackets->packets));
       } else if (auto universeMessage = as<UniverseMessage>(packet)) {
-        if (universeMessage->connection == ServerConnectionId) {
+        if (universeMessage->connection == server_connection_id) {
           if (auto passed = passMessage({universeMessage->message, universeMessage->args, std::make_pair(universeMessage->uuid, clientId)}); !passed)
             return std::unexpected(std::move(passed.error()));
         } else {
@@ -3659,7 +3661,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
     if (auto added = m_connectionServer->addConnection(clientId, std::move(connection)); !added)
       return std::unexpected(std::move(added.error()));
     registered = clientId;
-    if (auto sent = m_connectionServer->sendPackets(clientId, {std::make_shared<ConnectSuccessPacket>(clientId, m_universeSettings->uuid(), m_celestialDatabase->baseInformation()), std::make_shared<UniverseTimeUpdatePacket>(m_universeClock->time()), std::make_shared<PausePacket>(*m_pause, m_root.timing().timescale)}); !sent)
+    if (auto sent = m_connectionServer->sendPackets(clientId, {std::make_shared<ConnectSuccessPacket>(clientId, m_universeSettings->uuid(), m_celestialDatabase->baseInformation()), std::make_shared<UniverseTimeUpdatePacket>(m_universeClock->time()), std::make_shared<PausePacket>(*m_pause, m_root.timing().time_scale)}); !sent)
       return std::unexpected(std::move(sent.error()));
     if (auto added = m_clients.try_emplace(clientId, client); !added)
       return std::unexpected(std::move(added.error()));
@@ -3978,12 +3980,12 @@ std::expected<void, StarException> UniverseServer::doDisconnection(ConnectionId 
   for (auto const& subWorld : client->subWorlds()) {
     auto world = client->subWorld(subWorld);
     locker.unlock();
-    auto packets = world->removeClient(mainToSubWorldConnectionId(clientId));
+    auto packets = world->removeClient(main_to_sub_world_connection_id(clientId));
     bool removed = record(packets);
     if (removed && m_connectionServer->hasConnection(clientId))
       record(m_connectionServer->sendPackets(clientId, std::move(*packets)));
     if (!removed) {
-      auto finalPackets = world->pullOutgoingPackets(mainToSubWorldConnectionId(clientId));
+      auto finalPackets = world->pullOutgoingPackets(main_to_sub_world_connection_id(clientId));
       if (!finalPackets.empty() && m_connectionServer->hasConnection(clientId))
         record(m_connectionServer->sendPackets(clientId, std::move(finalPackets)));
     }
@@ -4986,7 +4988,7 @@ std::expected<void, StarException> UniverseServer::passMessage(Universe::Message
 }
 
 std::expected<RpcPromise<Json>, StarException> UniverseServer::sendUniverseMessage(ConnectionId const& connectionId, String const& message, JsonArray const& args) {
-  if (connectionId == ServerConnectionId) {
+  if (connectionId == server_connection_id) {
     auto pair = RpcPromise<Json>::make_pair();
     if (auto passed = passMessage({message, args, pair.second}); !passed)
       return std::unexpected(std::move(passed.error()));

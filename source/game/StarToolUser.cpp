@@ -434,7 +434,7 @@ void ToolUser::setupHumanoidHandItemPose(Humanoid& humanoid) const {
 
     auto world = m_user->get().world();
     if (!world) return std::unexpected(std::move(world.error()));
-    auto angleSide = getAngleSide(world->get().geometry().diff(aimPosition, position).angle());
+    auto angleSide = get_angle_side(world->get().geometry().diff(aimPosition, position).angle());
 
     if (auto swingItem = as<SwingableItem>(handItem)) {
       auto angle = swingItem->getAngleDir(angleSide.first, angleSide.second);

@@ -48,7 +48,7 @@ extern std::expected<EnumMap<EntityType>, StarException> const EntityTypeNames =
 Entity::~Entity() = default;
 
 std::expected<void, StarException> Entity::init(World& world, EntityId entityId, EntityMode mode) {
-  if (entityId == NullEntityId)
+  if (entityId == null_entity_id)
     return std::unexpected(EntityException("Entity::init called with null entity id"));
   if (m_world)
     return std::unexpected(EntityException("Entity::init called when already initialized"));
@@ -64,7 +64,7 @@ std::expected<void, StarException> Entity::uninit() {
   resetPresentation();
   m_world.reset();
   m_entityMode = {};
-  m_entityId = NullEntityId;
+  m_entityId = null_entity_id;
   return {};
 }
 
@@ -177,12 +177,12 @@ EntityDamageTeam Entity::getTeam() const {
 bool Entity::inWorld() const {
   if (m_world) {
     if constexpr (Star::debug_enabled) {
-      Star::star_assert_failed((m_world && m_entityId != NullEntityId && m_entityMode));
+      Star::star_assert_failed((m_world && m_entityId != null_entity_id && m_entityMode));
     }
     return true;
   } else {
     if constexpr (Star::debug_enabled) {
-      Star::star_assert_failed((!m_world && m_entityId == NullEntityId && !m_entityMode));
+      Star::star_assert_failed((!m_world && m_entityId == null_entity_id && !m_entityMode));
     }
     return false;
   }
@@ -229,7 +229,7 @@ Root& Entity::root() const {
 
 Entity::Entity(Root& root) : m_root(root) {
   m_world.reset();
-  m_entityId = NullEntityId;
+  m_entityId = null_entity_id;
   m_persistent = false;
   m_keepAlive = false;
 }

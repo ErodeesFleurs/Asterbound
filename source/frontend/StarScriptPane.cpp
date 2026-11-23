@@ -257,7 +257,7 @@ std::expected<void, StarException> ScriptPane::dismissed() {
 }
 
 std::expected<void, StarException> ScriptPane::tick(float dt) {
-  if (m_sourceEntityId != NullEntityId) {
+  if (m_sourceEntityId != null_entity_id) {
     auto reachable = m_client->worldClient()->playerCanReachEntity(m_sourceEntityId);
     if (!reachable)
       return std::unexpected(std::move(reachable.error()));

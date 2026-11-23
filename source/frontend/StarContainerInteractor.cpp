@@ -59,7 +59,7 @@ std::expected<void, StarException> ContainerInteractor::closeContainer() {
 }
 
 bool ContainerInteractor::containerOpen() const {
-  return openContainerId() != NullEntityId;
+  return openContainerId() != null_entity_id;
 }
 
 EntityId ContainerInteractor::openContainerId() const {
@@ -69,7 +69,7 @@ EntityId ContainerInteractor::openContainerId() const {
   if (m_openContainer)
     return m_openContainer->entityId();
 
-  return NullEntityId;
+  return null_entity_id;
 }
 
 // Make sure to check if this is valid when you use it!

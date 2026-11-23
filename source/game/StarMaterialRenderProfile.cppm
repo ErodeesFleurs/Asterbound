@@ -81,7 +81,7 @@ struct MaterialRenderMatch {
   List<MaterialMatchPoint> matchPoints;
   MaterialJoinType matchJoin;
 
-  // Positions here are in TilePixels
+  // Positions here are in tile_pixels
   List<std::pair<std::shared_ptr<MaterialRenderPiece const>, Vec2F>> resultingPieces;
   MaterialRenderMatchList subMatches;
   std::optional<TileLayer> requiredLayer;

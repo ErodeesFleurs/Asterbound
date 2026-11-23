@@ -187,7 +187,7 @@ public:
 
   // Returns false if the client id already exists, or the spawn target is
   // invalid.
-  [[nodiscard]] std::expected<bool, StarException> addClient(ConnectionId clientId, SpawnTarget const& spawnTarget, bool isLocal, bool isAdmin = false, NetCompatibilityRules netRules = {}, ClientSubWorldId subWorldId = MainClientWorldId);
+  [[nodiscard]] std::expected<bool, StarException> addClient(ConnectionId clientId, SpawnTarget const& spawnTarget, bool isLocal, bool isAdmin = false, NetCompatibilityRules netRules = {}, ClientSubWorldId subWorldId = main_client_world_id);
 
   // Removes client, sends the WorldStopPacket, and returns any pending packets
   // for that client
@@ -241,7 +241,7 @@ public:
   [[nodiscard]] std::expected<TileModificationList, StarException> replaceTiles(TileModificationList const& modificationList, TileDamage const& tileDamage, bool applyDamage = false) override;
   [[nodiscard]] std::expected<bool, StarException> damageWouldDestroy(Vec2I const& pos, TileLayer layer, TileDamage const& tileDamage) const override;
   std::shared_ptr<Entity> entity(EntityId entityId) const override;
-  [[nodiscard]] std::expected<void, StarException> addEntity(std::shared_ptr<Entity> const& entity, EntityId entityId = NullEntityId) override;
+  [[nodiscard]] std::expected<void, StarException> addEntity(std::shared_ptr<Entity> const& entity, EntityId entityId = null_entity_id) override;
   [[nodiscard]] std::expected<std::shared_ptr<Entity>, StarException> closestEntity(Vec2F const& center, float radius, EntityFilter selector = EntityFilter()) const override;
   [[nodiscard]] std::expected<void, StarException> forAllEntities(EntityCallback entityCallback) const override;
   [[nodiscard]] std::expected<void, StarException> forEachEntity(RectF const& boundBox, EntityCallback callback) const override;

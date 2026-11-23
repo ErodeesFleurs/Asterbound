@@ -1278,7 +1278,7 @@ const GameTestRegistration
       auto first = std::find_if(warm->begin(), warm->end(), [](Drawable const& d) { return d.isLine(); });
       ASSERT_NE(first, warm->end());
       auto const start = first->linePart().line.min();
-      auto const end = centerOfTile(origin + Vec2F(5, 0)) - player.position();
+      auto const end = center_of_tile(origin + Vec2F(5, 0)) - player.position();
       float length = 0;
       Vec2F previous = start;
       for (int i = 1; i <= 512; ++i) {
@@ -1312,9 +1312,9 @@ const GameTestRegistration
       // Changing input is not itself a beam tick. Display sampling must neither
       // observe the future transition nor enqueue its leftovers.
       player.aim(origin + Vec2F(20, 0));
-      auto const far_end = centerOfTile(origin + Vec2F(20, 0)) - player.position();
+      auto const far_end = center_of_tile(origin + Vec2F(20, 0)) - player.position();
       ASSERT_LT(far_end.magnitude(), range);
-      auto hand = player.handPosition(ToolHand::Primary, (beam.firePosition() - beam.handPosition()) / TilePixels);
+      auto hand = player.handPosition(ToolHand::Primary, (beam.firePosition() - beam.handPosition()) / tile_pixels);
       ASSERT_TRUE(hand);
       ASSERT_LT((far_end - *hand).magnitude(), range); // the chord alone would stay in range
       for (unsigned i = 0; i != displayCalls; ++i) {

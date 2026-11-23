@@ -193,12 +193,12 @@ JsonObject attachmentSettings = std::move(*result436);
 if (!result437) return std::unexpected(std::move(result437.error()));
 auto result438 = result437->get().to_double();
 if (!result438) return std::unexpected(std::move(result438.error()));
-xOffset += std::move(*result438) / TilePixels;
+xOffset += std::move(*result438) / tile_pixels;
     auto result439 = attachmentSettings.get("by");
 if (!result439) return std::unexpected(std::move(result439.error()));
 auto result440 = result439->get().to_double();
 if (!result440) return std::unexpected(std::move(result440.error()));
-yOffset += std::move(*result440) / TilePixels;
+yOffset += std::move(*result440) / tile_pixels;
 
     auto result441 = baseSettings.get("image");
 if (!result441) return std::unexpected(std::move(result441.error()));
@@ -209,7 +209,7 @@ auto result443 = assets->image(baseFile);
 if (!result443) return std::unexpected(std::move(result443.error()));
 float baseImageHeight = std::move(*result443)->height();
     if (config.ceiling)
-      yOffset = 1.0 - baseImageHeight / TilePixels;
+      yOffset = 1.0 - baseImageHeight / tile_pixels;
 
     {
       PlantPiece piece;
@@ -242,12 +242,12 @@ JsonObject attachmentSettings = std::move(*result447);
 if (!result448) return std::unexpected(std::move(result448.error()));
 auto result449 = result448->get().to_double();
 if (!result449) return std::unexpected(std::move(result449.error()));
-float xOf = xOffset + std::move(*result449) / TilePixels;
+float xOf = xOffset + std::move(*result449) / tile_pixels;
       auto result450 = attachmentSettings.get("by");
 if (!result450) return std::unexpected(std::move(result450.error()));
 auto result451 = result450->get().to_double();
 if (!result451) return std::unexpected(std::move(result451.error()));
-float yOf = yOffset + std::move(*result451) / TilePixels;
+float yOf = yOffset + std::move(*result451) / tile_pixels;
 
       bool condition454 = static_cast<bool>(baseLeavesSettings.contains("image"));
 if (condition454) {
@@ -307,12 +307,12 @@ m_pieces.push_back(piece);
 if (!result462) return std::unexpected(std::move(result462.error()));
 auto result463 = result462->get().to_double();
 if (!result463) return std::unexpected(std::move(result463.error()));
-xOffset += std::move(*result463) / TilePixels;
+xOffset += std::move(*result463) / tile_pixels;
     auto result464 = attachmentSettings.get("y");
 if (!result464) return std::unexpected(std::move(result464.error()));
 auto result465 = result464->get().to_double();
 if (!result465) return std::unexpected(std::move(result465.error()));
-yOffset += std::move(*result465) / TilePixels; // trunk height
+yOffset += std::move(*result465) / tile_pixels; // trunk height
 
     segment++;
   }
@@ -366,12 +366,12 @@ JsonObject attachmentSettings = std::move(*result477);
 if (!result478) return std::unexpected(std::move(result478.error()));
 auto result479 = result478->get().to_double();
 if (!result479) return std::unexpected(std::move(result479.error()));
-xOffset += std::move(*result479) / TilePixels;
+xOffset += std::move(*result479) / tile_pixels;
       auto result480 = attachmentSettings.get("by");
 if (!result480) return std::unexpected(std::move(result480.error()));
 auto result481 = result480->get().to_double();
 if (!result481) return std::unexpected(std::move(result481.error()));
-yOffset += std::move(*result481) / TilePixels;
+yOffset += std::move(*result481) / tile_pixels;
 
       auto result482 = middleSettings.get("image");
 if (!result482) return std::unexpected(std::move(result482.error()));
@@ -410,12 +410,12 @@ JsonObject attachmentSettings = std::move(*result487);
 if (!result488) return std::unexpected(std::move(result488.error()));
 auto result489 = result488->get().to_double();
 if (!result489) return std::unexpected(std::move(result489.error()));
-float xOf = xOffset + std::move(*result489) / TilePixels;
+float xOf = xOffset + std::move(*result489) / tile_pixels;
         auto result490 = attachmentSettings.get("by");
 if (!result490) return std::unexpected(std::move(result490.error()));
 auto result491 = result490->get().to_double();
 if (!result491) return std::unexpected(std::move(result491.error()));
-float yOf = yOffset + std::move(*result491) / TilePixels;
+float yOf = yOffset + std::move(*result491) / tile_pixels;
 
         bool condition494 = static_cast<bool>(trunkLeavesSettings.contains("image"));
 if (condition494) {
@@ -474,12 +474,12 @@ m_pieces.push_back(piece);
 if (!result502) return std::unexpected(std::move(result502.error()));
 auto result503 = result502->get().to_double();
 if (!result503) return std::unexpected(std::move(result503.error()));
-xOffset += std::move(*result503) / TilePixels;
+xOffset += std::move(*result503) / tile_pixels;
       auto result504 = attachmentSettings.get("y");
 if (!result504) return std::unexpected(std::move(result504.error()));
 auto result505 = result504->get().to_double();
 if (!result505) return std::unexpected(std::move(result505.error()));
-yOffset += std::move(*result505) / TilePixels;
+yOffset += std::move(*result505) / tile_pixels;
 
       // branch
       while (hasBranches && (yOffset >= branchYOffset) && ((middleHeight - i) > 0)) {
@@ -497,7 +497,7 @@ JsonObject attachmentSettings = std::move(*result508);
 if (!result509) return std::unexpected(std::move(result509.error()));
 auto result510 = result509->get().to_double();
 if (!result510) return std::unexpected(std::move(result510.error()));
-float h = std::move(*result510) / TilePixels;
+float h = std::move(*result510) / tile_pixels;
         if (yOffset < branchYOffset + (h / 2.0f))
           break;
 
@@ -505,12 +505,12 @@ float h = std::move(*result510) / TilePixels;
 if (!result511) return std::unexpected(std::move(result511.error()));
 auto result512 = result511->get().to_double();
 if (!result512) return std::unexpected(std::move(result512.error()));
-float xO = xOffset + std::move(*result512) / TilePixels;
+float xO = xOffset + std::move(*result512) / tile_pixels;
         auto result513 = attachmentSettings.get("by");
 if (!result513) return std::unexpected(std::move(result513.error()));
 auto result514 = result513->get().to_double();
 if (!result514) return std::unexpected(std::move(result514.error()));
-float yO = branchYOffset + std::move(*result514) / TilePixels;
+float yO = branchYOffset + std::move(*result514) / tile_pixels;
 
         auto result515 = config.stemSettings.get_bool("alwaysBranch", false);
 if (!result515) return std::unexpected(std::move(result515.error()));
@@ -559,12 +559,12 @@ JsonObject attachmentSettings = std::move(*result523);
 if (!result524) return std::unexpected(std::move(result524.error()));
 auto result525 = result524->get().to_double();
 if (!result525) return std::unexpected(std::move(result525.error()));
-float xOf = xO + std::move(*result525) / TilePixels;
+float xOf = xO + std::move(*result525) / tile_pixels;
             auto result526 = attachmentSettings.get("by");
 if (!result526) return std::unexpected(std::move(result526.error()));
 auto result527 = result526->get().to_double();
 if (!result527) return std::unexpected(std::move(result527.error()));
-float yOf = yO + std::move(*result527) / TilePixels;
+float yOf = yO + std::move(*result527) / tile_pixels;
 
             bool condition530 = static_cast<bool>(branchLeavesSettings.contains("image"));
 if (condition530) {
@@ -626,7 +626,7 @@ auto result539 = result538->get().to_double();
 if (!result539) return std::unexpected(std::move(result539.error()));
 auto result540 = rnd.uniform_int(4);
 if (!result540) return std::unexpected(std::move(result540.error()));
-branchYOffset += (std::move(*result539) / TilePixels) / static_cast<float>(1 + *result540);
+branchYOffset += (std::move(*result539) / tile_pixels) / static_cast<float>(1 + *result540);
         }
       }
       segment++;
@@ -655,12 +655,12 @@ JsonObject attachmentSettings = std::move(*result544);
 if (!result545) return std::unexpected(std::move(result545.error()));
 auto result546 = result545->get().to_double();
 if (!result546) return std::unexpected(std::move(result546.error()));
-xOffset += std::move(*result546) / TilePixels;
+xOffset += std::move(*result546) / tile_pixels;
       auto result547 = attachmentSettings.get("by");
 if (!result547) return std::unexpected(std::move(result547.error()));
 auto result548 = result547->get().to_double();
 if (!result548) return std::unexpected(std::move(result548.error()));
-yOffset += std::move(*result548) / TilePixels;
+yOffset += std::move(*result548) / tile_pixels;
 
       float coffset = roffset + this->root().random().uniform_float();
 
@@ -700,12 +700,12 @@ JsonObject attachmentSettings = std::move(*result554);
 if (!result555) return std::unexpected(std::move(result555.error()));
 auto result556 = result555->get().to_double();
 if (!result556) return std::unexpected(std::move(result556.error()));
-float xO = xOffset + std::move(*result556) / TilePixels;
+float xO = xOffset + std::move(*result556) / tile_pixels;
         auto result557 = attachmentSettings.get("by");
 if (!result557) return std::unexpected(std::move(result557.error()));
 auto result558 = result557->get().to_double();
 if (!result558) return std::unexpected(std::move(result558.error()));
-float yO = yOffset + std::move(*result558) / TilePixels;
+float yO = yOffset + std::move(*result558) / tile_pixels;
 
         bool condition561 = static_cast<bool>(crownLeavesSettings.contains("image"));
 if (condition561) {
@@ -866,7 +866,7 @@ auto imgMetadata = std::move(*result425);
     auto result426 = imgMetadata->imageSize(imageName);
 if (!result426) return std::unexpected(std::move(result426.error()));
 float imageHeight = std::move(*result426)[1];
-    offset = Vec2F(0.0f, 1.0f - imageHeight / TilePixels);
+    offset = Vec2F(0.0f, 1.0f - imageHeight / tile_pixels);
   }
 
   PlantPiece piece;
@@ -927,7 +927,7 @@ float shapeImageHeight = std::move(*result422)->height();
   // If this is a ceiling plant, offset the image so that the [0, 0] space is
   // at the top
   if (config.ceiling)
-    offset = Vec2F(0.0f, 1.0f - shapeImageHeight / TilePixels);
+    offset = Vec2F(0.0f, 1.0f - shapeImageHeight / tile_pixels);
 
   {
     PlantPiece piece;
@@ -1220,7 +1220,7 @@ auto imageMetadataDatabase = std::move(*result624);
     auto result625 = imageMetadataDatabase->imageSize(piece.image);
 if (!result625) return std::unexpected(std::move(result625.error()));
 piece.imageSize = std::move(*result625);
-    auto result626 = imageMetadataDatabase->imageSpaces(piece.image, piece.offset * TilePixels, PlantScanThreshold, piece.flip);
+    auto result626 = imageMetadataDatabase->imageSpaces(piece.image, piece.offset * tile_pixels, PlantScanThreshold, piece.flip);
 if (!result626) return std::unexpected(std::move(result626.error()));
 piece.spaces = Set<Vec2I>::from(
         std::move(*result626));
@@ -1373,7 +1373,7 @@ std::expected<void, StarException> Plant::render(RenderCallback& renderCallback)
   float damageXOffset = m_presentationDamageXOffset;
 
   for (auto const& plantPiece : m_pieces) {
-    auto size = Vec2F(plantPiece.imageSize) / TilePixels;
+    auto size = Vec2F(plantPiece.imageSize) / tile_pixels;
 
     Vec2F offset = plantPiece.offset;
     if ((m_ceiling && offset[1] <= m_tileDamageY) || (!m_ceiling && offset[1] + size[1] >= m_tileDamageY))
@@ -1381,7 +1381,7 @@ std::expected<void, StarException> Plant::render(RenderCallback& renderCallback)
 
     auto result603 = this->root().imageMetadataDatabase();
 if (!result603) return std::unexpected(std::move(result603.error()));
-auto result1283 = Drawable::makeImage(*std::move(*result603), plantPiece.imagePath, 1.0f / TilePixels, false, offset);
+auto result1283 = Drawable::makeImage(*std::move(*result603), plantPiece.imagePath, 1.0f / tile_pixels, false, offset);
 if (!result1283) return std::unexpected(std::move(result1283.error()));
 auto drawable = std::move(*result1283);
     if (plantPiece.flip)

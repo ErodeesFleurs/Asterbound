@@ -1059,7 +1059,7 @@ std::expected<void, StarException> MainInterface::openCraftingWindow(Json const&
   if (m_craftingWindow && m_paneManager.isDisplayed(m_craftingWindow)) {
     if (auto dismissed = m_paneManager.dismissPane(m_craftingWindow); !dismissed)
       return std::unexpected(std::move(dismissed.error()));
-    if (sourceEntityId != NullEntityId && m_craftingWindow->sourceEntityId() == sourceEntityId) {
+    if (sourceEntityId != null_entity_id && m_craftingWindow->sourceEntityId() == sourceEntityId) {
       m_craftingWindow.reset();
       return {};
     }
@@ -1082,7 +1082,7 @@ std::expected<void, StarException> MainInterface::openMerchantWindow(Json const&
   if (m_merchantWindow && m_paneManager.isDisplayed(m_merchantWindow)) {
     if (auto dismissed = m_paneManager.dismissPane(m_merchantWindow); !dismissed)
       return std::unexpected(std::move(dismissed.error()));
-    if (sourceEntityId != NullEntityId && m_merchantWindow->sourceEntityId() == sourceEntityId) {
+    if (sourceEntityId != null_entity_id && m_merchantWindow->sourceEntityId() == sourceEntityId) {
       m_merchantWindow.reset();
       return {};
     }
@@ -1267,7 +1267,7 @@ std::expected<bool, StarException> MainInterface::handleInputEvent(InputEvent co
               auto results = executeClientCommand(m_lastCommand);
               if (!results) return std::unexpected(std::move(results.error()));
               for (auto const& result : *results) {
-                if (auto added = addChatMessages({{{MessageContext::CommandResult}, ServerConnectionId, "", result}}, true); !added)
+                if (auto added = addChatMessages({{{MessageContext::CommandResult}, server_connection_id, "", result}}, true); !added)
                   return std::unexpected(std::move(added.error()));
               }
               return {};
@@ -1414,13 +1414,13 @@ std::expected<void, StarException> MainInterface::handleInteractAction(InteractA
     if (!lounged)
       return std::unexpected(std::move(lounged.error()));
   } else if (interactAction.type == InteractActionType::OpenCraftingInterface || interactAction.type == InteractActionType::OpenNpcCraftingInterface) {
-    if (interactAction.entityId != NullEntityId && !world->entity(interactAction.entityId))
+    if (interactAction.entityId != null_entity_id && !world->entity(interactAction.entityId))
       return {};
     return openCraftingWindow(interactAction.data, interactAction.entityId);
   } else if (interactAction.type == InteractActionType::OpenSongbookInterface) {
     return sendPaneEvent("$ui", "open", JsonObject{{"id", "songbook"}});
   } else if (interactAction.type == InteractActionType::OpenMerchantInterface) {
-    if (interactAction.entityId != NullEntityId && !world->entity(interactAction.entityId))
+    if (interactAction.entityId != null_entity_id && !world->entity(interactAction.entityId))
       return {};
     return openMerchantWindow(interactAction.data, interactAction.entityId);
   } else if (interactAction.type == InteractActionType::OpenAiInterface) {
@@ -1527,7 +1527,7 @@ std::expected<void, StarException> MainInterface::handleInteractAction(InteractA
     return sendPaneEvent("popup", "show", std::move(payload));
   } else if (interactAction.type == InteractActionType::ScriptPane) {
     auto sourceEntity = interactAction.entityId;
-    if (sourceEntity != NullEntityId && m_interactionScriptPanes.contains(sourceEntity) && m_paneManager.isDisplayed(m_interactionScriptPanes[sourceEntity])) {
+    if (sourceEntity != null_entity_id && m_interactionScriptPanes.contains(sourceEntity) && m_paneManager.isDisplayed(m_interactionScriptPanes[sourceEntity])) {
       if (auto dismissed = m_paneManager.dismissPane(m_interactionScriptPanes[sourceEntity]); !dismissed)
         return std::unexpected(std::move(dismissed.error()));
     }
@@ -1542,7 +1542,10 @@ std::expected<void, StarException> MainInterface::handleInteractAction(InteractA
     auto arguments = interactAction.data.get_array("messageArgs");
     if (!arguments)
       return std::unexpected(std::move(arguments.error()));
-    auto received = m_client->mainPlayer()->receiveMessage(connectionForEntity(interactAction.entityId), *type, *arguments);
+    auto owner = connection_for_entity(interactAction.entityId);
+    if (!owner)
+      return context().root().logger().warn("Ignoring interaction message from unowned entity {}", interactAction.entityId);
+    auto received = m_client->mainPlayer()->receiveMessage(*owner, *type, *arguments);
     if (!received)
       return std::unexpected(std::move(received.error()));
   }
@@ -1624,7 +1627,7 @@ std::expected<void, StarException> MainInterface::update(float dt) {
   if (!commandResults)
     return std::unexpected(std::move(commandResults.error()));
   for (auto const& result : *commandResults) {
-    auto added = addChatMessages({{{MessageContext::CommandResult}, ServerConnectionId, "", result}}, true);
+    auto added = addChatMessages({{{MessageContext::CommandResult}, server_connection_id, "", result}}, true);
     if (!added)
       return std::unexpected(std::move(added.error()));
   }
@@ -1784,7 +1787,7 @@ std::expected<void, StarException> MainInterface::update(float dt) {
 
         ChatReceivedMessage message = {
           {MessageContext::World},
-          ServerConnectionId,
+          server_connection_id,
           Text::strip_escape_codes(name),
           Text::strip_escape_codes(portraitAction.text),
           Text::strip_escape_codes(*portrait)};
@@ -2119,7 +2122,7 @@ std::expected<void, StarException> MainInterface::renderDebug() {
     bool clearSpatial = std::exchange(m_debugSpatialClearDue, false);
     for (auto const& line : context().root().spatialLogger().get_lines("world", clearSpatial)) {
       Vec2F begin = camera.worldToScreen(line.begin);
-      Vec2F end = camera.worldGeometry().diff(line.end, line.begin) * camera.pixelRatio() * TilePixels + begin;
+      Vec2F end = camera.worldGeometry().diff(line.end, line.begin) * camera.pixelRatio() * tile_pixels + begin;
       if (auto r = context().drawLine(begin, end, line.color, 1); !r) return std::unexpected(std::move(r.error()));
     }
     for (auto const& line : context().root().spatialLogger().get_lines("screen", clearSpatial)) {
@@ -2244,7 +2247,7 @@ std::expected<void, StarException> MainInterface::initHttpTrustDialog() {
 }
 
 std::expected<void, StarException> MainInterface::displayScriptPane(std::shared_ptr<ScriptPane>& scriptPane, EntityId sourceEntity) {
-  if (sourceEntity != NullEntityId)
+  if (sourceEntity != null_entity_id)
     m_interactionScriptPanes[sourceEntity] = scriptPane;
   PaneLayer layer = PaneLayer::Window;
   auto layerName = scriptPane->config().opt_string("paneLayer");

@@ -55,7 +55,7 @@ struct DamageSource {
 
   bool trackSourceEntity;
   // The originating entity for the damage, which can be different than the
-  // actual causing entity.  Optional, defaults to NullEntityId.
+  // actual causing entity.  Optional, defaults to null_entity_id.
   EntityId sourceEntityId;
   EntityDamageTeam team;
 

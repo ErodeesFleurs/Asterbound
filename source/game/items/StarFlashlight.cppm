@@ -148,7 +148,7 @@ std::expected<List<Drawable>, StarException> Flashlight::drawables() const {
   auto metadata = root().imageMetadataDatabase();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
-  auto drawable = Drawable::makeImage(**metadata, m_image, 1.0f / TilePixels, true, -m_handPosition / TilePixels);
+  auto drawable = Drawable::makeImage(**metadata, m_image, 1.0f / tile_pixels, true, -m_handPosition / tile_pixels);
   if (!drawable)
     return std::unexpected(std::move(drawable.error()));
   return List<Drawable>{std::move(*drawable)};
@@ -166,7 +166,7 @@ std::expected<List<LightSource>, StarException> Flashlight::lightSources() const
   auto handResult = hand();
   if (!handResult)
     return std::unexpected(std::move(handResult.error()));
-  auto ownerHandPosition = ownerResult->get().handPosition(*handResult, (m_lightPosition - m_handPosition) / TilePixels);
+  auto ownerHandPosition = ownerResult->get().handPosition(*handResult, (m_lightPosition - m_handPosition) / tile_pixels);
   if (!ownerHandPosition)
     return std::unexpected(std::move(ownerHandPosition.error()));
   auto aimPosition = ownerResult->get().aimPosition();

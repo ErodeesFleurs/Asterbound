@@ -311,7 +311,7 @@ private:
   
   BiMap<ClientSubWorldId, WorldId> m_subWorlds;
   IdMap<ClientSubWorldId, std::shared_ptr<WorldClientThread>> m_subWorldThreads =
-      decltype(m_subWorldThreads)::with_range<MinClientSubWorldId, MaxClientSubWorldId>();
+      decltype(m_subWorldThreads)::with_range<min_client_sub_world_id, max_client_sub_world_id>();
 
   ReloadPlayerCallback m_playerReloadPreCallback;
   ReloadPlayerCallback m_playerReloadCallback;

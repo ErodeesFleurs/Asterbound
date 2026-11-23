@@ -1253,7 +1253,7 @@ std::expected<void, StarException> CollectLiquidPacket::write(DataStream& ds) co
 }
 
 RequestDropPacket::RequestDropPacket() {
-  dropEntityId = NullEntityId;
+  dropEntityId = null_entity_id;
 }
 
 RequestDropPacket::RequestDropPacket(EntityId dropEntityId) : dropEntityId(dropEntityId) {}
@@ -1312,7 +1312,7 @@ std::expected<void, StarException> EntityInteractResultPacket::write(DataStream&
 }
 
 EntityCreatePacket::EntityCreatePacket() {
-  entityId = NullEntityId;
+  entityId = null_entity_id;
 }
 
 ServerDisconnectPacket::ServerDisconnectPacket() = default;
@@ -1481,7 +1481,7 @@ std::expected<void, StarException> EntityCreatePacket::write(DataStream& ds) con
   return ds.viwrite(entityId);
 }
 
-EntityUpdateSetPacket::EntityUpdateSetPacket() : EntityUpdateSetPacket(ServerConnectionId) {}
+EntityUpdateSetPacket::EntityUpdateSetPacket() : EntityUpdateSetPacket(server_connection_id) {}
 
 EntityUpdateSetPacket::EntityUpdateSetPacket(ConnectionId forConnection) : forConnection(forConnection) {}
 
@@ -1522,7 +1522,7 @@ std::expected<void, StarException> EntityUpdateSetPacket::write(DataStream& ds) 
 }
 
 EntityDestroyPacket::EntityDestroyPacket() {
-  entityId = NullEntityId;
+  entityId = null_entity_id;
   death = false;
 }
 

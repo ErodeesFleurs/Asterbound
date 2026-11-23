@@ -157,14 +157,14 @@ std::expected<std::optional<EntityId>, StarException> EntityMap::maybeReserveEnt
   if (m_spatialMap.size() >= static_cast<std::size_t>(m_endIdSpace - m_beginIdSpace))
     return std::unexpected(EntityMapException("No more entity id space in EntityMap::reserveEntityId"));
 
-  if (entityId == NullEntityId || m_spatialMap.contains(entityId))
+  if (entityId == null_entity_id || m_spatialMap.contains(entityId))
     return std::optional<EntityId>{};
   else
     return entityId;
 }
 
 std::expected<EntityId, StarException> EntityMap::reserveEntityId(EntityId entityId) {
-  if (entityId == NullEntityId)
+  if (entityId == null_entity_id)
     return reserveEntityId();
   auto reserved = maybeReserveEntityId(entityId);
   if (!reserved) return std::unexpected(std::move(reserved.error()));
@@ -191,7 +191,7 @@ std::expected<void, StarException> EntityMap::addEntity(std::shared_ptr<Entity> 
                                                       entity->entityId(), static_cast<int>(entity->entityType())));
   }
 
-  if (entityId == NullEntityId)
+  if (entityId == null_entity_id)
     return std::unexpected(EntityMapException::format("Null entity id in EntityMap::addEntity"));
 
   if (uniqueId && m_uniqueMap.contains_left(*uniqueId))
@@ -288,7 +288,7 @@ std::expected<void, StarException> EntityMap::updateAllEntities(EntityCallback c
 }
 
 EntityId EntityMap::uniqueEntityId(String const& uniqueId) const {
-  return m_uniqueMap.maybe_right(uniqueId).value_or(NullEntityId);
+  return m_uniqueMap.maybe_right(uniqueId).value_or(null_entity_id);
 }
 
 std::shared_ptr<Entity> EntityMap::entity(EntityId entityId) const {
@@ -520,7 +520,7 @@ std::expected<std::shared_ptr<InteractiveEntity>, StarException> EntityMap::inte
         if (auto tile = as_ref<TileEntity>(*entity)) {
           auto& tileEntity = tile->get();
           for (Vec2I space : tileEntity.interactiveSpaces()) {
-            auto dist = m_geometry.diff(pos, centerOfTile(space + tileEntity.tilePosition())).magnitude();
+            auto dist = m_geometry.diff(pos, center_of_tile(space + tileEntity.tilePosition())).magnitude();
             auto centerDist =
               m_geometry.diff(tileEntity.metaBoundBox().center() + tileEntity.position(), pos).magnitude();
             if ((dist < bestDistance) || ((dist == bestDistance) && (centerDist < bestCenterDistance))) {

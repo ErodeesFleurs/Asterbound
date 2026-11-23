@@ -683,88 +683,57 @@ RectF Npc::metaBoundBox() const {
 }
 
 std::expected<Vec2F, StarException> Npc::mouthOffset(bool ignoreAdjustments) const {
-  auto result135 = humanoid();
-if (!result135) return std::unexpected(std::move(result135.error()));
-auto result136 = std::move(*result135)->mouthOffset(ignoreAdjustments);
-if (!result136) return std::unexpected(std::move(result136.error()));
-auto result137 = humanoid();
-if (!result137) return std::unexpected(std::move(result137.error()));
-auto result138 = humanoid();
-if (!result138) return std::unexpected(std::move(result138.error()));
-auto result139 = std::move(*result138)->mouthOffset(ignoreAdjustments);
-if (!result139) return std::unexpected(std::move(result139.error()));
-return Vec2F{std::move(*result136)[0] * numericalDirection(std::move(*result137)->facingDirection()),
-      std::move(*result139)[1]};
+  auto body = humanoid();
+  if (!body) return std::unexpected(std::move(body.error()));
+  auto offset = (*body)->mouthOffset(ignoreAdjustments);
+  if (!offset) return std::unexpected(std::move(offset.error()));
+  (*offset)[0] *= numerical_direction((*body)->facingDirection());
+  return offset;
 }
 
 std::expected<Vec2F, StarException> Npc::feetOffset() const {
-  auto result140 = humanoid();
-if (!result140) return std::unexpected(std::move(result140.error()));
-auto result141 = std::move(*result140)->feetOffset();
-if (!result141) return std::unexpected(std::move(result141.error()));
-auto result142 = humanoid();
-if (!result142) return std::unexpected(std::move(result142.error()));
-auto result143 = humanoid();
-if (!result143) return std::unexpected(std::move(result143.error()));
-auto result144 = std::move(*result143)->feetOffset();
-if (!result144) return std::unexpected(std::move(result144.error()));
-return Vec2F{std::move(*result141)[0] * numericalDirection(std::move(*result142)->facingDirection()), std::move(*result144)[1]};
+  auto body = humanoid();
+  if (!body) return std::unexpected(std::move(body.error()));
+  auto offset = (*body)->feetOffset();
+  if (!offset) return std::unexpected(std::move(offset.error()));
+  (*offset)[0] *= numerical_direction((*body)->facingDirection());
+  return offset;
 }
 
 std::expected<Vec2F, StarException> Npc::headArmorOffset() const {
-  auto result145 = humanoid();
-if (!result145) return std::unexpected(std::move(result145.error()));
-auto result146 = std::move(*result145)->headArmorOffset();
-if (!result146) return std::unexpected(std::move(result146.error()));
-auto result147 = humanoid();
-if (!result147) return std::unexpected(std::move(result147.error()));
-auto result148 = humanoid();
-if (!result148) return std::unexpected(std::move(result148.error()));
-auto result149 = std::move(*result148)->headArmorOffset();
-if (!result149) return std::unexpected(std::move(result149.error()));
-return Vec2F{std::move(*result146)[0] * numericalDirection(std::move(*result147)->facingDirection()), std::move(*result149)[1]};
+  auto body = humanoid();
+  if (!body) return std::unexpected(std::move(body.error()));
+  auto offset = (*body)->headArmorOffset();
+  if (!offset) return std::unexpected(std::move(offset.error()));
+  (*offset)[0] *= numerical_direction((*body)->facingDirection());
+  return offset;
 }
 
 std::expected<Vec2F, StarException> Npc::chestArmorOffset() const {
-  auto result150 = humanoid();
-if (!result150) return std::unexpected(std::move(result150.error()));
-auto result151 = std::move(*result150)->chestArmorOffset();
-if (!result151) return std::unexpected(std::move(result151.error()));
-auto result152 = humanoid();
-if (!result152) return std::unexpected(std::move(result152.error()));
-auto result153 = humanoid();
-if (!result153) return std::unexpected(std::move(result153.error()));
-auto result154 = std::move(*result153)->chestArmorOffset();
-if (!result154) return std::unexpected(std::move(result154.error()));
-return Vec2F{std::move(*result151)[0] * numericalDirection(std::move(*result152)->facingDirection()), std::move(*result154)[1]};
+  auto body = humanoid();
+  if (!body) return std::unexpected(std::move(body.error()));
+  auto offset = (*body)->chestArmorOffset();
+  if (!offset) return std::unexpected(std::move(offset.error()));
+  (*offset)[0] *= numerical_direction((*body)->facingDirection());
+  return offset;
 }
 
 std::expected<Vec2F, StarException> Npc::backArmorOffset() const {
-  auto result155 = humanoid();
-if (!result155) return std::unexpected(std::move(result155.error()));
-auto result156 = std::move(*result155)->backArmorOffset();
-if (!result156) return std::unexpected(std::move(result156.error()));
-auto result157 = humanoid();
-if (!result157) return std::unexpected(std::move(result157.error()));
-auto result158 = humanoid();
-if (!result158) return std::unexpected(std::move(result158.error()));
-auto result159 = std::move(*result158)->backArmorOffset();
-if (!result159) return std::unexpected(std::move(result159.error()));
-return Vec2F{std::move(*result156)[0] * numericalDirection(std::move(*result157)->facingDirection()), std::move(*result159)[1]};
+  auto body = humanoid();
+  if (!body) return std::unexpected(std::move(body.error()));
+  auto offset = (*body)->backArmorOffset();
+  if (!offset) return std::unexpected(std::move(offset.error()));
+  (*offset)[0] *= numerical_direction((*body)->facingDirection());
+  return offset;
 }
 
 std::expected<Vec2F, StarException> Npc::legsArmorOffset() const {
-  auto result160 = humanoid();
-if (!result160) return std::unexpected(std::move(result160.error()));
-auto result161 = std::move(*result160)->legsArmorOffset();
-if (!result161) return std::unexpected(std::move(result161.error()));
-auto result162 = humanoid();
-if (!result162) return std::unexpected(std::move(result162.error()));
-auto result163 = humanoid();
-if (!result163) return std::unexpected(std::move(result163.error()));
-auto result164 = std::move(*result163)->legsArmorOffset();
-if (!result164) return std::unexpected(std::move(result164.error()));
-return Vec2F{std::move(*result161)[0] * numericalDirection(std::move(*result162)->facingDirection()), std::move(*result164)[1]};
+  auto body = humanoid();
+  if (!body) return std::unexpected(std::move(body.error()));
+  auto offset = (*body)->legsArmorOffset();
+  if (!offset) return std::unexpected(std::move(offset.error()));
+  (*offset)[0] *= numerical_direction((*body)->facingDirection());
+  return offset;
 }
 
 RectF Npc::collisionArea() const {
@@ -783,7 +752,7 @@ std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Npc::write_net
   }
   if (condition166) {
       if (auto mode = entityMode()) {
-        if (*mode == EntityMode::Master && connectionForEntity(entityId()) != ServerConnectionId) {
+        if (auto owner = connection_for_entity(entityId()); *mode == EntityMode::Master && owner && *owner != server_connection_id) {
           PolyF poly = m_movementController->collisionPoly();
           m_movementController->setCollisionPoly({ { 0.0f, -3.402823466e+38F }});
           auto result = m_netGroup.write_net_state(fromVersion, rules);
@@ -1502,7 +1471,7 @@ auto result298 = callbacks.register_callback("gender", [this]() -> std::expected
   auto result296 = humanoid();
   if (!result296)
     return std::unexpected(std::move(result296.error()));
-  auto result297 = enum_name<GenderNames>(std::move(*result296)->identity().gender);
+  auto result297 = enum_name<gender_names>(std::move(*result296)->identity().gender);
   if (!result297)
     return std::unexpected(std::move(result297.error()));
   return String(*result297);
@@ -1742,7 +1711,7 @@ if (!result365) return std::unexpected(std::move(result365.error()));
 
 auto result368 =
   callbacks.register_callback("setGender", [this](String const& gender) -> std::expected<void, StarException> {
-    auto result366 = enum_value<GenderNames>(gender);
+    auto result366 = enum_value<gender_names>(gender);
     if (!result366)
       return std::unexpected(std::move(result366.error()));
     auto result367 = setGender(*result366);

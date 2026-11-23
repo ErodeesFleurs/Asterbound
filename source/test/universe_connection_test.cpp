@@ -159,6 +159,50 @@ extern "C" int __wrap_pthread_create(pthread_t* thread, pthread_attr_t const* at
 
 using namespace Star;
 
+TEST(GameTypesTest, EntityConnectionBoundaries) {
+  struct Range {
+    ConnectionId connection;
+    EntityId first;
+    EntityId last;
+  };
+  constexpr Range ranges[] = {
+    {0, 1, std::numeric_limits<EntityId>::max()},
+    {1, -65536, -1},
+    {2, -131072, -65537},
+    {16383, -1073676288, -1073610753},
+    {16384, -1073741824, -1073676289},
+    {32766, -2147352576, -2147287041},
+  };
+  for (auto [connection, first, last] : ranges) {
+    SCOPED_TRACE(connection);
+    auto space = connection_entity_space(connection);
+    ASSERT_TRUE(space) << space.error().what();
+    EXPECT_EQ(space->first, first);
+    EXPECT_EQ(space->second, last);
+    for (auto id : {first, last}) {
+      EXPECT_EQ(connection_for_entity(id), connection);
+      EXPECT_EQ(entity_id_in_space(id, connection), true);
+    }
+    EXPECT_EQ(entity_id_in_space(first - 1, connection), false);
+    if (last < std::numeric_limits<EntityId>::max())
+      EXPECT_EQ(entity_id_in_space(last + 1, connection), false);
+  }
+  for (auto id : {null_entity_id, EntityId{-2147352577}, std::numeric_limits<EntityId>::min()}) {
+    EXPECT_FALSE(connection_for_entity(id));
+    EXPECT_EQ(entity_id_in_space(id, min_client_connection_id), false);
+    EXPECT_EQ(entity_id_in_space(id, max_client_sub_world_connection_id), false);
+  }
+  for (auto invalid : {ConnectionId{32767}, std::numeric_limits<ConnectionId>::max()}) {
+    EXPECT_FALSE(connection_entity_space(invalid).has_value());
+    EXPECT_FALSE(entity_id_in_space(-1, invalid).has_value());
+  }
+}
+
+static_assert(main_to_sub_world_connection_id(min_client_connection_id) == 16384);
+static_assert(main_to_sub_world_connection_id(max_client_connection_id) == 32766);
+static_assert(sub_world_to_main_connection_id(min_client_sub_world_connection_id) == 1);
+static_assert(sub_world_to_main_connection_id(max_client_sub_world_connection_id) == 16383);
+
 TEST(HandshakeDigestTest, Utf8CredentialsAndBinarySalt) {
   auto digest = HandshakeResponsePacket::password_digest("páss", "用户", hex_decode("00ff"));
   EXPECT_EQ(digest, hex_decode("90b7b1151a80bd041027d8838ae3c9f5dc07549c44684afc75b86ffbbbabf199"));
@@ -364,7 +408,7 @@ const GameTestRegistration universeConnectionsAll("UniverseConnections", "All", 
   });
   ASSERT_TRUE(server) << server.error().what();
 
-  ConnectionId clientId = ServerConnectionId;
+  ConnectionId clientId = server_connection_id;
   auto tcpServer = TcpServer::create(logger, HostAddressWithPort(HostAddress::localhost(), ServerPort));
   ASSERT_TRUE(tcpServer) << tcpServer.error().what();
   auto acceptCallback = (*tcpServer)->set_accept_callback([&logger, &server, &clientId](

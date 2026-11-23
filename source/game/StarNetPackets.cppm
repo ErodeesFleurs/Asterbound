@@ -1254,7 +1254,7 @@ struct EntityMessagePacket : PacketBase<PacketType::EntityMessage> {
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<EntityMessagePacket>(); }
 
   EntityMessagePacket();
-  EntityMessagePacket(std::variant<EntityId, String> entityId, String message, JsonArray args, Uuid uuid, ConnectionId fromConnection = ServerConnectionId);
+  EntityMessagePacket(std::variant<EntityId, String> entityId, String message, JsonArray args, Uuid uuid, ConnectionId fromConnection = server_connection_id);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
@@ -1581,7 +1581,7 @@ struct UniverseMessage : PacketBase<PacketType::UniverseMessage> {
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<UniverseMessage>(); }
 
   UniverseMessage();
-  UniverseMessage(ConnectionId connection, String message, JsonArray args, Uuid uuid, ConnectionId fromConnection = ServerConnectionId);
+  UniverseMessage(ConnectionId connection, String message, JsonArray args, Uuid uuid, ConnectionId fromConnection = server_connection_id);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;

@@ -75,7 +75,7 @@ std::expected<void, StarException> Item::initialize(Json config, String director
   auto rarity = instanceValue("rarity").and_then([](Json const& value) { return value.to_string(); });
   if (!rarity)
     return std::unexpected(std::move(rarity.error()));
-  auto rarityValue = enum_value<RarityNames>(*rarity);
+  auto rarityValue = enum_value<rarity_names>(*rarity);
   if (!rarityValue)
     return std::unexpected(std::move(rarityValue.error()));
   m_rarity = *rarityValue;
@@ -330,7 +330,7 @@ std::expected<List<Drawable>, StarException> Item::dropDrawables(std::optional<s
   auto drawables = iconDrawables();
   if (!drawables)
     return std::unexpected(std::move(drawables.error()));
-  Drawable::scaleAll(*drawables, 1.0f / TilePixels);
+  Drawable::scaleAll(*drawables, 1.0f / tile_pixels);
   return drawables;
 }
 

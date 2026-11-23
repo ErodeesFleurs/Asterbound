@@ -102,7 +102,7 @@ public:
   // passed in pointer directly and initialize it, and entity will have a valid
   // id in this world and be ready for use.  This is always the case on the
   // server, but not *always* the case on the client.
-  [[nodiscard]] virtual std::expected<void, StarException> addEntity(std::shared_ptr<Entity> const& entity, EntityId entityId = NullEntityId) = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> addEntity(std::shared_ptr<Entity> const& entity, EntityId entityId = null_entity_id) = 0;
 
   [[nodiscard]] virtual std::expected<std::shared_ptr<Entity>, StarException> closestEntity(Vec2F const& center, float radius, EntityFilter selector = {}) const = 0;
 

@@ -38,7 +38,7 @@ import star.line;
 namespace Star {
 
 DamageSource::DamageSource()
-  : damageType(DamageType::NoDamage), damage(0.0), sourceEntityId(NullEntityId), rayCheck(false) {}
+  : damageType(DamageType::NoDamage), damage(0.0), sourceEntityId(null_entity_id), rayCheck(false) {}
 
 std::expected<DamageSource, StarException> DamageSource::create(Json const& config) {
   DamageSource source;
@@ -85,7 +85,7 @@ std::expected<DamageSource, StarException> DamageSource::create(Json const& conf
   if (!track)
     return std::unexpected(std::move(track.error()));
   source.trackSourceEntity = *track;
-  auto id = config.get_int("sourceEntityId", NullEntityId);
+  auto id = config.get_int("sourceEntityId", null_entity_id);
   if (!id)
     return std::unexpected(std::move(id.error()));
   source.sourceEntityId = *id;
@@ -278,7 +278,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
 }
 
 DamageRequest::DamageRequest()
-  : hitType(HitType::Hit), damageType(DamageType::Damage), damage(0.0f), sourceEntityId(NullEntityId) {}
+  : hitType(HitType::Hit), damageType(DamageType::Damage), damage(0.0f), sourceEntityId(null_entity_id) {}
 
 std::expected<DamageRequest, StarException> DamageRequest::create(Json const& v) {
   DamageRequest request;
@@ -307,7 +307,7 @@ std::expected<DamageRequest, StarException> DamageRequest::create(Json const& v)
   if (!momentum)
     return std::unexpected(std::move(momentum.error()));
   request.knockbackMomentum = *momentum;
-  auto id = v.get_int("sourceEntityId", NullEntityId);
+  auto id = v.get_int("sourceEntityId", null_entity_id);
   if (!id)
     return std::unexpected(std::move(id.error()));
   request.sourceEntityId = *id;

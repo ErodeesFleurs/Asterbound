@@ -677,7 +677,7 @@ if (!result1204) return std::unexpected(std::move(result1204.error()));
 if (!result1205) return std::unexpected(std::move(result1205.error()));
 
     Star::erase_if(m_aliveMasterConnections, [this](auto& p) {
-        return p.second.tick(this->root().timing().timestep);
+        return p.second.tick(this->root().timing().time_step);
       });
 
     for (auto& loungePositionPair : m_loungePositions) {
@@ -695,7 +695,7 @@ if (!result1206) return std::unexpected(std::move(result1206.error()));
     auto result1207 = m_movementController->tickSlave(dt);
 if (!result1207) return std::unexpected(std::move(result1207.error()));
 
-    bool heartbeat = m_slaveHeartbeatTimer.wrapTick(root().timing().timestep);
+    bool heartbeat = m_slaveHeartbeatTimer.wrapTick(root().timing().time_step);
 
     for (auto& p : m_loungePositions) {
       if (heartbeat) {

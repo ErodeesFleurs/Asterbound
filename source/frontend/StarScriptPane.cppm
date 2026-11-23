@@ -57,7 +57,7 @@ public:
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ScriptPane>(); }
 
-  [[nodiscard]] static std::expected<std::shared_ptr<ScriptPane>, StarException> create(GuiContext& guiContext, std::shared_ptr<UniverseClient> client, Json config, EntityId sourceEntityId = NullEntityId);
+  [[nodiscard]] static std::expected<std::shared_ptr<ScriptPane>, StarException> create(GuiContext& guiContext, std::shared_ptr<UniverseClient> client, Json config, EntityId sourceEntityId = null_entity_id);
 
   [[nodiscard]] std::expected<void, StarException> displayed() override;
   [[nodiscard]] std::expected<void, StarException> dismissed() override;

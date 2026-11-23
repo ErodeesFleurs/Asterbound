@@ -267,7 +267,7 @@ std::expected<CharacterCreationResult, StarException> SpeciesDatabase::createHum
     result.identity.name = name;
     result.identity.species = species.species;
     result.identity.bodyDirectives = bodyColor + altColor;
-    auto selectedGender = enum_value<GenderNames>(gender.name);
+    auto selectedGender = enum_value<gender_names>(gender.name);
     if (!selectedGender) return std::unexpected(std::move(selectedGender.error()));
     result.identity.gender = *selectedGender;
     result.identity.hairGroup = gender.hairGroup;
@@ -371,10 +371,10 @@ std::expected<void, StarException> SpeciesDefinition::init(Json const& config) {
   auto noiseList = json_to_string_list(*noises);
   if (!noiseList) return std::unexpected(std::move(noiseList.error()));
   m_ouchNoises = std::move(*noiseList);
-  if (m_nameGen.size() < GenderNames.size() || m_ouchNoises.size() < GenderNames.size())
+  if (m_nameGen.size() < gender_names.size() || m_ouchNoises.size() < gender_names.size())
     return std::unexpected(
       StarException::format("Species '{}' must have at least {} nameGen and {} ouchNoises entries, has {} and {}",
-                            m_kind, GenderNames.size(), GenderNames.size(), m_nameGen.size(), m_ouchNoises.size()));
+                            m_kind, gender_names.size(), gender_names.size(), m_nameGen.size(), m_ouchNoises.size()));
   auto items = config.get_array("defaultItems", JsonArray{});
   if (!items) return std::unexpected(std::move(items.error()));
   for (auto const& value : *items) {

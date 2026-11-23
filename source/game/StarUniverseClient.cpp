@@ -503,7 +503,7 @@ std::expected<void, StarException> UniverseClient::disconnect() {
     }
     return {};
   }();
-  m_root.timing().timescale = 1.0f;
+  m_root.timing().time_scale = 1.0f;
   auto cleared = reset();
   if (m_mainPlayer)
     m_mainPlayer->setUniverseClient(std::nullopt);
@@ -617,7 +617,7 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
     }
   }
   if (m_warpCinemaCancelTimer) {
-    m_warpCinemaCancelTimer->tick(m_root.timing().timestep);
+    m_warpCinemaCancelTimer->tick(m_root.timing().time_step);
     if (m_warpCinemaCancelTimer->ready() && !m_warping) {
       m_warpCinemaCancelTimer.reset();
       auto operation46 = m_mainPlayer->setPendingCinematic(Json());
@@ -1250,7 +1250,7 @@ std::expected<bool, StarException> UniverseClient::reloadPlayer(Json const& data
     return std::unexpected(StarException("Cannot reload player without a client world"));
   EntityId entityId = player->entityId();
   if (!playerInWorld && world->get().inWorld()) {
-    auto spaceResult = connectionEntitySpace(world->get().connection());
+    auto spaceResult = connection_entity_space(world->get().connection());
     if (!spaceResult)
       return std::unexpected(std::move(spaceResult.error()));
     auto space = std::move(*spaceResult);
@@ -1596,7 +1596,7 @@ std::expected<RpcPromise<Json>, StarException> UniverseClient::sendSubWorldOnWor
 std::expected<RpcPromise<Json>, StarException> UniverseClient::sendMainWorldMessage(String const& message, JsonArray const& args) {
   if (!isConnected())
     return RpcPromise<Json>::make_failed("Not connected");
-  auto responseResult = m_worldClient->receiveMessage(ServerConnectionId, message, args);
+  auto responseResult = m_worldClient->receiveMessage(server_connection_id, message, args);
   if (!responseResult)
     return std::unexpected(std::move(responseResult.error()));
   auto response = std::move(*responseResult);
@@ -1767,7 +1767,7 @@ std::expected<void, StarException> UniverseClient::handlePackets(List<std::share
         m_celestialDatabase->invalidateCacheFor(planet->coordinate);
       } else if (auto pause = as<PausePacket>(packet)) {
         setPause(pause->pause);
-        m_root.timing().timescale = std::clamp(pause->timescale, 0.0f, 1024.f);
+        m_root.timing().time_scale = std::clamp(pause->timescale, 0.0f, 1024.f);
       } else if (auto info = as<ServerInfoPacket>(packet)) {
         m_serverInfo = ServerInfo{info->players, info->maxPlayers};
       } else if (auto request = as<ClientCustomWorldRequest>(packet)) {

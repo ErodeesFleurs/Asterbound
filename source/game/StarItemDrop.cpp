@@ -138,7 +138,7 @@ std::expected<std::shared_ptr<ItemDrop>, StarException> ItemDrop::createRandomiz
     return std::unexpected(std::move(distance.error()));
   auto offset = Vec2F(*distance, 0).rotate(std::numbers::pi * 2.0 * rootContext.random().uniform_float());
   offset[1] = std::fabs(offset[1]);
-  (*drop)->setPosition(position + offset / TilePixels);
+  (*drop)->setPosition(position + offset / tile_pixels);
   auto speed = config->get_float("randomizedSpeed");
   if (!speed)
     return std::unexpected(std::move(speed.error()));
@@ -233,7 +233,7 @@ std::expected<std::shared_ptr<ItemDrop>, StarException> ItemDrop::create(Root& r
     return std::unexpected(std::move(initialized.error()));
   if (auto initialized = drop->initializeItem(std::move(item)); !initialized)
     return std::unexpected(std::move(initialized.error()));
-  drop->m_owningEntity.set(NullEntityId);
+  drop->m_owningEntity.set(null_entity_id);
   drop->m_mode.set(Mode::Available);
   return drop;
 }
@@ -278,7 +278,7 @@ std::expected<std::shared_ptr<ItemDrop>, StarException> ItemDrop::create(Root& r
   if (!aging)
     return std::unexpected(std::move(aging.error()));
   drop->m_ageItemsTimer = std::move(*aging);
-  drop->m_owningEntity.set(NullEntityId);
+  drop->m_owningEntity.set(null_entity_id);
   return drop;
 }
 
@@ -482,7 +482,7 @@ std::expected<void, StarException> ItemDrop::update(float dt, std::uint64_t) {
     auto updated = recover_lua_script_error(m_scriptComponent.update(m_scriptComponent.update_dt(dt)));
     if (!updated)
       return std::unexpected(std::move(updated.error()));
-    if (m_owningEntity.get() != NullEntityId) {
+    if (m_owningEntity.get() != null_entity_id) {
       if (auto taken = updateTaken(true); !taken)
         return std::unexpected(std::move(taken.error()));
     } else {
@@ -567,9 +567,9 @@ std::expected<void, StarException> ItemDrop::update(float dt, std::uint64_t) {
     }
     if (auto ticked = m_netGroup.tick_net_interpolation(dt); !ticked)
       return std::unexpected(std::move(ticked.error()));
-    if (m_owningEntity.get() != NullEntityId) {
+    if (m_owningEntity.get() != null_entity_id) {
       if (m_dropAge.elapsedTime() > 1.0f) {
-        m_owningEntity.set(NullEntityId);
+        m_owningEntity.set(null_entity_id);
       } else {
         if (auto taken = updateTaken(false); !taken)
           return std::unexpected(std::move(taken.error()));
@@ -591,7 +591,7 @@ std::expected<void, StarException> ItemDrop::update(float dt, std::uint64_t) {
 }
 
 std::expected<bool, StarException> ItemDrop::shouldDestroy() const {
-  return m_mode.get() == Mode::Dead || (m_item->empty() && m_owningEntity.get() == NullEntityId);
+  return m_mode.get() == Mode::Dead || (m_item->empty() && m_owningEntity.get() == null_entity_id);
 }
 
 std::uint64_t ItemDrop::presentationEpoch() const {
@@ -620,7 +620,7 @@ std::expected<void, StarException> ItemDrop::render(RenderCallback& renderCallba
 
     beamColor.set_alpha_f(0.8f);
     Line2F line = { Vec2F(), Vec2F(0.0f, 1.0f + m_boundBox.height() / 2) };
-    float width = std::min(2.0f, m_boundBox.width() * TilePixels);
+    float width = std::min(2.0f, m_boundBox.width() * tile_pixels);
     auto drawable = Drawable::makeLine(line, width, beamColor, position());
     (drawable.linePart().endColor = beamColor)->set_alpha_f(0.0f);
     drawable.fullbright = true;
@@ -698,7 +698,7 @@ void ItemDrop::setIntangibleTime(float intangibleTime) {
 }
 
 std::expected<bool, StarException> ItemDrop::canTake() const {
-  if (m_mode.get() != Mode::Available || m_owningEntity.get() != NullEntityId || m_item->empty())
+  if (m_mode.get() != Mode::Available || m_owningEntity.get() != null_entity_id || m_item->empty())
     return false;
   if (isMaster()) {
     auto result = recover_lua_script_error(m_scriptComponent.invoke<bool>("canTake"));
@@ -891,7 +891,7 @@ std::expected<std::optional<LuaValue>, StarException> ItemDrop::evalScript(Strin
 std::expected<LuaCallbacks, StarException> ItemDrop::makeItemDropCallbacks() {
   LuaCallbacks callbacks;
   if (auto registered = callbacks.register_callback("takingEntity", [this]() -> std::optional<EntityId> {
-    if (m_owningEntity.get() == NullEntityId)
+    if (m_owningEntity.get() == null_entity_id)
       return {};
     return m_owningEntity.get();
   }); !registered)

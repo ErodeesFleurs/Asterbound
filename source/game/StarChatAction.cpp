@@ -8,7 +8,7 @@ import star.chat_action;
 namespace Star {
 
 SayChatAction::SayChatAction() {
-  entity = NullEntityId;
+  entity = null_entity_id;
 }
 
 SayChatAction::SayChatAction(EntityId entity, String const& text, Vec2F const& position)
@@ -22,7 +22,7 @@ SayChatAction::operator bool() const {
 }
 
 PortraitChatAction::PortraitChatAction() {
-  entity = NullEntityId;
+  entity = null_entity_id;
 }
 
 PortraitChatAction::PortraitChatAction(

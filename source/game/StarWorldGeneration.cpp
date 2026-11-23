@@ -992,7 +992,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::connectWireGroup(List<
 
   for (auto entry : wireGroup) {
     bool found = false;
-    Vec2F posf = centerOfTile(entry);
+    Vec2F posf = center_of_tile(entry);
     RectF bounds = {posf - Vec2F(16, 16), posf + Vec2F(16, 16)};
     auto rangeValuesResult1 = m_worldServer.query<WireEntity>(bounds);
     if (!rangeValuesResult1) return std::unexpected(std::move(rangeValuesResult1.error()));
@@ -1246,7 +1246,7 @@ std::expected<bool, StarException> SpawnerWorld::spawningProhibited(RectF const&
       auto autoconsttileResult1 = m_worldServer.getServerTile({x, y});
       if (!autoconsttileResult1) return std::unexpected(std::move(autoconsttileResult1.error()));
       auto const& tile = std::move(autoconsttileResult1->get());
-      if (tile.getCollision() == CollisionKind::Null || tile.dungeonId != NoDungeonId)
+      if (tile.getCollision() == CollisionKind::Null || tile.dungeonId != no_dungeon_id)
         return true;
     }
   }
@@ -1266,12 +1266,12 @@ std::expected<SpawnProfile, StarException> SpawnerWorld::spawnProfile(Vec2F cons
   auto biomeCheckedResult1 = worldTemplate->blockBiome(ipos[0], ipos[1]);
   if (!biomeCheckedResult1) return std::unexpected(std::move(biomeCheckedResult1.error()));
   if (auto biome = std::move((*biomeCheckedResult1))) {
-    // Dungeons, including ConstructionDungeonId (player constructed areas)
+    // Dungeons, including construction_dungeon_id (player constructed areas)
     // should be immune from spawning.
     auto autotileResult1 = m_worldServer.getServerTile(ipos);
     if (!autotileResult1) return std::unexpected(std::move(autotileResult1.error()));
     auto tile = std::move(autotileResult1->get());
-    if (tile.dungeonId == NoDungeonId)
+    if (tile.dungeonId == no_dungeon_id)
       return biome->spawnProfile;
   }
   return {};
@@ -1578,7 +1578,7 @@ std::expected<void, StarException> WorldGenerator::generateMicroDungeons(WorldSt
   auto facade = std::make_shared<DungeonGeneratorWorld>(m_worldServer, false);
 
   RectI sectorTiles = worldStorage.tileArray()->sector_region(sector);
-  RectI bounds = sectorTiles.padded(WorldSectorSize - 1);
+  RectI bounds = sectorTiles.padded(world_sector_size - 1);
 
   struct PlacementEntry {
     BiomeItemPlacement placement;
@@ -1694,7 +1694,7 @@ std::expected<void, StarException> WorldGenerator::generateCaveLiquid(WorldStora
   auto wrapCoords = [=](Vec2I const& coord) -> Vec2I { return Vec2I{positive_mod<int>(coord[0], dimensions[0]), coord[1]}; };
 
   RectI sectorTiles = tileArray->sector_region(sector);
-  RectI bounds = sectorTiles.padded(Vec2I(WorldSectorSize - 1, WorldSectorSize - 1));
+  RectI bounds = sectorTiles.padded(Vec2I(world_sector_size - 1, world_sector_size - 1));
 
   bounds.min()[1] = clamp<int>(bounds.min()[1], 0, dimensions[1] - 1);
   bounds.max()[1] = clamp<int>(bounds.max()[1], 0, dimensions[1] - 1);
@@ -1747,7 +1747,7 @@ std::expected<void, StarException> WorldGenerator::generateCaveLiquid(WorldStora
         badNodes.add(position);
       return {};
     }
-    if ((tile.dungeonId != NoDungeonId && (!fillMicrodungeons || tile.dungeonId != BiomeMicroDungeonId))
+    if ((tile.dungeonId != no_dungeon_id && (!fillMicrodungeons || tile.dungeonId != biome_micro_dungeon_id))
         || (!encloseLiquids && tile.background == EmptyMaterialId)
         || (tile.liquid.liquid != fillLiquid && tile.liquid.liquid != EmptyLiquidId)) {
       badNodes.add(position);
@@ -1867,7 +1867,7 @@ std::expected<void, StarException> WorldGenerator::prepareSector(WorldStorage& w
         auto blockInfo = std::move((*autoblockInfoResult1));
         // make sure that ocean liquid never exists on tiles without empty
         // background (except in real dungeons)
-        if (!isRealDungeon(tile->get().dungeonId) && tile->get().background != EmptyMaterialId)
+        if (!is_real_dungeon(tile->get().dungeonId) && tile->get().background != EmptyMaterialId)
           tile->get().liquid.source = false;
         // pressurize liquid under the ocean
         if (blockInfo.oceanLiquid != EmptyLiquidId && position[1] < blockInfo.oceanLiquidLevel) {
@@ -1900,7 +1900,7 @@ std::expected<void, StarException> WorldGenerator::prepareSector(WorldStorage& w
   for (int x = sectorTiles.x_min(); x < sectorTiles.x_max(); ++x) {
     for (int y = sectorTiles.y_min(); y < sectorTiles.y_max(); ++y) {
       auto tile = tileArray->tile(Vec2I(x, y));
-      if (tile.dungeonId == NoDungeonId) {
+      if (tile.dungeonId == no_dungeon_id) {
         auto autopotentialResult1 = worldTemplate->potentialBiomeItemsAt(x, y);
         if (!autopotentialResult1) return std::unexpected(std::move(autopotentialResult1.error()));
         auto potential = std::move((*autopotentialResult1));
@@ -2033,7 +2033,7 @@ std::expected<void, StarException> WorldGenerator::placeBiomeGrass(WorldStorage&
     // don't place mods in dungeons unless explicitly specified, also don't
     // touch non-grass mods
     if (tile.mod(modLayer) == BiomeModId || tile.mod(modLayer) == UndergroundBiomeModId
-        || (tile.dungeonId == NoDungeonId && tile.mod(modLayer) == NoModId)) {
+        || (tile.dungeonId == no_dungeon_id && tile.mod(modLayer) == NoModId)) {
       // check whether we're floor or ceiling
       auto tileAbove = worldStorage.tileArray()->tile(position + Vec2I(0, 1));
       auto tileBelow = worldStorage.tileArray()->tile(position + Vec2I(0, -1));
@@ -2570,7 +2570,7 @@ std::expected<bool, StarException> WorldGenerator::placePlant(WorldStorage& worl
   // root position, or if we're in a dungeon region.
   auto primaryTile = worldStorage.tileArray()->tile(position);
   auto rootTile = worldStorage.tileArray()->tile(position + primaryRoot);
-  if (primaryTile.dungeonId != NoDungeonId || rootTile.dungeonId != NoDungeonId)
+  if (primaryTile.dungeonId != no_dungeon_id || rootTile.dungeonId != no_dungeon_id)
     return false;
   if (isConnectableMaterial(primaryTile.foreground) || !isConnectableMaterial(rootTile.foreground))
     return false;

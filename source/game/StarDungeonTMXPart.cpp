@@ -468,7 +468,7 @@ std::expected<Vec2I, StarException> TMXObject::getSize(Json const& tmx) {
       if (!w) return std::unexpected(std::move(w.error()));
       auto h = tmx.get_uint("height");
       if (!h) return std::unexpected(std::move(h.error()));
-      return Vec2I(*w, *h) / TilePixels;
+      return Vec2I(*w, *h) / tile_pixels;
     }
   }
   return Vec2I();
@@ -479,7 +479,7 @@ std::expected<Vec2I, StarException> TMXObject::getImagePosition(Tiled::Propertie
   if (!x) return std::unexpected(std::move(x.error()));
   auto y = properties.opt<float>("imagePositionY");
   if (!y) return std::unexpected(std::move(y.error()));
-  return Vec2I(static_cast<int>(x->value_or(0) / TilePixels), -static_cast<int>(y->value_or(0) / TilePixels));
+  return Vec2I(static_cast<int>(x->value_or(0) / tile_pixels), -static_cast<int>(y->value_or(0) / tile_pixels));
 }
 
 std::expected<ObjectKind, StarException> TMXObject::getObjectKind(Json const& tmx, std::optional<Json> const& objectProperties) {
@@ -550,7 +550,7 @@ std::expected<Vec2I, StarException> TMXObject::getPos(Json const& tmx) {
   if (!x) return std::unexpected(std::move(x.error()));
   auto y = tmx.get_int("y");
   if (!y) return std::unexpected(std::move(y.error()));
-  return Vec2I(*x, *y) / TilePixels;
+  return Vec2I(*x, *y) / tile_pixels;
 }
 
 StarException TMXObject::tmxObjectError(Vec2I pos, String const& msg) {

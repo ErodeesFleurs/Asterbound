@@ -181,7 +181,7 @@ std::expected<std::shared_ptr<AudioInstance>, StarException> AmbientManager::upd
   }
   if (m_volumeChanged) {
     if (m_delay > 0)
-      m_delay -= m_root.timing().timestep;
+      m_delay -= m_root.timing().time_step;
     else {
       m_volumeChanged = false;
       if (m_currentTrack) {

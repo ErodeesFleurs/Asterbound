@@ -643,7 +643,7 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
     if (!animationPositionResult)
       return std::unexpected(std::move(animationPositionResult.error()));
     auto animationPosition = std::move(*animationPositionResult);
-    m_animationPosition = animationPosition / TilePixels;
+    m_animationPosition = animationPosition / tile_pixels;
     m_networkedAnimator->setFlipped(false);
     auto imageMetadataResult = root().imageMetadataDatabase();
     if (!imageMetadataResult)
@@ -730,7 +730,7 @@ std::expected<List<LightSource>, StarException> Object::lightSources(NetworkedAn
       color.set_value(std::clamp(color.value() * m_lightFlickering->value(SinWeightOperator<float>()), 0.0f, 1.0f));
 
     LightSource lightSource;
-    lightSource.position = position() + centerOfTile(orientation->lightPosition);
+    lightSource.position = position() + center_of_tile(orientation->lightPosition);
     lightSource.color = color.to_rgb_f();
     lightSource.type = m_config->lightType;
     lightSource.pointBeam = m_config->pointBeam;
@@ -851,7 +851,7 @@ std::expected<void, StarException> Object::update(float dt, std::uint64_t) {
   auto& currentWorld = currentWorldResult->get();
   if (isMaster()) {
     m_tileDamageStatus->recover(m_config->tileDamageParameters, dt);
-    if (m_liquidCheckTimer.wrapTick(root().timing().timestep)) {
+    if (m_liquidCheckTimer.wrapTick(root().timing().time_step)) {
       auto operation1 = checkLiquidBroken();
       if (!operation1)
         return std::unexpected(std::move(operation1.error()));
@@ -1322,7 +1322,7 @@ std::expected<List<Drawable>, StarException> Object::cursorHintDrawables() const
       return std::unexpected(std::move(imagePositionResult.error()));
     auto imagePosition = std::move(*imagePositionResult);
     auto drawableResult = Drawable::makeImage(*metadata, AssetPath::relative_to(m_config->path, placementImage),
-                                              1.0 / TilePixels, false, imagePosition / TilePixels);
+                                              1.0 / tile_pixels, false, imagePosition / tile_pixels);
     if (!drawableResult)
       return std::unexpected(std::move(drawableResult.error()));
     auto drawable = std::move(*drawableResult);
@@ -1460,7 +1460,7 @@ std::expected<void, StarException> Object::readStoredData(Json const& diskStore)
   if (!directionResult)
     return std::unexpected(std::move(directionResult.error()));
   auto direction = std::move(*directionResult);
-  auto directionValueResult = enum_value<DirectionNames>(direction);
+  auto directionValueResult = enum_value<direction_names>(direction);
   if (!directionValueResult)
     return std::unexpected(std::move(directionValueResult.error()));
   auto directionValue = std::move(*directionValueResult);
@@ -1573,7 +1573,7 @@ std::expected<Json, StarException> Object::writeStoredData() const {
     outputNodes.push_back(JsonObject{{"connections", std::move(connections)}, {"state", in.state.get()}});
   }
 
-  auto direction = enum_name<DirectionNames>(m_direction.get());
+  auto direction = enum_name<direction_names>(m_direction.get());
   if (!direction)
     return std::unexpected(std::move(direction.error()));
   auto storage = m_scriptComponent.get_script_storage();
@@ -1827,7 +1827,7 @@ std::expected<LuaCallbacks, StarException> Object::makeObjectCallbacks() {
   if (!operation1)
     return std::unexpected(std::move(operation1.error()));
   auto operation2 = callbacks.register_callback("direction", [this]() {
-  return numericalDirection(direction());
+  return numerical_direction(direction());
 });
   if (!operation2)
     return std::unexpected(std::move(operation2.error()));
@@ -2155,7 +2155,7 @@ std::expected<LuaCallbacks, StarException> Object::makeAnimatorObjectCallbacks()
   if (!operation1)
     return std::unexpected(std::move(operation1.error()));
   auto operation2 = callbacks.register_callback("direction", [this]() {
-  return numericalDirection(direction());
+  return numerical_direction(direction());
 });
   if (!operation2)
     return std::unexpected(std::move(operation2.error()));

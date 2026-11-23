@@ -32,7 +32,7 @@ std::expected<String, StarException> ChatProcessor::connectClient(ConnectionId c
 
   for (auto&& pair : m_clients) {
     pair.second.pendingMessages.push_back(
-      {{MessageContext::Broadcast}, ServerConnectionId, ServerNick, Star::format("Player '{}' connected", nick)});
+      {{MessageContext::Broadcast}, server_connection_id, ServerNick, Star::format("Player '{}' connected", nick)});
   }
 
   auto added = m_clients.add(clientId, ClientInfo(clientId, nick));
@@ -56,7 +56,7 @@ std::expected<List<ChatReceivedMessage>, StarException> ChatProcessor::disconnec
 
   for (auto&& pair : m_clients) {
     pair.second.pendingMessages.push_back(
-      {{MessageContext::Broadcast}, ServerConnectionId, ServerNick, Star::format("Player '{}' disconnected", clientInfo.nick)});
+      {{MessageContext::Broadcast}, server_connection_id, ServerNick, Star::format("Player '{}' disconnected", clientInfo.nick)});
   }
 
   return clientInfo.pendingMessages;
@@ -80,14 +80,14 @@ std::optional<ConnectionId> ChatProcessor::findNick(String const& nick) const {
   if (auto m = m_nicks.maybe(nick))
     return m;
   if (nick == ServerNick)
-    return ServerConnectionId;
+    return server_connection_id;
   return {};
 }
 
 std::expected<String, StarException> ChatProcessor::connectionNick(ConnectionId clientId) const {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lock_with_diagnostics(locker);
-  if (clientId == ServerConnectionId)
+  if (clientId == server_connection_id)
     return ServerNick;
   auto client = m_clients.get(clientId);
   if (!client) return std::unexpected(std::move(client.error()));
@@ -218,7 +218,7 @@ std::expected<void, StarException> ChatProcessor::whisper(ConnectionId sourceCon
   if (!handled) return std::unexpected(std::move(handled.error()));
   if (*handled) return {};
 
-  if (sourceConnectionId != ServerConnectionId) {
+  if (sourceConnectionId != server_connection_id) {
     auto source = m_clients.get(sourceConnectionId);
     if (!source) return std::unexpected(std::move(source.error()));
     source->get().pendingMessages.push_back(message);
@@ -232,19 +232,19 @@ std::expected<void, StarException> ChatProcessor::whisper(ConnectionId sourceCon
 std::expected<void, StarException> ChatProcessor::adminBroadcast(String const& text) {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lock_with_diagnostics(locker);
-  return broadcast(ServerConnectionId, text, {});
+  return broadcast(server_connection_id, text, {});
 }
 
 std::expected<void, StarException> ChatProcessor::adminMessage(MessageContext::Mode context, String const& channelName, String const& text) {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lock_with_diagnostics(locker);
-  return ChatProcessor::message(ServerConnectionId, context, channelName, text, {});
+  return ChatProcessor::message(server_connection_id, context, channelName, text, {});
 }
 
 std::expected<void, StarException> ChatProcessor::adminWhisper(ConnectionId targetClientId, String const& text) {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lock_with_diagnostics(locker);
-  return whisper(ServerConnectionId, targetClientId, text, {});
+  return whisper(server_connection_id, targetClientId, text, {});
 }
 
 std::expected<List<ChatReceivedMessage>, StarException> ChatProcessor::pullPendingMessages(ConnectionId clientId) {
@@ -325,7 +325,7 @@ std::expected<bool, StarException> ChatProcessor::handleCommand(ChatReceivedMess
     auto client = m_clients.get(message.fromConnection);
     if (!client) return std::unexpected(std::move(client.error()));
     client->get().pendingMessages.push_back(
-      {MessageContext(MessageContext::CommandResult), ServerConnectionId, ServerNick, response});
+      {MessageContext(MessageContext::CommandResult), server_connection_id, ServerNick, response});
   }
   return true;
 }
@@ -356,7 +356,7 @@ std::expected<void, StarException> ChatProcessor::updatePromises() {
         auto client = m_clients.get(entry.first);
         if (!client) return std::unexpected(std::move(client.error()));
         client->get().pendingMessages.push_back(
-          {MessageContext(MessageContext::CommandResult), ServerConnectionId, ServerNick, response});
+          {MessageContext(MessageContext::CommandResult), server_connection_id, ServerNick, response});
       }
       m_commandPromises.remove(uuid);
     }

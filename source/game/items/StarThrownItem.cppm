@@ -145,7 +145,7 @@ std::expected<std::shared_ptr<ThrownItem>, StarException> ThrownItem::create(Roo
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
   auto drawable =
-    Drawable::makeImage(**metadata, AssetPath::relative_to(directory, *image), 1.0f / TilePixels, true, Vec2F());
+    Drawable::makeImage(**metadata, AssetPath::relative_to(directory, *image), 1.0f / tile_pixels, true, Vec2F());
   if (!drawable)
     return std::unexpected(std::move(drawable.error()));
   item->m_drawables = {std::move(*drawable)};

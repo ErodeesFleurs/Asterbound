@@ -897,7 +897,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::portraitHandle
     auto modeName = config.get_string("portraitMode");
     if (!modeName)
       return std::unexpected(std::move(modeName.error()));
-    auto mode = enum_value<PortraitModeNames>(*modeName);
+    auto mode = enum_value<portrait_mode_names>(*modeName);
     if (!mode)
       return std::unexpected(std::move(mode.error()));
     auto changedMode = portrait->setMode(*mode);

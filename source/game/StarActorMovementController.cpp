@@ -754,9 +754,9 @@ void ActorMovementController::uninit() {
 }
 
 std::expected<Json, StarException> ActorMovementController::storeState() const {
-  auto movingName = enum_name<DirectionNames>(movingDirection());
+  auto movingName = enum_name<direction_names>(movingDirection());
   if (!movingName) return std::unexpected(std::move(movingName.error()));
-  auto facingName = enum_name<DirectionNames>(m_facingDirection.get());
+  auto facingName = enum_name<direction_names>(m_facingDirection.get());
   if (!facingName) return std::unexpected(std::move(facingName.error()));
   return JsonObject{{"position", json_from_vec2f(MovementController::position())},
                     {"velocity", json_from_vec2f(velocity())},
@@ -771,11 +771,11 @@ std::expected<void, StarException> ActorMovementController::loadState(Json const
   if (!loaded) return std::unexpected(std::move(loaded.error()));
   auto movingName = state.get_string("movingDirection");
   if (!movingName) return std::unexpected(std::move(movingName.error()));
-  auto movingDirection = enum_value<DirectionNames>(*movingName);
+  auto movingDirection = enum_value<direction_names>(*movingName);
   if (!movingDirection) return std::unexpected(std::move(movingDirection.error()));
   auto facingName = state.get_string("facingDirection");
   if (!facingName) return std::unexpected(std::move(facingName.error()));
-  auto facingDirection = enum_value<DirectionNames>(*facingName);
+  auto facingDirection = enum_value<direction_names>(*facingName);
   if (!facingDirection) return std::unexpected(std::move(facingDirection.error()));
   auto crouchingValue = state.get_bool("crouching");
   if (!crouchingValue) return std::unexpected(std::move(crouchingValue.error()));
@@ -1730,7 +1730,7 @@ std::expected<std::optional<bool>, StarException> PathController::move(ActorMove
     auto movement = (current_velocity + source_velocity) / 2.0 * m_edge_timer;
     movement_controller.setPosition(edge.source.position + movement);
 
-    if (auto direction = directionOf(delta[0]))
+    if (auto direction = direction_of(delta[0]))
       m_control_face = direction;
 
     m_edge_timer += dt;

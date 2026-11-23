@@ -799,7 +799,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> WorldServer::removeC
   }
 
   for (auto const& entityId : m_entityMap->entityIds()) {
-    if (connectionForEntity(entityId) == clientId) {
+    if (connection_for_entity(entityId) == clientId) {
       auto result65 = removeEntity(entityId, false);
       if (!result65)
         return std::unexpected(std::move(result65.error()));
@@ -829,7 +829,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> WorldServer::removeC
   m_clientInfo.remove(clientId);
 
   packets.push_back(std::make_shared<WorldStopPacket>("Removed"));
-  if (subWorldId == MainClientWorldId) {
+  if (subWorldId == main_client_world_id) {
     return packets;
   } else {
     return List<std::shared_ptr<Packet>>{std::make_shared<ClientSubWorldPackets>(subWorldId,std::move(packets))};
@@ -1033,23 +1033,29 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
           clientInfo->outgoingPackets.push_back(std::make_shared<GiveItemPacket>(taken->descriptor()));
       }
     } else if (auto hit = as<HitRequestPacket>(packet)) {
-      if (hit->remoteHitRequest.destinationConnection() == ServerConnectionId) {
+      auto owner = hit->remoteHitRequest.destination_connection();
+      if (!owner)
+        return std::unexpected(WorldServerException("Hit request has no owning connection"));
+      if (*owner == server_connection_id) {
         auto result86 = m_damageManager->pushRemoteHitRequest(hit->remoteHitRequest);
         if (!result86)
           return std::unexpected(std::move(result86.error()));
       } else {
-        auto destination = m_clientInfo.get(hit->remoteHitRequest.destinationConnection());
+        auto destination = m_clientInfo.get(*owner);
         if (!destination)
           return std::unexpected(std::move(destination.error()));
         destination->get()->outgoingPackets.push_back(std::make_shared<HitRequestPacket>(hit->remoteHitRequest));
       }
     } else if (auto damage = as<DamageRequestPacket>(packet)) {
-      if (damage->remoteDamageRequest.destinationConnection() == ServerConnectionId) {
+      auto owner = damage->remoteDamageRequest.destination_connection();
+      if (!owner)
+        return std::unexpected(WorldServerException("Damage request has no owning connection"));
+      if (*owner == server_connection_id) {
         auto result87 = m_damageManager->pushRemoteDamageRequest(damage->remoteDamageRequest);
         if (!result87)
           return std::unexpected(std::move(result87.error()));
       } else {
-        auto destination = m_clientInfo.get(damage->remoteDamageRequest.destinationConnection());
+        auto destination = m_clientInfo.get(*owner);
         if (!destination)
           return std::unexpected(std::move(destination.error()));
         destination->get()->outgoingPackets.push_back(
@@ -1065,8 +1071,10 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
             std::make_shared<DamageNotificationPacket>(damage->remoteDamageNotification));
       }
     } else if (auto entityInteract = as<EntityInteractPacket>(packet)) {
-      auto targetEntityConnection = connectionForEntity(entityInteract->interactRequest.targetId);
-      if (targetEntityConnection == ServerConnectionId) {
+      auto target_owner = connection_for_entity(entityInteract->interactRequest.targetId);
+      if (!target_owner)
+        return std::unexpected(WorldServerException("Interaction target has no owning connection"));
+      if (*target_owner == server_connection_id) {
         auto result89 = interact(entityInteract->interactRequest);
         if (!result89)
           return std::unexpected(std::move(result89.error()));
@@ -1080,20 +1088,23 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
         clientInfo->outgoingPackets.push_back(std::make_shared<EntityInteractResultPacket>(
           std::move(*result91), entityInteract->requestId, entityInteract->interactRequest.sourceId));
       } else {
-        auto result92 = m_clientInfo.get(targetEntityConnection);
+        auto result92 = m_clientInfo.get(*target_owner);
         if (!result92)
           return std::unexpected(std::move(result92.error()));
         auto const& forwardClientInfo = result92->get();
         forwardClientInfo->outgoingPackets.push_back(entityInteract);
       }
     } else if (auto interactResult = as<EntityInteractResultPacket>(packet)) {
-      auto result93 = m_clientInfo.get(connectionForEntity(interactResult->sourceEntityId));
+      auto source_owner = connection_for_entity(interactResult->sourceEntityId);
+      if (!source_owner)
+        return std::unexpected(WorldServerException("Interaction source has no owning connection"));
+      auto result93 = m_clientInfo.get(*source_owner);
       if (!result93)
         return std::unexpected(std::move(result93.error()));
       auto const& forwardClientInfo = result93->get();
       forwardClientInfo->outgoingPackets.push_back(interactResult);
     } else if (auto entityCreate = as<EntityCreatePacket>(packet)) {
-      auto legalEntityId = entityIdInSpace(entityCreate->entityId, clientInfo->clientId);
+      auto legalEntityId = entity_id_in_space(entityCreate->entityId, clientInfo->clientId);
       if (!legalEntityId)
         return std::unexpected(std::move(legalEntityId.error()));
       if (!*legalEntityId) {
@@ -1146,7 +1157,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       float interpolationLeadTime = clientInfo->interpolationTracker.interpolationLeadTime();
       auto result102 = m_entityMap->forAllEntities([&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
         EntityId entityId = entity->entityId();
-        if (connectionForEntity(entityId) == clientId) {
+        if (connection_for_entity(entityId) == clientId) {
           if constexpr (Star::debug_enabled) {
             Star::star_assert_failed((entity->isSlave()));
           }
@@ -1421,10 +1432,16 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
             clientInfo->outgoingPackets.push_back(std::make_shared<EntityMessageResponsePacket>(
               std::unexpected(String("Message not handled by entity")), entityMessagePacket->uuid));
           }
-        } else if (auto const& clientInfo = m_clientInfo.value(connectionForEntity(entity->entityId()))) {
-          m_entityMessageResponses[entityMessagePacket->uuid] = {clientInfo->clientId, clientId};
-          entityMessagePacket->fromConnection = clientId;
-          clientInfo->outgoingPackets.push_back(std::move(entityMessagePacket));
+        } else {
+          auto owner = connection_for_entity(entity->entityId());
+          if (!owner) {
+            clientInfo->outgoingPackets.push_back(std::make_shared<EntityMessageResponsePacket>(
+              std::unexpected(String("Entity has no owning connection")), entityMessagePacket->uuid));
+          } else if (auto destination = m_clientInfo.value(*owner)) {
+            m_entityMessageResponses[entityMessagePacket->uuid] = {*owner, clientId};
+            entityMessagePacket->fromConnection = clientId;
+            destination->outgoingPackets.push_back(std::move(entityMessagePacket));
+          }
         }
       }
     } else if (auto entityMessageResponsePacket = as<EntityMessageResponsePacket>(packet)) {
@@ -1501,7 +1518,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> WorldServer::getOutg
   if (!result148)
     return std::unexpected(std::move(result148.error()));
   auto const& clientInfo = result148->get();
-  if (clientInfo->subWorldId == MainClientWorldId) {
+  if (clientInfo->subWorldId == main_client_world_id) {
     return std::move(clientInfo->outgoingPackets);
   } else {
     return List<std::shared_ptr<Packet>>{std::make_shared<ClientSubWorldPackets>(clientInfo->subWorldId,std::move(clientInfo->outgoingPackets))};
@@ -1519,7 +1536,7 @@ bool WorldServer::sendPacket(ConnectionId clientId, std::shared_ptr<Packet> cons
 MessageResponseResult WorldServer::receiveMessage(ConnectionId fromConnection, String const& message, JsonArray const& args) {
   std::optional<ChainableJsonMessageResponse> result;
   for (auto&& p : m_scriptContexts) {
-    auto result149 = recover_lua_script_error(p.second->handle_message(message, fromConnection == ServerConnectionId, args));
+    auto result149 = recover_lua_script_error(p.second->handle_message(message, fromConnection == server_connection_id, args));
     if (!result149)
       return std::unexpected(std::move(result149.error()));
     result = std::move(*result149);
@@ -1629,7 +1646,7 @@ std::expected<void, StarException> WorldServer::update(float dt) {
       // rests on can be up to an entire sector large in any direction.
       bool condition157 = static_cast<bool>(doBreakChecks);
       if (condition157) {
-        auto result156 = world.regionActive(RectI::integral(tileEntity->metaBoundBox().translated(tileEntity->position())).padded(WorldSectorSize));
+        auto result156 = world.regionActive(RectI::integral(tileEntity->metaBoundBox().translated(tileEntity->position())).padded(world_sector_size));
         if (!result156)
           return std::unexpected(std::move(result156.error()));
         condition157 = static_cast<bool>(std::move(*result156));
@@ -1754,7 +1771,7 @@ std::expected<void, StarException> WorldServer::update(float dt) {
   if (!result180)
     return std::unexpected(std::move(result180.error()));
   if (auto delta = std::move(*result180)) {
-    auto result181 = m_worldStorage->tick(*delta * this->root().timing().timestep, std::cref(m_worldId));
+    auto result181 = m_worldStorage->tick(*delta * this->root().timing().time_step, std::cref(m_worldId));
     if (!result181)
       return std::unexpected(std::move(result181.error()));
   }
@@ -2143,7 +2160,7 @@ std::expected<bool, StarException> WorldServer::replaceTile(Vec2I const& pos, Ti
       auto damageParameters = std::move(*result225);
       bool harvested = tileDamage.amount >= 0 && tileDamage.harvestLevel >= damageParameters.requiredHarvestLevel();
       auto damage = placeMaterial.layer == TileLayer::Foreground ? tile->get().foregroundDamage : tile->get().backgroundDamage;
-      Vec2F dropPosition = centerOfTile(pos);
+      Vec2F dropPosition = center_of_tile(pos);
 
       auto result226 = destroyBlock(placeMaterial.layer, pos, harvested, !tileDamageIsPenetrating(damage.damageType()), false);
       if (!result226)
@@ -2152,7 +2169,7 @@ std::expected<bool, StarException> WorldServer::replaceTile(Vec2I const& pos, Ti
         auto result227 = ItemDrop::createRandomizedDrop(this->root(), drop, dropPosition);
         if (!result227)
           return std::unexpected(std::move(result227.error()));
-        auto result228 = addEntity(std::move(*result227), NullEntityId);
+        auto result228 = addEntity(std::move(*result227), null_entity_id);
         if (!result228)
           return std::unexpected(std::move(result228.error()));
       }
@@ -2343,7 +2360,7 @@ std::expected<TileDamageResult, StarException> WorldServer::damageTiles(List<Vec
 
             // if the tile is broken, send a message back to the source entity with position, layer, dungeonId, and whether the tile was harvested
             if (sourceEntity.has_value() && tile->get().foregroundDamage.dead()) {
-              auto result246 = enum_name<TileLayerNames>(TileLayer::Foreground);
+              auto result246 = enum_name<tile_layer_names>(TileLayer::Foreground);
               if (!result246)
                 return std::unexpected(std::move(result246.error()));
               auto result247 = sendEntityMessage(*sourceEntity, "tileBroken",
@@ -2375,7 +2392,7 @@ std::expected<TileDamageResult, StarException> WorldServer::damageTiles(List<Vec
 
           // if the tile is broken, send a message back to the source entity with position and whether the tile was harvested
           if (sourceEntity.has_value() && tile->get().backgroundDamage.dead()) {
-            auto result250 = enum_name<TileLayerNames>(TileLayer::Background);
+            auto result250 = enum_name<tile_layer_names>(TileLayer::Background);
             if (!result250)
               return std::unexpected(std::move(result250.error()));
             auto result251 = sendEntityMessage(*sourceEntity, "tileBroken",
@@ -2415,7 +2432,7 @@ DungeonId WorldServer::dungeonId(Vec2I const& pos) const {
 
 std::expected<bool, StarException> WorldServer::isPlayerModified(RectI const& region) const {
   auto result253 = m_tileArray->tile_satisfies(region, [](Vec2I const&, ServerTile const& tile) -> std::expected<bool, StarException> {
-    return tile.dungeonId == ConstructionDungeonId || tile.dungeonId == DestroyedBlockDungeonId;
+    return tile.dungeonId == construction_dungeon_id || tile.dungeonId == destroyed_block_dungeon_id;
   });
   if (!result253)
     return std::unexpected(std::move(result253.error()));
@@ -2870,7 +2887,7 @@ std::expected<void, StarException> WorldServer::init(bool firstTime) {
   m_tileGetterFunction = [&world = *this](Vec2I pos) -> std::expected<std::reference_wrapper<ServerTile const>, StarException> {
   return std::cref(world.m_tileArray->tile(pos));
   };
-  m_damageManager = std::make_shared<DamageManager>(*this, ServerConnectionId);
+  m_damageManager = std::make_shared<DamageManager>(*this, server_connection_id);
   m_wireProcessor = std::make_shared<WireProcessor>(m_worldStorage);
   auto result306 = LuaRoot::create(this->root());
   if (!result306)
@@ -2941,7 +2958,7 @@ std::expected<void, StarException> WorldServer::init(bool firstTime) {
   if (!result317)
     return std::unexpected(std::move(result317.error()));
 
-  auto result318 = setTileProtection(ProtectedZeroGDungeonId, true);
+  auto result318 = setTileProtection(protected_zero_g_dungeon_id, true);
   if (!result318)
     return std::unexpected(std::move(result318.error()));
 
@@ -3009,8 +3026,8 @@ std::expected<void, StarException> WorldServer::init(bool firstTime) {
       }
     }
 
-    world.m_dungeonIdGravity[ZeroGDungeonId] = 0.0;
-    world.m_dungeonIdGravity[ProtectedZeroGDungeonId] = 0.0;
+    world.m_dungeonIdGravity[zero_g_dungeon_id] = 0.0;
+    world.m_dungeonIdGravity[protected_zero_g_dungeon_id] = 0.0;
 
     world.m_generatingDungeon = false;
   }
@@ -3152,7 +3169,7 @@ std::expected<TileModificationList, StarException> WorldServer::doApplyTileModif
           tile->get().liquid = LiquidStore();
       }
 
-      tile->get().dungeonId = ConstructionDungeonId;
+      tile->get().dungeonId = construction_dungeon_id;
 
       if (updateNeighbors) {
         auto result341 = checkEntityBreaks(RectF::with_size(Vec2F(pos), Vec2F(1, 1)));
@@ -3395,7 +3412,7 @@ std::expected<void, StarException> WorldServer::updateTileEntityTiles(std::share
 }
 
 ConnectionId WorldServer::connection() const {
-  return ServerConnectionId;
+  return server_connection_id;
 }
 
 std::expected<bool, StarException> WorldServer::signalRegion(RectI const& region) {
@@ -3650,7 +3667,7 @@ std::expected<List<ItemDescriptor>, StarException> WorldServer::destroyBlock(Til
       tile->get().liquid = LiquidStore::endless(blockInfo.oceanLiquid, blockInfo.oceanLiquidLevel - pos[1]);
   }
 
-  tile->get().dungeonId = DestroyedBlockDungeonId;
+  tile->get().dungeonId = destroyed_block_dungeon_id;
 
   if (updateNeighbors) {
     auto result391 = checkEntityBreaks(RectF::with_size(Vec2F(pos), Vec2F(1, 1)));
@@ -3796,7 +3813,7 @@ std::expected<void, StarException> WorldServer::queueUpdatePackets(ConnectionId 
 
   HashMap<ConnectionId, std::shared_ptr<EntityUpdateSetPacket>> updateSetPackets;
   if (sendRemoteUpdates || clientInfo->local) {
-    auto result405 = updateSetPackets.add(ServerConnectionId, std::make_shared<EntityUpdateSetPacket>(ServerConnectionId));
+    auto result405 = updateSetPackets.add(server_connection_id, std::make_shared<EntityUpdateSetPacket>(server_connection_id));
     if (!result405)
       return std::unexpected(std::move(result405.error()));
   }
@@ -3811,10 +3828,10 @@ std::expected<void, StarException> WorldServer::queueUpdatePackets(ConnectionId 
   auto netRules = clientInfo->clientState->netCompatibilityRules();
   for (auto const& monitoredEntity : monitoredEntities) {
     EntityId entityId = monitoredEntity->entityId();
-    ConnectionId connectionId = connectionForEntity(entityId);
-    if (connectionId != clientId) {
+    auto owner = connection_for_entity(entityId);
+    if (owner && *owner != clientId) {
       if (auto version = clientInfo->clientSlavesNetVersion.find_ref(entityId)) {
-        if (auto updateSetPacket = updateSetPackets.value(connectionId)) {
+        if (auto updateSetPacket = updateSetPackets.value(*owner)) {
           auto pair = std::make_pair(entityId, version->get());
           auto& cache = m_netStateCache[netRules];
           auto i = cache.find(pair);
@@ -3861,14 +3878,20 @@ std::expected<void, StarException> WorldServer::updateDamage(float dt) {
   m_damageManager->pullPendingNotifications();
 
   for (auto const& remoteHitRequest : m_damageManager->pullRemoteHitRequests()) {
-    auto destination = m_clientInfo.get(remoteHitRequest.destinationConnection());
+    auto owner = remoteHitRequest.destination_connection();
+    if (!owner)
+      return std::unexpected(WorldServerException("Hit request has no owning connection"));
+    auto destination = m_clientInfo.get(*owner);
     if (!destination)
       return std::unexpected(std::move(destination.error()));
     destination->get()->outgoingPackets.push_back(std::make_shared<HitRequestPacket>(remoteHitRequest));
   }
 
   for (auto const& remoteDamageRequest : m_damageManager->pullRemoteDamageRequests()) {
-    auto destination = m_clientInfo.get(remoteDamageRequest.destinationConnection());
+    auto owner = remoteDamageRequest.destination_connection();
+    if (!owner)
+      return std::unexpected(WorldServerException("Damage request has no owning connection"));
+    auto destination = m_clientInfo.get(*owner);
     if (!destination)
       return std::unexpected(std::move(destination.error()));
     destination->get()->outgoingPackets.push_back(std::make_shared<DamageRequestPacket>(remoteDamageRequest));
@@ -3920,7 +3943,7 @@ std::expected<void, StarException> WorldServer::updateDamagedBlocks(float dt) {
       continue;
     }
 
-    Vec2F dropPosition = centerOfTile(pos);
+    Vec2F dropPosition = center_of_tile(pos);
     if (tile->get().foregroundDamage.dead()) {
       bool harvested = tile->get().foregroundDamage.harvested();
       auto result417 = destroyBlock(TileLayer::Foreground, pos, harvested, !tileDamageIsPenetrating(tile->get().foregroundDamage.damageType()), true);
@@ -3930,7 +3953,7 @@ std::expected<void, StarException> WorldServer::updateDamagedBlocks(float dt) {
         auto result418 = ItemDrop::createRandomizedDrop(this->root(), drop, dropPosition);
         if (!result418)
           return std::unexpected(std::move(result418.error()));
-        auto result419 = addEntity(std::move(*result418), NullEntityId);
+        auto result419 = addEntity(std::move(*result418), null_entity_id);
         if (!result419)
           return std::unexpected(std::move(result419.error()));
       }
@@ -3985,7 +4008,7 @@ std::expected<void, StarException> WorldServer::updateDamagedBlocks(float dt) {
         auto result428 = ItemDrop::createRandomizedDrop(this->root(), drop, dropPosition);
         if (!result428)
           return std::unexpected(std::move(result428.error()));
-        auto result429 = addEntity(std::move(*result428), NullEntityId);
+        auto result429 = addEntity(std::move(*result428), null_entity_id);
         if (!result429)
           return std::unexpected(std::move(result429.error()));
       }
@@ -4395,7 +4418,7 @@ std::expected<RpcPromise<Json>, StarException> WorldServer::sendEntityMessage(st
   if (!entity) {
     return RpcPromise<Json>::make_failed("Unknown entity");
   } else if (entity->isMaster()) {
-    auto result464 = entity->receiveMessage(ServerConnectionId, message, args);
+    auto result464 = entity->receiveMessage(server_connection_id, message, args);
     if (!result464)
       return std::unexpected(std::move(result464.error()));
     if (auto resp = std::move(*result464)) {
@@ -4407,11 +4430,14 @@ std::expected<RpcPromise<Json>, StarException> WorldServer::sendEntityMessage(st
       return RpcPromise<Json>::make_failed("Message not handled by entity");
     }
   } else {
-    auto pair = RpcPromise<Json>::make_pair();
-    auto destination = m_clientInfo.get(connectionForEntity(entity->entityId()));
+    auto owner = connection_for_entity(entity->entityId());
+    if (!owner)
+      return RpcPromise<Json>::make_failed("Entity has no owning connection");
+    auto destination = m_clientInfo.get(*owner);
     if (!destination)
       return std::unexpected(std::move(destination.error()));
     auto const& clientInfo = destination->get();
+    auto pair = RpcPromise<Json>::make_pair();
     Uuid uuid(this->root().random());
     m_entityMessageResponses[uuid] = {clientInfo->clientId, pair.second};
     clientInfo->outgoingPackets.push_back(
@@ -4445,7 +4471,7 @@ std::expected<Vec2F, StarException> WorldServer::findPlayerStart(std::optional<V
     return std::unexpected(std::move(result468.error()));
   auto maximumTries = std::move(*result468);
 
-  static const Set<DungeonId> allowedSpawnDungeonIds = {NoDungeonId, SpawnDungeonId, ConstructionDungeonId, DestroyedBlockDungeonId};
+  static const Set<DungeonId> allowedSpawnDungeonIds = {no_dungeon_id, spawn_dungeon_id, construction_dungeon_id, destroyed_block_dungeon_id};
 
   Vec2F pos;
   if (firstTry)
@@ -4712,7 +4738,7 @@ std::expected<bool, StarException> WorldServer::isVisibleToPlayer(RectF const& r
 }
 
 WorldServer::ClientInfo::ClientInfo(ConnectionId clientId, InterpolationTracker const trackerInit)
-  : clientId(clientId), subWorldId(MainClientWorldId), skyNetVersion(0), weatherNetVersion(0), pendingForward(false), started(false), local(false), admin(false), interpolationTracker(trackerInit) {}
+  : clientId(clientId), subWorldId(main_client_world_id), skyNetVersion(0), weatherNetVersion(0), pendingForward(false), started(false), local(false), admin(false), interpolationTracker(trackerInit) {}
 
 std::expected<std::shared_ptr<WorldServer::ClientInfo>, StarException> WorldServer::ClientInfo::create(Root& root, ConnectionId clientId, InterpolationTracker const trackerInit) {
   auto clientState = WorldClientState::create(root);
@@ -4732,7 +4758,7 @@ std::expected<List<RectI>, StarException> WorldServer::ClientInfo::monitoringReg
 }
 
 bool WorldServer::ClientInfo::needsDamageNotification(RemoteDamageNotification const& rdn) const {
-  if (clientId == connectionForEntity(rdn.sourceEntityId) || clientId == connectionForEntity(rdn.damageNotification.targetEntityId))
+  if (clientId == connection_for_entity(rdn.sourceEntityId) || clientId == connection_for_entity(rdn.damageNotification.targetEntityId))
     return true;
 
   if (clientSlavesNetVersion.contains(rdn.damageNotification.targetEntityId))

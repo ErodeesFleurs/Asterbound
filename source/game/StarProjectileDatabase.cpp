@@ -200,7 +200,7 @@ if (!result86) return std::unexpected(std::move(result86.error()));
 auto result87 = json_to_polyf(std::move(*result86));
 if (!result87) return std::unexpected(std::move(result87.error()));
 projectileConfig->damagePoly = std::move(*result87);
-    projectileConfig->damagePoly.scale(1.0f / TilePixels);
+    projectileConfig->damagePoly.scale(1.0f / tile_pixels);
   }
   auto result88 = config.get_bool("piercing", false);
 if (!result88) return std::unexpected(std::move(result88.error()));

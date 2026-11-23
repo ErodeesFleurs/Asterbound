@@ -106,27 +106,27 @@ std::expected<List<Vec2I>, StarException> ImageMetadataDatabase::imageSpaces(Ass
   auto const bytes_per_pixel = (*image)->bytes_per_pixel();
   auto const image_data = (*image)->span();
 
-  Vec2I min((position / TilePixels).floor());
-  Vec2I max(((Vec2F(imageWidth, imageHeight) + position) / TilePixels).ceil());
+  Vec2I min((position / tile_pixels).floor());
+  Vec2I max(((Vec2F(imageWidth, imageHeight) + position) / tile_pixels).ceil());
 
   List<Vec2I> spaces;
 
   for (int yspace = min[1]; yspace < max[1]; ++yspace) {
     for (int xspace = min[0]; xspace < max[0]; ++xspace) {
       float fillRatio = 0.0f;
-      std::array<int, TilePixels> x_pixels;
-      for (int x = 0; x < static_cast<int>(TilePixels); ++x) {
-        int xpixel = std::round(xspace * static_cast<int>(TilePixels) + x - position[0]);
+      std::array<int, tile_pixels> x_pixels;
+      for (int x = 0; x < static_cast<int>(tile_pixels); ++x) {
+        int xpixel = std::round(xspace * static_cast<int>(tile_pixels) + x - position[0]);
         x_pixels[x] = flip ? imageWidth - 1 - xpixel : xpixel;
       }
 
-      for (int y = 0; y < static_cast<int>(TilePixels); ++y) {
-        int ypixel = std::round(yspace * static_cast<int>(TilePixels) + y - position[1]);
+      for (int y = 0; y < static_cast<int>(tile_pixels); ++y) {
+        int ypixel = std::round(yspace * static_cast<int>(tile_pixels) + y - position[1]);
         if (ypixel < 0 || ypixel >= imageHeight)
           continue;
         auto const row_offset = bytes_per_pixel == 4 ? static_cast<std::size_t>(ypixel) * imageWidth * 4 : 0;
 
-        for (int x = 0; x < static_cast<int>(TilePixels); ++x) {
+        for (int x = 0; x < static_cast<int>(tile_pixels); ++x) {
           int xpixel = x_pixels[x];
 
           if (xpixel < 0 || xpixel >= imageWidth)
@@ -144,7 +144,7 @@ std::expected<List<Vec2I>, StarException> ImageMetadataDatabase::imageSpaces(Ass
             opaque = (*pixel)[3] > 0;
           }
           if (opaque)
-            fillRatio += 1.0f / square(TilePixels);
+            fillRatio += 1.0f / square(tile_pixels);
         }
       }
 

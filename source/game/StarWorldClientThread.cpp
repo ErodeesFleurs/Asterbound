@@ -295,7 +295,7 @@ std::expected<void, StarException> WorldClientThread::runLoop(std::stop_token st
   if (!updateMeasureWindow)
     return std::unexpected(std::move(updateMeasureWindow.error()));
 
-  double initial_step = root.timing().timestep;
+  double initial_step = root.timing().time_step;
   if (!valid_tick_interval(initial_step) || !valid_tick_interval(*updateMeasureWindow))
     return std::unexpected(StarException("Invalid tick interval or measurement window"));
   TickRateApproacher tick_approacher(1.0 / initial_step, *updateMeasureWindow);
@@ -304,7 +304,7 @@ std::expected<void, StarException> WorldClientThread::runLoop(std::stop_token st
     auto updated = update();
     if (!updated)
       return std::unexpected(std::move(updated.error()));
-    double current_step = root.timing().timestep;
+    double current_step = root.timing().time_step;
     if (!valid_tick_interval(current_step))
       return std::unexpected(StarException("Invalid tick interval or measurement window"));
     tick_approacher.set_target_rate(1.0 / current_step);
@@ -335,7 +335,7 @@ std::expected<void, StarException> WorldClientThread::update() {
       return std::unexpected(incoming.error().with_related(logged.error(), "World packet error logging also failed"));
   }
 
-  float dt = m_worldClient->root().timing().timestep * m_worldClient->root().timing().timescale;
+  float dt = m_worldClient->root().timing().time_step * m_worldClient->root().timing().time_scale;
   if (dt > 0.0f && (!m_pause || *m_pause == false)) {
     auto updated = m_worldClient->update(dt);
     if (!updated)
@@ -350,7 +350,7 @@ std::expected<void, StarException> WorldClientThread::update() {
       messages = std::move(m_messages);
     }
     auto settled = settleWorldMessageBatch(messages, [&](String const& message, JsonArray const& args) {
-      return m_worldClient->receiveMessage(ServerConnectionId, message, args);
+      return m_worldClient->receiveMessage(server_connection_id, message, args);
     });
     if (!settled)
       return std::unexpected(std::move(settled.error()));

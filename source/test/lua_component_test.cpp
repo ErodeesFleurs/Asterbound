@@ -623,10 +623,10 @@ const GameTestRegistration npcUpdateRecovery(
     ASSERT_TRUE(setup->npc->evalScript(
       "function update(dt) error('npc update recovery fault', 0) end"));
     auto updated = expectLoggedFailure(
-      [&] { return setup->world->update(fixture.root().timing().serverTimestep); }, "npc update recovery fault");
+      [&] { return setup->world->update(fixture.root().timing().server_time_step); }, "npc update recovery fault");
     ASSERT_TRUE(updated) << updated.error().what();
     EXPECT_FALSE(setup->world->entity(id));
-    ASSERT_TRUE(setup->world->update(fixture.root().timing().serverTimestep));
+    ASSERT_TRUE(setup->world->update(fixture.root().timing().server_time_step));
   });
 
 const GameTestRegistration npcMessageRecovery(
@@ -634,7 +634,7 @@ const GameTestRegistration npcMessageRecovery(
     auto setup = npcRecoveryWorld(fixture.root());
     ASSERT_TRUE(setup) << setup.error().what();
     auto closed = make_scope_exit([&] { EXPECT_TRUE(setup->world->close()); });
-    auto client = MinClientConnectionId;
+    auto client = min_client_connection_id;
     auto added = setup->world->addClient(client, SpawnTargetPosition(Vec2F(1024, 1024)), true);
     ASSERT_TRUE(added) << added.error().what();
     ASSERT_TRUE(*added);

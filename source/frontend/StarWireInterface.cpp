@@ -337,7 +337,7 @@ std::expected<void, StarException> WirePane::renderImpl() {
         if (!icon) return std::unexpected(std::move(icon.error()));
         auto size = context().textureSize(*icon);
         if (!size) return std::unexpected(std::move(size.error()));
-        auto drawn = context().drawQuad(*icon, camera.worldToScreen(centerOfTile(position) - ((Vec2F(*size) / TilePixels) / 2.0f)), camera.pixelRatio(), Color::palette_white.to_rgba());
+        auto drawn = context().drawQuad(*icon, camera.worldToScreen(center_of_tile(position) - ((Vec2F(*size) / tile_pixels) / 2.0f)), camera.pixelRatio(), Color::palette_white.to_rgba());
         if (!drawn) return std::unexpected(std::move(drawn.error()));
       }
     }
@@ -388,7 +388,7 @@ std::expected<void, StarException> WirePane::renderImpl() {
               }
             } else wire = badWire;
           }
-          auto drawn = renderWire(centerOfTile(position), centerOfTile(otherPosition), wire);
+          auto drawn = renderWire(center_of_tile(position), center_of_tile(otherPosition), wire);
           if (!drawn) return std::unexpected(std::move(drawn.error()));
         }
       }
@@ -408,7 +408,7 @@ std::expected<void, StarException> WirePane::renderImpl() {
       sourcePosition += *offset;
       drawLineColor = color->mix(Color::palette_white, phase);
     }
-    return renderWire(centerOfTile(sourcePosition), aimPos, drawLineColor);
+    return renderWire(center_of_tile(sourcePosition), aimPos, drawLineColor);
   }
   return {};
 }
@@ -437,7 +437,7 @@ std::expected<WireConnector::SwingResult, StarException> WirePane::swing(WorldGe
         WireNode node{.direction = direction, .nodeIndex = i};
         auto offset = entity->nodePosition(node);
         if (!offset) return std::unexpected(std::move(offset.error()));
-        Vec2F center = centerOfTile(entity->tilePosition() + *offset);
+        Vec2F center = center_of_tile(entity->tilePosition() + *offset);
         auto nodeBounds = RectF::with_size(center - m_nodeSize / 2.0f, m_nodeSize);
         auto contains = geometry.rect_contains(nodeBounds, pos);
         if (!contains) return std::unexpected(std::move(contains.error()));

@@ -297,7 +297,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
 MovementController::MovementController(Root& root) : m_root(root) {
   m_resting = false;
 
-  m_timeStep = root.timing().timestep;
+  m_timeStep = root.timing().time_step;
 
   m_liquidPercentage = 0.0f;
   m_liquidId = EmptyLiquidId;
@@ -1371,7 +1371,7 @@ std::expected<void, StarException> MovementController::queryCollisions(RectF con
           collisionPoly.poly = block.poly;
           collisionPoly.poly.translate(nearTranslation);
           collisionPoly.polyBounds = polyBounds;
-          collisionPoly.sortPosition = centerOfTile(block.space);
+          collisionPoly.sortPosition = center_of_tile(block.space);
           collisionPoly.movingCollisionId = {};
           collisionPoly.collisionKind = block.kind;
         }

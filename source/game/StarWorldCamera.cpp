@@ -50,8 +50,8 @@ void WorldCamera::updateRenderPosition(Vec2F position, bool force) {
   // moved in any direction.  This is sort of arbitrary, but helps prevent
   // judder if the camera is at a boundary and floating point inaccuracy is
   // causing the focus to jitter back and forth across the boundary.
-  if (std::fabs(position[0] - m_worldCenter[0]) < 1.0f / (TilePixels * m_renderPixelRatio * 2)
-   && std::fabs(position[1] - m_worldCenter[1]) < 1.0f / (TilePixels * m_renderPixelRatio * 2) && !force)
+  if (std::fabs(position[0] - m_worldCenter[0]) < 1.0f / (tile_pixels * m_renderPixelRatio * 2)
+   && std::fabs(position[1] - m_worldCenter[1]) < 1.0f / (tile_pixels * m_renderPixelRatio * 2) && !force)
     return;
 
   // First, make sure the camera center position is inside the main x
@@ -60,16 +60,16 @@ void WorldCamera::updateRenderPosition(Vec2F position, bool force) {
   m_worldCenter = m_worldGeometry.xwrap(position);
   if (!m_worldGeometry.is_null())
     m_worldCenter[1] =
-      clamp(m_worldCenter[1], static_cast<float>(m_screenSize[1]) / (TilePixels * m_renderPixelRatio * 2),
-            m_worldGeometry.height() - static_cast<float>(m_screenSize[1]) / (TilePixels * m_renderPixelRatio * 2));
+      clamp(m_worldCenter[1], static_cast<float>(m_screenSize[1]) / (tile_pixels * m_renderPixelRatio * 2),
+            m_worldGeometry.height() - static_cast<float>(m_screenSize[1]) / (tile_pixels * m_renderPixelRatio * 2));
 
   // Then, position the camera center position so that the tile grid is as
   // close as possible aligned to whole pixel boundaries.  This is incredibly
   // important, because this means that even without any complicated rounding,
-  // elements drawn in world space that are aligned with TilePixels will
+  // elements drawn in world space that are aligned with tile_pixels will
   // eventually also be aligned to real screen pixels.
 
-  float ratio = TilePixels * m_renderPixelRatio;
+  float ratio = tile_pixels * m_renderPixelRatio;
 
   if (m_screenSize[0] % 2 == 0)
     m_worldCenter[0] = std::round(m_worldCenter[0] * ratio) / ratio;

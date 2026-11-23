@@ -241,7 +241,7 @@ std::expected<bool, StarException> SystemWorldClient::handleIncomingPacket(std::
       auto ship = m_ship && entry.first == m_ship->uuid() ? m_ship : getShip(entry.first);
       if (!ship)
         return std::unexpected(StarPacketException::format("System update references missing ship {}", entry.first.hex()));
-      auto updated = ship->read_net_state(entry.second, SystemWorldTimestep);
+      auto updated = ship->read_net_state(entry.second, system_world_time_step);
       if (!updated)
         return std::unexpected(std::move(updated.error()));
     }
@@ -249,7 +249,7 @@ std::expected<bool, StarException> SystemWorldClient::handleIncomingPacket(std::
       auto object = getObject(entry.first);
       if (!object)
         return std::unexpected(StarPacketException::format("System update references missing object {}", entry.first.hex()));
-      auto updated = object->read_net_state(entry.second, SystemWorldTimestep);
+      auto updated = object->read_net_state(entry.second, system_world_time_step);
       if (!updated)
         return std::unexpected(std::move(updated.error()));
     }

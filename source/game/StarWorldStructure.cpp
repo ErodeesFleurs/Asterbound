@@ -79,7 +79,7 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
     auto autoimageSizeResult1 = imgMetadata->imageSize(overlay.image);
     if (!autoimageSizeResult1) return std::unexpected(std::move(autoimageSizeResult1.error()));
     auto imageSize = std::move((*autoimageSizeResult1));
-    result.m_region.combine(RectI::with_size(Vec2I::floor(overlay.min), Vec2I::ceil(Vec2F(imageSize) / TilePixels)));
+    result.m_region.combine(RectI::with_size(Vec2I::floor(overlay.min), Vec2I::ceil(Vec2F(imageSize) / tile_pixels)));
   }
   auto autoforegroundOverlaysResult1 = settings.get_array("foregroundOverlays", JsonArray());
   if (!autoforegroundOverlaysResult1) return std::unexpected(std::move(autoforegroundOverlaysResult1.error()));
@@ -102,7 +102,7 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
     auto autoimageSizeResult1 = imgMetadata->imageSize(overlay.image);
     if (!autoimageSizeResult1) return std::unexpected(std::move(autoimageSizeResult1.error()));
     auto imageSize = std::move((*autoimageSizeResult1));
-    result.m_region.combine(RectI::with_size(Vec2I::floor(overlay.min), Vec2I::ceil(Vec2F(imageSize) / TilePixels)));
+    result.m_region.combine(RectI::with_size(Vec2I::floor(overlay.min), Vec2I::ceil(Vec2F(imageSize) / tile_pixels)));
   }
   auto autoblockPositionResult1 = settings.get_array("blocksPosition", JsonArray{0, 0});
   if (!autoblockPositionResult1) return std::unexpected(std::move(autoblockPositionResult1.error()));
@@ -187,7 +187,7 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
     if (!autokeyField7Result1) return std::unexpected(std::move(autokeyField7Result1.error()));
     auto keyField7 = std::move((*autokeyField7Result1));
     auto objectDirection = blockKeyConfig.get_string("objectDirection", "left").and_then([](String const& name) {
-      return enum_value<DirectionNames>(name);
+      return enum_value<direction_names>(name);
     });
     if (!objectDirection)
       return std::unexpected(std::move(objectDirection.error()));
@@ -393,7 +393,7 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Json const& 
     if (!autofield1Result1) return std::unexpected(std::move(autofield1Result1.error()));
     auto field1 = std::move((*autofield1Result1));
     auto direction =
-      v.get_string("direction").and_then([](String const& name) { return enum_value<DirectionNames>(name); });
+      v.get_string("direction").and_then([](String const& name) { return enum_value<direction_names>(name); });
     if (!direction)
       return std::unexpected(std::move(direction.error()));
     auto field2 = *direction;
@@ -563,7 +563,7 @@ std::expected<Json, StarException> WorldStructure::store() const {
   };
 
   auto objectToJson = [](Object const& o) -> std::expected<Json, StarException> {
-    auto direction = enum_name<DirectionNames>(o.direction);
+    auto direction = enum_name<direction_names>(o.direction);
     if (!direction)
       return std::unexpected(std::move(direction.error()));
     return JsonObject{

@@ -148,14 +148,14 @@ const GameTestRegistration replicaPlayerSnapshot("EntitySnapshot", "RemotePlayer
   ASSERT_TRUE(store) << store.error().what();
   auto state = (*player)->write_net_state(0, rules);
   ASSERT_TRUE(state) << state.error().what();
-  auto joined = setup.world->addClient(MinClientConnectionId, SpawnTargetPosition(Vec2F(1024, 1024)), true, false, rules);
+  auto joined = setup.world->addClient(min_client_connection_id, SpawnTargetPosition(Vec2F(1024, 1024)), true, false, rules);
   ASSERT_TRUE(joined) << joined.error().what();
   ASSERT_TRUE(*joined);
-  auto space = connectionEntitySpace(MinClientConnectionId);
+  auto space = connection_entity_space(min_client_connection_id);
   ASSERT_TRUE(space) << space.error().what();
   EntityId id = space->first;
   auto packet = std::make_shared<EntityCreatePacket>(EntityType::Player, *store, state->first, id);
-  ASSERT_TRUE(setup.world->handleIncomingPackets(MinClientConnectionId,
+  ASSERT_TRUE(setup.world->handleIncomingPackets(min_client_connection_id,
       {std::make_shared<WorldStartAcknowledgePacket>(), packet}));
   auto remote = as<Player>(setup.world->entity(id));
   ASSERT_TRUE(remote) << "real EntityCreate must publish a slave player";

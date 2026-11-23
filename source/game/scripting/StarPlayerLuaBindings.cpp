@@ -480,7 +480,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
 
   if (auto registered = callbacks.register_callback("gender",
                                                    [&player]() -> std::expected<String, StarException> {
-                                                     auto value = enum_name<GenderNames>(player.gender());
+                                                     auto value = enum_name<gender_names>(player.gender());
                                                      if (!value)
                                                        return std::unexpected(std::move(value.error()));
                                                      return String(*value);
@@ -490,7 +490,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   if (auto registered =
         callbacks.register_callback("setGender",
                                    [&player](String const& gender) -> std::expected<void, StarException> {
-                                     auto value = enum_value<GenderNames>(gender);
+                                     auto value = enum_value<gender_names>(gender);
                                      if (!value)
                                        return std::unexpected(std::move(value.error()));
                                      return player.setGender(*value);
@@ -532,7 +532,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("lastDamagedTarget", [&player]() -> std::optional<EntityId> {
     auto id = player.lastDamagedTarget();
-    return id == NullEntityId ? std::nullopt : std::optional<EntityId>(id);
+    return id == null_entity_id ? std::nullopt : std::optional<EntityId>(id);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("timeSinceLastGaveDamage", [&player]() {
@@ -852,8 +852,10 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("interact", [&player](String const& type, Json const& configData, std::optional<EntityId> const& sourceEntityId) -> std::expected<void, StarException> {
-    auto action = InteractAction::create(type, sourceEntityId.value_or(NullEntityId), configData);
+    auto action = InteractAction::create(type, sourceEntityId.value_or(null_entity_id), configData);
     if (!action) return std::unexpected(std::move(action.error()));
+    if (!sourceEntityId && action->type == InteractActionType::Message)
+      action->entityId = player.entityId();
     return player.interact(*action);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
@@ -1871,7 +1873,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
   // more accurate than mcontroller.facingDirection
   if (auto registered = callbacks.register_callback("facingDirection", [&player]() -> std::expected<int, StarException> {
-    return numericalDirection(player.humanoid()->facingDirection());
+    return numerical_direction(player.humanoid()->facingDirection());
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 

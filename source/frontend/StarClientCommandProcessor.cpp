@@ -336,7 +336,9 @@ std::expected<StringList, StarException> ClientCommandProcessor::executeCommand(
     }
   } else {
     auto player = m_universeClient->mainPlayer();
-    auto response = player->receiveMessage(connectionForEntity(player->entityId()), "/" + *command, {*arguments});
+    auto owner = connection_for_entity(player->entityId());
+    if (!owner) return std::unexpected(StarException("Command player has no owning connection"));
+    auto response = player->receiveMessage(*owner, "/" + *command, {*arguments});
     if (!response) return std::unexpected(std::move(response.error()));
     if (*response) {
       if (std::holds_alternative<Json>(**response)) {

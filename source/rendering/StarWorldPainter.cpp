@@ -270,7 +270,7 @@ std::expected<void, StarException> WorldPainter::render(WorldRenderData& renderD
     if (!multiplier) return std::unexpected(std::move(multiplier.error()));
     if (auto result = m_renderer->setEffectParameter("lightMapMultiplier", *multiplier); !result)
       return std::unexpected(std::move(result.error()));
-    if (auto result = m_renderer->setEffectParameter("lightMapScale", Vec2F::filled(TilePixels * m_camera.pixelRatio())); !result)
+    if (auto result = m_renderer->setEffectParameter("lightMapScale", Vec2F::filled(tile_pixels * m_camera.pixelRatio())); !result)
       return std::unexpected(std::move(result.error()));
     if (auto result = m_renderer->setEffectParameter("lightMapOffset", m_camera.worldToScreen(Vec2F(renderData.lightMinPosition))); !result)
       return std::unexpected(std::move(result.error()));
@@ -409,8 +409,8 @@ std::expected<void, StarException> WorldPainter::renderParticles(WorldRenderData
 
     } else if (particle.type == Particle::Type::Textured || particle.type == Particle::Type::Animated) {
       auto drawableResult = particle.type == Particle::Type::Textured
-          ? Drawable::makeImage(*m_imageMetadata, particle.image, 1.0f / TilePixels, true, Vec2F(0, 0))
-          : particle.animation->drawable(1.0f / TilePixels);
+          ? Drawable::makeImage(*m_imageMetadata, particle.image, 1.0f / tile_pixels, true, Vec2F(0, 0))
+          : particle.animation->drawable(1.0f / tile_pixels);
       if (!drawableResult) return std::unexpected(std::move(drawableResult.error()));
       Drawable drawable = std::move(*drawableResult);
 
@@ -452,7 +452,7 @@ std::expected<void, StarException> WorldPainter::renderBars(WorldRenderData& ren
     offset += m_entityBarSpacing;
     if (bar.icon) {
       auto iconDrawPosition = position - (m_entityBarSize / 2).round() + m_entityBarIconOffset;
-      auto drawable = Drawable::makeImage(*m_imageMetadata, *bar.icon, 1.0f / TilePixels, true, iconDrawPosition);
+      auto drawable = Drawable::makeImage(*m_imageMetadata, *bar.icon, 1.0f / tile_pixels, true, iconDrawPosition);
       if (!drawable) return std::unexpected(std::move(drawable.error()));
       if (auto result = drawDrawable(std::move(*drawable)); !result) return std::unexpected(std::move(result.error()));
     }
@@ -517,7 +517,7 @@ std::expected<void, StarException> WorldPainter::drawEntityLayer(List<Drawable> 
 
 std::expected<void, StarException> WorldPainter::drawDrawable(Drawable const& drawable) {
   Vec2F position = m_camera.worldToScreen(drawable.position);
-  float scale = m_camera.pixelRatio() * TilePixels;
+  float scale = m_camera.pixelRatio() * tile_pixels;
 
   // draw the drawable if it's on screen
   // if it's not on screen, there's a random chance to pre-load

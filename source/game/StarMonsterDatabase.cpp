@@ -522,7 +522,7 @@ auto colorSwap = variant.colorSwap.value_or(std::move(*result71));
   auto result72 = animator->drawables();
 if (!result72) return std::unexpected(std::move(result72.error()));
 auto drawables = std::move(*result72);
-  Drawable::scaleAll(drawables, TilePixels);
+  Drawable::scaleAll(drawables, tile_pixels);
   return drawables;
 }
 
@@ -783,12 +783,12 @@ variant.statusSettings = std::move(*result123);
 if (!result124) return std::unexpected(std::move(result124.error()));
 auto result125 = json_to_vec2f(std::move(*result124));
 if (!result125) return std::unexpected(std::move(result125.error()));
-variant.mouthOffset = std::move(*result125) / TilePixels;
+variant.mouthOffset = std::move(*result125) / tile_pixels;
   auto result126 = variant.parameters.get("feetOffset");
 if (!result126) return std::unexpected(std::move(result126.error()));
 auto result127 = json_to_vec2f(std::move(*result126));
 if (!result127) return std::unexpected(std::move(result127.error()));
-variant.feetOffset = std::move(*result127) / TilePixels;
+variant.feetOffset = std::move(*result127) / tile_pixels;
   auto result128 = variant.parameters.get_string("powerLevelFunction", "monsterLevelPowerMultiplier");
 if (!result128) return std::unexpected(std::move(result128.error()));
 variant.powerLevelFunction = std::move(*result128);

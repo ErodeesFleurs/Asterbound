@@ -516,7 +516,7 @@ std::expected<void, StarException> ClientApplication::applicationInit(std::share
   } else {
     appController->setNormalWindow(*windowed_size);
   }
-  float update_rate = 1.0f / m_root->timing().timestep;
+  float update_rate = 1.0f / m_root->timing().time_step;
   auto configured_rate = settings.get("updateRate", {});
   if (!configured_rate)
     return std::unexpected(std::move(configured_rate.error()));
@@ -527,7 +527,7 @@ std::expected<void, StarException> ClientApplication::applicationInit(std::share
     if (!is_finite(*rate) || *rate <= 0.0f)
       return std::unexpected(StarException("updateRate must be finite and positive"));
     update_rate = *rate;
-    m_root->timing().timestep = 1.0f / update_rate;
+    m_root->timing().time_step = 1.0f / update_rate;
   }
   auto server_rate = settings.get("serverUpdateRate", {});
   if (!server_rate)
@@ -538,7 +538,7 @@ std::expected<void, StarException> ClientApplication::applicationInit(std::share
       return std::unexpected(std::move(rate.error()));
     if (!is_finite(*rate) || *rate <= 0.0f)
       return std::unexpected(StarException("serverUpdateRate must be finite and positive"));
-    m_root->timing().serverTimestep = 1.0f / *rate;
+    m_root->timing().server_time_step = 1.0f / *rate;
   }
   appController->setTargetUpdateRate(update_rate);
   if (auto applied = apply_render_settings(settings); !applied)
@@ -819,7 +819,7 @@ std::expected<void, StarException> ClientApplication::update() {
     return std::unexpected(std::move(configuration.error()));
   if (auto applied = apply_render_settings((*configuration)->current_configuration()); !applied)
     return std::unexpected(std::move(applied.error()));
-  float dt = m_root->timing().timestep * m_root->timing().timescale;
+  float dt = m_root->timing().time_step * m_root->timing().time_scale;
   auto& app = appController();
   if (m_state >= MainAppState::Title) {
     if (auto service = app->p2pNetworkingService()) {
@@ -1019,7 +1019,7 @@ std::expected<void, StarException> ClientApplication::render() {
 
   } else if (m_state == MainAppState::Title) {
     auto title = m_titleScreen->render(
-        m_root->timing().timescale == 0.0f ? 1.0f : appController()->renderInterpolation());
+        m_root->timing().time_scale == 0.0f ? 1.0f : appController()->renderInterpolation());
     if (!title)
       return std::unexpected(std::move(title.error()));
     auto cinematic = m_cinematicOverlay->render();
@@ -1029,7 +1029,7 @@ std::expected<void, StarException> ClientApplication::render() {
   } else if (m_state > MainAppState::Title) {
     std::shared_ptr<WorldClient> worldClient = m_universeClient->worldClient();
     PresentationContext const presentation(
-        m_universeClient->paused() || m_root->timing().timescale == 0.0f
+        m_universeClient->paused() || m_root->timing().time_scale == 0.0f
             ? 1.0f : appController()->renderInterpolation(),
         appController()->renderEpoch());
     if (worldClient) {
@@ -1938,7 +1938,7 @@ std::expected<void, StarException> ClientApplication::updateTitle(float dt) {
     return std::unexpected(std::move(updated.error()));
   if (auto mixed = m_mainMixer->update(dt); !mixed)
     return std::unexpected(std::move(mixed.error()));
-  m_mainMixer->set_speed(m_root->timing().timescale);
+  m_mainMixer->set_speed(m_root->timing().time_scale);
 
   auto& app = appController();
   auto active = m_titleScreen->textInputActive();
@@ -2312,7 +2312,10 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
           auto view = broadcast.utf8();
           if (view.rfind(VoiceBroadcastPrefix.utf8(), 0) != npos) {
             auto entityId = player->entityId();
-            auto speaker = m_voice->speaker(connectionForEntity(entityId));
+            auto owner = connection_for_entity(entityId);
+            if (!owner)
+              return false;
+            auto speaker = m_voice->speaker(*owner);
             if (!speaker)
               return std::unexpected(std::move(speaker.error()));
             (*speaker)->entityId = entityId;
@@ -2363,7 +2366,7 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
       return std::unexpected(std::move(updated.error()));
     if (auto mixed = m_mainMixer->update(dt, m_cinematicOverlay->muteSfx(), m_cinematicOverlay->muteMusic()); !mixed)
       return std::unexpected(std::move(mixed.error()));
-    m_mainMixer->set_speed(m_root->timing().timescale);
+    m_mainMixer->set_speed(m_root->timing().time_scale);
 
     auto active = m_mainInterface->textInputActive();
     if (!active)

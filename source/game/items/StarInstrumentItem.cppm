@@ -151,7 +151,7 @@ std::expected<std::shared_ptr<InstrumentItem>, StarException> InstrumentItem::cr
   if (!position)
     return std::unexpected(std::move(position.error()));
   auto drawable =
-    Drawable::makeImage(**metadata, AssetPath::relative_to(directory, *image), 1.0f / TilePixels, true, *position);
+    Drawable::makeImage(**metadata, AssetPath::relative_to(directory, *image), 1.0f / tile_pixels, true, *position);
   if (!drawable)
     return std::unexpected(std::move(drawable.error()));
   item->m_drawables.push_back(std::move(*drawable));
@@ -162,7 +162,7 @@ std::expected<std::shared_ptr<InstrumentItem>, StarException> InstrumentItem::cr
   if (!activePosition)
     return std::unexpected(std::move(activePosition.error()));
   auto activeDrawable = Drawable::makeImage(**metadata, AssetPath::relative_to(directory, *activeImage),
-                                            1.0f / TilePixels, true, *activePosition);
+                                            1.0f / tile_pixels, true, *activePosition);
   if (!activeDrawable)
     return std::unexpected(std::move(activeDrawable.error()));
   item->m_activeDrawables.push_back(std::move(*activeDrawable));

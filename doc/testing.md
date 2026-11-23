@@ -837,6 +837,11 @@ and benchmark lifetime management, not Root/GUI ownership or workload timing.
 For recorded runs, append `--benchmark_repetitions=7 --benchmark_out=<name>.json
 --benchmark_out_format=json`. The target list also includes cases outside this
 catalog; implementation and detailed labels live in [benchmark sources](../source/benchmark/).
+`GameTypesTest.EntityConnectionBoundaries` checks entity-to-connection ownership,
+including null and unassigned IDs. `EntitySnapshot` exercises a valid remote
+entity through the world server. The existing `Game/AStar/flat_walk8` benchmark
+is a world-scene comparison, not a timer for NPC offsets or ID lookup.
+
 
 | Area | Filtered command | Work |
 |---|---|---|

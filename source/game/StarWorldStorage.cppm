@@ -222,7 +222,7 @@ public:
   [[nodiscard]] std::expected<std::optional<Vec2F>, StarException> findUniqueEntity(String const& uniqueId);
 
   // If the given unique entity is not loaded, loads its sector and then if the
-  // unique entity is found, returns the entity id, otherwise NullEntityId.
+  // unique entity is found, returns the entity id, otherwise null_entity_id.
   [[nodiscard]] std::expected<EntityId, StarException> loadUniqueEntity(String const& uniqueId);
 
   // Does any queued generation work, potentially limiting the total number of
@@ -344,7 +344,7 @@ private:
   // Sync this sector to disk without unloading it.
   [[nodiscard]] std::expected<void, StarException> syncSector(Sector const& sector);
 
-  // Returns the sectors within WorldSectorSize of the given sector.  This is
+  // Returns the sectors within world_sector_size of the given sector.  This is
   // *not exactly the same* as the surrounding 9 sectors in a square pattern,
   // because first this does not return invalid sectors, and second, If a world
   // is not evenly divided by the sector size, this may return extra sectors on

@@ -120,9 +120,9 @@ private:
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback("running", [&self = *this]() { return self.m_movementController->get().running(); }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.register_callback("movingDirection", [&self = *this]() { return numericalDirection(self.m_movementController->get().movingDirection()); }); !result)
+  if (auto result = callbacks.register_callback("movingDirection", [&self = *this]() { return numerical_direction(self.m_movementController->get().movingDirection()); }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.register_callback("facingDirection", [&self = *this]() { return numericalDirection(self.m_movementController->get().facingDirection()); }); !result)
+  if (auto result = callbacks.register_callback("facingDirection", [&self = *this]() { return numerical_direction(self.m_movementController->get().facingDirection()); }); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback("crouching", [&self = *this]() { return self.m_movementController->get().crouching(); }); !result)
     return std::unexpected(std::move(result.error()));
@@ -169,12 +169,12 @@ private:
   }); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback("controlMove", [&self = *this](std::optional<float> const& direction, std::optional<bool> const& run) {
-    if (auto value = directionOf(direction.value_or(float{})))
+    if (auto value = direction_of(direction.value_or(float{})))
       self.m_controlMove.emplace(*value, run.value_or(true));
   }); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback("controlFace", [&self = *this](std::optional<float> const& direction) {
-    if (auto value = directionOf(direction.value_or(float{})))
+    if (auto value = direction_of(direction.value_or(float{})))
       self.m_controlFace = *value;
   }); !result)
     return std::unexpected(std::move(result.error()));

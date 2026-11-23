@@ -252,13 +252,13 @@ std::expected<void, StarException> CommandProcessor::close() {
 
 std::expected<ServerCommandResult, StarException> CommandProcessor::adminCommand(String const& command, String const& argumentString) {
   std::lock_guard locker(m_mutex);
-  return handleCommand(ServerConnectionId, command, argumentString);
+  return handleCommand(server_connection_id, command, argumentString);
 }
 
 std::expected<ServerCommandResult, StarException> CommandProcessor::userCommand(ConnectionId connectionId, String const& command, String const& argumentString) {
   std::lock_guard locker(m_mutex);
-  if (connectionId == ServerConnectionId)
-    return std::unexpected(StarException("CommandProcessor::userCommand called with ServerConnectionId"));
+  if (connectionId == server_connection_id)
+    return std::unexpected(StarException("CommandProcessor::userCommand called with server_connection_id"));
   return handleCommand(connectionId, command, argumentString);
 }
 
@@ -331,7 +331,7 @@ std::expected<String, StarException> CommandProcessor::admin(ConnectionId connec
       if (!*admin) return "Insufficient privileges to make self admin.";
     }
   }
-  if (targetClientId == ServerConnectionId) return "Invalid client state";
+  if (targetClientId == server_connection_id) return "Invalid client state";
   auto allowJson = (*config)->get("allowAdminCommands");
   if (!allowJson) return std::unexpected(std::move(allowJson.error()));
   auto allow = allowJson->to_bool();
@@ -509,7 +509,7 @@ std::expected<String, StarException> CommandProcessor::timescale(ConnectionId co
   auto arguments = std::move(*parsedArguments);
 
   if (arguments.empty())
-    return Star::format("Current timescale is {:6.6f}x", m_root.timing().timescale);
+    return Star::format("Current timescale is {:6.6f}x", m_root.timing().time_scale);
 
   auto parsedScale = lexical_cast<float>(arguments[0]);
   if (!parsedScale) return std::unexpected(std::move(parsedScale.error()));
@@ -529,7 +529,7 @@ std::expected<String, StarException> CommandProcessor::tickrate(ConnectionId con
   auto arguments = std::move(*parsedArguments);
 
   if (arguments.empty())
-    return Star::format("Current tick rate is {:4.2f}Hz", 1.0f / m_root.timing().serverTimestep);
+    return Star::format("Current tick rate is {:4.2f}Hz", 1.0f / m_root.timing().server_time_step);
 
   auto parsedRate = lexical_cast<float>(arguments[0]);
   if (!parsedRate) return std::unexpected(std::move(parsedRate.error()));
@@ -1658,7 +1658,7 @@ std::expected<std::optional<ConnectionId>, StarException> CommandProcessor::play
     if (*cidPrefix) {
       auto text = player.substr(CidPrefix.size());
       if (!text) return std::unexpected(std::move(text.error()));
-      auto cid = maybe_lexical_cast<ConnectionId>(*text).value_or(ServerConnectionId);
+      auto cid = maybe_lexical_cast<ConnectionId>(*text).value_or(server_connection_id);
       if (universe.isConnectedClient(cid)) return std::optional<ConnectionId>(cid);
     }
   }
@@ -1761,7 +1761,7 @@ std::expected<ServerCommandResult, StarException> CommandProcessor::handleComman
 }
 
 std::expected<std::optional<String>, StarException> CommandProcessor::adminCheck(ConnectionId connectionId, String const& commandDescription) const {
-  if (connectionId == ServerConnectionId) return std::optional<String>{};
+  if (connectionId == server_connection_id) return std::optional<String>{};
   auto configResult = m_root.configuration();
   if (!configResult) return std::unexpected(std::move(configResult.error()));
   auto config = std::move(*configResult);
@@ -1783,7 +1783,7 @@ std::expected<std::optional<String>, StarException> CommandProcessor::adminCheck
 }
 
 std::expected<std::optional<String>, StarException> CommandProcessor::localCheck(ConnectionId connectionId, String const& commandDescription) const {
-  if (connectionId == ServerConnectionId) return std::optional<String>{};
+  if (connectionId == server_connection_id) return std::optional<String>{};
   auto local = m_universe.isLocal(connectionId);
   if (!local) return std::unexpected(std::move(local.error()));
   if (!*local) return std::optional<String>(Star::format("The {} command can only be used locally.", commandDescription));

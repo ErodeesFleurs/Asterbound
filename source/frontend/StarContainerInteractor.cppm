@@ -40,7 +40,7 @@ public:
 
   bool containerOpen() const;
 
-  // Returns NullEntityId if no container is open
+  // Returns null_entity_id if no container is open
   EntityId openContainerId() const;
 
   // This does not perform any checks; make sure to check if it is valid if you use it!

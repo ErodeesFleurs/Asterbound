@@ -64,7 +64,7 @@ std::expected<std::optional<std::pair<List<RectI>, Set<Vec2I>>>, StarException> 
     return std::unexpected(DungeonException("Not reentrant."));
   m_generating = true;
   auto generatingGuard = make_scope_exit([this]() { m_generating = false; });
-  auto dungeonGenerator = DungeonGenerator::create(m_root, dungeonName, seed, threatLevel, BiomeMicroDungeonId);
+  auto dungeonGenerator = DungeonGenerator::create(m_root, dungeonName, seed, threatLevel, biome_micro_dungeon_id);
   if (!dungeonGenerator) return std::unexpected(std::move(dungeonGenerator.error()));
 
   auto generate = [&]() -> std::expected<std::optional<std::pair<List<RectI>, Set<Vec2I>>>, StarException> {
@@ -89,7 +89,7 @@ std::expected<std::optional<std::pair<List<RectI>, Set<Vec2I>>>, StarException> 
         if (tile.usesPlaces()) {
           auto dungeonId = facade->getDungeonIdAt(pos + tilePos);
           if (!dungeonId) return std::unexpected(std::move(dungeonId.error()));
-          if (*dungeonId != NoDungeonId) {
+          if (*dungeonId != no_dungeon_id) {
             collision = true;
             return true;
           }

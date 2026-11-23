@@ -683,7 +683,7 @@ std::expected<void, StarException> StatusController::tickMaster(float dt) {
       }
     }
   }
-  if (m_environmentStatusEffectUpdateTimer.wrapTick(m_root.timing().timestep)) {
+  if (m_environmentStatusEffectUpdateTimer.wrapTick(m_root.timing().time_step)) {
     PolyF collisionBody = m_movementController->get().collisionBody();
     auto world = m_parentEntity->get().world();
     if (!world) return std::unexpected(std::move(world.error()));
@@ -1167,7 +1167,7 @@ std::expected<LuaCallbacks, StarException> StatusController::makeUniqueEffectCal
     if (!metadata) return std::unexpected(std::move(metadata.error()));
     auto source = (*metadata)->sourceEntityId.get();
     if (!source) return std::optional<EntityId>(controller.m_parentEntity->get().entityId());
-    if (source == NullEntityId) return std::optional<EntityId>{};
+    if (source == null_entity_id) return std::optional<EntityId>{};
     return source;
   }); !result) return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback("setParentDirectives", [&uniqueEffect](std::optional<String> const& directives) -> void {

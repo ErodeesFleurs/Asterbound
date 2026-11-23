@@ -461,7 +461,7 @@ std::expected<void, StarException> CraftingPane::initialize(std::shared_ptr<Worl
     auto getBoolResult374 = m_settings.get_bool("titleFromEntity", false);
     if (!getBoolResult374)
       return std::unexpected(std::move(getBoolResult374.error()));
-    if (std::move(*getBoolResult374) && sourceEntityId != NullEntityId) {
+    if (std::move(*getBoolResult374) && sourceEntityId != null_entity_id) {
       auto entity = m_worldClient->entity(sourceEntityId);
   
       if (auto container = as<ContainerEntity>(entity)) {
@@ -619,7 +619,7 @@ std::expected<void, StarException> CraftingPane::unlockConfiguredRecipes(String 
 }
 
 std::expected<void, StarException> CraftingPane::upgradeTable() {
-  if (m_sourceEntityId == NullEntityId || !m_upgradeRecipe)
+  if (m_sourceEntityId == null_entity_id || !m_upgradeRecipe)
     return {};
 
   bool canUpgrade = m_player->isAdmin();
@@ -659,7 +659,7 @@ std::expected<std::size_t, StarException> CraftingPane::itemCount(List<std::shar
 
 std::expected<void, StarException> CraftingPane::update(float dt) {
   // shut down if we can't reach the table anymore.
-  if (m_sourceEntityId != NullEntityId) {
+  if (m_sourceEntityId != null_entity_id) {
     auto sourceEntity = as<TileEntity>(m_worldClient->entity(m_sourceEntityId));
     {
       bool condition410 = static_cast<bool>(!sourceEntity);
@@ -724,7 +724,7 @@ std::expected<void, StarException> CraftingPane::update(float dt) {
   }
 
   // crafters gonna craft
-  while (m_crafting && m_craftTimer.wrapTick(context().root().timing().timestep)) {
+  while (m_crafting && m_craftTimer.wrapTick(context().root().timing().time_step)) {
     auto craftCount = m_settings.get_int("craftCount", 1);
     if (!craftCount)
       return std::unexpected(std::move(craftCount.error()));
@@ -882,7 +882,7 @@ std::expected<void, StarException> CraftingPane::updateAvailableRecipes() {
           if (!rarityNames)
             return std::unexpected(std::move(rarityNames.error()));
           for (auto const& entry : std::move(*rarityNames)) {
-            auto rarity = enum_value<RarityNames>(entry);
+            auto rarity = enum_value<rarity_names>(entry);
             if (!rarity)
               return std::unexpected(std::move(rarity.error()));
             rarityFilter.add(*rarity);
@@ -1487,7 +1487,7 @@ std::expected<List<ItemRecipe>, StarException> CraftingPane::determineRecipes() 
           if (!rarityNames)
             return std::unexpected(std::move(rarityNames.error()));
           for (auto const& entry : std::move(*rarityNames)) {
-            auto rarity = enum_value<RarityNames>(entry);
+            auto rarity = enum_value<rarity_names>(entry);
             if (!rarity)
               return std::unexpected(std::move(rarity.error()));
             rarityFilter.add(*rarity);

@@ -299,7 +299,7 @@ int LuaBindings::ItemCallbacks::rarity(Item& item) { return static_cast<int>(ite
 //
 // @return a string representing the rarity of the item
 std::expected<String, StarException> LuaBindings::ItemCallbacks::rarityString(Item& item) {
-  auto name = enum_name<RarityNames>(item.rarity());
+  auto name = enum_name<rarity_names>(item.rarity());
   if (!name)
     return std::unexpected(std::move(name.error()));
   return String(*name);

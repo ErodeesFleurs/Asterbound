@@ -347,7 +347,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           [&](std::shared_ptr<Entity> const& entity,
               String const& portraitMode) -> std::expected<std::optional<List<Drawable>>, StarException> {
             if (auto portrait = as_ref<PortraitEntity>(*entity)) {
-              auto mode = enum_value<PortraitModeNames>(portraitMode);
+              auto mode = enum_value<portrait_mode_names>(portraitMode);
               if (!mode)
                 return std::unexpected(std::move(mode.error()));
               auto drawables = portrait->get().portrait(*mode);
@@ -738,7 +738,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "movingDirection",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<int>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return numericalDirection(actor->get().movementController().movingDirection());
+              return numerical_direction(actor->get().movementController().movingDirection());
             return {};
           });
         !registration)
@@ -747,7 +747,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "facingDirection",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<int>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return numericalDirection(actor->get().movementController().facingDirection());
+              return numerical_direction(actor->get().movementController().facingDirection());
             return {};
           });
         !registration)
@@ -894,7 +894,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           gender = npc->get().gender();
         if (!gender)
             return {};
-        auto name = enum_name<GenderNames>(*gender);
+        auto name = enum_name<gender_names>(*gender);
         if (!name)
           return std::unexpected(std::move(name.error()));
         return String(*name);

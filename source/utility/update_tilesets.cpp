@@ -154,8 +154,8 @@ Vec2U objectPositionPadding(Vec2I imagePosition) {
   int pixelsY = imagePosition.y();
 
   // Unsigned modulo operation gives the padding to use (in pixels)
-  unsigned padX = (unsigned)pixelsX % TilePixels;
-  unsigned padY = (unsigned)pixelsY % TilePixels;
+  unsigned padX = (unsigned)pixelsX % tile_pixels;
+  unsigned padY = (unsigned)pixelsY % tile_pixels;
   return Vec2U(padX, padY);
 }
 
@@ -214,7 +214,7 @@ std::expected<void, StarException> drawNodes(Assets const& assets, std::shared_p
     auto position = json_to_vec2i(node);
     if (!position)
       return std::unexpected(std::move(position.error()));
-    Vec2I nodePos = *position * TilePixels + Vec2I(0, TilePixels - (*nodeImage)->height());
+    Vec2I nodePos = *position * tile_pixels + Vec2I(0, tile_pixels - (*nodeImage)->height());
     Vec2U nodeImagePos = Vec2U(nodePos - imagePosition);
     auto drawn = image->draw_into(nodeImagePos, **nodeImage);
     if (!drawn)
@@ -239,7 +239,7 @@ std::expected<void, StarException> defineObjectOrientation(Root& root, TilesetUp
 
   std::shared_ptr<::Star::ObjectOrientation> orientation = orientations[orientationIndex];
 
-  Vec2I imagePosition = Vec2I(orientation->imagePosition * TilePixels);
+  Vec2I imagePosition = Vec2I(orientation->imagePosition * tile_pixels);
 
   List<std::shared_ptr<::Star::Image const>> layers;
   unsigned width = 0, height = 0;
@@ -303,7 +303,7 @@ std::expected<void, StarException> defineObjectOrientation(Root& root, TilesetUp
     Direction direction = *orientation->directionAffinity;
     if (orientation->flipImages)
       direction = -direction;
-    auto directionName = enum_name<DirectionNames>(direction);
+    auto directionName = enum_name<direction_names>(direction);
     if (!directionName)
       return std::unexpected(std::move(directionName.error()));
     properties["tilesetDirection"] = String(*directionName);
@@ -368,7 +368,7 @@ std::expected<void, StarException> scanLiquids(Root& root, TilesetUpdater& updat
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  Vec2U imageSize(TilePixels, TilePixels);
+  Vec2U imageSize(tile_pixels, tile_pixels);
   for (auto const& liquid : (*liquids)->allLiquidSettings()) {
     auto image = std::make_shared<Image>(imageSize, PixelFormat::RGBA32);
     image->fill(liquid->liquidColor);

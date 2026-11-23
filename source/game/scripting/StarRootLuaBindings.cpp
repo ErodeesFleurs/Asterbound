@@ -834,7 +834,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
     if (!database) return std::unexpected(std::move(database.error()));
     std::optional<Gender> parsedGender;
     if (gender) {
-      auto parsed = enum_value<GenderNames>(*gender);
+      auto parsed = enum_value<gender_names>(*gender);
       if (!parsed) return std::unexpected(std::move(parsed.error()));
       parsedGender = *parsed;
     }
@@ -1120,7 +1120,7 @@ std::expected<JsonArray, StarException> LuaBindings::RootCallbacks::npcPortrait(
   if (!database) return std::unexpected(std::move(database.error()));
   auto variant = (*database)->generateNpcVariant(species, typeName, level, seed.value_or(root.random().next_u64()), parameters.value_or(JsonObject{}), itemCatalog);
   if (!variant) return std::unexpected(std::move(variant.error()));
-  auto mode = enum_value<PortraitModeNames>(portraitMode);
+  auto mode = enum_value<portrait_mode_names>(portraitMode);
   if (!mode) return std::unexpected(std::move(mode.error()));
   auto drawables = (*database)->npcPortrait(*variant, *mode, itemCatalog);
   if (!drawables) return std::unexpected(std::move(drawables.error()));

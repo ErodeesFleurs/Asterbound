@@ -26,7 +26,9 @@ struct RemoteHitRequest {
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, RemoteHitRequest const& hitRequest);
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, RemoteHitRequest& hitRequest);
 
-  ConnectionId destinationConnection() const;
+  [[nodiscard]] constexpr std::optional<ConnectionId> destination_connection() const {
+    return connection_for_entity(causingEntityId);
+  }
 
   EntityId causingEntityId;
   EntityId targetEntityId;
@@ -40,7 +42,9 @@ struct RemoteDamageRequest {
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, RemoteDamageRequest const& damageRequest);
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, RemoteDamageRequest& damageRequest);
 
-  ConnectionId destinationConnection() const;
+  [[nodiscard]] constexpr std::optional<ConnectionId> destination_connection() const {
+    return connection_for_entity(targetEntityId);
+  }
 
   EntityId causingEntityId;
   EntityId targetEntityId;
@@ -72,7 +76,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> update(float dt);
 
   // Incoming RemoteHitRequest and RemoteDamageRequest must have the
-  // destinationConnection equal to the DamageManager's connectionId
+  // destination_connection equal to the DamageManager's connectionId
 
   [[nodiscard]] std::expected<void, StarException> pushRemoteHitRequest(RemoteHitRequest const& remoteHitRequest);
   [[nodiscard]] std::expected<void, StarException> pushRemoteDamageRequest(RemoteDamageRequest const& remoteDamageRequest);

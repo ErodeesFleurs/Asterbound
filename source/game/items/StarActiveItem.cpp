@@ -329,7 +329,7 @@ std::expected<void, StarException> ActiveItem::uninit() {
 std::expected<void, StarException> ActiveItem::update(float dt, FireMode fireMode, bool shifting, HashSet<MoveControlType> const& moves) {
   StringMap<bool> moveMap;
   for (auto move : moves) {
-    auto name = enum_name<MoveControlTypeNames>(move);
+    auto name = enum_name<move_control_type_names>(move);
     if (!name)
       return std::unexpected(std::move(name.error()));
     moveMap[String(*name)] = true;
@@ -338,7 +338,7 @@ std::expected<void, StarException> ActiveItem::update(float dt, FireMode fireMod
   if (!mode)
     return std::unexpected(std::move(mode.error()));
   if (*mode == EntityMode::Master) {
-    auto fireModeName = enum_name<FireModeNames>(fireMode);
+    auto fireModeName = enum_name<fire_mode_names>(fireMode);
     if (!fireModeName)
       return std::unexpected(std::move(fireModeName.error()));
     if (fireMode != m_currentFireMode) {
@@ -537,7 +537,7 @@ std::expected<List<Drawable>, StarException> ActiveItem::handDrawables(float int
     auto drawables = Item::iconDrawables();
     if (!drawables)
       return std::unexpected(std::move(drawables.error()));
-    Drawable::scaleAll(*drawables, 1.0f / TilePixels);
+    Drawable::scaleAll(*drawables, 1.0f / tile_pixels);
     return drawables;
   } else {
     return sample.drawables();
@@ -687,7 +687,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
   if (auto added = callbacks.register_callback(
         "fireMode",
         [this]() -> std::expected<String, StarException> {
-          return enum_name<FireModeNames>(m_currentFireMode).transform([](std::string_view name) {
+          return enum_name<fire_mode_names>(m_currentFireMode).transform([](std::string_view name) {
             return String(name);
           });
         });
@@ -697,7 +697,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       auto itemHand = hand();
       if (!itemHand)
         return std::unexpected(std::move(itemHand.error()));
-      return enum_name<ToolHandNames>(*itemHand).transform([](std::string_view name) { return String(name); });
+      return enum_name<tool_hand_names>(*itemHand).transform([](std::string_view name) { return String(name); });
     }); !added)
     return std::unexpected(std::move(added.error()));
   if (auto added = callbacks.register_callback("handPosition", [this](std::optional<Vec2F> offset) {
@@ -723,7 +723,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
         return std::unexpected(std::move(itemWorld.error()));
       Vec2F toTarget = itemWorld->get().geometry().diff(targetPosition, ownerPosition);
       // Keep the target beyond the hand's rotation center to avoid rapid flips.
-      auto dir = numericalDirection(itemOwner->get().facingDirection());
+      auto dir = numerical_direction(itemOwner->get().facingDirection());
       auto targetX = toTarget[0] * dir;
       auto centerX = handRotationCenter[0] * dir;
       if (centerX >= 0 && targetX >= 0 && targetX < centerX)
@@ -732,8 +732,8 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       float toTargetDist = toTarget.magnitude();
       // Clamp targets inside the barrel-offset circle to retain continuity.
       float angleAdjust = -std::asin(std::clamp(aimVerticalOffset / toTargetDist, -1.0f, 1.0f));
-      auto angleSide = getAngleSide(toTarget.angle());
-      return lua_tuple_return(angleSide.first + angleAdjust, numericalDirection(angleSide.second));
+      auto angleSide = get_angle_side(toTarget.angle());
+      return lua_tuple_return(angleSide.first + angleAdjust, numerical_direction(angleSide.second));
     }); !added)
     return std::unexpected(std::move(added.error()));
   if (auto added = callbacks.register_callback("aimAngle", [this](float aimVerticalOffset, Vec2F targetPosition) -> std::expected<float, StarException> {
@@ -771,7 +771,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
     return std::unexpected(std::move(added.error()));
   if (auto added = callbacks.register_callback("setArmAngle", [this](float value) { m_armAngle.set(value); }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.register_callback("setFacingDirection", [this](float value) { m_facingDirection.set(directionOf(value)); }); !added)
+  if (auto added = callbacks.register_callback("setFacingDirection", [this](float value) { m_facingDirection.set(direction_of(value)); }); !added)
     return std::unexpected(std::move(added.error()));
   if (auto added = callbacks.register_callback("setDamageSources", [this](std::optional<JsonArray> const& values) -> std::expected<void, StarException> {
       List<DamageSource> sources;
@@ -914,9 +914,11 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       auto itemOwner = owner();
       if (!itemOwner)
         return std::unexpected(std::move(itemOwner.error()));
-      auto action = InteractAction::create(type, sourceEntityId.value_or(NullEntityId), configData);
+      auto action = InteractAction::create(type, sourceEntityId.value_or(null_entity_id), configData);
       if (!action)
         return std::unexpected(std::move(action.error()));
+      if (!sourceEntityId && action->type == InteractActionType::Message)
+        action->entityId = itemOwner->get().entityId();
       return itemOwner->get().interact(*action);
     }); !added)
     return std::unexpected(std::move(added.error()));
@@ -974,7 +976,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeScriptedAnimationCall
   if (auto added = callbacks.register_callback("ownerArmAngle", [this]() { return m_armAngle.get(); }); !added)
     return std::unexpected(std::move(added.error()));
   if (auto added = callbacks.register_callback("ownerFacingDirection", [this]() {
-      return owner().transform([](std::reference_wrapper<ToolUserEntity> owner) { return numericalDirection(owner.get().facingDirection()); });
+      return owner().transform([](std::reference_wrapper<ToolUserEntity> owner) { return numerical_direction(owner.get().facingDirection()); });
     }); !added)
     return std::unexpected(std::move(added.error()));
   if (auto added = callbacks.register_callback("handPosition", [this](std::optional<Vec2F> offset) { return handPosition(offset.value_or(Vec2F{})); }); !added)

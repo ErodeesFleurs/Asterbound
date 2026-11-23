@@ -307,7 +307,7 @@ namespace Dungeon {
     if (auto d = settings.maybe("direction")) {
       auto name = d->to_string();
       if (!name) return std::unexpected(std::move(name.error()));
-      auto parsed = enum_value<DirectionNames>(*name);
+      auto parsed = enum_value<direction_names>(*name);
       if (!parsed) return std::unexpected(std::move(parsed.error()));
       direction = *parsed;
     }
@@ -1289,7 +1289,7 @@ namespace Dungeon {
   std::expected<bool, StarException> DungeonGeneratorWriter::otherDungeonPresent(Vec2I position) {
     auto id = m_facade->getDungeonIdAt(position);
     if (!id) return std::unexpected(std::move(id.error()));
-    return *id != NoDungeonId;
+    return *id != no_dungeon_id;
   }
 
   void DungeonGeneratorWriter::setDungeonId(Vec2I const& pos, DungeonId dungeonId) {

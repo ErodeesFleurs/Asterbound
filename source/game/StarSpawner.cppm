@@ -55,7 +55,7 @@ public:
   [[nodiscard]]
   virtual std::expected<float, StarException> threatLevel() const = 0;
 
-  // May return NullEntityId if spawning fails for some reason.
+  // May return null_entity_id if spawning fails for some reason.
   [[nodiscard]]
   virtual std::expected<EntityId, StarException> spawnEntity(std::shared_ptr<Entity> entity) const = 0;
   virtual std::shared_ptr<Entity> getEntity(EntityId entityId) const = 0;

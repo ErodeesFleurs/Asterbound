@@ -58,7 +58,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> message(ConnectionId sourceConnectionId, MessageContext::Mode context, String const& channelName, String const& text, JsonObject data = {});
   [[nodiscard]] std::expected<void, StarException> whisper(ConnectionId sourceConnectionId, ConnectionId targetClientId, String const& text, JsonObject data = {});
 
-  // Shorthand for passing ServerConnectionId as sourceConnectionId to
+  // Shorthand for passing server_connection_id as sourceConnectionId to
   // broadcast / message / whisper
   [[nodiscard]] std::expected<void, StarException> adminBroadcast(String const& text);
   [[nodiscard]] std::expected<void, StarException> adminMessage(MessageContext::Mode context, String const& channelName, String const& text);

@@ -56,7 +56,7 @@ bool QuestCoordinate::operator==(QuestCoordinate const& rhs) const { return coor
     if (!name) return std::unexpected(std::move(name.error()));
     std::optional<Gender> gender;
     if (*name) {
-      auto value = enum_value<GenderNames>(**name);
+      auto value = enum_value<gender_names>(**name);
       if (!value) return std::unexpected(std::move(value.error()));
       gender = *value;
     }
@@ -155,7 +155,7 @@ std::expected<QuestParam, StarException> QuestParam::diskLoad(Root& root, Json c
     auto const& entity = std::get<QuestEntity>(detail);
     Json gender;
     if (entity.gender) {
-      auto name = enum_name<GenderNames>(*entity.gender);
+      auto name = enum_name<gender_names>(*entity.gender);
       if (!name) return std::unexpected(std::move(name.error()));
       gender = String(*name);
     }

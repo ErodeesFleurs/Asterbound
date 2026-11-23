@@ -353,7 +353,7 @@ std::expected<SnapshotFixture, StarException> prepareSnapshotFixture(Root& root,
       return std::unexpected(std::move(projectile.error()));
     (*projectile)->setInitialPosition(Vec2F(964 + int(i % 16) * 10, 972 + int(i / 16) * 16));
     (*projectile)->setInitialVelocity(Vec2F(1, 0));
-    (*projectile)->setSourceEntity(NullEntityId, false);
+    (*projectile)->setSourceEntity(null_entity_id, false);
     auto added = fixture.world->addEntity(*projectile);
     if (!added)
       return std::unexpected(std::move(added.error()));
@@ -362,7 +362,7 @@ std::expected<SnapshotFixture, StarException> prepareSnapshotFixture(Root& root,
   }
   fixture.clients.reserve(clientCount);
   for (unsigned i = 0; i < clientCount; ++i) {
-    ConnectionId id = MinClientConnectionId + i;
+    ConnectionId id = min_client_connection_id + i;
     NetCompatibilityRules rules(i % 2 ? legacy_version : open_protocol_version);
     auto added = fixture.world->addClient(id, SpawnTargetPosition(Vec2F(1024, 1024)), false, false, rules);
     if (!added)

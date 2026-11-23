@@ -220,7 +220,7 @@ namespace Star {
 
 AiInterface::AiInterface(GuiContext& guiContext, std::shared_ptr<UniverseClient> client, std::shared_ptr<Cinematic> cinematic, Animation staticAnimation, Animation scanlineAnimation, Animation faceAnimation)
   : Pane(guiContext), m_currentPage(AiPages::StatusPage), m_client(std::move(client)), m_cinematic(std::move(cinematic)),
-    m_sourceEntityId(NullEntityId), m_staticAnimation(std::move(staticAnimation)), m_scanlineAnimation(std::move(scanlineAnimation)),
+    m_sourceEntityId(null_entity_id), m_staticAnimation(std::move(staticAnimation)), m_scanlineAnimation(std::move(scanlineAnimation)),
     m_faceAnimation("", std::move(faceAnimation)), m_textLength(0), m_textMaxLength(0) {}
 
 std::expected<std::shared_ptr<AiInterface>, StarException> AiInterface::create(GuiContext& guiContext, std::shared_ptr<UniverseClient> client, std::shared_ptr<Cinematic> cinematic) {

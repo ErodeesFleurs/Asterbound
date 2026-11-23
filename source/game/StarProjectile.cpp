@@ -482,7 +482,7 @@ if (!result925) return std::unexpected(std::move(result925.error()));
   if (!m_config->damagePoly.empty()) {
     PolyF damagePoly = m_config->damagePoly;
     if (m_config->flippable) {
-      auto angleSide = getAngleSide(m_movementController->rotation(), true);
+      auto angleSide = get_angle_side(m_movementController->rotation(), true);
       if (angleSide.second == Direction::Left)
         damagePoly.flip_horizontal(0);
       damagePoly.rotate(angleSide.first);
@@ -674,7 +674,7 @@ std::expected<void, StarException> Projectile::render(RenderCallback& renderCall
   String image = Star::format("{}:{}{}", m_config->image, frame, m_imageSuffix);
   auto result902 = this->root().imageMetadataDatabase();
 if (!result902) return std::unexpected(std::move(result902.error()));
-auto result1280 = Drawable::makeImage(*std::move(*result902), image, 1.0f / TilePixels, true, Vec2F());
+auto result1280 = Drawable::makeImage(*std::move(*result902), image, 1.0f / tile_pixels, true, Vec2F());
 if (!result1280) return std::unexpected(std::move(result1280.error()));
 Drawable drawable = std::move(*result1280);
   auto result903 = this->root().imageMetadataDatabase();
@@ -683,7 +683,7 @@ if (!result903) return std::unexpected(std::move(result903.error()));
   if (!directivesResult)
     return std::unexpected(std::move(directivesResult.error()));
   if (m_config->flippable) {
-    auto angleSide = getAngleSide(rotation, true);
+    auto angleSide = get_angle_side(rotation, true);
     if (angleSide.second == Direction::Left)
       drawable.scale(Vec2F(-1, 1));
     drawable.rotate(angleSide.first);
@@ -769,7 +769,7 @@ void Projectile::setSourceEntity(EntityId source, bool trackSource) {
       if (!m_damageTeam)
         setTeam(sourceEntity->getTeam());
     } else {
-      m_sourceEntity = NullEntityId;
+      m_sourceEntity = null_entity_id;
       m_trackSourceEntity = false;
     }
   }
@@ -853,7 +853,7 @@ auto blockDamageVariance = std::move(*result890);
     auto hueShift = world.materialHueShift(position, layer);
     if (isRealMaterial(material)) {
       auto particle = blockDamageParticle;
-      particle.position += centerOfTile(position);
+      particle.position += center_of_tile(position);
       particle.velocity = particle.velocity.magnitude() * vnorm(world.geometry().diff(damageSource, particle.position));
       auto result892 = materialDatabase->materialParticleColor(material, hueShift);
 if (!result892) return std::unexpected(std::move(result892.error()));
@@ -1593,7 +1593,7 @@ std::expected<void, StarException> Projectile::tickShared(float dt) {
   setFrame(getFrame());
 
   m_effectEmitter->setSourcePosition("normal", position());
-  m_effectEmitter->setDirection(getAngleSide(m_movementController->rotation(), true).second);
+  m_effectEmitter->setDirection(get_angle_side(m_movementController->rotation(), true).second);
   auto result719 = m_effectEmitter->tick(dt, *entityMode());
 if (!result719) return std::unexpected(std::move(result719.error()));
 
@@ -1610,7 +1610,7 @@ if (!result721) return std::unexpected(std::move(result721.error()));
   for (auto periodicActionIt = m_periodicActions.begin(); periodicActionIt != m_periodicActions.end();) {
     auto& periodicAction = *periodicActionIt;
     if (std::get<1>(periodicAction)) {
-      if (std::get<0>(periodicAction).wrapTick(root().timing().timestep)) {
+      if (std::get<0>(periodicAction).wrapTick(root().timing().time_step)) {
         auto actionResult = processAction(std::get<2>(periodicAction));
         if (!actionResult)
           return std::unexpected(std::move(actionResult.error()));
@@ -1732,7 +1732,7 @@ m_effectEmitter = std::move(*result704);
   auto result705 = m_parameters.get_float("speed", m_config->initialSpeed);
 if (!result705) return std::unexpected(std::move(result705.error()));
 m_initialSpeed = std::move(*result705);
-  m_sourceEntity = NullEntityId;
+  m_sourceEntity = null_entity_id;
   m_trackSourceEntity = false;
   auto result706 = m_parameters.get_int("bounces", m_config->bounces);
 if (!result706) return std::unexpected(std::move(result706.error()));
@@ -1806,7 +1806,7 @@ if (!result670) return std::unexpected(std::move(result670.error()));
   auto result671 = callbacks.register_callback("die", [&self = *this]() { self.m_timeToLive = 0.0f; });
 if (!result671) return std::unexpected(std::move(result671.error()));
   auto result672 = callbacks.register_callback("sourceEntity", [&self = *this]() -> std::optional<EntityId> {
-      if (self.m_sourceEntity == NullEntityId)
+      if (self.m_sourceEntity == null_entity_id)
         return {};
       else
         return self.m_sourceEntity;

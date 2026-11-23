@@ -290,7 +290,7 @@ std::expected<List<Drawable>, StarException> InspectionTool::drawables() const {
   auto metadata = root().imageMetadataDatabase();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
-  auto drawable = Drawable::makeImage(**metadata, m_image, 1.0f / TilePixels, true, -m_handPosition);
+  auto drawable = Drawable::makeImage(**metadata, m_image, 1.0f / tile_pixels, true, -m_handPosition);
   if (!drawable)
     return std::unexpected(std::move(drawable.error()));
   return List<Drawable>{std::move(*drawable)};
@@ -351,7 +351,7 @@ std::expected<float, StarException> InspectionTool::inspectionLevel(std::shared_
       spaceSet.add(tileEntity->tilePosition() + space);
 
     for (auto space : spaceSet) {
-      auto pointLevel = pointInspectionLevel(centerOfTile(space));
+      auto pointLevel = pointInspectionLevel(center_of_tile(space));
       if (!pointLevel)
         return std::unexpected(std::move(pointLevel.error()));
       if (*pointLevel > 0) {
@@ -386,7 +386,7 @@ std::expected<bool, StarException> InspectionTool::hasLineOfSight(Vec2I const& p
   auto itemWorld = world();
   if (!itemWorld)
     return std::unexpected(std::move(itemWorld.error()));
-  auto collisions = itemWorld->get().collidingTilesAlongLine(centerOfTile(m_currentPosition), centerOfTile(position));
+  auto collisions = itemWorld->get().collidingTilesAlongLine(center_of_tile(m_currentPosition), center_of_tile(position));
   if (!collisions)
     return std::unexpected(std::move(collisions.error()));
   for (auto collision : *collisions) {
@@ -471,7 +471,7 @@ std::expected<InspectionTool::InspectionResult, StarException> InspectionTool::i
     return std::unexpected(std::move(lineOfSight.error()));
   bool outOfRange = !*lineOfSight;
   if (!outOfRange) {
-    auto level = pointInspectionLevel(centerOfTile(position));
+    auto level = pointInspectionLevel(center_of_tile(position));
     if (!level)
       return std::unexpected(std::move(level.error()));
     outOfRange = *level < m_minimumInspectionLevel;

@@ -173,7 +173,7 @@ std::expected<std::shared_ptr<BlueprintItem>, StarException> BlueprintItem::crea
   auto image = (*assets)->json("/blueprint.config:inHandImage").and_then([](Json const& value) { return value.to_string(); });
   if (!image)
     return std::unexpected(std::move(image.error()));
-  auto drawable = Drawable::makeImage(**metadata, *image, 1.0f / TilePixels, true, Vec2F());
+  auto drawable = Drawable::makeImage(**metadata, *image, 1.0f / tile_pixels, true, Vec2F());
   if (!drawable)
     return std::unexpected(std::move(drawable.error()));
   item->m_inHandDrawable = {std::move(*drawable)};

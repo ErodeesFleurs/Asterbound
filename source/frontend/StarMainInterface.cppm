@@ -154,8 +154,8 @@ public:
 
   [[nodiscard]] std::expected<bool, StarException> pauseRequested() const;
 
-  [[nodiscard]] std::expected<void, StarException> openCraftingWindow(Json const& config, EntityId sourceEntityId = NullEntityId);
-  [[nodiscard]] std::expected<void, StarException> openMerchantWindow(Json const& config, EntityId sourceEntityId = NullEntityId);
+  [[nodiscard]] std::expected<void, StarException> openCraftingWindow(Json const& config, EntityId sourceEntityId = null_entity_id);
+  [[nodiscard]] std::expected<void, StarException> openMerchantWindow(Json const& config, EntityId sourceEntityId = null_entity_id);
   [[nodiscard]] std::expected<void, StarException> togglePlainCraftingWindow();
 
   bool windowsOpen() const;

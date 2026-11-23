@@ -35,11 +35,11 @@ const GameTestRegistration movementTerrainContactPreservesPositionAndVelocity(
     world->setTileProtectionEnabled(false);
     Vec2I origin(1024, 1024);
     ASSERT_TRUE(world->generateRegion(RectI::with_size(origin - Vec2I(16, 16), Vec2I(40, 40))));
-    ASSERT_TRUE(world->setDungeonGravity(NoDungeonId, 60.0f));
-    // Material placement marks constructed tiles with ConstructionDungeonId.
+    ASSERT_TRUE(world->setDungeonGravity(no_dungeon_id, 60.0f));
+    // Material placement marks constructed tiles with construction_dungeon_id.
     // gravity() rounds the final position, so the corner can sample the wall
     // rather than the neighboring empty tile. Keep both domain gravities fixed.
-    ASSERT_TRUE(world->setDungeonGravity(ConstructionDungeonId, 60.0f));
+    ASSERT_TRUE(world->setDungeonGravity(construction_dungeon_id, 60.0f));
     auto materials = root.materialDatabase();
     ASSERT_TRUE(materials) << materials.error().what();
     auto dirt = (*materials)->materialId("dirt");

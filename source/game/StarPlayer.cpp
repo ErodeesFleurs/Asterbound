@@ -488,7 +488,7 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
   m_songbook = std::move(songbook);
 
   m_lastDamagedOtherTimer = 0;
-  m_lastDamagedTarget = NullEntityId;
+  m_lastDamagedTarget = null_entity_id;
 
   auto ageItemsEveryJsonResult = assets->json("/player.config:ageItemsEvery");
   if (!ageItemsEveryJsonResult)
@@ -1548,7 +1548,7 @@ std::expected<Vec2F, StarException> Player::mouthOffset(bool ignoreAdjustments) 
   if (!offsetResult)
     return std::unexpected(std::move(offsetResult.error()));
   auto offset = std::move(*offsetResult);
-  return Vec2F(offset[0] * numericalDirection(facingDirection()), offset[1]);
+  return Vec2F(offset[0] * numerical_direction(facingDirection()), offset[1]);
 }
 
 std::expected<Vec2F, StarException> Player::feetOffset() const {
@@ -1556,7 +1556,7 @@ std::expected<Vec2F, StarException> Player::feetOffset() const {
   if (!offsetResult)
     return std::unexpected(std::move(offsetResult.error()));
   auto offset = std::move(*offsetResult);
-  return Vec2F(offset[0] * numericalDirection(facingDirection()), offset[1]);
+  return Vec2F(offset[0] * numerical_direction(facingDirection()), offset[1]);
 }
 
 std::expected<Vec2F, StarException> Player::headArmorOffset() const {
@@ -1564,7 +1564,7 @@ std::expected<Vec2F, StarException> Player::headArmorOffset() const {
   if (!offsetResult)
     return std::unexpected(std::move(offsetResult.error()));
   auto offset = std::move(*offsetResult);
-  return Vec2F(offset[0] * numericalDirection(facingDirection()), offset[1]);
+  return Vec2F(offset[0] * numerical_direction(facingDirection()), offset[1]);
 }
 
 std::expected<Vec2F, StarException> Player::chestArmorOffset() const {
@@ -1572,7 +1572,7 @@ std::expected<Vec2F, StarException> Player::chestArmorOffset() const {
   if (!offsetResult)
     return std::unexpected(std::move(offsetResult.error()));
   auto offset = std::move(*offsetResult);
-  return Vec2F(offset[0] * numericalDirection(facingDirection()), offset[1]);
+  return Vec2F(offset[0] * numerical_direction(facingDirection()), offset[1]);
 }
 
 std::expected<Vec2F, StarException> Player::backArmorOffset() const {
@@ -1580,7 +1580,7 @@ std::expected<Vec2F, StarException> Player::backArmorOffset() const {
   if (!offsetResult)
     return std::unexpected(std::move(offsetResult.error()));
   auto offset = std::move(*offsetResult);
-  return Vec2F(offset[0] * numericalDirection(facingDirection()), offset[1]);
+  return Vec2F(offset[0] * numerical_direction(facingDirection()), offset[1]);
 }
 
 std::expected<Vec2F, StarException> Player::legsArmorOffset() const {
@@ -1588,7 +1588,7 @@ std::expected<Vec2F, StarException> Player::legsArmorOffset() const {
   if (!offsetResult)
     return std::unexpected(std::move(offsetResult.error()));
   auto offset = std::move(*offsetResult);
-  return Vec2F(offset[0] * numericalDirection(facingDirection()), offset[1]);
+  return Vec2F(offset[0] * numerical_direction(facingDirection()), offset[1]);
 }
 
 std::expected<Vec2F, StarException> Player::mouthPosition() const {
@@ -2174,7 +2174,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
       }
     }
 
-    m_log->addPlayTime(root().timing().timestep);
+    m_log->addPlayTime(root().timing().time_step);
 
     if (m_ageItemsTimer.wrapTick(dt)) {
       auto itemDatabaseResult = root().itemDatabase();
@@ -2451,7 +2451,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
           auto mouth = std::move(*mouthResult);
           auto diff = currentWorld.geometry().diff(m_aimPosition, mouth);
           diff.set_x(std::fabsf(diff.x()));
-          headRotation = diff.angle() * .25f * numericalDirection(humanoid()->facingDirection());
+          headRotation = diff.angle() * .25f * numerical_direction(humanoid()->facingDirection());
         }
       }
       humanoid()->setHeadRotation(headRotation);
@@ -3852,7 +3852,7 @@ std::expected<String, StarException> Player::getFootstepSound(Vec2I const& senso
 }
 
 std::expected<bool, StarException> Player::inInteractionRange() const {
-  return inInteractionRange(centerOfTile(m_aimPosition));
+  return inInteractionRange(center_of_tile(m_aimPosition));
 }
 
 std::expected<bool, StarException> Player::inInteractionRange(Vec2F aimPos) const {
@@ -3866,7 +3866,7 @@ std::expected<bool, StarException> Player::inInteractionRange(Vec2F aimPos) cons
 }
 
 std::expected<bool, StarException> Player::inToolRange() const {
-  return inToolRange(centerOfTile(m_aimPosition));
+  return inToolRange(center_of_tile(m_aimPosition));
 }
 
 std::expected<bool, StarException> Player::inToolRange(Vec2F const& aimPos) const {

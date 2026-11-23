@@ -41,7 +41,7 @@ extern std::expected<EnumMap<InteractActionType>, StarException> const InteractA
 
 InteractAction::InteractAction() {
   type = InteractActionType::None;
-  entityId = NullEntityId;
+  entityId = null_entity_id;
 }
 
 InteractAction::InteractAction(InteractActionType type, EntityId entityId, Json data)

@@ -81,7 +81,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
   return ds << pmc.position << pmc.collision << pmc.collisionKind << pmc.categoryFilter;
 }
 
-MovingCollisionId::MovingCollisionId() : physicsEntityId(NullEntityId), collisionIndex(0) {}
+MovingCollisionId::MovingCollisionId() : physicsEntityId(null_entity_id), collisionIndex(0) {}
 
 MovingCollisionId::MovingCollisionId(EntityId physicsEntityId, std::size_t collisionIndex)
   : physicsEntityId(physicsEntityId), collisionIndex(collisionIndex) {}
@@ -91,7 +91,7 @@ bool MovingCollisionId::operator==(MovingCollisionId const& rhs) {
 }
 
 bool MovingCollisionId::valid() const {
-  return physicsEntityId != NullEntityId;
+  return physicsEntityId != null_entity_id;
 }
 
 MovingCollisionId::operator bool() const {

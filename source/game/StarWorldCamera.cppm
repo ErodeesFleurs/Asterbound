@@ -107,36 +107,36 @@ inline Vec2F WorldCamera::centerWorldPosition() const {
 
 inline Vec2F WorldCamera::worldToScreen(Vec2F worldCoord) const {
   Vec2F wrappedCoord = m_worldGeometry.nearest_to(Vec2F(m_worldCenter), worldCoord);
-  return Vec2F((wrappedCoord[0] - m_worldCenter[0]) * (TilePixels * m_renderPixelRatio)
+  return Vec2F((wrappedCoord[0] - m_worldCenter[0]) * (tile_pixels * m_renderPixelRatio)
                  + static_cast<float>(m_screenSize[0]) / 2.0,
-               (wrappedCoord[1] - m_worldCenter[1]) * (TilePixels * m_renderPixelRatio)
+               (wrappedCoord[1] - m_worldCenter[1]) * (tile_pixels * m_renderPixelRatio)
                  + static_cast<float>(m_screenSize[1]) / 2.0);
 }
 
 inline Vec2F WorldCamera::screenToWorld(Vec2F screen) const {
   return Vec2F(
-    (screen[0] - static_cast<float>(m_screenSize[0]) / 2.0) / (TilePixels * m_renderPixelRatio) + m_worldCenter[0],
-    (screen[1] - static_cast<float>(m_screenSize[1]) / 2.0) / (TilePixels * m_renderPixelRatio) + m_worldCenter[1]);
+    (screen[0] - static_cast<float>(m_screenSize[0]) / 2.0) / (tile_pixels * m_renderPixelRatio) + m_worldCenter[0],
+    (screen[1] - static_cast<float>(m_screenSize[1]) / 2.0) / (tile_pixels * m_renderPixelRatio) + m_worldCenter[1]);
 }
 
 inline RectF WorldCamera::worldScreenRect() const {
   // screen dimensions in world space
-  float w = static_cast<float>(m_screenSize[0]) / (TilePixels * m_renderPixelRatio);
-  float h = static_cast<float>(m_screenSize[1]) / (TilePixels * m_renderPixelRatio);
+  float w = static_cast<float>(m_screenSize[0]) / (tile_pixels * m_renderPixelRatio);
+  float h = static_cast<float>(m_screenSize[1]) / (tile_pixels * m_renderPixelRatio);
   return RectF::with_size(Vec2F(m_worldCenter[0] - w / 2, m_worldCenter[1] - h / 2), Vec2F(w, h));
 }
 
 inline RectI WorldCamera::worldTileRect() const {
   RectF screen = worldScreenRect();
   Vec2I min = Vec2I::floor(screen.min());
-  Vec2I size = Vec2I::ceil(Vec2F(m_screenSize) / (TilePixels * m_renderPixelRatio) + (screen.min() - Vec2F(min)));
+  Vec2I size = Vec2I::ceil(Vec2F(m_screenSize) / (tile_pixels * m_renderPixelRatio) + (screen.min() - Vec2F(min)));
   return RectI::with_size(min, size);
 }
 
 inline Vec2F WorldCamera::tileMinScreen() const {
   RectF screenRect = worldScreenRect();
   RectI tileRect = worldTileRect();
-  return (Vec2F(tileRect.min()) - screenRect.min()) * (TilePixels * m_renderPixelRatio);
+  return (Vec2F(tileRect.min()) - screenRect.min()) * (tile_pixels * m_renderPixelRatio);
 }
 
 inline void WorldCamera::update(float dt) {

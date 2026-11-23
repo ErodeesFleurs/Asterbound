@@ -567,7 +567,7 @@ std::expected<void, StarException> LuaScriptStorage::finish_shutdown(std::expect
   return shutdown;
 }
 
-LuaScriptUpdate::LuaScriptUpdate(LuaBaseComponent& host) : m_host(host), m_last_dt(host.root().timing().timestep * host.root().timing().timescale) {}
+LuaScriptUpdate::LuaScriptUpdate(LuaBaseComponent& host) : m_host(host), m_last_dt(host.root().timing().time_step * host.root().timing().time_scale) {}
 
 void LuaScriptUpdate::destroy() {
   // Child threads must stop before the parent-message queue is destroyed.

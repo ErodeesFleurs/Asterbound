@@ -38,7 +38,7 @@ import star.math_common;
 namespace Star {
 
 bool World::isServer() const {
-  return connection() == ServerConnectionId;
+  return connection() == server_connection_id;
 }
 
 bool World::isClient() const {

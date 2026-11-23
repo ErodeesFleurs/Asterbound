@@ -107,7 +107,7 @@ namespace Tiled {
     auto configured = presentProperty<String>(properties, "tilesetDirection");
     if (!configured) return std::unexpected(std::move(configured.error()));
     if (*configured) {
-      auto parsed = enum_value<DirectionNames>(**configured);
+      auto parsed = enum_value<direction_names>(**configured);
       if (!parsed) return std::unexpected(std::move(parsed.error()));
       direction = *parsed;
     }
@@ -196,7 +196,7 @@ namespace Tiled {
     return std::make_shared<StagehandBrush>(JsonObject{{"type", type}, {"parameters", configured}});
   }
   [[nodiscard]] std::expected<std::shared_ptr<Brush const>, StarException> getDungeonIdBrush(String const& value, Properties&) {
-    return std::make_shared<DungeonIdBrush>(maybe_lexical_cast<DungeonId>(value).value_or(NoDungeonId));
+    return std::make_shared<DungeonIdBrush>(maybe_lexical_cast<DungeonId>(value).value_or(no_dungeon_id));
   }
   [[nodiscard]] std::expected<std::shared_ptr<Brush const>, StarException> getBiomeItemsBrush(String const&, Properties&) {
     return std::make_shared<BiomeItemsBrush>();

@@ -387,8 +387,8 @@ std::expected<void, StarException> EnvironmentPainter::renderParallaxLayers(
     // parallax camera world position in *parallax space*
     Vec2F parallaxCameraCenter = parallaxWorldPosition - parallaxOrigin;
     parallaxCameraCenter =
-        Vec2F((((parallaxCameraCenter[0] / parallaxPixels[0]) * TilePixels) * camera.pixelRatio()) / parallaxValue[0],
-            (((parallaxCameraCenter[1] / parallaxPixels[1]) * TilePixels) * camera.pixelRatio()) / parallaxValue[1]);
+        Vec2F((((parallaxCameraCenter[0] / parallaxPixels[0]) * tile_pixels) * camera.pixelRatio()) / parallaxValue[0],
+            (((parallaxCameraCenter[1] / parallaxPixels[1]) * tile_pixels) * camera.pixelRatio()) / parallaxValue[1]);
 
     // width / height of screen in *parallax space*
     float parallaxScreenWidth = camera.screenSize()[0] / parallaxPixels[0];

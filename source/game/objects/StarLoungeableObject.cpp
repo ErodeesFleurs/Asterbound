@@ -107,7 +107,7 @@ std::expected<void, StarException> LoungeableObject::render(RenderCallback& rend
         if (!metadataResult)
           return std::unexpected(std::move(metadataResult.error()));
         auto metadata = std::move(*metadataResult);
-        auto drawableResult = Drawable::makeImage(*metadata, m_sitCoverImage, 1.0f / TilePixels, false, position() + orientation->imagePosition);
+        auto drawableResult = Drawable::makeImage(*metadata, m_sitCoverImage, 1.0f / tile_pixels, false, position() + orientation->imagePosition);
         if (!drawableResult)
           return std::unexpected(std::move(drawableResult.error()));
         auto drawable = std::move(*drawableResult);
@@ -198,7 +198,7 @@ std::expected<void, StarException> LoungeableObject::setOrientationIndex(std::si
       if (!positionResult)
         return std::unexpected(std::move(positionResult.error()));
       auto position = std::move(*positionResult);
-      m_sitPositions = {position / TilePixels};
+      m_sitPositions = {position / tile_pixels};
     } else {
       auto positionsConfigResult = configValue("sitPositions");
       if (!positionsConfigResult)
@@ -215,7 +215,7 @@ std::expected<void, StarException> LoungeableObject::setOrientationIndex(std::si
           if (!positionResult)
             return std::unexpected(std::move(positionResult.error()));
           auto position = std::move(*positionResult);
-          m_sitPositions.push_back(position / TilePixels);
+          m_sitPositions.push_back(position / tile_pixels);
         }
       }
     }

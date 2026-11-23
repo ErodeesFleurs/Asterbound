@@ -507,7 +507,7 @@ std::expected<void, StarException> MaterialItem::render(RenderCallback& renderCa
       auto metadata = root().imageMetadataDatabase();
       if (!metadata)
         return std::unexpected(std::move(metadata.error()));
-      auto indicator = Drawable::makeImage(**metadata, path, 1.0f / TilePixels, true, basePosition);
+      auto indicator = Drawable::makeImage(**metadata, path, 1.0f / tile_pixels, true, basePosition);
       if (!indicator)
         return std::unexpected(std::move(indicator.error()));
       indicator->fullbright = true;
@@ -872,7 +872,7 @@ std::expected<std::reference_wrapper<List<Drawable> const>, StarException> Mater
       TileDrawer::TerrainLayer layer = isBlock ? TileDrawer::TerrainLayer::Foreground : TileDrawer::TerrainLayer::Midground;
       for (int x = 0; x != 3; ++x) {
         for (int y = 0; y != 3; ++y) {
-          auto produced = tileDrawer->get().produceTerrainDrawables(tileDrawables, layer, {x, y}, renderData, 1.0f / TilePixels, position - Vec2I(1, 1));
+          auto produced = tileDrawer->get().produceTerrainDrawables(tileDrawables, layer, {x, y}, renderData, 1.0f / tile_pixels, position - Vec2I(1, 1));
           if (!produced)
             return std::unexpected(std::move(produced.error()));
         }

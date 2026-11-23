@@ -63,7 +63,7 @@ public:
   std::expected<bool, StarException> spawnTargetValid(SpawnTarget const& spawnTarget);
 
   [[nodiscard]]
-  std::expected<bool, StarException> addClient(ConnectionId clientId, SpawnTarget const& spawnTarget, bool isLocal, bool isAdmin = false, NetCompatibilityRules netRules = {}, ClientSubWorldId subWorldId = MainClientWorldId);
+  std::expected<bool, StarException> addClient(ConnectionId clientId, SpawnTarget const& spawnTarget, bool isLocal, bool isAdmin = false, NetCompatibilityRules netRules = {}, ClientSubWorldId subWorldId = main_client_world_id);
   // Returns final outgoing packets
   [[nodiscard]]
   std::expected<List<std::shared_ptr<Packet>>, StarException> removeClient(ConnectionId clientId);

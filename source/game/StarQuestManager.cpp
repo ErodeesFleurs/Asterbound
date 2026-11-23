@@ -304,7 +304,7 @@ std::expected<Json, StarException> QuestManager::dialogCinema(std::uint64_t toke
   auto cinema = lease.quest->completionCinema();
   if (!cinema) return std::unexpected(std::move(cinema.error()));
   if (!*cinema) return Json{};
-  auto gender = enum_name<GenderNames>(m_player->get().gender());
+  auto gender = enum_name<gender_names>(m_player->get().gender());
   if (!gender) return std::unexpected(std::move(gender.error()));
   auto path =
     (**cinema).replace_tags(StringMap<String>{{"species", m_player->get().species()}, {"gender", String(*gender)}});

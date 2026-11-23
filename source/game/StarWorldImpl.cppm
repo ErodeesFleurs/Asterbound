@@ -646,7 +646,7 @@ namespace WorldImpl {
 
     // Each column in tile_eval_columns is guaranteed to be no larger than the
     // sector size.
-    CellularLightIntensityCalculator::Cell lightingCellColumn[WorldSectorSize];
+    CellularLightIntensityCalculator::Cell lightingCellColumn[world_sector_size];
     auto evaluated = tileSectorArray->tile_eval_columns(lighting.calculation_region(), [&](Vec2I const& pos, std::span<typename TileSectorArray::Tile> column) -> std::expected<void, StarException> {
         for (std::size_t y = 0; y < column.size(); ++y) {
           auto& tile = column[y];
@@ -718,7 +718,7 @@ namespace WorldImpl {
       // If any of the entity spaces is within interaction range, then assume the
       // whole entity is in interaction range
       for (auto space : entity->spaces()) {
-        if (geometry.diff(entity->position() + centerOfTile(space), sourcePosition).magnitude() <= maxRange)
+        if (geometry.diff(entity->position() + center_of_tile(space), sourcePosition).magnitude() <= maxRange)
           return true;
       }
     }
@@ -746,7 +746,7 @@ namespace WorldImpl {
 
     if (auto tile_entity = as_ref<TileEntity>(*entity)) {
       for (auto space : prefer_interactive ? tile_entity->get().interactiveSpaces() : tile_entity->get().spaces()) {
-        auto space_position = entity->position() + centerOfTile(space);
+        auto space_position = entity->position() + center_of_tile(space);
         auto delta = geometry.diff(space_position, source_position);
         if (delta.magnitude() <= max_range) {
           auto reachable = can_reach_tile(space_position, delta);

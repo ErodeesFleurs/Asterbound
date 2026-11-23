@@ -151,7 +151,7 @@ std::expected<std::shared_ptr<WorldStorage>, StarException> WorldStorage::create
   if (!initialized) return std::unexpected(std::move(initialized.error()));
   auto& db = result->m_db;
   result->m_tileArray = std::make_shared<ServerTileSectorArray>(worldSize);
-  result->m_entityMap = std::make_shared<EntityMap>(worldSize, MinServerEntityId, MaxServerEntityId);
+  result->m_entityMap = std::make_shared<EntityMap>(worldSize, min_server_entity_id, max_server_entity_id);
   result->m_generatorFacade = generatorFacade;
   result->m_floatingDungeonWorld = false;
   {
@@ -203,7 +203,7 @@ std::expected<std::shared_ptr<WorldStorage>, StarException> WorldStorage::create
   auto metadata = std::move((*autometadataResult1));
   auto worldSize = metadata.worldSize;
   result->m_tileArray = std::make_shared<ServerTileSectorArray>(worldSize);
-  result->m_entityMap = std::make_shared<EntityMap>(worldSize, MinServerEntityId, MaxServerEntityId);
+  result->m_entityMap = std::make_shared<EntityMap>(worldSize, min_server_entity_id, max_server_entity_id);
   return result;
 }
 
@@ -241,7 +241,7 @@ std::expected<std::shared_ptr<WorldStorage>, StarException> WorldStorage::create
   auto metadata = std::move((*autometadataResult1));
   auto worldSize = metadata.worldSize;
   result->m_tileArray = std::make_shared<ServerTileSectorArray>(worldSize);
-  result->m_entityMap = std::make_shared<EntityMap>(worldSize, MinServerEntityId, MaxServerEntityId);
+  result->m_entityMap = std::make_shared<EntityMap>(worldSize, min_server_entity_id, max_server_entity_id);
   return result;
 }
 
@@ -432,7 +432,7 @@ std::expected<std::optional<Vec2F>, StarException> WorldStorage::findUniqueEntit
 
 std::expected<EntityId, StarException> WorldStorage::loadUniqueEntity(String const& uniqueId) {
   EntityId entityId = m_entityMap->uniqueEntityId(uniqueId);
-  if (entityId != NullEntityId)
+  if (entityId != null_entity_id)
     return entityId;
 
   auto index = getUniqueIndexEntry(uniqueId);
@@ -853,8 +853,8 @@ std::expected<WorldStorage::TileSectorStore, StarException> WorldStorage::readTi
   }
 
   store.tiles.reset(new TileArray());
-  for (std::size_t y = 0; y < WorldSectorSize; ++y) {
-    for (std::size_t x = 0; x < WorldSectorSize; ++x) {
+  for (std::size_t y = 0; y < world_sector_size; ++y) {
+    for (std::size_t x = 0; x < world_sector_size; ++x) {
       ServerTile tile;
       {
         auto operationResult1 = tile.read(ds, store.tileSerializationVersion);
@@ -911,8 +911,8 @@ std::expected<ByteArray, StarException> WorldStorage::writeTileSector(TileSector
   if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((store.tiles));
   }
-  for (std::size_t y = 0; y < WorldSectorSize; ++y) {
-    for (std::size_t x = 0; x < WorldSectorSize; ++x)
+  for (std::size_t y = 0; y < world_sector_size; ++y) {
+    for (std::size_t x = 0; x < world_sector_size; ++x)
       {
         auto written = (*store.tiles)(x, y).write(ds);
         if (!written) return std::unexpected(std::move(written.error()));
@@ -1458,7 +1458,7 @@ std::expected<void, StarException> WorldStorage::syncSector(Sector const& sector
 
 std::expected<List<WorldStorage::Sector>, StarException> WorldStorage::adjacentSectors(Sector const& sector) const {
   auto tiles = m_tileArray->sector_region(sector);
-  return m_tileArray->valid_sectors_for(tiles.padded(WorldSectorSize));
+  return m_tileArray->valid_sectors_for(tiles.padded(world_sector_size));
 }
 
 std::expected<void, StarException> WorldStorage::updateSectorUniques(Sector const& sector, UniqueIndexStore const& sectorUniques) {

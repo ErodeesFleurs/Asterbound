@@ -167,14 +167,14 @@ std::expected<void, StarException> BeamItem::update(float, FireMode, bool, HashS
   if (!item_world)
     return std::unexpected(std::move(item_world.error()));
   auto& user = item_owner->get();
-  auto origin = user.handPosition(*item_hand, (m_firePosition - m_handPosition) / TilePixels);
+  auto origin = user.handPosition(*item_hand, (m_firePosition - m_handPosition) / tile_pixels);
   if (!origin)
     return std::unexpected(std::move(origin.error()));
   auto aim = user.aimPosition();
   if (!aim)
     return std::unexpected(std::move(aim.error()));
   auto const endpoint = m_endType == EndType::TileGroup ? aim->round()
-      : m_endType == EndType::Wire ? *aim : centerOfTile(*aim);
+      : m_endType == EndType::Wire ? *aim : center_of_tile(*aim);
   auto const owner_position = user.position();
   auto const dest = item_world->get().geometry().diff(endpoint, owner_position);
   // The separate owner-to-target range check uses the unwrapped world coordinates.
@@ -189,7 +189,7 @@ std::expected<void, StarException> BeamItem::update(float, FireMode, bool, HashS
     far_control = far + (dest - far) * m_farControlPointElasticity;
     auto const desired = (dest - *origin) * m_nearControlPointDistance;
     auto const& near = m_beam_curve[1];
-    near_control = user.facingDirection() != getAngleSide(near.angle()).second
+    near_control = user.facingDirection() != get_angle_side(near.angle()).second
         ? desired : near + (desired - near) * m_nearControlPointElasticity;
   }
 
@@ -283,14 +283,14 @@ std::expected<float, StarException> BeamItem::getAngle(float angle) {
   if (m_beam_curve.dest().magnitude_squared() < m_beam_curve.origin().magnitude_squared()
       || m_beam_curve.origin() == m_beam_curve[1])
     return angle;
-  return getAngleSide(m_beam_curve[1].angle()).first;
+  return get_angle_side(m_beam_curve[1].angle()).first;
 }
 
 std::expected<List<Drawable>, StarException> BeamItem::drawables() const {
   auto metadata = beamRoot().imageMetadataDatabase();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
-  auto drawable = Drawable::makeImage(**metadata, m_image, 1.0f / TilePixels, true, -handPosition() / TilePixels);
+  auto drawable = Drawable::makeImage(**metadata, m_image, 1.0f / tile_pixels, true, -handPosition() / tile_pixels);
   if (!drawable)
     return std::unexpected(std::move(drawable.error()));
   return List<Drawable>{std::move(*drawable)};
@@ -370,7 +370,7 @@ std::expected<List<Drawable>, StarException> BeamItem::beamDrawables() const {
         auto metadata = beamRoot().imageMetadataDatabase();
         if (!metadata)
           return std::unexpected(std::move(metadata.error()));
-        auto ball = Drawable::makeImage(**metadata, endImage, 1.0f / TilePixels, true, m_beam_curve.dest());
+        auto ball = Drawable::makeImage(**metadata, endImage, 1.0f / tile_pixels, true, m_beam_curve.dest());
         if (!ball)
           return std::unexpected(std::move(ball.error()));
         Color ballColor = Color::palette_white;

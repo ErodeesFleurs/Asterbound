@@ -240,7 +240,7 @@ std::expected<void, StarException> FarmableObject::update(float dt, std::uint64_
       if (m_stage == lastStage)
         break;
     }
-    auto operation5 = m_immersion.update(root().timing().timestep, [this] { return liquidFillLevel(); });
+    auto operation5 = m_immersion.update(root().timing().time_step, [this] { return liquidFillLevel(); });
     if (!operation5)
       return std::unexpected(std::move(operation5.error()));
     if (m_immersion.average() > m_maxImmersion || m_immersion.average() < m_minImmersion) {

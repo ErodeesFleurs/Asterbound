@@ -281,7 +281,7 @@ std::expected<bool, StarException> FireableItem::windup() const {
 
 std::expected<void, StarException> FireableItem::update(float dt, FireMode fireMode, bool shifting, HashSet<MoveControlType> const&) {
   if (m_scriptComponent) {
-    auto modeName = enum_name<FireModeNames>(fireMode);
+    auto modeName = enum_name<fire_mode_names>(fireMode);
     if (!modeName)
       return std::unexpected(std::move(modeName.error()));
     auto invoked = recover_lua_script_error(m_scriptComponent->invoke("update", dt, *modeName, shifting));
@@ -461,7 +461,7 @@ std::expected<Vec2F, StarException> FireableItem::ownerFirePosition() const {
   auto handResult = hand();
   if (!handResult)
     return std::unexpected(std::move(handResult.error()));
-  return ownerResult->get().handPosition(*handResult, (this->firePosition() - handPosition()) / TilePixels);
+  return ownerResult->get().handPosition(*handResult, (this->firePosition() - handPosition()) / tile_pixels);
 }
 
 float FireableItem::windupTime() const {

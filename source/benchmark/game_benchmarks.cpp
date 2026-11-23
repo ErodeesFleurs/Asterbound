@@ -97,7 +97,7 @@ std::expected<Fixture, StarException> prepare_fixture(Root& root, std::shared_pt
   auto generated = world->generateRegion(RectI::with_size(Vec2I(1016, 1016), Vec2I(56, 24)));
   if (!generated)
     return std::unexpected(std::move(generated.error()));
-  for (auto dungeon : {NoDungeonId, ConstructionDungeonId}) {
+  for (auto dungeon : {no_dungeon_id, construction_dungeon_id}) {
     auto gravity = world->setDungeonGravity(dungeon, flying ? 0.0f : 60.0f);
     if (!gravity)
       return std::unexpected(std::move(gravity.error()));

@@ -269,7 +269,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
   if (!setLabelResult787)
     return std::unexpected(std::move(setLabelResult787.error()));
 
-  auto rarityName = enum_name<RarityNames>(item->rarity());
+  auto rarityName = enum_name<rarity_names>(item->rarity());
   if (!rarityName)
     return std::unexpected(std::move(rarityName.error()));
   auto rarityTitle = String(*rarityName).title_case();

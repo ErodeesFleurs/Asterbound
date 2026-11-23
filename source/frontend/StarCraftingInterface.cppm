@@ -62,7 +62,7 @@ public:
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<CraftingPane>(); }
 
   [[nodiscard]] static std::expected<std::shared_ptr<CraftingPane>, StarException> create(GuiContext& guiContext,
-      std::shared_ptr<WorldClient> worldClient, std::shared_ptr<Player> player, Json const& settings, EntityId sourceEntityId = NullEntityId);
+      std::shared_ptr<WorldClient> worldClient, std::shared_ptr<Player> player, Json const& settings, EntityId sourceEntityId = null_entity_id);
 
   [[nodiscard]] std::expected<void, StarException> displayed() override;
   [[nodiscard]] std::expected<void, StarException> dismissed() override;

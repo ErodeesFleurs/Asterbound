@@ -1475,7 +1475,7 @@ auto animator = std::move(*result243);
     auto result244 = animator->drawables();
 if (!result244) return std::unexpected(std::move(result244.error()));
 auto drawables = std::move(*result244);
-    Drawable::scaleAll(drawables, TilePixels);
+    Drawable::scaleAll(drawables, tile_pixels);
     return drawables;
   }
 }
