@@ -2605,6 +2605,7 @@ int __stdcall WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
   }
   std::unique_ptr<void, decltype(&LocalFree)> argsOwner(argsList, &LocalFree);
   Star::StringList args;
+  args.reserve(static_cast<std::size_t>(nArgs));
   for (int i = 0; i < nArgs; ++i) {
     auto arg = Star::String::from_wstring(argsList[i]);
     if (!arg) {
@@ -2615,7 +2616,7 @@ int __stdcall WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
   }
   unsigned long exceptionStackSize = 131072;
   SetThreadStackGuarantee(&exceptionStackSize);
-  return Star::runMainApplication(std::make_unique<Star::ClientApplication>(), args);
+  return Star::runMainApplication(std::make_unique<Star::ClientApplication>(), std::move(args));
 }
 #else
 int main(int argc, char** argv) {
@@ -2627,10 +2628,6 @@ int main(int argc, char** argv) {
     SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Asterbound startup error", diagnostic.c_str(), nullptr);
     return 1;
   }
-  Star::StringList args;
-  args.reserve(argc);
-  for (int i = 0; i < argc; ++i)
-    args.push_back(Star::String(std::string_view(argv[i])));
-  return Star::runMainApplication(std::make_unique<Star::ClientApplication>(), args);
+  return Star::runMainApplication(std::make_unique<Star::ClientApplication>(), Star::native_arguments(argc, argv));
 }
 #endif

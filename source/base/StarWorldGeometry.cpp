@@ -66,7 +66,7 @@ concept interval_coordinate = std::same_as<T, int> || std::same_as<T, float>;
 
 enum class IntervalSource { Rectangle, Region };
 
-template <IntervalSource Source, interval_coordinate T, std::invocable<T, T> MakePiece>
+template <IntervalSource source, interval_coordinate T, std::invocable<T, T> MakePiece>
 auto split_x_interval(WorldGeometry const& geometry, T min, T max, MakePiece make_piece)
     -> std::expected<StaticList<std::invoke_result_t<MakePiece, T, T>, 2>, StarException> {
   using Pieces = StaticList<std::invoke_result_t<MakePiece, T, T>, 2>;
@@ -77,7 +77,7 @@ auto split_x_interval(WorldGeometry const& geometry, T min, T max, MakePiece mak
 
   Wide length = static_cast<Wide>(max) - min;
   if constexpr (Star::debug_enabled) {
-    if constexpr (Source == IntervalSource::Region)
+    if constexpr (source == IntervalSource::Region)
       Star::star_assert_failed((max >= min));
     Star::star_assert_failed((length <= width));
   }
@@ -90,7 +90,7 @@ auto split_x_interval(WorldGeometry const& geometry, T min, T max, MakePiece mak
   // Rectangles translate their size; floating-point regions historically add
   // the old end before subtracting the old start. Keep both rounding orders.
   Wide end;
-  if constexpr (Source == IntervalSource::Region && std::same_as<T, float>)
+  if constexpr (source == IntervalSource::Region && std::same_as<T, float>)
     end = start + max - min;
   else
     end = start + length;

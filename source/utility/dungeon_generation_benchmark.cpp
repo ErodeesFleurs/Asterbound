@@ -120,10 +120,7 @@ import star.numeric_option;
 using namespace Star;
 
 [[nodiscard]]
-static std::expected<void, StarException> run(std::span<char const* const> argv) {
-  auto nativeRuntime = NativeRuntime::create();
-  if (!nativeRuntime)
-    return std::unexpected(std::move(nativeRuntime.error()));
+static std::expected<void, StarException> run(std::span<String const> argv) {
   constexpr unsigned default_repetitions = 5;
   constexpr unsigned default_report_every = 1;
   String const default_dungeon_world = "outpost";
@@ -200,7 +197,8 @@ static std::expected<void, StarException> run(std::span<char const* const> argv)
 }
 
 int main(int argc, char** argv) {
-  auto result = run({argv, static_cast<std::size_t>(argc)});
+  auto runtime = NativeRuntime::create();
+  auto result = runtime ? run(native_arguments(argc, argv)) : std::unexpected(std::move(runtime.error()));
   if (!result) {
     if (auto written = Star::print(*stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
       return 1;

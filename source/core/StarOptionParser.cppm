@@ -58,7 +58,7 @@ public:
 
   // Parse the given arguments into an options set, returns the options parsed
   // and a list of all the errors encountered while parsing.
-  [[nodiscard]] std::expected<ParseResult, StarException> parse_options(StringList const& arguments) const;
+  [[nodiscard]] std::expected<ParseResult, StarException> parse_options(std::span<String const> arguments) const;
 
   // Print help text, checking writes and flushing the destination.
   [[nodiscard]] std::expected<void, StarException> print_help(std::FILE& output) const;

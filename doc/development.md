@@ -62,9 +62,10 @@ and the title screen at its configured image scale after changes.
 
 ## C++ implementation boundaries
 
-In `source/core`, use PascalCase for classes and structs, and snake_case for
-concepts, functions and variables (including constants). Struct fields have no
-`m_` prefix. Use standard-library names such as `size()` when the contracts match.
+In `source/core` and `source/base`, use PascalCase for classes and structs, and
+snake_case for concepts, functions and variables (including constants and
+non-type template parameters). Struct fields have no `m_` prefix. Use names
+such as `size()` and `data()` only when the contracts match the standard library.
 Keep externally visible Lua names, configuration keys and wire encodings unchanged.
 Use spans for bounded ranges, references for required borrows and optional
 reference wrappers for nullable borrows. Confine raw addresses to the native
@@ -72,6 +73,10 @@ ABI or standard-library operation that requires them; do not propagate them
 into engine interfaces. Compose owning standard containers; formatter and trait
 utility inheritance is intentional.
 Borrows must not cross destruction, mutation or reentry that can replace owners.
+For example, `Lightmap::span()` and its `ImageView` conversion borrow an lvalue;
+`size()` reports dimensions, not the number of RGB channels. At narrow-character
+process entry points, `native_arguments(argc, argv)` owns the tokens; parsers
+consume `std::span<String const>` without retaining it.
 Name checked results by their operation or payload, never numeric suffixes.
 Use `if (auto written = ...; !written)` for status-only checks; keep decoded
 values in named locals and preserve first-error, ownership and transaction order.

@@ -22,15 +22,16 @@ class Lightmap {
 public:
   Lightmap();
   Lightmap(unsigned width, unsigned height);
-  Lightmap(Lightmap const& lightMap);
-  Lightmap(Lightmap&& lightMap) noexcept;
-  
-  Lightmap& operator=(Lightmap const& lightMap);
-  Lightmap& operator=(Lightmap&& lightMap) noexcept;
+  Lightmap(Lightmap const& other);
+  Lightmap(Lightmap&& other) noexcept;
+
+  Lightmap& operator=(Lightmap const& other);
+  Lightmap& operator=(Lightmap&& other) noexcept;
 
   void swap(Lightmap& other) noexcept;
 
-  operator ImageView();
+  operator ImageView() const &;
+  operator ImageView() const && = delete;
 
   [[nodiscard]] std::expected<void, StarException> set(unsigned x, unsigned y, float v);
   [[nodiscard]] std::expected<void, StarException> set(unsigned x, unsigned y, Vec3F const& v);
@@ -42,14 +43,15 @@ public:
   Vec2U size() const;
   unsigned width() const;
   unsigned height() const;
-  std::span<float> data();
-  std::span<float const> data() const;
+  std::span<float> span() & noexcept;
+  std::span<float const> span() const & noexcept;
+  std::span<float const> span() const && = delete;
 
 private:
   friend class CellularLightingCalculator;
   // Only the calculator skips initialization; it overwrites every RGB channel.
-  [[nodiscard]] std::expected<void, StarException> resizeForOverwrite(unsigned width, unsigned height);
-  std::size_t len() const;
+  [[nodiscard]] std::expected<void, StarException> resize_for_overwrite(unsigned width, unsigned height);
+  std::size_t channel_count() const noexcept;
 
   std::unique_ptr<float[]> m_data;
   std::size_t m_capacity = 0;
@@ -60,7 +62,7 @@ private:
 inline std::expected<void, StarException> Lightmap::set(unsigned x, unsigned y, float v) {
   if (x >= m_width || y >= m_height)
     return std::unexpected(LightmapException(Star::format("[{}, {}] out of range in Lightmap::set", x, y)));
-  auto pixels = data().subspan((std::size_t(y) * m_width + x) * 3, 3);
+  auto pixels = span().subspan((std::size_t(y) * m_width + x) * 3, 3);
   pixels[0] = pixels[1] = pixels[2] = v;
   return {};
 }
@@ -68,7 +70,7 @@ inline std::expected<void, StarException> Lightmap::set(unsigned x, unsigned y, 
 inline std::expected<void, StarException> Lightmap::set(unsigned x, unsigned y, Vec3F const& v) {
   if (x >= m_width || y >= m_height)
     return std::unexpected(LightmapException(Star::format("[{}, {}] out of range in Lightmap::set", x, y)));
-  auto pixels = data().subspan((std::size_t(y) * m_width + x) * 3, 3);
+  auto pixels = span().subspan((std::size_t(y) * m_width + x) * 3, 3);
   pixels[0] = v.x();
   pixels[1] = v.y();
   pixels[2] = v.z();
@@ -78,7 +80,7 @@ inline std::expected<void, StarException> Lightmap::set(unsigned x, unsigned y, 
 inline std::expected<void, StarException> Lightmap::add(unsigned x, unsigned y, Vec3F const& v) {
   if (x >= m_width || y >= m_height)
     return std::unexpected(LightmapException(Star::format("[{}, {}] out of range in Lightmap::add", x, y)));
-  auto pixels = data().subspan((std::size_t(y) * m_width + x) * 3, 3);
+  auto pixels = span().subspan((std::size_t(y) * m_width + x) * 3, 3);
   pixels[0] += v.x();
   pixels[1] += v.y();
   pixels[2] += v.z();
@@ -88,7 +90,7 @@ inline std::expected<void, StarException> Lightmap::add(unsigned x, unsigned y, 
 inline std::expected<Vec3F, StarException> Lightmap::get(unsigned x, unsigned y) const {
   if (x >= m_width || y >= m_height)
     return std::unexpected(LightmapException(Star::format("[{}, {}] out of range in Lightmap::get", x, y)));
-  auto pixels = data().subspan((std::size_t(y) * m_width + x) * 3, 3);
+  auto pixels = span().subspan((std::size_t(y) * m_width + x) * 3, 3);
   return Vec3F(pixels[0], pixels[1], pixels[2]);
 }
 
@@ -109,15 +111,15 @@ inline unsigned Lightmap::height() const {
   return m_height;
 }
 
-inline std::span<float> Lightmap::data() {
-  return {m_data.get(), len()};
+inline std::span<float> Lightmap::span() & noexcept {
+  return {m_data.get(), channel_count()};
 }
 
-inline std::span<float const> Lightmap::data() const {
-  return {m_data.get(), len()};
+inline std::span<float const> Lightmap::span() const & noexcept {
+  return {m_data.get(), channel_count()};
 }
 
-inline std::size_t Lightmap::len() const {
+inline std::size_t Lightmap::channel_count() const noexcept {
   return std::size_t(m_width) * m_height * 3;
 }
 

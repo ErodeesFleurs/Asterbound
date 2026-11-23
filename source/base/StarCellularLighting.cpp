@@ -19,43 +19,43 @@ namespace Star {
 Lightmap::Lightmap() : m_width(0), m_height(0) {}
 
 Lightmap::Lightmap(unsigned width, unsigned height) : Lightmap() {
-  auto resized = resizeForOverwrite(width, height);
+  auto resized = resize_for_overwrite(width, height);
   if (!resized) {
     Star::fatal_error(resized.error().what(), false);
     std::terminate();
   }
-  std::ranges::fill(data(), 0.0f);
+  std::ranges::fill(span(), 0.0f);
 }
 
-Lightmap::Lightmap(Lightmap const& lightMap) : Lightmap() {
-  operator=(lightMap);
+Lightmap::Lightmap(Lightmap const& other) : Lightmap() {
+  operator=(other);
 }
 
-Lightmap::Lightmap(Lightmap&& lightMap) noexcept : Lightmap() {
-  operator=(std::move(lightMap));
+Lightmap::Lightmap(Lightmap&& other) noexcept : Lightmap() {
+  operator=(std::move(other));
 }
 
-Lightmap& Lightmap::operator=(Lightmap const& lightMap) {
-  if (this == &lightMap)
+Lightmap& Lightmap::operator=(Lightmap const& other) {
+  if (this == &other)
     return *this;
-  auto length = lightMap.len();
-  if (length > m_capacity) {
-    m_data = std::make_unique_for_overwrite<float[]>(length);
-    m_capacity = length;
+  auto channels = other.span();
+  if (channels.size() > m_capacity) {
+    m_data = std::make_unique_for_overwrite<float[]>(channels.size());
+    m_capacity = channels.size();
   }
-  std::ranges::copy(lightMap.data(), std::span(m_data.get(), length).begin());
-  m_width = lightMap.m_width;
-  m_height = lightMap.m_height;
+  m_width = other.m_width;
+  m_height = other.m_height;
+  std::ranges::copy(channels, span().begin());
   return *this;
 }
 
-Lightmap& Lightmap::operator=(Lightmap&& lightMap) noexcept {
-  if (this == &lightMap)
+Lightmap& Lightmap::operator=(Lightmap&& other) noexcept {
+  if (this == &other)
     return *this;
-  m_width = std::exchange(lightMap.m_width, 0);
-  m_height = std::exchange(lightMap.m_height, 0);
-  m_data = std::move(lightMap.m_data);
-  m_capacity = std::exchange(lightMap.m_capacity, 0);
+  m_width = std::exchange(other.m_width, 0);
+  m_height = std::exchange(other.m_height, 0);
+  m_data = std::move(other.m_data);
+  m_capacity = std::exchange(other.m_capacity, 0);
   return *this;
 }
 
@@ -66,7 +66,7 @@ void Lightmap::swap(Lightmap& other) noexcept {
   std::swap(m_height, other.m_height);
 }
 
-std::expected<void, StarException> Lightmap::resizeForOverwrite(unsigned width, unsigned height) {
+std::expected<void, StarException> Lightmap::resize_for_overwrite(unsigned width, unsigned height) {
   auto bytes = Image::size_bytes({width, height}, PixelFormat::RGB_F);
   if (!bytes)
     return std::unexpected(LightmapException(bytes.error().what()));
@@ -80,9 +80,9 @@ std::expected<void, StarException> Lightmap::resizeForOverwrite(unsigned width, 
   return {};
 }
 
-Lightmap::operator ImageView() {
+Lightmap::operator ImageView() const & {
   ImageView view;
-  auto pixels = data();
+  auto pixels = span();
   view.data = {reinterpret_cast<std::uint8_t const*>(pixels.data()), pixels.size_bytes()};
   view.size = size();
   view.format = PixelFormat::RGB_F;
@@ -234,7 +234,7 @@ std::expected<void, StarException> CellularLightingCalculator::calculate(Lightma
     if (!m_brightness_limit)
       return std::unexpected(LightmapException("Lightmap output requires brightnessLimit"));
     array.calculate(array_min[0], array_min[1], array_max[0], array_max[1]);
-    auto resized = output.resizeForOverwrite(array_max[0] - array_min[0], array_max[1] - array_min[1]);
+    auto resized = output.resize_for_overwrite(array_max[0] - array_min[0], array_max[1] - array_min[1]);
     if (!resized)
       return resized;
 

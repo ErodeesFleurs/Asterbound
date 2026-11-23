@@ -11,6 +11,7 @@
 import std;
 import star.native_runtime;
 import star.format;
+import star.string;
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
 import star.algorithm;
 import star.windows_crt;
@@ -75,6 +76,14 @@ std::expected<void, StarException> prepare_optional_output(FILE& stream) {
 }
 
 }// namespace
+
+StringList native_arguments(int argc, char const* const argv[]) {
+  StringList arguments;
+  arguments.reserve(static_cast<std::size_t>(argc));
+  for (int i = 0; i < argc; ++i)
+    arguments.emplace_back(std::string_view(argv[i]));
+  return arguments;
+}
 
 std::expected<void, StarException> NativeRuntime::prepare_standard_streams() {
   auto output = prepare_optional_output(*stdout);

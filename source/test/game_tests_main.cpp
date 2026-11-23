@@ -5,6 +5,7 @@ import star.format;
 import star.root_loader;
 import star.game_test;
 import star.native_runtime;
+import star.string;
 
 #include "gtest/gtest.h"
 
@@ -24,7 +25,7 @@ GTEST_API_ int main(int argc, char** argv) {
       return 1;
     return 1;
   }
-  auto parsed = loader->command_parse_or_die({argv, static_cast<std::size_t>(argc)});
+  auto parsed = loader->command_parse_or_die(native_arguments(argc, argv));
   if (!parsed) {
     if (!Star::print(*stderr, "{}\n", parsed.error().what()))
       return 1;

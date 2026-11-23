@@ -1,8 +1,12 @@
 module;
 import std;
 import star.format;
+import star.string;
 
 namespace Star {
+
+// Copy the C runtime's argument vector at the entry point, including argv[0].
+[[nodiscard]] StringList native_arguments(int argc, char const* const argv[]);
 
 // Entry-owned native facilities; construct before application objects and keep
 // alive through their destruction and the entry point's error diagnostics.
@@ -48,5 +52,6 @@ Star::NativeRuntime::create(StandardStreams streams) {
 export module star.native_runtime;
 
 export namespace Star {
+  using ::Star::native_arguments;
   using ::Star::NativeRuntime;
 }

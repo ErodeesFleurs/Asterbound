@@ -154,7 +154,7 @@ Json const AdditionalDefaultConfiguration = JsonObject{
     {"allowAssetsMismatch", true},
     {"serverOverrideAssetsDigest", Json()}};
 
-static std::expected<void, StarException> run_server(std::span<char const* const> argv, bool& diagnostic_reported) {
+static std::expected<void, StarException> run_server(std::span<String const> argv, bool& diagnostic_reported) {
   #if defined STAR_SYSTEM_WINDOWS
   unsigned long exceptionStackSize = 131072;
   SetThreadStackGuarantee(&exceptionStackSize);
@@ -335,7 +335,7 @@ static std::expected<void, StarException> run_server(std::span<char const* const
 int main(int argc, char** argv) {
   auto nativeRuntime = NativeRuntime::create();
   bool diagnostic_reported = false;
-  auto result = nativeRuntime ? run_server({argv, static_cast<std::size_t>(argc)}, diagnostic_reported)
+  auto result = nativeRuntime ? run_server(native_arguments(argc, argv), diagnostic_reported)
       : std::expected<void, StarException>(std::unexpected(std::move(nativeRuntime.error())));
   if (!result) {
     auto text = Star::exception_summary(result.error());

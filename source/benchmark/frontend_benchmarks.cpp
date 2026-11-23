@@ -170,7 +170,7 @@ int main(int argc, char** argv) {
       return 1;
     return 1;
   }
-  auto parsed = loader->command_parse_or_die({argv, static_cast<std::size_t>(argc)});
+  auto parsed = loader->command_parse_or_die(Star::native_arguments(argc, argv));
   if (!parsed) {
     if (!Star::print(*stderr, "{}\n", parsed.error().what()))
       return 1;

@@ -5,17 +5,17 @@ import star.vector;
 namespace Star {
 namespace {
 
-// Major is selected once per ray. The ordinary interior path uses the
+// The major axis is selected once per ray. The ordinary interior path uses the
 // original int arithmetic. Clipped rays use wider signed indices so a
 // rounded coordinate at an INT_MAX-sized grid edge is still representable.
-template <unsigned Major, bool Clip, typename Cell>
+template <unsigned major_axis, bool clip, typename Cell>
 float wu_axis(std::span<Cell const> cells, std::size_t width, std::size_t height,
     float major1, float minor1, float major2, float minor2, float gradient,
     float per_obstacle, float max_attenuation) {
-  using Index = std::conditional_t<Clip, std::int64_t, int>;
+  using Index = std::conditional_t<clip, std::int64_t, int>;
   auto integer_part = [](auto value) {
     Index whole = static_cast<Index>(value);
-    if constexpr (Clip)
+    if constexpr (clip)
       return whole - static_cast<Index>(value < static_cast<decltype(value)>(whole));
     else
       return whole; // Interior Wu coordinates are nonnegative.
@@ -23,15 +23,15 @@ float wu_axis(std::span<Cell const> cells, std::size_t width, std::size_t height
   auto fractional_part = [&](auto value) -> decltype(value) { return value - integer_part(value); };
   auto reverse_fractional_part = [&](auto value) -> decltype(value) { return 1.0 - fractional_part(value); };
   auto nearest = [](float major) -> Index {
-    if constexpr (Clip)
+    if constexpr (clip)
       return static_cast<Index>(std::round(major));
     else
       return static_cast<Index>(major + 0.5);
   };
   auto obstacle = [&](Index major, Index minor) {
-    auto x = Major == 0 ? major : minor;
-    auto y = Major == 0 ? minor : major;
-    if constexpr (Clip)
+    auto x = major_axis == 0 ? major : minor;
+    auto y = major_axis == 0 ? minor : major;
+    if constexpr (clip)
       if (static_cast<std::size_t>(x) >= width || static_cast<std::size_t>(y) >= height)
         return false;
     return cells[static_cast<std::size_t>(x) * height + static_cast<std::size_t>(y)].obstacle;
@@ -78,7 +78,7 @@ float wu_axis(std::span<Cell const> cells, std::size_t width, std::size_t height
   return std::min(attenuation, max_attenuation);
 }
 
-template <bool Clip, typename Cell>
+template <bool clip, typename Cell>
 float line_attenuation(std::span<Cell const> cells, std::size_t width, std::size_t height,
     Vec2F const& start, Vec2F const& end, float per_obstacle, float max_attenuation) {
   float x1 = start[0] - 0.5;
@@ -88,10 +88,10 @@ float line_attenuation(std::span<Cell const> cells, std::size_t width, std::size
   float dx = x2 - x1;
   float dy = y2 - y1;
   if (std::fabs(dx) < std::fabs(dy))
-    return wu_axis<1, Clip>(cells, width, height, y1, x1, y2, x2, dx / dy, per_obstacle, max_attenuation);
+    return wu_axis<1, clip>(cells, width, height, y1, x1, y2, x2, dx / dy, per_obstacle, max_attenuation);
   if (dx == 0.0f)
     return 0.0f;
-  return wu_axis<0, Clip>(cells, width, height, x1, y1, x2, y2, dy / dx, per_obstacle, max_attenuation);
+  return wu_axis<0, clip>(cells, width, height, x1, y1, x2, y2, dy / dx, per_obstacle, max_attenuation);
 }
 
 } // namespace

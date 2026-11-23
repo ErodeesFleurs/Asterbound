@@ -6,6 +6,7 @@ import star.cellular_light_array;
 import star.cellular_lighting;
 import star.format;
 import star.game_test;
+import star.image;
 import star.json;
 import star.liquid_types;
 import star.liquids_database;
@@ -23,6 +24,15 @@ import star.world_tiles;
 using namespace Star;
 
 namespace {
+
+template <typename T>
+concept has_lightmap_span = requires(T&& map) { std::forward<T>(map).span(); };
+
+static_assert(std::same_as<decltype(std::declval<Lightmap&>().span()), std::span<float>>);
+static_assert(std::same_as<decltype(std::declval<Lightmap const&>().span()), std::span<float const>>);
+static_assert(!has_lightmap_span<Lightmap> && !has_lightmap_span<Lightmap const>);
+static_assert(std::is_convertible_v<Lightmap&, ImageView> && std::is_convertible_v<Lightmap const&, ImageView>);
+static_assert(!std::is_convertible_v<Lightmap&&, ImageView> && !std::is_convertible_v<Lightmap const&&, ImageView>);
 
 template <light_traits Traits>
 void check_point_obstacle_snapshot_refresh() {
@@ -228,7 +238,7 @@ void checkWideLightingSnapshot(GameTest& fixture, RectI const& query) {
     gatherTileOracle(oracle, tiles, **materials, **liquids, environment, 13.0f);
     Lightmap expected;
     ASSERT_TRUE(oracle.calculate(expected));
-    std::vector<float> snapshot(expected.data().begin(), expected.data().end());
+    std::vector<float> snapshot(std::from_range, expected.span());
     ASSERT_TRUE(std::ranges::any_of(snapshot, [](float value) { return value > 0.0f; }));
     for (bool parallel : {false, true}) {
       SCOPED_TRACE(std::format("monochrome={} parallel={}", monochrome, parallel));
@@ -240,8 +250,8 @@ void checkWideLightingSnapshot(GameTest& fixture, RectI const& query) {
       Lightmap output;
       ASSERT_TRUE(actual.calculate(output));
       ASSERT_EQ(output.size(), Vec2U(query.size()));
-      ASSERT_EQ(output.data().size(), snapshot.size());
-      ASSERT_EQ(std::memcmp(output.data().data(), snapshot.data(), output.data().size_bytes()), 0);
+      ASSERT_EQ(output.span().size(), snapshot.size());
+      ASSERT_EQ(std::memcmp(output.span().data(), snapshot.data(), output.span().size_bytes()), 0);
     }
   }
   ASSERT_TRUE(caller.finish());
@@ -367,6 +377,7 @@ TEST(CellularLightingParameters, InvalidConfigurationAndBoundsPreservePreviousSt
   auto color_region = color.calculation_region();
   auto intensity_region = intensity.calculation_region();
   auto reject = [&](String const& key, Json value) {
+    SCOPED_TRACE(key.utf8());
     auto invalid = valid.set(key, std::move(value));
     ASSERT_TRUE(invalid);
     EXPECT_FALSE(color.set_parameters(*invalid));
@@ -379,7 +390,13 @@ TEST(CellularLightingParameters, InvalidConfigurationAndBoundsPreservePreviousSt
   reject("spreadMaxObstacle", -1);
   reject("pointMaxAir", 0x1p31);
   reject("pointMaxObstacle", std::numeric_limits<double>::infinity());
-  reject("pointObstacleBoost", std::numeric_limits<double>::quiet_NaN());
+  // Supply a runtime IEEE payload even in builds that assume finite FP operands.
+  volatile std::uint64_t nan_bits = 0x7ff8000000000001ull;
+  Json nan = std::bit_cast<double>(std::uint64_t(nan_bits));
+  auto payload = nan.to_double();
+  ASSERT_TRUE(payload);
+  ASSERT_EQ(std::bit_cast<std::uint64_t>(*payload), std::uint64_t(nan_bits));
+  reject("pointObstacleBoost", std::move(nan));
   auto bad_limit = valid.set("brightnessLimit", -1);
   ASSERT_TRUE(bad_limit);
   EXPECT_FALSE(color.set_parameters(*bad_limit));
@@ -396,55 +413,70 @@ TEST(CellularLightingParameters, InvalidConfigurationAndBoundsPreservePreviousSt
   EXPECT_EQ(intensity.calculation_region(), intensity_region);
 }
 
+TEST(Lightmap, ConstViewBorrowsOnlyLogicalRgbBytes) {
+  Lightmap map(8, 3);
+  Lightmap smaller(2, 1);
+  map = smaller;
+  auto const& owner = map;
+  ImageView view = owner;
+  EXPECT_EQ(view.size, Vec2U(2, 1));
+  EXPECT_EQ(view.format, PixelFormat::RGB_F);
+  std::array const channels{1.0f, -0.0f, 0.25f, 2.0f, -1.0f, 0.5f};
+  ASSERT_EQ(map.span().size(), channels.size());
+  std::ranges::copy(channels, map.span().begin());
+  EXPECT_TRUE(std::ranges::equal(owner.span(), channels));
+  EXPECT_TRUE(std::ranges::equal(std::as_bytes(view.data), std::as_bytes(std::span(channels))));
+}
+
 TEST(Lightmap, CopyMovePreservesEveryRgbComponent) {
   Lightmap original(7, 5);
-  ASSERT_TRUE(std::ranges::all_of(original.data(), [](float value) { return value == 0.0f; }));
+  ASSERT_TRUE(std::ranges::all_of(original.span(), [](float value) { return value == 0.0f; }));
   for (unsigned y = 0; y < original.height(); ++y)
     for (unsigned x = 0; x < original.width(); ++x) {
       float value = 1.0f + y * original.width() + x;
       ASSERT_TRUE(original.set(x, y, Vec3F(value, value + 0.25f, value + 0.5f)));
     }
-  std::vector<float> snapshot(original.data().begin(), original.data().end());
+  std::vector<float> snapshot(std::from_range, original.span());
   Lightmap copy(original);
-  EXPECT_TRUE(std::ranges::equal(copy.data(), snapshot));
+  EXPECT_TRUE(std::ranges::equal(copy.span(), snapshot));
   auto const& alias = original;
   original = alias;
-  EXPECT_TRUE(std::ranges::equal(original.data(), snapshot));
+  EXPECT_TRUE(std::ranges::equal(original.span(), snapshot));
   Lightmap assigned(1, 2);
   assigned = original;
   EXPECT_EQ(assigned.size(), original.size());
-  EXPECT_TRUE(std::ranges::equal(assigned.data(), snapshot));
+  EXPECT_TRUE(std::ranges::equal(assigned.span(), snapshot));
   ASSERT_TRUE(original.set(6, 4, Vec3F::filled(-1.0f)));
   EXPECT_EQ(*copy.get(6, 4), Vec3F(35.0f, 35.25f, 35.5f));
 
   Lightmap moved(std::move(copy));
   EXPECT_TRUE(copy.empty());
   EXPECT_EQ(copy.size(), Vec2U());
-  EXPECT_TRUE(copy.data().empty());
-  EXPECT_TRUE(std::ranges::equal(moved.data(), snapshot));
-  auto& moveAlias = moved;
-  moved = std::move(moveAlias);
-  EXPECT_TRUE(std::ranges::equal(moved.data(), snapshot));
+  EXPECT_TRUE(copy.span().empty());
+  EXPECT_TRUE(std::ranges::equal(moved.span(), snapshot));
+  auto& move_alias = moved;
+  moved = std::move(move_alias);
+  EXPECT_TRUE(std::ranges::equal(moved.span(), snapshot));
   assigned = std::move(moved);
   EXPECT_TRUE(moved.empty());
-  EXPECT_TRUE(moved.data().empty());
-  EXPECT_TRUE(std::ranges::equal(assigned.data(), snapshot));
+  EXPECT_TRUE(moved.span().empty());
+  EXPECT_TRUE(std::ranges::equal(assigned.span(), snapshot));
 
   Lightmap small(2, 1);
   ASSERT_TRUE(small.set(0, 0, Vec3F(0.1f, 0.2f, 0.3f)));
   ASSERT_TRUE(small.set(1, 0, Vec3F(0.4f, 0.5f, 0.6f)));
   assigned = small;
   EXPECT_EQ(assigned.size(), small.size());
-  EXPECT_TRUE(std::ranges::equal(assigned.data(), small.data()));
+  EXPECT_TRUE(std::ranges::equal(assigned.span(), small.span()));
   assigned = Lightmap(0, 9);
   EXPECT_EQ(assigned.size(), Vec2U(0, 9));
   EXPECT_TRUE(assigned.empty());
-  EXPECT_TRUE(assigned.data().empty());
+  EXPECT_TRUE(assigned.span().empty());
   assigned = small;
   Lightmap empty;
   assigned = empty;
   EXPECT_EQ(assigned.size(), Vec2U());
-  EXPECT_TRUE(assigned.data().empty());
+  EXPECT_TRUE(assigned.span().empty());
   EXPECT_FALSE(assigned.get(0, 0));
   EXPECT_FALSE(assigned.set(0, 0, 1.0f));
   EXPECT_FALSE(assigned.add(0, 0, Vec3F::filled(1.0f)));
@@ -456,52 +488,52 @@ TEST(Lightmap, CopyMovePreservesEveryRgbComponent) {
 TEST(ClientLightingResult, RotatesOwnedMapsAndConsumesOnlyFreshResults) {
   ClientLightingResult completed;
   Lightmap pending(3, 2);
-  std::ranges::fill(pending.data(), 1.25f);
+  std::ranges::fill(pending.span(), 1.25f);
   Lightmap displayed(2, 2);
-  std::ranges::fill(displayed.data(), -3.0f);
+  std::ranges::fill(displayed.span(), -3.0f);
   Vec2I position(-10, -20);
   EXPECT_FALSE(completed.take(displayed, position));
   EXPECT_EQ(position, Vec2I(-10, -20));
-  EXPECT_TRUE(std::ranges::all_of(displayed.data(), [](float value) { return value == -3.0f; }));
+  EXPECT_TRUE(std::ranges::all_of(displayed.span(), [](float value) { return value == -3.0f; }));
 
   completed.publish(pending, {10, 20});
   EXPECT_TRUE(pending.empty());
-  EXPECT_TRUE(std::ranges::all_of(displayed.data(), [](float value) { return value == -3.0f; }));
+  EXPECT_TRUE(std::ranges::all_of(displayed.span(), [](float value) { return value == -3.0f; }));
   ASSERT_TRUE(completed.take(displayed, position));
   EXPECT_EQ(position, Vec2I(10, 20));
   EXPECT_EQ(displayed.size(), Vec2U(3, 2));
-  EXPECT_TRUE(std::ranges::all_of(displayed.data(), [](float value) { return value == 1.25f; }));
+  EXPECT_TRUE(std::ranges::all_of(displayed.span(), [](float value) { return value == 1.25f; }));
   EXPECT_FALSE(completed.take(displayed, position));
   EXPECT_EQ(position, Vec2I(10, 20));
-  EXPECT_TRUE(std::ranges::all_of(displayed.data(), [](float value) { return value == 1.25f; }));
+  EXPECT_TRUE(std::ranges::all_of(displayed.span(), [](float value) { return value == 1.25f; }));
 
   pending = Lightmap(4, 3);
-  std::ranges::fill(pending.data(), 2.5f);
+  std::ranges::fill(pending.span(), 2.5f);
   completed.publish(pending, {30, 40});
   EXPECT_EQ(pending.size(), Vec2U(2, 2));
-  EXPECT_TRUE(std::ranges::all_of(pending.data(), [](float value) { return value == -3.0f; }));
+  EXPECT_TRUE(std::ranges::all_of(pending.span(), [](float value) { return value == -3.0f; }));
   // Reuse the returned storage while the consumer still owns the first result.
-  std::ranges::fill(pending.data(), 7.5f);
-  EXPECT_TRUE(std::ranges::all_of(displayed.data(), [](float value) { return value == 1.25f; }));
+  std::ranges::fill(pending.span(), 7.5f);
+  EXPECT_TRUE(std::ranges::all_of(displayed.span(), [](float value) { return value == 1.25f; }));
   completed.publish(pending, {50, 60});
   ASSERT_TRUE(completed.take(displayed, position));
   EXPECT_EQ(position, Vec2I(50, 60));
   EXPECT_EQ(displayed.size(), Vec2U(2, 2));
-  EXPECT_TRUE(std::ranges::all_of(displayed.data(), [](float value) { return value == 7.5f; }));
+  EXPECT_TRUE(std::ranges::all_of(displayed.span(), [](float value) { return value == 7.5f; }));
   EXPECT_EQ(pending.size(), Vec2U(4, 3));
-  EXPECT_TRUE(std::ranges::all_of(pending.data(), [](float value) { return value == 2.5f; }));
+  EXPECT_TRUE(std::ranges::all_of(pending.span(), [](float value) { return value == 2.5f; }));
 
   completed.publish(pending, {70, 80});
   completed.reset();
   EXPECT_FALSE(completed.take(displayed, position));
   EXPECT_EQ(position, Vec2I(50, 60));
-  EXPECT_TRUE(std::ranges::all_of(displayed.data(), [](float value) { return value == 7.5f; }));
+  EXPECT_TRUE(std::ranges::all_of(displayed.span(), [](float value) { return value == 7.5f; }));
   Lightmap empty;
   completed.publish(empty, {90, 100});
   ASSERT_TRUE(completed.take(displayed, position));
   EXPECT_EQ(position, Vec2I(90, 100));
   EXPECT_TRUE(displayed.empty());
-  EXPECT_TRUE(displayed.data().empty());
+  EXPECT_TRUE(displayed.span().empty());
   EXPECT_FALSE(completed.take(displayed, position));
 }
 
@@ -536,10 +568,10 @@ const GameTestRegistration
         populate(reused);
         Lightmap expected;
         ASSERT_TRUE(fresh.calculate(expected));
-        std::ranges::fill(output.data(), -100.0f);
+        std::ranges::fill(output.span(), -100.0f);
         ASSERT_TRUE(reused.calculate(output));
         EXPECT_EQ(output.size(), Vec2U(size));
-        EXPECT_TRUE(std::ranges::equal(output.data(), expected.data()));
+        EXPECT_TRUE(std::ranges::equal(output.span(), expected.span()));
         ++iteration;
       }
     }
@@ -639,7 +671,7 @@ const GameTestRegistration
           addBoundaryLights(oracle, query);
           Lightmap expected;
           ASSERT_TRUE(oracle.calculate(expected));
-          std::vector<float> snapshot(expected.data().begin(), expected.data().end());
+          std::vector<float> snapshot(std::from_range, expected.span());
           for (bool parallel : {false, true}) {
             CellularLightingCalculator actual(monochrome);
             ASSERT_TRUE(actual.set_parameters(*config));
@@ -650,8 +682,8 @@ const GameTestRegistration
             Lightmap output;
             ASSERT_TRUE(actual.calculate(output));
             EXPECT_EQ(output.size(), Vec2U(query.size()));
-            ASSERT_EQ(output.data().size(), snapshot.size());
-            EXPECT_EQ(std::memcmp(output.data().data(), snapshot.data(), output.data().size_bytes()), 0);
+            ASSERT_EQ(output.span().size(), snapshot.size());
+            EXPECT_EQ(std::memcmp(output.span().data(), snapshot.data(), output.span().size_bytes()), 0);
           }
         }
       }
@@ -679,12 +711,12 @@ const GameTestRegistration
       addBoundaryLights(calculator, query);
       Lightmap lit;
       ASSERT_TRUE(calculator.calculate(lit));
-      EXPECT_TRUE(std::ranges::any_of(lit.data(), [](float value) { return value > 0.0f; }));
+      EXPECT_TRUE(std::ranges::any_of(lit.span(), [](float value) { return value > 0.0f; }));
       ASSERT_TRUE(calculator.begin(query));
       Lightmap dark;
       ASSERT_TRUE(calculator.calculate(dark));
       EXPECT_EQ(dark.size(), Vec2U(query.size()));
-      EXPECT_TRUE(std::ranges::all_of(dark.data(), [](float value) { return value == 0.0f; }));
+      EXPECT_TRUE(std::ranges::all_of(dark.span(), [](float value) { return value == 0.0f; }));
     }
   });
 

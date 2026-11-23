@@ -47,7 +47,7 @@ void OptionParser::add_argument(String argument_name, RequirementMode mode, Stri
   m_arguments.push_back({std::move(argument_name), mode, std::move(description)});
 }
 
-std::expected<OptionParser::ParseResult, StarException> OptionParser::parse_options(StringList const& arguments) const {
+std::expected<OptionParser::ParseResult, StarException> OptionParser::parse_options(std::span<String const> arguments) const {
   std::expected<ParseResult, StarException> result(std::in_place);
   auto& [options, errors] = *result;
 

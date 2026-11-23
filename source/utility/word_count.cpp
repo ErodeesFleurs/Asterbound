@@ -84,7 +84,7 @@ int main(int argc, char** argv) {
     if (!root_loader)
       return std::unexpected(std::move(root_loader.error()));
     root_loader->set_summary("Calculate a (very approximate) word count of user-facing text in assets");
-    auto initialized = root_loader->command_init_or_die({argv, static_cast<std::size_t>(argc)});
+    auto initialized = root_loader->command_init_or_die(native_arguments(argc, argv));
     if (!initialized)
       return std::unexpected(std::move(initialized.error()));
     auto& root = initialized->first;

@@ -9,8 +9,7 @@ import star.option_parser;
 
 namespace Star {
 
-// Option parser that accepts -h to print the help and exit and -v to print the
-// version and exit.
+// Adds -help and -version to the application options.
 class VersionOptionParser : public OptionParser {
 public:
   String version_string() const;
@@ -18,16 +17,16 @@ public:
 
   [[nodiscard]] static std::expected<VersionOptionParser, StarException> create();
 
-  // Parse the command line options, or, in the case of an error, -h, or -v,
-  // prints the appropriate text and immediately exits.
-  [[nodiscard]] std::expected<Options, StarException> parse_or_die(StringList const& cmd_line_arguments) const;
+  // Exits after printing help, version information or command-line errors.
+  [[nodiscard]] std::expected<Options, StarException> parse_or_die(std::span<String const> arguments) const;
 
-  // First sets the command name based on argv[0], then calls parse_or_die.
-  [[nodiscard]] std::expected<Options, StarException> command_parse_or_die(std::span<char const* const> argv);
+  // argv includes the executable name; an empty argv leaves the command name unchanged.
+  [[nodiscard]] std::expected<Options, StarException> command_parse_or_die(std::span<String const> argv);
 
 protected:
   VersionOptionParser() = default;
   [[nodiscard]] std::expected<void, StarException> initialize();
+  [[nodiscard]] std::span<String const> command_arguments(std::span<String const> argv);
 
 private:
   String m_version_name;

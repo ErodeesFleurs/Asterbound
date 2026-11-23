@@ -177,36 +177,28 @@ std::expected<RootLoader, StarException> RootLoader::create(Defaults defaults) {
 }
 
 std::expected<std::pair<Root::Settings, RootLoader::Options>, StarException> RootLoader::parse_or_die(
-    StringList const& cmd_line_arguments) const {
-  auto options = VersionOptionParser::parse_or_die(cmd_line_arguments);
+    std::span<String const> arguments) const {
+  auto options = VersionOptionParser::parse_or_die(arguments);
   if (!options) return std::unexpected(std::move(options.error()));
   auto settings = root_settings_for_options(*options);
   if (!settings) return std::unexpected(std::move(settings.error()));
   return std::pair{std::move(*settings), std::move(*options)};
 }
 
-std::expected<std::pair<std::unique_ptr<Root>, RootLoader::Options>, StarException> RootLoader::init_or_die(StringList const& cmd_line_arguments) const {
-  auto parsed = parse_or_die(cmd_line_arguments);
+std::expected<std::pair<std::unique_ptr<Root>, RootLoader::Options>, StarException> RootLoader::init_or_die(std::span<String const> arguments) const {
+  auto parsed = parse_or_die(arguments);
   if (!parsed) return std::unexpected(std::move(parsed.error()));
   auto root = Root::create(std::move(parsed->first));
   if (!root) return std::unexpected(std::move(root.error()));
   return std::pair{std::move(*root), std::move(parsed->second)};
 }
 
-std::expected<std::pair<Root::Settings, RootLoader::Options>, StarException> RootLoader::command_parse_or_die(std::span<char const* const> argv) {
-  auto options = VersionOptionParser::command_parse_or_die(argv);
-  if (!options) return std::unexpected(std::move(options.error()));
-  auto settings = root_settings_for_options(*options);
-  if (!settings) return std::unexpected(std::move(settings.error()));
-  return std::pair{std::move(*settings), std::move(*options)};
+std::expected<std::pair<Root::Settings, RootLoader::Options>, StarException> RootLoader::command_parse_or_die(std::span<String const> argv) {
+  return parse_or_die(command_arguments(argv));
 }
 
-std::expected<std::pair<std::unique_ptr<Root>, RootLoader::Options>, StarException> RootLoader::command_init_or_die(std::span<char const* const> argv) {
-  auto parsed = command_parse_or_die(argv);
-  if (!parsed) return std::unexpected(std::move(parsed.error()));
-  auto root = Root::create(std::move(parsed->first));
-  if (!root) return std::unexpected(std::move(root.error()));
-  return std::pair{std::move(*root), std::move(parsed->second)};
+std::expected<std::pair<std::unique_ptr<Root>, RootLoader::Options>, StarException> RootLoader::command_init_or_die(std::span<String const> argv) {
+  return init_or_die(command_arguments(argv));
 }
 
 std::expected<Root::Settings, StarException> RootLoader::root_settings_for_options(Options const& options) const {

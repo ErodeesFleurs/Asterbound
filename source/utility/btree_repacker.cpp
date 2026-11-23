@@ -22,7 +22,7 @@ import star.byte_array;
 using namespace Star;
 
 [[nodiscard]]
-static std::expected<int, StarException> repack_btree(std::span<char const* const> argv) {
+static std::expected<int, StarException> repack_btree(std::span<String const> argv) {
   Logger logger;
   auto startTime = std::chrono::steady_clock::now();
 
@@ -129,7 +129,7 @@ int main(int argc, char** argv) {
       return 1;
     return 1;
   }
-  auto result = repack_btree({argv, static_cast<std::size_t>(argc)});
+  auto result = repack_btree(native_arguments(argc, argv));
   if (!result) {
     if (auto written = Star::print(*stderr, "Exception caught: {}\n", Star::output_exception(ExceptionDiagnostic(result.error()), true)); !written)
       return 1;

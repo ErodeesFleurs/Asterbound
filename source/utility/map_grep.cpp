@@ -201,7 +201,7 @@ int main(int argc, char* argv[]) {
     root_loader->set_summary("Search Tiled map files for specific materials or objects.");
     root_loader->add_argument("MaterialId|ObjectName|Property=Value", OptionParser::Required);
     root_loader->add_argument("JsonMapFile", OptionParser::Multiple);
-    auto initialized = root_loader->command_init_or_die({argv, static_cast<std::size_t>(argc)});
+    auto initialized = root_loader->command_init_or_die(native_arguments(argc, argv));
     if (!initialized)
       return std::unexpected(std::move(initialized.error()));
     auto const& files = initialized->second.arguments;

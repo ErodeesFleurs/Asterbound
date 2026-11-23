@@ -4,6 +4,8 @@ import star.unicode;
 import star.shell_parser;
 import star.option_parser;
 import star.numeric_option;
+import star.version_option_parser;
+import star.native_runtime;
 import star.map;
 import star.list;
 import star.ordered_map;
@@ -100,13 +102,38 @@ TEST(ShellParser, InvalidUtf8PropagatesTheUnicodeError) {
   }
 }
 
+TEST(VersionOptionParser, NativeArgumentsOwnTokensAndKeepCommandBasename) {
+  char value[] = "two words";
+  char const* argv[] = {"bin/tool", "", value, nullptr};
+  auto command = Star::native_arguments(3, argv);
+  value[0] = 'x';
+
+  auto parser = Star::VersionOptionParser::create();
+  ASSERT_TRUE(parser);
+  parser->add_argument("files", Star::OptionParser::Multiple);
+  auto options = parser->command_parse_or_die(command);
+  ASSERT_TRUE(options);
+  EXPECT_EQ(options->arguments, (Star::StringList{"", "two words"}));
+
+  auto empty = parser->command_parse_or_die(Star::native_arguments(0, nullptr));
+  ASSERT_TRUE(empty);
+  EXPECT_TRUE(empty->arguments.empty());
+  std::unique_ptr<std::FILE, decltype(&std::fclose)> help(std::tmpfile(), &std::fclose);
+  ASSERT_TRUE(help);
+  ASSERT_TRUE(parser->print_help(*help));
+  std::rewind(help.get());
+  for (char expected : std::string_view("tool:\n"))
+    ASSERT_EQ(std::fgetc(help.get()), expected);
+}
+
 TEST(OptionParser, ConsumesParameterValueBeforeRecognizingFlags) {
   Star::OptionParser parser;
   ASSERT_TRUE(parser.add_parameter("value", "text", Star::OptionParser::Optional));
   ASSERT_TRUE(parser.add_switch("quiet"));
   parser.add_argument("arguments", Star::OptionParser::Multiple);
 
-  auto result = parser.parse_options({"-value", "--", "-quiet", "--", "-quiet", "tail"});
+  Star::String const arguments[] = {"-value", "--", "-quiet", "--", "-quiet", "tail"};
+  auto result = parser.parse_options(arguments);
   ASSERT_TRUE(result);
   EXPECT_TRUE(result->errors.empty());
   auto values = result->options.parameters.get("value");
@@ -122,7 +149,8 @@ TEST(OptionParser, DuplicateParameterStillConsumesItsValue) {
   ASSERT_TRUE(parser.add_switch("quiet"));
   parser.add_argument("arguments", Star::OptionParser::Multiple);
 
-  auto result = parser.parse_options({"-value", "first", "-value", "-quiet", "tail", "-value"});
+  Star::String const arguments[] = {"-value", "first", "-value", "-quiet", "tail", "-value"};
+  auto result = parser.parse_options(arguments);
   ASSERT_TRUE(result);
   EXPECT_EQ(result->errors, (Star::StringList{
       "Option with argument '-value' specified multiple times",
@@ -139,7 +167,8 @@ TEST(OptionParser, KeepsAllTokensAfterFirstStandaloneDelimiter) {
   ASSERT_TRUE(parser.add_switch("quiet"));
   parser.add_argument("files", Star::OptionParser::Multiple);
 
-  auto result = parser.parse_options({"before", "--", "--", "-quiet", "", "file"});
+  Star::String const arguments[] = {"before", "--", "--", "-quiet", "", "file"};
+  auto result = parser.parse_options(arguments);
   ASSERT_TRUE(result);
   EXPECT_TRUE(result->errors.empty());
   EXPECT_TRUE(result->options.switches.empty());
@@ -161,7 +190,8 @@ static_assert(!can_borrow_parameter<Star::OptionParser::Options const>);
 TEST(OptionParser, FirstParameterBorrowsStoredValue) {
   Star::OptionParser parser;
   ASSERT_TRUE(parser.add_parameter("value", "text", Star::OptionParser::Multiple));
-  auto result = parser.parse_options({"-value", "first", "-value", "second"});
+  Star::String const arguments[] = {"-value", "first", "-value", "second"};
+  auto result = parser.parse_options(arguments);
   ASSERT_TRUE(result);
   ASSERT_TRUE(result->errors.empty());
 
@@ -181,7 +211,8 @@ TEST(OptionParser, ReportsMissingRequiredParametersInDeclarationOrder) {
   Star::OptionParser parser;
   ASSERT_TRUE(parser.add_parameter("second", "text", Star::OptionParser::Required));
   ASSERT_TRUE(parser.add_parameter("first", "text", Star::OptionParser::Required));
-  auto result = parser.parse_options({"-unknown", "-first"});
+  Star::String const arguments[] = {"-unknown", "-first"};
+  auto result = parser.parse_options(arguments);
   ASSERT_TRUE(result);
   EXPECT_TRUE(result->options.parameters.empty());
   EXPECT_EQ(result->errors, (Star::StringList{

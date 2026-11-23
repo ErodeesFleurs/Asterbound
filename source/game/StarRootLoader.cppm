@@ -78,11 +78,11 @@ public:
 
   [[nodiscard]] static std::expected<RootLoader, StarException> create(Defaults defaults);
 
-  [[nodiscard]] std::expected<std::pair<Root::Settings, Options>, StarException> parse_or_die(StringList const& cmd_line_arguments) const;
-  [[nodiscard]] std::expected<std::pair<std::unique_ptr<Root>, Options>, StarException> init_or_die(StringList const& cmd_line_arguments) const;
+  [[nodiscard]] std::expected<std::pair<Root::Settings, Options>, StarException> parse_or_die(std::span<String const> arguments) const;
+  [[nodiscard]] std::expected<std::pair<std::unique_ptr<Root>, Options>, StarException> init_or_die(std::span<String const> arguments) const;
 
-  [[nodiscard]] std::expected<std::pair<Root::Settings, Options>, StarException> command_parse_or_die(std::span<char const* const> argv);
-  [[nodiscard]] std::expected<std::pair<std::unique_ptr<Root>, Options>, StarException> command_init_or_die(std::span<char const* const> argv);
+  [[nodiscard]] std::expected<std::pair<Root::Settings, Options>, StarException> command_parse_or_die(std::span<String const> argv);
+  [[nodiscard]] std::expected<std::pair<std::unique_ptr<Root>, Options>, StarException> command_init_or_die(std::span<String const> argv);
 
 private:
   explicit RootLoader(Defaults defaults);

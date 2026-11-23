@@ -175,7 +175,7 @@ int main(int argc, char* argv[]) {
     root_loader->set_summary("Replaces embedded tilesets in Tiled JSON files with references to external tilesets. Assumes tilesets are available in the packed assets.");
     root_loader->add_argument("searchRoot", OptionParser::Required);
     root_loader->add_argument("tilesetsPath", OptionParser::Required);
-    auto initialized = root_loader->command_init_or_die({argv, static_cast<std::size_t>(argc)});
+    auto initialized = root_loader->command_init_or_die(native_arguments(argc, argv));
     if (!initialized)
       return std::unexpected(std::move(initialized.error()));
     auto const& options = initialized->second;

@@ -183,8 +183,9 @@ void addFixtureLights(CellularLightingCalculator& calculator, RectI const& query
 }
 
 bool sameLightmap(Lightmap const& output, std::vector<float> const& reference, RectI const& query) {
-  return output.size() == Vec2U(query.size()) && output.data().size() == reference.size()
-    && std::memcmp(output.data().data(), reference.data(), output.data().size_bytes()) == 0;
+  auto channels = output.span();
+  return output.size() == Vec2U(query.size()) && channels.size() == reference.size()
+    && std::memcmp(channels.data(), reference.data(), channels.size_bytes()) == 0;
 }
 
 std::uint64_t lightDigest(std::span<float const> values) {
@@ -232,7 +233,7 @@ void lightingBenchmark(benchmark::State& state, PerformanceBenchmarkSession& ses
     session.fail(state, referenceCalculated.error());
     return;
   }
-  std::vector<float> reference(output.data().begin(), output.data().end());
+  std::vector<float> reference(std::from_range, output.span());
   state.SetLabel(std::format("snapshot={:016x}; loaded={}; workers={}", lightDigest(reference),
                              fixture.tiles.loaded_sector_count(), workers.worker_count()));
   auto gather = [&]() {
@@ -279,7 +280,7 @@ void lightingBenchmark(benchmark::State& state, PerformanceBenchmarkSession& ses
       session.fail(state, "Lighting output differs from the serial tile snapshot");
       break;
     }
-    benchmark::DoNotOptimize(output.data().data());
+    benchmark::DoNotOptimize(output.span().data());
     state.ResumeTiming();
   }
   state.SetItemsProcessed(state.iterations() * query.width() * query.height());

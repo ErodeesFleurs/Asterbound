@@ -66,7 +66,7 @@ std::expected<LuaMethods<Image>, StarException> LuaUserDataMethods<Image>::make(
     return std::unexpected(std::move(result.error()));
 
   if (auto result = methods.register_method("process", [](Image& image, LuaEngine& engine, String const& directives) -> std::expected<Image, StarException> {
-    List<std::shared_ptr<Image const>> resolvedImages;
+    List<std::shared_ptr<Image const>> resolved_images;
     return process_image_operations(
       parse_image_operations(directives), image,
       [&](String const& path) -> std::expected<std::optional<std::reference_wrapper<Image const>>, StarException> {
@@ -76,7 +76,7 @@ std::expected<LuaMethods<Image>, StarException> LuaUserDataMethods<Image>::make(
         if (!resolved)
           return std::unexpected(std::move(resolved.error()));
         auto result = optional_ref(*resolved);
-        resolvedImages.push_back(std::move(*resolved));
+        resolved_images.push_back(std::move(*resolved));
         return result;
       });
   }); !result)
