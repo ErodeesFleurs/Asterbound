@@ -51,8 +51,6 @@ struct ActorJumpProfile {
 
   Json toJson() const;
 
-  ActorJumpProfile merge(ActorJumpProfile const& rhs) const;
-
   std::optional<float> jumpSpeed;
   std::optional<float> jumpControlForce;
   std::optional<float> jumpInitialPercentage;
@@ -92,6 +90,8 @@ struct ActorMovementParameters {
   // Merge the given set of movement parameters on top of this one, with any
   // set parameters in rhs overwriting the ones in this set.
   ActorMovementParameters merge(ActorMovementParameters const& rhs) const;
+  void merge_from(ActorMovementParameters const& patch);
+  void merge_from(ActorMovementParameters&& patch);
 
   std::optional<float> mass;
   std::optional<float> gravityMultiplier;
@@ -276,8 +276,11 @@ public:
   void controlJump(bool jumpEvenIfUnable = false);
   void controlFly(Vec2F const& velocity);
 
-  [[nodiscard]] std::expected<std::optional<std::pair<Vec2F, bool>>, StarException> pathMove(Vec2F const& pathPosition, bool run = false, std::optional<PlatformerAStar::Parameters> const& parameters = {});
-  [[nodiscard]] std::expected<std::optional<std::pair<Vec2F, bool>>, StarException> controlPathMove(Vec2F const& pathPosition, bool run = false, std::optional<PlatformerAStar::Parameters> const& parameters = {});
+  // Advance one search step or collect the completed tick for this request.
+  [[nodiscard]] std::expected<std::optional<bool>, StarException>
+  path_move(Vec2F const& position, std::optional<PlatformerAStar::Parameters> const& parameters = {});
+  [[nodiscard]] std::expected<std::optional<bool>, StarException>
+  control_path_move(Vec2F const& position, bool run = false, std::optional<PlatformerAStar::Parameters> const& parameters = {});
 
   // Used for user controller input.
   void setMoveSpeedMultiplier(float multiplier = 1.0f);
@@ -348,11 +351,11 @@ private:
 
   std::optional<Vec2F> m_controlFly;
 
-  std::optional<std::pair<Vec2F, bool>> m_controlPathMove;
-  std::optional<std::pair<Vec2F, bool>> m_pathMoveResult;
-  std::shared_ptr<PathController> m_pathController;
+  std::optional<std::pair<Vec2F, bool>> m_control_path_move;
+  std::optional<std::pair<Vec2F, bool>> m_path_move_result;
+  std::unique_ptr<PathController> m_path_controller;
 
-  ActorMovementParameters m_controlParameters;
+  std::optional<ActorMovementParameters> m_control_parameters;
   ActorMovementModifiers m_controlModifiers;
 
   // Internal state data
@@ -374,8 +377,8 @@ class PathController {
 public:
   PathController(World& world);
 
-  PlatformerAStar::Parameters const& parameters() const;
-  void set_parameters(PlatformerAStar::Parameters const& parameters);
+  // A changed search policy invalidates both an in-flight finder and a ready path.
+  bool set_parameters(PlatformerAStar::Parameters const& parameters);
   void reset();
   bool pathfinding() const;
   std::optional<Vec2F> target_position() const;

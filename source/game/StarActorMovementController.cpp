@@ -139,22 +139,6 @@ Json ActorJumpProfile::toJson() const {
   };
 }
 
-ActorJumpProfile ActorJumpProfile::merge(ActorJumpProfile const& rhs) const {
-  ActorJumpProfile merged;
-
-  merged.jumpSpeed = (rhs.jumpSpeed ? rhs.jumpSpeed : jumpSpeed);
-  merged.jumpControlForce = (rhs.jumpControlForce ? rhs.jumpControlForce : jumpControlForce);
-  merged.jumpInitialPercentage = (rhs.jumpInitialPercentage ? rhs.jumpInitialPercentage : jumpInitialPercentage);
-  merged.jumpHoldTime = (rhs.jumpHoldTime ? rhs.jumpHoldTime : jumpHoldTime);
-  merged.jumpTotalHoldTime = (rhs.jumpTotalHoldTime ? rhs.jumpTotalHoldTime : jumpTotalHoldTime);
-  merged.multiJump = (rhs.multiJump ? rhs.multiJump : multiJump);
-  merged.reJumpDelay = (rhs.reJumpDelay ? rhs.reJumpDelay : reJumpDelay);
-  merged.autoJump = (rhs.autoJump ? rhs.autoJump : autoJump);
-  merged.collisionCancelled = (rhs.collisionCancelled ? rhs.collisionCancelled : collisionCancelled);
-
-  return merged;
-}
-
 namespace {
 using ActorWireResult = std::expected<std::reference_wrapper<DataStream>, StarException>;
 
@@ -437,58 +421,100 @@ std::expected<Json, StarException> ActorMovementParameters::toJson() const {
       {"pathExploreRate", json_from_optional(pathExploreRate)}};
 }
 
-ActorMovementParameters ActorMovementParameters::merge(ActorMovementParameters const& rhs) const {
+namespace {
+// A single patch writes only engaged fields. Resolving base + patch selects
+// the source before copying, so overwritten polygons and sets are never copied.
+template <class T, class Patch>
+  requires std::same_as<std::remove_cvref_t<Patch>, std::optional<T>> && std::assignable_from<std::optional<T>&, Patch>
+void merge_field(std::optional<T>& dest, Patch&& patch) {
+  if (patch)
+    dest = std::forward<Patch>(patch);
+}
+
+template <std::copyable T>
+void merge_field(std::optional<T>& dest, std::optional<T> const& base, std::optional<T> const& patch) {
+  dest = patch ? patch : base;
+}
+
+template <class T>
+concept jump_profile_source = std::same_as<std::remove_cvref_t<T>, ActorJumpProfile>;
+
+template <jump_profile_source... Sources>
+  requires (sizeof...(Sources) == 1 || sizeof...(Sources) == 2)
+void merge_fields(ActorJumpProfile& dest, Sources&&... sources) {
+  merge_field(dest.jumpSpeed, sources.jumpSpeed...);
+  merge_field(dest.jumpControlForce, sources.jumpControlForce...);
+  merge_field(dest.jumpInitialPercentage, sources.jumpInitialPercentage...);
+  merge_field(dest.jumpHoldTime, sources.jumpHoldTime...);
+  merge_field(dest.jumpTotalHoldTime, sources.jumpTotalHoldTime...);
+  merge_field(dest.multiJump, sources.multiJump...);
+  merge_field(dest.reJumpDelay, sources.reJumpDelay...);
+  merge_field(dest.autoJump, sources.autoJump...);
+  merge_field(dest.collisionCancelled, sources.collisionCancelled...);
+}
+
+template <class T>
+concept actor_parameter_source = std::same_as<std::remove_cvref_t<T>, ActorMovementParameters>;
+
+template <actor_parameter_source... Sources>
+  requires (sizeof...(Sources) == 1 || sizeof...(Sources) == 2)
+void merge_fields(ActorMovementParameters& dest, Sources&&... sources) {
+  merge_field(dest.mass, sources.mass...);
+  merge_field(dest.gravityMultiplier, sources.gravityMultiplier...);
+  merge_field(dest.liquidBuoyancy, sources.liquidBuoyancy...);
+  merge_field(dest.airBuoyancy, sources.airBuoyancy...);
+  merge_field(dest.bounceFactor, sources.bounceFactor...);
+  merge_field(dest.stopOnFirstBounce, sources.stopOnFirstBounce...);
+  merge_field(dest.enableSurfaceSlopeCorrection, sources.enableSurfaceSlopeCorrection...);
+  merge_field(dest.slopeSlidingFactor, sources.slopeSlidingFactor...);
+  merge_field(dest.maxMovementPerStep, sources.maxMovementPerStep...);
+  merge_field(dest.maximumCorrection, sources.maximumCorrection...);
+  merge_field(dest.speedLimit, sources.speedLimit...);
+  merge_field(dest.standingPoly, std::forward<Sources>(sources).standingPoly...);
+  merge_field(dest.crouchingPoly, std::forward<Sources>(sources).crouchingPoly...);
+  merge_field(dest.stickyCollision, sources.stickyCollision...);
+  merge_field(dest.stickyForce, sources.stickyForce...);
+  merge_field(dest.walkSpeed, sources.walkSpeed...);
+  merge_field(dest.runSpeed, sources.runSpeed...);
+  merge_field(dest.flySpeed, sources.flySpeed...);
+  merge_field(dest.airFriction, sources.airFriction...);
+  merge_field(dest.liquidFriction, sources.liquidFriction...);
+  merge_field(dest.minimumLiquidPercentage, sources.minimumLiquidPercentage...);
+  merge_field(dest.liquidImpedance, sources.liquidImpedance...);
+  merge_field(dest.normalGroundFriction, sources.normalGroundFriction...);
+  merge_field(dest.ambulatingGroundFriction, sources.ambulatingGroundFriction...);
+  merge_field(dest.groundForce, sources.groundForce...);
+  merge_field(dest.airForce, sources.airForce...);
+  merge_field(dest.liquidForce, sources.liquidForce...);
+  merge_fields(dest.airJumpProfile, sources.airJumpProfile...);
+  merge_fields(dest.liquidJumpProfile, sources.liquidJumpProfile...);
+  merge_field(dest.fallStatusSpeedMin, sources.fallStatusSpeedMin...);
+  merge_field(dest.fallThroughSustainFrames, sources.fallThroughSustainFrames...);
+  merge_field(dest.maximumPlatformCorrection, sources.maximumPlatformCorrection...);
+  merge_field(dest.maximumPlatformCorrectionVelocityFactor, sources.maximumPlatformCorrectionVelocityFactor...);
+  merge_field(dest.physicsEffectCategories, std::forward<Sources>(sources).physicsEffectCategories...);
+  merge_field(dest.groundMovementMinimumSustain, sources.groundMovementMinimumSustain...);
+  merge_field(dest.groundMovementMaximumSustain, sources.groundMovementMaximumSustain...);
+  merge_field(dest.groundMovementCheckDistance, sources.groundMovementCheckDistance...);
+  merge_field(dest.collisionEnabled, sources.collisionEnabled...);
+  merge_field(dest.frictionEnabled, sources.frictionEnabled...);
+  merge_field(dest.gravityEnabled, sources.gravityEnabled...);
+  merge_field(dest.pathExploreRate, sources.pathExploreRate...);
+}
+} // namespace
+
+ActorMovementParameters ActorMovementParameters::merge(ActorMovementParameters const& patch) const {
   ActorMovementParameters merged;
-
-  merged.mass = (rhs.mass ? rhs.mass : mass);
-  merged.gravityMultiplier = (rhs.gravityMultiplier ? rhs.gravityMultiplier : gravityMultiplier);
-  merged.liquidBuoyancy = (rhs.liquidBuoyancy ? rhs.liquidBuoyancy : liquidBuoyancy);
-  merged.airBuoyancy = (rhs.airBuoyancy ? rhs.airBuoyancy : airBuoyancy);
-  merged.bounceFactor = (rhs.bounceFactor ? rhs.bounceFactor : bounceFactor);
-  merged.stopOnFirstBounce = (rhs.stopOnFirstBounce ? rhs.stopOnFirstBounce : stopOnFirstBounce);
-  merged.enableSurfaceSlopeCorrection = (rhs.enableSurfaceSlopeCorrection ? rhs.enableSurfaceSlopeCorrection : enableSurfaceSlopeCorrection);
-  merged.slopeSlidingFactor = (rhs.slopeSlidingFactor ? rhs.slopeSlidingFactor : slopeSlidingFactor);
-  merged.maxMovementPerStep = (rhs.maxMovementPerStep ? rhs.maxMovementPerStep : maxMovementPerStep);
-  merged.maximumCorrection = (rhs.maximumCorrection ? rhs.maximumCorrection : maximumCorrection);
-  merged.speedLimit = (rhs.speedLimit ? rhs.speedLimit : speedLimit);
-  merged.standingPoly = (rhs.standingPoly ? rhs.standingPoly : standingPoly);
-  merged.crouchingPoly = (rhs.crouchingPoly ? rhs.crouchingPoly : crouchingPoly);
-  merged.stickyCollision = (rhs.stickyCollision ? rhs.stickyCollision : stickyCollision);
-  merged.stickyForce = (rhs.stickyForce ? rhs.stickyForce : stickyForce);
-  merged.walkSpeed = (rhs.walkSpeed ? rhs.walkSpeed : walkSpeed);
-  merged.runSpeed = (rhs.runSpeed ? rhs.runSpeed : runSpeed);
-  merged.flySpeed = (rhs.flySpeed ? rhs.flySpeed : flySpeed);
-  merged.airFriction = (rhs.airFriction ? rhs.airFriction : airFriction);
-  merged.liquidFriction = (rhs.liquidFriction ? rhs.liquidFriction : liquidFriction);
-  merged.minimumLiquidPercentage = (rhs.minimumLiquidPercentage ? rhs.minimumLiquidPercentage : minimumLiquidPercentage);
-  merged.liquidImpedance = (rhs.liquidImpedance ? rhs.liquidImpedance : liquidImpedance);
-  merged.normalGroundFriction = (rhs.normalGroundFriction ? rhs.normalGroundFriction : normalGroundFriction);
-  merged.ambulatingGroundFriction = (rhs.ambulatingGroundFriction ? rhs.ambulatingGroundFriction : ambulatingGroundFriction);
-  merged.groundForce = (rhs.groundForce ? rhs.groundForce : groundForce);
-  merged.airForce = (rhs.airForce ? rhs.airForce : airForce);
-  merged.liquidForce = (rhs.liquidForce ? rhs.liquidForce : liquidForce);
-
-  merged.airJumpProfile = airJumpProfile.merge(rhs.airJumpProfile);
-  merged.liquidJumpProfile = liquidJumpProfile.merge(rhs.liquidJumpProfile);
-
-  merged.fallStatusSpeedMin = (rhs.fallStatusSpeedMin ? rhs.fallStatusSpeedMin : fallStatusSpeedMin);
-  merged.fallThroughSustainFrames = (rhs.fallThroughSustainFrames ? rhs.fallThroughSustainFrames : fallThroughSustainFrames);
-  merged.maximumPlatformCorrection = (rhs.maximumPlatformCorrection ? rhs.maximumPlatformCorrection : maximumPlatformCorrection);
-  merged.maximumPlatformCorrectionVelocityFactor = (rhs.maximumPlatformCorrectionVelocityFactor ? rhs.maximumPlatformCorrectionVelocityFactor : maximumPlatformCorrectionVelocityFactor);
-
-  merged.physicsEffectCategories = (rhs.physicsEffectCategories ? rhs.physicsEffectCategories : physicsEffectCategories);
-
-  merged.groundMovementMinimumSustain = (rhs.groundMovementMinimumSustain ? rhs.groundMovementMinimumSustain : groundMovementMinimumSustain);
-  merged.groundMovementMaximumSustain = (rhs.groundMovementMaximumSustain ? rhs.groundMovementMaximumSustain : groundMovementMaximumSustain);
-  merged.groundMovementCheckDistance = (rhs.groundMovementCheckDistance ? rhs.groundMovementCheckDistance : groundMovementCheckDistance);
-
-  merged.collisionEnabled = (rhs.collisionEnabled ? rhs.collisionEnabled : collisionEnabled);
-  merged.frictionEnabled = (rhs.frictionEnabled ? rhs.frictionEnabled : frictionEnabled);
-  merged.gravityEnabled = (rhs.gravityEnabled ? rhs.gravityEnabled : gravityEnabled);
-
-  merged.pathExploreRate = (rhs.pathExploreRate ? rhs.pathExploreRate : pathExploreRate);
-
+  merge_fields(merged, *this, patch);
   return merged;
+}
+
+void ActorMovementParameters::merge_from(ActorMovementParameters const& patch) {
+  merge_fields(*this, patch);
+}
+
+void ActorMovementParameters::merge_from(ActorMovementParameters&& patch) {
+  merge_fields(*this, std::move(patch));
 }
 
 namespace {
@@ -617,7 +643,6 @@ ActorMovementController::ActorMovementController(Root& root) : MovementControlle
   m_controlDown = false;
   m_controlJump = false;
   m_controlJumpAnyway = false;
-  m_controlPathMove = {};
 
   m_fallThroughSustain = 0;
   m_lastControlJump = false;
@@ -664,10 +689,10 @@ std::expected<void, StarException> ActorMovementController::updateBaseParameters
 std::expected<void, StarException> ActorMovementController::resetBaseParameters(ActorMovementParameters const& parameters) {
   auto defaults = ActorMovementParameters::sensibleDefaults(root());
   if (!defaults) return std::unexpected(std::move(defaults.error()));
-  auto merged = defaults->merge(parameters);
-  auto applied = applyMCParameters(merged);
+  defaults->merge_from(parameters);
+  auto applied = applyMCParameters(*defaults);
   if (!applied) return std::unexpected(std::move(applied.error()));
-  m_baseParameters = std::move(merged);
+  m_baseParameters = std::move(*defaults);
   return {};
 }
 
@@ -684,7 +709,9 @@ void ActorMovementController::resetBaseModifiers(ActorMovementModifiers const& m
 }
 
 void ActorMovementController::uninit() {
-  m_pathController.reset();
+  m_control_path_move.reset();
+  m_path_move_result.reset();
+  m_path_controller.reset();
   MovementController::uninit();
 }
 
@@ -813,10 +840,7 @@ bool ActorMovementController::liquidMovement() const {
 }
 
 bool ActorMovementController::pathfinding() const {
-  if (m_pathController)
-    return m_pathController->pathfinding();
-  else
-    return false;
+  return m_path_controller && !m_path_move_result && m_path_controller->pathfinding();
 }
 
 void ActorMovementController::controlRotation(float rotationRate) {
@@ -849,7 +873,10 @@ void ActorMovementController::controlApproachYVelocity(float targetYVelocity, fl
 }
 
 void ActorMovementController::controlParameters(ActorMovementParameters const& parameters) {
-  m_controlParameters = m_controlParameters.merge(parameters);
+  if (m_control_parameters)
+    m_control_parameters->merge_from(parameters);
+  else
+    m_control_parameters.emplace(parameters);
 }
 
 void ActorMovementController::controlModifiers(ActorMovementModifiers const& modifiers) {
@@ -882,44 +909,37 @@ void ActorMovementController::controlFly(Vec2F const& velocity) {
   m_controlFly = velocity;
 }
 
-std::expected<std::optional<std::pair<Vec2F, bool>>, StarException> ActorMovementController::pathMove(Vec2F const& position, bool, std::optional<PlatformerAStar::Parameters> const& parameters) {
-  if (!m_pathController) {
-    auto activeWorld = world();
-    if (!activeWorld) return std::unexpected(std::move(activeWorld.error()));
-    m_pathController = std::make_shared<PathController>(activeWorld->get());
+std::expected<std::optional<bool>, StarException>
+ActorMovementController::path_move(Vec2F const& position, std::optional<PlatformerAStar::Parameters> const& parameters) {
+  if (!m_path_controller) {
+    auto active_world = world();
+    if (!active_world) return std::unexpected(std::move(active_world.error()));
+    m_path_controller = std::make_unique<PathController>(active_world->get());
   }
 
-  // set new parameters if they have changed
-  if (!m_pathController->target_position().has_value()
-      || (parameters && m_pathController->parameters() != *parameters)) {
-    if (parameters)
-      m_pathController->set_parameters(*parameters);
-    auto pathResult = m_pathController->find_path(*this, position);
-    if (!pathResult) return std::unexpected(std::move(pathResult.error()));
-    m_pathMoveResult = pathResult->transform([position](bool result) { return std::pair<Vec2F, bool>(position, result); });
+  if (parameters && m_path_controller->set_parameters(*parameters))
+    m_path_move_result.reset();
+
+  if (auto completed = std::exchange(m_path_move_result, {}); completed && completed->first == position) {
+    m_path_controller->reset();
+    m_control_path_move.reset();
+    return completed->second;
   }
 
-  // update target position if it has changed
-  if (m_pathController) {
-    if (auto result = m_pathController->find_path(*this, position); !result)
-      return std::unexpected(std::move(result.error()));
+  auto result = m_path_controller->find_path(*this, position);
+  if (result && result->has_value()) {
+    m_path_controller->reset();
+    m_control_path_move.reset();
   }
-
-  if (m_pathMoveResult.has_value()) {
-    // path controller failed or succeeded, return the result and reset the controller
-    m_pathController->reset();
-  }
-
-  return std::exchange(m_pathMoveResult, {});
+  return result;
 }
 
-std::expected<std::optional<std::pair<Vec2F, bool>>, StarException> ActorMovementController::controlPathMove(Vec2F const& position, bool run, std::optional<PlatformerAStar::Parameters> const& parameters) {
-  auto result = pathMove(position, run, parameters);
-  if (!result) return std::unexpected(std::move(result.error()));
-
-  if (!result->has_value())
-    m_controlPathMove = std::pair<Vec2F, bool>(position, run);
-
+std::expected<std::optional<bool>, StarException>
+ActorMovementController::control_path_move(Vec2F const& position, bool run,
+                                          std::optional<PlatformerAStar::Parameters> const& parameters) {
+  auto result = path_move(position, parameters);
+  if (result && !result->has_value())
+    m_control_path_move.emplace(position, run);
   return result;
 }
 
@@ -941,8 +961,8 @@ void ActorMovementController::clearControls() {
   m_controlJump = false;
   m_controlJumpAnyway = false;
   m_controlFly = {};
-  m_controlPathMove = {};
-  m_controlParameters = ActorMovementParameters();
+  m_control_path_move.reset();
+  m_control_parameters.reset();
   m_controlModifiers = ActorMovementModifiers();
 }
 
@@ -980,7 +1000,10 @@ std::expected<void, StarException> ActorMovementController::tickMaster(float dt)
     if (auto result = MovementController::tickMaster(dt); !result) return std::unexpected(std::move(result.error()));
     setPosition(m_entityAnchor->position);
   } else {
-    auto activeParameters = m_baseParameters.merge(m_controlParameters);
+    auto const merged = m_control_parameters.transform([this](ActorMovementParameters const& patch) {
+      return m_baseParameters.merge(patch);
+    });
+    auto const& active_parameters = merged ? *merged : m_baseParameters;
     auto activeModifiers = m_baseModifiers.combine(m_controlModifiers);
 
     if (activeModifiers.movementSuppressed) {
@@ -990,7 +1013,7 @@ std::expected<void, StarException> ActorMovementController::tickMaster(float dt)
       m_controlDown = false;
       m_controlJump = false;
       m_controlFly = {};
-      m_controlPathMove = {};
+      m_control_path_move.reset();
     }
 
     if (m_controlMove.has_value()
@@ -1001,23 +1024,24 @@ std::expected<void, StarException> ActorMovementController::tickMaster(float dt)
         || !m_controlApproachVelocities.empty()
         || !m_controlApproachVelocityAlongAngles.empty()) {
       // controlling any other movement overrides the pathing
-      m_controlPathMove.reset();
+      m_control_path_move.reset();
     }
 
-    if (m_controlPathMove && !m_pathMoveResult.has_value()) {
+    if (m_control_path_move && !m_path_move_result) {
       if (appliedForceRegion()) {
-        m_pathController->reset();
-      } else if (!m_pathController->pathfinding()) {
-        auto pathResult = m_pathController->move(*this, activeParameters, activeModifiers, m_controlPathMove->second, dt);
-        if (!pathResult) return std::unexpected(std::move(pathResult.error()));
-        m_pathMoveResult = pathResult->transform([&pathMove = m_controlPathMove](bool result) { return std::pair<Vec2F, bool>(pathMove->first, result); });
+        m_path_controller->reset();
+      } else if (!m_path_controller->pathfinding()) {
+        auto path_result = m_path_controller->move(*this, active_parameters, activeModifiers, m_control_path_move->second, dt);
+        if (!path_result) return std::unexpected(std::move(path_result.error()));
+        if (*path_result)
+          m_path_move_result.emplace(m_control_path_move->first, **path_result);
 
-        auto action = m_pathController->current_action();
+        auto action = m_path_controller->current_action();
         bool onGround = false;
         if (auto a = action) {
           using namespace PlatformerAStar;
-          m_walking.set(a == Action::Walk && !m_controlPathMove->second);
-          m_running.set(a == Action::Walk && m_controlPathMove->second);
+          m_walking.set(a == Action::Walk && !m_control_path_move->second);
+          m_running.set(a == Action::Walk && m_control_path_move->second);
           m_flying.set(a == Action::Fly || a == Action::Swim);
           m_falling.set((a == Action::Arc && yVelocity() < 0.0f) || a == Action::Drop);
           m_jumping.set(a == Action::Arc && yVelocity() >= 0.0f);
@@ -1025,7 +1049,7 @@ std::expected<void, StarException> ActorMovementController::tickMaster(float dt)
           onGround = a == Action::Walk || a == Action::Drop || a == Action::Jump;
 
           if (a == Action::Land || a== Action::Jump) {
-            auto inLiquid = liquidPercentage() >= activeParameters.minimumLiquidPercentage.value_or(1.0);
+            auto inLiquid = liquidPercentage() >= active_parameters.minimumLiquidPercentage.value_or(1.0);
             m_liquidMovement.set(inLiquid);
             m_groundMovement.set(!inLiquid);
             onGround = !inLiquid && onGround;
@@ -1037,29 +1061,31 @@ std::expected<void, StarException> ActorMovementController::tickMaster(float dt)
           m_walking.set(false);
           m_running.set(false);
         }
-        auto pathFacing = m_pathController->facing();
-        auto facing = (m_controlFace ? m_controlFace : pathFacing).value_or(m_facingDirection.get());
+        auto path_facing = m_path_controller->facing();
+        auto facing = (m_controlFace ? m_controlFace : path_facing).value_or(m_facingDirection.get());
         m_facingDirection.set(facing);
-        setMovingDirection(m_pathController->facing().value_or(m_facingDirection.get()));
+        setMovingDirection(path_facing.value_or(m_facingDirection.get()));
 
-        if (auto result = applyMCParameters(activeParameters); !result) return std::unexpected(std::move(result.error()));
+        if (auto result = applyMCParameters(active_parameters); !result) return std::unexpected(std::move(result.error()));
 
         // MovementController still handles updating liquid percentage and updating force regions
         if (auto result = updateLiquidPercentage(); !result) return std::unexpected(std::move(result.error()));
         if (auto result = updateForceRegions(dt); !result) return std::unexpected(std::move(result.error()));
         // onGround flag needs to be manually set, won't be set by MovementController::tickMaster
         setOnGround(onGround);
+        // Hold the receipt until the next request, not the finished edge list.
+        if (m_path_move_result)
+          m_path_controller->reset();
         clearControls();
         return {};
       } else {
-        auto pathResult = m_pathController->find_path(*this, m_controlPathMove->first);
-        if (!pathResult) return std::unexpected(std::move(pathResult.error()));
-        m_pathMoveResult = pathResult->transform([&pathMove = m_controlPathMove](bool result) {
-            return std::pair<Vec2F, bool>(pathMove->first, result);
-          });
+        auto path_result = m_path_controller->find_path(*this, m_control_path_move->first);
+        if (!path_result) return std::unexpected(std::move(path_result.error()));
+        if (*path_result)
+          m_path_move_result.emplace(m_control_path_move->first, **path_result);
       }
-    } else {
-      m_pathController = {};
+    } else if (!m_path_move_result) {
+      m_path_controller.reset();
     }
 
     // Do some basic movement consistency checks.
@@ -1067,11 +1093,11 @@ std::expected<void, StarException> ActorMovementController::tickMaster(float dt)
       m_controlMove = {};
 
     if ((m_controlDown && !m_lastControlDown) || m_controlFly)
-      m_fallThroughSustain = (*activeParameters.fallThroughSustainFrames);
+      m_fallThroughSustain = (*active_parameters.fallThroughSustainFrames);
     else if (m_fallThroughSustain > 0)
       --m_fallThroughSustain;
 
-    if (auto result = applyMCParameters(activeParameters); !result) return std::unexpected(std::move(result.error()));
+    if (auto result = applyMCParameters(active_parameters); !result) return std::unexpected(std::move(result.error()));
 
     m_targetHorizontalAmbulatingVelocity = 0.0f;
 
@@ -1085,8 +1111,8 @@ std::expected<void, StarException> ActorMovementController::tickMaster(float dt)
     for (auto const& approach : m_controlApproachVelocityAlongAngles)
       approachVelocityAlongAngle(approach.alongAngle, approach.targetVelocity * activeModifiers.speedModifier, approach.maxControlForce, approach.positiveOnly);
 
-    m_liquidMovement.set(liquidPercentage() >= (*activeParameters.minimumLiquidPercentage));
-    float liquidImpedance = (*activeParameters.liquidImpedance) * liquidPercentage();
+    m_liquidMovement.set(liquidPercentage() >= (*active_parameters.minimumLiquidPercentage));
+    float liquidImpedance = (*active_parameters.liquidImpedance) * liquidPercentage();
 
     std::optional<Direction> updatedMovingDirection;
     bool running = m_controlRun && !activeModifiers.runningSuppressed;
@@ -1094,12 +1120,12 @@ std::expected<void, StarException> ActorMovementController::tickMaster(float dt)
     if (m_controlFly) {
       Vec2F flyVelocity = *m_controlFly;
       if (flyVelocity.magnitude_squared() != 0)
-        flyVelocity = flyVelocity.normalized() * (*activeParameters.flySpeed);
+        flyVelocity = flyVelocity.normalized() * (*active_parameters.flySpeed);
 
       if (m_liquidMovement.get())
-        approachVelocity(flyVelocity * (1.0f - liquidImpedance) * activeModifiers.speedModifier, (*activeParameters.liquidForce) * activeModifiers.liquidMovementModifier);
+        approachVelocity(flyVelocity * (1.0f - liquidImpedance) * activeModifiers.speedModifier, (*active_parameters.liquidForce) * activeModifiers.liquidMovementModifier);
       else
-        approachVelocity(flyVelocity * activeModifiers.speedModifier, (*activeParameters.airForce));
+        approachVelocity(flyVelocity * activeModifiers.speedModifier, (*active_parameters.airForce));
 
       if (flyVelocity[0] > 0)
         updatedMovingDirection = Direction::Right;
@@ -1113,11 +1139,11 @@ std::expected<void, StarException> ActorMovementController::tickMaster(float dt)
       ActorJumpProfile jumpProfile;
       if (m_liquidMovement.get()) {
         jumpModifier = activeModifiers.liquidJumpModifier;
-        jumpProfile = activeParameters.liquidJumpProfile;
+        jumpProfile = active_parameters.liquidJumpProfile;
         (*jumpProfile.jumpSpeed) *= (1.0f - liquidImpedance);
       } else {
         jumpModifier = activeModifiers.airJumpModifier;
-        jumpProfile = activeParameters.airJumpProfile;
+        jumpProfile = active_parameters.airJumpProfile;
       }
 
       bool startJump = false;
@@ -1128,9 +1154,9 @@ std::expected<void, StarException> ActorMovementController::tickMaster(float dt)
       // according to the nearGroundCheckDistance, and we are past the minimum
       // sustain time, then go ahead and immediately clear the ground movement
       // sustain timer.
-      float minGroundSustain = (*activeParameters.groundMovementMinimumSustain);
-      float maxGroundSustain = (*activeParameters.groundMovementMaximumSustain);
-      float groundCheckDistance = (*activeParameters.groundMovementCheckDistance);
+      float minGroundSustain = (*active_parameters.groundMovementMinimumSustain);
+      float maxGroundSustain = (*active_parameters.groundMovementMaximumSustain);
+      float groundCheckDistance = (*active_parameters.groundMovementCheckDistance);
       m_groundMovementSustainTimer.tick(dt);
       if (onGround()) {
         m_groundMovementSustainTimer = GameTimer(maxGroundSustain);
@@ -1186,13 +1212,13 @@ std::expected<void, StarException> ActorMovementController::tickMaster(float dt)
       if (m_controlMove == Direction::Left) {
         updatedMovingDirection = Direction::Left;
         m_targetHorizontalAmbulatingVelocity =
-            -1.0f * (running ? (*activeParameters.runSpeed) * activeModifiers.speedModifier
-                             : (*activeParameters.walkSpeed) * activeModifiers.speedModifier);
+            -1.0f * (running ? (*active_parameters.runSpeed) * activeModifiers.speedModifier
+                             : (*active_parameters.walkSpeed) * activeModifiers.speedModifier);
       } else if (m_controlMove == Direction::Right) {
         updatedMovingDirection = Direction::Right;
         m_targetHorizontalAmbulatingVelocity =
-            1.0f * (running ? (*activeParameters.runSpeed) * activeModifiers.speedModifier
-                            : (*activeParameters.walkSpeed) * activeModifiers.speedModifier);
+            1.0f * (running ? (*active_parameters.runSpeed) * activeModifiers.speedModifier
+                            : (*active_parameters.walkSpeed) * activeModifiers.speedModifier);
       }
 
       m_targetHorizontalAmbulatingVelocity *= m_moveSpeedMultiplier;
@@ -1209,11 +1235,11 @@ std::expected<void, StarException> ActorMovementController::tickMaster(float dt)
       if (m_targetHorizontalAmbulatingVelocity != 0.0f && ambulationWouldAccelerate) {
         float ambulatingAccel;
         if (onGround())
-          ambulatingAccel = (*activeParameters.groundForce) * activeModifiers.groundMovementModifier;
+          ambulatingAccel = (*active_parameters.groundForce) * activeModifiers.groundMovementModifier;
         else if (m_liquidMovement.get())
-          ambulatingAccel = (*activeParameters.liquidForce) * activeModifiers.liquidMovementModifier;
+          ambulatingAccel = (*active_parameters.liquidForce) * activeModifiers.liquidMovementModifier;
         else
-          ambulatingAccel = (*activeParameters.airForce);
+          ambulatingAccel = (*active_parameters.airForce);
 
         approachXVelocity(m_targetHorizontalAmbulatingVelocity + surfaceVelocity[0], ambulatingAccel);
       }
@@ -1227,8 +1253,8 @@ std::expected<void, StarException> ActorMovementController::tickMaster(float dt)
         m_facingDirection.set(*m_controlFace);
       else if (updatedMovingDirection)
         m_facingDirection.set(*updatedMovingDirection);
-      else if (m_controlPathMove && m_pathController && m_pathController->facing())
-        m_facingDirection.set(*m_pathController->facing());
+      else if (m_control_path_move && m_path_controller && m_path_controller->facing())
+        m_facingDirection.set(*m_path_controller->facing());
     }
 
     m_groundMovement.set(!m_groundMovementSustainTimer.ready());
@@ -1239,7 +1265,7 @@ std::expected<void, StarException> ActorMovementController::tickMaster(float dt)
     }
     m_flying.set(static_cast<bool>(m_controlFly));
 
-    bool falling = (yVelocity() < (*activeParameters.fallStatusSpeedMin)) && !m_groundMovement.get();
+    bool falling = (yVelocity() < (*active_parameters.fallStatusSpeedMin)) && !m_groundMovement.get();
     m_falling.set(falling);
 
     if (auto result = MovementController::tickMaster(dt); !result) return std::unexpected(std::move(result.error()));
@@ -1248,9 +1274,9 @@ std::expected<void, StarException> ActorMovementController::tickMaster(float dt)
     m_lastControlDown = m_controlDown;
 
     if (m_liquidMovement.get())
-      m_canJump.set(m_reJumpTimer.ready() && (!m_groundMovementSustainTimer.ready() || (*activeParameters.liquidJumpProfile.multiJump)));
+      m_canJump.set(m_reJumpTimer.ready() && (!m_groundMovementSustainTimer.ready() || (*active_parameters.liquidJumpProfile.multiJump)));
     else
-      m_canJump.set(m_reJumpTimer.ready() && (!m_groundMovementSustainTimer.ready() || (*activeParameters.airJumpProfile.multiJump)));
+      m_canJump.set(m_reJumpTimer.ready() && (!m_groundMovementSustainTimer.ready() || (*active_parameters.airJumpProfile.multiJump)));
   }
 
   clearControls();
@@ -1312,10 +1338,7 @@ std::expected<void, StarException> ActorMovementController::applyMCParameters(Ac
 
   mcParameters.mass = parameters.mass;
 
-  if (!onGround() && yVelocity() < 0)
-    mcParameters.gravityMultiplier = (*parameters.gravityMultiplier);
-  else
-    mcParameters.gravityMultiplier = parameters.gravityMultiplier;
+  mcParameters.gravityMultiplier = parameters.gravityMultiplier;
 
   mcParameters.liquidBuoyancy = parameters.liquidBuoyancy;
   mcParameters.airBuoyancy = parameters.airBuoyancy;
@@ -1381,26 +1404,29 @@ std::expected<void, StarException> ActorMovementController::doSetAnchorState(std
     if (!entityAnchor)
       return std::unexpected(ActorMovementControllerException::format("Anchor position {} is disabled ActorMovementController::setAnchorState", anchorState->positionIndex));
   }
-  auto prevAnchor = m_entityAnchor;
+  auto previous_anchor = std::move(m_entityAnchor);
   m_anchorState.set(anchorState);
   m_entityAnchor = std::move(entityAnchor);
 
-  if (!entityAnchor && prevAnchor && prevAnchor->exitBottomPosition) {
-    auto boundBox = MovementController::localBoundBox();
-    Vec2F bottomMid = {boundBox.center()[0], boundBox.y_min()};
-    setPosition(*prevAnchor->exitBottomPosition - bottomMid);
-  }
-
-  if (m_entityAnchor)
+  if (m_entityAnchor) {
     setPosition(m_entityAnchor->position);
+  } else if (previous_anchor && previous_anchor->exitBottomPosition) {
+    auto bounds = MovementController::localBoundBox();
+    Vec2F bottom_center = {bounds.center()[0], bounds.y_min()};
+    setPosition(*previous_anchor->exitBottomPosition - bottom_center);
+  }
   return {};
 }
 
 PathController::PathController(World& world) : m_world(world), m_edge_index(0), m_edge_timer(0.0) {}
 
-PlatformerAStar::Parameters const& PathController::parameters() const { return m_parameters; }
-
-void PathController::set_parameters(PlatformerAStar::Parameters const& parameters) { m_parameters = parameters; }
+bool PathController::set_parameters(PlatformerAStar::Parameters const& parameters) {
+  if (m_parameters == parameters)
+    return false;
+  reset();
+  m_parameters = parameters;
+  return true;
+}
 
 void PathController::reset() {
   m_start_position = {};
@@ -1590,8 +1616,9 @@ std::expected<std::optional<bool>, StarException> PathController::move(ActorMove
 
   // pathfind to a new target position in the background while moving on the current path
   if (m_path_finder && m_target_position) {
-    if (auto result = find_path(movement_controller, *m_target_position); !result)
-      return std::unexpected(std::move(result.error()));
+    auto result = find_path(movement_controller, *m_target_position);
+    if (!result || result->has_value())
+      return result;
   }
 
   if (!m_path)

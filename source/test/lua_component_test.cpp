@@ -922,6 +922,9 @@ const GameTestRegistration
                         parameters.stopOnFirstBounce = true;
                         parameters.enableSurfaceSlopeCorrection = false;
                         parameters.pathExploreRate = 23.5f;
+                        parameters.gravityMultiplier = 1.0f;
+                        parameters.airJumpProfile.jumpSpeed = 2.0f;
+                        parameters.airJumpProfile.jumpInitialPercentage = 1.0f;
                         auto controller = ActorMovementController::create(fixture.root(), parameters);
                         ASSERT_TRUE(controller) << controller.error().what();
                         auto storage = File::ephemeral_file(fixture.root().random());
@@ -930,6 +933,7 @@ const GameTestRegistration
                         ASSERT_TRUE(world);
                         auto close = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
                         (*controller)->init(**world);
+                        (*controller)->setPosition(Vec2F(1024, 1024));
                         auto unbind = make_scope_exit([&] { (*controller)->uninit(); });
                         LuaActorScript component(fixture.root());
                         auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
@@ -951,24 +955,47 @@ const GameTestRegistration
                         EXPECT_EQ(**base, (Json(JsonArray{true, false, 23.5})));
                         ASSERT_TRUE(component.eval<LuaValue>(R"LUA(
     function update()
+      if self.sent then return end
+      self.sent = true
       mcontroller.controlParameters({
         stopOnFirstBounce = false,
         enableSurfaceSlopeCorrection = true,
-        pathExploreRate = 37.5,
+        airJumpProfile = {jumpSpeed = 12},
+        frictionEnabled = false,
         gravityEnabled = false,
         collisionEnabled = false
       })
+      mcontroller.controlParameters({
+        airJumpProfile = {reJumpDelay = 0},
+        gravityMultiplier = 0
+      })
+      mcontroller.controlJump(true)
     end
   )LUA"));
+                        ActorMovementParameters native_patch;
+                        native_patch.airJumpProfile.jumpInitialPercentage = 0.25f;
+                        (*controller)->controlParameters(native_patch);
                         ASSERT_TRUE(component.update<LuaValue>());
                         ASSERT_TRUE((*controller)->tickMaster(1.0f / 60.0f));
+                        // The jump uses the speed queued by Lua and the fraction
+                        // queued natively; later sparse patches must retain both.
+                        EXPECT_FLOAT_EQ((*controller)->yVelocity(), 3.0f);
                         auto active = component.eval<Json>(R"LUA(
     local p = mcontroller.parameters()
-    return {p.stopOnFirstBounce, p.enableSurfaceSlopeCorrection}
+    return {p.stopOnFirstBounce, p.enableSurfaceSlopeCorrection, p.gravityMultiplier}
   )LUA");
                         ASSERT_TRUE(active);
                         ASSERT_TRUE(*active);
-                        EXPECT_EQ(**active, (Json(JsonArray{false, true})));
+                        EXPECT_EQ(**active, (Json(JsonArray{false, true, 0})));
+                        ASSERT_TRUE(component.update<LuaValue>());
+                        ASSERT_TRUE((*controller)->tickMaster(1.0f / 60.0f));
+                        auto restored = component.eval<Json>(R"LUA(
+    local p = mcontroller.parameters()
+    return {p.stopOnFirstBounce, p.enableSurfaceSlopeCorrection, p.gravityMultiplier}
+  )LUA");
+                        ASSERT_TRUE(restored);
+                        ASSERT_TRUE(*restored);
+                        EXPECT_EQ(**restored, (Json(JsonArray{true, false, 1})));
                       });
 
 const GameTestRegistration clearedModBind("InputBindings", "ExplicitUnbindSurvivesReopeningInput", [](GameTest& fixture) {

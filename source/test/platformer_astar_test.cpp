@@ -9,6 +9,8 @@ import star.format;
 import star.game_test;
 import star.game_types;
 import star.lua;
+import star.lua_actor_movement_component;
+import star.lua_components;
 import star.lua_converters;
 import star.lua_game_converters;
 import star.lua_root;
@@ -399,6 +401,101 @@ const GameTestRegistration
       EXPECT_EQ(actor->position(), start - Vec2F(6, 0));
     });
   });
+
+const GameTestRegistration actor_path_budget("PathController", "ActorCollectsOneStepAndInvalidatesChangedSearch", [](GameTest& fixture) {
+  with_platform_world(fixture, [&](WorldServer& world, Vec2F origin, ActorMovementParameters parameters) {
+    parameters.gravityEnabled = false;
+    parameters.pathExploreRate = 1.0f;
+    auto created = ActorMovementController::create(fixture.root(), parameters);
+    ASSERT_TRUE(created) << created.error().what();
+    auto& actor = **created;
+    actor.init(world);
+    auto uninit = make_scope_exit([&] { actor.uninit(); });
+    Vec2F start = origin + Vec2F(0, 8.25f);
+    Vec2F blocked = origin + Vec2F(2, 3.25f); // Inside the fixture's wall.
+    actor.setPosition(start);
+    auto expect_step = [](auto result, std::optional<bool> expected) {
+      ASSERT_TRUE(result) << result.error().what();
+      EXPECT_EQ(*result, expected);
+    };
+    PlatformerAStar::Parameters limit;
+    limit.max_nodes_to_search = 2;
+    expect_step(actor.path_move(blocked, limit), {});
+    expect_step(actor.path_move(blocked, limit), {});
+    expect_step(actor.path_move(blocked, limit), false);
+    expect_step(actor.path_move(blocked, limit), {});
+    limit.max_nodes_to_search = 0;
+    expect_step(actor.path_move(blocked, limit), false); // Same target, different in-flight policy.
+
+    limit.max_nodes_to_search = 1;
+    expect_step(actor.control_path_move(blocked, false, limit), {});
+    ASSERT_TRUE(actor.tickMaster(1.0f / 60.0f));
+    expect_step(actor.path_move(blocked), false); // Tick exhausted the search; don't restart it to poll.
+    expect_step(actor.control_path_move(blocked, false, limit), {});
+    ASSERT_TRUE(actor.tickMaster(1.0f / 60.0f));
+    limit.max_nodes_to_search = 2;
+    expect_step(actor.path_move(blocked, limit), {}); // Old tick result does not match the new policy.
+
+    // Finish a short flight search, then change the policy before taking its first edge.
+    Vec2F nearby = start + Vec2F(1, 0);
+    expect_step(actor.path_move(nearby), {});
+    expect_step(actor.path_move(nearby), {});
+    ASSERT_FALSE(actor.pathfinding());
+    limit.max_nodes_to_search = 0;
+    expect_step(actor.path_move(nearby, limit), false);
+
+    // A background replan can also terminate inside move(), while an old edge is still active.
+    PathController controller(world);
+    limit.max_nodes_to_search = 2;
+    controller.set_parameters(limit);
+    expect_step(controller.find_path(actor, nearby), {});
+    expect_step(controller.find_path(actor, nearby), {});
+    ASSERT_TRUE(controller.current_action());
+    expect_step(controller.find_path(actor, blocked), {});
+    expect_step(controller.move(actor, parameters, actor.baseModifiers(), false, 0.0f), {});
+    expect_step(controller.move(actor, parameters, actor.baseModifiers(), false, 0.0f), false);
+  });
+});
+
+const GameTestRegistration lua_path_timing("PathController", "LuaObservesImmediateBufferedAndTickResults", [](GameTest& fixture) {
+  with_platform_world(fixture, [&](WorldServer& world, Vec2F origin, ActorMovementParameters parameters) {
+    parameters.gravityEnabled = false;
+    parameters.pathExploreRate = 1.0f;
+    auto created = ActorMovementController::create(fixture.root(), parameters);
+    ASSERT_TRUE(created) << created.error().what();
+    auto& actor = **created;
+    actor.init(world);
+    auto uninit = make_scope_exit([&] { actor.uninit(); });
+    Vec2F start = origin + Vec2F(0, 8.25f);
+    Vec2F blocked = origin + Vec2F(2, 3.25f);
+    actor.setPosition(start);
+    LuaActorScript script(fixture.root());
+    ASSERT_TRUE(script.add_actor_movement_callbacks(actor));
+    ASSERT_TRUE(script.init(world));
+    auto stop = make_scope_exit([&] { EXPECT_TRUE(script.uninit()); });
+    auto defined = script.eval<bool>(R"LUA(
+      function update(target, limit)
+        local reached = mcontroller.controlPathMove(target, false, {maxNodesToSearch = limit})
+        if reached == nil then return -1 end
+        return reached and 1 or 0
+      end
+      return true
+    )LUA");
+    ASSERT_TRUE(defined) << defined.error().what();
+    auto step = [&](Vec2F target, int limit, int expected) {
+      auto observed = script.update<int>(target, limit);
+      ASSERT_TRUE(observed) << observed.error().what();
+      EXPECT_EQ(*observed, std::optional<int>(expected));
+      ASSERT_TRUE(actor.tickMaster(1.0f / 60.0f));
+    };
+    step(start, 1, 1);    // Immediate success, not delayed to the next Lua update.
+    step(blocked, 1, -1); // Callback pending, perform_controls exhausts the search.
+    step(blocked, 1, 0);  // The buffered false is collected once.
+    step(blocked, 1, -1);
+    step(blocked, 2, -1); // Changed options invalidate the buffered result for this same position.
+    step(blocked, 2, 0);  // This time tickMaster exhausted it, after both script phases.
+  });
+});
 
 const GameTestRegistration
   platform_lua_contract("PlatformerAStar", "LuaNamesAndRepeatableResults", [](GameTest& fixture) {

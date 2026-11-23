@@ -1317,10 +1317,12 @@ std::expected<void, StarException> MovementController::updateParameters(Movement
   if (!parameters.groundFriction) return std::unexpected(MovementControllerException("Missing movement parameter 'groundFriction'"));
   if (!parameters.collisionPoly) return std::unexpected(MovementControllerException("Missing movement parameter 'collisionPoly'"));
   if (!parameters.mass) return std::unexpected(MovementControllerException("Missing movement parameter 'mass'"));
+  bool const refresh_interpolators = !m_parameters.mass || m_parameters.discontinuityThreshold != parameters.discontinuityThreshold;
   m_parameters = std::move(parameters);
   m_collisionPoly.set((*m_parameters.collisionPoly));
   m_mass.set((*m_parameters.mass));
-  updatePositionInterpolators();
+  if (refresh_interpolators)
+    updatePositionInterpolators();
   return {};
 }
 

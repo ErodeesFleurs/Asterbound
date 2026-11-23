@@ -842,6 +842,9 @@ including null and unassigned IDs. `EntitySnapshot` exercises a valid remote
 entity through the world server. The existing `Game/AStar/flat_walk8` benchmark
 is a world-scene comparison, not a timer for NPC offsets or ID lookup.
 
+For actor movement, `PathController.*` covers incremental search and Lua result
+delivery; `ActorMovementWire.*` checks the legacy field order. Neither the
+platform search benchmark nor its output fingerprint measures actor tick cost.
 
 | Area | Filtered command | Work |
 |---|---|---|

@@ -59,9 +59,10 @@ private:
   std::optional<bool> m_controlJump;
   bool m_controlHoldJump = false;
   std::optional<Vec2F> m_controlFly;
-  bool m_resetPathMove = false;
-  std::optional<std::pair<Vec2F, bool>> m_controlPathMove;
-  std::optional<std::pair<Vec2F, bool>> m_pathMoveResult;
+  bool m_reset_path_move = false;
+  std::optional<std::pair<Vec2F, bool>> m_control_path_move;
+  std::optional<std::pair<Vec2F, bool>> m_path_move_result;
+  std::optional<PlatformerAStar::Parameters> m_path_parameters;
 };
 
 [[nodiscard]] inline std::expected<void, StarException> LuaScriptMovement::add_actor_movement_callbacks(ActorMovementController& controller) {
@@ -71,31 +72,31 @@ private:
   auto callbacks = std::move(*built);
   callbacks.remove_callback("setVelocity");
   if (auto result = callbacks.register_callback("setVelocity", [&self = *this](Vec2F const& velocity) {
-    self.m_resetPathMove = true;
+    self.m_reset_path_move = true;
     self.m_movementController->get().setVelocity(velocity);
   }); !result)
     return std::unexpected(std::move(result.error()));
   callbacks.remove_callback("setXVelocity");
   if (auto result = callbacks.register_callback("setXVelocity", [&self = *this](float velocity) {
-    self.m_resetPathMove = true;
+    self.m_reset_path_move = true;
     self.m_movementController->get().setXVelocity(velocity);
   }); !result)
     return std::unexpected(std::move(result.error()));
   callbacks.remove_callback("setYVelocity");
   if (auto result = callbacks.register_callback("setYVelocity", [&self = *this](float velocity) {
-    self.m_resetPathMove = true;
+    self.m_reset_path_move = true;
     self.m_movementController->get().setYVelocity(velocity);
   }); !result)
     return std::unexpected(std::move(result.error()));
   callbacks.remove_callback("addMomentum");
   if (auto result = callbacks.register_callback("addMomentum", [&self = *this](Vec2F const& momentum) {
-    self.m_resetPathMove = true;
+    self.m_reset_path_move = true;
     self.m_movementController->get().addMomentum(momentum);
   }); !result)
     return std::unexpected(std::move(result.error()));
   callbacks.remove_callback("setRotation");
   if (auto result = callbacks.register_callback("setRotation", [&self = *this](float rotation) {
-    self.m_resetPathMove = true;
+    self.m_reset_path_move = true;
     self.m_movementController->get().setRotation(rotation);
   }); !result)
     return std::unexpected(std::move(result.error()));
@@ -160,8 +161,11 @@ private:
     self.m_controlApproachVelocityAlongAngle.emplace(std::numbers::pi / 2.0f, velocity, force, false);
   }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.register_callback("controlParameters", [&self = *this](ActorMovementParameters const& parameters) {
-    self.m_controlParameters = self.m_controlParameters.value_or(ActorMovementParameters{}).merge(parameters);
+  if (auto result = callbacks.register_callback("controlParameters", [&self = *this](ActorMovementParameters patch) {
+    if (self.m_controlParameters)
+      self.m_controlParameters->merge_from(std::move(patch));
+    else
+      self.m_controlParameters.emplace(std::move(patch));
   }); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback("controlModifiers", [&self = *this](ActorMovementModifiers const& modifiers) {
@@ -189,15 +193,19 @@ private:
   if (auto result = callbacks.register_callback("controlFly", [&self = *this](Vec2F const& velocity) { self.m_controlFly = velocity; }); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback("controlPathMove", [&self = *this](Vec2F const& position, std::optional<bool> run, std::optional<PlatformerAStar::Parameters> parameters) -> std::expected<std::optional<bool>, StarException> {
-    if (self.m_pathMoveResult && self.m_pathMoveResult->first == position)
-      return std::exchange(self.m_pathMoveResult, std::nullopt).transform([](auto const& result) { return result.second; });
-    self.m_pathMoveResult.reset();
-    auto result = self.m_movementController->get().pathMove(position, run.value_or(false), parameters);
-    if (!result)
-      return std::unexpected(std::move(result.error()));
-    if (!*result)
-      self.m_controlPathMove = std::pair<Vec2F, bool>(position, run.value_or(false));
-    return result->transform([](auto const& value) { return value.second; });
+    self.m_control_path_move.reset();
+    if (auto completed = std::exchange(self.m_path_move_result, {}); completed && completed->first == position
+        && (!parameters || parameters == self.m_path_parameters))
+      return completed->second;
+
+    // Scripts can observe an immediate terminal result. Only pending requests
+    // are replayed after the script update (including ticks between updates).
+    auto result = self.m_movementController->get().path_move(position, parameters);
+    if (result && !result->has_value()) {
+      self.m_control_path_move.emplace(position, run.value_or(false));
+      self.m_path_parameters = std::move(parameters);
+    }
+    return result;
   }); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback("pathfinding", [&self = *this]() { return self.m_movementController->get().pathfinding(); }); !result)
@@ -257,13 +265,15 @@ inline void LuaScriptMovement::set_auto_clear_controls(bool enabled) { m_autoCle
     m_movementController->get().controlJump();
   if (m_controlFly)
     m_movementController->get().controlFly(*m_controlFly);
-  if (m_resetPathMove)
-    m_controlPathMove.reset();
-  if (m_controlPathMove && !m_pathMoveResult) {
-    auto result = m_movementController->get().controlPathMove(m_controlPathMove->first, m_controlPathMove->second);
+  if (m_reset_path_move)
+    m_control_path_move.reset();
+  if (m_control_path_move && !m_path_move_result) {
+    auto const& [position, run] = *m_control_path_move;
+    auto result = m_movementController->get().control_path_move(position, run, m_path_parameters);
     if (!result)
       return std::unexpected(std::move(result.error()));
-    m_pathMoveResult = std::move(*result);
+    if (*result)
+      m_path_move_result.emplace(position, **result);
   }
   return {};
 }
@@ -283,10 +293,10 @@ inline void LuaScriptMovement::clear_controls() {
   m_controlJump.reset();
   m_controlHoldJump = false;
   m_controlFly.reset();
-  m_resetPathMove = false;
-  if (!m_controlPathMove)
-    m_pathMoveResult.reset();
-  m_controlPathMove.reset();
+  m_reset_path_move = false;
+  if (!m_control_path_move)
+    m_path_move_result.reset();
+  m_control_path_move.reset();
 }
 
 // Persistent entity scripts snapshot storage before stopping child threads.
