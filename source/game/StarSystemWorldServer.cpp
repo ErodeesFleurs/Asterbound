@@ -101,11 +101,11 @@ import star.static_random;
 import star.algorithm;
 namespace Star {
 
-SystemWorldServer::SystemWorldServer(Root& root, std::shared_ptr<Clock const> universeClock, std::shared_ptr<CelestialDatabase> celestialDatabase)
-  : SystemWorld(root, std::move(universeClock), std::move(celestialDatabase)), m_lastSpawn(0), m_objectSpawnTime(0) {}
+SystemWorldServer::SystemWorldServer(Root& root, std::shared_ptr<Clock const> universeClock, std::shared_ptr<CelestialDatabase> celestial_database)
+  : SystemWorld(root, std::move(universeClock), std::move(celestial_database)), m_lastSpawn(0), m_objectSpawnTime(0) {}
 
-std::expected<std::shared_ptr<SystemWorldServer>, StarException> SystemWorldServer::create(Root& root, Vec3I location, std::shared_ptr<Clock const> universeClock, std::shared_ptr<CelestialDatabase> celestialDatabase) {
-  auto server = std::shared_ptr<SystemWorldServer>(new SystemWorldServer(root, std::move(universeClock), std::move(celestialDatabase)));
+std::expected<std::shared_ptr<SystemWorldServer>, StarException> SystemWorldServer::create(Root& root, Vec3I location, std::shared_ptr<Clock const> universeClock, std::shared_ptr<CelestialDatabase> celestial_database) {
+  auto server = std::shared_ptr<SystemWorldServer>(new SystemWorldServer(root, std::move(universeClock), std::move(celestial_database)));
   auto initialized = server->initialize();
   if (!initialized)
     return std::unexpected(std::move(initialized.error()));
@@ -124,8 +124,8 @@ std::expected<std::shared_ptr<SystemWorldServer>, StarException> SystemWorldServ
   return server;
 }
 
-std::expected<std::shared_ptr<SystemWorldServer>, StarException> SystemWorldServer::create(Root& root, Json const& diskStore, std::shared_ptr<Clock const> universeClock, std::shared_ptr<CelestialDatabase> celestialDatabase) {
-  auto server = std::shared_ptr<SystemWorldServer>(new SystemWorldServer(root, std::move(universeClock), std::move(celestialDatabase)));
+std::expected<std::shared_ptr<SystemWorldServer>, StarException> SystemWorldServer::create(Root& root, Json const& diskStore, std::shared_ptr<Clock const> universeClock, std::shared_ptr<CelestialDatabase> celestial_database) {
+  auto server = std::shared_ptr<SystemWorldServer>(new SystemWorldServer(root, std::move(universeClock), std::move(celestial_database)));
   auto initialized = server->initialize();
   if (!initialized)
     return std::unexpected(std::move(initialized.error()));
@@ -206,11 +206,11 @@ std::expected<std::optional<std::pair<WarpAction, WarpMode>>, StarException> Sys
         return std::unexpected(std::move(planetPos.error()));
       if (std::abs(planetPos->magnitude() - position.magnitude()) > systemConfig().asteroidBeamDistance)
         continue;
-      auto parameters = m_celestialDatabase->parameters(planet);
+      auto parameters = m_celestial_database->parameters(planet);
       if (!parameters)
         return std::unexpected(std::move(parameters.error()));
       if (*parameters) {
-        if (auto asteroids = as<AsteroidsWorldParameters>((**parameters).visitableParameters())) {
+        if (auto asteroids = as<AsteroidsWorldParameters>((**parameters).visitable_parameters())) {
           float targetX = (position.angle() / (2 * std::numbers::pi)) * asteroids->worldSize[0];
           return std::optional(std::pair<WarpAction, WarpMode>(WarpToWorld(CelestialWorldId(planet), SpawnTargetX(targetX)), WarpMode::DeployOnly));
         }
@@ -345,7 +345,7 @@ std::expected<void, StarException> SystemWorldServer::removeObject(Uuid objectUu
 std::expected<bool, StarException> SystemWorldServer::addObject(std::shared_ptr<SystemObject> object, bool doRangeCheck) {
   if (doRangeCheck) {
     CelestialCoordinate system(m_location);
-    auto orbits = m_celestialDatabase->childOrbits(system);
+    auto orbits = m_celestial_database->child_orbits(system);
     if (!orbits)
       return std::unexpected(std::move(orbits.error()));
     auto outerOrbit = std::ranges::max_element(*orbits);
@@ -643,7 +643,7 @@ std::expected<Vec2F, StarException> SystemWorldServer::randomObjectSpawnPosition
   List<Vec2F> ranges;
   CelestialCoordinate system(m_location);
   auto const& config = systemConfig();
-  auto orbitList = m_celestialDatabase->childOrbits(system);
+  auto orbitList = m_celestial_database->child_orbits(system);
   if (!orbitList)
     return std::unexpected(std::move(orbitList.error()));
   auto orbits = orbitList->sorted();
@@ -704,7 +704,7 @@ std::expected<Vec2F, StarException> SystemWorldServer::randomObjectSpawnPosition
 std::expected<SkyParameters, StarException> SystemWorldServer::locationSkyParameters(SystemLocation const& location) const {
   SkyParameters sky = systemConfig().emptySkyParameters;
   if (std::holds_alternative<CelestialCoordinate>(location)) {
-    return SkyParameters::create(root(), std::get<CelestialCoordinate>(location), m_celestialDatabase);
+    return SkyParameters::create(root(), std::get<CelestialCoordinate>(location), m_celestial_database);
   } else if (std::holds_alternative<Vec2F>(location)) {
     auto const& position = std::get<Vec2F>(location);
     auto allPlanets = planets();
@@ -716,11 +716,11 @@ std::expected<SkyParameters, StarException> SystemWorldServer::locationSkyParame
         return std::unexpected(std::move(planetPos.error()));
       if (std::abs(position.magnitude() - planetPos->magnitude()) > systemConfig().asteroidBeamDistance)
         continue;
-      auto parameters = m_celestialDatabase->parameters(planet);
+      auto parameters = m_celestial_database->parameters(planet);
       if (!parameters)
         return std::unexpected(std::move(parameters.error()));
-      if (*parameters && is<AsteroidsWorldParameters>((**parameters).visitableParameters()))
-        return SkyParameters::create(root(), planet, m_celestialDatabase);
+      if (*parameters && is<AsteroidsWorldParameters>((**parameters).visitable_parameters()))
+        return SkyParameters::create(root(), planet, m_celestial_database);
     }
   } else if (!std::holds_alternative<std::monostate>(location)) {
     CelestialCoordinate target;
@@ -735,26 +735,26 @@ std::expected<SkyParameters, StarException> SystemWorldServer::locationSkyParame
     } else if (std::holds_alternative<CelestialOrbit>(location)) {
       target = std::get<CelestialOrbit>(location).target;
     }
-    if (target.isPlanetaryBody()) {
-      auto parameters = m_celestialDatabase->parameters(target);
+    if (target.is_planetary_body()) {
+      auto parameters = m_celestial_database->parameters(target);
       if (!parameters)
         return std::unexpected(std::move(parameters.error()));
       if (!*parameters)
         return std::unexpected(StarException("No celestial parameters for orbited planet"));
-      if (auto visitable = (**parameters).visitableParameters()) {
+      if (auto visitable = (**parameters).visitable_parameters()) {
         if (is<TerrestrialWorldParameters>(visitable)) {
           std::uint64_t seed = static_random_u64(Star::to_string(m_location));
           List<CelestialParameters> worlds;
-          auto planet = m_celestialDatabase->parameters(target);
+          auto planet = m_celestial_database->parameters(target);
           if (!planet)
             return std::unexpected(std::move(planet.error()));
           if (*planet)
             worlds.push_back(**planet);
-          auto children = m_celestialDatabase->children(target);
+          auto children = m_celestial_database->children(target);
           if (!children)
             return std::unexpected(std::move(children.error()));
           for (auto const& coordinate : *children) {
-            auto satellite = m_celestialDatabase->parameters(coordinate);
+            auto satellite = m_celestial_database->parameters(coordinate);
             if (!satellite)
               return std::unexpected(std::move(satellite.error()));
             if (*satellite)
@@ -763,13 +763,13 @@ std::expected<SkyParameters, StarException> SystemWorldServer::locationSkyParame
           for (std::size_t i = 0; i < worlds.size(); ++i) {
             auto const& world = worlds[i];
             Vec2F position{static_random_float(seed, world.seed(), "x"), static_random_float(seed, world.seed(), "y")};
-            auto drawables = CelestialGraphics::drawWorld(root(), world, i > 0 ? worlds[0] : CelestialParameters());
+            auto drawables = CelestialGraphics::draw_world(root(), world, i > 0 ? worlds[0] : CelestialParameters());
             if (!drawables)
               return std::unexpected(std::move(drawables.error()));
             sky.nearbyMoons.push_back({std::move(*drawables), position});
           }
         } else {
-          auto horizons = CelestialGraphics::worldHorizonImages(root(), **parameters);
+          auto horizons = CelestialGraphics::world_horizon_images(root(), **parameters);
           if (!horizons)
             return std::unexpected(std::move(horizons.error()));
           sky.horizonImages.insert_range_at(0, *horizons);

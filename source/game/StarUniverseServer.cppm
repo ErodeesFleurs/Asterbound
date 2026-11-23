@@ -224,7 +224,7 @@ public:
   std::shared_ptr<Clock> universeClock() const;
   std::shared_ptr<UniverseSettings> universeSettings() const;
 
-  std::shared_ptr<CelestialDatabase> celestialDatabase() override;
+  std::shared_ptr<CelestialDatabase> celestial_database() override;
 
   // If the client exists and is in a valid connection state, executes the
   // given function on the client world and player object in a thread safe way.
@@ -297,7 +297,7 @@ private:
   [[nodiscard]] std::expected<void, StarException> warpPlayers();
   [[nodiscard]] std::expected<void, StarException> flyShips();
   [[nodiscard]] std::expected<void, StarException> arriveShips();
-  [[nodiscard]] std::expected<void, StarException> respondToCelestialRequests();
+  [[nodiscard]] std::expected<void, StarException> respond_to_celestial_requests();
   [[nodiscard]] std::expected<void, StarException> processChat();
   [[nodiscard]] std::expected<void, StarException> clearBrokenWorlds();
   [[nodiscard]] std::expected<void, StarException> handleWorldMessages();
@@ -326,7 +326,7 @@ private:
   [[nodiscard]] std::expected<void, StarException> doPermBan(ConnectionId clientId, String const& reason, std::pair<bool, bool> banType);
   [[nodiscard]] std::expected<void, StarException> removeTimedBan();
 
-  [[nodiscard]] std::expected<void, StarException> addCelestialRequests(ConnectionId clientId, List<CelestialRequest> requests);
+  [[nodiscard]] std::expected<void, StarException> add_celestial_requests(ConnectionId clientId, List<CelestialRequest> requests);
 
   [[nodiscard]] std::expected<void, StarException> worldUpdated(WorldServerThread& worldServer);
   [[nodiscard]] std::expected<void, StarException> systemWorldUpdated(SystemWorldServerThread& systemWorldServer);
@@ -363,7 +363,7 @@ private:
   // generators
   [[nodiscard]] std::expected<std::optional<WorldServerPromise>, StarException> makeWorldPromise(WorldId const& worldId);
   [[nodiscard]] std::expected<std::optional<WorldServerPromise>, StarException> shipWorldPromise(ClientShipWorldId const& uuid);
-  [[nodiscard]] std::expected<std::optional<WorldServerPromise>, StarException> celestialWorldPromise(CelestialWorldId const& coordinate);
+  [[nodiscard]] std::expected<std::optional<WorldServerPromise>, StarException> celestial_world_promise(CelestialWorldId const& coordinate);
   [[nodiscard]] std::expected<std::optional<WorldServerPromise>, StarException> instanceWorldPromise(InstanceWorldId const& instanceWorld);
   [[nodiscard]] std::expected<std::optional<WorldServerPromise>, StarException> customWorldPromise(CustomWorldId const& customWorld, std::optional<std::shared_ptr<WorldTemplate>> worldTemplate = {});
   [[nodiscard]] std::expected<std::optional<WorldServerPromise>, StarException> clientCustomWorldPromise(ClientCustomWorldId const& clientCustomWorld, std::optional<std::shared_ptr<WorldTemplate>> worldTemplate = {});
@@ -385,7 +385,7 @@ private:
 
   // Get SkyParameters if the coordinate is a valid world, and empty
   // SkyParameters otherwise.
-  [[nodiscard]] std::expected<SkyParameters, StarException> celestialSkyParameters(CelestialCoordinate const& coordinate) const;
+  [[nodiscard]] std::expected<SkyParameters, StarException> celestial_sky_parameters(CelestialCoordinate const& coordinate) const;
 
   Root& m_root;
 
@@ -398,7 +398,7 @@ private:
   LockFile m_storage_directory_lock;
   ByteArray m_assetsDigest;
   StringMap<StringList> m_speciesShips;
-  std::shared_ptr<CelestialMasterDatabase> m_celestialDatabase;
+  std::shared_ptr<CelestialMasterDatabase> m_celestial_database;
   std::shared_ptr<Clock> m_universeClock;
   std::shared_ptr<UniverseSettings> m_universeSettings;
   WorkerPool m_workerPool;
@@ -443,7 +443,7 @@ private:
   HashMap<ConnectionId, std::tuple<Vec3I, SystemLocation, Json>> m_pendingFlights;
   HashMap<ConnectionId, CelestialCoordinate> m_pendingArrivals;
   HashMap<ConnectionId, String> m_pendingDisconnections;
-  HashMap<ConnectionId, List<WorkerPoolPromise<CelestialResponse>>> m_pendingCelestialRequests;
+  HashMap<ConnectionId, List<WorkerPoolPromise<CelestialResponse>>> m_pending_celestial_requests;
   List<std::pair<WorldId, UniverseFlagAction>> m_pendingFlagActions;
   HashMap<ConnectionId, List<std::tuple<String, ChatSendMode, JsonObject>>> m_pendingChat;
   std::optional<WorkerPoolPromise<CelestialCoordinate>> m_nextRandomizedStarterWorld;

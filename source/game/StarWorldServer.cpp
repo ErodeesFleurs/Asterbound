@@ -435,7 +435,7 @@ std::expected<void, StarException> WorldServer::initLua(UniverseServer& universe
   if (!result5)
     return std::unexpected(std::move(result5.error()));
   m_luaThreadCallbacks["universe"] = std::move(*result5);
-  auto result6 = LuaBindings::makeCelestialCallbacks(this->root(), universe);
+  auto result6 = LuaBindings::make_celestial_callbacks(this->root(), universe);
   if (!result6)
     return std::unexpected(std::move(result6.error()));
   m_luaThreadCallbacks["celestial"] = std::move(*result6);

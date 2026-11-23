@@ -247,6 +247,9 @@ set (star_game_tests_SOURCES
       ambient_test.cpp
       biome_placement_test.cpp
       camera_presentation_test.cpp
+      celestial_cache_test.cpp
+      celestial_persistence_test.cpp
+      celestial_value_test.cpp
       damage_database_test.cpp
       function_test.cpp
       humanoid_render_test.cpp

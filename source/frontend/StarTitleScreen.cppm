@@ -184,7 +184,7 @@ private:
   String m_password;
   bool m_forceLegacy;
 
-  std::shared_ptr<CelestialMasterDatabase> m_celestialDatabase;
+  std::shared_ptr<CelestialMasterDatabase> m_celestial_database;
 
   std::shared_ptr<Mixer> m_mixer;
 

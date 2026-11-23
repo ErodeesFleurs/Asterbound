@@ -169,7 +169,7 @@ std::expected<QuestParam, StarException> QuestParam::diskLoad(Root& root, Json c
   } else if (std::holds_alternative<QuestNpcType>(detail)) {
     auto const& npc = std::get<QuestNpcType>(detail);
     return JsonObject{{"type", "npcType"}, {"species", npc.species}, {"typeName", npc.typeName}, {"parameters", npc.parameters}, {"seed", json_from_optional(npc.seed)}};
-  } else if (std::holds_alternative<QuestCoordinate>(detail)) return JsonObject{{"type", "coordinate"}, {"coordinate", std::get<QuestCoordinate>(detail).coordinate.toJson()}};
+  } else if (std::holds_alternative<QuestCoordinate>(detail)) return JsonObject{{"type", "coordinate"}, {"coordinate", std::get<QuestCoordinate>(detail).coordinate.to_json()}};
   else if (std::holds_alternative<QuestJson>(detail)) return std::get<QuestJson>(detail).set("type", "json");
   return JsonObject{{"type", "noDetail"}};
 }

@@ -153,9 +153,9 @@ static std::expected<void, StarException> run(std::span<String const> argv) {
     if (auto written = Star::print(" done\n"); !written)
       return std::unexpected(std::move(written.error()));
 
-    auto celestialDatabase = CelestialMasterDatabase::create(*root);
-    if (!celestialDatabase)
-      return std::unexpected(std::move(celestialDatabase.error()));
+    auto celestial_database = CelestialMasterDatabase::create(*root);
+    if (!celestial_database)
+      return std::unexpected(std::move(celestial_database.error()));
 
     CelestialCoordinate coordinate;
     if (auto coordinate_text = options.first_parameter("coordinate")) {
@@ -164,11 +164,11 @@ static std::expected<void, StarException> run(std::span<String const> argv) {
         return std::unexpected(std::move(parsed.error()));
       coordinate = std::move(*parsed);
     } else {
-      auto found = (*celestialDatabase)->findRandomWorld(100, 50, [&](CelestialCoordinate const& coord) -> std::expected<bool, StarException> {
-          auto parameters = (*celestialDatabase)->parameters(coord);
+      auto found = (*celestial_database)->find_random_world(100, 50, [&](CelestialCoordinate const& coord) -> std::expected<bool, StarException> {
+          auto parameters = (*celestial_database)->parameters(coord);
           if (!parameters)
             return std::unexpected(std::move(parameters.error()));
-          return *parameters && (**parameters).isVisitable();
+          return *parameters && (**parameters).is_visitable();
         });
       if (!found)
         return std::unexpected(std::move(found.error()));
@@ -190,12 +190,12 @@ static std::expected<void, StarException> run(std::span<String const> argv) {
     if (auto written = Star::print("testing generation on coordinate {}\n", coordinate); !written)
       return std::unexpected(std::move(written.error()));
 
-    auto worldParameters = (*celestialDatabase)->parameters(coordinate);
+    auto worldParameters = (*celestial_database)->parameters(coordinate);
     if (!worldParameters)
       return std::unexpected(std::move(worldParameters.error()));
     if (!*worldParameters)
       return std::unexpected(StarException("Could not find world to generate, try again"));
-    auto createdTemplate = WorldTemplate::create(*root, (**worldParameters).visitableParameters(), SkyParameters(), (**worldParameters).seed());
+    auto createdTemplate = WorldTemplate::create(*root, (**worldParameters).visitable_parameters(), SkyParameters(), (**worldParameters).seed());
     if (!createdTemplate)
       return std::unexpected(std::move(createdTemplate.error()));
     auto worldTemplate = std::move(*createdTemplate);

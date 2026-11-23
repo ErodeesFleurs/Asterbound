@@ -80,7 +80,6 @@ import star.byte_array;
 namespace Star {
 
 class Root;
-class CelestialLog;
 
 class ClientContext {
 public:
@@ -146,6 +145,5 @@ private:
 export module star.client_context;
 
 export namespace Star {
-using ::Star::CelestialLog;
 using ::Star::ClientContext;
 }

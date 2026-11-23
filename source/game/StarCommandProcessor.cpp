@@ -218,7 +218,7 @@ std::expected<std::shared_ptr<CommandProcessor>, StarException> CommandProcessor
   processor->m_luaRoot->tune_auto_garbage_collection(*pause, *step);
   auto universeCallbacks = LuaBindings::makeUniverseServerCallbacks(root, universe);
   if (!universeCallbacks) return std::unexpected(std::move(universeCallbacks.error()));
-  auto celestialCallbacks = LuaBindings::makeCelestialCallbacks(root, universe);
+  auto celestialCallbacks = LuaBindings::make_celestial_callbacks(root, universe);
   if (!celestialCallbacks) return std::unexpected(std::move(celestialCallbacks.error()));
   auto universeAdded = processor->m_scriptComponent.add_callbacks("universe", *universeCallbacks);
   if (!universeAdded) return std::unexpected(std::move(universeAdded.error()));
@@ -418,13 +418,13 @@ std::expected<String, StarException> CommandProcessor::warpRandom(ConnectionId c
   if (!permission) return std::unexpected(std::move(permission.error()));
   if (*permission) return **permission;
   Vec2I size = {2, 2};
-  auto celestialDatabase = m_universe.celestialDatabase();
+  auto celestial_database = m_universe.celestial_database();
   std::optional<CelestialCoordinate> target;
   auto validPlanet = [&](CelestialCoordinate const& planet) -> std::expected<bool, StarException> {
-    auto parameters = celestialDatabase->parameters(planet);
+    auto parameters = celestial_database->parameters(planet);
     if (!parameters) return std::unexpected(std::move(parameters.error()));
     if (*parameters) {
-      if (auto visitable = (*parameters)->visitableParameters())
+      if (auto visitable = (*parameters)->visitable_parameters())
         return visitable->typeName == typeName;
     }
     return false;
@@ -432,23 +432,23 @@ std::expected<String, StarException> CommandProcessor::warpRandom(ConnectionId c
   while (!target) {
     RectI region = RectI::with_size(Vec2I(m_root.random().next_i32(), m_root.random().next_i32()), size);
     while (true) {
-      auto loaded = celestialDatabase->scanRegionFullyLoaded(region);
+      auto loaded = celestial_database->scan_region_fully_loaded(region);
       if (!loaded) return std::unexpected(std::move(loaded.error()));
       if (*loaded) break;
-      auto scanned = celestialDatabase->scanSystems(region);
+      auto scanned = celestial_database->scan_systems(region);
       if (!scanned) return std::unexpected(std::move(scanned.error()));
     }
-    auto systems = celestialDatabase->scanSystems(region);
+    auto systems = celestial_database->scan_systems(region);
     if (!systems) return std::unexpected(std::move(systems.error()));
     for (auto const& system : *systems) {
-      auto planets = celestialDatabase->children(system);
+      auto planets = celestial_database->children(system);
       if (!planets) return std::unexpected(std::move(planets.error()));
       for (auto const& planet : *planets) {
         auto valid = validPlanet(planet);
         if (!valid) return std::unexpected(std::move(valid.error()));
         if (*valid) target = planet;
         if (!target) {
-          auto moons = celestialDatabase->children(planet);
+          auto moons = celestial_database->children(planet);
           if (!moons) return std::unexpected(std::move(moons.error()));
           for (auto const& moon : *moons) {
             auto validMoon = validPlanet(moon);
@@ -1607,13 +1607,13 @@ std::expected<String, StarException> CommandProcessor::setWeather(ConnectionId c
     }
   }
   std::expected<bool, StarException> done;
-  if (coordinate.isNull()) {
+  if (coordinate.is_null()) {
     done = m_universe.executeForClient(connectionId, [weatherName, force](WorldServer& world, std::shared_ptr<Player> const& player) -> std::expected<void, StarException> { return world.setWeather(player->position(), weatherName, force); });
   } else {
     done = m_universe.setWeather(coordinate, weatherName, force);
   }
   if (!done) return std::unexpected(std::move(done.error()));
-  return *done ? (coordinate.isNull() ? Star::format("set weather to {}{}", weatherName, force ? std::string_view(" (forced)") : std::string_view()) : Star::format("set weather for {} to {}{}", coordinate, weatherName, force ? std::string_view(" (forced)") : std::string_view())) : String("failed to set weather");
+  return *done ? (coordinate.is_null() ? Star::format("set weather to {}{}", weatherName, force ? std::string_view(" (forced)") : std::string_view()) : Star::format("set weather for {} to {}{}", coordinate, weatherName, force ? std::string_view(" (forced)") : std::string_view())) : String("failed to set weather");
 }
 
 

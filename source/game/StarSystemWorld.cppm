@@ -107,7 +107,7 @@ class SystemWorld {
 public:
   Root& root() const { return m_root; }
 public:
-  SystemWorld(Root& root, std::shared_ptr<Clock const> universeClock, std::shared_ptr<CelestialDatabase> celestialDatabase);
+  SystemWorld(Root& root, std::shared_ptr<Clock const> universeClock, std::shared_ptr<CelestialDatabase> celestial_database);
 
   virtual ~SystemWorld() = default;
 
@@ -138,7 +138,7 @@ public:
 protected:
   [[nodiscard]] std::expected<void, StarException> initialize();
   Vec3I m_location;
-  std::shared_ptr<CelestialDatabase> m_celestialDatabase;
+  std::shared_ptr<CelestialDatabase> m_celestial_database;
 
 private:
   std::shared_ptr<Clock const> m_universeClock;

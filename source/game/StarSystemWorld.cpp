@@ -90,7 +90,7 @@ std::expected<CelestialOrbit, StarException> CelestialOrbit::fromJson(Json const
 
 Json CelestialOrbit::toJson() const {
   JsonObject json;
-  json.set("target", target.toJson());
+  json.set("target", target.to_json());
   json.set("direction", direction);
   json.set("enterTime", enterTime);
   json.set("enterPosition", json_from_vec2f(enterPosition));
@@ -199,7 +199,7 @@ std::expected<SystemLocation, StarException> jsonToSystemLocation(Json const& js
 
 Json jsonFromSystemLocation(SystemLocation const& location) {
   if (std::holds_alternative<CelestialCoordinate>(location))
-    return JsonArray{"coordinate", std::get<CelestialCoordinate>(location).toJson()};
+    return JsonArray{"coordinate", std::get<CelestialCoordinate>(location).to_json()};
   else if (std::holds_alternative<CelestialOrbit>(location))
     return JsonArray{"orbit", std::get<CelestialOrbit>(location).toJson()};
   else if (std::holds_alternative<Uuid>(location))
@@ -316,8 +316,8 @@ std::expected<SystemWorldConfig, StarException> SystemWorldConfig::fromJson(Json
   return config;
 }
 
-SystemWorld::SystemWorld(Root& root, std::shared_ptr<Clock const> universeClock, std::shared_ptr<CelestialDatabase> celestialDatabase)
-  : m_root(root), m_celestialDatabase(std::move(celestialDatabase)), m_universeClock(std::move(universeClock)) {}
+SystemWorld::SystemWorld(Root& root, std::shared_ptr<Clock const> universeClock, std::shared_ptr<CelestialDatabase> celestial_database)
+  : m_root(root), m_celestial_database(std::move(celestial_database)), m_universeClock(std::move(universeClock)) {}
 
 std::expected<void, StarException> SystemWorld::initialize() {
   auto assets = root().assets();
@@ -346,26 +346,26 @@ Vec3I SystemWorld::location() const {
 }
 
 std::expected<List<CelestialCoordinate>, StarException> SystemWorld::planets() const {
-  return m_celestialDatabase->children(CelestialCoordinate(m_location));
+  return m_celestial_database->children(CelestialCoordinate(m_location));
 }
 
 std::expected<std::uint64_t, StarException> SystemWorld::coordinateSeed(CelestialCoordinate const& coordinate, String const& seedMix) const {
   int satellite = 0;
   int planet = 0;
-  if (coordinate.isSatelliteBody()) {
-    auto satelliteOrbit = coordinate.orbitNumber();
+  if (coordinate.is_satellite_body()) {
+    auto satelliteOrbit = coordinate.orbit_number();
     if (!satelliteOrbit)
       return std::unexpected(std::move(satelliteOrbit.error()));
     satellite = *satelliteOrbit;
     auto parent = coordinate.parent();
     if (!parent)
       return std::unexpected(std::move(parent.error()));
-    auto parentOrbit = parent->orbitNumber();
+    auto parentOrbit = parent->orbit_number();
     if (!parentOrbit)
       return std::unexpected(std::move(parentOrbit.error()));
     planet = *parentOrbit;
-  } else if (coordinate.isPlanetaryBody()) {
-    auto orbit = coordinate.orbitNumber();
+  } else if (coordinate.is_planetary_body()) {
+    auto orbit = coordinate.orbit_number();
     if (!orbit)
       return std::unexpected(std::move(orbit.error()));
     // Preserve the original planetary seed's boolean orbit component.
@@ -380,7 +380,7 @@ std::expected<float, StarException> SystemWorld::planetOrbitDistance(CelestialCo
   if (!seed)
     return std::unexpected(std::move(seed.error()));
   RandomSource random(*seed);
-  if (coordinate.isSystem() || coordinate.isNull())
+  if (coordinate.is_system() || coordinate.is_null())
     return 0;
   auto parent = coordinate.parent();
   if (!parent)
@@ -389,7 +389,7 @@ std::expected<float, StarException> SystemWorld::planetOrbitDistance(CelestialCo
   if (!parentSize)
     return std::unexpected(std::move(parentSize.error()));
   float distance = *parentSize / 2.0;
-  auto orbit = coordinate.orbitNumber();
+  auto orbit = coordinate.orbit_number();
   if (!orbit)
     return std::unexpected(std::move(orbit.error()));
   for (int i = 0; i < *orbit; ++i) {
@@ -402,12 +402,12 @@ std::expected<float, StarException> SystemWorld::planetOrbitDistance(CelestialCo
         return std::unexpected(std::move(size.error()));
       distance += *size;
     }
-    if (coordinate.isPlanetaryBody()) {
+    if (coordinate.is_planetary_body()) {
       auto padding = random.uniform_float(m_config.planetaryOrbitPadding[0], m_config.planetaryOrbitPadding[1]);
       if (!padding)
         return std::unexpected(std::move(padding.error()));
       distance += *padding;
-    } else if (coordinate.isSatelliteBody()) {
+    } else if (coordinate.is_satellite_body()) {
       auto padding = random.uniform_float(m_config.satelliteOrbitPadding[0], m_config.satelliteOrbitPadding[1]);
       if (!padding)
         return std::unexpected(std::move(padding.error()));
@@ -428,7 +428,7 @@ float SystemWorld::orbitInterval(float distance, bool isMoon) const {
 
 std::expected<Vec2F, StarException> SystemWorld::orbitPosition(CelestialOrbit const& orbit) const {
   Vec2F targetPosition(0, 0);
-  if (orbit.target.isPlanetaryBody() || orbit.target.isSatelliteBody()) {
+  if (orbit.target.is_planetary_body() || orbit.target.is_satellite_body()) {
     auto position = planetPosition(orbit.target);
     if (!position)
       return std::unexpected(std::move(position.error()));
@@ -442,18 +442,18 @@ std::expected<Vec2F, StarException> SystemWorld::orbitPosition(CelestialOrbit co
 }
 
 std::expected<float, StarException> SystemWorld::clusterSize(CelestialCoordinate const& coordinate) const {
-  if (coordinate.isPlanetaryBody()) {
+  if (coordinate.is_planetary_body()) {
     auto parent = coordinate.parent();
     if (!parent)
       return std::unexpected(std::move(parent.error()));
-    auto orbits = m_celestialDatabase->childOrbits(*parent);
+    auto orbits = m_celestial_database->child_orbits(*parent);
     if (!orbits)
       return std::unexpected(std::move(orbits.error()));
-    auto orbit = coordinate.orbitNumber();
+    auto orbit = coordinate.orbit_number();
     if (!orbit)
       return std::unexpected(std::move(orbit.error()));
     if (orbits->contains(*orbit)) {
-      auto childOrbits = m_celestialDatabase->childOrbits(coordinate);
+      auto childOrbits = m_celestial_database->child_orbits(coordinate);
       if (!childOrbits)
         return std::unexpected(std::move(childOrbits.error()));
       auto outerOrbit = std::ranges::max_element(*childOrbits);
@@ -475,26 +475,26 @@ std::expected<float, StarException> SystemWorld::clusterSize(CelestialCoordinate
 }
 
 std::expected<float, StarException> SystemWorld::planetSize(CelestialCoordinate const& coordinate) const {
-  if (coordinate.isNull())
+  if (coordinate.is_null())
     return 0;
-  if (coordinate.isSystem())
+  if (coordinate.is_system())
     return m_config.starSize;
   auto parent = coordinate.parent();
   if (!parent)
     return std::unexpected(std::move(parent.error()));
-  auto orbits = m_celestialDatabase->childOrbits(*parent);
+  auto orbits = m_celestial_database->child_orbits(*parent);
   if (!orbits)
     return std::unexpected(std::move(orbits.error()));
-  auto orbit = coordinate.orbitNumber();
+  auto orbit = coordinate.orbit_number();
   if (!orbit)
     return std::unexpected(std::move(orbit.error()));
   if (!orbits->contains(*orbit))
     return m_config.emptyOrbitSize;
-  auto parameters = m_celestialDatabase->parameters(coordinate);
+  auto parameters = m_celestial_database->parameters(coordinate);
   if (!parameters)
     return std::unexpected(std::move(parameters.error()));
   if (*parameters) {
-    if (auto visitable = (**parameters).visitableParameters()) {
+    if (auto visitable = (**parameters).visitable_parameters()) {
       if (is<FloatingDungeonWorldParameters>(visitable))
         if (auto size = m_config.floatingDungeonWorldSizes.maybe(visitable->typeName))
           return *size;
@@ -511,7 +511,7 @@ std::expected<float, StarException> SystemWorld::planetSize(CelestialCoordinate 
 }
 
 std::expected<Vec2F, StarException> SystemWorld::planetPosition(CelestialCoordinate const& coordinate) const {
-  if (coordinate.isNull() || coordinate.isSystem())
+  if (coordinate.is_null() || coordinate.is_system())
     return Vec2F(0, 0);
   auto seed = coordinateSeed(coordinate, "PlanetSystemPosition");
   if (!seed)
@@ -526,7 +526,7 @@ std::expected<Vec2F, StarException> SystemWorld::planetPosition(CelestialCoordin
   auto distance = planetOrbitDistance(coordinate);
   if (!distance)
     return std::unexpected(std::move(distance.error()));
-  float interval = orbitInterval(*distance, coordinate.isSatelliteBody());
+  float interval = orbitInterval(*distance, coordinate.is_satellite_body());
   double start = random.uniform_float();
   double offset = std::fmod(m_universeClock->time(), interval) / interval;
   int direction = random.uniform_float() > 0.5 ? 1 : -1;
@@ -657,12 +657,12 @@ std::expected<std::optional<WarpAction>, StarException> SystemWorld::objectWarpA
     if (std::holds_alternative<InstanceWorldId>(warpToWorld.world)) {
       auto& instanceWorldId = std::get<InstanceWorldId>(warpToWorld.world);
       instanceWorldId.uuid = object->uuid();
-      auto parameters = m_celestialDatabase->parameters(CelestialCoordinate(m_location));
+      auto parameters = m_celestial_database->parameters(CelestialCoordinate(m_location));
       if (!parameters)
         return std::unexpected(std::move(parameters.error()));
       if (!*parameters)
         return std::optional<WarpAction>{};
-      auto threatData = (**parameters).getParameter("spaceThreatLevel");
+      auto threatData = (**parameters).get_parameter("spaceThreatLevel");
       if (!threatData)
         return std::unexpected(std::move(threatData.error()));
       auto threat = threatData->opt_float();
@@ -832,10 +832,10 @@ std::expected<void, StarException> SystemObject::serverUpdate(SystemWorldServer&
     setPosition(*position);
   } else if (m_config.permanent || !m_config.moving) {
     enterOrbit(CelestialCoordinate(system.location()), {0.0, 0.0}, system.time());
-  } else if (m_approach && !m_approach->isNull()) {
+  } else if (m_approach && !m_approach->is_null()) {
     if (!system.shipsAtLocation(m_uuid).empty())
       return {};
-    if (m_approach->isPlanetaryBody()) {
+    if (m_approach->is_planetary_body()) {
       auto approach = system.planetPosition(*m_approach);
       if (!approach)
         return std::unexpected(std::move(approach.error()));

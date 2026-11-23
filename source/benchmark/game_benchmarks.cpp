@@ -2,6 +2,10 @@
 #include <benchmark/benchmark.h>
 
 import std;
+import star.celestial_database;
+import star.celestial_coordinate;
+import star.celestial_parameters;
+import star.celestial_types;
 import star.biome;
 import star.biome_placement;
 import star.plant_database;
@@ -823,6 +827,95 @@ int main(int argc, char** argv) {
     return 1;
   }
   BenchmarkSession session{**root};
+  for (std::string_view scenario : {"ColdFourChunks", "HotSatelliteName", "LoadedSlaveScan"}) {
+    benchmark::RegisterBenchmark(std::string("Game/Celestial/").append(scenario).c_str(), [&, scenario](benchmark::State& state) {
+      auto master = CelestialMasterDatabase::create(session.root);
+      if (!master) return session.fail(state, master.error());
+      auto base = (*master)->base_information();
+      int const side = base.chunk_size;
+      RectI region(Vec2I(-side, -side), Vec2I(side, side));
+      auto systems = (*master)->scan_systems(region);
+      if (!systems) return session.fail(state, systems.error());
+      std::optional<CelestialCoordinate> moon;
+      std::uint64_t fingerprint = 14695981039346656037ull;
+      auto mix = [&](std::uint64_t v) { fingerprint = (fingerprint ^ v) * 1099511628211ull; };
+      auto record = [&](CelestialCoordinate const& coord) -> std::expected<void, StarException> {
+        auto p = (*master)->parameters(coord);
+        if (!p) return std::unexpected(std::move(p.error()));
+        if (!*p) return std::unexpected(StarException("Missing generated body"));
+        mix((**p).seed());
+        for (auto const& s : {coord.id(), (**p).name()}) {
+          for (unsigned char c : s.utf8()) mix(c);
+          mix(256);
+        }
+        return {};
+      };
+      for (auto const& system : *systems) {
+        if (auto r = record(system); !r) return session.fail(state, r.error());
+        auto planets = (*master)->children(system);
+        if (!planets) return session.fail(state, planets.error());
+        for (auto const& planet : *planets) {
+          if (auto r = record(planet); !r) return session.fail(state, r.error());
+          auto satellites = (*master)->children(planet);
+          if (!satellites) return session.fail(state, satellites.error());
+          for (auto const& satellite : *satellites) {
+            if (!moon) moon = satellite;
+            if (auto r = record(satellite); !r) return session.fail(state, r.error());
+          }
+        }
+      }
+      if (!moon) return session.fail(state, "Expected a moon in the fixed four-chunk fixture");
+      auto lines = (*master)->scan_constellation_lines(region);
+      if (!lines) return session.fail(state, lines.error());
+      for (auto const& [from, to] : *lines) {
+        mix(from[0]); mix(from[1]); mix(to[0]); mix(to[1]);
+      }
+      state.SetLabel(std::to_string(fingerprint));
+      if (scenario == "ColdFourChunks") {
+        for (auto _ : state) {
+          state.PauseTiming();
+          auto fresh = CelestialMasterDatabase::create(session.root);
+          if (!fresh) { state.ResumeTiming(); return session.fail(state, fresh.error()); }
+          state.ResumeTiming();
+          auto found = (*fresh)->scan_systems(region);
+          if (!found) return session.fail(state, found.error());
+          benchmark::DoNotOptimize(*found);
+          state.PauseTiming();
+          fresh->reset();
+          state.ResumeTiming();
+        }
+      } else if (scenario == "HotSatelliteName") {
+        for (auto _ : state) {
+          auto name = (*master)->name(*moon);
+          if (!name) return session.fail(state, name.error());
+          benchmark::DoNotOptimize(*name);
+        }
+      } else {
+        auto assets = session.root.assets();
+        if (!assets) return session.fail(state, assets.error());
+        auto slave = CelestialSlaveDatabase::create(*assets, session.root.random(), base);
+        if (!slave) return session.fail(state, slave.error());
+        auto signaled = (*slave)->signal_region(region);
+        if (!signaled) return session.fail(state, signaled.error());
+        List<CelestialResponse> responses;
+        for (auto const& request : (*slave)->pull_requests()) {
+          auto response = (*master)->respond_to_request(request);
+          if (!response) return session.fail(state, response.error());
+          responses.push_back(std::move(*response));
+        }
+        auto pushed = (*slave)->push_responses(std::move(responses));
+        if (!pushed) return session.fail(state, pushed.error());
+        auto loaded = (*slave)->scan_systems(region);
+        if (!loaded) return session.fail(state, loaded.error());
+        if (*loaded != *systems) return session.fail(state, "Slave and master system scans differ");
+        for (auto _ : state) {
+          auto found = (*slave)->scan_systems(region);
+          if (!found) return session.fail(state, found.error());
+          benchmark::DoNotOptimize(*found);
+        }
+      }
+    });
+  }
   for (std::string_view scenario : {"FirstTree", "Build16", "Sample128", "RandomSample128"}) {
     benchmark::RegisterBenchmark(std::string("Game/Biome/").append(scenario).c_str(), [&, scenario](benchmark::State& state) {
       auto plants = session.root.plantDatabase();

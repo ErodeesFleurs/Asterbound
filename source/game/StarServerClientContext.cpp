@@ -714,7 +714,7 @@ std::expected<Json, StarException> ServerClientContext::storeServerData() {
   if (!returnWarp)
     return std::unexpected(std::move(returnWarp.error()));
   return JsonObject{
-    {"shipCoordinate", m_shipCoordinate.get().toJson()},
+    {"shipCoordinate", m_shipCoordinate.get().to_json()},
     {"systemLocation", std::move(location)},
     {"isAdmin", m_isAdminNetState.get()},
     {"team", std::move(*teamData)},

@@ -1728,7 +1728,7 @@ std::expected<void, StarException> ClientApplication::prepareSessionInterface() 
       !installed)
     return installed;
   if (auto installed =
-        installLuaCallbacks("celestial", LuaBindings::makeCelestialCallbacks(*m_root, *m_universeClient));
+        installLuaCallbacks("celestial", LuaBindings::make_celestial_callbacks(*m_root, *m_universeClient));
       !installed)
     return installed;
   if (auto installed =

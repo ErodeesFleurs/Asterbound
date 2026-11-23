@@ -778,7 +778,7 @@ std::expected<void, StarException> MainInterface::synchronizeUiSession() {
     if (!callbacks) return std::unexpected(std::move(callbacks.error()));
     m_uiCapabilities.set("team", std::move(*callbacks));
   }
-  auto celestial = LuaBindings::makeCelestialCallbacks(context().root(), *m_client);
+  auto celestial = LuaBindings::make_celestial_callbacks(context().root(), *m_client);
   if (!celestial) return std::unexpected(std::move(celestial.error()));
   m_uiCapabilities.set("celestial", std::move(*celestial));
   auto chat = LuaBindings::makeChatCallbacks(*this, *m_client);

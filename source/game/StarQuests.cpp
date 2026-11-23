@@ -883,7 +883,7 @@ std::expected<void, StarException> Quest::initScriptBindings() {
   auto addedQuest = m_scriptComponent.add_callbacks("quest", std::move(*quest));
   if (!addedQuest) return std::unexpected(std::move(addedQuest.error()));
   if (m_client) {
-    auto celestial = LuaBindings::makeCelestialCallbacks(m_root, m_client->get());
+    auto celestial = LuaBindings::make_celestial_callbacks(m_root, m_client->get());
     if (!celestial) return std::unexpected(std::move(celestial.error()));
     auto addedCelestial = m_scriptComponent.add_callbacks("celestial", std::move(*celestial));
     if (!addedCelestial) return std::unexpected(std::move(addedCelestial.error()));

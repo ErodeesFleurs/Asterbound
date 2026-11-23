@@ -123,7 +123,6 @@ class ParticleManager;
 class UniverseClient;
 class Player;
 class Item;
-class CelestialLog;
 class ClientContext;
 class PlayerStorage;
 struct OverheadBar;
@@ -639,7 +638,6 @@ export module star.world_client;
 
 export namespace Star {
   using ::Star::Biome;
-  using ::Star::CelestialLog;
   using ::Star::ClientContext;
   using ::Star::DamageManager;
   using ::Star::ClientLightingResult;

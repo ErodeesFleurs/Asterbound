@@ -221,7 +221,7 @@ std::expected<std::shared_ptr<ScriptPane>, StarException> ScriptPane::create(Gui
   auto statusAdded = pane->m_script.add_callbacks("status", std::move(*status));
   if (!statusAdded)
     return std::unexpected(std::move(statusAdded.error()));
-  auto celestial = LuaBindings::makeCelestialCallbacks(guiContext.root(), *pane->m_client);
+  auto celestial = LuaBindings::make_celestial_callbacks(guiContext.root(), *pane->m_client);
   if (!celestial)
     return std::unexpected(std::move(celestial.error()));
   auto celestialAdded = pane->m_script.add_callbacks("celestial", std::move(*celestial));

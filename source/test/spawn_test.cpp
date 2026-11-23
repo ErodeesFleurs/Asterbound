@@ -85,14 +85,14 @@ validateWorld(Root& root, TestUniverse& testUniverse, std::int64_t timeoutMillis
 }
 
 const GameTestRegistration randomCelestialWorld("SpawnTest", "RandomCelestialWorld", [](GameTest& fixture) {
-  auto celestialDatabase = CelestialMasterDatabase::create(fixture.root());
-  ASSERT_TRUE(celestialDatabase);
-  auto celestialWorld = (*celestialDatabase)->findRandomWorld(10, 50,
+  auto celestial_database = CelestialMasterDatabase::create(fixture.root());
+  ASSERT_TRUE(celestial_database);
+  auto celestialWorld = (*celestial_database)->find_random_world(10, 50,
       [&](CelestialCoordinate const& coord) -> std::expected<bool, StarException> {
-        auto parameters = (*celestialDatabase)->parameters(coord);
+        auto parameters = (*celestial_database)->parameters(coord);
         if (!parameters)
           return std::unexpected(std::move(parameters.error()));
-        return (*parameters)->isVisitable();
+        return (*parameters)->is_visitable();
       });
   ASSERT_TRUE(celestialWorld);
   ASSERT_TRUE(*celestialWorld);

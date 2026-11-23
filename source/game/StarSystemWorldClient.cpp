@@ -98,11 +98,11 @@ import star.byte_array;
 import star.algorithm;
 namespace Star {
 
-SystemWorldClient::SystemWorldClient(Root& root, std::shared_ptr<Clock const> universeClock, std::shared_ptr<CelestialDatabase> celestialDatabase, std::shared_ptr<PlayerUniverseMap> universeMap)
-  : SystemWorld(root, std::move(universeClock), std::move(celestialDatabase)), m_universeMap(std::move(universeMap)) {}
+SystemWorldClient::SystemWorldClient(Root& root, std::shared_ptr<Clock const> universeClock, std::shared_ptr<CelestialDatabase> celestial_database, std::shared_ptr<PlayerUniverseMap> universeMap)
+  : SystemWorld(root, std::move(universeClock), std::move(celestial_database)), m_universeMap(std::move(universeMap)) {}
 
-std::expected<std::shared_ptr<SystemWorldClient>, StarException> SystemWorldClient::create(Root& root, std::shared_ptr<Clock const> universeClock, std::shared_ptr<CelestialDatabase> celestialDatabase, std::shared_ptr<PlayerUniverseMap> universeMap) {
-  auto client = std::shared_ptr<SystemWorldClient>(new SystemWorldClient(root, std::move(universeClock), std::move(celestialDatabase), std::move(universeMap)));
+std::expected<std::shared_ptr<SystemWorldClient>, StarException> SystemWorldClient::create(Root& root, std::shared_ptr<Clock const> universeClock, std::shared_ptr<CelestialDatabase> celestial_database, std::shared_ptr<PlayerUniverseMap> universeMap) {
+  auto client = std::shared_ptr<SystemWorldClient>(new SystemWorldClient(root, std::move(universeClock), std::move(celestial_database), std::move(universeMap)));
   auto initialized = client->initialize();
   if (!initialized)
     return std::unexpected(std::move(initialized.error()));
@@ -166,7 +166,7 @@ std::expected<void, StarException> SystemWorldClient::update(float dt) {
     }
   } else if (std::holds_alternative<CelestialCoordinate>(location)) {
     auto const& coordinate = std::get<CelestialCoordinate>(location);
-    if (coordinate.isPlanetaryBody() || coordinate.isSatelliteBody()) {
+    if (coordinate.is_planetary_body() || coordinate.is_satellite_body()) {
       auto planet = coordinate.planet();
       if (!planet)
         return std::unexpected(std::move(planet.error()));
@@ -176,7 +176,7 @@ std::expected<void, StarException> SystemWorldClient::update(float dt) {
     }
   } else if (std::holds_alternative<CelestialOrbit>(location)) {
     auto const& orbit = std::get<CelestialOrbit>(location);
-    if (orbit.target.isPlanetaryBody() || orbit.target.isSatelliteBody()) {
+    if (orbit.target.is_planetary_body() || orbit.target.is_satellite_body()) {
       auto planet = orbit.target.planet();
       if (!planet)
         return std::unexpected(std::move(planet.error()));
@@ -195,13 +195,13 @@ std::expected<void, StarException> SystemWorldClient::update(float dt) {
     if (!updated)
       return std::unexpected(std::move(updated.error()));
   }
-  if (currentSystem().isNull()) {
+  if (currentSystem().is_null()) {
     m_objects.clear();
     m_clientShips.clear();
     m_ship.reset();
     m_location = Vec3I();
-  } else if (auto slave = as<CelestialSlaveDatabase>(m_celestialDatabase)) {
-    return slave->signalSystem(currentSystem());
+  } else if (auto slave = as<CelestialSlaveDatabase>(m_celestial_database)) {
+    return slave->signal_system(currentSystem());
   }
   return {};
 }

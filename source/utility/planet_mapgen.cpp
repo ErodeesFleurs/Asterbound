@@ -110,9 +110,9 @@ static std::expected<void, StarException> run(std::span<String const> argv) {
     if (!initialized)
       return std::unexpected(std::move(initialized.error()));
     auto& [root, options] = *initialized;
-    auto celestialDatabase = CelestialMasterDatabase::create(*root);
-    if (!celestialDatabase)
-      return std::unexpected(std::move(celestialDatabase.error()));
+    auto celestial_database = CelestialMasterDatabase::create(*root);
+    if (!celestial_database)
+      return std::unexpected(std::move(celestial_database.error()));
 
     std::optional<CelestialCoordinate> coordinate;
     if (auto coordinate_text = options.first_parameter("coordinate")) {
@@ -128,7 +128,7 @@ static std::expected<void, StarException> run(std::span<String const> argv) {
           return std::unexpected(std::move(parsed.error()));
         seed = *parsed;
       }
-      auto found = (*celestialDatabase)->findRandomWorld(10, 50, {}, seed);
+      auto found = (*celestial_database)->find_random_world(10, 50, {}, seed);
       if (!found)
         return std::unexpected(std::move(found.error()));
       coordinate = std::move(*found);
@@ -138,7 +138,7 @@ static std::expected<void, StarException> run(std::span<String const> argv) {
 
     if (auto written = Star::print("Generating world with coordinate {}\n", *coordinate); !written)
       return std::unexpected(std::move(written.error()));
-    auto createdTemplate = WorldTemplate::create(*root, *coordinate, *celestialDatabase);
+    auto createdTemplate = WorldTemplate::create(*root, *coordinate, *celestial_database);
     if (!createdTemplate)
       return std::unexpected(std::move(createdTemplate.error()));
     auto& worldTemplate = **createdTemplate;

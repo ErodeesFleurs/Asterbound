@@ -424,8 +424,8 @@ std::expected<std::optional<String>, StarException> UniverseClient::connect(Univ
       if (!celestialResult)
         return std::unexpected(std::move(celestialResult.error()));
       auto celestial = std::move(*celestialResult);
-      m_celestialDatabase = std::move(celestial);
-      auto systemResult = SystemWorldClient::create(m_root, m_universeClock, m_celestialDatabase, m_mainPlayer->universeMap());
+      m_celestial_database = std::move(celestial);
+      auto systemResult = SystemWorldClient::create(m_root, m_universeClock, m_celestial_database, m_mainPlayer->universeMap());
       if (!systemResult)
         return std::unexpected(std::move(systemResult.error()));
       auto system = std::move(*systemResult);
@@ -800,7 +800,7 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
     if (!operation62)
       return std::unexpected(std::move(operation62.error()));
   }
-  auto requests = m_celestialDatabase->pullRequests();
+  auto requests = m_celestial_database->pull_requests();
   if (!requests.empty()) {
     auto operation63 = m_connection->pushSingle(std::make_shared<CelestialRequestPacket>(std::move(requests)));
     if (!operation63)
@@ -915,7 +915,7 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
     m_respawning = true;
     m_respawnTimer.reset();
   }
-  m_celestialDatabase->cleanup();
+  m_celestial_database->cleanup();
   if (auto stats = m_connection->incomingStats()) {
     m_root.logMap().set("net_total_incoming", Star::format("{:4.3f} kB/s", stats->bytesPerSecond / 1000.f));
     auto type_name = packet_type_name(stats->worstPacketType);
@@ -1034,8 +1034,8 @@ std::expected<void, StarException> UniverseClient::flyShip(Vec3I const& system, 
   return m_connection->pushSingle(std::make_shared<FlyShipPacket>(system, destination, settings));
 }
 
-std::shared_ptr<CelestialDatabase> UniverseClient::celestialDatabase() {
-  return m_celestialDatabase;
+std::shared_ptr<CelestialDatabase> UniverseClient::celestial_database() {
+  return m_celestial_database;
 }
 
 CelestialCoordinate UniverseClient::shipCoordinate() const {
@@ -1738,7 +1738,7 @@ std::expected<void, StarException> UniverseClient::handlePackets(List<std::share
         m_disconnectReason = disconnect->reason;
         return true;
       } else if (auto celestial = as<CelestialResponsePacket>(packet)) {
-        auto operation77 = m_celestialDatabase->pushResponses(std::move(celestial->responses));
+        auto operation77 = m_celestial_database->push_responses(std::move(celestial->responses));
         if (!operation77)
           return std::unexpected(std::move(operation77.error()));
       } else if (auto warp = as<PlayerWarpResultPacket>(packet)) {
@@ -1764,7 +1764,7 @@ std::expected<void, StarException> UniverseClient::handlePackets(List<std::share
           }
         }
       } else if (auto planet = as<PlanetTypeUpdatePacket>(packet)) {
-        m_celestialDatabase->invalidateCacheFor(planet->coordinate);
+        m_celestial_database->invalidate_cache_for(planet->coordinate);
       } else if (auto pause = as<PausePacket>(packet)) {
         setPause(pause->pause);
         m_root.timing().time_scale = std::clamp(pause->timescale, 0.0f, 1024.f);
@@ -1964,7 +1964,7 @@ std::expected<void, StarException> UniverseClient::reset() {
   m_worldClient.reset();
   m_systemWorldClient.reset();
   m_universeClock.reset();
-  m_celestialDatabase.reset();
+  m_celestial_database.reset();
   m_clientContext.reset();
   m_teamClient.reset();
   m_warping.reset();

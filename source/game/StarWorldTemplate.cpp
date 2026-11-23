@@ -93,22 +93,22 @@ std::expected<std::shared_ptr<WorldTemplate>, StarException> WorldTemplate::crea
   return result;
 }
 
-std::expected<std::shared_ptr<WorldTemplate>, StarException> WorldTemplate::create(Root& root, CelestialCoordinate const& celestialCoordinate, std::shared_ptr<CelestialDatabase> const& celestialDatabase) {
+std::expected<std::shared_ptr<WorldTemplate>, StarException> WorldTemplate::create(Root& root, CelestialCoordinate const& celestialCoordinate, std::shared_ptr<CelestialDatabase> const& celestial_database) {
   auto result = std::shared_ptr<WorldTemplate>(new WorldTemplate(root));
   auto initialized = result->initialize();
   if (!initialized) return std::unexpected(std::move(initialized.error()));
-  auto parameters = celestialDatabase->parameters(celestialCoordinate);
+  auto parameters = celestial_database->parameters(celestialCoordinate);
   if (!parameters) return std::unexpected(std::move(parameters.error()));
   if (!*parameters)
     return std::unexpected(StarException("Celestial parameters for constructing WorldTemplate not found!"));
-  result->m_celestialParameters = std::move(*parameters);
-  result->install_world_parameters(result->m_celestialParameters->visitableParameters());
+  result->m_celestial_parameters = std::move(*parameters);
+  result->install_world_parameters(result->m_celestial_parameters->visitable_parameters());
   if (!result->m_worldParameters)
     return std::unexpected(StarException("Cannot create WorldTemplate from non-visitable world"));
-  auto sky = SkyParameters::create(root, celestialCoordinate, celestialDatabase);
+  auto sky = SkyParameters::create(root, celestialCoordinate, celestial_database);
   if (!sky) return std::unexpected(std::move(sky.error()));
   result->m_skyParameters = std::move(*sky);
-  result->m_seed = result->m_celestialParameters->seed();
+  result->m_seed = result->m_celestial_parameters->seed();
   result->m_geometry = WorldGeometry(result->m_worldParameters->worldSize);
   if (auto parameters = as<TerrestrialWorldParameters>(result->m_worldParameters)) {
     auto layout = WorldLayout::buildTerrestrialLayout(root, *parameters, result->m_seed);
@@ -169,7 +169,7 @@ std::expected<std::shared_ptr<WorldTemplate>, StarException> WorldTemplate::crea
   if (!celestial->is_null()) {
     auto parameters = CelestialParameters::create(*celestial);
     if (!parameters) return std::unexpected(std::move(parameters.error()));
-    result->m_celestialParameters = std::move(*parameters);
+    result->m_celestial_parameters = std::move(*parameters);
   }
   auto parametersJson = store.get("worldParameters", {});
   if (!parametersJson) return std::unexpected(std::move(parametersJson.error()));
@@ -217,8 +217,8 @@ std::expected<std::shared_ptr<WorldTemplate>, StarException> WorldTemplate::crea
 
 std::expected<Json, StarException> WorldTemplate::store() const {
   Json celestial;
-  if (m_celestialParameters) {
-    auto stored = m_celestialParameters->diskStore();
+  if (m_celestial_parameters) {
+    auto stored = m_celestial_parameters->disk_store();
     if (!stored) return std::unexpected(std::move(stored.error()));
     celestial = std::move(*stored);
   }
@@ -245,8 +245,8 @@ std::expected<Json, StarException> WorldTemplate::store() const {
   };
 }
 
-std::optional<CelestialParameters> const& WorldTemplate::celestialParameters() const {
-  return m_celestialParameters;
+std::optional<CelestialParameters> const& WorldTemplate::celestial_parameters() const {
+  return m_celestial_parameters;
 }
 
 std::shared_ptr<VisitableWorldParameters const> WorldTemplate::worldParameters() const {
@@ -842,8 +842,8 @@ std::expected<void, StarException> WorldTemplate::initialize() {
 }
 
 std::expected<void, StarException> WorldTemplate::determineWorldName() {
-  if (m_celestialParameters) {
-    m_worldName = m_celestialParameters->name();
+  if (m_celestial_parameters) {
+    m_worldName = m_celestial_parameters->name();
   } else if (auto parameters = as<FloatingDungeonWorldParameters>(m_worldParameters)) {
     auto definitions = this->root().dungeonDefinitions();
     if (!definitions) return std::unexpected(std::move(definitions.error()));

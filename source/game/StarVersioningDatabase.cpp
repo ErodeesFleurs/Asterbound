@@ -308,21 +308,21 @@ std::expected<VersionedJson, StarException> VersioningDatabase::updateVersionedJ
 std::expected<VersionedJson, StarException> VersioningDatabase::updateVersionedJson(VersionedJson const& versionedJson, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog) const {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lock_with_diagnostics(locker);
-  auto celestialDatabase = CelestialMasterDatabase::create(m_root);
-  if (!celestialDatabase) return std::unexpected(std::move(celestialDatabase.error()));
+  auto celestial_database = CelestialMasterDatabase::create(m_root);
+  if (!celestial_database) return std::unexpected(std::move(celestial_database.error()));
   VersionedJson result = versionedJson;
   auto targetVersion = m_currentVersions.maybe(versionedJson.identifier);
   if (!targetVersion)
     return std::unexpected(VersioningDatabaseException::format("Versioned JSON has an unregistered identifier '{}'", versionedJson.identifier));
   LuaCallbacks celestialCallbacks;
-  auto registered = celestialCallbacks.register_callback("parameters", [&celestialDatabase](Json const& coordinate) -> std::expected<Json, StarException> {
+  auto registered = celestialCallbacks.register_callback("parameters", [&celestial_database](Json const& coordinate) -> std::expected<Json, StarException> {
     auto coord = CelestialCoordinate::create(coordinate);
     if (!coord) return std::unexpected(std::move(coord.error()));
-    auto parameters = (*celestialDatabase)->parameters(*coord);
+    auto parameters = (*celestial_database)->parameters(*coord);
     if (!parameters) return std::unexpected(std::move(parameters.error()));
     if (!*parameters)
       return std::unexpected(VersioningDatabaseException("Missing celestial parameters in versioning script"));
-    return (*parameters)->diskStore();
+    return (*parameters)->disk_store();
   });
   if (!registered) return std::unexpected(std::move(registered.error()));
   auto invokeUpdate = [&](String const& script, Json const& content) -> std::expected<Json, StarException> {

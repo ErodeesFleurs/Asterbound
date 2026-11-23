@@ -5,29 +5,11 @@ import star.string;
 import star.map;
 import star.json;
 
-import star.ordered_map;
 import star.either;
 import star.vector;
-import star.celestial_coordinate;
-import star.game_types;
-import star.color;
-import star.bi_map;
-import star.sky_types;
-import star.random;
 import star.weighted_pool;
 import star.list;
-import star.image_processing;
-import star.hash;
 import star.data_stream;
-import star.string_view;
-import star.thread;
-import star.directives;
-import star.asset_path;
-import star.animation;
-import star.particle;
-import star.weather_types;
-import star.force_regions;
-import star.world_parameters;
 import star.celestial_parameters;
 
 namespace Star {
@@ -35,18 +17,18 @@ namespace Star {
 using CelestialConstellation = List<std::pair<Vec2I, Vec2I>>;
 
 struct CelestialOrbitRegion {
-  String regionName;
-  Vec2I orbitRange;
-  float bodyProbability;
-  WeightedPool<String> planetaryTypes;
-  WeightedPool<String> satelliteTypes;
+  String region_name;
+  Vec2I orbit_range;
+  float body_probability;
+  WeightedPool<String> planetary_types;
+  WeightedPool<String> satellite_types;
 };
 
 struct CelestialPlanet {
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, CelestialPlanet& value);
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, CelestialPlanet const& value);
-  CelestialParameters planetParameters;
-  HashMap<int, CelestialParameters> satelliteParameters;
+  CelestialParameters planet_parameters;
+  HashMap<int, CelestialParameters> satellite_parameters;
 };
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, CelestialPlanet& planet);
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, CelestialPlanet const& planet);
@@ -54,11 +36,11 @@ struct CelestialPlanet {
 struct CelestialSystemObjects {
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, CelestialSystemObjects& value);
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, CelestialSystemObjects const& value);
-  Vec3I systemLocation;
+  Vec3I system_location;
   HashMap<int, CelestialPlanet> planets;
 };
-[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, CelestialSystemObjects& systemObjects);
-[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, CelestialSystemObjects const& systemObjects);
+[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, CelestialSystemObjects& system_objects);
+[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, CelestialSystemObjects const& system_objects);
 
 struct CelestialChunk {
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, CelestialChunk& value);
@@ -66,16 +48,16 @@ struct CelestialChunk {
   CelestialChunk();
   [[nodiscard]] static std::expected<CelestialChunk, StarException> create(Json const& store);
 
-  [[nodiscard]] std::expected<Json, StarException> toJson() const;
+  [[nodiscard]] std::expected<Json, StarException> to_json() const;
 
-  Vec2I chunkIndex;
+  Vec2I chunk_index;
   List<CelestialConstellation> constellations;
-  HashMap<Vec3I, CelestialParameters> systemParameters;
+  HashMap<Vec3I, CelestialParameters> system_parameters;
 
-  // System objects are kept separate from systemParameters here so that there
+  // System objects are kept separate from system_parameters here so that there
   // can be two phases of loading, one for basic system-level parameters for an
   // entire chunk the other for each set of sub objects for each system.
-  HashMap<Vec3I, HashMap<int, CelestialPlanet>> systemObjects;
+  HashMap<Vec3I, HashMap<int, CelestialPlanet>> system_objects;
   
   // only persistent chunks are saved to storage
   bool persistent = false;
@@ -89,15 +71,15 @@ using CelestialResponse = Either<CelestialChunk, CelestialSystemObjects>;
 struct CelestialBaseInformation {
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, CelestialBaseInformation& value);
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, CelestialBaseInformation const& value);
-  int planetOrbitalLevels;
-  int satelliteOrbitalLevels;
-  int chunkSize;
-  Vec2I xyCoordRange;
-  Vec2I zCoordRange;
-  bool enforceCoordRange;
+  int planet_orbital_levels;
+  int satellite_orbital_levels;
+  int chunk_size;
+  Vec2I xy_coord_range;
+  Vec2I z_coord_range;
+  bool enforce_coord_range;
 };
-[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, CelestialBaseInformation& celestialInformation);
-[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, CelestialBaseInformation const& celestialInformation);
+[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, CelestialBaseInformation& celestial_information);
+[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, CelestialBaseInformation const& celestial_information);
 }
 
 export module star.celestial_types;

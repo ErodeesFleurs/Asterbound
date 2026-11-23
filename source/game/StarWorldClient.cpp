@@ -286,7 +286,7 @@ std::expected<void, StarException> WorldClient::initialize(std::shared_ptr<Playe
   if (!result5)
     return std::unexpected(std::move(result5.error()));
   m_luaThreadCallbacks["universe"] = (std::move(*result5));
-  auto result6 = LuaBindings::makeCelestialCallbacks(this->root(), universe.celestialDatabase());
+  auto result6 = LuaBindings::make_celestial_callbacks(this->root(), universe.celestial_database());
   if (!result6)
     return std::unexpected(std::move(result6.error()));
   m_luaThreadCallbacks["celestial"] = (std::move(*result6));
@@ -459,7 +459,7 @@ std::expected<void, StarException> WorldClient::initialize(ClientSubWorldId subW
   if (!result38)
     return std::unexpected(std::move(result38.error()));
   m_luaThreadCallbacks["universe"] = (std::move(*result38));
-  auto result39 = LuaBindings::makeCelestialCallbacks(this->root(), universe.celestialDatabase());
+  auto result39 = LuaBindings::make_celestial_callbacks(this->root(), universe.celestial_database());
   if (!result39)
     return std::unexpected(std::move(result39.error()));
   m_luaThreadCallbacks["celestial"] = (std::move(*result39));

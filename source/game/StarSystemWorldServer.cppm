@@ -41,9 +41,9 @@ struct Packet;
 class SystemWorldServer : public SystemWorld {
 public:
   // create new system world server
-  [[nodiscard]] static std::expected<std::shared_ptr<SystemWorldServer>, StarException> create(Root& root, Vec3I location, std::shared_ptr<Clock const> universeClock, std::shared_ptr<CelestialDatabase> celestialDatabase);
+  [[nodiscard]] static std::expected<std::shared_ptr<SystemWorldServer>, StarException> create(Root& root, Vec3I location, std::shared_ptr<Clock const> universeClock, std::shared_ptr<CelestialDatabase> celestial_database);
   // load system world server from storage
-  [[nodiscard]] static std::expected<std::shared_ptr<SystemWorldServer>, StarException> create(Root& root, Json const& diskStore, std::shared_ptr<Clock const> universeClock, std::shared_ptr<CelestialDatabase> celestialDatabase);
+  [[nodiscard]] static std::expected<std::shared_ptr<SystemWorldServer>, StarException> create(Root& root, Json const& diskStore, std::shared_ptr<Clock const> universeClock, std::shared_ptr<CelestialDatabase> celestial_database);
 
   [[nodiscard]] std::expected<void, StarException> setClientDestination(ConnectionId const& clientId, SystemLocation const& destination);
 
@@ -80,7 +80,7 @@ public:
   [[nodiscard]] std::expected<Json, StarException> diskStore();
 
 private:
-  SystemWorldServer(Root& root, std::shared_ptr<Clock const> universeClock, std::shared_ptr<CelestialDatabase> celestialDatabase);
+  SystemWorldServer(Root& root, std::shared_ptr<Clock const> universeClock, std::shared_ptr<CelestialDatabase> celestial_database);
   struct ClientNetVersions {
     HashMap<Uuid, std::uint64_t> ships;
     HashMap<Uuid, std::uint64_t> objects;

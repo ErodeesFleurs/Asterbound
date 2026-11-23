@@ -5070,7 +5070,7 @@ const GameTestRegistration
       auto celestial = CelestialParameters::create(root, CelestialCoordinate{}, 1, name, JsonObject{});
       if (!celestial)
         return std::unexpected(std::move(celestial.error()));
-      auto storedCelestial = celestial->diskStore();
+      auto storedCelestial = celestial->disk_store();
       if (!storedCelestial)
         return std::unexpected(std::move(storedCelestial.error()));
       auto stored = storedTemplate->set("celestialParameters", *storedCelestial);

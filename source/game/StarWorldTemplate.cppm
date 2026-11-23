@@ -138,7 +138,7 @@ public:
   // Creates a blank world with the given size
   [[nodiscard]] static std::expected<std::shared_ptr<WorldTemplate>, StarException> create(Root& root, Vec2U const& size);
   // Creates a world from the given visitable celestial object.
-  [[nodiscard]] static std::expected<std::shared_ptr<WorldTemplate>, StarException> create(Root& root, CelestialCoordinate const& celestialCoordinate, std::shared_ptr<CelestialDatabase> const& celestialDatabase);
+  [[nodiscard]] static std::expected<std::shared_ptr<WorldTemplate>, StarException> create(Root& root, CelestialCoordinate const& celestialCoordinate, std::shared_ptr<CelestialDatabase> const& celestial_database);
   // Creates a world from a bare VisitableWorldParameters structure
   [[nodiscard]] static std::expected<std::shared_ptr<WorldTemplate>, StarException> create(Root& root, std::shared_ptr<VisitableWorldParameters const> const& worldParameters, SkyParameters const& skyParameters, std::uint64_t seed);
   // Load a world template from the given stored data.
@@ -146,7 +146,7 @@ public:
 
   [[nodiscard]] std::expected<Json, StarException> store() const;
 
-  std::optional<CelestialParameters> const& celestialParameters() const;
+  std::optional<CelestialParameters> const& celestial_parameters() const;
   std::shared_ptr<VisitableWorldParameters const> worldParameters() const;
   SkyParameters skyParameters() const;
   std::shared_ptr<WorldLayout> worldLayout() const;
@@ -262,7 +262,7 @@ private:
   float m_customTerrainBlendSize;
   float m_customTerrainBlendWeight;
 
-  std::optional<CelestialParameters> m_celestialParameters;
+  std::optional<CelestialParameters> m_celestial_parameters;
   std::shared_ptr<VisitableWorldParameters const> m_worldParameters;
   std::shared_ptr<AmbientNoisesDescription const> m_ambient_override;
   std::shared_ptr<AmbientNoisesDescription const> m_music_override;

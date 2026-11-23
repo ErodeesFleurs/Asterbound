@@ -94,7 +94,7 @@ class ClientContext;
 
 class SystemWorldClient : public SystemWorld {
 public:
-  [[nodiscard]] static std::expected<std::shared_ptr<SystemWorldClient>, StarException> create(Root& root, std::shared_ptr<Clock const> universeClock, std::shared_ptr<CelestialDatabase> celestialDatabase, std::shared_ptr<PlayerUniverseMap> clientContext);
+  [[nodiscard]] static std::expected<std::shared_ptr<SystemWorldClient>, StarException> create(Root& root, std::shared_ptr<Clock const> universeClock, std::shared_ptr<CelestialDatabase> celestial_database, std::shared_ptr<PlayerUniverseMap> clientContext);
 
   CelestialCoordinate currentSystem() const;
 
@@ -118,7 +118,7 @@ public:
   [[nodiscard]] std::expected<bool, StarException> handleIncomingPacket(std::shared_ptr<Packet> packet);
   List<std::shared_ptr<Packet>> pullOutgoingPackets();
 private:
-  SystemWorldClient(Root& root, std::shared_ptr<Clock const> universeClock, std::shared_ptr<CelestialDatabase> celestialDatabase, std::shared_ptr<PlayerUniverseMap> universeMap);
+  SystemWorldClient(Root& root, std::shared_ptr<Clock const> universeClock, std::shared_ptr<CelestialDatabase> celestial_database, std::shared_ptr<PlayerUniverseMap> universeMap);
   [[nodiscard]] std::expected<std::shared_ptr<SystemObject>, StarException> net_load_object(ByteArray net_store);
   [[nodiscard]] std::expected<std::shared_ptr<SystemClientShip>, StarException> net_load_ship(ByteArray net_store);
 

@@ -41,7 +41,7 @@ namespace Star {
 template<> [[nodiscard]] std::expected<Json, StarException> jsonFromBookmarkTarget<OrbitTarget>(OrbitTarget const& target) {
   if (std::holds_alternative<Uuid>(target))
     return Json(std::get<Uuid>(target).hex());
-  return std::get<CelestialCoordinate>(target).toJson();
+  return std::get<CelestialCoordinate>(target).to_json();
 }
 
 template<> [[nodiscard]] std::expected<OrbitTarget, StarException> jsonToBookmarkTarget<OrbitTarget>(Json const& json) {
@@ -161,7 +161,7 @@ std::expected<List<std::pair<Vec3I, OrbitBookmark>>, StarException> PlayerUniver
 }
 
 std::expected<bool, StarException> PlayerUniverseMap::addOrbitBookmark(CelestialCoordinate const& system, OrbitBookmark const& bookmark) {
-  if (system.isNull())
+  if (system.is_null())
     return std::unexpected(StarException("Cannot add orbit bookmark to null system"));
   auto map = universeMap();
   if (!map)
@@ -170,7 +170,7 @@ std::expected<bool, StarException> PlayerUniverseMap::addOrbitBookmark(Celestial
 }
 
 std::expected<bool, StarException> PlayerUniverseMap::removeOrbitBookmark(CelestialCoordinate const& system, OrbitBookmark const& bookmark) {
-  if (system.isNull())
+  if (system.is_null())
     return std::unexpected(StarException("Cannot remove orbit bookmark from null system"));
   auto map = universeMap();
   if (!map)
@@ -242,13 +242,13 @@ std::expected<List<OrbitBookmark>, StarException> PlayerUniverseMap::planetBookm
         auto bookmarkPlanet = coordinate.planet();
         if (!bookmarkPlanet)
           return std::unexpected(std::move(bookmarkPlanet.error()));
-        auto bookmarkOrbit = bookmarkPlanet->orbitNumber();
+        auto bookmarkOrbit = bookmarkPlanet->orbit_number();
         if (!bookmarkOrbit)
           return std::unexpected(std::move(bookmarkOrbit.error()));
         auto targetPlanet = planet.planet();
         if (!targetPlanet)
           return std::unexpected(std::move(targetPlanet.error()));
-        auto targetOrbit = targetPlanet->orbitNumber();
+        auto targetOrbit = targetPlanet->orbit_number();
         if (!targetOrbit)
           return std::unexpected(std::move(targetOrbit.error()));
         if (*bookmarkOrbit == *targetOrbit)
@@ -260,13 +260,13 @@ std::expected<List<OrbitBookmark>, StarException> PlayerUniverseMap::planetBookm
 }
 
 std::expected<bool, StarException> PlayerUniverseMap::isMapped(CelestialCoordinate const& coordinate) {
-  if (coordinate.isNull())
+  if (coordinate.is_null())
     return false;
   auto map = universeMap();
   if (!map)
     return std::unexpected(std::move(map.error()));
   if (auto system = map->get().systems.find_ref(coordinate.location())) {
-    if (coordinate.isSystem())
+    if (coordinate.is_system())
       return true;
     auto planet = coordinate.planet();
     if (!planet)
@@ -286,13 +286,13 @@ std::expected<HashMap<Uuid, PlayerUniverseMap::MappedObject>, StarException> Pla
 }
 
 std::expected<void, StarException> PlayerUniverseMap::addMappedCoordinate(CelestialCoordinate const& coordinate) {
-  if (coordinate.isNull())
+  if (coordinate.is_null())
     return {};
   auto map = universeMap();
   if (!map)
     return std::unexpected(std::move(map.error()));
   auto& system = map->get().systems[coordinate.location()];
-  if (!coordinate.isSystem()) {
+  if (!coordinate.is_system()) {
     auto planet = coordinate.planet();
     if (!planet)
       return std::unexpected(std::move(planet.error()));
@@ -383,7 +383,7 @@ std::expected<PlayerUniverseMap::SystemMap, StarException> PlayerUniverseMap::Sy
 std::expected<Json, StarException> PlayerUniverseMap::SystemMap::toJson() const {
   JsonArray planets;
   for (auto const& planet : mappedPlanets)
-    planets.push_back(planet.toJson());
+    planets.push_back(planet.to_json());
   JsonObject objects;
   for (auto const& pair : mappedObjects) {
     auto orbit = json_from_optional<CelestialOrbit>(pair.second.orbit, [](CelestialOrbit const& value) { return value.toJson(); });

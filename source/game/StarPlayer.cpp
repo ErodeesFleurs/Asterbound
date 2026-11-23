@@ -1078,7 +1078,7 @@ std::expected<void, StarException> Player::init(World& world, EntityId entityId,
       if (auto result = p.second->add_callbacks("animator", std::move(animatorCallbacks)); !result)
         return std::unexpected(std::move(result.error()));
       if (m_client) {
-        auto celestialCallbacksResult = LuaBindings::makeCelestialCallbacks(root(), m_client->get());
+        auto celestialCallbacksResult = LuaBindings::make_celestial_callbacks(root(), m_client->get());
         if (!celestialCallbacksResult)
           return std::unexpected(std::move(celestialCallbacksResult.error()));
         auto celestialCallbacks = std::move(*celestialCallbacksResult);

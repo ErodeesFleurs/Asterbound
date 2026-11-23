@@ -241,15 +241,15 @@ std::expected<void, StarException> TitleScreen::close() {
       error = std::move(r.error());
     m_scriptComponent.reset();
   }
-  if (m_celestialDatabase) {
-    if (auto r = m_celestialDatabase->close(); !r) {
+  if (m_celestial_database) {
+    if (auto r = m_celestial_database->close(); !r) {
       if (error)
         error = StarException(Star::format("Title celestial cleanup failed: {}",
             Star::print_exception(ExceptionDiagnostic(r.error()), true)), ExceptionDiagnostic(*error));
       else
         error = std::move(r.error());
     }
-    m_celestialDatabase.reset();
+    m_celestial_database.reset();
   }
   if (error)
     return std::unexpected(std::move(*error));
@@ -285,28 +285,28 @@ std::expected<void, StarException> TitleScreen::initialize(std::shared_ptr<Unive
   auto database = CelestialMasterDatabase::create(m_guiContext.root());
   if (!database)
     return std::unexpected(std::move(database.error()));
-  m_celestialDatabase = std::move(*database);
-  auto randomWorld = m_celestialDatabase->findRandomWorld(10, 50,
+  m_celestial_database = std::move(*database);
+  auto randomWorld = m_celestial_database->find_random_world(10, 50,
       [this](CelestialCoordinate const& coordinate) -> std::expected<bool, StarException> {
-        auto parameters = m_celestialDatabase->parameters(coordinate);
+        auto parameters = m_celestial_database->parameters(coordinate);
         if (!parameters)
           return std::unexpected(std::move(parameters.error()));
         if (!*parameters)
           return std::unexpected(StarException("Title world has no celestial parameters"));
-        return is<TerrestrialWorldParameters>((**parameters).visitableParameters());
+        return is<TerrestrialWorldParameters>((**parameters).visitable_parameters());
       });
   if (!randomWorld)
     return std::unexpected(std::move(randomWorld.error()));
   if (!*randomWorld)
     return std::unexpected(StarException("Could not find a terrestrial world for the title screen"));
-  auto name = m_celestialDatabase->name(**randomWorld);
+  auto name = m_celestial_database->name(**randomWorld);
   if (!name)
     return std::unexpected(std::move(name.error()));
   if (*name) {
     if (auto r = m_guiContext.root().logger().info("Title world is {} @ CelestialWorld:{}", Text::strip_escape_codes(**name), **randomWorld); !r)
       return std::unexpected(std::move(r.error()));
   }
-  auto skyParameters = SkyParameters::create(m_guiContext.root(), **randomWorld, m_celestialDatabase);
+  auto skyParameters = SkyParameters::create(m_guiContext.root(), **randomWorld, m_celestial_database);
   if (!skyParameters)
     return std::unexpected(std::move(skyParameters.error()));
   auto sky = Sky::create(m_guiContext.root(), *skyParameters, true);

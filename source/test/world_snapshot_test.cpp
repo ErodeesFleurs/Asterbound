@@ -342,7 +342,7 @@ const GameTestRegistration celestial_chunk_response(
     auto path = File::relative_to(*directory, "universe.chunks");
 
     CelestialChunk seed;
-    seed.chunkIndex = {0, -1};
+    seed.chunk_index = {0, -1};
     seed.constellations = {{{{0, -1}, {1, -1}}, {{1, -1}, {2, -1}}}};
     auto parameters = [&](CelestialCoordinate coordinate) {
       return CelestialParameters::create(root, coordinate, 42, coordinate.id(), JsonObject{});
@@ -352,18 +352,18 @@ const GameTestRegistration celestial_chunk_response(
       Vec3I system{x, -1, location[2] + x};
       auto star = parameters(CelestialCoordinate(system));
       ASSERT_TRUE(star) << star.error().what();
-      seed.systemParameters[system] = std::move(*star);
-      seed.systemObjects[system] = {};
+      seed.system_parameters[system] = std::move(*star);
+      seed.system_objects[system] = {};
     }
     auto planet = parameters(CelestialCoordinate(location, 3));
     auto moon = parameters(CelestialCoordinate(location, 3, 1));
     ASSERT_TRUE(planet) << planet.error().what();
     ASSERT_TRUE(moon) << moon.error().what();
-    auto& body = seed.systemObjects[location][3];
-    body.planetParameters = std::move(*planet);
-    body.satelliteParameters[1] = std::move(*moon);
+    auto& body = seed.system_objects[location][3];
+    body.planet_parameters = std::move(*planet);
+    body.satellite_parameters[1] = std::move(*moon);
 
-    auto stored = seed.toJson();
+    auto stored = seed.to_json();
     ASSERT_TRUE(stored) << stored.error().what();
     {
       auto versions = root.versioningDatabase();
@@ -375,7 +375,7 @@ const GameTestRegistration celestial_chunk_response(
       ASSERT_TRUE(VersionedJson::writeSubVersioning(stream, *versioned));
       auto compressed = compress(stream.data());
       ASSERT_TRUE(compressed) << compressed.error().what();
-      auto key = DataStreamBuffer::serialize(seed.chunkIndex);
+      auto key = DataStreamBuffer::serialize(seed.chunk_index);
       ASSERT_TRUE(key) << key.error().what();
       BTreeSha256Database storage(root.logger());
       ASSERT_TRUE(storage.set_content_identifier("Celestial2"));
@@ -391,13 +391,13 @@ const GameTestRegistration celestial_chunk_response(
     // the master loads, not from the original map or the response under test.
     auto loaded = CelestialChunk::create(*stored);
     ASSERT_TRUE(loaded) << loaded.error().what();
-    auto planets = loaded->systemObjects.get(location);
+    auto planets = loaded->system_objects.get(location);
     ASSERT_TRUE(planets) << planets.error().what();
     DataStreamBuffer system_wire;
     ASSERT_TRUE(system_wire.write(std::uint8_t{2}));
     ASSERT_TRUE(system_wire.write(CelestialSystemObjects{location, planets->get()}));
     auto legacy_chunk = *loaded;
-    legacy_chunk.systemObjects.clear();
+    legacy_chunk.system_objects.clear();
     DataStreamBuffer chunk_wire;
     ASSERT_TRUE(chunk_wire.write(std::uint8_t{1}));
     ASSERT_TRUE(chunk_wire.write(legacy_chunk));
@@ -406,7 +406,7 @@ const GameTestRegistration celestial_chunk_response(
     ASSERT_TRUE(database) << database.error().what();
     auto close_database = make_scope_exit([&] { EXPECT_TRUE((*database)->close()); });
     for (int pass = 0; pass < 2; ++pass) {
-      auto chunk = (*database)->respondToRequest(make_left(seed.chunkIndex));
+      auto chunk = (*database)->respond_to_request(make_left(seed.chunk_index));
       ASSERT_TRUE(chunk) << chunk.error().what();
       ASSERT_TRUE(chunk->is_left());
       EXPECT_TRUE(chunk->left_ref().persistent); // Not serialized.
@@ -414,7 +414,7 @@ const GameTestRegistration celestial_chunk_response(
       ASSERT_TRUE(summary) << summary.error().what();
       EXPECT_EQ(*summary, chunk_wire.data());
 
-      auto system = (*database)->respondToRequest(make_right(location));
+      auto system = (*database)->respond_to_request(make_right(location));
       ASSERT_TRUE(system) << system.error().what();
       auto objects = DataStreamBuffer::serialize(*system);
       ASSERT_TRUE(objects) << objects.error().what();
@@ -430,24 +430,24 @@ const GameTestRegistration fixedCoordinateGenerationIsDeterministic(
     auto storagePath = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(storagePath) << storagePath.error().what();
     auto finallyGuard = make_scope_exit([&storagePath]() { EXPECT_TRUE(File::remove_all(*storagePath)); });
-    auto celestialDatabase =
+    auto celestial_database =
       CelestialMasterDatabase::create(fixture.root(), File::relative_to(*storagePath, "universe.chunks"));
-    ASSERT_TRUE(celestialDatabase) << celestialDatabase.error().what();
-    auto closeDatabase = make_scope_exit([&]() { EXPECT_TRUE((*celestialDatabase)->close()); });
+    ASSERT_TRUE(celestial_database) << celestial_database.error().what();
+    auto closeDatabase = make_scope_exit([&]() { EXPECT_TRUE((*celestial_database)->close()); });
 
     // Find a real planet: the celestial generator places systems sparsely, and a
     // hand picked coordinate is most likely empty.
-    auto systems = (*celestialDatabase)->scanSystems(RectI::with_size(Vec2I(0, 0), Vec2I(32, 32)));
+    auto systems = (*celestial_database)->scan_systems(RectI::with_size(Vec2I(0, 0), Vec2I(32, 32)));
     ASSERT_TRUE(systems) << systems.error().what();
     ASSERT_FALSE(systems->empty());
     std::optional<CelestialCoordinate> coordinate;
     for (auto const& system : *systems) {
-      auto children = (*celestialDatabase)->children(system);
+      auto children = (*celestial_database)->children(system);
       ASSERT_TRUE(children) << children.error().what();
       for (auto const& child : *children) {
-        auto parameters = (*celestialDatabase)->parameters(child);
+        auto parameters = (*celestial_database)->parameters(child);
         ASSERT_TRUE(parameters) << parameters.error().what();
-        if (child.isPlanetaryBody() && *parameters) {
+        if (child.is_planetary_body() && *parameters) {
           coordinate = child;
           break;
         }
@@ -458,12 +458,12 @@ const GameTestRegistration fixedCoordinateGenerationIsDeterministic(
     ASSERT_TRUE(coordinate.has_value()) << "no planetary body found in the scanned region";
     // A separate template for the surface level: a template handed to a WorldServer
     // is modified by world generation.
-    auto surfaceTemplate = WorldTemplate::create(fixture.root(), *coordinate, *celestialDatabase);
+    auto surfaceTemplate = WorldTemplate::create(fixture.root(), *coordinate, *celestial_database);
     ASSERT_TRUE(surfaceTemplate) << surfaceTemplate.error().what();
     auto surfaceLevel = (*surfaceTemplate)->surfaceLevel();
 
     auto makeWorld = [&]() -> std::expected<std::shared_ptr<WorldServer>, StarException> {
-      auto worldTemplate = WorldTemplate::create(fixture.root(), *coordinate, *celestialDatabase);
+      auto worldTemplate = WorldTemplate::create(fixture.root(), *coordinate, *celestial_database);
       if (!worldTemplate)
         return std::unexpected(std::move(worldTemplate.error()));
       auto storage = File::ephemeral_file(fixture.root().random());

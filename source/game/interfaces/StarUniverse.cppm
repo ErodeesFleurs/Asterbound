@@ -29,7 +29,7 @@ public:
 
   virtual ~Universe() = default;
   
-  virtual std::shared_ptr<CelestialDatabase> celestialDatabase() = 0;
+  virtual std::shared_ptr<CelestialDatabase> celestial_database() = 0;
   
   [[nodiscard]] virtual std::expected<void, StarException> passMessage(Message&& message) = 0;
   // Sends a universe message to the target universe's main universe script context.

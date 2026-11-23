@@ -53,42 +53,42 @@ namespace Star {
 
 SkyParameters::SkyParameters() : seed(), skyColoring(make_right(Color::palette_black)), settings(JsonObject()) {}
 
-std::expected<SkyParameters, StarException> SkyParameters::create(Root& root, CelestialCoordinate const& coordinate, std::shared_ptr<CelestialDatabase> const& celestialDatabase) {
+std::expected<SkyParameters, StarException> SkyParameters::create(Root& root, CelestialCoordinate const& coordinate, std::shared_ptr<CelestialDatabase> const& celestial_database) {
   SkyParameters sky;
-  if (!coordinate || coordinate.isSystem())
+  if (!coordinate || coordinate.is_system())
     return sky;
-  auto parameters = celestialDatabase->parameters(coordinate);
+  auto parameters = celestial_database->parameters(coordinate);
   if (!parameters) return std::unexpected(std::move(parameters.error()));
   auto params = *parameters;
   if (!params) return sky;
   auto system = coordinate.system();
   if (!system) return std::unexpected(std::move(system.error()));
-  auto systemParameters = celestialDatabase->parameters(*system);
+  auto systemParameters = celestial_database->parameters(*system);
   if (!systemParameters) return std::unexpected(std::move(systemParameters.error()));
   auto systemParams = *systemParameters;
   sky.seed = static_random_u64(params->seed(), "SkySeed");
   auto selfCoordinate = params->coordinate();
-  if (selfCoordinate.isSatelliteBody()) {
+  if (selfCoordinate.is_satellite_body()) {
     auto parent = selfCoordinate.parent();
     if (!parent) return std::unexpected(std::move(parent.error()));
-    auto planetResult = celestialDatabase->parameters(*parent);
+    auto planetResult = celestial_database->parameters(*parent);
     if (!planetResult) return std::unexpected(std::move(planetResult.error()));
     if (auto planet = *planetResult) {
       Vec2F pos;
       pos[0] = static_random_float(params->seed(), planet->seed(), "x");
       pos[1] = static_random_float(params->seed(), planet->seed(), "y");
-      auto layers = CelestialGraphics::drawWorld(root, *planet, {});
+      auto layers = CelestialGraphics::draw_world(root, *planet, {});
       if (!layers) return std::unexpected(std::move(layers.error()));
       sky.nearbyPlanet = {{std::move(*layers), pos}};
     }
   }
   auto planetCoordinate = selfCoordinate.planet();
   if (!planetCoordinate) return std::unexpected(std::move(planetCoordinate.error()));
-  auto children = celestialDatabase->children(*planetCoordinate);
+  auto children = celestial_database->children(*planetCoordinate);
   if (!children) return std::unexpected(std::move(children.error()));
   for (auto satelliteCoordinate : *children) {
     if (satelliteCoordinate != selfCoordinate) {
-      auto satelliteResult = celestialDatabase->parameters(satelliteCoordinate);
+      auto satelliteResult = celestial_database->parameters(satelliteCoordinate);
       if (!satelliteResult) return std::unexpected(std::move(satelliteResult.error()));
       if (auto satellite = *satelliteResult) {
         Vec2F pos;
@@ -96,21 +96,21 @@ std::expected<SkyParameters, StarException> SkyParameters::create(Root& root, Ce
         pos[1] = static_random_float(params->seed(), satellite->seed(), "y");
         auto parent = satelliteCoordinate.parent();
         if (!parent) return std::unexpected(std::move(parent.error()));
-        auto parentParameters = celestialDatabase->parameters(*parent);
+        auto parentParameters = celestial_database->parameters(*parent);
         if (!parentParameters) return std::unexpected(std::move(parentParameters.error()));
-        auto layers = CelestialGraphics::drawWorld(root, *satellite, *parentParameters);
+        auto layers = CelestialGraphics::draw_world(root, *satellite, *parentParameters);
         if (!layers) return std::unexpected(std::move(layers.error()));
         sky.nearbyMoons.push_back({std::move(*layers), pos});
       }
     }
   }
-  auto horizon = CelestialGraphics::worldHorizonImages(root, *params);
+  auto horizon = CelestialGraphics::world_horizon_images(root, *params);
   if (!horizon) return std::unexpected(std::move(horizon.error()));
   sky.horizonImages = std::move(*horizon);
-  sky.readVisitableParameters(params->visitableParameters());
+  sky.readVisitableParameters(params->visitable_parameters());
   if (!systemParams)
     return std::unexpected(SkyException("Missing celestial system parameters"));
-  auto type = systemParams->getParameter("typeName");
+  auto type = systemParams->get_parameter("typeName");
   if (!type) return std::unexpected(std::move(type.error()));
   auto sunType = type->to_string();
   if (!sunType) return std::unexpected(std::move(sunType.error()));

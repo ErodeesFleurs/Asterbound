@@ -136,7 +136,6 @@ class Player;
 class PlayerStorage;
 class Statistics;
 class Clock;
-class CelestialLog;
 class CelestialSlaveDatabase;
 class CelestialDatabase;
 class JsonRpcInterface;
@@ -186,7 +185,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> warpPlayer(WarpAction const& warpAction, bool animate = true, String const& animationType = "default", bool deploy = false);
   [[nodiscard]] std::expected<void, StarException> flyShip(Vec3I const& system, SystemLocation const& destination, Json const& settings = {});
 
-  std::shared_ptr<CelestialDatabase> celestialDatabase() override;
+  std::shared_ptr<CelestialDatabase> celestial_database() override;
 
   CelestialCoordinate shipCoordinate() const;
 
@@ -226,7 +225,6 @@ public:
   ReloadPlayerCallback& playerReloadCallback();
 
   std::shared_ptr<Clock const> universeClock() const;
-  std::shared_ptr<CelestialLog const> celestialLog() const;
   std::shared_ptr<JsonRpcInterface> rpcInterface() const;
   std::shared_ptr<ClientContext> clientContext() const;
   std::shared_ptr<TeamClient> teamClient() const;
@@ -284,7 +282,7 @@ private:
   std::optional<UniverseConnection> m_connection;
   std::optional<ServerInfo> m_serverInfo;
 
-  std::shared_ptr<CelestialSlaveDatabase> m_celestialDatabase;
+  std::shared_ptr<CelestialSlaveDatabase> m_celestial_database;
   std::shared_ptr<ClientContext> m_clientContext;
   std::shared_ptr<TeamClient> m_teamClient;
 
@@ -339,7 +337,6 @@ export namespace Star {
   using ::Star::PlayerStorage;
   using ::Star::Statistics;
   using ::Star::Clock;
-  using ::Star::CelestialLog;
   using ::Star::CelestialSlaveDatabase;
   using ::Star::CelestialDatabase;
   using ::Star::JsonRpcInterface;

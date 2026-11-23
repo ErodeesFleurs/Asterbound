@@ -33,7 +33,7 @@ struct SkyParameters {
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, SkyParameters& value);
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, SkyParameters const& value);
   SkyParameters();
-  [[nodiscard]] static std::expected<SkyParameters, StarException> create(Root& root, CelestialCoordinate const& coordinate, std::shared_ptr<CelestialDatabase> const& celestialDatabase);
+  [[nodiscard]] static std::expected<SkyParameters, StarException> create(Root& root, CelestialCoordinate const& coordinate, std::shared_ptr<CelestialDatabase> const& celestial_database);
   SkyParameters(SkyParameters const& oldSkyParameters, std::shared_ptr<VisitableWorldParameters const> newVisitableParameters);
   [[nodiscard]] static std::expected<SkyParameters, StarException> create(Json const& config);
 

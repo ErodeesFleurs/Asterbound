@@ -231,7 +231,7 @@ std::expected<void, StarException> UniverseServer::initialize() {
   auto celestial = CelestialMasterDatabase::create(m_root, File::relative_to(m_storageDirectory, "universe.chunks"));
   if (!celestial)
     return std::unexpected(std::move(celestial.error()));
-  m_celestialDatabase = std::move(*celestial);
+  m_celestial_database = std::move(*celestial);
   if (auto result = m_root.logger().info("UniverseServer: Loading settings"); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = loadSettings(); !result)
@@ -664,8 +664,8 @@ std::shared_ptr<UniverseSettings> UniverseServer::universeSettings() const {
   return m_universeSettings;
 }
 
-std::shared_ptr<CelestialDatabase> UniverseServer::celestialDatabase() {
-  return m_celestialDatabase;
+std::shared_ptr<CelestialDatabase> UniverseServer::celestial_database() {
+  return m_celestial_database;
 }
 
 std::expected<bool, StarException> UniverseServer::executeForClient(ConnectionId clientId, std::function<std::expected<void, StarException>(WorldServer&, std::shared_ptr<Player>)> action) {
@@ -791,19 +791,19 @@ std::expected<bool, StarException> UniverseServer::unbanIp(String const& address
 std::expected<bool, StarException> UniverseServer::updatePlanetType(CelestialCoordinate const& coordinate, String const& newType, String const& weatherBiome) {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lock_with_diagnostics(locker);
-  if (coordinate.isNull())
+  if (coordinate.is_null())
     return false;
-  auto valid = m_celestialDatabase->coordinateValid(coordinate);
+  auto valid = m_celestial_database->coordinate_valid(coordinate);
   if (!valid)
     return std::unexpected(std::move(valid.error()));
   if (!*valid)
     return false;
-  auto parameters = m_celestialDatabase->parameters(coordinate);
+  auto parameters = m_celestial_database->parameters(coordinate);
   if (!parameters)
     return std::unexpected(std::move(parameters.error()));
   if (!*parameters)
     return false;
-  auto terrestrial = as<TerrestrialWorldParameters>((*parameters)->visitableParameters());
+  auto terrestrial = as<TerrestrialWorldParameters>((*parameters)->visitable_parameters());
   if (!terrestrial)
     return false;
   auto replacement = std::make_shared<TerrestrialWorldParameters>(*terrestrial);
@@ -816,8 +816,8 @@ std::expected<bool, StarException> UniverseServer::updatePlanetType(CelestialCoo
     return std::unexpected(std::move(weather.error()));
   replacement->weatherPool = std::move(*weather);
   replacement->terraformed = true;
-  (*parameters)->setVisitableParameters(replacement);
-  if (auto updated = m_celestialDatabase->updateParameters(coordinate, **parameters); !updated)
+  (*parameters)->set_visitable_parameters(replacement);
+  if (auto updated = m_celestial_database->update_parameters(coordinate, **parameters); !updated)
     return std::unexpected(std::move(updated.error()));
   std::shared_lock clientsLocker(m_clientsLock);
   for (auto clientId : m_clients | std::views::keys) {
@@ -830,9 +830,9 @@ std::expected<bool, StarException> UniverseServer::updatePlanetType(CelestialCoo
 std::expected<bool, StarException> UniverseServer::setWeather(CelestialCoordinate const& coordinate, String const& weatherName, bool force) {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lock_with_diagnostics(locker);
-  if (coordinate.isNull())
+  if (coordinate.is_null())
     return false;
-  auto valid = m_celestialDatabase->coordinateValid(coordinate);
+  auto valid = m_celestial_database->coordinate_valid(coordinate);
   if (!valid)
     return std::unexpected(std::move(valid.error()));
   if (!*valid)
@@ -852,9 +852,9 @@ std::expected<StringList, StarException> UniverseServer::weatherList(CelestialCo
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lock_with_diagnostics(locker);
   StringList names;
-  if (coordinate.isNull())
+  if (coordinate.is_null())
     return names;
-  auto valid = m_celestialDatabase->coordinateValid(coordinate);
+  auto valid = m_celestial_database->coordinate_valid(coordinate);
   if (!valid)
     return std::unexpected(std::move(valid.error()));
   if (!*valid)
@@ -1031,7 +1031,7 @@ std::expected<void, StarException> UniverseServer::runLoop(std::stop_token stopT
         return std::unexpected(std::move(result.error()));
       if (auto result = sendClientContextUpdates(); !result)
         return std::unexpected(std::move(result.error()));
-      if (auto result = respondToCelestialRequests(); !result)
+      if (auto result = respond_to_celestial_requests(); !result)
         return std::unexpected(std::move(result.error()));
       if (auto result = clearBrokenWorlds(); !result)
         return std::unexpected(std::move(result.error()));
@@ -1224,8 +1224,8 @@ std::expected<void, StarException> UniverseServer::shutdown() {
         record(message.promise.cancel("ServerShutdown"));
     }
   }
-  if (m_celestialDatabase)
-    record(m_celestialDatabase->close());
+  if (m_celestial_database)
+    record(m_celestial_database->close());
   if (error)
     return std::unexpected(std::move(*error));
   m_initialized = false;
@@ -1985,7 +1985,7 @@ std::expected<void, StarException> UniverseServer::flyShips() {
       destination = CelestialCoordinate(system);
     }
 
-    auto logged = destination.isNull()
+    auto logged = destination.is_null()
         ? m_root.logger().info("Flying ship for player {} to new starter world", clientId)
         : m_root.logger().info("Flying ship for player {} to {}", clientId, destination);
     if (!logged)
@@ -2055,7 +2055,7 @@ std::expected<void, StarException> UniverseServer::arriveShips() {
         clientSystem = std::move(*created);
         auto added =
           clientSystem->addClient(clientId, clientContext->playerUuid(), clientContext->shipUpgrades().shipSpeed,
-                                  coordinate.isSystem() ? SystemLocation{} : SystemLocation{coordinate});
+                                  coordinate.is_system() ? SystemLocation{} : SystemLocation{coordinate});
         if (!added)
           return std::unexpected(std::move(added.error()));
 
@@ -2067,7 +2067,7 @@ std::expected<void, StarException> UniverseServer::arriveShips() {
         return std::unexpected(std::move(location.error()));
       if (std::holds_alternative<std::monostate>(*location))
         return false;
-      if (!coordinate.isSystem()) {
+      if (!coordinate.is_system()) {
         auto created = triggerWorldCreation(CelestialWorldId(coordinate));
         if (!created)
           return std::unexpected(std::move(created.error()));
@@ -2114,11 +2114,11 @@ std::expected<void, StarException> UniverseServer::arriveShips() {
   return {};
 }
 
-std::expected<void, StarException> UniverseServer::respondToCelestialRequests() {
+std::expected<void, StarException> UniverseServer::respond_to_celestial_requests() {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lock_with_diagnostics(locker);
   std::shared_lock clientsLocker(m_clientsLock);
-  for (auto&& entry : m_pendingCelestialRequests) {
+  for (auto&& entry : m_pending_celestial_requests) {
     List<CelestialResponse> responses;
     for (auto it = entry.second.begin(); it != entry.second.end();) {
       auto ready = it->poll();
@@ -2128,7 +2128,7 @@ std::expected<void, StarException> UniverseServer::respondToCelestialRequests() 
         auto response = it->get();
         if (!response)
           return std::unexpected(std::move(response.error()));
-        // addCelestialRequests puts the only consumer handle directly in this queue.
+        // add_celestial_requests puts the only consumer handle directly in this queue.
         if (responses.empty())
           responses.reserve(entry.second.size());
         responses.push_back(std::move(response->get()));
@@ -2142,7 +2142,7 @@ std::expected<void, StarException> UniverseServer::respondToCelestialRequests() 
         return std::unexpected(std::move(sent.error()));
     }
   }
-  Star::erase_if(m_pendingCelestialRequests, [](auto const& entry) { return entry.second.empty(); });
+  Star::erase_if(m_pending_celestial_requests, [](auto const& entry) { return entry.second.empty(); });
   return {};
 }
 
@@ -2610,7 +2610,7 @@ std::expected<void, StarException> UniverseServer::doTriggeredStorage() {
   if (!interval)
     return std::unexpected(std::move(interval.error()));
   m_storageTriggerDeadline = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) + std::chrono::milliseconds(*interval);
-  return m_celestialDatabase->cleanupAndCommit();
+  return m_celestial_database->cleanup_and_commit();
 }
 
 std::expected<void, StarException> UniverseServer::saveSettings() {
@@ -2713,7 +2713,7 @@ std::expected<std::optional<CelestialCoordinate>, StarException> UniverseServer:
     return std::optional<CelestialCoordinate>(std::move(coordinate));
   }
   if (!m_nextRandomizedStarterWorld) {
-    m_nextRandomizedStarterWorld = m_workerPool.add_producer<CelestialCoordinate>([&root = m_root, assets = *assets, database = m_celestialDatabase]() -> std::expected<CelestialCoordinate, StarException> {
+    m_nextRandomizedStarterWorld = m_workerPool.add_producer<CelestialCoordinate>([&root = m_root, assets = *assets, database = m_celestial_database]() -> std::expected<CelestialCoordinate, StarException> {
       if (auto logged = root.logger().info("Searching for new randomized starter world"); !logged)
         return std::unexpected(std::move(logged.error()));
       auto filterWorld = [database](CelestialCoordinate const& coordinate, Json const& filter) -> std::expected<bool, StarException> {
@@ -2722,7 +2722,7 @@ std::expected<std::optional<CelestialCoordinate>, StarException> UniverseServer:
           return std::unexpected(std::move(parameters.error()));
         if (!*parameters)
           return false;
-        auto visitable = (*parameters)->visitableParameters();
+        auto visitable = (*parameters)->visitable_parameters();
         if (!visitable)
           return false;
         auto biome = filter.opt_string("terrestrialBiome");
@@ -2760,7 +2760,7 @@ std::expected<std::optional<CelestialCoordinate>, StarException> UniverseServer:
       auto range = config->get_uint("range");
       if (!range)
         return std::unexpected(std::move(range.error()));
-      auto random = database->findRandomWorld(*tries, *range, [&](CelestialCoordinate const& coordinate) -> std::expected<bool, StarException> {
+      auto random = database->find_random_world(*tries, *range, [&](CelestialCoordinate const& coordinate) -> std::expected<bool, StarException> {
         auto starter = config->get("starterWorld");
         if (!starter)
           return std::unexpected(std::move(starter.error()));
@@ -3057,12 +3057,12 @@ std::expected<void, StarException> UniverseServer::removeTimedBan() {
   return {};
 }
 
-std::expected<void, StarException> UniverseServer::addCelestialRequests(ConnectionId clientId, List<CelestialRequest> requests) {
+std::expected<void, StarException> UniverseServer::add_celestial_requests(ConnectionId clientId, List<CelestialRequest> requests) {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lock_with_diagnostics(locker);
   for (auto const& request : requests) {
-    m_pendingCelestialRequests[clientId].push_back(m_workerPool.add_producer<CelestialResponse>(
-      [&database = *m_celestialDatabase, request]() { return database.respondToRequest(request); }));
+    m_pending_celestial_requests[clientId].push_back(m_workerPool.add_producer<CelestialResponse>(
+      [&database = *m_celestial_database, request]() { return database.respond_to_request(request); }));
   }
   return {};
 }
@@ -3140,7 +3140,7 @@ std::expected<void, StarException> UniverseServer::packetsReceived(UniverseConne
           return std::unexpected(std::move(disconnected.error()));
 
       } else if (auto celestialRequest = as<CelestialRequestPacket>(packet)) {
-        if (auto added = addCelestialRequests(clientId, std::move(celestialRequest->requests)); !added)
+        if (auto added = add_celestial_requests(clientId, std::move(celestialRequest->requests)); !added)
           return std::unexpected(std::move(added.error()));
 
       } else if (auto entityMessage = as<EntityMessagePacket>(packet)) {
@@ -3661,7 +3661,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
     if (auto added = m_connectionServer->addConnection(clientId, std::move(connection)); !added)
       return std::unexpected(std::move(added.error()));
     registered = clientId;
-    if (auto sent = m_connectionServer->sendPackets(clientId, {std::make_shared<ConnectSuccessPacket>(clientId, m_universeSettings->uuid(), m_celestialDatabase->baseInformation()), std::make_shared<UniverseTimeUpdatePacket>(m_universeClock->time()), std::make_shared<PausePacket>(*m_pause, m_root.timing().time_scale)}); !sent)
+    if (auto sent = m_connectionServer->sendPackets(clientId, {std::make_shared<ConnectSuccessPacket>(clientId, m_universeSettings->uuid(), m_celestial_database->base_information()), std::make_shared<UniverseTimeUpdatePacket>(m_universeClock->time()), std::make_shared<PausePacket>(*m_pause, m_root.timing().time_scale)}); !sent)
       return std::unexpected(std::move(sent.error()));
     if (auto added = m_clients.try_emplace(clientId, client); !added)
       return std::unexpected(std::move(added.error()));
@@ -3678,7 +3678,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
           return std::unexpected(std::move(system.error()));
         if (auto added = (*system)->addClient(clientId, client->playerUuid(), client->shipUpgrades().shipSpeed, client->shipLocation()); !added)
           return std::unexpected(std::move(added.error()));
-        if (auto requested = addCelestialRequests(clientId, {make_left(location.vec2()), make_right(location)}); !requested) {
+        if (auto requested = add_celestial_requests(clientId, {make_left(location.vec2()), make_right(location)}); !requested) {
           auto removed = (*system)->removeClient(clientId);
           if (!removed)
             return std::unexpected(requested.error().with_related(removed.error(), "Removing failed system client failed"));
@@ -4181,7 +4181,7 @@ std::expected<void, StarException> UniverseServer::retireFailedWorldCreation(
 
 std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> UniverseServer::makeWorldPromise(WorldId const& worldId) {
   if (std::holds_alternative<CelestialWorldId>(worldId))
-    return celestialWorldPromise(std::get<CelestialWorldId>(worldId));
+    return celestial_world_promise(std::get<CelestialWorldId>(worldId));
   else if (std::holds_alternative<ClientShipWorldId>(worldId))
     return shipWorldPromise(std::get<ClientShipWorldId>(worldId));
   else if (std::holds_alternative<InstanceWorldId>(worldId))
@@ -4301,7 +4301,7 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
     ship->setUniverseSettings(m_universeSettings);
     ship->setReferenceClock(clock);
     clock->start();
-    auto sky = client->systemWorld() ? client->systemWorld()->clientSkyParameters(client->clientId()) : universe.celestialSkyParameters(client->shipCoordinate());
+    auto sky = client->systemWorld() ? client->systemWorld()->clientSkyParameters(client->clientId()) : universe.celestial_sky_parameters(client->shipCoordinate());
     if (!sky)
       return std::unexpected(std::move(sky.error()));
     if (auto set = ship->setOrbitalSky(*sky); !set)
@@ -4320,10 +4320,10 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
   }));
 }
 
-std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> UniverseServer::celestialWorldPromise(CelestialWorldId const& id) {
+std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> UniverseServer::celestial_world_promise(CelestialWorldId const& id) {
   if (!id)
     return std::nullopt;
-  return WorldServerPromise(m_workerPool.add_producer<std::shared_ptr<WorldServerThread>>([&universe = *this, &m_root = m_root, &m_universeSettings = m_universeSettings, &m_pause = m_pause, id, directory = m_storageDirectory, database = m_celestialDatabase, clock = m_universeClock]() -> std::expected<std::shared_ptr<WorldServerThread>, StarException> {
+  return WorldServerPromise(m_workerPool.add_producer<std::shared_ptr<WorldServerThread>>([&universe = *this, &m_root = m_root, &m_universeSettings = m_universeSettings, &m_pause = m_pause, id, directory = m_storageDirectory, database = m_celestial_database, clock = m_universeClock]() -> std::expected<std::shared_ptr<WorldServerThread>, StarException> {
     std::shared_ptr<WorldServer> world;
     auto path = File::relative_to(directory, Star::format("{}.world", id.filename()));
     auto exists = File::is_regular_file(path);
@@ -4363,7 +4363,7 @@ std::expected<std::optional<UniverseServer::WorldServerPromise>, StarException> 
       if (!created)
         return std::unexpected(std::move(created.error()));
       world = std::move(*created);
-      if (auto persistent = database->markPersistent(id); !persistent)
+      if (auto persistent = database->mark_persistent(id); !persistent)
         return std::unexpected(std::move(persistent.error()));
     }
     world->setUniverseSettings(m_universeSettings);
@@ -4844,7 +4844,7 @@ std::expected<std::shared_ptr<SystemWorldServerThread>, StarException> UniverseS
         auto store = (*database)->loadVersionedJson(*versioned, "System");
         if (!store)
           return std::unexpected(std::move(store.error()));
-        return SystemWorldServer::create(m_root, *store, m_universeClock, m_celestialDatabase);
+        return SystemWorldServer::create(m_root, *store, m_universeClock, m_celestial_database);
       }();
       if (loaded)
         world = std::move(*loaded);
@@ -4861,11 +4861,11 @@ std::expected<std::shared_ptr<SystemWorldServerThread>, StarException> UniverseS
     if (!world) {
       if (auto logged = m_root.logger().info("UniverseServer: Creating new system world at location {}", location); !logged)
         return std::unexpected(std::move(logged.error()));
-      auto created = SystemWorldServer::create(m_root, location, m_universeClock, m_celestialDatabase);
+      auto created = SystemWorldServer::create(m_root, location, m_universeClock, m_celestial_database);
       if (!created)
         return std::unexpected(std::move(created.error()));
       world = std::move(*created);
-      if (auto persistent = m_celestialDatabase->markPersistent(CelestialCoordinate(location)); !persistent)
+      if (auto persistent = m_celestial_database->mark_persistent(CelestialCoordinate(location)); !persistent)
         return std::unexpected(std::move(persistent.error()));
     }
     auto thread = std::make_shared<SystemWorldServerThread>(location, world, path);
@@ -4896,12 +4896,12 @@ std::expected<void, StarException> UniverseServer::worldDiedWithError(WorldId wo
   return {};
 }
 
-std::expected<SkyParameters, StarException> UniverseServer::celestialSkyParameters(CelestialCoordinate const& coordinate) const {
-  auto valid = m_celestialDatabase->coordinateValid(coordinate);
+std::expected<SkyParameters, StarException> UniverseServer::celestial_sky_parameters(CelestialCoordinate const& coordinate) const {
+  auto valid = m_celestial_database->coordinate_valid(coordinate);
   if (!valid)
     return std::unexpected(std::move(valid.error()));
   if (*valid)
-    return SkyParameters::create(m_root, coordinate, m_celestialDatabase);
+    return SkyParameters::create(m_root, coordinate, m_celestial_database);
   return SkyParameters();
 }
 
@@ -4933,7 +4933,7 @@ std::expected<void, StarException> UniverseServer::startLuaScripts() {
     auto universe = LuaBindings::makeUniverseServerCallbacks(m_root, *this);
     if (!universe)
       return std::unexpected(std::move(universe.error()));
-    auto celestial = LuaBindings::makeCelestialCallbacks(m_root, *this);
+    auto celestial = LuaBindings::make_celestial_callbacks(m_root, *this);
     if (!celestial)
       return std::unexpected(std::move(celestial.error()));
     if (auto added = script->add_callbacks("universe", *universe); !added)

@@ -1,4 +1,11 @@
 import std;
+import star.celestial_coordinate;
+import star.celestial_database;
+import star.celestial_graphics;
+import star.celestial_parameters;
+import star.celestial_types;
+import star.either;
+import star.list;
 import star.sky;
 import star.sky_parameters;
 import star.sky_types;
@@ -18,6 +25,40 @@ auto advanceSky(Sky& sky, double dt) {
   return sky.update(dt);
 }
 }
+
+const GameTestRegistration twinkle_frames("CelestialGraphics", "TwinkleWrapsAtPeriodAndRejectsInvalidPhase", [](GameTest& fixture) {
+  auto& root = fixture.root();
+  auto master = CelestialMasterDatabase::create(root);
+  ASSERT_TRUE(master);
+  auto assets = root.assets();
+  ASSERT_TRUE(assets);
+  auto slave = CelestialSlaveDatabase::create(*assets, root.random(), (*master)->base_information());
+  ASSERT_TRUE(slave);
+  CelestialCoordinate const system(Vec3I(0, 0, 1));
+  for (int period : {2, 0}) {
+    Json params = JsonObject{{"twinkleTime", JsonArray{period, period}}, {"twinkleFrames", "frames"}, {"twinkleBackground", "background"}};
+    auto star = CelestialParameters::create(root, system, 5, "Star", std::move(params));
+    ASSERT_TRUE(star);
+    CelestialChunk chunk;
+    chunk.chunk_index = {0, 0};
+    chunk.system_parameters[system.location()] = std::move(*star);
+    List<CelestialResponse> responses;
+    responses.push_back(make_left(std::move(chunk)));
+    ASSERT_TRUE((*slave)->push_responses(std::move(responses)));
+    auto layers = CelestialGraphics::draw_system_twinkle(root, **slave, system, 2.0);
+    if (period == 0) {
+      EXPECT_FALSE(layers);
+    } else {
+      ASSERT_TRUE(layers);
+      ASSERT_EQ(layers->size(), 2u);
+      EXPECT_EQ((*layers)[0].first, "background");
+      EXPECT_EQ((*layers)[1].first, "frames:0");
+      volatile std::uint64_t infinity_bits = 0x7ff0000000000000ull;
+      auto infinity = std::bit_cast<double>(static_cast<std::uint64_t>(infinity_bits));
+      EXPECT_FALSE(CelestialGraphics::draw_system_twinkle(root, **slave, system, infinity));
+    }
+  }
+});
 
 const GameTestRegistration skyPresentationTime(
     "SkyPresentationTest", "SamplesWithoutAdvancingTheClock", [](GameTest& fixture) {
