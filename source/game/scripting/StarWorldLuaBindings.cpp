@@ -1881,7 +1881,7 @@ namespace LuaBindings {
       return std::unexpected(std::move(result.error()));
     if (auto result = callbacks.register_callback("entityMouthPosition", [&world](EntityId entityId) -> std::expected<std::optional<Vec2F>, StarException> {
         if (auto entity = world.get<ChattyEntity>(entityId)) {
-          auto positionResult = entity->mouthPosition();
+          auto positionResult = entity->mouth_position();
           if (!positionResult)
             return std::unexpected(std::move(positionResult.error()));
           auto position = std::move(*positionResult);

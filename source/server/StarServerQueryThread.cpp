@@ -234,7 +234,7 @@ std::expected<void, StarException> ServerQueryThread::buildPlayerResponse() {
     return std::unexpected(std::move(header.error()));
   std::uint8_t i = 0;
   for (auto const& pair : *clientIds) {
-    auto name = m_universe.get().clientNick(pair.first);
+    auto name = m_universe.get().client_nick(pair.first);
     if (!name)
       return std::unexpected(std::move(name.error()));
     auto timeConnected = static_cast<float>((now - pair.second).count()) / 1000.f;

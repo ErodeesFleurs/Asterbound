@@ -102,6 +102,7 @@ import star.input;
 import star.label_widget;
 import star.ordered_set;
 import star.main_application;
+import star.player_storage;
 import star.test_universe;
 import star.universe_client;
 import star.warping;
@@ -470,20 +471,23 @@ void exercise_sail(GameTest& fixture, Application const& application) {
   ASSERT_TRUE((*universe)->close());
 }
 
-class SailTestApplication final : public Application {
+using SurfaceScenario = void(GameTest&, Application const&);
+
+class SurfaceTestApplication final : public Application {
 public:
-  explicit SailTestApplication(GameTest& fixture) : m_fixture(fixture) {}
+  SurfaceTestApplication(GameTest& fixture, SurfaceScenario& scenario) : m_fixture(fixture), m_scenario(scenario) {}
   Logger& logger() const override { return m_fixture.root().logger(); }
   std::expected<void, StarException> update() override {
-    exercise_sail(m_fixture, *this);
+    m_scenario(m_fixture, *this);
     appController()->quit();
     return {};
   }
 private:
   GameTest& m_fixture;
+  std::reference_wrapper<SurfaceScenario> m_scenario;
 };
 
-const GameTestRegistration sail_navigation("AiInterface", "PageSnapshotsAndSpeechReveal", [](GameTest& fixture) {
+void run_surface_scenario(GameTest& fixture, SurfaceScenario& scenario) {
   auto display = std::getenv("DISPLAY");
   auto owned = std::getenv("ASTERBOUND_RENDER_TEST_DISPLAY");
   if (!display || !owned || !*owned || std::string_view(display) != owned)
@@ -493,26 +497,30 @@ const GameTestRegistration sail_navigation("AiInterface", "PageSnapshotsAndSpeec
   auto directory = File::current_directory();
   ASSERT_TRUE(directory);
   auto restore_directory = make_scope_exit([&] { EXPECT_TRUE(File::change_directory(*directory)); });
-  EXPECT_EQ(runMainApplication(std::make_unique<SailTestApplication>(fixture),
+  EXPECT_EQ(runMainApplication(std::make_unique<SurfaceTestApplication>(fixture, scenario),
       {"frontend_tests", "-renderer", "opengl"}), 0);
+}
+
+const GameTestRegistration sail_navigation("AiInterface", "PageSnapshotsAndSpeechReveal", [](GameTest& fixture) {
+  run_surface_scenario(fixture, exercise_sail);
 });
 #endif
 
-std::optional<RectF> separateAgainst(List<RectF> const& obstacles, RectF box) {
+std::optional<RectF> separate_against(List<RectF> const& obstacles, RectF box) {
   BubbleSeparator<int> separator(1.0f);
   int id = 0;
   for (auto const& obstacle : obstacles)
-    separator.addBubble(obstacle.center(), obstacle, id++);
-  auto prepared = separator.updateDestinations([](BubbleState<int>&, int&) -> std::expected<void, StarException> {
+    separator.add_bubble(obstacle.center(), obstacle, id++);
+  auto prepared = separator.update_destinations([](BubbleState<int>&, int&) -> std::expected<void, StarException> {
     return {};
   });
   EXPECT_TRUE(prepared);
-  separator.addBubble(box.center(), box, -1);
+  separator.add_bubble(box.center(), box, -1);
   auto matches = separator.filtered([](BubbleState<int> const&, int id) { return id == -1; });
   EXPECT_EQ(matches.size(), 1u);
   std::optional<RectF> result;
   for (auto const& match : matches)
-    result = match.separatedBox;
+    result = match.separated_box;
   return result;
 }
 
@@ -520,25 +528,25 @@ TEST(ChatBubbleSeparation, ContainingProjectionsNeedBothEdgeQueries) {
   RectF box{0, 2, 10, 8};
   RectF containing{-100, 0, 100, 10};
   // A nonoverlapping neighbor hides the containing rectangle in one ordering.
-  EXPECT_EQ(separateAgainst({containing, {-20, 20, -10, 30}}, box), (RectF{0, 10, 10, 16}));
-  EXPECT_EQ(separateAgainst({containing, {20, 20, 30, 30}}, box), (RectF{0, 10, 10, 16}));
+  EXPECT_EQ(separate_against({containing, {-20, 20, -10, 30}}, box), (RectF{0, 10, 10, 16}));
+  EXPECT_EQ(separate_against({containing, {20, 20, 30, 30}}, box), (RectF{0, 10, 10, 16}));
 }
 
 TEST(ChatBubbleSeparation, EqualSizesRespectVerticalPriorityAndTouchingEdges) {
   RectF box{0, 0, 10, 10};
-  EXPECT_EQ(separateAgainst({{0, 5, 10, 15}}, box), box);
-  EXPECT_EQ(separateAgainst({{0, -5, 10, 5}}, box), (RectF{0, 10, 10, 20}));
-  EXPECT_EQ(separateAgainst({box}, box), (RectF{0, 10, 10, 20}));
-  EXPECT_EQ(separateAgainst({{10, 0, 20, 10}, {0, 10, 10, 20}}, box), box);
+  EXPECT_EQ(separate_against({{0, 5, 10, 15}}, box), box);
+  EXPECT_EQ(separate_against({{0, -5, 10, 5}}, box), (RectF{0, 10, 10, 20}));
+  EXPECT_EQ(separate_against({box}, box), (RectF{0, 10, 10, 20}));
+  EXPECT_EQ(separate_against({{10, 0, 20, 10}, {0, 10, 10, 20}}, box), box);
 }
 
 TEST(ChatBubbleSeparation, MixedSizesChainWithoutChangingDimensions) {
   RectF box{0, 0, 10, 10};
-  auto result = separateAgainst({{-5, 0, 15, 10}, {-2, 12, 13, 22}, {0, 24, 10, 44}}, RectF{0, 4, 10, 14});
+  auto result = separate_against({{-5, 0, 15, 10}, {-2, 12, 13, 22}, {0, 24, 10, 44}}, RectF{0, 4, 10, 14});
   ASSERT_TRUE(result);
   EXPECT_EQ(*result, (RectF{0, 44, 10, 54}));
   EXPECT_EQ(result->size(), box.size());
-  EXPECT_EQ(separateAgainst({{1, -5, 9, 50}}, box), box);
+  EXPECT_EQ(separate_against({{1, -5, 9, 50}}, box), box);
 }
 
 const GameTestRegistration
@@ -1239,6 +1247,167 @@ public:
 private:
   explicit ScriptTestPane(GuiContext& context) : BaseScriptPane(context) {}
 };
+
+#if defined(__linux__)
+void exercise_chat_history(GameTest& fixture, Application const& application) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto overlay = File::relative_to(*directory, "assets");
+  ASSERT_TRUE(File::create_directory(overlay));
+  ASSERT_TRUE(File::create_directory(File::relative_to(overlay, "interface")));
+  ASSERT_TRUE(File::create_directory(File::relative_to(overlay, "interface/chat")));
+  ASSERT_TRUE(File::write_file(String(R"({"config":{"chatHistoryLimit":3}})"),
+      File::relative_to(overlay, "interface/chat/chat.config.patch")));
+  // Observe only commands that the real log Canvas accepted; measurement and
+  // drawing use its actual methods and the application's render-initialized fonts.
+  ASSERT_TRUE(File::write_file(String(R"LUA(
+    local initialize = init
+    function init()
+      local bind = widget.bindCanvas
+      widget.bindCanvas = function(name)
+        local surface = bind(name)
+        if name ~= "log" then return surface end
+        return setmetatable({}, {__index = function(_, method)
+          return function(_, ...)
+            local result = surface[method](surface, ...)
+            if method == "clear" then drawn = {}
+            elseif method == "drawText" then
+              local text, placement = ...
+              drawn[#drawn + 1] = {text = text:match("(%d+)$"), y = placement.position[2]}
+            end
+            return result
+          end
+        end})
+      end
+      initialize()
+      widget.bindCanvas = bind
+    end
+    function message(n) return {context = {mode = "Broadcast"}, text = tostring(n)} end
+    function assert_log(expected)
+      assert(#storage.messages == #expected)
+      for i, value in ipairs(expected) do assert(storage.messages[i].text == tostring(value)) end
+    end
+    function assert_drawn(expected)
+      render()
+      assert(#drawn == #expected)
+      for i, value in ipairs(expected) do
+        assert(drawn[i].text == tostring(value))
+        assert(i == 1 or drawn[i-1].y < drawn[i].y)
+      end
+    end
+  )LUA"), File::relative_to(overlay, "observe-chat.lua")));
+  auto owned = createPrivateOverlayRoot(fixture.rootSettings(), *directory, overlay, "chat.config");
+  ASSERT_TRUE(owned) << owned.error().what();
+  auto& root = **owned;
+  auto configuration = root.configuration();
+  ASSERT_TRUE(configuration);
+  ASSERT_TRUE((*configuration)->set("bindings", JsonObject{}));
+  auto input = Input::create(root);
+  ASSERT_TRUE(input);
+  auto context = GuiContext::create(root, {}, application.appController());
+  ASSERT_TRUE(context) << context.error().what();
+  (*context)->bindInput(**input);
+  ASSERT_TRUE((*context)->renderInit(application.renderer()));
+  auto assets = root.assets();
+  ASSERT_TRUE(assets);
+  auto config = (*assets)->json("/interface/asterbound/chat/chat.config");
+  ASSERT_TRUE(config);
+  auto scripts = config->get_array("scripts");
+  ASSERT_TRUE(scripts);
+  scripts->push_back("/observe-chat.lua");
+  auto augmented = config->set("scripts", std::move(*scripts));
+  ASSERT_TRUE(augmented);
+  auto pane = ScriptTestPane::create(**context, *augmented);
+  ASSERT_TRUE(pane) << pane.error().what();
+  auto lua_root = LuaRoot::create(root);
+  ASSERT_TRUE(lua_root);
+  ASSERT_TRUE((*pane)->set_lua_root(*lua_root));
+  auto root_bindings = LuaBindings::makeRootCallbacks(root);
+  ASSERT_TRUE(root_bindings);
+  ASSERT_TRUE((*pane)->add_callbacks("root", std::move(*root_bindings)));
+  auto metadata = PlayerStorage::create(root, File::relative_to(*directory, "player"));
+  ASSERT_TRUE(metadata) << metadata.error().what();
+  ASSERT_TRUE((*metadata)->setMetadata("chatHistory", JsonArray{"previous", "earlier"}));
+  LuaCallbacks client;
+  ASSERT_TRUE(client.register_callback("storage", [storage = *metadata](String key) -> std::expected<LuaCallbacks, StarException> {
+    LuaCallbacks scope;
+    if (auto get = scope.register_callback("get", [storage, key](Json) { return storage->getMetadata(key); }); !get)
+      return std::unexpected(std::move(get.error()));
+    if (auto set = scope.register_callback("set", [storage, key](Json value) { return storage->setMetadata(key, std::move(value)); }); !set)
+      return std::unexpected(std::move(set.error()));
+    return scope;
+  }));
+  ASSERT_TRUE((*pane)->add_callbacks("client", std::move(client)));
+  PaneManager panes(**context);
+  ASSERT_TRUE(panes.displayPane(PaneLayer::Hud, *pane, {}));
+  auto check = [&](String const& code) {
+    auto result = (*pane)->evaluate(code);
+    ASSERT_TRUE(result) << result.error().what();
+    ASSERT_TRUE(*result);
+    EXPECT_EQ(**result, Json(true));
+  };
+  check(R"LUA(
+    setCurrentChat("draft", true)
+    incrementIndex()
+    assert(currentChat() == "previous")
+    -- Persist the exact message order of the old unversioned pane before restart.
+    storage.messageOrderVersion = nil
+    storage.messages = {message(3), message(2), message(1)}
+    return true
+  )LUA");
+  ASSERT_TRUE((*pane)->stopScripts());
+  ASSERT_TRUE((*pane)->resumeScripts());
+  check(R"LUA(
+    assert_log({1, 2, 3})
+    assert_drawn({3, 2, 1})
+    assert(currentChat() == "previous")
+    decrementIndex()
+    assert(currentChat() == "draft")
+    update(10000)
+    assert(visible() == 0)
+    receiveMessages({messages = {message(4), message(5)}, showPane = false})
+    assert_log({3, 4, 5})
+    assert(visible() == 0)
+    assert_drawn({})
+    addMessages({message(6)})
+    assert(visible() == 1)
+    assert_log({4, 5, 6})
+    assert_drawn({6, 5, 4})
+    scrollUp()
+    assert(storage.scroll > 0)
+    clear(2)
+    assert(storage.scroll == 0)
+    assert_log({4})
+    assert_drawn({4})
+    addMessages({message(7), message(8), message(9), message(10), message(11)})
+    assert_log({9, 10, 11})
+    addHistory("sent")
+    return true
+  )LUA");
+  ASSERT_TRUE((*pane)->stopScripts());
+  ASSERT_TRUE((*pane)->resumeScripts());
+  check(R"LUA(
+    assert_log({9, 10, 11})
+    assert_drawn({11, 10, 9})
+    clear(0)
+    assert_log({9, 10, 11})
+    clear()
+    assert_log({})
+    assert_drawn({})
+    assert(currentChat() == "draft")
+    return true
+  )LUA");
+  auto history = (*metadata)->getMetadata("chatHistory");
+  ASSERT_TRUE(history) << history.error().what();
+  EXPECT_EQ(*history, (JsonArray{"sent", "previous", "earlier"}));
+  ASSERT_TRUE(panes.dismissAllPanes());
+}
+
+const GameTestRegistration chat_history_surface("LuaChat", "ChronologicalBatchesKeepNewestAtBottomAcrossReload", [](GameTest& fixture) {
+  run_surface_scenario(fixture, exercise_chat_history);
+});
+#endif
 
 struct ScriptPaneContext {
   std::shared_ptr<GuiContext> context;

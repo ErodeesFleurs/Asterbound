@@ -348,18 +348,18 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeInterfaceCallbacks(M
   return callbacks;
 }
 
-std::expected<LuaCallbacks, StarException> LuaBindings::makeChatCallbacks(MainInterface& mainInterface, UniverseClient& client) {
+std::expected<LuaCallbacks, StarException> LuaBindings::make_chat_callbacks(MainInterface& main_interface, UniverseClient& client) {
   LuaCallbacks callbacks;
-  auto lifetime = mainInterface.callbackStopToken();
-  if (auto r = callbacks.register_callback("send", [&client, lifetime](String const& message, std::optional<String> modeName, std::optional<bool> speak, std::optional<JsonObject> data) -> std::expected<void, StarException> {
+  auto lifetime = main_interface.callbackStopToken();
+  if (auto r = callbacks.register_callback("send", [&client, lifetime](String const& message, std::optional<String> mode_name, std::optional<bool> speak, std::optional<JsonObject> data) -> std::expected<void, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
     ChatSendMode mode = ChatSendMode::Broadcast;
-    if (modeName) {
-      auto parsed = enum_value<ChatSendModeNames>(*modeName);
+    if (mode_name) {
+      auto parsed = enum_value<chat_send_mode_names>(*mode_name);
       if (!parsed) return std::unexpected(std::move(parsed.error()));
       mode = *parsed;
     }
-    return client.sendChat(message, mode, speak, std::move(data));
+    return client.send_chat(message, mode, speak, std::move(data));
   }); !r) return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.register_callback("parseArguments", [](String const& args) -> std::expected<LuaVariadic<Json>, StarException> {
     auto parsed = Json::parse_sequence(args);
@@ -368,57 +368,57 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeChatCallbacks(MainIn
     if (!values) return std::unexpected(std::move(values.error()));
     return LuaVariadic<Json>(std::move(*values));
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.register_callback("command", [&mainInterface, lifetime](String const& command) -> std::expected<StringList, StarException> {
+  if (auto r = callbacks.register_callback("command", [&main_interface, lifetime](String const& command) -> std::expected<StringList, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
-    return mainInterface.executeClientCommand(command);
+    return main_interface.executeClientCommand(command);
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.register_callback("addMessage", [&client, &mainInterface, lifetime](String const& text, std::optional<Json> config) -> std::expected<void, StarException> {
+  if (auto r = callbacks.register_callback("addMessage", [&client, &main_interface, lifetime](String const& text, std::optional<Json> config) -> std::expected<void, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
-    ChatReceivedMessage message({MessageContext::Mode::CommandResult, ""}, client.clientContext()->connectionId(), "", text);
-    bool showPane = true;
+    ChatReceivedMessage message{{MessageContext::Mode::CommandResult}, client.clientContext()->connectionId(), "", text};
+    bool show_pane = true;
     if (config) {
       auto mode = config->opt_string("mode");
       if (!mode) return std::unexpected(std::move(mode.error()));
       if (*mode) {
-        auto parsed = enum_value<MessageContextModeNames>(**mode);
+        auto parsed = enum_value<message_context_mode_names>(**mode);
         if (!parsed) return std::unexpected(std::move(parsed.error()));
         message.context.mode = *parsed;
       }
       auto channel = config->opt_string("channelName");
       if (!channel) return std::unexpected(std::move(channel.error()));
-      if (*channel) message.context.channelName = std::move(**channel);
+      if (*channel) message.context.channel_name = std::move(**channel);
       auto portrait = config->opt_string("portrait");
       if (!portrait) return std::unexpected(std::move(portrait.error()));
       if (*portrait) message.portrait = std::move(**portrait);
       auto nickname = config->opt_string("fromNick");
       if (!nickname) return std::unexpected(std::move(nickname.error()));
-      if (*nickname) message.fromNick = std::move(**nickname);
-      auto fromConnection = config->opt_uint("fromConnection");
-      if (!fromConnection) return std::unexpected(std::move(fromConnection.error()));
-      if (*fromConnection) message.fromConnection = static_cast<ConnectionId>(**fromConnection);
+      if (*nickname) message.from_nick = std::move(**nickname);
+      auto from_connection = chat_connection_id(*config, message.from_connection);
+      if (!from_connection) return std::unexpected(std::move(from_connection.error()));
+      message.from_connection = *from_connection;
       auto show = config->get_bool("showPane", true);
       if (!show) return std::unexpected(std::move(show.error()));
-      showPane = *show;
+      show_pane = *show;
     }
-    return mainInterface.addChatMessages({std::move(message)}, showPane);
+    return main_interface.add_chat_messages({std::move(message)}, show_pane);
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.register_callback("input", [&mainInterface, lifetime]() -> std::expected<String, StarException> {
+  if (auto r = callbacks.register_callback("input", [&main_interface, lifetime]() -> std::expected<String, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
-    auto value = mainInterface.callUi("chat", "currentChat", {});
+    auto value = main_interface.callUi("chat", "currentChat", {});
     if (!value) return std::unexpected(std::move(value.error()));
     if (!*value) return std::unexpected(GuiException("Chat pane does not export currentChat"));
     return (**value).to_string();
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.register_callback("setInput", [&mainInterface, lifetime](String const& text, std::optional<bool> moveCursor) -> std::expected<bool, StarException> {
+  if (auto r = callbacks.register_callback("setInput", [&main_interface, lifetime](String const& text, std::optional<bool> move_cursor) -> std::expected<bool, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
-    auto value = mainInterface.callUi("chat", "setCurrentChat", {text, moveCursor.value_or(false)});
+    auto value = main_interface.callUi("chat", "setCurrentChat", {text, move_cursor.value_or(false)});
     if (!value) return std::unexpected(std::move(value.error()));
     if (!*value) return std::unexpected(GuiException("Chat pane does not export setCurrentChat"));
     return (**value).to_bool();
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.register_callback("clear", [&mainInterface, lifetime](std::optional<std::size_t> count) -> std::expected<void, StarException> {
+  if (auto r = callbacks.register_callback("clear", [&main_interface, lifetime](std::optional<std::size_t> count) -> std::expected<void, StarException> {
     if (lifetime.stop_requested()) return std::unexpected(GuiException("Interface is detached"));
-    auto value = mainInterface.callUi("chat", "clear", {count ? Json(*count) : Json()});
+    auto value = main_interface.callUi("chat", "clear", {count ? Json(*count) : Json()});
     if (!value) return std::unexpected(std::move(value.error()));
     return {};
   }); !r) return std::unexpected(std::move(r.error()));

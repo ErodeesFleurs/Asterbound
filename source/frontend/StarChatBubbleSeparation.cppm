@@ -8,227 +8,180 @@ import star.format;
 import star.vector;
 namespace Star {
 
-template <typename T>
+template <std::movable T>
 struct BubbleState {
   T contents;
-  // The destination is the position the bubble is being pulled towards,
-  // ignoring the positions of all other bubbles (so it could overlap).
-  // This is the position of the entity.
-  Vec2F idealDestination;
-  // The idealDestination is the position of the entity now, while the
-  // currentDestination is only updated once the idealDestination passes a
-  // minimum distance. (So that the algorithm is not re-run for sub-pixel
-  // position changes.)
-  Vec2F currentDestination;
-  // The bound box of the nametag if it was at the destination.
-  RectF boundBox;
-  // The separation offset for the bubble chosen by the algorithm (which it may not
-  // have fully moved to yet).
-  Vec2F seperatedOffset;
-  // The bound box of the bubble around the separatedOffset.
-  RectF separatedBox;
-  // Where the bubble offset is now, which could be anywhere en route to the
-  // seperatedOffset.
-  Vec2F currentOffset;
-  Vec2F previousOffset;
-  bool presentationContinuous = false;
+  Vec2F ideal_destination;
+  Vec2F current_destination;
+  RectF bound_box;
+  Vec2F separated_offset;
+  RectF separated_box;
+  Vec2F current_offset;
+  Vec2F previous_offset;
+  bool presentation_continuous = false;
 
-  Vec2F sampleOffset(float alpha) const {
-    if (!presentationContinuous)
-      return currentOffset;
-    return previousOffset + std::clamp(alpha, 0.0f, 1.0f) * (currentOffset - previousOffset);
+  Vec2F sample_offset(float alpha) const {
+    if (!presentation_continuous)
+      return current_offset;
+    return previous_offset + std::clamp(alpha, 0.0f, 1.0f) * (current_offset - previous_offset);
   }
 
-  void resetPresentation() {
-    previousOffset = currentOffset;
-    presentationContinuous = false;
+  void reset_presentation() {
+    previous_offset = current_offset;
+    presentation_continuous = false;
   }
 };
 
-template <typename T>
+namespace bubble_detail {
+
+class EdgeIndex {
+public:
+  RectF separate(RectF box, std::optional<std::reference_wrapper<RectF const>> previous = {}) const;
+  void insert(RectF const& box);
+  void clear();
+  void append(RectF const& box);
+  void sort();
+
+private:
+  std::vector<RectF> m_left;
+  std::vector<RectF> m_right;
+};
+
+template <typename Function, typename State, typename Value>
+concept bubble_visitor = requires(Function& visit, State& state, Value& value) {
+  { std::invoke(visit, state, value) } -> std::same_as<std::expected<void, StarException>>;
+};
+
+}
+
+template <std::movable T>
 class BubbleSeparator {
 public:
   using Bubble = BubbleState<T>;
 
-  BubbleSeparator();
-  BubbleSeparator(float tweenFactor, float movementThreshold = 2.0f);
+  explicit BubbleSeparator(float tween_factor = 0.5f, float movement_threshold = 2.0f)
+    : m_tween_factor(tween_factor), m_movement_threshold(movement_threshold) {}
 
-  float tweenFactor() const;
-  void setTweenFactor(float tweenFactor);
+  float tween_factor() const { return m_tween_factor; }
+  void set_tween_factor(float factor) { m_tween_factor = factor; }
 
-  float movementThreshold() const;
-  void setMovementThreshold(float movementThreshold);
+  float movement_threshold() const { return m_movement_threshold; }
+  void set_movement_threshold(float threshold) { m_movement_threshold = threshold; }
 
-  void addBubble(Vec2F position, RectF boundBox, T contents, unsigned margin = 0);
+  void add_bubble(Vec2F position, RectF bound_box, T contents, unsigned margin = 0) {
+    bound_box.set_y_max(bound_box.y_max() + margin);
+    RectF separated = m_edges.separate(bound_box);
+    m_edges.insert(separated);
+    Vec2F offset = separated.min() - bound_box.min();
+    m_bubbles.insert_sorted(Bubble{.contents = std::move(contents),
+                                   .ideal_destination = position,
+                                   .current_destination = position,
+                                   .bound_box = bound_box,
+                                   .separated_offset = offset,
+                                   .separated_box = separated,
+                                   .current_offset = offset,
+                                   .previous_offset = offset}, compare_bubble_y);
+  }
 
-  void filter(std::function<bool(Bubble const&, T&)> func);
-  List<Bubble> filtered(std::function<bool(Bubble const&, T const&)> func);
-  // Tick-only: update anchors and solve separation, before filtering/tweening.
-  [[nodiscard]] std::expected<void, StarException> updateDestinations(std::function<std::expected<void, StarException>(Bubble&, T&)> func);
-  [[nodiscard]] std::expected<void, StarException> forEach(std::function<std::expected<void, StarException>(Bubble const&, T const&)> func) const;
+  template <typename Predicate>
+    requires std::predicate<Predicate&, Bubble const&, T&>
+  void filter(Predicate&& keep) {
+    auto size = m_bubbles.size();
+    m_bubbles.filter([&](Bubble& bubble) {
+      return std::invoke(keep, std::as_const(bubble), bubble.contents);
+    });
+    if (size != m_bubbles.size())
+      rebuild_edges();
+  }
 
-  void update(float dt);
-  void resetPresentation();
-  void clear();
-  bool empty() const;
+  template <typename Predicate>
+    requires std::copy_constructible<T> && std::predicate<Predicate&, Bubble const&, T const&>
+  List<Bubble> filtered(Predicate&& keep) const {
+    List<Bubble> result;
+    for (auto const& bubble : m_bubbles)
+      if (std::invoke(keep, bubble, bubble.contents))
+        result.push_back(bubble);
+    return result;
+  }
+
+  template <typename Function>
+    requires bubble_detail::bubble_visitor<Function, Bubble, T>
+  [[nodiscard]] std::expected<void, StarException> update_destinations(Function&& visit) {
+    for (auto& bubble : m_bubbles) {
+      auto result = std::invoke(visit, bubble, bubble.contents);
+      if (!result)
+        return result;
+    }
+
+    // All bubbles solve against the same previous tick, excluding exactly
+    // their own old rectangle. Publish the new geometry only after the pass.
+    bool edges_changed = false;
+    for (auto& bubble : m_bubbles) {
+      auto bounds = RectF::with_center(bubble.ideal_destination, bubble.bound_box.size());
+      auto separated = m_edges.separate(bounds, std::cref(bubble.separated_box));
+      edges_changed |= separated != bubble.separated_box;
+      bubble.current_destination = bubble.ideal_destination;
+      bubble.bound_box = bounds;
+      bubble.separated_offset = separated.min() - bounds.min();
+      bubble.separated_box = separated;
+    }
+    if (edges_changed)
+      rebuild_edges();
+    if (!std::ranges::is_sorted(m_bubbles, compare_bubble_y))
+      m_bubbles.sort(compare_bubble_y);
+    return {};
+  }
+
+  template <typename Function>
+    requires bubble_detail::bubble_visitor<Function, Bubble const, T const>
+  [[nodiscard]] std::expected<void, StarException> for_each(Function&& visit) const {
+    for (auto const& bubble : m_bubbles) {
+      auto result = std::invoke(visit, bubble, bubble.contents);
+      if (!result)
+        return result;
+    }
+    return {};
+  }
+
+  void update(float) {
+    for (auto& bubble : m_bubbles) {
+      bubble.previous_offset = bubble.current_offset;
+      bubble.current_offset += m_tween_factor * (bubble.separated_offset - bubble.current_offset);
+      if (!bubble.presentation_continuous)
+        bubble.previous_offset = bubble.current_offset;
+      bubble.presentation_continuous = true;
+    }
+  }
+
+  void reset_presentation() {
+    for (auto& bubble : m_bubbles)
+      bubble.reset_presentation();
+  }
+
+  void clear() {
+    m_bubbles.clear();
+    m_edges.clear();
+  }
+
+  bool empty() const { return m_bubbles.empty(); }
 
 private:
-  static bool compareBubbleY(Bubble const& a, Bubble const& b);
+  void rebuild_edges() {
+    m_edges.clear();
+    for (auto const& bubble : m_bubbles)
+      m_edges.append(bubble.separated_box);
+    m_edges.sort();
+  }
 
-  float m_tweenFactor;
-  float m_movementThreshold;
+  static bool compare_bubble_y(Bubble const& a, Bubble const& b) {
+    return a.current_destination[1] < b.current_destination[1];
+  }
+
+  float m_tween_factor;
+  float m_movement_threshold;
   List<Bubble> m_bubbles;
-  List<RectF> m_sortedLeftEdges;
-  List<RectF> m_sortedRightEdges;
+  bubble_detail::EdgeIndex m_edges;
 };
-
-bool compareLeft(RectF const& a, RectF const& b);
-bool compareRight(RectF const& a, RectF const& b);
-bool compareOverlapLeft(RectF const& newBox, RectF const& fixedBox);
-bool compareOverlapRight(RectF const& newBox, RectF const& fixedBox);
-
-// Shifts box upwards until it is not overlapping any of the boxes in
-// sortedLeftEdges
-// and sortedRightEdges.
-// The resulting box is returned and inserted into sortedLeftEdges and
-// sortedRightEdges.
-// The two lists contain all the chat bubbles that have been separated, sorted
-// by
-// the X positions of their left and right edges respectively.
-RectF separateBubble(List<RectF> const& sortedLeftEdges, List<RectF> const& sortedRightEdges, List<RectF>& outLeftEdges, List<RectF>& outRightEdges, RectF box);
-
-template <typename T>
-BubbleSeparator<T>::BubbleSeparator() : BubbleSeparator(0.5f, 2.0f) {}
-
-template <typename T>
-BubbleSeparator<T>::BubbleSeparator(float tweenFactor, float movementThreshold)
-  : m_tweenFactor(tweenFactor), m_movementThreshold(movementThreshold), m_sortedLeftEdges(), m_sortedRightEdges() {}
-
-template <typename T>
-float BubbleSeparator<T>::tweenFactor() const {
-  return m_tweenFactor;
-}
-
-template <typename T>
-void BubbleSeparator<T>::setTweenFactor(float tweenFactor) {
-  m_tweenFactor = tweenFactor;
-}
-
-template <typename T>
-float BubbleSeparator<T>::movementThreshold() const {
-  return m_movementThreshold;
-}
-
-template <typename T>
-void BubbleSeparator<T>::setMovementThreshold(float movementThreshold) {
-  m_movementThreshold = movementThreshold;
-}
-
-template <typename T>
-void BubbleSeparator<T>::addBubble(Vec2F position, RectF boundBox, T contents, unsigned margin) {
-  boundBox.set_y_max(boundBox.y_max() + margin);
-  RectF separated = separateBubble(m_sortedLeftEdges, m_sortedRightEdges, m_sortedLeftEdges, m_sortedRightEdges, boundBox);
-  Vec2F separatedOffset = separated.min() - boundBox.min();
-  Bubble bubble = {.contents = std::move(contents),
-                   .idealDestination = position,
-                   .currentDestination = position,
-                   .boundBox = boundBox,
-                   .seperatedOffset = separatedOffset,
-                   .separatedBox = separated,
-                   .currentOffset = separatedOffset,
-                   .previousOffset = separatedOffset};
-  m_bubbles.insert_sorted(std::move(bubble), &BubbleSeparator<T>::compareBubbleY);
-}
-
-template <typename T>
-void BubbleSeparator<T>::filter(std::function<bool(Bubble const&, T&)> func) {
-  m_bubbles.filter([this, func](Bubble& bubble) {
-    if (!func(bubble, bubble.contents)) {
-      m_sortedLeftEdges.remove(bubble.separatedBox);
-      m_sortedRightEdges.remove(bubble.separatedBox);
-      return false;
-    }
-    return true;
-  });
-}
-
-template <typename T>
-List<BubbleState<T>> BubbleSeparator<T>::filtered(std::function<bool(Bubble const&, T const&)> func) {
-  return m_bubbles.filtered([func](Bubble const& bubble) { return func(bubble, bubble.contents); });
-}
-
-template <typename T>
-[[nodiscard]] std::expected<void, StarException> BubbleSeparator<T>::updateDestinations(std::function<std::expected<void, StarException>(Bubble&, T&)> func) {
-  for (auto& bubble : m_bubbles) {
-    auto result = func(bubble, bubble.contents);
-    if (!result)
-      return std::unexpected(std::move(result.error()));
-  }
-
-  List<Box<float, 2>> leftEdges = std::move(m_sortedLeftEdges);
-  List<Box<float, 2>> rightEdges = std::move(m_sortedRightEdges);
-  for (auto& bubble : m_bubbles) {
-    leftEdges.remove(bubble.separatedBox);
-    rightEdges.remove(bubble.separatedBox);
-    RectF boundBox = RectF::with_center(bubble.idealDestination, bubble.boundBox.size());
-    RectF separated = separateBubble(leftEdges, rightEdges, m_sortedLeftEdges, m_sortedRightEdges, boundBox);
-    leftEdges.insert_sorted(bubble.separatedBox, compareLeft);
-    rightEdges.insert_sorted(bubble.separatedBox, compareRight);
-    bubble.currentDestination = bubble.idealDestination;
-    bubble.boundBox = boundBox;
-    bubble.seperatedOffset = separated.min() - boundBox.min();
-    bubble.separatedBox = separated;
-  }
-  m_sortedLeftEdges.sort(compareLeft);
-  m_sortedRightEdges.sort(compareRight);
-  if (!m_bubbles.empty())
-    m_bubbles.sort(&BubbleSeparator<T>::compareBubbleY);
-  return {};
-}
-
-template <typename T>
-[[nodiscard]] std::expected<void, StarException> BubbleSeparator<T>::forEach(std::function<std::expected<void, StarException>(Bubble const&, T const&)> func) const {
-  for (auto const& bubble : m_bubbles) {
-    auto result = func(bubble, bubble.contents);
-    if (!result)
-      return std::unexpected(std::move(result.error()));
-  }
-  return {};
-}
-
-template <typename T>
-void BubbleSeparator<T>::update(float) {
-  m_bubbles.exec([this](Bubble& bubble) {
-    bubble.previousOffset = bubble.currentOffset;
-    Vec2F delta = bubble.seperatedOffset - bubble.currentOffset;
-    bubble.currentOffset += m_tweenFactor * delta;
-    if (!bubble.presentationContinuous)
-      bubble.previousOffset = bubble.currentOffset;
-    bubble.presentationContinuous = true;
-  });
-}
-
-template <typename T>
-void BubbleSeparator<T>::resetPresentation() {
-  m_bubbles.exec([](Bubble& bubble) { bubble.resetPresentation(); });
-}
-
-template <typename T>
-void BubbleSeparator<T>::clear() {
-  m_bubbles.clear();
-  m_sortedLeftEdges.clear();
-  m_sortedRightEdges.clear();
-}
-
-template <typename T>
-bool BubbleSeparator<T>::empty() const {
-  return m_bubbles.empty();
-}
-
-template <typename T>
-bool BubbleSeparator<T>::compareBubbleY(Bubble const& a, Bubble const& b) {
-  return a.currentDestination[1] < b.currentDestination[1];
-}
 }
 
 export module star.chat_bubble_separation;
@@ -236,8 +189,8 @@ export module star.chat_bubble_separation;
 export namespace Star {
   using ::Star::BubbleState;
   using ::Star::BubbleSeparator;
-  using ::Star::compareLeft;
-  using ::Star::compareRight;
-  using ::Star::compareOverlapLeft;
-  using ::Star::compareOverlapRight;
+}
+
+export namespace Star::bubble_detail {
+  using ::Star::bubble_detail::EdgeIndex;
 }

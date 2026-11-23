@@ -206,9 +206,9 @@ public:
   [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> callScript(String const& func, LuaVariadic<LuaValue> const& args) override;
   [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> evalScript(String const& code) override;
 
-  [[nodiscard]] std::expected<Vec2F, StarException> mouthPosition() const override;
-  [[nodiscard]] std::expected<Vec2F, StarException> mouthPosition(bool ignoreAdjustments) const override;
-  List<ChatAction> pullPendingChatActions() override;
+  [[nodiscard]] std::expected<Vec2F, StarException> mouth_position() const override;
+  [[nodiscard]] std::expected<Vec2F, StarException> mouth_position(bool ignore_adjustments) const override;
+  List<ChatAction> pull_pending_chat_actions() override;
 
   [[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> forceRegions() const override;
 
@@ -233,7 +233,7 @@ private:
   [[nodiscard]] std::expected<void, StarException> updateStatus(float dt);
   [[nodiscard]] std::expected<LuaCallbacks, StarException> makeMonsterCallbacks();
 
-  [[nodiscard]] std::expected<void, StarException> addChatMessage(String const& message, String const& portrait = "");
+  [[nodiscard]] std::expected<void, StarException> add_chat_message(String const& message, String const& portrait = "");
 
   [[nodiscard]] std::expected<void, StarException> setupNetStates();
   [[nodiscard]] std::expected<void, StarException> getNetStates(bool initial);
@@ -290,10 +290,10 @@ private:
   NetElementBool m_displayNametag;
   NetElementBool m_interactive;
 
-  List<ChatAction> m_pendingChatActions;
-  NetElementEvent m_newChatMessageEvent;
-  NetElementString m_chatMessage;
-  NetElementString m_chatPortrait;
+  List<ChatAction> m_pending_chat_actions;
+  NetElementEvent m_new_chat_message_event;
+  NetElementString m_chat_message;
+  NetElementString m_chat_portrait;
 
   NetElementData<DamageBarType> m_damageBar;
 

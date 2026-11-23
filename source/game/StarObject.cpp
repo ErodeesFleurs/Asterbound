@@ -340,16 +340,16 @@ std::expected<void, StarException> Object::initialize(std::shared_ptr<ObjectConf
   auto operation13 = m_netGroup.add_net_element(m_lightSourceColor);
   if (!operation13)
     return std::unexpected(std::move(operation13.error()));
-  auto operation14 = m_netGroup.add_net_element(m_newChatMessageEvent);
+  auto operation14 = m_netGroup.add_net_element(m_new_chat_message_event);
   if (!operation14)
     return std::unexpected(std::move(operation14.error()));
-  auto operation15 = m_netGroup.add_net_element(m_chatMessage);
+  auto operation15 = m_netGroup.add_net_element(m_chat_message);
   if (!operation15)
     return std::unexpected(std::move(operation15.error()));
-  auto operation16 = m_netGroup.add_net_element(m_chatPortrait);
+  auto operation16 = m_netGroup.add_net_element(m_chat_portrait);
   if (!operation16)
     return std::unexpected(std::move(operation16.error()));
-  auto operation17 = m_netGroup.add_net_element(m_chatConfig);
+  auto operation17 = m_netGroup.add_net_element(m_chat_config);
   if (!operation17)
     return std::unexpected(std::move(operation17.error()));
   for (auto& node : m_inputNodes) {
@@ -1354,16 +1354,16 @@ std::expected<void, StarException> Object::getNetStates(bool initial) {
     if (!operation1)
       return std::unexpected(std::move(operation1.error()));
   }
-  if (m_newChatMessageEvent.pull_occurred() && !initial) {
-    auto mouthResult = mouthPosition();
+  if (m_new_chat_message_event.pull_occurred() && !initial) {
+    auto mouthResult = mouth_position();
     if (!mouthResult)
       return std::unexpected(std::move(mouthResult.error()));
     auto mouth = std::move(*mouthResult);
-    if (m_chatPortrait.get().empty())
-      m_pendingChatActions.push_back(SayChatAction{entityId(), m_chatMessage.get(), mouth});
+    if (m_chat_portrait.get().empty())
+      m_pending_chat_actions.push_back(SayChatAction{entityId(), m_chat_message.get(), mouth});
     else
-      m_pendingChatActions.push_back(
-        PortraitChatAction{entityId(), m_chatPortrait.get(), m_chatMessage.get(), mouth, m_chatConfig.get()});
+      m_pending_chat_actions.push_back(
+        PortraitChatAction{entityId(), m_chat_portrait.get(), m_chat_message.get(), mouth, m_chat_config.get()});
   }
   if (m_netImageKeys.pull_updated()) {
     m_imageKeys.merge(m_netImageKeys.base_map(), true);
@@ -1943,7 +1943,7 @@ std::expected<LuaCallbacks, StarException> Object::makeObjectCallbacks() {
   if (tags)
     line = line.replace_tags(*tags, false);
   if (!line.empty()) {
-    auto operation1 = addChatMessage(line, config);
+    auto operation1 = add_chat_message(line, config);
     if (!operation1)
       return std::unexpected(std::move(operation1.error()));
     return true;
@@ -1956,7 +1956,7 @@ std::expected<LuaCallbacks, StarException> Object::makeObjectCallbacks() {
   if (tags)
     line = line.replace_tags(*tags, false);
   if (!line.empty()) {
-    auto operation1 = addChatMessage(line, config, portrait);
+    auto operation1 = add_chat_message(line, config, portrait);
     if (!operation1)
       return std::unexpected(std::move(operation1.error()));
     return true;
@@ -2318,20 +2318,20 @@ std::expected<std::optional<LuaValue>, StarException> Object::evalScript(String 
   return recover_lua_script_error(m_scriptComponent.eval(code));
 }
 
-std::expected<Vec2F, StarException> Object::mouthPosition() const {
+std::expected<Vec2F, StarException> Object::mouth_position() const {
   if (auto orientation = currentOrientation()) {
     auto pos = position() + Vec2F(orientation->boundBox.center()[0], orientation->boundBox.max()[1]);
     if (!(orientation->boundBox.size()[0] % 2))
       pos[0] += 0.5;
-    auto configPositionResult = configValue("mouthPosition", Json());
-    if (!configPositionResult)
-      return std::unexpected(std::move(configPositionResult.error()));
-    auto configPosition = std::move(*configPositionResult);
-    if (configPosition) {
-      auto offsetResult = json_to_vec2f(configPosition);
-      if (!offsetResult)
-        return std::unexpected(std::move(offsetResult.error()));
-      auto offset = std::move(*offsetResult);
+    auto config_position_result = configValue("mouthPosition", Json());
+    if (!config_position_result)
+      return std::unexpected(std::move(config_position_result.error()));
+    auto config_position = std::move(*config_position_result);
+    if (config_position) {
+      auto offset_result = json_to_vec2f(config_position);
+      if (!offset_result)
+        return std::unexpected(std::move(offset_result.error()));
+      auto offset = std::move(*offset_result);
       if (m_direction.get() == Direction::Left)
         offset[0] = -offset[0];
       pos += offset;
@@ -2341,28 +2341,28 @@ std::expected<Vec2F, StarException> Object::mouthPosition() const {
   return position();
 }
 
-std::expected<Vec2F, StarException> Object::mouthPosition(bool) const {
-  return mouthPosition();
+std::expected<Vec2F, StarException> Object::mouth_position(bool) const {
+  return mouth_position();
 }
 
-List<ChatAction> Object::pullPendingChatActions() {
-  return std::move(m_pendingChatActions);
+List<ChatAction> Object::pull_pending_chat_actions() {
+  return std::move(m_pending_chat_actions);
 }
 
-std::expected<void, StarException> Object::addChatMessage(String const& message, Json const& config, String const& portrait) {
+std::expected<void, StarException> Object::add_chat_message(String const& message, Json const& config, String const& portrait) {
   assert(!isSlave());
-  auto mouthResult = mouthPosition();
-  if (!mouthResult)
-    return std::unexpected(std::move(mouthResult.error()));
-  auto mouth = std::move(*mouthResult);
-  m_chatMessage.set(message);
-  m_chatPortrait.set(portrait);
-  m_chatConfig.set(config);
-  m_newChatMessageEvent.trigger();
+  auto mouth_result = mouth_position();
+  if (!mouth_result)
+    return std::unexpected(std::move(mouth_result.error()));
+  auto mouth = std::move(*mouth_result);
+  m_chat_message.set(message);
+  m_chat_portrait.set(portrait);
+  m_chat_config.set(config);
+  m_new_chat_message_event.trigger();
   if (portrait.empty())
-    m_pendingChatActions.push_back(SayChatAction{entityId(), message, mouth});
+    m_pending_chat_actions.push_back(SayChatAction{entityId(), message, mouth});
   else
-    m_pendingChatActions.push_back(PortraitChatAction{entityId(), portrait, message, mouth});
+    m_pending_chat_actions.push_back(PortraitChatAction{entityId(), portrait, message, mouth});
   return {};
 }
 

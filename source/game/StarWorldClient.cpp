@@ -4289,7 +4289,7 @@ std::expected<RpcPromise<Json>, StarException> WorldClient::sendEntityMessage(st
   }
 }
 
-std::expected<List<ChatAction>, StarException> WorldClient::pullPendingChatActions() {
+std::expected<List<ChatAction>, StarException> WorldClient::pull_pending_chat_actions() {
   List<ChatAction> result;
   if (m_entityMap) {
     {
@@ -4297,7 +4297,7 @@ std::expected<List<ChatAction>, StarException> WorldClient::pullPendingChatActio
       if (!result310)
         return std::unexpected(std::move(result310.error()));
       for (auto const& entity : (std::move(*result310))) {
-        result.append_range(entity->pullPendingChatActions());
+        result.append_range(entity->pull_pending_chat_actions());
       }
     }
   }

@@ -89,6 +89,7 @@ import star.tile_modification;
 import star.world;
 import star.celestial_types;
 import star.chat_types;
+import star.chat_processor;
 import star.warping;
 import star.wiring;
 import star.player_types;
@@ -127,7 +128,6 @@ namespace Star {
 class Clock;
 class File;
 class Player;
-class ChatProcessor;
 class CommandProcessor;
 class TeamManager;
 class WorldTemplate;
@@ -190,16 +190,16 @@ public:
   [[nodiscard]] std::expected<String, StarException> clientDescriptor(ConnectionId clientId) const;
   [[nodiscard]] std::expected<unsigned, StarException> clientConnectionVersion(ConnectionId clientId) const;
 
-  [[nodiscard]] std::expected<String, StarException> clientNick(ConnectionId clientId) const;
-  std::optional<ConnectionId> findNick(String const& nick) const;
+  [[nodiscard]] std::expected<String, StarException> client_nick(ConnectionId client_id) const;
+  std::optional<ConnectionId> find_nick(String const& nick) const;
 
   [[nodiscard]] std::expected<String, StarException> clientAccount(ConnectionId clientId) const;
 
   std::optional<Uuid> uuidForClient(ConnectionId clientId) const;
   std::optional<ConnectionId> clientForUuid(Uuid const& uuid) const;
 
-  [[nodiscard]] std::expected<void, StarException> adminBroadcast(String const& text);
-  [[nodiscard]] std::expected<void, StarException> adminWhisper(ConnectionId clientId, String const& text);
+  [[nodiscard]] std::expected<void, StarException> admin_broadcast(String const& text);
+  [[nodiscard]] std::expected<void, StarException> admin_whisper(ConnectionId client_id, String const& text);
   [[nodiscard]] std::expected<ServerCommandResult, StarException> adminCommand(String text);
 
   [[nodiscard]] std::expected<bool, StarException> isAdmin(ConnectionId clientId) const;
@@ -285,7 +285,7 @@ private:
   enum class TcpState : std::uint8_t { No, Yes, Fuck };
 
   [[nodiscard]] std::expected<void, StarException> processUniverseFlags();
-  [[nodiscard]] std::expected<void, StarException> sendPendingChat();
+  [[nodiscard]] std::expected<void, StarException> send_pending_chat();
   [[nodiscard]] std::expected<void, StarException> updateTeams();
   [[nodiscard]] std::expected<void, StarException> updateShips();
   [[nodiscard]] std::expected<void, StarException> sendClockUpdates();
@@ -298,7 +298,7 @@ private:
   [[nodiscard]] std::expected<void, StarException> flyShips();
   [[nodiscard]] std::expected<void, StarException> arriveShips();
   [[nodiscard]] std::expected<void, StarException> respond_to_celestial_requests();
-  [[nodiscard]] std::expected<void, StarException> processChat();
+  [[nodiscard]] std::expected<void, StarException> process_chat();
   [[nodiscard]] std::expected<void, StarException> clearBrokenWorlds();
   [[nodiscard]] std::expected<void, StarException> handleWorldMessages();
   [[nodiscard]] std::expected<void, StarException> handleUniverseMessages();
@@ -433,7 +433,7 @@ private:
   List<ThreadFunction<void>> m_connectionAcceptThreads;
   LinkedList<std::pair<UniverseConnection, std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>>> m_deadConnections;
 
-  std::shared_ptr<ChatProcessor> m_chatProcessor;
+  ChatProcessor m_chat_processor;
   std::shared_ptr<CommandProcessor> m_commandProcessor;
   std::shared_ptr<TeamManager> m_teamManager;
 
@@ -445,7 +445,13 @@ private:
   HashMap<ConnectionId, String> m_pendingDisconnections;
   HashMap<ConnectionId, List<WorkerPoolPromise<CelestialResponse>>> m_pending_celestial_requests;
   List<std::pair<WorldId, UniverseFlagAction>> m_pendingFlagActions;
-  HashMap<ConnectionId, List<std::tuple<String, ChatSendMode, JsonObject>>> m_pendingChat;
+  struct PendingChat {
+    std::weak_ptr<ServerClientContext> origin;
+    String message;
+    ChatSendMode send_mode;
+    JsonObject data;
+  };
+  HashMap<ConnectionId, List<PendingChat>> m_pending_chat;
   std::optional<WorkerPoolPromise<CelestialCoordinate>> m_nextRandomizedStarterWorld;
   Map<WorldId, List<WorldServerThread::Message>> m_pendingWorldMessages;
 

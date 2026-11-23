@@ -392,7 +392,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "mouthPosition",
           [&](std::shared_ptr<Entity> const& entity) -> std::expected<std::optional<Vec2F>, StarException> {
             if (auto chatty = as_ref<ChattyEntity>(*entity))
-              return chatty->get().mouthPosition();
+              return chatty->get().mouth_position();
             return {};
           });
         !registration)

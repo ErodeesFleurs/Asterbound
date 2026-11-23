@@ -34,22 +34,20 @@ std::expected<void, StarException> requirePrivateStorage(String const& storage) 
   return {};
 }
 
-bool bubblePreflight() {
+bool bubble_preflight() {
   auto check = [](List<RectF> const& obstacles, RectF input, RectF expected) {
     BubbleSeparator<int> separator(1.0f);
     int id = 0;
     for (auto const& obstacle : obstacles)
-      separator.addBubble(obstacle.center(), obstacle, id++);
-    auto prepared = separator.updateDestinations([](BubbleState<int>&, int&) -> std::expected<void, StarException> {
+      separator.add_bubble(obstacle.center(), obstacle, id++);
+    auto prepared = separator.update_destinations([](BubbleState<int>&, int&) -> std::expected<void, StarException> {
       return {};
     });
     if (!prepared)
       return false;
-    separator.addBubble(input.center(), input, -1);
+    separator.add_bubble(input.center(), input, -1);
     auto matches = separator.filtered([](BubbleState<int> const&, int id) { return id == -1; });
-    return matches.size() == 1 && std::ranges::all_of(matches, [&](auto const& bubble) {
-      return bubble.separatedBox == expected;
-    });
+    return matches.size() == 1 && matches[0].separated_box == expected;
   };
   return check({{-100, 0, 100, 10}, {-20, 20, -10, 30}}, {0, 2, 10, 8}, {0, 10, 10, 16})
       && check({{-100, 0, 100, 10}, {20, 20, 30, 30}}, {0, 2, 10, 8}, {0, 10, 10, 16})
@@ -101,7 +99,7 @@ struct BubbleFixture {
   List<RectF> boxes;
 };
 
-BubbleFixture bubbleFixture() {
+BubbleFixture bubble_fixture() {
   BubbleFixture fixture;
   for (int i = 0; i < 64; ++i) {
     float x = float((i % 8) * 9 - 32);
@@ -115,14 +113,14 @@ BubbleFixture bubbleFixture() {
   return fixture;
 }
 
-void separateBubbles(benchmark::State& state, BubbleFixture const& fixture) {
+void separate_bubbles(benchmark::State& state, BubbleFixture const& fixture) {
   BubbleSeparator<int> separator(0.5f);
   int id = 0;
   for (auto const& box : fixture.boxes)
-    separator.addBubble(box.center(), box, id++);
+    separator.add_bubble(box.center(), box, id++);
   for (auto _ : state) {
     (void)_;
-    auto separated = separator.updateDestinations([](BubbleState<int>&, int&) -> std::expected<void, StarException> {
+    auto separated = separator.update_destinations([](BubbleState<int>&, int&) -> std::expected<void, StarException> {
       return {};
     });
     if (!separated) {
@@ -196,7 +194,7 @@ int main(int argc, char** argv) {
       return 1;
     return 1;
   }
-  if (!*keysValid || !bubblePreflight()) {
+  if (!*keysValid || !bubble_preflight()) {
     if (!Star::print(*stderr, "Frontend semantic preflight failed\n"))
       return 1;
     return 1;
@@ -228,9 +226,9 @@ int main(int argc, char** argv) {
       return 1;
     return 1;
   }
-  auto bubbles = bubbleFixture();
+  auto bubbles = bubble_fixture();
   benchmark::RegisterBenchmark("ChatBubble/SeparateDenseMixedSizes", [&](benchmark::State& state) {
-    separateBubbles(state, bubbles);
+    separate_bubbles(state, bubbles);
   })->MinTime(0.2)->UseRealTime();
   benchmark::RegisterBenchmark("KeyBindings/ResolveRepresentativeGameplayChords", [&](benchmark::State& state) {
     resolveGameplayChords(state, *bindings);

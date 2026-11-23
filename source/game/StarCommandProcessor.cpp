@@ -341,7 +341,7 @@ std::expected<String, StarException> CommandProcessor::admin(ConnectionId connec
   if (!wasAdmin) return std::unexpected(std::move(wasAdmin.error()));
   auto set = m_universe.setAdmin(targetClientId, !*wasAdmin);
   if (!set) return std::unexpected(std::move(set.error()));
-  auto nick = m_universe.clientNick(targetClientId);
+  auto nick = m_universe.client_nick(targetClientId);
   if (!nick) return std::unexpected(std::move(nick.error()));
   if (!*wasAdmin) return Star::format("Admin privileges now given to {}", *nick);
   return Star::format("Admin privileges taken away from {}", *nick);
@@ -372,9 +372,9 @@ std::expected<String, StarException> CommandProcessor::pvp(ConnectionId connecti
   auto nowPvp = m_universe.isPvp(connectionId);
   if (!nowPvp) return std::unexpected(std::move(nowPvp.error()));
   if (*nowPvp != *wasPvp) {
-    auto nick = m_universe.clientNick(connectionId);
+    auto nick = m_universe.client_nick(connectionId);
     if (!nick) return std::unexpected(std::move(nick.error()));
-    auto sent = m_universe.adminBroadcast(*nowPvp ? Star::format("Player {} is now PVP", *nick) : Star::format("Player {} is a big wimp and is no longer PVP", *nick));
+    auto sent = m_universe.admin_broadcast(*nowPvp ? Star::format("Player {} is now PVP", *nick) : Star::format("Player {} is a big wimp and is no longer PVP", *nick));
     if (!sent) return std::unexpected(std::move(sent.error()));
   }
   auto pvp = m_universe.isPvp(connectionId);
@@ -383,7 +383,7 @@ std::expected<String, StarException> CommandProcessor::pvp(ConnectionId connecti
 }
 
 std::expected<String, StarException> CommandProcessor::whoami(ConnectionId connectionId, String const&) {
-  auto nick = m_universe.clientNick(connectionId);
+  auto nick = m_universe.client_nick(connectionId);
   if (!nick) return std::unexpected(std::move(nick.error()));
   auto admin = m_universe.isAdmin(connectionId);
   if (!admin) return std::unexpected(std::move(admin.error()));
@@ -1164,7 +1164,7 @@ std::expected<String, StarException> CommandProcessor::kick(ConnectionId connect
 
   // Like IRC, if only the nick is passed then the nick is used as the reason
   if (arguments.size() == 1) {
-    auto nick = m_universe.clientNick(*toKick);
+    auto nick = m_universe.client_nick(*toKick);
     if (!nick) return std::unexpected(std::move(nick.error()));
     arguments.push_back(*nick);
   }
@@ -1198,7 +1198,7 @@ std::expected<String, StarException> CommandProcessor::ban(ConnectionId connecti
 
   String reason = arguments[0];
   if (arguments.size() < 2) {
-    auto nick = m_universe.clientNick(*toKick);
+    auto nick = m_universe.client_nick(*toKick);
     if (!nick) return std::unexpected(std::move(nick.error()));
     reason = *nick;
   }
@@ -1289,7 +1289,7 @@ std::expected<String, StarException> CommandProcessor::list(ConnectionId connect
   if (!assetsResult) return std::unexpected(std::move(assetsResult.error()));
   auto assets = std::move(*assetsResult);
   for (auto cid : m_universe.clientIds()) {
-    auto nick = m_universe.clientNick(cid);
+    auto nick = m_universe.client_nick(cid);
     if (!nick) return std::unexpected(std::move(nick.error()));
     res.push_back(Star::format("${} : {} : ${}", cid, *nick, m_universe.uuidForClient(cid)->hex()));
   }
@@ -1642,7 +1642,7 @@ std::expected<std::optional<ConnectionId>, StarException> CommandProcessor::play
   if (*username) {
     auto name = player.substr(UsernamePrefix.size());
     if (!name) return std::unexpected(std::move(name.error()));
-    return universe.findNick(*name);
+    return universe.find_nick(*name);
   }
   auto uuidPrefix = player.starts_with(UUIDPrefix);
   if (!uuidPrefix) return std::unexpected(std::move(uuidPrefix.error()));
@@ -1662,7 +1662,7 @@ std::expected<std::optional<ConnectionId>, StarException> CommandProcessor::play
       if (universe.isConnectedClient(cid)) return std::optional<ConnectionId>(cid);
     }
   }
-  return universe.findNick(player);
+  return universe.find_nick(player);
 }
 
 std::expected<CaseInsensitiveStringMap<CommandProcessor::Command>, StarException> CommandProcessor::makeCommandMap() {

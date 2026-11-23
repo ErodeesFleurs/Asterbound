@@ -356,7 +356,7 @@ std::expected<StringList, StarException> ClientCommandProcessor::executeCommand(
         Uuid uuid(m_context.root().random());
         m_commandPromises[uuid] = std::get<RpcPromise<Json>>(**response);
       }
-    } else if (auto sent = m_universeClient->sendChat(commandLine, ChatSendMode::Broadcast); !sent) {
+    } else if (auto sent = m_universeClient->send_chat(commandLine, ChatSendMode::Broadcast); !sent) {
       return std::unexpected(std::move(sent.error()));
     }
   }

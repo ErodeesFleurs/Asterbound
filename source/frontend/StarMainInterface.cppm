@@ -184,7 +184,7 @@ public:
   bool isDebugDisplayed();
 
   [[nodiscard]] std::expected<StringList, StarException> executeClientCommand(String const& command);
-  [[nodiscard]] std::expected<void, StarException> addChatMessages(List<ChatReceivedMessage> const& messages, bool showPane = true);
+  [[nodiscard]] std::expected<void, StarException> add_chat_messages(List<ChatReceivedMessage> const& messages, bool show_pane = true);
   [[nodiscard]] std::expected<std::optional<Json>, StarException> callPane(String const& id, String const& method, JsonArray const& arguments = {});
   [[nodiscard]] std::expected<std::optional<Json>, StarException> callUi(String const& id, String const& method, JsonArray const& arguments = {});
   [[nodiscard]] std::expected<void, StarException> sendPaneEvent(String const& id, String const& event, Json payload);
@@ -311,7 +311,7 @@ private:
 
   std::unique_ptr<NameplatePainter> m_nameplatePainter;
   std::unique_ptr<QuestIndicatorPainter> m_questIndicatorPainter;
-  std::unique_ptr<ChatBubbleManager> m_chatBubbleManager;
+  std::unique_ptr<ChatBubbleManager> m_chat_bubble_manager;
 
   bool m_disableHud = false;
 

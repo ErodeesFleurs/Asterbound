@@ -140,11 +140,11 @@ namespace Star::LuaBindings::UniverseServerCallbacks {
   [[nodiscard]] std::expected<List<ConnectionId>, StarException> clientIds(UniverseServer& universe);
   [[nodiscard]] std::expected<std::size_t, StarException> numberOfClients(UniverseServer& universe);
   [[nodiscard]] std::expected<bool, StarException> isConnectedClient(UniverseServer& universe, ConnectionId arg1);
-  [[nodiscard]] std::expected<String, StarException> clientNick(UniverseServer& universe, ConnectionId arg1);
-  [[nodiscard]] std::expected<std::optional<ConnectionId>, StarException> findNick(UniverseServer& universe, String const& arg1);
+  [[nodiscard]] std::expected<String, StarException> client_nick(UniverseServer& universe, ConnectionId arg1);
+  [[nodiscard]] std::expected<std::optional<ConnectionId>, StarException> find_nick(UniverseServer& universe, String const& arg1);
   [[nodiscard]] std::expected<String, StarException> clientAccount(UniverseServer& universe, ConnectionId arg1);
-  [[nodiscard]] std::expected<void, StarException> adminBroadcast(UniverseServer& universe, String const& arg1);
-  [[nodiscard]] std::expected<void, StarException> adminWhisper(UniverseServer& universe, ConnectionId arg1, String const& arg2);
+  [[nodiscard]] std::expected<void, StarException> admin_broadcast(UniverseServer& universe, String const& arg1);
+  [[nodiscard]] std::expected<void, StarException> admin_whisper(UniverseServer& universe, ConnectionId arg1, String const& arg2);
   [[nodiscard]] std::expected<bool, StarException> isAdmin(UniverseServer& universe, ConnectionId arg1);
   [[nodiscard]] std::expected<void, StarException> setAdmin(UniverseServer& universe, ConnectionId arg1, std::optional<bool> arg2);
   [[nodiscard]] std::expected<bool, StarException> isPvp(UniverseServer& universe, ConnectionId arg1);
@@ -184,12 +184,12 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseServerCallba
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.register_callback_with_signature<std::expected<String, StarException>, ConnectionId>(
         "clientNick",
-        [&universe](ConnectionId client) { return UniverseServerCallbacks::clientNick(universe, client); });
+        [&universe](ConnectionId client) { return UniverseServerCallbacks::client_nick(universe, client); });
       !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration =
         callbacks.register_callback_with_signature<std::expected<std::optional<ConnectionId>, StarException>, String>(
-          "findNick", [&universe](String const& nick) { return UniverseServerCallbacks::findNick(universe, nick); });
+          "findNick", [&universe](String const& nick) { return UniverseServerCallbacks::find_nick(universe, nick); });
       !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.register_callback_with_signature<std::expected<String, StarException>, ConnectionId>(
@@ -199,14 +199,14 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseServerCallba
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.register_callback_with_signature<std::expected<void, StarException>, String>(
         "adminBroadcast",
-        [&universe](String const& message) { return UniverseServerCallbacks::adminBroadcast(universe, message); });
+        [&universe](String const& message) { return UniverseServerCallbacks::admin_broadcast(universe, message); });
       !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration =
         callbacks.register_callback_with_signature<std::expected<void, StarException>, ConnectionId, String>(
           "adminWhisper",
           [&universe](ConnectionId client, String const& message) {
-            return UniverseServerCallbacks::adminWhisper(universe, client, message);
+            return UniverseServerCallbacks::admin_whisper(universe, client, message);
           });
       !registration)
     return std::unexpected(std::move(registration.error()));
@@ -473,24 +473,24 @@ std::expected<bool, StarException> LuaBindings::UniverseServerCallbacks::isConne
 //
 // @param clientId the client ID in question
 // @return A string containing the nickname of the given client
-std::expected<String, StarException> LuaBindings::UniverseServerCallbacks::clientNick(UniverseServer& universe, ConnectionId arg1) {
-  return universe.clientNick(arg1);
+std::expected<String, StarException> LuaBindings::UniverseServerCallbacks::client_nick(UniverseServer& universe, ConnectionId arg1) {
+  return universe.client_nick(arg1);
 }
 
 // Returns the client ID for the given nick
 //
 // @param nick the nickname of the client to search for
 // @return An integer containing the clientID of the nick in question
-std::expected<std::optional<ConnectionId>, StarException> LuaBindings::UniverseServerCallbacks::findNick(UniverseServer& universe, String const& arg1) {
-  return universe.findNick(arg1);
+std::expected<std::optional<ConnectionId>, StarException> LuaBindings::UniverseServerCallbacks::find_nick(UniverseServer& universe, String const& arg1) {
+  return universe.find_nick(arg1);
 }
 
 // Sends a message to all logged in clients
 //
 // @param message the message to broadcast
 // @return nil
-std::expected<void, StarException> LuaBindings::UniverseServerCallbacks::adminBroadcast(UniverseServer& universe, String const& arg1) {
-  return universe.adminBroadcast(arg1);
+std::expected<void, StarException> LuaBindings::UniverseServerCallbacks::admin_broadcast(UniverseServer& universe, String const& arg1) {
+  return universe.admin_broadcast(arg1);
 }
 
 std::expected<String, StarException> LuaBindings::UniverseServerCallbacks::clientAccount(UniverseServer& universe, ConnectionId arg1) {
@@ -503,10 +503,10 @@ std::expected<String, StarException> LuaBindings::UniverseServerCallbacks::clien
 // @param clientId the client id to whisper
 // @param message the message to whisper
 // @return nil
-std::expected<void, StarException> LuaBindings::UniverseServerCallbacks::adminWhisper(UniverseServer& universe, ConnectionId arg1, String const& arg2) {
+std::expected<void, StarException> LuaBindings::UniverseServerCallbacks::admin_whisper(UniverseServer& universe, ConnectionId arg1, String const& arg2) {
   ConnectionId client = arg1;
   String const& message = arg2;
-  return universe.adminWhisper(client, message);
+  return universe.admin_whisper(client, message);
 }
 
 // Returns whether or not a specific client is flagged as an admin

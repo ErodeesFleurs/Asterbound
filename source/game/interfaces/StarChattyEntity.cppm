@@ -3,23 +3,7 @@ import std;
 import star.format;
 import star.type_identity;
 import star.list;
-import star.json;
-import star.id_map;
-import star.casting;
 import star.vector;
-import star.data_stream;
-import star.game_types;
-import star.strong_typedef;
-import star.bi_map;
-
-
-import star.damage_types;
-import star.world_geometry;
-import star.status_types;
-import star.damage;
-
-import star.light_source;
-
 import star.entity;
 import star.chat_action;
 
@@ -30,9 +14,9 @@ public:
   void query_type(TypeQuery& query) const noexcept override { query_type_of<ChattyEntity, Entity>(*this, query); }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ChattyEntity>(); }
 
-  [[nodiscard]] virtual std::expected<Vec2F, StarException> mouthPosition() const = 0;
-  [[nodiscard]] virtual std::expected<Vec2F, StarException> mouthPosition(bool) const = 0;
-  virtual List<ChatAction> pullPendingChatActions() = 0;
+  [[nodiscard]] virtual std::expected<Vec2F, StarException> mouth_position() const = 0;
+  [[nodiscard]] virtual std::expected<Vec2F, StarException> mouth_position(bool) const = 0;
+  virtual List<ChatAction> pull_pending_chat_actions() = 0;
 };
 
 }

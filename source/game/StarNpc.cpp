@@ -174,7 +174,7 @@ if (!result2) return std::unexpected(std::move(result2.error()));
   m_disableWornArmor.set(npcVariant.disableWornArmor);
 
   m_emoteState = HumanoidEmote::Idle;
-  m_chatMessageUpdated = false;
+  m_chat_message_updated = false;
 
   m_statusText.set({});
   m_displayNametag.set(false);
@@ -1098,15 +1098,15 @@ if (!result208) return std::unexpected(std::move(result208.error()));
     if (m_danceCooldownTimer.tick(dt))
       m_dance = {};
 
-    if (m_chatMessageUpdated) {
+    if (m_chat_message_updated) {
       auto result225 = this->root().emoteProcessor();
 if (!result225) return std::unexpected(std::move(result225.error()));
-auto result226 = std::move(*result225)->detectEmotes(m_chatMessage.get());
+auto result226 = std::move(*result225)->detectEmotes(m_chat_message.get());
 if (!result226) return std::unexpected(std::move(result226.error()));
 auto state = std::move(*result226);
       if (state != HumanoidEmote::Idle)
         addEmote(state);
-      m_chatMessageUpdated = false;
+      m_chat_message_updated = false;
     }
 
     if (m_blinkCooldownTimer.tick(dt)) {
@@ -1309,7 +1309,7 @@ std::expected<Vec3B, StarException> Npc::nametagColor() const {
 }
 
 std::expected<Vec2F, StarException> Npc::nametagOrigin() const {
-  return mouthPosition(false);
+  return mouth_position(false);
 }
 
 std::expected<String, StarException> Npc::nametag() const {
@@ -1771,7 +1771,7 @@ if (!result382) return std::unexpected(std::move(result382.error()));
         line = line.replace_tags(*tags, false);
 
       if (!line.empty()) {
-        auto result383 = addChatMessage(line, config);
+        auto result383 = add_chat_message(line, config);
 if (!result383) return std::unexpected(std::move(result383.error()));
 
         return true;
@@ -1786,7 +1786,7 @@ if (!result384) return std::unexpected(std::move(result384.error()));
         line = line.replace_tags(*tags, false);
 
       if (!line.empty()) {
-        auto result385 = addChatMessage(line, config, portrait);
+        auto result385 = add_chat_message(line, config, portrait);
 if (!result385) return std::unexpected(std::move(result385.error()));
 
         return true;
@@ -2013,16 +2013,16 @@ if (!result439) return std::unexpected(std::move(result439.error()));
 if (!result440) return std::unexpected(std::move(result440.error()));
 
 
-  auto result441 = m_netGroup.add_net_element(m_newChatMessageEvent);
+  auto result441 = m_netGroup.add_net_element(m_new_chat_message_event);
 if (!result441) return std::unexpected(std::move(result441.error()));
 
-  auto result442 = m_netGroup.add_net_element(m_chatMessage);
+  auto result442 = m_netGroup.add_net_element(m_chat_message);
 if (!result442) return std::unexpected(std::move(result442.error()));
 
-  auto result443 = m_netGroup.add_net_element(m_chatPortrait);
+  auto result443 = m_netGroup.add_net_element(m_chat_portrait);
 if (!result443) return std::unexpected(std::move(result443.error()));
 
-  auto result444 = m_netGroup.add_net_element(m_chatConfig);
+  auto result444 = m_netGroup.add_net_element(m_chat_config);
 if (!result444) return std::unexpected(std::move(result444.error()));
 
 
@@ -2166,60 +2166,60 @@ if (!result477) return std::unexpected(std::move(result477.error()));
 
   }
 
-  if (m_newChatMessageEvent.pull_occurred() && !initial) {
-    m_chatMessageUpdated = true;
-    if (m_chatPortrait.get().empty())
+  if (m_new_chat_message_event.pull_occurred() && !initial) {
+    m_chat_message_updated = true;
+    if (m_chat_portrait.get().empty())
       {
-  auto result478 = mouthPosition();
+  auto result478 = mouth_position();
   if (!result478) return std::unexpected(std::move(result478.error()));
-  m_pendingChatActions.push_back(
-    SayChatAction{entityId(), m_chatMessage.get(), std::move(*result478), m_chatConfig.get()});
+  m_pending_chat_actions.push_back(
+    SayChatAction{entityId(), m_chat_message.get(), std::move(*result478), m_chat_config.get()});
 }
     else
       {
-  auto result479 = mouthPosition();
+  auto result479 = mouth_position();
   if (!result479) return std::unexpected(std::move(result479.error()));
-  m_pendingChatActions.push_back(PortraitChatAction{entityId(), m_chatPortrait.get(), m_chatMessage.get(),
-                                                    std::move(*result479), m_chatConfig.get()});
+  m_pending_chat_actions.push_back(PortraitChatAction{entityId(), m_chat_portrait.get(), m_chat_message.get(),
+                                                    std::move(*result479), m_chat_config.get()});
 }
   }
   return {};
 }
 
-std::expected<Vec2F, StarException> Npc::mouthPosition() const {
+std::expected<Vec2F, StarException> Npc::mouth_position() const {
   auto result480 = mouthOffset(true);
 if (!result480) return std::unexpected(std::move(result480.error()));
 return std::move(*result480) + position();
 }
 
-std::expected<Vec2F, StarException> Npc::mouthPosition(bool ignoreAdjustments) const {
-  auto result481 = mouthOffset(ignoreAdjustments);
+std::expected<Vec2F, StarException> Npc::mouth_position(bool ignore_adjustments) const {
+  auto result481 = mouthOffset(ignore_adjustments);
 if (!result481) return std::unexpected(std::move(result481.error()));
 return std::move(*result481) + position();
 }
 
-List<ChatAction> Npc::pullPendingChatActions() {
-  return std::move(m_pendingChatActions);
+List<ChatAction> Npc::pull_pending_chat_actions() {
+  return std::move(m_pending_chat_actions);
 }
 
-std::expected<void, StarException> Npc::addChatMessage(String const& message, Json const& config, String const& portrait) {
+std::expected<void, StarException> Npc::add_chat_message(String const& message, Json const& config, String const& portrait) {
   assert(!isSlave());
-  m_chatMessage.set(message);
-  m_chatPortrait.set(portrait);
-  m_chatConfig.set(config);
-  m_chatMessageUpdated = true;
-  m_newChatMessageEvent.trigger();
+  m_chat_message.set(message);
+  m_chat_portrait.set(portrait);
+  m_chat_config.set(config);
+  m_chat_message_updated = true;
+  m_new_chat_message_event.trigger();
   if (portrait.empty())
     {
-  auto result482 = mouthPosition();
+  auto result482 = mouth_position();
   if (!result482) return std::unexpected(std::move(result482.error()));
-  m_pendingChatActions.push_back(SayChatAction{entityId(), message, std::move(*result482), config});
+  m_pending_chat_actions.push_back(SayChatAction{entityId(), message, std::move(*result482), config});
 }
   else
     {
-  auto result483 = mouthPosition();
+  auto result483 = mouth_position();
   if (!result483) return std::unexpected(std::move(result483.error()));
-  m_pendingChatActions.push_back(PortraitChatAction{entityId(), portrait, message, std::move(*result483), config});
+  m_pending_chat_actions.push_back(PortraitChatAction{entityId(), portrait, message, std::move(*result483), config});
 }
   return {};
 }
@@ -2520,7 +2520,7 @@ std::expected<void, StarException> Npc::instrumentEquipped(String const& instrum
   if (!result512) return std::unexpected(std::move(result512.error()));
   if (std::move(*result512))
       {
-    auto result513 = mouthPosition();
+    auto result513 = mouth_position();
     if (!result513) return std::unexpected(std::move(result513.error()));
     m_songbook->keepAlive(instrumentKind, std::move(*result513));
   }

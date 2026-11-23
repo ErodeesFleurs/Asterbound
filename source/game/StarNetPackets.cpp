@@ -194,8 +194,8 @@ Packet::~Packet() = default;
 
 std::expected<void, StarException> Packet::read(DataStream&) { return {}; }
 std::expected<void, StarException> Packet::write(DataStream&) const { return {}; }
-std::expected<void, StarException> Packet::readJson(Json const&) { return {}; }
-std::expected<Json, StarException> Packet::writeJson() const  { return JsonObject{}; }
+std::expected<void, StarException> Packet::read_json(Json const&) { return {}; }
+std::expected<Json, StarException> Packet::write_json() const  { return JsonObject{}; }
 
 PacketCompressionMode Packet::compressionMode() const { return m_compressionMode; }
 void Packet::setCompressionMode(PacketCompressionMode compressionMode) { m_compressionMode = compressionMode; }
@@ -375,7 +375,7 @@ std::expected<std::shared_ptr<Packet>, StarException> createPacket(RandomService
   }
 
   if (args && !args->is_null()) {
-    auto read = packet->readJson(*args);
+    auto read = packet->read_json(*args);
     if (!read)
       return std::unexpected(std::move(read.error()));
   }
@@ -494,30 +494,30 @@ std::expected<void, StarException> HandshakeChallengePacket::write(DataStream& d
 
 ChatReceivePacket::ChatReceivePacket() = default;
 
-ChatReceivePacket::ChatReceivePacket(ChatReceivedMessage receivedMessage)
-    : receivedMessage(std::move(receivedMessage)) {}
+ChatReceivePacket::ChatReceivePacket(ChatReceivedMessage received_message)
+    : received_message(std::move(received_message)) {}
 
 std::expected<void, StarException> ChatReceivePacket::read(DataStream& ds) {
-  return ds.read(receivedMessage);
+  return ds.read(received_message);
 }
 
 std::expected<void, StarException> ChatReceivePacket::write(DataStream& ds) const {
-  return ds.write(receivedMessage);
+  return ds.write(received_message);
 }
 
-std::expected<void, StarException> ChatReceivePacket::readJson(Json const& json) {
+std::expected<void, StarException> ChatReceivePacket::read_json(Json const& json) {
   auto data = json.get("receivedMessage");
   if (!data)
     return std::unexpected(std::move(data.error()));
   auto decoded = ChatReceivedMessage::create(*data);
   if (!decoded)
     return std::unexpected(std::move(decoded.error()));
-  receivedMessage = std::move(*decoded);
+  received_message = std::move(*decoded);
   return {};
 }
 
-std::expected<Json, StarException> ChatReceivePacket::writeJson() const {
-  auto encoded = receivedMessage.toJson();
+std::expected<Json, StarException> ChatReceivePacket::write_json() const {
+  auto encoded = received_message.to_json();
   if (!encoded)
     return std::unexpected(std::move(encoded.error()));
   return JsonObject{
@@ -615,7 +615,7 @@ std::expected<void, StarException> PausePacket::write(DataStream& ds) const {
   return {};
 }
 
-std::expected<void, StarException> PausePacket::readJson(Json const& json) {
+std::expected<void, StarException> PausePacket::read_json(Json const& json) {
   {
     auto result = json.get_bool("pause");
     if (!result)
@@ -631,7 +631,7 @@ std::expected<void, StarException> PausePacket::readJson(Json const& json) {
   return {};
 }
 
-std::expected<Json, StarException> PausePacket::writeJson() const {
+std::expected<Json, StarException> PausePacket::write_json() const {
   return JsonObject{
     {"pause", pause},
     {"timescale", timescale}
@@ -656,7 +656,7 @@ std::expected<void, StarException> ServerInfoPacket::write(DataStream& ds) const
   return ds.write(fields);
 }
 
-std::expected<void, StarException> ServerInfoPacket::readJson(Json const& json) {
+std::expected<void, StarException> ServerInfoPacket::read_json(Json const& json) {
   {
     auto result = json.get_uint("players");
     if (!result)
@@ -672,7 +672,7 @@ std::expected<void, StarException> ServerInfoPacket::readJson(Json const& json) 
   return {};
 }
 
-std::expected<Json, StarException> ServerInfoPacket::writeJson() const {
+std::expected<Json, StarException> ServerInfoPacket::write_json() const {
   return JsonObject{
     {"players", players},
     {"maxPlayers", maxPlayers}
@@ -808,30 +808,32 @@ std::expected<void, StarException> FlyShipPacket::write(DataStream& ds) const {
   return {};
 }
 
-ChatSendPacket::ChatSendPacket() : sendMode(ChatSendMode::Broadcast) {}
+ChatSendPacket::ChatSendPacket() : send_mode(ChatSendMode::Broadcast) {}
 
-ChatSendPacket::ChatSendPacket(String text, ChatSendMode sendMode) : text(std::move(text)), sendMode(sendMode) {}
+ChatSendPacket::ChatSendPacket(String text, ChatSendMode send_mode) : text(std::move(text)), send_mode(send_mode) {}
 
-ChatSendPacket::ChatSendPacket(String text, ChatSendMode sendMode, JsonObject data) : text(std::move(text)), sendMode(sendMode), data(std::move(data)) {}
+ChatSendPacket::ChatSendPacket(String text, ChatSendMode send_mode, JsonObject data) : text(std::move(text)), send_mode(send_mode), data(std::move(data)) {}
 
 std::expected<void, StarException> ChatSendPacket::read(DataStream& ds) {
-  {
-    auto fields = std::tie(text, sendMode);
-    auto result = ds.read(fields);
-    if (!result)
-      return std::unexpected(std::move(result.error()));
-  }
+  String decoded_text;
+  ChatSendMode decoded_mode;
+  JsonObject decoded_data;
+  auto fields = std::tie(decoded_text, decoded_mode);
+  if (auto result = ds.read(fields); !result)
+    return std::unexpected(std::move(result.error()));
   if (ds.stream_compatibility_version() >= 5) {
-    auto result = ds.read(data);
-    if (!result)
+    if (auto result = ds.read(decoded_data); !result)
       return std::unexpected(std::move(result.error()));
   }
+  text = std::move(decoded_text);
+  send_mode = decoded_mode;
+  data = std::move(decoded_data);
   return {};
 }
 
 std::expected<void, StarException> ChatSendPacket::write(DataStream& ds) const {
   {
-    auto fields = std::tie(text, sendMode);
+    auto fields = std::tie(text, send_mode);
     auto result = ds.write(fields);
     if (!result)
       return std::unexpected(std::move(result.error()));
@@ -1103,7 +1105,7 @@ std::expected<void, StarException> GiveItemPacket::write(DataStream& ds) const {
   return ds.write(item);
 }
 
-std::expected<void, StarException> GiveItemPacket::readJson(Json const& json) {
+std::expected<void, StarException> GiveItemPacket::read_json(Json const& json) {
   auto data = json.get("item");
   if (!data)
     return std::unexpected(std::move(data.error()));
@@ -1114,7 +1116,7 @@ std::expected<void, StarException> GiveItemPacket::readJson(Json const& json) {
   return {};
 }
 
-std::expected<Json, StarException> GiveItemPacket::writeJson() const {
+std::expected<Json, StarException> GiveItemPacket::write_json() const {
   return JsonObject{
     {"item", item.toJson()}
   };
@@ -1604,7 +1606,7 @@ std::expected<void, StarException> EntityMessagePacket::write(DataStream& ds) co
   return ds.write(fields);
 }
 
-std::expected<void, StarException> EntityMessagePacket::readJson(Json const& json) {
+std::expected<void, StarException> EntityMessagePacket::read_json(Json const& json) {
   auto jEntityId = json.get("entityId");
   if (!jEntityId)
     return std::unexpected(std::move(jEntityId.error()));
@@ -1641,7 +1643,7 @@ std::expected<void, StarException> EntityMessagePacket::readJson(Json const& jso
   return {};
 }
 
-std::expected<Json, StarException> EntityMessagePacket::writeJson() const {
+std::expected<Json, StarException> EntityMessagePacket::write_json() const {
   return JsonObject{
     {"entityId", std::holds_alternative<EntityId>(entityId) ? Json(std::get<EntityId>(entityId)) : Json(std::get<String>(entityId))},
     {"message", message},
@@ -1683,7 +1685,7 @@ std::expected<void, StarException> UpdateWorldPropertiesPacket::write(DataStream
 }
 
 
-std::expected<void, StarException> UpdateWorldPropertiesPacket::readJson(Json const& json) {
+std::expected<void, StarException> UpdateWorldPropertiesPacket::read_json(Json const& json) {
   {
     auto result = json.get_object("updatedProperties");
     if (!result)
@@ -1693,7 +1695,7 @@ std::expected<void, StarException> UpdateWorldPropertiesPacket::readJson(Json co
   return {};
 }
 
-std::expected<Json, StarException> UpdateWorldPropertiesPacket::writeJson() const {
+std::expected<Json, StarException> UpdateWorldPropertiesPacket::write_json() const {
   return JsonObject{
     {"updatedProperties", updatedProperties},
   };
@@ -1714,7 +1716,7 @@ std::expected<void, StarException> UpdateTileProtectionPacket::write(DataStream&
   return ds.write(fields);
 }
 
-std::expected<void, StarException> UpdateTileProtectionPacket::readJson(Json const& json) {
+std::expected<void, StarException> UpdateTileProtectionPacket::read_json(Json const& json) {
   {
     auto result = json.get_uint("dungeonId");
     if (!result)
@@ -1730,7 +1732,7 @@ std::expected<void, StarException> UpdateTileProtectionPacket::readJson(Json con
   return {};
 }
 
-std::expected<Json, StarException> UpdateTileProtectionPacket::writeJson() const {
+std::expected<Json, StarException> UpdateTileProtectionPacket::write_json() const {
   return JsonObject{
     {"dungeonId", dungeonId},
     {"isProtected", isProtected}
@@ -1752,7 +1754,7 @@ std::expected<void, StarException> SetDungeonGravityPacket::write(DataStream& ds
   return ds.write(fields);
 }
 
-std::expected<void, StarException> SetDungeonGravityPacket::readJson(Json const& json) {
+std::expected<void, StarException> SetDungeonGravityPacket::read_json(Json const& json) {
   {
     auto result = json.get_uint("dungeonId");
     if (!result)
@@ -1768,7 +1770,7 @@ std::expected<void, StarException> SetDungeonGravityPacket::readJson(Json const&
   return {};
 }
 
-std::expected<Json, StarException> SetDungeonGravityPacket::writeJson() const {
+std::expected<Json, StarException> SetDungeonGravityPacket::write_json() const {
   return JsonObject{
     {"dungeonId", dungeonId},
     {"gravity", json_from_optional<float>(gravity)}
@@ -1790,7 +1792,7 @@ std::expected<void, StarException> SetDungeonBreathablePacket::write(DataStream&
   return ds.write(fields);
 }
 
-std::expected<void, StarException> SetDungeonBreathablePacket::readJson(Json const& json) {
+std::expected<void, StarException> SetDungeonBreathablePacket::read_json(Json const& json) {
   {
     auto result = json.get_uint("dungeonId");
     if (!result)
@@ -1806,7 +1808,7 @@ std::expected<void, StarException> SetDungeonBreathablePacket::readJson(Json con
   return {};
 }
 
-std::expected<Json, StarException> SetDungeonBreathablePacket::writeJson() const {
+std::expected<Json, StarException> SetDungeonBreathablePacket::write_json() const {
   return JsonObject{
     {"dungeonId", dungeonId},
     {"breathable", json_from_optional<bool>(breathable)}
@@ -1827,7 +1829,7 @@ std::expected<void, StarException> SetPlayerStartPacket::write(DataStream& ds) c
   return ds.write(fields);
 }
 
-std::expected<void, StarException> SetPlayerStartPacket::readJson(Json const& json) {
+std::expected<void, StarException> SetPlayerStartPacket::read_json(Json const& json) {
   auto startData = json.get("playerStart");
   if (!startData)
     return std::unexpected(std::move(startData.error()));
@@ -1844,7 +1846,7 @@ std::expected<void, StarException> SetPlayerStartPacket::readJson(Json const& js
   return {};
 }
 
-std::expected<Json, StarException> SetPlayerStartPacket::writeJson() const {
+std::expected<Json, StarException> SetPlayerStartPacket::write_json() const {
   return JsonObject{
     {"playerStart", json_from_vec2f(playerStart)},
     {"respawnInWorld", respawnInWorld}
@@ -2211,7 +2213,7 @@ std::expected<void, StarException> UniverseMessage::write(DataStream& ds) const 
   return ds.write(fields);
 }
 
-std::expected<void, StarException> UniverseMessage::readJson(Json const& json) {
+std::expected<void, StarException> UniverseMessage::read_json(Json const& json) {
   {
     auto result = json.get_uint("connection");
     if (!result)
@@ -2246,7 +2248,7 @@ std::expected<void, StarException> UniverseMessage::readJson(Json const& json) {
   return {};
 }
 
-std::expected<Json, StarException> UniverseMessage::writeJson() const {
+std::expected<Json, StarException> UniverseMessage::write_json() const {
   return JsonObject{
     {"connection", connection},
     {"message", message},

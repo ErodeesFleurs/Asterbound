@@ -202,8 +202,8 @@ public:
   std::shared_ptr<Sky const> currentSky() const;
   bool flying() const;
 
-  [[nodiscard]] std::expected<void, StarException> sendChat(String const& text, ChatSendMode sendMode, std::optional<bool> speak = {}, std::optional<JsonObject> data = {});
-  List<ChatReceivedMessage> pullChatMessages();
+  [[nodiscard]] std::expected<void, StarException> send_chat(String const& text, ChatSendMode send_mode, std::optional<bool> speak = {}, std::optional<JsonObject> data = {});
+  List<ChatReceivedMessage> pull_chat_messages();
 
   std::uint16_t players();
   std::uint16_t maxPlayers();
@@ -299,7 +299,7 @@ private:
 
   std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> m_storageTriggerDeadline;
 
-  List<ChatReceivedMessage> m_pendingMessages;
+  List<ChatReceivedMessage> m_pending_messages;
 
   std::optional<String> m_disconnectReason;
 

@@ -351,7 +351,7 @@ public:
   bool sendSecretBroadcast(StringView broadcast, bool raw = false, bool compress = true);
   [[nodiscard]] std::expected<bool, StarException> handleSecretBroadcast(std::shared_ptr<Player> player, StringView broadcast);
 
-  [[nodiscard]] std::expected<List<ChatAction>, StarException> pullPendingChatActions();
+  [[nodiscard]] std::expected<List<ChatAction>, StarException> pull_pending_chat_actions();
 
   WorldStructure const& centralStructure() const;
 

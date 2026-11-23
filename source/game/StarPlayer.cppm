@@ -188,8 +188,8 @@ public:
   Vec2F position() const override;
   Vec2F velocity() const override;
 
-  [[nodiscard]] std::expected<Vec2F, StarException> mouthPosition() const override;
-  [[nodiscard]] std::expected<Vec2F, StarException> mouthPosition(bool ignoreAdjustments) const override;
+  [[nodiscard]] std::expected<Vec2F, StarException> mouth_position() const override;
+  [[nodiscard]] std::expected<Vec2F, StarException> mouth_position(bool ignore_adjustments) const override;
   [[nodiscard]] std::expected<Vec2F, StarException> mouthOffset(bool ignoreAdjustments = true) const;
   [[nodiscard]] std::expected<Vec2F, StarException> feetOffset() const;
   [[nodiscard]] std::expected<Vec2F, StarException> headArmorOffset() const;
@@ -504,14 +504,14 @@ public:
   [[nodiscard]] std::expected<void, StarException> queueUIMessage(String const& message) override;
   void queueItemPickupMessage(std::shared_ptr<Item> const& item);
 
-  [[nodiscard]] std::expected<void, StarException> addChatMessage(String const& message, Json const& config = {});
+  [[nodiscard]] std::expected<void, StarException> add_chat_message(String const& message, Json const& config = {});
   void addEmote(HumanoidEmote const& emote, std::optional<float> emoteCooldown = {});
   [[nodiscard]] std::expected<void, StarException> setDance(std::optional<String> const & danceName);
   std::pair<HumanoidEmote, float> currentEmote() const;
 
   State currentState() const;
 
-  List<ChatAction> pullPendingChatActions() override;
+  List<ChatAction> pull_pending_chat_actions() override;
 
   [[nodiscard]] std::expected<std::optional<String>, StarException> inspectionLogName() const override;
   [[nodiscard]] std::expected<std::optional<String>, StarException> inspectionDescription(String const& species) const override;
@@ -755,7 +755,7 @@ private:
   List<String> m_queuedMessages;
   List<std::shared_ptr<Item>> m_queuedItemPickups;
 
-  List<ChatAction> m_pendingChatActions;
+  List<ChatAction> m_pending_chat_actions;
 
   StringSet m_missionRadioMessages;
   bool m_interruptRadioMessage;
@@ -768,9 +768,9 @@ private:
 
   AiState m_ai_state;
 
-  String m_chatMessage;
-  bool m_chatMessageChanged;
-  bool m_chatMessageUpdated;
+  String m_chat_message;
+  bool m_chat_message_changed;
+  bool m_chat_message_updated;
 
   std::shared_ptr<EffectEmitter> m_effectEmitter;
 
@@ -790,8 +790,8 @@ private:
   JsonObject m_humanoidParameters = JsonObject();
   NetElementData<EntityDamageTeam> m_teamNetState;
   NetElementEvent m_landedNetState;
-  NetElementString m_chatMessageNetState;
-  NetElementEvent m_newChatMessageNetState;
+  NetElementString m_chat_message_net_state;
+  NetElementEvent m_new_chat_message_net_state;
   NetElementString m_emoteNetState;
   NetElementData<std::optional<String>> m_humanoidDanceNetState;
 };

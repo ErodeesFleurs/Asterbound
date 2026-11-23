@@ -270,10 +270,9 @@ std::expected<void, StarException> UniverseServer::initialize() {
   if (!commands)
     return std::unexpected(std::move(commands.error()));
   m_commandProcessor = std::move(*commands);
-  m_chatProcessor = std::make_shared<ChatProcessor>(m_root.random());
-  m_chatProcessor->setCommandHandler(
-    [processor = m_commandProcessor.get()](ConnectionId clientId, String const& command, String const& arguments) {
-      return processor->userCommand(clientId, command, arguments);
+  m_chat_processor.set_command_handler(
+    [processor = m_commandProcessor](ConnectionId client_id, String const& command, String const& arguments) {
+      return processor->userCommand(client_id, command, arguments);
     });
   auto networkThreads = universeConfig->opt_uint("networkWorkerThreads");
   if (!networkThreads)
@@ -474,12 +473,12 @@ std::expected<unsigned, StarException> UniverseServer::clientConnectionVersion(C
     return 0;
 }
 
-std::expected<String, StarException> UniverseServer::clientNick(ConnectionId clientId) const {
-  return m_chatProcessor->connectionNick(clientId);
+std::expected<String, StarException> UniverseServer::client_nick(ConnectionId client_id) const {
+  return m_chat_processor.connection_nick(client_id);
 }
 
-std::optional<ConnectionId> UniverseServer::findNick(String const& nick) const {
-  return m_chatProcessor->findNick(nick);
+std::optional<ConnectionId> UniverseServer::find_nick(String const& nick) const {
+  return m_chat_processor.find_nick(nick);
 }
 
 std::expected<String, StarException> UniverseServer::clientAccount(ConnectionId clientId) const {
@@ -504,12 +503,12 @@ std::optional<ConnectionId> UniverseServer::clientForUuid(Uuid const& uuid) cons
   return getClientForUuid(uuid);
 }
 
-std::expected<void, StarException> UniverseServer::adminBroadcast(String const& text) {
-  return m_chatProcessor->adminBroadcast(text);
+std::expected<void, StarException> UniverseServer::admin_broadcast(String const& text) {
+  return m_chat_processor.admin_broadcast(text);
 }
 
-std::expected<void, StarException> UniverseServer::adminWhisper(ConnectionId clientId, String const& text) {
-  return m_chatProcessor->adminWhisper(clientId, text);
+std::expected<void, StarException> UniverseServer::admin_whisper(ConnectionId client_id, String const& text) {
+  return m_chat_processor.admin_whisper(client_id, text);
 }
 
 std::expected<ServerCommandResult, StarException> UniverseServer::adminCommand(String text) {
@@ -1007,7 +1006,7 @@ std::expected<void, StarException> UniverseServer::runLoop(std::stop_token stopT
         return std::unexpected(std::move(result.error()));
       if (auto result = removeTimedBan(); !result)
         return std::unexpected(std::move(result.error()));
-      if (auto result = sendPendingChat(); !result)
+      if (auto result = send_pending_chat(); !result)
         return std::unexpected(std::move(result.error()));
       if (auto result = updateTeams(); !result)
         return std::unexpected(std::move(result.error()));
@@ -1027,7 +1026,7 @@ std::expected<void, StarException> UniverseServer::runLoop(std::stop_token stopT
         return std::unexpected(std::move(result.error()));
       if (auto result = arriveShips(); !result)
         return std::unexpected(std::move(result.error()));
-      if (auto result = processChat(); !result)
+      if (auto result = process_chat(); !result)
         return std::unexpected(std::move(result.error()));
       if (auto result = sendClientContextUpdates(); !result)
         return std::unexpected(std::move(result.error()));
@@ -1211,8 +1210,7 @@ std::expected<void, StarException> UniverseServer::shutdown() {
     return std::unexpected(std::move(*error));
   }
   m_commandProcessor.reset();
-  if (m_chatProcessor)
-    m_chatProcessor->clearCommandHandler();
+  m_chat_processor.clear_command_handler();
   record(stopLua());
   {
     std::unique_lock locker(m_mainLock, std::defer_lock);
@@ -1329,21 +1327,21 @@ std::expected<void, StarException> UniverseServer::processUniverseFlags() {
   return {};
 }
 
-std::expected<void, StarException> UniverseServer::sendPendingChat() {
+std::expected<void, StarException> UniverseServer::send_pending_chat() {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lock_with_diagnostics(locker);
-  std::shared_lock clientsLocker(m_clientsLock);
+  std::shared_lock clients_locker(m_clientsLock);
   for (auto const& client : m_clients) {
     if (m_disconnectingClients.contains(client.first))
       continue;
-    auto messages = m_chatProcessor->pullPendingMessages(client.first);
+    auto messages = m_chat_processor.pull_pending_messages(client.first);
     if (!messages)
       return std::unexpected(std::move(messages.error()));
     if (!messages->empty()) {
       List<std::shared_ptr<Packet>> packets;
       packets.reserve(messages->size());
-      for (auto const& message : *messages)
-        packets.push_back(std::make_shared<ChatReceivePacket>(message));
+      for (auto& message : *messages)
+        packets.push_back(std::make_shared<ChatReceivePacket>(std::move(message)));
       if (auto sent = m_connectionServer->sendPackets(client.first, std::move(packets)); !sent)
         return std::unexpected(std::move(sent.error()));
     }
@@ -1368,22 +1366,22 @@ std::expected<void, StarException> UniverseServer::updateTeams() {
     else
       p.second->setTeam(EntityDamageTeam(TeamType::Friendly));
 
-    auto channels = m_chatProcessor->clientChannels(p.first);
+    auto channels = m_chat_processor.client_channels(p.first);
     auto team = m_teamManager->getTeam(p.second->playerUuid());
     auto worldName = Star::print_world_id(p.second->playerWorldId());
     if (!worldName)
       return std::unexpected(std::move(worldName.error()));
     for (auto const& channel : channels) {
       if (channel != *worldName && (!team || channel != team->hex()))
-        m_chatProcessor->leaveChannel(p.first, channel);
+        m_chat_processor.leave_channel(p.first, channel);
     }
     if (team) {
-      auto teamChannel = team->hex();
-      auto subscribed = channels.contains(teamChannel);
+      auto team_channel = team->hex();
+      auto subscribed = channels.contains(team_channel);
       if (!subscribed)
         return std::unexpected(std::move(subscribed.error()));
       if (!*subscribed)
-        m_chatProcessor->joinChannel(p.first, teamChannel);
+        m_chat_processor.join_channel(p.first, team_channel);
     }
   }
 
@@ -1773,7 +1771,7 @@ std::expected<void, StarException> UniverseServer::warpPlayers() {
             auto name = Star::print_world_id(currentWorld->worldId());
             if (!name)
               return std::unexpected(std::move(name.error()));
-            m_chatProcessor->leaveChannel(clientId, *name);
+            m_chat_processor.leave_channel(clientId, *name);
           }
           clientContext->setOrbitWarpAction({});
 
@@ -1795,7 +1793,7 @@ std::expected<void, StarException> UniverseServer::warpPlayers() {
             auto name = Star::print_world_id(warpToWorld.world);
             if (!name)
               return std::unexpected(std::move(name.error()));
-            m_chatProcessor->joinChannel(clientId, *name);
+            m_chat_processor.join_channel(clientId, *name);
 
             if (std::holds_alternative<ClientShipWorldId>(warpToWorld.world)) {
               if (auto clientId = getClientForUuid(std::get<ClientShipWorldId>(warpToWorld.world))) {
@@ -2146,36 +2144,34 @@ std::expected<void, StarException> UniverseServer::respond_to_celestial_requests
   return {};
 }
 
-std::expected<void, StarException> UniverseServer::processChat() {
+std::expected<void, StarException> UniverseServer::process_chat() {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lock_with_diagnostics(locker);
-  std::shared_lock clientsLocker(m_clientsLock);
+  std::shared_lock clients_locker(m_clientsLock);
 
-  for (auto const& p : std::exchange(m_pendingChat, {})) {
-    auto context = m_clients.get(p.first);
-    if (!context)
-      return std::unexpected(std::move(context.error()));
-    if (auto clientContext = context->get()) {
-      for (auto const& chat : p.second) {
-        auto& message = std::get<0>(chat);
-        auto sendMode = std::get<1>(chat);
-        auto& data = std::get<2>(chat);
-        if (clientContext->remoteAddress()) {
-          if (auto logged = m_root.logger().info("Chat: <{}> {}", clientContext->playerName(), message); !logged)
+  for (auto&& [client_id, pending] : std::exchange(m_pending_chat, {})) {
+    if (m_disconnectingClients.contains(client_id))
+      continue;
+    if (auto client_context = m_clients.value(client_id)) {
+      for (auto& [origin, message, send_mode, data] : pending) {
+        if (origin.lock() != client_context)
+          continue;
+        if (client_context->remoteAddress()) {
+          if (auto logged = m_root.logger().info("Chat: <{}> {}", client_context->playerName(), message); !logged)
             return std::unexpected(std::move(logged.error()));
         }
 
-        auto team = m_teamManager->getTeam(clientContext->playerUuid());
+        auto team = m_teamManager->getTeam(client_context->playerUuid());
         locker.unlock();
         auto sent = [&]() -> std::expected<void, StarException> {
-          if (sendMode == ChatSendMode::Broadcast)
-            return m_chatProcessor->broadcast(p.first, message, std::move(data));
-          if (sendMode == ChatSendMode::Party && team)
-            return m_chatProcessor->message(p.first, MessageContext::Mode::Party, team->hex(), message, std::move(data));
-          auto name = Star::print_world_id(clientContext->playerWorldId());
+          if (send_mode == ChatSendMode::Broadcast)
+            return m_chat_processor.broadcast(client_id, message, std::move(data));
+          if (send_mode == ChatSendMode::Party && team)
+            return m_chat_processor.message(client_id, MessageContext::Mode::Party, team->hex(), message, std::move(data));
+          auto name = Star::print_world_id(client_context->playerWorldId());
           if (!name)
             return std::unexpected(std::move(name.error()));
-          return m_chatProcessor->message(p.first, MessageContext::Mode::Local, *name, message, std::move(data));
+          return m_chat_processor.message(client_id, MessageContext::Mode::Local, *name, message, std::move(data));
         }();
         lock_with_diagnostics(locker);
         if (!sent)
@@ -2184,7 +2180,7 @@ std::expected<void, StarException> UniverseServer::processChat() {
     }
   }
 
-  return m_chatProcessor->updatePromises();
+  return m_chat_processor.update_promises();
 }
 
 std::expected<void, StarException> UniverseServer::clearBrokenWorlds() {
@@ -3125,11 +3121,10 @@ std::expected<void, StarException> UniverseServer::packetsReceived(UniverseConne
         if (auto flown = clientFlyShip(clientId, flyShip->system, flyShip->location, flyShip->settings); !flown)
           return std::unexpected(std::move(flown.error()));
 
-      } else if (auto chatSend = as<ChatSendPacket>(packet)) {
+      } else if (auto chat_send = as<ChatSendPacket>(packet)) {
         std::unique_lock locker(m_mainLock, std::defer_lock);
         lock_with_diagnostics(locker);
-        m_pendingChat[clientId].push_back(
-          std::make_tuple(std::move(chatSend->text), chatSend->sendMode, std::move(chatSend->data)));
+        m_pending_chat[clientId].emplace_back(clientContext, std::move(chat_send->text), chat_send->send_mode, std::move(chat_send->data));
 
       } else if (auto clientContextUpdatePacket = as<ClientContextUpdatePacket>(packet)) {
         if (auto updated = clientContext->readUpdate(std::move(clientContextUpdatePacket->updateData)); !updated)
@@ -3665,7 +3660,7 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
       return std::unexpected(std::move(sent.error()));
     if (auto added = m_clients.try_emplace(clientId, client); !added)
       return std::unexpected(std::move(added.error()));
-    if (auto joined = m_chatProcessor->connectClient(clientId, connect->playerName); !joined)
+    if (auto joined = m_chat_processor.connect_client(clientId, connect->playerName); !joined)
       return std::unexpected(std::move(joined.error()));
     clientsLocker.unlock();
     if (auto pvp = setPvp(clientId, false); !pvp)
@@ -3974,7 +3969,7 @@ std::expected<void, StarException> UniverseServer::doDisconnection(ConnectionId 
     }
     auto name = Star::print_world_id(world->worldId());
     if (record(name))
-      m_chatProcessor->leaveChannel(clientId, *name);
+      m_chat_processor.leave_channel(clientId, *name);
     lock_with_diagnostics(locker);
   }
   for (auto const& subWorld : client->subWorlds()) {
@@ -4003,8 +3998,8 @@ std::expected<void, StarException> UniverseServer::doDisconnection(ConnectionId 
       departed = false;
   }
   record(client->failWorldRequests());
-  if (m_chatProcessor->hasClient(clientId))
-    record(m_chatProcessor->disconnectClient(clientId));
+  if (m_chat_processor.has_client(clientId))
+    record(m_chat_processor.disconnect_client(clientId));
   bool registered = m_connectionServer->hasConnection(clientId);
   if (registered) {
     auto open = m_connectionServer->connectionIsOpen(clientId);

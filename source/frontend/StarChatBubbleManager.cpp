@@ -149,150 +149,150 @@ import star.image_metadata_database;
 
 import star.algorithm;
 namespace Star {
-ChatBubbleManager::ChatBubbleManager(GuiContext& context)
-  : m_guiContext(context), m_textTemplate(Vec2F()), m_portraitTextTemplate(Vec2F()) {}
+ChatBubbleManager::ChatBubbleManager(ConstructionKey, GuiContext& context)
+  : m_gui_context(context), m_text_template(Vec2F()), m_portrait_text_template(Vec2F()) {}
 
 std::expected<std::unique_ptr<ChatBubbleManager>, StarException> ChatBubbleManager::create(GuiContext& context) {
-  auto manager = std::unique_ptr<ChatBubbleManager>(new ChatBubbleManager(context));
+  auto manager = std::make_unique<ChatBubbleManager>(ConstructionKey{}, context);
   auto initialized = manager->initialize();
   if (!initialized) return std::unexpected(std::move(initialized.error()));
   return manager;
 }
 
 std::expected<void, StarException> ChatBubbleManager::initialize() {
-  auto& context = m_guiContext.get();
+  auto& context = m_gui_context.get();
   auto assets = context.root().assets();
   if (!assets) return std::unexpected(std::move(assets.error()));
   auto config = (*assets)->json("/interface/windowconfig/chatbubbles.config");
   if (!config) return std::unexpected(std::move(config.error()));
-  m_cachedInterfaceScale = context.interfaceScale();
-  auto colorJson = config->get("textColor");
-  if (!colorJson) return std::unexpected(std::move(colorJson.error()));
-  auto color = json_to_color(*colorJson);
+  m_cached_interface_scale = context.interfaceScale();
+  auto color_json = config->get("textColor");
+  if (!color_json) return std::unexpected(std::move(color_json.error()));
+  auto color = json_to_color(*color_json);
   if (!color) return std::unexpected(std::move(color.error()));
-  m_textStyle.color = color->to_rgba();
-  auto styleJson = config->get("textStyle");
-  if (!styleJson) return std::unexpected(std::move(styleJson.error()));
-  auto style = m_textStyle.load_json(*styleJson);
+  m_text_style.color = color->to_rgba();
+  auto style_json = config->get("textStyle");
+  if (!style_json) return std::unexpected(std::move(style_json.error()));
+  auto style = m_text_style.load_json(*style_json);
   if (!style) return std::unexpected(std::move(style.error()));
   {
     auto json = config->get("textPadding");
     if (!json) return std::unexpected(std::move(json.error()));
     auto value = json_to_vec2f(*json);
     if (!value) return std::unexpected(std::move(value.error()));
-    m_textPadding = *value;
+    m_text_padding = *value;
   }
   {
     auto json = config->get("bubbleOffset");
     if (!json) return std::unexpected(std::move(json.error()));
     auto value = json_to_vec2f(*json);
     if (!value) return std::unexpected(std::move(value.error()));
-    m_bubbleOffset = *value;
+    m_bubble_offset = *value;
   }
   {
     auto json = config->get("portraitMorePosition");
     if (!json) return std::unexpected(std::move(json.error()));
     auto value = json_to_vec2i(*json);
     if (!value) return std::unexpected(std::move(value.error()));
-    m_portraitMorePosition = *value;
+    m_portrait_more_position = *value;
   }
   {
     auto json = config->get("portraitBackgroundSize");
     if (!json) return std::unexpected(std::move(json.error()));
     auto value = json_to_vec2i(*json);
     if (!value) return std::unexpected(std::move(value.error()));
-    m_portraitBackgroundSize = *value;
+    m_portrait_background_size = *value;
   }
   {
     auto json = config->get("portraitPosition");
     if (!json) return std::unexpected(std::move(json.error()));
     auto value = json_to_vec2i(*json);
     if (!value) return std::unexpected(std::move(value.error()));
-    m_portraitPosition = *value;
+    m_portrait_position = *value;
   }
   {
     auto json = config->get("portraitSize");
     if (!json) return std::unexpected(std::move(json.error()));
     auto value = json_to_vec2i(*json);
     if (!value) return std::unexpected(std::move(value.error()));
-    m_portraitSize = *value;
+    m_portrait_size = *value;
   }
   {
     auto json = config->get("portraitTextPosition");
     if (!json) return std::unexpected(std::move(json.error()));
     auto value = json_to_vec2i(*json);
     if (!value) return std::unexpected(std::move(value.error()));
-    m_portraitTextPosition = *value;
+    m_portrait_text_position = *value;
   }
   {
     auto value = config->get_float("partSize");
     if (!value) return std::unexpected(std::move(value.error()));
-    m_partSize = *value;
+    m_part_size = *value;
   }
   {
     auto value = config->get_float("maxAge");
     if (!value) return std::unexpected(std::move(value.error()));
-    m_maxAge = std::move(*value);
+    m_max_age = std::move(*value);
   }
   {
     auto value = config->get_float("portraitMaxAge");
     if (!value) return std::unexpected(std::move(value.error()));
-    m_portraitMaxAge = std::move(*value);
+    m_portrait_max_age = std::move(*value);
   }
   {
     auto value = config->get_float("interBubbleMargin");
     if (!value) return std::unexpected(std::move(value.error()));
-    m_interBubbleMargin = std::move(*value);
+    m_inter_bubble_margin = std::move(*value);
   }
   {
     auto value = config->get_int("maxMessagePerEntity");
     if (!value) return std::unexpected(std::move(value.error()));
-    m_maxMessagePerEntity = std::move(*value);
+    m_max_message_per_entity = std::move(*value);
   }
   {
     auto value = config->get_string("portraitBackgroundImage");
     if (!value) return std::unexpected(std::move(value.error()));
-    m_portraitBackgroundImage = std::move(*value);
+    m_portrait_background_image = std::move(*value);
   }
   {
     auto value = config->get_string("portraitMoreImage");
     if (!value) return std::unexpected(std::move(value.error()));
-    m_portraitMoreImage = std::move(*value);
+    m_portrait_more_image = std::move(*value);
   }
   {
     auto value = config->get_uint("portraitTextWidth");
     if (!value) return std::unexpected(std::move(value.error()));
-    m_portraitTextWidth = std::move(*value);
+    m_portrait_text_width = std::move(*value);
   }
   {
     auto value = config->get_float("portraitChatterFramerate");
     if (!value) return std::unexpected(std::move(value.error()));
-    m_portraitChatterFramerate = std::move(*value);
+    m_portrait_chatter_framerate = std::move(*value);
   }
   {
     auto value = config->get_float("portraitChatterDuration");
     if (!value) return std::unexpected(std::move(value.error()));
-    m_portraitChatterDuration = std::move(*value);
+    m_portrait_chatter_duration = std::move(*value);
   }
   {
     auto value = config->get_float("furthestTextDistance");
     if (!value) return std::unexpected(std::move(value.error()));
-    m_furthestVisibleTextDistance = std::move(*value);
+    m_furthest_visible_text_distance = std::move(*value);
   }
   auto wrap = config->get_uint("textWrapWidth");
   if (!wrap) return std::unexpected(std::move(wrap.error()));
-  m_textTemplate = TextPositioning{Vec2F(), HorizontalAnchor::HMidAnchor, VerticalAnchor::TopAnchor, *wrap};
-  m_portraitTextTemplate = TextPositioning{Vec2F(m_portraitTextPosition), HorizontalAnchor::LeftAnchor,
-                                           VerticalAnchor::TopAnchor, m_portraitTextWidth};
+  m_text_template = TextPositioning{Vec2F(), HorizontalAnchor::HMidAnchor, VerticalAnchor::TopAnchor, *wrap};
+  m_portrait_text_template = TextPositioning{Vec2F(m_portrait_text_position), HorizontalAnchor::LeftAnchor,
+                                           VerticalAnchor::TopAnchor, m_portrait_text_width};
   {
     auto value = config->get_float("tweenFactor");
     if (!value) return std::unexpected(std::move(value.error()));
-    m_bubbles.setTweenFactor(*value);
+    m_bubbles.set_tween_factor(*value);
   }
   {
     auto value = config->get_float("movementThreshold");
     if (!value) return std::unexpected(std::move(value.error()));
-    m_bubbles.setMovementThreshold(*value);
+    m_bubbles.set_movement_threshold(*value);
   }
   auto functions = context.root().functionDatabase();
   if (!functions) return std::unexpected(std::move(functions.error()));
@@ -301,106 +301,105 @@ std::expected<void, StarException> ChatBubbleManager::initialize() {
     if (!name) return std::unexpected(std::move(name.error()));
     auto value = (*functions)->function(*name);
     if (!value) return std::unexpected(std::move(value.error()));
-    m_textFadeFunction = std::move(*value);
+    m_text_fade_function = std::move(*value);
   }
   {
     auto name = config->get_string("bubbleFadeFunction");
     if (!name) return std::unexpected(std::move(name.error()));
     auto value = (*functions)->function(*name);
     if (!value) return std::unexpected(std::move(value.error()));
-    m_bubbleFadeFunction = std::move(*value);
+    m_bubble_fade_function = std::move(*value);
   }
   return {};
 }
 
-std::expected<void, StarException> ChatBubbleManager::setCamera(WorldCamera const& camera) {
-  float oldPixelRatio = m_camera.pixelRatio();
-  float oldInterfaceScale = m_cachedInterfaceScale;
+std::expected<void, StarException> ChatBubbleManager::set_camera(WorldCamera const& camera) {
+  float old_pixel_ratio = m_camera.pixelRatio();
+  float old_interface_scale = m_cached_interface_scale;
   m_camera = camera;
-  m_cachedInterfaceScale = m_guiContext.get().interfaceScale();
-  if (m_camera.pixelRatio() != oldPixelRatio || m_cachedInterfaceScale != oldInterfaceScale) {
+  m_cached_interface_scale = m_gui_context.get().interfaceScale();
+  if (m_camera.pixelRatio() != old_pixel_ratio || m_cached_interface_scale != old_interface_scale) {
     List<ChatAction> actions;
-    auto collected = m_bubbles.forEach(
+    auto collected = m_bubbles.for_each(
       [&actions](BubbleState<Bubble> const& state, Bubble const& bubble) -> std::expected<void, StarException> {
-        actions.push_back(SayChatAction{bubble.entity, bubble.text, state.idealDestination, bubble.config});
+        actions.push_back(SayChatAction{bubble.entity, bubble.text, state.ideal_destination, bubble.config});
         return {};
       });
     if (!collected) return std::unexpected(std::move(collected.error()));
     m_bubbles.clear();
-    for (auto& portraitBubble : m_portraitBubbles)
-      actions.push_back(PortraitChatAction{portraitBubble.entity, portraitBubble.portrait, portraitBubble.text,
-                                           portraitBubble.position, portraitBubble.config});
-    m_portraitBubbles.clear();
-    return addChatActions(std::move(actions), true);
+    for (auto& portrait_bubble : m_portrait_bubbles)
+      actions.push_back(PortraitChatAction{portrait_bubble.entity, portrait_bubble.portrait, portrait_bubble.text,
+                                           portrait_bubble.position, portrait_bubble.config});
+    m_portrait_bubbles.clear();
+    return add_chat_actions(std::move(actions), true);
   }
   return {};
 }
 
-std::expected<void, StarException> ChatBubbleManager::update(float dt, std::shared_ptr<WorldClient> world) {
+std::expected<void, StarException> ChatBubbleManager::update(float dt, std::shared_ptr<WorldClient> const& world) {
   if (m_world.lock() != world) {
     // Actions queued for the new world have not bound an entity yet.
     m_bubbles.filter([](BubbleState<Bubble> const&, Bubble const& bubble) { return !bubble.instance; });
-    m_portraitBubbles.filter([](PortraitBubble const& bubble) { return !bubble.instance; });
+    m_portrait_bubbles.filter([](PortraitBubble const& bubble) { return !bubble.instance; });
     m_world = world;
   }
-  auto updated = m_bubbles.updateDestinations([this, dt, &world](BubbleState<Bubble>& bubbleState, Bubble& bubble) -> std::expected<void, StarException> {
+  auto updated = m_bubbles.update_destinations([this, dt, &world](BubbleState<Bubble>& bubble_state, Bubble& bubble) -> std::expected<void, StarException> {
     bubble.age += dt;
     if (auto entity = world->get<ChattyEntity>(bubble.entity)) {
       if (bubble.instance && bubble.instance->lock() != entity)
         return {};
       if (!bubble.instance)
         bubble.instance = entity;
-      if (bubble.presentationEpoch != entity->presentationEpoch()) {
-        bubbleState.resetPresentation();
-        bubble.presentationEpoch = entity->presentationEpoch();
+      if (bubble.presentation_epoch != entity->presentationEpoch()) {
+        bubble_state.reset_presentation();
+        bubble.presentation_epoch = entity->presentationEpoch();
       }
       auto onscreen = m_camera.worldGeometry().rect_intersects_rect(m_camera.worldScreenRect(), entity->metaBoundBox().translated(entity->position()));
       if (!onscreen) return std::unexpected(std::move(onscreen.error()));
       bubble.onscreen = *onscreen;
-      auto mouth = entity->mouthPosition();
+      auto mouth = entity->mouth_position();
       if (!mouth) return std::unexpected(std::move(mouth.error()));
-      bubbleState.idealDestination = m_camera.worldToScreen(*mouth + m_bubbleOffset);
+      bubble_state.ideal_destination = m_camera.worldToScreen(*mouth + m_bubble_offset);
     }
     return {};
   });
   if (!updated) return std::unexpected(std::move(updated.error()));
 
-  for (auto& portraitBubble : m_portraitBubbles) {
-    portraitBubble.age += dt;
-    if (auto entity = world->entity(portraitBubble.entity)) {
-      if (portraitBubble.instance && portraitBubble.instance->lock() != entity)
+  for (auto& portrait_bubble : m_portrait_bubbles) {
+    portrait_bubble.age += dt;
+    if (auto entity = world->entity(portrait_bubble.entity)) {
+      if (portrait_bubble.instance && portrait_bubble.instance->lock() != entity)
         continue;
-      if (!portraitBubble.instance)
-        portraitBubble.instance = entity;
+      if (!portrait_bubble.instance)
+        portrait_bubble.instance = entity;
       auto onscreen = m_camera.worldGeometry().rect_intersects_rect(m_camera.worldScreenRect(), entity->metaBoundBox().translated(entity->position()));
       if (!onscreen) return std::unexpected(std::move(onscreen.error()));
-      portraitBubble.onscreen = *onscreen;
+      portrait_bubble.onscreen = *onscreen;
       if (auto chatter = as<ChattyEntity>(entity)) {
-        auto mouth = chatter->mouthPosition();
+        auto mouth = chatter->mouth_position();
         if (!mouth) return std::unexpected(std::move(mouth.error()));
-        portraitBubble.position = *mouth;
+        portrait_bubble.position = *mouth;
       } else
-        portraitBubble.position = entity->position();
+        portrait_bubble.position = entity->position();
     }
   }
 
-  auto& count = m_entityBubbleCounts;
+  auto& count = m_entity_bubble_counts;
   count.clear();
-  m_portraitBubbles.filter([&](PortraitBubble const& portraitBubble) -> bool {
-      count[portraitBubble.entity] += m_maxMessagePerEntity;
-      if (count[portraitBubble.entity] > m_maxMessagePerEntity)
+  m_portrait_bubbles.filter([&](PortraitBubble const& portrait_bubble) -> bool {
+      if ((count[portrait_bubble.entity] += m_max_message_per_entity) > m_max_message_per_entity)
         return false;
-      if (auto entity = world->get<ChattyEntity>(portraitBubble.entity))
-        return portraitBubble.instance && portraitBubble.instance->lock() == entity
-            && portraitBubble.age < m_portraitMaxAge;
+      if (auto entity = world->get<ChattyEntity>(portrait_bubble.entity))
+        return portrait_bubble.instance && portrait_bubble.instance->lock() == entity
+            && portrait_bubble.age < m_portrait_max_age;
       return false;
     });
 
   m_bubbles.filter([&](BubbleState<Bubble> const&, Bubble const& bubble) -> bool {
-      if (++count[bubble.entity] > m_maxMessagePerEntity)
+      if (++count[bubble.entity] > m_max_message_per_entity)
         return false;
       if (auto entity = world->get<ChattyEntity>(bubble.entity))
-        return bubble.instance && bubble.instance->lock() == entity && bubble.age < m_maxAge;
+        return bubble.instance && bubble.instance->lock() == entity && bubble.age < m_max_age;
       return false;
     });
 
@@ -408,30 +407,30 @@ std::expected<void, StarException> ChatBubbleManager::update(float dt, std::shar
   return {};
 }
 
-std::expected<std::uint8_t, StarException> ChatBubbleManager::calcDistanceFadeAlpha(Vec2F bubbleScreenPosition, std::shared_ptr<StoredFunction> fadeFunction, WorldCamera const& camera) const {
+std::expected<std::uint8_t, StarException> ChatBubbleManager::calc_distance_fade_alpha(Vec2F bubble_screen_position, StoredFunction const& fade_function, WorldCamera const& camera) const {
   // first calculate bubble position as a factor, distance from center to edge
   // of screen (0.0-1.0)
-  float halfScreenwidth = camera.screenSize()[0] * 0.5f;
-  float distanceFactor = (std::fabsf(bubbleScreenPosition[0] - halfScreenwidth)) / halfScreenwidth;
+  float half_screen_width = camera.screenSize()[0] * 0.5f;
+  float distance_factor = (std::fabsf(bubble_screen_position[0] - half_screen_width)) / half_screen_width;
 
   // that distance factor is divided by the max allowable distance
   // to re-space the distance as a 0 - 1 over the max allowable distance
-  distanceFactor = std::clamp(distanceFactor / m_furthestVisibleTextDistance, 0.0f, 1.0f);
+  distance_factor = std::clamp(distance_factor / m_furthest_visible_text_distance, 0.0f, 1.0f);
 
-  auto evaluated = fadeFunction->evaluate(distanceFactor);
+  auto evaluated = fade_function.evaluate(distance_factor);
   if (!evaluated) return std::unexpected(std::move(evaluated.error()));
   return std::clamp(static_cast<int>(*evaluated), 0, 255);
 }
 std::expected<void, StarException> ChatBubbleManager::render(WorldClient const& world, WorldCamera const& camera, PresentationContext presentation) {
   if (m_world.lock().get() != &world)
     return {};
-  if (m_presentationEpoch != presentation.epoch()) {
-    m_bubbles.resetPresentation();
-    m_presentationEpoch = presentation.epoch();
+  if (m_presentation_epoch != presentation.epoch()) {
+    m_bubbles.reset_presentation();
+    m_presentation_epoch = presentation.epoch();
   }
-  if (m_bubbles.empty() && m_portraitBubbles.empty())
+  if (m_bubbles.empty() && m_portrait_bubbles.empty())
     return {};
-  auto configuration = m_guiContext.get().root().configuration();
+  auto configuration = m_gui_context.get().root().configuration();
   if (!configuration) return std::unexpected(std::move(configuration.error()));
   auto setting = (*configuration)->get("speechBubbles");
   if (!setting) return std::unexpected(std::move(setting.error()));
@@ -439,77 +438,77 @@ std::expected<void, StarException> ChatBubbleManager::render(WorldClient const& 
   if (!enabled) return std::unexpected(std::move(enabled.error()));
   if (!*enabled) return {};
 
-  float pixelRatio = m_guiContext.get().interfaceScale();
+  float pixel_ratio = m_gui_context.get().interfaceScale();
 
-  auto rendered = m_bubbles.forEach([this, &world, &camera, presentation, pixelRatio](BubbleState<Bubble> const& state, Bubble const& bubble) -> std::expected<void, StarException> {
+  auto rendered = m_bubbles.for_each([this, &world, &camera, presentation, pixel_ratio](BubbleState<Bubble> const& state, Bubble const& bubble) -> std::expected<void, StarException> {
       if (bubble.onscreen) {
         auto entity = world.entity(bubble.entity);
         if (!entity || !bubble.instance || bubble.instance->lock() != entity)
           return {};
-        auto origin = m_camera.screenToWorld(state.idealDestination);
+        auto origin = m_camera.screenToWorld(state.ideal_destination);
         origin += world.geometry().diff(world.renderPosition(bubble.entity, presentation), entity->position());
-        auto screenPosition = camera.worldToScreen(origin)
-            + state.sampleOffset(bubble.presentationEpoch == entity->presentationEpoch() ? presentation.interpolation() : 1.0f);
-        auto fade = calcDistanceFadeAlpha(screenPosition, m_bubbleFadeFunction, camera);
+        auto screen_position = camera.worldToScreen(origin)
+            + state.sample_offset(bubble.presentation_epoch == entity->presentationEpoch() ? presentation.interpolation() : 1.0f);
+        auto fade = calc_distance_fade_alpha(screen_position, *m_bubble_fade_function, camera);
         if (!fade) return std::unexpected(std::move(fade.error()));
         int alpha = *fade;
         if (alpha) {
-          for (auto const& bubbleImage : bubble.backgroundImages)
-            { auto drawn = drawBubbleImage(screenPosition, bubbleImage, pixelRatio, alpha); if (!drawn) return std::unexpected(std::move(drawn.error())); }
-          for (auto const& bubbleText : bubble.bubbleText)
-            { auto drawn = drawBubbleText(screenPosition, bubbleText, pixelRatio, alpha, false); if (!drawn) return std::unexpected(std::move(drawn.error())); }
+          for (auto const& bubble_image : bubble.background_images)
+            { auto drawn = draw_bubble_image(screen_position, bubble_image, pixel_ratio, alpha); if (!drawn) return std::unexpected(std::move(drawn.error())); }
+          for (auto const& bubble_text : bubble.bubble_text)
+            { auto drawn = draw_bubble_text(screen_position, bubble_text, pixel_ratio, alpha, false); if (!drawn) return std::unexpected(std::move(drawn.error())); }
         }
       }
       return {};
     });
   if (!rendered) return std::unexpected(std::move(rendered.error()));
 
-  for (auto const& portraitBubble : m_portraitBubbles) {
-    auto entity = world.entity(portraitBubble.entity);
-    if (!entity || !portraitBubble.instance || portraitBubble.instance->lock() != entity)
+  for (auto const& portrait_bubble : m_portrait_bubbles) {
+    auto entity = world.entity(portrait_bubble.entity);
+    if (!entity || !portrait_bubble.instance || portrait_bubble.instance->lock() != entity)
       continue;
-    if (portraitBubble.onscreen) {
-      auto position = portraitBubble.position;
-      position += world.geometry().diff(world.renderPosition(portraitBubble.entity, presentation), entity->position());
-      Vec2F screenPos = camera.worldToScreen(position + m_bubbleOffset);
+    if (portrait_bubble.onscreen) {
+      auto position = portrait_bubble.position;
+      position += world.geometry().diff(world.renderPosition(portrait_bubble.entity, presentation), entity->position());
+      Vec2F screen_pos = camera.worldToScreen(position + m_bubble_offset);
       int frame = 0;
-      if (portraitBubble.age <= m_portraitChatterDuration)
-        frame = static_cast<int>((portraitBubble.age / m_portraitChatterFramerate) * 2) % 2;
+      if (portrait_bubble.age <= m_portrait_chatter_duration)
+        frame = static_cast<int>((portrait_bubble.age / m_portrait_chatter_framerate) * 2) % 2;
       // 255 here because portrait bubbles are always full opacity
-      for (auto const& bubbleImage : portraitBubble.backgroundImages) {
-        auto frameImage = std::get<0>(bubbleImage).replace("<frame>", Star::to_string(frame));
-        if (!frameImage) return std::unexpected(std::move(frameImage.error()));
-        auto drawn = drawBubbleImage(screenPos, std::make_tuple(std::move(*frameImage), std::get<1>(bubbleImage)), pixelRatio, 255);
+      for (auto const& bubble_image : portrait_bubble.background_images) {
+        auto frame_image = std::get<0>(bubble_image).replace("<frame>", Star::to_string(frame));
+        if (!frame_image) return std::unexpected(std::move(frame_image.error()));
+        auto drawn = draw_bubble_image(screen_pos, std::make_tuple(std::move(*frame_image), std::get<1>(bubble_image)), pixel_ratio, 255);
         if (!drawn) return std::unexpected(std::move(drawn.error()));
       }
       // 255 here because portrait bubbles are always full opacity
-      for (auto const& bubbleText : portraitBubble.bubbleText)
-        { auto drawn = drawBubbleText(screenPos, bubbleText, pixelRatio, 255, true); if (!drawn) return std::unexpected(std::move(drawn.error())); }
+      for (auto const& bubble_text : portrait_bubble.bubble_text)
+        { auto drawn = draw_bubble_text(screen_pos, bubble_text, pixel_ratio, 255, true); if (!drawn) return std::unexpected(std::move(drawn.error())); }
     }
   }
   return {};
 }
 
-std::expected<void, StarException> ChatBubbleManager::addChatActions(List<ChatAction> chatActions, bool silent) {
-  float partSize = m_partSize;
-  float pixelRatio = m_guiContext.get().interfaceScale();
+std::expected<void, StarException> ChatBubbleManager::add_chat_actions(List<ChatAction> chat_actions, bool silent) {
+  float part_size = m_part_size;
+  float pixel_ratio = m_gui_context.get().interfaceScale();
 
-  for (auto const& action : chatActions) {
+  for (auto& action : chat_actions) {
     Json config = JsonObject{};
     Vec2F position;
 
     if (std::holds_alternative<SayChatAction>(action)) {
-      auto const& sayAction = std::get<SayChatAction>(action);
-      auto actionConfig = sayAction.config.opt_object();
-      if (!actionConfig) return std::unexpected(std::move(actionConfig.error()));
-      config = actionConfig->value_or(JsonObject{});
-      position = sayAction.position;
+      auto& say_action = std::get<SayChatAction>(action);
+      auto action_config = say_action.config.opt_object();
+      if (!action_config) return std::unexpected(std::move(action_config.error()));
+      config = std::move(*action_config).value_or(JsonObject{});
+      position = say_action.position;
 
-      TextStyle textStyle = m_textStyle;
-      auto fontSize = config.get_uint("fontSize", textStyle.font_size);
-      if (!fontSize)
-        return std::unexpected(std::move(fontSize.error()));
-      textStyle.font_size = *fontSize;
+      TextStyle text_style = m_text_style;
+      auto font_size = config.get_uint("fontSize", text_style.font_size);
+      if (!font_size)
+        return std::unexpected(std::move(font_size.error()));
+      text_style.font_size = *font_size;
       auto color_json = config.opt("color");
       if (!color_json)
         return std::unexpected(std::move(color_json.error()));
@@ -517,146 +516,155 @@ std::expected<void, StarException> ChatBubbleManager::addChatActions(List<ChatAc
         auto color = json_to_color(**color_json);
         if (!color)
           return std::unexpected(std::move(color.error()));
-        textStyle.color = color->to_rgba();
+        text_style.color = color->to_rgba();
       }
-      auto styleJson = config.get("style", Json());
-      if (!styleJson)
-        return std::unexpected(std::move(styleJson.error()));
-      auto loadedStyle = textStyle.load_json(*styleJson);
-      if (!loadedStyle)
-        return std::unexpected(std::move(loadedStyle.error()));
+      auto style_json = config.get("style", Json());
+      if (!style_json)
+        return std::unexpected(std::move(style_json.error()));
+      auto loaded_style = text_style.load_json(*style_json);
+      if (!loaded_style)
+        return std::unexpected(std::move(loaded_style.error()));
       // Size the bubble using the same final style and wrap width as drawing.
-      auto styled = m_guiContext.get().setTextStyle(textStyle, pixelRatio);
+      auto styled = m_gui_context.get().setTextStyle(text_style, pixel_ratio);
       if (!styled) return std::unexpected(std::move(styled.error()));
-      TextPositioning tp = scaledPositioning(m_textTemplate, pixelRatio);
-      auto result = m_guiContext.get().determineTextSize(sayAction.text, tp);
+      TextPositioning tp = scaled_positioning(m_text_template, pixel_ratio);
+      auto result = m_gui_context.get().determineTextSize(say_action.text, tp);
       if (!result) return std::unexpected(std::move(result.error()));
-      float textWidth = result->width() / pixelRatio + m_textPadding[0];
-      float textHeight = result->height() / pixelRatio + m_textPadding[1];
+      float text_width = result->width() / pixel_ratio + m_text_padding[0];
+      float text_height = result->height() / pixel_ratio + m_text_padding[1];
 
-      Vec2I innerTiles = Vec2I::ceil(Vec2F((textWidth + 4) / partSize, (textHeight + 4) / partSize));
-      if (innerTiles[0] % 2 == 0)
-        innerTiles[0] += 1;
-      if (innerTiles[0] < 3)
-        innerTiles[0] = 3;
-      int middleIdx = (innerTiles[0] - 1) / 2;
+      Vec2I inner_tiles = Vec2I::ceil(Vec2F((text_width + 4) / part_size, (text_height + 4) / part_size));
+      if (inner_tiles[0] % 2 == 0)
+        inner_tiles[0] += 1;
+      if (inner_tiles[0] < 3)
+        inner_tiles[0] = 3;
+      int middle_idx = (inner_tiles[0] - 1) / 2;
 
-      List<BubbleImage> backgroundImages;
+      List<BubbleImage> background_images;
       auto border = config.get_bool("drawBorder", true);
       if (!border) return std::unexpected(std::move(border.error()));
       if (*border) {
-        for (int y = 0; y < innerTiles[1]; y++) {
-          for (int x = 0; x < innerTiles[0]; x++) {
-            auto partPosition = [partSize](int x, int y) {
-              return Vec2F(x * partSize, y * partSize);
+        for (int y = 0; y < inner_tiles[1]; y++) {
+          for (int x = 0; x < inner_tiles[0]; x++) {
+            auto part_position = [part_size](int x, int y) {
+              return Vec2F(x * part_size, y * part_size);
             };
             if (y == 0) {
               if (x == 0) {
-                backgroundImages.push_back(
-                  BubbleImage{"/interface/chatbubbles/cornerBottomLeft.png", partPosition(x, y)});
-              } else if (x == innerTiles[0] - 1) {
-                backgroundImages.push_back(
-                  BubbleImage{"/interface/chatbubbles/cornerBottomRight.png", partPosition(x, y)});
+                background_images.push_back(
+                  BubbleImage{"/interface/chatbubbles/cornerBottomLeft.png", part_position(x, y)});
+              } else if (x == inner_tiles[0] - 1) {
+                background_images.push_back(
+                  BubbleImage{"/interface/chatbubbles/cornerBottomRight.png", part_position(x, y)});
               } else {
-                if (middleIdx == x)
-                  backgroundImages.push_back(BubbleImage{"/interface/chatbubbles/point.png", partPosition(x, y - 1)});
+                if (middle_idx == x)
+                  background_images.push_back(BubbleImage{"/interface/chatbubbles/point.png", part_position(x, y - 1)});
                 else
-                  backgroundImages.push_back(BubbleImage{"/interface/chatbubbles/sideDown.png", partPosition(x, y)});
+                  background_images.push_back(BubbleImage{"/interface/chatbubbles/sideDown.png", part_position(x, y)});
               }
-            } else if (y == innerTiles[1] - 1) {
+            } else if (y == inner_tiles[1] - 1) {
               if (x == 0)
-                backgroundImages.push_back(BubbleImage{"/interface/chatbubbles/cornerTopLeft.png", partPosition(x, y)});
-              else if (x == innerTiles[0] - 1)
-                backgroundImages.push_back(
-                  BubbleImage{"/interface/chatbubbles/cornerTopRight.png", partPosition(x, y)});
+                background_images.push_back(BubbleImage{"/interface/chatbubbles/cornerTopLeft.png", part_position(x, y)});
+              else if (x == inner_tiles[0] - 1)
+                background_images.push_back(
+                  BubbleImage{"/interface/chatbubbles/cornerTopRight.png", part_position(x, y)});
               else
-                backgroundImages.push_back(BubbleImage{"/interface/chatbubbles/sideUp.png", partPosition(x, y)});
+                background_images.push_back(BubbleImage{"/interface/chatbubbles/sideUp.png", part_position(x, y)});
             } else {
               if (x == 0)
-                backgroundImages.push_back(BubbleImage{"/interface/chatbubbles/sideLeft.png", partPosition(x, y)});
-              else if (x == innerTiles[0] - 1)
-                backgroundImages.push_back(BubbleImage{"/interface/chatbubbles/sideRight.png", partPosition(x, y)});
+                background_images.push_back(BubbleImage{"/interface/chatbubbles/sideLeft.png", part_position(x, y)});
+              else if (x == inner_tiles[0] - 1)
+                background_images.push_back(BubbleImage{"/interface/chatbubbles/sideRight.png", part_position(x, y)});
               else
-                backgroundImages.push_back(BubbleImage{"/interface/chatbubbles/center.png", partPosition(x, y)});
+                background_images.push_back(BubbleImage{"/interface/chatbubbles/center.png", part_position(x, y)});
             }
           }
         }
       }
 
-      float textMultiLineShift = textHeight;
-      float horizontalCenter = partSize * innerTiles[0] * 0.5f;
-      float verticalShift = (partSize * innerTiles[1] - textMultiLineShift) * 0.5f + textMultiLineShift - 1.0f;
-      Vec2F position = Vec2F(horizontalCenter, verticalShift);
-      List<BubbleText> bubbleTexts;
+      float text_multi_line_shift = text_height;
+      float horizontal_center = part_size * inner_tiles[0] * 0.5f;
+      float vertical_shift = (part_size * inner_tiles[1] - text_multi_line_shift) * 0.5f + text_multi_line_shift - 1.0f;
+      Vec2F position = Vec2F(horizontal_center, vertical_shift);
+      List<BubbleText> bubble_texts;
 
-      bubbleTexts.push_back(std::make_tuple(sayAction.text, textStyle, true, position));
+      bubble_texts.push_back(std::make_tuple(say_action.text, text_style, true, position));
 
-      for (auto& backgroundImage : backgroundImages)
-        std::get<1>(backgroundImage) += Vec2F(-horizontalCenter, partSize);
-      for (auto& bubbleText : bubbleTexts)
-        std::get<3>(bubbleText) += Vec2F(-horizontalCenter, partSize);
+      for (auto& background_image : background_images)
+        std::get<1>(background_image) += Vec2F(-horizontal_center, part_size);
+      for (auto& bubble_text : bubble_texts)
+        std::get<3>(bubble_text) += Vec2F(-horizontal_center, part_size);
 
-      auto pos = m_camera.worldToScreen(sayAction.position + m_bubbleOffset);
-      RectF boundBox = RectF::null();
-      for (auto const& image : backgroundImages) {
-        auto bounds = bubbleImageRect(pos, image, pixelRatio);
+      auto pos = m_camera.worldToScreen(say_action.position + m_bubble_offset);
+      RectF bound_box = RectF::null();
+      for (auto const& image : background_images) {
+        auto bounds = bubble_image_rect(pos, image, pixel_ratio);
         if (!bounds) return std::unexpected(std::move(bounds.error()));
-        boundBox.combine(*bounds);
+        bound_box.combine(*bounds);
       }
-      Bubble bubble = {.entity = sayAction.entity,
-                       .text = sayAction.text,
-                       .config = sayAction.config,
+      Bubble bubble = {.entity = say_action.entity,
+                       .text = std::move(say_action.text),
+                       .config = std::move(say_action.config),
                        .age = 0,
-                       .backgroundImages = std::move(backgroundImages),
-                       .bubbleText = std::move(bubbleTexts),
+                       .background_images = std::move(background_images),
+                       .bubble_text = std::move(bubble_texts),
                        .onscreen = false,
                        .instance = {}};
-      auto old_bubbles = m_bubbles.filtered([&sayAction](BubbleState<Bubble> const&, Bubble const& bubble) {
-          return bubble.entity == sayAction.entity;
-        });
-      m_bubbles.filter([&sayAction](BubbleState<Bubble> const&, Bubble const& bubble) { return bubble.entity != sayAction.entity; });
-      m_bubbles.addBubble(pos, boundBox, std::move(bubble), m_interBubbleMargin * pixelRatio);
+      struct PreviousBubble {
+        Vec2F destination;
+        RectF bounds;
+        Bubble contents;
+      };
+      List<PreviousBubble> old_bubbles;
+      m_bubbles.filter([&](BubbleState<Bubble> const& state, Bubble& previous) {
+        if (previous.entity != say_action.entity)
+          return true;
+        if (m_max_message_per_entity != 1)
+          old_bubbles.push_back({state.ideal_destination, state.bound_box, std::move(previous)});
+        return false;
+      });
+      m_bubbles.add_bubble(pos, bound_box, std::move(bubble), m_inter_bubble_margin * pixel_ratio);
       // A nonpositive limit historically used a negative slice stop, relative to the end.
-      auto stop = static_cast<std::int64_t>(m_maxMessagePerEntity) - 1;
+      auto stop = static_cast<std::int64_t>(m_max_message_per_entity) - 1;
       auto size = old_bubbles.size();
       auto keep = stop < 0 ? size - std::min(size, static_cast<std::size_t>(-stop))
                            : std::min(size, static_cast<std::size_t>(stop));
       if (keep != 0) {
-        old_bubbles.sort([](BubbleState<Bubble> const& a, BubbleState<Bubble> const& b) { return a.contents.age < b.contents.age; });
+        old_bubbles.sort([](PreviousBubble const& a, PreviousBubble const& b) { return a.contents.age < b.contents.age; });
         for (auto& previous : std::span(old_bubbles).first(keep))
-          m_bubbles.addBubble(previous.idealDestination, previous.boundBox, std::move(previous.contents), 0);
+          m_bubbles.add_bubble(previous.destination, previous.bounds, std::move(previous.contents), 0);
       }
 
     } else if (std::holds_alternative<PortraitChatAction>(action)) {
-      auto const& portraitAction = std::get<PortraitChatAction>(action);
-      auto actionConfig = portraitAction.config.opt_object();
-      if (!actionConfig) return std::unexpected(std::move(actionConfig.error()));
-      config = actionConfig->value_or(JsonObject{});
-      position = portraitAction.position;
+      auto& portrait_action = std::get<PortraitChatAction>(action);
+      auto action_config = portrait_action.config.opt_object();
+      if (!action_config) return std::unexpected(std::move(action_config.error()));
+      config = std::move(*action_config).value_or(JsonObject{});
+      position = portrait_action.position;
 
-      List<BubbleImage> backgroundImages;
-      backgroundImages.push_back(std::make_tuple(m_portraitBackgroundImage, Vec2F()));
+      List<BubbleImage> background_images;
+      background_images.push_back(std::make_tuple(m_portrait_background_image, Vec2F()));
       auto more = config.get_bool("drawMoreIndicator", false);
       if (!more) return std::unexpected(std::move(more.error()));
       if (*more)
-        backgroundImages.push_back(std::make_tuple(m_portraitMoreImage, Vec2F(m_portraitMorePosition)));
-      backgroundImages.push_back(std::make_tuple(portraitAction.portrait, Vec2F(m_portraitPosition)));
-      List<BubbleText> bubbleTexts;
-      bubbleTexts.push_back(std::make_tuple(portraitAction.text, m_textStyle, false, Vec2F(m_portraitTextPosition)));
+        background_images.push_back(std::make_tuple(m_portrait_more_image, Vec2F(m_portrait_more_position)));
+      background_images.push_back(std::make_tuple(portrait_action.portrait, Vec2F(m_portrait_position)));
+      List<BubbleText> bubble_texts;
+      bubble_texts.push_back(std::make_tuple(portrait_action.text, m_text_style, false, Vec2F(m_portrait_text_position)));
 
-      for (auto& backgroundImage : backgroundImages)
-        std::get<1>(backgroundImage) += Vec2F(-m_portraitBackgroundSize[0] / 2, 0);
-      for (auto& bubbleText : bubbleTexts)
-        std::get<3>(bubbleText) += Vec2F(-m_portraitBackgroundSize[0] / 2, 0);
+      for (auto& background_image : background_images)
+        std::get<1>(background_image) += Vec2F(-m_portrait_background_size[0] / 2, 0);
+      for (auto& bubble_text : bubble_texts)
+        std::get<3>(bubble_text) += Vec2F(-m_portrait_background_size[0] / 2, 0);
 
-      m_portraitBubbles.push_front({.entity = portraitAction.entity,
-                                    .portrait = portraitAction.portrait,
-                                    .text = portraitAction.text,
-                                    .position = portraitAction.position,
-                                    .config = portraitAction.config,
+      m_portrait_bubbles.push_front({.entity = portrait_action.entity,
+                                    .portrait = std::move(portrait_action.portrait),
+                                    .text = std::move(portrait_action.text),
+                                    .position = portrait_action.position,
+                                    .config = std::move(portrait_action.config),
                                     .age = 0,
-                                    .backgroundImages = std::move(backgroundImages),
-                                    .bubbleText = std::move(bubbleTexts),
+                                    .background_images = std::move(background_images),
+                                    .bubble_text = std::move(bubble_texts),
                                     .onscreen = false,
                                     .instance = {}});
     }
@@ -665,22 +673,22 @@ std::expected<void, StarException> ChatBubbleManager::addChatActions(List<ChatAc
       auto sound = config.opt_string("sound");
       if (!sound) return std::unexpected(std::move(sound.error()));
       if (*sound) {
-        auto assets = m_guiContext.get().root().assets();
+        auto assets = m_gui_context.get().root().assets();
         if (!assets)
           return std::unexpected(std::move(assets.error()));
         auto audio = (*assets)->audio(**sound);
         if (!audio) return std::unexpected(std::move(audio.error()));
         auto instance = AudioInstance::create(**audio);
         if (!instance) return std::unexpected(std::move(instance.error()));
-        auto audioInstance = std::move(*instance);
-        audioInstance->set_position(position);
+        auto audio_instance = std::move(*instance);
+        audio_instance->set_position(position);
         auto volume = config.get_float("volume", 1.0f);
         if (!volume) return std::unexpected(std::move(volume.error()));
         auto pitch = config.get_float("pitch", 1.0f);
         if (!pitch) return std::unexpected(std::move(pitch.error()));
-        audioInstance->set_volume(*volume);
-        audioInstance->set_pitch_multiplier(*pitch);
-        auto played = m_guiContext.get().playAudio(audioInstance);
+        audio_instance->set_volume(*volume);
+        audio_instance->set_pitch_multiplier(*pitch);
+        auto played = m_gui_context.get().playAudio(audio_instance);
         if (!played) return std::unexpected(std::move(played.error()));
       }
     }
@@ -688,34 +696,34 @@ std::expected<void, StarException> ChatBubbleManager::addChatActions(List<ChatAc
   return {};
 }
 
-std::expected<RectF, StarException> ChatBubbleManager::bubbleImageRect(Vec2F screenPos, BubbleImage const& image, float pixelRatio) {
-  auto metadata = m_guiContext.get().root().imageMetadataDatabase();
+std::expected<RectF, StarException> ChatBubbleManager::bubble_image_rect(Vec2F screen_pos, BubbleImage const& image, float pixel_ratio) {
+  auto metadata = m_gui_context.get().root().imageMetadataDatabase();
   if (!metadata) return std::unexpected(std::move(metadata.error()));
   auto size = (*metadata)->imageSize(std::get<0>(image));
   if (!size) return std::unexpected(std::move(size.error()));
-  return RectF::with_size(screenPos + std::get<1>(image) * pixelRatio, Vec2F(*size) * pixelRatio);
+  return RectF::with_size(screen_pos + std::get<1>(image) * pixel_ratio, Vec2F(*size) * pixel_ratio);
 }
 
-std::expected<void, StarException> ChatBubbleManager::drawBubbleImage(Vec2F screenPos, BubbleImage const& image, float pixelRatio, int alpha) {
-  return m_guiContext.get().drawQuad(std::get<0>(image), screenPos + std::get<1>(image) * pixelRatio, pixelRatio, {255, 255, 255, alpha});
+std::expected<void, StarException> ChatBubbleManager::draw_bubble_image(Vec2F screen_pos, BubbleImage const& image, float pixel_ratio, int alpha) {
+  return m_gui_context.get().drawQuad(std::get<0>(image), screen_pos + std::get<1>(image) * pixel_ratio, pixel_ratio, {255, 255, 255, alpha});
 }
 
-std::expected<void, StarException> ChatBubbleManager::drawBubbleText(Vec2F screenPos, BubbleText const& text, float pixelRatio, int alpha, bool isPortrait) {
+std::expected<void, StarException> ChatBubbleManager::draw_bubble_text(Vec2F screen_pos, BubbleText const& text, float pixel_ratio, int alpha, bool is_portrait) {
   TextStyle style = std::get<1>(text);
   style.color[3] *= (static_cast<float>(alpha) / 255.f);
-  auto styled = m_guiContext.get().setTextStyle(style, pixelRatio);
+  auto styled = m_gui_context.get().setTextStyle(style, pixel_ratio);
   if (!styled) return std::unexpected(std::move(styled.error()));
-  TextPositioning tp = isPortrait ? m_portraitTextTemplate : m_textTemplate;
-  tp.pos = screenPos + std::get<3>(text) * pixelRatio;
-  tp = scaledPositioning(tp, pixelRatio);
-  auto rendered = m_guiContext.get().renderText(std::get<0>(text), tp);
+  TextPositioning tp = is_portrait ? m_portrait_text_template : m_text_template;
+  tp.pos = screen_pos + std::get<3>(text) * pixel_ratio;
+  tp = scaled_positioning(tp, pixel_ratio);
+  auto rendered = m_gui_context.get().renderText(std::get<0>(text), tp);
   if (!rendered) return std::unexpected(std::move(rendered.error()));
   return {};
 }
 
-TextPositioning ChatBubbleManager::scaledPositioning(TextPositioning positioning, float pixelRatio) const {
+TextPositioning ChatBubbleManager::scaled_positioning(TextPositioning positioning, float pixel_ratio) const {
   positioning.wrapWidth =
-    positioning.wrapWidth.transform([pixelRatio](unsigned width) { return static_cast<unsigned>(width * pixelRatio); });
+    positioning.wrapWidth.transform([pixel_ratio](unsigned width) { return static_cast<unsigned>(width * pixel_ratio); });
   return positioning;
 }
 }

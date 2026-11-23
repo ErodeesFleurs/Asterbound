@@ -227,8 +227,8 @@ struct Packet {
   [[nodiscard]] virtual std::expected<void, StarException> read(DataStream& ds);
   [[nodiscard]] virtual std::expected<void, StarException> write(DataStream& ds) const;
 
-  [[nodiscard]] virtual std::expected<void, StarException> readJson(Json const& json);
-  [[nodiscard]] virtual std::expected<Json, StarException> writeJson() const;
+  [[nodiscard]] virtual std::expected<void, StarException> read_json(Json const& json);
+  [[nodiscard]] virtual std::expected<Json, StarException> write_json() const;
 
   PacketCompressionMode compressionMode() const;
   void setCompressionMode(PacketCompressionMode compressionMode);
@@ -353,15 +353,15 @@ struct ChatReceivePacket : PacketBase<PacketType::ChatReceive> {
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ChatReceivePacket>(); }
 
   ChatReceivePacket();
-  ChatReceivePacket(ChatReceivedMessage receivedMessage);
+  ChatReceivePacket(ChatReceivedMessage received_message);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  [[nodiscard]] std::expected<void, StarException> readJson(Json const& json) override;
-  [[nodiscard]] std::expected<Json, StarException> writeJson() const override;
+  [[nodiscard]] std::expected<void, StarException> read_json(Json const& json) override;
+  [[nodiscard]] std::expected<Json, StarException> write_json() const override;
 
-  ChatReceivedMessage receivedMessage;
+  ChatReceivedMessage received_message;
 };
 
 struct UniverseTimeUpdatePacket : PacketBase<PacketType::UniverseTimeUpdate> {
@@ -439,8 +439,8 @@ struct PausePacket : PacketBase<PacketType::Pause> {
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  [[nodiscard]] std::expected<void, StarException> readJson(Json const& json) override;
-  [[nodiscard]] std::expected<Json, StarException> writeJson() const override;
+  [[nodiscard]] std::expected<void, StarException> read_json(Json const& json) override;
+  [[nodiscard]] std::expected<Json, StarException> write_json() const override;
 
   bool pause = false;
   float timescale = 1.0f;
@@ -458,8 +458,8 @@ struct ServerInfoPacket : PacketBase<PacketType::ServerInfo> {
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  [[nodiscard]] std::expected<void, StarException> readJson(Json const& json) override;
-  [[nodiscard]] std::expected<Json, StarException> writeJson() const override;
+  [[nodiscard]] std::expected<void, StarException> read_json(Json const& json) override;
+  [[nodiscard]] std::expected<Json, StarException> write_json() const override;
 
   std::uint16_t players;
   std::uint16_t maxPlayers;
@@ -561,14 +561,14 @@ struct ChatSendPacket : PacketBase<PacketType::ChatSend> {
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ChatSendPacket>(); }
 
   ChatSendPacket();
-  ChatSendPacket(String text, ChatSendMode sendMode);
-  ChatSendPacket(String text, ChatSendMode sendMode, JsonObject data);
+  ChatSendPacket(String text, ChatSendMode send_mode);
+  ChatSendPacket(String text, ChatSendMode send_mode, JsonObject data);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
   String text;
-  ChatSendMode sendMode;
+  ChatSendMode send_mode;
   JsonObject data;
 };
 
@@ -789,8 +789,8 @@ struct GiveItemPacket : PacketBase<PacketType::GiveItem> {
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  [[nodiscard]] std::expected<void, StarException> readJson(Json const& json) override;
-  [[nodiscard]] std::expected<Json, StarException> writeJson() const override;
+  [[nodiscard]] std::expected<void, StarException> read_json(Json const& json) override;
+  [[nodiscard]] std::expected<Json, StarException> write_json() const override;
 
   ItemDescriptor item;
 };
@@ -823,8 +823,8 @@ struct UpdateTileProtectionPacket : PacketBase<PacketType::UpdateTileProtection>
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  [[nodiscard]] std::expected<void, StarException> readJson(Json const& json) override;
-  [[nodiscard]] std::expected<Json, StarException> writeJson() const override;
+  [[nodiscard]] std::expected<void, StarException> read_json(Json const& json) override;
+  [[nodiscard]] std::expected<Json, StarException> write_json() const override;
 
   DungeonId dungeonId;
   bool isProtected;
@@ -842,8 +842,8 @@ struct SetDungeonGravityPacket : PacketBase<PacketType::SetDungeonGravity> {
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  [[nodiscard]] std::expected<void, StarException> readJson(Json const& json) override;
-  [[nodiscard]] std::expected<Json, StarException> writeJson() const override;
+  [[nodiscard]] std::expected<void, StarException> read_json(Json const& json) override;
+  [[nodiscard]] std::expected<Json, StarException> write_json() const override;
 
   DungeonId dungeonId;
   std::optional<float> gravity;
@@ -861,8 +861,8 @@ struct SetDungeonBreathablePacket : PacketBase<PacketType::SetDungeonBreathable>
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  [[nodiscard]] std::expected<void, StarException> readJson(Json const& json) override;
-  [[nodiscard]] std::expected<Json, StarException> writeJson() const override;
+  [[nodiscard]] std::expected<void, StarException> read_json(Json const& json) override;
+  [[nodiscard]] std::expected<Json, StarException> write_json() const override;
 
   DungeonId dungeonId;
   std::optional<bool> breathable;
@@ -880,8 +880,8 @@ struct SetPlayerStartPacket : PacketBase<PacketType::SetPlayerStart> {
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  [[nodiscard]] std::expected<void, StarException> readJson(Json const& json) override;
-  [[nodiscard]] std::expected<Json, StarException> writeJson() const override;
+  [[nodiscard]] std::expected<void, StarException> read_json(Json const& json) override;
+  [[nodiscard]] std::expected<Json, StarException> write_json() const override;
 
   Vec2F playerStart;
   bool respawnInWorld;
@@ -1259,8 +1259,8 @@ struct EntityMessagePacket : PacketBase<PacketType::EntityMessage> {
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  [[nodiscard]] std::expected<void, StarException> readJson(Json const& json) override;
-  [[nodiscard]] std::expected<Json, StarException> writeJson() const override;
+  [[nodiscard]] std::expected<void, StarException> read_json(Json const& json) override;
+  [[nodiscard]] std::expected<Json, StarException> write_json() const override;
 
   std::variant<EntityId, String> entityId;
   String message;
@@ -1301,8 +1301,8 @@ struct UpdateWorldPropertiesPacket : PacketBase<PacketType::UpdateWorldPropertie
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  [[nodiscard]] std::expected<void, StarException> readJson(Json const& json) override;
-  [[nodiscard]] std::expected<Json, StarException> writeJson() const override;
+  [[nodiscard]] std::expected<void, StarException> read_json(Json const& json) override;
+  [[nodiscard]] std::expected<Json, StarException> write_json() const override;
 
   JsonObject updatedProperties;
 };
@@ -1586,8 +1586,8 @@ struct UniverseMessage : PacketBase<PacketType::UniverseMessage> {
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  [[nodiscard]] std::expected<void, StarException> readJson(Json const& json) override;
-  [[nodiscard]] std::expected<Json, StarException> writeJson() const override;
+  [[nodiscard]] std::expected<void, StarException> read_json(Json const& json) override;
+  [[nodiscard]] std::expected<Json, StarException> write_json() const override;
 
   ConnectionId connection;
   String message;

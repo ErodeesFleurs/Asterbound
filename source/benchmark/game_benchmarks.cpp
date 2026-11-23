@@ -2,6 +2,10 @@
 #include <benchmark/benchmark.h>
 
 import std;
+import star.chat_processor;
+import star.chat_types;
+import star.message_types;
+import star.rpc_promise;
 import star.celestial_database;
 import star.celestial_coordinate;
 import star.celestial_parameters;
@@ -827,6 +831,50 @@ int main(int argc, char** argv) {
     return 1;
   }
   BenchmarkSession session{**root};
+  for (std::string_view scenario : {"BroadcastDrain32", "ChannelChurn32", "PollPending64"}) {
+    benchmark::RegisterBenchmark(std::string("Game/Chat/").append(scenario).c_str(), [&, scenario](benchmark::State& state) {
+      ChatProcessor processor;
+      for (ConnectionId id = 1; id <= 32; ++id) {
+        auto added = processor.connect_client(id);
+        if (!added) return session.fail(state, added.error());
+      }
+      for (ConnectionId id = 1; id <= 32; ++id) {
+        auto drained = processor.pull_pending_messages(id);
+        if (!drained) return session.fail(state, drained.error());
+      }
+      if (scenario == "PollPending64") {
+        processor.set_command_handler([](ConnectionId, String, String) -> std::expected<ServerCommandResult, StarException> {
+          return RpcPromise<String>::make_pair().first;
+        });
+        for (unsigned i = 0; i != 64; ++i) {
+          auto sent = processor.broadcast(1, "/pending");
+          if (!sent) return session.fail(state, sent.error());
+        }
+        for (auto _ : state) {
+          auto result = processor.update_promises();
+          if (!result) return session.fail(state, result.error());
+        }
+      } else if (scenario == "ChannelChurn32") {
+        std::array<String, 32> channels;
+        for (unsigned i = 0; i != channels.size(); ++i) channels[i] = Star::format("channel-{}", i);
+        for (auto _ : state) {
+          for (auto const& channel : channels) processor.join_channel(1, channel);
+          for (auto const& channel : channels) processor.leave_channel(1, channel);
+        }
+      } else {
+        String const text("The quick brown fox jumps over the lazy dog.");
+        for (auto _ : state) {
+          auto sent = processor.broadcast(1, text);
+          if (!sent) return session.fail(state, sent.error());
+          for (ConnectionId id = 1; id <= 32; ++id) {
+            auto result = processor.pull_pending_messages(id);
+            if (!result) return session.fail(state, result.error());
+            benchmark::DoNotOptimize(*result);
+          }
+        }
+      }
+    });
+  }
   for (std::string_view scenario : {"ColdFourChunks", "HotSatelliteName", "LoadedSlaveScan"}) {
     benchmark::RegisterBenchmark(std::string("Game/Celestial/").append(scenario).c_str(), [&, scenario](benchmark::State& state) {
       auto master = CelestialMasterDatabase::create(session.root);

@@ -1173,7 +1173,7 @@ if (!result189) return std::unexpected(std::move(result189.error()));
 if (!result190) return std::unexpected(std::move(result190.error()));
 
   auto result191 = callbacks.register_callback("mouthPosition", [this]() {
-      return mouthPosition();
+      return mouth_position();
     });
 if (!result191) return std::unexpected(std::move(result191.error()));
 
@@ -1224,7 +1224,7 @@ if (!result198) return std::unexpected(std::move(result198.error()));
         line = line.replace_tags(*tags, false);
 
       if (!line.empty()) {
-        auto result199 = addChatMessage(line);
+        auto result199 = add_chat_message(line);
 if (!result199) return std::unexpected(std::move(result199.error()));
 
         return true;
@@ -1239,7 +1239,7 @@ if (!result200) return std::unexpected(std::move(result200.error()));
         line = line.replace_tags(*tags, false);
 
       if (!line.empty()) {
-        auto result201 = addChatMessage(line, portrait);
+        auto result201 = add_chat_message(line, portrait);
 if (!result201) return std::unexpected(std::move(result201.error()));
 
         return true;
@@ -1284,21 +1284,21 @@ if (!result209) return std::unexpected(std::move(result209.error()));
   return callbacks;
 }
 
-std::expected<void, StarException> Monster::addChatMessage(String const& message, String const& portrait) {
-  m_chatMessage.set(message);
-  m_chatPortrait.set(portrait);
-  m_newChatMessageEvent.trigger();
+std::expected<void, StarException> Monster::add_chat_message(String const& message, String const& portrait) {
+  m_chat_message.set(message);
+  m_chat_portrait.set(portrait);
+  m_new_chat_message_event.trigger();
   if (portrait.empty())
     {
-  auto result210 = mouthPosition();
+  auto result210 = mouth_position();
   if (!result210) return std::unexpected(std::move(result210.error()));
-  m_pendingChatActions.push_back(SayChatAction{entityId(), message, std::move(*result210)});
+  m_pending_chat_actions.push_back(SayChatAction{entityId(), message, std::move(*result210)});
 }
   else
     {
-  auto result211 = mouthPosition();
+  auto result211 = mouth_position();
   if (!result211) return std::unexpected(std::move(result211.error()));
-  m_pendingChatActions.push_back(PortraitChatAction{entityId(), portrait, message, std::move(*result211)});
+  m_pending_chat_actions.push_back(PortraitChatAction{entityId(), portrait, message, std::move(*result211)});
 }
   return {};
 }
@@ -1360,13 +1360,13 @@ if (!result228) return std::unexpected(std::move(result228.error()));
 if (!result229) return std::unexpected(std::move(result229.error()));
 
 
-  auto result230 = m_netGroup.add_net_element(m_newChatMessageEvent);
+  auto result230 = m_netGroup.add_net_element(m_new_chat_message_event);
 if (!result230) return std::unexpected(std::move(result230.error()));
 
-  auto result231 = m_netGroup.add_net_element(m_chatMessage);
+  auto result231 = m_netGroup.add_net_element(m_chat_message);
 if (!result231) return std::unexpected(std::move(result231.error()));
 
-  auto result232 = m_netGroup.add_net_element(m_chatPortrait);
+  auto result232 = m_netGroup.add_net_element(m_chat_portrait);
 if (!result232) return std::unexpected(std::move(result232.error()));
 
 
@@ -1420,19 +1420,19 @@ std::expected<void, StarException> Monster::getNetStates(bool initial) {
   if (m_dropPoolNetState.pull_updated())
     m_dropPool = m_dropPoolNetState.get();
 
-  if (m_newChatMessageEvent.pull_occurred() && !initial) {
-    if (m_chatPortrait.get().empty())
+  if (m_new_chat_message_event.pull_occurred() && !initial) {
+    if (m_chat_portrait.get().empty())
       {
-  auto result237 = mouthPosition();
+  auto result237 = mouth_position();
   if (!result237) return std::unexpected(std::move(result237.error()));
-  m_pendingChatActions.push_back(SayChatAction{entityId(), m_chatMessage.get(), std::move(*result237)});
+  m_pending_chat_actions.push_back(SayChatAction{entityId(), m_chat_message.get(), std::move(*result237)});
 }
     else
       {
-  auto result238 = mouthPosition();
+  auto result238 = mouth_position();
   if (!result238) return std::unexpected(std::move(result238.error()));
-  m_pendingChatActions.push_back(
-    PortraitChatAction{entityId(), m_chatPortrait.get(), m_chatMessage.get(), std::move(*result238)});
+  m_pending_chat_actions.push_back(
+    PortraitChatAction{entityId(), m_chat_portrait.get(), m_chat_message.get(), std::move(*result238)});
 }
   }
   return {};
@@ -1501,7 +1501,7 @@ std::expected<Vec3B, StarException> Monster::nametagColor() const {
 }
 
 std::expected<Vec2F, StarException> Monster::nametagOrigin() const {
-  return mouthPosition(false);
+  return mouth_position(false);
 }
 
 std::expected<String, StarException> Monster::nametag() const {
@@ -1520,18 +1520,18 @@ std::expected<std::optional<LuaValue>, StarException> Monster::evalScript(String
   return recover_lua_script_error(m_scriptComponent.eval(code));
 }
 
-std::expected<Vec2F, StarException> Monster::mouthPosition() const {
+std::expected<Vec2F, StarException> Monster::mouth_position() const {
   auto result245 = mouthOffset();
 if (!result245) return std::unexpected(std::move(result245.error()));
 return std::move(*result245) + position();
 }
 
-std::expected<Vec2F, StarException> Monster::mouthPosition(bool) const {
-  return mouthPosition();
+std::expected<Vec2F, StarException> Monster::mouth_position(bool) const {
+  return mouth_position();
 }
 
-List<ChatAction> Monster::pullPendingChatActions() {
-  return std::move(m_pendingChatActions);
+List<ChatAction> Monster::pull_pending_chat_actions() {
+  return std::move(m_pending_chat_actions);
 }
 
 std::expected<List<PhysicsForceRegion>, StarException> Monster::forceRegions() const {

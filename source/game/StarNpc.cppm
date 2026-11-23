@@ -201,9 +201,9 @@ public:
   [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> callScript(String const& func, LuaVariadic<LuaValue> const& args) override;
   [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> evalScript(String const& code) override;
 
-  [[nodiscard]] std::expected<Vec2F, StarException> mouthPosition() const override;
-  [[nodiscard]] std::expected<Vec2F, StarException> mouthPosition(bool ignoreAdjustments) const override;
-  List<ChatAction> pullPendingChatActions() override;
+  [[nodiscard]] std::expected<Vec2F, StarException> mouth_position() const override;
+  [[nodiscard]] std::expected<Vec2F, StarException> mouth_position(bool ignore_adjustments) const override;
+  List<ChatAction> pull_pending_chat_actions() override;
 
   bool isInteractive() const override;
   [[nodiscard]] std::expected<InteractAction, StarException> interact(InteractRequest const& request) override;
@@ -321,7 +321,7 @@ private:
   [[nodiscard]] std::expected<void, StarException> getNetStates(bool initial);
   [[nodiscard]] std::expected<void, StarException> setNetStates();
 
-  [[nodiscard]] std::expected<void, StarException> addChatMessage(String const& message, Json const& config, String const& portrait = "");
+  [[nodiscard]] std::expected<void, StarException> add_chat_message(String const& message, Json const& config, String const& portrait = "");
   void addEmote(HumanoidEmote const& emote);
   [[nodiscard]] std::expected<void, StarException> setDance(std::optional<String> const& danceName);
 
@@ -366,12 +366,12 @@ private:
   List<std::shared_ptr<BehaviorState>> m_behaviors;
   mutable LuaActorScript m_scriptComponent;
 
-  List<ChatAction> m_pendingChatActions;
-  NetElementEvent m_newChatMessageEvent;
-  NetElementString m_chatMessage;
-  NetElementString m_chatPortrait;
-  NetElementData<Json> m_chatConfig;
-  bool m_chatMessageUpdated;
+  List<ChatAction> m_pending_chat_actions;
+  NetElementEvent m_new_chat_message_event;
+  NetElementString m_chat_message;
+  NetElementString m_chat_portrait;
+  NetElementData<Json> m_chat_config;
+  bool m_chat_message_updated;
 
   NetElementData<std::optional<String>> m_statusText;
   NetElementBool m_displayNametag;

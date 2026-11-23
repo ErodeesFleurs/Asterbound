@@ -1724,7 +1724,7 @@ std::expected<void, StarException> ClientApplication::prepareSessionInterface() 
   if (auto installed = installLuaCallbacks("interface", LuaBindings::makeInterfaceCallbacks(*m_mainInterface));
       !installed)
     return installed;
-  if (auto installed = installLuaCallbacks("chat", LuaBindings::makeChatCallbacks(*m_mainInterface, *m_universeClient));
+  if (auto installed = installLuaCallbacks("chat", LuaBindings::make_chat_callbacks(*m_mainInterface, *m_universeClient));
       !installed)
     return installed;
   if (auto installed =
@@ -2323,7 +2323,7 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
             if (!name)
               return std::unexpected(std::move(name.error()));
             (*speaker)->name = std::move(*name);
-            auto mouth = player->mouthPosition();
+            auto mouth = player->mouth_position();
             if (!mouth)
               return std::unexpected(std::move(mouth.error()));
             (*speaker)->position = *mouth;

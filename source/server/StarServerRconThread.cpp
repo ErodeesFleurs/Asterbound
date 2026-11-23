@@ -58,7 +58,7 @@ std::expected<ServerCommandResult, StarException> ServerRconClient::handleComman
   if (command == "echo") {
     return ServerCommandResult(std::move(commandLine));
   } else if (command == "broadcast" || command == "say") {
-    auto broadcast = m_universe.get().adminBroadcast(commandLine);
+    auto broadcast = m_universe.get().admin_broadcast(commandLine);
     if (!broadcast)
       return std::unexpected(std::move(broadcast.error()));
     return ServerCommandResult(String(Star::format("OK: said {}", commandLine)));

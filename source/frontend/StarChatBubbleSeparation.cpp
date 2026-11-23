@@ -1,97 +1,70 @@
-
 import std;
-import star.rect;
-import star.list;
-
-
 import star.chat_bubble_separation;
-
+import star.rect;
 import star.vector;
-import star.algorithm;
-namespace Star {
 
-bool compareLeft(RectF const& a, RectF const& b) {
-  return a.x_min() < b.x_min();
+namespace Star::bubble_detail {
+namespace {
+float left_edge(RectF const& box) { return box.x_min(); }
+float right_edge(RectF const& box) { return box.x_max(); }
 }
 
-bool compareRight(RectF const& a, RectF const& b) {
-  return a.x_max() > b.x_max();
-}
-
-bool compareOverlapLeft(RectF const& newBox, RectF const& fixedBox) {
-  return newBox.x_max() < fixedBox.x_min();
-}
-
-bool compareOverlapRight(RectF const& newBox, RectF const& fixedBox) {
-  return newBox.x_min() > fixedBox.x_max();
-}
-
-template <typename Compare>
-void appendHorizontalOverlaps(List<RectF>& overlaps,
-    List<RectF> const& boxes,
-    List<RectF>::const_iterator leftBound,
-    Compare compare,
-    RectF const& box) {
-  auto i = leftBound;
-  if (i == boxes.begin())
-    return;
-  --i;
-  while (!compare(box, *i)) {
-    overlaps.push_back(*i);
-    if (i == boxes.begin())
-      return;
-    --i;
-  }
-}
-
-RectF separateBubble(List<RectF> const& sortedLeftEdges, List<RectF> const& sortedRightEdges, List<RectF>& outLeftEdges, List<RectF>& outRightEdges, RectF box) {
-  // We have to maintain two lists of boxes: one sorted by the left edges and
-  // one
-  // by the right edges. This is because boxes can be different sizes, and
-  // if we only check one edge, appendHorizontalOverlaps can miss any boxes
-  // whose projections onto the X axis entirely contain other boxes'.
-  auto leftOverlapBound = upper_bound(sortedLeftEdges.begin(), sortedLeftEdges.end(), box, compareOverlapLeft);
-  auto rightOverlapBound = upper_bound(sortedRightEdges.begin(), sortedRightEdges.end(), box, compareOverlapRight);
-
-  List<RectF> horizontalOverlaps;
-  appendHorizontalOverlaps(horizontalOverlaps, sortedLeftEdges, leftOverlapBound, compareOverlapRight, box);
-  appendHorizontalOverlaps(horizontalOverlaps, sortedRightEdges, rightOverlapBound, compareOverlapLeft, box);
-
-  // horizontalOverlaps now consists of the boxes that (when projected onto the
-  // X axis)
-  // overlap with 'box'.
-
+RectF EdgeIndex::separate(RectF box, std::optional<std::reference_wrapper<RectF const>> previous) const {
+  // Every strict X overlap is in BOTH prefixes. Scan only the smaller one;
+  // stopping at an intervening non-overlap could hide a containing rectangle.
+  auto left_count = std::ranges::lower_bound(m_left, box.x_max(), std::less{}, left_edge) - m_left.begin();
+  auto right_count = std::ranges::lower_bound(m_right, box.x_min(), std::greater{}, right_edge) - m_right.begin();
+  auto candidates = left_count <= right_count ? std::span(m_left).first(left_count) : std::span(m_right).first(right_count);
+  auto width = box.width();
   while (true) {
-    // While box is overlapping any other boxes, move it halfway away.
-    bool overlapping = false;
-    RectF overlapBoundBox = box;
-    for (auto const& overlapper : horizontalOverlaps) {
-      // Test against this iteration's box, not the growing overlap bound.
-      if (!overlapper.intersects(box, false))
-        continue;
-      Vec2F oSize = overlapper.size(), bSize = box.size();
-      bool separates = oSize[0] > bSize[0]
-          || (oSize[0] == bSize[0]
-              && (oSize[1] > bSize[1]
-                  || (oSize[1] == bSize[1] && overlapper.center()[1] <= box.center()[1])));
-      if (separates) {
-        overlapping = true;
-        overlapBoundBox = overlapBoundBox.combined(overlapper);
-      }
-    }
-    if (!overlapping)
-      break;
-    //SpatialLogger::log_poly("screen", PolyF(box), { 255, 0, 0, 255 });
-    //SpatialLogger::log_poly("screen", PolyF(overlapBoundBox), { 0, 0, 255, 255 });
     auto height = box.height();
-    box.set_y_min(overlapBoundBox.y_max());
-    box.set_y_max(box.y_min() + height);
+    auto center_y = box.center()[1];
+    auto next_bottom = box.y_min();
+    bool skipped_self = false;
+    for (auto const& other : candidates) {
+      if (!other.intersects(box, false))
+        continue;
+      if (!skipped_self && previous && other == previous->get()) {
+        skipped_self = true;
+        continue;
+      }
+      auto other_width = other.width();
+      if (other_width < width)
+        continue;
+      if (other_width == width) {
+        auto other_height = other.height();
+        if (other_height < height || (other_height == height && other.center()[1] > center_y))
+          continue;
+      }
+      next_bottom = std::max(next_bottom, other.y_max());
+    }
+    if (next_bottom == box.y_min())
+      return box;
+    // Move above the union of this iteration's box and its blockers.
+    next_bottom = std::max(next_bottom, box.y_max());
+    box.set_y_min(next_bottom);
+    box.set_y_max(next_bottom + height);
   }
+}
 
-  outLeftEdges.push_back(box);
-  outRightEdges.push_back(box);
+void EdgeIndex::insert(RectF const& box) {
+  m_left.insert(std::ranges::upper_bound(m_left, box.x_min(), std::less{}, left_edge), box);
+  m_right.insert(std::ranges::upper_bound(m_right, box.x_max(), std::greater{}, right_edge), box);
+}
 
-  return box;
+void EdgeIndex::clear() {
+  m_left.clear();
+  m_right.clear();
+}
+
+void EdgeIndex::append(RectF const& box) {
+  m_left.push_back(box);
+  m_right.push_back(box);
+}
+
+void EdgeIndex::sort() {
+  std::ranges::sort(m_left, std::less{}, left_edge);
+  std::ranges::sort(m_right, std::greater{}, right_edge);
 }
 
 }

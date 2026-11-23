@@ -798,7 +798,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("say", [&player](String const& message) -> std::expected<void, StarException> {
-    return player.addChatMessage(message);
+    return player.add_chat_message(message);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 

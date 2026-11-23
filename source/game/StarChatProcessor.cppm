@@ -6,96 +6,87 @@ import star.list;
 import star.map;
 import star.json;
 
-import star.data_stream;
 import star.rpc_promise;
 import star.game_types;
 import star.message_types;
 import star.chat_types;
 import star.set;
-import star.thread;
-import star.uuid;
 
 namespace Star {
-
-class RandomService;
 
 // Handles all chat routing and command parsing for client / server chat.
 // Thread safe.
 class ChatProcessor {
 public:
-  static std::string_view const ServerNick;
-
-  explicit ChatProcessor(RandomService& random);
+  static constexpr std::string_view server_nick = "server";
 
   // CommandHandler is passed the origin connection, the command portion
   // excluding the '/' character, and the remaining command line in full.
   using CommandHandler = std::function<std::expected<ServerCommandResult, StarException>(ConnectionId, String, String)>;
 
-  [[nodiscard]] std::expected<String, StarException> connectClient(ConnectionId clientId, String nick = "");
+  [[nodiscard]] std::expected<String, StarException> connect_client(ConnectionId client_id, String nick = {});
   // Returns any pending messages.
-  [[nodiscard]] std::expected<List<ChatReceivedMessage>, StarException> disconnectClient(ConnectionId clientId);
+  [[nodiscard]] std::expected<List<ChatReceivedMessage>, StarException> disconnect_client(ConnectionId client_id);
 
   List<ConnectionId> clients() const;
-  bool hasClient(ConnectionId clientId) const;
+  bool has_client(ConnectionId client_id) const;
 
   // Clears all clients and channels
   void reset();
 
   // Will return nothing if nick is not found.
-  std::optional<ConnectionId> findNick(String const& nick) const;
-  [[nodiscard]] std::expected<String, StarException> connectionNick(ConnectionId connectionId) const;
-  [[nodiscard]] std::expected<String, StarException> renick(ConnectionId clientId, String const& nick);
+  std::optional<ConnectionId> find_nick(String const& nick) const;
+  [[nodiscard]] std::expected<String, StarException> connection_nick(ConnectionId client_id) const;
+  [[nodiscard]] std::expected<String, StarException> renick(ConnectionId client_id, String const& nick);
 
-  // join / leave return true in the even that the client channel state was
-  // actually changed.
-  bool joinChannel(ConnectionId clientId, String const& channelName);
-  bool leaveChannel(ConnectionId clientId, String const& channelName);
+  // True only if a connected client's membership changed.
+  bool join_channel(ConnectionId client_id, String const& channel_name);
+  bool leave_channel(ConnectionId client_id, String const& channel_name);
 
-  StringList clientChannels(ConnectionId clientId) const;
-  StringList activeChannels() const;
+  StringList client_channels(ConnectionId client_id) const;
+  StringList active_channels() const;
 
-  [[nodiscard]] std::expected<void, StarException> broadcast(ConnectionId sourceConnectionId, String const& text, JsonObject data = {});
-  [[nodiscard]] std::expected<void, StarException> message(ConnectionId sourceConnectionId, MessageContext::Mode context, String const& channelName, String const& text, JsonObject data = {});
-  [[nodiscard]] std::expected<void, StarException> whisper(ConnectionId sourceConnectionId, ConnectionId targetClientId, String const& text, JsonObject data = {});
+  [[nodiscard]] std::expected<void, StarException> broadcast(ConnectionId source, String const& text, JsonObject data = {});
+  [[nodiscard]] std::expected<void, StarException> message(ConnectionId source, MessageContext::Mode mode, String const& channel_name, String const& text, JsonObject data = {});
+  [[nodiscard]] std::expected<void, StarException> whisper(ConnectionId source, ConnectionId target, String const& text, JsonObject data = {});
 
-  // Shorthand for passing server_connection_id as sourceConnectionId to
-  // broadcast / message / whisper
-  [[nodiscard]] std::expected<void, StarException> adminBroadcast(String const& text);
-  [[nodiscard]] std::expected<void, StarException> adminMessage(MessageContext::Mode context, String const& channelName, String const& text);
-  [[nodiscard]] std::expected<void, StarException> adminWhisper(ConnectionId targetClientId, String const& text);
+  [[nodiscard]] std::expected<void, StarException> admin_broadcast(String const& text);
+  [[nodiscard]] std::expected<void, StarException> admin_message(MessageContext::Mode mode, String const& channel_name, String const& text);
+  [[nodiscard]] std::expected<void, StarException> admin_whisper(ConnectionId target, String const& text);
 
-  [[nodiscard]] std::expected<List<ChatReceivedMessage>, StarException> pullPendingMessages(ConnectionId clientId);
+  [[nodiscard]] std::expected<List<ChatReceivedMessage>, StarException> pull_pending_messages(ConnectionId client_id);
 
-  void setCommandHandler(CommandHandler commandHandler);
-  void clearCommandHandler();
-  
-  [[nodiscard]] std::expected<void, StarException> updatePromises();
+  void set_command_handler(CommandHandler handler);
+  void clear_command_handler();
+  [[nodiscard]] std::expected<void, StarException> update_promises();
 
 private:
   struct ClientInfo {
-    ClientInfo(ConnectionId clientId, String const& nick);
-
-    ConnectionId clientId;
     String nick;
-    List<ChatReceivedMessage> pendingMessages;
+    List<ChatReceivedMessage> pending_messages;
   };
+  struct PendingCommand {
+    std::weak_ptr<ClientInfo> recipient;
+    RpcPromise<String> promise;
+  };
+  enum class Audience { All, Channel, Whisper };
 
-  String makeNickUnique(String nick);
+  [[nodiscard]] std::unique_lock<std::recursive_mutex> lock() const;
+  String unique_nick(String nick, ConnectionId owner) const;
+  [[nodiscard]] std::expected<String, StarException> renick_locked(ConnectionId client_id, String const& nick);
+  [[nodiscard]] std::expected<void, StarException> send_locked(Audience audience, ConnectionId source,
+      ConnectionId target, MessageContext context, String const& text, JsonObject data);
+  [[nodiscard]] std::expected<void, StarException> handle_command(ConnectionId source, std::weak_ptr<ClientInfo> recipient,
+      String command_line);
 
-  // Returns true if message was handled completely and needs no further
-  // processing.
-  [[nodiscard]] std::expected<bool, StarException> handleCommand(ChatReceivedMessage& message);
-
+  // The externally supplied handler can synchronously route another message.
   mutable std::recursive_mutex m_mutex;
-  RandomService& m_random;
-
-  HashMap<ConnectionId, ClientInfo> m_clients;
+  HashMap<ConnectionId, std::shared_ptr<ClientInfo>> m_clients;
   StringMap<ConnectionId> m_nicks;
   StringMap<Set<ConnectionId>> m_channels;
-
-  CommandHandler m_commandHandler;
-  
-  HashMap<Uuid,std::pair<ConnectionId,RpcPromise<String>>> m_commandPromises;
+  std::shared_ptr<CommandHandler const> m_command_handler;
+  std::list<PendingCommand> m_command_promises;
+  bool m_polling = false;
 };
 
 }

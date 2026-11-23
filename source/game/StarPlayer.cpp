@@ -476,8 +476,8 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
   m_emoteCooldownTimer = GameTimer(m_emoteCooldown);
   m_blinkCooldownTimer = GameTimer(0);
 
-  m_chatMessageChanged = false;
-  m_chatMessageUpdated = false;
+  m_chat_message_changed = false;
+  m_chat_message_updated = false;
 
   m_interruptRadioMessage = false;
 
@@ -598,11 +598,11 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
       return std::unexpected(std::move(result.error()));
   }
   {
-    if (auto result = m_netGroup.add_net_element(m_chatMessageNetState); !result)
+    if (auto result = m_netGroup.add_net_element(m_chat_message_net_state); !result)
       return std::unexpected(std::move(result.error()));
   }
   {
-    if (auto result = m_netGroup.add_net_element(m_newChatMessageNetState); !result)
+    if (auto result = m_netGroup.add_net_element(m_new_chat_message_net_state); !result)
       return std::unexpected(std::move(result.error()));
   }
   {
@@ -1594,15 +1594,15 @@ std::expected<Vec2F, StarException> Player::legsArmorOffset() const {
   return Vec2F(offset[0] * numerical_direction(facingDirection()), offset[1]);
 }
 
-std::expected<Vec2F, StarException> Player::mouthPosition() const {
-  return mouthPosition(true);
+std::expected<Vec2F, StarException> Player::mouth_position() const {
+  return mouth_position(true);
 }
 
-std::expected<Vec2F, StarException> Player::mouthPosition(bool ignoreAdjustments) const {
-  auto offsetResult = mouthOffset(ignoreAdjustments);
-  if (!offsetResult)
-    return std::unexpected(std::move(offsetResult.error()));
-  auto offset = std::move(*offsetResult);
+std::expected<Vec2F, StarException> Player::mouth_position(bool ignore_adjustments) const {
+  auto offset_result = mouthOffset(ignore_adjustments);
+  if (!offset_result)
+    return std::unexpected(std::move(offset_result.error()));
+  auto offset = std::move(*offset_result);
   return position() + offset;
 }
 
@@ -1921,18 +1921,18 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
     if (m_danceCooldownTimer.tick(dt))
       m_dance = {};
 
-    if (m_chatMessageUpdated) {
+    if (m_chat_message_updated) {
       auto emoteProcessorResult = root().emoteProcessor();
       if (!emoteProcessorResult)
         return std::unexpected(std::move(emoteProcessorResult.error()));
       auto emoteProcessor = std::move(*emoteProcessorResult);
-      auto stateResult = emoteProcessor->detectEmotes(m_chatMessage);
+      auto stateResult = emoteProcessor->detectEmotes(m_chat_message);
       if (!stateResult)
         return std::unexpected(std::move(stateResult.error()));
       auto state = std::move(*stateResult);
       if (state != HumanoidEmote::Idle)
         addEmote(state);
-      m_chatMessageUpdated = false;
+      m_chat_message_updated = false;
     }
 
     if (m_blinkCooldownTimer.tick(dt)) {
@@ -2191,7 +2191,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
             m_log->addScannedObject(*ir.objectName);
           }
 
-          if (auto chat = addChatMessage(ir.message, JsonObject{
+          if (auto chat = add_chat_message(ir.message, JsonObject{
             {"message", JsonObject{
               {"context", JsonObject{{"mode", "RadioMessage"}}},
               {"fromConnection", currentWorld.connection()},
@@ -2436,7 +2436,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
           disabled = bool(flag);
         }
         if (!disabled) {
-          auto mouthResult = mouthPosition();
+          auto mouthResult = mouth_position();
           if (!mouthResult)
             return std::unexpected(std::move(mouthResult.error()));
           auto mouth = std::move(*mouthResult);
@@ -3900,10 +3900,10 @@ std::expected<void, StarException> Player::getNetStates(bool initial) {
   setTeam(m_teamNetState.get());
   if (m_landedNetState.pull_occurred() && !initial)
     m_landingNoisePending = true;
-  if (m_newChatMessageNetState.pull_occurred() && !initial) {
-    m_chatMessage = m_chatMessageNetState.get();
-    m_chatMessageUpdated = true;
-    m_pendingChatActions.push_back(SayChatAction{entityId(), m_chatMessage, m_movementController->position()});
+  if (m_new_chat_message_net_state.pull_occurred() && !initial) {
+    m_chat_message = m_chat_message_net_state.get();
+    m_chat_message_updated = true;
+    m_pending_chat_actions.push_back(SayChatAction{entityId(), m_chat_message, m_movementController->position()});
   }
   if (!HumanoidEmoteNames)
     return std::unexpected(HumanoidEmoteNames.error());
@@ -3947,10 +3947,10 @@ std::expected<void, StarException> Player::setNetStates() {
     m_identityUpdated = false;
   }
   m_teamNetState.set(getTeam());
-  if (m_chatMessageChanged) {
-    m_chatMessageChanged = false;
-    m_chatMessageNetState.push(m_chatMessage);
-    m_newChatMessageNetState.trigger();
+  if (m_chat_message_changed) {
+    m_chat_message_changed = false;
+    m_chat_message_net_state.push(m_chat_message);
+    m_new_chat_message_net_state.trigger();
   }
   if (!HumanoidEmoteNames)
     return std::unexpected(HumanoidEmoteNames.error());
@@ -4287,7 +4287,7 @@ std::expected<Vec3B, StarException> Player::nametagColor() const {
 }
 
 std::expected<Vec2F, StarException> Player::nametagOrigin() const {
-  return mouthPosition(false);
+  return mouth_position(false);
 }
 
 std::expected<String, StarException> Player::nametag() const {
@@ -4452,18 +4452,18 @@ void Player::queueItemPickupMessage(std::shared_ptr<Item> const& item) {
     m_queuedItemPickups.push_back(item);
 }
 
-std::expected<void, StarException> Player::addChatMessage(String const& message, Json const& config) {
+std::expected<void, StarException> Player::add_chat_message(String const& message, Json const& config) {
   if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((!isSlave()));
   }
-  m_chatMessage = message;
-  m_chatMessageUpdated = true;
-  m_chatMessageChanged = true;
-  auto mouthResult = mouthPosition();
-  if (!mouthResult)
-    return std::unexpected(std::move(mouthResult.error()));
-  auto mouth = std::move(*mouthResult);
-  m_pendingChatActions.push_back(SayChatAction{entityId(), message, mouth, config});
+  m_chat_message = message;
+  m_chat_message_updated = true;
+  m_chat_message_changed = true;
+  auto mouth_result = mouth_position();
+  if (!mouth_result)
+    return std::unexpected(std::move(mouth_result.error()));
+  auto mouth = std::move(*mouth_result);
+  m_pending_chat_actions.push_back(SayChatAction{entityId(), message, mouth, config});
   return {};
 }
 
@@ -4502,7 +4502,7 @@ Player::State Player::currentState() const {
   return m_state;
 }
 
-List<ChatAction> Player::pullPendingChatActions() { return std::exchange(m_pendingChatActions, {}); }
+List<ChatAction> Player::pull_pending_chat_actions() { return std::exchange(m_pending_chat_actions, {}); }
 
 std::expected<std::optional<String>, StarException> Player::inspectionLogName() const {
   auto identifier = uniqueId();
@@ -4528,7 +4528,7 @@ std::expected<bool, StarException> Player::instrumentPlaying() {
 
 std::expected<void, StarException> Player::instrumentEquipped(String const& instrumentKind) {
   if (canUseTool()) {
-    auto mouthResult = mouthPosition();
+    auto mouthResult = mouth_position();
     if (!mouthResult)
       return std::unexpected(std::move(mouthResult.error()));
     auto mouth = std::move(*mouthResult);
@@ -4768,7 +4768,7 @@ std::expected<bool, StarException> Player::isOutside() {
   auto underground = std::move(*undergroundResult);
   if (underground)
     return false;
-  auto mouthResult = mouthPosition();
+  auto mouthResult = mouth_position();
   if (!mouthResult)
     return std::unexpected(std::move(mouthResult.error()));
   auto mouth = std::move(*mouthResult);

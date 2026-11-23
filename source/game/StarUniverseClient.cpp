@@ -789,7 +789,7 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
       }
       printout = "Invited " + printout;
     }
-    m_pendingMessages.emplace_back(MessageContext::CommandResult, 0, "", printout);
+    m_pending_messages.emplace_back(MessageContext{MessageContext::CommandResult}, 0, "", printout);
   }
   auto contextUpdateResult = m_clientContext->write_update();
   if (!contextUpdateResult)
@@ -1088,17 +1088,17 @@ bool UniverseClient::flying() const {
   return false;
 }
 
-std::expected<void, StarException> UniverseClient::sendChat(String const& text, ChatSendMode sendMode, std::optional<bool> speak, std::optional<JsonObject> data) {
-  auto commandResult = text.starts_with("/");
-  if (!commandResult)
-    return std::unexpected(std::move(commandResult.error()));
-  auto command = std::move(*commandResult);
+std::expected<void, StarException> UniverseClient::send_chat(String const& text, ChatSendMode send_mode, std::optional<bool> speak, std::optional<JsonObject> data) {
+  auto command_result = text.starts_with("/");
+  if (!command_result)
+    return std::unexpected(std::move(command_result.error()));
+  auto command = std::move(*command_result);
   if (speak.value_or(!command)) {
-    auto operation23 = m_mainPlayer->addChatMessage(text);
+    auto operation23 = m_mainPlayer->add_chat_message(text);
     if (!operation23)
       return std::unexpected(std::move(operation23.error()));
   }
-  auto packet = std::make_shared<ChatSendPacket>(text, sendMode);
+  auto packet = std::make_shared<ChatSendPacket>(text, send_mode);
   if (data)
     packet->data = std::move(*data);
   if (!m_connection)
@@ -1106,7 +1106,7 @@ std::expected<void, StarException> UniverseClient::sendChat(String const& text, 
   return m_connection->pushSingle(std::move(packet));
 }
 
-List<ChatReceivedMessage> UniverseClient::pullChatMessages() { return std::exchange(m_pendingMessages, {}); }
+List<ChatReceivedMessage> UniverseClient::pull_chat_messages() { return std::exchange(m_pending_messages, {}); }
 
 std::uint16_t UniverseClient::players() {
   return m_serverInfo.transform([](auto const& info) { return info.players; }).value_or(1);
@@ -1646,7 +1646,7 @@ std::expected<void, StarException> UniverseClient::handlePackets(List<std::share
         auto method = std::move(*methodResult);
         if (!std::holds_alternative<LuaNilType>(method)) {
           if (!packetJson) {
-            auto jsonResult = packet->writeJson();
+            auto jsonResult = packet->write_json();
             if (!jsonResult)
               return std::unexpected(std::move(jsonResult.error()));
             auto json = std::move(*jsonResult);
@@ -1728,7 +1728,7 @@ std::expected<void, StarException> UniverseClient::handlePackets(List<std::share
         m_mainPlayer->setAdmin(m_clientContext->isAdmin());
         m_mainPlayer->setTeam(m_clientContext->team());
       } else if (auto chat = as<ChatReceivePacket>(packet)) {
-        m_pendingMessages.push_back(chat->receivedMessage);
+        m_pending_messages.push_back(std::move(chat->received_message));
       } else if (auto time = as<UniverseTimeUpdatePacket>(packet)) {
         m_universeClock->set_time(time->universeTime);
       } else if (auto disconnect = as<ServerDisconnectPacket>(packet)) {

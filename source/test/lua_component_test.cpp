@@ -1932,9 +1932,9 @@ const GameTestRegistration fixedEnumJsonBoundaries("GameEnumNames", "ChatAndBeha
   auto message = ChatReceivedMessage::create(JsonObject{{"context", JsonObject{{"mode", "rAdIoMeSsAgE"}}}});
   ASSERT_TRUE(message);
   EXPECT_EQ(message->context.mode, MessageContext::RadioMessage);
-  EXPECT_TRUE(message->context.channelName.empty());
-  EXPECT_EQ(message->fromConnection, 0u);
-  auto encoded = message->toJson();
+  EXPECT_TRUE(message->context.channel_name.empty());
+  EXPECT_EQ(message->from_connection, 0u);
+  auto encoded = message->to_json();
   ASSERT_TRUE(encoded);
   auto context = encoded->get("context");
   ASSERT_TRUE(context);
@@ -1947,7 +1947,7 @@ const GameTestRegistration fixedEnumJsonBoundaries("GameEnumNames", "ChatAndBeha
   }
   EXPECT_FALSE(ChatReceivedMessage::create(JsonObject{{"context", JsonObject{}}}));
   message->context.mode = static_cast<MessageContext::Mode>(255);
-  EXPECT_FALSE(message->toJson());
+  EXPECT_FALSE(message->to_json());
 
   auto parameter = json_to_node_parameter(JsonObject{{"type", "nUmBeR"}});
   ASSERT_TRUE(parameter);

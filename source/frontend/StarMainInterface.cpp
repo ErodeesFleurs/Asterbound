@@ -634,7 +634,7 @@ std::expected<void, StarException> MainInterface::initWorldOverlays() {
   auto bubbles = ChatBubbleManager::create(context());
   if (!bubbles)
     return std::unexpected(std::move(bubbles.error()));
-  m_chatBubbleManager = std::move(*bubbles);
+  m_chat_bubble_manager = std::move(*bubbles);
   return {};
 }
 
@@ -781,7 +781,7 @@ std::expected<void, StarException> MainInterface::synchronizeUiSession() {
   auto celestial = LuaBindings::make_celestial_callbacks(context().root(), *m_client);
   if (!celestial) return std::unexpected(std::move(celestial.error()));
   m_uiCapabilities.set("celestial", std::move(*celestial));
-  auto chat = LuaBindings::makeChatCallbacks(*this, *m_client);
+  auto chat = LuaBindings::make_chat_callbacks(*this, *m_client);
   if (!chat) return std::unexpected(std::move(chat.error()));
   m_uiCapabilities.set("chat", std::move(*chat));
   auto interfaceCallbacks = LuaBindings::makeInterfaceCallbacks(*this);
@@ -931,20 +931,20 @@ std::expected<void, StarException> MainInterface::sendPaneEvent(String const& id
   return {};
 }
 
-std::expected<void, StarException> MainInterface::addChatMessages(List<ChatReceivedMessage> const& messages, bool showPane) {
+std::expected<void, StarException> MainInterface::add_chat_messages(List<ChatReceivedMessage> const& messages, bool show_pane) {
   if (messages.empty()) return {};
   JsonArray payload;
   payload.reserve(messages.size());
   for (auto const& message : messages) {
-    auto logged = message.fromNick.empty()
+    auto logged = message.from_nick.empty()
       ? context().root().logger().info("Chat: {}", message.text)
-      : context().root().logger().info("Chat: <{}> {}", message.fromNick, message.text);
+      : context().root().logger().info("Chat: <{}> {}", message.from_nick, message.text);
     if (!logged) return std::unexpected(std::move(logged.error()));
-    auto json = message.toJson();
+    auto json = message.to_json();
     if (!json) return std::unexpected(std::move(json.error()));
     payload.push_back(std::move(*json));
   }
-  return sendPaneEvent("chat", "messages", JsonObject{{"messages", std::move(payload)}, {"showPane", showPane}});
+  return sendPaneEvent("chat", "messages", JsonObject{{"messages", std::move(payload)}, {"showPane", show_pane}});
 }
 
 MainInterface::~MainInterface() {
@@ -1267,7 +1267,7 @@ std::expected<bool, StarException> MainInterface::handleInputEvent(InputEvent co
               auto results = executeClientCommand(m_lastCommand);
               if (!results) return std::unexpected(std::move(results.error()));
               for (auto const& result : *results) {
-                if (auto added = addChatMessages({{{MessageContext::CommandResult}, server_connection_id, "", result}}, true); !added)
+                if (auto added = add_chat_messages({{{MessageContext::CommandResult}, server_connection_id, "", result}}, true); !added)
                   return std::unexpected(std::move(added.error()));
               }
               return {};
@@ -1616,14 +1616,14 @@ std::expected<void, StarException> MainInterface::update(float dt) {
   }
 
 
-  auto chatAdded = addChatMessages(m_client->pullChatMessages(), true);
-  if (!chatAdded)
-    return std::unexpected(std::move(chatAdded.error()));
+  auto chat_added = add_chat_messages(m_client->pull_chat_messages(), true);
+  if (!chat_added)
+    return std::unexpected(std::move(chat_added.error()));
   auto commandResults = m_clientCommandProcessor->updatePromises();
   if (!commandResults)
     return std::unexpected(std::move(commandResults.error()));
   for (auto const& result : *commandResults) {
-    auto added = addChatMessages({{{MessageContext::CommandResult}, server_connection_id, "", result}}, true);
+    auto added = add_chat_messages({{{MessageContext::CommandResult}, server_connection_id, "", result}}, true);
     if (!added)
       return std::unexpected(std::move(added.error()));
   }
@@ -1758,26 +1758,26 @@ std::expected<void, StarException> MainInterface::update(float dt) {
   if (!indicatorsUpdated)
     return std::unexpected(std::move(indicatorsUpdated.error()));
 
-  auto cameraSet = m_chatBubbleManager->setCamera(m_worldPainter.get().camera());
-  if (!cameraSet)
-    return std::unexpected(std::move(cameraSet.error()));
-  if (auto worldClient = m_client->worldClient()) {
-    auto chatActions = worldClient->pullPendingChatActions();
-    if (!chatActions)
-      return std::unexpected(std::move(chatActions.error()));
+  auto camera_set = m_chat_bubble_manager->set_camera(m_worldPainter.get().camera());
+  if (!camera_set)
+    return std::unexpected(std::move(camera_set.error()));
+  if (auto world_client = m_client->worldClient()) {
+    auto chat_actions = world_client->pull_pending_chat_actions();
+    if (!chat_actions)
+      return std::unexpected(std::move(chat_actions.error()));
 
-    for (auto& action : *chatActions) {
+    for (auto& action : *chat_actions) {
       if (std::holds_alternative<PortraitChatAction>(action)) {
-        PortraitChatAction& portraitAction = std::get<PortraitChatAction>(action);
+        PortraitChatAction& portrait_action = std::get<PortraitChatAction>(action);
 
         String name;
-        if (auto npc = as<Npc>(worldClient->entity(portraitAction.entity))) {
-          auto npcName = npc->name();
-          if (!npcName)
-            return std::unexpected(std::move(npcName.error()));
-          name = std::move(*npcName);
+        if (auto npc = as<Npc>(world_client->entity(portrait_action.entity))) {
+          auto npc_name = npc->name();
+          if (!npc_name)
+            return std::unexpected(std::move(npc_name.error()));
+          name = std::move(*npc_name);
         }
-        auto portrait = portraitAction.portrait.replace("<frame>", "0");
+        auto portrait = portrait_action.portrait.replace("<frame>", "0");
         if (!portrait)
           return std::unexpected(std::move(portrait.error()));
 
@@ -1785,26 +1785,26 @@ std::expected<void, StarException> MainInterface::update(float dt) {
           {MessageContext::World},
           server_connection_id,
           Text::strip_escape_codes(name),
-          Text::strip_escape_codes(portraitAction.text),
+          Text::strip_escape_codes(portrait_action.text),
           Text::strip_escape_codes(*portrait)};
-        auto added = addChatMessages({message}, false);
+        auto added = add_chat_messages({message}, false);
         if (!added)
           return std::unexpected(std::move(added.error()));
       } else if (std::holds_alternative<SayChatAction>(action)) {
-        SayChatAction& sayAction = std::get<SayChatAction>(action);
+        SayChatAction& say_action = std::get<SayChatAction>(action);
 
-        if (sayAction.config) {
-          auto message = sayAction.config.opt("message");
+        if (say_action.config) {
+          auto message = say_action.config.opt("message");
           if (!message)
             return std::unexpected(std::move(message.error()));
           if (*message) {
             auto received = ChatReceivedMessage::create(**message);
             if (!received)
               return std::unexpected(std::move(received.error()));
-            auto showPane = sayAction.config.get_bool("showPane", false);
-            if (!showPane)
-              return std::unexpected(std::move(showPane.error()));
-            auto added = addChatMessages({std::move(*received)}, *showPane);
+            auto show_pane = say_action.config.get_bool("showPane", false);
+            if (!show_pane)
+              return std::unexpected(std::move(show_pane.error()));
+            auto added = add_chat_messages({std::move(*received)}, *show_pane);
             if (!added)
               return std::unexpected(std::move(added.error()));
           }
@@ -1812,12 +1812,12 @@ std::expected<void, StarException> MainInterface::update(float dt) {
       }
     }
 
-    auto actionsAdded = m_chatBubbleManager->addChatActions(std::move(*chatActions));
-    if (!actionsAdded)
-      return std::unexpected(std::move(actionsAdded.error()));
-    auto bubblesUpdated = m_chatBubbleManager->update(dt, worldClient);
-    if (!bubblesUpdated)
-      return std::unexpected(std::move(bubblesUpdated.error()));
+    auto actions_added = m_chat_bubble_manager->add_chat_actions(std::move(*chat_actions));
+    if (!actions_added)
+      return std::unexpected(std::move(actions_added.error()));
+    auto bubbles_updated = m_chat_bubble_manager->update(dt, world_client);
+    if (!bubbles_updated)
+      return std::unexpected(std::move(bubbles_updated.error()));
   }
 
   if (auto container = m_client->worldClient()->get<ContainerEntity>(m_containerInteractor->openContainerId())) {
@@ -1857,7 +1857,7 @@ std::expected<void, StarException> MainInterface::renderInWorldElements(Presenta
     return std::unexpected(std::move(rendered.error()));
   if (auto rendered = m_nameplatePainter->render(*world, camera, presentation); !rendered)
     return std::unexpected(std::move(rendered.error()));
-  return m_chatBubbleManager->render(*world, camera, presentation);
+  return m_chat_bubble_manager->render(*world, camera, presentation);
 }
 
 std::expected<void, StarException> MainInterface::render() {

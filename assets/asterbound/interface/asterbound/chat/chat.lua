@@ -75,6 +75,16 @@ function init()
   clientStorage = client.storage("chatHistory")
   state = storage
   state.messages = state.messages or jarray()
+  -- Unversioned pane checkpoints stored the newest received message first.
+  -- Input history is separate PlayerStorage metadata and keeps its old order.
+  if not state.messageOrderVersion then
+    local messages = state.messages
+    for first = 1, #messages // 2 do
+      local last = #messages - first + 1
+      messages[first], messages[last] = messages[last], messages[first]
+    end
+    state.messageOrderVersion = 1
+  end
   state.history = state.history or clientStorage.get(jarray())
   state.tab = state.tab or 1
   state.scroll = state.scroll or 0
@@ -192,13 +202,18 @@ function decrementIndex()
 end
 
 function addMessages(messages, showPane)
-  for _, message in ipairs(messages) do
-    table.insert(state.messages, 1, message)
+  local received = state.messages
+  local size, incoming = #received, #messages
+  local limit = math.max(0, math.floor(appearance.chatHistoryLimit))
+  local append = math.min(incoming, limit)
+  local keep = math.min(size, limit - append)
+  if keep < size then
+    for i = 1, size - keep do layouts[received[i]] = nil end
+    table.move(received, size - keep + 1, size, 1)
   end
-  while #state.messages > appearance.chatHistoryLimit do
-    layouts[state.messages[#state.messages]] = nil
-    table.remove(state.messages)
-  end
+  -- Compact once per batch; an oversized batch never enters the log in full.
+  table.move(messages, incoming - append + 1, incoming, keep + 1, received)
+  for i = keep + append + 1, size do received[i] = nil end
   if showPane ~= false then wake() end
   dirty = true
   checkpoint()
@@ -210,7 +225,10 @@ end
 
 function clear(count)
   count = math.min(count or #state.messages, #state.messages)
-  for _ = 1, count do layouts[state.messages[1]] = nil; table.remove(state.messages, 1) end
+  for i = #state.messages, #state.messages - count + 1, -1 do
+    layouts[state.messages[i]] = nil
+    state.messages[i] = nil
+  end
   state.scroll = 0
   dirty = true
   checkpoint()
@@ -422,7 +440,8 @@ local function drawLog(alpha)
   local messageStyle = copy(style)
   messageStyle.color = {255, 255, 255, alpha}
   local tint = {255, 255, 255, alpha}
-  for _, message in ipairs(state.messages) do
+  for i = #state.messages, 1, -1 do
+    local message = state.messages[i]
     if filtered(message) then
       local layout = messageLayout(message)
       if y + layout.height > 0 then
