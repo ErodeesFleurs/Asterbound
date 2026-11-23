@@ -385,7 +385,7 @@ std::expected<void, StarException> ItemDrop::init(World& world, EntityId entityI
       return std::unexpected(std::move(added.error()));
     if (auto added = add("entity", LuaBindings::makeEntityCallbacks(*this)); !added)
       return std::unexpected(std::move(added.error()));
-    if (auto added = add("mcontroller", LuaBindings::makeMovementControllerCallbacks(*m_movementController)); !added)
+    if (auto added = add("mcontroller", LuaBindings::make_movement_controller_callbacks(*m_movementController)); !added)
       return std::unexpected(std::move(added.error()));
     return recover_lua_script_error(m_scriptComponent.init(world));
   }();

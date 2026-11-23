@@ -335,19 +335,19 @@ std::expected<void, StarException> TechController::tickMaster(float dt) {
       if (m_moveDown)
         flightControl[1]--;
 
-      m_movementController->get().controlFly(flightControl);
+      m_movementController->get().control_fly(flightControl);
     }
   } else {
     if (m_moveLeft != m_moveRight)
-      m_movementController->get().controlMove(m_moveLeft ? Direction::Left : Direction::Right, m_moveRun);
+      m_movementController->get().control_move(m_moveLeft ? Direction::Left : Direction::Right, m_moveRun);
 
     if (m_moveJump && !m_moveDown)
-      m_movementController->get().controlJump();
+      m_movementController->get().control_jump();
 
     if (m_movementController->get().onGround() && m_moveDown && !m_moveJump)
-      m_movementController->get().controlCrouch();
+      m_movementController->get().control_crouch();
     else if (m_moveDown)
-      m_movementController->get().controlDown();
+      m_movementController->get().control_down();
   }
 
   for (auto& module : m_techModules) {

@@ -824,9 +824,9 @@ variant.damageTeam = std::move(*result135);
     variant.selfDamagePoly = std::move(*result137);
   }
     else {
-      if (!variant.movementSettings.standingPoly)
+      if (!variant.movementSettings.standing_poly)
         return std::unexpected(MonsterException("Monster has no standing polygon"));
-      variant.selfDamagePoly = *variant.movementSettings.standingPoly;
+      variant.selfDamagePoly = *variant.movementSettings.standing_poly;
     }
 }
 

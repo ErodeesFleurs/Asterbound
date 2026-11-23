@@ -919,12 +919,12 @@ const GameTestRegistration
   actorParameterCodec("LuaComponentBindings", "ActorParametersRoundtripAndReachRealMovementControls",
                       [](GameTest& fixture) {
                         ActorMovementParameters parameters;
-                        parameters.stopOnFirstBounce = true;
-                        parameters.enableSurfaceSlopeCorrection = false;
-                        parameters.pathExploreRate = 23.5f;
-                        parameters.gravityMultiplier = 1.0f;
-                        parameters.airJumpProfile.jumpSpeed = 2.0f;
-                        parameters.airJumpProfile.jumpInitialPercentage = 1.0f;
+                        parameters.stop_on_first_bounce = true;
+                        parameters.enable_surface_slope_correction = false;
+                        parameters.path_explore_rate = 23.5f;
+                        parameters.gravity_multiplier = 1.0f;
+                        parameters.air_jump_profile.jump_speed = 2.0f;
+                        parameters.air_jump_profile.jump_initial_percentage = 1.0f;
                         auto controller = ActorMovementController::create(fixture.root(), parameters);
                         ASSERT_TRUE(controller) << controller.error().what();
                         auto storage = File::ephemeral_file(fixture.root().random());
@@ -943,9 +943,9 @@ const GameTestRegistration
                         auto decoded = component.eval<ActorMovementParameters>("return roundtripInput");
                         ASSERT_TRUE(decoded) << decoded.error().what();
                         ASSERT_TRUE(*decoded);
-                        EXPECT_EQ((**decoded).stopOnFirstBounce, parameters.stopOnFirstBounce);
-                        EXPECT_EQ((**decoded).enableSurfaceSlopeCorrection, parameters.enableSurfaceSlopeCorrection);
-                        EXPECT_EQ((**decoded).pathExploreRate, parameters.pathExploreRate);
+                        EXPECT_EQ((**decoded).stop_on_first_bounce, parameters.stop_on_first_bounce);
+                        EXPECT_EQ((**decoded).enable_surface_slope_correction, parameters.enable_surface_slope_correction);
+                        EXPECT_EQ((**decoded).path_explore_rate, parameters.path_explore_rate);
                         auto base = component.eval<Json>(R"LUA(
     local p = mcontroller.baseParameters()
     return {p.stopOnFirstBounce, p.enableSurfaceSlopeCorrection, p.pathExploreRate}
@@ -973,10 +973,10 @@ const GameTestRegistration
     end
   )LUA"));
                         ActorMovementParameters native_patch;
-                        native_patch.airJumpProfile.jumpInitialPercentage = 0.25f;
-                        (*controller)->controlParameters(native_patch);
+                        native_patch.air_jump_profile.jump_initial_percentage = 0.25f;
+                        (*controller)->control_parameters(native_patch);
                         ASSERT_TRUE(component.update<LuaValue>());
-                        ASSERT_TRUE((*controller)->tickMaster(1.0f / 60.0f));
+                        ASSERT_TRUE((*controller)->tick_master(1.0f / 60.0f));
                         // The jump uses the speed queued by Lua and the fraction
                         // queued natively; later sparse patches must retain both.
                         EXPECT_FLOAT_EQ((*controller)->yVelocity(), 3.0f);
@@ -988,7 +988,7 @@ const GameTestRegistration
                         ASSERT_TRUE(*active);
                         EXPECT_EQ(**active, (Json(JsonArray{false, true, 0})));
                         ASSERT_TRUE(component.update<LuaValue>());
-                        ASSERT_TRUE((*controller)->tickMaster(1.0f / 60.0f));
+                        ASSERT_TRUE((*controller)->tick_master(1.0f / 60.0f));
                         auto restored = component.eval<Json>(R"LUA(
     local p = mcontroller.parameters()
     return {p.stopOnFirstBounce, p.enableSurfaceSlopeCorrection, p.gravityMultiplier}

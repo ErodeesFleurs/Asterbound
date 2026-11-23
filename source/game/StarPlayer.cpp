@@ -350,8 +350,8 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
   if (!movementParametersResult)
     return std::unexpected(std::move(movementParametersResult.error()));
   auto movementParameters = std::move(*movementParametersResult);
-  if (!movementParameters.physicsEffectCategories)
-    movementParameters.physicsEffectCategories = StringSet({"player"});
+  if (!movementParameters.physics_effect_categories)
+    movementParameters.physics_effect_categories = StringSet({"player"});
   auto movementControllerResult = ActorMovementController::create(root(), movementParameters);
   if (!movementControllerResult)
     return std::unexpected(std::move(movementControllerResult.error()));
@@ -719,7 +719,7 @@ std::expected<void, StarException> Player::net_load(ByteArray const& net_store, 
   if (!movementParametersResult)
     return std::unexpected(std::move(movementParametersResult.error()));
   auto movementParameters = std::move(*movementParametersResult);
-  if (auto result = m_movementController->resetBaseParameters(movementParameters); !result)
+  if (auto result = m_movementController->reset_base_parameters(movementParameters); !result)
     return std::unexpected(std::move(result.error()));
   m_deathParticleBurst.set(humanoid()->defaultDeathParticles());
   return {};
@@ -848,7 +848,7 @@ std::expected<void, StarException> Player::diskLoad(Json const& diskStore) {
   if (!movementResult)
     return std::unexpected(std::move(movementResult.error()));
   auto movement = std::move(*movementResult);
-  if (auto result = m_movementController->loadState(movement); !result)
+  if (auto result = m_movementController->load_state(movement); !result)
     return std::unexpected(std::move(result.error()));
   auto techControllerResult = diskStore.get("techController");
   if (!techControllerResult)
@@ -913,7 +913,7 @@ std::expected<void, StarException> Player::diskLoad(Json const& diskStore) {
   if (!movementParametersResult)
     return std::unexpected(std::move(movementParametersResult.error()));
   auto movementParameters = std::move(*movementParametersResult);
-  if (auto result = m_movementController->resetBaseParameters(movementParameters); !result)
+  if (auto result = m_movementController->reset_base_parameters(movementParameters); !result)
     return std::unexpected(std::move(result.error()));
   m_effectsAnimator->setGlobalTag("effectDirectives", speciesDef->effectDirectives());
   m_deathParticleBurst.set(humanoid()->defaultDeathParticles());
@@ -1009,7 +1009,7 @@ std::expected<void, StarException> Player::init(World& world, EntityId entityId,
   m_presentationBars.clear();
   m_controlMovementState.reset();
   m_movementAnimationState.reset();
-  m_movementController->setNetworkMovingDirection({});
+  m_movementController->set_network_moving_direction({});
   if (auto result = Entity::init(world, entityId, mode); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = m_tools->init(*this); !result)
@@ -1164,7 +1164,7 @@ std::expected<void, StarException> Player::uninit() {
   }
   m_controlMovementState.reset();
   m_movementAnimationState.reset();
-  m_movementController->setNetworkMovingDirection({});
+  m_movementController->set_network_moving_direction({});
   remember(Entity::uninit());
   if (error)
     return std::unexpected(std::move(*error));
@@ -1213,7 +1213,7 @@ std::expected<List<Drawable>, StarException> Player::drawables(float interpolati
           auto metadata = std::move(*metadataResult);
           if (auto result = drawable.imagePart().addDirectivesGroup(*metadata, directives, true); !result)
             return std::unexpected(std::move(result.error()));
-          if (auto anchor = as<LoungeAnchor>(m_movementController->entityAnchor())) {
+          if (auto anchor = as<LoungeAnchor>(m_movementController->entity_anchor())) {
             if (auto const& extra = anchor->directives) {
               if (auto result = drawable.imagePart().addDirectives(*metadata, *extra, true); !result)
                 return std::unexpected(std::move(result.error()));
@@ -1487,8 +1487,8 @@ std::expected<void, StarException> Player::destroy(std::optional<std::reference_
 }
 
 std::optional<EntityAnchorState> Player::loungingIn() const {
-  if (is<LoungeAnchor>(m_movementController->entityAnchor()))
-    return m_movementController->anchorState();
+  if (is<LoungeAnchor>(m_movementController->entity_anchor()))
+    return m_movementController->anchor_state();
   return {};
 }
 
@@ -1515,7 +1515,7 @@ std::expected<bool, StarException> Player::lounge(EntityId loungeableEntityId, s
   if (!anchor)
     return false;
   m_state = State::Lounge;
-  if (auto result = m_movementController->setAnchorState({loungeableEntityId, anchorIndex}); !result)
+  if (auto result = m_movementController->set_anchor_state({loungeableEntityId, anchorIndex}); !result)
     return std::unexpected(std::move(result.error()));
   return true;
 }
@@ -1523,7 +1523,7 @@ std::expected<bool, StarException> Player::lounge(EntityId loungeableEntityId, s
 std::expected<void, StarException> Player::stopLounging() {
   if (loungingIn()) {
     {
-      if (auto result = m_movementController->resetAnchorState(); !result)
+      if (auto result = m_movementController->reset_anchor_state(); !result)
         return std::unexpected(std::move(result.error()));
     }
     m_state = State::Idle;
@@ -1646,9 +1646,9 @@ void Player::setShifting(bool shifting) {
 }
 
 std::expected<void, StarException> Player::special(int specialKey) {
-  auto loungeAnchor = as<LoungeAnchor>(m_movementController->entityAnchor());
+  auto loungeAnchor = as<LoungeAnchor>(m_movementController->entity_anchor());
   if (loungeAnchor && loungeAnchor->controllable) {
-    auto anchorState = m_movementController->anchorState();
+    auto anchorState = m_movementController->anchor_state();
     if (!anchorState)
       return std::unexpected(PlayerException("Player lounge anchor has no anchor state"));
     {
@@ -1946,7 +1946,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
         return std::unexpected(std::move(blinkIntervalResult.error()));
       auto blinkInterval = std::move(*blinkIntervalResult);
       m_blinkCooldownTimer = GameTimer(blinkInterval);
-      auto loungeAnchor = as<LoungeAnchor>(m_movementController->entityAnchor());
+      auto loungeAnchor = as<LoungeAnchor>(m_movementController->entity_anchor());
       if (m_emoteState == HumanoidEmote::Idle && (!loungeAnchor || !loungeAnchor->emote))
         addEmote(HumanoidEmote::Blink);
     }
@@ -1954,7 +1954,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
     m_lastDamagedOtherTimer += dt;
 
     if (m_movementController->zeroG())
-      m_movementController->controlParameters(m_zeroGMovementParameters);
+      m_movementController->control_parameters(m_zeroGMovementParameters);
 
     if (isTeleporting()) {
       m_teleportTimer -= dt;
@@ -2003,12 +2003,12 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
       auto conflictingAnchor = std::move(*conflictingAnchorResult);
       if (conflictingAnchor)
         {
-          if (auto result = m_movementController->resetAnchorState(); !result)
+          if (auto result = m_movementController->reset_anchor_state(); !result)
             return std::unexpected(std::move(result.error()));
         }
 
       if (m_state == State::Lounge) {
-        if (auto loungeAnchor = as<LoungeAnchor>(m_movementController->entityAnchor())) {
+        if (auto loungeAnchor = as<LoungeAnchor>(m_movementController->entity_anchor())) {
           {
             if (auto result = m_statusController->setPersistentEffects("lounging", loungeAnchor->statusEffects); !result)
               return std::unexpected(std::move(result.error()));
@@ -2043,13 +2043,13 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
         } else {
           m_state = State::Idle;
           {
-            if (auto result = m_movementController->resetAnchorState(); !result)
+            if (auto result = m_movementController->reset_anchor_state(); !result)
               return std::unexpected(std::move(result.error()));
           }
         }
       } else {
         {
-          if (auto result = m_movementController->resetAnchorState(); !result)
+          if (auto result = m_movementController->reset_anchor_state(); !result)
             return std::unexpected(std::move(result.error()));
         }
         {
@@ -2071,7 +2071,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
 
       auto aimRelative = currentWorld.geometry().diff(m_aimPosition, position()); // dumb, but due to how things are ordered
       {
-        if (auto result = m_movementController->tickMaster(dt); !result)
+        if (auto result = m_movementController->tick_master(dt); !result)
           return std::unexpected(std::move(result.error()));
       }
       m_aimPosition = position() + aimRelative;                               // it's gonna have to be like this for now
@@ -2087,11 +2087,11 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
       }
 
       if (edgeTriggeredUse) {
-        auto anchor = as<LoungeAnchor>(m_movementController->entityAnchor());
+        auto anchor = as<LoungeAnchor>(m_movementController->entity_anchor());
         bool useTool = canUseTool();
         if (anchor && (!useTool || anchor->controllable))
           {
-            if (auto result = m_movementController->resetAnchorState(); !result)
+            if (auto result = m_movementController->reset_anchor_state(); !result)
               return std::unexpected(std::move(result.error()));
           }
         else if (useTool) {
@@ -2224,7 +2224,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
         return std::unexpected(std::move(result.error()));
     }
     {
-      if (auto result = m_movementController->tickSlave(dt); !result)
+      if (auto result = m_movementController->tick_slave(dt); !result)
         return std::unexpected(std::move(result.error()));
     }
     {
@@ -2243,7 +2243,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
 
   bool suppressedItems = !canUseTool();
 
-  auto loungeAnchor = as<LoungeAnchor>(m_movementController->entityAnchor());
+  auto loungeAnchor = as<LoungeAnchor>(m_movementController->entity_anchor());
   if (loungeAnchor && loungeAnchor->dance) {
     if (auto result = humanoid()->setDance(*loungeAnchor->dance); !result)
       return std::unexpected(std::move(result.error()));
@@ -2272,17 +2272,17 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
       return std::unexpected(std::move(result.error()));
   }
 
-  Direction facingDirection = m_movementController->facingDirection();
+  Direction facingDirection = m_movementController->facing_direction();
 
   auto overrideFacingDirectionResult = m_tools->setupHumanoidHandItems(*humanoid(), position(), m_aimPosition);
   if (!overrideFacingDirectionResult)
     return std::unexpected(std::move(overrideFacingDirectionResult.error()));
   auto overrideFacingDirection = std::move(*overrideFacingDirectionResult);
   if (!loungingIn() && overrideFacingDirection)
-    m_movementController->controlFace(facingDirection = *overrideFacingDirection);
+    m_movementController->control_face(facingDirection = *overrideFacingDirection);
 
   humanoid()->setFacingDirection(facingDirection);
-  Direction movingDirection = m_movementController->movingDirection();
+  Direction movingDirection = m_movementController->moving_direction();
   if (m_movementAnimationState) {
     auto tangent = Vec2F::with_angle(m_movementController->rotation());
     auto velocity = m_movementController->velocity();
@@ -2290,7 +2290,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
     movingDirection = tangentVelocity == 0.f ? facingDirection : tangentVelocity < 0.f ? Direction::Left : Direction::Right;
   }
   if (isMaster())
-    m_movementController->setNetworkMovingDirection(m_movementAnimationState ? std::optional(movingDirection) : std::nullopt);
+    m_movementController->set_network_moving_direction(m_movementAnimationState ? std::optional(movingDirection) : std::nullopt);
   if (auto result = humanoid()->setMovingBackwards(facingDirection != movingDirection); !result)
     return std::unexpected(std::move(result.error()));
 
@@ -2611,7 +2611,7 @@ std::expected<void, StarException> Player::collectRenderEvents(RenderCallback& c
 std::expected<void, StarException> Player::render(RenderCallback& renderCallback) {
   if (invisible())
     return {};
-  auto loungeAnchor = as<LoungeAnchor>(m_movementController->entityAnchor());
+  auto loungeAnchor = as<LoungeAnchor>(m_movementController->entity_anchor());
   EntityRenderLayer layer = RenderLayerPlayer;
   auto overrideLayerResult = getSecretProperty("overrideRenderLayer");
   if (!overrideLayerResult)
@@ -2922,7 +2922,7 @@ std::expected<void, StarException> Player::refreshHumanoid() const {
       if (!parametersResult)
         return std::unexpected(std::move(parametersResult.error()));
       auto parameters = std::move(*parametersResult);
-      return m_movementController->resetBaseParameters(parameters);
+      return m_movementController->reset_base_parameters(parameters);
     }
     return {};
   }();
@@ -3228,7 +3228,7 @@ std::expected<void, StarException> Player::playEmote(HumanoidEmote emote) {
 bool Player::canUseTool() const {
   bool canUse = !isDead() && !isTeleporting() && !m_techController->toolUsageSuppressed() && !m_statusController->toolUsageSuppressed();
   if (canUse) {
-    if (auto loungeAnchor = as<LoungeAnchor>(m_movementController->entityAnchor()))
+    if (auto loungeAnchor = as<LoungeAnchor>(m_movementController->entity_anchor()))
       if (loungeAnchor->suppressTools.value_or(loungeAnchor->controllable))
         return false;
   }
@@ -3429,11 +3429,11 @@ void Player::setDescription(String const& description) {
 }
 
 Direction Player::walkingDirection() const {
-  return m_movementController->movingDirection();
+  return m_movementController->moving_direction();
 }
 
 Direction Player::facingDirection() const {
-  return m_movementController->facingDirection();
+  return m_movementController->facing_direction();
 }
 
 std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Player::write_net_state(std::uint64_t fromVersion, NetCompatibilityRules rules) {
@@ -3471,10 +3471,10 @@ std::expected<void, StarException> Player::processControls() {
 
   if (useMoveVector) {
     m_pendingMoves.insert(m_moveVector.x() < 0.0f ? MoveControlType::Left : MoveControlType::Right);
-    m_movementController->setMoveSpeedMultiplier(std::clamp(std::abs(m_moveVector.x()), 0.0f, 1.0f));
+    m_movementController->set_move_speed_multiplier(std::clamp(std::abs(m_moveVector.x()), 0.0f, 1.0f));
   }
   else
-    m_movementController->setMoveSpeedMultiplier(1.0f);
+    m_movementController->set_move_speed_multiplier(1.0f);
 
   if (auto fireableMain = as<FireableItem>(m_tools->primaryHandItem())) {
     if (fireableMain->inUse() && fireableMain->walkWhileFiring())
@@ -3498,9 +3498,9 @@ std::expected<void, StarException> Player::processControls() {
       move = false;
   }
 
-  auto loungeAnchor = as<LoungeAnchor>(m_movementController->entityAnchor());
+  auto loungeAnchor = as<LoungeAnchor>(m_movementController->entity_anchor());
   if (loungeAnchor && loungeAnchor->controllable) {
-    auto anchorState = m_movementController->anchorState();
+    auto anchorState = m_movementController->anchor_state();
     if (!anchorState)
       return std::unexpected(PlayerException("Player lounge anchor has no anchor state"));
     if (auto loungeableEntity = currentWorld.get<LoungeableEntity>(anchorState->entityId)) {
@@ -3614,7 +3614,7 @@ std::expected<void, StarException> Player::controlMovementState(std::optional<St
 void Player::updateMovementAnimationState() {
   m_movementAnimationState = isMaster() ? m_controlMovementState : std::nullopt;
   if (isDead() || isTeleporting() || m_state == State::Lounge
-      || m_movementController->entityAnchor() || m_techController->parentState())
+      || m_movementController->entity_anchor() || m_techController->parentState())
     m_movementAnimationState.reset();
 }
 
@@ -3634,7 +3634,7 @@ std::expected<void, StarException> Player::processStateChanges(float dt) {
         m_state = State::Swim;
       else if (m_state != State::Lounge)
         m_state = State::SwimIdle;
-    } else if (m_movementController->groundMovement()) {
+    } else if (m_movementController->ground_movement()) {
       if (m_movementController->running()) {
         m_state = State::Run;
       } else if (m_movementController->walking()) {
@@ -3645,7 +3645,7 @@ std::expected<void, StarException> Player::processStateChanges(float dt) {
         if (m_state != State::Lounge)
           m_state = State::Idle;
       }
-    } else if (m_movementController->liquidMovement()) {
+    } else if (m_movementController->liquid_movement()) {
       if (m_movementController->jumping()) {
         m_state = State::Swim;
       } else {
@@ -3760,7 +3760,7 @@ std::expected<void, StarException> Player::processStateChanges(float dt) {
     if (auto result = humanoid()->setState(*m_movementAnimationState); !result)
       return std::unexpected(std::move(result.error()));
   } else {
-    auto loungeAnchor = as<LoungeAnchor>(m_movementController->entityAnchor());
+    auto loungeAnchor = as<LoungeAnchor>(m_movementController->entity_anchor());
     if (m_state == State::Idle) {
       {
         if (auto result = humanoid()->setState(Humanoid::Idle); !result)
@@ -3931,9 +3931,9 @@ std::expected<void, StarException> Player::setNetStates() {
   // Teleport/lounge/death can start after update (for example in postUpdate).
   // They must not be hidden by a presentation request already resolved above.
   if (isDead() || isTeleporting() || m_state == State::Lounge
-      || m_movementController->entityAnchor() || m_techController->parentState()) {
+      || m_movementController->entity_anchor() || m_techController->parentState()) {
     m_movementAnimationState.reset();
-    m_movementController->setNetworkMovingDirection({});
+    m_movementController->set_network_moving_direction({});
   }
   State state = m_state;
   if (m_movementAnimationState) {
@@ -4646,7 +4646,7 @@ std::expected<Json, StarException> Player::diskStore() {
   if (!inventoryResult)
     return std::unexpected(std::move(inventoryResult.error()));
   auto inventory = std::move(*inventoryResult);
-  auto movementResult = m_movementController->storeState();
+  auto movementResult = m_movementController->store_state();
   if (!movementResult)
     return std::unexpected(std::move(movementResult.error()));
   auto movement = std::move(*movementResult);
@@ -5050,9 +5050,9 @@ std::expected<EntityHighlightEffect, StarException> Player::inspectionHighlight(
 
 std::expected<Vec2F, StarException> Player::cameraPosition() {
   if (auto currentWorld = maybeWorld()) {
-    if (auto anchor = as<LoungeAnchor>(m_movementController->entityAnchor())) {
+    if (auto anchor = as<LoungeAnchor>(m_movementController->entity_anchor())) {
       if (anchor->cameraFocus) {
-        auto state = m_movementController->anchorState();
+        auto state = m_movementController->anchor_state();
         if (!state)
           return std::unexpected(PlayerException("Player lounge anchor has no anchor state"));
         if (auto entity = currentWorld->get().entity(state->entityId))
@@ -5157,7 +5157,7 @@ std::expected<void, StarException> Player::refreshHumanoidParameters() {
   if (!parametersResult)
     return std::unexpected(std::move(parametersResult.error()));
   auto parameters = std::move(*parametersResult);
-  if (auto result = m_movementController->resetBaseParameters(parameters); !result)
+  if (auto result = m_movementController->reset_base_parameters(parameters); !result)
     return std::unexpected(std::move(result.error()));
   if (inWorld()) {
     if (isMaster()) {

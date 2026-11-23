@@ -11,5 +11,5 @@ class MovementController;
 export module star.movement_controller_lua_bindings;
 
 export namespace Star::LuaBindings {
-  [[nodiscard]] std::expected<LuaCallbacks, StarException> makeMovementControllerCallbacks(MovementController& movementController);
+  [[nodiscard]] std::expected<LuaCallbacks, StarException> make_movement_controller_callbacks(MovementController& movement_controller);
 }

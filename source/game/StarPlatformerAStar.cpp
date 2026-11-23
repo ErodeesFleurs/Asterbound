@@ -229,8 +229,8 @@ std::expected<std::optional<bool>, StarException> PathFinder::explore(std::optio
     if (!collision_scan)
       return std::unexpected(std::move(collision_scan.error()));
 
-    std::optional<float> walk_speed = m_movement_params.walkSpeed;
-    std::optional<float> run_speed = m_movement_params.runSpeed;
+    std::optional<float> walk_speed = m_movement_params.walk_speed;
+    std::optional<float> run_speed = m_movement_params.run_speed;
 
     // Try walking up the ramp first, preserving the original predicate order.
     if (slope_up) {
@@ -272,7 +272,7 @@ std::expected<std::optional<bool>, StarException> PathFinder::explore(std::optio
       }
     }
     if (*forward_valid) {
-      if (!m_movement_params.standingPoly)
+      if (!m_movement_params.standing_poly)
         return std::unexpected(MovementControllerException("PathFinder requires standingPoly for walking"));
       bounds = standing_bounds();
       float back = direction > 0 ? bounds.x_min() : bounds.x_max();
@@ -303,7 +303,7 @@ std::expected<std::optional<bool>, StarException> PathFinder::explore(std::optio
   }
 
   std::expected<void, StarException> PathFinder::get_jumping_neighbors(Node const& node, List<Edge>& neighbors) const {
-    if (auto jump_speed = m_movement_params.airJumpProfile.jumpSpeed) {
+    if (auto jump_speed = m_movement_params.air_jump_profile.jump_speed) {
       float jump_cost = m_search_params.jump_cost.value_or(default_jump_cost);
       auto liquid = in_liquid(node.position);
       if (!liquid) return std::unexpected(std::move(liquid.error()));
@@ -381,8 +381,8 @@ std::expected<std::optional<bool>, StarException> PathFinder::explore(std::optio
   std::expected<void, StarException>
   PathFinder::for_each_arc_velocity(float y_velocity,
                                     std::function<std::expected<void, StarException>(Vec2F const&)> const& func) const {
-    auto walk_speed = m_movement_params.walkSpeed;
-    auto run_speed = m_movement_params.runSpeed;
+    auto walk_speed = m_movement_params.walk_speed;
+    auto run_speed = m_movement_params.run_speed;
     auto vertical = func(Vec2F(0, y_velocity));
     if (!vertical) return std::unexpected(std::move(vertical.error()));
     if (m_search_params.enable_walk_speed_jumps && walk_speed) {
@@ -416,9 +416,9 @@ std::expected<std::optional<bool>, StarException> PathFinder::explore(std::optio
     auto world_gravity = m_world.get().gravity(pos);
     if (!world_gravity)
       return std::unexpected(std::move(world_gravity.error()));
-    float gravity = *world_gravity * parameters.gravityMultiplier.value_or(1.0f);
-    if (!parameters.gravityEnabled.value_or(true) || parameters.mass.value_or(0.0f) == 0.0f) gravity = 0.0f;
-    float buoyancy = parameters.airBuoyancy.value_or(0.0f);
+    float gravity = *world_gravity * parameters.gravity_multiplier.value_or(1.0f);
+    if (!parameters.gravity_enabled.value_or(true) || parameters.mass.value_or(0.0f) == 0.0f) gravity = 0.0f;
+    float buoyancy = parameters.air_buoyancy.value_or(0.0f);
     return Vec2F(0, -gravity * (1.0f - buoyancy));
   }
 
@@ -523,8 +523,8 @@ std::expected<std::optional<bool>, StarException> PathFinder::explore(std::optio
       if (jumping && velocity[1] <= 0.0f) {
         // We've reached a peak in the jump and the entity can now choose to
         // change direction.
-        std::optional<float> run_speed = m_movement_params.runSpeed;
-        std::optional<float> walk_speed = m_movement_params.walkSpeed;
+        std::optional<float> run_speed = m_movement_params.run_speed;
+        std::optional<float> walk_speed = m_movement_params.walk_speed;
         float crawl_multiplier = m_search_params.jump_drop_x_multiplier.value_or(default_jump_drop_x_multiplier);
 
         if ((*node.velocity)[0] != 0.0f || m_search_params.enable_vertical_jump_air_control) {
@@ -612,7 +612,7 @@ std::expected<std::optional<bool>, StarException> PathFinder::explore(std::optio
     if (!bounds) return std::unexpected(std::move(bounds.error()));
     auto liquid = m_world.get().liquidLevel(*bounds);
     if (!liquid) return std::unexpected(std::move(liquid.error()));
-    return liquid->level >= m_movement_params.minimumLiquidPercentage.value_or(0.5f);
+    return liquid->level >= m_movement_params.minimum_liquid_percentage.value_or(0.5f);
   }
 
   std::expected<RectF, StarException> PathFinder::bound_box(Vec2F pos, BoundBoxKind bound_kind) const {
@@ -624,7 +624,7 @@ std::expected<std::optional<bool>, StarException> PathFinder::explore(std::optio
     else if (m_search_params.bound_box)
       bounds = *m_search_params.bound_box;
     else {
-      if (!m_movement_params.standingPoly)
+      if (!m_movement_params.standing_poly)
         return std::unexpected(MovementControllerException("PathFinder requires standingPoly or boundBox"));
       bounds = standing_bounds();
     }
@@ -642,7 +642,7 @@ std::expected<std::optional<bool>, StarException> PathFinder::explore(std::optio
 
   RectF PathFinder::standing_bounds() const {
     if (!m_standing_bounds)
-      m_standing_bounds = m_movement_params.standingPoly->bounding_box();
+      m_standing_bounds = m_movement_params.standing_poly->bounding_box();
     return *m_standing_bounds;
   }
 
@@ -652,7 +652,7 @@ std::expected<std::optional<bool>, StarException> PathFinder::explore(std::optio
     if (m_search_params.bound_box)
       bounds = *m_search_params.bound_box;
     else {
-      if (!m_movement_params.standingPoly)
+      if (!m_movement_params.standing_poly)
         return std::unexpected(MovementControllerException("PathFinder requires standingPoly or boundBox"));
       bounds = standing_bounds();
     }

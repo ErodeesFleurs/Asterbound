@@ -73,20 +73,20 @@ template <platform_world_callback Callback> void with_platform_world(GameTest& f
   for (int y = 1; y <= 5; ++y)
     ASSERT_TRUE(place(origin + Vec2I(2, y)));
 
-  auto defaults = ActorMovementParameters::sensibleDefaults(root);
+  auto defaults = ActorMovementParameters::sensible_defaults(root);
   ASSERT_TRUE(defaults) << defaults.error().what();
   auto parameters = std::move(*defaults);
-  parameters.standingPoly = PolyF(RectF(-0.25f, -0.25f, 0.25f, 0.25f));
-  parameters.crouchingPoly = parameters.standingPoly;
+  parameters.standing_poly = PolyF(RectF(-0.25f, -0.25f, 0.25f, 0.25f));
+  parameters.crouching_poly = parameters.standing_poly;
   parameters.mass = 1.0f;
-  parameters.airForce = 128.0f;
-  parameters.flySpeed = 8.0f;
-  parameters.runSpeed = 8.0f;
-  parameters.walkSpeed = 4.0f;
-  parameters.gravityMultiplier = 1.0f;
-  parameters.airBuoyancy = 0.0f;
-  parameters.liquidBuoyancy = 0.0f;
-  parameters.pathExploreRate = 1000.0f;
+  parameters.air_force = 128.0f;
+  parameters.fly_speed = 8.0f;
+  parameters.run_speed = 8.0f;
+  parameters.walk_speed = 4.0f;
+  parameters.gravity_multiplier = 1.0f;
+  parameters.air_buoyancy = 0.0f;
+  parameters.liquid_buoyancy = 0.0f;
+  parameters.path_explore_rate = 1000.0f;
   callback(*world, Vec2F(origin), parameters);
 }
 
@@ -213,10 +213,10 @@ const GameTestRegistration platform_simulated_landings(
   "PlatformerAStar", "FallingAndPlatformDropProduceArcLandTransitions", [](GameTest& fixture) {
     with_platform_world(fixture, [&](WorldServer& world, Vec2F origin, ActorMovementParameters parameters) {
       ASSERT_TRUE(place_ledge(fixture.root(), world, origin, TileCollisionOverride::Platform));
-      parameters.gravityEnabled = true;
-      parameters.airJumpProfile.jumpSpeed.reset();
-      parameters.walkSpeed.reset();
-      parameters.runSpeed.reset();
+      parameters.gravity_enabled = true;
+      parameters.air_jump_profile.jump_speed.reset();
+      parameters.walk_speed.reset();
+      parameters.run_speed.reset();
       auto search_parameters = explicit_bounds();
       search_parameters.drop_cost = 0.25f;
       // The free fall and platform drop enter different synchronous callback
@@ -252,10 +252,10 @@ const GameTestRegistration
   platform_standing_bounds("PlatformerAStar", "WalkOffLedgeUsesStandingPolyWithBoundsOverrides", [](GameTest& fixture) {
     with_platform_world(fixture, [&](WorldServer& world, Vec2F origin, ActorMovementParameters parameters) {
       ASSERT_TRUE(place_ledge(fixture.root(), world, origin, TileCollisionOverride::Block));
-      parameters.gravityEnabled = true;
-      parameters.airJumpProfile.jumpSpeed.reset();
-      parameters.walkSpeed = 4.0f;
-      parameters.runSpeed.reset();
+      parameters.gravity_enabled = true;
+      parameters.air_jump_profile.jump_speed.reset();
+      parameters.walk_speed = 4.0f;
+      parameters.run_speed.reset();
       auto search_parameters = explicit_bounds();
       Vec2F start = origin + Vec2F(-6, 6.25f);
       Vec2F target = origin + Vec2F(-2, 1.25f);
@@ -284,9 +284,9 @@ const GameTestRegistration platform_missing_standing_poly(
   "PlatformerAStar", "BoundsOverridesPreserveMissingStandingPolyErrorTiming", [](GameTest& fixture) {
     with_platform_world(fixture, [&](WorldServer& world, Vec2F origin, ActorMovementParameters parameters) {
       ASSERT_TRUE(place_ledge(fixture.root(), world, origin, TileCollisionOverride::Block));
-      parameters.gravityEnabled = true;
-      parameters.airJumpProfile.jumpSpeed.reset();
-      parameters.standingPoly.reset();
+      parameters.gravity_enabled = true;
+      parameters.air_jump_profile.jump_speed.reset();
+      parameters.standing_poly.reset();
       auto search_parameters = explicit_bounds();
       // Stand/Drop overrides alone cannot supply the Full box used to round
       // the endpoints: this error must occur during construction.
@@ -323,7 +323,7 @@ const GameTestRegistration
     with_platform_world(fixture, [](WorldServer& world, Vec2F origin, ActorMovementParameters parameters) {
       for (bool flying : {false, true}) {
         SCOPED_TRACE(flying ? "flight over real wall" : "walk on real floor");
-        parameters.gravityEnabled = !flying;
+        parameters.gravity_enabled = !flying;
         Vec2F start = origin + (flying ? Vec2F(-6, 4.25f) : Vec2F(-8, 1.25f));
         Vec2F target = origin + (flying ? Vec2F(6, 4.25f) : Vec2F(-3, 1.25f));
         PlatformerAStar::Parameters search_parameters;
@@ -339,7 +339,7 @@ const GameTestRegistration
         for (auto const& edge : *oracle) {
           EXPECT_EQ(edge.action, flying ? PlatformerAStar::Action::Fly : PlatformerAStar::Action::Walk);
           detoured |= edge.target.position[1] >= origin[1] + 6.25f;
-          auto collision_poly = *parameters.standingPoly;
+          auto collision_poly = *parameters.standing_poly;
           collision_poly.translate(edge.target.position);
           auto collided = world.polyCollision(collision_poly);
           ASSERT_TRUE(collided) << collided.error().what();
@@ -360,7 +360,7 @@ const GameTestRegistration
 const GameTestRegistration
   platform_replan_target("PathController", "OppositeTargetReplanDoesNotReuseEdgeTimer", [](GameTest& fixture) {
     with_platform_world(fixture, [&](WorldServer& world, Vec2F origin, ActorMovementParameters parameters) {
-      parameters.gravityEnabled = false;
+      parameters.gravity_enabled = false;
       auto created = ActorMovementController::create(fixture.root(), parameters);
       ASSERT_TRUE(created) << created.error().what();
       auto actor = *created;
@@ -376,7 +376,7 @@ const GameTestRegistration
       EXPECT_EQ(controller.current_action(), PlatformerAStar::Action::Fly);
       // move() first evaluates t=0, then accumulates dt. Keep the shared source
       // position while retaining a nonzero timer on the original rightward edge.
-      ASSERT_TRUE(controller.move(*actor, parameters, actor->baseModifiers(), false, 0.0625f));
+      ASSERT_TRUE(controller.move(*actor, parameters, actor->base_modifiers(), false, 0.0625f));
       EXPECT_EQ(actor->position(), start);
       auto replanned = controller.find_path(*actor, start - Vec2F(6, 0));
       ASSERT_TRUE(replanned) << replanned.error().what();
@@ -384,16 +384,16 @@ const GameTestRegistration
       EXPECT_EQ(controller.target_position(), start - Vec2F(6, 0));
       EXPECT_EQ(controller.current_action(), PlatformerAStar::Action::Fly);
       actor->setVelocity(Vec2F(-8, 0));
-      ASSERT_TRUE(controller.move(*actor, parameters, actor->baseModifiers(), false, 0.0f));
+      ASSERT_TRUE(controller.move(*actor, parameters, actor->base_modifiers(), false, 0.0f));
       // Same Fly action and source, different target: retaining the old timer
       // teleports half a tile left here. A new edge must begin exactly at t=0.
       EXPECT_EQ(actor->position(), start);
-      ASSERT_TRUE(controller.move(*actor, parameters, actor->baseModifiers(), false, 0.0625f));
-      ASSERT_TRUE(controller.move(*actor, parameters, actor->baseModifiers(), false, 0.0f));
+      ASSERT_TRUE(controller.move(*actor, parameters, actor->base_modifiers(), false, 0.0625f));
+      ASSERT_TRUE(controller.move(*actor, parameters, actor->base_modifiers(), false, 0.0f));
       EXPECT_EQ(actor->position(), start - Vec2F(0.5f, 0));
       bool reached = false;
       for (unsigned tick = 0; tick < 100 && !reached; ++tick) {
-        auto moved = controller.move(*actor, parameters, actor->baseModifiers(), false, 0.0625f);
+        auto moved = controller.move(*actor, parameters, actor->base_modifiers(), false, 0.0625f);
         ASSERT_TRUE(moved) << moved.error().what();
         reached = moved->value_or(false);
       }
@@ -404,8 +404,8 @@ const GameTestRegistration
 
 const GameTestRegistration actor_path_budget("PathController", "ActorCollectsOneStepAndInvalidatesChangedSearch", [](GameTest& fixture) {
   with_platform_world(fixture, [&](WorldServer& world, Vec2F origin, ActorMovementParameters parameters) {
-    parameters.gravityEnabled = false;
-    parameters.pathExploreRate = 1.0f;
+    parameters.gravity_enabled = false;
+    parameters.path_explore_rate = 1.0f;
     auto created = ActorMovementController::create(fixture.root(), parameters);
     ASSERT_TRUE(created) << created.error().what();
     auto& actor = **created;
@@ -429,10 +429,10 @@ const GameTestRegistration actor_path_budget("PathController", "ActorCollectsOne
 
     limit.max_nodes_to_search = 1;
     expect_step(actor.control_path_move(blocked, false, limit), {});
-    ASSERT_TRUE(actor.tickMaster(1.0f / 60.0f));
+    ASSERT_TRUE(actor.tick_master(1.0f / 60.0f));
     expect_step(actor.path_move(blocked), false); // Tick exhausted the search; don't restart it to poll.
     expect_step(actor.control_path_move(blocked, false, limit), {});
-    ASSERT_TRUE(actor.tickMaster(1.0f / 60.0f));
+    ASSERT_TRUE(actor.tick_master(1.0f / 60.0f));
     limit.max_nodes_to_search = 2;
     expect_step(actor.path_move(blocked, limit), {}); // Old tick result does not match the new policy.
 
@@ -452,15 +452,15 @@ const GameTestRegistration actor_path_budget("PathController", "ActorCollectsOne
     expect_step(controller.find_path(actor, nearby), {});
     ASSERT_TRUE(controller.current_action());
     expect_step(controller.find_path(actor, blocked), {});
-    expect_step(controller.move(actor, parameters, actor.baseModifiers(), false, 0.0f), {});
-    expect_step(controller.move(actor, parameters, actor.baseModifiers(), false, 0.0f), false);
+    expect_step(controller.move(actor, parameters, actor.base_modifiers(), false, 0.0f), {});
+    expect_step(controller.move(actor, parameters, actor.base_modifiers(), false, 0.0f), false);
   });
 });
 
 const GameTestRegistration lua_path_timing("PathController", "LuaObservesImmediateBufferedAndTickResults", [](GameTest& fixture) {
   with_platform_world(fixture, [&](WorldServer& world, Vec2F origin, ActorMovementParameters parameters) {
-    parameters.gravityEnabled = false;
-    parameters.pathExploreRate = 1.0f;
+    parameters.gravity_enabled = false;
+    parameters.path_explore_rate = 1.0f;
     auto created = ActorMovementController::create(fixture.root(), parameters);
     ASSERT_TRUE(created) << created.error().what();
     auto& actor = **created;
@@ -486,7 +486,7 @@ const GameTestRegistration lua_path_timing("PathController", "LuaObservesImmedia
       auto observed = script.update<int>(target, limit);
       ASSERT_TRUE(observed) << observed.error().what();
       EXPECT_EQ(*observed, std::optional<int>(expected));
-      ASSERT_TRUE(actor.tickMaster(1.0f / 60.0f));
+      ASSERT_TRUE(actor.tick_master(1.0f / 60.0f));
     };
     step(start, 1, 1);    // Immediate success, not delayed to the next Lua update.
     step(blocked, 1, -1); // Callback pending, perform_controls exhausts the search.
@@ -500,7 +500,7 @@ const GameTestRegistration lua_path_timing("PathController", "LuaObservesImmedia
 const GameTestRegistration
   platform_lua_contract("PlatformerAStar", "LuaNamesAndRepeatableResults", [](GameTest& fixture) {
     with_platform_world(fixture, [&](WorldServer& world, Vec2F origin, ActorMovementParameters parameters) {
-      parameters.gravityEnabled = false;
+      parameters.gravity_enabled = false;
       auto lua_root = LuaRoot::create(fixture.root());
       ASSERT_TRUE(lua_root) << lua_root.error().what();
       auto context = (*lua_root)->lua_engine().create_context();

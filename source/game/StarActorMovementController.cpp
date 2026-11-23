@@ -95,59 +95,59 @@ ActorJumpProfile::ActorJumpProfile() = default;
 
 std::expected<ActorJumpProfile, StarException> ActorJumpProfile::create(Json const& config) {
   ActorJumpProfile value;
-  auto jumpSpeedResult = config.opt_float("jumpSpeed");
-  if (!jumpSpeedResult) return std::unexpected(std::move(jumpSpeedResult.error()));
-  value.jumpSpeed = *jumpSpeedResult;
-  auto jumpControlForceResult = config.opt_float("jumpControlForce");
-  if (!jumpControlForceResult) return std::unexpected(std::move(jumpControlForceResult.error()));
-  value.jumpControlForce = *jumpControlForceResult;
-  auto jumpInitialPercentageResult = config.opt_float("jumpInitialPercentage");
-  if (!jumpInitialPercentageResult) return std::unexpected(std::move(jumpInitialPercentageResult.error()));
-  value.jumpInitialPercentage = *jumpInitialPercentageResult;
-  auto jumpHoldTimeResult = config.opt_float("jumpHoldTime");
-  if (!jumpHoldTimeResult) return std::unexpected(std::move(jumpHoldTimeResult.error()));
-  value.jumpHoldTime = *jumpHoldTimeResult;
-  auto jumpTotalHoldTimeResult = config.opt_float("jumpTotalHoldTime");
-  if (!jumpTotalHoldTimeResult) return std::unexpected(std::move(jumpTotalHoldTimeResult.error()));
-  value.jumpTotalHoldTime = *jumpTotalHoldTimeResult;
-  auto multiJumpResult = config.opt_bool("multiJump");
-  if (!multiJumpResult) return std::unexpected(std::move(multiJumpResult.error()));
-  value.multiJump = *multiJumpResult;
-  auto reJumpDelayResult = config.opt_float("reJumpDelay");
-  if (!reJumpDelayResult) return std::unexpected(std::move(reJumpDelayResult.error()));
-  value.reJumpDelay = *reJumpDelayResult;
-  auto autoJumpResult = config.opt_bool("autoJump");
-  if (!autoJumpResult) return std::unexpected(std::move(autoJumpResult.error()));
-  value.autoJump = *autoJumpResult;
-  auto collisionCancelledResult = config.opt_bool("collisionCancelled");
-  if (!collisionCancelledResult) return std::unexpected(std::move(collisionCancelledResult.error()));
-  value.collisionCancelled = *collisionCancelledResult;
+  auto jump_speed_result = config.opt_float("jumpSpeed");
+  if (!jump_speed_result) return std::unexpected(std::move(jump_speed_result.error()));
+  value.jump_speed = *jump_speed_result;
+  auto jump_control_force_result = config.opt_float("jumpControlForce");
+  if (!jump_control_force_result) return std::unexpected(std::move(jump_control_force_result.error()));
+  value.jump_control_force = *jump_control_force_result;
+  auto jump_initial_percentage_result = config.opt_float("jumpInitialPercentage");
+  if (!jump_initial_percentage_result) return std::unexpected(std::move(jump_initial_percentage_result.error()));
+  value.jump_initial_percentage = *jump_initial_percentage_result;
+  auto jump_hold_time_result = config.opt_float("jumpHoldTime");
+  if (!jump_hold_time_result) return std::unexpected(std::move(jump_hold_time_result.error()));
+  value.jump_hold_time = *jump_hold_time_result;
+  auto jump_total_hold_time_result = config.opt_float("jumpTotalHoldTime");
+  if (!jump_total_hold_time_result) return std::unexpected(std::move(jump_total_hold_time_result.error()));
+  value.jump_total_hold_time = *jump_total_hold_time_result;
+  auto multi_jump_result = config.opt_bool("multiJump");
+  if (!multi_jump_result) return std::unexpected(std::move(multi_jump_result.error()));
+  value.multi_jump = *multi_jump_result;
+  auto re_jump_delay_result = config.opt_float("reJumpDelay");
+  if (!re_jump_delay_result) return std::unexpected(std::move(re_jump_delay_result.error()));
+  value.re_jump_delay = *re_jump_delay_result;
+  auto auto_jump_result = config.opt_bool("autoJump");
+  if (!auto_jump_result) return std::unexpected(std::move(auto_jump_result.error()));
+  value.auto_jump = *auto_jump_result;
+  auto collision_cancelled_result = config.opt_bool("collisionCancelled");
+  if (!collision_cancelled_result) return std::unexpected(std::move(collision_cancelled_result.error()));
+  value.collision_cancelled = *collision_cancelled_result;
   return value;
 }
 
-Json ActorJumpProfile::toJson() const {
+Json ActorJumpProfile::to_json() const {
   return JsonObject{
-    {"jumpSpeed", json_from_optional(jumpSpeed)},
-    {"jumpControlForce", json_from_optional(jumpControlForce)},
-    {"jumpInitialPercentage", json_from_optional(jumpInitialPercentage)},
-    {"jumpHoldTime", json_from_optional(jumpHoldTime)},
-    {"jumpTotalHoldTime", json_from_optional(jumpTotalHoldTime)},
-    {"multiJump", json_from_optional(multiJump)},
-    {"reJumpDelay", json_from_optional(reJumpDelay)},
-    {"autoJump", json_from_optional(autoJump)},
-    {"collisionCancelled", json_from_optional(collisionCancelled)}
+    {"jumpSpeed", json_from_optional(jump_speed)},
+    {"jumpControlForce", json_from_optional(jump_control_force)},
+    {"jumpInitialPercentage", json_from_optional(jump_initial_percentage)},
+    {"jumpHoldTime", json_from_optional(jump_hold_time)},
+    {"jumpTotalHoldTime", json_from_optional(jump_total_hold_time)},
+    {"multiJump", json_from_optional(multi_jump)},
+    {"reJumpDelay", json_from_optional(re_jump_delay)},
+    {"autoJump", json_from_optional(auto_jump)},
+    {"collisionCancelled", json_from_optional(collision_cancelled)}
   };
 }
 
 namespace {
 using ActorWireResult = std::expected<std::reference_wrapper<DataStream>, StarException>;
 
-template <bool Writing, typename... Fields>
-  requires ((Writing && (stream_writable<Fields> && ...)) || (!Writing && (stream_readable<Fields> && ...)))
+template <bool writing, typename... Fields>
+  requires ((writing && (stream_writable<Fields> && ...)) || (!writing && (stream_readable<Fields> && ...)))
 ActorWireResult transfer_fields(DataStream& ds, Fields&... fields) {
   std::expected<void, StarException> result;
   auto transfer = [&](auto& field) {
-    if constexpr (Writing)
+    if constexpr (writing)
       result = ds.write(field);
     else
       result = ds.read(field);
@@ -161,8 +161,8 @@ ActorWireResult transfer_fields(DataStream& ds, Fields&... fields) {
 template <typename T>
   requires std::same_as<std::remove_const_t<T>, ActorJumpProfile>
 ActorWireResult transfer_jump_profile(DataStream& ds, T& p) {
-  return transfer_fields<std::is_const_v<T>>(ds, p.jumpSpeed, p.jumpControlForce, p.jumpInitialPercentage,
-    p.jumpHoldTime, p.jumpTotalHoldTime, p.multiJump, p.reJumpDelay, p.autoJump, p.collisionCancelled);
+  return transfer_fields<std::is_const_v<T>>(ds, p.jump_speed, p.jump_control_force, p.jump_initial_percentage,
+    p.jump_hold_time, p.jump_total_hold_time, p.multi_jump, p.re_jump_delay, p.auto_jump, p.collision_cancelled);
 }
 }
 
@@ -174,7 +174,7 @@ ActorWireResult operator<<(DataStream& ds, ActorJumpProfile const& profile) {
   return transfer_jump_profile(ds, profile);
 }
 
-std::expected<ActorMovementParameters, StarException> ActorMovementParameters::sensibleDefaults(Root& root) {
+std::expected<ActorMovementParameters, StarException> ActorMovementParameters::sensible_defaults(Root& root) {
   auto assets = root.assets();
   if (!assets) return std::unexpected(std::move(assets.error()));
   auto config = (*assets)->json("/default_actor_movement.config");
@@ -191,234 +191,234 @@ std::expected<ActorMovementParameters, StarException> ActorMovementParameters::c
   if (config.is_null())
     return value;
 
-  auto massResult = config.opt_float("mass");
-  if (!massResult) return std::unexpected(std::move(massResult.error()));
-  value.mass = *massResult;
-  auto gravityMultiplierResult = config.opt_float("gravityMultiplier");
-  if (!gravityMultiplierResult) return std::unexpected(std::move(gravityMultiplierResult.error()));
-  value.gravityMultiplier = *gravityMultiplierResult;
-  auto liquidBuoyancyResult = config.opt_float("liquidBuoyancy");
-  if (!liquidBuoyancyResult) return std::unexpected(std::move(liquidBuoyancyResult.error()));
-  value.liquidBuoyancy = *liquidBuoyancyResult;
-  auto airBuoyancyResult = config.opt_float("airBuoyancy");
-  if (!airBuoyancyResult) return std::unexpected(std::move(airBuoyancyResult.error()));
-  value.airBuoyancy = *airBuoyancyResult;
-  auto bounceFactorResult = config.opt_float("bounceFactor");
-  if (!bounceFactorResult) return std::unexpected(std::move(bounceFactorResult.error()));
-  value.bounceFactor = *bounceFactorResult;
-  auto stopOnFirstBounceResult = config.opt_bool("stopOnFirstBounce");
-  if (!stopOnFirstBounceResult) return std::unexpected(std::move(stopOnFirstBounceResult.error()));
-  value.stopOnFirstBounce = *stopOnFirstBounceResult;
-  auto enableSurfaceSlopeCorrectionResult = config.opt_bool("enableSurfaceSlopeCorrection");
-  if (!enableSurfaceSlopeCorrectionResult) return std::unexpected(std::move(enableSurfaceSlopeCorrectionResult.error()));
-  value.enableSurfaceSlopeCorrection = *enableSurfaceSlopeCorrectionResult;
-  auto slopeSlidingFactorResult = config.opt_float("slopeSlidingFactor");
-  if (!slopeSlidingFactorResult) return std::unexpected(std::move(slopeSlidingFactorResult.error()));
-  value.slopeSlidingFactor = *slopeSlidingFactorResult;
-  auto maxMovementPerStepResult = config.opt_float("maxMovementPerStep");
-  if (!maxMovementPerStepResult) return std::unexpected(std::move(maxMovementPerStepResult.error()));
-  value.maxMovementPerStep = *maxMovementPerStepResult;
-  auto maximumCorrectionResult = config.opt_float("maximumCorrection");
-  if (!maximumCorrectionResult) return std::unexpected(std::move(maximumCorrectionResult.error()));
-  value.maximumCorrection = *maximumCorrectionResult;
-  auto speedLimitResult = config.opt_float("speedLimit");
-  if (!speedLimitResult) return std::unexpected(std::move(speedLimitResult.error()));
-  value.speedLimit = *speedLimitResult;
+  auto mass_result = config.opt_float("mass");
+  if (!mass_result) return std::unexpected(std::move(mass_result.error()));
+  value.mass = *mass_result;
+  auto gravity_multiplier_result = config.opt_float("gravityMultiplier");
+  if (!gravity_multiplier_result) return std::unexpected(std::move(gravity_multiplier_result.error()));
+  value.gravity_multiplier = *gravity_multiplier_result;
+  auto liquid_buoyancy_result = config.opt_float("liquidBuoyancy");
+  if (!liquid_buoyancy_result) return std::unexpected(std::move(liquid_buoyancy_result.error()));
+  value.liquid_buoyancy = *liquid_buoyancy_result;
+  auto air_buoyancy_result = config.opt_float("airBuoyancy");
+  if (!air_buoyancy_result) return std::unexpected(std::move(air_buoyancy_result.error()));
+  value.air_buoyancy = *air_buoyancy_result;
+  auto bounce_factor_result = config.opt_float("bounceFactor");
+  if (!bounce_factor_result) return std::unexpected(std::move(bounce_factor_result.error()));
+  value.bounce_factor = *bounce_factor_result;
+  auto stop_on_first_bounce_result = config.opt_bool("stopOnFirstBounce");
+  if (!stop_on_first_bounce_result) return std::unexpected(std::move(stop_on_first_bounce_result.error()));
+  value.stop_on_first_bounce = *stop_on_first_bounce_result;
+  auto enable_surface_slope_correction_result = config.opt_bool("enableSurfaceSlopeCorrection");
+  if (!enable_surface_slope_correction_result) return std::unexpected(std::move(enable_surface_slope_correction_result.error()));
+  value.enable_surface_slope_correction = *enable_surface_slope_correction_result;
+  auto slope_sliding_factor_result = config.opt_float("slopeSlidingFactor");
+  if (!slope_sliding_factor_result) return std::unexpected(std::move(slope_sliding_factor_result.error()));
+  value.slope_sliding_factor = *slope_sliding_factor_result;
+  auto max_movement_per_step_result = config.opt_float("maxMovementPerStep");
+  if (!max_movement_per_step_result) return std::unexpected(std::move(max_movement_per_step_result.error()));
+  value.max_movement_per_step = *max_movement_per_step_result;
+  auto maximum_correction_result = config.opt_float("maximumCorrection");
+  if (!maximum_correction_result) return std::unexpected(std::move(maximum_correction_result.error()));
+  value.maximum_correction = *maximum_correction_result;
+  auto speed_limit_result = config.opt_float("speedLimit");
+  if (!speed_limit_result) return std::unexpected(std::move(speed_limit_result.error()));
+  value.speed_limit = *speed_limit_result;
 
   // "collisionPoly" is used as a synonym for setting both the standing and
   // crouching polys.
 
-  auto collisionPolyConfigResult = config.get("collisionPoly", {});
-  if (!collisionPolyConfigResult) return std::unexpected(std::move(collisionPolyConfigResult.error()));
-  auto const& collisionPolyConfig = *collisionPolyConfigResult;
-  auto standingPolyConfigResult = config.get("standingPoly", {});
-  if (!standingPolyConfigResult) return std::unexpected(std::move(standingPolyConfigResult.error()));
-  auto const& standingPolyConfig = *standingPolyConfigResult;
-  auto crouchingPolyConfigResult = config.get("crouchingPoly", {});
-  if (!crouchingPolyConfigResult) return std::unexpected(std::move(crouchingPolyConfigResult.error()));
-  auto const& crouchingPolyConfig = *crouchingPolyConfigResult;
+  auto collision_poly_config_result = config.get("collisionPoly", {});
+  if (!collision_poly_config_result) return std::unexpected(std::move(collision_poly_config_result.error()));
+  auto const& collision_poly_config = *collision_poly_config_result;
+  auto standing_poly_config_result = config.get("standingPoly", {});
+  if (!standing_poly_config_result) return std::unexpected(std::move(standing_poly_config_result.error()));
+  auto const& standing_poly_config = *standing_poly_config_result;
+  auto crouching_poly_config_result = config.get("crouchingPoly", {});
+  if (!crouching_poly_config_result) return std::unexpected(std::move(crouching_poly_config_result.error()));
+  auto const& crouching_poly_config = *crouching_poly_config_result;
 
-  if (!standingPolyConfig.is_null())
+  if (!standing_poly_config.is_null())
 {
-    auto standingPolyValue = json_to_polyf(standingPolyConfig);
-    if (!standingPolyValue) return std::unexpected(std::move(standingPolyValue.error()));
-    value.standingPoly = std::move(*standingPolyValue);
+    auto standing_poly_value = json_to_polyf(standing_poly_config);
+    if (!standing_poly_value) return std::unexpected(std::move(standing_poly_value.error()));
+    value.standing_poly = std::move(*standing_poly_value);
   }
-  else if (!collisionPolyConfig.is_null())
+  else if (!collision_poly_config.is_null())
 {
-    auto standingPolyValue = json_to_polyf(collisionPolyConfig);
-    if (!standingPolyValue) return std::unexpected(std::move(standingPolyValue.error()));
-    value.standingPoly = std::move(*standingPolyValue);
+    auto standing_poly_value = json_to_polyf(collision_poly_config);
+    if (!standing_poly_value) return std::unexpected(std::move(standing_poly_value.error()));
+    value.standing_poly = std::move(*standing_poly_value);
   }
 
-  if (!crouchingPolyConfig.is_null())
+  if (!crouching_poly_config.is_null())
 {
-    auto crouchingPolyValue = json_to_polyf(crouchingPolyConfig);
-    if (!crouchingPolyValue) return std::unexpected(std::move(crouchingPolyValue.error()));
-    value.crouchingPoly = std::move(*crouchingPolyValue);
+    auto crouching_poly_value = json_to_polyf(crouching_poly_config);
+    if (!crouching_poly_value) return std::unexpected(std::move(crouching_poly_value.error()));
+    value.crouching_poly = std::move(*crouching_poly_value);
   }
-  else if (!collisionPolyConfig.is_null())
+  else if (!collision_poly_config.is_null())
 {
-    auto crouchingPolyValue = json_to_polyf(collisionPolyConfig);
-    if (!crouchingPolyValue) return std::unexpected(std::move(crouchingPolyValue.error()));
-    value.crouchingPoly = std::move(*crouchingPolyValue);
+    auto crouching_poly_value = json_to_polyf(collision_poly_config);
+    if (!crouching_poly_value) return std::unexpected(std::move(crouching_poly_value.error()));
+    value.crouching_poly = std::move(*crouching_poly_value);
   }
 
-  auto stickyCollisionResult = config.opt_bool("stickyCollision");
-  if (!stickyCollisionResult) return std::unexpected(std::move(stickyCollisionResult.error()));
-  value.stickyCollision = *stickyCollisionResult;
-  auto stickyForceResult = config.opt_float("stickyForce");
-  if (!stickyForceResult) return std::unexpected(std::move(stickyForceResult.error()));
-  value.stickyForce = *stickyForceResult;
+  auto sticky_collision_result = config.opt_bool("stickyCollision");
+  if (!sticky_collision_result) return std::unexpected(std::move(sticky_collision_result.error()));
+  value.sticky_collision = *sticky_collision_result;
+  auto sticky_force_result = config.opt_float("stickyForce");
+  if (!sticky_force_result) return std::unexpected(std::move(sticky_force_result.error()));
+  value.sticky_force = *sticky_force_result;
 
-  auto walkSpeedResult = config.opt_float("walkSpeed");
-  if (!walkSpeedResult) return std::unexpected(std::move(walkSpeedResult.error()));
-  value.walkSpeed = *walkSpeedResult;
-  auto runSpeedResult = config.opt_float("runSpeed");
-  if (!runSpeedResult) return std::unexpected(std::move(runSpeedResult.error()));
-  value.runSpeed = *runSpeedResult;
-  auto flySpeedResult = config.opt_float("flySpeed");
-  if (!flySpeedResult) return std::unexpected(std::move(flySpeedResult.error()));
-  value.flySpeed = *flySpeedResult;
-  auto airFrictionResult = config.opt_float("airFriction");
-  if (!airFrictionResult) return std::unexpected(std::move(airFrictionResult.error()));
-  value.airFriction = *airFrictionResult;
-  auto liquidFrictionResult = config.opt_float("liquidFriction");
-  if (!liquidFrictionResult) return std::unexpected(std::move(liquidFrictionResult.error()));
-  value.liquidFriction = *liquidFrictionResult;
-  auto minimumLiquidPercentageResult = config.opt_float("minimumLiquidPercentage");
-  if (!minimumLiquidPercentageResult) return std::unexpected(std::move(minimumLiquidPercentageResult.error()));
-  value.minimumLiquidPercentage = *minimumLiquidPercentageResult;
-  auto liquidImpedanceResult = config.opt_float("liquidImpedance");
-  if (!liquidImpedanceResult) return std::unexpected(std::move(liquidImpedanceResult.error()));
-  value.liquidImpedance = *liquidImpedanceResult;
-  auto normalGroundFrictionResult = config.opt_float("normalGroundFriction");
-  if (!normalGroundFrictionResult) return std::unexpected(std::move(normalGroundFrictionResult.error()));
-  value.normalGroundFriction = *normalGroundFrictionResult;
-  auto ambulatingGroundFrictionResult = config.opt_float("ambulatingGroundFriction");
-  if (!ambulatingGroundFrictionResult) return std::unexpected(std::move(ambulatingGroundFrictionResult.error()));
-  value.ambulatingGroundFriction = *ambulatingGroundFrictionResult;
-  auto groundForceResult = config.opt_float("groundForce");
-  if (!groundForceResult) return std::unexpected(std::move(groundForceResult.error()));
-  value.groundForce = *groundForceResult;
-  auto airForceResult = config.opt_float("airForce");
-  if (!airForceResult) return std::unexpected(std::move(airForceResult.error()));
-  value.airForce = *airForceResult;
-  auto liquidForceResult = config.opt_float("liquidForce");
-  if (!liquidForceResult) return std::unexpected(std::move(liquidForceResult.error()));
-  value.liquidForce = *liquidForceResult;
+  auto walk_speed_result = config.opt_float("walkSpeed");
+  if (!walk_speed_result) return std::unexpected(std::move(walk_speed_result.error()));
+  value.walk_speed = *walk_speed_result;
+  auto run_speed_result = config.opt_float("runSpeed");
+  if (!run_speed_result) return std::unexpected(std::move(run_speed_result.error()));
+  value.run_speed = *run_speed_result;
+  auto fly_speed_result = config.opt_float("flySpeed");
+  if (!fly_speed_result) return std::unexpected(std::move(fly_speed_result.error()));
+  value.fly_speed = *fly_speed_result;
+  auto air_friction_result = config.opt_float("airFriction");
+  if (!air_friction_result) return std::unexpected(std::move(air_friction_result.error()));
+  value.air_friction = *air_friction_result;
+  auto liquid_friction_result = config.opt_float("liquidFriction");
+  if (!liquid_friction_result) return std::unexpected(std::move(liquid_friction_result.error()));
+  value.liquid_friction = *liquid_friction_result;
+  auto minimum_liquid_percentage_result = config.opt_float("minimumLiquidPercentage");
+  if (!minimum_liquid_percentage_result) return std::unexpected(std::move(minimum_liquid_percentage_result.error()));
+  value.minimum_liquid_percentage = *minimum_liquid_percentage_result;
+  auto liquid_impedance_result = config.opt_float("liquidImpedance");
+  if (!liquid_impedance_result) return std::unexpected(std::move(liquid_impedance_result.error()));
+  value.liquid_impedance = *liquid_impedance_result;
+  auto normal_ground_friction_result = config.opt_float("normalGroundFriction");
+  if (!normal_ground_friction_result) return std::unexpected(std::move(normal_ground_friction_result.error()));
+  value.normal_ground_friction = *normal_ground_friction_result;
+  auto ambulating_ground_friction_result = config.opt_float("ambulatingGroundFriction");
+  if (!ambulating_ground_friction_result) return std::unexpected(std::move(ambulating_ground_friction_result.error()));
+  value.ambulating_ground_friction = *ambulating_ground_friction_result;
+  auto ground_force_result = config.opt_float("groundForce");
+  if (!ground_force_result) return std::unexpected(std::move(ground_force_result.error()));
+  value.ground_force = *ground_force_result;
+  auto air_force_result = config.opt_float("airForce");
+  if (!air_force_result) return std::unexpected(std::move(air_force_result.error()));
+  value.air_force = *air_force_result;
+  auto liquid_force_result = config.opt_float("liquidForce");
+  if (!liquid_force_result) return std::unexpected(std::move(liquid_force_result.error()));
+  value.liquid_force = *liquid_force_result;
 
-  auto airJumpProfileConfig = config.opt("airJumpProfile");
-  if (!airJumpProfileConfig) return std::unexpected(std::move(airJumpProfileConfig.error()));
-  if (*airJumpProfileConfig) {
-    auto airJumpProfileValue = ActorJumpProfile::create(**airJumpProfileConfig);
-    if (!airJumpProfileValue) return std::unexpected(std::move(airJumpProfileValue.error()));
-    value.airJumpProfile = std::move(*airJumpProfileValue);
+  auto air_jump_profile_config = config.opt("airJumpProfile");
+  if (!air_jump_profile_config) return std::unexpected(std::move(air_jump_profile_config.error()));
+  if (*air_jump_profile_config) {
+    auto air_jump_profile_value = ActorJumpProfile::create(**air_jump_profile_config);
+    if (!air_jump_profile_value) return std::unexpected(std::move(air_jump_profile_value.error()));
+    value.air_jump_profile = std::move(*air_jump_profile_value);
   }
-  auto liquidJumpProfileConfig = config.opt("liquidJumpProfile");
-  if (!liquidJumpProfileConfig) return std::unexpected(std::move(liquidJumpProfileConfig.error()));
-  if (*liquidJumpProfileConfig) {
-    auto liquidJumpProfileValue = ActorJumpProfile::create(**liquidJumpProfileConfig);
-    if (!liquidJumpProfileValue) return std::unexpected(std::move(liquidJumpProfileValue.error()));
-    value.liquidJumpProfile = std::move(*liquidJumpProfileValue);
-  }
-
-  auto fallStatusSpeedMinResult = config.opt_float("fallStatusSpeedMin");
-  if (!fallStatusSpeedMinResult) return std::unexpected(std::move(fallStatusSpeedMinResult.error()));
-  value.fallStatusSpeedMin = *fallStatusSpeedMinResult;
-  auto fallThroughSustainFramesResult = config.opt_int("fallThroughSustainFrames");
-  if (!fallThroughSustainFramesResult) return std::unexpected(std::move(fallThroughSustainFramesResult.error()));
-  value.fallThroughSustainFrames = *fallThroughSustainFramesResult;
-  auto maximumPlatformCorrectionResult = config.opt_float("maximumPlatformCorrection");
-  if (!maximumPlatformCorrectionResult) return std::unexpected(std::move(maximumPlatformCorrectionResult.error()));
-  value.maximumPlatformCorrection = *maximumPlatformCorrectionResult;
-  auto maximumPlatformCorrectionVelocityFactorResult = config.opt_float("maximumPlatformCorrectionVelocityFactor");
-  if (!maximumPlatformCorrectionVelocityFactorResult) return std::unexpected(std::move(maximumPlatformCorrectionVelocityFactorResult.error()));
-  value.maximumPlatformCorrectionVelocityFactor = *maximumPlatformCorrectionVelocityFactorResult;
-
-  auto physicsEffectCategoriesConfig = config.opt("physicsEffectCategories");
-  if (!physicsEffectCategoriesConfig) return std::unexpected(std::move(physicsEffectCategoriesConfig.error()));
-  if (*physicsEffectCategoriesConfig) {
-    auto physicsEffectCategoriesValue = json_to_string_set(**physicsEffectCategoriesConfig);
-    if (!physicsEffectCategoriesValue) return std::unexpected(std::move(physicsEffectCategoriesValue.error()));
-    value.physicsEffectCategories = std::move(*physicsEffectCategoriesValue);
+  auto liquid_jump_profile_config = config.opt("liquidJumpProfile");
+  if (!liquid_jump_profile_config) return std::unexpected(std::move(liquid_jump_profile_config.error()));
+  if (*liquid_jump_profile_config) {
+    auto liquid_jump_profile_value = ActorJumpProfile::create(**liquid_jump_profile_config);
+    if (!liquid_jump_profile_value) return std::unexpected(std::move(liquid_jump_profile_value.error()));
+    value.liquid_jump_profile = std::move(*liquid_jump_profile_value);
   }
 
-  auto groundMovementMinimumSustainResult = config.opt_float("groundMovementMinimumSustain");
-  if (!groundMovementMinimumSustainResult) return std::unexpected(std::move(groundMovementMinimumSustainResult.error()));
-  value.groundMovementMinimumSustain = *groundMovementMinimumSustainResult;
-  auto groundMovementMaximumSustainResult = config.opt_float("groundMovementMaximumSustain");
-  if (!groundMovementMaximumSustainResult) return std::unexpected(std::move(groundMovementMaximumSustainResult.error()));
-  value.groundMovementMaximumSustain = *groundMovementMaximumSustainResult;
-  auto groundMovementCheckDistanceResult = config.opt_float("groundMovementCheckDistance");
-  if (!groundMovementCheckDistanceResult) return std::unexpected(std::move(groundMovementCheckDistanceResult.error()));
-  value.groundMovementCheckDistance = *groundMovementCheckDistanceResult;
+  auto fall_status_speed_min_result = config.opt_float("fallStatusSpeedMin");
+  if (!fall_status_speed_min_result) return std::unexpected(std::move(fall_status_speed_min_result.error()));
+  value.fall_status_speed_min = *fall_status_speed_min_result;
+  auto fall_through_sustain_frames_result = config.opt_int("fallThroughSustainFrames");
+  if (!fall_through_sustain_frames_result) return std::unexpected(std::move(fall_through_sustain_frames_result.error()));
+  value.fall_through_sustain_frames = *fall_through_sustain_frames_result;
+  auto maximum_platform_correction_result = config.opt_float("maximumPlatformCorrection");
+  if (!maximum_platform_correction_result) return std::unexpected(std::move(maximum_platform_correction_result.error()));
+  value.maximum_platform_correction = *maximum_platform_correction_result;
+  auto maximum_platform_correction_velocity_factor_result = config.opt_float("maximumPlatformCorrectionVelocityFactor");
+  if (!maximum_platform_correction_velocity_factor_result) return std::unexpected(std::move(maximum_platform_correction_velocity_factor_result.error()));
+  value.maximum_platform_correction_velocity_factor = *maximum_platform_correction_velocity_factor_result;
 
-  auto collisionEnabledResult = config.opt_bool("collisionEnabled");
-  if (!collisionEnabledResult) return std::unexpected(std::move(collisionEnabledResult.error()));
-  value.collisionEnabled = *collisionEnabledResult;
-  auto frictionEnabledResult = config.opt_bool("frictionEnabled");
-  if (!frictionEnabledResult) return std::unexpected(std::move(frictionEnabledResult.error()));
-  value.frictionEnabled = *frictionEnabledResult;
-  auto gravityEnabledResult = config.opt_bool("gravityEnabled");
-  if (!gravityEnabledResult) return std::unexpected(std::move(gravityEnabledResult.error()));
-  value.gravityEnabled = *gravityEnabledResult;
+  auto physics_effect_categories_config = config.opt("physicsEffectCategories");
+  if (!physics_effect_categories_config) return std::unexpected(std::move(physics_effect_categories_config.error()));
+  if (*physics_effect_categories_config) {
+    auto physics_effect_categories_value = json_to_string_set(**physics_effect_categories_config);
+    if (!physics_effect_categories_value) return std::unexpected(std::move(physics_effect_categories_value.error()));
+    value.physics_effect_categories = std::move(*physics_effect_categories_value);
+  }
 
-  auto pathExploreRateResult = config.opt_float("pathExploreRate");
-  if (!pathExploreRateResult) return std::unexpected(std::move(pathExploreRateResult.error()));
-  value.pathExploreRate = *pathExploreRateResult;
+  auto ground_movement_minimum_sustain_result = config.opt_float("groundMovementMinimumSustain");
+  if (!ground_movement_minimum_sustain_result) return std::unexpected(std::move(ground_movement_minimum_sustain_result.error()));
+  value.ground_movement_minimum_sustain = *ground_movement_minimum_sustain_result;
+  auto ground_movement_maximum_sustain_result = config.opt_float("groundMovementMaximumSustain");
+  if (!ground_movement_maximum_sustain_result) return std::unexpected(std::move(ground_movement_maximum_sustain_result.error()));
+  value.ground_movement_maximum_sustain = *ground_movement_maximum_sustain_result;
+  auto ground_movement_check_distance_result = config.opt_float("groundMovementCheckDistance");
+  if (!ground_movement_check_distance_result) return std::unexpected(std::move(ground_movement_check_distance_result.error()));
+  value.ground_movement_check_distance = *ground_movement_check_distance_result;
+
+  auto collision_enabled_result = config.opt_bool("collisionEnabled");
+  if (!collision_enabled_result) return std::unexpected(std::move(collision_enabled_result.error()));
+  value.collision_enabled = *collision_enabled_result;
+  auto friction_enabled_result = config.opt_bool("frictionEnabled");
+  if (!friction_enabled_result) return std::unexpected(std::move(friction_enabled_result.error()));
+  value.friction_enabled = *friction_enabled_result;
+  auto gravity_enabled_result = config.opt_bool("gravityEnabled");
+  if (!gravity_enabled_result) return std::unexpected(std::move(gravity_enabled_result.error()));
+  value.gravity_enabled = *gravity_enabled_result;
+
+  auto path_explore_rate_result = config.opt_float("pathExploreRate");
+  if (!path_explore_rate_result) return std::unexpected(std::move(path_explore_rate_result.error()));
+  value.path_explore_rate = *path_explore_rate_result;
   return value;
 }
 
-std::expected<Json, StarException> ActorMovementParameters::toJson() const {
-  auto standingPolyJson = json_from_optional(standingPoly, json_from_polyf);
-  if (!standingPolyJson) return std::unexpected(std::move(standingPolyJson.error()));
-  auto crouchingPolyJson = json_from_optional(crouchingPoly, json_from_polyf);
-  if (!crouchingPolyJson) return std::unexpected(std::move(crouchingPolyJson.error()));
-  auto physicsEffectCategoriesJson = json_from_optional(physicsEffectCategories, json_from_string_set);
-  if (!physicsEffectCategoriesJson) return std::unexpected(std::move(physicsEffectCategoriesJson.error()));
+std::expected<Json, StarException> ActorMovementParameters::to_json() const {
+  auto standing_poly_json = json_from_optional(standing_poly, json_from_polyf);
+  if (!standing_poly_json) return std::unexpected(std::move(standing_poly_json.error()));
+  auto crouching_poly_json = json_from_optional(crouching_poly, json_from_polyf);
+  if (!crouching_poly_json) return std::unexpected(std::move(crouching_poly_json.error()));
+  auto physics_effect_categories_json = json_from_optional(physics_effect_categories, json_from_string_set);
+  if (!physics_effect_categories_json) return std::unexpected(std::move(physics_effect_categories_json.error()));
 
   return JsonObject{{"mass", json_from_optional(mass)},
-      {"gravityMultiplier", json_from_optional(gravityMultiplier)},
-      {"liquidBuoyancy", json_from_optional(liquidBuoyancy)},
-      {"airBuoyancy", json_from_optional(airBuoyancy)},
-      {"bounceFactor", json_from_optional(bounceFactor)},
-      {"stopOnFirstBounce", json_from_optional(stopOnFirstBounce)},
-      {"enableSurfaceSlopeCorrection", json_from_optional(enableSurfaceSlopeCorrection)},
-      {"slopeSlidingFactor", json_from_optional(slopeSlidingFactor)},
-      {"maxMovementPerStep", json_from_optional(maxMovementPerStep)},
-      {"maximumCorrection", json_from_optional(maximumCorrection)},
-      {"speedLimit", json_from_optional(speedLimit)},
-      {"standingPoly", *standingPolyJson},
-      {"crouchingPoly", *crouchingPolyJson},
-      {"stickyCollision", json_from_optional(stickyCollision)},
-      {"stickyForce", json_from_optional(stickyForce)},
-      {"walkSpeed", json_from_optional(walkSpeed)},
-      {"runSpeed", json_from_optional(runSpeed)},
-      {"flySpeed", json_from_optional(flySpeed)},
-      {"airFriction", json_from_optional(airFriction)},
-      {"liquidFriction", json_from_optional(liquidFriction)},
-      {"minimumLiquidPercentage", json_from_optional(minimumLiquidPercentage)},
-      {"liquidImpedance", json_from_optional(liquidImpedance)},
-      {"normalGroundFriction", json_from_optional(normalGroundFriction)},
-      {"ambulatingGroundFriction", json_from_optional(ambulatingGroundFriction)},
-      {"groundForce", json_from_optional(groundForce)},
-      {"airForce", json_from_optional(airForce)},
-      {"liquidForce", json_from_optional(liquidForce)},
-      {"airJumpProfile", airJumpProfile.toJson()},
-      {"liquidJumpProfile", liquidJumpProfile.toJson()},
-      {"fallStatusSpeedMin", json_from_optional(fallStatusSpeedMin)},
-      {"fallThroughSustainFrames", json_from_optional(fallThroughSustainFrames)},
-      {"maximumPlatformCorrection", json_from_optional(maximumPlatformCorrection)},
-      {"maximumPlatformCorrectionVelocityFactor", json_from_optional(maximumPlatformCorrectionVelocityFactor)},
-      {"physicsEffectCategories", *physicsEffectCategoriesJson},
-      {"groundMovementMinimumSustain", json_from_optional(groundMovementMinimumSustain)},
-      {"groundMovementMaximumSustain", json_from_optional(groundMovementMaximumSustain)},
-      {"groundMovementCheckDistance", json_from_optional(groundMovementCheckDistance)},
-      {"collisionEnabled", json_from_optional(collisionEnabled)},
-      {"frictionEnabled", json_from_optional(frictionEnabled)},
-      {"gravityEnabled", json_from_optional(gravityEnabled)},
-      {"pathExploreRate", json_from_optional(pathExploreRate)}};
+      {"gravityMultiplier", json_from_optional(gravity_multiplier)},
+      {"liquidBuoyancy", json_from_optional(liquid_buoyancy)},
+      {"airBuoyancy", json_from_optional(air_buoyancy)},
+      {"bounceFactor", json_from_optional(bounce_factor)},
+      {"stopOnFirstBounce", json_from_optional(stop_on_first_bounce)},
+      {"enableSurfaceSlopeCorrection", json_from_optional(enable_surface_slope_correction)},
+      {"slopeSlidingFactor", json_from_optional(slope_sliding_factor)},
+      {"maxMovementPerStep", json_from_optional(max_movement_per_step)},
+      {"maximumCorrection", json_from_optional(maximum_correction)},
+      {"speedLimit", json_from_optional(speed_limit)},
+      {"standingPoly", *standing_poly_json},
+      {"crouchingPoly", *crouching_poly_json},
+      {"stickyCollision", json_from_optional(sticky_collision)},
+      {"stickyForce", json_from_optional(sticky_force)},
+      {"walkSpeed", json_from_optional(walk_speed)},
+      {"runSpeed", json_from_optional(run_speed)},
+      {"flySpeed", json_from_optional(fly_speed)},
+      {"airFriction", json_from_optional(air_friction)},
+      {"liquidFriction", json_from_optional(liquid_friction)},
+      {"minimumLiquidPercentage", json_from_optional(minimum_liquid_percentage)},
+      {"liquidImpedance", json_from_optional(liquid_impedance)},
+      {"normalGroundFriction", json_from_optional(normal_ground_friction)},
+      {"ambulatingGroundFriction", json_from_optional(ambulating_ground_friction)},
+      {"groundForce", json_from_optional(ground_force)},
+      {"airForce", json_from_optional(air_force)},
+      {"liquidForce", json_from_optional(liquid_force)},
+      {"airJumpProfile", air_jump_profile.to_json()},
+      {"liquidJumpProfile", liquid_jump_profile.to_json()},
+      {"fallStatusSpeedMin", json_from_optional(fall_status_speed_min)},
+      {"fallThroughSustainFrames", json_from_optional(fall_through_sustain_frames)},
+      {"maximumPlatformCorrection", json_from_optional(maximum_platform_correction)},
+      {"maximumPlatformCorrectionVelocityFactor", json_from_optional(maximum_platform_correction_velocity_factor)},
+      {"physicsEffectCategories", *physics_effect_categories_json},
+      {"groundMovementMinimumSustain", json_from_optional(ground_movement_minimum_sustain)},
+      {"groundMovementMaximumSustain", json_from_optional(ground_movement_maximum_sustain)},
+      {"groundMovementCheckDistance", json_from_optional(ground_movement_check_distance)},
+      {"collisionEnabled", json_from_optional(collision_enabled)},
+      {"frictionEnabled", json_from_optional(friction_enabled)},
+      {"gravityEnabled", json_from_optional(gravity_enabled)},
+      {"pathExploreRate", json_from_optional(path_explore_rate)}};
 }
 
 namespace {
@@ -442,15 +442,15 @@ concept jump_profile_source = std::same_as<std::remove_cvref_t<T>, ActorJumpProf
 template <jump_profile_source... Sources>
   requires (sizeof...(Sources) == 1 || sizeof...(Sources) == 2)
 void merge_fields(ActorJumpProfile& dest, Sources&&... sources) {
-  merge_field(dest.jumpSpeed, sources.jumpSpeed...);
-  merge_field(dest.jumpControlForce, sources.jumpControlForce...);
-  merge_field(dest.jumpInitialPercentage, sources.jumpInitialPercentage...);
-  merge_field(dest.jumpHoldTime, sources.jumpHoldTime...);
-  merge_field(dest.jumpTotalHoldTime, sources.jumpTotalHoldTime...);
-  merge_field(dest.multiJump, sources.multiJump...);
-  merge_field(dest.reJumpDelay, sources.reJumpDelay...);
-  merge_field(dest.autoJump, sources.autoJump...);
-  merge_field(dest.collisionCancelled, sources.collisionCancelled...);
+  merge_field(dest.jump_speed, sources.jump_speed...);
+  merge_field(dest.jump_control_force, sources.jump_control_force...);
+  merge_field(dest.jump_initial_percentage, sources.jump_initial_percentage...);
+  merge_field(dest.jump_hold_time, sources.jump_hold_time...);
+  merge_field(dest.jump_total_hold_time, sources.jump_total_hold_time...);
+  merge_field(dest.multi_jump, sources.multi_jump...);
+  merge_field(dest.re_jump_delay, sources.re_jump_delay...);
+  merge_field(dest.auto_jump, sources.auto_jump...);
+  merge_field(dest.collision_cancelled, sources.collision_cancelled...);
 }
 
 template <class T>
@@ -460,46 +460,46 @@ template <actor_parameter_source... Sources>
   requires (sizeof...(Sources) == 1 || sizeof...(Sources) == 2)
 void merge_fields(ActorMovementParameters& dest, Sources&&... sources) {
   merge_field(dest.mass, sources.mass...);
-  merge_field(dest.gravityMultiplier, sources.gravityMultiplier...);
-  merge_field(dest.liquidBuoyancy, sources.liquidBuoyancy...);
-  merge_field(dest.airBuoyancy, sources.airBuoyancy...);
-  merge_field(dest.bounceFactor, sources.bounceFactor...);
-  merge_field(dest.stopOnFirstBounce, sources.stopOnFirstBounce...);
-  merge_field(dest.enableSurfaceSlopeCorrection, sources.enableSurfaceSlopeCorrection...);
-  merge_field(dest.slopeSlidingFactor, sources.slopeSlidingFactor...);
-  merge_field(dest.maxMovementPerStep, sources.maxMovementPerStep...);
-  merge_field(dest.maximumCorrection, sources.maximumCorrection...);
-  merge_field(dest.speedLimit, sources.speedLimit...);
-  merge_field(dest.standingPoly, std::forward<Sources>(sources).standingPoly...);
-  merge_field(dest.crouchingPoly, std::forward<Sources>(sources).crouchingPoly...);
-  merge_field(dest.stickyCollision, sources.stickyCollision...);
-  merge_field(dest.stickyForce, sources.stickyForce...);
-  merge_field(dest.walkSpeed, sources.walkSpeed...);
-  merge_field(dest.runSpeed, sources.runSpeed...);
-  merge_field(dest.flySpeed, sources.flySpeed...);
-  merge_field(dest.airFriction, sources.airFriction...);
-  merge_field(dest.liquidFriction, sources.liquidFriction...);
-  merge_field(dest.minimumLiquidPercentage, sources.minimumLiquidPercentage...);
-  merge_field(dest.liquidImpedance, sources.liquidImpedance...);
-  merge_field(dest.normalGroundFriction, sources.normalGroundFriction...);
-  merge_field(dest.ambulatingGroundFriction, sources.ambulatingGroundFriction...);
-  merge_field(dest.groundForce, sources.groundForce...);
-  merge_field(dest.airForce, sources.airForce...);
-  merge_field(dest.liquidForce, sources.liquidForce...);
-  merge_fields(dest.airJumpProfile, sources.airJumpProfile...);
-  merge_fields(dest.liquidJumpProfile, sources.liquidJumpProfile...);
-  merge_field(dest.fallStatusSpeedMin, sources.fallStatusSpeedMin...);
-  merge_field(dest.fallThroughSustainFrames, sources.fallThroughSustainFrames...);
-  merge_field(dest.maximumPlatformCorrection, sources.maximumPlatformCorrection...);
-  merge_field(dest.maximumPlatformCorrectionVelocityFactor, sources.maximumPlatformCorrectionVelocityFactor...);
-  merge_field(dest.physicsEffectCategories, std::forward<Sources>(sources).physicsEffectCategories...);
-  merge_field(dest.groundMovementMinimumSustain, sources.groundMovementMinimumSustain...);
-  merge_field(dest.groundMovementMaximumSustain, sources.groundMovementMaximumSustain...);
-  merge_field(dest.groundMovementCheckDistance, sources.groundMovementCheckDistance...);
-  merge_field(dest.collisionEnabled, sources.collisionEnabled...);
-  merge_field(dest.frictionEnabled, sources.frictionEnabled...);
-  merge_field(dest.gravityEnabled, sources.gravityEnabled...);
-  merge_field(dest.pathExploreRate, sources.pathExploreRate...);
+  merge_field(dest.gravity_multiplier, sources.gravity_multiplier...);
+  merge_field(dest.liquid_buoyancy, sources.liquid_buoyancy...);
+  merge_field(dest.air_buoyancy, sources.air_buoyancy...);
+  merge_field(dest.bounce_factor, sources.bounce_factor...);
+  merge_field(dest.stop_on_first_bounce, sources.stop_on_first_bounce...);
+  merge_field(dest.enable_surface_slope_correction, sources.enable_surface_slope_correction...);
+  merge_field(dest.slope_sliding_factor, sources.slope_sliding_factor...);
+  merge_field(dest.max_movement_per_step, sources.max_movement_per_step...);
+  merge_field(dest.maximum_correction, sources.maximum_correction...);
+  merge_field(dest.speed_limit, sources.speed_limit...);
+  merge_field(dest.standing_poly, std::forward<Sources>(sources).standing_poly...);
+  merge_field(dest.crouching_poly, std::forward<Sources>(sources).crouching_poly...);
+  merge_field(dest.sticky_collision, sources.sticky_collision...);
+  merge_field(dest.sticky_force, sources.sticky_force...);
+  merge_field(dest.walk_speed, sources.walk_speed...);
+  merge_field(dest.run_speed, sources.run_speed...);
+  merge_field(dest.fly_speed, sources.fly_speed...);
+  merge_field(dest.air_friction, sources.air_friction...);
+  merge_field(dest.liquid_friction, sources.liquid_friction...);
+  merge_field(dest.minimum_liquid_percentage, sources.minimum_liquid_percentage...);
+  merge_field(dest.liquid_impedance, sources.liquid_impedance...);
+  merge_field(dest.normal_ground_friction, sources.normal_ground_friction...);
+  merge_field(dest.ambulating_ground_friction, sources.ambulating_ground_friction...);
+  merge_field(dest.ground_force, sources.ground_force...);
+  merge_field(dest.air_force, sources.air_force...);
+  merge_field(dest.liquid_force, sources.liquid_force...);
+  merge_fields(dest.air_jump_profile, sources.air_jump_profile...);
+  merge_fields(dest.liquid_jump_profile, sources.liquid_jump_profile...);
+  merge_field(dest.fall_status_speed_min, sources.fall_status_speed_min...);
+  merge_field(dest.fall_through_sustain_frames, sources.fall_through_sustain_frames...);
+  merge_field(dest.maximum_platform_correction, sources.maximum_platform_correction...);
+  merge_field(dest.maximum_platform_correction_velocity_factor, sources.maximum_platform_correction_velocity_factor...);
+  merge_field(dest.physics_effect_categories, std::forward<Sources>(sources).physics_effect_categories...);
+  merge_field(dest.ground_movement_minimum_sustain, sources.ground_movement_minimum_sustain...);
+  merge_field(dest.ground_movement_maximum_sustain, sources.ground_movement_maximum_sustain...);
+  merge_field(dest.ground_movement_check_distance, sources.ground_movement_check_distance...);
+  merge_field(dest.collision_enabled, sources.collision_enabled...);
+  merge_field(dest.friction_enabled, sources.friction_enabled...);
+  merge_field(dest.gravity_enabled, sources.gravity_enabled...);
+  merge_field(dest.path_explore_rate, sources.path_explore_rate...);
 }
 } // namespace
 
@@ -522,14 +522,14 @@ template <typename T>
   requires std::same_as<std::remove_const_t<T>, ActorMovementParameters>
 ActorWireResult transfer_movement_parameters(DataStream& ds, T& p) {
   // The three groundMovement sustain/distance settings are JSON-only.
-  return transfer_fields<std::is_const_v<T>>(ds, p.mass, p.gravityMultiplier, p.liquidBuoyancy, p.airBuoyancy,
-    p.bounceFactor, p.stopOnFirstBounce, p.enableSurfaceSlopeCorrection, p.slopeSlidingFactor, p.maxMovementPerStep,
-    p.maximumCorrection, p.speedLimit, p.standingPoly, p.crouchingPoly, p.stickyCollision, p.stickyForce,
-    p.walkSpeed, p.runSpeed, p.flySpeed, p.airFriction, p.liquidFriction, p.minimumLiquidPercentage,
-    p.liquidImpedance, p.normalGroundFriction, p.ambulatingGroundFriction, p.groundForce, p.airForce, p.liquidForce,
-    p.airJumpProfile, p.liquidJumpProfile, p.fallStatusSpeedMin, p.fallThroughSustainFrames,
-    p.maximumPlatformCorrection, p.maximumPlatformCorrectionVelocityFactor, p.physicsEffectCategories,
-    p.collisionEnabled, p.frictionEnabled, p.gravityEnabled, p.pathExploreRate);
+  return transfer_fields<std::is_const_v<T>>(ds, p.mass, p.gravity_multiplier, p.liquid_buoyancy, p.air_buoyancy,
+    p.bounce_factor, p.stop_on_first_bounce, p.enable_surface_slope_correction, p.slope_sliding_factor, p.max_movement_per_step,
+    p.maximum_correction, p.speed_limit, p.standing_poly, p.crouching_poly, p.sticky_collision, p.sticky_force,
+    p.walk_speed, p.run_speed, p.fly_speed, p.air_friction, p.liquid_friction, p.minimum_liquid_percentage,
+    p.liquid_impedance, p.normal_ground_friction, p.ambulating_ground_friction, p.ground_force, p.air_force, p.liquid_force,
+    p.air_jump_profile, p.liquid_jump_profile, p.fall_status_speed_min, p.fall_through_sustain_frames,
+    p.maximum_platform_correction, p.maximum_platform_correction_velocity_factor, p.physics_effect_categories,
+    p.collision_enabled, p.friction_enabled, p.gravity_enabled, p.path_explore_rate);
 }
 }
 
@@ -542,78 +542,78 @@ ActorWireResult operator<<(DataStream& ds, ActorMovementParameters const& parame
 }
 
 ActorMovementModifiers::ActorMovementModifiers() {
-  groundMovementModifier = 1.0f;
-  liquidMovementModifier = 1.0f;
-  speedModifier = 1.0f;
-  airJumpModifier = 1.0f;
-  liquidJumpModifier = 1.0f;
-  runningSuppressed = false;
-  jumpingSuppressed = false;
-  facingSuppressed = false;
-  movementSuppressed = false;
+  ground_movement_modifier = 1.0f;
+  liquid_movement_modifier = 1.0f;
+  speed_modifier = 1.0f;
+  air_jump_modifier = 1.0f;
+  liquid_jump_modifier = 1.0f;
+  running_suppressed = false;
+  jumping_suppressed = false;
+  facing_suppressed = false;
+  movement_suppressed = false;
 
  }
 
 std::expected<ActorMovementModifiers, StarException> ActorMovementModifiers::create(Json const& config) {
   ActorMovementModifiers value;
   if (!config.is_null()) {
-    auto groundMovementModifierResult = config.get_float("groundMovementModifier", 1.0f);
-    if (!groundMovementModifierResult) return std::unexpected(std::move(groundMovementModifierResult.error()));
-    value.groundMovementModifier = *groundMovementModifierResult;
-    auto liquidMovementModifierResult = config.get_float("liquidMovementModifier", 1.0f);
-    if (!liquidMovementModifierResult) return std::unexpected(std::move(liquidMovementModifierResult.error()));
-    value.liquidMovementModifier = *liquidMovementModifierResult;
-    auto speedModifierResult = config.get_float("speedModifier", 1.0f);
-    if (!speedModifierResult) return std::unexpected(std::move(speedModifierResult.error()));
-    value.speedModifier = *speedModifierResult;
-    auto airJumpModifierResult = config.get_float("airJumpModifier", 1.0f);
-    if (!airJumpModifierResult) return std::unexpected(std::move(airJumpModifierResult.error()));
-    value.airJumpModifier = *airJumpModifierResult;
-    auto liquidJumpModifierResult = config.get_float("liquidJumpModifier", 1.0f);
-    if (!liquidJumpModifierResult) return std::unexpected(std::move(liquidJumpModifierResult.error()));
-    value.liquidJumpModifier = *liquidJumpModifierResult;
-    auto runningSuppressedResult = config.get_bool("runningSuppressed", false);
-    if (!runningSuppressedResult) return std::unexpected(std::move(runningSuppressedResult.error()));
-    value.runningSuppressed = *runningSuppressedResult;
-    auto jumpingSuppressedResult = config.get_bool("jumpingSuppressed", false);
-    if (!jumpingSuppressedResult) return std::unexpected(std::move(jumpingSuppressedResult.error()));
-    value.jumpingSuppressed = *jumpingSuppressedResult;
-    auto facingSuppressedResult = config.get_bool("facingSuppressed", false);
-    if (!facingSuppressedResult) return std::unexpected(std::move(facingSuppressedResult.error()));
-    value.facingSuppressed = *facingSuppressedResult;
-    auto movementSuppressedResult = config.get_bool("movementSuppressed", false);
-    if (!movementSuppressedResult) return std::unexpected(std::move(movementSuppressedResult.error()));
-    value.movementSuppressed = *movementSuppressedResult;
+    auto ground_movement_modifier_result = config.get_float("groundMovementModifier", 1.0f);
+    if (!ground_movement_modifier_result) return std::unexpected(std::move(ground_movement_modifier_result.error()));
+    value.ground_movement_modifier = *ground_movement_modifier_result;
+    auto liquid_movement_modifier_result = config.get_float("liquidMovementModifier", 1.0f);
+    if (!liquid_movement_modifier_result) return std::unexpected(std::move(liquid_movement_modifier_result.error()));
+    value.liquid_movement_modifier = *liquid_movement_modifier_result;
+    auto speed_modifier_result = config.get_float("speedModifier", 1.0f);
+    if (!speed_modifier_result) return std::unexpected(std::move(speed_modifier_result.error()));
+    value.speed_modifier = *speed_modifier_result;
+    auto air_jump_modifier_result = config.get_float("airJumpModifier", 1.0f);
+    if (!air_jump_modifier_result) return std::unexpected(std::move(air_jump_modifier_result.error()));
+    value.air_jump_modifier = *air_jump_modifier_result;
+    auto liquid_jump_modifier_result = config.get_float("liquidJumpModifier", 1.0f);
+    if (!liquid_jump_modifier_result) return std::unexpected(std::move(liquid_jump_modifier_result.error()));
+    value.liquid_jump_modifier = *liquid_jump_modifier_result;
+    auto running_suppressed_result = config.get_bool("runningSuppressed", false);
+    if (!running_suppressed_result) return std::unexpected(std::move(running_suppressed_result.error()));
+    value.running_suppressed = *running_suppressed_result;
+    auto jumping_suppressed_result = config.get_bool("jumpingSuppressed", false);
+    if (!jumping_suppressed_result) return std::unexpected(std::move(jumping_suppressed_result.error()));
+    value.jumping_suppressed = *jumping_suppressed_result;
+    auto facing_suppressed_result = config.get_bool("facingSuppressed", false);
+    if (!facing_suppressed_result) return std::unexpected(std::move(facing_suppressed_result.error()));
+    value.facing_suppressed = *facing_suppressed_result;
+    auto movement_suppressed_result = config.get_bool("movementSuppressed", false);
+    if (!movement_suppressed_result) return std::unexpected(std::move(movement_suppressed_result.error()));
+    value.movement_suppressed = *movement_suppressed_result;
   }
   return value;
 }
 
-Json ActorMovementModifiers::toJson() const {
+Json ActorMovementModifiers::to_json() const {
   return JsonObject{
-    {"groundMovementModifier", groundMovementModifier},
-    {"liquidMovementModifier", liquidMovementModifier},
-    {"speedModifier", speedModifier},
-    {"airJumpModifier", airJumpModifier},
-    {"liquidJumpModifier", liquidJumpModifier},
-    {"runningSuppressed", runningSuppressed},
-    {"jumpingSuppressed", jumpingSuppressed},
-    {"facingSuppressed", facingSuppressed},
-    {"movementSuppressed", movementSuppressed}
+    {"groundMovementModifier", ground_movement_modifier},
+    {"liquidMovementModifier", liquid_movement_modifier},
+    {"speedModifier", speed_modifier},
+    {"airJumpModifier", air_jump_modifier},
+    {"liquidJumpModifier", liquid_jump_modifier},
+    {"runningSuppressed", running_suppressed},
+    {"jumpingSuppressed", jumping_suppressed},
+    {"facingSuppressed", facing_suppressed},
+    {"movementSuppressed", movement_suppressed}
   };
 }
 
 ActorMovementModifiers ActorMovementModifiers::combine(ActorMovementModifiers const& rhs) const {
   ActorMovementModifiers res = *this;
 
-  res.groundMovementModifier *= rhs.groundMovementModifier;
-  res.liquidMovementModifier *= rhs.liquidMovementModifier;
-  res.speedModifier *= rhs.speedModifier;
-  res.airJumpModifier *= rhs.airJumpModifier;
-  res.liquidJumpModifier *= rhs.liquidJumpModifier;
-  res.runningSuppressed = res.runningSuppressed || rhs.runningSuppressed;
-  res.jumpingSuppressed = res.jumpingSuppressed || rhs.jumpingSuppressed;
-  res.facingSuppressed = res.facingSuppressed || rhs.facingSuppressed;
-  res.movementSuppressed = res.movementSuppressed || rhs.movementSuppressed;
+  res.ground_movement_modifier *= rhs.ground_movement_modifier;
+  res.liquid_movement_modifier *= rhs.liquid_movement_modifier;
+  res.speed_modifier *= rhs.speed_modifier;
+  res.air_jump_modifier *= rhs.air_jump_modifier;
+  res.liquid_jump_modifier *= rhs.liquid_jump_modifier;
+  res.running_suppressed = res.running_suppressed || rhs.running_suppressed;
+  res.jumping_suppressed = res.jumping_suppressed || rhs.jumping_suppressed;
+  res.facing_suppressed = res.facing_suppressed || rhs.facing_suppressed;
+  res.movement_suppressed = res.movement_suppressed || rhs.movement_suppressed;
 
   return res;
 }
@@ -622,9 +622,9 @@ namespace {
 template <typename T>
   requires std::same_as<std::remove_const_t<T>, ActorMovementModifiers>
 ActorWireResult transfer_movement_modifiers(DataStream& ds, T& m) {
-  return transfer_fields<std::is_const_v<T>>(ds, m.groundMovementModifier, m.liquidMovementModifier,
-    m.speedModifier, m.airJumpModifier, m.liquidJumpModifier, m.runningSuppressed, m.jumpingSuppressed,
-    m.facingSuppressed, m.movementSuppressed);
+  return transfer_fields<std::is_const_v<T>>(ds, m.ground_movement_modifier, m.liquid_movement_modifier,
+    m.speed_modifier, m.air_jump_modifier, m.liquid_jump_modifier, m.running_suppressed, m.jumping_suppressed,
+    m.facing_suppressed, m.movement_suppressed);
 }
 }
 
@@ -636,76 +636,76 @@ ActorWireResult operator<<(DataStream& ds, ActorMovementModifiers const& modifie
   return transfer_movement_modifiers(ds, modifiers);
 }
 
-ActorMovementController::ActorMovementController(Root& root) : MovementController(root) {
-  m_controlRotationRate = 0.0f;
-  m_controlRun = false;
-  m_controlCrouch = false;
-  m_controlDown = false;
-  m_controlJump = false;
-  m_controlJumpAnyway = false;
+ActorMovementController::ActorMovementController(ConstructionKey, Root& root) : MovementController(root) {
+  m_control_rotation_rate = 0.0f;
+  m_control_run = false;
+  m_control_crouch = false;
+  m_control_down = false;
+  m_control_jump = false;
+  m_control_jump_anyway = false;
 
-  m_fallThroughSustain = 0;
-  m_lastControlJump = false;
-  m_lastControlDown = false;
-  m_targetHorizontalAmbulatingVelocity = 0.0f;
-  m_moveSpeedMultiplier = 1.0f;
+  m_fall_through_sustain = 0;
+  m_last_control_jump = false;
+  m_last_control_down = false;
+  m_target_horizontal_ambulating_velocity = 0.0f;
+  m_move_speed_multiplier = 1.0f;
 
 }
 
 std::expected<std::shared_ptr<ActorMovementController>, StarException> ActorMovementController::create(Root& root, ActorMovementParameters const& parameters) {
-  auto controller = std::shared_ptr<ActorMovementController>(new ActorMovementController(root));
+  auto controller = std::make_shared<ActorMovementController>(ConstructionKey{}, root);
   auto initialized = controller->initialize({});
   if (!initialized) return std::unexpected(std::move(initialized.error()));
   if (auto result = controller->add_net_element(controller->m_walking); !result) return std::unexpected(std::move(result.error()));
   if (auto result = controller->add_net_element(controller->m_running); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = controller->add_net_element(controller->m_movingDirection); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = controller->add_net_element(controller->m_facingDirection); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = controller->add_net_element(controller->m_moving_direction); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = controller->add_net_element(controller->m_facing_direction); !result) return std::unexpected(std::move(result.error()));
   if (auto result = controller->add_net_element(controller->m_crouching); !result) return std::unexpected(std::move(result.error()));
   if (auto result = controller->add_net_element(controller->m_flying); !result) return std::unexpected(std::move(result.error()));
   if (auto result = controller->add_net_element(controller->m_falling); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = controller->add_net_element(controller->m_canJump); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = controller->add_net_element(controller->m_can_jump); !result) return std::unexpected(std::move(result.error()));
   if (auto result = controller->add_net_element(controller->m_jumping); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = controller->add_net_element(controller->m_groundMovement); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = controller->add_net_element(controller->m_liquidMovement); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = controller->add_net_element(controller->m_anchorState); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = controller->add_net_element(controller->m_ground_movement); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = controller->add_net_element(controller->m_liquid_movement); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = controller->add_net_element(controller->m_anchor_state); !result) return std::unexpected(std::move(result.error()));
 
-  auto configured = controller->resetBaseParameters(parameters);
+  auto configured = controller->reset_base_parameters(parameters);
   if (!configured) return std::unexpected(std::move(configured.error()));
   return controller;
 }
 
-ActorMovementParameters const& ActorMovementController::baseParameters() const {
-  return m_baseParameters;
+ActorMovementParameters const& ActorMovementController::base_parameters() const {
+  return m_base_parameters;
 }
 
-std::expected<void, StarException> ActorMovementController::updateBaseParameters(ActorMovementParameters const& parameters) {
-  auto merged = m_baseParameters.merge(parameters);
-  auto applied = applyMCParameters(merged);
+std::expected<void, StarException> ActorMovementController::update_base_parameters(ActorMovementParameters const& parameters) {
+  auto merged = m_base_parameters.merge(parameters);
+  auto applied = apply_mc_parameters(merged);
   if (!applied) return std::unexpected(std::move(applied.error()));
-  m_baseParameters = std::move(merged);
+  m_base_parameters = std::move(merged);
   return {};
 }
 
-std::expected<void, StarException> ActorMovementController::resetBaseParameters(ActorMovementParameters const& parameters) {
-  auto defaults = ActorMovementParameters::sensibleDefaults(root());
+std::expected<void, StarException> ActorMovementController::reset_base_parameters(ActorMovementParameters const& parameters) {
+  auto defaults = ActorMovementParameters::sensible_defaults(root());
   if (!defaults) return std::unexpected(std::move(defaults.error()));
   defaults->merge_from(parameters);
-  auto applied = applyMCParameters(*defaults);
+  auto applied = apply_mc_parameters(*defaults);
   if (!applied) return std::unexpected(std::move(applied.error()));
-  m_baseParameters = std::move(*defaults);
+  m_base_parameters = std::move(*defaults);
   return {};
 }
 
-ActorMovementModifiers const& ActorMovementController::baseModifiers() const {
-  return m_baseModifiers;
+ActorMovementModifiers const& ActorMovementController::base_modifiers() const {
+  return m_base_modifiers;
 }
 
-void ActorMovementController::updateBaseModifiers(ActorMovementModifiers const& modifiers) {
-  m_baseModifiers = m_baseModifiers.combine(modifiers);
+void ActorMovementController::update_base_modifiers(ActorMovementModifiers const& modifiers) {
+  m_base_modifiers = m_base_modifiers.combine(modifiers);
 }
 
-void ActorMovementController::resetBaseModifiers(ActorMovementModifiers const& modifiers) {
-  m_baseModifiers = modifiers;
+void ActorMovementController::reset_base_modifiers(ActorMovementModifiers const& modifiers) {
+  m_base_modifiers = modifiers;
 }
 
 void ActorMovementController::uninit() {
@@ -715,63 +715,63 @@ void ActorMovementController::uninit() {
   MovementController::uninit();
 }
 
-std::expected<Json, StarException> ActorMovementController::storeState() const {
-  auto movingName = enum_name<direction_names>(movingDirection());
-  if (!movingName) return std::unexpected(std::move(movingName.error()));
-  auto facingName = enum_name<direction_names>(m_facingDirection.get());
-  if (!facingName) return std::unexpected(std::move(facingName.error()));
+std::expected<Json, StarException> ActorMovementController::store_state() const {
+  auto moving_name = enum_name<direction_names>(moving_direction());
+  if (!moving_name) return std::unexpected(std::move(moving_name.error()));
+  auto facing_name = enum_name<direction_names>(m_facing_direction.get());
+  if (!facing_name) return std::unexpected(std::move(facing_name.error()));
   return JsonObject{{"position", json_from_vec2f(MovementController::position())},
                     {"velocity", json_from_vec2f(velocity())},
                     {"rotation", MovementController::rotation()},
-                    {"movingDirection", String(*movingName)},
-                    {"facingDirection", String(*facingName)},
+                    {"movingDirection", String(*moving_name)},
+                    {"facingDirection", String(*facing_name)},
                     {"crouching", m_crouching.get()}};
 }
 
-std::expected<void, StarException> ActorMovementController::loadState(Json const& state) {
+std::expected<void, StarException> ActorMovementController::load_state(Json const& state) {
   auto loaded = MovementController::loadState(state);
   if (!loaded) return std::unexpected(std::move(loaded.error()));
-  auto movingName = state.get_string("movingDirection");
-  if (!movingName) return std::unexpected(std::move(movingName.error()));
-  auto movingDirection = enum_value<direction_names>(*movingName);
-  if (!movingDirection) return std::unexpected(std::move(movingDirection.error()));
-  auto facingName = state.get_string("facingDirection");
-  if (!facingName) return std::unexpected(std::move(facingName.error()));
-  auto facingDirection = enum_value<direction_names>(*facingName);
-  if (!facingDirection) return std::unexpected(std::move(facingDirection.error()));
-  auto crouchingValue = state.get_bool("crouching");
-  if (!crouchingValue) return std::unexpected(std::move(crouchingValue.error()));
-  setMovingDirection(*movingDirection);
-  m_facingDirection.set(*facingDirection);
-  m_crouching.set(*crouchingValue);
+  auto moving_name = state.get_string("movingDirection");
+  if (!moving_name) return std::unexpected(std::move(moving_name.error()));
+  auto moving_direction = enum_value<direction_names>(*moving_name);
+  if (!moving_direction) return std::unexpected(std::move(moving_direction.error()));
+  auto facing_name = state.get_string("facingDirection");
+  if (!facing_name) return std::unexpected(std::move(facing_name.error()));
+  auto facing_direction = enum_value<direction_names>(*facing_name);
+  if (!facing_direction) return std::unexpected(std::move(facing_direction.error()));
+  auto crouching_value = state.get_bool("crouching");
+  if (!crouching_value) return std::unexpected(std::move(crouching_value.error()));
+  set_moving_direction(*moving_direction);
+  m_facing_direction.set(*facing_direction);
+  m_crouching.set(*crouching_value);
   return {};
 }
 
-std::expected<void, StarException> ActorMovementController::setAnchorState(EntityAnchorState anchorState) {
-  return doSetAnchorState(anchorState);
+std::expected<void, StarException> ActorMovementController::set_anchor_state(EntityAnchorState anchor_state) {
+  return do_set_anchor_state(anchor_state);
 }
 
-std::expected<void, StarException> ActorMovementController::resetAnchorState() {
-  return doSetAnchorState({});
+std::expected<void, StarException> ActorMovementController::reset_anchor_state() {
+  return do_set_anchor_state({});
 }
 
-std::optional<EntityAnchorState> ActorMovementController::anchorState() const {
-  return m_anchorState.get();
+std::optional<EntityAnchorState> ActorMovementController::anchor_state() const {
+  return m_anchor_state.get();
 }
 
-std::shared_ptr<EntityAnchor const> ActorMovementController::entityAnchor() const {
-  return m_entityAnchor;
+std::shared_ptr<EntityAnchor const> ActorMovementController::entity_anchor() const {
+  return m_entity_anchor;
 }
 
 Vec2F ActorMovementController::position() const {
-  if (m_entityAnchor)
-    return m_entityAnchor->position;
+  if (m_entity_anchor)
+    return m_entity_anchor->position;
   return MovementController::position();
 }
 
 float ActorMovementController::rotation() const {
-  if (m_entityAnchor)
-    return m_entityAnchor->angle;
+  if (m_entity_anchor)
+    return m_entity_anchor->angle;
   return MovementController::rotation();
 }
 
@@ -783,32 +783,32 @@ bool ActorMovementController::running() const {
   return m_running.get();
 }
 
-Direction ActorMovementController::movingDirection() const {
-  return m_nativeMovingDirection.value_or(m_movingDirection.get());
+Direction ActorMovementController::moving_direction() const {
+  return m_native_moving_direction.value_or(m_moving_direction.get());
 }
 
-void ActorMovementController::setMovingDirection(Direction direction) {
-  if (m_nativeMovingDirection)
-    m_nativeMovingDirection = direction;
+void ActorMovementController::set_moving_direction(Direction direction) {
+  if (m_native_moving_direction)
+    m_native_moving_direction = direction;
   else
-    m_movingDirection.set(direction);
+    m_moving_direction.set(direction);
 }
 
-void ActorMovementController::setNetworkMovingDirection(std::optional<Direction> direction) {
+void ActorMovementController::set_network_moving_direction(std::optional<Direction> direction) {
   if (direction) {
-    if (!m_nativeMovingDirection)
-      m_nativeMovingDirection = m_movingDirection.get();
-    m_movingDirection.set(*direction);
-  } else if (m_nativeMovingDirection) {
-    m_movingDirection.set(*m_nativeMovingDirection);
-    m_nativeMovingDirection.reset();
+    if (!m_native_moving_direction)
+      m_native_moving_direction = m_moving_direction.get();
+    m_moving_direction.set(*direction);
+  } else if (m_native_moving_direction) {
+    m_moving_direction.set(*m_native_moving_direction);
+    m_native_moving_direction.reset();
   }
 }
 
-Direction ActorMovementController::facingDirection() const {
-  if (m_entityAnchor)
-    return m_entityAnchor->direction;
-  return m_facingDirection.get();
+Direction ActorMovementController::facing_direction() const {
+  if (m_entity_anchor)
+    return m_entity_anchor->direction;
+  return m_facing_direction.get();
 }
 
 bool ActorMovementController::crouching() const {
@@ -823,90 +823,90 @@ bool ActorMovementController::falling() const {
   return m_falling.get();
 }
 
-bool ActorMovementController::canJump() const {
-  return m_canJump.get();
+bool ActorMovementController::can_jump() const {
+  return m_can_jump.get();
 }
 
 bool ActorMovementController::jumping() const {
   return m_jumping.get();
 }
 
-bool ActorMovementController::groundMovement() const {
-  return m_groundMovement.get();
+bool ActorMovementController::ground_movement() const {
+  return m_ground_movement.get();
 }
 
-bool ActorMovementController::liquidMovement() const {
-  return m_liquidMovement.get();
+bool ActorMovementController::liquid_movement() const {
+  return m_liquid_movement.get();
 }
 
 bool ActorMovementController::pathfinding() const {
   return m_path_controller && !m_path_move_result && m_path_controller->pathfinding();
 }
 
-void ActorMovementController::controlRotation(float rotationRate) {
-  m_controlRotationRate += rotationRate;
+void ActorMovementController::control_rotation(float rotation_rate) {
+  m_control_rotation_rate += rotation_rate;
 }
 
-void ActorMovementController::controlAcceleration(Vec2F const& acceleration) {
-  m_controlAcceleration += acceleration;
+void ActorMovementController::control_acceleration(Vec2F const& acceleration) {
+  m_control_acceleration += acceleration;
 }
 
-void ActorMovementController::controlForce(Vec2F const& force) {
-  m_controlForce += force;
+void ActorMovementController::control_force(Vec2F const& force) {
+  m_control_force += force;
 }
 
-void ActorMovementController::controlApproachVelocity(Vec2F const& targetVelocity, float maxControlForce) {
-  m_controlApproachVelocities.push_back({targetVelocity, maxControlForce});
+void ActorMovementController::control_approach_velocity(Vec2F const& target_velocity, float max_control_force) {
+  m_control_approach_velocities.push_back({target_velocity, max_control_force});
 }
 
-void ActorMovementController::controlApproachVelocityAlongAngle(
-    float angle, float targetVelocity, float maxControlForce, bool positiveOnly) {
-  m_controlApproachVelocityAlongAngles.push_back({angle, targetVelocity, maxControlForce, positiveOnly});
+void ActorMovementController::control_approach_velocity_along_angle(
+    float angle, float target_velocity, float max_control_force, bool positive_only) {
+  m_control_approach_velocity_along_angles.push_back({angle, target_velocity, max_control_force, positive_only});
 }
 
-void ActorMovementController::controlApproachXVelocity(float targetXVelocity, float maxControlForce) {
-  controlApproachVelocityAlongAngle(0, targetXVelocity, maxControlForce, false);
+void ActorMovementController::control_approach_x_velocity(float target_xvelocity, float max_control_force) {
+  control_approach_velocity_along_angle(0, target_xvelocity, max_control_force, false);
 }
 
-void ActorMovementController::controlApproachYVelocity(float targetYVelocity, float maxControlForce) {
-  controlApproachVelocityAlongAngle(std::numbers::pi / 2, targetYVelocity, maxControlForce, false);
+void ActorMovementController::control_approach_y_velocity(float target_yvelocity, float max_control_force) {
+  control_approach_velocity_along_angle(std::numbers::pi / 2, target_yvelocity, max_control_force, false);
 }
 
-void ActorMovementController::controlParameters(ActorMovementParameters const& parameters) {
+void ActorMovementController::control_parameters(ActorMovementParameters const& parameters) {
   if (m_control_parameters)
     m_control_parameters->merge_from(parameters);
   else
     m_control_parameters.emplace(parameters);
 }
 
-void ActorMovementController::controlModifiers(ActorMovementModifiers const& modifiers) {
-  m_controlModifiers = m_controlModifiers.combine(modifiers);
+void ActorMovementController::control_modifiers(ActorMovementModifiers const& modifiers) {
+  m_control_modifiers = m_control_modifiers.combine(modifiers);
 }
 
-void ActorMovementController::controlMove(Direction direction, bool run) {
-  m_controlMove = direction;
-  m_controlRun = run;
+void ActorMovementController::control_move(Direction direction, bool run) {
+  m_control_move = direction;
+  m_control_run = run;
 }
 
-void ActorMovementController::controlFace(Direction direction) {
-  m_controlFace = direction;
+void ActorMovementController::control_face(Direction direction) {
+  m_control_face = direction;
 }
 
-void ActorMovementController::controlDown() {
-  m_controlDown = true;
+void ActorMovementController::control_down() {
+  m_control_down = true;
 }
 
-void ActorMovementController::controlCrouch() {
-  m_controlCrouch = true;
+void ActorMovementController::control_crouch() {
+  m_control_crouch = true;
 }
 
-void ActorMovementController::controlJump(bool jumpEvenIfUnable) {
-  m_controlJump = true;
-  m_controlJumpAnyway |= jumpEvenIfUnable;
+void ActorMovementController::control_jump(bool jump_even_if_unable) {
+  m_control_jump = true;
+  m_control_jump_anyway |= jump_even_if_unable;
 }
 
-void ActorMovementController::controlFly(Vec2F const& velocity) {
-  m_controlFly = velocity;
+void ActorMovementController::control_fly(Vec2F const& velocity) {
+  m_control_fly = velocity;
 }
 
 std::expected<std::optional<bool>, StarException>
@@ -943,86 +943,86 @@ ActorMovementController::control_path_move(Vec2F const& position, bool run,
   return result;
 }
 
-void ActorMovementController::setMoveSpeedMultiplier(float scale) {
-  m_moveSpeedMultiplier = scale;
+void ActorMovementController::set_move_speed_multiplier(float scale) {
+  m_move_speed_multiplier = scale;
 }
 
-void ActorMovementController::clearControls() {
-  m_controlRotationRate = 0.0f;
-  m_controlAcceleration = Vec2F();
-  m_controlForce = Vec2F();
-  m_controlApproachVelocities.clear();
-  m_controlApproachVelocityAlongAngles.clear();
-  m_controlMove = {};
-  m_controlFace = {};
-  m_controlRun = false;
-  m_controlCrouch = false;
-  m_controlDown = false;
-  m_controlJump = false;
-  m_controlJumpAnyway = false;
-  m_controlFly = {};
+void ActorMovementController::clear_controls() {
+  m_control_rotation_rate = 0.0f;
+  m_control_acceleration = Vec2F();
+  m_control_force = Vec2F();
+  m_control_approach_velocities.clear();
+  m_control_approach_velocity_along_angles.clear();
+  m_control_move = {};
+  m_control_face = {};
+  m_control_run = false;
+  m_control_crouch = false;
+  m_control_down = false;
+  m_control_jump = false;
+  m_control_jump_anyway = false;
+  m_control_fly = {};
   m_control_path_move.reset();
   m_control_parameters.reset();
-  m_controlModifiers = ActorMovementModifiers();
+  m_control_modifiers = ActorMovementModifiers();
 }
 
-std::expected<void, StarException> ActorMovementController::tickMaster(float dt) {
-  auto activeWorld = world();
-  if (!activeWorld) return std::unexpected(std::move(activeWorld.error()));
-  World& worldRef = activeWorld->get();
-  std::shared_ptr<EntityAnchor const> newAnchor;
-  if (auto anchorState = m_anchorState.get()) {
-    if (auto anchorableEntity = as<AnchorableEntity>(worldRef.entity(anchorState->entityId)))
+std::expected<void, StarException> ActorMovementController::tick_master(float dt) {
+  auto active_world = world();
+  if (!active_world) return std::unexpected(std::move(active_world.error()));
+  World& world_ref = active_world->get();
+  std::shared_ptr<EntityAnchor const> new_anchor;
+  if (auto anchor_state = m_anchor_state.get()) {
+    if (auto anchorable_entity = as<AnchorableEntity>(world_ref.entity(anchor_state->entityId)))
       {
-        auto anchorValue = anchorableEntity->anchor(anchorState->positionIndex);
-        if (!anchorValue) return std::unexpected(std::move(anchorValue.error()));
-        newAnchor = std::move(*anchorValue);
+        auto anchor_value = anchorable_entity->anchor(anchor_state->positionIndex);
+        if (!anchor_value) return std::unexpected(std::move(anchor_value.error()));
+        new_anchor = std::move(*anchor_value);
       }
   }
 
-  if (newAnchor)
-    m_entityAnchor = newAnchor;
+  if (new_anchor)
+    m_entity_anchor = new_anchor;
   else
-    if (auto result = resetAnchorState(); !result) return std::unexpected(std::move(result.error()));
+    if (auto result = reset_anchor_state(); !result) return std::unexpected(std::move(result.error()));
 
-  if (m_entityAnchor) {
+  if (m_entity_anchor) {
     m_walking.set(false);
     m_running.set(false);
     m_crouching.set(false);
     m_flying.set(false);
     m_falling.set(false);
-    m_canJump.set(false);
+    m_can_jump.set(false);
     m_jumping.set(false);
-    m_groundMovement.set(false);
-    m_liquidMovement.set(false);
+    m_ground_movement.set(false);
+    m_liquid_movement.set(false);
 
-    setVelocity((m_entityAnchor->position - MovementController::position()) / dt);
+    setVelocity((m_entity_anchor->position - MovementController::position()) / dt);
     if (auto result = MovementController::tickMaster(dt); !result) return std::unexpected(std::move(result.error()));
-    setPosition(m_entityAnchor->position);
+    setPosition(m_entity_anchor->position);
   } else {
     auto const merged = m_control_parameters.transform([this](ActorMovementParameters const& patch) {
-      return m_baseParameters.merge(patch);
+      return m_base_parameters.merge(patch);
     });
-    auto const& active_parameters = merged ? *merged : m_baseParameters;
-    auto activeModifiers = m_baseModifiers.combine(m_controlModifiers);
+    auto const& active_parameters = merged ? *merged : m_base_parameters;
+    auto active_modifiers = m_base_modifiers.combine(m_control_modifiers);
 
-    if (activeModifiers.movementSuppressed) {
-      m_controlMove = {};
-      m_controlRun = false;
-      m_controlCrouch = false;
-      m_controlDown = false;
-      m_controlJump = false;
-      m_controlFly = {};
+    if (active_modifiers.movement_suppressed) {
+      m_control_move = {};
+      m_control_run = false;
+      m_control_crouch = false;
+      m_control_down = false;
+      m_control_jump = false;
+      m_control_fly = {};
       m_control_path_move.reset();
     }
 
-    if (m_controlMove.has_value()
-        || m_controlCrouch
-        || m_controlDown
-        || m_controlJump
-        || m_controlFly.has_value()
-        || !m_controlApproachVelocities.empty()
-        || !m_controlApproachVelocityAlongAngles.empty()) {
+    if (m_control_move.has_value()
+        || m_control_crouch
+        || m_control_down
+        || m_control_jump
+        || m_control_fly.has_value()
+        || !m_control_approach_velocities.empty()
+        || !m_control_approach_velocity_along_angles.empty()) {
       // controlling any other movement overrides the pathing
       m_control_path_move.reset();
     }
@@ -1031,13 +1031,13 @@ std::expected<void, StarException> ActorMovementController::tickMaster(float dt)
       if (appliedForceRegion()) {
         m_path_controller->reset();
       } else if (!m_path_controller->pathfinding()) {
-        auto path_result = m_path_controller->move(*this, active_parameters, activeModifiers, m_control_path_move->second, dt);
+        auto path_result = m_path_controller->move(*this, active_parameters, active_modifiers, m_control_path_move->second, dt);
         if (!path_result) return std::unexpected(std::move(path_result.error()));
         if (*path_result)
           m_path_move_result.emplace(m_control_path_move->first, **path_result);
 
         auto action = m_path_controller->current_action();
-        bool onGround = false;
+        bool on_ground = false;
         if (auto a = action) {
           using namespace PlatformerAStar;
           m_walking.set(a == Action::Walk && !m_control_path_move->second);
@@ -1046,37 +1046,37 @@ std::expected<void, StarException> ActorMovementController::tickMaster(float dt)
           m_falling.set((a == Action::Arc && yVelocity() < 0.0f) || a == Action::Drop);
           m_jumping.set(a == Action::Arc && yVelocity() >= 0.0f);
 
-          onGround = a == Action::Walk || a == Action::Drop || a == Action::Jump;
+          on_ground = a == Action::Walk || a == Action::Drop || a == Action::Jump;
 
           if (a == Action::Land || a== Action::Jump) {
-            auto inLiquid = liquidPercentage() >= active_parameters.minimumLiquidPercentage.value_or(1.0);
-            m_liquidMovement.set(inLiquid);
-            m_groundMovement.set(!inLiquid);
-            onGround = !inLiquid && onGround;
+            auto in_liquid = liquidPercentage() >= active_parameters.minimum_liquid_percentage.value_or(1.0);
+            m_liquid_movement.set(in_liquid);
+            m_ground_movement.set(!in_liquid);
+            on_ground = !in_liquid && on_ground;
           } else {
-            m_liquidMovement.set(a == Action::Swim);
-            m_groundMovement.set(a != Action::Arc && a != Action::Swim);
+            m_liquid_movement.set(a == Action::Swim);
+            m_ground_movement.set(a != Action::Arc && a != Action::Swim);
           }
         } else {
           m_walking.set(false);
           m_running.set(false);
         }
         auto path_facing = m_path_controller->facing();
-        auto facing = (m_controlFace ? m_controlFace : path_facing).value_or(m_facingDirection.get());
-        m_facingDirection.set(facing);
-        setMovingDirection(path_facing.value_or(m_facingDirection.get()));
+        auto facing = (m_control_face ? m_control_face : path_facing).value_or(m_facing_direction.get());
+        m_facing_direction.set(facing);
+        set_moving_direction(path_facing.value_or(m_facing_direction.get()));
 
-        if (auto result = applyMCParameters(active_parameters); !result) return std::unexpected(std::move(result.error()));
+        if (auto result = apply_mc_parameters(active_parameters); !result) return std::unexpected(std::move(result.error()));
 
         // MovementController still handles updating liquid percentage and updating force regions
         if (auto result = updateLiquidPercentage(); !result) return std::unexpected(std::move(result.error()));
         if (auto result = updateForceRegions(dt); !result) return std::unexpected(std::move(result.error()));
         // onGround flag needs to be manually set, won't be set by MovementController::tickMaster
-        setOnGround(onGround);
+        setOnGround(on_ground);
         // Hold the receipt until the next request, not the finished edge list.
         if (m_path_move_result)
           m_path_controller->reset();
-        clearControls();
+        clear_controls();
         return {};
       } else {
         auto path_result = m_path_controller->find_path(*this, m_control_path_move->first);
@@ -1089,327 +1089,327 @@ std::expected<void, StarException> ActorMovementController::tickMaster(float dt)
     }
 
     // Do some basic movement consistency checks.
-    if (m_controlFly)
-      m_controlMove = {};
+    if (m_control_fly)
+      m_control_move = {};
 
-    if ((m_controlDown && !m_lastControlDown) || m_controlFly)
-      m_fallThroughSustain = (*active_parameters.fallThroughSustainFrames);
-    else if (m_fallThroughSustain > 0)
-      --m_fallThroughSustain;
+    if ((m_control_down && !m_last_control_down) || m_control_fly)
+      m_fall_through_sustain = (*active_parameters.fall_through_sustain_frames);
+    else if (m_fall_through_sustain > 0)
+      --m_fall_through_sustain;
 
-    if (auto result = applyMCParameters(active_parameters); !result) return std::unexpected(std::move(result.error()));
+    if (auto result = apply_mc_parameters(active_parameters); !result) return std::unexpected(std::move(result.error()));
 
-    m_targetHorizontalAmbulatingVelocity = 0.0f;
+    m_target_horizontal_ambulating_velocity = 0.0f;
 
-    rotate(m_controlRotationRate);
-    accelerate(m_controlAcceleration);
-    force(m_controlForce);
+    rotate(m_control_rotation_rate);
+    accelerate(m_control_acceleration);
+    force(m_control_force);
 
-    for (auto const& approach : m_controlApproachVelocities)
-      approachVelocity(approach.targetVelocity * activeModifiers.speedModifier, approach.maxControlForce);
+    for (auto const& approach : m_control_approach_velocities)
+      approachVelocity(approach.target_velocity * active_modifiers.speed_modifier, approach.max_control_force);
 
-    for (auto const& approach : m_controlApproachVelocityAlongAngles)
-      approachVelocityAlongAngle(approach.alongAngle, approach.targetVelocity * activeModifiers.speedModifier, approach.maxControlForce, approach.positiveOnly);
+    for (auto const& approach : m_control_approach_velocity_along_angles)
+      approachVelocityAlongAngle(approach.along_angle, approach.target_velocity * active_modifiers.speed_modifier, approach.max_control_force, approach.positive_only);
 
-    m_liquidMovement.set(liquidPercentage() >= (*active_parameters.minimumLiquidPercentage));
-    float liquidImpedance = (*active_parameters.liquidImpedance) * liquidPercentage();
+    m_liquid_movement.set(liquidPercentage() >= (*active_parameters.minimum_liquid_percentage));
+    float liquid_impedance = (*active_parameters.liquid_impedance) * liquidPercentage();
 
-    std::optional<Direction> updatedMovingDirection;
-    bool running = m_controlRun && !activeModifiers.runningSuppressed;
+    std::optional<Direction> updated_moving_direction;
+    bool running = m_control_run && !active_modifiers.running_suppressed;
 
-    if (m_controlFly) {
-      Vec2F flyVelocity = *m_controlFly;
-      if (flyVelocity.magnitude_squared() != 0)
-        flyVelocity = flyVelocity.normalized() * (*active_parameters.flySpeed);
+    if (m_control_fly) {
+      Vec2F fly_velocity = *m_control_fly;
+      if (fly_velocity.magnitude_squared() != 0)
+        fly_velocity = fly_velocity.normalized() * (*active_parameters.fly_speed);
 
-      if (m_liquidMovement.get())
-        approachVelocity(flyVelocity * (1.0f - liquidImpedance) * activeModifiers.speedModifier, (*active_parameters.liquidForce) * activeModifiers.liquidMovementModifier);
+      if (m_liquid_movement.get())
+        approachVelocity(fly_velocity * (1.0f - liquid_impedance) * active_modifiers.speed_modifier, (*active_parameters.liquid_force) * active_modifiers.liquid_movement_modifier);
       else
-        approachVelocity(flyVelocity * activeModifiers.speedModifier, (*active_parameters.airForce));
+        approachVelocity(fly_velocity * active_modifiers.speed_modifier, (*active_parameters.air_force));
 
-      if (flyVelocity[0] > 0)
-        updatedMovingDirection = Direction::Right;
-      else if (flyVelocity[0] < 0)
-        updatedMovingDirection = Direction::Left;
+      if (fly_velocity[0] > 0)
+        updated_moving_direction = Direction::Right;
+      else if (fly_velocity[0] < 0)
+        updated_moving_direction = Direction::Left;
 
-      m_groundMovementSustainTimer = GameTimer(0);
+      m_ground_movement_sustain_timer = GameTimer(0);
 
     } else {
-      float jumpModifier;
-      ActorJumpProfile jumpProfile;
-      if (m_liquidMovement.get()) {
-        jumpModifier = activeModifiers.liquidJumpModifier;
-        jumpProfile = active_parameters.liquidJumpProfile;
-        (*jumpProfile.jumpSpeed) *= (1.0f - liquidImpedance);
+      float jump_modifier;
+      ActorJumpProfile jump_profile;
+      if (m_liquid_movement.get()) {
+        jump_modifier = active_modifiers.liquid_jump_modifier;
+        jump_profile = active_parameters.liquid_jump_profile;
+        (*jump_profile.jump_speed) *= (1.0f - liquid_impedance);
       } else {
-        jumpModifier = activeModifiers.airJumpModifier;
-        jumpProfile = active_parameters.airJumpProfile;
+        jump_modifier = active_modifiers.air_jump_modifier;
+        jump_profile = active_parameters.air_jump_profile;
       }
 
-      bool startJump = false;
-      bool holdJump = false;
+      bool start_jump = false;
+      bool hold_jump = false;
 
       // If we are on the ground, then reset the ground movement sustain timer
       // to the maximum.  If we are not on the ground or near the ground
       // according to the nearGroundCheckDistance, and we are past the minimum
       // sustain time, then go ahead and immediately clear the ground movement
       // sustain timer.
-      float minGroundSustain = (*active_parameters.groundMovementMinimumSustain);
-      float maxGroundSustain = (*active_parameters.groundMovementMaximumSustain);
-      float groundCheckDistance = (*active_parameters.groundMovementCheckDistance);
-      m_groundMovementSustainTimer.tick(dt);
+      float min_ground_sustain = (*active_parameters.ground_movement_minimum_sustain);
+      float max_ground_sustain = (*active_parameters.ground_movement_maximum_sustain);
+      float ground_check_distance = (*active_parameters.ground_movement_check_distance);
+      m_ground_movement_sustain_timer.tick(dt);
       if (onGround()) {
-        m_groundMovementSustainTimer = GameTimer(maxGroundSustain);
-      } else if (!m_groundMovementSustainTimer.ready() && groundCheckDistance > 0.0f && maxGroundSustain - m_groundMovementSustainTimer.timer > minGroundSustain) {
-        PolyF collisionBody = MovementController::collisionBody();
-        collisionBody.translate(Vec2F(0, -groundCheckDistance));
-        auto collision = worldRef.polyCollision(collisionBody, {CollisionKind::Block, CollisionKind::Dynamic, CollisionKind::Platform, CollisionKind::Slippery});
+        m_ground_movement_sustain_timer = GameTimer(max_ground_sustain);
+      } else if (!m_ground_movement_sustain_timer.ready() && ground_check_distance > 0.0f && max_ground_sustain - m_ground_movement_sustain_timer.timer > min_ground_sustain) {
+        PolyF collision_body = MovementController::collisionBody();
+        collision_body.translate(Vec2F(0, -ground_check_distance));
+        auto collision = world_ref.polyCollision(collision_body, {CollisionKind::Block, CollisionKind::Dynamic, CollisionKind::Platform, CollisionKind::Slippery});
         if (!collision) return std::unexpected(std::move(collision.error()));
         if (!*collision)
-          m_groundMovementSustainTimer = GameTimer(0);
+          m_ground_movement_sustain_timer = GameTimer(0);
       }
 
-      bool standingJumpable = !m_groundMovementSustainTimer.ready();
-      bool controlJump = m_controlJump && (!activeModifiers.jumpingSuppressed || m_controlJumpAnyway);
+      bool standing_jumpable = !m_ground_movement_sustain_timer.ready();
+      bool control_jump = m_control_jump && (!active_modifiers.jumping_suppressed || m_control_jump_anyway);
 
       // We are doing a jump if m_reJumpTimer has run out and there has been a
       // new m_controlJump command which was just recently triggered.  If
       // jumpProfile.autoJump is set, then we don't care whether it is a new
       // m_controlJump command, m_controlJump can be held.
-      if (m_reJumpTimer.ready() && controlJump && ((*jumpProfile.autoJump) || !m_lastControlJump)) {
-        if (standingJumpable || (*jumpProfile.multiJump) || m_controlJumpAnyway)
-          startJump = true;
-      } else if (m_jumping.get() && controlJump && (!m_jumpHoldTimer || !m_jumpHoldTimer->ready())) {
-        if (!(*jumpProfile.collisionCancelled) || collisionCorrection()[1] >= 0.0f)
-          holdJump = true;
+      if (m_re_jump_timer.ready() && control_jump && ((*jump_profile.auto_jump) || !m_last_control_jump)) {
+        if (standing_jumpable || (*jump_profile.multi_jump) || m_control_jump_anyway)
+          start_jump = true;
+      } else if (m_jumping.get() && control_jump && (!m_jump_hold_timer || !m_jump_hold_timer->ready())) {
+        if (!(*jump_profile.collision_cancelled) || collisionCorrection()[1] >= 0.0f)
+          hold_jump = true;
       }
 
-      if (startJump) {
+      if (start_jump) {
         m_jumping.set(true);
 
-        m_reJumpTimer = GameTimer((*jumpProfile.reJumpDelay));
-        if ((*jumpProfile.jumpHoldTime) >= 0.0f)
-          m_jumpHoldTimer = GameTimer((*jumpProfile.jumpHoldTime));
+        m_re_jump_timer = GameTimer((*jump_profile.re_jump_delay));
+        if ((*jump_profile.jump_hold_time) >= 0.0f)
+          m_jump_hold_timer = GameTimer((*jump_profile.jump_hold_time));
         else
-          m_jumpHoldTimer = {};
+          m_jump_hold_timer = {};
 
-        setYVelocity(yVelocity() + (*jumpProfile.jumpSpeed) * (*jumpProfile.jumpInitialPercentage) * jumpModifier);
+        setYVelocity(yVelocity() + (*jump_profile.jump_speed) * (*jump_profile.jump_initial_percentage) * jump_modifier);
 
-        m_groundMovementSustainTimer = GameTimer(0);
+        m_ground_movement_sustain_timer = GameTimer(0);
 
-      } else if (holdJump) {
-        m_reJumpTimer.tick(dt);
-        if (m_jumpHoldTimer)
-          m_jumpHoldTimer->tick(dt);
+      } else if (hold_jump) {
+        m_re_jump_timer.tick(dt);
+        if (m_jump_hold_timer)
+          m_jump_hold_timer->tick(dt);
 
-        approachYVelocity((*jumpProfile.jumpSpeed) * jumpModifier, (*jumpProfile.jumpControlForce) * jumpModifier);
+        approachYVelocity((*jump_profile.jump_speed) * jump_modifier, (*jump_profile.jump_control_force) * jump_modifier);
 
       } else {
         m_jumping.set(false);
-        m_reJumpTimer.tick(dt);
+        m_re_jump_timer.tick(dt);
       }
 
-      if (m_controlMove == Direction::Left) {
-        updatedMovingDirection = Direction::Left;
-        m_targetHorizontalAmbulatingVelocity =
-            -1.0f * (running ? (*active_parameters.runSpeed) * activeModifiers.speedModifier
-                             : (*active_parameters.walkSpeed) * activeModifiers.speedModifier);
-      } else if (m_controlMove == Direction::Right) {
-        updatedMovingDirection = Direction::Right;
-        m_targetHorizontalAmbulatingVelocity =
-            1.0f * (running ? (*active_parameters.runSpeed) * activeModifiers.speedModifier
-                            : (*active_parameters.walkSpeed) * activeModifiers.speedModifier);
+      if (m_control_move == Direction::Left) {
+        updated_moving_direction = Direction::Left;
+        m_target_horizontal_ambulating_velocity =
+            -1.0f * (running ? (*active_parameters.run_speed) * active_modifiers.speed_modifier
+                             : (*active_parameters.walk_speed) * active_modifiers.speed_modifier);
+      } else if (m_control_move == Direction::Right) {
+        updated_moving_direction = Direction::Right;
+        m_target_horizontal_ambulating_velocity =
+            1.0f * (running ? (*active_parameters.run_speed) * active_modifiers.speed_modifier
+                            : (*active_parameters.walk_speed) * active_modifiers.speed_modifier);
       }
 
-      m_targetHorizontalAmbulatingVelocity *= m_moveSpeedMultiplier;
+      m_target_horizontal_ambulating_velocity *= m_move_speed_multiplier;
 
-      if (m_liquidMovement.get())
-        m_targetHorizontalAmbulatingVelocity *= (1.0f - liquidImpedance);
+      if (m_liquid_movement.get())
+        m_target_horizontal_ambulating_velocity *= (1.0f - liquid_impedance);
 
-      Vec2F surfaceVelocity = MovementController::surfaceVelocity();
+      Vec2F surface_velocity = MovementController::surfaceVelocity();
 
       // don't ambulate if we're already moving faster than the target velocity in the direction of ambulation
-      bool ambulationWouldAccelerate = std::abs(m_targetHorizontalAmbulatingVelocity + surfaceVelocity[0]) > std::abs(xVelocity())
-          || (m_targetHorizontalAmbulatingVelocity < 0) != (xVelocity() < 0);
+      bool ambulation_would_accelerate = std::abs(m_target_horizontal_ambulating_velocity + surface_velocity[0]) > std::abs(xVelocity())
+          || (m_target_horizontal_ambulating_velocity < 0) != (xVelocity() < 0);
 
-      if (m_targetHorizontalAmbulatingVelocity != 0.0f && ambulationWouldAccelerate) {
-        float ambulatingAccel;
+      if (m_target_horizontal_ambulating_velocity != 0.0f && ambulation_would_accelerate) {
+        float ambulating_accel;
         if (onGround())
-          ambulatingAccel = (*active_parameters.groundForce) * activeModifiers.groundMovementModifier;
-        else if (m_liquidMovement.get())
-          ambulatingAccel = (*active_parameters.liquidForce) * activeModifiers.liquidMovementModifier;
+          ambulating_accel = (*active_parameters.ground_force) * active_modifiers.ground_movement_modifier;
+        else if (m_liquid_movement.get())
+          ambulating_accel = (*active_parameters.liquid_force) * active_modifiers.liquid_movement_modifier;
         else
-          ambulatingAccel = (*active_parameters.airForce);
+          ambulating_accel = (*active_parameters.air_force);
 
-        approachXVelocity(m_targetHorizontalAmbulatingVelocity + surfaceVelocity[0], ambulatingAccel);
+        approachXVelocity(m_target_horizontal_ambulating_velocity + surface_velocity[0], ambulating_accel);
       }
     }
 
-    if (updatedMovingDirection)
-      setMovingDirection(*updatedMovingDirection);
+    if (updated_moving_direction)
+      set_moving_direction(*updated_moving_direction);
 
-    if (!activeModifiers.facingSuppressed) {
-      if (m_controlFace)
-        m_facingDirection.set(*m_controlFace);
-      else if (updatedMovingDirection)
-        m_facingDirection.set(*updatedMovingDirection);
+    if (!active_modifiers.facing_suppressed) {
+      if (m_control_face)
+        m_facing_direction.set(*m_control_face);
+      else if (updated_moving_direction)
+        m_facing_direction.set(*updated_moving_direction);
       else if (m_control_path_move && m_path_controller && m_path_controller->facing())
-        m_facingDirection.set(*m_path_controller->facing());
+        m_facing_direction.set(*m_path_controller->facing());
     }
 
-    m_groundMovement.set(!m_groundMovementSustainTimer.ready());
-    if (m_groundMovement.get()) {
-      m_running.set(running && m_controlMove);
-      m_walking.set(!running && m_controlMove);
-      m_crouching.set(m_controlCrouch && !m_controlMove);
+    m_ground_movement.set(!m_ground_movement_sustain_timer.ready());
+    if (m_ground_movement.get()) {
+      m_running.set(running && m_control_move);
+      m_walking.set(!running && m_control_move);
+      m_crouching.set(m_control_crouch && !m_control_move);
     }
-    m_flying.set(static_cast<bool>(m_controlFly));
+    m_flying.set(static_cast<bool>(m_control_fly));
 
-    bool falling = (yVelocity() < (*active_parameters.fallStatusSpeedMin)) && !m_groundMovement.get();
+    bool falling = (yVelocity() < (*active_parameters.fall_status_speed_min)) && !m_ground_movement.get();
     m_falling.set(falling);
 
     if (auto result = MovementController::tickMaster(dt); !result) return std::unexpected(std::move(result.error()));
 
-    m_lastControlJump = m_controlJump;
-    m_lastControlDown = m_controlDown;
+    m_last_control_jump = m_control_jump;
+    m_last_control_down = m_control_down;
 
-    if (m_liquidMovement.get())
-      m_canJump.set(m_reJumpTimer.ready() && (!m_groundMovementSustainTimer.ready() || (*active_parameters.liquidJumpProfile.multiJump)));
+    if (m_liquid_movement.get())
+      m_can_jump.set(m_re_jump_timer.ready() && (!m_ground_movement_sustain_timer.ready() || (*active_parameters.liquid_jump_profile.multi_jump)));
     else
-      m_canJump.set(m_reJumpTimer.ready() && (!m_groundMovementSustainTimer.ready() || (*active_parameters.airJumpProfile.multiJump)));
+      m_can_jump.set(m_re_jump_timer.ready() && (!m_ground_movement_sustain_timer.ready() || (*active_parameters.air_jump_profile.multi_jump)));
   }
 
-  clearControls();
+  clear_controls();
   return {};
 }
 
-std::expected<void, StarException> ActorMovementController::tickSlave(float dt) {
-  auto activeWorld = world();
-  if (!activeWorld) return std::unexpected(std::move(activeWorld.error()));
-  World& worldRef = activeWorld->get();
+std::expected<void, StarException> ActorMovementController::tick_slave(float dt) {
+  auto active_world = world();
+  if (!active_world) return std::unexpected(std::move(active_world.error()));
+  World& world_ref = active_world->get();
   if (auto result = MovementController::tickSlave(dt); !result) return std::unexpected(std::move(result.error()));
 
-  m_entityAnchor.reset();
-  if (auto anchorState = m_anchorState.get()) {
-    if (auto anchorableEntity = as<AnchorableEntity>(worldRef.entity(anchorState->entityId)))
+  m_entity_anchor.reset();
+  if (auto anchor_state = m_anchor_state.get()) {
+    if (auto anchorable_entity = as<AnchorableEntity>(world_ref.entity(anchor_state->entityId)))
       {
-        auto anchorValue = anchorableEntity->anchor(anchorState->positionIndex);
-        if (!anchorValue) return std::unexpected(std::move(anchorValue.error()));
-        m_entityAnchor = std::move(*anchorValue);
+        auto anchor_value = anchorable_entity->anchor(anchor_state->positionIndex);
+        if (!anchor_value) return std::unexpected(std::move(anchor_value.error()));
+        m_entity_anchor = std::move(*anchor_value);
       }
   }
   return {};
 }
 
-std::expected<void, StarException> ActorMovementController::applyMCParameters(ActorMovementParameters const& parameters) {
-  if (!parameters.fallThroughSustainFrames) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'fallThroughSustainFrames'"));
-  if (!parameters.minimumLiquidPercentage) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'minimumLiquidPercentage'"));
-  if (!parameters.liquidImpedance) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'liquidImpedance'"));
-  if (!parameters.flySpeed) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'flySpeed'"));
-  if (!parameters.liquidForce) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'liquidForce'"));
-  if (!parameters.airForce) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'airForce'"));
-  if (!parameters.groundMovementMinimumSustain) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'groundMovementMinimumSustain'"));
-  if (!parameters.groundMovementMaximumSustain) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'groundMovementMaximumSustain'"));
-  if (!parameters.groundMovementCheckDistance) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'groundMovementCheckDistance'"));
-  if (!parameters.runSpeed) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'runSpeed'"));
-  if (!parameters.walkSpeed) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'walkSpeed'"));
-  if (!parameters.groundForce) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'groundForce'"));
-  if (!parameters.fallStatusSpeedMin) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'fallStatusSpeedMin'"));
-  if (!parameters.gravityMultiplier) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'gravityMultiplier'"));
-  if (!parameters.crouchingPoly) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'crouchingPoly'"));
-  if (!parameters.standingPoly) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'standingPoly'"));
-  if (!parameters.airJumpProfile.jumpSpeed) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'airJumpProfile.jumpSpeed'"));
-  if (!parameters.airJumpProfile.autoJump) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'airJumpProfile.autoJump'"));
-  if (!parameters.airJumpProfile.multiJump) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'airJumpProfile.multiJump'"));
-  if (!parameters.airJumpProfile.collisionCancelled) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'airJumpProfile.collisionCancelled'"));
-  if (!parameters.airJumpProfile.reJumpDelay) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'airJumpProfile.reJumpDelay'"));
-  if (!parameters.airJumpProfile.jumpHoldTime) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'airJumpProfile.jumpHoldTime'"));
-  if (!parameters.airJumpProfile.jumpInitialPercentage) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'airJumpProfile.jumpInitialPercentage'"));
-  if (!parameters.airJumpProfile.jumpControlForce) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'airJumpProfile.jumpControlForce'"));
-  if (!parameters.liquidJumpProfile.jumpSpeed) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'liquidJumpProfile.jumpSpeed'"));
-  if (!parameters.liquidJumpProfile.autoJump) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'liquidJumpProfile.autoJump'"));
-  if (!parameters.liquidJumpProfile.multiJump) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'liquidJumpProfile.multiJump'"));
-  if (!parameters.liquidJumpProfile.collisionCancelled) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'liquidJumpProfile.collisionCancelled'"));
-  if (!parameters.liquidJumpProfile.reJumpDelay) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'liquidJumpProfile.reJumpDelay'"));
-  if (!parameters.liquidJumpProfile.jumpHoldTime) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'liquidJumpProfile.jumpHoldTime'"));
-  if (!parameters.liquidJumpProfile.jumpInitialPercentage) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'liquidJumpProfile.jumpInitialPercentage'"));
-  if (!parameters.liquidJumpProfile.jumpControlForce) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'liquidJumpProfile.jumpControlForce'"));
-  MovementParameters mcParameters;
+std::expected<void, StarException> ActorMovementController::apply_mc_parameters(ActorMovementParameters const& parameters) {
+  if (!parameters.fall_through_sustain_frames) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'fallThroughSustainFrames'"));
+  if (!parameters.minimum_liquid_percentage) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'minimumLiquidPercentage'"));
+  if (!parameters.liquid_impedance) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'liquidImpedance'"));
+  if (!parameters.fly_speed) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'flySpeed'"));
+  if (!parameters.liquid_force) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'liquidForce'"));
+  if (!parameters.air_force) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'airForce'"));
+  if (!parameters.ground_movement_minimum_sustain) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'groundMovementMinimumSustain'"));
+  if (!parameters.ground_movement_maximum_sustain) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'groundMovementMaximumSustain'"));
+  if (!parameters.ground_movement_check_distance) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'groundMovementCheckDistance'"));
+  if (!parameters.run_speed) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'runSpeed'"));
+  if (!parameters.walk_speed) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'walkSpeed'"));
+  if (!parameters.ground_force) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'groundForce'"));
+  if (!parameters.fall_status_speed_min) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'fallStatusSpeedMin'"));
+  if (!parameters.gravity_multiplier) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'gravityMultiplier'"));
+  if (!parameters.crouching_poly) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'crouchingPoly'"));
+  if (!parameters.standing_poly) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'standingPoly'"));
+  if (!parameters.air_jump_profile.jump_speed) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'airJumpProfile.jumpSpeed'"));
+  if (!parameters.air_jump_profile.auto_jump) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'airJumpProfile.autoJump'"));
+  if (!parameters.air_jump_profile.multi_jump) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'airJumpProfile.multiJump'"));
+  if (!parameters.air_jump_profile.collision_cancelled) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'airJumpProfile.collisionCancelled'"));
+  if (!parameters.air_jump_profile.re_jump_delay) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'airJumpProfile.reJumpDelay'"));
+  if (!parameters.air_jump_profile.jump_hold_time) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'airJumpProfile.jumpHoldTime'"));
+  if (!parameters.air_jump_profile.jump_initial_percentage) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'airJumpProfile.jumpInitialPercentage'"));
+  if (!parameters.air_jump_profile.jump_control_force) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'airJumpProfile.jumpControlForce'"));
+  if (!parameters.liquid_jump_profile.jump_speed) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'liquidJumpProfile.jumpSpeed'"));
+  if (!parameters.liquid_jump_profile.auto_jump) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'liquidJumpProfile.autoJump'"));
+  if (!parameters.liquid_jump_profile.multi_jump) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'liquidJumpProfile.multiJump'"));
+  if (!parameters.liquid_jump_profile.collision_cancelled) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'liquidJumpProfile.collisionCancelled'"));
+  if (!parameters.liquid_jump_profile.re_jump_delay) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'liquidJumpProfile.reJumpDelay'"));
+  if (!parameters.liquid_jump_profile.jump_hold_time) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'liquidJumpProfile.jumpHoldTime'"));
+  if (!parameters.liquid_jump_profile.jump_initial_percentage) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'liquidJumpProfile.jumpInitialPercentage'"));
+  if (!parameters.liquid_jump_profile.jump_control_force) return std::unexpected(ActorMovementControllerException("Missing actor movement parameter 'liquidJumpProfile.jumpControlForce'"));
+  MovementParameters mc_parameters;
 
-  mcParameters.mass = parameters.mass;
+  mc_parameters.mass = parameters.mass;
 
-  mcParameters.gravityMultiplier = parameters.gravityMultiplier;
+  mc_parameters.gravityMultiplier = parameters.gravity_multiplier;
 
-  mcParameters.liquidBuoyancy = parameters.liquidBuoyancy;
-  mcParameters.airBuoyancy = parameters.airBuoyancy;
-  mcParameters.bounceFactor = parameters.bounceFactor;
-  mcParameters.stopOnFirstBounce = parameters.stopOnFirstBounce;
-  mcParameters.enableSurfaceSlopeCorrection = parameters.enableSurfaceSlopeCorrection;
-  mcParameters.slopeSlidingFactor = parameters.slopeSlidingFactor;
-  mcParameters.maxMovementPerStep = parameters.maxMovementPerStep;
+  mc_parameters.liquidBuoyancy = parameters.liquid_buoyancy;
+  mc_parameters.airBuoyancy = parameters.air_buoyancy;
+  mc_parameters.bounceFactor = parameters.bounce_factor;
+  mc_parameters.stopOnFirstBounce = parameters.stop_on_first_bounce;
+  mc_parameters.enableSurfaceSlopeCorrection = parameters.enable_surface_slope_correction;
+  mc_parameters.slopeSlidingFactor = parameters.slope_sliding_factor;
+  mc_parameters.maxMovementPerStep = parameters.max_movement_per_step;
 
   if (m_crouching.get())
-    mcParameters.collisionPoly = (*parameters.crouchingPoly);
+    mc_parameters.collisionPoly = (*parameters.crouching_poly);
   else
-    mcParameters.collisionPoly = (*parameters.standingPoly);
+    mc_parameters.collisionPoly = (*parameters.standing_poly);
 
-  mcParameters.stickyCollision = parameters.stickyCollision;
-  mcParameters.stickyForce = parameters.stickyForce;
+  mc_parameters.stickyCollision = parameters.sticky_collision;
+  mc_parameters.stickyForce = parameters.sticky_force;
 
-  mcParameters.airFriction = parameters.airFriction;
-  mcParameters.liquidFriction = parameters.liquidFriction;
+  mc_parameters.airFriction = parameters.air_friction;
+  mc_parameters.liquidFriction = parameters.liquid_friction;
 
   // If we are traveling in the correct direction while in a movement mode that
   // requires contact with the ground (ambulating i.e. walking or running), and
   // not traveling faster than our target horizontal movement, then apply the
   // special 'ambulatingGroundFriction'.
-  float relativeXVelocity = xVelocity() - surfaceVelocity()[0];
-  bool useAmbulatingGroundFriction = (m_walking.get() || m_running.get())
-      && std::copysign(1, m_targetHorizontalAmbulatingVelocity) == std::copysign(1, relativeXVelocity)
-      && std::fabs(relativeXVelocity) <= std::fabs(m_targetHorizontalAmbulatingVelocity);
+  float relative_xvelocity = xVelocity() - surfaceVelocity()[0];
+  bool use_ambulating_ground_friction = (m_walking.get() || m_running.get())
+      && std::copysign(1, m_target_horizontal_ambulating_velocity) == std::copysign(1, relative_xvelocity)
+      && std::fabs(relative_xvelocity) <= std::fabs(m_target_horizontal_ambulating_velocity);
 
-  if (useAmbulatingGroundFriction)
-    mcParameters.groundFriction = parameters.ambulatingGroundFriction;
+  if (use_ambulating_ground_friction)
+    mc_parameters.groundFriction = parameters.ambulating_ground_friction;
   else
-    mcParameters.groundFriction = parameters.normalGroundFriction;
+    mc_parameters.groundFriction = parameters.normal_ground_friction;
 
-  mcParameters.collisionEnabled = parameters.collisionEnabled;
-  mcParameters.frictionEnabled = parameters.frictionEnabled;
-  mcParameters.gravityEnabled = parameters.gravityEnabled;
+  mc_parameters.collisionEnabled = parameters.collision_enabled;
+  mc_parameters.frictionEnabled = parameters.friction_enabled;
+  mc_parameters.gravityEnabled = parameters.gravity_enabled;
 
-  mcParameters.ignorePlatformCollision = m_fallThroughSustain > 0 || m_controlFly || m_controlDown;
-  mcParameters.maximumPlatformCorrection = parameters.maximumPlatformCorrection;
-  mcParameters.maximumPlatformCorrectionVelocityFactor = parameters.maximumPlatformCorrectionVelocityFactor;
+  mc_parameters.ignorePlatformCollision = m_fall_through_sustain > 0 || m_control_fly || m_control_down;
+  mc_parameters.maximumPlatformCorrection = parameters.maximum_platform_correction;
+  mc_parameters.maximumPlatformCorrectionVelocityFactor = parameters.maximum_platform_correction_velocity_factor;
 
-  mcParameters.physicsEffectCategories = parameters.physicsEffectCategories;
+  mc_parameters.physicsEffectCategories = parameters.physics_effect_categories;
 
-  mcParameters.maximumCorrection = parameters.maximumCorrection;
-  mcParameters.speedLimit = parameters.speedLimit;
+  mc_parameters.maximumCorrection = parameters.maximum_correction;
+  mc_parameters.speedLimit = parameters.speed_limit;
 
-  return MovementController::applyParameters(mcParameters);
+  return MovementController::applyParameters(mc_parameters);
 }
 
-std::expected<void, StarException> ActorMovementController::doSetAnchorState(std::optional<EntityAnchorState> anchorState) {
-  std::shared_ptr<EntityAnchor const> entityAnchor;
-  if (anchorState) {
-    auto activeWorld = world();
-    if (!activeWorld) return std::unexpected(std::move(activeWorld.error()));
-    World& worldRef = activeWorld->get();
-    auto anchorableEntity = as<AnchorableEntity>(worldRef.entity(anchorState->entityId));
-    if (!anchorableEntity)
-      return std::unexpected(ActorMovementControllerException::format("No such anchorable entity id {} in ActorMovementController::setAnchorState", anchorState->entityId));
-    auto anchorValue = anchorableEntity->anchor(anchorState->positionIndex);
-    if (!anchorValue) return std::unexpected(std::move(anchorValue.error()));
-    entityAnchor = std::move(*anchorValue);
-    if (!entityAnchor)
-      return std::unexpected(ActorMovementControllerException::format("Anchor position {} is disabled ActorMovementController::setAnchorState", anchorState->positionIndex));
+std::expected<void, StarException> ActorMovementController::do_set_anchor_state(std::optional<EntityAnchorState> anchor_state) {
+  std::shared_ptr<EntityAnchor const> entity_anchor;
+  if (anchor_state) {
+    auto active_world = world();
+    if (!active_world) return std::unexpected(std::move(active_world.error()));
+    World& world_ref = active_world->get();
+    auto anchorable_entity = as<AnchorableEntity>(world_ref.entity(anchor_state->entityId));
+    if (!anchorable_entity)
+      return std::unexpected(ActorMovementControllerException::format("No such anchorable entity id {} in ActorMovementController::set_anchor_state", anchor_state->entityId));
+    auto anchor_value = anchorable_entity->anchor(anchor_state->positionIndex);
+    if (!anchor_value) return std::unexpected(std::move(anchor_value.error()));
+    entity_anchor = std::move(*anchor_value);
+    if (!entity_anchor)
+      return std::unexpected(ActorMovementControllerException::format("Anchor position {} is disabled ActorMovementController::set_anchor_state", anchor_state->positionIndex));
   }
-  auto previous_anchor = std::move(m_entityAnchor);
-  m_anchorState.set(anchorState);
-  m_entityAnchor = std::move(entityAnchor);
+  auto previous_anchor = std::move(m_entity_anchor);
+  m_anchor_state.set(anchor_state);
+  m_entity_anchor = std::move(entity_anchor);
 
-  if (m_entityAnchor) {
-    setPosition(m_entityAnchor->position);
+  if (m_entity_anchor) {
+    setPosition(m_entity_anchor->position);
   } else if (previous_anchor && previous_anchor->exitBottomPosition) {
     auto bounds = MovementController::localBoundBox();
     Vec2F bottom_center = {bounds.center()[0], bounds.y_min()};
@@ -1477,13 +1477,13 @@ PathController::find_path(ActorMovementController& movement_controller, Vec2F co
         return std::unexpected(std::move(grounded_result.error()));
       grounded = *grounded_result;
     }
-    if (*movement_controller.parameters().gravityEnabled && !grounded && !movement_controller.liquidMovement()) {
+    if (*movement_controller.parameters().gravityEnabled && !grounded && !movement_controller.liquid_movement()) {
       return {};
     }
     m_start_position = movement_controller.position();
     m_target_position = target_position;
     auto finder = PathFinder::create(m_world.get(), movement_controller.position(), *m_target_position,
-                                     movement_controller.baseParameters(), m_parameters);
+                                     movement_controller.base_parameters(), m_parameters);
     if (!finder) return std::unexpected(std::move(finder.error()));
     m_path_finder = std::move(*finder);
   }
@@ -1492,7 +1492,7 @@ PathController::find_path(ActorMovementController& movement_controller, Vec2F co
     return true; // Reached goal
 
   if (m_path_finder) {
-    auto exploration = m_path_finder->explore(movement_controller.baseParameters().pathExploreRate.value_or(100.0));
+    auto exploration = m_path_finder->explore(movement_controller.base_parameters().path_explore_rate.value_or(100.0));
     if (!exploration) return std::unexpected(std::move(exploration.error()));
     auto explored = *exploration;
     if (explored) {
@@ -1556,12 +1556,12 @@ PathController::find_path(ActorMovementController& movement_controller, Vec2F co
           // merging the paths failed, and the entity has moved from the path start position
           // try to bridge the gap from the current position to the new path
           auto bridge_result = PathFinder::create(m_world.get(), movement_controller.position(), *m_start_position,
-                                                  movement_controller.baseParameters(), m_parameters);
+                                                  movement_controller.base_parameters(), m_parameters);
           if (!bridge_result)
             return std::unexpected(std::move(bridge_result.error()));
           auto bridge_path_finder = std::move(*bridge_result);
           auto bridge_exploration =
-            bridge_path_finder->explore(movement_controller.baseParameters().pathExploreRate.value_or(100.0));
+            bridge_path_finder->explore(movement_controller.base_parameters().path_explore_rate.value_or(100.0));
           if (!bridge_exploration)
             return std::unexpected(std::move(bridge_exploration.error()));
           auto explored = *bridge_exploration;
@@ -1634,7 +1634,7 @@ std::expected<std::optional<bool>, StarException> PathController::move(ActorMove
     Vec2F target_velocity;
     switch (edge.action) {
       case Action::Jump:
-        if (modifiers.jumpingSuppressed) {
+        if (modifiers.jumping_suppressed) {
           reset();
           return {};
         }
@@ -1649,20 +1649,20 @@ std::expected<std::optional<bool>, StarException> PathController::move(ActorMove
           // accelerate along path using airForce
           float angle_factor = movement_controller.velocity().normalized() * delta.normalized();
           float speed_along_angle = angle_factor * movement_controller.velocity().magnitude();
-          auto acc = parameters.airForce.value_or(0.0) / movement_controller.mass();
+          auto acc = parameters.air_force.value_or(0.0) / movement_controller.mass();
           source_velocity =
-            delta.normalized() * std::fmin(parameters.flySpeed.value_or(0.0), speed_along_angle + acc * dt);
+            delta.normalized() * std::fmin(parameters.fly_speed.value_or(0.0), speed_along_angle + acc * dt);
           target_velocity = source_velocity;
         }
         break;
       case Action::Swim:
         source_velocity = target_velocity =
-          delta.normalized() * parameters.flySpeed.value_or(0.0f) * (1.0f - parameters.liquidImpedance.value_or(0.0f));
+          delta.normalized() * parameters.fly_speed.value_or(0.0f) * (1.0f - parameters.liquid_impedance.value_or(0.0f));
         break;
       case Action::Walk:
         source_velocity =
-          delta.normalized() * (run ? parameters.runSpeed.value_or(0.0f) : parameters.walkSpeed.value_or(0.0f));
-        source_velocity *= modifiers.speedModifier;
+          delta.normalized() * (run ? parameters.run_speed.value_or(0.0f) : parameters.walk_speed.value_or(0.0f));
+        source_velocity *= modifiers.speed_modifier;
         target_velocity = source_velocity;
         break;
       default: {}
@@ -1771,7 +1771,7 @@ std::expected<bool, StarException> PathController::validate_edge(ActorMovementCo
     auto liquid = world.liquidLevel(bounds);
     if (!liquid)
       return std::unexpected(std::move(liquid.error()));
-    return liquid->level >= movement_controller.baseParameters().minimumLiquidPercentage.value_or(1.0);
+    return liquid->level >= movement_controller.base_parameters().minimum_liquid_percentage.value_or(1.0);
   };
   switch (edge.action) {
   case Action::Walk: return on_ground(movement_controller, edge.source.position, ground_collision);

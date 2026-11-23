@@ -230,8 +230,8 @@ if (!result13) return std::unexpected(std::move(result13.error()));
 auto result14 = ActorMovementParameters::create(json_merge(std::move(*result13)->defaultMovementParameters(), m_npcVariant.movementParameters));
 if (!result14) return std::unexpected(std::move(result14.error()));
 auto movementParameters = std::move(*result14);
-  if (!movementParameters.physicsEffectCategories)
-    movementParameters.physicsEffectCategories = StringSet({"npc"});
+  if (!movementParameters.physics_effect_categories)
+    movementParameters.physics_effect_categories = StringSet({"npc"});
   auto result15 = ActorMovementController::create(this->root(), movementParameters);
 if (!result15) return std::unexpected(std::move(result15.error()));
 m_movementController = std::move(*result15);
@@ -303,7 +303,7 @@ std::expected<std::shared_ptr<Npc>, StarException> Npc::create(Root& rootContext
 std::expected<void, StarException> Npc::loadState(Json const& diskStore) {
   auto result32 = diskStore.get("movementController");
 if (!result32) return std::unexpected(std::move(result32.error()));
-auto result33 = m_movementController->loadState(std::move(*result32));
+auto result33 = m_movementController->load_state(std::move(*result32));
 if (!result33) return std::unexpected(std::move(result33.error()));
 
   auto result34 = diskStore.get("statusController");
@@ -413,7 +413,7 @@ std::expected<Json, StarException> Npc::diskStore() const {
 if (!result66) return std::unexpected(std::move(result66.error()));
 auto result67 = std::move(*result66)->writeNpcVariantToJson(m_npcVariant);
 if (!result67) return std::unexpected(std::move(result67.error()));
-auto result68 = m_movementController->storeState();
+auto result68 = m_movementController->store_state();
 if (!result68) return std::unexpected(std::move(result68.error()));
 auto result69 = m_statusController->diskStore();
 if (!result69) return std::unexpected(std::move(result69.error()));
@@ -494,7 +494,7 @@ if (!result84) return std::unexpected(std::move(result84.error()));
 
 
   if (isMaster()) {
-    auto result85 = m_movementController->resetAnchorState();
+    auto result85 = m_movementController->reset_anchor_state();
 if (!result85) return std::unexpected(std::move(result85.error()));
 
 
@@ -598,7 +598,7 @@ if (!result114) return std::unexpected(std::move(result114.error()));
 
 std::expected<void, StarException> Npc::uninit() {
   if (isMaster()) {
-    auto result115 = m_movementController->resetAnchorState();
+    auto result115 = m_movementController->reset_anchor_state();
 if (!result115) return std::unexpected(std::move(result115.error()));
 
     auto result116 = recover_lua_script_error(m_scriptComponent.uninit());
@@ -933,13 +933,13 @@ if (!result185) return std::unexpected(std::move(result185.error()));
   if (!result186) return std::unexpected(std::move(result186.error()));
   if (std::move(*result186))
         {
-    auto result187 = m_movementController->resetAnchorState();
+    auto result187 = m_movementController->reset_anchor_state();
     if (!result187) return std::unexpected(std::move(result187.error()));
 
   }
 }
 
-    auto anchor = m_movementController->entityAnchor();
+    auto anchor = m_movementController->entity_anchor();
     if (auto loungeAnchor = anchor ? as_ref<LoungeAnchor>(*anchor) : std::nullopt) {
       if (loungeAnchor->get().emote)
         {
@@ -1011,7 +1011,7 @@ if (!result201) return std::unexpected(std::move(result201.error()));
       return std::unexpected(std::move(result.error()));
 
 
-    auto result206 = m_movementController->tickMaster(dt);
+    auto result206 = m_movementController->tick_master(dt);
 if (!result206) return std::unexpected(std::move(result206.error()));
 
     auto result207 = m_statusController->tickMaster(dt);
@@ -1022,8 +1022,8 @@ if (!result207) return std::unexpected(std::move(result207.error()));
 if (!result208) return std::unexpected(std::move(result208.error()));
 
 
-    if (!is<LoungeAnchor>(m_movementController->entityAnchor())) {
-      if (m_movementController->groundMovement()) {
+    if (!is<LoungeAnchor>(m_movementController->entity_anchor())) {
+      if (m_movementController->ground_movement()) {
         if (m_movementController->running())
           {
   auto result209 = humanoid();
@@ -1056,7 +1056,7 @@ if (!result208) return std::unexpected(std::move(result208.error()));
   if (!result216) return std::unexpected(std::move(result216.error()));
 
 }
-      } else if (m_movementController->liquidMovement()) {
+      } else if (m_movementController->liquid_movement()) {
         if (std::abs(m_movementController->xVelocity()) > 0)
           {
   auto result217 = humanoid();
@@ -1132,7 +1132,7 @@ if (!result231) return std::unexpected(std::move(result231.error()));
     auto result232 = m_netGroup.tick_net_interpolation(dt);
 if (!result232) return std::unexpected(std::move(result232.error()));
 
-    auto result233 = m_movementController->tickSlave(dt);
+    auto result233 = m_movementController->tick_slave(dt);
 if (!result233) return std::unexpected(std::move(result233.error()));
 
     auto result234 = m_statusController->tickSlave(dt);
@@ -1201,7 +1201,7 @@ std::expected<void, StarException> Npc::updateHumanoidDirectives() {
 
 std::expected<void, StarException> Npc::render(RenderCallback& renderCallback) {
   EntityRenderLayer renderLayer = RenderLayerNpc;
-  auto anchor = m_movementController->entityAnchor();
+  auto anchor = m_movementController->entity_anchor();
   if (auto loungeAnchor = anchor ? as_ref<LoungeAnchor>(*anchor) : std::nullopt)
     renderLayer = loungeAnchor->get().loungeRenderLayer;
 
@@ -1377,12 +1377,12 @@ if (!result276) return std::unexpected(std::move(result276.error()));
 
   auto result277 = humanoid();
 if (!result277) return std::unexpected(std::move(result277.error()));
-auto result278 = std::move(*result277)->setMovingBackwards(m_movementController->movingDirection() != m_movementController->facingDirection());
+auto result278 = std::move(*result277)->setMovingBackwards(m_movementController->moving_direction() != m_movementController->facing_direction());
 if (!result278) return std::unexpected(std::move(result278.error()));
 
   auto result279 = humanoid();
 if (!result279) return std::unexpected(std::move(result279.error()));
-std::move(*result279)->setFacingDirection(m_movementController->facingDirection());
+std::move(*result279)->setFacingDirection(m_movementController->facing_direction());
   auto result280 = humanoid();
 if (!result280) return std::unexpected(std::move(result280.error()));
 std::move(*result280)->setRotation(m_movementController->rotation());
@@ -1392,9 +1392,9 @@ std::move(*result280)->setRotation(m_movementController->rotation());
   if (auto fireableMain = mainItem ? as_ref<FireableItem>(*mainItem) : std::nullopt) {
     if (fireableMain->get().firing()) {
       if (fireableMain->get().stopWhileFiring())
-        firingModifiers.movementSuppressed = true;
+        firingModifiers.movement_suppressed = true;
       else if (fireableMain->get().walkWhileFiring())
-        firingModifiers.runningSuppressed = true;
+        firingModifiers.running_suppressed = true;
     }
   }
 
@@ -1402,9 +1402,9 @@ std::move(*result280)->setRotation(m_movementController->rotation());
   if (auto fireableAlt = altItem ? as_ref<FireableItem>(*altItem) : std::nullopt) {
     if (fireableAlt->get().firing()) {
       if (fireableAlt->get().stopWhileFiring())
-        firingModifiers.movementSuppressed = true;
+        firingModifiers.movement_suppressed = true;
       else if (fireableAlt->get().walkWhileFiring())
-        firingModifiers.runningSuppressed = true;
+        firingModifiers.running_suppressed = true;
     }
   }
 
@@ -1429,7 +1429,7 @@ if (!result284) return std::unexpected(std::move(result284.error()));
   auto result287 = m_tools->setupHumanoidHandItems(*std::move(*result285), position(), std::move(*result286));
   if (!result287) return std::unexpected(std::move(result287.error()));
   if (auto overrideDirection = std::move(*result287))
-      m_movementController->controlFace(*overrideDirection);
+      m_movementController->control_face(*overrideDirection);
 }
 
   if (auto result = updateHumanoidDirectives(); !result)
@@ -1836,20 +1836,20 @@ if (!result392) return std::unexpected(std::move(result392.error()));
           return false;
 }
 
-      auto result398 = m_movementController->setAnchorState({loungeableEntityId, anchorIndex});
+      auto result398 = m_movementController->set_anchor_state({loungeableEntityId, anchorIndex});
 if (!result398) return std::unexpected(std::move(result398.error()));
 
       return true;
     });
 if (!result399) return std::unexpected(std::move(result399.error()));
 
-  auto result401 = callbacks.register_callback("resetLounging", [this]() -> std::expected<void, StarException> { auto result400 = m_movementController->resetAnchorState();
+  auto result401 = callbacks.register_callback("resetLounging", [this]() -> std::expected<void, StarException> { auto result400 = m_movementController->reset_anchor_state();
 if (!result400) return std::unexpected(std::move(result400.error()));
    return {};
 });
 if (!result401) return std::unexpected(std::move(result401.error()));
 
-  auto result402 = callbacks.register_callback("isLounging", [this]() { return is<LoungeAnchor>(m_movementController->entityAnchor()); });
+  auto result402 = callbacks.register_callback("isLounging", [this]() { return is<LoungeAnchor>(m_movementController->entity_anchor()); });
 if (!result402) return std::unexpected(std::move(result402.error()));
 
   auto result403 = callbacks.register_callback("loungingIn", [this]() -> std::optional<EntityId> {
@@ -2278,8 +2278,8 @@ RectF Npc::interactiveBoundBox() const {
 }
 
 std::optional<EntityAnchorState> Npc::loungingIn() const {
-  if (is<LoungeAnchor>(m_movementController->entityAnchor()))
-    return m_movementController->anchorState();
+  if (is<LoungeAnchor>(m_movementController->entity_anchor()))
+    return m_movementController->anchor_state();
   return {};
 }
 
@@ -2342,7 +2342,7 @@ std::expected<bool, StarException> Npc::canUseTool() const {
 if (!result497) return std::unexpected(std::move(result497.error()));
 bool canUse = !std::move(*result497) && !m_statusController->toolUsageSuppressed();
   if (canUse) {
-    auto anchor = m_movementController->entityAnchor();
+    auto anchor = m_movementController->entity_anchor();
     if (auto loungeAnchor = anchor ? as_ref<LoungeAnchor>(*anchor) : std::nullopt)
       if (loungeAnchor->get().suppressTools.value_or(loungeAnchor->get().controllable))
         return false;
@@ -2440,11 +2440,11 @@ std::expected<float, StarException> Npc::interactRadius() const {
 }
 
 Direction Npc::facingDirection() const {
-  return m_movementController->facingDirection();
+  return m_movementController->facing_direction();
 }
 
 Direction Npc::walkingDirection() const {
-  return m_movementController->movingDirection();
+  return m_movementController->moving_direction();
 }
 
 bool Npc::isAdmin() const {
@@ -2885,7 +2885,7 @@ if (!result559) return std::unexpected(std::move(result559.error()));
 if (!result560) return std::unexpected(std::move(result560.error()));
 auto result561 = ActorMovementParameters::create(json_merge(std::move(*result560)->defaultMovementParameters(), m_npcVariant.movementParameters));
 if (!result561) return std::unexpected(std::move(result561.error()));
-auto result562 = m_movementController->resetBaseParameters(std::move(*result561));
+auto result562 = m_movementController->reset_base_parameters(std::move(*result561));
 if (!result562) return std::unexpected(std::move(result562.error()));
 
 

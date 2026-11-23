@@ -689,7 +689,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "anchorState",
           [&](std::shared_ptr<Entity> entity) -> std::expected<LuaVariadic<LuaValue>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              if (auto anchorState = actor->get().movementController().anchorState())
+              if (auto anchorState = actor->get().movementController().anchor_state())
                 return LuaVariadic<LuaValue>{LuaInt(anchorState->entityId), LuaInt(anchorState->positionIndex)};
             return LuaVariadic<LuaValue>();
           });
@@ -700,7 +700,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "baseMovementParameters",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<Json>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return actor->get().movementController().baseParameters().toJson();
+              return actor->get().movementController().base_parameters().to_json();
             return {};
           });
         !registration)
@@ -738,7 +738,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "movingDirection",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<int>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return numerical_direction(actor->get().movementController().movingDirection());
+              return numerical_direction(actor->get().movementController().moving_direction());
             return {};
           });
         !registration)
@@ -747,7 +747,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "facingDirection",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<int>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return numerical_direction(actor->get().movementController().facingDirection());
+              return numerical_direction(actor->get().movementController().facing_direction());
             return {};
           });
         !registration)
@@ -783,7 +783,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "canJump",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<bool>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return actor->get().movementController().canJump();
+              return actor->get().movementController().can_jump();
             return {};
           });
         !registration)
@@ -801,7 +801,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "groundMovement",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<bool>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return actor->get().movementController().groundMovement();
+              return actor->get().movementController().ground_movement();
             return {};
           });
         !registration)
@@ -810,7 +810,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "liquidMovement",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<bool>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return actor->get().movementController().liquidMovement();
+              return actor->get().movementController().liquid_movement();
             return {};
           });
         !registration)

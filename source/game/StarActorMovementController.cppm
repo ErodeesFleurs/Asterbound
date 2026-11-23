@@ -43,49 +43,49 @@ struct ActorMovementControllerExceptionTag {
 using ActorMovementControllerException = StarError<ActorMovementControllerExceptionTag, MovementControllerException>;
 
 struct ActorJumpProfile {
-  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ActorJumpProfile& movementParameters);
-  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, ActorJumpProfile const& movementParameters);
+  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ActorJumpProfile& movement_parameters);
+  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, ActorJumpProfile const& movement_parameters);
 
   ActorJumpProfile();
   [[nodiscard]] static std::expected<ActorJumpProfile, StarException> create(Json const& config);
 
-  Json toJson() const;
+  Json to_json() const;
 
-  std::optional<float> jumpSpeed;
-  std::optional<float> jumpControlForce;
-  std::optional<float> jumpInitialPercentage;
+  std::optional<float> jump_speed;
+  std::optional<float> jump_control_force;
+  std::optional<float> jump_initial_percentage;
 
   // If this is greater than 0.0, jump hold time is limited by this factor.
-  std::optional<float> jumpHoldTime;
+  std::optional<float> jump_hold_time;
   // If this is greater than 0.0, then the total jump time for *all jumps in a
   // multi jump set* is limited by this factor.
-  std::optional<float> jumpTotalHoldTime;
+  std::optional<float> jump_total_hold_time;
 
-  std::optional<bool> multiJump;
-  std::optional<float> reJumpDelay;
-  std::optional<bool> autoJump;
-  std::optional<bool> collisionCancelled;
+  std::optional<bool> multi_jump;
+  std::optional<float> re_jump_delay;
+  std::optional<bool> auto_jump;
+  std::optional<bool> collision_cancelled;
 };
 
-[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ActorJumpProfile& movementParameters);
-[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, ActorJumpProfile const& movementParameters);
+[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ActorJumpProfile& movement_parameters);
+[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, ActorJumpProfile const& movement_parameters);
 
 // A not-quite superset of MovementParameters, with some fields from
 // MovementParameters ignored because they make no sense, and other fields
 // expanded out to different cases based on Actor specific things.
 struct ActorMovementParameters {
-  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ActorMovementParameters& movementParameters);
-  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, ActorMovementParameters const& movementParameters);
+  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ActorMovementParameters& movement_parameters);
+  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, ActorMovementParameters const& movement_parameters);
 
   // Load sensible defaults from a config file.
-  [[nodiscard]] static std::expected<ActorMovementParameters, StarException> sensibleDefaults(Root& root);
+  [[nodiscard]] static std::expected<ActorMovementParameters, StarException> sensible_defaults(Root& root);
 
   // Construct parameters from config with only those specified in the config
   // set, if any.
   explicit ActorMovementParameters();
   [[nodiscard]] static std::expected<ActorMovementParameters, StarException> create(Json const& config);
 
-  [[nodiscard]] std::expected<Json, StarException> toJson() const;
+  [[nodiscard]] std::expected<Json, StarException> to_json() const;
 
   // Merge the given set of movement parameters on top of this one, with any
   // set parameters in rhs overwriting the ones in this set.
@@ -94,63 +94,63 @@ struct ActorMovementParameters {
   void merge_from(ActorMovementParameters&& patch);
 
   std::optional<float> mass;
-  std::optional<float> gravityMultiplier;
-  std::optional<float> liquidBuoyancy;
-  std::optional<float> airBuoyancy;
-  std::optional<float> bounceFactor;
-  std::optional<bool> stopOnFirstBounce;
-  std::optional<bool> enableSurfaceSlopeCorrection;
-  std::optional<float> slopeSlidingFactor;
-  std::optional<float> maxMovementPerStep;
-  std::optional<float> maximumCorrection;
-  std::optional<float> speedLimit;
+  std::optional<float> gravity_multiplier;
+  std::optional<float> liquid_buoyancy;
+  std::optional<float> air_buoyancy;
+  std::optional<float> bounce_factor;
+  std::optional<bool> stop_on_first_bounce;
+  std::optional<bool> enable_surface_slope_correction;
+  std::optional<float> slope_sliding_factor;
+  std::optional<float> max_movement_per_step;
+  std::optional<float> maximum_correction;
+  std::optional<float> speed_limit;
 
-  std::optional<PolyF> standingPoly;
-  std::optional<PolyF> crouchingPoly;
+  std::optional<PolyF> standing_poly;
+  std::optional<PolyF> crouching_poly;
 
-  std::optional<bool> stickyCollision;
-  std::optional<float> stickyForce;
+  std::optional<bool> sticky_collision;
+  std::optional<float> sticky_force;
 
-  std::optional<float> walkSpeed;
-  std::optional<float> runSpeed;
-  std::optional<float> flySpeed;
+  std::optional<float> walk_speed;
+  std::optional<float> run_speed;
+  std::optional<float> fly_speed;
 
-  std::optional<float> airFriction;
-  std::optional<float> liquidFriction;
+  std::optional<float> air_friction;
+  std::optional<float> liquid_friction;
 
-  std::optional<float> minimumLiquidPercentage;
-  std::optional<float> liquidImpedance;
+  std::optional<float> minimum_liquid_percentage;
+  std::optional<float> liquid_impedance;
 
-  std::optional<float> normalGroundFriction;
-  std::optional<float> ambulatingGroundFriction;
+  std::optional<float> normal_ground_friction;
+  std::optional<float> ambulating_ground_friction;
 
-  std::optional<float> groundForce;
-  std::optional<float> airForce;
-  std::optional<float> liquidForce;
+  std::optional<float> ground_force;
+  std::optional<float> air_force;
+  std::optional<float> liquid_force;
 
-  ActorJumpProfile airJumpProfile;
-  ActorJumpProfile liquidJumpProfile;
+  ActorJumpProfile air_jump_profile;
+  ActorJumpProfile liquid_jump_profile;
 
-  std::optional<float> fallStatusSpeedMin;
-  std::optional<int> fallThroughSustainFrames;
-  std::optional<float> maximumPlatformCorrection;
-  std::optional<float> maximumPlatformCorrectionVelocityFactor;
+  std::optional<float> fall_status_speed_min;
+  std::optional<int> fall_through_sustain_frames;
+  std::optional<float> maximum_platform_correction;
+  std::optional<float> maximum_platform_correction_velocity_factor;
 
-  std::optional<StringSet> physicsEffectCategories;
+  std::optional<StringSet> physics_effect_categories;
 
-  std::optional<float> groundMovementMinimumSustain;
-  std::optional<float> groundMovementMaximumSustain;
-  std::optional<float> groundMovementCheckDistance;
+  std::optional<float> ground_movement_minimum_sustain;
+  std::optional<float> ground_movement_maximum_sustain;
+  std::optional<float> ground_movement_check_distance;
 
-  std::optional<bool> collisionEnabled;
-  std::optional<bool> frictionEnabled;
-  std::optional<bool> gravityEnabled;
+  std::optional<bool> collision_enabled;
+  std::optional<bool> friction_enabled;
+  std::optional<bool> gravity_enabled;
 
-  std::optional<float> pathExploreRate;
+  std::optional<float> path_explore_rate;
 };
 
-[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ActorMovementParameters& movementParameters);
-[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, ActorMovementParameters const& movementParameters);
+[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ActorMovementParameters& movement_parameters);
+[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, ActorMovementParameters const& movement_parameters);
 
 // A set of normalized values that act as "modifiers" or "bonuses" to movement,
 // and can be combined sensibly.  A modifier of 0.0 represents a 0% change, a
@@ -158,35 +158,44 @@ struct ActorMovementParameters {
 // a 20% decrease.  Also includes some flags that disable functionality
 // combined with logical OR.
 struct ActorMovementModifiers {
-  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ActorMovementModifiers& movementModifiers);
-  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, ActorMovementModifiers const& movementModifiers);
+  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ActorMovementModifiers& movement_modifiers);
+  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, ActorMovementModifiers const& movement_modifiers);
 
   explicit ActorMovementModifiers();
   [[nodiscard]] static std::expected<ActorMovementModifiers, StarException> create(Json const& config);
 
-  Json toJson() const;
+  Json to_json() const;
 
   // Combines each modifier value through addition.
   ActorMovementModifiers combine(ActorMovementModifiers const& rhs) const;
 
-  float groundMovementModifier;
-  float liquidMovementModifier;
-  float speedModifier;
-  float airJumpModifier;
-  float liquidJumpModifier;
+  float ground_movement_modifier;
+  float liquid_movement_modifier;
+  float speed_modifier;
+  float air_jump_modifier;
+  float liquid_jump_modifier;
 
-  bool runningSuppressed;
-  bool jumpingSuppressed;
+  bool running_suppressed;
+  bool jumping_suppressed;
   // Suppresses left, right, down, crouch, jump, and fly controls
-  bool movementSuppressed;
-  bool facingSuppressed;
+  bool movement_suppressed;
+  bool facing_suppressed;
 };
 
-[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ActorMovementModifiers& movementModifiers);
-[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, ActorMovementModifiers const& movementModifiers);
+[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ActorMovementModifiers& movement_modifiers);
+[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, ActorMovementModifiers const& movement_modifiers);
 
 class ActorMovementController : public virtual MovementController {
+  class ConstructionKey {
+    friend class ActorMovementController;
+    ConstructionKey() = default;
+
+  public:
+    ConstructionKey(ConstructionKey const&) = default;
+  };
+
 public:
+  ActorMovementController(ConstructionKey, Root& root);
   // Constructs an ActorMovementController with parameters loaded from sensible
   // defaults, and the given parameters (if any) applied on top of them.
   [[nodiscard]] static std::expected<std::shared_ptr<ActorMovementController>, StarException> create(Root& root, ActorMovementParameters const& parameters = ActorMovementParameters());
@@ -194,38 +203,38 @@ public:
   void uninit() override;
 
   // Currently active parameters.
-  ActorMovementParameters const& baseParameters() const;
+  ActorMovementParameters const& base_parameters() const;
 
   // Apply any set parameters from the given set on top of the current set.
-  [[nodiscard]] std::expected<void, StarException> updateBaseParameters(ActorMovementParameters const& parameters);
+  [[nodiscard]] std::expected<void, StarException> update_base_parameters(ActorMovementParameters const& parameters);
 
   // Reset the parameters from the sensible defaults, and apply the given
   // parameters (if any) on top of them.
-  [[nodiscard]] std::expected<void, StarException> resetBaseParameters(ActorMovementParameters const& parameters = ActorMovementParameters());
+  [[nodiscard]] std::expected<void, StarException> reset_base_parameters(ActorMovementParameters const& parameters = ActorMovementParameters());
 
   // Currently active modifiers.
-  ActorMovementModifiers const& baseModifiers() const;
+  ActorMovementModifiers const& base_modifiers() const;
 
   // Combine the given modifiers with the already active modifiers.
-  void updateBaseModifiers(ActorMovementModifiers const& modifiers);
+  void update_base_modifiers(ActorMovementModifiers const& modifiers);
 
   // Reset all modifiers to the given values
-  void resetBaseModifiers(ActorMovementModifiers const& modifiers = ActorMovementModifiers());
+  void reset_base_modifiers(ActorMovementModifiers const& modifiers = ActorMovementModifiers());
 
   // Stores and loads position, velocity, rotation, movingDirection,
   // facingDirection, and crouching
-  [[nodiscard]] std::expected<Json, StarException> storeState() const;
-  [[nodiscard]] std::expected<void, StarException> loadState(Json const& state);
+  [[nodiscard]] std::expected<Json, StarException> store_state() const;
+  [[nodiscard]] std::expected<void, StarException> load_state(Json const& state);
 
   // Optionaly anchor this ActorMovementController to the given
   // AnchorableEntity.  position, rotation, and facing direction will be set
   // based on the entity anchor alone every tick, and on slaved
   // ActorMovementControllers it will be updated based on the actual slave-side
   // AnchorableEntity state.
-  [[nodiscard]] std::expected<void, StarException> setAnchorState(EntityAnchorState anchorState);
-  [[nodiscard]] std::expected<void, StarException> resetAnchorState();
-  std::optional<EntityAnchorState> anchorState() const;
-  std::shared_ptr<EntityAnchor const> entityAnchor() const;
+  [[nodiscard]] std::expected<void, StarException> set_anchor_state(EntityAnchorState anchor_state);
+  [[nodiscard]] std::expected<void, StarException> reset_anchor_state();
+  std::optional<EntityAnchorState> anchor_state() const;
+  std::shared_ptr<EntityAnchor const> entity_anchor() const;
 
   // ActorMovementController position and rotation honor the entity anchor, if
   // an anchor is set.
@@ -234,47 +243,47 @@ public:
 
   bool walking() const;
   bool running() const;
-  Direction movingDirection() const;
+  Direction moving_direction() const;
   // Override only the existing network presentation field; local movement
   // direction, facing, velocity and physics remain unchanged.
-  void setNetworkMovingDirection(std::optional<Direction> direction);
-  Direction facingDirection() const;
+  void set_network_moving_direction(std::optional<Direction> direction);
+  Direction facing_direction() const;
   bool crouching() const;
   bool flying() const;
   bool falling() const;
-  bool canJump() const;
+  bool can_jump() const;
   bool jumping() const;
   // Slightly different than onGround, in that this is sustained for a few
   // extra frames of movement before it becomes false.
-  bool groundMovement() const;
-  bool liquidMovement() const;
+  bool ground_movement() const;
+  bool liquid_movement() const;
   bool pathfinding() const;
 
   // Basic direct physics controls that can be called multiple times per
   // update and will be combined.
-  void controlRotation(float rotationRate);
-  void controlAcceleration(Vec2F const& acceleration);
-  void controlForce(Vec2F const& force);
-  void controlApproachVelocity(Vec2F const& targetVelocity, float maxControlForce);
-  void controlApproachVelocityAlongAngle(float angle, float targetVelocity, float maxControlForce, bool positiveOnly = false);
-  void controlApproachXVelocity(float targetXVelocity, float maxControlForce);
-  void controlApproachYVelocity(float targetYVelocity, float maxControlForce);
+  void control_rotation(float rotation_rate);
+  void control_acceleration(Vec2F const& acceleration);
+  void control_force(Vec2F const& force);
+  void control_approach_velocity(Vec2F const& target_velocity, float max_control_force);
+  void control_approach_velocity_along_angle(float angle, float target_velocity, float max_control_force, bool positive_only = false);
+  void control_approach_x_velocity(float target_xvelocity, float max_control_force);
+  void control_approach_y_velocity(float target_yvelocity, float max_control_force);
 
   // Apply ActorMovementParameters / ActorMovementModifiers only as long as
   // the controls are active.  Can be called multiple times per update and
   // will be combined.
-  void controlParameters(ActorMovementParameters const& parameters);
-  void controlModifiers(ActorMovementModifiers const& modifiers);
+  void control_parameters(ActorMovementParameters const& parameters);
+  void control_modifiers(ActorMovementModifiers const& modifiers);
 
   // Higher level movement controls that use forces defined in the
   // ActorMovementParameters.  Calling more than once per update will override
   // previous calls.
-  void controlMove(Direction direction, bool run = true);
-  void controlFace(Direction direction);
-  void controlDown();
-  void controlCrouch();
-  void controlJump(bool jumpEvenIfUnable = false);
-  void controlFly(Vec2F const& velocity);
+  void control_move(Direction direction, bool run = true);
+  void control_face(Direction direction);
+  void control_down();
+  void control_crouch();
+  void control_jump(bool jump_even_if_unable = false);
+  void control_fly(Vec2F const& velocity);
 
   // Advance one search step or collect the completed tick for this request.
   [[nodiscard]] std::expected<std::optional<bool>, StarException>
@@ -283,94 +292,93 @@ public:
   control_path_move(Vec2F const& position, bool run = false, std::optional<PlatformerAStar::Parameters> const& parameters = {});
 
   // Used for user controller input.
-  void setMoveSpeedMultiplier(float multiplier = 1.0f);
+  void set_move_speed_multiplier(float multiplier = 1.0f);
 
   // Clears all control data.
-  void clearControls();
+  void clear_controls();
 
   // Integrates the ActorMovementController and applies all
   // the control data and clears it for the next step.
-  [[nodiscard]] std::expected<void, StarException> tickMaster(float dt);
+  [[nodiscard]] std::expected<void, StarException> tick_master(float dt);
 
-  [[nodiscard]] std::expected<void, StarException> tickSlave(float dt);
+  [[nodiscard]] std::expected<void, StarException> tick_slave(float dt);
 
 
 private:
-  explicit ActorMovementController(Root& root);
   struct ApproachVelocityCommand {
-    Vec2F targetVelocity;
-    float maxControlForce;
+    Vec2F target_velocity;
+    float max_control_force;
   };
 
   struct ApproachVelocityAlongAngleCommand {
-    float alongAngle;
-    float targetVelocity;
-    float maxControlForce;
-    bool positiveOnly;
+    float along_angle;
+    float target_velocity;
+    float max_control_force;
+    bool positive_only;
   };
 
-  [[nodiscard]] std::expected<void, StarException> applyMCParameters(ActorMovementParameters const& parameters);
-  [[nodiscard]] std::expected<void, StarException> doSetAnchorState(std::optional<EntityAnchorState> anchorState);
-  void setMovingDirection(Direction direction);
+  [[nodiscard]] std::expected<void, StarException> apply_mc_parameters(ActorMovementParameters const& parameters);
+  [[nodiscard]] std::expected<void, StarException> do_set_anchor_state(std::optional<EntityAnchorState> anchor_state);
+  void set_moving_direction(Direction direction);
 
-  ActorMovementParameters m_baseParameters;
-  ActorMovementModifiers m_baseModifiers;
+  ActorMovementParameters m_base_parameters;
+  ActorMovementModifiers m_base_modifiers;
 
   // State data
 
   NetElementBool m_walking;
   NetElementBool m_running;
-  NetElementEnum<Direction> m_movingDirection;
-  std::optional<Direction> m_nativeMovingDirection;
-  NetElementEnum<Direction> m_facingDirection;
+  NetElementEnum<Direction> m_moving_direction;
+  std::optional<Direction> m_native_moving_direction;
+  NetElementEnum<Direction> m_facing_direction;
   NetElementBool m_crouching;
   NetElementBool m_flying;
   NetElementBool m_falling;
-  NetElementBool m_canJump;
+  NetElementBool m_can_jump;
   NetElementBool m_jumping;
-  NetElementBool m_groundMovement;
-  NetElementBool m_liquidMovement;
-  NetElementData<std::optional<EntityAnchorState>> m_anchorState;
-  std::shared_ptr<EntityAnchor const> m_entityAnchor;
+  NetElementBool m_ground_movement;
+  NetElementBool m_liquid_movement;
+  NetElementData<std::optional<EntityAnchorState>> m_anchor_state;
+  std::shared_ptr<EntityAnchor const> m_entity_anchor;
 
   // Command data
 
-  float m_controlRotationRate;
-  Vec2F m_controlAcceleration;
-  Vec2F m_controlForce;
-  List<ApproachVelocityCommand> m_controlApproachVelocities;
-  List<ApproachVelocityAlongAngleCommand> m_controlApproachVelocityAlongAngles;
+  float m_control_rotation_rate;
+  Vec2F m_control_acceleration;
+  Vec2F m_control_force;
+  List<ApproachVelocityCommand> m_control_approach_velocities;
+  List<ApproachVelocityAlongAngleCommand> m_control_approach_velocity_along_angles;
 
-  std::optional<Direction> m_controlMove;
-  std::optional<Direction> m_controlFace;
-  bool m_controlRun;
-  bool m_controlCrouch;
-  bool m_controlDown;
-  bool m_controlJump;
-  bool m_controlJumpAnyway;
+  std::optional<Direction> m_control_move;
+  std::optional<Direction> m_control_face;
+  bool m_control_run;
+  bool m_control_crouch;
+  bool m_control_down;
+  bool m_control_jump;
+  bool m_control_jump_anyway;
 
-  std::optional<Vec2F> m_controlFly;
+  std::optional<Vec2F> m_control_fly;
 
   std::optional<std::pair<Vec2F, bool>> m_control_path_move;
   std::optional<std::pair<Vec2F, bool>> m_path_move_result;
   std::unique_ptr<PathController> m_path_controller;
 
   std::optional<ActorMovementParameters> m_control_parameters;
-  ActorMovementModifiers m_controlModifiers;
+  ActorMovementModifiers m_control_modifiers;
 
   // Internal state data
 
-  int m_fallThroughSustain;
-  bool m_lastControlJump;
-  bool m_lastControlDown;
-  float m_moveSpeedMultiplier;
+  int m_fall_through_sustain;
+  bool m_last_control_jump;
+  bool m_last_control_down;
+  float m_move_speed_multiplier;
 
-  GameTimer m_reJumpTimer;
-  std::optional<GameTimer> m_jumpHoldTimer;
-  GameTimer m_groundMovementSustainTimer;
+  GameTimer m_re_jump_timer;
+  std::optional<GameTimer> m_jump_hold_timer;
+  GameTimer m_ground_movement_sustain_timer;
 
   // Target horizontal velocity for walking / running
-  float m_targetHorizontalAmbulatingVelocity;
+  float m_target_horizontal_ambulating_velocity;
 };
 
 class PathController {

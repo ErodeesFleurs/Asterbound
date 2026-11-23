@@ -130,13 +130,13 @@ std::expected<Fixture, StarException> prepare_fixture(Root& root, std::shared_pt
   }
   ActorMovementParameters movement;
   movement.mass = 1.0f;
-  movement.gravityEnabled = true;
-  movement.gravityMultiplier = 1.0f;
-  movement.airBuoyancy = 0.0f;
-  movement.minimumLiquidPercentage = 0.5f;
-  movement.walkSpeed = 4.0f;
-  movement.runSpeed = 8.0f;
-  movement.airJumpProfile.jumpSpeed.reset();
+  movement.gravity_enabled = true;
+  movement.gravity_multiplier = 1.0f;
+  movement.air_buoyancy = 0.0f;
+  movement.minimum_liquid_percentage = 0.5f;
+  movement.walk_speed = 4.0f;
+  movement.run_speed = 8.0f;
+  movement.air_jump_profile.jump_speed.reset();
   PlatformerAStar::Parameters parameters;
   parameters.bound_box = RectF(-0.25f, -0.25f, 0.25f, 0.25f);
   parameters.standing_bound_box = parameters.bound_box;

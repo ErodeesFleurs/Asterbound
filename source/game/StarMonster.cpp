@@ -191,20 +191,20 @@ if (!result11) return std::unexpected(std::move(result11.error()));
   }
   m_scriptComponent.set_update_delta(m_monsterVariant.initialScriptDelta);
 
-  auto result12 = ActorMovementParameters::sensibleDefaults(this->root());
+  auto result12 = ActorMovementParameters::sensible_defaults(this->root());
 if (!result12) return std::unexpected(std::move(result12.error()));
 auto movementParameters = std::move(*result12).merge(monsterVariant.movementSettings);
-  if (movementParameters.standingPoly)
-    movementParameters.standingPoly->scale(m_monsterVariant.animatorZoom);
-  if (movementParameters.crouchingPoly)
-    movementParameters.crouchingPoly->scale(m_monsterVariant.animatorZoom);
-  *movementParameters.walkSpeed *= monsterVariant.walkMultiplier;
-  *movementParameters.runSpeed *= monsterVariant.runMultiplier;
-  *movementParameters.airJumpProfile.jumpSpeed *= monsterVariant.jumpMultiplier;
-  *movementParameters.liquidJumpProfile.jumpSpeed *= monsterVariant.jumpMultiplier;
+  if (movementParameters.standing_poly)
+    movementParameters.standing_poly->scale(m_monsterVariant.animatorZoom);
+  if (movementParameters.crouching_poly)
+    movementParameters.crouching_poly->scale(m_monsterVariant.animatorZoom);
+  *movementParameters.walk_speed *= monsterVariant.walkMultiplier;
+  *movementParameters.run_speed *= monsterVariant.runMultiplier;
+  *movementParameters.air_jump_profile.jump_speed *= monsterVariant.jumpMultiplier;
+  *movementParameters.liquid_jump_profile.jump_speed *= monsterVariant.jumpMultiplier;
   *movementParameters.mass *= monsterVariant.weightMultiplier;
-  if (!movementParameters.physicsEffectCategories)
-    movementParameters.physicsEffectCategories = StringSet{"monster"};
+  if (!movementParameters.physics_effect_categories)
+    movementParameters.physics_effect_categories = StringSet{"monster"};
   auto result13 = ActorMovementController::create(this->root(), movementParameters);
 if (!result13) return std::unexpected(std::move(result13.error()));
 m_movementController = std::move(*result13);
@@ -239,7 +239,7 @@ if (!result16) return std::unexpected(std::move(result16.error()));
 m_monsterLevel = std::move(*result16);
   auto result17 = diskStore.get("movementState");
 if (!result17) return std::unexpected(std::move(result17.error()));
-auto result18 = m_movementController->loadState(std::move(*result17));
+auto result18 = m_movementController->load_state(std::move(*result17));
 if (!result18) return std::unexpected(std::move(result18.error()));
 
   auto result19 = diskStore.get("statusController");
@@ -295,7 +295,7 @@ setUniqueId(std::move(*result31));
 }
 
 std::expected<Json, StarException> Monster::diskStore() const {
-  auto result35 = m_movementController->storeState();
+  auto result35 = m_movementController->store_state();
 if (!result35) return std::unexpected(std::move(result35.error()));
 auto result36 = m_statusController->diskStore();
 if (!result36) return std::unexpected(std::move(result36.error()));
@@ -905,7 +905,7 @@ std::expected<void, StarException> Monster::update(float dt, std::uint64_t) {
   m_movementController->setTimestep(dt);
 
   if (isMaster()) {
-    m_networkedAnimator->setFlipped((m_movementController->facingDirection() == Direction::Left) != m_monsterVariant.reversed);
+    m_networkedAnimator->setFlipped((m_movementController->facing_direction() == Direction::Left) != m_monsterVariant.reversed);
 
     if (m_knockedOut) {
       m_knockoutTimer -= dt;
@@ -928,7 +928,7 @@ if (!result140) return std::unexpected(std::move(result140.error()));
 }
     }
 
-    auto result143 = m_movementController->tickMaster(dt);
+    auto result143 = m_movementController->tick_master(dt);
 if (!result143) return std::unexpected(std::move(result143.error()));
 
 
@@ -950,7 +950,7 @@ if (!result147) return std::unexpected(std::move(result147.error()));
 if (!result148) return std::unexpected(std::move(result148.error()));
 
 
-    auto result149 = m_movementController->tickSlave(dt);
+    auto result149 = m_movementController->tick_slave(dt);
 if (!result149) return std::unexpected(std::move(result149.error()));
 
   }
@@ -1085,7 +1085,7 @@ DamageBarType Monster::damageBar() const {
 }
 
 std::expected<Vec2F, StarException> Monster::getAbsolutePosition(Vec2F relativePosition) const {
-  if (m_movementController->facingDirection() == Direction::Left)
+  if (m_movementController->facing_direction() == Direction::Left)
     relativePosition[0] *= -1;
   if (m_movementController->rotation() != 0)
     relativePosition = relativePosition.rotate(m_movementController->rotation());
@@ -1100,7 +1100,7 @@ m_effectEmitter->setSourcePosition("mouth", position() + std::move(*result177));
   auto result178 = feetOffset();
 if (!result178) return std::unexpected(std::move(result178.error()));
 m_effectEmitter->setSourcePosition("feet", position() + std::move(*result178));
-  m_effectEmitter->setDirection(m_movementController->facingDirection());
+  m_effectEmitter->setDirection(m_movementController->facing_direction());
   auto result179 = m_effectEmitter->tick(dt, *entityMode());
 if (!result179) return std::unexpected(std::move(result179.error()));
 
@@ -1183,7 +1183,7 @@ if (!result191) return std::unexpected(std::move(result191.error()));
   auto result193 = callbacks.register_callback("flyTo", [this](Vec2F const& arg1) -> std::expected<void, StarException> {
       auto result192 = world();
 if (!result192) return std::unexpected(std::move(result192.error()));
-m_movementController->controlFly(result192->get().geometry().diff(arg1, position()));
+m_movementController->control_fly(result192->get().geometry().diff(arg1, position()));
       return {};
 });
 if (!result193) return std::unexpected(std::move(result193.error()));

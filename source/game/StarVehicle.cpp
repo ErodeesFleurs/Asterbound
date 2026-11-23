@@ -548,7 +548,7 @@ if (!result1245) return std::unexpected(std::move(result1245.error()));
 if (!result1246) return std::unexpected(std::move(result1246.error()));
 auto result1247 = m_scriptComponent.add_callbacks("entity", std::move(*result1246));
 if (!result1247) return std::unexpected(std::move(result1247.error()));
-    auto result1248 = LuaBindings::makeMovementControllerCallbacks(*m_movementController);
+    auto result1248 = LuaBindings::make_movement_controller_callbacks(*m_movementController);
 if (!result1248) return std::unexpected(std::move(result1248.error()));
 auto result1249 = m_scriptComponent.add_callbacks("mcontroller", std::move(*result1248));
 if (!result1249) return std::unexpected(std::move(result1249.error()));

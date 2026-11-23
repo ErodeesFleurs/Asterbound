@@ -273,10 +273,10 @@ const GameTestRegistration transientMovementAnimation(
     auto& player = *setup.player;
     auto& movement = player.movementController();
     ActorMovementParameters parameters;
-    parameters.gravityEnabled = false;
-    parameters.collisionEnabled = false;
-    parameters.frictionEnabled = false;
-    ASSERT_TRUE(movement.updateBaseParameters(parameters));
+    parameters.gravity_enabled = false;
+    parameters.collision_enabled = false;
+    parameters.friction_enabled = false;
+    ASSERT_TRUE(movement.update_base_parameters(parameters));
     movement.setPosition(Vec2F(1024, 1024));
     auto nativeCollisionPoly = movement.collisionPoly();
 
@@ -334,7 +334,7 @@ const GameTestRegistration transientMovementAnimation(
         EXPECT_EQ(remotes[i]->humanoid()->state(), state);
         EXPECT_EQ(remotes[i]->humanoid()->facingDirection(), player.humanoid()->facingDirection());
         EXPECT_EQ(remotes[i]->humanoid()->movingBackwards(), player.humanoid()->movingBackwards());
-        EXPECT_EQ(remotes[i]->movementController().movingDirection(), networkDirection);
+        EXPECT_EQ(remotes[i]->movementController().moving_direction(), networkDirection);
         EXPECT_NEAR(remotes[i]->movementController().rotation(), movement.rotation(), .011f);
         EXPECT_FALSE(remotes[i]->movementController().onGround());
         EXPECT_FALSE(remotes[i]->movementController().crouching());
@@ -346,7 +346,7 @@ const GameTestRegistration transientMovementAnimation(
     };
     std::array states{Humanoid::Idle, Humanoid::Walk, Humanoid::Run, Humanoid::Jump, Humanoid::Fall, Humanoid::Duck};
     std::array<std::string_view, 6> names{"idle", "walk", "run", "jump", "fall", "duck"};
-    auto nativeDirection = movement.movingDirection();
+    auto nativeDirection = movement.moving_direction();
     for (float rotation : {0.f, std::numbers::pi_v<float> / 2, std::numbers::pi_v<float>, -std::numbers::pi_v<float> / 2}) {
       movement.setRotation(rotation);
       auto tangent = Vec2F::with_angle(rotation);
@@ -354,13 +354,13 @@ const GameTestRegistration transientMovementAnimation(
         player.setGenericProperty("poseFixture", Json(String(names[i])));
         for (auto facing : {Direction::Left, Direction::Right}) {
           for (auto direction : {Direction::Left, Direction::Right}) {
-            movement.controlFace(facing);
+            movement.control_face(facing);
             movement.setVelocity(tangent * (direction == Direction::Left ? -14.f : 14.f));
             ASSERT_TRUE(tick());
             EXPECT_EQ(player.humanoid()->state(), states[i]);
             EXPECT_EQ(player.humanoid()->facingDirection(), facing);
             EXPECT_EQ(player.humanoid()->movingBackwards(), facing != direction);
-            EXPECT_EQ(movement.movingDirection(), nativeDirection);
+            EXPECT_EQ(movement.moving_direction(), nativeDirection);
             EXPECT_FALSE(movement.onGround());
             EXPECT_TRUE(movement.zeroG());
             EXPECT_FALSE(movement.crouching());
@@ -380,14 +380,14 @@ const GameTestRegistration transientMovementAnimation(
     movement.setRotation(std::numbers::pi_v<float>);
     player.setGenericProperty("poseFixture", "run");
     for (auto direction : {Direction::Right, Direction::Left}) {
-      movement.controlMove(direction);
-      movement.controlFace(Direction::Right);
+      movement.control_move(direction);
+      movement.control_face(Direction::Right);
       movement.setVelocity(Vec2F(-14.f, 0.f));
       ASSERT_TRUE(tick());
-      EXPECT_EQ(movement.movingDirection(), direction);
+      EXPECT_EQ(movement.moving_direction(), direction);
       sync(Humanoid::Run, Direction::Right);
     }
-    nativeDirection = movement.movingDirection();
+    nativeDirection = movement.moving_direction();
     movement.setVelocity(Vec2F());
     ASSERT_TRUE(tick());
     EXPECT_FALSE(player.humanoid()->movingBackwards());
@@ -399,7 +399,7 @@ const GameTestRegistration transientMovementAnimation(
     player.setGenericProperty("poseFixture", Json());
     ASSERT_TRUE(tick());
     EXPECT_EQ(player.humanoid()->state(), Humanoid::SwimIdle);
-    EXPECT_EQ(movement.movingDirection(), nativeDirection);
+    EXPECT_EQ(movement.moving_direction(), nativeDirection);
     sync(Humanoid::SwimIdle, nativeDirection);
     player.setGenericProperty("poseFixture", "duck");
     player.setGenericProperty("poseRevoke", true);
@@ -420,13 +420,13 @@ const GameTestRegistration transientMovementAnimation(
     ASSERT_TRUE(player.uninit());
     ASSERT_TRUE(player.init(*setup.world, 100, EntityMode::Master));
     ASSERT_TRUE(player.refreshHumanoid());
-    ASSERT_TRUE(movement.updateBaseParameters(parameters));
+    ASSERT_TRUE(movement.update_base_parameters(parameters));
     ASSERT_TRUE(tick());
     EXPECT_EQ(player.humanoid()->state(), Humanoid::SwimIdle);
-    sync(Humanoid::SwimIdle, movement.movingDirection());
+    sync(Humanoid::SwimIdle, movement.moving_direction());
     player.setGenericProperty("poseFixture", "duck");
     movement.setVelocity(Vec2F());
-    movement.controlFace(Direction::Right);
+    movement.control_face(Direction::Right);
     ASSERT_TRUE(tick());
     sync(Humanoid::Duck, Direction::Right);
     ASSERT_TRUE(player.teleportOut());
@@ -437,13 +437,13 @@ const GameTestRegistration transientMovementAnimation(
       versions[i] = packet->second;
       ASSERT_TRUE(remotes[i]->read_net_state(packet->first, 0.f, rules[i]));
       EXPECT_TRUE(remotes[i]->isTeleporting());
-      EXPECT_EQ(remotes[i]->movementController().movingDirection(), movement.movingDirection());
+      EXPECT_EQ(remotes[i]->movementController().moving_direction(), movement.moving_direction());
     }
     ASSERT_TRUE(tick());
     EXPECT_TRUE(player.isTeleporting());
     // Teleport freezes the previous humanoid cycle, but must send its native
     // teleport state and restore native movingDirection, not the request.
-    sync(player.humanoid()->state(), movement.movingDirection());
+    sync(player.humanoid()->state(), movement.moving_direction());
     for (auto const& remote : remotes)
       EXPECT_TRUE(remote->isTeleporting());
     ASSERT_TRUE(player.teleportAbort());
@@ -467,7 +467,7 @@ const GameTestRegistration transientMovementAnimation(
     ASSERT_TRUE(tick());
     ASSERT_TRUE(player.isDead());
     EXPECT_NE(player.humanoid()->state(), Humanoid::Duck);
-    sync(player.humanoid()->state(), movement.movingDirection());
+    sync(player.humanoid()->state(), movement.moving_direction());
   });
 
 const GameTestRegistration refreshedMovementCycles(
@@ -954,7 +954,7 @@ const GameTestRegistration playerPresentationEvents(
     ASSERT_TRUE(lua);
     auto context = (*lua)->create_context(StringList{});
     ASSERT_TRUE(context);
-    auto callbacks = LuaBindings::makeMovementControllerCallbacks(player.movementController());
+    auto callbacks = LuaBindings::make_movement_controller_callbacks(player.movementController());
     ASSERT_TRUE(callbacks);
     ASSERT_TRUE(context->set_callbacks("mcontroller", *callbacks));
     auto epoch = player.presentationEpoch();

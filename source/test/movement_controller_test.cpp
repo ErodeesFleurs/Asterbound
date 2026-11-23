@@ -36,18 +36,18 @@ TEST(ActorMovementWire, LegacyParametersAndNestedJumpProfiles) {
   ByteArray bytes({legacy, sizeof(legacy) - 1});
   DataStreamBuffer input(bytes);
   ActorMovementParameters p;
-  p.groundMovementMinimumSustain = 3.0f;
-  p.groundMovementMaximumSustain = 4.0f;
-  p.groundMovementCheckDistance = 5.0f;
+  p.ground_movement_minimum_sustain = 3.0f;
+  p.ground_movement_maximum_sustain = 4.0f;
+  p.ground_movement_check_distance = 5.0f;
   ASSERT_TRUE(input >> p);
   EXPECT_EQ(p.mass, 1.0f);
-  EXPECT_EQ(p.airJumpProfile.multiJump, false);
-  EXPECT_EQ(p.liquidJumpProfile.collisionCancelled, true);
-  EXPECT_EQ(p.collisionEnabled, false);
-  EXPECT_EQ(p.pathExploreRate, 2.0f);
-  EXPECT_EQ(p.groundMovementMinimumSustain, 3.0f);
-  EXPECT_EQ(p.groundMovementMaximumSustain, 4.0f);
-  EXPECT_EQ(p.groundMovementCheckDistance, 5.0f);
+  EXPECT_EQ(p.air_jump_profile.multi_jump, false);
+  EXPECT_EQ(p.liquid_jump_profile.collision_cancelled, true);
+  EXPECT_EQ(p.collision_enabled, false);
+  EXPECT_EQ(p.path_explore_rate, 2.0f);
+  EXPECT_EQ(p.ground_movement_minimum_sustain, 3.0f);
+  EXPECT_EQ(p.ground_movement_maximum_sustain, 4.0f);
+  EXPECT_EQ(p.ground_movement_check_distance, 5.0f);
   DataStreamBuffer output;
   ASSERT_TRUE(output << p);
   EXPECT_EQ(output.data(), bytes);
@@ -60,24 +60,24 @@ TEST(ActorMovementWire, ModifierFlagOrderAndTruncatedPrefix) {
   DataStreamBuffer input(bytes);
   ActorMovementModifiers m;
   ASSERT_TRUE(input >> m);
-  EXPECT_EQ(m.groundMovementModifier, 1.0f);
-  EXPECT_EQ(m.liquidMovementModifier, 2.0f);
-  EXPECT_EQ(m.speedModifier, 3.0f);
-  EXPECT_EQ(m.airJumpModifier, 4.0f);
-  EXPECT_EQ(m.liquidJumpModifier, 5.0f);
-  EXPECT_TRUE(m.runningSuppressed);
-  EXPECT_FALSE(m.jumpingSuppressed);
-  EXPECT_TRUE(m.facingSuppressed);
-  EXPECT_FALSE(m.movementSuppressed);
+  EXPECT_EQ(m.ground_movement_modifier, 1.0f);
+  EXPECT_EQ(m.liquid_movement_modifier, 2.0f);
+  EXPECT_EQ(m.speed_modifier, 3.0f);
+  EXPECT_EQ(m.air_jump_modifier, 4.0f);
+  EXPECT_EQ(m.liquid_jump_modifier, 5.0f);
+  EXPECT_TRUE(m.running_suppressed);
+  EXPECT_FALSE(m.jumping_suppressed);
+  EXPECT_TRUE(m.facing_suppressed);
+  EXPECT_FALSE(m.movement_suppressed);
   DataStreamBuffer output;
   ASSERT_TRUE(output << m);
   EXPECT_EQ(output.data(), bytes);
 
   DataStreamBuffer truncated(ByteArray({legacy, 8}));
-  m.liquidMovementModifier = m.liquidJumpModifier = -1.0f;
+  m.liquid_movement_modifier = m.liquid_jump_modifier = -1.0f;
   EXPECT_FALSE(truncated >> m);
-  EXPECT_EQ(m.liquidMovementModifier, 2.0f);
-  EXPECT_EQ(m.liquidJumpModifier, -1.0f);
+  EXPECT_EQ(m.liquid_movement_modifier, 2.0f);
+  EXPECT_EQ(m.liquid_jump_modifier, -1.0f);
 }
 
 // Exercise the real WorldServer collision query and tickMaster consumer rather

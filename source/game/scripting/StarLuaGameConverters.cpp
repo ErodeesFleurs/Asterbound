@@ -322,10 +322,10 @@ LuaConverter<PlatformerAStar::Parameters>::to(LuaStackValue v) {
 }
 
 std::expected<void, StarException> LuaConverter<ActorJumpProfile>::from(LuaStack stack, ActorJumpProfile const& v) {
-  return makeTable(stack, "jumpSpeed", v.jumpSpeed, "jumpControlForce", v.jumpControlForce, "jumpInitialPercentage",
-                   v.jumpInitialPercentage, "jumpHoldTime", v.jumpHoldTime, "jumpTotalHoldTime", v.jumpTotalHoldTime,
-                   "multiJump", v.multiJump, "reJumpDelay", v.reJumpDelay, "autoJump", v.autoJump, "collisionCancelled",
-                   v.collisionCancelled);
+  return makeTable(stack, "jumpSpeed", v.jump_speed, "jumpControlForce", v.jump_control_force, "jumpInitialPercentage",
+                   v.jump_initial_percentage, "jumpHoldTime", v.jump_hold_time, "jumpTotalHoldTime", v.jump_total_hold_time,
+                   "multiJump", v.multi_jump, "reJumpDelay", v.re_jump_delay, "autoJump", v.auto_jump, "collisionCancelled",
+                   v.collision_cancelled);
 }
 
 std::expected<std::optional<ActorJumpProfile>, StarException> LuaConverter<ActorJumpProfile>::to(LuaStackValue v) {
@@ -336,10 +336,10 @@ std::expected<std::optional<ActorJumpProfile>, StarException> LuaConverter<Actor
   auto const& table = v;
   ActorJumpProfile result;
   auto read =
-    readFields(table, "jumpSpeed", result.jumpSpeed, "jumpControlForce", result.jumpControlForce,
-               "jumpInitialPercentage", result.jumpInitialPercentage, "jumpHoldTime", result.jumpHoldTime,
-               "jumpTotalHoldTime", result.jumpTotalHoldTime, "multiJump", result.multiJump, "reJumpDelay",
-               result.reJumpDelay, "autoJump", result.autoJump, "collisionCancelled", result.collisionCancelled);
+    readFields(table, "jumpSpeed", result.jump_speed, "jumpControlForce", result.jump_control_force,
+               "jumpInitialPercentage", result.jump_initial_percentage, "jumpHoldTime", result.jump_hold_time,
+               "jumpTotalHoldTime", result.jump_total_hold_time, "multiJump", result.multi_jump, "reJumpDelay",
+               result.re_jump_delay, "autoJump", result.auto_jump, "collisionCancelled", result.collision_cancelled);
   if (!read)
     return std::unexpected(std::move(read.error()));
   if (!*read)
@@ -350,23 +350,23 @@ std::expected<std::optional<ActorJumpProfile>, StarException> LuaConverter<Actor
 std::expected<void, StarException> LuaConverter<ActorMovementParameters>::from(LuaStack stack,
                                                                                ActorMovementParameters const& v) {
   return makeTable(
-    stack, "mass", v.mass, "gravityMultiplier", v.gravityMultiplier, "liquidBuoyancy", v.liquidBuoyancy, "airBuoyancy",
-    v.airBuoyancy, "bounceFactor", v.bounceFactor, "stopOnFirstBounce", v.stopOnFirstBounce,
-    "enableSurfaceSlopeCorrection", v.enableSurfaceSlopeCorrection, "slopeSlidingFactor", v.slopeSlidingFactor,
-    "maxMovementPerStep", v.maxMovementPerStep, "maximumCorrection", v.maximumCorrection, "speedLimit", v.speedLimit,
-    "standingPoly", v.standingPoly, "crouchingPoly", v.crouchingPoly, "stickyCollision", v.stickyCollision,
-    "stickyForce", v.stickyForce, "walkSpeed", v.walkSpeed, "runSpeed", v.runSpeed, "flySpeed", v.flySpeed,
-    "airFriction", v.airFriction, "liquidFriction", v.liquidFriction, "minimumLiquidPercentage",
-    v.minimumLiquidPercentage, "liquidImpedance", v.liquidImpedance, "normalGroundFriction", v.normalGroundFriction,
-    "ambulatingGroundFriction", v.ambulatingGroundFriction, "groundForce", v.groundForce, "airForce", v.airForce,
-    "liquidForce", v.liquidForce, "airJumpProfile", v.airJumpProfile, "liquidJumpProfile", v.liquidJumpProfile,
-    "fallStatusSpeedMin", v.fallStatusSpeedMin, "fallThroughSustainFrames", v.fallThroughSustainFrames,
-    "maximumPlatformCorrection", v.maximumPlatformCorrection, "maximumPlatformCorrectionVelocityFactor",
-    v.maximumPlatformCorrectionVelocityFactor, "physicsEffectCategories", v.physicsEffectCategories,
-    "groundMovementMinimumSustain", v.groundMovementMinimumSustain, "groundMovementMaximumSustain",
-    v.groundMovementMaximumSustain, "groundMovementCheckDistance", v.groundMovementCheckDistance, "collisionEnabled",
-    v.collisionEnabled, "frictionEnabled", v.frictionEnabled, "gravityEnabled", v.gravityEnabled, "pathExploreRate",
-    v.pathExploreRate);
+    stack, "mass", v.mass, "gravityMultiplier", v.gravity_multiplier, "liquidBuoyancy", v.liquid_buoyancy, "airBuoyancy",
+    v.air_buoyancy, "bounceFactor", v.bounce_factor, "stopOnFirstBounce", v.stop_on_first_bounce,
+    "enableSurfaceSlopeCorrection", v.enable_surface_slope_correction, "slopeSlidingFactor", v.slope_sliding_factor,
+    "maxMovementPerStep", v.max_movement_per_step, "maximumCorrection", v.maximum_correction, "speedLimit", v.speed_limit,
+    "standingPoly", v.standing_poly, "crouchingPoly", v.crouching_poly, "stickyCollision", v.sticky_collision,
+    "stickyForce", v.sticky_force, "walkSpeed", v.walk_speed, "runSpeed", v.run_speed, "flySpeed", v.fly_speed,
+    "airFriction", v.air_friction, "liquidFriction", v.liquid_friction, "minimumLiquidPercentage",
+    v.minimum_liquid_percentage, "liquidImpedance", v.liquid_impedance, "normalGroundFriction", v.normal_ground_friction,
+    "ambulatingGroundFriction", v.ambulating_ground_friction, "groundForce", v.ground_force, "airForce", v.air_force,
+    "liquidForce", v.liquid_force, "airJumpProfile", v.air_jump_profile, "liquidJumpProfile", v.liquid_jump_profile,
+    "fallStatusSpeedMin", v.fall_status_speed_min, "fallThroughSustainFrames", v.fall_through_sustain_frames,
+    "maximumPlatformCorrection", v.maximum_platform_correction, "maximumPlatformCorrectionVelocityFactor",
+    v.maximum_platform_correction_velocity_factor, "physicsEffectCategories", v.physics_effect_categories,
+    "groundMovementMinimumSustain", v.ground_movement_minimum_sustain, "groundMovementMaximumSustain",
+    v.ground_movement_maximum_sustain, "groundMovementCheckDistance", v.ground_movement_check_distance, "collisionEnabled",
+    v.collision_enabled, "frictionEnabled", v.friction_enabled, "gravityEnabled", v.gravity_enabled, "pathExploreRate",
+    v.path_explore_rate);
 }
 
 std::expected<std::optional<ActorMovementParameters>, StarException>
@@ -379,43 +379,43 @@ LuaConverter<ActorMovementParameters>::to(LuaStackValue v) {
   ActorMovementParameters result;
   std::optional<PolyF> standingFallback, crouchingFallback;
   auto read = readFields(
-    table, "mass", result.mass, "gravityMultiplier", result.gravityMultiplier, "liquidBuoyancy", result.liquidBuoyancy,
-    "airBuoyancy", result.airBuoyancy, "bounceFactor", result.bounceFactor, "stopOnFirstBounce",
-    result.stopOnFirstBounce, "enableSurfaceSlopeCorrection", result.enableSurfaceSlopeCorrection, "slopeSlidingFactor",
-    result.slopeSlidingFactor, "maxMovementPerStep", result.maxMovementPerStep, "maximumCorrection",
-    result.maximumCorrection, "speedLimit", result.speedLimit, "standingPoly", result.standingPoly, "collisionPoly",
-    standingFallback, "crouchingPoly", result.crouchingPoly, "collisionPoly", crouchingFallback, "stickyCollision",
-    result.stickyCollision, "stickyForce", result.stickyForce, "walkSpeed", result.walkSpeed, "runSpeed",
-    result.runSpeed, "flySpeed", result.flySpeed, "airFriction", result.airFriction, "liquidFriction",
-    result.liquidFriction, "minimumLiquidPercentage", result.minimumLiquidPercentage, "liquidImpedance",
-    result.liquidImpedance, "normalGroundFriction", result.normalGroundFriction, "ambulatingGroundFriction",
-    result.ambulatingGroundFriction, "groundForce", result.groundForce, "airForce", result.airForce, "liquidForce",
-    result.liquidForce, "airJumpProfile", result.airJumpProfile, "liquidJumpProfile", result.liquidJumpProfile,
-    "fallStatusSpeedMin", result.fallStatusSpeedMin, "fallThroughSustainFrames", result.fallThroughSustainFrames,
-    "maximumPlatformCorrection", result.maximumPlatformCorrection, "maximumPlatformCorrectionVelocityFactor",
-    result.maximumPlatformCorrectionVelocityFactor, "physicsEffectCategories", result.physicsEffectCategories,
-    "groundMovementMinimumSustain", result.groundMovementMinimumSustain, "groundMovementMaximumSustain",
-    result.groundMovementMaximumSustain, "groundMovementCheckDistance", result.groundMovementCheckDistance,
-    "collisionEnabled", result.collisionEnabled, "frictionEnabled", result.frictionEnabled, "gravityEnabled",
-    result.gravityEnabled, "pathExploreRate", result.pathExploreRate);
+    table, "mass", result.mass, "gravityMultiplier", result.gravity_multiplier, "liquidBuoyancy", result.liquid_buoyancy,
+    "airBuoyancy", result.air_buoyancy, "bounceFactor", result.bounce_factor, "stopOnFirstBounce",
+    result.stop_on_first_bounce, "enableSurfaceSlopeCorrection", result.enable_surface_slope_correction, "slopeSlidingFactor",
+    result.slope_sliding_factor, "maxMovementPerStep", result.max_movement_per_step, "maximumCorrection",
+    result.maximum_correction, "speedLimit", result.speed_limit, "standingPoly", result.standing_poly, "collisionPoly",
+    standingFallback, "crouchingPoly", result.crouching_poly, "collisionPoly", crouchingFallback, "stickyCollision",
+    result.sticky_collision, "stickyForce", result.sticky_force, "walkSpeed", result.walk_speed, "runSpeed",
+    result.run_speed, "flySpeed", result.fly_speed, "airFriction", result.air_friction, "liquidFriction",
+    result.liquid_friction, "minimumLiquidPercentage", result.minimum_liquid_percentage, "liquidImpedance",
+    result.liquid_impedance, "normalGroundFriction", result.normal_ground_friction, "ambulatingGroundFriction",
+    result.ambulating_ground_friction, "groundForce", result.ground_force, "airForce", result.air_force, "liquidForce",
+    result.liquid_force, "airJumpProfile", result.air_jump_profile, "liquidJumpProfile", result.liquid_jump_profile,
+    "fallStatusSpeedMin", result.fall_status_speed_min, "fallThroughSustainFrames", result.fall_through_sustain_frames,
+    "maximumPlatformCorrection", result.maximum_platform_correction, "maximumPlatformCorrectionVelocityFactor",
+    result.maximum_platform_correction_velocity_factor, "physicsEffectCategories", result.physics_effect_categories,
+    "groundMovementMinimumSustain", result.ground_movement_minimum_sustain, "groundMovementMaximumSustain",
+    result.ground_movement_maximum_sustain, "groundMovementCheckDistance", result.ground_movement_check_distance,
+    "collisionEnabled", result.collision_enabled, "frictionEnabled", result.friction_enabled, "gravityEnabled",
+    result.gravity_enabled, "pathExploreRate", result.path_explore_rate);
   if (!read)
     return std::unexpected(std::move(read.error()));
   if (!*read)
     return std::nullopt;
-  if (!result.standingPoly)
-    result.standingPoly = std::move(standingFallback);
-  if (!result.crouchingPoly)
-    result.crouchingPoly = std::move(crouchingFallback);
+  if (!result.standing_poly)
+    result.standing_poly = std::move(standingFallback);
+  if (!result.crouching_poly)
+    result.crouching_poly = std::move(crouchingFallback);
   return result;
 }
 
 std::expected<void, StarException> LuaConverter<ActorMovementModifiers>::from(LuaStack stack,
                                                                               ActorMovementModifiers const& v) {
-  return makeTable(stack, "groundMovementModifier", v.groundMovementModifier, "liquidMovementModifier",
-                   v.liquidMovementModifier, "speedModifier", v.speedModifier, "airJumpModifier", v.airJumpModifier,
-                   "liquidJumpModifier", v.liquidJumpModifier, "runningSuppressed", v.runningSuppressed,
-                   "jumpingSuppressed", v.jumpingSuppressed, "facingSuppressed", v.facingSuppressed,
-                   "movementSuppressed", v.movementSuppressed);
+  return makeTable(stack, "groundMovementModifier", v.ground_movement_modifier, "liquidMovementModifier",
+                   v.liquid_movement_modifier, "speedModifier", v.speed_modifier, "airJumpModifier", v.air_jump_modifier,
+                   "liquidJumpModifier", v.liquid_jump_modifier, "runningSuppressed", v.running_suppressed,
+                   "jumpingSuppressed", v.jumping_suppressed, "facingSuppressed", v.facing_suppressed,
+                   "movementSuppressed", v.movement_suppressed);
 }
 
 std::expected<std::optional<ActorMovementModifiers>, StarException>
@@ -436,15 +436,15 @@ LuaConverter<ActorMovementModifiers>::to(LuaStackValue v) {
   if (!*read)
     return std::nullopt;
   ActorMovementModifiers result;
-  result.groundMovementModifier = ground.value_or(1.0f);
-  result.liquidMovementModifier = liquid.value_or(1.0f);
-  result.speedModifier = speed.value_or(1.0f);
-  result.airJumpModifier = airJump.value_or(1.0f);
-  result.liquidJumpModifier = liquidJump.value_or(1.0f);
-  result.runningSuppressed = running.value_or(false);
-  result.jumpingSuppressed = jumping.value_or(false);
-  result.facingSuppressed = facing.value_or(false);
-  result.movementSuppressed = movement.value_or(false);
+  result.ground_movement_modifier = ground.value_or(1.0f);
+  result.liquid_movement_modifier = liquid.value_or(1.0f);
+  result.speed_modifier = speed.value_or(1.0f);
+  result.air_jump_modifier = airJump.value_or(1.0f);
+  result.liquid_jump_modifier = liquidJump.value_or(1.0f);
+  result.running_suppressed = running.value_or(false);
+  result.jumping_suppressed = jumping.value_or(false);
+  result.facing_suppressed = facing.value_or(false);
+  result.movement_suppressed = movement.value_or(false);
   return result;
 }
 
