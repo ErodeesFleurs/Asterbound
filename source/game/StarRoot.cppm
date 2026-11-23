@@ -198,7 +198,7 @@ public:
   [[nodiscard]] std::expected<std::shared_ptr<DanceDatabase const>, StarException> danceDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<SpawnTypeDatabase const>, StarException> spawnTypeDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<RadioMessageDatabase const>, StarException> radioMessageDatabase();
-  [[nodiscard]] std::expected<std::shared_ptr<CollectionDatabase const>, StarException> collectionDatabase();
+  [[nodiscard]] std::expected<std::shared_ptr<CollectionDatabase const>, StarException> collection_database();
 
   Settings& settings();
 
@@ -382,8 +382,8 @@ private:
   std::shared_ptr<RadioMessageDatabase> m_radioMessageDatabase;
   std::mutex m_radioMessageDatabaseMutex;
 
-  std::shared_ptr<CollectionDatabase> m_collectionDatabase;
-  std::mutex m_collectionDatabaseMutex;
+  std::shared_ptr<CollectionDatabase> m_collection_database;
+  std::mutex m_collection_database_mutex;
 };
 
 }

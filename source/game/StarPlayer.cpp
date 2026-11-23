@@ -1826,20 +1826,20 @@ MessageResponseResult Player::receiveMessage(ConnectionId fromConnection, String
     auto event = std::move(*eventResult);
     statistics()->recordEvent(event, fields);
   } else if (message == "addCollectable") {
-    auto collectionResult = args.get(0).to_string();
-    if (!collectionResult)
-      return std::unexpected(std::move(collectionResult.error()));
-    auto collection = std::move(*collectionResult);
-    auto collectableResult = args.get(1).to_string();
-    if (!collectableResult)
-      return std::unexpected(std::move(collectableResult.error()));
-    auto collectable = std::move(*collectableResult);
-    auto databaseResult = root().collectionDatabase();
-    if (!databaseResult)
-      return std::unexpected(std::move(databaseResult.error()));
-    auto database = std::move(*databaseResult);
-    if (database->hasCollectable(collection, collectable)) {
-      if (auto result = addCollectable(collection, collectable); !result)
+    auto collection_result = args.get(0).to_string();
+    if (!collection_result)
+      return std::unexpected(std::move(collection_result.error()));
+    auto collection = std::move(*collection_result);
+    auto collectable_result = args.get(1).to_string();
+    if (!collectable_result)
+      return std::unexpected(std::move(collectable_result.error()));
+    auto collectable = std::move(*collectable_result);
+    auto database_result = root().collection_database();
+    if (!database_result)
+      return std::unexpected(std::move(database_result.error()));
+    auto database = std::move(*database_result);
+    if (database->contains(collection, collectable)) {
+      if (auto result = add_collectable(collection, collectable); !result)
         return std::unexpected(std::move(result.error()));
     }
   } else {
@@ -2736,8 +2736,8 @@ std::expected<void, StarException> Player::triggerPickupEvents(std::shared_ptr<I
     if (auto result = addBlueprint(blueprint); !result)
       return std::unexpected(std::move(result.error()));
   }
-  for (auto const& collectable : item->collectablesOnPickup()) {
-    if (auto result = addCollectable(collectable.first, collectable.second); !result)
+  for (auto const& collectable : item->collectables_on_pickup()) {
+    if (auto result = add_collectable(collectable.first, collectable.second); !result)
       return std::unexpected(std::move(result.error()));
   }
   auto messagesResult = item->instanceValue("radioMessagesOnPickup", JsonArray());
@@ -2998,43 +2998,25 @@ bool Player::blueprintKnown(ItemDescriptor const& descriptor) const {
   return m_blueprints->isKnown(descriptor);
 }
 
-std::expected<bool, StarException> Player::addCollectable(String const& collectionName, String const& collectableName) {
-  if (!m_log->addCollectable(collectionName, collectableName))
+std::expected<bool, StarException> Player::add_collectable(String const& collection_name, String const& collectable_name) {
+  if (m_log->has_collectable(collection_name, collectable_name))
     return false;
-  auto databaseResult = root().collectionDatabase();
-  if (!databaseResult)
-    return std::unexpected(std::move(databaseResult.error()));
-  auto database = std::move(*databaseResult);
-  auto collectionResult = database->collection(collectionName);
-  if (!collectionResult)
-    return std::unexpected(std::move(collectionResult.error()));
-  auto collection = std::move(*collectionResult);
-  auto collectableResult = database->collectable(collectionName, collectableName);
-  if (!collectableResult)
-    return std::unexpected(std::move(collectableResult.error()));
-  auto collectable = std::move(*collectableResult);
-  auto assetsResult = root().assets();
-  if (!assetsResult)
-    return std::unexpected(std::move(assetsResult.error()));
-  auto assets = std::move(*assetsResult);
-  auto messageResult = assets->json("/player.config:collectableUnlock");
-  if (!messageResult)
-    return std::unexpected(std::move(messageResult.error()));
-  auto message = std::move(*messageResult);
-  auto textResult = message.to_string();
-  if (!textResult)
-    return std::unexpected(std::move(textResult.error()));
-  auto text = std::move(*textResult);
-  auto collectableTextResult = text.replace("<collectable>", collectable.title);
-  if (!collectableTextResult)
-    return std::unexpected(std::move(collectableTextResult.error()));
-  auto collectableText = std::move(*collectableTextResult);
-  auto formattedResult = collectableText.replace("<collection>", collection.title);
-  if (!formattedResult)
-    return std::unexpected(std::move(formattedResult.error()));
-  auto formatted = std::move(*formattedResult);
-  if (auto result = queueUIMessage(formatted); !result)
-    return std::unexpected(std::move(result.error()));
+  auto database = root().collection_database();
+  if (!database) return std::unexpected(std::move(database.error()));
+  auto collection = (*database)->collection(collection_name);
+  if (!collection) return std::unexpected(std::move(collection.error()));
+  auto entry = (*database)->collectable(collection_name, collectable_name);
+  if (!entry) return std::unexpected(std::move(entry.error()));
+  auto assets = root().assets();
+  if (!assets) return std::unexpected(std::move(assets.error()));
+  auto message = (*assets)->json("/player.config:collectableUnlock")
+      .and_then([](Json const& value) { return value.to_string(); })
+      .and_then([&](String const& text) { return text.replace("<collectable>", entry->title); })
+      .and_then([&](String const& text) { return text.replace("<collection>", collection->title); });
+  if (!message) return std::unexpected(std::move(message.error()));
+  if (!m_log->add_collectable(collection_name, collectable_name))
+    return false;
+  if (auto queued = queueUIMessage(*message); !queued) return std::unexpected(std::move(queued.error()));
   return true;
 }
 

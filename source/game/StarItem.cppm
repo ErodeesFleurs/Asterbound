@@ -124,8 +124,11 @@ public:
   bool twoHanded() const;
   float timeToLive() const;
 
+  String const& directory() const&;
+  String const& directory() const&& = delete;
   List<ItemDescriptor> learnBlueprintsOnPickup() const;
-  StringMap<String> collectablesOnPickup() const;
+  StringMap<String> const& collectables_on_pickup() const&;
+  StringMap<String> const& collectables_on_pickup() const&& = delete;
 
   [[nodiscard]]
   std::expected<List<QuestArcDescriptor>, StarException> pickupQuestTemplates() const;
@@ -176,8 +179,6 @@ protected:
   [[nodiscard]]
   std::expected<void, StarException> setInstanceValue(String const& name, Json const& val);
 
-  String const& directory() const;
-
 private:
   std::reference_wrapper<Root> m_root;
   Json m_config;
@@ -203,7 +204,7 @@ private:
 
   List<ItemDescriptor> m_matchingDescriptors;
   List<ItemDescriptor> m_learnBlueprintsOnPickup;
-  StringMap<String> m_collectablesOnPickup;
+  StringMap<String> m_collectables_on_pickup;
 };
 
 class GenericItem : public Item {

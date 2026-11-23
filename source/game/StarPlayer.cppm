@@ -338,7 +338,7 @@ public:
   [[nodiscard]] std::expected<bool, StarException> addBlueprint(ItemDescriptor const& descriptor, bool showFailure = false);
   bool blueprintKnown(ItemDescriptor const& descriptor) const;
 
-  [[nodiscard]] std::expected<bool, StarException> addCollectable(String const& collectionName, String const& collectableName);
+  [[nodiscard]] std::expected<bool, StarException> add_collectable(String const& collection_name, String const& collectable_name);
 
   std::shared_ptr<PlayerUniverseMap> universeMap() const;
 

@@ -44,22 +44,22 @@ std::expected<PlayerLog, StarException> PlayerLog::create(Json const& json) {
       return std::unexpected(std::move(strings.error()));
     field.second.get() = std::move(*strings);
   }
-  auto collections = json.get_object("collections");
+  auto collections = json.get("collections").and_then([](Json const& value) { return value.iterate_object(); });
   if (!collections)
     return std::unexpected(std::move(collections.error()));
   for (auto const& entry : *collections) {
     auto strings = json_to_string_set(entry.second);
     if (!strings)
       return std::unexpected(std::move(strings.error()));
-    log.m_collections[entry.first] = std::move(*strings);
+    log.m_collections.try_emplace(entry.first, std::move(*strings));
   }
   return log;
 }
 
 Json PlayerLog::toJson() const {
-  auto collections = JsonObject();
-  for (auto const& pair : m_collections)
-    collections[pair.first] = json_from_string_set(pair.second);
+  JsonObject collections;
+  for (auto const& [name, entries] : m_collections)
+    collections.emplace(name, json_from_string_set(entries));
 
   return JsonObject{{"deathCount", m_deathCount},
       {"playTime", m_playTime},
@@ -67,7 +67,7 @@ Json PlayerLog::toJson() const {
       {"scannedObjects", json_from_string_set(m_scannedObjects)},
       {"radioMessages", json_from_string_set(m_radioMessages)},
       {"cinematics", json_from_string_set(m_cinematics)},
-      {"collections", collections}};
+      {"collections", std::move(collections)}};
 }
 
 int PlayerLog::deathCount() const {
@@ -144,14 +144,16 @@ StringSet PlayerLog::collectables(String const& collection) const {
   return {};
 }
 
-bool PlayerLog::addCollectable(String const& collection, String const& collectable) {
-  if (!m_collections.contains(collection))
-    m_collections[collection] = {};
+bool PlayerLog::has_collectable(String const& collection, String const& id) const {
+  auto entries = m_collections.find_ref(collection);
+  return entries && entries->get().contains(id);
+}
 
+bool PlayerLog::add_collectable(String const& collection, String const& collectable) {
   return m_collections[collection].add(collectable);
 }
 
-void PlayerLog::clearCollectables(String const& collection) {
+void PlayerLog::clear_collectables(String const& collection) {
   m_collections.remove(collection);
 }
 

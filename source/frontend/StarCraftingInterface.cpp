@@ -1371,7 +1371,7 @@ std::expected<void, StarException> CraftingPane::craft(int count) {
         return std::unexpected(std::move(giveItemResult520.error()));
 
       for (auto&& collectable : recipe.collectables) {
-        auto collectable_added = m_player->addCollectable(collectable.first, collectable.second);
+        auto collectable_added = m_player->add_collectable(collectable.first, collectable.second);
         if (!collectable_added)
           return std::unexpected(std::move(collectable_added.error()));
       }

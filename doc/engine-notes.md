@@ -71,6 +71,7 @@ commits identify upstream sources; they are not cross-platform validation report
 - A server context retains its encoded update until the local connection queue accepts it. A retry sends that frame before later changes; queue acceptance is not a remote delivery acknowledgment. On the client, ship and custom-world changes stay pending until their respective writes succeed. A failed disconnect save retains the updates for retry without exposing the retired session as active.
 - Known codices retain the edition learned by the player across catalog reloads. The reader polls the player library identity and revision; it fetches list summaries only when the library changes and loads the selected book's pages separately. The save format remains an object mapping codex IDs to read flags.
 - Reusing a known codex item marks the book unread. A missing codex does not produce an “already known” message, and a malformed notification does not change the library.
+- A collection unlock validates the entry and prepares its notification before recording progress. A failed unlock can be retried; a duplicate does not notify again. Item and monster entries resolve on demand, outside the collection cache lock. A relative inventory icon belongs to the resolved item, so looking it up never reruns its Lua builder.
 - [Physics-object force bounds](https://github.com/OpenStarbound/OpenStarbound/commit/b66ad015) remain in object-local coordinates for spatial indexing, including at large world positions. Returned force regions still use world coordinates.
 
 ### Text layout

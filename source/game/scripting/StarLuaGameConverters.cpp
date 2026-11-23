@@ -738,7 +738,7 @@ std::expected<std::optional<Drawable>, StarException> LuaConverter<Drawable>::to
 }
 
 std::expected<void, StarException> LuaConverter<Collection>::from(LuaStack stack, Collection const& c) {
-  auto type = Star::enum_name<CollectionTypeNames>(c.type);
+  auto type = Star::enum_name<collection_type_names>(c.type);
   if (!type)
     return std::unexpected(std::move(type.error()));
   return makeTable(stack, "name", c.name, "type", *type, "title", c.title);
@@ -754,12 +754,12 @@ std::expected<std::optional<Collection>, StarException> LuaConverter<Collection>
     return std::unexpected(std::move(read.error()));
   if (!*read)
     return std::nullopt;
-  auto converted = maybe_enum_value<CollectionTypeNames>(type);
+  auto converted = maybe_enum_value<collection_type_names>(type);
   if (!converted)
     return std::unexpected(std::move(converted.error()));
   if (!*converted)
     return std::nullopt;
-  return Collection(name, **converted, title);
+  return Collection{std::move(name), std::move(title), **converted};
 }
 
 std::expected<void, StarException> LuaConverter<Collectable>::from(LuaStack stack, Collectable const& c) {
@@ -788,7 +788,7 @@ std::expected<std::optional<Collectable>, StarException> LuaConverter<Collectabl
   auto icon = maybeField<String>(table, "icon");
   if (!icon)
     return std::unexpected(std::move(icon.error()));
-  return Collectable(std::move(**name), order->value_or(0), title->value_or(""), description->value_or(""), icon->value_or(""));
+  return Collectable{std::move(**name), order->value_or(0), std::move(*title).value_or(""), std::move(*description).value_or(""), std::move(*icon).value_or("")};
 }
 
 std::expected<void, StarException> LuaConverter<PhysicsMovingCollision>::from(LuaStack stack,

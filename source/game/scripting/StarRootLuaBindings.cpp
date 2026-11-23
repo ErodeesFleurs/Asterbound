@@ -735,16 +735,16 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
     return (*database)->treeFoliageDirectory(foliageName);
   }); !r) return std::unexpected(std::move(r.error()));
 
-  if (auto r = callbacks.register_callback("collection", [&root](String const& collectionName) -> std::expected<Collection, StarException> {
-    auto database = root.collectionDatabase();
+  if (auto r = callbacks.register_callback("collection", [&root](String const& collection_name) -> std::expected<Collection, StarException> {
+    auto database = root.collection_database();
     if (!database) return std::unexpected(std::move(database.error()));
-    return (*database)->collection(collectionName);
+    return (*database)->collection(collection_name);
   }); !r) return std::unexpected(std::move(r.error()));
 
-  if (auto r = callbacks.register_callback("collectables", [&root, itemCatalog](String const& collectionName) -> std::expected<List<Collectable>, StarException> {
-    auto database = root.collectionDatabase();
+  if (auto r = callbacks.register_callback("collectables", [&root, item_catalog = itemCatalog](String const& collection_name) -> std::expected<List<Collectable>, StarException> {
+    auto database = root.collection_database();
     if (!database) return std::unexpected(std::move(database.error()));
-    return (*database)->collectables(collectionName, itemCatalog);
+    return (*database)->collectables(collection_name, item_catalog);
   }); !r) return std::unexpected(std::move(r.error()));
 
   if (auto r = callbacks.register_callback("elementalResistance", [&root](String const& damageKindName) -> std::expected<String, StarException> {

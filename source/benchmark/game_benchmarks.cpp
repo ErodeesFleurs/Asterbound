@@ -62,6 +62,7 @@ import star.tile_modification;
 import star.vector;
 import star.world_server;
 import star.world_tiles;
+import star.collection_database;
 import star.codex;
 import star.codex_database;
 import star.item_database;
@@ -805,6 +806,60 @@ void luaNestedProfileExport(benchmark::State& state, BenchmarkSession& session) 
   state.SetItemsProcessed(state.iterations());
 }
 
+enum class CollectionProbe { Generic, Item, Cold, Duplicate };
+
+void benchmark_collection(benchmark::State& state, BenchmarkSession& session, CollectionProbe probe) {
+  auto directory = File::temporary_directory(session.root.random());
+  if (!directory) return session.fail(state, directory.error());
+  auto cleanup = make_scope_exit([&] { if (auto removed = File::remove_all(*directory); !removed) session.fail(state, removed.error()); });
+  auto put = [&](String const& file, String const& text) { return File::write_file(text, File::relative_to(*directory, file)); };
+  auto settings = session.root.settings();
+  settings.assetSources.push_back(*directory);
+  String group = probe == CollectionProbe::Item || probe == CollectionProbe::Cold ? String("benchitems") : String("benchgeneric");
+  JsonObject entries;
+  for (unsigned i = 0; i != 128; ++i)
+    entries.emplace(Star::format("entry{}", i), JsonObject{{"item", "collectionprobeitem"}, {"title", "Probe"}, {"order", i}});
+  auto text = Json(JsonObject{{"name", group}, {"type", group == "benchitems" ? Json("item") : Json("generic")}, {"collectables", std::move(entries)}}).repr();
+  if (!text) return session.fail(state, text.error());
+  if (auto saved = put("probe.collection", *text); !saved) return session.fail(state, saved.error());
+  if (auto saved = put("probe.item", R"({"itemName":"collectionprobeitem","shortdescription":"Probe","rarity":"Common","inventoryIcon":"/assetmissing.png","builder":"/collectionprobe.lua"})"); !saved) return session.fail(state, saved.error());
+  if (auto saved = put("collectionprobe.lua", "function build(d,c,p) c.shortdescription='Built probe'; return c,p end"); !saved) return session.fail(state, saved.error());
+  auto root = Root::create(std::move(settings));
+  if (!root) return session.fail(state, root.error());
+  auto db = (*root)->collection_database();
+  if (!db) return session.fail(state, db.error());
+  if (probe == CollectionProbe::Duplicate) {
+    auto factory = (*root)->playerFactory();
+    if (!factory) return session.fail(state, factory.error());
+    auto player = (*factory)->create();
+    if (!player) return session.fail(state, player.error());
+    String id = "entry0";
+    auto added = (*player)->add_collectable(group, id);
+    if (!added || !*added) return session.fail(state, "Initial unlock failed");
+    for (auto _ : state) {
+      auto duplicate = (*player)->add_collectable(group, id);
+      if (!duplicate || *duplicate) return session.fail(state, "Duplicate unlock changed progress");
+      benchmark::DoNotOptimize(*duplicate);
+    }
+  } else if (probe == CollectionProbe::Cold) {
+    auto items = (*root)->itemDatabase();
+    if (!items) return session.fail(state, items.error());
+    for (auto _ : state) {
+      auto entry = (*db)->collectable(group, "entry0");
+      if (!entry || entry->title != "Built probe") return session.fail(state, "Cold item resolution failed");
+      benchmark::DoNotOptimize(*entry);
+    }
+  } else {
+    auto warm = (*db)->collectables(group);
+    if (!warm || warm->size() != 128) return session.fail(state, "Incomplete collection fixture");
+    for (auto _ : state) {
+      auto list = (*db)->collectables(group);
+      if (!list) return session.fail(state, list.error());
+      benchmark::DoNotOptimize(*list);
+    }
+  }
+}
+
 enum class CodexProbe { StablePoll, AllRead, ChangedOrder };
 
 void benchmark_player_codexes(benchmark::State& state, BenchmarkSession& session, CodexProbe probe) {
@@ -940,6 +995,10 @@ int main(int argc, char** argv) {
     return 1;
   }
   BenchmarkSession session{**root};
+  for (auto [name, probe] : {std::pair<std::string_view, CollectionProbe>{"GenericBulk128", CollectionProbe::Generic}, {"ItemBulk128", CollectionProbe::Item}, {"FirstBuilderItem", CollectionProbe::Cold}, {"DuplicateUnlock", CollectionProbe::Duplicate}}) {
+    auto& registered = *benchmark::RegisterBenchmark(std::format("Game/Collection/{}", name), [&, probe](benchmark::State& state) { benchmark_collection(state, session, probe); });
+    if (probe == CollectionProbe::Cold) registered.Iterations(1);
+  }
   benchmark::RegisterBenchmark("Game/Codex/StablePanePoll", [&](benchmark::State& state) {
     benchmark_player_codexes(state, session, CodexProbe::StablePoll);
   });

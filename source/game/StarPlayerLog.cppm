@@ -39,8 +39,9 @@ public:
 
   StringList collections() const;
   StringSet collectables(String const& collection) const;
-  bool addCollectable(String const& collection, String const& collectable);
-  void clearCollectables(String const& collection);
+  bool has_collectable(String const& collection, String const& id) const;
+  bool add_collectable(String const& collection, String const& collectable);
+  void clear_collectables(String const& collection);
 
 private:
   int m_deathCount;

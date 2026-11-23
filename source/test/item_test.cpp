@@ -50,6 +50,7 @@ import star.game_test;
 import star.algorithm;
 import star.file;
 import star.random;
+import star.player_log;
 import star.collection_database;
 import star.entity;
 import star.player;
@@ -1177,7 +1178,7 @@ end
     EXPECT_EQ(rebuilt->count(), 3u);
     EXPECT_EQ(rebuilt->friendlyName(), "RebuiltReady_LeafOwner");
     EXPECT_EQ(rebuilt->parameters().get_string("nestedCatalog"), "rebuilder");
-    auto collections = root.collectionDatabase();
+    auto collections = root.collection_database();
     ASSERT_TRUE(collections);
     auto leaf = (*collections)->collectable("readycatalogcollection", "leaf");
     ASSERT_TRUE(leaf);
@@ -1510,6 +1511,86 @@ function uninit() visit("uninit") end
     EXPECT_TRUE((*invalid)->uninit());
     EXPECT_FALSE((*invalid)->initialized());
   });
+
+const GameTestRegistration collection_resolution("CollectionTest", "UnlockRetryLazySourceAndBuilderDirectory", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto overlay = File::relative_to(*directory, "assets");
+  ASSERT_TRUE(File::create_directories(File::relative_to(overlay, "probes")));
+  auto put = [&](String const& name, String const& contents) {
+    return File::write_file(contents, File::relative_to(overlay, name));
+  };
+  ASSERT_TRUE(put("probes/entries.collection", R"({"name":"probeitems","type":"item","title":"Items","collectables":{
+    "tool":{"item":"collectabletesttool"},"blank":{"item":"collectabletesttool","icon":""},"layers":{"item":"collectabletestlayers"},"broken":{"item":123}}})"));
+  auto base_assets = fixture.root().assets();
+  ASSERT_TRUE(base_assets);
+  auto png = (*base_assets)->bytes("/assetmissing.png");
+  ASSERT_TRUE(png);
+  ASSERT_TRUE(File::write_file(**png, File::relative_to(overlay, "probes/picture.png")));
+  ASSERT_TRUE(put("probes/layers.item", R"({"itemName":"collectabletestlayers","shortdescription":"Layers","rarity":"Common","inventoryIcon":[]})"));
+  ASSERT_TRUE(put("probes/a.collection", R"({"name":"duplicateprobe","title":"A","collectables":{"a":{}}})"));
+  ASSERT_TRUE(put("probes/b.collection", R"({"name":"duplicateprobe","title":"B","collectables":{"b":{}}})"));
+  ASSERT_TRUE(put("probes/tool.item", R"({"itemName":"collectabletesttool","shortdescription":"Tool","rarity":"Common","inventoryIcon":"picture.png","builder":"/probes/build.lua"})"));
+  ASSERT_TRUE(put("probes/build.lua", R"(function build(d,c,p)
+    root.setConfiguration("collectableFixtureCalls", (root.getConfiguration("collectableFixtureCalls") or 0) + 1)
+    return c,p end)"));
+  ASSERT_TRUE(put("player.config.patch", R"([{"op":"replace","path":"/collectableUnlock","value":false}])"));
+  auto settings = fixture.rootSettings();
+  settings.assetSources.push_back(overlay);
+  settings.storageDirectory = File::relative_to(*directory, "storage");
+  settings.runtimeConfigFile = {}; settings.logDirectory = {}; settings.logFile = {}; settings.includeUGC = false;
+  auto created = Root::create(std::move(settings));
+  ASSERT_TRUE(created);
+  auto& root = **created;
+  auto factory = root.playerFactory();
+  ASSERT_TRUE(factory);
+  auto player = (*factory)->create();
+  ASSERT_TRUE(player);
+  auto db = root.collection_database();
+  ASSERT_TRUE(db);
+  auto config = root.configuration();
+  ASSERT_TRUE(config);
+  ASSERT_TRUE((*config)->set("collectableFixtureCalls", 0));
+  auto tool = (*db)->collectable("probeitems", "tool");
+  ASSERT_TRUE(tool) << tool.error().what();
+  EXPECT_EQ(tool->icon, String("/probes/picture.png"));
+  EXPECT_EQ((*config)->get("collectableFixtureCalls"), Json(1));
+  auto blank = (*db)->collectable("probeitems", "blank");
+  ASSERT_TRUE(blank);
+  EXPECT_TRUE(blank->icon.empty());
+  auto layers = (*db)->collectable("probeitems", "layers");
+  ASSERT_TRUE(layers) << layers.error().what();
+  EXPECT_TRUE(layers->icon.empty());
+  auto duplicate_group = (*db)->collection("duplicateprobe");
+  ASSERT_TRUE(duplicate_group);
+  auto surviving = (*db)->collectables("duplicateprobe");
+  ASSERT_TRUE(surviving);
+  ASSERT_EQ(surviving->size(), 1u);
+  EXPECT_EQ((*surviving)[0].name, duplicate_group->title == "A" ? String("a") : String("b"));
+  ASSERT_TRUE((*db)->contains("probeitems", "broken"));
+  for (unsigned i = 0; i != 2; ++i) {
+    auto bad = (*db)->collectable("probeitems", "broken");
+    ASSERT_FALSE(bad);
+    EXPECT_NE(std::string_view(bad.error().what()).find("/probes/entries.collection"), std::string_view::npos);
+  }
+  (*player)->pullQueuedMessages();
+  EXPECT_FALSE((*player)->add_collectable("probeitems", "missing"));
+  EXPECT_FALSE((*player)->add_collectable("probeitems", "tool"));
+  EXPECT_FALSE((*player)->log()->has_collectable("probeitems", "tool"));
+  EXPECT_TRUE((*player)->pullQueuedMessages().empty());
+  ASSERT_TRUE(put("player.config.patch", R"([{"op":"replace","path":"/collectableUnlock","value":"<collectable> in <collection>"}])"));
+  auto assets = root.assets();
+  ASSERT_TRUE(assets);
+  (*assets)->hot_reload();
+  auto added = (*player)->add_collectable("probeitems", "tool");
+  ASSERT_TRUE(added) << added.error().what();
+  EXPECT_TRUE(*added);
+  auto duplicate = (*player)->add_collectable("probeitems", "tool");
+  ASSERT_TRUE(duplicate);
+  EXPECT_FALSE(*duplicate);
+  EXPECT_EQ((*player)->pullQueuedMessages(), List<String>({"Tool in Items"}));
+});
 
 const GameTestRegistration codex_item_messages(
   "ItemTest", "CodexItemPreservesLearningStateOnHintFailure", [](GameTest& fixture) {

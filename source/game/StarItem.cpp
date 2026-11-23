@@ -204,7 +204,7 @@ std::expected<void, StarException> Item::initialize(Json config, String director
     auto value = pair.second.to_string();
     if (!value)
       return std::unexpected(std::move(value.error()));
-    m_collectablesOnPickup[pair.first] = std::move(*value);
+    m_collectables_on_pickup[pair.first] = std::move(*value);
   }
   return {};
 }
@@ -505,7 +505,7 @@ std::expected<void, StarException> Item::setInstanceValue(String const& name, Js
   return {};
 }
 
-String const& Item::directory() const {
+String const& Item::directory() const& {
   return m_directory;
 }
 
@@ -513,8 +513,8 @@ List<ItemDescriptor> Item::learnBlueprintsOnPickup() const {
   return m_learnBlueprintsOnPickup;
 }
 
-StringMap<String> Item::collectablesOnPickup() const {
-  return m_collectablesOnPickup;
+StringMap<String> const& Item::collectables_on_pickup() const& {
+  return m_collectables_on_pickup;
 }
 
 std::expected<std::shared_ptr<GenericItem>, StarException> GenericItem::create(Root& root, Json const& config, String const& directory, Json const& parameters) {
