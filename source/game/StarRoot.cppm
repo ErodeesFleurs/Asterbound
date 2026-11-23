@@ -190,7 +190,7 @@ public:
   [[nodiscard]] std::expected<std::shared_ptr<ImageMetadataDatabase const>, StarException> imageMetadataDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<VersioningDatabase const>, StarException> versioningDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<QuestTemplateDatabase const>, StarException> questTemplateDatabase();
-  [[nodiscard]] std::expected<std::shared_ptr<AiDatabase const>, StarException> aiDatabase();
+  [[nodiscard]] std::expected<std::shared_ptr<AiDatabase const>, StarException> ai_database();
   [[nodiscard]] std::expected<std::shared_ptr<TechDatabase const>, StarException> techDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<CodexDatabase const>, StarException> codexDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<BehaviorDatabase const>, StarException> behaviorDatabase();
@@ -358,8 +358,8 @@ private:
   std::shared_ptr<QuestTemplateDatabase> m_questTemplateDatabase;
   std::mutex m_questTemplateDatabaseMutex;
 
-  std::shared_ptr<AiDatabase> m_aiDatabase;
-  std::mutex m_aiDatabaseMutex;
+  std::shared_ptr<AiDatabase> m_ai_database;
+  std::mutex m_ai_database_mutex;
 
   std::shared_ptr<TechDatabase> m_techDatabase;
   std::mutex m_techDatabaseMutex;

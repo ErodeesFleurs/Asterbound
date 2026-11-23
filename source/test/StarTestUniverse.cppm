@@ -44,6 +44,7 @@ public:
   WorldId currentPlayerWorld() const;
 
   [[nodiscard]] std::expected<void, StarException> update(unsigned times = 1);
+  std::shared_ptr<UniverseClient> const& client() const { return m_client; }
   std::shared_ptr<WorldClient> worldClient() const;
 
   [[nodiscard]] std::expected<List<Drawable>, StarException> currentClientDrawables();

@@ -396,7 +396,7 @@ std::expected<void, StarException> Root::reload() {
     std::lock_guard codexDatabaseLock(m_codexDatabaseMutex);
     std::lock_guard behaviorDatabaseMutex(m_behaviorDatabaseMutex);
     std::lock_guard techDatabaseLock(m_techDatabaseMutex);
-    std::lock_guard aiDatabaseLock(m_aiDatabaseMutex);
+    std::lock_guard ai_database_lock(m_ai_database_mutex);
     std::lock_guard questTemplateDatabaseLock(m_questTemplateDatabaseMutex);
     std::lock_guard emoteProcessorLock(m_emoteProcessorMutex);
     std::lock_guard terrainDatabaseLock(m_terrainDatabaseMutex);
@@ -443,7 +443,7 @@ std::expected<void, StarException> Root::reload() {
     m_codexDatabase.reset();
     m_behaviorDatabase.reset();
     m_techDatabase.reset();
-    m_aiDatabase.reset();
+    m_ai_database.reset();
     m_questTemplateDatabase.reset();
     m_emoteProcessor.reset();
     m_terrainDatabase.reset();
@@ -500,7 +500,7 @@ std::expected<void, StarException> Root::fullyLoad() {
   add(&Root::codexDatabase);
   add(&Root::behaviorDatabase);
   add(&Root::techDatabase);
-  add(&Root::aiDatabase);
+  add(&Root::ai_database);
   add(&Root::questTemplateDatabase);
   add(&Root::emoteProcessor);
   add(&Root::terrainDatabase);
@@ -880,8 +880,8 @@ std::expected<std::shared_ptr<QuestTemplateDatabase const>, StarException> Root:
   });
 }
 
-std::expected<std::shared_ptr<AiDatabase const>, StarException> Root::aiDatabase() {
-  return loadMember(m_aiDatabase, m_aiDatabaseMutex, "AiDatabase", *this);
+std::expected<std::shared_ptr<AiDatabase const>, StarException> Root::ai_database() {
+  return loadMember(m_ai_database, m_ai_database_mutex, "AiDatabase", *this);
 }
 
 std::expected<std::shared_ptr<TechDatabase const>, StarException> Root::techDatabase() {

@@ -3,16 +3,7 @@ import std;
 import star.string;
 import star.format;
 import star.json;
-
 import star.ordered_set;
-import star.data_stream;
-import star.bi_map;
-import star.item_descriptor;
-import star.game_types;
-import star.strong_typedef;
-import star.item_descriptor;
-import star.celestial_coordinate;
-import star.quest_descriptor;
 
 namespace Star {
 
@@ -24,32 +15,31 @@ using AiException = StarError<AiExceptionTag, StarException>;
 struct AiSpeech {
   String animation;
   String text;
-  float speedModifier;
+  float speed_modifier;
 };
 
 struct AiState {
-  AiState();
-  [[nodiscard]] static std::expected<AiState, StarException> create(Json const& v);
+  [[nodiscard]] static std::expected<AiState, StarException> create(Json const& config);
 
-  Json toJson() const;
+  Json to_json() const;
 
-  OrderedHashSet<String> availableMissions;
-  OrderedHashSet<String> completedMissions;
+  OrderedHashSet<String> available_missions;
+  OrderedHashSet<String> completed_missions;
 };
 
 struct AiSpeciesMissionText {
-  String buttonText;
-  String repeatButtonText;
-  AiSpeech selectSpeech;
+  String button_text;
+  String repeat_button_text;
+  AiSpeech select_speech;
 };
 
 struct AiMission {
-  String missionName;
-  String missionUniqueWorld;
-  std::optional<String> warpAnimation;
-  std::optional<bool> warpDeploy;
+  String mission_name;
+  String mission_unique_world;
+  std::optional<String> warp_animation;
+  std::optional<bool> warp_deploy;
   String icon;
-  StringMap<AiSpeciesMissionText> speciesText;
+  StringMap<AiSpeciesMissionText> species_text;
 };
 
 }

@@ -238,6 +238,7 @@ set (star_game_tests_SOURCES
 
       StarTestUniverse.cpp
       StarGameTest.cpp
+      ai_types_test.cpp
       assets_test.cpp
       assets_patch_read_test.cpp
       assets_reference_cache_test.cpp
@@ -314,6 +315,12 @@ if(STAR_BUILD_GUI)
     star_test_gtest star_base_modules star_frontend_modules star_application_modules star_build_config
     $<LINK_ONLY:star_core_dependencies> $<LINK_ONLY:star_extern_dependencies>
     $<LINK_ONLY:star_application_dependencies> $<LINK_ONLY:star_voice_dependencies>)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_libraries(frontend_tests PRIVATE ${STAR_SDL_TARGET})
+    if(TARGET star_application)
+      target_sources(frontend_tests PRIVATE $<TARGET_OBJECTS:star_application>)
+    endif()
+  endif()
   set_target_properties(frontend_tests PROPERTIES CXX_SCAN_FOR_MODULES ON)
   star_add_asset_test(frontend_tests)
   set_property(TEST frontend_tests APPEND PROPERTY LABELS "Frontend")

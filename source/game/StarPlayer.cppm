@@ -572,8 +572,8 @@ public:
   [[nodiscard]] std::expected<std::optional<std::pair<Json, RpcPromiseKeeper<Json>>>, StarException> pullPendingConfirmation();
   void queueConfirmation(Json const& dialogConfig, RpcPromiseKeeper<Json> const& resultPromise);
 
-  AiState const& aiState() const;
-  AiState& aiState();
+  AiState const& ai_state() const;
+  AiState& ai_state();
 
   // In inspection mode, scannable, scanned, and interesting objects will be
   // rendered with special highlighting.
@@ -761,7 +761,7 @@ private:
   std::optional<PlayerWarpRequest> m_pendingWarp;
   Deque<std::pair<Json, RpcPromiseKeeper<Json>>> m_pendingConfirmations;
 
-  AiState m_aiState;
+  AiState m_ai_state;
 
   String m_chatMessage;
   bool m_chatMessageChanged;

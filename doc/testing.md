@@ -850,6 +850,7 @@ platform search benchmark nor its output fingerprint measures actor tick cost.
 |---|---|---|
 | Lua | `./result/bin/core_benchmarks --benchmark_filter='Lua/'` | Calls, callbacks, contexts and coroutines; asset workers share one VM. |
 | JSON | `./result/bin/json_benchmarks` | Parsing, preserved formatting, path updates and patches. |
+| SAIL saves | `game_benchmarks --benchmark_filter='^Game/AiState/'` | Decode two ordered mission lists with 64 names each from existing JSON; excludes parsing text and widget rendering. |
 | Asset locators | `./result/bin/core_benchmarks --benchmark_filter='^Core/AssetPath/'` | Byte parsing, canonical output, filename/extension, sub-path/directive edits and relative concatenation. |
 | Path search | `core_benchmarks --benchmark_filter='^Core/AStar/'`; `game_benchmarks --benchmark_filter='^Game/AStar/'` | Graph chains/branches, partial fallback and budgeted restart; real WorldServer walk/flight. |
 | Algorithms | `./result/bin/algorithm_benchmarks --benchmark_filter='Algorithm/'` | Ordinary/checked cached-key and stable sorting; held-key filtering. |

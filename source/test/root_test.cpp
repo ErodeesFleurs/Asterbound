@@ -224,7 +224,7 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
     ASSERT_NO_FATAL_FAILURE(expectCatalog("imageMetadataDatabase", root.imageMetadataDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("versioningDatabase", root.versioningDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("questTemplateDatabase", root.questTemplateDatabase()));
-    ASSERT_NO_FATAL_FAILURE(expectCatalog("aiDatabase", root.aiDatabase()));
+    ASSERT_NO_FATAL_FAILURE(expectCatalog("aiDatabase", root.ai_database()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("techDatabase", root.techDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("codexDatabase", root.codexDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("stagehandDatabase", root.stagehandDatabase()));

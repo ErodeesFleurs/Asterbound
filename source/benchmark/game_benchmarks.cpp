@@ -7,6 +7,7 @@ import star.asset_path;
 import star.file;
 import star.format;
 import star.json;
+import star.ai_types;
 import star.list;
 import star.logging;
 import star.lua;
@@ -812,6 +813,20 @@ int main(int argc, char** argv) {
     return 1;
   }
   BenchmarkSession session{**root};
+  benchmark::RegisterBenchmark("Game/AiState/ReadMissionLists", [](benchmark::State& state) {
+    JsonArray missions;
+    for (unsigned i = 0; i < 64; ++i)
+      missions.emplace_back(Star::format("mission_with_nontrivial_name_{}", i));
+    Json config = JsonObject{{"availableMissions", missions}, {"completedMissions", std::move(missions)}};
+    for (auto _ : state) {
+      auto decoded = AiState::create(config);
+      if (!decoded) {
+        state.SkipWithError(decoded.error().what());
+        break;
+      }
+      benchmark::DoNotOptimize(decoded);
+    }
+  });
   benchmark::RegisterBenchmark("Warp/LongEntityTargetToJson", [](benchmark::State& state) {
     SpawnTarget const target{SpawnTargetUniqueEntity(String(std::string(512, 'x')))};
     for (auto _ : state) {

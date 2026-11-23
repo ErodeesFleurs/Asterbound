@@ -1520,23 +1520,23 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("enableMission", [&player](String const& mission) -> std::expected<void, StarException> {
-    AiState& aiState = player.aiState();
-      if (!aiState.completedMissions.contains(mission))
-        aiState.availableMissions.add(mission);
+    AiState& state = player.ai_state();
+    if (!state.completed_missions.contains(mission))
+      state.available_missions.add(mission);
     return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("completeMission", [&player](String const& mission) -> std::expected<void, StarException> {
-    AiState& aiState = player.aiState();
-      aiState.availableMissions.remove(mission);
-      aiState.completedMissions.add(mission);
+    AiState& state = player.ai_state();
+    state.available_missions.remove(mission);
+    state.completed_missions.add(mission);
     return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("hasCompletedMission", [&player](String const& mission) -> std::expected<bool, StarException> {
-    return player.aiState().completedMissions.contains(mission);
+    return player.ai_state().completed_missions.contains(mission);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 

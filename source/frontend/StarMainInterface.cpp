@@ -498,7 +498,7 @@ std::expected<void, StarException> MainInterface::initMainBarPanes() {
                                 m_plainCraftingWindow);
       !result)
     return std::unexpected(std::move(result.error()));
-  auto ai = AiInterface::create(context(), m_client, m_cinematicOverlay);
+  auto ai = AiInterface::create(context(), m_client);
   if (!ai)
     return std::unexpected(std::move(ai.error()));
   if (auto result = m_paneManager.registerPane(MainInterfacePanes::Ai, PaneLayer::Window, *ai); !result)
@@ -1424,10 +1424,6 @@ std::expected<void, StarException> MainInterface::handleInteractAction(InteractA
       return {};
     return openMerchantWindow(interactAction.data, interactAction.entityId);
   } else if (interactAction.type == InteractActionType::OpenAiInterface) {
-    auto pane = m_paneManager.registeredPane<AiInterface>(MainInterfacePanes::Ai);
-    if (!pane)
-      return std::unexpected(std::move(pane.error()));
-    (*pane)->setSourceEntityId(interactAction.entityId);
     auto displayed = m_paneManager.displayRegisteredPane(MainInterfacePanes::Ai);
     if (!displayed)
       return std::unexpected(std::move(displayed.error()));

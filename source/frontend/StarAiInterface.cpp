@@ -1,241 +1,61 @@
-import star.json_extra;
 import std;
-import star.format;
-import star.memory;
-import star.json;
-import star.xx_hash;
-import star.id_map;
-import star.ordered_map;
-import star.lru_cache;
-import star.thread;
-import star.time;
-import star.random;
-import star.ttl_cache;
-import star.casting;
-import star.game_types;
-import star.rpc_promise;
-import star.vector;
-import star.bi_map;
-import star.a_star;
-import star.data_stream;
-import star.string;
-import star.color;
-import star.list;
-import star.image_processing;
-import star.hash;
-import star.string_view;
-import star.directives;
-import star.asset_path;
-import star.ordered_set;
-import star.strong_typedef;
-import star.input_event;
-import star.font;
-import star.text;
-import star.listener;
-import star.set;
-import star.audio;
-import star.map;
-import star.lexical_cast;
-import star.json_rpc;
-import star.io_device;
-import star.ref_ptr;
-import star.logging;
-import star.periodic_function;
-import star.weighted_pool;
-import star.byte_array;
-import star.data_stream_devices;
-
-typedef struct ZSTD_CCtx_s ZSTD_CCtx;
-typedef struct ZSTD_DCtx_s ZSTD_DCtx;
-typedef ZSTD_DCtx ZSTD_DStream;
-typedef ZSTD_CCtx ZSTD_CStream;
-import star.zstd_compression;
-import star.net_compatibility;
-import star.math_common;
-import star.worker_pool;
-
-import star.sector_array_2d;
-import star.perlin;
-import star.btree;
-import star.btree_database;
-import star.image;
-
-import star.lua_root;
-
-import star.lua_components;
-import star.lua_actor_movement_component;
-import star.lua_animation_component;
-import star.damage_types;
-import star.world_geometry;
-import star.status_types;
-import star.damage;
-import star.light_source;
-import star.entity;
-import star.tile_damage;
-import star.interaction_types;
-import star.interactive_entity;
-import star.collision_block;
-import star.tile_entity;
-import star.tile_modification;
-import star.force_regions;
-import star.world;
-import star.physics_entity;
-import star.movement_controller;
-import star.platformer_astar_types;
-import star.anchorable_entity;
-
-import star.game_timers;
-import star.actor_movement_controller;
-import star.item;
-import star.item_descriptor;
-import star.item_database;
-import star.item_recipe;
-import star.drawable;
-import star.uuid;
-import star.player_companions;
-
-import star.celestial_coordinate;
-import star.quest_descriptor;
-import star.ai_types;
-import star.warping;
-import star.application;
-import star.statistics_service;
-import star.p2p_networking_service;
-import star.user_generated_content_service;
-import star.desktop_service;
-import star.application_controller;
-import star.renderer;
-import star.asset_source;
-import star.assets;
-import star.root_base;
-import star.configuration;
-import star.root;
-import star.font_texture_group;
-import star.anchor_types;
-import star.text_painter;
-import star.asset_texture_group;
-import star.drawable_painter;
-import star.gui_types;
-import star.key_bindings;
-import star.mixer;
-import star.gui_context;
-import star.widget;
-import star.pane;
-
-import star.pane_manager;
-import star.registered_pane_manager;
-
-
-import star.main_interface_types;
-import star.animation;
-import star.tech_database;
-
-
-
-import star.ai_interface;
-import star.container_entity;
-import star.particle;
-import star.animated_part_set;
-import star.networked_animator;
-import star.humanoid;
-import star.mobile_entity;
-import star.actor_entity;
-import star.tool_user_entity;
-import star.lounging_entities;
-import star.chat_action;
-import star.chatty_entity;
-import star.emote_entity;
-import star.portrait_entity;
-import star.damage_bar_entity;
-import star.nametag_entity;
-import star.inspectable_entity;
-import star.inventory_types;
-import star.entity_rendering_types;
-import star.entity_rendering;
-import star.player_types;
-import star.radio_message_database;
-import star.player;
-import star.host_address;
-import star.sky_types;
-import star.weather_types;
-import star.world_parameters;
-import star.celestial_parameters;
-import star.chat_types;
-import star.socket;
-import star.tcp;
-import star.liquid_types;
-import star.tile_sector_array;
-import star.world_layout;
-import star.collision_generator;
-import star.world_tiles;
-import star.celestial_types;
-import star.wiring;
-import star.plant;
-import star.plant_database;
-import star.biome_placement;
-import star.versioning_database;
-import star.world_storage;
-import star.sky_parameters;
-import star.system_world;
-import star.damage_manager;
-import star.net_packets;
-import star.net_packet_socket;
-import star.universe_connection;
-import star.sky_render_data;
-import star.parallax;
-import star.cellular_light_array;
-import star.cellular_lighting;
-import star.world_render_data;
-import star.world_structure;
-import star.world_client_state;
-import star.interpolation_tracker;
-import star.ambient;
-import star.weather;
-import star.world_client;
-import star.world_client_thread;
-import star.universe;
-// TODO: make this more thread safe
-import star.universe_client;
-import star.canvas_widget;
-import star.label_widget;
-import star.image_widget;
-import star.image_stretch_widget;
-import star.widget_parsing;
-import star.gui_reader;
-import star.list_widget;
-import star.button_group;
-import star.button_widget;
-import star.tab_set;
-import star.progress_widget;
-import star.item_slot_widget;
-import star.stack_widget;
-import star.cinematic;
-
 import star.ai_database;
-
-
+import star.ai_interface;
+import star.ai_types;
+import star.animation;
+import star.assets;
+import star.audio;
+import star.button_widget;
+import star.canvas_widget;
 import star.client_context;
+import star.drawable;
+import star.format;
+import star.gui_context;
+import star.gui_reader;
+import star.image_stretch_widget;
+import star.image_widget;
+import star.json;
+import star.label_widget;
+import star.list;
+import star.list_widget;
+import star.mixer;
+import star.ordered_set;
+import star.pane;
+import star.player;
+import star.player_companions;
+import star.player_types;
+import star.root;
+import star.stack_widget;
+import star.string;
+import star.text;
+import star.universe_client;
+import star.uuid;
+import star.vector;
+import star.warping;
+import star.widget;
+import star.widget_parsing;
 
 namespace Star {
 
-AiInterface::AiInterface(GuiContext& guiContext, std::shared_ptr<UniverseClient> client, std::shared_ptr<Cinematic> cinematic, Animation staticAnimation, Animation scanlineAnimation, Animation faceAnimation)
-  : Pane(guiContext), m_currentPage(AiPages::StatusPage), m_client(std::move(client)), m_cinematic(std::move(cinematic)),
-    m_sourceEntityId(null_entity_id), m_staticAnimation(std::move(staticAnimation)), m_scanlineAnimation(std::move(scanlineAnimation)),
-    m_faceAnimation("", std::move(faceAnimation)), m_textLength(0), m_textMaxLength(0) {}
+AiInterface::AiInterface(ConstructionKey, GuiContext& gui_context, std::shared_ptr<UniverseClient> client,
+    std::shared_ptr<AiDatabase const> database, Animation static_animation, Animation scanline_animation, Animation face_animation)
+  : Pane(gui_context), m_current_page(AiPages::StatusPage), m_client(std::move(client)), m_ai_database(std::move(database)),
+    m_static_animation(std::move(static_animation)), m_scanline_animation(std::move(scanline_animation)),
+    m_face_animation("", std::move(face_animation)) {}
 
-std::expected<std::shared_ptr<AiInterface>, StarException> AiInterface::create(GuiContext& guiContext, std::shared_ptr<UniverseClient> client, std::shared_ptr<Cinematic> cinematic) {
-  auto database = guiContext.root().aiDatabase();
+std::expected<std::shared_ptr<AiInterface>, StarException> AiInterface::create(GuiContext& gui_context, std::shared_ptr<UniverseClient> client) {
+  auto database = gui_context.root().ai_database();
   if (!database)
     return std::unexpected(std::move(database.error()));
-  auto staticAnimation = (*database)->staticAnimation(client->mainPlayer()->shipSpecies());
-  if (!staticAnimation)
-    return std::unexpected(std::move(staticAnimation.error()));
-  auto faceAnimation = Animation::create(guiContext.root());
-  if (!faceAnimation)
-    return std::unexpected(std::move(faceAnimation.error()));
-  auto pane = std::shared_ptr<AiInterface>(new AiInterface(guiContext, std::move(client), std::move(cinematic),
-      std::move(*staticAnimation), (*database)->scanlineAnimation(), std::move(*faceAnimation)));
-  pane->m_aiDatabase = std::move(*database);
+  auto static_animation = (*database)->static_animation(client->mainPlayer()->shipSpecies());
+  if (!static_animation)
+    return std::unexpected(std::move(static_animation.error()));
+  auto face_animation = Animation::create(gui_context.root());
+  if (!face_animation)
+    return std::unexpected(std::move(face_animation.error()));
+  auto scanline_animation = (*database)->scanline_animation();
+  auto pane = std::make_shared<AiInterface>(ConstructionKey{}, gui_context, std::move(client), std::move(*database),
+      std::move(*static_animation), std::move(scanline_animation), std::move(*face_animation));
   auto initialized = pane->initializePane();
   if (!initialized)
     return std::unexpected(std::move(initialized.error()));
@@ -246,22 +66,22 @@ std::expected<std::shared_ptr<AiInterface>, StarException> AiInterface::create(G
 }
 
 std::expected<void, StarException> AiInterface::initialize() {
-  auto assetsResult = context().root().assets();
-  if (!assetsResult)
-    return std::unexpected(std::move(assetsResult.error()));
-  auto assets = *assetsResult;
+  auto assets_result = context().root().assets();
+  if (!assets_result)
+    return std::unexpected(std::move(assets_result.error()));
+  auto const& assets = *assets_result;
   auto config = assets->json("/interface/ai/ai.config");
   if (!config)
     return std::unexpected(std::move(config.error()));
   GuiReader reader(context());
   reader.registerCallback("close", [this](Widget&) -> std::expected<void, StarException> { dismiss(); return {}; });
-  reader.registerCallback("missionItemList", [this](Widget&) { return selectMission(); });
-  reader.registerCallback("startMission", [this](Widget&) { return startMission(); });
-  reader.registerCallback("crewItemList", [this](Widget&) { return selectRecruit(); });
-  reader.registerCallback("dismissRecruit", [this](Widget&) { return dismissRecruit(); });
-  reader.registerCallback("showMissions", [this](Widget&) { return showMissions(); });
-  reader.registerCallback("showCrew", [this](Widget&) { return showCrew(); });
-  reader.registerCallback("goBack", [this](Widget&) { return goBack(); });
+  reader.registerCallback("missionItemList", [this](Widget&) { return select_mission(); });
+  reader.registerCallback("startMission", [this](Widget&) { return start_mission(); });
+  reader.registerCallback("crewItemList", [this](Widget&) { return select_recruit(); });
+  reader.registerCallback("dismissRecruit", [this](Widget&) { return dismiss_recruit(); });
+  reader.registerCallback("showMissions", [this](Widget&) { return show_missions(ListAction::Open); });
+  reader.registerCallback("showCrew", [this](Widget&) { return show_crew(ListAction::Open); });
+  reader.registerCallback("goBack", [this](Widget&) { return go_back(); });
   auto layout = config->get("guiConfig");
   if (!layout)
     return std::unexpected(std::move(layout.error()));
@@ -269,91 +89,89 @@ std::expected<void, StarException> AiInterface::initialize() {
   if (!constructed)
     return std::unexpected(std::move(constructed.error()));
 
-  auto mainStack = fetchChild<StackWidget>("mainStack");
-  if (!mainStack) return std::unexpected(std::move(mainStack.error()));
-  m_mainStack = std::move(*mainStack);
-  auto missionStack = findChild<StackWidget>("missionStack");
-  if (!missionStack) return std::unexpected(std::move(missionStack.error()));
-  m_missionStack = std::move(*missionStack);
-  auto crewStack = findChild<StackWidget>("crewStack");
-  if (!crewStack) return std::unexpected(std::move(crewStack.error()));
-  m_crewStack = std::move(*crewStack);
-  auto leftPadding = config->get_int("breadcrumbLeftPadding");
-  if (!leftPadding) return std::unexpected(std::move(leftPadding.error()));
-  m_breadcrumbLeftPadding = *leftPadding;
-  auto rightPadding = config->get_int("breadcrumbRightPadding");
-  if (!rightPadding) return std::unexpected(std::move(rightPadding.error()));
-  m_breadcrumbRightPadding = *rightPadding;
-  auto homeBg = fetchChild<ImageStretchWidget>("homeBreadcrumbBg");
-  if (!homeBg) return std::unexpected(std::move(homeBg.error()));
-  m_homeBreadcrumbBackground = std::move(*homeBg);
-  auto pageBg = fetchChild<ImageStretchWidget>("pageBreadcrumbBg");
-  if (!pageBg) return std::unexpected(std::move(pageBg.error()));
-  m_pageBreadcrumbBackground = std::move(*pageBg);
-  auto itemBg = fetchChild<ImageStretchWidget>("itemBreadcrumbBg");
-  if (!itemBg) return std::unexpected(std::move(itemBg.error()));
-  m_itemBreadcrumbBackground = std::move(*itemBg);
+  auto main_stack = fetchChild<StackWidget>("mainStack");
+  if (!main_stack) return std::unexpected(std::move(main_stack.error()));
+  m_main_stack = std::move(*main_stack);
+  auto mission_stack = findChild<StackWidget>("missionStack");
+  if (!mission_stack) return std::unexpected(std::move(mission_stack.error()));
+  m_mission_stack = std::move(*mission_stack);
+  auto crew_stack = findChild<StackWidget>("crewStack");
+  if (!crew_stack) return std::unexpected(std::move(crew_stack.error()));
+  m_crew_stack = std::move(*crew_stack);
+  auto left_padding = config->get_int("breadcrumbLeftPadding");
+  if (!left_padding) return std::unexpected(std::move(left_padding.error()));
+  m_breadcrumb_left_padding = *left_padding;
+  auto right_padding = config->get_int("breadcrumbRightPadding");
+  if (!right_padding) return std::unexpected(std::move(right_padding.error()));
+  m_breadcrumb_right_padding = *right_padding;
+  auto home_bg = fetchChild<ImageStretchWidget>("homeBreadcrumbBg");
+  if (!home_bg) return std::unexpected(std::move(home_bg.error()));
+  m_home_breadcrumb_background = std::move(*home_bg);
+  auto page_bg = fetchChild<ImageStretchWidget>("pageBreadcrumbBg");
+  if (!page_bg) return std::unexpected(std::move(page_bg.error()));
+  m_page_breadcrumb_background = std::move(*page_bg);
+  auto item_bg = fetchChild<ImageStretchWidget>("itemBreadcrumbBg");
+  if (!item_bg) return std::unexpected(std::move(item_bg.error()));
+  m_item_breadcrumb_background = std::move(*item_bg);
   auto home = fetchChild<LabelWidget>("homeBreadcrumb");
   if (!home) return std::unexpected(std::move(home.error()));
-  m_homeBreadcrumbWidget = std::move(*home);
+  m_home_breadcrumb_widget = std::move(*home);
   auto page = fetchChild<LabelWidget>("pageBreadcrumb");
   if (!page) return std::unexpected(std::move(page.error()));
-  m_pageBreadcrumbWidget = std::move(*page);
+  m_page_breadcrumb_widget = std::move(*page);
   auto item = fetchChild<LabelWidget>("itemBreadcrumb");
   if (!item) return std::unexpected(std::move(item.error()));
-  m_itemBreadcrumbWidget = std::move(*item);
+  m_item_breadcrumb_widget = std::move(*item);
   auto canvas = findChild<CanvasWidget>("aiFaceCanvas");
   if (!canvas) return std::unexpected(std::move(canvas.error()));
-  m_aiFaceCanvasWidget = std::move(*canvas);
+  m_ai_face_canvas_widget = std::move(*canvas);
   auto missions = findChild<ListWidget>("missionItemList");
   if (!missions) return std::unexpected(std::move(missions.error()));
-  m_missionListWidget = std::move(*missions);
+  m_mission_list_widget = std::move(*missions);
   auto crew = findChild<ListWidget>("crewItemList");
   if (!crew) return std::unexpected(std::move(crew.error()));
-  m_crewListWidget = std::move(*crew);
-  auto showMissions = findChild<ButtonWidget>("showMissions");
-  if (!showMissions) return std::unexpected(std::move(showMissions.error()));
-  m_showMissionsButton = std::move(*showMissions);
-  auto showCrew = findChild<ButtonWidget>("showCrew");
-  if (!showCrew) return std::unexpected(std::move(showCrew.error()));
-  m_showCrewButton = std::move(*showCrew);
+  m_crew_list_widget = std::move(*crew);
+  auto show_missions = findChild<ButtonWidget>("showMissions");
+  if (!show_missions) return std::unexpected(std::move(show_missions.error()));
+  m_show_missions_button = std::move(*show_missions);
+  auto show_crew = findChild<ButtonWidget>("showCrew");
+  if (!show_crew) return std::unexpected(std::move(show_crew.error()));
+  m_show_crew_button = std::move(*show_crew);
   auto back = findChild<ButtonWidget>("backButton");
   if (!back) return std::unexpected(std::move(back.error()));
-  m_backButton = std::move(*back);
-  auto missionName = findChild<LabelWidget>("missionName");
-  if (!missionName) return std::unexpected(std::move(missionName.error()));
-  m_missionNameLabel = std::move(*missionName);
-  auto missionIcon = findChild<ImageWidget>("missionIcon");
-  if (!missionIcon) return std::unexpected(std::move(missionIcon.error()));
-  m_missionIcon = std::move(*missionIcon);
+  m_back_button = std::move(*back);
+  auto mission_name = findChild<LabelWidget>("missionName");
+  if (!mission_name) return std::unexpected(std::move(mission_name.error()));
+  m_mission_name_label = std::move(*mission_name);
+  auto mission_icon = findChild<ImageWidget>("missionIcon");
+  if (!mission_icon) return std::unexpected(std::move(mission_icon.error()));
+  m_mission_icon = std::move(*mission_icon);
   auto start = findChild<ButtonWidget>("startMission");
   if (!start) return std::unexpected(std::move(start.error()));
-  m_startMissionButton = std::move(*start);
-  auto recruitName = findChild<LabelWidget>("recruitName");
-  if (!recruitName) return std::unexpected(std::move(recruitName.error()));
-  m_recruitNameLabel = std::move(*recruitName);
-  auto recruitIcon = findChild<ImageWidget>("recruitIcon");
-  if (!recruitIcon) return std::unexpected(std::move(recruitIcon.error()));
-  m_recruitIcon = std::move(*recruitIcon);
-  auto dismissRecruit = findChild<ButtonWidget>("dismissRecruit");
-  if (!dismissRecruit) return std::unexpected(std::move(dismissRecruit.error()));
-  m_dismissRecruitButton = std::move(*dismissRecruit);
+  auto recruit_name = findChild<LabelWidget>("recruitName");
+  if (!recruit_name) return std::unexpected(std::move(recruit_name.error()));
+  m_recruit_name_label = std::move(*recruit_name);
+  auto recruit_icon = findChild<ImageWidget>("recruitIcon");
+  if (!recruit_icon) return std::unexpected(std::move(recruit_icon.error()));
+  m_recruit_icon = std::move(*recruit_icon);
+  auto dismiss_recruit = findChild<ButtonWidget>("dismissRecruit");
+  if (!dismiss_recruit) return std::unexpected(std::move(dismiss_recruit.error()));
   m_species = m_client->mainPlayer()->shipSpecies();
-  auto missionBreadcrumb = config->get_string("missionBreadcrumbText");
-  if (!missionBreadcrumb) return std::unexpected(std::move(missionBreadcrumb.error()));
-  m_missionBreadcrumbText = std::move(*missionBreadcrumb);
-  auto missionDeploy = config->get_string("missionDeployText");
-  if (!missionDeploy) return std::unexpected(std::move(missionDeploy.error()));
-  m_missionDeployText = std::move(*missionDeploy);
-  auto crewBreadcrumb = config->get_string("crewBreadcrumbText");
-  if (!crewBreadcrumb) return std::unexpected(std::move(crewBreadcrumb.error()));
-  m_crewBreadcrumbText = std::move(*crewBreadcrumb);
-  auto recruitNameText = config->get_string("defaultRecruitName");
-  if (!recruitNameText) return std::unexpected(std::move(recruitNameText.error()));
-  m_defaultRecruitName = std::move(*recruitNameText);
+  auto mission_breadcrumb = config->get_string("missionBreadcrumbText");
+  if (!mission_breadcrumb) return std::unexpected(std::move(mission_breadcrumb.error()));
+  m_mission_breadcrumb_text = std::move(*mission_breadcrumb);
+  auto mission_deploy = config->get_string("missionDeployText");
+  if (!mission_deploy) return std::unexpected(std::move(mission_deploy.error()));
+  m_mission_deploy_text = std::move(*mission_deploy);
+  auto crew_breadcrumb = config->get_string("crewBreadcrumbText");
+  if (!crew_breadcrumb) return std::unexpected(std::move(crew_breadcrumb.error()));
+  m_crew_breadcrumb_text = std::move(*crew_breadcrumb);
+  auto recruit_name_text = config->get_string("defaultRecruitName");
+  if (!recruit_name_text) return std::unexpected(std::move(recruit_name_text.error()));
+  m_default_recruit_name = std::move(*recruit_name_text);
   auto description = config->get_string("defaultRecruitDescription");
   if (!description) return std::unexpected(std::move(description.error()));
-  m_defaultRecruitDescription = std::move(*description);
+  m_default_recruit_description = std::move(*description);
   return {};
 }
 
@@ -362,112 +180,111 @@ std::expected<void, StarException> AiInterface::update(float dt) {
     dismiss();
   auto result = Pane::update(dt);
   if (!result) return std::unexpected(std::move(result.error()));
-  result = m_showCrewButton->setVisibility(m_currentPage == AiPages::StatusPage);
-  if (!result) return std::unexpected(std::move(result.error()));
-  result = m_showMissionsButton->setVisibility(m_currentPage == AiPages::StatusPage);
-  if (!result) return std::unexpected(std::move(result.error()));
-  result = m_backButton->setVisibility(m_currentPage != AiPages::StatusPage);
-  if (!result) return std::unexpected(std::move(result.error()));
-  m_staticAnimation.update(dt);
-  m_scanlineAnimation.update(dt);
+  m_static_animation.update(dt);
+  m_scanline_animation.update(dt);
 
-  if (m_currentSpeech) {
-    m_textLength += m_currentSpeech->speedModifier * m_aiDatabase->charactersPerSecond() * dt;
-    result = m_currentTextWidget->setText(m_currentSpeech->text);
+  static String const idle("idle");
+  if (m_speech) {
+    auto& speech = *m_speech;
+    if (speech.progress < speech.length)
+      speech.progress += speech.speed_modifier * m_ai_database->characters_per_second() * dt;
+    bool speaking = speech.progress < speech.length;
+    unsigned visible = speaking ? static_cast<unsigned>(std::max(0.0f, speech.progress)) : speech.length;
+    if (speech.label->getTextCharLimit() != visible) {
+      result = speech.label->setTextCharLimit(visible);
+      if (!result) return std::unexpected(std::move(result.error()));
+    }
+    result = set_face_animation(speaking ? speech.animation : idle);
     if (!result) return std::unexpected(std::move(result.error()));
-    result = m_currentTextWidget->setTextCharLimit(std::min(m_textMaxLength, std::floor(m_textLength)));
-    if (!result) return std::unexpected(std::move(result.error()));
-    result = setFaceAnimation(m_textLength < m_textMaxLength ? m_currentSpeech->animation : "idle");
-    if (!result) return std::unexpected(std::move(result.error()));
-    if (m_textLength < m_textMaxLength) {
-      if (!m_chatterSound || m_chatterSound->finished()) {
+    if (speaking) {
+      if (!m_chatter_sound || m_chatter_sound->finished()) {
         auto assets = context().root().assets();
         if (!assets) return std::unexpected(std::move(assets.error()));
-        auto soundConfig = (*assets)->json("/interface/ai/ai.config:chatterSound");
-        if (!soundConfig) return std::unexpected(std::move(soundConfig.error()));
-        auto soundName = soundConfig->to_string();
-        if (!soundName) return std::unexpected(std::move(soundName.error()));
-        auto sound = (*assets)->audio(*soundName);
+        auto sound_config = (*assets)->json("/interface/ai/ai.config:chatterSound");
+        if (!sound_config) return std::unexpected(std::move(sound_config.error()));
+        auto sound_name = sound_config->to_string();
+        if (!sound_name) return std::unexpected(std::move(sound_name.error()));
+        auto sound = (*assets)->audio(*sound_name);
         if (!sound) return std::unexpected(std::move(sound.error()));
         auto chatter = AudioInstance::create(**sound);
         if (!chatter) return std::unexpected(std::move(chatter.error()));
-        m_chatterSound = std::move(*chatter);
-        m_chatterSound->set_loops(-1);
-        auto played = context().playAudio(m_chatterSound);
+        m_chatter_sound = std::move(*chatter);
+        m_chatter_sound->set_loops(-1);
+        auto played = context().playAudio(m_chatter_sound);
         if (!played)
           return std::unexpected(std::move(played.error()));
       }
-    } else if (m_chatterSound) {
-      m_chatterSound->stop();
+    } else if (m_chatter_sound) {
+      m_chatter_sound->stop();
+      m_chatter_sound.reset();
     }
-    m_faceAnimation.second.update(dt * m_currentSpeech->speedModifier);
+    m_face_animation.second.update(dt * speech.speed_modifier);
   } else {
-    result = setFaceAnimation("idle");
+    result = set_face_animation(idle);
     if (!result) return std::unexpected(std::move(result.error()));
-    m_faceAnimation.second.update(dt);
-    if (m_chatterSound)
-      m_chatterSound->stop();
+    m_face_animation.second.update(dt);
+    if (m_chatter_sound) {
+      m_chatter_sound->stop();
+      m_chatter_sound.reset();
+    }
   }
 
-  auto const& aiState = m_client->mainPlayer()->aiState();
-  if (!std::ranges::equal(aiState.availableMissions, m_availableMissions)
-      || !std::ranges::equal(aiState.completedMissions, m_completedMissions)) {
-    m_availableMissions = aiState.availableMissions.values();
-    m_completedMissions = aiState.completedMissions.values();
-    result = populateMissions();
-    if (!result) return std::unexpected(std::move(result.error()));
-  }
-  auto crew = m_client->mainPlayer()->companions()->getCompanions("crew");
-  if (crew != m_crew) {
-    m_crew = crew;
-    result = populateCrew();
-    if (!result) return std::unexpected(std::move(result.error()));
-  }
-  m_aiFaceCanvasWidget->clear();
-  auto face = m_faceAnimation.second.drawable(1.0f);
+  if (m_current_page == AiPages::MissionList || m_current_page == AiPages::MissionPage)
+    result = show_missions(ListAction::Refresh);
+  else if (m_current_page == AiPages::CrewList || m_current_page == AiPages::CrewPage)
+    result = show_crew(ListAction::Refresh);
+  if (!result) return std::unexpected(std::move(result.error()));
+  m_ai_face_canvas_widget->clear();
+  auto face = m_face_animation.second.drawable(1.0f);
   if (!face) return std::unexpected(std::move(face.error()));
-  m_aiFaceCanvasWidget->drawDrawable(std::move(*face), Vec2F(0, 0));
-  auto staticDrawable = m_staticAnimation.drawable(1.0f);
-  if (!staticDrawable) return std::unexpected(std::move(staticDrawable.error()));
-  m_aiFaceCanvasWidget->drawDrawable(std::move(*staticDrawable), Vec2F(0, 0));
-  auto scanline = m_scanlineAnimation.drawable(1.0f);
+  m_ai_face_canvas_widget->drawDrawable(std::move(*face), Vec2F(0, 0));
+  auto static_drawable = m_static_animation.drawable(1.0f);
+  if (!static_drawable) return std::unexpected(std::move(static_drawable.error()));
+  m_ai_face_canvas_widget->drawDrawable(std::move(*static_drawable), Vec2F(0, 0));
+  auto scanline = m_scanline_animation.drawable(1.0f);
   if (!scanline) return std::unexpected(std::move(scanline.error()));
-  m_aiFaceCanvasWidget->drawDrawable(std::move(*scanline), Vec2F(0, 0));
+  m_ai_face_canvas_widget->drawDrawable(std::move(*scanline), Vec2F(0, 0));
   return {};
 }
 
-std::expected<void, StarException> AiInterface::updateBreadcrumbs() {
+std::expected<void, StarException> AiInterface::update_breadcrumbs() {
   // Home breadcrumb
-  auto width = m_homeBreadcrumbWidget->size()[0];
-  width += m_breadcrumbLeftPadding + m_breadcrumbRightPadding;
-  m_homeBreadcrumbBackground->setSize(Vec2I(width, m_homeBreadcrumbBackground->size()[1]));
+  auto width = m_home_breadcrumb_widget->size()[0];
+  width += m_breadcrumb_left_padding + m_breadcrumb_right_padding;
+  m_home_breadcrumb_background->setSize(Vec2I(width, m_home_breadcrumb_background->size()[1]));
 
   // Middle breadcrumb
-  if (m_currentPage != AiPages::StatusPage) {
-    Vec2I pagePosition = m_homeBreadcrumbBackground->position() + Vec2I(width, 0);
-    m_pageBreadcrumbWidget->setPosition(Vec2I(pagePosition[0] + m_breadcrumbLeftPadding, m_homeBreadcrumbWidget->position()[1]));
-    m_pageBreadcrumbBackground->setPosition(pagePosition - Vec2I(m_breadcrumbRightPadding, 0));
-    width = m_pageBreadcrumbWidget->size()[0] + (2 * m_breadcrumbRightPadding) + m_breadcrumbLeftPadding; // Add right padding twice because of the overlap to the left
-    m_pageBreadcrumbBackground->setSize(Vec2I(width, m_pageBreadcrumbBackground->size()[1]));
+  if (m_current_page != AiPages::StatusPage) {
+    Vec2I page_position = m_home_breadcrumb_background->position() + Vec2I(width, 0);
+    m_page_breadcrumb_widget->setPosition(Vec2I(page_position[0] + m_breadcrumb_left_padding, m_home_breadcrumb_widget->position()[1]));
+    m_page_breadcrumb_background->setPosition(page_position - Vec2I(m_breadcrumb_right_padding, 0));
+    width = m_page_breadcrumb_widget->size()[0] + (2 * m_breadcrumb_right_padding) + m_breadcrumb_left_padding; // Add right padding twice because of the overlap to the left
+    m_page_breadcrumb_background->setSize(Vec2I(width, m_page_breadcrumb_background->size()[1]));
 
     // End breadcrumb
-    if (m_currentPage == AiPages::MissionPage || m_currentPage == AiPages::CrewPage) {
-      Vec2I itemPosition = m_pageBreadcrumbBackground->position() + Vec2I(width, 0);
-      m_itemBreadcrumbWidget->setPosition(Vec2I(itemPosition[0] + m_breadcrumbLeftPadding, m_homeBreadcrumbWidget->position()[1]));
-      m_itemBreadcrumbBackground->setPosition(itemPosition - Vec2I(m_breadcrumbRightPadding, 0));
-      width = m_itemBreadcrumbWidget->size()[0] + (2 * m_breadcrumbRightPadding) + m_breadcrumbLeftPadding;
-      m_itemBreadcrumbBackground->setSize(Vec2I(width, m_itemBreadcrumbBackground->size()[1]));
+    if (m_current_page == AiPages::MissionPage || m_current_page == AiPages::CrewPage) {
+      Vec2I item_position = m_page_breadcrumb_background->position() + Vec2I(width, 0);
+      m_item_breadcrumb_widget->setPosition(Vec2I(item_position[0] + m_breadcrumb_left_padding, m_home_breadcrumb_widget->position()[1]));
+      m_item_breadcrumb_background->setPosition(item_position - Vec2I(m_breadcrumb_right_padding, 0));
+      width = m_item_breadcrumb_widget->size()[0] + (2 * m_breadcrumb_right_padding) + m_breadcrumb_left_padding;
+      m_item_breadcrumb_background->setSize(Vec2I(width, m_item_breadcrumb_background->size()[1]));
     }
   }
 
-  // Visibility
-  auto result = m_pageBreadcrumbBackground->setVisibility(m_currentPage != AiPages::StatusPage);
+  bool home = m_current_page == AiPages::StatusPage;
+  auto result = m_show_crew_button->setVisibility(home);
   if (!result) return std::unexpected(std::move(result.error()));
-  result = m_pageBreadcrumbWidget->setVisibility(m_currentPage != AiPages::StatusPage);
+  result = m_show_missions_button->setVisibility(home);
   if (!result) return std::unexpected(std::move(result.error()));
-  result = m_itemBreadcrumbBackground->setVisibility(m_currentPage == AiPages::MissionPage || m_currentPage == AiPages::CrewPage);
+  result = m_back_button->setVisibility(!home);
   if (!result) return std::unexpected(std::move(result.error()));
-  return m_itemBreadcrumbWidget->setVisibility(m_currentPage == AiPages::MissionPage || m_currentPage == AiPages::CrewPage);
+  result = m_page_breadcrumb_background->setVisibility(!home);
+  if (!result) return std::unexpected(std::move(result.error()));
+  result = m_page_breadcrumb_widget->setVisibility(m_current_page != AiPages::StatusPage);
+  if (!result) return std::unexpected(std::move(result.error()));
+  result = m_item_breadcrumb_background->setVisibility(m_current_page == AiPages::MissionPage || m_current_page == AiPages::CrewPage);
+  if (!result) return std::unexpected(std::move(result.error()));
+  return m_item_breadcrumb_widget->setVisibility(m_current_page == AiPages::MissionPage || m_current_page == AiPages::CrewPage);
 }
 
 std::expected<void, StarException> AiInterface::displayed() {
@@ -475,175 +292,197 @@ std::expected<void, StarException> AiInterface::displayed() {
     return {};
   auto result = Pane::displayed();
   if (!result) return std::unexpected(std::move(result.error()));
-  return showStatus();
+  return show_status();
 }
 
 std::expected<void, StarException> AiInterface::dismissed() {
-  if (m_chatterSound)
-    m_chatterSound->stop();
-  m_selectedMission = {};
-  m_selectedRecruit = {};
+  if (m_chatter_sound) {
+    m_chatter_sound->stop();
+    m_chatter_sound.reset();
+  }
+  m_speech.reset();
+  m_selected_mission = {};
+  m_selected_recruit = {};
   return Pane::dismissed();
 }
 
-void AiInterface::setSourceEntityId(EntityId sourceEntityId) {
-  m_sourceEntityId = sourceEntityId;
-}
-
-std::expected<void, StarException> AiInterface::showStatus() {
-  auto speech = m_aiDatabase->shipStatus(m_client->clientContext()->shipUpgrades().shipLevel);
+std::expected<void, StarException> AiInterface::show_status() {
+  auto speech = m_ai_database->ship_status(m_client->clientContext()->shipUpgrades().shipLevel);
   if (!speech) return std::unexpected(std::move(speech.error()));
-  m_currentPage = AiPages::StatusPage;
-  auto result = setCurrentSpeech("shipStatusText", std::move(*speech));
+  m_current_page = AiPages::StatusPage;
+  auto result = set_current_speech("shipStatusText", std::move(*speech));
   if (!result) return std::unexpected(std::move(result.error()));
-  result = m_mainStack->showPage(0);
+  result = m_main_stack->showPage(0);
   if (!result) return std::unexpected(std::move(result.error()));
-  return updateBreadcrumbs();
+  return update_breadcrumbs();
 }
 
-std::expected<void, StarException> AiInterface::showMissions() {
-  m_currentPage = AiPages::MissionList;
-  m_currentSpeech = {};
-  auto result = m_pageBreadcrumbWidget->setText(m_missionBreadcrumbText);
+std::expected<void, StarException> AiInterface::show_missions(ListAction action) {
+  auto const& state = m_client->mainPlayer()->ai_state();
+  if (action == ListAction::Refresh && m_current_page == AiPages::MissionPage && m_selected_mission
+      && (state.available_missions.contains(*m_selected_mission) || state.completed_missions.contains(*m_selected_mission)))
+    return {};
+  if (!m_mission_rows || !std::ranges::equal(state.available_missions, m_mission_rows->available)
+      || !std::ranges::equal(state.completed_missions, m_mission_rows->completed)) {
+    m_mission_rows.reset();
+    auto populated = populate_missions(state);
+    if (!populated) return std::unexpected(std::move(populated.error()));
+    m_mission_rows.emplace(state.available_missions.values(), state.completed_missions.values());
+  } else if (action == ListAction::Refresh && m_current_page == AiPages::MissionList) {
+    return {};
+  }
+  m_current_page = AiPages::MissionList;
+  m_speech.reset();
+  auto result = m_page_breadcrumb_widget->setText(m_mission_breadcrumb_text);
   if (!result) return std::unexpected(std::move(result.error()));
-  result = populateMissions();
+  result = m_mission_list_widget->clearSelected();
   if (!result) return std::unexpected(std::move(result.error()));
-  result = m_missionListWidget->clearSelected();
+  result = m_main_stack->showPage(1);
   if (!result) return std::unexpected(std::move(result.error()));
-  result = m_mainStack->showPage(1);
-  if (!result) return std::unexpected(std::move(result.error()));
-  result = m_missionStack->showPage(0);
-  if (!result) return std::unexpected(std::move(result.error()));
-  if (m_availableMissions.empty() && m_completedMissions.empty()) {
-    result = m_missionStack->showPage(0);
+  if (state.available_missions.empty() && state.completed_missions.empty()) {
+    result = m_mission_stack->showPage(0);
     if (!result) return std::unexpected(std::move(result.error()));
-    result = setCurrentSpeech("noMissionsText", m_aiDatabase->noMissionsSpeech());
+    result = set_current_speech("noMissionsText", m_ai_database->no_missions_speech());
   } else {
-    result = m_missionStack->showPage(1);
+    result = m_mission_stack->showPage(1);
   }
   if (!result) return std::unexpected(std::move(result.error()));
-  return updateBreadcrumbs();
+  return update_breadcrumbs();
 }
 
-std::expected<void, StarException> AiInterface::selectMission() {
-  std::size_t selectedItem = m_missionListWidget->selectedItem();
-  m_selectedMission = {};
-  if (selectedItem < m_availableMissions.size())
-    m_selectedMission = m_availableMissions[selectedItem];
-  else if (selectedItem < m_availableMissions.size() + m_completedMissions.size())
-    m_selectedMission = m_completedMissions[selectedItem - m_availableMissions.size()];
-  if (!m_selectedMission)
+std::expected<void, StarException> AiInterface::select_mission() {
+  std::size_t selected_item = m_mission_list_widget->selectedItem();
+  m_selected_mission = {};
+  if (!m_mission_rows)
     return {};
-  auto mission = m_aiDatabase->mission(*m_selectedMission);
+  if (selected_item < m_mission_rows->available.size())
+    m_selected_mission = m_mission_rows->available[selected_item];
+  else if (selected_item - m_mission_rows->available.size() < m_mission_rows->completed.size())
+    m_selected_mission = m_mission_rows->completed[selected_item - m_mission_rows->available.size()];
+  if (!m_selected_mission)
+    return {};
+  auto mission = m_ai_database->mission(*m_selected_mission);
   if (!mission) return std::unexpected(std::move(mission.error()));
-  auto missionText = mission->speciesText.value(m_species, mission->speciesText.value("default"));
-  m_currentPage = AiPages::MissionPage;
-  auto result = setCurrentSpeech("missionText", missionText.selectSpeech);
+  auto const& mission_text = m_ai_database->mission_text(mission->get(), m_species);
+  m_current_page = AiPages::MissionPage;
+  auto result = set_current_speech("missionText", mission_text.select_speech);
   if (!result) return std::unexpected(std::move(result.error()));
-  result = m_missionNameLabel->setText(missionText.buttonText);
+  result = m_mission_name_label->setText(mission_text.button_text);
   if (!result) return std::unexpected(std::move(result.error()));
-  result = m_missionIcon->setImage(mission->icon);
+  result = m_mission_icon->setImage(mission->get().icon);
   if (!result) return std::unexpected(std::move(result.error()));
-  result = m_itemBreadcrumbWidget->setText(m_missionDeployText);
+  result = m_item_breadcrumb_widget->setText(m_mission_deploy_text);
   if (!result) return std::unexpected(std::move(result.error()));
-  result = m_missionStack->showPage(2);
+  result = m_mission_stack->showPage(2);
   if (!result) return std::unexpected(std::move(result.error()));
-  return updateBreadcrumbs();
+  return update_breadcrumbs();
 }
 
-std::expected<void, StarException> AiInterface::showCrew() {
-  m_currentPage = AiPages::CrewList;
-  m_currentSpeech = {};
-  auto result = m_pageBreadcrumbWidget->setText(m_crewBreadcrumbText);
+std::expected<void, StarException> AiInterface::show_crew(ListAction action) {
+  auto crew = m_client->mainPlayer()->companions()->getCompanions("crew");
+  if (action == ListAction::Refresh && m_current_page == AiPages::CrewPage && m_selected_recruit
+      && std::ranges::find(crew, m_selected_recruit) != crew.end())
+    return {};
+  if (!m_crew_rows || crew != *m_crew_rows) {
+    m_crew_rows.reset();
+    auto populated = populate_crew(crew);
+    if (!populated) return std::unexpected(std::move(populated.error()));
+    m_crew_rows.emplace(std::move(crew));
+  } else if (action == ListAction::Refresh && m_current_page == AiPages::CrewList) {
+    return {};
+  }
+  m_current_page = AiPages::CrewList;
+  m_speech.reset();
+  auto result = m_page_breadcrumb_widget->setText(m_crew_breadcrumb_text);
   if (!result) return std::unexpected(std::move(result.error()));
-  result = populateMissions();
+  result = m_crew_list_widget->clearSelected();
   if (!result) return std::unexpected(std::move(result.error()));
-  result = m_crewListWidget->clearSelected();
+  result = m_main_stack->showPage(2);
   if (!result) return std::unexpected(std::move(result.error()));
-  result = m_mainStack->showPage(2);
-  if (!result) return std::unexpected(std::move(result.error()));
-  if (m_crew.empty()) {
-    result = m_crewStack->showPage(0);
+  if (m_crew_rows->empty()) {
+    result = m_crew_stack->showPage(0);
     if (!result) return std::unexpected(std::move(result.error()));
-    result = setCurrentSpeech("noCrewText", m_aiDatabase->noCrewSpeech());
+    result = set_current_speech("noCrewText", m_ai_database->no_crew_speech());
   } else {
-    result = m_crewStack->showPage(1);
+    result = m_crew_stack->showPage(1);
   }
   if (!result) return std::unexpected(std::move(result.error()));
-  return updateBreadcrumbs();
+  return update_breadcrumbs();
 }
 
-std::expected<void, StarException> AiInterface::selectRecruit() {
-  std::size_t selectedItem = m_crewListWidget->selectedItem();
-  m_selectedRecruit = selectedItem < m_crew.size() ? m_crew[selectedItem] : nullptr;
-  if (!m_selectedRecruit)
+std::expected<void, StarException> AiInterface::select_recruit() {
+  std::size_t selected_item = m_crew_list_widget->selectedItem();
+  m_selected_recruit.reset();
+  if (m_crew_rows && selected_item < m_crew_rows->size())
+    m_selected_recruit = (*m_crew_rows)[selected_item];
+  if (!m_selected_recruit)
     return {};
-  m_currentPage = AiPages::CrewPage;
-  auto description = m_selectedRecruit->description();
+  m_current_page = AiPages::CrewPage;
+  auto description = m_selected_recruit->description();
   if (!description) return std::unexpected(std::move(description.error()));
-  auto name = m_selectedRecruit->name();
+  auto name = m_selected_recruit->name();
   if (!name) return std::unexpected(std::move(name.error()));
-  auto speech = description->value_or(m_defaultRecruitDescription);
-  auto result = setCurrentSpeech(
-    "recruitText", {.animation = m_aiDatabase->defaultAnimation(), .text = speech, .speedModifier = 1.0f});
+  auto const& recruit_name = *name ? **name : m_default_recruit_name;
+  auto result = set_current_speech("recruitText", {.animation = m_ai_database->default_animation(),
+      .text = std::move(*description).value_or(m_default_recruit_description), .speed_modifier = 1.0f});
   if (!result) return std::unexpected(std::move(result.error()));
-  result = m_recruitNameLabel->setText(name->value_or(m_defaultRecruitName));
+  result = m_recruit_name_label->setText(recruit_name);
   if (!result) return std::unexpected(std::move(result.error()));
-  result = m_recruitIcon->setDrawables(m_selectedRecruit->portrait());
+  result = m_recruit_icon->setDrawables(m_selected_recruit->portrait());
   if (!result) return std::unexpected(std::move(result.error()));
-  result = m_itemBreadcrumbWidget->setText(name->value_or(m_defaultRecruitName));
+  result = m_item_breadcrumb_widget->setText(recruit_name);
   if (!result) return std::unexpected(std::move(result.error()));
-  result = m_crewStack->showPage(2);
+  result = m_crew_stack->showPage(2);
   if (!result) return std::unexpected(std::move(result.error()));
-  return updateBreadcrumbs();
+  return update_breadcrumbs();
 }
 
-std::expected<void, StarException> AiInterface::populateMissions() {
-  auto result = m_missionListWidget->clear();
+std::expected<void, StarException> AiInterface::populate_missions(AiState const& state) {
+  auto result = m_mission_list_widget->clear();
   if (!result) return std::unexpected(std::move(result.error()));
-  auto addMission = [this](String const& missionName, bool completed) -> std::expected<void, StarException> {
-    auto widget = m_missionListWidget->addItem();
+  auto add_mission = [this](String const& mission_name, bool completed) -> std::expected<void, StarException> {
+    auto widget = m_mission_list_widget->addItem();
     if (!widget) return std::unexpected(std::move(widget.error()));
     auto label = (*widget)->fetchChild<LabelWidget>("itemName");
     if (!label) return std::unexpected(std::move(label.error()));
     auto icon = (*widget)->fetchChild<ImageWidget>("itemIcon");
     if (!icon) return std::unexpected(std::move(icon.error()));
-    auto mission = m_aiDatabase->mission(missionName);
+    auto mission = m_ai_database->mission(mission_name);
     if (!mission) return std::unexpected(std::move(mission.error()));
-    auto image = (*icon)->setImage(mission->icon);
+    auto image = (*icon)->setImage(mission->get().icon);
     if (!image) return std::unexpected(std::move(image.error()));
-    auto missionText = mission->speciesText.value(m_species, mission->speciesText.value("default"));
-    return (*label)->setText(completed ? missionText.repeatButtonText : missionText.buttonText);
+    auto const& mission_text = m_ai_database->mission_text(mission->get(), m_species);
+    return (*label)->setText(completed ? mission_text.repeat_button_text : mission_text.button_text);
   };
-  for (auto const& missionName : m_availableMissions) {
-    result = addMission(missionName, false);
+  for (auto const& mission_name : state.available_missions) {
+    result = add_mission(mission_name, false);
     if (!result) return std::unexpected(std::move(result.error()));
   }
-  for (auto const& missionName : m_completedMissions) {
-    result = addMission(missionName, true);
+  for (auto const& mission_name : state.completed_missions) {
+    result = add_mission(mission_name, true);
     if (!result) return std::unexpected(std::move(result.error()));
   }
-  return m_missionListWidget->setSelected(npos);
+  return {};
 }
 
-std::expected<void, StarException> AiInterface::startMission() {
-  if (!m_selectedMission)
+std::expected<void, StarException> AiInterface::start_mission() {
+  if (!m_selected_mission)
     return {};
-  auto mission = m_aiDatabase->mission(*m_selectedMission);
+  auto mission = m_ai_database->mission(*m_selected_mission);
   if (!mission) return std::unexpected(std::move(mission.error()));
   auto result = m_client->warpPlayer(
-      WarpToWorld{InstanceWorldId(mission->missionUniqueWorld, m_client->teamUuid()), {}},
-      true, mission->warpAnimation.value_or("default"), mission->warpDeploy.value_or(false));
+      WarpToWorld{InstanceWorldId(mission->get().mission_unique_world, m_client->teamUuid()), {}},
+      true, mission->get().warp_animation.value_or("default"), mission->get().warp_deploy.value_or(false));
   if (!result) return std::unexpected(std::move(result.error()));
   dismiss();
   return {};
 }
 
-std::expected<void, StarException> AiInterface::populateCrew() {
-  auto result = m_crewListWidget->clear();
+std::expected<void, StarException> AiInterface::populate_crew(List<std::shared_ptr<Companion>> const& crew) {
+  auto result = m_crew_list_widget->clear();
   if (!result) return std::unexpected(std::move(result.error()));
-  for (auto const& recruit : m_crew) {
-    auto widget = m_crewListWidget->addItem();
+  for (auto const& recruit : crew) {
+    auto widget = m_crew_list_widget->addItem();
     if (!widget) return std::unexpected(std::move(widget.error()));
     auto label = (*widget)->fetchChild<LabelWidget>("itemName");
     if (!label) return std::unexpected(std::move(label.error()));
@@ -653,54 +492,54 @@ std::expected<void, StarException> AiInterface::populateCrew() {
     if (!result) return std::unexpected(std::move(result.error()));
     auto name = recruit->name();
     if (!name) return std::unexpected(std::move(name.error()));
-    result = (*label)->setText(name->value_or(m_defaultRecruitName));
+    result = (*label)->setText(std::move(*name).value_or(m_default_recruit_name));
     if (!result) return std::unexpected(std::move(result.error()));
-  }
-  return m_crewListWidget->setSelected(npos);
-}
-
-std::expected<void, StarException> AiInterface::dismissRecruit() {
-  if (!m_selectedRecruit)
-    return {};
-  auto podUuid = m_selectedRecruit->podUuid();
-  if (!podUuid) return std::unexpected(std::move(podUuid.error()));
-  auto result = m_client->mainPlayer()->companions()->dismissCompanion("crew", *podUuid);
-  if (!result) return std::unexpected(std::move(result.error()));
-  return m_crewStack->showPage(1);
-}
-
-std::expected<void, StarException> AiInterface::goBack() {
-  std::expected<void, StarException> result;
-  if (m_currentPage == AiPages::MissionPage)
-    result = showMissions();
-  else if (m_currentPage == AiPages::CrewPage)
-    result = showCrew();
-  else if (m_currentPage == AiPages::MissionList || m_currentPage == AiPages::CrewList)
-    result = showStatus();
-  if (!result) return std::unexpected(std::move(result.error()));
-  return updateBreadcrumbs();
-}
-
-std::expected<void, StarException> AiInterface::setFaceAnimation(String const& name) {
-  if (m_faceAnimation.first != name) {
-    auto animation = m_aiDatabase->animation(m_species, name);
-    if (!animation) return std::unexpected(std::move(animation.error()));
-    m_faceAnimation = {name, std::move(*animation)};
   }
   return {};
 }
 
-std::expected<void, StarException> AiInterface::setCurrentSpeech(String const& textWidget, AiSpeech speech) {
-  auto widget = findChild<LabelWidget>(textWidget);
+std::expected<void, StarException> AiInterface::dismiss_recruit() {
+  if (!m_selected_recruit)
+    return {};
+  auto pod_uuid = m_selected_recruit->podUuid();
+  if (!pod_uuid) return std::unexpected(std::move(pod_uuid.error()));
+  auto result = m_client->mainPlayer()->companions()->dismissCompanion("crew", *pod_uuid);
+  if (!result) return std::unexpected(std::move(result.error()));
+  return show_crew(ListAction::Open);
+}
+
+std::expected<void, StarException> AiInterface::go_back() {
+  if (m_current_page == AiPages::MissionPage)
+    return show_missions(ListAction::Open);
+  if (m_current_page == AiPages::CrewPage)
+    return show_crew(ListAction::Open);
+  if (m_current_page == AiPages::MissionList || m_current_page == AiPages::CrewList)
+    return show_status();
+  return {};
+}
+
+std::expected<void, StarException> AiInterface::set_face_animation(String const& name) {
+  if (m_face_animation.first != name) {
+    auto animation = m_ai_database->animation(m_species, name);
+    if (!animation) return std::unexpected(std::move(animation.error()));
+    m_face_animation = {name, std::move(*animation)};
+  }
+  return {};
+}
+
+std::expected<void, StarException> AiInterface::set_current_speech(String const& text_widget, AiSpeech speech) {
+  auto widget = findChild<LabelWidget>(text_widget);
   if (!widget) return std::unexpected(std::move(widget.error()));
   auto length = Text::visible_length(speech.text);
   if (!length) return std::unexpected(std::move(length.error()));
-  auto result = (*widget)->setText("");
+  if ((*widget)->getTextCharLimit() != 0u) {
+    auto limited = (*widget)->setTextCharLimit(0u);
+    if (!limited) return std::unexpected(std::move(limited.error()));
+  }
+  auto result = (*widget)->setText(std::move(speech.text));
   if (!result) return std::unexpected(std::move(result.error()));
-  m_currentSpeech = std::move(speech);
-  m_textLength = 0;
-  m_textMaxLength = *length;
-  m_currentTextWidget = std::move(*widget);
+  auto limit = static_cast<unsigned>(std::min<std::size_t>(*length, std::numeric_limits<unsigned>::max()));
+  m_speech.emplace(std::move(*widget), std::move(speech.animation), speech.speed_modifier, limit);
   return {};
 }
 

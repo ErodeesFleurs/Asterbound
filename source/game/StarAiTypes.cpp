@@ -1,48 +1,41 @@
-import star.format;
-import star.json_extra;
 import std;
-import star.json;
-import star.ordered_set;
-import star.data_stream;
-import star.bi_map;
-import star.item_descriptor;
-import star.game_types;
-import star.strong_typedef;
-import star.item_descriptor;
-import star.celestial_coordinate;
-import star.quest_descriptor;
 import star.ai_types;
+import star.format;
+import star.json;
+import star.json_extra;
+import star.ordered_set;
+import star.string;
 
 namespace Star {
 
-AiState::AiState() = default;
-
-std::expected<AiState, StarException> AiState::create(Json const& v) {
-  AiState result;
-  auto available = v.get("availableMissions", JsonArray());
-  if (!available) return std::unexpected(std::move(available.error()));
-  auto availableList = json_to_string_list(*available);
-  if (!availableList) return std::unexpected(std::move(availableList.error()));
-  result.availableMissions.insert_range(*availableList);
-  auto completed = v.get("completedMissions", JsonArray());
-  if (!completed) return std::unexpected(std::move(completed.error()));
-  auto completedList = json_to_string_list(*completed);
-  if (!completedList) return std::unexpected(std::move(completedList.error()));
-  result.completedMissions.insert_range(*completedList);
-  return result;
+std::expected<AiState, StarException> AiState::create(Json const& config) {
+  auto read_missions = [&](String const& key) -> std::expected<OrderedHashSet<String>, StarException> {
+    auto field = config.find(key);
+    if (!field)
+      return std::unexpected(std::move(field.error()));
+    if (!*field)
+      return OrderedHashSet<String>{};
+    return json_to_set<OrderedHashSet<String>>((*field)->get(), [](Json const& entry) { return entry.to_string(); });
+  };
+  auto available = read_missions("availableMissions");
+  if (!available)
+    return std::unexpected(std::move(available.error()));
+  auto completed = read_missions("completedMissions");
+  if (!completed)
+    return std::unexpected(std::move(completed.error()));
+  return AiState{std::move(*available), std::move(*completed)};
 }
 
-Json AiState::toJson() const {
-  JsonArray available;
-  available.reserve(availableMissions.size());
-  for (auto const& mission : availableMissions)
-    available.emplace_back(mission);
-  JsonArray completed;
-  completed.reserve(completedMissions.size());
-  for (auto const& mission : completedMissions)
-    completed.emplace_back(mission);
-  return JsonObject{{"availableMissions", std::move(available)},
-      {"completedMissions", std::move(completed)}};
+Json AiState::to_json() const {
+  auto encode = [](OrderedHashSet<String> const& missions) {
+    JsonArray result;
+    result.reserve(missions.size());
+    for (auto const& mission : missions)
+      result.emplace_back(mission);
+    return result;
+  };
+  return JsonObject{{"availableMissions", encode(available_missions)},
+      {"completedMissions", encode(completed_missions)}};
 }
 
 }

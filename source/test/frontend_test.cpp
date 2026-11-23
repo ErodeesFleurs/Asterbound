@@ -90,6 +90,21 @@ import star.buffer;
 import star.byte_array;
 import star.main_mixer;
 import star.mixer;
+#if defined(__linux__)
+#include <SDL3/SDL.h>
+import star.ai_database;
+import star.ai_interface;
+import star.ai_types;
+import star.application;
+import star.application_controller;
+import star.input;
+import star.label_widget;
+import star.ordered_set;
+import star.main_application;
+import star.test_universe;
+import star.universe_client;
+import star.warping;
+#endif
 #include "gtest/gtest.h"
 #include "gtest/gtest-spi.h"
 
@@ -337,6 +352,150 @@ auto createPrivateOverlayRoot(Root::Settings settings, String const& directory, 
   settings.includeUGC = false;
   return Root::create(settings);
 }
+
+#if defined(__linux__)
+void exercise_sail(GameTest& fixture, Application const& application) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory) << directory.error().what();
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto overlay = File::relative_to(*directory, "assets");
+  ASSERT_TRUE(File::create_directory(overlay));
+  String const formatted("^red;AB^reset;界.");
+  auto write_mission = [&](String id, String text) -> std::expected<void, StarException> {
+    Json speech = JsonObject{{"animation", "idle"}, {"text", std::move(text)}};
+    Json language = JsonObject{{"buttonText", id}, {"repeatButtonText", "Repeat"}, {"selectSpeech", std::move(speech)}};
+    Json value = JsonObject{{"missionName", id}, {"missionWorld", id}, {"icon", "/assetmissing.png"},
+        {"speciesText", JsonObject{{"default", std::move(language)}}}};
+    auto encoded = value.print_json();
+    if (!encoded) return std::unexpected(std::move(encoded.error()));
+    return File::write_file(*encoded, File::relative_to(overlay, id + ".aimission"));
+  };
+  ASSERT_TRUE(write_mission("sail-reveal", formatted));
+  ASSERT_TRUE(write_mission("sail-empty", ""));
+  auto created_root = createPrivateOverlayRoot(fixture.rootSettings(), *directory, overlay, "sail.config");
+  ASSERT_TRUE(created_root) << created_root.error().what();
+  auto& root = **created_root;
+  auto configuration = root.configuration();
+  ASSERT_TRUE(configuration) << configuration.error().what();
+  ASSERT_TRUE((*configuration)->set("bindings", JsonObject{}));
+  auto input = Input::create(root);
+  ASSERT_TRUE(input) << input.error().what();
+  auto context = GuiContext::create(root, std::make_shared<Mixer>(root.logger(), 44100, 2), application.appController());
+  ASSERT_TRUE(context) << context.error().what();
+  (*context)->bindInput(**input);
+  ASSERT_TRUE((*context)->renderInit(application.renderer()));
+  auto universe = TestUniverse::create(root, {800, 600});
+  ASSERT_TRUE(universe) << universe.error().what();
+  auto const& client = (*universe)->client();
+  auto player = client->mainPlayer();
+  auto uuid = player->uuid();
+  ASSERT_TRUE(uuid) << uuid.error().what();
+  ASSERT_TRUE((*universe)->warpPlayer(ClientShipWorldId(*uuid)));
+  ASSERT_TRUE(client->playerOnOwnShip());
+  auto& state = player->ai_state();
+  state.available_missions.clear();
+  state.completed_missions.clear();
+  state.available_missions.add("sail-reveal");
+  state.completed_missions.add("sail-empty");
+
+  auto pane = AiInterface::create(**context, client);
+  ASSERT_TRUE(pane) << pane.error().what();
+  auto press = [&](String const& name) -> std::expected<void, StarException> {
+    auto button = (*pane)->findChild<ButtonWidget>(name);
+    if (!button) return std::unexpected(std::move(button.error()));
+    auto pressed = (*button)->setPressed(true);
+    if (!pressed) return std::unexpected(std::move(pressed.error()));
+    return (*button)->setPressed(false);
+  };
+  auto missions = (*pane)->findChild<ListWidget>("missionItemList");
+  auto text = (*pane)->findChild<LabelWidget>("missionText");
+  auto status = (*pane)->findChild<LabelWidget>("shipStatusText");
+  ASSERT_TRUE(missions && text && status);
+  ASSERT_TRUE((*pane)->displayed());
+  EXPECT_EQ((*status)->getTextCharLimit(), 0u);
+  ASSERT_TRUE(press("showMissions")); // No update between initial display and navigation.
+  ASSERT_EQ((*missions)->listSize(), 2u);
+  auto row = (*missions)->itemAt(0);
+  auto repeat = (*missions)->itemAt(1)->fetchChild<LabelWidget>("itemName");
+  ASSERT_TRUE(repeat);
+  EXPECT_EQ((*repeat)->text(), "Repeat");
+  ASSERT_TRUE((*missions)->setSelected(0));
+  EXPECT_EQ((*text)->text(), formatted);
+  EXPECT_EQ((*text)->getTextCharLimit(), 0u);
+  auto database = root.ai_database();
+  ASSERT_TRUE(database) << database.error().what();
+  float rate = (*database)->characters_per_second();
+  ASSERT_GT(rate, 0.0f);
+  // Both label setters replace the measured size. A custom size surviving a
+  // tick proves neither setter ran when the integer reveal count stayed put.
+  Vec2I const custom_size{123, 45};
+  (*text)->setSize(custom_size);
+  ASSERT_TRUE((*pane)->update(0.25f / rate));
+  EXPECT_EQ((*text)->getTextCharLimit(), 0u);
+  EXPECT_EQ((*text)->size(), custom_size);
+  ASSERT_TRUE((*pane)->update(1.25f / rate));
+  EXPECT_EQ((*text)->getTextCharLimit(), 1u);
+  EXPECT_NE((*text)->size(), custom_size);
+  ASSERT_TRUE((*pane)->update(4.0f / rate));
+  EXPECT_EQ((*text)->getTextCharLimit(), 4u);
+  (*text)->setSize(custom_size);
+  ASSERT_TRUE((*pane)->update(0.0f));
+  EXPECT_EQ((*text)->getTextCharLimit(), 4u);
+  EXPECT_EQ((*text)->size(), custom_size);
+  ASSERT_TRUE(press("backButton"));
+  EXPECT_EQ((*missions)->itemAt(0), row); // Navigation must not rebuild unchanged rows.
+  ASSERT_TRUE((*missions)->setSelected(1));
+  EXPECT_TRUE((*text)->text().empty());
+  EXPECT_EQ((*text)->getTextCharLimit(), 0u);
+  ASSERT_TRUE((*pane)->update(1.0f / rate));
+  EXPECT_EQ((*text)->getTextCharLimit(), 0u);
+
+  ASSERT_TRUE(press("backButton"));
+  ASSERT_TRUE(press("backButton"));
+  state.available_missions.add("missing-sail-regression-mission");
+  ASSERT_TRUE(press("showCrew")); // An unrelated missing mission must not block the crew page.
+  ASSERT_TRUE((*pane)->update(0.0f));
+  EXPECT_EQ((*missions)->itemAt(0), row);
+  ASSERT_TRUE(press("backButton"));
+  EXPECT_FALSE(press("showMissions")); // The same mission error belongs on its own page.
+  state.available_missions.clear();
+  state.completed_missions.clear();
+  ASSERT_TRUE(press("showMissions"));
+  EXPECT_EQ((*missions)->listSize(), 0u);
+  auto empty = (*pane)->findChild<LabelWidget>("noMissionsText");
+  ASSERT_TRUE(empty);
+  EXPECT_EQ((*empty)->getTextCharLimit(), 0u);
+  ASSERT_TRUE((*pane)->dismissed());
+  ASSERT_TRUE((*universe)->close());
+}
+
+class SailTestApplication final : public Application {
+public:
+  explicit SailTestApplication(GameTest& fixture) : m_fixture(fixture) {}
+  Logger& logger() const override { return m_fixture.root().logger(); }
+  std::expected<void, StarException> update() override {
+    exercise_sail(m_fixture, *this);
+    appController()->quit();
+    return {};
+  }
+private:
+  GameTest& m_fixture;
+};
+
+const GameTestRegistration sail_navigation("AiInterface", "PageSnapshotsAndSpeechReveal", [](GameTest& fixture) {
+  auto display = std::getenv("DISPLAY");
+  auto owned = std::getenv("ASTERBOUND_RENDER_TEST_DISPLAY");
+  if (!display || !owned || !*owned || std::string_view(display) != owned)
+    GTEST_SKIP() << "Requires an explicitly owned Xvfb display";
+  ASSERT_TRUE(SDL_SetHintWithPriority(SDL_HINT_VIDEO_DRIVER, "x11", SDL_HINT_OVERRIDE));
+  ASSERT_TRUE(SDL_SetHintWithPriority(SDL_HINT_AUDIO_DRIVER, "dummy", SDL_HINT_OVERRIDE));
+  auto directory = File::current_directory();
+  ASSERT_TRUE(directory);
+  auto restore_directory = make_scope_exit([&] { EXPECT_TRUE(File::change_directory(*directory)); });
+  EXPECT_EQ(runMainApplication(std::make_unique<SailTestApplication>(fixture),
+      {"frontend_tests", "-renderer", "opengl"}), 0);
+});
+#endif
 
 std::optional<RectF> separateAgainst(List<RectF> const& obstacles, RectF box) {
   BubbleSeparator<int> separator(1.0f);

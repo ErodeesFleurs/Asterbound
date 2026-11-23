@@ -929,15 +929,17 @@ std::expected<void, StarException> Player::diskLoad(Json const& diskStore) {
     return std::unexpected(std::move(result.error()));
   if (auto result = m_codexes->learnInitialCodexes(species()); !result)
     return std::unexpected(std::move(result.error()));
-  auto aiJsonResult = diskStore.get("aiState", JsonObject{});
-  if (!aiJsonResult)
-    return std::unexpected(std::move(aiJsonResult.error()));
-  auto aiJson = std::move(*aiJsonResult);
-  auto aiStateResult = AiState::create(aiJson);
-  if (!aiStateResult)
-    return std::unexpected(std::move(aiStateResult.error()));
-  auto aiState = std::move(*aiStateResult);
-  m_aiState = std::move(aiState);
+  auto ai_json = diskStore.find("aiState");
+  if (!ai_json)
+    return std::unexpected(std::move(ai_json.error()));
+  if (*ai_json) {
+    auto state = AiState::create((*ai_json)->get());
+    if (!state)
+      return std::unexpected(std::move(state.error()));
+    m_ai_state = std::move(*state);
+  } else {
+    m_ai_state = {};
+  }
   for (auto&& script : m_genericScriptContexts) {
     if (auto result = script.second->set_script_storage({}); !result)
       return std::unexpected(std::move(result.error()));
@@ -4677,7 +4679,7 @@ std::expected<Json, StarException> Player::diskStore() {
     {"techs", std::move(techs)}, {"identity", std::move(identity)}, {"team", std::move(team)},
     {"inventory", std::move(inventory)}, {"movementController", std::move(movement)},
     {"techController", std::move(techController)}, {"statusController", std::move(statusController)},
-    {"log", m_log->toJson()}, {"aiState", m_aiState.toJson()}, {"quests", std::move(quests)},
+    {"log", m_log->toJson()}, {"aiState", m_ai_state.to_json()}, {"quests", std::move(quests)},
     {"companions", std::move(companions)}, {"deployment", std::move(deployment)},
     {"genericProperties", m_genericProperties}, {"genericScriptStorage", std::move(storage)}, {"humanoidParameters", m_humanoidParameters}
   };
@@ -4881,15 +4883,13 @@ std::expected<void, StarException> Player::queueRadioMessage(Json const& message
         return std::unexpected(std::move(firstResult.error()));
       auto first = std::move(*firstResult);
       if (first != '/') {
-        auto aiResult = root().aiDatabase();
-        if (!aiResult)
-          return std::unexpected(std::move(aiResult.error()));
-        auto ai = std::move(*aiResult);
-        auto portraitResult = ai->portraitImage(shipSpecies(), message.portraitImage);
-        if (!portraitResult)
-          return std::unexpected(std::move(portraitResult.error()));
-        auto portrait = std::move(*portraitResult);
-        message.portraitImage = std::move(portrait);
+        auto ai = root().ai_database();
+        if (!ai)
+          return std::unexpected(std::move(ai.error()));
+        auto portrait = (*ai)->portrait_image(shipSpecies(), message.portraitImage);
+        if (!portrait)
+          return std::unexpected(std::move(portrait.error()));
+        message.portraitImage = std::move(*portrait);
       }
     }
     return std::optional<RadioMessage>{std::move(message)};
@@ -5007,12 +5007,12 @@ void Player::queueConfirmation(Json const& dialogConfig, RpcPromiseKeeper<Json> 
   m_pendingConfirmations.push_back(std::make_pair(dialogConfig, resultPromise));
 }
 
-AiState const& Player::aiState() const {
-  return m_aiState;
+AiState const& Player::ai_state() const {
+  return m_ai_state;
 }
 
-AiState& Player::aiState() {
-  return m_aiState;
+AiState& Player::ai_state() {
+  return m_ai_state;
 }
 
 bool Player::inspecting() const {
