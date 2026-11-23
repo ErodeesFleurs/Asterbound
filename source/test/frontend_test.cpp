@@ -93,6 +93,7 @@ import star.main_mixer;
 import star.mixer;
 #if defined(__linux__)
 #include <SDL3/SDL.h>
+#include "StarTestDisplay.hpp"
 import star.ai_database;
 import star.ai_interface;
 import star.ai_types;
@@ -111,6 +112,16 @@ import star.warping;
 #include "gtest/gtest-spi.h"
 
 using namespace Star;
+
+#if defined(__linux__)
+// Fatal platform errors are already logged. Never wait for someone to click a
+// modal dialog on a private test display.
+extern "C" bool SDLCALL __wrap_SDL_ShowSimpleMessageBox(SDL_MessageBoxFlags, char const* title,
+    char const* message, SDL_Window*) {
+  ADD_FAILURE() << title << ": " << message;
+  return false;
+}
+#endif
 
 namespace {
 
@@ -475,30 +486,46 @@ using SurfaceScenario = void(GameTest&, Application const&);
 
 class SurfaceTestApplication final : public Application {
 public:
-  SurfaceTestApplication(GameTest& fixture, SurfaceScenario& scenario) : m_fixture(fixture), m_scenario(scenario) {}
+  SurfaceTestApplication(GameTest& fixture, SurfaceScenario& scenario, bool& ran)
+    : m_fixture(fixture), m_scenario(scenario), m_ran(ran) {}
   Logger& logger() const override { return m_fixture.root().logger(); }
   std::expected<void, StarException> update() override {
     m_scenario(m_fixture, *this);
+    m_ran = true;
     appController()->quit();
     return {};
   }
 private:
   GameTest& m_fixture;
   std::reference_wrapper<SurfaceScenario> m_scenario;
+  bool& m_ran;
 };
 
 void run_surface_scenario(GameTest& fixture, SurfaceScenario& scenario) {
-  auto display = std::getenv("DISPLAY");
-  auto owned = std::getenv("ASTERBOUND_RENDER_TEST_DISPLAY");
-  if (!display || !owned || !*owned || std::string_view(display) != owned)
-    GTEST_SKIP() << "Requires an explicitly owned Xvfb display";
-  ASSERT_TRUE(SDL_SetHintWithPriority(SDL_HINT_VIDEO_DRIVER, "x11", SDL_HINT_OVERRIDE));
-  ASSERT_TRUE(SDL_SetHintWithPriority(SDL_HINT_AUDIO_DRIVER, "dummy", SDL_HINT_OVERRIDE));
-  auto directory = File::current_directory();
-  ASSERT_TRUE(directory);
-  auto restore_directory = make_scope_exit([&] { EXPECT_TRUE(File::change_directory(*directory)); });
-  EXPECT_EQ(runMainApplication(std::make_unique<SurfaceTestApplication>(fixture, scenario),
-      {"frontend_tests", "-renderer", "opengl"}), 0);
+  auto lease = std::getenv("ASTERBOUND_RENDER_TEST_DISPLAY");
+  if (!lease)
+    GTEST_SKIP() << "Requires scripts/ci/linux/with-test-display.py";
+  ASSERT_TRUE(matches_test_display(lease)) << "Stale or invalid isolated test display: " << lease;
+  // The native application owns process-wide signal registration for its
+  // lifetime. Re-exec this selected case rather than starting SDL twice.
+  testing::GTEST_FLAG(death_test_style) = "threadsafe";
+  EXPECT_EXIT({
+    bool ran = false;
+    EXPECT_TRUE(SDL_SetHintWithPriority(SDL_HINT_VIDEO_DRIVER, "x11", SDL_HINT_OVERRIDE));
+    EXPECT_TRUE(SDL_SetHintWithPriority(SDL_HINT_AUDIO_DRIVER, "dummy", SDL_HINT_OVERRIDE));
+    if (!testing::Test::HasFailure()) {
+      EXPECT_EQ(runMainApplication(std::make_unique<SurfaceTestApplication>(fixture, scenario, ran),
+          {"frontend_tests", "-renderer", "opengl"}), 0);
+      EXPECT_TRUE(ran) << "Application exited before the surface scenario ran";
+    }
+    auto const& result = *testing::UnitTest::GetInstance()->current_test_info()->result();
+    for (int i = 0; i < result.total_part_count(); ++i) {
+      auto const& part = result.GetTestPartResult(i);
+      if (part.failed())
+        std::fprintf(stderr, "%s:%d: %s\n", part.file_name(), part.line_number(), part.message());
+    }
+    std::_Exit(testing::Test::HasFailure() ? 1 : 0);
+  }, testing::ExitedWithCode(0), "");
 }
 
 const GameTestRegistration sail_navigation("AiInterface", "PageSnapshotsAndSpeechReveal", [](GameTest& fixture) {

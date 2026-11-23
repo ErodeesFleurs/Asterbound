@@ -134,6 +134,21 @@ TEST(PeriodicFunctionTest, LargeDeltaAdvancesOneHalfCycle) {
   EXPECT_EQ(random.next_u32(), reference.next_u32());
 }
 
+TEST(PeriodicFunctionTest, DescendingLightEndpointsPreservePhase) {
+  RandomService random(157);
+  // The stock gnome gun's blue light runs in the opposite phase to its green light.
+  auto wave = PeriodicFunction<float>::create(random, 0.5f, 0.6f, 0.1f);
+  ASSERT_TRUE(wave);
+  auto weights = [](float t) { return std::array{1.0f - t, t}; };
+  EXPECT_FLOAT_EQ(wave->value(weights), 0.6f);
+  wave->update(0.125f);
+  EXPECT_FLOAT_EQ(wave->value(weights), 0.35f);
+  wave->update(0.125f);
+  EXPECT_FLOAT_EQ(wave->value(weights), 0.1f);
+  wave->update(0.25f);
+  EXPECT_FLOAT_EQ(wave->value(weights), 0.6f);
+}
+
 TEST(PeriodicFunctionTest, ZeroLengthHalfCycleReachesTargetWithoutResampling) {
   // With this seed the fourth draw (first sampled duration) is exactly zero.
   RandomService random(1765881573), reference(1765881573);
@@ -150,11 +165,15 @@ TEST(PeriodicFunctionTest, ZeroLengthHalfCycleReachesTargetWithoutResampling) {
   EXPECT_EQ(random.next_u32(), reference.next_u32());
 }
 
-TEST(PeriodicFunctionTest, InvalidDurationDoesNotAdvanceRandomStream) {
+TEST(PeriodicFunctionTest, InvalidParametersDoNotAdvanceRandomStream) {
   RandomService random(167), reference(167);
   using Wave = PeriodicFunction<float>;
   EXPECT_FALSE(Wave::create(random, 0.0f));
   EXPECT_FALSE(Wave::create(random, 1.0f, 0.0f, 1.0f, -0.25f));
+  EXPECT_FALSE(Wave::create(random, 1.0f, 0.0f, 1.0f, 0.0f, -0.25f));
+  constexpr float largest = std::numeric_limits<float>::max();
+  EXPECT_FALSE(Wave::create(random, 1.0f, largest, 0.0f, 0.0f, largest));
+  EXPECT_FALSE(Wave::create(random, 1.0f, 0.0f, -largest, 0.0f, largest));
   // Materialize the IEEE input at runtime; a fast-math call to infinity()
   // need not even store the value in the caller's argument slot.
   for (auto bits : {0x7f800000u, 0xff800000u, 0x7fc00001u}) {

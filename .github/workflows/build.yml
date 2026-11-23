@@ -212,6 +212,7 @@ jobs:
           libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev \
           libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev \
           libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev libpipewire-0.3-dev libwayland-dev libdecor-0-dev liburing-dev \
+          xvfb libgl1-mesa-dri mesa-vulkan-drivers vulkan-validationlayers \
           '^libxcb.*-dev' libx11-xcb-dev libxrender-dev libxkbcommon-x11-dev \
           autoconf autoconf-archive automake libtool libltdl-dev patchelf tarlz
 
@@ -230,7 +231,12 @@ jobs:
         working-directory: source
         env:
           PRESET: ${{ matrix.preset }}
-        run: ctest --preset "$PRESET" --output-junit "$GITHUB_WORKSPACE/build/$PRESET/test-results.xml"
+        run: |
+          lvp=(/usr/share/vulkan/icd.d/lvp_icd*.json)
+          test "${#lvp[@]}" -eq 1
+          test -f "${lvp[0]}"
+          python3 ../scripts/ci/linux/with-test-display.py env LIBGL_ALWAYS_SOFTWARE=1 VK_DRIVER_FILES="${lvp[0]}" \
+            ctest --preset "$PRESET" --output-junit "$GITHUB_WORKSPACE/build/$PRESET/test-results.xml"
 
       - name: Prepare Artifacts
         run: tarlz -c3vf ${{ matrix.artifact }}.tar.lz dist

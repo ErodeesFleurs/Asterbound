@@ -3,6 +3,7 @@
 #include <vulkan/vulkan.h>
 #include "imgui.h"
 #include "gtest/gtest.h"
+#include "StarTestDisplay.hpp"
 
 import std;
 import star.format;
@@ -260,10 +261,10 @@ protected:
   virtual bool vulkan() const { return false; }
 
   void SetUp() override {
-    auto display = std::getenv("DISPLAY");
-    auto owned = std::getenv("ASTERBOUND_RENDER_TEST_DISPLAY");
-    if (!display || !owned || !*owned || std::string_view(display) != owned)
-      GTEST_SKIP() << "Set ASTERBOUND_RENDER_TEST_DISPLAY=DISPLAY only for an owned isolated Xvfb";
+    auto lease = std::getenv("ASTERBOUND_RENDER_TEST_DISPLAY");
+    if (!lease)
+      GTEST_SKIP() << "Requires scripts/ci/linux/with-test-display.py";
+    ASSERT_TRUE(matches_test_display(lease)) << "Stale or invalid isolated test display: " << lease;
     ASSERT_TRUE(SDL_SetHintWithPriority(SDL_HINT_VIDEO_DRIVER, "x11", SDL_HINT_OVERRIDE));
     ASSERT_TRUE(SDL_InitSubSystem(SDL_INIT_VIDEO)) << SDL_GetError();
     video = true;

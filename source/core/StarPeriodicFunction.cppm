@@ -92,11 +92,14 @@ std::expected<PeriodicFunction<Float>, StarException> PeriodicFunction<Float>::c
   auto finite = classify_finite(period, min, max, period_variance, magnitude_variance);
   if (!std::ranges::all_of(finite, std::identity{}))
     return std::unexpected(MathException("Periodic function parameters must be finite"));
-  if (period <= 0 || period_variance < 0 || magnitude_variance < 0 || max < min)
-    return std::unexpected(MathException("Periodic function requires a positive period, nonnegative variances and ordered magnitudes"));
+  if (period <= 0 || period_variance < 0 || magnitude_variance < 0)
+    return std::unexpected(MathException("Periodic function requires a positive period and nonnegative variances"));
 
   HalfCycle half_cycle{period / 2, period_variance / 2};
-  auto bounds = classify_finite(half_cycle.period + half_cycle.variance, min - magnitude_variance, max + magnitude_variance);
+  // The named min/max are alternating phase endpoints; stock lights can run
+  // from bright to dim. Order them only for the sample overflow check.
+  auto [lower, upper] = std::minmax(min, max);
+  auto bounds = classify_finite(half_cycle.period + half_cycle.variance, lower - magnitude_variance, upper + magnitude_variance);
   if (half_cycle.period <= 0 || !std::ranges::all_of(bounds, std::identity{}))
     return std::unexpected(MathException("Periodic function requires a representable half-period and finite sample bounds"));
   return PeriodicFunction(random, half_cycle, min, max, magnitude_variance);

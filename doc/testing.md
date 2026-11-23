@@ -82,14 +82,35 @@ rendered-session or cross-platform gameplay evidence.
 ### Native renderer regression suite
 
 Linux GUI builds include `renderer_regression_tests`, which uses real SDL
-windows and backend rendering without Root or game assets. Run it only inside
-an owned Xvfb with private HOME/XDG/D-Bus directories:
+windows and backend rendering without Root or game assets. Put Xvfb on `PATH`,
+install working OpenGL and Vulkan drivers and the Khronos validation layer,
+and launch the tests from the repository root:
 
 ```sh
-ASTERBOUND_RENDER_TEST_DISPLAY="$DISPLAY" ./dist/renderer_regression_tests
+python3 scripts/ci/linux/with-test-display.py ./dist/renderer_regression_tests
+
+# Include both native frontend surface cases using the asset-backed runner:
+ASTERBOUND_ASSETS=/absolute/path/to/Starbound/assets \
+  python3 scripts/ci/linux/with-test-display.py \
+  ctest --test-dir build/linux-release -L '^Frontend$' --output-on-failure
 ```
 
-Without that explicit display opt-in, all cases skip before SDL initialization.
+The launcher allocates a fresh authenticated Xvfb, private HOME/XDG directories
+and a temporary display lease; D-Bus and the invoking desktop are not used.
+Do not export `ASTERBOUND_RENDER_TEST_DISPLAY` yourself. Without a requested
+display the surface cases skip before SDL; a stale or mismatched lease fails.
+Driver overrides, if needed, can be passed via `env` **after** the launcher so
+they apply to the tests, not Xvfb. A host Mesa requiring a newer glibc also
+needs a compatible runtime for the test process and its re-executed children;
+do not change the global loader or `LD_LIBRARY_PATH`.
+
+The frontend suite re-executes each selected SDL scenario in a fresh process
+because production signal registration is process-scoped. The parent checks
+that the scenario actually ran and reports child assertion and application
+errors without waiting for a modal dialog. Normal GoogleTest filtering still
+selects the same individual cases. Linux Actions runs the asset-free preset
+inside the same Xvfb launcher with Mesa software rendering.
+
 Vulkan cases require the Khronos validation layer and enable synchronization
 validation. Readback copies the engine's presentation-source image, not the
 swapchain image; the latter is not allocated with transfer-source usage.
@@ -534,6 +555,7 @@ integer `intersection` requires a signed type wide enough for the displacement.
 `PeriodicTest.*` checks tick cadence and phase preservation when the interval changes.
 `PeriodicFunctionTest.*` checks that a large delta advances light flicker by only
 one half-cycle and that invalid parameters fail before consuming random draws.
+The two flicker intensities are phase endpoints, not sorted bounds: `ItemTest.ConstructItems` exercises the stock `gnomegun` whose blue light runs from 0.6 to 0.1.
 Stock lamps can specify period variance equal to or greater than the period.
 A nonpositive sampled duration reaches its target immediately, without division
 by zero or a replacement draw.
