@@ -16,14 +16,14 @@ function clipboard.hasText() end
 ---@return String?
 function clipboard.getText() end
 
---- Reads raw PNG or JPEG bytes while focused and authorized; nil if unavailable or over 8 MiB.
+--- Reads raw GIF, WebP, PNG, JPEG or BMP bytes while focused and authorized; nil if unavailable or over 8 MiB.
 ---@return string?
 function clipboard.getImage() end
 
---- Converts JPEG bytes (at most 2 MiB, 4096 per side, 4,194,304 pixels) to PNG fitted within 128×128; nil on invalid or unsupported input. Does not access the clipboard or filesystem.
+--- Converts JPEG, static WebP or uncompressed BMP bytes (at most 2 MiB, 4096 per side, 4,194,304 pixels) to PNG fitted within 128×128. Returns nil for animated WebP or other unsupported/invalid input. Does not access the clipboard or filesystem.
 ---@param bytes string
 ---@return string?
-function clipboard.jpegToPng(bytes) end
+function clipboard.imageToPng(bytes) end
 
 --- Reads URI-list text while focused and authorized; ignores payloads over 16 KiB and never opens files.
 ---@return string?

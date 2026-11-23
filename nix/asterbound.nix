@@ -14,6 +14,7 @@
   dependencies,
   libpng,
   libjpeg_turbo,
+  libwebp,
   freetype,
   libogg,
   libvorbis,
@@ -237,6 +238,7 @@ let
       ]
       ++ lib.optionals guiSupport [
         libjpeg_turbo
+        libwebp
         patchedSdl3
         glew
         libGL
@@ -294,6 +296,7 @@ stdenv.mkDerivation {
   ]
   ++ lib.optionals guiSupport [
     libjpeg_turbo
+    libwebp
     patchedSdl3
     glew
     libGL

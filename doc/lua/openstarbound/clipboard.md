@@ -28,19 +28,21 @@ Returns the clipboard text when access is available, or `nil` otherwise.
 
 #### `Maybe<String>` clipboard.getImage()
 
-Reads the raw bytes offered as `image/png`, or `image/jpeg` if unavailable. Requires focus and clipboard
-read authorization; returns `nil` when neither is available within 8 MiB. Detect the format from bytes,
+Reads raw GIF, WebP, PNG, JPEG or BMP bytes, in that order, preferring original animation to a static
+preview. Requires focus and clipboard read authorization. Returns `nil` if none is available within 8 MiB. Detect the format from bytes,
 not MIME: some applications publish JPEG under `image/png`. Does not open file references.
 
 ---
 
-#### `Maybe<String>` clipboard.jpegToPng(`String` bytes)
+#### `Maybe<String>` clipboard.imageToPng(`String` bytes)
 
-Converts JPEG bytes already held by the script to a PNG byte string. Does not read files or the
-clipboard and does not need clipboard permission. The input is limited to 2 MiB, 4096 pixels on
-either side and 4,194,304 pixels total. Raster dimensions are preserved up to 128×128; larger
-images are reduced proportionally. Returns `nil` for unsupported, malformed or truncated images
-or inputs outside the limits. EXIF and other metadata are not copied.
+Converts JPEG, static WebP or uncompressed BMP bytes to a PNG byte string. The format is detected
+from the bytes. The input is limited to 2 MiB, 4096 pixels on either side and 4,194,304 pixels
+total. Raster dimensions are preserved up to 128×128; larger images are reduced proportionally.
+WebP transparency is preserved. Animated WebP is rejected rather than flattened. PNG and GIF
+are not converted: use their original bytes. Returns `nil` for invalid or unsupported input.
+Metadata, including EXIF orientation, is not applied or copied. This function does not access
+files or the clipboard and does not require clipboard permission.
 
 ---
 

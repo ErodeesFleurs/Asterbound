@@ -1411,16 +1411,20 @@ private:
       });
     }
 
-    std::optional<std::string> getClipboardImageBytes(ClipboardImageFormat format) override {
-      return parent.m_dispatcher.invoke([&, format]() -> std::optional<std::string> {
-        auto mime = format == ClipboardImageFormat::Png ? "image/png" : "image/jpeg";
-        if (!parent.m_focused.load(std::memory_order_relaxed) || !SDL_HasClipboardData(mime))
+    std::optional<std::string> getClipboardImageBytes() override {
+      return parent.m_dispatcher.invoke([&]() -> std::optional<std::string> {
+        if (!parent.m_focused.load(std::memory_order_relaxed))
           return {};
-        std::size_t size = 0;
-        std::unique_ptr<void, decltype(&SDL_free)> data(SDL_GetClipboardData(mime, &size), &SDL_free);
-        if (!data || !size || size > 8 * 1024 * 1024)
-          return {};
-        return std::string(static_cast<char const*>(data.get()), size);
+        // Prefer original animation to a clipboard provider's static preview.
+        for (auto mime : {"image/gif", "image/webp", "image/png", "image/jpeg", "image/bmp", "image/x-bmp", "image/x-ms-bmp"}) {
+          if (!SDL_HasClipboardData(mime))
+            continue;
+          std::size_t size = 0;
+          std::unique_ptr<void, decltype(&SDL_free)> data(SDL_GetClipboardData(mime, &size), &SDL_free);
+          if (data && size && size <= 8 * 1024 * 1024)
+            return std::string(static_cast<char const*>(data.get()), size);
+        }
+        return {};
       });
     }
 

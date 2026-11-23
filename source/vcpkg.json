@@ -10,6 +10,7 @@
     "freetype",
     "libpng",
     "libjpeg-turbo",
+    { "name": "libwebp", "default-features": false, "features": ["simd"] },
     "opus",
     { "name": "libsodium", "version>=": "1.0.21" },
     "zstd",

@@ -77,8 +77,7 @@ public:
   [[nodiscard]] virtual std::expected<bool, StarException> setClipboardImage(Image const& image, std::optional<std::reference_wrapper<ByteArray>> png = std::nullopt, std::optional<std::reference_wrapper<String const>> path = std::nullopt) = 0;
   [[nodiscard]] virtual std::expected<bool, StarException> setClipboardFile(String const& path) = 0;
   virtual std::optional<String> getClipboard() = 0;
-  enum class ClipboardImageFormat { Png, Jpeg };
-  virtual std::optional<std::string> getClipboardImageBytes(ClipboardImageFormat format) = 0;
+  virtual std::optional<std::string> getClipboardImageBytes() = 0;
   virtual std::optional<std::string> getClipboardFileReference() = 0;
 
   virtual bool isFocused() const = 0;
