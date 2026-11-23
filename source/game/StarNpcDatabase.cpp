@@ -1010,12 +1010,12 @@ for (auto const& item : npcVariant.items) {
       auto result211 = makeItem(item.second);
       if (!result211)
         return std::unexpected(std::move(result211.error()));
-      armor->setItem(static_cast<std::uint8_t>(*equipmentSlot), as<ArmorItem>(std::move(*result211)));
+      armor->set_item(static_cast<std::uint8_t>(*equipmentSlot), as<ArmorItem>(std::move(*result211)));
     }
   }
 }
 
-  auto result212 = armor->setupHumanoid(*humanoid, false);
+  auto result212 = armor->setup_humanoid(*humanoid, false);
 if (!result212) return std::unexpected(std::move(result212.error()));
 
 

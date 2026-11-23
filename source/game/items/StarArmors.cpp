@@ -224,11 +224,11 @@ std::expected<List<PersistentStatusEffect>, StarException> ArmorItem::statusEffe
   return m_statusEffects;
 }
 
-bool ArmorItem::statusEffectsInCosmeticSlot() const {
+bool ArmorItem::status_effects_in_cosmetic_slot() const noexcept {
   return m_statusEffectsInCosmeticSlot;
 }
 
-List<PersistentStatusEffect> ArmorItem::cosmeticStatusEffects() const {
+List<PersistentStatusEffect> const& ArmorItem::cosmetic_status_effects() const& noexcept {
   return m_cosmeticStatusEffects;
 }
 

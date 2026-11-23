@@ -5,6 +5,7 @@ import star.actor_movement_controller;
 import star.animated_part_set;
 import star.color;
 import star.algorithm;
+import star.armor_wearer;
 import star.armors;
 import star.asset_path;
 import star.assets;
@@ -168,6 +169,76 @@ const GameTestRegistration self_damage_history(
     )LUA");
     ASSERT_TRUE(inflicted) << inflicted.error().what();
     EXPECT_EQ(*inflicted, *observed);
+  });
+
+const GameTestRegistration armor_visibility_transitions(
+  "ArmorWearerTest", "CosmeticBoundsMaskingNudityAndConfigRetry", [](GameTest& fixture) {
+    auto& root = fixture.root();
+    auto assets = root.assets();
+    ASSERT_TRUE(assets);
+    auto config = (*assets)->json("/humanoid.config");
+    ASSERT_TRUE(config);
+    auto humanoid = Humanoid::create(root, *config);
+    ASSERT_TRUE(humanoid);
+    ASSERT_TRUE((*humanoid)->setIdentity(HumanoidIdentity{}));
+    auto owner = ArmorWearer::create(root);
+    ASSERT_TRUE(owner);
+    auto& wearer = **owner;
+    auto database = root.itemDatabase();
+    ASSERT_TRUE(database);
+    String name;
+    for (auto const& candidate : (*database)->allItems()) {
+      auto type = (*database)->itemType(candidate);
+      ASSERT_TRUE(type);
+      if (*type == ItemType::HeadArmor) {
+        name = candidate;
+        break;
+      }
+    }
+    ASSERT_FALSE(name.empty());
+    auto make_armor = [&](JsonObject overrides) -> std::shared_ptr<ArmorItem> {
+      auto descriptor = ItemDescriptor::create(name, 1, std::move(overrides));
+      if (!descriptor)
+        return {};
+      auto item = (*database)->item(*descriptor);
+      return item ? as<ArmorItem>(std::move(*item)) : std::shared_ptr<ArmorItem>{};
+    };
+    auto base = (*humanoid)->defaultMovementParameters();
+    auto functional = make_armor({{"hideInVanillaSlots", false}, {"bypassNude", false},
+        {"humanoidConfig", JsonObject{{"movementParameters", JsonObject{{"armorProbe", 1}}}}}});
+    auto cosmetic = make_armor({{"armorTypesToHide", JsonArray{"Head"}}, {"humanoidConfig", JsonObject{}}});
+    ASSERT_TRUE(functional);
+    ASSERT_TRUE(cosmetic);
+    ASSERT_TRUE(wearer.set_item(0, functional));
+    for (unsigned invalid : {12u, 248u, 255u})
+      EXPECT_FALSE(wearer.set_cosmetic_item(invalid, cosmetic));
+    EXPECT_EQ(wearer.item_descriptor(0), functional->descriptor());
+    auto refresh = [&](bool nude = false) { return wearer.setup_humanoid(**humanoid, nude); };
+    ASSERT_EQ(refresh(), true);
+    auto equipped = (*humanoid)->defaultMovementParameters();
+    ASSERT_NE(equipped, base);
+    EXPECT_EQ(refresh(), false);
+    for (unsigned relative : {0u, 11u}) {
+      ASSERT_TRUE(wearer.set_cosmetic_item(relative, cosmetic));
+      EXPECT_EQ(wearer.item_descriptor(8 + relative), cosmetic->descriptor());
+      ASSERT_EQ(refresh(), true);
+      EXPECT_EQ((*humanoid)->defaultMovementParameters(), base);
+      ASSERT_TRUE(wearer.set_cosmetic_item(relative, {}));
+      ASSERT_EQ(refresh(), true);
+      EXPECT_EQ((*humanoid)->defaultMovementParameters(), equipped);
+    }
+    ASSERT_EQ(refresh(true), true);
+    EXPECT_EQ((*humanoid)->defaultMovementParameters(), base);
+    ASSERT_EQ(refresh(), true);
+    auto broken = make_armor({{"humanoidConfig", JsonObject{{"headRotationCenter", JsonArray{1}}}},
+                               {"hideInVanillaSlots", false}});
+    ASSERT_TRUE(broken);
+    ASSERT_TRUE(wearer.set_item(0, broken));
+    EXPECT_FALSE(refresh().has_value());
+    EXPECT_FALSE(refresh().has_value());
+    ASSERT_TRUE(wearer.set_item(0, {}));
+    EXPECT_EQ(refresh(), true);
+    EXPECT_EQ((*humanoid)->defaultMovementParameters(), base);
   });
 
 const GameTestRegistration

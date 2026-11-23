@@ -240,21 +240,21 @@ namespace Star {
 
 namespace {
 
-template <typename Armor, typename SetItem>
-std::expected<void, StarException> applyLoungeCosmeticOverride(
-    JsonObject const& overrides, String const& key, EquipmentSlot slot, ItemDatabase const& itemDatabase,
-    ArmorWearer& armor, SetItem&& setItem) {
-  auto overrideJson = overrides.maybe(key);
-  if (!overrideJson)
+template <std::derived_from<ArmorItem> Armor>
+std::expected<void, StarException> apply_lounge_cosmetic_override(
+    JsonObject const& overrides, String const& key, EquipmentSlot slot, ItemDatabase const& item_database,
+    ArmorWearer& armor) {
+  auto override_json = overrides.maybe(key);
+  if (!override_json)
     return {};
-  auto descriptor = ItemDescriptor::create(*overrideJson);
+  auto descriptor = ItemDescriptor::create(*override_json);
   if (!descriptor)
     return std::unexpected(std::move(descriptor.error()));
-  auto item = itemDatabase.item(std::move(*descriptor));
+  auto item = item_database.item(std::move(*descriptor));
   if (!item)
     return std::unexpected(std::move(item.error()));
   if (PlayerInventory::itemAllowedAsEquipment(*item, slot))
-    setItem(armor, as<Armor>(*item));
+    armor.set_item(static_cast<std::uint8_t>(slot), as<Armor>(std::move(*item)));
   return {};
 }
 
@@ -559,7 +559,7 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
     m_inCinematicStatusEffects.push_back(std::move(effect));
   }
 
-  if (auto result = synchronizeEquipmentStatusEffects(*m_armor, *m_tools, *m_statusController); !result)
+  if (auto result = synchronize_equipment_status_effects(*m_armor, *m_tools, *m_statusController); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = m_statusController->resetAllResources(); !result)
     return std::unexpected(std::move(result.error()));
@@ -1615,7 +1615,7 @@ std::expected<void, StarException> Player::revive(Vec2F const& footPosition) {
     return {};
   m_state = State::Idle;
   m_emoteState = HumanoidEmote::Idle;
-  if (auto result = synchronizeEquipmentStatusEffects(*m_armor, *m_tools, *m_statusController); !result)
+  if (auto result = synchronize_equipment_status_effects(*m_armor, *m_tools, *m_statusController); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = m_statusController->resetAllResources(); !result)
     return std::unexpected(std::move(result.error()));
@@ -2023,17 +2023,13 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
             return std::unexpected(std::move(itemDatabaseResult.error()));
           auto itemDatabase = std::move(*itemDatabaseResult);
           auto const& overrides = loungeAnchor->armorCosmeticOverrides;
-          if (auto result = applyLoungeCosmeticOverride<HeadArmor>(overrides, "head", EquipmentSlot::HeadCosmetic,
-                  *itemDatabase, *m_armor, [](ArmorWearer& armor, std::shared_ptr<HeadArmor> item) { armor.setHeadCosmeticItem(std::move(item)); }); !result)
+          if (auto result = apply_lounge_cosmetic_override<HeadArmor>(overrides, "head", EquipmentSlot::HeadCosmetic, *itemDatabase, *m_armor); !result)
             return std::unexpected(std::move(result.error()));
-          if (auto result = applyLoungeCosmeticOverride<ChestArmor>(overrides, "chest", EquipmentSlot::ChestCosmetic,
-                  *itemDatabase, *m_armor, [](ArmorWearer& armor, std::shared_ptr<ChestArmor> item) { armor.setChestCosmeticItem(std::move(item)); }); !result)
+          if (auto result = apply_lounge_cosmetic_override<ChestArmor>(overrides, "chest", EquipmentSlot::ChestCosmetic, *itemDatabase, *m_armor); !result)
             return std::unexpected(std::move(result.error()));
-          if (auto result = applyLoungeCosmeticOverride<LegsArmor>(overrides, "legs", EquipmentSlot::LegsCosmetic,
-                  *itemDatabase, *m_armor, [](ArmorWearer& armor, std::shared_ptr<LegsArmor> item) { armor.setLegsCosmeticItem(std::move(item)); }); !result)
+          if (auto result = apply_lounge_cosmetic_override<LegsArmor>(overrides, "legs", EquipmentSlot::LegsCosmetic, *itemDatabase, *m_armor); !result)
             return std::unexpected(std::move(result.error()));
-          if (auto result = applyLoungeCosmeticOverride<BackArmor>(overrides, "back", EquipmentSlot::BackCosmetic,
-                  *itemDatabase, *m_armor, [](ArmorWearer& armor, std::shared_ptr<BackArmor> item) { armor.setBackCosmeticItem(std::move(item)); }); !result)
+          if (auto result = apply_lounge_cosmetic_override<BackArmor>(overrides, "back", EquipmentSlot::BackCosmetic, *itemDatabase, *m_armor); !result)
             return std::unexpected(std::move(result.error()));
         } else {
           m_state = State::Idle;
@@ -2102,7 +2098,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
         }
       }
 
-      if (auto result = synchronizeEquipmentStatusEffects(*m_armor, *m_tools, *m_statusController); !result)
+      if (auto result = synchronize_equipment_status_effects(*m_armor, *m_tools, *m_statusController); !result)
         return std::unexpected(std::move(result.error()));
 
       if (!m_techController->techOverridden())
@@ -2895,7 +2891,7 @@ std::expected<void, StarException> Player::refreshArmor() {
     auto slot = static_cast<EquipmentSlot>(i);
     auto item = m_inventory->equipment(slot);
     bool visible = m_inventory->equipmentVisibility(slot);
-    if (m_armor->setItem(i, item, visible)) {
+    if (m_armor->set_item(i, item, visible)) {
       if (slot >= EquipmentSlot::Cosmetic1 && shouldSetArmorSecrets)
         {
           if (auto result = setNetArmorSecret(slot, item, visible); !result)
@@ -2908,7 +2904,7 @@ std::expected<void, StarException> Player::refreshArmor() {
 
 std::expected<void, StarException> Player::refreshHumanoid() const {
   auto refreshed = [&]() -> std::expected<void, StarException> {
-    auto changedResult = m_armor->setupHumanoid(*humanoid(), forceNude());
+    auto changedResult = m_armor->setup_humanoid(*humanoid(), forceNude());
     if (!changedResult)
       return std::unexpected(std::move(changedResult.error()));
     auto changed = std::move(*changedResult);
@@ -4049,7 +4045,7 @@ std::expected<void, StarException> Player::getNetArmorSecrets() {
           return std::unexpected(std::move(result.error()));
         if (auto result = m_inventory->setItem(slot, item); !result)
           return std::unexpected(std::move(result.error()));
-        m_armor->setCosmeticItem(i, item);
+        m_armor->set_cosmetic_item(i, item);
       }
     }
   }
@@ -4738,7 +4734,7 @@ std::expected<void, StarException> Player::finalizeCreation() {
     return std::unexpected(std::move(result.error()));
   m_state = State::Idle;
   m_emoteState = HumanoidEmote::Idle;
-  if (auto result = synchronizeEquipmentStatusEffects(*m_armor, *m_tools, *m_statusController); !result)
+  if (auto result = synchronize_equipment_status_effects(*m_armor, *m_tools, *m_statusController); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = m_statusController->resetAllResources(); !result)
     return std::unexpected(std::move(result.error()));
@@ -5137,14 +5133,14 @@ std::expected<void, StarException> Player::refreshHumanoidParameters() {
   } else {
     m_humanoidParameters = m_currentNetHumanoid->humanoidParameters();
   }
-  auto armorResult = m_armor->diskStore();
+  auto armorResult = m_armor->disk_store();
   if (!armorResult)
     return std::unexpected(std::move(armorResult.error()));
   auto armor = std::move(*armorResult);
   m_armor->reset();
-  if (auto result = m_armor->diskLoad(armor); !result)
+  if (auto result = m_armor->disk_load(armor); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = m_armor->setupHumanoid(*humanoid(), forceNude()); !result)
+  if (auto result = m_armor->setup_humanoid(*humanoid(), forceNude()); !result)
     return std::unexpected(std::move(result.error()));
   auto parametersResult = ActorMovementParameters::create(json_merge(humanoid()->defaultMovementParameters(), humanoid()->playerMovementParameters().value_or(m_config->movementParameters)));
   if (!parametersResult)

@@ -91,8 +91,9 @@ public:
 
   [[nodiscard]]
   std::expected<List<PersistentStatusEffect>, StarException> statusEffects() const override;
-  bool statusEffectsInCosmeticSlot() const;
-  List<PersistentStatusEffect> cosmeticStatusEffects() const;
+  [[nodiscard]] bool status_effects_in_cosmetic_slot() const noexcept;
+  [[nodiscard]] List<PersistentStatusEffect> const& cosmetic_status_effects() const& noexcept;
+  List<PersistentStatusEffect> const& cosmetic_status_effects() const&& = delete;
 
   [[nodiscard]]
   std::expected<StringSet, StarException> effectSources() const override;

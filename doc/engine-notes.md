@@ -62,6 +62,7 @@ commits identify upstream sources; they are not cross-platform validation report
 - [Known blueprint relearning](https://github.com/OpenStarbound/OpenStarbound/commit/9814f594) without a failure notification no longer constructs an Item or loads notification assets. New unlocks still validate Item construction before changing blueprint state.
 - [Damage kind names](https://github.com/OpenStarbound/OpenStarbound/commit/b37ef403) are case-insensitive at insertion and lookup, including duplicate detection. Elemental type names remain case-sensitive and are validated against their own catalog.
 - [Legacy humanoid back sleeves](https://github.com/OpenStarbound/OpenStarbound/commit/75eb1c9d) retain the armor's fullbright setting while holding items.
+- `ArmorWearer` maps extra cosmetic slots `0–11` to physical slots `8–19`; invalid indices never overwrite functional armor. A facing change updates only visible garments with flip directives. Appearance caching does not suppress per-tick effect emission. Missing armor save keys leave existing slots unchanged.
 - [Physics-object force bounds](https://github.com/OpenStarbound/OpenStarbound/commit/b66ad015) remain in object-local coordinates for spatial indexing, including at large world positions. Returned force regions still use world coordinates.
 
 ### Text layout

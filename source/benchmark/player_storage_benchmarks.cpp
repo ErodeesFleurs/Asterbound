@@ -155,6 +155,25 @@ void storage_updates(benchmark::State& state, Root& root, bool& failed, storage_
 }// namespace
 
 void register_player_storage_benchmarks(Star::Root& root, bool& failed) {
+  for (bool appearance : {false, true}) {
+    benchmark::RegisterBenchmark(appearance ? "Player/StableAppearance" : "Player/StableEquipmentSlots",
+        [&, appearance](benchmark::State& state) {
+          auto player = create_benchmark_player(root, "Armor benchmark");
+          if (!player) {
+            failed = true;
+            state.SkipWithError(player.error().what());
+            return;
+          }
+          for (auto _ : state) {
+            auto refreshed = appearance ? (*player)->refreshHumanoid() : (*player)->refreshArmor();
+            if (!refreshed) {
+              failed = true;
+              state.SkipWithError(refreshed.error().what());
+              break;
+            }
+          }
+        });
+  }
   benchmark::RegisterBenchmark("PlayerStorage/MetadataUnchanged",
                                [&root, &failed](benchmark::State& state) {
                                  storage_updates(state, root, failed, storage_operation::metadata, false);

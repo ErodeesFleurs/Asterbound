@@ -1031,17 +1031,14 @@ if (!checked171) return std::unexpected(std::move(checked171.error()));
 std::optional<Json> newPlayerMovementParameters = std::move(*checked171);
   bool movementParametersChanged = m_defaultMovementParameters != newMovementParameters || m_playerMovementParameters != newPlayerMovementParameters;
 
-  m_defaultMovementParameters = newMovementParameters;
-  m_playerMovementParameters = newPlayerMovementParameters;
-
-  m_mergeConfig = merger;
-
-
   auto checked172 = config.get_array("headRotationCenter", JsonArray{0,-2});
 if (!checked172) return std::unexpected(std::move(checked172.error()));
 auto checked173 = json_to_vec2f(std::move(*checked172));
 if (!checked173) return std::unexpected(std::move(checked173.error()));
 m_headRotationCenter = std::move(*checked173) / tile_pixels;
+  m_defaultMovementParameters = std::move(newMovementParameters);
+  m_playerMovementParameters = std::move(newPlayerMovementParameters);
+  m_mergeConfig = std::move(merger);
 
   return movementParametersChanged;
 }

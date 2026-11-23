@@ -356,7 +356,7 @@ if (!result50) return std::unexpected(std::move(result50.error()));
 
   auto result51 = diskStore.get("armor");
 if (!result51) return std::unexpected(std::move(result51.error()));
-auto result52 = m_armor->diskLoad(std::move(*result51));
+auto result52 = m_armor->disk_load(std::move(*result51));
 if (!result52) return std::unexpected(std::move(result52.error()));
   auto result53 = diskStore.get("tools");
 if (!result53) return std::unexpected(std::move(result53.error()));
@@ -417,7 +417,7 @@ auto result68 = m_movementController->store_state();
 if (!result68) return std::unexpected(std::move(result68.error()));
 auto result69 = m_statusController->diskStore();
 if (!result69) return std::unexpected(std::move(result69.error()));
-auto result70 = m_armor->diskStore();
+auto result70 = m_armor->disk_store();
 if (!result70) return std::unexpected(std::move(result70.error()));
 auto result71 = m_tools->diskStore();
 if (!result71) return std::unexpected(std::move(result71.error()));
@@ -489,7 +489,7 @@ if (!result82) return std::unexpected(std::move(result82.error()));
 
   auto result83 = humanoid();
 if (!result83) return std::unexpected(std::move(result83.error()));
-auto result84 = m_armor->setupHumanoid(*std::move(*result83), forceNude());
+auto result84 = m_armor->setup_humanoid(*std::move(*result83), forceNude());
 if (!result84) return std::unexpected(std::move(result84.error()));
 
 
@@ -1007,7 +1007,7 @@ if (!result200) return std::unexpected(std::move(result200.error()));
 if (!result201) return std::unexpected(std::move(result201.error()));
 
 
-    if (auto result = synchronizeEquipmentStatusEffects(*m_armor, *m_tools, *m_statusController, m_disableWornArmor.get()); !result)
+    if (auto result = synchronize_equipment_status_effects(*m_armor, *m_tools, *m_statusController, m_disableWornArmor.get()); !result)
       return std::unexpected(std::move(result.error()));
 
 
@@ -1410,7 +1410,7 @@ std::move(*result280)->setRotation(m_movementController->rotation());
 
   auto result281 = humanoid();
 if (!result281) return std::unexpected(std::move(result281.error()));
-auto result282 = m_armor->setupHumanoid(*std::move(*result281), forceNude());
+auto result282 = m_armor->setup_humanoid(*std::move(*result281), forceNude());
 if (!result282) return std::unexpected(std::move(result282.error()));
 
 
@@ -1891,7 +1891,7 @@ if (!result407) return std::unexpected(std::move(result407.error()));
   auto result408 = EquipmentSlotNames->find_left_ref(entry);
   if (!result408) return std::unexpected(std::move(result408.error()));
   if (auto equipmentSlot = std::move(*result408)) {
-    return m_armor->itemDescriptor(static_cast<std::uint8_t>(equipmentSlot->get())).toJson();
+    return m_armor->item_descriptor(static_cast<std::uint8_t>(equipmentSlot->get())).toJson();
         } else {
     auto result409 = entry.equals_ignore_case("primary");
     if (!result409) return std::unexpected(std::move(result409.error()));
@@ -2309,7 +2309,7 @@ auto item = std::move(*result491);
   auto result492 = EquipmentSlotNames->find_left_ref(slot);
   if (!result492) return std::unexpected(std::move(result492.error()));
   if (auto equipmentSlot = std::move(*result492)) {
-    m_armor->setItem(static_cast<std::uint8_t>(equipmentSlot->get()), as<ArmorItem>(item));
+    m_armor->set_item(static_cast<std::uint8_t>(equipmentSlot->get()), as<ArmorItem>(item));
     } else {
     auto result493 = slot.equals_ignore_case("primary");
     if (!result493) return std::unexpected(std::move(result493.error()));
@@ -2869,15 +2869,15 @@ if (!result555) return std::unexpected(std::move(result555.error()));
 m_npcVariant.humanoidParameters = result555->get()->humanoidParameters();
   }
 
-  auto result556 = m_armor->diskStore();
+  auto result556 = m_armor->disk_store();
 if (!result556) return std::unexpected(std::move(result556.error()));
 auto armor = std::move(*result556);
   m_armor->reset();
-  auto result557 = m_armor->diskLoad(armor);
+  auto result557 = m_armor->disk_load(armor);
 if (!result557) return std::unexpected(std::move(result557.error()));
   auto result558 = humanoid();
 if (!result558) return std::unexpected(std::move(result558.error()));
-auto result559 = m_armor->setupHumanoid(*std::move(*result558), forceNude());
+auto result559 = m_armor->setup_humanoid(*std::move(*result558), forceNude());
 if (!result559) return std::unexpected(std::move(result559.error()));
 
 
