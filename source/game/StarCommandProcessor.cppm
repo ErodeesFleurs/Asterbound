@@ -20,76 +20,83 @@ class UniverseServer;
 class Root;
 
 class CommandProcessor {
+  struct ConstructionKey { explicit ConstructionKey() = default; };
 public:
+  CommandProcessor(ConstructionKey, Root& root, UniverseServer& universe);
   [[nodiscard]] static std::expected<std::shared_ptr<CommandProcessor>, StarException> create(Root& root, UniverseServer& universe);
   [[nodiscard]] std::expected<void, StarException> close();
 
-  [[nodiscard]] std::expected<ServerCommandResult, StarException> adminCommand(String const& command, String const& argumentString);
-  [[nodiscard]] std::expected<ServerCommandResult, StarException> userCommand(ConnectionId clientId, String const& command, String const& argumentString);
+  [[nodiscard]] std::expected<ServerCommandResult, StarException> admin_command(String const& command, String const& argument_string);
+  [[nodiscard]] std::expected<ServerCommandResult, StarException> user_command(ConnectionId client_id, String const& command, String const& argument_string);
 private:
-  CommandProcessor(Root& root, UniverseServer& universe);
-  [[nodiscard]] static std::expected<std::optional<ConnectionId>, StarException> playerCidFromCommand(String const& player, UniverseServer& universe);
+  [[nodiscard]] static std::expected<std::optional<ConnectionId>, StarException> player_cid_from_command(String const& player, UniverseServer& universe);
 
-  [[nodiscard]] std::expected<String, StarException> help(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> admin(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> serverDebug(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> pvp(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> whoami(ConnectionId connectionId, String const& argumentString);
+  [[nodiscard]] std::expected<String, StarException> help(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> admin(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> server_debug(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> pvp(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> whoami(ConnectionId connection_id, String const& argument_string);
 	
-  [[nodiscard]] std::expected<String, StarException> warp(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> warpRandom(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> timewarp(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> timescale(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> tickrate(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> setTileProtection(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> setDungeonId(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> setPlayerStart(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> spawnItem(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> spawnTreasure(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> spawnMonster(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> spawnNpc(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> spawnVehicle(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> spawnStagehand(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> clearStagehand(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> spawnLiquid(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> kick(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> ban(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> unbanIp(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> unbanUuid(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> list(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> clientCoordinate(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> serverReload(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> eval(ConnectionId connectionId, String const& lua);
-  [[nodiscard]] std::expected<String, StarException> entityEval(ConnectionId connectionId, String const& lua);
-  [[nodiscard]] std::expected<String, StarException> enableSpawning(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> disableSpawning(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> placeDungeon(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> setUniverseFlag(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> resetUniverseFlags(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> addBiomeRegion(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> expandBiomeRegion(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> updatePlanetType(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> setWeather(ConnectionId connectionId, String const& argumentString);
-  [[nodiscard]] std::expected<String, StarException> setEnvironmentBiome(ConnectionId connectionId, String const& argumentString);
+  [[nodiscard]] std::expected<String, StarException> warp(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> warp_random(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> timewarp(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> timescale(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> tickrate(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> set_tile_protection(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> set_dungeon_id(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> set_player_start(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> spawn_item(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> spawn_treasure(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> spawn_monster(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> spawn_npc(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> spawn_vehicle(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> spawn_stagehand(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> clear_stagehand(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> spawn_liquid(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> kick(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> ban(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> unban_ip(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> unban_uuid(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> list(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> client_coordinate(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> server_reload(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> eval(ConnectionId connection_id, String const& lua);
+  [[nodiscard]] std::expected<String, StarException> entity_eval(ConnectionId connection_id, String const& lua);
+  template <bool enabled>
+  [[nodiscard]] std::expected<String, StarException> set_spawning(ConnectionId connection_id, String const&);
+  [[nodiscard]] std::expected<String, StarException> place_dungeon(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> set_universe_flag(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> reset_universe_flags(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> add_biome_region(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> expand_biome_region(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> update_planet_type(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> set_weather(ConnectionId connection_id, String const& argument_string);
+  [[nodiscard]] std::expected<String, StarException> set_environment_biome(ConnectionId connection_id, String const& argument_string);
 
-  using Command = std::expected<String, StarException> (CommandProcessor::*)(ConnectionId, String const&);
-  static const std::expected<CaseInsensitiveStringMap<Command>, StarException> s_commandMap;
-  [[nodiscard]] static std::expected<CaseInsensitiveStringMap<Command>, StarException> makeCommandMap();
+  using CommandHandler = std::expected<String, StarException> (CommandProcessor::*)(ConnectionId, String const&);
+  struct Command {
+    CommandHandler handler;
+    std::string_view admin_action;
+    bool local_only = false;
+  };
+  using CommandMap = CaseInsensitiveStringMap<Command>;
+  static const std::expected<CommandMap, StarException> s_command_map;
+  [[nodiscard]] static std::expected<CommandMap, StarException> make_command_map();
 
   mutable std::mutex m_mutex;
 
-  [[nodiscard]] std::expected<ServerCommandResult, StarException> handleCommand(ConnectionId connectionId, String const& command, String const& argumentString);
-  [[nodiscard]] std::expected<std::optional<String>, StarException> adminCheck(ConnectionId connectionId, String const& commandDescription) const;
-  [[nodiscard]] std::expected<std::optional<String>, StarException> localCheck(ConnectionId connectionId, String const& commandDescription) const;
-  [[nodiscard]] std::expected<LuaCallbacks, StarException> makeCommandCallbacks();
+  [[nodiscard]] std::expected<ServerCommandResult, StarException> handle_command(ConnectionId connection_id, String const& command, String const& argument_string);
+  [[nodiscard]] std::expected<std::optional<String>, StarException> admin_check(ConnectionId connection_id, std::string_view command_description) const;
+  [[nodiscard]] std::expected<std::optional<String>, StarException> local_check(ConnectionId connection_id, std::string_view command_description) const;
+  [[nodiscard]] std::expected<LuaCallbacks, StarException> make_command_callbacks();
 
   Root& m_root;
   UniverseServer& m_universe;
 
   // CommandProcessor can be accessed from multiple threads.
   // To avoid issues of thread unsafe accesses where an rcon command might be handled while a universe server script context is running, CommandProcessor instances have their own lua root instead.
-  std::shared_ptr<LuaRoot> m_luaRoot;
-  LuaBaseComponent m_scriptComponent;
+  std::shared_ptr<LuaRoot> m_lua_root;
+  LuaBaseComponent m_script_component;
 };
 
 }

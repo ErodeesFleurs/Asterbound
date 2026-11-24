@@ -1,5 +1,4 @@
 module;
-import star.uuid;
 import std;
 import star.json;
 import star.string;
@@ -62,14 +61,32 @@ namespace Star {
 
 class Quest;
 
+class PendingClientCommands {
+public:
+  void push(RpcPromise<Json> promise) { m_pending.push_back(std::move(promise)); }
+  [[nodiscard]] std::expected<void, StarException> poll(StringList& replies);
+
+private:
+  std::vector<RpcPromise<Json>> m_pending;
+  bool m_polling = false;
+};
+
+class ClientCommandProcessor;
+template <typename Function>
+concept client_builtin_command = requires(Function function, ClientCommandProcessor& self, String const& arguments) {
+  { (self.*function)(arguments) } -> std::same_as<std::expected<String, StarException>>;
+} || requires(Function function, ClientCommandProcessor& self) {
+  { (self.*function)() } -> std::same_as<std::expected<String, StarException>>;
+};
+
 class ClientCommandProcessor {
 public:
   ClientCommandProcessor(GuiContext& context, std::shared_ptr<UniverseClient> universeClient, std::shared_ptr<Cinematic> cinematicOverlay,
       MainInterfacePaneManager& paneManager, StringMap<StringList> macroCommands);
   void detachInterface() { m_paneManager.reset(); }
 
-  [[nodiscard]] std::expected<StringList, StarException> handleCommand(String const& commandLine);
-  [[nodiscard]] std::expected<StringList, StarException> updatePromises();
+  [[nodiscard]] std::expected<StringList, StarException> handle_command(String const& command_line);
+  [[nodiscard]] std::expected<void, StarException> poll_replies(StringList& replies) { return m_pending.poll(replies); }
 
   bool debugDisplayEnabled() const;
   bool debugHudEnabled() const;
@@ -78,7 +95,9 @@ public:
 private:
   [[nodiscard]] std::expected<bool, StarException> adminCommandAllowed() const;
   [[nodiscard]] std::expected<String, StarException> previewQuestDialog(StringList const& arguments, String const& kind);
-  [[nodiscard]] std::expected<StringList, StarException> executeCommand(String const& commandLine);
+  using MacroPath = std::vector<std::string_view>;
+  [[nodiscard]] std::expected<void, StarException> append_command(String const& command_line, StringList& output, MacroPath& path);
+  [[nodiscard]] std::expected<void, StarException> execute_command(String const& command_line, StringList& output, MacroPath& path);
 
   [[nodiscard]] std::expected<String, StarException> reload();
   [[nodiscard]] std::expected<String, StarException> hotReload();
@@ -118,13 +137,12 @@ private:
   [[nodiscard]] std::expected<String, StarException> render(String const& imagePath);
 
   using BuiltinCommand = std::reference_wrapper<std::expected<String, StarException>(ClientCommandProcessor&, String const&)>;
-  template <auto Command>
-  [[nodiscard]] static std::expected<String, StarException> invokeBuiltin(ClientCommandProcessor& self, String const& arguments) {
-    if constexpr (std::is_invocable_v<decltype(Command), ClientCommandProcessor&, String const&>) {
-      return (self.*Command)(arguments);
+  template <client_builtin_command auto command>
+  [[nodiscard]] static std::expected<String, StarException> invoke_builtin(ClientCommandProcessor& self, String const& arguments) {
+    if constexpr (std::invocable<decltype(command), ClientCommandProcessor&, String const&>) {
+      return (self.*command)(arguments);
     } else {
-      (void)arguments;
-      return (self.*Command)();
+      return (self.*command)();
     }
   }
   [[nodiscard]] static std::expected<CaseInsensitiveStringMap<BuiltinCommand>, StarException> makeBuiltinCommands();
@@ -135,8 +153,8 @@ private:
   std::shared_ptr<UniverseClient> m_universeClient;
   std::shared_ptr<Cinematic> m_cinematicOverlay;
   std::optional<std::reference_wrapper<MainInterfacePaneManager>> m_paneManager;
-  StringMap<StringList> m_macroCommands;
-  HashMap<Uuid,RpcPromise<Json>> m_commandPromises;
+  StringMap<StringList> const m_macro_commands;
+  PendingClientCommands m_pending;
   bool m_debugDisplayEnabled = false;
   bool m_debugHudEnabled = true;
   bool m_fixedCameraEnabled = false;
@@ -148,5 +166,6 @@ export module star.client_command_processor;
 
 export namespace Star {
   using ::Star::Quest;
+  using ::Star::PendingClientCommands;
   using ::Star::ClientCommandProcessor;
 }

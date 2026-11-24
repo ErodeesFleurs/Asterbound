@@ -7,7 +7,7 @@ import star.ordered_map;
 import star.lru_cache;
 import star.thread;
 import star.time;
-import star.random;
+import star.algorithm;
 import star.ttl_cache;
 import star.casting;
 import star.data_stream;
@@ -85,7 +85,6 @@ import star.item_recipe;
 import star.celestial_coordinate;
 import star.quest_descriptor;
 import star.lua_components;
-import star.uuid;
 import star.warping;
 import star.quests;
 import star.quest_manager;
@@ -217,46 +216,46 @@ namespace Star {
 ClientCommandProcessor::ClientCommandProcessor(GuiContext& context, std::shared_ptr<UniverseClient> universeClient, std::shared_ptr<Cinematic> cinematicOverlay,
   MainInterfacePaneManager& paneManager, StringMap<StringList> macroCommands)
   : m_context(context), m_universeClient(std::move(universeClient)), m_cinematicOverlay(std::move(cinematicOverlay)),
-  m_paneManager(paneManager), m_macroCommands(std::move(macroCommands)) {}
+  m_paneManager(paneManager), m_macro_commands(std::move(macroCommands)) {}
 
 std::expected<CaseInsensitiveStringMap<ClientCommandProcessor::BuiltinCommand>, StarException> ClientCommandProcessor::makeBuiltinCommands() {
   std::pair<std::string_view, BuiltinCommand> const entries[] = {
-    {"reload", invokeBuiltin<&ClientCommandProcessor::reload>},
-    {"hotReload", invokeBuiltin<&ClientCommandProcessor::hotReload>},
-    {"whoami", invokeBuiltin<&ClientCommandProcessor::whoami>},
-    {"gravity", invokeBuiltin<&ClientCommandProcessor::gravity>},
-    {"debug", invokeBuiltin<&ClientCommandProcessor::debug>},
-    {"boxes", invokeBuiltin<&ClientCommandProcessor::boxes>},
-    {"fullbright", invokeBuiltin<&ClientCommandProcessor::fullbright>},
-    {"asyncLighting", invokeBuiltin<&ClientCommandProcessor::asyncLighting>},
-    {"setGravity", invokeBuiltin<&ClientCommandProcessor::setGravity>},
-    {"resetGravity", invokeBuiltin<&ClientCommandProcessor::resetGravity>},
-    {"fixedCamera", invokeBuiltin<&ClientCommandProcessor::fixedCamera>},
-    {"monochromeLighting", invokeBuiltin<&ClientCommandProcessor::monochromeLighting>},
-    {"radioMessage", invokeBuiltin<&ClientCommandProcessor::radioMessage>},
-    {"clearRadioMessages", invokeBuiltin<&ClientCommandProcessor::clearRadioMessages>},
-    {"clearCinematics", invokeBuiltin<&ClientCommandProcessor::clearCinematics>},
-    {"startQuest", invokeBuiltin<&ClientCommandProcessor::startQuest>},
-    {"completeQuest", invokeBuiltin<&ClientCommandProcessor::completeQuest>},
-    {"failQuest", invokeBuiltin<&ClientCommandProcessor::failQuest>},
-    {"previewNewQuest", invokeBuiltin<&ClientCommandProcessor::previewNewQuest>},
-    {"previewQuestComplete", invokeBuiltin<&ClientCommandProcessor::previewQuestComplete>},
-    {"previewQuestFailed", invokeBuiltin<&ClientCommandProcessor::previewQuestFailed>},
-    {"clearScannedObjects", invokeBuiltin<&ClientCommandProcessor::clearScannedObjects>},
-    {"played", invokeBuiltin<&ClientCommandProcessor::playTime>},
-    {"deaths", invokeBuiltin<&ClientCommandProcessor::deathCount>},
-    {"cinema", invokeBuiltin<&ClientCommandProcessor::cinema>},
-    {"suicide", invokeBuiltin<&ClientCommandProcessor::suicide>},
-    {"naked", invokeBuiltin<&ClientCommandProcessor::naked>},
-    {"resetAchievements", invokeBuiltin<&ClientCommandProcessor::resetAchievements>},
-    {"statistic", invokeBuiltin<&ClientCommandProcessor::statistic>},
-    {"giveessentialitem", invokeBuiltin<&ClientCommandProcessor::giveEssentialItem>},
-    {"maketechavailable", invokeBuiltin<&ClientCommandProcessor::makeTechAvailable>},
-    {"enabletech", invokeBuiltin<&ClientCommandProcessor::enableTech>},
-    {"upgradeship", invokeBuiltin<&ClientCommandProcessor::upgradeShip>},
-    {"swap", invokeBuiltin<&ClientCommandProcessor::swap>},
-    {"respawnInWorld", invokeBuiltin<&ClientCommandProcessor::respawnInWorld>},
-    {"render", invokeBuiltin<&ClientCommandProcessor::render>}
+    {"reload", invoke_builtin<&ClientCommandProcessor::reload>},
+    {"hotReload", invoke_builtin<&ClientCommandProcessor::hotReload>},
+    {"whoami", invoke_builtin<&ClientCommandProcessor::whoami>},
+    {"gravity", invoke_builtin<&ClientCommandProcessor::gravity>},
+    {"debug", invoke_builtin<&ClientCommandProcessor::debug>},
+    {"boxes", invoke_builtin<&ClientCommandProcessor::boxes>},
+    {"fullbright", invoke_builtin<&ClientCommandProcessor::fullbright>},
+    {"asyncLighting", invoke_builtin<&ClientCommandProcessor::asyncLighting>},
+    {"setGravity", invoke_builtin<&ClientCommandProcessor::setGravity>},
+    {"resetGravity", invoke_builtin<&ClientCommandProcessor::resetGravity>},
+    {"fixedCamera", invoke_builtin<&ClientCommandProcessor::fixedCamera>},
+    {"monochromeLighting", invoke_builtin<&ClientCommandProcessor::monochromeLighting>},
+    {"radioMessage", invoke_builtin<&ClientCommandProcessor::radioMessage>},
+    {"clearRadioMessages", invoke_builtin<&ClientCommandProcessor::clearRadioMessages>},
+    {"clearCinematics", invoke_builtin<&ClientCommandProcessor::clearCinematics>},
+    {"startQuest", invoke_builtin<&ClientCommandProcessor::startQuest>},
+    {"completeQuest", invoke_builtin<&ClientCommandProcessor::completeQuest>},
+    {"failQuest", invoke_builtin<&ClientCommandProcessor::failQuest>},
+    {"previewNewQuest", invoke_builtin<&ClientCommandProcessor::previewNewQuest>},
+    {"previewQuestComplete", invoke_builtin<&ClientCommandProcessor::previewQuestComplete>},
+    {"previewQuestFailed", invoke_builtin<&ClientCommandProcessor::previewQuestFailed>},
+    {"clearScannedObjects", invoke_builtin<&ClientCommandProcessor::clearScannedObjects>},
+    {"played", invoke_builtin<&ClientCommandProcessor::playTime>},
+    {"deaths", invoke_builtin<&ClientCommandProcessor::deathCount>},
+    {"cinema", invoke_builtin<&ClientCommandProcessor::cinema>},
+    {"suicide", invoke_builtin<&ClientCommandProcessor::suicide>},
+    {"naked", invoke_builtin<&ClientCommandProcessor::naked>},
+    {"resetAchievements", invoke_builtin<&ClientCommandProcessor::resetAchievements>},
+    {"statistic", invoke_builtin<&ClientCommandProcessor::statistic>},
+    {"giveessentialitem", invoke_builtin<&ClientCommandProcessor::giveEssentialItem>},
+    {"maketechavailable", invoke_builtin<&ClientCommandProcessor::makeTechAvailable>},
+    {"enabletech", invoke_builtin<&ClientCommandProcessor::enableTech>},
+    {"upgradeship", invoke_builtin<&ClientCommandProcessor::upgradeShip>},
+    {"swap", invoke_builtin<&ClientCommandProcessor::swap>},
+    {"respawnInWorld", invoke_builtin<&ClientCommandProcessor::respawnInWorld>},
+    {"render", invoke_builtin<&ClientCommandProcessor::render>}
   };
   CaseInsensitiveStringMap<BuiltinCommand> commands;
   for (auto const& entry : entries) {
@@ -292,46 +291,72 @@ std::expected<String, StarException> ClientCommandProcessor::previewQuestDialog(
   return "No such quest";
 }
 
-std::expected<StringList, StarException> ClientCommandProcessor::handleCommand(String const& commandLine) {
-  auto result = executeCommand(commandLine);
-  if (result) return result;
+namespace {
+std::expected<void, StarException> append_command_result(StringList& output, Json const& value) {
+  if (value.is_null())
+    return {};
+  auto text = value.is_type(Json::Type::String) ? value.to_string() : value.repr(1, true);
+  if (!text) return std::unexpected(std::move(text.error()));
+  output.push_back(std::move(*text));
+  return {};
+}
+}
+
+std::expected<StringList, StarException> ClientCommandProcessor::handle_command(String const& command_line) {
+  StringList output;
+  MacroPath path;
+  auto handled = append_command(command_line, output, path);
+  if (!handled) return std::unexpected(std::move(handled.error()));
+  return output;
+}
+
+std::expected<void, StarException> ClientCommandProcessor::append_command(String const& command_line, StringList& output, MacroPath& path) {
+  auto result = execute_command(command_line, output, path);
+  if (result) return {};
   if (result.error().is<ShellParsingException>()) {
     auto logged = m_context.root().logger().error("Shell parsing exception: {}", Star::output_exception(ExceptionDiagnostic(result.error()), false));
     if (!logged) return std::unexpected(std::move(logged.error()));
-    return StringList{"Shell parsing exception"};
+    output.push_back("Shell parsing exception");
+  } else {
+    auto logged = m_context.root().logger().error("Exception caught handling client command {}: {}", command_line, Star::output_exception(ExceptionDiagnostic(result.error()), true));
+    if (!logged) return std::unexpected(std::move(logged.error()));
+    output.push_back(Star::format("Exception caught handling client command {}", command_line));
   }
-  auto logged = m_context.root().logger().error("Exception caught handling client command {}: {}", commandLine, Star::output_exception(ExceptionDiagnostic(result.error()), true));
-  if (!logged) return std::unexpected(std::move(logged.error()));
-  return StringList{Star::format("Exception caught handling client command {}", commandLine)};
+  return {};
 }
 
-std::expected<StringList, StarException> ClientCommandProcessor::executeCommand(String const& commandLine) {
-  auto prefixed = commandLine.starts_with("/");
+std::expected<void, StarException> ClientCommandProcessor::execute_command(String const& command_line, StringList& output, MacroPath& path) {
+  auto prefixed = command_line.starts_with("/");
   if (!prefixed) return std::unexpected(std::move(prefixed.error()));
   if (!*prefixed)
     return std::unexpected(StarException("ClientCommandProcessor expected command, does not start with '/'"));
-  auto arguments = commandLine.substr(1);
+  auto arguments = command_line.substr(1);
   if (!arguments) return std::unexpected(std::move(arguments.error()));
   auto command = arguments->extract();
   if (!command) return std::unexpected(std::move(command.error()));
   if (!s_builtinCommands) return std::unexpected(s_builtinCommands.error());
   auto key = CaseInsensitiveStringView::create(*command);
   if (!key) return std::unexpected(std::move(key.error()));
-  StringList result;
   if (auto builtin = s_builtinCommands->maybe(*key)) {
-    auto output = (*builtin)(*this, *arguments);
-    if (!output) return std::unexpected(std::move(output.error()));
-    result.push_back(std::move(*output));
-  } else if (auto macro = m_macroCommands.maybe(*command)) {
-    for (auto const& entry : *macro) {
-      auto isCommand = entry.starts_with("/");
-      if (!isCommand) return std::unexpected(std::move(isCommand.error()));
-      if (*isCommand) {
-        auto output = handleCommand(entry);
-        if (!output) return std::unexpected(std::move(output.error()));
-        result.append_range(std::move(*output));
+    auto reply = (*builtin)(*this, *arguments);
+    if (!reply) return std::unexpected(std::move(reply.error()));
+    output.push_back(std::move(*reply));
+  } else if (auto macro = m_macro_commands.find_ref(*command)) {
+    std::string_view name(command->utf8());
+    if (std::ranges::find(path, name) != path.end()) {
+      output.push_back(Star::format("Recursive client command macro: {}", *command));
+      return {};
+    }
+    path.push_back(name);
+    auto pop = make_scope_exit([&] { path.pop_back(); });
+    for (auto const& entry : macro->get()) {
+      auto is_command = entry.starts_with("/");
+      if (!is_command) return std::unexpected(std::move(is_command.error()));
+      if (*is_command) {
+        auto handled = append_command(entry, output, path);
+        if (!handled) return std::unexpected(std::move(handled.error()));
       } else {
-        result.push_back(entry);
+        output.push_back(entry);
       }
     }
   } else {
@@ -341,62 +366,60 @@ std::expected<StringList, StarException> ClientCommandProcessor::executeCommand(
     auto response = player->receiveMessage(*owner, "/" + *command, {*arguments});
     if (!response) return std::unexpected(std::move(response.error()));
     if (*response) {
-      if (std::holds_alternative<Json>(**response)) {
-        auto const& value = std::get<Json>(**response);
-        if (value.is_type(Json::Type::String)) {
-          auto text = value.string_ptr();
-          if (!text) return std::unexpected(std::move(text.error()));
-          result.push_back(**text);
-        } else if (!value.is_null()) {
-          auto printed = value.repr(1, true);
-          if (!printed) return std::unexpected(std::move(printed.error()));
-          result.push_back(std::move(*printed));
-        }
-      } else {
-        Uuid uuid(m_context.root().random());
-        m_commandPromises[uuid] = std::get<RpcPromise<Json>>(**response);
-      }
-    } else if (auto sent = m_universeClient->send_chat(commandLine, ChatSendMode::Broadcast); !sent) {
+      if (std::holds_alternative<Json>(**response))
+        return append_command_result(output, std::get<Json>(**response));
+      m_pending.push(std::move(std::get<RpcPromise<Json>>(**response)));
+    } else if (auto sent = m_universeClient->send_chat(command_line, ChatSendMode::Broadcast); !sent) {
       return std::unexpected(std::move(sent.error()));
     }
   }
-  return result;
+  return {};
 }
 
-std::expected<StringList, StarException> ClientCommandProcessor::updatePromises() {
-  StringList result;
-  for (auto const& uuid : m_commandPromises.keys()) {
-    auto& promise = m_commandPromises[uuid];
-    auto finished = promise.finished();
-    if (!finished) return std::unexpected(std::move(finished.error()));
-    if (!*finished) continue;
-    auto succeeded = promise.succeeded();
-    if (!succeeded) return std::unexpected(std::move(succeeded.error()));
-    if (*succeeded) {
-      auto response = promise.result();
-      if (!response) return std::unexpected(std::move(response.error()));
-      if (!*response)
-        return std::unexpected(StarException("Successful client command promise has no result"));
-      auto& value = **response;
-      if (value.is_type(Json::Type::String)) {
-        auto text = value.string_ptr();
-        if (!text) return std::unexpected(std::move(text.error()));
-        result.push_back(**text);
-      } else if (!value.is_null()) {
-        auto printed = value.repr(1, true);
-        if (!printed) return std::unexpected(std::move(printed.error()));
-        result.push_back(std::move(*printed));
-      }
-    } else {
-      auto error = promise.error();
-      if (!error) return std::unexpected(std::move(error.error()));
-      if (!*error)
-        return std::unexpected(StarException("Failed client command promise has no error"));
-      result.push_back(Star::format("Error: {}", **error));
-    }
-    m_commandPromises.remove(uuid);
+namespace {
+std::expected<bool, StarException> poll_command(RpcPromise<Json> const& promise, StringList& replies) {
+  auto status = promise.status();
+  if (!status) return std::unexpected(std::move(status.error()));
+  if (*status == RpcPromiseStatus::Pending)
+    return false;
+  if (*status == RpcPromiseStatus::Succeeded) {
+    auto value = promise.result();
+    if (!value) return std::unexpected(std::move(value.error()));
+    if (!*value) return std::unexpected(StarException("Successful client command promise has no result"));
+    auto appended = append_command_result(replies, **value);
+    if (!appended) return std::unexpected(std::move(appended.error()));
+  } else {
+    auto error = promise.error();
+    if (!error) return std::unexpected(std::move(error.error()));
+    if (!*error) return std::unexpected(StarException("Failed client command promise has no error"));
+    replies.push_back(Star::format("{}: {}", *status == RpcPromiseStatus::Cancelled ? "Cancelled" : "Error", **error));
   }
-  return result;
+  return true;
+}
+}
+
+std::expected<void, StarException> PendingClientCommands::poll(StringList& replies) {
+  if (m_pending.empty() || m_polling)
+    return {};
+  m_polling = true;
+  std::size_t kept = 0;
+  std::size_t next = 0;
+  auto finish = make_scope_exit([&] {
+    // Keep the unobserved suffix, including any new submissions, in order.
+    if (kept != next)
+      m_pending.erase(m_pending.begin() + kept, m_pending.begin() + next);
+    m_polling = false;
+  });
+  auto const count = m_pending.size();
+  while (next != count) {
+    // Lazy transforms can enqueue commands and reallocate m_pending.
+    auto promise = std::move(m_pending[next++]);
+    auto done = poll_command(promise, replies);
+    if (!done || !*done)
+      m_pending[kept++] = std::move(promise);
+    if (!done) return std::unexpected(std::move(done.error()));
+  }
+  return {};
 }
 
 bool ClientCommandProcessor::debugDisplayEnabled() const {

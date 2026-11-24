@@ -431,6 +431,8 @@ std::expected<void, StarException> MainInterface::initialize(std::shared_ptr<Wor
   auto config = MainInterfaceConfig::loadFromAssets(context());
   if (!config)
     return std::unexpected(std::move(config.error()));
+  m_clientCommandProcessor = std::make_shared<ClientCommandProcessor>(context(), m_client, m_cinematicOverlay,
+      m_paneManager, std::move((*config)->macroCommands));
   m_config = std::move(*config);
   auto cursor = InterfaceCursor::create(context());
   if (!cursor)
@@ -544,7 +546,6 @@ std::expected<void, StarException> MainInterface::initScriptAndHudPanes(std::sha
                                 ScriptPane::create(context(), m_client, *collectionConfig), m_collections);
       !result)
     return std::unexpected(std::move(result.error()));
-  m_clientCommandProcessor = std::make_shared<ClientCommandProcessor>(context(), m_client, m_cinematicOverlay, m_paneManager, m_config->macroCommands);
   if (auto result = initUiController(); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result =
@@ -1619,14 +1620,15 @@ std::expected<void, StarException> MainInterface::update(float dt) {
   auto chat_added = add_chat_messages(m_client->pull_chat_messages(), true);
   if (!chat_added)
     return std::unexpected(std::move(chat_added.error()));
-  auto commandResults = m_clientCommandProcessor->updatePromises();
-  if (!commandResults)
-    return std::unexpected(std::move(commandResults.error()));
-  for (auto const& result : *commandResults) {
+  StringList command_replies;
+  auto polled = m_clientCommandProcessor->poll_replies(command_replies);
+  for (auto const& result : command_replies) {
     auto added = add_chat_messages({{{MessageContext::CommandResult}, server_connection_id, "", result}}, true);
     if (!added)
       return std::unexpected(std::move(added.error()));
   }
+  if (!polled)
+    return std::unexpected(std::move(polled.error()));
 
   if (auto worldClient = m_client->worldClient()) {
     if (worldClient->inWorld()) {
@@ -1904,7 +1906,7 @@ std::expected<StringList, StarException> MainInterface::executeClientCommand(Str
   } commandScope{.enabled = m_commandInput, .previous = std::exchange(m_commandInput, false)};
   if (commandScope.previous)
     m_lastCommand = command;
-  return m_clientCommandProcessor->handleCommand(command);
+  return m_clientCommandProcessor->handle_command(command);
 }
 
 std::expected<void, StarException> MainInterface::queueMessage(String const& message, std::optional<float> cooldown, float spring) {

@@ -118,6 +118,8 @@ import star.net_packet_socket;
 import star.universe_connection;
 import star.universe_settings;
 import star.universe_server;
+import star.command_processor;
+import star.message_types;
 import star.asset_source;
 import star.assets;
 import star.root_base;
@@ -176,6 +178,88 @@ const GameTestRegistration serverRun("ServerTest", "Run", [](GameTest& fixture) 
   EXPECT_TRUE(stopped) << (stopped ? "" : stopped.error().what());
   auto joined = (*server)->join();
   ASSERT_TRUE(joined) << joined.error().what();
+});
+
+const GameTestRegistration command_dispatch("ServerTest", "CommandDispatchAndPatchedHelp", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory) << directory.error().what();
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto overlay = File::relative_to(*directory, "assets");
+  ASSERT_TRUE(File::create_directory(overlay));
+  ASSERT_TRUE(File::write_file(String(R"([
+    {"op":"replace","path":"/basicCommands","value":{"z":"last","topic":"first","help":"footer"}},
+    {"op":"replace","path":"/openSbCommands","value":{"topic":"second","mod":"patched command"}},
+    {"op":"replace","path":"/adminCommands","value":{"secret":"admin topic"}},
+    {"op":"replace","path":"/basicHelpText","value":"Basic: <commands>"},
+    {"op":"replace","path":"/openSbHelpText","value":"Mod: <commands>"},
+    {"op":"remove","path":"/openSbDebugCommands"}
+  ])"), File::relative_to(overlay, "help.config.patch")));
+  ASSERT_TRUE(File::write_file(String(R"([
+    {"op":"replace","path":"/commandProcessorScripts","value":["/command_probe.lua"]}
+  ])"), File::relative_to(overlay, "universe_server.config.patch")));
+  ASSERT_TRUE(File::write_file(String(R"(
+    function command(name, id, args)
+      return name .. ":" .. table.concat(args, "|")
+    end
+  )"), File::relative_to(overlay, "command_probe.lua")));
+  auto settings = fixture.rootSettings();
+  settings.assetSources.push_back(overlay);
+  settings.storageDirectory = File::relative_to(*directory, "storage");
+  settings.runtimeConfigFile = {};
+  settings.logDirectory = {};
+  settings.logFile = {};
+  settings.includeUGC = false;
+  auto root = Root::create(std::move(settings));
+  ASSERT_TRUE(root) << root.error().what();
+  auto config = (*root)->configuration();
+  ASSERT_TRUE(config) << config.error().what();
+  ASSERT_TRUE((*config)->set("allowAdminCommands", false));
+  auto server = UniverseServer::create(**root, (*root)->toStoragePath("universe"));
+  ASSERT_TRUE(server) << server.error().what();
+  auto processor = CommandProcessor::create(**root, **server);
+  ASSERT_TRUE(processor) << processor.error().what();
+  auto close = make_scope_exit([&] { EXPECT_TRUE((*processor)->close()); });
+  auto expect_reply = [](std::expected<ServerCommandResult, StarException> result, std::string_view expected) {
+    ASSERT_TRUE(result) << result.error().what();
+    ASSERT_TRUE(std::holds_alternative<String>(*result));
+    EXPECT_EQ(std::get<String>(*result).utf8(), expected);
+  };
+  auto user = [&](String const& name, String const& args) { return (*processor)->user_command(1, name, args); };
+  auto admin = [&](String const& name, String const& args) { return (*server)->admin_command(name, args); };
+
+  // Point queries consult even the admin categories, but stop on the first match.
+  // The absent final category is not needed for a non-admin's summary either.
+  expect_reply(user("HeLp", "topic"), "first");
+  expect_reply(user("help", "mod"), "patched command");
+  expect_reply(user("help", "secret"), "admin topic");
+  expect_reply(user("help", ""), "Basic: /help, /topic, /z\nMod: /mod, /topic\nfooter");
+  EXPECT_FALSE(admin("help", ""));
+  expect_reply(user("SpAwNiTeM", ""), "Admin commands disabled on this server.");
+  expect_reply(user("eval", ""), "The execute server script command can only be used locally.");
+  expect_reply(user("entityeval", ""), "The execute server entity script command can only be used locally.");
+  ASSERT_TRUE((*config)->set("allowAdminCommands", true));
+  ASSERT_TRUE((*config)->set("allowAdminCommandsFromAnyone", false));
+  expect_reply(user("spawnitem", ""), "Insufficient privileges to spawn items.");
+  expect_reply(user("disablespawning", ""), "Insufficient privileges to disable world spawning.");
+  expect_reply(user("whereami", ""), "Your current location is Nowhere");
+  expect_reply(user("whereis", "@nobody"), "Your current location is Nowhere");
+  expect_reply(admin("WHEREAMI", "@nobody"), "No user with specifier @nobody found.");
+  expect_reply(admin("WhereIs", "@nobody"), "No user with specifier @nobody found.");
+  expect_reply(admin("LuaProbe", R"('first two' '' three)"), "LuaProbe:first two||three");
+
+  expect_reply(admin("TiMeWaRp", ""), "Not enough arguments to /timewarp");
+  expect_reply(admin("timewarp", "later"), "Could not parse the argument later as a time adjustment");
+  expect_reply(admin("timewarp", "-0"), "You suck at time travel.");
+  expect_reply(admin("timewarp", "-1"), "Great Scott! We can't go back in time!");
+  expect_reply(admin("timewarp", "-1 please"), "And then a step to the right...");
+  expect_reply(admin("timewarp", "1"), "It's just a jump to the left...");
+  expect_reply(admin("enablespawning", ""), "enabling monster spawning failed");
+  expect_reply(admin("disablespawning", ""), "disabling monster spawning failed");
+  expect_reply(admin("spawnitem", "probe 1 ["), "Could not parse item parameters");
+  expect_reply(admin("spawnitem", "probe invalid"), "Could not load item 'probe'");
+  expect_reply(admin("spawntreasure", "probe invalid"), "Could not load item 'probe'");
+  expect_reply(admin("spawnvehicle", "probe []"), "Could not spawn vehicle");
+  expect_reply(admin("spawnstagehand", "probe []"), "Could not spawn Stagehand of type 'probe []'");
 });
 
 const GameTestRegistration universe_directory_lock("ServerTest", "DirectoryLockPrecedesLuaInit", [](GameTest& fixture) {

@@ -298,7 +298,7 @@ target_include_directories (game_tests PRIVATE
     ${STAR_GAME_INCLUDES}
     ${CMAKE_CURRENT_SOURCE_DIR}
   )
-target_link_libraries (game_tests PRIVATE star_test_gtest star_base_modules star_game_modules star_build_config
+target_link_libraries (game_tests PRIVATE star_test_gtest star_base_modules star_server_modules star_game_modules star_build_config
   $<LINK_ONLY:star_core_dependencies> $<LINK_ONLY:star_extern_dependencies>)
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
   target_compile_definitions (game_tests PRIVATE STAR_TEST_WRAP_PTHREAD_CREATE=1)

@@ -1,5 +1,12 @@
 import std;
 import star.chat_bubble_separation;
+import star.chat_types;
+import star.client_command_processor;
+import star.main_interface_types;
+import star.rpc_promise;
+import star.test_universe;
+import star.universe_client;
+import star.warping;
 import star.format;
 import star.game_test;
 import star.input_event;
@@ -104,9 +111,6 @@ import star.label_widget;
 import star.ordered_set;
 import star.main_application;
 import star.player_storage;
-import star.test_universe;
-import star.universe_client;
-import star.warping;
 #endif
 #include "gtest/gtest.h"
 #include "gtest/gtest-spi.h"
@@ -124,6 +128,53 @@ extern "C" bool SDLCALL __wrap_SDL_ShowSimpleMessageBox(SDL_MessageBoxFlags, cha
 #endif
 
 namespace {
+
+TEST(PendingClientCommands, DeliversPrefixBeforeDiagnosticAndDefersReentrantSubmissions) {
+  PendingClientCommands pending;
+  StringList replies;
+  auto [waiting, keeper] = RpcPromise<Json>::make_pair();
+  pending.push(std::move(waiting));
+  pending.push(RpcPromise<Json>::make_fulfilled(Json("first")));
+  int attempts = 0;
+  auto retry = RpcPromise<Json>::make_fulfilled(Json("retried")).wrap([&](Json value) -> std::expected<Json, StarException> {
+    if (++attempts == 1) {
+      for (unsigned i = 0; i != 32; ++i)
+        pending.push(RpcPromise<Json>::make_fulfilled(Json()));
+      pending.push(RpcPromise<Json>::make_fulfilled(Json("new")));
+      StringList nested;
+      EXPECT_TRUE(pending.poll(nested));
+      EXPECT_TRUE(nested.empty());
+      return std::unexpected(StarException("query diagnostic"));
+    }
+    pending.push(RpcPromise<Json>::make_fulfilled(Json("next tick")));
+    return value;
+  });
+  ASSERT_TRUE(retry);
+  pending.push(std::move(*retry));
+  pending.push(RpcPromise<Json>::make_fulfilled(Json()));
+  auto object = Json(JsonObject{{"z", 1}, {"a", 2}});
+  auto printed = object.repr(1, true);
+  ASSERT_TRUE(printed);
+  pending.push(RpcPromise<Json>::make_fulfilled(std::move(object)));
+  pending.push(RpcPromise<Json>::make_failed("remote failure"));
+  auto [cancelled, canceller] = RpcPromise<Json>::make_pair();
+  ASSERT_TRUE(canceller.cancel("stopped").value_or(false));
+  pending.push(std::move(cancelled));
+
+  auto first = pending.poll(replies);
+  ASSERT_FALSE(first);
+  EXPECT_NE(std::string_view(first.error().what()).find("query diagnostic"), std::string_view::npos);
+  EXPECT_EQ(replies, (StringList{"first"}));
+  replies.clear();
+  ASSERT_TRUE(pending.poll(replies));
+  EXPECT_EQ(replies, (StringList{"retried", *printed, "Error: remote failure", "Cancelled: stopped", "new"}));
+  ASSERT_EQ(attempts, 2);
+  ASSERT_TRUE(keeper.fulfill(Json("last")));
+  replies.clear();
+  ASSERT_TRUE(pending.poll(replies));
+  ASSERT_TRUE(pending.poll(replies));
+  EXPECT_EQ(replies, (StringList{"last", "next tick"}));
+}
 
 TEST(RendererShaderGuard, AcceptsWindowsAndMixedLineEndings) {
   constexpr std::string_view lf = "#version 140\nvoid main() {\n  gl_Position = vec4(0.0);\n}\n";
@@ -816,6 +867,71 @@ std::expected<std::shared_ptr<GuiContext>, StarException> textEditorContext(Game
     return std::unexpected(std::move(configured.error()));
   return GuiContext::create(fixture.root(), {}, {});
 }
+
+const GameTestRegistration client_command_routing("ClientCommandProcessor", "MacroPathAndLocalBeforeServerDispatch", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto overlay = File::relative_to(*directory, "assets");
+  ASSERT_TRUE(File::create_directory(overlay));
+  ASSERT_TRUE(File::write_file(String(R"([{"op":"add","path":"/genericScriptContexts/commandProbe","value":"/commandProbe.lua"}])"),
+                               File::relative_to(overlay, "player.config.patch")));
+  ASSERT_TRUE(File::write_file(String(R"LUA(
+    function init()
+      for _, name in ipairs({"/DeBuG", "/Probe", "/probe"}) do
+        message.setHandler(name, function(_, isLocal, args)
+          assert(isLocal)
+          return "local:" .. args
+        end)
+      end
+    end
+  )LUA"), File::relative_to(overlay, "commandProbe.lua")));
+  auto owned = createPrivateOverlayRoot(fixture.rootSettings(), *directory, overlay, "commands.config");
+  ASSERT_TRUE(owned) << owned.error().what();
+  auto& root = **owned;
+  auto configuration = root.configuration();
+  ASSERT_TRUE(configuration);
+  ASSERT_TRUE((*configuration)->set("bindings", JsonObject{}));
+  auto context = GuiContext::create(root, {}, {});
+  ASSERT_TRUE(context) << context.error().what();
+  auto universe = TestUniverse::create(root, {800, 600});
+  ASSERT_TRUE(universe) << universe.error().what();
+  auto const& client = (*universe)->client();
+  auto uuid = client->mainPlayer()->uuid();
+  ASSERT_TRUE(uuid);
+  ASSERT_TRUE((*universe)->warpPlayer(ClientShipWorldId(*uuid)));
+  MainInterfacePaneManager panes(**context);
+  ClientCommandProcessor commands(**context, client, {}, panes, {
+    {"DeBuG", {"shadowed builtin"}}, {"Probe", {"macro"}},
+    {"Cycle", {"before", "/Branch", "/swap", "/Branch", "after"}},
+    {"Branch", {"/Cycle", "/Probe", "/DeBuG", "/probe argument  with  spaces"}},
+    {"Self", {"/Self"}}
+  });
+  commands.detachInterface(); // /swap now produces a regular child command error.
+  auto expanded = commands.handle_command("/Cycle");
+  ASSERT_TRUE(expanded) << expanded.error().what();
+  EXPECT_EQ(*expanded, (StringList{"before", "Recursive client command macro: Cycle", "macro",
+    "Debug display enabled", "local:argument  with  spaces", "Exception caught handling client command /swap",
+    "Recursive client command macro: Cycle", "macro", "Debug display disabled", "local:argument  with  spaces", "after"}));
+  auto self = commands.handle_command("/Self");
+  ASSERT_TRUE(self);
+  EXPECT_EQ(*self, (StringList{"Recursive client command macro: Self"}));
+
+  auto forwarded = commands.handle_command("/serverwhoami");
+  ASSERT_TRUE(forwarded);
+  EXPECT_TRUE(forwarded->empty());
+  StringList network_replies;
+  auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+  while (network_replies.empty() && std::chrono::steady_clock::now() < deadline) {
+    ASSERT_TRUE((*universe)->update());
+    for (auto& received : client->pull_chat_messages())
+      if (received.context.mode == MessageContext::CommandResult)
+        network_replies.push_back(std::move(received.text));
+  }
+  ASSERT_EQ(network_replies.size(), 1u);
+  EXPECT_TRUE(network_replies.front().utf8().starts_with("Server: You are "));
+  ASSERT_TRUE((*universe)->close());
+});
 
 std::expected<std::shared_ptr<Font>, StarException> clone_test_font(Assets const& assets, String const& path) {
   auto source = assets.font(path);

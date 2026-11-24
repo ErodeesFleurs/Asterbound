@@ -273,7 +273,7 @@ std::expected<void, StarException> UniverseServer::initialize() {
   m_commandProcessor = std::move(*commands);
   m_chat_processor.set_command_handler(
     [processor = m_commandProcessor](ConnectionId client_id, String const& command, String const& arguments) {
-      return processor->userCommand(client_id, command, arguments);
+      return processor->user_command(client_id, command, arguments);
     });
   auto networkThreads = universeConfig->opt_uint("networkWorkerThreads");
   if (!networkThreads)
@@ -512,11 +512,8 @@ std::expected<void, StarException> UniverseServer::admin_whisper(ConnectionId cl
   return m_chat_processor.admin_whisper(client_id, text);
 }
 
-std::expected<ServerCommandResult, StarException> UniverseServer::adminCommand(String text) {
-  auto command = text.extract();
-  if (!command)
-    return std::unexpected(std::move(command.error()));
-  return m_commandProcessor->adminCommand(*command, text);
+std::expected<ServerCommandResult, StarException> UniverseServer::admin_command(String const& command, String const& arguments) {
+  return m_commandProcessor->admin_command(command, arguments);
 }
 
 std::expected<bool, StarException> UniverseServer::isAdmin(ConnectionId clientId) const {

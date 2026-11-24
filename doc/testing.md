@@ -745,6 +745,17 @@ tracker polls from trigger-and-consume pairs. Each dispatch iteration calls 64
 live listeners; the retained case also keeps 256 cancelled targets and handles alive.
 These are dispatch costs, not full asset reload times.
 
+### Command routing
+
+Run `ServerTest.CommandDispatchAndPatchedHelp` and
+`Rcon.IdleAndFragmentedRequestsDrainDelayedReplies` in `game_tests`, and
+`PendingClientCommands.*:ClientCommandProcessor.*` in `frontend_tests`.
+Use private storage and owned assets. For timing, compare the same requests
+over authenticated loopback connections to both server builds: `echo` is
+a transport control, `help` lists all groups, and `HeLp help` looks up one
+topic. Compare response bytes before latency; exclude startup and login.
+These timings do not measure client-side macro expansion or promise polling.
+
 ### Cellular lighting
 
 Use `Lighting/Propagate/` to isolate propagation and `Lighting/GatherAndPropagate/`

@@ -200,7 +200,7 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> admin_broadcast(String const& text);
   [[nodiscard]] std::expected<void, StarException> admin_whisper(ConnectionId client_id, String const& text);
-  [[nodiscard]] std::expected<ServerCommandResult, StarException> adminCommand(String text);
+  [[nodiscard]] std::expected<ServerCommandResult, StarException> admin_command(String const& command, String const& arguments);
 
   [[nodiscard]] std::expected<bool, StarException> isAdmin(ConnectionId clientId) const;
   [[nodiscard]] std::expected<bool, StarException> canBecomeAdmin(ConnectionId clientId) const;

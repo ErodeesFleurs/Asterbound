@@ -109,6 +109,9 @@ import star.game_test;
 import star.test_universe;
 import star.configuration;
 import star.root;
+import star.file;
+import star.server_rcon;
+import star.universe_server;
 
 #include "gtest/gtest.h"
 
@@ -503,6 +506,156 @@ namespace {
     return std::unexpected(StarException("Loopback connection was not accepted"));
   return std::pair{std::move(*client), std::move(*server)};
 }
+
+// Independent wire oracle: length excludes itself, integers are little-endian,
+// and even a zero-length response carries both trailing nulls.
+std::string rcon_packet(std::uint32_t id, std::uint32_t type, std::string_view text = {}) {
+  std::string packet;
+  packet.reserve(text.size() + 14);
+  for (auto value : {static_cast<std::uint32_t>(text.size() + 10), id, type})
+    for (unsigned shift : {0u, 8u, 16u, 24u})
+      packet.push_back(static_cast<char>(value >> shift));
+  packet.append(text);
+  packet.append(2, '\0');
+  return packet;
+}
+
+testing::AssertionResult write_rcon_bytes(TcpSocket& socket, std::string_view bytes) {
+  while (!bytes.empty()) {
+    auto sent = socket.send(bytes);
+    if (!sent)
+      return testing::AssertionFailure() << sent.error().what();
+    if (!*sent)
+      return testing::AssertionFailure() << "No progress writing RCON fixture request";
+    bytes.remove_prefix(*sent);
+  }
+  return testing::AssertionSuccess();
+}
+
+testing::AssertionResult read_rcon_bytes(TcpSocket& socket, std::string_view expected) {
+  std::array<char, 4096> buffer;
+  while (!expected.empty()) {
+    auto received = socket.receive(std::span(buffer).first(std::min(buffer.size(), expected.size())));
+    if (!received)
+      return testing::AssertionFailure() << received.error().what();
+    if (!*received)
+      return testing::AssertionFailure() << "Missing " << expected.size() << " RCON wire bytes";
+    if (!expected.starts_with(std::string_view(std::span(buffer).first(*received))))
+      return testing::AssertionFailure() << "Unexpected RCON wire data (" << expected.size() << " bytes remaining)";
+    expected.remove_prefix(*received);
+  }
+  return testing::AssertionSuccess();
+}
+
+const GameTestRegistration rcon_delayed_command("Rcon", "IdleAndFragmentedRequestsDrainDelayedReplies", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory) << directory.error().what();
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto overlay = File::relative_to(*directory, "assets");
+  ASSERT_TRUE(File::create_directory(overlay));
+  ASSERT_TRUE(File::write_file(String(R"([
+    {"op":"replace","path":"/commandProcessorScripts","value":["/rcon_command.lua"]},
+    {"op":"add","path":"/scriptContexts/rconReply","value":["/rcon_reply.lua"]}
+  ])"), File::relative_to(overlay, "universe_server.config.patch")));
+  ASSERT_TRUE(File::write_file(String(R"(
+    function command(name, connection, args)
+      local promise = universe.sendOwnUniverseMessage(args[1])
+      root.setConfiguration("rconDispatched", root.getConfiguration("rconDispatched") + 1)
+      return promise
+    end
+  )"), File::relative_to(overlay, "rcon_command.lua")));
+  ASSERT_TRUE(File::write_file(String(R"(
+    function init()
+      message.setHandler("rconBulk", function() return string.rep("界", 4096 * 64) .. "!" end)
+      message.setHandler("rconEmpty", function() return "" end)
+    end
+  )"), File::relative_to(overlay, "rcon_reply.lua")));
+  auto settings = fixture.rootSettings();
+  settings.assetSources.push_back(overlay);
+  settings.storageDirectory = File::relative_to(*directory, "storage");
+  settings.runtimeConfigFile = {};
+  settings.logDirectory = {};
+  settings.logFile = {};
+  settings.includeUGC = false;
+  auto root = Root::create(std::move(settings));
+  ASSERT_TRUE(root) << root.error().what();
+  auto config = (*root)->configuration();
+  ASSERT_TRUE(config) << config.error().what();
+  ASSERT_TRUE((*config)->set("rconServerPassword", "loopback"));
+  ASSERT_TRUE((*config)->set("rconDispatched", 0));
+  auto universe = UniverseServer::create(**root, (*root)->toStoragePath("universe"));
+  ASSERT_TRUE(universe) << universe.error().what();
+
+  struct Session {
+    std::shared_ptr<TcpSocket> peer;
+    std::shared_ptr<ServerRconClient> worker;
+  };
+  std::array<Session, 3> sessions;
+  constexpr std::array<std::string_view, 3> requests{"rconlate rconBulk", "rconlate rconEmpty", "rconlate rconMissing"};
+  auto next_request = rcon_packet(0x87654321, 2, "echo 尾部");
+  // One client stays silent; two leave the next length/body incomplete.
+  constexpr std::array<std::size_t, 3> fragments{0, 2, 14};
+  for (unsigned i = 0; i < sessions.size(); ++i) {
+    auto pair = connectionTestTcpPair((*root)->logger());
+    ASSERT_TRUE(pair) << pair.error().what();
+    auto& [peer, accepted] = *pair;
+    ASSERT_TRUE(peer->set_timeout(5000));
+    ASSERT_TRUE(SocketTestAccess::set_buffer_size(*accepted, SO_SNDBUF, 4096));
+    auto worker = ServerRconClient::create(**universe, accepted, 0);
+    ASSERT_TRUE(worker) << worker.error().what();
+    sessions[i] = {peer, *worker};
+    ASSERT_TRUE((*worker)->start());
+    ASSERT_TRUE(write_rcon_bytes(*peer, rcon_packet(8, 3, "incorrect")));
+    ASSERT_TRUE(read_rcon_bytes(*peer, rcon_packet(0xffffffff, 2)));
+    ASSERT_TRUE(write_rcon_bytes(*peer, rcon_packet(9, 3, "loopback")));
+    ASSERT_TRUE(read_rcon_bytes(*peer, rcon_packet(9, 0) + rcon_packet(9, 2)));
+    ASSERT_TRUE(write_rcon_bytes(*peer, rcon_packet(0xfedcba00 + i, 2, requests[i])
+        + next_request.substr(0, fragments[i])));
+  }
+  // All three Lua commands have queued real promises; only the universe thread
+  // can resolve them. No peer writes again until after its reply is verified.
+  auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+  while ((*config)->get("rconDispatched") != Json(3) && std::chrono::steady_clock::now() < deadline)
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+  ASSERT_EQ((*config)->get("rconDispatched"), Json(3));
+  ASSERT_TRUE((*universe)->start());
+  ASSERT_TRUE(read_rcon_bytes(*sessions[1].peer, rcon_packet(0xfedcba01, 0)));
+  ASSERT_TRUE(read_rcon_bytes(*sessions[2].peer, rcon_packet(0xfedcba02, 0,
+      "RCON: Command promise failed: Message not handled by universe")));
+  std::string chunk;
+  chunk.reserve(4096 * 3);
+  for (unsigned i = 0; i < 4096; ++i)
+    chunk += "界";
+  auto bulk_packet = rcon_packet(0xfedcba00, 0, chunk);
+  for (unsigned i = 0; i < 64; ++i)
+    ASSERT_TRUE(read_rcon_bytes(*sessions[0].peer, bulk_packet)) << "chunk " << i;
+  ASSERT_TRUE(read_rcon_bytes(*sessions[0].peer, rcon_packet(0xfedcba00, 0, "!")));
+  for (unsigned i : {1u, 2u}) {
+    ASSERT_TRUE(write_rcon_bytes(*sessions[i].peer, std::string_view(next_request).substr(fragments[i])));
+    ASSERT_TRUE(read_rcon_bytes(*sessions[i].peer, rcon_packet(0x87654321, 0, "尾部")));
+  }
+  // Timeout zero must still wake promptly on explicit stop, even mid-prefix.
+  ASSERT_TRUE(write_rcon_bytes(*sessions[0].peer, std::string_view(next_request).substr(0, 1)));
+  auto before_stop = std::chrono::steady_clock::now();
+  for (auto& session : sessions) {
+    session.worker->stop();
+    ASSERT_TRUE(session.worker->join());
+  }
+  EXPECT_LT(std::chrono::steady_clock::now() - before_stop, std::chrono::seconds(2));
+
+  auto pair = connectionTestTcpPair((*root)->logger());
+  ASSERT_TRUE(pair) << pair.error().what();
+  ASSERT_TRUE(pair->first->set_timeout(3000));
+  auto expiring = ServerRconClient::create(**universe, pair->second, 150);
+  ASSERT_TRUE(expiring) << expiring.error().what();
+  ASSERT_TRUE(write_rcon_bytes(*pair->first, std::string_view(next_request).substr(0, 2)));
+  ASSERT_TRUE((*expiring)->start());
+  std::array<char, 1> byte;
+  EXPECT_EQ(pair->first->receive(byte), 0u);
+  EXPECT_FALSE(pair->first->is_active()); // EOF, not just the peer's own read timeout.
+  ASSERT_TRUE((*expiring)->join());
+  ASSERT_TRUE((*universe)->stop());
+});
 
 const GameTestRegistration native_socket_timeouts("UniverseConnections", "NativeSocketTimeouts", [](GameTest& fixture) {
   auto pair = connectionTestTcpPair(fixture.root().logger());
