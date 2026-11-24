@@ -94,8 +94,8 @@ struct MainInterfaceConfig {
 
   Vec2I debugOffset;
   TextStyle debugTextStyle;
-  float debugSpatialClearTime;
-  float debugMapClearTime;
+  float debug_spatial_clear_time;
+  float debug_map_clear_time;
   Color debugBackgroundColor;
   int debugBackgroundPad;
 

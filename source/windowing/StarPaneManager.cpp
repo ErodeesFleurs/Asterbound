@@ -106,7 +106,7 @@ std::expected<void, StarException> PaneManager::initializePaneManager() {
     return std::unexpected(std::move(time.error()));
   m_tooltipMouseoverRadius = *radius;
   m_tooltipMouseOffset = *offset;
-  m_tooltipShowTimer = GameTimer(*time);
+  m_tooltip_show_timer = GameTimer(*time);
   return {};
 }
 
@@ -354,14 +354,14 @@ std::expected<bool, StarException> PaneManager::sendInputEvent(InputEvent const&
   }
 
   if (std::holds_alternative<MouseButtonDownEvent>(event)) {
-    m_tooltipShowTimer.reset();
+    m_tooltip_show_timer.reset();
     if (m_activeTooltip) {
       auto dismissed = dismiss(m_activeTooltip);
       if (!dismissed)
         return std::unexpected(std::move(dismissed.error()));
       m_activeTooltip.reset();
       m_tooltipParentPane.reset();
-      m_tooltipShowTimer.reset();
+      m_tooltip_show_timer.reset();
     }
   }
 
@@ -509,12 +509,12 @@ std::expected<void, StarException> PaneManager::renderLayers(PaneLayer front, Pa
 std::expected<void, StarException> PaneManager::update(float dt) {
   auto newTooltipParentPane = getPaneAt(m_tooltipLastMousePos);
 
-  bool updateTooltip = m_tooltipShowTimer.tick(dt) || (m_activeTooltip && (
+  bool update_tooltip = m_tooltip_show_timer.tick(dt) || (m_activeTooltip && (
     vmag(m_tooltipInitialPosition - m_tooltipLastMousePos) > m_tooltipMouseoverRadius
     || m_tooltipParentPane != newTooltipParentPane
     || !m_tooltipParentPane->inWindow(m_tooltipLastMousePos))); 
 
-  if (updateTooltip) {
+  if (update_tooltip) {
     if (m_activeTooltip) {
       auto dismissed = dismiss(m_activeTooltip);
       if (!dismissed)
@@ -523,7 +523,7 @@ std::expected<void, StarException> PaneManager::update(float dt) {
       m_tooltipParentPane.reset();
     }
 
-    m_tooltipShowTimer.reset();
+    m_tooltip_show_timer.reset();
     if (newTooltipParentPane) {
       auto tooltip = newTooltipParentPane->createTooltip(m_tooltipLastMousePos);
       if (!tooltip)

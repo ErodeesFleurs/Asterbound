@@ -291,13 +291,13 @@ private:
   std::shared_ptr<QuestManager> m_questManager;
 
   WarpAction m_pendingWarp;
-  GameTimer m_warpDelay;
-  std::optional<GameTimer> m_warpCinemaCancelTimer;
+  GameTimer m_warp_delay;
+  std::optional<GameTimer> m_warp_cinema_cancel_timer;
 
   std::optional<WarpAction> m_warping;
   bool m_respawnWarped;
   bool m_respawning;
-  GameTimer m_respawnTimer;
+  GameTimer m_respawn_timer;
 
   std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> m_storageTriggerDeadline;
 

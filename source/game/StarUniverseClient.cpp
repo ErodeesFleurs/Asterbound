@@ -568,18 +568,18 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
             return std::unexpected(std::move(operation43.error()));
           m_pendingWarp = WarpAction();
           m_warping.reset();
-          m_warpDelay.reset();
+          m_warp_delay.reset();
         }
       }
     }
   }
   if (!std::holds_alternative<std::monostate>(m_pendingWarp) &&
-      ((m_warping && !m_mainPlayer->isTeleportingOut()) || (!m_warping && m_warpDelay.tick(dt)))) {
+      ((m_warping && !m_mainPlayer->isTeleportingOut()) || (!m_warping && m_warp_delay.tick(dt)))) {
     auto operation44 = m_connection->pushSingle(
       std::make_shared<PlayerWarpPacket>(std::exchange(m_pendingWarp, {}), m_mainPlayer->isDeploying()));
     if (!operation44)
       return std::unexpected(std::move(operation44.error()));
-    m_warpDelay.reset();
+    m_warp_delay.reset();
     if (m_warping) {
       auto minimumJsonResult = assets->json("/client.config:playerWarpCinemaMinimumTime");
       if (!minimumJsonResult)
@@ -589,7 +589,7 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
       if (!minimumResult)
         return std::unexpected(std::move(minimumResult.error()));
       auto minimum = std::move(*minimumResult);
-      m_warpCinemaCancelTimer = GameTimer(minimum);
+      m_warp_cinema_cancel_timer = GameTimer(minimum);
       String path = m_mainPlayer->isDeploying() ? std::string_view("/client.config:deployCinematic") : std::string_view("/client.config:warpCinematic");
       auto cinematicPathJsonResult = assets->json(path);
       if (!cinematicPathJsonResult)
@@ -614,10 +614,10 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
         return std::unexpected(std::move(operation45.error()));
     }
   }
-  if (m_warpCinemaCancelTimer) {
-    m_warpCinemaCancelTimer->tick(m_root.timing().time_step);
-    if (m_warpCinemaCancelTimer->ready() && !m_warping) {
-      m_warpCinemaCancelTimer.reset();
+  if (m_warp_cinema_cancel_timer) {
+    m_warp_cinema_cancel_timer->tick(m_root.timing().time_step);
+    if (m_warp_cinema_cancel_timer->ready() && !m_warping) {
+      m_warp_cinema_cancel_timer.reset();
       auto operation46 = m_mainPlayer->setPendingCinematic(Json());
       if (!operation46)
         return std::unexpected(std::move(operation46.error()));
@@ -868,7 +868,7 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
   if (!m_worldClient->mainPlayerDead() || m_mainPlayer->mode_config().permadeath) {
     m_respawnWarped = m_respawning = false;
   } else if (m_respawning) {
-    if (m_respawnTimer.tick(dt)) {
+    if (m_respawn_timer.tick(dt)) {
       bool ownShip = playerOnOwnShip();
       if (ownShip || m_worldClient->respawnInWorld()) {
         auto operation69 = m_worldClient->reviveMainPlayer();
@@ -876,7 +876,7 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
           return std::unexpected(std::move(operation69.error()));
         m_respawning = false;
       } else if (!ownShip && !m_respawnWarped) {
-        if (m_respawnTimer.time > 0.f) {
+        if (m_respawn_timer.duration > 0.f) {
           auto cinematicJsonResult = assets->json("/client.config:respawnCinematic");
           if (!cinematicJsonResult)
             return std::unexpected(std::move(cinematicJsonResult.error()));
@@ -898,12 +898,12 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
         }
         m_respawnWarped = true;
         m_pendingWarp = WarpAlias::OwnShip;
-        m_warpDelay.reset();
+        m_warp_delay.reset();
         m_respawning = false;
       }
     }
   } else if (m_respawnWarped) {
-    if (m_respawnTimer.tick(dt) && playerOnOwnShip()) {
+    if (m_respawn_timer.tick(dt) && playerOnOwnShip()) {
       auto operation71 = m_worldClient->reviveMainPlayer();
       if (!operation71)
         return std::unexpected(std::move(operation71.error()));
@@ -911,7 +911,7 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
     }
   } else {
     m_respawning = true;
-    m_respawnTimer.reset();
+    m_respawn_timer.reset();
   }
   m_celestial_database->cleanup();
   if (auto stats = m_connection->incomingStats()) {
@@ -1020,7 +1020,7 @@ std::expected<void, StarException> UniverseClient::warpPlayer(WarpAction const& 
     if (!operation22)
       return std::unexpected(std::move(operation22.error()));
     m_warping = warpAction;
-    m_warpDelay.reset();
+    m_warp_delay.reset();
   }
   m_pendingWarp = warpAction;
   return {};
@@ -1297,7 +1297,7 @@ std::expected<bool, StarException> UniverseClient::reloadPlayer(Json const& data
         return std::unexpected(std::move(operation41.error()));
     } else {
       m_respawning = false;
-      m_respawnTimer.reset();
+      m_respawn_timer.reset();
     }
     auto originalDataResult = m_playerStorage->savePlayer(player);
     if (!originalDataResult)
@@ -1989,7 +1989,7 @@ std::expected<void, StarException> UniverseClient::reset() {
     if (!delayResult)
       return std::unexpected(std::move(delayResult.error()));
     auto delay = std::move(*delayResult);
-    m_warpDelay = GameTimer(delay);
+    m_warp_delay = GameTimer(delay);
     auto reviveJsonResult = assets->json("/client.config:playerReviveTime");
     if (!reviveJsonResult)
       return std::unexpected(std::move(reviveJsonResult.error()));
@@ -1998,7 +1998,7 @@ std::expected<void, StarException> UniverseClient::reset() {
     if (!reviveResult)
       return std::unexpected(std::move(reviveResult.error()));
     auto revive = std::move(*reviveResult);
-    m_respawnTimer = GameTimer(revive);
+    m_respawn_timer = GameTimer(revive);
     return {};
   }();
   remember(std::move(timers));

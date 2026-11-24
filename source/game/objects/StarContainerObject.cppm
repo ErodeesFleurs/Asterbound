@@ -167,7 +167,7 @@ private:
 
   ContainerCallback m_containerCallback;
 
-  EpochTimer m_ageItemsTimer;
+  EpochTimer m_age_items_timer;
 
   List<std::shared_ptr<Item>> m_lostItems;
 };

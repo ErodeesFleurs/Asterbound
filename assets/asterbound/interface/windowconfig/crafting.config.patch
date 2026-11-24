@@ -1,11 +1,11 @@
 // Default config for all crafting interfaces, vanilla and modded.
 
 { "default" : {
-  // Disables the crafting timer if true.
+  // If true, craft the entire selected quantity immediately, as for zero-duration recipes.
   "disableTimer" : false,
 
-  // This is only used if the crafting timer is enabled.
-  // This is how many crafts are ran when the crafting timer wraps.
+  // Crafts per completed timer period, capped by the remaining selected quantity.
+  // A timed recipe completes at most one such batch per interface update.
   "craftCount" : 1,
 
   // This is how many of any item can be crafted at once.

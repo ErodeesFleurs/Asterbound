@@ -483,7 +483,7 @@ TestUniverse::waitForWorldReady(std::int64_t timeoutMilliseconds) {
     }
 
     bool schedulesReady = true;
-    float expiryTime = 0;
+    float expiry_time = 0;
     for (auto& [id, observation] : observedEntities)
       observation.present = false;
     auto executed = m_server->executeForClient(
@@ -501,7 +501,7 @@ TestUniverse::waitForWorldReady(std::int64_t timeoutMilliseconds) {
         if (!active)
           return std::unexpected(std::move(active.error()));
         schedulesReady = *active && step > ready.firstServerStep;
-        expiryTime = world.expiryTime();
+        expiry_time = world.expiry_time();
         float dt = world.root().timing().server_time_step * world.root().timing().time_scale;
 
         auto settled = [&](Observation& observation, double period) {
@@ -567,7 +567,7 @@ TestUniverse::waitForWorldReady(std::int64_t timeoutMilliseconds) {
     // Reuse a real handler without altering its expiry setting. Its response
     // proves a *successful* later world update, not merely currentStep++, which
     // happens before entity/script execution and can precede a failure.
-    auto message = m_server->sendWorldMessage(worldId, "keepAlive", JsonArray{expiryTime});
+    auto message = m_server->sendWorldMessage(worldId, "keepAlive", JsonArray{expiry_time});
     if (!message)
       return std::unexpected(std::move(message.error()));
     barrier = std::move(*message);

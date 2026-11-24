@@ -298,7 +298,7 @@ private:
   Vec2F m_presentationDamageShake;
 
   [[nodiscard]] std::expected<void, StarException> checkLiquidBroken();
-  GameTimer m_liquidCheckTimer;
+  GameTimer m_liquid_check_timer;
 
   std::shared_ptr<ObjectConfig const> m_config;
   std::optional<List<std::shared_ptr<ObjectOrientation>>> m_orientations;
@@ -330,7 +330,7 @@ private:
   mutable StringMap<String> m_imageKeys;
 
   void resetEmissionTimers();
-  List<GameTimer> m_emissionTimers;
+  List<GameTimer> m_emission_timers;
 
   NetElementBool m_soundEffectEnabled;
   std::shared_ptr<AudioInstance> m_soundEffect;

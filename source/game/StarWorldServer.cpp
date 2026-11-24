@@ -231,7 +231,7 @@ std::expected<std::shared_ptr<WorldServer>, StarException> WorldServer::create(R
     return std::unexpected(std::move(settings.error()));
   world->m_universeSettings = std::move(*settings);
   world->m_worldId = worldTemplate->worldName();
-  world->m_expiryTimer = GameTimer(0.0f);
+  world->m_expiry_timer = GameTimer(0.0f);
   if (auto result = world->init(true); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = world->writeMetadata(); !result)
@@ -700,7 +700,7 @@ std::expected<bool, StarException> WorldServer::addClient(ConnectionId clientId,
     tracker = std::move(*result48);
   }
 
-  tracker.update(m_currentTime);
+  tracker.update(m_current_time);
 
   auto result49 = ClientInfo::create(this->root(), clientId, tracker);
   if (!result49)
@@ -1581,19 +1581,19 @@ std::expected<void, StarException> WorldServer::setFidelity(WorldServerFidelity 
 
 bool WorldServer::shouldExpire() {
   if (!m_clientInfo.empty()) {
-    m_expiryTimer.reset();
+    m_expiry_timer.reset();
     return false;
   }
 
-  return m_expiryTimer.ready();
+  return m_expiry_timer.ready();
 }
 
-void WorldServer::setExpiryTime(float expiryTime) {
-  m_expiryTimer = GameTimer(expiryTime);
+void WorldServer::set_expiry_time(float expiry_time) {
+  m_expiry_timer = GameTimer(expiry_time);
 }
 
-float WorldServer::expiryTime() {
-  return m_expiryTimer.timer;
+float WorldServer::expiry_time() {
+  return m_expiry_timer.remaining;
 }
 
 List<EntityId> WorldServer::entity_ids() const {
@@ -1601,10 +1601,10 @@ List<EntityId> WorldServer::entity_ids() const {
 }
 
 std::expected<void, StarException> WorldServer::update(float dt) {
-  m_currentTime += dt;
+  m_current_time += dt;
   ++m_currentStep;
   for (auto const& pair : m_clientInfo)
-    pair.second->interpolationTracker.update(m_currentTime);
+    pair.second->interpolationTracker.update(m_current_time);
 
   List<WorldAction> triggeredActions;
   m_timers.filter([&triggeredActions, dt](std::pair<float, WorldAction>& timer) {
@@ -1626,9 +1626,8 @@ std::expected<void, StarException> WorldServer::update(float dt) {
   if (!result154)
     return std::unexpected(std::move(result154.error()));
 
-  bool doBreakChecks = m_tileEntityBreakCheckTimer.wrapTick(m_currentTime) && m_needsGlobalBreakCheck;
-  if (doBreakChecks)
-    m_needsGlobalBreakCheck = false;
+  bool const do_break_checks = m_tile_entity_break_check_timer.wrap_tick(dt)
+      && std::exchange(m_needs_global_break_check, false);
 
   List<EntityId> toRemove;
   auto result162 = m_entityMap->update_all_entities([&, &world = *this](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
@@ -1640,17 +1639,13 @@ std::expected<void, StarException> WorldServer::update(float dt) {
       // Only do break checks on objects if all sectors the object touches
       // *and surrounding sectors* are active.  Objects that this object
       // rests on can be up to an entire sector large in any direction.
-      bool condition157 = static_cast<bool>(doBreakChecks);
-      if (condition157) {
-        auto result156 = world.regionActive(RectI::integral(tileEntity->metaBoundBox().translated(tileEntity->position())).padded(world_sector_size));
-        if (!result156)
-          return std::unexpected(std::move(result156.error()));
-        condition157 = static_cast<bool>(std::move(*result156));
-      }
-      if (condition157) {
-        auto result158 = tileEntity->checkBroken();
-        if (!result158)
-          return std::unexpected(std::move(result158.error()));
+      if (do_break_checks) {
+        auto active = world.regionActive(RectI::integral(tileEntity->metaBoundBox().translated(tileEntity->position())).padded(world_sector_size));
+        if (!active) return std::unexpected(std::move(active.error()));
+        if (*active) {
+          auto broken = tileEntity->checkBroken();
+          if (!broken) return std::unexpected(std::move(broken.error()));
+        }
       }
       auto result159 = world.updateTileEntityTiles(tileEntity);
       if (!result159)
@@ -1831,7 +1826,7 @@ std::expected<void, StarException> WorldServer::update(float dt) {
     }
   }
 
-  bool sendRemoteUpdates = m_entityUpdateTimer.wrapTick(dt);
+  bool const send_remote_updates = m_entity_update_timer.wrap_tick(dt);
   std::optional<Vec2I> activeRegionPad;
   // These protocol-neutral packets are read-only after construction. Retain
   // them only through this final snapshot phase, never across simulation ticks.
@@ -1860,7 +1855,7 @@ std::expected<void, StarException> WorldServer::update(float dt) {
     // only queues future generation and refreshes sector TTLs.
     if (m_generatingDungeon)
       sectorSnapshots.clear();
-    auto result194 = queueUpdatePackets(pair.first, sendRemoteUpdates, *result190, sectorSnapshots);
+    auto result194 = queueUpdatePackets(pair.first, send_remote_updates, *result190, sectorSnapshots);
     if (!result194)
       return std::unexpected(std::move(result194.error()));
   }
@@ -1869,7 +1864,7 @@ std::expected<void, StarException> WorldServer::update(float dt) {
   for (auto& pair : m_clientInfo)
     pair.second->pendingForward = false;
 
-  m_expiryTimer.tick(dt);
+  m_expiry_timer.tick(dt);
 
   this->root().logMap().set(Star::format("server_{}_entities", m_worldId), Star::format("{} in {} sectors", m_entityMap->size(), m_tileArray->loaded_sector_count()));
   this->root().logMap().set(Star::format("server_{}_time", m_worldId), Star::format("age = {:4.2f}, day = {:4.2f}/{:4.2f}s", epochTime(), timeOfDay(), dayLength()));
@@ -2068,8 +2063,8 @@ std::expected<void, StarException> WorldServer::activateLiquidLocation(Vec2I con
   return {};
 }
 
-void WorldServer::requestGlobalBreakCheck() {
-  m_needsGlobalBreakCheck = true;
+void WorldServer::request_global_break_check() {
+  m_needs_global_break_check = true;
 }
 
 void WorldServer::setSpawningEnabled(bool spawningEnabled) {
@@ -2849,7 +2844,7 @@ std::expected<void, StarException> WorldServer::init(bool firstTime) {
 
   m_worldStorage->setFloatingDungeonWorld(isFloatingDungeonWorld());
 
-  m_currentTime = 0;
+  m_current_time = 0;
   m_currentStep = 0;
   m_generatingDungeon = false;
   m_geometry = WorldGeometry(m_worldTemplate->size());
@@ -2894,14 +2889,12 @@ std::expected<void, StarException> WorldServer::init(bool firstTime) {
   auto result312 = m_serverConfig.query("interpolationSettings.normal");
   if (!result312)
     return std::unexpected(std::move(result312.error()));
-  auto result313 = std::move(*result312).get_float("entityUpdateDelta");
-  if (!result313)
-    return std::unexpected(std::move(result313.error()));
-  m_entityUpdateTimer = GameTimer(std::move(*result313) / 60.f);
-  auto result314 = m_serverConfig.get_float("tileEntityBreakCheckInterval");
-  if (!result314)
-    return std::unexpected(std::move(result314.error()));
-  m_tileEntityBreakCheckTimer = GameTimer(std::move(*result314));
+  auto update_delta = result312->get_float("entityUpdateDelta");
+  if (!update_delta) return std::unexpected(std::move(update_delta.error()));
+  m_entity_update_timer = GameTimer(*update_delta / 60.f);
+  auto check_interval = m_serverConfig.get_float("tileEntityBreakCheckInterval");
+  if (!check_interval) return std::unexpected(std::move(check_interval.error()));
+  m_tile_entity_break_check_timer = GameTimer(*check_interval);
 
   auto liquid_seed = root.random().next_u64();
   auto liquid_world = LiquidWorld::create(*this);
@@ -3654,7 +3647,7 @@ std::expected<void, StarException> WorldServer::queueUpdatePackets(ConnectionId 
   if (!result394)
     return std::unexpected(std::move(result394.error()));
   auto const& clientInfo = result394->get();
-  clientInfo->outgoingPackets.push_back(std::make_shared<StepUpdatePacket>(m_currentTime));
+  clientInfo->outgoingPackets.push_back(std::make_shared<StepUpdatePacket>(m_current_time));
 
   std::optional<String> weatherDomain;
   auto clientWindow = clientInfo->clientState->window();

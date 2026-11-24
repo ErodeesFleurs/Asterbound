@@ -538,13 +538,13 @@ private:
   ClientSubWorldId m_subWorldId;
   bool m_requestedDestroy = false;
 
-  GameTimer m_worldDimTimer;
+  GameTimer m_world_dim_timer;
   float m_worldDimLevel;
   Vec3B m_worldDimColor;
 
   bool m_interactiveHighlightMode = false;
 
-  GameTimer m_parallaxFadeTimer;
+  GameTimer m_parallax_fade_timer;
   std::shared_ptr<Parallax> m_currentParallax;
   std::shared_ptr<Parallax> m_nextParallax;
   std::optional<String> m_weatherParallaxAsset;
@@ -564,7 +564,7 @@ private:
   HashMap<EntityId, std::uint64_t> m_masterEntitiesNetVersion;
 
   InterpolationTracker m_interpolationTracker;
-  GameTimer m_entityUpdateTimer;
+  GameTimer m_entity_update_timer;
 
   List<std::shared_ptr<Packet>> m_outgoingPackets;
   std::optional<std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>> m_pingTime;
@@ -628,7 +628,7 @@ private:
   
   StringMap<std::shared_ptr<WorldClient::ScriptComponent>> m_scriptContexts;
 
-  GameTimer m_expiryTimer;
+  GameTimer m_expiry_timer;
   
   std::reference_wrapper<UniverseClient> m_universe;
   

@@ -470,7 +470,7 @@ std::expected<BlockMoveResult, BlockMoveError> FallingBlocksWorld::move_block(Ve
   source.foreground = EmptyMaterialId;
   source.foregroundMod = NoModId;
   source.update_collision(CollisionKind::None);
-  m_world_server.requestGlobalBreakCheck();
+  m_world_server.request_global_break_check();
   return BlockMoveResult::Changed;
 }
 

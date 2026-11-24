@@ -619,6 +619,18 @@ with a conservative earliest-timestamp bound; negative smear, TTL changes and
 failed-insertion timestamps must remain covered. Filtered cleanup still visits
 every entry. Revisiting evicted cells re-executes their deterministic callbacks.
 
+### Game timers
+
+`GameTimers.GlobalBreakRequestsFollowElapsedSteps` counts actual tile-entity
+break checks in an active sector; the server clock keeps advancing even with
+no pending request. `GameTimerTest.*` and `EpochTimerTest.*` cover the legacy
+wire layout and truncated reads. A countdown drops overshoot on reset; an
+epoch clock rebases after a backward step without reducing elapsed time.
+
+For the farm window, compare sampling and non-sampling ticks separately and
+check crop survival at the immersion threshold. For crafting, a timed recipe
+may finish one configured batch per UI update; instant crafting is separate.
+
 ### Falling blocks
 
 `FallingBlocksTest.*` exercises wave scheduling and retries; `FallingBlocksWorld.*`

@@ -96,7 +96,7 @@ private:
   EntityId m_sourceEntityId;
   Json m_settings;
 
-  GameTimer m_refreshTimer;
+  GameTimer m_refresh_timer;
 
   JsonArray m_itemList;
   std::size_t m_selectedIndex;

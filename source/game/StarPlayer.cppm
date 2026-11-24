@@ -507,7 +507,7 @@ public:
   void queueItemPickupMessage(std::shared_ptr<Item> const& item);
 
   [[nodiscard]] std::expected<void, StarException> add_chat_message(String const& message, Json const& config = {});
-  void addEmote(HumanoidEmote const& emote, std::optional<float> emoteCooldown = {});
+  void addEmote(HumanoidEmote const& emote, std::optional<float> emote_cooldown = {});
   [[nodiscard]] std::expected<void, StarException> set_dance(std::optional<String> const& dance_name);
   std::pair<HumanoidEmote, float> currentEmote() const;
 
@@ -683,11 +683,11 @@ private:
 
   float m_footstepTimer;
   float m_teleportTimer;
-  GameTimer m_emoteCooldownTimer;
-  GameTimer m_blinkCooldownTimer;
+  GameTimer m_emote_cooldown_timer;
+  GameTimer m_blink_cooldown_timer;
   float m_lastDamagedOtherTimer;
   EntityId m_lastDamagedTarget;
-  GameTimer m_ageItemsTimer;
+  GameTimer m_age_items_timer;
 
   float m_footstepVolumeVariance;
   float m_landingVolume;
@@ -698,8 +698,8 @@ private:
   std::shared_ptr<NetworkedAnimator> m_effectsAnimator;
   NetworkedAnimator::DynamicTarget m_effectsAnimatorDynamicTarget;
 
-  float m_emoteCooldown;
-  Vec2F m_blinkInterval;
+  float m_emote_cooldown;
+  Vec2F m_blink_interval;
 
   HashSet<MoveControlType> m_pendingMoves;
   Vec2F m_moveVector;
@@ -760,7 +760,7 @@ private:
 
   StringSet m_missionRadioMessages;
   bool m_interruptRadioMessage;
-  List<std::pair<GameTimer, RadioMessage>> m_delayedRadioMessages;
+  List<std::pair<GameTimer, RadioMessage>> m_delayed_radio_messages;
   Deque<RadioMessage> m_pendingRadioMessages;
   std::optional<Json> m_pendingCinematic;
   std::optional<AltMusicRequest> m_pending_alt_music;

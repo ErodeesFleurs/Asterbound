@@ -97,9 +97,9 @@ private:
   double m_stageEnterTime;
   double m_nextStageTime;
 
-  SlidingWindow m_immersion;
-  float m_minImmersion;
-  float m_maxImmersion;
+  std::optional<SlidingWindow> m_immersion;
+  float m_min_immersion;
+  float m_max_immersion;
 
   bool m_consumeSoilMoisture;
 

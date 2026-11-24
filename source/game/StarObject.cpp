@@ -510,8 +510,8 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
         m_lightSourceColor.set(Color::palette_clear);
       }
       m_soundEffectEnabled.set(true);
-      m_liquidCheckTimer = GameTimer(m_config->liquidCheckInterval);
-      m_liquidCheckTimer.setDone();
+      m_liquid_check_timer = GameTimer(m_config->liquid_check_interval);
+      m_liquid_check_timer.set_done();
       auto keepAliveConfigResult = configValue("keepAlive", false);
       if (!keepAliveConfigResult)
         return std::unexpected(std::move(keepAliveConfigResult.error()));
@@ -851,7 +851,7 @@ std::expected<void, StarException> Object::update(float dt, std::uint64_t) {
   auto& currentWorld = currentWorldResult->get();
   if (isMaster()) {
     m_tileDamageStatus->recover(m_config->tileDamageParameters, dt);
-    if (m_liquidCheckTimer.wrapTick(root().timing().time_step)) {
+    if (m_liquid_check_timer.wrap_tick(root().timing().time_step)) {
       auto operation1 = checkLiquidBroken();
       if (!operation1)
         return std::unexpected(std::move(operation1.error()));
@@ -879,7 +879,7 @@ std::expected<void, StarException> Object::update(float dt, std::uint64_t) {
   }
   if (m_lightFlickering)
     m_lightFlickering->update(dt);
-  for (auto& timer : m_emissionTimers)
+  for (auto& timer : m_emission_timers)
     timer.tick(dt);
   if (currentWorld.isClient()) {
     auto operation5 = recover_lua_script_error(m_scriptedAnimator.update());
@@ -1779,10 +1779,10 @@ void Object::setImageKey(String const& name, String const& value) {
 }
 
 void Object::resetEmissionTimers() {
-  m_emissionTimers.clear();
+  m_emission_timers.clear();
   if (auto orientation = currentOrientation())
     for (std::size_t i = 0; i < orientation->particleEmitters.size(); i++)
-      m_emissionTimers.push_back(GameTimer());
+      m_emission_timers.push_back(GameTimer());
 }
 
 std::size_t Object::orientationIndex() const {
@@ -2451,13 +2451,13 @@ std::expected<void, StarException> Object::collectParticles(RenderCallback& rend
   if (!inWorld())
     return {};
   if (auto orientation = currentOrientation()) {
-    if (m_emissionTimers.size() != orientation->particleEmitters.size())
+    if (m_emission_timers.size() != orientation->particleEmitters.size())
       resetEmissionTimers();
     for (std::size_t i = 0; i < orientation->particleEmitters.size(); ++i) {
       auto const& emitter = orientation->particleEmitters[i];
       if (emitter.particleEmissionRate <= 0.0f)
         continue;
-      auto& timer = m_emissionTimers[i];
+      auto& timer = m_emission_timers[i];
       if (timer.ready()) {
         auto particle = emitter.particle;
         particle.applyVariance(root(), emitter.particleVariance);

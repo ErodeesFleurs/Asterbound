@@ -172,7 +172,7 @@ m_boundBox = std::move(*result1019);
 if (!result1020) return std::unexpected(std::move(result1020.error()));
 auto result1021 = std::move(*result1020).to_float();
 if (!result1021) return std::unexpected(std::move(result1021.error()));
-m_slaveControlTimeout = std::move(*result1021);
+m_slave_control_timeout = std::move(*result1021);
   auto result1022 = configValue("receiveExtraControls", false);
 if (!result1022) return std::unexpected(std::move(result1022.error()));
 auto result1023 = std::move(*result1022).to_bool();
@@ -182,7 +182,7 @@ m_receiveExtraControls = std::move(*result1023);
 if (!result1024) return std::unexpected(std::move(result1024.error()));
 auto result1025 = std::move(*result1024).to_float();
 if (!result1025) return std::unexpected(std::move(result1025.error()));
-m_slaveHeartbeatTimer = GameTimer(std::move(*result1025));
+m_slave_heartbeat_timer = GameTimer(std::move(*result1025));
   auto result1026 = configValue("damageTeam");
 if (!result1026) return std::unexpected(std::move(result1026.error()));
 auto teamConfig = std::move(*result1026);
@@ -559,7 +559,7 @@ if (!result1251) return std::unexpected(std::move(result1251.error()));
     auto result1252 = recover_lua_script_error(m_scriptComponent.init(world));
 if (!result1252) return std::unexpected(std::move(result1252.error()));
   } else {
-    m_slaveHeartbeatTimer.reset();
+    m_slave_heartbeat_timer.reset();
   }
 
   if (world.isClient()) {
@@ -676,15 +676,15 @@ if (!result1204) return std::unexpected(std::move(result1204.error()));
     auto result1205 = recover_lua_script_error(m_scriptComponent.update(m_scriptComponent.update_dt(dt)));
 if (!result1205) return std::unexpected(std::move(result1205.error()));
 
-    Star::erase_if(m_aliveMasterConnections, [this](auto& p) {
-        return p.second.tick(this->root().timing().time_step);
-      });
+    Star::erase_if(m_alive_master_connections, [this](decltype(m_alive_master_connections)::value_type& connection) {
+      return connection.second.tick(root().timing().time_step);
+    });
 
     for (auto& loungePositionPair : m_loungePositions) {
       for (auto& p : loungePositionPair.second.masterControlState) {
         p.second.masterHeld = false;
         filter(p.second.slavesHeld, [this](ConnectionId id) {
-            return m_aliveMasterConnections.contains(id);
+            return m_alive_master_connections.contains(id);
           });
       }
     }
@@ -695,7 +695,7 @@ if (!result1206) return std::unexpected(std::move(result1206.error()));
     auto result1207 = m_movementController->tickSlave(dt);
 if (!result1207) return std::unexpected(std::move(result1207.error()));
 
-    bool heartbeat = m_slaveHeartbeatTimer.wrapTick(root().timing().time_step);
+    bool heartbeat = m_slave_heartbeat_timer.wrap_tick(root().timing().time_step);
 
     for (auto& p : m_loungePositions) {
       if (heartbeat) {
@@ -861,7 +861,7 @@ if (!result1181) return std::unexpected(std::move(result1181.error()));
 }
 
 MessageResponseResult Vehicle::receiveMessage(ConnectionId connectionId, String const& message, JsonArray const& args) {
-  m_aliveMasterConnections[connectionId] = GameTimer(m_slaveControlTimeout);
+  m_alive_master_connections[connectionId] = GameTimer(m_slave_control_timeout);
   auto result1145 = message.equals_ignore_case("control_on");
 if (!result1145) return std::unexpected(std::move(result1145.error()));
 if (std::move(*result1145)) {

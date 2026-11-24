@@ -609,13 +609,13 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
   if (!fetchChildResult58)
     return std::unexpected(std::move(fetchChildResult58.error()));
   m_trashSlot = std::move(*fetchChildResult58);
-  auto getResult59 = config.get("trashBurnTimeout");
-  if (!getResult59)
-    return std::unexpected(std::move(getResult59.error()));
-  auto toFloatResult60 = std::move(*getResult59).to_float();
-  if (!toFloatResult60)
-    return std::unexpected(std::move(toFloatResult60.error()));
-  m_trashBurn = GameTimer(std::move(*toFloatResult60));
+  auto burn_config = config.get("trashBurnTimeout");
+  if (!burn_config)
+    return std::unexpected(std::move(burn_config.error()));
+  auto burn_duration = std::move(*burn_config).to_float();
+  if (!burn_duration)
+    return std::unexpected(std::move(burn_duration.error()));
+  m_trash_burn = GameTimer(std::move(*burn_duration));
 
   auto head_overlay = fetchChild<ImageWidget>("techHeadDisabled");
   if (!head_overlay)
@@ -1056,7 +1056,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
   m_trashSlot->setItem(std::move(*itemsAtResult129));
   m_trashSlot->showLinkIndicator(customBarItems.contains(m_trashSlot->item()));
   if (auto trashItem = m_trashSlot->item()) {
-    if (m_trashBurn.tick(dt) && trashItem->count() > 0) {
+    if (m_trash_burn.tick(dt) && trashItem->count() > 0) {
       m_player->statistics()->recordEvent("trashItem", JsonObject{
           {"itemName", trashItem->name()},
           {"count", trashItem->count()},
@@ -1067,9 +1067,9 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
         return std::unexpected(std::move(takeResult130.error()));
     }
   } else {
-    m_trashBurn.reset();
+    m_trash_burn.reset();
   }
-  m_trashSlot->setProgress(m_trashBurn.timer / m_trashBurn.time);
+  m_trashSlot->setProgress(m_trash_burn.remaining_fraction());
 
   {
     auto const& enumResult131 = EquipmentSlotNames;

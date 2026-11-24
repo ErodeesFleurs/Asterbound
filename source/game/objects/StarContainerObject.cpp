@@ -302,25 +302,15 @@ std::expected<void, StarException> ContainerObject::update(float dt, std::uint64
         }
       }
     }
-    m_ageItemsTimer.update(currentWorld.get().epochTime());
-    auto ageConfigResult = configValue("ageItemsEvery", 10);
-    if (!ageConfigResult)
-      return std::unexpected(std::move(ageConfigResult.error()));
-    auto ageConfig = std::move(*ageConfigResult);
-    auto ageIntervalResult = ageConfig.to_double();
-    if (!ageIntervalResult)
-      return std::unexpected(std::move(ageIntervalResult.error()));
-    auto ageInterval = std::move(*ageIntervalResult);
-    if (m_ageItemsTimer.elapsedTime() > ageInterval) {
-      auto multiplierConfigResult = configValue("itemAgeMultiplier", 1.0f);
-      if (!multiplierConfigResult)
-        return std::unexpected(std::move(multiplierConfigResult.error()));
-      auto multiplierConfig = std::move(*multiplierConfigResult);
-      auto multiplierResult = multiplierConfig.to_double();
-      if (!multiplierResult)
-        return std::unexpected(std::move(multiplierResult.error()));
-      auto multiplier = std::move(*multiplierResult);
-      double elapsed = m_ageItemsTimer.elapsedTime() * multiplier;
+    m_age_items_timer.update(currentWorld.get().epochTime());
+    auto interval = configValue("ageItemsEvery", 10).and_then([](Json const& value) { return value.to_double(); });
+    if (!interval)
+      return std::unexpected(std::move(interval.error()));
+    if (m_age_items_timer.elapsed_time() > *interval) {
+      auto multiplier = configValue("itemAgeMultiplier", 1.0f).and_then([](Json const& value) { return value.to_double(); });
+      if (!multiplier)
+        return std::unexpected(std::move(multiplier.error()));
+      double elapsed = m_age_items_timer.elapsed_time() * *multiplier;
       for (auto& item : m_items->items()) {
         auto databaseResult = root().itemDatabase();
         if (!databaseResult)
@@ -333,7 +323,7 @@ std::expected<void, StarException> ContainerObject::update(float dt, std::uint64
         if (aged)
           itemsUpdated();
       }
-      m_ageItemsTimer.setElapsedTime(0.0);
+      m_age_items_timer.set_elapsed_time(0.0);
     }
     if (std::exchange(m_runUpdatedCallback, false)) {
       auto operation4 = recover_lua_script_error(m_scriptComponent.invoke("containerCallback"));
@@ -1214,15 +1204,10 @@ std::expected<void, StarException> ContainerObject::readStoredData(Json const& d
     return std::unexpected(std::move(itemsResult.error()));
   auto items = std::move(*itemsResult);
   m_items = std::make_shared<ItemBag>(std::move(items));
-  auto timerConfigResult = diskStore.get("ageItemsTimer");
-  if (!timerConfigResult)
-    return std::unexpected(std::move(timerConfigResult.error()));
-  auto timerConfig = std::move(*timerConfigResult);
-  auto timerResult = EpochTimer::create(timerConfig);
-  if (!timerResult)
-    return std::unexpected(std::move(timerResult.error()));
-  auto timer = std::move(*timerResult);
-  m_ageItemsTimer = std::move(timer);
+  auto timer = diskStore.get("ageItemsTimer").and_then(EpochTimer::from_json);
+  if (!timer)
+    return std::unexpected(std::move(timer.error()));
+  m_age_items_timer = *timer;
   auto slotsConfigResult = configValue("slotCount");
   if (!slotsConfigResult)
     return std::unexpected(std::move(slotsConfigResult.error()));
@@ -1254,7 +1239,7 @@ std::expected<Json, StarException> ContainerObject::writeStoredData() const {
                          {"craftingProgress", m_craftingProgress.get()},
                          {"initialized", m_initialized},
                          {"items", std::move(items)},
-                         {"ageItemsTimer", m_ageItemsTimer.toJson()}});
+                         {"ageItemsTimer", m_age_items_timer.to_json()}});
 }
 
 std::expected<ItemRecipe, StarException> ContainerObject::recipeForMaterials(List<std::shared_ptr<Item>> const& inputItems) {

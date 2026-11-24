@@ -205,7 +205,7 @@ struct ObjectConfig {
 
   std::optional<float> minimumLiquidLevel;
   std::optional<float> maximumLiquidLevel;
-  float liquidCheckInterval;
+  float liquid_check_interval;
 
   float health;
 

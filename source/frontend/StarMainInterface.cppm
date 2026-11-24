@@ -303,10 +303,10 @@ private:
   Vec2I m_cursorScreenIPos{};
   std::shared_ptr<ItemSlotWidget> m_cursorItem;
 
-  GameTimer m_debugSpatialClearTimer;
-  GameTimer m_debugMapClearTimer;
-  bool m_debugSpatialClearDue = false;
-  bool m_debugMapClearDue = false;
+  GameTimer m_debug_spatial_clear_timer;
+  GameTimer m_debug_map_clear_timer;
+  bool m_debug_spatial_clear_due = false;
+  bool m_debug_map_clear_due = false;
   RectF m_debugTextRect{RectF::null()};
 
   std::unique_ptr<NameplatePainter> m_nameplatePainter;

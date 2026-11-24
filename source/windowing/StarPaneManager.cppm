@@ -150,7 +150,7 @@ private:
 
   float m_tooltipMouseoverRadius;
   Vec2I m_tooltipMouseOffset;
-  GameTimer m_tooltipShowTimer;
+  GameTimer m_tooltip_show_timer;
   Vec2I m_tooltipLastMousePos;
   Vec2I m_tooltipInitialPosition;
   std::shared_ptr<Pane> m_activeTooltip;

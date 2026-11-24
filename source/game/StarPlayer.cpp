@@ -454,27 +454,27 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
 
   m_isAdmin = false;
 
-  auto emoteCooldownJsonResult = assets->json("/player.config:emoteCooldown");
-  if (!emoteCooldownJsonResult)
-    return std::unexpected(std::move(emoteCooldownJsonResult.error()));
-  auto emoteCooldownJson = std::move(*emoteCooldownJsonResult);
-  auto emoteCooldownResult = emoteCooldownJson.to_float();
-  if (!emoteCooldownResult)
-    return std::unexpected(std::move(emoteCooldownResult.error()));
-  auto emoteCooldown = std::move(*emoteCooldownResult);
-  m_emoteCooldown = emoteCooldown;
-  auto blinkIntervalJsonResult = assets->json("/player.config:blinkInterval");
-  if (!blinkIntervalJsonResult)
-    return std::unexpected(std::move(blinkIntervalJsonResult.error()));
-  auto blinkIntervalJson = std::move(*blinkIntervalJsonResult);
-  auto blinkIntervalResult = json_to_vec2f(blinkIntervalJson);
-  if (!blinkIntervalResult)
-    return std::unexpected(std::move(blinkIntervalResult.error()));
-  auto blinkInterval = std::move(*blinkIntervalResult);
-  m_blinkInterval = blinkInterval;
+  auto emote_cooldown_json_result = assets->json("/player.config:emoteCooldown");
+  if (!emote_cooldown_json_result)
+    return std::unexpected(std::move(emote_cooldown_json_result.error()));
+  auto emote_cooldown_json = std::move(*emote_cooldown_json_result);
+  auto emote_cooldown_result = emote_cooldown_json.to_float();
+  if (!emote_cooldown_result)
+    return std::unexpected(std::move(emote_cooldown_result.error()));
+  auto emote_cooldown = std::move(*emote_cooldown_result);
+  m_emote_cooldown = emote_cooldown;
+  auto blink_interval_json_result = assets->json("/player.config:blinkInterval");
+  if (!blink_interval_json_result)
+    return std::unexpected(std::move(blink_interval_json_result.error()));
+  auto blink_interval_json = std::move(*blink_interval_json_result);
+  auto blink_interval_result = json_to_vec2f(blink_interval_json);
+  if (!blink_interval_result)
+    return std::unexpected(std::move(blink_interval_result.error()));
+  auto blink_interval = std::move(*blink_interval_result);
+  m_blink_interval = blink_interval;
 
-  m_emoteCooldownTimer = GameTimer(m_emoteCooldown);
-  m_blinkCooldownTimer = GameTimer(0);
+  m_emote_cooldown_timer = GameTimer(m_emote_cooldown);
+  m_blink_cooldown_timer = GameTimer(0);
 
   m_chat_message_changed = false;
   m_chat_message_updated = false;
@@ -490,15 +490,15 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
   m_lastDamagedOtherTimer = 0;
   m_lastDamagedTarget = null_entity_id;
 
-  auto ageItemsEveryJsonResult = assets->json("/player.config:ageItemsEvery");
-  if (!ageItemsEveryJsonResult)
-    return std::unexpected(std::move(ageItemsEveryJsonResult.error()));
-  auto ageItemsEveryJson = std::move(*ageItemsEveryJsonResult);
-  auto ageItemsEveryResult = ageItemsEveryJson.to_float();
-  if (!ageItemsEveryResult)
-    return std::unexpected(std::move(ageItemsEveryResult.error()));
-  auto ageItemsEvery = std::move(*ageItemsEveryResult);
-  m_ageItemsTimer = GameTimer(ageItemsEvery);
+  auto age_items_every_json_result = assets->json("/player.config:ageItemsEvery");
+  if (!age_items_every_json_result)
+    return std::unexpected(std::move(age_items_every_json_result.error()));
+  auto age_items_every_json = std::move(*age_items_every_json_result);
+  auto age_items_every_result = age_items_every_json.to_float();
+  if (!age_items_every_result)
+    return std::unexpected(std::move(age_items_every_result.error()));
+  auto age_items_every = std::move(*age_items_every_result);
+  m_age_items_timer = GameTimer(age_items_every);
 
   if (auto result = refreshEquipment(); !result)
     return std::unexpected(std::move(result.error()));
@@ -1911,7 +1911,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
     // Requests from postUpdate, messages before this tick, or a prior world
     // must not outlive the generic update that actually refreshes them.
     m_controlMovementState.reset();
-    if (m_emoteCooldownTimer.tick(dt))
+    if (m_emote_cooldown_timer.tick(dt))
       m_emoteState = HumanoidEmote::Idle;
     m_dance.tick(dt);
 
@@ -1923,12 +1923,12 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
       m_chat_message_updated = false;
     }
 
-    if (m_blinkCooldownTimer.tick(dt)) {
-      auto blinkIntervalResult = root().random().uniform_float(m_blinkInterval[0], m_blinkInterval[1]);
-      if (!blinkIntervalResult)
-        return std::unexpected(std::move(blinkIntervalResult.error()));
-      auto blinkInterval = std::move(*blinkIntervalResult);
-      m_blinkCooldownTimer = GameTimer(blinkInterval);
+    if (m_blink_cooldown_timer.tick(dt)) {
+      auto blink_interval_result = root().random().uniform_float(m_blink_interval[0], m_blink_interval[1]);
+      if (!blink_interval_result)
+        return std::unexpected(std::move(blink_interval_result.error()));
+      auto blink_interval = std::move(*blink_interval_result);
+      m_blink_cooldown_timer = GameTimer(blink_interval);
       auto loungeAnchor = as<LoungeAnchor>(m_movementController->entity_anchor());
       if (m_emoteState == HumanoidEmote::Idle && (!loungeAnchor || !loungeAnchor->emote))
         addEmote(HumanoidEmote::Blink);
@@ -2124,14 +2124,14 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
         }
       }
 
-      for (auto& pair : m_delayedRadioMessages) {
+      for (auto& pair : m_delayed_radio_messages) {
         if (pair.first.tick(dt))
           {
             if (auto result = queueRadioMessage(pair.second); !result)
               return std::unexpected(std::move(result.error()));
           }
       }
-      m_delayedRadioMessages.filter([](std::pair<GameTimer, RadioMessage>& pair) { return !pair.first.ready(); });
+      m_delayed_radio_messages.filter([](std::pair<GameTimer, RadioMessage>& pair) { return !pair.first.ready(); });
     }
 
     if (m_isAdmin) {
@@ -2155,13 +2155,13 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
 
     m_log->addPlayTime(root().timing().time_step);
 
-    if (m_ageItemsTimer.wrapTick(dt)) {
+    if (m_age_items_timer.wrap_tick(dt)) {
       auto itemDatabaseResult = root().itemDatabase();
   if (!itemDatabaseResult)
     return std::unexpected(std::move(itemDatabaseResult.error()));
   auto itemDatabase = std::move(*itemDatabaseResult);
       if (auto result = m_inventory->forEveryItem([&](InventorySlot const&, std::shared_ptr<Item>& item) -> std::expected<void, StarException> {
-        if (auto result = itemDatabase->ageItem(item, m_ageItemsTimer.time); !result)
+        if (auto result = itemDatabase->ageItem(item, m_age_items_timer.duration); !result)
           return std::unexpected(std::move(result.error()));
         return {};
       }); !result)
@@ -4436,12 +4436,12 @@ std::expected<void, StarException> Player::add_chat_message(String const& messag
   return {};
 }
 
-void Player::addEmote(HumanoidEmote const& emote, std::optional<float> emoteCooldown) {
+void Player::addEmote(HumanoidEmote const& emote, std::optional<float> emote_cooldown) {
   if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((!isSlave()));
   }
   m_emoteState = emote;
-  m_emoteCooldownTimer = GameTimer(emoteCooldown.value_or(m_emoteCooldown));
+  m_emote_cooldown_timer = GameTimer(emote_cooldown.value_or(m_emote_cooldown));
 }
 std::expected<void, StarException> Player::set_dance(std::optional<String> const& dance_name) {
   if constexpr (Star::debug_enabled)
@@ -4451,7 +4451,7 @@ std::expected<void, StarException> Player::set_dance(std::optional<String> const
 }
 
 std::pair<HumanoidEmote, float> Player::currentEmote() const {
-  return std::make_pair(m_emoteState, m_emoteCooldownTimer.timer);
+  return std::make_pair(m_emoteState, m_emote_cooldown_timer.remaining);
 }
 
 Player::State Player::currentState() const {
@@ -4706,7 +4706,7 @@ bool Player::invisible() const {
 std::expected<void, StarException> Player::animatePortrait(float dt) {
   if (auto result = humanoid()->animate(dt, {}); !result)
     return std::unexpected(std::move(result.error()));
-  if (m_emoteCooldownTimer.tick(dt))
+  if (m_emote_cooldown_timer.tick(dt))
     m_emoteState = HumanoidEmote::Idle;
   return humanoid()->setEmoteState(m_emoteState);
 }
@@ -4866,15 +4866,15 @@ std::expected<void, StarException> Player::queueRadioMessage(Json const& message
     if (pending.messageId == message.messageId)
       return {};
   }
-  for (auto& delayed : m_delayedRadioMessages) {
+  for (auto& delayed : m_delayed_radio_messages) {
     if (delayed.second.messageId == message.messageId) {
       if (delay == 0)
-        delayed.first.setDone();
+        delayed.first.set_done();
       return {};
     }
   }
   if (delay > 0) {
-    m_delayedRadioMessages.push_back(std::pair<GameTimer, RadioMessage>{GameTimer(delay), std::move(message)});
+    m_delayed_radio_messages.push_back(std::pair<GameTimer, RadioMessage>{GameTimer(delay), std::move(message)});
     return {};
   }
   return queueRadioMessage(std::move(message));

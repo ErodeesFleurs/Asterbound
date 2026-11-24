@@ -3,16 +3,19 @@
 import std;
 import star.actor_movement_controller;
 import star.algorithm;
+import star.assets;
 import star.byte_array;
 import star.data_stream;
 import star.data_stream_devices;
 import star.data_stream_extra;
 import star.entity;
 import star.entity_map;
+import star.farmable_object;
 import star.file;
 import star.force_regions;
 import star.format;
 import star.game_test;
+import star.game_timers;
 import star.game_types;
 import star.interactive_entity;
 import star.json;
@@ -179,6 +182,85 @@ std::shared_ptr<ObjectConfig> unanchored_physics_config() {
   config->orientations.push_back(std::move(orientation));
   return config;
 }
+
+TEST(SlidingWindow, RejectsInvalidConfiguration) {
+  static_assert(!std::default_initializable<SlidingWindow>);
+  auto empty = SlidingWindow::create(1, 0, 0);
+  ASSERT_FALSE(empty);
+  EXPECT_NE(std::string_view(empty.error().what()).find("immersionResolution"), std::string_view::npos);
+  EXPECT_FALSE(SlidingWindow::create(1, std::numeric_limits<std::size_t>::max(), 0));
+  EXPECT_FALSE(SlidingWindow::create(-1, 1, 0));
+  EXPECT_FALSE(SlidingWindow::create(0, 1, 0));
+  constexpr float infinite_window = std::numeric_limits<float>::infinity();
+  constexpr float nan_sample = std::numeric_limits<float>::quiet_NaN();
+  EXPECT_FALSE(SlidingWindow::create(infinite_window, 1, 0));
+  EXPECT_FALSE(SlidingWindow::create(1, 1, nan_sample));
+}
+
+TEST(SlidingWindow, FailedSampleConsumesPeriodWithoutReplacingSlot) {
+  auto window = SlidingWindow::create(3, 3, -1);
+  ASSERT_TRUE(window);
+  int calls = 0;
+  auto fail = [&]() -> std::expected<float, StarException> {
+    ++calls;
+    return std::unexpected(StarException("liquid query failed"));
+  };
+  ASSERT_TRUE(window->update(0.75f, fail));
+  EXPECT_EQ(calls, 0);
+  EXPECT_FALSE(window->update(0.25f, fail));
+  ASSERT_TRUE(window->update(0.75f, fail));
+  EXPECT_EQ(calls, 1);
+  EXPECT_EQ(window->average(), -1);
+
+  // Slots 1, 2, 0 receive the samples. Physical-order float addition loses
+  // the unit in (1 + 2^24) - 2^24; chronological or double sums retain it.
+  for (float value : {0x1p24f, -0x1p24f, 1.f}) {
+    ASSERT_TRUE(window->update(10.f, [value, &calls]() -> std::expected<float, StarException> {
+      ++calls;
+      return value;
+    }));
+  }
+  EXPECT_EQ(calls, 4);
+  EXPECT_EQ(window->average(), 0);
+}
+
+const GameTestRegistration farm_immersion("FarmableObject", "ImmersionSampleThreshold", [](GameTest& fixture) {
+  auto& root = fixture.root();
+  auto assets = root.assets();
+  ASSERT_TRUE(assets);
+  auto farming = (*assets)->json("/farming.config");
+  ASSERT_TRUE(farming);
+  auto duration = farming->get_float("immersionWindow");
+  auto count = farming->get_uint("immersionResolution");
+  ASSERT_TRUE(duration && count && *count);
+  float period = *duration / *count;
+
+  auto storage = File::ephemeral_file(root.random());
+  ASSERT_TRUE(storage);
+  auto world = WorldServer::create(root, Vec2U(128, 128), *storage);
+  ASSERT_TRUE(world) << world.error().what();
+  auto close = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
+  auto config = unanchored_physics_config();
+  config->orientations.front()->spaces = {Vec2I(0, 0)};
+  config->orientations.front()->frames = 1;
+  config->orientations.front()->animationCycle = 1;
+  EXPECT_FALSE(FarmableObject::create(root, config, JsonObject{{"minImmersion", 1}, {"maxImmersion", 0}}));
+  for (int threshold : {0, 1}) {
+    auto crop = FarmableObject::create(root, config, JsonObject{{"minImmersion", threshold}, {"maxImmersion", threshold}});
+    ASSERT_TRUE(crop) << crop.error().what();
+    ASSERT_TRUE((*crop)->setTilePosition({64, 64}));
+    ASSERT_TRUE((*crop)->init(**world, 1, EntityMode::Master));
+    auto release = make_scope_exit([&] { EXPECT_TRUE((*crop)->uninit()); });
+    ASSERT_TRUE((*crop)->update(period / 2, 1));
+    auto before = (*crop)->shouldDestroy();
+    ASSERT_TRUE(before);
+    EXPECT_FALSE(*before);
+    ASSERT_TRUE((*crop)->update(period / 2, 2));
+    auto after = (*crop)->shouldDestroy();
+    ASSERT_TRUE(after);
+    EXPECT_EQ(*after, threshold != 0); // Dry soil: exactly at zero survives, strictly below one dies.
+  }
+});
 
 template <typename T>
 concept typed_map_query = requires(EntityMap const& map, RectF const& bounds) { map.query<T>(bounds); };

@@ -450,8 +450,8 @@ std::expected<void, StarException> MainInterface::initialize(std::shared_ptr<Wor
     return std::unexpected(std::move(cursorItem.error()));
   m_cursorItem = std::move(*cursorItem);
 
-  m_debugSpatialClearTimer = GameTimer(m_config->debugSpatialClearTime);
-  m_debugMapClearTimer = GameTimer(m_config->debugMapClearTime);
+  m_debug_spatial_clear_timer = GameTimer(m_config->debug_spatial_clear_time);
+  m_debug_map_clear_timer = GameTimer(m_config->debug_map_clear_time);
 
   if (auto initialized = initMainBarPanes(); !initialized)
     return std::unexpected(std::move(initialized.error()));
@@ -1562,8 +1562,8 @@ std::expected<void, StarException> MainInterface::preUpdate(float) {
 }
 
 std::expected<void, StarException> MainInterface::update(float dt) {
-  m_debugSpatialClearDue |= m_debugSpatialClearTimer.wrapTick(dt);
-  m_debugMapClearDue |= m_debugMapClearTimer.wrapTick(dt);
+  m_debug_spatial_clear_due |= m_debug_spatial_clear_timer.wrap_tick(dt);
+  m_debug_map_clear_due |= m_debug_map_clear_timer.wrap_tick(dt);
   if (auto synchronized = synchronizeUiSession(); !synchronized)
     return std::unexpected(std::move(synchronized.error()));
 
@@ -2090,7 +2090,7 @@ std::expected<void, StarException> MainInterface::renderDebug() {
       if (auto r = context().setTextStyle(m_config->debugTextStyle); !r) return std::unexpected(std::move(r.error()));
       if (auto r = context().setLineSpacing(0.5f); !r) return std::unexpected(std::move(r.error()));
       auto& log_map = context().root().logMap();
-      auto log_map_values = std::exchange(m_debugMapClearDue, false) ? log_map.drain() : log_map.snapshot();
+      auto log_map_values = std::exchange(m_debug_map_clear_due, false) ? log_map.drain() : log_map.snapshot();
       auto height = windowHeight();
       if (!height) return std::unexpected(std::move(height.error()));
       List<String> formatted;
@@ -2117,13 +2117,13 @@ std::expected<void, StarException> MainInterface::renderDebug() {
       }
     }
     auto const& camera = m_worldPainter.get().camera();
-    bool clearSpatial = std::exchange(m_debugSpatialClearDue, false);
-    for (auto const& line : context().root().spatialLogger().get_lines("world", clearSpatial)) {
+    bool clear_spatial = std::exchange(m_debug_spatial_clear_due, false);
+    for (auto const& line : context().root().spatialLogger().get_lines("world", clear_spatial)) {
       Vec2F begin = camera.worldToScreen(line.begin);
       Vec2F end = camera.worldGeometry().diff(line.end, line.begin) * camera.pixelRatio() * tile_pixels + begin;
       if (auto r = context().drawLine(begin, end, line.color, 1); !r) return std::unexpected(std::move(r.error()));
     }
-    for (auto const& line : context().root().spatialLogger().get_lines("screen", clearSpatial)) {
+    for (auto const& line : context().root().spatialLogger().get_lines("screen", clear_spatial)) {
       if (auto r = context().drawLine(Vec2F(line.begin), Vec2F(line.end), line.color, 1); !r) return std::unexpected(std::move(r.error()));
     }
     auto drawPoint = [&](Vec2F position, Vec4B const& color) -> std::expected<void, StarException> {
@@ -2132,19 +2132,19 @@ std::expected<void, StarException> MainInterface::renderDebug() {
       if (auto r = context().drawLine(position + Vec2F(2, 2), position + Vec2F(2, -2), color, 1); !r) return std::unexpected(std::move(r.error()));
       return context().drawLine(position + Vec2F(2, -2), position + Vec2F(-2, -2), color, 1);
     };
-    for (auto const& point : context().root().spatialLogger().get_points("world", clearSpatial)) {
+    for (auto const& point : context().root().spatialLogger().get_points("world", clear_spatial)) {
       if (auto r = drawPoint(camera.worldToScreen(point.position), point.color); !r) return std::unexpected(std::move(r.error()));
     }
-    for (auto const& point : context().root().spatialLogger().get_points("screen", clearSpatial)) {
+    for (auto const& point : context().root().spatialLogger().get_points("screen", clear_spatial)) {
       if (auto r = drawPoint(point.position, point.color); !r) return std::unexpected(std::move(r.error()));
     }
     if (auto r = context().setTextStyle(m_config->debugTextStyle); !r) return std::unexpected(std::move(r.error()));
-    for (auto const& logText : context().root().spatialLogger().get_text("world", clearSpatial)) {
+    for (auto const& logText : context().root().spatialLogger().get_text("world", clear_spatial)) {
       if (auto r = context().setFontColor(logText.color); !r) return std::unexpected(std::move(r.error()));
       if (auto r = context().renderText(logText.text, camera.worldToScreen(logText.position)); !r)
         return std::unexpected(std::move(r.error()));
     }
-    for (auto const& logText : context().root().spatialLogger().get_text("screen", clearSpatial)) {
+    for (auto const& logText : context().root().spatialLogger().get_text("screen", clear_spatial)) {
       if (auto r = context().setFontColor(logText.color); !r) return std::unexpected(std::move(r.error()));
       if (auto r = context().renderText(logText.text, logText.position); !r)
         return std::unexpected(std::move(r.error()));

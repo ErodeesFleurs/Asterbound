@@ -219,8 +219,8 @@ public:
   [[nodiscard]] std::expected<void, StarException> setFidelity(WorldServerFidelity fidelity);
 
   bool shouldExpire();
-  void setExpiryTime(float expiryTime);
-  float expiryTime();
+  void set_expiry_time(float expiry_time);
+  float expiry_time();
 
   [[nodiscard]] std::expected<void, StarException> update(float dt);
 
@@ -341,7 +341,7 @@ public:
 
   // if blocks cascade, we'll need to do a break check across all tile entities
   // when the timer next ticks
-  void requestGlobalBreakCheck();
+  void request_global_break_check();
 
   void setSpawningEnabled(bool spawningEnabled);
 
@@ -522,7 +522,7 @@ private:
   StringMap<std::shared_ptr<WorldServer::ScriptComponent>> m_scriptContexts;
 
   WorldGeometry m_geometry;
-  double m_currentTime;
+  double m_current_time;
   std::uint64_t m_currentStep;
   mutable CellularLightIntensityCalculator m_lightIntensityCalculator;
   std::shared_ptr<Sky> m_sky;
@@ -537,8 +537,8 @@ private:
   HashMap<NetCompatibilityRules, HashMap<std::pair<EntityId, std::uint64_t>, std::pair<ByteArray, std::uint64_t>>> m_netStateCache;
   OrderedHashMap<ConnectionId, std::shared_ptr<ClientInfo>> m_clientInfo;
 
-  GameTimer m_entityUpdateTimer;
-  GameTimer m_tileEntityBreakCheckTimer;
+  GameTimer m_entity_update_timer;
+  GameTimer m_tile_entity_break_check_timer;
 
   std::shared_ptr<LiquidCellEngine<LiquidId>> m_liquid_engine;
   std::shared_ptr<FallingBlocksAgent> m_falling_blocks_agent;
@@ -551,7 +551,7 @@ private:
 
   List<std::pair<float, WorldAction>> m_timers;
 
-  bool m_needsGlobalBreakCheck = false;
+  bool m_needs_global_break_check = false;
 
   bool m_generatingDungeon = false;
   HashMap<DungeonId, float> m_dungeonIdGravity;
@@ -566,7 +566,7 @@ private:
 
   String m_worldId;
 
-  GameTimer m_expiryTimer;
+  GameTimer m_expiry_timer;
   
   StringMap<LuaCallbacks> m_luaThreadCallbacks;
 };

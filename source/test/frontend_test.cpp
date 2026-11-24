@@ -103,6 +103,10 @@ import star.mixer;
 #include "StarTestDisplay.hpp"
 import star.ai_database;
 import star.ai_interface;
+import star.crafting_interface;
+import star.item_descriptor;
+import star.player_inventory;
+import star.player_log;
 import star.ai_types;
 import star.application;
 import star.application_controller;
@@ -581,6 +585,81 @@ void run_surface_scenario(GameTest& fixture, SurfaceScenario& scenario) {
 
 const GameTestRegistration sail_navigation("AiInterface", "PageSnapshotsAndSpeechReveal", [](GameTest& fixture) {
   run_surface_scenario(fixture, exercise_sail);
+});
+
+void exercise_crafting(GameTest& fixture, Application const& application) {
+  auto& root = fixture.root();
+  auto configuration = root.configuration();
+  ASSERT_TRUE(configuration);
+  ASSERT_TRUE((*configuration)->set("bindings", JsonObject{}));
+  auto input = Input::create(root);
+  ASSERT_TRUE(input) << input.error().what();
+  auto context = GuiContext::create(root, std::make_shared<Mixer>(root.logger(), 44100, 2), application.appController());
+  ASSERT_TRUE(context) << context.error().what();
+  (*context)->bindInput(**input);
+  ASSERT_TRUE((*context)->renderInit(application.renderer()));
+
+  auto universe = TestUniverse::create(root, {800, 600});
+  ASSERT_TRUE(universe) << universe.error().what();
+  auto const& client = (*universe)->client();
+  auto player = client->mainPlayer();
+  // This test player has no starter outfit for the tutorial to reclaim on exit.
+  player->log()->setIntroComplete(true);
+  ASSERT_TRUE((*universe)->warpPlayer(InstanceWorldId("outpost")));
+  auto item = ItemDescriptor::create("perfectlygenericitem", 1);
+  ASSERT_TRUE(item);
+  auto produced = [&] { return player->inventory()->hasCountOfItem(*item); };
+
+  constexpr float short_duration = 1.0f / 128;
+  for (auto [duration, disable_timer] : {std::pair{short_duration, false}, std::pair{0.0f, false},
+                                         std::pair{short_duration, true}}) {
+    SCOPED_TRACE(Star::format("duration={}, disableTimer={}", duration, disable_timer));
+    Json recipe = JsonObject{{"duration", duration}, {"input", JsonArray{}},
+        {"output", JsonObject{{"item", item->name()}, {"count", 3}}}};
+    Json settings = JsonObject{{"recipes", JsonArray{std::move(recipe)}}, {"craftCount", 2},
+        {"disableTimer", disable_timer}, {"requiresBlueprint", false}};
+    auto created = CraftingPane::create(**context, client->worldClient(), player, settings);
+    ASSERT_TRUE(created) << created.error().what();
+    Pane& pane = **created;
+    ASSERT_TRUE(pane.displayed());
+    auto list = pane.requireChild<ListWidget>("scrollArea.itemList");
+    auto count = pane.requireChild<TextBoxWidget>("tbSpinCount");
+    auto button = pane.requireChild<ButtonWidget>("btnCraft");
+    ASSERT_TRUE(list && count && button);
+    ASSERT_EQ((*list)->listSize(), 1u);
+    ASSERT_TRUE((*list)->setSelected(0));
+    ASSERT_TRUE(pane.update(0));
+    ASSERT_TRUE((*count)->setText("5"));
+    ASSERT_EQ((*count)->getText(), "x5");
+    auto before = produced();
+    ASSERT_TRUE((*button)->setPressed(true));
+    auto released = (*button)->setPressed(false);
+    ASSERT_TRUE(released) << released.error().what();
+    if (duration > 0 && !disable_timer) {
+      EXPECT_EQ(produced(), before);
+      ASSERT_TRUE(pane.update(duration / 2));
+      EXPECT_EQ(produced(), before);
+      ASSERT_TRUE(pane.update(duration / 2));
+      EXPECT_EQ(produced(), before + 6);
+      EXPECT_EQ((*count)->getText(), "x3");
+      ASSERT_TRUE(pane.update(duration * 8)); // Discard overshoot; only one batch.
+      EXPECT_EQ(produced(), before + 12);
+      EXPECT_EQ((*count)->getText(), "x1");
+      ASSERT_TRUE(pane.update(0));
+      EXPECT_EQ(produced(), before + 12);
+      ASSERT_TRUE(pane.update(duration)); // Last batch contains only one craft.
+    }
+    EXPECT_EQ(produced(), before + 15);
+    EXPECT_EQ((*count)->getText(), "x1");
+    ASSERT_TRUE(pane.update(1));
+    EXPECT_EQ(produced(), before + 15);
+    ASSERT_TRUE(pane.dismissed());
+  }
+  ASSERT_TRUE((*universe)->close());
+}
+
+const GameTestRegistration crafting_batches("CraftingPane", "TimedBatchesAndInstantQuantity", [](GameTest& fixture) {
+  run_surface_scenario(fixture, exercise_crafting);
 });
 #endif
 
@@ -5537,7 +5616,7 @@ const GameTestRegistration
     GameTimer expected(0.7f);
     float fade = 0.3f;
     auto activePlayer = *player;
-    auto checkStep = [&](ScriptTestPane& subject, GameTimer& expected, float fade,
+    auto check_step = [&](ScriptTestPane& subject, GameTimer& expected, float fade,
                          float dt) -> testing::AssertionResult {
       bool ready = false;
       if ((*cinematic)->completed())
@@ -5552,13 +5631,13 @@ const GameTestRegistration
         return testing::AssertionFailure() << timer.error().what();
       if (!*timer)
         return testing::AssertionFailure() << "Missing planet countdown";
-      auto timerValue = (**timer).to_float();
-      if (!timerValue)
-        return testing::AssertionFailure() << timerValue.error().what();
-      if (*timerValue != expected.timer)
-        return testing::AssertionFailure() << "Countdown: " << *timerValue << " != " << expected.timer;
+      auto timer_value = (**timer).to_float();
+      if (!timer_value)
+        return testing::AssertionFailure() << timer_value.error().what();
+      if (*timer_value != expected.remaining)
+        return testing::AssertionFailure() << "Countdown: " << *timer_value << " != " << expected.remaining;
       if ((*cinematic)->completed() && !ready) {
-        float alpha = expected.timer < fade ? expected.timer / fade : 1.0f;
+        float alpha = expected.remaining < fade ? expected.remaining / fade : 1.0f;
         auto actual = subject.evaluate("return storage.alpha");
         if (!actual)
           return testing::AssertionFailure() << actual.error().what();
@@ -5572,7 +5651,7 @@ const GameTestRegistration
       }
       return testing::AssertionSuccess();
     };
-    auto step = [&](float dt) { return checkStep(*pane, expected, fade, dt); };
+    auto step = [&](float dt) { return check_step(*pane, expected, fade, dt); };
     ASSERT_TRUE(startCinema());
     ASSERT_TRUE(step(0.4f));// Off-world cinematic resets, without advancing.
     EXPECT_FALSE(pane->visibility());
@@ -5639,9 +5718,9 @@ const GameTestRegistration
     // real asset script. Only duration/fade configuration inputs are injected;
     // countdown/alpha are computed by Lua and applied to native pane/widgets.
     ASSERT_TRUE((*player)->uninit());
-    for (auto [duration, fadeTime] : {std::pair{0.0f, 0.0f}, std::pair{-0.5f, 0.3f}, std::pair{0.7f, 0.0f},
+    for (auto [duration, fade_time] : {std::pair{0.0f, 0.0f}, std::pair{-0.5f, 0.3f}, std::pair{0.7f, 0.0f},
                                       std::pair{0.7f, -0.2f}, std::pair{0.7f, 1.3f}}) {
-      SCOPED_TRACE(Star::format("duration={}, fade={}", duration, fadeTime));
+      SCOPED_TRACE(Star::format("duration={}, fade={}", duration, fade_time));
       auto boundaryPane = ScriptTestPane::create(**context, Json(*paneConfig));
       ASSERT_TRUE(boundaryPane) << boundaryPane.error().what();
       auto boundaryText = textEditor(**context, "");
@@ -5654,20 +5733,20 @@ const GameTestRegistration
           if (path == "/interface.config:planetNameTime")
             return Json(duration);
           if (path == "/interface.config:planetNameFadeTime")
-            return Json(fadeTime);
+            return Json(fade_time);
           return (*assets)->json(path);
         }));
       ASSERT_TRUE((*boundaryPane)->add_callbacks("root", std::move(styleInputs)));
       ASSERT_TRUE((*boundaryPane)->add_callbacks("player", *playerCallbacks));
       ASSERT_TRUE((*boundaryPane)->add_callbacks("interface", interface));
       ASSERT_TRUE((*boundaryPane)->displayed());
-      GameTimer boundaryTimer(duration);
+      GameTimer boundary_timer(duration);
       ASSERT_TRUE(startCinema());
-      ASSERT_TRUE(checkStep(**boundaryPane, boundaryTimer, fadeTime, 0.0f));
+      ASSERT_TRUE(check_step(**boundaryPane, boundary_timer, fade_time, 0.0f));
       (*cinematic)->stop();
       for (float dt : {0.0f, -0.1f, 0.1f, 0.2f, 1.0f}) {
         SCOPED_TRACE(dt);
-        ASSERT_TRUE(checkStep(**boundaryPane, boundaryTimer, fadeTime, dt));
+        ASSERT_TRUE(check_step(**boundaryPane, boundary_timer, fade_time, dt));
       }
       ASSERT_TRUE((*boundaryPane)->dismissed());
     }

@@ -297,16 +297,8 @@ std::expected<void, StarException> CraftingPane::initialize(std::shared_ptr<Worl
   return {};
 });
 
-  reader.registerCallback("btnCraft", [this](Widget&)  -> std::expected<void, StarException> { auto toggleCraftResult344 = toggleCraft();
-                                                        if (!toggleCraftResult344)
-                                                          return std::unexpected(std::move(toggleCraftResult344.error())); 
-  return {};
-});
-  reader.registerCallback("btnStopCraft", [this](Widget&)  -> std::expected<void, StarException> { auto toggleCraftResult345 = toggleCraft();
-                                                            if (!toggleCraftResult345)
-                                                              return std::unexpected(std::move(toggleCraftResult345.error())); 
-  return {};
-});
+  reader.registerCallback("btnCraft", [this](Widget&) { return toggle_craft(); });
+  reader.registerCallback("btnStopCraft", [this](Widget&) { return toggle_craft(); });
 
   reader.registerCallback("btnFilterHaveMaterials", [this](Widget&)  -> std::expected<void, StarException> {
       auto configuration = context().root().configuration();
@@ -556,7 +548,7 @@ std::expected<void, StarException> CraftingPane::displayed() {
 }
 
 std::expected<void, StarException> CraftingPane::dismissed() {
-  stopCrafting();
+  stop_crafting();
   auto dismissedResult396 = Pane::dismissed();
   if (!dismissedResult396)
     return std::unexpected(std::move(dismissedResult396.error()));
@@ -677,7 +669,7 @@ std::expected<void, StarException> CraftingPane::update(float dt) {
   bool changedHighlight = (m_displayedRecipe != m_guiList->selectedItem());
 
   if (changedHighlight) {
-    stopCrafting(); // TODO: allow viewing other recipes without interrupting crafting
+    stop_crafting(); // TODO: allow viewing other recipes without interrupting crafting
 
     m_displayedRecipe = m_guiList->selectedItem();
     auto countTextChangedResult411 = countTextChanged();
@@ -714,12 +706,9 @@ std::expected<void, StarException> CraftingPane::update(float dt) {
     }
   }
 
-  // crafters gonna craft
-  while (m_crafting && m_craftTimer.wrapTick(context().root().timing().time_step)) {
-    auto craftCount = m_settings.get_int("craftCount", 1);
-    if (!craftCount)
-      return std::unexpected(std::move(craftCount.error()));
-    auto crafted = craft(std::min(m_count, static_cast<int>(std::move(*craftCount))));
+  // Like other periodic consumers, finish at most one batch per update.
+  if (m_crafting && m_craft_timer.wrap_tick(dt)) {
+    auto crafted = craft(std::min(m_count, m_batch_size));
     if (!crafted)
       return std::unexpected(std::move(crafted.error()));
   }
@@ -742,7 +731,7 @@ std::expected<void, StarException> CraftingPane::update(float dt) {
         currentRecipeIcon->setItem(item);
   
         if (m_crafting)
-          currentRecipeIcon->setProgress(1.0f - m_craftTimer.percent());
+          currentRecipeIcon->setProgress(1.0f - m_craft_timer.remaining_fraction());
         else
           currentRecipeIcon->setProgress(1.0f);
       }
@@ -1201,61 +1190,54 @@ std::expected<std::shared_ptr<Pane>, StarException> CraftingPane::setupTooltip(I
   return tooltip;
 }
 
-void CraftingPane::stopCrafting() {
-  if (m_craftingSound)
-    m_craftingSound->stop();
+void CraftingPane::stop_crafting() {
+  if (m_crafting_sound)
+    m_crafting_sound->stop();
   m_crafting = false;
 }
 
-std::expected<void, StarException> CraftingPane::toggleCraft() {
+std::expected<void, StarException> CraftingPane::toggle_craft() {
   if (m_crafting) {
-    stopCrafting();
-  } else {
-    auto recipeFromSelectedWidgetResult507 = recipeFromSelectedWidget();
-    if (!recipeFromSelectedWidgetResult507)
-      return std::unexpected(std::move(recipeFromSelectedWidgetResult507.error()));
-    auto recipe = std::move(*recipeFromSelectedWidgetResult507);
-    {
-      bool condition509 = static_cast<bool>(recipe.duration > 0);
-      if (condition509) {
-        auto getBoolResult508 = m_settings.get_bool("disableTimer", false);
-        if (!getBoolResult508)
-          return std::unexpected(std::move(getBoolResult508.error()));
-        condition509 = static_cast<bool>(!std::move(*getBoolResult508));
-      }
-      if (condition509) {
-        m_crafting = true;
-        m_craftTimer = GameTimer(recipe.duration);
-  
-        {
-          auto optStringResult510 = m_settings.opt_string("craftingSound");
-          if (!optStringResult510)
-            return std::unexpected(std::move(optStringResult510.error()));
-          if (auto craftingSound = std::move(*optStringResult510)) {
-            auto assetsResult511 = context().root().assets();
-            if (!assetsResult511)
-              return std::unexpected(std::move(assetsResult511.error()));
-            auto assets = std::move(*assetsResult511);
-            auto audio = assets->audio(*craftingSound);
-            if (!audio)
-              return std::unexpected(std::move(audio.error()));
-            auto createResult512 = AudioInstance::create(**audio);
-            if (!createResult512)
-              return std::unexpected(std::move(createResult512.error()));
-            m_craftingSound = std::move(*createResult512);
-            m_craftingSound->set_loops(-1);
-            auto playAudioResult513 = context().playAudio(m_craftingSound);
-            if (!playAudioResult513)
-              return std::unexpected(std::move(playAudioResult513.error()));
-          }
-        }
-      } else {
-        auto craftResult514 = craft(m_count);
-        if (!craftResult514)
-          return std::unexpected(std::move(craftResult514.error()));
-      }
-    }
+    stop_crafting();
+    return {};
   }
+
+  auto recipe = recipeFromSelectedWidget();
+  if (!recipe)
+    return std::unexpected(std::move(recipe.error()));
+  if (!(recipe->duration > 0))
+    return craft(m_count);
+  auto disable_timer = m_settings.get_bool("disableTimer", false);
+  if (!disable_timer)
+    return std::unexpected(std::move(disable_timer.error()));
+  if (*disable_timer)
+    return craft(m_count);
+
+  auto batch_size = m_settings.get_int("craftCount", 1);
+  if (!batch_size)
+    return std::unexpected(std::move(batch_size.error()));
+  auto sound = m_settings.opt_string("craftingSound");
+  if (!sound)
+    return std::unexpected(std::move(sound.error()));
+  if (*sound) {
+    auto assets = context().root().assets();
+    if (!assets)
+      return std::unexpected(std::move(assets.error()));
+    auto audio = (*assets)->audio(**sound);
+    if (!audio)
+      return std::unexpected(std::move(audio.error()));
+    auto instance = AudioInstance::create(**audio);
+    if (!instance)
+      return std::unexpected(std::move(instance.error()));
+    (*instance)->set_loops(-1);
+    auto played = context().playAudio(*instance);
+    if (!played)
+      return std::unexpected(std::move(played.error()));
+    m_crafting_sound = std::move(*instance);
+  }
+  m_batch_size = static_cast<int>(std::clamp<std::int64_t>(*batch_size, 0, std::numeric_limits<int>::max()));
+  m_craft_timer = GameTimer(recipe->duration);
+  m_crafting = true;
   return {};
 }
 
@@ -1272,14 +1254,14 @@ std::expected<void, StarException> CraftingPane::craft(int count) {
     if (!database)
       return std::unexpected(std::move(database.error()));
     if (count <= 0) {
-      stopCrafting();
+      stop_crafting();
       return {};
     }
     auto crafted = (*database)->craft_recipe(*m_player, recipe, static_cast<std::uint64_t>(count));
     if (!crafted)
       return std::unexpected(std::move(crafted.error()));
     if (!*crafted) {
-      stopCrafting();
+      stop_crafting();
       return updateAvailableRecipes();
     }
 
@@ -1293,7 +1275,7 @@ std::expected<void, StarException> CraftingPane::craft(int count) {
   m_count -= count;
   if (m_count <= 0) {
     m_count = 1;
-    stopCrafting();
+    stop_crafting();
   }
   auto countChangedResult523 = countChanged();
   if (!countChangedResult523)

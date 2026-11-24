@@ -153,7 +153,7 @@ std::expected<void, StarException> StatusController::configure(Json const& confi
   m_appliesWeatherStatusEffects = *appliesWeatherStatusEffects;
   auto timer = config.get_float("environmentStatusEffectUpdateTimer", 0.15f);
   if (!timer) return std::unexpected(std::move(timer.error()));
-  m_environmentStatusEffectUpdateTimer = GameTimer(*timer);
+  m_environment_status_effect_update_timer = GameTimer(*timer);
   auto animation = config.opt_string("primaryAnimationConfig");
   if (!animation) return std::unexpected(std::move(animation.error()));
   m_primaryAnimationConfig = std::move(*animation);
@@ -599,7 +599,7 @@ std::expected<void, StarException> StatusController::init(Entity& parentEntity, 
     }
   }
 
-  m_environmentStatusEffectUpdateTimer.reset();
+  m_environment_status_effect_update_timer.reset();
   return {};
 }
 
@@ -680,7 +680,7 @@ std::expected<void, StarException> StatusController::tickMaster(float dt) {
       }
     }
   }
-  if (m_environmentStatusEffectUpdateTimer.wrapTick(m_root.timing().time_step)) {
+  if (m_environment_status_effect_update_timer.wrap_tick(m_root.timing().time_step)) {
     PolyF collisionBody = m_movementController->get().collisionBody();
     auto world = m_parentEntity->get().world();
     if (!world) return std::unexpected(std::move(world.error()));

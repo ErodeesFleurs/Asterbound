@@ -10,171 +10,85 @@ import star.game_timers;
 import star.math_common;
 namespace Star {
 
-GameTimer::GameTimer() : time(), timer() {}
-
-GameTimer::GameTimer(float time) : time(time) {
-  reset();
+std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, GameTimer& timer) {
+  GameTimer decoded;
+  auto read = ds >> decoded.duration >> decoded.remaining;
+  if (read)
+    timer = decoded;
+  return read;
 }
 
-bool GameTimer::tick(float dt) {
-  timer = approach(0.0f, timer, dt);
-  return timer == 0.0f;
+std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, GameTimer const& timer) {
+  return ds << timer.duration << timer.remaining;
 }
 
-bool GameTimer::ready() const {
-  return timer == 0.0f;
+std::expected<SlidingWindow, StarException> SlidingWindow::create(float const& window_size, std::size_t resolution, float const& initial_value) {
+  if (!resolution || resolution > std::vector<float>().max_size())
+    return std::unexpected(StarException("Invalid immersionResolution: expected a positive sample count"));
+  if (!is_finite(window_size) || window_size <= 0)
+    return std::unexpected(StarException("Invalid immersionWindow: expected a positive finite duration"));
+  float period = window_size / resolution;
+  if (period == 0)
+    return std::unexpected(StarException("Invalid immersionWindow / immersionResolution: sample period underflows"));
+  if (!is_finite(initial_value))
+    return std::unexpected(StarException("Invalid initial immersion: expected a finite value"));
+  return SlidingWindow(period, resolution, initial_value);
 }
 
-bool GameTimer::wrapTick(float dt) {
-  auto res = tick(dt);
-  if (res)
-    reset();
-  return res;
-}
+SlidingWindow::SlidingWindow(float period, std::size_t resolution, float initial_value)
+  : m_sample_timer(period), m_average(initial_value), m_window(resolution, initial_value) {}
 
-void GameTimer::reset() {
-  timer = time;
-}
+void SlidingWindow::record_sample(float value) {
+#ifdef __clang__
+#pragma clang fp reassociate(off)
+#endif
+  if (++m_index == m_window.size())
+    m_index = 0;
+  m_window[m_index] = value;
 
-void GameTimer::setDone() {
-  timer = 0.0f;
-}
-
-void GameTimer::invert() {
-  timer = time - timer;
-}
-
-float GameTimer::percent() const {
-  if (time)
-    return timer / time;
-  else
-    return 0.0f;
-}
-
-std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, GameTimer& gt) {
-  if (auto r = ds >> gt.time; !r) return std::unexpected(std::move(r.error()));
-  if (auto r = ds >> gt.timer; !r) return std::unexpected(std::move(r.error()));
-  return std::ref(ds);
-}
-
-std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, GameTimer const& gt) {
-  if (auto r = ds << gt.time; !r) return std::unexpected(std::move(r.error()));
-  if (auto r = ds << gt.timer; !r) return std::unexpected(std::move(r.error()));
-  return std::ref(ds);
-}
-
-SlidingWindow::SlidingWindow() : windowSize(1.0f), resolution(1) {}
-
-SlidingWindow::SlidingWindow(float windowSize, std::size_t resolution, float initialValue)
-  : windowSize(windowSize), resolution(resolution) {
-  sampleTimer = GameTimer(windowSize / resolution);
-  window = std::vector<float>(resolution);
-  reset(initialValue);
-}
-
-void SlidingWindow::reset(float initialValue) {
-  sampleTimer.reset();
-  currentIndex = 0;
-  currentMin = initialValue;
-  currentMax = initialValue;
-  currentAverage = initialValue;
-  std::fill(window.begin(), window.end(), initialValue);
-}
-
-std::expected<void, StarException> SlidingWindow::update(float dt, std::function<std::expected<float, StarException>()> sampleFunction) {
-  if (sampleTimer.wrapTick(dt)) {
-    if (!sampleFunction) return std::unexpected(StarException("SlidingWindow sample function is empty"));
-    auto sample = sampleFunction();
-    if (!sample) return std::unexpected(std::move(sample.error()));
-    processUpdate(*sample);
-  }
-  return {};
-}
-
-void SlidingWindow::update(float dt, float newValue) {
-  if (sampleTimer.wrapTick(dt)) {
-    processUpdate(newValue);
-  }
-}
-
-void SlidingWindow::processUpdate(float newValue) {
-  ++currentIndex;
-  currentIndex = currentIndex % resolution;
-  window[currentIndex] = newValue;
-
-  currentMin = std::numeric_limits<float>::max();
-  currentMax = 0;
+  // The physical slot order matters at the crop's immersion threshold.
   float total = 0;
-  for (float v : window) {
-    total += v;
-    currentMin = std::min(currentMin, v);
-    currentMax = std::max(currentMax, v);
-  }
-  currentAverage = total / resolution;
+  for (float entry : m_window)
+    total += entry;
+  m_average = total / m_window.size();
 }
 
-float SlidingWindow::min() {
-  return currentMin;
-}
-
-float SlidingWindow::max() {
-  return currentMax;
-}
-
-float SlidingWindow::average() {
-  return currentAverage;
-}
-
-EpochTimer::EpochTimer() : m_elapsedTime(0.0) {}
-
-std::expected<EpochTimer, StarException> EpochTimer::create(Json json) {
-  EpochTimer result;
-  auto last = json.get("lastEpochTime");
-  if (!last) return std::unexpected(std::move(last.error()));
-  auto lastTime = last->opt_double();
-  if (!lastTime) return std::unexpected(std::move(lastTime.error()));
-  result.m_lastSeenEpochTime = *lastTime;
+std::expected<EpochTimer, StarException> EpochTimer::from_json(Json const& json) {
+  auto last = json.get("lastEpochTime").and_then([](Json const& value) { return value.opt_double(); });
+  if (!last)
+    return std::unexpected(std::move(last.error()));
   auto elapsed = json.get_double("elapsedTime");
-  if (!elapsed) return std::unexpected(std::move(elapsed.error()));
-  result.m_elapsedTime = *elapsed;
-  return result;
+  if (!elapsed)
+    return std::unexpected(std::move(elapsed.error()));
+  EpochTimer timer;
+  timer.m_last_epoch_time = *last;
+  timer.m_elapsed_time = *elapsed;
+  return timer;
 }
 
-Json EpochTimer::toJson() const {
-  return JsonObject{{"lastEpochTime", json_from_optional(m_lastSeenEpochTime)}, {"elapsedTime", m_elapsedTime}};
+Json EpochTimer::to_json() const {
+  return JsonObject{{"lastEpochTime", json_from_optional(m_last_epoch_time)}, {"elapsedTime", m_elapsed_time}};
 }
 
-void EpochTimer::update(double newEpochTime) {
-  if (!m_lastSeenEpochTime) {
-    m_lastSeenEpochTime = newEpochTime;
-  } else {
-    // Don't allow elapsed time to go backwards in the case of the epoch time
-    // being lost or wrong.
-    double difference = newEpochTime - *m_lastSeenEpochTime;
-    if (difference > 0)
-      m_elapsedTime += difference;
-    m_lastSeenEpochTime = newEpochTime;
+void EpochTimer::update(double epoch_time) noexcept {
+  if (m_last_epoch_time) {
+    double delta = epoch_time - *m_last_epoch_time;
+    if (delta > 0.0)
+      m_elapsed_time += delta;
   }
+  m_last_epoch_time = epoch_time;
 }
 
-double EpochTimer::elapsedTime() const {
-  return m_elapsedTime;
+std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, EpochTimer& timer) {
+  EpochTimer decoded;
+  auto read = ds >> decoded.m_last_epoch_time >> decoded.m_elapsed_time;
+  if (read)
+    timer = decoded;
+  return read;
 }
 
-void EpochTimer::setElapsedTime(double elapsedTime) {
-  m_elapsedTime = elapsedTime;
-}
-
-std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, EpochTimer& et) {
-  if (auto r = ds >> et.m_lastSeenEpochTime; !r) return std::unexpected(std::move(r.error()));
-  if (auto r = ds >> et.m_elapsedTime; !r) return std::unexpected(std::move(r.error()));
-  return std::ref(ds);
-}
-
-std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, EpochTimer const& et) {
-  if (auto r = ds << et.m_lastSeenEpochTime; !r) return std::unexpected(std::move(r.error()));
-  if (auto r = ds << et.m_elapsedTime; !r) return std::unexpected(std::move(r.error()));
-  return std::ref(ds);
+std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, EpochTimer const& timer) {
+  return ds << timer.m_last_epoch_time << timer.m_elapsed_time;
 }
 
 }

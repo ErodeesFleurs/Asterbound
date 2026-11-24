@@ -183,10 +183,10 @@ std::expected<std::shared_ptr<ItemDrop>, StarException> ItemDrop::throwDrop(Root
     (*drop)->setVelocity(velocity + vnorm(direction) * *speed);
   }
   (*drop)->setEternal(eternal);
-  auto intangibleTime = config->get_float("throwIntangibleTime");
-  if (!intangibleTime)
-    return std::unexpected(std::move(intangibleTime.error()));
-  (*drop)->setIntangibleTime(*intangibleTime);
+  auto intangible_time = config->get_float("throwIntangibleTime");
+  if (!intangible_time)
+    return std::unexpected(std::move(intangible_time.error()));
+  (*drop)->set_intangible_time(*intangible_time);
   return drop;
 }
 
@@ -270,14 +270,14 @@ std::expected<std::shared_ptr<ItemDrop>, StarException> ItemDrop::create(Root& r
   if (!eternal)
     return std::unexpected(std::move(eternal.error()));
   drop->m_eternal = *eternal;
-  auto age = store.get("dropAge").and_then([](Json const& value) { return EpochTimer::create(value); });
+  auto age = store.get("dropAge").and_then(EpochTimer::from_json);
   if (!age)
     return std::unexpected(std::move(age.error()));
-  drop->m_dropAge = std::move(*age);
-  auto aging = store.get("ageItemsTimer").and_then([](Json const& value) { return EpochTimer::create(value); });
+  drop->m_drop_age = *age;
+  auto aging = store.get("ageItemsTimer").and_then(EpochTimer::from_json);
   if (!aging)
     return std::unexpected(std::move(aging.error()));
-  drop->m_ageItemsTimer = std::move(*aging);
+  drop->m_age_items_timer = *aging;
   drop->m_owningEntity.set(null_entity_id);
   return drop;
 }
@@ -301,9 +301,9 @@ std::expected<std::shared_ptr<ItemDrop>, StarException> ItemDrop::create(Root& r
     return std::unexpected(std::move(initialized.error()));
   if (auto read = ds.read(drop->m_eternal); !read)
     return std::unexpected(std::move(read.error()));
-  if (auto read = ds.read(drop->m_dropAge); !read)
+  if (auto read = ds.read(drop->m_drop_age); !read)
     return std::unexpected(std::move(read.error()));
-  if (auto read = ds.read(drop->m_intangibleTimer); !read)
+  if (auto read = ds.read(drop->m_intangible_timer); !read)
     return std::unexpected(std::move(read.error()));
   return drop;
 }
@@ -325,8 +325,8 @@ std::expected<Json, StarException> ItemDrop::diskStore() const {
     {"position", json_from_vec2f(m_movementController->position())},
     {"mode", mode->get()},
     {"eternal", m_eternal},
-    {"dropAge", m_dropAge.toJson()},
-    {"ageItemsTimer", m_ageItemsTimer.toJson()}
+    {"dropAge", m_drop_age.to_json()},
+    {"ageItemsTimer", m_age_items_timer.to_json()}
   });
 }
 
@@ -337,9 +337,9 @@ std::expected<ByteArray, StarException> ItemDrop::net_store(NetCompatibilityRule
     return std::unexpected(std::move(written.error()));
   if (auto written = ds.write(m_eternal); !written)
     return std::unexpected(std::move(written.error()));
-  if (auto written = ds.write(m_dropAge); !written)
+  if (auto written = ds.write(m_drop_age); !written)
     return std::unexpected(std::move(written.error()));
-  if (auto written = ds.write(m_intangibleTimer); !written)
+  if (auto written = ds.write(m_intangible_timer); !written)
     return std::unexpected(std::move(written.error()));
   return ds.take_data();
 }
@@ -477,7 +477,7 @@ std::expected<void, StarException> ItemDrop::update(float dt, std::uint64_t) {
   if (!currentWorld)
     return std::unexpected(std::move(currentWorld.error()));
   auto& world = currentWorld->get();
-  m_dropAge.update(world.epochTime());
+  m_drop_age.update(world.epochTime());
   if (isMaster()) {
     auto updated = recover_lua_script_error(m_scriptComponent.update(m_scriptComponent.update_dt(dt)));
     if (!updated)
@@ -511,7 +511,7 @@ std::expected<void, StarException> ItemDrop::update(float dt, std::uint64_t) {
             if (!taken)
               return std::unexpected(std::move(taken.error()));
             m_item->stackWith(optional_ref(*taken));
-            m_dropAge.setElapsedTime(std::min(m_dropAge.elapsedTime(), closeDrop.m_dropAge.elapsedTime()));
+            m_drop_age.set_elapsed_time(std::min(m_drop_age.elapsed_time(), closeDrop.m_drop_age.elapsed_time()));
             m_movementController->setPosition(
               m_movementController->position()
               + world.geometry().diff(closeDrop.position(), m_movementController->position()) / 2.0f);
@@ -529,30 +529,30 @@ std::expected<void, StarException> ItemDrop::update(float dt, std::uint64_t) {
     }
     if (auto ticked = m_movementController->tickMaster(dt); !ticked)
       return std::unexpected(std::move(ticked.error()));
-    m_intangibleTimer.tick(dt);
-    m_ageItemsTimer.update(world.epochTime());
+    m_intangible_timer.tick(dt);
+    m_age_items_timer.update(world.epochTime());
     if ((m_mode.get() == Mode::Intangible || m_mode.get() == Mode::Available) && m_movementController->atWorldLimit())
       m_mode.set(Mode::Dead);
-    if (m_mode.get() == Mode::Intangible && m_intangibleTimer.ready())
+    if (m_mode.get() == Mode::Intangible && m_intangible_timer.ready())
       m_mode.set(Mode::Available);
-    if (!m_eternal && m_mode.get() == Mode::Available && m_dropAge.elapsedTime() > m_item->timeToLive())
+    if (!m_eternal && m_mode.get() == Mode::Available && m_drop_age.elapsed_time() > m_item->timeToLive())
       m_mode.set(Mode::Dead);
-    if (m_mode.get() == Mode::Taken && m_dropAge.elapsedTime() > m_afterTakenLife)
+    if (m_mode.get() == Mode::Taken && m_drop_age.elapsed_time() > m_after_taken_life)
       m_mode.set(Mode::Dead);
     if (m_overrideMode)
       m_mode.set(*m_overrideMode);
     if (m_clientEntityMode != ClientEntityMode::ClientSlaveOnly && m_mode.get() == Mode::Available)
       m_mode.set(Mode::Intangible);
-    if (m_mode.get() <= Mode::Available && m_ageItemsTimer.elapsedTime() > m_ageItemsEvery) {
+    if (m_mode.get() <= Mode::Available && m_age_items_timer.elapsed_time() > m_age_items_every) {
       auto database = root().itemDatabase();
       if (!database)
         return std::unexpected(std::move(database.error()));
-      auto aged = (*database)->ageItem(m_item, m_ageItemsTimer.elapsedTime());
+      auto aged = (*database)->ageItem(m_item, m_age_items_timer.elapsed_time());
       if (!aged)
         return std::unexpected(std::move(aged.error()));
       if (*aged)
         m_itemDescriptor.set(m_item->descriptor());
-      m_ageItemsTimer.setElapsedTime(0.0);
+      m_age_items_timer.set_elapsed_time(0.0);
     }
   } else {
     if (m_itemDescriptor.pull_updated()) {
@@ -568,7 +568,7 @@ std::expected<void, StarException> ItemDrop::update(float dt, std::uint64_t) {
     if (auto ticked = m_netGroup.tick_net_interpolation(dt); !ticked)
       return std::unexpected(std::move(ticked.error()));
     if (m_owningEntity.get() != null_entity_id) {
-      if (m_dropAge.elapsedTime() > 1.0f) {
+      if (m_drop_age.elapsed_time() > 1.0f) {
         m_owningEntity.set(null_entity_id);
       } else {
         if (auto taken = updateTaken(false); !taken)
@@ -691,8 +691,8 @@ void ItemDrop::setEternal(bool eternal) {
   m_eternal = eternal;
 }
 
-void ItemDrop::setIntangibleTime(float intangibleTime) {
-  m_intangibleTimer = GameTimer(intangibleTime);
+void ItemDrop::set_intangible_time(float intangible_time) {
+  m_intangible_timer = GameTimer(intangible_time);
   if (m_mode.get() == Mode::Available)
     m_mode.set(Mode::Intangible);
 }
@@ -710,7 +710,7 @@ std::expected<bool, StarException> ItemDrop::canTake() const {
   return true;
 }
 
-std::expected<std::shared_ptr<Item>, StarException> ItemDrop::takeBy(EntityId entityId, float timeOffset) {
+std::expected<std::shared_ptr<Item>, StarException> ItemDrop::takeBy(EntityId entityId, float time_offset) {
   auto takeable = canTake();
   if (!takeable)
     return std::unexpected(std::move(takeable.error()));
@@ -720,7 +720,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDrop::takeBy(EntityId en
   if (!taken)
     return std::unexpected(std::move(taken.error()));
   m_owningEntity.set(entityId);
-  m_dropAge.setElapsedTime(timeOffset);
+  m_drop_age.set_elapsed_time(time_offset);
   m_mode.set(Mode::Taken);
   setPersistent(false);
   return taken;
@@ -807,9 +807,9 @@ std::expected<void, StarException> ItemDrop::initialize() {
     target = *value;
     return {};
   };
-  if (auto loaded = loadFloat("afterTakenLife", m_afterTakenLife); !loaded)
+  if (auto loaded = loadFloat("afterTakenLife", m_after_taken_life); !loaded)
     return std::unexpected(std::move(loaded.error()));
-  if (auto loaded = loadFloat("overheadTime", m_overheadTime); !loaded)
+  if (auto loaded = loadFloat("overheadTime", m_overhead_time); !loaded)
     return std::unexpected(std::move(loaded.error()));
   if (auto loaded = loadFloat("pickupDistance", m_pickupDistance); !loaded)
     return std::unexpected(std::move(loaded.error()));
@@ -827,10 +827,10 @@ std::expected<void, StarException> ItemDrop::initialize() {
     return std::unexpected(std::move(loaded.error()));
   if (auto loaded = loadFloat("combineRadius", m_combineRadius); !loaded)
     return std::unexpected(std::move(loaded.error()));
-  auto ageEvery = m_config.get_double("ageItemsEvery", 10);
-  if (!ageEvery)
-    return std::unexpected(std::move(ageEvery.error()));
-  m_ageItemsEvery = *ageEvery;
+  auto age_every = m_config.get_double("ageItemsEvery", 10);
+  if (!age_every)
+    return std::unexpected(std::move(age_every.error()));
+  m_age_items_every = *age_every;
   auto rarityBeam = m_config.get_bool("drawRarityBeam", false);
   if (!rarityBeam)
     return std::unexpected(std::move(rarityBeam.error()));
@@ -849,7 +849,7 @@ std::expected<void, StarException> ItemDrop::updateTaken(bool master) {
   auto& world = currentWorld->get();
   if (auto owningEntity = world.entity(m_owningEntity.get())) {
     Vec2F position = m_movementController->position();
-    bool overhead = m_dropAge.elapsedTime() < m_overheadTime;
+    bool overhead = m_drop_age.elapsed_time() < m_overhead_time;
     Vec2F targetPosition = owningEntity->position();
     if (overhead) {
       targetPosition += m_overheadOffset;
@@ -900,9 +900,9 @@ std::expected<LuaCallbacks, StarException> ItemDrop::makeItemDropCallbacks() {
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("eternal", [this]() { return m_eternal; }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.register_callback("setIntangibleTime", [this](float time) { setIntangibleTime(time); }); !registered)
+  if (auto registered = callbacks.register_callback("setIntangibleTime", [this](float time) { set_intangible_time(time); }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.register_callback("intangibleTime", [this]() { return m_intangibleTimer.timer; }); !registered)
+  if (auto registered = callbacks.register_callback("intangibleTime", [this]() { return m_intangible_timer.remaining; }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("setOverrideMode", [this](std::optional<String> const& mode) -> std::expected<void, StarException> {
     if (!mode) {

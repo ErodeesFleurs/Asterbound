@@ -187,12 +187,12 @@ auto assets = std::move(*result3);
 if (!result4) return std::unexpected(std::move(result4.error()));
 auto result5 = std::move(*result4).to_float();
 if (!result5) return std::unexpected(std::move(result5.error()));
-m_emoteCooldownTimer = GameTimer(std::move(*result5));
+m_emote_cooldown_timer = GameTimer(std::move(*result5));
   auto result6 = assets->json("/npcs/npc.config:blinkInterval");
 if (!result6) return std::unexpected(std::move(result6.error()));
 auto result7 = json_to_vec2f(std::move(*result6));
 if (!result7) return std::unexpected(std::move(result7.error()));
-m_blinkInterval = std::move(*result7);
+m_blink_interval = std::move(*result7);
 
   auto result8 = assets->json("/quests/quests.config:defaultIndicatorOffset");
 if (!result8) return std::unexpected(std::move(result8.error()));
@@ -272,7 +272,7 @@ auto result28 = std::move(*result27).to_int();
 if (!result28) return std::unexpected(std::move(result28.error()));
 m_hitDamageNotificationLimit = std::move(*result28);
 
-  m_blinkCooldownTimer = GameTimer();
+  m_blink_cooldown_timer = GameTimer();
 
   auto result29 = ArmorWearer::create(this->root());
 if (!result29) return std::unexpected(std::move(result29.error()));
@@ -399,7 +399,7 @@ auto result64 = json_to_string_list(std::move(*result63));
 if (!result64) return std::unexpected(std::move(result64.error()));
 m_dropPools.set(std::move(*result64));
 
-  m_blinkCooldownTimer = GameTimer();
+  m_blink_cooldown_timer = GameTimer();
 
   auto result65 = diskStore.get_bool("aggressive");
 if (!result65) return std::unexpected(std::move(result65.error()));
@@ -1090,7 +1090,7 @@ if (!result208) return std::unexpected(std::move(result208.error()));
       }
     }
 
-    if (m_emoteCooldownTimer.tick(dt))
+    if (m_emote_cooldown_timer.tick(dt))
       m_emoteState = HumanoidEmote::Idle;
     m_dance.tick(dt);
 
@@ -1102,10 +1102,10 @@ if (!result208) return std::unexpected(std::move(result208.error()));
       m_chat_message_updated = false;
     }
 
-    if (m_blinkCooldownTimer.tick(dt)) {
-      auto result227 = this->root().random().uniform_float(m_blinkInterval[0], m_blinkInterval[1]);
+    if (m_blink_cooldown_timer.tick(dt)) {
+      auto result227 = this->root().random().uniform_float(m_blink_interval[0], m_blink_interval[1]);
 if (!result227) return std::unexpected(std::move(result227.error()));
-m_blinkCooldownTimer = GameTimer(std::move(*result227));
+m_blink_cooldown_timer = GameTimer(std::move(*result227));
       if (m_emoteState == HumanoidEmote::Idle)
         addEmote(HumanoidEmote::Blink);
     }
@@ -2217,7 +2217,7 @@ std::expected<void, StarException> Npc::add_chat_message(String const& message, 
 void Npc::addEmote(HumanoidEmote const& emote) {
   assert(!isSlave());
   m_emoteState = emote;
-  m_emoteCooldownTimer.reset();
+  m_emote_cooldown_timer.reset();
 }
 
 std::expected<void, StarException> Npc::set_dance(std::optional<String> const& dance_name) {

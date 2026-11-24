@@ -226,7 +226,7 @@ if (!result949) return std::unexpected(std::move(result949.error()));
 m_timeToLive = std::move(*result949);
   setSourceEntity(m_sourceEntity, m_trackSourceEntity);
 
-  m_periodicActions.clear();
+  m_periodic_actions.clear();
   auto result950 = m_parameters.contains("periodicActions");
 if (!result950) return std::unexpected(std::move(result950.error()));
 if (std::move(*result950)) {
@@ -238,11 +238,11 @@ auto result952 = c.get_float("time");
 if (!result952) return std::unexpected(std::move(result952.error()));
 auto result953 = c.get_bool("repeat", true);
 if (!result953) return std::unexpected(std::move(result953.error()));
-m_periodicActions.push_back(std::make_tuple(GameTimer(std::move(*result952)), std::move(*result953), c));
+m_periodic_actions.push_back(std::make_tuple(GameTimer(std::move(*result952)), std::move(*result953), c));
 }
   } else {
-    for (auto const& [time, repeat, action] : m_config->periodicActions)
-      m_periodicActions.push_back(std::make_tuple(GameTimer(time), repeat, action));
+    for (auto const& [time, repeat, action] : m_config->periodic_actions)
+      m_periodic_actions.push_back(std::make_tuple(GameTimer(time), repeat, action));
   }
 
   if (isMaster()) {
@@ -1599,24 +1599,24 @@ if (!result721) return std::unexpected(std::move(result721.error()));
 }
   }
 
-  for (auto periodicActionIt = m_periodicActions.begin(); periodicActionIt != m_periodicActions.end();) {
-    auto& periodicAction = *periodicActionIt;
-    if (std::get<1>(periodicAction)) {
-      if (std::get<0>(periodicAction).wrapTick(root().timing().time_step)) {
-        auto actionResult = processAction(std::get<2>(periodicAction));
+  for (auto periodic_action_it = m_periodic_actions.begin(); periodic_action_it != m_periodic_actions.end();) {
+    auto& periodic_action = *periodic_action_it;
+    if (std::get<1>(periodic_action)) {
+      if (std::get<0>(periodic_action).wrap_tick(root().timing().time_step)) {
+        auto actionResult = processAction(std::get<2>(periodic_action));
         if (!actionResult)
           return std::unexpected(std::move(actionResult.error()));
       }
     } else {
-      if (std::get<0>(periodicAction).tick(dt)) {
-        auto actionResult = processAction(std::get<2>(periodicAction));
+      if (std::get<0>(periodic_action).tick(dt)) {
+        auto actionResult = processAction(std::get<2>(periodic_action));
         if (!actionResult)
           return std::unexpected(std::move(actionResult.error()));
-        periodicActionIt = m_periodicActions.erase(periodicActionIt);
+        periodic_action_it = m_periodic_actions.erase(periodic_action_it);
         continue;
       }
     }
-    ++periodicActionIt;
+    ++periodic_action_it;
   }
   return {};
 }

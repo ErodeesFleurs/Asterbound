@@ -378,10 +378,10 @@ private:
   NetElementBool m_displayNametag;
 
   HumanoidEmote m_emoteState;
-  GameTimer m_emoteCooldownTimer;
+  GameTimer m_emote_cooldown_timer;
   TimedDance m_dance;
-  GameTimer m_blinkCooldownTimer;
-  Vec2F m_blinkInterval;
+  GameTimer m_blink_cooldown_timer;
+  Vec2F m_blink_interval;
 
   NetElementBool m_isInteractive;
 

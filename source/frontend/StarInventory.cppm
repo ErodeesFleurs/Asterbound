@@ -115,7 +115,7 @@ private:
   bool m_expectingSwap;
   InventorySlot m_containerSource;
 
-  GameTimer m_trashBurn;
+  GameTimer m_trash_burn;
   std::shared_ptr<ItemSlotWidget> m_trashSlot;
 
   Map<String, std::shared_ptr<ItemGridWidget>> m_itemGrids;

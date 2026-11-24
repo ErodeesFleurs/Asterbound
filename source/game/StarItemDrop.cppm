@@ -142,14 +142,13 @@ public:
 
   void setEternal(bool eternal);
 
-  // If intangibleTime is set, will be intangible and unable to be picked up
-  // until that amount of time has passed.
-  void setIntangibleTime(float intangibleTime);
+  // Delay pickup by the given amount of game time.
+  void set_intangible_time(float intangible_time);
 
   // Mark this drop as taken by the given entity.  The drop will animate
   // towards them for a while and then disappear.
   [[nodiscard]]
-  std::expected<std::shared_ptr<Item>, StarException> takeBy(EntityId entityId, float timeOffset = 0.0f);
+  std::expected<std::shared_ptr<Item>, StarException> takeBy(EntityId entityId, float time_offset = 0.0f);
 
   // Mark this drop as taken, but do not animate it towards a player simply
   // disappear next step.
@@ -194,8 +193,8 @@ private:
   Json m_parameters;
   std::shared_ptr<Item> m_item;
   RectF m_boundBox;
-  float m_afterTakenLife;
-  float m_overheadTime;
+  float m_after_taken_life;
+  float m_overhead_time;
   float m_pickupDistance;
   float m_velocity;
   float m_velocityApproach;
@@ -204,7 +203,7 @@ private:
 
   float m_combineChance;
   float m_combineRadius;
-  double m_ageItemsEvery;
+  double m_age_items_every;
 
   NetElementTopGroup m_netGroup;
   NetElementEnum<Mode> m_mode;
@@ -214,9 +213,9 @@ private:
 
   // Only updated on master
   bool m_eternal;
-  EpochTimer m_dropAge;
-  GameTimer m_intangibleTimer;
-  EpochTimer m_ageItemsTimer;
+  EpochTimer m_drop_age;
+  GameTimer m_intangible_timer;
+  EpochTimer m_age_items_timer;
 
   bool m_drawRarityBeam;
   bool m_overForeground;

@@ -141,7 +141,7 @@ import star.material_database;
 
 namespace Star {
 
-FarmableObject::FarmableObject(Root& rootContext) : Entity(rootContext), Object(rootContext), m_stage(0), m_stageAlt(-1), m_stageEnterTime(0), m_nextStageTime(0), m_minImmersion(0), m_maxImmersion(2), m_consumeSoilMoisture(true), m_finalStage(false) {}
+FarmableObject::FarmableObject(Root& rootContext) : Entity(rootContext), Object(rootContext), m_stage(0), m_stageAlt(-1), m_stageEnterTime(0), m_nextStageTime(0), m_min_immersion(0), m_max_immersion(2), m_consumeSoilMoisture(true), m_finalStage(false) {}
 
 std::expected<std::shared_ptr<FarmableObject>, StarException> FarmableObject::create(Root& rootContext, std::shared_ptr<ObjectConfig const> config, Json const& parameters) {
   auto object = std::shared_ptr<FarmableObject>(new FarmableObject(rootContext));
@@ -166,24 +166,16 @@ std::expected<std::shared_ptr<FarmableObject>, StarException> FarmableObject::cr
     return std::unexpected(std::move(startingStageResult.error()));
   auto startingStage = std::move(*startingStageResult);
   object->m_stage = std::move(startingStage);
-  auto minImmersionConfigResult = object->configValue("minImmersion", 0);
-  if (!minImmersionConfigResult)
-    return std::unexpected(std::move(minImmersionConfigResult.error()));
-  auto minImmersionConfig = std::move(*minImmersionConfigResult);
-  auto minImmersionResult = minImmersionConfig.to_float();
-  if (!minImmersionResult)
-    return std::unexpected(std::move(minImmersionResult.error()));
-  auto minImmersion = std::move(*minImmersionResult);
-  object->m_minImmersion = std::move(minImmersion);
-  auto maxImmersionConfigResult = object->configValue("maxImmersion", 2);
-  if (!maxImmersionConfigResult)
-    return std::unexpected(std::move(maxImmersionConfigResult.error()));
-  auto maxImmersionConfig = std::move(*maxImmersionConfigResult);
-  auto maxImmersionResult = maxImmersionConfig.to_float();
-  if (!maxImmersionResult)
-    return std::unexpected(std::move(maxImmersionResult.error()));
-  auto maxImmersion = std::move(*maxImmersionResult);
-  object->m_maxImmersion = std::move(maxImmersion);
+  auto min_immersion = object->configValue("minImmersion", 0).and_then(&Json::to_float);
+  if (!min_immersion)
+    return std::unexpected(std::move(min_immersion.error()));
+  auto max_immersion = object->configValue("maxImmersion", 2).and_then(&Json::to_float);
+  if (!max_immersion)
+    return std::unexpected(std::move(max_immersion.error()));
+  if (!is_finite(*min_immersion) || !is_finite(*max_immersion) || *min_immersion > *max_immersion)
+    return std::unexpected(ObjectException("Expected finite minImmersion <= maxImmersion"));
+  object->m_min_immersion = *min_immersion;
+  object->m_max_immersion = *max_immersion;
   auto consumeSoilMoistureConfigResult = object->configValue("consumeSoilMoisture", true);
   if (!consumeSoilMoistureConfigResult)
     return std::unexpected(std::move(consumeSoilMoistureConfigResult.error()));
@@ -193,27 +185,25 @@ std::expected<std::shared_ptr<FarmableObject>, StarException> FarmableObject::cr
     return std::unexpected(std::move(consumeSoilMoistureResult.error()));
   auto consumeSoilMoisture = std::move(*consumeSoilMoistureResult);
   object->m_consumeSoilMoisture = std::move(consumeSoilMoisture);
-  auto assetsResult = rootContext.assets();
-  if (!assetsResult)
-    return std::unexpected(std::move(assetsResult.error()));
-  auto assets = std::move(*assetsResult);
-  auto windowConfigResult = assets->json("/farming.config:immersionWindow");
-  if (!windowConfigResult)
-    return std::unexpected(std::move(windowConfigResult.error()));
-  auto windowConfig = std::move(*windowConfigResult);
-  auto windowResult = windowConfig.to_float();
-  if (!windowResult)
-    return std::unexpected(std::move(windowResult.error()));
-  auto window = std::move(*windowResult);
-  auto resolutionConfigResult = assets->json("/farming.config:immersionResolution");
-  if (!resolutionConfigResult)
-    return std::unexpected(std::move(resolutionConfigResult.error()));
-  auto resolutionConfig = std::move(*resolutionConfigResult);
-  auto resolutionResult = resolutionConfig.to_uint();
-  if (!resolutionResult)
-    return std::unexpected(std::move(resolutionResult.error()));
-  auto resolution = std::move(*resolutionResult);
-  object->m_immersion = SlidingWindow(window, resolution, (object->m_minImmersion + object->m_maxImmersion) / 2);
+  auto assets = rootContext.assets();
+  if (!assets)
+    return std::unexpected(std::move(assets.error()));
+  auto farming = (*assets)->json("/farming.config");
+  if (!farming)
+    return std::unexpected(std::move(farming.error()));
+  auto window_size = farming->get_float("immersionWindow");
+  if (!window_size)
+    return std::unexpected(std::move(window_size.error()));
+  auto count = farming->get_double("immersionResolution");
+  if (!count)
+    return std::unexpected(std::move(count.error()));
+  if (!is_finite(*count) || *count < 1 || *count >= std::ldexp(1.0, std::numeric_limits<std::size_t>::digits)
+      || *count != std::trunc(*count))
+    return std::unexpected(ObjectException("Invalid immersionResolution: expected a positive integer sample count"));
+  auto immersion = SlidingWindow::create(*window_size, static_cast<std::size_t>(*count), std::midpoint(*min_immersion, *max_immersion));
+  if (!immersion)
+    return std::unexpected(std::move(immersion.error()));
+  object->m_immersion.emplace(std::move(*immersion));
   return object;
 }
 
@@ -240,10 +230,11 @@ std::expected<void, StarException> FarmableObject::update(float dt, std::uint64_
       if (m_stage == lastStage)
         break;
     }
-    auto operation5 = m_immersion.update(root().timing().time_step, [this] { return liquidFillLevel(); });
-    if (!operation5)
-      return std::unexpected(std::move(operation5.error()));
-    if (m_immersion.average() > m_maxImmersion || m_immersion.average() < m_minImmersion) {
+    auto sampled = m_immersion->update(dt, [this] { return liquidFillLevel(); });
+    if (!sampled)
+      return std::unexpected(std::move(sampled.error()));
+    auto average = m_immersion->average();
+    if (average > m_max_immersion || average < m_min_immersion) {
       auto operation6 = breakObject(false);
       if (!operation6)
         return std::unexpected(std::move(operation6.error()));

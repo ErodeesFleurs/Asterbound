@@ -81,8 +81,8 @@ private:
   [[nodiscard]] std::expected<void, StarException> update(float dt) override;
   [[nodiscard]] std::expected<void, StarException> updateCraftButtons();
   [[nodiscard]] std::expected<void, StarException> updateAvailableRecipes();
-  void stopCrafting();
-  [[nodiscard]] std::expected<void, StarException> toggleCraft();
+  void stop_crafting();
+  [[nodiscard]] std::expected<void, StarException> toggle_craft();
   [[nodiscard]] std::expected<void, StarException> craft(int count);
   [[nodiscard]] std::expected<void, StarException> countChanged();
   [[nodiscard]] std::expected<void, StarException> countTextChanged();
@@ -99,8 +99,9 @@ private:
   std::shared_ptr<PlayerBlueprints> m_blueprints;
 
   bool m_crafting;
-  GameTimer m_craftTimer;
-  std::shared_ptr<AudioInstance> m_craftingSound;
+  GameTimer m_craft_timer;
+  int m_batch_size = 1;
+  std::shared_ptr<AudioInstance> m_crafting_sound;
   int m_count;
   List<ItemRecipe> m_recipes;
   BiHashMap<ItemRecipe, std::shared_ptr<Widget>> m_recipesWidgetMap; // maps ItemRecipe to guiList WidgetPtrs

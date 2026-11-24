@@ -130,14 +130,14 @@ std::expected<std::unique_ptr<MainInterfaceConfig>, StarException> MainInterface
     if (!json) return std::unexpected(std::move(json.error()));
     auto value = json->to_float();
     if (!value) return std::unexpected(std::move(value.error()));
-    config->debugSpatialClearTime = std::move(*value);
+    config->debug_spatial_clear_time = std::move(*value);
   }
   {
     auto json = (*assets)->json("/interface.config:debugMapClearTime");
     if (!json) return std::unexpected(std::move(json.error()));
     auto value = json->to_float();
     if (!value) return std::unexpected(std::move(value.error()));
-    config->debugMapClearTime = std::move(*value);
+    config->debug_map_clear_time = std::move(*value);
   }
   {
     auto json = (*assets)->json("/interface.config:debugBackgroundColor");

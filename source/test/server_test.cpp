@@ -140,6 +140,7 @@ import star.rect;
 import star.object;
 import star.object_database;
 import star.format;
+import star.game_timers;
 
 #include "gtest/gtest.h"
 
@@ -150,6 +151,11 @@ namespace Star {
 struct WorldServerTestAccess {
   using Timing = WorldServer::UpdateTiming;
   using Limit = WorldServer::ProcessingLimit;
+
+  static void start_break_clock(WorldServer& world) {
+    world.m_current_time = 120;
+    world.m_tile_entity_break_check_timer = GameTimer(0.125f);
+  }
 
   static void setConfiguration(WorldServer& world, Json settings) {
     auto updated = world.m_serverConfig.set("fidelitySettings", std::move(settings));
@@ -184,7 +190,45 @@ std::expected<std::shared_ptr<WorldServer>, StarException> createSchedulingWorld
     return std::unexpected(std::move(storage.error()));
   return WorldServer::create(root, Vec2U(2048, 2048), *storage);
 }
+
+class BreakCountingChair : public Object {
+public:
+  explicit BreakCountingChair(Root& root) : Entity(root), Object(root) {}
+  using Object::initialize;
+
+  std::expected<bool, StarException> checkBroken() override {
+    ++checks;
+    return Object::checkBroken();
+  }
+
+  unsigned checks = 0;
+};
 }// namespace
+
+const GameTestRegistration server_break_clock("GameTimers", "GlobalBreakRequestsFollowElapsedSteps", [](GameTest& fixture) {
+  auto& root = fixture.root();
+  auto world = createSchedulingWorld(root).value();
+  auto close = make_scope_exit([&] { EXPECT_TRUE(world->close()); });
+  Vec2I const pos(1024, 1024);
+  world->generateRegion(RectI::with_size(pos - Vec2I(40, 40), {80, 80})).value();
+  for (int x = -3; x <= 3; ++x) {
+    auto& floor = world->modifyServerTile(pos + Vec2I(x, -1)).value().value().get();
+    floor.foreground = StructureMaterialId;
+    floor.update_collision(CollisionKind::Block);
+  }
+  auto chair = std::make_shared<BreakCountingChair>(root);
+  chair->initialize(root.objectDatabase().value()->getConfig("woodenchair").value(), JsonObject()).value();
+  chair->setTilePosition(pos).value();
+  world->addEntity(chair).value();
+  WorldServerTestAccess::start_break_clock(*world);
+  auto const before = chair->checks;
+  for (unsigned step = 1; step <= 12; ++step) {
+    // Idle for two steps: the periodic clock must still advance.
+    if (step > 2) world->request_global_break_check();
+    world->update(0.03125f).value();
+    EXPECT_EQ(chair->checks - before, step / 4) << step;
+  }
+});
 
 const GameTestRegistration falling_block_world_edges("FallingBlocksWorld", "UnloadedSectorEdgesAndWrappedMoves", [](GameTest& fixture) {
   auto created = createSchedulingWorld(fixture.root());

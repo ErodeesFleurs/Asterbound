@@ -1160,7 +1160,7 @@ std::expected<void, StarException> ActorMovementController::tick_master(float dt
       m_ground_movement_sustain_timer.tick(dt);
       if (onGround()) {
         m_ground_movement_sustain_timer = GameTimer(max_ground_sustain);
-      } else if (!m_ground_movement_sustain_timer.ready() && ground_check_distance > 0.0f && max_ground_sustain - m_ground_movement_sustain_timer.timer > min_ground_sustain) {
+      } else if (!m_ground_movement_sustain_timer.ready() && ground_check_distance > 0.0f && max_ground_sustain - m_ground_movement_sustain_timer.remaining > min_ground_sustain) {
         PolyF collision_body = MovementController::collisionBody();
         collision_body.translate(Vec2F(0, -ground_check_distance));
         auto collision = world_ref.poly_collision(collision_body, {CollisionKind::Block, CollisionKind::Dynamic, CollisionKind::Platform, CollisionKind::Slippery});

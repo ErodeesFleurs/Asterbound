@@ -268,7 +268,7 @@ std::expected<void, StarException> WorldClient::initialize(std::shared_ptr<Playe
   if (!result2)
     return std::unexpected(std::move(result2.error()));
   m_clientConfig = (std::move(*result2));
-  m_expiryTimer = GameTimer(0);
+  m_expiry_timer = GameTimer(0);
   m_headless = false;
   m_subWorldId = main_client_world_id;
   
@@ -279,15 +279,15 @@ std::expected<void, StarException> WorldClient::initialize(std::shared_ptr<Playe
   auto result3 = m_clientConfig.get_float("worldDimTime");
   if (!result3)
     return std::unexpected(std::move(result3.error()));
-  m_worldDimTimer = GameTimer((std::move(*result3)));
-  m_worldDimTimer.setDone();
+  m_world_dim_timer = GameTimer((std::move(*result3)));
+  m_world_dim_timer.set_done();
   m_worldDimLevel = 0.0f;
   
   auto result4 = m_clientConfig.get_float("parallaxFadeTime");
   if (!result4)
     return std::unexpected(std::move(result4.error()));
-  m_parallaxFadeTimer = GameTimer((std::move(*result4)));
-  m_parallaxFadeTimer.setDone();
+  m_parallax_fade_timer = GameTimer((std::move(*result4)));
+  m_parallax_fade_timer.set_done();
   
   m_collisionDebug = false;
   m_inWorld = false;
@@ -439,7 +439,7 @@ std::expected<void, StarException> WorldClient::initialize(ClientSubWorldId subW
   auto result34 = m_clientConfig.get_float("idleSubWorldExpireTime");
   if (!result34)
     return std::unexpected(std::move(result34.error()));
-  m_expiryTimer = GameTimer((std::move(*result34)));
+  m_expiry_timer = GameTimer((std::move(*result34)));
   m_headless = true;
   
   m_currentStep = 0;
@@ -1026,7 +1026,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& render_d
   }
   
   // If we're dimming the world, then that takes priority
-  float dim_ratio = m_worldDimTimer.percent();
+  float dim_ratio = m_world_dim_timer.remaining_fraction();
   
   // Spends 80% of the time at pitch black with 10% ramp up and down
   
@@ -1334,11 +1334,11 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& render_d
   }
   
   if (m_currentParallax) {
-    if (m_parallaxFadeTimer.ready()) {
+    if (m_parallax_fade_timer.ready()) {
       render_data.parallax_layers.append_range(m_currentParallax->layers());
     } else {
       for (auto layer : m_currentParallax->layers()) {
-        layer.alpha = std::min(1.0f, m_parallaxFadeTimer.percent() * 2);
+        layer.alpha = std::min(1.0f, m_parallax_fade_timer.remaining_fraction() * 2);
         render_data.parallax_layers.push_back(layer);
       }
     }
@@ -1346,7 +1346,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& render_d
   
   if (m_nextParallax) {
     for (auto layer : m_nextParallax->layers()) {
-      layer.alpha = std::min(1.0f, (1.0f - m_parallaxFadeTimer.percent()) * 2);
+      layer.alpha = std::min(1.0f, (1.0f - m_parallax_fade_timer.remaining_fraction()) * 2);
       render_data.parallax_layers.push_back(layer);
     }
   }
@@ -1483,7 +1483,7 @@ List<std::shared_ptr<AudioInstance>> WorldClient::pullPendingAudio() { return st
 List<std::shared_ptr<AudioInstance>> WorldClient::pull_pending_music() { return std::exchange(m_music, {}); }
 
 void WorldClient::dimWorld() {
-  m_worldDimTimer.reset();
+  m_world_dim_timer.reset();
 }
 
 bool WorldClient::interactiveHighlightMode() const {
@@ -1498,13 +1498,13 @@ void WorldClient::setParallax(std::shared_ptr<Parallax> newParallax) {
   if (newParallax) {
     if (!m_currentParallax) {
       m_currentParallax = std::move(newParallax);
-    } else if (m_parallaxFadeTimer.ready() && newParallax != m_currentParallax) {
+    } else if (m_parallax_fade_timer.ready() && newParallax != m_currentParallax) {
       m_nextParallax = std::move(newParallax);
-      m_parallaxFadeTimer.reset();
+      m_parallax_fade_timer.reset();
     } else if (m_nextParallax && newParallax == m_currentParallax) {
       m_currentParallax = m_nextParallax;
       m_nextParallax = std::move(newParallax);
-      m_parallaxFadeTimer.invert();
+      m_parallax_fade_timer.invert();
     }
   }
 }
@@ -2033,7 +2033,7 @@ List<std::shared_ptr<Packet>> WorldClient::getOutgoingPackets() {
 }
 
 MessageResponseResult WorldClient::receiveMessage(ConnectionId fromConnection, String const& message, JsonArray const& args) {
-  m_expiryTimer.reset();
+  m_expiry_timer.reset();
   if (!inWorld()) {
     // script contexts aren't active to handle this message
     return {};
@@ -2059,14 +2059,14 @@ std::shared_ptr<WorldClient::ScriptComponent> WorldClient::scriptContext(String 
 }
 
 std::expected<void, StarException> WorldClient::update(float dt) {
-  m_expiryTimer.tick(dt);
+  m_expiry_timer.tick(dt);
   if (!inWorld()) {
     return {};
   }
   m_presentationTimestep = dt;
-  m_worldDimTimer.tick(dt);
-  m_parallaxFadeTimer.tick(dt);
-  if (m_parallaxFadeTimer.ready() && m_nextParallax) {
+  m_world_dim_timer.tick(dt);
+  m_parallax_fade_timer.tick(dt);
+  if (m_parallax_fade_timer.ready() && m_nextParallax) {
     m_currentParallax = m_nextParallax;
     m_nextParallax.reset();
   }
@@ -2190,8 +2190,8 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     return std::unexpected(std::move(result160.error()));
   if (m_headless) {
     if (m_entityMap->size() > 0) {
-      m_expiryTimer.reset();
-    } else if (m_expiryTimer.ready()) {
+      m_expiry_timer.reset();
+    } else if (m_expiry_timer.ready()) {
       // world has had no entities and isn't being used, destroy it
       requestDestroy();
     }
@@ -2500,7 +2500,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     }
   }
   
-  auto result194 = queueUpdatePackets(m_entityUpdateTimer.wrapTick(dt));
+  auto result194 = queueUpdatePackets(m_entity_update_timer.wrap_tick(dt));
   if (!result194)
     return std::unexpected(std::move(result194.error()));
   
@@ -3333,7 +3333,7 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
       m_interpolationTracker = (std::move(*result256));
     }
     
-    m_entityUpdateTimer = GameTimer(m_interpolationTracker.entityUpdateDelta());
+    m_entity_update_timer = GameTimer(m_interpolationTracker.entityUpdateDelta());
     
     m_clientId = startPacket.clientId;
     auto result257 = connection_entity_space(startPacket.clientId);
@@ -3609,7 +3609,7 @@ std::expected<void, StarException> WorldClient::clearWorld() {
   m_parallaxWindTime = {};
   if (m_weather)
     remember(m_weather->clear());
-  m_parallaxFadeTimer.setDone();
+  m_parallax_fade_timer.set_done();
 
   if (m_clientState)
     m_clientState->reset();
@@ -3638,7 +3638,7 @@ std::expected<void, StarException> WorldClient::clearWorld() {
 
   m_force_regions.clear();
   
-  m_expiryTimer.reset();
+  m_expiry_timer.reset();
   m_requestedDestroy = false;
   if (error)
     return std::unexpected(std::move(*error));
@@ -4141,7 +4141,7 @@ bool WorldClient::pullRequestedDestroy() {
 }
 
 void WorldClient::requestDestroy() {
-  m_expiryTimer.reset();
+  m_expiry_timer.reset();
   m_requestedDestroy = true;
 }
 
@@ -4376,7 +4376,7 @@ bool WorldClient::shouldExpire() {
     return false;
   }
 
-  return m_expiryTimer.ready();
+  return m_expiry_timer.ready();
 }
 
 }

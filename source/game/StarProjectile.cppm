@@ -227,7 +227,7 @@ private:
   String m_persistentAudioFile;
   std::shared_ptr<AudioInstance> m_persistentAudio;
 
-  List<std::tuple<GameTimer, bool, Json>> m_periodicActions;
+  List<std::tuple<GameTimer, bool, Json>> m_periodic_actions;
 
   NetElementTopGroup m_netGroup;
   std::shared_ptr<MovementController> m_movementController;

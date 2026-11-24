@@ -233,7 +233,7 @@ auto result96 = c.get_float("time");
 if (!result96) return std::unexpected(std::move(result96.error()));
 auto result97 = c.get_bool("repeat", true);
 if (!result97) return std::unexpected(std::move(result97.error()));
-projectileConfig->periodicActions.push_back(std::make_tuple(std::move(*result96), std::move(*result97), c));
+projectileConfig->periodic_actions.push_back(std::make_tuple(std::move(*result96), std::move(*result97), c));
 }
 
   auto result98 = config.get_string("image");

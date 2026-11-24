@@ -231,7 +231,7 @@ private:
   String m_path;
   Json m_dynamicConfig;
   RectF m_boundBox;
-  float m_slaveControlTimeout = 0.0f;
+  float m_slave_control_timeout = 0.0f;
   bool m_receiveExtraControls;
   OrderedHashMap<String, LoungePositionConfig> m_loungePositions;
   OrderedHashMap<String, MovingCollisionConfig> m_movingCollisions;
@@ -249,7 +249,7 @@ private:
   LuaAnimationScript m_scriptedAnimator;
   NetElementHashMap<String, Json> m_scriptedAnimationParameters;
 
-  Map<ConnectionId, GameTimer> m_aliveMasterConnections;
+  Map<ConnectionId, GameTimer> m_alive_master_connections;
   bool m_shouldDestroy = false;
   NetElementData<EntityDamageTeam> m_damageTeam;
   OrderedHashMap<String, DamageSourceConfig> m_damageSources;
@@ -257,7 +257,7 @@ private:
   EntityRenderLayer m_base_render_layer;
   std::optional<EntityRenderLayer> m_override_render_layer;
   
-  GameTimer m_slaveHeartbeatTimer;
+  GameTimer m_slave_heartbeat_timer;
 };
 
 }

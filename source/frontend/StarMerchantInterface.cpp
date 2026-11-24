@@ -225,13 +225,13 @@ std::expected<void, StarException> MerchantPane::initialize(std::shared_ptr<Worl
     return std::unexpected(std::move(fetchJsonResult570.error()));
   m_settings = json_merge(std::move(*fetchJsonResult570), settings);
 
-  auto jsonResult571 = assets->json("/merchant.config:autoRefreshRate");
-  if (!jsonResult571)
-    return std::unexpected(std::move(jsonResult571.error()));
-  auto toFloatResult572 = std::move(*jsonResult571).to_float();
-  if (!toFloatResult572)
-    return std::unexpected(std::move(toFloatResult572.error()));
-  m_refreshTimer = GameTimer(std::move(*toFloatResult572));
+  auto refresh_config = assets->json("/merchant.config:autoRefreshRate");
+  if (!refresh_config)
+    return std::unexpected(std::move(refresh_config.error()));
+  auto refresh_duration = std::move(*refresh_config).to_float();
+  if (!refresh_duration)
+    return std::unexpected(std::move(refresh_duration.error()));
+  m_refresh_timer = GameTimer(std::move(*refresh_duration));
 
   auto jsonResult573 = assets->json("/merchant.config:defaultBuyFactor");
   if (!jsonResult573)
@@ -529,7 +529,7 @@ std::expected<void, StarException> MerchantPane::update(float dt) {
       dismiss();
   }
 
-  if (m_refreshTimer.wrapTick(context().root().timing().time_step)) {
+  if (m_refresh_timer.wrap_tick(context().root().timing().time_step)) {
     for (std::size_t i = 0; i < m_itemList.size(); ++i) {
       auto itemConfig = m_itemList.get(i);
       auto itemWidget = m_itemGuiList->itemAt(i);

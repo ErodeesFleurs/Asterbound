@@ -6,6 +6,8 @@ import star.list;
 import star.image_processing;
 import star.hash;
 import star.data_stream;
+import star.data_stream_devices;
+import star.game_timers;
 import star.string_view;
 import star.thread;
 import star.directives;
@@ -97,6 +99,100 @@ void PrintTo(ItemDescriptor const& descriptor, std::ostream* stream) {
 using namespace Star;
 
 namespace {
+
+TEST(GameTimerTest, SignedCountdownAndSingleExpiration) {
+  GameTimer zero;
+  EXPECT_TRUE(zero.ready());
+  EXPECT_TRUE(zero.wrap_tick(0.0f));
+  EXPECT_TRUE(zero.wrap_tick(9.0f));
+  EXPECT_EQ(zero.remaining_fraction(), 0.0f);
+
+  GameTimer timer(-4.0f);
+  EXPECT_EQ(timer.remaining_fraction(), 1.0f);
+  EXPECT_FALSE(timer.tick(1.0f));
+  EXPECT_EQ(timer.remaining_fraction(), 0.75f);
+  timer.invert();
+  EXPECT_EQ(timer.remaining, -1.0f);
+  EXPECT_FALSE(timer.tick(-0.5f));
+  EXPECT_EQ(timer.remaining, -1.5f);
+  EXPECT_TRUE(timer.wrap_tick(10.0f));
+  EXPECT_EQ(timer.remaining, timer.duration);
+  EXPECT_FALSE(timer.wrap_tick(0.0f));
+  timer.set_done();
+  EXPECT_TRUE(timer.ready());
+  timer.reset();
+  EXPECT_TRUE(timer.tick(4.0f));
+  EXPECT_TRUE(timer.ready());
+}
+
+TEST(GameTimerTest, LegacyFloatsAndTruncatedRead) {
+  constexpr std::array<char, 8> wire{0x40, 0, 0, 0, 0x3f, 0, 0, 0}; // duration 2, remaining 0.5
+  GameTimer timer(-8.0f);
+  timer.tick(1.0f);
+  for (std::size_t n = 0; n < wire.size(); ++n) {
+    SCOPED_TRACE(n);
+    auto read = DataStreamBuffer::deserialize(timer, std::span(wire).first(n));
+    ASSERT_FALSE(read);
+    EXPECT_TRUE(read.error().is<EofException>());
+    EXPECT_EQ(timer.duration, -8.0f);
+    EXPECT_EQ(timer.remaining, -7.0f);
+  }
+  ASSERT_TRUE(DataStreamBuffer::deserialize(timer, wire));
+  EXPECT_EQ(timer.duration, 2.0f);
+  EXPECT_EQ(timer.remaining, 0.5f);
+  DataStreamBuffer encoded;
+  ASSERT_TRUE(encoded.write(timer));
+  EXPECT_TRUE(std::ranges::equal(encoded.span(), wire));
+}
+
+TEST(EpochTimerTest, LegacySaveAndBackwardClockRebase) {
+  Json cold_save = JsonObject{{"lastEpochTime", Json()}, {"elapsedTime", 0.0}};
+  EXPECT_EQ(EpochTimer{}.to_json(), cold_save);
+  auto timer = EpochTimer::from_json(cold_save);
+  ASSERT_TRUE(timer);
+  timer->update(100);
+  timer->update(90);
+  EXPECT_EQ(timer->elapsed_time(), 0);
+  timer->update(95);
+  EXPECT_EQ(timer->elapsed_time(), 5);
+  timer->set_elapsed_time(-2);
+  timer->update(96);
+  Json warm_save = JsonObject{{"lastEpochTime", 96.0}, {"elapsedTime", -1.0}};
+  EXPECT_EQ(timer->to_json(), warm_save);
+  auto resumed = EpochTimer::from_json(warm_save);
+  ASSERT_TRUE(resumed);
+  resumed->update(100);
+  EXPECT_EQ(resumed->elapsed_time(), 3);
+  EXPECT_FALSE(EpochTimer::from_json(JsonObject{{"elapsedTime", 1}}));
+  EXPECT_FALSE(EpochTimer::from_json(JsonObject{{"lastEpochTime", Json()}}));
+  EXPECT_FALSE(EpochTimer::from_json(JsonObject{{"lastEpochTime", "bad"}, {"elapsedTime", 1}}));
+}
+
+TEST(EpochTimerTest, LegacyOptionalAndTruncatedRead) {
+  // An optional epoch (absent or 2.0) followed by 3.0 elapsed, in network order.
+  constexpr std::array<char, 9> absent{0, 0x40, 8, 0, 0, 0, 0, 0, 0};
+  constexpr std::array<char, 17> present{1, 0x40, 0, 0, 0, 0, 0, 0, 0, 0x40, 8, 0, 0, 0, 0, 0, 0};
+  for (std::span<char const> bytes : {std::span<char const>(absent), std::span<char const>(present)}) {
+    EpochTimer timer;
+    timer.update(90);
+    timer.set_elapsed_time(-2);
+    auto previous = timer.to_json();
+    for (std::size_t n = 0; n < bytes.size(); ++n) {
+      SCOPED_TRACE(n);
+      auto read = DataStreamBuffer::deserialize(timer, bytes.first(n));
+      ASSERT_FALSE(read);
+      EXPECT_TRUE(read.error().is<EofException>());
+      EXPECT_EQ(timer.to_json(), previous);
+    }
+    ASSERT_TRUE(DataStreamBuffer::deserialize(timer, bytes));
+    EXPECT_EQ(timer.elapsed_time(), 3);
+    DataStreamBuffer encoded;
+    ASSERT_TRUE(encoded.write(timer));
+    EXPECT_TRUE(std::ranges::equal(encoded.span(), bytes));
+    timer.update(5);
+    EXPECT_EQ(timer.elapsed_time(), bytes[0] ? 6 : 3);
+  }
+}
 
 [[nodiscard]] std::expected<std::shared_ptr<Item>, StarException> inventoryTestItem(
     ItemDatabase const& database, String const& name, std::uint64_t count = 1, Json parameters = Json()) {

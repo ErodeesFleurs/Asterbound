@@ -81,7 +81,7 @@ struct ProjectileConfig {
   JsonArray actionOnTimeout;
 
   // Time, repeat flag, and action config
-  List<std::tuple<float, bool, Json>> periodicActions;
+  List<std::tuple<float, bool, Json>> periodic_actions;
 
   String image;
   unsigned frameNumber = 0;

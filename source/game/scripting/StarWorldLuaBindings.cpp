@@ -1167,9 +1167,9 @@ namespace LuaBindings {
         }); !result)
         return std::unexpected(std::move(result.error()));
 
-      if (auto result = callbacks.register_callback("expiryTime", [serverWorld]() -> float { return serverWorld->get().expiryTime(); }); !result)
+      if (auto result = callbacks.register_callback("expiryTime", [serverWorld]() -> float { return serverWorld->get().expiry_time(); }); !result)
         return std::unexpected(std::move(result.error()));
-      if (auto result = callbacks.register_callback("setExpiryTime", [serverWorld](float expiryTime) { return serverWorld->get().setExpiryTime(expiryTime); }); !result)
+      if (auto result = callbacks.register_callback("setExpiryTime", [serverWorld](float expiry_time) { return serverWorld->get().set_expiry_time(expiry_time); }); !result)
         return std::unexpected(std::move(result.error()));
 
       if (auto result = callbacks.register_callback("wire", [serverWorld](Vec2I outputPosition, std::size_t outputIndex, Vec2I inputPosition, std::size_t inputIndex) -> std::expected<void, StarException> {
@@ -2550,7 +2550,7 @@ namespace LuaBindings {
       if (initialVelocity)
         itemDrop->setVelocity(*initialVelocity);
       if (intangibleTime)
-        itemDrop->setIntangibleTime(*intangibleTime);
+        itemDrop->set_intangible_time(*intangibleTime);
       if (auto operation = world.addEntity(itemDrop); !operation)
         return std::unexpected(std::move(operation.error()));
       return itemDrop->inWorld() ? std::optional<EntityId>(itemDrop->entityId()) : std::nullopt;

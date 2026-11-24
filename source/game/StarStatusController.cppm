@@ -302,7 +302,7 @@ private:
   float m_minimumLiquidStatusEffectPercentage;
   bool m_appliesEnvironmentStatusEffects;
   bool m_appliesWeatherStatusEffects;
-  GameTimer m_environmentStatusEffectUpdateTimer;
+  GameTimer m_environment_status_effect_update_timer;
 
   std::optional<String> m_primaryAnimationConfig;
   StatScript m_primaryScript;

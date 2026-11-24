@@ -1278,11 +1278,11 @@ std::expected<std::shared_ptr<ObjectConfig>, StarException> ObjectDatabase::read
       return std::unexpected(std::move(maximumLiquidLevelResult.error()));
     auto maximumLiquidLevel = std::move(*maximumLiquidLevelResult);
     objectConfig->maximumLiquidLevel = std::move(maximumLiquidLevel);
-    auto liquidCheckIntervalResult = config.get_float("liquidCheckInterval", 0.5);
-    if (!liquidCheckIntervalResult)
-      return std::unexpected(std::move(liquidCheckIntervalResult.error()));
-    auto liquidCheckInterval = std::move(*liquidCheckIntervalResult);
-    objectConfig->liquidCheckInterval = std::move(liquidCheckInterval);
+    auto liquid_check_interval_result = config.get_float("liquidCheckInterval", 0.5);
+    if (!liquid_check_interval_result)
+      return std::unexpected(std::move(liquid_check_interval_result.error()));
+    auto liquid_check_interval = std::move(*liquid_check_interval_result);
+    objectConfig->liquid_check_interval = std::move(liquid_check_interval);
     auto healthResult = config.get_float("health", 1);
     if (!healthResult)
       return std::unexpected(std::move(healthResult.error()));
