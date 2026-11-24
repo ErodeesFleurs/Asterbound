@@ -437,7 +437,13 @@ private:
   std::shared_ptr<CommandProcessor> m_commandProcessor;
   std::shared_ptr<TeamManager> m_teamManager;
 
-  HashMap<ConnectionId, std::pair<WarpAction, bool>> m_pendingPlayerWarps;
+  enum class WarpAttempt { Requested, Return, OwnShip };
+  struct PendingPlayerWarp {
+    WarpAction action;
+    bool deploy;
+    WarpAttempt attempt = WarpAttempt::Requested;
+  };
+  HashMap<ConnectionId, PendingPlayerWarp> m_pendingPlayerWarps;
   HashMap<ConnectionId, HashMap<ClientSubWorldId, WorldId>> m_pendingSubWorlds;
   HashMap<ConnectionId, std::pair<std::tuple<Vec3I, SystemLocation, Json>, std::optional<double>>> m_queuedFlights;
   HashMap<ConnectionId, std::tuple<Vec3I, SystemLocation, Json>> m_pendingFlights;

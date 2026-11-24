@@ -64,6 +64,7 @@ import star.item_database;
 import star.item_slot_widget;
 import star.drawable;
 import star.cinematic;
+import star.interface_cursor;
 import star.world_server;
 import star.casting;
 import star.vertical_layout;
@@ -556,7 +557,7 @@ private:
   bool& m_ran;
 };
 
-void run_surface_scenario(GameTest& fixture, SurfaceScenario& scenario) {
+void run_surface_scenario(GameTest& fixture, SurfaceScenario& scenario, char const* audioDriver = "dummy") {
   auto lease = std::getenv("ASTERBOUND_RENDER_TEST_DISPLAY");
   if (!lease)
     GTEST_SKIP() << "Requires scripts/ci/linux/with-test-display.py";
@@ -567,7 +568,11 @@ void run_surface_scenario(GameTest& fixture, SurfaceScenario& scenario) {
   EXPECT_EXIT({
     bool ran = false;
     EXPECT_TRUE(SDL_SetHintWithPriority(SDL_HINT_VIDEO_DRIVER, "x11", SDL_HINT_OVERRIDE));
-    EXPECT_TRUE(SDL_SetHintWithPriority(SDL_HINT_AUDIO_DRIVER, "dummy", SDL_HINT_OVERRIDE));
+    EXPECT_TRUE(SDL_SetHintWithPriority(SDL_HINT_AUDIO_DRIVER, audioDriver, SDL_HINT_OVERRIDE));
+    if (std::string_view(audioDriver) == "disk") {
+      EXPECT_TRUE(SDL_SetHintWithPriority(SDL_HINT_AUDIO_DISK_OUTPUT_FILE, "/dev/null", SDL_HINT_OVERRIDE));
+      EXPECT_TRUE(SDL_SetHintWithPriority(SDL_HINT_AUDIO_DISK_INPUT_FILE, "/dev/null/microphone", SDL_HINT_OVERRIDE));
+    }
     if (!testing::Test::HasFailure()) {
       EXPECT_EQ(runMainApplication(std::make_unique<SurfaceTestApplication>(fixture, scenario, ran),
           {"frontend_tests", "-renderer", "opengl"}), 0);
@@ -582,6 +587,161 @@ void run_surface_scenario(GameTest& fixture, SurfaceScenario& scenario) {
     std::_Exit(testing::Test::HasFailure() ? 1 : 0);
   }, testing::ExitedWithCode(0), "");
 }
+
+void exercise_unavailable_audio(GameTest& fixture, Application const& application) {
+  ASSERT_FALSE(SDL_WasInit(SDL_INIT_AUDIO));
+  auto const& controller = application.appController();
+  controller->enableAudio();
+  controller->disableAudio();
+  auto created = Voice::create(fixture.root(), controller);
+  ASSERT_TRUE(created) << created.error().what();
+  auto& voice = **created;
+  ASSERT_TRUE(voice.availableDevices().empty());
+  Json settings = JsonObject{{"enabled", true}, {"inputEnabled", true}, {"deviceName", "absent microphone"}};
+  ASSERT_TRUE(voice.loadJson(settings, true));
+  ASSERT_TRUE(voice.init());
+  ASSERT_TRUE(voice.update(0));
+  auto saved = voice.saveJson();
+  EXPECT_TRUE(saved.get_bool("enabled").value_or(false));
+  EXPECT_TRUE(saved.get_bool("inputEnabled").value_or(false));
+  EXPECT_EQ(saved.get_string("deviceName").value_or(String()), "absent microphone");
+  EXPECT_FALSE(controller->closeAudioInputDevice());
+}
+
+const GameTestRegistration unavailable_audio("OptionalDevices", "NoAudioDriverKeepsClientAndVoiceSettings", [](GameTest& fixture) {
+  run_surface_scenario(fixture, exercise_unavailable_audio, "asterbound-nonexistent-driver");
+});
+
+void exercise_unavailable_microphone(GameTest& fixture, Application const& application) {
+  ASSERT_TRUE(SDL_WasInit(SDL_INIT_AUDIO));
+  auto const& controller = application.appController();
+  auto created = Voice::create(fixture.root(), controller);
+  ASSERT_TRUE(created) << created.error().what();
+  auto& voice = **created;
+  auto devices = voice.availableDevices();
+  ASSERT_FALSE(devices.empty());
+  Json prefs = JsonObject{{"inputEnabled", true}, {"deviceName", devices.front()}};
+  ASSERT_TRUE(voice.loadJson(prefs, true));
+  ASSERT_TRUE(voice.init());
+  EXPECT_FALSE(controller->closeAudioInputDevice());
+  auto saved = voice.saveJson();
+  EXPECT_TRUE(saved.get_bool("inputEnabled").value_or(false));
+  EXPECT_EQ(saved.get_string("deviceName").value_or(String()), devices.front());
+
+  ASSERT_TRUE(SDL_SetHintWithPriority(SDL_HINT_AUDIO_DISK_INPUT_FILE, "/dev/zero", SDL_HINT_OVERRIDE));
+  ASSERT_TRUE(voice.loadJson(saved, true));
+  ASSERT_TRUE(voice.update(0));
+  EXPECT_FALSE(controller->closeAudioInputDevice());
+  ASSERT_TRUE(voice.setDeviceName(std::nullopt));
+  EXPECT_TRUE(controller->closeAudioInputDevice());
+}
+
+const GameTestRegistration unavailable_microphone("OptionalDevices", "MissingMicrophoneRetriesOnlyOnPreferenceChange", [](GameTest& fixture) {
+  for (int i = 0; i < SDL_GetNumAudioDrivers(); ++i) {
+    if (std::string_view(SDL_GetAudioDriver(i)) == "disk") {
+      run_surface_scenario(fixture, exercise_unavailable_microphone, "disk");
+      return;
+    }
+  }
+  GTEST_SKIP() << "SDL disk audio driver is not compiled in";
+});
+
+void exercise_optional_ui_content(GameTest& fixture, Application const& application) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto overlay = File::relative_to(*directory, "assets");
+  ASSERT_TRUE(File::create_directory(overlay));
+  ASSERT_TRUE(File::write_file(String(R"({"buttonClickSound":["bad/path"],"buttonReleaseSound":["bad/path"],
+      "buttonHoverSound":["bad/path"],"buttonHoverOffSound":[]})"), File::relative_to(overlay, "interface.config.patch")));
+  auto created = createPrivateOverlayRoot(fixture.rootSettings(), *directory, overlay, "optional-ui.config");
+  ASSERT_TRUE(created) << created.error().what();
+  auto& root = **created;
+  auto configuration = root.configuration();
+  ASSERT_TRUE(configuration);
+  ASSERT_TRUE((*configuration)->set("bindings", JsonObject{}));
+  auto input = Input::create(root);
+  ASSERT_TRUE(input);
+  auto context = GuiContext::create(root, std::make_shared<Mixer>(root.logger(), 44100, 2), application.appController());
+  ASSERT_TRUE(context);
+  (*context)->bindInput(**input);
+
+  class CursorWarnings : public LogSink {
+  public:
+    std::expected<void, StarException> log(std::string_view message, LogLevel) override {
+      if (message.contains("Ignoring invalid cursor override"))
+        ++count;
+      return {};
+    }
+    std::atomic<unsigned> count{};
+  };
+  auto warnings = std::make_shared<CursorWarnings>();
+  warnings->set_level(LogLevel::Warn);
+  root.logger().add_sink(warnings);
+  auto cursor = InterfaceCursor::create(**context);
+  ASSERT_TRUE(cursor);
+  auto size = (*cursor)->size();
+  ASSERT_TRUE((*cursor)->setCursor("invalid/path"));
+  ASSERT_TRUE((*cursor)->setCursor("invalid/path"));
+  EXPECT_EQ(warnings->count.load(), 1u);
+  EXPECT_EQ((*cursor)->size(), size);
+  ASSERT_TRUE((*cursor)->drawable());
+
+  auto overlayPlayer = Cinematic::create(**context);
+  ASSERT_TRUE(overlayPlayer);
+  auto& cinema = **overlayPlayer;
+  Json panel = JsonObject{{"drawables", JsonArray{JsonObject{{"image", 17}}}}, {"startTime", 5},
+      {"keyframes", JsonArray{JsonObject{{"timecode", 0}, {"alpha", 1}}, JsonObject{{"timecode", 100}}}}};
+  Json definition = JsonObject{{"panels", JsonArray{panel}}, {"audio", JsonArray{}}, {"letterbox", false},
+      {"muteSfx", true}, {"muteMusic", true}};
+  ASSERT_TRUE(cinema.load(definition));
+  cinema.setTime(0);
+  EXPECT_FALSE(cinema.render()); // Missing renderer is not a content failure.
+  ASSERT_FALSE(cinema.completed());
+  ASSERT_TRUE((*context)->renderInit(application.renderer()));
+  ASSERT_TRUE(cinema.render());
+  ASSERT_TRUE(cinema.suppressInput());
+  std::optional<RectI> clip = RectI(5, 5, 25, 25);
+  ASSERT_TRUE(application.renderer()->setScissorRect(clip));
+  cinema.setTime(6);
+  ASSERT_TRUE(cinema.render());
+  EXPECT_EQ(application.renderer()->scissorRect(), clip);
+  EXPECT_TRUE(cinema.completed());
+  EXPECT_FALSE(cinema.suppressInput());
+  EXPECT_FALSE(cinema.muteMusic());
+  EXPECT_FALSE(cinema.muteSfx());
+  ASSERT_TRUE(application.renderer()->setScissorRect({}));
+  ASSERT_TRUE(cinema.load(definition));
+  ASSERT_TRUE(cinema.loadOptional(std::unexpected(StarException("invalid cinematic asset"))));
+  EXPECT_TRUE(cinema.completed());
+  EXPECT_FALSE(cinema.suppressInput());
+
+  auto button = ButtonWidget::create(**context);
+  ASSERT_TRUE(button);
+  ASSERT_TRUE((*button)->setImages("/interface/title/joinserverUp.png"));
+  ASSERT_TRUE((*button)->render((*button)->screenBoundRect()));
+  int releases = 0;
+  (*button)->setCallback([&](Widget&) -> std::expected<void, StarException> {
+    if (++releases == 2)
+      return std::unexpected(StarException("callback failed"));
+    return {};
+  });
+  ASSERT_TRUE((*button)->mouseOver());
+  ASSERT_TRUE((*button)->mouseOut());
+  for (int n = 1; n <= 2; ++n) {
+    auto down = (*button)->sendEvent(MouseButtonDownEvent{MouseButton::Left, {1, 1}});
+    ASSERT_TRUE(down && *down);
+    ASSERT_TRUE((*button)->isPressed());
+    auto up = (*button)->sendEvent(MouseButtonUpEvent{MouseButton::Left, {1, 1}});
+    EXPECT_EQ(up.has_value(), n == 1);
+    EXPECT_EQ(releases, n);
+    if (n == 1)
+      EXPECT_FALSE((*button)->isPressed());
+  }
+}
+
+const GameTestRegistration optional_ui_content("OptionalUiContent", "BadMediaDoesNotInterruptInputOrEscapeOverlay",
+    [](GameTest& fixture) { run_surface_scenario(fixture, exercise_optional_ui_content); });
 
 const GameTestRegistration sail_navigation("AiInterface", "PageSnapshotsAndSpeechReveal", [](GameTest& fixture) {
   run_surface_scenario(fixture, exercise_sail);

@@ -587,6 +587,72 @@ public:
     return m_dispatcher.invoke([&] { return initializeNative(applicationPath, platformArguments); });
   }
 
+#ifdef STAR_SYSTEM_LINUX
+  std::expected<Image, StarException> readWindowIcon(String const& path) {
+    auto device = File::open(path, IOMode::Read);
+    if (!device)
+      return std::unexpected(std::move(device.error()));
+    auto image = Image::read_png(m_logger->get(), *device);
+    if (!image)
+      return std::unexpected(std::move(image.error()));
+    return process_image_operations(List<ImageOperation>{FlipImageOperation{FlipImageOperation::Mode::FlipY}},
+        image->convert(PixelFormat::RGBA32));
+  }
+
+  static std::expected<bool, StarException> installXdgIcon(String const& source) {
+    auto home = std::getenv("XDG_DATA_HOME");
+    std::string_view suffix = "/icons";
+    if (!home || !*home) {
+      home = std::getenv("HOME");
+      suffix = "/.local/share/icons";
+    }
+    if (!home || !*home)
+      return false;
+    auto directory = String::join_with("", String(std::string_view(home)), suffix);
+    if (!directory)
+      return std::unexpected(std::move(directory.error()));
+    auto exists = File::is_directory(*directory);
+    if (!exists || !*exists)
+      return exists;
+    auto path = String::join_with("", *directory, "/asterbound.png");
+    if (!path)
+      return std::unexpected(std::move(path.error()));
+    auto installed = File::is_regular_file(*path);
+    if (!installed)
+      return std::unexpected(std::move(installed.error()));
+    if (*installed)
+      return false;
+    if (auto copied = File::copy(source, *path); !copied)
+      return std::unexpected(std::move(copied.error()));
+    return true;
+  }
+
+  std::expected<void, StarException> initializeWindowIcon() {
+    String const path = ".icon/asterbound.png";
+    auto present = File::is_regular_file(path);
+    if (!present)
+      return m_logger->get().warn("Could not inspect window icon '{}': {}", path, present.error().what());
+    if (!*present)
+      return {};
+    auto image = readWindowIcon(path);
+    if (!image)
+      return m_logger->get().warn("Could not read window icon '{}': {}", path, image.error().what());
+    std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> surface(SDL_CreateSurfaceFrom(
+        static_cast<int>(image->width()), static_cast<int>(image->height()), SDL_PIXELFORMAT_ABGR8888,
+        image->span().data(), static_cast<int>(image->width() * image->bytes_per_pixel())), SDL_DestroySurface);
+    if (!surface || !SDL_SetWindowIcon(m_sdlWindow.get(), surface.get())) {
+      if (auto logged = m_logger->get().warn("Could not set window icon '{}': {}", path, SDL_GetError()); !logged)
+        return std::unexpected(std::move(logged.error()));
+    }
+    auto installed = installXdgIcon(path);
+    if (!installed)
+      return m_logger->get().warn("Could not install XDG icon '{}': {}", path, installed.error().what());
+    if (*installed)
+      return m_logger->get().info("Application: Installed Icon to XDG Icons Directory");
+    return {};
+  }
+#endif
+
   [[nodiscard]] std::expected<void, StarException> initializeNative(String const& applicationPath, StringList const& platformArguments) {
     auto contextScope = NativeUiContextScope::create(nullptr, nullptr, nullptr);
     if (!contextScope)
@@ -607,18 +673,22 @@ public:
 
     if (auto result = m_logger->get().info("Application: Initializing SDL Controller"); !result)
       return std::unexpected(std::move(result.error()));
-    if (!SDL_InitSubSystem(SDL_INIT_GAMEPAD))
-      return std::unexpected(ApplicationException(Star::format("Couldn't initialize SDL Controller: {}", SDL_GetError())));
+    m_gamepadsAvailable = SDL_InitSubSystem(SDL_INIT_GAMEPAD);
+    if (m_gamepadsAvailable) {
+      SDL_SetJoystickEventsEnabled(true);
+    } else if (auto logged = m_logger->get().warn("Controller input unavailable: {}", SDL_GetError()); !logged) {
+      return std::unexpected(std::move(logged.error()));
+    }
 
     if (auto result = m_logger->get().info("Application: Initializing SDL Audio"); !result)
       return std::unexpected(std::move(result.error()));
-    if (!SDL_InitSubSystem(SDL_INIT_AUDIO))
-      return std::unexpected(ApplicationException(Star::format("Couldn't initialize SDL Audio: {}", SDL_GetError())));
-
-    if (auto result = m_logger->get().info("Application: using Audio Driver '{}'", SDL_GetCurrentAudioDriver()); !result)
-      return std::unexpected(std::move(result.error()));
-
-    SDL_SetJoystickEventsEnabled(true);
+    m_audioAvailable = SDL_InitSubSystem(SDL_INIT_AUDIO);
+    if (!m_audioAvailable) {
+      if (auto logged = m_logger->get().warn("Audio playback and capture unavailable: {}", SDL_GetError()); !logged)
+        return std::unexpected(std::move(logged.error()));
+    } else if (auto logged = m_logger->get().info("Application: using Audio Driver '{}'", SDL_GetCurrentAudioDriver()); !logged) {
+      return std::unexpected(std::move(logged.error()));
+    }
 
     auto platformServices = PcPlatformServices::create(m_logger->get(), applicationPath, platformArguments);
     if (!platformServices)
@@ -649,88 +719,8 @@ public:
 #endif
     
 #ifdef STAR_SYSTEM_LINUX
-    auto iconExists = File::is_regular_file(".icon/asterbound.png");
-    if (!iconExists)
-      return std::unexpected(std::move(iconExists.error()));
-    if (*iconExists) {
-      auto device = File::open(".icon/asterbound.png", IOMode::Read);
-      if (!device)
-        return std::unexpected(std::move(device.error()));
-      auto isPng = Image::is_png(*device);
-      if (!isPng)
-        return std::unexpected(std::move(isPng.error()));
-      if (*isPng) {
-        auto img = Image::read_png(m_logger->get(), *device);
-        if (!img)
-          return std::unexpected(std::move(img.error()));
-        auto conv = img->convert(PixelFormat::RGBA32);
-        auto flippedResult = process_image_operations(
-          List<ImageOperation>{FlipImageOperation{FlipImageOperation::Mode::FlipY}}, std::move(conv));
-        if (!flippedResult)
-          return std::unexpected(std::move(flippedResult.error()));
-        auto& flipped = *flippedResult;
-
-        SDL_PixelFormat sdlFmt = static_cast<SDL_PixelFormat>(SDL_PIXELFORMAT_ABGR8888);
-
-        int w = static_cast<int>(flipped.width());
-        int h = static_cast<int>(flipped.height());
-        int pitch = static_cast<int>(flipped.bytes_per_pixel() * flipped.width());
-
-        std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> iconSurface(SDL_CreateSurfaceFrom(
-          w,
-          h,
-          sdlFmt,
-          flipped.span().data(),
-          pitch
-        ), SDL_DestroySurface);
-
-        if (iconSurface) {
-          SDL_SetWindowIcon(m_sdlWindow.get(), iconSurface.get());
-        } else {
-          if (auto result = m_logger->get().warn("Could not create SDL surface for icon '{}': {}", ".icon/asterbound.png", SDL_GetError()); !result)
-            return std::unexpected(std::move(result.error()));
-        }
-      }
-
-      // Get XDG Icons Directory following XDG Base Directory Specification
-      String XdgIconsPath;
-      const char* XdgDataHome = std::getenv("XDG_DATA_HOME");
-      const char* Home = std::getenv("HOME");
-
-      if (XdgDataHome && XdgDataHome[0] != '\0') {
-        auto path = String::join_with("", String(std::string_view(XdgDataHome)), "/icons");
-        if (!path)
-          return std::unexpected(std::move(path.error()));
-        XdgIconsPath = std::move(*path);
-      } else if (Home && Home[0] != '\0') {
-        auto path = String::join_with("", String(std::string_view(Home)), "/.local/share/icons");
-        if (!path)
-          return std::unexpected(std::move(path.error()));
-        XdgIconsPath = std::move(*path);
-      }
-
-      // Install Icon if not Installed
-      std::expected<bool, StarException> iconsDirectoryExists = false;
-      if (!XdgIconsPath.empty())
-        iconsDirectoryExists = File::is_directory(XdgIconsPath);
-      if (!iconsDirectoryExists)
-        return std::unexpected(std::move(iconsDirectoryExists.error()));
-      if (*iconsDirectoryExists) {
-        auto icon = String::join_with("", XdgIconsPath, "/asterbound.png");
-        if (!icon)
-          return std::unexpected(std::move(icon.error()));
-        const String XdgIcon = std::move(*icon);
-        auto installed = File::is_regular_file(XdgIcon);
-        if (!installed)
-          return std::unexpected(std::move(installed.error()));
-        if (!*installed) {
-          if (auto result = File::copy(".icon/asterbound.png", XdgIcon); !result)
-            return std::unexpected(std::move(result.error()));
-          if (auto result = m_logger->get().info("Application: Installed Icon to XDG Icons Directory"); !result)
-            return std::unexpected(std::move(result.error()));
-        }
-      }
-    }
+    if (auto icon = initializeWindowIcon(); !icon)
+      return std::unexpected(std::move(icon.error()));
 
     SDL_SetHint(SDL_HINT_AUDIO_DEVICE_APP_ICON_NAME, "asterbound");
 #endif
@@ -767,30 +757,32 @@ public:
 
     SDL_StopTextInput(m_sdlWindow.get());
 
-    if (auto result = m_logger->get().info("Application: Opening audio device"); !result)
-      return std::unexpected(std::move(result.error()));
-    m_audioOutputData.clear();
-    SDL_AudioSpec desired = {.format = SDL_AUDIO_S16, .channels = 2, .freq = 44100};
-    m_sdlAudioOutputStream.reset(SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &desired,
-    [](void* userdata, SDL_AudioStream* stream, int len, int) {
-      if (len > 0) {
-        auto& sdlPlatform = *static_cast<SdlPlatform*>(userdata);
-        sdlPlatform.m_audioOutputData.resize(len / sizeof(std::int16_t));
-        auto result = sdlPlatform.getAudioData(sdlPlatform.m_audioOutputData);
-        if (!result) {
-          sdlPlatform.recordAudioError(std::move(result.error()));
-          return;
+    if (m_audioAvailable) {
+      if (auto result = m_logger->get().info("Application: Opening audio device"); !result)
+        return std::unexpected(std::move(result.error()));
+      m_audioOutputData.clear();
+      SDL_AudioSpec desired = {.format = SDL_AUDIO_S16, .channels = 2, .freq = 44100};
+      m_sdlAudioOutputStream.reset(SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &desired,
+      [](void* userdata, SDL_AudioStream* stream, int len, int) {
+        if (len > 0) {
+          auto& sdlPlatform = *static_cast<SdlPlatform*>(userdata);
+          sdlPlatform.m_audioOutputData.resize(len / sizeof(std::int16_t));
+          auto result = sdlPlatform.getAudioData(sdlPlatform.m_audioOutputData);
+          if (!result) {
+            sdlPlatform.recordAudioError(std::move(result.error()));
+            return;
+          }
+          SDL_PutAudioStreamData(stream, sdlPlatform.m_audioOutputData.data(), len);
         }
-        SDL_PutAudioStreamData(stream, sdlPlatform.m_audioOutputData.data(), len);
+      }, this));
+      if (!m_sdlAudioOutputStream) {
+        if (auto result = m_logger->get().error("Application: Could not open audio device, no sound available!"); !result)
+          return std::unexpected(std::move(result.error()));
+      } else {
+        if (auto result = m_logger->get().info("Application: Opened default audio device with 44.1khz / 16 bit stereo audio"); !result)
+          return std::unexpected(std::move(result.error()));
+        SDL_ResumeAudioDevice(SDL_GetAudioStreamDevice(m_sdlAudioOutputStream.get()));
       }
-    }, this));
-    if (!m_sdlAudioOutputStream) {
-      if (auto result = m_logger->get().error("Application: Could not open audio device, no sound available!"); !result)
-        return std::unexpected(std::move(result.error()));
-    } else {
-      if (auto result = m_logger->get().info("Application: Opened default audio device with 44.1khz / 16 bit stereo audio"); !result)
-        return std::unexpected(std::move(result.error()));
-      SDL_ResumeAudioDevice(SDL_GetAudioStreamDevice(m_sdlAudioOutputStream.get()));
     }
 
     if (m_useVulkan) {
@@ -829,6 +821,8 @@ public:
       : ImGui_ImplSDL3_InitForOpenGL(m_sdlWindow.get(), m_sdlGlContext.get());
     if (!m_imguiSdlInitialized)
       return std::unexpected(ApplicationException::format("Application: Could not initialize ImGui SDL backend: {}", SDL_GetError()));
+    if (!m_gamepadsAvailable)
+      ImGui_ImplSDL3_SetGamepadMode(ImGui_ImplSDL3_GamepadMode_Manual, nullptr, 0);
     installImguiPlatformCallbacks();
     if (m_vulkanRenderer) {
       if (auto initialized = m_vulkanRenderer->initializeGui(); !initialized)
@@ -858,6 +852,8 @@ public:
         return std::unexpected(std::move(result.error()));
       return false;
     }
+    if (!m_audioAvailable)
+      return false;
     m_audioInputCallback = std::move(callback);
     SDL_AudioSpec desired = {.format = SDL_AUDIO_S16, .channels = channels, .freq = freq};
     m_sdlAudioInputStream.reset(SDL_OpenAudioDeviceStream(deviceId, &desired,
@@ -874,20 +870,26 @@ public:
       }
     }, this));
 
-    if (m_sdlAudioInputStream) {
-      if (auto result = m_logger->get().info("Opened audio input device '{}'", SDL_GetAudioDeviceName(SDL_GetAudioStreamDevice(m_sdlAudioInputStream.get()))); !result) {
-        closeAudioInputDevice();
-        return std::unexpected(std::move(result.error()));
-      }
-      SDL_ResumeAudioDevice(SDL_GetAudioStreamDevice(m_sdlAudioInputStream.get()));
-    }
-    else {
+    if (!m_sdlAudioInputStream) {
       m_audioInputCallback = {};
-      if (auto result = m_logger->get().info("Failed to open audio input device: {}", SDL_GetError()); !result)
+      if (auto result = m_logger->get().warn("Failed to open audio input device: {}", SDL_GetError()); !result)
         return std::unexpected(std::move(result.error()));
+      return false;
     }
-
-    return static_cast<bool>(m_sdlAudioInputStream);
+    auto id = SDL_GetAudioStreamDevice(m_sdlAudioInputStream.get());
+    if (!SDL_ResumeAudioDevice(id)) {
+      auto logged = m_logger->get().warn("Failed to start audio input device: {}", SDL_GetError());
+      closeAudioInputDevice();
+      if (!logged)
+        return std::unexpected(std::move(logged.error()));
+      return false;
+    }
+    auto name = SDL_GetAudioDeviceName(id);
+    if (auto result = m_logger->get().info("Opened audio input device '{}'", name ? name : "(unknown)"); !result) {
+      closeAudioInputDevice();
+      return std::unexpected(std::move(result.error()));
+    }
+    return true;
   }
 
   bool closeAudioInputDevice() {
@@ -1850,6 +1852,8 @@ private:
     m_focused.store((SDL_GetWindowFlags(m_sdlWindow.get()) & SDL_WINDOW_INPUT_FOCUS) != 0, std::memory_order_relaxed);
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
+      if (!m_gamepadsAvailable && event.type >= SDL_EVENT_GAMEPAD_AXIS_MOTION && event.type <= SDL_EVENT_GAMEPAD_STEAM_HANDLE_UPDATED)
+        continue;
       SDL_ConvertEventToRenderCoordinates(SDL_GetRenderer(m_sdlWindow.get()), &event);
       queueImguiEvent(event);
       std::optional<InputEvent> starEvent;
@@ -2259,6 +2263,8 @@ private:
   bool m_imguiSdlInitialized = false;
   bool m_imguiOpenGlInitialized = false;
   bool m_sdlInitialized = false;
+  bool m_gamepadsAvailable = false;
+  bool m_audioAvailable = false;
   std::unique_ptr<SDL_AudioStream, decltype(&SDL_DestroyAudioStream)> m_sdlAudioOutputStream{nullptr, SDL_DestroyAudioStream};
   std::unique_ptr<SDL_AudioStream, decltype(&SDL_DestroyAudioStream)> m_sdlAudioInputStream{nullptr, SDL_DestroyAudioStream};
   AudioCallback m_audioInputCallback;

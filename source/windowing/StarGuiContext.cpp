@@ -615,14 +615,28 @@ std::expected<void, StarException> GuiContext::playAudio(std::shared_ptr<AudioIn
   return m_mixer->play(std::move(audioInstance));
 }
 
+static std::expected<std::shared_ptr<AudioInstance>, StarException> loadGuiAudio(Assets const& assets, String const& path) {
+  auto audio = assets.audio(path);
+  if (!audio)
+    return std::unexpected(std::move(audio.error()));
+  return AudioInstance::create(**audio);
+}
+
+std::expected<void, StarException> GuiContext::playOptionalAudio(String const& audioAsset) {
+  auto assets = m_root.assets();
+  if (!assets)
+    return std::unexpected(std::move(assets.error()));
+  auto instance = loadGuiAudio(**assets, audioAsset);
+  if (!instance)
+    return m_root.logger().warn("Skipping optional GUI sound '{}': {}", audioAsset, instance.error().what());
+  return m_mixer->play(std::move(*instance));
+}
+
 std::expected<std::shared_ptr<AudioInstance>, StarException> GuiContext::playAudio(String const& audioAsset, int loops, float volume, float pitch) {
   auto assets = m_root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto audio = (*assets)->audio(audioAsset);
-  if (!audio)
-    return std::unexpected(std::move(audio.error()));
-  auto audioInstance = AudioInstance::create(**audio);
+  auto audioInstance = loadGuiAudio(**assets, audioAsset);
   if (!audioInstance)
     return std::unexpected(std::move(audioInstance.error()));
   (*audioInstance)->set_volume(volume);

@@ -701,6 +701,10 @@ const GameTestRegistration crafting_batch_accounting("ItemTest", "CraftingBatchA
   ASSERT_EQ(inventory.setItem(SwapSlot{}, *plain), true);
   auto plain_id = (*plain)->descriptor().singular();
   auto marked_id = (*marked)->descriptor().singular();
+  auto zero = inventory.takeItems(marked_id.withCount(0), false, true);
+  ASSERT_TRUE(zero);
+  EXPECT_EQ(zero->count(), 0u);
+  EXPECT_EQ(inventory.hasCountOfItem(marked_id.withCount(3), true), 7u);
   ItemRecipe recipe{};
   recipe.output = *result;
   recipe.inputs = {plain_id, plain_id};

@@ -44,6 +44,8 @@ import star.tile_modification;
 import star.utility_lua_bindings;
 import star.vector;
 import star.world_server;
+import star.object;
+import star.object_database;
 import star.world_tiles;
 import star.networked_animator;
 import star.networked_animator_lua_bindings;
@@ -80,6 +82,8 @@ import star.entity;
 import star.net_packets;
 import star.test_universe;
 import star.universe_client;
+import star.universe_server;
+import star.rpc_promise;
 import star.message_types;
 import star.uuid;
 import star.mixer;
@@ -587,6 +591,151 @@ const GameTestRegistration alt_music_lifecycle("WorldClientTest", "AltMusicStopA
   EXPECT_TRUE(second->finished()) << "World reset must cancel the active voice";
   ASSERT_TRUE(world->update(1.0f / 60.0f));
   EXPECT_FALSE(take_alt_voice()) << "The new world must not inherit the old playlist";
+});
+
+const GameTestRegistration presentation_message_failures("WorldClientTest", "PresentationMessageFailuresSettleBothPeers", [](GameTest& fixture) {
+  auto universe = TestUniverse::create(fixture.root(), {100, 100});
+  ASSERT_TRUE(universe) << universe.error().what();
+  auto close = make_scope_exit([&] { EXPECT_TRUE((*universe)->close()); });
+  auto player = (*universe)->client()->mainPlayer();
+  auto uuid = player->uuid();
+  ASSERT_TRUE(uuid);
+  ASSERT_TRUE((*universe)->warpPlayer(ClientShipWorldId(*uuid)));
+  auto world = (*universe)->worldClient();
+  auto owner = connection_for_entity(player->entityId());
+  ASSERT_TRUE(owner);
+
+  String const path = "/sfx/interface/voice_on.ogg";
+  std::pair<String, JsonArray> const invalid[] = {
+    {"playCinematic", {}}, {"playCinematic", {Json{}}}, {"playCinematic", {JsonObject{}, 1}},
+    {"playAltMusic", {Json(JsonArray{path, JsonObject{}})}}, {"playAltMusic", {path, "slow"}},
+    {"playAltMusic", {path, 0, 1e30}}, {"playAltMusic", {path + ":subpath"}},
+    {"stopAltMusic", {Json(JsonArray{})}}
+  };
+
+  // The relay must answer the original calling client's UUID (even for null
+  // cinematics), rather than forwarding or losing the request.
+  std::vector<RpcPromise<Json>> from_client, from_server;
+  for (auto const& [message, args] : invalid) {
+    auto sent = world->sendEntityMessage(String("missing-presentation-test-entity"), message, args);
+    ASSERT_TRUE(sent);
+    from_client.push_back(std::move(*sent));
+  }
+
+  // A server-originated request bypasses the relay check. Exercise the real
+  // player and original server keepers, including a success after the errors.
+  auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+  while (from_server.empty() && std::chrono::steady_clock::now() < deadline) {
+    ASSERT_TRUE((*universe)->update());
+    auto sent = (*universe)->server()->executeForClient(*owner, [&](WorldServer& server, std::shared_ptr<Player> remote) -> std::expected<void, StarException> {
+      auto send = [&](String const& message, JsonArray const& args) -> std::expected<void, StarException> {
+        auto result = server.sendEntityMessage(remote->entityId(), message, args);
+        if (!result)
+          return std::unexpected(std::move(result.error()));
+        from_server.push_back(std::move(*result));
+        return {};
+      };
+      for (auto const& [message, args] : invalid) {
+        if (auto result = send(message, args); !result)
+          return result;
+      }
+      if (auto result = send("unhandled-presentation-test-message", {}); !result)
+        return result;
+      return send("playCinematic", {JsonObject{{"test", true}}});
+    });
+    ASSERT_TRUE(sent) << sent.error().what();
+  }
+  ASSERT_EQ(from_server.size(), std::size(invalid) + 2);
+  while (std::chrono::steady_clock::now() < deadline) {
+    if (std::ranges::all_of(from_client, [](auto const& p) { return p.finished() == true; }) &&
+        std::ranges::all_of(from_server, [](auto const& p) { return p.finished() == true; }))
+      break;
+    ASSERT_TRUE((*universe)->update());
+  }
+  for (std::size_t i = 0; i < std::size(invalid); ++i) {
+    SCOPED_TRACE(i);
+    auto reason = from_client[i].error();
+    ASSERT_TRUE(reason && *reason);
+    EXPECT_NE(**reason, String("Unknown entity"));
+    EXPECT_NE(**reason, String("Message not handled by entity"));
+    auto server_reason = from_server[i].error();
+    ASSERT_TRUE(server_reason);
+    EXPECT_EQ(*server_reason, *reason);
+  }
+  auto unhandled = from_server[std::size(invalid)].error();
+  ASSERT_TRUE(unhandled && *unhandled);
+  EXPECT_EQ(**unhandled, "Message not handled by entity");
+  auto accepted = from_server.back().result();
+  ASSERT_TRUE(accepted && *accepted);
+  EXPECT_TRUE((**accepted).is_null());
+  EXPECT_TRUE((*universe)->client()->isConnected());
+
+  // Rejection is transactional. A malformed replacement cannot discard a
+  // previously queued request; a single string track is not an empty list.
+  ASSERT_TRUE(world->sendEntityMessage(player->entityId(), "playAltMusic", {path, 0.25, 2}));
+  auto bad = world->sendEntityMessage(player->entityId(), "playAltMusic", {Json(JsonArray{path, 7})});
+  ASSERT_TRUE(bad);
+  EXPECT_EQ(bad->failed(), true);
+  auto pending = player->pull_pending_alt_music();
+  ASSERT_TRUE(pending && pending->tracks);
+  EXPECT_EQ(*pending->tracks, StringList{path});
+  EXPECT_EQ(pending->loops, 2);
+  EXPECT_EQ(pending->fade_time, 0.25f);
+  // Unrelated native errors are not mistaken for a rejected cosmetic RPC.
+  EXPECT_FALSE(world->sendEntityMessage(player->entityId(), "recordEvent", {}));
+});
+
+const GameTestRegistration vanished_warp_target("UniverseServerTest", "ReturnsAfterSpawnTargetDisappearsDuringWarp", [](GameTest& fixture) {
+  auto universe = TestUniverse::create(fixture.root(), {100, 100});
+  ASSERT_TRUE(universe) << universe.error().what();
+  auto close = make_scope_exit([&] { EXPECT_TRUE((*universe)->close()); });
+  auto client = (*universe)->client();
+  auto player = client->mainPlayer();
+  player->log()->setIntroComplete(true);
+  WorldId const original = InstanceWorldId("outpost");
+  ASSERT_TRUE((*universe)->warpPlayer(original));
+  ASSERT_EQ((*universe)->currentPlayerWorld(), original);
+  auto world = (*universe)->worldClient();
+  auto owner = connection_for_entity(player->entityId());
+  ASSERT_TRUE(owner);
+
+  // A real client-owned teleporter in the same world passes the spawn check,
+  // then removeClient erases it before addClient resolves the unique target.
+  String const target_id = "temporary-warp-regression";
+  SpawnTarget const target = SpawnTargetUniqueEntity(target_id);
+  auto objects = fixture.root().objectDatabase();
+  ASSERT_TRUE(objects);
+  auto object = (*objects)->createObject("stoneteleporter", JsonObject{{"clientEntityMode", "ClientMasterAllowed"},
+      {"uniqueId", target_id}, {"unbreakable", true}, {"scripts", JsonArray{}}});
+  ASSERT_TRUE(object) << object.error().what();
+  ASSERT_TRUE((*object)->setTilePosition(Vec2I::floor(player->position()) + Vec2I(12, 0)));
+  ASSERT_TRUE(world->addEntity(*object));
+  ASSERT_TRUE((*object)->isMaster());
+  bool available = false;
+  auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+  while (!available && std::chrono::steady_clock::now() < deadline) {
+    ASSERT_TRUE((*universe)->update());
+    auto observed = (*universe)->server()->executeForClient(*owner, [&](WorldServer& server, std::shared_ptr<Player>) -> std::expected<void, StarException> {
+      auto valid = server.spawnTargetValid(target);
+      if (!valid)
+        return std::unexpected(std::move(valid.error()));
+      available = *valid;
+      return {};
+    });
+    ASSERT_TRUE(observed) << observed.error().what();
+  }
+  ASSERT_TRUE(available);
+  ASSERT_TRUE(client->warpPlayer(WarpToWorld(original, target), false));
+  deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+  while (((*object)->inWorld() || !world->inWorld() || (*universe)->currentPlayerWorld() != original) &&
+         std::chrono::steady_clock::now() < deadline) {
+    auto updated = (*universe)->update();
+    ASSERT_TRUE(updated) << updated.error().what();
+  }
+  EXPECT_FALSE((*object)->inWorld()) << "The original world was never left";
+  EXPECT_TRUE(world->inWorld());
+  EXPECT_EQ((*universe)->currentPlayerWorld(), original) << "The queued return position must survive the failed join";
+  EXPECT_TRUE(client->isConnected());
 });
 
 const GameTestRegistration prediction_liquid_update("WorldClientTest", "LiquidPacketPreservesPredictedTerrain", [](GameTest& fixture) {

@@ -45,6 +45,7 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> update(unsigned times = 1);
   std::shared_ptr<UniverseClient> const& client() const { return m_client; }
+  std::shared_ptr<UniverseServer> const& server() const { return m_server; }
   String const& storage_directory() const { return m_storagePath; }
   std::shared_ptr<WorldClient> worldClient() const;
 

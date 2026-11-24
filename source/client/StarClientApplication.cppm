@@ -193,6 +193,7 @@ private:
   // Main acknowledges presentation; only the application owner touches these.
   std::optional<PresentedCamera> m_preparedCamera;
   std::optional<PresentedCamera> m_inputCamera;
+  RenderPreferences m_renderPreferences;
   float m_appliedRenderFpsLimit = -1.0f;
   bool m_appliedVSync = true;
   std::optional<RenderOutputSettings> m_appliedOutputSettings;
@@ -211,6 +212,9 @@ private:
   std::optional<PendingMultiPlayerConnection> m_pendingMultiPlayerConnection;
   std::optional<HostAddressWithPort> m_currentRemoteJoin;
   std::int64_t m_timeSinceJoin = 0;
+  std::shared_ptr<JsonObject const> m_observedDiscord;
+  std::optional<Json> m_observedActivityDetails;
+  std::variant<std::monostate, std::shared_ptr<String const>, StringList> m_activityDetails;
 
   ByteArray m_immediateFont;
 

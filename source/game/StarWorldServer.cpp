@@ -1233,127 +1233,28 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       clientInfo->outgoingPackets.push_back(
         std::make_shared<FindUniqueEntityResponsePacket>(findUniqueEntity->uniqueEntityId, std::move(*result115)));
     } else if (auto entityMessagePacket = as<EntityMessagePacket>(packet)) {
-      auto rejectMessage = [&, &world = *this](String const& reason) -> std::expected<void, StarException> {
-      auto result116 = world.root().logger().warn("WorldServer: rejecting EntityMessage '{}' from client {}: {}",
-                       entityMessagePacket->message, clientId, reason);
-      if (!result116)
-      return std::unexpected(std::move(result116.error()));
-      clientInfo->outgoingPackets.push_back(
-        std::make_shared<EntityMessageResponsePacket>(std::unexpected(reason), entityMessagePacket->uuid));
-      return {};
-      };
-
-      auto assetPathExists = [&world = *this](String const& path) -> std::expected<bool, StarException> {
-        if (path.empty())
-          return false;
-        auto assets = world.root().assets();
-        if (!assets)
-          return std::unexpected(std::move(assets.error()));
-        String checkPath = AssetPath::split(path).base_path;
-        if (checkPath.empty())
-          return false;
-        return (*assets)->asset_exists(checkPath);
+      auto rejectMessage = [&](String const& reason) -> std::expected<void, StarException> {
+        auto logged = root.logger().warn("WorldServer: rejecting EntityMessage '{}' from client {}: {}",
+                                           entityMessagePacket->message, clientId, reason);
+        if (!logged)
+          return std::unexpected(std::move(logged.error()));
+        clientInfo->outgoingPackets.push_back(
+            std::make_shared<EntityMessageResponsePacket>(std::unexpected(reason), entityMessagePacket->uuid));
+        return {};
       };
 
       bool messageRejected = false;
 
-      if (entityMessagePacket->message == "playCinematic" && !entityMessagePacket->args.empty()) {
-        Json const& cinematicArg = entityMessagePacket->args[0];
-        bool valid = false;
-        if (cinematicArg.is_type(Json::Type::Object)) {
-          // Inline cinematic definition - accept as-is.
-          valid = true;
-        } else if (cinematicArg.is_type(Json::Type::String)) {
-          auto result118 = cinematicArg.to_string();
-          if (!result118)
-            return std::unexpected(std::move(result118.error()));
-          auto exists = assetPathExists(*result118);
-          if (!exists) {
-            auto rejected = rejectMessage(Star::format("invalid cinematic asset path '{}': {}", *result118, exists.error().what()));
-            if (!rejected)
-              return std::unexpected(std::move(rejected.error()));
-            continue;
-          }
-          valid = *exists;
-          if (!valid) {
-            auto result119 = cinematicArg.to_string();
-            if (!result119)
-              return std::unexpected(std::move(result119.error()));
-            auto result120 = rejectMessage(Star::format("invalid cinematic asset path '{}'", std::move(*result119)));
-            if (!result120)
-              return std::unexpected(std::move(result120.error()));
-          }
-        } else if (!cinematicArg.is_null()) {
-          auto result121 = rejectMessage(
-            Star::format("non-string/non-object cinematic argument of type {}", static_cast<int>(cinematicArg.type())));
-          if (!result121)
-            return std::unexpected(std::move(result121.error()));
+      if (auto presentation = Player::presentation_message(entityMessagePacket->message)) {
+        auto checked = Player::process_presentation_message(root, *presentation, entityMessagePacket->args);
+        if (!checked)
+          return std::unexpected(std::move(checked.error()));
+        if (*checked) {
+          auto rejected = rejectMessage(**checked);
+          if (!rejected)
+            return std::unexpected(std::move(rejected.error()));
+          continue;
         }
-        if (!valid)
-          messageRejected = true;
-      } else if (entityMessagePacket->message == "playAltMusic" && !entityMessagePacket->args.empty()) {
-        Json const& tracksArg = entityMessagePacket->args[0];
-        bool valid = true;
-        if (tracksArg.can_convert(Json::Type::Array)) {
-          auto result123 = tracksArg.to_array();
-          if (!result123)
-            return std::unexpected(std::move(result123.error()));
-          for (auto const& trackJson : std::move(*result123)) {
-            bool condition125 = static_cast<bool>(!trackJson.is_type(Json::Type::String));
-            if (!condition125) {
-              auto result124 = trackJson.to_string();
-              if (!result124)
-                return std::unexpected(std::move(result124.error()));
-              auto exists = assetPathExists(*result124);
-              if (!exists) {
-                auto rejected = rejectMessage(Star::format("invalid music asset path '{}': {}", *result124, exists.error().what()));
-                if (!rejected)
-                  return std::unexpected(std::move(rejected.error()));
-                valid = false;
-                break;
-              }
-              condition125 = !*exists;
-            }
-            if (condition125) {
-              valid = false;
-              auto result126 = trackJson.to_string();
-              if (!result126)
-                return std::unexpected(std::move(result126.error()));
-              auto result127 = rejectMessage(Star::format("invalid music asset path '{}'", std::move(*result126)));
-              if (!result127)
-                return std::unexpected(std::move(result127.error()));
-              break;
-            }
-          }
-        } else if (tracksArg.is_type(Json::Type::String)) {
-          auto result128 = tracksArg.to_string();
-          if (!result128)
-            return std::unexpected(std::move(result128.error()));
-          auto exists = assetPathExists(*result128);
-          if (!exists) {
-            auto rejected = rejectMessage(Star::format("invalid music asset path '{}': {}", *result128, exists.error().what()));
-            if (!rejected)
-              return std::unexpected(std::move(rejected.error()));
-            continue;
-          }
-          if (!*exists) {
-            valid = false;
-            auto result129 = tracksArg.to_string();
-            if (!result129)
-              return std::unexpected(std::move(result129.error()));
-            auto result130 = rejectMessage(Star::format("invalid music asset path '{}'", std::move(*result129)));
-            if (!result130)
-              return std::unexpected(std::move(result130.error()));
-          }
-        } else {
-          valid = false;
-          auto result131 =
-            rejectMessage(Star::format("invalid playAltMusic argument of type {}", static_cast<int>(tracksArg.type())));
-          if (!result131)
-            return std::unexpected(std::move(result131.error()));
-        }
-        if (!valid)
-          messageRejected = true;
       } else if (entityMessagePacket->message == "warp" && !entityMessagePacket->args.empty()) {
         Json const& warpArg = entityMessagePacket->args[0];
         bool valid = false;

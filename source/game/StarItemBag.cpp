@@ -292,14 +292,19 @@ bool ItemBag::consumeItems(ItemDescriptor const& descriptor, bool exactMatch) {
   return true;
 }
 
-std::uint64_t ItemBag::available(ItemDescriptor const& descriptor, bool exactMatch) const {
+std::uint64_t ItemBag::matching_count(ItemDescriptor const& descriptor, bool exactMatch) const {
   std::uint64_t count = 0;
   for (auto const& items : m_items) {
     if (items && items->matches(descriptor, exactMatch))
       count += std::min(items->count(), std::numeric_limits<std::uint64_t>::max() - count);
   }
 
-  return count / descriptor.count();
+  return count;
+}
+
+std::uint64_t ItemBag::available(ItemDescriptor const& descriptor, bool exactMatch) const {
+  auto batch = descriptor.count();
+  return batch ? matching_count(descriptor, exactMatch) / batch : 0;
 }
 
 std::uint64_t ItemBag::itemsCanFit(std::optional<std::reference_wrapper<Item const>> items) const {

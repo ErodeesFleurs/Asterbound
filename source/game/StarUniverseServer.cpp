@@ -592,7 +592,7 @@ std::expected<RpcPromise<Json>, StarException> UniverseServer::sendWorldMessage(
 std::expected<void, StarException> UniverseServer::clientWarpPlayer(ConnectionId clientId, WarpAction action, bool deploy) {
   std::unique_lock locker(m_mainLock, std::defer_lock);
   lock_with_diagnostics(locker);
-  m_pendingPlayerWarps[clientId] = std::pair<WarpAction, bool>(std::move(action), std::move(deploy));
+  m_pendingPlayerWarps[clientId] = {std::move(action), deploy};
   return {};
 }
 
@@ -1696,13 +1696,13 @@ std::expected<void, StarException> UniverseServer::warpPlayers() {
     auto warpEntry = m_pendingPlayerWarps.get(clientId);
     if (!warpEntry)
       return std::unexpected(std::move(warpEntry.error()));
-    auto& warp = warpEntry->get();
-    WarpAction warpAction = warp.first;
-    bool deploy = warp.second;
+    auto [warpAction, deploy, attempt] = warpEntry->get();
 
     auto client_context = m_clients.value(clientId);
-    if (!client_context)
+    if (!client_context) {
+      m_pendingPlayerWarps.remove(clientId);
       continue;
+    }
 
     if (std::holds_alternative<WarpToPlayer>(warpAction)) {
       auto const& toPlayerUuid = std::get<WarpToPlayer>(warpAction);
@@ -1728,6 +1728,30 @@ std::expected<void, StarException> UniverseServer::warpPlayers() {
     if (!resolved)
       return std::unexpected(std::move(resolved.error()));
     auto warpToWorld = std::move(*resolved);
+    // Called under the main lock. A rejected warp leaves an attached player
+    // in place. Once detached, try the saved return position, then the default
+    // spawn on their own ship, never queueing the same attempt indefinitely.
+    auto fail_warp = [&](bool invalid) -> std::expected<void, StarException> {
+      if (auto sent = m_connectionServer->sendPackets(clientId, {std::make_shared<PlayerWarpResultPacket>(false, warpAction, invalid)}); !sent)
+        return std::unexpected(std::move(sent.error()));
+      if (!client_context->player_world()) {
+        if (attempt == WarpAttempt::Requested) {
+          if (auto back = client_context->player_return_warp(); back && back != warpToWorld) {
+            m_pendingPlayerWarps[clientId] = {std::move(back), false, WarpAttempt::Return};
+            return {};
+          }
+        }
+        if (attempt != WarpAttempt::OwnShip && warpToWorld != WarpToWorld(ClientShipWorldId(client_context->player_uuid()))) {
+          m_pendingPlayerWarps[clientId] = {WarpAlias::OwnShip, false, WarpAttempt::OwnShip};
+          return {};
+        }
+        // No authoritative world can host this session. Don't leave a
+        // connected player with neither a world nor a pending warp.
+        m_pendingDisconnections[clientId] = "Unable to return player to a world";
+      }
+      m_pendingPlayerWarps.remove(clientId);
+      return {};
+    };
     auto created = triggerWorldCreation(warpToWorld.world);
     if (!created)
       return std::unexpected(std::move(created.error()));
@@ -1799,17 +1823,10 @@ std::expected<void, StarException> UniverseServer::warpPlayers() {
                   client_context->set_orbit_warp_action(systemWorld->clientWarpAction(*clientId));
               }
             }
-          } else if (auto returnWarp = client_context->player_return_warp()) {
-            auto name = Star::print_warp_action(returnWarp);
-            if (!name)
-              return std::unexpected(std::move(name.error()));
-            if (auto logged = m_root.logger().info("UniverseServer: Warping player {} failed, returning to '{}'", clientId, *name); !logged)
-              return std::unexpected(std::move(logged.error()));
-            m_pendingPlayerWarps[clientId] = {returnWarp, false};
           } else {
-            if (auto logged = m_root.logger().info("UniverseServer: Warping player {} failed, returning to ship", clientId); !logged)
-              return std::unexpected(std::move(logged.error()));
-            m_pendingPlayerWarps[clientId] = {WarpAlias::OwnShip, false};
+            if (auto failed = fail_warp(false); !failed)
+              return std::unexpected(std::move(failed.error()));
+            continue;
           }
           if (auto sent = m_connectionServer->sendPackets(clientId, {std::make_shared<PlayerWarpResultPacket>(true, warpAction, false)}); !sent)
             return std::unexpected(std::move(sent.error()));
@@ -1818,9 +1835,8 @@ std::expected<void, StarException> UniverseServer::warpPlayers() {
           if (auto logged = m_root.logger().info("UniverseServer: Warping player {} failed, invalid spawn target '{}'", clientId, Star::print_spawn_target(warpToWorld.target)); !logged)
             return std::unexpected(std::move(logged.error()));
           lock_with_diagnostics(locker);
-          if (auto sent = m_connectionServer->sendPackets(clientId, {std::make_shared<PlayerWarpResultPacket>(false, warpAction, true)}); !sent)
-            return std::unexpected(std::move(sent.error()));
-          m_pendingPlayerWarps.remove(clientId);
+          if (auto failed = fail_warp(true); !failed)
+            return std::unexpected(std::move(failed.error()));
         }
       } else {
         auto name = Star::print_world_id(warpToWorld.world);
@@ -1828,13 +1844,9 @@ std::expected<void, StarException> UniverseServer::warpPlayers() {
           return std::unexpected(std::move(name.error()));
         if (auto logged = m_root.logger().info("UniverseServer: Warping player {} failed, invalid world '{}' or world failed to load", clientId, *name); !logged)
           return std::unexpected(std::move(logged.error()));
-        if (auto sent = m_connectionServer->sendPackets(clientId, {std::make_shared<PlayerWarpResultPacket>(false, warpAction, false)}); !sent)
-          return std::unexpected(std::move(sent.error()));
-        m_pendingPlayerWarps.remove(clientId);
+        if (auto failed = fail_warp(false); !failed)
+          return std::unexpected(std::move(failed.error()));
       }
-    } else {
-      // If the world is not created yet, just wait for it to create.
-      //m_pendingPlayerWarps[clientId] = {warpAction, deploy}; // Bott: ...there's no point to setting it again like this since it's already set. Nothing above removes it by this point.
     }
   }
   
@@ -2353,7 +2365,7 @@ std::expected<void, StarException> UniverseServer::shutdownInactiveWorlds() {
       } else if (world->noClients() && world->shouldExpire()) {
         bool anyPendingWarps = false;
         for (auto const& p : m_pendingPlayerWarps) {
-          auto warp = resolveWarpAction(p.second.first, p.first, p.second.second);
+          auto warp = resolveWarpAction(p.second.action, p.first, p.second.deploy);
           if (!warp)
             return std::unexpected(std::move(warp.error()));
           if (warp->world == world->worldId()) {

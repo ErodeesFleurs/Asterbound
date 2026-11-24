@@ -181,6 +181,21 @@ struct RenderOutputSettings {
 // Reads the persistent renderOutput/renderExposure/hdrPaperWhite/hdrPeakLuminance
 // keys, validating their original numeric values before narrowing to floats.
 [[nodiscard]] std::expected<RenderOutputSettings, StarException> renderOutputSettingsFromJson(Json const& config);
+[[nodiscard]] std::expected<double, StarException> validatedRenderFpsLimit(Json const& value);
+
+// Only changed preferences are decoded. A malformed field leaves its effective
+// value untouched; the four coupled output parameters are one field.
+struct RenderPreferences {
+  RenderOutputSettings output;
+  double fpsLimit = 0;
+  bool vsync = true;
+  bool hdr = true;
+
+  [[nodiscard]] std::expected<List<std::string_view>, StarException> observe(Json const& config);
+
+private:
+  std::shared_ptr<JsonObject const> m_observed;
+};
 
 class Renderer {
 public:
@@ -276,4 +291,6 @@ export namespace Star {
   using ::Star::RenderOutputSettings;
   using ::Star::validateRenderOutputSettings;
   using ::Star::renderOutputSettingsFromJson;
+  using ::Star::validatedRenderFpsLimit;
+  using ::Star::RenderPreferences;
 }

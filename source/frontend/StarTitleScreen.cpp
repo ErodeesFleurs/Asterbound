@@ -485,6 +485,20 @@ std::expected<void, StarException> TitleScreen::goToMultiPlayerSelectCharacter(b
   return switchState(TitleState::MultiPlayerSelectCharacter);
 }
 
+std::expected<void, StarException> TitleScreen::showConnectionError(String const& field, String const& message) {
+  if (auto shown = switchState(TitleState::MultiPlayerConnect); !shown)
+    return shown;
+  auto labelled = m_multiPlayerMenu->setLabel("connectionError", message);
+  if (!labelled)
+    return std::unexpected(std::move(labelled.error()));
+  auto widget = m_multiPlayerMenu->fetchChild<TextBoxWidget>(field);
+  if (!widget)
+    return std::unexpected(std::move(widget.error()));
+  if (!*widget)
+    return {};
+  return (*widget)->focus();
+}
+
 void TitleScreen::stop_music() {
   if (m_current_music_track)
     m_current_music_track->stop(8.0f);
@@ -1018,6 +1032,8 @@ std::expected<void, StarException> TitleScreen::switchState(TitleState titleStat
     } else if (titleState == TitleState::SinglePlayerCreateCharacter || titleState == TitleState::MultiPlayerCreateCharacter) {
       if (auto r = m_paneManager->displayRegisteredPane("charCreationMenu"); !r) return std::unexpected(std::move(r.error()));
     } else if (titleState == TitleState::MultiPlayerConnect) {
+      if (auto cleared = m_multiPlayerMenu->setLabel("connectionError", ""); !cleared)
+        return std::unexpected(std::move(cleared.error()));
       if (auto r = m_paneManager->displayRegisteredPane("multiplayerMenu"); !r) return std::unexpected(std::move(r.error()));
       if (auto r = m_paneManager->displayRegisteredPane("serverSelect"); !r) return std::unexpected(std::move(r.error()));
       auto addressWidget = m_multiPlayerMenu->fetchChild("address");

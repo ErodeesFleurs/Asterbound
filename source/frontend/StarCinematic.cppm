@@ -38,6 +38,7 @@ public:
   [[nodiscard]] static std::expected<std::shared_ptr<Cinematic>, StarException> create(GuiContext& context);
 
   [[nodiscard]] std::expected<void, StarException> load(Json const& definition);
+  [[nodiscard]] std::expected<void, StarException> loadOptional(std::expected<Json, StarException> definition);
 
   void setPlayer(std::shared_ptr<Player> player);
 
@@ -61,6 +62,7 @@ public:
 private:
   explicit Cinematic(GuiContext& context);
   [[nodiscard]] std::expected<void, StarException> loadDefinition(Json const& definition);
+  std::expected<void, StarException> rejectContent(StarException const& error);
 
   struct TimeSkip {
     float availableTime;

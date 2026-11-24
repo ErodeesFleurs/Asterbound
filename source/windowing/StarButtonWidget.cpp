@@ -109,12 +109,13 @@ std::expected<void, StarException> ButtonWidget::initialize() {
            std::pair{std::string_view("buttonReleaseSound"), std::ref(m_releaseSounds)},
            std::pair{std::string_view("buttonHoverSound"), std::ref(m_hoverSounds)},
            std::pair{std::string_view("buttonHoverOffSound"), std::ref(m_hoverOffSounds)}}) {
-    auto json = config->get(entry.first);
-    if (!json)
-      return std::unexpected(std::move(json.error()));
-    auto sounds = json_to_string_list(*json);
-    if (!sounds)
-      return std::unexpected(std::move(sounds.error()));
+    auto sounds = config->get(entry.first, JsonArray{}).and_then([](Json value) { return json_to_string_list(value); });
+    if (!sounds) {
+      auto logged = context().root().logger().warn("Ignoring malformed {}: {}", entry.first, sounds.error().what());
+      if (!logged)
+        return logged;
+      continue;
+    }
     entry.second.get() = std::move(*sounds);
   }
   return {};
@@ -209,20 +210,24 @@ std::expected<void, StarException> ButtonWidget::renderImpl() {
   return {};
 }
 
+static std::expected<void, StarException> playButtonSound(GuiContext& gui, StringList const& sounds) {
+  if (sounds.empty())
+    return {};
+  auto sound = gui.root().random().sample_ref(sounds);
+  if (!sound)
+    return std::unexpected(std::move(sound.error()));
+  if (sound->get().empty())
+    return {};
+  return gui.playOptionalAudio(sound->get());
+}
+
 std::expected<bool, StarException> ButtonWidget::sendEvent(InputEvent const& event) {
   if (m_visible && !m_disabled) {
     if (std::holds_alternative<MouseButtonDownEvent>(event) && std::get<MouseButtonDownEvent>(event).mouse_button == MouseButton::Left) {
       if (inMember(*context().mousePosition(event))) {
         if (!isPressed()) {
-          auto soundResult = this->context().root().random().sample_value(m_clickSounds, "");
-          if (!soundResult)
-            return std::unexpected(std::move(soundResult.error()));
-          auto sound = std::move(*soundResult);
-          if (!sound.empty()) {
-            auto played = context().playAudio(sound);
-            if (!played)
-              return std::unexpected(std::move(played.error()));
-          }
+          if (auto played = playButtonSound(context(), m_clickSounds); !played)
+            return std::unexpected(std::move(played.error()));
         }
         auto pressed = setPressed(true);
         if (!pressed)
@@ -241,15 +246,8 @@ std::expected<bool, StarException> ButtonWidget::sendEvent(InputEvent const& eve
       }
     } else if (std::holds_alternative<MouseButtonUpEvent>(event)) {
       if (isPressed()) {
-        auto soundResult = context().root().random().sample_value(m_releaseSounds, "");
-        if (!soundResult)
-          return std::unexpected(std::move(soundResult.error()));
-        auto sound = std::move(*soundResult);
-        if (!sound.empty()) {
-          auto played = context().playAudio(sound);
-          if (!played)
-            return std::unexpected(std::move(played.error()));
-        }
+        if (auto played = playButtonSound(context(), m_releaseSounds); !played)
+          return std::unexpected(std::move(played.error()));
       }
       auto pressed = setPressed(false);
       if (!pressed)
@@ -267,15 +265,8 @@ std::expected<void, StarException> ButtonWidget::mouseOver() {
     return std::unexpected(std::move(over.error()));
   if (!m_disabled) {
     if (!m_hovered) {
-      auto soundResult = context().root().random().sample_value(m_hoverSounds);
-      if (!soundResult)
-        return std::unexpected(std::move(soundResult.error()));
-      auto sound = std::move(*soundResult);
-      if (!sound.empty()) {
-        auto played = context().playAudio(sound);
-        if (!played)
-          return std::unexpected(std::move(played.error()));
-      }
+      if (auto played = playButtonSound(context(), m_hoverSounds); !played)
+        return played;
     }
     m_hovered = true;
   }
@@ -287,15 +278,8 @@ std::expected<void, StarException> ButtonWidget::mouseOut() {
   if (!out)
     return std::unexpected(std::move(out.error()));
   if (!m_disabled && m_hovered) {
-    auto soundResult = context().root().random().sample_value(m_hoverOffSounds);
-    if (!soundResult)
-      return std::unexpected(std::move(soundResult.error()));
-    auto sound = std::move(*soundResult);
-    if (!sound.empty()) {
-      auto played = context().playAudio(sound);
-      if (!played)
-        return std::unexpected(std::move(played.error()));
-    }
+    if (auto played = playButtonSound(context(), m_hoverOffSounds); !played)
+      return played;
   }
   m_hovered = false;
   m_pressed = false;
@@ -307,15 +291,8 @@ std::expected<void, StarException> ButtonWidget::mouseReturnStillDown() {
   if (!returned)
     return std::unexpected(std::move(returned.error()));
   if (!isPressed()) {
-    auto soundResult = context().root().random().sample_value(m_clickSounds, "");
-    if (!soundResult)
-      return std::unexpected(std::move(soundResult.error()));
-    auto sound = std::move(*soundResult);
-    if (!sound.empty()) {
-      auto played = context().playAudio(sound);
-      if (!played)
-        return std::unexpected(std::move(played.error()));
-    }
+    if (auto played = playButtonSound(context(), m_clickSounds); !played)
+      return played;
   }
   m_hovered = true;
   m_pressed = true;

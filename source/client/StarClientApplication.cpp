@@ -945,28 +945,24 @@ std::expected<void, StarException> ClientApplication::update_http() {
 }
 
 std::expected<void, StarException> ClientApplication::apply_render_settings(Json const& settings) {
-  auto output = renderOutputSettingsFromJson(settings);
-  if (!output)
-    return std::unexpected(std::move(output.error()));
-  if (auto renderer = Application::renderer(); renderer && m_appliedOutputSettings != *output) {
-    if (auto applied = renderer->setOutputSettings(*output); !applied)
-      return std::unexpected(std::move(applied.error()));
-    m_appliedOutputSettings = *output;
+  auto rejected = m_renderPreferences.observe(settings);
+  if (!rejected)
+    return std::unexpected(std::move(rejected.error()));
+  for (auto key : *rejected) {
+    if (auto logged = logger().warn("Ignoring invalid {} preference; keeping previous display setting", key); !logged)
+      return std::unexpected(std::move(logged.error()));
   }
-  auto limit = settings.get("renderFpsLimit", {}).and_then([](Json const& value) { return value.to_double(); });
-  if (!limit)
-    return std::unexpected(std::move(limit.error()));
-  if (!is_finite(*limit) || *limit < 0.0 || *limit > std::numeric_limits<float>::max())
-    return std::unexpected(StarException("renderFpsLimit must be finite, nonnegative and representable as a float"));
-  auto vsync = settings.get("vsync", {}).and_then([](Json const& value) { return value.to_bool(); });
-  if (!vsync)
-    return std::unexpected(std::move(vsync.error()));
-  if (m_appliedVSync != *vsync) {
-    if (auto applied = appController()->setVSyncEnabled(*vsync); !applied)
+  if (auto renderer = Application::renderer(); renderer && m_appliedOutputSettings != m_renderPreferences.output) {
+    if (auto applied = renderer->setOutputSettings(m_renderPreferences.output); !applied)
       return std::unexpected(std::move(applied.error()));
-    m_appliedVSync = *vsync;
+    m_appliedOutputSettings = m_renderPreferences.output;
   }
-  float rate = static_cast<float>(*limit);
+  if (m_appliedVSync != m_renderPreferences.vsync) {
+    if (auto applied = appController()->setVSyncEnabled(m_renderPreferences.vsync); !applied)
+      return std::unexpected(std::move(applied.error()));
+    m_appliedVSync = m_renderPreferences.vsync;
+  }
+  float rate = static_cast<float>(m_renderPreferences.fpsLimit);
   if (m_appliedRenderFpsLimit != rate) {
     appController()->setTargetRenderRate(rate);
     m_appliedRenderFpsLimit = rate;
@@ -989,10 +985,7 @@ std::expected<void, StarException> ClientApplication::render() {
   auto sampling = renderer->setMultiSampling(aa->value_or(false) ? 4 : 0);
   if (!sampling)
     return std::unexpected(std::move(sampling.error()));
-  auto hdr = settings.get("hdr", {}).and_then([](Json const& value) { return value.opt_bool(); });
-  if (!hdr)
-    return std::unexpected(std::move(hdr.error()));
-  auto mainHdr = renderer->setMainHDR(hdr->value_or(true));
+  auto mainHdr = renderer->setMainHDR(m_renderPreferences.hdr);
   if (!mainHdr)
     return std::unexpected(std::move(mainHdr.error()));
   auto effect = renderer->switchEffectConfig("interface");
@@ -1354,13 +1347,12 @@ std::expected<void, StarException> ClientApplication::changeState(MainAppState n
 
 std::expected<void, StarException> ClientApplication::prepareStateCinematic(MainAppState newState) {
   if (newState == MainAppState::Mods || newState == MainAppState::Splash) {
-    auto cinematic = m_root->assets().and_then([&](auto assets) {
-      return assets->json(newState == MainAppState::Mods ? std::string_view("/cinematics/mods/modloading.cinematic") : std::string_view("/cinematics/splash.cinematic"));
-    });
-    if (!cinematic)
-      return std::unexpected(std::move(cinematic.error()));
-    if (auto loaded = m_cinematicOverlay->load(*cinematic); !loaded)
-      return std::unexpected(std::move(loaded.error()));
+    auto assets = m_root->assets();
+    if (!assets)
+      return std::unexpected(std::move(assets.error()));
+    auto path = newState == MainAppState::Mods ? "/cinematics/mods/modloading.cinematic" : "/cinematics/splash.cinematic";
+    if (auto loaded = m_cinematicOverlay->loadOptional((*assets)->json(std::string_view(path))); !loaded)
+      return loaded;
     if (newState == MainAppState::Splash) {
       auto loader = Thread::invoke("Async root loader", [root = std::ref(*m_root)] { return root.get().fullyLoad(); });
       if (!loader)
@@ -1584,25 +1576,20 @@ std::expected<void, StarException> ClientApplication::startSession(MainAppState 
   auto assets = m_root->assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto loading = (*assets)->json("/client.config:loadingCinematic").and_then([](Json j) { return j.to_string(); });
-  if (!loading)
-    return std::unexpected(std::move(loading.error()));
-  auto cinematic = (*assets)->json(*loading);
-  if (!cinematic)
-    return std::unexpected(std::move(cinematic.error()));
-  if (auto loaded = m_cinematicOverlay->load(*cinematic); !loaded)
+  auto loading = (*assets)->json("/client.config:loadingCinematic").and_then([](Json j) { return j.to_string(); })
+    .and_then([&](String path) { return (*assets)->json(path); });
+  if (auto loaded = m_cinematicOverlay->loadOptional(std::move(loading)); !loaded)
     return loaded;
+  Json pendingIntro;
   if (!m_player->log()->introComplete()) {
     auto intro = (*assets)->json("/client.config:introCinematic").and_then([](Json j) { return j.to_string(); });
-    if (!intro)
-      return std::unexpected(std::move(intro.error()));
-    if (auto pending =
-          m_player->setPendingCinematic(Json(intro->replace_tags(StringMap<String>{{"species", m_player->species()}})));
-        !pending)
-      return pending;
-  } else if (auto pending = m_player->setPendingCinematic(Json()); !pending) {
-    return pending;
+    if (intro)
+      pendingIntro = Json(intro->replace_tags(StringMap<String>{{"species", m_player->species()}}));
+    else if (auto warned = m_root->logger().warn_exception("Skipping unavailable intro cinematic", ExceptionDiagnostic(intro.error())); !warned)
+      return warned;
   }
+  if (auto pending = m_player->setPendingCinematic(pendingIntro); !pending)
+    return pending;
   auto connected = newState == MainAppState::MultiPlayer ? connectMultiPlayer() : connectSinglePlayer();
   if (!connected)
     return std::unexpected(std::move(connected.error()));
@@ -2014,11 +2001,17 @@ std::expected<void, StarException> ClientApplication::updateTitle(float dt) {
         *port_text = Star::to_string(*default_port);
       }
       auto port = HostAddressWithPort::parse_port(port_text->utf8());
-      if (!port)
-        return setError(Star::format("invalid port: {}", *port_text));
+      if (!port) {
+        if (auto warned = m_root->logger().warn("Invalid multiplayer port: {}", *port_text); !warned)
+          return warned;
+        return m_titleScreen->showConnectionError("port", "Port must be a number from 0 to 65535.");
+      }
       auto address = HostAddressWithPort::lookup(*host_text, *port);
-      if (!address)
-        return setError("Error resolving server address", ExceptionDiagnostic(address.error()));
+      if (!address) {
+        if (auto warned = m_root->logger().warn_exception("Could not resolve server address", ExceptionDiagnostic(address.error())); !warned)
+          return warned;
+        return m_titleScreen->showConnectionError("address", "Could not resolve server address.");
+      }
       m_pendingMultiPlayerConnection =
         PendingMultiPlayerConnection{.server = *address,
                                      .account = m_titleScreen->multiPlayerAccount(),
@@ -2114,30 +2107,45 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
         return "";
       };
 
-      String finalDetails = "";
-      auto activity_details = config->get_path("discord.activityDetails");
-      if (!activity_details)
-        return std::unexpected(std::move(activity_details.error()));
-      if (activity_details->is_type(Json::Type::Array)) {
-        auto details = activity_details->iterate_array();
-        if (!details)
-          return std::unexpected(std::move(details.error()));
-        StringList detailsList;
-        for (auto& detail : *details) {
-          auto tag = detail.to_string();
-          if (!tag)
-            return std::unexpected(std::move(tag.error()));
-          auto text = getActivityDetail(*tag);
+      // The immutable Discord object changes independently of the rest of the
+      // configuration. Validate all tags before invoking any player queries.
+      auto discord = config->get("discord");
+      if (!discord)
+        return std::unexpected(std::move(discord.error()));
+      auto object = discord->is_type(Json::Type::Object) ? *discord->object_ptr() : nullptr;
+      if (!m_observedActivityDetails || m_observedDiscord != object) {
+        auto value = object ? object->value("activityDetails") : Json();
+        if (!m_observedActivityDetails || value != *m_observedActivityDetails) {
+          m_activityDetails = std::monostate{};
+          if (value.is_type(Json::Type::String))
+            m_activityDetails = *value.string_ptr();
+          else if (value.is_type(Json::Type::Array)) {
+            if (auto tags = json_to_string_list(value))
+              m_activityDetails = std::move(*tags);
+          }
+          if (std::holds_alternative<std::monostate>(m_activityDetails)) {
+            if (auto logged = logger().warn("Ignoring discord.activityDetails: expected a string or an array of strings"); !logged)
+              return std::unexpected(std::move(logged.error()));
+          }
+          m_observedActivityDetails = std::move(value);
+        }
+        m_observedDiscord = std::move(object);
+      }
+
+      String finalDetails;
+      if (auto tags = std::get_if<StringList>(&m_activityDetails)) {
+        bool first = true;
+        for (auto const& tag : *tags) {
+          auto text = getActivityDetail(tag);
           if (!text)
             return std::unexpected(std::move(text.error()));
-          detailsList.push_back(std::move(*text));
+          if (!first)
+            finalDetails.append("\n");
+          first = false;
+          finalDetails.append(*text);
         }
-        finalDetails = detailsList.join("\n");
-      } else if (activity_details->is_type(Json::Type::String)) {
-        auto text = activity_details->to_string();
-        if (!text)
-          return std::unexpected(std::move(text.error()));
-        auto details = text->lookup_tags(getActivityDetail);
+      } else if (auto text = std::get_if<std::shared_ptr<String const>>(&m_activityDetails)) {
+        auto details = (*text)->lookup_tags(getActivityDetail);
         if (!details)
           return std::unexpected(std::move(details.error()));
         finalDetails = std::move(*details);

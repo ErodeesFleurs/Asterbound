@@ -312,7 +312,8 @@ std::expected<std::unique_ptr<PcPlatformServices>, StarException> PcPlatformServ
       return std::unexpected(std::move(logged.error()));
     auto registered = services->m_state->discordCore->ActivityManager().RegisterCommand(path.utf8().c_str());
     if (registered != discord::Result::Ok)
-      return std::unexpected(ApplicationException::format("Could not register Discord launch command (err {})", (int)registered));
+      if (auto logged = logger.warn("Could not register Discord launch command (err {})", (int)registered); !logged)
+        return std::unexpected(std::move(logged.error()));
   }
 #endif
 

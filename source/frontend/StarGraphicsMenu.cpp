@@ -177,19 +177,6 @@ import star.shaders_menu;
 
 namespace Star {
 
-namespace {
-
-std::expected<double, StarException> validatedRenderFpsLimit(Json const& value) {
-  auto rate = value.to_double();
-  if (!rate)
-    return std::unexpected(std::move(rate.error()));
-  if (!is_finite(*rate) || *rate < 0 || *rate > std::numeric_limits<float>::max())
-    return std::unexpected(GuiException("renderFpsLimit must be a finite nonnegative render rate"));
-  return *rate;
-}
-
-}
-
 GraphicsMenu::GraphicsMenu(GuiContext& guiContext, PaneManager& manager)
   : Pane(guiContext), m_paneManager(std::ref(manager)) {}
 
@@ -521,25 +508,34 @@ std::expected<void, StarException> GraphicsMenu::initConfig() {
       return std::unexpected(std::move(value.error()));
     m_localChanges.set(key, std::move(*value));
   }
-  auto fps = m_localChanges.get("renderFpsLimit");
-  if (!fps)
-    return std::unexpected(std::move(fps.error()));
-  auto rate = validatedRenderFpsLimit(fps->get());
-  if (!rate)
-    return std::unexpected(std::move(rate.error()));
+  // Stage usable defaults for rejected persisted preferences; opening the
+  // pane must not write the user's config. Apply still validates edits strictly.
+  for (std::string_view key : {"vsync", "hdr"}) {
+    if (!settings.get_bool(key))
+      m_localChanges.set(key, true);
+  }
+  if (!renderOutputSettingsFromJson(settings)) {
+    constexpr RenderOutputSettings defaults;
+    m_localChanges.set("renderOutput", "legacy");
+    m_localChanges.set("renderExposure", defaults.exposure);
+    m_localChanges.set("hdrPaperWhite", defaults.paperWhiteNits);
+    m_localChanges.set("hdrPeakLuminance", defaults.peakNits);
+  }
+  auto configured = settings.get("renderFpsLimit").and_then(validatedRenderFpsLimit);
+  auto rate = configured.value_or(0);
+  if (!configured)
+    m_localChanges.set("renderFpsLimit", rate);
   // Include the exact configured value, rather than rounding custom limits to a preset.
   m_renderFpsList = m_renderFpsPresets;
-  auto it = std::lower_bound(m_renderFpsList.begin(), m_renderFpsList.end(), *rate);
-  if (it == m_renderFpsList.end() || *it != *rate)
-    m_renderFpsList.insert(it, *rate);
+  auto it = std::lower_bound(m_renderFpsList.begin(), m_renderFpsList.end(), rate);
+  if (it == m_renderFpsList.end() || *it != rate)
+    m_renderFpsList.insert(it, rate);
   auto slider = requireChild<SliderBarWidget>("renderFpsSlider");
   if (!slider)
     return std::unexpected(std::move(slider.error()));
   if (auto result = (*slider)->setRange(0, m_renderFpsList.size() - 1, 1); !result)
     return std::unexpected(std::move(result.error()));
   Json localConfig(m_localChanges);
-  if (auto output = renderOutputSettingsFromJson(localConfig); !output)
-    return std::unexpected(std::move(output.error()));
   m_renderExposureList.clear();
   for (int step = -20; step <= 20; ++step)
     m_renderExposureList.push_back(step / 2.0);

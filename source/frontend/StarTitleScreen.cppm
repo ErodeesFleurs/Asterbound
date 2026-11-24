@@ -114,6 +114,7 @@ public:
   // connection screen if 'skipConnection' is true.  If the player backs out of
   // the multiplayer menu, the skip connection is forgotten.
   [[nodiscard]] std::expected<void, StarException> goToMultiPlayerSelectCharacter(bool skipConnection);
+  [[nodiscard]] std::expected<void, StarException> showConnectionError(String const& field, String const& message);
 
   void stop_music();
 

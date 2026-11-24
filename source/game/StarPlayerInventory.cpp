@@ -493,7 +493,7 @@ std::uint64_t PlayerInventory::hasCountOfItem(ItemDescriptor const& descriptor, 
   for (auto const& slot : m_equipment)
     count_slot(slot.second);
   for (auto const& bag : m_bags)
-    add(bag.second->available(descriptor, exactMatch));
+    add(bag.second->matching_count(descriptor, exactMatch));
   return total;
 }
 
@@ -504,7 +504,7 @@ bool PlayerInventory::consumeItems(ItemDescriptor const& descriptor, bool exactM
   if (hasCountOfItem(descriptor, exactMatch) < remaining)
     return false;
   for (auto const& bag : m_bags) {
-    auto take = std::min(remaining, bag.second->available(descriptor, exactMatch));
+    auto take = std::min(remaining, bag.second->matching_count(descriptor, exactMatch));
     if (take && !bag.second->consumeItems(descriptor.withCount(take), exactMatch))
       return false;
     remaining -= take;

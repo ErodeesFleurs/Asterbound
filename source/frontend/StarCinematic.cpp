@@ -168,6 +168,11 @@ namespace Star {
 const float vWidth = 960.0f;
 const float vHeight = 540.0f;
 
+struct CinematicContentErrorTag {
+  static constexpr std::string_view name() { return "CinematicContentError"; }
+};
+using CinematicContentError = StarError<CinematicContentErrorTag, StarException>;
+
 std::expected<std::shared_ptr<Cinematic>, StarException> Cinematic::create(GuiContext& context) {
   return std::shared_ptr<Cinematic>(new Cinematic(context));
 }
@@ -185,6 +190,18 @@ std::expected<void, StarException> Cinematic::load(Json const& definition) {
     return std::unexpected(std::move(loaded.error()));
   pending.m_player = m_player;
   *this = std::move(pending);
+  return {};
+}
+
+std::expected<void, StarException> Cinematic::rejectContent(StarException const& error) {
+  stop();
+  return m_guiContext.get().root().logger().warn("Skipping malformed cinematic: {}", error.what());
+}
+
+std::expected<void, StarException> Cinematic::loadOptional(std::expected<Json, StarException> definition) {
+  auto loaded = definition.and_then([this](Json const& config) { return load(config); });
+  if (!loaded)
+    return rejectContent(loaded.error());
   return {};
 }
 
@@ -247,6 +264,8 @@ std::expected<void, StarException> Cinematic::loadDefinition(Json const& definit
     auto animationFrames = panelDefinition.get_int("animationFrames", std::numeric_limits<int>::max());
     if (!animationFrames)
       return std::unexpected(std::move(animationFrames.error()));
+    if (*animationFrames <= 0 || *animationFrames > std::numeric_limits<int>::max())
+      return std::unexpected(StarException("Cinematic animationFrames must be a positive int"));
     panel->animationFrames = *animationFrames;
     auto text = panelDefinition.get_string("text", "");
     if (!text)
@@ -502,7 +521,9 @@ std::expected<void, StarException> Cinematic::render() {
   if (fadeFactor < 1.0f)
     return {};
 
+  std::optional<RectI> previousScissor;
   if (m_scissor) {
+    previousScissor = renderer.scissorRect();
     auto scissor = renderer.setScissorRect(m_scissorRect);
     if (!scissor)
       return std::unexpected(std::move(scissor.error()));
@@ -526,6 +547,10 @@ std::expected<void, StarException> Cinematic::render() {
         m_completable = true;
       if (!values.alpha)
         continue;
+      if (!(values.frame >= std::numeric_limits<int>::min() && static_cast<double>(values.frame) <= std::numeric_limits<int>::max()))
+        return std::unexpected(CinematicContentError("Cinematic frame is outside the integer range"));
+      if (!(values.alpha >= 0 && values.alpha <= 1 && values.textPercentage >= 0 && values.textPercentage <= 1))
+        return std::unexpected(CinematicContentError("Invalid cinematic panel alpha or textPercentage"));
       auto frame = Star::to_string(static_cast<int>(values.frame) % panel->animationFrames);
       auto alphaColor = Color::rgba_f(1.0f, 1.0f, 1.0f, values.alpha);
       for (auto const& d : panel->drawables) {
@@ -534,13 +559,13 @@ std::expected<void, StarException> Cinematic::render() {
           return std::unexpected(std::move(metadata.error()));
         auto image = d.get_string("image");
         if (!image)
-          return std::unexpected(std::move(image.error()));
+          return std::unexpected(CinematicContentError("Invalid panel image", std::move(image.error())));
         auto definition = d.set("image", image->replace_tags(StringMap<String>{{"species", playerSpecies}, {"frame", frame}}));
         if (!definition)
-          return std::unexpected(std::move(definition.error()));
+          return std::unexpected(CinematicContentError("Invalid panel image definition", std::move(definition.error())));
         auto drawable = Drawable::create(**metadata, *definition);
         if (!drawable)
-          return std::unexpected(std::move(drawable.error()));
+          return std::unexpected(CinematicContentError("Invalid panel drawable", std::move(drawable.error())));
         drawable->translate(m_offset);
         drawable->scale(values.zoom);
         drawable->translate(values.position);
@@ -552,7 +577,7 @@ std::expected<void, StarException> Cinematic::render() {
       if (!panel->avatar.empty() && m_player) {
         auto portraitMode = enum_value<portrait_mode_names>(panel->avatar);
         if (!portraitMode)
-          return std::unexpected(std::move(portraitMode.error()));
+          return std::unexpected(CinematicContentError("Invalid panel avatar", std::move(portraitMode.error())));
         auto portrait = m_player->portrait(*portraitMode);
         if (!portrait)
           return std::unexpected(std::move(portrait.error()));
@@ -581,7 +606,7 @@ std::expected<void, StarException> Cinematic::render() {
         if (values.textPercentage < 1.0) {
           auto length = panel->text.length();
           if (!length)
-            return std::unexpected(std::move(length.error()));
+            return std::unexpected(CinematicContentError("Invalid panel text", std::move(length.error())));
           tp.charLimit = std::floor(*length * values.textPercentage);
         }
         auto text = textPainter.renderText(panel->text, tp);
@@ -594,17 +619,18 @@ std::expected<void, StarException> Cinematic::render() {
   auto panelsRendered = renderPanels();
 
   if (m_scissor) {
-    auto resetScissor = renderer.setScissorRect({});
+    auto resetScissor = renderer.setScissorRect(previousScissor);
     if (!resetScissor) {
       if (!panelsRendered)
-        return std::unexpected(panelsRendered.error().with_context(
-            Star::format("Cinematic scissor restoration failed: {}",
-                Star::print_exception(ExceptionDiagnostic(resetScissor.error()), true))));
+        return std::unexpected(resetScissor.error().with_related(panelsRendered.error(), "Drawing cinematic panels also failed"));
       return std::unexpected(std::move(resetScissor.error()));
     }
   }
-  if (!panelsRendered)
+  if (!panelsRendered) {
+    if (panelsRendered.error().is<CinematicContentError>())
+      return rejectContent(panelsRendered.error());
     return std::unexpected(std::move(panelsRendered.error()));
+  }
 
   for (std::size_t i = 0; i < m_audioCues.size(); ++i) {
     if (m_audioCues[i].endTimecode > 0 && m_audioCues[i].endTimecode <= currentTimecode()) {
@@ -619,10 +645,10 @@ std::expected<void, StarException> Cinematic::render() {
         return std::unexpected(std::move(assets.error()));
       auto audio = (*assets)->audio(m_audioCues[i].resource);
       if (!audio)
-        return std::unexpected(std::move(audio.error()));
+        return rejectContent(audio.error());
       auto audioInstance = AudioInstance::create(**audio);
       if (!audioInstance)
-        return std::unexpected(std::move(audioInstance.error()));
+        return rejectContent(audioInstance.error());
       (*audioInstance)->set_loops(m_audioCues[i].loops);
       (*audioInstance)->set_mixer_group(MixerGroup::Cinematic);
       auto played = mixer->play(*audioInstance);
@@ -648,8 +674,11 @@ std::expected<void, StarException> Cinematic::drawDrawable(Drawable const& drawa
   if (drawable.is_image()) {
     auto const& imagePart = drawable.image_part();
     auto texture = textureGroup->get().loadTexture(imagePart.image);
-    if (!texture)
+    if (!texture) {
+      if (texture.error().is<AssetException>())
+        return std::unexpected(CinematicContentError("Invalid panel texture asset", std::move(texture.error())));
       return std::unexpected(std::move(texture.error()));
+    }
     auto size = Vec2F((*texture)->size());
 
     RectF imageRect(Vec2F(), size);
@@ -678,7 +707,7 @@ std::expected<void, StarException> Cinematic::drawDrawable(Drawable const& drawa
         upperLeft,  Vec2F{0, size[1]},
         drawableColor, 0.0f);
   } else if (!std::holds_alternative<std::monostate>(drawable.part)) {
-    return std::unexpected(StarException("Cinematic drawable must be an image"));
+    return std::unexpected(CinematicContentError("Cinematic drawable must be an image"));
   }
   return {};
 }

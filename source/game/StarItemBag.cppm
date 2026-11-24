@@ -90,8 +90,11 @@ public:
   // only if the entirety of the count is available.  Returns success.
   bool consumeItems(ItemDescriptor const& descriptor, bool exactMatch = false);
 
+  // Physical units, independent of the requested stack size.
+  std::uint64_t matching_count(ItemDescriptor const& descriptor, bool exactMatch) const;
+
   // Returns the number of times this ItemDescriptor could be consumed using
-  // the items in this container.
+  // the items in this container. A zero-sized request has no consumable batches.
   std::uint64_t available(ItemDescriptor const& descriptor, bool exactMatch = false) const;
 
   // Returns the number of items that can fit anywhere in the bag, including

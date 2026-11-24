@@ -566,6 +566,13 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> setInCinematic(bool inCinematic);
 
+  enum class PresentationMessage { Cinematic, PlayMusic, StopMusic };
+  static std::optional<PresentationMessage> presentation_message(String const& message);
+  // Without a recipient the relay checks the same arguments without publishing a request.
+  // A returned reason rejects only this message; unexpected denotes a native failure.
+  [[nodiscard]] static std::expected<std::optional<String>, StarException> process_presentation_message(
+      Root& root, PresentationMessage message, JsonArray const& args, std::optional<std::reference_wrapper<Player>> recipient = {});
+
   struct AltMusicRequest {
     std::optional<StringList> tracks; // A disengaged list requests a stop.
     float fade_time = 0;

@@ -24,5 +24,14 @@
     "checkable" : true,
     "checked": false
   },
+  "connectionError" : {
+    "type" : "label",
+    "position" : [115, 17],
+    "hAnchor" : "mid",
+    "fontSize" : 8,
+    "color" : [255, 172, 140],
+    "value" : "",
+    "mouseTransparent" : true
+  },
   "password" : { "hidden" : true }
 }

@@ -2,6 +2,7 @@ import std;
 import star.format;
 import star.json;
 import star.list;
+import star.map;
 import star.image;
 import star.poly;
 import star.bi_map;
@@ -67,6 +68,59 @@ std::expected<RenderOutputSettings, StarException> renderOutputSettingsFromJson(
   if (auto result = validateOutputLevels(*exposure, *paperWhite, *peak); !result)
     return std::unexpected(std::move(result.error()));
   return RenderOutputSettings{*mode, static_cast<float>(*exposure), static_cast<float>(*paperWhite), static_cast<float>(*peak)};
+}
+
+std::expected<double, StarException> validatedRenderFpsLimit(Json const& value) {
+  auto rate = value.to_double();
+  if (!rate)
+    return std::unexpected(std::move(rate.error()));
+  if (!is_finite(*rate) || *rate < 0 || *rate > std::numeric_limits<float>::max())
+    return std::unexpected(RendererException("renderFpsLimit must be finite, nonnegative and representable as a float"));
+  return *rate;
+}
+
+std::expected<List<std::string_view>, StarException> RenderPreferences::observe(Json const& config) {
+  auto snapshot = config.object_ptr();
+  if (!snapshot)
+    return std::unexpected(std::move(snapshot.error()));
+  List<std::string_view> rejected;
+  if (*snapshot == m_observed)
+    return rejected;
+
+  auto changed = [&](std::string_view key) {
+    if (!m_observed)
+      return true;
+    auto current = (*snapshot)->find(key);
+    auto old = m_observed->find(key);
+    if (current == (*snapshot)->end() || old == m_observed->end())
+      return (current == (*snapshot)->end()) != (old == m_observed->end());
+    auto const& value = current->second;
+    if (value.type() != old->second.type())
+      return true;
+    // No preference accepts containers. Do not traverse malformed JSON trees
+    // (or re-diagnose one) because an unrelated config key changed.
+    if (value.is_type(Json::Type::Array) || value.is_type(Json::Type::Object))
+      return false;
+    if (value.is_type(Json::Type::Float))
+      return std::bit_cast<std::uint64_t>(*value.to_double()) != std::bit_cast<std::uint64_t>(*old->second.to_double());
+    return value != old->second;
+  };
+  auto accept = [&](std::string_view key, auto parsed, auto& destination) {
+    if (parsed)
+      destination = *parsed;
+    else
+      rejected.push_back(key);
+  };
+  if (changed("renderOutput") || changed("renderExposure") || changed("hdrPaperWhite") || changed("hdrPeakLuminance"))
+    accept("renderOutput/renderExposure/hdrPaperWhite/hdrPeakLuminance", renderOutputSettingsFromJson(config), output);
+  if (changed("renderFpsLimit"))
+    accept("renderFpsLimit", config.get("renderFpsLimit").and_then(validatedRenderFpsLimit), fpsLimit);
+  if (changed("vsync"))
+    accept("vsync", config.get_bool("vsync"), vsync);
+  if (changed("hdr"))
+    accept("hdr", config.get_bool("hdr", true), hdr);
+  m_observed = std::move(*snapshot);
+  return rejected;
 }
 
 

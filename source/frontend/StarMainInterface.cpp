@@ -1506,18 +1506,21 @@ std::expected<void, StarException> MainInterface::handleInteractAction(InteractA
         return std::unexpected(std::move(displayed.error()));
     }
   } else if (interactAction.type == InteractActionType::ShowPopup) {
+    auto reject = [&](StarException const& error) {
+      return context().root().logger().warn("Ignoring malformed ShowPopup: {}", error.what());
+    };
     auto message = interactAction.data.get_string("message");
     if (!message)
-      return std::unexpected(std::move(message.error()));
+      return reject(message.error());
     auto title = interactAction.data.get_string("title", "");
     if (!title)
-      return std::unexpected(std::move(title.error()));
+      return reject(title.error());
     auto subtitle = interactAction.data.get_string("subtitle", "");
     if (!subtitle)
-      return std::unexpected(std::move(subtitle.error()));
+      return reject(subtitle.error());
     auto sound = interactAction.data.opt_string("sound");
     if (!sound)
-      return std::unexpected(std::move(sound.error()));
+      return reject(sound.error());
     JsonObject payload{{"message", std::move(*message)}, {"title", std::move(*title)}, {"subtitle", std::move(*subtitle)}};
     if (*sound)
       payload.set("sound", std::move(**sound));
@@ -1640,30 +1643,9 @@ std::expected<void, StarException> MainInterface::update(float dt) {
           auto assets = context().root().assets();
           if (!assets)
             return std::unexpected(std::move(assets.error()));
-          Json definition;
-          auto fetched = (*assets)->fetch_json(std::move(*cinematic));
-          if (!fetched) {
-            auto logged = context().root().logger().warn("MainInterface: failed to fetch cinematic: {}", fetched.error().what());
-            if (!logged)
-              return std::unexpected(std::move(logged.error()));
-          } else {
-            definition = std::move(*fetched);
-          }
-          if (definition.is_type(Json::Type::Object)) {
-            auto loaded = m_cinematicOverlay->load(definition);
-            if (!loaded) {
-              auto logged = context().root().logger().warn("MainInterface: rejected malformed cinematic ({}), stopping overlay", loaded.error().what());
-              if (!logged)
-                return std::unexpected(std::move(logged.error()));
-              m_cinematicOverlay->stop();
-            }
-          } else {
-            auto logged = context().root().logger().warn("MainInterface: ignoring non-object cinematic of type {}",
-                                                         static_cast<int>(definition.type()));
-            if (!logged)
-              return std::unexpected(std::move(logged.error()));
-            m_cinematicOverlay->stop();
-          }
+          auto loaded = m_cinematicOverlay->loadOptional((*assets)->fetch_json(std::move(*cinematic)));
+          if (!loaded)
+            return loaded;
         } else {
           m_cinematicOverlay->stop();
         }

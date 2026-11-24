@@ -297,10 +297,11 @@ std::expected<void, StarException> Voice::loadJson(Json const& config, bool skip
     closeDevice();
     shouldResetEncoder = shouldResetDevice = true;
   }
-  if (shouldResetEncoder) {
+  // Startup loads preferences before init() creates the encoder and opens capture.
+  if (m_encoder && shouldResetEncoder) {
     if (auto result = resetEncoder(); !result) return result;
   }
-  if (shouldResetDevice) {
+  if (m_encoder && shouldResetDevice) {
     if (auto result = resetDevice(); !result) return result;
   }
   if (changed && !skipSave)
@@ -531,19 +532,22 @@ std::expected<void, StarException> Voice::setDeviceName(std::optional<String> de
   if (m_deviceName == deviceName)
     return {};
   m_deviceName = std::move(deviceName);
-  if (m_deviceOpen)
-    return openDevice();
+  if (m_encoder && shouldEnableInput())
+    return resetDevice();
   return {};
 }
 
 StringList Voice::availableDevices() {
   StringList list;
+  if (!SDL_WasInit(SDL_INIT_AUDIO))
+    return list;
   int numDevices;
   std::unique_ptr<SDL_AudioDeviceID, decltype(&SDL_free)> devices(SDL_GetAudioRecordingDevices(&numDevices), SDL_free);
   if (devices) {
     list.reserve(numDevices);
     for (auto device : std::span<SDL_AudioDeviceID const>(devices.get(), numDevices))
-      list.emplace_back(std::string(std::string_view(SDL_GetAudioDeviceName(device))));
+      if (auto name = SDL_GetAudioDeviceName(device))
+        list.emplace_back(std::string_view(name));
   }
   list.sort();
   return list;
@@ -723,15 +727,14 @@ std::expected<void, StarException> Voice::resetDevice() {
 std::expected<void, StarException> Voice::openDevice() {
   if (m_deviceOpen)
     return {};
-  closeDevice();
 
   std::uint32_t deviceId = SDL_AUDIO_DEVICE_DEFAULT_RECORDING;
-  if (m_deviceName) {
+  if (m_deviceName && SDL_WasInit(SDL_INIT_AUDIO)) {
     int numDevices;
     std::unique_ptr<SDL_AudioDeviceID, decltype(&SDL_free)> devices(SDL_GetAudioRecordingDevices(&numDevices), SDL_free);
     if (devices) {
       for (auto device : std::span<SDL_AudioDeviceID const>(devices.get(), numDevices)) {
-        if (*m_deviceName == std::string_view(SDL_GetAudioDeviceName(device))) {
+        if (auto name = SDL_GetAudioDeviceName(device); name && *m_deviceName == std::string_view(name)) {
           deviceId = device;
           break;
         }
@@ -747,10 +750,7 @@ std::expected<void, StarException> Voice::openDevice() {
     }
   );
   if (!opened) return std::unexpected(std::move(opened.error()));
-  if (!*opened)
-    return std::unexpected(VoiceException::format("Could not open input device: {}", SDL_GetError()));
-
-  m_deviceOpen = true;
+  m_deviceOpen = *opened;
   return {};
 }
 

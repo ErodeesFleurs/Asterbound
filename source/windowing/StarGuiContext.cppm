@@ -126,6 +126,7 @@ public:
   [[nodiscard]] std::expected<StringList, StarException> wrapInterfaceText(String const& s, std::optional<unsigned> wrapWidth);
   [[nodiscard]] std::expected<void, StarException> playAudio(std::shared_ptr<AudioInstance> audioInstance);
   [[nodiscard]] std::expected<std::shared_ptr<AudioInstance>, StarException> playAudio(String const& audioAsset, int loops = 0, float volume = 1.0f, float pitch = 1.0f);
+  [[nodiscard]] std::expected<void, StarException> playOptionalAudio(String const& audioAsset);
   bool shiftHeld() const;
   void setShiftHeld(bool held);
   String getClipboard() const;

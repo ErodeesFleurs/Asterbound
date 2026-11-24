@@ -319,6 +319,7 @@ set_tests_properties(core_tests PROPERTIES
 if(STAR_BUILD_GUI)
   add_executable(frontend_tests
     $<TARGET_OBJECTS:star_extern> $<TARGET_OBJECTS:star_core> $<TARGET_OBJECTS:star_game>
+    render_preferences_test.cpp
     game_tests_main.cpp StarTestUniverse.cpp StarGameTest.cpp frontend_test.cpp bubble_presentation_test.cpp chat_bubble_test.cpp)
   target_sources(frontend_tests PRIVATE FILE_SET CXX_MODULES FILES StarTestUniverse.cppm StarGameTest.cppm)
   target_include_directories(frontend_tests PRIVATE

@@ -117,6 +117,7 @@ public:
   IDiscordCore core{};
   DiscordCreateParams params{};
   bool destroyed = false;
+  EDiscordResult registrationResult = DiscordResult_Ok;
 
 private:
   static void DISCORD_API destroy(IDiscordCore*) {
@@ -160,7 +161,7 @@ private:
     return DiscordResult_Ok;
   }
   static EDiscordResult DISCORD_API registerCommand(IDiscordActivityManager*, char const*) {
-    return DiscordResult_Ok;
+    return active->registrationResult;
   }
   static void DISCORD_API updateActivity(IDiscordActivityManager*, DiscordActivity* value,
       void* data, void(DISCORD_API* callback)(void*, EDiscordResult)) {
@@ -280,6 +281,10 @@ protected:
   std::shared_ptr<Star::P2PNetworkingService> networking;
 };
 
+struct DiscordRegistrationFailure : DiscordLobbyTest {
+  DiscordRegistrationFailure() { api.registrationResult = DiscordResult_InvalidCommand; }
+};
+
 } // namespace
 
 extern "C" EDiscordResult DISCORD_API DiscordCreate(DiscordVersion version,
@@ -290,6 +295,16 @@ extern "C" EDiscordResult DISCORD_API DiscordCreate(DiscordVersion version,
   DiscordApi::active->params = *params;
   *result = &DiscordApi::active->core;
   return DiscordResult_Ok;
+}
+
+TEST_F(DiscordRegistrationFailure, CanStillPublishActivity) {
+  ASSERT_TRUE(networking->setActivityData("In Game", "On ship", 123, {}));
+  ASSERT_TRUE(api.completeActivity(DiscordResult_Ok));
+  ASSERT_TRUE(api.synchronize());
+  ASSERT_TRUE(platform->update());
+  auto calls = api.snapshot();
+  ASSERT_EQ(calls.activities.size(), 1u);
+  EXPECT_STREQ(calls.activities.front().details, "On ship");
 }
 
 TEST_F(DiscordLobbyTest, UnsupportedCreationKeepsPlatformAndRichPresenceAliveWithoutRetrying) {

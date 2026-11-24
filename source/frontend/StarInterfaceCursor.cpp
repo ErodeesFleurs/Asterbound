@@ -59,11 +59,18 @@ std::expected<void, StarException> InterfaceCursor::resetCursor() {
   auto path = config->to_string();
   if (!path)
     return std::unexpected(std::move(path.error()));
-  return setCursor(*path);
+  return selectCursor(*path, false);
 }
 
 std::expected<void, StarException> InterfaceCursor::setCursor(String const& configFile) {
-  if (m_configFile == configFile)
+  return selectCursor(configFile, true);
+}
+
+std::expected<void, StarException> InterfaceCursor::selectCursor(String const& configFile, bool optional) {
+  if (optional && m_rejectedOverride == configFile)
+    return {};
+  m_rejectedOverride.reset();
+  if (!std::holds_alternative<std::monostate>(m_drawable) && m_configFile == configFile)
     return {};
 
   auto& root = m_guiContext.get().root();
@@ -73,7 +80,15 @@ std::expected<void, StarException> InterfaceCursor::setCursor(String const& conf
   auto imageMetadata = root.imageMetadataDatabase();
   if (!imageMetadata)
     return std::unexpected(std::move(imageMetadata.error()));
-  auto config = (*assets)->json(configFile);
+  auto loaded = loadCursor(configFile, **assets, **imageMetadata);
+  if (loaded || !optional)
+    return loaded;
+  m_rejectedOverride = configFile;
+  return root.logger().warn("Ignoring invalid cursor override '{}': {}", configFile, loaded.error().what());
+}
+
+std::expected<void, StarException> InterfaceCursor::loadCursor(String const& configFile, Assets const& assets, ImageMetadataDatabase const& metadata) {
+  auto config = assets.json(configFile);
   if (!config)
     return std::unexpected(std::move(config.error()));
   auto offsetJson = config->get("offset");
@@ -91,7 +106,7 @@ std::expected<void, StarException> InterfaceCursor::setCursor(String const& conf
     auto image = config->get_string("image");
     if (!image)
       return std::unexpected(std::move(image.error()));
-    auto imageSize = (*imageMetadata)->imageSize(*image);
+    auto imageSize = metadata.imageSize(*image);
     if (!imageSize)
       return std::unexpected(std::move(imageSize.error()));
     drawable = std::move(*image);
@@ -100,13 +115,13 @@ std::expected<void, StarException> InterfaceCursor::setCursor(String const& conf
     auto animationJson = config->get("animation");
     if (!animationJson)
       return std::unexpected(std::move(animationJson.error()));
-    auto animation = Animation::create(root, *animationJson, "/interface");
+    auto animation = Animation::create(m_guiContext.get().root(), *animationJson, "/interface");
     if (!animation)
       return std::unexpected(std::move(animation.error()));
     auto frame = animation->drawable(1.0f);
     if (!frame)
       return std::unexpected(std::move(frame.error()));
-    auto bounds = frame->bound_box(**imageMetadata, false);
+    auto bounds = frame->bound_box(metadata, false);
     if (!bounds)
       return std::unexpected(std::move(bounds.error()));
     size = Vec2I(bounds->size());

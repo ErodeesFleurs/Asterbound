@@ -23,6 +23,8 @@ import star.vector;
 namespace Star {
 
 class GuiContext;
+class Assets;
+class ImageMetadataDatabase;
 
 class InterfaceCursor {
 public:
@@ -44,8 +46,11 @@ public:
 
 private:
   explicit InterfaceCursor(GuiContext& context);
+  std::expected<void, StarException> selectCursor(String const& configFile, bool optional);
+  std::expected<void, StarException> loadCursor(String const& configFile, Assets const& assets, ImageMetadataDatabase const& metadata);
   std::reference_wrapper<GuiContext> m_guiContext;
   String m_configFile;
+  std::optional<String> m_rejectedOverride;
   Vec2I m_offset;
   Vec2I m_size;
   unsigned int m_scale;

@@ -1724,6 +1724,115 @@ std::expected<void, StarException> Player::dropItem() {
   return {};
 }
 
+std::optional<Player::PresentationMessage> Player::presentation_message(String const& message) {
+  if (message == "playCinematic")
+    return PresentationMessage::Cinematic;
+  if (message == "playAltMusic")
+    return PresentationMessage::PlayMusic;
+  if (message == "stopAltMusic")
+    return PresentationMessage::StopMusic;
+  return {};
+}
+
+std::expected<std::optional<String>, StarException> Player::process_presentation_message(
+    Root& root, PresentationMessage message, JsonArray const& args, std::optional<std::reference_wrapper<Player>> recipient) {
+  std::shared_ptr<Assets const> assets;
+  auto check_path = [&](String const& path) -> std::expected<std::optional<String>, StarException> {
+    auto locator = AssetPath::split(path);
+    if (locator.base_path.empty() || !locator.directives.empty() || (locator.sub_path && message != PresentationMessage::Cinematic))
+      return Star::format("Invalid presentation asset path '{}'", path);
+    if (!assets) {
+      auto loaded = root.assets();
+      if (!loaded)
+        return std::unexpected(std::move(loaded.error()));
+      assets = std::move(*loaded);
+    }
+    // asset_exists only validates/folds the supplied UTF-8 key and probes the index.
+    auto exists = assets->asset_exists(locator.base_path);
+    if (!exists)
+      return String(exists.error().what());
+    if (!*exists)
+      return Star::format("Unknown presentation asset '{}'", path);
+    return {};
+  };
+
+  if (message == PresentationMessage::Cinematic) {
+    if (args.empty() || !(args[0].is_type(Json::Type::Object) || args[0].is_type(Json::Type::String)))
+      return String("playCinematic requires an object or an asset path");
+    bool unique = false;
+    if (args.size() > 1) {
+      auto value = args[1].to_bool();
+      if (!value)
+        return String("playCinematic unique must be a boolean");
+      unique = *value;
+    }
+    if (args[0].is_type(Json::Type::String)) {
+      auto path = args[0].string_ptr();
+      if (!path)
+        return std::unexpected(std::move(path.error()));
+      auto checked = check_path(**path);
+      if (!checked || *checked)
+        return checked;
+    }
+    if (recipient) {
+      auto queued = recipient->get().setPendingCinematic(args[0], unique);
+      if (!queued)
+        return std::unexpected(std::move(queued.error()));
+    }
+    return {};
+  }
+
+  AltMusicRequest request;
+  bool play = message == PresentationMessage::PlayMusic;
+  std::size_t fade_index = play ? 1 : 0;
+  if (args.size() > fade_index) {
+    auto fade = args[fade_index].to_double();
+    if (!fade || !is_finite(*fade) || *fade < 0 || *fade > std::numeric_limits<float>::max())
+      return String("Music fade time must be a finite nonnegative duration");
+    request.fade_time = static_cast<float>(*fade);
+  }
+  if (play) {
+    if (args.empty())
+      return String("playAltMusic requires a track or playlist");
+    if (args.size() > 2) {
+      auto loops = args[2].to_int();
+      if (!loops || !std::in_range<int>(*loops))
+        return String("playAltMusic loops must fit in an integer");
+      request.loops = static_cast<int>(*loops);
+    }
+    if (recipient)
+      request.tracks.emplace();
+    auto track = [&](Json const& value) -> std::expected<std::optional<String>, StarException> {
+      auto path = value.string_ptr();
+      if (!path)
+        return String("playAltMusic tracks must be asset paths");
+      auto checked = check_path(**path);
+      if (checked && !*checked && recipient)
+        request.tracks->push_back(**path);
+      return checked;
+    };
+    if (args[0].is_type(Json::Type::Array)) {
+      auto tracks = args[0].array_ptr();
+      if (!tracks)
+        return std::unexpected(std::move(tracks.error()));
+      if (recipient)
+        request.tracks->reserve((*tracks)->size());
+      for (auto const& value : **tracks) {
+        auto checked = track(value);
+        if (!checked || *checked)
+          return checked;
+      }
+    } else {
+      auto checked = track(args[0]);
+      if (!checked || *checked)
+        return checked;
+    }
+  }
+  if (recipient)
+    recipient->get().m_pending_alt_music = std::move(request);
+  return {};
+}
+
 MessageResponseResult Player::receiveMessage(ConnectionId fromConnection, String const& message, JsonArray const& args) {
   auto currentWorldResult = world();
   if (!currentWorldResult)
@@ -1765,49 +1874,13 @@ MessageResponseResult Player::receiveMessage(ConnectionId fromConnection, String
     setPendingWarp(action, animation, deploy);
   } else if (message == "interruptRadioMessage") {
     m_interruptRadioMessage = true;
-  } else if (message == "playCinematic" && !args.empty()) {
-    bool unique = false;
-    if (args.size() > 1) {
-      auto valueResult = args[1].to_bool();
-      if (!valueResult)
-        return std::unexpected(std::move(valueResult.error()));
-      auto value = std::move(*valueResult);
-      unique = value;
-    }
-    if (auto result = setPendingCinematic(args[0], unique); !result)
-      return std::unexpected(std::move(result.error()));
-  } else if (message == "playAltMusic" && !args.empty()) {
-    AltMusicRequest request;
-    if (args.size() > 1) {
-      auto fade_time = args[1].to_float();
-      if (!fade_time)
-        return std::unexpected(std::move(fade_time.error()));
-      request.fade_time = *fade_time;
-    }
-    if (args.size() > 2) {
-      auto loops = args[2].to_int();
-      if (!loops)
-        return std::unexpected(std::move(loops.error()));
-      request.loops = *loops;
-    }
-    if (args[0].can_convert(Json::Type::Array)) {
-      auto tracks = json_to_string_list(args[0]);
-      if (!tracks)
-        return std::unexpected(std::move(tracks.error()));
-      request.tracks = std::move(*tracks);
-    } else {
-      request.tracks.emplace();
-    }
-    m_pending_alt_music = std::move(request);
-  } else if (message == "stopAltMusic") {
-    AltMusicRequest request;
-    if (!args.empty()) {
-      auto fade_time = args[0].to_float();
-      if (!fade_time)
-        return std::unexpected(std::move(fade_time.error()));
-      request.fade_time = *fade_time;
-    }
-    m_pending_alt_music = std::move(request);
+  } else if (auto presentation = presentation_message(message)) {
+    auto checked = process_presentation_message(root(), *presentation, args, std::ref(*this));
+    if (!checked)
+      return std::unexpected(std::move(checked.error()));
+    if (*checked)
+      return ChainableJsonMessageResponse(RpcPromise<Json>::make_failed(std::move(**checked)));
+    return ChainableJsonMessageResponse(Json{});
   } else if (message == "recordEvent") {
     auto eventJsonResult = args.at(0);
     if (!eventJsonResult)
