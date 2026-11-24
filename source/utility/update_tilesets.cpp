@@ -244,7 +244,7 @@ std::expected<void, StarException> defineObjectOrientation(Root& root, TilesetUp
   List<std::shared_ptr<::Star::Image const>> layers;
   unsigned width = 0, height = 0;
   for (auto const& imageLayer : orientation->imageLayers) {
-    auto path = AssetPath::join(imageLayer.imagePart().image);
+    auto path = AssetPath::join(imageLayer.image_part().image);
     String imageName = path.replace_tags(StringMap<String>{}, true, "default");
     auto loaded = assets->image(imageName);
     if (!loaded)

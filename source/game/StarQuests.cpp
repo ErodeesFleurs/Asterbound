@@ -457,7 +457,7 @@ std::expected<Json, StarException> Quest::diskStore() const {
   result["completionText"] = m_completionText;
   result["failureText"] = m_failureText;
   auto portraits = json_from_map_v(m_portraits, [](List<Drawable> const& portrait) {
-    return json_from_list(portrait, [](Drawable const& drawable) { return drawable.toJson(); });
+    return json_from_list(portrait, [](Drawable const& drawable) { return drawable.to_json(); });
   });
   if (!portraits) return std::unexpected(std::move(portraits.error()));
   result["portraits"] = std::move(*portraits);
@@ -1085,7 +1085,7 @@ std::expected<void, StarException> Quest::setEntityParameter(String const& param
   if (auto portraitEntity = as_ref<PortraitEntity>(entity)) {
     auto drawables = portraitEntity->get().portrait(PortraitMode::Full);
     if (!drawables) return std::unexpected(std::move(drawables.error()));
-    auto json = json_from_list(*drawables, [](Drawable const& drawable) { return drawable.toJson(); });
+    auto json = json_from_list(*drawables, [](Drawable const& drawable) { return drawable.to_json(); });
     if (!json) return std::unexpected(std::move(json.error()));
     portrait = std::move(*json);
     auto entityName = portraitEntity->get().name();
@@ -1126,7 +1126,7 @@ std::expected<std::shared_ptr<Quest>, StarException> createPreviewQuest(
   if (!*config) return std::shared_ptr<Quest>();
   auto drawables = player.portrait(PortraitMode::Full);
   if (!drawables) return std::unexpected(std::move(drawables.error()));
-  auto portrait = json_from_list(*drawables, [](Drawable const& drawable) { return drawable.toJson(); });
+  auto portrait = json_from_list(*drawables, [](Drawable const& drawable) { return drawable.to_json(); });
   if (!portrait) return std::unexpected(std::move(portrait.error()));
   JsonObject paramJson = (*config)->parameterExamples;
   for (auto&& [name, parameter] : paramJson) {

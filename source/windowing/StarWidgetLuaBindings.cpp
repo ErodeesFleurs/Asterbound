@@ -287,7 +287,7 @@ std::expected<LuaMethods<LuaCanvas>, StarException> LuaUserDataMethods<LuaCanvas
           auto metadata = canvas->context().root().imageMetadataDatabase();
           if (!metadata)
             return std::unexpected(std::move(metadata.error()));
-          auto drawable = Drawable::makeImage(**metadata, image, 1.0, true, {0.0, 0.0}, color.value_or(Color::palette_white));
+          auto drawable = Drawable::make_image(**metadata, image, 1.0, true, {0.0, 0.0}, color.value_or(Color::palette_white));
           if (!drawable)
             return std::unexpected(std::move(drawable.error()));
           if (std::holds_alternative<Vec2F>(scale))
@@ -918,7 +918,7 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("setImageDrawables", [parentWidget](String const& widgetName, List<Drawable> drawables, std::optional<Vec2F> scale) -> std::expected<void, StarException> {
     return withWidget<ImageWidget>(parentWidget, widgetName, [&](std::shared_ptr<ImageWidget> widget) -> std::expected<void, StarException> {
-      if (scale) Drawable::scaleAll(drawables, *scale);
+      if (scale) Drawable::scale_all(drawables, *scale);
       return widget->setDrawables(std::move(drawables));
     });
   }); !registered)

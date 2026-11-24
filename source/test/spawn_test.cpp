@@ -71,8 +71,8 @@ validateWorld(Root& root, TestUniverse& testUniverse, std::int64_t timeoutMillis
   if (!assets)
     return std::unexpected(std::move(assets.error()));
   for (auto const& drawable : ready->drawables) {
-    if (drawable.isImage()) {
-      auto image = (*assets)->image(drawable.imagePart().image);
+    if (drawable.is_image()) {
+      auto image = (*assets)->image(drawable.image_part().image);
       if (!image)
         return std::unexpected(std::move(image.error()));
     }

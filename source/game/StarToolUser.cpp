@@ -367,8 +367,8 @@ ItemDescriptor ToolUser::altHandItemDescriptor() const {
     if (!imageMetadata) return std::unexpected(std::move(imageMetadata.error()));
     auto operation = image_operation_to_string(op);
     for (Drawable& drawable : drawables) {
-      if (drawable.isImage()) {
-        auto applied = drawable.imagePart().addDirectives(**imageMetadata, operation, true);
+      if (drawable.is_image()) {
+        auto applied = drawable.image_part().add_directives(**imageMetadata, operation, true);
         if (!applied) return std::unexpected(std::move(applied.error()));
       }
       drawable.color = opacityMask;

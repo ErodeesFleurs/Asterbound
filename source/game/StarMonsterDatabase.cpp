@@ -522,7 +522,7 @@ auto colorSwap = variant.colorSwap.value_or(std::move(*result71));
   auto result72 = animator->drawables();
 if (!result72) return std::unexpected(std::move(result72.error()));
 auto drawables = std::move(*result72);
-  Drawable::scaleAll(drawables, tile_pixels);
+  Drawable::scale_all(drawables, tile_pixels);
   return drawables;
 }
 

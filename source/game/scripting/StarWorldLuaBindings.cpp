@@ -1405,7 +1405,7 @@ namespace LuaBindings {
       if (cache.entity.lock() != entity || cache.mode != modeName || cache.drawables != *portrait) {
         auto metadata = world.root().imageMetadataDatabase();
         if (!metadata) return std::unexpected(std::move(metadata.error()));
-        auto bounds = Drawable::boundBoxAll(**metadata, *portrait, true);
+        auto bounds = Drawable::bound_box_all(**metadata, *portrait, true);
         if (!bounds) return std::unexpected(std::move(bounds.error()));
         cache.entity = entity;
         cache.mode = modeName;

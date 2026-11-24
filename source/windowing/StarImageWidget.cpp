@@ -91,33 +91,33 @@ std::expected<void, StarException> ImageWidget::setImage(String const& image) {
     return setDrawables({});
   auto metadata = context().root().imageMetadataDatabase();
   if (!metadata) return std::unexpected(std::move(metadata.error()));
-  auto drawable = Drawable::makeImage(**metadata, image, 1.0f, false, Vec2F());
+  auto drawable = Drawable::make_image(**metadata, image, 1.0f, false, Vec2F());
   if (!drawable) return std::unexpected(std::move(drawable.error()));
   return setDrawables({std::move(*drawable)});
 }
 
 std::expected<void, StarException> ImageWidget::setScale(float scale) {
   m_scale = scale;
-  return transformDrawables();
+  return transform_drawables();
 }
 
 std::expected<void, StarException> ImageWidget::setRotation(float rotation) {
   m_rotation = rotation;
-  return transformDrawables();
+  return transform_drawables();
 }
 
 std::expected<String, StarException> ImageWidget::image() const {
-  if (!m_drawables.empty() && !m_drawables[0].isImage())
+  if (!m_drawables.empty() && !m_drawables[0].is_image())
     return std::unexpected(GuiException("Image widget drawable is not an image"));
   if (m_drawables.empty())
     return "";
   else
-    return AssetPath::join(m_drawables[0].imagePart().image);
+    return AssetPath::join(m_drawables[0].image_part().image);
 }
 
 std::expected<void, StarException> ImageWidget::setDrawables(List<Drawable> drawables) {
   m_baseDrawables = std::move(drawables);
-  return transformDrawables();
+  return transform_drawables();
 }
 
 Vec2I ImageWidget::offset() {
@@ -134,7 +134,7 @@ bool ImageWidget::centered() {
 
 std::expected<void, StarException> ImageWidget::setCentered(bool centered) {
   m_centered = centered;
-  return transformDrawables();
+  return transform_drawables();
 }
 
 bool ImageWidget::trim() {
@@ -143,17 +143,17 @@ bool ImageWidget::trim() {
 
 std::expected<void, StarException> ImageWidget::setTrim(bool trim) {
   m_trim = trim;
-  return transformDrawables();
+  return transform_drawables();
 }
 
 std::expected<void, StarException> ImageWidget::setMaxSize(Vec2I const& size) {
   m_maxSize = size;
-  return transformDrawables();
+  return transform_drawables();
 }
 
 std::expected<void, StarException> ImageWidget::setMinSize(Vec2I const& size) {
   m_minSize = size;
-  return transformDrawables();
+  return transform_drawables();
 }
 
 RectI ImageWidget::screenBoundRect() const {
@@ -165,26 +165,19 @@ RectI ImageWidget::screenBoundRect() const {
   return base;
 }
 
-std::expected<void, StarException> ImageWidget::transformDrawables() {
-  m_drawables.clear();
-  for (auto const& drawable : m_baseDrawables)
-    m_drawables.push_back(Drawable(drawable));
+std::expected<void, StarException> ImageWidget::transform_drawables() {
+  m_drawables = m_baseDrawables;
 
   if (m_rotation != 0)
-    Drawable::rotateAll(m_drawables, m_rotation);
+    Drawable::rotate_all(m_drawables, m_rotation);
 
   auto metadata = context().root().imageMetadataDatabase();
   if (!metadata) return std::unexpected(std::move(metadata.error()));
-  // Centered drawables are pre-centered around 0,0.
-  if (m_centered) {
-    auto boundBox = Drawable::boundBoxAll(**metadata, m_drawables, m_trim);
-    if (!boundBox) return std::unexpected(std::move(boundBox.error()));
-    Drawable::translateAll(m_drawables, -boundBox->center());
-  }
-
-  auto boundBox = Drawable::boundBoxAll(**metadata, m_drawables, m_trim);
-  if (!boundBox) return std::unexpected(std::move(boundBox.error()));
-  auto size = boundBox->size().piecewise_max({0, 0});
+  auto bounds = Drawable::bound_box_all(**metadata, m_drawables, m_trim);
+  if (!bounds) return std::unexpected(std::move(bounds.error()));
+  if (m_centered && !bounds->is_null())
+    Drawable::translate_all(m_drawables, -bounds->center());
+  auto size = bounds->is_null() ? Vec2F() : bounds->size().piecewise_max({0, 0});
   if (size[0] && size[1]) {
     if ((size[0] > m_maxSize[0]) || (size[1] > m_maxSize[1])) {
       m_scale = std::min(m_maxSize[0] / size[0], m_maxSize[1] / size[1]);
@@ -193,7 +186,7 @@ std::expected<void, StarException> ImageWidget::transformDrawables() {
     }
   }
 
-  Drawable::scaleAll(m_drawables, m_scale);
+  Drawable::scale_all(m_drawables, m_scale);
 
   setSize(Vec2I((size * m_scale).ceil()));
   return {};

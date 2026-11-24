@@ -17,6 +17,14 @@ import star.image;
 import star.vector;
 import star.rect;
 import star.matrix3;
+import star.color;
+import star.drawable;
+import star.drawable_painter;
+import star.game_types;
+import star.line;
+import star.list;
+import star.poly;
+import star.ref_ptr;
 
 using namespace Star;
 
@@ -408,6 +416,78 @@ class OpenGlRendererRegression : public RendererRegression {};
 class VulkanRendererRegression : public RendererRegression {
   bool vulkan() const override { return true; }
 };
+
+TEST_F(OpenGlRendererRegression, ProjectedDrawableEdgesAndVertices) {
+  DrawablePainter painter(renderer, {});
+  RectF const viewport(0, 0, Width, Height);
+  auto const red = Color::rgb(255, 0, 0);
+  auto const green = Color::rgb(0, 255, 0);
+  auto const blue = Color::rgb(0, 0, 255);
+  auto const yellow = Color::rgb(255, 255, 0);
+  checked(renderer->loadConfig(json(R"({})")));
+  solid("geometry", R"({"includeVBTextures":false})");
+
+  for (float zoom : {1.0f, 2.0f}) {
+    SCOPED_TRACE(testing::Message() << "zoom " << zoom);
+    checked(renderer->startFrame());
+    select("geometry");
+    quad(Width, Height, {0, 0, 0, 255});
+    checked(renderer->flush());
+    auto& submitted = renderer->immediatePrimitives();
+    ASSERT_TRUE(submitted.empty());
+    auto stroke = [&](Vec2F start, Vec2F end, Color const& color, bool fullbright,
+                      std::optional<Color> tail = {}, float width = 8.0f) {
+      float scale = tile_pixels * zoom;
+      Drawable::LinePart part{Line2F({}, (end - start) / scale), width, tail};
+      painter.draw_projected_line(part, color, fullbright, start, scale, zoom, std::cref(viewport));
+    };
+    // All three centerlines miss the viewport; the projected strokes do not.
+    stroke({12, -1}, {72, -1}, red, false, blue);
+    stroke({Width + 1, 12}, {Width + 1, 52}, green, true);
+    stroke({30, Height + 1}, {70, Height + 11}, blue, false, {}, -8.0f);
+    stroke({12, -1 - 4 * zoom}, {72, -1 - 4 * zoom}, red, true);
+    stroke({-10, 20}, {-1, 20}, red, true); // Broad bound overlaps, but the butt cap misses.
+    stroke({-400, 20}, {-390, 20}, red, true); // Fully outside even the broad bound.
+    ASSERT_EQ(submitted.size(), 3u);
+    auto const& gradient = std::get<RenderQuad>(submitted[0]);
+    auto expect_corner = [](RenderVertex const& vertex, float x, float y) {
+      EXPECT_FLOAT_EQ(vertex.screenCoordinate.x(), x);
+      EXPECT_FLOAT_EQ(vertex.screenCoordinate.y(), y);
+    };
+    expect_corner(gradient.a, 12, -1 + 4 * zoom);
+    expect_corner(gradient.b, 12, -1 - 4 * zoom);
+    expect_corner(gradient.c, 72, -1 - 4 * zoom);
+    expect_corner(gradient.d, 72, -1 + 4 * zoom);
+    EXPECT_EQ(gradient.a.color, red.to_rgba());
+    EXPECT_EQ(gradient.b.color, red.to_rgba());
+    EXPECT_EQ(gradient.c.color, blue.to_rgba());
+    EXPECT_EQ(gradient.d.color, blue.to_rgba());
+    EXPECT_EQ(gradient.a.param1, 1.0f);
+    EXPECT_EQ(std::get<RenderQuad>(submitted[1]).a.param1, 0.0f);
+
+    auto polygon = Drawable::make_poly(PolyF{{-2, -2}, {3, -1}, {2, 2}, {-3, 1}}, yellow);
+    polygon.fullbright = false; // Polygons retain their historical fixed zero light parameter.
+    checked(painter.draw_drawable_projected(polygon, {48, 34}, 4, zoom));
+    ASSERT_EQ(submitted.size(), 4u);
+    auto const& poly = std::get<RenderPoly>(submitted[3]);
+    EXPECT_FALSE(poly.texture);
+    std::array<Vec2F, 4> const expected{{{40, 26}, {60, 30}, {56, 42}, {36, 38}}};
+    ASSERT_EQ(poly.vertexes.size(), expected.size());
+    for (std::size_t i = 0; i != expected.size(); ++i) {
+      EXPECT_EQ(poly.vertexes[i].screenCoordinate, expected[i]);
+      EXPECT_EQ(poly.vertexes[i].textureCoordinate, Vec2F());
+      EXPECT_EQ(poly.vertexes[i].color, yellow.to_rgba());
+      EXPECT_EQ(poly.vertexes[i].param1, 0.0f);
+    }
+    auto image = pixels();
+    expectPixel(image, Width, 42, 0, {125, 0, 130, 255});
+    expectPixel(image, Width, 42, static_cast<unsigned>(4 * zoom - 1), {0, 0, 0, 255});
+    expectPixel(image, Width, Width - 1, 30, {0, 255, 0, 255});
+    expectPixel(image, Width, 32, Height - 1, {0, 0, 255, 255});
+    expectPixel(image, Width, 48, 34, {255, 255, 0, 255});
+    checked(renderer->finishFrame());
+  }
+}
 
 TEST_F(OpenGlRendererRegression, RepeatedPingPongPassesSamplePreviousResult) {
   repeatedPasses();

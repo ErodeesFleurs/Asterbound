@@ -537,7 +537,7 @@ std::expected<List<Drawable>, StarException> ActiveItem::handDrawables(float int
     auto drawables = Item::icon_drawables();
     if (!drawables)
       return std::unexpected(std::move(drawables.error()));
-    Drawable::scaleAll(*drawables, 1.0f / tile_pixels);
+    Drawable::scale_all(*drawables, 1.0f / tile_pixels);
     return drawables;
   } else {
     return sample.drawables();
@@ -869,7 +869,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       auto metadata = root().imageMetadataDatabase();
       if (!metadata)
         return std::unexpected(std::move(metadata.error()));
-      auto drawable = Drawable::makeImage(**metadata, AssetPath::relative_to(directory(), *image), 1.0f, true, Vec2F());
+      auto drawable = Drawable::make_image(**metadata, AssetPath::relative_to(directory(), *image), 1.0f, true, Vec2F());
       if (!drawable)
         return std::unexpected(std::move(drawable.error()));
       drawables.push_back(std::move(*drawable));

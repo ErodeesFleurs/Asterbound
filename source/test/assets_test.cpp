@@ -47,6 +47,8 @@ import star.drawable;
 import star.image_metadata_database;
 import star.color;
 import star.rect;
+import star.line;
+import star.matrix3;
 
 #include "gtest/gtest.h"
 #include "gtest/gtest-spi.h"
@@ -368,9 +370,9 @@ const GameTestRegistration animation_drawable_transform(
     Vec2F const offset(2.25f, -7.5f);
     auto color = Color::rgba(15, 92, 173, 201);
     for (bool centered : {false, true}) {
-      auto expected = Drawable::makeImage(**metadata, image, 0.375f, centered, offset);
+      auto expected = Drawable::make_image(**metadata, image, 0.375f, centered, offset);
       ASSERT_TRUE(expected) << expected.error().what();
-      auto applied = expected->imagePart().addDirectivesGroup(**metadata, border, true);
+      auto applied = expected->image_part().add_directives_group(**metadata, border, true);
       ASSERT_TRUE(applied) << applied.error().what();
       expected->rotate(0.7f);
       expected->color = color;
@@ -381,6 +383,108 @@ const GameTestRegistration animation_drawable_transform(
       EXPECT_EQ(*actual, *expected);
     }
   });
+
+const GameTestRegistration drawable_directives_retry(
+  "DrawableTest", "DirectivesRetryAndUncenteredFastPath", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto overlay = File::relative_to(*directory, "assets");
+    ASSERT_TRUE(File::create_directory(overlay));
+    auto frames_path = File::relative_to(overlay, "sample.frames");
+    String frames(R"({"frameList":{"tile":[0,0,2,2]}})");
+    auto png = pngTestBytes(fixture.root().logger());
+    ASSERT_TRUE(png);
+    ASSERT_TRUE(File::write_file(*png, File::relative_to(overlay, "sample.png")));
+    ASSERT_TRUE(File::write_file(frames, frames_path));
+    ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(overlay, "preload.config")));
+    auto settings = fixture.rootSettings();
+    settings.assetDirectories.clear();
+    settings.assetSources = {overlay};
+    settings.storageDirectory = File::relative_to(*directory, "storage");
+    settings.runtimeConfigFile = {};
+    settings.logFile = {};
+    settings.includeUGC = false;
+    settings.assetsSettings.missing_image = {};
+    auto root = Root::create(std::move(settings));
+    ASSERT_TRUE(root) << root.error().what();
+    auto assets = (*root)->assets();
+    ASSERT_TRUE(assets) << assets.error().what();
+    auto database = (*root)->imageMetadataDatabase();
+    ASSERT_TRUE(database);
+    auto const& metadata = **database;
+    auto transform = Mat3F::translation({4, 7}) * Mat3F::scaling({2, -3});
+    Drawable::ImagePart const original{"/sample.png:tile?border=1;ffffff", transform};
+    Directives border("?border=2;ffffff");
+    DirectivesGroup group(String("?flipx"));
+    group += border;
+    auto single = original, grouped = original, removed = original;
+
+    // Only the original path has a cached size. Every candidate must read frames.
+    ASSERT_EQ(metadata.imageSize(original.image), Vec2U(4, 4));
+    ASSERT_TRUE(File::write_file(String("{"), frames_path));
+    (*assets)->hot_reload();
+    EXPECT_FALSE(single.add_directives(metadata, border, true));
+    EXPECT_FALSE(grouped.add_directives_group(metadata, group, true));
+    EXPECT_FALSE(removed.remove_directives(metadata, true));
+    EXPECT_EQ(single, original);
+    EXPECT_EQ(grouped, original);
+    EXPECT_EQ(removed, original);
+
+    ASSERT_TRUE(File::write_file(frames, frames_path));
+    (*assets)->hot_reload();
+    ASSERT_TRUE(single.add_directives(metadata, border, true));
+    ASSERT_TRUE(grouped.add_directives_group(metadata, group, true));
+    ASSERT_TRUE(removed.remove_directives(metadata, true));
+    EXPECT_EQ(AssetPath::join(single.image), "/sample.png:tile?border=1;ffffff?border=2;ffffff");
+    EXPECT_EQ(AssetPath::join(grouped.image), "/sample.png:tile?border=1;ffffff?flipx?border=2;ffffff");
+    EXPECT_EQ(AssetPath::join(removed.image), "/sample.png:tile");
+    EXPECT_EQ(single.transformation, transform * Mat3F::translation({-2, -2}));
+    EXPECT_EQ(grouped.transformation, single.transformation);
+    EXPECT_EQ(removed.transformation, transform * Mat3F::translation({1, 1}));
+
+    Drawable::ImagePart missing{"/missing.png", transform};
+    ASSERT_FALSE(metadata.imageSize(missing.image));
+    ASSERT_TRUE(missing.remove_directives(metadata, true));
+    ASSERT_TRUE(missing.add_directives(metadata, Directives{}, true));
+    ASSERT_TRUE(missing.add_directives_group(metadata, DirectivesGroup{}, true));
+    ASSERT_TRUE(missing.add_directives(metadata, border));
+    ASSERT_TRUE(missing.add_directives_group(metadata, missing.image.directives));
+    EXPECT_EQ(AssetPath::join(missing.image), "/missing.png?border=2;ffffff?border=2;ffffff");
+    ASSERT_TRUE(missing.remove_directives(metadata));
+    EXPECT_EQ(AssetPath::join(missing.image), "/missing.png");
+    EXPECT_EQ(missing.transformation, transform);
+  });
+
+const GameTestRegistration drawable_gradient_wire("DrawableTest", "GradientJsonAndLegacyWire", [](GameTest& fixture) {
+  auto metadata = fixture.root().imageMetadataDatabase();
+  ASSERT_TRUE(metadata);
+  auto solid = Drawable::make_line({{1, 2}, {-3, 4}}, 2.5f, Color::rgba(87, 220, 255, 204), {8, -9});
+  solid.fullbright = true;
+  auto legacy_json = solid.to_json();
+  ASSERT_TRUE(legacy_json);
+  EXPECT_EQ(legacy_json->contains("endColor"), false);
+  EXPECT_EQ(Drawable::create(**metadata, *legacy_json), solid);
+  auto gradient = solid;
+  gradient.line_part().end_color = Color::rgba(87, 220, 255, 0);
+  auto json = gradient.to_json();
+  ASSERT_TRUE(json);
+  EXPECT_EQ(json->get("endColor"), json_from_color(*gradient.line_part().end_color));
+  EXPECT_EQ(Drawable::create(**metadata, *json), gradient);
+  auto invalid = json->set("endColor", JsonArray{});
+  ASSERT_TRUE(invalid);
+  EXPECT_FALSE(Drawable::create(**metadata, *invalid));
+
+  // Independent legacy packet: tag 1, endpoints, width, position, start RGBA, fullbright.
+  DataStreamBuffer legacy;
+  ASSERT_TRUE(legacy << std::uint8_t{1} << Vec2F(1, 2) << Vec2F(-3, 4) << 2.5f
+                     << Vec2F(8, -9) << solid.color.to_rgba_f() << true);
+  auto wire = DataStreamBuffer::serialize(gradient);
+  ASSERT_TRUE(wire);
+  EXPECT_EQ(*wire, legacy.data());
+  ASSERT_TRUE(DataStreamBuffer::deserialize(gradient, legacy.span()));
+  EXPECT_EQ(gradient, solid);
+});
 
 const GameTestRegistration objectCursorPreviewRandomIsolation(
   "AssetsTest", "ObjectCursorPreviewColdAndWarmCachesPreserveGameplayRandom", [](GameTest& fixture) {

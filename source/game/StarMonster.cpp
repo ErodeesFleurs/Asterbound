@@ -1006,11 +1006,11 @@ std::expected<void, StarException> Monster::render(RenderCallback& renderCallbac
   auto result154 = sample.drawables(position());
   if (!result154) return std::unexpected(std::move(result154.error()));
   for (auto& drawable : std::move(*result154)) {
-      if (drawable.isImage())
+      if (drawable.is_image())
         {
     auto result155 = this->root().imageMetadataDatabase();
     if (!result155) return std::unexpected(std::move(result155.error()));
-    auto result156 = drawable.imagePart().addDirectivesGroup(*std::move(*result155), m_statusController->parentDirectives(), true);
+    auto result156 = drawable.image_part().add_directives_group(*std::move(*result155), m_statusController->parentDirectives(), true);
     if (!result156) return std::unexpected(std::move(result156.error()));
 
   }
@@ -1464,7 +1464,7 @@ std::expected<List<Drawable>, StarException> Monster::portrait(PortraitMode) con
   if (m_monsterVariant.portraitIcon) {
     auto result241 = this->root().imageMetadataDatabase();
 if (!result241) return std::unexpected(std::move(result241.error()));
-auto result242 = Drawable::makeImage(*std::move(*result241), *m_monsterVariant.portraitIcon, 1.0f, true, Vec2F());
+auto result242 = Drawable::make_image(*std::move(*result241), *m_monsterVariant.portraitIcon, 1.0f, true, Vec2F());
 if (!result242) return std::unexpected(std::move(result242.error()));
 return List<Drawable>{std::move(*result242)};
   } else {
@@ -1475,7 +1475,7 @@ auto animator = std::move(*result243);
     auto result244 = animator->drawables();
 if (!result244) return std::unexpected(std::move(result244.error()));
 auto drawables = std::move(*result244);
-    Drawable::scaleAll(drawables, tile_pixels);
+    Drawable::scale_all(drawables, tile_pixels);
     return drawables;
   }
 }

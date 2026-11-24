@@ -645,8 +645,8 @@ std::expected<void, StarException> Cinematic::drawDrawable(Drawable const& drawa
 
   auto& primitives = renderer->get().immediatePrimitives();
 
-  if (drawable.isImage()) {
-    auto const& imagePart = drawable.imagePart();
+  if (drawable.is_image()) {
+    auto const& imagePart = drawable.image_part();
     auto texture = textureGroup->get().loadTexture(imagePart.image);
     if (!texture)
       return std::unexpected(std::move(texture.error()));

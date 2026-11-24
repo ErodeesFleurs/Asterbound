@@ -321,7 +321,7 @@ std::expected<void, StarException> WorldPainter::render(WorldRenderData& renderD
   };
 
   if (auto r = renderEntitiesUntil(RenderLayerBackgroundOverlay); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = drawDrawableSet(renderData.backgroundOverlays); !r) return std::unexpected(std::move(r.error()));
+  if (auto r = draw_drawable_set(renderData.backgroundOverlays); !r) return std::unexpected(std::move(r.error()));
   if (auto r = renderEntitiesUntil(RenderLayerBackgroundTile); !r) return std::unexpected(std::move(r.error()));
   if (auto r = m_tilePainter->renderBackground(m_camera); !r) return std::unexpected(std::move(r.error()));
   if (auto r = renderEntitiesUntil(RenderLayerPlatform); !r) return std::unexpected(std::move(r.error()));
@@ -335,11 +335,11 @@ std::expected<void, StarException> WorldPainter::render(WorldRenderData& renderD
   if (auto r = renderEntitiesUntil(RenderLayerForegroundTile); !r) return std::unexpected(std::move(r.error()));
   if (auto r = m_tilePainter->renderForeground(m_camera); !r) return std::unexpected(std::move(r.error()));
   if (auto r = renderEntitiesUntil(RenderLayerForegroundOverlay); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = drawDrawableSet(renderData.foregroundOverlays); !r) return std::unexpected(std::move(r.error()));
+  if (auto r = draw_drawable_set(renderData.foregroundOverlays); !r) return std::unexpected(std::move(r.error()));
   if (auto r = renderEntitiesUntil(RenderLayerFrontParticle); !r) return std::unexpected(std::move(r.error()));
   if (auto r = renderParticles(renderData, Particle::Layer::Front); !r) return std::unexpected(std::move(r.error()));
   if (auto r = renderEntitiesUntil(RenderLayerOverlay); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = drawDrawableSet(renderData.nametags); !r) return std::unexpected(std::move(r.error()));
+  if (auto r = draw_drawable_set(renderData.nametags); !r) return std::unexpected(std::move(r.error()));
   if (auto r = renderBars(renderData); !r) return std::unexpected(std::move(r.error()));
   if (auto r = renderEntitiesUntil({}); !r) return std::unexpected(std::move(r.error()));
 
@@ -409,15 +409,15 @@ std::expected<void, StarException> WorldPainter::renderParticles(WorldRenderData
 
     } else if (particle.type == Particle::Type::Textured || particle.type == Particle::Type::Animated) {
       auto drawableResult = particle.type == Particle::Type::Textured
-          ? Drawable::makeImage(*m_imageMetadata, particle.image, 1.0f / tile_pixels, true, Vec2F(0, 0))
+          ? Drawable::make_image(*m_imageMetadata, particle.image, 1.0f / tile_pixels, true, Vec2F(0, 0))
           : particle.animation->drawable(1.0f / tile_pixels);
       if (!drawableResult) return std::unexpected(std::move(drawableResult.error()));
       Drawable drawable = std::move(*drawableResult);
 
       if (particle.flip && particle.flippable)
         drawable.scale(Vec2F(-1, 1));
-      if (drawable.isImage() && particle.type != Particle::Type::Animated) {
-        if (auto result = drawable.imagePart().addDirectivesGroup(*m_imageMetadata, particle.directives, true); !result)
+      if (drawable.is_image() && particle.type != Particle::Type::Animated) {
+        if (auto result = drawable.image_part().add_directives_group(*m_imageMetadata, particle.directives, true); !result)
           return std::unexpected(std::move(result.error()));
       }
       drawable.fullbright = particle.fullbright;
@@ -425,7 +425,7 @@ std::expected<void, StarException> WorldPainter::renderParticles(WorldRenderData
       drawable.rotate(particle.rotation);
       drawable.scale(particle.size);
       drawable.translate(particle.position);
-      if (auto result = drawDrawable(std::move(drawable)); !result) return std::unexpected(std::move(result.error()));
+      if (auto result = draw_drawable(drawable); !result) return std::unexpected(std::move(result.error()));
 
     } else if (particle.type == Particle::Type::Text) {
       Vec2F position = m_camera.worldToScreen(particle.position);
@@ -452,9 +452,9 @@ std::expected<void, StarException> WorldPainter::renderBars(WorldRenderData& ren
     offset += m_entityBarSpacing;
     if (bar.icon) {
       auto iconDrawPosition = position - (m_entityBarSize / 2).round() + m_entityBarIconOffset;
-      auto drawable = Drawable::makeImage(*m_imageMetadata, *bar.icon, 1.0f / tile_pixels, true, iconDrawPosition);
+      auto drawable = Drawable::make_image(*m_imageMetadata, *bar.icon, 1.0f / tile_pixels, true, iconDrawPosition);
       if (!drawable) return std::unexpected(std::move(drawable.error()));
-      if (auto result = drawDrawable(std::move(*drawable)); !result) return std::unexpected(std::move(result.error()));
+      if (auto result = draw_drawable(*drawable); !result) return std::unexpected(std::move(result.error()));
     }
 
     if (!bar.detailOnly) {
@@ -463,8 +463,8 @@ std::expected<void, StarException> WorldPainter::renderBars(WorldRenderData& ren
       auto fullColor = bar.color;
       auto emptyColor = Color::palette_black;
 
-      if (auto result = drawDrawable(Drawable::makePoly(PolyF(emptyBar), emptyColor, position)); !result) return std::unexpected(std::move(result.error()));
-      if (auto result = drawDrawable(Drawable::makePoly(PolyF(fullBar), fullColor, position)); !result) return std::unexpected(std::move(result.error()));
+      if (auto result = draw_drawable(Drawable::make_poly(PolyF(emptyBar), emptyColor, position)); !result) return std::unexpected(std::move(result.error()));
+      if (auto result = draw_drawable(Drawable::make_poly(PolyF(fullBar), fullColor, position)); !result) return std::unexpected(std::move(result.error()));
     }
   }
 
@@ -483,16 +483,16 @@ std::expected<void, StarException> WorldPainter::drawEntityLayer(List<Drawable> 
       auto highlightDrawable = Drawable(drawable);
       highlightDrawable.fullbright = true;
       highlightDrawable.color = Color::rgba_f(1, 1, 1, highlightEffect.level * drawable.color.alpha_f());
-      if (auto result = highlightDrawable.imagePart().addDirectives(*m_imageMetadata, highlightDirectives, true);
+      if (auto result = highlightDrawable.image_part().add_directives(*m_imageMetadata, highlightDirectives, true);
           !result)
         return std::unexpected(std::move(result.error()));
-      return drawDrawable(std::move(highlightDrawable));
+      return draw_drawable(highlightDrawable);
     };
 
     // first pass, draw underlay
     if (!underlayDirectives.empty()) {
       for (auto const& d : drawables) {
-        if (d.isImage()) {
+        if (d.is_image()) {
           if (auto result = drawHighlight(d, underlayDirectives); !result)
             return std::unexpected(std::move(result.error()));
         }
@@ -501,43 +501,48 @@ std::expected<void, StarException> WorldPainter::drawEntityLayer(List<Drawable> 
 
     // second pass, draw main drawables and overlays
     for (auto const& d : drawables) {
-      if (auto result = drawDrawable(d); !result) return std::unexpected(std::move(result.error()));
-      if (!overlayDirectives.empty() && d.isImage()) {
+      if (auto result = draw_drawable(d); !result) return std::unexpected(std::move(result.error()));
+      if (!overlayDirectives.empty() && d.is_image()) {
         if (auto result = drawHighlight(d, overlayDirectives); !result)
           return std::unexpected(std::move(result.error()));
       }
     }
   } else {
     for (auto const& d : drawables) {
-      if (auto result = drawDrawable(d); !result) return std::unexpected(std::move(result.error()));
+      if (auto result = draw_drawable(d); !result) return std::unexpected(std::move(result.error()));
     }
   }
   return {};
 }
 
-std::expected<void, StarException> WorldPainter::drawDrawable(Drawable const& drawable) {
+std::expected<void, StarException> WorldPainter::draw_drawable(Drawable const& drawable) {
   Vec2F position = m_camera.worldToScreen(drawable.position);
-  float scale = m_camera.pixelRatio() * tile_pixels;
+  float pixel_ratio = m_camera.pixelRatio();
+  float scale = pixel_ratio * tile_pixels;
+  RectF viewport = RectF::with_size({}, Vec2F(m_camera.screenSize()));
+  if (drawable.is_line()) {
+    m_drawablePainter->draw_projected_line(drawable.line_part(), drawable.color, drawable.fullbright,
+        position, scale, pixel_ratio, std::cref(viewport));
+    return {};
+  }
 
-  // draw the drawable if it's on screen
-  // if it's not on screen, there's a random chance to pre-load
-  // pre-load is not done on every tick because it's expensive to look up images with long paths
-  auto bounds = drawable.boundBox(*m_imageMetadata, false);
+  auto bounds = drawable.bound_box(*m_imageMetadata, false);
   if (!bounds) return std::unexpected(std::move(bounds.error()));
-  RectF screenBounds((bounds->min() - drawable.position) * scale + position,
+  RectF screen_bounds((bounds->min() - drawable.position) * scale + position,
       (bounds->max() - drawable.position) * scale + position);
-  if (RectF::with_size(Vec2F(), Vec2F(m_camera.screenSize())).intersects(screenBounds))
-    return m_drawablePainter->drawDrawableProjected(drawable, position, scale, m_camera.pixelRatio());
-  if (drawable.isImage() && m_preloadRandom.uniform_float() < m_preloadTextureChance) {
-    auto image = m_assets->try_image(drawable.imagePart().image);
+  if (viewport.intersects(screen_bounds))
+    return m_drawablePainter->draw_drawable_projected(drawable, position, scale, pixel_ratio);
+  // Only occasionally pay for preloading a potentially long, off-screen asset path.
+  if (drawable.is_image() && m_preloadRandom.uniform_float() < m_preloadTextureChance) {
+    auto image = m_assets->try_image(drawable.image_part().image);
     if (!image) return std::unexpected(std::move(image.error()));
   }
   return {};
 }
 
-std::expected<void, StarException> WorldPainter::drawDrawableSet(List<Drawable> const& drawables) {
+std::expected<void, StarException> WorldPainter::draw_drawable_set(List<Drawable> const& drawables) {
   for (Drawable const& drawable : drawables) {
-    if (auto result = drawDrawable(drawable); !result) return std::unexpected(std::move(result.error()));
+    if (auto result = draw_drawable(drawable); !result) return std::unexpected(std::move(result.error()));
   }
   return m_renderer->flush();
 }

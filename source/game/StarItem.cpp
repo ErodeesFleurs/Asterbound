@@ -108,7 +108,7 @@ std::expected<void, StarException> Item::initialize(Json config, String director
       auto image = icon.to_string();
       if (!image)
         return std::unexpected(std::move(image.error()));
-      auto drawable = Drawable::makeImage(**metadata, AssetPath::relative_to(m_directory, *image), 1.0f, true, Vec2F());
+      auto drawable = Drawable::make_image(**metadata, AssetPath::relative_to(m_directory, *image), 1.0f, true, Vec2F());
       if (!drawable)
         return std::unexpected(std::move(drawable.error()));
       drawables.push_back(std::move(*drawable));
@@ -330,7 +330,7 @@ std::expected<List<Drawable>, StarException> Item::drop_drawables(std::optional<
   auto drawables = icon_drawables();
   if (!drawables)
     return std::unexpected(std::move(drawables.error()));
-  Drawable::scaleAll(*drawables, 1.0f / tile_pixels);
+  Drawable::scale_all(*drawables, 1.0f / tile_pixels);
   return drawables;
 }
 
@@ -389,7 +389,7 @@ std::expected<void, StarException> Item::setIconDrawables(List<Drawable> drawabl
   auto metadata = root().imageMetadataDatabase();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
-  auto boundBox = Drawable::boundBoxAll(**metadata, drawables, true);
+  auto boundBox = Drawable::bound_box_all(**metadata, drawables, true);
   if (!boundBox)
     return std::unexpected(std::move(boundBox.error()));
   if (!boundBox->is_empty()) {
@@ -413,7 +413,7 @@ std::expected<void, StarException> Item::setSecondaryIconDrawables(std::optional
   auto metadata = root().imageMetadataDatabase();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
-  auto boundBox = Drawable::boundBoxAll(**metadata, *drawables, true);
+  auto boundBox = Drawable::bound_box_all(**metadata, *drawables, true);
   if (!boundBox)
     return std::unexpected(std::move(boundBox.error()));
   if (!boundBox->is_empty()) {

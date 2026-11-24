@@ -107,12 +107,12 @@ std::expected<void, StarException> LoungeableObject::render(RenderCallback& rend
         if (!metadataResult)
           return std::unexpected(std::move(metadataResult.error()));
         auto metadata = std::move(*metadataResult);
-        auto drawableResult = Drawable::makeImage(*metadata, m_sitCoverImage, 1.0f / tile_pixels, false, position() + orientation->imagePosition);
+        auto drawableResult = Drawable::make_image(*metadata, m_sitCoverImage, 1.0f / tile_pixels, false, position() + orientation->imagePosition);
         if (!drawableResult)
           return std::unexpected(std::move(drawableResult.error()));
         auto drawable = std::move(*drawableResult);
         if (m_flipImages) {
-          auto boundsResult = drawable.boundBox(*metadata, false);
+          auto boundsResult = drawable.bound_box(*metadata, false);
           if (!boundsResult)
             return std::unexpected(std::move(boundsResult.error()));
           auto bounds = std::move(*boundsResult);

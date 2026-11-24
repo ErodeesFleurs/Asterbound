@@ -30,7 +30,8 @@ struct Drawable {
   struct LinePart {
     Line2F line;
     float width;
-    std::optional<Color> endColor;
+    // Local/JSON gradient; legacy network packets carry only the start color.
+    std::optional<Color> end_color;
     bool operator==(LinePart const&) const = default;
   };
 
@@ -49,72 +50,62 @@ struct Drawable {
     // Add directives to this ImagePart, while optionally keeping the
     // transformed center of the image the same if the directives change the
     // image size.
-    [[nodiscard]] std::expected<std::reference_wrapper<ImagePart>, StarException> addDirectives(ImageMetadataDatabase const& imageMetadata, Directives const& directives, bool keepImageCenterPosition = false);
-    [[nodiscard]] std::expected<std::reference_wrapper<ImagePart>, StarException> addDirectivesGroup(ImageMetadataDatabase const& imageMetadata, DirectivesGroup const& directivesGroup, bool keepImageCenterPosition = false);
+    [[nodiscard]] std::expected<std::reference_wrapper<ImagePart>, StarException> add_directives(
+        ImageMetadataDatabase const& image_metadata, Directives const& directives, bool keep_center = false);
+    [[nodiscard]] std::expected<std::reference_wrapper<ImagePart>, StarException> add_directives_group(
+        ImageMetadataDatabase const& image_metadata, DirectivesGroup const& directives, bool keep_center = false);
 
     // Remove directives from this ImagePart, while optionally keeping the
     // transformed center of the image the same if the directives change the
     // image size.
-    [[nodiscard]] std::expected<std::reference_wrapper<ImagePart>, StarException> removeDirectives(ImageMetadataDatabase const& imageMetadata, bool keepImageCenterPosition = false);
+    [[nodiscard]] std::expected<std::reference_wrapper<ImagePart>, StarException> remove_directives(
+        ImageMetadataDatabase const& image_metadata, bool keep_center = false);
   };
 
-  static Drawable makeLine(Line2F const& line, float lineWidth, Color const& color, Vec2F const& position = Vec2F());
-  static Drawable makePoly(PolyF poly, Color const& color, Vec2F const& position = Vec2F());
-  [[nodiscard]] static std::expected<Drawable, StarException> makeImage(ImageMetadataDatabase const& imageMetadata, AssetPath image, float pixelSize, bool centered, Vec2F const& position, Color const& color = Color::palette_white);
+  static Drawable make_line(Line2F const& line, float line_width, Color const& color, Vec2F const& position = Vec2F());
+  static Drawable make_poly(PolyF poly, Color const& color, Vec2F const& position = Vec2F());
+  [[nodiscard]] static std::expected<Drawable, StarException> make_image(ImageMetadataDatabase const& image_metadata, AssetPath image, float pixel_size, bool centered, Vec2F const& position, Color const& color = Color::palette_white);
   [[nodiscard]] static std::expected<Drawable, StarException> make_animation_image(ImageMetadataDatabase const& image_metadata,
       AssetPath image, float pixel_size, bool centered, Vec2F const& position, DirectivesGroup const& processing, Color const& color);
 
-  template <typename DrawablesContainer>
-  static void translateAll(DrawablesContainer& drawables, Vec2F const& translation);
-
-  template <typename DrawablesContainer>
-  static void rotateAll(DrawablesContainer& drawables, float rotation, Vec2F const& rotationCenter = Vec2F());
-
-  template <typename DrawablesContainer>
-  static void scaleAll(DrawablesContainer& drawables, float scaling, Vec2F const& scaleCenter = Vec2F());
-
-  template <typename DrawablesContainer>
-  static void scaleAll(DrawablesContainer& drawables, Vec2F const& scaling, Vec2F const& scaleCenter = Vec2F());
-
-  template <typename DrawablesContainer>
-  static void transformAll(DrawablesContainer& drawables, Mat3F const& transformation);
-
-  template <typename DrawablesContainer>
-  static void rebaseAll(DrawablesContainer& drawables, Vec2F const& newBase = Vec2F());
-
-  template <typename DrawablesContainer>
-  [[nodiscard]] static std::expected<RectF, StarException> boundBoxAll(ImageMetadataDatabase const& imageMetadata, DrawablesContainer const& drawables, bool cropImages);
+  static void translate_all(std::span<Drawable> drawables, Vec2F const& translation);
+  static void rotate_all(std::span<Drawable> drawables, float rotation, Vec2F const& rotation_center = Vec2F());
+  static void scale_all(std::span<Drawable> drawables, float scaling, Vec2F const& scale_center = Vec2F());
+  static void scale_all(std::span<Drawable> drawables, Vec2F const& scaling, Vec2F const& scale_center = Vec2F());
+  static void transform_all(std::span<Drawable> drawables, Mat3F const& transformation);
+  static void rebase_all(std::span<Drawable> drawables, Vec2F const& new_base = Vec2F());
+  [[nodiscard]] static std::expected<RectF, StarException> bound_box_all(ImageMetadataDatabase const& image_metadata, std::span<Drawable const> drawables, bool crop_images);
 
   Drawable();
-  [[nodiscard]] static std::expected<Drawable, StarException> create(ImageMetadataDatabase const& imageMetadata, Json const& json);
+  [[nodiscard]] static std::expected<Drawable, StarException> create(ImageMetadataDatabase const& image_metadata, Json const& json);
 
-  [[nodiscard]] std::expected<Json, StarException> toJson() const;
+  [[nodiscard]] std::expected<Json, StarException> to_json() const;
 
   void translate(Vec2F const& translation);
-  void rotate(float rotation, Vec2F const& rotationCenter = Vec2F());
-  void scale(float scaling, Vec2F const& scaleCenter = Vec2F());
-  void scale(Vec2F const& scaling, Vec2F const& scaleCenter = Vec2F());
+  void rotate(float rotation, Vec2F const& rotation_center = Vec2F());
+  void scale(float scaling, Vec2F const& scale_center = Vec2F());
+  void scale(Vec2F const& scaling, Vec2F const& scale_center = Vec2F());
   void transform(Mat3F const& transformation);
 
   // Change the base position of a drawable without changing the position that
   // the drawable appears, useful to re-base a set of drawables at the same
   // position so that they will be transformed together with minimal drift
   // between them.
-  void rebase(Vec2F const& newBase = Vec2F());
+  void rebase(Vec2F const& new_base = Vec2F());
 
-  [[nodiscard]] std::expected<RectF, StarException> boundBox(ImageMetadataDatabase const& imageMetadata, bool cropImages) const;
+  [[nodiscard]] std::expected<RectF, StarException> bound_box(ImageMetadataDatabase const& image_metadata, bool crop_images) const;
 
-  bool isLine() const;
-  LinePart& linePart();
-  LinePart const& linePart() const;
+  bool is_line() const;
+  LinePart& line_part();
+  LinePart const& line_part() const;
 
-  bool isPoly() const;
-  PolyPart& polyPart();
-  PolyPart const& polyPart() const;
+  bool is_poly() const;
+  PolyPart& poly_part();
+  PolyPart const& poly_part() const;
 
-  bool isImage() const;
-  ImagePart& imagePart();
-  ImagePart const& imagePart() const;
+  bool is_image() const;
+  ImagePart& image_part();
+  ImagePart const& image_part() const;
 
   std::variant<std::monostate, LinePart, PolyPart, ImagePart> part;
 
@@ -127,87 +118,39 @@ struct Drawable {
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, Drawable& drawable);
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, Drawable const& drawable);
 
-template <typename DrawablesContainer>
-void Drawable::translateAll(DrawablesContainer& drawables, Vec2F const& translation) {
-  for (auto& drawable : drawables)
-    drawable.translate(translation);
-}
-
-template <typename DrawablesContainer>
-void Drawable::rotateAll(DrawablesContainer& drawables, float rotation, Vec2F const& rotationCenter) {
-  for (auto& drawable : drawables)
-    drawable.rotate(rotation, rotationCenter);
-}
-
-template <typename DrawablesContainer>
-void Drawable::scaleAll(DrawablesContainer& drawables, float scaling, Vec2F const& scaleCenter) {
-  for (auto& drawable : drawables)
-    drawable.scale(scaling, scaleCenter);
-}
-
-template <typename DrawablesContainer>
-void Drawable::scaleAll(DrawablesContainer& drawables, Vec2F const& scaling, Vec2F const& scaleCenter) {
-  for (auto& drawable : drawables)
-    drawable.scale(scaling, scaleCenter);
-}
-
-template <typename DrawablesContainer>
-void Drawable::transformAll(DrawablesContainer& drawables, Mat3F const& transformation) {
-  for (auto& drawable : drawables)
-    drawable.transform(transformation);
-}
-
-template <typename DrawablesContainer>
-void Drawable::rebaseAll(DrawablesContainer& drawables, Vec2F const& newBase) {
-  for (auto& drawable : drawables)
-    drawable.rebase(newBase);
-}
-
-template <typename DrawablesContainer>
-[[nodiscard]] std::expected<RectF, StarException> Drawable::boundBoxAll(ImageMetadataDatabase const& imageMetadata, DrawablesContainer const& drawables, bool cropImages) {
-  RectF boundBox = RectF::null();
-  for (auto const& drawable : drawables) {
-    auto bounds = drawable.boundBox(imageMetadata, cropImages);
-    if (!bounds)
-      return std::unexpected(std::move(bounds.error()));
-    boundBox.combine(*bounds);
-  }
-  return boundBox;
-}
-
-inline bool Drawable::isLine() const {
+inline bool Drawable::is_line() const {
   return std::holds_alternative<LinePart>(part);
 }
 
-inline Drawable::LinePart& Drawable::linePart() {
+inline Drawable::LinePart& Drawable::line_part() {
   return std::get<LinePart>(part);
 }
 
-inline Drawable::LinePart const& Drawable::linePart() const {
+inline Drawable::LinePart const& Drawable::line_part() const {
   return std::get<LinePart>(part);
 }
 
-inline bool Drawable::isPoly() const {
+inline bool Drawable::is_poly() const {
   return std::holds_alternative<PolyPart>(part);
 }
 
-inline Drawable::PolyPart& Drawable::polyPart() {
+inline Drawable::PolyPart& Drawable::poly_part() {
   return std::get<PolyPart>(part);
 }
 
-inline Drawable::PolyPart const& Drawable::polyPart() const {
+inline Drawable::PolyPart const& Drawable::poly_part() const {
   return std::get<PolyPart>(part);
 }
 
-inline bool Drawable::isImage() const {
+inline bool Drawable::is_image() const {
   return std::holds_alternative<ImagePart>(part);
 }
 
-inline Drawable::ImagePart& Drawable::imagePart() {
+inline Drawable::ImagePart& Drawable::image_part() {
   return std::get<ImagePart>(part);
 }
 
-inline Drawable::ImagePart const& Drawable::imagePart() const {
+inline Drawable::ImagePart const& Drawable::image_part() const {
   return std::get<ImagePart>(part);
 }
 

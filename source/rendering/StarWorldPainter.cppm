@@ -115,8 +115,8 @@ private:
 
   [[nodiscard]] std::expected<void, StarException> drawEntityLayer(List<Drawable> const& drawables, EntityHighlightEffect highlightEffect = EntityHighlightEffect());
 
-  [[nodiscard]] std::expected<void, StarException> drawDrawable(Drawable const& drawable);
-  [[nodiscard]] std::expected<void, StarException> drawDrawableSet(List<Drawable> const& drawable);
+  [[nodiscard]] std::expected<void, StarException> draw_drawable(Drawable const& drawable);
+  [[nodiscard]] std::expected<void, StarException> draw_drawable_set(List<Drawable> const& drawables);
 
   Root& m_root;
   WorldCamera m_camera;

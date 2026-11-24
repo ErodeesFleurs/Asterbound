@@ -1202,7 +1202,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
           auto result66 = self.root().imageMetadataDatabase();
           if (!result66)
             return std::unexpected(std::move(result66.error()));
-          auto result67 = Drawable::makeImage(*(std::move(*result66)), image, 1.0f / tile_pixels, true, entity->position(), color);
+          auto result67 = Drawable::make_image(*(std::move(*result66)), image, 1.0f / tile_pixels, true, entity->position(), color);
           if (!result67)
             return std::unexpected(std::move(result67.error()));
           auto drawable = (std::move(*result67));
@@ -1217,11 +1217,11 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
         if (directives) {
           int directiveIndex = static_cast<unsigned>(entity->entityId()) % directives->get().size();
           for (auto& d : p.second) {
-            if (d.isImage()) {
+            if (d.is_image()) {
               auto result69 = self.root().imageMetadataDatabase();
               if (!result69)
                 return std::unexpected(std::move(result69.error()));
-              auto result70 = d.imagePart().addDirectives(*(std::move(*result69)), directives->get()[directiveIndex], true);
+              auto result70 = d.image_part().add_directives(*(std::move(*result69)), directives->get()[directiveIndex], true);
               if (!result70)
                 return std::unexpected(std::move(result70.error()));
             }
@@ -1466,7 +1466,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
     auto result88 = self.root().imageMetadataDatabase();
     if (!result88)
       return std::unexpected(std::move(result88.error()));
-    auto result89 = Drawable::makeImage(*(std::move(*result88)), overlay.image, 1.0f / tile_pixels, false, overlay.min);
+    auto result89 = Drawable::make_image(*(std::move(*result88)), overlay.image, 1.0f / tile_pixels, false, overlay.min);
     if (!result89)
       return std::unexpected(std::move(result89.error()));
     Drawable drawable = (std::move(*result89));

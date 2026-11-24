@@ -1216,11 +1216,11 @@ if (!result238) return std::unexpected(std::move(result238.error()));
   if (!result242) return std::unexpected(std::move(result242.error()));
   for (auto& drawable : std::move(*result242)) {
       drawable.translate(position());
-      if (drawable.isImage())
+      if (drawable.is_image())
         {
     auto result243 = this->root().imageMetadataDatabase();
     if (!result243) return std::unexpected(std::move(result243.error()));
-    auto result244 = drawable.imagePart().addDirectivesGroup(*std::move(*result243), humanoidDirectives, true);
+    auto result244 = drawable.image_part().add_directives_group(*std::move(*result243), humanoidDirectives, true);
     if (!result244) return std::unexpected(std::move(result244.error()));
 
   }

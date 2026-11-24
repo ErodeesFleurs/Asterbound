@@ -106,7 +106,7 @@ std::expected<void, StarException> InterfaceCursor::setCursor(String const& conf
     auto frame = animation->drawable(1.0f);
     if (!frame)
       return std::unexpected(std::move(frame.error()));
-    auto bounds = frame->boundBox(**imageMetadata, false);
+    auto bounds = frame->bound_box(**imageMetadata, false);
     if (!bounds)
       return std::unexpected(std::move(bounds.error()));
     size = Vec2I(bounds->size());
@@ -129,7 +129,7 @@ std::expected<Drawable, StarException> InterfaceCursor::drawable() const {
     auto metadata = m_guiContext.get().root().imageMetadataDatabase();
     if (!metadata)
       return std::unexpected(std::move(metadata.error()));
-    return Drawable::makeImage(**metadata, image, 1.0f, false, {});
+    return Drawable::make_image(**metadata, image, 1.0f, false, {});
   }
   if (std::holds_alternative<Animation>(m_drawable))
     return std::get<Animation>(m_drawable).drawable(1.0f);

@@ -290,7 +290,7 @@ std::expected<List<Drawable>, StarException> BeamItem::drawables() const {
   auto metadata = beamRoot().imageMetadataDatabase();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
-  auto drawable = Drawable::makeImage(**metadata, m_image, 1.0f / tile_pixels, true, -handPosition() / tile_pixels);
+  auto drawable = Drawable::make_image(**metadata, m_image, 1.0f / tile_pixels, true, -handPosition() / tile_pixels);
   if (!drawable)
     return std::unexpected(std::move(drawable.error()));
   return List<Drawable>{std::move(*drawable)};
@@ -370,7 +370,7 @@ std::expected<List<Drawable>, StarException> BeamItem::beamDrawables() const {
         auto metadata = beamRoot().imageMetadataDatabase();
         if (!metadata)
           return std::unexpected(std::move(metadata.error()));
-        auto ball = Drawable::makeImage(**metadata, endImage, 1.0f / tile_pixels, true, m_beam_curve.dest());
+        auto ball = Drawable::make_image(**metadata, endImage, 1.0f / tile_pixels, true, m_beam_curve.dest());
         if (!ball)
           return std::unexpected(std::move(ball.error()));
         Color ballColor = Color::palette_white;
@@ -416,24 +416,24 @@ std::expected<List<Drawable>, StarException> BeamItem::beamDrawables() const {
             return std::unexpected(std::move(jitterY.error()));
           Vec2F currentLoc = m_beam_curve.point_at(pos) + Vec2F(*jitterX, *jitterY);
           res.push_back(
-              Drawable::makeLine(Line2F(previousLoc, currentLoc), lineThickness, mainColor, Vec2F()));
-          res.push_back(Drawable::makeLine(Line2F(previousLoc, currentLoc),
+              Drawable::make_line(Line2F(previousLoc, currentLoc), lineThickness, mainColor, Vec2F()));
+          res.push_back(Drawable::make_line(Line2F(previousLoc, currentLoc),
               lineThickness * m_firstStripeThickness,
               firstStripe,
               Vec2F()));
-          res.push_back(Drawable::makeLine(Line2F(previousLoc, currentLoc),
+          res.push_back(Drawable::make_line(Line2F(previousLoc, currentLoc),
               lineThickness * m_secondStripeThickness,
               secondStripe,
               Vec2F()));
           previousLoc = std::move(currentLoc);
         }
-        res.push_back(Drawable::makeLine(
+        res.push_back(Drawable::make_line(
             Line2F(previousLoc, m_beam_curve.dest()), lineThickness, mainColor, Vec2F()));
-        res.push_back(Drawable::makeLine(Line2F(previousLoc, m_beam_curve.dest()),
+        res.push_back(Drawable::make_line(Line2F(previousLoc, m_beam_curve.dest()),
             lineThickness * m_firstStripeThickness,
             firstStripe,
             Vec2F()));
-        res.push_back(Drawable::makeLine(Line2F(previousLoc, m_beam_curve.dest()),
+        res.push_back(Drawable::make_line(Line2F(previousLoc, m_beam_curve.dest()),
             lineThickness * m_secondStripeThickness,
             secondStripe,
             Vec2F()));

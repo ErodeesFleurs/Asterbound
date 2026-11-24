@@ -37,6 +37,7 @@ The following additional keys may be specified for any drawable type:
 The following additional key may be specified for line drawables:
 
 * [`float` __width__] - Specifies the width of the line to be rendered.
+* [`Color` __endColor__] - Optional color at the second endpoint. Without it, both ends use `color`. The legacy binary drawable format omits this field.
 
 The following transformation options may be specified for image drawables. Note that if a __transformation__ is specified, it will be used instead of other specific transformation operations.
 

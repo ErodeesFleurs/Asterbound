@@ -193,8 +193,8 @@ std::expected<List<Drawable>, StarException> ConsumableItem::drawables() const {
   auto drawables = icon_drawables();
   if (!drawables)
     return std::unexpected(std::move(drawables.error()));
-  Drawable::scaleAll(*drawables, 1.0f / tile_pixels);
-  Drawable::translateAll(*drawables, -handPosition() / tile_pixels);
+  Drawable::scale_all(*drawables, 1.0f / tile_pixels);
+  Drawable::translate_all(*drawables, -handPosition() / tile_pixels);
   return drawables;
 }
 

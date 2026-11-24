@@ -148,7 +148,7 @@ std::expected<List<Drawable>, StarException> Flashlight::drawables() const {
   auto metadata = root().imageMetadataDatabase();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
-  auto drawable = Drawable::makeImage(**metadata, m_image, 1.0f / tile_pixels, true, -m_handPosition / tile_pixels);
+  auto drawable = Drawable::make_image(**metadata, m_image, 1.0f / tile_pixels, true, -m_handPosition / tile_pixels);
   if (!drawable)
     return std::unexpected(std::move(drawable.error()));
   return List<Drawable>{std::move(*drawable)};

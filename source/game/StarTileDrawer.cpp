@@ -237,7 +237,7 @@ std::expected<bool, StarException> TileDrawer::produceTerrainDrawables(Drawables
       if (!textureCoords)
         return std::unexpected(std::move(textureCoords.error()));
       auto image = getPieceImage(piecePair.first, textureCoords->get(), materialHue, directives);
-      auto drawable = Drawable::makeImage(*imageMetadata, image, scale, false, piecePair.second * scale + Vec2F(pos), color);
+      auto drawable = Drawable::make_image(*imageMetadata, image, scale, false, piecePair.second * scale + Vec2F(pos), color);
       if (!drawable)
         return std::unexpected(std::move(drawable.error()));
       drawList.emplace_back(std::move(*drawable));
@@ -271,7 +271,7 @@ std::expected<bool, StarException> TileDrawer::produceTerrainDrawables(Drawables
       if (!textureCoords)
         return std::unexpected(std::move(textureCoords.error()));
       auto image = getPieceImage(piecePair.first, textureCoords->get(), modHue, directives);
-      auto drawable = Drawable::makeImage(*imageMetadata, image, scale, false, piecePair.second * scale + Vec2F(pos), color);
+      auto drawable = Drawable::make_image(*imageMetadata, image, scale, false, piecePair.second * scale + Vec2F(pos), color);
       if (!drawable)
         return std::unexpected(std::move(drawable.error()));
       drawList.emplace_back(std::move(*drawable));
@@ -283,7 +283,7 @@ std::expected<bool, StarException> TileDrawer::produceTerrainDrawables(Drawables
     auto crackingImage = materialRenderProfile->damageImage(damageLevel, damageType);
     if (!crackingImage)
       return std::unexpected(std::move(crackingImage.error()));
-    auto drawable = Drawable::makeImage(*imageMetadata, crackingImage->get().first, scale, false, crackingImage->get().second * scale + Vec2F(pos), color);
+    auto drawable = Drawable::make_image(*imageMetadata, crackingImage->get().first, scale, false, crackingImage->get().second * scale + Vec2F(pos), color);
     if (!drawable)
       return std::unexpected(std::move(drawable.error()));
     drawList.emplace_back(std::move(*drawable));

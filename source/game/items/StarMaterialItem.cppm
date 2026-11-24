@@ -287,11 +287,11 @@ std::expected<std::shared_ptr<MaterialItem>, StarException> MaterialItem::create
     if (!drawables)
       return std::unexpected(std::move(drawables.error()));
     for (auto& drawable : *drawables) {
-      if (drawable.isImage()) {
+      if (drawable.is_image()) {
         auto metadata = root.imageMetadataDatabase();
         if (!metadata)
           return std::unexpected(std::move(metadata.error()));
-        auto added = drawable.imagePart().addDirectives(**metadata, Directives(String(Star::format("?hueshift={}", materialHueToDegrees(item->m_materialHueShift)))), false);
+        auto added = drawable.image_part().add_directives(**metadata, Directives(String(Star::format("?hueshift={}", materialHueToDegrees(item->m_materialHueShift)))), false);
         if (!added)
           return std::unexpected(std::move(added.error()));
       }
@@ -507,7 +507,7 @@ std::expected<void, StarException> MaterialItem::render(RenderCallback& renderCa
       auto metadata = root().imageMetadataDatabase();
       if (!metadata)
         return std::unexpected(std::move(metadata.error()));
-      auto indicator = Drawable::makeImage(**metadata, path, 1.0f / tile_pixels, true, basePosition);
+      auto indicator = Drawable::make_image(**metadata, path, 1.0f / tile_pixels, true, basePosition);
       if (!indicator)
         return std::unexpected(std::move(indicator.error()));
       indicator->fullbright = true;
@@ -888,7 +888,7 @@ std::expected<std::reference_wrapper<List<Drawable> const>, StarException> Mater
       auto metadata = root().imageMetadataDatabase();
       if (!metadata)
         return std::unexpected(std::move(metadata.error()));
-      auto boundBox = Drawable::boundBoxAll(**metadata, drawables, true);
+      auto boundBox = Drawable::bound_box_all(**metadata, drawables, true);
       if (!boundBox)
         return std::unexpected(std::move(boundBox.error()));
       if (!boundBox->is_empty()) {

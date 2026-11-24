@@ -317,12 +317,12 @@ std::expected<void, StarException> GuiContext::drawQuad(AssetPath const& texName
 std::expected<void, StarException> GuiContext::drawDrawable(Drawable drawable, Vec2F const& screenPos, float pixelRatio, Vec4B const& color) {
   if (!m_drawablePainter)
     return std::unexpected(GuiContextException("GuiContext::drawDrawable() called before renderInit"));
-  if (drawable.isLine())
-    drawable.linePart().width *= pixelRatio;
+  if (drawable.is_line())
+    drawable.line_part().width *= pixelRatio;
   drawable.scale(pixelRatio);
   drawable.translate(screenPos);
   drawable.color *= Color::rgba(color);
-  return m_drawablePainter->drawDrawable(drawable);
+  return m_drawablePainter->draw_drawable(drawable);
 }
 
 std::expected<void, StarException> GuiContext::drawLine(Vec2F const& begin, Vec2F const end, Vec4B const& color, float lineWidth) {
@@ -444,12 +444,12 @@ std::expected<void, StarException> GuiContext::drawImageStretchSet(ImageStretchS
 }
 
 std::expected<bool, StarException> GuiContext::trySetCursor(Drawable const& drawable, Vec2I const& offset, int pixelRatio) {
-  if (!drawable.isImage())
+  if (!drawable.is_image())
     return false;
   auto assets = m_root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto const& imagePath = drawable.imagePart().image;
+  auto const& imagePath = drawable.image_part().image;
   auto image = (*assets)->image(imagePath);
   if (!image)
     return std::unexpected(std::move(image.error()));

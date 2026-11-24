@@ -674,12 +674,12 @@ std::expected<void, StarException> Projectile::render(RenderCallback& renderCall
   String image = Star::format("{}:{}{}", m_config->image, frame, m_imageSuffix);
   auto result902 = this->root().imageMetadataDatabase();
 if (!result902) return std::unexpected(std::move(result902.error()));
-auto result1280 = Drawable::makeImage(*std::move(*result902), image, 1.0f / tile_pixels, true, Vec2F());
+auto result1280 = Drawable::make_image(*std::move(*result902), image, 1.0f / tile_pixels, true, Vec2F());
 if (!result1280) return std::unexpected(std::move(result1280.error()));
 Drawable drawable = std::move(*result1280);
   auto result903 = this->root().imageMetadataDatabase();
 if (!result903) return std::unexpected(std::move(result903.error()));
-  auto directivesResult = drawable.imagePart().addDirectives(**result903, m_imageDirectives, true);
+  auto directivesResult = drawable.image_part().add_directives(**result903, m_imageDirectives, true);
   if (!directivesResult)
     return std::unexpected(std::move(directivesResult.error()));
   if (m_config->flippable) {

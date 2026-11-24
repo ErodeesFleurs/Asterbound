@@ -326,7 +326,7 @@ std::expected<Json, StarException> TeamManager::fetchTeamStatus(Json const& argu
       auto warp = WarpModeNames->get_right(mem.warpMode);
       if (!warp) return std::unexpected(std::move(warp.error()));
       member["warpMode"] = warp->get();
-      auto portrait = json_from_list(mem.portrait, std::mem_fn(&Drawable::toJson));
+      auto portrait = json_from_list(mem.portrait, std::mem_fn(&Drawable::to_json));
       if (!portrait) return std::unexpected(std::move(portrait.error()));
       member["portrait"] = *portrait;
       members.push_back(member);

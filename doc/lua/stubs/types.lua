@@ -94,6 +94,7 @@
 ---@class Drawable
 ---@field line? [Vec2F, Vec2F]
 ---@field width? number
+---@field endColor? Color
 ---@field poly? PolyF
 ---@field image? string
 ---@field transformation? Mat3F

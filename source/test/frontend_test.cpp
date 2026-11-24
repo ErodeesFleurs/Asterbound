@@ -4461,7 +4461,7 @@ const GameTestRegistration drawableGeometry("LuaDrawable", "SerializedImagesPres
   expectGeometry(*portrait);
 
   // Quest detail JSON carries the same absolute image transformation.
-  auto json = native->toJson();
+  auto json = native->to_json();
   ASSERT_TRUE(json) << json.error().what();
   ASSERT_TRUE(context->set("portraitJson", *json));
   auto portraitJson = context->eval<Drawable>("return portraitJson");
@@ -4475,6 +4475,31 @@ const GameTestRegistration drawableGeometry("LuaDrawable", "SerializedImagesPres
   )LUA");
   ASSERT_TRUE(authored) << authored.error().what();
   expectGeometry(*authored);
+});
+
+const GameTestRegistration image_widget_layout("ImageWidget", "CenteredTrimAndCeilUseBaseGeometry", [](GameTest& fixture) {
+  auto context = textEditorContext(fixture);
+  ASSERT_TRUE(context) << context.error().what();
+  auto widget = ImageWidget::create(**context);
+  ASSERT_TRUE(widget) << widget.error().what();
+  ASSERT_TRUE((*widget)->setCentered(true));
+  EXPECT_EQ((*widget)->size(), (Vec2I{0, 0}));
+
+  // This bundled 16x16 icon has a 14x15 nontransparent rectangle.
+  ASSERT_TRUE((*widget)->setImage("/asterbound/modicon.png"));
+  EXPECT_EQ((*widget)->size(), (Vec2I{16, 16}));
+  ASSERT_TRUE((*widget)->setTrim(true));
+  EXPECT_EQ((*widget)->size(), (Vec2I{14, 15}));
+  ASSERT_TRUE((*widget)->setScale(0.5f));
+  EXPECT_EQ((*widget)->size(), (Vec2I{7, 8}));
+  ASSERT_TRUE((*widget)->setTrim(false));
+  EXPECT_EQ((*widget)->size(), (Vec2I{8, 8}));
+  ASSERT_TRUE((*widget)->setImage("/asterbound/modicon.png?crop=0;0;1;1"));
+  EXPECT_EQ((*widget)->size(), (Vec2I{1, 1}));
+  ASSERT_TRUE((*widget)->setTrim(true));
+  EXPECT_EQ((*widget)->size(), (Vec2I{0, 0}));
+  ASSERT_TRUE((*widget)->setDrawables({}));
+  EXPECT_EQ((*widget)->size(), (Vec2I{0, 0}));
 });
 
 const GameTestRegistration questLogPresentation(

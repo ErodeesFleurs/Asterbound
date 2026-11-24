@@ -1381,7 +1381,7 @@ std::expected<void, StarException> Plant::render(RenderCallback& renderCallback)
 
     auto result603 = this->root().imageMetadataDatabase();
 if (!result603) return std::unexpected(std::move(result603.error()));
-auto result1283 = Drawable::makeImage(*std::move(*result603), plantPiece.imagePath, 1.0f / tile_pixels, false, offset);
+auto result1283 = Drawable::make_image(*std::move(*result603), plantPiece.imagePath, 1.0f / tile_pixels, false, offset);
 if (!result1283) return std::unexpected(std::move(result1283.error()));
 auto drawable = std::move(*result1283);
     if (plantPiece.flip)

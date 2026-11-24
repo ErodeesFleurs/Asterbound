@@ -222,10 +222,10 @@ std::expected<Json, StarException> QuestManager::dialogView(std::uint64_t token,
       : lease.kind == "complete" ? (*qt)->questCompleteGuiConfig : (*qt)->questFailedGuiConfig;
   String portraitName = lease.kind == "offer" ? String("QuestStarted") : lease.kind == "complete" ? String("QuestComplete") : String("QuestFailed");
   auto portrait = json_from_list(quest.portrait(portraitName).value_or(List<Drawable>{}),
-      [](Drawable const& drawable) { return drawable.toJson(); });
+      [](Drawable const& drawable) { return drawable.to_json(); });
   if (!portrait) return std::unexpected(std::move(portrait.error()));
   auto objectiveJson = json_from_list(std::move(objective).value_or(List<Drawable>{}),
-      [](Drawable const& drawable) { return drawable.toJson(); });
+      [](Drawable const& drawable) { return drawable.to_json(); });
   if (!objectiveJson) return std::unexpected(std::move(objectiveJson.error()));
   JsonArray rewards;
   rewards.reserve(quest.rewards().size());

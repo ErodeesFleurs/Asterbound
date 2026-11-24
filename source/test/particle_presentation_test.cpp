@@ -281,10 +281,10 @@ void expect_frame_path(Animation const& animation, String const& path) {
   auto drawable = animation.drawable(1);
   ASSERT_TRUE(drawable) << drawable.error().what();
   if (path.empty()) {
-    EXPECT_FALSE(drawable->isImage());
+    EXPECT_FALSE(drawable->is_image());
   } else {
-    ASSERT_TRUE(drawable->isImage());
-    EXPECT_EQ(AssetPath::join(drawable->imagePart().image), path);
+    ASSERT_TRUE(drawable->is_image());
+    EXPECT_EQ(AssetPath::join(drawable->image_part().image), path);
   }
 }
 

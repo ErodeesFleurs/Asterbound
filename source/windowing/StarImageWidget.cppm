@@ -80,7 +80,7 @@ protected:
 
 private:
   explicit ImageWidget(GuiContext& context);
-  [[nodiscard]] std::expected<void, StarException> transformDrawables();
+  [[nodiscard]] std::expected<void, StarException> transform_drawables();
 
   List<Drawable> m_baseDrawables;
   List<Drawable> m_drawables;

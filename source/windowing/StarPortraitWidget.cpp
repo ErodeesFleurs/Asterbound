@@ -225,7 +225,7 @@ std::expected<void, StarException> PortraitWidget::updateSize() {
   if (!m_iconMode && m_entity) {
     auto portrait = m_entity->portrait(m_portraitMode);
     if (!portrait) return std::unexpected(std::move(portrait.error()));
-    auto bounds = Drawable::boundBoxAll(**metadata, *portrait, false);
+    auto bounds = Drawable::bound_box_all(**metadata, *portrait, false);
     if (!bounds) return std::unexpected(std::move(bounds.error()));
     setSize(Vec2I((bounds->size() * tile_pixels * m_scale).ceil()));
   } else {

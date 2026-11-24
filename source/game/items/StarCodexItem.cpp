@@ -52,7 +52,7 @@ std::expected<std::shared_ptr<CodexItem>, StarException> CodexItem::create(
   auto metadata = root.imageMetadataDatabase();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
-  auto icon = Drawable::makeImage(**metadata, *icon_path, 1.0f, true, Vec2F());
+  auto icon = Drawable::make_image(**metadata, *icon_path, 1.0f, true, Vec2F());
   if (!icon)
     return std::unexpected(std::move(icon.error()));
   item->m_icon = std::move(*icon);

@@ -192,7 +192,7 @@ std::expected<List<Drawable>, StarException> TillingTool::drawables() const {
     ? m_idleFrame
     : m_animationFrame[std::max(
         0, std::min(m_frames - 1, static_cast<int>(std::floor((m_frameTiming / m_frameCycle) * m_frames))))];
-  auto drawable = Drawable::makeImage(**metadata, image, 1.0f / tile_pixels, true, -handPosition() / tile_pixels);
+  auto drawable = Drawable::make_image(**metadata, image, 1.0f / tile_pixels, true, -handPosition() / tile_pixels);
   if (!drawable)
     return std::unexpected(std::move(drawable.error()));
   return List<Drawable>{std::move(*drawable)};

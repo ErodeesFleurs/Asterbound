@@ -374,7 +374,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
         return std::unexpected(std::move(imageResult.error()));
       auto image = std::move(*imageResult);
       auto drawableResult =
-        Drawable::makeImage(*imageMetadata, AssetPath::relative_to(path, image), 1.0 / tile_pixels, false, {});
+        Drawable::make_image(*imageMetadata, AssetPath::relative_to(path, image), 1.0 / tile_pixels, false, {});
       if (!drawableResult)
         return std::unexpected(std::move(drawableResult.error()));
       auto drawable = std::move(*drawableResult);
@@ -443,13 +443,13 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
       if (!image_keys)
         return std::unexpected(std::move(image_keys.error()));
       for (auto const& layer : orientation->imageLayers) {
-        if (layer.isImage()) {
-          auto image = AssetPath::join(layer.imagePart().image).replace_tags(*image_keys, true, "default");
+        if (layer.is_image()) {
+          auto image = AssetPath::join(layer.image_part().image).replace_tags(*image_keys, true, "default");
           auto thresholdResult = orientationSettings.get_double("spaceScan");
           if (!thresholdResult)
             return std::unexpected(std::move(thresholdResult.error()));
           auto threshold = std::move(*thresholdResult);
-          auto scannedResult = imageMetadata->imageSpaces(image, imagePosition + (layer.position + layer.imagePart().transformation.transform_point(Vec2F())) * tile_pixels, threshold, orientation->flipImages);
+          auto scannedResult = imageMetadata->imageSpaces(image, imagePosition + (layer.position + layer.image_part().transformation.transform_point(Vec2F())) * tile_pixels, threshold, orientation->flipImages);
           if (!scannedResult)
             return std::unexpected(std::move(scannedResult.error()));
           auto scanned = std::move(*scannedResult);
@@ -1403,7 +1403,7 @@ std::expected<List<Drawable>, StarException> ObjectDatabase::cursorHintDrawables
     if (!imagePositionResult)
       return std::unexpected(std::move(imagePositionResult.error()));
     auto imagePosition = std::move(*imagePositionResult);
-    auto drawableResult = Drawable::makeImage(*imageMetadata, AssetPath::relative_to(config->path, *placementImage),
+    auto drawableResult = Drawable::make_image(*imageMetadata, AssetPath::relative_to(config->path, *placementImage),
                                               1.0 / tile_pixels, false, Vec2F(position) + imagePosition / tile_pixels);
     if (!drawableResult)
       return std::unexpected(std::move(drawableResult.error()));
@@ -1432,11 +1432,11 @@ std::expected<List<Drawable>, StarException> ObjectDatabase::cursorHintDrawables
       return std::unexpected(std::move(image_keys.error()));
     for (auto const& layer : orientation->imageLayers) {
       Drawable drawable = layer;
-      auto& image = drawable.imagePart().image;
+      auto& image = drawable.image_part().image;
       auto taggedImage = AssetPath::join(image).replace_tags(*image_keys, true, "default");
       image = std::move(taggedImage);
       if (orientation->flipImages) {
-        auto boundsResult = drawable.boundBox(*imageMetadata, false);
+        auto boundsResult = drawable.bound_box(*imageMetadata, false);
         if (!boundsResult)
           return std::unexpected(std::move(boundsResult.error()));
         auto bounds = std::move(*boundsResult);
@@ -1444,7 +1444,7 @@ std::expected<List<Drawable>, StarException> ObjectDatabase::cursorHintDrawables
       }
       drawables.push_back(std::move(drawable));
     }
-    Drawable::translateAll(drawables, Vec2F(position) + orientation->imagePosition);
+    Drawable::translate_all(drawables, Vec2F(position) + orientation->imagePosition);
   }
   return drawables;
 }

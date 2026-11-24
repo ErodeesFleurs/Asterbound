@@ -1384,9 +1384,9 @@ const GameTestRegistration
       auto warm = beam.nonRotatedDrawables();
       ASSERT_TRUE(warm);
       ASSERT_FALSE(warm->empty());
-      auto first = std::find_if(warm->begin(), warm->end(), [](Drawable const& d) { return d.isLine(); });
+      auto first = std::find_if(warm->begin(), warm->end(), [](Drawable const& d) { return d.is_line(); });
       ASSERT_NE(first, warm->end());
-      auto const start = first->linePart().line.min();
+      auto const start = first->line_part().line.min();
       auto const end = center_of_tile(origin + Vec2F(5, 0)) - player.position();
       float length = 0;
       Vec2F previous = start;
@@ -1404,7 +1404,7 @@ const GameTestRegistration
       ASSERT_EQ(stripes % 3, 0);
       ASSERT_GT(stripes, 3);
       auto const vertex = point_at(start, end, 1.f / static_cast<float>(stripes / 3 + 1));
-      EXPECT_LT((first->linePart().line.max() - vertex).magnitude(), .001f);
+      EXPECT_LT((first->line_part().line.max() - vertex).magnitude(), .001f);
       ASSERT_TRUE(player.collectRenderEvents(discard));
 
       // This private Root has no UniverseServer/background simulation threads.

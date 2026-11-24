@@ -334,7 +334,7 @@ std::expected<Json, StarException> LuaBindings::ItemCallbacks::icon_drawables(It
   auto drawables = item.icon_drawables();
   if (!drawables)
     return std::unexpected(std::move(drawables.error()));
-  return json_from_list<Drawable>(*drawables, [](Drawable const& drawable) { return drawable.toJson(); });
+  return json_from_list<Drawable>(*drawables, [](Drawable const& drawable) { return drawable.to_json(); });
 }
 
 // Returns the dropDrawables for this item serialized into json
@@ -345,7 +345,7 @@ std::expected<Json, StarException> LuaBindings::ItemCallbacks::drop_drawables(It
   auto drawables = item.drop_drawables(std::nullopt);
   if (!drawables)
     return std::unexpected(std::move(drawables.error()));
-  return json_from_list<Drawable>(*drawables, [](Drawable const& drawable) { return drawable.toJson(); });
+  return json_from_list<Drawable>(*drawables, [](Drawable const& drawable) { return drawable.to_json(); });
 }
 
 // Returns the large image for this item as displayed on mouseover in the

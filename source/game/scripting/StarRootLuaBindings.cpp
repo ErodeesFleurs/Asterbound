@@ -1127,7 +1127,7 @@ std::expected<JsonArray, StarException> LuaBindings::RootCallbacks::npcPortrait(
   JsonArray result;
   result.reserve(drawables->size());
   for (auto const& drawable : *drawables) {
-    auto json = drawable.toJson();
+    auto json = drawable.to_json();
     if (!json) return std::unexpected(std::move(json.error()));
     result.push_back(std::move(*json));
   }
@@ -1153,7 +1153,7 @@ std::expected<JsonArray, StarException> LuaBindings::RootCallbacks::monsterPortr
   JsonArray result;
   result.reserve(drawables->size());
   for (auto const& drawable : *drawables) {
-    auto json = drawable.toJson();
+    auto json = drawable.to_json();
     if (!json) return std::unexpected(std::move(json.error()));
     result.push_back(std::move(*json));
   }

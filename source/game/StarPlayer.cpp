@@ -1207,16 +1207,16 @@ std::expected<List<Drawable>, StarException> Player::drawables(float interpolati
       auto rendered = std::move(*renderedResult);
       for (auto& drawable : rendered) {
         drawable.translate(position() + m_techController->parentOffset());
-        if (drawable.isImage()) {
+        if (drawable.is_image()) {
           auto metadataResult = root().imageMetadataDatabase();
           if (!metadataResult)
             return std::unexpected(std::move(metadataResult.error()));
           auto metadata = std::move(*metadataResult);
-          if (auto result = drawable.imagePart().addDirectivesGroup(*metadata, directives, true); !result)
+          if (auto result = drawable.image_part().add_directives_group(*metadata, directives, true); !result)
             return std::unexpected(std::move(result.error()));
           if (auto anchor = as<LoungeAnchor>(m_movementController->entity_anchor())) {
             if (auto const& extra = anchor->directives) {
-              if (auto result = drawable.imagePart().addDirectives(*metadata, *extra, true); !result)
+              if (auto result = drawable.image_part().add_directives(*metadata, *extra, true); !result)
                 return std::unexpected(std::move(result.error()));
             }
           }

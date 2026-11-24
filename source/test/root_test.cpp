@@ -2013,7 +2013,7 @@ const GameTestRegistration animatorPartDrawableFirstAdd("AnimatorTest", "PartDra
         if (!drawables) return std::unexpected(std::move(drawables.error()));
         std::vector<float> result;
         for (auto const& drawable : *drawables) {
-          auto json = drawable.toJson();
+          auto json = drawable.to_json();
           if (!json) return std::unexpected(std::move(json.error()));
           auto width = json->get_float("width");
           if (!width) return std::unexpected(std::move(width.error()));

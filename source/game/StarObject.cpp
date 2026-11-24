@@ -653,7 +653,7 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
     if (!drawablesResult)
       return std::unexpected(std::move(drawablesResult.error()));
     auto drawables = std::move(*drawablesResult);
-    auto boundsResult = Drawable::boundBoxAll(*imageMetadata, drawables, false);
+    auto boundsResult = Drawable::bound_box_all(*imageMetadata, drawables, false);
     if (!boundsResult)
       return std::unexpected(std::move(boundsResult.error()));
     auto bounds = std::move(*boundsResult);
@@ -1319,7 +1319,7 @@ std::expected<List<Drawable>, StarException> Object::cursorHintDrawables() const
     if (!imagePositionResult)
       return std::unexpected(std::move(imagePositionResult.error()));
     auto imagePosition = std::move(*imagePositionResult);
-    auto drawableResult = Drawable::makeImage(*metadata, AssetPath::relative_to(m_config->path, placementImage),
+    auto drawableResult = Drawable::make_image(*metadata, AssetPath::relative_to(m_config->path, placementImage),
                                               1.0 / tile_pixels, false, imagePosition / tile_pixels);
     if (!drawableResult)
       return std::unexpected(std::move(drawableResult.error()));
@@ -2379,7 +2379,7 @@ std::expected<List<Drawable>, StarException> Object::orientationDrawables(std::s
     List<Drawable> generated;
     for (auto const& layer : orientation->imageLayers) {
       Drawable drawable = layer;
-      auto& imagePart = drawable.imagePart();
+      auto& imagePart = drawable.image_part();
       imagePart.image.directives.clear();
       String imagePath = AssetPath::join(imagePart.image);
       if ((m_colorDirectives || !m_colorSuffix.empty()) && m_imageKeys.contains("color")) {
@@ -2401,26 +2401,26 @@ std::expected<List<Drawable>, StarException> Object::orientationDrawables(std::s
         else
           imagePart.image = imagePath.replace_tags(m_imageKeys, true, "default");
         color = std::move(backup);
-        imagePart.image.directives = layer.imagePart().image.directives;
+        imagePart.image.directives = layer.image_part().image.directives;
         if (m_colorDirectives) {
-          auto operation1 = imagePart.addDirectives(*metadata, m_colorDirectives);
+          auto operation1 = imagePart.add_directives(*metadata, m_colorDirectives);
           if (!operation1)
             return std::unexpected(std::move(operation1.error()));
         }
         if (suffix != npos) {
-          auto operation2 = imagePart.addDirectives(*metadata, m_colorSuffix + String(image.substr(suffix)).replace_tags(m_imageKeys, true, "default"));
+          auto operation2 = imagePart.add_directives(*metadata, m_colorSuffix + String(image.substr(suffix)).replace_tags(m_imageKeys, true, "default"));
           if (!operation2)
             return std::unexpected(std::move(operation2.error()));
         }
       } else {
         imagePart.image = imagePath.replace_tags(m_imageKeys, true, "default");
-        imagePart.image.directives = layer.imagePart().image.directives;
+        imagePart.image.directives = layer.image_part().image.directives;
       }
-      auto operation3 = imagePart.addDirectives(*metadata, m_directives);
+      auto operation3 = imagePart.add_directives(*metadata, m_directives);
       if (!operation3)
         return std::unexpected(std::move(operation3.error()));
       if (orientation->flipImages) {
-        auto boundsResult = drawable.boundBox(*metadata, false);
+        auto boundsResult = drawable.bound_box(*metadata, false);
         if (!boundsResult)
           return std::unexpected(std::move(boundsResult.error()));
         auto bounds = std::move(*boundsResult);
@@ -2435,7 +2435,7 @@ std::expected<List<Drawable>, StarException> Object::orientationDrawables(std::s
   if (!shakeResult)
     return std::unexpected(std::move(shakeResult.error()));
   auto shake = std::move(*shakeResult);
-  Drawable::translateAll(drawables, orientation->imagePosition + shake);
+  Drawable::translate_all(drawables, orientation->imagePosition + shake);
   return drawables;
 }
 

@@ -696,7 +696,7 @@ std::expected<void, StarException> PlantDrop::render(RenderCallback& renderCallb
     for (auto const& plantPiece : m_pieces) {
       auto result293 = this->root().imageMetadataDatabase();
 if (!result293) return std::unexpected(std::move(result293.error()));
-auto result1284 = Drawable::makeImage(*std::move(*result293), plantPiece.image, 1.0f / tile_pixels, false, plantPiece.offset);
+auto result1284 = Drawable::make_image(*std::move(*result293), plantPiece.image, 1.0f / tile_pixels, false, plantPiece.offset);
 if (!result1284) return std::unexpected(std::move(result1284.error()));
 auto drawable = std::move(*result1284);
       if (plantPiece.flip)

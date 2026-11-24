@@ -1433,7 +1433,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     if (!knownPortraitRevision || *knownPortraitRevision != quest.portraitRevision()) {
       result.set("portraitTitle", "");
       if (auto portrait = quest.portrait("Objective")) {
-        auto json = json_from_list(*portrait, [](Drawable const& drawable) { return drawable.toJson(); });
+        auto json = json_from_list(*portrait, [](Drawable const& drawable) { return drawable.to_json(); });
         if (!json) return std::unexpected(std::move(json.error()));
         result.set("portrait", std::move(*json));
         result.set("portraitTitle", quest.portraitTitle("Objective").value_or(""));

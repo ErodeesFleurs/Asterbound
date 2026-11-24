@@ -316,7 +316,7 @@ const GameTestRegistration
           ASSERT_TRUE(drawables) << drawables.error().what();
           unsigned sleeves = 0;
           for (auto const& drawable : *drawables) {
-            if (drawable.isImage() && drawable.imagePart().image.base_path == sleeve) {
+            if (drawable.is_image() && drawable.image_part().image.base_path == sleeve) {
               ++sleeves;
               EXPECT_EQ(drawable.fullbright, fullbright)
                 << "holding=" << holding << ", armor fullbright=" << fullbright;
@@ -588,8 +588,8 @@ const GameTestRegistration refreshedMovementCycles(
               ASSERT_TRUE(drawables) << drawables.error().what();
               String renderedFrames;
               for (auto const& drawable : *drawables) {
-                if (drawable.isImage() && drawable.imagePart().image.sub_path)
-                  renderedFrames += AssetPath::join(drawable.imagePart().image);
+                if (drawable.is_image() && drawable.image_part().image.sub_path)
+                  renderedFrames += AssetPath::join(drawable.image_part().image);
               }
               frames.insert(std::move(renderedFrames));
             }
@@ -688,7 +688,7 @@ const GameTestRegistration animatorSemanticSampling(
     auto made = NetworkedAnimator::create(fixture.root(), *config);
     ASSERT_TRUE(made) << made.error().what();
     auto& animator = **made;
-    auto line = Drawable::makeLine(Line2F({0, 0}, {1, 0}), 1, Color::palette_white);
+    auto line = Drawable::make_line(Line2F({0, 0}, {1, 0}), 1, Color::palette_white);
     animator.setPartDrawables("body", {line});
     NetworkedAnimator::DynamicTarget events;
     ASSERT_TRUE(animator.update(.1f, std::ref(events)));
@@ -822,7 +822,7 @@ const GameTestRegistration sampledPartTransformOverrides(
     ASSERT_TRUE(made) << made.error().what();
     auto& animator = **made;
     ASSERT_TRUE(animator.update(0, {}));
-    auto line = Drawable::makeLine(Line2F({0, 0}, {1, 0}), 1, Color::palette_white);
+    auto line = Drawable::make_line(Line2F({0, 0}, {1, 0}), 1, Color::palette_white);
     animator.setPartDrawables("child", {line});
     auto expectVec = [](Vec2F const& actual, Vec2F const& expected) {
       EXPECT_NEAR(actual[0], expected[0], 1e-5f);
@@ -860,10 +860,10 @@ const GameTestRegistration sampledPartTransformOverrides(
       expectVec((*lights)[0].position, final.transform_point(Vec2F{0, 0}));
       auto expectedLine = line;
       expectedLine.transform(final);
-      ASSERT_TRUE((*drawables)[0].isLine());
+      ASSERT_TRUE((*drawables)[0].is_line());
       expectVec((*drawables)[0].position, expectedLine.position);
-      expectVec((*drawables)[0].linePart().line.min(), expectedLine.linePart().line.min());
-      expectVec((*drawables)[0].linePart().line.max(), expectedLine.linePart().line.max());
+      expectVec((*drawables)[0].line_part().line.min(), expectedLine.line_part().line.min());
+      expectVec((*drawables)[0].line_part().line.max(), expectedLine.line_part().line.max());
     };
     auto idle = Mat3F::translation({3, 0});
     for (int reuse = 0; reuse != 2; ++reuse) {
@@ -948,12 +948,12 @@ const GameTestRegistration humanoidSemanticSampling(
       EXPECT_NE(*previous, *current);
       // Compare with a semantic rotation of the same fixed idle pose, not a
       // drawable-by-index blend. Sprite identity remains authored by the pose.
-      Drawable::rotateAll(*previous, .5f);
-      Drawable::rebaseAll(*previous);
+      Drawable::rotate_all(*previous, .5f);
+      Drawable::rebase_all(*previous);
       ASSERT_EQ(previous->size(), middle->size());
       for (std::size_t i = 0; i != previous->size(); ++i) {
-        if ((*previous)[i].isImage() && (*middle)[i].isImage()) {
-          EXPECT_EQ((*previous)[i].imagePart().image, (*middle)[i].imagePart().image);
+        if ((*previous)[i].is_image() && (*middle)[i].is_image()) {
+          EXPECT_EQ((*previous)[i].image_part().image, (*middle)[i].image_part().image);
           EXPECT_NEAR((*previous)[i].position[0], (*middle)[i].position[0], 1e-5f);
           EXPECT_NEAR((*previous)[i].position[1], (*middle)[i].position[1], 1e-5f);
         }
@@ -1328,15 +1328,15 @@ const GameTestRegistration humanoid_dance_playback(
     auto find_sprite = [](List<Drawable> const& drawables, String const& path)
         -> std::optional<std::reference_wrapper<Drawable::ImagePart const>> {
       for (auto const& drawable : drawables)
-        if (drawable.isImage() && drawable.imagePart().image.base_path == path)
-          return std::cref(drawable.imagePart());
+        if (drawable.is_image() && drawable.image_part().image.base_path == path)
+          return std::cref(drawable.image_part());
       return {};
     };
     auto check_pose = [&](List<Drawable> const& drawables, String const& body_frame, bool held) {
       auto body = find_sprite(drawables, "/humanoid/human/malebody.png");
       ASSERT_TRUE(body);
       EXPECT_EQ(body->get().image.sub_path, body_frame);
-      EXPECT_EQ(std::ranges::count_if(drawables, &Drawable::isLine), held ? 2 : 0);
+      EXPECT_EQ(std::ranges::count_if(drawables, &Drawable::is_line), held ? 2 : 0);
     };
     auto near = [](Vec2F actual, Vec2F expected) {
       EXPECT_NEAR(actual[0], expected[0], 1e-5f);
@@ -1356,7 +1356,7 @@ const GameTestRegistration humanoid_dance_playback(
       for (auto hand : {ToolHand::Primary, ToolHand::Alt}) {
         model.setHandFrameOverrides(hand, "rotation", "rotation");
         model.setHandParameters(hand, true, 0, 0, false, false, false);
-        model.setHandDrawables(hand, {Drawable::makeLine(Line2F({0, 0}, {1, 0}), 1, Color::palette_white)});
+        model.setHandDrawables(hand, {Drawable::make_line(Line2F({0, 0}, {1, 0}), 1, Color::palette_white)});
       }
       auto idle = model.render();
       ASSERT_TRUE(idle) << idle.error().what();

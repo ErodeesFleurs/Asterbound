@@ -621,8 +621,8 @@ std::expected<void, StarException> ItemDrop::render(RenderCallback& renderCallba
     beamColor.set_alpha_f(0.8f);
     Line2F line = { Vec2F(), Vec2F(0.0f, 1.0f + m_boundBox.height() / 2) };
     float width = std::min(2.0f, m_boundBox.width() * tile_pixels);
-    auto drawable = Drawable::makeLine(line, width, beamColor, position());
-    (drawable.linePart().endColor = beamColor)->set_alpha_f(0.0f);
+    auto drawable = Drawable::make_line(line, width, beamColor, position());
+    (drawable.line_part().end_color = beamColor)->set_alpha_f(0.0f);
     drawable.fullbright = true;
     if (auto added = renderCallback.addDrawable(std::move(drawable), RenderLayerItemDrop); !added)
       return std::unexpected(std::move(added.error()));
@@ -650,8 +650,8 @@ std::expected<void, StarException> ItemDrop::render(RenderCallback& renderCallba
       if (!metadata)
         return std::unexpected(std::move(metadata.error()));
       for (auto& drawable : generated) {
-        if (drawable.isImage()) {
-          auto added = drawable.imagePart().addDirectives(**metadata, dropDirectives, true);
+        if (drawable.is_image()) {
+          auto added = drawable.image_part().add_directives(**metadata, dropDirectives, true);
           if (!added)
             return std::unexpected(std::move(added.error()));
         }

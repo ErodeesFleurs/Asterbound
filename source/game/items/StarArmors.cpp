@@ -240,8 +240,8 @@ std::expected<List<Drawable>, StarException> ArmorItem::drawables() const {
   auto drawables = icon_drawables();
   if (!drawables)
     return std::unexpected(std::move(drawables.error()));
-  Drawable::scaleAll(*drawables, 1.0f / tile_pixels);
-  Drawable::translateAll(*drawables, -handPosition() / tile_pixels);
+  Drawable::scale_all(*drawables, 1.0f / tile_pixels);
+  Drawable::translate_all(*drawables, -handPosition() / tile_pixels);
   return drawables;
 }
 
@@ -299,14 +299,14 @@ std::expected<void, StarException> ArmorItem::refreshIconDrawables() {
   if (!drawables)
     return std::unexpected(std::move(drawables.error()));
   for (auto& drawable : *drawables) {
-    if (drawable.isImage()) {
+    if (drawable.is_image()) {
       auto metadata = root().imageMetadataDatabase();
       if (!metadata)
         return std::unexpected(std::move(metadata.error()));
-      auto removed = drawable.imagePart().removeDirectives(**metadata, true);
+      auto removed = drawable.image_part().remove_directives(**metadata, true);
       if (!removed)
         return std::unexpected(std::move(removed.error()));
-      auto added = drawable.imagePart().addDirectives(**metadata, m_directives, true);
+      auto added = drawable.image_part().add_directives(**metadata, m_directives, true);
       if (!added)
         return std::unexpected(std::move(added.error()));
     }

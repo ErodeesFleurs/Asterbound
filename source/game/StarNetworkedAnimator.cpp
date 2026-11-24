@@ -1782,7 +1782,7 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
 
         auto metadata = m_root.get().imageMetadataDatabase();
         if (!metadata) return std::unexpected(std::move(metadata.error()));
-        auto created = Drawable::makeImage(**metadata, !relativeImage.empty() ? relativeImage : usedImage, 1.0f / tile_pixels, centered, Vec2F());
+        auto created = Drawable::make_image(**metadata, !relativeImage.empty() ? relativeImage : usedImage, 1.0f / tile_pixels, centered, Vec2F());
         if (!created) return std::unexpected(std::move(created.error()));
         Drawable drawable = std::move(*created);
         if (find == m_cachedPartDrawables.end())
@@ -1794,11 +1794,11 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
       }
 
       Drawable drawable = find->second.second;
-      auto& imagePart = drawable.imagePart();
+      auto& imagePart = drawable.image_part();
       for (Directives const& directives : baseProcessingDirectives) {
         auto metadata = m_root.get().imageMetadataDatabase();
         if (!metadata) return std::unexpected(std::move(metadata.error()));
-        auto added = imagePart.addDirectives(**metadata, directives, centered);
+        auto added = imagePart.add_directives(**metadata, directives, centered);
         if (!added) return std::unexpected(std::move(added.error()));
       }
       drawable.fullbright = fullbright;

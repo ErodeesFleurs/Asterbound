@@ -655,7 +655,7 @@ std::expected<std::optional<Drawable>, StarException> LuaConverter<Drawable>::to
       return std::unexpected(std::move(readWidth.error()));
     if (!*readWidth)
       return std::nullopt;
-    drawable = Drawable::makeLine(std::move(*line), width, color.value_or(Color::palette_white));
+    drawable = Drawable::make_line(std::move(*line), width, color.value_or(Color::palette_white));
   } else {
     std::optional<PolyF> poly;
     auto readPoly = readFields(table, "poly", poly);
@@ -664,7 +664,7 @@ std::expected<std::optional<Drawable>, StarException> LuaConverter<Drawable>::to
     if (!*readPoly)
       return std::nullopt;
     if (poly) {
-      drawable = Drawable::makePoly(std::move(*poly), color.value_or(Color::palette_white));
+      drawable = Drawable::make_poly(std::move(*poly), color.value_or(Color::palette_white));
     } else {
       std::optional<String> image;
       auto readImage = readFields(table, "image", image);
@@ -684,7 +684,7 @@ std::expected<std::optional<Drawable>, StarException> LuaConverter<Drawable>::to
       auto metadata = root->get().imageMetadataDatabase();
       if (!metadata)
         return std::unexpected(std::move(metadata.error()));
-      auto converted = Drawable::makeImage(**metadata, std::move(*image), 1.0f, !transformation && centered.value_or(true), Vec2F(), color.value_or(Color::palette_white));
+      auto converted = Drawable::make_image(**metadata, std::move(*image), 1.0f, !transformation && centered.value_or(true), Vec2F(), color.value_or(Color::palette_white));
       if (!converted)
         return std::unexpected(std::move(converted.error()));
       drawable = std::move(*converted);

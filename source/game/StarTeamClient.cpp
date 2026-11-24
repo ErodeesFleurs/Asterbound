@@ -474,7 +474,7 @@ std::expected<std::optional<Json>, StarException> TeamClient::memberPortrait(Uui
     JsonArray portrait;
     portrait.reserve(member.portrait.size());
     for (auto const& drawable : member.portrait) {
-      auto json = drawable.toJson();
+      auto json = drawable.to_json();
       if (!json) return std::unexpected(std::move(json.error()));
       portrait.push_back(std::move(*json));
     }
@@ -559,7 +559,7 @@ std::expected<void, StarException> TeamClient::writePlayerData(JsonObject& reque
     if (!portrait) return std::unexpected(std::move(portrait.error()));
     JsonArray images;
     for (auto const& drawable : *portrait) {
-      auto json = drawable.toJson();
+      auto json = drawable.to_json();
       if (!json) return std::unexpected(std::move(json.error()));
       images.push_back(std::move(*json));
     }
