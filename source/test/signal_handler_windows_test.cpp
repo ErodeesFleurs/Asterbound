@@ -74,6 +74,11 @@ void fault_child(bool overflow) {
       std::_Exit(23);
   }
   if (overflow) {
+    // Match the exception-stack reserve installed by the native Windows client,
+    // server and worker entry points. GTest's re-exec main has no such setup.
+    ULONG exception_stack_size = 128 * 1024;
+    if (!SetThreadStackGuarantee(&exception_stack_size))
+      std::_Exit(24);
     volatile unsigned stop = UINT_MAX;
     std::_Exit(static_cast<int>(exhaust_stack(1, stop)));
   }
