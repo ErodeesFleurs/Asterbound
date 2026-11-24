@@ -222,7 +222,7 @@ public:
   [[nodiscard]] std::expected<List<DamageSource>, StarException> damageSources() const override;
 
   [[nodiscard]] std::expected<bool, StarException> shouldDestroy() const override;
-  [[nodiscard]] std::expected<void, StarException> destroy(std::optional<std::reference_wrapper<RenderCallback>> renderCallback) override;
+  [[nodiscard]] std::expected<void, StarException> destroy(std::optional<std::reference_wrapper<RenderCallback>> render_callback) override;
 
   std::optional<EntityAnchorState> loungingIn() const override;
   [[nodiscard]] std::expected<bool, StarException> lounge(EntityId loungeableEntityId, std::size_t anchorIndex);
@@ -294,11 +294,11 @@ public:
 
   std::uint64_t presentationEpoch() const override;
 
-  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& renderCallback) override;
+  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& render_callback) override;
 
-  [[nodiscard]] std::expected<void, StarException> render(RenderCallback& renderCallback) override;
+  [[nodiscard]] std::expected<void, StarException> render(RenderCallback& render_callback) override;
 
-  [[nodiscard]] std::expected<void, StarException> renderLightSources(RenderCallback& renderCallback) override;
+  [[nodiscard]] std::expected<void, StarException> renderLightSources(RenderCallback& render_callback) override;
   
   [[nodiscard]] std::expected<void, StarException> setRenderLayer(std::optional<EntityRenderLayer> layer);
 
@@ -750,7 +750,7 @@ private:
   List<Particle> m_callbackParticles;
   List<std::tuple<String, float, float>> m_callbackSounds;
   List<std::shared_ptr<AudioInstance>> m_hiddenLoopAudios;
-  List<OverheadBar> m_presentationBars;
+  List<OverheadBar> m_presentation_bars;
   DirectivesGroup m_presentationHumanoidDirectives;
 
   List<String> m_queuedMessages;

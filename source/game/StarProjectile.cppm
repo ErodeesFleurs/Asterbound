@@ -112,16 +112,16 @@ public:
   // If the bullet time to live has run out, or if it has collided, etc this
   // will return true.
   [[nodiscard]] std::expected<bool, StarException> shouldDestroy() const override;
-  [[nodiscard]] std::expected<void, StarException> destroy(std::optional<std::reference_wrapper<RenderCallback>> renderCallback) override;
+  [[nodiscard]] std::expected<void, StarException> destroy(std::optional<std::reference_wrapper<RenderCallback>> render_callback) override;
 
   [[nodiscard]] std::expected<List<DamageSource>, StarException> damageSources() const override;
   [[nodiscard]] std::expected<void, StarException> hitOther(EntityId targetEntityId, DamageRequest const& dr) override;
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::uint64_t currentStep) override;
   std::uint64_t presentationEpoch() const override;
-  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& renderCallback) override;
-  [[nodiscard]] std::expected<void, StarException> render(RenderCallback& renderCallback) override;
-  [[nodiscard]] std::expected<void, StarException> renderLightSources(RenderCallback& renderCallback) override;
+  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& render_callback) override;
+  [[nodiscard]] std::expected<void, StarException> render(RenderCallback& render_callback) override;
+  [[nodiscard]] std::expected<void, StarException> renderLightSources(RenderCallback& render_callback) override;
 
   [[nodiscard]] MessageResponseResult receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) override;
 
@@ -195,7 +195,7 @@ private:
 
   [[nodiscard]] std::expected<LuaCallbacks, StarException> makeProjectileCallbacks();
 
-  [[nodiscard]] std::expected<void, StarException> collectPendingRenderEvents(RenderCallback& renderCallback);
+  [[nodiscard]] std::expected<void, StarException> collectPendingRenderEvents(RenderCallback& render_callback);
   int frameAt(float animationTimer, float timeToLive) const;
 
   std::shared_ptr<ProjectileConfig> m_config;

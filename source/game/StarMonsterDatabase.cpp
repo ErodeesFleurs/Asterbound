@@ -738,9 +738,9 @@ if (!result111) return std::unexpected(std::move(result111.error()));
 variant.metaBoundBox = std::move(*result111);
   auto renderLayerName = variant.parameters.opt_string("renderLayer");
   if (!renderLayerName) return std::unexpected(std::move(renderLayerName.error()));
-  variant.renderLayer = RenderLayerMonster;
+  variant.renderLayer = render_layer_monster;
   if (*renderLayerName) {
-    auto layer = parseRenderLayer(**renderLayerName);
+    auto layer = parse_render_layer(**renderLayerName);
     if (!layer) return std::unexpected(std::move(layer.error()));
     variant.renderLayer = *layer;
   }

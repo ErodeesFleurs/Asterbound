@@ -142,9 +142,9 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::uint64_t currentStep) override;
 
-  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& renderCallback) override;
+  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& render_callback) override;
 
-  [[nodiscard]] std::expected<void, StarException> render(RenderCallback& renderCallback) override;
+  [[nodiscard]] std::expected<void, StarException> render(RenderCallback& render_callback) override;
 
   [[nodiscard]] std::expected<bool, StarException> damageTiles(List<Vec2I> const& position, Vec2F const& sourcePosition, TileDamage const& tileDamage) override;
 

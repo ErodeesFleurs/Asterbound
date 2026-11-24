@@ -598,7 +598,7 @@ std::uint64_t ItemDrop::presentationEpoch() const {
   return Entity::presentationEpoch() + m_movementController->presentationEpoch();
 }
 
-std::expected<void, StarException> ItemDrop::render(RenderCallback& renderCallback) {
+std::expected<void, StarException> ItemDrop::render(RenderCallback& render_callback) {
   if (m_mode.get() != Mode::Taken && m_drawRarityBeam) {
     Color beamColor;
     switch (m_item->rarity()) {
@@ -624,7 +624,7 @@ std::expected<void, StarException> ItemDrop::render(RenderCallback& renderCallba
     auto drawable = Drawable::make_line(line, width, beamColor, position());
     (drawable.line_part().end_color = beamColor)->set_alpha_f(0.0f);
     drawable.fullbright = true;
-    if (auto added = renderCallback.addDrawable(std::move(drawable), RenderLayerItemDrop); !added)
+    if (auto added = render_callback.add_drawable(std::move(drawable), render_layer_item_drop); !added)
       return std::unexpected(std::move(added.error()));
   }
 
@@ -632,12 +632,12 @@ std::expected<void, StarException> ItemDrop::render(RenderCallback& renderCallba
     auto mat = as_ref<MaterialItem>(*m_item);
     List<Drawable> generated;
     if (mat) {
-      auto preview = mat->get().generatedPreview(renderCallback.tileDrawer(), Vec2I(position().floor()));
+      auto preview = mat->get().generatedPreview(render_callback.tile_drawer(), Vec2I(position().floor()));
       if (!preview)
         return std::unexpected(std::move(preview.error()));
       generated = preview->get();
     } else {
-      auto drawables = m_item->drop_drawables(renderCallback.tileDrawer());
+      auto drawables = m_item->drop_drawables(render_callback.tile_drawer());
       if (!drawables)
         return std::unexpected(std::move(drawables.error()));
       generated = std::move(*drawables);
@@ -661,22 +661,22 @@ std::expected<void, StarException> ItemDrop::render(RenderCallback& renderCallba
     if (mat)
       m_overForeground = true;
   }
-  EntityRenderLayer renderLayer = m_mode.get() == Mode::Taken || m_overForeground ? RenderLayerForegroundTile : RenderLayerItemDrop;
+  EntityRenderLayer renderLayer = m_mode.get() == Mode::Taken || m_overForeground ? render_layer_foreground_tile : render_layer_item_drop;
   Vec2F dropPosition = position();
   for (Drawable drawable : *m_drawables) {
     drawable.position += dropPosition;
-    if (auto added = renderCallback.addDrawable(std::move(drawable), renderLayer); !added)
+    if (auto added = render_callback.add_drawable(std::move(drawable), renderLayer); !added)
       return std::unexpected(std::move(added.error()));
   }
   return {};
 }
 
-std::expected<void, StarException> ItemDrop::renderLightSources(RenderCallback& renderCallback) {
+std::expected<void, StarException> ItemDrop::renderLightSources(RenderCallback& render_callback) {
   LightSource light;
   light.type = LightType::Spread;
   light.color = Vec3F::filled(20.f / 255.f);
   light.position = position();
-  return renderCallback.addLightSource(std::move(light));
+  return render_callback.add_light_source(std::move(light));
 }
 
 MovementController& ItemDrop::movementController() {

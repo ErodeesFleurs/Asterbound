@@ -394,7 +394,7 @@ if (auto res = std::move(*result935))
   return m_timeToLive <= 0.0f;
 }
 
-std::expected<void, StarException> Projectile::destroy(std::optional<std::reference_wrapper<RenderCallback>> renderCallback) {
+std::expected<void, StarException> Projectile::destroy(std::optional<std::reference_wrapper<RenderCallback>> render_callback) {
   auto result927 = m_parameters.get_array("actionOnReap", m_config->actionOnReap);
 if (!result927) return std::unexpected(std::move(result927.error()));
 for (auto const& action : std::move(*result927))
@@ -421,9 +421,9 @@ if (!result932) return std::unexpected(std::move(result932.error()));
 }
   }
 
-  if (renderCallback)
+  if (render_callback)
     {
-auto result933 = collectPendingRenderEvents(renderCallback->get());
+auto result933 = collectPendingRenderEvents(render_callback->get());
 if (!result933) return std::unexpected(std::move(result933.error()));
 }
 
@@ -652,22 +652,22 @@ std::uint64_t Projectile::presentationEpoch() const {
   return Entity::presentationEpoch() + m_movementController->presentationEpoch();
 }
 
-std::expected<void, StarException> Projectile::collectRenderEvents(RenderCallback& renderCallback) {
-  auto result900 = collectPendingRenderEvents(renderCallback);
+std::expected<void, StarException> Projectile::collectRenderEvents(RenderCallback& render_callback) {
+  auto result900 = collectPendingRenderEvents(render_callback);
 if (!result900) return std::unexpected(std::move(result900.error()));
 
   if (m_persistentAudio)
     m_persistentAudio->set_position(position());
 
-  auto result901 = m_effectEmitter->collectRenderEvents(renderCallback);
+  auto result901 = m_effectEmitter->collectRenderEvents(render_callback);
 if (!result901) return std::unexpected(std::move(result901.error()));
 
   return {};
 }
 
-std::expected<void, StarException> Projectile::render(RenderCallback& renderCallback) {
-  float rotation = samplePresentationRotation(m_movementController->rotation(), renderCallback.presentation().interpolation());
-  float alpha = renderCallback.presentation().interpolation();
+std::expected<void, StarException> Projectile::render(RenderCallback& render_callback) {
+  float rotation = samplePresentationRotation(m_movementController->rotation(), render_callback.presentation().interpolation());
+  float alpha = render_callback.presentation().interpolation();
   int frame = m_frame;
   if (frame == getFrame())
     frame = frameAt(std::lerp(m_previousAnimationTimer, m_animationTimer, alpha), std::lerp(m_previousTimeToLive, m_timeToLive, alpha));
@@ -692,16 +692,16 @@ if (!result903) return std::unexpected(std::move(result903.error()));
   }
   drawable.fullbright = m_config->fullbright;
   drawable.translate(position());
-  auto result904 = renderCallback.addDrawable(std::move(drawable), m_config->renderLayer);
+  auto result904 = render_callback.add_drawable(std::move(drawable), m_config->renderLayer);
 if (!result904) return std::unexpected(std::move(result904.error()));
   return {};
 }
 
-std::expected<void, StarException> Projectile::renderLightSources(RenderCallback& renderCallback) {
-  auto lights = renderCallback.addLightSources(m_renderLights);
+std::expected<void, StarException> Projectile::renderLightSources(RenderCallback& render_callback) {
+  auto lights = render_callback.add_light_sources(m_renderLights);
   if (!lights)
     return std::unexpected(std::move(lights.error()));
-  auto result899 = renderCallback.addLightSource({position(), m_config->lightColor.to_rgb_f(), m_config->lightType, 0.0f, 0.0f, 0.0f});
+  auto result899 = render_callback.add_light_source({position(), m_config->lightColor.to_rgb_f(), m_config->lightType, 0.0f, 0.0f, 0.0f});
 if (!result899) return std::unexpected(std::move(result899.error()));
   return {};
 }
@@ -1833,17 +1833,17 @@ if (!result680) return std::unexpected(std::move(result680.error()));
   return callbacks;
 }
 
-std::expected<void, StarException> Projectile::collectPendingRenderEvents(RenderCallback& renderCallback) {
+std::expected<void, StarException> Projectile::collectPendingRenderEvents(RenderCallback& render_callback) {
   m_renderLights.clear();
   for (auto const& renderable : m_pendingRenderables) {
     if (std::holds_alternative<std::shared_ptr<AudioInstance>>(renderable))
       {
-auto result668 = renderCallback.addAudio(std::get<std::shared_ptr<AudioInstance>>(renderable));
+auto result668 = render_callback.add_audio(std::get<std::shared_ptr<AudioInstance>>(renderable));
 if (!result668) return std::unexpected(std::move(result668.error()));
 }
     else if (std::holds_alternative<Particle>(renderable))
       {
-auto result669 = renderCallback.add_particle(Particle(std::get<Particle>(renderable)));
+auto result669 = render_callback.add_particle(Particle(std::get<Particle>(renderable)));
 if (!result669) return std::unexpected(std::move(result669.error()));
 }
     else if (auto light = std::get_if<LightSource>(&renderable))

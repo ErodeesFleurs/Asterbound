@@ -131,9 +131,9 @@ public:
   std::uint64_t presentationEpoch() const override;
 
   [[nodiscard]]
-  std::expected<void, StarException> render(RenderCallback& renderCallback) override;
+  std::expected<void, StarException> render(RenderCallback& render_callback) override;
   [[nodiscard]]
-  std::expected<void, StarException> renderLightSources(RenderCallback& renderCallback) override;
+  std::expected<void, StarException> renderLightSources(RenderCallback& render_callback) override;
   
   MovementController& movementController() override;
   

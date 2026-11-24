@@ -5,15 +5,7 @@ import star.format;
 
 import star.color;
 import star.string;
-import star.data_stream;
-import star.list;
-import star.image_processing;
-import star.hash;
 import star.string_view;
-import star.thread;
-import star.directives;
-import star.asset_path;
-import star.drawable;
 import star.bi_map;
 import star.vector;
 import star.game_types;
@@ -40,64 +32,68 @@ private:
 
 using EntityRenderLayer = std::uint32_t;
 
-inline constexpr unsigned RenderLayerUpperBits = 5;
-inline constexpr unsigned RenderLayerLowerBits = 32 - RenderLayerUpperBits;
-inline constexpr EntityRenderLayer RenderLayerLowerMask = static_cast<EntityRenderLayer>(-1) >> RenderLayerUpperBits;
+inline constexpr unsigned render_layer_upper_bits = 5;
+inline constexpr unsigned render_layer_lower_bits = 32 - render_layer_upper_bits;
+inline constexpr EntityRenderLayer render_layer_lower_mask = static_cast<EntityRenderLayer>(-1) >> render_layer_upper_bits;
 
-inline constexpr EntityRenderLayer RenderLayerBackgroundOverlay = 1 << RenderLayerLowerBits;
-inline constexpr EntityRenderLayer RenderLayerBackgroundTile = 2 << RenderLayerLowerBits;
-inline constexpr EntityRenderLayer RenderLayerPlatform = 3 << RenderLayerLowerBits;
-inline constexpr EntityRenderLayer RenderLayerPlant = 4 << RenderLayerLowerBits;
-inline constexpr EntityRenderLayer RenderLayerPlantDrop = 5 << RenderLayerLowerBits;
-inline constexpr EntityRenderLayer RenderLayerObject = 6 << RenderLayerLowerBits;
-inline constexpr EntityRenderLayer RenderLayerPreviewObject = 7 << RenderLayerLowerBits;
-inline constexpr EntityRenderLayer RenderLayerBackParticle = 8 << RenderLayerLowerBits;
-inline constexpr EntityRenderLayer RenderLayerVehicle = 9 << RenderLayerLowerBits;
-inline constexpr EntityRenderLayer RenderLayerEffect = 10 << RenderLayerLowerBits;
-inline constexpr EntityRenderLayer RenderLayerProjectile = 11 << RenderLayerLowerBits;
-inline constexpr EntityRenderLayer RenderLayerMonster = 12 << RenderLayerLowerBits;
-inline constexpr EntityRenderLayer RenderLayerNpc = 13 << RenderLayerLowerBits;
-inline constexpr EntityRenderLayer RenderLayerPlayer = 14 << RenderLayerLowerBits;
-inline constexpr EntityRenderLayer RenderLayerItemDrop = 15 << RenderLayerLowerBits;
-inline constexpr EntityRenderLayer RenderLayerLiquid = 16 << RenderLayerLowerBits;
-inline constexpr EntityRenderLayer RenderLayerMiddleParticle = 17 << RenderLayerLowerBits;
-inline constexpr EntityRenderLayer RenderLayerForegroundTile = 18 << RenderLayerLowerBits;
-inline constexpr EntityRenderLayer RenderLayerForegroundEntity = 19 << RenderLayerLowerBits;
-inline constexpr EntityRenderLayer RenderLayerForegroundOverlay = 20 << RenderLayerLowerBits;
-inline constexpr EntityRenderLayer RenderLayerFrontParticle = 21 << RenderLayerLowerBits;
-inline constexpr EntityRenderLayer RenderLayerOverlay = 22 << RenderLayerLowerBits;
+inline constexpr EntityRenderLayer render_layer_background_overlay = 1u << render_layer_lower_bits;
+inline constexpr EntityRenderLayer render_layer_background_tile = 2u << render_layer_lower_bits;
+inline constexpr EntityRenderLayer render_layer_platform = 3u << render_layer_lower_bits;
+inline constexpr EntityRenderLayer render_layer_plant = 4u << render_layer_lower_bits;
+inline constexpr EntityRenderLayer render_layer_plant_drop = 5u << render_layer_lower_bits;
+inline constexpr EntityRenderLayer render_layer_object = 6u << render_layer_lower_bits;
+inline constexpr EntityRenderLayer render_layer_preview_object = 7u << render_layer_lower_bits;
+inline constexpr EntityRenderLayer render_layer_back_particle = 8u << render_layer_lower_bits;
+inline constexpr EntityRenderLayer render_layer_vehicle = 9u << render_layer_lower_bits;
+inline constexpr EntityRenderLayer render_layer_effect = 10u << render_layer_lower_bits;
+inline constexpr EntityRenderLayer render_layer_projectile = 11u << render_layer_lower_bits;
+inline constexpr EntityRenderLayer render_layer_monster = 12u << render_layer_lower_bits;
+inline constexpr EntityRenderLayer render_layer_npc = 13u << render_layer_lower_bits;
+inline constexpr EntityRenderLayer render_layer_player = 14u << render_layer_lower_bits;
+inline constexpr EntityRenderLayer render_layer_item_drop = 15u << render_layer_lower_bits;
+inline constexpr EntityRenderLayer render_layer_liquid = 16u << render_layer_lower_bits;
+inline constexpr EntityRenderLayer render_layer_middle_particle = 17u << render_layer_lower_bits;
+inline constexpr EntityRenderLayer render_layer_foreground_tile = 18u << render_layer_lower_bits;
+inline constexpr EntityRenderLayer render_layer_foreground_entity = 19u << render_layer_lower_bits;
+inline constexpr EntityRenderLayer render_layer_foreground_overlay = 20u << render_layer_lower_bits;
+inline constexpr EntityRenderLayer render_layer_front_particle = 21u << render_layer_lower_bits;
+inline constexpr EntityRenderLayer render_layer_overlay = 22u << render_layer_lower_bits;
 
-[[nodiscard]] std::expected<EntityRenderLayer, StarException> parseRenderLayer(String renderLayer);
+constexpr EntityRenderLayer vehicle_layer_offset(EntityId entity_id, EntityRenderLayer vehicle_layer) {
+  return (static_cast<EntityRenderLayer>(entity_id) * 4u + vehicle_layer) & render_layer_lower_mask;
+}
+
+[[nodiscard]] std::expected<EntityRenderLayer, StarException> parse_render_layer(StringView render_layer);
 
 struct PreviewTile {
-  PreviewTile();
-  PreviewTile(Vec2I const& position, bool foreground, MaterialId matId, MaterialHue hueShift, bool updateMatId);
-  PreviewTile(Vec2I const& position, bool foreground, Vec3B const& light, bool updateLight);
-  PreviewTile(Vec2I const& position, bool foreground, MaterialId matId, MaterialHue hueShift, bool updateMatId, Vec3B const& light, bool updateLight, MaterialColorVariant colorVariant);
-  PreviewTile(Vec2I const& position, LiquidId liqId);
+  PreviewTile() = default;
+  PreviewTile(Vec2I const& position, bool foreground, MaterialId mat_id, MaterialHue hue_shift, bool update_mat_id);
+  PreviewTile(Vec2I const& position, bool foreground, Vec3B const& light, bool update_light);
+  PreviewTile(Vec2I const& position, bool foreground, MaterialId mat_id, MaterialHue hue_shift, bool update_mat_id, Vec3B const& light, bool update_light, MaterialColorVariant color_variant);
+  PreviewTile(Vec2I const& position, LiquidId liq_id);
 
   Vec2I position;
-  bool foreground;
+  bool foreground = false;
 
-  LiquidId liqId;
-  MaterialId matId;
-  MaterialHue hueShift;
-  bool updateMatId;
-  MaterialColorVariant colorVariant;
+  LiquidId liq_id = EmptyLiquidId;
+  MaterialId mat_id = NullMaterialId;
+  MaterialHue hue_shift = 0;
+  bool update_mat_id = false;
+  MaterialColorVariant color_variant = DefaultMaterialColorVariant;
   Vec3B light;
-  bool updateLight;
+  bool update_light = false;
 };
 
 struct OverheadBar {
-  OverheadBar();
+  OverheadBar() = default;
   [[nodiscard]] static std::expected<OverheadBar, StarException> create(Json const& json);
-  OverheadBar(std::optional<String> icon, float percentage, Color color, bool detailOnly);
+  OverheadBar(std::optional<String> icon, float percentage, Color color, bool detail_only);
 
-  Vec2F entityPosition;
+  Vec2F entity_position;
   std::optional<String> icon;
-  float percentage;
+  float percentage = 0.0f;
   Color color;
-  bool detailOnly;
+  bool detail_only = false;
 };
 
 enum class EntityHighlightEffectType {
@@ -107,7 +103,7 @@ enum class EntityHighlightEffectType {
   Interesting,
   Inspected
 };
-inline constexpr auto EntityHighlightEffectTypeNames =
+inline constexpr auto entity_highlight_effect_type_names =
   sorted_enum_names(std::to_array<std::pair<EntityHighlightEffectType, std::string_view>>(
     {{EntityHighlightEffectType::None, "none"},
      {EntityHighlightEffectType::Interactive, "interactive"},
@@ -127,35 +123,36 @@ export module star.entity_rendering_types;
 export namespace Star {
   using ::Star::PresentationContext;
   using ::Star::EntityRenderLayer;
-  using ::Star::parseRenderLayer;
+  using ::Star::parse_render_layer;
+  using ::Star::vehicle_layer_offset;
   using ::Star::PreviewTile;
   using ::Star::OverheadBar;
   using ::Star::EntityHighlightEffectType;
-  using ::Star::EntityHighlightEffectTypeNames;
+  using ::Star::entity_highlight_effect_type_names;
   using ::Star::EntityHighlightEffect;
-  using ::Star::RenderLayerUpperBits;
-  using ::Star::RenderLayerLowerBits;
-  using ::Star::RenderLayerLowerMask;
-  using ::Star::RenderLayerBackgroundOverlay;
-  using ::Star::RenderLayerBackgroundTile;
-  using ::Star::RenderLayerPlatform;
-  using ::Star::RenderLayerPlant;
-  using ::Star::RenderLayerPlantDrop;
-  using ::Star::RenderLayerObject;
-  using ::Star::RenderLayerPreviewObject;
-  using ::Star::RenderLayerBackParticle;
-  using ::Star::RenderLayerVehicle;
-  using ::Star::RenderLayerEffect;
-  using ::Star::RenderLayerProjectile;
-  using ::Star::RenderLayerMonster;
-  using ::Star::RenderLayerNpc;
-  using ::Star::RenderLayerPlayer;
-  using ::Star::RenderLayerItemDrop;
-  using ::Star::RenderLayerLiquid;
-  using ::Star::RenderLayerMiddleParticle;
-  using ::Star::RenderLayerForegroundTile;
-  using ::Star::RenderLayerForegroundEntity;
-  using ::Star::RenderLayerForegroundOverlay;
-  using ::Star::RenderLayerFrontParticle;
-  using ::Star::RenderLayerOverlay;
+  using ::Star::render_layer_upper_bits;
+  using ::Star::render_layer_lower_bits;
+  using ::Star::render_layer_lower_mask;
+  using ::Star::render_layer_background_overlay;
+  using ::Star::render_layer_background_tile;
+  using ::Star::render_layer_platform;
+  using ::Star::render_layer_plant;
+  using ::Star::render_layer_plant_drop;
+  using ::Star::render_layer_object;
+  using ::Star::render_layer_preview_object;
+  using ::Star::render_layer_back_particle;
+  using ::Star::render_layer_vehicle;
+  using ::Star::render_layer_effect;
+  using ::Star::render_layer_projectile;
+  using ::Star::render_layer_monster;
+  using ::Star::render_layer_npc;
+  using ::Star::render_layer_player;
+  using ::Star::render_layer_item_drop;
+  using ::Star::render_layer_liquid;
+  using ::Star::render_layer_middle_particle;
+  using ::Star::render_layer_foreground_tile;
+  using ::Star::render_layer_foreground_entity;
+  using ::Star::render_layer_foreground_overlay;
+  using ::Star::render_layer_front_particle;
+  using ::Star::render_layer_overlay;
 }

@@ -506,7 +506,7 @@ if (!result335) return std::unexpected(std::move(result335.error()));
 }
 
 
-std::expected<void, StarException> PlantDrop::particleForPlantPart(PlantDropPiece const& piece, String const& mode, Json const& mainConfig, RenderCallback& renderCallback) {
+std::expected<void, StarException> PlantDrop::particleForPlantPart(PlantDropPiece const& piece, String const& mode, Json const& mainConfig, RenderCallback& render_callback) {
   auto result295 = mainConfig.get("particles", JsonObject());
 if (!result295) return std::unexpected(std::move(result295.error()));
 auto result296 = std::move(*result295).get(mode, JsonObject());
@@ -569,7 +569,7 @@ density--;
 
 particle.position = position() + particlePos.rotate(m_movementController->rotation());
 
-auto result305 = renderCallback.add_particle(std::move(particle));
+auto result305 = render_callback.add_particle(std::move(particle));
 if (!result305) return std::unexpected(std::move(result305.error()));
   }
   return {};
@@ -579,7 +579,7 @@ std::uint64_t PlantDrop::presentationEpoch() const {
   return Entity::presentationEpoch() + m_movementController->presentationEpoch();
 }
 
-std::expected<void, StarException> PlantDrop::collectRenderEvents(RenderCallback& renderCallback) {
+std::expected<void, StarException> PlantDrop::collectRenderEvents(RenderCallback& render_callback) {
   auto result284 = this->root().assets();
 if (!result284) return std::unexpected(std::move(result284.error()));
 auto assets = std::move(*result284);
@@ -589,7 +589,7 @@ auto assets = std::move(*result284);
     // smoke, particles
 
     if (m_master) {
-      auto playBreakSound = [&self = *this, &assets, &renderCallback](Json const& config)  -> std::expected<void, StarException> {
+      auto playBreakSound = [&self = *this, &assets, &render_callback](Json const& config)  -> std::expected<void, StarException> {
         auto result263 = config.get("sounds", JsonObject());
 if (!result263) return std::unexpected(std::move(result263.error()));
 auto result264 = std::move(*result263).get_array("breakTree", JsonArray());
@@ -610,7 +610,7 @@ audioInstance->set_position(self.collisionRect().center() + self.position());
 auto result268 = sound.get_float("volume", 1.0f);
 if (!result268) return std::unexpected(std::move(result268.error()));
 audioInstance->set_volume(std::move(*result268));
-auto result269 = renderCallback.addAudio(std::move(audioInstance));
+auto result269 = render_callback.add_audio(std::move(audioInstance));
 if (!result269) return std::unexpected(std::move(result269.error()));
         }
         return {};
@@ -624,12 +624,12 @@ if (!result286) return std::unexpected(std::move(result286.error()));
     for (auto const& plantPiece : m_pieces) {
       if (plantPiece.kind == Plant::PlantPieceKind::Stem)
         {
-auto result287 = particleForPlantPart(plantPiece, "breakTree", m_stemConfig, renderCallback);
+auto result287 = particleForPlantPart(plantPiece, "breakTree", m_stemConfig, render_callback);
 if (!result287) return std::unexpected(std::move(result287.error()));
 }
       if (plantPiece.kind == Plant::PlantPieceKind::Foliage)
         {
-auto result288 = particleForPlantPart(plantPiece, "breakTree", m_foliageConfig, renderCallback);
+auto result288 = particleForPlantPart(plantPiece, "breakTree", m_foliageConfig, render_callback);
 if (!result288) return std::unexpected(std::move(result288.error()));
 }
     }
@@ -639,7 +639,7 @@ if (!result288) return std::unexpected(std::move(result288.error()));
     m_spawnedDropEffects = true;
     // smoke, particles
 
-    auto playHitSound = [&self = *this, &assets, &renderCallback](Json const& config)  -> std::expected<void, StarException> {
+    auto playHitSound = [&self = *this, &assets, &render_callback](Json const& config)  -> std::expected<void, StarException> {
       auto result256 = config.get("sounds", JsonObject());
 if (!result256) return std::unexpected(std::move(result256.error()));
 auto result257 = std::move(*result256).get_array("hitGround", JsonArray());
@@ -660,7 +660,7 @@ audioInstance->set_position(self.collisionRect().center() + self.position());
 auto result261 = sound.get_float("volume", 1.0f);
 if (!result261) return std::unexpected(std::move(result261.error()));
 audioInstance->set_volume(std::move(*result261));
-auto result262 = renderCallback.addAudio(std::move(audioInstance));
+auto result262 = render_callback.add_audio(std::move(audioInstance));
 if (!result262) return std::unexpected(std::move(result262.error()));
       }
       return {};
@@ -673,12 +673,12 @@ if (!result290) return std::unexpected(std::move(result290.error()));
     for (auto const& plantPiece : m_pieces) {
       if (plantPiece.kind == Plant::PlantPieceKind::Stem)
         {
-auto result291 = particleForPlantPart(plantPiece, "hitGround", m_stemConfig, renderCallback);
+auto result291 = particleForPlantPart(plantPiece, "hitGround", m_stemConfig, render_callback);
 if (!result291) return std::unexpected(std::move(result291.error()));
 }
       if (plantPiece.kind == Plant::PlantPieceKind::Foliage)
         {
-auto result292 = particleForPlantPart(plantPiece, "hitGround", m_foliageConfig, renderCallback);
+auto result292 = particleForPlantPart(plantPiece, "hitGround", m_foliageConfig, render_callback);
 if (!result292) return std::unexpected(std::move(result292.error()));
 }
     }
@@ -687,8 +687,8 @@ if (!result292) return std::unexpected(std::move(result292.error()));
   return {};
 }
 
-std::expected<void, StarException> PlantDrop::render(RenderCallback& renderCallback) {
-  float alpha = renderCallback.presentation().interpolation();
+std::expected<void, StarException> PlantDrop::render(RenderCallback& render_callback) {
+  float alpha = render_callback.presentation().interpolation();
   float rotation = isMaster()
     ? m_movementController->rotation() - m_presentationRotationTravel * (1.0f - alpha)
     : samplePresentationRotation(m_movementController->rotation(), alpha);
@@ -703,7 +703,7 @@ auto drawable = std::move(*result1284);
         drawable.scale(Vec2F(-1, 1));
       drawable.rotate(rotation);
       drawable.translate(position());
-      auto result294 = renderCallback.addDrawable(std::move(drawable), RenderLayerPlantDrop);
+      auto result294 = render_callback.add_drawable(std::move(drawable), render_layer_plant_drop);
 if (!result294) return std::unexpected(std::move(result294.error()));
     }
   }

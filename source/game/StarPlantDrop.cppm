@@ -95,9 +95,9 @@ public:
 
   std::uint64_t presentationEpoch() const override;
 
-  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& renderCallback) override;
+  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& render_callback) override;
 
-  [[nodiscard]] std::expected<void, StarException> render(RenderCallback& renderCallback) override;
+  [[nodiscard]] std::expected<void, StarException> render(RenderCallback& render_callback) override;
   
   MovementController& movementController() override;
 
@@ -116,7 +116,7 @@ private:
     bool flip;
   };
 
-  [[nodiscard]] std::expected<void, StarException> particleForPlantPart(PlantDropPiece const& piece, String const& mode, Json const& mainConfig, RenderCallback& renderCallback);
+  [[nodiscard]] std::expected<void, StarException> particleForPlantPart(PlantDropPiece const& piece, String const& mode, Json const& mainConfig, RenderCallback& render_callback);
 
   NetElementTopGroup m_netGroup;
   String m_description;

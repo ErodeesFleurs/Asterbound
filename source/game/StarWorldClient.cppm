@@ -333,8 +333,12 @@ public:
   [[nodiscard]] std::expected<void, StarException> update(float dt);
   // borderTiles here should extend the client window for border tile
   // calculations.  It is not necessary on the light array.
-  [[nodiscard]] std::expected<void, StarException> render(WorldRenderData& renderData, unsigned borderTiles, std::optional<std::reference_wrapper<TileDrawer>> tileDrawer, PresentationContext presentation);
-  Vec2F renderPosition(EntityId entityId, PresentationContext presentation) const;
+  [[nodiscard]] std::expected<void, StarException> render(WorldRenderData& render_data, unsigned border_tiles, std::optional<std::reference_wrapper<TileDrawer>> tile_drawer, PresentationContext presentation);
+  struct EntityRenderSample {
+    PresentationContext context;
+    Vec2F offset;
+  };
+  EntityRenderSample sample_entity(Entity const& entity, PresentationContext presentation) const;
   void resetPresentation();
   List<std::shared_ptr<AudioInstance>> pullPendingAudio();
   List<std::shared_ptr<AudioInstance>> pull_pending_music();
@@ -373,36 +377,35 @@ private:
   explicit WorldClient(Root& root, UniverseClient& universe);
   [[nodiscard]] std::expected<void, StarException> initialize(std::shared_ptr<Player> mainPlayer, std::shared_ptr<LuaRoot> luaRoot, UniverseClient& universe);
   [[nodiscard]] std::expected<void, StarException> initialize(ClientSubWorldId subWorldId, UniverseClient& universe);
-  PresentationContext presentationFor(Entity const& entity, PresentationContext presentation) const;
+  std::shared_ptr<VisitableWorldParameters const> directive_parameters() const;
   bool verify_broadcast_signature(std::shared_ptr<Player> const& player, bool legacy,
       std::span<char const> public_key, std::span<char const> signature, std::span<char const> message);
 
   static const float DropDist;
 
   struct ClientRenderCallback : RenderCallback {
-    explicit ClientRenderCallback(std::optional<std::reference_wrapper<TileDrawer>> drawer, PresentationContext presentation = PresentationContext(), float dt = 0.0f, Vec2F offset = {}) : m_tileDrawer(drawer), m_presentation(presentation), m_timestep(dt), m_offset(offset) {}
-    std::optional<std::reference_wrapper<TileDrawer>> tileDrawer() const override { return m_tileDrawer; }
-    PresentationContext presentation() const override { return m_presentation; }
-    float timestep() const override { return m_timestep; }
+    explicit ClientRenderCallback(std::optional<std::reference_wrapper<TileDrawer>> drawer, PresentationContext presentation = PresentationContext(), float dt = 0.0f, Vec2F offset = {}) : drawer_ref(drawer), sample_context(presentation), step_duration(dt), position_offset(offset) {}
+    std::optional<std::reference_wrapper<TileDrawer>> tile_drawer() const override { return drawer_ref; }
+    PresentationContext presentation() const override { return sample_context; }
+    float timestep() const override { return step_duration; }
     void clear();
-    std::optional<std::reference_wrapper<TileDrawer>> m_tileDrawer;
-    PresentationContext m_presentation;
-    float m_timestep;
-    Vec2F m_offset;
-    [[nodiscard]] std::expected<void, StarException> addDrawable(Drawable drawable, EntityRenderLayer renderLayer) override;
-    [[nodiscard]] std::expected<void, StarException> addLightSource(LightSource lightSource) override;
+    std::optional<std::reference_wrapper<TileDrawer>> drawer_ref;
+    PresentationContext sample_context;
+    float step_duration;
+    Vec2F position_offset;
+    [[nodiscard]] std::expected<void, StarException> add_drawable(Drawable drawable, EntityRenderLayer render_layer) override;
+    [[nodiscard]] std::expected<void, StarException> add_light_source(LightSource light_source) override;
     [[nodiscard]] std::expected<void, StarException> add_particle(Particle&& particle) override;
-    [[nodiscard]] std::expected<void, StarException> addAudio(std::shared_ptr<AudioInstance> audio) override;
-    [[nodiscard]] std::expected<void, StarException> addTilePreview(PreviewTile preview) override;
-    [[nodiscard]] std::expected<void, StarException> addOverheadBar(OverheadBar bar) override;
+    [[nodiscard]] std::expected<void, StarException> add_audio(std::shared_ptr<AudioInstance> audio) override;
+    [[nodiscard]] std::expected<void, StarException> add_tile_preview(PreviewTile preview) override;
+    [[nodiscard]] std::expected<void, StarException> add_overhead_bar(OverheadBar bar) override;
 
-    Map<EntityRenderLayer, List<Drawable>> drawables;
-    Map<EntityRenderLayer, List<Drawable>>* drawableTarget = nullptr;
-    List<LightSource> lightSources;
+    std::optional<std::reference_wrapper<FrameLayers<Drawable>>> drawable_target;
+    List<LightSource> light_sources;
     List<Particle> particles;
     List<std::shared_ptr<AudioInstance>> audios;
-    List<PreviewTile> previewTiles;
-    List<OverheadBar> overheadBars;
+    List<PreviewTile> preview_tiles;
+    List<OverheadBar> overhead_bars;
   };
 
   struct EntityPresentation {
@@ -483,7 +486,7 @@ private:
   Map<EntityId, HiddenEntityAudio> m_hiddenEntityAudio;
   float m_inspectionFlickerMultiplier = 1.0f;
   float m_presentationTimestep = 0.0f;
-  ClientRenderCallback m_eventRenderCallback{std::nullopt};
+  ClientRenderCallback m_event_render_callback{std::nullopt};
   std::shared_ptr<ClientTileSectorArray> m_tileArray;
   ClientTileGetter m_tileGetterFunction;
   std::shared_ptr<DamageManager> m_damageManager;
@@ -512,7 +515,7 @@ private:
   List<std::pair<Vec2F, Vec3F>> m_pendingParticleLights;
   RectI m_pendingLightRange;
   std::atomic<bool> m_pendingLightReady;
-  List<PreviewTile> m_previewTiles;
+  List<PreviewTile> m_preview_tiles;
 
   std::shared_ptr<Sky> m_sky;
 

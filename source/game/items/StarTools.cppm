@@ -237,7 +237,7 @@ public:
 
   void setEnd(EndType type) override;
   [[nodiscard]]
-  std::expected<List<PreviewTile>, StarException> previewTiles(bool shifting) const override;
+  std::expected<List<PreviewTile>, StarException> preview_tiles(bool shifting) const override;
   bool beamActive() const override;
   [[nodiscard]]
   std::expected<void, StarException> fire(FireMode mode, bool shifting, bool edgeTriggered) override;
@@ -295,7 +295,7 @@ public:
   [[nodiscard]]
   std::expected<void, StarException> update(float dt, FireMode fireMode, bool shifting, HashSet<MoveControlType> const& moves) override;
   [[nodiscard]]
-  std::expected<List<PreviewTile>, StarException> previewTiles(bool shifting) const override;
+  std::expected<List<PreviewTile>, StarException> preview_tiles(bool shifting) const override;
   [[nodiscard]]
   std::expected<void, StarException> init(ToolUserEntity& owner, ToolHand hand) override;
   bool beamActive() const override;

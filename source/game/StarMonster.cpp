@@ -769,7 +769,7 @@ std::expected<bool, StarException> Monster::shouldDestroy() const {
   return m_knockedOut && m_knockoutTimer <= 0;
 }
 
-std::expected<void, StarException> Monster::destroy(std::optional<std::reference_wrapper<RenderCallback>> renderCallback) {
+std::expected<void, StarException> Monster::destroy(std::optional<std::reference_wrapper<RenderCallback>> render_callback) {
   auto result119 = recover_lua_script_error(m_scriptComponent.invoke("die"));
 if (!result119) return std::unexpected(std::move(result119.error()));
 
@@ -838,7 +838,7 @@ treasurePool = std::move(*result121);
     }
   }
 
-  if (renderCallback) {
+  if (render_callback) {
     if (!m_deathParticleBurst.empty())
       {
   auto result131 = m_networkedAnimator->burstParticleEmitter(m_deathParticleBurst);
@@ -857,11 +857,11 @@ treasurePool = std::move(*result121);
 if (!result133) return std::unexpected(std::move(result133.error()));
 
 
-    auto result134 = renderCallback->get().addAudios(m_networkedAnimatorDynamicTarget.pullNewAudios());
+    auto result134 = render_callback->get().add_audios(m_networkedAnimatorDynamicTarget.pullNewAudios());
 if (!result134) return std::unexpected(std::move(result134.error()));
-    auto result135 = renderCallback->get().addParticles(m_networkedAnimatorDynamicTarget.pullNewParticles());
+    auto result135 = render_callback->get().add_particles(m_networkedAnimatorDynamicTarget.pullNewParticles());
 if (!result135) return std::unexpected(std::move(result135.error()));
-    auto result136 = renderCallback->get().addParticles(m_statusController->pullNewParticles());
+    auto result136 = render_callback->get().add_particles(m_statusController->pullNewParticles());
 if (!result136) return std::unexpected(std::move(result136.error()));
   }
 
@@ -981,27 +981,27 @@ std::uint64_t Monster::presentationEpoch() const {
   return Entity::presentationEpoch() + m_movementController->presentationEpoch();
 }
 
-std::expected<void, StarException> Monster::collectRenderEvents(RenderCallback& renderCallback) {
-  auto result158 = renderCallback.addAudios(m_networkedAnimatorDynamicTarget.pullNewAudios());
+std::expected<void, StarException> Monster::collectRenderEvents(RenderCallback& render_callback) {
+  auto result158 = render_callback.add_audios(m_networkedAnimatorDynamicTarget.pullNewAudios());
 if (!result158) return std::unexpected(std::move(result158.error()));
-  auto result159 = renderCallback.addParticles(m_networkedAnimatorDynamicTarget.pullNewParticles());
+  auto result159 = render_callback.add_particles(m_networkedAnimatorDynamicTarget.pullNewParticles());
 if (!result159) return std::unexpected(std::move(result159.error()));
-  auto result162 = renderCallback.addParticles(m_statusController->pullNewParticles());
+  auto result162 = render_callback.add_particles(m_statusController->pullNewParticles());
 if (!result162) return std::unexpected(std::move(result162.error()));
-  auto result163 = renderCallback.addAudios(m_statusController->pullNewAudios());
+  auto result163 = render_callback.add_audios(m_statusController->pullNewAudios());
 if (!result163) return std::unexpected(std::move(result163.error()));
 
-  auto result164 = m_effectEmitter->collectRenderEvents(renderCallback);
+  auto result164 = m_effectEmitter->collectRenderEvents(render_callback);
 if (!result164) return std::unexpected(std::move(result164.error()));
-  auto result166 = renderCallback.addAudios(m_scriptedAnimator.pull_new_audios());
+  auto result166 = render_callback.add_audios(m_scriptedAnimator.pull_new_audios());
 if (!result166) return std::unexpected(std::move(result166.error()));
-  auto result167 = renderCallback.addParticles(m_scriptedAnimator.pull_new_particles());
+  auto result167 = render_callback.add_particles(m_scriptedAnimator.pull_new_particles());
 if (!result167) return std::unexpected(std::move(result167.error()));
   return {};
 }
 
-std::expected<void, StarException> Monster::render(RenderCallback& renderCallback) {
-  auto sample = m_networkedAnimator->sample(renderCallback.presentation().interpolation());
+std::expected<void, StarException> Monster::render(RenderCallback& render_callback) {
+  auto sample = m_networkedAnimator->sample(render_callback.presentation().interpolation());
   {
   auto result154 = sample.drawables(position());
   if (!result154) return std::unexpected(std::move(result154.error()));
@@ -1014,35 +1014,35 @@ std::expected<void, StarException> Monster::render(RenderCallback& renderCallbac
     if (!result156) return std::unexpected(std::move(result156.error()));
 
   }
-      auto result157 = renderCallback.addDrawable(std::move(drawable), m_monsterVariant.renderLayer);
+      auto result157 = render_callback.add_drawable(std::move(drawable), m_monsterVariant.renderLayer);
   if (!result157) return std::unexpected(std::move(result157.error()));
     }
 }
 
 
-  auto result160 = m_statusController->drawables(renderCallback.presentation().interpolation());
+  auto result160 = m_statusController->drawables(render_callback.presentation().interpolation());
 if (!result160) return std::unexpected(std::move(result160.error()));
-auto result161 = renderCallback.addDrawables(std::move(*result160), m_monsterVariant.renderLayer);
+auto result161 = render_callback.add_drawables(std::move(*result160), m_monsterVariant.renderLayer);
 if (!result161) return std::unexpected(std::move(result161.error()));
 
 for (auto const& drawablePair : m_scriptedAnimator.drawables()) {
-  auto result165 = renderCallback.addDrawable(drawablePair.first, drawablePair.second.value_or(m_monsterVariant.renderLayer));
+  auto result165 = render_callback.add_drawable(drawablePair.first, drawablePair.second.value_or(m_monsterVariant.renderLayer));
   if (!result165) return std::unexpected(std::move(result165.error()));
 }
   return {};
 }
 
-std::expected<void, StarException> Monster::renderLightSources(RenderCallback& renderCallback) {
-  auto sample = m_networkedAnimator->sample(renderCallback.presentation().interpolation());
+std::expected<void, StarException> Monster::renderLightSources(RenderCallback& render_callback) {
+  auto sample = m_networkedAnimator->sample(render_callback.presentation().interpolation());
   auto result168 = sample.lightSources(position());
 if (!result168) return std::unexpected(std::move(result168.error()));
-auto result169 = renderCallback.addLightSources(std::move(*result168));
+auto result169 = render_callback.add_light_sources(*result168);
 if (!result169) return std::unexpected(std::move(result169.error()));
-  auto result170 = m_statusController->lightSources(renderCallback.presentation().interpolation());
+  auto result170 = m_statusController->lightSources(render_callback.presentation().interpolation());
 if (!result170) return std::unexpected(std::move(result170.error()));
-auto result171 = renderCallback.addLightSources(std::move(*result170));
+auto result171 = render_callback.add_light_sources(*result170);
 if (!result171) return std::unexpected(std::move(result171.error()));
-  auto result172 = renderCallback.addLightSources(m_scriptedAnimator.light_sources());
+  auto result172 = render_callback.add_light_sources(m_scriptedAnimator.light_sources());
 if (!result172) return std::unexpected(std::move(result172.error()));
   return {};
 }

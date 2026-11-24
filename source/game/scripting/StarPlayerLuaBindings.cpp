@@ -563,7 +563,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   
   if (auto registered = callbacks.register_callback("setRenderLayer", [&player](std::optional<String> const& layer) -> std::expected<void, StarException> {
     if (layer) {
-      auto parsed = parseRenderLayer(*layer);
+      auto parsed = parse_render_layer(*layer);
     if (!parsed) return std::unexpected(std::move(parsed.error()));
     return player.setRenderLayer(*parsed);
     }

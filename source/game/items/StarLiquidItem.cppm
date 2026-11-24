@@ -118,7 +118,7 @@ public:
   float liquidQuantity() const;
 
   [[nodiscard]]
-  std::expected<List<PreviewTile>, StarException> previewTiles(bool shifting) const override;
+  std::expected<List<PreviewTile>, StarException> preview_tiles(bool shifting) const override;
 
   [[nodiscard]]
   std::expected<bool, StarException> canPlace(bool shifting) const;
@@ -270,7 +270,7 @@ float LiquidItem::liquidQuantity() const {
   return m_quantity;
 }
 
-std::expected<List<PreviewTile>, StarException> LiquidItem::previewTiles(bool shifting) const {
+std::expected<List<PreviewTile>, StarException> LiquidItem::preview_tiles(bool shifting) const {
   List<PreviewTile> result;
   if (initialized()) {
     auto itemOwner = owner();

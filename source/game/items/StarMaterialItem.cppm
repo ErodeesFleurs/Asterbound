@@ -189,7 +189,7 @@ public:
   [[nodiscard]]
   std::expected<void, StarException> update(float dt, FireMode fireMode, bool shifting, HashSet<MoveControlType> const& moves) override;
   [[nodiscard]]
-  std::expected<void, StarException> render(RenderCallback& renderCallback, EntityRenderLayer renderLayer) override;
+  std::expected<void, StarException> render(RenderCallback& render_callback, EntityRenderLayer renderLayer) override;
 
   [[nodiscard]]
   std::expected<List<Drawable>, StarException> preview(std::optional<std::reference_wrapper<TileDrawer>> tileDrawer, std::shared_ptr<Player> const& viewer = {}) const override;
@@ -215,7 +215,7 @@ public:
   TileCollisionOverride& collisionOverride();
 
   [[nodiscard]]
-  std::expected<List<PreviewTile>, StarException> previewTiles(bool shifting) const override;
+  std::expected<List<PreviewTile>, StarException> preview_tiles(bool shifting) const override;
   [[nodiscard]]
   std::expected<std::reference_wrapper<List<Drawable> const>, StarException> generatedPreview(std::optional<std::reference_wrapper<TileDrawer>> tileDrawer, Vec2I position = {}) const;
 private:
@@ -487,7 +487,7 @@ std::expected<void, StarException> MaterialItem::update(float dt, FireMode fireM
   return {};
 }
 
-std::expected<void, StarException> MaterialItem::render(RenderCallback& renderCallback, EntityRenderLayer) {
+std::expected<void, StarException> MaterialItem::render(RenderCallback& render_callback, EntityRenderLayer) {
   if (m_blockSwap || m_collisionOverride != TileCollisionOverride::None) {
     auto itemOwner = owner();
     if (!itemOwner)
@@ -517,7 +517,7 @@ std::expected<void, StarException> MaterialItem::render(RenderCallback& renderCa
         return std::unexpected(std::move(aimPosition.error()));
       for (auto& tilePos : tileArea(calcRadius(m_shifting), *aimPosition)) {
         indicator->position = basePosition + Vec2F(tilePos);
-        auto added = renderCallback.addDrawable(*indicator, RenderLayerForegroundTile);
+        auto added = render_callback.add_drawable(*indicator, render_layer_foreground_tile);
         if (!added)
           return std::unexpected(std::move(added.error()));
       }
@@ -852,7 +852,7 @@ std::expected<std::reference_wrapper<List<Drawable> const>, StarException> Mater
       auto resized = renderData.tiles.set_size({3, 3});
       if (!resized) return std::unexpected(std::move(resized.error()));
       renderData.tiles.fill(TileDrawer::DefaultRenderTile);
-      renderData.tileMinPosition = { 0, 0 };
+      renderData.tile_min_position = { 0, 0 };
       auto tile = renderData.tiles.at({1, 1});
       if (!tile)
         return std::unexpected(std::move(tile.error()));
@@ -1022,7 +1022,7 @@ TileCollisionOverride& MaterialItem::collisionOverride() {
   return m_collisionOverride;
 }
 
-std::expected<List<PreviewTile>, StarException> MaterialItem::previewTiles(bool shifting) const {
+std::expected<List<PreviewTile>, StarException> MaterialItem::preview_tiles(bool shifting) const {
   List<PreviewTile> result;
   if (initialized()) {
     auto itemOwner = owner();

@@ -223,7 +223,7 @@ std::expected<void, StarException> QuestIndicatorPainter::render(WorldClient con
     if (!drawable)
       return std::unexpected(std::move(drawable.error()));
     drawable->fullbright = true;
-    auto position = indicator.world_position + world.geometry().diff(world.renderPosition(entity_id, presentation), entity->position());
+    auto position = indicator.world_position + world.sample_entity(*entity, presentation).offset;
     auto drawn = context.drawDrawable(*drawable, camera.worldToScreen(position), 1, Vec4B(255, 255, 255, 255));
     if (!drawn)
       return std::unexpected(std::move(drawn.error()));

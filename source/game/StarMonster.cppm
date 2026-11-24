@@ -168,17 +168,17 @@ public:
   [[nodiscard]] std::expected<void, StarException> knockout();
 
   [[nodiscard]] std::expected<bool, StarException> shouldDestroy() const override;
-  [[nodiscard]] std::expected<void, StarException> destroy(std::optional<std::reference_wrapper<RenderCallback>> renderCallback) override;
+  [[nodiscard]] std::expected<void, StarException> destroy(std::optional<std::reference_wrapper<RenderCallback>> render_callback) override;
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::uint64_t currentStep) override;
 
   std::uint64_t presentationEpoch() const override;
 
-  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& renderCallback) override;
+  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& render_callback) override;
 
-  [[nodiscard]] std::expected<void, StarException> render(RenderCallback& renderCallback) override;
+  [[nodiscard]] std::expected<void, StarException> render(RenderCallback& render_callback) override;
 
-  [[nodiscard]] std::expected<void, StarException> renderLightSources(RenderCallback& renderCallback) override;
+  [[nodiscard]] std::expected<void, StarException> renderLightSources(RenderCallback& render_callback) override;
 
   void setPosition(Vec2F const& pos);
 

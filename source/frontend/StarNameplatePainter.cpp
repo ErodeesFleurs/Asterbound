@@ -304,7 +304,7 @@ std::expected<void, StarException> NameplatePainter::render(WorldClient const& w
     auto entity = world.entity(nametag.entityId);
     if (!entity || nametag.instance.lock() != entity)
       return {};
-    auto origin = nametag.origin + world.geometry().diff(world.renderPosition(nametag.entityId, presentation), entity->position());
+    auto origin = nametag.origin + world.sample_entity(*entity, presentation).offset;
     auto position = camera.worldToScreen(origin) + m_offset * camera.pixelRatio()
         + bubble.sample_offset(nametag.presentationEpoch == entity->presentationEpoch() ? presentation.interpolation() : 1.0f);
     auto style = context.setTextStyle(m_textStyle);

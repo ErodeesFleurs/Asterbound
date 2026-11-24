@@ -62,46 +62,46 @@ class RenderCallback {
 public:
   virtual ~RenderCallback();
 
-  virtual std::optional<std::reference_wrapper<TileDrawer>> tileDrawer() const;
+  virtual std::optional<std::reference_wrapper<TileDrawer>> tile_drawer() const;
   virtual PresentationContext presentation() const { return PresentationContext(); }
   virtual float timestep() const { return 0.0f; }
 
 
-  [[nodiscard]] virtual std::expected<void, StarException> addDrawable(Drawable drawable, EntityRenderLayer renderLayer) = 0;
-  [[nodiscard]] virtual std::expected<void, StarException> addLightSource(LightSource lightSource) = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> add_drawable(Drawable drawable, EntityRenderLayer render_layer) = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> add_light_source(LightSource light_source) = 0;
   // A failed submission must leave the particle intact for a retry.
   [[nodiscard]] virtual std::expected<void, StarException> add_particle(Particle&& particle) = 0;
-  [[nodiscard]] virtual std::expected<void, StarException> addAudio(std::shared_ptr<AudioInstance> audio) = 0;
-  [[nodiscard]] virtual std::expected<void, StarException> addTilePreview(PreviewTile preview) = 0;
-  [[nodiscard]] virtual std::expected<void, StarException> addOverheadBar(OverheadBar bar) = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> add_audio(std::shared_ptr<AudioInstance> audio) = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> add_tile_preview(PreviewTile preview) = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> add_overhead_bar(OverheadBar bar) = 0;
 
   // Convenience non-virtuals
 
-  [[nodiscard]] std::expected<void, StarException> addDrawables(List<Drawable> drawables, EntityRenderLayer renderLayer, Vec2F translate = Vec2F());
-  [[nodiscard]] std::expected<void, StarException> addLightSources(List<LightSource> lightSources, Vec2F translate = Vec2F());
-  [[nodiscard]] std::expected<void, StarException> addParticles(List<Particle> particles, Vec2F translate = Vec2F());
-  [[nodiscard]] std::expected<void, StarException> addAudios(List<std::shared_ptr<AudioInstance>> audios, Vec2F translate = Vec2F());
-  [[nodiscard]] std::expected<void, StarException> addTilePreviews(List<PreviewTile> previews);
-  [[nodiscard]] std::expected<void, StarException> addOverheadBars(List<OverheadBar> bars, Vec2F translate = Vec2F());
+  [[nodiscard]] std::expected<void, StarException> add_drawables(List<Drawable> drawables, EntityRenderLayer render_layer, Vec2F translate = Vec2F());
+  [[nodiscard]] std::expected<void, StarException> add_light_sources(std::span<LightSource const> light_sources, Vec2F translate = Vec2F());
+  [[nodiscard]] std::expected<void, StarException> add_particles(List<Particle> particles, Vec2F translate = Vec2F());
+  [[nodiscard]] std::expected<void, StarException> add_audios(List<std::shared_ptr<AudioInstance>> audios, Vec2F translate = Vec2F());
+  [[nodiscard]] std::expected<void, StarException> add_tile_previews(List<PreviewTile> previews);
+  [[nodiscard]] std::expected<void, StarException> add_overhead_bars(std::span<OverheadBar const> bars, Vec2F translate = Vec2F());
 };
 
 // Consume hidden entity events on the same tick as visible entities without
 // replaying an accumulated audio/particle burst when they become visible.
 class NullRenderCallback : public RenderCallback {
 public:
-  explicit NullRenderCallback(List<std::shared_ptr<AudioInstance>>* deferredLoops = nullptr) : m_deferredLoops(deferredLoops) {}
-  std::expected<void, StarException> addDrawable(Drawable, EntityRenderLayer) override { return {}; }
-  std::expected<void, StarException> addLightSource(LightSource) override { return {}; }
+  explicit NullRenderCallback(std::optional<std::reference_wrapper<List<std::shared_ptr<AudioInstance>>>> deferred_loops = std::nullopt) : m_deferred_loops(deferred_loops) {}
+  std::expected<void, StarException> add_drawable(Drawable, EntityRenderLayer) override { return {}; }
+  std::expected<void, StarException> add_light_source(LightSource) override { return {}; }
   std::expected<void, StarException> add_particle(Particle&&) override { return {}; }
-  std::expected<void, StarException> addAudio(std::shared_ptr<AudioInstance> audio) override {
-    if (m_deferredLoops && audio->loops() != 0)
-      m_deferredLoops->push_back(std::move(audio));
+  std::expected<void, StarException> add_audio(std::shared_ptr<AudioInstance> audio) override {
+    if (m_deferred_loops && audio->loops() != 0)
+      m_deferred_loops->get().push_back(std::move(audio));
     return {};
   }
-  std::expected<void, StarException> addTilePreview(PreviewTile) override { return {}; }
-  std::expected<void, StarException> addOverheadBar(OverheadBar) override { return {}; }
+  std::expected<void, StarException> add_tile_preview(PreviewTile) override { return {}; }
+  std::expected<void, StarException> add_overhead_bar(OverheadBar) override { return {}; }
 private:
-  List<std::shared_ptr<AudioInstance>>* m_deferredLoops;
+  std::optional<std::reference_wrapper<List<std::shared_ptr<AudioInstance>>>> m_deferred_loops;
 };
 
 }

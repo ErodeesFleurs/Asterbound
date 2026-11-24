@@ -170,7 +170,7 @@ public:
   [[nodiscard]] virtual std::expected<bool, StarException> shouldDestroy() const;
   // Will be called once before removing the entity from the World on both
   // master and slave entities. The callback is absent on the server.
-  [[nodiscard]] virtual std::expected<void, StarException> destroy(std::optional<std::reference_wrapper<RenderCallback>> renderCallback);
+  [[nodiscard]] virtual std::expected<void, StarException> destroy(std::optional<std::reference_wrapper<RenderCallback>> render_callback);
 
   // Entities can send other entities potentially remote messages and get
   // responses back from them, and should implement this to receive and respond

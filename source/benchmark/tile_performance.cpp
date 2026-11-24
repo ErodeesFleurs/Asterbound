@@ -81,7 +81,7 @@ struct TileFixture {
 
   void reset() {
     data.geometry = WorldGeometry(Vec2U{4096, 2048});
-    data.tileMinPosition = FixtureMin;
+    data.tile_min_position = FixtureMin;
     auto resized = data.tiles.set_size({FixtureSize.x(), FixtureSize.y()});
     if (!resized) Star::fatal_error(resized.error().what(), false);
     for (unsigned x = 0; x < FixtureSize.x(); ++x) {

@@ -301,7 +301,7 @@ std::unique_lock<std::mutex> TileDrawer::lockRenderData() {
 }
 
 RenderTile const& TileDrawer::getRenderTile(WorldRenderData const& renderData, Vec2I const& worldPos) {
-  Vec2I arrayPos = Vec2I(renderData.geometry.pdiff(worldPos[0], renderData.tileMinPosition[0]), worldPos[1] - renderData.tileMinPosition[1]);
+  Vec2I arrayPos = Vec2I(renderData.geometry.pdiff(worldPos[0], renderData.tile_min_position[0]), worldPos[1] - renderData.tile_min_position[1]);
 
   Vec2I size = Vec2I(renderData.tiles.extents());
   if (arrayPos[0] >= 0 && arrayPos[1] >= 0 && arrayPos[0] < size[0] && arrayPos[1] < size[1])

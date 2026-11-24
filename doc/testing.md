@@ -619,6 +619,15 @@ with a conservative earliest-timestamp bound; negative smear, TTL changes and
 failed-insertion timestamps must remain covered. Filtered cleanup still visits
 every entry. Revisiting evicted cells re-executes their deterministic callbacks.
 
+### Entity rendering
+
+Verify world-space particle birth on the logic tick separately from drawable,
+light and overlay sampling on repeated display frames. An absent or empty
+global directives list selects no directive. Fullbright frames still sample
+visible particles but do not request entity lights. Compare stable layer keys
+and changing vehicle/script layers separately; preserve same-layer order and
+check overlapping pixels as well as retained storage.
+
 ### Entity indexing
 
 Automatic IDs use both endpoints of the assigned interval. Explicit IDs outside

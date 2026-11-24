@@ -272,7 +272,7 @@ if (!result108) return std::unexpected(std::move(result108.error()));
 projectileConfig->fullbright = std::move(*result108);
   auto result109 = config.get_string("renderLayer", "Projectile");
 if (!result109) return std::unexpected(std::move(result109.error()));
-auto result110 = parseRenderLayer(std::move(*result109));
+auto result110 = parse_render_layer(*result109);
 if (!result110) return std::unexpected(std::move(result110.error()));
 projectileConfig->renderLayer = std::move(*result110);
 

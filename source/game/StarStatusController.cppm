@@ -175,7 +175,7 @@ public:
   const DirectivesGroup& parentDirectives() const;
   [[nodiscard]] std::expected<List<Drawable>, StarException> drawables(float interpolation = 1.0f) const;
   [[nodiscard]] std::expected<List<LightSource>, StarException> lightSources(float interpolation = 1.0f) const;
-  [[nodiscard]] std::expected<List<OverheadBar>, StarException> overheadBars();
+  [[nodiscard]] std::expected<List<OverheadBar>, StarException> overhead_bars();
   bool toolUsageSuppressed() const;
 
   // new audios and particles will only be generated on the client

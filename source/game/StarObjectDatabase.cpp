@@ -389,7 +389,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
     if (!renderLayerNameResult)
       return std::unexpected(std::move(renderLayerNameResult.error()));
     auto renderLayerName = std::move(*renderLayerNameResult);
-    auto renderLayerResult = parseRenderLayer(renderLayerName);
+    auto renderLayerResult = parse_render_layer(renderLayerName);
     if (!renderLayerResult)
       return std::unexpected(std::move(renderLayerResult.error()));
     auto renderLayer = std::move(*renderLayerResult);

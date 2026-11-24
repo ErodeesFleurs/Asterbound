@@ -46,6 +46,9 @@ import star.player_lua_bindings;
 import star.root;
 import star.random;
 import star.string;
+import star.string_view;
+import star.liquid_types;
+import star.material_types;
 import star.uuid;
 import star.vector;
 import star.world_server;
@@ -53,6 +56,46 @@ import star.world_server;
 using namespace Star;
 
 namespace {
+TEST(EntityRenderingTypes, LayerSpellingsAndUnsignedPacking) {
+  EXPECT_EQ(parse_render_layer("pReViEwObJeCt"), render_layer_preview_object);
+  EXPECT_EQ(parse_render_layer("Player+3"), render_layer_player + 3u);
+  EXPECT_EQ(parse_render_layer("Player-3"), render_layer_player - 3u);
+  EXPECT_EQ(parse_render_layer("Player+-3"), render_layer_player - 3u);
+  EXPECT_EQ(parse_render_layer("Player--3"), render_layer_player + 3u);
+  EXPECT_EQ(parse_render_layer("Player--2147483648"), render_layer_player + 0x80000000u);
+  EXPECT_EQ(parse_render_layer("Player+-2147483648"), render_layer_player - 0x80000000u);
+  EXPECT_FALSE(parse_render_layer("Player-3+2"));
+  EXPECT_FALSE(parse_render_layer("Player++3"));
+  EXPECT_FALSE(parse_render_layer("Player-"));
+  EXPECT_FALSE(parse_render_layer("unknown"));
+  EXPECT_EQ(vehicle_layer_offset(std::numeric_limits<EntityId>::min(), 1), 1u);
+  EXPECT_EQ(vehicle_layer_offset(std::numeric_limits<EntityId>::max(), 2), render_layer_lower_mask - 1u);
+  EXPECT_EQ(vehicle_layer_offset(-1, 0), render_layer_lower_mask - 3u);
+}
+
+TEST(EntityRenderingTypes, PreviewDefaultsAndBarSchema) {
+  PreviewTile blank;
+  EXPECT_FALSE(blank.foreground);
+  EXPECT_FALSE(blank.update_mat_id);
+  EXPECT_FALSE(blank.update_light);
+  EXPECT_EQ(blank.mat_id, NullMaterialId);
+  EXPECT_EQ(blank.liq_id, EmptyLiquidId);
+  EXPECT_EQ(blank.hue_shift, 0);
+  EXPECT_EQ(blank.color_variant, DefaultMaterialColorVariant);
+  PreviewTile liquid(Vec2I(2, 3), LiquidId{5});
+  EXPECT_TRUE(liquid.foreground);
+  EXPECT_EQ(liquid.liq_id, 5);
+  EXPECT_EQ(liquid.mat_id, NullMaterialId);
+
+  auto bar = OverheadBar::create(JsonObject{{"percentage", .25f}, {"color", JsonArray{12, 34, 56}},
+      {"position", JsonArray{4, 5}}, {"detailOnly", true}});
+  ASSERT_TRUE(bar) << bar.error().what();
+  EXPECT_EQ(bar->entity_position, Vec2F(4, 5));
+  EXPECT_EQ(bar->percentage, .25f);
+  EXPECT_TRUE(bar->detail_only);
+  EXPECT_FALSE(bar->icon);
+}
+
 struct PlayerWorldContext {
   PlayerWorldContext() = default;
   PlayerWorldContext(PlayerWorldContext const&) = delete;
@@ -982,7 +1025,7 @@ const GameTestRegistration playerPresentationEvents(
           ++particles;
         return {};
       }
-      std::expected<void, StarException> addAudio(std::shared_ptr<AudioInstance>) override {
+      std::expected<void, StarException> add_audio(std::shared_ptr<AudioInstance>) override {
         ++audios;
         return {};
       }
@@ -1083,10 +1126,13 @@ const GameTestRegistration hiddenLoopingPresentationAudio(
     ASSERT_TRUE(loop);
     (*loop)->set_loops(-1);
     List<std::shared_ptr<AudioInstance>> retained;
-    NullRenderCallback hidden(&retained);
-    ASSERT_TRUE(hidden.addAudio(*oneShot));
+    NullRenderCallback hidden(retained);
+    EXPECT_FALSE((*oneShot)->position());
+    ASSERT_TRUE(hidden.add_audios({*oneShot}));
+    ASSERT_TRUE((*oneShot)->position());
+    EXPECT_EQ(*(*oneShot)->position(), Vec2F());
     EXPECT_TRUE(retained.empty());
-    ASSERT_TRUE(hidden.addAudio(*loop));
+    ASSERT_TRUE(hidden.add_audio(*loop));
     ASSERT_EQ(retained.size(), 1u);
     EXPECT_EQ(retained[0], *loop);
     // The original instance survives so animator position/volume/stop updates

@@ -38,33 +38,36 @@ class TileDrawer;
 
 RenderCallback::~RenderCallback() = default;
 
-std::optional<std::reference_wrapper<TileDrawer>> RenderCallback::tileDrawer() const {
+std::optional<std::reference_wrapper<TileDrawer>> RenderCallback::tile_drawer() const {
   return std::nullopt;
 }
 
-std::expected<void, StarException> RenderCallback::addDrawables(List<Drawable> drawables, EntityRenderLayer renderLayer, Vec2F translate) {
+std::expected<void, StarException> RenderCallback::add_drawables(List<Drawable> drawables, EntityRenderLayer render_layer, Vec2F translate) {
   for (auto& drawable : drawables) {
-    drawable.translate(translate);
-    auto result = addDrawable(std::move(drawable), renderLayer);
+    if (translate != Vec2F())
+      drawable.translate(translate);
+    auto result = add_drawable(std::move(drawable), render_layer);
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
   return {};
 }
 
-std::expected<void, StarException> RenderCallback::addLightSources(List<LightSource> lightSources, Vec2F translate) {
-  for (auto& lightSource : lightSources) {
-    lightSource.translate(translate);
-    auto result = addLightSource(std::move(lightSource));
+std::expected<void, StarException> RenderCallback::add_light_sources(std::span<LightSource const> light_sources, Vec2F translate) {
+  for (auto light_source : light_sources) {
+    if (translate != Vec2F())
+      light_source.translate(translate);
+    auto result = add_light_source(std::move(light_source));
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
   return {};
 }
 
-std::expected<void, StarException> RenderCallback::addParticles(List<Particle> particles, Vec2F translate) {
+std::expected<void, StarException> RenderCallback::add_particles(List<Particle> particles, Vec2F translate) {
   for (auto& particle : particles) {
-    particle.translate(translate);
+    if (translate != Vec2F())
+      particle.translate(translate);
     auto result = add_particle(std::move(particle));
     if (!result)
       return std::unexpected(std::move(result.error()));
@@ -72,29 +75,30 @@ std::expected<void, StarException> RenderCallback::addParticles(List<Particle> p
   return {};
 }
 
-std::expected<void, StarException> RenderCallback::addAudios(List<std::shared_ptr<AudioInstance>> audios, Vec2F translate) {
+std::expected<void, StarException> RenderCallback::add_audios(List<std::shared_ptr<AudioInstance>> audios, Vec2F translate) {
   for (auto& audio : audios) {
     audio->translate(translate);
-    auto result = addAudio(std::move(audio));
+    auto result = add_audio(std::move(audio));
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
   return {};
 }
 
-std::expected<void, StarException> RenderCallback::addTilePreviews(List<PreviewTile> previews) {
+std::expected<void, StarException> RenderCallback::add_tile_previews(List<PreviewTile> previews) {
   for (auto& preview : previews) {
-    auto result = addTilePreview(std::move(preview));
+    auto result = add_tile_preview(std::move(preview));
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
   return {};
 }
 
-std::expected<void, StarException> RenderCallback::addOverheadBars(List<OverheadBar> bars, Vec2F translate) {
-  for (auto& bar : bars) {
-    bar.entityPosition += translate;
-    auto result = addOverheadBar(std::move(bar));
+std::expected<void, StarException> RenderCallback::add_overhead_bars(std::span<OverheadBar const> bars, Vec2F translate) {
+  for (auto bar : bars) {
+    if (translate != Vec2F())
+      bar.entity_position += translate;
+    auto result = add_overhead_bar(std::move(bar));
     if (!result)
       return std::unexpected(std::move(result.error()));
   }

@@ -104,16 +104,16 @@ public:
   std::optional<std::reference_wrapper<TileDrawer>> tileDrawer() const;
 
   void update(float dt);
-  [[nodiscard]] std::expected<void, StarException> render(WorldRenderData& renderData, std::function<std::expected<bool, StarException>()> lightWaiter);
-  [[nodiscard]] std::expected<void, StarException> adjustLighting(WorldRenderData& renderData);
+  [[nodiscard]] std::expected<void, StarException> render(WorldRenderData& render_data, std::function<std::expected<bool, StarException>()> light_waiter);
+  [[nodiscard]] std::expected<void, StarException> adjustLighting(WorldRenderData& render_data);
 
 private:
   explicit WorldPainter(Root& root);
   [[nodiscard]] std::expected<void, StarException> initialize();
-  [[nodiscard]] std::expected<void, StarException> renderParticles(WorldRenderData& renderData, Particle::Layer layer);
-  [[nodiscard]] std::expected<void, StarException> renderBars(WorldRenderData& renderData);
+  [[nodiscard]] std::expected<void, StarException> renderParticles(WorldRenderData& render_data, Particle::Layer layer);
+  [[nodiscard]] std::expected<void, StarException> renderBars(WorldRenderData& render_data);
 
-  [[nodiscard]] std::expected<void, StarException> drawEntityLayer(List<Drawable> const& drawables, EntityHighlightEffect highlightEffect = EntityHighlightEffect());
+  [[nodiscard]] std::expected<void, StarException> draw_entity_layer(List<Drawable> const& drawables, EntityHighlightEffect highlight_effect);
 
   [[nodiscard]] std::expected<void, StarException> draw_drawable(Drawable const& drawable);
   [[nodiscard]] std::expected<void, StarException> draw_drawable_set(List<Drawable> const& drawables);
@@ -128,9 +128,9 @@ private:
   std::shared_ptr<EnvironmentPainter> m_environmentPainter;
   std::shared_ptr<TilePainter> m_tilePainter;
 
-  Json m_highlightConfig;
-  Map<EntityHighlightEffectType, std::pair<Directives, Directives>> m_highlightDirectives;
-  Map<EntityRenderLayer, List<std::pair<EntityHighlightEffect, std::reference_wrapper<List<Drawable> const>>>> m_entityDrawableLayers;
+  Json m_highlight_config;
+  Map<EntityHighlightEffectType, std::pair<Directives, Directives>> m_highlight_directives;
+  FrameLayers<EntityDrawableGroup> m_entity_drawable_layers;
 
   Vec2F m_entityBarOffset;
   Vec2F m_entityBarSpacing;

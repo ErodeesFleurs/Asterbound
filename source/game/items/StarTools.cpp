@@ -778,7 +778,7 @@ void BeamMiningTool::setEnd(EndType) {
   m_endType = EndType::Object;
 }
 
-std::expected<List<PreviewTile>, StarException> BeamMiningTool::previewTiles(bool shifting) const {
+std::expected<List<PreviewTile>, StarException> BeamMiningTool::preview_tiles(bool shifting) const {
   List<PreviewTile> result;
   auto ownerp = owner();
   if (!ownerp)
@@ -1097,7 +1097,7 @@ std::expected<void, StarException> PaintingBeamTool::update(float dt, FireMode f
   return FireableItem::update(dt, fireMode, shifting, moves);
 }
 
-std::expected<List<PreviewTile>, StarException> PaintingBeamTool::previewTiles(bool shifting) const {
+std::expected<List<PreviewTile>, StarException> PaintingBeamTool::preview_tiles(bool shifting) const {
   List<PreviewTile> result;
   auto ownerResult = owner();
   if (!ownerResult)

@@ -116,7 +116,7 @@ struct EffectEmitter::PendingEvents {
     if (!prepared)
       return std::unexpected(std::move(prepared.error()));
     for (; audio_index < audio.sounds.size(); ++audio_index) {
-      auto added = sink.addAudio(audio.sounds[audio_index]);
+      auto added = sink.add_audio(audio.sounds[audio_index]);
       if (!added)
         return std::unexpected(std::move(added.error()));
     }
@@ -241,11 +241,11 @@ void EffectEmitter::reset() {
   m_activeSources.set({});
 }
 
-std::expected<void, StarException> EffectEmitter::collectRenderEvents(RenderCallback& renderCallback) {
+std::expected<void, StarException> EffectEmitter::collectRenderEvents(RenderCallback& render_callback) {
   m_collectsEvents = true;
   std::shared_ptr<ParticleDatabase const> database;
   if (m_pending_events) {
-    auto submitted = m_pending_events->submit(m_root, renderCallback, database);
+    auto submitted = m_pending_events->submit(m_root, render_callback, database);
     if (!submitted)
       return submitted;
     m_pending_events.reset();
@@ -257,7 +257,7 @@ std::expected<void, StarException> EffectEmitter::collectRenderEvents(RenderCall
     if (!source->has_pending_events())
       continue;
     PendingEvents batch{*source, source->take_stages(), position->get(), m_baseVelocity, m_direction};
-    auto submitted = batch.submit(m_root, renderCallback, database);
+    auto submitted = batch.submit(m_root, render_callback, database);
     if (!submitted) {
       m_pending_events = std::make_unique<PendingEvents>(std::move(batch));
       return submitted;

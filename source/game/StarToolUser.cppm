@@ -99,9 +99,9 @@ public:
   [[nodiscard]] std::expected<List<DamageSource>, StarException> damageSources() const;
   [[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> forceRegions() const;
 
-  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& renderCallback);
+  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& render_callback);
 
-  [[nodiscard]] std::expected<void, StarException> render(RenderCallback& renderCallback, bool inToolRange, bool shifting, EntityRenderLayer renderLayer);
+  [[nodiscard]] std::expected<void, StarException> render(RenderCallback& render_callback, bool inToolRange, bool shifting, EntityRenderLayer renderLayer);
 
   [[nodiscard]] std::expected<void, StarException> setItems(std::shared_ptr<Item> primaryHandItem, std::shared_ptr<Item> altHandItem);
 

@@ -18,7 +18,7 @@ public:
 
   virtual ~PreviewTileTool() = default;
   [[nodiscard]]
-  virtual std::expected<List<PreviewTile>, StarException> previewTiles(bool shifting) const = 0;
+  virtual std::expected<List<PreviewTile>, StarException> preview_tiles(bool shifting) const = 0;
 };
 
 }

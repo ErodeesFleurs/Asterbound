@@ -1287,7 +1287,7 @@ if (!result623) return std::unexpected(std::move(result623.error()));
   return {};
 }
 
-std::expected<void, StarException> Plant::collectRenderEvents(RenderCallback& renderCallback) {
+std::expected<void, StarException> Plant::collectRenderEvents(RenderCallback& render_callback) {
   auto damageOffset = this->root().random().uniform_float(-0.1f, 0.1f);
   if (!damageOffset)
     return std::unexpected(std::move(damageOffset.error()));
@@ -1334,7 +1334,7 @@ auto particle = std::move(*result611);
         }
         particle.position = {m_tileDamageX + this->root().random().uniform_float(), m_tileDamageY + this->root().random().uniform_float()};
         particle.translate(position());
-        auto result612 = renderCallback.add_particle(std::move(particle));
+        auto result612 = render_callback.add_particle(std::move(particle));
 if (!result612) return std::unexpected(std::move(result612.error()));
       }
       auto result613 = m_stemDropConfig.get("sounds", JsonObject());
@@ -1361,7 +1361,7 @@ audioInstance->set_position(pos);
 auto result619 = sound.get_float("volume", 1.0f);
 if (!result619) return std::unexpected(std::move(result619.error()));
 audioInstance->set_volume(std::move(*result619));
-auto result620 = renderCallback.addAudio(std::move(audioInstance));
+auto result620 = render_callback.add_audio(std::move(audioInstance));
 if (!result620) return std::unexpected(std::move(result620.error()));
       }
     }
@@ -1369,7 +1369,7 @@ if (!result620) return std::unexpected(std::move(result620.error()));
   return {};
 }
 
-std::expected<void, StarException> Plant::render(RenderCallback& renderCallback) {
+std::expected<void, StarException> Plant::render(RenderCallback& render_callback) {
   float damageXOffset = m_presentationDamageXOffset;
 
   for (auto const& plantPiece : m_pieces) {
@@ -1388,13 +1388,13 @@ auto drawable = std::move(*result1283);
       drawable.scale(Vec2F(-1, 1));
 
     if (plantPiece.rotationType == RotateCrownBranch || plantPiece.rotationType == RotateCrownLeaves) {
-      drawable.rotate(branchRotation(m_tilePosition[0], plantPiece.rotationOffset * 1.4f, renderCallback.presentation().interpolation()) * 0.7f, plantPiece.offset + Vec2F(size[0] / 2.0f, 0));
+      drawable.rotate(branchRotation(m_tilePosition[0], plantPiece.rotationOffset * 1.4f, render_callback.presentation().interpolation()) * 0.7f, plantPiece.offset + Vec2F(size[0] / 2.0f, 0));
       drawable.translate(Vec2F(0, -0.40f));
     } else if (plantPiece.rotationType == RotateBranch || plantPiece.rotationType == RotateLeaves) {
-      drawable.rotate(branchRotation(m_tilePosition[0], plantPiece.rotationOffset * 1.4f, renderCallback.presentation().interpolation()), plantPiece.offset + Vec2F(size) / 2.0f);
+      drawable.rotate(branchRotation(m_tilePosition[0], plantPiece.rotationOffset * 1.4f, render_callback.presentation().interpolation()), plantPiece.offset + Vec2F(size) / 2.0f);
     }
     drawable.translate(position());
-    auto result604 = renderCallback.addDrawable(std::move(drawable), RenderLayerPlant);
+    auto result604 = render_callback.add_drawable(std::move(drawable), render_layer_plant);
 if (!result604) return std::unexpected(std::move(result604.error()));
   }
 

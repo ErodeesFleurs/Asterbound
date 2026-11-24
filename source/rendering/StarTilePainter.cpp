@@ -175,15 +175,15 @@ std::expected<std::shared_ptr<TilePainter>, StarException> TilePainter::create(R
 }
 
 std::expected<void, StarException> TilePainter::adjustLighting(WorldRenderData& renderData) const {
-  RectI lightRange = RectI::with_size(renderData.lightMinPosition, Vec2I(renderData.lightMap.size()));
+  RectI lightRange = RectI::with_size(renderData.light_min_position, Vec2I(renderData.light_map.size()));
   return forEachRenderTile(renderData, lightRange, [&](Vec2I const& pos, RenderTile const& tile) -> std::expected<void, StarException> {
       // Only adjust lighting for tiles with liquid above the draw threshold
       float drawLevel = liquidDrawLevel(byte_to_float(tile.liquidLevel));
       if (drawLevel == 0.0f)
         return {};
 
-      auto lightIndex = Vec2U(pos - renderData.lightMinPosition);
-      auto lightValue = renderData.lightMap.get(lightIndex.x(), lightIndex.y());
+      auto lightIndex = Vec2U(pos - renderData.light_min_position);
+      auto lightValue = renderData.light_map.get(lightIndex.x(), lightIndex.y());
       if (!lightValue)
         return std::unexpected(std::move(lightValue.error()));
 
@@ -194,7 +194,7 @@ std::expected<void, StarException> TilePainter::adjustLighting(WorldRenderData& 
       auto adjusted = lightValue->piecewise_multiply(Vec3F::filled(1.f - darknessLevel)
                                                      + liquid->get().bottomLightMix * darknessLevel);
 
-      return renderData.lightMap.set(lightIndex.x(), lightIndex.y(), adjusted);
+      return renderData.light_map.set(lightIndex.x(), lightIndex.y(), adjusted);
     });
 }
 

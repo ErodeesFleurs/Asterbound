@@ -201,9 +201,9 @@ m_interactive.set(std::move(*result1029));
 if (!result1030) return std::unexpected(std::move(result1030.error()));
 auto result1031 = std::move(*result1030).to_string();
 if (!result1031) return std::unexpected(std::move(result1031.error()));
-auto result1032 = parseRenderLayer(std::move(*result1031));
+auto result1032 = parse_render_layer(*result1031);
 if (!result1032) return std::unexpected(std::move(result1032.error()));
-m_baseRenderLayer = std::move(*result1032);
+m_base_render_layer = std::move(*result1032);
   auto result1033 = configValue("overrideRenderLayer");
 if (!result1033) return std::unexpected(std::move(result1033.error()));
 if (!std::move(*result1033).is_null()) {
@@ -211,9 +211,9 @@ if (!std::move(*result1033).is_null()) {
 if (!result1034) return std::unexpected(std::move(result1034.error()));
 auto result1035 = std::move(*result1034).to_string();
 if (!result1035) return std::unexpected(std::move(result1035.error()));
-auto result1036 = parseRenderLayer(std::move(*result1035));
+auto result1036 = parse_render_layer(*result1035);
 if (!result1036) return std::unexpected(std::move(result1036.error()));
-m_overrideRenderLayer = std::move(*result1036);
+m_override_render_layer = std::move(*result1036);
   }
 
   auto result1037 = configValue("animationScript");
@@ -781,16 +781,16 @@ std::uint64_t Vehicle::presentationEpoch() const {
 
 std::expected<void, StarException> Vehicle::collectRenderEvents(RenderCallback& renderer) {
   auto&& result1190 = m_networkedAnimatorDynamicTarget.pullNewAudios();
-auto result1191 = renderer.addAudios(result1190);
+auto result1191 = renderer.add_audios(std::move(result1190));
 if (!result1191) return std::unexpected(std::move(result1191.error()));
   auto&& result1192 = m_networkedAnimatorDynamicTarget.pullNewParticles();
-auto result1193 = renderer.addParticles(result1192);
+auto result1193 = renderer.add_particles(std::move(result1192));
 if (!result1193) return std::unexpected(std::move(result1193.error()));
   auto&& result1196 = m_scriptedAnimator.pull_new_audios();
-auto result1197 = renderer.addAudios(result1196);
+auto result1197 = renderer.add_audios(std::move(result1196));
 if (!result1197) return std::unexpected(std::move(result1197.error()));
   auto&& result1198 = m_scriptedAnimator.pull_new_particles();
-auto result1199 = renderer.addParticles(result1198);
+auto result1199 = renderer.add_particles(std::move(result1198));
 if (!result1199) return std::unexpected(std::move(result1199.error()));
   return {};
 }
@@ -802,21 +802,21 @@ if (!result1187) return std::unexpected(std::move(result1187.error()));
 for (auto& drawable : std::move(*result1187)) {
     if (drawable.second < 0.0f)
       {
-auto result1188 = renderer.addDrawable(std::move(drawable.first), renderLayer(VehicleLayer::Back));
+auto result1188 = renderer.add_drawable(std::move(drawable.first), render_layer(VehicleLayer::Back));
 if (!result1188) return std::unexpected(std::move(result1188.error()));
 }
     else
       {
-auto result1189 = renderer.addDrawable(std::move(drawable.first), renderLayer(VehicleLayer::Front));
+auto result1189 = renderer.add_drawable(std::move(drawable.first), render_layer(VehicleLayer::Front));
 if (!result1189) return std::unexpected(std::move(result1189.error()));
 }
   }
 
 
   auto&& result1194 = m_scriptedAnimator.drawables();
-for (auto drawablePair : result1194)
+for (auto const& drawable_pair : result1194)
     {
-auto result1195 = renderer.addDrawable(drawablePair.first, drawablePair.second.value_or(renderLayer(VehicleLayer::Front)));
+auto result1195 = renderer.add_drawable(drawable_pair.first, drawable_pair.second.value_or(render_layer(VehicleLayer::Front)));
 if (!result1195) return std::unexpected(std::move(result1195.error()));
 }
   return {};
@@ -826,10 +826,10 @@ std::expected<void, StarException> Vehicle::renderLightSources(RenderCallback& r
   auto sample = m_networkedAnimator->sample(renderer.presentation().interpolation());
   auto result1183 = sample.lightSources(position());
 if (!result1183) return std::unexpected(std::move(result1183.error()));
-auto result1184 = renderer.addLightSources(std::move(*result1183));
+auto result1184 = renderer.add_light_sources(*result1183);
 if (!result1184) return std::unexpected(std::move(result1184.error()));
   auto&& result1185 = m_scriptedAnimator.light_sources();
-auto result1186 = renderer.addLightSources(result1185);
+auto result1186 = renderer.add_light_sources(result1185);
 if (!result1186) return std::unexpected(std::move(result1186.error()));
   return {};
 }
@@ -845,16 +845,16 @@ std::expected<bool, StarException> Vehicle::shouldDestroy() const {
   return m_shouldDestroy;
 }
 
-std::expected<void, StarException> Vehicle::destroy(std::optional<std::reference_wrapper<RenderCallback>> renderCallback) {
-  if (renderCallback) {
+std::expected<void, StarException> Vehicle::destroy(std::optional<std::reference_wrapper<RenderCallback>> render_callback) {
+  if (render_callback) {
     auto result1177 = m_networkedAnimator->update(0.0, std::ref(m_networkedAnimatorDynamicTarget));
 if (!result1177) return std::unexpected(std::move(result1177.error()));
 
     auto&& result1178 = m_networkedAnimatorDynamicTarget.pullNewAudios();
-auto result1179 = renderCallback->get().addAudios(result1178);
+auto result1179 = render_callback->get().add_audios(std::move(result1178));
 if (!result1179) return std::unexpected(std::move(result1179.error()));
     auto&& result1180 = m_networkedAnimatorDynamicTarget.pullNewParticles();
-auto result1181 = renderCallback->get().addParticles(result1180);
+auto result1181 = render_callback->get().add_particles(std::move(result1180));
 if (!result1181) return std::unexpected(std::move(result1181.error()));
   }
   return {};
@@ -1072,7 +1072,7 @@ Vec2F partAnchor = std::move(*result1133);
   if (loungePosition->direction == Direction::Left)
     loungePosition->angle += std::numbers::pi;
   loungePosition->controllable = true;
-  loungePosition->loungeRenderLayer = renderLayer(VehicleLayer::Passenger);
+  loungePosition->loungeRenderLayer = render_layer(VehicleLayer::Passenger);
   loungePosition->orientation = positionConfig.orientation.get();
   loungePosition->emote = positionConfig.emote.get();
   loungePosition->dance = positionConfig.dance.get();
@@ -1208,12 +1208,12 @@ void Vehicle::setPosition(Vec2F const& position) {
   m_movementController->setPosition(position);
 }
 
-EntityRenderLayer Vehicle::renderLayer(VehicleLayer vehicleLayer) const {
+EntityRenderLayer Vehicle::render_layer(VehicleLayer vehicle_layer) const {
   // Z-offset based on entity id, so vehicles don't overlap strangely.
-  return m_overrideRenderLayer
-    ? (*m_overrideRenderLayer + static_cast<unsigned>(vehicleLayer))
-    : (m_baseRenderLayer
-       + (static_cast<EntityRenderLayer>(entityId() * 4 + static_cast<unsigned>(vehicleLayer)) & RenderLayerLowerMask));
+  return m_override_render_layer
+    ? (*m_override_render_layer + static_cast<unsigned>(vehicle_layer))
+    : (m_base_render_layer
+       + vehicle_layer_offset(entityId(), static_cast<EntityRenderLayer>(vehicle_layer)));
 }
 
 std::expected<LuaCallbacks, StarException> Vehicle::makeVehicleCallbacks() {

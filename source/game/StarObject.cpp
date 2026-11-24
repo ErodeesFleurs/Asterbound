@@ -889,36 +889,36 @@ std::expected<void, StarException> Object::update(float dt, std::uint64_t) {
   return {};
 }
 
-std::expected<void, StarException> Object::collectRenderEvents(RenderCallback& renderCallback) {
+std::expected<void, StarException> Object::collectRenderEvents(RenderCallback& render_callback) {
   for (auto const& pair : m_imageKeys)
     m_networkedAnimator->setGlobalTag(pair.first, pair.second);
   auto shake = computeDamageShake();
   if (!shake)
     return std::unexpected(std::move(shake.error()));
   m_presentationDamageShake = *shake;
-  auto operation1 = collectParticles(renderCallback);
+  auto operation1 = collectParticles(render_callback);
   if (!operation1)
     return std::unexpected(std::move(operation1.error()));
-  auto operation2 = collectSounds(renderCallback);
+  auto operation2 = collectSounds(render_callback);
   if (!operation2)
     return std::unexpected(std::move(operation2.error()));
-  auto operation3 = renderCallback.addAudios(m_networkedAnimatorDynamicTarget.pullNewAudios());
+  auto operation3 = render_callback.add_audios(m_networkedAnimatorDynamicTarget.pullNewAudios());
   if (!operation3)
     return std::unexpected(std::move(operation3.error()));
-  auto operation4 = renderCallback.addParticles(m_networkedAnimatorDynamicTarget.pullNewParticles());
+  auto operation4 = render_callback.add_particles(m_networkedAnimatorDynamicTarget.pullNewParticles());
   if (!operation4)
     return std::unexpected(std::move(operation4.error()));
-  auto operation8 = renderCallback.addParticles(m_scriptedAnimator.pull_new_particles());
+  auto operation8 = render_callback.add_particles(m_scriptedAnimator.pull_new_particles());
   if (!operation8)
     return std::unexpected(std::move(operation8.error()));
-  auto operation9 = renderCallback.addAudios(m_scriptedAnimator.pull_new_audios());
+  auto operation9 = render_callback.add_audios(m_scriptedAnimator.pull_new_audios());
   if (!operation9)
     return std::unexpected(std::move(operation9.error()));
   return {};
 }
 
-std::expected<void, StarException> Object::render(RenderCallback& renderCallback) {
-  auto sample = m_networkedAnimator->sample(renderCallback.presentation().interpolation());
+std::expected<void, StarException> Object::render(RenderCallback& render_callback) {
+  auto sample = m_networkedAnimator->sample(render_callback.presentation().interpolation());
   if (!m_networkedAnimator->constParts().empty()) {
     auto shakeResult = damageShake();
     if (!shakeResult)
@@ -928,7 +928,7 @@ std::expected<void, StarException> Object::render(RenderCallback& renderCallback
     if (!drawablesResult)
       return std::unexpected(std::move(drawablesResult.error()));
     auto drawables = std::move(*drawablesResult);
-    auto operation5 = renderCallback.addDrawables(drawables, renderLayer());
+    auto operation5 = render_callback.add_drawables(std::move(drawables), renderLayer());
     if (!operation5)
       return std::unexpected(std::move(operation5.error()));
   } else if (m_orientationIndex != npos) {
@@ -936,28 +936,28 @@ std::expected<void, StarException> Object::render(RenderCallback& renderCallback
     if (!drawablesResult)
       return std::unexpected(std::move(drawablesResult.error()));
     auto drawables = std::move(*drawablesResult);
-    auto operation6 = renderCallback.addDrawables(drawables, renderLayer(), position());
+    auto operation6 = render_callback.add_drawables(std::move(drawables), renderLayer(), position());
     if (!operation6)
       return std::unexpected(std::move(operation6.error()));
   }
   auto const& drawables = m_scriptedAnimator.drawables();
   for (auto const& pair : drawables) {
-    auto operation7 = renderCallback.addDrawable(pair.first, pair.second.value_or(renderLayer()));
+    auto operation7 = render_callback.add_drawable(pair.first, pair.second.value_or(renderLayer()));
     if (!operation7)
       return std::unexpected(std::move(operation7.error()));
   }
   return {};
 }
 
-std::expected<void, StarException> Object::renderLightSources(RenderCallback& renderCallback) {
-  auto sample = m_networkedAnimator->sample(renderCallback.presentation().interpolation());
+std::expected<void, StarException> Object::renderLightSources(RenderCallback& render_callback) {
+  auto sample = m_networkedAnimator->sample(render_callback.presentation().interpolation());
   auto lightsResult = lightSources(&sample);
   if (!lightsResult)
     return std::unexpected(std::move(lightsResult.error()));
-  if (auto added = renderCallback.addLightSources(std::move(*lightsResult)); !added)
+  if (auto added = render_callback.add_light_sources(*lightsResult); !added)
     return std::unexpected(std::move(added.error()));
   auto const& lights = m_scriptedAnimator.light_sources();
-  return renderCallback.addLightSources(lights);
+  return render_callback.add_light_sources(lights);
 }
 
 std::expected<bool, StarException> Object::damageTiles(List<Vec2I> const&, Vec2F const&, TileDamage const& tileDamage) {
@@ -997,7 +997,7 @@ std::expected<bool, StarException> Object::shouldDestroy() const {
   return m_broken || (m_health.get() <= 0);
 }
 
-std::expected<void, StarException> Object::destroy(std::optional<std::reference_wrapper<RenderCallback>> renderCallback) {
+std::expected<void, StarException> Object::destroy(std::optional<std::reference_wrapper<RenderCallback>> render_callback) {
   bool doSmash = m_health.get() <= 0;
   if (!doSmash) {
     auto smashConfigResult = configValue("smashOnBreak", m_config->smashOnBreak);
@@ -1145,7 +1145,7 @@ std::expected<void, StarException> Object::destroy(std::optional<std::reference_
         return std::unexpected(std::move(operation8.error()));
     }
   }
-  if (renderCallback && doSmash && !m_config->smashSoundOptions.empty()) {
+  if (render_callback && doSmash && !m_config->smashSoundOptions.empty()) {
     auto assetsResult = root().assets();
     if (!assetsResult)
       return std::unexpected(std::move(assetsResult.error()));
@@ -1162,11 +1162,12 @@ std::expected<void, StarException> Object::destroy(std::optional<std::reference_
     if (!instanceResult)
       return std::unexpected(std::move(instanceResult.error()));
     auto instance = std::move(*instanceResult);
-    auto operation9 = renderCallback->get().addAudios({std::move(instance)}, position());
+    instance->translate(position());
+    auto operation9 = render_callback->get().add_audio(std::move(instance));
     if (!operation9)
       return std::unexpected(std::move(operation9.error()));
   }
-  if (renderCallback && doSmash && !m_config->smashParticles.empty()) {
+  if (render_callback && doSmash && !m_config->smashParticles.empty()) {
     auto particlesDatabaseResult = root().particleDatabase();
     if (!particlesDatabaseResult)
       return std::unexpected(std::move(particlesDatabaseResult.error()));
@@ -1211,7 +1212,7 @@ std::expected<void, StarException> Object::destroy(std::optional<std::reference_
         particles.push_back(std::move(particle));
       }
     }
-    auto operation10 = renderCallback->get().addParticles(particles);
+    auto operation10 = render_callback->get().add_particles(std::move(particles));
     if (!operation10)
       return std::unexpected(std::move(operation10.error()));
   }
@@ -2443,10 +2444,10 @@ EntityRenderLayer Object::renderLayer() const {
   if (auto orientation = currentOrientation())
     return orientation->renderLayer;
   else
-    return RenderLayerObject;
+    return render_layer_object;
 }
 
-std::expected<void, StarException> Object::collectParticles(RenderCallback& renderCallback) {
+std::expected<void, StarException> Object::collectParticles(RenderCallback& render_callback) {
   if (!inWorld())
     return {};
   if (auto orientation = currentOrientation()) {
@@ -2468,7 +2469,7 @@ std::expected<void, StarException> Object::collectParticles(RenderCallback& rend
           particle.translate(Vec2F(space) + Vec2F(0.5, 0.5));
         }
         particle.translate(position());
-        auto operation1 = renderCallback.add_particle(std::move(particle));
+        auto operation1 = render_callback.add_particle(std::move(particle));
         if (!operation1)
           return std::unexpected(std::move(operation1.error()));
         auto varianceResult = root().random().uniform_float(-emitter.particleEmissionRateVariance, emitter.particleEmissionRateVariance);
@@ -2482,7 +2483,7 @@ std::expected<void, StarException> Object::collectParticles(RenderCallback& rend
   return {};
 }
 
-std::expected<void, StarException> Object::collectSounds(RenderCallback& renderCallback) {
+std::expected<void, StarException> Object::collectSounds(RenderCallback& render_callback) {
   if (m_soundEffectEnabled.get()) {
     if (!m_config->soundEffect.empty() && (!m_soundEffect || m_soundEffect->finished())) {
       auto assetsResult = root().assets();
@@ -2509,7 +2510,7 @@ std::expected<void, StarException> Object::collectSounds(RenderCallback& renderC
       sound->set_position(metaBoundBox().center() + position());
       sound->set_volume(0);
       sound->set_volume(1, 1.0);
-      auto operation2 = renderCallback.addAudio(sound);
+      auto operation2 = render_callback.add_audio(sound);
       if (!operation2)
         return std::unexpected(std::move(operation2.error()));
       m_soundEffect = std::move(sound);

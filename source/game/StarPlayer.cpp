@@ -1006,7 +1006,7 @@ ClientEntityMode Player::clientEntityMode() const {
 
 std::expected<void, StarException> Player::init(World& world, EntityId entityId, EntityMode mode) {
   m_hiddenLoopAudios.clear();
-  m_presentationBars.clear();
+  m_presentation_bars.clear();
   m_controlMovementState.reset();
   m_movementAnimationState.reset();
   m_movementController->set_network_moving_direction({});
@@ -1130,7 +1130,7 @@ std::expected<void, StarException> Player::uninit() {
   for (auto const& audio : m_hiddenLoopAudios)
     audio->stop();
   m_hiddenLoopAudios.clear();
-  m_presentationBars.clear();
+  m_presentation_bars.clear();
   std::optional<StarException> error;
   auto remember = [&error](auto result) {
     if (!result) {
@@ -1431,15 +1431,15 @@ std::expected<bool, StarException> Player::shouldDestroy() const {
   return isDead();
 }
 
-std::expected<void, StarException> Player::destroy(std::optional<std::reference_wrapper<RenderCallback>> renderCallback) {
+std::expected<void, StarException> Player::destroy(std::optional<std::reference_wrapper<RenderCallback>> render_callback) {
   m_state = State::Idle;
   m_emoteState = HumanoidEmote::Idle;
-  if (renderCallback && m_deathParticleBurst.get()) {
+  if (render_callback && m_deathParticleBurst.get()) {
     auto particlesResult = humanoid()->particles(*m_deathParticleBurst.get());
     if (!particlesResult)
       return std::unexpected(std::move(particlesResult.error()));
     auto particles = std::move(*particlesResult);
-    if (auto result = renderCallback->get().addParticles(std::move(particles), position()); !result)
+    if (auto result = render_callback->get().add_particles(std::move(particles), position()); !result)
       return std::unexpected(std::move(result.error()));
   }
   if (isMaster()) {
@@ -2472,21 +2472,21 @@ std::uint64_t Player::presentationEpoch() const {
 }
 
 std::expected<void, StarException> Player::collectRenderEvents(RenderCallback& callback) {
-  NullRenderCallback discard(&m_hiddenLoopAudios);
+  NullRenderCallback discard(m_hiddenLoopAudios);
   bool hidden = invisible();
-  RenderCallback& renderCallback = hidden ? static_cast<RenderCallback&>(discard) : callback;
+  RenderCallback& render_callback = hidden ? static_cast<RenderCallback&>(discard) : callback;
   if (!hidden && !isTeleporting()) {
-    auto bars = m_statusController->overheadBars();
+    auto bars = m_statusController->overhead_bars();
     if (!bars)
       return std::unexpected(std::move(bars.error()));
-    m_presentationBars = std::move(*bars);
+    m_presentation_bars = std::move(*bars);
   } else {
-    m_presentationBars.clear();
+    m_presentation_bars.clear();
   }
   if (!hidden) {
     for (auto& audio : std::exchange(m_hiddenLoopAudios, {})) {
       if (!audio->finished()) {
-        if (auto result = callback.addAudio(std::move(audio)); !result)
+        if (auto result = callback.add_audio(std::move(audio)); !result)
           return std::unexpected(std::move(result.error()));
       }
     }
@@ -2517,7 +2517,7 @@ std::expected<void, StarException> Player::collectRenderEvents(RenderCallback& c
       auto offset = std::move(*offsetResult);
       noise->set_position(position() + offset);
       noise->set_volume(m_landingVolume);
-      if (auto result = renderCallback.addAudio(std::move(noise)); !result)
+      if (auto result = render_callback.add_audio(std::move(noise)); !result)
         return std::unexpected(std::move(result.error()));
     }
     if (m_footstepPending) {
@@ -2535,7 +2535,7 @@ std::expected<void, StarException> Player::collectRenderEvents(RenderCallback& c
         return std::unexpected(std::move(varianceResult.error()));
       auto variance = std::move(*varianceResult);
       noise->set_volume(1 - variance);
-      if (auto result = renderCallback.addAudio(std::move(noise)); !result)
+      if (auto result = render_callback.add_audio(std::move(noise)); !result)
         return std::unexpected(std::move(result.error()));
     }
     }
@@ -2544,15 +2544,15 @@ std::expected<void, StarException> Player::collectRenderEvents(RenderCallback& c
   }
   m_footstepPending = false;
   m_landingNoisePending = false;
-  if (auto result = renderCallback.addAudios(m_effectsAnimatorDynamicTarget.pullNewAudios()); !result)
+  if (auto result = render_callback.add_audios(m_effectsAnimatorDynamicTarget.pullNewAudios()); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = renderCallback.addParticles(m_effectsAnimatorDynamicTarget.pullNewParticles()); !result)
+  if (auto result = render_callback.add_particles(m_effectsAnimatorDynamicTarget.pullNewParticles()); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = renderCallback.addAudios(m_techController->pullNewAudios()); !result)
+  if (auto result = render_callback.add_audios(m_techController->pullNewAudios()); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = renderCallback.addAudios(m_statusController->pullNewAudios()); !result)
+  if (auto result = render_callback.add_audios(m_statusController->pullNewAudios()); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = renderCallback.addAudios(m_humanoidDynamicTarget.pullNewAudios()); !result)
+  if (auto result = render_callback.add_audios(m_humanoidDynamicTarget.pullNewAudios()); !result)
     return std::unexpected(std::move(result.error()));
   for (auto const& pending : std::exchange(m_callbackSounds, {})) {
     auto assetsResult = root().assets();
@@ -2570,30 +2570,30 @@ std::expected<void, StarException> Player::collectRenderEvents(RenderCallback& c
     audio->set_volume(std::get<1>(pending));
     audio->set_pitch_multiplier(std::get<2>(pending));
     audio->set_position(position());
-    if (auto result = renderCallback.addAudio(std::move(audio)); !result)
+    if (auto result = render_callback.add_audio(std::move(audio)); !result)
       return std::unexpected(std::move(result.error()));
   }
   auto emittedResult = particles();
   if (!emittedResult)
     return std::unexpected(std::move(emittedResult.error()));
-  if (auto result = renderCallback.addParticles(std::move(*emittedResult)); !result)
+  if (auto result = render_callback.add_particles(std::move(*emittedResult)); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = m_tools->collectRenderEvents(renderCallback); !result)
+  if (auto result = m_tools->collectRenderEvents(render_callback); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = m_effectEmitter->collectRenderEvents(renderCallback); !result)
+  if (auto result = m_effectEmitter->collectRenderEvents(render_callback); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = m_songbook->collectRenderEvents(renderCallback); !result)
+  if (auto result = m_songbook->collectRenderEvents(render_callback); !result)
     return std::unexpected(std::move(result.error()));
   if (isMaster())
-    return m_deployment->collectRenderEvents(renderCallback, position());
+    return m_deployment->collectRenderEvents(render_callback, position());
   return {};
 }
 
-std::expected<void, StarException> Player::render(RenderCallback& renderCallback) {
+std::expected<void, StarException> Player::render(RenderCallback& render_callback) {
   if (invisible())
     return {};
   auto loungeAnchor = as<LoungeAnchor>(m_movementController->entity_anchor());
-  EntityRenderLayer layer = RenderLayerPlayer;
+  EntityRenderLayer layer = render_layer_player;
   auto overrideLayerResult = getSecretProperty("overrideRenderLayer");
   if (!overrideLayerResult)
     return std::unexpected(std::move(overrideLayerResult.error()));
@@ -2606,34 +2606,34 @@ std::expected<void, StarException> Player::render(RenderCallback& renderCallback
   }
   if (loungeAnchor)
     layer = loungeAnchor->loungeRenderLayer;
-  auto renderedResult = drawables(renderCallback.presentation().interpolation());
+  auto renderedResult = drawables(render_callback.presentation().interpolation());
   if (!renderedResult)
     return std::unexpected(std::move(renderedResult.error()));
-  if (auto result = renderCallback.addDrawables(std::move(*renderedResult), layer); !result)
+  if (auto result = render_callback.add_drawables(std::move(*renderedResult), layer); !result)
     return std::unexpected(std::move(result.error()));
   if (!isTeleporting()) {
-    if (auto result = renderCallback.addOverheadBars(m_presentationBars, position()); !result)
+    if (auto result = render_callback.add_overhead_bars(m_presentation_bars, position()); !result)
       return std::unexpected(std::move(result.error()));
   }
   auto rangeResult = inToolRange();
   if (!rangeResult)
     return std::unexpected(std::move(rangeResult.error()));
   auto range = std::move(*rangeResult);
-  if (auto result = m_tools->render(renderCallback, range, m_shifting, layer); !result)
+  if (auto result = m_tools->render(render_callback, range, m_shifting, layer); !result)
     return std::unexpected(std::move(result.error()));
   if (isMaster())
-    return m_deployment->render(renderCallback, position());
+    return m_deployment->render(render_callback, position());
   return {};
 }
 
-std::expected<void, StarException> Player::renderLightSources(RenderCallback& renderCallback) {
-  auto lightsResult = presentationLightSources(renderCallback.presentation().interpolation());
+std::expected<void, StarException> Player::renderLightSources(RenderCallback& render_callback) {
+  auto lightsResult = presentationLightSources(render_callback.presentation().interpolation());
   if (!lightsResult)
     return std::unexpected(std::move(lightsResult.error()));
   auto lights = std::move(*lightsResult);
-  if (auto result = renderCallback.addLightSources(std::move(lights)); !result)
+  if (auto result = render_callback.add_light_sources(lights); !result)
     return std::unexpected(std::move(result.error()));
-  return m_deployment->renderLightSources(renderCallback);
+  return m_deployment->renderLightSources(render_callback);
 }
 
 std::expected<void, StarException> Player::setRenderLayer(std::optional<EntityRenderLayer> layer) {

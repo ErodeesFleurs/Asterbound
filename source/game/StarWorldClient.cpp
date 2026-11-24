@@ -213,6 +213,17 @@ const String secret_broadcast_public_key = "SecretBroadcastPublicKey";
 constexpr std::string_view secret_broadcast_prefix("\0Broadcast\0", sizeof("\0Broadcast\0") - 1);
 const String legacy_voice_public_key(std::string("\0SE_VOICE_SIGNING_KEY", sizeof("\0SE_VOICE_SIGNING_KEY") - 1));
 constexpr std::string_view legacy_voice_prefix("data\0voice\0", sizeof("data\0voice\0") - 1);
+
+std::optional<std::reference_wrapper<Directives const>> select_directive(
+    std::shared_ptr<VisitableWorldParameters const> const& parameters, EntityId entity_id) {
+  if (!parameters || !parameters->globalDirectives || parameters->globalDirectives->empty())
+    return {};
+  auto const& options = *parameters->globalDirectives;
+  auto const& selected = options[static_cast<unsigned>(entity_id) % options.size()];
+  if (selected.empty())
+    return {};
+  return std::cref(selected);
+}
 }
 
 const float WorldClient::DropDist = 6.0f;
@@ -597,11 +608,11 @@ std::expected<void, StarException> WorldClient::removeEntity(EntityId entityId, 
     return {};
 
   if (andDie) {
-    ClientRenderCallback renderCallback(std::nullopt);
-    NullRenderCallback hiddenEvents;
+    ClientRenderCallback render_callback(std::nullopt);
+    NullRenderCallback hidden_events;
     RenderCallback& events = m_startupHiddenEntities.contains(entityId)
-        ? static_cast<RenderCallback&>(hiddenEvents)
-        : static_cast<RenderCallback&>(renderCallback);
+        ? static_cast<RenderCallback&>(hidden_events)
+        : static_cast<RenderCallback&>(render_callback);
     // Removal packets can arrive before the next tick's event pass. Drain
     // pending live events before destroy() contributes its final death effects.
     auto collected = entity->collectRenderEvents(events);
@@ -619,20 +630,12 @@ std::expected<void, StarException> WorldClient::removeEntity(EntityId entityId, 
     if (!destroyed)
       return std::unexpected(std::move(destroyed.error()));
 
-    std::optional<std::reference_wrapper<List<Directives> const>> directives;
-    if (auto& worldTemplate = m_worldTemplate) {
-      if (const auto& parameters = worldTemplate->worldParameters())
-        if (auto& globalDirectives = m_worldTemplate->worldParameters()->globalDirectives)
-          directives = std::cref(*globalDirectives);
-    }
-    if (directives) {
-      int directiveIndex = static_cast<unsigned>(entity->entityId()) % directives->get().size();
-      for (auto& p : renderCallback.particles)
-        p.directives.append(directives->get()[directiveIndex]);
-    }
+    if (auto selected = select_directive(directive_parameters(), entity->entityId()))
+      for (auto& particle : render_callback.particles)
+        particle.directives.append(selected->get());
 
-    m_particles->addParticles(std::move(renderCallback.particles));
-    m_samples.append_range(std::move(renderCallback.audios));
+    m_particles->addParticles(std::move(render_callback.particles));
+    m_samples.append_range(std::move(render_callback.audios));
   }
 
   if (auto version = m_masterEntitiesNetVersion.try_extract_value(entity->entityId())) {
@@ -970,26 +973,18 @@ WorldClientState& WorldClient::clientState() {
   return *m_clientState;
 }
 
-Vec2F WorldClient::renderPosition(EntityId entityId, PresentationContext presentation) const {
-  auto entity = this->entity(entityId);
-  if (!entity)
-    return {};
-  if (auto entry = m_entityPresentation.find_ref(entityId)) {
-    auto const& state = entry->get();
-    if (state.continuous && state.instance.lock() == entity && state.epoch == entity->presentationEpoch())
-      return state.position.sample(m_geometry, presentation.interpolation());
-  }
-  return entity->position();
+std::shared_ptr<VisitableWorldParameters const> WorldClient::directive_parameters() const {
+  return m_worldTemplate ? m_worldTemplate->worldParameters() : nullptr;
 }
 
-PresentationContext WorldClient::presentationFor(Entity const& entity, PresentationContext presentation) const {
+WorldClient::EntityRenderSample WorldClient::sample_entity(Entity const& entity, PresentationContext presentation) const {
   if (auto entry = m_entityPresentation.find_ref(entity.entityId())) {
     auto const& state = entry->get();
     if (state.continuous && state.instance.lock().get() == &entity && state.epoch == entity.presentationEpoch())
-      return presentation;
+      return {presentation, m_geometry.diff(state.position.sample(m_geometry, presentation.interpolation()), entity.position())};
   }
   // A replacement, teleport, or explicit reset has no previous display pose.
-  return presentation.current();
+  return {presentation.current(), {}};
 }
 
 void WorldClient::resetPresentation() {
@@ -1001,7 +996,7 @@ void WorldClient::resetPresentation() {
     m_sky->resetPresentation();
 }
 
-std::expected<void, StarException> WorldClient::render(WorldRenderData& renderData, unsigned bufferTiles, std::optional<std::reference_wrapper<TileDrawer>> tileDrawer, PresentationContext presentation) {
+std::expected<void, StarException> WorldClient::render(WorldRenderData& render_data, unsigned buffer_tiles, std::optional<std::reference_wrapper<TileDrawer>> tile_drawer, PresentationContext presentation) {
   if (m_headless) {
     return {};
   }
@@ -1022,65 +1017,57 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
     m_lightingThreadStarted = true;
   }
   
-  renderData.prepareFrame();
+  render_data.prepare_frame();
   float const interpolation = presentation.interpolation();
   if (!inWorld()) {
-    renderData.entityDrawables.clear();
-    renderData.particles.clear();
+    render_data.entity_drawables.clear();
+    render_data.particles.clear();
     return {};
   }
   
   // If we're dimming the world, then that takes priority
-  float dimRatio = m_worldDimTimer.percent();
+  float dim_ratio = m_worldDimTimer.percent();
   
   // Spends 80% of the time at pitch black with 10% ramp up and down
   
   m_worldDimColor = {};
   // always reset this to prevent persistent dimming from other sources
-  if (dimRatio) {
-    if (dimRatio <= 0.1f) {
-      m_worldDimLevel = dimRatio / 0.1f;
-    } else if (dimRatio >= 0.9f) {
-      m_worldDimLevel = (1 - dimRatio) / (1 - 0.9f);
+  if (dim_ratio) {
+    if (dim_ratio <= 0.1f) {
+      m_worldDimLevel = dim_ratio / 0.1f;
+    } else if (dim_ratio >= 0.9f) {
+      m_worldDimLevel = (1 - dim_ratio) / (1 - 0.9f);
     } else {
       m_worldDimLevel = 1.0f;
     }
   }
   
-  List<LightSource> renderLightSources;
-  m_previewTiles.clear();
+  m_preview_tiles.clear();
   
-  renderData.geometry = m_geometry;
-  m_particles->sampleParticles(interpolation, renderData.particles);
-  
-  ClientRenderCallback lightingRenderCallback(tileDrawer, presentation, m_presentationTimestep);
-  auto result47 = m_entityMap->for_all_entities([&, &self = *this](std::shared_ptr<Entity> const& entity)  -> std::expected<void, StarException> {
-      if (self.m_startupHiddenEntities.contains(entity->entityId())) {
-        return {};
-      }
-      
-      lightingRenderCallback.m_offset = self.m_geometry.diff(self.renderPosition(entity->entityId(), presentation), entity->position());
-      lightingRenderCallback.m_presentation = self.presentationFor(*entity, presentation);
-      auto result46 = entity->renderLightSources(lightingRenderCallback);
-      if (!result46)
-        return std::unexpected(std::move(result46.error()));
-      return {};
-    });
-  if (!result47)
-    return std::unexpected(std::move(result47.error()));
-  
-  renderLightSources = std::move(lightingRenderCallback.lightSources);
+  render_data.geometry = m_geometry;
+  m_particles->sampleParticles(interpolation, render_data.particles);
   
   RectI window = m_clientState->window();
-  RectI tileRange = window.padded(bufferTiles);
-  renderData.tileMinPosition = tileRange.min();
+  RectI tileRange = window.padded(buffer_tiles);
+  render_data.tile_min_position = tileRange.min();
   
   if (!m_fullBright) {
+    ClientRenderCallback lighting_callback(tile_drawer, presentation, m_presentationTimestep);
+    auto lights = m_entityMap->for_all_entities([&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
+      if (m_startupHiddenEntities.contains(entity->entityId()))
+        return {};
+      auto sample = sample_entity(*entity, presentation);
+      lighting_callback.position_offset = sample.offset;
+      lighting_callback.sample_context = sample.context;
+      return entity->renderLightSources(lighting_callback);
+    });
+    if (!lights)
+      return std::unexpected(std::move(lights.error()));
     {
-      std::lock_guard m_prepLocker(m_lightMapPrepMutex);
-      m_pendingLights = std::move(renderLightSources);
+      std::lock_guard prep_lock(m_lightMapPrepMutex);
+      m_pendingLights = std::move(lighting_callback.light_sources);
       m_pendingParticleLights.clear();
-      for (auto const& particle : renderData.particles)
+      for (auto const& particle : render_data.particles)
         if (particle.light != Color::palette_clear)
           m_pendingParticleLights.push_back({particle.position, particle.light.to_rgb_f()});
       m_pendingLightRange = window.padded(1);
@@ -1091,7 +1078,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
     if (m_asyncLighting) {
       m_lightingCond.notify_one();
     } else {
-      std::lock_guard lightingLocker(m_lightingMutex);
+      std::lock_guard lighting_locker(m_lightingMutex);
       auto result48 = lightingCalc();
       if (!result48)
         return std::unexpected(std::move(result48.error()));
@@ -1107,7 +1094,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
   auto result51 = (std::move(*result50)).to_float();
   if (!result51)
     return std::unexpected(std::move(result51.error()));
-  float pulseAmount = (std::move(*result51));
+  float pulse_amount = (std::move(*result51));
   auto result52 = this->root().assets();
   if (!result52)
     return std::unexpected(std::move(result52.error()));
@@ -1117,12 +1104,12 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
   auto result54 = (std::move(*result53)).to_float();
   if (!result54)
     return std::unexpected(std::move(result54.error()));
-  float pulseRate = (std::move(*result54));
-  float pulseLevel = 1 - pulseAmount * 0.5 * (std::sin(2 * std::numbers::pi * pulseRate * std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)).time_since_epoch().count() / 1000.0) + 1);
+  float pulse_rate = (std::move(*result54));
+  float pulse_level = 1 - pulse_amount * 0.5 * (std::sin(2 * std::numbers::pi * pulse_rate * std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)).time_since_epoch().count() / 1000.0) + 1);
   
   bool inspecting = m_mainPlayer->inspecting();
   
-  EntityId playerAimInteractive = null_entity_id;
+  EntityId player_aim_interactive = null_entity_id;
   {
     auto result59 = this->root().configuration();
     if (!result59)
@@ -1139,34 +1126,28 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
         if (!result62)
           return std::unexpected(std::move(result62.error()));
         if (auto entity = (std::move(*result62))) {
-          playerAimInteractive = entity->entityId();
+          player_aim_interactive = entity->entityId();
         }
       }
     }
   }
   
-  std::optional<std::reference_wrapper<List<Directives> const>> directives;
-  if (auto& worldTemplate = m_worldTemplate) {
-    if (const auto& parameters = worldTemplate->worldParameters()) {
-      if (auto& globalDirectives = parameters->globalDirectives) {
-        directives = std::cref(*globalDirectives);
-      }
-    }
-  }
-  std::size_t drawableIndex = 0;
+  auto directives = directive_parameters();
+  std::shared_ptr<ImageMetadataDatabase const> image_metadata;
+  std::size_t drawable_index = 0;
   auto result72 = m_entityMap->for_all_entities([&, &self = *this](std::shared_ptr<Entity> const& entity)  -> std::expected<void, StarException> {
       if (self.m_startupHiddenEntities.contains(entity->entityId())) {
         return {};
       }
       
-      if (drawableIndex == renderData.entityDrawables.size())
-        renderData.entityDrawables.push_back({});
-      auto& ed = renderData.entityDrawables[drawableIndex++];
-      ClientRenderCallback renderCallback(tileDrawer, self.presentationFor(*entity, presentation), self.m_presentationTimestep,
-          self.m_geometry.diff(self.renderPosition(entity->entityId(), presentation), entity->position()));
-      renderCallback.drawableTarget = &ed.layers;
+      if (drawable_index == render_data.entity_drawables.size())
+        render_data.entity_drawables.push_back({});
+      auto& ed = render_data.entity_drawables[drawable_index++];
+      auto sample = self.sample_entity(*entity, presentation);
+      ClientRenderCallback render_callback(tile_drawer, sample.context, self.m_presentationTimestep, sample.offset);
+      render_callback.drawable_target = ed.layers;
       
-      auto rendered = entity->render(renderCallback);
+      auto rendered = entity->render(render_callback);
       if (!rendered) {
         auto const& e = rendered.error();
         if (entity->isMaster()) {
@@ -1189,10 +1170,10 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
           auto result64 = self.root().logger().error("WorldClient: Exception caught in {}::render ({}): {}", result63->get(), entity->entityId(), issue);
           if (!result64)
             return std::unexpected(std::move(result64.error()));
-          auto toolUser = as<ToolUserEntity>(entity);
+          auto tool_user = as<ToolUserEntity>(entity);
           String image = "/rendering/sprites/error.png";
-          if (toolUser) {
-            auto result65 = enum_name<direction_names>(toolUser->facingDirection());
+          if (tool_user) {
+            auto result65 = enum_name<direction_names>(tool_user->facingDirection());
             if (!result65)
               return std::unexpected(std::move(result65.error()));
             image = Star::format("/rendering/sprites/error_{}.png", *result65);
@@ -1207,21 +1188,23 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
             return std::unexpected(std::move(result67.error()));
           auto drawable = (std::move(*result67));
           drawable.fullbright = true;
-          auto result68 = renderCallback.addDrawable(std::move(drawable), RenderLayerMiddleParticle);
+          auto result68 = render_callback.add_drawable(std::move(drawable), render_layer_middle_particle);
           if (!result68)
             return std::unexpected(std::move(result68.error()));
         }
       }
       
-      for (auto& p : ed.layers) {
-        if (directives) {
-          int directiveIndex = static_cast<unsigned>(entity->entityId()) % directives->get().size();
-          for (auto& d : p.second) {
+      if (auto selected = select_directive(directives, entity->entityId())) {
+        for (auto& layer : ed.layers) {
+          for (auto& d : layer.second) {
             if (d.is_image()) {
-              auto result69 = self.root().imageMetadataDatabase();
-              if (!result69)
-                return std::unexpected(std::move(result69.error()));
-              auto result70 = d.image_part().add_directives(*(std::move(*result69)), directives->get()[directiveIndex], true);
+              if (!image_metadata) {
+                auto metadata = self.root().imageMetadataDatabase();
+                if (!metadata)
+                  return std::unexpected(std::move(metadata.error()));
+                image_metadata = std::move(*metadata);
+              }
+              auto result70 = d.image_part().add_directives(*image_metadata, selected->get(), true);
               if (!result70)
                 return std::unexpected(std::move(result70.error()));
             }
@@ -1229,11 +1212,11 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
         }
       }
       
-      if (self.m_interactiveHighlightMode || (!inspecting && entity->entityId() == playerAimInteractive)) {
+      if (self.m_interactiveHighlightMode || (!inspecting && entity->entityId() == player_aim_interactive)) {
         if (auto interactive = as<InteractiveEntity>(entity)) {
           if (interactive->isInteractive()) {
-            ed.highlightEffect.type = EntityHighlightEffectType::Interactive;
-            ed.highlightEffect.level = pulseLevel;
+            ed.highlight_effect.type = EntityHighlightEffectType::Interactive;
+            ed.highlight_effect.level = pulse_level;
           }
         }
       } else if (inspecting) {
@@ -1241,105 +1224,105 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
           auto result71 = self.m_mainPlayer->inspectionHighlight(inspectable);
           if (!result71)
             return std::unexpected(std::move(result71.error()));
-          ed.highlightEffect = (std::move(*result71));
-          ed.highlightEffect.level *= self.m_inspectionFlickerMultiplier;
+          ed.highlight_effect = (std::move(*result71));
+          ed.highlight_effect.level *= self.m_inspectionFlickerMultiplier;
         }
       }
 
-      self.m_previewTiles.append_range(std::move(renderCallback.previewTiles));
-      renderData.overheadBars.append_range(std::move(renderCallback.overheadBars));
+      self.m_preview_tiles.append_range(std::move(render_callback.preview_tiles));
+      render_data.overhead_bars.append_range(std::move(render_callback.overhead_bars));
       return {};
     }, [](std::shared_ptr<Entity> const& a, std::shared_ptr<Entity> const& b) {
       return a->entityId() < b->entityId();
     });
   if (!result72)
     return std::unexpected(std::move(result72.error()));
-  renderData.entityDrawables.resize(drawableIndex);
+  render_data.entity_drawables.resize(drawable_index);
   
   auto result73 = this->root().workers();
   if (!result73)
     return std::unexpected(std::move(result73.error()));
-  auto result74 = m_tileArray->tile_each_to(result73->get(), renderData.tiles, tileRange, [](RenderTile& renderTile, Vec2I const&, ClientTile const& clientTile)  -> std::expected<void, StarException> {
-      renderTile.foreground = clientTile.foreground;
-      renderTile.foregroundMod = clientTile.foregroundMod;
+  auto result74 = m_tileArray->tile_each_to(result73->get(), render_data.tiles, tileRange, [](RenderTile& render_tile, Vec2I const&, ClientTile const& client_tile)  -> std::expected<void, StarException> {
+      render_tile.foreground = client_tile.foreground;
+      render_tile.foregroundMod = client_tile.foregroundMod;
       
-      renderTile.background = clientTile.background;
-      renderTile.backgroundMod = clientTile.backgroundMod;
+      render_tile.background = client_tile.background;
+      render_tile.backgroundMod = client_tile.backgroundMod;
       
-      renderTile.foregroundHueShift = clientTile.foregroundHueShift;
-      renderTile.foregroundModHueShift = clientTile.foregroundModHueShift;
-      renderTile.foregroundColorVariant = clientTile.foregroundColorVariant;
-      renderTile.foregroundDamageType = clientTile.foregroundDamage.damage_type();
-      renderTile.foregroundDamageLevel = float_to_byte(clientTile.foregroundDamage.damage_effect_percentage());
+      render_tile.foregroundHueShift = client_tile.foregroundHueShift;
+      render_tile.foregroundModHueShift = client_tile.foregroundModHueShift;
+      render_tile.foregroundColorVariant = client_tile.foregroundColorVariant;
+      render_tile.foregroundDamageType = client_tile.foregroundDamage.damage_type();
+      render_tile.foregroundDamageLevel = float_to_byte(client_tile.foregroundDamage.damage_effect_percentage());
       
-      renderTile.backgroundHueShift = clientTile.backgroundHueShift;
-      renderTile.backgroundModHueShift = clientTile.backgroundModHueShift;
-      renderTile.backgroundColorVariant = clientTile.backgroundColorVariant;
-      renderTile.backgroundDamageType = clientTile.backgroundDamage.damage_type();
-      renderTile.backgroundDamageLevel = float_to_byte(clientTile.backgroundDamage.damage_effect_percentage());
+      render_tile.backgroundHueShift = client_tile.backgroundHueShift;
+      render_tile.backgroundModHueShift = client_tile.backgroundModHueShift;
+      render_tile.backgroundColorVariant = client_tile.backgroundColorVariant;
+      render_tile.backgroundDamageType = client_tile.backgroundDamage.damage_type();
+      render_tile.backgroundDamageLevel = float_to_byte(client_tile.backgroundDamage.damage_effect_percentage());
       
-      renderTile.liquidId = clientTile.liquid.liquid;
-      renderTile.liquidLevel = float_to_byte(clientTile.liquid.level);
+      render_tile.liquidId = client_tile.liquid.liquid;
+      render_tile.liquidLevel = float_to_byte(client_tile.liquid.level);
       return {};
     });
   if (!result74)
     return std::unexpected(std::move(result74.error()));
 
   for (auto&& pair : m_predicted_tiles) {
-    Vec2I tileArrayPos(m_geometry.pdiff(pair.first[0], renderData.tileMinPosition[0]), pair.first[1] - renderData.tileMinPosition[1]);
-    if (tileArrayPos[0] >= 0 && tileArrayPos[0] < static_cast<int>(renderData.tiles.extent(0)) && tileArrayPos[1] >= 0
-        && tileArrayPos[1] < static_cast<int>(renderData.tiles.extent(1))) {
-      RenderTile& renderTile = renderData.tiles(tileArrayPos[0], tileArrayPos[1]);
+    Vec2I tile_array_pos(m_geometry.pdiff(pair.first[0], render_data.tile_min_position[0]), pair.first[1] - render_data.tile_min_position[1]);
+    if (tile_array_pos[0] >= 0 && tile_array_pos[0] < static_cast<int>(render_data.tiles.extent(0)) && tile_array_pos[1] >= 0
+        && tile_array_pos[1] < static_cast<int>(render_data.tiles.extent(1))) {
+      RenderTile& render_tile = render_data.tiles(tile_array_pos[0], tile_array_pos[1]);
       PredictedTile& p = pair.second;
       if (p.liquid) {
         auto& liquid = *p.liquid;
-        if (liquid.liquid == renderTile.liquidId) {
+        if (liquid.liquid == render_tile.liquidId) {
           std::uint8_t added = float_to_byte(liquid.level, true);
-          renderTile.liquidLevel = (renderTile.liquidLevel > 255 - added) ? 255 : renderTile.liquidLevel + added;
+          render_tile.liquidLevel = (render_tile.liquidLevel > 255 - added) ? 255 : render_tile.liquidLevel + added;
         } else {
-          renderTile.liquidId = liquid.liquid;
-          renderTile.liquidLevel = float_to_byte(liquid.level, true);
+          render_tile.liquidId = liquid.liquid;
+          render_tile.liquidLevel = float_to_byte(liquid.level, true);
         }
       }
       
-      pair.second.apply(renderTile);
+      pair.second.apply(render_tile);
     }
   }
 
-  for (auto const& previewTile : m_previewTiles) {
-    Vec2I tileArrayPos(m_geometry.pdiff(previewTile.position[0], renderData.tileMinPosition[0]), previewTile.position[1] - renderData.tileMinPosition[1]);
-    if (tileArrayPos[0] >= 0 && tileArrayPos[0] < static_cast<int>(renderData.tiles.extent(0)) && tileArrayPos[1] >= 0
-        && tileArrayPos[1] < static_cast<int>(renderData.tiles.extent(1))) {
-      RenderTile& renderTile = renderData.tiles(tileArrayPos[0], tileArrayPos[1]);
+  for (auto const& preview_tile : m_preview_tiles) {
+    Vec2I tile_array_pos(m_geometry.pdiff(preview_tile.position[0], render_data.tile_min_position[0]), preview_tile.position[1] - render_data.tile_min_position[1]);
+    if (tile_array_pos[0] >= 0 && tile_array_pos[0] < static_cast<int>(render_data.tiles.extent(0)) && tile_array_pos[1] >= 0
+        && tile_array_pos[1] < static_cast<int>(render_data.tiles.extent(1))) {
+      RenderTile& render_tile = render_data.tiles(tile_array_pos[0], tile_array_pos[1]);
       
-      auto material = previewTile.matId;
-      auto hueShift = previewTile.hueShift;
-      auto colorVariant = previewTile.colorVariant;
-      if (previewTile.updateMatId) {
-        if (previewTile.foreground) {
-          renderTile.foreground = material;
-          renderTile.foregroundHueShift = hueShift;
-          renderTile.foregroundColorVariant = colorVariant;
+      auto material = preview_tile.mat_id;
+      auto hue_shift = preview_tile.hue_shift;
+      auto color_variant = preview_tile.color_variant;
+      if (preview_tile.update_mat_id) {
+        if (preview_tile.foreground) {
+          render_tile.foreground = material;
+          render_tile.foregroundHueShift = hue_shift;
+          render_tile.foregroundColorVariant = color_variant;
         } else {
-          renderTile.background = material;
-          renderTile.backgroundHueShift = hueShift;
-          renderTile.backgroundColorVariant = colorVariant;
+          render_tile.background = material;
+          render_tile.backgroundHueShift = hue_shift;
+          render_tile.backgroundColorVariant = color_variant;
         }
       }
       
-      if (previewTile.liqId != EmptyLiquidId) {
-        renderTile.liquidId = previewTile.liqId;
-        renderTile.liquidLevel = 255;
+      if (preview_tile.liq_id != EmptyLiquidId) {
+        render_tile.liquidId = preview_tile.liq_id;
+        render_tile.liquidLevel = 255;
       }
     }
   }
   
-  this->root().logMap().set("client_render_particle_count", renderData.particles.size());
+  this->root().logMap().set("client_render_particle_count", render_data.particles.size());
   
   auto result75 = m_sky->renderData(interpolation);
   if (!result75)
     return std::unexpected(std::move(result75.error()));
-  renderData.skyRenderData = (std::move(*result75));
+  render_data.sky_render_data = (std::move(*result75));
   
   auto biome_result = mainEnvironmentBiome();
   if (!biome_result)
@@ -1352,11 +1335,11 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
   
   if (m_currentParallax) {
     if (m_parallaxFadeTimer.ready()) {
-      renderData.parallaxLayers.append_range(m_currentParallax->layers());
+      render_data.parallax_layers.append_range(m_currentParallax->layers());
     } else {
       for (auto layer : m_currentParallax->layers()) {
         layer.alpha = std::min(1.0f, m_parallaxFadeTimer.percent() * 2);
-        renderData.parallaxLayers.push_back(layer);
+        render_data.parallax_layers.push_back(layer);
       }
     }
   }
@@ -1364,7 +1347,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
   if (m_nextParallax) {
     for (auto layer : m_nextParallax->layers()) {
       layer.alpha = std::min(1.0f, (1.0f - m_parallaxFadeTimer.percent()) * 2);
-      renderData.parallaxLayers.push_back(layer);
+      render_data.parallax_layers.push_back(layer);
     }
   }
   
@@ -1417,7 +1400,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
   if (m_weatherParallax) {
     for (auto layer : m_weatherParallax->layers()) {
       layer.alpha *= m_weather->weatherIntensity();
-      renderData.parallaxLayers.push_back(std::move(layer));
+      render_data.parallax_layers.push_back(std::move(layer));
     }
   }
   
@@ -1425,30 +1408,30 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
   auto result85 = this->root().functionDatabase();
   if (!result85)
     return std::unexpected(std::move(result85.error()));
-  auto functionDatabase = (std::move(*result85));
-  float windInterpolation = renderData.skyRenderData.epochTime == m_sky->epochTime() ? 1.0f : interpolation;
-  auto windTimeSample = m_parallaxWindTime.sample(windInterpolation);
-  for (auto& layer : renderData.parallaxLayers) {
+  auto function_database = (std::move(*result85));
+  float wind_interpolation = render_data.sky_render_data.epochTime == m_sky->epochTime() ? 1.0f : interpolation;
+  auto wind_time_sample = m_parallaxWindTime.sample(wind_interpolation);
+  for (auto& layer : render_data.parallax_layers) {
     if (layer.followsWind || layer.windSpeedMultiplier) {
-      double windTime;
-      float horizontalSpeed = layer.speed[0];
+      double wind_time;
+      float horizontal_speed = layer.speed[0];
       if (layer.followsWind) {
         // Parallax texture offsets move the image opposite the offset sign,
         // so negate the magnitude to make positive wind move imagery right.
-        horizontalSpeed = -std::abs(horizontalSpeed);
-        windTime = layer.windSpeedMultiplier
-            ? windTimeSample[2] * *layer.windSpeedMultiplier
-            : windTimeSample[0];
+        horizontal_speed = -std::abs(horizontal_speed);
+        wind_time = layer.windSpeedMultiplier
+            ? wind_time_sample[2] * *layer.windSpeedMultiplier
+            : wind_time_sample[0];
       } else {
-        windTime = windTimeSample[1] * *layer.windSpeedMultiplier;
+        wind_time = wind_time_sample[1] * *layer.windSpeedMultiplier;
       }
       
-      layer.parallaxOffset[0] += horizontalSpeed * windTime / m_sky->dayLength();
+      layer.parallaxOffset[0] += horizontal_speed * wind_time / m_sky->dayLength();
       layer.speed[0] = 0.0f;
     }
     
     if (!layer.timeOfDayCorrelation.empty()) {
-      auto result86 = functionDatabase->function(layer.timeOfDayCorrelation);
+      auto result86 = function_database->function(layer.timeOfDayCorrelation);
       if (!result86)
         return std::unexpected(std::move(result86.error()));
       auto result87 = (std::move(*result86))->evaluate(m_sky->timeOfDay() / m_sky->dayLength());
@@ -1458,11 +1441,11 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
     }
   }
   
-  std::stable_sort(renderData.parallaxLayers.begin(), renderData.parallaxLayers.end(), [](ParallaxLayer const& a, ParallaxLayer const& b) {
+  std::stable_sort(render_data.parallax_layers.begin(), render_data.parallax_layers.end(), [](ParallaxLayer const& a, ParallaxLayer const& b) {
     return std::tie(a.zLevel, a.verticalOrigin) > std::tie(b.zLevel, b.verticalOrigin);
   });
   
-  auto overlayToDrawable = [&self = *this](WorldStructure::Overlay const& overlay) -> std::expected<Drawable, StarException> {
+  auto overlay_to_drawable = [&self = *this](WorldStructure::Overlay const& overlay) -> std::expected<Drawable, StarException> {
     auto result88 = self.root().imageMetadataDatabase();
     if (!result88)
       return std::unexpected(std::move(result88.error()));
@@ -1475,23 +1458,23 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
   };
   
   for (auto const& overlay : m_centralStructure.backgroundOverlays()) {
-    auto drawable = overlayToDrawable(overlay);
+    auto drawable = overlay_to_drawable(overlay);
     if (!drawable) {
       return std::unexpected(std::move(drawable.error()));
     }
-    renderData.backgroundOverlays.push_back(std::move(*drawable));
+    render_data.background_overlays.push_back(std::move(*drawable));
   }
   for (auto const& overlay : m_centralStructure.foregroundOverlays()) {
-    auto drawable = overlayToDrawable(overlay);
+    auto drawable = overlay_to_drawable(overlay);
     if (!drawable) {
       return std::unexpected(std::move(drawable.error()));
     }
-    renderData.foregroundOverlays.push_back(std::move(*drawable));
+    render_data.foreground_overlays.push_back(std::move(*drawable));
   }
   
-  renderData.isFullbright = m_fullBright;
-  renderData.dimLevel = m_worldDimLevel;
-  renderData.dimColor = m_worldDimColor;
+  render_data.is_fullbright = m_fullBright;
+  render_data.dim_level = m_worldDimLevel;
+  render_data.dim_color = m_worldDimColor;
   return {};
 }
 
@@ -2352,6 +2335,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
       return std::unexpected(std::move(result177.error()));
     // Entity events are born at this completed tick's state. Unlike weather,
     // they must not integrate/age for the timestep that produced their birth.
+    auto directives = directive_parameters();
     auto events = m_entityMap->for_all_entities([&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
       // The removal path performs the final live-event drain before destroy().
       // Collectors may synthesize effects, so a queued death must not run both.
@@ -2360,20 +2344,20 @@ std::expected<void, StarException> WorldClient::update(float dt) {
       // Offscreen entities still emit once per tick. Startup-hidden entities
       // consume their queues without exposing effects before their spawn.
       bool hidden = m_startupHiddenEntities.contains(entity->entityId());
-      List<std::shared_ptr<AudioInstance>>* deferredLoops = nullptr;
+      std::optional<std::reference_wrapper<List<std::shared_ptr<AudioInstance>>>> deferred_loops;
       if (hidden) {
         auto& pending = m_hiddenEntityAudio[entity->entityId()];
         if (pending.instance.lock() != entity) {
           pending.instance = entity;
           pending.loops.clear();
         }
-        deferredLoops = &pending.loops;
+        deferred_loops = pending.loops;
       }
-      NullRenderCallback hiddenEvents(deferredLoops);
-      m_eventRenderCallback.clear();
+      NullRenderCallback hidden_events(deferred_loops);
+      m_event_render_callback.clear();
       auto collected = entity->collectRenderEvents(hidden
-          ? static_cast<RenderCallback&>(hiddenEvents)
-          : static_cast<RenderCallback&>(m_eventRenderCallback));
+          ? static_cast<RenderCallback&>(hidden_events)
+          : static_cast<RenderCallback&>(m_event_render_callback));
       if (!collected) {
         if (entity->isMaster())
           return std::unexpected(std::move(collected.error()));
@@ -2392,15 +2376,11 @@ std::expected<void, StarException> WorldClient::update(float dt) {
             if (!audio->finished())
               m_samples.push_back(std::move(audio));
       }
-      if (auto const& parameters = m_worldTemplate->worldParameters()) {
-        if (auto const& directives = parameters->globalDirectives; directives && !directives->empty()) {
-          auto index = static_cast<unsigned>(entity->entityId()) % directives->size();
-          for (auto& particle : m_eventRenderCallback.particles)
-            particle.directives.append((*directives)[index]);
-        }
-      }
-      m_particles->addParticles(std::move(m_eventRenderCallback.particles));
-      m_samples.append_range(std::move(m_eventRenderCallback.audios));
+      if (auto selected = select_directive(directives, entity->entityId()))
+        for (auto& particle : m_event_render_callback.particles)
+          particle.directives.append(selected->get());
+      m_particles->addParticles(std::move(m_event_render_callback.particles));
+      m_samples.append_range(std::move(m_event_render_callback.audios));
       return {};
     });
     if (!events)
@@ -2778,18 +2758,18 @@ std::expected<bool, StarException> WorldClient::waitForLighting(std::optional<st
   std::lock_guard prepLocker(m_lightMapPrepMutex);
   std::lock_guard lightMapLocker(m_lightMapMutex);
   if (renderData && m_lightMap.ready) {
-    for (auto& previewTile : m_previewTiles) {
-      if (previewTile.updateLight) {
-        Vec2I lightArrayPos(m_geometry.pdiff(previewTile.position[0], m_lightMap.minPosition[0]), previewTile.position[1] - m_lightMap.minPosition[1]);
+    for (auto& preview_tile : m_preview_tiles) {
+      if (preview_tile.update_light) {
+        Vec2I lightArrayPos(m_geometry.pdiff(preview_tile.position[0], m_lightMap.minPosition[0]), preview_tile.position[1] - m_lightMap.minPosition[1]);
         if (lightArrayPos[0] >= 0 && lightArrayPos[0] < static_cast<int>(m_lightMap.lightMap.width()) && lightArrayPos[1] >= 0
             && lightArrayPos[1] < static_cast<int>(m_lightMap.lightMap.height())) {
-          auto result202 = m_lightMap.lightMap.set(lightArrayPos[0], lightArrayPos[1], Color::rgb_bytes_to_float(previewTile.light));
+          auto result202 = m_lightMap.lightMap.set(lightArrayPos[0], lightArrayPos[1], Color::rgb_bytes_to_float(preview_tile.light));
           if (!result202)
             return std::unexpected(std::move(result202.error()));
         }
       }
     }
-    return m_lightMap.take(renderData->get().lightMap, renderData->get().lightMinPosition);
+    return m_lightMap.take(renderData->get().light_map, renderData->get().light_min_position);
   }
   return false;
 }
@@ -3006,20 +2986,9 @@ std::expected<void, StarException> WorldClient::handleDamageNotifications() {
       if (!result228)
         return std::unexpected(std::move(result228.error()));
       auto hitParticles = (std::move(*result228));
-      std::optional<std::reference_wrapper<List<Directives> const>> directives;
-      if (auto& worldTemplate = m_worldTemplate) {
-        if (const auto& parameters = worldTemplate->worldParameters()) {
-          if (auto& globalDirectives = parameters->globalDirectives) {
-            directives = std::cref(*globalDirectives);
-          }
-        }
-      }
-      if (directives) {
-        int directiveIndex = static_cast<unsigned>(damageNotification.target_entity_id) % directives->get().size();
-        for (auto& p : hitParticles) {
-          p.directives.append(directives->get()[directiveIndex]);
-        }
-      }
+      if (auto selected = select_directive(directive_parameters(), damageNotification.target_entity_id))
+        for (auto& particle : hitParticles)
+          particle.directives.append(selected->get());
       m_particles->addParticles(std::move(hitParticles));
     }
   }
@@ -4089,24 +4058,26 @@ std::expected<bool, StarException> WorldClient::handleSecretBroadcast(std::share
 
 
 void WorldClient::ClientRenderCallback::clear() {
-  for (auto& layer : drawables)
-    layer.second.clear();
-  lightSources.clear();
+  light_sources.clear();
   particles.clear();
   audios.clear();
-  previewTiles.clear();
-  overheadBars.clear();
+  preview_tiles.clear();
+  overhead_bars.clear();
 }
 
-std::expected<void, StarException> WorldClient::ClientRenderCallback::addDrawable(Drawable drawable, EntityRenderLayer renderLayer) {
-  drawable.translate(m_offset);
-  (drawableTarget ? *drawableTarget : drawables)[renderLayer].push_back(std::move(drawable));
+std::expected<void, StarException> WorldClient::ClientRenderCallback::add_drawable(Drawable drawable, EntityRenderLayer render_layer) {
+  if (!drawable_target)
+    return {};
+  if (position_offset != Vec2F())
+    drawable.translate(position_offset);
+  drawable_target->get().append(render_layer, std::move(drawable));
   return {};
 }
 
-std::expected<void, StarException> WorldClient::ClientRenderCallback::addLightSource(LightSource lightSource) {
-  lightSource.translate(m_offset);
-  lightSources.push_back(std::move(lightSource));
+std::expected<void, StarException> WorldClient::ClientRenderCallback::add_light_source(LightSource light_source) {
+  if (position_offset != Vec2F())
+    light_source.translate(position_offset);
+  light_sources.push_back(std::move(light_source));
   return {};
 }
 
@@ -4115,19 +4086,20 @@ std::expected<void, StarException> WorldClient::ClientRenderCallback::add_partic
   return {};
 }
 
-std::expected<void, StarException> WorldClient::ClientRenderCallback::addAudio(std::shared_ptr<AudioInstance> audio) {
+std::expected<void, StarException> WorldClient::ClientRenderCallback::add_audio(std::shared_ptr<AudioInstance> audio) {
   audios.push_back(std::move(audio));
   return {};
 }
 
-std::expected<void, StarException> WorldClient::ClientRenderCallback::addTilePreview(PreviewTile preview) {
-  previewTiles.push_back(std::move(preview));
+std::expected<void, StarException> WorldClient::ClientRenderCallback::add_tile_preview(PreviewTile preview) {
+  preview_tiles.push_back(std::move(preview));
   return {};
 }
 
-std::expected<void, StarException> WorldClient::ClientRenderCallback::addOverheadBar(OverheadBar bar) {
-  bar.entityPosition += m_offset;
-  overheadBars.push_back(std::move(bar));
+std::expected<void, StarException> WorldClient::ClientRenderCallback::add_overhead_bar(OverheadBar bar) {
+  if (position_offset != Vec2F())
+    bar.entity_position += position_offset;
+  overhead_bars.push_back(std::move(bar));
   return {};
 }
 

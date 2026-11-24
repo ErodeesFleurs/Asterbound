@@ -211,31 +211,31 @@ std::expected<void, StarException> PlayerDeployment::update(float dt) {
   return {};
 }
 
-std::expected<void, StarException> PlayerDeployment::collectRenderEvents(RenderCallback& renderCallback, Vec2F const& position) {
-  auto particles = renderCallback.addParticles(m_scriptComponent.pull_new_particles());
+std::expected<void, StarException> PlayerDeployment::collectRenderEvents(RenderCallback& render_callback, Vec2F const& position) {
+  auto particles = render_callback.add_particles(m_scriptComponent.pull_new_particles());
   if (!particles)
     return std::unexpected(std::move(particles.error()));
-  for (auto const& audio : m_scriptComponent.pull_new_audios()) {
+  for (auto& audio : m_scriptComponent.pull_new_audios()) {
     audio->set_position(position);
-    auto added = renderCallback.addAudio(audio);
+    auto added = render_callback.add_audio(std::move(audio));
     if (!added)
       return std::unexpected(std::move(added.error()));
   }
   return {};
 }
 
-std::expected<void, StarException> PlayerDeployment::render(RenderCallback& renderCallback, Vec2F const& position) {
+std::expected<void, StarException> PlayerDeployment::render(RenderCallback& render_callback, Vec2F const& position) {
   for (auto drawablePair : m_scriptComponent.drawables()) {
     drawablePair.first.translate(position);
-    auto added = renderCallback.addDrawable(drawablePair.first, drawablePair.second.value_or(RenderLayerPlayer));
+    auto added = render_callback.add_drawable(std::move(drawablePair.first), drawablePair.second.value_or(render_layer_player));
     if (!added)
       return std::unexpected(std::move(added.error()));
   }
   return {};
 }
 
-std::expected<void, StarException> PlayerDeployment::renderLightSources(RenderCallback& renderCallback) {
-  return renderCallback.addLightSources(m_scriptComponent.light_sources());
+std::expected<void, StarException> PlayerDeployment::renderLightSources(RenderCallback& render_callback) {
+  return render_callback.add_light_sources(m_scriptComponent.light_sources());
 }
 
 }

@@ -140,7 +140,7 @@ public:
   [[nodiscard]] std::expected<List<LightSource>, StarException> lightSources() const override;
 
   [[nodiscard]] std::expected<bool, StarException> shouldDestroy() const override;
-  [[nodiscard]] std::expected<void, StarException> destroy(std::optional<std::reference_wrapper<RenderCallback>> renderCallback) override;
+  [[nodiscard]] std::expected<void, StarException> destroy(std::optional<std::reference_wrapper<RenderCallback>> render_callback) override;
 
   [[nodiscard]] MessageResponseResult receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) override;
 
@@ -221,7 +221,7 @@ private:
 
   enum class VehicleLayer { Back, Passenger, Front };
 
-  EntityRenderLayer renderLayer(VehicleLayer vehicleLayer) const;
+  EntityRenderLayer render_layer(VehicleLayer vehicle_layer) const;
 
   [[nodiscard]] std::expected<LuaCallbacks, StarException> makeVehicleCallbacks();
   [[nodiscard]] std::expected<Json, StarException> configValue(String const& name, Json def = {}) const;
@@ -254,8 +254,8 @@ private:
   NetElementData<EntityDamageTeam> m_damageTeam;
   OrderedHashMap<String, DamageSourceConfig> m_damageSources;
 
-  EntityRenderLayer m_baseRenderLayer;
-  std::optional<EntityRenderLayer> m_overrideRenderLayer;
+  EntityRenderLayer m_base_render_layer;
+  std::optional<EntityRenderLayer> m_override_render_layer;
   
   GameTimer m_slaveHeartbeatTimer;
 };

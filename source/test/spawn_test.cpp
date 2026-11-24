@@ -9,6 +9,10 @@ import star.bi_map;
 import star.random;
 import star.weighted_pool;
 import star.list;
+import star.drawable;
+import star.damage;
+import star.damage_manager;
+import star.world_template;
 import star.image_processing;
 import star.hash;
 import star.data_stream;
@@ -44,6 +48,9 @@ import star.lua;
 import star.lua_root;
 
 import star.test_universe;
+import star.universe_client;
+import star.player;
+import star.player_log;
 import star.entity;
 import star.entity_rendering;
 import star.rect;
@@ -60,6 +67,70 @@ import star.celestial_database;
 import star.game_test;
 
 using namespace Star;
+
+TEST(EntityFrameLayers, StableAndChurningKeysReuseStorageAndKeepEntityOrder) {
+  WorldRenderData frame;
+  frame.entity_drawables.resize(2);
+  FrameLayers<EntityDrawableGroup> routes;
+  constexpr EntityRenderLayer shared_layer = 0;
+  std::array<std::uintptr_t, 4> stable_storage{};
+  std::array<std::array<std::uintptr_t, 4>, 2> vehicle_storage{};
+  for (EntityRenderLayer i = 0; i < 1024; ++i) {
+    // Stable first, then change one simulated vehicle layer every frame.
+    auto const vehicle_layer = i < 16 ? 1u : i;
+    frame.prepare_frame();
+    auto& first = frame.entity_drawables[0];
+    auto& second = frame.entity_drawables[1];
+    first.highlight_effect.level = 0.25f;
+    second.highlight_effect.level = 0.75f;
+    first.layers.append(vehicle_layer, {});
+    first.layers.append(shared_layer, {});
+    second.layers.append(shared_layer, {});
+    route_entity_drawables(routes, frame.entity_drawables);
+
+    auto const bucket_count = i < 16 ? 2 : 3;
+    ASSERT_EQ(std::ranges::distance(first.layers), bucket_count);
+    ASSERT_EQ(std::ranges::distance(second.layers), 1);
+    ASSERT_EQ(std::ranges::distance(routes), bucket_count);
+    auto const& shared = *routes.begin();
+    auto const& vehicle = *std::prev(routes.end());
+    ASSERT_EQ(vehicle.first, vehicle_layer);
+    ASSERT_EQ(shared.first, shared_layer);
+    ASSERT_EQ(vehicle.second.size(), 1u);
+    ASSERT_EQ(shared.second.size(), 2u);
+    EXPECT_EQ(shared.second[0].highlight_effect.level, 0.25f);
+    EXPECT_EQ(shared.second[1].highlight_effect.level, 0.75f);
+    EXPECT_EQ(&shared.second[0].drawables.get(), &first.layers.begin()->second);
+    EXPECT_EQ(&shared.second[1].drawables.get(), &second.layers.begin()->second);
+    auto const& source = *std::prev(first.layers.end());
+    ASSERT_EQ(source.first, vehicle_layer);
+    EXPECT_EQ(&vehicle.second.front().drawables.get(), &source.second);
+    // Nodes and list buffers survive, including the stable key encountered
+    // *after* a new key. Churn needs only two alternating vehicle buckets.
+    std::array const changing{
+      reinterpret_cast<std::uintptr_t>(&source), reinterpret_cast<std::uintptr_t>(source.second.data()),
+      reinterpret_cast<std::uintptr_t>(&vehicle), reinterpret_cast<std::uintptr_t>(vehicle.second.data())};
+    std::array const stable{
+      reinterpret_cast<std::uintptr_t>(&shared), reinterpret_cast<std::uintptr_t>(shared.second.data()),
+      reinterpret_cast<std::uintptr_t>(shared.second[0].drawables.get().data()),
+      reinterpret_cast<std::uintptr_t>(shared.second[1].drawables.get().data())};
+    if (i == 0) {
+      stable_storage = stable;
+      vehicle_storage.fill(changing);
+    }
+    if (i == 16)
+      vehicle_storage[0] = changing;
+    EXPECT_EQ(stable, stable_storage);
+    ASSERT_EQ(changing, vehicle_storage[i % 2]);
+  }
+  // When a layer disappears and stays absent, release its node and buffer.
+  for (int i = 0; i < 3; ++i) {
+    frame.prepare_frame();
+    route_entity_drawables(routes, frame.entity_drawables);
+  }
+  EXPECT_TRUE(std::ranges::empty(routes));
+  EXPECT_TRUE(std::ranges::empty(frame.entity_drawables[0].layers));
+}
 
 [[nodiscard]] std::expected<TestUniverse::ReadyWorld, StarException>
 validateWorld(Root& root, TestUniverse& testUniverse, std::int64_t timeoutMilliseconds = 60000) {
@@ -171,7 +242,17 @@ class PresentationLifecycleEntity : public Entity {
 public:
   explicit PresentationLifecycleEntity(Root& root) : Entity(root) {}
   EntityType entityType() const override { return EntityType::Stagehand; }
-  Vec2F position() const override { return {1024, 1024}; }
+  Vec2F position() const override { return current_position; }
+  std::expected<void, StarException> renderLightSources(RenderCallback&) override {
+    ++light_collections;
+    return {};
+  }
+  static constexpr EntityRenderLayer fixture_layer = render_layer_effect + 101;
+  std::expected<void, StarException> render(RenderCallback& renderer) override {
+    if (image)
+      return renderer.add_drawable(*image, fixture_layer);
+    return {};
+  }
   RectF metaBoundBox() const override { return RectF::with_size({}, {1, 1}); }
   ClientEntityMode clientEntityMode() const override { return ClientEntityMode::ClientMasterAllowed; }
   std::expected<void, StarException> init(World& world, EntityId id, EntityMode) override {
@@ -189,11 +270,13 @@ public:
   std::expected<bool, StarException> shouldDestroy() const override { return dying; }
   std::expected<void, StarException> collectRenderEvents(RenderCallback& renderer) override {
     ++collections;
-    if (failCollection)
+    if (next_position)
+      current_position = *std::exchange(next_position, std::nullopt);
+    if (fail_collection)
       return std::unexpected(StarException("Deliberate presentation lifecycle test failure"));
-    if (nextParticle) {
-      auto emitted = renderer.add_particle(std::move(*nextParticle));
-      nextParticle.reset();
+    if (next_particle) {
+      auto emitted = renderer.add_particle(std::move(*next_particle));
+      next_particle.reset();
       return emitted;
     }
     return {};
@@ -206,9 +289,13 @@ public:
     ++uninitializations;
     return Entity::uninit();
   }
+  Vec2F current_position{1024, 1024};
+  std::optional<Vec2F> next_position;
+  std::optional<Drawable> image;
+  unsigned light_collections = 0;
   bool dying = false;
-  bool failCollection = false;
-  std::optional<Particle> nextParticle;
+  bool fail_collection = false;
+  std::optional<Particle> next_particle;
   unsigned collections = 0;
   unsigned destructions = 0;
   unsigned uninitializations = 0;
@@ -216,7 +303,7 @@ public:
 
 }
 
-const GameTestRegistration presentationRemovalLifecycle(
+const GameTestRegistration presentation_removal_lifecycle(
   "SpawnTest", "PresentationRemovalCollectsOnceAndIsolatesSlaveFailures", [](GameTest& fixture) {
     // Failure isolation is the subject here; use a private Root rather than
     // the shared fixture's sink that fails on every expected Error record.
@@ -224,16 +311,31 @@ const GameTestRegistration presentationRemovalLifecycle(
     ASSERT_TRUE(directory);
     auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
     auto settings = fixture.rootSettings();
+    // Sampled text has no image processing payload; exercise the hit path
+    // with a real textured damage particle rather than an animated stock hit.
+    auto overlay = File::relative_to(*directory, "assets");
+    ASSERT_TRUE(File::create_directories(overlay));
+    ASSERT_TRUE(File::write_file(String(R"({
+      "kind":"presentation-directive-test",
+      "effects":{"organic":{"hit":{"particles":[[{
+        "type":"textured","image":"/rendering/sprites/error.png","timeToLive":2,
+        "collidesForeground":false,"collidesLiquid":false
+      }]]}}}
+    })"), File::relative_to(overlay, "presentation-directive-test.damage")));
+    settings.assetSources.push_back(overlay);
     settings.storageDirectory = File::relative_to(*directory, "storage");
     settings.runtimeConfigFile = {};
     settings.logDirectory = {};
     settings.logFile = {};
     settings.includeUGC = false;
-    auto createdRoot = Root::create(std::move(settings));
-    ASSERT_TRUE(createdRoot) << createdRoot.error().what();
-    auto& root = **createdRoot;
+    auto created_root = Root::create(std::move(settings));
+    ASSERT_TRUE(created_root) << created_root.error().what();
+    auto& root = **created_root;
     auto universe = TestUniverse::create(root, Vec2U(100, 100));
     ASSERT_TRUE(universe) << universe.error().what();
+    // This fixture travels straight to the outpost; the unclothed test player
+    // never enters the tutorial where the starter clothes would be assigned.
+    (*universe)->client()->mainPlayer()->log()->setIntroComplete(true);
     ASSERT_TRUE((*universe)->warpPlayer(InstanceWorldId("outpost")));
     auto ready = (*universe)->waitForWorldReady();
     ASSERT_TRUE(ready) << ready.error().what();
@@ -245,14 +347,15 @@ const GameTestRegistration presentationRemovalLifecycle(
     ASSERT_TRUE(world->addEntity(dying));
     ASSERT_TRUE(dying->inWorld());
     ASSERT_TRUE(dying->promote(*world));
-    auto dyingId = dying->entityId();
+    auto dying_id = dying->entityId();
     dying->dying = true;
     ASSERT_TRUE(world->update(dt));
     EXPECT_EQ(dying->collections, 1u);
     EXPECT_EQ(dying->destructions, 1u);
     EXPECT_EQ(dying->uninitializations, 1u);
-    EXPECT_FALSE(world->entity(dyingId));
+    EXPECT_FALSE(world->entity(dying_id));
     auto emitter = std::make_shared<PresentationLifecycleEntity>(root);
+    emitter->current_position[0] = static_cast<float>(world->geometry().width()) - 1;
     ASSERT_TRUE(world->addEntity(emitter));
     Particle newborn;
     newborn.type = Particle::Type::Text;
@@ -265,38 +368,132 @@ const GameTestRegistration presentationRemovalLifecycle(
     newborn.collidesForeground = false;
     newborn.collidesLiquid = false;
     newborn.timeToLive = 2.0f;
-    emitter->nextParticle = newborn;
+    emitter->next_particle = newborn;
     ASSERT_TRUE(world->update(dt));
     WorldRenderData display;
-    auto findNewborn = [&]() -> Particle const* {
+    auto find_newborn = [&]() -> std::optional<std::reference_wrapper<Particle const>> {
       for (auto const& particle : display.particles)
         if (particle.string == newborn.string)
-          return &particle;
-      return nullptr;
+          return std::cref(particle);
+      return {};
     };
+    world->setFullBright(true);
     for (float alpha : {0.0f, 0.5f, 1.0f, 0.25f}) {
       ASSERT_TRUE(world->render(display, 0, std::nullopt, PresentationContext(alpha)));
-      auto sampled = findNewborn();
+      auto sampled = find_newborn();
       ASSERT_TRUE(sampled);
-      EXPECT_EQ(sampled->position, newborn.position);
-      EXPECT_FLOAT_EQ(sampled->timeToLive, 2.0f);
+      EXPECT_EQ(sampled->get().position, newborn.position);
+      EXPECT_FLOAT_EQ(sampled->get().timeToLive, 2.0f);
     }
+    EXPECT_EQ(emitter->light_collections, 0u);
+    world->setFullBright(false);
+    emitter->next_position = Vec2F{1, emitter->current_position[1]};
     ASSERT_TRUE(world->update(dt));
+    auto sample = world->sample_entity(*emitter, PresentationContext(0.25f));
+    EXPECT_FLOAT_EQ(sample.context.interpolation(), 0.25f);
+    EXPECT_FLOAT_EQ(sample.offset[0], -1.5f);
+    EXPECT_FLOAT_EQ(sample.offset[1], 0.0f);
+    PresentationLifecycleEntity replacement(root);
+    ASSERT_TRUE(replacement.init(*world, emitter->entityId(), EntityMode::Slave));
+    auto replaced = world->sample_entity(replacement, PresentationContext(0.25f));
+    EXPECT_EQ(replaced.offset, Vec2F());
+    EXPECT_FLOAT_EQ(replaced.context.interpolation(), 1.0f);
+    ASSERT_TRUE(replacement.uninit());
+    emitter->resetPresentation();
+    auto reset = world->sample_entity(*emitter, PresentationContext(0.25f));
+    EXPECT_EQ(reset.offset, Vec2F());
+    EXPECT_FLOAT_EQ(reset.context.interpolation(), 1.0f);
     ASSERT_TRUE(world->render(display, 0, std::nullopt, PresentationContext()));
-    auto advanced = findNewborn();
+    EXPECT_EQ(emitter->light_collections, 1u);
+    auto advanced = find_newborn();
     ASSERT_TRUE(advanced);
-    auto travel = world->geometry().diff(advanced->position, newborn.position);
+    auto travel = world->geometry().diff(advanced->get().position, newborn.position);
     EXPECT_NEAR(travel[0], 1.0f, 1e-4f);
     EXPECT_NEAR(travel[1], 0.0f, 1e-4f);
-    EXPECT_NEAR(advanced->timeToLive, 2.0f - dt, 1e-6f);
+    EXPECT_NEAR(advanced->get().timeToLive, 2.0f - dt, 1e-6f);
     ASSERT_TRUE(world->removeEntity(emitter->entityId(), false));
+
+    auto parameters_data = net_store_visitable_world_parameters(world->currentTemplate()->worldParameters());
+    ASSERT_TRUE(parameters_data);
+    auto parameters = net_load_visitable_world_parameters(std::move(*parameters_data));
+    ASSERT_TRUE(parameters && *parameters);
+    auto metadata = root.imageMetadataDatabase();
+    ASSERT_TRUE(metadata);
+    auto image = Drawable::make_image(**metadata, "/rendering/sprites/error.png", 1.0f, false, newborn.position);
+    ASSERT_TRUE(image);
+    List<Directives> choices{Directives("?flipx"), Directives("?flipy"), Directives("?hueshift=27")};
+    for (unsigned mode = 0; mode != 3; ++mode) {
+      auto& options = (*parameters)->globalDirectives;
+      options.reset();
+      if (mode == 1)
+        options.emplace();
+      if (mode == 2)
+        options = choices;
+      auto encoded = net_store_visitable_world_parameters(*parameters);
+      ASSERT_TRUE(encoded);
+      ASSERT_TRUE(world->handleIncomingPackets({std::make_shared<WorldParametersUpdatePacket>(std::move(*encoded))}));
+      auto probe = std::make_shared<PresentationLifecycleEntity>(root);
+      probe->image = *image;
+      ASSERT_TRUE(world->addEntity(probe));
+      auto expected_directive = [&](EntityId id) {
+        return mode == 2 ? choices[static_cast<unsigned>(id) % choices.size()].string() : String();
+      };
+      auto expected = expected_directive(probe->entityId());
+      AssetPath tick_marker(std::string_view{Star::format("/rendering/sprites/error.png?hueshift={}", 10 + mode)});
+      AssetPath removal_marker(std::string_view{Star::format("/rendering/sprites/error.png?hueshift={}", 20 + mode)});
+      probe->next_particle = newborn;
+      probe->next_particle->type = Particle::Type::Textured;
+      probe->next_particle->image = tick_marker;
+      auto damage = std::make_shared<DamageNotificationPacket>();
+      auto& hit = damage->remoteDamageNotification.damage_notification;
+      hit.target_entity_id = -19;
+      hit.position = newborn.position + Vec2F{static_cast<float>(mode) * 4, 0};
+      hit.damage_source_kind = "presentation-directive-test";
+      hit.target_material_kind = "organic";
+      ASSERT_TRUE(world->handleIncomingPackets({damage}));
+      ASSERT_TRUE(world->update(dt));
+      ASSERT_TRUE(world->render(display, 0, std::nullopt, PresentationContext()));
+      bool saw_image = false;
+      for (auto const& entity : display.entity_drawables) {
+        for (auto const& [layer, drawables] : entity.layers) {
+          if (layer != probe->fixture_layer || drawables.empty())
+            continue;
+          ASSERT_EQ(drawables.size(), 1u);
+          EXPECT_EQ(drawables.front().image_part().image.directives.to_string(), expected);
+          saw_image = true;
+        }
+      }
+      EXPECT_TRUE(saw_image);
+      probe->next_particle = newborn;
+      probe->next_particle->type = Particle::Type::Textured;
+      probe->next_particle->image = removal_marker;
+      ASSERT_TRUE(world->removeEntity(probe->entityId(), true));
+      ASSERT_TRUE(world->render(display, 0, std::nullopt, PresentationContext()));
+      bool saw_tick = false, saw_removal = false, saw_hit = false;
+      for (auto const& particle : display.particles) {
+        if (particle.type != Particle::Type::Textured)
+          continue;
+        if (particle.image == tick_marker || particle.image == removal_marker) {
+          EXPECT_EQ(particle.directives.to_string(), expected);
+          saw_tick |= particle.image == tick_marker;
+          saw_removal |= particle.image == removal_marker;
+        } else if (particle.image.base_path == "/rendering/sprites/error.png" && particle.image.directives.empty()
+            && world->geometry().diff(particle.position, hit.position).magnitude() < 0.5f) {
+          EXPECT_EQ(particle.directives.to_string(), expected_directive(hit.target_entity_id));
+          saw_hit = true;
+        }
+      }
+      EXPECT_TRUE(saw_tick);
+      EXPECT_TRUE(saw_removal);
+      EXPECT_TRUE(saw_hit);
+    }
 
     // Exercise the real incoming death-packet path, including its optional
     // interpolation timer. Every intervening live tick and the final removal
     // may collect once, never both regular and teardown passes in one tick.
-    for (bool failCollection : {false, true}) {
+    for (bool fail_collection : {false, true}) {
       auto slave = std::make_shared<PresentationLifecycleEntity>(root);
-      slave->failCollection = failCollection;
+      slave->fail_collection = fail_collection;
       ASSERT_TRUE(world->addEntity(slave));
       ASSERT_TRUE(slave->inWorld());
       auto id = slave->entityId();
@@ -316,14 +513,14 @@ const GameTestRegistration presentationRemovalLifecycle(
     }
 
     auto master = std::make_shared<PresentationLifecycleEntity>(root);
-    master->failCollection = true;
+    master->fail_collection = true;
     ASSERT_TRUE(world->addEntity(master));
     ASSERT_TRUE(master->promote(*world));
-    auto masterId = master->entityId();
-    EXPECT_FALSE(world->removeEntity(masterId, true));
-    EXPECT_TRUE(world->entity(masterId));
+    auto master_id = master->entityId();
+    EXPECT_FALSE(world->removeEntity(master_id, true));
+    EXPECT_TRUE(world->entity(master_id));
     EXPECT_EQ(master->destructions, 0u);
     EXPECT_EQ(master->uninitializations, 0u);
-    ASSERT_TRUE(world->removeEntity(masterId, false));
+    ASSERT_TRUE(world->removeEntity(master_id, false));
     ASSERT_TRUE((*universe)->close());
   });

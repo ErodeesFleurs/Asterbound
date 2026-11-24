@@ -348,7 +348,7 @@ std::expected<void, StarException> ContainerObject::update(float dt, std::uint64
   return {};
 }
 
-std::expected<void, StarException> ContainerObject::collectRenderEvents(RenderCallback& renderCallback) {
+std::expected<void, StarException> ContainerObject::collectRenderEvents(RenderCallback& render_callback) {
   auto assetsResult = root().assets();
   if (!assetsResult)
     return std::unexpected(std::move(assetsResult.error()));
@@ -387,7 +387,7 @@ std::expected<void, StarException> ContainerObject::collectRenderEvents(RenderCa
           auto instance = std::move(*instanceResult);
           instance->set_position(position());
           instance->set_range_multiplier(config()->soundEffectRangeMultiplier);
-          auto operation1 = renderCallback.addAudio(std::move(instance));
+          auto operation1 = render_callback.add_audio(std::move(instance));
           if (!operation1)
             return std::unexpected(std::move(operation1.error()));
         }
@@ -432,7 +432,7 @@ std::expected<void, StarException> ContainerObject::collectRenderEvents(RenderCa
           auto instance = std::move(*instanceResult);
           instance->set_position(position());
           instance->set_range_multiplier(config()->soundEffectRangeMultiplier);
-          auto operation2 = renderCallback.addAudio(std::move(instance));
+          auto operation2 = render_callback.add_audio(std::move(instance));
           if (!operation2)
             return std::unexpected(std::move(operation2.error()));
         }
@@ -454,11 +454,11 @@ std::expected<void, StarException> ContainerObject::collectRenderEvents(RenderCa
       m_animationFrameCooldown = 0;
     }
   }
-  return Object::collectRenderEvents(renderCallback);
+  return Object::collectRenderEvents(render_callback);
 }
 
-std::expected<void, StarException> ContainerObject::destroy(std::optional<std::reference_wrapper<RenderCallback>> renderCallback) {
-  auto operation1 = Object::destroy(renderCallback);
+std::expected<void, StarException> ContainerObject::destroy(std::optional<std::reference_wrapper<RenderCallback>> render_callback) {
+  auto operation1 = Object::destroy(render_callback);
   if (!operation1)
     return std::unexpected(std::move(operation1.error()));
   if (isMaster()) {

@@ -62,11 +62,11 @@ public:
   [[nodiscard]] MessageResponseResult receiveMessage(String const& message, bool localMessage, JsonArray const& args = {});
   [[nodiscard]] std::expected<void, StarException> update(float dt);
 
-  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& renderCallback, Vec2F const& position);
+  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& render_callback, Vec2F const& position);
 
-  [[nodiscard]] std::expected<void, StarException> render(RenderCallback& renderCallback, Vec2F const& position);
+  [[nodiscard]] std::expected<void, StarException> render(RenderCallback& render_callback, Vec2F const& position);
 
-  [[nodiscard]] std::expected<void, StarException> renderLightSources(RenderCallback& renderCallback);
+  [[nodiscard]] std::expected<void, StarException> renderLightSources(RenderCallback& render_callback);
 private:
   Root& m_root;
   Json m_config;

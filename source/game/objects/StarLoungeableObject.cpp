@@ -92,8 +92,8 @@ std::expected<std::shared_ptr<LoungeableObject>, StarException> LoungeableObject
   return object;
 }
 
-std::expected<void, StarException> LoungeableObject::render(RenderCallback& renderCallback) {
-  auto operation2 = Object::render(renderCallback);
+std::expected<void, StarException> LoungeableObject::render(RenderCallback& render_callback) {
+  auto operation2 = Object::render(render_callback);
   if (!operation2)
     return std::unexpected(std::move(operation2.error()));
   if (!m_sitCoverImage.empty()) {
@@ -118,7 +118,7 @@ std::expected<void, StarException> LoungeableObject::render(RenderCallback& rend
           auto bounds = std::move(*boundsResult);
           drawable.scale(Vec2F(-1, 1), bounds.center());
         }
-        auto operation3 = renderCallback.addDrawable(std::move(drawable), RenderLayerObject + 2);
+        auto operation3 = render_callback.add_drawable(std::move(drawable), render_layer_object + 2);
         if (!operation3)
           return std::unexpected(std::move(operation3.error()));
       }
@@ -172,7 +172,7 @@ std::expected<std::shared_ptr<LoungeAnchor const>, StarException> LoungeableObje
   loungeAnchor->orientation = m_sitOrientation;
   // Layer all anchored entities one above the object layer, in top to bottom
   // order based on the anchor index.
-  loungeAnchor->loungeRenderLayer = RenderLayerObject + m_sitPositions.size() - positionIndex;
+  loungeAnchor->loungeRenderLayer = render_layer_object + m_sitPositions.size() - positionIndex;
 
   loungeAnchor->statusEffects = m_sitStatusEffects;
   loungeAnchor->effectEmitters = m_sitEffectEmitters;

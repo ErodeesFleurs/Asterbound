@@ -322,7 +322,7 @@ struct EffectEventSink : NullRenderCallback {
     particles.push_back(particle.position);
     return {};
   }
-  std::expected<void, StarException> addAudio(std::shared_ptr<AudioInstance> audio) override {
+  std::expected<void, StarException> add_audio(std::shared_ptr<AudioInstance> audio) override {
     if (accepted.size() == fail_at) {
       fail_at.reset();
       rejected_audio = std::move(audio);

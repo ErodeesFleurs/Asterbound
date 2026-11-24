@@ -126,7 +126,7 @@ private:
 
 template <typename Function>
 [[nodiscard]] std::expected<void, StarException> TileDrawer::forEachRenderTile(WorldRenderData const& renderData, RectI const& worldCoordRange, Function&& function) {
-  RectI indexRect = RectI::with_size(Vec2I(renderData.geometry.pdiff(worldCoordRange.min()[0], renderData.tileMinPosition[0]), worldCoordRange.min()[1] - renderData.tileMinPosition[1]), worldCoordRange.size());
+  RectI indexRect = RectI::with_size(Vec2I(renderData.geometry.pdiff(worldCoordRange.min()[0], renderData.tile_min_position[0]), worldCoordRange.min()[1] - renderData.tile_min_position[1]), worldCoordRange.size());
   indexRect.limit(RectI::with_size(Vec2I(0, 0), Vec2I(renderData.tiles.extents())));
   if (!indexRect.is_empty()) {
     for (int x = indexRect.x_min(); x < indexRect.x_max(); ++x) {

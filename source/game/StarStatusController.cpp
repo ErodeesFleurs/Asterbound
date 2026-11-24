@@ -784,7 +784,7 @@ std::expected<List<LightSource>, StarException> StatusController::lightSources(f
   return output;
 }
 
-std::expected<List<OverheadBar>, StarException> StatusController::overheadBars() {
+std::expected<List<OverheadBar>, StarException> StatusController::overhead_bars() {
   auto json = m_primaryScript.invoke<JsonArray>("overheadBars");
   if (!json) {
     if (json.error().is<LuaScriptError>()) return List<OverheadBar>{};

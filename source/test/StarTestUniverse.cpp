@@ -410,7 +410,7 @@ std::expected<List<Drawable>, StarException> TestUniverse::currentClientDrawable
     return std::unexpected(std::move(rendered.error()));
 
   List<Drawable> drawables;
-  for (auto& ed : renderData.entityDrawables) {
+  for (auto& ed : renderData.entity_drawables) {
     for (auto& p : ed.layers)
       drawables.append_range(std::move(p.second));
   }

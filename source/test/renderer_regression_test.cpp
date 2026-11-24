@@ -25,6 +25,7 @@ import star.line;
 import star.list;
 import star.poly;
 import star.ref_ptr;
+import star.world_render_data;
 
 using namespace Star;
 
@@ -416,6 +417,36 @@ class OpenGlRendererRegression : public RendererRegression {};
 class VulkanRendererRegression : public RendererRegression {
   bool vulkan() const override { return true; }
 };
+
+TEST_F(OpenGlRendererRegression, RekeyedLayersPreserveOverlappingPixelsAndEntityOrder) {
+  DrawablePainter painter(renderer, {});
+  WorldRenderData frame;
+  frame.entity_drawables.resize(2);
+  FrameLayers<EntityDrawableGroup> routes;
+  checked(renderer->loadConfig(json(R"({})")));
+  solid("layers", R"({"includeVBTextures":false})");
+  for (unsigned vehicle_layer : {10u, 30u, 5u}) {
+    frame.prepare_frame();
+    auto& first = frame.entity_drawables[0].layers;
+    auto& second = frame.entity_drawables[1].layers;
+    first.append(20u, Drawable::make_poly(PolyF(RectF(10, 10, 80, 50)), Color::rgb(0, 255, 0)));
+    first.append(vehicle_layer, Drawable::make_poly(PolyF(RectF(0, 0, Width, Height)), Color::rgb(255, 0, 0)));
+    second.append(20u, Drawable::make_poly(PolyF(RectF(25, 20, 70, 40)), Color::rgb(0, 0, 255)));
+    route_entity_drawables(routes, frame.entity_drawables);
+    checked(renderer->startFrame());
+    select("layers");
+    for (auto const& [key, groups] : routes)
+      for (auto const& group : groups)
+        for (auto const& drawable : group.drawables.get())
+          checked(painter.draw_drawable_projected(drawable, drawable.position, 1, 1));
+    auto image = pixels();
+    Pixel const red{255, 0, 0, 255};
+    expectPixel(image, Width, 5, 5, red);
+    expectPixel(image, Width, 15, 15, vehicle_layer > 20u ? red : Pixel{0, 255, 0, 255});
+    expectPixel(image, Width, 45, 32, vehicle_layer > 20u ? red : Pixel{0, 0, 255, 255});
+    checked(renderer->finishFrame());
+  }
+}
 
 TEST_F(OpenGlRendererRegression, ProjectedDrawableEdgesAndVertices) {
   DrawablePainter painter(renderer, {});

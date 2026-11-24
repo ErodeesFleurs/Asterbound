@@ -783,7 +783,7 @@ bool ToolUser::firingAlt() const {
   return ds;
 }
 
-[[nodiscard]] std::expected<void, StarException> ToolUser::collectRenderEvents(RenderCallback& renderCallback) {
+[[nodiscard]] std::expected<void, StarException> ToolUser::collectRenderEvents(RenderCallback& render_callback) {
   for (auto const& item : {m_primaryHandItem.get(), m_altHandItem.get()}) {
     if (auto active = as<ActiveItem>(item)) {
       auto audio = active->pullNewAudios();
@@ -791,9 +791,9 @@ bool ToolUser::firingAlt() const {
       auto particles = active->pullNewParticles();
       if (!particles) return std::unexpected(std::move(particles.error()));
       if (!m_suppress.get()) {
-        auto audioAdded = renderCallback.addAudios(std::move(*audio));
+        auto audioAdded = render_callback.add_audios(std::move(*audio));
         if (!audioAdded) return std::unexpected(std::move(audioAdded.error()));
-        auto particlesAdded = renderCallback.addParticles(std::move(*particles));
+        auto particlesAdded = render_callback.add_particles(std::move(*particles));
         if (!particlesAdded) return std::unexpected(std::move(particlesAdded.error()));
       }
     }
@@ -801,20 +801,20 @@ bool ToolUser::firingAlt() const {
   return {};
 }
 
-[[nodiscard]] std::expected<void, StarException> ToolUser::render(RenderCallback& renderCallback, bool, bool shifting, EntityRenderLayer renderLayer) {
+[[nodiscard]] std::expected<void, StarException> ToolUser::render(RenderCallback& render_callback, bool, bool shifting, EntityRenderLayer renderLayer) {
   if (m_suppress.get())
     return {};
   auto preview = as<PreviewTileTool>(m_primaryHandItem.get());
   if (!preview) preview = as<PreviewTileTool>(m_altHandItem.get());
   if (preview) {
-    auto tiles = preview->previewTiles(shifting);
+    auto tiles = preview->preview_tiles(shifting);
     if (!tiles) return std::unexpected(std::move(tiles.error()));
-    auto added = renderCallback.addTilePreviews(*tiles);
+    auto added = render_callback.add_tile_previews(std::move(*tiles));
     if (!added) return std::unexpected(std::move(added.error()));
   }
   for (auto const& item : {m_primaryHandItem.get(), m_altHandItem.get()}) {
     if (auto renderable = as<RenderableItem>(item)) {
-      auto rendered = renderable->render(renderCallback, renderLayer);
+      auto rendered = renderable->render(render_callback, renderLayer);
       if (!rendered) return std::unexpected(std::move(rendered.error()));
     }
   }
@@ -822,8 +822,8 @@ bool ToolUser::firingAlt() const {
     if (auto active = as<ActiveItem>(item)) {
       auto drawables = active->entityDrawables();
       if (!drawables) return std::unexpected(std::move(drawables.error()));
-      for (auto const& drawable : *drawables) {
-        auto added = renderCallback.addDrawable(drawable.first, drawable.second.value_or(renderLayer));
+      for (auto& drawable : *drawables) {
+        auto added = render_callback.add_drawable(std::move(drawable.first), drawable.second.value_or(renderLayer));
         if (!added) return std::unexpected(std::move(added.error()));
       }
     }

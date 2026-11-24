@@ -61,57 +61,110 @@ import star.cellular_lighting;
 
 namespace Star {
 
-struct EntityDrawables {
-  EntityHighlightEffect highlightEffect;
-  Map<EntityRenderLayer, List<Drawable>> layers;
+// Keep last frame's keys available for the whole submission: a new vehicle
+// must not steal a still-visible layer's list just because it renders first.
+// Reuse nodes absent for a full frame, expiring any unused spares next reset.
+template <std::movable T>
+class FrameLayers {
+public:
+  void prepare_frame() {
+    m_spares.clear();
+    for (auto it = m_layers.begin(); it != m_layers.end();) {
+      if (it->second.empty()) {
+        m_spares.insert(m_spares.end(), m_layers.extract(it++));
+      } else {
+        it->second.clear();
+        ++it;
+      }
+    }
+  }
+
+  void append(EntityRenderLayer key, T&& value) {
+    auto hint = m_layers.lower_bound(key);
+    if (hint == m_layers.end() || hint->first != key) {
+      if (m_spares.empty()) {
+        hint = m_layers.try_emplace(hint, key);
+      } else {
+        auto node = m_spares.extract(m_spares.begin());
+        node.key() = key;
+        hint = m_layers.insert(hint, std::move(node));
+      }
+    }
+    hint->second.push_back(std::move(value));
+  }
+
+  auto begin() { return m_layers.begin(); }
+  auto end() { return m_layers.end(); }
+  auto begin() const { return m_layers.begin(); }
+  auto end() const { return m_layers.end(); }
+
+private:
+  std::map<EntityRenderLayer, List<T>> m_layers;
+  std::map<EntityRenderLayer, List<T>> m_spares;
 };
 
+struct EntityDrawables {
+  EntityHighlightEffect highlight_effect;
+  FrameLayers<Drawable> layers;
+};
+
+struct EntityDrawableGroup {
+  EntityHighlightEffect highlight_effect;
+  std::reference_wrapper<List<Drawable> const> drawables;
+};
+
+inline void route_entity_drawables(FrameLayers<EntityDrawableGroup>& routes, List<EntityDrawables> const& entities) {
+  routes.prepare_frame();
+  for (auto const& entity : entities)
+    for (auto const& [key, drawables] : entity.layers)
+      if (!drawables.empty())
+        routes.append(key, {entity.highlight_effect, std::cref(drawables)});
+}
 
 struct WorldRenderData {
   // Reset transient frame data while retaining entity and particle sample slots.
   // WorldClient refills/truncates those slots before publishing the frame.
-  void prepareFrame();
+  void prepare_frame();
 
   WorldGeometry geometry;
 
-  Vec2I tileMinPosition;
+  Vec2I tile_min_position;
   RenderTileArray tiles;
-  Vec2I lightMinPosition;
-  Lightmap lightMap;
+  Vec2I light_min_position;
+  Lightmap light_map;
 
-  List<EntityDrawables> entityDrawables;
+  List<EntityDrawables> entity_drawables;
   List<Particle> particles;
 
-  List<OverheadBar> overheadBars;
+  List<OverheadBar> overhead_bars;
   List<Drawable> nametags;
 
-  List<Drawable> backgroundOverlays;
-  List<Drawable> foregroundOverlays;
+  List<Drawable> background_overlays;
+  List<Drawable> foreground_overlays;
 
-  List<ParallaxLayer> parallaxLayers;
+  List<ParallaxLayer> parallax_layers;
 
-  SkyRenderData skyRenderData;
+  SkyRenderData sky_render_data;
 
-  bool isFullbright = false;
-  float dimLevel = 0.0f;
-  Vec3B dimColor;
+  bool is_fullbright = false;
+  float dim_level = 0.0f;
+  Vec3B dim_color;
 };
 
-inline void WorldRenderData::prepareFrame() {
+inline void WorldRenderData::prepare_frame() {
   tiles.clear(); // Retain storage for the next frame.
 
-  for (auto& entity : entityDrawables) {
-    entity.highlightEffect = {};
-    for (auto& layer : entity.layers)
-      layer.second.clear();
+  for (auto& entity : entity_drawables) {
+    entity.highlight_effect = {};
+    entity.layers.prepare_frame();
   }
   // ParticleManager overwrites numeric presentation state in retained slots;
   // destroying them here would discard cached immutable payload every frame.
-  overheadBars.clear();
+  overhead_bars.clear();
   nametags.clear();
-  backgroundOverlays.clear();
-  foregroundOverlays.clear();
-  parallaxLayers.clear();
+  background_overlays.clear();
+  foreground_overlays.clear();
+  parallax_layers.clear();
 }
 
 }
@@ -119,6 +172,9 @@ inline void WorldRenderData::prepareFrame() {
 export module star.world_render_data;
 
 export namespace Star {
+  using ::Star::FrameLayers;
+  using ::Star::EntityDrawableGroup;
+  using ::Star::route_entity_drawables;
   using ::Star::EntityDrawables;
   using ::Star::WorldRenderData;
 }

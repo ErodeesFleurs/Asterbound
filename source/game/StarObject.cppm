@@ -130,15 +130,15 @@ public:
 
   [[nodiscard]] std::expected<bool, StarException> shouldDestroy() const override;
   [[nodiscard]] std::expected<void, StarException>
-  destroy(std::optional<std::reference_wrapper<RenderCallback>> renderCallback) override;
+  destroy(std::optional<std::reference_wrapper<RenderCallback>> render_callback) override;
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::uint64_t currentStep) override;
 
-  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& renderCallback) override;
+  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& render_callback) override;
 
-  [[nodiscard]] std::expected<void, StarException> render(RenderCallback& renderCallback) override;
+  [[nodiscard]] std::expected<void, StarException> render(RenderCallback& render_callback) override;
 
-  [[nodiscard]] std::expected<void, StarException> renderLightSources(RenderCallback& renderCallback) override;
+  [[nodiscard]] std::expected<void, StarException> renderLightSources(RenderCallback& render_callback) override;
 
   [[nodiscard]] std::expected<bool, StarException> checkBroken() override;
 
@@ -288,8 +288,8 @@ private:
 
   // Lights are sampled for display; emissions are collected once per logic tick.
   [[nodiscard]] std::expected<List<LightSource>, StarException> lightSources(NetworkedAnimator::Sample const* sample) const;
-  [[nodiscard]] std::expected<void, StarException> collectParticles(RenderCallback& renderCallback);
-  [[nodiscard]] std::expected<void, StarException> collectSounds(RenderCallback& renderCallback);
+  [[nodiscard]] std::expected<void, StarException> collectParticles(RenderCallback& render_callback);
+  [[nodiscard]] std::expected<void, StarException> collectSounds(RenderCallback& render_callback);
 
   List<std::shared_ptr<ObjectOrientation>> const& getOrientations() const;
 

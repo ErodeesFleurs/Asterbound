@@ -446,7 +446,7 @@ std::expected<void, StarException> ChatBubbleManager::render(WorldClient const& 
         if (!entity || !bubble.instance || bubble.instance->lock() != entity)
           return {};
         auto origin = m_camera.screenToWorld(state.ideal_destination);
-        origin += world.geometry().diff(world.renderPosition(bubble.entity, presentation), entity->position());
+        origin += world.sample_entity(*entity, presentation).offset;
         auto screen_position = camera.worldToScreen(origin)
             + state.sample_offset(bubble.presentation_epoch == entity->presentationEpoch() ? presentation.interpolation() : 1.0f);
         auto fade = calc_distance_fade_alpha(screen_position, *m_bubble_fade_function, camera);
@@ -469,7 +469,7 @@ std::expected<void, StarException> ChatBubbleManager::render(WorldClient const& 
       continue;
     if (portrait_bubble.onscreen) {
       auto position = portrait_bubble.position;
-      position += world.geometry().diff(world.renderPosition(portrait_bubble.entity, presentation), entity->position());
+      position += world.sample_entity(*entity, presentation).offset;
       Vec2F screen_pos = camera.worldToScreen(position + m_bubble_offset);
       int frame = 0;
       if (portrait_bubble.age <= m_portrait_chatter_duration)

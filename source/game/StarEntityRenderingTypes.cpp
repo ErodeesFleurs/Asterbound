@@ -3,15 +3,7 @@ import std;
 import star.json;
 import star.color;
 import star.string;
-import star.data_stream;
-import star.list;
-import star.image_processing;
-import star.hash;
 import star.string_view;
-import star.thread;
-import star.directives;
-import star.asset_path;
-import star.drawable;
 import star.bi_map;
 import star.vector;
 import star.game_types;
@@ -23,136 +15,89 @@ import star.format;
 
 namespace Star {
 
-std::expected<EntityRenderLayer, StarException> parseRenderLayer(String renderLayer) {
-  static auto const RenderLayerMap = []() -> std::expected<CaseInsensitiveStringMap<EntityRenderLayer>, StarException> {
-    std::initializer_list<std::pair<String, EntityRenderLayer>> layers{
-    {"BackgroundOverlay", RenderLayerBackgroundOverlay},
-    {"BackgroundTile", RenderLayerBackgroundTile},
-    {"Platform", RenderLayerPlatform},
-    {"Plant", RenderLayerPlant},
-    {"PlantDrop", RenderLayerPlantDrop},
-    {"Object", RenderLayerObject},
-    {"PreviewObject", RenderLayerPreviewObject},
-    {"BackParticle", RenderLayerBackParticle},
-    {"Vehicle", RenderLayerVehicle},
-    {"Effect", RenderLayerEffect},
-    {"Projectile", RenderLayerProjectile},
-    {"Monster", RenderLayerMonster},
-    {"Npc", RenderLayerNpc},
-    {"Player", RenderLayerPlayer},
-    {"ItemDrop", RenderLayerItemDrop},
-    {"Liquid", RenderLayerLiquid},
-    {"MiddleParticle", RenderLayerMiddleParticle},
-    {"ForegroundTile", RenderLayerForegroundTile},
-    {"ForegroundEntity", RenderLayerForegroundEntity},
-    {"ForegroundOverlay", RenderLayerForegroundOverlay},
-    {"FrontParticle", RenderLayerFrontParticle},
-    {"Overlay", RenderLayerOverlay},
-    };
-    CaseInsensitiveStringMap<EntityRenderLayer> result;
-    for (auto const& [name, layer] : layers) {
-      auto key = CaseInsensitiveString::create(name);
-      if (!key) return std::unexpected(std::move(key.error()));
-      result.set(std::move(*key), layer);
-    }
-    return result;
-  }();
-
-  int offset = 0;
-  auto plus = renderLayer.contains("+");
-  if (!plus)
-    return std::unexpected(std::move(plus.error()));
-  auto minus = renderLayer.contains("-");
-  if (!minus)
-    return std::unexpected(std::move(minus.error()));
-  if (*plus || *minus) {
-    auto parts = renderLayer.split(*plus ? "+" : "-", 1);
-    if (!parts)
-      return std::unexpected(std::move(parts.error()));
-    auto name = parts->at(0);
-    if (!name)
-      return std::unexpected(std::move(name.error()));
-    auto amount = parts->at(1);
-    if (!amount)
-      return std::unexpected(std::move(amount.error()));
-    auto parsed = lexical_cast<int>(amount->get());
-    if (!parsed)
-      return std::unexpected(std::move(parsed.error()));
-    renderLayer = name->get();
-    offset = *plus ? *parsed : -*parsed;
-  }
-
-  if (!RenderLayerMap)
-    return std::unexpected(RenderLayerMap.error());
-  auto key = CaseInsensitiveStringView::create(renderLayer);
-  if (!key)
-    return std::unexpected(std::move(key.error()));
-  auto layer = RenderLayerMap->get(*key);
-  if (!layer)
-    return std::unexpected(std::move(layer.error()));
-  return layer->get() + offset;
+namespace {
+constexpr auto render_layer_names = std::to_array<std::pair<EntityRenderLayer, std::string_view>>({
+    {render_layer_background_overlay, "BackgroundOverlay"},
+    {render_layer_background_tile, "BackgroundTile"},
+    {render_layer_platform, "Platform"},
+    {render_layer_plant, "Plant"},
+    {render_layer_plant_drop, "PlantDrop"},
+    {render_layer_object, "Object"},
+    {render_layer_preview_object, "PreviewObject"},
+    {render_layer_back_particle, "BackParticle"},
+    {render_layer_vehicle, "Vehicle"},
+    {render_layer_effect, "Effect"},
+    {render_layer_projectile, "Projectile"},
+    {render_layer_monster, "Monster"},
+    {render_layer_npc, "Npc"},
+    {render_layer_player, "Player"},
+    {render_layer_item_drop, "ItemDrop"},
+    {render_layer_liquid, "Liquid"},
+    {render_layer_middle_particle, "MiddleParticle"},
+    {render_layer_foreground_tile, "ForegroundTile"},
+    {render_layer_foreground_entity, "ForegroundEntity"},
+    {render_layer_foreground_overlay, "ForegroundOverlay"},
+    {render_layer_front_particle, "FrontParticle"},
+    {render_layer_overlay, "Overlay"},
+});
 }
 
-PreviewTile::PreviewTile()
-  : foreground(false),
-    liqId(EmptyLiquidId),
-    matId(NullMaterialId),
-    hueShift(0),
-    updateMatId(false),
-    colorVariant(DefaultMaterialColorVariant),
-    updateLight(false) {}
+std::expected<EntityRenderLayer, StarException> parse_render_layer(StringView render_layer) {
+  auto name = render_layer.utf8();
+  // '+' has priority even when '-' appears earlier in the spelling.
+  auto separator = name.find('+');
+  bool subtract = separator == std::string_view::npos;
+  if (subtract)
+    separator = name.find('-');
+  EntityRenderLayer offset = 0;
+  if (separator != std::string_view::npos) {
+    auto amount = lexical_cast<int>(name.substr(separator + 1));
+    if (!amount) {
+      // Legacy delimiter searches diagnose malformed UTF-8 before a bad
+      // number, but only if the searches actually traverse those bytes.
+      for (StringView sign : {StringView("+"), StringView("-")}) {
+        if (auto found = render_layer.contains(sign); !found)
+          return std::unexpected(std::move(found.error()));
+      }
+      return std::unexpected(std::move(amount.error()));
+    }
+    offset = static_cast<EntityRenderLayer>(*amount);
+    if (subtract)
+      offset = 0u - offset;
+    name = name.substr(0, separator);
+  }
+  auto layer = enum_value<render_layer_names>(name);
+  if (!layer)
+    return std::unexpected(std::move(layer.error()));
+  return *layer + offset;
+}
 
 PreviewTile::PreviewTile(
-    Vec2I const& position, bool foreground, MaterialId matId, MaterialHue hueShift, bool updateMatId)
-  : position(position),
-    foreground(foreground),
-    liqId(EmptyLiquidId),
-    matId(matId),
-    hueShift(hueShift),
-    updateMatId(updateMatId),
-    colorVariant(DefaultMaterialColorVariant),
-    updateLight(false) {}
+    Vec2I const& position, bool foreground, MaterialId mat_id, MaterialHue hue_shift, bool update_mat_id)
+  : position(position), foreground(foreground), mat_id(mat_id), hue_shift(hue_shift), update_mat_id(update_mat_id) {}
 
-PreviewTile::PreviewTile(Vec2I const& position, bool foreground, Vec3B const& light, bool updateLight)
-  : position(position),
-    foreground(foreground),
-    liqId(EmptyLiquidId),
-    matId(NullMaterialId),
-    hueShift(0),
-    updateMatId(false),
-    colorVariant(DefaultMaterialColorVariant),
-    light(light),
-    updateLight(updateLight) {}
+PreviewTile::PreviewTile(Vec2I const& position, bool foreground, Vec3B const& light, bool update_light)
+  : position(position), foreground(foreground), light(light), update_light(update_light) {}
 
 PreviewTile::PreviewTile(Vec2I const& position,
     bool foreground,
-    MaterialId matId,
-    MaterialHue hueShift,
-    bool updateMatId,
+    MaterialId mat_id,
+    MaterialHue hue_shift,
+    bool update_mat_id,
     Vec3B const& light,
-    bool updateLight,
-    MaterialColorVariant colorVariant)
+    bool update_light,
+    MaterialColorVariant color_variant)
   : position(position),
     foreground(foreground),
-    liqId(EmptyLiquidId),
-    matId(matId),
-    hueShift(hueShift),
-    updateMatId(updateMatId),
-    colorVariant(colorVariant),
+    mat_id(mat_id),
+    hue_shift(hue_shift),
+    update_mat_id(update_mat_id),
+    color_variant(color_variant),
     light(light),
-    updateLight(updateLight) {}
+    update_light(update_light) {}
 
-PreviewTile::PreviewTile(Vec2I const& position, LiquidId liqId)
-  : position(position),
-    foreground(true),
-    liqId(liqId),
-    matId(NullMaterialId),
-    hueShift(0),
-    updateMatId(false),
-    colorVariant(DefaultMaterialColorVariant),
-    updateLight(false) {}
-
-OverheadBar::OverheadBar() : percentage(0.0f), detailOnly(false) {}
+PreviewTile::PreviewTile(Vec2I const& position, LiquidId liq_id)
+  : position(position), foreground(true), liq_id(liq_id) {}
 
 std::expected<OverheadBar, StarException> OverheadBar::create(Json const& json) {
   OverheadBar bar;
@@ -163,7 +108,7 @@ std::expected<OverheadBar, StarException> OverheadBar::create(Json const& json) 
     auto parsed = json_to_vec2f(**position);
     if (!parsed)
       return std::unexpected(std::move(parsed.error()));
-    bar.entityPosition = *parsed;
+    bar.entity_position = *parsed;
   }
   auto icon = json.opt_string("icon");
   if (!icon)
@@ -173,21 +118,21 @@ std::expected<OverheadBar, StarException> OverheadBar::create(Json const& json) 
   if (!percentage)
     return std::unexpected(std::move(percentage.error()));
   bar.percentage = *percentage;
-  auto colorConfig = json.get("color");
-  if (!colorConfig)
-    return std::unexpected(std::move(colorConfig.error()));
-  auto color = json_to_color(*colorConfig);
+  auto color_config = json.get("color");
+  if (!color_config)
+    return std::unexpected(std::move(color_config.error()));
+  auto color = json_to_color(*color_config);
   if (!color)
     return std::unexpected(std::move(color.error()));
   bar.color = std::move(*color);
-  auto detailOnly = json.get_bool("detailOnly", false);
-  if (!detailOnly)
-    return std::unexpected(std::move(detailOnly.error()));
-  bar.detailOnly = *detailOnly;
+  auto detail_only = json.get_bool("detailOnly", false);
+  if (!detail_only)
+    return std::unexpected(std::move(detail_only.error()));
+  bar.detail_only = *detail_only;
   return bar;
 }
 
-OverheadBar::OverheadBar(std::optional<String> icon, float percentage, Color color, bool detailOnly)
-  : icon(std::move(icon)), percentage(percentage), color(std::move(color)), detailOnly(detailOnly) {}
+OverheadBar::OverheadBar(std::optional<String> icon, float percentage, Color color, bool detail_only)
+  : icon(std::move(icon)), percentage(percentage), color(std::move(color)), detail_only(detail_only) {}
 
 }

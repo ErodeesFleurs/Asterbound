@@ -92,7 +92,7 @@ private:
   if (auto result = callbacks.register_callback("addDrawable", [&self = *this](Drawable drawable, std::optional<String> layerName) -> std::expected<void, StarException> {
     std::optional<EntityRenderLayer> layer;
     if (layerName) {
-      auto parsed = parseRenderLayer(*layerName);
+      auto parsed = parse_render_layer(*layerName);
       if (!parsed)
         return std::unexpected(std::move(parsed.error()));
       layer = *parsed;
@@ -112,7 +112,7 @@ private:
       return std::unexpected(std::move(drawable.error()));
     std::optional<EntityRenderLayer> layer;
     if (layerName) {
-      auto parsed = parseRenderLayer(*layerName);
+      auto parsed = parse_render_layer(*layerName);
       if (!parsed)
         return std::unexpected(std::move(parsed.error()));
       layer = *parsed;
