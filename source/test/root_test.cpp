@@ -84,6 +84,8 @@ import star.message_types;
 import star.uuid;
 import star.mixer;
 import star.world_client;
+import star.world_render_data;
+import star.entity_rendering_types;
 import star.warping;
 import star.data_stream_devices;
 import star.byte_array;
@@ -592,10 +594,8 @@ const GameTestRegistration prediction_liquid_update("WorldClientTest", "LiquidPa
   auto universe = TestUniverse::create(root, {100, 100});
   ASSERT_TRUE(universe) << universe.error().what();
   auto close = make_scope_exit([&] { EXPECT_TRUE((*universe)->close()); });
-  auto player = (*universe)->client()->mainPlayer();
-  auto uuid = player->uuid();
-  ASSERT_TRUE(uuid) << uuid.error().what();
-  ASSERT_TRUE((*universe)->warpPlayer(ClientShipWorldId(*uuid)));
+  (*universe)->client()->mainPlayer()->log()->setIntroComplete(true);
+  ASSERT_TRUE((*universe)->warpPlayer(InstanceWorldId("outpost")));
   auto world = (*universe)->worldClient();
   ASSERT_TRUE(world);
   auto materials = root.materialDatabase();
@@ -603,7 +603,7 @@ const GameTestRegistration prediction_liquid_update("WorldClientTest", "LiquidPa
   auto dirt = (*materials)->materialId("dirt");
   ASSERT_TRUE(dirt) << dirt.error().what();
   // A local packet batch gives us a known loaded neighborhood, independently
-  // of the ship layout. No network tick can acknowledge our pending edit.
+  // of the outpost layout. No network tick can acknowledge our pending edit.
   NetTile air;
   air.background = *dirt;
   air.foreground = EmptyMaterialId;
@@ -614,7 +614,7 @@ const GameTestRegistration prediction_liquid_update("WorldClientTest", "LiquidPa
   ASSERT_TRUE(patch->array.set_size({7, 7}, air));
   ASSERT_TRUE(world->handleIncomingPackets({patch}));
   Vec2I const position(11, 11);
-  auto change = world->applyTileModifications({{position, PlaceMaterial{TileLayer::Foreground, *dirt, 0, TileCollisionOverride::Block}}}, true);
+  auto change = world->applyTileModifications({{position, PlaceMaterial{TileLayer::Foreground, *dirt, 53, TileCollisionOverride::Block}}}, true);
   ASSERT_TRUE(change) << change.error().what();
   ASSERT_TRUE(change->empty());
   auto inside = Vec2F(position) + Vec2F(0.625f, 0.625f);
@@ -631,6 +631,41 @@ const GameTestRegistration prediction_liquid_update("WorldClientTest", "LiquidPa
   auto rebuilt = world->point_collision(inside);
   ASSERT_TRUE(rebuilt) << rebuilt.error().what();
   EXPECT_TRUE(*rebuilt) << "Neighbor refresh lost a foreground prediction after an unrelated liquid packet";
+
+  auto falling = (*materials)->materialId("redtoyblock");
+  auto cascading = (*materials)->materialId("sand");
+  ASSERT_TRUE(falling);
+  ASSERT_TRUE(cascading);
+  Vec2I const falling_pos(10, 11), cascading_pos(12, 11), invalid_pos(11, 12);
+  auto placements = world->applyTileModifications({
+      {falling_pos, PlaceMaterial{TileLayer::Foreground, *falling, 63}},
+      {cascading_pos, PlaceMaterial{TileLayer::Foreground, *cascading, 73}},
+      {invalid_pos, PlaceLiquid{1, 1.0f}}}, true);
+  ASSERT_TRUE(placements) << placements.error().what();
+  ASSERT_TRUE(placements->empty());
+  MaterialId missing = 0;
+  while (isRealMaterial(missing) && (*materials)->isValidMaterialId(missing))
+    ++missing;
+  ASSERT_TRUE(isRealMaterial(missing));
+  EXPECT_FALSE(world->applyTileModifications({{invalid_pos, PlaceMaterial{TileLayer::Foreground, missing, 83}}}, true));
+
+  world->setClientWindow(RectI::with_size({8, 8}, {7, 7}));
+  WorldRenderData frame;
+  auto rendered = world->render(frame, 0, std::nullopt, PresentationContext());
+  ASSERT_TRUE(rendered) << rendered.error().what();
+  auto predicted_tile = [&](Vec2I pos) -> RenderTile const& {
+    auto index = pos - frame.tile_min_position;
+    return frame.tiles(index[0], index[1]);
+  };
+  EXPECT_EQ(predicted_tile(position).foreground, *dirt);
+  EXPECT_EQ(predicted_tile(position).foregroundHueShift, 53);
+  for (auto pos : {falling_pos, cascading_pos}) {
+    EXPECT_EQ(predicted_tile(pos).foreground, StructureMaterialId);
+    EXPECT_EQ(predicted_tile(pos).foregroundHueShift, air.foregroundHueShift);
+  }
+  EXPECT_EQ(predicted_tile(invalid_pos).foreground, EmptyMaterialId);
+  EXPECT_EQ(predicted_tile(invalid_pos).liquidId, 1);
+  EXPECT_EQ(predicted_tile(invalid_pos).liquidLevel, 255);
 });
 
 const GameTestRegistration signed_broadcast_lifecycle("RootTest", "SignedBroadcastPublicationAndKeyReplacement", [](GameTest& fixture) {

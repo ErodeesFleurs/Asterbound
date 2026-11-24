@@ -377,95 +377,101 @@ std::expected<void, StarException> LiquidWorld::liquid_collision(Vec2I const& li
 }
 
 std::expected<std::shared_ptr<FallingBlocksWorld>, StarException> FallingBlocksWorld::create(WorldServer& world) {
-  auto result = std::shared_ptr<FallingBlocksWorld>(new FallingBlocksWorld(world));
+  struct MakeShared final : FallingBlocksWorld {
+    explicit MakeShared(WorldServer& world) : FallingBlocksWorld(world) {}
+  };
   auto materials = world.root().materialDatabase();
   if (!materials) return std::unexpected(std::move(materials.error()));
-  result->m_materialDatabase = std::move(*materials);
+  auto result = std::make_shared<MakeShared>(world);
+  result->m_material_database = std::move(*materials);
   return result;
 }
 
-std::expected<FallingBlockType, StarException> FallingBlocksWorld::blockType(Vec2I const& pos) {
-  auto autoconsttileResult1 = m_worldServer.getServerTile(pos, true);
-  if (!autoconsttileResult1) return std::unexpected(std::move(autoconsttileResult1.error()));
-  auto const& tile = std::move(autoconsttileResult1->get());
-  if (tile.rootSource) {
-    return FallingBlockType::Immovable;
-  } if (tile.foreground == EmptyMaterialId) {
-    if (auto condition80 = [&]() -> std::expected<bool, StarException> {
-            auto conditionResult1 = m_worldServer.tileIsOccupied(pos, TileLayer::Foreground);
-      if (!conditionResult1) return std::unexpected(std::move(conditionResult1.error()));
-      auto condition = std::move((*conditionResult1));
-      return static_cast<bool>(condition);
-    }(); !condition80)
-      return std::unexpected(std::move(condition80.error()));
-    else if (*condition80)
-      return FallingBlockType::Immovable;
-    else
-      return FallingBlockType::Open;
-  } else if (auto condition79 = [&]() -> std::expected<bool, StarException> {
-        auto conditionResult1 = m_materialDatabase->isCascadingFallingMaterial(tile.foreground);
-    if (!conditionResult1) return std::unexpected(std::move(conditionResult1.error()));
-    auto condition = std::move((*conditionResult1));
-    return static_cast<bool>(condition);
-  }(); !condition79)
-    return std::unexpected(std::move(condition79.error()));
-  else if (*condition79) {
-    return FallingBlockType::Cascading;
-  } else if (auto condition78 = [&]() -> std::expected<bool, StarException> {
-        auto conditionResult1 = m_materialDatabase->isFallingMaterial(tile.foreground);
-    if (!conditionResult1) return std::unexpected(std::move(conditionResult1.error()));
-    auto condition = std::move((*conditionResult1));
-    return static_cast<bool>(condition);
-  }(); !condition78)
-    return std::unexpected(std::move(condition78.error()));
-  else if (*condition78) {
-    return FallingBlockType::Falling;
-  } else {
-    return FallingBlockType::Immovable;
+std::expected<FallingBehavior, StarException> FallingBlocksWorld::source_behavior(Vec2I const& pos) {
+  auto geometry = m_world_server.geometry();
+  auto location = geometry.xwrap(pos);
+  auto y = location[1];
+  if (y < 0 || std::cmp_greater(y, geometry.height()))
+    return FallingBehavior::Stationary;
+  if (std::cmp_less(y, geometry.height())) {
+    auto tile = m_world_server.getServerTile(location, true);
+    if (!tile) return std::unexpected(std::move(tile.error()));
+    if (!tile->get().rootSource && tile->get().foreground != EmptyMaterialId) {
+      auto behavior = m_material_database->falling_behavior(tile->get().foreground);
+      if (!behavior || *behavior != FallingBehavior::Stationary)
+        return behavior;
+    }
   }
+
+  // The old below probe also requested its sector. Keep that request when
+  // skipping a stationary source would otherwise leave a different sector asleep.
+  if (y > 0 && (y % world_sector_size == 0 || std::cmp_equal(y, geometry.height()))) {
+    auto signaled = m_world_server.signalRegion(RectI::with_size({location[0], y - 1}, {1, 1}));
+    if (!signaled) return std::unexpected(std::move(signaled.error()));
+  }
+  return FallingBehavior::Stationary;
 }
 
-std::expected<void, StarException> FallingBlocksWorld::moveBlock(Vec2I const& from, Vec2I const& to) {
-  auto& generationRoot = m_worldServer.root();
-  auto autofromTileResult1 = m_worldServer.modifyServerTile(from, true);
-  if (!autofromTileResult1) return std::unexpected(std::move(autofromTileResult1.error()));
-  auto fromTile = std::move((*autofromTileResult1));
-  auto autotoTileResult1 = m_worldServer.modifyServerTile(to, true);
-  if (!autotoTileResult1) return std::unexpected(std::move(autotoTileResult1.error()));
-  auto toTile = std::move((*autotoTileResult1));
-  if (!fromTile || !toTile)
-    return {};
+std::expected<bool, StarException> FallingBlocksWorld::target_open(Vec2I const& pos) {
+  auto geometry = m_world_server.geometry();
+  if (pos[1] < 0 || std::cmp_greater_equal(pos[1], geometry.height())) return false;
+  auto location = geometry.xwrap(pos);
+  auto tile = m_world_server.getServerTile(location, true);
+  if (!tile) return std::unexpected(std::move(tile.error()));
+  if (tile->get().rootSource || tile->get().foreground != EmptyMaterialId) return false;
+  auto occupied = m_world_server.tileIsOccupied(location, TileLayer::Foreground);
+  if (!occupied) return std::unexpected(std::move(occupied.error()));
+  return !*occupied;
+}
 
-  if (m_worldServer.isTileProtected(to)) {
-    auto rangeValuesResult1 = m_worldServer.destroyBlock(TileLayer::Foreground, from, true, true);
-    if (!rangeValuesResult1) return std::unexpected(std::move(rangeValuesResult1.error()));
-    auto rangeValues = std::move((*rangeValuesResult1));
-    for (auto const& drop : rangeValues) {
-      auto randomizedDrop = ItemDrop::createRandomizedDrop(generationRoot, drop, Vec2F(to));
-      if (!randomizedDrop)
-        return std::unexpected(std::move(randomizedDrop.error()));
-      auto dropAdded = m_worldServer.addEntity((*randomizedDrop));
-      if (!dropAdded)
-        return std::unexpected(std::move(dropAdded.error()));
-    }
-  } else {
-    toTile->get().foreground = fromTile->get().foreground;
-    toTile->get().foregroundMod = NoModId;
-    toTile->get().foregroundHueShift = fromTile->get().foregroundHueShift;
-    toTile->get().foregroundColorVariant = fromTile->get().foregroundColorVariant;
-    {
-      auto operationResult1 = m_materialDatabase->materialCollisionKind(toTile->get().foreground);
-      if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-      toTile->get().update_collision((*operationResult1));
-    }
+std::expected<BlockMoveResult, BlockMoveError> FallingBlocksWorld::move_block(Vec2I const& from, Vec2I const& to) {
+  auto geometry = m_world_server.geometry();
+  auto source_pos = geometry.xwrap(from);
+  auto target_pos = geometry.xwrap(to);
+  auto writable_tile = [&](Vec2I const& pos) -> std::expected<std::optional<std::reference_wrapper<ServerTile>>, StarException> {
+    if (pos[1] < 0 || std::cmp_greater_equal(pos[1], geometry.height())) return {};
+    return m_world_server.modifyServerTile(pos, true);
+  };
+  auto source_tile = writable_tile(source_pos);
+  if (!source_tile) return std::unexpected(BlockMoveError{std::move(source_tile.error())});
+  auto target_tile = writable_tile(target_pos);
+  if (!target_tile) return std::unexpected(BlockMoveError{std::move(target_tile.error())});
+  if (!*source_tile || !*target_tile) return BlockMoveResult::Unchanged;
+  auto& source = (*source_tile)->get();
+  auto& target = (*target_tile)->get();
+  if (source.foreground == EmptyMaterialId || target.foreground != EmptyMaterialId)
+    return BlockMoveResult::Unchanged;
 
-    fromTile->get().foreground = EmptyMaterialId;
-    fromTile->get().foregroundMod = NoModId;
-    fromTile->get().update_collision(CollisionKind::None);
-    m_worldServer.requestGlobalBreakCheck();
+  if (m_world_server.isTileProtected(target_pos)) {
+    auto material = source.foreground;
+    auto mod = source.foregroundMod;
+    auto drops = m_world_server.destroyBlock(TileLayer::Foreground, source_pos, true, true);
+    // destroyBlock can fail either before mutation or while notifying neighbors.
+    // A mod-only break is committed work even though the material still stands.
+    auto result = source.foreground != material || source.foregroundMod != mod
+        ? BlockMoveResult::Changed : BlockMoveResult::Unchanged;
+    if (!drops) return std::unexpected(BlockMoveError{std::move(drops.error()), result});
+    for (auto const& drop : *drops) {
+      auto entity = ItemDrop::createRandomizedDrop(m_world_server.root(), drop, Vec2F(target_pos));
+      if (!entity) return std::unexpected(BlockMoveError{std::move(entity.error()), result});
+      auto added = m_world_server.addEntity(*entity);
+      if (!added) return std::unexpected(BlockMoveError{std::move(added.error()), result});
+    }
+    return result;
   }
 
-  return {};
+  auto collision = m_material_database->materialCollisionKind(source.foreground);
+  if (!collision) return std::unexpected(BlockMoveError{std::move(collision.error())});
+  target.foreground = source.foreground;
+  target.foregroundMod = NoModId;
+  target.foregroundHueShift = source.foregroundHueShift;
+  target.foregroundColorVariant = source.foregroundColorVariant;
+  target.update_collision(*collision);
+  source.foreground = EmptyMaterialId;
+  source.foregroundMod = NoModId;
+  source.update_collision(CollisionKind::None);
+  m_world_server.requestGlobalBreakCheck();
+  return BlockMoveResult::Changed;
 }
 
 DungeonGeneratorWorld::DungeonGeneratorWorld(WorldServer& worldServer, bool markForActivation)

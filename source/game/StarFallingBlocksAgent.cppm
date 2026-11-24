@@ -1,81 +1,57 @@
 module;
-import star.format;
-import star.xx_hash;
-import star.json;
-import star.vector;
-import star.set;
-import star.map;
-import star.random;
-import star.game_types;
-import star.list;
-import star.bi_map;
 import std;
+import star.format;
+import star.list;
+import star.material_types;
+import star.random;
 import star.rect;
-import star.thread;
-import star.worker_pool;
-
-import star.sector_array_2d;
-import star.perlin;
-import star.weighted_pool;
-import star.color;
-import star.image_processing;
-import star.hash;
-import star.data_stream;
-import star.string_view;
-import star.directives;
-import star.asset_path;
-
-
-import star.collision_block;
-import star.liquid_types;
-import star.tile_damage;
-import star.tile_sector_array;
-import star.animation;
-import star.particle;
-import star.weather_types;
-import star.celestial_coordinate;
-import star.sky_types;
-import star.force_regions;
-import star.world_parameters;
-import star.celestial_parameters;
-import star.world_layout;
-import star.collision_generator;
-import star.world_tiles;
+import star.set;
+import star.vector;
 
 namespace Star {
 class Root;
 
-class MaterialDatabase;
+enum class BlockMoveResult { Unchanged, Changed };
 
-enum class FallingBlockType {
-  Immovable,
-  Falling,
-  Cascading,
-  Open
+struct BlockMoveError {
+  StarException cause;
+  BlockMoveResult result = BlockMoveResult::Unchanged;
 };
 
 class FallingBlocksFacade {
 public:
   virtual ~FallingBlocksFacade() = default;
 
-  [[nodiscard]] virtual std::expected<FallingBlockType, StarException> blockType(Vec2I const& pos) = 0;
-  [[nodiscard]] virtual std::expected<void, StarException> moveBlock(Vec2I const& from, Vec2I const& to) = 0;
+  [[nodiscard]] virtual std::expected<FallingBehavior, StarException> source_behavior(Vec2I const& pos) = 0;
+  [[nodiscard]] virtual std::expected<bool, StarException> target_open(Vec2I const& pos) = 0;
+  [[nodiscard]] virtual std::expected<BlockMoveResult, BlockMoveError> move_block(Vec2I const& from, Vec2I const& to) = 0;
 };
 
 class FallingBlocksAgent {
+  struct ConstructionKey { explicit ConstructionKey() = default; };
+
 public:
-  [[nodiscard]] static std::expected<std::shared_ptr<FallingBlocksAgent>, StarException> create(Root& root, std::shared_ptr<FallingBlocksFacade> worldFacade);
+  FallingBlocksAgent(ConstructionKey, std::shared_ptr<FallingBlocksFacade> facade, std::uint64_t seed, float probability);
+  [[nodiscard]] static std::expected<std::shared_ptr<FallingBlocksAgent>, StarException> create(Root& root, std::shared_ptr<FallingBlocksFacade> facade);
+  [[nodiscard]] static std::expected<std::shared_ptr<FallingBlocksAgent>, StarException> create(std::shared_ptr<FallingBlocksFacade> facade, std::uint64_t seed, double probability);
 
   [[nodiscard]] std::expected<void, StarException> update();
 
-  void visitLocation(Vec2I const& location);
-  void visitRegion(RectI const& region);
+  void visit_location(Vec2I const& location);
+  void visit_region(RectI const& region);
 
 private:
-  FallingBlocksAgent(Root& root, std::shared_ptr<FallingBlocksFacade> worldFacade);
+  void begin_wave(HashSet<Vec2I>& candidates);
+  [[nodiscard]] std::expected<std::optional<Vec2I>, StarException> choose_target(Vec2I const& pos);
+  void schedule_change(Vec2I const& from, Vec2I const& to);
+
   std::shared_ptr<FallingBlocksFacade> m_facade;
-  float m_immediateUpwardPropagateProbability;
+  float m_propagate_probability;
   HashSet<Vec2I> m_pending;
+  HashSet<Vec2I> m_next_wave;
+  List<Vec2I> m_positions;
+  std::size_t m_cursor = 0;
+  std::optional<bool> m_prefer_left;
   RandomSource m_random;
 };
 
@@ -84,8 +60,8 @@ private:
 export module star.falling_blocks_agent;
 
 export namespace Star {
-  using ::Star::FallingBlockType;
-  using ::Star::MaterialDatabase;
+  using ::Star::BlockMoveResult;
+  using ::Star::BlockMoveError;
   using ::Star::FallingBlocksFacade;
   using ::Star::FallingBlocksAgent;
 }

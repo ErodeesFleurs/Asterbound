@@ -130,6 +130,15 @@ import star.file;
 import star.algorithm;
 import star.vector;
 import star.json_extra;
+import star.falling_blocks_agent;
+import star.material_types;
+import star.material_database;
+import star.world_generation;
+import star.item;
+import star.item_drop;
+import star.rect;
+import star.object;
+import star.object_database;
 import star.format;
 
 #include "gtest/gtest.h"
@@ -156,6 +165,14 @@ struct WorldServerTestAccess {
   static std::expected<std::optional<std::uint64_t>, StarException> limit(WorldServer& world, Limit limit) {
     return world.processingLimit(limit);
   }
+
+  static std::expected<void, StarException> generate_queued_sectors(WorldServer& world) {
+    return world.m_worldStorage->generateQueue({});
+  }
+
+  static std::expected<void, StarException> unload_sectors(WorldServer& world) {
+    return world.m_worldStorage->unloadAll(true);
+  }
 };
 
 }
@@ -168,6 +185,246 @@ std::expected<std::shared_ptr<WorldServer>, StarException> createSchedulingWorld
   return WorldServer::create(root, Vec2U(2048, 2048), *storage);
 }
 }// namespace
+
+const GameTestRegistration falling_block_world_edges("FallingBlocksWorld", "UnloadedSectorEdgesAndWrappedMoves", [](GameTest& fixture) {
+  auto created = createSchedulingWorld(fixture.root());
+  ASSERT_TRUE(created) << created.error().what();
+  auto& world = **created;
+  auto close = make_scope_exit([&] { EXPECT_TRUE(world.close()); });
+  auto facade = FallingBlocksWorld::create(world);
+  ASSERT_TRUE(facade) << facade.error().what();
+  auto& blocks = **facade;
+  Vec2I source_pos(0, 1024), target_pos(-1, 1023);
+  auto cell = [](Vec2I const& pos) { return RectI::with_size(pos, {1, 1}); };
+  // The player's initial generation radius can include this seam. Start
+  // with an empty activation queue and explicitly unload the startup sectors.
+  ASSERT_TRUE(WorldServerTestAccess::generate_queued_sectors(world));
+  ASSERT_TRUE(WorldServerTestAccess::unload_sectors(world));
+  // No synchronous generation: the unloaded source is stationary, yet both
+  // it and the distinct sector below it must become active on queue drain.
+  ASSERT_EQ(world.regionActive(cell(source_pos)), false);
+  ASSERT_EQ(world.regionActive(cell({0, 1023})), false);
+  ASSERT_EQ(blocks.source_behavior(source_pos), FallingBehavior::Stationary);
+  ASSERT_TRUE(WorldServerTestAccess::generate_queued_sectors(world));
+  EXPECT_EQ(world.regionActive(cell(source_pos)), true);
+  EXPECT_EQ(world.regionActive(cell({0, 1023})), true);
+
+  ASSERT_TRUE(world.generateRegion(cell(target_pos)));
+  auto source_tile = world.modifyServerTile(source_pos);
+  auto target_tile = world.modifyServerTile({2047, 1023});
+  ASSERT_TRUE(source_tile && *source_tile && target_tile && *target_tile);
+  auto& source = (*source_tile)->get();
+  auto& target = (*target_tile)->get();
+  auto materials = fixture.root().materialDatabase();
+  ASSERT_TRUE(materials);
+  auto sand = (*materials)->materialId("sand");
+  ASSERT_TRUE(sand);
+  source.foreground = *sand;
+  source.foregroundHueShift = 29;
+  source.foregroundColorVariant = 3;
+  source.update_collision(CollisionKind::Block);
+  target.foreground = EmptyMaterialId;
+  target.update_collision(CollisionKind::None);
+  source.rootSource = source_pos;
+  EXPECT_EQ(blocks.source_behavior(source_pos), FallingBehavior::Stationary);
+  source.rootSource.reset();
+  EXPECT_EQ(blocks.source_behavior(source_pos), FallingBehavior::Cascading);
+  target.rootSource = source_pos;
+  EXPECT_EQ(blocks.target_open(target_pos), false);
+  target.rootSource.reset();
+  EXPECT_EQ(blocks.target_open(target_pos), true);
+  EXPECT_EQ(blocks.target_open({std::numeric_limits<int>::max(), 1023}), true);
+  EXPECT_EQ(blocks.target_open({0, std::numeric_limits<int>::max()}), false);
+
+  // An unavailable endpoint must not change the other end. A failed
+  // collision lookup must not install the source material or its appearance.
+  auto unavailable = blocks.move_block(source_pos, {0, -1});
+  ASSERT_TRUE(unavailable);
+  EXPECT_EQ(*unavailable, BlockMoveResult::Unchanged);
+  EXPECT_EQ(source.foreground, *sand);
+  MaterialId missing = 0;
+  while (missing < FirstMetaMaterialId && (*materials)->isValidMaterialId(missing)) ++missing;
+  ASSERT_LT(missing, FirstMetaMaterialId);
+  source.foreground = missing;
+  target.foregroundHueShift = 18;
+  target.foregroundColorVariant = 1;
+  auto failed = blocks.move_block(source_pos, target_pos);
+  ASSERT_FALSE(failed);
+  EXPECT_EQ(failed.error().result, BlockMoveResult::Unchanged);
+  EXPECT_EQ(source.foreground, missing);
+  EXPECT_EQ(target.foreground, EmptyMaterialId);
+  EXPECT_EQ(target.foregroundHueShift, 18);
+  EXPECT_EQ(target.foregroundColorVariant, 1);
+  EXPECT_EQ(target.getCollision(), CollisionKind::None);
+
+  source.foreground = *sand;
+  auto moved = blocks.move_block(source_pos, target_pos);
+  ASSERT_TRUE(moved) << moved.error().cause.what();
+  EXPECT_EQ(*moved, BlockMoveResult::Changed);
+  EXPECT_EQ(source.foreground, EmptyMaterialId);
+  EXPECT_EQ(source.getCollision(), CollisionKind::None);
+  EXPECT_EQ(target.foreground, *sand);
+  EXPECT_EQ(target.foregroundHueShift, 29);
+  EXPECT_EQ(target.foregroundColorVariant, 3);
+  EXPECT_EQ(target.getCollision(), CollisionKind::Block);
+  EXPECT_EQ(blocks.target_open(target_pos), false);
+});
+
+const GameTestRegistration falling_block_protection("FallingBlocksWorld", "ProtectedModOnlyAndMaterialDrops", [](GameTest& fixture) {
+  auto created = createSchedulingWorld(fixture.root());
+  ASSERT_TRUE(created) << created.error().what();
+  auto& world = **created;
+  auto close = make_scope_exit([&] { EXPECT_TRUE(world.close()); });
+  auto facade = FallingBlocksWorld::create(world);
+  ASSERT_TRUE(facade);
+  auto& blocks = **facade;
+  Vec2I source_pos(1024, 1025), target_pos(1024, 1024);
+  ASSERT_TRUE(world.generateRegion(RectI::with_size(target_pos, {1, 2})));
+  auto source_tile = world.modifyServerTile(source_pos);
+  auto target_tile = world.modifyServerTile(target_pos);
+  ASSERT_TRUE(source_tile && *source_tile && target_tile && *target_tile);
+  auto& source = (*source_tile)->get();
+  auto& target = (*target_tile)->get();
+  target.dungeonId = 17;
+  target.foreground = EmptyMaterialId;
+  world.setTileProtectionEnabled(true);
+  ASSERT_TRUE(world.setTileProtection(17, true));
+  auto materials = fixture.root().materialDatabase();
+  ASSERT_TRUE(materials);
+  auto sand = (*materials)->materialId("sand");
+  auto grass = (*materials)->modId("grass");
+  auto copper = (*materials)->modId("copper");
+  ASSERT_TRUE(sand && grass && copper);
+  auto drops = [&]() {
+    std::multiset<String> names;
+    for (auto id : world.entity_ids()) {
+      if (auto drop = as<ItemDrop>(world.entity(id)))
+        names.insert(drop->item()->name());
+    }
+    return names;
+  };
+  auto initial = drops();
+  source.foreground = *sand;
+  source.update_collision(CollisionKind::Block);
+  source.foregroundMod = *grass;
+  auto stripped = blocks.move_block(source_pos, target_pos);
+  ASSERT_TRUE(stripped) << stripped.error().cause.what();
+  EXPECT_EQ(*stripped, BlockMoveResult::Changed);
+  EXPECT_EQ(source.foreground, *sand);
+  EXPECT_EQ(source.foregroundMod, NoModId);
+  EXPECT_EQ(source.getCollision(), CollisionKind::Block);
+  EXPECT_EQ(target.foreground, EmptyMaterialId);
+  EXPECT_EQ(drops(), initial);
+
+  // A co-breaking mod and its material emit two distinct item entities.
+  source.foregroundMod = *copper;
+  auto broken = blocks.move_block(source_pos, target_pos);
+  ASSERT_TRUE(broken) << broken.error().cause.what();
+  EXPECT_EQ(*broken, BlockMoveResult::Changed);
+  EXPECT_EQ(source.foreground, EmptyMaterialId);
+  EXPECT_EQ(source.foregroundMod, NoModId);
+  EXPECT_EQ(source.getCollision(), CollisionKind::None);
+  EXPECT_EQ(target.foreground, EmptyMaterialId);
+  EXPECT_EQ(target.dungeonId, 17);
+  initial.insert("sand");
+  initial.insert("copperore");
+  EXPECT_EQ(drops(), initial);
+  auto again = blocks.move_block(source_pos, target_pos);
+  ASSERT_TRUE(again);
+  EXPECT_EQ(*again, BlockMoveResult::Unchanged);
+  EXPECT_EQ(drops(), initial);
+
+  // A chair occupies empty foreground spaces, independently of rooted
+  // material. Probe one of its actual footprint cells, not its bounding box.
+  Vec2I chair_pos(1032, 1024);
+  ASSERT_TRUE(world.generateRegion(RectI::with_size(chair_pos - Vec2I(3, 1), {7, 6})));
+  for (int x = -3; x <= 3; ++x) {
+    auto floor = world.modifyServerTile(chair_pos + Vec2I(x, -1));
+    ASSERT_TRUE(floor && *floor);
+    (*floor)->get().foreground = StructureMaterialId;
+    (*floor)->get().update_collision(CollisionKind::Block);
+  }
+  auto objects = fixture.root().objectDatabase();
+  ASSERT_TRUE(objects);
+  auto chair = (*objects)->createForPlacement(world, "woodenchair", chair_pos, Direction::Left);
+  ASSERT_TRUE(chair && *chair);
+  ASSERT_TRUE(world.addEntity(*chair));
+  auto spaces = (*chair)->spaces();
+  ASSERT_FALSE(spaces.empty());
+  auto occupied_pos = chair_pos + spaces.front();
+  auto occupied = world.getServerTile(occupied_pos);
+  ASSERT_TRUE(occupied);
+  ASSERT_EQ(occupied->get().foreground, EmptyMaterialId);
+  ASSERT_FALSE(occupied->get().rootSource);
+  EXPECT_EQ(blocks.target_open(occupied_pos), false);
+  EXPECT_EQ(blocks.source_behavior(occupied_pos), FallingBehavior::Stationary);
+});
+
+const GameTestRegistration falling_block_partial_drop("FallingBlocksWorld", "RetryAfterSecondProtectedDropFails", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto overlay = File::relative_to(*directory, "assets");
+  auto items = File::relative_to(overlay, "items/generic/crafting");
+  ASSERT_TRUE(File::create_directories(items));
+  // Only copper fails during ItemDrop::init. The first (sand) entity has
+  // already been published when the second addEntity reports the error.
+  ASSERT_TRUE(File::write_file(String(R"([{"op":"add","path":"/itemDrop","value":{"scripts":[false]}}])"),
+      File::relative_to(items, "copperore.item.patch")));
+  auto settings = fixture.rootSettings();
+  settings.assetSources.push_back(overlay);
+  settings.storageDirectory = File::relative_to(*directory, "storage");
+  settings.runtimeConfigFile = {};
+  settings.logDirectory = {};
+  settings.logFile = {};
+  settings.includeUGC = false;
+  auto root = Root::create(std::move(settings));
+  ASSERT_TRUE(root) << root.error().what();
+  auto created = createSchedulingWorld(**root);
+  ASSERT_TRUE(created) << created.error().what();
+  auto& world = **created;
+  auto close = make_scope_exit([&] { EXPECT_TRUE(world.close()); });
+  auto facade = FallingBlocksWorld::create(world);
+  ASSERT_TRUE(facade);
+  auto agent = FallingBlocksAgent::create(*facade, 471, 1);
+  ASSERT_TRUE(agent);
+  Vec2I source_pos(1024, 1025), target_pos(1024, 1024);
+  ASSERT_TRUE(world.generateRegion(RectI::with_size(target_pos, {1, 2})));
+  auto source_tile = world.modifyServerTile(source_pos);
+  auto target_tile = world.modifyServerTile(target_pos);
+  ASSERT_TRUE(source_tile && *source_tile && target_tile && *target_tile);
+  auto& source = (*source_tile)->get();
+  auto& target = (*target_tile)->get();
+  target.dungeonId = 17;
+  target.foreground = EmptyMaterialId;
+  world.setTileProtectionEnabled(true);
+  ASSERT_TRUE(world.setTileProtection(17, true));
+  auto materials = (*root)->materialDatabase();
+  ASSERT_TRUE(materials);
+  auto sand = (*materials)->materialId("sand");
+  auto copper = (*materials)->modId("copper");
+  ASSERT_TRUE(sand && copper);
+  source.foreground = *sand;
+  source.foregroundMod = *copper;
+  source.update_collision(CollisionKind::Block);
+  auto initial = world.entity_ids().size();
+  (*agent)->visit_location(source_pos);
+  auto failed = (*agent)->update();
+  ASSERT_FALSE(failed);
+  EXPECT_EQ(source.foreground, EmptyMaterialId);
+  EXPECT_EQ(source.foregroundMod, NoModId);
+  EXPECT_EQ(target.foreground, EmptyMaterialId);
+  ASSERT_EQ(world.entity_ids().size(), initial + 1);
+  unsigned sand_drops = 0;
+  for (auto id : world.entity_ids()) {
+    if (auto drop = as<ItemDrop>(world.entity(id)); drop && drop->item()->name() == "sand")
+      ++sand_drops;
+  }
+  EXPECT_EQ(sand_drops, 1u);
+  ASSERT_TRUE((*agent)->update());
+  ASSERT_TRUE((*agent)->update());
+  EXPECT_EQ(world.entity_ids().size(), initial + 1);
+});
 
 const GameTestRegistration serverRun("ServerTest", "Run", [](GameTest& fixture) {
   auto server = UniverseServer::create(fixture.root(), fixture.root().toStoragePath("universe"));

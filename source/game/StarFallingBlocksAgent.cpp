@@ -1,162 +1,164 @@
-import star.format;
-import star.xx_hash;
-import star.json;
-import star.vector;
-import star.set;
-import star.map;
-import star.random;
-import star.game_types;
-import star.list;
-import star.bi_map;
 import std;
-import star.rect;
-import star.thread;
-import star.worker_pool;
-
-import star.sector_array_2d;
-import star.perlin;
-import star.weighted_pool;
-import star.color;
-import star.image_processing;
-import star.hash;
-import star.data_stream;
-import star.string_view;
-import star.directives;
-import star.asset_path;
-import star.ordered_map;
-import star.io_device;
-import star.ref_ptr;
-import star.logging;
-import star.listener;
-
-import star.collision_block;
-import star.liquid_types;
-import star.tile_damage;
-import star.tile_sector_array;
-import star.animation;
-import star.particle;
-import star.weather_types;
-import star.celestial_coordinate;
-import star.sky_types;
-import star.force_regions;
-import star.world_parameters;
-import star.celestial_parameters;
-import star.world_layout;
-import star.collision_generator;
-import star.world_tiles;
-import star.asset_source;
 import star.assets;
-
-import star.configuration;
-import star.root;
-
 import star.falling_blocks_agent;
+import star.format;
+import star.json;
+import star.list;
+import star.material_types;
+import star.math_common;
+import star.random;
+import star.rect;
+import star.root;
+import star.set;
+import star.string;
+import star.vector;
 
-import star.algorithm;
 namespace Star {
 
-FallingBlocksAgent::FallingBlocksAgent(Root& root, std::shared_ptr<FallingBlocksFacade> worldFacade)
-  : m_facade(std::move(worldFacade)), m_random(root.random().next_u64()) {
+namespace {
+constexpr int coord_min = std::numeric_limits<int>::min();
+constexpr int coord_max = std::numeric_limits<int>::max();
 }
 
-std::expected<std::shared_ptr<FallingBlocksAgent>, StarException> FallingBlocksAgent::create(Root& root, std::shared_ptr<FallingBlocksFacade> worldFacade) {
-  auto result = std::shared_ptr<FallingBlocksAgent>(new FallingBlocksAgent(root, std::move(worldFacade)));
+FallingBlocksAgent::FallingBlocksAgent(ConstructionKey, std::shared_ptr<FallingBlocksFacade> facade, std::uint64_t seed, float probability)
+  : m_facade(std::move(facade)), m_propagate_probability(probability), m_random(seed) {}
+
+std::expected<std::shared_ptr<FallingBlocksAgent>, StarException> FallingBlocksAgent::create(Root& root, std::shared_ptr<FallingBlocksFacade> facade) {
+  auto seed = root.random().next_u64();
   auto assets = root.assets();
-  if (!assets) return std::unexpected(std::move(assets.error()));
+  if (!assets)
+    return std::unexpected(std::move(assets.error()));
   auto config = (*assets)->json("/worldserver.config:fallingBlocksImmediateUpwardPropogateProbability");
-  if (!config) return std::unexpected(std::move(config.error()));
-  auto probability = config->to_float();
-  if (!probability) return std::unexpected(std::move(probability.error()));
-  result->m_immediateUpwardPropagateProbability = *probability;
-  return result;
+  if (!config)
+    return std::unexpected(std::move(config.error()));
+  auto probability = config->to_double();
+  if (!probability)
+    return std::unexpected(std::move(probability.error()));
+  return create(std::move(facade), seed, *probability);
 }
 
-std::expected<void, StarException> FallingBlocksAgent::update() {
-  HashSet<Vec2I> processing = std::exchange(m_pending, {});
+std::expected<std::shared_ptr<FallingBlocksAgent>, StarException> FallingBlocksAgent::create(std::shared_ptr<FallingBlocksFacade> facade, std::uint64_t seed, double probability) {
+  if (!is_finite(probability) || probability < 0 || probability > 1)
+    return std::unexpected(StarException("fallingBlocksImmediateUpwardPropogateProbability must be finite and within [0, 1]"));
+  return std::make_shared<FallingBlocksAgent>(ConstructionKey{}, std::move(facade), seed, static_cast<float>(probability));
+}
 
-  while (!processing.empty()) {
-    List<Vec2I> positions;
-    for (auto const& pos : std::exchange(processing, {}))
-      positions.push_back(pos);
+void FallingBlocksAgent::begin_wave(HashSet<Vec2I>& candidates) {
+  m_positions.clear();
+  m_positions.reserve(candidates.size());
+  for (auto const& pos : candidates)
+    m_positions.push_back(pos);
+  // A retained bucket count would change iteration order before the next shuffle.
+  candidates = HashSet<Vec2I>{};
+  m_random.shuffle(m_positions);
+  m_positions.sort([](Vec2I const& a, Vec2I const& b) { return a[1] < b[1]; });
+  m_cursor = 0;
+}
 
-    m_random.shuffle(positions);
+std::expected<std::optional<Vec2I>, StarException> FallingBlocksAgent::choose_target(Vec2I const& pos) {
+  auto behavior = m_facade->source_behavior(pos);
+  if (!behavior)
+    return std::unexpected(std::move(behavior.error()));
+  if (*behavior == FallingBehavior::Stationary || pos[1] == coord_min)
+    return {};
 
-    positions.sort([](auto const& a, auto const& b) {
-        return a[1] < b[1];
-      });
+  Vec2I below{pos[0], pos[1] - 1};
+  auto open = m_facade->target_open(below);
+  if (!open)
+    return std::unexpected(std::move(open.error()));
+  if (*open)
+    return below;
+  if (*behavior != FallingBehavior::Cascading)
+    return {};
 
-    for (auto const& pos : positions) {
-      Vec2I belowPos = pos + Vec2I(0, -1);
-      Vec2I belowLeftPos = pos + Vec2I(-1, -1);
-      Vec2I belowRightPos = pos + Vec2I(1, -1);
-
-      auto thisBlockResult = m_facade->blockType(pos);
-
-
-      if (!thisBlockResult) return std::unexpected(std::move(thisBlockResult.error()));
-
-
-      FallingBlockType thisBlock = *thisBlockResult;
-      auto belowBlockResult = m_facade->blockType(belowPos);
-
-      if (!belowBlockResult) return std::unexpected(std::move(belowBlockResult.error()));
-
-      FallingBlockType belowBlock = *belowBlockResult;
-
-      std::optional<Vec2I> moveTo;
-
-      if (thisBlock == FallingBlockType::Falling) {
-        if (belowBlock == FallingBlockType::Open)
-          moveTo = belowPos;
-      } else if (thisBlock == FallingBlockType::Cascading) {
-        if (belowBlock == FallingBlockType::Open) {
-          moveTo = belowPos;
-        } else {
-          auto belowLeftBlockResult = m_facade->blockType(belowLeftPos);
-
-          if (!belowLeftBlockResult) return std::unexpected(std::move(belowLeftBlockResult.error()));
-
-          FallingBlockType belowLeftBlock = *belowLeftBlockResult;
-          auto belowRightBlockResult = m_facade->blockType(belowRightPos);
-
-          if (!belowRightBlockResult) return std::unexpected(std::move(belowRightBlockResult.error()));
-
-          FallingBlockType belowRightBlock = *belowRightBlockResult;
-
-          if (belowLeftBlock == FallingBlockType::Open && belowRightBlock == FallingBlockType::Open)
-            moveTo = m_random.next_bool() ? belowLeftPos : belowRightPos;
-          else if (belowLeftBlock == FallingBlockType::Open)
-            moveTo = belowLeftPos;
-          else if (belowRightBlock == FallingBlockType::Open)
-            moveTo = belowRightPos;
-        }
-      }
-
-      if (moveTo) {
-        if (auto r = m_facade->moveBlock(pos, *moveTo); !r) return std::unexpected(std::move(r.error()));
-        if (m_random.uniform_float() < m_immediateUpwardPropagateProbability) {
-          processing.add(pos + Vec2I(0, 1));
-          processing.add(pos + Vec2I(-1, 1));
-          processing.add(pos + Vec2I(1, 1));
-        }
-
-        visitLocation(pos);
-        visitLocation(*moveTo);
-      }
+  bool left = false;
+  if (pos[0] != coord_min) {
+    auto open_left = m_facade->target_open({pos[0] - 1, below[1]});
+    if (!open_left)
+      return std::unexpected(std::move(open_left.error()));
+    left = *open_left;
+  }
+  if (pos[0] != coord_max) {
+    auto open_right = m_facade->target_open({pos[0] + 1, below[1]});
+    if (!open_right)
+      return std::unexpected(std::move(open_right.error()));
+    if (*open_right) {
+      if (!left)
+        return Vec2I{pos[0] + 1, below[1]};
+      // Re-probe the world on a pre-commit retry, but keep the already drawn
+      // tie-breaker if both destinations are still open.
+      if (!m_prefer_left)
+        m_prefer_left = m_random.next_bool();
+      if (!*m_prefer_left)
+        return Vec2I{pos[0] + 1, below[1]};
     }
   }
+  if (left)
+    return Vec2I{pos[0] - 1, below[1]};
   return {};
 }
 
-void FallingBlocksAgent::visitLocation(Vec2I const& location) {
-  visitRegion(RectI::with_size(location, Vec2I(1, 1)));
+void FallingBlocksAgent::schedule_change(Vec2I const& from, Vec2I const& to) {
+  if (m_random.uniform_float() < m_propagate_probability && from[1] != coord_max) {
+    int y = from[1] + 1;
+    m_next_wave.add({from[0], y});
+    if (from[0] != coord_min)
+      m_next_wave.add({from[0] - 1, y});
+    if (from[0] != coord_max)
+      m_next_wave.add({from[0] + 1, y});
+  }
+  visit_location(from);
+  visit_location(to);
 }
 
-void FallingBlocksAgent::visitRegion(RectI const& region) {
-  for (int x = region.x_min() - 1; x <= region.x_max(); ++x) {
-    for (int y = region.y_min(); y <= region.y_max(); ++y) 
-      m_pending.add({x, y});
+std::expected<void, StarException> FallingBlocksAgent::update() {
+  if (m_positions.empty()) {
+    if (m_pending.empty())
+      return {};
+    begin_wave(m_pending);
   }
+
+  for (;;) {
+    while (m_cursor < m_positions.size()) {
+      auto const& from = m_positions[m_cursor];
+      auto to = choose_target(from);
+      if (!to)
+        return std::unexpected(std::move(to.error()));
+      if (*to) {
+        auto moved = m_facade->move_block(from, **to);
+        if (!moved && moved.error().result == BlockMoveResult::Unchanged)
+          return std::unexpected(std::move(moved.error().cause));
+        if (!moved || *moved == BlockMoveResult::Changed)
+          schedule_change(from, **to);
+        if (!moved) {
+          // Destruction committed before the error: never destroy or emit drops twice.
+          ++m_cursor;
+          m_prefer_left.reset();
+          return std::unexpected(std::move(moved.error().cause));
+        }
+      }
+      ++m_cursor;
+      m_prefer_left.reset();
+    }
+    if (m_next_wave.empty())
+      break;
+    begin_wave(m_next_wave);
+  }
+  m_positions.clear();
+  return {};
+}
+
+void FallingBlocksAgent::visit_location(Vec2I const& location) {
+  // The edited cell can support three cells across, on this row and the one above.
+  visit_region(RectI(location, {location[0] + (location[0] != coord_max), location[1] + (location[1] != coord_max)}));
+}
+
+void FallingBlocksAgent::visit_region(RectI const& region) {
+  // Inclusive upper bounds, matching the single-cell 3x2 footprint. Widen the
+  // loop counters so even an upper bound of INT_MAX has a representable successor.
+  for (std::int64_t x = region.x_min() - (region.x_min() != coord_min); x <= region.x_max(); ++x)
+    for (std::int64_t y = region.y_min(); y <= region.y_max(); ++y)
+      m_pending.add({static_cast<int>(x), static_cast<int>(y)});
 }
 
 }

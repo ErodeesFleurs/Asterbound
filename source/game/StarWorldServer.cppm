@@ -541,7 +541,7 @@ private:
   GameTimer m_tileEntityBreakCheckTimer;
 
   std::shared_ptr<LiquidCellEngine<LiquidId>> m_liquid_engine;
-  std::shared_ptr<FallingBlocksAgent> m_fallingBlocksAgent;
+  std::shared_ptr<FallingBlocksAgent> m_falling_blocks_agent;
   std::shared_ptr<Spawner> m_spawner;
 
   // Keep track of material spaces and roots registered by tile entities to

@@ -4293,61 +4293,62 @@ std::expected<void, StarException> WorldClient::renderCollisionDebug() {
 
 std::expected<void, StarException> WorldClient::inform_tile_prediction(Vec2I const& pos, TileModification const& modification) {
   auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
+  if (std::holds_alternative<PlaceMaterial>(modification)
+      && std::get<PlaceMaterial>(modification).layer == TileLayer::Foreground) {
+    auto const& placement = std::get<PlaceMaterial>(modification);
+    auto materials = root().materialDatabase();
+    if (!materials)
+      return std::unexpected(std::move(materials.error()));
+    auto behavior = (*materials)->falling_behavior(placement.material);
+    if (!behavior)
+      return std::unexpected(std::move(behavior.error()));
+    CollisionKind collision;
+    if (placement.collisionOverride == TileCollisionOverride::None) {
+      auto kind = (*materials)->materialCollisionKind(placement.material);
+      if (!kind)
+        return std::unexpected(std::move(kind.error()));
+      collision = *kind;
+    } else {
+      collision = collisionKindFromOverride(placement.collisionOverride);
+    }
+
+    auto& prediction = m_predicted_tiles[pos];
+    auto previous = prediction.collision;
+    bool stationary = *behavior == FallingBehavior::Stationary;
+    prediction.foreground = stationary ? placement.material : StructureMaterialId;
+    prediction.foregroundHueShift = stationary ? placement.materialHueShift : std::nullopt;
+    prediction.collision = collision;
+    prediction.time = now;
+    invalidate_prediction_change(pos, previous, collision);
+    return {};
+  }
+
   auto& p = m_predicted_tiles[pos];
   p.time = now;
   if (std::holds_alternative<PlaceMaterial>(modification)) {
-    auto const& placeMaterial = std::get<PlaceMaterial>(modification);
-    if (placeMaterial.layer == TileLayer::Foreground) {
-      auto result314 = this->root().materialDatabase();
-      if (!result314)
-        return std::unexpected(std::move(result314.error()));
-      auto materialDatabase = (std::move(*result314));
-      {
-        auto result316 = materialDatabase->isCascadingFallingMaterial(placeMaterial.material);
-        if (!result316)
-          return std::unexpected(std::move(result316.error()));
-        if (!(std::move(*result316))
-               && !materialDatabase->         isFallingMaterial(placeMaterial.material)) {
-          p.foreground = placeMaterial.material;
-          p.foregroundHueShift = placeMaterial.materialHueShift;
-        } else {
-          p.foreground = StructureMaterialId;
-        }
-      }
-      auto previous = p.collision;
-      if (placeMaterial.collisionOverride != TileCollisionOverride::None) {
-        p.collision = collisionKindFromOverride(placeMaterial.collisionOverride);
-      } else {
-        auto result317 = materialDatabase->materialCollisionKind(placeMaterial.material);
-        if (!result317)
-          return std::unexpected(std::move(result317.error()));
-        p.collision = (std::move(*result317));
-      }
-      invalidate_prediction_change(pos, previous, p.collision);
-    } else {
-      p.background = placeMaterial.material;
-      p.backgroundHueShift = placeMaterial.materialHueShift;
-    }
+    auto const& placement = std::get<PlaceMaterial>(modification);
+    p.background = placement.material;
+    p.backgroundHueShift = placement.materialHueShift;
   } else if (std::holds_alternative<PlaceMod>(modification)) {
-    auto const& placeMod = std::get<PlaceMod>(modification);
-    if (placeMod.layer == TileLayer::Foreground) {
-      p.foregroundMod = placeMod.mod;
+    auto const& place_mod = std::get<PlaceMod>(modification);
+    if (place_mod.layer == TileLayer::Foreground) {
+      p.foregroundMod = place_mod.mod;
     } else {
-      p.backgroundMod = placeMod.mod;
+      p.backgroundMod = place_mod.mod;
     }
   } else if (std::holds_alternative<PlaceMaterialColor>(modification)) {
-    auto const& placeColor = std::get<PlaceMaterialColor>(modification);
-    if (placeColor.layer == TileLayer::Foreground) {
-      p.foregroundColorVariant = placeColor.color;
+    auto const& place_color = std::get<PlaceMaterialColor>(modification);
+    if (place_color.layer == TileLayer::Foreground) {
+      p.foregroundColorVariant = place_color.color;
     } else {
-      p.backgroundColorVariant = placeColor.color;
+      p.backgroundColorVariant = place_color.color;
     }
   } else if (std::holds_alternative<PlaceLiquid>(modification)) {
-    auto const& placeLiquid = std::get<PlaceLiquid>(modification);
-    if (!p.liquid || p.liquid->liquid != placeLiquid.liquid) {
-      p.liquid = LiquidLevel(placeLiquid.liquid, placeLiquid.liquidLevel);
+    auto const& place_liquid = std::get<PlaceLiquid>(modification);
+    if (!p.liquid || p.liquid->liquid != place_liquid.liquid) {
+      p.liquid = LiquidLevel(place_liquid.liquid, place_liquid.liquidLevel);
     } else {
-      p.liquid->level += placeLiquid.liquidLevel;
+      p.liquid->level += place_liquid.liquidLevel;
     }
   }
   return {};

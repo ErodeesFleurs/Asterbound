@@ -153,9 +153,7 @@ public:
   [[nodiscard]]
   std::expected<bool, StarException> isSoil(MaterialId materialId) const;
   [[nodiscard]]
-  std::expected<bool, StarException> isFallingMaterial(MaterialId materialId) const;
-  [[nodiscard]]
-  std::expected<bool, StarException> isCascadingFallingMaterial(MaterialId materialId) const;
+  std::expected<FallingBehavior, StarException> falling_behavior(MaterialId material_id) const;
   [[nodiscard]]
   std::expected<bool, StarException> blocksLiquidFlow(MaterialId materialId) const;
 
@@ -198,8 +196,7 @@ private:
     bool foregroundOnly;
     bool supportsMods;
     bool soil;
-    bool falling;
-    bool cascading;
+    FallingBehavior falling_behavior = FallingBehavior::Stationary;
     bool blocksLiquidFlow;
 
     std::shared_ptr<MaterialRenderProfile const> materialRenderProfile;

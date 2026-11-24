@@ -3,6 +3,7 @@ import star.game_test;
 import star.image_metadata_database;
 import star.json;
 import star.map;
+import star.material_database;
 import star.material_render_profile;
 import star.material_types;
 import star.root;
@@ -28,6 +29,30 @@ TEST(MaterialHueTest, FiniteDegreesTruncateAndWrap) {
 }
 
 namespace {
+
+const GameTestRegistration material_falling_behavior("MaterialDatabaseTest", "FallingBehavior", [](GameTest& fixture) {
+  auto materials = fixture.root().materialDatabase();
+  ASSERT_TRUE(materials) << materials.error().what();
+  for (auto const& [name, expected] : {std::pair{String("dirt"), FallingBehavior::Stationary},
+                                      std::pair{String("redtoyblock"), FallingBehavior::Falling},
+                                      std::pair{String("sand"), FallingBehavior::Cascading}}) {
+    auto id = (*materials)->materialId(name);
+    ASSERT_TRUE(id) << id.error().what();
+    auto behavior = (*materials)->falling_behavior(*id);
+    ASSERT_TRUE(behavior) << behavior.error().what();
+    EXPECT_EQ(*behavior, expected);
+  }
+  for (auto id : {FirstMetaMaterialId, StructureMaterialId, EmptyMaterialId, NullMaterialId}) {
+    auto behavior = (*materials)->falling_behavior(id);
+    ASSERT_TRUE(behavior) << behavior.error().what();
+    EXPECT_EQ(*behavior, FallingBehavior::Stationary);
+  }
+  MaterialId missing = 0;
+  while (isRealMaterial(missing) && (*materials)->isValidMaterialId(missing))
+    ++missing;
+  ASSERT_TRUE(isRealMaterial(missing));
+  EXPECT_FALSE((*materials)->falling_behavior(missing));
+});
 
 const GameTestRegistration
   materialRuleJoinNames("MaterialRenderProfile", "RuleJoinNamesPreserveDefaultsCaseAndErrors", [](GameTest& fixture) {

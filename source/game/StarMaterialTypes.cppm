@@ -7,6 +7,7 @@ namespace Star {
 
 using MaterialId = std::uint16_t;
 using MaterialHue = std::uint8_t;
+enum class FallingBehavior : std::uint8_t { Stationary, Falling, Cascading };
 
 // Empty and non-colliding.
 inline constexpr MaterialId EmptyMaterialId = 65535;
@@ -105,6 +106,7 @@ export module star.material_types;
 export namespace Star {
   using ::Star::MaterialId;
   using ::Star::MaterialHue;
+  using ::Star::FallingBehavior;
   using ::Star::EmptyMaterialId;
   using ::Star::NullMaterialId;
   using ::Star::StructureMaterialId;

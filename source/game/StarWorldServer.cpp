@@ -1749,9 +1749,9 @@ std::expected<void, StarException> WorldServer::update(float dt) {
   if (!result176)
     return std::unexpected(std::move(result176.error()));
   if (std::move(*result176)) {
-    auto result177 = m_fallingBlocksAgent->update();
-    if (!result177)
-      return std::unexpected(std::move(result177.error()));
+    auto updated = m_falling_blocks_agent->update();
+    if (!updated)
+      return std::unexpected(std::move(updated.error()));
   }
 
   auto result178 = shouldRunThisStep(UpdateTiming::BlockDamage);
@@ -2224,7 +2224,7 @@ std::expected<TileModificationList, StarException> WorldServer::replaceTiles(Til
     if (!result234)
       return std::unexpected(std::move(result234.error()));
     m_liquid_engine->visit_location(pair.first);
-    m_fallingBlocksAgent->visitLocation(pair.first);
+    m_falling_blocks_agent->visit_location(pair.first);
   }
 
   return failures;
@@ -2911,13 +2911,13 @@ std::expected<void, StarException> WorldServer::init(bool firstTime) {
   for (auto const& liquid_settings : liquidsDatabase->allLiquidSettings())
     m_liquid_engine->set_liquid_tick_delta(liquid_settings->id, liquid_settings->tickDelta);
 
-  auto fallingBlocksWorld = FallingBlocksWorld::create(*this);
-  if (!fallingBlocksWorld)
-    return std::unexpected(std::move(fallingBlocksWorld.error()));
-  auto result315 = FallingBlocksAgent::create(this->root(), std::move(*fallingBlocksWorld));
-  if (!result315)
-    return std::unexpected(std::move(result315.error()));
-  m_fallingBlocksAgent = std::move(*result315);
+  auto falling_world = FallingBlocksWorld::create(*this);
+  if (!falling_world)
+    return std::unexpected(std::move(falling_world.error()));
+  auto falling_agent = FallingBlocksAgent::create(root, std::move(*falling_world));
+  if (!falling_agent)
+    return std::unexpected(std::move(falling_agent.error()));
+  m_falling_blocks_agent = std::move(*falling_agent);
 
   // Dungeon and spawned entity scripts may query wind or weather while the
   // initial world regions are being generated, so domains must exist first.
@@ -3150,7 +3150,7 @@ std::expected<TileModificationList, StarException> WorldServer::doApplyTileModif
         if (!result341)
           return std::unexpected(std::move(result341.error()));
         m_liquid_engine->visit_location(pos);
-        m_fallingBlocksAgent->visitLocation(pos);
+        m_falling_blocks_agent->visit_location(pos);
       }
 
       auto result343 = queueTileUpdates(pos);
@@ -3243,7 +3243,7 @@ std::expected<TileModificationList, StarException> WorldServer::doApplyTileModif
       if (!result354)
         return std::unexpected(std::move(result354.error()));
       m_liquid_engine->visit_location(pos);
-      m_fallingBlocksAgent->visitLocation(pos);
+      m_falling_blocks_agent->visit_location(pos);
     }
 
     it = unapplied.erase(current);
@@ -3310,7 +3310,7 @@ std::expected<void, StarException> WorldServer::updateTileEntityTiles(std::share
         updatedTile = collision_changed = true;
       if (collision_changed) {
         m_liquid_engine->visit_location(pos);
-        m_fallingBlocksAgent->visitLocation(pos);
+        m_falling_blocks_agent->visit_location(pos);
         WorldImpl::invalidate_collision_cache(*m_tileArray, RectI::with_size(pos, {1, 1}));
       }
       if (updatedTile) {
@@ -3349,7 +3349,7 @@ std::expected<void, StarException> WorldServer::updateTileEntityTiles(std::share
       }
       if (collision_changed) {
         m_liquid_engine->visit_location(pos);
-        m_fallingBlocksAgent->visitLocation(pos);
+        m_falling_blocks_agent->visit_location(pos);
         WorldImpl::invalidate_collision_cache(*m_tileArray, RectI::with_size(pos, {1, 1}));
       }
       if (updatedTile) {
@@ -3637,7 +3637,7 @@ std::expected<List<ItemDescriptor>, StarException> WorldServer::destroyBlock(Til
     if (!result391)
       return std::unexpected(std::move(result391.error()));
     m_liquid_engine->visit_location(pos);
-    m_fallingBlocksAgent->visitLocation(pos);
+    m_falling_blocks_agent->visit_location(pos);
   }
   auto result392 = queueTileUpdates(pos);
   if (!result392)

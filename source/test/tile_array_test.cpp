@@ -3,6 +3,9 @@ import star.list;
 import star.multi_array;
 import star.set;
 import star.vector;
+import star.falling_blocks_agent;
+import star.material_types;
+import star.random;
 import star.thread;
 import star.worker_pool;
 
@@ -990,6 +993,208 @@ const GameTestRegistration effective_tile_collision("TileSectorArrayTest", "Obje
   EXPECT_FALSE(tile.collision_cache_dirty);
   EXPECT_TRUE(tile.update_object_collision(CollisionKind::None));
   EXPECT_EQ(tile.getCollision(), CollisionKind::Block);
+});
+
+using FallingMove = std::pair<Vec2I, Vec2I>;
+
+struct FallingGrid : FallingBlocksFacade {
+  enum class Fault { None, Source, Target, BeforeMove, AfterMove, Unwritable };
+  Fault fault = Fault::None;
+  Vec2I fault_pos{};
+  std::map<Vec2I, FallingBehavior> tiles;
+  std::vector<Vec2I> sources;
+  std::vector<Vec2I> targets;
+  std::vector<FallingMove> moves;
+
+  bool take_fault(Fault kind, Vec2I const& pos) {
+    if (kind != fault || pos != fault_pos)
+      return false;
+    fault = Fault::None;
+    return true;
+  }
+
+  std::expected<FallingBehavior, StarException> source_behavior(Vec2I const& pos) override {
+    if (take_fault(Fault::Source, pos))
+      return std::unexpected(StarException("source"));
+    sources.push_back(pos);
+    auto tile = tiles.find(pos);
+    return tile == tiles.end() ? FallingBehavior::Stationary : tile->second;
+  }
+
+  std::expected<bool, StarException> target_open(Vec2I const& pos) override {
+    if (take_fault(Fault::Target, pos))
+      return std::unexpected(StarException("target"));
+    targets.push_back(pos);
+    return !tiles.contains(pos);
+  }
+
+  std::expected<BlockMoveResult, BlockMoveError> move_block(Vec2I const& from, Vec2I const& to) override {
+    if (take_fault(Fault::Unwritable, from))
+      return BlockMoveResult::Unchanged;
+    if (take_fault(Fault::BeforeMove, from))
+      return std::unexpected(BlockMoveError{StarException("move")});
+    if (!tiles.contains(from) || tiles.contains(to))
+      return std::unexpected(BlockMoveError{StarException("invalid move")});
+    moves.emplace_back(from, to);
+    auto tile = tiles.extract(from);
+    tile.key() = to;
+    tiles.insert(std::move(tile));
+    if (take_fault(Fault::AfterMove, from))
+      return std::unexpected(BlockMoveError{StarException("drop"), BlockMoveResult::Changed});
+    return BlockMoveResult::Changed;
+  }
+};
+
+const GameTestRegistration falling_limits("FallingBlocksTest", "ProbabilityAndClippedNeighborhoods", [](GameTest&) {
+  auto grid = std::make_shared<FallingGrid>();
+  for (double p : {-0.01, 1.000000001, std::numeric_limits<double>::infinity(), std::numeric_limits<double>::quiet_NaN()})
+    EXPECT_FALSE(FallingBlocksAgent::create(grid, 1, p));
+  auto agent = FallingBlocksAgent::create(grid, 1, 1);
+  ASSERT_TRUE(agent);
+  constexpr int lo = std::numeric_limits<int>::min();
+  constexpr int hi = std::numeric_limits<int>::max();
+  (*agent)->visit_location({lo, lo});
+  (*agent)->visit_location({hi, hi});
+  grid->tiles[{lo, lo}] = FallingBehavior::Cascading;
+  grid->tiles[{hi, hi}] = FallingBehavior::Cascading;
+  grid->tiles[{hi, hi - 1}] = FallingBehavior::Stationary;
+  ASSERT_TRUE((*agent)->update());
+  EXPECT_EQ((std::set<Vec2I>(grid->sources.begin(), grid->sources.end())),
+      (std::set<Vec2I>{{lo, lo}, {lo, lo + 1}, {lo + 1, lo}, {lo + 1, lo + 1}, {hi - 1, hi}, {hi, hi}}));
+  EXPECT_EQ(grid->targets, (std::vector<Vec2I>{{hi, hi - 1}, {hi - 1, hi - 1}}));
+  EXPECT_EQ(grid->moves, (std::vector<FallingMove>{{{hi, hi}, {hi - 1, hi - 1}}}));
+});
+
+const GameTestRegistration falling_quiet("FallingBlocksTest", "StationaryAndUnwritableDoNotPropagate", [](GameTest&) {
+  auto grid = std::make_shared<FallingGrid>();
+  auto agent = FallingBlocksAgent::create(grid, 23, 1);
+  ASSERT_TRUE(agent);
+  (*agent)->visit_region(RectI(0, 0, 30, 30));
+  (*agent)->visit_location({3, 4});
+  grid->tiles[{3, 4}] = FallingBehavior::Falling;
+  grid->fault = FallingGrid::Fault::Unwritable;
+  grid->fault_pos = {3, 4};
+  ASSERT_TRUE((*agent)->update());
+  EXPECT_EQ(grid->sources.size(), 32u * 31u);
+  EXPECT_EQ(grid->targets, (std::vector<Vec2I>{{3, 3}}));
+  EXPECT_TRUE(grid->moves.empty());
+  grid->sources.clear();
+  ASSERT_TRUE((*agent)->update());
+  EXPECT_TRUE(grid->sources.empty());
+});
+
+const GameTestRegistration falling_column("FallingBlocksTest", "ImmediateColumnVersusNextTick", [](GameTest&) {
+  for (double probability : {0., 1.}) {
+    auto grid = std::make_shared<FallingGrid>();
+    auto agent = FallingBlocksAgent::create(grid, 91, probability);
+    ASSERT_TRUE(agent);
+    grid->tiles[{0, 0}] = FallingBehavior::Stationary;
+    for (int y = 2; y <= 5; ++y)
+      grid->tiles[{0, y}] = FallingBehavior::Falling;
+    (*agent)->visit_region(RectI(1, 2, 1, 2));
+    ASSERT_TRUE((*agent)->update());
+    std::vector<FallingMove> expected;
+    for (int y = 2; y <= (probability == 1 ? 5 : 2); ++y)
+      expected.emplace_back(Vec2I{0, y}, Vec2I{0, y - 1});
+    EXPECT_EQ(grid->moves, expected);
+    ASSERT_TRUE((*agent)->update());
+    if (probability == 0)
+      expected.emplace_back(Vec2I{0, 3}, Vec2I{0, 2});
+    EXPECT_EQ(grid->moves, expected);
+  }
+});
+
+const GameTestRegistration falling_contention("FallingBlocksTest", "SeededSlopeContention", [](GameTest&) {
+  // The first pair shares exactly one destination. Later independent two-sided
+  // slopes expose the subsequent direction draws, including the draw after a
+  // successful move at probability zero, but none after an unwritable move.
+  for (unsigned seed : {3u, 19u, 73u}) {
+    auto grid = std::make_shared<FallingGrid>();
+    auto agent = FallingBlocksAgent::create(grid, seed, 0);
+    ASSERT_TRUE(agent);
+    HashSet<Vec2I> candidates;
+    for (int x = 0; x <= 64; ++x)
+      candidates.add({x, 2});
+    (*agent)->visit_region(RectI(1, 2, 64, 2));
+    grid->tiles[{-1, 1}] = FallingBehavior::Stationary;
+    grid->tiles[{3, 1}] = FallingBehavior::Stationary;
+    for (int x = 0; x <= 64; x += x < 2 ? 2 : 4) {
+      grid->tiles[{x, 2}] = FallingBehavior::Cascading;
+      grid->tiles[{x, 1}] = FallingBehavior::Stationary;
+    }
+    grid->fault = FallingGrid::Fault::Unwritable;
+    grid->fault_pos = {10, 2};
+    RandomSource random(seed);
+    auto ordered = candidates.values();
+    random.shuffle(ordered);
+    ordered.sort([](Vec2I const& a, Vec2I const& b) { return a[1] < b[1]; });
+    bool contested = false;
+    std::vector<FallingMove> expected;
+    for (auto const& from : ordered) {
+      if (!grid->tiles.contains(from))
+        continue;
+      Vec2I to{1, 1};
+      if (from[0] <= 2) {
+        if (std::exchange(contested, true))
+          continue;
+      } else {
+        to[0] = from[0] + (random.next_bool() ? -1 : 1);
+      }
+      if (from == grid->fault_pos)
+        continue;
+      expected.emplace_back(from, to);
+      random.uniform_float();
+    }
+    ASSERT_TRUE((*agent)->update());
+    EXPECT_TRUE(std::ranges::equal(grid->sources, ordered));
+    EXPECT_EQ(grid->moves, expected);
+  }
+});
+
+const GameTestRegistration falling_resume("FallingBlocksTest", "ResumeTailNextWaveAndDeferredWork", [](GameTest&) {
+  using Fault = FallingGrid::Fault;
+  auto setup = [] {
+    auto grid = std::make_shared<FallingGrid>();
+    grid->tiles[{0, 2}] = FallingBehavior::Falling;
+    grid->tiles[{0, 3}] = FallingBehavior::Falling;
+    grid->tiles[{4, 4}] = FallingBehavior::Cascading;
+    grid->tiles[{4, 3}] = FallingBehavior::Stationary;
+    grid->tiles[{8, 5}] = FallingBehavior::Cascading;
+    grid->tiles[{8, 4}] = FallingBehavior::Stationary;
+    return grid;
+  };
+  auto prime = [](FallingBlocksAgent& agent) {
+    agent.visit_region(RectI(1, 2, 1, 2));
+    agent.visit_region(RectI(5, 4, 5, 4));
+    agent.visit_region(RectI(9, 5, 9, 5));
+  };
+  for (auto fault : {Fault::Source, Fault::Target, Fault::BeforeMove, Fault::AfterMove}) {
+    auto reference = setup();
+    auto grid = setup();
+    auto uninterrupted = FallingBlocksAgent::create(reference, 41, 1);
+    auto agent = FallingBlocksAgent::create(grid, 41, 1);
+    ASSERT_TRUE(uninterrupted && agent);
+    prime(**uninterrupted);
+    prime(**agent);
+    grid->fault = fault;
+    grid->fault_pos = fault == Fault::Target ? Vec2I{5, 3} : Vec2I{4, 4};
+    ASSERT_TRUE((*uninterrupted)->update());
+    ASSERT_FALSE((*agent)->update());
+    // New external edits during the interruption belong to the next tick.
+    (*agent)->visit_location({50, 50});
+    ASSERT_TRUE((*agent)->update());
+    EXPECT_EQ(grid->moves, reference->moves);
+    EXPECT_EQ(grid->tiles, reference->tiles);
+    if (fault == Fault::AfterMove)
+      EXPECT_EQ(std::ranges::count(grid->sources, Vec2I{4, 4}), 1);
+    EXPECT_EQ(std::ranges::count(grid->sources, Vec2I{0, 2}), 1);
+    EXPECT_EQ(std::ranges::count(grid->sources, Vec2I{50, 50}), 0);
+    // The ordinary source/target neighborhoods and external edit survived.
+    grid->sources.clear();
+    ASSERT_TRUE((*agent)->update());
+    EXPECT_EQ(std::ranges::count(grid->sources, Vec2I{50, 50}), 1);
+    EXPECT_GE(std::ranges::count(grid->sources, Vec2I{0, 1}), 1);
+  }
 });
 
 }

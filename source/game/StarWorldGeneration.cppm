@@ -113,13 +113,14 @@ class FallingBlocksWorld : public FallingBlocksFacade {
 public:
   [[nodiscard]] static std::expected<std::shared_ptr<FallingBlocksWorld>, StarException> create(WorldServer& world);
 
-  [[nodiscard]] std::expected<FallingBlockType, StarException> blockType(Vec2I const& pos) override;
-  [[nodiscard]] std::expected<void, StarException> moveBlock(Vec2I const& from, Vec2I const& to) override;
+  [[nodiscard]] std::expected<FallingBehavior, StarException> source_behavior(Vec2I const& pos) override;
+  [[nodiscard]] std::expected<bool, StarException> target_open(Vec2I const& pos) override;
+  [[nodiscard]] std::expected<BlockMoveResult, BlockMoveError> move_block(Vec2I const& from, Vec2I const& to) override;
 
 private:
-  explicit FallingBlocksWorld(WorldServer& world) : m_worldServer(world) {}
-  WorldServer& m_worldServer;
-  std::shared_ptr<MaterialDatabase const> m_materialDatabase;
+  explicit FallingBlocksWorld(WorldServer& world) : m_world_server(world) {}
+  WorldServer& m_world_server;
+  std::shared_ptr<MaterialDatabase const> m_material_database;
 };
 
 class DungeonGeneratorWorld : public DungeonGeneratorWorldFacade {

@@ -216,13 +216,15 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
         auto value = config->get_bool("falling", false);
         if (!value)
           return std::unexpected(std::move(value.error()));
-        material.falling = std::move(*value);
+        if (*value)
+          material.falling_behavior = FallingBehavior::Falling;
       }
       {
         auto value = config->get_bool("cascading", false);
         if (!value)
           return std::unexpected(std::move(value.error()));
-        material.cascading = std::move(*value);
+        if (*value)
+          material.falling_behavior = FallingBehavior::Cascading;
       }
       auto renderConfig = config->opt("renderTemplate");
       if (!renderConfig)
@@ -275,7 +277,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
         material.foregroundOnly = std::move(*value);
       }
       {
-        auto value = config->get_bool("supportsMods", !(material.falling || material.cascading || material.collisionKind != CollisionKind::Block));
+        auto value = config->get_bool("supportsMods", material.falling_behavior == FallingBehavior::Stationary && material.collisionKind == CollisionKind::Block);
         if (!value)
           return std::unexpected(std::move(value.error()));
         material.supportsMods = std::move(*value);
@@ -816,18 +818,11 @@ std::expected<ModId, StarException> MaterialDatabase::tilledModFor(MaterialId id
   return info->get().tillableMod;
 }
 
-std::expected<bool, StarException> MaterialDatabase::isFallingMaterial(MaterialId id) const {
-  if (!isRealMaterial(id)) return false;
-  auto info = getMaterialInfo(id);
+std::expected<FallingBehavior, StarException> MaterialDatabase::falling_behavior(MaterialId material_id) const {
+  if (!isRealMaterial(material_id)) return FallingBehavior::Stationary;
+  auto info = getMaterialInfo(material_id);
   if (!info) return std::unexpected(std::move(info.error()));
-  return info->get().falling;
-}
-
-std::expected<bool, StarException> MaterialDatabase::isCascadingFallingMaterial(MaterialId id) const {
-  if (!isRealMaterial(id)) return false;
-  auto info = getMaterialInfo(id);
-  if (!info) return std::unexpected(std::move(info.error()));
-  return info->get().cascading;
+  return info->get().falling_behavior;
 }
 
 std::expected<bool, StarException> MaterialDatabase::supportsMod(MaterialId materialId, ModId modId) const {
@@ -842,7 +837,7 @@ MaterialDatabase::MetaMaterialInfo::MetaMaterialInfo(String name, MaterialId id,
                                                      bool blocksLiquidFlow)
     : name(std::move(name)), id(id), collisionKind(collisionKind), blocksLiquidFlow(blocksLiquidFlow) {}
 
-MaterialDatabase::MaterialInfo::MaterialInfo() : id(NullMaterialId), tillableMod(NoModId), falling(), cascading() {}
+MaterialDatabase::MaterialInfo::MaterialInfo() : id(NullMaterialId), tillableMod(NoModId) {}
 
 MaterialDatabase::ModInfo::ModInfo() : id(NoModId), tilled(), breaksWithTile() {}
 

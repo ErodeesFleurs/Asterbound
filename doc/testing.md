@@ -619,6 +619,15 @@ with a conservative earliest-timestamp bound; negative smear, TTL changes and
 failed-insertion timestamps must remain covered. Filtered cleanup still visits
 every entry. Revisiting evicted cells re-executes their deterministic callbacks.
 
+### Falling blocks
+
+`FallingBlocksTest.*` exercises wave scheduling and retries; `FallingBlocksWorld.*`
+exercises server tiles, protection and drops. Keep immediate upward propagation
+separate from the next update's six-cell neighborhood. Compare ordered moves
+as well as final tiles: a shuffle or extra random draw can change which block
+wins a contested destination. The asset key retains its legacy spelling,
+`fallingBlocksImmediateUpwardPropogateProbability`.
+
 ### Entity splash particles
 
 Run `game_tests --gtest_filter='EntitySplashTest.*'` with real assets.
